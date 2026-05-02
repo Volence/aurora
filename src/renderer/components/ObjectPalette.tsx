@@ -1,0 +1,99 @@
+import React, { useRef } from 'react';
+import { useEditorStore } from '../state/editorStore';
+import { useProjectStore } from '../state/projectStore';
+
+interface ObjectPaletteProps {
+  selectedType: number;
+  onSelectType: (type: number, subtype?: number) => void;
+}
+
+export default function ObjectPalette({ selectedType, onSelectType }: ObjectPaletteProps) {
+  const filterRef = useRef<HTMLInputElement>(null);
+  const [filter, setFilter] = React.useState('');
+  const project = useProjectStore((s) => s.project);
+  const selectedObjectTypeId = useEditorStore((s) => s.selectedObjectTypeId);
+
+  const objectLibrary = project?.objectLibrary ?? [];
+
+  const matchesFilter = React.useCallback((def: { id: string; name: string }) => {
+    if (!filter) return true;
+    const q = filter.toLowerCase();
+    return def.name.toLowerCase().includes(q) || def.id.toLowerCase().includes(q);
+  }, [filter]);
+
+  const filtered = objectLibrary.filter(matchesFilter);
+
+  return (
+    <div style={styles.container}>
+      <div style={styles.header}>
+        <span>Object Palette</span>
+        <input
+          ref={filterRef}
+          style={styles.filter}
+          placeholder="Filter..."
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+        />
+      </div>
+      <div style={styles.list}>
+        {filtered.length === 0 && (
+          <div style={styles.empty}>
+            {objectLibrary.length === 0 ? 'No object library loaded' : 'No matches'}
+          </div>
+        )}
+        {filtered.map((def) => (
+          <button
+            key={def.id}
+            style={{
+              ...styles.entry,
+              ...(def.id === selectedObjectTypeId ? styles.entrySelected : {}),
+            }}
+            onClick={() => {
+              useEditorStore.getState().setSelectedObjectTypeId(def.id, def.defaultSubtype);
+            }}
+            title={`${def.id}: ${def.codeLabel}`}
+          >
+            <span style={styles.entryId}>{def.id}</span>
+            <span style={styles.entryName}>{def.name}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+const styles: Record<string, React.CSSProperties> = {
+  container: {
+    flex: 1, display: 'flex', flexDirection: 'column',
+    overflow: 'hidden',
+  },
+  header: {
+    padding: '8px 12px', display: 'flex', flexDirection: 'column', gap: 6,
+    borderBottom: '1px solid #313244',
+  },
+  filter: {
+    padding: '4px 8px', background: '#313244', color: '#cdd6f4',
+    border: '1px solid #45475a', borderRadius: 4, fontSize: 12,
+  },
+  list: {
+    flex: 1, overflow: 'auto', padding: 4,
+  },
+  empty: {
+    padding: 12, color: '#6c7086', fontSize: 12,
+  },
+  entry: {
+    display: 'flex', alignItems: 'center', gap: 8, width: '100%',
+    padding: '4px 8px', background: 'transparent', border: 'none',
+    color: '#cdd6f4', cursor: 'pointer', borderRadius: 4, fontSize: 12,
+    textAlign: 'left' as const,
+  },
+  entrySelected: {
+    background: '#313244', outline: '1px solid #89b4fa',
+  },
+  entryId: {
+    color: '#89b4fa', fontFamily: 'monospace', fontSize: 11, flexShrink: 0, width: 40,
+  },
+  entryName: {
+    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const,
+  },
+};

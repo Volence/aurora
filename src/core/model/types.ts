@@ -33,3 +33,28 @@ export {
   SF_NO_Y_WRAP,
   SF_PRESERVE_STATE,
 } from './s4-types';
+
+// Legacy types for backwards-compat with import/export modules (S2-era Tile->Block->Chunk hierarchy)
+export interface TileRef {
+  tileIndex: number;
+  xFlip: boolean;
+  yFlip: boolean;
+  palette: number;
+  priority: boolean;
+}
+
+export interface Block {
+  tiles: TileRef[];
+}
+
+export interface BlockRef {
+  blockIndex: number;
+  xFlip: boolean;
+  yFlip: boolean;
+  solidTop: boolean;
+  solidAll: boolean;
+}
+
+export interface Chunk {
+  blocks: BlockRef[];
+}
