@@ -1,9 +1,10 @@
 import { create } from 'zustand';
 import { EditHistory } from '../../core/editing/history';
 import type { AnyCommand, S4Level } from '../../core/editing/commands';
-import type { Level } from '../../core/model/types';
 
-export type EditorTool = 'view' | 'select' | 'place-object' | 'place-ring' | 'paint-chunk';
+export type EditorTool =
+  | 'view' | 'select' | 'paint-tile' | 'paint-block' | 'stamp-chunk'
+  | 'paint-collision' | 'eraser' | 'place-object' | 'place-ring';
 
 export interface Selection {
   type: 'object' | 'ring';
@@ -63,17 +64,27 @@ interface EditorState {
   multiSelection: MultiSelection | null;
   dirty: boolean;
   historyVersion: number;
-  selectedChunkIndex: number;
-  selectedObjectType: number;
+
+  // S4 tool state
+  activeSectionIndex: number;
+  selectedTileIndex: number;
+  selectedPaletteLine: number;
+  selectedChunkId: string | null;
+  selectedObjectTypeId: string | null;
   selectedObjectSubtype: number;
   selectedRingPattern: number;
+  selectedCollisionType: number;
 
   setTool: (tool: EditorTool) => void;
   setSelection: (selection: Selection | null) => void;
   setMultiSelection: (multiSelection: MultiSelection | null) => void;
-  setSelectedChunkIndex: (index: number) => void;
-  setSelectedObjectType: (type: number, subtype?: number) => void;
+  setActiveSectionIndex: (index: number) => void;
+  setSelectedTileIndex: (index: number) => void;
+  setSelectedPaletteLine: (line: number) => void;
+  setSelectedChunkId: (id: string | null) => void;
+  setSelectedObjectTypeId: (id: string | null, subtype?: number) => void;
   setSelectedRingPattern: (index: number) => void;
+  setSelectedCollisionType: (type: number) => void;
   markDirty: () => void;
   markClean: () => void;
   bumpVersion: () => void;
@@ -87,17 +98,26 @@ export const useEditorStore = create<EditorState>((set) => ({
   multiSelection: null,
   dirty: false,
   historyVersion: 0,
-  selectedChunkIndex: 0,
-  selectedObjectType: 0x02,
+
+  activeSectionIndex: 0,
+  selectedTileIndex: 0,
+  selectedPaletteLine: 0,
+  selectedChunkId: null,
+  selectedObjectTypeId: null,
   selectedObjectSubtype: 0,
   selectedRingPattern: 0,
+  selectedCollisionType: 0,
 
   setTool: (tool) => set({ tool, selection: null, multiSelection: null }),
   setSelection: (selection) => set({ selection, multiSelection: null }),
   setMultiSelection: (multiSelection) => set({ multiSelection, selection: null }),
-  setSelectedChunkIndex: (index) => set({ selectedChunkIndex: index }),
-  setSelectedObjectType: (type, subtype) => set({ selectedObjectType: type, selectedObjectSubtype: subtype ?? 0 }),
+  setActiveSectionIndex: (index) => set({ activeSectionIndex: index }),
+  setSelectedTileIndex: (index) => set({ selectedTileIndex: index }),
+  setSelectedPaletteLine: (line) => set({ selectedPaletteLine: line }),
+  setSelectedChunkId: (id) => set({ selectedChunkId: id }),
+  setSelectedObjectTypeId: (id, subtype) => set({ selectedObjectTypeId: id, selectedObjectSubtype: subtype ?? 0 }),
   setSelectedRingPattern: (index) => set({ selectedRingPattern: index }),
+  setSelectedCollisionType: (type) => set({ selectedCollisionType: type }),
   markDirty: () => set({ dirty: true }),
   markClean: () => set({ dirty: false }),
   bumpVersion: () => set((s) => ({ historyVersion: s.historyVersion + 1 })),
