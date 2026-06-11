@@ -201,12 +201,12 @@ export default function MapViewport() {
       // (set-palette-line / set-tileset-tiles) works from the keyboard path.
       const level: S4Level | null = getStoreActiveLevel(state);
 
-      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) {
         if (level) undo(level);
         e.preventDefault();
         return;
       }
-      if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key.toLowerCase() === 'z' && e.shiftKey))) {
         if (level) redo(level);
         e.preventDefault();
         return;

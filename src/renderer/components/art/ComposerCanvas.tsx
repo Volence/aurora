@@ -84,13 +84,24 @@ export default function ComposerCanvas() {
     return useArtStore.getState().open?.doc ?? null;
   }
 
+  /**
+   * Effective zoom for rendering: capped so the composed canvas never exceeds
+   * 16000px on its wider axis. Both render() and pointer-coordinate mapping
+   * must call this helper so clicks always land on the correct pixel.
+   */
+  function getEffectiveZoom(doc: ComposerDoc): number {
+    const s = useArtStore.getState();
+    const docPxWidth = doc.widthTiles * 8;
+    return Math.max(1, Math.min(s.zoom, Math.floor(16000 / (docPxWidth * (s.repeatPreview ? 3 : 1)))));
+  }
+
   /** Canvas-local px → doc pixel coords (accounts for repeat-preview offset). */
   function toDocPx(e: { clientX: number; clientY: number }): { x: number; y: number } | null {
     const canvas = canvasRef.current;
     const doc = getDoc();
     if (!canvas || !doc) return null;
     const rect = canvas.getBoundingClientRect();
-    const z = useArtStore.getState().zoom;
+    const z = getEffectiveZoom(doc);
     const pxW = doc.widthTiles * 8, pxH = doc.heightTiles * 8;
     const ox = useArtStore.getState().repeatPreview ? pxW * z : 0;
     const oy = useArtStore.getState().repeatPreview ? pxH * z : 0;
@@ -106,7 +117,7 @@ export default function ComposerCanvas() {
     const doc = getDoc();
     if (!canvas || !doc) return { x: 0, y: 0 };
     const rect = canvas.getBoundingClientRect();
-    const z = useArtStore.getState().zoom;
+    const z = getEffectiveZoom(doc);
     const pxW = doc.widthTiles * 8, pxH = doc.heightTiles * 8;
     const ox = useArtStore.getState().repeatPreview ? pxW * z : 0;
     const oy = useArtStore.getState().repeatPreview ? pxH * z : 0;
@@ -206,7 +217,7 @@ export default function ComposerCanvas() {
     const atlas = zone.tileset.tiles;
     const lines = zone.palette.lines;
     const pxW = doc.widthTiles * 8, pxH = doc.heightTiles * 8;
-    const z = useArtStore.getState().zoom;
+    const z = getEffectiveZoom(doc);
     const repeat = useArtStore.getState().repeatPreview;
 
     // Compose the doc at native resolution (one ImageData per 8x8 cell).
@@ -304,7 +315,7 @@ export default function ComposerCanvas() {
     const ctx = overlay.getContext('2d');
     if (!ctx) return;
     ctx.clearRect(0, 0, overlay.width, overlay.height);
-    const z = useArtStore.getState().zoom;
+    const z = getEffectiveZoom(doc);
     const repeat = useArtStore.getState().repeatPreview;
     const ox = repeat ? doc.widthTiles * 8 * z : 0;
     const oy = repeat ? doc.heightTiles * 8 * z : 0;
@@ -504,10 +515,12 @@ export default function ComposerCanvas() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [drawOverlay]);
 
-  const handlePointerUp = useCallback((e: React.PointerEvent) => {
-    const g = gestureRef.current;
-    gestureRef.current = null;
-    if (!g) return;
+  /**
+   * Commit a completed (or cancelled) stroke gesture. Nulling gestureRef before
+   * calling prevents double-invocation from both onPointerUp and onPointerCancel
+   * firing for the same pointer event (some browsers emit both).
+   */
+  const finishGesture = useCallback((g: Gesture) => {
     const o = useArtStore.getState().open;
     if (!o) { drawOverlay(); return; }
     const doc = o.doc;
@@ -521,16 +534,21 @@ export default function ComposerCanvas() {
         const working = new Uint8Array(atlas[g.atlasTarget.tileIndex].pixels);
         if (!tilesEqual(g.strokeBase, working)) {
           const level = getActiveLevel(useProjectStore.getState());
-          if (level) {
-            executeCommand({
-              type: 'set-tileset-tiles',
-              description: `art: edit tile #${g.atlasTarget.tileIndex}`,
-              sectionIndex: -1,
-              at: g.atlasTarget.tileIndex,
-              oldTiles: [{ pixels: g.strokeBase }],
-              newTiles: [{ pixels: working }],
-            }, level);
+          if (!level) {
+            // No active level: roll back the optimistic in-place atlas mutation
+            // to keep the atlas consistent with undo history.
+            atlas[g.atlasTarget.tileIndex].pixels.set(g.strokeBase);
+            useArtStore.getState().bumpDoc();
+            return;
           }
+          executeCommand({
+            type: 'set-tileset-tiles',
+            description: `art: edit tile #${g.atlasTarget.tileIndex}`,
+            sectionIndex: -1,
+            at: g.atlasTarget.tileIndex,
+            oldTiles: [{ pixels: g.strokeBase }],
+            newTiles: [{ pixels: working }],
+          }, level);
         }
       }
       if (g.localDirty) useArtStore.getState().markOpenDirty();
@@ -589,6 +607,24 @@ export default function ComposerCanvas() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [commitWrites, drawOverlay]);
+
+  const handlePointerUp = useCallback((e: React.PointerEvent) => {
+    const g = gestureRef.current;
+    // Null the ref BEFORE calling finishGesture to guard against double-invocation
+    // (some browsers fire both pointerup and pointercancel for the same event).
+    gestureRef.current = null;
+    if (!g) return;
+    finishGesture(g);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [finishGesture]);
+
+  const handlePointerCancel = useCallback((_e: React.PointerEvent) => {
+    const g = gestureRef.current;
+    gestureRef.current = null;
+    if (!g) return;
+    finishGesture(g);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [finishGesture]);
 
   // ---------- transforms via artStore pendingAction (ToolColumn, Task 9) ----------
 
@@ -689,6 +725,8 @@ export default function ComposerCanvas() {
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
+          onPointerCancel={handlePointerCancel}
+          onLostPointerCapture={handlePointerCancel}
         >
           <canvas ref={canvasRef} style={styles.canvas} />
           <canvas ref={overlayRef} style={styles.overlay} />
