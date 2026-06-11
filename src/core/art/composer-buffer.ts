@@ -201,6 +201,9 @@ export function sliceForSave(doc: ComposerDoc, atlas: Tile[]): SliceResult {
     } else if (cell.atlasTile !== null) {
       tileIndex = cell.atlasTile;
     } else {
+      // Empty cell: word 0 (tile #0, palette 0, no flags). This is ambiguous
+      // with a stamp of tile #0/pal 0/no flags — unreachable via UI (palette
+      // lines are 1-3 for user painting); relevant to programmatic callers.
       nametable[i] = 0;
       return;
     }

@@ -3,6 +3,7 @@ import { useEditorStore } from '../state/editorStore';
 import { useProjectStore, getCurrentZone } from '../state/projectStore';
 import { useToastStore } from '../state/toastStore';
 import { useArtStore } from '../state/artStore';
+import { openDocumentGuarded } from './art/open-document';
 import { docFromChunk } from '../../core/art/composer-buffer';
 import { importChunks } from '../../core/formats/chunk-mappings';
 import { kosinskiDecompress } from '../../core/formats/kosinski';
@@ -181,13 +182,13 @@ export default function ChunkLibrary() {
     const idx = chunkIndexAt(e);
     if (idx < 0) return;
     const chunk = chunks[idx];
-    useArtStore.getState().openDocument({
+    if (!openDocumentGuarded({
       doc: docFromChunk(chunk),
       liveTileIndex: null,
       chunkId: chunk.id,
       name: chunk.name,
       dirty: false,
-    });
+    })) return;
     useEditorStore.getState().setAppMode('art');
   }, [chunks, chunkIndexAt]);
 

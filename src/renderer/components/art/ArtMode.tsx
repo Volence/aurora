@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useArtStore } from '../../state/artStore';
+import { openDocumentGuarded } from './open-document';
 import { createDoc, docFromChunk, sliceForSave } from '../../../core/art/composer-buffer';
 import { useProjectStore, getActiveLevel, getCurrentZone } from '../../state/projectStore';
 import { useEditorStore, undo, redo, executeCommand } from '../../state/editorStore';
@@ -71,7 +72,7 @@ export default function ArtMode() {
   }
 
   function handleNewTile() {
-    openDocument({
+    openDocumentGuarded({
       doc: createDoc(1, 1),
       liveTileIndex: null,
       chunkId: null,
@@ -81,7 +82,7 @@ export default function ArtMode() {
   }
 
   function handleNewBlock() {
-    openDocument({
+    openDocumentGuarded({
       doc: createDoc(2, 2),
       liveTileIndex: null,
       chunkId: null,
@@ -93,7 +94,7 @@ export default function ArtMode() {
   function handleNewChunk() {
     const w = clampDim(chunkW);
     const h = clampDim(chunkH);
-    openDocument({
+    openDocumentGuarded({
       doc: createDoc(w, h),
       liveTileIndex: null,
       chunkId: null,
@@ -123,9 +124,17 @@ export default function ArtMode() {
       useToastStore.getState().addToast(String(err instanceof Error ? err.message : err), 'error');
       return;
     }
-    if (atlas.length + slice.newTiles.length > 0x800) {
-      useToastStore.getState().addToast('Tileset full (2048 tiles) — cannot save', 'error');
-      return;
+    // Note: sliceForSave already throws when atlas.length + newTiles >= 0x800,
+    // so an additional > 0x800 ceiling guard here is unreachable.
+
+    // Verify the chunk still exists before touching history.
+    let existingChunk: ChunkDef | undefined;
+    if (o.chunkId !== null) {
+      existingChunk = pstate.project.chunkLibrary.find((c) => c.id === o.chunkId);
+      if (!existingChunk) {
+        useToastStore.getState().addToast('Chunk no longer exists — cannot save', 'error');
+        return;
+      }
     }
 
     if (slice.newTiles.length > 0) {
@@ -141,11 +150,7 @@ export default function ArtMode() {
 
     let saved: ChunkDef | undefined;
     if (o.chunkId !== null) {
-      const chunk = pstate.project.chunkLibrary.find((c) => c.id === o.chunkId);
-      if (!chunk) {
-        useToastStore.getState().addToast('Chunk no longer exists — cannot save', 'error');
-        return;
-      }
+      const chunk = existingChunk!;
       executeCommand({
         type: 'set-chunk',
         description: `art: edit chunk ${chunk.name}`,

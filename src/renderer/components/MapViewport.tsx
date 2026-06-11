@@ -3,6 +3,7 @@ import { useViewStore } from '../state/viewStore';
 import { useProjectStore, getCurrentAct, getCurrentZone, getActiveLevel as getStoreActiveLevel } from '../state/projectStore';
 import { useEditorStore, executeCommand, undo, redo, setCommandInvalidationListener, RING_PATTERNS } from '../state/editorStore';
 import { useArtStore } from '../state/artStore';
+import { openDocumentGuarded } from './art/open-document';
 import { createDoc, docFromTile } from '../../core/art/composer-buffer';
 import type { AnyCommand, S4Level } from '../../core/editing/commands';
 import { SectionRenderer } from '../canvas/SectionRenderer';
@@ -345,6 +346,9 @@ export default function MapViewport() {
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     const tool = useEditorStore.getState().tool;
+
+    // Right-click opens the context menu; never paint/drag from it.
+    if (e.button === 2) return;
 
     if (tool === 'view' || e.button === 1) {
       isDragging.current = true;
@@ -816,13 +820,13 @@ export default function MapViewport() {
     if (!section) return;
     const word = section.tileGrid.nametable[m.row * SECTION_TILES_WIDE + m.col];
     const tileIndex = unpackNametableWord(word).tileIndex;
-    useArtStore.getState().openDocument({
+    if (!openDocumentGuarded({
       doc: docFromTile(tileIndex),
       liveTileIndex: tileIndex,
       chunkId: null,
       name: `tile #${tileIndex}`,
       dirty: false,
-    });
+    })) return;
     useEditorStore.getState().setAppMode('art');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -854,13 +858,13 @@ export default function MapViewport() {
         cell.coll = section.tileGrid.collision[idx];
       }
     }
-    useArtStore.getState().openDocument({
+    if (!openDocumentGuarded({
       doc,
       liveTileIndex: null,
       chunkId: null,
       name: `block (${bx},${by})`,
       dirty: true, // copied off the map and not yet in the library
-    });
+    })) return;
     useEditorStore.getState().setAppMode('art');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { useProjectStore, getCurrentZone, getCurrentAct, getActiveLevel } from '../../state/projectStore';
 import { useEditorStore, executeCommand } from '../../state/editorStore';
 import { useArtStore } from '../../state/artStore';
+import { openDocumentGuarded } from './open-document';
 import { useToastStore } from '../../state/toastStore';
 import { docFromTile, sliceForSave } from '../../../core/art/composer-buffer';
 import { tileUsageCounts } from '../../../core/art/usage';
@@ -209,7 +210,7 @@ export default function TilesetPanel() {
   const handleDoubleClick = useCallback((e: React.MouseEvent) => {
     const idx = tileIndexAt(e);
     if (idx < 0) return;
-    openDocument({
+    openDocumentGuarded({
       doc: docFromTile(idx),
       liveTileIndex: idx,
       chunkId: null,
@@ -217,7 +218,7 @@ export default function TilesetPanel() {
       dirty: false,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [itemSize, itemCount, openDocument]);
+  }, [itemSize, itemCount]);
 
   const handleMouseLeave = useCallback(() => {
     hoveredRef.current = -1;
@@ -259,6 +260,8 @@ export default function TilesetPanel() {
       oldTiles: [null],
       newTiles: [{ pixels: new Uint8Array(src.pixels) }],
     }, level);
+    // Duplicate always replaces the current doc (it IS the current doc's copy),
+    // so we call openDocument directly — no dirty-doc guard needed here.
     openDocument({
       doc: docFromTile(newIdx),
       liveTileIndex: newIdx,
@@ -309,6 +312,8 @@ export default function TilesetPanel() {
     } else {
       useToastStore.getState().addToast(`Identical tile already exists — opened #${tileIdx}`, 'info');
     }
+    // Add-to-tileset resolves the new doc to a live atlas tile — never dirty at
+    // this point, so openDocument directly (no guard needed).
     openDocument({
       doc: docFromTile(tileIdx),
       liveTileIndex: tileIdx,

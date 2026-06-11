@@ -775,10 +775,12 @@ export default function ComposerCanvas() {
     const handler = (e: KeyboardEvent) => {
       if ((e.target as HTMLElement).tagName === 'INPUT') return;
 
-      // X/Y: toggle pending flips for the tile-stamp brush (tile space only).
-      if (!e.ctrlKey && !e.metaKey && !e.altKey
+      // X/Y: toggle pending flips for the tile-stamp brush (tile-stamp only;
+      // guard !e.repeat so holding the key doesn't strobe the flip).
+      if (!e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey
           && (e.key === 'x' || e.key === 'y')
-          && useArtStore.getState().brushSpace === 'tile') {
+          && useArtStore.getState().brushSpace === 'tile'
+          && useArtStore.getState().tool === 'tile-stamp') {
         if (e.key === 'x') flipRef.current.hf = !flipRef.current.hf;
         else flipRef.current.vf = !flipRef.current.vf;
         drawOverlay();
@@ -826,6 +828,7 @@ export default function ComposerCanvas() {
     setSelection(null);
     gestureRef.current = null;
     tileHintRef.current = false;
+    flipRef.current = { hf: false, vf: false };
   }, [open?.doc]);
 
   if (!open) return null;
