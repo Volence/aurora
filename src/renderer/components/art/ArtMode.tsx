@@ -1,6 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useArtStore } from '../../state/artStore';
 import { createDoc } from '../../../core/art/composer-buffer';
+import { useProjectStore, getActiveLevel } from '../../state/projectStore';
+import { undo, redo } from '../../state/editorStore';
+import ComposerCanvas from './ComposerCanvas';
 
 export default function ArtMode() {
   const open = useArtStore((s) => s.open);
@@ -9,6 +12,28 @@ export default function ArtMode() {
   // State for the "New Chunk" W/H inputs
   const [chunkW, setChunkW] = useState(2);
   const [chunkH, setChunkH] = useState(2);
+
+  // Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y: MapViewport (which owns the map-mode
+  // handler) is unmounted while in Art mode, so undo/redo must be re-bound
+  // here. Same call pattern as MapViewport's keyboard path — the level view
+  // includes the zone tileset/palette so zone commands undo correctly.
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.target as HTMLElement).tagName === 'INPUT') return;
+      const level = getActiveLevel(useProjectStore.getState());
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+        if (level) undo(level);
+        e.preventDefault();
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
+        if (level) redo(level);
+        e.preventDefault();
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
 
   function clampDim(v: number): number {
     return Math.max(1, Math.min(64, Math.round(v)));
@@ -64,9 +89,7 @@ export default function ArtMode() {
               <span style={styles.docName}>{open.name}</span>
               {open.dirty && <span style={styles.dirtyBadge}>unsaved</span>}
             </div>
-            <div style={styles.canvasPlaceholder}>
-              ComposerCanvas — Task 8
-            </div>
+            <ComposerCanvas />
           </div>
         ) : (
           <div style={styles.launcher}>
@@ -77,7 +100,7 @@ export default function ArtMode() {
             </button>
 
             <button style={styles.newButton} onClick={handleNewBlock}>
-              New Block <span style={styles.preset}>16×16 (2 tiles)</span>
+              New Block <span style={styles.preset}>16×16 (2×2 tiles)</span>
             </button>
 
             <div style={styles.newChunkRow}>
@@ -205,15 +228,6 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: 3,
     lineHeight: '14px',
     fontWeight: 600,
-  },
-  canvasPlaceholder: {
-    flex: 1,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    color: '#45475a',
-    fontSize: 13,
-    fontStyle: 'italic',
   },
   launcher: {
     flex: 1,

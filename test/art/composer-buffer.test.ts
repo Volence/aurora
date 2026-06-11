@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   createDoc, docFromChunk, docFromTile, getPixel, setPixels, stampTile,
-  sliceForSave, cellAt,
+  sliceForSave, cellAt, docToBuffer, bufferToWrites,
 } from '../../src/core/art/composer-buffer';
 import { packNametableWord, createChunkDef } from '../../src/core/model/s4-types';
 import type { Tile } from '../../src/core/model/s4-types';
@@ -156,5 +156,35 @@ describe('sliceForSave', () => {
     doc.cells[1].localId = id2;
 
     expect(() => sliceForSave(doc, bigAtlas)).toThrow(/2048/);
+  });
+});
+
+describe('docToBuffer / bufferToWrites', () => {
+  it('round-trips: buffer reflects atlas + local cells, and writes from a diff reproduce the edit', () => {
+    const doc = createDoc(2, 1);
+    doc.cells[0].atlasTile = 1;                       // all-7s atlas tile
+    setPixels(doc, atlas, [{ x: 9, y: 1, value: 3 }]); // cell 1 becomes local
+    const buf = docToBuffer(doc, atlas);
+    expect(buf.width).toBe(16);
+    expect(buf.height).toBe(8);
+    expect(buf.data[0]).toBe(7);              // atlas-backed pixel
+    expect(buf.data[1 * 16 + 9]).toBe(3);     // local pixel
+    expect(buf.data[8]).toBe(0);              // untouched local stays empty
+
+    // round-trip: edit the buffer, diff, apply, re-extract — buffers match
+    const after = { width: buf.width, height: buf.height, data: new Uint8Array(buf.data) };
+    after.data[5 * 16 + 12] = 9;
+    setPixels(doc, atlas, bufferToWrites(buf, after));
+    expect(Array.from(docToBuffer(doc, atlas).data)).toEqual(Array.from(after.data));
+  });
+
+  it('bufferToWrites returns only changed pixels with correct coordinates', () => {
+    const doc = createDoc(1, 1);
+    const before = docToBuffer(doc, atlas);
+    const after = { width: 8, height: 8, data: new Uint8Array(before.data) };
+    after.data[3 * 8 + 2] = 5;
+    const writes = bufferToWrites(before, after);
+    expect(writes).toEqual([{ x: 2, y: 3, value: 5 }]);
+    expect(bufferToWrites(before, before)).toEqual([]);
   });
 });

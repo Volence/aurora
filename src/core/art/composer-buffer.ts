@@ -2,6 +2,8 @@ import type { Tile, ChunkDef } from '../model/s4-types';
 import { unpackNametableWord, packNametableWord } from '../model/s4-types';
 import { canonicalizeTile } from '../export/tile-dedup';
 import { flipTile } from '../import/tile-dedup';
+import type { PixelBuffer } from './pixel-ops';
+import { createBuffer } from './pixel-ops';
 
 export interface ComposerCell {
   atlasTile: number | null;  // index into the zone tileset
@@ -104,6 +106,38 @@ export function setPixels(
     }
     doc.localPixels.get(cell.localId!)![(wr.y % 8) * 8 + (wr.x % 8)] = wr.value & 0xF;
   }
+}
+
+/**
+ * Flatten the whole document into one PixelBuffer (doc orientation — cell
+ * flips applied). Used by whole-doc operations (fill, shapes, transforms,
+ * selection move/paste) that run pure pixel-ops and then diff back to writes.
+ */
+export function docToBuffer(doc: ComposerDoc, atlas: Tile[]): PixelBuffer {
+  const w = doc.widthTiles * 8;
+  const buf = createBuffer(w, doc.heightTiles * 8);
+  for (let cy = 0; cy < doc.heightTiles; cy++) {
+    for (let cx = 0; cx < doc.widthTiles; cx++) {
+      const px = cellPixels(doc, atlas, doc.cells[cy * doc.widthTiles + cx]);
+      for (let row = 0; row < 8; row++) {
+        buf.data.set(px.subarray(row * 8, row * 8 + 8), (cy * 8 + row) * w + cx * 8);
+      }
+    }
+  }
+  return buf;
+}
+
+/** Diff two equal-sized buffers into setPixels-ready writes (after wins). */
+export function bufferToWrites(
+  before: PixelBuffer, after: PixelBuffer,
+): Array<{ x: number; y: number; value: number }> {
+  const out: Array<{ x: number; y: number; value: number }> = [];
+  for (let i = 0; i < before.data.length; i++) {
+    if (before.data[i] !== after.data[i]) {
+      out.push({ x: i % before.width, y: Math.floor(i / before.width), value: after.data[i] });
+    }
+  }
+  return out;
 }
 
 export interface StampSpec { tile: number; pal: number; hf: boolean; vf: boolean; pri: boolean; coll: number; }

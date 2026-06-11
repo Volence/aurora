@@ -17,6 +17,9 @@ function clone(buf: PixelBuffer): PixelBuffer {
 
 export function floodFill(buf: PixelBuffer, x: number, y: number, value: number): PixelBuffer {
   const out = clone(buf);
+  // Bounds guard: a seed at x === width would otherwise wrap (row-major
+  // indexing) into the first pixel of the next row and fill from there.
+  if (x < 0 || x >= buf.width || y < 0 || y >= buf.height) return out;
   const { width, height, data } = out;
   const target = data[y * width + x];
   if (target === value) return out;

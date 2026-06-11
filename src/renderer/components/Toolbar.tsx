@@ -183,7 +183,10 @@ export default function Toolbar({ onOpenProject, onOpenRecent, onSave }: Toolbar
               </div>
             )}
 
-            <span style={styles.separator} />
+            {/* The separator after the Map|Art toggle already precedes this
+                group in Art mode — only add another when the map tool groups
+                (and their trailing content) render between them. */}
+            {appMode === 'map' && <span style={styles.separator} />}
 
             <div style={styles.buttonGroup}>
               <button

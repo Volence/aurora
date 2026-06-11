@@ -278,6 +278,13 @@ async function handle(req: AgentRequest): Promise<unknown> {
     }
 
     case 'goto': {
+      // MCP navigation targets the map viewport; if the user left the app in
+      // Art mode, MapViewport (and its canvas) is unmounted. Switch back to
+      // Map and wait two frames so the viewport mounts and paints first.
+      if (useEditorStore.getState().appMode !== 'map') {
+        useEditorStore.getState().setAppMode('map');
+        await new Promise<void>(r => requestAnimationFrame(() => requestAnimationFrame(() => r())));
+      }
       const ctx = requireProject();
       if (!Number.isInteger(req.section) || req.section < 0 || req.section >= ctx.act.sections.length) {
         throw new Error(`section ${req.section} out of range`);
@@ -295,6 +302,12 @@ async function handle(req: AgentRequest): Promise<unknown> {
     }
 
     case 'screenshot': {
+      // Screenshots read the map canvas, which is unmounted in Art mode —
+      // flip back to Map and give it two frames to mount before looking it up.
+      if (useEditorStore.getState().appMode !== 'map') {
+        useEditorStore.getState().setAppMode('map');
+        await new Promise<void>(r => requestAnimationFrame(() => requestAnimationFrame(() => r())));
+      }
       requireProject();
       const canvas = document.getElementById('map-canvas') as HTMLCanvasElement | null;
       if (!canvas) throw new Error('map canvas not found — is the viewport mounted?');

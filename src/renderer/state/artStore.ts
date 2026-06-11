@@ -30,6 +30,8 @@ interface ArtState {
   zoom: number;                 // pixels per art pixel
   open: OpenDocument | null;
   docVersion: number;           // bump to re-render the canvas
+  /** One-shot transform request (e.g. 'flip-h') consumed by ComposerCanvas. */
+  pendingAction: string | null;
 
   setTool: (t: ArtTool) => void;
   setBrushSpace: (b: BrushSpace) => void;
@@ -42,12 +44,17 @@ interface ArtState {
   openDocument: (d: OpenDocument) => void;
   closeDocument: () => void;
   bumpDoc: () => void;
+  /** Mark the open document as having unsaved local edits. */
+  markOpenDirty: () => void;
+  requestAction: (a: string) => void;
+  clearAction: () => void;
 }
 
 export const useArtStore = create<ArtState>((set) => ({
   tool: 'pencil', brushSpace: 'pixel', selectedColor: 1, paletteLine: 1,
   ditherPattern: 'checker', ditherSecondary: 0,
   mirror: null, repeatPreview: false, zoom: 24, open: null, docVersion: 0,
+  pendingAction: null,
 
   setTool: (tool) => set({ tool }),
   setBrushSpace: (brushSpace) => set({ brushSpace }),
@@ -60,4 +67,8 @@ export const useArtStore = create<ArtState>((set) => ({
   openDocument: (open) => set({ open, docVersion: 0 }),
   closeDocument: () => set({ open: null }),
   bumpDoc: () => set((s) => ({ docVersion: s.docVersion + 1 })),
+  markOpenDirty: () => set((s) =>
+    s.open && !s.open.dirty ? { open: { ...s.open, dirty: true } } : {}),
+  requestAction: (pendingAction) => set({ pendingAction }),
+  clearAction: () => set({ pendingAction: null }),
 }));

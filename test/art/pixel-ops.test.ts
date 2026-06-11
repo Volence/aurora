@@ -37,6 +37,13 @@ describe('floodFill', () => {
     const out = floodFill(b, 0, 0, 3);
     expect(Array.from(out.data)).toEqual([3, 3, 3, 3]);
   });
+  it('ignores out-of-bounds seeds (x === width must not wrap-fill the next row)', () => {
+    const b = buf(4, 4, 0);
+    const out = floodFill(b, 4, 0, 7); // row-major index would wrap to (0,1)
+    expect(out.data.every(v => v === 0)).toBe(true);
+    expect(floodFill(b, -1, 0, 7).data.every(v => v === 0)).toBe(true);
+    expect(floodFill(b, 0, 4, 7).data.every(v => v === 0)).toBe(true);
+  });
 });
 
 describe('drawLine', () => {
