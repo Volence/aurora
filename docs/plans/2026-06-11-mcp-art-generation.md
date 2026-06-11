@@ -1,6 +1,6 @@
 # MCP Art-Generation Integration Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Embed an MCP server in the editor's Electron main process so a Claude Code session can generate level art live in the running editor, with screenshots and budget validation — plus fix two stale modules the MCP depends on.
 
@@ -29,7 +29,7 @@ The current parser expects 48-row strips (128 bytes/column, nibble-packed collis
 - Modify: `test/formats/s4-strips.test.ts` (full rewrite)
 - No change needed: `src/renderer/hooks/useProject.ts` imports `STRIP_ROWS`/`STRIP_COLS` and loops over them (`useProject.ts:276-283`) — it adapts automatically when `STRIP_ROWS` becomes 256.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Replace the entire contents of `test/formats/s4-strips.test.ts`:
 
@@ -115,12 +115,12 @@ describe('s4-strips (engine wide-strip format)', () => {
 });
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `npx vitest run test/formats/s4-strips.test.ts`
 Expected: FAIL — `WIDE_STRIP_SIZE` is not exported; constants are 48/128.
 
-- [ ] **Step 3: Rewrite the implementation**
+- [x] **Step 3: Rewrite the implementation**
 
 Replace the entire contents of `src/core/formats/s4-strips.ts`:
 
@@ -213,17 +213,17 @@ export function serializeStrips(data: StripData): Uint8Array {
 }
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `npx vitest run test/formats/s4-strips.test.ts`
 Expected: PASS (6 tests)
 
-- [ ] **Step 5: Run the full suite to catch consumers**
+- [x] **Step 5: Run the full suite to catch consumers**
 
 Run: `npx vitest run`
 Expected: PASS. If `useProject` or others reference removed names, fix imports (only `parseStrips`, `STRIP_ROWS`, `STRIP_COLS` are consumed today).
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/core/formats/s4-strips.ts test/formats/s4-strips.test.ts
@@ -243,7 +243,7 @@ Replace the hardcoded `VRAM_BASE_B = 113 * 32` with the engine's algorithm: chec
 - Modify: `test/export/vram-coloring.test.ts` (rewrite)
 - Create: `test/export/tile-dedup.test.ts`
 
-- [ ] **Step 1: Write failing tests for coloring + base assignment**
+- [x] **Step 1: Write failing tests for coloring + base assignment**
 
 Replace the entire contents of `test/export/vram-coloring.test.ts`:
 
@@ -295,12 +295,12 @@ describe('generateVramBasesAsm', () => {
 });
 ```
 
-- [ ] **Step 2: Run to verify failure**
+- [x] **Step 2: Run to verify failure**
 
 Run: `npx vitest run test/export/vram-coloring.test.ts`
 Expected: FAIL — `computeVramColoring`, `assignVramBases`, `FG_TILE_LIMIT` not exported.
 
-- [ ] **Step 3: Rewrite `src/core/export/vram-coloring.ts`**
+- [x] **Step 3: Rewrite `src/core/export/vram-coloring.ts`**
 
 ```typescript
 // VRAM color-group base assignment — mirrors s4_engine/tools/tile_dedupe.py
@@ -365,12 +365,12 @@ export function generateVramBasesAsm(zonePrefix: string, bases: number[]): strin
 }
 ```
 
-- [ ] **Step 4: Run coloring tests**
+- [x] **Step 4: Run coloring tests**
 
 Run: `npx vitest run test/export/vram-coloring.test.ts`
 Expected: PASS
 
-- [ ] **Step 5: Write failing tests for group unions**
+- [x] **Step 5: Write failing tests for group unions**
 
 Create `test/export/tile-dedup.test.ts`:
 
@@ -439,12 +439,12 @@ describe('serializeTiles', () => {
 });
 ```
 
-- [ ] **Step 6: Run to verify failure**
+- [x] **Step 6: Run to verify failure**
 
 Run: `npx vitest run test/export/tile-dedup.test.ts`
 Expected: FAIL — functions not exported.
 
-- [ ] **Step 7: Rewrite `src/core/export/tile-dedup.ts`**
+- [x] **Step 7: Rewrite `src/core/export/tile-dedup.ts`**
 
 ```typescript
 import type { Tile } from '../model/s4-types';
@@ -544,7 +544,7 @@ export function serializeTiles(tiles: Tile[]): Uint8Array {
 
 (The old `deduplicateSectionTiles`/`DedupResult` are deleted — `export/index.ts` is the only consumer and is updated next.)
 
-- [ ] **Step 8: Update `src/core/export/index.ts` to the group flow**
+- [x] **Step 8: Update `src/core/export/index.ts` to the group flow**
 
 Replace the body of `exportAct` (keep the imports/interfaces, adjusting imports):
 
@@ -639,12 +639,12 @@ export function exportAct(
 }
 ```
 
-- [ ] **Step 9: Run the full suite, fix fallout**
+- [x] **Step 9: Run the full suite, fix fallout**
 
 Run: `npx vitest run`
 Expected: tile-dedup and vram-coloring tests PASS. If other export tests asserted old base values (113 hardcode) or `deduplicateSectionTiles`, update them to the new API semantics — the behavior change is intentional.
 
-- [ ] **Step 10: Commit**
+- [x] **Step 10: Commit**
 
 ```bash
 git add src/core/export/vram-coloring.ts src/core/export/tile-dedup.ts src/core/export/index.ts test/export/vram-coloring.test.ts test/export/tile-dedup.test.ts
@@ -658,7 +658,7 @@ git commit -m "fix: compute VRAM bases from measured group unions instead of har
 **Files:**
 - Create: `src/shared/agent-protocol.ts`
 
-- [ ] **Step 1: Create the protocol module** (types + channel constants; no separate test — exercised by Tasks 4–9)
+- [x] **Step 1: Create the protocol module** (types + channel constants; no separate test — exercised by Tasks 4–9)
 
 ```typescript
 // Wire protocol between the MCP server (main process) and the renderer's
@@ -703,7 +703,7 @@ export interface AgentResponseEnvelope {
 }
 ```
 
-- [ ] **Step 2: Typecheck and commit**
+- [x] **Step 2: Typecheck and commit**
 
 Run: `npm run build`
 Expected: builds clean.
@@ -721,7 +721,7 @@ git commit -m "feat: add shared agent IPC protocol types"
 - Create: `src/core/agent/validation.ts`
 - Create: `test/agent/validation.test.ts`
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 Create `test/agent/validation.test.ts`:
 
@@ -784,12 +784,12 @@ describe('validatePaintRegion', () => {
 });
 ```
 
-- [ ] **Step 2: Run to verify failure**
+- [x] **Step 2: Run to verify failure**
 
 Run: `npx vitest run test/agent/validation.test.ts`
 Expected: FAIL — module missing.
 
-- [ ] **Step 3: Implement `src/core/agent/validation.ts`**
+- [x] **Step 3: Implement `src/core/agent/validation.ts`**
 
 ```typescript
 import { SECTION_TILES_WIDE, SECTION_TILES_HIGH } from '../model/s4-types';
@@ -867,7 +867,7 @@ export function validatePaintRegion(
 }
 ```
 
-- [ ] **Step 4: Run tests, expect PASS, commit**
+- [x] **Step 4: Run tests, expect PASS, commit**
 
 Run: `npx vitest run test/agent/validation.test.ts`
 
@@ -885,7 +885,7 @@ git commit -m "feat: add agent input validation (palette, tiles, paint regions)"
 - Create: `src/core/agent/budget.ts`
 - Create: `test/agent/budget.test.ts`
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 Create `test/agent/budget.test.ts`:
 
@@ -959,12 +959,12 @@ describe('computeActBudget', () => {
 });
 ```
 
-- [ ] **Step 2: Run to verify failure**
+- [x] **Step 2: Run to verify failure**
 
 Run: `npx vitest run test/agent/budget.test.ts`
 Expected: FAIL — module missing.
 
-- [ ] **Step 3: Implement `src/core/agent/budget.ts`**
+- [x] **Step 3: Implement `src/core/agent/budget.ts`**
 
 ```typescript
 import { unpackNametableWord } from '../model/s4-types';
@@ -1038,11 +1038,11 @@ export function computeActBudget(act: ActLike, tilesetTiles: Tile[]): ActBudget 
 }
 ```
 
-- [ ] **Step 4: Export `flipTile` from `src/core/import/tile-dedup.ts`**
+- [x] **Step 4: Export `flipTile` from `src/core/import/tile-dedup.ts`**
 
 Change line 6 from `function flipTile(` to `export function flipTile(`.
 
-- [ ] **Step 5: Run tests, expect PASS, run full suite, commit**
+- [x] **Step 5: Run tests, expect PASS, run full suite, commit**
 
 Run: `npx vitest run test/agent/budget.test.ts && npx vitest run`
 
@@ -1062,7 +1062,7 @@ git commit -m "feat: add flip-aware VRAM budget computation for agent tools"
 - Modify: `src/core/editing/history.ts`
 - Create: `test/editing/zone-commands.test.ts`
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 Create `test/editing/zone-commands.test.ts`:
 
@@ -1139,12 +1139,12 @@ describe('set-tileset-tiles command', () => {
 });
 ```
 
-- [ ] **Step 2: Run to verify failure**
+- [x] **Step 2: Run to verify failure**
 
 Run: `npx vitest run test/editing/zone-commands.test.ts`
 Expected: FAIL — types don't exist; `S4Level` has no `tileset`/`palette`.
 
-- [ ] **Step 3: Extend `src/core/editing/commands.ts`**
+- [x] **Step 3: Extend `src/core/editing/commands.ts`**
 
 Update the imports and `S4Level`, and add the two command interfaces + union members:
 
@@ -1183,7 +1183,7 @@ And add both to the `AnyCommand` union:
   | SetTilesetTilesCommand;
 ```
 
-- [ ] **Step 4: Extend `src/core/editing/history.ts`**
+- [x] **Step 4: Extend `src/core/editing/history.ts`**
 
 The current `applyCommand`/`undoCommand` fetch the section up front and bail if missing — zone commands use `sectionIndex: -1`. Restructure both functions to handle zone commands before the section lookup:
 
@@ -1233,7 +1233,7 @@ function undoCommand(cmd: AnyCommand, level: S4Level): void {
 }
 ```
 
-- [ ] **Step 5: Run tests, expect PASS, run full suite, commit**
+- [x] **Step 5: Run tests, expect PASS, run full suite, commit**
 
 Run: `npx vitest run test/editing/zone-commands.test.ts && npx vitest run`
 
@@ -1253,7 +1253,7 @@ git commit -m "feat: add zone-level undo commands for palette lines and tileset 
 - Modify: `src/renderer/App.tsx` (register handler once on mount)
 - Modify: `src/renderer/env.d.ts` (type `window.agentBridge`)
 
-- [ ] **Step 1: Add the bridge to `src/preload/index.ts`**
+- [x] **Step 1: Add the bridge to `src/preload/index.ts`**
 
 Add below the existing `api` (channel names are string literals here because preload can import from `../shared`; use the constants):
 
@@ -1275,7 +1275,7 @@ contextBridge.exposeInMainWorld('agentBridge', agentBridge);
 export type AgentBridge = typeof agentBridge;
 ```
 
-- [ ] **Step 2: Type the bridge in `src/renderer/env.d.ts`**
+- [x] **Step 2: Type the bridge in `src/renderer/env.d.ts`**
 
 Add (alongside the existing `window.api` declaration style found in the file):
 
@@ -1291,11 +1291,11 @@ declare global {
 
 (Adapt to the file's existing declaration pattern — if it declares `interface Window` directly, extend that.)
 
-- [ ] **Step 3: Add the canvas id in `MapViewport.tsx`**
+- [x] **Step 3: Add the canvas id in `MapViewport.tsx`**
 
 Find the `<canvas ref={canvasRef}` JSX element and add `id="map-canvas"`.
 
-- [ ] **Step 4: Create `src/renderer/agent/agent-handler.ts`**
+- [x] **Step 4: Create `src/renderer/agent/agent-handler.ts`**
 
 ```typescript
 import { useProjectStore, getCurrentZone, getCurrentAct } from '../state/projectStore';
@@ -1568,7 +1568,7 @@ async function handle(req: AgentRequest): Promise<unknown> {
 }
 ```
 
-- [ ] **Step 5: Register the handler in `src/renderer/App.tsx`**
+- [x] **Step 5: Register the handler in `src/renderer/App.tsx`**
 
 Add the import and a one-time effect (place with the other top-level hooks in the App component):
 
@@ -1580,12 +1580,12 @@ import { registerAgentHandler } from './agent/agent-handler';
 useEffect(() => { registerAgentHandler(); }, []);
 ```
 
-- [ ] **Step 6: Build and run suite**
+- [x] **Step 6: Build and run suite**
 
 Run: `npm run build && npx vitest run`
 Expected: clean build, all tests pass. Fix any import-path or type errors (e.g. `decodeGenesisColor` signature — check `src/core/formats/palette.ts` and adapt the call if it returns `{r,g,b,a}` vs takes extra args).
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/preload/index.ts src/renderer/agent/agent-handler.ts src/renderer/components/MapViewport.tsx src/renderer/App.tsx src/renderer/env.d.ts
@@ -1599,7 +1599,7 @@ git commit -m "feat: renderer agent handler + preload bridge (mutations, navigat
 **Files:**
 - Create: `src/main/agent-bridge.ts`
 
-- [ ] **Step 1: Create `src/main/agent-bridge.ts`**
+- [x] **Step 1: Create `src/main/agent-bridge.ts`**
 
 ```typescript
 import { ipcMain } from 'electron';
@@ -1651,7 +1651,7 @@ export function requestAgent(win: BrowserWindow, payload: AgentRequest): Promise
 }
 ```
 
-- [ ] **Step 2: Build and commit**
+- [x] **Step 2: Build and commit**
 
 Run: `npm run build`
 
@@ -1669,7 +1669,7 @@ git commit -m "feat: main-process agent bridge with request correlation and time
 - Create: `src/main/mcp-server.ts`
 - Modify: `src/main/index.ts` (start/stop wiring)
 
-- [ ] **Step 1: Install dependencies**
+- [x] **Step 1: Install dependencies**
 
 ```bash
 npm install @modelcontextprotocol/sdk zod express
@@ -1678,7 +1678,7 @@ npm install -D @types/express
 
 **API drift guard:** after install, skim `node_modules/@modelcontextprotocol/sdk/README.md` for the current `McpServer`/`registerTool`/`StreamableHTTPServerTransport` usage. The code below follows the documented stateless-HTTP pattern; adapt names if the installed major version differs.
 
-- [ ] **Step 2: Create `src/main/mcp-server.ts`**
+- [x] **Step 2: Create `src/main/mcp-server.ts`**
 
 ```typescript
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -1887,7 +1887,7 @@ export function stopMcpServer(): void {
 }
 ```
 
-- [ ] **Step 3: Wire into `src/main/index.ts`**
+- [x] **Step 3: Wire into `src/main/index.ts`**
 
 ```typescript
 import { app, BrowserWindow } from 'electron';
@@ -1941,12 +1941,12 @@ app.on('window-all-closed', () => {
 });
 ```
 
-- [ ] **Step 4: Build, full suite**
+- [x] **Step 4: Build, full suite**
 
 Run: `npm run build && npx vitest run`
 Expected: clean. If electron-vite complains about bundling express/SDK into the main bundle, add them to `build.rollupOptions.external` is NOT correct (they must be bundled or available at runtime) — instead check `electron.vite.config.ts`: the default externalizes `dependencies`, which is fine because they're in `dependencies` and present in `node_modules` at runtime.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add package.json package-lock.json src/main/mcp-server.ts src/main/index.ts
@@ -1961,7 +1961,7 @@ git commit -m "feat: embed MCP server in main process (12 tools, stateless HTTP,
 - Create: `docs/MCP.md`
 - Modify: `docs/specs/2026-06-11-mcp-art-generation-design.md` (note save_chunk undo nuance)
 
-- [ ] **Step 1: Write `docs/MCP.md`**
+- [x] **Step 1: Write `docs/MCP.md`**
 
 ```markdown
 # MCP Integration
@@ -1993,25 +1993,25 @@ matching the existing chunk-library behavior.
   (BG region starts at slot 1024). `check_budget` and every mutation reply report it.
 ```
 
-- [ ] **Step 2: Amend the spec's undo note**
+- [x] **Step 2: Amend the spec's undo note**
 
 In `docs/specs/2026-06-11-mcp-art-generation-design.md`, in the Mutate table row for `save_chunk`, append: "(chunk-library addition; additive and outside undo history, matching existing ChunkLibrary behavior)".
 
-- [ ] **Step 3: Final verification**
+- [x] **Step 3: Final verification**
 
 ```bash
 npx vitest run          # all green
 npm run build           # clean build
 ```
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add docs/MCP.md docs/specs/2026-06-11-mcp-art-generation-design.md
 git commit -m "docs: MCP usage guide and spec clarification"
 ```
 
-- [ ] **Step 5: Manual E2E checklist (requires the user / a head)**
+- [x] **Step 5: Manual E2E checklist (requires the user / a head)**
 
 Left for the user after the overnight run — listed here so it isn't forgotten:
 1. `npm run dev`, load the OJZ project.
