@@ -10,14 +10,16 @@ import type { Tile, Zone, Act } from '../../core/model/s4-types';
 import { validatePaletteLine, validateTilePixels, validatePaintRegion, validateEntries } from '../../core/agent/validation';
 import { computeActBudget, canonicalTileHash } from '../../core/agent/budget';
 import { decodeGenesisColor, encodeGenesisColor } from '../../core/formats/palette';
+import { BG_WIDTH } from '../../core/formats/bg-tiles';
 import type { AgentRequest, AgentRequestEnvelope, NametableEntrySpec } from '../../shared/agent-protocol';
 
 let registered = false;
 
 // Zone-wide background (Plane B): a fixed 64x32 nametable with its own tile
 // blob — a SEPARATE tile space from the zone tileset (the engine loads it at
-// VRAM slot 1024+). Layout tile indices are local to the BG blob.
-const BG_TILES_WIDE = 64;
+// VRAM slot 1024+). Layout tile indices are local to the BG blob in BOTH
+// directions: load-time normalization (normalizeBgLayout) guarantees the
+// in-memory layout get_bg returns is local, and set_bg validates local input.
 const BG_TILES_HIGH = 32;
 const BG_MAX_TILES = 512;
 
@@ -318,7 +320,7 @@ async function handle(req: AgentRequest): Promise<unknown> {
     case 'get-bg': {
       const ctx = requireProject();
       return {
-        width: BG_TILES_WIDE,
+        width: BG_WIDTH,
         height: BG_TILES_HIGH,
         layout: ctx.act.bgLayout ? Array.from(ctx.act.bgLayout) : null,
         tiles: ctx.act.bgTiles ? ctx.act.bgTiles.map(t => Array.from(t.pixels)) : null,
@@ -336,8 +338,8 @@ async function handle(req: AgentRequest): Promise<unknown> {
         if (err) throw new Error(`tile ${i}: ${err}`);
         newTiles.push({ pixels: Uint8Array.from(req.tiles[i]) });
       }
-      if (!Array.isArray(req.layout) || req.layout.length !== BG_TILES_WIDE * BG_TILES_HIGH) {
-        throw new Error(`layout must have ${BG_TILES_WIDE * BG_TILES_HIGH} words (${BG_TILES_WIDE}x${BG_TILES_HIGH}), got ${Array.isArray(req.layout) ? req.layout.length : typeof req.layout}`);
+      if (!Array.isArray(req.layout) || req.layout.length !== BG_WIDTH * BG_TILES_HIGH) {
+        throw new Error(`layout must have ${BG_WIDTH * BG_TILES_HIGH} words (${BG_WIDTH}x${BG_TILES_HIGH}), got ${Array.isArray(req.layout) ? req.layout.length : typeof req.layout}`);
       }
       for (let i = 0; i < req.layout.length; i++) {
         const word = req.layout[i];

@@ -14,7 +14,7 @@ function legacyAtlasPath(chunkLibraryPath: string): string {
 }
 import { loadS4Config, type S4ProjectConfig } from '../../core/config/s4-config';
 import { parseTiles } from '../../core/formats/tiles';
-import { parseBgTiles, serializeBgTiles, padBgTilesToLayout, stripBgTilePadding } from '../../core/formats/bg-tiles';
+import { parseBgTiles, serializeBgTiles, normalizeBgLayout, BG_TILE_BASE_SLOT, BG_WIDTH } from '../../core/formats/bg-tiles';
 import { buildPalette } from '../../core/formats/palette';
 import { parseNametable } from '../../core/formats/s4-nametable';
 import { parseCollision } from '../../core/formats/s4-collision';
@@ -199,14 +199,16 @@ export function useProject() {
       // may point into the engine's regenerated data/generated tree, so edits
       // (set-bg commands, BG-layer painting) would vanish on reload otherwise.
       if (act.bgLayout && act.bgTiles) {
-        const editorBgLayoutPath = `data/editor/${zone.id}_bg.bin`;
-        const editorBgTilesPath = `data/editor/${zone.id}_bg_tiles.bin`;
+        const editorBgLayoutPath = `data/editor/${zone.id}_${act.id}_bg.bin`;
+        const editorBgTilesPath = `data/editor/${zone.id}_${act.id}_bg_tiles.bin`;
+        // Editor-owned BG files stay in the LOCAL index convention (in-memory
+        // arrays serialized verbatim) — the engine build pipeline regenerates
+        // its own VRAM-absolute files. On reload, normalizeBgLayout detects
+        // local indices and passes them through, so load(save(state))
+        // reproduces the in-memory arrays exactly.
         const bgLayoutBytes = serializeNametable(act.bgLayout);
         await window.api.writeBinaryFile(basePath, editorBgLayoutPath, bgLayoutBytes.buffer as ArrayBuffer);
-        // Invert the load-time VRAM-base padding, then write the engine blob
-        // shape (2-byte BE byte-length header + raw tiles) that parseBgTiles
-        // reads back — load(save(state)) reproduces the in-memory arrays.
-        const bgTileBytes = serializeBgTiles(stripBgTilePadding(act.bgLayout, act.bgTiles));
+        const bgTileBytes = serializeBgTiles(act.bgTiles);
         await window.api.writeBinaryFile(basePath, editorBgTilesPath, bgTileBytes.buffer as ArrayBuffer);
 
         const rawAct = config.raw.zones.find(rz => rz.id === zone.id)
@@ -398,20 +400,19 @@ async function loadFullProject(config: ReturnType<typeof loadS4Config>): Promise
       try {
         if (actConfig.bgLayout) {
           const bgRaw = await readFile(basePath, actConfig.bgLayout);
-          const bgWidth = 64;
-          const bgHeight = Math.floor(bgRaw.length / (bgWidth * 2));
-          bgLayout = parseNametable(bgRaw, bgWidth, bgHeight);
+          const bgHeight = Math.floor(bgRaw.length / (BG_WIDTH * 2));
+          // Normalize ONCE at load: engine-emitted layouts use VRAM-absolute
+          // tile indices (BG_TILE_BASE_SLOT + n); the in-memory convention is
+          // ALWAYS local to the BG blob (tile 0 = first blob tile). Editor-
+          // saved files are already local and pass through unchanged.
+          bgLayout = normalizeBgLayout(parseNametable(bgRaw, BG_WIDTH, bgHeight), BG_TILE_BASE_SLOT);
         }
         if (actConfig.bgTiles) {
           // parseBgTiles detects the engine blob's 2-byte byte-length header
-          // (and accepts headerless dumps); padBgTilesToLayout converts
-          // VRAM-absolute layouts (engine-emitted, indices 1024+) into a
-          // directly-indexable array, leaving local-index layouts untouched.
+          // (and accepts headerless dumps). The blob is used as-is — no blank
+          // padding — because the layout above is normalized to local indices.
           const bgTileRaw = await readFile(basePath, actConfig.bgTiles);
-          const rawBgTiles = parseBgTiles(bgTileRaw);
-          bgTiles = bgLayout && rawBgTiles.length > 0
-            ? padBgTilesToLayout(bgLayout, rawBgTiles)
-            : rawBgTiles;
+          bgTiles = parseBgTiles(bgTileRaw);
         }
       } catch {
         // optional bg data

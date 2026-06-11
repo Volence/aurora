@@ -66,6 +66,10 @@ export class SectionRenderer {
     this.bg = null;
   }
 
+  hasBg(): boolean {
+    return this.bg !== null;
+  }
+
   getBg(): { nametable: Uint16Array; width: number; height: number } | null {
     if (!this.bg) return null;
     return { nametable: this.bg.nametable, width: this.bg.width, height: this.bg.height };
@@ -124,13 +128,15 @@ export class SectionRenderer {
   }
 
   renderBg(ctx: CanvasRenderingContext2D, viewport: SectionViewport): void {
-    if (!this.bg) return;
-    this.flushBgDirty();
-
     const { x: vpX, y: vpY, width, height, zoom } = viewport;
 
+    // Always clear the backdrop — even with no BG loaded — so callers on the
+    // BG editing layer never composite over a stale frame.
     ctx.fillStyle = '#000000';
     ctx.fillRect(0, 0, width, height);
+
+    if (!this.bg) return;
+    this.flushBgDirty();
 
     ctx.save();
     ctx.imageSmoothingEnabled = false;

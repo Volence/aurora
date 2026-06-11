@@ -129,7 +129,7 @@ function buildServer(getWindow: () => BrowserWindow | null): McpServer {
     async (args) => textResult(await forward({ kind: 'goto', ...args })));
 
   server.registerTool('get_bg',
-    { description: 'Read the zone-wide background (Plane B): a 64x32 tile nametable plus its own tile blob (max 512 tiles) — a SEPARATE tile space from the FG tileset (loaded at VRAM slot 1024+). Nametable tile indices are local to the BG blob, not the zone tileset. Returns layout (2048 nametable words, row-major) and tiles (64 pixel values each), or nulls when the act has no background.' },
+    { description: 'Read the zone-wide background (Plane B): a 64x32 tile nametable plus its own tile blob (max 512 tiles) — a SEPARATE tile space from the FG tileset (loaded at VRAM slot 1024+). Nametable tile indices are local to the BG blob, not the zone tileset; both get_bg and set_bg use this local convention (engine VRAM-absolute files are normalized at load), so a get_bg result can be fed straight back to set_bg. Returns layout (2048 nametable words, row-major) and tiles (64 pixel values each), or nulls when the act has no background. Note: the editor renders Plane B once at world origin (512x256 px), so screenshots away from the origin will not show it.' },
     async () => textResult(await forward({ kind: 'get-bg' })));
 
   server.registerTool('set_bg',

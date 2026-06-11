@@ -10,6 +10,7 @@ import { SectionRenderer } from '../canvas/SectionRenderer';
 import { OverlayRenderer } from '../canvas/OverlayRenderer';
 import type { SectionOverlayInfo } from '../canvas/OverlayRenderer';
 import { SECTION_TILES_WIDE, SECTION_TILES_HIGH, SECTION_PIXEL_SIZE, unpackNametableWord } from '../../core/model/s4-types';
+import { BG_WIDTH } from '../../core/formats/bg-tiles';
 import type { Section, ObjectPlacement, RingPlacement } from '../../core/model/s4-types';
 
 export const sectionRenderer = new SectionRenderer();
@@ -79,10 +80,9 @@ export default function MapViewport() {
     }
 
     if (act.bgLayout && act.bgTiles) {
-      const bgWidth = 64;
-      const bgHeight = Math.floor(act.bgLayout.length / bgWidth);
+      const bgHeight = Math.floor(act.bgLayout.length / BG_WIDTH);
       if (bgHeight > 0) {
-        sectionRenderer.loadBg(act.bgLayout, bgWidth, bgHeight, act.bgTiles, zone.palette.lines);
+        sectionRenderer.loadBg(act.bgLayout, BG_WIDTH, bgHeight, act.bgTiles, zone.palette.lines);
       }
     }
   }, []);
@@ -152,9 +152,12 @@ export default function MapViewport() {
       sectionRenderer.renderBg(ctx, viewport);
     } else {
       // showBgPlane: paint Plane B first, then composite the foreground over
-      // it (empty FG words are transparent in the section canvases).
-      if (overlays.showBgPlane) sectionRenderer.renderBg(ctx, viewport);
-      sectionRenderer.render(ctx, viewport, activeSectionIndex, !overlays.showBgPlane);
+      // it (empty FG words are transparent in the section canvases). Only
+      // composite when a BG is actually loaded — otherwise render() must
+      // clear the canvas itself or stale frames ghost through.
+      const bgVisible = overlays.showBgPlane && sectionRenderer.hasBg();
+      if (bgVisible) sectionRenderer.renderBg(ctx, viewport);
+      sectionRenderer.render(ctx, viewport, activeSectionIndex, !bgVisible);
 
       const sectionInfos: SectionOverlayInfo[] = [];
       for (let i = 0; i < act.sections.length; i++) {
@@ -194,8 +197,9 @@ export default function MapViewport() {
       if (layer === 'bg') {
         sectionRenderer.renderBg(ctx, viewport);
       } else {
-        if (overlays.showBgPlane) sectionRenderer.renderBg(ctx, viewport);
-        sectionRenderer.render(ctx, viewport, useEditorStore.getState().activeSectionIndex, !overlays.showBgPlane);
+        const bgVisible = overlays.showBgPlane && sectionRenderer.hasBg();
+        if (bgVisible) sectionRenderer.renderBg(ctx, viewport);
+        sectionRenderer.render(ctx, viewport, useEditorStore.getState().activeSectionIndex, !bgVisible);
         const sectionInfos: SectionOverlayInfo[] = [];
         for (let i = 0; i < act.sections.length; i++) {
           const section = act.sections[i];

@@ -23,9 +23,14 @@ matching the existing chunk-library behavior.
 
 `get_bg`/`set_bg` operate on the zone-wide background (Plane B): a 64x32 tile
 nametable plus its own tile blob (max 512 tiles) — a separate tile space from
-the FG tileset, with nametable indices local to the BG blob. `set_bg` replaces
-the whole plane in one undo step. `screenshot` accepts `showBg: true` to render
-the background plane during capture (restores the overlay state afterwards).
+the FG tileset. Both directions use the LOCAL index convention (nametable tile
+indices index directly into the BG blob): engine-emitted files with
+VRAM-absolute indices (1024+) are normalized once at load, so a `get_bg`
+result round-trips straight back into `set_bg`. `set_bg` replaces the whole
+plane in one undo step. `screenshot` accepts `showBg: true` to render the
+background plane during capture (restores the overlay state afterwards). Note
+that the editor renders Plane B once at world origin (512x256 px) — screenshots
+of regions away from the origin won't show it.
 
 ## Constraints enforced at the tool boundary
 

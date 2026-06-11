@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  parseBgTiles, serializeBgTiles, padBgTilesToLayout, stripBgTilePadding,
+  parseBgTiles, serializeBgTiles, normalizeBgLayout, BG_TILE_BASE_SLOT, BG_WIDTH,
 } from '../../src/core/formats/bg-tiles';
 import type { Tile } from '../../src/core/model/s4-types';
 
@@ -48,58 +48,102 @@ describe('BG tile blob format (2-byte BE byte-length header + raw 4bpp tiles)', 
   });
 });
 
-describe('VRAM-base padding (loader) and stripping (saver)', () => {
-  it('pads blob tiles up to the min nonzero layout index when indices are VRAM-absolute', () => {
-    const layout = new Uint16Array(64 * 32);
-    layout[0] = 1024;       // min nonzero index
-    layout[1] = 1025;
-    const blob = [tile(3), tile(4)];
-    const padded = padBgTilesToLayout(layout, blob);
-    expect(padded).toHaveLength(1026);
-    expect(padded[1024].pixels[0]).toBe(3);
-    expect(padded[1025].pixels[0]).toBe(4);
-    expect(padded[0].pixels.every(p => p === 0)).toBe(true);
+describe('normalizeBgLayout (engine VRAM-absolute -> local BG-blob indices)', () => {
+  it('exports the engine BG region base slot and Plane B width', () => {
+    expect(BG_TILE_BASE_SLOT).toBe(1024);
+    expect(BG_WIDTH).toBe(64);
   });
 
-  it('leaves blob untouched when layout indices are already local to the blob', () => {
-    const layout = new Uint16Array(64 * 32);
-    layout[0] = 0x2001; // tile 1 of 3 — max index < blob length
-    layout[1] = 2;
-    const blob = [tile(1), tile(2), tile(3)];
-    expect(padBgTilesToLayout(layout, blob)).toBe(blob);
-  });
-
-  it('strips a blank padding prefix so save inverts load', () => {
-    const layout = new Uint16Array(64 * 32);
+  it('subtracts the base from engine-convention indices, preserving pal/flip/pri bits', () => {
+    const layout = new Uint16Array(BG_WIDTH * 32);
     layout[0] = 1024;
-    layout[1] = 1025;
-    const padded = padBgTilesToLayout(layout, [tile(3), tile(4)]);
-    const stripped = stripBgTilePadding(layout, padded);
-    expect(stripped).toHaveLength(2);
-    expect(stripped[0].pixels[0]).toBe(3);
+    layout[1] = (1 << 15) | (2 << 13) | (1 << 12) | (1 << 11) | 1025; // pri, pal 2, vf, hf
+    layout[2] = (3 << 13) | 1026;                                     // pal 3
+    const out = normalizeBgLayout(layout, BG_TILE_BASE_SLOT);
+    expect(out[0]).toBe(0);
+    expect(out[1] & 0x7FF).toBe(1);
+    expect(out[1] & 0xF800).toBe((1 << 15) | (2 << 13) | (1 << 12) | (1 << 11));
+    expect(out[2] & 0x7FF).toBe(2);
+    expect(out[2] & 0xF800).toBe(3 << 13);
   });
 
-  it('does not strip when the prefix contains art (local indices using tile 0)', () => {
-    const layout = new Uint16Array(64 * 32);
-    layout[0] = 1;          // min nonzero index = 1, but tiles[0] has art
-    const tiles = [tile(9), tile(1)];
-    expect(stripBgTilePadding(layout, tiles)).toBe(tiles);
+  it('leaves blank words (tile bits 0) untouched, flags and all', () => {
+    const layout = new Uint16Array(BG_WIDTH * 32);
+    layout[0] = 1024;            // engine convention trigger
+    layout[1] = 0;               // blank
+    layout[2] = (1 << 13) | 0;   // tile 0 with pal bits — VRAM blank tile ref
+    const out = normalizeBgLayout(layout, BG_TILE_BASE_SLOT);
+    expect(out[1]).toBe(0);
+    expect(out[2]).toBe((1 << 13) | 0);
   });
 
-  it('round-trips load -> save -> load for both index conventions', () => {
-    for (const base of [0, 1024]) {
-      const layout = new Uint16Array(64 * 32);
-      layout[0] = base === 0 ? 1 : base;
-      layout[5] = (base === 0 ? 1 : base) + 1;
-      const inMemory = padBgTilesToLayout(layout, [tile(0), tile(5), tile(6)].slice(base === 0 ? 0 : 1));
-      // save
-      const blobBytes = serializeBgTiles(stripBgTilePadding(layout, inMemory));
-      // load
-      const reloaded = padBgTilesToLayout(layout, parseBgTiles(blobBytes));
-      expect(reloaded.length).toBe(inMemory.length);
-      for (let i = 0; i < inMemory.length; i++) {
-        expect(Array.from(reloaded[i].pixels)).toEqual(Array.from(inMemory[i].pixels));
-      }
+  it('passes already-local layouts through unchanged (min nonzero index < base)', () => {
+    const layout = new Uint16Array(BG_WIDTH * 32);
+    layout[0] = (2 << 13) | 1;
+    layout[1] = 5;
+    expect(normalizeBgLayout(layout, BG_TILE_BASE_SLOT)).toBe(layout);
+  });
+
+  it('passes an all-blank layout through unchanged', () => {
+    const layout = new Uint16Array(BG_WIDTH * 32);
+    expect(normalizeBgLayout(layout, BG_TILE_BASE_SLOT)).toBe(layout);
+  });
+
+  it('does not mutate the input when converting', () => {
+    const layout = new Uint16Array(BG_WIDTH * 32);
+    layout[0] = 1024;
+    normalizeBgLayout(layout, BG_TILE_BASE_SLOT);
+    expect(layout[0]).toBe(1024);
+  });
+});
+
+describe('load/save round-trip in the local convention', () => {
+  it('round-trips an engine-shaped fixture: load -> normalize -> save -> reload, render-equivalent', () => {
+    // Synthetic engine output: 3 tiles, layout indices 1024-1026.
+    const engineTiles = [tile(1), tile(2), tile(3)];
+    const engineBlob = serializeBgTiles(engineTiles);
+    const engineLayout = new Uint16Array(BG_WIDTH * 32);
+    engineLayout[0] = 1024;
+    engineLayout[1] = (1 << 13) | 1025;
+    engineLayout[2] = 1026;
+
+    // Load: parse + normalize once. In-memory is local from here on.
+    const loadedTiles = parseBgTiles(engineBlob);
+    const loadedLayout = normalizeBgLayout(engineLayout, BG_TILE_BASE_SLOT);
+    expect(Array.from(loadedLayout.slice(0, 3)).map(w => w & 0x7FF)).toEqual([0, 1, 2]);
+
+    // Save: serialize the in-memory arrays directly (editor files stay local).
+    const savedBlob = serializeBgTiles(loadedTiles);
+    const savedLayout = loadedLayout;
+
+    // Reload: normalize is a no-op on local data.
+    const reloadedTiles = parseBgTiles(savedBlob);
+    const reloadedLayout = normalizeBgLayout(savedLayout, BG_TILE_BASE_SLOT);
+    expect(reloadedLayout).toBe(savedLayout);
+    expect(reloadedTiles).toHaveLength(3);
+
+    // Render-equivalence: every layout word resolves to the same pixels the
+    // engine layout resolved to.
+    for (let i = 0; i < 3; i++) {
+      const localIdx = reloadedLayout[i] & 0x7FF;
+      expect(Array.from(reloadedTiles[localIdx].pixels)).toEqual(Array.from(engineTiles[i].pixels));
+      expect(reloadedLayout[i] & 0xF800).toBe(engineLayout[i] & 0xF800);
+    }
+  });
+
+  it('preserves blank tile 0 + unreferenced trailing tiles (the old strip/pad corruption case)', () => {
+    // Local layout whose min nonzero index is 1, blob with a blank tile 0 and
+    // unreferenced trailing tiles. The deleted strip-at-save/pad-at-load pair
+    // shifted these blobs by one tile on reload; the local convention must
+    // round-trip them byte-identically.
+    const tiles = [tile(0), tile(7), tile(0), tile(9)];
+    const layout = new Uint16Array(BG_WIDTH * 32);
+    layout[0] = 1;
+    expect(normalizeBgLayout(layout, BG_TILE_BASE_SLOT)).toBe(layout);
+    const reloaded = parseBgTiles(serializeBgTiles(tiles));
+    expect(reloaded).toHaveLength(4);
+    for (let i = 0; i < 4; i++) {
+      expect(Array.from(reloaded[i].pixels)).toEqual(Array.from(tiles[i].pixels));
     }
   });
 });

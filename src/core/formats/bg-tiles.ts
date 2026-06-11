@@ -34,54 +34,38 @@ export function serializeBgTiles(tiles: Tile[]): Uint8Array {
   return out;
 }
 
-/** Min nonzero tile index referenced by a BG layout (the engine's VRAM base slot). */
-function layoutVramBase(layout: Uint16Array): number {
-  let base = 0x7FF;
-  for (let i = 0; i < layout.length; i++) {
-    const idx = layout[i] & 0x7FF;
-    if (idx > 0 && idx < base) base = idx;
-  }
-  return base;
-}
+/** Plane B nametable width in tiles (the engine's fixed 64x32 Plane B). */
+export const BG_WIDTH = 64;
 
 /**
- * Make a parsed BG blob directly indexable by the layout's tile indices.
+ * First VRAM tile slot of the BG region. Engine-emitted layouts index tiles
+ * from this slot (VRAM-absolute); the editor's in-memory convention is ALWAYS
+ * local to the BG blob (tile 0 = first blob tile).
+ */
+export const BG_TILE_BASE_SLOT = 1024;
+
+/**
+ * Normalize a BG layout to the local index convention, once, at load time.
  *
- * Engine-emitted layouts use VRAM-absolute indices (BG_TILE_BASE_SLOT + n,
- * i.e. 1024+) while the blob stores only the referenced tiles — so the blob
- * is padded with blank tiles up to the min nonzero index. Editor/agent
- * layouts already use indices local to the blob (max index < blob length)
- * and are returned untouched.
+ * Engine-convention layouts (every nonzero tile index >= base) get `base`
+ * subtracted from each word's tile-index bits — pal/flip/pri bits are
+ * preserved, and words with tile bits 0 (VRAM blank-tile refs) are left
+ * untouched. Already-local layouts (min nonzero index < base, or all-blank)
+ * pass through unchanged, so the function is idempotent and editor-saved
+ * files load as-is.
  */
-export function padBgTilesToLayout(layout: Uint16Array, tiles: Tile[]): Tile[] {
-  if (tiles.length === 0) return tiles;
-  let maxIdx = 0;
+export function normalizeBgLayout(layout: Uint16Array, base: number): Uint16Array {
+  let min = Infinity;
   for (let i = 0; i < layout.length; i++) {
     const idx = layout[i] & 0x7FF;
-    if (idx > maxIdx) maxIdx = idx;
+    if (idx > 0 && idx < min) min = idx;
   }
-  if (maxIdx < tiles.length) return tiles; // indices already local to the blob
-  const base = layoutVramBase(layout);
-  if (base <= 0 || base >= 0x7FF) return tiles;
-  const padded: Tile[] = new Array(base + tiles.length);
-  for (let t = 0; t < base; t++) padded[t] = { pixels: new Uint8Array(64) };
-  for (let t = 0; t < tiles.length; t++) padded[base + t] = tiles[t];
-  return padded;
-}
-
-/**
- * Inverse of padBgTilesToLayout for saving: drop the blank padding prefix
- * below the layout's min nonzero index so a reload (parse + pad) rebuilds the
- * exact in-memory array. Refuses to strip when the prefix contains art (e.g.
- * agent-built layouts that reference tile 0), where the unpadded blob already
- * round-trips because every index stays below the blob length.
- */
-export function stripBgTilePadding(layout: Uint16Array, tiles: Tile[]): Tile[] {
-  const base = layoutVramBase(layout);
-  if (base <= 0 || base >= 0x7FF || base >= tiles.length) return tiles;
-  for (let t = 0; t < base; t++) {
-    const px = tiles[t]?.pixels;
-    if (!px || px.some(p => p !== 0)) return tiles;
+  if (min === Infinity || min < base) return layout; // no tile refs at all, or already local
+  const out = new Uint16Array(layout.length);
+  for (let i = 0; i < layout.length; i++) {
+    const word = layout[i];
+    const idx = word & 0x7FF;
+    out[i] = idx === 0 ? word : (word & 0xF800) | (idx - base);
   }
-  return tiles.slice(base);
+  return out;
 }
