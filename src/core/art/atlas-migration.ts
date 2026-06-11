@@ -16,6 +16,15 @@ interface TileMapping { index: number; fx: boolean; fy: boolean; }
  * sections. Mutates zoneTiles/chunks/sections in place (load-time transform,
  * not an undoable command — see the spec). Throws before any mutation if the
  * merged atlas would exceed the 2048-tile hardware ceiling.
+ *
+ * RE-ENTRY HAZARD: this function is NOT idempotent in the general case. If a
+ * merge appended tiles and the remapped chunk nametables were saved, running
+ * the migration again with the same chunkTiles input misinterprets the
+ * already-zone-space indices as chunkTiles indices and corrupts references.
+ * Callers must guarantee at-most-once semantics (the loader only migrates
+ * when chunks_tiles.bin is non-empty, and the save path empties it after a
+ * successful migration). The OJZ project is additionally safe because its
+ * zone tileset and chunkTiles share one file, making re-runs a fixed point.
  */
 export function migrateChunkTilesIntoTileset(
   zoneTiles: Tile[],

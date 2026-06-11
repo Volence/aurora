@@ -63,6 +63,32 @@ describe('migrateChunkTilesIntoTileset', () => {
     expect(unpackNametableWord(section.tileGrid.nametable[0]).tileIndex).toBe(1); // untouched
   });
 
+  it('collapses flip/exact duplicates among the incoming tiles onto one appended tile', () => {
+    const zoneTiles: Tile[] = [{ pixels: new Uint8Array(64) }];
+    const fresh = tileFromRow([1, 2, 3, 4, 5, 6, 7, 8]);
+    const hflipped = tileFromRow([8, 7, 6, 5, 4, 3, 2, 1]);
+    const exactDup = tileFromRow([1, 2, 3, 4, 5, 6, 7, 8]);
+    const chunkTiles = [fresh, hflipped, exactDup];
+    const chunk = createChunkDef('c', 'C', 3, 1);
+    chunk.nametable[0] = packNametableWord(0, 1, false, false, false); // fresh
+    chunk.nametable[1] = packNametableWord(1, 1, false, false, false); // hflip variant
+    chunk.nametable[2] = packNametableWord(2, 1, false, true, false);  // exact dup, vflagged
+
+    const result = migrateChunkTilesIntoTileset(zoneTiles, chunkTiles, [chunk], []);
+    expect(result.appended).toBe(1);
+    expect(zoneTiles.length).toBe(2);
+    const e0 = unpackNametableWord(chunk.nametable[0]);
+    const e1 = unpackNametableWord(chunk.nametable[1]);
+    const e2 = unpackNametableWord(chunk.nametable[2]);
+    expect(e0.tileIndex).toBe(1);
+    expect(e1.tileIndex).toBe(1);
+    expect(e2.tileIndex).toBe(1);
+    expect(e0.hFlip).toBe(false);
+    expect(e1.hFlip).toBe(true);   // compensated against first-seen orientation
+    expect(e2.hFlip).toBe(false);
+    expect(e2.vFlip).toBe(true);   // original flag preserved
+  });
+
   it('throws if the merge would exceed 2048 tiles, before mutating anything', () => {
     const zoneTiles: Tile[] = Array.from({ length: 2048 }, (_, i) => {
       const p = new Uint8Array(64); p[0] = i & 0xF; p[1] = (i >> 4) & 0xF; p[2] = (i >> 8) & 0xF;
