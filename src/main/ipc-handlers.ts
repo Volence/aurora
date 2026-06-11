@@ -37,10 +37,16 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle(IPC_CHANNELS.WRITE_BINARY_FILE, async (_event, basePath: string, relativePath: string, data: ArrayBuffer) => {
     const { resolve, dirname } = await import('path');
-    const { writeFileSync, mkdirSync } = await import('fs');
+    const { writeFileSync, renameSync, mkdirSync } = await import('fs');
     const fullPath = resolve(basePath, relativePath);
     mkdirSync(dirname(fullPath), { recursive: true });
-    writeFileSync(fullPath, Buffer.from(data));
+    // Write to a sibling .tmp file first, then atomically rename into place.
+    // On POSIX a same-directory rename is atomic, so a crash mid-write cannot
+    // corrupt the target (critical for project.json, which bricks the project
+    // if partially written).
+    const tmpPath = fullPath + '.tmp';
+    writeFileSync(tmpPath, Buffer.from(data));
+    renameSync(tmpPath, fullPath);
     return true;
   });
 

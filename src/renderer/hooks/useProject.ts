@@ -2,6 +2,16 @@ import { useCallback } from 'react';
 import { useProjectStore, getCurrentAct, getCurrentZone } from '../state/projectStore';
 import { useViewStore } from '../state/viewStore';
 import { useEditorStore } from '../state/editorStore';
+
+// Set to true only when migrateChunkTilesIntoTileset ran successfully during
+// the current loadFullProject call. Reset at the top of each load so stale
+// flag from a previous session cannot gate a truncation on the next save.
+let legacyAtlasMergedThisLoad = false;
+
+/** Derive the legacy chunk-tiles atlas path from the chunk-library JSON path. */
+function legacyAtlasPath(chunkLibraryPath: string): string {
+  return chunkLibraryPath.replace('.json', '_tiles.bin');
+}
 import { loadS4Config, type S4ProjectConfig } from '../../core/config/s4-config';
 import { parseTiles } from '../../core/formats/tiles';
 import { buildPalette } from '../../core/formats/palette';
@@ -192,15 +202,22 @@ export function useProject() {
       // general. Now that the unified tileset is saved to the editor-owned
       // path and project.json points there, truncate the legacy atlas so the
       // migration can never re-enter on the merged data.
-      // Guard: skip the truncation if that path is still some zone's CURRENT
-      // raw-config tileset (i.e. the retarget above didn't move it) — in the
-      // OJZ project the configured tileset literally aliases chunks_tiles.bin,
-      // and truncating the live tileset file would destroy the zone art.
-      if (config.chunkLibraryPath) {
-        const legacyChunkTilesPath = config.chunkLibraryPath.replace('.json', '_tiles.bin');
-        const aliasesLiveTileset = config.raw.zones.some(rz => rz.tileset === legacyChunkTilesPath);
+      // Guards (both must pass — belt-and-braces):
+      //   1. legacyAtlasMergedThisLoad — the migration actually ran and
+      //      succeeded during the current load. If chunks.json failed to parse
+      //      on load (swallowed in the catch block), the migration was skipped
+      //      and we must NOT truncate — doing so would permanently destroy
+      //      tile art that was never merged into the zone tileset.
+      //   2. aliasesLiveTileset check — skip if that path is still some zone's
+      //      CURRENT raw-config tileset (i.e. the retarget above didn't move
+      //      it). In the OJZ project the configured tileset literally aliases
+      //      chunks_tiles.bin; truncating the live tileset file would destroy
+      //      zone art.
+      if (config.chunkLibraryPath && legacyAtlasMergedThisLoad) {
+        const atlasTruncatePath = legacyAtlasPath(config.chunkLibraryPath);
+        const aliasesLiveTileset = config.raw.zones.some(rz => rz.tileset === atlasTruncatePath);
         if (!aliasesLiveTileset) {
-          await window.api.writeBinaryFile(basePath, legacyChunkTilesPath, new ArrayBuffer(0));
+          await window.api.writeBinaryFile(basePath, atlasTruncatePath, new ArrayBuffer(0));
         }
       }
 
@@ -247,6 +264,10 @@ export function useProject() {
 }
 
 async function loadFullProject(config: ReturnType<typeof loadS4Config>): Promise<S4Project> {
+  // Reset migration flag at the start of every load so a stale true from a
+  // prior session cannot incorrectly gate truncation on the next save.
+  legacyAtlasMergedThisLoad = false;
+
   const basePath = config.basePath;
   const zones: Zone[] = [];
 
@@ -446,8 +467,7 @@ async function loadFullProject(config: ReturnType<typeof loadS4Config>): Promise
     // Load the legacy chunk-tiles atlas (chunks_tiles.bin) — used only as
     // migration input below; it is never put on the project object.
     try {
-      const tilesPath = config.chunkLibraryPath.replace('.json', '_tiles.bin');
-      const tilesRaw = await readFile(basePath, tilesPath);
+      const tilesRaw = await readFile(basePath, legacyAtlasPath(config.chunkLibraryPath));
       chunkTiles = parseTiles(tilesRaw);
     } catch {
       // no chunk tiles
@@ -467,6 +487,7 @@ async function loadFullProject(config: ReturnType<typeof loadS4Config>): Promise
       '[load] chunks_tiles.bin is non-empty but the chunk library is empty — skipping atlas migration (nothing references those tiles)',
     );
   }
+  // TODO(art-suite follow-up): make chunks.json self-describing (tileSpace marker) so migration is idempotent without truncation ordering.
   if (chunkTiles.length > 0 && chunkLibrary.length > 0 && zones.length > 0) {
     try {
       const allSections = zones.flatMap(z => z.acts.flatMap(a => a.sections));
@@ -480,6 +501,10 @@ async function loadFullProject(config: ReturnType<typeof loadS4Config>): Promise
         `Tile atlases unified — ${result.appended} tiles merged, ${result.remapped} entries checked`,
         'success',
       );
+      // Mark that migration ran successfully this load — saveProject uses this
+      // to gate truncation of the legacy atlas (belt-and-braces with the alias
+      // guard: BOTH must pass before we zero chunks_tiles.bin).
+      legacyAtlasMergedThisLoad = true;
     } catch (err) {
       // Abort the load: post-migration code paths cannot render chunkTiles,
       // so a half-loaded project would reference the wrong atlas.

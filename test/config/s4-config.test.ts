@@ -57,7 +57,43 @@ describe('s4-config', () => {
     };
     const config = loadS4Config(json, '/project');
     expect(config.raw).toBe(json);
-    expect(JSON.parse(JSON.stringify(config.raw))).toEqual(json);
+  });
+
+  it('unknown fields survive a tileset-retarget stringify round-trip', () => {
+    const json: S4ProjectConfig = {
+      name: 'Sonic 4',
+      engine: 's4',
+      zones: [{
+        id: 'ojz',
+        name: 'Orange Juice Zone',
+        tileset: 'data/editor/ojz/chunks_tiles.bin',
+        palette: 'data/palettes/ojz_palette.bin',
+        acts: [{
+          id: 'act1',
+          gridWidth: 4,
+          gridHeight: 3,
+          dataPath: 'data/levels/ojz/act1/',
+          bgLayout: null,
+          bgTiles: null,
+          parallax: null,
+          startPosition: { secX: 0, secY: 0, localX: 256, localY: 256 },
+        }],
+      }],
+      objectLibrary: 'data/objdefs/objects.json',
+      chunkLibrary: 'data/editor/ojz/chunks.json',
+    };
+    const config = loadS4Config(json, '/project');
+
+    // Attach a hypothetical future field that the current schema does not know about
+    (config.raw as Record<string, unknown>).futureField = { keep: true };
+
+    // Simulate what saveProject does: mutate the tileset and re-stringify
+    config.raw.zones[0].tileset = 'data/editor/ojz_tiles.bin';
+    const output = JSON.stringify(config.raw);
+
+    expect(output).toContain('"futureField"');
+    expect(output).toContain('"keep":true');
+    expect(output).toContain('"data/editor/ojz_tiles.bin"');
   });
 
   it('survives a tileset retarget through a stringify round-trip', () => {
