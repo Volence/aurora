@@ -9,6 +9,7 @@ import type { ChunkDef } from '../../../core/model/s4-types';
 import ComposerCanvas from './ComposerCanvas';
 import ToolColumn from './ToolColumn';
 import TilesetPanel from './TilesetPanel';
+import PaletteEditor from './PaletteEditor';
 import ChunkLibrary from '../ChunkLibrary';
 
 function slug(name: string): string {
@@ -174,9 +175,9 @@ export default function ArtMode() {
       useProjectStore.getState().addChunks([saved]);
       useEditorStore.getState().markDirty();
     }
-    // MapViewport (which owns the invalidation listener) is unmounted in Art
-    // mode — bust the chunk thumbnail cache here so it refreshes on return.
-    useEditorStore.getState().bumpChunkLibraryVersion();
+    // Thumbnail invalidation: the set-chunk path bumps chunkLibraryVersion in
+    // editorStore (bumpStoreVersions); the addChunks path changes chunks.length,
+    // which is part of ChunkLibrary's thumb cache key. No explicit bump needed.
 
     // Re-open from the saved source so locals collapse to atlas references.
     openDocument({
@@ -268,13 +269,11 @@ export default function ArtMode() {
         )}
       </div>
 
-      {/* Right panel: tileset + palette + chunk library placeholder */}
+      {/* Right panel: tileset + palette + chunk library */}
       <div style={styles.rightPanel}>
         <TilesetPanel />
         <div style={styles.panelHeader}>Palette</div>
-        <div style={styles.placeholder}>
-          PaletteEditor — Task 11
-        </div>
+        <PaletteEditor />
         <ChunkLibrary />
       </div>
     </div>
@@ -314,12 +313,6 @@ const styles: Record<string, React.CSSProperties> = {
     textTransform: 'uppercase' as const,
     letterSpacing: 1,
     borderBottom: '1px solid #313244',
-  },
-  placeholder: {
-    padding: '8px',
-    fontSize: 11,
-    color: '#45475a',
-    fontStyle: 'italic',
   },
   center: {
     flex: 1,

@@ -108,12 +108,9 @@ export default function MapViewport() {
           // caches at load time — re-prerender everything.
           reloadAllSections();
           break;
-        case 'set-chunk':
-          // Chunk nametable/collision changed — bust the thumbnail cache so
-          // ChunkLibrary recomputes thumbnails on next render.
-          useEditorStore.getState().bumpChunkLibraryVersion();
-          break;
         default:
+          // set-chunk thumbnail invalidation is a store concern handled in
+          // editorStore (bumpStoreVersions) so it survives Art mode.
           // Objects/rings are drawn by the OverlayRenderer from live state
           // every frame; the historyVersion bump already re-renders them.
           break;

@@ -153,10 +153,22 @@ export function setCommandInvalidationListener(fn: ((cmd: AnyCommand) => void) |
 }
 
 /**
+ * Store-level invalidation for commands. Unlike the renderer-cache listener
+ * above (owned by MapViewport, unmounted in Art mode), these version bumps are
+ * pure store concerns and must fire for every execute/undo/redo regardless of
+ * which mode is active — e.g. undoing a set-chunk in Art mode must still bust
+ * the ChunkLibrary thumbnail cache.
+ */
+function bumpStoreVersions(cmd: AnyCommand): void {
+  if (cmd.type === 'set-chunk') useEditorStore.getState().bumpChunkLibraryVersion();
+}
+
+/**
  * Execute a command against the current level, updating history and triggering re-render.
  */
 export function executeCommand(command: AnyCommand, level: S4Level): void {
   editHistory.execute(command, level);
+  bumpStoreVersions(command);
   invalidationListener?.(command);
   useEditorStore.getState().markDirty();
   useEditorStore.getState().bumpVersion();
@@ -164,12 +176,18 @@ export function executeCommand(command: AnyCommand, level: S4Level): void {
 
 export function undo(level: S4Level): void {
   const cmd = editHistory.undo(level);
-  if (cmd) invalidationListener?.(cmd);
+  if (cmd) {
+    bumpStoreVersions(cmd);
+    invalidationListener?.(cmd);
+  }
   useEditorStore.getState().bumpVersion();
 }
 
 export function redo(level: S4Level): void {
   const cmd = editHistory.redo(level);
-  if (cmd) invalidationListener?.(cmd);
+  if (cmd) {
+    bumpStoreVersions(cmd);
+    invalidationListener?.(cmd);
+  }
   useEditorStore.getState().bumpVersion();
 }
