@@ -49,6 +49,14 @@ and the editor is not active.
   disabled). If content is blank, ensure a project is loaded and the section is
   rendered (use `goto` first).
 
+## Shared atlas, palette, and undo stack with human editing
+
+Agent and human art editing share the same atlas, palette, and undo stack. A `write_tiles`
+call and a brush stroke in Art mode are the same kind of operation: both produce
+`set-tileset-tiles` commands on the project's EditHistory, and both are undone with Ctrl+Z.
+The `goto` and `screenshot` tools auto-switch the editor to Map mode so the viewport is
+visible for screenshots. See `docs/ART_SUITE.md` for the full human-facing art workflow.
+
 ## Known limitations
 
 - Tile atlases were unified (2026-06): rendering, export, budget, and MCP all use
