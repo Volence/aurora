@@ -66,6 +66,7 @@ interface EditorState {
   multiSelection: MultiSelection | null;
   dirty: boolean;
   historyVersion: number;
+  chunkLibraryVersion: number;
 
   // S4 tool state
   activeSectionIndex: number;
@@ -92,6 +93,7 @@ interface EditorState {
   markDirty: () => void;
   markClean: () => void;
   bumpVersion: () => void;
+  bumpChunkLibraryVersion: () => void;
 }
 
 export const editHistory = new EditHistory();
@@ -102,6 +104,7 @@ export const useEditorStore = create<EditorState>((set) => ({
   multiSelection: null,
   dirty: false,
   historyVersion: 0,
+  chunkLibraryVersion: 0,
 
   activeSectionIndex: 0,
   editingLayer: 'fg',
@@ -127,6 +130,7 @@ export const useEditorStore = create<EditorState>((set) => ({
   markDirty: () => set({ dirty: true }),
   markClean: () => set({ dirty: false }),
   bumpVersion: () => set((s) => ({ historyVersion: s.historyVersion + 1 })),
+  bumpChunkLibraryVersion: () => set((s) => ({ chunkLibraryVersion: s.chunkLibraryVersion + 1 })),
 }));
 
 /**

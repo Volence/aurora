@@ -64,6 +64,7 @@ function rebuildThumbCache(chunks: ChunkDef[], tiles: Tile[], palette: Palette, 
 
 export default function ChunkLibrary() {
   const selectedChunkId = useEditorStore((s) => s.selectedChunkId);
+  const chunkLibraryVersion = useEditorStore((s) => s.chunkLibraryVersion);
   const project = useProjectStore((s) => s.project);
   const currentZoneId = useProjectStore((s) => s.currentZoneId);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -80,9 +81,12 @@ export default function ChunkLibrary() {
 
   useEffect(() => {
     if (zone && currentZoneId && chunks.length > 0 && tiles.length > 0) {
-      rebuildThumbCache(chunks, tiles, palette, `${currentZoneId}:${chunks.length}:${tiles.length}`);
+      rebuildThumbCache(
+        chunks, tiles, palette,
+        `${currentZoneId}:${chunks.length}:${tiles.length}:${chunkLibraryVersion}`,
+      );
     }
-  }, [zone, currentZoneId, chunks.length, tiles.length]);
+  }, [zone, currentZoneId, chunks.length, tiles.length, chunkLibraryVersion]);
 
   const renderGrid = useCallback(() => {
     const canvas = canvasRef.current;
@@ -128,7 +132,7 @@ export default function ChunkLibrary() {
         }
       }
     }
-  }, [chunks, scrollTop, selectedChunkId, tiles.length]);
+  }, [chunks, scrollTop, selectedChunkId, tiles.length, chunkLibraryVersion]);
 
   useEffect(() => {
     renderGrid();

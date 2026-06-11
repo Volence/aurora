@@ -1,9 +1,10 @@
-import type { ObjectPlacement, RingPlacement, Section, Tileset, Palette, Color, Tile } from '../model/s4-types';
+import type { ObjectPlacement, RingPlacement, Section, Tileset, Palette, Color, Tile, ChunkDef } from '../model/s4-types';
 
 export interface S4Level {
   sections: (Section | null)[];
-  tileset?: Tileset;   // zone-level; present when zone commands are used
+  tileset?: Tileset;          // zone-level; present when zone commands are used
   palette?: Palette;
+  chunkLibrary?: ChunkDef[];  // zone-level; present when set-chunk commands are used
 }
 
 export interface EditCommand {
@@ -97,6 +98,15 @@ export interface SetTilesetTilesCommand extends EditCommand {
   newTiles: Tile[];
 }
 
+export interface SetChunkCommand extends EditCommand {
+  type: 'set-chunk';
+  chunkId: string;
+  oldNametable: Uint16Array;
+  newNametable: Uint16Array;
+  oldCollision: Uint8Array;
+  newCollision: Uint8Array;
+}
+
 export type AnyCommand =
   | SetTilesCommand
   | SetCollisionCommand
@@ -112,4 +122,5 @@ export type AnyCommand =
   | DeleteObjectsCommand
   | DeleteRingsCommand
   | SetPaletteLineCommand
-  | SetTilesetTilesCommand;
+  | SetTilesetTilesCommand
+  | SetChunkCommand;

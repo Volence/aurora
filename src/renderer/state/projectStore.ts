@@ -75,5 +75,10 @@ export function getActiveLevel(state: ProjectState): S4Level | null {
   const zone = getCurrentZone(state);
   const act = getCurrentAct(state);
   if (!zone || !act) return null;
-  return { sections: act.sections, tileset: zone.tileset, palette: zone.palette };
+  return {
+    sections: act.sections,
+    tileset: zone.tileset,
+    palette: zone.palette,
+    chunkLibrary: state.project?.chunkLibrary,
+  };
 }

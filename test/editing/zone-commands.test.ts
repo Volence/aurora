@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { EditHistory } from '../../src/core/editing/history';
 import type { S4Level } from '../../src/core/editing/commands';
 import type { Tile, Palette } from '../../src/core/model/s4-types';
+import { createChunkDef } from '../../src/core/model/s4-types';
 
 function makeLevel(): S4Level {
   const palette: Palette = {
@@ -66,6 +67,45 @@ describe('set-tileset-tiles command', () => {
     expect(level.tileset!.tiles[0].pixels[0]).toBe(7);
     history.undo(level);
     expect(level.tileset!.tiles[0].pixels[0]).toBe(0);
+  });
+});
+
+describe('set-chunk command', () => {
+  function levelWithChunk() {
+    const level = makeLevel();
+    const chunk = createChunkDef('c1', 'Chunk 1', 2, 2);
+    (level as { chunkLibrary?: unknown }).chunkLibrary = [chunk];
+    return { level, chunk };
+  }
+
+  it('applies and undoes nametable+collision swaps', () => {
+    const { level, chunk } = levelWithChunk();
+    const history = new EditHistory();
+    const newNt = new Uint16Array([1, 2, 3, 4]);
+    const newColl = new Uint8Array([5, 6, 7, 8]);
+    history.execute({
+      type: 'set-chunk', description: 'edit chunk', sectionIndex: -1,
+      chunkId: 'c1',
+      oldNametable: new Uint16Array(chunk.nametable), newNametable: newNt,
+      oldCollision: new Uint8Array(chunk.collision), newCollision: newColl,
+    }, level);
+    expect(Array.from(chunk.nametable)).toEqual([1, 2, 3, 4]);
+    history.undo(level);
+    expect(Array.from(chunk.nametable)).toEqual([0, 0, 0, 0]);
+    expect(Array.from(chunk.collision)).toEqual([0, 0, 0, 0]);
+  });
+
+  it('throws when level lacks chunkLibrary or the chunk id is unknown', () => {
+    const level = makeLevel();
+    const history = new EditHistory();
+    const cmd = {
+      type: 'set-chunk' as const, description: 'x', sectionIndex: -1, chunkId: 'nope',
+      oldNametable: new Uint16Array(0), newNametable: new Uint16Array(0),
+      oldCollision: new Uint8Array(0), newCollision: new Uint8Array(0),
+    };
+    expect(() => history.execute(cmd, level)).toThrow(/chunkLibrary/);
+    (level as { chunkLibrary?: unknown }).chunkLibrary = [];
+    expect(() => history.execute(cmd, level)).toThrow(/nope/);
   });
 });
 

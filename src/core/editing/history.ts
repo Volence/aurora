@@ -65,6 +65,14 @@ function applyCommand(cmd: AnyCommand, level: S4Level): void {
     }
     return;
   }
+  if (cmd.type === 'set-chunk') {
+    if (!level.chunkLibrary) throw new Error('set-chunk requires level.chunkLibrary');
+    const chunk = level.chunkLibrary.find(c => c.id === cmd.chunkId);
+    if (!chunk) throw new Error(`set-chunk: unknown chunk ${cmd.chunkId}`);
+    chunk.nametable = new Uint16Array(cmd.newNametable);
+    chunk.collision = new Uint8Array(cmd.newCollision);
+    return;
+  }
 
   const section = level.sections[cmd.sectionIndex];
   if (!section) return;
@@ -148,6 +156,14 @@ function undoCommand(cmd: AnyCommand, level: S4Level): void {
         level.tileset.tiles[cmd.at + i] = { pixels: new Uint8Array(old.pixels) };
       }
     }
+    return;
+  }
+  if (cmd.type === 'set-chunk') {
+    if (!level.chunkLibrary) throw new Error('set-chunk requires level.chunkLibrary');
+    const chunk = level.chunkLibrary.find(c => c.id === cmd.chunkId);
+    if (!chunk) throw new Error(`set-chunk: unknown chunk ${cmd.chunkId}`);
+    chunk.nametable = new Uint16Array(cmd.oldNametable);
+    chunk.collision = new Uint8Array(cmd.oldCollision);
     return;
   }
 
