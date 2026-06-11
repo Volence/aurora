@@ -1,5 +1,6 @@
 import React from 'react';
 import { useArtStore } from '../../state/artStore';
+import { useEditorStore } from '../../state/editorStore';
 import type { ArtTool } from '../../state/artStore';
 import type { DitherPattern, MirrorMode } from '../../../core/art/pixel-ops';
 
@@ -52,6 +53,11 @@ export default function ToolColumn() {
   const ditherPattern = useArtStore((s) => s.ditherPattern);
   const ditherSecondary = useArtStore((s) => s.ditherSecondary);
   const setDither = useArtStore((s) => s.setDither);
+  // Shared with Map mode's paint-collision tool. Map mode has no bounded
+  // picker, so clamp here: collision types are nibble-sized (0-15) in the
+  // editor's collision grids (per s4-strips).
+  const selectedCollisionType = useEditorStore((s) => s.selectedCollisionType);
+  const setSelectedCollisionType = useEditorStore((s) => s.setSelectedCollisionType);
 
   function cycleMirror() {
     const cur = MIRROR_CYCLE.indexOf(mirror);
@@ -121,6 +127,27 @@ export default function ToolColumn() {
             <button
               style={styles.ditherStepButton}
               onClick={() => setDither(ditherPattern, (ditherSecondary + 1) % 16)}
+            >
+              ▶
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Collision config: type stepper (wraps 0-15, nibble-sized) */}
+      {tool === 'collision' && (
+        <div style={styles.ditherConfig}>
+          <div style={styles.ditherStepper} title="Collision type to paint (0 = none)">
+            <button
+              style={styles.ditherStepButton}
+              onClick={() => setSelectedCollisionType((selectedCollisionType + 15) % 16)}
+            >
+              ◀
+            </button>
+            <span style={styles.ditherValue}>{selectedCollisionType & 0xF}</span>
+            <button
+              style={styles.ditherStepButton}
+              onClick={() => setSelectedCollisionType((selectedCollisionType + 1) % 16)}
             >
               ▶
             </button>

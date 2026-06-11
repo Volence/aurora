@@ -1,6 +1,20 @@
 # Art Suite — Usage Guide
 
-The Art Suite adds an in-editor Art mode for creating and editing tiles, 16×16 blocks,
+> **Terminology**
+>
+> | Term | Size | Notes |
+> |---|---|---|
+> | **Tile** | 8×8 px (1×1 tile) | The atomic Genesis art unit |
+> | **Block** | 16×16 px (2×2 tiles) | Classic Sonic block; editor-only concept |
+> | **Chunk** | 128×128 px (16×16 tiles) | The standard authoring unit; editor-only concept |
+>
+> Chunks and blocks exist only in the editor — the exported level data is flat
+> tile grids. Caveat: the s4_engine internally calls its 128×128 slicing unit a
+> "block" (`BLOCK_PIXEL_SIZE = 128` in `s4-types`). That naming is kept in
+> core/export code identifiers but never appears in UI labels, where 128×128 is
+> always a **chunk**.
+
+The Art Suite adds an in-editor Art mode for creating and editing tiles, blocks,
 and chunks (arbitrary-size assemblies of tiles) without leaving the level editor.
 All edits are one undo step (Ctrl+Z), shared with map edits and MCP agent edits.
 
@@ -23,8 +37,8 @@ When no document is open the canvas shows a launcher with three options:
 | Preset | Size | Use for |
 |---|---|---|
 | **New Tile 1×1** | 8×8 px | Painting a brand-new 8×8 tile |
-| **Block — 128×128 px (16×16 tiles)** | 16×16 tiles (128×128 px) | Composing a full 16×16-tile engine block from existing tiles |
-| **New Chunk W×H** | User-specified (1–64 tiles each dimension) | Custom-size chunk assembly |
+| **Block — 16×16 px (2×2 tiles)** | 2×2 tiles (16×16 px) | Composing a classic 16×16 block |
+| **New Chunk W×H** | User-specified (1–64 tiles each dimension; defaults to 16×16 tiles = one 128×128 px chunk) | Chunk assembly |
 
 Double-clicking a tile in the Tileset Panel opens that tile in a **1×1 edit-in-place
 document** (liveTileIndex is set; edits write directly to the atlas via `set-tileset-tiles`
@@ -32,8 +46,8 @@ commands). Double-clicking a chunk in the Chunk Library opens a **chunk document
 (chunkId is set).
 
 Right-click on the map canvas provides two quick-open entries: **Edit tile in Art mode**
-(opens the tile under the cursor for in-place editing) and **Edit 128×128 block as chunk**
-(copies the block-aligned region under the cursor into a new unsaved document).
+(opens the tile under the cursor for in-place editing) and **Edit 128×128 chunk region**
+(copies the chunk-aligned region under the cursor into a new unsaved document).
 
 ---
 
@@ -64,7 +78,7 @@ The two brush space tabs in the Tool Column switch the canvas between modes:
 | **Select** | Drag a marquee; Ctrl+C/V copies/pastes the selection; transforms apply to the selection if one is active, else the whole document |
 | **Dither** | Alternates two colors per a dither pattern (Checker/Sparse25/Sparse75); secondary color set in the dither panel below the tool buttons |
 | **Tile-stamp** (tile space) | Stamp the selected atlas tile into a whole cell |
-| **Collision** | Paint a collision type into a tile cell (reuses `selectedCollisionType` from the map editor) |
+| **Collision** | Paint a collision type into a tile cell (shares `selectedCollisionType` with the map editor); a ◀ N ▶ stepper appears below the tool buttons to pick the type (0–15, 0 = none) |
 
 ### Mirror Mode
 
@@ -171,7 +185,9 @@ The Palette Editor (right column, below the Tileset Panel) shows 4 lines × 16 s
 - The selected swatch's Genesis word (e.g. `$0A42`) is shown next to the sliders for
   cross-referencing with MCP `set_palette` output.
 - Clicking a swatch also sets it as the active paint color and palette line for pixel
-  brushes.
+  brushes. The active line drives the Tileset Panel preview — tile thumbnails recolor
+  to the clicked line — and empty composer cells adopt the active line when first
+  painted, so strokes render through the palette line you picked.
 
 ---
 

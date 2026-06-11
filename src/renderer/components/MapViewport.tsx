@@ -912,7 +912,7 @@ export default function MapViewport() {
             Edit tile in Art mode
           </button>
           <button style={styles.ctxItem} onClick={() => handleEditBlock(ctxMenu)}>
-            Edit 128×128 block as chunk
+            Edit 128×128 chunk region
           </button>
         </div>
       )}

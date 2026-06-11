@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   createDoc, docFromChunk, docFromTile, getPixel, setPixels, stampTile,
-  sliceForSave, cellAt, docToBuffer, bufferToWrites,
+  sliceForSave, cellAt, docToBuffer, bufferToWrites, adoptPaletteLineForEmptyCells,
 } from '../../src/core/art/composer-buffer';
 import { packNametableWord, createChunkDef } from '../../src/core/model/s4-types';
 import type { Tile } from '../../src/core/model/s4-types';
@@ -186,5 +186,31 @@ describe('docToBuffer / bufferToWrites', () => {
     const writes = bufferToWrites(before, after);
     expect(writes).toEqual([{ x: 2, y: 3, value: 5 }]);
     expect(bufferToWrites(before, before)).toEqual([]);
+  });
+});
+
+describe('adoptPaletteLineForEmptyCells', () => {
+  it('empty cells under the writes adopt the active palette line', () => {
+    const doc = createDoc(2, 1);
+    adoptPaletteLineForEmptyCells(doc, [{ x: 1, y: 1 }], 3);
+    expect(cellAt(doc, 0, 0).pal).toBe(3);
+    expect(cellAt(doc, 1, 0).pal).toBe(0); // untouched cell keeps its line
+  });
+
+  it('occupied cells (atlas or local) keep their existing line', () => {
+    const doc = createDoc(2, 1);
+    cellAt(doc, 0, 0).atlasTile = 1;
+    cellAt(doc, 0, 0).pal = 2;
+    setPixels(doc, atlas, [{ x: 8, y: 0, value: 5 }]); // cell (1,0) becomes local
+    cellAt(doc, 1, 0).pal = 1;
+    adoptPaletteLineForEmptyCells(doc, [{ x: 0, y: 0 }, { x: 8, y: 0 }], 3);
+    expect(cellAt(doc, 0, 0).pal).toBe(2);
+    expect(cellAt(doc, 1, 0).pal).toBe(1);
+  });
+
+  it('masks the line to 0-3', () => {
+    const doc = createDoc(1, 1);
+    adoptPaletteLineForEmptyCells(doc, [{ x: 0, y: 0 }], 6);
+    expect(cellAt(doc, 0, 0).pal).toBe(2);
   });
 });

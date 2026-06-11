@@ -22,9 +22,9 @@ export default function ArtMode() {
   const historyVersion = useEditorStore((s) => s.historyVersion);
   const project = useProjectStore((s) => s.project);
 
-  // State for the "New Chunk" W/H inputs
-  const [chunkW, setChunkW] = useState(2);
-  const [chunkH, setChunkH] = useState(2);
+  // State for the "New Chunk" W/H inputs (default = one 128×128 px chunk)
+  const [chunkW, setChunkW] = useState(16);
+  const [chunkH, setChunkH] = useState(16);
 
   // Close stale documents: undo can shrink the tileset below an open live
   // tile, and the chunk library can lose the open chunk (Clear).
@@ -88,12 +88,14 @@ export default function ArtMode() {
   }
 
   function handleNewBlock() {
-    // An engine block is 16×16 tiles = 128×128 px (BLOCK_TILES in s4-types).
+    // A block is the classic 16×16 px unit: 2×2 tiles. (Not to be confused
+    // with the s4_engine's internal 128×128 "block" slicing unit — that one
+    // is the editor's "chunk".)
     openDocumentGuarded({
-      doc: createDoc(16, 16),
+      doc: createDoc(2, 2),
       liveTileIndex: null,
       chunkId: null,
-      name: 'New Block (128×128)',
+      name: 'New Block (16×16)',
       dirty: false,
     });
   }
@@ -250,12 +252,12 @@ export default function ArtMode() {
             </button>
 
             <button style={styles.newButton} onClick={handleNewBlock}>
-              Block <span style={styles.preset}>128×128 px (16×16 tiles)</span>
+              Block <span style={styles.preset}>16×16 px (2×2 tiles)</span>
             </button>
 
             <div style={styles.newChunkRow}>
               <button style={styles.newButton} onClick={handleNewChunk}>
-                New Chunk
+                New Chunk <span style={styles.preset}>(128×128 px = 16×16 tiles)</span>
               </button>
               <label style={styles.dimLabel}>
                 W

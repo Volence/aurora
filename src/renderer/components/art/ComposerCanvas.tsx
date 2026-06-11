@@ -7,6 +7,7 @@ import {
 import { useToastStore } from '../../state/toastStore';
 import {
   cellAt, setPixels, getPixel, docToBuffer, bufferToWrites, stampTile,
+  adoptPaletteLineForEmptyCells,
 } from '../../../core/art/composer-buffer';
 import type { ComposerDoc } from '../../../core/art/composer-buffer';
 import {
@@ -187,6 +188,9 @@ export default function ComposerCanvas() {
       ? writes.filter((w) => cellAt(doc, w.x >> 3, w.y >> 3).atlasTile === null)
       : writes;
     if (!filtered.length) return;
+    // Empty cells adopt the active palette line so painted colors render
+    // through the line the user picked (must precede setPixels' copy-on-write).
+    adoptPaletteLineForEmptyCells(doc, filtered, useArtStore.getState().paletteLine);
     setPixels(doc, atlas, filtered);
     useArtStore.getState().markOpenDirty();
     useArtStore.getState().bumpDoc();
@@ -486,6 +490,8 @@ export default function ComposerCanvas() {
       writes.push({ x: p.x, y: p.y, value: strokeValue(p.x, p.y) });
     }
     if (!writes.length) return;
+    // Empty cells adopt the active palette line (see commitWrites).
+    adoptPaletteLineForEmptyCells(doc, writes, s.paletteLine);
     setPixels(doc, getAtlas(), writes);
     g.localDirty = true;
     useArtStore.getState().bumpDoc();

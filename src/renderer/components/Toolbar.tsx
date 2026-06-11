@@ -5,6 +5,16 @@ import { useEditorStore, editHistory, undo, redo, type EditorTool, type EditingL
 import type { S4Level } from '../../core/editing/commands';
 import type { RecentProject } from '../../shared/ipc-types';
 
+// Display-name overrides for overlay toggles whose store keys use engine-
+// internal naming. showBlockGrid draws 128px lines — that's the editor's
+// "chunk" unit (the s4_engine internally calls 128×128 a "block");
+// showChunkGrid draws the 2048px section boundaries. Code identifiers are
+// intentionally NOT renamed.
+const OVERLAY_LABELS: Record<string, string> = {
+  showBlockGrid: 'Chunk Grid (128px)',
+  showChunkGrid: 'Section Grid (2048px)',
+};
+
 interface ToolbarProps {
   onOpenProject: () => void;
   onOpenRecent: (path: string) => void;
@@ -248,7 +258,7 @@ export default function Toolbar({ onOpenProject, onOpenRecent, onSave }: Toolbar
                 onChange={() => toggleOverlay(key)}
                 style={{ width: 12, height: 12 }}
               />
-              {key.replace('show', '').replace(/([A-Z])/g, ' $1').trim()}
+              {OVERLAY_LABELS[key] ?? key.replace('show', '').replace(/([A-Z])/g, ' $1').trim()}
             </label>
           ))}
 

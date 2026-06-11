@@ -109,6 +109,25 @@ export function setPixels(
 }
 
 /**
+ * Before painting on EMPTY cells (no atlas tile, no local pixels), adopt the
+ * active palette line so the freshly painted colors render through the line
+ * the user picked (empty cells default to pal 0 — the sprite line — which
+ * renders lines 1-3 colors dark). Occupied cells keep their line. Must be
+ * called BEFORE setPixels: setPixels copy-on-writes empty cells into locals,
+ * which would make them look occupied.
+ */
+export function adoptPaletteLineForEmptyCells(
+  doc: ComposerDoc,
+  writes: Array<{ x: number; y: number }>,
+  paletteLine: number,
+): void {
+  for (const w of writes) {
+    const cell = cellAt(doc, Math.floor(w.x / 8), Math.floor(w.y / 8));
+    if (cell.atlasTile === null && cell.localId === null) cell.pal = paletteLine & 3;
+  }
+}
+
+/**
  * Flatten the whole document into one PixelBuffer (doc orientation — cell
  * flips applied). Used by whole-doc operations (fill, shapes, transforms,
  * selection move/paste) that run pure pixel-ops and then diff back to writes.
