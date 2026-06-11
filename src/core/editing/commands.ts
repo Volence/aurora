@@ -1,7 +1,9 @@
-import type { ObjectPlacement, RingPlacement, Section } from '../model/s4-types';
+import type { ObjectPlacement, RingPlacement, Section, Tileset, Palette, Color, Tile } from '../model/s4-types';
 
 export interface S4Level {
   sections: (Section | null)[];
+  tileset?: Tileset;   // zone-level; present when zone commands are used
+  palette?: Palette;
 }
 
 export interface EditCommand {
@@ -81,6 +83,20 @@ export interface DeleteRingsCommand extends EditCommand {
   items: Array<{ ringIndex: number; ring: RingPlacement }>;
 }
 
+export interface SetPaletteLineCommand extends EditCommand {
+  type: 'set-palette-line';
+  line: number;
+  oldColors: Color[];
+  newColors: Color[];
+}
+
+export interface SetTilesetTilesCommand extends EditCommand {
+  type: 'set-tileset-tiles';
+  at: number;                  // first tileset index written
+  oldTiles: (Tile | null)[];   // null = slot did not exist (appended)
+  newTiles: Tile[];
+}
+
 export type AnyCommand =
   | SetTilesCommand
   | SetCollisionCommand
@@ -94,4 +110,6 @@ export type AnyCommand =
   | MoveObjectsCommand
   | MoveRingsCommand
   | DeleteObjectsCommand
-  | DeleteRingsCommand;
+  | DeleteRingsCommand
+  | SetPaletteLineCommand
+  | SetTilesetTilesCommand;

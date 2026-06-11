@@ -49,6 +49,19 @@ export class EditHistory {
 }
 
 function applyCommand(cmd: AnyCommand, level: S4Level): void {
+  if (cmd.type === 'set-palette-line') {
+    if (level.palette) level.palette.lines[cmd.line].colors = cmd.newColors.map(c => ({ ...c }));
+    return;
+  }
+  if (cmd.type === 'set-tileset-tiles') {
+    if (level.tileset) {
+      for (let i = 0; i < cmd.newTiles.length; i++) {
+        level.tileset.tiles[cmd.at + i] = { pixels: new Uint8Array(cmd.newTiles[i].pixels) };
+      }
+    }
+    return;
+  }
+
   const section = level.sections[cmd.sectionIndex];
   if (!section) return;
 
@@ -115,6 +128,25 @@ function applyCommand(cmd: AnyCommand, level: S4Level): void {
 }
 
 function undoCommand(cmd: AnyCommand, level: S4Level): void {
+  if (cmd.type === 'set-palette-line') {
+    if (level.palette) level.palette.lines[cmd.line].colors = cmd.oldColors.map(c => ({ ...c }));
+    return;
+  }
+  if (cmd.type === 'set-tileset-tiles') {
+    if (level.tileset) {
+      // Walk backwards so appended-slot truncation is safe
+      for (let i = cmd.oldTiles.length - 1; i >= 0; i--) {
+        const old = cmd.oldTiles[i];
+        if (old === null) {
+          level.tileset.tiles.splice(cmd.at + i, 1);   // was appended: remove
+        } else {
+          level.tileset.tiles[cmd.at + i] = { pixels: new Uint8Array(old.pixels) };
+        }
+      }
+    }
+    return;
+  }
+
   const section = level.sections[cmd.sectionIndex];
   if (!section) return;
 
