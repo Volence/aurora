@@ -5,22 +5,31 @@ import { computeVramColoring, FG_TILE_LIMIT } from '../export/vram-coloring';
 
 function rawHash(pixels: Uint8Array): string {
   let s = '';
-  for (let i = 0; i < 64; i++) s += pixels[i].toString(16);
+  for (let i = 0; i < 64; i++) s += (pixels[i] & 0xF).toString(16);
   return s;
 }
 
+// Assumes Tile pixel arrays are immutable after creation (true: the editor
+// paints nametables, never tile pixels).
+const canonicalHashCache = new WeakMap<Uint8Array, string>();
+
 /** Flip-aware canonical hash: minimum of the 4 flip-variant hashes. */
 export function canonicalTileHash(pixels: Uint8Array): string {
+  const cached = canonicalHashCache.get(pixels);
+  if (cached !== undefined) return cached;
   let min = rawHash(pixels);
   for (const [xf, yf] of [[true, false], [false, true], [true, true]] as const) {
     const h = rawHash(flipTile(pixels, xf, yf));
     if (h < min) min = h;
   }
+  canonicalHashCache.set(pixels, min);
   return min;
 }
 
 export interface ActBudget {
   perSection: Array<{ index: number; uniqueTiles: number }>;
+  // Counts match export exactly (both flip-aware + blank seed), so
+  // fits === !exportThrows.
   groups: Array<{ color: number; unionTiles: number; baseSlot: number }>;
   limit: number;
   fits: boolean;

@@ -1,5 +1,6 @@
 import type { Tile } from '../model/s4-types';
 import { unpackNametableWord, packNametableWord } from '../model/s4-types';
+import { flipTile } from '../import/tile-dedup';
 
 const hashCache = new WeakMap<Uint8Array, string>();
 
@@ -10,6 +11,32 @@ function tileHash(pixels: Uint8Array): string {
   for (let i = 0; i < 64; i++) s += (pixels[i] & 0xF).toString(16);
   hashCache.set(pixels, s);
   return s;
+}
+
+interface CanonicalTile {
+  pixels: Uint8Array;   // canonical orientation
+  hash: string;
+  fx: boolean;          // flip applied to source to reach canonical
+  fy: boolean;
+}
+
+const canonicalCache = new WeakMap<Uint8Array, CanonicalTile>();
+
+// Flip-aware canonical form — matches the engine pipeline
+// (s4_engine/tools/tile_dedupe.py canonical_form: lex-smallest orientation).
+// Assumes Tile pixel arrays are immutable after creation (true: the editor
+// paints nametables, never tile pixels).
+function canonicalizeTile(pixels: Uint8Array): CanonicalTile {
+  const cached = canonicalCache.get(pixels);
+  if (cached) return cached;
+  let best: CanonicalTile = { pixels, hash: tileHash(pixels), fx: false, fy: false };
+  for (const [fx, fy] of [[true, false], [false, true], [true, true]] as const) {
+    const flipped = flipTile(pixels, fx, fy);
+    const hash = tileHash(flipped);
+    if (hash < best.hash) best = { pixels: flipped, hash, fx, fy };
+  }
+  canonicalCache.set(pixels, best);
+  return best;
 }
 
 /** One union per VRAM color group: ordered tiles + content-hash -> slot map. */
@@ -55,10 +82,10 @@ export function buildGroupUnions(
       const entry = unpackNametableWord(sec.nametable[i]);
       const tile = sec.tiles[entry.tileIndex];
       if (!tile) continue;
-      const hash = tileHash(tile.pixels);
-      if (!union.slotByHash.has(hash)) {
-        union.slotByHash.set(hash, union.tiles.length);
-        union.tiles.push(tile);
+      const canon = canonicalizeTile(tile.pixels);
+      if (!union.slotByHash.has(canon.hash)) {
+        union.slotByHash.set(canon.hash, union.tiles.length);
+        union.tiles.push({ pixels: canon.pixels });
       }
     }
   }
@@ -68,7 +95,8 @@ export function buildGroupUnions(
 
 /**
  * Remap a section nametable to absolute VRAM indices: baseSlot + union slot.
- * Word 0 stays 0 (empty). Flags (palette/priority/flips) are preserved.
+ * Word 0 stays 0 (empty). Palette/priority are preserved; flip bits are
+ * XOR-compensated against the canonical orientation stored in the union.
  */
 export function remapNametableToGroup(
   nametable: Uint16Array,
@@ -82,10 +110,14 @@ export function remapNametableToGroup(
     const entry = unpackNametableWord(nametable[i]);
     const tile = tiles[entry.tileIndex];
     if (!tile) continue;
-    const slot = union.slotByHash.get(tileHash(tile.pixels));
+    const canon = canonicalizeTile(tile.pixels);
+    const slot = union.slotByHash.get(canon.hash);
     if (slot === undefined) continue;
+    // source = flip(canonical, fx, fy), so an entry rendering
+    // flip(source, hf, vf) renders flip(canonical, hf^fx, vf^fy).
     remapped[i] = packNametableWord(
-      baseSlot + slot, entry.palette, entry.priority, entry.vFlip, entry.hFlip,
+      baseSlot + slot, entry.palette, entry.priority,
+      entry.vFlip !== canon.fy, entry.hFlip !== canon.fx,
     );
   }
   return remapped;

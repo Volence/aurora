@@ -1,10 +1,16 @@
 import { describe, it, expect } from 'vitest';
 import { buildGroupUnions, remapNametableToGroup, serializeTiles } from '../../src/core/export/tile-dedup';
-import { packNametableWord } from '../../src/core/model/s4-types';
+import { packNametableWord, unpackNametableWord } from '../../src/core/model/s4-types';
 import type { Tile } from '../../src/core/model/s4-types';
 
 function tile(fill: number): Tile {
   return { pixels: new Uint8Array(64).fill(fill & 0xF) };
+}
+
+function tileFromRows(rows: number[][]): Tile {
+  const pixels = new Uint8Array(64);
+  rows.forEach((row, r) => row.forEach((v, c) => { pixels[r * 8 + c] = v; }));
+  return { pixels };
 }
 
 describe('buildGroupUnions', () => {
@@ -73,6 +79,37 @@ describe('buildGroupUnions blank-slot reservation', () => {
     expect(unions[0].slotByHash.get('0'.repeat(64))).toBe(0);
     // group 1 is NOT padded
     expect(unions[1].tiles.length).toBe(0);
+  });
+});
+
+describe('flip-aware dedup', () => {
+  it('merges a tile and its h-flip into one union slot', () => {
+    const base = tileFromRows([[1, 2, 3, 4, 5, 6, 7, 8]]);
+    const hflipped = tileFromRows([[8, 7, 6, 5, 4, 3, 2, 1]]);
+    const tiles: Tile[] = [tile(0), base, hflipped];
+    const nt = new Uint16Array(2);
+    nt[0] = packNametableWord(1, 0, false, false, false);
+    nt[1] = packNametableWord(2, 0, false, false, false);
+    const unions = buildGroupUnions([{ nametable: nt, tiles, color: 0 }], 1);
+    expect(unions[0].tiles.length).toBe(2); // blank + one canonical
+  });
+
+  it('compensates entry flip bits against the canonical orientation', () => {
+    const base = tileFromRows([[1, 2, 3, 4, 5, 6, 7, 8]]);
+    const hflipped = tileFromRows([[8, 7, 6, 5, 4, 3, 2, 1]]);
+    const tiles: Tile[] = [tile(0), base, hflipped];
+    const nt = new Uint16Array(2);
+    nt[0] = packNametableWord(1, 0, false, false, false); // base, no flips
+    nt[1] = packNametableWord(2, 0, false, false, false); // hflip variant, no flips
+    const unions = buildGroupUnions([{ nametable: nt, tiles, color: 0 }], 1);
+    const remapped = remapNametableToGroup(nt, tiles, unions[0], 0);
+    const a = unpackNametableWord(remapped[0]);
+    const b = unpackNametableWord(remapped[1]);
+    expect(a.tileIndex).toBe(b.tileIndex);      // same canonical slot
+    expect(a.vFlip).toBe(b.vFlip);
+    expect(a.hFlip).not.toBe(b.hFlip);          // exactly one is h-flipped
+    // Rendering both yields the original distinct appearances — verified by
+    // the differing hFlip compensation above.
   });
 });
 
