@@ -1,4 +1,4 @@
-import { useProjectStore, getCurrentZone, getCurrentAct } from '../state/projectStore';
+import { useProjectStore, getCurrentZone, getCurrentAct, getActiveLevel } from '../state/projectStore';
 import { useEditorStore, executeCommand } from '../state/editorStore';
 import { useViewStore } from '../state/viewStore';
 import type { S4Level, SetTilesCommand } from '../../core/editing/commands';
@@ -41,12 +41,9 @@ function requireProject(): Ctx {
   const state = useProjectStore.getState();
   const zone = getCurrentZone(state);
   const act = getCurrentAct(state);
-  if (!state.project || !zone || !act) throw new Error('no project loaded');
-  return {
-    zone,
-    act,
-    level: { sections: act.sections, tileset: zone.tileset, palette: zone.palette },
-  };
+  const level = getActiveLevel(state);
+  if (!state.project || !zone || !act || !level) throw new Error('no project loaded');
+  return { zone, act, level };
 }
 
 function budgetSummary(ctx: Ctx) {
@@ -81,6 +78,13 @@ async function handle(req: AgentRequest): Promise<unknown> {
 
     case 'get-tiles': {
       const ctx = requireProject();
+      // Deliberately reads zone.tileset.tiles (NOT a section's effective atlas
+      // or project.chunkTiles): this is the agent's writable tile space —
+      // write-tiles appends/overwrites here, and get-tiles must read back the
+      // same indices the agent wrote. Validation of paint/save operations, by
+      // contrast, resolves the effective atlas (section.tiles ?? zone tileset,
+      // or chunkTiles for the chunk library) because that is what budget,
+      // export, and rendering consume. See NOTE above requireProject.
       const tiles = ctx.zone.tileset.tiles;
       if (!Number.isInteger(req.start) || !Number.isInteger(req.count) || req.count < 1) {
         throw new Error(`start/count must be integers with count >= 1, got start=${req.start} count=${req.count}`);
@@ -179,9 +183,11 @@ async function handle(req: AgentRequest): Promise<unknown> {
       const ctx = requireProject();
       const section = ctx.act.sections[req.section];
       if (!section) throw new Error(`section ${req.section} is empty or out of range`);
+      // Validate tile indices against the section's *effective* atlas:
+      // budget/export/rendering all resolve section.tiles ?? zone.tileset.tiles.
       const err = validatePaintRegion(req.section, req.x, req.y, req.w, req.h, req.entries, {
         sectionCount: ctx.act.sections.length,
-        tilesetSize: ctx.zone.tileset.tiles.length,
+        tilesetSize: (section.tiles ?? ctx.zone.tileset.tiles).length,
       });
       if (err) throw new Error(err);
       const entries: SetTilesCommand['entries'] = [];
@@ -218,9 +224,13 @@ async function handle(req: AgentRequest): Promise<unknown> {
       if (!Array.isArray(req.entries) || req.entries.length !== req.w * req.h) {
         throw new Error(`entries length ${Array.isArray(req.entries) ? req.entries.length : typeof req.entries} != ${req.w}x${req.h}`);
       }
-      const entriesErr = validateEntries(req.entries, ctx.zone.tileset.tiles.length);
-      if (entriesErr) throw new Error(entriesErr);
       const state = useProjectStore.getState();
+      // Chunk nametables index into the chunk-library atlas (project.chunkTiles)
+      // when one is loaded — the UI stamp tool assigns it to section.tiles before
+      // stamping — so validate entries against that atlas, not the zone tileset.
+      const atlas = state.project!.chunkTiles.length > 0 ? state.project!.chunkTiles : ctx.zone.tileset.tiles;
+      const entriesErr = validateEntries(req.entries, atlas.length);
+      if (entriesErr) throw new Error(entriesErr);
       const id = `agent-${Date.now()}-${state.project!.chunkLibrary.length}`;
       const chunk = createChunkDef(id, req.name, req.w, req.h);
       req.entries.forEach((spec, i) => {
@@ -234,10 +244,21 @@ async function handle(req: AgentRequest): Promise<unknown> {
     }
 
     case 'stamp-chunk': {
-      requireProject();
+      const ctx = requireProject();
       const state = useProjectStore.getState();
       const chunk = state.project!.chunkLibrary.find(c => c.id === req.chunkId);
       if (!chunk) throw new Error(`chunk ${req.chunkId} not found`);
+      // Mirror the UI stamp tool (MapViewport): chunk nametables index into the
+      // chunk-library atlas, so lazily pin it as the section's effective atlas
+      // before painting. Budget/export/rendering resolve section.tiles ??
+      // zone.tileset.tiles, and the delegated paint-region below validates
+      // against the same effective atlas. No renderer reload is needed: when
+      // chunkTiles is non-empty the viewport already renders sections without
+      // their own atlas using chunkTiles, so this assignment is render-neutral.
+      const section = ctx.act.sections[req.section];
+      if (section && state.project!.chunkTiles.length > 0 && !section.tiles) {
+        section.tiles = state.project!.chunkTiles;
+      }
       const entries: NametableEntrySpec[] = [];
       for (let i = 0; i < chunk.widthTiles * chunk.heightTiles; i++) {
         const e = unpackNametableWord(chunk.nametable[i]);

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useProjectStore, getCurrentZone, getCurrentAct } from '../state/projectStore';
+import { useProjectStore, getActiveLevel } from '../state/projectStore';
 import { useViewStore, type OverlayOptions } from '../state/viewStore';
 import { useEditorStore, editHistory, undo, redo, type EditorTool, type EditingLayer } from '../state/editorStore';
 import type { S4Level } from '../../core/editing/commands';
@@ -60,9 +60,7 @@ export default function Toolbar({ onOpenProject, onOpenRecent, onSave }: Toolbar
   }, []);
 
   function getLevel(): S4Level | null {
-    const state = useProjectStore.getState();
-    const act = getCurrentAct(state);
-    return act ? { sections: act.sections } : null;
+    return getActiveLevel(useProjectStore.getState());
   }
 
   return (

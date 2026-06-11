@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { LoadedS4Config } from '../../core/config/s4-config';
 import type { S4Project, Zone, Act, Tileset, Palette, ObjectDef, ChunkDef } from '../../core/model/s4-types';
+import type { S4Level } from '../../core/editing/commands';
 
 interface ProjectState {
   config: LoadedS4Config | null;
@@ -63,4 +64,17 @@ export function getCurrentAct(state: ProjectState): Act | null {
   const zone = getCurrentZone(state);
   if (!zone || !state.currentActId) return null;
   return zone.acts.find(a => a.id === state.currentActId) ?? null;
+}
+
+/**
+ * Build the S4Level view used by the undo/redo system. Always includes the
+ * zone-level tileset and palette so zone commands (set-palette-line,
+ * set-tileset-tiles) can be applied/undone — a level missing those fields
+ * makes the history layer throw rather than silently no-op.
+ */
+export function getActiveLevel(state: ProjectState): S4Level | null {
+  const zone = getCurrentZone(state);
+  const act = getCurrentAct(state);
+  if (!zone || !act) return null;
+  return { sections: act.sections, tileset: zone.tileset, palette: zone.palette };
 }

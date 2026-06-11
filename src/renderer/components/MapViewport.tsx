@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useCallback } from 'react';
 import { useViewStore } from '../state/viewStore';
-import { useProjectStore, getCurrentAct, getCurrentZone } from '../state/projectStore';
+import { useProjectStore, getCurrentAct, getCurrentZone, getActiveLevel as getStoreActiveLevel } from '../state/projectStore';
 import { useEditorStore, executeCommand, undo, redo, setCommandInvalidationListener, RING_PATTERNS } from '../state/editorStore';
 import type { AnyCommand, S4Level } from '../../core/editing/commands';
 import { SectionRenderer } from '../canvas/SectionRenderer';
@@ -196,7 +196,9 @@ export default function MapViewport() {
     const handler = (e: KeyboardEvent) => {
       const state = useProjectStore.getState();
       const act = getCurrentAct(state);
-      const level: S4Level | null = act ? { sections: act.sections } : null;
+      // Must include zone tileset/palette so undo/redo of zone commands
+      // (set-palette-line / set-tileset-tiles) works from the keyboard path.
+      const level: S4Level | null = getStoreActiveLevel(state);
 
       if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
         if (level) undo(level);
@@ -319,9 +321,7 @@ export default function MapViewport() {
   }
 
   function getActiveLevel(): S4Level | null {
-    const state = useProjectStore.getState();
-    const act = getCurrentAct(state);
-    return act ? { sections: act.sections } : null;
+    return getStoreActiveLevel(useProjectStore.getState());
   }
 
   function getSectionByIndex(idx: number): Section | null {

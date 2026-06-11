@@ -52,14 +52,16 @@ export class EditHistory {
 
 function applyCommand(cmd: AnyCommand, level: S4Level): void {
   if (cmd.type === 'set-palette-line') {
-    if (level.palette) level.palette.lines[cmd.line].colors = cmd.newColors.map(c => ({ ...c }));
+    // Throw, don't skip: a silent no-op here corrupts history (the command
+    // consumes an undo slot without doing anything).
+    if (!level.palette) throw new Error('set-palette-line requires level.palette');
+    level.palette.lines[cmd.line].colors = cmd.newColors.map(c => ({ ...c }));
     return;
   }
   if (cmd.type === 'set-tileset-tiles') {
-    if (level.tileset) {
-      for (let i = 0; i < cmd.newTiles.length; i++) {
-        level.tileset.tiles[cmd.at + i] = { pixels: new Uint8Array(cmd.newTiles[i].pixels) };
-      }
+    if (!level.tileset) throw new Error('set-tileset-tiles requires level.tileset');
+    for (let i = 0; i < cmd.newTiles.length; i++) {
+      level.tileset.tiles[cmd.at + i] = { pixels: new Uint8Array(cmd.newTiles[i].pixels) };
     }
     return;
   }
@@ -131,19 +133,19 @@ function applyCommand(cmd: AnyCommand, level: S4Level): void {
 
 function undoCommand(cmd: AnyCommand, level: S4Level): void {
   if (cmd.type === 'set-palette-line') {
-    if (level.palette) level.palette.lines[cmd.line].colors = cmd.oldColors.map(c => ({ ...c }));
+    if (!level.palette) throw new Error('set-palette-line requires level.palette');
+    level.palette.lines[cmd.line].colors = cmd.oldColors.map(c => ({ ...c }));
     return;
   }
   if (cmd.type === 'set-tileset-tiles') {
-    if (level.tileset) {
-      // Walk backwards so appended-slot truncation is safe
-      for (let i = cmd.oldTiles.length - 1; i >= 0; i--) {
-        const old = cmd.oldTiles[i];
-        if (old === null) {
-          level.tileset.tiles.splice(cmd.at + i, 1);   // was appended: remove
-        } else {
-          level.tileset.tiles[cmd.at + i] = { pixels: new Uint8Array(old.pixels) };
-        }
+    if (!level.tileset) throw new Error('set-tileset-tiles requires level.tileset');
+    // Walk backwards so appended-slot truncation is safe
+    for (let i = cmd.oldTiles.length - 1; i >= 0; i--) {
+      const old = cmd.oldTiles[i];
+      if (old === null) {
+        level.tileset.tiles.splice(cmd.at + i, 1);   // was appended: remove
+      } else {
+        level.tileset.tiles[cmd.at + i] = { pixels: new Uint8Array(old.pixels) };
       }
     }
     return;

@@ -68,3 +68,31 @@ describe('set-tileset-tiles command', () => {
     expect(level.tileset!.tiles[0].pixels[0]).toBe(0);
   });
 });
+
+describe('zone commands against a level missing zone fields', () => {
+  it('throws when set-palette-line is executed without level.palette', () => {
+    const level: S4Level = { sections: [] }; // no palette/tileset (e.g. sections-only view)
+    const history = new EditHistory();
+    expect(() => history.execute({
+      type: 'set-palette-line',
+      description: 'set palette line 0',
+      sectionIndex: -1,
+      line: 0,
+      oldColors: [],
+      newColors: Array.from({ length: 16 }, () => ({ r: 0, g: 0, b: 0, a: 255 })),
+    }, level)).toThrow('set-palette-line requires level.palette');
+  });
+
+  it('throws when set-tileset-tiles is executed without level.tileset', () => {
+    const level: S4Level = { sections: [] };
+    const history = new EditHistory();
+    expect(() => history.execute({
+      type: 'set-tileset-tiles',
+      description: 'write 1 tile',
+      sectionIndex: -1,
+      at: 0,
+      oldTiles: [null],
+      newTiles: [{ pixels: new Uint8Array(64) }],
+    }, level)).toThrow('set-tileset-tiles requires level.tileset');
+  });
+});
