@@ -8,6 +8,11 @@ export interface ActDescriptorInput {
   parallaxRef: string | null;
 }
 
+/** Sanitize a BG-library id (slug-timestamp, dash-separated) into an asm label fragment. */
+function asmLabelFragment(id: string): string {
+  return id.replace(/[^A-Za-z0-9_]/g, '_');
+}
+
 export function generateActDescriptorAsm(
   zonePrefix: string,
   actId: string,
@@ -36,6 +41,13 @@ export function generateActDescriptorAsm(
   lines.push('');
 
   // Section table
+  // The BINCLUDE note is the build-pipeline contract for per-section
+  // backgrounds: the editor emits the label, the engine build provides it.
+  if (sections.some(s => s !== null && s.bgLayoutRef !== null)) {
+    lines.push(`; NOTE: non-zero sec_bg_layout entries reference editor BG-library`);
+    lines.push(`; binaries (data/editor/${zonePrefix}_bg_{id}.bin). The build pipeline must`);
+    lines.push(`; BINCLUDE each referenced binary at its ${zonePrefix}_BG_{id} label.`);
+  }
   lines.push(`${label}_Sections:`);
   for (let i = 0; i < sections.length; i++) {
     const section = sections[i];
@@ -58,7 +70,7 @@ export function generateActDescriptorAsm(
     lines.push(`    dc.l    ${section.paletteRef ?? `${zonePrefix}_Palette`}  ; sec_pal`);
     lines.push(`    dc.l    ${section.parallaxRef ?? '0'}  ; sec_parallax_config`);
     lines.push(`    dc.l    0                         ; sec_raster_table`);
-    lines.push(`    dc.l    ${section.bgLayoutRef ?? '0'}  ; sec_bg_layout`);
+    lines.push(`    dc.l    ${section.bgLayoutRef !== null ? `${zonePrefix}_BG_${asmLabelFragment(section.bgLayoutRef)}` : '0'}  ; sec_bg_layout`);
     lines.push(`    dc.l    ${secLabel}_TypeTable        ; sec_type_table`);
     lines.push(`    dc.l    0                         ; sec_pal_cycle`);
     lines.push(`    dc.l    0                         ; sec_sound_bank`);

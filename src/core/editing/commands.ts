@@ -119,6 +119,17 @@ export interface SetBgCommand extends EditCommand {
   newTiles: Tile[] | null;
 }
 
+export interface SetSectionBgCommand extends EditCommand {
+  type: 'set-section-bg';
+  // Assign which background (Plane B) the section displays: null = the act
+  // default (act.bgLayout/bgTiles), otherwise an S4Project.bgLibrary entry
+  // id. Only the ref swaps in history — library entries themselves are
+  // additive store state outside undo (addBgToLibrary), like the chunk
+  // library.
+  oldRef: string | null;
+  newRef: string | null;
+}
+
 export type AnyCommand =
   | SetTilesCommand
   | SetCollisionCommand
@@ -136,4 +147,5 @@ export type AnyCommand =
   | SetPaletteLineCommand
   | SetTilesetTilesCommand
   | SetChunkCommand
-  | SetBgCommand;
+  | SetBgCommand
+  | SetSectionBgCommand;

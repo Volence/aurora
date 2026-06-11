@@ -175,11 +175,25 @@ export interface Zone {
   palette: Palette;
 }
 
+/**
+ * A named background in the project BG library. Sections reference entries by
+ * id via Section.bgLayoutRef (null = the act default act.bgLayout/bgTiles,
+ * which conceptually participates as id null). Layout indices are LOCAL to
+ * the entry's tile blob, matching the act-default BG convention.
+ */
+export interface BgLibraryEntry {
+  id: string;
+  name: string;
+  layout: Uint16Array;
+  tiles: Tile[];
+}
+
 export interface S4Project {
   name: string;
   zones: Zone[];
   objectLibrary: ObjectDef[];
   chunkLibrary: ChunkDef[];
+  bgLibrary: BgLibraryEntry[];
   basePath: string;
 }
 

@@ -134,13 +134,28 @@ function buildServer(getWindow: () => BrowserWindow | null): McpServer {
 
   server.registerTool('set_bg',
     {
-      description: 'Replace the zone-wide background (Plane B) wholesale: a 64x32 tile nametable (2048 row-major words) plus its tile blob (max 512 tiles of 64 pixel values 0-15). The BG is a SEPARATE 512-tile space from the FG tileset; nametable tile indices are local to the BG blob (index < tiles.length). Words use the VDP format (pal bits 13-14, vf bit 12, hf bit 11, tile bits 0-10). One undo step.',
+      description: 'Write a zone-wide background (Plane B): a 64x32 tile nametable (2048 row-major words) plus its tile blob (max 512 tiles of 64 pixel values 0-15). Without "name": replaces the act-default background wholesale (one undo step). With "name": SAVES the BG to the project BG library under a generated id (returned in the reply; additive, outside undo history) instead of replacing the act default — assign it to sections with assign_section_bg. The BG is a SEPARATE 512-tile space from the FG tileset; nametable tile indices are local to the BG blob (index < tiles.length). Words use the VDP format (pal bits 13-14, vf bit 12, hf bit 11, tile bits 0-10).',
       inputSchema: {
         layout: z.array(z.number().int().min(0).max(0xFFFF)).length(2048),
         tiles: z.array(z.array(z.number().int().min(0).max(15)).length(64)).min(1).max(512),
+        name: z.string().min(1).optional().describe('save to the BG library under this name instead of replacing the act default; the reply includes the generated id'),
       },
     },
-    async ({ layout, tiles }) => textResult(await forward({ kind: 'set-bg', layout, tiles })));
+    async ({ layout, tiles, name }) => textResult(await forward({ kind: 'set-bg', layout, tiles, name })));
+
+  server.registerTool('list_bgs',
+    { description: 'List available backgrounds: the act default (dimensions + tile count), every BG library entry (id, name, tile count), and each section\'s current assignment (bgId null = act default).' },
+    async () => textResult(await forward({ kind: 'list-bgs' })));
+
+  server.registerTool('assign_section_bg',
+    {
+      description: 'Assign which background a section displays: a BG library id (from set_bg with name, or list_bgs), or null to revert to the act default. The viewport composites the assigned BG while that section is active. One undo step.',
+      inputSchema: {
+        section: z.number().int().min(0),
+        bgId: z.string().nullable().describe('BG library entry id, or null for the act default'),
+      },
+    },
+    async ({ section, bgId }) => textResult(await forward({ kind: 'assign-section-bg', section, bgId })));
 
   server.registerTool('screenshot',
     {

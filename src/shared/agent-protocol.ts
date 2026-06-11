@@ -26,7 +26,12 @@ export type AgentRequest =
   | { kind: 'stamp-chunk'; chunkId: string; section: number; x: number; y: number }
   | { kind: 'goto'; section: number; x?: number; y?: number; zoom?: number }
   | { kind: 'get-bg' }
-  | { kind: 'set-bg'; layout: number[]; tiles: number[][] }  // 64x32 words; tiles: 64 values 0-15 each, indices local to this blob
+  // 64x32 words; tiles: 64 values 0-15 each, indices local to this blob.
+  // name set: ADD to the BG library under a generated id (reply includes it)
+  // instead of replacing the act default.
+  | { kind: 'set-bg'; layout: number[]; tiles: number[][]; name?: string }
+  | { kind: 'assign-section-bg'; section: number; bgId: string | null }  // null = act default
+  | { kind: 'list-bgs' }
   | { kind: 'screenshot'; region?: { x: number; y: number; w: number; h: number }; showBg?: boolean };
 
 export interface AgentRequestEnvelope {

@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { EditHistory } from '../../src/core/editing/history';
 import type { S4Level } from '../../src/core/editing/commands';
 import type { Tile, Palette, Act } from '../../src/core/model/s4-types';
-import { createChunkDef } from '../../src/core/model/s4-types';
+import { createChunkDef, createSection } from '../../src/core/model/s4-types';
 
 function makeLevel(): S4Level {
   const palette: Palette = {
@@ -196,6 +196,57 @@ describe('set-bg command', () => {
       oldLayout: null, newLayout: new Uint16Array(64 * 32),
       oldTiles: null, newTiles: [{ pixels: new Uint8Array(64) }],
     }, level)).toThrow('set-bg requires level.act');
+  });
+});
+
+describe('set-section-bg command', () => {
+  function levelWithSection(): { level: S4Level; section: ReturnType<typeof createSection> } {
+    const section = createSection(0, 'Sec0');
+    const level: S4Level = { ...makeLevel(), sections: [section] };
+    return { level, section };
+  }
+
+  it('applies, undoes, and redoes a null -> id assignment', () => {
+    const { level, section } = levelWithSection();
+    const history = new EditHistory();
+    history.execute({
+      type: 'set-section-bg', description: 'assign forest bg', sectionIndex: 0,
+      oldRef: null, newRef: 'forest-1718000000',
+    }, level);
+    expect(section.bgLayoutRef).toBe('forest-1718000000');
+    history.undo(level);
+    expect(section.bgLayoutRef).toBeNull();
+    history.redo(level);
+    expect(section.bgLayoutRef).toBe('forest-1718000000');
+  });
+
+  it('restores the previous id on undo of an id -> id swap and supports clearing to null', () => {
+    const { level, section } = levelWithSection();
+    section.bgLayoutRef = 'cave-1';
+    const history = new EditHistory();
+    history.execute({
+      type: 'set-section-bg', description: 'swap bg', sectionIndex: 0,
+      oldRef: 'cave-1', newRef: 'forest-2',
+    }, level);
+    expect(section.bgLayoutRef).toBe('forest-2');
+    history.execute({
+      type: 'set-section-bg', description: 'back to act default', sectionIndex: 0,
+      oldRef: 'forest-2', newRef: null,
+    }, level);
+    expect(section.bgLayoutRef).toBeNull();
+    history.undo(level);
+    expect(section.bgLayoutRef).toBe('forest-2');
+    history.undo(level);
+    expect(section.bgLayoutRef).toBe('cave-1');
+  });
+
+  it('is a safe no-op on a null section slot', () => {
+    const level: S4Level = { ...makeLevel(), sections: [null] };
+    const history = new EditHistory();
+    expect(() => history.execute({
+      type: 'set-section-bg', description: 'assign bg', sectionIndex: 0,
+      oldRef: null, newRef: 'forest-1',
+    }, level)).not.toThrow();
   });
 });
 

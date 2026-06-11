@@ -11,10 +11,30 @@ import { OverlayRenderer } from '../canvas/OverlayRenderer';
 import type { SectionOverlayInfo } from '../canvas/OverlayRenderer';
 import { SECTION_TILES_WIDE, SECTION_TILES_HIGH, SECTION_PIXEL_SIZE, unpackNametableWord } from '../../core/model/s4-types';
 import { BG_WIDTH } from '../../core/formats/bg-tiles';
-import type { Section, ObjectPlacement, RingPlacement } from '../../core/model/s4-types';
+import type { Section, ObjectPlacement, RingPlacement, Act, Tile, BgLibraryEntry } from '../../core/model/s4-types';
 
 export const sectionRenderer = new SectionRenderer();
 const overlayRenderer = new OverlayRenderer();
+
+/**
+ * Resolve which background (Plane B) the viewport should display for the
+ * ACTIVE section: its bgLayoutRef names a BG-library entry, null (or a
+ * dangling id) falls back to the act default. Returns null when no BG exists
+ * at all.
+ */
+function resolveActiveBg(
+  act: Act,
+  bgLibrary: BgLibraryEntry[],
+  activeSectionIndex: number,
+): { layout: Uint16Array; tiles: Tile[] } | null {
+  const ref = act.sections[activeSectionIndex]?.bgLayoutRef ?? null;
+  if (ref !== null) {
+    const entry = bgLibrary.find(b => b.id === ref);
+    if (entry) return { layout: entry.layout, tiles: entry.tiles };
+  }
+  if (act.bgLayout && act.bgTiles) return { layout: act.bgLayout, tiles: act.bgTiles };
+  return null;
+}
 
 interface CtxMenuState {
   x: number;             // container-local px
@@ -55,6 +75,30 @@ export default function MapViewport() {
   const editingLayer = useEditorStore((s) => s.editingLayer);
   const selection = useEditorStore((s) => s.selection);
 
+  // Rebuild only the BG entry from the resolved background of the ACTIVE
+  // section (bgLayoutRef -> library entry, else act default). Lighter than
+  // reloadAllSections — used when the active section or its assignment
+  // changes (FG canvases are untouched).
+  const reloadBg = useCallback(() => {
+    const state = useProjectStore.getState();
+    const zone = getCurrentZone(state);
+    const act = getCurrentAct(state);
+    if (!zone || !act) return;
+
+    sectionRenderer.clearBg();
+    const resolved = resolveActiveBg(
+      act,
+      state.project?.bgLibrary ?? [],
+      useEditorStore.getState().activeSectionIndex,
+    );
+    if (resolved) {
+      const bgHeight = Math.floor(resolved.layout.length / BG_WIDTH);
+      if (bgHeight > 0) {
+        sectionRenderer.loadBg(resolved.layout, BG_WIDTH, bgHeight, resolved.tiles, zone.palette.lines);
+      }
+    }
+  }, []);
+
   // Reload (re-prerender) every section + bg from current project state.
   // Stable callback: reads stores via getState so it can also be invoked from
   // the command-invalidation listener (palette/tileset changes invalidate the
@@ -67,7 +111,6 @@ export default function MapViewport() {
 
     sectionRenderer.setGrid(act.gridWidth, act.gridHeight);
     sectionRenderer.clearSections();
-    sectionRenderer.clearBg();
 
     // Unified atlas: section nametables index into the zone tileset. The
     // section.tiles override is kept for future per-section art, but nothing
@@ -79,18 +122,19 @@ export default function MapViewport() {
       sectionRenderer.loadSection(i, section.tileGrid, tiles, zone.palette.lines);
     }
 
-    if (act.bgLayout && act.bgTiles) {
-      const bgHeight = Math.floor(act.bgLayout.length / BG_WIDTH);
-      if (bgHeight > 0) {
-        sectionRenderer.loadBg(act.bgLayout, BG_WIDTH, bgHeight, act.bgTiles, zone.palette.lines);
-      }
-    }
-  }, []);
+    reloadBg();
+  }, [reloadBg]);
 
   // Load all sections + bg when project/act changes
   useEffect(() => {
     reloadAllSections();
   }, [project, currentZoneId, currentActId, reloadAllSections]);
+
+  // Re-resolve the displayed BG when the active section changes — its
+  // bgLayoutRef may point at a different library entry (or the act default).
+  useEffect(() => {
+    reloadBg();
+  }, [activeSectionIndex, reloadBg]);
 
   // Centralized renderer-cache invalidation: every command executed/undone/redone
   // (UI tools, keyboard undo/redo, or the agent handler) lands here so the
@@ -109,9 +153,13 @@ export default function MapViewport() {
           reloadAllSections();
           break;
         case 'set-bg':
-          // The BG entry's canvas and TileRenderer are built from
-          // act.bgLayout/bgTiles in loadBg — rebuild from the new arrays.
-          reloadAllSections();
+          // The BG entry's canvas and TileRenderer are built from the
+          // resolved layout/tiles arrays in loadBg — rebuild from the new
+          // arrays. FG canvases are untouched by both commands.
+        case 'set-section-bg':
+          // Which BG the viewport composites depends on the active section's
+          // ref — re-resolve against the library/act default.
+          reloadBg();
           break;
         default:
           // set-chunk thumbnail invalidation is a store concern handled in
@@ -122,7 +170,7 @@ export default function MapViewport() {
       }
     });
     return () => setCommandInvalidationListener(null);
-  }, [reloadAllSections]);
+  }, [reloadAllSections, reloadBg]);
 
   // Re-render when anything visual changes
   useEffect(() => {
@@ -329,15 +377,24 @@ export default function MapViewport() {
   function paintBgTile(worldX: number, worldY: number): void {
     const state = useProjectStore.getState();
     const act = getCurrentAct(state);
-    if (!act?.bgLayout) return;
+    if (!act) return;
+
+    // Paint the RESOLVED layout — the same array loadBg handed the renderer
+    // (held by reference, so markBgDirty repaints from it). When the active
+    // section displays a library BG, this edits that library entry in place
+    // (additive store state, like chunk edits in Art mode).
+    const resolved = resolveActiveBg(
+      act, state.project?.bgLibrary ?? [], useEditorStore.getState().activeSectionIndex,
+    );
+    if (!resolved) return;
 
     const tile = worldToBgTile(worldX, worldY);
     if (!tile) return;
 
     const { selectedTileIndex, selectedPaletteLine } = useEditorStore.getState();
     const newNt = (selectedTileIndex & 0x7FF) | ((selectedPaletteLine & 0x3) << 13);
-    if (act.bgLayout[tile.tileIndex] !== newNt) {
-      act.bgLayout[tile.tileIndex] = newNt;
+    if (resolved.layout[tile.tileIndex] !== newNt) {
+      resolved.layout[tile.tileIndex] = newNt;
       sectionRenderer.markBgDirty([tile.tileIndex]);
       useEditorStore.getState().markDirty();
       useEditorStore.getState().bumpVersion();

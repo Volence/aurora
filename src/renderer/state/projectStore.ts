@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import type { LoadedS4Config } from '../../core/config/s4-config';
-import type { S4Project, Zone, Act, Tileset, Palette, ObjectDef, ChunkDef } from '../../core/model/s4-types';
+import type { S4Project, Zone, Act, Tileset, Palette, ObjectDef, ChunkDef, BgLibraryEntry } from '../../core/model/s4-types';
 import type { S4Level } from '../../core/editing/commands';
 
 interface ProjectState {
@@ -19,6 +19,7 @@ interface ProjectState {
   setError: (error: string | null) => void;
   setObjectSprites: (sprites: Map<string, ImageBitmap>) => void;
   addChunks: (chunks: ChunkDef[]) => void;
+  addBgToLibrary: (entry: BgLibraryEntry) => void;
   clearChunks: () => void;
   reset: () => void;
 }
@@ -44,6 +45,18 @@ export const useProjectStore = create<ProjectState>((set) => ({
       project: {
         ...state.project,
         chunkLibrary: [...state.project.chunkLibrary, ...chunks],
+      },
+    };
+  }),
+  // Library adds are additive and live outside undo history, like addChunks
+  // (save_chunk). Sections only reference entries by id (set-section-bg IS a
+  // history command), so an un-undoable add is non-destructive.
+  addBgToLibrary: (entry) => set((state) => {
+    if (!state.project) return {};
+    return {
+      project: {
+        ...state.project,
+        bgLibrary: [...state.project.bgLibrary, entry],
       },
     };
   }),

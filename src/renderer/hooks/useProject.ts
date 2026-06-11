@@ -15,6 +15,8 @@ function legacyAtlasPath(chunkLibraryPath: string): string {
 import { loadS4Config, type S4ProjectConfig } from '../../core/config/s4-config';
 import { parseTiles } from '../../core/formats/tiles';
 import { parseBgTiles, serializeBgTiles, normalizeBgLayout, BG_TILE_BASE_SLOT, BG_WIDTH } from '../../core/formats/bg-tiles';
+import { bgLibIndexPath, bgLibLayoutPath, bgLibTilesPath, serializeBgLibraryIndex, parseBgLibraryIndex } from '../../core/formats/bg-library';
+import { serializeSectionMeta, parseSectionMeta } from '../../core/formats/section-meta';
 import { buildPalette } from '../../core/formats/palette';
 import { parseNametable } from '../../core/formats/s4-nametable';
 import { parseCollision } from '../../core/formats/s4-collision';
@@ -42,6 +44,7 @@ import type {
   ChunkDef,
   ObjectPlacement,
   RingPlacement,
+  BgLibraryEntry,
 } from '../../core/model/s4-types';
 
 async function readFile(basePath: string, relativePath: string): Promise<Uint8Array> {
@@ -159,6 +162,27 @@ export function useProject() {
         const ringsJson = JSON.stringify(section.rings, null, 2);
         const ringsBytes = new TextEncoder().encode(ringsJson);
         await window.api.writeBinaryFile(basePath, `${prefix}.rings.json`, ringsBytes.buffer as ArrayBuffer);
+
+        // Write meta sidecar (.meta.json) — scalar refs (bgLayoutRef,
+        // paletteRef). Written only when at least one ref is non-null; when
+        // all refs are null we still OVERWRITE an existing sidecar (with
+        // nulls) so a previously-saved ref that was cleared in-session cannot
+        // resurrect on the next load. A read probe gates that overwrite so
+        // the common all-default case creates no files.
+        const metaJson = serializeSectionMeta({ bgLayoutRef: section.bgLayoutRef, paletteRef: section.paletteRef });
+        const metaPath = `${prefix}.meta.json`;
+        if (metaJson !== null) {
+          const metaBytes = new TextEncoder().encode(metaJson);
+          await window.api.writeBinaryFile(basePath, metaPath, metaBytes.buffer as ArrayBuffer);
+        } else {
+          try {
+            await window.api.readBinaryFile(basePath, metaPath);
+            const clearedBytes = new TextEncoder().encode(JSON.stringify({ bgLayoutRef: null, paletteRef: null }, null, 2));
+            await window.api.writeBinaryFile(basePath, metaPath, clearedBytes.buffer as ArrayBuffer);
+          } catch {
+            // no stale sidecar to clear
+          }
+        }
       }
 
       // Save chunk library
@@ -217,6 +241,23 @@ export function useProject() {
           rawAct.bgLayout = editorBgLayoutPath;
           rawAct.bgTiles = editorBgTilesPath;
           configChanged = true;
+        }
+      }
+
+      // Persist the BG library (named alternate backgrounds sections can
+      // reference) to editor-owned paths: an id/name index JSON plus
+      // per-entry layout/tile binaries in the LOCAL index convention (same
+      // round-trip guarantee as the act BG above). Single-zone assumption:
+      // like the chunk library, the data model has ONE library per project,
+      // keyed here under the current zone's id.
+      if (project.bgLibrary.length > 0) {
+        const indexBytes = new TextEncoder().encode(serializeBgLibraryIndex(project.bgLibrary));
+        await window.api.writeBinaryFile(basePath, bgLibIndexPath(zone.id), indexBytes.buffer as ArrayBuffer);
+        for (const entry of project.bgLibrary) {
+          const layoutBytes = serializeNametable(entry.layout);
+          await window.api.writeBinaryFile(basePath, bgLibLayoutPath(zone.id, entry.id), layoutBytes.buffer as ArrayBuffer);
+          const tileBytes = serializeBgTiles(entry.tiles);
+          await window.api.writeBinaryFile(basePath, bgLibTilesPath(zone.id, entry.id), tileBytes.buffer as ArrayBuffer);
         }
       }
 
@@ -298,6 +339,7 @@ async function loadFullProject(config: ReturnType<typeof loadS4Config>): Promise
 
   const basePath = config.basePath;
   const zones: Zone[] = [];
+  const bgLibrary: BgLibraryEntry[] = [];
 
   for (const zoneConfig of config.zones) {
     // Load tileset
@@ -387,6 +429,17 @@ async function loadFullProject(config: ReturnType<typeof loadS4Config>): Promise
             section.rings = [];
           }
 
+          // Load meta sidecar (bgLayoutRef/paletteRef) — optional, only
+          // written when a section carries non-default refs.
+          try {
+            const metaRaw = await readFile(basePath, `${prefix}.meta.json`);
+            const meta = parseSectionMeta(new TextDecoder().decode(metaRaw));
+            section.bgLayoutRef = meta.bgLayoutRef;
+            section.paletteRef = meta.paletteRef;
+          } catch {
+            // no meta sidecar — defaults from createSection stand
+          }
+
           sections.push(section);
         } catch {
           // Section doesn't exist yet
@@ -437,6 +490,34 @@ async function loadFullProject(config: ReturnType<typeof loadS4Config>): Promise
       tileset,
       palette,
     });
+
+    // Load the zone's BG library (editor-owned, optional): index JSON of
+    // id/name plus per-entry layout/tile binaries. Editor-saved layouts are
+    // already in the LOCAL index convention, so no normalization is needed
+    // (parseBgTiles still detects the blob header shape). Entries accumulate
+    // into the project-level library (single-zone assumption, like chunks).
+    try {
+      const idxRaw = await readFile(basePath, bgLibIndexPath(zoneConfig.id));
+      const indexEntries = parseBgLibraryIndex(new TextDecoder().decode(idxRaw));
+      for (const meta of indexEntries) {
+        try {
+          const layoutRaw = await readFile(basePath, bgLibLayoutPath(zoneConfig.id, meta.id));
+          const tilesRaw = await readFile(basePath, bgLibTilesPath(zoneConfig.id, meta.id));
+          const height = Math.floor(layoutRaw.length / (BG_WIDTH * 2));
+          if (height < 1) continue;
+          bgLibrary.push({
+            id: meta.id,
+            name: meta.name,
+            layout: parseNametable(layoutRaw, BG_WIDTH, height),
+            tiles: parseBgTiles(tilesRaw),
+          });
+        } catch (entryErr) {
+          console.warn(`[load] BG library entry ${meta.id} failed to load:`, entryErr);
+        }
+      }
+    } catch {
+      // no BG library for this zone
+    }
   }
 
   // Load object library
@@ -529,6 +610,7 @@ async function loadFullProject(config: ReturnType<typeof loadS4Config>): Promise
     zones,
     objectLibrary,
     chunkLibrary,
+    bgLibrary,
     basePath,
   };
 }

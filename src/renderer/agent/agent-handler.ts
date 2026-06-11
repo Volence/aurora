@@ -11,6 +11,7 @@ import { validatePaletteLine, validateTilePixels, validatePaintRegion, validateE
 import { computeActBudget, canonicalTileHash } from '../../core/agent/budget';
 import { decodeGenesisColor, encodeGenesisColor } from '../../core/formats/palette';
 import { BG_WIDTH } from '../../core/formats/bg-tiles';
+import { makeBgId } from '../../core/formats/bg-library';
 import type { AgentRequest, AgentRequestEnvelope, NametableEntrySpec } from '../../shared/agent-protocol';
 
 let registered = false;
@@ -352,6 +353,18 @@ async function handle(req: AgentRequest): Promise<unknown> {
         }
       }
       const newLayout = Uint16Array.from(req.layout);
+
+      // name provided: ADD to the BG library (additive, outside undo history
+      // — like save-chunk/addChunks) instead of replacing the act default.
+      // Sections opt in via assign-section-bg.
+      if (req.name !== undefined) {
+        const name = req.name.trim();
+        if (!name) throw new Error('name must be non-empty');
+        const id = makeBgId(name);
+        useProjectStore.getState().addBgToLibrary({ id, name, layout: newLayout, tiles: newTiles });
+        return { id, name, tiles: newTiles.length, uniqueWords: new Set(newLayout).size };
+      }
+
       executeCommand({
         type: 'set-bg',
         description: `agent: set background (${newTiles.length} tiles)`,
@@ -362,6 +375,46 @@ async function handle(req: AgentRequest): Promise<unknown> {
         newTiles,
       }, ctx.level);
       return { tiles: newTiles.length, uniqueWords: new Set(newLayout).size };
+    }
+
+    case 'assign-section-bg': {
+      const ctx = requireProject();
+      if (!Number.isInteger(req.section) || req.section < 0 || req.section >= ctx.act.sections.length) {
+        throw new Error(`section ${req.section} out of range (0-${ctx.act.sections.length - 1})`);
+      }
+      const section = ctx.act.sections[req.section];
+      if (!section) throw new Error(`section ${req.section} is empty`);
+      if (req.bgId !== null) {
+        const library = useProjectStore.getState().project!.bgLibrary;
+        if (!library.some(b => b.id === req.bgId)) {
+          throw new Error(`bg "${req.bgId}" not found in the library (use list-bgs)`);
+        }
+      }
+      if (section.bgLayoutRef === req.bgId) {
+        // No-op guard: a same-ref command would consume an undo slot without
+        // changing anything.
+        return { section: req.section, bgId: req.bgId, changed: false };
+      }
+      executeCommand({
+        type: 'set-section-bg',
+        description: `agent: section ${req.section} bg -> ${req.bgId ?? 'act default'}`,
+        sectionIndex: req.section,
+        oldRef: section.bgLayoutRef,
+        newRef: req.bgId,
+      }, ctx.level);
+      return { section: req.section, bgId: req.bgId, changed: true };
+    }
+
+    case 'list-bgs': {
+      const ctx = requireProject();
+      const library = useProjectStore.getState().project!.bgLibrary;
+      return {
+        actDefault: ctx.act.bgLayout && ctx.act.bgTiles
+          ? { width: BG_WIDTH, height: Math.floor(ctx.act.bgLayout.length / BG_WIDTH), tiles: ctx.act.bgTiles.length }
+          : null,
+        entries: library.map(b => ({ id: b.id, name: b.name, tiles: b.tiles.length })),
+        sections: ctx.act.sections.map((s, i) => s ? { index: i, bgId: s.bgLayoutRef } : null),
+      };
     }
 
     case 'screenshot': {

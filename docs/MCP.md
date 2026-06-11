@@ -14,23 +14,34 @@ is one undo step (Ctrl+Z), and nothing touches disk until you save.
 
 ## Tools
 
-Query: `get_project_info`, `get_palette`, `get_tiles`, `get_nametable_region`, `check_budget`, `get_bg`
-Mutate (one undo step each): `set_palette`, `write_tiles`, `paint_region`, `save_chunk`*, `stamp_chunk`, `set_bg`
+Query: `get_project_info`, `get_palette`, `get_tiles`, `get_nametable_region`, `check_budget`, `get_bg`, `list_bgs`
+Mutate (one undo step each): `set_palette`, `write_tiles`, `paint_region`, `save_chunk`*, `stamp_chunk`, `set_bg`*, `assign_section_bg`
 View: `goto`, `screenshot`
 
 *`save_chunk` adds to the chunk library outside undo history (additive only),
-matching the existing chunk-library behavior.
+matching the existing chunk-library behavior. `set_bg` with a `name` argument
+likewise ADDS the background to the project BG library (outside undo history)
+instead of replacing the act default; the reply includes the generated id.
 
 `get_bg`/`set_bg` operate on the zone-wide background (Plane B): a 64x32 tile
 nametable plus its own tile blob (max 512 tiles) — a separate tile space from
 the FG tileset. Both directions use the LOCAL index convention (nametable tile
 indices index directly into the BG blob): engine-emitted files with
 VRAM-absolute indices (1024+) are normalized once at load, so a `get_bg`
-result round-trips straight back into `set_bg`. `set_bg` replaces the whole
-plane in one undo step. `screenshot` accepts `showBg: true` to render the
-background plane during capture (restores the overlay state afterwards). Note
-that the editor renders Plane B once at world origin (512x256 px) — screenshots
-of regions away from the origin won't show it.
+result round-trips straight back into `set_bg`. `set_bg` (without `name`)
+replaces the whole plane in one undo step. `screenshot` accepts `showBg: true`
+to render the background plane during capture (restores the overlay state
+afterwards). Note that the editor renders Plane B once at world origin
+(512x256 px) — screenshots of regions away from the origin won't show it.
+
+Per-section backgrounds: every section displays the act default unless
+`assign_section_bg` points it at a BG library entry (`bgId` from `set_bg` with
+`name`, or `list_bgs`; `bgId: null` reverts to the act default). The viewport
+composites the background of the ACTIVE section, so `goto` a section to see
+its assigned BG. Assignments are one undo step each and persist in per-section
+`.meta.json` sidecars; library entries persist under `data/editor/` on save.
+Export emits `{zone}_BG_{id}` labels in the act descriptor's section table —
+the engine build must BINCLUDE the referenced binaries.
 
 ## Constraints enforced at the tool boundary
 
