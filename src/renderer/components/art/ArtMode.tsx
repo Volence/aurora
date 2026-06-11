@@ -4,6 +4,8 @@ import { createDoc } from '../../../core/art/composer-buffer';
 import { useProjectStore, getActiveLevel } from '../../state/projectStore';
 import { undo, redo } from '../../state/editorStore';
 import ComposerCanvas from './ComposerCanvas';
+import ToolColumn from './ToolColumn';
+import TilesetPanel from './TilesetPanel';
 
 export default function ArtMode() {
   const open = useArtStore((s) => s.open);
@@ -73,12 +75,10 @@ export default function ArtMode() {
 
   return (
     <div style={styles.root}>
-      {/* Left panel: tool column placeholder */}
+      {/* Left panel: tool column */}
       <div style={styles.leftPanel}>
         <div style={styles.panelHeader}>Tools</div>
-        <div style={styles.placeholder}>
-          Tool column coming in Task 9
-        </div>
+        <ToolColumn />
       </div>
 
       {/* Center: composer canvas or new-document launcher */}
@@ -136,10 +136,7 @@ export default function ArtMode() {
 
       {/* Right panel: tileset + palette + chunk library placeholder */}
       <div style={styles.rightPanel}>
-        <div style={styles.panelHeader}>Tileset</div>
-        <div style={styles.placeholder}>
-          TilesetPanel — Task 9
-        </div>
+        <TilesetPanel />
         <div style={styles.panelHeader}>Palette</div>
         <div style={styles.placeholder}>
           PaletteEditor — Task 11

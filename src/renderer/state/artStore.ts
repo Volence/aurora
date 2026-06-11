@@ -32,6 +32,8 @@ interface ArtState {
   docVersion: number;           // bump to re-render the canvas
   /** One-shot transform request (e.g. 'flip-h') consumed by ComposerCanvas. */
   pendingAction: string | null;
+  /** Atlas tile index used by the tile-stamp brush. */
+  brushTile: number;
 
   setTool: (t: ArtTool) => void;
   setBrushSpace: (b: BrushSpace) => void;
@@ -48,13 +50,14 @@ interface ArtState {
   markOpenDirty: () => void;
   requestAction: (a: string) => void;
   clearAction: () => void;
+  setBrushTile: (t: number) => void;
 }
 
 export const useArtStore = create<ArtState>((set) => ({
   tool: 'pencil', brushSpace: 'pixel', selectedColor: 1, paletteLine: 1,
   ditherPattern: 'checker', ditherSecondary: 0,
   mirror: null, repeatPreview: false, zoom: 24, open: null, docVersion: 0,
-  pendingAction: null,
+  pendingAction: null, brushTile: 0,
 
   setTool: (tool) => set({ tool }),
   setBrushSpace: (brushSpace) => set({ brushSpace }),
@@ -71,4 +74,5 @@ export const useArtStore = create<ArtState>((set) => ({
     s.open && !s.open.dirty ? { open: { ...s.open, dirty: true } } : {}),
   requestAction: (pendingAction) => set({ pendingAction }),
   clearAction: () => set({ pendingAction: null }),
+  setBrushTile: (brushTile) => set({ brushTile }),
 }));
