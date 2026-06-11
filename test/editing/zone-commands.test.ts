@@ -90,9 +90,12 @@ describe('set-chunk command', () => {
       oldCollision: new Uint8Array(chunk.collision), newCollision: newColl,
     }, level);
     expect(Array.from(chunk.nametable)).toEqual([1, 2, 3, 4]);
+    expect(Array.from(chunk.collision)).toEqual([5, 6, 7, 8]);
     history.undo(level);
     expect(Array.from(chunk.nametable)).toEqual([0, 0, 0, 0]);
     expect(Array.from(chunk.collision)).toEqual([0, 0, 0, 0]);
+    history.redo(level);
+    expect(Array.from(chunk.nametable)).toEqual([1, 2, 3, 4]);
   });
 
   it('throws when level lacks chunkLibrary or the chunk id is unknown', () => {
