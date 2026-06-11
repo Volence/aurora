@@ -1,10 +1,11 @@
-import type { ObjectPlacement, RingPlacement, Section, Tileset, Palette, Color, Tile, ChunkDef } from '../model/s4-types';
+import type { ObjectPlacement, RingPlacement, Section, Tileset, Palette, Color, Tile, ChunkDef, Act } from '../model/s4-types';
 
 export interface S4Level {
   sections: (Section | null)[];
   tileset?: Tileset;          // zone-level; present when zone commands are used
   palette?: Palette;
   chunkLibrary?: ChunkDef[];  // zone-level; present when set-chunk commands are used
+  act?: Act;                  // current act; present when set-bg commands are used
 }
 
 export interface EditCommand {
@@ -107,6 +108,17 @@ export interface SetChunkCommand extends EditCommand {
   newCollision: Uint8Array;
 }
 
+export interface SetBgCommand extends EditCommand {
+  type: 'set-bg';
+  // Whole-plane swap of the act's zone-wide background (Plane B): 64x32
+  // nametable plus its own tile blob (a separate tile space from the zone
+  // tileset — layout indices are local to the BG blob).
+  oldLayout: Uint16Array | null;
+  newLayout: Uint16Array | null;
+  oldTiles: Tile[] | null;
+  newTiles: Tile[] | null;
+}
+
 export type AnyCommand =
   | SetTilesCommand
   | SetCollisionCommand
@@ -123,4 +135,5 @@ export type AnyCommand =
   | DeleteRingsCommand
   | SetPaletteLineCommand
   | SetTilesetTilesCommand
-  | SetChunkCommand;
+  | SetChunkCommand
+  | SetBgCommand;

@@ -14,12 +14,18 @@ is one undo step (Ctrl+Z), and nothing touches disk until you save.
 
 ## Tools
 
-Query: `get_project_info`, `get_palette`, `get_tiles`, `get_nametable_region`, `check_budget`
-Mutate (one undo step each): `set_palette`, `write_tiles`, `paint_region`, `save_chunk`*, `stamp_chunk`
+Query: `get_project_info`, `get_palette`, `get_tiles`, `get_nametable_region`, `check_budget`, `get_bg`
+Mutate (one undo step each): `set_palette`, `write_tiles`, `paint_region`, `save_chunk`*, `stamp_chunk`, `set_bg`
 View: `goto`, `screenshot`
 
 *`save_chunk` adds to the chunk library outside undo history (additive only),
 matching the existing chunk-library behavior.
+
+`get_bg`/`set_bg` operate on the zone-wide background (Plane B): a 64x32 tile
+nametable plus its own tile blob (max 512 tiles) — a separate tile space from
+the FG tileset, with nametable indices local to the BG blob. `set_bg` replaces
+the whole plane in one undo step. `screenshot` accepts `showBg: true` to render
+the background plane during capture (restores the overlay state afterwards).
 
 ## Constraints enforced at the tool boundary
 

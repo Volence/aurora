@@ -73,6 +73,14 @@ function applyCommand(cmd: AnyCommand, level: S4Level): void {
     chunk.collision = new Uint8Array(cmd.newCollision);
     return;
   }
+  if (cmd.type === 'set-bg') {
+    if (!level.act) throw new Error('set-bg requires level.act');
+    level.act.bgLayout = cmd.newLayout ? new Uint16Array(cmd.newLayout) : null;
+    level.act.bgTiles = cmd.newTiles
+      ? cmd.newTiles.map(t => ({ pixels: new Uint8Array(t.pixels) }))
+      : null;
+    return;
+  }
 
   const section = level.sections[cmd.sectionIndex];
   if (!section) return;
@@ -164,6 +172,14 @@ function undoCommand(cmd: AnyCommand, level: S4Level): void {
     if (!chunk) throw new Error(`set-chunk: unknown chunk ${cmd.chunkId}`);
     chunk.nametable = new Uint16Array(cmd.oldNametable);
     chunk.collision = new Uint8Array(cmd.oldCollision);
+    return;
+  }
+  if (cmd.type === 'set-bg') {
+    if (!level.act) throw new Error('set-bg requires level.act');
+    level.act.bgLayout = cmd.oldLayout ? new Uint16Array(cmd.oldLayout) : null;
+    level.act.bgTiles = cmd.oldTiles
+      ? cmd.oldTiles.map(t => ({ pixels: new Uint8Array(t.pixels) }))
+      : null;
     return;
   }
 

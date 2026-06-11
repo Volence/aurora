@@ -234,13 +234,20 @@ export class SectionRenderer {
     return row * this.gridWidth + col;
   }
 
-  render(ctx: CanvasRenderingContext2D, viewport: SectionViewport, activeSectionIndex?: number): void {
+  /**
+   * Draw the foreground sections. Pass clearBackground=false to composite over
+   * an already-painted backdrop (e.g. renderBg) — empty nametable words are
+   * transparent in the section canvases, so Plane B shows through.
+   */
+  render(ctx: CanvasRenderingContext2D, viewport: SectionViewport, activeSectionIndex?: number, clearBackground = true): void {
     this.flushAllDirty();
 
     const { x: vpX, y: vpY, width, height, zoom } = viewport;
 
-    ctx.fillStyle = '#000000';
-    ctx.fillRect(0, 0, width, height);
+    if (clearBackground) {
+      ctx.fillStyle = '#000000';
+      ctx.fillRect(0, 0, width, height);
+    }
 
     ctx.save();
     ctx.imageSmoothingEnabled = false;

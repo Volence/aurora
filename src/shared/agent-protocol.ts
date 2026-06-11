@@ -25,7 +25,9 @@ export type AgentRequest =
   | { kind: 'save-chunk'; name: string; w: number; h: number; entries: NametableEntrySpec[] }
   | { kind: 'stamp-chunk'; chunkId: string; section: number; x: number; y: number }
   | { kind: 'goto'; section: number; x?: number; y?: number; zoom?: number }
-  | { kind: 'screenshot'; region?: { x: number; y: number; w: number; h: number } };
+  | { kind: 'get-bg' }
+  | { kind: 'set-bg'; layout: number[]; tiles: number[][] }  // 64x32 words; tiles: 64 values 0-15 each, indices local to this blob
+  | { kind: 'screenshot'; region?: { x: number; y: number; w: number; h: number }; showBg?: boolean };
 
 export interface AgentRequestEnvelope {
   id: number;

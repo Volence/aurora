@@ -14,6 +14,7 @@ function legacyAtlasPath(chunkLibraryPath: string): string {
 }
 import { loadS4Config, type S4ProjectConfig } from '../../core/config/s4-config';
 import { parseTiles } from '../../core/formats/tiles';
+import { parseBgTiles, serializeBgTiles, padBgTilesToLayout, stripBgTilePadding } from '../../core/formats/bg-tiles';
 import { buildPalette } from '../../core/formats/palette';
 import { parseNametable } from '../../core/formats/s4-nametable';
 import { parseCollision } from '../../core/formats/s4-collision';
@@ -192,6 +193,31 @@ export function useProject() {
           configChanged = true;
         }
       }
+
+      // Persist the current act's background (Plane B) to editor-owned paths,
+      // mirroring the tileset retarget above: the configured bgLayout/bgTiles
+      // may point into the engine's regenerated data/generated tree, so edits
+      // (set-bg commands, BG-layer painting) would vanish on reload otherwise.
+      if (act.bgLayout && act.bgTiles) {
+        const editorBgLayoutPath = `data/editor/${zone.id}_bg.bin`;
+        const editorBgTilesPath = `data/editor/${zone.id}_bg_tiles.bin`;
+        const bgLayoutBytes = serializeNametable(act.bgLayout);
+        await window.api.writeBinaryFile(basePath, editorBgLayoutPath, bgLayoutBytes.buffer as ArrayBuffer);
+        // Invert the load-time VRAM-base padding, then write the engine blob
+        // shape (2-byte BE byte-length header + raw tiles) that parseBgTiles
+        // reads back — load(save(state)) reproduces the in-memory arrays.
+        const bgTileBytes = serializeBgTiles(stripBgTilePadding(act.bgLayout, act.bgTiles));
+        await window.api.writeBinaryFile(basePath, editorBgTilesPath, bgTileBytes.buffer as ArrayBuffer);
+
+        const rawAct = config.raw.zones.find(rz => rz.id === zone.id)
+          ?.acts.find(ra => ra.id === act.id);
+        if (rawAct && (rawAct.bgLayout !== editorBgLayoutPath || rawAct.bgTiles !== editorBgTilesPath)) {
+          rawAct.bgLayout = editorBgLayoutPath;
+          rawAct.bgTiles = editorBgTilesPath;
+          configChanged = true;
+        }
+      }
+
       if (configChanged) {
         const projectJsonBytes = new TextEncoder().encode(JSON.stringify(config.raw, null, 2));
         await window.api.writeBinaryFile(basePath, 'project.json', projectJsonBytes.buffer as ArrayBuffer);
@@ -377,32 +403,15 @@ async function loadFullProject(config: ReturnType<typeof loadS4Config>): Promise
           bgLayout = parseNametable(bgRaw, bgWidth, bgHeight);
         }
         if (actConfig.bgTiles) {
+          // parseBgTiles detects the engine blob's 2-byte byte-length header
+          // (and accepts headerless dumps); padBgTilesToLayout converts
+          // VRAM-absolute layouts (engine-emitted, indices 1024+) into a
+          // directly-indexable array, leaving local-index layouts untouched.
           const bgTileRaw = await readFile(basePath, actConfig.bgTiles);
-          const rawBgTiles = parseTiles(bgTileRaw);
-
-          if (bgLayout && rawBgTiles.length > 0) {
-            // Find min tile index in nametable to determine VRAM base offset
-            let vramBase = 0x7FF;
-            for (let i = 0; i < bgLayout.length; i++) {
-              const idx = bgLayout[i] & 0x7FF;
-              if (idx > 0 && idx < vramBase) vramBase = idx;
-            }
-            if (vramBase > 0 && vramBase < 0x7FF) {
-              const maxIndex = vramBase + rawBgTiles.length;
-              const indexedTiles: Tile[] = new Array(maxIndex);
-              for (let t = 0; t < maxIndex; t++) {
-                indexedTiles[t] = { pixels: new Uint8Array(64) };
-              }
-              for (let t = 0; t < rawBgTiles.length; t++) {
-                indexedTiles[vramBase + t] = rawBgTiles[t];
-              }
-              bgTiles = indexedTiles;
-            } else {
-              bgTiles = rawBgTiles;
-            }
-          } else {
-            bgTiles = rawBgTiles;
-          }
+          const rawBgTiles = parseBgTiles(bgTileRaw);
+          bgTiles = bgLayout && rawBgTiles.length > 0
+            ? padBgTilesToLayout(bgLayout, rawBgTiles)
+            : rawBgTiles;
         }
       } catch {
         // optional bg data

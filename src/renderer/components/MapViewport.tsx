@@ -108,6 +108,11 @@ export default function MapViewport() {
           // caches at load time — re-prerender everything.
           reloadAllSections();
           break;
+        case 'set-bg':
+          // The BG entry's canvas and TileRenderer are built from
+          // act.bgLayout/bgTiles in loadBg — rebuild from the new arrays.
+          reloadAllSections();
+          break;
         default:
           // set-chunk thumbnail invalidation is a store concern handled in
           // editorStore (bumpStoreVersions) so it survives Art mode.
@@ -146,7 +151,10 @@ export default function MapViewport() {
     if (editingLayer === 'bg') {
       sectionRenderer.renderBg(ctx, viewport);
     } else {
-      sectionRenderer.render(ctx, viewport, activeSectionIndex);
+      // showBgPlane: paint Plane B first, then composite the foreground over
+      // it (empty FG words are transparent in the section canvases).
+      if (overlays.showBgPlane) sectionRenderer.renderBg(ctx, viewport);
+      sectionRenderer.render(ctx, viewport, activeSectionIndex, !overlays.showBgPlane);
 
       const sectionInfos: SectionOverlayInfo[] = [];
       for (let i = 0; i < act.sections.length; i++) {
@@ -186,7 +194,8 @@ export default function MapViewport() {
       if (layer === 'bg') {
         sectionRenderer.renderBg(ctx, viewport);
       } else {
-        sectionRenderer.render(ctx, viewport, useEditorStore.getState().activeSectionIndex);
+        if (overlays.showBgPlane) sectionRenderer.renderBg(ctx, viewport);
+        sectionRenderer.render(ctx, viewport, useEditorStore.getState().activeSectionIndex, !overlays.showBgPlane);
         const sectionInfos: SectionOverlayInfo[] = [];
         for (let i = 0; i < act.sections.length; i++) {
           const section = act.sections[i];

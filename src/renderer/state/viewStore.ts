@@ -20,6 +20,7 @@ interface ViewState {
   setZoom: (zoom: number, centerX?: number, centerY?: number) => void;
   setPosition: (x: number, y: number) => void;
   toggleOverlay: (key: keyof OverlayOptions) => void;
+  setOverlay: (key: keyof OverlayOptions, value: boolean) => void;
 }
 
 export const useViewStore = create<ViewState>((set) => ({
@@ -60,5 +61,9 @@ export const useViewStore = create<ViewState>((set) => ({
 
   toggleOverlay: (key) => set((state) => ({
     overlays: { ...state.overlays, [key]: !state.overlays[key] },
+  })),
+
+  setOverlay: (key, value) => set((state) => ({
+    overlays: { ...state.overlays, [key]: value },
   })),
 }));

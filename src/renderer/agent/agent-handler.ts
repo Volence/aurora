@@ -14,6 +14,13 @@ import type { AgentRequest, AgentRequestEnvelope, NametableEntrySpec } from '../
 
 let registered = false;
 
+// Zone-wide background (Plane B): a fixed 64x32 nametable with its own tile
+// blob — a SEPARATE tile space from the zone tileset (the engine loads it at
+// VRAM slot 1024+). Layout tile indices are local to the BG blob.
+const BG_TILES_WIDE = 64;
+const BG_TILES_HIGH = 32;
+const BG_MAX_TILES = 512;
+
 export function registerAgentHandler(): void {
   if (registered || !window.agentBridge) return;
   registered = true;
@@ -308,26 +315,81 @@ async function handle(req: AgentRequest): Promise<unknown> {
       return { section: req.section, vpX: useViewStore.getState().vpX, vpY: useViewStore.getState().vpY, zoom: useViewStore.getState().zoom };
     }
 
+    case 'get-bg': {
+      const ctx = requireProject();
+      return {
+        width: BG_TILES_WIDE,
+        height: BG_TILES_HIGH,
+        layout: ctx.act.bgLayout ? Array.from(ctx.act.bgLayout) : null,
+        tiles: ctx.act.bgTiles ? ctx.act.bgTiles.map(t => Array.from(t.pixels)) : null,
+      };
+    }
+
+    case 'set-bg': {
+      const ctx = requireProject();
+      if (!Array.isArray(req.tiles) || req.tiles.length < 1 || req.tiles.length > BG_MAX_TILES) {
+        throw new Error(`tiles must be 1-${BG_MAX_TILES} tiles, got ${Array.isArray(req.tiles) ? req.tiles.length : typeof req.tiles}`);
+      }
+      const newTiles: Tile[] = [];
+      for (let i = 0; i < req.tiles.length; i++) {
+        const err = validateTilePixels(req.tiles[i]);
+        if (err) throw new Error(`tile ${i}: ${err}`);
+        newTiles.push({ pixels: Uint8Array.from(req.tiles[i]) });
+      }
+      if (!Array.isArray(req.layout) || req.layout.length !== BG_TILES_WIDE * BG_TILES_HIGH) {
+        throw new Error(`layout must have ${BG_TILES_WIDE * BG_TILES_HIGH} words (${BG_TILES_WIDE}x${BG_TILES_HIGH}), got ${Array.isArray(req.layout) ? req.layout.length : typeof req.layout}`);
+      }
+      for (let i = 0; i < req.layout.length; i++) {
+        const word = req.layout[i];
+        if (!Number.isInteger(word) || word < 0 || word > 0xFFFF) {
+          throw new Error(`layout word ${i} = ${word}: must be a 16-bit nametable word`);
+        }
+        const tileIdx = word & 0x7FF;
+        if (tileIdx >= newTiles.length) {
+          throw new Error(`layout word ${i}: tile index ${tileIdx} out of range (blob has ${newTiles.length} tiles; indices are local to the BG blob)`);
+        }
+      }
+      const newLayout = Uint16Array.from(req.layout);
+      executeCommand({
+        type: 'set-bg',
+        description: `agent: set background (${newTiles.length} tiles)`,
+        sectionIndex: -1,
+        oldLayout: ctx.act.bgLayout ? new Uint16Array(ctx.act.bgLayout) : null,
+        newLayout,
+        oldTiles: ctx.act.bgTiles ? ctx.act.bgTiles.map(t => ({ pixels: new Uint8Array(t.pixels) })) : null,
+        newTiles,
+      }, ctx.level);
+      return { tiles: newTiles.length, uniqueWords: new Set(newLayout).size };
+    }
+
     case 'screenshot': {
       await ensureMapMode();
       requireProject();
       const canvas = document.getElementById('map-canvas') as HTMLCanvasElement | null;
       if (!canvas) throw new Error('map canvas not found — is the viewport mounted?');
-      // Give the renderer a frame to flush pending paints (e.g. right after goto/paint)
-      await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
-      let source: HTMLCanvasElement = canvas;
-      if (req.region) {
-        const { x, y, w, h } = req.region;
-        if (w < 1 || h < 1 || x < 0 || y < 0 || x + w > canvas.width || y + h > canvas.height) {
-          throw new Error(`region out of canvas bounds (canvas is ${canvas.width}x${canvas.height})`);
+      const view = useViewStore.getState();
+      const prevShowBg = view.overlays.showBgPlane;
+      if (req.showBg) view.setOverlay('showBgPlane', true);
+      try {
+        // Give the renderer a frame to flush pending paints (e.g. right after
+        // goto/paint, or the overlay change above)
+        await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+        let source: HTMLCanvasElement = canvas;
+        if (req.region) {
+          const { x, y, w, h } = req.region;
+          if (w < 1 || h < 1 || x < 0 || y < 0 || x + w > canvas.width || y + h > canvas.height) {
+            throw new Error(`region out of canvas bounds (canvas is ${canvas.width}x${canvas.height})`);
+          }
+          const crop = document.createElement('canvas');
+          crop.width = w; crop.height = h;
+          crop.getContext('2d')!.drawImage(canvas, x, y, w, h, 0, 0, w, h);
+          source = crop;
         }
-        const crop = document.createElement('canvas');
-        crop.width = w; crop.height = h;
-        crop.getContext('2d')!.drawImage(canvas, x, y, w, h, 0, 0, w, h);
-        source = crop;
+        const dataUrl = source.toDataURL('image/png');
+        return { pngBase64: dataUrl.slice('data:image/png;base64,'.length), width: source.width, height: source.height };
+      } finally {
+        if (req.showBg) useViewStore.getState().setOverlay('showBgPlane', prevShowBg);
       }
-      const dataUrl = source.toDataURL('image/png');
-      return { pngBase64: dataUrl.slice('data:image/png;base64,'.length), width: source.width, height: source.height };
     }
 
     default: {

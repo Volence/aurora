@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { EditHistory } from '../../src/core/editing/history';
 import type { S4Level } from '../../src/core/editing/commands';
-import type { Tile, Palette } from '../../src/core/model/s4-types';
+import type { Tile, Palette, Act } from '../../src/core/model/s4-types';
 import { createChunkDef } from '../../src/core/model/s4-types';
 
 function makeLevel(): S4Level {
@@ -109,6 +109,93 @@ describe('set-chunk command', () => {
     expect(() => history.execute(cmd, level)).toThrow(/chunkLibrary/);
     (level as { chunkLibrary?: unknown }).chunkLibrary = [];
     expect(() => history.execute(cmd, level)).toThrow(/nope/);
+  });
+});
+
+describe('set-bg command', () => {
+  function makeAct(): Act {
+    return {
+      id: 'act1', gridWidth: 1, gridHeight: 1, sections: [],
+      startPosition: { secX: 0, secY: 0, localX: 0, localY: 0 },
+      bgLayout: null, bgTiles: null, parallaxRef: null,
+    };
+  }
+
+  function levelWithAct(): { level: S4Level; act: Act } {
+    const act = makeAct();
+    const level = { ...makeLevel(), act };
+    return { level, act };
+  }
+
+  it('applies and undoes a null -> data background swap', () => {
+    const { level, act } = levelWithAct();
+    const history = new EditHistory();
+    const newLayout = new Uint16Array(64 * 32);
+    newLayout[0] = 0x2001; // tile 1, palette 1
+    const newTiles: Tile[] = [
+      { pixels: new Uint8Array(64) },
+      { pixels: new Uint8Array(64).fill(5) },
+    ];
+    history.execute({
+      type: 'set-bg', description: 'agent: set background', sectionIndex: -1,
+      oldLayout: null, newLayout,
+      oldTiles: null, newTiles,
+    }, level);
+    expect(act.bgLayout).not.toBeNull();
+    expect(act.bgLayout![0]).toBe(0x2001);
+    expect(act.bgTiles).toHaveLength(2);
+    expect(act.bgTiles![1].pixels[0]).toBe(5);
+    history.undo(level);
+    expect(act.bgLayout).toBeNull();
+    expect(act.bgTiles).toBeNull();
+    history.redo(level);
+    expect(act.bgLayout![0]).toBe(0x2001);
+    expect(act.bgTiles![1].pixels[0]).toBe(5);
+  });
+
+  it('restores the previous background on undo of a data -> data swap', () => {
+    const { level, act } = levelWithAct();
+    act.bgLayout = new Uint16Array(64 * 32).fill(0x0001);
+    act.bgTiles = [{ pixels: new Uint8Array(64).fill(1) }, { pixels: new Uint8Array(64).fill(2) }];
+    const history = new EditHistory();
+    history.execute({
+      type: 'set-bg', description: 'agent: set background', sectionIndex: -1,
+      oldLayout: new Uint16Array(act.bgLayout),
+      newLayout: new Uint16Array(64 * 32).fill(0x0002),
+      oldTiles: act.bgTiles.map(t => ({ pixels: new Uint8Array(t.pixels) })),
+      newTiles: [{ pixels: new Uint8Array(64).fill(9) }],
+    }, level);
+    expect(act.bgLayout![100]).toBe(0x0002);
+    expect(act.bgTiles).toHaveLength(1);
+    history.undo(level);
+    expect(act.bgLayout![100]).toBe(0x0001);
+    expect(act.bgTiles).toHaveLength(2);
+    expect(act.bgTiles![1].pixels[0]).toBe(2);
+  });
+
+  it('deep-copies: mutating command payload after execute does not affect the act', () => {
+    const { level, act } = levelWithAct();
+    const history = new EditHistory();
+    const newLayout = new Uint16Array(64 * 32);
+    const newTiles: Tile[] = [{ pixels: new Uint8Array(64) }];
+    history.execute({
+      type: 'set-bg', description: 'set bg', sectionIndex: -1,
+      oldLayout: null, newLayout, oldTiles: null, newTiles,
+    }, level);
+    newLayout[7] = 0xBEEF;
+    newTiles[0].pixels[7] = 15;
+    expect(act.bgLayout![7]).toBe(0);
+    expect(act.bgTiles![0].pixels[7]).toBe(0);
+  });
+
+  it('throws when level lacks act', () => {
+    const level = makeLevel(); // no act
+    const history = new EditHistory();
+    expect(() => history.execute({
+      type: 'set-bg', description: 'set bg', sectionIndex: -1,
+      oldLayout: null, newLayout: new Uint16Array(64 * 32),
+      oldTiles: null, newTiles: [{ pixels: new Uint8Array(64) }],
+    }, level)).toThrow('set-bg requires level.act');
   });
 });
 

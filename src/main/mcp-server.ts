@@ -128,6 +128,20 @@ function buildServer(getWindow: () => BrowserWindow | null): McpServer {
     },
     async (args) => textResult(await forward({ kind: 'goto', ...args })));
 
+  server.registerTool('get_bg',
+    { description: 'Read the zone-wide background (Plane B): a 64x32 tile nametable plus its own tile blob (max 512 tiles) — a SEPARATE tile space from the FG tileset (loaded at VRAM slot 1024+). Nametable tile indices are local to the BG blob, not the zone tileset. Returns layout (2048 nametable words, row-major) and tiles (64 pixel values each), or nulls when the act has no background.' },
+    async () => textResult(await forward({ kind: 'get-bg' })));
+
+  server.registerTool('set_bg',
+    {
+      description: 'Replace the zone-wide background (Plane B) wholesale: a 64x32 tile nametable (2048 row-major words) plus its tile blob (max 512 tiles of 64 pixel values 0-15). The BG is a SEPARATE 512-tile space from the FG tileset; nametable tile indices are local to the BG blob (index < tiles.length). Words use the VDP format (pal bits 13-14, vf bit 12, hf bit 11, tile bits 0-10). One undo step.',
+      inputSchema: {
+        layout: z.array(z.number().int().min(0).max(0xFFFF)).length(2048),
+        tiles: z.array(z.array(z.number().int().min(0).max(15)).length(64)).min(1).max(512),
+      },
+    },
+    async ({ layout, tiles }) => textResult(await forward({ kind: 'set-bg', layout, tiles })));
+
   server.registerTool('screenshot',
     {
       description: 'PNG of the map canvas (current viewport). Optional region crop in canvas pixels. Region coordinates are in canvas device pixels (the on-screen viewport canvas), not tile or world coordinates.',
@@ -136,10 +150,11 @@ function buildServer(getWindow: () => BrowserWindow | null): McpServer {
           x: z.number().int().min(0), y: z.number().int().min(0),
           w: z.number().int().min(1), h: z.number().int().min(1),
         }).optional(),
+        showBg: z.boolean().optional().describe('render the background plane during capture'),
       },
     },
-    async ({ region }) => {
-      const result = await forward({ kind: 'screenshot', region }) as { pngBase64: string };
+    async ({ region, showBg }) => {
+      const result = await forward({ kind: 'screenshot', region, showBg }) as { pngBase64: string };
       return { content: [{ type: 'image' as const, data: result.pngBase64, mimeType: 'image/png' }] };
     });
 

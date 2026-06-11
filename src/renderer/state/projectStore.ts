@@ -69,7 +69,8 @@ export function getCurrentAct(state: ProjectState): Act | null {
  * Build the S4Level view used by the undo/redo system. Always includes the
  * zone-level tileset and palette so zone commands (set-palette-line,
  * set-tileset-tiles) can be applied/undone — a level missing those fields
- * makes the history layer throw rather than silently no-op.
+ * makes the history layer throw rather than silently no-op. The current act
+ * is included for the same reason (set-bg swaps act.bgLayout/bgTiles).
  */
 export function getActiveLevel(state: ProjectState): S4Level | null {
   const zone = getCurrentZone(state);
@@ -80,5 +81,6 @@ export function getActiveLevel(state: ProjectState): S4Level | null {
     tileset: zone.tileset,
     palette: zone.palette,
     chunkLibrary: state.project?.chunkLibrary,
+    act,
   };
 }
