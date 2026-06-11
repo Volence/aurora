@@ -1,9 +1,14 @@
 import type { Tile } from '../model/s4-types';
 import { unpackNametableWord, packNametableWord } from '../model/s4-types';
 
+const hashCache = new WeakMap<Uint8Array, string>();
+
 function tileHash(pixels: Uint8Array): string {
+  const cached = hashCache.get(pixels);
+  if (cached !== undefined) return cached;
   let s = '';
-  for (let i = 0; i < 64; i++) s += pixels[i].toString(16);
+  for (let i = 0; i < 64; i++) s += (pixels[i] & 0xF).toString(16);
+  hashCache.set(pixels, s);
   return s;
 }
 
@@ -32,6 +37,15 @@ export function buildGroupUnions(
     tiles: [],
     slotByHash: new Map<string, number>(),
   }));
+
+  // VRAM tile slot 0 renders for empty nametable words — reserve a blank
+  // tile at slot 0 of group 0 (the group loaded at VRAM base 0), matching
+  // the engine pipeline (ojz_strip_gen.py keeps src tile 0 blank in unions).
+  if (unions.length > 0) {
+    const blank: Tile = { pixels: new Uint8Array(64) };
+    unions[0].slotByHash.set(tileHash(blank.pixels), 0);
+    unions[0].tiles.push(blank);
+  }
 
   for (const sec of sections) {
     if (sec.color < 0) continue;
