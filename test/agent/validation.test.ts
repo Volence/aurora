@@ -9,6 +9,10 @@ describe('validateGenesisColor', () => {
     expect(validateGenesisColor(0x0EEE)).toBeNull();
     expect(validateGenesisColor(0x0A42)).toBeNull();
   });
+  it('returns an error string (not a throw) for null/undefined', () => {
+    expect(validateGenesisColor(null as unknown as number)).toMatch(/16-bit/i);
+    expect(validateGenesisColor(undefined as unknown as number)).toMatch(/16-bit/i);
+  });
   it('rejects odd channel values and out-of-range bits', () => {
     expect(validateGenesisColor(0x0001)).toMatch(/even/i);
     expect(validateGenesisColor(0x0010)).toMatch(/even/i);
@@ -46,6 +50,10 @@ describe('validatePaintRegion', () => {
   it('rejects out-of-bounds regions', () => {
     expect(validatePaintRegion(0, 250, 0, 10, 1, Array(10).fill({ tile: 1, pal: 1 }), opts)).toMatch(/bounds/i);
     expect(validatePaintRegion(9, 0, 0, 1, 1, [{ tile: 1, pal: 1 }], opts)).toMatch(/section/i);
+  });
+  it('rejects non-integer and NaN coordinates', () => {
+    expect(validatePaintRegion(0, NaN, 0, 1, 1, [{ tile: 1, pal: 1 }], opts)).toMatch(/integer/i);
+    expect(validatePaintRegion(0, 0.5, 0, 1, 1, [{ tile: 1, pal: 1 }], opts)).toMatch(/integer/i);
   });
   it('rejects entry count mismatch and bad entries', () => {
     expect(validatePaintRegion(0, 0, 0, 2, 2, Array(3).fill({ tile: 1, pal: 1 }), opts)).toMatch(/entries/i);

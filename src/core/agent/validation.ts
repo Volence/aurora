@@ -6,7 +6,7 @@ import type { NametableEntrySpec } from '../../shared/agent-protocol';
 /** Genesis CRAM word: 0000 BBB0 GGG0 RRR0 — 9-bit color, even nibble values only. */
 export function validateGenesisColor(word: number): string | null {
   if (!Number.isInteger(word) || word < 0 || word > 0xFFFF) {
-    return `color $${word.toString(16)} is not a 16-bit word`;
+    return `color $${String(word)} is not a 16-bit word`;
   }
   if ((word & 0xF111) !== 0) {
     return `color $${word.toString(16).toUpperCase().padStart(4, '0')} invalid: channels must be even values 0-$E (word & $F111 must be 0)`;
@@ -49,6 +49,9 @@ export function validatePaintRegion(
 ): string | null {
   if (!Number.isInteger(section) || section < 0 || section >= opts.sectionCount) {
     return `section ${section} out of range (0-${opts.sectionCount - 1})`;
+  }
+  if (![x, y, w, h].every(Number.isInteger)) {
+    return `region coords must be integers, got (${x},${y}) ${w}x${h}`;
   }
   if (w < 1 || h < 1 || x < 0 || y < 0 ||
       x + w > SECTION_TILES_WIDE || y + h > SECTION_TILES_HIGH) {
