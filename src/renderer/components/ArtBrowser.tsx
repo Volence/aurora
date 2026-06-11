@@ -6,16 +6,19 @@ import type { Tile, Palette } from '../../core/model/s4-types';
 // Pre-rendered tile thumbnail caches
 let tileCache: OffscreenCanvas[] = [];
 let cacheZoneId: string | null = null;
+let cachePalLine: number = -1;
 
-function ensureTileCache(tiles: Tile[], palette: Palette, zoneId: string) {
-  if (cacheZoneId === zoneId && tileCache.length === tiles.length) return;
+function ensureTileCache(tiles: Tile[], palette: Palette, zoneId: string, paletteLine: number) {
+  if (cacheZoneId === zoneId && cachePalLine === paletteLine && tileCache.length === tiles.length) return;
   cacheZoneId = zoneId;
+  cachePalLine = paletteLine;
+
+  const pal = palette.lines[paletteLine]?.colors ?? palette.lines[0]?.colors ?? [];
 
   tileCache = tiles.map((tile) => {
     const c = new OffscreenCanvas(8, 8);
     const ctx = c.getContext('2d')!;
     const img = ctx.createImageData(8, 8);
-    const pal = palette.lines[0]?.colors ?? [];
     for (let i = 0; i < 64; i++) {
       const color = pal[tile.pixels[i]] ?? { r: 0, g: 0, b: 0, a: 255 };
       img.data[i * 4] = color.r;
@@ -32,6 +35,7 @@ export default function ArtBrowser() {
   const project = useProjectStore((s) => s.project);
   const currentZoneId = useProjectStore((s) => s.currentZoneId);
   const selectedTileIndex = useEditorStore((s) => s.selectedTileIndex);
+  const selectedPaletteLine = useEditorStore((s) => s.selectedPaletteLine);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const overlayRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -48,12 +52,12 @@ export default function ArtBrowser() {
   const palette = zone?.palette ?? { lines: [] };
   const itemCount = tiles.length;
 
-  // Build caches when zone changes
+  // Build caches when zone or palette line changes
   useEffect(() => {
     if (zone && currentZoneId) {
-      ensureTileCache(zone.tileset.tiles, zone.palette, currentZoneId);
+      ensureTileCache(zone.tileset.tiles, zone.palette, currentZoneId, selectedPaletteLine);
     }
-  }, [zone, currentZoneId]);
+  }, [zone, currentZoneId, selectedPaletteLine]);
 
   // Draw the tile grid
   const renderGrid = useCallback(() => {
@@ -105,7 +109,7 @@ export default function ArtBrowser() {
       overlay.width = rect.width;
       overlay.height = rect.height;
     }
-  }, [zone, scrollTop, itemSize, itemCount, selectedTileIndex]);
+  }, [zone, scrollTop, itemSize, itemCount, selectedTileIndex, selectedPaletteLine]);
 
   useEffect(() => {
     renderGrid();

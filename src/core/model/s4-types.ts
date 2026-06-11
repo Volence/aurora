@@ -73,6 +73,7 @@ export interface Section {
   tileGrid: SectionTileGrid;
   objects: ObjectPlacement[];
   rings: RingPlacement[];
+  tiles: Tile[] | null;
   paletteRef: string | null;
   parallaxRef: string | null;
   bgLayoutRef: string | null;
@@ -87,6 +88,7 @@ export function createSection(index: number, name: string): Section {
     tileGrid: createSectionTileGrid(),
     objects: [],
     rings: [],
+    tiles: null,
     paletteRef: null,
     parallaxRef: null,
     bgLayoutRef: null,
@@ -178,6 +180,7 @@ export interface S4Project {
   zones: Zone[];
   objectLibrary: ObjectDef[];
   chunkLibrary: ChunkDef[];
+  chunkTiles: Tile[];
   basePath: string;
 }
 

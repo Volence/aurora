@@ -58,6 +58,8 @@ export const RING_PATTERNS: RingPattern[] = [
   ]},
 ];
 
+export type EditingLayer = 'fg' | 'bg';
+
 interface EditorState {
   tool: EditorTool;
   selection: Selection | null;
@@ -67,6 +69,7 @@ interface EditorState {
 
   // S4 tool state
   activeSectionIndex: number;
+  editingLayer: EditingLayer;
   selectedTileIndex: number;
   selectedPaletteLine: number;
   selectedChunkId: string | null;
@@ -79,6 +82,7 @@ interface EditorState {
   setSelection: (selection: Selection | null) => void;
   setMultiSelection: (multiSelection: MultiSelection | null) => void;
   setActiveSectionIndex: (index: number) => void;
+  setEditingLayer: (layer: EditingLayer) => void;
   setSelectedTileIndex: (index: number) => void;
   setSelectedPaletteLine: (line: number) => void;
   setSelectedChunkId: (id: string | null) => void;
@@ -100,6 +104,7 @@ export const useEditorStore = create<EditorState>((set) => ({
   historyVersion: 0,
 
   activeSectionIndex: 0,
+  editingLayer: 'fg',
   selectedTileIndex: 0,
   selectedPaletteLine: 0,
   selectedChunkId: null,
@@ -112,6 +117,7 @@ export const useEditorStore = create<EditorState>((set) => ({
   setSelection: (selection) => set({ selection, multiSelection: null }),
   setMultiSelection: (multiSelection) => set({ multiSelection, selection: null }),
   setActiveSectionIndex: (index) => set({ activeSectionIndex: index }),
+  setEditingLayer: (layer) => set({ editingLayer: layer }),
   setSelectedTileIndex: (index) => set({ selectedTileIndex: index }),
   setSelectedPaletteLine: (line) => set({ selectedPaletteLine: line }),
   setSelectedChunkId: (id) => set({ selectedChunkId: id }),

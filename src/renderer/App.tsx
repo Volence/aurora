@@ -5,13 +5,17 @@ import SectionGridNav from './components/SectionGridNav';
 import ChunkLibrary from './components/ChunkLibrary';
 import ObjectPalette from './components/ObjectPalette';
 import RingPatternPalette from './components/RingPatternPalette';
+import ArtBrowser from './components/ArtBrowser';
+import PaletteViewer from './components/PaletteViewer';
 import PropertiesPanel from './components/PropertiesPanel';
+import StatusBar from './components/StatusBar';
+import ToastContainer from './components/ToastContainer';
 import { useProject } from './hooks/useProject';
 import { useProjectStore } from './state/projectStore';
 import { useEditorStore } from './state/editorStore';
 
 export default function App() {
-  const { openProject, saveProject } = useProject();
+  const { openProject, openProjectByPath, saveProject } = useProject();
   const error = useProjectStore((s) => s.error);
   const tool = useEditorStore((s) => s.tool);
 
@@ -29,7 +33,7 @@ export default function App() {
 
   return (
     <div style={styles.root}>
-      <Toolbar onOpenProject={openProject} onSave={saveProject} />
+      <Toolbar onOpenProject={openProject} onOpenRecent={openProjectByPath} onSave={saveProject} />
 
       {error && (
         <div style={styles.error}>
@@ -59,10 +63,15 @@ export default function App() {
               onSelect={(index) => useEditorStore.getState().setSelectedRingPattern(index)}
             />
           )}
+          <div style={{ flex: 1 }} />
+          <ArtBrowser />
         </div>
         <MapViewport />
         <PropertiesPanel />
       </div>
+      <PaletteViewer />
+      <StatusBar />
+      <ToastContainer />
     </div>
   );
 }

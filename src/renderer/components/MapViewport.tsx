@@ -5,7 +5,8 @@ import { useEditorStore, executeCommand, undo, redo, RING_PATTERNS } from '../st
 import type { AnyCommand, S4Level } from '../../core/editing/commands';
 import { SectionRenderer } from '../canvas/SectionRenderer';
 import { OverlayRenderer } from '../canvas/OverlayRenderer';
-import { SECTION_TILES_WIDE, SECTION_TILES_HIGH } from '../../core/model/s4-types';
+import type { SectionOverlayInfo } from '../canvas/OverlayRenderer';
+import { SECTION_TILES_WIDE, SECTION_TILES_HIGH, SECTION_PIXEL_SIZE } from '../../core/model/s4-types';
 import type { Section, ObjectPlacement, RingPlacement } from '../../core/model/s4-types';
 
 export const sectionRenderer = new SectionRenderer();
@@ -18,7 +19,13 @@ export default function MapViewport() {
   const isDragging = useRef(false);
   const isPaintDragging = useRef(false);
   const lastMouse = useRef({ x: 0, y: 0 });
-  const dragTarget = useRef<{ type: 'object' | 'ring'; index: number; startX: number; startY: number } | null>(null);
+  const dragTarget = useRef<{
+    type: 'object' | 'ring';
+    sectionIndex: number;
+    index: number;
+    startX: number;
+    startY: number;
+  } | null>(null);
 
   const vpX = useViewStore((s) => s.vpX);
   const vpY = useViewStore((s) => s.vpY);
@@ -31,26 +38,44 @@ export default function MapViewport() {
   const currentActId = useProjectStore((s) => s.currentActId);
   const historyVersion = useEditorStore((s) => s.historyVersion);
   const activeSectionIndex = useEditorStore((s) => s.activeSectionIndex);
+  const editingLayer = useEditorStore((s) => s.editingLayer);
   const selection = useEditorStore((s) => s.selection);
 
-  // Load tileset + section when project/act/section changes
+  // Load all sections + bg when project/act changes
   useEffect(() => {
     const state = useProjectStore.getState();
     const zone = getCurrentZone(state);
     const act = getCurrentAct(state);
     if (!zone || !act) return;
 
-    // Load tileset into renderer
-    sectionRenderer.loadTileset(zone.tileset.tiles, zone.palette.lines);
+    sectionRenderer.setGrid(act.gridWidth, act.gridHeight);
+    sectionRenderer.clearSections();
+    sectionRenderer.clearBg();
 
-    // Load active section
-    const section = act.sections[activeSectionIndex];
-    if (section) {
-      sectionRenderer.loadSection(section.tileGrid);
+    // Prefer the full zone art atlas (chunkTiles) for rendering — section nametables
+    // use source tile indices that index directly into this atlas.
+    // Fall back to zone.tileset.tiles if no atlas is loaded yet.
+    const tileAtlas = (project?.chunkTiles?.length ?? 0) > 0
+      ? project!.chunkTiles
+      : zone.tileset.tiles;
+
+    for (let i = 0; i < act.sections.length; i++) {
+      const section = act.sections[i];
+      if (!section) continue;
+      const tiles = section.tiles ?? tileAtlas;
+      sectionRenderer.loadSection(i, section.tileGrid, tiles, zone.palette.lines);
     }
-  }, [project, currentZoneId, currentActId, activeSectionIndex]);
 
-  // Re-render when history changes (edits happened)
+    if (act.bgLayout && act.bgTiles) {
+      const bgWidth = 64;
+      const bgHeight = Math.floor(act.bgLayout.length / bgWidth);
+      if (bgHeight > 0) {
+        sectionRenderer.loadBg(act.bgLayout, bgWidth, bgHeight, act.bgTiles, zone.palette.lines);
+      }
+    }
+  }, [project, currentZoneId, currentActId]);
+
+  // Re-render when anything visual changes
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -72,30 +97,24 @@ export default function MapViewport() {
       return;
     }
 
-    const section = act.sections[activeSectionIndex];
-    if (!section) {
-      ctx.fillStyle = '#11111b';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      return;
-    }
-
-    // Render section tiles
-    sectionRenderer.render(ctx, {
-      x: vpX, y: vpY,
-      width: canvas.width, height: canvas.height,
-      zoom,
-    });
-
-    // Render overlays
     const viewport = { x: vpX, y: vpY, width: canvas.width, height: canvas.height, zoom };
-    overlayRenderer.render(
-      ctx,
-      section.objects,
-      section.rings,
-      overlays,
-      viewport,
-    );
-  }, [vpX, vpY, zoom, overlays, project, currentZoneId, currentActId, activeSectionIndex, historyVersion, selection]);
+
+    if (editingLayer === 'bg') {
+      sectionRenderer.renderBg(ctx, viewport);
+    } else {
+      sectionRenderer.render(ctx, viewport, activeSectionIndex);
+
+      const sectionInfos: SectionOverlayInfo[] = [];
+      for (let i = 0; i < act.sections.length; i++) {
+        const section = act.sections[i];
+        if (!section) continue;
+        const offset = sectionRenderer.sectionWorldOffset(i);
+        sectionInfos.push({ section, offsetX: offset.x, offsetY: offset.y });
+      }
+
+      overlayRenderer.render(ctx, sectionInfos, overlays, viewport);
+    }
+  }, [vpX, vpY, zoom, overlays, project, currentZoneId, currentActId, activeSectionIndex, editingLayer, historyVersion, selection]);
 
   // Handle resize
   useEffect(() => {
@@ -105,44 +124,47 @@ export default function MapViewport() {
     const observer = new ResizeObserver(() => {
       const canvas = canvasRef.current;
       if (!canvas) return;
-      const rect = container.getBoundingClientRect();
-      canvas.width = rect.width;
-      canvas.height = rect.height;
+      const r = container.getBoundingClientRect();
+      canvas.width = r.width;
+      canvas.height = r.height;
 
       const state = useProjectStore.getState();
       const act = getCurrentAct(state);
-      const section = act?.sections[useEditorStore.getState().activeSectionIndex];
-      if (section) {
-        const ctx = canvas.getContext('2d');
-        if (ctx) {
-          ctx.imageSmoothingEnabled = false;
-          sectionRenderer.render(ctx, {
-            x: vpX, y: vpY,
-            width: canvas.width, height: canvas.height,
-            zoom,
-          });
-          overlayRenderer.render(ctx, section.objects, section.rings, overlays, {
-            x: vpX, y: vpY, width: canvas.width, height: canvas.height, zoom,
-          });
+      if (!act) return;
+
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      ctx.imageSmoothingEnabled = false;
+
+      const viewport = { x: vpX, y: vpY, width: canvas.width, height: canvas.height, zoom };
+      const layer = useEditorStore.getState().editingLayer;
+
+      if (layer === 'bg') {
+        sectionRenderer.renderBg(ctx, viewport);
+      } else {
+        sectionRenderer.render(ctx, viewport, useEditorStore.getState().activeSectionIndex);
+        const sectionInfos: SectionOverlayInfo[] = [];
+        for (let i = 0; i < act.sections.length; i++) {
+          const section = act.sections[i];
+          if (!section) continue;
+          const offset = sectionRenderer.sectionWorldOffset(i);
+          sectionInfos.push({ section, offsetX: offset.x, offsetY: offset.y });
         }
+        overlayRenderer.render(ctx, sectionInfos, overlays, viewport);
       }
     });
 
     observer.observe(container);
     return () => observer.disconnect();
-  }, [vpX, vpY, zoom, overlays, project, currentZoneId, currentActId, activeSectionIndex, historyVersion]);
+  }, [vpX, vpY, zoom, overlays, project, currentZoneId, currentActId, editingLayer, historyVersion]);
 
   // Keyboard shortcuts
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       const state = useProjectStore.getState();
       const act = getCurrentAct(state);
-      const section = act?.sections[useEditorStore.getState().activeSectionIndex];
-
-      // Build S4Level for undo/redo
       const level: S4Level | null = act ? { sections: act.sections } : null;
 
-      // Undo/redo
       if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
         if (level) undo(level);
         e.preventDefault();
@@ -154,26 +176,28 @@ export default function MapViewport() {
         return;
       }
 
-      // Delete selected
-      if ((e.key === 'Delete' || e.key === 'Backspace') && level && section) {
+      if ((e.key === 'Delete' || e.key === 'Backspace') && level) {
         const { selection: sel } = useEditorStore.getState();
         if (sel) {
-          if (sel.type === 'object' && section.objects[sel.index]) {
-            executeCommand({
-              type: 'delete-object',
-              description: `Delete object`,
-              sectionIndex: sel.sectionIndex,
-              objectIndex: sel.index,
-              object: { ...section.objects[sel.index] },
-            }, level);
-          } else if (sel.type === 'ring' && section.rings[sel.index]) {
-            executeCommand({
-              type: 'delete-ring',
-              description: 'Delete ring',
-              sectionIndex: sel.sectionIndex,
-              ringIndex: sel.index,
-              ring: { ...section.rings[sel.index] },
-            }, level);
+          const sec = act?.sections[sel.sectionIndex];
+          if (sec) {
+            if (sel.type === 'object' && sec.objects[sel.index]) {
+              executeCommand({
+                type: 'delete-object',
+                description: 'Delete object',
+                sectionIndex: sel.sectionIndex,
+                objectIndex: sel.index,
+                object: { ...sec.objects[sel.index] },
+              }, level);
+            } else if (sel.type === 'ring' && sec.rings[sel.index]) {
+              executeCommand({
+                type: 'delete-ring',
+                description: 'Delete ring',
+                sectionIndex: sel.sectionIndex,
+                ringIndex: sel.index,
+                ring: { ...sec.rings[sel.index] },
+              }, level);
+            }
           }
           useEditorStore.getState().setSelection(null);
           e.preventDefault();
@@ -181,7 +205,6 @@ export default function MapViewport() {
         }
       }
 
-      // Navigation
       const step = 64;
       switch (e.key) {
         case 'ArrowLeft': pan(step, 0); e.preventDefault(); break;
@@ -191,7 +214,6 @@ export default function MapViewport() {
         case '=': case '+': setZoom(zoom * 1.5); e.preventDefault(); break;
         case '-': setZoom(zoom / 1.5); e.preventDefault(); break;
         case '0': setZoom(1); e.preventDefault(); break;
-        // Tool shortcuts
         case 'v': useEditorStore.getState().setTool('view'); break;
         case 's': if (!e.ctrlKey) useEditorStore.getState().setTool('select'); break;
         case 'o': useEditorStore.getState().setTool('place-object'); break;
@@ -217,11 +239,50 @@ export default function MapViewport() {
     };
   }
 
-  function worldToTile(worldX: number, worldY: number): { col: number; row: number; index: number } {
+  function worldToSectionTile(worldX: number, worldY: number): {
+    sectionIndex: number;
+    col: number;
+    row: number;
+    tileIndex: number;
+    localX: number;
+    localY: number;
+  } | null {
+    const sectionIndex = sectionRenderer.sectionAtWorld(worldX, worldY);
+    if (sectionIndex < 0) return null;
+    const offset = sectionRenderer.sectionWorldOffset(sectionIndex);
+    const localX = worldX - offset.x;
+    const localY = worldY - offset.y;
+    const col = Math.floor(localX / 8);
+    const row = Math.floor(localY / 8);
+    if (col < 0 || col >= SECTION_TILES_WIDE || row < 0 || row >= SECTION_TILES_HIGH) return null;
+    return { sectionIndex, col, row, tileIndex: row * SECTION_TILES_WIDE + col, localX, localY };
+  }
+
+  function worldToBgTile(worldX: number, worldY: number): { col: number; row: number; tileIndex: number } | null {
+    const bg = sectionRenderer.getBg();
+    if (!bg) return null;
     const col = Math.floor(worldX / 8);
     const row = Math.floor(worldY / 8);
-    const index = row * SECTION_TILES_WIDE + col;
-    return { col, row, index };
+    if (col < 0 || col >= bg.width || row < 0 || row >= bg.height) return null;
+    return { col, row, tileIndex: row * bg.width + col };
+  }
+
+  function paintBgTile(worldX: number, worldY: number): void {
+    const state = useProjectStore.getState();
+    const act = getCurrentAct(state);
+    if (!act?.bgLayout) return;
+
+    const tile = worldToBgTile(worldX, worldY);
+    if (!tile) return;
+
+    const { selectedTileIndex, selectedPaletteLine } = useEditorStore.getState();
+    const newNt = (selectedTileIndex & 0x7FF) | ((selectedPaletteLine & 0x3) << 13);
+    if (act.bgLayout[tile.tileIndex] !== newNt) {
+      act.bgLayout[tile.tileIndex] = newNt;
+      sectionRenderer.markBgDirty([tile.tileIndex]);
+      useEditorStore.getState().markDirty();
+      useEditorStore.getState().bumpVersion();
+    }
   }
 
   function getActiveLevel(): S4Level | null {
@@ -230,10 +291,9 @@ export default function MapViewport() {
     return act ? { sections: act.sections } : null;
   }
 
-  function getActiveSection(): Section | null {
+  function getSectionByIndex(idx: number): Section | null {
     const state = useProjectStore.getState();
     const act = getCurrentAct(state);
-    const idx = useEditorStore.getState().activeSectionIndex;
     return act?.sections[idx] ?? null;
   }
 
@@ -247,44 +307,53 @@ export default function MapViewport() {
       return;
     }
 
-    const section = getActiveSection();
     const level = getActiveLevel();
-    if (!section || !level) return;
+    if (!level) return;
 
     const world = screenToWorld(e.clientX, e.clientY);
-    const sectionIdx = useEditorStore.getState().activeSectionIndex;
 
     if (tool === 'select') {
-      // Try to find object near click
-      const objIdx = section.objects.findIndex(
-        (o) => Math.abs(o.x - world.x) < 16 && Math.abs(o.y - world.y) < 16
-      );
-      if (objIdx >= 0) {
-        useEditorStore.getState().setSelection({ type: 'object', sectionIndex: sectionIdx, index: objIdx });
-        dragTarget.current = {
-          type: 'object', index: objIdx,
-          startX: section.objects[objIdx].x, startY: section.objects[objIdx].y,
-        };
-        isDragging.current = true;
-        lastMouse.current = { x: e.clientX, y: e.clientY };
-        e.preventDefault();
-        return;
-      }
+      const state = useProjectStore.getState();
+      const act = getCurrentAct(state);
+      if (!act) return;
 
-      // Try rings
-      const ringIdx = section.rings.findIndex(
-        (r) => Math.abs(r.x - world.x) < 12 && Math.abs(r.y - world.y) < 12
-      );
-      if (ringIdx >= 0) {
-        useEditorStore.getState().setSelection({ type: 'ring', sectionIndex: sectionIdx, index: ringIdx });
-        dragTarget.current = {
-          type: 'ring', index: ringIdx,
-          startX: section.rings[ringIdx].x, startY: section.rings[ringIdx].y,
-        };
-        isDragging.current = true;
-        lastMouse.current = { x: e.clientX, y: e.clientY };
-        e.preventDefault();
-        return;
+      // Search all sections for hit
+      for (let secIdx = 0; secIdx < act.sections.length; secIdx++) {
+        const section = act.sections[secIdx];
+        if (!section) continue;
+        const offset = sectionRenderer.sectionWorldOffset(secIdx);
+
+        const objIdx = section.objects.findIndex(
+          (o) => Math.abs((o.x + offset.x) - world.x) < 16 && Math.abs((o.y + offset.y) - world.y) < 16
+        );
+        if (objIdx >= 0) {
+          useEditorStore.getState().setActiveSectionIndex(secIdx);
+          useEditorStore.getState().setSelection({ type: 'object', sectionIndex: secIdx, index: objIdx });
+          dragTarget.current = {
+            type: 'object', sectionIndex: secIdx, index: objIdx,
+            startX: section.objects[objIdx].x, startY: section.objects[objIdx].y,
+          };
+          isDragging.current = true;
+          lastMouse.current = { x: e.clientX, y: e.clientY };
+          e.preventDefault();
+          return;
+        }
+
+        const ringIdx = section.rings.findIndex(
+          (r) => Math.abs((r.x + offset.x) - world.x) < 12 && Math.abs((r.y + offset.y) - world.y) < 12
+        );
+        if (ringIdx >= 0) {
+          useEditorStore.getState().setActiveSectionIndex(secIdx);
+          useEditorStore.getState().setSelection({ type: 'ring', sectionIndex: secIdx, index: ringIdx });
+          dragTarget.current = {
+            type: 'ring', sectionIndex: secIdx, index: ringIdx,
+            startX: section.rings[ringIdx].x, startY: section.rings[ringIdx].y,
+          };
+          isDragging.current = true;
+          lastMouse.current = { x: e.clientX, y: e.clientY };
+          e.preventDefault();
+          return;
+        }
       }
 
       useEditorStore.getState().setSelection(null);
@@ -295,33 +364,45 @@ export default function MapViewport() {
     }
 
     if (tool === 'paint-tile') {
-      const tile = worldToTile(world.x, world.y);
-      if (tile.index >= 0 && tile.index < section.tileGrid.nametable.length) {
-        const { selectedTileIndex, selectedPaletteLine } = useEditorStore.getState();
-        const oldNt = section.tileGrid.nametable[tile.index];
-        const oldColl = section.tileGrid.collision[tile.index];
-        // Pack nametable word: tile index + palette line
-        const newNt = (selectedTileIndex & 0x7FF) | ((selectedPaletteLine & 0x3) << 13);
-        if (oldNt !== newNt) {
-          executeCommand({
-            type: 'set-tiles',
-            description: `Paint tile at (${tile.col}, ${tile.row})`,
-            sectionIndex: sectionIdx,
-            entries: [{ index: tile.index, oldNt, newNt, oldColl, newColl: oldColl }],
-          }, level);
-          sectionRenderer.markDirty([tile.index]);
-        }
+      if (useEditorStore.getState().editingLayer === 'bg') {
+        paintBgTile(world.x, world.y);
+        isPaintDragging.current = true;
+        e.preventDefault();
+        return;
       }
+
+      const info = worldToSectionTile(world.x, world.y);
+      if (!info) return;
+      const section = getSectionByIndex(info.sectionIndex);
+      if (!section) return;
+
+      const { selectedTileIndex, selectedPaletteLine } = useEditorStore.getState();
+      const oldNt = section.tileGrid.nametable[info.tileIndex];
+      const oldColl = section.tileGrid.collision[info.tileIndex];
+      const newNt = (selectedTileIndex & 0x7FF) | ((selectedPaletteLine & 0x3) << 13);
+      if (oldNt !== newNt) {
+        executeCommand({
+          type: 'set-tiles',
+          description: `Paint tile at (${info.col}, ${info.row})`,
+          sectionIndex: info.sectionIndex,
+          entries: [{ index: info.tileIndex, oldNt, newNt, oldColl, newColl: oldColl }],
+        }, level);
+        sectionRenderer.markDirty(info.sectionIndex, [info.tileIndex]);
+      }
+      useEditorStore.getState().setActiveSectionIndex(info.sectionIndex);
       isPaintDragging.current = true;
       e.preventDefault();
       return;
     }
 
     if (tool === 'paint-block') {
-      // Paint a 16x16 (2x2 tile) area
-      const tile = worldToTile(world.x, world.y);
-      const baseCol = Math.floor(tile.col / 2) * 2;
-      const baseRow = Math.floor(tile.row / 2) * 2;
+      const info = worldToSectionTile(world.x, world.y);
+      if (!info) return;
+      const section = getSectionByIndex(info.sectionIndex);
+      if (!section) return;
+
+      const baseCol = Math.floor(info.col / 2) * 2;
+      const baseRow = Math.floor(info.row / 2) * 2;
       const { selectedTileIndex, selectedPaletteLine } = useEditorStore.getState();
       const entries: Array<{ index: number; oldNt: number; newNt: number; oldColl: number; newColl: number }> = [];
       const dirtyIndices: number[] = [];
@@ -347,70 +428,145 @@ export default function MapViewport() {
         executeCommand({
           type: 'set-tiles',
           description: `Paint block at (${baseCol}, ${baseRow})`,
-          sectionIndex: sectionIdx,
+          sectionIndex: info.sectionIndex,
           entries,
         }, level);
-        sectionRenderer.markDirty(dirtyIndices);
+        sectionRenderer.markDirty(info.sectionIndex, dirtyIndices);
       }
+      useEditorStore.getState().setActiveSectionIndex(info.sectionIndex);
       isPaintDragging.current = true;
       e.preventDefault();
       return;
     }
 
     if (tool === 'stamp-chunk') {
-      // TODO: stamp chunk from chunk library
+      const { selectedChunkId } = useEditorStore.getState();
+      const liveProject = useProjectStore.getState().project;
+      const chunk = liveProject?.chunkLibrary.find(c => c.id === selectedChunkId);
+      if (!chunk) { e.preventDefault(); return; }
+
+      const info = worldToSectionTile(world.x, world.y);
+      if (!info) { e.preventDefault(); return; }
+      const section = getSectionByIndex(info.sectionIndex);
+      if (!section) { e.preventDefault(); return; }
+
+      const baseCol = Math.floor(info.col / chunk.widthTiles) * chunk.widthTiles;
+      const baseRow = Math.floor(info.row / chunk.heightTiles) * chunk.heightTiles;
+
+      const entries: Array<{ index: number; oldNt: number; newNt: number; oldColl: number; newColl: number }> = [];
+      const dirtyIndices: number[] = [];
+
+      for (let r = 0; r < chunk.heightTiles; r++) {
+        for (let c = 0; c < chunk.widthTiles; c++) {
+          const col = baseCol + c;
+          const row = baseRow + r;
+          if (col >= SECTION_TILES_WIDE || row >= SECTION_TILES_HIGH) continue;
+          const idx = row * SECTION_TILES_WIDE + col;
+          const oldNt = section.tileGrid.nametable[idx];
+          const oldColl = section.tileGrid.collision[idx];
+          const newNt = chunk.nametable[r * chunk.widthTiles + c];
+          const newColl = chunk.collision[r * chunk.widthTiles + c];
+          if (oldNt !== newNt || oldColl !== newColl) {
+            entries.push({ index: idx, oldNt, newNt, oldColl, newColl });
+            dirtyIndices.push(idx);
+          }
+        }
+      }
+
+      if (entries.length > 0) {
+        // Ensure section renderer has the full zone art atlas for chunk tile indices
+        const chunkTiles = liveProject?.chunkTiles ?? [];
+        if (chunkTiles.length > 0 && !section.tiles) {
+          section.tiles = chunkTiles;
+          const pState = useProjectStore.getState();
+          const zone = getCurrentZone(pState);
+          if (zone) {
+            sectionRenderer.loadSection(
+              info.sectionIndex,
+              section.tileGrid,
+              section.tiles,
+              zone.palette.lines,
+            );
+          }
+        }
+
+        executeCommand({
+          type: 'set-tiles',
+          description: `Stamp chunk ${selectedChunkId} at (${baseCol}, ${baseRow})`,
+          sectionIndex: info.sectionIndex,
+          entries,
+        }, level);
+        sectionRenderer.markDirty(info.sectionIndex, dirtyIndices);
+      }
+      useEditorStore.getState().setActiveSectionIndex(info.sectionIndex);
       e.preventDefault();
       return;
     }
 
     if (tool === 'paint-collision') {
-      const tile = worldToTile(world.x, world.y);
-      if (tile.index >= 0 && tile.index < section.tileGrid.collision.length) {
-        const { selectedCollisionType } = useEditorStore.getState();
-        const oldColl = section.tileGrid.collision[tile.index];
-        if (oldColl !== selectedCollisionType) {
-          executeCommand({
-            type: 'set-collision',
-            description: `Paint collision at (${tile.col}, ${tile.row})`,
-            sectionIndex: sectionIdx,
-            entries: [{ index: tile.index, oldColl, newColl: selectedCollisionType }],
-          }, level);
-        }
+      const info = worldToSectionTile(world.x, world.y);
+      if (!info) return;
+      const section = getSectionByIndex(info.sectionIndex);
+      if (!section) return;
+
+      const { selectedCollisionType } = useEditorStore.getState();
+      const oldColl = section.tileGrid.collision[info.tileIndex];
+      if (oldColl !== selectedCollisionType) {
+        executeCommand({
+          type: 'set-collision',
+          description: `Paint collision at (${info.col}, ${info.row})`,
+          sectionIndex: info.sectionIndex,
+          entries: [{ index: info.tileIndex, oldColl, newColl: selectedCollisionType }],
+        }, level);
       }
+      useEditorStore.getState().setActiveSectionIndex(info.sectionIndex);
       isPaintDragging.current = true;
       e.preventDefault();
       return;
     }
 
     if (tool === 'place-object') {
+      const secIdx = sectionRenderer.sectionAtWorld(world.x, world.y);
+      if (secIdx < 0) return;
+      const section = getSectionByIndex(secIdx);
+      if (!section) return;
+
+      const offset = sectionRenderer.sectionWorldOffset(secIdx);
       const { selectedObjectTypeId, selectedObjectSubtype } = useEditorStore.getState();
       const obj: ObjectPlacement = {
-        x: Math.round(world.x),
-        y: Math.round(world.y),
+        x: Math.round(world.x - offset.x),
+        y: Math.round(world.y - offset.y),
         typeId: selectedObjectTypeId ?? '0',
         subtype: selectedObjectSubtype,
       };
       executeCommand({
         type: 'add-object',
         description: `Place object ${selectedObjectTypeId}`,
-        sectionIndex: sectionIdx,
+        sectionIndex: secIdx,
         object: obj,
       }, level);
+      useEditorStore.getState().setActiveSectionIndex(secIdx);
       e.preventDefault();
       return;
     }
 
     if (tool === 'place-ring') {
+      const secIdx = sectionRenderer.sectionAtWorld(world.x, world.y);
+      if (secIdx < 0) return;
+      const section = getSectionByIndex(secIdx);
+      if (!section) return;
+
+      const offset = sectionRenderer.sectionWorldOffset(secIdx);
       const patternIdx = useEditorStore.getState().selectedRingPattern;
       const pattern = RING_PATTERNS[patternIdx] || RING_PATTERNS[0];
-      const localX = Math.round(world.x);
-      const localY = Math.round(world.y);
+      const localX = Math.round(world.x - offset.x);
+      const localY = Math.round(world.y - offset.y);
 
       if (pattern.offsets.length === 1) {
         executeCommand({
           type: 'add-ring',
           description: 'Place ring',
-          sectionIndex: sectionIdx,
+          sectionIndex: secIdx,
           ring: { x: localX, y: localY },
         }, level);
       } else {
@@ -418,10 +574,11 @@ export default function MapViewport() {
         executeCommand({
           type: 'add-rings',
           description: `Place ${pattern.name} rings`,
-          sectionIndex: sectionIdx,
+          sectionIndex: secIdx,
           rings,
         }, level);
       }
+      useEditorStore.getState().setActiveSectionIndex(secIdx);
       e.preventDefault();
       return;
     }
@@ -430,41 +587,47 @@ export default function MapViewport() {
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     const tool = useEditorStore.getState().tool;
 
-    // Paint dragging for tile/collision tools
+    // Paint dragging
     if (isPaintDragging.current && (tool === 'paint-tile' || tool === 'paint-collision')) {
-      const section = getActiveSection();
-      const level = getActiveLevel();
-      if (!section || !level) return;
-      const sectionIdx = useEditorStore.getState().activeSectionIndex;
       const world = screenToWorld(e.clientX, e.clientY);
-      const tile = worldToTile(world.x, world.y);
 
-      if (tile.index >= 0 && tile.index < section.tileGrid.nametable.length) {
-        if (tool === 'paint-tile') {
-          const { selectedTileIndex, selectedPaletteLine } = useEditorStore.getState();
-          const oldNt = section.tileGrid.nametable[tile.index];
-          const oldColl = section.tileGrid.collision[tile.index];
-          const newNt = (selectedTileIndex & 0x7FF) | ((selectedPaletteLine & 0x3) << 13);
-          if (oldNt !== newNt) {
-            executeCommand({
-              type: 'set-tiles',
-              description: `Paint tile at (${tile.col}, ${tile.row})`,
-              sectionIndex: sectionIdx,
-              entries: [{ index: tile.index, oldNt, newNt, oldColl, newColl: oldColl }],
-            }, level);
-            sectionRenderer.markDirty([tile.index]);
-          }
-        } else {
-          const { selectedCollisionType } = useEditorStore.getState();
-          const oldColl = section.tileGrid.collision[tile.index];
-          if (oldColl !== selectedCollisionType) {
-            executeCommand({
-              type: 'set-collision',
-              description: `Paint collision at (${tile.col}, ${tile.row})`,
-              sectionIndex: sectionIdx,
-              entries: [{ index: tile.index, oldColl, newColl: selectedCollisionType }],
-            }, level);
-          }
+      // BG layer paint drag
+      if (tool === 'paint-tile' && useEditorStore.getState().editingLayer === 'bg') {
+        paintBgTile(world.x, world.y);
+        return;
+      }
+
+      const level = getActiveLevel();
+      if (!level) return;
+      const info = worldToSectionTile(world.x, world.y);
+      if (!info) return;
+      const section = getSectionByIndex(info.sectionIndex);
+      if (!section) return;
+
+      if (tool === 'paint-tile') {
+        const { selectedTileIndex, selectedPaletteLine } = useEditorStore.getState();
+        const oldNt = section.tileGrid.nametable[info.tileIndex];
+        const oldColl = section.tileGrid.collision[info.tileIndex];
+        const newNt = (selectedTileIndex & 0x7FF) | ((selectedPaletteLine & 0x3) << 13);
+        if (oldNt !== newNt) {
+          executeCommand({
+            type: 'set-tiles',
+            description: `Paint tile at (${info.col}, ${info.row})`,
+            sectionIndex: info.sectionIndex,
+            entries: [{ index: info.tileIndex, oldNt, newNt, oldColl, newColl: oldColl }],
+          }, level);
+          sectionRenderer.markDirty(info.sectionIndex, [info.tileIndex]);
+        }
+      } else {
+        const { selectedCollisionType } = useEditorStore.getState();
+        const oldColl = section.tileGrid.collision[info.tileIndex];
+        if (oldColl !== selectedCollisionType) {
+          executeCommand({
+            type: 'set-collision',
+            description: `Paint collision at (${info.col}, ${info.row})`,
+            sectionIndex: info.sectionIndex,
+            entries: [{ index: info.tileIndex, oldColl, newColl: selectedCollisionType }],
+          }, level);
         }
       }
       return;
@@ -472,17 +635,24 @@ export default function MapViewport() {
 
     // Drag object/ring
     if (isDragging.current && dragTarget.current && tool === 'select') {
-      const section = getActiveSection();
+      const target = dragTarget.current;
+      const section = getSectionByIndex(target.sectionIndex);
       if (!section) return;
       const world = screenToWorld(e.clientX, e.clientY);
-      const target = dragTarget.current;
+      const offset = sectionRenderer.sectionWorldOffset(target.sectionIndex);
 
       if (target.type === 'object') {
         const obj = section.objects[target.index];
-        if (obj) { obj.x = Math.round(world.x); obj.y = Math.round(world.y); }
+        if (obj) {
+          obj.x = Math.round(world.x - offset.x);
+          obj.y = Math.round(world.y - offset.y);
+        }
       } else {
         const ring = section.rings[target.index];
-        if (ring) { ring.x = Math.round(world.x); ring.y = Math.round(world.y); }
+        if (ring) {
+          ring.x = Math.round(world.x - offset.x);
+          ring.y = Math.round(world.y - offset.y);
+        }
       }
       useEditorStore.getState().bumpVersion();
       return;
@@ -501,20 +671,32 @@ export default function MapViewport() {
     const bar = hoverBarRef.current;
     if (!bar) return;
     const world = screenToWorld(e.clientX, e.clientY);
-    const tile = worldToTile(world.x, world.y);
     bar.style.display = 'flex';
-    bar.innerHTML = `Tile (${tile.col}, ${tile.row}) | Pos ${Math.floor(world.x)}, ${Math.floor(world.y)}`;
+
+    if (useEditorStore.getState().editingLayer === 'bg') {
+      const bgTile = worldToBgTile(world.x, world.y);
+      if (bgTile) {
+        bar.innerHTML = `BG | Tile (${bgTile.col}, ${bgTile.row}) | Pos ${Math.floor(world.x)}, ${Math.floor(world.y)}`;
+      } else {
+        bar.innerHTML = `BG | Pos ${Math.floor(world.x)}, ${Math.floor(world.y)}`;
+      }
+    } else {
+      const info = worldToSectionTile(world.x, world.y);
+      if (info) {
+        bar.innerHTML = `Sec ${info.sectionIndex} | Tile (${info.col}, ${info.row}) | Pos ${Math.floor(world.x)}, ${Math.floor(world.y)}`;
+      } else {
+        bar.innerHTML = `Pos ${Math.floor(world.x)}, ${Math.floor(world.y)}`;
+      }
+    }
   }, [pan]);
 
   const handleMouseUp = useCallback((_e: React.MouseEvent) => {
     isPaintDragging.current = false;
 
-    // Commit object/ring drag
     if (dragTarget.current && isDragging.current) {
-      const section = getActiveSection();
-      const level = getActiveLevel();
       const target = dragTarget.current;
-      const sectionIdx = useEditorStore.getState().activeSectionIndex;
+      const section = getSectionByIndex(target.sectionIndex);
+      const level = getActiveLevel();
 
       if (section && level) {
         if (target.type === 'object') {
@@ -525,8 +707,8 @@ export default function MapViewport() {
             obj.y = target.startY;
             executeCommand({
               type: 'move-object',
-              description: `Move object`,
-              sectionIndex: sectionIdx,
+              description: 'Move object',
+              sectionIndex: target.sectionIndex,
               objectIndex: target.index,
               oldX: target.startX, oldY: target.startY,
               newX: finalX, newY: finalY,
@@ -541,7 +723,7 @@ export default function MapViewport() {
             executeCommand({
               type: 'move-ring',
               description: 'Move ring',
-              sectionIndex: sectionIdx,
+              sectionIndex: target.sectionIndex,
               ringIndex: target.index,
               oldX: target.startX, oldY: target.startY,
               newX: finalX, newY: finalY,

@@ -1,17 +1,21 @@
-import type { ObjectPlacement, RingPlacement } from '../../core/model/s4-types';
+import type { ObjectPlacement, RingPlacement, Section } from '../../core/model/s4-types';
+import { SECTION_TILES_WIDE, SECTION_TILES_HIGH, SECTION_PIXEL_SIZE } from '../../core/model/s4-types';
 import type { OverlayOptions } from '../state/viewStore';
 
-/**
- * Renders overlay elements (objects, rings, grid, collision) on the canvas.
- */
+type Ctx = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
+
+export interface SectionOverlayInfo {
+  section: Section;
+  offsetX: number;
+  offsetY: number;
+}
+
 export class OverlayRenderer {
   render(
-    ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
-    objects: ObjectPlacement[],
-    rings: RingPlacement[],
+    ctx: Ctx,
+    sections: SectionOverlayInfo[],
     options: OverlayOptions,
     viewport: { x: number; y: number; width: number; height: number; zoom: number },
-    collision?: Uint8Array,
   ): void {
     const { x: vpX, y: vpY, zoom } = viewport;
 
@@ -19,37 +23,26 @@ export class OverlayRenderer {
     ctx.scale(zoom, zoom);
     ctx.translate(-vpX, -vpY);
 
-    if (options.showTileGrid) {
-      this.drawTileGrid(ctx, viewport);
-    }
+    if (options.showTileGrid) this.drawTileGrid(ctx, viewport);
+    if (options.showBlockGrid) this.drawBlockGrid(ctx, viewport);
+    if (options.showChunkGrid) this.drawSectionGrid(ctx, viewport);
 
-    if (options.showBlockGrid) {
-      this.drawBlockGrid(ctx, viewport);
-    }
-
-    if (options.showChunkGrid) {
-      this.drawChunkGrid(ctx, viewport);
-    }
-
-    if (options.showCollision && collision) {
-      this.drawCollisionOverlay(ctx, viewport, collision);
-    }
-
-    if (options.showRings) {
-      this.drawRings(ctx, rings, viewport);
-    }
-
-    if (options.showObjects) {
-      this.drawObjects(ctx, objects, viewport);
+    for (const info of sections) {
+      if (options.showCollision) {
+        this.drawCollisionOverlay(ctx, viewport, info.section.tileGrid.collision, info.offsetX, info.offsetY);
+      }
+      if (options.showRings) {
+        this.drawRings(ctx, info.section.rings, viewport, info.offsetX, info.offsetY);
+      }
+      if (options.showObjects) {
+        this.drawObjects(ctx, info.section.objects, viewport, info.offsetX, info.offsetY);
+      }
     }
 
     ctx.restore();
   }
 
-  drawTileGrid(
-    ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
-    viewport: { x: number; y: number; width: number; height: number; zoom: number },
-  ): void {
+  drawTileGrid(ctx: Ctx, viewport: { x: number; y: number; width: number; height: number; zoom: number }): void {
     const { x: vpX, y: vpY, width, height, zoom } = viewport;
     const vpWidth = width / zoom;
     const vpHeight = height / zoom;
@@ -75,10 +68,7 @@ export class OverlayRenderer {
     }
   }
 
-  drawBlockGrid(
-    ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
-    viewport: { x: number; y: number; width: number; height: number; zoom: number },
-  ): void {
+  drawBlockGrid(ctx: Ctx, viewport: { x: number; y: number; width: number; height: number; zoom: number }): void {
     const { x: vpX, y: vpY, width, height, zoom } = viewport;
     const vpWidth = width / zoom;
     const vpHeight = height / zoom;
@@ -104,10 +94,7 @@ export class OverlayRenderer {
     }
   }
 
-  private drawChunkGrid(
-    ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
-    viewport: { x: number; y: number; width: number; height: number; zoom: number },
-  ): void {
+  private drawSectionGrid(ctx: Ctx, viewport: { x: number; y: number; width: number; height: number; zoom: number }): void {
     const { x: vpX, y: vpY, width, height, zoom } = viewport;
     const vpWidth = width / zoom;
     const vpHeight = height / zoom;
@@ -115,18 +102,17 @@ export class OverlayRenderer {
     ctx.strokeStyle = 'rgba(255, 255, 0, 0.3)';
     ctx.lineWidth = 2;
 
-    // Section boundary at 2048px
-    const startX = Math.floor(vpX / 2048) * 2048;
-    const startY = Math.floor(vpY / 2048) * 2048;
+    const startX = Math.floor(vpX / SECTION_PIXEL_SIZE) * SECTION_PIXEL_SIZE;
+    const startY = Math.floor(vpY / SECTION_PIXEL_SIZE) * SECTION_PIXEL_SIZE;
 
-    for (let x = startX; x < vpX + vpWidth; x += 2048) {
+    for (let x = startX; x < vpX + vpWidth; x += SECTION_PIXEL_SIZE) {
       ctx.beginPath();
       ctx.moveTo(x, vpY);
       ctx.lineTo(x, vpY + vpHeight);
       ctx.stroke();
     }
 
-    for (let y = startY; y < vpY + vpHeight; y += 2048) {
+    for (let y = startY; y < vpY + vpHeight; y += SECTION_PIXEL_SIZE) {
       ctx.beginPath();
       ctx.moveTo(vpX, y);
       ctx.lineTo(vpX + vpWidth, y);
@@ -135,65 +121,73 @@ export class OverlayRenderer {
   }
 
   drawCollisionOverlay(
-    ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
+    ctx: Ctx,
     viewport: { x: number; y: number; width: number; height: number; zoom: number },
     collision: Uint8Array,
+    offsetX: number,
+    offsetY: number,
   ): void {
     const { x: vpX, y: vpY, width, height, zoom } = viewport;
     const vpWidth = width / zoom;
     const vpHeight = height / zoom;
-    const tilesWide = 256; // SECTION_TILES_WIDE
 
-    const startCol = Math.max(0, Math.floor(vpX / 8));
-    const startRow = Math.max(0, Math.floor(vpY / 8));
-    const endCol = Math.min(tilesWide, Math.ceil((vpX + vpWidth) / 8));
-    const endRow = Math.min(256, Math.ceil((vpY + vpHeight) / 8));
+    const localVpX = vpX - offsetX;
+    const localVpY = vpY - offsetY;
+
+    const startCol = Math.max(0, Math.floor(localVpX / 8));
+    const startRow = Math.max(0, Math.floor(localVpY / 8));
+    const endCol = Math.min(SECTION_TILES_WIDE, Math.ceil((localVpX + vpWidth) / 8));
+    const endRow = Math.min(SECTION_TILES_HIGH, Math.ceil((localVpY + vpHeight) / 8));
 
     for (let row = startRow; row < endRow; row++) {
       for (let col = startCol; col < endCol; col++) {
-        const idx = row * tilesWide + col;
+        const idx = row * SECTION_TILES_WIDE + col;
         const collType = collision[idx];
         if (collType === 0) continue;
 
         const color = COLLISION_COLORS[collType] ?? 'rgba(255, 0, 255, 0.3)';
         ctx.fillStyle = color;
-        ctx.fillRect(col * 8, row * 8, 8, 8);
+        ctx.fillRect(col * 8 + offsetX, row * 8 + offsetY, 8, 8);
       }
     }
   }
 
-  private drawObjects(
-    ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
+  drawObjects(
+    ctx: Ctx,
     objects: ObjectPlacement[],
     viewport: { x: number; y: number; width: number; height: number; zoom: number },
+    offsetX: number,
+    offsetY: number,
   ): void {
     const { x: vpX, y: vpY, width, height, zoom } = viewport;
     const vpWidth = width / zoom;
     const vpHeight = height / zoom;
 
     for (const obj of objects) {
-      if (obj.x < vpX - 64 || obj.x > vpX + vpWidth + 64) continue;
-      if (obj.y < vpY - 64 || obj.y > vpY + vpHeight + 64) continue;
+      const wx = obj.x + offsetX;
+      const wy = obj.y + offsetY;
+      if (wx < vpX - 64 || wx > vpX + vpWidth + 64) continue;
+      if (wy < vpY - 64 || wy > vpY + vpHeight + 64) continue;
 
-      // Colored rectangle fallback
       ctx.fillStyle = 'rgba(255, 100, 100, 0.7)';
-      ctx.fillRect(obj.x - 8, obj.y - 8, 16, 16);
+      ctx.fillRect(wx - 8, wy - 8, 16, 16);
       ctx.strokeStyle = '#ff4444';
       ctx.lineWidth = 1;
-      ctx.strokeRect(obj.x - 8, obj.y - 8, 16, 16);
+      ctx.strokeRect(wx - 8, wy - 8, 16, 16);
 
       ctx.fillStyle = '#ffffff';
       ctx.font = '8px monospace';
       ctx.textAlign = 'center';
-      const label = obj.typeId;
-      ctx.fillText(label, obj.x, obj.y + 3);
+      ctx.fillText(obj.typeId, wx, wy + 3);
     }
   }
 
-  private drawRings(
-    ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
+  drawRings(
+    ctx: Ctx,
     rings: RingPlacement[],
     viewport: { x: number; y: number; width: number; height: number; zoom: number },
+    offsetX: number,
+    offsetY: number,
   ): void {
     const { x: vpX, y: vpY, width, height, zoom } = viewport;
     const vpWidth = width / zoom;
@@ -204,11 +198,13 @@ export class OverlayRenderer {
     ctx.lineWidth = 1;
 
     for (const ring of rings) {
-      if (ring.x < vpX - 16 || ring.x > vpX + vpWidth + 16) continue;
-      if (ring.y < vpY - 16 || ring.y > vpY + vpHeight + 16) continue;
+      const wx = ring.x + offsetX;
+      const wy = ring.y + offsetY;
+      if (wx < vpX - 16 || wx > vpX + vpWidth + 16) continue;
+      if (wy < vpY - 16 || wy > vpY + vpHeight + 16) continue;
 
       ctx.beginPath();
-      ctx.arc(ring.x, ring.y, 6, 0, Math.PI * 2);
+      ctx.arc(wx, wy, 6, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
     }
@@ -216,11 +212,11 @@ export class OverlayRenderer {
 }
 
 const COLLISION_COLORS: Record<number, string> = {
-  1: 'rgba(0, 128, 255, 0.3)',   // solid
-  2: 'rgba(255, 0, 0, 0.3)',     // hazard/spike
-  3: 'rgba(0, 255, 0, 0.3)',     // platform (top-solid)
-  4: 'rgba(255, 128, 0, 0.3)',   // slope
-  5: 'rgba(128, 0, 255, 0.3)',   // water
-  6: 'rgba(255, 255, 0, 0.3)',   // death
-  7: 'rgba(0, 255, 255, 0.3)',   // special
+  1: 'rgba(0, 128, 255, 0.3)',
+  2: 'rgba(255, 0, 0, 0.3)',
+  3: 'rgba(0, 255, 0, 0.3)',
+  4: 'rgba(255, 128, 0, 0.3)',
+  5: 'rgba(128, 0, 255, 0.3)',
+  6: 'rgba(255, 255, 0, 0.3)',
+  7: 'rgba(0, 255, 255, 0.3)',
 };

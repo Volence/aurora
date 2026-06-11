@@ -3,6 +3,8 @@ export interface S4ActConfig {
   gridWidth: number;
   gridHeight: number;
   dataPath: string;
+  stripPath?: string;
+  stripPrefix?: string;
   bgLayout: string;
   bgTiles: string;
   parallax: string | null;

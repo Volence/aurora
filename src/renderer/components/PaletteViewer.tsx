@@ -1,10 +1,12 @@
 import React from 'react';
 import { useProjectStore, getCurrentZone } from '../state/projectStore';
+import { useEditorStore } from '../state/editorStore';
 import type { Color } from '../../core/model/s4-types';
 
 export default function PaletteViewer() {
   const project = useProjectStore((s) => s.project);
   const currentZoneId = useProjectStore((s) => s.currentZoneId);
+  const selectedPaletteLine = useEditorStore((s) => s.selectedPaletteLine);
 
   const state = useProjectStore.getState();
   const zone = getCurrentZone(state);
@@ -21,24 +23,42 @@ export default function PaletteViewer() {
 
   return (
     <div style={styles.container}>
-      <span style={styles.label}>Palette</span>
+      <span style={styles.label}>Pal Line</span>
       <div style={styles.lines}>
-        {palette.lines.map((line, lineIdx) => (
-          <div key={lineIdx} style={styles.line}>
-            <span style={styles.lineLabel}>{lineIdx}</span>
-            {line.colors.map((color, colorIdx) => (
-              <div
-                key={colorIdx}
-                style={{
-                  ...styles.swatch,
-                  backgroundColor: colorToCSS(color),
-                  border: color.a === 0 ? '1px dashed #45475a' : '1px solid #313244',
-                }}
-                title={`Line ${lineIdx}, Color ${colorIdx}: R${color.r} G${color.g} B${color.b}${color.a === 0 ? ' (transparent)' : ''}`}
-              />
-            ))}
-          </div>
-        ))}
+        {palette.lines.map((line, lineIdx) => {
+          const isSelected = lineIdx === selectedPaletteLine;
+          return (
+            <button
+              key={lineIdx}
+              style={{
+                ...styles.lineButton,
+                ...(isSelected ? styles.lineSelected : {}),
+              }}
+              onClick={() => useEditorStore.getState().setSelectedPaletteLine(lineIdx)}
+              title={`Select palette line ${lineIdx} for painting`}
+            >
+              <span style={{
+                ...styles.lineLabel,
+                ...(isSelected ? styles.lineLabelSelected : {}),
+              }}>
+                {lineIdx}
+              </span>
+              {line.colors.map((color, colorIdx) => (
+                <div
+                  key={colorIdx}
+                  style={{
+                    ...styles.swatch,
+                    backgroundColor: colorToCSS(color),
+                    border: color.a === 0
+                      ? '1px dashed #45475a'
+                      : isSelected ? '1px solid #89b4fa' : '1px solid #313244',
+                  }}
+                  title={`Line ${lineIdx}, Color ${colorIdx}: R${color.r} G${color.g} B${color.b}${color.a === 0 ? ' (transparent)' : ''}`}
+                />
+              ))}
+            </button>
+          );
+        })}
       </div>
     </div>
   );
@@ -56,19 +76,30 @@ const styles: Record<string, React.CSSProperties> = {
     flexShrink: 0, overflow: 'auto',
   },
   label: {
-    fontSize: 12, fontWeight: 600, color: '#a6adc8', textTransform: 'uppercase' as const,
+    fontSize: 11, fontWeight: 600, color: '#6c7086', textTransform: 'uppercase' as const,
     letterSpacing: 1, flexShrink: 0,
   },
   lines: {
-    display: 'flex', gap: 12,
+    display: 'flex', gap: 6,
   },
-  line: {
+  lineButton: {
     display: 'flex', alignItems: 'center', gap: 1,
+    cursor: 'pointer', padding: '3px 5px', borderRadius: 4,
+    border: '2px solid transparent',
+    background: 'transparent',
+    outline: 'none',
+  },
+  lineSelected: {
+    border: '2px solid #89b4fa',
+    background: 'rgba(137, 180, 250, 0.15)',
   },
   lineLabel: {
     fontSize: 10, color: '#6c7086', marginRight: 4, fontFamily: 'monospace',
   },
+  lineLabelSelected: {
+    color: '#89b4fa', fontWeight: 700,
+  },
   swatch: {
-    width: 16, height: 16, borderRadius: 2, flexShrink: 0,
+    width: 14, height: 14, borderRadius: 2, flexShrink: 0,
   },
 };

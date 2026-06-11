@@ -41,8 +41,9 @@ export function exportAct(
     const section = sections[i];
     if (!section) continue;
 
-    // Tile dedup + VRAM remapping
-    const dedup = deduplicateSectionTiles(section.tileGrid.nametable, tileset.tiles, vramBases[i]);
+    // Tile dedup + VRAM remapping (prefer section-specific tiles over zone tileset)
+    const tiles = section.tiles ?? tileset.tiles;
+    const dedup = deduplicateSectionTiles(section.tileGrid.nametable, tiles, vramBases[i]);
     const nametable = serializeNametable(dedup.remappedNametable);
     const collision = serializeCollision(section.tileGrid.collision);
 

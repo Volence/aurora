@@ -48,8 +48,8 @@ describe('entity-data asm export', () => {
     ];
     const result = generateEntityDataAsm('OJZ', 0, [], objects, objectLibrary);
     const lines = result.split('\n');
-    const objLines = lines.filter(l => l.includes('dc.l') && l.includes('X='));
-    expect(objLines[0]).toContain('X=$100'); // 256
+    const objLines = lines.filter(l => l.includes('dc.w') && l.includes('X='));
+    expect(objLines[0]).toContain('X=$0100'); // 256
   });
 
   it('throws if section exceeds 32 types', () => {

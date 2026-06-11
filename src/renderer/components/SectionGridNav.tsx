@@ -1,6 +1,8 @@
 import React from 'react';
 import { useEditorStore } from '../state/editorStore';
+import { useViewStore } from '../state/viewStore';
 import { useProjectStore, getCurrentAct } from '../state/projectStore';
+import { SECTION_PIXEL_SIZE } from '../../core/model/s4-types';
 
 export default function SectionGridNav() {
   const activeSectionIndex = useEditorStore(s => s.activeSectionIndex);
@@ -11,6 +13,16 @@ export default function SectionGridNav() {
   if (!act) return <div style={styles.empty}>No act loaded</div>;
 
   const { gridWidth, gridHeight, sections } = act;
+
+  const handleSectionClick = (index: number) => {
+    useEditorStore.getState().setActiveSectionIndex(index);
+    const col = index % gridWidth;
+    const row = Math.floor(index / gridWidth);
+    useViewStore.getState().setPosition(
+      col * SECTION_PIXEL_SIZE,
+      row * SECTION_PIXEL_SIZE,
+    );
+  };
 
   return (
     <div style={styles.container}>
@@ -24,7 +36,7 @@ export default function SectionGridNav() {
               ...(i === activeSectionIndex ? styles.active : {}),
               ...(sec === null ? styles.null : {}),
             }}
-            onClick={() => useEditorStore.getState().setActiveSectionIndex(i)}
+            onClick={() => handleSectionClick(i)}
           >
             {sec ? i : '—'}
           </button>

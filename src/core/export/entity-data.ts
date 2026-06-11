@@ -1,5 +1,20 @@
 import type { ObjectPlacement, RingPlacement, ObjectDef } from '../model/s4-types';
 
+// v2 placement word bit positions (matches engine constants.asm OEF_*)
+const OEF_ANY_Y      = 15;
+const OEF_YFLIP      = 14;
+const OEF_XFLIP      = 13;
+const OEF_TYPE_SHIFT = 8;
+const OEF_TYPE_MASK  = 0x1F;
+const OEF_SUBTYPE_MASK = 0xFF;
+
+function validatePlacement(secIndex: number, obj: ObjectPlacement, typeCount: number): void {
+  if (obj.x < 0 || obj.x > 0x7FF) throw new Error(`Section ${secIndex}: object X ${obj.x} out of bounds (0–$7FF)`);
+  if (obj.y < 0 || obj.y > 0x7FF) throw new Error(`Section ${secIndex}: object Y ${obj.y} out of bounds (0–$7FF)`);
+  if (obj.subtype > OEF_SUBTYPE_MASK) throw new Error(`Section ${secIndex}: subtype ${obj.subtype} out of range (0–255)`);
+  if (typeCount > 32) throw new Error(`Section ${secIndex} has ${typeCount} unique object types (max 32)`);
+}
+
 export function generateEntityDataAsm(
   zonePrefix: string,
   sectionIndex: number,
@@ -32,8 +47,11 @@ export function generateEntityDataAsm(
     }
   }
 
-  if (usedTypeIds.length > 32) {
-    throw new Error(`Section ${sectionIndex} has ${usedTypeIds.length} unique object types (max 32)`);
+  // Hard-fail validation
+  for (const obj of sortedObjects) {
+    const typeIndex = usedTypeIds.indexOf(obj.typeId);
+    validatePlacement(sectionIndex, obj, usedTypeIds.length);
+    if (typeIndex > OEF_TYPE_MASK) throw new Error(`Section ${sectionIndex}: type index ${typeIndex} out of range (0–31)`);
   }
 
   // Type table
@@ -47,18 +65,20 @@ export function generateEntityDataAsm(
   }
   lines.push('');
 
-  // Object list
+  // Object list — v2: dc.w x, y, flags|type|subtype; terminated by dc.w -1
   lines.push(`${secLabel}_Objects:`);
   for (const obj of sortedObjects) {
     const typeIndex = usedTypeIds.indexOf(obj.typeId);
-    const xHex = obj.x.toString(16).toUpperCase().padStart(3, '0');
-    const yHex = obj.y.toString(16).toUpperCase().padStart(3, '0');
-    const packed = ((obj.x & 0x3FF) << 20) | ((obj.y & 0x3FF) << 10) | ((typeIndex & 0x1F) << 5) | (obj.subtype & 0x1F);
-    const packedHex = packed.toString(16).toUpperCase().padStart(8, '0');
+    const xHex = obj.x.toString(16).toUpperCase().padStart(4, '0');
+    const yHex = obj.y.toString(16).toUpperCase().padStart(4, '0');
+    const flags =
+      ((typeIndex & OEF_TYPE_MASK) << OEF_TYPE_SHIFT) |
+      (obj.subtype & OEF_SUBTYPE_MASK);
+    const flagsHex = flags.toString(16).toUpperCase().padStart(4, '0');
     const def = objectLibrary.find(d => d.id === obj.typeId);
-    lines.push(`    dc.l $${packedHex}   ; X=$${xHex}, Y=$${yHex}, ${def?.name ?? obj.typeId}:${obj.subtype}`);
+    lines.push(`    dc.w $${xHex}, $${yHex}, $${flagsHex}   ; X=$${xHex}, Y=$${yHex}, ${def?.name ?? obj.typeId}:${obj.subtype}`);
   }
-  lines.push('    dc.l 0                                 ; terminator');
+  lines.push('    dc.w -1                                 ; terminator');
 
   return lines.join('\n');
 }
