@@ -1,11 +1,20 @@
-const STRIP_BYTES = 128;
-const NAMETABLE_WORDS_PER_STRIP = 48;
-const NAMETABLE_BYTES_PER_STRIP = 96;
-const COLLISION_BYTES_PER_STRIP = 24;
-const STRIPS_PER_SECTION = 256;
+// Engine wide-strip format — must match s4_engine/tools/ojz_strip_gen.py
+// (STRIP_TILE_HEIGHT=256, COLLISION_ROWS_PER_STRIP=128, STRIP_COLLISION_PAD=8).
+//
+// Per column (WIDE_STRIP_SIZE = 776 bytes):
+//   [0..511]    256 big-endian nametable words (full section height)
+//   [512..639]  128 collision bytes, path A — 1 byte per 16px cell (2 tile rows)
+//   [640..767]  128 collision bytes, path B (engine ships B = copy of A)
+//   [768..775]  8 bytes padding (0)
 
-export const STRIP_ROWS = 48;
+export const STRIP_ROWS = 256;
 export const STRIP_COLS = 256;
+
+const NT_BYTES_PER_STRIP = STRIP_ROWS * 2;          // 512
+const COLL_CELLS_PER_STRIP = STRIP_ROWS / 2;        // 128
+const STRIP_PAD = 8;
+export const WIDE_STRIP_SIZE =
+  NT_BYTES_PER_STRIP + 2 * COLL_CELLS_PER_STRIP + STRIP_PAD; // 776
 
 export interface StripData {
   nametable: Uint16Array;
@@ -15,21 +24,13 @@ export interface StripData {
 }
 
 /**
- * Parse a section's strip file (column-major, 128 bytes/strip, 256 strips)
- * into a row-major nametable grid + collision grid.
- *
- * Strip layout (128 bytes each):
- *   [0..95]   48 big-endian 16-bit nametable words (column of 48 tiles)
- *   [96..119] 24 collision bytes (one per pair of rows, or one per tile - TBD)
- *   [120..127] 8 bytes padding
- *
- * Output: row-major grid of STRIP_COLS × STRIP_ROWS
+ * Parse a section's wide-strip file (column-major) into row-major grids.
+ * Collision is read from path A only; each cell byte covers two tile rows.
  */
 export function parseStrips(data: Uint8Array): StripData {
-  if (data.length < STRIPS_PER_SECTION * STRIP_BYTES) {
-    throw new Error(
-      `Strip file too small: expected ${STRIPS_PER_SECTION * STRIP_BYTES} bytes, got ${data.length}`
-    );
+  const expected = STRIP_COLS * WIDE_STRIP_SIZE;
+  if (data.length < expected) {
+    throw new Error(`Strip file too small: expected ${expected} bytes, got ${data.length}`);
   }
 
   const width = STRIP_COLS;
@@ -37,26 +38,19 @@ export function parseStrips(data: Uint8Array): StripData {
   const nametable = new Uint16Array(width * height);
   const collision = new Uint8Array(width * height);
 
-  for (let col = 0; col < STRIPS_PER_SECTION; col++) {
-    const stripOffset = col * STRIP_BYTES;
+  for (let col = 0; col < STRIP_COLS; col++) {
+    const stripOffset = col * WIDE_STRIP_SIZE;
 
-    // Read 48 big-endian nametable words (column-major → row-major)
-    for (let row = 0; row < NAMETABLE_WORDS_PER_STRIP; row++) {
+    for (let row = 0; row < STRIP_ROWS; row++) {
       const wordOffset = stripOffset + row * 2;
-      const word = (data[wordOffset] << 8) | data[wordOffset + 1];
-      nametable[row * width + col] = word;
+      nametable[row * width + col] = (data[wordOffset] << 8) | data[wordOffset + 1];
     }
 
-    // Read 24 collision bytes
-    // Each byte maps to 2 rows of tiles in the column (48 tiles / 24 bytes = 2 rows per byte)
-    const collOffset = stripOffset + NAMETABLE_BYTES_PER_STRIP;
-    for (let i = 0; i < COLLISION_BYTES_PER_STRIP; i++) {
-      const collByte = data[collOffset + i];
-      const row1 = i * 2;
-      const row2 = i * 2 + 1;
-      // High nibble = first row, low nibble = second row
-      collision[row1 * width + col] = (collByte >> 4) & 0x0F;
-      collision[row2 * width + col] = collByte & 0x0F;
+    const collOffset = stripOffset + NT_BYTES_PER_STRIP;
+    for (let cell = 0; cell < COLL_CELLS_PER_STRIP; cell++) {
+      const value = data[collOffset + cell];
+      collision[(cell * 2) * width + col] = value;
+      collision[(cell * 2 + 1) * width + col] = value;
     }
   }
 
@@ -64,30 +58,28 @@ export function parseStrips(data: Uint8Array): StripData {
 }
 
 /**
- * Serialize a row-major nametable + collision grid back to column-major strip format.
+ * Serialize row-major grids back to the wide-strip format.
+ * Path A is sampled from even tile rows; path B is emitted as a copy of A.
  */
 export function serializeStrips(data: StripData): Uint8Array {
-  const output = new Uint8Array(STRIPS_PER_SECTION * STRIP_BYTES);
+  const output = new Uint8Array(STRIP_COLS * WIDE_STRIP_SIZE);
 
-  for (let col = 0; col < STRIPS_PER_SECTION; col++) {
-    const stripOffset = col * STRIP_BYTES;
+  for (let col = 0; col < STRIP_COLS; col++) {
+    const stripOffset = col * WIDE_STRIP_SIZE;
 
-    // Write nametable words (big-endian)
-    for (let row = 0; row < NAMETABLE_WORDS_PER_STRIP; row++) {
+    for (let row = 0; row < STRIP_ROWS; row++) {
       const word = data.nametable[row * data.width + col];
       output[stripOffset + row * 2] = (word >> 8) & 0xFF;
       output[stripOffset + row * 2 + 1] = word & 0xFF;
     }
 
-    // Write collision bytes (2 rows per byte: high nibble = first, low nibble = second)
-    const collOffset = stripOffset + NAMETABLE_BYTES_PER_STRIP;
-    for (let i = 0; i < COLLISION_BYTES_PER_STRIP; i++) {
-      const row1 = i * 2;
-      const row2 = i * 2 + 1;
-      const hi = data.collision[row1 * data.width + col] & 0x0F;
-      const lo = data.collision[row2 * data.width + col] & 0x0F;
-      output[collOffset + i] = (hi << 4) | lo;
+    const collOffset = stripOffset + NT_BYTES_PER_STRIP;
+    for (let cell = 0; cell < COLL_CELLS_PER_STRIP; cell++) {
+      const value = data.collision[(cell * 2) * data.width + col] & 0xFF;
+      output[collOffset + cell] = value;                          // path A
+      output[collOffset + COLL_CELLS_PER_STRIP + cell] = value;   // path B
     }
+    // pad bytes already 0
   }
 
   return output;
