@@ -27,6 +27,8 @@ matching the existing chunk-library behavior.
 - Tiles: 8x8, pixel values 0-15, index 0 transparent; tileset capped at 2048.
 - Budget: flip-aware unique tiles per VRAM color group must fit the 1024-tile FG pool
   (BG region starts at slot 1024). `check_budget` and every mutation reply report it.
+- Over-budget paints are allowed and reported (`fits: false` in the reply); export is
+  where overflow hard-fails. Optimize tile reuse before exporting.
 
 ## Discovery file
 

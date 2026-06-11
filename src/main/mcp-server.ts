@@ -40,7 +40,7 @@ function buildServer(getWindow: () => BrowserWindow | null): McpServer {
     async () => textResult(await forward({ kind: 'get-project-info' })));
 
   server.registerTool('get_palette',
-    { description: 'The active 4x16 palette as RGB per line. Line 0 is sprite-reserved; index 0 of each line is transparent.' },
+    { description: 'The active 4x16 palette as RGB per line plus Genesis CRAM words (0000BBB0GGG0RRR0, ready to pass back to set_palette). Line 0 is sprite-reserved; index 0 of each line is transparent.' },
     async () => textResult(await forward({ kind: 'get-palette' })));
 
   server.registerTool('get_tiles',
@@ -76,7 +76,7 @@ function buildServer(getWindow: () => BrowserWindow | null): McpServer {
 
   server.registerTool('write_tiles',
     {
-      description: 'Append or overwrite tileset tiles. Each tile is 64 pixel values 0-15 (index 0 = transparent). Omit "at" to append. One undo step.',
+      description: 'Append or overwrite tileset tiles. Each tile is 64 pixel values 0-15 (index 0 = transparent). Omit "at" to append. One undo step. Reply flags tiles that duplicate an existing tile or its flip (reuse that index instead).',
       inputSchema: {
         tiles: z.array(z.array(z.number().int().min(0).max(15)).length(64)).min(1).max(128),
         at: z.number().int().min(0).optional(),

@@ -35,8 +35,8 @@ Three pieces, all in this repo:
 ### 1. MCP server in the main process — `src/main/mcp-server.ts`
 
 - Official `@modelcontextprotocol/sdk`, Streamable HTTP transport.
-- Starts after the main window is created; binds `127.0.0.1` on an OS-assigned port.
-- Writes a discovery file `~/.sonic-level-editor/mcp.json`: `{ port, pid, projectPath }`.
+- Starts after the main window is created; binds `127.0.0.1` (default port 38473, ephemeral fallback).
+- Writes a discovery file `~/.sonic-level-editor/mcp.json`: `{ url, port, pid }`.
 - One-time client setup: `claude mcp add --transport http sonic-editor http://127.0.0.1:<port>/mcp`.
 - Translates tool calls into IPC round-trips to the renderer (mutations, queries, navigation, screenshots). The server holds no project state of its own.
 - Crash-isolated: a thrown error rejects that tool call only; nothing propagates into the editor. No project loaded / window gone → clean structured error ("no project loaded", "editor not ready").
@@ -44,7 +44,7 @@ Three pieces, all in this repo:
 
 ### 2. Agent IPC channel — preload + renderer
 
-- New channel `agent:command` carrying structured requests: `{ kind: 'mutate' | 'query' | 'navigate' | 'screenshot', ... }`.
+- New channels `agent:request`/`agent:response` carrying structured requests: `{ kind: 'mutate' | 'query' | 'navigate' | 'screenshot', ... }`.
 - Renderer handler executes against the Zustand stores (`projectStore`, `editorStore`) through the existing editing-command system.
 - **Every mutation request builds exactly one batched command** pushed onto `EditHistory` — one tool call = one Ctrl+Z step, interleaved linearly with the user's own edits.
 
@@ -59,7 +59,7 @@ Three pieces, all in this repo:
 | Tool | Description |
 |------|-------------|
 | `get_project_info` | Zones/acts/section grid, tileset size, chunk library listing, project paths. |
-| `get_palette(section?)` | Active 4×16 palette as Genesis words and RGB. |
+| `get_palette` | Active 4×16 palette as RGB and Genesis CRAM words. |
 | `get_tiles(start, count)` | Raw 8×8 pixel-index arrays. |
 | `get_nametable_region(section, x, y, w, h)` | Decoded entries: tile index, palette line, h/v flip, priority. |
 | `check_budget(section?)` | Flip-aware unique-tile count per section and per VRAM color group vs. pool limits. |
@@ -69,8 +69,8 @@ Three pieces, all in this repo:
 | Tool | Description |
 |------|-------------|
 | `set_palette(line, colors)` | Writes one palette line. Validates 9-bit BGR, even-only channel values. Line 0 is rejected by default (engine convention reserves it for player/sprite art — confirm against s4_engine during implementation and adjust if the reservation differs). |
-| `write_tiles(tiles, at?)` | Append or replace tileset tiles. Returns assigned indices; warns when a tile duplicates an existing tile or its flip. |
-| `paint_region(section, x, y, entries)` | Writes a rectangle of nametable entries through the same path as the tile brush. |
+| `write_tiles(tiles, at?)` | Append or replace tileset tiles. Returns assigned indices and flags tiles that duplicate an existing tile or its flip. |
+| `paint_region(section, x, y, w, h, entries)` | Writes a rectangle of nametable entries through the same path as the tile brush. |
 | `save_chunk(name, w, h, nametable)` | Adds a reusable pattern to the chunk library. (chunk-library addition; additive and outside undo history, matching existing ChunkLibrary behavior) |
 | `stamp_chunk(id, section, x, y)` | Stamps a library chunk onto a section grid. |
 
@@ -79,11 +79,11 @@ Three pieces, all in this repo:
 | Tool | Description |
 |------|-------------|
 | `goto(section, x?, y?, zoom?)` | Sets active section, scrolls, zooms via `editorStore` — agent and user share one view. |
-| `screenshot(region?, scale?)` | PNG of the map canvas only (via `canvas.toDataURL()`), current viewport or requested region. |
+| `screenshot(region?)` | PNG of the map canvas only (via `canvas.toDataURL()`), current viewport or requested region. Zoom via `goto`. |
 
 ## Data Flow
 
-Mutation: MCP server (main) → `agent:command` IPC → renderer handler → build batched command → `EditHistory` apply → store update → dirty-rect repaint → IPC reply (result + budget).
+Mutation: MCP server (main) → `agent:request`/`agent:response` IPC → renderer handler → build batched command → `EditHistory` apply → store update → dirty-rect repaint → IPC reply (result + budget).
 
 - Renderer in-memory state is the single source of truth. The MCP never writes project files while the app runs; no two-writers problem with unsaved work.
 - IPC serializes onto the renderer event loop — agent commands and user brush strokes cannot race.
@@ -92,7 +92,7 @@ Mutation: MCP server (main) → `agent:command` IPC → renderer handler → bui
 
 ## Error Handling
 
-- Validate before mutating: palette values, tile index ranges (≤ 11-bit), region bounds, budget overflow on `write_tiles`/`paint_region`.
+- Validate before mutating: palette values, tile index ranges (≤ 11-bit), region bounds. Budget is computed and reported on every mutation reply rather than blocking over-budget paints (deliberate: intermediate over-budget states are useful while iterating; export hard-fails on real overflow and undo recovers).
 - A failed call applies nothing — commands are all-or-nothing; no partial application.
 - Structured, specific error messages (what failed, the offending value, the limit).
 - Window closed or reloading → "editor not ready" rejection; no queueing.

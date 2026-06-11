@@ -8,8 +8,8 @@ import {
 } from '../../core/model/s4-types';
 import type { Tile, Zone, Act } from '../../core/model/s4-types';
 import { validatePaletteLine, validateTilePixels, validatePaintRegion, validateEntries } from '../../core/agent/validation';
-import { computeActBudget } from '../../core/agent/budget';
-import { decodeGenesisColor } from '../../core/formats/palette';
+import { computeActBudget, canonicalTileHash } from '../../core/agent/budget';
+import { decodeGenesisColor, encodeGenesisColor } from '../../core/formats/palette';
 import type { AgentRequest, AgentRequestEnvelope, NametableEntrySpec } from '../../shared/agent-protocol';
 
 let registered = false;
@@ -73,6 +73,8 @@ async function handle(req: AgentRequest): Promise<unknown> {
       return {
         lines: ctx.zone.palette.lines.map(line =>
           line.colors.map(c => ({ r: c.r, g: c.g, b: c.b }))),
+        words: ctx.zone.palette.lines.map(line =>
+          line.colors.map(c => encodeGenesisColor(c))),
       };
     }
 
@@ -173,6 +175,19 @@ async function handle(req: AgentRequest): Promise<unknown> {
         if (err) throw new Error(`tile ${i}: ${err}`);
         newTiles.push({ pixels: Uint8Array.from(req.tiles[i]) });
       }
+      // Warn (don't reject) when an incoming tile duplicates an existing
+      // tileset tile or one of its flips — the agent can reuse the existing
+      // index (with h/v flip bits) instead of spending a new tile.
+      const existingByHash = new Map<string, number>();
+      for (let i = 0; i < tiles.length; i++) {
+        const hash = canonicalTileHash(tiles[i].pixels);
+        if (!existingByHash.has(hash)) existingByHash.set(hash, i);
+      }
+      const duplicates: Array<{ index: number; duplicateOf: number }> = [];
+      for (let i = 0; i < newTiles.length; i++) {
+        const existing = existingByHash.get(canonicalTileHash(newTiles[i].pixels));
+        if (existing !== undefined) duplicates.push({ index: at + i, duplicateOf: existing });
+      }
       const oldTiles = newTiles.map((_, i) =>
         at + i < tiles.length ? { pixels: new Uint8Array(tiles[at + i].pixels) } : null);
       executeCommand({
@@ -183,7 +198,7 @@ async function handle(req: AgentRequest): Promise<unknown> {
         oldTiles,
         newTiles,
       }, ctx.level);
-      return { at, count: newTiles.length, budget: budgetSummary(ctx) };
+      return { at, count: newTiles.length, duplicates, budget: budgetSummary(ctx) };
     }
 
     case 'paint-region': {
