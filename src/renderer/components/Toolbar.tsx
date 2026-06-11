@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useProjectStore, getActiveLevel } from '../state/projectStore';
 import { useViewStore, type OverlayOptions } from '../state/viewStore';
-import { useEditorStore, editHistory, undo, redo, type EditorTool, type EditingLayer } from '../state/editorStore';
+import { useEditorStore, editHistory, undo, redo, type EditorTool, type EditingLayer, type AppMode } from '../state/editorStore';
 import type { S4Level } from '../../core/editing/commands';
 import type { RecentProject } from '../../shared/ipc-types';
 
@@ -25,6 +25,8 @@ export default function Toolbar({ onOpenProject, onOpenRecent, onSave }: Toolbar
   const dirty = useEditorStore((s) => s.dirty);
   const editingLayer = useEditorStore((s) => s.editingLayer);
   const historyVersion = useEditorStore((s) => s.historyVersion);
+  const appMode = useEditorStore((s) => s.appMode);
+  const setAppMode = useEditorStore((s) => s.setAppMode);
 
   const [recentOpen, setRecentOpen] = useState(false);
   const [recentProjects, setRecentProjects] = useState<RecentProject[]>([]);
@@ -125,7 +127,23 @@ export default function Toolbar({ onOpenProject, onOpenRecent, onSave }: Toolbar
 
             <span style={styles.separator} />
 
-            {(['fg', 'bg'] as EditingLayer[]).map((layer) => (
+            {(['map', 'art'] as AppMode[]).map((mode) => (
+              <button
+                key={mode}
+                style={{
+                  ...styles.smallButton,
+                  ...(appMode === mode ? styles.toolActive : {}),
+                }}
+                onClick={() => setAppMode(mode)}
+                title={mode === 'map' ? 'Map editor' : 'Art editor'}
+              >
+                {mode === 'map' ? 'Map' : 'Art'}
+              </button>
+            ))}
+
+            <span style={styles.separator} />
+
+            {appMode === 'map' && (['fg', 'bg'] as EditingLayer[]).map((layer) => (
               <button
                 key={layer}
                 style={{
@@ -139,29 +157,31 @@ export default function Toolbar({ onOpenProject, onOpenRecent, onSave }: Toolbar
               </button>
             ))}
 
-            <span style={styles.separator} />
+            {appMode === 'map' && <span style={styles.separator} />}
 
-            <div style={styles.buttonGroup}>
-              {([
-                ['view', 'View'],
-                ['select', 'Sel'],
-                ['paint-tile', 'Tile'],
-                ['paint-block', 'Blk'],
-                ['stamp-chunk', 'Chk'],
-                ['paint-collision', 'Col'],
-                ['place-object', '+Obj'],
-                ['place-ring', '+Rng'],
-              ] as [EditorTool, string][]).map(([t, label]) => (
-                <button
-                  key={t}
-                  style={{ ...styles.smallButton, ...(tool === t ? styles.toolActive : {}) }}
-                  onClick={() => setTool(t)}
-                  title={t}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
+            {appMode === 'map' && (
+              <div style={styles.buttonGroup}>
+                {([
+                  ['view', 'View'],
+                  ['select', 'Sel'],
+                  ['paint-tile', 'Tile'],
+                  ['paint-block', 'Blk'],
+                  ['stamp-chunk', 'Chk'],
+                  ['paint-collision', 'Col'],
+                  ['place-object', '+Obj'],
+                  ['place-ring', '+Rng'],
+                ] as [EditorTool, string][]).map(([t, label]) => (
+                  <button
+                    key={t}
+                    style={{ ...styles.smallButton, ...(tool === t ? styles.toolActive : {}) }}
+                    onClick={() => setTool(t)}
+                    title={t}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            )}
 
             <span style={styles.separator} />
 
