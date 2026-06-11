@@ -1,7 +1,9 @@
 import React, { useRef, useEffect, useCallback, useState } from 'react';
 import { useArtStore } from '../../state/artStore';
 import { useEditorStore, executeCommand } from '../../state/editorStore';
-import { useProjectStore, getCurrentZone, getActiveLevel } from '../../state/projectStore';
+import {
+  useProjectStore, getCurrentZone, getActiveLevel, getCurrentAct,
+} from '../../state/projectStore';
 import { useToastStore } from '../../state/toastStore';
 import {
   cellAt, setPixels, getPixel, docToBuffer, bufferToWrites, stampTile,
@@ -12,6 +14,7 @@ import {
   wrapShift, ditherValue, mirrorPoints,
 } from '../../../core/art/pixel-ops';
 import type { PixelBuffer } from '../../../core/art/pixel-ops';
+import { tileUsageCounts } from '../../../core/art/usage';
 import type { Tile } from '../../../core/model/s4-types';
 
 interface Write { x: number; y: number; value: number; }
@@ -83,6 +86,8 @@ export default function ComposerCanvas() {
   const flipRef = useRef<{ hf: boolean; vf: boolean }>({ hf: false, vf: false });
   /** One hint toast per document when tile tools are used on a live-tile doc. */
   const tileHintRef = useRef(false);
+  /** One warning toast per chunk document when an atlas-shared tile is edited. */
+  const sharedEditHintRef = useRef(false);
   const clipboardRef = useRef<{ w: number; h: number; data: Uint8Array } | null>(null);
   const [selection, setSelection] = useState<SelRect | null>(null);
   const selectionRef = useRef<SelRect | null>(null);
@@ -188,6 +193,20 @@ export default function ComposerCanvas() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  /**
+   * One-shot per chunk document: warn that a pixel edit landed on a shared
+   * atlas tile, so the change shows up everywhere that tile is used.
+   */
+  function warnSharedTileEdit(tileIndex: number) {
+    const o = useArtStore.getState().open;
+    if (!o || o.chunkId === null || sharedEditHintRef.current) return;
+    sharedEditHintRef.current = true;
+    const act = getCurrentAct(useProjectStore.getState());
+    const uses = act ? (tileUsageCounts(act).get(tileIndex) ?? 0) : 0;
+    useToastStore.getState().addToast(
+      `tile #${tileIndex} used ${uses}× in this act — edited everywhere`, 'info');
+  }
+
   /** One set-tileset-tiles command for writes landing on a single atlas tile. */
   function commitAtlasTile(tileIndex: number, cellIndex: number, writes: Write[]) {
     if (!writes.length) return;
@@ -216,6 +235,7 @@ export default function ComposerCanvas() {
       oldTiles: [{ pixels: oldPixels }],
       newTiles: [{ pixels: newPixels }],
     }, level);
+    warnSharedTileEdit(tileIndex);
     useArtStore.getState().bumpDoc();
   }
 
@@ -624,7 +644,7 @@ export default function ComposerCanvas() {
    * calling prevents double-invocation from both onPointerUp and onPointerCancel
    * firing for the same pointer event (some browsers emit both).
    */
-  const finishGesture = useCallback((g: Gesture) => {
+  const finishGesture = useCallback((g: Gesture, shiftKey = false) => {
     const o = useArtStore.getState().open;
     if (!o) { drawOverlay(); return; }
     const doc = o.doc;
@@ -655,6 +675,7 @@ export default function ComposerCanvas() {
             oldTiles: [{ pixels: g.strokeBase }],
             newTiles: [{ pixels: working }],
           }, level);
+          warnSharedTileEdit(g.atlasTarget.tileIndex);
         }
       }
       if (g.localDirty) useArtStore.getState().markOpenDirty();
@@ -668,9 +689,10 @@ export default function ComposerCanvas() {
         after = drawLine(before, g.anchor.x, g.anchor.y, g.last.x, g.last.y, s.selectedColor);
       } else {
         // drawRect requires positive w/h — normalize to min-corner + abs.
+        // Shift held at pointerup → filled rectangle instead of an outline.
         const x = Math.min(g.anchor.x, g.last.x), y = Math.min(g.anchor.y, g.last.y);
         const w = Math.abs(g.last.x - g.anchor.x) + 1, h = Math.abs(g.last.y - g.anchor.y) + 1;
-        after = drawRect(before, x, y, w, h, s.selectedColor, false);
+        after = drawRect(before, x, y, w, h, s.selectedColor, shiftKey);
       }
       commitWrites(bufferToWrites(before, after), { cx: g.anchor.x >> 3, cy: g.anchor.y >> 3 });
       drawOverlay();
@@ -720,7 +742,7 @@ export default function ComposerCanvas() {
     // (some browsers fire both pointerup and pointercancel for the same event).
     gestureRef.current = null;
     if (!g) return;
-    finishGesture(g);
+    finishGesture(g, e.shiftKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [finishGesture]);
 
@@ -731,6 +753,17 @@ export default function ComposerCanvas() {
     finishGesture(g);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [finishGesture]);
+
+  /**
+   * Wheel zoom over the canvas: up doubles, down halves; setZoom clamps to
+   * the 2–64 range. preventDefault is skipped (React may attach wheel
+   * listeners passively); stopPropagation keeps ancestors from reacting.
+   */
+  const handleWheel = useCallback((e: React.WheelEvent) => {
+    e.stopPropagation();
+    const s = useArtStore.getState();
+    s.setZoom(s.zoom * (e.deltaY < 0 ? 2 : 0.5));
+  }, []);
 
   // ---------- transforms via artStore pendingAction (ToolColumn, Task 9) ----------
 
@@ -833,6 +866,7 @@ export default function ComposerCanvas() {
     setSelection(null);
     gestureRef.current = null;
     tileHintRef.current = false;
+    sharedEditHintRef.current = false;
     flipRef.current = { hf: false, vf: false };
   }, [open?.doc]);
 
@@ -848,6 +882,7 @@ export default function ComposerCanvas() {
           onPointerUp={handlePointerUp}
           onPointerCancel={handlePointerCancel}
           onLostPointerCapture={handlePointerCancel}
+          onWheel={handleWheel}
         >
           <canvas ref={canvasRef} style={styles.canvas} />
           <canvas ref={overlayRef} style={styles.overlay} />

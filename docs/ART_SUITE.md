@@ -10,8 +10,9 @@ All edits are one undo step (Ctrl+Z), shared with map edits and MCP agent edits.
 
 Click the **Art** button in the Toolbar (next to **Map**). The main area switches to the
 Art mode layout: tool column on the left, composer canvas in the centre, and a right
-column stacking the Tileset Panel, Palette Editor, and Chunk Library. Switching back to
-**Map** shows a dirty-document confirmation if the current document has unsaved changes.
+column stacking the Tileset Panel, Palette Editor, and Chunk Library. Switching between
+**Map** and **Art** preserves the open document — you can toggle back and forth without
+losing unsaved work.
 
 ---
 
@@ -22,7 +23,7 @@ When no document is open the canvas shows a launcher with three options:
 | Preset | Size | Use for |
 |---|---|---|
 | **New Tile 1×1** | 8×8 px | Painting a brand-new 8×8 tile |
-| **New Block 16×16** | 16×16 tiles (128×128 px) | Composing a full 16×16-tile block from existing tiles |
+| **Block — 128×128 px (16×16 tiles)** | 16×16 tiles (128×128 px) | Composing a full 16×16-tile engine block from existing tiles |
 | **New Chunk W×H** | User-specified (1–64 tiles each dimension) | Custom-size chunk assembly |
 
 Double-clicking a tile in the Tileset Panel opens that tile in a **1×1 edit-in-place
@@ -84,7 +85,7 @@ Apply to the selection if active, otherwise to the whole document:
 |---|---|
 | Flip H | Mirror pixels left ↔ right |
 | Flip V | Mirror pixels top ↔ bottom |
-| Rotate 90° | Rotate clockwise (square documents only; button disabled otherwise) |
+| Rotate 90° | Rotate clockwise (button disabled for non-square documents; silently skips non-square selections) |
 | Wrap-shift arrows | Scroll content wrapping at edges (useful for aligning seams) |
 
 ### Zoom
@@ -129,10 +130,12 @@ After painting a new tile, click **Add to tileset** in the Tileset Panel header.
 undergoes flip-aware deduplication against the atlas:
 
 - If the pixels (or any flip of them) already exist, the editor opens that existing tile
-  instead of appending a duplicate and shows a toast: "This tile already exists at #N".
+  instead of appending a duplicate and shows a toast: "Identical tile already exists —
+  opened #N" (or "Matches existing tile #N (flipped) — opened it" for flip matches).
 - If the tile is genuinely new, it is appended at the next free index via a
-  `set-tileset-tiles` command (ceiling-guarded at 2048 tiles; shows an error toast and
-  aborts if full).
+  `set-tileset-tiles` command with a "Added tile #N to tileset" toast (ceiling-guarded at
+  2048 tiles; shows a "Tileset full (2048 tiles) — cannot add" error toast and aborts if
+  full).
 
 ### New chunk → Save to library
 

@@ -88,11 +88,12 @@ export default function ArtMode() {
   }
 
   function handleNewBlock() {
+    // An engine block is 16×16 tiles = 128×128 px (BLOCK_TILES in s4-types).
     openDocumentGuarded({
-      doc: createDoc(2, 2),
+      doc: createDoc(16, 16),
       liveTileIndex: null,
       chunkId: null,
-      name: 'New Block (16×16)',
+      name: 'New Block (128×128)',
       dirty: false,
     });
   }
@@ -200,6 +201,10 @@ export default function ArtMode() {
   }
 
   const showSave = open !== null && open.liveTileIndex === null;
+  // Chunk docs whose cells reference atlas tiles: pixel edits to those cells
+  // write the shared tileset tile, so they show up everywhere it's used.
+  const hasSharedTiles = open !== null && open.chunkId !== null
+    && open.doc.cells.some((c) => c.atlasTile !== null);
 
   return (
     <div style={styles.root}>
@@ -216,6 +221,11 @@ export default function ArtMode() {
             <div style={styles.docHeader}>
               <span style={styles.docName}>{open.name}</span>
               {open.dirty && <span style={styles.dirtyBadge}>unsaved</span>}
+              {hasSharedTiles && (
+                <span style={styles.sharedWarning}>
+                  ⚠ pixel edits to existing tiles propagate everywhere they're used
+                </span>
+              )}
               {showSave && (
                 <button
                   style={{ ...styles.saveButton, ...(open.dirty ? {} : styles.saveDisabled) }}
@@ -240,7 +250,7 @@ export default function ArtMode() {
             </button>
 
             <button style={styles.newButton} onClick={handleNewBlock}>
-              New Block <span style={styles.preset}>16×16 (2×2 tiles)</span>
+              Block <span style={styles.preset}>128×128 px (16×16 tiles)</span>
             </button>
 
             <div style={styles.newChunkRow}>
@@ -345,6 +355,10 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 12,
     color: '#cdd6f4',
     fontWeight: 500,
+  },
+  sharedWarning: {
+    fontSize: 10,
+    color: '#f9e2af',
   },
   dirtyBadge: {
     fontSize: 9,
