@@ -71,7 +71,7 @@ Three pieces, all in this repo:
 | `set_palette(line, colors)` | Writes one palette line. Validates 9-bit BGR, even-only channel values. Line 0 is rejected by default (engine convention reserves it for player/sprite art — confirm against s4_engine during implementation and adjust if the reservation differs). |
 | `write_tiles(tiles, at?)` | Append or replace tileset tiles. Returns assigned indices; warns when a tile duplicates an existing tile or its flip. |
 | `paint_region(section, x, y, entries)` | Writes a rectangle of nametable entries through the same path as the tile brush. |
-| `save_chunk(name, w, h, nametable)` | Adds a reusable pattern to the chunk library. |
+| `save_chunk(name, w, h, nametable)` | Adds a reusable pattern to the chunk library. (chunk-library addition; additive and outside undo history, matching existing ChunkLibrary behavior) |
 | `stamp_chunk(id, section, x, y)` | Stamps a library chunk onto a section grid. |
 
 ### See & navigate
