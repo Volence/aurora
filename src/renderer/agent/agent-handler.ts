@@ -129,9 +129,16 @@ async function handle(req: AgentRequest): Promise<unknown> {
     case 'check-budget': {
       const ctx = requireProject();
       const budget = budgetSummary(ctx);
-      return req.section !== undefined
-        ? { ...budget, perSection: budget.perSection.filter(p => p.index === req.section) }
-        : budget;
+      if (req.section !== undefined) {
+        if (!Number.isInteger(req.section) || req.section < 0 || req.section >= ctx.act.sections.length) {
+          throw new Error(`section ${req.section} out of range (0-${ctx.act.sections.length - 1})`);
+        }
+        if (!ctx.act.sections[req.section]) {
+          throw new Error(`section ${req.section} is empty`);
+        }
+        return { ...budget, perSection: budget.perSection.filter(p => p.index === req.section) };
+      }
+      return budget;
     }
 
     case 'set-palette': {
