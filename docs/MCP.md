@@ -51,15 +51,9 @@ and the editor is not active.
 
 ## Known limitations
 
-- Projects that render via the `chunkTiles` atlas screenshot differently than they
-  export: the map canvas prefers the full chunkTiles art atlas when present, while
-  export and agent validation/budget use the zone tileset (export-consistent tile
-  space). This is a pre-existing editor inconsistency; agent budget and validation
-  are always export-consistent.
+- Tile atlases were unified (2026-06): rendering, export, budget, and MCP all use
+  the zone tileset.
 - Odd-tile-row collision edits are dropped on strip serialization: the engine format
   stores one collision byte per 16px cell (every two tile rows), so only even tile
   rows are authoritative. Edits to odd rows are written to the in-memory grid but
   are overwritten when the strip file is serialized.
-- `write_tiles` targets the zone tileset: sections pinned to the `chunkTiles` atlas
-  render from that atlas instead of the zone tileset, so newly written tiles will
-  not appear in screenshots for those sections until the atlas is rebuilt.

@@ -30,13 +30,12 @@ export function registerAgentHandler(): void {
 
 interface Ctx { zone: Zone; act: Act; level: S4Level; }
 
-// NOTE: agent reads/validation/budget operate on the export-consistent tile
-// space (zone.tileset.tiles, optionally overridden per-section by
-// section.tiles) — export ignores project.chunkTiles too. MapViewport,
-// however, prefers the full zone art atlas (project.chunkTiles) for rendering
-// when present, so projects rendering via chunkTiles will screenshot
-// differently than they export. Pre-existing editor inconsistency, flagged
-// for follow-up.
+// NOTE: tile atlases are unified (2026-06). Rendering, export, budget, and
+// agent reads/validation all operate on the zone tileset (zone.tileset.tiles,
+// optionally overridden per-section by section.tiles — unused today, reserved
+// for future per-section art). The legacy chunk-library atlas
+// (chunks_tiles.bin) is merged into the zone tileset at load time (see
+// src/core/art/atlas-migration.ts), so screenshots and exports agree.
 function requireProject(): Ctx {
   const state = useProjectStore.getState();
   const zone = getCurrentZone(state);
@@ -80,13 +79,10 @@ async function handle(req: AgentRequest): Promise<unknown> {
 
     case 'get-tiles': {
       const ctx = requireProject();
-      // Deliberately reads zone.tileset.tiles (NOT a section's effective atlas
-      // or project.chunkTiles): this is the agent's writable tile space —
-      // write-tiles appends/overwrites here, and get-tiles must read back the
-      // same indices the agent wrote. Validation of paint/save operations, by
-      // contrast, resolves the effective atlas (section.tiles ?? zone tileset,
-      // or chunkTiles for the chunk library) because that is what budget,
-      // export, and rendering consume. See NOTE above requireProject.
+      // Reads zone.tileset.tiles — the unified atlas. write-tiles
+      // appends/overwrites here, and get-tiles reads back the same indices;
+      // budget, export, and rendering all consume the same tileset
+      // (section.tiles ?? zone tileset). See NOTE above requireProject.
       const tiles = ctx.zone.tileset.tiles;
       if (!Number.isInteger(req.start) || !Number.isInteger(req.count) || req.count < 1) {
         throw new Error(`start/count must be integers with count >= 1, got start=${req.start} count=${req.count}`);
@@ -247,11 +243,8 @@ async function handle(req: AgentRequest): Promise<unknown> {
         throw new Error(`entries length ${Array.isArray(req.entries) ? req.entries.length : typeof req.entries} != ${req.w}x${req.h}`);
       }
       const state = useProjectStore.getState();
-      // Chunk nametables index into the chunk-library atlas (project.chunkTiles)
-      // when one is loaded — the UI stamp tool assigns it to section.tiles before
-      // stamping — so validate entries against that atlas, not the zone tileset.
-      const atlas = state.project!.chunkTiles.length > 0 ? state.project!.chunkTiles : ctx.zone.tileset.tiles;
-      const entriesErr = validateEntries(req.entries, atlas.length);
+      // Chunk nametables index into the unified zone tileset.
+      const entriesErr = validateEntries(req.entries, ctx.zone.tileset.tiles.length);
       if (entriesErr) throw new Error(entriesErr);
       const id = `agent-${Date.now()}-${state.project!.chunkLibrary.length}`;
       const chunk = createChunkDef(id, req.name, req.w, req.h);
@@ -270,17 +263,8 @@ async function handle(req: AgentRequest): Promise<unknown> {
       const state = useProjectStore.getState();
       const chunk = state.project!.chunkLibrary.find(c => c.id === req.chunkId);
       if (!chunk) throw new Error(`chunk ${req.chunkId} not found`);
-      // Mirror the UI stamp tool (MapViewport): chunk nametables index into the
-      // chunk-library atlas, so lazily pin it as the section's effective atlas
-      // before painting. Budget/export/rendering resolve section.tiles ??
-      // zone.tileset.tiles, and the delegated paint-region below validates
-      // against the same effective atlas. No renderer reload is needed: when
-      // chunkTiles is non-empty the viewport already renders sections without
-      // their own atlas using chunkTiles, so this assignment is render-neutral.
-      const section = ctx.act.sections[req.section];
-      if (section && state.project!.chunkTiles.length > 0 && !section.tiles) {
-        section.tiles = state.project!.chunkTiles;
-      }
+      // Chunk nametables index into the unified zone tileset — the delegated
+      // paint-region below validates against the same atlas the section renders.
       const entries: NametableEntrySpec[] = [];
       for (let i = 0; i < chunk.widthTiles * chunk.heightTiles; i++) {
         const e = unpackNametableWord(chunk.nametable[i]);

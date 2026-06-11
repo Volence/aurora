@@ -55,17 +55,13 @@ export default function MapViewport() {
     sectionRenderer.clearSections();
     sectionRenderer.clearBg();
 
-    // Prefer the full zone art atlas (chunkTiles) for rendering — section nametables
-    // use source tile indices that index directly into this atlas.
-    // Fall back to zone.tileset.tiles if no atlas is loaded yet.
-    const tileAtlas = (state.project?.chunkTiles?.length ?? 0) > 0
-      ? state.project!.chunkTiles
-      : zone.tileset.tiles;
-
+    // Unified atlas: section nametables index into the zone tileset. The
+    // section.tiles override is kept for future per-section art, but nothing
+    // assigns it today (the load-time atlas migration nulls legacy pins).
     for (let i = 0; i < act.sections.length; i++) {
       const section = act.sections[i];
       if (!section) continue;
-      const tiles = section.tiles ?? tileAtlas;
+      const tiles = section.tiles ?? zone.tileset.tiles;
       sectionRenderer.loadSection(i, section.tileGrid, tiles, zone.palette.lines);
     }
 
@@ -507,22 +503,6 @@ export default function MapViewport() {
       }
 
       if (entries.length > 0) {
-        // Ensure section renderer has the full zone art atlas for chunk tile indices
-        const chunkTiles = liveProject?.chunkTiles ?? [];
-        if (chunkTiles.length > 0 && !section.tiles) {
-          section.tiles = chunkTiles;
-          const pState = useProjectStore.getState();
-          const zone = getCurrentZone(pState);
-          if (zone) {
-            sectionRenderer.loadSection(
-              info.sectionIndex,
-              section.tileGrid,
-              section.tiles,
-              zone.palette.lines,
-            );
-          }
-        }
-
         executeCommand({
           type: 'set-tiles',
           description: `Stamp chunk ${selectedChunkId} at (${baseCol}, ${baseRow})`,

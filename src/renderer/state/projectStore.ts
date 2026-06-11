@@ -18,7 +18,7 @@ interface ProjectState {
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
   setObjectSprites: (sprites: Map<string, ImageBitmap>) => void;
-  addChunks: (chunks: ChunkDef[], tiles?: import('../../core/model/s4-types').Tile[]) => void;
+  addChunks: (chunks: ChunkDef[]) => void;
   clearChunks: () => void;
   reset: () => void;
 }
@@ -38,19 +38,18 @@ export const useProjectStore = create<ProjectState>((set) => ({
   setLoading: (loading) => set({ loading }),
   setError: (error) => set({ error, loading: false }),
   setObjectSprites: (objectSprites) => set({ objectSprites }),
-  addChunks: (chunks, tiles) => set((state) => {
+  addChunks: (chunks) => set((state) => {
     if (!state.project) return {};
     return {
       project: {
         ...state.project,
         chunkLibrary: [...state.project.chunkLibrary, ...chunks],
-        chunkTiles: tiles ?? state.project.chunkTiles,
       },
     };
   }),
   clearChunks: () => set((state) => {
     if (!state.project) return {};
-    return { project: { ...state.project, chunkLibrary: [], chunkTiles: [] } };
+    return { project: { ...state.project, chunkLibrary: [] } };
   }),
   reset: () => set({ config: null, project: null, currentZoneId: null, currentActId: null, loading: false, error: null, objectSprites: new Map() }),
 }));

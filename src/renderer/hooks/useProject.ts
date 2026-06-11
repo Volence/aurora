@@ -16,6 +16,7 @@ import { serializeObjectList } from '../../core/formats/s4-objects';
 import { parseStrips, STRIP_COLS, STRIP_ROWS } from '../../core/formats/s4-strips';
 import { exportAct } from '../../core/export/index';
 import { createSection, SECTION_TILES_WIDE, SECTION_TILES_HIGH } from '../../core/model/s4-types';
+import { migrateChunkTilesIntoTileset } from '../../core/art/atlas-migration';
 import { useToastStore } from '../state/toastStore';
 import type {
   S4Project,
@@ -158,23 +159,6 @@ export function useProject() {
         const chunksJson = JSON.stringify(serializedChunks);
         const chunksBytes = new TextEncoder().encode(chunksJson);
         await window.api.writeBinaryFile(basePath, config.chunkLibraryPath, chunksBytes.buffer as ArrayBuffer);
-
-        // Save chunk tiles as raw 4bpp binary
-        if (project.chunkTiles.length > 0) {
-          const tilesPath = config.chunkLibraryPath.replace('.json', '_tiles.bin');
-          const tileBytes = new Uint8Array(project.chunkTiles.length * 32);
-          for (let t = 0; t < project.chunkTiles.length; t++) {
-            const pixels = project.chunkTiles[t].pixels;
-            for (let row = 0; row < 8; row++) {
-              for (let col = 0; col < 4; col++) {
-                const hi = pixels[row * 8 + col * 2] & 0xF;
-                const lo = pixels[row * 8 + col * 2 + 1] & 0xF;
-                tileBytes[t * 32 + row * 4 + col] = (hi << 4) | lo;
-              }
-            }
-          }
-          await window.api.writeBinaryFile(basePath, tilesPath, tileBytes.buffer as ArrayBuffer);
-        }
       }
 
       // Export assembly + binaries
@@ -416,7 +400,8 @@ async function loadFullProject(config: ReturnType<typeof loadS4Config>): Promise
       // no chunk library
     }
 
-    // Load chunk tiles
+    // Load the legacy chunk-tiles atlas (chunks_tiles.bin) — used only as
+    // migration input below; it is never put on the project object.
     try {
       const tilesPath = config.chunkLibraryPath.replace('.json', '_tiles.bin');
       const tilesRaw = await readFile(basePath, tilesPath);
@@ -426,12 +411,39 @@ async function loadFullProject(config: ReturnType<typeof loadS4Config>): Promise
     }
   }
 
+  // Atlas unification: merge the legacy chunkTiles atlas into the zone tileset
+  // and remap chunk-library/pinned-section nametables to zone-tileset indices.
+  // At-most-once gate: only runs when chunks_tiles.bin parsed non-empty (the
+  // migration is not idempotent in general — see its RE-ENTRY HAZARD note).
+  // Single-zone assumption: the data model has ONE chunk library per project,
+  // so we migrate into zones[0]'s tileset (the OJZ project has one zone).
+  if (chunkTiles.length > 0 && zones.length > 0) {
+    try {
+      const allSections = zones.flatMap(z => z.acts.flatMap(a => a.sections));
+      const result = migrateChunkTilesIntoTileset(
+        zones[0].tileset.tiles, chunkTiles, chunkLibrary, allSections,
+      );
+      // "checked" not "remapped": the count includes identity rewrites (on
+      // projects where chunkTiles already equals the zone tileset, every
+      // entry maps to itself).
+      useToastStore.getState().addToast(
+        `Tile atlases unified — ${result.appended} tiles merged, ${result.remapped} entries checked`,
+        'success',
+      );
+    } catch (err) {
+      // Abort the load: post-migration code paths cannot render chunkTiles,
+      // so a half-loaded project would reference the wrong atlas.
+      throw new Error(
+        `Atlas unification failed: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  }
+
   return {
     name: config.name,
     zones,
     objectLibrary,
     chunkLibrary,
-    chunkTiles,
     basePath,
   };
 }

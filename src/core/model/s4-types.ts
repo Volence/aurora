@@ -180,7 +180,6 @@ export interface S4Project {
   zones: Zone[];
   objectLibrary: ObjectDef[];
   chunkLibrary: ChunkDef[];
-  chunkTiles: Tile[];
   basePath: string;
 }
 

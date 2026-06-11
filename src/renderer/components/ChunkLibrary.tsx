@@ -5,6 +5,7 @@ import { useToastStore } from '../state/toastStore';
 import { importChunks } from '../../core/formats/chunk-mappings';
 import { kosinskiDecompress } from '../../core/formats/kosinski';
 import { parseTiles } from '../../core/formats/tiles';
+import { migrateChunkTilesIntoTileset } from '../../core/art/atlas-migration';
 import { unpackNametableWord } from '../../core/model/s4-types';
 import type { ChunkDef, Tile, Palette } from '../../core/model/s4-types';
 
@@ -74,8 +75,7 @@ export default function ChunkLibrary() {
   const state = useProjectStore.getState();
   const zone = getCurrentZone(state);
   const chunks = project?.chunkLibrary ?? [];
-  const chunkTiles = project?.chunkTiles ?? [];
-  const tiles = chunkTiles.length > 0 ? chunkTiles : zone?.tileset.tiles ?? [];
+  const tiles = zone?.tileset.tiles ?? [];
   const palette = zone?.palette ?? { lines: [] };
 
   useEffect(() => {
@@ -197,7 +197,13 @@ export default function ChunkLibrary() {
       const artDecompressed = kosinskiDecompress(artData);
       const artTiles = parseTiles(artDecompressed);
 
-      useProjectStore.getState().addChunks(imported, artTiles);
+      // Unified atlas: merge the imported art into the zone tileset (flip-aware
+      // dedup) and remap the imported chunks' nametables to zone-tileset indices.
+      const pZone = getCurrentZone(useProjectStore.getState());
+      if (!pZone) throw new Error('no active zone to import into');
+      migrateChunkTilesIntoTileset(pZone.tileset.tiles, artTiles, imported, []);
+
+      useProjectStore.getState().addChunks(imported);
       useEditorStore.getState().markDirty();
 
       if (imported.length > 0) {
