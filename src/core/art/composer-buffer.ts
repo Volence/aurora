@@ -62,13 +62,16 @@ export function cellAt(doc: ComposerDoc, cx: number, cy: number): ComposerCell {
   return doc.cells[cy * doc.widthTiles + cx];
 }
 
-/** Resolve a cell's current 64 pixels in DOC orientation (cell flips applied). */
+/**
+ * Resolve a cell's current 64 pixels in DOC orientation (cell flips applied).
+ * Always returns a fresh array — safe to mutate.
+ */
 export function cellPixels(doc: ComposerDoc, atlas: Tile[], cell: ComposerCell): Uint8Array {
   let src: Uint8Array;
   if (cell.localId !== null) src = doc.localPixels.get(cell.localId)!;
   else if (cell.atlasTile !== null && atlas[cell.atlasTile]) src = atlas[cell.atlasTile].pixels;
   else src = new Uint8Array(64);
-  return (cell.hf || cell.vf) ? flipTile(src, cell.hf, cell.vf) : src;
+  return (cell.hf || cell.vf) ? flipTile(src, cell.hf, cell.vf) : new Uint8Array(src);
 }
 
 export function getPixel(doc: ComposerDoc, atlas: Tile[], x: number, y: number): number {
@@ -106,6 +109,8 @@ export function setPixels(
 export interface StampSpec { tile: number; pal: number; hf: boolean; vf: boolean; pri: boolean; coll: number; }
 
 export function stampTile(doc: ComposerDoc, cx: number, cy: number, spec: StampSpec): void {
+  const old = doc.cells[cy * doc.widthTiles + cx];
+  if (old.localId !== null) doc.localPixels.delete(old.localId);
   doc.cells[cy * doc.widthTiles + cx] = {
     atlasTile: spec.tile, localId: null,
     pal: spec.pal, hf: spec.hf, vf: spec.vf, pri: spec.pri, coll: spec.coll,
@@ -139,18 +144,25 @@ export function sliceForSave(doc: ComposerDoc, atlas: Tile[]): SliceResult {
     collision[i] = cell.coll;
     let tileIndex: number; let hf = cell.hf; let vf = cell.vf;
     if (cell.localId !== null) {
-      const pixels = doc.localPixels.get(cell.localId)!;
-      const canon = canonicalizeTile(pixels);
+      // Snapshot before canonicalizing so the WeakMap cache key is unique
+      // per logical version of the buffer (avoids stale dedup after re-edits).
+      const snapshot = new Uint8Array(doc.localPixels.get(cell.localId)!);
+      const canon = canonicalizeTile(snapshot);
       const hit = atlasByHash.get(canon.hash) ?? pending.get(canon.hash);
       if (hit) {
         tileIndex = hit.index;
-        hf = canon.fx !== hit.fx;  // cell flips are baked into locals (false)
-        vf = canon.fy !== hit.fy;
+        // Honor cell flips (may be non-false when caller sets them manually);
+        // compose with flip compensation from canonicalization.
+        hf = cell.hf !== (canon.fx !== hit.fx);
+        vf = cell.vf !== (canon.fy !== hit.fy);
       } else {
+        if (atlas.length + newTiles.length >= 0x800)
+          throw new Error('tileset would exceed 2048 tiles (11-bit index)');
         tileIndex = atlas.length + newTiles.length;
         pending.set(canon.hash, { index: tileIndex, fx: canon.fx, fy: canon.fy });
-        newTiles.push({ pixels: new Uint8Array(pixels) });
-        hf = false; vf = false;
+        newTiles.push({ pixels: snapshot });
+        // Preserve cell flips (baked invariant: normally false, but honored if set)
+        hf = cell.hf; vf = cell.vf;
       }
     } else if (cell.atlasTile !== null) {
       tileIndex = cell.atlasTile;
