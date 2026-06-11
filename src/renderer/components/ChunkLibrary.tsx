@@ -2,6 +2,8 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useEditorStore } from '../state/editorStore';
 import { useProjectStore, getCurrentZone } from '../state/projectStore';
 import { useToastStore } from '../state/toastStore';
+import { useArtStore } from '../state/artStore';
+import { docFromChunk } from '../../core/art/composer-buffer';
 import { importChunks } from '../../core/formats/chunk-mappings';
 import { kosinskiDecompress } from '../../core/formats/kosinski';
 import { parseTiles } from '../../core/formats/tiles';
@@ -153,9 +155,9 @@ export default function ChunkLibrary() {
     setScrollTop((prev) => Math.max(0, Math.min(maxScroll, prev + e.deltaY)));
   }, [chunks.length]);
 
-  const handleClick = useCallback((e: React.MouseEvent) => {
+  const chunkIndexAt = useCallback((e: React.MouseEvent): number => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!canvas) return -1;
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top + scrollTopRef.current;
@@ -164,10 +166,30 @@ export default function ChunkLibrary() {
     const col = Math.floor(x / (THUMB_PX + gap));
     const row = Math.floor(y / (THUMB_PX + gap));
     const idx = row * cols + col;
-    if (idx >= 0 && idx < chunks.length) {
+    return idx >= 0 && idx < chunks.length ? idx : -1;
+  }, [chunks]);
+
+  const handleClick = useCallback((e: React.MouseEvent) => {
+    const idx = chunkIndexAt(e);
+    if (idx >= 0) {
       useEditorStore.getState().setSelectedChunkId(chunks[idx].id);
     }
-  }, [chunks]);
+  }, [chunks, chunkIndexAt]);
+
+  // Double-click: open the chunk as a composer document in Art mode.
+  const handleDoubleClick = useCallback((e: React.MouseEvent) => {
+    const idx = chunkIndexAt(e);
+    if (idx < 0) return;
+    const chunk = chunks[idx];
+    useArtStore.getState().openDocument({
+      doc: docFromChunk(chunk),
+      liveTileIndex: null,
+      chunkId: chunk.id,
+      name: chunk.name,
+      dirty: false,
+    });
+    useEditorStore.getState().setAppMode('art');
+  }, [chunks, chunkIndexAt]);
 
   const handleImport = useCallback(async () => {
     try {
@@ -264,7 +286,7 @@ export default function ChunkLibrary() {
           {selectedName && (
             <div style={styles.selectionInfo}>
               <span style={styles.selectedBadge}>{selectedName}</span>
-              <span style={styles.hint}>Click map to stamp</span>
+              <span style={styles.hint}>Click map to stamp · dbl-click to edit</span>
             </div>
           )}
           <div
@@ -272,6 +294,7 @@ export default function ChunkLibrary() {
             style={styles.canvasWrap}
             onWheel={handleScroll}
             onClick={handleClick}
+            onDoubleClick={handleDoubleClick}
           >
             <canvas ref={canvasRef} style={styles.canvas} />
           </div>

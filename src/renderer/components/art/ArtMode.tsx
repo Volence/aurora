@@ -1,19 +1,48 @@
 import React, { useState, useEffect } from 'react';
 import { useArtStore } from '../../state/artStore';
-import { createDoc } from '../../../core/art/composer-buffer';
-import { useProjectStore, getActiveLevel } from '../../state/projectStore';
-import { undo, redo } from '../../state/editorStore';
+import { createDoc, docFromChunk, sliceForSave } from '../../../core/art/composer-buffer';
+import { useProjectStore, getActiveLevel, getCurrentZone } from '../../state/projectStore';
+import { useEditorStore, undo, redo, executeCommand } from '../../state/editorStore';
+import { useToastStore } from '../../state/toastStore';
+import type { ChunkDef } from '../../../core/model/s4-types';
 import ComposerCanvas from './ComposerCanvas';
 import ToolColumn from './ToolColumn';
 import TilesetPanel from './TilesetPanel';
+import ChunkLibrary from '../ChunkLibrary';
+
+function slug(name: string): string {
+  return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'chunk';
+}
 
 export default function ArtMode() {
   const open = useArtStore((s) => s.open);
   const openDocument = useArtStore((s) => s.openDocument);
+  const historyVersion = useEditorStore((s) => s.historyVersion);
+  const project = useProjectStore((s) => s.project);
 
   // State for the "New Chunk" W/H inputs
   const [chunkW, setChunkW] = useState(2);
   const [chunkH, setChunkH] = useState(2);
+
+  // Close stale documents: undo can shrink the tileset below an open live
+  // tile, and the chunk library can lose the open chunk (Clear).
+  useEffect(() => {
+    const o = useArtStore.getState().open;
+    if (!o) return;
+    const state = useProjectStore.getState();
+    const zone = getCurrentZone(state);
+    if (o.liveTileIndex !== null && zone
+        && o.liveTileIndex >= zone.tileset.tiles.length) {
+      useArtStore.getState().closeDocument();
+      useToastStore.getState().addToast('Tile no longer exists (undone) — document closed', 'info');
+      return;
+    }
+    if (o.chunkId !== null && state.project
+        && !state.project.chunkLibrary.some((c) => c.id === o.chunkId)) {
+      useArtStore.getState().closeDocument();
+      useToastStore.getState().addToast('Chunk no longer exists — document closed', 'info');
+    }
+  }, [historyVersion, project]);
 
   // Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y: MapViewport (which owns the map-mode
   // handler) is unmounted while in Art mode, so undo/redo must be re-bound
@@ -73,6 +102,94 @@ export default function ArtMode() {
     });
   }
 
+  /**
+   * Save the open chunk/new document to the chunk library. New local tiles
+   * are first appended to the zone tileset (one undoable command); the chunk
+   * layout itself goes through set-chunk (existing) or addChunks (new —
+   * library adds stay outside history, matching the import flow).
+   */
+  function handleSave() {
+    const o = useArtStore.getState().open;
+    const pstate = useProjectStore.getState();
+    const zone = getCurrentZone(pstate);
+    const level = getActiveLevel(pstate);
+    if (!o || !zone || !level || !pstate.project) return;
+    const atlas = zone.tileset.tiles;
+
+    let slice;
+    try {
+      slice = sliceForSave(o.doc, atlas);
+    } catch (err) {
+      useToastStore.getState().addToast(String(err instanceof Error ? err.message : err), 'error');
+      return;
+    }
+    if (atlas.length + slice.newTiles.length > 0x800) {
+      useToastStore.getState().addToast('Tileset full (2048 tiles) — cannot save', 'error');
+      return;
+    }
+
+    if (slice.newTiles.length > 0) {
+      executeCommand({
+        type: 'set-tileset-tiles',
+        description: `art: add ${slice.newTiles.length} tiles for ${o.name}`,
+        sectionIndex: -1,
+        at: atlas.length,
+        oldTiles: slice.newTiles.map(() => null),
+        newTiles: slice.newTiles,
+      }, level);
+    }
+
+    let saved: ChunkDef | undefined;
+    if (o.chunkId !== null) {
+      const chunk = pstate.project.chunkLibrary.find((c) => c.id === o.chunkId);
+      if (!chunk) {
+        useToastStore.getState().addToast('Chunk no longer exists — cannot save', 'error');
+        return;
+      }
+      executeCommand({
+        type: 'set-chunk',
+        description: `art: edit chunk ${chunk.name}`,
+        sectionIndex: -1,
+        chunkId: chunk.id,
+        oldNametable: new Uint16Array(chunk.nametable),
+        newNametable: new Uint16Array(slice.nametable),
+        oldCollision: new Uint8Array(chunk.collision),
+        newCollision: new Uint8Array(slice.collision),
+      }, level);
+      saved = chunk;
+    } else {
+      saved = {
+        id: `${slug(o.name)}-${Date.now()}`,
+        name: o.name,
+        widthTiles: o.doc.widthTiles,
+        heightTiles: o.doc.heightTiles,
+        nametable: new Uint16Array(slice.nametable),
+        collision: new Uint8Array(slice.collision),
+      };
+      useProjectStore.getState().addChunks([saved]);
+      useEditorStore.getState().markDirty();
+    }
+    // MapViewport (which owns the invalidation listener) is unmounted in Art
+    // mode — bust the chunk thumbnail cache here so it refreshes on return.
+    useEditorStore.getState().bumpChunkLibraryVersion();
+
+    // Re-open from the saved source so locals collapse to atlas references.
+    openDocument({
+      doc: docFromChunk(saved),
+      liveTileIndex: null,
+      chunkId: saved.id,
+      name: saved.name,
+      dirty: false,
+    });
+    useToastStore.getState().addToast(
+      o.chunkId !== null
+        ? `Saved chunk "${saved.name}"`
+        : `Added "${saved.name}" to chunk library — Save project to keep`,
+      'success');
+  }
+
+  const showSave = open !== null && open.liveTileIndex === null;
+
   return (
     <div style={styles.root}>
       {/* Left panel: tool column */}
@@ -88,6 +205,18 @@ export default function ArtMode() {
             <div style={styles.docHeader}>
               <span style={styles.docName}>{open.name}</span>
               {open.dirty && <span style={styles.dirtyBadge}>unsaved</span>}
+              {showSave && (
+                <button
+                  style={{ ...styles.saveButton, ...(open.dirty ? {} : styles.saveDisabled) }}
+                  disabled={!open.dirty}
+                  onClick={handleSave}
+                  title={open.chunkId !== null
+                    ? 'Save changes back to this chunk (new tiles are added to the tileset)'
+                    : 'Save this document as a new chunk in the library'}
+                >
+                  {open.chunkId !== null ? 'Save' : 'Save to library'}
+                </button>
+              )}
             </div>
             <ComposerCanvas />
           </div>
@@ -141,10 +270,7 @@ export default function ArtMode() {
         <div style={styles.placeholder}>
           PaletteEditor — Task 11
         </div>
-        <div style={styles.panelHeader}>Chunks</div>
-        <div style={styles.placeholder}>
-          ChunkLibrary — Task 10
-        </div>
+        <ChunkLibrary />
       </div>
     </div>
   );
@@ -225,6 +351,23 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: 3,
     lineHeight: '14px',
     fontWeight: 600,
+  },
+  saveButton: {
+    marginLeft: 'auto',
+    padding: '2px 10px',
+    background: '#a6e3a1',
+    color: '#1e1e2e',
+    border: '1px solid #a6e3a1',
+    borderRadius: 4,
+    cursor: 'pointer',
+    fontSize: 11,
+    fontWeight: 600,
+  },
+  saveDisabled: {
+    background: '#313244',
+    color: '#6c7086',
+    borderColor: '#45475a',
+    cursor: 'default',
   },
   launcher: {
     flex: 1,

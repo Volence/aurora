@@ -2,8 +2,9 @@ import React, { useRef, useEffect, useCallback, useState } from 'react';
 import { useArtStore } from '../../state/artStore';
 import { useEditorStore, executeCommand } from '../../state/editorStore';
 import { useProjectStore, getCurrentZone, getActiveLevel } from '../../state/projectStore';
+import { useToastStore } from '../../state/toastStore';
 import {
-  cellAt, setPixels, getPixel, docToBuffer, bufferToWrites,
+  cellAt, setPixels, getPixel, docToBuffer, bufferToWrites, stampTile,
 } from '../../../core/art/composer-buffer';
 import type { ComposerDoc } from '../../../core/art/composer-buffer';
 import {
@@ -32,7 +33,8 @@ type Gesture =
       strokeBase: Uint8Array | null; touched: boolean; localDirty: boolean; last: { x: number; y: number } }
   | { kind: 'shape'; tool: 'line' | 'rect'; anchor: { x: number; y: number }; last: { x: number; y: number } }
   | { kind: 'marquee'; anchor: { x: number; y: number }; last: { x: number; y: number } }
-  | { kind: 'move-sel'; orig: SelRect; start: { x: number; y: number }; last: { x: number; y: number } };
+  | { kind: 'move-sel'; orig: SelRect; start: { x: number; y: number }; last: { x: number; y: number } }
+  | { kind: 'tile'; tool: 'tile-stamp' | 'collision'; last: { cx: number; cy: number } };
 
 /** Bresenham point list (inclusive) — interpolates fast pointer moves. */
 function linePoints(x0: number, y0: number, x1: number, y1: number): Array<{ x: number; y: number }> {
@@ -61,6 +63,11 @@ export default function ComposerCanvas() {
   const zoom = useArtStore((s) => s.zoom);
   const repeatPreview = useArtStore((s) => s.repeatPreview);
   const pendingAction = useArtStore((s) => s.pendingAction);
+  // Tile-space brush state: HUD + collision overlay must redraw on changes.
+  const tool = useArtStore((s) => s.tool);
+  const brushSpace = useArtStore((s) => s.brushSpace);
+  const brushTile = useArtStore((s) => s.brushTile);
+  const selectedCollisionType = useEditorStore((s) => s.selectedCollisionType);
   // Atlas tiles / palette can change underneath the doc (undo, agent writes).
   const historyVersion = useEditorStore((s) => s.historyVersion);
 
@@ -68,6 +75,10 @@ export default function ComposerCanvas() {
   const overlayRef = useRef<HTMLCanvasElement>(null);
   const gestureRef = useRef<Gesture | null>(null);
   const hoverRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  /** Pending H/V flips for the tile-stamp brush (X/Y keys toggle, HUD shows). */
+  const flipRef = useRef<{ hf: boolean; vf: boolean }>({ hf: false, vf: false });
+  /** One hint toast per document when tile tools are used on a live-tile doc. */
+  const tileHintRef = useRef(false);
   const clipboardRef = useRef<{ w: number; h: number; data: Uint8Array } | null>(null);
   const [selection, setSelection] = useState<SelRect | null>(null);
   const selectionRef = useRef<SelRect | null>(null);
@@ -353,6 +364,38 @@ export default function ComposerCanvas() {
         ctx.strokeRect(ox + x * z, oy + y * z, w * z, h * z);
       }
     }
+
+    // Tile brush space extras: collision values per cell + a corner HUD.
+    const s = useArtStore.getState();
+    if (s.brushSpace === 'tile' && (s.tool === 'tile-stamp' || s.tool === 'collision')) {
+      if (s.tool === 'collision' && z >= 6) {
+        // Collision is otherwise invisible — show each cell's value.
+        ctx.font = `${Math.max(9, Math.min(14, z))}px monospace`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        for (let cy = 0; cy < doc.heightTiles; cy++) {
+          for (let cx = 0; cx < doc.widthTiles; cx++) {
+            const coll = doc.cells[cy * doc.widthTiles + cx].coll;
+            const tx = ox + (cx * 8 + 4) * z, ty = oy + (cy * 8 + 4) * z;
+            ctx.fillStyle = 'rgba(17,17,27,0.65)';
+            ctx.fillRect(tx - z, ty - z * 0.75, z * 2, z * 1.5);
+            ctx.fillStyle = coll === 0 ? '#6c7086' : '#f9e2af';
+            ctx.fillText(String(coll), tx, ty);
+          }
+        }
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'alphabetic';
+      }
+      const hud = s.tool === 'tile-stamp'
+        ? `stamp #${s.brushTile}  flip[X]:${flipRef.current.hf ? 'H' : '–'} [Y]:${flipRef.current.vf ? 'V' : '–'}`
+        : `collision: ${useEditorStore.getState().selectedCollisionType}`;
+      ctx.font = '11px monospace';
+      const tw = ctx.measureText(hud).width;
+      ctx.fillStyle = 'rgba(17,17,27,0.85)';
+      ctx.fillRect(4, 4, tw + 12, 18);
+      ctx.fillStyle = '#f9e2af';
+      ctx.fillText(hud, 10, 17);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -365,7 +408,7 @@ export default function ComposerCanvas() {
 
   useEffect(() => {
     drawOverlay();
-  }, [selection, drawOverlay]);
+  }, [selection, tool, brushSpace, brushTile, selectedCollisionType, drawOverlay]);
 
   // ---------- stroke painting ----------
 
@@ -423,6 +466,30 @@ export default function ComposerCanvas() {
     useArtStore.getState().bumpDoc();
   }
 
+  /** Apply one tile-space tool action to a doc cell (stamp or collision). */
+  function applyTileCell(t: 'tile-stamp' | 'collision', cx: number, cy: number) {
+    const o = useArtStore.getState().open;
+    if (!o) return;
+    const doc = o.doc;
+    if (cx < 0 || cx >= doc.widthTiles || cy < 0 || cy >= doc.heightTiles) return;
+    if (t === 'tile-stamp') {
+      const s = useArtStore.getState();
+      const zone = getCurrentZone(useProjectStore.getState());
+      stampTile(doc, cx, cy, {
+        tile: s.brushTile,
+        pal: s.paletteLine,
+        hf: flipRef.current.hf,
+        vf: flipRef.current.vf,
+        pri: false,
+        coll: zone?.tileset.collisionTypes?.[s.brushTile] ?? 0,
+      });
+    } else {
+      cellAt(doc, cx, cy).coll = useEditorStore.getState().selectedCollisionType;
+    }
+    useArtStore.getState().markOpenDirty();
+    useArtStore.getState().bumpDoc();
+  }
+
   // ---------- pointer handlers ----------
 
   const handlePointerDown = useCallback((e: React.PointerEvent) => {
@@ -430,7 +497,29 @@ export default function ComposerCanvas() {
     const o = useArtStore.getState().open;
     if (!o) return;
     const s = useArtStore.getState();
-    if (s.brushSpace !== 'pixel') return; // tile-space tools land in Task 10
+
+    if (s.brushSpace === 'tile') {
+      if (s.tool !== 'tile-stamp' && s.tool !== 'collision') return;
+      // Live-tile docs are a single atlas tile — stamping/collision over it is
+      // pointless (the chunk nametable is what carries those). Hint once.
+      if (o.liveTileIndex !== null) {
+        if (!tileHintRef.current) {
+          tileHintRef.current = true;
+          useToastStore.getState().addToast(
+            'Tile-space tools work on chunk/new documents, not single live tiles', 'info');
+        }
+        return;
+      }
+      const tp = toDocPx(e);
+      if (!tp) return;
+      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+      const cx = tp.x >> 3, cy = tp.y >> 3;
+      applyTileCell(s.tool, cx, cy);
+      gestureRef.current = { kind: 'tile', tool: s.tool, last: { cx, cy } };
+      e.preventDefault();
+      return;
+    }
+
     const p = toDocPx(e);
     if (!p) return;
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
@@ -503,6 +592,16 @@ export default function ComposerCanvas() {
     const g = gestureRef.current;
     if (!g) return;
     const cp = toDocPxClamped(e);
+    if (g.kind === 'tile') {
+      const cx = cp.x >> 3, cy = cp.y >> 3;
+      if (cx === g.last.cx && cy === g.last.cy) return;
+      // Stamp every cell crossed (Bresenham in cell space).
+      for (const pt of linePoints(g.last.cx, g.last.cy, cx, cy).slice(1)) {
+        applyTileCell(g.tool, pt.x, pt.y);
+      }
+      g.last = { cx, cy };
+      return;
+    }
     if (g.kind === 'stroke') {
       if (cp.x === g.last.x && cp.y === g.last.y) return;
       const pts = linePoints(g.last.x, g.last.y, cp.x, cp.y).slice(1);
@@ -526,6 +625,8 @@ export default function ComposerCanvas() {
     const doc = o.doc;
     const atlas = getAtlas();
     const s = useArtStore.getState();
+
+    if (g.kind === 'tile') return; // cells already applied + dirtied per stamp
 
     if (g.kind === 'stroke') {
       if (g.atlasTarget && g.touched && g.strokeBase) {
@@ -674,6 +775,17 @@ export default function ComposerCanvas() {
     const handler = (e: KeyboardEvent) => {
       if ((e.target as HTMLElement).tagName === 'INPUT') return;
 
+      // X/Y: toggle pending flips for the tile-stamp brush (tile space only).
+      if (!e.ctrlKey && !e.metaKey && !e.altKey
+          && (e.key === 'x' || e.key === 'y')
+          && useArtStore.getState().brushSpace === 'tile') {
+        if (e.key === 'x') flipRef.current.hf = !flipRef.current.hf;
+        else flipRef.current.vf = !flipRef.current.vf;
+        drawOverlay();
+        e.preventDefault();
+        return;
+      }
+
       if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
         const sel = selectionRef.current;
         const doc = getDoc();
@@ -707,12 +819,13 @@ export default function ComposerCanvas() {
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [commitWrites]);
+  }, [commitWrites, drawOverlay]);
 
   // Drop selection when the document changes identity.
   useEffect(() => {
     setSelection(null);
     gestureRef.current = null;
+    tileHintRef.current = false;
   }, [open?.doc]);
 
   if (!open) return null;

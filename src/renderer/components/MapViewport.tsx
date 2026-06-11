@@ -1,16 +1,26 @@
-import React, { useRef, useEffect, useCallback } from 'react';
+import React, { useRef, useEffect, useCallback, useState } from 'react';
 import { useViewStore } from '../state/viewStore';
 import { useProjectStore, getCurrentAct, getCurrentZone, getActiveLevel as getStoreActiveLevel } from '../state/projectStore';
 import { useEditorStore, executeCommand, undo, redo, setCommandInvalidationListener, RING_PATTERNS } from '../state/editorStore';
+import { useArtStore } from '../state/artStore';
+import { createDoc, docFromTile } from '../../core/art/composer-buffer';
 import type { AnyCommand, S4Level } from '../../core/editing/commands';
 import { SectionRenderer } from '../canvas/SectionRenderer';
 import { OverlayRenderer } from '../canvas/OverlayRenderer';
 import type { SectionOverlayInfo } from '../canvas/OverlayRenderer';
-import { SECTION_TILES_WIDE, SECTION_TILES_HIGH, SECTION_PIXEL_SIZE } from '../../core/model/s4-types';
+import { SECTION_TILES_WIDE, SECTION_TILES_HIGH, SECTION_PIXEL_SIZE, unpackNametableWord } from '../../core/model/s4-types';
 import type { Section, ObjectPlacement, RingPlacement } from '../../core/model/s4-types';
 
 export const sectionRenderer = new SectionRenderer();
 const overlayRenderer = new OverlayRenderer();
+
+interface CtxMenuState {
+  x: number;             // container-local px
+  y: number;
+  sectionIndex: number;  // map location under the cursor
+  col: number;
+  row: number;
+}
 
 export default function MapViewport() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -26,6 +36,8 @@ export default function MapViewport() {
     startX: number;
     startY: number;
   } | null>(null);
+
+  const [ctxMenu, setCtxMenu] = useState<CtxMenuState | null>(null);
 
   const vpX = useViewStore((s) => s.vpX);
   const vpY = useViewStore((s) => s.vpY);
@@ -764,6 +776,95 @@ export default function MapViewport() {
     }
   }, [setZoom]);
 
+  // ---------- right-click context menu (Art mode entry points) ----------
+
+  const handleContextMenu = useCallback((e: React.MouseEvent) => {
+    e.preventDefault(); // always suppress the browser menu over the map
+    if (useEditorStore.getState().editingLayer === 'bg') { setCtxMenu(null); return; }
+    const world = screenToWorld(e.clientX, e.clientY);
+    const info = worldToSectionTile(world.x, world.y);
+    const container = containerRef.current;
+    if (!info || !container) { setCtxMenu(null); return; }
+    const rect = container.getBoundingClientRect();
+    setCtxMenu({
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top,
+      sectionIndex: info.sectionIndex,
+      col: info.col,
+      row: info.row,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Close the context menu on click-away or Escape.
+  useEffect(() => {
+    if (!ctxMenu) return;
+    const onDown = () => setCtxMenu(null);
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setCtxMenu(null); };
+    window.addEventListener('mousedown', onDown);
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('mousedown', onDown);
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [ctxMenu]);
+
+  /** Open the 8×8 tile under the cursor as a live-tile document in Art mode. */
+  const handleEditTile = useCallback((m: CtxMenuState) => {
+    setCtxMenu(null);
+    const section = getSectionByIndex(m.sectionIndex);
+    if (!section) return;
+    const word = section.tileGrid.nametable[m.row * SECTION_TILES_WIDE + m.col];
+    const tileIndex = unpackNametableWord(word).tileIndex;
+    useArtStore.getState().openDocument({
+      doc: docFromTile(tileIndex),
+      liveTileIndex: tileIndex,
+      chunkId: null,
+      name: `tile #${tileIndex}`,
+      dirty: false,
+    });
+    useEditorStore.getState().setAppMode('art');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  /**
+   * Open the block-aligned 128×128 (16×16-tile) region under the cursor as a
+   * NEW unsaved chunk document (a copy — saving never writes back to the map).
+   */
+  const handleEditBlock = useCallback((m: CtxMenuState) => {
+    setCtxMenu(null);
+    const section = getSectionByIndex(m.sectionIndex);
+    if (!section) return;
+    const bx = Math.floor(m.col / 16);
+    const by = Math.floor(m.row / 16);
+    const doc = createDoc(16, 16);
+    for (let r = 0; r < 16; r++) {
+      for (let c = 0; c < 16; c++) {
+        const idx = (by * 16 + r) * SECTION_TILES_WIDE + (bx * 16 + c);
+        const word = section.tileGrid.nametable[idx];
+        const cell = doc.cells[r * 16 + c];
+        if (word !== 0) {
+          const entry = unpackNametableWord(word);
+          cell.atlasTile = entry.tileIndex;
+          cell.pal = entry.palette;
+          cell.hf = entry.hFlip;
+          cell.vf = entry.vFlip;
+          cell.pri = entry.priority;
+        }
+        cell.coll = section.tileGrid.collision[idx];
+      }
+    }
+    useArtStore.getState().openDocument({
+      doc,
+      liveTileIndex: null,
+      chunkId: null,
+      name: `block (${bx},${by})`,
+      dirty: true, // copied off the map and not yet in the library
+    });
+    useEditorStore.getState().setAppMode('art');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const tool = useEditorStore((s) => s.tool);
   const cursor = tool === 'view' ? 'grab'
     : tool === 'select' ? 'default'
@@ -796,9 +897,24 @@ export default function MapViewport() {
         if (hoverBarRef.current) hoverBarRef.current.style.display = 'none';
       }}
       onWheel={handleWheel}
+      onContextMenu={handleContextMenu}
     >
       <canvas id="map-canvas" ref={canvasRef} style={styles.canvas} />
       <div ref={hoverBarRef} style={{ ...styles.hoverBar, display: 'none' }} />
+      {ctxMenu && (
+        <div
+          style={{ ...styles.ctxMenu, left: ctxMenu.x, top: ctxMenu.y }}
+          onMouseDown={(e) => e.stopPropagation()}
+          onContextMenu={(e) => e.preventDefault()}
+        >
+          <button style={styles.ctxItem} onClick={() => handleEditTile(ctxMenu)}>
+            Edit tile in Art mode
+          </button>
+          <button style={styles.ctxItem} onClick={() => handleEditBlock(ctxMenu)}>
+            Edit 128×128 block as chunk
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -823,5 +939,18 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 11, fontFamily: 'monospace', color: '#a6adc8',
     gap: 6, alignItems: 'center',
     pointerEvents: 'none',
+  },
+  ctxMenu: {
+    position: 'absolute', zIndex: 20,
+    display: 'flex', flexDirection: 'column',
+    minWidth: 190, padding: 4,
+    background: '#181825', border: '1px solid #45475a', borderRadius: 6,
+    boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
+  },
+  ctxItem: {
+    padding: '6px 10px', textAlign: 'left' as const,
+    background: 'transparent', color: '#cdd6f4',
+    border: 'none', borderRadius: 4,
+    cursor: 'pointer', fontSize: 12,
   },
 };

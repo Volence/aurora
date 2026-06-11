@@ -193,7 +193,7 @@ export default function TilesetPanel() {
 
     if (hoverLabelRef.current) {
       hoverLabelRef.current.textContent = newIdx >= 0
-        ? `#${newIdx} (0x${newIdx.toString(16).toUpperCase()}) — used ${usageRef.current.get(newIdx) ?? 0}×`
+        ? `#${newIdx} (0x${newIdx.toString(16).toUpperCase()}) — used ${usageRef.current.get(newIdx) ?? 0}× in this act`
         : '';
     }
   }, [itemSize, itemCount]);
@@ -290,7 +290,8 @@ export default function TilesetPanel() {
       return;
     }
 
-    const tileIdx = unpackNametableWord(result.nametable[0]).tileIndex;
+    const entry = unpackNametableWord(result.nametable[0]);
+    const tileIdx = entry.tileIndex;
     if (result.newTiles.length > 0) {
       executeCommand({
         type: 'set-tileset-tiles',
@@ -301,6 +302,10 @@ export default function TilesetPanel() {
         newTiles: result.newTiles,
       }, level);
       useToastStore.getState().addToast(`Added tile #${tileIdx} to tileset`, 'success');
+    } else if (entry.hFlip || entry.vFlip) {
+      // Dedup matched only after flipping — say so, since the art won't look
+      // identical to what was drawn.
+      useToastStore.getState().addToast(`Matches existing tile #${tileIdx} (flipped) — opened it`, 'info');
     } else {
       useToastStore.getState().addToast(`Identical tile already exists — opened #${tileIdx}`, 'info');
     }
@@ -345,7 +350,7 @@ export default function TilesetPanel() {
           {liveTileOpen && open && (
             <>
               <span style={styles.liveInfo}>
-                tile #{open.liveTileIndex} — used {usage.get(open.liveTileIndex!) ?? 0}× on map
+                tile #{open.liveTileIndex} — used {usage.get(open.liveTileIndex!) ?? 0}× in this act
               </span>
               <button style={styles.actionButton} onClick={handleDuplicate}
                 title="Copy this tile to a new atlas slot and edit the copy (map keeps the original)">
