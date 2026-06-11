@@ -203,6 +203,8 @@ export default function ChunkLibrary() {
       if (!pZone) throw new Error('no active zone to import into');
       migrateChunkTilesIntoTileset(pZone.tileset.tiles, artTiles, imported, []);
 
+      // Invalidation: addChunks replaces the project object, which retriggers
+      // MapViewport's reload effect — that is what re-prerenders the grown atlas.
       useProjectStore.getState().addChunks(imported);
       useEditorStore.getState().markDirty();
 

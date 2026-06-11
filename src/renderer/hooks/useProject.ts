@@ -15,6 +15,7 @@ import { parseObjectList } from '../../core/formats/s4-objects';
 import { serializeObjectList } from '../../core/formats/s4-objects';
 import { parseStrips, STRIP_COLS, STRIP_ROWS } from '../../core/formats/s4-strips';
 import { exportAct } from '../../core/export/index';
+import { serializeTiles } from '../../core/export/tile-dedup';
 import { createSection, SECTION_TILES_WIDE, SECTION_TILES_HIGH } from '../../core/model/s4-types';
 import { migrateChunkTilesIntoTileset } from '../../core/art/atlas-migration';
 import { useToastStore } from '../state/toastStore';
@@ -52,10 +53,13 @@ export function useProject() {
       const json = JSON.parse(new TextDecoder().decode(jsonData)) as S4ProjectConfig;
       const config = loadS4Config(json, dir);
 
+      // Load the full project BEFORE committing config to the store: a failed
+      // load (e.g. atlas-migration abort) must not leave a new config paired
+      // with a stale/absent project, or pollute the recent-projects list.
+      const project = await loadFullProject(config);
+
       setConfig(config);
       await window.api.addRecentProject(dir, config.name);
-
-      const project = await loadFullProject(config);
       setProject(project);
 
       if (config.zones.length > 0) {
@@ -159,6 +163,45 @@ export function useProject() {
         const chunksJson = JSON.stringify(serializedChunks);
         const chunksBytes = new TextEncoder().encode(chunksJson);
         await window.api.writeBinaryFile(basePath, config.chunkLibraryPath, chunksBytes.buffer as ArrayBuffer);
+      }
+
+      // Persist each zone's tileset to an editor-owned path. The configured
+      // tileset may point into the engine's regenerated data/generated tree
+      // (or even alias the legacy chunks_tiles.bin), so we always write to
+      // data/editor/ and retarget project.json to it. Without this, MCP
+      // write_tiles and imported/merged art vanish on reload.
+      let configChanged = false;
+      for (const projZone of project.zones) {
+        const editorTilesetPath = `data/editor/${projZone.id}_tiles.bin`;
+        const tileBytes = serializeTiles(projZone.tileset.tiles);
+        await window.api.writeBinaryFile(basePath, editorTilesetPath, tileBytes.buffer as ArrayBuffer);
+
+        const rawZone = config.raw.zones.find(rz => rz.id === projZone.id);
+        if (rawZone && rawZone.tileset !== editorTilesetPath) {
+          rawZone.tileset = editorTilesetPath;
+          configChanged = true;
+        }
+      }
+      if (configChanged) {
+        const projectJsonBytes = new TextEncoder().encode(JSON.stringify(config.raw, null, 2));
+        await window.api.writeBinaryFile(basePath, 'project.json', projectJsonBytes.buffer as ArrayBuffer);
+      }
+
+      // RE-ENTRY HAZARD closure: the load-time atlas migration re-runs any
+      // time chunks_tiles.bin parses non-empty, and it is not idempotent in
+      // general. Now that the unified tileset is saved to the editor-owned
+      // path and project.json points there, truncate the legacy atlas so the
+      // migration can never re-enter on the merged data.
+      // Guard: skip the truncation if that path is still some zone's CURRENT
+      // raw-config tileset (i.e. the retarget above didn't move it) — in the
+      // OJZ project the configured tileset literally aliases chunks_tiles.bin,
+      // and truncating the live tileset file would destroy the zone art.
+      if (config.chunkLibraryPath) {
+        const legacyChunkTilesPath = config.chunkLibraryPath.replace('.json', '_tiles.bin');
+        const aliasesLiveTileset = config.raw.zones.some(rz => rz.tileset === legacyChunkTilesPath);
+        if (!aliasesLiveTileset) {
+          await window.api.writeBinaryFile(basePath, legacyChunkTilesPath, new ArrayBuffer(0));
+        }
       }
 
       // Export assembly + binaries
@@ -417,7 +460,14 @@ async function loadFullProject(config: ReturnType<typeof loadS4Config>): Promise
   // migration is not idempotent in general — see its RE-ENTRY HAZARD note).
   // Single-zone assumption: the data model has ONE chunk library per project,
   // so we migrate into zones[0]'s tileset (the OJZ project has one zone).
-  if (chunkTiles.length > 0 && zones.length > 0) {
+  // Pointless-merge guard: with zero chunks there are no nametable entries to
+  // remap, so merging the atlas would only bloat the tileset with orphan tiles.
+  if (chunkTiles.length > 0 && chunkLibrary.length === 0) {
+    console.warn(
+      '[load] chunks_tiles.bin is non-empty but the chunk library is empty — skipping atlas migration (nothing references those tiles)',
+    );
+  }
+  if (chunkTiles.length > 0 && chunkLibrary.length > 0 && zones.length > 0) {
     try {
       const allSections = zones.flatMap(z => z.acts.flatMap(a => a.sections));
       const result = migrateChunkTilesIntoTileset(
