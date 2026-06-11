@@ -779,7 +779,7 @@ export default function MapViewport() {
       }}
       onWheel={handleWheel}
     >
-      <canvas ref={canvasRef} style={styles.canvas} />
+      <canvas id="map-canvas" ref={canvasRef} style={styles.canvas} />
       <div ref={hoverBarRef} style={{ ...styles.hoverBar, display: 'none' }} />
     </div>
   );

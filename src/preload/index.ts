@@ -1,6 +1,8 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import { IPC_CHANNELS } from '../shared/ipc-types';
 import type { RecentProject } from '../shared/ipc-types';
+import { AGENT_REQUEST_CHANNEL, AGENT_RESPONSE_CHANNEL } from '../shared/agent-protocol';
+import type { AgentRequestEnvelope, AgentResponseEnvelope } from '../shared/agent-protocol';
 
 const api = {
   readBinaryFile: (basePath: string, relativePath: string): Promise<ArrayBuffer> =>
@@ -31,3 +33,16 @@ const api = {
 contextBridge.exposeInMainWorld('api', api);
 
 export type ElectronAPI = typeof api;
+
+const agentBridge = {
+  onRequest: (callback: (envelope: AgentRequestEnvelope) => void): void => {
+    ipcRenderer.on(AGENT_REQUEST_CHANNEL, (_event, envelope: AgentRequestEnvelope) => callback(envelope));
+  },
+  respond: (envelope: AgentResponseEnvelope): void => {
+    ipcRenderer.send(AGENT_RESPONSE_CHANNEL, envelope);
+  },
+};
+
+contextBridge.exposeInMainWorld('agentBridge', agentBridge);
+
+export type AgentBridge = typeof agentBridge;

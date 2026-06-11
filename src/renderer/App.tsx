@@ -13,11 +13,15 @@ import ToastContainer from './components/ToastContainer';
 import { useProject } from './hooks/useProject';
 import { useProjectStore } from './state/projectStore';
 import { useEditorStore } from './state/editorStore';
+import { registerAgentHandler } from './agent/agent-handler';
 
 export default function App() {
   const { openProject, openProjectByPath, saveProject } = useProject();
   const error = useProjectStore((s) => s.error);
   const tool = useEditorStore((s) => s.tool);
+
+  // Register the MCP agent bridge handler once on mount
+  useEffect(() => { registerAgentHandler(); }, []);
 
   // Global Ctrl+S handler
   useEffect(() => {
