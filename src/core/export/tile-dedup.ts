@@ -13,7 +13,7 @@ function tileHash(pixels: Uint8Array): string {
   return s;
 }
 
-interface CanonicalTile {
+export interface CanonicalTile {
   pixels: Uint8Array;   // canonical orientation
   hash: string;
   fx: boolean;          // flip applied to source to reach canonical
@@ -26,7 +26,7 @@ const canonicalCache = new WeakMap<Uint8Array, CanonicalTile>();
 // (s4_engine/tools/tile_dedupe.py canonical_form: lex-smallest orientation).
 // Assumes Tile pixel arrays are immutable after creation (true: the editor
 // paints nametables, never tile pixels).
-function canonicalizeTile(pixels: Uint8Array): CanonicalTile {
+export function canonicalizeTile(pixels: Uint8Array): CanonicalTile {
   const cached = canonicalCache.get(pixels);
   if (cached) return cached;
   let best: CanonicalTile = { pixels, hash: tileHash(pixels), fx: false, fy: false };
