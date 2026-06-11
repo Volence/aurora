@@ -55,6 +55,11 @@ describe('validatePaintRegion', () => {
     expect(validatePaintRegion(0, NaN, 0, 1, 1, [{ tile: 1, pal: 1 }], opts)).toMatch(/integer/i);
     expect(validatePaintRegion(0, 0.5, 0, 1, 1, [{ tile: 1, pal: 1 }], opts)).toMatch(/integer/i);
   });
+  it('rejects non-array entries', () => {
+    expect(validatePaintRegion(0, 0, 0, 1, 1, null as unknown as never, opts)).toMatch(/array/i);
+    expect(validatePaintRegion(0, 0, 0, 1, 1, undefined as unknown as never, opts)).toMatch(/array/i);
+    expect(validatePaintRegion(0, 0, 0, 1, 1, { length: 1 } as unknown as never, opts)).toMatch(/array/i);
+  });
   it('rejects entry count mismatch and bad entries', () => {
     expect(validatePaintRegion(0, 0, 0, 2, 2, Array(3).fill({ tile: 1, pal: 1 }), opts)).toMatch(/entries/i);
     expect(validatePaintRegion(0, 0, 0, 1, 1, [{ tile: 100, pal: 1 }], opts)).toMatch(/tile/i);

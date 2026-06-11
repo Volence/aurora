@@ -41,12 +41,31 @@ export interface PaintRegionOptions {
   tilesetSize: number;
 }
 
+/** Validate a list of nametable entry specs (tile/pal/coll ranges). */
+export function validateEntries(entries: NametableEntrySpec[], tilesetSize: number): string | null {
+  if (!Array.isArray(entries)) return 'entries must be an array';
+  for (let i = 0; i < entries.length; i++) {
+    const e = entries[i];
+    if (!Number.isInteger(e.tile) || e.tile < 0 || e.tile >= tilesetSize || e.tile > 0x7FF) {
+      return `entry ${i}: tile ${e.tile} out of range (tileset has ${tilesetSize} tiles, hardware max 2047)`;
+    }
+    if (!Number.isInteger(e.pal) || e.pal < 0 || e.pal > 3) {
+      return `entry ${i}: palette line ${e.pal} out of range 0-3`;
+    }
+    if (e.coll !== undefined && (!Number.isInteger(e.coll) || e.coll < 0 || e.coll > 255)) {
+      return `entry ${i}: collision type ${e.coll} out of range 0-255`;
+    }
+  }
+  return null;
+}
+
 export function validatePaintRegion(
   section: number,
   x: number, y: number, w: number, h: number,
   entries: NametableEntrySpec[],
   opts: PaintRegionOptions,
 ): string | null {
+  if (!Array.isArray(entries)) return 'entries must be an array';
   if (!Number.isInteger(section) || section < 0 || section >= opts.sectionCount) {
     return `section ${section} out of range (0-${opts.sectionCount - 1})`;
   }
@@ -60,17 +79,5 @@ export function validatePaintRegion(
   if (entries.length !== w * h) {
     return `entries length ${entries.length} != region size ${w * h}`;
   }
-  for (let i = 0; i < entries.length; i++) {
-    const e = entries[i];
-    if (!Number.isInteger(e.tile) || e.tile < 0 || e.tile >= opts.tilesetSize || e.tile > 0x7FF) {
-      return `entry ${i}: tile ${e.tile} out of range (tileset has ${opts.tilesetSize} tiles, hardware max 2047)`;
-    }
-    if (!Number.isInteger(e.pal) || e.pal < 0 || e.pal > 3) {
-      return `entry ${i}: palette line ${e.pal} out of range 0-3`;
-    }
-    if (e.coll !== undefined && (!Number.isInteger(e.coll) || e.coll < 0 || e.coll > 255)) {
-      return `entry ${i}: collision type ${e.coll} out of range 0-255`;
-    }
-  }
-  return null;
+  return validateEntries(entries, opts.tilesetSize);
 }

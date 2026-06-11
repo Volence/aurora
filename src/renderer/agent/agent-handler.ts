@@ -7,7 +7,7 @@ import {
   packNametableWord, unpackNametableWord, createChunkDef,
 } from '../../core/model/s4-types';
 import type { Tile, Zone, Act } from '../../core/model/s4-types';
-import { validatePaletteLine, validateTilePixels, validatePaintRegion } from '../../core/agent/validation';
+import { validatePaletteLine, validateTilePixels, validatePaintRegion, validateEntries } from '../../core/agent/validation';
 import { computeActBudget } from '../../core/agent/budget';
 import { decodeGenesisColor } from '../../core/formats/palette';
 import type { AgentRequest, AgentRequestEnvelope, NametableEntrySpec } from '../../shared/agent-protocol';
@@ -30,6 +30,13 @@ export function registerAgentHandler(): void {
 
 interface Ctx { zone: Zone; act: Act; level: S4Level; }
 
+// NOTE: agent reads/validation/budget operate on the export-consistent tile
+// space (zone.tileset.tiles, optionally overridden per-section by
+// section.tiles) — export ignores project.chunkTiles too. MapViewport,
+// however, prefers the full zone art atlas (project.chunkTiles) for rendering
+// when present, so projects rendering via chunkTiles will screenshot
+// differently than they export. Pre-existing editor inconsistency, flagged
+// for follow-up.
 function requireProject(): Ctx {
   const state = useProjectStore.getState();
   const zone = getCurrentZone(state);
@@ -75,6 +82,9 @@ async function handle(req: AgentRequest): Promise<unknown> {
     case 'get-tiles': {
       const ctx = requireProject();
       const tiles = ctx.zone.tileset.tiles;
+      if (!Number.isInteger(req.start) || !Number.isInteger(req.count) || req.count < 1) {
+        throw new Error(`start/count must be integers with count >= 1, got start=${req.start} count=${req.count}`);
+      }
       if (req.start < 0 || req.start >= tiles.length) {
         throw new Error(`start ${req.start} out of range (tileset has ${tiles.length} tiles)`);
       }
@@ -134,13 +144,14 @@ async function handle(req: AgentRequest): Promise<unknown> {
         oldColors: ctx.zone.palette.lines[req.line].colors.map(c => ({ ...c })),
         newColors,
       }, ctx.level);
-      return { ok: true, budget: budgetSummary(ctx) };
+      return { line: req.line, budget: budgetSummary(ctx) };
     }
 
     case 'write-tiles': {
       const ctx = requireProject();
       const tiles = ctx.zone.tileset.tiles;
       const at = req.at ?? tiles.length;
+      if (!Number.isInteger(at)) throw new Error(`at=${at} must be an integer`);
       if (at < 0 || at > tiles.length) {
         throw new Error(`at=${at} out of range (0-${tiles.length}; writes must be contiguous)`);
       }
@@ -199,10 +210,16 @@ async function handle(req: AgentRequest): Promise<unknown> {
     }
 
     case 'save-chunk': {
-      requireProject();
-      if (req.w < 1 || req.h < 1 || req.entries.length !== req.w * req.h) {
-        throw new Error(`entries length ${req.entries.length} != ${req.w}x${req.h}`);
+      const ctx = requireProject();
+      if (!Number.isInteger(req.w) || !Number.isInteger(req.h) ||
+          req.w < 1 || req.w > 64 || req.h < 1 || req.h > 64) {
+        throw new Error(`chunk size must be 1-64 tiles per axis, got ${req.w}x${req.h}`);
       }
+      if (!Array.isArray(req.entries) || req.entries.length !== req.w * req.h) {
+        throw new Error(`entries length ${Array.isArray(req.entries) ? req.entries.length : typeof req.entries} != ${req.w}x${req.h}`);
+      }
+      const entriesErr = validateEntries(req.entries, ctx.zone.tileset.tiles.length);
+      if (entriesErr) throw new Error(entriesErr);
       const state = useProjectStore.getState();
       const id = `agent-${Date.now()}-${state.project!.chunkLibrary.length}`;
       const chunk = createChunkDef(id, req.name, req.w, req.h);
@@ -235,7 +252,7 @@ async function handle(req: AgentRequest): Promise<unknown> {
 
     case 'goto': {
       const ctx = requireProject();
-      if (req.section < 0 || req.section >= ctx.act.sections.length) {
+      if (!Number.isInteger(req.section) || req.section < 0 || req.section >= ctx.act.sections.length) {
         throw new Error(`section ${req.section} out of range`);
       }
       useEditorStore.getState().setActiveSectionIndex(req.section);
@@ -269,6 +286,11 @@ async function handle(req: AgentRequest): Promise<unknown> {
       }
       const dataUrl = source.toDataURL('image/png');
       return { pngBase64: dataUrl.slice('data:image/png;base64,'.length), width: source.width, height: source.height };
+    }
+
+    default: {
+      const exhaustive: never = req;
+      throw new Error(`unknown request kind: ${(exhaustive as { kind?: string }).kind}`);
     }
   }
 }

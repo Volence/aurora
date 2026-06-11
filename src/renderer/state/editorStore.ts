@@ -130,20 +130,36 @@ export const useEditorStore = create<EditorState>((set) => ({
 }));
 
 /**
+ * Centralized renderer-cache invalidation hook. The component that owns the
+ * renderer caches (MapViewport) registers a listener here; every command that
+ * goes through executeCommand/undo/redo is forwarded to it so cached canvases
+ * can be repainted — regardless of whether the mutation came from the UI,
+ * keyboard undo/redo, or the agent handler.
+ */
+let invalidationListener: ((cmd: AnyCommand) => void) | null = null;
+
+export function setCommandInvalidationListener(fn: ((cmd: AnyCommand) => void) | null): void {
+  invalidationListener = fn;
+}
+
+/**
  * Execute a command against the current level, updating history and triggering re-render.
  */
 export function executeCommand(command: AnyCommand, level: S4Level): void {
   editHistory.execute(command, level);
+  invalidationListener?.(command);
   useEditorStore.getState().markDirty();
   useEditorStore.getState().bumpVersion();
 }
 
 export function undo(level: S4Level): void {
-  editHistory.undo(level);
+  const cmd = editHistory.undo(level);
+  if (cmd) invalidationListener?.(cmd);
   useEditorStore.getState().bumpVersion();
 }
 
 export function redo(level: S4Level): void {
-  editHistory.redo(level);
+  const cmd = editHistory.redo(level);
+  if (cmd) invalidationListener?.(cmd);
   useEditorStore.getState().bumpVersion();
 }

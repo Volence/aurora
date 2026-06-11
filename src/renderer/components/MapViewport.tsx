@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useCallback } from 'react';
 import { useViewStore } from '../state/viewStore';
 import { useProjectStore, getCurrentAct, getCurrentZone } from '../state/projectStore';
-import { useEditorStore, executeCommand, undo, redo, RING_PATTERNS } from '../state/editorStore';
+import { useEditorStore, executeCommand, undo, redo, setCommandInvalidationListener, RING_PATTERNS } from '../state/editorStore';
 import type { AnyCommand, S4Level } from '../../core/editing/commands';
 import { SectionRenderer } from '../canvas/SectionRenderer';
 import { OverlayRenderer } from '../canvas/OverlayRenderer';
@@ -41,8 +41,11 @@ export default function MapViewport() {
   const editingLayer = useEditorStore((s) => s.editingLayer);
   const selection = useEditorStore((s) => s.selection);
 
-  // Load all sections + bg when project/act changes
-  useEffect(() => {
+  // Reload (re-prerender) every section + bg from current project state.
+  // Stable callback: reads stores via getState so it can also be invoked from
+  // the command-invalidation listener (palette/tileset changes invalidate the
+  // prerendered tile bitmaps baked into each section's TileRenderer).
+  const reloadAllSections = useCallback(() => {
     const state = useProjectStore.getState();
     const zone = getCurrentZone(state);
     const act = getCurrentAct(state);
@@ -55,8 +58,8 @@ export default function MapViewport() {
     // Prefer the full zone art atlas (chunkTiles) for rendering — section nametables
     // use source tile indices that index directly into this atlas.
     // Fall back to zone.tileset.tiles if no atlas is loaded yet.
-    const tileAtlas = (project?.chunkTiles?.length ?? 0) > 0
-      ? project!.chunkTiles
+    const tileAtlas = (state.project?.chunkTiles?.length ?? 0) > 0
+      ? state.project!.chunkTiles
       : zone.tileset.tiles;
 
     for (let i = 0; i < act.sections.length; i++) {
@@ -73,7 +76,37 @@ export default function MapViewport() {
         sectionRenderer.loadBg(act.bgLayout, bgWidth, bgHeight, act.bgTiles, zone.palette.lines);
       }
     }
-  }, [project, currentZoneId, currentActId]);
+  }, []);
+
+  // Load all sections + bg when project/act changes
+  useEffect(() => {
+    reloadAllSections();
+  }, [project, currentZoneId, currentActId, reloadAllSections]);
+
+  // Centralized renderer-cache invalidation: every command executed/undone/redone
+  // (UI tools, keyboard undo/redo, or the agent handler) lands here so the
+  // section canvases never go stale.
+  useEffect(() => {
+    setCommandInvalidationListener((cmd: AnyCommand) => {
+      switch (cmd.type) {
+        case 'set-tiles':
+        case 'set-collision':
+          sectionRenderer.markDirty(cmd.sectionIndex, cmd.entries.map(e => e.index));
+          break;
+        case 'set-tileset-tiles':
+        case 'set-palette-line':
+          // Tile pixels / palette are baked into per-section TileRenderer
+          // caches at load time — re-prerender everything.
+          reloadAllSections();
+          break;
+        default:
+          // Objects/rings are drawn by the OverlayRenderer from live state
+          // every frame; the historyVersion bump already re-renders them.
+          break;
+      }
+    });
+    return () => setCommandInvalidationListener(null);
+  }, [reloadAllSections]);
 
   // Re-render when anything visual changes
   useEffect(() => {

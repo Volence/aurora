@@ -25,20 +25,22 @@ export class EditHistory {
     this.notify();
   }
 
-  undo(level: S4Level): void {
+  undo(level: S4Level): AnyCommand | undefined {
     const cmd = this.undoStack.pop();
-    if (!cmd) return;
+    if (!cmd) return undefined;
     undoCommand(cmd, level);
     this.redoStack.push(cmd);
     this.notify();
+    return cmd;
   }
 
-  redo(level: S4Level): void {
+  redo(level: S4Level): AnyCommand | undefined {
     const cmd = this.redoStack.pop();
-    if (!cmd) return;
+    if (!cmd) return undefined;
     applyCommand(cmd, level);
     this.undoStack.push(cmd);
     this.notify();
+    return cmd;
   }
 
   clear(): void {
