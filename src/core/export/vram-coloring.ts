@@ -1,33 +1,56 @@
-const VRAM_BASE_A = 0 * 32;     // color 0: tile 0
-const VRAM_BASE_B = 113 * 32;   // color 1: tile 113 ($0E20)
+// VRAM color-group base assignment — mirrors s4_engine/tools/tile_dedupe.py
+// assign_section_slots: groups get cumulative bases from measured union sizes.
 
-export function computeVramBases(
+// BG region starts at tile slot 1024 ($400); FG group unions must fit below it.
+export const FG_TILE_LIMIT = 1024;
+
+/**
+ * Checkerboard coloring: active sections get (col+row)%2, inactive get -1.
+ * Adjacent (H/V) sections are co-visible during teleports and must differ.
+ */
+export function computeVramColoring(
   gridWidth: number,
   gridHeight: number,
   activeSlots: boolean[],
 ): number[] {
   const count = gridWidth * gridHeight;
-  const bases = new Array<number>(count).fill(0);
-
+  const colors = new Array<number>(count).fill(-1);
   for (let i = 0; i < count; i++) {
-    if (!activeSlots[i]) {
-      bases[i] = 0;
-      continue;
-    }
-
+    if (!activeSlots[i]) continue;
     const col = i % gridWidth;
     const row = Math.floor(i / gridWidth);
-
-    bases[i] = (col + row) % 2 === 0 ? VRAM_BASE_A : VRAM_BASE_B;
+    colors[i] = (col + row) % 2;
   }
-
-  return bases;
+  return colors;
 }
 
-export function generateVramBasesAsm(
-  zonePrefix: string,
-  bases: number[],
-): string {
+export interface VramBaseAssignment {
+  /** Per-section VRAM byte address (colorBases[color] * 32; 0 for inactive). */
+  bases: number[];
+  /** Tile-slot base per color group (cumulative union counts). */
+  colorBases: number[];
+}
+
+export function assignVramBases(
+  colors: number[],
+  groupUnionCounts: number[],
+): VramBaseAssignment {
+  const colorBases: number[] = [];
+  let cursor = 0;
+  for (let c = 0; c < groupUnionCounts.length; c++) {
+    colorBases.push(cursor);
+    cursor += groupUnionCounts[c];
+  }
+  if (cursor > FG_TILE_LIMIT) {
+    throw new Error(
+      `VRAM overflow: color groups need ${cursor} tiles, FG pool limit is ${FG_TILE_LIMIT}`,
+    );
+  }
+  const bases = colors.map(c => (c < 0 ? 0 : colorBases[c] * 32));
+  return { bases, colorBases };
+}
+
+export function generateVramBasesAsm(zonePrefix: string, bases: number[]): string {
   const lines: string[] = [];
   for (let i = 0; i < bases.length; i++) {
     const tileIndex = bases[i] / 32;
