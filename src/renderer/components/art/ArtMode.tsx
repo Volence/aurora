@@ -52,7 +52,12 @@ export default function ArtMode() {
   // includes the zone tileset/palette so zone commands undo correctly.
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if ((e.target as HTMLElement).tagName === 'INPUT') return;
+      // Skip undo/redo only for text-entry inputs; allow range/checkbox/button/
+      // radio so Ctrl+Z works immediately after a palette slider commit.
+      const target = e.target as HTMLElement;
+      if (target.tagName === 'INPUT'
+          && !['range', 'checkbox', 'button', 'radio'].includes(
+            (target as HTMLInputElement).type)) return;
       const level = getActiveLevel(useProjectStore.getState());
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) {
         if (level) undo(level);

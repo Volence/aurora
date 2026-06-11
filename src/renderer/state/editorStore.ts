@@ -158,9 +158,18 @@ export function setCommandInvalidationListener(fn: ((cmd: AnyCommand) => void) |
  * pure store concerns and must fire for every execute/undo/redo regardless of
  * which mode is active — e.g. undoing a set-chunk in Art mode must still bust
  * the ChunkLibrary thumbnail cache.
+ *
+ * chunkLibraryVersion is also bumped for set-palette-line and set-tileset-tiles
+ * because chunk thumbnails bake both palette colors and tile pixels: in-place
+ * tile edits keep tiles.length constant but change pixels, and palette edits
+ * change colors used by the baked thumbs.
  */
 function bumpStoreVersions(cmd: AnyCommand): void {
-  if (cmd.type === 'set-chunk') useEditorStore.getState().bumpChunkLibraryVersion();
+  if (cmd.type === 'set-chunk'
+      || cmd.type === 'set-palette-line'
+      || cmd.type === 'set-tileset-tiles') {
+    useEditorStore.getState().bumpChunkLibraryVersion();
+  }
 }
 
 /**

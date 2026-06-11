@@ -70,6 +70,10 @@ export default function ComposerCanvas() {
   const selectedCollisionType = useEditorStore((s) => s.selectedCollisionType);
   // Atlas tiles / palette can change underneath the doc (undo, agent writes).
   const historyVersion = useEditorStore((s) => s.historyVersion);
+  // paletteVersion ticks on every live preview step — kept separate from
+  // historyVersion so the tile-thumb cache (keyed on historyVersion) is not
+  // rebuilt per slider tick.
+  const paletteVersion = useArtStore((s) => s.paletteVersion);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const overlayRef = useRef<HTMLCanvasElement>(null);
@@ -402,9 +406,10 @@ export default function ComposerCanvas() {
   // Re-render on document open/edit, zoom, repeat toggle, and any history
   // change (atlas tiles / palette lines can change underneath the doc).
   // openDocument resets docVersion to 0, so `open` must be a dep too.
+  // paletteVersion handles live slider preview ticks without touching historyVersion.
   useEffect(() => {
     render();
-  }, [open, docVersion, zoom, repeatPreview, historyVersion, render]);
+  }, [open, docVersion, zoom, repeatPreview, historyVersion, paletteVersion, render]);
 
   useEffect(() => {
     drawOverlay();

@@ -30,6 +30,11 @@ interface ArtState {
   zoom: number;                 // pixels per art pixel
   open: OpenDocument | null;
   docVersion: number;           // bump to re-render the canvas
+  /** Incremented on every live palette preview tick (slider drag). Separate
+   *  from historyVersion so per-tick repaint of the composer/swatches does NOT
+   *  trigger expensive cache rebuilds (TilesetPanel, ChunkLibrary thumbnails)
+   *  that are keyed on historyVersion. Only bumped by committed commands. */
+  paletteVersion: number;
   /** One-shot transform request (e.g. 'flip-h') consumed by ComposerCanvas. */
   pendingAction: string | null;
   /** Atlas tile index used by the tile-stamp brush. */
@@ -46,6 +51,7 @@ interface ArtState {
   openDocument: (d: OpenDocument) => void;
   closeDocument: () => void;
   bumpDoc: () => void;
+  bumpPaletteVersion: () => void;
   /** Mark the open document as having unsaved local edits. */
   markOpenDirty: () => void;
   requestAction: (a: string) => void;
@@ -57,6 +63,7 @@ export const useArtStore = create<ArtState>((set) => ({
   tool: 'pencil', brushSpace: 'pixel', selectedColor: 1, paletteLine: 1,
   ditherPattern: 'checker', ditherSecondary: 0,
   mirror: null, repeatPreview: false, zoom: 24, open: null, docVersion: 0,
+  paletteVersion: 0,
   pendingAction: null, brushTile: 0,
 
   setTool: (tool) => set({ tool }),
@@ -70,6 +77,7 @@ export const useArtStore = create<ArtState>((set) => ({
   openDocument: (open) => set({ open, docVersion: 0 }),
   closeDocument: () => set({ open: null }),
   bumpDoc: () => set((s) => ({ docVersion: s.docVersion + 1 })),
+  bumpPaletteVersion: () => set((s) => ({ paletteVersion: s.paletteVersion + 1 })),
   markOpenDirty: () => set((s) =>
     s.open && !s.open.dirty ? { open: { ...s.open, dirty: true } } : {}),
   requestAction: (pendingAction) => set({ pendingAction }),

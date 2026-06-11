@@ -27,10 +27,16 @@ const CHANNEL_COLORS: Record<string, string> = { r: '#f38ba8', g: '#a6e3a1', b: 
  * sprite-reserved (locked); index 0 of every line is transparent (locked for
  * editing but clickable as the eraser-equivalent paint color). The grid
  * doubles as the painting color picker (artStore.selectedColor/paletteLine).
+ *
+ * Mount invariant: PaletteEditor only renders in Art mode. MapViewport's
+ * keydown handler lacks the INPUT-type guard, so mid-drag Ctrl+Z while a
+ * slider has focus is not a reachable code path.
  */
 export default function PaletteEditor() {
-  // Subscribing to historyVersion re-renders swatches after undo/redo restores
-  // colors, and after each live-preview bumpVersion() during slider drags.
+  // Subscribe to paletteVersion for live-preview repaint during slider drags.
+  // historyVersion re-renders swatches after undo/redo restores colors and
+  // after committed commands (set-palette-line bumps both).
+  useArtStore((s) => s.paletteVersion);
   useEditorStore((s) => s.historyVersion);
   const project = useProjectStore((s) => s.project);
   const zone = getCurrentZone(useProjectStore.getState());
@@ -67,8 +73,9 @@ export default function PaletteEditor() {
 
   /**
    * Live preview: write the quantized color directly into the palette object
-   * and bump docVersion + historyVersion so the composer canvas (and any
-   * mounted palette-derived view) repaints immediately.
+   * and bump docVersion + paletteVersion so the composer canvas (and the
+   * swatch grid) repaint immediately without touching historyVersion — keeping
+   * TilesetPanel's tile-thumb cache (keyed on historyVersion) silent per tick.
    */
   function previewChange(line: number, idx: number, channel: 'r' | 'g' | 'b', level3: number) {
     const z = getCurrentZone(useProjectStore.getState());
@@ -81,20 +88,27 @@ export default function PaletteEditor() {
     }));
     z.palette.lines[line].colors[idx] = next;
     useArtStore.getState().bumpDoc();
-    useEditorStore.getState().bumpVersion();
+    useArtStore.getState().bumpPaletteVersion();
   }
 
   /**
-   * Commit on slider release: restore the pre-drag line FIRST, then run the
-   * set-palette-line command — so history's undo snapshot is the pre-drag
-   * state, not the mid-drag preview.
+   * Commit on slider release (pointerup), keyboard release (keyup — arrow keys
+   * fire onChange but no pointerup), or focus loss (blur). Restore the pre-drag
+   * line FIRST, then run the set-palette-line command — so history's undo
+   * snapshot is the pre-drag state, not the mid-drag preview.
+   *
+   * Blurs the active slider after commit so Ctrl+Z (ArtMode's keydown handler)
+   * is not blocked by the INPUT early-return guard on the next undo.
    *
    * Note: MapViewport's invalidation listener handles set-palette-line →
    * reloadAllSections for the MAP repaint, but in Art mode it is unmounted —
    * the composer repaints via historyVersion, and the map re-prerenders on
    * remount (MapViewport's mount effect). Established pattern; see ArtMode.
    */
-  function commitDrag() {
+  function commitDrag(e?: React.SyntheticEvent) {
+    // Blur the slider so post-commit Ctrl+Z reaches ArtMode's keydown handler
+    // without being swallowed by the INPUT guard.
+    (e?.currentTarget as HTMLElement | undefined)?.blur?.();
     const pre = preDragRef.current;
     preDragRef.current = null;
     if (!pre) return;
@@ -183,6 +197,8 @@ export default function PaletteEditor() {
                 onPointerDown={() => beginDrag(sel.line)}
                 onChange={(e) => previewChange(sel.line, sel.idx, ch, Number(e.target.value))}
                 onPointerUp={commitDrag}
+                onKeyUp={commitDrag}
+                onBlur={commitDrag}
                 style={styles.slider}
               />
               <span style={styles.channelValue}>{to3(selColor[ch])}</span>
