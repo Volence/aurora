@@ -1,7 +1,11 @@
-import type { ObjectPlacement, RingPlacement, Section } from '../model/s4-types';
+import type { ObjectPlacement, RingPlacement, Section, Tileset, Palette, Color, Tile, ChunkDef, Act } from '../model/s4-types';
 
 export interface S4Level {
   sections: (Section | null)[];
+  tileset?: Tileset;          // zone-level; present when zone commands are used
+  palette?: Palette;
+  chunkLibrary?: ChunkDef[];  // zone-level; present when set-chunk commands are used
+  act?: Act;                  // current act; present when set-bg commands are used
 }
 
 export interface EditCommand {
@@ -81,6 +85,51 @@ export interface DeleteRingsCommand extends EditCommand {
   items: Array<{ ringIndex: number; ring: RingPlacement }>;
 }
 
+export interface SetPaletteLineCommand extends EditCommand {
+  type: 'set-palette-line';
+  line: number;
+  oldColors: Color[];
+  newColors: Color[];
+}
+
+export interface SetTilesetTilesCommand extends EditCommand {
+  type: 'set-tileset-tiles';
+  at: number;                  // first tileset index written
+  oldTiles: (Tile | null)[];   // null = slot did not exist (appended)
+  newTiles: Tile[];
+}
+
+export interface SetChunkCommand extends EditCommand {
+  type: 'set-chunk';
+  chunkId: string;
+  oldNametable: Uint16Array;
+  newNametable: Uint16Array;
+  oldCollision: Uint8Array;
+  newCollision: Uint8Array;
+}
+
+export interface SetBgCommand extends EditCommand {
+  type: 'set-bg';
+  // Whole-plane swap of the act's zone-wide background (Plane B): 64x32
+  // nametable plus its own tile blob (a separate tile space from the zone
+  // tileset — layout indices are local to the BG blob).
+  oldLayout: Uint16Array | null;
+  newLayout: Uint16Array | null;
+  oldTiles: Tile[] | null;
+  newTiles: Tile[] | null;
+}
+
+export interface SetSectionBgCommand extends EditCommand {
+  type: 'set-section-bg';
+  // Assign which background (Plane B) the section displays: null = the act
+  // default (act.bgLayout/bgTiles), otherwise an S4Project.bgLibrary entry
+  // id. Only the ref swaps in history — library entries themselves are
+  // additive store state outside undo (addBgToLibrary), like the chunk
+  // library.
+  oldRef: string | null;
+  newRef: string | null;
+}
+
 export type AnyCommand =
   | SetTilesCommand
   | SetCollisionCommand
@@ -94,4 +143,9 @@ export type AnyCommand =
   | MoveObjectsCommand
   | MoveRingsCommand
   | DeleteObjectsCommand
-  | DeleteRingsCommand;
+  | DeleteRingsCommand
+  | SetPaletteLineCommand
+  | SetTilesetTilesCommand
+  | SetChunkCommand
+  | SetBgCommand
+  | SetSectionBgCommand;

@@ -60,12 +60,16 @@ export const RING_PATTERNS: RingPattern[] = [
 
 export type EditingLayer = 'fg' | 'bg';
 
+export type AppMode = 'map' | 'art';
+
 interface EditorState {
   tool: EditorTool;
   selection: Selection | null;
   multiSelection: MultiSelection | null;
   dirty: boolean;
   historyVersion: number;
+  chunkLibraryVersion: number;
+  appMode: AppMode;
 
   // S4 tool state
   activeSectionIndex: number;
@@ -83,6 +87,7 @@ interface EditorState {
   setMultiSelection: (multiSelection: MultiSelection | null) => void;
   setActiveSectionIndex: (index: number) => void;
   setEditingLayer: (layer: EditingLayer) => void;
+  setAppMode: (mode: AppMode) => void;
   setSelectedTileIndex: (index: number) => void;
   setSelectedPaletteLine: (line: number) => void;
   setSelectedChunkId: (id: string | null) => void;
@@ -92,6 +97,7 @@ interface EditorState {
   markDirty: () => void;
   markClean: () => void;
   bumpVersion: () => void;
+  bumpChunkLibraryVersion: () => void;
 }
 
 export const editHistory = new EditHistory();
@@ -102,6 +108,8 @@ export const useEditorStore = create<EditorState>((set) => ({
   multiSelection: null,
   dirty: false,
   historyVersion: 0,
+  chunkLibraryVersion: 0,
+  appMode: 'map' as AppMode,
 
   activeSectionIndex: 0,
   editingLayer: 'fg',
@@ -118,6 +126,7 @@ export const useEditorStore = create<EditorState>((set) => ({
   setMultiSelection: (multiSelection) => set({ multiSelection, selection: null }),
   setActiveSectionIndex: (index) => set({ activeSectionIndex: index }),
   setEditingLayer: (layer) => set({ editingLayer: layer }),
+  setAppMode: (mode) => set({ appMode: mode }),
   setSelectedTileIndex: (index) => set({ selectedTileIndex: index }),
   setSelectedPaletteLine: (line) => set({ selectedPaletteLine: line }),
   setSelectedChunkId: (id) => set({ selectedChunkId: id }),
@@ -127,23 +136,67 @@ export const useEditorStore = create<EditorState>((set) => ({
   markDirty: () => set({ dirty: true }),
   markClean: () => set({ dirty: false }),
   bumpVersion: () => set((s) => ({ historyVersion: s.historyVersion + 1 })),
+  bumpChunkLibraryVersion: () => set((s) => ({ chunkLibraryVersion: s.chunkLibraryVersion + 1 })),
 }));
+
+/**
+ * Centralized renderer-cache invalidation hook. The component that owns the
+ * renderer caches (MapViewport) registers a listener here; every command that
+ * goes through executeCommand/undo/redo is forwarded to it so cached canvases
+ * can be repainted — regardless of whether the mutation came from the UI,
+ * keyboard undo/redo, or the agent handler.
+ */
+let invalidationListener: ((cmd: AnyCommand) => void) | null = null;
+
+export function setCommandInvalidationListener(fn: ((cmd: AnyCommand) => void) | null): void {
+  invalidationListener = fn;
+}
+
+/**
+ * Store-level invalidation for commands. Unlike the renderer-cache listener
+ * above (owned by MapViewport, unmounted in Art mode), these version bumps are
+ * pure store concerns and must fire for every execute/undo/redo regardless of
+ * which mode is active — e.g. undoing a set-chunk in Art mode must still bust
+ * the ChunkLibrary thumbnail cache.
+ *
+ * chunkLibraryVersion is also bumped for set-palette-line and set-tileset-tiles
+ * because chunk thumbnails bake both palette colors and tile pixels: in-place
+ * tile edits keep tiles.length constant but change pixels, and palette edits
+ * change colors used by the baked thumbs.
+ */
+function bumpStoreVersions(cmd: AnyCommand): void {
+  if (cmd.type === 'set-chunk'
+      || cmd.type === 'set-palette-line'
+      || cmd.type === 'set-tileset-tiles') {
+    useEditorStore.getState().bumpChunkLibraryVersion();
+  }
+}
 
 /**
  * Execute a command against the current level, updating history and triggering re-render.
  */
 export function executeCommand(command: AnyCommand, level: S4Level): void {
   editHistory.execute(command, level);
+  bumpStoreVersions(command);
+  invalidationListener?.(command);
   useEditorStore.getState().markDirty();
   useEditorStore.getState().bumpVersion();
 }
 
 export function undo(level: S4Level): void {
-  editHistory.undo(level);
+  const cmd = editHistory.undo(level);
+  if (cmd) {
+    bumpStoreVersions(cmd);
+    invalidationListener?.(cmd);
+  }
   useEditorStore.getState().bumpVersion();
 }
 
 export function redo(level: S4Level): void {
-  editHistory.redo(level);
+  const cmd = editHistory.redo(level);
+  if (cmd) {
+    bumpStoreVersions(cmd);
+    invalidationListener?.(cmd);
+  }
   useEditorStore.getState().bumpVersion();
 }

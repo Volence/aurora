@@ -1,9 +1,19 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useProjectStore, getCurrentZone, getCurrentAct } from '../state/projectStore';
+import { useProjectStore, getActiveLevel } from '../state/projectStore';
 import { useViewStore, type OverlayOptions } from '../state/viewStore';
-import { useEditorStore, editHistory, undo, redo, type EditorTool, type EditingLayer } from '../state/editorStore';
+import { useEditorStore, editHistory, undo, redo, type EditorTool, type EditingLayer, type AppMode } from '../state/editorStore';
 import type { S4Level } from '../../core/editing/commands';
 import type { RecentProject } from '../../shared/ipc-types';
+
+// Display-name overrides for overlay toggles whose store keys use engine-
+// internal naming. showBlockGrid draws 128px lines — that's the editor's
+// "chunk" unit (the s4_engine internally calls 128×128 a "block");
+// showChunkGrid draws the 2048px section boundaries. Code identifiers are
+// intentionally NOT renamed.
+const OVERLAY_LABELS: Record<string, string> = {
+  showBlockGrid: 'Chunk Grid (128px)',
+  showChunkGrid: 'Section Grid (2048px)',
+};
 
 interface ToolbarProps {
   onOpenProject: () => void;
@@ -25,6 +35,8 @@ export default function Toolbar({ onOpenProject, onOpenRecent, onSave }: Toolbar
   const dirty = useEditorStore((s) => s.dirty);
   const editingLayer = useEditorStore((s) => s.editingLayer);
   const historyVersion = useEditorStore((s) => s.historyVersion);
+  const appMode = useEditorStore((s) => s.appMode);
+  const setAppMode = useEditorStore((s) => s.setAppMode);
 
   const [recentOpen, setRecentOpen] = useState(false);
   const [recentProjects, setRecentProjects] = useState<RecentProject[]>([]);
@@ -60,9 +72,7 @@ export default function Toolbar({ onOpenProject, onOpenRecent, onSave }: Toolbar
   }, []);
 
   function getLevel(): S4Level | null {
-    const state = useProjectStore.getState();
-    const act = getCurrentAct(state);
-    return act ? { sections: act.sections } : null;
+    return getActiveLevel(useProjectStore.getState());
   }
 
   return (
@@ -127,7 +137,23 @@ export default function Toolbar({ onOpenProject, onOpenRecent, onSave }: Toolbar
 
             <span style={styles.separator} />
 
-            {(['fg', 'bg'] as EditingLayer[]).map((layer) => (
+            {(['map', 'art'] as AppMode[]).map((mode) => (
+              <button
+                key={mode}
+                style={{
+                  ...styles.smallButton,
+                  ...(appMode === mode ? styles.toolActive : {}),
+                }}
+                onClick={() => setAppMode(mode)}
+                title={mode === 'map' ? 'Map editor' : 'Art editor'}
+              >
+                {mode === 'map' ? 'Map' : 'Art'}
+              </button>
+            ))}
+
+            <span style={styles.separator} />
+
+            {appMode === 'map' && (['fg', 'bg'] as EditingLayer[]).map((layer) => (
               <button
                 key={layer}
                 style={{
@@ -141,31 +167,36 @@ export default function Toolbar({ onOpenProject, onOpenRecent, onSave }: Toolbar
               </button>
             ))}
 
-            <span style={styles.separator} />
+            {appMode === 'map' && <span style={styles.separator} />}
 
-            <div style={styles.buttonGroup}>
-              {([
-                ['view', 'View'],
-                ['select', 'Sel'],
-                ['paint-tile', 'Tile'],
-                ['paint-block', 'Blk'],
-                ['stamp-chunk', 'Chk'],
-                ['paint-collision', 'Col'],
-                ['place-object', '+Obj'],
-                ['place-ring', '+Rng'],
-              ] as [EditorTool, string][]).map(([t, label]) => (
-                <button
-                  key={t}
-                  style={{ ...styles.smallButton, ...(tool === t ? styles.toolActive : {}) }}
-                  onClick={() => setTool(t)}
-                  title={t}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
+            {appMode === 'map' && (
+              <div style={styles.buttonGroup}>
+                {([
+                  ['view', 'View'],
+                  ['select', 'Sel'],
+                  ['paint-tile', 'Tile'],
+                  ['paint-block', 'Blk'],
+                  ['stamp-chunk', 'Chk'],
+                  ['paint-collision', 'Col'],
+                  ['place-object', '+Obj'],
+                  ['place-ring', '+Rng'],
+                ] as [EditorTool, string][]).map(([t, label]) => (
+                  <button
+                    key={t}
+                    style={{ ...styles.smallButton, ...(tool === t ? styles.toolActive : {}) }}
+                    onClick={() => setTool(t)}
+                    title={t}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            )}
 
-            <span style={styles.separator} />
+            {/* The separator after the Map|Art toggle already precedes this
+                group in Art mode — only add another when the map tool groups
+                (and their trailing content) render between them. */}
+            {appMode === 'map' && <span style={styles.separator} />}
 
             <div style={styles.buttonGroup}>
               <button
@@ -227,7 +258,7 @@ export default function Toolbar({ onOpenProject, onOpenRecent, onSave }: Toolbar
                 onChange={() => toggleOverlay(key)}
                 style={{ width: 12, height: 12 }}
               />
-              {key.replace('show', '').replace(/([A-Z])/g, ' $1').trim()}
+              {OVERLAY_LABELS[key] ?? key.replace('show', '').replace(/([A-Z])/g, ' $1').trim()}
             </label>
           ))}
 

@@ -2,9 +2,13 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useEditorStore } from '../state/editorStore';
 import { useProjectStore, getCurrentZone } from '../state/projectStore';
 import { useToastStore } from '../state/toastStore';
+import { useArtStore } from '../state/artStore';
+import { openDocumentGuarded } from './art/open-document';
+import { docFromChunk } from '../../core/art/composer-buffer';
 import { importChunks } from '../../core/formats/chunk-mappings';
 import { kosinskiDecompress } from '../../core/formats/kosinski';
 import { parseTiles } from '../../core/formats/tiles';
+import { migrateChunkTilesIntoTileset } from '../../core/art/atlas-migration';
 import { unpackNametableWord } from '../../core/model/s4-types';
 import type { ChunkDef, Tile, Palette } from '../../core/model/s4-types';
 
@@ -63,6 +67,7 @@ function rebuildThumbCache(chunks: ChunkDef[], tiles: Tile[], palette: Palette, 
 
 export default function ChunkLibrary() {
   const selectedChunkId = useEditorStore((s) => s.selectedChunkId);
+  const chunkLibraryVersion = useEditorStore((s) => s.chunkLibraryVersion);
   const project = useProjectStore((s) => s.project);
   const currentZoneId = useProjectStore((s) => s.currentZoneId);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -74,15 +79,17 @@ export default function ChunkLibrary() {
   const state = useProjectStore.getState();
   const zone = getCurrentZone(state);
   const chunks = project?.chunkLibrary ?? [];
-  const chunkTiles = project?.chunkTiles ?? [];
-  const tiles = chunkTiles.length > 0 ? chunkTiles : zone?.tileset.tiles ?? [];
+  const tiles = zone?.tileset.tiles ?? [];
   const palette = zone?.palette ?? { lines: [] };
 
   useEffect(() => {
     if (zone && currentZoneId && chunks.length > 0 && tiles.length > 0) {
-      rebuildThumbCache(chunks, tiles, palette, `${currentZoneId}:${chunks.length}:${tiles.length}`);
+      rebuildThumbCache(
+        chunks, tiles, palette,
+        `${currentZoneId}:${chunks.length}:${tiles.length}:${chunkLibraryVersion}`,
+      );
     }
-  }, [zone, currentZoneId, chunks.length, tiles.length]);
+  }, [zone, currentZoneId, chunks.length, tiles.length, chunkLibraryVersion]);
 
   const renderGrid = useCallback(() => {
     const canvas = canvasRef.current;
@@ -128,7 +135,7 @@ export default function ChunkLibrary() {
         }
       }
     }
-  }, [chunks, scrollTop, selectedChunkId, tiles.length]);
+  }, [chunks, scrollTop, selectedChunkId, tiles.length, chunkLibraryVersion]);
 
   useEffect(() => {
     renderGrid();
@@ -149,9 +156,9 @@ export default function ChunkLibrary() {
     setScrollTop((prev) => Math.max(0, Math.min(maxScroll, prev + e.deltaY)));
   }, [chunks.length]);
 
-  const handleClick = useCallback((e: React.MouseEvent) => {
+  const chunkIndexAt = useCallback((e: React.MouseEvent): number => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!canvas) return -1;
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top + scrollTopRef.current;
@@ -160,10 +167,30 @@ export default function ChunkLibrary() {
     const col = Math.floor(x / (THUMB_PX + gap));
     const row = Math.floor(y / (THUMB_PX + gap));
     const idx = row * cols + col;
-    if (idx >= 0 && idx < chunks.length) {
+    return idx >= 0 && idx < chunks.length ? idx : -1;
+  }, [chunks]);
+
+  const handleClick = useCallback((e: React.MouseEvent) => {
+    const idx = chunkIndexAt(e);
+    if (idx >= 0) {
       useEditorStore.getState().setSelectedChunkId(chunks[idx].id);
     }
-  }, [chunks]);
+  }, [chunks, chunkIndexAt]);
+
+  // Double-click: open the chunk as a composer document in Art mode.
+  const handleDoubleClick = useCallback((e: React.MouseEvent) => {
+    const idx = chunkIndexAt(e);
+    if (idx < 0) return;
+    const chunk = chunks[idx];
+    if (!openDocumentGuarded({
+      doc: docFromChunk(chunk),
+      liveTileIndex: null,
+      chunkId: chunk.id,
+      name: chunk.name,
+      dirty: false,
+    })) return;
+    useEditorStore.getState().setAppMode('art');
+  }, [chunks, chunkIndexAt]);
 
   const handleImport = useCallback(async () => {
     try {
@@ -197,7 +224,15 @@ export default function ChunkLibrary() {
       const artDecompressed = kosinskiDecompress(artData);
       const artTiles = parseTiles(artDecompressed);
 
-      useProjectStore.getState().addChunks(imported, artTiles);
+      // Unified atlas: merge the imported art into the zone tileset (flip-aware
+      // dedup) and remap the imported chunks' nametables to zone-tileset indices.
+      const pZone = getCurrentZone(useProjectStore.getState());
+      if (!pZone) throw new Error('no active zone to import into');
+      migrateChunkTilesIntoTileset(pZone.tileset.tiles, artTiles, imported, []);
+
+      // Invalidation: addChunks replaces the project object, which retriggers
+      // MapViewport's reload effect — that is what re-prerenders the grown atlas.
+      useProjectStore.getState().addChunks(imported);
       useEditorStore.getState().markDirty();
 
       if (imported.length > 0) {
@@ -252,7 +287,7 @@ export default function ChunkLibrary() {
           {selectedName && (
             <div style={styles.selectionInfo}>
               <span style={styles.selectedBadge}>{selectedName}</span>
-              <span style={styles.hint}>Click map to stamp</span>
+              <span style={styles.hint}>Click map to stamp · dbl-click to edit</span>
             </div>
           )}
           <div
@@ -260,6 +295,7 @@ export default function ChunkLibrary() {
             style={styles.canvasWrap}
             onWheel={handleScroll}
             onClick={handleClick}
+            onDoubleClick={handleDoubleClick}
           >
             <canvas ref={canvasRef} style={styles.canvas} />
           </div>

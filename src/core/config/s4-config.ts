@@ -34,6 +34,13 @@ export interface LoadedS4Config {
   zones: S4ZoneConfig[];
   objectLibraryPath: string;
   chunkLibraryPath: string;
+  /**
+   * The raw parsed project.json, retained verbatim so saveProject can
+   * retarget zone tileset paths and write the file back without losing
+   * fields the editor doesn't model. Note: `zones` above shares the same
+   * objects as `raw.zones`, so mutations through either are visible to both.
+   */
+  raw: S4ProjectConfig;
 }
 
 export function loadS4Config(json: S4ProjectConfig, basePath: string): LoadedS4Config {
@@ -59,5 +66,6 @@ export function loadS4Config(json: S4ProjectConfig, basePath: string): LoadedS4C
     zones: json.zones,
     objectLibraryPath: json.objectLibrary || '',
     chunkLibraryPath: json.chunkLibrary || '',
+    raw: json,
   };
 }

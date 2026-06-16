@@ -3,7 +3,7 @@ import type { Tile, TileRef } from '../model/types';
 /**
  * Generate all 4 flip variants of a tile's pixel data.
  */
-function flipTile(pixels: Uint8Array, xFlip: boolean, yFlip: boolean): Uint8Array {
+export function flipTile(pixels: Uint8Array, xFlip: boolean, yFlip: boolean): Uint8Array {
   const out = new Uint8Array(64);
   for (let row = 0; row < 8; row++) {
     for (let col = 0; col < 8; col++) {

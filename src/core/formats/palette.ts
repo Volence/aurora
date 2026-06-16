@@ -17,6 +17,16 @@ export function decodeGenesisColor(word: number): Color {
 }
 
 /**
+ * Encode an RGB color as a Genesis VDP 16-bit color word (0000BBB0 GGG0RRR0).
+ * Each 8-bit channel is clamped and rounded to the nearest 3-bit level (0-7).
+ * Inverse of decodeGenesisColor: encode(decode(w)) === w for valid words.
+ */
+export function encodeGenesisColor(color: { r: number; g: number; b: number }): number {
+  const to3 = (v: number) => Math.round(Math.min(255, Math.max(0, v)) / 255 * 7);
+  return (to3(color.b) << 9) | (to3(color.g) << 5) | (to3(color.r) << 1);
+}
+
+/**
  * Parse raw Genesis palette data into a PaletteLine (16 colors).
  * Each color is a big-endian 16-bit word.
  */

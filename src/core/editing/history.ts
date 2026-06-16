@@ -25,20 +25,22 @@ export class EditHistory {
     this.notify();
   }
 
-  undo(level: S4Level): void {
+  undo(level: S4Level): AnyCommand | undefined {
     const cmd = this.undoStack.pop();
-    if (!cmd) return;
+    if (!cmd) return undefined;
     undoCommand(cmd, level);
     this.redoStack.push(cmd);
     this.notify();
+    return cmd;
   }
 
-  redo(level: S4Level): void {
+  redo(level: S4Level): AnyCommand | undefined {
     const cmd = this.redoStack.pop();
-    if (!cmd) return;
+    if (!cmd) return undefined;
     applyCommand(cmd, level);
     this.undoStack.push(cmd);
     this.notify();
+    return cmd;
   }
 
   clear(): void {
@@ -49,6 +51,37 @@ export class EditHistory {
 }
 
 function applyCommand(cmd: AnyCommand, level: S4Level): void {
+  if (cmd.type === 'set-palette-line') {
+    // Throw, don't skip: a silent no-op here corrupts history (the command
+    // consumes an undo slot without doing anything).
+    if (!level.palette) throw new Error('set-palette-line requires level.palette');
+    level.palette.lines[cmd.line].colors = cmd.newColors.map(c => ({ ...c }));
+    return;
+  }
+  if (cmd.type === 'set-tileset-tiles') {
+    if (!level.tileset) throw new Error('set-tileset-tiles requires level.tileset');
+    for (let i = 0; i < cmd.newTiles.length; i++) {
+      level.tileset.tiles[cmd.at + i] = { pixels: new Uint8Array(cmd.newTiles[i].pixels) };
+    }
+    return;
+  }
+  if (cmd.type === 'set-chunk') {
+    if (!level.chunkLibrary) throw new Error('set-chunk requires level.chunkLibrary');
+    const chunk = level.chunkLibrary.find(c => c.id === cmd.chunkId);
+    if (!chunk) throw new Error(`set-chunk: unknown chunk ${cmd.chunkId}`);
+    chunk.nametable = new Uint16Array(cmd.newNametable);
+    chunk.collision = new Uint8Array(cmd.newCollision);
+    return;
+  }
+  if (cmd.type === 'set-bg') {
+    if (!level.act) throw new Error('set-bg requires level.act');
+    level.act.bgLayout = cmd.newLayout ? new Uint16Array(cmd.newLayout) : null;
+    level.act.bgTiles = cmd.newTiles
+      ? cmd.newTiles.map(t => ({ pixels: new Uint8Array(t.pixels) }))
+      : null;
+    return;
+  }
+
   const section = level.sections[cmd.sectionIndex];
   if (!section) return;
 
@@ -58,6 +91,9 @@ function applyCommand(cmd: AnyCommand, level: S4Level): void {
         section.tileGrid.nametable[e.index] = e.newNt;
         section.tileGrid.collision[e.index] = e.newColl;
       }
+      break;
+    case 'set-section-bg':
+      section.bgLayoutRef = cmd.newRef;
       break;
     case 'set-collision':
       for (const e of cmd.entries) {
@@ -115,6 +151,41 @@ function applyCommand(cmd: AnyCommand, level: S4Level): void {
 }
 
 function undoCommand(cmd: AnyCommand, level: S4Level): void {
+  if (cmd.type === 'set-palette-line') {
+    if (!level.palette) throw new Error('set-palette-line requires level.palette');
+    level.palette.lines[cmd.line].colors = cmd.oldColors.map(c => ({ ...c }));
+    return;
+  }
+  if (cmd.type === 'set-tileset-tiles') {
+    if (!level.tileset) throw new Error('set-tileset-tiles requires level.tileset');
+    // Walk backwards so appended-slot truncation is safe
+    for (let i = cmd.oldTiles.length - 1; i >= 0; i--) {
+      const old = cmd.oldTiles[i];
+      if (old === null) {
+        level.tileset.tiles.splice(cmd.at + i, 1);   // was appended: remove
+      } else {
+        level.tileset.tiles[cmd.at + i] = { pixels: new Uint8Array(old.pixels) };
+      }
+    }
+    return;
+  }
+  if (cmd.type === 'set-chunk') {
+    if (!level.chunkLibrary) throw new Error('set-chunk requires level.chunkLibrary');
+    const chunk = level.chunkLibrary.find(c => c.id === cmd.chunkId);
+    if (!chunk) throw new Error(`set-chunk: unknown chunk ${cmd.chunkId}`);
+    chunk.nametable = new Uint16Array(cmd.oldNametable);
+    chunk.collision = new Uint8Array(cmd.oldCollision);
+    return;
+  }
+  if (cmd.type === 'set-bg') {
+    if (!level.act) throw new Error('set-bg requires level.act');
+    level.act.bgLayout = cmd.oldLayout ? new Uint16Array(cmd.oldLayout) : null;
+    level.act.bgTiles = cmd.oldTiles
+      ? cmd.oldTiles.map(t => ({ pixels: new Uint8Array(t.pixels) }))
+      : null;
+    return;
+  }
+
   const section = level.sections[cmd.sectionIndex];
   if (!section) return;
 
@@ -124,6 +195,9 @@ function undoCommand(cmd: AnyCommand, level: S4Level): void {
         section.tileGrid.nametable[e.index] = e.oldNt;
         section.tileGrid.collision[e.index] = e.oldColl;
       }
+      break;
+    case 'set-section-bg':
+      section.bgLayoutRef = cmd.oldRef;
       break;
     case 'set-collision':
       for (const e of cmd.entries) {

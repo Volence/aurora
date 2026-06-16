@@ -1,8 +1,9 @@
 import type { Act, Tileset, ObjectDef } from '../model/s4-types';
 import { serializeNametable } from '../formats/s4-nametable';
 import { serializeCollision } from '../formats/s4-collision';
-import { deduplicateSectionTiles } from './tile-dedup';
-import { computeVramBases, generateVramBasesAsm } from './vram-coloring';
+import { buildGroupUnions, remapNametableToGroup, serializeTiles } from './tile-dedup';
+import type { SectionTileData } from './tile-dedup';
+import { computeVramColoring, assignVramBases, generateVramBasesAsm } from './vram-coloring';
 import { generateActDescriptorAsm } from './act-descriptor';
 import { generateEntityDataAsm } from './entity-data';
 
@@ -28,12 +29,23 @@ export function exportAct(
 ): ExportResult {
   const { gridWidth, gridHeight, sections } = act;
 
-  // VRAM graph-coloring
   const activeSlots = sections.map(s => s !== null);
-  const vramBases = computeVramBases(gridWidth, gridHeight, activeSlots);
-  const vramBasesAsm = generateVramBasesAsm(zonePrefix, vramBases);
+  const colors = computeVramColoring(gridWidth, gridHeight, activeSlots);
 
-  // Per-section binaries
+  // Group unions across sections sharing a color (engine: shared union blob)
+  const sectionData: SectionTileData[] = sections.map((section, i) => ({
+    nametable: section ? section.tileGrid.nametable : new Uint16Array(0),
+    tiles: section ? (section.tiles ?? tileset.tiles) : [],
+    color: section ? colors[i] : -1,
+  }));
+  const numColors = 2;
+  const unions = buildGroupUnions(sectionData, numColors);
+  const { bases, colorBases } = assignVramBases(
+    colors,
+    unions.map(u => u.tiles.length),
+  );
+  const vramBasesAsm = generateVramBasesAsm(zonePrefix, bases);
+
   const sectionBinaries: SectionBinary[] = [];
   const entityDataParts: string[] = [];
 
@@ -41,30 +53,24 @@ export function exportAct(
     const section = sections[i];
     if (!section) continue;
 
-    // Tile dedup + VRAM remapping (prefer section-specific tiles over zone tileset)
+    const color = colors[i];
     const tiles = section.tiles ?? tileset.tiles;
-    const dedup = deduplicateSectionTiles(section.tileGrid.nametable, tiles, vramBases[i]);
-    const nametable = serializeNametable(dedup.remappedNametable);
-    const collision = serializeCollision(section.tileGrid.collision);
+    const remapped = remapNametableToGroup(
+      section.tileGrid.nametable, tiles, unions[color], colorBases[color],
+    );
 
     sectionBinaries.push({
       index: i,
-      nametable,
-      collision,
-      tileArt: dedup.tileArtBytes,
+      nametable: serializeNametable(remapped),
+      collision: serializeCollision(section.tileGrid.collision),
+      tileArt: serializeTiles(unions[color].tiles), // group blob, shared per color
     });
 
-    // Entity data
     entityDataParts.push(generateEntityDataAsm(
-      zonePrefix,
-      i,
-      section.rings,
-      section.objects,
-      objectLibrary,
+      zonePrefix, i, section.rings, section.objects, objectLibrary,
     ));
   }
 
-  // Act descriptor
   const actDescriptorAsm = generateActDescriptorAsm(zonePrefix, act.id, {
     gridWidth,
     gridHeight,
@@ -73,11 +79,9 @@ export function exportAct(
     parallaxRef: act.parallaxRef,
   });
 
-  const entityDataAsm = entityDataParts.join('\n\n');
-
   return {
     actDescriptorAsm,
-    entityDataAsm,
+    entityDataAsm: entityDataParts.join('\n\n'),
     vramBasesAsm,
     sectionBinaries,
   };

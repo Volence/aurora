@@ -10,14 +10,20 @@ import PaletteViewer from './components/PaletteViewer';
 import PropertiesPanel from './components/PropertiesPanel';
 import StatusBar from './components/StatusBar';
 import ToastContainer from './components/ToastContainer';
+import ArtMode from './components/art/ArtMode';
 import { useProject } from './hooks/useProject';
 import { useProjectStore } from './state/projectStore';
 import { useEditorStore } from './state/editorStore';
+import { registerAgentHandler } from './agent/agent-handler';
 
 export default function App() {
   const { openProject, openProjectByPath, saveProject } = useProject();
   const error = useProjectStore((s) => s.error);
   const tool = useEditorStore((s) => s.tool);
+  const appMode = useEditorStore((s) => s.appMode);
+
+  // Register the MCP agent bridge handler once on mount
+  useEffect(() => { registerAgentHandler(); }, []);
 
   // Global Ctrl+S handler
   useEffect(() => {
@@ -47,29 +53,35 @@ export default function App() {
         </div>
       )}
 
-      <div style={styles.main}>
-        <div style={styles.leftPanel}>
-          <SectionGridNav />
-          {tool === 'stamp-chunk' && <ChunkLibrary />}
-          {tool === 'place-object' && (
-            <ObjectPalette
-              selectedType={0}
-              onSelectType={(type, subtype) => useEditorStore.getState().setSelectedObjectTypeId(String(type), subtype)}
-            />
-          )}
-          {tool === 'place-ring' && (
-            <RingPatternPalette
-              selectedIndex={useEditorStore.getState().selectedRingPattern}
-              onSelect={(index) => useEditorStore.getState().setSelectedRingPattern(index)}
-            />
-          )}
-          <div style={{ flex: 1 }} />
-          <ArtBrowser />
-        </div>
-        <MapViewport />
-        <PropertiesPanel />
-      </div>
-      <PaletteViewer />
+      {appMode === 'art' ? (
+        <ArtMode />
+      ) : (
+        <>
+          <div style={styles.main}>
+            <div style={styles.leftPanel}>
+              <SectionGridNav />
+              {tool === 'stamp-chunk' && <ChunkLibrary />}
+              {tool === 'place-object' && (
+                <ObjectPalette
+                  selectedType={0}
+                  onSelectType={(type, subtype) => useEditorStore.getState().setSelectedObjectTypeId(String(type), subtype)}
+                />
+              )}
+              {tool === 'place-ring' && (
+                <RingPatternPalette
+                  selectedIndex={useEditorStore.getState().selectedRingPattern}
+                  onSelect={(index) => useEditorStore.getState().setSelectedRingPattern(index)}
+                />
+              )}
+              <div style={{ flex: 1 }} />
+              <ArtBrowser />
+            </div>
+            <MapViewport />
+            <PropertiesPanel />
+          </div>
+          <PaletteViewer />
+        </>
+      )}
       <StatusBar />
       <ToastContainer />
     </div>

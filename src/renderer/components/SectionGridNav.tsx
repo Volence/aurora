@@ -6,6 +6,8 @@ import { SECTION_PIXEL_SIZE } from '../../core/model/s4-types';
 
 export default function SectionGridNav() {
   const activeSectionIndex = useEditorStore(s => s.activeSectionIndex);
+  // historyVersion: re-render badges when set-section-bg executes/undoes.
+  useEditorStore(s => s.historyVersion);
   const project = useProjectStore(s => s.project);
   const state = useProjectStore.getState();
   const act = getCurrentAct(state);
@@ -28,19 +30,28 @@ export default function SectionGridNav() {
     <div style={styles.container}>
       <div style={styles.header}>Sections ({gridWidth}x{gridHeight})</div>
       <div style={{ ...styles.grid, gridTemplateColumns: `repeat(${gridWidth}, 1fr)` }}>
-        {sections.map((sec, i) => (
-          <button
-            key={i}
-            style={{
-              ...styles.cell,
-              ...(i === activeSectionIndex ? styles.active : {}),
-              ...(sec === null ? styles.null : {}),
-            }}
-            onClick={() => handleSectionClick(i)}
-          >
-            {sec ? i : '—'}
-          </button>
-        ))}
+        {sections.map((sec, i) => {
+          // Corner dot marks sections assigned a BG-library background
+          // (bgLayoutRef != null); tooltip names it.
+          const bgName = sec?.bgLayoutRef
+            ? project?.bgLibrary.find(b => b.id === sec.bgLayoutRef)?.name ?? sec.bgLayoutRef
+            : null;
+          return (
+            <button
+              key={i}
+              style={{
+                ...styles.cell,
+                ...(i === activeSectionIndex ? styles.active : {}),
+                ...(sec === null ? styles.null : {}),
+              }}
+              title={bgName ? `BG: ${bgName}` : undefined}
+              onClick={() => handleSectionClick(i)}
+            >
+              {sec ? i : '—'}
+              {bgName && <span style={styles.bgDot} />}
+            </button>
+          );
+        })}
       </div>
     </div>
   );
@@ -53,7 +64,12 @@ const styles: Record<string, React.CSSProperties> = {
   cell: {
     padding: '4px 0', textAlign: 'center', fontSize: 10,
     background: '#313244', border: '1px solid #45475a', borderRadius: 2,
-    color: '#cdd6f4', cursor: 'pointer',
+    color: '#cdd6f4', cursor: 'pointer', position: 'relative',
+  },
+  bgDot: {
+    position: 'absolute', top: 1, right: 1,
+    width: 5, height: 5, borderRadius: '50%',
+    background: '#a6e3a1',
   },
   active: { background: '#89b4fa', color: '#1e1e2e', border: '1px solid #89b4fa' },
   null: { background: '#11111b', color: '#45475a' },

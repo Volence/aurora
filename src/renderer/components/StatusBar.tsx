@@ -6,7 +6,7 @@ const TOOL_INFO: Record<EditorTool, { label: string; hint: string }> = {
   'view': { label: 'View', hint: 'Click + drag to pan, scroll to zoom' },
   'select': { label: 'Select', hint: 'Click objects/rings to select, drag to move' },
   'paint-tile': { label: 'Paint Tile', hint: 'Click to place selected tile, right-click to pick' },
-  'paint-block': { label: 'Paint Block', hint: 'Click to place 2x2 tile block' },
+  'paint-block': { label: 'Paint Block', hint: 'Click to place a 16×16 px block (2×2 tiles)' },
   'stamp-chunk': { label: 'Stamp Chunk', hint: 'Select a chunk from the library, then click to stamp onto the map' },
   'paint-collision': { label: 'Paint Collision', hint: 'Click to set collision type on tiles' },
   'eraser': { label: 'Eraser', hint: 'Click to erase tiles' },

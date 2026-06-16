@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
-import { decodeGenesisColor, parsePaletteLine, buildPalette } from '../../src/core/formats/palette';
+import { decodeGenesisColor, encodeGenesisColor, parsePaletteLine, buildPalette } from '../../src/core/formats/palette';
 
 const FIXTURES = resolve(__dirname, '../fixtures');
 
@@ -30,6 +30,23 @@ describe('Genesis palette parsing', () => {
     it('decodes pure blue (0x0E00)', () => {
       const c = decodeGenesisColor(0x0E00);
       expect(c).toEqual({ r: 0, g: 0, b: 255, a: 255 });
+    });
+  });
+
+  describe('encodeGenesisColor', () => {
+    it('round-trips valid words: encode(decode(w)) === w', () => {
+      for (const word of [0x0000, 0x0EEE, 0x0A42, 0x000E, 0x0E00, 0x00E0]) {
+        expect(encodeGenesisColor(decodeGenesisColor(word))).toBe(word);
+      }
+    });
+
+    it('clamps and rounds arbitrary 8-bit values to the nearest 3-bit level', () => {
+      // r=300 clamps to 255 -> 7, g=-5 clamps to 0 -> 0, b=128 rounds to 4
+      expect(encodeGenesisColor({ r: 300, g: -5, b: 128 }))
+        .toBe((4 << 9) | (0 << 5) | (7 << 1));
+      // mid-grey 127 rounds to 3 on every channel
+      expect(encodeGenesisColor({ r: 127, g: 127, b: 127 }))
+        .toBe((3 << 9) | (3 << 5) | (3 << 1));
     });
   });
 

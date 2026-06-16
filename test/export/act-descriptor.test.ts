@@ -28,6 +28,35 @@ describe('act-descriptor asm export', () => {
     expect(result).toContain('; --- Section 2 (null) ---');
   });
 
+  it('emits a sanitized BG-library label for sections with a bgLayoutRef, 0 otherwise', () => {
+    const withRef = createSection(0, 'Sec0');
+    withRef.bgLayoutRef = 'forest-1718000000';
+    const without = createSection(1, 'Sec1');
+    const result = generateActDescriptorAsm('OJZ', 'Act1', {
+      gridWidth: 2,
+      gridHeight: 1,
+      sections: [withRef, without],
+      startPosition: { secX: 0, secY: 0, localX: 0, localY: 0 },
+      parallaxRef: null,
+    });
+    // Library ids (slug-timestamp) are sanitized into valid asm labels.
+    expect(result).toContain('dc.l    OJZ_BG_forest_1718000000  ; sec_bg_layout');
+    expect(result).toContain('dc.l    0  ; sec_bg_layout');
+    // The BINCLUDE contract is stated once for the build pipeline.
+    expect(result).toContain('BINCLUDE');
+  });
+
+  it('omits the BG BINCLUDE note when no section has a bgLayoutRef', () => {
+    const result = generateActDescriptorAsm('OJZ', 'Act1', {
+      gridWidth: 1,
+      gridHeight: 1,
+      sections: [createSection(0, 'Sec0')],
+      startPosition: { secX: 0, secY: 0, localX: 0, localY: 0 },
+      parallaxRef: null,
+    });
+    expect(result).not.toContain('BINCLUDE');
+  });
+
   it('null section exports as 72 zero bytes', () => {
     const sections: (Section | null)[] = [null];
     const result = generateActDescriptorAsm('OJZ', 'Act1', {

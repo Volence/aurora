@@ -2,8 +2,21 @@ import { useCallback } from 'react';
 import { useProjectStore, getCurrentAct, getCurrentZone } from '../state/projectStore';
 import { useViewStore } from '../state/viewStore';
 import { useEditorStore } from '../state/editorStore';
+
+// Set to true only when migrateChunkTilesIntoTileset ran successfully during
+// the current loadFullProject call. Reset at the top of each load so stale
+// flag from a previous session cannot gate a truncation on the next save.
+let legacyAtlasMergedThisLoad = false;
+
+/** Derive the legacy chunk-tiles atlas path from the chunk-library JSON path. */
+function legacyAtlasPath(chunkLibraryPath: string): string {
+  return chunkLibraryPath.replace('.json', '_tiles.bin');
+}
 import { loadS4Config, type S4ProjectConfig } from '../../core/config/s4-config';
 import { parseTiles } from '../../core/formats/tiles';
+import { parseBgTiles, serializeBgTiles, normalizeBgLayout, BG_TILE_BASE_SLOT, BG_WIDTH } from '../../core/formats/bg-tiles';
+import { bgLibIndexPath, bgLibLayoutPath, bgLibTilesPath, serializeBgLibraryIndex, parseBgLibraryIndex } from '../../core/formats/bg-library';
+import { serializeSectionMeta, parseSectionMeta } from '../../core/formats/section-meta';
 import { buildPalette } from '../../core/formats/palette';
 import { parseNametable } from '../../core/formats/s4-nametable';
 import { parseCollision } from '../../core/formats/s4-collision';
@@ -15,7 +28,9 @@ import { parseObjectList } from '../../core/formats/s4-objects';
 import { serializeObjectList } from '../../core/formats/s4-objects';
 import { parseStrips, STRIP_COLS, STRIP_ROWS } from '../../core/formats/s4-strips';
 import { exportAct } from '../../core/export/index';
+import { serializeTiles } from '../../core/export/tile-dedup';
 import { createSection, SECTION_TILES_WIDE, SECTION_TILES_HIGH } from '../../core/model/s4-types';
+import { migrateChunkTilesIntoTileset } from '../../core/art/atlas-migration';
 import { useToastStore } from '../state/toastStore';
 import type {
   S4Project,
@@ -29,6 +44,7 @@ import type {
   ChunkDef,
   ObjectPlacement,
   RingPlacement,
+  BgLibraryEntry,
 } from '../../core/model/s4-types';
 
 async function readFile(basePath: string, relativePath: string): Promise<Uint8Array> {
@@ -51,10 +67,13 @@ export function useProject() {
       const json = JSON.parse(new TextDecoder().decode(jsonData)) as S4ProjectConfig;
       const config = loadS4Config(json, dir);
 
+      // Load the full project BEFORE committing config to the store: a failed
+      // load (e.g. atlas-migration abort) must not leave a new config paired
+      // with a stale/absent project, or pollute the recent-projects list.
+      const project = await loadFullProject(config);
+
       setConfig(config);
       await window.api.addRecentProject(dir, config.name);
-
-      const project = await loadFullProject(config);
       setProject(project);
 
       if (config.zones.length > 0) {
@@ -143,6 +162,27 @@ export function useProject() {
         const ringsJson = JSON.stringify(section.rings, null, 2);
         const ringsBytes = new TextEncoder().encode(ringsJson);
         await window.api.writeBinaryFile(basePath, `${prefix}.rings.json`, ringsBytes.buffer as ArrayBuffer);
+
+        // Write meta sidecar (.meta.json) — scalar refs (bgLayoutRef,
+        // paletteRef). Written only when at least one ref is non-null; when
+        // all refs are null we still OVERWRITE an existing sidecar (with
+        // nulls) so a previously-saved ref that was cleared in-session cannot
+        // resurrect on the next load. A read probe gates that overwrite so
+        // the common all-default case creates no files.
+        const metaJson = serializeSectionMeta({ bgLayoutRef: section.bgLayoutRef, paletteRef: section.paletteRef });
+        const metaPath = `${prefix}.meta.json`;
+        if (metaJson !== null) {
+          const metaBytes = new TextEncoder().encode(metaJson);
+          await window.api.writeBinaryFile(basePath, metaPath, metaBytes.buffer as ArrayBuffer);
+        } else {
+          try {
+            await window.api.readBinaryFile(basePath, metaPath);
+            const clearedBytes = new TextEncoder().encode(JSON.stringify({ bgLayoutRef: null, paletteRef: null }, null, 2));
+            await window.api.writeBinaryFile(basePath, metaPath, clearedBytes.buffer as ArrayBuffer);
+          } catch {
+            // no stale sidecar to clear
+          }
+        }
       }
 
       // Save chunk library
@@ -158,22 +198,95 @@ export function useProject() {
         const chunksJson = JSON.stringify(serializedChunks);
         const chunksBytes = new TextEncoder().encode(chunksJson);
         await window.api.writeBinaryFile(basePath, config.chunkLibraryPath, chunksBytes.buffer as ArrayBuffer);
+      }
 
-        // Save chunk tiles as raw 4bpp binary
-        if (project.chunkTiles.length > 0) {
-          const tilesPath = config.chunkLibraryPath.replace('.json', '_tiles.bin');
-          const tileBytes = new Uint8Array(project.chunkTiles.length * 32);
-          for (let t = 0; t < project.chunkTiles.length; t++) {
-            const pixels = project.chunkTiles[t].pixels;
-            for (let row = 0; row < 8; row++) {
-              for (let col = 0; col < 4; col++) {
-                const hi = pixels[row * 8 + col * 2] & 0xF;
-                const lo = pixels[row * 8 + col * 2 + 1] & 0xF;
-                tileBytes[t * 32 + row * 4 + col] = (hi << 4) | lo;
-              }
-            }
-          }
-          await window.api.writeBinaryFile(basePath, tilesPath, tileBytes.buffer as ArrayBuffer);
+      // Persist each zone's tileset to an editor-owned path. The configured
+      // tileset may point into the engine's regenerated data/generated tree
+      // (or even alias the legacy chunks_tiles.bin), so we always write to
+      // data/editor/ and retarget project.json to it. Without this, MCP
+      // write_tiles and imported/merged art vanish on reload.
+      let configChanged = false;
+      for (const projZone of project.zones) {
+        const editorTilesetPath = `data/editor/${projZone.id}_tiles.bin`;
+        const tileBytes = serializeTiles(projZone.tileset.tiles);
+        await window.api.writeBinaryFile(basePath, editorTilesetPath, tileBytes.buffer as ArrayBuffer);
+
+        const rawZone = config.raw.zones.find(rz => rz.id === projZone.id);
+        if (rawZone && rawZone.tileset !== editorTilesetPath) {
+          rawZone.tileset = editorTilesetPath;
+          configChanged = true;
+        }
+      }
+
+      // Persist the current act's background (Plane B) to editor-owned paths,
+      // mirroring the tileset retarget above: the configured bgLayout/bgTiles
+      // may point into the engine's regenerated data/generated tree, so edits
+      // (set-bg commands, BG-layer painting) would vanish on reload otherwise.
+      if (act.bgLayout && act.bgTiles) {
+        const editorBgLayoutPath = `data/editor/${zone.id}_${act.id}_bg.bin`;
+        const editorBgTilesPath = `data/editor/${zone.id}_${act.id}_bg_tiles.bin`;
+        // Editor-owned BG files stay in the LOCAL index convention (in-memory
+        // arrays serialized verbatim) — the engine build pipeline regenerates
+        // its own VRAM-absolute files. On reload, normalizeBgLayout detects
+        // local indices and passes them through, so load(save(state))
+        // reproduces the in-memory arrays exactly.
+        const bgLayoutBytes = serializeNametable(act.bgLayout);
+        await window.api.writeBinaryFile(basePath, editorBgLayoutPath, bgLayoutBytes.buffer as ArrayBuffer);
+        const bgTileBytes = serializeBgTiles(act.bgTiles);
+        await window.api.writeBinaryFile(basePath, editorBgTilesPath, bgTileBytes.buffer as ArrayBuffer);
+
+        const rawAct = config.raw.zones.find(rz => rz.id === zone.id)
+          ?.acts.find(ra => ra.id === act.id);
+        if (rawAct && (rawAct.bgLayout !== editorBgLayoutPath || rawAct.bgTiles !== editorBgTilesPath)) {
+          rawAct.bgLayout = editorBgLayoutPath;
+          rawAct.bgTiles = editorBgTilesPath;
+          configChanged = true;
+        }
+      }
+
+      // Persist the BG library (named alternate backgrounds sections can
+      // reference) to editor-owned paths: an id/name index JSON plus
+      // per-entry layout/tile binaries in the LOCAL index convention (same
+      // round-trip guarantee as the act BG above). Single-zone assumption:
+      // like the chunk library, the data model has ONE library per project,
+      // keyed here under the current zone's id.
+      if (project.bgLibrary.length > 0) {
+        const indexBytes = new TextEncoder().encode(serializeBgLibraryIndex(project.bgLibrary));
+        await window.api.writeBinaryFile(basePath, bgLibIndexPath(zone.id), indexBytes.buffer as ArrayBuffer);
+        for (const entry of project.bgLibrary) {
+          const layoutBytes = serializeNametable(entry.layout);
+          await window.api.writeBinaryFile(basePath, bgLibLayoutPath(zone.id, entry.id), layoutBytes.buffer as ArrayBuffer);
+          const tileBytes = serializeBgTiles(entry.tiles);
+          await window.api.writeBinaryFile(basePath, bgLibTilesPath(zone.id, entry.id), tileBytes.buffer as ArrayBuffer);
+        }
+      }
+
+      if (configChanged) {
+        const projectJsonBytes = new TextEncoder().encode(JSON.stringify(config.raw, null, 2));
+        await window.api.writeBinaryFile(basePath, 'project.json', projectJsonBytes.buffer as ArrayBuffer);
+      }
+
+      // RE-ENTRY HAZARD closure: the load-time atlas migration re-runs any
+      // time chunks_tiles.bin parses non-empty, and it is not idempotent in
+      // general. Now that the unified tileset is saved to the editor-owned
+      // path and project.json points there, truncate the legacy atlas so the
+      // migration can never re-enter on the merged data.
+      // Guards (both must pass — belt-and-braces):
+      //   1. legacyAtlasMergedThisLoad — the migration actually ran and
+      //      succeeded during the current load. If chunks.json failed to parse
+      //      on load (swallowed in the catch block), the migration was skipped
+      //      and we must NOT truncate — doing so would permanently destroy
+      //      tile art that was never merged into the zone tileset.
+      //   2. aliasesLiveTileset check — skip if that path is still some zone's
+      //      CURRENT raw-config tileset (i.e. the retarget above didn't move
+      //      it). In the OJZ project the configured tileset literally aliases
+      //      chunks_tiles.bin; truncating the live tileset file would destroy
+      //      zone art.
+      if (config.chunkLibraryPath && legacyAtlasMergedThisLoad) {
+        const atlasTruncatePath = legacyAtlasPath(config.chunkLibraryPath);
+        const aliasesLiveTileset = config.raw.zones.some(rz => rz.tileset === atlasTruncatePath);
+        if (!aliasesLiveTileset) {
+          await window.api.writeBinaryFile(basePath, atlasTruncatePath, new ArrayBuffer(0));
         }
       }
 
@@ -220,8 +333,13 @@ export function useProject() {
 }
 
 async function loadFullProject(config: ReturnType<typeof loadS4Config>): Promise<S4Project> {
+  // Reset migration flag at the start of every load so a stale true from a
+  // prior session cannot incorrectly gate truncation on the next save.
+  legacyAtlasMergedThisLoad = false;
+
   const basePath = config.basePath;
   const zones: Zone[] = [];
+  const bgLibrary: BgLibraryEntry[] = [];
 
   for (const zoneConfig of config.zones) {
     // Load tileset
@@ -311,6 +429,17 @@ async function loadFullProject(config: ReturnType<typeof loadS4Config>): Promise
             section.rings = [];
           }
 
+          // Load meta sidecar (bgLayoutRef/paletteRef) — optional, only
+          // written when a section carries non-default refs.
+          try {
+            const metaRaw = await readFile(basePath, `${prefix}.meta.json`);
+            const meta = parseSectionMeta(new TextDecoder().decode(metaRaw));
+            section.bgLayoutRef = meta.bgLayoutRef;
+            section.paletteRef = meta.paletteRef;
+          } catch {
+            // no meta sidecar — defaults from createSection stand
+          }
+
           sections.push(section);
         } catch {
           // Section doesn't exist yet
@@ -324,37 +453,19 @@ async function loadFullProject(config: ReturnType<typeof loadS4Config>): Promise
       try {
         if (actConfig.bgLayout) {
           const bgRaw = await readFile(basePath, actConfig.bgLayout);
-          const bgWidth = 64;
-          const bgHeight = Math.floor(bgRaw.length / (bgWidth * 2));
-          bgLayout = parseNametable(bgRaw, bgWidth, bgHeight);
+          const bgHeight = Math.floor(bgRaw.length / (BG_WIDTH * 2));
+          // Normalize ONCE at load: engine-emitted layouts use VRAM-absolute
+          // tile indices (BG_TILE_BASE_SLOT + n); the in-memory convention is
+          // ALWAYS local to the BG blob (tile 0 = first blob tile). Editor-
+          // saved files are already local and pass through unchanged.
+          bgLayout = normalizeBgLayout(parseNametable(bgRaw, BG_WIDTH, bgHeight), BG_TILE_BASE_SLOT);
         }
         if (actConfig.bgTiles) {
+          // parseBgTiles detects the engine blob's 2-byte byte-length header
+          // (and accepts headerless dumps). The blob is used as-is — no blank
+          // padding — because the layout above is normalized to local indices.
           const bgTileRaw = await readFile(basePath, actConfig.bgTiles);
-          const rawBgTiles = parseTiles(bgTileRaw);
-
-          if (bgLayout && rawBgTiles.length > 0) {
-            // Find min tile index in nametable to determine VRAM base offset
-            let vramBase = 0x7FF;
-            for (let i = 0; i < bgLayout.length; i++) {
-              const idx = bgLayout[i] & 0x7FF;
-              if (idx > 0 && idx < vramBase) vramBase = idx;
-            }
-            if (vramBase > 0 && vramBase < 0x7FF) {
-              const maxIndex = vramBase + rawBgTiles.length;
-              const indexedTiles: Tile[] = new Array(maxIndex);
-              for (let t = 0; t < maxIndex; t++) {
-                indexedTiles[t] = { pixels: new Uint8Array(64) };
-              }
-              for (let t = 0; t < rawBgTiles.length; t++) {
-                indexedTiles[vramBase + t] = rawBgTiles[t];
-              }
-              bgTiles = indexedTiles;
-            } else {
-              bgTiles = rawBgTiles;
-            }
-          } else {
-            bgTiles = rawBgTiles;
-          }
+          bgTiles = parseBgTiles(bgTileRaw);
         }
       } catch {
         // optional bg data
@@ -379,6 +490,34 @@ async function loadFullProject(config: ReturnType<typeof loadS4Config>): Promise
       tileset,
       palette,
     });
+
+    // Load the zone's BG library (editor-owned, optional): index JSON of
+    // id/name plus per-entry layout/tile binaries. Editor-saved layouts are
+    // already in the LOCAL index convention, so no normalization is needed
+    // (parseBgTiles still detects the blob header shape). Entries accumulate
+    // into the project-level library (single-zone assumption, like chunks).
+    try {
+      const idxRaw = await readFile(basePath, bgLibIndexPath(zoneConfig.id));
+      const indexEntries = parseBgLibraryIndex(new TextDecoder().decode(idxRaw));
+      for (const meta of indexEntries) {
+        try {
+          const layoutRaw = await readFile(basePath, bgLibLayoutPath(zoneConfig.id, meta.id));
+          const tilesRaw = await readFile(basePath, bgLibTilesPath(zoneConfig.id, meta.id));
+          const height = Math.floor(layoutRaw.length / (BG_WIDTH * 2));
+          if (height < 1) continue;
+          bgLibrary.push({
+            id: meta.id,
+            name: meta.name,
+            layout: parseNametable(layoutRaw, BG_WIDTH, height),
+            tiles: parseBgTiles(tilesRaw),
+          });
+        } catch (entryErr) {
+          console.warn(`[load] BG library entry ${meta.id} failed to load:`, entryErr);
+        }
+      }
+    } catch {
+      // no BG library for this zone
+    }
   }
 
   // Load object library
@@ -416,13 +555,53 @@ async function loadFullProject(config: ReturnType<typeof loadS4Config>): Promise
       // no chunk library
     }
 
-    // Load chunk tiles
+    // Load the legacy chunk-tiles atlas (chunks_tiles.bin) — used only as
+    // migration input below; it is never put on the project object.
     try {
-      const tilesPath = config.chunkLibraryPath.replace('.json', '_tiles.bin');
-      const tilesRaw = await readFile(basePath, tilesPath);
+      const tilesRaw = await readFile(basePath, legacyAtlasPath(config.chunkLibraryPath));
       chunkTiles = parseTiles(tilesRaw);
     } catch {
       // no chunk tiles
+    }
+  }
+
+  // Atlas unification: merge the legacy chunkTiles atlas into the zone tileset
+  // and remap chunk-library/pinned-section nametables to zone-tileset indices.
+  // At-most-once gate: only runs when chunks_tiles.bin parsed non-empty (the
+  // migration is not idempotent in general — see its RE-ENTRY HAZARD note).
+  // Single-zone assumption: the data model has ONE chunk library per project,
+  // so we migrate into zones[0]'s tileset (the OJZ project has one zone).
+  // Pointless-merge guard: with zero chunks there are no nametable entries to
+  // remap, so merging the atlas would only bloat the tileset with orphan tiles.
+  if (chunkTiles.length > 0 && chunkLibrary.length === 0) {
+    console.warn(
+      '[load] chunks_tiles.bin is non-empty but the chunk library is empty — skipping atlas migration (nothing references those tiles)',
+    );
+  }
+  // TODO(art-suite follow-up): make chunks.json self-describing (tileSpace marker) so migration is idempotent without truncation ordering.
+  if (chunkTiles.length > 0 && chunkLibrary.length > 0 && zones.length > 0) {
+    try {
+      const allSections = zones.flatMap(z => z.acts.flatMap(a => a.sections));
+      const result = migrateChunkTilesIntoTileset(
+        zones[0].tileset.tiles, chunkTiles, chunkLibrary, allSections,
+      );
+      // "checked" not "remapped": the count includes identity rewrites (on
+      // projects where chunkTiles already equals the zone tileset, every
+      // entry maps to itself).
+      useToastStore.getState().addToast(
+        `Tile atlases unified — ${result.appended} tiles merged, ${result.remapped} entries checked`,
+        'success',
+      );
+      // Mark that migration ran successfully this load — saveProject uses this
+      // to gate truncation of the legacy atlas (belt-and-braces with the alias
+      // guard: BOTH must pass before we zero chunks_tiles.bin).
+      legacyAtlasMergedThisLoad = true;
+    } catch (err) {
+      // Abort the load: post-migration code paths cannot render chunkTiles,
+      // so a half-loaded project would reference the wrong atlas.
+      throw new Error(
+        `Atlas unification failed: ${err instanceof Error ? err.message : String(err)}`,
+      );
     }
   }
 
@@ -431,7 +610,7 @@ async function loadFullProject(config: ReturnType<typeof loadS4Config>): Promise
     zones,
     objectLibrary,
     chunkLibrary,
-    chunkTiles,
+    bgLibrary,
     basePath,
   };
 }

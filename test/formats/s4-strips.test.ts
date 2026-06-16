@@ -1,65 +1,79 @@
 import { describe, it, expect } from 'vitest';
-import { parseStrips, serializeStrips, STRIP_COLS, STRIP_ROWS } from '../../src/core/formats/s4-strips';
+import {
+  parseStrips, serializeStrips, STRIP_ROWS, STRIP_COLS, WIDE_STRIP_SIZE,
+} from '../../src/core/formats/s4-strips';
 
-describe('s4-strips', () => {
-  it('parses a minimal strip file correctly', () => {
-    // Create a 256-strip file (256 * 128 = 32768 bytes)
-    const data = new Uint8Array(256 * 128);
+function buildFile(): Uint8Array {
+  // 256 columns x 776 bytes
+  return new Uint8Array(STRIP_COLS * WIDE_STRIP_SIZE);
+}
 
-    // Set strip 0 (col 0), row 0: nametable word 0x1234
-    data[0] = 0x12;
-    data[1] = 0x34;
-
-    // Set strip 0 (col 0), row 1: nametable word 0x5678
-    data[2] = 0x56;
-    data[3] = 0x78;
-
-    // Set strip 1 (col 1), row 0: nametable word 0xABCD
-    data[128] = 0xAB;
-    data[129] = 0xCD;
-
-    // Set strip 0, collision byte 0 (at offset 96): 0x31 = row0=3, row1=1
-    data[96] = 0x31;
-
-    const result = parseStrips(data);
-
-    expect(result.width).toBe(STRIP_COLS);
-    expect(result.height).toBe(STRIP_ROWS);
-
-    // Row 0, col 0
-    expect(result.nametable[0 * STRIP_COLS + 0]).toBe(0x1234);
-    // Row 1, col 0
-    expect(result.nametable[1 * STRIP_COLS + 0]).toBe(0x5678);
-    // Row 0, col 1
-    expect(result.nametable[0 * STRIP_COLS + 1]).toBe(0xABCD);
-
-    // Collision: byte 0x31 → row0 high nibble = 3, row1 low nibble = 1
-    expect(result.collision[0 * STRIP_COLS + 0]).toBe(3);
-    expect(result.collision[1 * STRIP_COLS + 0]).toBe(1);
+describe('s4-strips (engine wide-strip format)', () => {
+  it('has the engine constants', () => {
+    expect(STRIP_ROWS).toBe(256);
+    expect(STRIP_COLS).toBe(256);
+    expect(WIDE_STRIP_SIZE).toBe(776); // 512 NT + 128 collA + 128 collB + 8 pad
   });
 
-  it('round-trips through serialize/parse', () => {
-    const original = new Uint8Array(256 * 128);
-    // Fill some data
-    for (let col = 0; col < 256; col++) {
-      for (let row = 0; row < 48; row++) {
-        const off = col * 128 + row * 2;
-        const word = (col + row) & 0xFFFF;
-        original[off] = (word >> 8) & 0xFF;
-        original[off + 1] = word & 0xFF;
+  it('rejects undersized files', () => {
+    expect(() => parseStrips(new Uint8Array(WIDE_STRIP_SIZE * 255))).toThrow(/too small/i);
+  });
+
+  it('parses nametable words column-major to row-major', () => {
+    const data = buildFile();
+    // column 3, row 5 -> word 0xA15B
+    const off = 3 * WIDE_STRIP_SIZE + 5 * 2;
+    data[off] = 0xA1; data[off + 1] = 0x5B;
+    const grid = parseStrips(data);
+    expect(grid.width).toBe(256);
+    expect(grid.height).toBe(256);
+    expect(grid.nametable[5 * 256 + 3]).toBe(0xA15B);
+  });
+
+  it('expands path-A collision bytes to both covered tile rows', () => {
+    const data = buildFile();
+    // column 7, collision cell 10 (tile rows 20 and 21) -> type 0x42
+    const off = 7 * WIDE_STRIP_SIZE + 512 + 10;
+    data[off] = 0x42;
+    const grid = parseStrips(data);
+    expect(grid.collision[20 * 256 + 7]).toBe(0x42);
+    expect(grid.collision[21 * 256 + 7]).toBe(0x42);
+  });
+
+  it('ignores path B on parse (editor edits a single collision layer)', () => {
+    const data = buildFile();
+    const off = 0 * WIDE_STRIP_SIZE + 512 + 128 + 0; // plane B, cell 0
+    data[off] = 0x99;
+    const grid = parseStrips(data);
+    expect(grid.collision[0]).toBe(0);
+  });
+
+  it('serializes: plane B is a copy of plane A, pad is zero', () => {
+    const grid = parseStrips(buildFile());
+    grid.nametable[12 * 256 + 4] = 0x1234;
+    grid.collision[30 * 256 + 9] = 0x07; // tile row 30 -> cell 15
+    const out = serializeStrips(grid);
+    expect(out.length).toBe(STRIP_COLS * WIDE_STRIP_SIZE);
+    const colBase = 4 * WIDE_STRIP_SIZE;
+    expect(out[colBase + 12 * 2]).toBe(0x12);
+    expect(out[colBase + 12 * 2 + 1]).toBe(0x34);
+    const col9 = 9 * WIDE_STRIP_SIZE;
+    expect(out[col9 + 512 + 15]).toBe(0x07);        // plane A
+    expect(out[col9 + 512 + 128 + 15]).toBe(0x07);  // plane B = copy
+    for (let i = 0; i < 8; i++) expect(out[col9 + 512 + 256 + i]).toBe(0);
+  });
+
+  it('round-trips parse -> serialize -> parse', () => {
+    const data = buildFile();
+    for (let col = 0; col < 256; col += 17) {
+      for (let row = 0; row < 256; row += 13) {
+        const off = col * WIDE_STRIP_SIZE + row * 2;
+        data[off] = (col ^ row) & 0xFF; data[off + 1] = (col + row) & 0xFF;
       }
     }
-
-    const parsed = parseStrips(original);
-    const reserialized = serializeStrips(parsed);
-    const reparsed = parseStrips(reserialized);
-
-    expect(reparsed.nametable).toEqual(parsed.nametable);
-    expect(reparsed.collision).toEqual(parsed.collision);
-  });
-
-  it('throws on undersized input', () => {
-    const small = new Uint8Array(100);
-    expect(() => parseStrips(small)).toThrow('Strip file too small');
+    const a = parseStrips(data);
+    const b = parseStrips(serializeStrips(a));
+    expect(b.nametable).toEqual(a.nametable);
+    expect(b.collision).toEqual(a.collision);
   });
 });

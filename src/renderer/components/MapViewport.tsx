@@ -1,16 +1,48 @@
-import React, { useRef, useEffect, useCallback } from 'react';
+import React, { useRef, useEffect, useCallback, useState } from 'react';
 import { useViewStore } from '../state/viewStore';
-import { useProjectStore, getCurrentAct, getCurrentZone } from '../state/projectStore';
-import { useEditorStore, executeCommand, undo, redo, RING_PATTERNS } from '../state/editorStore';
+import { useProjectStore, getCurrentAct, getCurrentZone, getActiveLevel as getStoreActiveLevel } from '../state/projectStore';
+import { useEditorStore, executeCommand, undo, redo, setCommandInvalidationListener, RING_PATTERNS } from '../state/editorStore';
+import { useArtStore } from '../state/artStore';
+import { openDocumentGuarded } from './art/open-document';
+import { createDoc, docFromTile } from '../../core/art/composer-buffer';
 import type { AnyCommand, S4Level } from '../../core/editing/commands';
 import { SectionRenderer } from '../canvas/SectionRenderer';
 import { OverlayRenderer } from '../canvas/OverlayRenderer';
 import type { SectionOverlayInfo } from '../canvas/OverlayRenderer';
-import { SECTION_TILES_WIDE, SECTION_TILES_HIGH, SECTION_PIXEL_SIZE } from '../../core/model/s4-types';
-import type { Section, ObjectPlacement, RingPlacement } from '../../core/model/s4-types';
+import { SECTION_TILES_WIDE, SECTION_TILES_HIGH, SECTION_PIXEL_SIZE, unpackNametableWord } from '../../core/model/s4-types';
+import { BG_WIDTH } from '../../core/formats/bg-tiles';
+import type { Section, ObjectPlacement, RingPlacement, Act, Tile, BgLibraryEntry } from '../../core/model/s4-types';
 
 export const sectionRenderer = new SectionRenderer();
 const overlayRenderer = new OverlayRenderer();
+
+/**
+ * Resolve which background (Plane B) the viewport should display for the
+ * ACTIVE section: its bgLayoutRef names a BG-library entry, null (or a
+ * dangling id) falls back to the act default. Returns null when no BG exists
+ * at all.
+ */
+function resolveActiveBg(
+  act: Act,
+  bgLibrary: BgLibraryEntry[],
+  activeSectionIndex: number,
+): { layout: Uint16Array; tiles: Tile[] } | null {
+  const ref = act.sections[activeSectionIndex]?.bgLayoutRef ?? null;
+  if (ref !== null) {
+    const entry = bgLibrary.find(b => b.id === ref);
+    if (entry) return { layout: entry.layout, tiles: entry.tiles };
+  }
+  if (act.bgLayout && act.bgTiles) return { layout: act.bgLayout, tiles: act.bgTiles };
+  return null;
+}
+
+interface CtxMenuState {
+  x: number;             // container-local px
+  y: number;
+  sectionIndex: number;  // map location under the cursor
+  col: number;
+  row: number;
+}
 
 export default function MapViewport() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -27,6 +59,8 @@ export default function MapViewport() {
     startY: number;
   } | null>(null);
 
+  const [ctxMenu, setCtxMenu] = useState<CtxMenuState | null>(null);
+
   const vpX = useViewStore((s) => s.vpX);
   const vpY = useViewStore((s) => s.vpY);
   const zoom = useViewStore((s) => s.zoom);
@@ -41,8 +75,35 @@ export default function MapViewport() {
   const editingLayer = useEditorStore((s) => s.editingLayer);
   const selection = useEditorStore((s) => s.selection);
 
-  // Load all sections + bg when project/act changes
-  useEffect(() => {
+  // Rebuild only the BG entry from the resolved background of the ACTIVE
+  // section (bgLayoutRef -> library entry, else act default). Lighter than
+  // reloadAllSections — used when the active section or its assignment
+  // changes (FG canvases are untouched).
+  const reloadBg = useCallback(() => {
+    const state = useProjectStore.getState();
+    const zone = getCurrentZone(state);
+    const act = getCurrentAct(state);
+    if (!zone || !act) return;
+
+    sectionRenderer.clearBg();
+    const resolved = resolveActiveBg(
+      act,
+      state.project?.bgLibrary ?? [],
+      useEditorStore.getState().activeSectionIndex,
+    );
+    if (resolved) {
+      const bgHeight = Math.floor(resolved.layout.length / BG_WIDTH);
+      if (bgHeight > 0) {
+        sectionRenderer.loadBg(resolved.layout, BG_WIDTH, bgHeight, resolved.tiles, zone.palette.lines);
+      }
+    }
+  }, []);
+
+  // Reload (re-prerender) every section + bg from current project state.
+  // Stable callback: reads stores via getState so it can also be invoked from
+  // the command-invalidation listener (palette/tileset changes invalidate the
+  // prerendered tile bitmaps baked into each section's TileRenderer).
+  const reloadAllSections = useCallback(() => {
     const state = useProjectStore.getState();
     const zone = getCurrentZone(state);
     const act = getCurrentAct(state);
@@ -50,30 +111,66 @@ export default function MapViewport() {
 
     sectionRenderer.setGrid(act.gridWidth, act.gridHeight);
     sectionRenderer.clearSections();
-    sectionRenderer.clearBg();
 
-    // Prefer the full zone art atlas (chunkTiles) for rendering — section nametables
-    // use source tile indices that index directly into this atlas.
-    // Fall back to zone.tileset.tiles if no atlas is loaded yet.
-    const tileAtlas = (project?.chunkTiles?.length ?? 0) > 0
-      ? project!.chunkTiles
-      : zone.tileset.tiles;
-
+    // Unified atlas: section nametables index into the zone tileset. The
+    // section.tiles override is kept for future per-section art, but nothing
+    // assigns it today (the load-time atlas migration nulls legacy pins).
     for (let i = 0; i < act.sections.length; i++) {
       const section = act.sections[i];
       if (!section) continue;
-      const tiles = section.tiles ?? tileAtlas;
+      const tiles = section.tiles ?? zone.tileset.tiles;
       sectionRenderer.loadSection(i, section.tileGrid, tiles, zone.palette.lines);
     }
 
-    if (act.bgLayout && act.bgTiles) {
-      const bgWidth = 64;
-      const bgHeight = Math.floor(act.bgLayout.length / bgWidth);
-      if (bgHeight > 0) {
-        sectionRenderer.loadBg(act.bgLayout, bgWidth, bgHeight, act.bgTiles, zone.palette.lines);
+    reloadBg();
+  }, [reloadBg]);
+
+  // Load all sections + bg when project/act changes
+  useEffect(() => {
+    reloadAllSections();
+  }, [project, currentZoneId, currentActId, reloadAllSections]);
+
+  // Re-resolve the displayed BG when the active section changes — its
+  // bgLayoutRef may point at a different library entry (or the act default).
+  useEffect(() => {
+    reloadBg();
+  }, [activeSectionIndex, reloadBg]);
+
+  // Centralized renderer-cache invalidation: every command executed/undone/redone
+  // (UI tools, keyboard undo/redo, or the agent handler) lands here so the
+  // section canvases never go stale.
+  useEffect(() => {
+    setCommandInvalidationListener((cmd: AnyCommand) => {
+      switch (cmd.type) {
+        case 'set-tiles':
+        case 'set-collision':
+          sectionRenderer.markDirty(cmd.sectionIndex, cmd.entries.map(e => e.index));
+          break;
+        case 'set-tileset-tiles':
+        case 'set-palette-line':
+          // Tile pixels / palette are baked into per-section TileRenderer
+          // caches at load time — re-prerender everything.
+          reloadAllSections();
+          break;
+        case 'set-bg':
+          // The BG entry's canvas and TileRenderer are built from the
+          // resolved layout/tiles arrays in loadBg — rebuild from the new
+          // arrays. FG canvases are untouched by both commands.
+        case 'set-section-bg':
+          // Which BG the viewport composites depends on the active section's
+          // ref — re-resolve against the library/act default.
+          reloadBg();
+          break;
+        default:
+          // set-chunk thumbnail invalidation is a store concern handled in
+          // editorStore (bumpStoreVersions) so it survives Art mode.
+          // Objects/rings are drawn by the OverlayRenderer from live state
+          // every frame; the historyVersion bump already re-renders them.
+          break;
       }
-    }
-  }, [project, currentZoneId, currentActId]);
+    });
+    return () => setCommandInvalidationListener(null);
+  }, [reloadAllSections, reloadBg]);
 
   // Re-render when anything visual changes
   useEffect(() => {
@@ -102,7 +199,13 @@ export default function MapViewport() {
     if (editingLayer === 'bg') {
       sectionRenderer.renderBg(ctx, viewport);
     } else {
-      sectionRenderer.render(ctx, viewport, activeSectionIndex);
+      // showBgPlane: paint Plane B first, then composite the foreground over
+      // it (empty FG words are transparent in the section canvases). Only
+      // composite when a BG is actually loaded — otherwise render() must
+      // clear the canvas itself or stale frames ghost through.
+      const bgVisible = overlays.showBgPlane && sectionRenderer.hasBg();
+      if (bgVisible) sectionRenderer.renderBg(ctx, viewport);
+      sectionRenderer.render(ctx, viewport, activeSectionIndex, !bgVisible);
 
       const sectionInfos: SectionOverlayInfo[] = [];
       for (let i = 0; i < act.sections.length; i++) {
@@ -142,7 +245,9 @@ export default function MapViewport() {
       if (layer === 'bg') {
         sectionRenderer.renderBg(ctx, viewport);
       } else {
-        sectionRenderer.render(ctx, viewport, useEditorStore.getState().activeSectionIndex);
+        const bgVisible = overlays.showBgPlane && sectionRenderer.hasBg();
+        if (bgVisible) sectionRenderer.renderBg(ctx, viewport);
+        sectionRenderer.render(ctx, viewport, useEditorStore.getState().activeSectionIndex, !bgVisible);
         const sectionInfos: SectionOverlayInfo[] = [];
         for (let i = 0; i < act.sections.length; i++) {
           const section = act.sections[i];
@@ -163,14 +268,16 @@ export default function MapViewport() {
     const handler = (e: KeyboardEvent) => {
       const state = useProjectStore.getState();
       const act = getCurrentAct(state);
-      const level: S4Level | null = act ? { sections: act.sections } : null;
+      // Must include zone tileset/palette so undo/redo of zone commands
+      // (set-palette-line / set-tileset-tiles) works from the keyboard path.
+      const level: S4Level | null = getStoreActiveLevel(state);
 
-      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) {
         if (level) undo(level);
         e.preventDefault();
         return;
       }
-      if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key.toLowerCase() === 'z' && e.shiftKey))) {
         if (level) redo(level);
         e.preventDefault();
         return;
@@ -270,15 +377,24 @@ export default function MapViewport() {
   function paintBgTile(worldX: number, worldY: number): void {
     const state = useProjectStore.getState();
     const act = getCurrentAct(state);
-    if (!act?.bgLayout) return;
+    if (!act) return;
+
+    // Paint the RESOLVED layout — the same array loadBg handed the renderer
+    // (held by reference, so markBgDirty repaints from it). When the active
+    // section displays a library BG, this edits that library entry in place
+    // (additive store state, like chunk edits in Art mode).
+    const resolved = resolveActiveBg(
+      act, state.project?.bgLibrary ?? [], useEditorStore.getState().activeSectionIndex,
+    );
+    if (!resolved) return;
 
     const tile = worldToBgTile(worldX, worldY);
     if (!tile) return;
 
     const { selectedTileIndex, selectedPaletteLine } = useEditorStore.getState();
     const newNt = (selectedTileIndex & 0x7FF) | ((selectedPaletteLine & 0x3) << 13);
-    if (act.bgLayout[tile.tileIndex] !== newNt) {
-      act.bgLayout[tile.tileIndex] = newNt;
+    if (resolved.layout[tile.tileIndex] !== newNt) {
+      resolved.layout[tile.tileIndex] = newNt;
       sectionRenderer.markBgDirty([tile.tileIndex]);
       useEditorStore.getState().markDirty();
       useEditorStore.getState().bumpVersion();
@@ -286,9 +402,7 @@ export default function MapViewport() {
   }
 
   function getActiveLevel(): S4Level | null {
-    const state = useProjectStore.getState();
-    const act = getCurrentAct(state);
-    return act ? { sections: act.sections } : null;
+    return getStoreActiveLevel(useProjectStore.getState());
   }
 
   function getSectionByIndex(idx: number): Section | null {
@@ -299,6 +413,9 @@ export default function MapViewport() {
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     const tool = useEditorStore.getState().tool;
+
+    // Right-click opens the context menu; never paint/drag from it.
+    if (e.button === 2) return;
 
     if (tool === 'view' || e.button === 1) {
       isDragging.current = true;
@@ -474,22 +591,6 @@ export default function MapViewport() {
       }
 
       if (entries.length > 0) {
-        // Ensure section renderer has the full zone art atlas for chunk tile indices
-        const chunkTiles = liveProject?.chunkTiles ?? [];
-        if (chunkTiles.length > 0 && !section.tiles) {
-          section.tiles = chunkTiles;
-          const pState = useProjectStore.getState();
-          const zone = getCurrentZone(pState);
-          if (zone) {
-            sectionRenderer.loadSection(
-              info.sectionIndex,
-              section.tileGrid,
-              section.tiles,
-              zone.palette.lines,
-            );
-          }
-        }
-
         executeCommand({
           type: 'set-tiles',
           description: `Stamp chunk ${selectedChunkId} at (${baseCol}, ${baseRow})`,
@@ -746,6 +847,95 @@ export default function MapViewport() {
     }
   }, [setZoom]);
 
+  // ---------- right-click context menu (Art mode entry points) ----------
+
+  const handleContextMenu = useCallback((e: React.MouseEvent) => {
+    e.preventDefault(); // always suppress the browser menu over the map
+    if (useEditorStore.getState().editingLayer === 'bg') { setCtxMenu(null); return; }
+    const world = screenToWorld(e.clientX, e.clientY);
+    const info = worldToSectionTile(world.x, world.y);
+    const container = containerRef.current;
+    if (!info || !container) { setCtxMenu(null); return; }
+    const rect = container.getBoundingClientRect();
+    setCtxMenu({
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top,
+      sectionIndex: info.sectionIndex,
+      col: info.col,
+      row: info.row,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Close the context menu on click-away or Escape.
+  useEffect(() => {
+    if (!ctxMenu) return;
+    const onDown = () => setCtxMenu(null);
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setCtxMenu(null); };
+    window.addEventListener('mousedown', onDown);
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('mousedown', onDown);
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [ctxMenu]);
+
+  /** Open the 8×8 tile under the cursor as a live-tile document in Art mode. */
+  const handleEditTile = useCallback((m: CtxMenuState) => {
+    setCtxMenu(null);
+    const section = getSectionByIndex(m.sectionIndex);
+    if (!section) return;
+    const word = section.tileGrid.nametable[m.row * SECTION_TILES_WIDE + m.col];
+    const tileIndex = unpackNametableWord(word).tileIndex;
+    if (!openDocumentGuarded({
+      doc: docFromTile(tileIndex),
+      liveTileIndex: tileIndex,
+      chunkId: null,
+      name: `tile #${tileIndex}`,
+      dirty: false,
+    })) return;
+    useEditorStore.getState().setAppMode('art');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  /**
+   * Open the block-aligned 128×128 (16×16-tile) region under the cursor as a
+   * NEW unsaved chunk document (a copy — saving never writes back to the map).
+   */
+  const handleEditBlock = useCallback((m: CtxMenuState) => {
+    setCtxMenu(null);
+    const section = getSectionByIndex(m.sectionIndex);
+    if (!section) return;
+    const bx = Math.floor(m.col / 16);
+    const by = Math.floor(m.row / 16);
+    const doc = createDoc(16, 16);
+    for (let r = 0; r < 16; r++) {
+      for (let c = 0; c < 16; c++) {
+        const idx = (by * 16 + r) * SECTION_TILES_WIDE + (bx * 16 + c);
+        const word = section.tileGrid.nametable[idx];
+        const cell = doc.cells[r * 16 + c];
+        if (word !== 0) {
+          const entry = unpackNametableWord(word);
+          cell.atlasTile = entry.tileIndex;
+          cell.pal = entry.palette;
+          cell.hf = entry.hFlip;
+          cell.vf = entry.vFlip;
+          cell.pri = entry.priority;
+        }
+        cell.coll = section.tileGrid.collision[idx];
+      }
+    }
+    if (!openDocumentGuarded({
+      doc,
+      liveTileIndex: null,
+      chunkId: null,
+      name: `block (${bx},${by})`,
+      dirty: true, // copied off the map and not yet in the library
+    })) return;
+    useEditorStore.getState().setAppMode('art');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const tool = useEditorStore((s) => s.tool);
   const cursor = tool === 'view' ? 'grab'
     : tool === 'select' ? 'default'
@@ -778,9 +968,24 @@ export default function MapViewport() {
         if (hoverBarRef.current) hoverBarRef.current.style.display = 'none';
       }}
       onWheel={handleWheel}
+      onContextMenu={handleContextMenu}
     >
-      <canvas ref={canvasRef} style={styles.canvas} />
+      <canvas id="map-canvas" ref={canvasRef} style={styles.canvas} />
       <div ref={hoverBarRef} style={{ ...styles.hoverBar, display: 'none' }} />
+      {ctxMenu && (
+        <div
+          style={{ ...styles.ctxMenu, left: ctxMenu.x, top: ctxMenu.y }}
+          onMouseDown={(e) => e.stopPropagation()}
+          onContextMenu={(e) => e.preventDefault()}
+        >
+          <button style={styles.ctxItem} onClick={() => handleEditTile(ctxMenu)}>
+            Edit tile in Art mode
+          </button>
+          <button style={styles.ctxItem} onClick={() => handleEditBlock(ctxMenu)}>
+            Edit 128×128 chunk region
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -805,5 +1010,18 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 11, fontFamily: 'monospace', color: '#a6adc8',
     gap: 6, alignItems: 'center',
     pointerEvents: 'none',
+  },
+  ctxMenu: {
+    position: 'absolute', zIndex: 20,
+    display: 'flex', flexDirection: 'column',
+    minWidth: 190, padding: 4,
+    background: '#181825', border: '1px solid #45475a', borderRadius: 6,
+    boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
+  },
+  ctxItem: {
+    padding: '6px 10px', textAlign: 'left' as const,
+    background: 'transparent', color: '#cdd6f4',
+    border: 'none', borderRadius: 4,
+    cursor: 'pointer', fontSize: 12,
   },
 };

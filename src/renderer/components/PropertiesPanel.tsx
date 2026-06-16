@@ -1,7 +1,7 @@
 import React from 'react';
-import { useProjectStore, getCurrentAct, getCurrentZone } from '../state/projectStore';
+import { useProjectStore, getCurrentAct, getCurrentZone, getActiveLevel } from '../state/projectStore';
 import { useViewStore } from '../state/viewStore';
-import { useEditorStore } from '../state/editorStore';
+import { useEditorStore, executeCommand } from '../state/editorStore';
 
 export default function PropertiesPanel() {
   const project = useProjectStore((s) => s.project);
@@ -81,6 +81,31 @@ export default function PropertiesPanel() {
             <>
               <Property label="Objects" value={String(section.objects.length)} />
               <Property label="Rings" value={String(section.rings.length)} />
+              <div style={styles.property}>
+                <span style={styles.propLabel}>Background</span>
+                <select
+                  style={styles.select}
+                  value={section.bgLayoutRef ?? ''}
+                  onChange={(e) => {
+                    const newRef = e.target.value === '' ? null : e.target.value;
+                    if (newRef === section.bgLayoutRef) return;
+                    const level = getActiveLevel(useProjectStore.getState());
+                    if (!level) return;
+                    executeCommand({
+                      type: 'set-section-bg',
+                      description: `Section ${activeSectionIndex} background`,
+                      sectionIndex: activeSectionIndex,
+                      oldRef: section.bgLayoutRef,
+                      newRef,
+                    }, level);
+                  }}
+                >
+                  <option value="">Act default</option>
+                  {project.bgLibrary.map((b) => (
+                    <option key={b.id} value={b.id}>{b.name}</option>
+                  ))}
+                </select>
+              </div>
             </>
           )}
           {!section && <Property label="Status" value="(empty)" />}
@@ -142,5 +167,10 @@ const styles: Record<string, React.CSSProperties> = {
   },
   propValue: {
     color: '#cdd6f4', fontFamily: 'monospace', fontSize: 11,
+  },
+  select: {
+    maxWidth: 120, fontSize: 11,
+    background: '#313244', color: '#cdd6f4',
+    border: '1px solid #45475a', borderRadius: 2,
   },
 };
