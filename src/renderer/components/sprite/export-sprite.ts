@@ -39,14 +39,14 @@ export async function exportSprite(name: string): Promise<void> {
   const project = useProjectStore.getState().project;
   if (!project) { toast('No project open', 'error'); return; }
 
-  const { frames, steps } = useSpriteStore.getState();
+  const { frames, steps, originX, originY } = useSpriteStore.getState();
   const palette = useArtStore.getState().paletteLine;
 
   if (steps.length === 0) { toast('Add at least one animation step before exporting', 'error'); return; }
 
   const rawFrames: RawFrame[] = frames.map((b, i) => ({
     id: `f${i}`, pixels: b.data, width: b.width, height: b.height,
-    originX: b.width / 2, originY: b.height / 2, palette, priority: false,
+    originX, originY, palette, priority: false,
   }));
   const anim: PerFrameAnimation = {
     name: 'Loop',
@@ -107,7 +107,7 @@ export async function loadSpriteByName(name: string): Promise<void> {
       .filter((s) => s.frame < frames.length)
       .map((s) => ({ frameIndex: s.frame, duration: s.duration }));
 
-    useSpriteStore.getState().loadSprite(frames, steps);
+    useSpriteStore.getState().loadSprite(frames, steps, recon.originX, recon.originY);
     toast(`Loaded "${name}": ${frames.length} frames${steps.length ? `, ${steps.length} anim steps` : ''}`, 'success');
   } catch (e) {
     toast(`Load failed for "${name}": ${e instanceof Error ? e.message : String(e)}`, 'error');
@@ -132,7 +132,7 @@ export async function loadEngineCharacter(name: string): Promise<void> {
     const art = new Uint8Array(await window.api.readBinaryFile(base, `art/uncompressed/characters/${name}.bin`));
     const recon = reconstructDPLCSprite(map, dplc, art);
     const frames = recon.frames.map((data) => ({ width: recon.width, height: recon.height, data }));
-    useSpriteStore.getState().loadSprite(frames, []);
+    useSpriteStore.getState().loadSprite(frames, [], recon.originX, recon.originY);
     // Load the character's own palette as a display override so it looks right.
     try {
       const palBytes = new Uint8Array(await window.api.readBinaryFile(base, `art/palettes/${name}.bin`));

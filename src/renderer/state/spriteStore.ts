@@ -25,6 +25,10 @@ interface SpriteState {
   frames: PixelBuffer[];   // each frame's 4bpp indices
   currentIndex: number;
   showPieces: boolean;     // overlay auto-decomposition piece outlines
+  /** Object origin within the frame canvas (px). Preserved across load→export so
+   *  non-centered sprites round-trip without shifting piece offsets. */
+  originX: number;
+  originY: number;
 
   setTool: (t: SpriteTool) => void;
   setZoom: (z: number) => void;
@@ -44,7 +48,7 @@ interface SpriteState {
   setPlaybackMode: (m: PlaybackMode) => void;
 
   // Load (replace the whole working sprite)
-  loadSprite: (frames: PixelBuffer[], steps: AnimStepUI[]) => void;
+  loadSprite: (frames: PixelBuffer[], steps: AnimStepUI[], originX: number, originY: number) => void;
 
   /** Display-only palette (e.g. a loaded character's own colors). Null = use the zone palette line. */
   paletteOverride: Color[] | null;
@@ -69,6 +73,8 @@ export const useSpriteStore = create<SpriteState>((set) => ({
   frames: [blankFrame()],
   currentIndex: 0,
   showPieces: false,
+  originX: DEFAULT_FRAME_SIZE / 2,
+  originY: DEFAULT_FRAME_SIZE / 2,
 
   setTool: (tool) => set({ tool }),
   setZoom: (zoom) => set({ zoom: Math.min(24, Math.max(2, zoom)) }),
@@ -76,9 +82,15 @@ export const useSpriteStore = create<SpriteState>((set) => ({
   setBuffer: (b) => set((s) => {
     const frames = s.frames.slice();
     frames[s.currentIndex] = b;
-    return { frames };
+    // Editing reverts display to the project palette (export uses the active line,
+    // not a loaded character's display override) — keep WYSIWYG honest.
+    return s.paletteOverride ? { frames, paletteOverride: null } : { frames };
   }),
-  addFrame: () => set((s) => ({ frames: [...s.frames, blankFrame()], currentIndex: s.frames.length })),
+  // New frame matches the current canvas size (loaded sprites may not be 32x32).
+  addFrame: () => set((s) => {
+    const cur = s.frames[s.currentIndex];
+    return { frames: [...s.frames, createBuffer(cur.width, cur.height)], currentIndex: s.frames.length };
+  }),
   duplicateFrame: () => set((s) => {
     const frames = [...s.frames, cloneFrame(s.frames[s.currentIndex])];
     return { frames, currentIndex: frames.length - 1 };
@@ -104,10 +116,12 @@ export const useSpriteStore = create<SpriteState>((set) => ({
   })),
   setPlaybackMode: (playbackMode) => set({ playbackMode }),
 
-  loadSprite: (frames, steps) => set({
+  loadSprite: (frames, steps, originX, originY) => set({
     frames: frames.length ? frames : [blankFrame()],
     steps,
     currentIndex: 0,
+    originX,
+    originY,
     paletteOverride: null,
   }),
 

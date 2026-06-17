@@ -53,16 +53,24 @@ export default function SpriteMode() {
   useArtStore((s) => s.paletteVersion);
   const [spriteName, setSpriteName] = useState('NewSprite');
   const [available, setAvailable] = useState<string[]>([]);
+  const [busy, setBusy] = useState(false);
 
   // Refresh the list of saved sprites when entering sprite mode.
   useEffect(() => { listSprites().then(setAvailable).catch(() => setAvailable([])); }, []);
 
   async function handleLoad() {
-    await loadSpriteByName(spriteName);
+    if (busy) return;
+    setBusy(true);
+    try { await loadSpriteByName(spriteName); } finally { setBusy(false); }
   }
+  // Serialize export (the index.json read-modify-write isn't transactional).
   async function handleExport() {
-    await exportSprite(spriteName);
-    listSprites().then(setAvailable).catch(() => {});
+    if (busy) return;
+    setBusy(true);
+    try {
+      await exportSprite(spriteName);
+      await listSprites().then(setAvailable).catch(() => {});
+    } finally { setBusy(false); }
   }
 
   const override = useSpriteStore((s) => s.paletteOverride);
@@ -143,8 +151,8 @@ export default function SpriteMode() {
               </select>
             )}
             <div style={styles.btnRow}>
-              <button style={styles.exportBtn} onClick={handleExport}>Export</button>
-              <button style={styles.loadBtn} onClick={handleLoad}>Load</button>
+              <button style={{ ...styles.exportBtn, ...(busy ? styles.btnDisabled : {}) }} onClick={handleExport} disabled={busy}>Export</button>
+              <button style={{ ...styles.loadBtn, ...(busy ? styles.btnDisabled : {}) }} onClick={handleLoad} disabled={busy}>Load</button>
             </div>
             <div style={styles.hint}>Export writes mappings / art / anims + manifest to data/sprites/{spriteName || '<name>'}/. Load reconstructs editable frames + timeline from there.</div>
             <div style={styles.inspectorTitle}>Load engine character</div>
@@ -212,6 +220,7 @@ const styles: Record<string, React.CSSProperties> = {
   btnRow: { display: 'flex', gap: 6 },
   exportBtn: { flex: 1, padding: '5px 10px', background: '#89b4fa', color: '#1e1e2e', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 12, fontWeight: 600 },
   loadBtn: { flex: 1, padding: '5px 10px', background: '#313244', color: '#cdd6f4', border: '1px solid #45475a', borderRadius: 4, cursor: 'pointer', fontSize: 12, fontWeight: 600 },
+  btnDisabled: { opacity: 0.5, cursor: 'default' },
   inspectorTitle: { fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5, color: '#9399b2', marginBottom: 8 },
   stat: { display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#cdd6f4', padding: '2px 0' },
   hint: { fontSize: 11, color: '#6c7086', marginTop: 8, lineHeight: 1.4 },

@@ -47,6 +47,23 @@ describe('reconstructSpriteFrames', () => {
     const recon = reconstructSpriteFrames(new Uint8Array(0), new Uint8Array(0));
     expect(recon.frames.length).toBeGreaterThanOrEqual(1);
   });
+
+  it('preserves origin so a NON-centered sprite survives load→re-export (regression: C1)', () => {
+    // Content only in the left columns of a 24x16 canvas → object origin is NOT the canvas center.
+    const pixels = paint((set) => { set(0, 0, 1); set(0, 1, 2); }, 24, 16);
+    const ox = 12, oy = 8;
+    const { tiles, pieces } = decomposeFrame({ id: 'f', pixels, width: 24, height: 16, originX: ox, originY: oy, palette: 0, priority: false });
+    const bytes1 = serializeSpriteMappings([{ id: 'f', pieces }]);
+
+    const recon = reconstructSpriteFrames(bytes1, serializeTiles(tiles));
+    // Re-export each reconstructed frame using the RECONSTRUCTED origin (what the store now stores).
+    const reDecomp = decomposeFrame({
+      id: 'f', pixels: recon.frames[0], width: recon.width, height: recon.height,
+      originX: recon.originX, originY: recon.originY, palette: 0, priority: false,
+    });
+    const bytes2 = serializeSpriteMappings([{ id: 'f', pieces: reDecomp.pieces }]);
+    expect(bytes2).toEqual(bytes1); // identical mappings → no spatial drift
+  });
 });
 
 function piece(p: Partial<SpritePiece>): SpritePiece {

@@ -33,6 +33,17 @@ describe('renderFrameToIndices', () => {
     expect(Array.from(back)).toEqual(Array.from(pixels));
   });
 
+  it('applies xFlip+yFlip cell remapping on a 2x2 piece', () => {
+    // tiles 0..3 are uniform fills 1..4. Column-major cells: (0,0)=t0,(0,1)=t1,(1,0)=t2,(1,1)=t3.
+    const tiles = [1, 2, 3, 4].map((v) => ({ pixels: new Uint8Array(64).fill(v) }));
+    const frame = { id: 'x', pieces: [{ xOffset: 0, yOffset: 0, widthCells: 2, heightCells: 2, tile: 0, palette: 0, priority: false, xFlip: true, yFlip: true }] };
+    const back = renderFrameToIndices(frame, tiles, 16, 16, 0, 0);
+    // output cell (0,0) ← source cell (1,1) = tile 3 (fill 4)
+    expect(back[0]).toBe(4);
+    // output cell (1,1) bottom-right pixel ← source cell (0,0) = tile 0 (fill 1)
+    expect(back[15 * 16 + 15]).toBe(1);
+  });
+
   it('applies xFlip when reconstructing a multi-cell piece', () => {
     // 2x1 piece (16x8): left tile=1, right tile=2. With xFlip the cells swap and
     // each tile mirrors — so the left half should show tile 2's mirror, etc.
