@@ -101,23 +101,27 @@ parameterized by a **version** (`SonicMappingsVer`/`SonicDplcVer`); each game ta
 specific version. Verified against `s2disasm/mappings/MapMacros.asm` (and cross-checked with
 our `sprite-mappings.ts`):
 
-| Format | frame-count hdr | piece | piece fields | DPLC entry hdr | art |
-|---|---|---|---|---|---|
-| **S1** (Ver 1) | **byte** | **5 B** | y.b, size.b, tile-attr (2 B), x.b | byte count + 2-B entries | Nemesis |
-| **S2** (Ver 2) | word | **8 B** | y/size.w, attr.w, **2P-dup tile.w**, x.w | word count + 2-B entries | Nemesis |
-| **S3K** (custom) | word | **6 B** | **bit layout NOT in macros — needs RE** | word count + 2-B entries (encoding **TBD**) | Nemesis |
-| **S4** (ours) | word + 6-B bbox hdr | 8 B | VDP-order (existing) | existing S4 DPLC | uncompressed |
+Verified against the OrionNavattan/Hivebrain MapMacros gist + `s2disasm` macros (verbatim
+`dc.w`/`dc.b` definitions):
 
-Common bits: size byte = `((w-1)&3)<<2 | (h-1)&3`; tile word = `pri<<15 | pal<<13 | yflip<<12
-| xflip<<11 | tile`. DPLC entry (S1/S2) = `((tiles-1)&0xF)<<12 | (offset&0xFFF)` (2 bytes).
-Note: our existing `sprite-mappings.ts` documents the **6-byte (Ver 0/1-style)** S2 piece,
-which is NOT the Ver-2 layout s2disasm uses — the s2 adapter must target **Ver 2 (8-byte)**.
+| Format | piece-count hdr | piece | piece fields | DPLC count hdr | DPLC entry (2 B) | art |
+|---|---|---|---|---|---|---|
+| **S1** (fmt 1) | **byte** | **5 B** | `ypos+dims.w, tile.w, xpos.b` | byte | `(count-1)<<12 \| offset` | Nemesis |
+| **S2** (fmt 2) | word | **8 B** | `ypos+dims.w, tile.w, 2P-tile.w, xpos.w` | word | `(count-1)<<12 \| offset` | Nemesis |
+| **S3K** (fmt 3) | word | **6 B** | `ypos+dims.w, tile.w, xpos.w` (S2 minus 2P word) | word | `offset<<4 \| (count-1)` ⚠ **reversed** | Nemesis |
+| **S4** (ours) | word + 6-B bbox hdr | 8 B | VDP-order (existing) | word | existing | uncompressed |
 
-**S3K is the highest-risk adapter:** skdisasm has no macro defining the S3K piece/DPLC bit
-layout (only raw data + separate 2P tables). Its plan phase MUST begin with a focused
-reverse-engineering step (skdisasm engine read code / cross-ref SonMapEd or an emulator)
-before any code. **S3K 2P art** is stored as entirely separate mapping/DPLC tables (not a
-mirror flag) — v1 loads the primary tables and ignores/notes the 2P duplicate.
+Common to S1/S2/S3K: `ypos+dims.w` = `(ypos<<8) \| (w-1)<<2 \| (h-1)`; **tile word** =
+`pri<<15 \| pal<<13 \| yflip<<12 \| xflip<<11 \| tile` (identical across all three).
+- **S2 2P-tile word** = `(tile>>1)+attrs` — a 2-player-mode duplicate; the s2 adapter
+  **ignores it on read** and **emits it on write** (derive from the 1P tile).
+- **S3K DPLC quirk** — entry packing is **reversed** vs S1/S2: `count=(entry&0xF)+1`,
+  `offset=entry>>4`. This is the one S3K detail to confirm against real `skdisasm` DPLC data
+  in the adapter's tests (low residual risk — well-documented, just bit-order-sensitive).
+- Our existing `sprite-mappings.ts` documents an **older 6-byte S2 (fmt 0/1-style)** piece —
+  NOT the fmt-2 (8-byte) layout; the s2 adapter targets **fmt 2**.
+- **S3K 2P art** is stored as entirely separate mapping/DPLC tables (not a mirror flag) — v1
+  loads the primary tables and ignores/notes the 2P duplicate.
 
 ## 5. Import flow
 
@@ -153,14 +157,14 @@ mirror flag) — v1 loads the primary tables and ignores/notes the 2P duplicate.
 1. **Compression module** — Nemesis decode+encode, Kosinski encode; tests vs real data. (no game coupling)
 2. **Adapter interface + `s4` adapter** — refactor existing S4 code behind the interface (no behavior change; tests stay green).
 3. **`s2` adapter** — read+write S2 mappings/DPLC (most-ready; parser scaffold exists). End-to-end test on a real `s2disasm` sprite.
-4. **`s1` adapter** — read+write S1 (Ver 1, 5-byte pieces, byte counts). Layout verified.
-5. **`s3k` adapter** — **starts with a reverse-engineering task** to pin the S3K piece/DPLC
-   bit layout (undocumented in skdisasm; see §10), then read+write. May slip to a follow-up
-   if RE is hard — S1/S2/S4 round-trip is the committed v1; S3K is best-effort.
+4. **`s1` adapter** — read+write S1 (fmt 1: 5-byte pieces, byte counts). Layout verified.
+5. **`s3k` adapter** — read+write S3K (fmt 3: 6-byte pieces; **reversed DPLC nibble order**).
+   Layout verified from the MapMacros gist; tests confirm the DPLC bit order against real
+   `skdisasm` data. 2P duplicate tables noted, not loaded in v1.
 6. **UI wiring** — format dropdowns + manifest `sourceFormat`.
 
-Phases 1–4 are fully grounded in verified formats; phase 5 (S3K) carries the only real
-unknown and is sequenced last so it can't block the rest.
+All five phases are grounded in verified formats. The only residual detail (S3K DPLC bit
+order) is pinned by a round-trip test against real S3K data, so nothing blocks the others.
 
 Each phase is independently testable; phases 1–2 land with zero user-visible change (pure
 refactor + new module), de-risking the rest.
@@ -183,11 +187,12 @@ refactor + new module), de-risking the rest.
   the 6-byte layout in our current `sprite-mappings.ts`.
 - S3K 2P art = separate tables (not a mirror flag); v1 loads primary, notes the duplicate.
 
+**Resolved by web research (OrionNavattan/Hivebrain MapMacros gist):** S3K mapping (fmt 3,
+6-byte pieces) AND DPLC (reversed nibble: `offset<<4 | (count-1)`) are now documented in §4 —
+no binary RE needed. Only the S3K DPLC bit-order is confirmed by a round-trip test vs real
+`skdisasm` data during implementation.
+
 **Still open (resolve in planning):**
-- **S3K piece + DPLC bit layout** — genuinely undocumented in skdisasm macros. The S3K
-  adapter's plan phase starts with a reverse-engineering task (skdisasm engine read code /
-  SonMapEd cross-ref / emulator). Until then, the S3K piece/DPLC byte fields in §4 are TBD.
-  *Risk:* if RE proves hard, S3K may slip to its own follow-up while S1/S2/S4 ship.
 - Kosinski **encoder** parity — verify our port matches `clownlzss`/`accurate-kosinski`
   output (decode∘encode identity + structural diff) before relying on it for art saving.
 - Where multi-game art files live in a project vs ad-hoc open (lean: ad-hoc folder/file
