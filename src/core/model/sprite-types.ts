@@ -26,5 +26,10 @@ export interface SpriteFrame {
  * bits 3-2 = WIDTH-1, bits 1-0 = HEIGHT-1. (s4_engine macros.asm `sprSize`.)
  */
 export function sizeCode(widthCells: number, heightCells: number): number {
+  for (const [name, v] of [['widthCells', widthCells], ['heightCells', heightCells]] as const) {
+    if (!Number.isInteger(v) || v < 1 || v > 4) {
+      throw new Error(`sizeCode: ${name}=${v} out of range [1,4]`);
+    }
+  }
   return (((widthCells - 1) & 3) << 2) | ((heightCells - 1) & 3);
 }

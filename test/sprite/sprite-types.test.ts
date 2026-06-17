@@ -13,3 +13,10 @@ describe('sizeCode', () => {
     expect(sizeCode(3, 2)).toBe(0x09);
   });
 });
+
+describe('sizeCode validation', () => {
+  it('throws on out-of-range cell counts', () => {
+    expect(() => sizeCode(0, 1)).toThrow(/widthCells=0 out of range/);
+    expect(() => sizeCode(1, 5)).toThrow(/heightCells=5 out of range/);
+  });
+});

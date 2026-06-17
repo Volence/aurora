@@ -42,10 +42,19 @@ function tileAttrs(p: SpritePiece): number {
   ) & 0xffff;
 }
 
+function validatePiece(p: SpritePiece): void {
+  if (!Number.isInteger(p.tile) || p.tile < 0 || p.tile > 0x7ff) {
+    throw new Error(`sprite piece tile=${p.tile} out of range [0,0x7FF] (must be relative to art base, not absolute VRAM)`);
+  }
+  if (!Number.isInteger(p.palette) || p.palette < 0 || p.palette > 3) {
+    throw new Error(`sprite piece palette=${p.palette} out of range [0,3]`);
+  }
+}
+
 function serializeFrameBlock(frame: SpriteFrame): Uint8Array {
   const bbox = computeFrameBbox(frame.pieces);
   const out = new Uint8Array(6 + frame.pieces.length * 8);
-  const dv = new DataView(out.buffer);
+  const dv = new DataView(out.buffer, out.byteOffset, out.byteLength);
   dv.setInt8(0, bbox.xMin);
   dv.setInt8(1, bbox.xMax);
   dv.setInt8(2, bbox.yMin);
@@ -53,6 +62,7 @@ function serializeFrameBlock(frame: SpriteFrame): Uint8Array {
   dv.setUint16(4, frame.pieces.length, false);
   let o = 6;
   for (const p of frame.pieces) {
+    validatePiece(p);
     dv.setInt16(o, p.yOffset, false); o += 2;
     out[o++] = sizeCode(p.widthCells, p.heightCells);
     out[o++] = 0; // VDP link byte placeholder (engine fills at runtime)
@@ -71,7 +81,7 @@ export function serializeSpriteMappings(frames: SpriteFrame[]): Uint8Array {
   const blocks = frames.map(serializeFrameBlock);
   const total = tableSize + blocks.reduce((s, b) => s + b.length, 0);
   const out = new Uint8Array(total);
-  const dv = new DataView(out.buffer);
+  const dv = new DataView(out.buffer, out.byteOffset, out.byteLength);
   let off = tableSize;
   frames.forEach((_, i) => {
     dv.setUint16(i * 2, off, false);

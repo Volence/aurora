@@ -86,3 +86,20 @@ describe('serializeSpriteMappings (structural invariants)', () => {
     expect(dv.getUint16(off1 + 4, false)).toBe(1);
   });
 });
+
+describe('serializeSpriteMappings (range validation)', () => {
+  it('throws on tile index beyond 0x7FF (e.g. an absolute VRAM index)', () => {
+    expect(() => serializeSpriteMappings([{ id: 'x', pieces: [piece({ tile: 0x800 })] }]))
+      .toThrow(/tile=2048 out of range/);
+  });
+  it('throws on palette beyond 3', () => {
+    expect(() => serializeSpriteMappings([{ id: 'x', pieces: [piece({ palette: 4 })] }]))
+      .toThrow(/palette=4 out of range/);
+  });
+  it('throws on cell dimensions outside 1..4', () => {
+    expect(() => serializeSpriteMappings([{ id: 'x', pieces: [piece({ widthCells: 5 })] }]))
+      .toThrow(/widthCells=5 out of range/);
+    expect(() => serializeSpriteMappings([{ id: 'x', pieces: [piece({ heightCells: 0 })] }]))
+      .toThrow(/heightCells=0 out of range/);
+  });
+});
