@@ -37,23 +37,35 @@ editor; menu-art mode; live emulator hot-reload; importing existing engine binar
 All formats verified against `s4_engine` source (see vision doc research + the format
 deep-dive). The editor's internal sprite model is format-agnostic; export writes these.
 
-### 2.1 Mappings (S4-optimized binary, VDP order)
-Per `tools/convert_s2_mappings.py`, `data/mappings/*.bin`, consumed via `SST_mappings` ($10).
+### 2.1 Mappings (S4 VDP-order format)
+**Authoritative sources (read before implementing):** `engine/objects/sprites.asm`
+(`Render_Sprites`/`Draw_Sprite` — the runtime consumer), `data/mappings/test_mappings.asm`
+(worked example), `tools/convert_s2_mappings.py` (`_compute_bbox` — bbox/flip rules),
+`constants.asm` (`FRAME_BBOX_*`, `FRAME_PIECE_COUNT=4`, `FRAME_PIECES=6`), `macros.asm`
+(`sprSize`), `docs/ENGINE_ARCHITECTURE.md` §7.8. Consumed via `SST_mappings` ($10).
+**Sonic 2's mapping format is SOURCE-ONLY** — converted offline by `convert_s2_mappings.py`,
+never in ROM. The editor's working/save format is this VDP-order format (or a logical
+authoring format that compiles to it — see §8), NOT the S2 format.
 ```
 Offset table:   dc.w Frame0-MapStart, Frame1-MapStart, …     (frame_count words)
-Per frame:
-  +0 dc.b x_min, x_max, y_min, y_max   ; signed bbox extents, FLIP-INVARIANT (union of
-                                       ;   flipped+unflipped — conservative, always correct)
+Per frame (6-byte header + pieces):
+  +0 dc.b x_min, x_max, y_min, y_max   ; signed bbox; FAR EDGES (x_max = x_off+width_px).
+                                       ;   Flip-invariant via SYMMETRIZATION (see below).
   +4 dc.w piece_count
-  per piece (8 bytes):
-    +0 dc.w y_offset                   ; signed
-    +2 dc.b size_code                  ; bits3-2 = width-1 (0-3), bits1-0 = height-1 (0-3)
-    +3 dc.b 0                          ; pad
+  per piece (8 bytes, VDP sprite-table order):
+    +0 dc.w y_offset                   ; signed, relative to object origin
+    +2 dc.b size_code                  ; = sprSize(w,h)>>8 = ((h-1)<<2)|(w-1):
+                                       ;   bits 3-2 = HEIGHT-1, bits 1-0 = WIDTH-1 (cells 1-4)
+    +3 dc.b 0                          ; VDP sprite-LINK byte placeholder (engine fills @ runtime)
     +4 dc.w tile_attrs                 ; (pri<<15)|(pal<<13)|(vflip<<12)|(hflip<<11)|tile
-    +6 dc.w x_offset                   ; signed
+                                       ;   tile index is RELATIVE to art_tile base, NOT absolute VRAM
+    +6 dc.w x_offset                   ; signed, relative to object origin
 ```
-Frame indices valid `0x00–0xF6`; `0xF7–0xFF` are animation control codes (must reject frame
-ids ≥ `0xF7`).
+**Bbox rule (`_compute_bbox`):** raw extents = union of piece far-edge rectangles, then
+symmetrized: `x_min,x_max = min(x_min,-x_max), max(x_max,-x_min)` (same for y) — one box
+valid for all 4 flip states (exact for symmetric frames, conservative otherwise). **Hard-fail
+if any extent falls outside signed-byte [-128,127].**
+Frame indices valid `0x00–0xF6`; `0xF7–0xFF` are animation control codes (reject frame ids ≥ `0xF7`).
 
 ### 2.2 Animation scripts (`.asm`, `data/animations/`)
 Consumed by `engine/objects/animate.asm` via `SST_anim_table` ($1A); object selects an anim
@@ -178,8 +190,14 @@ current marker box otherwise. No change to object placement/commands.
 
 ## 8. Export
 
-New `src/core/export/sprite-export.ts`, hooked into `exportAct()`:
-- `generateMappingsBin(spriteDef)` → S4 mappings binary (§2.1).
+**Architecture: authoring + convert** (chosen over direct-emit, per the engine handoff —
+tile offsets and DPLC indices are assigned downstream of authoring). The editor's working
+model is the **logical `SpriteDef`** (§4: frames as bitmaps + pieces with logical tile refs).
+A converter — `src/core/export/sprite-export.ts`, a TS mirror of `convert_s2_mappings.py` —
+emits the runtime artifacts. Hooked into `exportAct()`:
+- `generateMappingsBin(spriteDef)` → S4 VDP-order mappings (§2.1): computes the symmetrized
+  bbox (hard-fail on signed-byte overflow), `size_code` via `((h-1)<<2)|(w-1)`, link byte 0,
+  **tile indices relative to the art base**, pieces in VDP order.
 - `generateAnimationsAsm(spriteDef)` → `.asm` matching `data/animations/` (§2.2), event tags
   inline.
 - `generateArtBin(spriteDef)` → uncompressed tile blob for the object's VRAM region.
