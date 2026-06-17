@@ -68,3 +68,21 @@ describe('serializeSpriteMappings (vs test_mappings.asm)', () => {
     expect(hex(out.subarray(12, 14))).toBe('d8 01');
   });
 });
+
+describe('serializeSpriteMappings (structural invariants)', () => {
+  it('offset table entries point at valid frame starts and total length is exact', () => {
+    const frames: SpriteFrame[] = [
+      { id: 'a', pieces: [piece({ widthCells: 2, heightCells: 2 }), piece({ xOffset: 16, widthCells: 1, heightCells: 1 })] },
+      { id: 'b', pieces: [piece({ widthCells: 1, heightCells: 1 })] },
+    ];
+    const out = serializeSpriteMappings(frames);
+    const dv = new DataView(out.buffer, out.byteOffset, out.byteLength);
+    const off0 = dv.getUint16(0, false);
+    const off1 = dv.getUint16(2, false);
+    expect(off0).toBe(4);
+    expect(off1).toBe(4 + (6 + 2 * 8));
+    expect(out.length).toBe(off1 + (6 + 1 * 8));
+    expect(dv.getUint16(off0 + 4, false)).toBe(2);
+    expect(dv.getUint16(off1 + 4, false)).toBe(1);
+  });
+});
