@@ -5,6 +5,7 @@ import { useSpriteStore } from '../../state/spriteStore';
 import type { SpriteTool } from '../../state/spriteStore';
 import SpriteCanvas from './SpriteCanvas';
 import type { OverlayRect } from './SpriteCanvas';
+import Timeline from './Timeline';
 import PaletteEditor from '../art/PaletteEditor';
 import { decomposeFrame } from '../../../core/art/sprite-decompose';
 import type { PixelBuffer } from '../../../core/art/pixel-ops';
@@ -130,6 +131,8 @@ export default function SpriteMode() {
           <button style={styles.frameOp} title="Delete current frame" onClick={() => useSpriteStore.getState().deleteFrame()}>Delete</button>
         </div>
       </div>
+
+      <Timeline />
     </div>
   );
 }

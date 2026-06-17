@@ -4,6 +4,14 @@ import { createBuffer } from '../../core/art/pixel-ops';
 
 export type SpriteTool = 'pencil' | 'fill' | 'eraser';
 
+export type PlaybackMode = 'forward' | 'reverse' | 'pingpong';
+
+/** One animation step: a reference to a frame + how long it holds (in 1/60s ticks). */
+export interface AnimStepUI {
+  frameIndex: number;
+  duration: number; // 1/60s ticks
+}
+
 /**
  * Sprite-mode editing state (chunk 2: multiple frames + decomposition overlay).
  * Paint color + palette line are SHARED with Art mode via artStore (so the
@@ -25,7 +33,17 @@ interface SpriteState {
   duplicateFrame: () => void;
   deleteFrame: () => void;
   selectFrame: (i: number) => void;
+
+  // Animation (chunk 3)
+  steps: AnimStepUI[];
+  playbackMode: PlaybackMode;
+  addStep: (frameIndex: number) => void;
+  removeStep: (i: number) => void;
+  setStepDuration: (i: number, duration: number) => void;
+  setPlaybackMode: (m: PlaybackMode) => void;
 }
+
+const DEFAULT_STEP_DURATION = 6;
 
 export const DEFAULT_FRAME_SIZE = 32;
 
@@ -59,8 +77,32 @@ export const useSpriteStore = create<SpriteState>((set) => ({
   }),
   deleteFrame: () => set((s) => {
     if (s.frames.length <= 1) return s; // keep at least one frame
-    const frames = s.frames.filter((_, i) => i !== s.currentIndex);
-    return { frames, currentIndex: Math.min(s.currentIndex, frames.length - 1) };
+    const removed = s.currentIndex;
+    const frames = s.frames.filter((_, i) => i !== removed);
+    // Drop steps referencing the removed frame; shift higher references down.
+    const steps = s.steps
+      .filter((st) => st.frameIndex !== removed)
+      .map((st) => (st.frameIndex > removed ? { ...st, frameIndex: st.frameIndex - 1 } : st));
+    return { frames, steps, currentIndex: Math.min(removed, frames.length - 1) };
   }),
   selectFrame: (i) => set((s) => ({ currentIndex: Math.min(Math.max(0, i), s.frames.length - 1) })),
+
+  steps: [],
+  playbackMode: 'forward',
+  addStep: (frameIndex) => set((s) => ({ steps: [...s.steps, { frameIndex, duration: DEFAULT_STEP_DURATION }] })),
+  removeStep: (i) => set((s) => ({ steps: s.steps.filter((_, idx) => idx !== i) })),
+  setStepDuration: (i, duration) => set((s) => ({
+    steps: s.steps.map((st, idx) => (idx === i ? { ...st, duration: Math.min(0x7f, Math.max(1, Math.round(duration) || 1)) } : st)),
+  })),
+  setPlaybackMode: (playbackMode) => set({ playbackMode }),
 }));
+
+/** Build the frame-index play order for a playback mode (one full cycle). */
+export function buildPlayOrder(stepCount: number, mode: PlaybackMode): number[] {
+  if (stepCount <= 1) return stepCount === 1 ? [0] : [];
+  const fwd = Array.from({ length: stepCount }, (_, i) => i);
+  if (mode === 'forward') return fwd;
+  if (mode === 'reverse') return fwd.slice().reverse();
+  // pingpong: 0..n-1, then n-2..1 (endpoints not repeated)
+  return fwd.concat(fwd.slice(1, -1).reverse());
+}
