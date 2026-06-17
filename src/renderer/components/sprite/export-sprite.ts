@@ -5,7 +5,9 @@ import type { AnimStepUI } from '../../state/spriteStore';
 import { useToastStore } from '../../state/toastStore';
 import { buildSpriteExport } from '../../../core/export/sprite-export';
 import type { SpriteManifest } from '../../../core/export/sprite-export';
-import { reconstructSpriteFrames, reconstructDPLCSprite } from '../../../core/import/sprite-import';
+import { reconstructDPLCSprite, reconstructWithAdapter } from '../../../core/import/sprite-import';
+import { getAdapter } from '../../../core/formats/games';
+import type { SpriteFormatId } from '../../../core/formats/sprite-format-adapter';
 import { parsePaletteLine } from '../../../core/formats/palette';
 import { parseCharacterAnims } from '../../../core/import/anim-import';
 
@@ -43,7 +45,7 @@ export async function exportSprite(name: string): Promise<void> {
   const project = useProjectStore.getState().project;
   if (!project) { toast('No project open', 'error'); return; }
 
-  const { frames, steps, originX, originY, exportDplc } = useSpriteStore.getState();
+  const { frames, steps, originX, originY, exportDplc, format } = useSpriteStore.getState();
   const palette = useArtStore.getState().paletteLine;
 
   if (steps.length === 0) { toast('Add at least one animation step before exporting', 'error'); return; }
@@ -59,7 +61,7 @@ export async function exportSprite(name: string): Promise<void> {
   };
 
   try {
-    const out = buildSpriteExport(name, rawFrames, anim, { dplc: exportDplc });
+    const out = buildSpriteExport(name, rawFrames, anim, { dplc: exportDplc, targetFormat: format });
     const base = project.basePath;
     const dir = `data/sprites/${name}`;
     const enc = new TextEncoder();
@@ -75,7 +77,7 @@ export async function exportSprite(name: string): Promise<void> {
     index.sprites = [...index.sprites.filter((s) => s.name !== name), entry].sort((a, b) => a.name.localeCompare(b.name));
     await window.api.writeBinaryFile(base, INDEX_PATH, toArrayBuffer(enc.encode(JSON.stringify(index, null, 2))));
 
-    toast(`Exported "${name}": ${out.manifest.frameCount} frames, ${out.manifest.tileCount} tiles → ${dir}/`, 'success');
+    toast(`Exported "${name}" as ${format.toUpperCase()}: ${out.manifest.frameCount} frames, ${out.manifest.tileCount} tiles → ${dir}/`, 'success');
   } catch (e) {
     toast(`Export failed: ${e instanceof Error ? e.message : String(e)}`, 'error');
   }
@@ -93,10 +95,13 @@ function sanitizeName(s: string): string {
 
 /**
  * Import a sprite from an arbitrary folder anywhere on disk (not necessarily in the
- * project) via a directory picker. Expects mappings.bin + art.bin (+ optional
- * dplc.bin, sprite.json). DPLC-aware. Lets you bring in external sprites.
+ * project) via a directory picker, interpreting the files as a chosen game format.
+ * Expects mappings.bin + art.bin (+ optional dplc.bin, sprite.json). The art is
+ * decompressed per the format (Nemesis for s1/s2/s3k; raw for s4). The opened
+ * format becomes the working/export target, so you can re-save in any other format
+ * (cross-game porting). DPLC-aware.
  */
-export async function openSpriteFolder(): Promise<void> {
+export async function openSpriteFolder(sourceFormat: SpriteFormatId = 's4'): Promise<void> {
   const toast = useToastStore.getState().addToast;
   const dir = await window.api.selectDirectory();
   if (!dir) return;
@@ -106,8 +111,10 @@ export async function openSpriteFolder(): Promise<void> {
     if (!map || !art) { toast('Folder must contain mappings.bin and art.bin', 'error'); return; }
     const dplcBytes = await tryRead(dir, 'dplc.bin');
     const manifest = await readJson<SpriteManifest>(dir, 'sprite.json');
+    // A sprite.json sourceFormat overrides the dropdown (re-open keeps its format).
+    const fmt = manifest?.sourceFormat ?? sourceFormat;
 
-    const recon = dplcBytes ? reconstructDPLCSprite(map, dplcBytes, art) : reconstructSpriteFrames(map, art);
+    const recon = reconstructWithAdapter(getAdapter(fmt), map, art, dplcBytes ?? undefined);
     const frames = recon.frames.map((data) => ({ width: recon.width, height: recon.height, data }));
     const steps: AnimStepUI[] = (manifest?.animSteps ?? [])
       .filter((s) => s.frame < frames.length)
@@ -117,7 +124,8 @@ export async function openSpriteFolder(): Promise<void> {
     useSpriteStore.getState().loadSprite(frames, steps, recon.originX, recon.originY);
     useSpriteStore.getState().setName(name);
     useSpriteStore.getState().setExportDplc(!!dplcBytes);
-    toast(`Imported "${name}": ${frames.length} frames${dplcBytes ? ' (DPLC)' : ''}`, 'success');
+    useSpriteStore.getState().setFormat(fmt);
+    toast(`Imported "${name}" as ${fmt.toUpperCase()}: ${frames.length} frames${dplcBytes ? ' (DPLC)' : ''}`, 'success');
   } catch (e) {
     toast(`Import failed: ${e instanceof Error ? e.message : String(e)}`, 'error');
   }
@@ -146,10 +154,12 @@ export async function loadSpriteByName(name: string): Promise<void> {
   try {
     const mappings = new Uint8Array(await window.api.readBinaryFile(base, `${dir}/mappings.bin`));
     const art = new Uint8Array(await window.api.readBinaryFile(base, `${dir}/art.bin`));
-    const recon = reconstructSpriteFrames(mappings, art);
+    const manifest = await readJson<SpriteManifest>(base, `${dir}/sprite.json`);
+    const fmt: SpriteFormatId = manifest?.sourceFormat ?? 's4';
+    const dplcBytes = manifest?.dplc ? await tryRead(base, `${dir}/dplc.bin`) : null;
+    const recon = reconstructWithAdapter(getAdapter(fmt), mappings, art, dplcBytes ?? undefined);
     const frames = recon.frames.map((data) => ({ width: recon.width, height: recon.height, data }));
 
-    const manifest = await readJson<SpriteManifest>(base, `${dir}/sprite.json`);
     const steps: AnimStepUI[] = (manifest?.animSteps ?? [])
       .filter((s) => s.frame < frames.length)
       .map((s) => ({ frameIndex: s.frame, duration: s.duration }));
@@ -157,7 +167,8 @@ export async function loadSpriteByName(name: string): Promise<void> {
     useSpriteStore.getState().loadSprite(frames, steps, recon.originX, recon.originY);
     useSpriteStore.getState().setName(name);
     useSpriteStore.getState().setExportDplc(!!manifest?.dplc); // default export mode to how it was saved
-    toast(`Loaded "${name}": ${frames.length} frames${steps.length ? `, ${steps.length} anim steps` : ''}`, 'success');
+    useSpriteStore.getState().setFormat(fmt);
+    toast(`Loaded "${name}" (${fmt.toUpperCase()}): ${frames.length} frames${steps.length ? `, ${steps.length} anim steps` : ''}`, 'success');
   } catch (e) {
     toast(`Load failed for "${name}": ${e instanceof Error ? e.message : String(e)}`, 'error');
   }

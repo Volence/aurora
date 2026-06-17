@@ -10,8 +10,16 @@ import Timeline from './Timeline';
 import { exportSprite, loadSpriteByName, listSprites, loadEngineCharacter, openSpriteFolder } from './export-sprite';
 import PaletteEditor from '../art/PaletteEditor';
 import { decomposeFrame } from '../../../core/art/sprite-decompose';
+import type { SpriteFormatId } from '../../../core/formats/sprite-format-adapter';
 
 const SIZE_PRESETS = [16, 24, 32, 48, 64];
+
+const FORMATS: { id: SpriteFormatId; label: string }[] = [
+  { id: 's4', label: 'S4 (our engine)' },
+  { id: 's1', label: 'Sonic 1' },
+  { id: 's2', label: 'Sonic 2' },
+  { id: 's3k', label: 'Sonic 3&K / S.C.E.' },
+];
 
 export default function SpriteMode() {
   const project = useProjectStore((s) => s.project);
@@ -25,6 +33,8 @@ export default function SpriteMode() {
   const spriteName = useSpriteStore((s) => s.name);
   const setSpriteName = (n: string) => useSpriteStore.getState().setName(n);
   const exportDplc = useSpriteStore((s) => s.exportDplc);
+  const format = useSpriteStore((s) => s.format);
+  const [openAs, setOpenAs] = useState<SpriteFormatId>('s2');
   const [available, setAvailable] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [newSize, setNewSize] = useState(32);
@@ -116,11 +126,24 @@ export default function SpriteMode() {
               <input type="checkbox" checked={exportDplc} onChange={(e) => useSpriteStore.getState().setExportDplc(e.target.checked)} />
               DPLC (streamed art)
             </label>
+            <label style={styles.fmtRow} title="Game format the sprite is saved in (re-save in another format to port it).">
+              <span style={styles.dim}>Save as</span>
+              <select style={styles.fmtSelect} value={format}
+                onChange={(e) => useSpriteStore.getState().setFormat(e.target.value as SpriteFormatId)}>
+                {FORMATS.map((f) => <option key={f.id} value={f.id}>{f.label}</option>)}
+              </select>
+            </label>
             <div style={styles.btnRow}>
               <button style={{ ...styles.primary, ...(busy ? styles.disabled : {}) }} disabled={busy} onClick={handleExport}>Export</button>
               <button style={{ ...styles.secondary, ...(busy ? styles.disabled : {}) }} disabled={busy} onClick={handleLoad}>Load</button>
             </div>
-            <button style={styles.secondary} title="Import a sprite folder from anywhere on disk (mappings.bin + art.bin [+ dplc.bin])" onClick={openSpriteFolder}>Open folder…</button>
+            <label style={styles.fmtRow} title="Interpret the opened files as this game's format. The opened format becomes the Save-as target, so you can convert by saving in another format.">
+              <span style={styles.dim}>Open as</span>
+              <select style={styles.fmtSelect} value={openAs} onChange={(e) => setOpenAs(e.target.value as SpriteFormatId)}>
+                {FORMATS.map((f) => <option key={f.id} value={f.id}>{f.label}</option>)}
+              </select>
+            </label>
+            <button style={styles.secondary} title="Import a sprite folder from anywhere on disk (mappings.bin + art.bin [+ dplc.bin]), read as the chosen format" onClick={() => openSpriteFolder(openAs)}>Open folder…</button>
             <div style={styles.sectionTitle}>Load engine character</div>
             <div style={styles.btnRow}>
               {['sonic', 'tails', 'knuckles'].map((c) => (
@@ -157,6 +180,8 @@ const styles: Record<string, React.CSSProperties> = {
   stat: { display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#cdd6f4' },
   nameInput: { background: '#313244', color: '#cdd6f4', border: '1px solid #45475a', borderRadius: 4, fontSize: 12, padding: '4px 6px' },
   btnRow: { display: 'flex', gap: 6 },
+  fmtRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 },
+  fmtSelect: { flex: 1, background: '#313244', color: '#cdd6f4', border: '1px solid #45475a', borderRadius: 4, fontSize: 12, padding: '4px 6px' },
   primary: { flex: 1, padding: '5px 8px', background: '#89b4fa', color: '#1e1e2e', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 12, fontWeight: 600 },
   secondary: { flex: 1, padding: '5px 8px', background: '#313244', color: '#cdd6f4', border: '1px solid #45475a', borderRadius: 4, cursor: 'pointer', fontSize: 12 },
   disabled: { opacity: 0.5, cursor: 'default' },

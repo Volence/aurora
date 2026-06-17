@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import type { PixelBuffer, MirrorMode, DitherPattern } from '../../core/art/pixel-ops';
 import { createBuffer, flipH, flipV, rotate90 } from '../../core/art/pixel-ops';
 import type { Color } from '../../core/model/s4-types';
+import type { SpriteFormatId } from '../../core/formats/sprite-format-adapter';
 
 export type SpriteTool =
   | 'pencil' | 'eraser' | 'fill' | 'eyedropper' | 'line' | 'rect' | 'select' | 'dither';
@@ -46,6 +47,8 @@ interface SpriteState {
   setName: (name: string) => void;
   exportDplc: boolean;         // export as DPLC (streamed art) vs flat resident art
   setExportDplc: (v: boolean) => void;
+  format: SpriteFormatId;      // game format to interpret on open / write on export
+  setFormat: (f: SpriteFormatId) => void;
 
   setTool: (t: SpriteTool) => void;
   setZoom: (z: number) => void;
@@ -112,9 +115,11 @@ export const useSpriteStore = create<SpriteState>((set) => ({
   selection: null,
   name: 'NewSprite',
   exportDplc: false,
+  format: 's4',
 
   setName: (name) => set({ name }),
   setExportDplc: (exportDplc) => set({ exportDplc }),
+  setFormat: (format) => set({ format }),
   setTool: (tool) => set((s) => ({ tool, selection: tool === 'select' ? s.selection : null })),
   setZoom: (zoom) => set({ zoom: Math.min(48, Math.max(1, Math.round(zoom))) }),
   setShowPieces: (showPieces) => set({ showPieces }),
@@ -186,6 +191,7 @@ export const useSpriteStore = create<SpriteState>((set) => ({
     selection: null,
     name: 'NewSprite',
     exportDplc: false,
+    format: 's4',
   }),
 
   loadSprite: (frames, steps, originX, originY) => set({
