@@ -1,9 +1,15 @@
 import { create } from 'zustand';
-import type { PixelBuffer } from '../../core/art/pixel-ops';
-import { createBuffer } from '../../core/art/pixel-ops';
+import type { PixelBuffer, MirrorMode, DitherPattern } from '../../core/art/pixel-ops';
+import { createBuffer, flipH, flipV, rotate90 } from '../../core/art/pixel-ops';
 import type { Color } from '../../core/model/s4-types';
 
-export type SpriteTool = 'pencil' | 'fill' | 'eraser';
+export type SpriteTool =
+  | 'pencil' | 'eraser' | 'fill' | 'eyedropper' | 'line' | 'rect' | 'select' | 'dither';
+
+export type SpriteTransform = 'flip-h' | 'flip-v' | 'rotate-90';
+
+/** A rectangular marquee selection in sprite-pixel coords. */
+export interface SpriteSelection { x: number; y: number; w: number; h: number; }
 
 export type PlaybackMode = 'forward' | 'reverse' | 'pingpong';
 
@@ -30,9 +36,21 @@ interface SpriteState {
   originX: number;
   originY: number;
 
+  // Brush/craft state (matches Art mode's tool model)
+  mirror: MirrorMode | null;
+  pixelPerfect: boolean;
+  ditherPattern: DitherPattern;
+  ditherSecondary: number;     // 0-15 (0 = transparent)
+  selection: SpriteSelection | null;
+
   setTool: (t: SpriteTool) => void;
   setZoom: (z: number) => void;
   setShowPieces: (v: boolean) => void;
+  setMirror: (m: MirrorMode | null) => void;
+  setPixelPerfect: (v: boolean) => void;
+  setDither: (pattern: DitherPattern, secondary: number) => void;
+  setSelection: (s: SpriteSelection | null) => void;
+  applyTransform: (t: SpriteTransform) => void;
   setBuffer: (b: PixelBuffer) => void;   // replace the current frame
   addFrame: () => void;
   duplicateFrame: () => void;
@@ -54,6 +72,8 @@ interface SpriteState {
 
   // Load (replace the whole working sprite)
   loadSprite: (frames: PixelBuffer[], steps: AnimStepUI[], originX: number, originY: number) => void;
+  /** Start a fresh single-frame sprite of the given pixel dimensions. */
+  newSprite: (w: number, h: number) => void;
 
   /** Display-only palette (e.g. a loaded character's own colors). Null = use the zone palette line. */
   paletteOverride: Color[] | null;
@@ -81,9 +101,31 @@ export const useSpriteStore = create<SpriteState>((set) => ({
   originX: DEFAULT_FRAME_SIZE / 2,
   originY: DEFAULT_FRAME_SIZE / 2,
 
-  setTool: (tool) => set({ tool }),
-  setZoom: (zoom) => set({ zoom: Math.min(24, Math.max(2, zoom)) }),
+  mirror: null,
+  pixelPerfect: true,
+  ditherPattern: 'checker',
+  ditherSecondary: 0,
+  selection: null,
+
+  setTool: (tool) => set((s) => ({ tool, selection: tool === 'select' ? s.selection : null })),
+  setZoom: (zoom) => set({ zoom: Math.min(48, Math.max(1, Math.round(zoom))) }),
   setShowPieces: (showPieces) => set({ showPieces }),
+  setMirror: (mirror) => set({ mirror }),
+  setPixelPerfect: (pixelPerfect) => set({ pixelPerfect }),
+  setDither: (ditherPattern, ditherSecondary) => set({ ditherPattern, ditherSecondary }),
+  setSelection: (selection) => set({ selection }),
+  applyTransform: (t) => set((s) => {
+    const cur = s.frames[s.currentIndex];
+    const buf: PixelBuffer = { width: cur.width, height: cur.height, data: cur.data };
+    let next: PixelBuffer;
+    if (t === 'flip-h') next = flipH(buf);
+    else if (t === 'flip-v') next = flipV(buf);
+    else if (t === 'rotate-90') { if (cur.width !== cur.height) return s; next = rotate90(buf); }
+    else return s;
+    const frames = s.frames.slice();
+    frames[s.currentIndex] = next;
+    return { frames };
+  }),
   setBuffer: (b) => set((s) => {
     const frames = s.frames.slice();
     frames[s.currentIndex] = b;
@@ -124,6 +166,17 @@ export const useSpriteStore = create<SpriteState>((set) => ({
 
   characterAnims: [],
   setCharacterAnims: (characterAnims) => set({ characterAnims }),
+
+  newSprite: (w, h) => set({
+    frames: [createBuffer(Math.max(8, w | 0), Math.max(8, h | 0))],
+    currentIndex: 0,
+    steps: [],
+    originX: Math.floor(Math.max(8, w | 0) / 2),
+    originY: Math.floor(Math.max(8, h | 0) / 2),
+    paletteOverride: null,
+    characterAnims: [],
+    selection: null,
+  }),
 
   loadSprite: (frames, steps, originX, originY) => set({
     frames: frames.length ? frames : [blankFrame()],
