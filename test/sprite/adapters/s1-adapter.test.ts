@@ -3,39 +3,42 @@ import { readFileSync } from 'fs';
 import { s1Adapter } from '../../../src/core/formats/games/s1';
 
 const fx = (n: string) => new Uint8Array(readFileSync(new URL(`../../fixtures/mappings/${n}`, import.meta.url)));
-const map = fx('s1_obj0B_map.bin');
-const dplc = fx('s1_obj08_dplc.bin');
 
-describe('s1 adapter — vs real assembled Ver 1 fixture', () => {
-  const frames = s1Adapter.readMappings(map);
+describe('s1 adapter — vs REAL s1disasm mapping data (Ball Hog)', () => {
+  const frames = s1Adapter.readMappings(fx('s1_ballhog_map.bin'));
 
-  it('recovers all 5 frames with a byte piece-count header', () => {
-    expect(frames).toHaveLength(5);
+  it('recovers all 6 frames with a byte piece-count header', () => {
+    expect(frames).toHaveLength(6);
     expect(frames[0].pieces).toHaveLength(2);
   });
 
   it('reads 5-byte piece fields (ypos.b/size.b/tile.w/xpos.b)', () => {
+    // .hog_Stand: spritePiece -$C,-$11,3,2,0  and  -$C,-1,3,3,6
     expect(frames[0].pieces[0]).toEqual({
-      xOffset: -16, yOffset: -16, widthCells: 4, heightCells: 1,
+      xOffset: -12, yOffset: -17, widthCells: 3, heightCells: 2,
       tile: 0, palette: 0, priority: false, xFlip: false, yFlip: false,
     });
-    expect(frames[0].pieces[1]).toMatchObject({ tile: 0x24, widthCells: 4, heightCells: 3, yOffset: -8, xOffset: -16 });
+    expect(frames[0].pieces[1]).toMatchObject({ xOffset: -12, yOffset: -1, widthCells: 3, heightCells: 3, tile: 6 });
+    // .hog_Open differs only in the second piece's tile ($F).
+    expect(frames[1].pieces[1]).toMatchObject({ tile: 0xf });
   });
 
   it('writeMappings reproduces the real fixture byte-for-byte (incl. even pad)', () => {
-    expect(Array.from(s1Adapter.writeMappings(frames))).toEqual(Array.from(map));
+    expect(Array.from(s1Adapter.writeMappings(frames))).toEqual(Array.from(fx('s1_ballhog_map.bin')));
   });
 });
 
-describe('s1 adapter — DPLC (byte count, standard packing)', () => {
-  const perFrame = s1Adapter.readDPLC!(dplc);
+describe('s1 adapter — vs REAL s1disasm DPLC data (Sonic Dynamic Gfx Script)', () => {
+  const perFrame = s1Adapter.readDPLC!(fx('s1_sonicdplc.bin'));
 
-  it('reads expanded source-tile lists', () => {
+  it('recovers 88 frames; Null is empty, Stand loads tiles 0..16', () => {
+    expect(perFrame).toHaveLength(88);
     expect(perFrame[0]).toEqual([]);
-    expect(perFrame[1]).toEqual([0, 1, 2, 3, 4, 5, 6, 7]);
+    // SonPLC_Stand: dplcEntry 3,0 / 8,3 / 3,$B / 3,$E  ->  consecutive 0..16
+    expect(perFrame[1]).toEqual(Array.from({ length: 17 }, (_, i) => i));
   });
 
-  it('round-trips semantically', () => {
+  it('round-trips real S1 DPLC semantically', () => {
     expect(s1Adapter.readDPLC!(s1Adapter.writeDPLC!(perFrame))).toEqual(perFrame);
   });
 });

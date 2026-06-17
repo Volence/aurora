@@ -98,8 +98,11 @@ Clean Engine (S.C.E.). Format ↔ codebase mapping and the ground-truth status o
 | `s2` | s2disasm (local) | Ver 2 (8-B pieces, 2P word) | ✅ assembled fixtures (read field-level + byte-exact write) |
 | `s3k` | skdisasm (local) | Ver 3 (6-B pieces; reversed DPLC) | ✅ assembled fixtures + **real skdisasm DPLC** |
 | `s3k` | **S.C.E.** (local) | Ver 3 — same as skdisasm | ✅ **real S.C.E. mapping** round-trips byte-exact |
-| `s1` | s1disasm (**not local**) | Ver 1 (5-B pieces, byte count) | ⚠ fixture currently synthesized (real S2 piece-set assembled as Ver 1); **needs real s1disasm data** |
+| `s1` | s1disasm (local) | Ver 1 (5-B pieces, byte count) | ✅ **real s1disasm Ball Hog mapping + Sonic DynPLC** (read field-level + byte-exact write) |
 | `s4` | s4_engine (our project) | native VDP-order | ✅ existing sprite-mode tests |
+
+All four Sonic Retro sources are present locally (`s1disasm`, `s2disasm`, `skdisasm`)
+plus S.C.E., and every format is now validated against real sprite data from them.
 
 **S.C.E. = `s3k` format.** Its sprite mappings are the Ver-3 6-byte layout; its
 `DPLCEntry` macro is a *static art-DMA* declaration (`dc.l dmaSource,mappings`), not
