@@ -31,3 +31,52 @@ export function computeFrameBbox(pieces: SpritePiece[]): FrameBbox {
   }
   return { xMin: sxMin, xMax: sxMax, yMin: syMin, yMax: syMax };
 }
+
+function tileAttrs(p: SpritePiece): number {
+  return (
+    ((p.priority ? 1 : 0) << 15) |
+    ((p.palette & 3) << 13) |
+    ((p.yFlip ? 1 : 0) << 12) |
+    ((p.xFlip ? 1 : 0) << 11) |
+    (p.tile & 0x7ff)
+  ) & 0xffff;
+}
+
+function serializeFrameBlock(frame: SpriteFrame): Uint8Array {
+  const bbox = computeFrameBbox(frame.pieces);
+  const out = new Uint8Array(6 + frame.pieces.length * 8);
+  const dv = new DataView(out.buffer);
+  dv.setInt8(0, bbox.xMin);
+  dv.setInt8(1, bbox.xMax);
+  dv.setInt8(2, bbox.yMin);
+  dv.setInt8(3, bbox.yMax);
+  dv.setUint16(4, frame.pieces.length, false);
+  let o = 6;
+  for (const p of frame.pieces) {
+    dv.setInt16(o, p.yOffset, false); o += 2;
+    out[o++] = sizeCode(p.widthCells, p.heightCells);
+    out[o++] = 0; // VDP link byte placeholder (engine fills at runtime)
+    dv.setUint16(o, tileAttrs(p), false); o += 2;
+    dv.setInt16(o, p.xOffset, false); o += 2;
+  }
+  return out;
+}
+
+/**
+ * Serialize frames to the S4 VDP-order mappings binary:
+ * word offset table (one per frame, offset from table start) + frame blocks.
+ */
+export function serializeSpriteMappings(frames: SpriteFrame[]): Uint8Array {
+  const tableSize = frames.length * 2;
+  const blocks = frames.map(serializeFrameBlock);
+  const total = tableSize + blocks.reduce((s, b) => s + b.length, 0);
+  const out = new Uint8Array(total);
+  const dv = new DataView(out.buffer);
+  let off = tableSize;
+  frames.forEach((_, i) => {
+    dv.setUint16(i * 2, off, false);
+    out.set(blocks[i], off);
+    off += blocks[i].length;
+  });
+  return out;
+}
