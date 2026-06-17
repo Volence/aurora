@@ -98,3 +98,35 @@ describe('decomposeFrame', () => {
     expect(pieces[0]).toMatchObject({ palette: 2, priority: true, xFlip: false, yFlip: false });
   });
 });
+
+import { assembleSprite } from '../../src/core/art/sprite-decompose';
+import { serializeSpriteMappings } from '../../src/core/export/sprite-mappings-export';
+import { serializeTiles } from '../../src/core/export/tile-dedup';
+
+describe('assembleSprite', () => {
+  it('concatenates per-frame art and rebases piece tile indices', () => {
+    // frame A: one filled tile (color 1). frame B: one filled tile (color 2).
+    const a = new Uint8Array(8 * 8).fill(1);
+    const b = new Uint8Array(8 * 8).fill(2);
+    const { art, frames } = assembleSprite([
+      { id: 'a', pixels: a, width: 8, height: 8, originX: 0, originY: 0, palette: 0, priority: false },
+      { id: 'b', pixels: b, width: 8, height: 8, originX: 0, originY: 0, palette: 0, priority: false },
+    ]);
+    expect(art).toHaveLength(2);             // one tile per frame, not deduped across frames
+    expect(frames[0].pieces[0].tile).toBe(0); // frame A base 0
+    expect(frames[1].pieces[0].tile).toBe(1); // frame B rebased to 1
+  });
+
+  it('produces frames that serialize and art that serializes (integration with Plan 1)', () => {
+    const px = new Uint8Array(16 * 16).fill(5);
+    const { art, frames } = assembleSprite([
+      { id: 'f0', pixels: px, width: 16, height: 16, originX: 8, originY: 8, palette: 0, priority: false },
+    ]);
+    const mapBytes = serializeSpriteMappings(frames);
+    const artBytes = serializeTiles(art);
+    expect(mapBytes.length).toBeGreaterThan(0);
+    expect(artBytes.length).toBe(art.length * 32); // 32 bytes per 8x8 4bpp tile
+    // single 2x2 piece → frame block = 6-byte header + 8-byte piece; table = 2 bytes
+    expect(mapBytes.length).toBe(2 + 6 + 8);
+  });
+});

@@ -113,3 +113,23 @@ export function decomposeFrame(frame: RawFrame): { tiles: Tile[]; pieces: Sprite
   }
   return { tiles, pieces };
 }
+
+import type { SpriteFrame } from '../model/sprite-types';
+
+/**
+ * Decompose every frame and lay the sprite's art out contiguously (v1: per-frame
+ * blocks, no cross-frame dedup — fine for non-DPLC objects where all art is resident).
+ * Piece tile indices are rebased to the sprite's art pool. Returns the art pool (feed
+ * to serializeTiles) and the SpriteFrame[] (feed to serializeSpriteMappings).
+ */
+export function assembleSprite(raws: RawFrame[]): { art: Tile[]; frames: SpriteFrame[] } {
+  const art: Tile[] = [];
+  const frames: SpriteFrame[] = [];
+  for (const rawFrame of raws) {
+    const { tiles, pieces } = decomposeFrame(rawFrame);
+    const base = art.length;
+    for (const t of tiles) art.push(t);
+    frames.push({ id: rawFrame.id, pieces: pieces.map((p) => ({ ...p, tile: p.tile + base })) });
+  }
+  return { art, frames };
+}
