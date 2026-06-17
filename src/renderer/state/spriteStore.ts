@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { PixelBuffer } from '../../core/art/pixel-ops';
 import { createBuffer } from '../../core/art/pixel-ops';
+import type { Color } from '../../core/model/s4-types';
 
 export type SpriteTool = 'pencil' | 'fill' | 'eraser';
 
@@ -44,6 +45,10 @@ interface SpriteState {
 
   // Load (replace the whole working sprite)
   loadSprite: (frames: PixelBuffer[], steps: AnimStepUI[]) => void;
+
+  /** Display-only palette (e.g. a loaded character's own colors). Null = use the zone palette line. */
+  paletteOverride: Color[] | null;
+  setPaletteOverride: (colors: Color[] | null) => void;
 }
 
 const DEFAULT_STEP_DURATION = 6;
@@ -103,7 +108,11 @@ export const useSpriteStore = create<SpriteState>((set) => ({
     frames: frames.length ? frames : [blankFrame()],
     steps,
     currentIndex: 0,
+    paletteOverride: null,
   }),
+
+  paletteOverride: null,
+  setPaletteOverride: (paletteOverride) => set({ paletteOverride }),
 }));
 
 /** Build the frame-index play order for a playback mode (one full cycle). */

@@ -65,9 +65,10 @@ export default function SpriteMode() {
     listSprites().then(setAvailable).catch(() => {});
   }
 
+  const override = useSpriteStore((s) => s.paletteOverride);
   const buffer = frames[currentIndex];
   const zone = getCurrentZone(useProjectStore.getState());
-  const colors = zone?.palette.lines[paletteLine]?.colors ?? [];
+  const colors = override ?? zone?.palette.lines[paletteLine]?.colors ?? [];
 
   // Live auto-decomposition of the current frame (Plan 2).
   const decomp = useMemo(() => {

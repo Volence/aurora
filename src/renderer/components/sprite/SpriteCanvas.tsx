@@ -23,9 +23,10 @@ export default function SpriteCanvas({ overlayRects }: { overlayRects?: OverlayR
   const paletteLine = useArtStore((s) => s.paletteLine);
   // Re-render when palette colors change.
   useArtStore((s) => s.paletteVersion);
+  const override = useSpriteStore((s) => s.paletteOverride);
 
   const zone = getCurrentZone(useProjectStore.getState());
-  const colors = zone?.palette.lines[paletteLine]?.colors ?? [];
+  const colors = override ?? zone?.palette.lines[paletteLine]?.colors ?? [];
 
   const drawingRef = useRef(false);
   const lastRef = useRef<{ x: number; y: number } | null>(null);

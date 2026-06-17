@@ -6,6 +6,7 @@ import { useToastStore } from '../../state/toastStore';
 import { buildSpriteExport } from '../../../core/export/sprite-export';
 import type { SpriteManifest } from '../../../core/export/sprite-export';
 import { reconstructSpriteFrames, reconstructDPLCSprite } from '../../../core/import/sprite-import';
+import { parsePaletteLine } from '../../../core/formats/palette';
 import type { RawFrame } from '../../../core/art/sprite-decompose';
 import type { PerFrameAnimation } from '../../../core/export/sprite-anim-export';
 
@@ -132,7 +133,12 @@ export async function loadEngineCharacter(name: string): Promise<void> {
     const recon = reconstructDPLCSprite(map, dplc, art);
     const frames = recon.frames.map((data) => ({ width: recon.width, height: recon.height, data }));
     useSpriteStore.getState().loadSprite(frames, []);
-    toast(`Loaded ${name}: ${frames.length} frames (${recon.width}×${recon.height}). Colors use the active palette line.`, 'success');
+    // Load the character's own palette as a display override so it looks right.
+    try {
+      const palBytes = new Uint8Array(await window.api.readBinaryFile(base, `art/palettes/${name}.bin`));
+      useSpriteStore.getState().setPaletteOverride(parsePaletteLine(palBytes, 0, 16).colors);
+    } catch { /* palette optional — fall back to the active palette line */ }
+    toast(`Loaded ${name}: ${frames.length} frames (${recon.width}×${recon.height})`, 'success');
   } catch (e) {
     toast(`Load ${name} failed: ${e instanceof Error ? e.message : String(e)}`, 'error');
   }

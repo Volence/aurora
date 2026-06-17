@@ -42,8 +42,9 @@ export default function Timeline() {
   const playbackMode = useSpriteStore((s) => s.playbackMode);
   const paletteLine = useArtStore((s) => s.paletteLine);
   useArtStore((s) => s.paletteVersion);
+  const override = useSpriteStore((s) => s.paletteOverride);
   const zone = getCurrentZone(useProjectStore.getState());
-  const colors = zone?.palette.lines[paletteLine]?.colors ?? [];
+  const colors = override ?? zone?.palette.lines[paletteLine]?.colors ?? [];
 
   const [playing, setPlaying] = useState(false);
   const posRef = useRef(0);
