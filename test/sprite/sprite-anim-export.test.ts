@@ -49,3 +49,40 @@ describe('generateAnimationAsm — table + base form', () => {
       .toThrow(/duration=\d+ out of range/);
   });
 });
+
+describe('generateAnimationAsm — inline event tags', () => {
+  it('emits a sound event before its frame', () => {
+    const asm = generateAnimationAsm('A', [
+      { name: 'Atk', duration: 3, steps: [{ frame: 1 }, { frame: 2, events: [{ kind: 'sound', soundId: 0x81 }] }], control: { kind: 'loop' } },
+    ]);
+    // events precede the frame they annotate: ... 1, AF_SOUND, 129, 2, AF_END
+    expect(asm).toContain('\t\tdc.b 3, 1, AF_SOUND, 129, 2, AF_END');
+  });
+
+  it('emits collision and set-field events', () => {
+    const asm = generateAnimationAsm('A', [
+      { name: 'X', duration: 1, steps: [{ frame: 0, events: [{ kind: 'collision', collisionType: 5 }, { kind: 'setField', sstOffset: 0x3c, value: 1 }] }], control: { kind: 'loop' } },
+    ]);
+    // both events before frame 0: AF_COLLISION, 5, AF_SET_FIELD, 60, 1, 0, 0
+    expect(asm).toContain('\t\tdc.b 1, AF_COLLISION, 5, AF_SET_FIELD, 60, 1, 0, 0, AF_END');
+  });
+
+  it('emits a callback event as objroutine hi/lo + pad', () => {
+    const asm = generateAnimationAsm('A', [
+      { name: 'C', duration: 1, steps: [{ frame: 0, events: [{ kind: 'callback', routine: 'Obj_Spawn_Dust' }] }], control: { kind: 'loop' } },
+    ]);
+    expect(asm).toContain('AF_CALLBACK, objroutine(Obj_Spawn_Dust)>>8, objroutine(Obj_Spawn_Dust)&$FF, 0');
+  });
+
+  it('rejects an invalid callback routine label', () => {
+    expect(() => generateAnimationAsm('A', [
+      { name: 'C', duration: 1, steps: [{ frame: 0, events: [{ kind: 'callback', routine: '3bad name' }] }], control: { kind: 'loop' } },
+    ])).toThrow(/not a valid label/);
+  });
+
+  it('rejects an out-of-range sound id', () => {
+    expect(() => generateAnimationAsm('A', [
+      { name: 'C', duration: 1, steps: [{ frame: 0, events: [{ kind: 'sound', soundId: 300 }] }], control: { kind: 'loop' } },
+    ])).toThrow(/soundId=300 out of range/);
+  });
+});
