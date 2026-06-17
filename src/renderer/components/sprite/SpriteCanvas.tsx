@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useSpriteStore } from '../../state/spriteStore';
 import { useArtStore } from '../../state/artStore';
 import { useProjectStore, getCurrentZone } from '../../state/projectStore';
-import { floodFill, drawLine, drawRect, ditherValue, mirrorPoints } from '../../../core/art/pixel-ops';
+import { floodFill, drawLine, drawRect, ditherValue, mirrorPoints, isLCorner } from '../../../core/art/pixel-ops';
 import type { PixelBuffer } from '../../../core/art/pixel-ops';
 
 /** A piece outline to overlay, in sprite-pixel coords. */
@@ -160,11 +160,8 @@ export default function SpriteCanvas({ overlayRects }: { overlayRects?: OverlayR
     if (last && last.x === p.x && last.y === p.y) return;
     pts.push(p);
     // pixel-perfect: drop the middle of an L-corner
-    if (pixelPerfect && pts.length >= 3) {
-      const a = pts[pts.length - 3], b = pts[pts.length - 2], c = pts[pts.length - 1];
-      if (Math.abs(c.x - a.x) === 1 && Math.abs(c.y - a.y) === 1 && (b.x === a.x || b.x === c.x) && (b.y === a.y || b.y === c.y)) {
-        pts.splice(pts.length - 2, 1);
-      }
+    if (pixelPerfect && pts.length >= 3 && isLCorner(pts[pts.length - 3], pts[pts.length - 2], pts[pts.length - 1])) {
+      pts.splice(pts.length - 2, 1);
     }
   }
 

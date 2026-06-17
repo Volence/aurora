@@ -118,3 +118,18 @@ describe('mirrorPoints', () => {
     expect(mirrorPoints(8, 7, 4, 3, 'v').length).toBe(1); // center row on odd height: dedup
   });
 });
+
+import { isLCorner } from '../../src/core/art/pixel-ops';
+
+describe('isLCorner (pixel-perfect)', () => {
+  it('flags the middle of an L-corner', () => {
+    expect(isLCorner({ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 1, y: 1 })).toBe(true);
+    expect(isLCorner({ x: 0, y: 0 }, { x: 0, y: 1 }, { x: 1, y: 1 })).toBe(true);
+  });
+  it('does not flag a straight run', () => {
+    expect(isLCorner({ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 2, y: 0 })).toBe(false);
+  });
+  it('does not flag a pure diagonal (no orthogonal middle)', () => {
+    expect(isLCorner({ x: 0, y: 0 }, { x: 1, y: 1 }, { x: 2, y: 2 })).toBe(false);
+  });
+});
