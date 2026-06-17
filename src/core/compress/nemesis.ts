@@ -1,3 +1,7 @@
+export class NemesisError extends Error {
+  constructor(message: string) { super(message); this.name = 'NemesisError'; }
+}
+
 export interface NemesisHeader {
   xorMode: boolean;
   tileCount: number;
@@ -5,7 +9,8 @@ export interface NemesisHeader {
 
 /** Parse the 2-byte big-endian Nemesis header: bit15 = XOR mode, bits14-0 = tile count. */
 export function nemesisHeader(input: Uint8Array): NemesisHeader {
-  const word = ((input[0] ?? 0) << 8) | (input[1] ?? 0);
+  if (input.length < 2) throw new NemesisError('Nemesis input too short for a header');
+  const word = (input[0] << 8) | input[1];
   return { xorMode: (word & 0x8000) !== 0, tileCount: word & 0x7fff };
 }
 
@@ -14,12 +19,13 @@ export function nemesisHeader(input: Uint8Array): NemesisHeader {
  * Faithful port of clownnemesis/decompress.c.
  */
 export function nemesisDecompress(input: Uint8Array): Uint8Array {
-  let pos = 0;
-  const readByte = (): number => (pos < input.length ? input[pos++] : 0);
-
-  const word = (readByte() << 8) | readByte();
-  const xorMode = (word & 0x8000) !== 0;
-  const tileCount = word & 0x7fff;
+  const { xorMode, tileCount } = nemesisHeader(input);
+  let pos = 2; // header consumed
+  // Truncated/corrupt streams must fail loudly, never hang (clownnemesis errors too).
+  const readByte = (): number => {
+    if (pos >= input.length) throw new NemesisError('Unexpected end of Nemesis data');
+    return input[pos++];
+  };
 
   const tValue = new Int16Array(256).fill(-1);
   const tLength = new Uint8Array(256);
