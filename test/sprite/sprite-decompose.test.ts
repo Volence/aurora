@@ -34,3 +34,67 @@ describe('tileIsEmpty', () => {
     expect(tileIsEmpty({ pixels: t })).toBe(false);
   });
 });
+
+import { decomposeFrame } from '../../src/core/art/sprite-decompose';
+import type { RawFrame } from '../../src/core/art/sprite-decompose';
+
+function raw(over: Partial<RawFrame> & { pixels: Uint8Array; width: number; height: number }): RawFrame {
+  return { id: 'f', originX: 0, originY: 0, palette: 0, priority: false, ...over };
+}
+
+describe('decomposeFrame', () => {
+  it('packs a solid 16x16 frame into one 2x2 piece with 4 column-major tiles', () => {
+    // distinct color per tile so we can verify column-major ordering:
+    // grid (gx,gy): (0,0)=1 (1,0)=2 (0,1)=3 (1,1)=4
+    const px = new Uint8Array(16 * 16);
+    const set = (gx: number, gy: number, c: number) => {
+      for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) px[(gy * 8 + y) * 16 + (gx * 8 + x)] = c;
+    };
+    set(0, 0, 1); set(1, 0, 2); set(0, 1, 3); set(1, 1, 4);
+    const { tiles, pieces } = decomposeFrame(raw({ pixels: px, width: 16, height: 16, originX: 8, originY: 8 }));
+    expect(pieces).toHaveLength(1);
+    expect(pieces[0]).toMatchObject({ xOffset: -8, yOffset: -8, widthCells: 2, heightCells: 2, tile: 0, palette: 0 });
+    // VDP column-major: (0,0),(0,1),(1,0),(1,1) → colors 1,3,2,4
+    expect(tiles.map((t) => t.pixels[0])).toEqual([1, 3, 2, 4]);
+  });
+
+  it('splits a 5-wide run into a 4-cell piece and a 1-cell piece (max 4 cells)', () => {
+    const px = new Uint8Array((5 * 8) * 8).fill(1); // 40x8 all filled
+    const { pieces } = decomposeFrame(raw({ pixels: px, width: 40, height: 8 }));
+    expect(pieces).toHaveLength(2);
+    expect(pieces[0]).toMatchObject({ widthCells: 4, heightCells: 1, xOffset: 0 });
+    expect(pieces[1]).toMatchObject({ widthCells: 1, heightCells: 1, xOffset: 32 });
+  });
+
+  it('skips empty tiles (a gap produces two pieces)', () => {
+    // 3 tiles wide, middle empty: [filled][empty][filled]
+    const px = new Uint8Array((3 * 8) * 8);
+    const fill = (gx: number) => { for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) px[y * 24 + (gx * 8 + x)] = 1; };
+    fill(0); fill(2);
+    const { pieces } = decomposeFrame(raw({ pixels: px, width: 24, height: 8 }));
+    expect(pieces.map((p) => p.xOffset).sort((a, b) => a - b)).toEqual([0, 16]);
+    expect(pieces.every((p) => p.widthCells === 1)).toBe(true);
+  });
+
+  it('dedups identical tile blocks, reusing the base tile index', () => {
+    // two identical filled tiles separated by an empty tile → 2 pieces, 1 pooled tile
+    const px = new Uint8Array((3 * 8) * 8);
+    const fill = (gx: number) => { for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) px[y * 24 + (gx * 8 + x)] = 7; };
+    fill(0); fill(2);
+    const { tiles, pieces } = decomposeFrame(raw({ pixels: px, width: 24, height: 8 }));
+    expect(tiles).toHaveLength(1);
+    expect(pieces.every((p) => p.tile === 0)).toBe(true);
+  });
+
+  it('returns no pieces for a fully transparent frame', () => {
+    const { tiles, pieces } = decomposeFrame(raw({ pixels: new Uint8Array(16 * 16), width: 16, height: 16 }));
+    expect(pieces).toHaveLength(0);
+    expect(tiles).toHaveLength(0);
+  });
+
+  it('carries palette and priority onto every piece', () => {
+    const px = new Uint8Array(8 * 8).fill(1);
+    const { pieces } = decomposeFrame(raw({ pixels: px, width: 8, height: 8, palette: 2, priority: true }));
+    expect(pieces[0]).toMatchObject({ palette: 2, priority: true, xFlip: false, yFlip: false });
+  });
+});
