@@ -1,4 +1,5 @@
 import type { Tile } from '../model/s4-types';
+import type { SpritePiece, SpriteFrame } from '../model/sprite-types';
 
 export const CELL = 8; // px per tile cell
 
@@ -20,8 +21,6 @@ export function tileIsEmpty(tile: Tile): boolean {
   return true;
 }
 
-import type { SpritePiece } from '../model/sprite-types';
-
 /**
  * A painted whole-frame bitmap. v1: a single palette line for the whole frame.
  * origin = the object origin within the bitmap (px); piece offsets are computed
@@ -39,8 +38,9 @@ export interface RawFrame {
 }
 
 function blockKey(block: Tile[]): string {
-  // Identity key over the block's pixels in order. Small sprites → cheap.
-  return block.map((t) => String.fromCharCode(...t.pixels)).join('|');
+  let key = '';
+  for (const t of block) { for (let i = 0; i < t.pixels.length; i++) key += String.fromCharCode(t.pixels[i]); key += '|'; }
+  return key;
 }
 
 /**
@@ -51,6 +51,13 @@ function blockKey(block: Tile[]): string {
  * indices are relative to THIS frame's block start (0-based); assembleSprite rebases.
  */
 export function decomposeFrame(frame: RawFrame): { tiles: Tile[]; pieces: SpritePiece[] } {
+  if (!Number.isInteger(frame.width) || !Number.isInteger(frame.height) || frame.width <= 0 || frame.height <= 0) {
+    throw new Error(`RawFrame width/height must be positive integers, got ${frame.width}x${frame.height}`);
+  }
+  if (frame.pixels.length !== frame.width * frame.height) {
+    throw new Error(`RawFrame pixels length ${frame.pixels.length} != width*height (${frame.width}*${frame.height})`);
+  }
+
   const cols = Math.ceil(frame.width / CELL);
   const rows = Math.ceil(frame.height / CELL);
   const grid: Tile[][] = [];
@@ -113,8 +120,6 @@ export function decomposeFrame(frame: RawFrame): { tiles: Tile[]; pieces: Sprite
   }
   return { tiles, pieces };
 }
-
-import type { SpriteFrame } from '../model/sprite-types';
 
 /**
  * Decompose every frame and lay the sprite's art out contiguously (v1: per-frame

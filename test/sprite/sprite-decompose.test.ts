@@ -99,6 +99,56 @@ describe('decomposeFrame', () => {
   });
 });
 
+describe('decomposeFrame validation', () => {
+  it('throws when pixels length does not match width*height', () => {
+    expect(() => decomposeFrame(raw({ pixels: new Uint8Array(10), width: 16, height: 16 })))
+      .toThrow(/pixels length/);
+  });
+  it('throws on non-positive dimensions', () => {
+    expect(() => decomposeFrame(raw({ pixels: new Uint8Array(0), width: 0, height: 0 })))
+      .toThrow(/positive integers/);
+  });
+});
+
+describe('decomposeFrame packer shape coverage', () => {
+  it('packs a full 4x4 region into a single 4x4 piece', () => {
+    // 32x32 all filled
+    const px = new Uint8Array(32 * 32).fill(1);
+    const { pieces } = decomposeFrame(raw({ pixels: px, width: 32, height: 32 }));
+    expect(pieces).toHaveLength(1);
+    expect(pieces[0]).toMatchObject({ widthCells: 4, heightCells: 4 });
+  });
+
+  it('emits only rectangular pieces for an L-shaped region (no overlap, full cover)', () => {
+    // 2 wide x 2 tall grid; bottom-right tile empty (L-shape):
+    // (0,0)X (1,0)X
+    // (0,1)X (1,1).
+    const W = 16, H = 16;
+    const px = new Uint8Array(W * H);
+    const fill = (gx: number, gy: number) => {
+      for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) px[(gy * 8 + y) * W + (gx * 8 + x)] = 1;
+    };
+    fill(0, 0); fill(1, 0); fill(0, 1);
+    const { pieces } = decomposeFrame(raw({ pixels: px, width: W, height: H }));
+    // Every piece must be a rectangle within 4x4 and cover exactly the 3 filled cells with no overlap.
+    let coveredCells = 0;
+    const seen = new Set<string>();
+    for (const p of pieces) {
+      expect(p.widthCells).toBeGreaterThanOrEqual(1);
+      expect(p.widthCells).toBeLessThanOrEqual(4);
+      expect(p.heightCells).toBeLessThanOrEqual(4);
+      const gx0 = (p.xOffset) / 8, gy0 = (p.yOffset) / 8; // originX/Y default 0
+      for (let c = 0; c < p.widthCells; c++) for (let r = 0; r < p.heightCells; r++) {
+        const k = `${gx0 + c},${gy0 + r}`;
+        expect(seen.has(k)).toBe(false); // no overlap
+        seen.add(k);
+        coveredCells++;
+      }
+    }
+    expect(coveredCells).toBe(3); // exactly the 3 filled cells, no empty cell pulled in
+  });
+});
+
 import { assembleSprite } from '../../src/core/art/sprite-decompose';
 import { serializeSpriteMappings } from '../../src/core/export/sprite-mappings-export';
 import { serializeTiles } from '../../src/core/export/tile-dedup';
