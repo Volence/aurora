@@ -88,6 +88,30 @@ Lets the singular open accept a real disassembly mapping/DPLC `.asm` file direct
   pipeline with the project's game format.
 - Lands after 6a/6b; details refined once those are in.
 
+## 3.5 Target codebases & validation matrix
+
+Saves must work against the real Sonic Retro disassemblies (S1/S2/S3K) and the Sonic
+Clean Engine (S.C.E.). Format ↔ codebase mapping and the ground-truth status of each:
+
+| Format id | Real codebase(s) | Mapping/DPLC layout | Real-data validation |
+|---|---|---|---|
+| `s2` | s2disasm (local) | Ver 2 (8-B pieces, 2P word) | ✅ assembled fixtures (read field-level + byte-exact write) |
+| `s3k` | skdisasm (local) | Ver 3 (6-B pieces; reversed DPLC) | ✅ assembled fixtures + **real skdisasm DPLC** |
+| `s3k` | **S.C.E.** (local) | Ver 3 — same as skdisasm | ✅ **real S.C.E. mapping** round-trips byte-exact |
+| `s1` | s1disasm (**not local**) | Ver 1 (5-B pieces, byte count) | ⚠ fixture currently synthesized (real S2 piece-set assembled as Ver 1); **needs real s1disasm data** |
+| `s4` | s4_engine (our project) | native VDP-order | ✅ existing sprite-mode tests |
+
+**S.C.E. = `s3k` format.** Its sprite mappings are the Ver-3 6-byte layout; its
+`DPLCEntry` macro is a *static art-DMA* declaration (`dc.l dmaSource,mappings`), not
+per-frame DPLC, so character DPLC (if used) is plain S3K. No separate adapter — S.C.E.
+is selected as `s3k` (the UI may surface it under an "S.C.E." label that maps to s3k).
+
+**Only real gap: Sonic 1.** No s1disasm in the workspace, so the S1 fixture is
+synthesized from real S2 pieces assembled with the Ver-1 macros (authoritative for the
+byte layout, but not real S1 sprite data). Closing it = download s1disasm (Sonic Retro)
+and add a real S1 mapping/DPLC fixture, same asl+p2bin recipe. Tracked as a follow-up;
+does not block 6a/6b.
+
 ## 4. Integration points / files
 
 - `src/core/import/sprite-import.ts` — adapter-driven reconstruct (6a).

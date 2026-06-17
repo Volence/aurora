@@ -26,6 +26,25 @@ describe('s3k adapter — vs real assembled Ver 3 fixture', () => {
   });
 });
 
+describe('s3k adapter — reads real Sonic Clean Engine (S.C.E.) mappings', () => {
+  // S.C.E. is S3K-based: its sprite mappings use the Ver-3 6-byte piece layout.
+  // Assembled verbatim from S.C.E. "Map - Insta-Shield.asm" (pure dc.b/dc.w).
+  const frames = s3kAdapter.readMappings(fx('sce_instashield_map.bin'));
+
+  it('decodes the real S.C.E. table (8 frames, Ver-3 pieces)', () => {
+    expect(frames).toHaveLength(8);
+    expect(frames[0].pieces).toHaveLength(3);
+    expect(frames[0].pieces[0]).toEqual({
+      xOffset: -16, yOffset: -24, widthCells: 3, heightCells: 1,
+      tile: 0, palette: 0, priority: false, xFlip: false, yFlip: false,
+    });
+  });
+
+  it('round-trips real S.C.E. mappings byte-for-byte', () => {
+    expect(Array.from(s3kAdapter.writeMappings(frames))).toEqual(Array.from(fx('sce_instashield_map.bin')));
+  });
+});
+
 describe('s3k adapter — DPLC reversed packing + count-1 header', () => {
   const perFrame = s3kAdapter.readDPLC!(dplc);
 
