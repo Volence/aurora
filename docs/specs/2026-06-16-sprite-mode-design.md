@@ -67,6 +67,14 @@ valid for all 4 flip states (exact for symmetric frames, conservative otherwise)
 if any extent falls outside signed-byte [-128,127].**
 Frame indices valid `0x00–0xF6`; `0xF7–0xFF` are animation control codes (reject frame ids ≥ `0xF7`).
 
+**Runtime is applied by `Render_Sprites`/`Emit_ObjectPieces` (`sprites.asm`) — DO NOT pre-bake:**
+the engine adds object screen X/Y, the VDP +128 bias, the `art_tile` base (→ tile is relative),
+and the running link index (→ link byte stays 0); forces X=0→1 (VDP sprite-mask avoidance);
+and **mirrors multi-cell pieces at runtime via 4 flip loops + `CellOffsets_*`** — so the editor
+emits flip *bits* only and never stores mirrored tile data. Multi-cell tiles within a piece are
+ordered **VDP column-major** (down each column, then next column). Emission stops at
+`MAX_VDP_SPRITES = 80` total hardware sprites (a piece-count budget dimension — see §6).
+
 ### 2.2 Animation scripts (`.asm`, `data/animations/`)
 Consumed by `engine/objects/animate.asm` via `SST_anim_table` ($1A); object selects an anim
 via `SST_anim` ($18). Output is `SST_mapping_frame` ($23).
@@ -92,11 +100,28 @@ Per-frame duration form (opt-in, AnimateSprite_PerFrame): dc.b frame0,dur0,frame
 | `$F8` | AF_COLLISION | +coll_type | set `SST_collision_resp` |
 | `$F7` | AF_SET_FIELD | +sst_off,+val,+0 | write an SST byte |
 Events execute inline without advancing the frame; all consume even byte counts.
+Frame-byte ranges: `$00–$F6` are mapping frame indices (Sonic's sheet reaches `$DF`); only
+`$F7+` dispatches as a control/event, so an `$80+` byte in a *frame* slot is data, not a
+command. **`$FF` is position-disambiguated:** in a *duration* slot it means `DUR_DYNAMIC`
+(take the hold from caller `d3` — speed-scaled walk/run); in a *frame/control* slot it means
+`AF_END`. The editor must emit it in the correct slot.
 
 ### 2.3 Art
 Uncompressed 8×8 4bpp tiles DMA'd into the object's reserved VRAM region; mappings index it
 relative to `art_tile` ($14 = `(pri<<15)|(pal<<13)|tile`). **v1 = non-DPLC**: all art
 loaded once; no per-frame DMA. (`Perform_DPLC` simply isn't called for these objects.)
+
+### 2.4 DPLC stream (deferred to the character/animated-art fast-follow — documented now)
+Parallel per-frame stream (separate file from mappings, same frame indices), `engine/objects/dplc.asm`:
+```
+Offset table:  dc.w (FrameData - FileStart)    ; one per frame
+Frame data:    dc.w entry_count, then entry_count × dc.w entry
+Entry word:    bits 15-12 = tile_count-1 (1..16),  bits 11-0 = tile_start (source tile index)
+```
+`Perform_DPLC` skips when `mapping_frame == prev_frame`; DMA dest is caller-supplied (`d1.w`),
+the entry carries only source tile + count. **Build-time:** lay art contiguously so each frame
+is ideally 1 entry = one DMA/frame-change; a frame with **>16 tiles must split into
+`ceil(tiles/16)` entries** (the 4-bit count caps at 16 — a real `dplc_layout.py` bug).
 
 ### 2.4 Object ↔ art binding (for the registry)
 `objdef` macro fields the registry must associate per object id: `mappings` label ($10),
@@ -175,10 +200,13 @@ On save/export, per frame:
    (reuse `export/tile-dedup.ts` logic).
 2. Pack the non-empty tile region into hardware pieces: each piece ≤ 4×4 tiles, single
    palette line; respect `overrides` (palette-line regions / manual pieces) when present.
-3. Emit the S4 mapping frame (§2.1): flip-invariant bbox, pieces in VDP order, `tile_attrs`
-   from each piece's tile index + palette line + flip + priority.
-Determinism + a clear piece-count readout matter (sprite/VRAM budgeting). Log any frame that
-exceeds its `vramTileBudget` rather than silently truncating.
+3. Emit the S4 mapping frame (§2.1): symmetrized bbox, pieces in VDP order, each piece's
+   tiles assigned in **VDP column-major order**, `tile_attrs` from tile index (relative) +
+   palette line + flip bits + priority.
+Determinism + a clear piece-count/tile-count readout matter. Budget against both
+`vramTileBudget` (VRAM) and the **80 total hardware sprites** (`MAX_VDP_SPRITES`) — high piece
+counts eat that shared on-screen budget. Log any frame that exceeds its budget rather than
+silently truncating.
 
 ## 7. Object previews
 
