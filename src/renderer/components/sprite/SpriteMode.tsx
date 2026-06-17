@@ -7,7 +7,7 @@ import type { OverlayRect } from './SpriteCanvas';
 import SpriteToolColumn from './SpriteToolColumn';
 import FrameGrid from './FrameGrid';
 import Timeline from './Timeline';
-import { exportSprite, loadSpriteByName, listSprites, loadEngineCharacter } from './export-sprite';
+import { exportSprite, loadSpriteByName, listSprites, loadEngineCharacter, openSpriteFolder } from './export-sprite';
 import PaletteEditor from '../art/PaletteEditor';
 import { decomposeFrame } from '../../../core/art/sprite-decompose';
 
@@ -120,6 +120,7 @@ export default function SpriteMode() {
               <button style={{ ...styles.primary, ...(busy ? styles.disabled : {}) }} disabled={busy} onClick={handleExport}>Export</button>
               <button style={{ ...styles.secondary, ...(busy ? styles.disabled : {}) }} disabled={busy} onClick={handleLoad}>Load</button>
             </div>
+            <button style={styles.secondary} title="Import a sprite folder from anywhere on disk (mappings.bin + art.bin [+ dplc.bin])" onClick={openSpriteFolder}>Open folder…</button>
             <div style={styles.sectionTitle}>Load engine character</div>
             <div style={styles.btnRow}>
               {['sonic', 'tails', 'knuckles'].map((c) => (

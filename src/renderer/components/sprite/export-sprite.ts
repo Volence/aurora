@@ -81,6 +81,48 @@ export async function exportSprite(name: string): Promise<void> {
   }
 }
 
+async function tryRead(base: string, rel: string): Promise<Uint8Array | null> {
+  try { return new Uint8Array(await window.api.readBinaryFile(base, rel)); } catch { return null; }
+}
+
+/** Sanitize a folder name into a valid asm label for export. */
+function sanitizeName(s: string): string {
+  const cleaned = s.replace(/[^A-Za-z0-9_]/g, '_');
+  return /^[A-Za-z_]/.test(cleaned) ? cleaned : `s_${cleaned}`;
+}
+
+/**
+ * Import a sprite from an arbitrary folder anywhere on disk (not necessarily in the
+ * project) via a directory picker. Expects mappings.bin + art.bin (+ optional
+ * dplc.bin, sprite.json). DPLC-aware. Lets you bring in external sprites.
+ */
+export async function openSpriteFolder(): Promise<void> {
+  const toast = useToastStore.getState().addToast;
+  const dir = await window.api.selectDirectory();
+  if (!dir) return;
+  try {
+    const map = await tryRead(dir, 'mappings.bin');
+    const art = await tryRead(dir, 'art.bin');
+    if (!map || !art) { toast('Folder must contain mappings.bin and art.bin', 'error'); return; }
+    const dplcBytes = await tryRead(dir, 'dplc.bin');
+    const manifest = await readJson<SpriteManifest>(dir, 'sprite.json');
+
+    const recon = dplcBytes ? reconstructDPLCSprite(map, dplcBytes, art) : reconstructSpriteFrames(map, art);
+    const frames = recon.frames.map((data) => ({ width: recon.width, height: recon.height, data }));
+    const steps: AnimStepUI[] = (manifest?.animSteps ?? [])
+      .filter((s) => s.frame < frames.length)
+      .map((s) => ({ frameIndex: s.frame, duration: s.duration }));
+
+    const name = sanitizeName(manifest?.name ?? dir.split(/[\\/]/).filter(Boolean).pop() ?? 'Imported');
+    useSpriteStore.getState().loadSprite(frames, steps, recon.originX, recon.originY);
+    useSpriteStore.getState().setName(name);
+    useSpriteStore.getState().setExportDplc(!!dplcBytes);
+    toast(`Imported "${name}": ${frames.length} frames${dplcBytes ? ' (DPLC)' : ''}`, 'success');
+  } catch (e) {
+    toast(`Import failed: ${e instanceof Error ? e.message : String(e)}`, 'error');
+  }
+}
+
 /** Names of sprites the editor knows about (from data/sprites/index.json). */
 export async function listSprites(): Promise<string[]> {
   const project = useProjectStore.getState().project;
