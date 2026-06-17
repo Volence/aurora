@@ -11,9 +11,12 @@ import type { PixelBuffer } from '../../../core/art/pixel-ops';
  * Pencil/eraser drag-draws via pixel-ops drawLine; fill uses floodFill. Paint
  * color + palette line come from artStore (shared with the PaletteEditor picker).
  */
-export default function SpriteCanvas() {
+/** A piece outline to overlay, in sprite-pixel coords. */
+export interface OverlayRect { x: number; y: number; w: number; h: number; }
+
+export default function SpriteCanvas({ overlayRects }: { overlayRects?: OverlayRect[] }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const buffer = useSpriteStore((s) => s.buffer);
+  const buffer = useSpriteStore((s) => s.frames[s.currentIndex]);
   const zoom = useSpriteStore((s) => s.zoom);
   const tool = useSpriteStore((s) => s.tool);
   const selectedColor = useArtStore((s) => s.selectedColor);
@@ -57,7 +60,15 @@ export default function SpriteCanvas() {
     for (let gy = 0; gy <= height; gy += 8) {
       ctx.beginPath(); ctx.moveTo(0, gy * zoom + 0.5); ctx.lineTo(width * zoom, gy * zoom + 0.5); ctx.stroke();
     }
-  }, [buffer, zoom, colors]);
+    // piece-outline overlay (auto-decomposition preview)
+    if (overlayRects && overlayRects.length) {
+      ctx.strokeStyle = '#f9e2af';
+      ctx.lineWidth = 2;
+      for (const r of overlayRects) {
+        ctx.strokeRect(r.x * zoom + 1, r.y * zoom + 1, r.w * zoom - 2, r.h * zoom - 2);
+      }
+    }
+  }, [buffer, zoom, colors, overlayRects]);
 
   function pixelAt(e: React.PointerEvent): { x: number; y: number } | null {
     const canvas = canvasRef.current;
