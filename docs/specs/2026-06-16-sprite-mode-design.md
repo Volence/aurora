@@ -260,6 +260,11 @@ invalidation listeners work unchanged.
   stock-Sonic-2 mapping format that `src/core/formats/sprite-mappings.ts` already parses;
   path = parse S2 mappings+art → editor `SpriteDef` → re-export to S4 (§2.1). Also enables
   importing existing `s4_engine` sprites.
+- **Multi-format sprite interop (S1/S2/S3K ↔ S4)** — generalize the above into per-game
+  reader/writer **adapters** around the logical `SpriteDef` hub (§4). Mappings, DPLC, and
+  animation streams all differ per game; S3K adds mirrored-player art. S2 reader + S4 writer
+  exist; S1/S3K are added adapters. A modern multi-game sprite tool with S4 as a first-class
+  target; PitcherPlant (S2→S4) is the first consumer. See vision doc backlog.
 - DPLC/characters; shadow/highlight authoring+preview; section VRAM precalc; palette-fade
   preview; emulator hot-reload (see vision doc).
 

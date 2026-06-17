@@ -71,6 +71,15 @@ three-step where you assemble tiles.
   existing `src/core/formats/sprite-mappings.ts` parser already reads. Path: import S2
   mappings+art → editor sprite model → re-export to S4 format. Fast-follow after v1.
 
+- **Multi-format sprite interop (S1 / S2 / S3K ↔ S4)** — user idea 2026-06-17. Open existing
+  Sonic 1/2/3K sprite art (that's where most existing art lives) and save/convert between
+  them and our S4 format. Architecture: the editor's **logical `SpriteDef` is the hub**;
+  each game is a reader/writer **adapter** (mappings + DPLC + animation streams all differ
+  per game; S3K adds mirrored-player art + its own DPLC). We already have the S2 reader and
+  (v1) the S4 writer, so the spine exists — S1 and S3K are additional adapters. Effectively a
+  modern SonMapEd/ClownMapEd with our canvas on top and S4 as a first-class target. The
+  PitcherPlant port is the first concrete consumer (needs S2→S4 anyway). Backlog, post-v1.
+
 ## Architecture keystone
 
 A **shared art core** (extracted from the existing `ComposerCanvas`) + a **sprite/object
