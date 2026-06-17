@@ -3,7 +3,7 @@ import { useSpriteStore } from '../../state/spriteStore';
 import { useArtStore } from '../../state/artStore';
 import { useProjectStore, getCurrentZone } from '../../state/projectStore';
 import { floodFill, drawLine, drawRect, ditherValue, mirrorPoints, isLCorner } from '../../../core/art/pixel-ops';
-import type { PixelBuffer } from '../../../core/art/pixel-ops';
+import type { PixelBuffer, MirrorMode } from '../../../core/art/pixel-ops';
 
 /** A piece outline to overlay, in sprite-pixel coords. */
 export interface OverlayRect { x: number; y: number; w: number; h: number; }
@@ -23,6 +23,23 @@ function setPx(b: PixelBuffer, x: number, y: number, v: number) {
 }
 function norm(x0: number, y0: number, x1: number, y1: number) {
   return { x: Math.min(x0, x1), y: Math.min(y0, y1), w: Math.abs(x1 - x0) + 1, h: Math.abs(y1 - y0) + 1 };
+}
+/** Endpoint pairs for a mirrored line/rect — apply each symmetry to BOTH endpoints
+ *  (NOT index-paired, which is unsound when dedup changes list length). */
+function mirrorEndpointPairs(w: number, h: number, a: Pt, b: Pt, mode: MirrorMode | null): Array<{ a: Pt; b: Pt }> {
+  if (!mode) return [{ a, b }];
+  const fns: Array<(p: Pt) => Pt> = [(p) => p];
+  if (mode === 'h' || mode === 'both') fns.push((p) => ({ x: w - 1 - p.x, y: p.y }));
+  if (mode === 'v' || mode === 'both') fns.push((p) => ({ x: p.x, y: h - 1 - p.y }));
+  if (mode === 'both') fns.push((p) => ({ x: w - 1 - p.x, y: h - 1 - p.y }));
+  const out: Array<{ a: Pt; b: Pt }> = [];
+  const seen = new Set<string>();
+  for (const f of fns) {
+    const aa = f(a), bb = f(b);
+    const key = `${aa.x},${aa.y},${bb.x},${bb.y}`;
+    if (!seen.has(key)) { seen.add(key); out.push({ a: aa, b: bb }); }
+  }
+  return out;
 }
 
 /**
@@ -169,20 +186,21 @@ export default function SpriteCanvas({ overlayRects }: { overlayRects?: OverlayR
     if (e.button !== 0) return; // left only; let middle/right pan/scroll
     const p = pixelAt(e);
     if (!p) return;
-    e.currentTarget.setPointerCapture(e.pointerId);
-    drawing.current = true;
     const st = useSpriteStore.getState();
 
+    // Instantaneous tools: no drag, so don't capture the pointer.
     if (tool === 'eyedropper') {
       useArtStore.getState().setSelectedColor(buffer.data[p.y * buffer.width + p.x]);
-      drawing.current = false;
       return;
     }
     if (tool === 'fill') {
       st.setBuffer(floodFill(buffer, p.x, p.y, paintValue(p.x, p.y)));
-      drawing.current = false;
       return;
     }
+
+    e.currentTarget.setPointerCapture(e.pointerId);
+    drawing.current = true;
+
     if (tool === 'line' || tool === 'rect') {
       snapshot.current = clone(buffer); start.current = p; setPreview({ kind: tool, x0: p.x, y0: p.y, x1: p.x, y1: p.y });
       return;
@@ -212,11 +230,12 @@ export default function SpriteCanvas({ overlayRects }: { overlayRects?: OverlayR
     if (!drawing.current) return;
     const p = pixelAt(e);
     if (!p) return;
-    if (tool === 'line' || tool === 'rect') { const s = start.current!; setPreview({ kind: tool, x0: s.x, y0: s.y, x1: p.x, y1: p.y }); return; }
+    const s = start.current;
+    if (tool === 'line' || tool === 'rect') { if (s) setPreview({ kind: tool, x0: s.x, y0: s.y, x1: p.x, y1: p.y }); return; }
     if (tool === 'select') {
       const mv = moveRegion.current;
-      if (mv) { setPreview({ kind: 'move', dx: p.x - mv.ox, dy: p.y - mv.oy }); }
-      else { const s = start.current!; setPreview({ kind: 'marquee', x0: s.x, y0: s.y, x1: p.x, y1: p.y }); }
+      if (mv) setPreview({ kind: 'move', dx: p.x - mv.ox, dy: p.y - mv.oy });
+      else if (s) setPreview({ kind: 'marquee', x0: s.x, y0: s.y, x1: p.x, y1: p.y });
       return;
     }
     pushPathPoint(p); renderStroke();
@@ -231,12 +250,7 @@ export default function SpriteCanvas({ overlayRects }: { overlayRects?: OverlayR
 
     if ((tool === 'line' || tool === 'rect') && snapshot.current && start.current && p) {
       let buf = snapshot.current;
-      const ends = mirror
-        ? mirrorPoints(buf.width, buf.height, start.current.x, start.current.y, mirror).map((m, i) => {
-            const e2 = mirrorPoints(buf.width, buf.height, p.x, p.y, mirror)[i] ?? p; return { a: m, b: e2 };
-          })
-        : [{ a: start.current, b: p }];
-      for (const { a, b } of ends) {
+      for (const { a, b } of mirrorEndpointPairs(buf.width, buf.height, start.current, p, mirror)) {
         buf = tool === 'line' ? drawLine(buf, a.x, a.y, b.x, b.y, selectedColor)
           : drawRect(buf, Math.min(a.x, b.x), Math.min(a.y, b.y), Math.abs(b.x - a.x) + 1, Math.abs(b.y - a.y) + 1, selectedColor, true);
       }
@@ -257,7 +271,7 @@ export default function SpriteCanvas({ overlayRects }: { overlayRects?: OverlayR
         st.setSelection(n.w > 1 || n.h > 1 ? n : null);
       }
     }
-    snapshot.current = null; path.current = []; start.current = null; setPreview(null);
+    snapshot.current = null; path.current = []; start.current = null; moveRegion.current = null; setPreview(null);
   }
 
   return (

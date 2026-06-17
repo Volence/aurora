@@ -34,7 +34,7 @@ export default function SpriteMode() {
 
   function fitToView() {
     const el = canvasWrapRef.current;
-    if (!el) return;
+    if (!el || el.clientWidth === 0 || el.clientHeight === 0) return; // not laid out yet
     const pad = 24;
     const z = Math.floor(Math.min((el.clientWidth - pad) / buffer.width, (el.clientHeight - pad) / buffer.height));
     useSpriteStore.getState().setZoom(Math.max(1, Math.min(48, z)));
@@ -74,7 +74,7 @@ export default function SpriteMode() {
           <button key={s} style={styles.sizeBtn} title={`New ${s}×${s} sprite`} onClick={() => { useSpriteStore.getState().newSprite(s, s); }}>{s}</button>
         ))}
         <input type="number" min={8} max={128} value={newSize} style={styles.sizeInput}
-          onChange={(e) => setNewSize(Number(e.target.value))} title="custom size (px)" />
+          onChange={(e) => setNewSize(Math.max(8, Math.min(128, Number(e.target.value) || 8)))} title="custom size (px)" />
         <button style={styles.sizeBtn} onClick={() => useSpriteStore.getState().newSprite(newSize, newSize)}>New □</button>
         <span style={styles.sep} />
         <button style={styles.btn} onClick={fitToView}>Fit</button>

@@ -124,7 +124,7 @@ export const useSpriteStore = create<SpriteState>((set) => ({
     else return s;
     const frames = s.frames.slice();
     frames[s.currentIndex] = next;
-    return { frames };
+    return { frames, selection: null }; // marquee coords no longer valid after a transform
   }),
   setBuffer: (b) => set((s) => {
     const frames = s.frames.slice();
