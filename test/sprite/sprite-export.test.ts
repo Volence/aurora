@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { buildSpriteExport } from '../../src/core/export/sprite-export';
+import { buildSpriteExport, serializeDPLC } from '../../src/core/export/sprite-export';
+import { parseDPLC, reconstructDPLCSprite } from '../../src/core/import/sprite-import';
 import type { RawFrame } from '../../src/core/art/sprite-decompose';
 import type { PerFrameAnimation } from '../../src/core/export/sprite-anim-export';
 
@@ -34,5 +35,37 @@ describe('buildSpriteExport', () => {
 
   it('rejects an empty frame list', () => {
     expect(() => buildSpriteExport('X', [], anim)).toThrow(/no frames/);
+  });
+});
+
+describe('serializeDPLC', () => {
+  it('round-trips with parseDPLC', () => {
+    const entries = [[{ start: 5, count: 3 }], [{ start: 0, count: 16 }, { start: 16, count: 2 }]];
+    const bytes = serializeDPLC(entries);
+    // frame 0 loads source tiles 5,6,7 ; frame 1 loads 0..15 then 16,17
+    expect(parseDPLC(bytes)).toEqual([
+      [5, 6, 7],
+      [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17],
+    ]);
+  });
+});
+
+describe('buildSpriteExport DPLC mode', () => {
+  it('emits a dplc stream and round-trips back to the same frames', () => {
+    const a = frame('a', 1), b = frame('b', 2);
+    const out = buildSpriteExport('Char', [a, b], anim, { dplc: true });
+    expect(out.dplc).toBeDefined();
+    expect(out.manifest.dplc).toBe(true);
+    // reconstruct from the DPLC artifacts → identical frames
+    const recon = reconstructDPLCSprite(out.mappings, out.dplc!, out.art);
+    expect(recon.frames).toHaveLength(2);
+    expect(Array.from(recon.frames[0])).toEqual(Array.from(a.pixels));
+    expect(Array.from(recon.frames[1])).toEqual(Array.from(b.pixels));
+  });
+
+  it('non-DPLC export has no dplc stream', () => {
+    const out = buildSpriteExport('Char', [frame('a', 1)], anim);
+    expect(out.dplc).toBeUndefined();
+    expect(out.manifest.dplc).toBe(false);
   });
 });

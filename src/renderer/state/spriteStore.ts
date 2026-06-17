@@ -42,6 +42,10 @@ interface SpriteState {
   ditherPattern: DitherPattern;
   ditherSecondary: number;     // 0-15 (0 = transparent)
   selection: SpriteSelection | null;
+  name: string;                // sprite name (export folder + anim label); follows loads
+  setName: (name: string) => void;
+  exportDplc: boolean;         // export as DPLC (streamed art) vs flat resident art
+  setExportDplc: (v: boolean) => void;
 
   setTool: (t: SpriteTool) => void;
   setZoom: (z: number) => void;
@@ -106,7 +110,11 @@ export const useSpriteStore = create<SpriteState>((set) => ({
   ditherPattern: 'checker',
   ditherSecondary: 0,
   selection: null,
+  name: 'NewSprite',
+  exportDplc: false,
 
+  setName: (name) => set({ name }),
+  setExportDplc: (exportDplc) => set({ exportDplc }),
   setTool: (tool) => set((s) => ({ tool, selection: tool === 'select' ? s.selection : null })),
   setZoom: (zoom) => set({ zoom: Math.min(48, Math.max(1, Math.round(zoom))) }),
   setShowPieces: (showPieces) => set({ showPieces }),
@@ -176,6 +184,8 @@ export const useSpriteStore = create<SpriteState>((set) => ({
     paletteOverride: null,
     characterAnims: [],
     selection: null,
+    name: 'NewSprite',
+    exportDplc: false,
   }),
 
   loadSprite: (frames, steps, originX, originY) => set({

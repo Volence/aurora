@@ -43,7 +43,7 @@ export async function exportSprite(name: string): Promise<void> {
   const project = useProjectStore.getState().project;
   if (!project) { toast('No project open', 'error'); return; }
 
-  const { frames, steps, originX, originY } = useSpriteStore.getState();
+  const { frames, steps, originX, originY, exportDplc } = useSpriteStore.getState();
   const palette = useArtStore.getState().paletteLine;
 
   if (steps.length === 0) { toast('Add at least one animation step before exporting', 'error'); return; }
@@ -59,12 +59,13 @@ export async function exportSprite(name: string): Promise<void> {
   };
 
   try {
-    const out = buildSpriteExport(name, rawFrames, anim);
+    const out = buildSpriteExport(name, rawFrames, anim, { dplc: exportDplc });
     const base = project.basePath;
     const dir = `data/sprites/${name}`;
     const enc = new TextEncoder();
     await window.api.writeBinaryFile(base, `${dir}/mappings.bin`, toArrayBuffer(out.mappings));
     await window.api.writeBinaryFile(base, `${dir}/art.bin`, toArrayBuffer(out.art));
+    if (out.dplc) await window.api.writeBinaryFile(base, `${dir}/dplc.bin`, toArrayBuffer(out.dplc));
     await window.api.writeBinaryFile(base, `${dir}/${name}_anims.asm`, toArrayBuffer(enc.encode(out.animAsm)));
     await window.api.writeBinaryFile(base, `${dir}/sprite.json`, toArrayBuffer(enc.encode(JSON.stringify(out.manifest, null, 2))));
 
@@ -112,6 +113,8 @@ export async function loadSpriteByName(name: string): Promise<void> {
       .map((s) => ({ frameIndex: s.frame, duration: s.duration }));
 
     useSpriteStore.getState().loadSprite(frames, steps, recon.originX, recon.originY);
+    useSpriteStore.getState().setName(name);
+    useSpriteStore.getState().setExportDplc(!!manifest?.dplc); // default export mode to how it was saved
     toast(`Loaded "${name}": ${frames.length} frames${steps.length ? `, ${steps.length} anim steps` : ''}`, 'success');
   } catch (e) {
     toast(`Load failed for "${name}": ${e instanceof Error ? e.message : String(e)}`, 'error');
@@ -137,6 +140,8 @@ export async function loadEngineCharacter(name: string): Promise<void> {
     const recon = reconstructDPLCSprite(map, dplc, art);
     const frames = recon.frames.map((data) => ({ width: recon.width, height: recon.height, data }));
     useSpriteStore.getState().loadSprite(frames, [], recon.originX, recon.originY);
+    useSpriteStore.getState().setName(name);
+    useSpriteStore.getState().setExportDplc(true); // characters are DPLC by nature
     // Load the character's own palette as a display override so it looks right.
     try {
       const palBytes = new Uint8Array(await window.api.readBinaryFile(base, `art/palettes/${name}.bin`));

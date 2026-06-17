@@ -22,7 +22,9 @@ export default function SpriteMode() {
   const paletteLine = useArtStore((s) => s.paletteLine);
   useArtStore((s) => s.paletteVersion);
 
-  const [spriteName, setSpriteName] = useState('NewSprite');
+  const spriteName = useSpriteStore((s) => s.name);
+  const setSpriteName = (n: string) => useSpriteStore.getState().setName(n);
+  const exportDplc = useSpriteStore((s) => s.exportDplc);
   const [available, setAvailable] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [newSize, setNewSize] = useState(32);
@@ -110,6 +112,10 @@ export default function SpriteMode() {
                 {available.map((n) => <option key={n} value={n}>{n}</option>)}
               </select>
             )}
+            <label style={styles.check} title="Streamed art (DPLC) vs all art resident. Characters use DPLC; most objects don't.">
+              <input type="checkbox" checked={exportDplc} onChange={(e) => useSpriteStore.getState().setExportDplc(e.target.checked)} />
+              DPLC (streamed art)
+            </label>
             <div style={styles.btnRow}>
               <button style={{ ...styles.primary, ...(busy ? styles.disabled : {}) }} disabled={busy} onClick={handleExport}>Export</button>
               <button style={{ ...styles.secondary, ...(busy ? styles.disabled : {}) }} disabled={busy} onClick={handleLoad}>Load</button>

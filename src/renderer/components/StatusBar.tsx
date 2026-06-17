@@ -19,7 +19,20 @@ export default function StatusBar() {
   const selectedChunkId = useEditorStore((s) => s.selectedChunkId);
   const editingLayer = useEditorStore((s) => s.editingLayer);
   const activeSectionIndex = useEditorStore((s) => s.activeSectionIndex);
+  const appMode = useEditorStore((s) => s.appMode);
   const project = useProjectStore((s) => s.project);
+
+  // The map-mode tool/layer/section badges (incl. the "FG" layer) don't apply in
+  // Art/Sprite mode — show a mode-appropriate bar instead.
+  if (appMode !== 'map') {
+    return (
+      <div style={styles.bar}>
+        <span style={styles.toolBadge}>{appMode === 'sprite' ? 'Sprite' : 'Art'}</span>
+        <span style={styles.hint}>{appMode === 'sprite' ? 'Sprite / animation editor' : 'Level art editor'}</span>
+        <div style={{ flex: 1 }} />
+      </div>
+    );
+  }
 
   const info = TOOL_INFO[tool];
   const chunkCount = project?.chunkLibrary.length ?? 0;
