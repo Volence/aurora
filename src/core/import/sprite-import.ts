@@ -1,6 +1,8 @@
 import { parseSpriteMappings } from './sprite-mappings-import';
 import { parseTiles } from '../formats/tiles';
 import { renderFrameToIndices } from '../art/sprite-render';
+import { compressionFor } from '../compress';
+import type { SpriteFormatAdapter } from '../formats/sprite-format-adapter';
 import type { SpriteFrame } from '../model/sprite-types';
 import type { Tile } from '../model/s4-types';
 
@@ -73,13 +75,43 @@ function frameBounds(frames: SpriteFrame[]): { width: number; height: number; or
   };
 }
 
-export function reconstructSpriteFrames(mappingsBytes: Uint8Array, artBytes: Uint8Array): ReconstructedSprite {
-  const frames = parseSpriteMappings(mappingsBytes);
-  const tiles = parseTiles(artBytes);
+/**
+ * Shared render core: lay logical frames onto one origin-aligned canvas. When
+ * `dplc` is given, each frame's mapping tile indices are first resolved through
+ * that frame's source-tile list (streaming-art sprites); otherwise the art pool
+ * is fully resident and indexed directly.
+ */
+function renderFrames(frames: SpriteFrame[], art: Tile[], dplc?: number[][]): ReconstructedSprite {
+  const blank: Tile = { pixels: new Uint8Array(64) };
   const { width, height, originX, originY } = frameBounds(frames);
-  const out = frames.map((f) => renderFrameToIndices(f, tiles, width, height, originX, originY));
+  const out = frames.map((f, i) => {
+    const tiles = dplc ? (dplc[i] ?? []).map((src) => art[src] ?? blank) : art;
+    return renderFrameToIndices(f, tiles, width, height, originX, originY);
+  });
   if (out.length === 0) out.push(new Uint8Array(width * height));
   return { width, height, originX, originY, frames: out };
+}
+
+export function reconstructSpriteFrames(mappingsBytes: Uint8Array, artBytes: Uint8Array): ReconstructedSprite {
+  return renderFrames(parseSpriteMappings(mappingsBytes), parseTiles(artBytes));
+}
+
+/**
+ * Format-agnostic reconstruct: decompress the art per the adapter's compression,
+ * parse mappings (and DPLC, if streamed) through the adapter, then render. This is
+ * the multi-game entry point — `reconstructSpriteFrames`/`reconstructDPLCSprite`
+ * are the S4-specific equivalents. See the phase-6 design doc.
+ */
+export function reconstructWithAdapter(
+  adapter: SpriteFormatAdapter,
+  mappingsBytes: Uint8Array,
+  artBytes: Uint8Array,
+  dplcBytes?: Uint8Array,
+): ReconstructedSprite {
+  const tiles = parseTiles(compressionFor(adapter.artCompression).decompress(artBytes));
+  const frames = adapter.readMappings(mappingsBytes);
+  const dplc = dplcBytes && adapter.readDPLC ? adapter.readDPLC(dplcBytes) : undefined;
+  return renderFrames(frames, tiles, dplc);
 }
 
 /**
@@ -89,16 +121,5 @@ export function reconstructSpriteFrames(mappingsBytes: Uint8Array, artBytes: Uin
  * Pair the UNOPTIMIZED dplc with the UNCOMPRESSED art (the optimizer rearranges both).
  */
 export function reconstructDPLCSprite(mappingsBytes: Uint8Array, dplcBytes: Uint8Array, artBytes: Uint8Array): ReconstructedSprite {
-  const frames = parseSpriteMappings(mappingsBytes);
-  const dplc = parseDPLC(dplcBytes);
-  const art = parseTiles(artBytes);
-  const blank: Tile = { pixels: new Uint8Array(64) };
-  const { width, height, originX, originY } = frameBounds(frames);
-  const out = frames.map((f, i) => {
-    const localToSource = dplc[i] ?? [];
-    const frameTiles: Tile[] = localToSource.map((src) => art[src] ?? blank);
-    return renderFrameToIndices(f, frameTiles, width, height, originX, originY);
-  });
-  if (out.length === 0) out.push(new Uint8Array(width * height));
-  return { width, height, originX, originY, frames: out };
+  return renderFrames(parseSpriteMappings(mappingsBytes), parseTiles(artBytes), parseDPLC(dplcBytes));
 }
