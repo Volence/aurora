@@ -46,6 +46,11 @@ interface SpriteState {
   removeStep: (i: number) => void;
   setStepDuration: (i: number, duration: number) => void;
   setPlaybackMode: (m: PlaybackMode) => void;
+  setSteps: (steps: AnimStepUI[]) => void;
+
+  /** Named animations loaded from a character's script (empty for new/editor sprites). */
+  characterAnims: { name: string; steps: AnimStepUI[] }[];
+  setCharacterAnims: (anims: { name: string; steps: AnimStepUI[] }[]) => void;
 
   // Load (replace the whole working sprite)
   loadSprite: (frames: PixelBuffer[], steps: AnimStepUI[], originX: number, originY: number) => void;
@@ -115,6 +120,10 @@ export const useSpriteStore = create<SpriteState>((set) => ({
     steps: s.steps.map((st, idx) => (idx === i ? { ...st, duration: Math.min(0x7f, Math.max(1, Math.round(duration) || 1)) } : st)),
   })),
   setPlaybackMode: (playbackMode) => set({ playbackMode }),
+  setSteps: (steps) => set({ steps }),
+
+  characterAnims: [],
+  setCharacterAnims: (characterAnims) => set({ characterAnims }),
 
   loadSprite: (frames, steps, originX, originY) => set({
     frames: frames.length ? frames : [blankFrame()],
@@ -123,6 +132,7 @@ export const useSpriteStore = create<SpriteState>((set) => ({
     originX,
     originY,
     paletteOverride: null,
+    characterAnims: [],
   }),
 
   paletteOverride: null,

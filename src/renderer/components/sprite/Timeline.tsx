@@ -40,6 +40,7 @@ export default function Timeline() {
   const currentIndex = useSpriteStore((s) => s.currentIndex);
   const steps = useSpriteStore((s) => s.steps);
   const playbackMode = useSpriteStore((s) => s.playbackMode);
+  const characterAnims = useSpriteStore((s) => s.characterAnims);
   const paletteLine = useArtStore((s) => s.paletteLine);
   useArtStore((s) => s.paletteVersion);
   const override = useSpriteStore((s) => s.paletteOverride);
@@ -94,6 +95,12 @@ export default function Timeline() {
             {MODES.map((m) => <option key={m} value={m}>{m}</option>)}
           </select>
         </div>
+        {characterAnims.length > 0 && (
+          <select style={styles.select} defaultValue="0"
+            onChange={(e) => { const a = characterAnims[Number(e.target.value)]; if (a) useSpriteStore.getState().setSteps(a.steps); }}>
+            {characterAnims.map((a, i) => <option key={a.name} value={i}>{a.name} ({a.steps.length}f)</option>)}
+          </select>
+        )}
       </div>
 
       <div style={styles.steps}>

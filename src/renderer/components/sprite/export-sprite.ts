@@ -7,6 +7,10 @@ import { buildSpriteExport } from '../../../core/export/sprite-export';
 import type { SpriteManifest } from '../../../core/export/sprite-export';
 import { reconstructSpriteFrames, reconstructDPLCSprite } from '../../../core/import/sprite-import';
 import { parsePaletteLine } from '../../../core/formats/palette';
+import { parseCharacterAnims } from '../../../core/import/anim-import';
+
+/** DUR_DYNAMIC (speed-scaled in-game) has no fixed hold — use this for editor playback. */
+const DYNAMIC_PREVIEW_HOLD = 5;
 import type { RawFrame } from '../../../core/art/sprite-decompose';
 import type { PerFrameAnimation } from '../../../core/export/sprite-anim-export';
 
@@ -138,7 +142,24 @@ export async function loadEngineCharacter(name: string): Promise<void> {
       const palBytes = new Uint8Array(await window.api.readBinaryFile(base, `art/palettes/${name}.bin`));
       useSpriteStore.getState().setPaletteOverride(parsePaletteLine(palBytes, 0, 16).colors);
     } catch { /* palette optional — fall back to the active palette line */ }
-    toast(`Loaded ${name}: ${frames.length} frames (${recon.width}×${recon.height})`, 'success');
+
+    // Load the named animation scripts so they can be played in-editor.
+    let animCount = 0;
+    try {
+      const asm = new TextDecoder().decode(new Uint8Array(await window.api.readBinaryFile(base, `data/animations/${name}_anims.asm`)));
+      const parsed = parseCharacterAnims(asm);
+      const charAnims = parsed.map((a) => ({
+        name: a.name,
+        steps: a.frames
+          .filter((f) => f < frames.length)
+          .map((f) => ({ frameIndex: f, duration: a.duration === 'dynamic' ? DYNAMIC_PREVIEW_HOLD : Math.max(1, a.duration) })),
+      })).filter((a) => a.steps.length > 0);
+      useSpriteStore.getState().setCharacterAnims(charAnims);
+      if (charAnims[0]) useSpriteStore.getState().setSteps(charAnims[0].steps); // auto-load the first
+      animCount = charAnims.length;
+    } catch { /* anim script optional */ }
+
+    toast(`Loaded ${name}: ${frames.length} frames${animCount ? `, ${animCount} animations` : ''} (${recon.width}×${recon.height})`, 'success');
   } catch (e) {
     toast(`Load ${name} failed: ${e instanceof Error ? e.message : String(e)}`, 'error');
   }
