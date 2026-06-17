@@ -60,12 +60,21 @@ adapter** — this generalizes existing code rather than duplicating it.
 
 `src/core/compress/`:
 - `nemesis.ts` — `decompress(Uint8Array): Uint8Array` and `compress(Uint8Array): Uint8Array`,
-  ported from `programs/clownnemesis/{decompress,compress}.c`. Nemesis is a per-row
-  Huffman-style nibble code with an XOR/inline mode bit; the C reference is the authority.
+  ported from `programs/clownnemesis/{decompress,compress}.c` (format verified — see below).
 - `kosinski.ts` — keep the existing `kosinskiDecompress`; add `kosinskiCompress` ported from
   `programs/clownlzss` / `accurate-kosinski`.
 - `index.ts` — `compressionFor(kind)` returns `{ decompress, compress }`; `'uncompressed'`
   is identity. Adapters reference art compression by `kind`, never by concrete impl.
+
+**Nemesis format (verified vs `clownnemesis`):** 2-byte big-endian header = `bit15` XOR-mode
+flag, `bits14-0` tile count. Code table: bytes with `0x80` set are `0x80|nibble` value
+markers; other bytes are `(runLen-1)<<4 | codeBits` followed by a code byte stored at index
+`code << (8-codeBits)`; `0xFF` ends the table. Bitstream is **MSB-first**; a 6-bit `0x3F` is
+the inline escape → next `3` bits = runLen-1, next `4` bits = nibble. Nibbles accumulate into
+32-bit rows; in XOR mode each row is XORed against the previous output row. Encoder builds
+codes for runs occurring ≥3 times; **port the Fano ("accurate") path** to match Sega's output
+byte-for-byte (stable sort required), with the `0x3F`-prefix-avoidance and accurate-mode
+trailing-byte quirk. Nibbles are high-then-low per byte. Input must be a multiple of 0x20 bytes.
 
 **Validation strategy (no guessing):** decode is checked against **real workspace data**
 (decompress an actual `s2disasm/art/nemesis/*` blob; assert size/known bytes). Encode is
@@ -87,20 +96,28 @@ interface SpriteFormatAdapter {
 ```
 
 Shared traits: all mapping formats are a **word offset table** (frameCount recovered from
-`firstOffset/2`) + per-frame `pieceCount` + pieces. Per-game differences each adapter owns
-(byte layouts verified during implementation against the disassembly macros +
-`sprite-mappings.ts` + round-trip tests — exactly how S4 was nailed):
+`firstOffset/2`) + per-frame piece-count + pieces. The Sonic-disassembly formats are
+parameterized by a **version** (`SonicMappingsVer`/`SonicDplcVer`); each game targets a
+specific version. Verified against `s2disasm/mappings/MapMacros.asm` (and cross-checked with
+our `sprite-mappings.ts`):
 
-| Game | piece count | piece bytes | X offset | DPLC | art |
+| Format | frame-count hdr | piece | piece fields | DPLC entry hdr | art |
 |---|---|---|---|---|---|
-| **S1** | byte | 5 | byte | S1 DPLC | Nemesis |
-| **S2** | word | 6 | word | S2 DPLC | Nemesis |
-| **S3K** | word | 6 (S2-like) | word | S3K DPLC (+2P) | Nemesis |
-| **S4** | word | 8 (VDP-order, bbox header) | word | S4 DPLC | uncompressed |
+| **S1** (Ver 1) | **byte** | **5 B** | y.b, size.b, tile-attr (2 B), x.b | byte count + 2-B entries | Nemesis |
+| **S2** (Ver 2) | word | **8 B** | y/size.w, attr.w, **2P-dup tile.w**, x.w | word count + 2-B entries | Nemesis |
+| **S3K** (custom) | word | **6 B** | **bit layout NOT in macros — needs RE** | word count + 2-B entries (encoding **TBD**) | Nemesis |
+| **S4** (ours) | word + 6-B bbox hdr | 8 B | VDP-order (existing) | existing S4 DPLC | uncompressed |
 
-The existing `src/core/formats/sprite-mappings.ts` (S2, 6-byte pieces) is the starting point
-for the s2 adapter's read side. **S3K 2P-mirror** art is the one wrinkle flagged for possible
-v1 simplification (load primary art; note the 2P duplicate).
+Common bits: size byte = `((w-1)&3)<<2 | (h-1)&3`; tile word = `pri<<15 | pal<<13 | yflip<<12
+| xflip<<11 | tile`. DPLC entry (S1/S2) = `((tiles-1)&0xF)<<12 | (offset&0xFFF)` (2 bytes).
+Note: our existing `sprite-mappings.ts` documents the **6-byte (Ver 0/1-style)** S2 piece,
+which is NOT the Ver-2 layout s2disasm uses — the s2 adapter must target **Ver 2 (8-byte)**.
+
+**S3K is the highest-risk adapter:** skdisasm has no macro defining the S3K piece/DPLC bit
+layout (only raw data + separate 2P tables). Its plan phase MUST begin with a focused
+reverse-engineering step (skdisasm engine read code / cross-ref SonMapEd or an emulator)
+before any code. **S3K 2P art** is stored as entirely separate mapping/DPLC tables (not a
+mirror flag) — v1 loads the primary tables and ignores/notes the 2P duplicate.
 
 ## 5. Import flow
 
@@ -136,8 +153,14 @@ v1 simplification (load primary art; note the 2P duplicate).
 1. **Compression module** — Nemesis decode+encode, Kosinski encode; tests vs real data. (no game coupling)
 2. **Adapter interface + `s4` adapter** — refactor existing S4 code behind the interface (no behavior change; tests stay green).
 3. **`s2` adapter** — read+write S2 mappings/DPLC (most-ready; parser scaffold exists). End-to-end test on a real `s2disasm` sprite.
-4. **`s1` adapter**, then **`s3k` adapter** (+ the 2P-mirror decision).
-5. **UI wiring** — format dropdowns + manifest `sourceFormat`.
+4. **`s1` adapter** — read+write S1 (Ver 1, 5-byte pieces, byte counts). Layout verified.
+5. **`s3k` adapter** — **starts with a reverse-engineering task** to pin the S3K piece/DPLC
+   bit layout (undocumented in skdisasm; see §10), then read+write. May slip to a follow-up
+   if RE is hard — S1/S2/S4 round-trip is the committed v1; S3K is best-effort.
+6. **UI wiring** — format dropdowns + manifest `sourceFormat`.
+
+Phases 1–4 are fully grounded in verified formats; phase 5 (S3K) carries the only real
+unknown and is sequenced last so it can't block the rest.
 
 Each phase is independently testable; phases 1–2 land with zero user-visible change (pure
 refactor + new module), de-risking the rest.
@@ -151,11 +174,21 @@ refactor + new module), de-risking the rest.
 - **End-to-end**: import a real S2 sprite → export → re-import → identical frames; one
   cross-format case (S2 → S4) round-trips through the editor.
 
-## 10. Open questions (resolve in planning)
+## 10. Open questions / resolved
 
-- Exact S1 and S3K binary piece/DPLC layouts — confirm against `skdisasm` macros before
-  writing those adapters (S2 is already documented in `sprite-mappings.ts`).
-- Whether S3K 2P-mirror art is loaded, ignored, or auto-derived on export (lean: load
-  primary, note duplicate; revisit if a real S3K sprite needs it).
+**Resolved by source research (2026-06-17):**
+- Nemesis format + encoder algorithm — fully spec'd from `clownnemesis` (§3).
+- S1 (Ver 1, 5-byte) and S2 (Ver 2, 8-byte incl. 2P-dup word) mapping + DPLC layouts —
+  verified vs `s2disasm/mappings/MapMacros.asm` (§4). The s2 adapter targets **Ver 2**, not
+  the 6-byte layout in our current `sprite-mappings.ts`.
+- S3K 2P art = separate tables (not a mirror flag); v1 loads primary, notes the duplicate.
+
+**Still open (resolve in planning):**
+- **S3K piece + DPLC bit layout** — genuinely undocumented in skdisasm macros. The S3K
+  adapter's plan phase starts with a reverse-engineering task (skdisasm engine read code /
+  SonMapEd cross-ref / emulator). Until then, the S3K piece/DPLC byte fields in §4 are TBD.
+  *Risk:* if RE proves hard, S3K may slip to its own follow-up while S1/S2/S4 ship.
+- Kosinski **encoder** parity — verify our port matches `clownlzss`/`accurate-kosinski`
+  output (decode∘encode identity + structural diff) before relying on it for art saving.
 - Where multi-game art files live in a project vs ad-hoc open (lean: ad-hoc folder/file
   open like `openSpriteFolder`, format chosen at open time).
