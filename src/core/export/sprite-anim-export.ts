@@ -25,6 +25,11 @@ export interface SpriteAnimation {
   control: AnimControl;
 }
 
+const LABEL_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
+function assertLabel(what: string, s: string): void {
+  if (!LABEL_RE.test(s)) throw new Error(`anim ${what} "${s}" is not a valid asm label`);
+}
+
 function checkByte(name: string, v: number, max = 0xff): void {
   if (!Number.isInteger(v) || v < 0 || v > max) {
     throw new Error(`anim ${name}=${v} out of range [0,${max}]`);
@@ -49,6 +54,7 @@ function controlTokens(c: AnimControl): string[] {
     case 'change': checkByte('change animId', c.animId, 0xf6); return ['AF_CHANGE', String(c.animId)];
     case 'routine': return ['AF_ROUTINE'];
     case 'delete': return ['AF_DELETE'];
+    default: { const _exhaustive: never = c; throw new Error(`unhandled control kind ${(_exhaustive as AnimControl).kind}`); }
   }
 }
 
@@ -60,8 +66,9 @@ function eventTokens(e: AnimEvent): string[] {
       checkByte('sstOffset', e.sstOffset); checkByte('setField value', e.value);
       return ['AF_SET_FIELD', String(e.sstOffset), String(e.value), '0'];
     case 'callback':
-      if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(e.routine)) throw new Error(`anim callback routine "${e.routine}" is not a valid label`);
+      assertLabel('callback routine', e.routine);
       return ['AF_CALLBACK', `objroutine(${e.routine})>>8`, `objroutine(${e.routine})&$FF`, '0'];
+    default: { const _exhaustive: never = e; throw new Error(`unhandled event kind ${(_exhaustive as AnimEvent).kind}`); }
   }
 }
 
@@ -71,6 +78,18 @@ function eventTokens(e: AnimEvent): string[] {
  * See docs/specs/2026-06-16-sprite-mode-design.md §2.2.
  */
 export function generateAnimationAsm(tableLabel: string, anims: SpriteAnimation[]): string {
+  assertLabel('tableLabel', tableLabel);
+  if (anims.length === 0) throw new Error('generateAnimationAsm: anims is empty');
+  const seen = new Set<string>();
+  for (const a of anims) {
+    assertLabel('animation name', a.name);
+    if (seen.has(a.name)) throw new Error(`generateAnimationAsm: duplicate animation name "${a.name}"`);
+    seen.add(a.name);
+    if (a.steps.length === 0) throw new Error(`generateAnimationAsm: animation "${a.name}" has no steps`);
+    if (a.control.kind === 'change' && a.control.animId >= anims.length) {
+      throw new Error(`generateAnimationAsm: animation "${a.name}" change animId=${a.control.animId} >= anims.length ${anims.length}`);
+    }
+  }
   const lines: string[] = [`${tableLabel}:`];
   for (const a of anims) lines.push(`\t\tdc.w ${tableLabel}_${a.name}-${tableLabel}`);
   lines.push('');

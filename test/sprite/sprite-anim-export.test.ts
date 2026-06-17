@@ -77,12 +77,37 @@ describe('generateAnimationAsm — inline event tags', () => {
   it('rejects an invalid callback routine label', () => {
     expect(() => generateAnimationAsm('A', [
       { name: 'C', duration: 1, steps: [{ frame: 0, events: [{ kind: 'callback', routine: '3bad name' }] }], control: { kind: 'loop' } },
-    ])).toThrow(/not a valid label/);
+    ])).toThrow(/not a valid asm label/);
   });
 
   it('rejects an out-of-range sound id', () => {
     expect(() => generateAnimationAsm('A', [
       { name: 'C', duration: 1, steps: [{ frame: 0, events: [{ kind: 'sound', soundId: 300 }] }], control: { kind: 'loop' } },
     ])).toThrow(/soundId=300 out of range/);
+  });
+});
+
+describe('generateAnimationAsm — structural validation', () => {
+  const ok = { duration: 1 as const, steps: [{ frame: 0 }], control: { kind: 'loop' as const } };
+  it('throws on an empty anims array', () => {
+    expect(() => generateAnimationAsm('Ani_X', [])).toThrow(/anims is empty/);
+  });
+  it('throws on an animation with no steps', () => {
+    expect(() => generateAnimationAsm('Ani_X', [{ name: 'Walk', duration: 1, steps: [], control: { kind: 'loop' } }]))
+      .toThrow(/has no steps/);
+  });
+  it('throws on duplicate animation names', () => {
+    expect(() => generateAnimationAsm('Ani_X', [{ name: 'Walk', ...ok }, { name: 'Walk', ...ok }]))
+      .toThrow(/duplicate animation name "Walk"/);
+  });
+  it('throws on an invalid animation name', () => {
+    expect(() => generateAnimationAsm('Ani_X', [{ name: 'Walk Cycle', ...ok }])).toThrow(/is not a valid asm label/);
+  });
+  it('throws on an invalid tableLabel', () => {
+    expect(() => generateAnimationAsm('Ani-X', [{ name: 'Walk', ...ok }])).toThrow(/tableLabel .* not a valid asm label/);
+  });
+  it('throws when an AF_CHANGE targets an animId beyond the table', () => {
+    expect(() => generateAnimationAsm('Ani_X', [{ name: 'Walk', duration: 1, steps: [{ frame: 0 }], control: { kind: 'change', animId: 3 } }]))
+      .toThrow(/change animId=3 >= anims.length/);
   });
 });
