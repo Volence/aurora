@@ -137,7 +137,7 @@ export default function Toolbar({ onOpenProject, onOpenRecent, onSave }: Toolbar
 
             <span style={styles.separator} />
 
-            {(['map', 'art'] as AppMode[]).map((mode) => (
+            {(['map', 'art', 'sprite'] as AppMode[]).map((mode) => (
               <button
                 key={mode}
                 style={{
@@ -145,9 +145,9 @@ export default function Toolbar({ onOpenProject, onOpenRecent, onSave }: Toolbar
                   ...(appMode === mode ? styles.toolActive : {}),
                 }}
                 onClick={() => setAppMode(mode)}
-                title={mode === 'map' ? 'Map editor' : 'Art editor'}
+                title={mode === 'map' ? 'Map editor' : mode === 'art' ? 'Art editor' : 'Sprite editor'}
               >
-                {mode === 'map' ? 'Map' : 'Art'}
+                {mode === 'map' ? 'Map' : mode === 'art' ? 'Art' : 'Sprite'}
               </button>
             ))}
 

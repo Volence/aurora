@@ -127,6 +127,19 @@ export function ditherValue(
   }
 }
 
+/**
+ * Pixel-perfect rule: true if `b` is the redundant middle pixel of an L-corner
+ * between `a` and `c` (a and c diagonally adjacent; b orthogonally adjacent to
+ * both). Such a `b` should be dropped from a freehand stroke to avoid the
+ * doubled-corner "jaggies" that make pixel art look amateur.
+ */
+export function isLCorner(
+  a: { x: number; y: number }, b: { x: number; y: number }, c: { x: number; y: number },
+): boolean {
+  return Math.abs(c.x - a.x) === 1 && Math.abs(c.y - a.y) === 1
+    && (b.x === a.x || b.x === c.x) && (b.y === a.y || b.y === c.y);
+}
+
 export type MirrorMode = 'h' | 'v' | 'both';
 
 /** All points a symmetric stroke at (x,y) touches, deduped. */
