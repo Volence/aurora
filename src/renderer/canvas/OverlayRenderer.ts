@@ -1,6 +1,7 @@
 import type { ObjectPlacement, RingPlacement, Section } from '../../core/model/s4-types';
 import { SECTION_TILES_WIDE, SECTION_TILES_HIGH, SECTION_PIXEL_SIZE } from '../../core/model/s4-types';
 import type { OverlayOptions } from '../state/viewStore';
+import type { ObjectPreview } from '../state/projectStore';
 
 type Ctx = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
 
@@ -16,6 +17,7 @@ export class OverlayRenderer {
     sections: SectionOverlayInfo[],
     options: OverlayOptions,
     viewport: { x: number; y: number; width: number; height: number; zoom: number },
+    objectSprites?: Map<string, ObjectPreview>,
   ): void {
     const { x: vpX, y: vpY, zoom } = viewport;
 
@@ -35,7 +37,7 @@ export class OverlayRenderer {
         this.drawRings(ctx, info.section.rings, viewport, info.offsetX, info.offsetY);
       }
       if (options.showObjects) {
-        this.drawObjects(ctx, info.section.objects, viewport, info.offsetX, info.offsetY);
+        this.drawObjects(ctx, info.section.objects, viewport, info.offsetX, info.offsetY, objectSprites);
       }
     }
 
@@ -158,6 +160,7 @@ export class OverlayRenderer {
     viewport: { x: number; y: number; width: number; height: number; zoom: number },
     offsetX: number,
     offsetY: number,
+    objectSprites?: Map<string, ObjectPreview>,
   ): void {
     const { x: vpX, y: vpY, width, height, zoom } = viewport;
     const vpWidth = width / zoom;
@@ -168,6 +171,14 @@ export class OverlayRenderer {
       const wy = obj.y + offsetY;
       if (wx < vpX - 64 || wx > vpX + vpWidth + 64) continue;
       if (wy < vpY - 64 || wy > vpY + vpHeight + 64) continue;
+
+      const preview = objectSprites?.get(obj.typeId);
+      if (preview) {
+        // Sprite preview, origin aligned to the placement point.
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(preview.bitmap, wx - preview.originX, wy - preview.originY);
+        continue;
+      }
 
       ctx.fillStyle = 'rgba(255, 100, 100, 0.7)';
       ctx.fillRect(wx - 8, wy - 8, 16, 16);

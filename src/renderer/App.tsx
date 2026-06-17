@@ -16,15 +16,21 @@ import { useProject } from './hooks/useProject';
 import { useProjectStore } from './state/projectStore';
 import { useEditorStore } from './state/editorStore';
 import { registerAgentHandler } from './agent/agent-handler';
+import { refreshObjectPreviews } from './object-previews';
 
 export default function App() {
   const { openProject, openProjectByPath, saveProject } = useProject();
   const error = useProjectStore((s) => s.error);
   const tool = useEditorStore((s) => s.tool);
   const appMode = useEditorStore((s) => s.appMode);
+  const project = useProjectStore((s) => s.project);
+  const currentZoneId = useProjectStore((s) => s.currentZoneId);
 
   // Register the MCP agent bridge handler once on mount
   useEffect(() => { registerAgentHandler(); }, []);
+
+  // Build object preview images (from sprite bindings) when a project/zone loads.
+  useEffect(() => { if (project && currentZoneId) refreshObjectPreviews().catch(() => {}); }, [project, currentZoneId]);
 
   // Global Ctrl+S handler
   useEffect(() => {

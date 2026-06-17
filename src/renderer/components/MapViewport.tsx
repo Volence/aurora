@@ -70,6 +70,7 @@ export default function MapViewport() {
   const project = useProjectStore((s) => s.project);
   const currentZoneId = useProjectStore((s) => s.currentZoneId);
   const currentActId = useProjectStore((s) => s.currentActId);
+  const objectSprites = useProjectStore((s) => s.objectSprites);
   const historyVersion = useEditorStore((s) => s.historyVersion);
   const activeSectionIndex = useEditorStore((s) => s.activeSectionIndex);
   const editingLayer = useEditorStore((s) => s.editingLayer);
@@ -215,9 +216,9 @@ export default function MapViewport() {
         sectionInfos.push({ section, offsetX: offset.x, offsetY: offset.y });
       }
 
-      overlayRenderer.render(ctx, sectionInfos, overlays, viewport);
+      overlayRenderer.render(ctx, sectionInfos, overlays, viewport, useProjectStore.getState().objectSprites);
     }
-  }, [vpX, vpY, zoom, overlays, project, currentZoneId, currentActId, activeSectionIndex, editingLayer, historyVersion, selection]);
+  }, [vpX, vpY, zoom, overlays, project, currentZoneId, currentActId, activeSectionIndex, editingLayer, historyVersion, selection, objectSprites]);
 
   // Handle resize
   useEffect(() => {

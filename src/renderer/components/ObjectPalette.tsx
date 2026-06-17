@@ -1,6 +1,8 @@
-import React, { useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { useEditorStore } from '../state/editorStore';
 import { useProjectStore } from '../state/projectStore';
+import { listSprites } from './sprite/export-sprite';
+import { readObjectBindings, setObjectBinding } from '../object-previews';
 
 interface ObjectPaletteProps {
   selectedType: number;
@@ -14,6 +16,21 @@ export default function ObjectPalette({ selectedType, onSelectType }: ObjectPale
   const selectedObjectTypeId = useEditorStore((s) => s.selectedObjectTypeId);
 
   const objectLibrary = project?.objectLibrary ?? [];
+
+  // Sprite-preview binding for the selected object type.
+  const [sprites, setSprites] = React.useState<string[]>([]);
+  const [bindings, setBindings] = React.useState<Record<string, string>>({});
+  useEffect(() => {
+    if (!project) return;
+    listSprites().then(setSprites).catch(() => setSprites([]));
+    readObjectBindings(project.basePath).then(setBindings).catch(() => setBindings({}));
+  }, [project]);
+
+  async function assignSprite(spriteName: string) {
+    if (!selectedObjectTypeId) return;
+    await setObjectBinding(selectedObjectTypeId, spriteName);
+    setBindings((b) => { const n = { ...b }; if (spriteName) n[selectedObjectTypeId] = spriteName; else delete n[selectedObjectTypeId]; return n; });
+  }
 
   const matchesFilter = React.useCallback((def: { id: string; name: string }) => {
     if (!filter) return true;
@@ -58,6 +75,20 @@ export default function ObjectPalette({ selectedType, onSelectType }: ObjectPale
           </button>
         ))}
       </div>
+      {selectedObjectTypeId && (
+        <div style={styles.bindRow}>
+          <span style={styles.bindLabel}>Preview sprite</span>
+          <select
+            style={styles.bindSelect}
+            value={bindings[selectedObjectTypeId] ?? ''}
+            onChange={(e) => assignSprite(e.target.value)}
+            title="Show this object as a sprite preview on the map"
+          >
+            <option value="">— none (box) —</option>
+            {sprites.map((n) => <option key={n} value={n}>{n}</option>)}
+          </select>
+        </div>
+      )}
     </div>
   );
 }
@@ -95,5 +126,14 @@ const styles: Record<string, React.CSSProperties> = {
   },
   entryName: {
     overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const,
+  },
+  bindRow: {
+    padding: '8px 12px', borderTop: '1px solid #313244', display: 'flex',
+    flexDirection: 'column', gap: 4,
+  },
+  bindLabel: { fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.5, color: '#9399b2' },
+  bindSelect: {
+    padding: '4px 6px', background: '#313244', color: '#cdd6f4',
+    border: '1px solid #45475a', borderRadius: 4, fontSize: 12,
   },
 };

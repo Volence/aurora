@@ -71,6 +71,8 @@ export interface SpriteManifest {
   frame: { width: number; height: number };
   frameCount: number;
   tileCount: number;
+  /** Palette line the sprite was authored against (for previews). */
+  paletteLine: number;
   /** true = streamed art (DPLC + frame-local mappings); false = all art resident. */
   dplc: boolean;
   animTable: string;
@@ -107,6 +109,7 @@ export function buildSpriteExport(name: string, rawFrames: RawFrame[], anim: Per
     frame: { width: rawFrames[0].width, height: rawFrames[0].height },
     frameCount,
     tileCount,
+    paletteLine: rawFrames[0].palette,
     dplc: !!opts?.dplc,
     animTable,
     animSteps: anim.steps.map((s) => ({ frame: s.frame, duration: s.duration })),

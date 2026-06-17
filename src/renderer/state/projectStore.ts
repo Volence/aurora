@@ -3,6 +3,13 @@ import type { LoadedS4Config } from '../../core/config/s4-config';
 import type { S4Project, Zone, Act, Tileset, Palette, ObjectDef, ChunkDef, BgLibraryEntry } from '../../core/model/s4-types';
 import type { S4Level } from '../../core/editing/commands';
 
+/** A rendered object-preview image + its origin (for centering on the placement point). */
+export interface ObjectPreview {
+  bitmap: ImageBitmap;
+  originX: number;
+  originY: number;
+}
+
 interface ProjectState {
   config: LoadedS4Config | null;
   project: S4Project | null;
@@ -10,14 +17,15 @@ interface ProjectState {
   currentActId: string | null;
   loading: boolean;
   error: string | null;
-  objectSprites: Map<string, ImageBitmap>;
+  /** Object id → rendered preview (from a sprite binding). Empty until built. */
+  objectSprites: Map<string, ObjectPreview>;
 
   setConfig: (config: LoadedS4Config) => void;
   setProject: (project: S4Project) => void;
   setCurrentAct: (zoneId: string, actId: string) => void;
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
-  setObjectSprites: (sprites: Map<string, ImageBitmap>) => void;
+  setObjectSprites: (sprites: Map<string, ObjectPreview>) => void;
   addChunks: (chunks: ChunkDef[]) => void;
   addBgToLibrary: (entry: BgLibraryEntry) => void;
   clearChunks: () => void;
