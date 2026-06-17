@@ -1,0 +1,52 @@
+import { useProjectStore } from '../../state/projectStore';
+import { useArtStore } from '../../state/artStore';
+import { useSpriteStore } from '../../state/spriteStore';
+import { useToastStore } from '../../state/toastStore';
+import { buildSpriteExport } from '../../../core/export/sprite-export';
+import type { RawFrame } from '../../../core/art/sprite-decompose';
+import type { PerFrameAnimation } from '../../../core/export/sprite-anim-export';
+
+/** Copy a (possibly offset/shared) view into a standalone ArrayBuffer for IPC. */
+function toArrayBuffer(u: Uint8Array): ArrayBuffer {
+  return u.slice().buffer;
+}
+
+/**
+ * Assemble the current sprite (frames + timeline) and write the engine artifacts
+ * to s4_engine/data/sprites/<name>/ : mappings.bin, art.bin, <name>_anims.asm,
+ * sprite.json (manifest). Reports via toast.
+ */
+export async function exportSprite(name: string): Promise<void> {
+  const toast = useToastStore.getState().addToast;
+  const project = useProjectStore.getState().project;
+  if (!project) { toast('No project open', 'error'); return; }
+
+  const { frames, steps } = useSpriteStore.getState();
+  const palette = useArtStore.getState().paletteLine;
+
+  if (steps.length === 0) { toast('Add at least one animation step before exporting', 'error'); return; }
+
+  const rawFrames: RawFrame[] = frames.map((b, i) => ({
+    id: `f${i}`, pixels: b.data, width: b.width, height: b.height,
+    originX: b.width / 2, originY: b.height / 2, palette, priority: false,
+  }));
+  const anim: PerFrameAnimation = {
+    name: 'Loop',
+    steps: steps.map((s) => ({ frame: s.frameIndex, duration: s.duration })),
+    control: { kind: 'loop' },
+  };
+
+  try {
+    const out = buildSpriteExport(name, rawFrames, anim);
+    const base = project.basePath;
+    const dir = `data/sprites/${name}`;
+    const enc = new TextEncoder();
+    await window.api.writeBinaryFile(base, `${dir}/mappings.bin`, toArrayBuffer(out.mappings));
+    await window.api.writeBinaryFile(base, `${dir}/art.bin`, toArrayBuffer(out.art));
+    await window.api.writeBinaryFile(base, `${dir}/${name}_anims.asm`, toArrayBuffer(enc.encode(out.animAsm)));
+    await window.api.writeBinaryFile(base, `${dir}/sprite.json`, toArrayBuffer(enc.encode(JSON.stringify(out.manifest, null, 2))));
+    toast(`Exported "${name}": ${out.manifest.frameCount} frames, ${out.manifest.tileCount} tiles → ${dir}/`, 'success');
+  } catch (e) {
+    toast(`Export failed: ${e instanceof Error ? e.message : String(e)}`, 'error');
+  }
+}

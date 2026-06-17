@@ -111,3 +111,29 @@ describe('generateAnimationAsm — structural validation', () => {
       .toThrow(/change animId=3 >= anims.length/);
   });
 });
+
+import { generatePerFrameAnimationAsm } from '../../src/core/export/sprite-anim-export';
+
+describe('generatePerFrameAnimationAsm — per-frame duration form', () => {
+  it('emits frame,duration pairs terminated by the control code', () => {
+    const asm = generatePerFrameAnimationAsm('Ani_X', [
+      { name: 'Walk', steps: [{ frame: 7, duration: 6 }, { frame: 8, duration: 4 }], control: { kind: 'loop' } },
+    ]);
+    expect(asm).toContain('\t\tdc.b 7, 6, 8, 4, AF_END');
+  });
+  it('emits events before the frame,duration pair', () => {
+    const asm = generatePerFrameAnimationAsm('Ani_X', [
+      { name: 'Atk', steps: [{ frame: 2, duration: 3, events: [{ kind: 'sound', soundId: 0x81 }] }], control: { kind: 'loop' } },
+    ]);
+    expect(asm).toContain('\t\tdc.b AF_SOUND, 129, 2, 3, AF_END');
+  });
+  it('shares structural validation with the per-anim form', () => {
+    expect(() => generatePerFrameAnimationAsm('Ani_X', [])).toThrow(/anims is empty/);
+    expect(() => generatePerFrameAnimationAsm('Ani-X', [{ name: 'W', steps: [{ frame: 0, duration: 1 }], control: { kind: 'loop' } }]))
+      .toThrow(/tableLabel .* not a valid asm label/);
+  });
+  it('throws on a per-frame duration above 0x7F', () => {
+    expect(() => generatePerFrameAnimationAsm('Ani_X', [{ name: 'W', steps: [{ frame: 0, duration: 0x80 }], control: { kind: 'loop' } }]))
+      .toThrow(/duration=128 out of range/);
+  });
+});

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useProjectStore, getCurrentZone } from '../../state/projectStore';
 import { useArtStore } from '../../state/artStore';
 import { useSpriteStore } from '../../state/spriteStore';
@@ -6,6 +6,7 @@ import type { SpriteTool } from '../../state/spriteStore';
 import SpriteCanvas from './SpriteCanvas';
 import type { OverlayRect } from './SpriteCanvas';
 import Timeline from './Timeline';
+import { exportSprite } from './export-sprite';
 import PaletteEditor from '../art/PaletteEditor';
 import { decomposeFrame } from '../../../core/art/sprite-decompose';
 import type { PixelBuffer } from '../../../core/art/pixel-ops';
@@ -50,6 +51,7 @@ export default function SpriteMode() {
   const currentIndex = useSpriteStore((s) => s.currentIndex);
   const paletteLine = useArtStore((s) => s.paletteLine);
   useArtStore((s) => s.paletteVersion);
+  const [spriteName, setSpriteName] = useState('NewSprite');
 
   const buffer = frames[currentIndex];
   const zone = getCurrentZone(useProjectStore.getState());
@@ -112,6 +114,20 @@ export default function SpriteMode() {
             <div style={styles.stat}><span>Unique tiles</span><b>{decomp.tiles.length}</b></div>
             <div style={styles.hint}>Pieces ≤ 4×4 cells, auto-packed. Toggle “Show pieces” to overlay.</div>
           </div>
+          <div style={styles.exportBox}>
+            <div style={styles.inspectorTitle}>Export</div>
+            <input
+              style={styles.nameInput}
+              value={spriteName}
+              onChange={(e) => setSpriteName(e.target.value)}
+              placeholder="SpriteName"
+              spellCheck={false}
+            />
+            <button style={styles.exportBtn} onClick={() => exportSprite(spriteName)}>
+              Export to engine
+            </button>
+            <div style={styles.hint}>Writes mappings / art / anims + manifest to data/sprites/{spriteName || '<name>'}/.</div>
+          </div>
           <PaletteEditor />
         </div>
       </div>
@@ -162,6 +178,9 @@ const styles: Record<string, React.CSSProperties> = {
     borderLeft: '1px solid #313244', overflow: 'auto', display: 'flex', flexDirection: 'column',
   },
   inspector: { padding: '10px 12px', borderBottom: '1px solid #313244' },
+  exportBox: { padding: '10px 12px', borderBottom: '1px solid #313244', display: 'flex', flexDirection: 'column', gap: 6 },
+  nameInput: { background: '#313244', color: '#cdd6f4', border: '1px solid #45475a', borderRadius: 4, fontSize: 12, padding: '4px 6px' },
+  exportBtn: { padding: '5px 10px', background: '#89b4fa', color: '#1e1e2e', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 12, fontWeight: 600 },
   inspectorTitle: { fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5, color: '#9399b2', marginBottom: 8 },
   stat: { display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#cdd6f4', padding: '2px 0' },
   hint: { fontSize: 11, color: '#6c7086', marginTop: 8, lineHeight: 1.4 },

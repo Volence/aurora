@@ -77,19 +77,27 @@ function eventTokens(e: AnimEvent): string[] {
  * blocks `dc.b duration, [events] frame, …, control`. Uses engine symbolic constants.
  * See docs/specs/2026-06-16-sprite-mode-design.md §2.2.
  */
-export function generateAnimationAsm(tableLabel: string, anims: SpriteAnimation[]): string {
+function validateAnimList(
+  fn: string,
+  tableLabel: string,
+  anims: { name: string; steps: unknown[]; control: AnimControl }[],
+): void {
   assertLabel('tableLabel', tableLabel);
-  if (anims.length === 0) throw new Error('generateAnimationAsm: anims is empty');
+  if (anims.length === 0) throw new Error(`${fn}: anims is empty`);
   const seen = new Set<string>();
   for (const a of anims) {
     assertLabel('animation name', a.name);
-    if (seen.has(a.name)) throw new Error(`generateAnimationAsm: duplicate animation name "${a.name}"`);
+    if (seen.has(a.name)) throw new Error(`${fn}: duplicate animation name "${a.name}"`);
     seen.add(a.name);
-    if (a.steps.length === 0) throw new Error(`generateAnimationAsm: animation "${a.name}" has no steps`);
+    if (a.steps.length === 0) throw new Error(`${fn}: animation "${a.name}" has no steps`);
     if (a.control.kind === 'change' && a.control.animId >= anims.length) {
-      throw new Error(`generateAnimationAsm: animation "${a.name}" change animId=${a.control.animId} >= anims.length ${anims.length}`);
+      throw new Error(`${fn}: animation "${a.name}" change animId=${a.control.animId} >= anims.length ${anims.length}`);
     }
   }
+}
+
+export function generateAnimationAsm(tableLabel: string, anims: SpriteAnimation[]): string {
+  validateAnimList('generateAnimationAsm', tableLabel, anims);
   const lines: string[] = [`${tableLabel}:`];
   for (const a of anims) lines.push(`\t\tdc.w ${tableLabel}_${a.name}-${tableLabel}`);
   lines.push('');
@@ -98,6 +106,44 @@ export function generateAnimationAsm(tableLabel: string, anims: SpriteAnimation[
     for (const step of a.steps) {
       for (const ev of step.events ?? []) tokens.push(...eventTokens(ev));
       tokens.push(frameToken(step.frame));
+    }
+    tokens.push(...controlTokens(a.control));
+    lines.push(`${tableLabel}_${a.name}:`);
+    lines.push(`\t\tdc.b ${tokens.join(', ')}`);
+    lines.push('\t\teven');
+    lines.push('');
+  }
+  return lines.join('\n');
+}
+
+/** Per-frame-duration animation step: a frame with its own hold + optional events. */
+export interface PerFrameStep {
+  frame: number;        // mapping frame index, 0x00..0xF6
+  duration: number;     // per-frame hold, 0..0x7F ticks
+  events?: AnimEvent[];
+}
+
+export interface PerFrameAnimation {
+  name: string;
+  steps: PerFrameStep[];
+  control: AnimControl;
+}
+
+/**
+ * Per-frame-duration form (engine `AnimateSprite_PerFrame`): emits
+ * `dc.b [events] frame, dur, frame, dur, …, control`. Each frame carries its own
+ * hold; events precede the frame they annotate. See spec §2.2.
+ */
+export function generatePerFrameAnimationAsm(tableLabel: string, anims: PerFrameAnimation[]): string {
+  validateAnimList('generatePerFrameAnimationAsm', tableLabel, anims);
+  const lines: string[] = [`${tableLabel}:`];
+  for (const a of anims) lines.push(`\t\tdc.w ${tableLabel}_${a.name}-${tableLabel}`);
+  lines.push('');
+  for (const a of anims) {
+    const tokens: string[] = [];
+    for (const step of a.steps) {
+      for (const ev of step.events ?? []) tokens.push(...eventTokens(ev));
+      tokens.push(frameToken(step.frame), durationToken(step.duration));
     }
     tokens.push(...controlTokens(a.control));
     lines.push(`${tableLabel}_${a.name}:`);
