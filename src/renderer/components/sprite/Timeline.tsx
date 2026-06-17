@@ -48,8 +48,11 @@ export default function Timeline() {
   const colors = override ?? zone?.palette.lines[paletteLine]?.colors ?? [];
 
   const [playing, setPlaying] = useState(false);
+  const [speed, setSpeed] = useState(1);
   const posRef = useRef(0);
   const accRef = useRef(0);
+  const speedRef = useRef(1);
+  speedRef.current = speed;
   const [, force] = useReducer((x) => x + 1, 0);
 
   useEffect(() => {
@@ -62,8 +65,9 @@ export default function Timeline() {
     let last = performance.now();
     const loop = (now: number) => {
       const dt = now - last; last = now;
-      accRef.current += dt / (1000 / 60); // elapsed in 1/60s ticks
-      const dur = steps[order[posRef.current]]?.duration ?? 6;
+      accRef.current += (dt / (1000 / 60)) * speedRef.current; // elapsed in 1/60s ticks
+      // Engine holds each frame for (duration + 1) ticks (timer counts D..0 then advances).
+      const dur = (steps[order[posRef.current]]?.duration ?? 6) + 1;
       if (accRef.current >= dur) {
         accRef.current = 0;
         posRef.current = (posRef.current + 1) % order.length;
@@ -93,6 +97,9 @@ export default function Timeline() {
           <select value={playbackMode} style={styles.select}
             onChange={(e) => useSpriteStore.getState().setPlaybackMode(e.target.value as PlaybackMode)}>
             {MODES.map((m) => <option key={m} value={m}>{m}</option>)}
+          </select>
+          <select value={speed} style={styles.select} title="preview speed" onChange={(e) => setSpeed(Number(e.target.value))}>
+            {[0.25, 0.5, 1, 2, 4].map((s) => <option key={s} value={s}>{s}×</option>)}
           </select>
         </div>
         {characterAnims.length > 0 && (
