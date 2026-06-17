@@ -11,6 +11,7 @@ import PropertiesPanel from './components/PropertiesPanel';
 import StatusBar from './components/StatusBar';
 import ToastContainer from './components/ToastContainer';
 import ArtMode from './components/art/ArtMode';
+import SpriteMode from './components/sprite/SpriteMode';
 import { useProject } from './hooks/useProject';
 import { useProjectStore } from './state/projectStore';
 import { useEditorStore } from './state/editorStore';
@@ -55,6 +56,8 @@ export default function App() {
 
       {appMode === 'art' ? (
         <ArtMode />
+      ) : appMode === 'sprite' ? (
+        <SpriteMode />
       ) : (
         <>
           <div style={styles.main}>

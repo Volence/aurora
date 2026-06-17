@@ -60,7 +60,7 @@ export const RING_PATTERNS: RingPattern[] = [
 
 export type EditingLayer = 'fg' | 'bg';
 
-export type AppMode = 'map' | 'art';
+export type AppMode = 'map' | 'art' | 'sprite';
 
 interface EditorState {
   tool: EditorTool;
