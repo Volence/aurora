@@ -25,6 +25,8 @@ export interface SpriteManifest {
   tileCount: number;
   piecesPerFrame: number[];
   animTable: string;
+  /** Timeline steps (frame index + 1/60s hold) so a load can restore the animation. */
+  animSteps: { frame: number; duration: number }[];
   bytes: { mappings: number; art: number };
 }
 
@@ -52,6 +54,7 @@ export function buildSpriteExport(name: string, rawFrames: RawFrame[], anim: Per
     tileCount: art.length,
     piecesPerFrame: frames.map((f) => f.pieces.length),
     animTable,
+    animSteps: anim.steps.map((s) => ({ frame: s.frame, duration: s.duration })),
     bytes: { mappings: mappings.length, art: artBytes.length },
   };
 

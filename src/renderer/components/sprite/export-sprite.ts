@@ -1,10 +1,27 @@
 import { useProjectStore } from '../../state/projectStore';
 import { useArtStore } from '../../state/artStore';
 import { useSpriteStore } from '../../state/spriteStore';
+import type { AnimStepUI } from '../../state/spriteStore';
 import { useToastStore } from '../../state/toastStore';
 import { buildSpriteExport } from '../../../core/export/sprite-export';
+import type { SpriteManifest } from '../../../core/export/sprite-export';
+import { reconstructSpriteFrames } from '../../../core/import/sprite-import';
 import type { RawFrame } from '../../../core/art/sprite-decompose';
 import type { PerFrameAnimation } from '../../../core/export/sprite-anim-export';
+
+const SPRITES_DIR = 'data/sprites';
+const INDEX_PATH = `${SPRITES_DIR}/index.json`;
+
+interface SpriteIndexEntry { name: string; frameCount: number; tileCount: number; }
+
+async function readJson<T>(basePath: string, rel: string): Promise<T | null> {
+  try {
+    const bytes = new Uint8Array(await window.api.readBinaryFile(basePath, rel));
+    return JSON.parse(new TextDecoder().decode(bytes)) as T;
+  } catch {
+    return null;
+  }
+}
 
 /** Copy a (possibly offset/shared) view into a standalone ArrayBuffer for IPC. */
 function toArrayBuffer(u: Uint8Array): ArrayBuffer {
@@ -45,8 +62,53 @@ export async function exportSprite(name: string): Promise<void> {
     await window.api.writeBinaryFile(base, `${dir}/art.bin`, toArrayBuffer(out.art));
     await window.api.writeBinaryFile(base, `${dir}/${name}_anims.asm`, toArrayBuffer(enc.encode(out.animAsm)));
     await window.api.writeBinaryFile(base, `${dir}/sprite.json`, toArrayBuffer(enc.encode(JSON.stringify(out.manifest, null, 2))));
+
+    // Upsert the sprite index so Load can list it.
+    const index = (await readJson<{ sprites: SpriteIndexEntry[] }>(base, INDEX_PATH)) ?? { sprites: [] };
+    const entry: SpriteIndexEntry = { name, frameCount: out.manifest.frameCount, tileCount: out.manifest.tileCount };
+    index.sprites = [...index.sprites.filter((s) => s.name !== name), entry].sort((a, b) => a.name.localeCompare(b.name));
+    await window.api.writeBinaryFile(base, INDEX_PATH, toArrayBuffer(enc.encode(JSON.stringify(index, null, 2))));
+
     toast(`Exported "${name}": ${out.manifest.frameCount} frames, ${out.manifest.tileCount} tiles → ${dir}/`, 'success');
   } catch (e) {
     toast(`Export failed: ${e instanceof Error ? e.message : String(e)}`, 'error');
+  }
+}
+
+/** Names of sprites the editor knows about (from data/sprites/index.json). */
+export async function listSprites(): Promise<string[]> {
+  const project = useProjectStore.getState().project;
+  if (!project) return [];
+  const index = await readJson<{ sprites: SpriteIndexEntry[] }>(project.basePath, INDEX_PATH);
+  return (index?.sprites ?? []).map((s) => s.name);
+}
+
+/**
+ * Load a sprite from data/sprites/<name>/ into the editor: reconstruct editable
+ * frame bitmaps from mappings.bin + art.bin, and restore the timeline from the
+ * manifest. Works for editor-exported sprites and any non-DPLC sprite whose art
+ * is fully present in art.bin.
+ */
+export async function loadSpriteByName(name: string): Promise<void> {
+  const toast = useToastStore.getState().addToast;
+  const project = useProjectStore.getState().project;
+  if (!project) { toast('No project open', 'error'); return; }
+  const base = project.basePath;
+  const dir = `${SPRITES_DIR}/${name}`;
+  try {
+    const mappings = new Uint8Array(await window.api.readBinaryFile(base, `${dir}/mappings.bin`));
+    const art = new Uint8Array(await window.api.readBinaryFile(base, `${dir}/art.bin`));
+    const recon = reconstructSpriteFrames(mappings, art);
+    const frames = recon.frames.map((data) => ({ width: recon.width, height: recon.height, data }));
+
+    const manifest = await readJson<SpriteManifest>(base, `${dir}/sprite.json`);
+    const steps: AnimStepUI[] = (manifest?.animSteps ?? [])
+      .filter((s) => s.frame < frames.length)
+      .map((s) => ({ frameIndex: s.frame, duration: s.duration }));
+
+    useSpriteStore.getState().loadSprite(frames, steps);
+    toast(`Loaded "${name}": ${frames.length} frames${steps.length ? `, ${steps.length} anim steps` : ''}`, 'success');
+  } catch (e) {
+    toast(`Load failed for "${name}": ${e instanceof Error ? e.message : String(e)}`, 'error');
   }
 }

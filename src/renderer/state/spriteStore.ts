@@ -41,6 +41,9 @@ interface SpriteState {
   removeStep: (i: number) => void;
   setStepDuration: (i: number, duration: number) => void;
   setPlaybackMode: (m: PlaybackMode) => void;
+
+  // Load (replace the whole working sprite)
+  loadSprite: (frames: PixelBuffer[], steps: AnimStepUI[]) => void;
 }
 
 const DEFAULT_STEP_DURATION = 6;
@@ -95,6 +98,12 @@ export const useSpriteStore = create<SpriteState>((set) => ({
     steps: s.steps.map((st, idx) => (idx === i ? { ...st, duration: Math.min(0x7f, Math.max(1, Math.round(duration) || 1)) } : st)),
   })),
   setPlaybackMode: (playbackMode) => set({ playbackMode }),
+
+  loadSprite: (frames, steps) => set({
+    frames: frames.length ? frames : [blankFrame()],
+    steps,
+    currentIndex: 0,
+  }),
 }));
 
 /** Build the frame-index play order for a playback mode (one full cycle). */

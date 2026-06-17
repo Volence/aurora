@@ -6,7 +6,7 @@ import type { SpriteTool } from '../../state/spriteStore';
 import SpriteCanvas from './SpriteCanvas';
 import type { OverlayRect } from './SpriteCanvas';
 import Timeline from './Timeline';
-import { exportSprite } from './export-sprite';
+import { exportSprite, loadSpriteByName, listSprites } from './export-sprite';
 import PaletteEditor from '../art/PaletteEditor';
 import { decomposeFrame } from '../../../core/art/sprite-decompose';
 import type { PixelBuffer } from '../../../core/art/pixel-ops';
@@ -52,6 +52,18 @@ export default function SpriteMode() {
   const paletteLine = useArtStore((s) => s.paletteLine);
   useArtStore((s) => s.paletteVersion);
   const [spriteName, setSpriteName] = useState('NewSprite');
+  const [available, setAvailable] = useState<string[]>([]);
+
+  // Refresh the list of saved sprites when entering sprite mode.
+  useEffect(() => { listSprites().then(setAvailable).catch(() => setAvailable([])); }, []);
+
+  async function handleLoad() {
+    await loadSpriteByName(spriteName);
+  }
+  async function handleExport() {
+    await exportSprite(spriteName);
+    listSprites().then(setAvailable).catch(() => {});
+  }
 
   const buffer = frames[currentIndex];
   const zone = getCurrentZone(useProjectStore.getState());
@@ -115,7 +127,7 @@ export default function SpriteMode() {
             <div style={styles.hint}>Pieces ≤ 4×4 cells, auto-packed. Toggle “Show pieces” to overlay.</div>
           </div>
           <div style={styles.exportBox}>
-            <div style={styles.inspectorTitle}>Export</div>
+            <div style={styles.inspectorTitle}>Sprite</div>
             <input
               style={styles.nameInput}
               value={spriteName}
@@ -123,10 +135,17 @@ export default function SpriteMode() {
               placeholder="SpriteName"
               spellCheck={false}
             />
-            <button style={styles.exportBtn} onClick={() => exportSprite(spriteName)}>
-              Export to engine
-            </button>
-            <div style={styles.hint}>Writes mappings / art / anims + manifest to data/sprites/{spriteName || '<name>'}/.</div>
+            {available.length > 0 && (
+              <select style={styles.nameInput} value="" onChange={(e) => { if (e.target.value) setSpriteName(e.target.value); }}>
+                <option value="">— saved sprites ({available.length}) —</option>
+                {available.map((n) => <option key={n} value={n}>{n}</option>)}
+              </select>
+            )}
+            <div style={styles.btnRow}>
+              <button style={styles.exportBtn} onClick={handleExport}>Export</button>
+              <button style={styles.loadBtn} onClick={handleLoad}>Load</button>
+            </div>
+            <div style={styles.hint}>Export writes mappings / art / anims + manifest to data/sprites/{spriteName || '<name>'}/. Load reconstructs editable frames + timeline from there.</div>
           </div>
           <PaletteEditor />
         </div>
@@ -180,7 +199,9 @@ const styles: Record<string, React.CSSProperties> = {
   inspector: { padding: '10px 12px', borderBottom: '1px solid #313244' },
   exportBox: { padding: '10px 12px', borderBottom: '1px solid #313244', display: 'flex', flexDirection: 'column', gap: 6 },
   nameInput: { background: '#313244', color: '#cdd6f4', border: '1px solid #45475a', borderRadius: 4, fontSize: 12, padding: '4px 6px' },
-  exportBtn: { padding: '5px 10px', background: '#89b4fa', color: '#1e1e2e', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 12, fontWeight: 600 },
+  btnRow: { display: 'flex', gap: 6 },
+  exportBtn: { flex: 1, padding: '5px 10px', background: '#89b4fa', color: '#1e1e2e', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 12, fontWeight: 600 },
+  loadBtn: { flex: 1, padding: '5px 10px', background: '#313244', color: '#cdd6f4', border: '1px solid #45475a', borderRadius: 4, cursor: 'pointer', fontSize: 12, fontWeight: 600 },
   inspectorTitle: { fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5, color: '#9399b2', marginBottom: 8 },
   stat: { display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#cdd6f4', padding: '2px 0' },
   hint: { fontSize: 11, color: '#6c7086', marginTop: 8, lineHeight: 1.4 },
