@@ -6,7 +6,7 @@ import type { SpriteTool } from '../../state/spriteStore';
 import SpriteCanvas from './SpriteCanvas';
 import type { OverlayRect } from './SpriteCanvas';
 import Timeline from './Timeline';
-import { exportSprite, loadSpriteByName, listSprites } from './export-sprite';
+import { exportSprite, loadSpriteByName, listSprites, loadEngineCharacter } from './export-sprite';
 import PaletteEditor from '../art/PaletteEditor';
 import { decomposeFrame } from '../../../core/art/sprite-decompose';
 import type { PixelBuffer } from '../../../core/art/pixel-ops';
@@ -146,6 +146,15 @@ export default function SpriteMode() {
               <button style={styles.loadBtn} onClick={handleLoad}>Load</button>
             </div>
             <div style={styles.hint}>Export writes mappings / art / anims + manifest to data/sprites/{spriteName || '<name>'}/. Load reconstructs editable frames + timeline from there.</div>
+            <div style={styles.inspectorTitle}>Load engine character</div>
+            <div style={styles.btnRow}>
+              {['sonic', 'tails', 'knuckles'].map((c) => (
+                <button key={c} style={styles.loadBtn} onClick={() => loadEngineCharacter(c)} title={`Load ${c} frames (experimental, no timeline)`}>
+                  {c[0].toUpperCase() + c.slice(1)}
+                </button>
+              ))}
+            </div>
+            <div style={styles.hint}>Experimental: loads DPLC character frames (poses) for viewing/editing. No timeline yet; colors use the active palette line.</div>
           </div>
           <PaletteEditor />
         </div>

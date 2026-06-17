@@ -5,7 +5,7 @@ import type { AnimStepUI } from '../../state/spriteStore';
 import { useToastStore } from '../../state/toastStore';
 import { buildSpriteExport } from '../../../core/export/sprite-export';
 import type { SpriteManifest } from '../../../core/export/sprite-export';
-import { reconstructSpriteFrames } from '../../../core/import/sprite-import';
+import { reconstructSpriteFrames, reconstructDPLCSprite } from '../../../core/import/sprite-import';
 import type { RawFrame } from '../../../core/art/sprite-decompose';
 import type { PerFrameAnimation } from '../../../core/export/sprite-anim-export';
 
@@ -110,5 +110,30 @@ export async function loadSpriteByName(name: string): Promise<void> {
     toast(`Loaded "${name}": ${frames.length} frames${steps.length ? `, ${steps.length} anim steps` : ''}`, 'success');
   } catch (e) {
     toast(`Load failed for "${name}": ${e instanceof Error ? e.message : String(e)}`, 'error');
+  }
+}
+
+/**
+ * Load a DPLC character (sonic / tails / knuckles) straight from the engine's
+ * native layout (data/mappings, data/dplc unoptimized, art/uncompressed/characters)
+ * into editable frames. EXPERIMENTAL: no timeline yet (the named animations live in
+ * <name>_anims.asm, not parsed); colors use the active palette line, not the
+ * character's own palette. Frames load so you can scrub/edit the poses.
+ */
+export async function loadEngineCharacter(name: string): Promise<void> {
+  const toast = useToastStore.getState().addToast;
+  const project = useProjectStore.getState().project;
+  if (!project) { toast('No project open', 'error'); return; }
+  const base = project.basePath;
+  try {
+    const map = new Uint8Array(await window.api.readBinaryFile(base, `data/mappings/${name}.bin`));
+    const dplc = new Uint8Array(await window.api.readBinaryFile(base, `data/dplc/${name}.bin`));
+    const art = new Uint8Array(await window.api.readBinaryFile(base, `art/uncompressed/characters/${name}.bin`));
+    const recon = reconstructDPLCSprite(map, dplc, art);
+    const frames = recon.frames.map((data) => ({ width: recon.width, height: recon.height, data }));
+    useSpriteStore.getState().loadSprite(frames, []);
+    toast(`Loaded ${name}: ${frames.length} frames (${recon.width}×${recon.height}). Colors use the active palette line.`, 'success');
+  } catch (e) {
+    toast(`Load ${name} failed: ${e instanceof Error ? e.message : String(e)}`, 'error');
   }
 }
