@@ -54,10 +54,11 @@ Per frame (6-byte header + pieces):
   +4 dc.w piece_count
   per piece (8 bytes, VDP sprite-table order):
     +0 dc.w y_offset                   ; signed, relative to object origin
-    +2 dc.b size_code                  ; = sprSize(w,h)>>8 = ((h-1)<<2)|(w-1):
-                                       ;   bits 3-2 = HEIGHT-1, bits 1-0 = WIDTH-1 (cells 1-4)
+    +2 dc.b size_code                  ; = sprSize(w,h)>>8 = ((w-1)<<2)|(h-1):
+                                       ;   bits 3-2 = WIDTH-1, bits 1-0 = HEIGHT-1 (cells 1-4)
+                                       ;   1x1=$00 2x2=$05 4x1=$0C 1x4=$03 4x4=$0F
     +3 dc.b 0                          ; VDP sprite-LINK byte placeholder (engine fills @ runtime)
-    +4 dc.w tile_attrs                 ; (pri<<15)|(pal<<13)|(vflip<<12)|(hflip<<11)|tile
+    +4 dc.w tile_attrs                 ; (pri<<15)|(pal<<13)|(yflip<<12=$1000)|(xflip<<11=$0800)|tile
                                        ;   tile index is RELATIVE to art_tile base, NOT absolute VRAM
     +6 dc.w x_offset                   ; signed, relative to object origin
 ```
@@ -68,12 +69,26 @@ if any extent falls outside signed-byte [-128,127].**
 Frame indices valid `0x00–0xF6`; `0xF7–0xFF` are animation control codes (reject frame ids ≥ `0xF7`).
 
 **Runtime is applied by `Render_Sprites`/`Emit_ObjectPieces` (`sprites.asm`) — DO NOT pre-bake:**
-the engine adds object screen X/Y, the VDP +128 bias, the `art_tile` base (→ tile is relative),
-and the running link index (→ link byte stays 0); forces X=0→1 (VDP sprite-mask avoidance);
-and **mirrors multi-cell pieces at runtime via 4 flip loops + `CellOffsets_*`** — so the editor
-emits flip *bits* only and never stores mirrored tile data. Multi-cell tiles within a piece are
-ordered **VDP column-major** (down each column, then next column). Emission stops at
+the engine adds object screen X/Y + the VDP +128 bias, the `art_tile` base (→ tile relative),
+and the running link index (→ link byte stays 0); forces on-screen X=0→1 (sprite-mask
+avoidance). Multi-cell tiles within a piece are numbered **VDP column-major**. Emission stops at
 `MAX_VDP_SPRITES = 80` total hardware sprites (a piece-count budget dimension — see §6).
+
+**Flip geometry (needed for the preview renderer AND bbox — §7, §6).** `x_offset/y_offset` are
+the **unflipped top-left corner**; author them that way and NEVER pre-flip — flips are whole-piece
+via the tile-attr bits, and the engine recomputes the corner by subtracting the piece's pixel
+extent. Per-piece extents: `width_px = (((size>>2)&3)+1)*8`, `height_px = ((size&3)+1)*8`.
+
+| Variant | tile_attr | corner Y | corner X |
+|---|---|---|---|
+| unflipped | as authored | y_offset | x_offset |
+| X-flip | `^ $0800` | y_offset | −x_offset − width_px |
+| Y-flip | `^ $1000` | −y_offset − height_px | x_offset |
+| XY-flip | `^ $1800` | −y_offset − height_px | −x_offset − width_px |
+
+(`CellOffsets_XFlip` is just a 16-entry size→`width_px` lookup; the formulas above replace it.)
+The flip-invariant bbox (above) is only correct when per-piece far edges use these same
+`width_px/height_px` — i.e. the corrected `size_code` bit order.
 
 ### 2.2 Animation scripts (`.asm`, `data/animations/`)
 Consumed by `engine/objects/animate.asm` via `SST_anim_table` ($1A); object selects an anim
