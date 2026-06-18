@@ -108,11 +108,14 @@ export function parseSonicAnimScript(text: string): ParsedAnim[] {
   const clean = text.split(/\r?\n/).map((l) => l.replace(/;.*$/, '').trim());
 
   // Ordered anim labels from the `dc.w Label - Base` offset table (Base ignored).
+  // The table may be preceded by its own label (e.g. `Ani_Foo:` then the dc.w rows),
+  // so collect every offset-table entry and stop at the first dc.b data block — a
+  // leading table label must NOT end the scan. (dc.w appears only in the table.)
   const order: string[] = [];
   for (const l of clean) {
     const m = l.match(/^dc\.w\s+(\w+)\s*-\s*\w+/);
-    if (m) order.push(m[1]);
-    else if (/^\w+:/.test(l)) break; // first labeled data block ends the table
+    if (m) { order.push(m[1]); continue; }
+    if (/(^|:\s*)dc\.b\b/.test(l)) break; // first data block ends the table
   }
 
   // Collect each label's dc.b byte list (label + dc.b may share a line).
