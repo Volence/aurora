@@ -12,6 +12,7 @@ import type { ProjectScan } from './export-sprite';
 import PaletteEditor from '../art/PaletteEditor';
 import { decomposeFrame } from '../../../core/art/sprite-decompose';
 import type { SpriteFormatId } from '../../../core/formats/sprite-format-adapter';
+import type { CompressionKind } from '../../../core/compress';
 
 const SIZE_PRESETS = [16, 24, 32, 48, 64];
 
@@ -21,6 +22,18 @@ const FORMATS: { id: SpriteFormatId; label: string }[] = [
   { id: 's2', label: 'Sonic 2' },
   { id: 's3k', label: 'Sonic 3&K / S.C.E.' },
 ];
+
+const COMPRESSIONS: { id: CompressionKind; label: string }[] = [
+  { id: 'nemesis', label: 'Nemesis' },
+  { id: 'kosinski-moduled', label: 'Kosinski (moduled)' },
+  { id: 'kosinski', label: 'Kosinski (plain)' },
+  { id: 'uncompressed', label: 'Uncompressed' },
+];
+
+/** Per-game default art compression (overridable — compression is per-sprite). */
+const DEFAULT_COMPRESSION: Record<SpriteFormatId, CompressionKind> = {
+  s1: 'nemesis', s2: 'nemesis', s3k: 'kosinski-moduled', s4: 'uncompressed',
+};
 
 export default function SpriteMode() {
   const project = useProjectStore((s) => s.project);
@@ -36,6 +49,7 @@ export default function SpriteMode() {
   const exportDplc = useSpriteStore((s) => s.exportDplc);
   const format = useSpriteStore((s) => s.format);
   const [openAs, setOpenAs] = useState<SpriteFormatId>('s2');
+  const [openComp, setOpenComp] = useState<CompressionKind>('nemesis');
   const [available, setAvailable] = useState<string[]>([]);
   const [scan, setScan] = useState<ProjectScan | null>(null);
   const [scanFilter, setScanFilter] = useState('');
@@ -135,13 +149,20 @@ export default function SpriteMode() {
             <div style={styles.sectionTitle}>Open — import a sprite to edit or convert</div>
             <label style={styles.fmtRow} title="Read the opened files as this game's format. It also becomes the Save-as target, so you can convert by saving in another format.">
               <span style={styles.dim}>Read as</span>
-              <select style={styles.fmtSelect} value={openAs} onChange={(e) => setOpenAs(e.target.value as SpriteFormatId)}>
+              <select style={styles.fmtSelect} value={openAs}
+                onChange={(e) => { const f = e.target.value as SpriteFormatId; setOpenAs(f); setOpenComp(DEFAULT_COMPRESSION[f]); }}>
                 {FORMATS.map((f) => <option key={f.id} value={f.id}>{f.label}</option>)}
+              </select>
+            </label>
+            <label style={styles.fmtRow} title="Art compression of the picked art file. This is per-SPRITE, not per-game — e.g. most S3K badnik art is Kosinski-moduled; some is Nemesis or uncompressed.">
+              <span style={styles.dim}>Art comp.</span>
+              <select style={styles.fmtSelect} value={openComp} onChange={(e) => setOpenComp(e.target.value as CompressionKind)}>
+                {COMPRESSIONS.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
               </select>
             </label>
             <button style={{ ...styles.primary, ...(busy ? styles.disabled : {}) }} disabled={busy}
               title="Pick the mapping file (.asm or .bin), then its art file (.nem/.bin), then an optional DPLC file."
-              onClick={() => openSprite(openAs)}>Open sprite…</button>
+              onClick={() => openSprite(openAs, openComp)}>Open sprite…</button>
             <div style={styles.hint}>Pick a mapping file (.asm or .bin), then its art file, then an optional DPLC.</div>
             <button style={{ ...styles.secondary, ...(busy ? styles.disabled : {}) }} disabled={busy}
               title="Scan a Sonic 1/2/3K (or S.C.E.) disassembly folder and list every sprite set it finds." onClick={handleScanProject}>
@@ -169,7 +190,7 @@ export default function SpriteMode() {
                         <span style={{ ...styles.scanTag, opacity: s.art ? 1 : 0.35 }} title={s.art ? 'art auto-paired' : 'art not found — pick on open'}>A</span>
                       </span>
                       <button style={styles.scanOpen} disabled={busy}
-                        onClick={async () => { if (busy) return; setBusy(true); try { await openDiscoveredSet(scan.baseDir, s); } finally { setBusy(false); } }}>Open</button>
+                        onClick={async () => { if (busy) return; setBusy(true); try { await openDiscoveredSet(scan.baseDir, s, openComp); } finally { setBusy(false); } }}>Open</button>
                     </div>
                   ))}
                   {scanMatches.length > 200 && <div style={styles.dim}>…{scanMatches.length - 200} more (filter to narrow)</div>}

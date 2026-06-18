@@ -13,6 +13,7 @@ import type { SpriteFormatAdapter } from '../../../core/formats/sprite-format-ad
 import { discoverSpriteSets } from '../../../core/import/sprite-discovery';
 import type { DiscoveredSpriteSet } from '../../../core/import/sprite-discovery';
 import type { SpriteFormatId } from '../../../core/formats/sprite-format-adapter';
+import type { CompressionKind } from '../../../core/compress';
 import { parsePaletteLine } from '../../../core/formats/palette';
 import { parseCharacterAnims, parseAnyAnimScript } from '../../../core/import/anim-import';
 import type { ParsedAnim } from '../../../core/import/anim-import';
@@ -129,16 +130,17 @@ function dplcFromFile(path: string, bytes: Uint8Array, adapter: SpriteFormatAdap
 
 /**
  * Import a sprite by picking its files in sequence: the MAPPING first (a `.asm`
- * disassembly file OR an extracted `.bin` — auto-detected), then its ART file
- * (Nemesis for s1/s2/s3k, raw for s4), then an OPTIONAL DPLC file (.asm/.bin). Read
- * as the chosen game format, which becomes the Save-as target for cross-game porting.
+ * disassembly file OR an extracted `.bin` — auto-detected), then its ART file, then
+ * an OPTIONAL DPLC file (.asm/.bin). Read as the chosen game format; ART COMPRESSION
+ * is chosen independently (it is per-sprite, not per-game — e.g. S3K art is often
+ * Kosinski-moduled, uncompressed, or Nemesis). The format becomes the Save-as target.
  */
-export async function openSprite(sourceFormat: SpriteFormatId = 's2'): Promise<void> {
+export async function openSprite(sourceFormat: SpriteFormatId = 's2', artCompression: CompressionKind = 'nemesis'): Promise<void> {
   const toast = useToastStore.getState().addToast;
   const adapter = getAdapter(sourceFormat);
   const mapPath = await window.api.selectFile('Select mapping file (.asm or .bin)', [{ name: 'Mapping', extensions: ['asm', 'bin'] }]);
   if (!mapPath) return;
-  const artPath = await window.api.selectFile('Select art file (Nemesis .nem / .bin)', [{ name: 'Art', extensions: ['nem', 'bin'] }]);
+  const artPath = await window.api.selectFile('Select art file (.nem / .bin)', [{ name: 'Art', extensions: ['nem', 'bin'] }]);
   if (!artPath) return;
   const dplcPath = await window.api.selectFile('Optional DPLC file (.asm / .bin — cancel to skip)', [{ name: 'DPLC', extensions: ['asm', 'bin'] }]);
   try {
@@ -146,7 +148,7 @@ export async function openSprite(sourceFormat: SpriteFormatId = 's2'): Promise<v
     if (frames.length === 0) { toast('No sprite mappings found in that file', 'error'); return; }
 
     const dplc = dplcPath ? dplcFromFile(dplcPath, await readAbsolute(dplcPath), adapter) : undefined;
-    const recon = reconstructFromFrames(frames, await readAbsolute(artPath), adapter.artCompression, dplc);
+    const recon = reconstructFromFrames(frames, await readAbsolute(artPath), artCompression, dplc);
     const frameBufs = recon.frames.map((data) => ({ width: recon.width, height: recon.height, data }));
 
     const name = nameFromPath(mapPath);
@@ -220,7 +222,7 @@ export async function scanProjectForSprites(): Promise<ProjectScan | null> {
  * the scanned base dir, parse the macro call-sites, and load. If the art file was
  * not auto-paired (s1/s2 store art under unrelated names), prompt for it manually.
  */
-export async function openDiscoveredSet(baseDir: string, set: DiscoveredSpriteSet): Promise<void> {
+export async function openDiscoveredSet(baseDir: string, set: DiscoveredSpriteSet, artCompression: CompressionKind = 'nemesis'): Promise<void> {
   const toast = useToastStore.getState().addToast;
   try {
     const adapter = getAdapter(set.game);
@@ -240,7 +242,7 @@ export async function openDiscoveredSet(baseDir: string, set: DiscoveredSpriteSe
       ? dplcFromFile(set.dplc, new Uint8Array(await window.api.readBinaryFile(baseDir, set.dplc)), adapter)
       : undefined;
 
-    const recon = reconstructFromFrames(frames, artBytes, adapter.artCompression, dplc);
+    const recon = reconstructFromFrames(frames, artBytes, artCompression, dplc);
     const frameBufs = recon.frames.map((data) => ({ width: recon.width, height: recon.height, data }));
     const name = sanitizeName(set.name);
     useSpriteStore.getState().loadSprite(frameBufs, [], recon.originX, recon.originY);
