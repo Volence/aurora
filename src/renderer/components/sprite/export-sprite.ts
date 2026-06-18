@@ -3,8 +3,10 @@ import { useArtStore } from '../../state/artStore';
 import { useSpriteStore } from '../../state/spriteStore';
 import type { AnimStepUI } from '../../state/spriteStore';
 import { useToastStore } from '../../state/toastStore';
-import { buildSpriteExport } from '../../../core/export/sprite-export';
+import { buildSpriteExport, buildDPLCData } from '../../../core/export/sprite-export';
 import type { SpriteManifest } from '../../../core/export/sprite-export';
+import { assembleSprite } from '../../../core/art/sprite-decompose';
+import { writeAsmMappings, writeAsmDPLC } from '../../../core/export/sprite-asm-export';
 import { reconstructDPLCSprite, reconstructWithAdapter, reconstructFromFrames } from '../../../core/import/sprite-import';
 import { getAdapter } from '../../../core/formats/games';
 import { parseAsmMappings, parseAsmDPLC, assembleDataAsm } from '../../../core/import/asm-mappings';
@@ -87,6 +89,36 @@ export async function exportSprite(name: string): Promise<void> {
     toast(`Exported "${name}" as ${format.toUpperCase()}: ${out.manifest.frameCount} frames, ${out.manifest.tileCount} tiles → ${dir}/`, 'success');
   } catch (e) {
     toast(`Export failed: ${e instanceof Error ? e.message : String(e)}`, 'error');
+  }
+}
+
+/**
+ * Export the current sprite's MAPPINGS (+ DPLC if streaming) as Sonic-disassembly
+ * macro source (spritePiece/dplcEntry), saved via a file dialog. Lets you port an
+ * edited sprite back into a disassembly's native `.asm` form. Art is not included
+ * (export it separately as a compressed binary, or via the engine export).
+ */
+export async function exportSpriteAsm(name: string): Promise<void> {
+  const toast = useToastStore.getState().addToast;
+  const { frames, originX, originY, exportDplc } = useSpriteStore.getState();
+  const palette = useArtStore.getState().paletteLine;
+  if (frames.length === 0) { toast('No frames to export', 'error'); return; }
+
+  const rawFrames: RawFrame[] = frames.map((b, i) => ({
+    id: `f${i}`, pixels: b.data, width: b.width, height: b.height, originX, originY, palette, priority: false,
+  }));
+  try {
+    let asm: string;
+    if (exportDplc) {
+      const d = buildDPLCData(rawFrames);
+      asm = `${writeAsmMappings(d.frames, `Map_${name}`)}\n${writeAsmDPLC(d.perFrameTiles, `DPLC_${name}`)}`;
+    } else {
+      asm = writeAsmMappings(assembleSprite(rawFrames).frames, `Map_${name}`);
+    }
+    const ok = await window.api.saveFile(`Map_${name}.asm`, new TextEncoder().encode(asm).buffer as ArrayBuffer);
+    if (ok) toast(`Exported "${name}" mappings as .asm${exportDplc ? ' (+ DPLC)' : ''}`, 'success');
+  } catch (e) {
+    toast(`ASM export failed: ${e instanceof Error ? e.message : String(e)}`, 'error');
   }
 }
 

@@ -7,7 +7,7 @@ import type { OverlayRect } from './SpriteCanvas';
 import SpriteToolColumn from './SpriteToolColumn';
 import FrameGrid from './FrameGrid';
 import Timeline from './Timeline';
-import { exportSprite, loadSpriteByName, listSprites, loadEngineCharacter, openSprite, scanProjectForSprites, openDiscoveredSet, loadSpriteAnimations } from './export-sprite';
+import { exportSprite, exportSpriteAsm, loadSpriteByName, listSprites, loadEngineCharacter, openSprite, scanProjectForSprites, openDiscoveredSet, loadSpriteAnimations } from './export-sprite';
 import type { ProjectScan } from './export-sprite';
 import PaletteEditor from '../art/PaletteEditor';
 import { decomposeFrame } from '../../../core/art/sprite-decompose';
@@ -223,7 +223,12 @@ export default function SpriteMode() {
                 {FORMATS.map((f) => <option key={f.id} value={f.id}>{f.label}</option>)}
               </select>
             </label>
-            <button style={{ ...styles.primary, ...(busy ? styles.disabled : {}) }} disabled={busy} onClick={handleExport}>Export</button>
+            <div style={styles.btnRow}>
+              <button style={{ ...styles.primary, ...(busy ? styles.disabled : {}) }} disabled={busy} onClick={handleExport}>Export</button>
+              <button style={{ ...styles.secondary, ...(busy ? styles.disabled : {}) }} disabled={busy}
+                title="Save the mappings (+ DPLC) as disassembly .asm macro source (spritePiece/dplcEntry) — to port back into a Sonic 1/2/3K disassembly."
+                onClick={async () => { if (busy) return; setBusy(true); try { await exportSpriteAsm(spriteName); } finally { setBusy(false); } }}>Export .asm…</button>
+            </div>
           </div>
 
           <div style={styles.section}>
