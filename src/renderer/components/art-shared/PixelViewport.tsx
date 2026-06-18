@@ -34,10 +34,12 @@ export interface PixelViewportProps {
   selection?: Selection | null;           // committed selection (dashed)
   layers?: PixelViewportLayers;
   overlays?: ViewportOverlay[];           // host-supplied static overlays (e.g. piece outlines)
+  drawUnderlay?: (ctx: CanvasRenderingContext2D, zoom: number) => void; // below selection/preview (e.g. grids), origin-translated
   drawOverlay?: (ctx: CanvasRenderingContext2D, zoom: number) => void; // escape hatch (e.g. collision HUD), origin-translated
   hostPointer?: HostPointer | null;       // when set, pointer routes here instead of the controller (tile-space tools)
   onCommit: (result: GestureResult) => void;
-  onPick?: (value: number) => void;
+  onPick?: (value: number, pixel: { x: number; y: number }) => void;
+  onHover?: (pixel: { x: number; y: number } | null) => void; // pointer position over the editable surface (for paste etc.)
   style?: React.CSSProperties;
 }
 
@@ -53,7 +55,7 @@ const SPRITE_CHECKER: [[number, number, number], [number, number, number]] = [[4
  * See docs/specs/2026-06-18-unified-drawing-core-design.md.
  */
 export default function PixelViewport({
-  buffer, palette, paletteLines, lineMap, zoom, controller, selection, layers, overlays, drawOverlay, hostPointer, onCommit, onPick, style,
+  buffer, palette, paletteLines, lineMap, zoom, controller, selection, layers, overlays, drawUnderlay, drawOverlay, hostPointer, onCommit, onPick, onHover, style,
 }: PixelViewportProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const drawing = useRef(false);
@@ -131,6 +133,7 @@ export default function PixelViewport({
       else if (gk === 'tile') gridLines(layers?.tilePx ?? 8, 0.18);
       else if (gk === 'block') gridLines(layers?.blockPx ?? 16, 0.22);
     }
+    drawUnderlay?.(ctx, zoom);
     for (const o of overlays ?? []) {
       ctx.strokeStyle = o.color ?? '#f9e2af';
       if (o.kind === 'marquee') { ctx.lineWidth = 1; ctx.setLineDash([4, 3]); ctx.strokeRect(o.x * zoom + 0.5, o.y * zoom + 0.5, o.w * zoom, o.h * zoom); ctx.setLineDash([]); }
@@ -181,7 +184,7 @@ export default function PixelViewport({
     }
     const immediate = controller.begin(buffer, p.x, p.y, selection ?? null);
     if (immediate) {
-      if (immediate.pick !== undefined) onPick?.(immediate.pick);
+      if (immediate.pick !== undefined) onPick?.(immediate.pick, p);
       else onCommit(immediate);
       return;
     }
@@ -190,11 +193,12 @@ export default function PixelViewport({
     rerender();
   }
   function onPointerMove(e: React.PointerEvent) {
-    if (hostDrawing.current && hostPointer) { const p = localPixel(e); if (p) { lastValid.current = p; hostPointer.move(p, e); rerender(); } return; }
-    if (!drawing.current) return;
+    if (hostDrawing.current && hostPointer) { const p = localPixel(e); if (p) { lastValid.current = p; onHover?.(p); hostPointer.move(p, e); rerender(); } return; }
+    if (!drawing.current) { if (onHover) onHover(localPixel(e)); return; }
     const p = localPixel(e);
     if (!p) return;
     lastValid.current = p;
+    onHover?.(p);
     controller.move(p.x, p.y);
     rerender();
   }

@@ -26,6 +26,25 @@ describe('PixelEditController — instantaneous tools', () => {
   });
 });
 
+describe('PixelEditController — gesture start (for host commit routing)', () => {
+  it('eyedropper/fill report the click position as result.start', () => {
+    const e = new PixelEditController(cfg({ tool: 'eyedropper' }));
+    expect(e.begin(buf(8, 8), 3, 5, null)!.start).toEqual({ x: 3, y: 5 });
+    const f = new PixelEditController(cfg({ tool: 'fill' }));
+    expect(f.begin(buf(8, 8), 6, 2, null)!.start).toEqual({ x: 6, y: 2 });
+  });
+  it('a stroke reports its pointer-down position as result.start', () => {
+    const c = new PixelEditController(cfg({ tool: 'pencil' }));
+    c.begin(buf(16, 16), 9, 11, null); c.move(12, 11);
+    expect(c.end(12, 11).start).toEqual({ x: 9, y: 11 });
+  });
+  it('line/rect report their anchor as result.start', () => {
+    const c = new PixelEditController(cfg({ tool: 'line' }));
+    c.begin(buf(16, 16), 2, 4, null);
+    expect(c.end(10, 10).start).toEqual({ x: 2, y: 4 });
+  });
+});
+
 describe('PixelEditController — strokes', () => {
   it('pencil single point sets the pixel', () => {
     const c = new PixelEditController(cfg({ tool: 'pencil', color: 3 }));
