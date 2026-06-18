@@ -21,8 +21,11 @@ describe('compressionFor', () => {
     expect(out).not.toBe(x);
     expect(Array.from(c.decompress(out))).toEqual([1, 2, 3]);
   });
-  it('kosinski decompress is wired; compress throws until the level-art work', () => {
-    expect(typeof compressionFor('kosinski').decompress).toBe('function');
-    expect(() => compressionFor('kosinski').compress(new Uint8Array(0))).toThrow(/not implemented yet/);
+  it('kosinski + kosinski-moduled round-trip through the registry', () => {
+    const raw = new Uint8Array([1, 2, 3, 3, 3, 3, 4, 5, 1, 2, 3, 3, 3, 3, 4, 5]);
+    for (const kind of ['kosinski', 'kosinski-moduled'] as const) {
+      const c = compressionFor(kind);
+      expect(Array.from(c.decompress(c.compress(raw)))).toEqual(Array.from(raw));
+    }
   });
 });
