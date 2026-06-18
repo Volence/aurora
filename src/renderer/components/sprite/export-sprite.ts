@@ -8,6 +8,8 @@ import type { SpriteManifest } from '../../../core/export/sprite-export';
 import { reconstructDPLCSprite, reconstructWithAdapter, reconstructFromFrames } from '../../../core/import/sprite-import';
 import { getAdapter } from '../../../core/formats/games';
 import { parseAsmMappings, parseAsmDPLC } from '../../../core/import/asm-mappings';
+import { discoverSpriteSets } from '../../../core/import/sprite-discovery';
+import type { DiscoveredSpriteSet } from '../../../core/import/sprite-discovery';
 import type { SpriteFormatId } from '../../../core/formats/sprite-format-adapter';
 import { parsePaletteLine } from '../../../core/formats/palette';
 import { parseCharacterAnims } from '../../../core/import/anim-import';
@@ -170,6 +172,65 @@ export async function openSpriteAsm(sourceFormat: SpriteFormatId = 's2'): Promis
     toast(`Imported "${name}" from ${sourceFormat.toUpperCase()} .asm: ${frameBufs.length} frames${dplc ? ' (DPLC)' : ''}`, 'success');
   } catch (e) {
     toast(`ASM import failed: ${e instanceof Error ? e.message : String(e)}`, 'error');
+  }
+}
+
+export interface ProjectScan { baseDir: string; sets: DiscoveredSpriteSet[]; }
+
+/**
+ * Scan a chosen disassembly project folder for sprite sets (mapping .asm paired
+ * with sibling DPLC + art by the known layouts). Returns the base dir + detected
+ * sets for the UI to list; opening a set re-validates by parsing it (6c).
+ */
+export async function scanProjectForSprites(): Promise<ProjectScan | null> {
+  const toast = useToastStore.getState().addToast;
+  const baseDir = await window.api.selectDirectory();
+  if (!baseDir) return null;
+  try {
+    const files = await window.api.listProjectFiles(baseDir);
+    const sets = discoverSpriteSets(files);
+    if (sets.length === 0) toast('No sprite mapping .asm files found in that folder', 'info');
+    return { baseDir, sets };
+  } catch (e) {
+    toast(`Project scan failed: ${e instanceof Error ? e.message : String(e)}`, 'error');
+    return null;
+  }
+}
+
+/**
+ * Open a discovered sprite set: read its mapping (+ DPLC) .asm and art relative to
+ * the scanned base dir, parse the macro call-sites, and load. If the art file was
+ * not auto-paired (s1/s2 store art under unrelated names), prompt for it manually.
+ */
+export async function openDiscoveredSet(baseDir: string, set: DiscoveredSpriteSet): Promise<void> {
+  const toast = useToastStore.getState().addToast;
+  try {
+    const mapText = new TextDecoder().decode(new Uint8Array(await window.api.readBinaryFile(baseDir, set.mappings)));
+    const frames = parseAsmMappings(mapText);
+    if (frames.length === 0) { toast(`"${set.name}" has no parseable spritePiece mappings (raw bytes?)`, 'error'); return; }
+
+    let artBytes: Uint8Array;
+    if (set.art) {
+      artBytes = new Uint8Array(await window.api.readBinaryFile(baseDir, set.art));
+    } else {
+      const artPath = await window.api.selectFile(`Select art for "${set.name}" (Nemesis .nem / .bin)`, [{ name: 'Art', extensions: ['nem', 'bin'] }]);
+      if (!artPath) { toast('Art file required to open the sprite', 'error'); return; }
+      artBytes = await readAbsolute(artPath);
+    }
+    const dplc = set.dplc
+      ? parseAsmDPLC(new TextDecoder().decode(new Uint8Array(await window.api.readBinaryFile(baseDir, set.dplc))))
+      : undefined;
+
+    const recon = reconstructFromFrames(frames, artBytes, getAdapter(set.game).artCompression, dplc);
+    const frameBufs = recon.frames.map((data) => ({ width: recon.width, height: recon.height, data }));
+    const name = sanitizeName(set.name);
+    useSpriteStore.getState().loadSprite(frameBufs, [], recon.originX, recon.originY);
+    useSpriteStore.getState().setName(name);
+    useSpriteStore.getState().setExportDplc(!!dplc);
+    useSpriteStore.getState().setFormat(set.game);
+    toast(`Opened "${set.name}" (${set.game.toUpperCase()}): ${frameBufs.length} frames${dplc ? ' (DPLC)' : ''}`, 'success');
+  } catch (e) {
+    toast(`Open "${set.name}" failed: ${e instanceof Error ? e.message : String(e)}`, 'error');
   }
 }
 

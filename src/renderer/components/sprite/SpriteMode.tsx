@@ -7,7 +7,8 @@ import type { OverlayRect } from './SpriteCanvas';
 import SpriteToolColumn from './SpriteToolColumn';
 import FrameGrid from './FrameGrid';
 import Timeline from './Timeline';
-import { exportSprite, loadSpriteByName, listSprites, loadEngineCharacter, openSpriteFolder, openSpriteAsm } from './export-sprite';
+import { exportSprite, loadSpriteByName, listSprites, loadEngineCharacter, openSpriteFolder, openSpriteAsm, scanProjectForSprites, openDiscoveredSet } from './export-sprite';
+import type { ProjectScan } from './export-sprite';
 import PaletteEditor from '../art/PaletteEditor';
 import { decomposeFrame } from '../../../core/art/sprite-decompose';
 import type { SpriteFormatId } from '../../../core/formats/sprite-format-adapter';
@@ -36,6 +37,8 @@ export default function SpriteMode() {
   const format = useSpriteStore((s) => s.format);
   const [openAs, setOpenAs] = useState<SpriteFormatId>('s2');
   const [available, setAvailable] = useState<string[]>([]);
+  const [scan, setScan] = useState<ProjectScan | null>(null);
+  const [scanFilter, setScanFilter] = useState('');
   const [busy, setBusy] = useState(false);
   const [newSize, setNewSize] = useState(32);
   const canvasWrapRef = useRef<HTMLDivElement>(null);
@@ -64,6 +67,17 @@ export default function SpriteMode() {
     setBusy(true);
     try { await exportSprite(spriteName); await listSprites().then(setAvailable).catch(() => {}); } finally { setBusy(false); }
   }
+  async function handleScanProject() {
+    if (busy) return;
+    setBusy(true);
+    try { const r = await scanProjectForSprites(); if (r) { setScan(r); setScanFilter(''); } } finally { setBusy(false); }
+  }
+
+  const scanMatches = useMemo(() => {
+    if (!scan) return [];
+    const q = scanFilter.trim().toLowerCase();
+    return q ? scan.sets.filter((s) => s.name.toLowerCase().includes(q)) : scan.sets;
+  }, [scan, scanFilter]);
 
   const decomp = useMemo(() => decomposeFrame({
     id: 'cur', pixels: buffer.data, width: buffer.width, height: buffer.height,
@@ -147,6 +161,35 @@ export default function SpriteMode() {
               <button style={styles.secondary} title="Import a sprite folder from anywhere on disk (mappings.bin + art.bin [+ dplc.bin]), read as the chosen format" onClick={() => openSpriteFolder(openAs)}>Open folder…</button>
               <button style={styles.secondary} title="Open a disassembly .asm mapping file directly (e.g. obj0B.asm + its Nemesis art), read as the chosen format" onClick={() => openSpriteAsm(openAs)}>Open .asm…</button>
             </div>
+            <button style={{ ...styles.secondary, ...(busy ? styles.disabled : {}) }} disabled={busy}
+              title="Scan a Sonic 1/2/3K disassembly folder for sprite sets (mapping + DPLC + art) and list them to open." onClick={handleScanProject}>
+              Open project…
+            </button>
+            {scan && (
+              <div style={styles.scanPanel}>
+                <div style={styles.fmtRow}>
+                  <input style={styles.fmtSelect} value={scanFilter} placeholder={`Filter ${scan.sets.length} sets…`}
+                    onChange={(e) => setScanFilter(e.target.value)} spellCheck={false} />
+                  <button style={styles.sizeBtn} title="Close list" onClick={() => setScan(null)}>✕</button>
+                </div>
+                <div style={styles.scanList}>
+                  {scanMatches.slice(0, 200).map((s) => (
+                    <div key={s.mappings} style={styles.scanRow} title={s.mappings}>
+                      <span style={styles.scanName}>{s.name}</span>
+                      <span style={styles.scanBadges}>
+                        <span style={styles.scanGame}>{s.game.toUpperCase()}</span>
+                        {s.dplc && <span style={styles.scanTag} title="DPLC found">D</span>}
+                        <span style={{ ...styles.scanTag, opacity: s.art ? 1 : 0.35 }} title={s.art ? 'art auto-paired' : 'art not found — pick on open'}>A</span>
+                      </span>
+                      <button style={styles.scanOpen} disabled={busy}
+                        onClick={async () => { if (busy) return; setBusy(true); try { await openDiscoveredSet(scan.baseDir, s); } finally { setBusy(false); } }}>Open</button>
+                    </div>
+                  ))}
+                  {scanMatches.length > 200 && <div style={styles.dim}>…{scanMatches.length - 200} more (filter to narrow)</div>}
+                  {scanMatches.length === 0 && <div style={styles.dim}>no matches</div>}
+                </div>
+              </div>
+            )}
             <div style={styles.sectionTitle}>Load engine character</div>
             <div style={styles.btnRow}>
               {['sonic', 'tails', 'knuckles'].map((c) => (
@@ -185,6 +228,14 @@ const styles: Record<string, React.CSSProperties> = {
   btnRow: { display: 'flex', gap: 6 },
   fmtRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 },
   fmtSelect: { flex: 1, background: '#313244', color: '#cdd6f4', border: '1px solid #45475a', borderRadius: 4, fontSize: 12, padding: '4px 6px' },
+  scanPanel: { display: 'flex', flexDirection: 'column', gap: 4, marginTop: 4, padding: 6, background: '#1e1e2e', border: '1px solid #45475a', borderRadius: 4 },
+  scanList: { display: 'flex', flexDirection: 'column', gap: 2, maxHeight: 220, overflowY: 'auto' },
+  scanRow: { display: 'flex', alignItems: 'center', gap: 6, padding: '2px 4px', borderRadius: 3, background: '#313244' },
+  scanName: { flex: 1, fontSize: 11, color: '#cdd6f4', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  scanBadges: { display: 'flex', alignItems: 'center', gap: 3 },
+  scanGame: { fontSize: 9, color: '#9399b2', fontWeight: 700 },
+  scanTag: { fontSize: 9, color: '#1e1e2e', background: '#89b4fa', borderRadius: 2, padding: '0 3px', fontWeight: 700 },
+  scanOpen: { padding: '2px 8px', background: '#313244', color: '#cdd6f4', border: '1px solid #45475a', borderRadius: 3, cursor: 'pointer', fontSize: 11 },
   primary: { flex: 1, padding: '5px 8px', background: '#89b4fa', color: '#1e1e2e', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 12, fontWeight: 600 },
   secondary: { flex: 1, padding: '5px 8px', background: '#313244', color: '#cdd6f4', border: '1px solid #45475a', borderRadius: 4, cursor: 'pointer', fontSize: 12 },
   disabled: { opacity: 0.5, cursor: 'default' },
