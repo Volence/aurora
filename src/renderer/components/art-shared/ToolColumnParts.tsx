@@ -146,25 +146,25 @@ export function Divider() {
 export const S: Record<string, React.CSSProperties> = {
   toolButton: {
     width: 40, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center',
-    background: '#313244', color: '#cdd6f4', border: '1px solid #45475a', borderRadius: 4,
+    background: '#2A2F3D', color: '#E8EAF2', border: '1px solid #3A4152', borderRadius: 4,
     cursor: 'pointer', fontSize: 14, lineHeight: 1, flexShrink: 0,
   },
-  toolActive: { background: '#89b4fa', color: '#1e1e2e', borderColor: '#89b4fa' },
+  toolActive: { background: '#34D399', color: '#12151E', borderColor: '#34D399' },
   smallText: { fontSize: 10, fontWeight: 600 },
   disabled: { opacity: 0.35, cursor: 'default' },
   config: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, width: '100%' },
   ditherButton: {
     width: 40, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center',
-    background: '#313244', color: '#cdd6f4', border: '1px solid #45475a', borderRadius: 4,
+    background: '#2A2F3D', color: '#E8EAF2', border: '1px solid #3A4152', borderRadius: 4,
     cursor: 'pointer', fontSize: 10, lineHeight: 1, flexShrink: 0,
   },
   stepper: { display: 'flex', alignItems: 'center', gap: 2, width: 40, justifyContent: 'space-between' },
   stepButton: {
     width: 12, height: 16, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-    background: '#313244', color: '#a6adc8', border: '1px solid #45475a', borderRadius: 3,
+    background: '#2A2F3D', color: '#B8BECE', border: '1px solid #3A4152', borderRadius: 3,
     cursor: 'pointer', fontSize: 7, lineHeight: 1,
   },
-  value: { fontSize: 10, color: '#cdd6f4', fontFamily: 'monospace' },
-  divider: { width: '80%', height: 1, background: '#313244', margin: '4px 0', flexShrink: 0 },
-  zoomLabel: { fontSize: 10, color: '#6c7086', fontFamily: 'monospace' },
+  value: { fontSize: 10, color: '#E8EAF2', fontFamily: 'monospace' },
+  divider: { width: '80%', height: 1, background: '#2A2F3D', margin: '4px 0', flexShrink: 0 },
+  zoomLabel: { fontSize: 10, color: '#6E7589', fontFamily: 'monospace' },
 };

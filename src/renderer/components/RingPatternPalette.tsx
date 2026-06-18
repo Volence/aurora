@@ -52,7 +52,7 @@ function PatternPreview({ pattern, selected }: { pattern: typeof RING_PATTERNS[0
           cx={o.dx * scale + offsetX}
           cy={o.dy * scale + offsetY}
           r={Math.max(2, 3 * scale)}
-          fill={selected ? '#1e1e2e' : '#f9e2af'}
+          fill={selected ? '#12151E' : '#f9e2af'}
         />
       ))}
     </svg>
@@ -62,12 +62,12 @@ function PatternPreview({ pattern, selected }: { pattern: typeof RING_PATTERNS[0
 const styles: Record<string, React.CSSProperties> = {
   container: {
     width: 180, display: 'flex', flexDirection: 'column',
-    background: '#1e1e2e', borderRight: '1px solid #313244',
+    background: '#12151E', borderRight: '1px solid #2A2F3D',
     flexShrink: 0, overflow: 'hidden',
   },
   header: {
-    padding: '8px 12px', fontSize: 12, fontWeight: 600, color: '#a6adc8',
-    borderBottom: '1px solid #313244', textTransform: 'uppercase' as const,
+    padding: '8px 12px', fontSize: 12, fontWeight: 600, color: '#B8BECE',
+    borderBottom: '1px solid #2A2F3D', textTransform: 'uppercase' as const,
     letterSpacing: 1,
   },
   list: {
@@ -77,11 +77,11 @@ const styles: Record<string, React.CSSProperties> = {
   item: {
     display: 'flex', alignItems: 'center', gap: 8,
     padding: '4px 8px', background: 'transparent', border: '1px solid transparent',
-    color: '#cdd6f4', cursor: 'pointer', borderRadius: 4,
+    color: '#E8EAF2', cursor: 'pointer', borderRadius: 4,
     textAlign: 'left' as const, width: '100%',
   },
   itemSelected: {
-    background: '#89b4fa', color: '#1e1e2e', borderColor: '#89b4fa',
+    background: '#34D399', color: '#12151E', borderColor: '#34D399',
   },
   label: {
     fontSize: 12,

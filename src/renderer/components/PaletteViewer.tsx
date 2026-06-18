@@ -50,8 +50,8 @@ export default function PaletteViewer() {
                     ...styles.swatch,
                     backgroundColor: colorToCSS(color),
                     border: color.a === 0
-                      ? '1px dashed #45475a'
-                      : isSelected ? '1px solid #89b4fa' : '1px solid #313244',
+                      ? '1px dashed #3A4152'
+                      : isSelected ? '1px solid #34D399' : '1px solid #2A2F3D',
                   }}
                   title={`Line ${lineIdx}, Color ${colorIdx}: R${color.r} G${color.g} B${color.b}${color.a === 0 ? ' (transparent)' : ''}`}
                 />
@@ -72,11 +72,11 @@ function colorToCSS(c: Color): string {
 const styles: Record<string, React.CSSProperties> = {
   container: {
     display: 'flex', alignItems: 'center', gap: 12,
-    padding: '6px 12px', background: '#181825', borderTop: '1px solid #313244',
+    padding: '6px 12px', background: '#0A0C12', borderTop: '1px solid #2A2F3D',
     flexShrink: 0, overflow: 'auto',
   },
   label: {
-    fontSize: 11, fontWeight: 600, color: '#6c7086', textTransform: 'uppercase' as const,
+    fontSize: 11, fontWeight: 600, color: '#6E7589', textTransform: 'uppercase' as const,
     letterSpacing: 1, flexShrink: 0,
   },
   lines: {
@@ -90,14 +90,14 @@ const styles: Record<string, React.CSSProperties> = {
     outline: 'none',
   },
   lineSelected: {
-    border: '2px solid #89b4fa',
+    border: '2px solid #34D399',
     background: 'rgba(137, 180, 250, 0.15)',
   },
   lineLabel: {
-    fontSize: 10, color: '#6c7086', marginRight: 4, fontFamily: 'monospace',
+    fontSize: 10, color: '#6E7589', marginRight: 4, fontFamily: 'monospace',
   },
   lineLabelSelected: {
-    color: '#89b4fa', fontWeight: 700,
+    color: '#34D399', fontWeight: 700,
   },
   swatch: {
     width: 14, height: 14, borderRadius: 2, flexShrink: 0,

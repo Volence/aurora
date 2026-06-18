@@ -107,7 +107,7 @@ export default function PixelViewport({
     const cw = tilesX * width * zoom, ch = tilesY * height * zoom;
     ctx.clearRect(0, 0, cw, ch);
     if (repeat) {
-      ctx.fillStyle = '#11111b'; ctx.fillRect(0, 0, cw, ch);
+      ctx.fillStyle = '#0A0C12'; ctx.fillRect(0, 0, cw, ch);
       // faint surrounding copies, then the editable center at full opacity
       ctx.globalAlpha = 1 / 3;
       for (let ty = 0; ty < tilesY; ty++) for (let tx = 0; tx < tilesX; tx++) {
@@ -220,7 +220,7 @@ export default function PixelViewport({
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
-      style={{ imageRendering: 'pixelated', cursor: 'crosshair', boxShadow: '0 0 0 1px #45475a', display: 'block', ...style }}
+      style={{ imageRendering: 'pixelated', cursor: 'crosshair', boxShadow: '0 0 0 1px #3A4152', display: 'block', ...style }}
     />
   );
 }

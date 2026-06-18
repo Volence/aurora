@@ -103,7 +103,7 @@ export default function ChunkLibrary() {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     ctx.imageSmoothingEnabled = false;
-    ctx.fillStyle = '#11111b';
+    ctx.fillStyle = '#0A0C12';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     const gap = 4;
@@ -124,7 +124,7 @@ export default function ChunkLibrary() {
         // Label
         ctx.fillStyle = 'rgba(0,0,0,0.6)';
         ctx.fillRect(x, y + THUMB_PX - 12, THUMB_PX, 12);
-        ctx.fillStyle = '#cdd6f4';
+        ctx.fillStyle = '#E8EAF2';
         ctx.font = '9px monospace';
         ctx.fillText(`$${idx.toString(16).toUpperCase().padStart(2, '0')}`, x + 2, y + THUMB_PX - 3);
 
@@ -308,21 +308,21 @@ export default function ChunkLibrary() {
 const styles: Record<string, React.CSSProperties> = {
   container: {
     display: 'flex', flexDirection: 'column',
-    borderTop: '1px solid #313244',
+    borderTop: '1px solid #2A2F3D',
     flex: 1, minHeight: 120, flexShrink: 0,
   },
   header: {
     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-    padding: '4px 8px', borderBottom: '1px solid #313244',
+    padding: '4px 8px', borderBottom: '1px solid #2A2F3D',
     flexShrink: 0,
   },
   label: {
-    fontSize: 11, fontWeight: 600, color: '#a6adc8',
+    fontSize: 11, fontWeight: 600, color: '#B8BECE',
     textTransform: 'uppercase' as const, letterSpacing: 1,
   },
   headerBtn: {
-    padding: '2px 8px', background: '#313244', color: '#cdd6f4',
-    border: '1px solid #45475a', borderRadius: 3, cursor: 'pointer',
+    padding: '2px 8px', background: '#2A2F3D', color: '#E8EAF2',
+    border: '1px solid #3A4152', borderRadius: 3, cursor: 'pointer',
     fontSize: 10,
   },
   canvasWrap: {
@@ -334,18 +334,18 @@ const styles: Record<string, React.CSSProperties> = {
   },
   selectionInfo: {
     display: 'flex', alignItems: 'center', gap: 6,
-    padding: '3px 8px', borderBottom: '1px solid #313244',
+    padding: '3px 8px', borderBottom: '1px solid #2A2F3D',
     flexShrink: 0,
   },
   selectedBadge: {
-    fontSize: 10, fontWeight: 600, color: '#1e1e2e', background: '#a6e3a1',
+    fontSize: 10, fontWeight: 600, color: '#12151E', background: '#a6e3a1',
     padding: '0 5px', borderRadius: 3, lineHeight: '16px',
   },
   empty: {
     padding: '12px 8px', display: 'flex', flexDirection: 'column',
-    alignItems: 'center', gap: 4, color: '#6c7086', fontSize: 11,
+    alignItems: 'center', gap: 4, color: '#6E7589', fontSize: 11,
   },
   hint: {
-    fontSize: 9, color: '#45475a', textAlign: 'center' as const,
+    fontSize: 9, color: '#3A4152', textAlign: 'center' as const,
   },
 };

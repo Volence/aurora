@@ -133,18 +133,18 @@ export default function Timeline() {
 }
 
 const styles: Record<string, React.CSSProperties> = {
-  root: { display: 'flex', gap: 12, padding: '8px 10px', background: '#181825', borderTop: '1px solid #313244', alignItems: 'flex-start' },
+  root: { display: 'flex', gap: 12, padding: '8px 10px', background: '#0A0C12', borderTop: '1px solid #2A2F3D', alignItems: 'flex-start' },
   preview: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, flexShrink: 0 },
   controls: { display: 'flex', gap: 6, alignItems: 'center' },
-  playBtn: { padding: '4px 10px', background: '#a6e3a1', color: '#1e1e2e', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 12, fontWeight: 600 },
-  select: { background: '#313244', color: '#cdd6f4', border: '1px solid #45475a', borderRadius: 4, fontSize: 11, padding: '3px 4px' },
+  playBtn: { padding: '4px 10px', background: '#a6e3a1', color: '#12151E', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 12, fontWeight: 600 },
+  select: { background: '#2A2F3D', color: '#E8EAF2', border: '1px solid #3A4152', borderRadius: 4, fontSize: 11, padding: '3px 4px' },
   steps: { display: 'flex', gap: 6, overflowX: 'auto', alignItems: 'flex-start', flex: 1 },
-  hint: { fontSize: 12, color: '#6c7086', alignSelf: 'center' },
-  stepCell: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, padding: 3, background: '#1e1e2e', border: '1px solid #45475a', borderRadius: 4 },
+  hint: { fontSize: 12, color: '#6E7589', alignSelf: 'center' },
+  stepCell: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, padding: 3, background: '#12151E', border: '1px solid #3A4152', borderRadius: 4 },
   stepLive: { borderColor: '#a6e3a1', boxShadow: '0 0 0 1px #a6e3a1' },
   stepMeta: { display: 'flex', alignItems: 'center', gap: 2 },
-  stepLabel: { fontSize: 10, color: '#a6adc8' },
-  dur: { width: 34, background: '#313244', color: '#cdd6f4', border: '1px solid #45475a', borderRadius: 3, fontSize: 10, padding: '1px 2px' },
+  stepLabel: { fontSize: 10, color: '#B8BECE' },
+  dur: { width: 34, background: '#2A2F3D', color: '#E8EAF2', border: '1px solid #3A4152', borderRadius: 3, fontSize: 10, padding: '1px 2px' },
   del: { background: 'none', border: 'none', color: '#f38ba8', cursor: 'pointer', fontSize: 13, lineHeight: 1, padding: 0 },
-  addStep: { alignSelf: 'center', padding: '4px 10px', background: '#313244', color: '#cdd6f4', border: '1px dashed #585b70', borderRadius: 4, cursor: 'pointer', fontSize: 12, whiteSpace: 'nowrap' },
+  addStep: { alignSelf: 'center', padding: '4px 10px', background: '#2A2F3D', color: '#E8EAF2', border: '1px dashed #585b70', borderRadius: 4, cursor: 'pointer', fontSize: 12, whiteSpace: 'nowrap' },
 };
