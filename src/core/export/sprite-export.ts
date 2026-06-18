@@ -48,7 +48,7 @@ export function serializeDPLC(frames: Array<Array<{ start: number; count: number
  * source-tile indices are consecutive from its base. Serialization to a concrete
  * game format (mappings + DPLC packing) is done by the target adapter.
  */
-function buildDPLCData(rawFrames: RawFrame[]): { frames: SpriteFrame[]; allTiles: Tile[]; perFrameTiles: number[][] } {
+export function buildDPLCData(rawFrames: RawFrame[]): { frames: SpriteFrame[]; allTiles: Tile[]; perFrameTiles: number[][] } {
   const allTiles: Tile[] = [];
   const frames: SpriteFrame[] = [];
   const perFrameTiles: number[][] = [];
