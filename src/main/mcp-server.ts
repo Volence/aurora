@@ -23,7 +23,7 @@ const entrySchema = z.object({
 });
 
 function buildServer(getWindow: () => BrowserWindow | null): McpServer {
-  const server = new McpServer({ name: 'sonic-level-editor', version: '0.1.0' });
+  const server = new McpServer({ name: 'aurora', version: '0.1.0' });
 
   const forward = async (payload: AgentRequest) => {
     const win = getWindow();
@@ -177,7 +177,14 @@ function buildServer(getWindow: () => BrowserWindow | null): McpServer {
 }
 
 let httpServer: Server | null = null;
-let discoveryPath: string | null = null;
+let discoveryPaths: string[] = [];
+
+// Aurora's discovery file moved from ~/.sonic-level-editor/ to ~/.aurora/ with the
+// rename. We write BOTH during the transition window so existing bus/MCP clients
+// pointing at the legacy path keep finding us; remove the legacy write once every
+// client resolves ~/.aurora/mcp.json.
+const DISCOVERY_DIR = '.aurora';
+const LEGACY_DISCOVERY_DIR = '.sonic-level-editor';
 
 export async function startMcpServer(getWindow: () => BrowserWindow | null): Promise<void> {
   const exp = express();
@@ -216,19 +223,29 @@ export async function startMcpServer(getWindow: () => BrowserWindow | null): Pro
     port = await listen(0); // fallback to an ephemeral port
   }
 
-  const dir = join(electronApp.getPath('home'), '.sonic-level-editor');
-  mkdirSync(dir, { recursive: true });
-  discoveryPath = join(dir, 'mcp.json');
-  writeFileSync(discoveryPath, JSON.stringify({
+  const home = electronApp.getPath('home');
+  const contents = JSON.stringify({
     url: `http://127.0.0.1:${port}/mcp`, port, pid: process.pid,
-  }, null, 2));
+  }, null, 2);
+  discoveryPaths = [];
+  for (const sub of [DISCOVERY_DIR, LEGACY_DISCOVERY_DIR]) {
+    const dir = join(home, sub);
+    try {
+      mkdirSync(dir, { recursive: true });
+      const p = join(dir, 'mcp.json');
+      writeFileSync(p, contents);
+      discoveryPaths.push(p);
+    } catch (err) {
+      console.error(`[mcp] could not write discovery file in ${dir}:`, err);
+    }
+  }
   console.log(`[mcp] listening on http://127.0.0.1:${port}/mcp`);
 }
 
 export function stopMcpServer(): void {
   if (httpServer) { httpServer.close(); httpServer = null; }
-  if (discoveryPath) {
-    try { rmSync(discoveryPath); } catch { /* already gone */ }
-    discoveryPath = null;
+  for (const p of discoveryPaths) {
+    try { rmSync(p); } catch { /* already gone */ }
   }
+  discoveryPaths = [];
 }

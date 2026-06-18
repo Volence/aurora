@@ -13,7 +13,7 @@ function createWindow(): BrowserWindow {
   const win = new BrowserWindow({
     width: 1400,
     height: 900,
-    title: 'Sonic Level Editor',
+    title: 'Aurora',
     webPreferences: {
       preload: join(moduleDir, '../preload/index.js'),
       contextIsolation: true,

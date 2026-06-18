@@ -1,7 +1,7 @@
 {
-  "name": "sonic-level-editor",
+  "name": "aurora",
   "version": "0.1.0",
-  "description": "Modern level editor for Sega Genesis Sonic ROM hacks",
+  "description": "Aurora — visual authoring (level art, sprites, animation, menus) for the Empyrean Sega Genesis suite",
   "main": "dist/main/index.mjs",
   "scripts": {
     "dev": "electron-vite dev",
