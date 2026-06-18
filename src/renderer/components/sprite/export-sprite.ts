@@ -7,7 +7,9 @@ import { buildSpriteExport } from '../../../core/export/sprite-export';
 import type { SpriteManifest } from '../../../core/export/sprite-export';
 import { reconstructDPLCSprite, reconstructWithAdapter, reconstructFromFrames } from '../../../core/import/sprite-import';
 import { getAdapter } from '../../../core/formats/games';
-import { parseAsmMappings, parseAsmDPLC } from '../../../core/import/asm-mappings';
+import { parseAsmMappings, parseAsmDPLC, assembleDataAsm } from '../../../core/import/asm-mappings';
+import type { SpriteFrame } from '../../../core/model/sprite-types';
+import type { SpriteFormatAdapter } from '../../../core/formats/sprite-format-adapter';
 import { discoverSpriteSets } from '../../../core/import/sprite-discovery';
 import type { DiscoveredSpriteSet } from '../../../core/import/sprite-discovery';
 import type { SpriteFormatId } from '../../../core/formats/sprite-format-adapter';
@@ -108,6 +110,22 @@ function nameFromPath(path: string): string {
 
 const isAsm = (path: string) => /\.asm$/i.test(path);
 
+/** Frames from a mapping file: macro call-sites if present, else assemble raw dc.b/.w. */
+function framesFromMapping(path: string, bytes: Uint8Array, adapter: SpriteFormatAdapter): SpriteFrame[] {
+  if (!isAsm(path)) return adapter.readMappings(bytes);
+  const text = new TextDecoder().decode(bytes);
+  const macro = parseAsmMappings(text);
+  return macro.length ? macro : adapter.readMappings(assembleDataAsm(text));
+}
+
+/** Per-frame DPLC source-tile lists from a DPLC file (macro or raw dc form). */
+function dplcFromFile(path: string, bytes: Uint8Array, adapter: SpriteFormatAdapter): number[][] | undefined {
+  if (!isAsm(path)) return adapter.readDPLC?.(bytes);
+  const text = new TextDecoder().decode(bytes);
+  const macro = parseAsmDPLC(text);
+  return macro.length ? macro : adapter.readDPLC?.(assembleDataAsm(text));
+}
+
 /**
  * Import a sprite by picking its files in sequence: the MAPPING first (a `.asm`
  * disassembly file OR an extracted `.bin` — auto-detected), then its ART file
@@ -123,19 +141,10 @@ export async function openSprite(sourceFormat: SpriteFormatId = 's2'): Promise<v
   if (!artPath) return;
   const dplcPath = await window.api.selectFile('Optional DPLC file (.asm / .bin — cancel to skip)', [{ name: 'DPLC', extensions: ['asm', 'bin'] }]);
   try {
-    const mapBytes = await readAbsolute(mapPath);
-    const frames = isAsm(mapPath)
-      ? parseAsmMappings(new TextDecoder().decode(mapBytes))
-      : adapter.readMappings(mapBytes);
+    const frames = framesFromMapping(mapPath, await readAbsolute(mapPath), adapter);
     if (frames.length === 0) { toast('No sprite mappings found in that file', 'error'); return; }
 
-    let dplc: number[][] | undefined;
-    if (dplcPath) {
-      const dBytes = await readAbsolute(dplcPath);
-      dplc = isAsm(dplcPath)
-        ? parseAsmDPLC(new TextDecoder().decode(dBytes))
-        : adapter.readDPLC?.(dBytes);
-    }
+    const dplc = dplcPath ? dplcFromFile(dplcPath, await readAbsolute(dplcPath), adapter) : undefined;
     const recon = reconstructFromFrames(frames, await readAbsolute(artPath), adapter.artCompression, dplc);
     const frameBufs = recon.frames.map((data) => ({ width: recon.width, height: recon.height, data }));
 
@@ -180,9 +189,10 @@ export async function scanProjectForSprites(): Promise<ProjectScan | null> {
 export async function openDiscoveredSet(baseDir: string, set: DiscoveredSpriteSet): Promise<void> {
   const toast = useToastStore.getState().addToast;
   try {
-    const mapText = new TextDecoder().decode(new Uint8Array(await window.api.readBinaryFile(baseDir, set.mappings)));
-    const frames = parseAsmMappings(mapText);
-    if (frames.length === 0) { toast(`"${set.name}" has no parseable spritePiece mappings (raw bytes?)`, 'error'); return; }
+    const adapter = getAdapter(set.game);
+    const mapBytes = new Uint8Array(await window.api.readBinaryFile(baseDir, set.mappings));
+    const frames = framesFromMapping(set.mappings, mapBytes, adapter);
+    if (frames.length === 0) { toast(`"${set.name}" has no readable sprite mappings`, 'error'); return; }
 
     let artBytes: Uint8Array;
     if (set.art) {
@@ -193,10 +203,10 @@ export async function openDiscoveredSet(baseDir: string, set: DiscoveredSpriteSe
       artBytes = await readAbsolute(artPath);
     }
     const dplc = set.dplc
-      ? parseAsmDPLC(new TextDecoder().decode(new Uint8Array(await window.api.readBinaryFile(baseDir, set.dplc))))
+      ? dplcFromFile(set.dplc, new Uint8Array(await window.api.readBinaryFile(baseDir, set.dplc)), adapter)
       : undefined;
 
-    const recon = reconstructFromFrames(frames, artBytes, getAdapter(set.game).artCompression, dplc);
+    const recon = reconstructFromFrames(frames, artBytes, adapter.artCompression, dplc);
     const frameBufs = recon.frames.map((data) => ({ width: recon.width, height: recon.height, data }));
     const name = sanitizeName(set.name);
     useSpriteStore.getState().loadSprite(frameBufs, [], recon.originX, recon.originY);

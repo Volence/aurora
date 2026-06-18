@@ -71,6 +71,64 @@ function collectBlocks(text: string, headerOp: string, entryOp: string): { order
   return { order: tableLabels.length ? tableLabels : blockOrder, blocks };
 }
 
+/**
+ * Minimal two-pass assembler for the DATA portion of a mapping/DPLC `.asm` that is
+ * stored as raw `dc.b`/`dc.w`/`dc.l` (e.g. Flex 2 output, S.C.E. / skdisasm tables)
+ * rather than spritePiece macros. Resolves label arithmetic in the offset table
+ * (e.g. `Frame_0 - Base`) and honors `even`. The resulting bytes are then read by a
+ * format adapter — i.e. a raw-byte `.asm` is just the binary in text form.
+ */
+const DC_WIDTH: Record<string, number> = { b: 1, w: 2, l: 4 };
+
+function dcWidth(op: string | null): number | null {
+  const m = op?.match(/^dc\.([bwl])$/i);
+  return m ? DC_WIDTH[m[1].toLowerCase()] : null;
+}
+
+/** Evaluate an operand expression: signed terms of labels or `$hex`/decimal literals. */
+function evalExpr(expr: string, labels: Map<string, number>): number {
+  const terms = expr.match(/[+-]?[^+-]+/g) ?? [];
+  let val = 0;
+  for (let term of terms) {
+    term = term.trim();
+    let sign = 1;
+    if (term[0] === '+') term = term.slice(1).trim();
+    else if (term[0] === '-') { sign = -1; term = term.slice(1).trim(); }
+    if (term === '') continue;
+    val += sign * (labels.has(term) ? labels.get(term)! : evalOperand(term));
+  }
+  return val;
+}
+
+export function assembleDataAsm(text: string): Uint8Array {
+  const lines = text.split(/\r?\n/).map(parseLine).filter((l): l is ParsedLine => l !== null);
+
+  // Pass 1: record each label's byte address.
+  const labels = new Map<string, number>();
+  let addr = 0;
+  for (const ln of lines) {
+    if (ln.label) labels.set(ln.label, addr);
+    if (!ln.op) continue;
+    if (/^even$/i.test(ln.op)) { addr += addr & 1; continue; }
+    const w = dcWidth(ln.op);
+    if (w) addr += w * ln.args.length;
+  }
+
+  // Pass 2: emit bytes (big-endian), resolving label arithmetic.
+  const out: number[] = [];
+  for (const ln of lines) {
+    if (!ln.op) continue;
+    if (/^even$/i.test(ln.op)) { if (out.length & 1) out.push(0); continue; }
+    const w = dcWidth(ln.op);
+    if (!w) continue;
+    for (const a of ln.args) {
+      const v = evalExpr(a, labels);
+      for (let i = w - 1; i >= 0; i--) out.push((v >> (i * 8)) & 0xff);
+    }
+  }
+  return new Uint8Array(out);
+}
+
 export function parseAsmMappings(text: string): SpriteFrame[] {
   const { order, blocks } = collectBlocks(text, 'spriteHeader', 'spritePiece');
   if (blocks.size === 0) return [];
