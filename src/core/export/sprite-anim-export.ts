@@ -110,7 +110,7 @@ export function generateAnimationAsm(tableLabel: string, anims: SpriteAnimation[
     tokens.push(...controlTokens(a.control));
     lines.push(`${tableLabel}_${a.name}:`);
     lines.push(`\t\tdc.b ${tokens.join(', ')}`);
-    lines.push('\t\teven');
+    lines.push('\t\talign 2');
     lines.push('');
   }
   return lines.join('\n');
@@ -148,7 +148,7 @@ export function generatePerFrameAnimationAsm(tableLabel: string, anims: PerFrame
     tokens.push(...controlTokens(a.control));
     lines.push(`${tableLabel}_${a.name}:`);
     lines.push(`\t\tdc.b ${tokens.join(', ')}`);
-    lines.push('\t\teven');
+    lines.push('\t\talign 2');
     lines.push('');
   }
   return lines.join('\n');
