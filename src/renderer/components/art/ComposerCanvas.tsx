@@ -61,7 +61,6 @@ export default function ComposerCanvas() {
   const repeatPreview = useArtStore((s) => s.repeatPreview);
   const pendingAction = useArtStore((s) => s.pendingAction);
   const tool = useArtStore((s) => s.tool);
-  const brushSpace = useArtStore((s) => s.brushSpace);
   const brushTile = useArtStore((s) => s.brushTile);
   const selectedColor = useArtStore((s) => s.selectedColor);
   const mirror = useArtStore((s) => s.mirror);
@@ -295,8 +294,9 @@ export default function ComposerCanvas() {
     s.setZoom(s.zoom * (e.deltaY < 0 ? 2 : 0.5));
   }, []);
 
-  // Tile-space tools (stamp/collision) bypass the engine via the host hook.
-  const tileTools = brushSpace === 'tile' && (tool === 'tile-stamp' || tool === 'collision');
+  // Tile-space tools (stamp/collision) are tile-space by nature — route them to
+  // the host hook whenever selected, regardless of the px/tile tab state.
+  const tileTools = tool === 'tile-stamp' || tool === 'collision';
   const hostPointer: HostPointer | null = useMemo(() => {
     if (!tileTools) return null;
     const t = tool as 'tile-stamp' | 'collision';
@@ -366,7 +366,7 @@ export default function ComposerCanvas() {
     const doc = getDoc();
     if (!doc) return;
     const s = useArtStore.getState();
-    if (!(s.brushSpace === 'tile' && (s.tool === 'tile-stamp' || s.tool === 'collision'))) return;
+    if (!(s.tool === 'tile-stamp' || s.tool === 'collision')) return;
     const pxW = doc.widthTiles * 8, pxH = doc.heightTiles * 8;
 
     if (s.tool === 'collision' && z >= 6) {
@@ -455,7 +455,6 @@ export default function ComposerCanvas() {
       // holding the key doesn't strobe the flip).
       if (!e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey
           && (e.key === 'x' || e.key === 'y')
-          && useArtStore.getState().brushSpace === 'tile'
           && useArtStore.getState().tool === 'tile-stamp') {
         if (e.key === 'x') flipRef.current.hf = !flipRef.current.hf;
         else flipRef.current.vf = !flipRef.current.vf;
@@ -464,7 +463,8 @@ export default function ComposerCanvas() {
         return;
       }
 
-      if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
+      // Copy (Ctrl/Cmd+C) or Cut (Ctrl/Cmd+X) the active selection.
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'c' || e.key === 'x')) {
         const sel = selectionRef.current;
         const doc = getDoc();
         if (!sel || !doc) return;
@@ -475,6 +475,15 @@ export default function ComposerCanvas() {
             (sel.y + ry) * buf.width + sel.x + sel.w), ry * sel.w);
         }
         clipboardRef.current = { w: sel.w, h: sel.h, data };
+        if (e.key === 'x') {
+          // Cut: clear the selected region as one undo step, then drop the marquee.
+          const after = { width: buf.width, height: buf.height, data: new Uint8Array(buf.data) };
+          for (let ry = 0; ry < sel.h; ry++) {
+            for (let rx = 0; rx < sel.w; rx++) after.data[(sel.y + ry) * after.width + (sel.x + rx)] = 0;
+          }
+          commitWrites(bufferToWrites(buf, after), null, true);
+          setSelection(null);
+        }
         e.preventDefault();
         return;
       }

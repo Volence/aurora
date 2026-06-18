@@ -66,7 +66,9 @@ export const useArtStore = create<ArtState>((set) => ({
   paletteVersion: 0,
   pendingAction: null, brushTile: 0,
 
-  setTool: (tool) => set({ tool }),
+  // Selecting a tool implies its brush space (tile-stamp/collision are tile-space,
+  // everything else paints pixels) so the px/tile tab always reflects reality.
+  setTool: (tool) => set({ tool, brushSpace: (tool === 'tile-stamp' || tool === 'collision') ? 'tile' : 'pixel' }),
   setBrushSpace: (brushSpace) => set({ brushSpace }),
   setSelectedColor: (selectedColor) => set({ selectedColor }),
   setPaletteLine: (paletteLine) => set({ paletteLine }),
