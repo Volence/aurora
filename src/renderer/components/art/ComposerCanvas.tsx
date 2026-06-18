@@ -288,6 +288,13 @@ export default function ComposerCanvas() {
     if (pixel) hoverRef.current = pixel;
   }, []);
 
+  /** Wheel over the canvas: up doubles, down halves (setZoom clamps the range). */
+  const onWheel = useCallback((e: React.WheelEvent) => {
+    e.stopPropagation();
+    const s = useArtStore.getState();
+    s.setZoom(s.zoom * (e.deltaY < 0 ? 2 : 0.5));
+  }, []);
+
   // Tile-space tools (stamp/collision) bypass the engine via the host hook.
   const tileTools = brushSpace === 'tile' && (tool === 'tile-stamp' || tool === 'collision');
   const hostPointer: HostPointer | null = useMemo(() => {
@@ -505,7 +512,7 @@ export default function ComposerCanvas() {
 
   return (
     <div style={styles.scroller}>
-      <div style={styles.holder}>
+      <div style={styles.holder} onWheel={onWheel}>
         <PixelViewport
           buffer={buffer}
           palette={paletteLines[0]}
