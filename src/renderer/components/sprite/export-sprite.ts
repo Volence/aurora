@@ -14,7 +14,8 @@ import { discoverSpriteSets } from '../../../core/import/sprite-discovery';
 import type { DiscoveredSpriteSet } from '../../../core/import/sprite-discovery';
 import type { SpriteFormatId } from '../../../core/formats/sprite-format-adapter';
 import { parsePaletteLine } from '../../../core/formats/palette';
-import { parseCharacterAnims } from '../../../core/import/anim-import';
+import { parseCharacterAnims, parseAnyAnimScript } from '../../../core/import/anim-import';
+import type { ParsedAnim } from '../../../core/import/anim-import';
 
 /** DUR_DYNAMIC (speed-scaled in-game) has no fixed hold — use this for editor playback. */
 const DYNAMIC_PREVIEW_HOLD = 5;
@@ -156,6 +157,39 @@ export async function openSprite(sourceFormat: SpriteFormatId = 's2'): Promise<v
     toast(`Imported "${name}" as ${sourceFormat.toUpperCase()}: ${frameBufs.length} frames${dplc ? ' (DPLC)' : ''}`, 'success');
   } catch (e) {
     toast(`Import failed: ${e instanceof Error ? e.message : String(e)}`, 'error');
+  }
+}
+
+/** Convert parsed animations into editor timeline animations for the current frames. */
+function toTimelineAnims(parsed: ParsedAnim[], frameCount: number) {
+  return parsed.map((a) => ({
+    name: a.name,
+    steps: a.frames
+      .filter((f) => f < frameCount)
+      .map((f) => ({ frameIndex: f, duration: a.duration === 'dynamic' ? DYNAMIC_PREVIEW_HOLD : Math.max(1, a.duration) })),
+  })).filter((a) => a.steps.length > 0);
+}
+
+/**
+ * Load an animation script (.asm) for the CURRENT sprite — classic Sonic ($FF/$FE)
+ * or S4-engine (AF_*) form, auto-detected. Populates the animation picker and loads
+ * the first animation into the timeline. Frame indices past the loaded frame count
+ * are dropped.
+ */
+export async function loadSpriteAnimations(): Promise<void> {
+  const toast = useToastStore.getState().addToast;
+  const animPath = await window.api.selectFile('Select animation script (.asm)', [{ name: 'ASM source', extensions: ['asm'] }]);
+  if (!animPath) return;
+  try {
+    const parsed = parseAnyAnimScript(new TextDecoder().decode(await readAbsolute(animPath)));
+    const frameCount = useSpriteStore.getState().frames.length;
+    const anims = toTimelineAnims(parsed, frameCount);
+    if (anims.length === 0) { toast('No animations found in that file', 'error'); return; }
+    useSpriteStore.getState().setCharacterAnims(anims);
+    useSpriteStore.getState().setSteps(anims[0].steps);
+    toast(`Loaded ${anims.length} animation${anims.length > 1 ? 's' : ''} (showing "${anims[0].name}")`, 'success');
+  } catch (e) {
+    toast(`Load animations failed: ${e instanceof Error ? e.message : String(e)}`, 'error');
   }
 }
 

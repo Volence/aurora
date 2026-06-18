@@ -7,7 +7,7 @@ import type { OverlayRect } from './SpriteCanvas';
 import SpriteToolColumn from './SpriteToolColumn';
 import FrameGrid from './FrameGrid';
 import Timeline from './Timeline';
-import { exportSprite, loadSpriteByName, listSprites, loadEngineCharacter, openSprite, scanProjectForSprites, openDiscoveredSet } from './export-sprite';
+import { exportSprite, loadSpriteByName, listSprites, loadEngineCharacter, openSprite, scanProjectForSprites, openDiscoveredSet, loadSpriteAnimations } from './export-sprite';
 import type { ProjectScan } from './export-sprite';
 import PaletteEditor from '../art/PaletteEditor';
 import { decomposeFrame } from '../../../core/art/sprite-decompose';
@@ -146,6 +146,11 @@ export default function SpriteMode() {
             <button style={{ ...styles.secondary, ...(busy ? styles.disabled : {}) }} disabled={busy}
               title="Scan a Sonic 1/2/3K (or S.C.E.) disassembly folder and list every sprite set it finds." onClick={handleScanProject}>
               Scan disassembly project…
+            </button>
+            <button style={{ ...styles.secondary, ...(busy ? styles.disabled : {}) }} disabled={busy}
+              title="Load an animation script (.asm) for the current sprite — classic Sonic ($FF/$FE) or S4-engine (AF_*) form."
+              onClick={async () => { if (busy) return; setBusy(true); try { await loadSpriteAnimations(); } finally { setBusy(false); } }}>
+              Load animations…
             </button>
             {scan && (
               <div style={styles.scanPanel}>
