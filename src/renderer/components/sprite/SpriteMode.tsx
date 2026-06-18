@@ -129,42 +129,29 @@ export default function SpriteMode() {
             <div style={styles.sectionTitle}>Sprite</div>
             <input style={styles.nameInput} value={spriteName} spellCheck={false}
               onChange={(e) => setSpriteName(e.target.value)} placeholder="SpriteName" />
-            {available.length > 0 && (
-              <select style={styles.nameInput} value=""
-                onChange={(e) => { if (e.target.value) { setSpriteName(e.target.value); } }}>
-                <option value="">— load saved ({available.length}) —</option>
-                {available.map((n) => <option key={n} value={n}>{n}</option>)}
-              </select>
-            )}
-            <label style={styles.check} title="Streamed art (DPLC) vs all art resident. Characters use DPLC; most objects don't.">
-              <input type="checkbox" checked={exportDplc} onChange={(e) => useSpriteStore.getState().setExportDplc(e.target.checked)} />
-              DPLC (streamed art)
-            </label>
-            <label style={styles.fmtRow} title="Game format the sprite is saved in (re-save in another format to port it).">
-              <span style={styles.dim}>Save as</span>
-              <select style={styles.fmtSelect} value={format}
-                onChange={(e) => useSpriteStore.getState().setFormat(e.target.value as SpriteFormatId)}>
-                {FORMATS.map((f) => <option key={f.id} value={f.id}>{f.label}</option>)}
-              </select>
-            </label>
-            <div style={styles.btnRow}>
-              <button style={{ ...styles.primary, ...(busy ? styles.disabled : {}) }} disabled={busy} onClick={handleExport}>Export</button>
-              <button style={{ ...styles.secondary, ...(busy ? styles.disabled : {}) }} disabled={busy} onClick={handleLoad}>Load</button>
-            </div>
-            <label style={styles.fmtRow} title="Interpret the opened files as this game's format. The opened format becomes the Save-as target, so you can convert by saving in another format.">
-              <span style={styles.dim}>Open as</span>
+          </div>
+
+          <div style={styles.section}>
+            <div style={styles.sectionTitle}>Open — import a sprite to edit or convert</div>
+            <label style={styles.fmtRow} title="Read the opened files as this game's format. It also becomes the Save-as target, so you can convert by saving in another format.">
+              <span style={styles.dim}>Read as</span>
               <select style={styles.fmtSelect} value={openAs} onChange={(e) => setOpenAs(e.target.value as SpriteFormatId)}>
                 {FORMATS.map((f) => <option key={f.id} value={f.id}>{f.label}</option>)}
               </select>
             </label>
             <div style={styles.btnRow}>
-              <button style={styles.secondary} title="Import a sprite folder from anywhere on disk (mappings.bin + art.bin [+ dplc.bin]), read as the chosen format" onClick={() => openSpriteFolder(openAs)}>Open folder…</button>
-              <button style={styles.secondary} title="Open a disassembly .asm mapping file directly (e.g. obj0B.asm + its Nemesis art), read as the chosen format" onClick={() => openSpriteAsm(openAs)}>Open .asm…</button>
+              <button style={{ ...styles.secondary, ...(busy ? styles.disabled : {}) }} disabled={busy}
+                title="Open a folder containing mappings.bin + art.bin (+ optional dplc.bin) — e.g. sprites you exported or extracted as binary."
+                onClick={() => openSpriteFolder(openAs)}>Binary folder…</button>
+              <button style={{ ...styles.secondary, ...(busy ? styles.disabled : {}) }} disabled={busy}
+                title="Open a disassembly mapping .asm (e.g. obj0B.asm); you then pick its art file (+ optional DPLC .asm)."
+                onClick={() => openSpriteAsm(openAs)}>Mapping .asm…</button>
             </div>
             <button style={{ ...styles.secondary, ...(busy ? styles.disabled : {}) }} disabled={busy}
-              title="Scan a Sonic 1/2/3K disassembly folder for sprite sets (mapping + DPLC + art) and list them to open." onClick={handleScanProject}>
-              Open project…
+              title="Scan a Sonic 1/2/3K (or S.C.E.) disassembly folder and list every sprite set it finds." onClick={handleScanProject}>
+              Scan disassembly project…
             </button>
+            <div style={styles.hint}>Each open needs a mapping file + an art file (+ optional DPLC).</div>
             {scan && (
               <div style={styles.scanPanel}>
                 <div style={styles.fmtRow}>
@@ -190,6 +177,37 @@ export default function SpriteMode() {
                 </div>
               </div>
             )}
+          </div>
+
+          <div style={styles.section}>
+            <div style={styles.sectionTitle}>Save</div>
+            <label style={styles.check} title="Streamed art (DPLC) vs all art resident. Characters use DPLC; most objects don't.">
+              <input type="checkbox" checked={exportDplc} onChange={(e) => useSpriteStore.getState().setExportDplc(e.target.checked)} />
+              DPLC (streamed art)
+            </label>
+            <label style={styles.fmtRow} title="Game format the sprite is saved in. Pick a different format than it was opened in to port it.">
+              <span style={styles.dim}>Save as</span>
+              <select style={styles.fmtSelect} value={format}
+                onChange={(e) => useSpriteStore.getState().setFormat(e.target.value as SpriteFormatId)}>
+                {FORMATS.map((f) => <option key={f.id} value={f.id}>{f.label}</option>)}
+              </select>
+            </label>
+            <button style={{ ...styles.primary, ...(busy ? styles.disabled : {}) }} disabled={busy} onClick={handleExport}>Export</button>
+          </div>
+
+          <div style={styles.section}>
+            <div style={styles.sectionTitle}>Saved sprites — your exported sprites</div>
+            <div style={styles.btnRow}>
+              <select style={{ ...styles.nameInput, flex: 1 }} value=""
+                onChange={(e) => { if (e.target.value) { setSpriteName(e.target.value); } }}>
+                <option value="">{available.length ? `— pick saved (${available.length}) —` : '— none saved yet —'}</option>
+                {available.map((n) => <option key={n} value={n}>{n}</option>)}
+              </select>
+              <button style={{ ...styles.secondary, ...(busy ? styles.disabled : {}) }} disabled={busy} onClick={handleLoad}>Load</button>
+            </div>
+          </div>
+
+          <div style={styles.section}>
             <div style={styles.sectionTitle}>Load engine character</div>
             <div style={styles.btnRow}>
               {['sonic', 'tails', 'knuckles'].map((c) => (
@@ -226,6 +244,7 @@ const styles: Record<string, React.CSSProperties> = {
   stat: { display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#cdd6f4' },
   nameInput: { background: '#313244', color: '#cdd6f4', border: '1px solid #45475a', borderRadius: 4, fontSize: 12, padding: '4px 6px' },
   btnRow: { display: 'flex', gap: 6 },
+  hint: { fontSize: 10, color: '#7f849c', lineHeight: 1.3 },
   fmtRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 },
   fmtSelect: { flex: 1, background: '#313244', color: '#cdd6f4', border: '1px solid #45475a', borderRadius: 4, fontSize: 12, padding: '4px 6px' },
   scanPanel: { display: 'flex', flexDirection: 'column', gap: 4, marginTop: 4, padding: 6, background: '#1e1e2e', border: '1px solid #45475a', borderRadius: 4 },
