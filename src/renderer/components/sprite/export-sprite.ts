@@ -96,82 +96,57 @@ function sanitizeName(s: string): string {
   return /^[A-Za-z_]/.test(cleaned) ? cleaned : `s_${cleaned}`;
 }
 
-/**
- * Import a sprite from an arbitrary folder anywhere on disk (not necessarily in the
- * project) via a directory picker, interpreting the files as a chosen game format.
- * Expects mappings.bin + art.bin (+ optional dplc.bin, sprite.json). The art is
- * decompressed per the format (Nemesis for s1/s2/s3k; raw for s4). The opened
- * format becomes the working/export target, so you can re-save in any other format
- * (cross-game porting). DPLC-aware.
- */
-export async function openSpriteFolder(sourceFormat: SpriteFormatId = 's4'): Promise<void> {
-  const toast = useToastStore.getState().addToast;
-  const dir = await window.api.selectDirectory();
-  if (!dir) return;
-  try {
-    const map = await tryRead(dir, 'mappings.bin');
-    const art = await tryRead(dir, 'art.bin');
-    if (!map || !art) { toast('Folder must contain mappings.bin and art.bin', 'error'); return; }
-    const dplcBytes = await tryRead(dir, 'dplc.bin');
-    const manifest = await readJson<SpriteManifest>(dir, 'sprite.json');
-    // A sprite.json sourceFormat overrides the dropdown (re-open keeps its format).
-    const fmt = manifest?.sourceFormat ?? sourceFormat;
-
-    const recon = reconstructWithAdapter(getAdapter(fmt), map, art, dplcBytes ?? undefined);
-    const frames = recon.frames.map((data) => ({ width: recon.width, height: recon.height, data }));
-    const steps: AnimStepUI[] = (manifest?.animSteps ?? [])
-      .filter((s) => s.frame < frames.length)
-      .map((s) => ({ frameIndex: s.frame, duration: s.duration }));
-
-    const name = sanitizeName(manifest?.name ?? dir.split(/[\\/]/).filter(Boolean).pop() ?? 'Imported');
-    useSpriteStore.getState().loadSprite(frames, steps, recon.originX, recon.originY);
-    useSpriteStore.getState().setName(name);
-    useSpriteStore.getState().setExportDplc(!!dplcBytes);
-    useSpriteStore.getState().setFormat(fmt);
-    toast(`Imported "${name}" as ${fmt.toUpperCase()}: ${frames.length} frames${dplcBytes ? ' (DPLC)' : ''}`, 'success');
-  } catch (e) {
-    toast(`Import failed: ${e instanceof Error ? e.message : String(e)}`, 'error');
-  }
-}
-
 /** Read a file by absolute path (selectFile returns absolute paths). */
 async function readAbsolute(path: string): Promise<Uint8Array> {
   return new Uint8Array(await window.api.readBinaryFile(path, ''));
 }
 
+/** Strip a directory + extension from an absolute path to get a base sprite name. */
+function nameFromPath(path: string): string {
+  return sanitizeName(path.split(/[\\/]/).filter(Boolean).pop()?.replace(/\.[^.]+$/, '') ?? 'Imported');
+}
+
+const isAsm = (path: string) => /\.asm$/i.test(path);
+
 /**
- * Open a sprite straight from a disassembly's `.asm` mapping file (e.g.
- * s2disasm/mappings/sprite/obj0B.asm) — parses the spritePiece/dplcEntry macro
- * call-sites into logical frames, no pre-extraction needed. Pick the mappings
- * `.asm`, an art file (Nemesis), and optionally a DPLC `.asm`. The chosen format
- * sets the art compression and becomes the Save-as target for porting.
+ * Import a sprite by picking its files in sequence: the MAPPING first (a `.asm`
+ * disassembly file OR an extracted `.bin` — auto-detected), then its ART file
+ * (Nemesis for s1/s2/s3k, raw for s4), then an OPTIONAL DPLC file (.asm/.bin). Read
+ * as the chosen game format, which becomes the Save-as target for cross-game porting.
  */
-export async function openSpriteAsm(sourceFormat: SpriteFormatId = 's2'): Promise<void> {
+export async function openSprite(sourceFormat: SpriteFormatId = 's2'): Promise<void> {
   const toast = useToastStore.getState().addToast;
-  const mapPath = await window.api.selectFile('Select mappings .asm', [{ name: 'ASM source', extensions: ['asm'] }]);
+  const adapter = getAdapter(sourceFormat);
+  const mapPath = await window.api.selectFile('Select mapping file (.asm or .bin)', [{ name: 'Mapping', extensions: ['asm', 'bin'] }]);
   if (!mapPath) return;
   const artPath = await window.api.selectFile('Select art file (Nemesis .nem / .bin)', [{ name: 'Art', extensions: ['nem', 'bin'] }]);
   if (!artPath) return;
-  const dplcPath = await window.api.selectFile('Optional DPLC .asm (cancel to skip)', [{ name: 'ASM source', extensions: ['asm'] }]);
+  const dplcPath = await window.api.selectFile('Optional DPLC file (.asm / .bin — cancel to skip)', [{ name: 'DPLC', extensions: ['asm', 'bin'] }]);
   try {
-    const frames = parseAsmMappings(new TextDecoder().decode(await readAbsolute(mapPath)));
-    if (frames.length === 0) {
-      toast('No spritePiece macros found (raw-byte mappings?) — assemble to .bin and use Open folder', 'error');
-      return;
+    const mapBytes = await readAbsolute(mapPath);
+    const frames = isAsm(mapPath)
+      ? parseAsmMappings(new TextDecoder().decode(mapBytes))
+      : adapter.readMappings(mapBytes);
+    if (frames.length === 0) { toast('No sprite mappings found in that file', 'error'); return; }
+
+    let dplc: number[][] | undefined;
+    if (dplcPath) {
+      const dBytes = await readAbsolute(dplcPath);
+      dplc = isAsm(dplcPath)
+        ? parseAsmDPLC(new TextDecoder().decode(dBytes))
+        : adapter.readDPLC?.(dBytes);
     }
-    const art = await readAbsolute(artPath);
-    const dplc = dplcPath ? parseAsmDPLC(new TextDecoder().decode(await readAbsolute(dplcPath))) : undefined;
-    const recon = reconstructFromFrames(frames, art, getAdapter(sourceFormat).artCompression, dplc);
+    const recon = reconstructFromFrames(frames, await readAbsolute(artPath), adapter.artCompression, dplc);
     const frameBufs = recon.frames.map((data) => ({ width: recon.width, height: recon.height, data }));
 
-    const name = sanitizeName(mapPath.split(/[\\/]/).filter(Boolean).pop()?.replace(/\.asm$/i, '') ?? 'Imported');
+    const name = nameFromPath(mapPath);
     useSpriteStore.getState().loadSprite(frameBufs, [], recon.originX, recon.originY);
     useSpriteStore.getState().setName(name);
     useSpriteStore.getState().setExportDplc(!!dplc);
     useSpriteStore.getState().setFormat(sourceFormat);
-    toast(`Imported "${name}" from ${sourceFormat.toUpperCase()} .asm: ${frameBufs.length} frames${dplc ? ' (DPLC)' : ''}`, 'success');
+    toast(`Imported "${name}" as ${sourceFormat.toUpperCase()}: ${frameBufs.length} frames${dplc ? ' (DPLC)' : ''}`, 'success');
   } catch (e) {
-    toast(`ASM import failed: ${e instanceof Error ? e.message : String(e)}`, 'error');
+    toast(`Import failed: ${e instanceof Error ? e.message : String(e)}`, 'error');
   }
 }
 

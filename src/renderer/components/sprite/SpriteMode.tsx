@@ -7,7 +7,7 @@ import type { OverlayRect } from './SpriteCanvas';
 import SpriteToolColumn from './SpriteToolColumn';
 import FrameGrid from './FrameGrid';
 import Timeline from './Timeline';
-import { exportSprite, loadSpriteByName, listSprites, loadEngineCharacter, openSpriteFolder, openSpriteAsm, scanProjectForSprites, openDiscoveredSet } from './export-sprite';
+import { exportSprite, loadSpriteByName, listSprites, loadEngineCharacter, openSprite, scanProjectForSprites, openDiscoveredSet } from './export-sprite';
 import type { ProjectScan } from './export-sprite';
 import PaletteEditor from '../art/PaletteEditor';
 import { decomposeFrame } from '../../../core/art/sprite-decompose';
@@ -139,19 +139,14 @@ export default function SpriteMode() {
                 {FORMATS.map((f) => <option key={f.id} value={f.id}>{f.label}</option>)}
               </select>
             </label>
-            <div style={styles.btnRow}>
-              <button style={{ ...styles.secondary, ...(busy ? styles.disabled : {}) }} disabled={busy}
-                title="Open a folder containing mappings.bin + art.bin (+ optional dplc.bin) — e.g. sprites you exported or extracted as binary."
-                onClick={() => openSpriteFolder(openAs)}>Binary folder…</button>
-              <button style={{ ...styles.secondary, ...(busy ? styles.disabled : {}) }} disabled={busy}
-                title="Open a disassembly mapping .asm (e.g. obj0B.asm); you then pick its art file (+ optional DPLC .asm)."
-                onClick={() => openSpriteAsm(openAs)}>Mapping .asm…</button>
-            </div>
+            <button style={{ ...styles.primary, ...(busy ? styles.disabled : {}) }} disabled={busy}
+              title="Pick the mapping file (.asm or .bin), then its art file (.nem/.bin), then an optional DPLC file."
+              onClick={() => openSprite(openAs)}>Open sprite…</button>
+            <div style={styles.hint}>Pick a mapping file (.asm or .bin), then its art file, then an optional DPLC.</div>
             <button style={{ ...styles.secondary, ...(busy ? styles.disabled : {}) }} disabled={busy}
               title="Scan a Sonic 1/2/3K (or S.C.E.) disassembly folder and list every sprite set it finds." onClick={handleScanProject}>
               Scan disassembly project…
             </button>
-            <div style={styles.hint}>Each open needs a mapping file + an art file (+ optional DPLC).</div>
             {scan && (
               <div style={styles.scanPanel}>
                 <div style={styles.fmtRow}>
@@ -177,10 +172,20 @@ export default function SpriteMode() {
                 </div>
               </div>
             )}
+            <div style={styles.divider} />
+            <div style={styles.dim}>Reopen a sprite you exported:</div>
+            <div style={styles.btnRow}>
+              <select style={{ ...styles.nameInput, flex: 1 }} value=""
+                onChange={(e) => { if (e.target.value) { setSpriteName(e.target.value); } }}>
+                <option value="">{available.length ? `— pick saved (${available.length}) —` : '— none saved yet —'}</option>
+                {available.map((n) => <option key={n} value={n}>{n}</option>)}
+              </select>
+              <button style={{ ...styles.secondary, ...(busy ? styles.disabled : {}) }} disabled={busy} onClick={handleLoad}>Load</button>
+            </div>
           </div>
 
           <div style={styles.section}>
-            <div style={styles.sectionTitle}>Save</div>
+            <div style={styles.sectionTitle}>Export to project</div>
             <label style={styles.check} title="Streamed art (DPLC) vs all art resident. Characters use DPLC; most objects don't.">
               <input type="checkbox" checked={exportDplc} onChange={(e) => useSpriteStore.getState().setExportDplc(e.target.checked)} />
               DPLC (streamed art)
@@ -193,18 +198,6 @@ export default function SpriteMode() {
               </select>
             </label>
             <button style={{ ...styles.primary, ...(busy ? styles.disabled : {}) }} disabled={busy} onClick={handleExport}>Export</button>
-          </div>
-
-          <div style={styles.section}>
-            <div style={styles.sectionTitle}>Saved sprites — your exported sprites</div>
-            <div style={styles.btnRow}>
-              <select style={{ ...styles.nameInput, flex: 1 }} value=""
-                onChange={(e) => { if (e.target.value) { setSpriteName(e.target.value); } }}>
-                <option value="">{available.length ? `— pick saved (${available.length}) —` : '— none saved yet —'}</option>
-                {available.map((n) => <option key={n} value={n}>{n}</option>)}
-              </select>
-              <button style={{ ...styles.secondary, ...(busy ? styles.disabled : {}) }} disabled={busy} onClick={handleLoad}>Load</button>
-            </div>
           </div>
 
           <div style={styles.section}>
@@ -245,6 +238,7 @@ const styles: Record<string, React.CSSProperties> = {
   nameInput: { background: '#313244', color: '#cdd6f4', border: '1px solid #45475a', borderRadius: 4, fontSize: 12, padding: '4px 6px' },
   btnRow: { display: 'flex', gap: 6 },
   hint: { fontSize: 10, color: '#7f849c', lineHeight: 1.3 },
+  divider: { height: 1, background: '#45475a', margin: '2px 0' },
   fmtRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 },
   fmtSelect: { flex: 1, background: '#313244', color: '#cdd6f4', border: '1px solid #45475a', borderRadius: 4, fontSize: 12, padding: '4px 6px' },
   scanPanel: { display: 'flex', flexDirection: 'column', gap: 4, marginTop: 4, padding: 6, background: '#1e1e2e', border: '1px solid #45475a', borderRadius: 4 },
