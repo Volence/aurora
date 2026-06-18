@@ -5,8 +5,9 @@ import type { AnimStepUI } from '../../state/spriteStore';
 import { useToastStore } from '../../state/toastStore';
 import { buildSpriteExport } from '../../../core/export/sprite-export';
 import type { SpriteManifest } from '../../../core/export/sprite-export';
-import { reconstructDPLCSprite, reconstructWithAdapter } from '../../../core/import/sprite-import';
+import { reconstructDPLCSprite, reconstructWithAdapter, reconstructFromFrames } from '../../../core/import/sprite-import';
 import { getAdapter } from '../../../core/formats/games';
+import { parseAsmMappings, parseAsmDPLC } from '../../../core/import/asm-mappings';
 import type { SpriteFormatId } from '../../../core/formats/sprite-format-adapter';
 import { parsePaletteLine } from '../../../core/formats/palette';
 import { parseCharacterAnims } from '../../../core/import/anim-import';
@@ -128,6 +129,47 @@ export async function openSpriteFolder(sourceFormat: SpriteFormatId = 's4'): Pro
     toast(`Imported "${name}" as ${fmt.toUpperCase()}: ${frames.length} frames${dplcBytes ? ' (DPLC)' : ''}`, 'success');
   } catch (e) {
     toast(`Import failed: ${e instanceof Error ? e.message : String(e)}`, 'error');
+  }
+}
+
+/** Read a file by absolute path (selectFile returns absolute paths). */
+async function readAbsolute(path: string): Promise<Uint8Array> {
+  return new Uint8Array(await window.api.readBinaryFile(path, ''));
+}
+
+/**
+ * Open a sprite straight from a disassembly's `.asm` mapping file (e.g.
+ * s2disasm/mappings/sprite/obj0B.asm) — parses the spritePiece/dplcEntry macro
+ * call-sites into logical frames, no pre-extraction needed. Pick the mappings
+ * `.asm`, an art file (Nemesis), and optionally a DPLC `.asm`. The chosen format
+ * sets the art compression and becomes the Save-as target for porting.
+ */
+export async function openSpriteAsm(sourceFormat: SpriteFormatId = 's2'): Promise<void> {
+  const toast = useToastStore.getState().addToast;
+  const mapPath = await window.api.selectFile('Select mappings .asm', [{ name: 'ASM source', extensions: ['asm'] }]);
+  if (!mapPath) return;
+  const artPath = await window.api.selectFile('Select art file (Nemesis .nem / .bin)', [{ name: 'Art', extensions: ['nem', 'bin'] }]);
+  if (!artPath) return;
+  const dplcPath = await window.api.selectFile('Optional DPLC .asm (cancel to skip)', [{ name: 'ASM source', extensions: ['asm'] }]);
+  try {
+    const frames = parseAsmMappings(new TextDecoder().decode(await readAbsolute(mapPath)));
+    if (frames.length === 0) {
+      toast('No spritePiece macros found (raw-byte mappings?) — assemble to .bin and use Open folder', 'error');
+      return;
+    }
+    const art = await readAbsolute(artPath);
+    const dplc = dplcPath ? parseAsmDPLC(new TextDecoder().decode(await readAbsolute(dplcPath))) : undefined;
+    const recon = reconstructFromFrames(frames, art, getAdapter(sourceFormat).artCompression, dplc);
+    const frameBufs = recon.frames.map((data) => ({ width: recon.width, height: recon.height, data }));
+
+    const name = sanitizeName(mapPath.split(/[\\/]/).filter(Boolean).pop()?.replace(/\.asm$/i, '') ?? 'Imported');
+    useSpriteStore.getState().loadSprite(frameBufs, [], recon.originX, recon.originY);
+    useSpriteStore.getState().setName(name);
+    useSpriteStore.getState().setExportDplc(!!dplc);
+    useSpriteStore.getState().setFormat(sourceFormat);
+    toast(`Imported "${name}" from ${sourceFormat.toUpperCase()} .asm: ${frameBufs.length} frames${dplc ? ' (DPLC)' : ''}`, 'success');
+  } catch (e) {
+    toast(`ASM import failed: ${e instanceof Error ? e.message : String(e)}`, 'error');
   }
 }
 

@@ -2,6 +2,7 @@ import { parseSpriteMappings } from './sprite-mappings-import';
 import { parseTiles } from '../formats/tiles';
 import { renderFrameToIndices } from '../art/sprite-render';
 import { compressionFor } from '../compress';
+import type { CompressionKind } from '../compress';
 import type { SpriteFormatAdapter } from '../formats/sprite-format-adapter';
 import type { SpriteFrame } from '../model/sprite-types';
 import type { Tile } from '../model/s4-types';
@@ -94,6 +95,22 @@ function renderFrames(frames: SpriteFrame[], art: Tile[], dplc?: number[][]): Re
 
 export function reconstructSpriteFrames(mappingsBytes: Uint8Array, artBytes: Uint8Array): ReconstructedSprite {
   return renderFrames(parseSpriteMappings(mappingsBytes), parseTiles(artBytes));
+}
+
+/**
+ * Reconstruct from already-parsed logical frames (e.g. from the `.asm` call-site
+ * parser) + the raw compressed art bytes. Decompresses per `compression`, then
+ * renders. Used by the disassembly-`.asm` open path where mappings come as text,
+ * not binary.
+ */
+export function reconstructFromFrames(
+  frames: SpriteFrame[],
+  artBytes: Uint8Array,
+  compression: CompressionKind,
+  dplc?: number[][],
+): ReconstructedSprite {
+  const tiles = parseTiles(compressionFor(compression).decompress(artBytes));
+  return renderFrames(frames, tiles, dplc);
 }
 
 /**

@@ -7,7 +7,7 @@ import type { OverlayRect } from './SpriteCanvas';
 import SpriteToolColumn from './SpriteToolColumn';
 import FrameGrid from './FrameGrid';
 import Timeline from './Timeline';
-import { exportSprite, loadSpriteByName, listSprites, loadEngineCharacter, openSpriteFolder } from './export-sprite';
+import { exportSprite, loadSpriteByName, listSprites, loadEngineCharacter, openSpriteFolder, openSpriteAsm } from './export-sprite';
 import PaletteEditor from '../art/PaletteEditor';
 import { decomposeFrame } from '../../../core/art/sprite-decompose';
 import type { SpriteFormatId } from '../../../core/formats/sprite-format-adapter';
@@ -143,7 +143,10 @@ export default function SpriteMode() {
                 {FORMATS.map((f) => <option key={f.id} value={f.id}>{f.label}</option>)}
               </select>
             </label>
-            <button style={styles.secondary} title="Import a sprite folder from anywhere on disk (mappings.bin + art.bin [+ dplc.bin]), read as the chosen format" onClick={() => openSpriteFolder(openAs)}>Open folder…</button>
+            <div style={styles.btnRow}>
+              <button style={styles.secondary} title="Import a sprite folder from anywhere on disk (mappings.bin + art.bin [+ dplc.bin]), read as the chosen format" onClick={() => openSpriteFolder(openAs)}>Open folder…</button>
+              <button style={styles.secondary} title="Open a disassembly .asm mapping file directly (e.g. obj0B.asm + its Nemesis art), read as the chosen format" onClick={() => openSpriteAsm(openAs)}>Open .asm…</button>
+            </div>
             <div style={styles.sectionTitle}>Load engine character</div>
             <div style={styles.btnRow}>
               {['sonic', 'tails', 'knuckles'].map((c) => (
