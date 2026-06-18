@@ -10,6 +10,7 @@ import PaletteViewer from './components/PaletteViewer';
 import PropertiesPanel from './components/PropertiesPanel';
 import StatusBar from './components/StatusBar';
 import ToastContainer from './components/ToastContainer';
+import CommandPalette, { type Command } from './components/CommandPalette';
 import ArtMode from './components/art/ArtMode';
 import SpriteMode from './components/sprite/SpriteMode';
 import { useProject } from './hooks/useProject';
@@ -43,6 +44,25 @@ export default function App() {
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [saveProject]);
+
+  // Window/tab title: `Aurora — <context>` (Empyrean chrome convention).
+  useEffect(() => {
+    const modeLabel = appMode === 'art' ? 'Art' : appMode === 'sprite' ? 'Sprite' : 'Map';
+    const ctx = project ? [currentZoneId, modeLabel].filter(Boolean).join(' · ') : null;
+    document.title = ctx ? `Aurora — ${ctx}` : 'Aurora';
+  }, [project, currentZoneId, appMode]);
+
+  // Command palette (Ctrl/Cmd-K) entries.
+  const commands: Command[] = React.useMemo(() => {
+    const setAppMode = useEditorStore.getState().setAppMode;
+    return [
+      { id: 'open', label: 'Open Project…', hint: 'project', run: () => openProject() },
+      { id: 'save', label: 'Save Project', hint: 'Ctrl+S', run: () => saveProject() },
+      { id: 'mode-map', label: 'Switch to Map mode', hint: 'mode', run: () => setAppMode('map') },
+      { id: 'mode-art', label: 'Switch to Art mode', hint: 'mode', run: () => setAppMode('art') },
+      { id: 'mode-sprite', label: 'Switch to Sprite mode', hint: 'mode', run: () => setAppMode('sprite') },
+    ];
+  }, [openProject, saveProject]);
 
   return (
     <div style={styles.root}>
@@ -93,6 +113,7 @@ export default function App() {
       )}
       <StatusBar />
       <ToastContainer />
+      <CommandPalette commands={commands} />
     </div>
   );
 }
@@ -100,22 +121,22 @@ export default function App() {
 const styles: Record<string, React.CSSProperties> = {
   root: {
     display: 'flex', flexDirection: 'column', height: '100vh',
-    background: '#1e1e2e', color: '#cdd6f4',
+    background: '#12151E', color: '#E8EAF2',
   },
   main: {
     flex: 1, display: 'flex', overflow: 'hidden',
   },
   leftPanel: {
     width: 200, display: 'flex', flexDirection: 'column',
-    background: '#1e1e2e', borderRight: '1px solid #313244',
+    background: '#12151E', borderRight: '1px solid #2A2F3D',
     flexShrink: 0, overflow: 'auto',
   },
   error: {
-    padding: '6px 12px', background: '#f38ba8', color: '#1e1e2e',
+    padding: '6px 12px', background: '#f38ba8', color: '#12151E',
     fontSize: 13, display: 'flex', alignItems: 'center', gap: 8,
   },
   dismissButton: {
     padding: '2px 8px', background: 'rgba(0,0,0,0.2)', border: 'none',
-    color: '#1e1e2e', borderRadius: 4, cursor: 'pointer', fontSize: 12,
+    color: '#12151E', borderRadius: 4, cursor: 'pointer', fontSize: 12,
   },
 };

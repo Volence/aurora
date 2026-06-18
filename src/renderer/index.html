@@ -8,7 +8,7 @@
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     html, body, #root { width: 100%; height: 100%; overflow: hidden; }
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #1e1e2e; color: #cdd6f4; }
+    body { font-family: var(--font-ui, "Inter", system-ui, -apple-system, 'Segoe UI', sans-serif); background: var(--void, #0A0C12); color: var(--text-base, #B8BECE); font-size: var(--text-base-size, 13px); }
 
     /* Button hover/active feedback */
     button:not(:disabled):hover { filter: brightness(1.3); }
@@ -21,7 +21,7 @@
     select { transition: filter 0.1s; }
 
     /* Checkbox label hover */
-    label:hover { color: #cdd6f4 !important; }
+    label:hover { color: #E8EAF2 !important; }
 
     /* Toast animations */
     @keyframes toast-in {

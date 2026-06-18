@@ -140,12 +140,12 @@ function Property({ label, value }: { label: string; value: string }) {
 const styles: Record<string, React.CSSProperties> = {
   container: {
     width: 220, display: 'flex', flexDirection: 'column',
-    background: '#1e1e2e', borderLeft: '1px solid #313244',
+    background: '#12151E', borderLeft: '1px solid #2A2F3D',
     flexShrink: 0,
   },
   header: {
-    padding: '8px 12px', fontSize: 12, fontWeight: 600, color: '#a6adc8',
-    borderBottom: '1px solid #313244', textTransform: 'uppercase' as const,
+    padding: '8px 12px', fontSize: 12, fontWeight: 600, color: '#B8BECE',
+    borderBottom: '1px solid #2A2F3D', textTransform: 'uppercase' as const,
     letterSpacing: 1,
   },
   content: {
@@ -155,7 +155,7 @@ const styles: Record<string, React.CSSProperties> = {
     marginBottom: 12,
   },
   sectionTitle: {
-    fontSize: 11, fontWeight: 600, color: '#89b4fa', marginBottom: 4,
+    fontSize: 11, fontWeight: 600, color: '#34D399', marginBottom: 4,
     textTransform: 'uppercase' as const, letterSpacing: 0.5,
   },
   property: {
@@ -163,14 +163,14 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 12,
   },
   propLabel: {
-    color: '#a6adc8',
+    color: '#B8BECE',
   },
   propValue: {
-    color: '#cdd6f4', fontFamily: 'monospace', fontSize: 11,
+    color: '#E8EAF2', fontFamily: 'monospace', fontSize: 11,
   },
   select: {
     maxWidth: 120, fontSize: 11,
-    background: '#313244', color: '#cdd6f4',
-    border: '1px solid #45475a', borderRadius: 2,
+    background: '#2A2F3D', color: '#E8EAF2',
+    border: '1px solid #3A4152', borderRadius: 2,
   },
 };

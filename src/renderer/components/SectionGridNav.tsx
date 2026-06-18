@@ -58,20 +58,20 @@ export default function SectionGridNav() {
 }
 
 const styles: Record<string, React.CSSProperties> = {
-  container: { padding: 8, borderBottom: '1px solid #313244' },
-  header: { fontSize: 11, color: '#6c7086', marginBottom: 4 },
+  container: { padding: 8, borderBottom: '1px solid #2A2F3D' },
+  header: { fontSize: 11, color: '#6E7589', marginBottom: 4 },
   grid: { display: 'grid', gap: 2 },
   cell: {
     padding: '4px 0', textAlign: 'center', fontSize: 10,
-    background: '#313244', border: '1px solid #45475a', borderRadius: 2,
-    color: '#cdd6f4', cursor: 'pointer', position: 'relative',
+    background: '#2A2F3D', border: '1px solid #3A4152', borderRadius: 2,
+    color: '#E8EAF2', cursor: 'pointer', position: 'relative',
   },
   bgDot: {
     position: 'absolute', top: 1, right: 1,
     width: 5, height: 5, borderRadius: '50%',
     background: '#a6e3a1',
   },
-  active: { background: '#89b4fa', color: '#1e1e2e', border: '1px solid #89b4fa' },
-  null: { background: '#11111b', color: '#45475a' },
-  empty: { padding: 8, color: '#6c7086', fontSize: 11 },
+  active: { background: '#34D399', color: '#12151E', border: '1px solid #34D399' },
+  null: { background: '#0A0C12', color: '#3A4152' },
+  empty: { padding: 8, color: '#6E7589', fontSize: 11 },
 };

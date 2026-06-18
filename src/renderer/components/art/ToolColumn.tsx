@@ -129,9 +129,9 @@ const styles: Record<string, React.CSSProperties> = {
   },
   tabRow: { display: 'flex', flexDirection: 'column', gap: 2, width: '100%' },
   tab: {
-    width: '100%', padding: '3px 0', background: '#313244', color: '#a6adc8',
-    border: '1px solid #45475a', borderRadius: 4, cursor: 'pointer', fontSize: 10,
+    width: '100%', padding: '3px 0', background: '#2A2F3D', color: '#B8BECE',
+    border: '1px solid #3A4152', borderRadius: 4, cursor: 'pointer', fontSize: 10,
   },
-  tabActive: { background: '#89b4fa', color: '#1e1e2e', borderColor: '#89b4fa', fontWeight: 600 },
+  tabActive: { background: '#34D399', color: '#12151E', borderColor: '#34D399', fontWeight: 600 },
   config: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, width: '100%' },
 };

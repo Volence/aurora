@@ -34,27 +34,27 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
   },
   dialog: {
-    background: '#1e1e2e', border: '1px solid #45475a', borderRadius: 8,
+    background: '#12151E', border: '1px solid #3A4152', borderRadius: 8,
     width: 400, display: 'flex', flexDirection: 'column',
   },
   header: {
     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-    padding: '12px 16px', borderBottom: '1px solid #313244',
+    padding: '12px 16px', borderBottom: '1px solid #2A2F3D',
   },
-  title: { fontSize: 16, fontWeight: 600, color: '#cdd6f4' },
+  title: { fontSize: 16, fontWeight: 600, color: '#E8EAF2' },
   closeBtn: {
-    background: 'transparent', border: 'none', color: '#6c7086',
+    background: 'transparent', border: 'none', color: '#6E7589',
     cursor: 'pointer', fontSize: 16, padding: '4px 8px',
   },
   body: {
-    padding: '24px 16px', color: '#a6adc8', fontSize: 13,
+    padding: '24px 16px', color: '#B8BECE', fontSize: 13,
   },
   actions: {
-    display: 'flex', gap: 8, padding: '12px 16px', borderTop: '1px solid #313244',
+    display: 'flex', gap: 8, padding: '12px 16px', borderTop: '1px solid #2A2F3D',
     justifyContent: 'flex-end',
   },
   cancelBtn: {
-    padding: '6px 16px', background: '#313244', color: '#cdd6f4',
-    border: '1px solid #45475a', borderRadius: 4, cursor: 'pointer', fontSize: 13,
+    padding: '6px 16px', background: '#2A2F3D', color: '#E8EAF2',
+    border: '1px solid #3A4152', borderRadius: 4, cursor: 'pointer', fontSize: 13,
   },
 };

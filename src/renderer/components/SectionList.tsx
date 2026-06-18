@@ -44,12 +44,12 @@ export default function SectionList() {
 const styles: Record<string, React.CSSProperties> = {
   container: {
     width: 200, display: 'flex', flexDirection: 'column',
-    background: '#1e1e2e', borderRight: '1px solid #313244',
+    background: '#12151E', borderRight: '1px solid #2A2F3D',
     flexShrink: 0,
   },
   header: {
-    padding: '8px 12px', fontSize: 12, fontWeight: 600, color: '#a6adc8',
-    borderBottom: '1px solid #313244', textTransform: 'uppercase' as const,
+    padding: '8px 12px', fontSize: 12, fontWeight: 600, color: '#B8BECE',
+    borderBottom: '1px solid #2A2F3D', textTransform: 'uppercase' as const,
     letterSpacing: 1,
   },
   list: {
@@ -58,19 +58,19 @@ const styles: Record<string, React.CSSProperties> = {
   item: {
     display: 'flex', alignItems: 'center', gap: 8, width: '100%',
     padding: '6px 8px', background: 'transparent', border: 'none',
-    color: '#cdd6f4', cursor: 'pointer', borderRadius: 4, fontSize: 13,
+    color: '#E8EAF2', cursor: 'pointer', borderRadius: 4, fontSize: 13,
     textAlign: 'left' as const,
   },
   active: {
-    background: '#313244', outline: '1px solid #89b4fa',
+    background: '#2A2F3D', outline: '1px solid #34D399',
   },
   index: {
-    color: '#89b4fa', fontFamily: 'monospace', fontSize: 12,
+    color: '#34D399', fontFamily: 'monospace', fontSize: 12,
   },
   name: {
     flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const,
   },
   empty: {
-    padding: 12, color: '#6c7086', fontSize: 12,
+    padding: 12, color: '#6E7589', fontSize: 12,
   },
 };

@@ -411,7 +411,7 @@ export default function ComposerCanvas() {
           const tx = (cx * 8 + 4) * z, ty = (cy * 8 + 4) * z;
           ctx.fillStyle = 'rgba(17,17,27,0.65)';
           ctx.fillRect(tx - z, ty - z * 0.75, z * 2, z * 1.5);
-          ctx.fillStyle = coll === 0 ? '#6c7086' : '#f9e2af';
+          ctx.fillStyle = coll === 0 ? '#6E7589' : '#f9e2af';
           ctx.fillText(String(coll), tx, ty);
         }
       }
@@ -585,7 +585,7 @@ const styles: Record<string, React.CSSProperties> = {
     flex: 1,
     overflow: 'auto',
     display: 'flex',
-    background: '#11111b',
+    background: '#0A0C12',
   },
   holder: {
     margin: 'auto',

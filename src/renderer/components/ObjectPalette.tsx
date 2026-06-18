@@ -100,40 +100,40 @@ const styles: Record<string, React.CSSProperties> = {
   },
   header: {
     padding: '8px 12px', display: 'flex', flexDirection: 'column', gap: 6,
-    borderBottom: '1px solid #313244',
+    borderBottom: '1px solid #2A2F3D',
   },
   filter: {
-    padding: '4px 8px', background: '#313244', color: '#cdd6f4',
-    border: '1px solid #45475a', borderRadius: 4, fontSize: 12,
+    padding: '4px 8px', background: '#2A2F3D', color: '#E8EAF2',
+    border: '1px solid #3A4152', borderRadius: 4, fontSize: 12,
   },
   list: {
     flex: 1, overflow: 'auto', padding: 4,
   },
   empty: {
-    padding: 12, color: '#6c7086', fontSize: 12,
+    padding: 12, color: '#6E7589', fontSize: 12,
   },
   entry: {
     display: 'flex', alignItems: 'center', gap: 8, width: '100%',
     padding: '4px 8px', background: 'transparent', border: 'none',
-    color: '#cdd6f4', cursor: 'pointer', borderRadius: 4, fontSize: 12,
+    color: '#E8EAF2', cursor: 'pointer', borderRadius: 4, fontSize: 12,
     textAlign: 'left' as const,
   },
   entrySelected: {
-    background: '#313244', outline: '1px solid #89b4fa',
+    background: '#2A2F3D', outline: '1px solid #34D399',
   },
   entryId: {
-    color: '#89b4fa', fontFamily: 'monospace', fontSize: 11, flexShrink: 0, width: 40,
+    color: '#34D399', fontFamily: 'monospace', fontSize: 11, flexShrink: 0, width: 40,
   },
   entryName: {
     overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const,
   },
   bindRow: {
-    padding: '8px 12px', borderTop: '1px solid #313244', display: 'flex',
+    padding: '8px 12px', borderTop: '1px solid #2A2F3D', display: 'flex',
     flexDirection: 'column', gap: 4,
   },
   bindLabel: { fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.5, color: '#9399b2' },
   bindSelect: {
-    padding: '4px 6px', background: '#313244', color: '#cdd6f4',
-    border: '1px solid #45475a', borderRadius: 4, fontSize: 12,
+    padding: '4px 6px', background: '#2A2F3D', color: '#E8EAF2',
+    border: '1px solid #3A4152', borderRadius: 4, fontSize: 12,
   },
 };

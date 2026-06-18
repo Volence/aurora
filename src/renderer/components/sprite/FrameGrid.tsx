@@ -64,13 +64,13 @@ export default function FrameGrid() {
 }
 
 const styles: Record<string, React.CSSProperties> = {
-  root: { background: '#181825', borderTop: '1px solid #313244', display: 'flex', flexDirection: 'column', maxHeight: 180 },
+  root: { background: '#0A0C12', borderTop: '1px solid #2A2F3D', display: 'flex', flexDirection: 'column', maxHeight: 180 },
   header: { display: 'flex', alignItems: 'center', gap: 6, padding: '4px 8px', borderBottom: '1px solid #232334' },
-  collapse: { background: 'none', border: 'none', color: '#cdd6f4', cursor: 'pointer', fontSize: 12, padding: 0, width: 16 },
+  collapse: { background: 'none', border: 'none', color: '#E8EAF2', cursor: 'pointer', fontSize: 12, padding: 0, width: 16 },
   title: { fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5, color: '#9399b2' },
-  op: { padding: '3px 8px', background: '#313244', color: '#cdd6f4', border: '1px solid #45475a', borderRadius: 4, cursor: 'pointer', fontSize: 11, whiteSpace: 'nowrap' },
+  op: { padding: '3px 8px', background: '#2A2F3D', color: '#E8EAF2', border: '1px solid #3A4152', borderRadius: 4, cursor: 'pointer', fontSize: 11, whiteSpace: 'nowrap' },
   grid: { display: 'flex', flexWrap: 'wrap', gap: 4, padding: 8, overflowY: 'auto', alignContent: 'flex-start' },
-  cell: { position: 'relative', width: 44, height: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 2, background: '#1e1e2e', border: '1px solid #45475a', borderRadius: 4, cursor: 'pointer', lineHeight: 0 },
-  cellActive: { borderColor: '#89b4fa', boxShadow: '0 0 0 1px #89b4fa' },
-  num: { position: 'absolute', bottom: 0, right: 1, fontSize: 8, color: '#cdd6f4', lineHeight: 1, textShadow: '0 0 2px #000' },
+  cell: { position: 'relative', width: 44, height: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 2, background: '#12151E', border: '1px solid #3A4152', borderRadius: 4, cursor: 'pointer', lineHeight: 0 },
+  cellActive: { borderColor: '#34D399', boxShadow: '0 0 0 1px #34D399' },
+  num: { position: 'absolute', bottom: 0, right: 1, fontSize: 8, color: '#E8EAF2', lineHeight: 1, textShadow: '0 0 2px #000' },
 };

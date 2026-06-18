@@ -76,6 +76,6 @@ export default function SpriteToolColumn() {
 const styles: Record<string, React.CSSProperties> = {
   column: {
     display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, padding: '6px 4px',
-    overflowY: 'auto', background: '#1e1e2e', borderRight: '1px solid #313244', width: 50, flexShrink: 0,
+    overflowY: 'auto', background: '#12151E', borderRight: '1px solid #2A2F3D', width: 50, flexShrink: 0,
   },
 };

@@ -73,7 +73,7 @@ export default function ArtBrowser() {
     if (!ctx) return;
 
     ctx.imageSmoothingEnabled = false;
-    ctx.fillStyle = '#11111b';
+    ctx.fillStyle = '#0A0C12';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     const cols = Math.max(1, Math.floor(canvas.width / (itemSize + 2)));
@@ -152,7 +152,7 @@ export default function ArtBrowser() {
       const drawRow = Math.floor(newIdx / cols);
       const dx = drawCol * (itemSize + 2);
       const dy = drawRow * (itemSize + 2) - scrollTopRef.current;
-      ctx.strokeStyle = '#89b4fa';
+      ctx.strokeStyle = '#34D399';
       ctx.lineWidth = 2;
       ctx.strokeRect(dx, dy, itemSize, itemSize);
     }
@@ -231,20 +231,20 @@ export default function ArtBrowser() {
 const styles: Record<string, React.CSSProperties> = {
   container: {
     display: 'flex', flexDirection: 'column',
-    background: '#1e1e2e', borderTop: '1px solid #313244',
+    background: '#12151E', borderTop: '1px solid #2A2F3D',
     height: 180, flexShrink: 0,
   },
   tabs: {
     display: 'flex', alignItems: 'center', gap: 0,
-    borderBottom: '1px solid #313244', flexShrink: 0,
+    borderBottom: '1px solid #2A2F3D', flexShrink: 0,
   },
   label: {
-    padding: '6px 12px', fontSize: 12, fontWeight: 600, color: '#a6adc8',
+    padding: '6px 12px', fontSize: 12, fontWeight: 600, color: '#B8BECE',
     textTransform: 'uppercase' as const, letterSpacing: 1,
   },
   hoverLabel: {
     marginLeft: 'auto', padding: '0 12px',
-    fontSize: 11, fontFamily: 'monospace', color: '#89b4fa',
+    fontSize: 11, fontFamily: 'monospace', color: '#34D399',
   },
   canvasWrap: {
     flex: 1, position: 'relative', overflow: 'hidden',

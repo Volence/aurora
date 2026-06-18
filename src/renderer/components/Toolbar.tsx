@@ -4,6 +4,7 @@ import { useViewStore, type OverlayOptions } from '../state/viewStore';
 import { useEditorStore, editHistory, undo, redo, type EditorTool, type EditingLayer, type AppMode } from '../state/editorStore';
 import type { S4Level } from '../../core/editing/commands';
 import type { RecentProject } from '../../shared/ipc-types';
+import AuroraMark from './AuroraMark';
 
 // Display-name overrides for overlay toggles whose store keys use engine-
 // internal naming. showBlockGrid draws 128px lines — that's the editor's
@@ -79,6 +80,10 @@ export default function Toolbar({ onOpenProject, onOpenRecent, onSave }: Toolbar
     <header style={styles.toolbar}>
       {/* Row 1: Project, zone selector, layer, and tools */}
       <div style={styles.toolbarRow}>
+        <div style={styles.brand} title="Aurora — visual authoring (Empyrean suite)">
+          <AuroraMark size={20} />
+          <span style={styles.wordmark}>Aurora</span>
+        </div>
         <div style={{ position: 'relative' }} ref={dropdownRef}>
           <div style={{ display: 'flex', gap: 0 }}>
             <button onClick={onOpenProject} style={{ ...styles.button, borderRadius: '4px 0 0 4px' }} disabled={loading}>
@@ -263,7 +268,7 @@ export default function Toolbar({ onOpenProject, onOpenRecent, onSave }: Toolbar
           ))}
 
           <div style={{ flex: 1 }} />
-          <span style={{ color: '#6c7086', fontSize: 10 }}>v0.3.0</span>
+          <span style={{ color: '#6E7589', fontSize: 10 }}>v0.3.0</span>
         </div>
       )}
     </header>
@@ -273,46 +278,54 @@ export default function Toolbar({ onOpenProject, onOpenRecent, onSave }: Toolbar
 const styles: Record<string, React.CSSProperties> = {
   toolbar: {
     display: 'flex', flexDirection: 'column' as const,
-    background: '#181825', borderBottom: '1px solid #313244',
+    background: '#0A0C12', borderBottom: '1px solid #2A2F3D',
     flexShrink: 0,
   },
   toolbarRow: {
     display: 'flex', alignItems: 'center', gap: 6,
     padding: '3px 8px', flexWrap: 'wrap' as const,
   },
+  brand: {
+    display: 'flex', alignItems: 'center', gap: 6, paddingRight: 8, marginRight: 2,
+    borderRight: '1px solid var(--border, #2A2F3D)', userSelect: 'none' as const,
+  },
+  wordmark: {
+    fontSize: 13, fontWeight: 600, letterSpacing: '0.04em',
+    color: 'var(--text-hi, #E8EAF2)',
+  },
   buttonGroup: {
     display: 'flex', alignItems: 'center', gap: 2,
   },
   button: {
-    padding: '2px 8px', background: '#313244', color: '#cdd6f4', border: '1px solid #45475a',
+    padding: '2px 8px', background: '#2A2F3D', color: '#E8EAF2', border: '1px solid #3A4152',
     borderRadius: 4, cursor: 'pointer', fontSize: 11, whiteSpace: 'nowrap' as const,
   },
   smallButton: {
-    padding: '1px 5px', background: '#313244', color: '#cdd6f4', border: '1px solid #45475a',
+    padding: '1px 5px', background: '#2A2F3D', color: '#E8EAF2', border: '1px solid #3A4152',
     borderRadius: 3, cursor: 'pointer', fontSize: 11, minWidth: 22,
   },
   toolActive: {
-    background: '#89b4fa', color: '#1e1e2e', borderColor: '#89b4fa',
+    background: '#34D399', color: '#12151E', borderColor: '#34D399',
   },
   saveFlash: {
-    background: '#a6e3a1', color: '#1e1e2e', borderColor: '#a6e3a1',
+    background: '#a6e3a1', color: '#12151E', borderColor: '#a6e3a1',
   },
   dirtyBadge: {
-    fontSize: 9, color: '#1e1e2e', background: '#f9e2af',
+    fontSize: 9, color: '#12151E', background: '#f9e2af',
     padding: '0 4px', borderRadius: 3, lineHeight: '14px', fontWeight: 600,
   },
   select: {
-    padding: '2px 4px', background: '#313244', color: '#cdd6f4', border: '1px solid #45475a',
+    padding: '2px 4px', background: '#2A2F3D', color: '#E8EAF2', border: '1px solid #3A4152',
     borderRadius: 4, fontSize: 11, maxWidth: 180,
   },
   separator: {
-    width: 1, height: 16, background: '#45475a', flexShrink: 0,
+    width: 1, height: 16, background: '#3A4152', flexShrink: 0,
   },
   zoomLabel: {
-    fontSize: 11, color: '#a6adc8', minWidth: 32, textAlign: 'center' as const,
+    fontSize: 11, color: '#B8BECE', minWidth: 32, textAlign: 'center' as const,
   },
   checkLabel: {
-    fontSize: 11, color: '#a6adc8', display: 'flex', alignItems: 'center', gap: 2, cursor: 'pointer',
+    fontSize: 11, color: '#B8BECE', display: 'flex', alignItems: 'center', gap: 2, cursor: 'pointer',
     whiteSpace: 'nowrap' as const,
   },
   loading: {
@@ -320,24 +333,24 @@ const styles: Record<string, React.CSSProperties> = {
   },
   dropdown: {
     position: 'absolute' as const, top: '100%', left: 0, marginTop: 4,
-    background: '#313244', border: '1px solid #45475a', borderRadius: 6,
+    background: '#2A2F3D', border: '1px solid #3A4152', borderRadius: 6,
     minWidth: 320, maxHeight: 300, overflow: 'auto', zIndex: 100,
     boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
   },
   dropdownEmpty: {
-    padding: '12px 16px', color: '#6c7086', fontSize: 13,
+    padding: '12px 16px', color: '#6E7589', fontSize: 13,
   },
   dropdownItem: {
     display: 'flex', flexDirection: 'column' as const, width: '100%',
     padding: '8px 12px', background: 'transparent', border: 'none',
-    color: '#cdd6f4', cursor: 'pointer', textAlign: 'left' as const,
-    borderBottom: '1px solid #45475a',
+    color: '#E8EAF2', cursor: 'pointer', textAlign: 'left' as const,
+    borderBottom: '1px solid #3A4152',
   },
   projectName: {
     fontSize: 13, fontWeight: 500,
   },
   projectPath: {
-    fontSize: 11, color: '#6c7086', overflow: 'hidden',
+    fontSize: 11, color: '#6E7589', overflow: 'hidden',
     textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const,
   },
 };

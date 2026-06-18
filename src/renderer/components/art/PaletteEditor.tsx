@@ -20,7 +20,7 @@ interface SwatchSel {
 }
 
 const CHANNELS = ['r', 'g', 'b'] as const;
-const CHANNEL_COLORS: Record<string, string> = { r: '#f38ba8', g: '#a6e3a1', b: '#89b4fa' };
+const CHANNEL_COLORS: Record<string, string> = { r: '#f38ba8', g: '#a6e3a1', b: '#34D399' };
 
 /**
  * Genesis palette editor: 4 rows × 16 swatches over zone.palette. Line 0 is
@@ -232,20 +232,20 @@ const styles: Record<string, React.CSSProperties> = {
     height: 20,
     minWidth: 0,
     flex: '1 1 0',
-    border: '1px solid #313244',
+    border: '1px solid #2A2F3D',
     borderRadius: 2,
     cursor: 'pointer',
     boxSizing: 'border-box' as const,
   },
   checkerboard: {
-    background: 'repeating-conic-gradient(#6c7086 0% 25%, #45475a 0% 50%) 0 0 / 8px 8px',
+    background: 'repeating-conic-gradient(#6E7589 0% 25%, #3A4152 0% 50%) 0 0 / 8px 8px',
   },
   locked: {
     opacity: 0.35,
     cursor: 'not-allowed',
   },
   paintSel: {
-    outline: '2px solid #89b4fa',
+    outline: '2px solid #34D399',
     outlineOffset: -1,
   },
   editSel: {
@@ -256,15 +256,15 @@ const styles: Record<string, React.CSSProperties> = {
     flexDirection: 'column',
     gap: 4,
     padding: 6,
-    background: '#11111b',
-    border: '1px solid #313244',
+    background: '#0A0C12',
+    border: '1px solid #2A2F3D',
     borderRadius: 4,
   },
   editHeader: {
     display: 'flex',
     justifyContent: 'space-between',
     fontSize: 10,
-    color: '#a6adc8',
+    color: '#B8BECE',
     marginBottom: 2,
   },
   word: {
@@ -288,7 +288,7 @@ const styles: Record<string, React.CSSProperties> = {
   channelValue: {
     fontSize: 10,
     fontFamily: 'monospace',
-    color: '#cdd6f4',
+    color: '#E8EAF2',
     width: 10,
     textAlign: 'right' as const,
   },
