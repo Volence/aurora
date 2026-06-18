@@ -15,6 +15,7 @@ import {
 } from '../../../core/art/pixel-ops';
 import type { PixelBuffer } from '../../../core/art/pixel-ops';
 import { tileUsageCounts } from '../../../core/art/usage';
+import type { AnyCommand, SetTilesetTilesCommand } from '../../../core/editing/commands';
 import { PixelEditController } from '../../../core/art/pixel-edit-controller';
 import type { GestureResult, ArtTool as CtlArtTool } from '../../../core/art/pixel-edit-controller';
 import PixelViewport from '../art-shared/PixelViewport';
@@ -137,47 +138,81 @@ export default function ComposerCanvas() {
   /**
    * Commit a batch of writes (stroke / fill / shapes / transforms / paste /
    * selection moves) as ONE undo step:
-   * - live-tile doc           → set-tileset-tiles on open.liveTileIndex
-   * - chunk doc, atlas origin → set-tileset-tiles on that tile, writes clamped
-   * - otherwise               → doc-local setPixels (no command until save);
-   *                             `allowCow` lets transforms/paste copy-on-write
-   *                             atlas-referencing chunk cells into locals,
-   *                             while strokes/fill skip them.
+   * - live-tile doc            → set-tileset-tiles on open.liveTileIndex
+   * - chunk doc, direct paint  → edit the shared tileset art of EVERY atlas
+   *                              cell the writes cross (batched into one undo
+   *                              step); empty/local cells paint doc-local
+   * - otherwise / `allowCow`   → doc-local setPixels (no command until save);
+   *                              paste/move/transform pass allowCow so they
+   *                              copy-on-write into NEW local tiles rather than
+   *                              mutating the chunk's shared tileset art.
    */
-  const commitWrites = useCallback((
-    writes: Write[],
-    originCell: { cx: number; cy: number } | null,
-    allowCow = false,
-  ) => {
+  const commitWrites = useCallback((writes: Write[], allowCow = false) => {
     if (!writes.length) return;
     const o = useArtStore.getState().open;
     if (!o) return;
     const doc = o.doc;
     const atlas = getAtlas();
 
+    // Live-tile doc: the whole canvas is one shared tileset tile.
     if (o.liveTileIndex !== null) {
       commitAtlasTile(o.liveTileIndex, 0, writes);
       return;
     }
-    if (o.chunkId !== null && originCell && !allowCow) {
-      const cell = cellAt(doc, originCell.cx, originCell.cy);
-      if (cell.atlasTile !== null) {
-        const clamped = writes.filter(
-          (w) => (w.x >> 3) === originCell.cx && (w.y >> 3) === originCell.cy);
-        commitAtlasTile(cell.atlasTile, originCell.cy * doc.widthTiles + originCell.cx, clamped);
-        return;
+
+    // Chunk doc, direct paint: edit each crossed atlas tile's shared art in
+    // flip-space; collect doc-local writes for empty/local cells.
+    if (o.chunkId !== null && !allowCow) {
+      const newPixels = new Map<number, Uint8Array>();
+      const oldPixels = new Map<number, Uint8Array>();
+      const localWrites: Write[] = [];
+      for (const w of writes) {
+        const cell = cellAt(doc, w.x >> 3, w.y >> 3);
+        if (cell.atlasTile !== null && atlas[cell.atlasTile]) {
+          const ti = cell.atlasTile;
+          if (!newPixels.has(ti)) {
+            oldPixels.set(ti, new Uint8Array(atlas[ti].pixels));
+            newPixels.set(ti, new Uint8Array(atlas[ti].pixels));
+          }
+          const lx = w.x & 7, ly = w.y & 7;
+          const ax = cell.hf ? 7 - lx : lx;       // doc-space → atlas-space
+          const ay = cell.vf ? 7 - ly : ly;
+          newPixels.get(ti)![ay * 8 + ax] = w.value & 0xF;
+        } else {
+          localWrites.push(w);
+        }
       }
+      const level = getActiveLevel(useProjectStore.getState());
+      const cmds: SetTilesetTilesCommand[] = [];
+      for (const [ti, nw] of newPixels) {
+        if (tilesEqual(oldPixels.get(ti)!, nw)) continue;
+        cmds.push({
+          type: 'set-tileset-tiles', description: `art: edit tile #${ti}`,
+          sectionIndex: -1, at: ti,
+          oldTiles: [{ pixels: oldPixels.get(ti)! }], newTiles: [{ pixels: nw }],
+        });
+      }
+      if (cmds.length && level) {
+        const cmd: AnyCommand = cmds.length === 1 ? cmds[0]
+          : { type: 'batch', description: `art: edit ${cmds.length} tiles`, sectionIndex: -1, commands: cmds };
+        executeCommand(cmd, level);
+        warnSharedTileEdit(cmds[0].at);
+        useArtStore.getState().bumpDoc();
+      }
+      if (localWrites.length) {
+        adoptPaletteLineForEmptyCells(doc, localWrites, useArtStore.getState().paletteLine);
+        setPixels(doc, atlas, localWrites);
+        useArtStore.getState().markOpenDirty();
+        useArtStore.getState().bumpDoc();
+      }
+      return;
     }
-    // Doc-local path. On chunk docs, strokes/fill must not silently
-    // copy-on-write atlas-referencing cells (allowCow=false filters them out).
-    const filtered = (o.chunkId !== null && !allowCow)
-      ? writes.filter((w) => cellAt(doc, w.x >> 3, w.y >> 3).atlasTile === null)
-      : writes;
-    if (!filtered.length) return;
-    // Empty cells adopt the active palette line so painted colors render
-    // through the line the user picked (must precede setPixels' copy-on-write).
-    adoptPaletteLineForEmptyCells(doc, filtered, useArtStore.getState().paletteLine);
-    setPixels(doc, atlas, filtered);
+
+    // Doc-local path (new docs; and allowCow paste/move/transform on chunks,
+    // which copy-on-write atlas cells into fresh local tiles). Empty cells
+    // adopt the active palette line so painted colors render correctly.
+    adoptPaletteLineForEmptyCells(doc, writes, useArtStore.getState().paletteLine);
+    setPixels(doc, atlas, writes);
     useArtStore.getState().markOpenDirty();
     useArtStore.getState().bumpDoc();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -269,12 +304,9 @@ export default function ComposerCanvas() {
     if (r.selection !== undefined) setSelection(r.selection);
     const writes = bufferToWrites(buffer, r.buffer);
     if (!writes.length) return;
-    // 'select' moves/pastes pixels across cells → allow copy-on-write, no origin.
-    if (useArtStore.getState().tool === 'select') {
-      commitWrites(writes, null, true);
-    } else {
-      commitWrites(writes, r.start ? { cx: r.start.x >> 3, cy: r.start.y >> 3 } : null, false);
-    }
+    // 'select' moves pixels across cells → copy-on-write into local tiles
+    // (don't mutate the chunk's shared tileset art). Direct paint edits shared art.
+    commitWrites(writes, useArtStore.getState().tool === 'select');
   }, [buffer, commitWrites]);
 
   const onPick = useCallback((value: number, pixel: { x: number; y: number }) => {
@@ -440,7 +472,7 @@ export default function ComposerCanvas() {
         after.data.set(out.data.subarray(ry * region.w, (ry + 1) * region.w),
           (region.y + ry) * after.width + region.x);
       }
-      commitWrites(bufferToWrites(before, after), null, true);
+      commitWrites(bufferToWrites(before, after), true);
     }
     useArtStore.getState().clearAction();
   }, [pendingAction, commitWrites]);
@@ -481,7 +513,7 @@ export default function ComposerCanvas() {
           for (let ry = 0; ry < sel.h; ry++) {
             for (let rx = 0; rx < sel.w; rx++) after.data[(sel.y + ry) * after.width + (sel.x + rx)] = 0;
           }
-          commitWrites(bufferToWrites(buf, after), null, true);
+          commitWrites(bufferToWrites(buf, after), true);
           setSelection(null);
         }
         e.preventDefault();
@@ -499,7 +531,7 @@ export default function ComposerCanvas() {
           after.data.set(clip.data.subarray(ry * clip.w, (ry + 1) * clip.w),
             (py + ry) * after.width + px);
         }
-        commitWrites(bufferToWrites(before, after), null, true);
+        commitWrites(bufferToWrites(before, after), true);
         setSelection({ x: px, y: py, w: clip.w, h: clip.h });
         e.preventDefault();
       }

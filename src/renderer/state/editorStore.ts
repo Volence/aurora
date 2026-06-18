@@ -165,6 +165,10 @@ export function setCommandInvalidationListener(fn: ((cmd: AnyCommand) => void) |
  * change colors used by the baked thumbs.
  */
 function bumpStoreVersions(cmd: AnyCommand): void {
+  if (cmd.type === 'batch') {
+    for (const c of cmd.commands) bumpStoreVersions(c);
+    return;
+  }
   if (cmd.type === 'set-chunk'
       || cmd.type === 'set-palette-line'
       || cmd.type === 'set-tileset-tiles') {
