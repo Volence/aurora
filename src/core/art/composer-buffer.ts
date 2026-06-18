@@ -146,6 +146,27 @@ export function docToBuffer(doc: ComposerDoc, atlas: Tile[]): PixelBuffer {
   return buf;
 }
 
+/**
+ * Per-pixel palette-line map for the document (doc-pixel sized, row-major) — each
+ * pixel carries its cell's `pal`. Pairs with docToBuffer so a renderer can resolve
+ * the true color of every pixel (cells can use different palette lines). Used by the
+ * shared PixelViewport to render multi-palette level art.
+ */
+export function docLineMap(doc: ComposerDoc): Uint8Array {
+  const w = doc.widthTiles * 8;
+  const out = new Uint8Array(w * doc.heightTiles * 8);
+  for (let cy = 0; cy < doc.heightTiles; cy++) {
+    for (let cx = 0; cx < doc.widthTiles; cx++) {
+      const pal = doc.cells[cy * doc.widthTiles + cx].pal & 3;
+      for (let row = 0; row < 8; row++) {
+        const base = (cy * 8 + row) * w + cx * 8;
+        for (let col = 0; col < 8; col++) out[base + col] = pal;
+      }
+    }
+  }
+  return out;
+}
+
 /** Diff two equal-sized buffers into setPixels-ready writes (after wins). */
 export function bufferToWrites(
   before: PixelBuffer, after: PixelBuffer,

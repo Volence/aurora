@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   createDoc, docFromChunk, docFromTile, getPixel, setPixels, stampTile,
   sliceForSave, cellAt, docToBuffer, bufferToWrites, adoptPaletteLineForEmptyCells,
+  docLineMap,
 } from '../../src/core/art/composer-buffer';
 import { packNametableWord, createChunkDef } from '../../src/core/model/s4-types';
 import type { Tile } from '../../src/core/model/s4-types';
@@ -54,6 +55,20 @@ describe('pixel access', () => {
     expect(getPixel(doc, atlas, 3, 3)).toBe(2);
     expect(getPixel(doc, atlas, 0, 0)).toBe(7); // copied source pixels kept
     expect(atlas[1].pixels[3 * 8 + 3]).toBe(7); // atlas untouched
+  });
+});
+
+describe('docLineMap', () => {
+  it('returns each cell\'s palette line per pixel (doc-pixel sized)', () => {
+    const doc = createDoc(2, 1); // 16×8 px
+    cellAt(doc, 0, 0).pal = 1;
+    cellAt(doc, 1, 0).pal = 3;
+    const lm = docLineMap(doc);
+    expect(lm.length).toBe(16 * 8);
+    expect(lm[0]).toBe(1);          // (0,0) → cell (0,0) pal 1
+    expect(lm[7]).toBe(1);          // (7,0) still cell (0,0)
+    expect(lm[8]).toBe(3);          // (8,0) → cell (1,0) pal 3
+    expect(lm[7 * 16 + 15]).toBe(3); // bottom-right → cell (1,0)
   });
 });
 
