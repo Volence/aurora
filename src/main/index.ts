@@ -14,6 +14,9 @@ function createWindow(): BrowserWindow {
     width: 1400,
     height: 900,
     title: 'Aurora',
+    // Aurora mark as the window/taskbar icon (Linux honors the BrowserWindow
+    // icon on X11). Resolved relative to the bundle: dist/main → <root>/build.
+    icon: join(moduleDir, '../../build/icon.png'),
     webPreferences: {
       preload: join(moduleDir, '../preload/index.js'),
       contextIsolation: true,
