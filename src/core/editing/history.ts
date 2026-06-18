@@ -51,6 +51,10 @@ export class EditHistory {
 }
 
 function applyCommand(cmd: AnyCommand, level: S4Level): void {
+  if (cmd.type === 'batch') {
+    for (const c of cmd.commands) applyCommand(c, level);
+    return;
+  }
   if (cmd.type === 'set-palette-line') {
     // Throw, don't skip: a silent no-op here corrupts history (the command
     // consumes an undo slot without doing anything).
@@ -151,6 +155,10 @@ function applyCommand(cmd: AnyCommand, level: S4Level): void {
 }
 
 function undoCommand(cmd: AnyCommand, level: S4Level): void {
+  if (cmd.type === 'batch') {
+    for (let i = cmd.commands.length - 1; i >= 0; i--) undoCommand(cmd.commands[i], level);
+    return;
+  }
   if (cmd.type === 'set-palette-line') {
     if (!level.palette) throw new Error('set-palette-line requires level.palette');
     level.palette.lines[cmd.line].colors = cmd.oldColors.map(c => ({ ...c }));

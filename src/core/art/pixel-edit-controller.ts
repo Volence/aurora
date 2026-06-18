@@ -26,7 +26,7 @@ export type Preview =
   | { kind: 'none' }
   | { kind: 'line' | 'rect' | 'marquee'; x0: number; y0: number; x1: number; y1: number }
   | { kind: 'move'; dx: number; dy: number; sel: Selection };
-export interface GestureResult { buffer: PixelBuffer; selection?: Selection | null; pick?: number; }
+export interface GestureResult { buffer: PixelBuffer; selection?: Selection | null; pick?: number; start?: { x: number; y: number }; }
 
 interface Pt { x: number; y: number; }
 
@@ -126,8 +126,8 @@ export class PixelEditController {
    *  (fill/eyedropper); otherwise begins a drag and returns null. */
   begin(buffer: PixelBuffer, x: number, y: number, selection: Selection | null): GestureResult | null {
     this.sel = selection;
-    if (this.cfg.tool === 'eyedropper') return { buffer, pick: buffer.data[y * buffer.width + x] };
-    if (this.cfg.tool === 'fill') return { buffer: floodFill(buffer, x, y, this.paintValue(x, y)) };
+    if (this.cfg.tool === 'eyedropper') return { buffer, pick: buffer.data[y * buffer.width + x], start: { x, y } };
+    if (this.cfg.tool === 'fill') return { buffer: floodFill(buffer, x, y, this.paintValue(x, y)), start: { x, y } };
 
     this.active = true;
     this.snapshot = clone(buffer);
@@ -191,6 +191,10 @@ export class PixelEditController {
   }
 
   private finish(x: number, y: number): GestureResult {
+    return { ...this.finishInner(x, y), start: this.start ?? undefined };
+  }
+
+  private finishInner(x: number, y: number): GestureResult {
     const t = this.cfg.tool;
     const snap = this.snapshot!;
     if (t === 'line' || t === 'rect') {

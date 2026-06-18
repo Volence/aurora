@@ -33,6 +33,33 @@ describe('set-palette-line command', () => {
   });
 });
 
+describe('batch command', () => {
+  it('applies child commands in order and undoes them in reverse, as one step', () => {
+    const level = makeLevel();
+    level.tileset!.tiles.push({ pixels: new Uint8Array(64) }); // tiles 0,1 both blank
+    const history = new EditHistory();
+    history.execute({
+      type: 'batch',
+      description: 'art: edit 2 tiles',
+      sectionIndex: -1,
+      commands: [
+        { type: 'set-tileset-tiles', description: 't0', sectionIndex: -1, at: 0,
+          oldTiles: [{ pixels: new Uint8Array(64) }], newTiles: [{ pixels: new Uint8Array(64).fill(5) }] },
+        { type: 'set-tileset-tiles', description: 't1', sectionIndex: -1, at: 1,
+          oldTiles: [{ pixels: new Uint8Array(64) }], newTiles: [{ pixels: new Uint8Array(64).fill(7) }] },
+      ],
+    }, level);
+    expect(level.tileset!.tiles[0].pixels[0]).toBe(5);
+    expect(level.tileset!.tiles[1].pixels[0]).toBe(7);
+    history.undo(level); // single undo reverts both
+    expect(level.tileset!.tiles[0].pixels[0]).toBe(0);
+    expect(level.tileset!.tiles[1].pixels[0]).toBe(0);
+    history.redo(level);
+    expect(level.tileset!.tiles[0].pixels[0]).toBe(5);
+    expect(level.tileset!.tiles[1].pixels[0]).toBe(7);
+  });
+});
+
 describe('set-tileset-tiles command', () => {
   it('appends tiles and removes them on undo', () => {
     const level = makeLevel();

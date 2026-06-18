@@ -130,7 +130,18 @@ export interface SetSectionBgCommand extends EditCommand {
   newRef: string | null;
 }
 
+/**
+ * Groups several commands into one undo step. Children apply in order and undo
+ * in reverse. Used for multi-tile pixel edits (a stroke/shape crossing several
+ * chunk tiles edits each tileset tile, but undoes as a single action).
+ */
+export interface BatchCommand extends EditCommand {
+  type: 'batch';
+  commands: AnyCommand[];
+}
+
 export type AnyCommand =
+  | BatchCommand
   | SetTilesCommand
   | SetCollisionCommand
   | MoveObjectCommand

@@ -188,6 +188,31 @@ Each phase leaves both modes fully working and independently reviewable. Phase 4
 one to review most carefully; the engine + viewport land first and are proven on the
 simpler sprite surface before the level canvas is touched.
 
+## 8.5 Composer migration — resolved approach (rev 3, 2026-06-18)
+
+Reading the level canvas revealed two real divergences the original "85% similar"
+estimate missed. Both are solved by *extending the viewport with general capabilities*
+(not Composer-specific leakage), because building craft features twice is not
+best-in-class:
+
+- **Per-cell palettes:** level-art cells each carry a palette line. The viewport gains
+  an optional **per-pixel palette-line map** (`paletteLines: Color[][]` + `lineMap:
+  Uint8Array`); color = `paletteLines[lineMap[i]][index]`. The sprite host passes a
+  single `palette` (unchanged). This makes the viewport a real tilemap editor.
+- **Configurable checkerboard scale** (sprite 1×1, level 2×2) + **repeat tiling**
+  (3×3 seamless preview, with pointer mapping into the center tile) + a **host-pointer
+  hook** so tile-space tools (stamp/collision) bypass the controller.
+- **Live-atlas commit:** the Composer keeps its incremental live edit + flip-space undo
+  + palette adoption + chunk rules. The engine's per-move `workingBuffer()` is diffed
+  (`diffWrites`) and fed into the Composer's existing commit path each move — same live
+  behavior, sourced from the shared engine.
+
+Composer doc ↔ editable surface: a pure `composeDocBuffer(doc, atlas)` → `{ indices,
+lineMap }` (testable) for render; the controller edits `indices`; writes apply back via
+`commitWrites`. Migration order: extend viewport (sprite unaffected) → render-parity
+(verify level art identical) → route pixel tools through the controller → tile tools via
+the host hook.
+
 ## 9. Open questions / resolved
 
 - **Resolved:** rendering IS unified (one `PixelViewport`); it stays data-model-agnostic
