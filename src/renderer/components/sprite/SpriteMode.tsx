@@ -7,11 +7,33 @@ import type { OverlayRect } from './SpriteCanvas';
 import SpriteToolColumn from './SpriteToolColumn';
 import FrameGrid from './FrameGrid';
 import Timeline from './Timeline';
-import { exportSprite, loadSpriteByName, listSprites, loadEngineCharacter, openSpriteFolder } from './export-sprite';
+import { exportSprite, loadSpriteByName, listSprites, loadEngineCharacter, openSprite, scanProjectForSprites, openDiscoveredSet, loadSpriteAnimations } from './export-sprite';
+import type { ProjectScan } from './export-sprite';
 import PaletteEditor from '../art/PaletteEditor';
 import { decomposeFrame } from '../../../core/art/sprite-decompose';
+import type { SpriteFormatId } from '../../../core/formats/sprite-format-adapter';
+import type { CompressionKind } from '../../../core/compress';
 
 const SIZE_PRESETS = [16, 24, 32, 48, 64];
+
+const FORMATS: { id: SpriteFormatId; label: string }[] = [
+  { id: 's4', label: 'S4 (our engine)' },
+  { id: 's1', label: 'Sonic 1' },
+  { id: 's2', label: 'Sonic 2' },
+  { id: 's3k', label: 'Sonic 3&K / S.C.E.' },
+];
+
+const COMPRESSIONS: { id: CompressionKind; label: string }[] = [
+  { id: 'nemesis', label: 'Nemesis' },
+  { id: 'kosinski-moduled', label: 'Kosinski (moduled)' },
+  { id: 'kosinski', label: 'Kosinski (plain)' },
+  { id: 'uncompressed', label: 'Uncompressed' },
+];
+
+/** Per-game default art compression (overridable — compression is per-sprite). */
+const DEFAULT_COMPRESSION: Record<SpriteFormatId, CompressionKind> = {
+  s1: 'nemesis', s2: 'nemesis', s3k: 'kosinski-moduled', s4: 'uncompressed',
+};
 
 export default function SpriteMode() {
   const project = useProjectStore((s) => s.project);
@@ -25,7 +47,12 @@ export default function SpriteMode() {
   const spriteName = useSpriteStore((s) => s.name);
   const setSpriteName = (n: string) => useSpriteStore.getState().setName(n);
   const exportDplc = useSpriteStore((s) => s.exportDplc);
+  const format = useSpriteStore((s) => s.format);
+  const [openAs, setOpenAs] = useState<SpriteFormatId>('s2');
+  const [openComp, setOpenComp] = useState<CompressionKind>('nemesis');
   const [available, setAvailable] = useState<string[]>([]);
+  const [scan, setScan] = useState<ProjectScan | null>(null);
+  const [scanFilter, setScanFilter] = useState('');
   const [busy, setBusy] = useState(false);
   const [newSize, setNewSize] = useState(32);
   const canvasWrapRef = useRef<HTMLDivElement>(null);
@@ -54,6 +81,17 @@ export default function SpriteMode() {
     setBusy(true);
     try { await exportSprite(spriteName); await listSprites().then(setAvailable).catch(() => {}); } finally { setBusy(false); }
   }
+  async function handleScanProject() {
+    if (busy) return;
+    setBusy(true);
+    try { const r = await scanProjectForSprites(); if (r) { setScan(r); setScanFilter(''); } } finally { setBusy(false); }
+  }
+
+  const scanMatches = useMemo(() => {
+    if (!scan) return [];
+    const q = scanFilter.trim().toLowerCase();
+    return q ? scan.sets.filter((s) => s.name.toLowerCase().includes(q)) : scan.sets;
+  }, [scan, scanFilter]);
 
   const decomp = useMemo(() => decomposeFrame({
     id: 'cur', pixels: buffer.data, width: buffer.width, height: buffer.height,
@@ -105,22 +143,90 @@ export default function SpriteMode() {
             <div style={styles.sectionTitle}>Sprite</div>
             <input style={styles.nameInput} value={spriteName} spellCheck={false}
               onChange={(e) => setSpriteName(e.target.value)} placeholder="SpriteName" />
-            {available.length > 0 && (
-              <select style={styles.nameInput} value=""
+          </div>
+
+          <div style={styles.section}>
+            <div style={styles.sectionTitle}>Open — import a sprite to edit or convert</div>
+            <label style={styles.fmtRow} title="Read the opened files as this game's format. It also becomes the Save-as target, so you can convert by saving in another format.">
+              <span style={styles.dim}>Read as</span>
+              <select style={styles.fmtSelect} value={openAs}
+                onChange={(e) => { const f = e.target.value as SpriteFormatId; setOpenAs(f); setOpenComp(DEFAULT_COMPRESSION[f]); }}>
+                {FORMATS.map((f) => <option key={f.id} value={f.id}>{f.label}</option>)}
+              </select>
+            </label>
+            <label style={styles.fmtRow} title="Art compression of the picked art file. This is per-SPRITE, not per-game — e.g. most S3K badnik art is Kosinski-moduled; some is Nemesis or uncompressed.">
+              <span style={styles.dim}>Art comp.</span>
+              <select style={styles.fmtSelect} value={openComp} onChange={(e) => setOpenComp(e.target.value as CompressionKind)}>
+                {COMPRESSIONS.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
+              </select>
+            </label>
+            <button style={{ ...styles.primary, ...(busy ? styles.disabled : {}) }} disabled={busy}
+              title="Pick the mapping file (.asm or .bin), then its art file (.nem/.bin), then an optional DPLC file."
+              onClick={() => openSprite(openAs, openComp)}>Open sprite…</button>
+            <div style={styles.hint}>Pick a mapping file (.asm or .bin), then its art file, then an optional DPLC.</div>
+            <button style={{ ...styles.secondary, ...(busy ? styles.disabled : {}) }} disabled={busy}
+              title="Scan a Sonic 1/2/3K (or S.C.E.) disassembly folder and list every sprite set it finds." onClick={handleScanProject}>
+              Scan disassembly project…
+            </button>
+            <button style={{ ...styles.secondary, ...(busy ? styles.disabled : {}) }} disabled={busy}
+              title="Load an animation script (.asm) for the current sprite — classic Sonic ($FF/$FE) or S4-engine (AF_*) form."
+              onClick={async () => { if (busy) return; setBusy(true); try { await loadSpriteAnimations(); } finally { setBusy(false); } }}>
+              Load animations…
+            </button>
+            {scan && (
+              <div style={styles.scanPanel}>
+                <div style={styles.fmtRow}>
+                  <input style={styles.fmtSelect} value={scanFilter} placeholder={`Filter ${scan.sets.length} sets…`}
+                    onChange={(e) => setScanFilter(e.target.value)} spellCheck={false} />
+                  <button style={styles.sizeBtn} title="Close list" onClick={() => setScan(null)}>✕</button>
+                </div>
+                <div style={styles.scanList}>
+                  {scanMatches.slice(0, 200).map((s) => (
+                    <div key={s.mappings} style={styles.scanRow} title={s.mappings}>
+                      <span style={styles.scanName}>{s.name}</span>
+                      <span style={styles.scanBadges}>
+                        <span style={styles.scanGame}>{s.game.toUpperCase()}</span>
+                        {s.dplc && <span style={styles.scanTag} title="DPLC found">D</span>}
+                        <span style={{ ...styles.scanTag, opacity: s.art ? 1 : 0.35 }} title={s.art ? 'art auto-paired' : 'art not found — pick on open'}>A</span>
+                      </span>
+                      <button style={styles.scanOpen} disabled={busy}
+                        onClick={async () => { if (busy) return; setBusy(true); try { await openDiscoveredSet(scan.baseDir, s, openComp); } finally { setBusy(false); } }}>Open</button>
+                    </div>
+                  ))}
+                  {scanMatches.length > 200 && <div style={styles.dim}>…{scanMatches.length - 200} more (filter to narrow)</div>}
+                  {scanMatches.length === 0 && <div style={styles.dim}>no matches</div>}
+                </div>
+              </div>
+            )}
+            <div style={styles.divider} />
+            <div style={styles.dim}>Reopen a sprite you exported:</div>
+            <div style={styles.btnRow}>
+              <select style={{ ...styles.nameInput, flex: 1 }} value=""
                 onChange={(e) => { if (e.target.value) { setSpriteName(e.target.value); } }}>
-                <option value="">— load saved ({available.length}) —</option>
+                <option value="">{available.length ? `— pick saved (${available.length}) —` : '— none saved yet —'}</option>
                 {available.map((n) => <option key={n} value={n}>{n}</option>)}
               </select>
-            )}
+              <button style={{ ...styles.secondary, ...(busy ? styles.disabled : {}) }} disabled={busy} onClick={handleLoad}>Load</button>
+            </div>
+          </div>
+
+          <div style={styles.section}>
+            <div style={styles.sectionTitle}>Export to project</div>
             <label style={styles.check} title="Streamed art (DPLC) vs all art resident. Characters use DPLC; most objects don't.">
               <input type="checkbox" checked={exportDplc} onChange={(e) => useSpriteStore.getState().setExportDplc(e.target.checked)} />
               DPLC (streamed art)
             </label>
-            <div style={styles.btnRow}>
-              <button style={{ ...styles.primary, ...(busy ? styles.disabled : {}) }} disabled={busy} onClick={handleExport}>Export</button>
-              <button style={{ ...styles.secondary, ...(busy ? styles.disabled : {}) }} disabled={busy} onClick={handleLoad}>Load</button>
-            </div>
-            <button style={styles.secondary} title="Import a sprite folder from anywhere on disk (mappings.bin + art.bin [+ dplc.bin])" onClick={openSpriteFolder}>Open folder…</button>
+            <label style={styles.fmtRow} title="Game format the sprite is saved in. Pick a different format than it was opened in to port it.">
+              <span style={styles.dim}>Save as</span>
+              <select style={styles.fmtSelect} value={format}
+                onChange={(e) => useSpriteStore.getState().setFormat(e.target.value as SpriteFormatId)}>
+                {FORMATS.map((f) => <option key={f.id} value={f.id}>{f.label}</option>)}
+              </select>
+            </label>
+            <button style={{ ...styles.primary, ...(busy ? styles.disabled : {}) }} disabled={busy} onClick={handleExport}>Export</button>
+          </div>
+
+          <div style={styles.section}>
             <div style={styles.sectionTitle}>Load engine character</div>
             <div style={styles.btnRow}>
               {['sonic', 'tails', 'knuckles'].map((c) => (
@@ -157,6 +263,18 @@ const styles: Record<string, React.CSSProperties> = {
   stat: { display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#cdd6f4' },
   nameInput: { background: '#313244', color: '#cdd6f4', border: '1px solid #45475a', borderRadius: 4, fontSize: 12, padding: '4px 6px' },
   btnRow: { display: 'flex', gap: 6 },
+  hint: { fontSize: 10, color: '#7f849c', lineHeight: 1.3 },
+  divider: { height: 1, background: '#45475a', margin: '2px 0' },
+  fmtRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 },
+  fmtSelect: { flex: 1, background: '#313244', color: '#cdd6f4', border: '1px solid #45475a', borderRadius: 4, fontSize: 12, padding: '4px 6px' },
+  scanPanel: { display: 'flex', flexDirection: 'column', gap: 4, marginTop: 4, padding: 6, background: '#1e1e2e', border: '1px solid #45475a', borderRadius: 4 },
+  scanList: { display: 'flex', flexDirection: 'column', gap: 2, maxHeight: 220, overflowY: 'auto' },
+  scanRow: { display: 'flex', alignItems: 'center', gap: 6, padding: '2px 4px', borderRadius: 3, background: '#313244' },
+  scanName: { flex: 1, fontSize: 11, color: '#cdd6f4', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  scanBadges: { display: 'flex', alignItems: 'center', gap: 3 },
+  scanGame: { fontSize: 9, color: '#9399b2', fontWeight: 700 },
+  scanTag: { fontSize: 9, color: '#1e1e2e', background: '#89b4fa', borderRadius: 2, padding: '0 3px', fontWeight: 700 },
+  scanOpen: { padding: '2px 8px', background: '#313244', color: '#cdd6f4', border: '1px solid #45475a', borderRadius: 3, cursor: 'pointer', fontSize: 11 },
   primary: { flex: 1, padding: '5px 8px', background: '#89b4fa', color: '#1e1e2e', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 12, fontWeight: 600 },
   secondary: { flex: 1, padding: '5px 8px', background: '#313244', color: '#cdd6f4', border: '1px solid #45475a', borderRadius: 4, cursor: 'pointer', fontSize: 12 },
   disabled: { opacity: 0.5, cursor: 'default' },

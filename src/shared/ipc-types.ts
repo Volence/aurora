@@ -8,6 +8,7 @@ export const IPC_CHANNELS = {
   SAVE_FILE: 'file:save',
   WRITE_BINARY_FILE: 'file:write-binary',
   SELECT_FILES: 'dialog:select-files',
+  LIST_PROJECT_FILES: 'file:list-project-files',
 } as const;
 
 export type IpcChannels = typeof IPC_CHANNELS;

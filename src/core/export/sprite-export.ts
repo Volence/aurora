@@ -1,9 +1,11 @@
 import { assembleSprite, decomposeFrame } from '../art/sprite-decompose';
 import type { RawFrame } from '../art/sprite-decompose';
-import { serializeSpriteMappings } from './sprite-mappings-export';
 import { serializeTiles } from './tile-dedup';
 import { generatePerFrameAnimationAsm } from './sprite-anim-export';
 import type { PerFrameAnimation } from './sprite-anim-export';
+import { getAdapter } from '../formats/games';
+import { compressionFor } from '../compress';
+import type { SpriteFormatId } from '../formats/sprite-format-adapter';
 import type { SpriteFrame } from '../model/sprite-types';
 import type { Tile } from '../model/s4-types';
 
@@ -41,29 +43,23 @@ export function serializeDPLC(frames: Array<Array<{ start: number; count: number
 }
 
 /**
- * DPLC layout: each frame decomposes into its OWN tile pool (frame-local mapping
- * indices), the art is laid contiguously per frame, and a DPLC entry streams each
- * frame's tiles to VRAM. Frames over 16 tiles split into multiple entries.
+ * DPLC decomposition: each frame decomposes into its OWN tile pool (frame-local
+ * mapping indices), the art is laid contiguously per frame, and each frame's
+ * source-tile indices are consecutive from its base. Serialization to a concrete
+ * game format (mappings + DPLC packing) is done by the target adapter.
  */
-function buildDPLCArtifacts(rawFrames: RawFrame[]): { mappings: Uint8Array; art: Uint8Array; dplc: Uint8Array; tileCount: number } {
+function buildDPLCData(rawFrames: RawFrame[]): { frames: SpriteFrame[]; allTiles: Tile[]; perFrameTiles: number[][] } {
   const allTiles: Tile[] = [];
   const frames: SpriteFrame[] = [];
-  const dplcEntries: Array<Array<{ start: number; count: number }>> = [];
+  const perFrameTiles: number[][] = [];
   for (const rf of rawFrames) {
     const { tiles, pieces } = decomposeFrame(rf);
     const base = allTiles.length;
     for (const t of tiles) allTiles.push(t);
     frames.push({ id: rf.id, pieces }); // LOCAL piece tile indices (0-based per frame)
-    const entries: Array<{ start: number; count: number }> = [];
-    for (let off = 0; off < tiles.length; off += 16) entries.push({ start: base + off, count: Math.min(16, tiles.length - off) });
-    dplcEntries.push(entries);
+    perFrameTiles.push(tiles.map((_, k) => base + k)); // contiguous source indices
   }
-  return {
-    mappings: serializeSpriteMappings(frames),
-    art: serializeTiles(allTiles),
-    dplc: serializeDPLC(dplcEntries),
-    tileCount: allTiles.length,
-  };
+  return { frames, allTiles, perFrameTiles };
 }
 
 export interface SpriteManifest {
@@ -79,6 +75,8 @@ export interface SpriteManifest {
   /** Timeline steps (frame index + 1/60s hold) so a load can restore the animation. */
   animSteps: { frame: number; duration: number }[];
   bytes: { mappings: number; art: number; dplc: number };
+  /** Game format the artifacts were written in (defaults the export target on re-open). */
+  sourceFormat: SpriteFormatId;
 }
 
 /**
@@ -87,17 +85,25 @@ export interface SpriteManifest {
  * The animation's step.frame values index editor frames, which assembleSprite
  * preserves 1:1 as mapping-frame indices.
  */
-export function buildSpriteExport(name: string, rawFrames: RawFrame[], anim: PerFrameAnimation, opts?: { dplc?: boolean }): SpriteExport {
+export function buildSpriteExport(name: string, rawFrames: RawFrame[], anim: PerFrameAnimation, opts?: { dplc?: boolean; targetFormat?: SpriteFormatId }): SpriteExport {
   if (!LABEL_RE.test(name)) throw new Error(`sprite name "${name}" is not a valid asm label`);
   if (rawFrames.length === 0) throw new Error('buildSpriteExport: no frames');
 
+  const targetFormat = opts?.targetFormat ?? 's4';
+  const adapter = getAdapter(targetFormat);
+  const codec = compressionFor(adapter.artCompression);
+
   let mappings: Uint8Array, artBytes: Uint8Array, dplc: Uint8Array | undefined, tileCount: number, frameCount: number;
   if (opts?.dplc) {
-    const d = buildDPLCArtifacts(rawFrames);
-    mappings = d.mappings; artBytes = d.art; dplc = d.dplc; tileCount = d.tileCount; frameCount = rawFrames.length;
+    const d = buildDPLCData(rawFrames);
+    mappings = adapter.writeMappings(d.frames);
+    artBytes = codec.compress(serializeTiles(d.allTiles));
+    dplc = adapter.writeDPLC ? adapter.writeDPLC(d.perFrameTiles) : undefined;
+    tileCount = d.allTiles.length; frameCount = rawFrames.length;
   } else {
     const { art, frames } = assembleSprite(rawFrames); // flat: all art resident, global tile indices
-    mappings = serializeSpriteMappings(frames); artBytes = serializeTiles(art);
+    mappings = adapter.writeMappings(frames);
+    artBytes = codec.compress(serializeTiles(art));
     tileCount = art.length; frameCount = frames.length;
   }
 
@@ -114,6 +120,7 @@ export function buildSpriteExport(name: string, rawFrames: RawFrame[], anim: Per
     animTable,
     animSteps: anim.steps.map((s) => ({ frame: s.frame, duration: s.duration })),
     bytes: { mappings: mappings.length, art: artBytes.length, dplc: dplc?.length ?? 0 },
+    sourceFormat: targetFormat,
   };
 
   return { mappings, art: artBytes, dplc, animAsm, manifest };

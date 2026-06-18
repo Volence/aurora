@@ -1,13 +1,17 @@
 import { ipcMain, dialog, BrowserWindow } from 'electron';
 import { writeFileSync } from 'fs';
 import { IPC_CHANNELS } from '../shared/ipc-types';
-import { readBinaryFile } from './file-io';
+import { readBinaryFile, listProjectFiles } from './file-io';
 import { getRecentProjects, addRecentProject, removeRecentProject } from './recent-projects';
 
 export function registerIpcHandlers(): void {
   ipcMain.handle(IPC_CHANNELS.READ_BINARY_FILE, async (_event, basePath: string, relativePath: string) => {
     const buffer = await readBinaryFile(basePath, relativePath);
     return buffer;
+  });
+
+  ipcMain.handle(IPC_CHANNELS.LIST_PROJECT_FILES, async (_event, basePath: string) => {
+    return listProjectFiles(basePath);
   });
 
   ipcMain.handle(IPC_CHANNELS.SELECT_DIRECTORY, async (event) => {

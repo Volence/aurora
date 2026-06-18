@@ -28,6 +28,9 @@ const api = {
 
   selectFile: (title: string, filters: { name: string; extensions: string[] }[]): Promise<string | null> =>
     ipcRenderer.invoke(IPC_CHANNELS.SELECT_FILES, title, filters),
+
+  listProjectFiles: (basePath: string): Promise<string[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.LIST_PROJECT_FILES, basePath),
 };
 
 contextBridge.exposeInMainWorld('api', api);

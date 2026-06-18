@@ -5,9 +5,18 @@ import type { AnimStepUI } from '../../state/spriteStore';
 import { useToastStore } from '../../state/toastStore';
 import { buildSpriteExport } from '../../../core/export/sprite-export';
 import type { SpriteManifest } from '../../../core/export/sprite-export';
-import { reconstructSpriteFrames, reconstructDPLCSprite } from '../../../core/import/sprite-import';
+import { reconstructDPLCSprite, reconstructWithAdapter, reconstructFromFrames } from '../../../core/import/sprite-import';
+import { getAdapter } from '../../../core/formats/games';
+import { parseAsmMappings, parseAsmDPLC, assembleDataAsm } from '../../../core/import/asm-mappings';
+import type { SpriteFrame } from '../../../core/model/sprite-types';
+import type { SpriteFormatAdapter } from '../../../core/formats/sprite-format-adapter';
+import { discoverSpriteSets } from '../../../core/import/sprite-discovery';
+import type { DiscoveredSpriteSet } from '../../../core/import/sprite-discovery';
+import type { SpriteFormatId } from '../../../core/formats/sprite-format-adapter';
+import type { CompressionKind } from '../../../core/compress';
 import { parsePaletteLine } from '../../../core/formats/palette';
-import { parseCharacterAnims } from '../../../core/import/anim-import';
+import { parseCharacterAnims, parseAnyAnimScript } from '../../../core/import/anim-import';
+import type { ParsedAnim } from '../../../core/import/anim-import';
 
 /** DUR_DYNAMIC (speed-scaled in-game) has no fixed hold — use this for editor playback. */
 const DYNAMIC_PREVIEW_HOLD = 5;
@@ -43,7 +52,7 @@ export async function exportSprite(name: string): Promise<void> {
   const project = useProjectStore.getState().project;
   if (!project) { toast('No project open', 'error'); return; }
 
-  const { frames, steps, originX, originY, exportDplc } = useSpriteStore.getState();
+  const { frames, steps, originX, originY, exportDplc, format } = useSpriteStore.getState();
   const palette = useArtStore.getState().paletteLine;
 
   if (steps.length === 0) { toast('Add at least one animation step before exporting', 'error'); return; }
@@ -59,7 +68,7 @@ export async function exportSprite(name: string): Promise<void> {
   };
 
   try {
-    const out = buildSpriteExport(name, rawFrames, anim, { dplc: exportDplc });
+    const out = buildSpriteExport(name, rawFrames, anim, { dplc: exportDplc, targetFormat: format });
     const base = project.basePath;
     const dir = `data/sprites/${name}`;
     const enc = new TextEncoder();
@@ -75,7 +84,7 @@ export async function exportSprite(name: string): Promise<void> {
     index.sprites = [...index.sprites.filter((s) => s.name !== name), entry].sort((a, b) => a.name.localeCompare(b.name));
     await window.api.writeBinaryFile(base, INDEX_PATH, toArrayBuffer(enc.encode(JSON.stringify(index, null, 2))));
 
-    toast(`Exported "${name}": ${out.manifest.frameCount} frames, ${out.manifest.tileCount} tiles → ${dir}/`, 'success');
+    toast(`Exported "${name}" as ${format.toUpperCase()}: ${out.manifest.frameCount} frames, ${out.manifest.tileCount} tiles → ${dir}/`, 'success');
   } catch (e) {
     toast(`Export failed: ${e instanceof Error ? e.message : String(e)}`, 'error');
   }
@@ -91,35 +100,158 @@ function sanitizeName(s: string): string {
   return /^[A-Za-z_]/.test(cleaned) ? cleaned : `s_${cleaned}`;
 }
 
+/** Read a file by absolute path (selectFile returns absolute paths). */
+async function readAbsolute(path: string): Promise<Uint8Array> {
+  return new Uint8Array(await window.api.readBinaryFile(path, ''));
+}
+
+/** Strip a directory + extension from an absolute path to get a base sprite name. */
+function nameFromPath(path: string): string {
+  return sanitizeName(path.split(/[\\/]/).filter(Boolean).pop()?.replace(/\.[^.]+$/, '') ?? 'Imported');
+}
+
+const isAsm = (path: string) => /\.asm$/i.test(path);
+
+/** Frames from a mapping file: macro call-sites if present, else assemble raw dc.b/.w. */
+function framesFromMapping(path: string, bytes: Uint8Array, adapter: SpriteFormatAdapter): SpriteFrame[] {
+  if (!isAsm(path)) return adapter.readMappings(bytes);
+  const text = new TextDecoder().decode(bytes);
+  const macro = parseAsmMappings(text);
+  return macro.length ? macro : adapter.readMappings(assembleDataAsm(text));
+}
+
+/** Per-frame DPLC source-tile lists from a DPLC file (macro or raw dc form). */
+function dplcFromFile(path: string, bytes: Uint8Array, adapter: SpriteFormatAdapter): number[][] | undefined {
+  if (!isAsm(path)) return adapter.readDPLC?.(bytes);
+  const text = new TextDecoder().decode(bytes);
+  const macro = parseAsmDPLC(text);
+  return macro.length ? macro : adapter.readDPLC?.(assembleDataAsm(text));
+}
+
 /**
- * Import a sprite from an arbitrary folder anywhere on disk (not necessarily in the
- * project) via a directory picker. Expects mappings.bin + art.bin (+ optional
- * dplc.bin, sprite.json). DPLC-aware. Lets you bring in external sprites.
+ * Import a sprite by picking its files in sequence: the MAPPING first (a `.asm`
+ * disassembly file OR an extracted `.bin` — auto-detected), then its ART file, then
+ * an OPTIONAL DPLC file (.asm/.bin). Read as the chosen game format; ART COMPRESSION
+ * is chosen independently (it is per-sprite, not per-game — e.g. S3K art is often
+ * Kosinski-moduled, uncompressed, or Nemesis). The format becomes the Save-as target.
  */
-export async function openSpriteFolder(): Promise<void> {
+export async function openSprite(sourceFormat: SpriteFormatId = 's2', artCompression: CompressionKind = 'nemesis'): Promise<void> {
   const toast = useToastStore.getState().addToast;
-  const dir = await window.api.selectDirectory();
-  if (!dir) return;
+  const adapter = getAdapter(sourceFormat);
+  const mapPath = await window.api.selectFile('Select mapping file (.asm or .bin)', [{ name: 'Mapping', extensions: ['asm', 'bin'] }]);
+  if (!mapPath) return;
+  const artPath = await window.api.selectFile('Select art file (.nem / .bin)', [{ name: 'Art', extensions: ['nem', 'bin'] }]);
+  if (!artPath) return;
+  const dplcPath = await window.api.selectFile('Optional DPLC file (.asm / .bin — cancel to skip)', [{ name: 'DPLC', extensions: ['asm', 'bin'] }]);
   try {
-    const map = await tryRead(dir, 'mappings.bin');
-    const art = await tryRead(dir, 'art.bin');
-    if (!map || !art) { toast('Folder must contain mappings.bin and art.bin', 'error'); return; }
-    const dplcBytes = await tryRead(dir, 'dplc.bin');
-    const manifest = await readJson<SpriteManifest>(dir, 'sprite.json');
+    const frames = framesFromMapping(mapPath, await readAbsolute(mapPath), adapter);
+    if (frames.length === 0) { toast('No sprite mappings found in that file', 'error'); return; }
 
-    const recon = dplcBytes ? reconstructDPLCSprite(map, dplcBytes, art) : reconstructSpriteFrames(map, art);
-    const frames = recon.frames.map((data) => ({ width: recon.width, height: recon.height, data }));
-    const steps: AnimStepUI[] = (manifest?.animSteps ?? [])
-      .filter((s) => s.frame < frames.length)
-      .map((s) => ({ frameIndex: s.frame, duration: s.duration }));
+    const dplc = dplcPath ? dplcFromFile(dplcPath, await readAbsolute(dplcPath), adapter) : undefined;
+    const recon = reconstructFromFrames(frames, await readAbsolute(artPath), artCompression, dplc);
+    const frameBufs = recon.frames.map((data) => ({ width: recon.width, height: recon.height, data }));
 
-    const name = sanitizeName(manifest?.name ?? dir.split(/[\\/]/).filter(Boolean).pop() ?? 'Imported');
-    useSpriteStore.getState().loadSprite(frames, steps, recon.originX, recon.originY);
+    const name = nameFromPath(mapPath);
+    useSpriteStore.getState().loadSprite(frameBufs, [], recon.originX, recon.originY);
     useSpriteStore.getState().setName(name);
-    useSpriteStore.getState().setExportDplc(!!dplcBytes);
-    toast(`Imported "${name}": ${frames.length} frames${dplcBytes ? ' (DPLC)' : ''}`, 'success');
+    useSpriteStore.getState().setExportDplc(!!dplc);
+    useSpriteStore.getState().setFormat(sourceFormat);
+    toast(`Imported "${name}" as ${sourceFormat.toUpperCase()}: ${frameBufs.length} frames${dplc ? ' (DPLC)' : ''}`, 'success');
   } catch (e) {
     toast(`Import failed: ${e instanceof Error ? e.message : String(e)}`, 'error');
+  }
+}
+
+/** Convert parsed animations into editor timeline animations for the current frames. */
+function toTimelineAnims(parsed: ParsedAnim[], frameCount: number) {
+  return parsed.map((a) => ({
+    name: a.name,
+    steps: a.frames
+      .filter((f) => f < frameCount)
+      .map((f) => ({ frameIndex: f, duration: a.duration === 'dynamic' ? DYNAMIC_PREVIEW_HOLD : Math.max(1, a.duration) })),
+  })).filter((a) => a.steps.length > 0);
+}
+
+/**
+ * Load an animation script (.asm) for the CURRENT sprite — classic Sonic ($FF/$FE)
+ * or S4-engine (AF_*) form, auto-detected. Populates the animation picker and loads
+ * the first animation into the timeline. Frame indices past the loaded frame count
+ * are dropped.
+ */
+export async function loadSpriteAnimations(): Promise<void> {
+  const toast = useToastStore.getState().addToast;
+  const animPath = await window.api.selectFile('Select animation script (.asm)', [{ name: 'ASM source', extensions: ['asm'] }]);
+  if (!animPath) return;
+  try {
+    const parsed = parseAnyAnimScript(new TextDecoder().decode(await readAbsolute(animPath)));
+    const frameCount = useSpriteStore.getState().frames.length;
+    const anims = toTimelineAnims(parsed, frameCount);
+    if (anims.length === 0) { toast('No animations found in that file', 'error'); return; }
+    useSpriteStore.getState().setCharacterAnims(anims);
+    useSpriteStore.getState().setSteps(anims[0].steps);
+    toast(`Loaded ${anims.length} animation${anims.length > 1 ? 's' : ''} (showing "${anims[0].name}")`, 'success');
+  } catch (e) {
+    toast(`Load animations failed: ${e instanceof Error ? e.message : String(e)}`, 'error');
+  }
+}
+
+export interface ProjectScan { baseDir: string; sets: DiscoveredSpriteSet[]; }
+
+/**
+ * Scan a chosen disassembly project folder for sprite sets (mapping .asm paired
+ * with sibling DPLC + art by the known layouts). Returns the base dir + detected
+ * sets for the UI to list; opening a set re-validates by parsing it (6c).
+ */
+export async function scanProjectForSprites(): Promise<ProjectScan | null> {
+  const toast = useToastStore.getState().addToast;
+  const baseDir = await window.api.selectDirectory();
+  if (!baseDir) return null;
+  try {
+    const files = await window.api.listProjectFiles(baseDir);
+    const sets = discoverSpriteSets(files);
+    if (sets.length === 0) toast('No sprite mapping .asm files found in that folder', 'info');
+    return { baseDir, sets };
+  } catch (e) {
+    toast(`Project scan failed: ${e instanceof Error ? e.message : String(e)}`, 'error');
+    return null;
+  }
+}
+
+/**
+ * Open a discovered sprite set: read its mapping (+ DPLC) .asm and art relative to
+ * the scanned base dir, parse the macro call-sites, and load. If the art file was
+ * not auto-paired (s1/s2 store art under unrelated names), prompt for it manually.
+ */
+export async function openDiscoveredSet(baseDir: string, set: DiscoveredSpriteSet, artCompression: CompressionKind = 'nemesis'): Promise<void> {
+  const toast = useToastStore.getState().addToast;
+  try {
+    const adapter = getAdapter(set.game);
+    const mapBytes = new Uint8Array(await window.api.readBinaryFile(baseDir, set.mappings));
+    const frames = framesFromMapping(set.mappings, mapBytes, adapter);
+    if (frames.length === 0) { toast(`"${set.name}" has no readable sprite mappings`, 'error'); return; }
+
+    let artBytes: Uint8Array;
+    if (set.art) {
+      artBytes = new Uint8Array(await window.api.readBinaryFile(baseDir, set.art));
+    } else {
+      const artPath = await window.api.selectFile(`Select art for "${set.name}" (Nemesis .nem / .bin)`, [{ name: 'Art', extensions: ['nem', 'bin'] }]);
+      if (!artPath) { toast('Art file required to open the sprite', 'error'); return; }
+      artBytes = await readAbsolute(artPath);
+    }
+    const dplc = set.dplc
+      ? dplcFromFile(set.dplc, new Uint8Array(await window.api.readBinaryFile(baseDir, set.dplc)), adapter)
+      : undefined;
+
+    const recon = reconstructFromFrames(frames, artBytes, artCompression, dplc);
+    const frameBufs = recon.frames.map((data) => ({ width: recon.width, height: recon.height, data }));
+    const name = sanitizeName(set.name);
+    useSpriteStore.getState().loadSprite(frameBufs, [], recon.originX, recon.originY);
+    useSpriteStore.getState().setName(name);
+    useSpriteStore.getState().setExportDplc(!!dplc);
+    useSpriteStore.getState().setFormat(set.game);
+    toast(`Opened "${set.name}" (${set.game.toUpperCase()}): ${frameBufs.length} frames${dplc ? ' (DPLC)' : ''}`, 'success');
+  } catch (e) {
+    toast(`Open "${set.name}" failed: ${e instanceof Error ? e.message : String(e)}`, 'error');
   }
 }
 
@@ -146,10 +278,12 @@ export async function loadSpriteByName(name: string): Promise<void> {
   try {
     const mappings = new Uint8Array(await window.api.readBinaryFile(base, `${dir}/mappings.bin`));
     const art = new Uint8Array(await window.api.readBinaryFile(base, `${dir}/art.bin`));
-    const recon = reconstructSpriteFrames(mappings, art);
+    const manifest = await readJson<SpriteManifest>(base, `${dir}/sprite.json`);
+    const fmt: SpriteFormatId = manifest?.sourceFormat ?? 's4';
+    const dplcBytes = manifest?.dplc ? await tryRead(base, `${dir}/dplc.bin`) : null;
+    const recon = reconstructWithAdapter(getAdapter(fmt), mappings, art, dplcBytes ?? undefined);
     const frames = recon.frames.map((data) => ({ width: recon.width, height: recon.height, data }));
 
-    const manifest = await readJson<SpriteManifest>(base, `${dir}/sprite.json`);
     const steps: AnimStepUI[] = (manifest?.animSteps ?? [])
       .filter((s) => s.frame < frames.length)
       .map((s) => ({ frameIndex: s.frame, duration: s.duration }));
@@ -157,7 +291,8 @@ export async function loadSpriteByName(name: string): Promise<void> {
     useSpriteStore.getState().loadSprite(frames, steps, recon.originX, recon.originY);
     useSpriteStore.getState().setName(name);
     useSpriteStore.getState().setExportDplc(!!manifest?.dplc); // default export mode to how it was saved
-    toast(`Loaded "${name}": ${frames.length} frames${steps.length ? `, ${steps.length} anim steps` : ''}`, 'success');
+    useSpriteStore.getState().setFormat(fmt);
+    toast(`Loaded "${name}" (${fmt.toUpperCase()}): ${frames.length} frames${steps.length ? `, ${steps.length} anim steps` : ''}`, 'success');
   } catch (e) {
     toast(`Load failed for "${name}": ${e instanceof Error ? e.message : String(e)}`, 'error');
   }

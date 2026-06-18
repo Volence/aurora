@@ -15,7 +15,7 @@ describe('generateAnimationAsm — table + base form', () => {
         '',
         'Ani_Test_Walk:',
         '\t\tdc.b DUR_DYNAMIC, 7, 8, AF_END',
-        '\t\teven',
+        '\t\talign 2',
         '',
       ].join('\n'),
     );

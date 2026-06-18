@@ -34,7 +34,7 @@ function parseNum(tok: string): number | null {
 const CONTROLS = new Set(['AF_END', 'AF_BACK', 'AF_CHANGE', 'AF_ROUTINE', 'AF_DELETE']);
 
 export function parseCharacterAnims(text: string): ParsedAnim[] {
-  const clean = text.split('\n').map((l) => l.replace(/;.*$/, '').trim());
+  const clean = text.split(/\r?\n/).map((l) => l.replace(/;.*$/, '').trim());
 
   // Find the table label: a `Label:` whose next dc.w references itself.
   let table = '';
@@ -94,4 +94,72 @@ export function parseCharacterAnims(text: string): ParsedAnim[] {
     anims.push({ name, duration, frames, control });
   }
   return anims;
+}
+
+/**
+ * Parse a CLASSIC Sonic 1/2/3K animation script (raw control bytes, not AF_* macros):
+ *   <table>:  dc.w <Anim> - <Base> …          (ordered offset table)
+ *   <Anim>:   dc.b <speed>, frame, frame, …, <control>[, arg]
+ * Control bytes are $FA-$FF: $FF restart (loop), $FE n go back n frames, $FD n switch
+ * to anim n, $FC next routine, $FB reset (treated as delete). Frame bytes are < $FA.
+ * `duration` is the single per-anim speed. Best-effort; unknown tokens are skipped.
+ */
+export function parseSonicAnimScript(text: string): ParsedAnim[] {
+  const clean = text.split(/\r?\n/).map((l) => l.replace(/;.*$/, '').trim());
+
+  // Ordered anim labels from the `dc.w Label - Base` offset table (Base ignored).
+  // The table may be preceded by its own label (e.g. `Ani_Foo:` then the dc.w rows),
+  // so collect every offset-table entry and stop at the first dc.b data block — a
+  // leading table label must NOT end the scan. (dc.w appears only in the table.)
+  const order: string[] = [];
+  for (const l of clean) {
+    const m = l.match(/^dc\.w\s+(\w+)\s*-\s*\w+/);
+    if (m) { order.push(m[1]); continue; }
+    if (/(^|:\s*)dc\.b\b/.test(l)) break; // first data block ends the table
+  }
+
+  // Collect each label's dc.b byte list (label + dc.b may share a line).
+  const blocks = new Map<string, number[]>();
+  let cur: number[] | null = null;
+  for (const l of clean) {
+    if (l === '') continue;
+    let body = l;
+    const lm = l.match(/^(\w+):\s*(.*)$/);
+    if (lm) { cur = []; blocks.set(lm[1], cur); body = lm[2]; }
+    const dm = body.match(/^dc\.b\s+(.*)$/);
+    if (dm && cur) {
+      for (const tok of dm[1].split(',').map((s) => s.trim()).filter(Boolean)) {
+        const n = parseNum(tok);
+        if (n !== null) cur.push(n & 0xff);
+      }
+    }
+  }
+
+  const anims: ParsedAnim[] = [];
+  for (const label of order) {
+    const bytes = blocks.get(label);
+    if (!bytes || bytes.length === 0) continue;
+    const duration = bytes[0];
+    const frames: number[] = [];
+    let control: ParsedControl = null;
+    for (let i = 1; i < bytes.length; i++) {
+      const b = bytes[i];
+      if (b < 0xfa) { frames.push(b); continue; }
+      if (b === 0xff) control = { kind: 'loop' };
+      else if (b === 0xfe) control = { kind: 'back', count: bytes[i + 1] ?? 0 };
+      else if (b === 0xfd) control = { kind: 'change', animId: bytes[i + 1] ?? 0 };
+      else if (b === 0xfc) control = { kind: 'routine' };
+      else control = { kind: 'delete' }; // $FB / $FA
+      break;
+    }
+    anims.push({ name: label, duration, frames, control });
+  }
+  return anims;
+}
+
+/** Load either animation-script dialect: classic ($FF/$FE) or S4-engine (AF_*). */
+export function parseAnyAnimScript(text: string): ParsedAnim[] {
+  const classic = parseSonicAnimScript(text);
+  if (classic.length) return classic;
+  return parseCharacterAnims(text);
 }
