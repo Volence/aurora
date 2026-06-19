@@ -1,3 +1,6 @@
 node_modules/
 dist/
 out/
+
+# Superpowers brainstorm visual-companion mockups (local, ephemeral)
+.superpowers/
