@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useCallback, useMemo, useState } from 'react';
+import React, { useRef, useEffect, useLayoutEffect, useCallback, useMemo, useState } from 'react';
 import { useArtStore } from '../../state/artStore';
 import { useEditorStore, executeCommand } from '../../state/editorStore';
 import {
@@ -325,12 +325,38 @@ export default function ComposerCanvas() {
     if (pixel) hoverRef.current = pixel;
   }, []);
 
-  /** Wheel over the canvas: up doubles, down halves (setZoom clamps the range). */
-  const onWheel = useCallback((e: React.WheelEvent) => {
-    e.stopPropagation();
-    const s = useArtStore.getState();
-    s.setZoom(s.zoom * (e.deltaY < 0 ? 2 : 0.5));
+  // Cursor-anchored wheel zoom: keep the doc point under the cursor fixed while
+  // zooming. A native non-passive listener is used so preventDefault actually
+  // stops the default scroll (React's onWheel is passive). The post-zoom scroll
+  // correction runs in a layout effect once the canvas has resized.
+  const scrollerRef = useRef<HTMLDivElement>(null);
+  const zoomAnchor = useRef<{ cx: number; cy: number; sx: number; sy: number } | null>(null);
+  const effectiveZoomRef = useRef(effectiveZoom);
+  effectiveZoomRef.current = effectiveZoom;
+
+  useEffect(() => {
+    const scroller = scrollerRef.current;
+    if (!scroller) return;
+    const handler = (e: WheelEvent) => {
+      e.preventDefault();
+      const rect = scroller.getBoundingClientRect();
+      const sx = e.clientX - rect.left, sy = e.clientY - rect.top;
+      const z = effectiveZoomRef.current;
+      zoomAnchor.current = { cx: (scroller.scrollLeft + sx) / z, cy: (scroller.scrollTop + sy) / z, sx, sy };
+      const s = useArtStore.getState();
+      s.setZoom(s.zoom * (e.deltaY < 0 ? 2 : 0.5));
+    };
+    scroller.addEventListener('wheel', handler, { passive: false });
+    return () => scroller.removeEventListener('wheel', handler);
   }, []);
+
+  useLayoutEffect(() => {
+    const a = zoomAnchor.current, scroller = scrollerRef.current;
+    if (!a || !scroller) return;
+    zoomAnchor.current = null;
+    scroller.scrollLeft = a.cx * effectiveZoom - a.sx;
+    scroller.scrollTop = a.cy * effectiveZoom - a.sy;
+  }, [effectiveZoom]);
 
   // Tile-space tools (stamp/collision) are tile-space by nature — route them to
   // the host hook whenever selected, regardless of the px/tile tab state.
@@ -558,8 +584,8 @@ export default function ComposerCanvas() {
   if (!open) return null;
 
   return (
-    <div style={styles.scroller}>
-      <div style={styles.holder} onWheel={onWheel}>
+    <div ref={scrollerRef} style={styles.scroller}>
+      <div style={styles.holder}>
         <PixelViewport
           buffer={buffer}
           palette={paletteLines[0]}
