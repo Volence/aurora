@@ -51,6 +51,9 @@ export default function MapViewport() {
   const containerRef = useRef<HTMLDivElement>(null);
   const hoverBarRef = useRef<HTMLDivElement>(null);
   const isDragging = useRef(false);
+  // Screen pos at mousedown — used to tell a View-mode click (select the section
+  // under the cursor) from a pan-drag.
+  const downPos = useRef<{ x: number; y: number } | null>(null);
   const isPaintDragging = useRef(false);
   const lastMouse = useRef({ x: 0, y: 0 });
   const dragTarget = useRef<{
@@ -423,6 +426,7 @@ export default function MapViewport() {
     if (tool === 'view' || e.button === 1) {
       isDragging.current = true;
       lastMouse.current = { x: e.clientX, y: e.clientY };
+      downPos.current = { x: e.clientX, y: e.clientY };
       e.preventDefault();
       return;
     }
@@ -794,8 +798,24 @@ export default function MapViewport() {
     }
   }, [pan]);
 
-  const handleMouseUp = useCallback((_e: React.MouseEvent) => {
+  const handleMouseUp = useCallback((e: React.MouseEvent) => {
     isPaintDragging.current = false;
+
+    // View tool: a click (pointer barely moved) selects the section under the
+    // cursor — a pan-drag does not.
+    if (useEditorStore.getState().tool === 'view' && downPos.current) {
+      const dx = e.clientX - downPos.current.x;
+      const dy = e.clientY - downPos.current.y;
+      if (dx * dx + dy * dy < 25) { // moved < 5px → treat as a click
+        const world = screenToWorld(e.clientX, e.clientY);
+        const secIdx = sectionRenderer.sectionAtWorld(world.x, world.y);
+        const act = getCurrentAct(useProjectStore.getState());
+        if (secIdx >= 0 && act && act.sections[secIdx]) {
+          useEditorStore.getState().setActiveSectionIndex(secIdx);
+        }
+      }
+    }
+    downPos.current = null;
 
     if (dragTarget.current && isDragging.current) {
       const target = dragTarget.current;

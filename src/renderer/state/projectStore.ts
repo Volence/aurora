@@ -37,6 +37,15 @@ interface ProjectState {
    * (grid_w * grid_h would exceed MAX_ACT_SECTIONS) or no act is loaded.
    */
   addSection: (atIndex?: number) => number | null;
+  /**
+   * Resize the act's section grid to newWidth × newHeight, preserving every
+   * section's (col,row) position (only its flat index changes); new slots are
+   * null. Returns false (no change) if it would exceed MAX_ACT_SECTIONS or drop
+   * a non-null section off a shrunk edge.
+   */
+  resizeGrid: (newWidth: number, newHeight: number) => boolean;
+  /** Clear a section slot to empty (null). Returns true if a section was removed. */
+  removeSection: (index: number) => boolean;
   clearChunks: () => void;
   reset: () => void;
 }
@@ -113,6 +122,49 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     const newProject: S4Project = { ...state.project, zones: state.project.zones.map((z) => (z.id === zone.id ? newZone : z)) };
     set({ project: newProject });
     return targetIndex;
+  },
+  resizeGrid: (newWidth, newHeight) => {
+    const state = get();
+    if (!state.project || !state.currentZoneId || !state.currentActId) return false;
+    const zone = state.project.zones.find((z) => z.id === state.currentZoneId);
+    const act = zone?.acts.find((a) => a.id === state.currentActId);
+    if (!zone || !act) return false;
+    if (newWidth < 1 || newHeight < 1 || newWidth * newHeight > MAX_ACT_SECTIONS) return false;
+
+    const oldW = act.gridWidth, oldH = act.gridHeight, old = act.sections;
+    // Refuse if shrinking would drop a non-null section off a removed edge.
+    for (let row = 0; row < oldH; row++) {
+      for (let col = 0; col < oldW; col++) {
+        if ((col >= newWidth || row >= newHeight) && old[row * oldW + col] != null) return false;
+      }
+    }
+    // Reshape: keep each section's (col,row); only its flat index changes.
+    const next: (Section | null)[] = new Array(newWidth * newHeight).fill(null);
+    const copyH = Math.min(oldH, newHeight), copyW = Math.min(oldW, newWidth);
+    for (let row = 0; row < copyH; row++) {
+      for (let col = 0; col < copyW; col++) {
+        const sec = old[row * oldW + col];
+        if (sec) { const flat = row * newWidth + col; next[flat] = { ...sec, index: flat }; }
+      }
+    }
+    const newAct: Act = { ...act, gridWidth: newWidth, gridHeight: newHeight, sections: next };
+    const newZone: Zone = { ...zone, acts: zone.acts.map((a) => (a.id === act.id ? newAct : a)) };
+    set({ project: { ...state.project, zones: state.project.zones.map((z) => (z.id === zone.id ? newZone : z)) } });
+    return true;
+  },
+  removeSection: (index) => {
+    const state = get();
+    if (!state.project || !state.currentZoneId || !state.currentActId) return false;
+    const zone = state.project.zones.find((z) => z.id === state.currentZoneId);
+    const act = zone?.acts.find((a) => a.id === state.currentActId);
+    if (!zone || !act) return false;
+    if (index < 0 || index >= act.sections.length || act.sections[index] == null) return false;
+    const sections = act.sections.slice();
+    sections[index] = null;
+    const newAct: Act = { ...act, sections };
+    const newZone: Zone = { ...zone, acts: zone.acts.map((a) => (a.id === act.id ? newAct : a)) };
+    set({ project: { ...state.project, zones: state.project.zones.map((z) => (z.id === zone.id ? newZone : z)) } });
+    return true;
   },
   clearChunks: () => set((state) => {
     if (!state.project) return {};
