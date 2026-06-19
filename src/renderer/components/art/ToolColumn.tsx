@@ -45,6 +45,8 @@ export default function ToolColumn() {
   const ditherPattern = useArtStore((s) => s.ditherPattern);
   const ditherSecondary = useArtStore((s) => s.ditherSecondary);
   const setDither = useArtStore((s) => s.setDither);
+  const pixelPerfect = useArtStore((s) => s.pixelPerfect);
+  const setPixelPerfect = useArtStore((s) => s.setPixelPerfect);
   // Shared with Map mode's paint-collision tool. Map mode has no bounded
   // picker, so clamp here: collision types are nibble-sized (0-15) in the
   // editor's collision grids (per s4-strips).
@@ -101,6 +103,14 @@ export default function ToolColumn() {
       {/* Mirror cycle + repeat preview */}
       <MirrorButton mirror={mirror} onChange={setMirror} />
       <ToolButton glyph="Rpt" small active={repeatPreview} title="Toggle 3×3 repeat preview" onClick={toggleRepeatPreview} />
+
+      {/* Pixel-perfect mode (pencil / line only) */}
+      {(tool === 'pencil' || tool === 'line') && (
+        <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11 }}>
+          <input type="checkbox" checked={pixelPerfect} onChange={(e) => setPixelPerfect(e.target.checked)} />
+          Pixel-perfect
+        </label>
+      )}
 
       <Divider />
 

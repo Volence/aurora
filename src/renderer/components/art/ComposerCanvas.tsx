@@ -65,6 +65,7 @@ export default function ComposerCanvas() {
   const brushTile = useArtStore((s) => s.brushTile);
   const selectedColor = useArtStore((s) => s.selectedColor);
   const mirror = useArtStore((s) => s.mirror);
+  const pixelPerfect = useArtStore((s) => s.pixelPerfect);
   const ditherPattern = useArtStore((s) => s.ditherPattern);
   const ditherSecondary = useArtStore((s) => s.ditherSecondary);
   const selectedCollisionType = useEditorStore((s) => s.selectedCollisionType);
@@ -294,7 +295,7 @@ export default function ComposerCanvas() {
   const ctlTool: CtlArtTool = (tool === 'tile-stamp' || tool === 'collision') ? 'pencil' : tool;
   const config = {
     tool: ctlTool, color: selectedColor, mirror,
-    ditherPattern, ditherSecondary, pixelPerfect: false,
+    ditherPattern, ditherSecondary, pixelPerfect,
   };
   if (!controllerRef.current) controllerRef.current = new PixelEditController(config);
   controllerRef.current.setConfig(config);

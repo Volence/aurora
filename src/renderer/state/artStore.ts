@@ -26,6 +26,7 @@ interface ArtState {
   ditherPattern: DitherPattern;
   ditherSecondary: number;
   mirror: MirrorMode | null;
+  pixelPerfect: boolean;
   repeatPreview: boolean;
   zoom: number;                 // pixels per art pixel
   open: OpenDocument | null;
@@ -46,6 +47,7 @@ interface ArtState {
   setPaletteLine: (l: number) => void;
   setDither: (p: DitherPattern, secondary: number) => void;
   setMirror: (m: MirrorMode | null) => void;
+  setPixelPerfect: (v: boolean) => void;
   toggleRepeatPreview: () => void;
   setZoom: (z: number) => void;
   openDocument: (d: OpenDocument) => void;
@@ -62,7 +64,7 @@ interface ArtState {
 export const useArtStore = create<ArtState>((set) => ({
   tool: 'pencil', brushSpace: 'pixel', selectedColor: 1, paletteLine: 1,
   ditherPattern: 'checker', ditherSecondary: 0,
-  mirror: null, repeatPreview: false, zoom: 24, open: null, docVersion: 0,
+  mirror: null, pixelPerfect: false, repeatPreview: false, zoom: 24, open: null, docVersion: 0,
   paletteVersion: 0,
   pendingAction: null, brushTile: 0,
 
@@ -74,6 +76,7 @@ export const useArtStore = create<ArtState>((set) => ({
   setPaletteLine: (paletteLine) => set({ paletteLine }),
   setDither: (ditherPattern, ditherSecondary) => set({ ditherPattern, ditherSecondary }),
   setMirror: (mirror) => set({ mirror }),
+  setPixelPerfect: (pixelPerfect) => set({ pixelPerfect }),
   toggleRepeatPreview: () => set((s) => ({ repeatPreview: !s.repeatPreview })),
   setZoom: (zoom) => set({ zoom: Math.max(2, Math.min(64, zoom)) }),
   openDocument: (open) => set({ open, docVersion: 0 }),
