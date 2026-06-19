@@ -13,6 +13,10 @@ import ToastContainer from './components/ToastContainer';
 import CommandPalette, { type Command } from './components/CommandPalette';
 import ArtMode from './components/art/ArtMode';
 import SpriteMode from './components/sprite/SpriteMode';
+import EditorShell from './shell/EditorShell';
+import MapToolDock from './shell/MapToolDock';
+import MapStatusBar from './shell/MapStatusBar';
+import { Panel, PanelHeader, T } from './components/ui';
 import { useProject } from './hooks/useProject';
 import { useProjectStore } from './state/projectStore';
 import { useEditorStore } from './state/editorStore';
@@ -66,8 +70,6 @@ export default function App() {
 
   return (
     <div style={styles.root}>
-      <Toolbar onOpenProject={openProject} onOpenRecent={openProjectByPath} onSave={saveProject} />
-
       {error && (
         <div style={styles.error}>
           {error}
@@ -81,37 +83,61 @@ export default function App() {
       )}
 
       {appMode === 'art' ? (
-        <ArtMode />
-      ) : appMode === 'sprite' ? (
-        <SpriteMode />
-      ) : (
         <>
-          <div style={styles.main}>
-            <div style={styles.leftPanel}>
+          <Toolbar onOpenProject={openProject} onOpenRecent={openProjectByPath} onSave={saveProject} />
+          <ArtMode />
+          <StatusBar />
+        </>
+      ) : appMode === 'sprite' ? (
+        <>
+          <Toolbar onOpenProject={openProject} onOpenRecent={openProjectByPath} onSave={saveProject} />
+          <SpriteMode />
+          <StatusBar />
+        </>
+      ) : (
+        <EditorShell
+          appBar={<Toolbar onOpenProject={openProject} onOpenRecent={openProjectByPath} onSave={saveProject} />}
+          toolDock={<MapToolDock />}
+          panels={
+            <Panel width={240} scroll>
+              <PanelHeader>Sections</PanelHeader>
               <SectionGridNav />
-              {tool === 'stamp-chunk' && <ChunkLibrary />}
+              {tool === 'stamp-chunk' && (
+                <>
+                  <PanelHeader>Chunks</PanelHeader>
+                  <ChunkLibrary />
+                </>
+              )}
               {tool === 'place-object' && (
-                <ObjectPalette
-                  selectedType={0}
-                  onSelectType={(type, subtype) => useEditorStore.getState().setSelectedObjectTypeId(String(type), subtype)}
-                />
+                <>
+                  <PanelHeader>Objects</PanelHeader>
+                  <ObjectPalette
+                    selectedType={0}
+                    onSelectType={(type, subtype) => useEditorStore.getState().setSelectedObjectTypeId(String(type), subtype)}
+                  />
+                </>
               )}
               {tool === 'place-ring' && (
-                <RingPatternPalette
-                  selectedIndex={useEditorStore.getState().selectedRingPattern}
-                  onSelect={(index) => useEditorStore.getState().setSelectedRingPattern(index)}
-                />
+                <>
+                  <PanelHeader>Ring Patterns</PanelHeader>
+                  <RingPatternPalette
+                    selectedIndex={useEditorStore.getState().selectedRingPattern}
+                    onSelect={(index) => useEditorStore.getState().setSelectedRingPattern(index)}
+                  />
+                </>
               )}
-              <div style={{ flex: 1 }} />
+              <PanelHeader>Art</PanelHeader>
               <ArtBrowser />
-            </div>
-            <MapViewport />
-            <PropertiesPanel />
-          </div>
-          <PaletteViewer />
-        </>
+              <PanelHeader>Properties</PanelHeader>
+              <PropertiesPanel />
+            </Panel>
+          }
+          bottomExtra={<PaletteViewer />}
+          status={<MapStatusBar />}
+        >
+          <MapViewport />
+        </EditorShell>
       )}
-      <StatusBar />
       <ToastContainer />
       <CommandPalette commands={commands} />
     </div>
@@ -121,22 +147,14 @@ export default function App() {
 const styles: Record<string, React.CSSProperties> = {
   root: {
     display: 'flex', flexDirection: 'column', height: '100vh',
-    background: '#12151E', color: '#E8EAF2',
-  },
-  main: {
-    flex: 1, display: 'flex', overflow: 'hidden',
-  },
-  leftPanel: {
-    width: 200, display: 'flex', flexDirection: 'column',
-    background: '#12151E', borderRight: '1px solid #2A2F3D',
-    flexShrink: 0, overflow: 'auto',
+    background: T.surface, color: T.textHi,
   },
   error: {
-    padding: '6px 12px', background: '#f38ba8', color: '#12151E',
+    padding: '6px 12px', background: T.error, color: T.void,
     fontSize: 13, display: 'flex', alignItems: 'center', gap: 8,
   },
   dismissButton: {
     padding: '2px 8px', background: 'rgba(0,0,0,0.2)', border: 'none',
-    color: '#12151E', borderRadius: 4, cursor: 'pointer', fontSize: 12,
+    color: T.void, borderRadius: 4, cursor: 'pointer', fontSize: 12,
   },
 };
