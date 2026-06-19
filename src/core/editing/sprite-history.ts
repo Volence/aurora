@@ -1,10 +1,15 @@
 import type { PixelBuffer } from '../art/pixel-ops';
+import type { Color } from '../model/s4-types';
+import type { SpritePaletteMode } from '../art/sprite-palette';
 
 /** A full snapshot of the sprite document for undo/redo. */
 export interface SpriteSnapshot {
   frames: PixelBuffer[];
   currentIndex: number;
   selection: { x: number; y: number; w: number; h: number } | null;
+  paletteMode: SpritePaletteMode;
+  zoneLine: number;
+  standalonePalette: Color[];
 }
 
 function cloneBuf(b: PixelBuffer): PixelBuffer {
@@ -15,6 +20,9 @@ function cloneSnap(s: SpriteSnapshot): SpriteSnapshot {
     frames: s.frames.map(cloneBuf),
     currentIndex: s.currentIndex,
     selection: s.selection ? { ...s.selection } : null,
+    paletteMode: s.paletteMode,
+    zoneLine: s.zoneLine,
+    standalonePalette: s.standalonePalette.map((c) => ({ ...c })),
   };
 }
 

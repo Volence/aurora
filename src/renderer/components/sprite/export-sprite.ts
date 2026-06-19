@@ -1,4 +1,4 @@
-import { useProjectStore } from '../../state/projectStore';
+import { useProjectStore, getCurrentZone } from '../../state/projectStore';
 import { useArtStore } from '../../state/artStore';
 import { useSpriteStore } from '../../state/spriteStore';
 import type { AnimStepUI } from '../../state/spriteStore';
@@ -333,9 +333,9 @@ export async function loadSpriteByName(name: string): Promise<void> {
 /**
  * Load a DPLC character (sonic / tails / knuckles) straight from the engine's
  * native layout (data/mappings, data/dplc unoptimized, art/uncompressed/characters)
- * into editable frames. EXPERIMENTAL: no timeline yet (the named animations live in
- * <name>_anims.asm, not parsed); colors use the active palette line, not the
- * character's own palette. Frames load so you can scrub/edit the poses.
+ * into editable frames. EXPERIMENTAL: the named animations live in
+ * <name>_anims.asm and are parsed into the picker. The character binds to zone
+ * CRAM line 0, where its own palette is loaded so it looks right.
  */
 export async function loadEngineCharacter(name: string): Promise<void> {
   const toast = useToastStore.getState().addToast;
@@ -351,11 +351,16 @@ export async function loadEngineCharacter(name: string): Promise<void> {
     useSpriteStore.getState().loadSprite(frames, [], recon.originX, recon.originY);
     useSpriteStore.getState().setName(name);
     useSpriteStore.getState().setExportDplc(true); // characters are DPLC by nature
-    // Load the character's own palette as a display override so it looks right.
+    // Bind the character to zone CRAM line 0 (the shared player palette) and load
+    // its own colors there so it looks right.
     try {
       const palBytes = new Uint8Array(await window.api.readBinaryFile(base, `art/palettes/${name}.bin`));
-      useSpriteStore.getState().setPaletteOverride(parsePaletteLine(palBytes, 0, 16).colors);
-    } catch { /* palette optional — fall back to the active palette line */ }
+      const colors = parsePaletteLine(palBytes, 0, 16).colors;
+      const zone = getCurrentZone(useProjectStore.getState());
+      if (zone) { zone.palette.lines[0].colors = colors; useArtStore.getState().bumpPaletteVersion(); }
+    } catch { /* palette optional */ }
+    useSpriteStore.getState().setPaletteMode('zone');
+    useSpriteStore.getState().setZoneLine(0);
 
     // Load the named animation scripts so they can be played in-editor.
     let animCount = 0;

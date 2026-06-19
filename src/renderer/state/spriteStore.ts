@@ -4,6 +4,9 @@ import { createBuffer, flipH, flipV, rotate90 } from '../../core/art/pixel-ops';
 import type { Color } from '../../core/model/s4-types';
 import type { SpriteFormatId } from '../../core/formats/sprite-format-adapter';
 import { SpriteHistory, type SpriteSnapshot } from '../../core/editing/sprite-history';
+import type { SpritePaletteMode } from '../../core/art/sprite-palette';
+import { blankStandalonePalette } from '../../core/art/sprite-palette';
+import { useProjectStore, getCurrentZone } from './projectStore';
 
 export type SpriteTool =
   | 'pencil' | 'eraser' | 'fill' | 'eyedropper' | 'line' | 'rect' | 'select' | 'dither';
@@ -91,9 +94,15 @@ interface SpriteState {
   /** Start a fresh single-frame sprite of the given pixel dimensions. */
   newSprite: (w: number, h: number) => void;
 
-  /** Display-only palette (e.g. a loaded character's own colors). Null = use the zone palette line. */
-  paletteOverride: Color[] | null;
-  setPaletteOverride: (colors: Color[] | null) => void;
+  /** How the sprite is colored: bound to a zone CRAM line, or its own private palette. */
+  paletteMode: SpritePaletteMode;
+  zoneLine: number;
+  standalonePalette: Color[];
+  setPaletteMode: (m: SpritePaletteMode) => void;
+  setZoneLine: (line: number) => void;
+  setStandalonePalette: (colors: Color[]) => void;
+  clearPalette: () => void;
+  clearCanvas: () => void;
 }
 
 const DEFAULT_STEP_DURATION = 6;
@@ -117,6 +126,9 @@ const snap = (s: SpriteState): SpriteSnapshot => ({
   frames: s.frames,
   currentIndex: s.currentIndex,
   selection: s.selection,
+  paletteMode: s.paletteMode,
+  zoneLine: s.zoneLine,
+  standalonePalette: s.standalonePalette,
 });
 
 export const useSpriteStore = create<SpriteState>((set, get) => ({
@@ -137,6 +149,9 @@ export const useSpriteStore = create<SpriteState>((set, get) => ({
   exportDplc: false,
   format: 's4',
   historyTick: 0,
+  paletteMode: 'zone',
+  zoneLine: 1,
+  standalonePalette: blankStandalonePalette(),
 
   setName: (name) => set({ name }),
   setExportDplc: (exportDplc) => set({ exportDplc }),
@@ -168,9 +183,7 @@ export const useSpriteStore = create<SpriteState>((set, get) => ({
     history.record(snap(s));
     const frames = s.frames.slice();
     frames[s.currentIndex] = b;
-    // Editing reverts display to the project palette (export uses the active line,
-    // not a loaded character's display override) — keep WYSIWYG honest.
-    set({ frames, historyTick: s.historyTick + 1, ...(s.paletteOverride ? { paletteOverride: null } : {}) });
+    set({ frames, historyTick: s.historyTick + 1 });
   },
   // New frame matches the current canvas size (loaded sprites may not be 32x32).
   addFrame: () => {
@@ -204,12 +217,12 @@ export const useSpriteStore = create<SpriteState>((set, get) => ({
   undo: () => {
     const s = get();
     const prev = history.undo(snap(s));
-    if (prev) set({ frames: prev.frames, currentIndex: prev.currentIndex, selection: prev.selection, paletteOverride: null, historyTick: s.historyTick + 1 });
+    if (prev) set({ frames: prev.frames, currentIndex: prev.currentIndex, selection: prev.selection, paletteMode: prev.paletteMode, zoneLine: prev.zoneLine, standalonePalette: prev.standalonePalette, historyTick: s.historyTick + 1 });
   },
   redo: () => {
     const s = get();
     const next = history.redo(snap(s));
-    if (next) set({ frames: next.frames, currentIndex: next.currentIndex, selection: next.selection, historyTick: s.historyTick + 1 });
+    if (next) set({ frames: next.frames, currentIndex: next.currentIndex, selection: next.selection, paletteMode: next.paletteMode, zoneLine: next.zoneLine, standalonePalette: next.standalonePalette, historyTick: s.historyTick + 1 });
   },
 
   steps: [],
@@ -233,7 +246,9 @@ export const useSpriteStore = create<SpriteState>((set, get) => ({
       steps: [],
       originX: Math.floor(Math.max(8, w | 0) / 2),
       originY: Math.floor(Math.max(8, h | 0) / 2),
-      paletteOverride: null,
+      paletteMode: 'zone',
+      zoneLine: 1,
+      standalonePalette: blankStandalonePalette(),
       characterAnims: [],
       selection: null,
       name: 'NewSprite',
@@ -251,14 +266,26 @@ export const useSpriteStore = create<SpriteState>((set, get) => ({
       currentIndex: 0,
       originX,
       originY,
-      paletteOverride: null,
       characterAnims: [],
       historyTick: 0,
     });
   },
 
-  paletteOverride: null,
-  setPaletteOverride: (paletteOverride) => set({ paletteOverride }),
+  setZoneLine: (zoneLine) => set({ zoneLine: Math.max(0, Math.min(3, zoneLine | 0)) }),
+  setStandalonePalette: (standalonePalette) => { const s = get(); history.record(snap(s)); set({ standalonePalette, historyTick: s.historyTick + 1 }); },
+  setPaletteMode: (mode) => {
+    const s = get(); history.record(snap(s));
+    if (mode === 'standalone' && s.paletteMode === 'zone') {
+      const zone = getCurrentZone(useProjectStore.getState());
+      const line = zone?.palette.lines[s.zoneLine]?.colors;
+      const seed = line ? line.map((c) => ({ ...c })) : blankStandalonePalette();
+      set({ paletteMode: 'standalone', standalonePalette: seed, historyTick: s.historyTick + 1 });
+    } else {
+      set({ paletteMode: mode, historyTick: s.historyTick + 1 });
+    }
+  },
+  clearPalette: () => { const s = get(); history.record(snap(s)); set({ paletteMode: 'standalone', standalonePalette: blankStandalonePalette(), historyTick: s.historyTick + 1 }); },
+  clearCanvas: () => { const s = get(); history.record(snap(s)); const cur = s.frames[s.currentIndex]; const frames = s.frames.slice(); frames[s.currentIndex] = createBuffer(cur.width, cur.height); set({ frames, historyTick: s.historyTick + 1 }); },
 }));
 
 /** Build the frame-index play order for a playback mode (one full cycle). */

@@ -4,7 +4,7 @@ import { createBuffer } from '../../src/core/art/pixel-ops';
 
 function snap(fill: number): SpriteSnapshot {
   const b = createBuffer(4, 4); b.data.fill(fill);
-  return { frames: [b], currentIndex: 0, selection: null };
+  return { frames: [b], currentIndex: 0, selection: null, paletteMode: 'zone', zoneLine: 1, standalonePalette: [] };
 }
 
 describe('SpriteHistory', () => {
@@ -56,5 +56,19 @@ describe('SpriteHistory', () => {
     const h = new SpriteHistory(2);
     h.record(snap(0)); h.record(snap(1)); h.record(snap(2));
     expect(h.depth).toBe(2);
+  });
+  it('round-trips palette state (mode/line/standalone) through undo', () => {
+    const h = new SpriteHistory();
+    const a: SpriteSnapshot = { frames: [createBuffer(4, 4)], currentIndex: 0, selection: null,
+      paletteMode: 'zone', zoneLine: 2, standalonePalette: [] };
+    h.record(a);
+    const b: SpriteSnapshot = { frames: [createBuffer(4, 4)], currentIndex: 0, selection: null,
+      paletteMode: 'standalone', zoneLine: 2, standalonePalette: [{ r: 9, g: 0, b: 0, a: 255 }] };
+    const back = h.undo(b)!;
+    expect(back.paletteMode).toBe('zone');
+    expect(back.zoneLine).toBe(2);
+    back.standalonePalette.push({ r: 1, g: 1, b: 1, a: 255 });
+    const fwd = h.redo(back)!;
+    expect(fwd.standalonePalette).toEqual([{ r: 9, g: 0, b: 0, a: 255 }]);
   });
 });

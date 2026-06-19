@@ -5,6 +5,7 @@ import { useSpriteStore, buildPlayOrder } from '../../state/spriteStore';
 import type { PlaybackMode } from '../../state/spriteStore';
 import type { PixelBuffer } from '../../../core/art/pixel-ops';
 import type { Color } from '../../../core/model/s4-types';
+import { resolveDisplayPalette } from '../../../core/art/sprite-palette';
 import { T } from '../ui';
 import { CHECKER_A, CHECKER_B, OOB_MARKER } from '../../canvas/canvas-colors';
 
@@ -43,11 +44,12 @@ export default function Timeline() {
   const steps = useSpriteStore((s) => s.steps);
   const playbackMode = useSpriteStore((s) => s.playbackMode);
   const characterAnims = useSpriteStore((s) => s.characterAnims);
-  const paletteLine = useArtStore((s) => s.paletteLine);
+  const paletteMode = useSpriteStore((s) => s.paletteMode);
+  const zoneLine = useSpriteStore((s) => s.zoneLine);
+  const standalonePalette = useSpriteStore((s) => s.standalonePalette);
   useArtStore((s) => s.paletteVersion);
-  const override = useSpriteStore((s) => s.paletteOverride);
   const zone = getCurrentZone(useProjectStore.getState());
-  const colors = override ?? zone?.palette.lines[paletteLine]?.colors ?? [];
+  const colors = resolveDisplayPalette(paletteMode, zoneLine, standalonePalette, zone?.palette.lines ?? []);
 
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState(1);

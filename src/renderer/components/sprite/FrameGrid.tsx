@@ -4,6 +4,7 @@ import { useArtStore } from '../../state/artStore';
 import { useSpriteStore } from '../../state/spriteStore';
 import type { PixelBuffer } from '../../../core/art/pixel-ops';
 import type { Color } from '../../../core/model/s4-types';
+import { resolveDisplayPalette } from '../../../core/art/sprite-palette';
 import { T } from '../ui';
 import { CHECKER_A, CHECKER_B, OOB_MARKER } from '../../canvas/canvas-colors';
 
@@ -33,11 +34,12 @@ function Thumb({ buffer, colors, size }: { buffer: PixelBuffer; colors: Color[];
 export default function FrameGrid() {
   const frames = useSpriteStore((s) => s.frames);
   const currentIndex = useSpriteStore((s) => s.currentIndex);
-  const paletteLine = useArtStore((s) => s.paletteLine);
+  const paletteMode = useSpriteStore((s) => s.paletteMode);
+  const zoneLine = useSpriteStore((s) => s.zoneLine);
+  const standalonePalette = useSpriteStore((s) => s.standalonePalette);
   useArtStore((s) => s.paletteVersion);
-  const override = useSpriteStore((s) => s.paletteOverride);
   const zone = getCurrentZone(useProjectStore.getState());
-  const colors = override ?? zone?.palette.lines[paletteLine]?.colors ?? [];
+  const colors = resolveDisplayPalette(paletteMode, zoneLine, standalonePalette, zone?.palette.lines ?? []);
   const [collapsed, setCollapsed] = useState(false);
 
   return (
