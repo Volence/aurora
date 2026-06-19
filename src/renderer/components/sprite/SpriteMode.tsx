@@ -9,6 +9,7 @@ import Timeline from './Timeline';
 import { exportSprite, exportSpriteAsm, loadSpriteByName, listSprites, loadEngineCharacter, openSprite, scanProjectForSprites, openDiscoveredSet, loadSpriteAnimations } from './export-sprite';
 import type { ProjectScan } from './export-sprite';
 import PaletteEditor from '../art/PaletteEditor';
+import SpritePaletteHeader from './SpritePaletteHeader';
 import { decomposeFrame } from '../../../core/art/sprite-decompose';
 import type { SpriteFormatId } from '../../../core/formats/sprite-format-adapter';
 import type { CompressionKind } from '../../../core/compress';
@@ -250,6 +251,7 @@ export default function SpriteMode({ appBar }: { appBar: React.ReactNode }) {
           </CollapsibleSection>
 
           <CollapsibleSection id="sprite.palette" title="Palette">
+            <SpritePaletteHeader />
             <PaletteEditor />
           </CollapsibleSection>
         </Panel>
