@@ -9,7 +9,10 @@ export function CollapsibleSection({ id, title, right, defaultCollapsed = false,
 }) {
   const [state, setState] = useState(loadPanelState);
   const collapsed = isCollapsed(state, id, defaultCollapsed);
-  const toggle = () => { const next = togglePanel(state, id, defaultCollapsed); setState(next); savePanelState(next); };
+  // Re-load the latest persisted state on each toggle (instead of writing this
+  // section's mount-time snapshot) so collapsing one section never clobbers
+  // another section's persisted collapse state.
+  const toggle = () => { const next = togglePanel(loadPanelState(), id, defaultCollapsed); savePanelState(next); setState(next); };
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
       <div onClick={toggle} style={{ cursor: 'pointer' }}>
