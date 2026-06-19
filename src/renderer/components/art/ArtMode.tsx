@@ -6,7 +6,7 @@ import { useProjectStore, getActiveLevel, getCurrentZone } from '../../state/pro
 import { useEditorStore, undo, redo, executeCommand } from '../../state/editorStore';
 import { useToastStore } from '../../state/toastStore';
 import type { ChunkDef } from '../../../core/model/s4-types';
-import { Panel, PanelHeader, T } from '../ui';
+import { Panel, CollapsibleSection, T } from '../ui';
 import EditorShell from '../../shell/EditorShell';
 import ArtToolDock from '../../shell/ArtToolDock';
 import ArtToolOptions from '../../shell/ArtToolOptions';
@@ -245,10 +245,15 @@ export default function ArtMode({ appBar }: { appBar: React.ReactNode }) {
       toolOptions={<ArtToolOptions before={docHeader} />}
       panels={
         <Panel width={240} scroll>
-          <TilesetPanel />
-          <PanelHeader>Palette</PanelHeader>
-          <PaletteEditor />
-          <ChunkLibrary />
+          <CollapsibleSection id="art.tileset" title="Tileset">
+            <TilesetPanel />
+          </CollapsibleSection>
+          <CollapsibleSection id="art.palette" title="Palette">
+            <PaletteEditor />
+          </CollapsibleSection>
+          <CollapsibleSection id="art.chunks" title="Chunks">
+            <ChunkLibrary />
+          </CollapsibleSection>
         </Panel>
       }
       status={<ArtStatusBar />}

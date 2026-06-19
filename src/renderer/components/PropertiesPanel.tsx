@@ -140,8 +140,8 @@ function Property({ label, value }: { label: string; value: string }) {
 
 const styles: Record<string, React.CSSProperties> = {
   container: {
-    width: 220, display: 'flex', flexDirection: 'column',
-    background: T.surface, borderLeft: `1px solid ${T.border}`,
+    display: 'flex', flexDirection: 'column',
+    background: T.surface,
     flexShrink: 0,
   },
   header: {

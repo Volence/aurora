@@ -131,11 +131,11 @@ export function MirrorButton({ mirror, onChange }: { mirror: MirrorMode | null; 
 /** Zoom in/out buttons with a current-zoom label. Callers own the step math. */
 export function ZoomControl({ zoom, onZoomIn, onZoomOut }: { zoom: number; onZoomIn: () => void; onZoomOut: () => void }) {
   return (
-    <>
+    <span style={S.zoomGroup}>
       <ToolButton glyph="+" title="Zoom in" onClick={onZoomIn} />
-      <div style={S.zoomLabel}>{zoom}×</div>
+      <span style={S.zoomLabel}>{zoom}×</span>
       <ToolButton glyph="−" title="Zoom out" onClick={onZoomOut} />
-    </>
+    </span>
   );
 }
 
@@ -153,7 +153,7 @@ export const S: Record<string, React.CSSProperties> = {
   toolActive: { background: T.accent, color: T.surface, borderColor: T.accent },
   smallText: { fontSize: 10, fontWeight: 600 },
   disabled: { opacity: 0.35, cursor: 'default' },
-  config: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, width: '100%' },
+  config: { display: 'inline-flex', alignItems: 'center', gap: 2 },
   ditherButton: {
     width: 40, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center',
     background: T.border, color: T.textHi, border: `1px solid ${T.borderStrong}`, borderRadius: 4,
@@ -167,5 +167,6 @@ export const S: Record<string, React.CSSProperties> = {
   },
   value: { fontSize: 10, color: T.textHi, fontFamily: 'monospace' },
   divider: { width: '80%', height: 1, background: T.border, margin: '4px 0', flexShrink: 0 },
+  zoomGroup: { display: 'inline-flex', alignItems: 'center', gap: 4 },
   zoomLabel: { fontSize: 10, color: T.textLo, fontFamily: 'monospace' },
 };

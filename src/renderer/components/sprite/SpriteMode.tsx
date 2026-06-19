@@ -12,7 +12,7 @@ import PaletteEditor from '../art/PaletteEditor';
 import { decomposeFrame } from '../../../core/art/sprite-decompose';
 import type { SpriteFormatId } from '../../../core/formats/sprite-format-adapter';
 import type { CompressionKind } from '../../../core/compress';
-import { Panel, PanelHeader, T } from '../ui';
+import { Panel, CollapsibleSection, T } from '../ui';
 import EditorShell from '../../shell/EditorShell';
 import SpriteToolDock from '../../shell/SpriteToolDock';
 import SpriteToolOptions from '../../shell/SpriteToolOptions';
@@ -114,19 +114,21 @@ export default function SpriteMode({ appBar }: { appBar: React.ReactNode }) {
       toolOptions={<SpriteToolOptions newSize={newSize} onNewSize={setNewSize} onFit={fitToView} />}
       panels={
         <Panel width={240} scroll>
-          <PanelHeader>Mapping</PanelHeader>
+          <CollapsibleSection id="sprite.mapping" title="Mapping">
           <div style={styles.section}>
             <div style={styles.stat}><span>Hardware pieces</span><b>{decomp.pieces.length}</b></div>
             <div style={styles.stat}><span>Unique tiles</span><b>{decomp.tiles.length}</b></div>
           </div>
+          </CollapsibleSection>
 
-          <PanelHeader>Sprite</PanelHeader>
+          <CollapsibleSection id="sprite.name" title="Sprite">
           <div style={styles.section}>
             <input style={styles.nameInput} value={spriteName} spellCheck={false}
               onChange={(e) => setSpriteName(e.target.value)} placeholder="SpriteName" />
           </div>
+          </CollapsibleSection>
 
-          <PanelHeader>Open — import a sprite to edit or convert</PanelHeader>
+          <CollapsibleSection id="sprite.open" title="Open — import a sprite to edit or convert">
           <div style={styles.section}>
             <label style={styles.fmtRow} title="Read the opened files as this game's format. It also becomes the Save-as target, so you can convert by saving in another format.">
               <span style={styles.dim}>Read as</span>
@@ -190,8 +192,9 @@ export default function SpriteMode({ appBar }: { appBar: React.ReactNode }) {
               <button style={{ ...styles.secondary, ...(busy ? styles.disabled : {}) }} disabled={busy} onClick={handleLoad}>Load</button>
             </div>
           </div>
+          </CollapsibleSection>
 
-          <PanelHeader>Export to project</PanelHeader>
+          <CollapsibleSection id="sprite.export" title="Export to project">
           <div style={styles.section}>
             <label style={styles.check} title="Streamed art (DPLC) vs all art resident. Characters use DPLC; most objects don't.">
               <input type="checkbox" checked={exportDplc} onChange={(e) => useSpriteStore.getState().setExportDplc(e.target.checked)} />
@@ -211,8 +214,9 @@ export default function SpriteMode({ appBar }: { appBar: React.ReactNode }) {
                 onClick={async () => { if (busy) return; setBusy(true); try { await exportSpriteAsm(spriteName); } finally { setBusy(false); } }}>Export .asm…</button>
             </div>
           </div>
+          </CollapsibleSection>
 
-          <PanelHeader>Load engine character</PanelHeader>
+          <CollapsibleSection id="sprite.character" title="Load engine character">
           <div style={styles.section}>
             <div style={styles.btnRow}>
               {['sonic', 'tails', 'knuckles'].map((c) => (
@@ -220,9 +224,11 @@ export default function SpriteMode({ appBar }: { appBar: React.ReactNode }) {
               ))}
             </div>
           </div>
+          </CollapsibleSection>
 
-          <PanelHeader>Palette</PanelHeader>
-          <PaletteEditor />
+          <CollapsibleSection id="sprite.palette" title="Palette">
+            <PaletteEditor />
+          </CollapsibleSection>
         </Panel>
       }
       bottomExtra={<><FrameGrid /><Timeline /></>}

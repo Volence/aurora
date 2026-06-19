@@ -15,7 +15,7 @@ import SpriteMode from './components/sprite/SpriteMode';
 import EditorShell from './shell/EditorShell';
 import MapToolDock from './shell/MapToolDock';
 import MapStatusBar from './shell/MapStatusBar';
-import { Panel, PanelHeader, T } from './components/ui';
+import { Panel, CollapsibleSection, T } from './components/ui';
 import { useProject } from './hooks/useProject';
 import { useProjectStore } from './state/projectStore';
 import { useEditorStore } from './state/editorStore';
@@ -91,36 +91,36 @@ export default function App() {
           toolDock={<MapToolDock />}
           panels={
             <Panel width={240} scroll>
-              <PanelHeader>Sections</PanelHeader>
-              <SectionGridNav />
+              <CollapsibleSection id="map.sections" title="Sections">
+                <SectionGridNav />
+              </CollapsibleSection>
               {tool === 'stamp-chunk' && (
-                <>
-                  <PanelHeader>Chunks</PanelHeader>
+                <CollapsibleSection id="map.palette" title="Chunks">
                   <ChunkLibrary />
-                </>
+                </CollapsibleSection>
               )}
               {tool === 'place-object' && (
-                <>
-                  <PanelHeader>Objects</PanelHeader>
+                <CollapsibleSection id="map.palette" title="Objects">
                   <ObjectPalette
                     selectedType={0}
                     onSelectType={(type, subtype) => useEditorStore.getState().setSelectedObjectTypeId(String(type), subtype)}
                   />
-                </>
+                </CollapsibleSection>
               )}
               {tool === 'place-ring' && (
-                <>
-                  <PanelHeader>Ring Patterns</PanelHeader>
+                <CollapsibleSection id="map.palette" title="Ring Patterns">
                   <RingPatternPalette
                     selectedIndex={useEditorStore.getState().selectedRingPattern}
                     onSelect={(index) => useEditorStore.getState().setSelectedRingPattern(index)}
                   />
-                </>
+                </CollapsibleSection>
               )}
-              <PanelHeader>Art</PanelHeader>
-              <ArtBrowser />
-              <PanelHeader>Properties</PanelHeader>
-              <PropertiesPanel />
+              <CollapsibleSection id="map.art" title="Art">
+                <ArtBrowser />
+              </CollapsibleSection>
+              <CollapsibleSection id="map.props" title="Properties">
+                <PropertiesPanel />
+              </CollapsibleSection>
             </Panel>
           }
           bottomExtra={<PaletteViewer />}
