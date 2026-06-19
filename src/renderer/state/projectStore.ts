@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { LoadedS4Config } from '../../core/config/s4-config';
-import type { S4Project, Zone, Act, Tileset, Palette, ObjectDef, ChunkDef, BgLibraryEntry } from '../../core/model/s4-types';
+import type { S4Project, Zone, Act, Tileset, Palette, ObjectDef, ChunkDef, BgLibraryEntry, Section } from '../../core/model/s4-types';
+import { createSection, MAX_ACT_SECTIONS } from '../../core/model/s4-types';
 import type { S4Level } from '../../core/editing/commands';
 
 /** A rendered object-preview image + its origin (for centering on the placement point). */
@@ -28,11 +29,19 @@ interface ProjectState {
   setObjectSprites: (sprites: Map<string, ObjectPreview>) => void;
   addChunks: (chunks: ChunkDef[]) => void;
   addBgToLibrary: (entry: BgLibraryEntry) => void;
+  /**
+   * Create a blank section in the current act. Fills the first empty grid slot;
+   * if the grid is full, appends a new ROW (grid_h+1) — never grows grid_w, since
+   * the flat index depends on grid_w and growing it would re-map every section.
+   * Returns the new section's flat index, or null if at the engine cap
+   * (grid_w * grid_h would exceed MAX_ACT_SECTIONS) or no act is loaded.
+   */
+  addSection: (atIndex?: number) => number | null;
   clearChunks: () => void;
   reset: () => void;
 }
 
-export const useProjectStore = create<ProjectState>((set) => ({
+export const useProjectStore = create<ProjectState>((set, get) => ({
   config: null,
   project: null,
   currentZoneId: null,
@@ -68,6 +77,43 @@ export const useProjectStore = create<ProjectState>((set) => ({
       },
     };
   }),
+  addSection: (atIndex) => {
+    const state = get();
+    if (!state.project || !state.currentZoneId || !state.currentActId) return null;
+    const zone = state.project.zones.find((z) => z.id === state.currentZoneId);
+    const act = zone?.acts.find((a) => a.id === state.currentActId);
+    if (!zone || !act) return null;
+
+    const sections = act.sections.slice();
+    let gridHeight = act.gridHeight;
+    let targetIndex: number;
+
+    if (atIndex !== undefined && atIndex >= 0 && atIndex < sections.length && sections[atIndex] == null) {
+      // Fill the specifically-requested empty slot.
+      targetIndex = atIndex;
+    } else {
+      const firstNull = sections.findIndex((s) => s == null);
+      if (firstNull >= 0) {
+        targetIndex = firstNull;
+      } else {
+        // Grid is full — append a new row (grid_w null slots). Appending keeps
+        // every existing flat index stable; growing grid_w would re-map them all.
+        if (act.gridWidth * (gridHeight + 1) > MAX_ACT_SECTIONS) return null; // engine cap
+        targetIndex = sections.length;
+        for (let i = 0; i < act.gridWidth; i++) sections.push(null);
+        gridHeight += 1;
+      }
+    }
+
+    const newSection: Section = createSection(targetIndex, `Section ${targetIndex}`);
+    sections[targetIndex] = newSection;
+
+    const newAct: Act = { ...act, sections, gridHeight };
+    const newZone: Zone = { ...zone, acts: zone.acts.map((a) => (a.id === act.id ? newAct : a)) };
+    const newProject: S4Project = { ...state.project, zones: state.project.zones.map((z) => (z.id === zone.id ? newZone : z)) };
+    set({ project: newProject });
+    return targetIndex;
+  },
   clearChunks: () => set((state) => {
     if (!state.project) return {};
     return { project: { ...state.project, chunkLibrary: [] } };

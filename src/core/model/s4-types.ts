@@ -4,6 +4,9 @@ export const SECTION_PIXEL_SIZE = 2048;
 export const BLOCK_TILES = 16;
 export const BLOCK_PIXEL_SIZE = 128;
 export const BLOCKS_PER_SECTION = 16;
+/** Engine cap: an act's grid_w * grid_h must be <= this (s4_engine constants.asm
+ *  MAX_ACT_SECTIONS; the ROM build asserts it). The editor must not exceed it. */
+export const MAX_ACT_SECTIONS = 48;
 
 export interface SectionTileGrid {
   width: number;

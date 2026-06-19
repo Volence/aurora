@@ -2,7 +2,7 @@ import React from 'react';
 import { useEditorStore } from '../state/editorStore';
 import { useViewStore } from '../state/viewStore';
 import { useProjectStore, getCurrentAct } from '../state/projectStore';
-import { SECTION_PIXEL_SIZE } from '../../core/model/s4-types';
+import { SECTION_PIXEL_SIZE, MAX_ACT_SECTIONS } from '../../core/model/s4-types';
 import { T } from './ui';
 
 export default function SectionGridNav() {
@@ -17,21 +17,34 @@ export default function SectionGridNav() {
 
   const { gridWidth, gridHeight, sections } = act;
 
-  const handleSectionClick = (index: number) => {
+  // Single click selects (highlights) without moving the camera — double-click
+  // frames the section in the viewport. (Auto-jump-on-select was disorienting.)
+  const selectSection = (index: number) => {
     useEditorStore.getState().setActiveSectionIndex(index);
+  };
+  const jumpToSection = (index: number) => {
     const col = index % gridWidth;
     const row = Math.floor(index / gridWidth);
-    useViewStore.getState().setPosition(
-      col * SECTION_PIXEL_SIZE,
-      row * SECTION_PIXEL_SIZE,
-    );
+    useViewStore.getState().setPosition(col * SECTION_PIXEL_SIZE, row * SECTION_PIXEL_SIZE);
   };
+  const createSectionAt = (index?: number) => {
+    const newIndex = useProjectStore.getState().addSection(index);
+    if (newIndex !== null) {
+      useEditorStore.getState().setActiveSectionIndex(newIndex);
+      useEditorStore.getState().markDirty();
+    }
+  };
+
+  const hasEmptySlot = sections.some(s => s == null);
+  const canGrow = gridWidth * (gridHeight + 1) <= MAX_ACT_SECTIONS;
+  const canAdd = hasEmptySlot || canGrow;
 
   return (
     <div style={styles.container}>
-      <div style={styles.header}>Sections ({gridWidth}x{gridHeight})</div>
+      <div style={styles.header}>Sections ({gridWidth}×{gridHeight})</div>
       <div style={{ ...styles.grid, gridTemplateColumns: `repeat(${gridWidth}, 1fr)` }}>
         {sections.map((sec, i) => {
+          const isNull = sec === null;
           // Corner dot marks sections assigned a BG-library background
           // (bgLayoutRef != null); tooltip names it.
           const bgName = sec?.bgLayoutRef
@@ -43,17 +56,30 @@ export default function SectionGridNav() {
               style={{
                 ...styles.cell,
                 ...(i === activeSectionIndex ? styles.active : {}),
-                ...(sec === null ? styles.null : {}),
+                ...(isNull ? styles.null : {}),
               }}
-              title={bgName ? `BG: ${bgName}` : undefined}
-              onClick={() => handleSectionClick(i)}
+              title={isNull
+                ? 'Empty slot — click to add a section here'
+                : bgName ? `BG: ${bgName} · double-click to jump` : 'Double-click to jump to this section'}
+              onClick={() => (isNull ? createSectionAt(i) : selectSection(i))}
+              onDoubleClick={() => { if (!isNull) jumpToSection(i); }}
             >
-              {sec ? i : '—'}
+              {sec ? i : '+'}
               {bgName && <span style={styles.bgDot} />}
             </button>
           );
         })}
       </div>
+      <button
+        style={{ ...styles.addBtn, ...(canAdd ? {} : styles.addBtnDisabled) }}
+        disabled={!canAdd}
+        title={canAdd
+          ? 'Add a blank section (fills an empty slot, or appends a new row)'
+          : `At the engine limit of ${MAX_ACT_SECTIONS} sections`}
+        onClick={() => createSectionAt()}
+      >
+        + Add section
+      </button>
     </div>
   );
 }
@@ -73,6 +99,12 @@ const styles: Record<string, React.CSSProperties> = {
     background: T.success,
   },
   active: { background: T.accent, color: T.surface, border: `1px solid ${T.accent}` },
-  null: { background: T.void, color: T.borderStrong },
+  null: { background: T.void, color: T.textLo, cursor: 'pointer' },
+  addBtn: {
+    marginTop: 6, width: '100%', padding: '4px 0', fontSize: 11,
+    background: T.overlay, color: T.textBase, border: `1px solid ${T.border}`,
+    borderRadius: 3, cursor: 'pointer',
+  },
+  addBtnDisabled: { opacity: 0.5, cursor: 'default' },
   empty: { padding: 8, color: T.textLo, fontSize: 11 },
 };
