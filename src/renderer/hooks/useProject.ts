@@ -350,15 +350,20 @@ async function loadFullProject(config: ReturnType<typeof loadS4Config>): Promise
       collisionTypes: new Uint8Array(256), // TODO: load collision type table
     };
 
-    // Load palette — S4 engine loads level palette at CRAM line 1 (offset $20),
-    // line 0 is reserved for player sprites
+    // Load palette — level art at CRAM lines 1–3 (destOffset 16), and the shared
+    // player palette (Sonic/Tails) into line 0, which every zone carries in-game.
     const palData = await readFile(basePath, zoneConfig.palette);
-    const palette = buildPalette([{
-      data: palData,
-      srcOffset: 0,
-      destOffset: 16,
-      length: Math.min(48, Math.floor(palData.length / 2)),
-    }]);
+    const sources = [{ data: palData, srcOffset: 0, destOffset: 16, length: Math.min(48, Math.floor(palData.length / 2)) }];
+    try {
+      const playerPal = await readFile(basePath, 'art/palettes/SonicAndTails.bin');
+      sources.unshift({ data: playerPal, srcOffset: 0, destOffset: 0, length: 16 });
+    } catch {
+      try {
+        const playerPal = await readFile(basePath, 'art/palettes/sonic.bin');
+        sources.unshift({ data: playerPal, srcOffset: 0, destOffset: 0, length: 16 });
+      } catch { /* no player palette — line 0 stays empty */ }
+    }
+    const palette = buildPalette(sources);
 
     // Load acts
     const acts: Act[] = [];
