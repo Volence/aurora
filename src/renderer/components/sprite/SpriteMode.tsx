@@ -11,6 +11,7 @@ import type { ProjectScan } from './export-sprite';
 import PaletteEditor from '../art/PaletteEditor';
 import SpritePaletteHeader from './SpritePaletteHeader';
 import { useAnchoredZoom } from '../art-shared/use-anchored-zoom';
+import { useHandPan } from '../art-shared/use-hand-pan';
 import { decomposeFrame } from '../../../core/art/sprite-decompose';
 import type { SpriteFormatId } from '../../../core/formats/sprite-format-adapter';
 import type { CompressionKind } from '../../../core/compress';
@@ -63,6 +64,7 @@ export default function SpriteMode({ appBar }: { appBar: React.ReactNode }) {
   // Cursor-anchored wheel zoom on the sprite canvas (sprite zoom is integer, so
   // the default 2x step crosses integer boundaries cleanly).
   useAnchoredZoom(canvasWrapRef, zoom, () => useSpriteStore.getState().zoom, (z) => useSpriteStore.getState().setZoom(z));
+  useHandPan(canvasWrapRef);
 
   const buffer = frames[currentIndex];
 

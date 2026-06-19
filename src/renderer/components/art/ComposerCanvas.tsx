@@ -21,6 +21,7 @@ import type { GestureResult, ArtTool as CtlArtTool } from '../../../core/art/pix
 import PixelViewport from '../art-shared/PixelViewport';
 import type { HostPointer } from '../art-shared/PixelViewport';
 import { useAnchoredZoom } from '../art-shared/use-anchored-zoom';
+import { useHandPan } from '../art-shared/use-hand-pan';
 import type { Tile, Color } from '../../../core/model/s4-types';
 import { T } from '../ui';
 import {
@@ -329,6 +330,7 @@ export default function ComposerCanvas() {
   // Cursor-anchored wheel zoom (the doc point under the cursor stays put).
   const scrollerRef = useRef<HTMLDivElement>(null);
   useAnchoredZoom(scrollerRef, effectiveZoom, () => useArtStore.getState().zoom, (z) => useArtStore.getState().setZoom(z));
+  useHandPan(scrollerRef);
 
   // Tile-space tools (stamp/collision) are tile-space by nature — route them to
   // the host hook whenever selected, regardless of the px/tile tab state.
