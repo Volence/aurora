@@ -22,7 +22,10 @@ export default function EditorShell(p: EditorShellProps) {
         <div style={{ width: 44, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, padding: '6px 0', background: T.void, borderRight: `1px solid ${T.border}`, flexShrink: 0 }}>
           {p.toolDock}
         </div>
-        <div style={{ flex: 1, position: 'relative', overflow: 'hidden', background: T.surface }}>
+        {/* display:flex so a flow child (e.g. MapViewport's flex:1 root) stretches to
+            fill; still position:relative so absolute-inset:0 children (Art/Sprite
+            canvases) fill it too. Without display:flex, MapViewport collapses to 0 height. */}
+        <div style={{ flex: 1, position: 'relative', display: 'flex', overflow: 'hidden', background: T.surface }}>
           {p.children}
         </div>
         <div style={{ display: 'flex', flexShrink: 0 }}>{p.panels}</div>
