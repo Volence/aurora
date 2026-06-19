@@ -51,15 +51,16 @@ export function IconButton({ icon, label, onClick, disabled }: {
   );
 }
 
-export function Chip({ children, active, onClick }: {
-  children: React.ReactNode; active?: boolean; onClick?: () => void;
+export function Chip({ children, active, onClick, disabled }: {
+  children: React.ReactNode; active?: boolean; onClick?: () => void; disabled?: boolean;
 }) {
   return (
-    <span onClick={onClick} style={{
+    <span onClick={disabled ? undefined : onClick} style={{
       display: 'inline-flex', alignItems: 'center', gap: T.s2, padding: `${T.s1} ${T.s3}`,
       background: active ? T.accent : T.raised, color: active ? T.onAccent : T.textBase,
       border: `1px solid ${active ? T.accent : T.border}`, borderRadius: T.rMd,
-      fontSize: 11, cursor: onClick ? 'pointer' : 'default', whiteSpace: 'nowrap',
+      fontSize: 11, cursor: disabled ? 'default' : (onClick ? 'pointer' : 'default'),
+      opacity: disabled ? 0.5 : 1, whiteSpace: 'nowrap',
     }}>{children}</span>
   );
 }

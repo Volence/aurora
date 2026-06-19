@@ -41,8 +41,18 @@ export default function MapStatusBar() {
   const project = useProjectStore((s) => s.project);
   const zone = getCurrentZone(useProjectStore.getState());
 
+  const selectedChunkId = useEditorStore((s) => s.selectedChunkId);
+
   const info = TOOL_INFO[tool];
   const zoomPercent = Math.round(zoom * 100);
+
+  const chunkCount = project?.chunkLibrary.length ?? 0;
+  let contextInfo = '';
+  if (tool === 'stamp-chunk') {
+    if (chunkCount === 0) contextInfo = 'No chunks loaded — import chunks first';
+    else if (!selectedChunkId) contextInfo = 'Select a chunk from the library panel';
+    else contextInfo = `Chunk: ${selectedChunkId}`;
+  }
 
   const left = (
     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }}>
@@ -50,6 +60,7 @@ export default function MapStatusBar() {
       <span style={{ color: T.textBase }}>{editingLayer.toUpperCase()}</span>
       <span style={{ color: T.textLo }}>{zone?.name ?? ''}</span>
       <span style={{ color: T.textLo }}>Section {activeSectionIndex}</span>
+      <span style={{ color: T.textLo }}>{contextInfo || info.hint}</span>
     </span>
   );
 

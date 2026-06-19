@@ -161,7 +161,8 @@ export default function Toolbar({ onOpenProject, onOpenRecent, onSave }: Toolbar
           />
           <Chip
             active={saveFlash}
-            onClick={(!dirty && !saveFlash) ? undefined : async () => {
+            disabled={!dirty && !saveFlash}
+            onClick={async () => {
               await onSave();
               setSaveFlash(true);
               setTimeout(() => setSaveFlash(false), 1500);
