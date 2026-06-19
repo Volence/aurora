@@ -85,6 +85,13 @@ function applyCommand(cmd: AnyCommand, level: S4Level): void {
       : null;
     return;
   }
+  if (cmd.type === 'set-sections') {
+    if (!level.act) throw new Error('set-sections requires level.act');
+    level.act.gridWidth = cmd.newGridWidth;
+    level.act.gridHeight = cmd.newGridHeight;
+    level.act.sections = cmd.newSections.slice();
+    return;
+  }
 
   const section = level.sections[cmd.sectionIndex];
   if (!section) return;
@@ -191,6 +198,13 @@ function undoCommand(cmd: AnyCommand, level: S4Level): void {
     level.act.bgTiles = cmd.oldTiles
       ? cmd.oldTiles.map(t => ({ pixels: new Uint8Array(t.pixels) }))
       : null;
+    return;
+  }
+  if (cmd.type === 'set-sections') {
+    if (!level.act) throw new Error('set-sections requires level.act');
+    level.act.gridWidth = cmd.oldGridWidth;
+    level.act.gridHeight = cmd.oldGridHeight;
+    level.act.sections = cmd.oldSections.slice();
     return;
   }
 
