@@ -12,6 +12,7 @@ import { migrateChunkTilesIntoTileset } from '../../core/art/atlas-migration';
 import { unpackNametableWord } from '../../core/model/s4-types';
 import type { ChunkDef, Tile, Palette } from '../../core/model/s4-types';
 import { T } from './ui';
+import { CANVAS_VOID, CHUNK_LABEL_BG, CHUNK_LABEL_TEXT, TILE_SELECTED } from '../canvas/canvas-colors';
 
 const CHUNK_PX = 128;
 const THUMB_SCALE = 0.5;
@@ -104,7 +105,7 @@ export default function ChunkLibrary() {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     ctx.imageSmoothingEnabled = false;
-    ctx.fillStyle = '#0A0C12';
+    ctx.fillStyle = CANVAS_VOID;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     const gap = 4;
@@ -123,14 +124,14 @@ export default function ChunkLibrary() {
         ctx.drawImage(thumbCache[idx], x, y, THUMB_PX, THUMB_PX);
 
         // Label
-        ctx.fillStyle = 'rgba(0,0,0,0.6)';
+        ctx.fillStyle = CHUNK_LABEL_BG;
         ctx.fillRect(x, y + THUMB_PX - 12, THUMB_PX, 12);
-        ctx.fillStyle = '#E8EAF2';
+        ctx.fillStyle = CHUNK_LABEL_TEXT;
         ctx.font = '9px monospace';
         ctx.fillText(`$${idx.toString(16).toUpperCase().padStart(2, '0')}`, x + 2, y + THUMB_PX - 3);
 
         if (chunks[idx].id === selectedChunkId) {
-          ctx.strokeStyle = '#a6e3a1';
+          ctx.strokeStyle = TILE_SELECTED;
           ctx.lineWidth = 2;
           ctx.strokeRect(x, y, THUMB_PX, THUMB_PX);
         }

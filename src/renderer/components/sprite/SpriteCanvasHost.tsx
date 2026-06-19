@@ -6,6 +6,7 @@ import PixelViewport from '../art-shared/PixelViewport';
 import type { ViewportOverlay } from '../art-shared/PixelViewport';
 import { PixelEditController, diffWrites } from '../../../core/art/pixel-edit-controller';
 import type { GestureResult } from '../../../core/art/pixel-edit-controller';
+import { OVERLAY_OUTLINE } from '../../canvas/canvas-colors';
 
 /** A piece outline to overlay, in sprite-pixel coords. */
 export interface OverlayRect { x: number; y: number; w: number; h: number; }
@@ -39,7 +40,7 @@ export default function SpriteCanvasHost({ overlayRects }: { overlayRects?: Over
   if (!controllerRef.current) controllerRef.current = new PixelEditController(config);
   controllerRef.current.setConfig(config);
 
-  const overlays: ViewportOverlay[] = (overlayRects ?? []).map((r) => ({ kind: 'outline', x: r.x, y: r.y, w: r.w, h: r.h, color: '#f9e2af' }));
+  const overlays: ViewportOverlay[] = (overlayRects ?? []).map((r) => ({ kind: 'outline', x: r.x, y: r.y, w: r.w, h: r.h, color: OVERLAY_OUTLINE }));
 
   function onCommit(r: GestureResult) {
     const st = useSpriteStore.getState();

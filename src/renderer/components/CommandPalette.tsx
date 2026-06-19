@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { T } from './ui';
 
 export interface Command {
   id: string;
@@ -86,22 +87,22 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex', justifyContent: 'center', alignItems: 'flex-start', paddingTop: '12vh', zIndex: 1000,
   },
   panel: {
-    width: 540, maxWidth: '90vw', background: 'var(--surface, #12151E)',
-    border: '1px solid var(--border-strong, #3A4152)', borderRadius: 'var(--radius-xl, 8px)',
+    width: 540, maxWidth: '90vw', background: T.surface,
+    border: `1px solid ${T.borderStrong}`, borderRadius: T.rXl,
     boxShadow: '0 16px 48px rgba(0,0,0,0.5)', overflow: 'hidden',
   },
   input: {
-    width: '100%', padding: '12px 16px', fontSize: 15, color: 'var(--text-hi, #E8EAF2)',
-    background: 'transparent', border: 'none', borderBottom: '1px solid var(--border, #2A2F3D)', outline: 'none',
-    fontFamily: 'var(--font-ui, sans-serif)',
+    width: '100%', padding: '12px 16px', fontSize: 15, color: T.textHi,
+    background: 'transparent', border: 'none', borderBottom: `1px solid ${T.border}`, outline: 'none',
+    fontFamily: T.fontUi,
   },
   list: { maxHeight: 360, overflowY: 'auto', padding: 4 },
   row: {
     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-    padding: '7px 12px', borderRadius: 'var(--radius-md, 4px)', cursor: 'pointer',
-    color: 'var(--text-base, #B8BECE)', fontSize: 13,
+    padding: '7px 12px', borderRadius: T.rMd, cursor: 'pointer',
+    color: T.textBase, fontSize: 13,
   },
-  rowActive: { background: 'var(--raised, #1A1E2A)', color: 'var(--text-hi, #E8EAF2)', boxShadow: 'inset 2px 0 0 var(--accent, #34D399)' },
-  hint: { fontSize: 11, color: 'var(--text-lo, #6E7589)', fontFamily: 'var(--font-mono, monospace)' },
-  empty: { padding: '12px', color: 'var(--text-lo, #6E7589)', fontSize: 13, textAlign: 'center' },
+  rowActive: { background: T.raised, color: T.textHi, boxShadow: `inset 2px 0 0 ${T.accent}` },
+  hint: { fontSize: 11, color: T.textLo, fontFamily: T.fontMono },
+  empty: { padding: '12px', color: T.textLo, fontSize: 13, textAlign: 'center' },
 };

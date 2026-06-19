@@ -1,5 +1,6 @@
 import React from 'react';
 import type { DitherPattern, MirrorMode } from '../../../core/art/pixel-ops';
+import { T } from '../ui';
 
 /**
  * Shared presentational building blocks for the level-art and sprite-art tool
@@ -146,25 +147,25 @@ export function Divider() {
 export const S: Record<string, React.CSSProperties> = {
   toolButton: {
     width: 40, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center',
-    background: '#2A2F3D', color: '#E8EAF2', border: '1px solid #3A4152', borderRadius: 4,
+    background: T.border, color: T.textHi, border: `1px solid ${T.borderStrong}`, borderRadius: 4,
     cursor: 'pointer', fontSize: 14, lineHeight: 1, flexShrink: 0,
   },
-  toolActive: { background: '#34D399', color: '#12151E', borderColor: '#34D399' },
+  toolActive: { background: T.accent, color: T.surface, borderColor: T.accent },
   smallText: { fontSize: 10, fontWeight: 600 },
   disabled: { opacity: 0.35, cursor: 'default' },
   config: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, width: '100%' },
   ditherButton: {
     width: 40, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center',
-    background: '#2A2F3D', color: '#E8EAF2', border: '1px solid #3A4152', borderRadius: 4,
+    background: T.border, color: T.textHi, border: `1px solid ${T.borderStrong}`, borderRadius: 4,
     cursor: 'pointer', fontSize: 10, lineHeight: 1, flexShrink: 0,
   },
   stepper: { display: 'flex', alignItems: 'center', gap: 2, width: 40, justifyContent: 'space-between' },
   stepButton: {
     width: 12, height: 16, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-    background: '#2A2F3D', color: '#B8BECE', border: '1px solid #3A4152', borderRadius: 3,
+    background: T.border, color: T.textBase, border: `1px solid ${T.borderStrong}`, borderRadius: 3,
     cursor: 'pointer', fontSize: 7, lineHeight: 1,
   },
-  value: { fontSize: 10, color: '#E8EAF2', fontFamily: 'monospace' },
-  divider: { width: '80%', height: 1, background: '#2A2F3D', margin: '4px 0', flexShrink: 0 },
-  zoomLabel: { fontSize: 10, color: '#6E7589', fontFamily: 'monospace' },
+  value: { fontSize: 10, color: T.textHi, fontFamily: 'monospace' },
+  divider: { width: '80%', height: 1, background: T.border, margin: '4px 0', flexShrink: 0 },
+  zoomLabel: { fontSize: 10, color: T.textLo, fontFamily: 'monospace' },
 };

@@ -2,6 +2,8 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useProjectStore, getCurrentZone } from '../state/projectStore';
 import { useEditorStore } from '../state/editorStore';
 import type { Tile, Palette } from '../../core/model/s4-types';
+import { T } from './ui';
+import { CANVAS_VOID, TILE_SELECTED, TILE_HOVER } from '../canvas/canvas-colors';
 
 // Pre-rendered tile thumbnail caches
 let tileCache: OffscreenCanvas[] = [];
@@ -73,7 +75,7 @@ export default function ArtBrowser() {
     if (!ctx) return;
 
     ctx.imageSmoothingEnabled = false;
-    ctx.fillStyle = '#0A0C12';
+    ctx.fillStyle = CANVAS_VOID;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     const cols = Math.max(1, Math.floor(canvas.width / (itemSize + 2)));
@@ -98,7 +100,7 @@ export default function ArtBrowser() {
     const sx = selectedCol * (itemSize + 2);
     const sy = selectedRow * (itemSize + 2) - scrollTop;
     if (sy > -itemSize && sy < canvas.height) {
-      ctx.strokeStyle = '#a6e3a1';
+      ctx.strokeStyle = TILE_SELECTED;
       ctx.lineWidth = 2;
       ctx.strokeRect(sx, sy, itemSize, itemSize);
     }
@@ -152,7 +154,7 @@ export default function ArtBrowser() {
       const drawRow = Math.floor(newIdx / cols);
       const dx = drawCol * (itemSize + 2);
       const dy = drawRow * (itemSize + 2) - scrollTopRef.current;
-      ctx.strokeStyle = '#34D399';
+      ctx.strokeStyle = TILE_HOVER;
       ctx.lineWidth = 2;
       ctx.strokeRect(dx, dy, itemSize, itemSize);
     }
@@ -231,20 +233,20 @@ export default function ArtBrowser() {
 const styles: Record<string, React.CSSProperties> = {
   container: {
     display: 'flex', flexDirection: 'column',
-    background: '#12151E', borderTop: '1px solid #2A2F3D',
+    background: T.surface, borderTop: `1px solid ${T.border}`,
     height: 180, flexShrink: 0,
   },
   tabs: {
     display: 'flex', alignItems: 'center', gap: 0,
-    borderBottom: '1px solid #2A2F3D', flexShrink: 0,
+    borderBottom: `1px solid ${T.border}`, flexShrink: 0,
   },
   label: {
-    padding: '6px 12px', fontSize: 12, fontWeight: 600, color: '#B8BECE',
+    padding: '6px 12px', fontSize: 12, fontWeight: 600, color: T.textBase,
     textTransform: 'uppercase' as const, letterSpacing: 1,
   },
   hoverLabel: {
     marginLeft: 'auto', padding: '0 12px',
-    fontSize: 11, fontFamily: 'monospace', color: '#34D399',
+    fontSize: 11, fontFamily: 'monospace', color: T.accent,
   },
   canvasWrap: {
     flex: 1, position: 'relative', overflow: 'hidden',

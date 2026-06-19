@@ -2,6 +2,10 @@ import type { ObjectPlacement, RingPlacement, Section } from '../../core/model/s
 import { SECTION_TILES_WIDE, SECTION_TILES_HIGH, SECTION_PIXEL_SIZE } from '../../core/model/s4-types';
 import type { OverlayOptions } from '../state/viewStore';
 import type { ObjectPreview } from '../state/projectStore';
+import {
+  GRID_TILE, GRID_BLOCK, GRID_SECTION, COLLISION_OOB, COLLISION_PALETTE,
+  OBJECT_BOX_FILL, OBJECT_BOX_STROKE, OBJECT_LABEL, RING_FILL, RING_STROKE,
+} from './canvas-colors';
 
 type Ctx = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
 
@@ -49,7 +53,7 @@ export class OverlayRenderer {
     const vpWidth = width / zoom;
     const vpHeight = height / zoom;
 
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.06)';
+    ctx.strokeStyle = GRID_TILE;
     ctx.lineWidth = 0.5;
 
     const startX = Math.floor(vpX / 8) * 8;
@@ -75,7 +79,7 @@ export class OverlayRenderer {
     const vpWidth = width / zoom;
     const vpHeight = height / zoom;
 
-    ctx.strokeStyle = 'rgba(0, 200, 100, 0.25)';
+    ctx.strokeStyle = GRID_BLOCK;
     ctx.lineWidth = 1;
 
     const startX = Math.floor(vpX / 128) * 128;
@@ -101,7 +105,7 @@ export class OverlayRenderer {
     const vpWidth = width / zoom;
     const vpHeight = height / zoom;
 
-    ctx.strokeStyle = 'rgba(255, 255, 0, 0.3)';
+    ctx.strokeStyle = GRID_SECTION;
     ctx.lineWidth = 2;
 
     const startX = Math.floor(vpX / SECTION_PIXEL_SIZE) * SECTION_PIXEL_SIZE;
@@ -147,7 +151,7 @@ export class OverlayRenderer {
         const collType = collision[idx];
         if (collType === 0) continue;
 
-        const color = COLLISION_COLORS[collType] ?? 'rgba(255, 0, 255, 0.3)';
+        const color = COLLISION_PALETTE[collType] ?? COLLISION_OOB;
         ctx.fillStyle = color;
         ctx.fillRect(col * 8 + offsetX, row * 8 + offsetY, 8, 8);
       }
@@ -180,13 +184,13 @@ export class OverlayRenderer {
         continue;
       }
 
-      ctx.fillStyle = 'rgba(255, 100, 100, 0.7)';
+      ctx.fillStyle = OBJECT_BOX_FILL;
       ctx.fillRect(wx - 8, wy - 8, 16, 16);
-      ctx.strokeStyle = '#ff4444';
+      ctx.strokeStyle = OBJECT_BOX_STROKE;
       ctx.lineWidth = 1;
       ctx.strokeRect(wx - 8, wy - 8, 16, 16);
 
-      ctx.fillStyle = '#ffffff';
+      ctx.fillStyle = OBJECT_LABEL;
       ctx.font = '8px monospace';
       ctx.textAlign = 'center';
       ctx.fillText(obj.typeId, wx, wy + 3);
@@ -204,8 +208,8 @@ export class OverlayRenderer {
     const vpWidth = width / zoom;
     const vpHeight = height / zoom;
 
-    ctx.fillStyle = 'rgba(255, 220, 0, 0.8)';
-    ctx.strokeStyle = '#ffaa00';
+    ctx.fillStyle = RING_FILL;
+    ctx.strokeStyle = RING_STROKE;
     ctx.lineWidth = 1;
 
     for (const ring of rings) {
@@ -221,13 +225,3 @@ export class OverlayRenderer {
     }
   }
 }
-
-const COLLISION_COLORS: Record<number, string> = {
-  1: 'rgba(0, 128, 255, 0.3)',
-  2: 'rgba(255, 0, 0, 0.3)',
-  3: 'rgba(0, 255, 0, 0.3)',
-  4: 'rgba(255, 128, 0, 0.3)',
-  5: 'rgba(128, 0, 255, 0.3)',
-  6: 'rgba(255, 255, 0, 0.3)',
-  7: 'rgba(0, 255, 255, 0.3)',
-};

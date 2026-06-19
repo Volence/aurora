@@ -12,6 +12,8 @@ import type { SectionOverlayInfo } from '../canvas/OverlayRenderer';
 import { SECTION_TILES_WIDE, SECTION_TILES_HIGH, SECTION_PIXEL_SIZE, unpackNametableWord } from '../../core/model/s4-types';
 import { BG_WIDTH } from '../../core/formats/bg-tiles';
 import type { Section, ObjectPlacement, RingPlacement, Act, Tile, BgLibraryEntry } from '../../core/model/s4-types';
+import { T } from './ui';
+import { CANVAS_VOID } from '../canvas/canvas-colors';
 
 export const sectionRenderer = new SectionRenderer();
 const overlayRenderer = new OverlayRenderer();
@@ -190,7 +192,7 @@ export default function MapViewport() {
     const state = useProjectStore.getState();
     const act = getCurrentAct(state);
     if (!act) {
-      ctx.fillStyle = '#0A0C12';
+      ctx.fillStyle = CANVAS_VOID;
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       return;
     }
@@ -994,7 +996,7 @@ export default function MapViewport() {
 const styles: Record<string, React.CSSProperties> = {
   container: {
     flex: 1, position: 'relative', overflow: 'hidden',
-    background: '#0A0C12',
+    background: T.void,
   },
   canvas: {
     position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
@@ -1002,13 +1004,13 @@ const styles: Record<string, React.CSSProperties> = {
   },
   empty: {
     flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
-    color: '#6E7589', background: '#0A0C12',
+    color: T.textLo, background: T.void,
   },
   hoverBar: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
     padding: '4px 12px', background: 'rgba(17, 17, 27, 0.9)',
-    borderTop: '1px solid #2A2F3D',
-    fontSize: 11, fontFamily: 'monospace', color: '#B8BECE',
+    borderTop: `1px solid ${T.border}`,
+    fontSize: 11, fontFamily: 'monospace', color: T.textBase,
     gap: 6, alignItems: 'center',
     pointerEvents: 'none',
   },
@@ -1016,12 +1018,12 @@ const styles: Record<string, React.CSSProperties> = {
     position: 'absolute', zIndex: 20,
     display: 'flex', flexDirection: 'column',
     minWidth: 190, padding: 4,
-    background: '#0A0C12', border: '1px solid #3A4152', borderRadius: 6,
+    background: T.void, border: `1px solid ${T.borderStrong}`, borderRadius: 6,
     boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
   },
   ctxItem: {
     padding: '6px 10px', textAlign: 'left' as const,
-    background: 'transparent', color: '#E8EAF2',
+    background: 'transparent', color: T.textHi,
     border: 'none', borderRadius: 4,
     cursor: 'pointer', fontSize: 12,
   },

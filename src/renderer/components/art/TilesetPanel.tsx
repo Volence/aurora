@@ -9,6 +9,7 @@ import { tileUsageCounts } from '../../../core/art/usage';
 import { unpackNametableWord } from '../../../core/model/s4-types';
 import type { Tile, Palette } from '../../../core/model/s4-types';
 import { T } from '../ui';
+import { CANVAS_VOID, TILE_SELECTED, TILE_HOVER } from '../../canvas/canvas-colors';
 
 // Pre-rendered tile thumbnail cache (separate from ArtBrowser's — that one
 // stays for Map mode). Keyed on zone/palette-line/history so in-place atlas
@@ -96,7 +97,7 @@ export default function TilesetPanel() {
     if (!ctx) return;
 
     ctx.imageSmoothingEnabled = false;
-    ctx.fillStyle = '#0A0C12';
+    ctx.fillStyle = CANVAS_VOID;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     const cols = Math.max(1, Math.floor(canvas.width / (itemSize + 2)));
@@ -121,7 +122,7 @@ export default function TilesetPanel() {
     const sx = selectedCol * (itemSize + 2);
     const sy = selectedRow * (itemSize + 2) - scrollTop;
     if (sy > -itemSize && sy < canvas.height) {
-      ctx.strokeStyle = '#a6e3a1';
+      ctx.strokeStyle = TILE_SELECTED;
       ctx.lineWidth = 2;
       ctx.strokeRect(sx, sy, itemSize, itemSize);
     }
@@ -188,7 +189,7 @@ export default function TilesetPanel() {
       const drawRow = Math.floor(newIdx / cols);
       const dx = drawCol * (itemSize + 2);
       const dy = drawRow * (itemSize + 2) - scrollTopRef.current;
-      ctx.strokeStyle = '#34D399';
+      ctx.strokeStyle = TILE_HOVER;
       ctx.lineWidth = 2;
       ctx.strokeRect(dx, dy, itemSize, itemSize);
     }

@@ -21,6 +21,11 @@ import type { GestureResult, ArtTool as CtlArtTool } from '../../../core/art/pix
 import PixelViewport from '../art-shared/PixelViewport';
 import type { HostPointer } from '../art-shared/PixelViewport';
 import type { Tile, Color } from '../../../core/model/s4-types';
+import { T } from '../ui';
+import {
+  PIXEL_GRID, PIXEL_GRID_TILE, PIXEL_GRID_BLOCK,
+  HUD_CHIP_BG, HUD_CELL_BG, HUD_COLL_ZERO, HUD_COLL_NONZERO,
+} from '../../canvas/canvas-colors';
 
 interface Write { x: number; y: number; value: number; }
 interface SelRect { x: number; y: number; w: number; h: number; }
@@ -372,21 +377,21 @@ export default function ComposerCanvas() {
     if (!doc) return;
     const pxW = doc.widthTiles * 8, pxH = doc.heightTiles * 8;
     if (z >= 8) {
-      ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+      ctx.strokeStyle = PIXEL_GRID;
       ctx.lineWidth = 1;
       ctx.beginPath();
       for (let x = 1; x < pxW; x++) { ctx.moveTo(x * z + 0.5, 0); ctx.lineTo(x * z + 0.5, pxH * z); }
       for (let y = 1; y < pxH; y++) { ctx.moveTo(0, y * z + 0.5); ctx.lineTo(pxW * z, y * z + 0.5); }
       ctx.stroke();
     }
-    ctx.strokeStyle = 'rgba(255,255,255,0.22)';
+    ctx.strokeStyle = PIXEL_GRID_TILE;
     ctx.lineWidth = 1;
     ctx.beginPath();
     for (let x = 8; x < pxW; x += 8) { ctx.moveTo(x * z + 0.5, 0); ctx.lineTo(x * z + 0.5, pxH * z); }
     for (let y = 8; y < pxH; y += 8) { ctx.moveTo(0, y * z + 0.5); ctx.lineTo(pxW * z, y * z + 0.5); }
     ctx.stroke();
     if (doc.widthTiles >= 16) {
-      ctx.strokeStyle = 'rgba(249,226,175,0.45)';
+      ctx.strokeStyle = PIXEL_GRID_BLOCK;
       ctx.beginPath();
       for (let x = 128; x < pxW; x += 128) { ctx.moveTo(x * z + 0.5, 0); ctx.lineTo(x * z + 0.5, pxH * z); }
       for (let y = 128; y < pxH; y += 128) { ctx.moveTo(0, y * z + 0.5); ctx.lineTo(pxW * z, y * z + 0.5); }
@@ -410,9 +415,9 @@ export default function ComposerCanvas() {
         for (let cx = 0; cx < doc.widthTiles; cx++) {
           const coll = doc.cells[cy * doc.widthTiles + cx].coll;
           const tx = (cx * 8 + 4) * z, ty = (cy * 8 + 4) * z;
-          ctx.fillStyle = 'rgba(17,17,27,0.65)';
+          ctx.fillStyle = HUD_CELL_BG;
           ctx.fillRect(tx - z, ty - z * 0.75, z * 2, z * 1.5);
-          ctx.fillStyle = coll === 0 ? '#6E7589' : '#f9e2af';
+          ctx.fillStyle = coll === 0 ? HUD_COLL_ZERO : HUD_COLL_NONZERO;
           ctx.fillText(String(coll), tx, ty);
         }
       }
@@ -430,9 +435,9 @@ export default function ComposerCanvas() {
       : `collision: ${useEditorStore.getState().selectedCollisionType}`;
     ctx.font = '11px monospace';
     const tw = ctx.measureText(hud).width;
-    ctx.fillStyle = 'rgba(17,17,27,0.85)';
+    ctx.fillStyle = HUD_CHIP_BG;
     ctx.fillRect(4, 4, tw + 12, 18);
-    ctx.fillStyle = '#f9e2af';
+    ctx.fillStyle = HUD_COLL_NONZERO;
     ctx.fillText(hud, 10, 17);
     ctx.restore();
   }, [repeatPreview]);
@@ -586,7 +591,7 @@ const styles: Record<string, React.CSSProperties> = {
     flex: 1,
     overflow: 'auto',
     display: 'flex',
-    background: '#0A0C12',
+    background: T.void,
   },
   holder: {
     margin: 'auto',

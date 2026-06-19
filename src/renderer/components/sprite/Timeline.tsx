@@ -6,6 +6,7 @@ import type { PlaybackMode } from '../../state/spriteStore';
 import type { PixelBuffer } from '../../../core/art/pixel-ops';
 import type { Color } from '../../../core/model/s4-types';
 import { T } from '../ui';
+import { CHECKER_A, CHECKER_B, OOB_MARKER } from '../../canvas/canvas-colors';
 
 const MODES: PlaybackMode[] = ['forward', 'reverse', 'pingpong'];
 
@@ -19,8 +20,8 @@ function BufferView({ buffer, colors, scale }: { buffer: PixelBuffer; colors: Co
     for (let y = 0; y < height; y++) {
       for (let x = 0; x < width; x++) {
         const idx = data[y * width + x];
-        if (idx === 0) { ctx.fillStyle = (x + y) % 2 === 0 ? '#2a2a3a' : '#33334a'; }
-        else { const c = colors[idx]; ctx.fillStyle = c ? `rgb(${c.r},${c.g},${c.b})` : '#ff00ff'; }
+        if (idx === 0) { ctx.fillStyle = (x + y) % 2 === 0 ? CHECKER_A : CHECKER_B; }
+        else { const c = colors[idx]; ctx.fillStyle = c ? `rgb(${c.r},${c.g},${c.b})` : OOB_MARKER; }
         ctx.fillRect(x, y, 1, 1);
       }
     }

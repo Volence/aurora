@@ -1,6 +1,7 @@
 import type { Tile, PaletteLine, SectionTileGrid } from '../../core/model/s4-types';
 import { unpackNametableWord, SECTION_TILES_WIDE, SECTION_TILES_HIGH, SECTION_PIXEL_SIZE } from '../../core/model/s4-types';
 import { TileRenderer } from './TileRenderer';
+import { CANVAS_BLACK, ACTIVE_SECTION_BORDER } from './canvas-colors';
 
 export interface SectionViewport {
   x: number;
@@ -132,7 +133,7 @@ export class SectionRenderer {
 
     // Always clear the backdrop — even with no BG loaded — so callers on the
     // BG editing layer never composite over a stale frame.
-    ctx.fillStyle = '#000000';
+    ctx.fillStyle = CANVAS_BLACK;
     ctx.fillRect(0, 0, width, height);
 
     if (!this.bg) return;
@@ -251,7 +252,7 @@ export class SectionRenderer {
     const { x: vpX, y: vpY, width, height, zoom } = viewport;
 
     if (clearBackground) {
-      ctx.fillStyle = '#000000';
+      ctx.fillStyle = CANVAS_BLACK;
       ctx.fillRect(0, 0, width, height);
     }
 
@@ -276,7 +277,7 @@ export class SectionRenderer {
     // Draw active section border
     if (activeSectionIndex !== undefined) {
       const offset = this.sectionWorldOffset(activeSectionIndex);
-      ctx.strokeStyle = 'rgba(137, 180, 250, 0.6)';
+      ctx.strokeStyle = ACTIVE_SECTION_BORDER;
       ctx.lineWidth = 2 / zoom;
       ctx.strokeRect(offset.x, offset.y, SECTION_PIXEL_SIZE, SECTION_PIXEL_SIZE);
     }

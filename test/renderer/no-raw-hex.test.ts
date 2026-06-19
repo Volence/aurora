@@ -5,7 +5,7 @@ import { join, basename } from 'node:path';
 
 // Ratchet: lower this toward 0 as components migrate to tokens (ui/theme.ts).
 // It must only ever DECREASE. Final task sets it to 0.
-const MAX_RAW_HEX = 164;
+const MAX_RAW_HEX = 0;
 
 const ROOT = join(__dirname, '..', '..', 'src', 'renderer');
 const HEX = /#[0-9a-fA-F]{6}\b/g;
@@ -23,6 +23,7 @@ function countRawHex(): { total: number; perFile: Record<string, number> } {
   let total = 0;
   for (const file of walk(ROOT)) {
     if (basename(file) === 'theme.css') continue; // tokens live here (it's .css anyway)
+    if (basename(file) === 'canvas-colors.ts') continue; // canvas-only color source (the canvas analog of theme.css)
     const hits = (readFileSync(file, 'utf8').match(HEX) ?? []).length;
     if (hits) { perFile[file] = hits; total += hits; }
   }

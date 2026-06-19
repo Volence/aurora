@@ -3,6 +3,7 @@ import { useEditorStore } from '../state/editorStore';
 import { useViewStore } from '../state/viewStore';
 import { useProjectStore, getCurrentAct } from '../state/projectStore';
 import { SECTION_PIXEL_SIZE } from '../../core/model/s4-types';
+import { T } from './ui';
 
 export default function SectionGridNav() {
   const activeSectionIndex = useEditorStore(s => s.activeSectionIndex);
@@ -58,20 +59,20 @@ export default function SectionGridNav() {
 }
 
 const styles: Record<string, React.CSSProperties> = {
-  container: { padding: 8, borderBottom: '1px solid #2A2F3D' },
-  header: { fontSize: 11, color: '#6E7589', marginBottom: 4 },
+  container: { padding: 8, borderBottom: `1px solid ${T.border}` },
+  header: { fontSize: 11, color: T.textLo, marginBottom: 4 },
   grid: { display: 'grid', gap: 2 },
   cell: {
     padding: '4px 0', textAlign: 'center', fontSize: 10,
-    background: '#2A2F3D', border: '1px solid #3A4152', borderRadius: 2,
-    color: '#E8EAF2', cursor: 'pointer', position: 'relative',
+    background: T.border, border: `1px solid ${T.borderStrong}`, borderRadius: 2,
+    color: T.textHi, cursor: 'pointer', position: 'relative',
   },
   bgDot: {
     position: 'absolute', top: 1, right: 1,
     width: 5, height: 5, borderRadius: '50%',
-    background: '#a6e3a1',
+    background: T.success,
   },
-  active: { background: '#34D399', color: '#12151E', border: '1px solid #34D399' },
-  null: { background: '#0A0C12', color: '#3A4152' },
-  empty: { padding: 8, color: '#6E7589', fontSize: 11 },
+  active: { background: T.accent, color: T.surface, border: `1px solid ${T.accent}` },
+  null: { background: T.void, color: T.borderStrong },
+  empty: { padding: 8, color: T.textLo, fontSize: 11 },
 };

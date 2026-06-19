@@ -1,4 +1,5 @@
 import React from 'react';
+import { T } from './ui';
 
 // TODO: Rewrite ChunkSheetImporter for S4 tile-based system.
 // The old importer worked with Tile->Block->Chunk hierarchy which no longer exists.
@@ -34,27 +35,27 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
   },
   dialog: {
-    background: '#12151E', border: '1px solid #3A4152', borderRadius: 8,
+    background: T.surface, border: `1px solid ${T.borderStrong}`, borderRadius: 8,
     width: 400, display: 'flex', flexDirection: 'column',
   },
   header: {
     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-    padding: '12px 16px', borderBottom: '1px solid #2A2F3D',
+    padding: '12px 16px', borderBottom: `1px solid ${T.border}`,
   },
-  title: { fontSize: 16, fontWeight: 600, color: '#E8EAF2' },
+  title: { fontSize: 16, fontWeight: 600, color: T.textHi },
   closeBtn: {
-    background: 'transparent', border: 'none', color: '#6E7589',
+    background: 'transparent', border: 'none', color: T.textLo,
     cursor: 'pointer', fontSize: 16, padding: '4px 8px',
   },
   body: {
-    padding: '24px 16px', color: '#B8BECE', fontSize: 13,
+    padding: '24px 16px', color: T.textBase, fontSize: 13,
   },
   actions: {
-    display: 'flex', gap: 8, padding: '12px 16px', borderTop: '1px solid #2A2F3D',
+    display: 'flex', gap: 8, padding: '12px 16px', borderTop: `1px solid ${T.border}`,
     justifyContent: 'flex-end',
   },
   cancelBtn: {
-    padding: '6px 16px', background: '#2A2F3D', color: '#E8EAF2',
-    border: '1px solid #3A4152', borderRadius: 4, cursor: 'pointer', fontSize: 13,
+    padding: '6px 16px', background: T.border, color: T.textHi,
+    border: `1px solid ${T.borderStrong}`, borderRadius: 4, cursor: 'pointer', fontSize: 13,
   },
 };
