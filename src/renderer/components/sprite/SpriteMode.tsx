@@ -62,6 +62,29 @@ export default function SpriteMode({ appBar }: { appBar: React.ReactNode }) {
 
   useEffect(() => { listSprites().then(setAvailable).catch(() => setAvailable([])); }, []);
 
+  // Ctrl/Cmd+Z (no shift) → undo; Ctrl/Cmd+Y or Ctrl/Cmd+Shift+Z → redo.
+  // Mirror ArtMode's guard: skip only text-entry inputs so undo works right
+  // after a slider/checkbox commit.
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      if (target.tagName === 'INPUT'
+          && !['range', 'checkbox', 'button', 'radio'].includes(
+            (target as HTMLInputElement).type)) return;
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) {
+        useSpriteStore.getState().undo();
+        e.preventDefault();
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key.toLowerCase() === 'z' && e.shiftKey))) {
+        useSpriteStore.getState().redo();
+        e.preventDefault();
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
+
   function fitToView() {
     const el = canvasWrapRef.current;
     if (!el || el.clientWidth === 0 || el.clientHeight === 0) return; // not laid out yet

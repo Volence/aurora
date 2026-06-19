@@ -3,6 +3,7 @@ import type { PixelBuffer, MirrorMode, DitherPattern } from '../../core/art/pixe
 import { createBuffer, flipH, flipV, rotate90 } from '../../core/art/pixel-ops';
 import type { Color } from '../../core/model/s4-types';
 import type { SpriteFormatId } from '../../core/formats/sprite-format-adapter';
+import { SpriteHistory, type SpriteSnapshot } from '../../core/editing/sprite-history';
 
 export type SpriteTool =
   | 'pencil' | 'eraser' | 'fill' | 'eyedropper' | 'line' | 'rect' | 'select' | 'dither';
@@ -64,6 +65,14 @@ interface SpriteState {
   deleteFrame: () => void;
   selectFrame: (i: number) => void;
 
+  // Undo/redo (snapshot-based). `historyTick` bumps on every history change so
+  // the UI re-evaluates canUndo/canRedo.
+  historyTick: number;
+  canUndo: () => boolean;
+  canRedo: () => boolean;
+  undo: () => void;
+  redo: () => void;
+
   // Animation (chunk 3)
   steps: AnimStepUI[];
   playbackMode: PlaybackMode;
@@ -99,7 +108,18 @@ function cloneFrame(b: PixelBuffer): PixelBuffer {
   return { width: b.width, height: b.height, data: new Uint8Array(b.data) };
 }
 
-export const useSpriteStore = create<SpriteState>((set) => ({
+/** Module-level undo/redo history for the working sprite document. */
+const history = new SpriteHistory();
+
+/** Build a snapshot from live state. SpriteHistory deep-clones on record/undo/
+ *  redo, so passing live refs is safe. */
+const snap = (s: SpriteState): SpriteSnapshot => ({
+  frames: s.frames,
+  currentIndex: s.currentIndex,
+  selection: s.selection,
+});
+
+export const useSpriteStore = create<SpriteState>((set, get) => ({
   tool: 'pencil',
   zoom: 10,
   frames: [blankFrame()],
@@ -116,6 +136,7 @@ export const useSpriteStore = create<SpriteState>((set) => ({
   name: 'NewSprite',
   exportDplc: false,
   format: 's4',
+  historyTick: 0,
 
   setName: (name) => set({ name }),
   setExportDplc: (exportDplc) => set({ exportDplc }),
@@ -127,45 +148,69 @@ export const useSpriteStore = create<SpriteState>((set) => ({
   setPixelPerfect: (pixelPerfect) => set({ pixelPerfect }),
   setDither: (ditherPattern, ditherSecondary) => set({ ditherPattern, ditherSecondary }),
   setSelection: (selection) => set({ selection }),
-  applyTransform: (t) => set((s) => {
+  applyTransform: (t) => {
+    const s = get();
     const cur = s.frames[s.currentIndex];
     const buf: PixelBuffer = { width: cur.width, height: cur.height, data: cur.data };
     let next: PixelBuffer;
     if (t === 'flip-h') next = flipH(buf);
     else if (t === 'flip-v') next = flipV(buf);
-    else if (t === 'rotate-90') { if (cur.width !== cur.height) return s; next = rotate90(buf); }
-    else return s;
+    else if (t === 'rotate-90') { if (cur.width !== cur.height) return; next = rotate90(buf); }
+    else return;
+    history.record(snap(s)); // only records when the transform actually applies
     const frames = s.frames.slice();
     frames[s.currentIndex] = next;
-    return { frames, selection: null }; // marquee coords no longer valid after a transform
-  }),
-  setBuffer: (b) => set((s) => {
+    // marquee coords no longer valid after a transform
+    set({ frames, selection: null, historyTick: s.historyTick + 1 });
+  },
+  setBuffer: (b) => {
+    const s = get();
+    history.record(snap(s));
     const frames = s.frames.slice();
     frames[s.currentIndex] = b;
     // Editing reverts display to the project palette (export uses the active line,
     // not a loaded character's display override) — keep WYSIWYG honest.
-    return s.paletteOverride ? { frames, paletteOverride: null } : { frames };
-  }),
+    set({ frames, historyTick: s.historyTick + 1, ...(s.paletteOverride ? { paletteOverride: null } : {}) });
+  },
   // New frame matches the current canvas size (loaded sprites may not be 32x32).
-  addFrame: () => set((s) => {
+  addFrame: () => {
+    const s = get();
+    history.record(snap(s));
     const cur = s.frames[s.currentIndex];
-    return { frames: [...s.frames, createBuffer(cur.width, cur.height)], currentIndex: s.frames.length };
-  }),
-  duplicateFrame: () => set((s) => {
+    set({ frames: [...s.frames, createBuffer(cur.width, cur.height)], currentIndex: s.frames.length, historyTick: s.historyTick + 1 });
+  },
+  duplicateFrame: () => {
+    const s = get();
+    history.record(snap(s));
     const frames = [...s.frames, cloneFrame(s.frames[s.currentIndex])];
-    return { frames, currentIndex: frames.length - 1 };
-  }),
-  deleteFrame: () => set((s) => {
-    if (s.frames.length <= 1) return s; // keep at least one frame
+    set({ frames, currentIndex: frames.length - 1, historyTick: s.historyTick + 1 });
+  },
+  deleteFrame: () => {
+    const s = get();
+    if (s.frames.length <= 1) return; // keep at least one frame
+    history.record(snap(s));
     const removed = s.currentIndex;
     const frames = s.frames.filter((_, i) => i !== removed);
     // Drop steps referencing the removed frame; shift higher references down.
     const steps = s.steps
       .filter((st) => st.frameIndex !== removed)
       .map((st) => (st.frameIndex > removed ? { ...st, frameIndex: st.frameIndex - 1 } : st));
-    return { frames, steps, currentIndex: Math.min(removed, frames.length - 1) };
-  }),
+    set({ frames, steps, currentIndex: Math.min(removed, frames.length - 1), historyTick: s.historyTick + 1 });
+  },
   selectFrame: (i) => set((s) => ({ currentIndex: Math.min(Math.max(0, i), s.frames.length - 1) })),
+
+  canUndo: () => history.canUndo,
+  canRedo: () => history.canRedo,
+  undo: () => {
+    const s = get();
+    const prev = history.undo(snap(s));
+    if (prev) set({ frames: prev.frames, currentIndex: prev.currentIndex, selection: prev.selection, paletteOverride: null, historyTick: s.historyTick + 1 });
+  },
+  redo: () => {
+    const s = get();
+    const next = history.redo(snap(s));
+    if (next) set({ frames: next.frames, currentIndex: next.currentIndex, selection: next.selection, historyTick: s.historyTick + 1 });
+  },
 
   steps: [],
   playbackMode: 'forward',
@@ -180,29 +225,37 @@ export const useSpriteStore = create<SpriteState>((set) => ({
   characterAnims: [],
   setCharacterAnims: (characterAnims) => set({ characterAnims }),
 
-  newSprite: (w, h) => set({
-    frames: [createBuffer(Math.max(8, w | 0), Math.max(8, h | 0))],
-    currentIndex: 0,
-    steps: [],
-    originX: Math.floor(Math.max(8, w | 0) / 2),
-    originY: Math.floor(Math.max(8, h | 0) / 2),
-    paletteOverride: null,
-    characterAnims: [],
-    selection: null,
-    name: 'NewSprite',
-    exportDplc: false,
-    format: 's4',
-  }),
+  newSprite: (w, h) => {
+    history.clear(); // a fresh sprite starts with empty history
+    set({
+      frames: [createBuffer(Math.max(8, w | 0), Math.max(8, h | 0))],
+      currentIndex: 0,
+      steps: [],
+      originX: Math.floor(Math.max(8, w | 0) / 2),
+      originY: Math.floor(Math.max(8, h | 0) / 2),
+      paletteOverride: null,
+      characterAnims: [],
+      selection: null,
+      name: 'NewSprite',
+      exportDplc: false,
+      format: 's4',
+      historyTick: 0,
+    });
+  },
 
-  loadSprite: (frames, steps, originX, originY) => set({
-    frames: frames.length ? frames : [blankFrame()],
-    steps,
-    currentIndex: 0,
-    originX,
-    originY,
-    paletteOverride: null,
-    characterAnims: [],
-  }),
+  loadSprite: (frames, steps, originX, originY) => {
+    history.clear(); // a loaded sprite starts with empty history
+    set({
+      frames: frames.length ? frames : [blankFrame()],
+      steps,
+      currentIndex: 0,
+      originX,
+      originY,
+      paletteOverride: null,
+      characterAnims: [],
+      historyTick: 0,
+    });
+  },
 
   paletteOverride: null,
   setPaletteOverride: (paletteOverride) => set({ paletteOverride }),

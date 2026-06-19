@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useProjectStore, getActiveLevel } from '../state/projectStore';
 import { useEditorStore, editHistory, undo, redo, type EditingLayer, type AppMode } from '../state/editorStore';
+import { useSpriteStore } from '../state/spriteStore';
 import type { S4Level } from '../../core/editing/commands';
 import type { RecentProject } from '../../shared/ipc-types';
 import AuroraMark from './AuroraMark';
@@ -23,6 +24,8 @@ export default function Toolbar({ onOpenProject, onOpenRecent, onSave }: Toolbar
   const historyVersion = useEditorStore((s) => s.historyVersion);
   const appMode = useEditorStore((s) => s.appMode);
   const setAppMode = useEditorStore((s) => s.setAppMode);
+  // Re-evaluate sprite Undo/Redo enablement whenever the sprite history changes.
+  const spriteTick = useSpriteStore((s) => s.historyTick);
 
   const [recentOpen, setRecentOpen] = useState(false);
   const [recentProjects, setRecentProjects] = useState<RecentProject[]>([]);
@@ -150,14 +153,24 @@ export default function Toolbar({ onOpenProject, onOpenRecent, onSave }: Toolbar
           <IconButton
             icon={<Icons.IconUndo size={14} />}
             label="Undo (Ctrl+Z)"
-            onClick={() => { const l = getLevel(); if (l) undo(l); }}
-            disabled={!editHistory.canUndo}
+            onClick={() => {
+              if (appMode === 'sprite') useSpriteStore.getState().undo();
+              else { const l = getLevel(); if (l) undo(l); }
+            }}
+            disabled={appMode === 'sprite'
+              ? (void spriteTick, !useSpriteStore.getState().canUndo())
+              : !editHistory.canUndo}
           />
           <IconButton
             icon={<Icons.IconRedo size={14} />}
             label="Redo (Ctrl+Y)"
-            onClick={() => { const l = getLevel(); if (l) redo(l); }}
-            disabled={!editHistory.canRedo}
+            onClick={() => {
+              if (appMode === 'sprite') useSpriteStore.getState().redo();
+              else { const l = getLevel(); if (l) redo(l); }
+            }}
+            disabled={appMode === 'sprite'
+              ? (void spriteTick, !useSpriteStore.getState().canRedo())
+              : !editHistory.canRedo}
           />
           <Chip
             active={saveFlash}
