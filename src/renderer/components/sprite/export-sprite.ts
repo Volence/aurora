@@ -359,8 +359,9 @@ export async function loadEngineCharacter(name: string): Promise<void> {
       const zone = getCurrentZone(useProjectStore.getState());
       if (zone) { zone.palette.lines[0].colors = colors; useArtStore.getState().bumpPaletteVersion(); }
     } catch { /* palette optional */ }
-    useSpriteStore.getState().setPaletteMode('zone');
-    useSpriteStore.getState().setZoneLine(0);
+    // Set the bind directly (not via the history-recording actions): loadSprite
+    // just cleared history, so a fresh character starts with an empty undo stack.
+    useSpriteStore.setState({ paletteMode: 'zone', zoneLine: 0 });
 
     // Load the named animation scripts so they can be played in-editor.
     let animCount = 0;
