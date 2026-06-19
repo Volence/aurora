@@ -8,7 +8,6 @@ import RingPatternPalette from './components/RingPatternPalette';
 import ArtBrowser from './components/ArtBrowser';
 import PaletteViewer from './components/PaletteViewer';
 import PropertiesPanel from './components/PropertiesPanel';
-import StatusBar from './components/StatusBar';
 import ToastContainer from './components/ToastContainer';
 import CommandPalette, { type Command } from './components/CommandPalette';
 import ArtMode from './components/art/ArtMode';
@@ -85,11 +84,7 @@ export default function App() {
       {appMode === 'art' ? (
         <ArtMode appBar={<Toolbar onOpenProject={openProject} onOpenRecent={openProjectByPath} onSave={saveProject} />} />
       ) : appMode === 'sprite' ? (
-        <>
-          <Toolbar onOpenProject={openProject} onOpenRecent={openProjectByPath} onSave={saveProject} />
-          <SpriteMode />
-          <StatusBar />
-        </>
+        <SpriteMode appBar={<Toolbar onOpenProject={openProject} onOpenRecent={openProjectByPath} onSave={saveProject} />} />
       ) : (
         <EditorShell
           appBar={<Toolbar onOpenProject={openProject} onOpenRecent={openProjectByPath} onSave={saveProject} />}
