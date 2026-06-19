@@ -154,8 +154,11 @@ export default function MapViewport() {
           break;
         case 'set-tileset-tiles':
         case 'set-palette-line':
+        case 'set-sections':
           // Tile pixels / palette are baked into per-section TileRenderer
-          // caches at load time — re-prerender everything.
+          // caches at load time, and a structural grid change (add/remove/
+          // resize/move/paste) re-indexes the whole grid — re-prerender
+          // everything.
           reloadAllSections();
           break;
         case 'set-bg':

@@ -1,21 +1,74 @@
-import React from 'react';
-import { useEditorStore } from '../state/editorStore';
+import React, { useEffect, useRef, useState } from 'react';
+import { useEditorStore, executeCommand } from '../state/editorStore';
 import { useViewStore } from '../state/viewStore';
-import { useProjectStore, getCurrentAct } from '../state/projectStore';
+import { useProjectStore, getCurrentAct, getActiveLevel } from '../state/projectStore';
 import { SECTION_PIXEL_SIZE, MAX_ACT_SECTIONS } from '../../core/model/s4-types';
+import type { Section } from '../../core/model/s4-types';
+import * as ops from '../../core/editing/section-ops';
 import { T } from './ui';
+
+// Module-level clipboard: a deep-cloned section survives re-renders and lets
+// the user paste into any slot (even after switching the active section).
+let sectionClipboard: Section | null = null;
+
+interface MenuState {
+  index: number;
+  sec: Section | null;
+  x: number;
+  y: number;
+}
 
 export default function SectionGridNav() {
   const activeSectionIndex = useEditorStore(s => s.activeSectionIndex);
-  // historyVersion: re-render badges when set-section-bg executes/undoes.
+  // historyVersion: re-render badges when set-section-bg / set-sections
+  // executes/undoes.
   useEditorStore(s => s.historyVersion);
   const project = useProjectStore(s => s.project);
   const state = useProjectStore.getState();
   const act = getCurrentAct(state);
 
+  // The flat index currently being dragged (for move-by-drop), and the cell
+  // hovered during a drag (for the drop-target outline).
+  const dragFrom = useRef<number | null>(null);
+  const [dragOver, setDragOver] = useState<number | null>(null);
+  // Right-click context menu (copy / paste / remove).
+  const [menu, setMenu] = useState<MenuState | null>(null);
+
+  // Close the context menu on any outside click (mirrors Toolbar's dropdown).
+  useEffect(() => {
+    if (!menu) return;
+    const handler = () => setMenu(null);
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [menu]);
+
   if (!act) return <div style={styles.empty}>No act loaded</div>;
 
   const { gridWidth, gridHeight, sections } = act;
+
+  /**
+   * Central dispatch for every structural grid op. Runs the pure op against a
+   * snapshot of the current grid; if it changes anything, wraps the before/after
+   * in a single undoable `set-sections` command and focuses the result.
+   * executeCommand already marks the project dirty.
+   */
+  const applyGridOp = (
+    compute: (g: ops.GridState) => ops.GridOpResult | null,
+    description: string,
+  ) => {
+    const pstate = useProjectStore.getState();
+    const a = getCurrentAct(pstate);
+    const level = getActiveLevel(pstate);
+    if (!a || !level) return;
+    const result = compute({ gridWidth: a.gridWidth, gridHeight: a.gridHeight, sections: a.sections });
+    if (!result) return;
+    executeCommand({
+      type: 'set-sections', description, sectionIndex: 0,
+      oldGridWidth: a.gridWidth, oldGridHeight: a.gridHeight, oldSections: a.sections.slice(),
+      newGridWidth: result.gridWidth, newGridHeight: result.gridHeight, newSections: result.sections,
+    }, level);
+    useEditorStore.getState().setActiveSectionIndex(result.focusIndex);
+  };
 
   // Single click selects (highlights) without moving the camera — double-click
   // frames the section in the viewport. (Auto-jump-on-select was disorienting.)
@@ -28,28 +81,52 @@ export default function SectionGridNav() {
     useViewStore.getState().setPosition(col * SECTION_PIXEL_SIZE, row * SECTION_PIXEL_SIZE);
   };
   const createSectionAt = (index?: number) => {
-    const newIndex = useProjectStore.getState().addSection(index);
-    if (newIndex !== null) {
-      useEditorStore.getState().setActiveSectionIndex(newIndex);
-      useEditorStore.getState().markDirty();
-    }
+    applyGridOp(g => ops.addSection(g, index), 'Add section');
   };
   const removeSectionAt = (index: number) => {
-    if (!window.confirm(`Remove section ${index}? Its tiles, objects and rings are lost (no undo yet).`)) return;
-    if (useProjectStore.getState().removeSection(index)) {
-      useEditorStore.getState().markDirty();
-    }
+    // Removal is undoable (Ctrl+Z) — no confirm needed.
+    applyGridOp(g => ops.removeSection(g, index), 'Remove section');
   };
-  // Resize the grid; preserve the active section's grid position across the
-  // re-indexing that a width change causes.
+  // Resize the grid; the pure op remaps the active section's (col,row) across
+  // the re-indexing that a width change causes.
   const resizeGridTo = (w: number, h: number) => {
-    const oldW = gridWidth;
-    const active = useEditorStore.getState().activeSectionIndex;
-    if (useProjectStore.getState().resizeGrid(w, h)) {
-      const col = active % oldW, row = Math.floor(active / oldW);
-      useEditorStore.getState().setActiveSectionIndex(col < w && row < h ? row * w + col : 0);
-      useEditorStore.getState().markDirty();
+    applyGridOp(g => ops.resizeGrid(g, w, h, useEditorStore.getState().activeSectionIndex), 'Resize grid');
+  };
+
+  // --- Drag-to-move ---------------------------------------------------------
+  const onCellDragStart = (i: number) => { dragFrom.current = i; };
+  const onCellDragOver = (i: number, e: React.DragEvent) => {
+    e.preventDefault(); // allow drop
+    if (dragOver !== i) setDragOver(i);
+  };
+  const onCellDrop = (i: number) => {
+    const from = dragFrom.current;
+    dragFrom.current = null;
+    setDragOver(null);
+    if (from === null || from === i) return;
+    applyGridOp(g => ops.moveSection(g, from, i), 'Move section');
+  };
+  const onCellDragEnd = () => { dragFrom.current = null; setDragOver(null); };
+
+  // --- Copy / paste context menu --------------------------------------------
+  const openMenu = (i: number, sec: Section | null, e: React.MouseEvent) => {
+    e.preventDefault();
+    setMenu({ index: i, sec, x: e.clientX, y: e.clientY });
+  };
+  const doCopy = () => {
+    if (menu?.sec) sectionClipboard = ops.cloneSection(menu.sec, 0);
+    setMenu(null);
+  };
+  const doPaste = () => {
+    if (menu && sectionClipboard) {
+      const idx = menu.index;
+      applyGridOp(g => ops.pasteSection(g, sectionClipboard!, idx), 'Paste section');
     }
+    setMenu(null);
+  };
+  const doRemove = () => {
+    if (menu?.sec) removeSectionAt(menu.index);
+    setMenu(null);
   };
 
   const lastColEmpty = Array.from({ length: gridHeight }, (_, r) => sections[r * gridWidth + (gridWidth - 1)]).every(s => s == null);
@@ -82,17 +159,25 @@ export default function SectionGridNav() {
           return (
             <button
               key={i}
+              draggable={!isNull}
               style={{
                 ...styles.cell,
                 ...(i === activeSectionIndex ? styles.active : {}),
                 ...(isNull ? styles.null : {}),
+                ...(dragOver === i ? styles.dropTarget : {}),
               }}
               title={isNull
-                ? 'Empty slot — click to add a section here'
-                : bgName ? `BG: ${bgName} · double-click to jump · right-click to remove` : 'Double-click to jump · right-click to remove'}
+                ? 'Empty slot — click to add a section here · right-click to paste'
+                : bgName
+                  ? `BG: ${bgName} · double-click to jump · drag to move · right-click for menu`
+                  : 'Double-click to jump · drag to move · right-click for menu'}
               onClick={() => (isNull ? createSectionAt(i) : selectSection(i))}
               onDoubleClick={() => { if (!isNull) jumpToSection(i); }}
-              onContextMenu={(e) => { e.preventDefault(); if (!isNull) removeSectionAt(i); }}
+              onContextMenu={(e) => openMenu(i, sec, e)}
+              onDragStart={() => onCellDragStart(i)}
+              onDragOver={(e) => onCellDragOver(i, e)}
+              onDrop={() => onCellDrop(i)}
+              onDragEnd={onCellDragEnd}
             >
               {sec ? i : '+'}
               {bgName && <span style={styles.bgDot} />}
@@ -122,6 +207,25 @@ export default function SectionGridNav() {
       >
         + Add section
       </button>
+
+      {menu && (
+        <div
+          style={{ ...styles.menu, left: menu.x, top: menu.y }}
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          {menu.sec && (
+            <button style={styles.menuItem} onClick={doCopy}>Copy</button>
+          )}
+          <button
+            style={{ ...styles.menuItem, ...(sectionClipboard ? {} : styles.menuItemDisabled) }}
+            disabled={!sectionClipboard}
+            onClick={doPaste}
+          >Paste here</button>
+          {menu.sec && (
+            <button style={styles.menuItem} onClick={doRemove}>Remove</button>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -142,6 +246,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   active: { background: T.accent, color: T.surface, border: `1px solid ${T.accent}` },
   null: { background: T.void, color: T.textLo, cursor: 'pointer' },
+  dropTarget: { outline: `2px solid ${T.accent}`, outlineOffset: -1 },
   gridControls: {
     display: 'flex', alignItems: 'center', gap: 3, marginTop: 6,
     fontSize: 10, color: T.textLo,
@@ -161,4 +266,16 @@ const styles: Record<string, React.CSSProperties> = {
   },
   addBtnDisabled: { opacity: 0.5, cursor: 'default' },
   empty: { padding: 8, color: T.textLo, fontSize: 11 },
+  menu: {
+    position: 'fixed', zIndex: 1000, minWidth: 110,
+    background: T.surface, border: `1px solid ${T.borderStrong}`, borderRadius: 4,
+    padding: 3, display: 'flex', flexDirection: 'column', gap: 1,
+    boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
+  },
+  menuItem: {
+    textAlign: 'left', padding: '4px 8px', fontSize: 11,
+    background: 'transparent', color: T.textBase, border: 'none',
+    borderRadius: 2, cursor: 'pointer',
+  },
+  menuItemDisabled: { opacity: 0.4, cursor: 'default' },
 };
