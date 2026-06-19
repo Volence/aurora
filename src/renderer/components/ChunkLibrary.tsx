@@ -11,6 +11,7 @@ import { parseTiles } from '../../core/formats/tiles';
 import { migrateChunkTilesIntoTileset } from '../../core/art/atlas-migration';
 import { unpackNametableWord } from '../../core/model/s4-types';
 import type { ChunkDef, Tile, Palette } from '../../core/model/s4-types';
+import { T } from './ui';
 
 const CHUNK_PX = 128;
 const THUMB_SCALE = 0.5;
@@ -308,21 +309,21 @@ export default function ChunkLibrary() {
 const styles: Record<string, React.CSSProperties> = {
   container: {
     display: 'flex', flexDirection: 'column',
-    borderTop: '1px solid #2A2F3D',
+    borderTop: `1px solid ${T.border}`,
     flex: 1, minHeight: 120, flexShrink: 0,
   },
   header: {
     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-    padding: '4px 8px', borderBottom: '1px solid #2A2F3D',
+    padding: '4px 8px', borderBottom: `1px solid ${T.border}`,
     flexShrink: 0,
   },
   label: {
-    fontSize: 11, fontWeight: 600, color: '#B8BECE',
+    fontSize: 11, fontWeight: 600, color: T.textBase,
     textTransform: 'uppercase' as const, letterSpacing: 1,
   },
   headerBtn: {
-    padding: '2px 8px', background: '#2A2F3D', color: '#E8EAF2',
-    border: '1px solid #3A4152', borderRadius: 3, cursor: 'pointer',
+    padding: '2px 8px', background: T.border, color: T.textHi,
+    border: `1px solid ${T.borderStrong}`, borderRadius: 3, cursor: 'pointer',
     fontSize: 10,
   },
   canvasWrap: {
@@ -334,18 +335,18 @@ const styles: Record<string, React.CSSProperties> = {
   },
   selectionInfo: {
     display: 'flex', alignItems: 'center', gap: 6,
-    padding: '3px 8px', borderBottom: '1px solid #2A2F3D',
+    padding: '3px 8px', borderBottom: `1px solid ${T.border}`,
     flexShrink: 0,
   },
   selectedBadge: {
-    fontSize: 10, fontWeight: 600, color: '#12151E', background: '#a6e3a1',
+    fontSize: 10, fontWeight: 600, color: T.surface, background: T.success,
     padding: '0 5px', borderRadius: 3, lineHeight: '16px',
   },
   empty: {
     padding: '12px 8px', display: 'flex', flexDirection: 'column',
-    alignItems: 'center', gap: 4, color: '#6E7589', fontSize: 11,
+    alignItems: 'center', gap: 4, color: T.textLo, fontSize: 11,
   },
   hint: {
-    fontSize: 9, color: '#3A4152', textAlign: 'center' as const,
+    fontSize: 9, color: T.borderStrong, textAlign: 'center' as const,
   },
 };

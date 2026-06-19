@@ -4,6 +4,7 @@ import { useEditorStore, executeCommand } from '../../state/editorStore';
 import { useArtStore } from '../../state/artStore';
 import { encodeGenesisColor, decodeGenesisColor } from '../../../core/formats/palette';
 import type { Color } from '../../../core/model/s4-types';
+import { T } from '../ui';
 
 /** 8-bit channel → Genesis 3-bit level (0-7). */
 function to3(v: number): number {
@@ -20,7 +21,7 @@ interface SwatchSel {
 }
 
 const CHANNELS = ['r', 'g', 'b'] as const;
-const CHANNEL_COLORS: Record<string, string> = { r: '#f38ba8', g: '#a6e3a1', b: '#34D399' };
+const CHANNEL_COLORS: Record<string, string> = { r: T.error, g: T.success, b: T.info };
 
 /**
  * Genesis palette editor: 4 rows × 16 swatches over zone.palette. Line 0 is
@@ -232,44 +233,44 @@ const styles: Record<string, React.CSSProperties> = {
     height: 20,
     minWidth: 0,
     flex: '1 1 0',
-    border: '1px solid #2A2F3D',
+    border: `1px solid ${T.border}`,
     borderRadius: 2,
     cursor: 'pointer',
     boxSizing: 'border-box' as const,
   },
   checkerboard: {
-    background: 'repeating-conic-gradient(#6E7589 0% 25%, #3A4152 0% 50%) 0 0 / 8px 8px',
+    background: `repeating-conic-gradient(${T.textLo} 0% 25%, ${T.borderStrong} 0% 50%) 0 0 / 8px 8px`,
   },
   locked: {
     opacity: 0.35,
     cursor: 'not-allowed',
   },
   paintSel: {
-    outline: '2px solid #34D399',
+    outline: `2px solid ${T.accent}`,
     outlineOffset: -1,
   },
   editSel: {
-    border: '2px solid #f5e0dc',
+    border: `2px solid ${T.textHi}`,
   },
   editPanel: {
     display: 'flex',
     flexDirection: 'column',
     gap: 4,
     padding: 6,
-    background: '#0A0C12',
-    border: '1px solid #2A2F3D',
+    background: T.void,
+    border: `1px solid ${T.border}`,
     borderRadius: 4,
   },
   editHeader: {
     display: 'flex',
     justifyContent: 'space-between',
     fontSize: 10,
-    color: '#B8BECE',
+    color: T.textBase,
     marginBottom: 2,
   },
   word: {
-    fontFamily: 'monospace',
-    color: '#f9e2af',
+    fontFamily: T.fontMono,
+    color: T.warning,
   },
   sliderRow: {
     display: 'flex',
@@ -287,8 +288,8 @@ const styles: Record<string, React.CSSProperties> = {
   },
   channelValue: {
     fontSize: 10,
-    fontFamily: 'monospace',
-    color: '#E8EAF2',
+    fontFamily: T.fontMono,
+    color: T.textHi,
     width: 10,
     textAlign: 'right' as const,
   },

@@ -83,11 +83,7 @@ export default function App() {
       )}
 
       {appMode === 'art' ? (
-        <>
-          <Toolbar onOpenProject={openProject} onOpenRecent={openProjectByPath} onSave={saveProject} />
-          <ArtMode />
-          <StatusBar />
-        </>
+        <ArtMode appBar={<Toolbar onOpenProject={openProject} onOpenRecent={openProjectByPath} onSave={saveProject} />} />
       ) : appMode === 'sprite' ? (
         <>
           <Toolbar onOpenProject={openProject} onOpenRecent={openProjectByPath} onSave={saveProject} />

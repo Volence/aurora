@@ -5,7 +5,7 @@ import { join, basename } from 'node:path';
 
 // Ratchet: lower this toward 0 as components migrate to tokens (ui/theme.ts).
 // It must only ever DECREASE. Final task sets it to 0.
-const MAX_RAW_HEX = 313;
+const MAX_RAW_HEX = 242;
 
 const ROOT = join(__dirname, '..', '..', 'src', 'renderer');
 const HEX = /#[0-9a-fA-F]{6}\b/g;
