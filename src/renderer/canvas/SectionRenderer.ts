@@ -36,6 +36,11 @@ export class SectionRenderer {
   private gridHeight = 1;
   private tempCanvas = new OffscreenCanvas(8, 8);
   private tempCtx = this.tempCanvas.getContext('2d')!;
+  // Prerendered zone tileset+palette, shared by every section that draws from
+  // the zone atlas (the common case). Built once per reload via prepareTiles()
+  // instead of once PER SECTION — the old per-section prerender re-rendered the
+  // whole tileset N times at load.
+  private sharedTileRenderer: TileRenderer | null = null;
 
   setGrid(width: number, height: number): void {
     this.gridWidth = width;
@@ -147,13 +152,32 @@ export class SectionRenderer {
     ctx.restore();
   }
 
-  loadSection(index: number, tileGrid: SectionTileGrid, tiles: Tile[], paletteLines: PaletteLine[]): void {
+  /**
+   * Prerender the zone tileset+palette once. Call before the loadSection loop;
+   * every section that omits its own tiles reuses this shared cache instead of
+   * re-prerendering the whole tileset per section.
+   */
+  prepareTiles(tiles: Tile[], paletteLines: PaletteLine[]): void {
+    const renderer = new TileRenderer();
+    renderer.prerender(tiles, paletteLines);
+    this.sharedTileRenderer = renderer;
+  }
+
+  loadSection(index: number, tileGrid: SectionTileGrid, tiles?: Tile[], paletteLines?: PaletteLine[]): void {
     const canvas = new OffscreenCanvas(SECTION_PIXEL_SIZE, SECTION_PIXEL_SIZE);
     const ctx = canvas.getContext('2d')!;
     ctx.imageSmoothingEnabled = false;
 
-    const tileRenderer = new TileRenderer();
-    tileRenderer.prerender(tiles, paletteLines);
+    // Per-section art override → its own cache; otherwise the shared zone cache.
+    let tileRenderer: TileRenderer;
+    if (tiles && paletteLines) {
+      tileRenderer = new TileRenderer();
+      tileRenderer.prerender(tiles, paletteLines);
+    } else if (this.sharedTileRenderer) {
+      tileRenderer = this.sharedTileRenderer;
+    } else {
+      return; // no tileset prepared and no override — nothing to draw
+    }
 
     const entry: SectionEntry = {
       tileRenderer,

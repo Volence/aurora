@@ -117,6 +117,9 @@ export default function MapViewport() {
 
     sectionRenderer.setGrid(act.gridWidth, act.gridHeight);
     sectionRenderer.clearSections();
+    // Prerender the zone tileset ONCE; sections share it (the per-section
+    // prerender re-rendered the whole atlas for every section at load).
+    sectionRenderer.prepareTiles(zone.tileset.tiles, zone.palette.lines);
 
     // Unified atlas: section nametables index into the zone tileset. The
     // section.tiles override is kept for future per-section art, but nothing
@@ -124,8 +127,11 @@ export default function MapViewport() {
     for (let i = 0; i < act.sections.length; i++) {
       const section = act.sections[i];
       if (!section) continue;
-      const tiles = section.tiles ?? zone.tileset.tiles;
-      sectionRenderer.loadSection(i, section.tileGrid, tiles, zone.palette.lines);
+      if (section.tiles) {
+        sectionRenderer.loadSection(i, section.tileGrid, section.tiles, zone.palette.lines);
+      } else {
+        sectionRenderer.loadSection(i, section.tileGrid); // reuse shared prerender
+      }
     }
 
     reloadBg();
