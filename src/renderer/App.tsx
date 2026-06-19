@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import Toolbar from './components/Toolbar';
 import MapViewport from './components/MapViewport';
 import SectionGridNav from './components/SectionGridNav';

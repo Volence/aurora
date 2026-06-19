@@ -74,5 +74,5 @@ const styles: Record<string, React.CSSProperties> = {
   grid: { display: 'flex', flexWrap: 'wrap', gap: 4, padding: 8, overflowY: 'auto', alignContent: 'flex-start' },
   cell: { position: 'relative', width: 44, height: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 2, background: T.void, border: `1px solid ${T.borderStrong}`, borderRadius: 4, cursor: 'pointer', lineHeight: 0 },
   cellActive: { borderColor: T.accent, boxShadow: `0 0 0 1px ${T.accent}` },
-  num: { position: 'absolute', bottom: 0, right: 1, fontSize: 8, color: T.textHi, lineHeight: 1, textShadow: '0 0 2px #000' },
+  num: { position: 'absolute', bottom: 0, right: 1, fontSize: 8, color: T.textHi, lineHeight: 1, textShadow: '0 0 2px rgba(0,0,0,0.9)' },
 };

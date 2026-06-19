@@ -8,7 +8,8 @@ import { join, basename } from 'node:path';
 const MAX_RAW_HEX = 0;
 
 const ROOT = join(__dirname, '..', '..', 'src', 'renderer');
-const HEX = /#[0-9a-fA-F]{6}\b/g;
+// Matches 3- or 6-digit hex color literals (word-bounded so #abcdef counts once).
+const HEX = /#[0-9a-fA-F]{3}(?:[0-9a-fA-F]{3})?\b/g;
 
 function walk(dir: string): string[] {
   return readdirSync(dir).flatMap((name) => {
