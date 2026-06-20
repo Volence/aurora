@@ -55,7 +55,7 @@ export class OverlayRenderer {
         // render path A as the base and outline the cells where B differs, so the
         // dual-layer/loop regions stand out instead of the planes hiding each other.
         const a = info.section.collisionEdit ?? info.section.engineCollision ?? info.section.tileGrid.collision;
-        const b = info.section.engineCollisionB ?? null;
+        const b = info.section.collisionEditB ?? info.section.engineCollisionB ?? null;
         if (options.showCollision && options.showCollisionPathB && b) {
           this.drawCollisionOverlay(ctx, viewport, a, info.offsetX, info.offsetY, collisionProfiles ?? null, options.showCollisionAngles, b);
         } else {

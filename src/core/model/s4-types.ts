@@ -86,6 +86,9 @@ export interface Section {
    *  and written by set-collision-edit. Separate from tileGrid.collision (legacy
    *  chunk/nibble) and engineCollision (read-only strip reference). */
   collisionEdit?: Uint8Array | null;
+  /** Editable path-B collision plane (the alternate/loop layer), mirror of
+   *  collisionEdit. Seeded from engineCollisionB or a saved .collattrb.bin. */
+  collisionEditB?: Uint8Array | null;
   objects: ObjectPlacement[];
   rings: RingPlacement[];
   tiles: Tile[] | null;

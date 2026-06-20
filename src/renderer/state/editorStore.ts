@@ -84,6 +84,7 @@ interface EditorState {
   selectedRingPattern: number;
   selectedCollisionType: number;
   selectedCollisionProfile: number; // 0-255 attr index for the map collision palette
+  collisionPaintPlane: 'a' | 'b';
 
   setTool: (tool: EditorTool) => void;
   setSelection: (selection: Selection | null) => void;
@@ -98,6 +99,7 @@ interface EditorState {
   setSelectedRingPattern: (index: number) => void;
   setSelectedCollisionType: (type: number) => void;
   setSelectedCollisionProfile: (index: number) => void;
+  setCollisionPaintPlane: (plane: 'a' | 'b') => void;
   markDirty: () => void;
   markClean: () => void;
   bumpVersion: () => void;
@@ -129,6 +131,7 @@ export const useEditorStore = create<EditorState>((set) => ({
   selectedRingPattern: 0,
   selectedCollisionType: 0,
   selectedCollisionProfile: 0,
+  collisionPaintPlane: 'a',
 
   setTool: (tool) => set({ tool, selection: null, multiSelection: null }),
   setSelection: (selection) => set({ selection, multiSelection: null }),
@@ -143,6 +146,7 @@ export const useEditorStore = create<EditorState>((set) => ({
   setSelectedRingPattern: (index) => set({ selectedRingPattern: index }),
   setSelectedCollisionType: (type) => set({ selectedCollisionType: type }),
   setSelectedCollisionProfile: (index) => set({ selectedCollisionProfile: Math.max(0, Math.min(255, index | 0)) }),
+  setCollisionPaintPlane: (collisionPaintPlane) => set({ collisionPaintPlane }),
   markDirty: () => set({ dirty: true }),
   markClean: () => set({ dirty: false }),
   bumpVersion: () => set((s) => ({ historyVersion: s.historyVersion + 1 })),

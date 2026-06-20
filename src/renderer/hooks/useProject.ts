@@ -167,6 +167,10 @@ export function useProject() {
           const caData = serializeCollAttr(section.collisionEdit);
           await window.api.writeBinaryFile(basePath, `${prefix}.collattr.bin`, caData.buffer as ArrayBuffer);
         }
+        if (section.collisionEditB) {
+          const cbData = serializeCollAttr(section.collisionEditB);
+          await window.api.writeBinaryFile(basePath, `${prefix}.collattrb.bin`, cbData.buffer as ArrayBuffer);
+        }
 
         // Write objects (.objects.json)
         const objectsJson = JSON.stringify(section.objects, null, 2);
@@ -440,6 +444,12 @@ async function loadFullProject(config: ReturnType<typeof loadS4Config>): Promise
                 section.collisionEdit = parseCollAttr(caRaw);
               } catch {
                 section.collisionEdit = new Uint8Array(engineColl);
+              }
+              try {
+                const cbRaw = await readFile(basePath, `${prefix}.collattrb.bin`);
+                section.collisionEditB = parseCollAttr(cbRaw);
+              } catch {
+                section.collisionEditB = new Uint8Array(engineCollB);
               }
               loaded = true;
             } catch (stripErr) {

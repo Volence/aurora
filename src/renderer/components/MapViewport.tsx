@@ -438,15 +438,16 @@ export default function MapViewport() {
   function paintCollisionCell(info: { sectionIndex: number; col: number; row: number }, justHere: boolean) {
     const section = getSectionByIndex(info.sectionIndex);
     if (!section) return;
-    // Lazily seed the editable plane if it's missing — e.g. the project was opened
-    // before collisionEdit existed and a hot-reload didn't re-run the loader. Clone
-    // the engine path-A baseline (matches the load seed; keeps the A/B diff clean).
-    if (!section.collisionEdit) {
+    const plane = useEditorStore.getState().collisionPaintPlane;
+    // Lazily seed the target plane (clone its engine baseline) if missing.
+    if (plane === 'b') {
+      if (!section.collisionEditB) section.collisionEditB = section.engineCollisionB
+        ? new Uint8Array(section.engineCollisionB) : new Uint8Array(SECTION_TILES_WIDE * SECTION_TILES_HIGH);
+    } else if (!section.collisionEdit) {
       section.collisionEdit = section.engineCollision
-        ? new Uint8Array(section.engineCollision)
-        : new Uint8Array(SECTION_TILES_WIDE * SECTION_TILES_HIGH);
+        ? new Uint8Array(section.engineCollision) : new Uint8Array(SECTION_TILES_WIDE * SECTION_TILES_HIGH);
     }
-    const ce = section.collisionEdit;
+    const ce = (plane === 'b' ? section.collisionEditB : section.collisionEdit)!;
     const cellCol = info.col >> 1, cellRow = info.row >> 1;
     const cellKey = `${info.sectionIndex}:${cellCol}:${cellRow}`;
     if (lastPaintedCell.current === cellKey) return; // same cursor cell — skip
@@ -477,7 +478,8 @@ export default function MapViewport() {
     if (!level) return;
     executeCommand({
       type: 'set-collision-edit',
-      description: justHere ? `Paint collision (this block)` : `Paint collision (${targets.length} matching blocks)`,
+      plane,
+      description: justHere ? `Paint collision ${plane.toUpperCase()} (this block)` : `Paint collision ${plane.toUpperCase()} (${targets.length} matching blocks)`,
       sectionIndex: info.sectionIndex,
       entries,
     }, level);
@@ -853,9 +855,10 @@ export default function MapViewport() {
             // Snap to the 16px cell's top-left tile (both tiles share the byte).
             const cellCol = Math.floor(info.col / 2) * 2;
             const cellRow = Math.floor(info.row / 2) * 2;
-            const pathB = overlays.showCollisionPathB;
+            // In the A/B diff (both overlays on) the base shown is A, so report A.
+            const pathB = overlays.showCollisionPathB && !overlays.showCollision;
             const coll = (pathB
-              ? (section.engineCollisionB ?? section.engineCollision)
+              ? (section.collisionEditB ?? section.engineCollisionB ?? section.engineCollision)
               : (section.collisionEdit ?? section.engineCollision)) ?? section.tileGrid.collision;
             const index = coll[cellRow * SECTION_TILES_WIDE + cellCol];
             const profiles = useProjectStore.getState().collisionProfiles;

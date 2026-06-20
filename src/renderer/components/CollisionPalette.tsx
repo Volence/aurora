@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { useEditorStore } from '../state/editorStore';
 import { useProjectStore } from '../state/projectStore';
+import { useViewStore } from '../state/viewStore';
 import { columnSolidRun } from '../../core/collision/collision-render';
 import type { CollisionProfile, Solidity } from '../../core/collision/collision-model';
 import { T } from './ui';
@@ -42,6 +43,20 @@ export default function CollisionPalette() {
   const profiles = useProjectStore((s) => s.collisionProfiles);
   const selected = useEditorStore((s) => s.selectedCollisionProfile);
   const set = useEditorStore((s) => s.setSelectedCollisionProfile);
+  const plane = useEditorStore((s) => s.collisionPaintPlane);
+
+  function pickPlane(p: 'a' | 'b') {
+    useEditorStore.getState().setCollisionPaintPlane(p);
+    const v = useViewStore.getState();
+    v.setOverlay('showCollision', p === 'a');        // show the plane you're editing,
+    v.setOverlay('showCollisionPathB', p === 'b');   // hide the other (diff is in the View menu)
+  }
+  // Show the active plane when the collision tool opens — but only if no collision
+  // overlay is on yet, so an A/B-diff view the user set up in the View menu survives.
+  useEffect(() => {
+    const ov = useViewStore.getState().overlays;
+    if (!ov.showCollision && !ov.showCollisionPathB) pickPlane(plane);
+  }, []);
 
   if (!profiles) return <div style={styles.note}>Collision tables not found — open a project with collision data.</div>;
 
@@ -50,6 +65,11 @@ export default function CollisionPalette() {
 
   return (
     <div>
+      <div style={styles.planes}>
+        <span style={styles.planeLabel}>Plane</span>
+        <button onClick={() => pickPlane('a')} style={{ ...styles.planeBtn, ...(plane === 'a' ? styles.planeSel : {}) }}>A</button>
+        <button onClick={() => pickPlane('b')} style={{ ...styles.planeBtn, ...(plane === 'b' ? styles.planeSel : {}) }}>B</button>
+      </div>
       <div style={styles.hint}>Pick a shape, then paint on the map. Paints every block with the same tiles; hold Alt to paint just one.</div>
       <div style={styles.grid}>
         <button title="Erase (air)" onClick={() => set(0)} style={{ ...styles.cell, ...(selected === 0 ? styles.sel : {}) }}>
@@ -77,4 +97,8 @@ const styles: Record<string, React.CSSProperties> = {
   },
   sel: { outline: `2px solid ${T.accent}`, outlineOffset: -1 },
   erase: { color: T.textLo, fontSize: 14 },
+  planes: { display: 'flex', alignItems: 'center', gap: 4, padding: `${T.s2} ${T.s2} 0` },
+  planeLabel: { fontSize: 10, color: T.textLo, marginRight: 2 },
+  planeBtn: { padding: `1px ${T.s2}`, background: T.overlay, color: T.textBase, border: `1px solid ${T.border}`, borderRadius: T.rSm, cursor: 'pointer', fontSize: 11, minWidth: 22 },
+  planeSel: { background: T.accent, color: T.onAccent, borderColor: T.accent },
 };
