@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { EditHistory } from '../../core/editing/history';
 import type { AnyCommand, S4Level } from '../../core/editing/commands';
+import { useArtStore } from './artStore';
 
 export type EditorTool =
   | 'view' | 'select' | 'paint-tile' | 'paint-block' | 'stamp-chunk'
@@ -173,6 +174,13 @@ function bumpStoreVersions(cmd: AnyCommand): void {
       || cmd.type === 'set-palette-line'
       || cmd.type === 'set-tileset-tiles') {
     useEditorStore.getState().bumpChunkLibraryVersion();
+  }
+  // A committed palette-line change (a slider commit, a copy-bridge write, or its
+  // undo/redo) must repaint every paletteVersion subscriber — notably the sprite
+  // canvas, which watches paletteVersion but not historyVersion. The live slider
+  // preview bumps paletteVersion itself; this covers the commit + undo/redo paths.
+  if (cmd.type === 'set-palette-line') {
+    useArtStore.getState().bumpPaletteVersion();
   }
 }
 
