@@ -79,9 +79,11 @@ export default function SpriteMode({ appBar }: { appBar: React.ReactNode }) {
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
-      if (target.tagName === 'INPUT'
-          && !['range', 'checkbox', 'button', 'radio'].includes(
-            (target as HTMLInputElement).type)) return;
+      const isTextEntry = target.isContentEditable
+        || target.tagName === 'TEXTAREA'
+        || (target.tagName === 'INPUT'
+          && !['range', 'checkbox', 'button', 'radio'].includes((target as HTMLInputElement).type));
+      if (isTextEntry) return;
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) {
         spriteModeUndo();
         e.preventDefault();
@@ -90,6 +92,21 @@ export default function SpriteMode({ appBar }: { appBar: React.ReactNode }) {
       if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key.toLowerCase() === 'z' && e.shiftKey))) {
         spriteModeRedo();
         e.preventDefault();
+        return;
+      }
+      // Only swallow the native shortcut when the clipboard action actually
+      // applied (had a selection / a clip); otherwise let the browser handle it.
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c') {
+        if (useSpriteStore.getState().copySelection()) e.preventDefault();
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'x') {
+        if (useSpriteStore.getState().cutSelection()) e.preventDefault();
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'v') {
+        if (useSpriteStore.getState().paste()) e.preventDefault();
+        return;
       }
     };
     window.addEventListener('keydown', handler);
