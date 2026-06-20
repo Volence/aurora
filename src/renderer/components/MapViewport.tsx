@@ -16,6 +16,7 @@ import { T } from './ui';
 import CollisionLegend from './CollisionLegend';
 import { CANVAS_VOID } from '../canvas/canvas-colors';
 import { angleDegrees, isAir, isKnownProfile } from '../../core/collision/collision-model';
+import { cellTileIndices } from '../../core/collision/collision-cell';
 import { heightSparkline } from '../../core/collision/collision-render';
 
 export const sectionRenderer = new SectionRenderer();
@@ -58,6 +59,7 @@ export default function MapViewport() {
   // under the cursor) from a pan-drag.
   const downPos = useRef<{ x: number; y: number } | null>(null);
   const isPaintDragging = useRef(false);
+  const lastPaintedCell = useRef<string | null>(null);
   const lastMouse = useRef({ x: 0, y: 0 });
   const dragTarget = useRef<{
     type: 'object' | 'ring';
@@ -183,8 +185,9 @@ export default function MapViewport() {
         default:
           // set-chunk thumbnail invalidation is a store concern handled in
           // editorStore (bumpStoreVersions) so it survives Art mode.
-          // Objects/rings are drawn by the OverlayRenderer from live state
-          // every frame; the historyVersion bump already re-renders them.
+          // Objects/rings AND the collision overlay (incl. set-collision-edit)
+          // are drawn by the OverlayRenderer from live state every frame; the
+          // historyVersion bump already re-renders them — no markDirty needed.
           break;
       }
     });
@@ -424,6 +427,32 @@ export default function MapViewport() {
     return getStoreActiveLevel(useProjectStore.getState());
   }
 
+  // Paint the 16px cell containing `info` with the selected profile via
+  // set-collision-edit. Writes all four 8px tiles of the cell; deduped per cell
+  // (lastPaintedCell) so dragging within a cell doesn't push duplicate commands.
+  function paintCollisionCell(info: { sectionIndex: number; col: number; row: number }) {
+    const section = getSectionByIndex(info.sectionIndex);
+    if (!section || !section.collisionEdit) return;
+    const cellKey = `${info.sectionIndex}:${info.col >> 1}:${info.row >> 1}`;
+    if (lastPaintedCell.current === cellKey) return;
+    lastPaintedCell.current = cellKey;
+    const level = getActiveLevel();
+    if (!level) return;
+    const profile = useEditorStore.getState().selectedCollisionProfile;
+    const indices = cellTileIndices(info.col >> 1, info.row >> 1, SECTION_TILES_WIDE);
+    const entries = indices
+      .map((index) => ({ index, oldColl: section.collisionEdit![index], newColl: profile }))
+      .filter((e) => e.oldColl !== e.newColl);
+    if (entries.length === 0) return;
+    executeCommand({
+      type: 'set-collision-edit',
+      description: `Paint collision at cell (${info.col >> 1}, ${info.row >> 1})`,
+      sectionIndex: info.sectionIndex,
+      entries,
+    }, level);
+    useEditorStore.getState().setActiveSectionIndex(info.sectionIndex);
+  }
+
   function getSectionByIndex(idx: number): Section | null {
     const state = useProjectStore.getState();
     const act = getCurrentAct(state);
@@ -627,20 +656,8 @@ export default function MapViewport() {
     if (tool === 'paint-collision') {
       const info = worldToSectionTile(world.x, world.y);
       if (!info) return;
-      const section = getSectionByIndex(info.sectionIndex);
-      if (!section) return;
-
-      const { selectedCollisionType } = useEditorStore.getState();
-      const oldColl = section.tileGrid.collision[info.tileIndex];
-      if (oldColl !== selectedCollisionType) {
-        executeCommand({
-          type: 'set-collision',
-          description: `Paint collision at (${info.col}, ${info.row})`,
-          sectionIndex: info.sectionIndex,
-          entries: [{ index: info.tileIndex, oldColl, newColl: selectedCollisionType }],
-        }, level);
-      }
-      useEditorStore.getState().setActiveSectionIndex(info.sectionIndex);
+      lastPaintedCell.current = null;
+      paintCollisionCell(info);
       isPaintDragging.current = true;
       e.preventDefault();
       return;
@@ -740,16 +757,7 @@ export default function MapViewport() {
           sectionRenderer.markDirty(info.sectionIndex, [info.tileIndex]);
         }
       } else {
-        const { selectedCollisionType } = useEditorStore.getState();
-        const oldColl = section.tileGrid.collision[info.tileIndex];
-        if (oldColl !== selectedCollisionType) {
-          executeCommand({
-            type: 'set-collision',
-            description: `Paint collision at (${info.col}, ${info.row})`,
-            sectionIndex: info.sectionIndex,
-            entries: [{ index: info.tileIndex, oldColl, newColl: selectedCollisionType }],
-          }, level);
-        }
+        paintCollisionCell(info);
       }
       return;
     }
@@ -814,8 +822,9 @@ export default function MapViewport() {
             const cellCol = Math.floor(info.col / 2) * 2;
             const cellRow = Math.floor(info.row / 2) * 2;
             const pathB = overlays.showCollisionPathB;
-            const coll = (pathB ? (section.engineCollisionB ?? section.engineCollision) : section.engineCollision)
-              ?? section.tileGrid.collision;
+            const coll = (pathB
+              ? (section.engineCollisionB ?? section.engineCollision)
+              : (section.collisionEdit ?? section.engineCollision)) ?? section.tileGrid.collision;
             const index = coll[cellRow * SECTION_TILES_WIDE + cellCol];
             const profiles = useProjectStore.getState().collisionProfiles;
             const path = pathB ? 'B' : 'A';

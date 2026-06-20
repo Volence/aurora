@@ -5,6 +5,7 @@ import SectionGridNav from './components/SectionGridNav';
 import ChunkLibrary from './components/ChunkLibrary';
 import ObjectPalette from './components/ObjectPalette';
 import RingPatternPalette from './components/RingPatternPalette';
+import CollisionPalette from './components/CollisionPalette';
 import ArtBrowser from './components/ArtBrowser';
 import PaletteViewer from './components/PaletteViewer';
 import PropertiesPanel from './components/PropertiesPanel';
@@ -113,6 +114,11 @@ export default function App() {
                     selectedIndex={useEditorStore.getState().selectedRingPattern}
                     onSelect={(index) => useEditorStore.getState().setSelectedRingPattern(index)}
                   />
+                </CollapsibleSection>
+              )}
+              {tool === 'paint-collision' && (
+                <CollapsibleSection id="map.palette" title="Collision">
+                  <CollisionPalette />
                 </CollapsibleSection>
               )}
               <CollapsibleSection id="map.art" title="Art">
