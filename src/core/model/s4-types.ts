@@ -74,6 +74,11 @@ export interface Section {
   index: number;
   name: string;
   tileGrid: SectionTileGrid;
+  /** Read-only per-cell engine collision attr indices (0-255), loaded from the
+   *  baked strips — the game's ground-truth collision, independent of the editable
+   *  (and possibly crude/stale) tileGrid.collision. Used by the collision VIEW.
+   *  null when no strip source is available. */
+  engineCollision?: Uint8Array | null;
   objects: ObjectPlacement[];
   rings: RingPlacement[];
   tiles: Tile[] | null;

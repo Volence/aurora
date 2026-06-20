@@ -812,7 +812,8 @@ export default function MapViewport() {
             // Snap to the 16px cell's top-left tile (both tiles share the byte).
             const cellCol = Math.floor(info.col / 2) * 2;
             const cellRow = Math.floor(info.row / 2) * 2;
-            const index = section.tileGrid.collision[cellRow * SECTION_TILES_WIDE + cellCol];
+            const coll = section.engineCollision ?? section.tileGrid.collision;
+            const index = coll[cellRow * SECTION_TILES_WIDE + cellCol];
             const profiles = useProjectStore.getState().collisionProfiles;
             if (isAir(profiles, index)) {
               extra = ' | Coll: air';

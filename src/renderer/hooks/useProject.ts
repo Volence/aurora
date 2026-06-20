@@ -396,21 +396,32 @@ async function loadFullProject(config: ReturnType<typeof loadS4Config>): Promise
             // No editor files — try strip source
           }
 
-          if (!loaded && actConfig.stripPath) {
+          // The engine's real per-cell collision attr indices come from the baked
+          // strips. Load them into a read-only layer for the collision VIEW —
+          // ALWAYS, independent of the editable .coll.bin above, which may hold a
+          // crude/stale model (e.g. 0/1 solidity) that doesn't match the engine's
+          // heightmap/angle/solidity tables. Also seed tileGrid from strips when no
+          // editor files exist.
+          if (actConfig.stripPath) {
             try {
               const stripPrefix = actConfig.stripPrefix || 'sec';
               const stripFile = `${actConfig.stripPath}${stripPrefix}${i}_strips_source.bin`;
               const stripRaw = await readFile(basePath, stripFile);
               const stripData = parseStrips(stripRaw);
 
+              const engineColl = new Uint8Array(SECTION_TILES_WIDE * SECTION_TILES_HIGH);
               for (let row = 0; row < STRIP_ROWS; row++) {
                 for (let col = 0; col < STRIP_COLS; col++) {
                   const srcIdx = row * STRIP_COLS + col;
                   const dstIdx = row * SECTION_TILES_WIDE + col;
-                  section.tileGrid.nametable[dstIdx] = stripData.nametable[srcIdx];
-                  section.tileGrid.collision[dstIdx] = stripData.collision[srcIdx];
+                  engineColl[dstIdx] = stripData.collision[srcIdx];
+                  if (!loaded) {
+                    section.tileGrid.nametable[dstIdx] = stripData.nametable[srcIdx];
+                    section.tileGrid.collision[dstIdx] = stripData.collision[srcIdx];
+                  }
                 }
               }
+              section.engineCollision = engineColl;
               loaded = true;
             } catch (stripErr) {
               const msg = stripErr instanceof Error ? stripErr.message : String(stripErr);

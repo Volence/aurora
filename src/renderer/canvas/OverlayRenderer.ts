@@ -50,7 +50,10 @@ export class OverlayRenderer {
 
     for (const info of sections) {
       if (options.showCollision) {
-        this.drawCollisionOverlay(ctx, viewport, info.section.tileGrid.collision, info.offsetX, info.offsetY, collisionProfiles ?? null, options.showCollisionAngles);
+        // The read-only engineCollision (real attr indices from strips) is the
+        // ground truth for the view; fall back to the editable array only if absent.
+        const coll = info.section.engineCollision ?? info.section.tileGrid.collision;
+        this.drawCollisionOverlay(ctx, viewport, coll, info.offsetX, info.offsetY, collisionProfiles ?? null, options.showCollisionAngles);
       }
       if (options.showRings) {
         this.drawRings(ctx, info.section.rings, viewport, info.offsetX, info.offsetY);
