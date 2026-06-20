@@ -43,6 +43,16 @@ export const COLLISION_SOLID_EDGE = 'rgba(255,150,60,1)';        // solid edges 
 /** Blue angle needle. */
 export const COLLISION_ANGLE_NEEDLE = 'rgba(120,190,255,1)';     // angle needle — blue
 
+// ---------- collision paint hover preview (MapViewport ghost) ----------
+/** Translucent silhouette fill for the ghost shape under the cursor. */
+export const COLLISION_PREVIEW_FILL = 'rgba(120,220,180,0.5)';   // ghost shape — translucent teal
+/** Outline around every block the stroke would change (reuse / brush scope). */
+export const COLLISION_PREVIEW_SCOPE = 'rgba(255,255,255,0.45)'; // scope outline — faint white
+/** Brighter outline around the cell directly under the cursor. */
+export const COLLISION_PREVIEW_PRIMARY = 'rgba(120,190,255,0.95)'; // cursor cell — blue
+/** Translucent fill marking cells an erase stroke would clear. */
+export const COLLISION_PREVIEW_ERASE = 'rgba(255,90,90,0.4)';    // erase scope — translucent red
+
 // ---------- map object/ring markers (OverlayRenderer) ----------
 export const OBJECT_BOX_FILL = 'rgba(255, 100, 100, 0.7)';
 export const OBJECT_BOX_STROKE = '#ff4444';

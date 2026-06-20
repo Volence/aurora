@@ -14,13 +14,29 @@ import { BG_WIDTH } from '../../core/formats/bg-tiles';
 import type { Section, ObjectPlacement, RingPlacement, Act, Tile, BgLibraryEntry } from '../../core/model/s4-types';
 import { T } from './ui';
 import CollisionLegend from './CollisionLegend';
-import { CANVAS_VOID } from '../canvas/canvas-colors';
+import {
+  CANVAS_VOID,
+  COLLISION_SHAPE_LINE, COLLISION_SOLID_EDGE, COLLISION_ANGLE_NEEDLE,
+  COLLISION_PREVIEW_FILL, COLLISION_PREVIEW_SCOPE, COLLISION_PREVIEW_PRIMARY, COLLISION_PREVIEW_ERASE,
+} from '../canvas/canvas-colors';
 import { angleDegrees, isAir, isKnownProfile } from '../../core/collision/collision-model';
 import { cellTileIndices } from '../../core/collision/collision-cell';
-import { findMatchingBlockCells } from '../../core/collision/collision-block';
+import { collisionPaintTargets } from '../../core/collision/collision-paint';
+import { drawCollisionShape } from '../../core/collision/collision-shape-draw';
+import type { ShapeDrawCtx, ShapeDrawOpts } from '../../core/collision/collision-shape-draw';
 import { heightSparkline } from '../../core/collision/collision-render';
 
 export const sectionRenderer = new SectionRenderer();
+
+// Translucent variant of the shape draw opts for the collision paint ghost.
+const COLLISION_PREVIEW_OPTS: ShapeDrawOpts = {
+  fill: COLLISION_PREVIEW_FILL,
+  line: COLLISION_SHAPE_LINE,
+  solidEdge: COLLISION_SOLID_EDGE,
+  needle: COLLISION_ANGLE_NEEDLE,
+  showSolidEdges: true,
+  showNeedle: true,
+};
 const overlayRenderer = new OverlayRenderer();
 
 /**
@@ -53,8 +69,12 @@ interface CtxMenuState {
 
 export default function MapViewport() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const previewCanvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const hoverBarRef = useRef<HTMLDivElement>(null);
+  // The block under the cursor in collision-paint mode (cell units), for the
+  // ghost preview. `alt` latches the live Alt key (paint just this block).
+  const previewHoverRef = useRef<{ sectionIndex: number; cellCol: number; cellRow: number; alt: boolean } | null>(null);
   const isDragging = useRef(false);
   // Screen pos at mousedown — used to tell a View-mode click (select the section
   // under the cursor) from a pan-drag.
@@ -90,6 +110,69 @@ export default function MapViewport() {
   const activeSectionIndex = useEditorStore((s) => s.activeSectionIndex);
   const editingLayer = useEditorStore((s) => s.editingLayer);
   const selection = useEditorStore((s) => s.selection);
+
+  // Collision paint ghost: on a separate canvas layered over the map, draw a
+  // translucent preview of the selected shape under the cursor plus an outline of
+  // every block the stroke would change (reuse set / brush area / erase scope).
+  // Reads everything fresh so it can be called from the render effect (pan/zoom/
+  // version realign) and from mousemove (cell change). Clears when not painting.
+  const drawCollisionPreview = useCallback(() => {
+    const pcv = previewCanvasRef.current, container = containerRef.current;
+    if (!pcv || !container) return;
+    const rect = container.getBoundingClientRect();
+    const w = Math.floor(rect.width), h = Math.floor(rect.height);
+    if (pcv.width !== w || pcv.height !== h) { pcv.width = w; pcv.height = h; }
+    const ctx = pcv.getContext('2d');
+    if (!ctx) return;
+    ctx.clearRect(0, 0, pcv.width, pcv.height);
+
+    const hover = previewHoverRef.current;
+    if (!hover
+      || useEditorStore.getState().tool !== 'paint-collision'
+      || useEditorStore.getState().editingLayer === 'bg') return;
+
+    const act = getCurrentAct(useProjectStore.getState());
+    const section = act?.sections[hover.sectionIndex];
+    if (!section) return;
+
+    const profiles = useProjectStore.getState().collisionProfiles;
+    const profileIdx = useEditorStore.getState().selectedCollisionProfile;
+    const brush = useEditorStore.getState().collisionBrushSize;
+    const cellsW = SECTION_TILES_WIDE / 2, cellsH = SECTION_TILES_HIGH / 2;
+    const { primary, all } = collisionPaintTargets({
+      cellCol: hover.cellCol, cellRow: hover.cellRow, brush, justHere: hover.alt,
+      nametable: section.tileGrid.nametable, width: SECTION_TILES_WIDE, cellsW, cellsH,
+    });
+    const offset = sectionRenderer.sectionWorldOffset(hover.sectionIndex);
+    const { vpX, vpY, zoom } = useViewStore.getState();
+    const erasing = profileIdx === 0;
+    const profile = (!erasing && profiles && profileIdx > 0 && profileIdx < profiles.solidCount)
+      ? profiles.profiles[profileIdx] : null;
+
+    ctx.save();
+    ctx.imageSmoothingEnabled = false;
+    ctx.scale(zoom, zoom);
+    ctx.translate(-vpX, -vpY);
+
+    // Scope: outline every block the stroke would change (erase tints red).
+    const inset = 0.5 / zoom;
+    for (const t of all) {
+      const wx = offset.x + t.cellCol * 16, wy = offset.y + t.cellRow * 16;
+      if (erasing) { ctx.fillStyle = COLLISION_PREVIEW_ERASE; ctx.fillRect(wx, wy, 16, 16); }
+      ctx.strokeStyle = COLLISION_PREVIEW_SCOPE;
+      ctx.lineWidth = 1 / zoom;
+      ctx.strokeRect(wx + inset, wy + inset, 16 - 2 * inset, 16 - 2 * inset);
+    }
+
+    // The shape ghost at the cursor cell + a brighter outline.
+    const wx = offset.x + primary.cellCol * 16, wy = offset.y + primary.cellRow * 16;
+    if (profile) drawCollisionShape(ctx as unknown as ShapeDrawCtx, wx, wy, 16, profile, COLLISION_PREVIEW_OPTS);
+    ctx.strokeStyle = COLLISION_PREVIEW_PRIMARY;
+    ctx.lineWidth = 1.5 / zoom;
+    ctx.strokeRect(wx + 0.75 / zoom, wy + 0.75 / zoom, 16 - 1.5 / zoom, 16 - 1.5 / zoom);
+
+    ctx.restore();
+  }, []);
 
   // Rebuild only the BG entry from the resolved background of the ACTIVE
   // section (bgLayoutRef -> library entry, else act default). Lighter than
@@ -243,7 +326,9 @@ export default function MapViewport() {
 
       overlayRenderer.render(ctx, sectionInfos, overlays, viewport, useProjectStore.getState().objectSprites, useProjectStore.getState().collisionProfiles);
     }
-  }, [vpX, vpY, zoom, overlays, project, currentZoneId, currentActId, activeSectionIndex, editingLayer, historyVersion, selection, objectSprites, collisionProfiles]);
+    // Realign the collision paint ghost after any pan/zoom/version change.
+    drawCollisionPreview();
+  }, [vpX, vpY, zoom, overlays, project, currentZoneId, currentActId, activeSectionIndex, editingLayer, historyVersion, selection, objectSprites, collisionProfiles, drawCollisionPreview]);
 
   // Handle resize
   useEffect(() => {
@@ -457,34 +542,22 @@ export default function MapViewport() {
     const brush = useEditorStore.getState().collisionBrushSize;
     const cellsW = SECTION_TILES_WIDE / 2, cellsH = SECTION_TILES_HIGH / 2;
 
-    let targets: Array<{ cellCol: number; cellRow: number }>;
-    let label: string;
-    if (brush > 1) {
-      // Bigger brush: the N×N block area centred on the cursor, painted
-      // positionally (no reuse — a multi-block stroke means "this region", not
-      // "every matching block"). Ideal for erasing/clearing an area.
-      const half = brush >> 1;
-      targets = [];
-      for (let dr = -half; dr <= half; dr++) {
-        for (let dc = -half; dc <= half; dc++) {
-          const cc = cellCol + dc, cr = cellRow + dr;
-          if (cc >= 0 && cr >= 0 && cc < cellsW && cr < cellsH) targets.push({ cellCol: cc, cellRow: cr });
-        }
-      }
-      label = `${brush}×${brush} area`;
-    } else if (justHere) {
-      targets = [{ cellCol, cellRow }];
-      label = 'this block';
-    } else {
-      // Cheap no-op guard: if the clicked block is already fully the selected
-      // profile, there's nothing to do (its matches were painted when first
-      // touched) — return before the per-section match scan.
+    // Cheap no-op guard for the expensive reuse scan: if the clicked block is
+    // already fully the selected profile, its matches were painted when first
+    // touched — return before collisionPaintTargets does the per-section scan.
+    if (brush === 1 && !justHere) {
       const clicked = cellTileIndices(cellCol, cellRow, SECTION_TILES_WIDE);
       if (clicked.every((i) => ce[i] === profile)) return;
-      // Default: every block with the same content.
-      targets = findMatchingBlockCells(section.tileGrid.nametable, cellCol, cellRow, SECTION_TILES_WIDE, cellsW, cellsH);
-      label = `${targets.length} matching blocks`;
     }
+
+    // Same target set the hover preview shows (collisionPaintTargets) — paint and
+    // preview share one source of truth so they can't drift.
+    const { all: targets } = collisionPaintTargets({
+      cellCol, cellRow, brush, justHere,
+      nametable: section.tileGrid.nametable, width: SECTION_TILES_WIDE, cellsW, cellsH,
+    });
+    const label = brush > 1 ? `${brush}×${brush} area`
+      : justHere ? 'this block' : `${targets.length} matching blocks`;
 
     const entries: Array<{ index: number; oldColl: number; newColl: number }> = [];
     for (const t of targets) {
@@ -897,11 +970,27 @@ export default function MapViewport() {
           }
         }
         bar.innerHTML = `Sec ${info.sectionIndex} | Tile (${info.col}, ${info.row}) | Pos ${Math.floor(world.x)}, ${Math.floor(world.y)}${extra}`;
+
+        // Collision paint ghost: track the hovered block; redraw only when the
+        // cell (or Alt) changes, so it stays cheap while the mouse moves.
+        if (useEditorStore.getState().tool === 'paint-collision') {
+          const cc = info.col >> 1, cr = info.row >> 1;
+          const prev = previewHoverRef.current;
+          if (!prev || prev.sectionIndex !== info.sectionIndex || prev.cellCol !== cc
+              || prev.cellRow !== cr || prev.alt !== e.altKey) {
+            previewHoverRef.current = { sectionIndex: info.sectionIndex, cellCol: cc, cellRow: cr, alt: e.altKey };
+            drawCollisionPreview();
+          }
+        } else if (previewHoverRef.current) {
+          previewHoverRef.current = null;
+          drawCollisionPreview();
+        }
       } else {
         bar.innerHTML = `Pos ${Math.floor(world.x)}, ${Math.floor(world.y)}`;
+        if (previewHoverRef.current) { previewHoverRef.current = null; drawCollisionPreview(); }
       }
     }
-  }, [pan]);
+  }, [pan, drawCollisionPreview]);
 
   const handleMouseUp = useCallback((e: React.MouseEvent) => {
     isPaintDragging.current = false;
@@ -1094,11 +1183,13 @@ export default function MapViewport() {
         if (dragTarget.current) dragTarget.current = null;
         isDragging.current = false;
         if (hoverBarRef.current) hoverBarRef.current.style.display = 'none';
+        if (previewHoverRef.current) { previewHoverRef.current = null; drawCollisionPreview(); }
       }}
       onWheel={handleWheel}
       onContextMenu={handleContextMenu}
     >
       <canvas id="map-canvas" ref={canvasRef} style={styles.canvas} />
+      <canvas ref={previewCanvasRef} style={styles.previewCanvas} />
       <CollisionLegend />
       <div ref={hoverBarRef} style={{ ...styles.hoverBar, display: 'none' }} />
       {ctxMenu && (
@@ -1127,6 +1218,10 @@ const styles: Record<string, React.CSSProperties> = {
   canvas: {
     position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
     imageRendering: 'pixelated',
+  },
+  previewCanvas: {
+    position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
+    imageRendering: 'pixelated', pointerEvents: 'none',
   },
   empty: {
     flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
