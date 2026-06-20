@@ -112,18 +112,17 @@ and the bake wiring.
 
 Each phase is independently shippable. Phase 1 is editor-only (no ROM); Phase 2 makes it real.
 
-## 6. Open questions for review
+## 6. Resolved decisions (user, 2026-06-20)
 
-- **Reuse default:** should map-paint default to **reuse (all matching blocks)** or **just here**,
-  with a modifier (e.g. Alt) for the other? (Recommendation: paint = just-here by default — least
-  surprising; a "apply to all matching" action/toggle for reuse — so a stray paint never silently
-  changes the whole level.)
-- **Content-key scope:** key block reuse on the **section** (matches within this section) or the
-  **whole act/zone**? (Recommendation: section, matching the engine's per-section block grid.)
-- **Tile-scope honesty:** confirm you're OK that 8px-tile painting collapses to the 16px cell on
-  export (Aurora can *show* the finer paint but the game rounds it).
-- **Phase 2 sequencing:** build Phase 1 (reuse, editor-only) first and verify the UX, then do the
-  engine bake wiring? Or wire the ROM early on a tiny slice to prove end-to-end?
+- **Reuse default = APPLY TO ALL MATCHING BLOCKS.** Map-paint defaults to reuse (every block with
+  the same content), with a **modifier (Alt) for "just here."** Rationale (user): you paint because
+  you *see* something wrong, and it's rarely one isolated block.
+- **Content-key scope = per-section** (matches the engine's per-section block grid).
+- **Tile-scope rounding = accepted** — Aurora may paint at 8px-tile resolution; it collapses to the
+  engine's 16px cell on export (shown finer, rounded in-game).
+- **Sequencing = reuse-first (editor-only), then ROM.** Phase 1 (block-keyed reuse) builds on the
+  Phase-2a base and is immediately testable; Phase 2 (the verified, low-risk engine bake change)
+  follows on a proven authoring layer.
 
 ## 7. Testing & verification
 
