@@ -17,6 +17,7 @@ import CollisionLegend from './CollisionLegend';
 import { CANVAS_VOID } from '../canvas/canvas-colors';
 import { angleDegrees, isAir, isKnownProfile } from '../../core/collision/collision-model';
 import { cellTileIndices } from '../../core/collision/collision-cell';
+import { findMatchingBlockCells } from '../../core/collision/collision-block';
 import { heightSparkline } from '../../core/collision/collision-render';
 
 export const sectionRenderer = new SectionRenderer();
@@ -60,6 +61,9 @@ export default function MapViewport() {
   const downPos = useRef<{ x: number; y: number } | null>(null);
   const isPaintDragging = useRef(false);
   const lastPaintedCell = useRef<string | null>(null);
+  // Collision paint mode latched at mousedown (Alt = paint just the clicked block),
+  // so toggling Alt mid-drag can't switch a single stroke between reuse and local.
+  const paintJustHere = useRef(false);
   const lastMouse = useRef({ x: 0, y: 0 });
   const dragTarget = useRef<{
     type: 'object' | 'ring';
@@ -427,26 +431,45 @@ export default function MapViewport() {
     return getStoreActiveLevel(useProjectStore.getState());
   }
 
-  // Paint the 16px cell containing `info` with the selected profile via
-  // set-collision-edit. Writes all four 8px tiles of the cell; deduped per cell
-  // (lastPaintedCell) so dragging within a cell doesn't push duplicate commands.
-  function paintCollisionCell(info: { sectionIndex: number; col: number; row: number }) {
+  // Paint collision at the 16px block under `info` with the selected profile.
+  // Default: every block in the section with the SAME tiles (reuse). `justHere`
+  // (Alt): only the clicked block. The block is the 2×2 tiles at (cellCol,cellRow);
+  // a paint sets all four 8px sub-tiles. One undoable set-collision-edit command.
+  function paintCollisionCell(info: { sectionIndex: number; col: number; row: number }, justHere: boolean) {
     const section = getSectionByIndex(info.sectionIndex);
     if (!section || !section.collisionEdit) return;
-    const cellKey = `${info.sectionIndex}:${info.col >> 1}:${info.row >> 1}`;
-    if (lastPaintedCell.current === cellKey) return;
+    const ce = section.collisionEdit;
+    const cellCol = info.col >> 1, cellRow = info.row >> 1;
+    const cellKey = `${info.sectionIndex}:${cellCol}:${cellRow}`;
+    if (lastPaintedCell.current === cellKey) return; // same cursor cell — skip
     lastPaintedCell.current = cellKey;
+
+    const profile = useEditorStore.getState().selectedCollisionProfile;
+    // Cheap no-op guard: if the clicked block is already fully the selected
+    // profile, there's nothing to do (its matches were painted when first
+    // touched) — return before the per-section match scan.
+    const clicked = cellTileIndices(cellCol, cellRow, SECTION_TILES_WIDE);
+    if (clicked.every((i) => ce[i] === profile)) return;
+
+    const cellsW = SECTION_TILES_WIDE / 2, cellsH = SECTION_TILES_HIGH / 2;
+    // Default: every block with the same content. Alt: only the clicked block.
+    const targets = justHere
+      ? [{ cellCol, cellRow }]
+      : findMatchingBlockCells(section.tileGrid.nametable, cellCol, cellRow, SECTION_TILES_WIDE, cellsW, cellsH);
+
+    const entries: Array<{ index: number; oldColl: number; newColl: number }> = [];
+    for (const t of targets) {
+      for (const index of cellTileIndices(t.cellCol, t.cellRow, SECTION_TILES_WIDE)) {
+        const oldColl = ce[index];
+        if (oldColl !== profile) entries.push({ index, oldColl, newColl: profile });
+      }
+    }
+    if (entries.length === 0) return;
     const level = getActiveLevel();
     if (!level) return;
-    const profile = useEditorStore.getState().selectedCollisionProfile;
-    const indices = cellTileIndices(info.col >> 1, info.row >> 1, SECTION_TILES_WIDE);
-    const entries = indices
-      .map((index) => ({ index, oldColl: section.collisionEdit![index], newColl: profile }))
-      .filter((e) => e.oldColl !== e.newColl);
-    if (entries.length === 0) return;
     executeCommand({
       type: 'set-collision-edit',
-      description: `Paint collision at cell (${info.col >> 1}, ${info.row >> 1})`,
+      description: justHere ? `Paint collision (this block)` : `Paint collision (${targets.length} matching blocks)`,
       sectionIndex: info.sectionIndex,
       entries,
     }, level);
@@ -657,7 +680,8 @@ export default function MapViewport() {
       const info = worldToSectionTile(world.x, world.y);
       if (!info) return;
       lastPaintedCell.current = null;
-      paintCollisionCell(info);
+      paintJustHere.current = e.altKey; // latch the mode for the whole stroke
+      paintCollisionCell(info, paintJustHere.current);
       isPaintDragging.current = true;
       e.preventDefault();
       return;
@@ -757,7 +781,7 @@ export default function MapViewport() {
           sectionRenderer.markDirty(info.sectionIndex, [info.tileIndex]);
         }
       } else {
-        paintCollisionCell(info);
+        paintCollisionCell(info, paintJustHere.current); // latched mode (not live Alt)
       }
       return;
     }

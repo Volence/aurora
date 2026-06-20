@@ -50,7 +50,7 @@ export default function CollisionPalette() {
 
   return (
     <div>
-      <div style={styles.hint}>Pick a shape, then paint cells on the map. These are the level's profiles.</div>
+      <div style={styles.hint}>Pick a shape, then paint on the map. Paints every block with the same tiles; hold Alt to paint just one.</div>
       <div style={styles.grid}>
         <button title="Erase (air)" onClick={() => set(0)} style={{ ...styles.cell, ...(selected === 0 ? styles.sel : {}) }}>
           <span style={styles.erase}>∅</span>
