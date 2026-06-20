@@ -77,6 +77,34 @@ export default function CollisionPalette() {
     }, level);
   }
 
+  // Reset the active section's editable collision to the real engine baseline
+  // (escape hatch for a section that drifted to empty/wrong). Undoable.
+  function resetToEngine() {
+    const ed = useEditorStore.getState();
+    const level = getActiveLevel(useProjectStore.getState());
+    if (!level) return;
+    const section = level.sections[ed.activeSectionIndex];
+    if (!section) return;
+    const p = ed.collisionPaintPlane;
+    const engine = p === 'b' ? section.engineCollisionB : section.engineCollision;
+    if (!engine) return; // no baseline loaded — re-open the project first
+    if (p === 'b') {
+      if (!section.collisionEditB) section.collisionEditB = new Uint8Array(engine);
+    } else if (!section.collisionEdit) {
+      section.collisionEdit = new Uint8Array(engine);
+    }
+    const ce = p === 'b' ? section.collisionEditB : section.collisionEdit;
+    if (!ce) return;
+    const entries: Array<{ index: number; oldColl: number; newColl: number }> = [];
+    for (let i = 0; i < ce.length; i++) if (ce[i] !== engine[i]) entries.push({ index: i, oldColl: ce[i], newColl: engine[i] });
+    if (!entries.length) return;
+    executeCommand({
+      type: 'set-collision-edit', plane: p,
+      description: `Reset collision ${p.toUpperCase()} to engine (section ${ed.activeSectionIndex})`,
+      sectionIndex: ed.activeSectionIndex, entries,
+    }, level);
+  }
+
   function pickPlane(p: 'a' | 'b') {
     useEditorStore.getState().setCollisionPaintPlane(p);
     const v = useViewStore.getState();
@@ -129,8 +157,10 @@ export default function CollisionPalette() {
           <button key={n} onClick={() => setBrush(n)} title={n === 1 ? 'Single block (reuse matching)' : `${n}×${n} block area`}
             style={{ ...styles.planeBtn, ...(brush === n ? styles.planeSel : {}) }}>{n === 1 ? '1' : `${n}×${n}`}</button>
         ))}
+        <button onClick={resetToEngine} title={`Reset section ${activeSection} collision to the real engine baseline (this plane) — undoable`}
+          style={{ ...styles.planeBtn, marginLeft: 'auto' }}>Reset sec {activeSection}</button>
         <button onClick={clearSection} title={`Erase ALL collision in section ${activeSection} (this plane) — undoable`}
-          style={{ ...styles.planeBtn, marginLeft: 'auto' }}>Clear sec {activeSection}</button>
+          style={styles.planeBtn}>Clear sec {activeSection}</button>
       </div>
       <div style={styles.hint}>{brush > 1
         ? `Pick a shape, then paint on the map. Paints the ${brush}×${brush} block area under the cursor.`
