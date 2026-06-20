@@ -21,6 +21,7 @@ import { serializeSectionMeta, parseSectionMeta } from '../../core/formats/secti
 import { buildPalette } from '../../core/formats/palette';
 import { parseNametable } from '../../core/formats/s4-nametable';
 import { parseCollision } from '../../core/formats/s4-collision';
+import { parseCollAttr, serializeCollAttr } from '../../core/formats/s4-collattr';
 import { serializeNametable } from '../../core/formats/s4-nametable';
 import { serializeCollision } from '../../core/formats/s4-collision';
 import { serializeRingList } from '../../core/formats/s4-rings';
@@ -159,6 +160,13 @@ export function useProject() {
         // Write collision (.coll.bin)
         const collData = serializeCollision(section.tileGrid.collision);
         await window.api.writeBinaryFile(basePath, `${prefix}.coll.bin`, collData.buffer as ArrayBuffer);
+
+        // Write editable collision attr plane (.collattr.bin) — the real authored
+        // collision, separate from the legacy .coll.bin.
+        if (section.collisionEdit) {
+          const caData = serializeCollAttr(section.collisionEdit);
+          await window.api.writeBinaryFile(basePath, `${prefix}.collattr.bin`, caData.buffer as ArrayBuffer);
+        }
 
         // Write objects (.objects.json)
         const objectsJson = JSON.stringify(section.objects, null, 2);
@@ -425,6 +433,14 @@ async function loadFullProject(config: ReturnType<typeof loadS4Config>): Promise
               }
               section.engineCollision = engineColl;
               section.engineCollisionB = engineCollB;
+              // Editable collision plane: a saved .collattr.bin if present, else a
+              // CLONE of the strip path-A (so paints don't mutate the diff baseline).
+              try {
+                const caRaw = await readFile(basePath, `${prefix}.collattr.bin`);
+                section.collisionEdit = parseCollAttr(caRaw);
+              } catch {
+                section.collisionEdit = new Uint8Array(engineColl);
+              }
               loaded = true;
             } catch (stripErr) {
               const msg = stripErr instanceof Error ? stripErr.message : String(stripErr);

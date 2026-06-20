@@ -81,6 +81,11 @@ export interface Section {
    *  `engineCollisionB` is the alternate plane (dual-layer/loop sections). */
   engineCollision?: Uint8Array | null;
   engineCollisionB?: Uint8Array | null;
+  /** Editable real-attr (0-255) collision plane — the authored path-A collision.
+   *  Seeded from the strips (clone) or a saved .collattr.bin; rendered by the view
+   *  and written by set-collision-edit. Separate from tileGrid.collision (legacy
+   *  chunk/nibble) and engineCollision (read-only strip reference). */
+  collisionEdit?: Uint8Array | null;
   objects: ObjectPlacement[];
   rings: RingPlacement[];
   tiles: Tile[] | null;
