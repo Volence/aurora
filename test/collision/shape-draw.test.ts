@@ -37,6 +37,12 @@ describe('needleEndpoints', () => {
     expect(y1).toBeCloseTo(y2);
   });
 
+  it('deg 45 points up-and-right in the CCW math convention (locks the sign drawCollisionShape negates)', () => {
+    const { x1, y1, x2, y2 } = needleEndpoints(45, cx, cy, L);
+    expect(x2).toBeGreaterThan(x1); // +x to the right
+    expect(y2).toBeLessThan(y1);    // -y is up (screen space) → +45° rises to the right
+  });
+
   it('midpoint is the centre for any angle', () => {
     for (const deg of [0, 90, 180, 37, 256]) {
       const { x1, y1, x2, y2 } = needleEndpoints(deg, cx, cy, L);

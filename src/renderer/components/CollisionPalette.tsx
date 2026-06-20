@@ -75,6 +75,14 @@ export default function CollisionPalette() {
     return out;
   }, [profiles, kind]);
 
+  // Only show kind tabs that actually have profiles — e.g. this table has no
+  // ~90° "wall" angled profiles (walls are full solid blocks, in the Solid tab).
+  const presentKinds = useMemo(() => {
+    const s = new Set<CollisionKind>();
+    if (profiles) for (let i = 1; i < profiles.solidCount; i++) s.add(classifyProfile(profiles.profiles[i]));
+    return s;
+  }, [profiles]);
+
   if (!profiles) return <div style={styles.note}>Collision tables not found — open a project with collision data.</div>;
 
   const selProfile = selected > 0 && selected < profiles.solidCount ? profiles.profiles[selected] : null;
@@ -100,7 +108,7 @@ export default function CollisionPalette() {
 
       <div style={styles.tabs}>
         <button onClick={() => setKind('all')} style={{ ...styles.planeBtn, ...(kind === 'all' ? styles.planeSel : {}) }}>All</button>
-        {COLLISION_KINDS.map((k) => (
+        {COLLISION_KINDS.filter((k) => presentKinds.has(k)).map((k) => (
           <button key={k} onClick={() => setKind(k)} style={{ ...styles.planeBtn, ...(kind === k ? styles.planeSel : {}) }}>{k}</button>
         ))}
       </div>

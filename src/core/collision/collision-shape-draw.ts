@@ -121,7 +121,11 @@ export function drawCollisionShape(
     const deg = angleDegrees(profile);
     if (deg !== null) {
       const cx = x + size / 2, cy = y + size / 2, L = size * 0.32;
-      const { x1, y1, x2, y2 } = needleEndpoints(deg, cx, cy, L);
+      // The engine angle is clockwise in screen space (y down): a small positive
+      // angle means the surface DESCENDS to the right. needleEndpoints uses the
+      // math (CCW) convention, so negate the angle so the needle lies ALONG the
+      // silhouette's actual slope instead of mirroring it.
+      const { x1, y1, x2, y2 } = needleEndpoints(-deg, cx, cy, L);
       ctx.strokeStyle = opts.needle;
       ctx.lineWidth = Math.max(1, (size / 16) * 1.5);
       ctx.beginPath();
