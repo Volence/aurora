@@ -1,5 +1,5 @@
 // src/renderer/components/art/PaletteCopyMenu.tsx
-import React, { useEffect } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { T } from '../ui';
 
 export interface CopyMenuItem {
@@ -8,14 +8,20 @@ export interface CopyMenuItem {
   onSelect: () => void;
 }
 
+const MARGIN = 6; // keep the menu this far from the viewport edges
+
 /**
  * A small cursor-anchored menu used by the palette copy bridge ("Copy to ▸").
- * Positioned at fixed (x, y); closes on outside mousedown or Escape. Items run
- * their onSelect then close. Purely presentational — the caller builds the items.
+ * Opens at (x, y) then clamps itself inside the viewport (so a right-click near
+ * the right/bottom edge doesn't run off-screen). Closes on outside mousedown or
+ * Escape. Items run their onSelect then close. Purely presentational.
  */
 export default function PaletteCopyMenu({
   x, y, heading, items, onClose,
 }: { x: number; y: number; heading: string; items: CopyMenuItem[]; onClose: () => void }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState({ x, y });
+
   useEffect(() => {
     const close = () => onClose();
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
@@ -27,9 +33,24 @@ export default function PaletteCopyMenu({
     };
   }, [onClose]);
 
+  // After layout, clamp so the whole menu stays on-screen.
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const { width, height } = el.getBoundingClientRect();
+    const maxX = window.innerWidth - width - MARGIN;
+    const maxY = window.innerHeight - height - MARGIN;
+    const nx = Math.max(MARGIN, Math.min(x, maxX));
+    const ny = Math.max(MARGIN, Math.min(y, maxY));
+    if (nx !== pos.x || ny !== pos.y) setPos({ x: nx, y: ny });
+    // Re-clamp only when the anchor or item set changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [x, y, items]);
+
   return (
     <div
-      style={{ ...styles.menu, left: x, top: y }}
+      ref={ref}
+      style={{ ...styles.menu, left: pos.x, top: pos.y }}
       onMouseDown={(e) => e.stopPropagation()}
       onContextMenu={(e) => e.preventDefault()}
     >
