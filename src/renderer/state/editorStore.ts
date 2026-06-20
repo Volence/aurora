@@ -83,6 +83,7 @@ interface EditorState {
   selectedObjectSubtype: number;
   selectedRingPattern: number;
   selectedCollisionType: number;
+  selectedCollisionProfile: number; // 0-255 attr index for the map collision palette
 
   setTool: (tool: EditorTool) => void;
   setSelection: (selection: Selection | null) => void;
@@ -96,6 +97,7 @@ interface EditorState {
   setSelectedObjectTypeId: (id: string | null, subtype?: number) => void;
   setSelectedRingPattern: (index: number) => void;
   setSelectedCollisionType: (type: number) => void;
+  setSelectedCollisionProfile: (index: number) => void;
   markDirty: () => void;
   markClean: () => void;
   bumpVersion: () => void;
@@ -126,6 +128,7 @@ export const useEditorStore = create<EditorState>((set) => ({
   selectedObjectSubtype: 0,
   selectedRingPattern: 0,
   selectedCollisionType: 0,
+  selectedCollisionProfile: 0,
 
   setTool: (tool) => set({ tool, selection: null, multiSelection: null }),
   setSelection: (selection) => set({ selection, multiSelection: null }),
@@ -139,6 +142,7 @@ export const useEditorStore = create<EditorState>((set) => ({
   setSelectedObjectTypeId: (id, subtype) => set({ selectedObjectTypeId: id, selectedObjectSubtype: subtype ?? 0 }),
   setSelectedRingPattern: (index) => set({ selectedRingPattern: index }),
   setSelectedCollisionType: (type) => set({ selectedCollisionType: type }),
+  setSelectedCollisionProfile: (index) => set({ selectedCollisionProfile: Math.max(0, Math.min(255, index | 0)) }),
   markDirty: () => set({ dirty: true }),
   markClean: () => set({ dirty: false }),
   bumpVersion: () => set((s) => ({ historyVersion: s.historyVersion + 1 })),
