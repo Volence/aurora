@@ -33,6 +33,16 @@ export const COLLISION_UNKNOWN = 'rgba(255,0,255,0.5)';           // out-of-rang
 export const COLLISION_FALLBACK = 'rgba(120,160,220,0.35)';       // flat fill when no tables
 export const COLLISION_DIFF = 'rgba(255,120,40,0.95)';            // outline: A/B planes differ here
 
+// ---------- collision shape palette (CollisionPalette previews / thumbnails) ----------
+/** Neutral teal silhouette fill for a drawn collision shape. */
+export const COLLISION_SHAPE_FILL = 'rgba(70,200,150,0.9)';      // shape body — teal
+/** Lighter teal surface-line stroke tracing the column tops. */
+export const COLLISION_SHAPE_LINE = 'rgba(150,235,205,0.95)';    // surface line — light teal
+/** Orange highlight for the solid-side box edges. */
+export const COLLISION_SOLID_EDGE = 'rgba(255,150,60,1)';        // solid edges — orange
+/** Blue angle needle. */
+export const COLLISION_ANGLE_NEEDLE = 'rgba(120,190,255,1)';     // angle needle — blue
+
 // ---------- map object/ring markers (OverlayRenderer) ----------
 export const OBJECT_BOX_FILL = 'rgba(255, 100, 100, 0.7)';
 export const OBJECT_BOX_STROKE = '#ff4444';
