@@ -77,8 +77,10 @@ export interface Section {
   /** Read-only per-cell engine collision attr indices (0-255), loaded from the
    *  baked strips — the game's ground-truth collision, independent of the editable
    *  (and possibly crude/stale) tileGrid.collision. Used by the collision VIEW.
-   *  null when no strip source is available. */
+   *  null when no strip source is available. `engineCollision` is path A;
+   *  `engineCollisionB` is the alternate plane (dual-layer/loop sections). */
   engineCollision?: Uint8Array | null;
+  engineCollisionB?: Uint8Array | null;
   objects: ObjectPlacement[];
   rings: RingPlacement[];
   tiles: Tile[] | null;

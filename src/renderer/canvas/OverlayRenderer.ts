@@ -51,8 +51,12 @@ export class OverlayRenderer {
     for (const info of sections) {
       if (options.showCollision) {
         // The read-only engineCollision (real attr indices from strips) is the
-        // ground truth for the view; fall back to the editable array only if absent.
-        const coll = info.section.engineCollision ?? info.section.tileGrid.collision;
+        // ground truth for the view — path A, or path B when toggled (it falls
+        // back to A if a section has no B); the editable array only if no strips.
+        const eng = options.showCollisionPathB
+          ? (info.section.engineCollisionB ?? info.section.engineCollision)
+          : info.section.engineCollision;
+        const coll = eng ?? info.section.tileGrid.collision;
         this.drawCollisionOverlay(ctx, viewport, coll, info.offsetX, info.offsetY, collisionProfiles ?? null, options.showCollisionAngles);
       }
       if (options.showRings) {

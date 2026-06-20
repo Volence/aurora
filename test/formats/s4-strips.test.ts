@@ -40,12 +40,14 @@ describe('s4-strips (engine wide-strip format)', () => {
     expect(grid.collision[21 * 256 + 7]).toBe(0x42);
   });
 
-  it('ignores path B on parse (editor edits a single collision layer)', () => {
+  it('reads path B into a separate collisionB layer (expanded to both tile rows)', () => {
     const data = buildFile();
     const off = 0 * WIDE_STRIP_SIZE + 512 + 128 + 0; // plane B, cell 0
     data[off] = 0x99;
     const grid = parseStrips(data);
-    expect(grid.collision[0]).toBe(0);
+    expect(grid.collision[0]).toBe(0);          // path A unaffected
+    expect(grid.collisionB[0 * 256 + 0]).toBe(0x99); // path B, tile row 0
+    expect(grid.collisionB[1 * 256 + 0]).toBe(0x99); // path B, tile row 1 (same cell)
   });
 
   it('serializes: plane B is a copy of plane A, pad is zero', () => {

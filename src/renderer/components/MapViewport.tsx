@@ -812,19 +812,22 @@ export default function MapViewport() {
             // Snap to the 16px cell's top-left tile (both tiles share the byte).
             const cellCol = Math.floor(info.col / 2) * 2;
             const cellRow = Math.floor(info.row / 2) * 2;
-            const coll = section.engineCollision ?? section.tileGrid.collision;
+            const pathB = overlays.showCollisionPathB;
+            const coll = (pathB ? (section.engineCollisionB ?? section.engineCollision) : section.engineCollision)
+              ?? section.tileGrid.collision;
             const index = coll[cellRow * SECTION_TILES_WIDE + cellCol];
             const profiles = useProjectStore.getState().collisionProfiles;
+            const path = pathB ? 'B' : 'A';
             if (isAir(profiles, index)) {
-              extra = ' | Coll: air';
+              extra = ` | Coll ${path}: air`;
             } else if (!profiles) {
-              extra = ` | Coll #${index} (tables not loaded)`;
+              extra = ` | Coll ${path} #${index} (tables not loaded)`;
             } else if (isKnownProfile(profiles, index)) {
               const p = profiles.profiles[index];
               const deg = angleDegrees(p);
-              extra = ` | Coll #${index} ${p.solidity} ${deg === null ? '—' : deg + '°'} ${heightSparkline(p.heights)}`;
+              extra = ` | Coll ${path} #${index} ${p.solidity} ${deg === null ? '—' : deg + '°'} ${heightSparkline(p.heights)}`;
             } else {
-              extra = ` | Coll #${index} (unknown)`;
+              extra = ` | Coll ${path} #${index} (unknown)`;
             }
           }
         }

@@ -410,11 +410,13 @@ async function loadFullProject(config: ReturnType<typeof loadS4Config>): Promise
               const stripData = parseStrips(stripRaw);
 
               const engineColl = new Uint8Array(SECTION_TILES_WIDE * SECTION_TILES_HIGH);
+              const engineCollB = new Uint8Array(SECTION_TILES_WIDE * SECTION_TILES_HIGH);
               for (let row = 0; row < STRIP_ROWS; row++) {
                 for (let col = 0; col < STRIP_COLS; col++) {
                   const srcIdx = row * STRIP_COLS + col;
                   const dstIdx = row * SECTION_TILES_WIDE + col;
                   engineColl[dstIdx] = stripData.collision[srcIdx];
+                  engineCollB[dstIdx] = stripData.collisionB[srcIdx];
                   if (!loaded) {
                     section.tileGrid.nametable[dstIdx] = stripData.nametable[srcIdx];
                     section.tileGrid.collision[dstIdx] = stripData.collision[srcIdx];
@@ -422,6 +424,7 @@ async function loadFullProject(config: ReturnType<typeof loadS4Config>): Promise
                 }
               }
               section.engineCollision = engineColl;
+              section.engineCollisionB = engineCollB;
               loaded = true;
             } catch (stripErr) {
               const msg = stripErr instanceof Error ? stripErr.message : String(stripErr);
