@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useProjectStore } from '../../state/projectStore';
 import { useArtStore } from '../../state/artStore';
 import { useSpriteStore } from '../../state/spriteStore';
+import { spriteModeUndo, spriteModeRedo } from '../../state/sprite-undo';
 import SpriteCanvas from './SpriteCanvasHost';
 import type { OverlayRect } from './SpriteCanvasHost';
 import FrameGrid from './FrameGrid';
@@ -82,12 +83,12 @@ export default function SpriteMode({ appBar }: { appBar: React.ReactNode }) {
           && !['range', 'checkbox', 'button', 'radio'].includes(
             (target as HTMLInputElement).type)) return;
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) {
-        useSpriteStore.getState().undo();
+        spriteModeUndo();
         e.preventDefault();
         return;
       }
       if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key.toLowerCase() === 'z' && e.shiftKey))) {
-        useSpriteStore.getState().redo();
+        spriteModeRedo();
         e.preventDefault();
       }
     };

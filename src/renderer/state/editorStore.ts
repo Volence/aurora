@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { EditHistory } from '../../core/editing/history';
 import type { AnyCommand, S4Level } from '../../core/editing/commands';
 import { useArtStore } from './artStore';
+import { registerRedoClearer, invalidateSiblingRedos } from '../../core/editing/undo-bus';
 
 export type EditorTool =
   | 'view' | 'select' | 'paint-tile' | 'paint-block' | 'stamp-chunk'
@@ -102,6 +103,10 @@ interface EditorState {
 }
 
 export const editHistory = new EditHistory();
+// Let a sibling history (the sprite snapshot history) invalidate this redo when a
+// new sprite edit lands, and vice-versa — so sprite mode behaves as one timeline.
+const clearLevelRedo = () => editHistory.clearRedo();
+registerRedoClearer(clearLevelRedo);
 
 export const useEditorStore = create<EditorState>((set) => ({
   tool: 'view',
@@ -189,6 +194,10 @@ function bumpStoreVersions(cmd: AnyCommand): void {
  */
 export function executeCommand(command: AnyCommand, level: S4Level): void {
   editHistory.execute(command, level);
+  // In sprite mode a palette edit is a new entry in the merged sprite-mode
+  // timeline, so it invalidates the sprite history's redo. Gated on sprite mode
+  // so ordinary level editing (map/art) never disturbs a sprite's redo stack.
+  if (useEditorStore.getState().appMode === 'sprite') invalidateSiblingRedos(clearLevelRedo);
   bumpStoreVersions(command);
   invalidationListener?.(command);
   useEditorStore.getState().markDirty();

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useProjectStore, getActiveLevel } from '../state/projectStore';
 import { useEditorStore, editHistory, undo, redo, type EditingLayer, type AppMode } from '../state/editorStore';
 import { useSpriteStore } from '../state/spriteStore';
+import { spriteModeUndo, spriteModeRedo, spriteModeCanUndo, spriteModeCanRedo } from '../state/sprite-undo';
 import type { S4Level } from '../../core/editing/commands';
 import type { RecentProject } from '../../shared/ipc-types';
 import AuroraMark from './AuroraMark';
@@ -154,22 +155,22 @@ export default function Toolbar({ onOpenProject, onOpenRecent, onSave }: Toolbar
             icon={<Icons.IconUndo size={14} />}
             label="Undo (Ctrl+Z)"
             onClick={() => {
-              if (appMode === 'sprite') useSpriteStore.getState().undo();
+              if (appMode === 'sprite') spriteModeUndo();
               else { const l = getLevel(); if (l) undo(l); }
             }}
             disabled={appMode === 'sprite'
-              ? (void spriteTick, !useSpriteStore.getState().canUndo())
+              ? (void spriteTick, void historyVersion, !spriteModeCanUndo())
               : !editHistory.canUndo}
           />
           <IconButton
             icon={<Icons.IconRedo size={14} />}
             label="Redo (Ctrl+Y)"
             onClick={() => {
-              if (appMode === 'sprite') useSpriteStore.getState().redo();
+              if (appMode === 'sprite') spriteModeRedo();
               else { const l = getLevel(); if (l) redo(l); }
             }}
             disabled={appMode === 'sprite'
-              ? (void spriteTick, !useSpriteStore.getState().canRedo())
+              ? (void spriteTick, void historyVersion, !spriteModeCanRedo())
               : !editHistory.canRedo}
           />
           <Chip

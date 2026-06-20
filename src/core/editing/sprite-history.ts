@@ -1,6 +1,7 @@
 import type { PixelBuffer } from '../art/pixel-ops';
 import type { Color } from '../model/s4-types';
 import type { SpritePaletteMode } from '../art/sprite-palette';
+import { nextEditSeq } from './edit-seq';
 
 /** A full snapshot of the sprite document for undo/redo. */
 export interface SpriteSnapshot {
@@ -35,6 +36,10 @@ function cloneSnap(s: SpriteSnapshot): SpriteSnapshot {
 export class SpriteHistory {
   private undoStack: SpriteSnapshot[] = [];
   private redoStack: SpriteSnapshot[] = [];
+  // Edit-sequence stamps (see edit-seq.ts), index-aligned with the stacks, so
+  // sprite-mode undo can be merged with the level history by recency.
+  private undoSeq: number[] = [];
+  private redoSeq: number[] = [];
 
   constructor(private cap = 50) {}
 
@@ -42,16 +47,26 @@ export class SpriteHistory {
   get canRedo(): boolean { return this.redoStack.length > 0; }
   get depth(): number { return this.undoStack.length; }
 
+  /** Edit-seq of the top undo entry, or -1. */
+  topUndoSeq(): number { return this.undoSeq.length ? this.undoSeq[this.undoSeq.length - 1] : -1; }
+  /** Edit-seq of the top redo entry, or -1. */
+  topRedoSeq(): number { return this.redoSeq.length ? this.redoSeq[this.redoSeq.length - 1] : -1; }
+  /** Drop the redo stack (a new edit on a sibling history invalidates it). */
+  clearRedo(): void { this.redoStack = []; this.redoSeq = []; }
+
   record(snapshot: SpriteSnapshot): void {
     this.undoStack.push(cloneSnap(snapshot));
-    if (this.undoStack.length > this.cap) this.undoStack.shift();
+    this.undoSeq.push(nextEditSeq());
+    if (this.undoStack.length > this.cap) { this.undoStack.shift(); this.undoSeq.shift(); }
     this.redoStack = [];
+    this.redoSeq = [];
   }
 
   undo(current: SpriteSnapshot): SpriteSnapshot | null {
     const prev = this.undoStack.pop();
     if (!prev) return null;
     this.redoStack.push(cloneSnap(current));
+    this.redoSeq.push(this.undoSeq.pop()!);
     return cloneSnap(prev);
   }
 
@@ -59,11 +74,14 @@ export class SpriteHistory {
     const next = this.redoStack.pop();
     if (!next) return null;
     this.undoStack.push(cloneSnap(current));
+    this.undoSeq.push(this.redoSeq.pop()!);
     return cloneSnap(next);
   }
 
   clear(): void {
     this.undoStack = [];
     this.redoStack = [];
+    this.undoSeq = [];
+    this.redoSeq = [];
   }
 }

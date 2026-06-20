@@ -1,14 +1,26 @@
 import type { AnyCommand, S4Level } from './commands';
+import { nextEditSeq } from './edit-seq';
 
 const MAX_HISTORY = 200;
 
 export class EditHistory {
   private undoStack: AnyCommand[] = [];
   private redoStack: AnyCommand[] = [];
+  // Edit-sequence stamps, kept index-aligned with undoStack/redoStack, so a
+  // consumer can merge this timeline with another (the sprite history) by recency.
+  private undoSeq: number[] = [];
+  private redoSeq: number[] = [];
   private listeners: Array<() => void> = [];
 
   get canUndo(): boolean { return this.undoStack.length > 0; }
   get canRedo(): boolean { return this.redoStack.length > 0; }
+
+  /** Edit-seq of the top undo entry (the one a next undo would revert), or -1. */
+  topUndoSeq(): number { return this.undoSeq.length ? this.undoSeq[this.undoSeq.length - 1] : -1; }
+  /** Edit-seq of the top redo entry (the one a next redo would re-apply), or -1. */
+  topRedoSeq(): number { return this.redoSeq.length ? this.redoSeq[this.redoSeq.length - 1] : -1; }
+  /** Drop the redo stack (a new edit on a *sibling* history invalidates it). */
+  clearRedo(): void { if (this.redoStack.length) { this.redoStack = []; this.redoSeq = []; this.notify(); } }
 
   onChange(listener: () => void): () => void {
     this.listeners.push(listener);
@@ -20,8 +32,10 @@ export class EditHistory {
   execute(command: AnyCommand, level: S4Level): void {
     applyCommand(command, level);
     this.undoStack.push(command);
-    if (this.undoStack.length > MAX_HISTORY) this.undoStack.shift();
+    this.undoSeq.push(nextEditSeq());
+    if (this.undoStack.length > MAX_HISTORY) { this.undoStack.shift(); this.undoSeq.shift(); }
     this.redoStack = [];
+    this.redoSeq = [];
     this.notify();
   }
 
@@ -30,6 +44,7 @@ export class EditHistory {
     if (!cmd) return undefined;
     undoCommand(cmd, level);
     this.redoStack.push(cmd);
+    this.redoSeq.push(this.undoSeq.pop()!);
     this.notify();
     return cmd;
   }
@@ -39,6 +54,7 @@ export class EditHistory {
     if (!cmd) return undefined;
     applyCommand(cmd, level);
     this.undoStack.push(cmd);
+    this.undoSeq.push(this.redoSeq.pop()!);
     this.notify();
     return cmd;
   }
@@ -46,6 +62,8 @@ export class EditHistory {
   clear(): void {
     this.undoStack = [];
     this.redoStack = [];
+    this.undoSeq = [];
+    this.redoSeq = [];
     this.notify();
   }
 }

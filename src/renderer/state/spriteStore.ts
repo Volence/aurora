@@ -4,6 +4,7 @@ import { createBuffer, flipH, flipV, rotate90 } from '../../core/art/pixel-ops';
 import type { Color } from '../../core/model/s4-types';
 import type { SpriteFormatId } from '../../core/formats/sprite-format-adapter';
 import { SpriteHistory, type SpriteSnapshot } from '../../core/editing/sprite-history';
+import { registerRedoClearer, invalidateSiblingRedos } from '../../core/editing/undo-bus';
 import type { SpritePaletteMode } from '../../core/art/sprite-palette';
 import { blankStandalonePalette } from '../../core/art/sprite-palette';
 import { useProjectStore, getCurrentZone } from './projectStore';
@@ -117,8 +118,25 @@ function cloneFrame(b: PixelBuffer): PixelBuffer {
   return { width: b.width, height: b.height, data: new Uint8Array(b.data) };
 }
 
-/** Module-level undo/redo history for the working sprite document. */
-const history = new SpriteHistory();
+/** Module-level undo/redo history for the working sprite document. Exported so
+ *  sprite-mode undo can be merged with the level command history by recency. */
+export const spriteHistory = new SpriteHistory();
+const history = spriteHistory;
+
+// A new sprite edit invalidates the level history's redo (the merged sprite-mode
+// timeline). Registered here; the editing stores never import each other.
+const clearSpriteRedo = () => spriteHistory.clearRedo();
+registerRedoClearer(clearSpriteRedo);
+
+/** Record a pre-edit snapshot AND invalidate sibling (level) redo — every sprite
+ *  edit funnels through here so the merged sprite-mode timeline stays consistent.
+ *  Not gated on appMode: every store mutator that reaches here is reachable only
+ *  while editing a sprite (i.e. in sprite mode), so the level-redo invalidation
+ *  is always a sprite-session event. */
+function recordEdit(s: SpriteState): void {
+  invalidateSiblingRedos(clearSpriteRedo);
+  history.record(snap(s));
+}
 
 /** Build a snapshot from live state. SpriteHistory deep-clones on record/undo/
  *  redo, so passing live refs is safe. */
@@ -172,7 +190,7 @@ export const useSpriteStore = create<SpriteState>((set, get) => ({
     else if (t === 'flip-v') next = flipV(buf);
     else if (t === 'rotate-90') { if (cur.width !== cur.height) return; next = rotate90(buf); }
     else return;
-    history.record(snap(s)); // only records when the transform actually applies
+    recordEdit(s); // only records when the transform actually applies
     const frames = s.frames.slice();
     frames[s.currentIndex] = next;
     // marquee coords no longer valid after a transform
@@ -180,7 +198,7 @@ export const useSpriteStore = create<SpriteState>((set, get) => ({
   },
   setBuffer: (b) => {
     const s = get();
-    history.record(snap(s));
+    recordEdit(s);
     const frames = s.frames.slice();
     frames[s.currentIndex] = b;
     set({ frames, historyTick: s.historyTick + 1 });
@@ -188,20 +206,20 @@ export const useSpriteStore = create<SpriteState>((set, get) => ({
   // New frame matches the current canvas size (loaded sprites may not be 32x32).
   addFrame: () => {
     const s = get();
-    history.record(snap(s));
+    recordEdit(s);
     const cur = s.frames[s.currentIndex];
     set({ frames: [...s.frames, createBuffer(cur.width, cur.height)], currentIndex: s.frames.length, historyTick: s.historyTick + 1 });
   },
   duplicateFrame: () => {
     const s = get();
-    history.record(snap(s));
+    recordEdit(s);
     const frames = [...s.frames, cloneFrame(s.frames[s.currentIndex])];
     set({ frames, currentIndex: frames.length - 1, historyTick: s.historyTick + 1 });
   },
   deleteFrame: () => {
     const s = get();
     if (s.frames.length <= 1) return; // keep at least one frame
-    history.record(snap(s));
+    recordEdit(s);
     const removed = s.currentIndex;
     const frames = s.frames.filter((_, i) => i !== removed);
     // Drop steps referencing the removed frame; shift higher references down.
@@ -272,9 +290,9 @@ export const useSpriteStore = create<SpriteState>((set, get) => ({
   },
 
   setZoneLine: (zoneLine) => set({ zoneLine: Math.max(0, Math.min(3, zoneLine | 0)) }),
-  setStandalonePalette: (standalonePalette) => { const s = get(); history.record(snap(s)); set({ standalonePalette, historyTick: s.historyTick + 1 }); },
+  setStandalonePalette: (standalonePalette) => { const s = get(); recordEdit(s); set({ standalonePalette, historyTick: s.historyTick + 1 }); },
   setPaletteMode: (mode) => {
-    const s = get(); history.record(snap(s));
+    const s = get(); recordEdit(s);
     if (mode === 'standalone' && s.paletteMode === 'zone') {
       const zone = getCurrentZone(useProjectStore.getState());
       const line = zone?.palette.lines[s.zoneLine]?.colors;
@@ -284,8 +302,8 @@ export const useSpriteStore = create<SpriteState>((set, get) => ({
       set({ paletteMode: mode, historyTick: s.historyTick + 1 });
     }
   },
-  clearPalette: () => { const s = get(); history.record(snap(s)); set({ paletteMode: 'standalone', standalonePalette: blankStandalonePalette(), historyTick: s.historyTick + 1 }); },
-  clearCanvas: () => { const s = get(); history.record(snap(s)); const cur = s.frames[s.currentIndex]; const frames = s.frames.slice(); frames[s.currentIndex] = createBuffer(cur.width, cur.height); set({ frames, historyTick: s.historyTick + 1 }); },
+  clearPalette: () => { const s = get(); recordEdit(s); set({ paletteMode: 'standalone', standalonePalette: blankStandalonePalette(), historyTick: s.historyTick + 1 }); },
+  clearCanvas: () => { const s = get(); recordEdit(s); const cur = s.frames[s.currentIndex]; const frames = s.frames.slice(); frames[s.currentIndex] = createBuffer(cur.width, cur.height); set({ frames, historyTick: s.historyTick + 1 }); },
 }));
 
 /** Build the frame-index play order for a playback mode (one full cycle). */
