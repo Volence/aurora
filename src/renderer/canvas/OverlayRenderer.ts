@@ -3,9 +3,14 @@ import { SECTION_TILES_WIDE, SECTION_TILES_HIGH, SECTION_PIXEL_SIZE } from '../.
 import type { OverlayOptions } from '../state/viewStore';
 import type { ObjectPreview } from '../state/projectStore';
 import {
-  GRID_TILE, GRID_BLOCK, GRID_SECTION, COLLISION_OOB, COLLISION_PALETTE,
+  GRID_TILE, GRID_BLOCK, GRID_SECTION,
+  COLLISION_FILL_ALL, COLLISION_FILL_TOP, COLLISION_FILL_SIDES, COLLISION_FILL_NONE,
+  COLLISION_SURFACE_LINE, COLLISION_ANGLE_TICK, COLLISION_UNKNOWN, COLLISION_FALLBACK,
   OBJECT_BOX_FILL, OBJECT_BOX_STROKE, OBJECT_LABEL, RING_FILL, RING_STROKE,
 } from './canvas-colors';
+import type { CollisionProfileSet, Solidity } from '../../core/collision/collision-model';
+import { isAir, isKnownProfile } from '../../core/collision/collision-model';
+import { columnSolidRun } from '../../core/collision/collision-render';
 
 type Ctx = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
 
@@ -15,6 +20,15 @@ export interface SectionOverlayInfo {
   offsetY: number;
 }
 
+function solidityFill(s: Solidity): string {
+  switch (s) {
+    case 'all': return COLLISION_FILL_ALL;
+    case 'top': return COLLISION_FILL_TOP;
+    case 'sides-bottom': return COLLISION_FILL_SIDES;
+    default: return COLLISION_FILL_NONE;
+  }
+}
+
 export class OverlayRenderer {
   render(
     ctx: Ctx,
@@ -22,6 +36,7 @@ export class OverlayRenderer {
     options: OverlayOptions,
     viewport: { x: number; y: number; width: number; height: number; zoom: number },
     objectSprites?: Map<string, ObjectPreview>,
+    collisionProfiles?: CollisionProfileSet | null,
   ): void {
     const { x: vpX, y: vpY, zoom } = viewport;
 
@@ -35,7 +50,7 @@ export class OverlayRenderer {
 
     for (const info of sections) {
       if (options.showCollision) {
-        this.drawCollisionOverlay(ctx, viewport, info.section.tileGrid.collision, info.offsetX, info.offsetY);
+        this.drawCollisionOverlay(ctx, viewport, info.section.tileGrid.collision, info.offsetX, info.offsetY, collisionProfiles ?? null, options.showCollisionAngles);
       }
       if (options.showRings) {
         this.drawRings(ctx, info.section.rings, viewport, info.offsetX, info.offsetY);
@@ -132,28 +147,71 @@ export class OverlayRenderer {
     collision: Uint8Array,
     offsetX: number,
     offsetY: number,
+    profiles: CollisionProfileSet | null,
+    showAngles: boolean,
   ): void {
     const { x: vpX, y: vpY, width, height, zoom } = viewport;
-    const vpWidth = width / zoom;
-    const vpHeight = height / zoom;
+    const vpW = width / zoom, vpH = height / zoom;
+    const localVpX = vpX - offsetX, localVpY = vpY - offsetY;
+    // 16px cells = 128×128 per section (256 tiles / 2). cellsW bounds the column
+    // loop, cellsH the row loop (a section is square today, but keep them distinct).
+    const cellsW = SECTION_TILES_WIDE / 2, cellsH = SECTION_TILES_HIGH / 2;
+    const startCol = Math.max(0, Math.floor(localVpX / 16));
+    const startRow = Math.max(0, Math.floor(localVpY / 16));
+    const endCol = Math.min(cellsW, Math.ceil((localVpX + vpW) / 16));
+    const endRow = Math.min(cellsH, Math.ceil((localVpY + vpH) / 16));
 
-    const localVpX = vpX - offsetX;
-    const localVpY = vpY - offsetY;
+    for (let cr = startRow; cr < endRow; cr++) {
+      for (let cc = startCol; cc < endCol; cc++) {
+        // Sample the cell's top-left tile (both tiles of a cell share the byte).
+        const index = collision[(cr * 2) * SECTION_TILES_WIDE + (cc * 2)];
+        if (isAir(profiles, index)) continue; // index 0
 
-    const startCol = Math.max(0, Math.floor(localVpX / 8));
-    const startRow = Math.max(0, Math.floor(localVpY / 8));
-    const endCol = Math.min(SECTION_TILES_WIDE, Math.ceil((localVpX + vpWidth) / 8));
-    const endRow = Math.min(SECTION_TILES_HIGH, Math.ceil((localVpY + vpHeight) / 8));
+        const cx = cc * 16 + offsetX, cy = cr * 16 + offsetY;
 
-    for (let row = startRow; row < endRow; row++) {
-      for (let col = startCol; col < endCol; col++) {
-        const idx = row * SECTION_TILES_WIDE + col;
-        const collType = collision[idx];
-        if (collType === 0) continue;
+        if (!profiles) { // no tables: flat fallback fill
+          ctx.fillStyle = COLLISION_FALLBACK;
+          ctx.fillRect(cx, cy, 16, 16);
+          continue;
+        }
+        if (!isKnownProfile(profiles, index)) { // stale / out-of-range index
+          ctx.fillStyle = COLLISION_UNKNOWN;
+          ctx.fillRect(cx, cy, 16, 16);
+          continue;
+        }
 
-        const color = COLLISION_PALETTE[collType] ?? COLLISION_OOB;
-        ctx.fillStyle = color;
-        ctx.fillRect(col * 8 + offsetX, row * 8 + offsetY, 8, 8);
+        const p = profiles.profiles[index];
+        ctx.fillStyle = solidityFill(p.solidity);
+        // Per-column silhouette.
+        for (let c = 0; c < 16; c++) {
+          const run = columnSolidRun(p.heights[c]);
+          if (!run) continue;
+          ctx.fillRect(cx + c, cy + run.y, 1, run.h);
+        }
+        // Crisp line along the collidable surface — the top of a floor (h>0) or
+        // the underside of a hanging ceiling (h<0).
+        ctx.strokeStyle = COLLISION_SURFACE_LINE;
+        ctx.lineWidth = 1 / zoom;
+        for (let c = 0; c < 16; c++) {
+          const h = p.heights[c];
+          const run = columnSolidRun(h);
+          if (!run) continue;
+          const surfaceY = h >= 0 ? run.y : run.y + run.h;
+          ctx.beginPath();
+          ctx.moveTo(cx + c, cy + surfaceY);
+          ctx.lineTo(cx + c + 1, cy + surfaceY);
+          ctx.stroke();
+        }
+        if (showAngles && p.hasAngle) {
+          const a = (p.angle / 256) * Math.PI * 2;
+          const mx = cx + 8, my = cy + 8, len = 6;
+          ctx.strokeStyle = COLLISION_ANGLE_TICK;
+          ctx.lineWidth = 1.5 / zoom;
+          ctx.beginPath();
+          ctx.moveTo(mx - Math.cos(a) * len, my + Math.sin(a) * len);
+          ctx.lineTo(mx + Math.cos(a) * len, my - Math.sin(a) * len);
+          ctx.stroke();
+        }
       }
     }
   }

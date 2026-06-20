@@ -22,18 +22,15 @@ export const GRID_BLOCK = 'rgba(0, 200, 100, 0.25)';    // 128px block grid
 export const GRID_SECTION = 'rgba(255, 255, 0, 0.3)';   // section grid
 
 // ---------- collision overlay palette (OverlayRenderer) ----------
-/** Out-of-range / unknown collision type marker. */
-export const COLLISION_OOB = 'rgba(255, 0, 255, 0.3)';
-/** Collision type → translucent fill. Indexed by collision id (1..7). */
-export const COLLISION_PALETTE: Record<number, string> = {
-  1: 'rgba(0, 128, 255, 0.3)',
-  2: 'rgba(255, 0, 0, 0.3)',
-  3: 'rgba(0, 255, 0, 0.3)',
-  4: 'rgba(255, 128, 0, 0.3)',
-  5: 'rgba(128, 0, 255, 0.3)',
-  6: 'rgba(255, 255, 0, 0.3)',
-  7: 'rgba(0, 255, 255, 0.3)',
-};
+/** Real-collision overlay fills, by solidity class (translucent so art shows). */
+export const COLLISION_FILL_ALL = 'rgba(80,200,120,0.42)';        // full solid — green
+export const COLLISION_FILL_TOP = 'rgba(240,200,70,0.42)';        // jump-through top — amber
+export const COLLISION_FILL_SIDES = 'rgba(90,150,240,0.42)';      // walls/ceiling — blue
+export const COLLISION_FILL_NONE = 'rgba(160,160,170,0.25)';      // no-solidity shape — faint gray
+export const COLLISION_SURFACE_LINE = 'rgba(255,255,255,0.85)';   // crisp top-of-surface stroke
+export const COLLISION_ANGLE_TICK = 'rgba(255,80,80,0.9)';        // angle indicator
+export const COLLISION_UNKNOWN = 'rgba(255,0,255,0.5)';           // out-of-range attr index
+export const COLLISION_FALLBACK = 'rgba(120,160,220,0.35)';       // flat fill when no tables
 
 // ---------- map object/ring markers (OverlayRenderer) ----------
 export const OBJECT_BOX_FILL = 'rgba(255, 100, 100, 0.7)';

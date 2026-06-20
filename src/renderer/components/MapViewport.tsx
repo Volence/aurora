@@ -14,6 +14,8 @@ import { BG_WIDTH } from '../../core/formats/bg-tiles';
 import type { Section, ObjectPlacement, RingPlacement, Act, Tile, BgLibraryEntry } from '../../core/model/s4-types';
 import { T } from './ui';
 import { CANVAS_VOID } from '../canvas/canvas-colors';
+import { angleDegrees, isAir, isKnownProfile } from '../../core/collision/collision-model';
+import { heightSparkline } from '../../core/collision/collision-render';
 
 export const sectionRenderer = new SectionRenderer();
 const overlayRenderer = new OverlayRenderer();
@@ -76,6 +78,7 @@ export default function MapViewport() {
   const currentZoneId = useProjectStore((s) => s.currentZoneId);
   const currentActId = useProjectStore((s) => s.currentActId);
   const objectSprites = useProjectStore((s) => s.objectSprites);
+  const collisionProfiles = useProjectStore((s) => s.collisionProfiles);
   const historyVersion = useEditorStore((s) => s.historyVersion);
   const activeSectionIndex = useEditorStore((s) => s.activeSectionIndex);
   const editingLayer = useEditorStore((s) => s.editingLayer);
@@ -230,9 +233,9 @@ export default function MapViewport() {
         sectionInfos.push({ section, offsetX: offset.x, offsetY: offset.y });
       }
 
-      overlayRenderer.render(ctx, sectionInfos, overlays, viewport, useProjectStore.getState().objectSprites);
+      overlayRenderer.render(ctx, sectionInfos, overlays, viewport, useProjectStore.getState().objectSprites, useProjectStore.getState().collisionProfiles);
     }
-  }, [vpX, vpY, zoom, overlays, project, currentZoneId, currentActId, activeSectionIndex, editingLayer, historyVersion, selection, objectSprites]);
+  }, [vpX, vpY, zoom, overlays, project, currentZoneId, currentActId, activeSectionIndex, editingLayer, historyVersion, selection, objectSprites, collisionProfiles]);
 
   // Handle resize
   useEffect(() => {
@@ -270,7 +273,7 @@ export default function MapViewport() {
           const offset = sectionRenderer.sectionWorldOffset(i);
           sectionInfos.push({ section, offsetX: offset.x, offsetY: offset.y });
         }
-        overlayRenderer.render(ctx, sectionInfos, overlays, viewport);
+        overlayRenderer.render(ctx, sectionInfos, overlays, viewport, undefined, useProjectStore.getState().collisionProfiles);
       }
     });
 
@@ -800,7 +803,31 @@ export default function MapViewport() {
     } else {
       const info = worldToSectionTile(world.x, world.y);
       if (info) {
-        bar.innerHTML = `Sec ${info.sectionIndex} | Tile (${info.col}, ${info.row}) | Pos ${Math.floor(world.x)}, ${Math.floor(world.y)}`;
+        let extra = '';
+        const overlays = useViewStore.getState().overlays;
+        if (overlays.showCollision) {
+          const act = getCurrentAct(useProjectStore.getState());
+          const section = act?.sections[info.sectionIndex] ?? null;
+          if (section) {
+            // Snap to the 16px cell's top-left tile (both tiles share the byte).
+            const cellCol = Math.floor(info.col / 2) * 2;
+            const cellRow = Math.floor(info.row / 2) * 2;
+            const index = section.tileGrid.collision[cellRow * SECTION_TILES_WIDE + cellCol];
+            const profiles = useProjectStore.getState().collisionProfiles;
+            if (isAir(profiles, index)) {
+              extra = ' | Coll: air';
+            } else if (!profiles) {
+              extra = ` | Coll #${index} (tables not loaded)`;
+            } else if (isKnownProfile(profiles, index)) {
+              const p = profiles.profiles[index];
+              const deg = angleDegrees(p);
+              extra = ` | Coll #${index} ${p.solidity} ${deg === null ? '—' : deg + '°'} ${heightSparkline(p.heights)}`;
+            } else {
+              extra = ` | Coll #${index} (unknown)`;
+            }
+          }
+        }
+        bar.innerHTML = `Sec ${info.sectionIndex} | Tile (${info.col}, ${info.row}) | Pos ${Math.floor(world.x)}, ${Math.floor(world.y)}${extra}`;
       } else {
         bar.innerHTML = `Pos ${Math.floor(world.x)}, ${Math.floor(world.y)}`;
       }
