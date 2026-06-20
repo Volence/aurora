@@ -26,6 +26,7 @@ export interface SetCollisionCommand extends EditCommand {
 
 export interface SetCollisionEditCommand extends EditCommand {
   type: 'set-collision-edit';
+  plane: 'a' | 'b';
   entries: Array<{ index: number; oldColl: number; newColl: number }>;
 }
 
