@@ -5,7 +5,7 @@ import type { ObjectPreview } from '../state/projectStore';
 import {
   GRID_TILE, GRID_BLOCK, GRID_SECTION,
   COLLISION_FILL_ALL, COLLISION_FILL_TOP, COLLISION_FILL_SIDES, COLLISION_FILL_NONE,
-  COLLISION_SURFACE_LINE, COLLISION_ANGLE_TICK, COLLISION_UNKNOWN, COLLISION_FALLBACK,
+  COLLISION_SURFACE_LINE, COLLISION_ANGLE_TICK, COLLISION_UNKNOWN, COLLISION_FALLBACK, COLLISION_DIFF,
   OBJECT_BOX_FILL, OBJECT_BOX_STROKE, OBJECT_LABEL, RING_FILL, RING_STROKE,
 } from './canvas-colors';
 import type { CollisionProfileSet, Solidity } from '../../core/collision/collision-model';
@@ -50,15 +50,18 @@ export class OverlayRenderer {
 
     for (const info of sections) {
       if (options.showCollision || options.showCollisionPathB) {
-        // Two independent planes: "Collision" shows path A, "Collision Path B"
-        // shows path B (the read-only engine attr indices from strips). Path B is
-        // preferred when both are on, and falls back to A if a section has no B;
-        // the editable array is used only when there are no strips at all.
-        const eng = options.showCollisionPathB
-          ? (info.section.engineCollisionB ?? info.section.engineCollision)
-          : info.section.engineCollision;
-        const coll = eng ?? info.section.tileGrid.collision;
-        this.drawCollisionOverlay(ctx, viewport, coll, info.offsetX, info.offsetY, collisionProfiles ?? null, options.showCollisionAngles);
+        // Two independent planes (read-only engine attr indices from strips):
+        // "Collision" = path A, "Collision Path B" = path B. When BOTH are on,
+        // render path A as the base and outline the cells where B differs, so the
+        // dual-layer/loop regions stand out instead of the planes hiding each other.
+        const a = info.section.engineCollision ?? info.section.tileGrid.collision;
+        const b = info.section.engineCollisionB ?? null;
+        if (options.showCollision && options.showCollisionPathB && b) {
+          this.drawCollisionOverlay(ctx, viewport, a, info.offsetX, info.offsetY, collisionProfiles ?? null, options.showCollisionAngles, b);
+        } else {
+          const coll = (options.showCollisionPathB ? (b ?? a) : a);
+          this.drawCollisionOverlay(ctx, viewport, coll, info.offsetX, info.offsetY, collisionProfiles ?? null, options.showCollisionAngles, null);
+        }
       }
       if (options.showRings) {
         this.drawRings(ctx, info.section.rings, viewport, info.offsetX, info.offsetY);
@@ -157,6 +160,7 @@ export class OverlayRenderer {
     offsetY: number,
     profiles: CollisionProfileSet | null,
     showAngles: boolean,
+    diffWith: Uint8Array | null,
   ): void {
     const { x: vpX, y: vpY, width, height, zoom } = viewport;
     const vpW = width / zoom, vpH = height / zoom;
@@ -172,53 +176,62 @@ export class OverlayRenderer {
     for (let cr = startRow; cr < endRow; cr++) {
       for (let cc = startCol; cc < endCol; cc++) {
         // Sample the cell's top-left tile (both tiles of a cell share the byte).
-        const index = collision[(cr * 2) * SECTION_TILES_WIDE + (cc * 2)];
-        if (isAir(profiles, index)) continue; // index 0
-
+        const cellIdx = (cr * 2) * SECTION_TILES_WIDE + (cc * 2);
+        const index = collision[cellIdx];
+        // Dual-layer diff: does the other plane differ at this cell? (Computed
+        // even for air cells, so a B-only-solid cell still gets highlighted.)
+        const differs = diffWith !== null && diffWith[cellIdx] !== index;
         const cx = cc * 16 + offsetX, cy = cr * 16 + offsetY;
 
-        if (!profiles) { // no tables: flat fallback fill
-          ctx.fillStyle = COLLISION_FALLBACK;
-          ctx.fillRect(cx, cy, 16, 16);
-          continue;
-        }
-        if (!isKnownProfile(profiles, index)) { // stale / out-of-range index
-          ctx.fillStyle = COLLISION_UNKNOWN;
-          ctx.fillRect(cx, cy, 16, 16);
-          continue;
+        if (!isAir(profiles, index)) {
+          if (!profiles) { // no tables: flat fallback fill
+            ctx.fillStyle = COLLISION_FALLBACK;
+            ctx.fillRect(cx, cy, 16, 16);
+          } else if (!isKnownProfile(profiles, index)) { // stale / out-of-range
+            ctx.fillStyle = COLLISION_UNKNOWN;
+            ctx.fillRect(cx, cy, 16, 16);
+          } else {
+            const p = profiles.profiles[index];
+            ctx.fillStyle = solidityFill(p.solidity);
+            // Per-column silhouette.
+            for (let c = 0; c < 16; c++) {
+              const run = columnSolidRun(p.heights[c]);
+              if (!run) continue;
+              ctx.fillRect(cx + c, cy + run.y, 1, run.h);
+            }
+            // Crisp line along the collidable surface — top of a floor (h>0) or
+            // the underside of a hanging ceiling (h<0).
+            ctx.strokeStyle = COLLISION_SURFACE_LINE;
+            ctx.lineWidth = 1 / zoom;
+            for (let c = 0; c < 16; c++) {
+              const h = p.heights[c];
+              const run = columnSolidRun(h);
+              if (!run) continue;
+              const surfaceY = h >= 0 ? run.y : run.y + run.h;
+              ctx.beginPath();
+              ctx.moveTo(cx + c, cy + surfaceY);
+              ctx.lineTo(cx + c + 1, cy + surfaceY);
+              ctx.stroke();
+            }
+            if (showAngles && p.hasAngle) {
+              const a = (p.angle / 256) * Math.PI * 2;
+              const mx = cx + 8, my = cy + 8, len = 6;
+              ctx.strokeStyle = COLLISION_ANGLE_TICK;
+              ctx.lineWidth = 1.5 / zoom;
+              ctx.beginPath();
+              ctx.moveTo(mx - Math.cos(a) * len, my + Math.sin(a) * len);
+              ctx.lineTo(mx + Math.cos(a) * len, my - Math.sin(a) * len);
+              ctx.stroke();
+            }
+          }
         }
 
-        const p = profiles.profiles[index];
-        ctx.fillStyle = solidityFill(p.solidity);
-        // Per-column silhouette.
-        for (let c = 0; c < 16; c++) {
-          const run = columnSolidRun(p.heights[c]);
-          if (!run) continue;
-          ctx.fillRect(cx + c, cy + run.y, 1, run.h);
-        }
-        // Crisp line along the collidable surface — the top of a floor (h>0) or
-        // the underside of a hanging ceiling (h<0).
-        ctx.strokeStyle = COLLISION_SURFACE_LINE;
-        ctx.lineWidth = 1 / zoom;
-        for (let c = 0; c < 16; c++) {
-          const h = p.heights[c];
-          const run = columnSolidRun(h);
-          if (!run) continue;
-          const surfaceY = h >= 0 ? run.y : run.y + run.h;
-          ctx.beginPath();
-          ctx.moveTo(cx + c, cy + surfaceY);
-          ctx.lineTo(cx + c + 1, cy + surfaceY);
-          ctx.stroke();
-        }
-        if (showAngles && p.hasAngle) {
-          const a = (p.angle / 256) * Math.PI * 2;
-          const mx = cx + 8, my = cy + 8, len = 6;
-          ctx.strokeStyle = COLLISION_ANGLE_TICK;
+        // Outline cells where the two planes disagree (dual-layer regions).
+        if (differs) {
+          const inset = 0.75 / zoom;
+          ctx.strokeStyle = COLLISION_DIFF;
           ctx.lineWidth = 1.5 / zoom;
-          ctx.beginPath();
-          ctx.moveTo(mx - Math.cos(a) * len, my + Math.sin(a) * len);
-          ctx.lineTo(mx + Math.cos(a) * len, my - Math.sin(a) * len);
-          ctx.stroke();
+          ctx.strokeRect(cx + inset, cy + inset, 16 - 2 * inset, 16 - 2 * inset);
         }
       }
     }

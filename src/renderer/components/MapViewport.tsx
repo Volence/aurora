@@ -13,6 +13,7 @@ import { SECTION_TILES_WIDE, SECTION_TILES_HIGH, SECTION_PIXEL_SIZE, unpackNamet
 import { BG_WIDTH } from '../../core/formats/bg-tiles';
 import type { Section, ObjectPlacement, RingPlacement, Act, Tile, BgLibraryEntry } from '../../core/model/s4-types';
 import { T } from './ui';
+import CollisionLegend from './CollisionLegend';
 import { CANVAS_VOID } from '../canvas/canvas-colors';
 import { angleDegrees, isAir, isKnownProfile } from '../../core/collision/collision-model';
 import { heightSparkline } from '../../core/collision/collision-render';
@@ -1034,6 +1035,7 @@ export default function MapViewport() {
       onContextMenu={handleContextMenu}
     >
       <canvas id="map-canvas" ref={canvasRef} style={styles.canvas} />
+      <CollisionLegend />
       <div ref={hoverBarRef} style={{ ...styles.hoverBar, display: 'none' }} />
       {ctxMenu && (
         <div

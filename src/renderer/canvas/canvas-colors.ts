@@ -31,6 +31,7 @@ export const COLLISION_SURFACE_LINE = 'rgba(255,255,255,0.85)';   // crisp top-o
 export const COLLISION_ANGLE_TICK = 'rgba(255,80,80,0.9)';        // angle indicator
 export const COLLISION_UNKNOWN = 'rgba(255,0,255,0.5)';           // out-of-range attr index
 export const COLLISION_FALLBACK = 'rgba(120,160,220,0.35)';       // flat fill when no tables
+export const COLLISION_DIFF = 'rgba(255,120,40,0.95)';            // outline: A/B planes differ here
 
 // ---------- map object/ring markers (OverlayRenderer) ----------
 export const OBJECT_BOX_FILL = 'rgba(255, 100, 100, 0.7)';
