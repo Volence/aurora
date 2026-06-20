@@ -7,6 +7,7 @@ import type { ViewportOverlay } from '../art-shared/PixelViewport';
 import { PixelEditController, diffWrites } from '../../../core/art/pixel-edit-controller';
 import type { GestureResult } from '../../../core/art/pixel-edit-controller';
 import { resolveDisplayPalette } from '../../../core/art/sprite-palette';
+import type { PixelHudHandle } from '../art-shared/PixelHud';
 import { OVERLAY_OUTLINE } from '../../canvas/canvas-colors';
 
 /** A piece outline to overlay, in sprite-pixel coords. */
@@ -18,7 +19,7 @@ export interface OverlayRect { x: number; y: number; w: number; h: number; }
  * commits results via setBuffer/setSelection. Replaces the old standalone SpriteCanvas;
  * all drawing logic + rendering now live in the shared core.
  */
-export default function SpriteCanvasHost({ overlayRects }: { overlayRects?: OverlayRect[] }) {
+export default function SpriteCanvasHost({ overlayRects, hudRef }: { overlayRects?: OverlayRect[]; hudRef?: React.RefObject<PixelHudHandle | null> }) {
   const buffer = useSpriteStore((s) => s.frames[s.currentIndex]);
   const zoom = useSpriteStore((s) => s.zoom);
   const tool = useSpriteStore((s) => s.tool);
@@ -63,6 +64,15 @@ export default function SpriteCanvasHost({ overlayRects }: { overlayRects?: Over
       overlays={overlays}
       onCommit={onCommit}
       onPick={(v) => useArtStore.getState().setSelectedColor(v)}
+      onHover={(pixel) => {
+        if (!hudRef) return;
+        if (pixel && pixel.x >= 0 && pixel.y >= 0 && pixel.x < buffer.width && pixel.y < buffer.height) {
+          const idx = buffer.data[pixel.y * buffer.width + pixel.x];
+          hudRef.current?.update({ x: pixel.x, y: pixel.y, idx, color: palette[idx] }, zoom);
+        } else {
+          hudRef.current?.update(null, zoom);
+        }
+      }}
     />
   );
 }

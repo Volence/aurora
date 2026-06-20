@@ -12,6 +12,7 @@ import PaletteEditor from '../art/PaletteEditor';
 import SpritePaletteHeader from './SpritePaletteHeader';
 import { useAnchoredZoom } from '../art-shared/use-anchored-zoom';
 import { useHandPan } from '../art-shared/use-hand-pan';
+import { PixelHud, type PixelHudHandle } from '../art-shared/PixelHud';
 import { decomposeFrame } from '../../../core/art/sprite-decompose';
 import type { SpriteFormatId } from '../../../core/formats/sprite-format-adapter';
 import type { CompressionKind } from '../../../core/compress';
@@ -65,6 +66,7 @@ export default function SpriteMode({ appBar }: { appBar: React.ReactNode }) {
   // the default 2x step crosses integer boundaries cleanly).
   useAnchoredZoom(canvasWrapRef, zoom, () => useSpriteStore.getState().zoom, (z) => useSpriteStore.getState().setZoom(z));
   useHandPan(canvasWrapRef);
+  const spriteHudRef = useRef<PixelHudHandle>(null);
 
   const buffer = frames[currentIndex];
 
@@ -270,9 +272,10 @@ export default function SpriteMode({ appBar }: { appBar: React.ReactNode }) {
           wrapper expands to the slot like ArtMode's canvas does. */}
       <div ref={canvasWrapRef} style={styles.canvasWrap}>
         <div style={styles.canvasPad}>
-          <SpriteCanvas overlayRects={overlayRects} />
+          <SpriteCanvas overlayRects={overlayRects} hudRef={spriteHudRef} />
         </div>
       </div>
+      <PixelHud ref={spriteHudRef} />
     </EditorShell>
   );
 }
