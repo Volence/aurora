@@ -40,6 +40,8 @@ export default function SpriteToolOptions({
   const ditherSecondary = useSpriteStore((s) => s.ditherSecondary);
   const frames = useSpriteStore((s) => s.frames);
   const currentIndex = useSpriteStore((s) => s.currentIndex);
+  const selection = useSpriteStore((s) => s.selection);
+  const clipboard = useSpriteStore((s) => s.clipboard);
 
   const cur = frames[currentIndex];
   const square = cur.width === cur.height;
@@ -99,6 +101,14 @@ export default function SpriteToolOptions({
           items={TRANSFORMS.map((t) => ({ ...t, disabled: t.action === 'rotate-90' && !square }))}
           onAction={(a) => st().applyTransform(a)}
         />
+      </span>
+
+      <Divider />
+
+      <span style={{ display: 'inline-flex', gap: 4 }}>
+        <Chip disabled={!selection} title="Copy selection (Ctrl+C)" onClick={() => st().copySelection()}>Copy</Chip>
+        <Chip disabled={!selection} title="Cut selection (Ctrl+X)" onClick={() => st().cutSelection()}>Cut</Chip>
+        <Chip disabled={!clipboard} title="Paste (Ctrl+V)" onClick={() => st().paste()}>Paste</Chip>
       </span>
 
       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginLeft: 'auto' }}>
