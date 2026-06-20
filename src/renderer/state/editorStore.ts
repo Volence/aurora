@@ -85,6 +85,7 @@ interface EditorState {
   selectedCollisionType: number;
   selectedCollisionProfile: number; // 0-255 attr index for the map collision palette
   collisionPaintPlane: 'a' | 'b';
+  collisionBrushSize: number; // brush width in 16px blocks; 1 = reuse, >1 = positional N×N area
 
   setTool: (tool: EditorTool) => void;
   setSelection: (selection: Selection | null) => void;
@@ -100,6 +101,7 @@ interface EditorState {
   setSelectedCollisionType: (type: number) => void;
   setSelectedCollisionProfile: (index: number) => void;
   setCollisionPaintPlane: (plane: 'a' | 'b') => void;
+  setCollisionBrushSize: (size: number) => void;
   markDirty: () => void;
   markClean: () => void;
   bumpVersion: () => void;
@@ -132,6 +134,7 @@ export const useEditorStore = create<EditorState>((set) => ({
   selectedCollisionType: 0,
   selectedCollisionProfile: 0,
   collisionPaintPlane: 'a',
+  collisionBrushSize: 1,
 
   setTool: (tool) => set({ tool, selection: null, multiSelection: null }),
   setSelection: (selection) => set({ selection, multiSelection: null }),
@@ -147,6 +150,7 @@ export const useEditorStore = create<EditorState>((set) => ({
   setSelectedCollisionType: (type) => set({ selectedCollisionType: type }),
   setSelectedCollisionProfile: (index) => set({ selectedCollisionProfile: Math.max(0, Math.min(255, index | 0)) }),
   setCollisionPaintPlane: (collisionPaintPlane) => set({ collisionPaintPlane }),
+  setCollisionBrushSize: (size) => set({ collisionBrushSize: Math.max(1, Math.min(15, size | 0)) }),
   markDirty: () => set({ dirty: true }),
   markClean: () => set({ dirty: false }),
   bumpVersion: () => set((s) => ({ historyVersion: s.historyVersion + 1 })),

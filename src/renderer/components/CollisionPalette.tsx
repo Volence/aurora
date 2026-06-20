@@ -44,6 +44,8 @@ export default function CollisionPalette() {
   const selected = useEditorStore((s) => s.selectedCollisionProfile);
   const set = useEditorStore((s) => s.setSelectedCollisionProfile);
   const plane = useEditorStore((s) => s.collisionPaintPlane);
+  const brush = useEditorStore((s) => s.collisionBrushSize);
+  const setBrush = useEditorStore((s) => s.setCollisionBrushSize);
 
   function pickPlane(p: 'a' | 'b') {
     useEditorStore.getState().setCollisionPaintPlane(p);
@@ -70,7 +72,16 @@ export default function CollisionPalette() {
         <button onClick={() => pickPlane('a')} style={{ ...styles.planeBtn, ...(plane === 'a' ? styles.planeSel : {}) }}>A</button>
         <button onClick={() => pickPlane('b')} style={{ ...styles.planeBtn, ...(plane === 'b' ? styles.planeSel : {}) }}>B</button>
       </div>
-      <div style={styles.hint}>Pick a shape, then paint on the map. Paints every block with the same tiles; hold Alt to paint just one.</div>
+      <div style={styles.planes}>
+        <span style={styles.planeLabel}>Brush</span>
+        {[1, 3, 5, 7].map((n) => (
+          <button key={n} onClick={() => setBrush(n)} title={n === 1 ? 'Single block (reuse matching)' : `${n}×${n} block area`}
+            style={{ ...styles.planeBtn, ...(brush === n ? styles.planeSel : {}) }}>{n === 1 ? '1' : `${n}×${n}`}</button>
+        ))}
+      </div>
+      <div style={styles.hint}>{brush > 1
+        ? `Pick a shape, then paint on the map. Paints the ${brush}×${brush} block area under the cursor.`
+        : 'Pick a shape, then paint on the map. Paints every block with the same tiles; hold Alt to paint just one.'}</div>
       <div style={styles.grid}>
         <button title="Erase (air)" onClick={() => set(0)} style={{ ...styles.cell, ...(selected === 0 ? styles.sel : {}) }}>
           <span style={styles.erase}>∅</span>

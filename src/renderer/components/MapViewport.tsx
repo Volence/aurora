@@ -454,17 +454,37 @@ export default function MapViewport() {
     lastPaintedCell.current = cellKey;
 
     const profile = useEditorStore.getState().selectedCollisionProfile;
-    // Cheap no-op guard: if the clicked block is already fully the selected
-    // profile, there's nothing to do (its matches were painted when first
-    // touched) — return before the per-section match scan.
-    const clicked = cellTileIndices(cellCol, cellRow, SECTION_TILES_WIDE);
-    if (clicked.every((i) => ce[i] === profile)) return;
-
+    const brush = useEditorStore.getState().collisionBrushSize;
     const cellsW = SECTION_TILES_WIDE / 2, cellsH = SECTION_TILES_HIGH / 2;
-    // Default: every block with the same content. Alt: only the clicked block.
-    const targets = justHere
-      ? [{ cellCol, cellRow }]
-      : findMatchingBlockCells(section.tileGrid.nametable, cellCol, cellRow, SECTION_TILES_WIDE, cellsW, cellsH);
+
+    let targets: Array<{ cellCol: number; cellRow: number }>;
+    let label: string;
+    if (brush > 1) {
+      // Bigger brush: the N×N block area centred on the cursor, painted
+      // positionally (no reuse — a multi-block stroke means "this region", not
+      // "every matching block"). Ideal for erasing/clearing an area.
+      const half = brush >> 1;
+      targets = [];
+      for (let dr = -half; dr <= half; dr++) {
+        for (let dc = -half; dc <= half; dc++) {
+          const cc = cellCol + dc, cr = cellRow + dr;
+          if (cc >= 0 && cr >= 0 && cc < cellsW && cr < cellsH) targets.push({ cellCol: cc, cellRow: cr });
+        }
+      }
+      label = `${brush}×${brush} area`;
+    } else if (justHere) {
+      targets = [{ cellCol, cellRow }];
+      label = 'this block';
+    } else {
+      // Cheap no-op guard: if the clicked block is already fully the selected
+      // profile, there's nothing to do (its matches were painted when first
+      // touched) — return before the per-section match scan.
+      const clicked = cellTileIndices(cellCol, cellRow, SECTION_TILES_WIDE);
+      if (clicked.every((i) => ce[i] === profile)) return;
+      // Default: every block with the same content.
+      targets = findMatchingBlockCells(section.tileGrid.nametable, cellCol, cellRow, SECTION_TILES_WIDE, cellsW, cellsH);
+      label = `${targets.length} matching blocks`;
+    }
 
     const entries: Array<{ index: number; oldColl: number; newColl: number }> = [];
     for (const t of targets) {
@@ -479,7 +499,7 @@ export default function MapViewport() {
     executeCommand({
       type: 'set-collision-edit',
       plane,
-      description: justHere ? `Paint collision ${plane.toUpperCase()} (this block)` : `Paint collision ${plane.toUpperCase()} (${targets.length} matching blocks)`,
+      description: `Paint collision ${plane.toUpperCase()} (${label})`,
       sectionIndex: info.sectionIndex,
       entries,
     }, level);
