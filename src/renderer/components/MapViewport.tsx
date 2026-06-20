@@ -437,7 +437,15 @@ export default function MapViewport() {
   // a paint sets all four 8px sub-tiles. One undoable set-collision-edit command.
   function paintCollisionCell(info: { sectionIndex: number; col: number; row: number }, justHere: boolean) {
     const section = getSectionByIndex(info.sectionIndex);
-    if (!section || !section.collisionEdit) return;
+    if (!section) return;
+    // Lazily seed the editable plane if it's missing — e.g. the project was opened
+    // before collisionEdit existed and a hot-reload didn't re-run the loader. Clone
+    // the engine path-A baseline (matches the load seed; keeps the A/B diff clean).
+    if (!section.collisionEdit) {
+      section.collisionEdit = section.engineCollision
+        ? new Uint8Array(section.engineCollision)
+        : new Uint8Array(SECTION_TILES_WIDE * SECTION_TILES_HIGH);
+    }
     const ce = section.collisionEdit;
     const cellCol = info.col >> 1, cellRow = info.row >> 1;
     const cellKey = `${info.sectionIndex}:${cellCol}:${cellRow}`;
