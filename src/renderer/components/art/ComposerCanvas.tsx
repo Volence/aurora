@@ -22,6 +22,7 @@ import PixelViewport from '../art-shared/PixelViewport';
 import type { HostPointer } from '../art-shared/PixelViewport';
 import { useAnchoredZoom } from '../art-shared/use-anchored-zoom';
 import { useHandPan } from '../art-shared/use-hand-pan';
+import { PixelHud, type PixelHudHandle } from '../art-shared/PixelHud';
 import type { Tile, Color } from '../../../core/model/s4-types';
 import { T } from '../ui';
 import {
@@ -323,8 +324,22 @@ export default function ComposerCanvas() {
     if (doc) useArtStore.getState().setPaletteLine(cellAt(doc, pixel.x >> 3, pixel.y >> 3).pal);
   }, []);
 
+  // On-canvas HUD: updated imperatively in onHover (no re-render / re-blit).
+  const hudRef = useRef<PixelHudHandle>(null);
+  const hudDataRef = useRef({ buffer, paletteLines, lineMap, zoom: effectiveZoom });
+  hudDataRef.current = { buffer, paletteLines, lineMap, zoom: effectiveZoom };
+
   const onHover = useCallback((pixel: { x: number; y: number } | null) => {
     if (pixel) hoverRef.current = pixel;
+    const { buffer: buf, paletteLines: pls, lineMap: lm, zoom: z } = hudDataRef.current;
+    if (pixel && pixel.x >= 0 && pixel.y >= 0 && pixel.x < buf.width && pixel.y < buf.height) {
+      const i = pixel.y * buf.width + pixel.x;
+      const idx = buf.data[i];
+      const line = lm ? lm[i] : 0;
+      hudRef.current?.update({ x: pixel.x, y: pixel.y, idx, color: pls[line]?.[idx] }, z);
+    } else {
+      hudRef.current?.update(null, z);
+    }
   }, []);
 
   // Cursor-anchored wheel zoom (the doc point under the cursor stays put).
@@ -558,7 +573,8 @@ export default function ComposerCanvas() {
   if (!open) return null;
 
   return (
-    <div ref={scrollerRef} style={styles.scroller}>
+    <div style={styles.frame}>
+      <div ref={scrollerRef} style={styles.scroller}>
       <div style={styles.holder}>
         <PixelViewport
           buffer={buffer}
@@ -582,11 +598,16 @@ export default function ComposerCanvas() {
           onHover={onHover}
         />
       </div>
+      </div>
+      <PixelHud ref={hudRef} />
     </div>
   );
 }
 
 const styles: Record<string, React.CSSProperties> = {
+  frame: {
+    flex: 1, position: 'relative', display: 'flex', minWidth: 0, minHeight: 0,
+  },
   scroller: {
     flex: 1,
     overflow: 'auto',
