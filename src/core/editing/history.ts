@@ -129,6 +129,11 @@ function applyCommand(cmd: AnyCommand, level: S4Level): void {
         section.tileGrid.collision[e.index] = e.newColl;
       }
       break;
+    case 'set-collision-edit':
+      if (section.collisionEdit) {
+        for (const e of cmd.entries) section.collisionEdit[e.index] = e.newColl;
+      }
+      break;
     case 'move-object': {
       const obj = section.objects[cmd.objectIndex];
       if (obj) { obj.x = cmd.newX; obj.y = cmd.newY; }
@@ -242,6 +247,11 @@ function undoCommand(cmd: AnyCommand, level: S4Level): void {
     case 'set-collision':
       for (const e of cmd.entries) {
         section.tileGrid.collision[e.index] = e.oldColl;
+      }
+      break;
+    case 'set-collision-edit':
+      if (section.collisionEdit) {
+        for (const e of cmd.entries) section.collisionEdit[e.index] = e.oldColl;
       }
       break;
     case 'move-object': {

@@ -24,6 +24,11 @@ export interface SetCollisionCommand extends EditCommand {
   entries: Array<{ index: number; oldColl: number; newColl: number }>;
 }
 
+export interface SetCollisionEditCommand extends EditCommand {
+  type: 'set-collision-edit';
+  entries: Array<{ index: number; oldColl: number; newColl: number }>;
+}
+
 export interface MoveObjectCommand extends EditCommand {
   type: 'move-object';
   objectIndex: number;
@@ -153,6 +158,7 @@ export type AnyCommand =
   | BatchCommand
   | SetTilesCommand
   | SetCollisionCommand
+  | SetCollisionEditCommand
   | MoveObjectCommand
   | AddObjectCommand
   | DeleteObjectCommand
