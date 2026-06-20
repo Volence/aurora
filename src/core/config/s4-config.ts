@@ -25,6 +25,9 @@ export interface S4ProjectConfig {
   zones: S4ZoneConfig[];
   objectLibrary: string;
   chunkLibrary: string;
+  /** Optional path (relative to the project) to the engine's collision tables
+   *  dir. Defaults to 'data/collision/' when absent. */
+  collisionDataPath?: string;
 }
 
 export interface LoadedS4Config {

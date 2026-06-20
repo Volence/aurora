@@ -2,6 +2,7 @@ import { useCallback } from 'react';
 import { useProjectStore, getCurrentAct, getCurrentZone } from '../state/projectStore';
 import { useViewStore } from '../state/viewStore';
 import { useEditorStore } from '../state/editorStore';
+import { loadCollisionProfiles } from './load-collision';
 
 // Set to true only when migrateChunkTilesIntoTileset ran successfully during
 // the current loadFullProject call. Reset at the top of each load so stale
@@ -75,6 +76,12 @@ export function useProject() {
       setConfig(config);
       await window.api.addRecentProject(dir, config.name);
       setProject(project);
+
+      // Load the engine's collision tables (read-only view). Missing/unreadable
+      // tables → null → the overlay falls back to flat fills (no crash).
+      const collPath = config.raw.collisionDataPath ?? 'data/collision/';
+      const collisionProfiles = await loadCollisionProfiles(config.basePath, collPath);
+      useProjectStore.getState().setCollisionProfiles(collisionProfiles);
 
       if (config.zones.length > 0) {
         const zone = config.zones[0];
