@@ -4,6 +4,8 @@ import { useViewStore, type OverlayOptions } from '../state/viewStore';
 
 const LABELS: Record<string, string> = {
   showBlockGrid: 'Chunk grid (128px)', showChunkGrid: 'Section grid (2048px)',
+  showCollision: 'Collision (path A)', showCollisionPathB: 'Collision (path B)',
+  showCollisionAngles: 'Collision angles',
 };
 function pretty(key: string) {
   return LABELS[key] ?? key.replace('show', '').replace(/([A-Z])/g, ' $1').trim();

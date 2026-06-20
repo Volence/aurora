@@ -49,10 +49,11 @@ export class OverlayRenderer {
     if (options.showChunkGrid) this.drawSectionGrid(ctx, viewport);
 
     for (const info of sections) {
-      if (options.showCollision) {
-        // The read-only engineCollision (real attr indices from strips) is the
-        // ground truth for the view — path A, or path B when toggled (it falls
-        // back to A if a section has no B); the editable array only if no strips.
+      if (options.showCollision || options.showCollisionPathB) {
+        // Two independent planes: "Collision" shows path A, "Collision Path B"
+        // shows path B (the read-only engine attr indices from strips). Path B is
+        // preferred when both are on, and falls back to A if a section has no B;
+        // the editable array is used only when there are no strips at all.
         const eng = options.showCollisionPathB
           ? (info.section.engineCollisionB ?? info.section.engineCollision)
           : info.section.engineCollision;

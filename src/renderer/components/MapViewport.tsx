@@ -805,7 +805,7 @@ export default function MapViewport() {
       if (info) {
         let extra = '';
         const overlays = useViewStore.getState().overlays;
-        if (overlays.showCollision) {
+        if (overlays.showCollision || overlays.showCollisionPathB) {
           const act = getCurrentAct(useProjectStore.getState());
           const section = act?.sections[info.sectionIndex] ?? null;
           if (section) {
