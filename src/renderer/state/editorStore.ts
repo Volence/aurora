@@ -150,7 +150,7 @@ export const useEditorStore = create<EditorState>((set) => ({
   setSelectedCollisionType: (type) => set({ selectedCollisionType: type }),
   setSelectedCollisionProfile: (index) => set({ selectedCollisionProfile: Math.max(0, Math.min(255, index | 0)) }),
   setCollisionPaintPlane: (collisionPaintPlane) => set({ collisionPaintPlane }),
-  setCollisionBrushSize: (size) => set({ collisionBrushSize: Math.max(1, Math.min(15, size | 0)) }),
+  setCollisionBrushSize: (size) => set({ collisionBrushSize: Math.max(1, Math.min(31, size | 0)) }),
   markDirty: () => set({ dirty: true }),
   markClean: () => set({ dirty: false }),
   bumpVersion: () => set((s) => ({ historyVersion: s.historyVersion + 1 })),

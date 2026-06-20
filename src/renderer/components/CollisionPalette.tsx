@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { useEditorStore } from '../state/editorStore';
-import { useProjectStore } from '../state/projectStore';
+import { useEditorStore, executeCommand } from '../state/editorStore';
+import { useProjectStore, getActiveLevel } from '../state/projectStore';
 import { useViewStore } from '../state/viewStore';
+import { SECTION_TILES_WIDE, SECTION_TILES_HIGH } from '../../core/model/s4-types';
 import { angleDegrees } from '../../core/collision/collision-model';
 import type { CollisionProfile } from '../../core/collision/collision-model';
 import { classifyProfile, COLLISION_KINDS } from '../../core/collision/collision-classify';
@@ -46,8 +47,35 @@ export default function CollisionPalette() {
   const plane = useEditorStore((s) => s.collisionPaintPlane);
   const brush = useEditorStore((s) => s.collisionBrushSize);
   const setBrush = useEditorStore((s) => s.setCollisionBrushSize);
+  const activeSection = useEditorStore((s) => s.activeSectionIndex);
 
   const [kind, setKind] = useState<'all' | CollisionKind>('all');
+
+  // Wipe the active section's collision on the active plane (one undoable command).
+  function clearSection() {
+    const ed = useEditorStore.getState();
+    const level = getActiveLevel(useProjectStore.getState());
+    if (!level) return;
+    const section = level.sections[ed.activeSectionIndex];
+    if (!section) return;
+    const p = ed.collisionPaintPlane;
+    const blank = () => new Uint8Array(SECTION_TILES_WIDE * SECTION_TILES_HIGH);
+    if (p === 'b') {
+      if (!section.collisionEditB) section.collisionEditB = section.engineCollisionB ? new Uint8Array(section.engineCollisionB) : blank();
+    } else if (!section.collisionEdit) {
+      section.collisionEdit = section.engineCollision ? new Uint8Array(section.engineCollision) : blank();
+    }
+    const ce = p === 'b' ? section.collisionEditB : section.collisionEdit;
+    if (!ce) return;
+    const entries: Array<{ index: number; oldColl: number; newColl: number }> = [];
+    for (let i = 0; i < ce.length; i++) if (ce[i] !== 0) entries.push({ index: i, oldColl: ce[i], newColl: 0 });
+    if (!entries.length) return;
+    executeCommand({
+      type: 'set-collision-edit', plane: p,
+      description: `Clear collision ${p.toUpperCase()} (section ${ed.activeSectionIndex})`,
+      sectionIndex: ed.activeSectionIndex, entries,
+    }, level);
+  }
 
   function pickPlane(p: 'a' | 'b') {
     useEditorStore.getState().setCollisionPaintPlane(p);
@@ -97,10 +125,12 @@ export default function CollisionPalette() {
       </div>
       <div style={styles.planes}>
         <span style={styles.planeLabel}>Brush</span>
-        {[1, 3, 5, 7].map((n) => (
+        {[1, 7, 15, 25].map((n) => (
           <button key={n} onClick={() => setBrush(n)} title={n === 1 ? 'Single block (reuse matching)' : `${n}×${n} block area`}
             style={{ ...styles.planeBtn, ...(brush === n ? styles.planeSel : {}) }}>{n === 1 ? '1' : `${n}×${n}`}</button>
         ))}
+        <button onClick={clearSection} title={`Erase ALL collision in section ${activeSection} (this plane) — undoable`}
+          style={{ ...styles.planeBtn, marginLeft: 'auto' }}>Clear sec {activeSection}</button>
       </div>
       <div style={styles.hint}>{brush > 1
         ? `Pick a shape, then paint on the map. Paints the ${brush}×${brush} block area under the cursor.`
