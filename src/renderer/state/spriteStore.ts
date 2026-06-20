@@ -7,6 +7,8 @@ import { SpriteHistory, type SpriteSnapshot } from '../../core/editing/sprite-hi
 import { registerRedoClearer, invalidateSiblingRedos } from '../../core/editing/undo-bus';
 import type { SpritePaletteMode } from '../../core/art/sprite-palette';
 import { blankStandalonePalette } from '../../core/art/sprite-palette';
+import { copyRegion, clearRegion, pasteRegion, type ClipRegion } from '../../core/art/pixel-clipboard';
+import { diffWrites } from '../../core/art/pixel-edit-controller';
 import { useProjectStore, getCurrentZone } from './projectStore';
 
 export type SpriteTool =
@@ -48,6 +50,12 @@ interface SpriteState {
   ditherPattern: DitherPattern;
   ditherSecondary: number;     // 0-15 (0 = transparent)
   selection: SpriteSelection | null;
+  clipboard: ClipRegion | null;
+  /** Each returns true if the action was applicable (had a selection / clipboard),
+   *  so the keyboard handler only swallows the native shortcut when it acted. */
+  copySelection: () => boolean;
+  cutSelection: () => boolean;
+  paste: () => boolean;
   name: string;                // sprite name (export folder + anim label); follows loads
   setName: (name: string) => void;
   exportDplc: boolean;         // export as DPLC (streamed art) vs flat resident art
@@ -163,6 +171,7 @@ export const useSpriteStore = create<SpriteState>((set, get) => ({
   ditherPattern: 'checker',
   ditherSecondary: 0,
   selection: null,
+  clipboard: null,
   name: 'NewSprite',
   exportDplc: false,
   format: 's4',
@@ -202,6 +211,51 @@ export const useSpriteStore = create<SpriteState>((set, get) => ({
     const frames = s.frames.slice();
     frames[s.currentIndex] = b;
     set({ frames, historyTick: s.historyTick + 1 });
+  },
+  copySelection: () => {
+    const s = get();
+    if (!s.selection) return false;
+    const region = copyRegion(s.frames[s.currentIndex], s.selection);
+    if (!region) return false;
+    set({ clipboard: region });
+    return true;
+  },
+  cutSelection: () => {
+    const s = get();
+    if (!s.selection) return false;
+    const cur = s.frames[s.currentIndex];
+    const region = copyRegion(cur, s.selection);
+    if (!region) return false;
+    const cleared = clearRegion(cur, s.selection);
+    // Only push an undo step / clobber redo when pixels actually cleared (an
+    // already-blank region is a no-op edit). Mirrors applyTransform.
+    if (diffWrites(cur, cleared).length > 0) recordEdit(s);
+    const frames = s.frames.slice();
+    frames[s.currentIndex] = cleared;
+    set({ frames, clipboard: region, selection: null, historyTick: s.historyTick + 1 });
+    return true;
+  },
+  paste: () => {
+    const s = get();
+    const clip = s.clipboard;
+    if (!clip) return false;
+    const cur = s.frames[s.currentIndex];
+    // Origin: the selection's top-left if present, else (0,0); clamped so the
+    // region fits (overflow is clipped by pasteRegion regardless).
+    const ox = Math.max(0, Math.min(s.selection?.x ?? 0, Math.max(0, cur.width - clip.w)));
+    const oy = Math.max(0, Math.min(s.selection?.y ?? 0, Math.max(0, cur.height - clip.h)));
+    const pasted = pasteRegion(cur, clip, ox, oy);
+    // Nothing landed (all-transparent / fully-clipped clip): no undo step, no
+    // redo clobber. The clipboard existed, so the shortcut is still "handled".
+    if (diffWrites(cur, pasted).length === 0) return true;
+    recordEdit(s);
+    const frames = s.frames.slice();
+    frames[s.currentIndex] = pasted;
+    // Switch to select and select the pasted rect so it can be dragged next
+    // (setTool would clear the selection, so set tool + selection together here).
+    const w = Math.min(clip.w, cur.width - ox), h = Math.min(clip.h, cur.height - oy);
+    set({ frames, tool: 'select', selection: { x: ox, y: oy, w, h }, historyTick: s.historyTick + 1 });
+    return true;
   },
   // New frame matches the current canvas size (loaded sprites may not be 32x32).
   addFrame: () => {
