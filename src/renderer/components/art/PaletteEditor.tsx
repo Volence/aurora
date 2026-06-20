@@ -1,11 +1,14 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useProjectStore, getCurrentZone, getActiveLevel } from '../../state/projectStore';
+import { useProjectStore, getCurrentZone, getActiveLevel, getCurrentAct } from '../../state/projectStore';
 import { useEditorStore, executeCommand } from '../../state/editorStore';
 import { useArtStore } from '../../state/artStore';
 import { useSpriteStore } from '../../state/spriteStore';
 import { encodeGenesisColor, decodeGenesisColor } from '../../../core/formats/palette';
+import { copySwatchInto, copyLineInto } from '../../../core/art/palette-copy';
+import { paletteLineUsageCounts } from '../../../core/art/usage';
 import type { Color } from '../../../core/model/s4-types';
 import { T } from '../ui';
+import PaletteCopyMenu, { type CopyMenuItem } from './PaletteCopyMenu';
 
 /** 8-bit channel → Genesis 3-bit level (0-7). */
 function to3(v: number): number {
@@ -23,6 +26,16 @@ interface SwatchSel {
 
 const CHANNELS = ['r', 'g', 'b'] as const;
 const CHANNEL_COLORS: Record<string, string> = { r: T.error, g: T.success, b: T.info };
+
+/** Source carried by an in-progress swatch/line drag (HTML5 DnD; payload in a
+ *  module ref, mirroring SectionGridNav — no dataTransfer). */
+type DragPayload = { kind: 'swatch'; color: Color } | { kind: 'line'; colors: Color[] };
+let dragPayload: DragPayload | null = null;
+
+function sameColors(a: Color[], b: Color[]): boolean {
+  return a.length === b.length && a.every((c, i) =>
+    encodeGenesisColor(c) === encodeGenesisColor(b[i]) && c.a === b[i].a);
+}
 
 /**
  * Genesis palette editor: 4 rows × 16 swatches over zone.palette. The grid
@@ -62,6 +75,9 @@ export default function PaletteEditor() {
   const inSprite = appMode === 'sprite';
 
   const [sel, setSel] = useState<SwatchSel | null>(null);
+  const [menu, setMenu] = useState<{ x: number; y: number; heading: string; items: CopyMenuItem[] } | null>(null);
+  // Highlighted drop target during a drag: `${kind}:${line}:${idx}`.
+  const [dropKey, setDropKey] = useState<string | null>(null);
   // Pre-drag deep copy of the edited line so the committed undo snapshot is
   // the true pre-drag state (live preview mutates the palette in place).
   const preDragRef = useRef<{ line: number; colors: Color[] } | null>(null);
@@ -234,6 +250,145 @@ export default function PaletteEditor() {
     }, level);
   }
 
+  /** Copy a single color into a zone line index, via the undoable set-palette-line command. */
+  function applyZoneSwatchCopy(line: number, idx: number, src: Color) {
+    if (idx <= 0) return;
+    const state = useProjectStore.getState();
+    const z = getCurrentZone(state);
+    const level = getActiveLevel(state);
+    if (!z || !level) return;
+    const old = z.palette.lines[line].colors.map((c) => ({ ...c }));
+    const edited = copySwatchInto(old, idx, src);
+    if (sameColors(edited, old)) return;
+    executeCommand({
+      type: 'set-palette-line', line, oldColors: old, newColors: edited,
+      sectionIndex: -1, description: `copy color into line ${line} idx ${idx}`,
+    }, level);
+  }
+
+  /** Copy 16 colors (1-15) into a zone line, via set-palette-line. */
+  function applyZoneLineCopy(line: number, src: Color[]) {
+    const state = useProjectStore.getState();
+    const z = getCurrentZone(state);
+    const level = getActiveLevel(state);
+    if (!z || !level) return;
+    const old = z.palette.lines[line].colors.map((c) => ({ ...c }));
+    const edited = copyLineInto(old, src);
+    if (sameColors(edited, old)) return;
+    executeCommand({
+      type: 'set-palette-line', line, oldColors: old, newColors: edited,
+      sectionIndex: -1, description: `copy palette line into ${line}`,
+    }, level);
+  }
+
+  /** Copy a single color into the standalone palette, via setStandalonePalette (sprite undo). */
+  function applyStandaloneSwatchCopy(idx: number, src: Color) {
+    if (idx <= 0) return;
+    const cur = useSpriteStore.getState().standalonePalette;
+    const edited = copySwatchInto(cur, idx, src);
+    if (sameColors(edited, cur)) return;
+    useSpriteStore.getState().setStandalonePalette(edited);
+  }
+
+  /** Copy 16 colors into the standalone palette. */
+  function applyStandaloneLineCopy(src: Color[]) {
+    const cur = useSpriteStore.getState().standalonePalette;
+    const edited = copyLineInto(cur, src);
+    if (sameColors(edited, cur)) return;
+    useSpriteStore.getState().setStandalonePalette(edited);
+  }
+
+  /** Usage note for a zone line: line 0 always shared; 1-3 show tile counts.
+   *  Takes precomputed counts so a menu open scans the act's nametables once. */
+  function zoneLineNote(line: number, counts: Map<number, number>): string | undefined {
+    if (line === 0) return 'player';
+    const uses = counts.get(line) ?? 0;
+    return uses > 0 ? `${uses.toLocaleString()} tiles` : undefined;
+  }
+
+  /** Per-line tile usage for the active act (one nametable scan) — for menu notes. */
+  function actLineCounts(): Map<number, number> {
+    const act = getCurrentAct(useProjectStore.getState());
+    return act ? paletteLineUsageCounts(act) : new Map<number, number>();
+  }
+
+  /** A zone line is off-limits as a copy participant when it's the Art-mode
+   *  sprite-reserved line 0 — mirrors the per-swatch `locked` so the copy bridge
+   *  can't overwrite the player palette outside sprite mode. */
+  function zoneLineLocked(line: number): boolean {
+    return line === 0 && !inSprite;
+  }
+
+  /** Build "Copy to ▸" targets for a single swatch (index-preserving). `srcLine`
+   *  is the source zone line, or -1 when the source is the standalone palette.
+   *  The standalone palette is a target only in sprite mode. */
+  function swatchMenuItems(srcLine: number, idx: number, src: Color): CopyMenuItem[] {
+    const items: CopyMenuItem[] = [];
+    const counts = actLineCounts();
+    for (let l = 0; l < lines.length; l++) {
+      if (l === srcLine || zoneLineLocked(l)) continue; // skip source + locked line 0
+      items.push({ label: `Zone line ${l} · idx ${idx}`, note: zoneLineNote(l, counts), onSelect: () => applyZoneSwatchCopy(l, idx, src) });
+    }
+    if (inSprite && srcLine !== -1) {
+      items.push({ label: `Standalone · idx ${idx}`, onSelect: () => applyStandaloneSwatchCopy(idx, src) });
+    }
+    return items;
+  }
+
+  /** Build "Copy to ▸" targets for a whole line. */
+  function lineMenuItems(srcLine: number, src: Color[]): CopyMenuItem[] {
+    const items: CopyMenuItem[] = [];
+    const counts = actLineCounts();
+    for (let l = 0; l < lines.length; l++) {
+      if (l === srcLine || zoneLineLocked(l)) continue;
+      items.push({ label: `Zone line ${l}`, note: zoneLineNote(l, counts), onSelect: () => applyZoneLineCopy(l, src) });
+    }
+    if (inSprite && srcLine !== -1) {
+      items.push({ label: 'Standalone', onSelect: () => applyStandaloneLineCopy(src) });
+    }
+    return items;
+  }
+
+  function openSwatchMenu(e: React.MouseEvent, srcLine: number, idx: number, src: Color) {
+    e.preventDefault(); // suppress the native menu even on a non-source (idx 0) swatch
+    if (idx <= 0) return; // transparent backdrop isn't a copy source
+    setMenu({ x: e.clientX, y: e.clientY, heading: 'Copy color to', items: swatchMenuItems(srcLine, idx, src) });
+  }
+  function openLineMenu(e: React.MouseEvent, srcLine: number, src: Color[]) {
+    e.preventDefault();
+    setMenu({ x: e.clientX, y: e.clientY, heading: 'Copy line to', items: lineMenuItems(srcLine, src) });
+  }
+
+  function onSwatchDragStart(color: Color) { dragPayload = { kind: 'swatch', color }; }
+  function onLineDragStart(colors: Color[]) { dragPayload = { kind: 'line', colors: colors.map((c) => ({ ...c })) }; }
+  function onSwatchDragOver(e: React.DragEvent, key: string, idx: number, locked = false) {
+    if (dragPayload?.kind !== 'swatch' || idx <= 0 || locked) return;
+    e.preventDefault();
+    if (dropKey !== key) setDropKey(key);
+  }
+  function onLineDragOver(e: React.DragEvent, key: string, locked = false) {
+    if (dragPayload?.kind !== 'line' || locked) return;
+    e.preventDefault();
+    if (dropKey !== key) setDropKey(key);
+  }
+  function endDrag() { dragPayload = null; setDropKey(null); }
+  /** Drop a swatch onto a target. `destLine` is the zone line, or -1 for standalone.
+   *  `locked` (Art-mode line 0) rejects the drop so the player palette is safe. */
+  function onSwatchDrop(destLine: number, idx: number, locked = false) {
+    const p = dragPayload;
+    endDrag();
+    if (p?.kind !== 'swatch' || idx <= 0 || locked) return;
+    if (destLine === -1) applyStandaloneSwatchCopy(idx, p.color);
+    else applyZoneSwatchCopy(destLine, idx, p.color);
+  }
+  function onLineDrop(destLine: number, locked = false) {
+    const p = dragPayload;
+    endDrag();
+    if (p?.kind !== 'line' || locked) return;
+    if (destLine === -1) applyStandaloneLineCopy(p.colors);
+    else applyZoneLineCopy(destLine, p.colors);
+  }
+
   const selColor = sel
     ? (standaloneSprite ? standalone[sel.idx] : lines[sel.line]?.colors[sel.idx])
     : null;
@@ -244,6 +399,16 @@ export default function PaletteEditor() {
       <div style={styles.grid}>
         {standaloneSprite ? (
           <div style={styles.row}>
+            <div
+              style={styles.grip}
+              title="Drag to copy this palette · right-click to copy to a zone line"
+              draggable
+              onDragStart={() => onLineDragStart(standalone)}
+              onDragOver={(e) => onLineDragOver(e, 'sa-line')}
+              onDrop={() => onLineDrop(-1)}
+              onDragEnd={endDrag}
+              onContextMenu={(e) => openLineMenu(e, -1, standalone)}
+            />
             {standalone.map((c, ci) => {
               const transparent = ci === 0;
               const isEditSel = sel !== null && sel.idx === ci;
@@ -255,6 +420,12 @@ export default function PaletteEditor() {
                 <div
                   key={ci}
                   title={title}
+                  draggable={ci > 0}
+                  onDragStart={() => onSwatchDragStart(c)}
+                  onDragOver={(e) => onSwatchDragOver(e, `sa:0:${ci}`, ci)}
+                  onDrop={() => onSwatchDrop(-1, ci)}
+                  onDragEnd={endDrag}
+                  onContextMenu={(e) => openSwatchMenu(e, -1, ci, c)}
                   onClick={() => handleStandaloneClick(ci)}
                   style={{
                     ...styles.swatch,
@@ -263,18 +434,31 @@ export default function PaletteEditor() {
                       : { background: `rgb(${c.r},${c.g},${c.b})` }),
                     ...(isPaintSel ? styles.paintSel : {}),
                     ...(isEditSel ? styles.editSel : {}),
+                    ...(dropKey === `sa:0:${ci}` ? styles.dropTarget : {}),
                   }}
                 />
               );
             })}
           </div>
         ) : (
-          lines.map((line, li) => (
+          lines.map((line, li) => {
+            // Line 0 is the editable player palette in Sprite mode; locked
+            // (sprite-reserved) only in Art mode. Gates the grip + every swatch.
+            const rowLocked = li === 0 && !inSprite;
+            return (
             <div key={li} style={styles.row}>
+              <div
+                style={{ ...styles.grip, ...(rowLocked ? styles.locked : {}), ...(dropKey === `z-line:${li}` ? styles.dropTarget : {}) }}
+                title={rowLocked ? 'sprite-reserved (line 0)' : `Drag to copy line ${li} · right-click to copy elsewhere`}
+                draggable={!rowLocked}
+                onDragStart={() => onLineDragStart(line.colors)}
+                onDragOver={(e) => onLineDragOver(e, `z-line:${li}`, rowLocked)}
+                onDrop={() => onLineDrop(li, rowLocked)}
+                onDragEnd={endDrag}
+                onContextMenu={(e) => { e.preventDefault(); if (!rowLocked) openLineMenu(e, li, line.colors); }}
+              />
               {line.colors.map((c, ci) => {
-                // Line 0 is the editable player palette in Sprite mode; locked
-                // (sprite-reserved) only in Art mode.
-                const locked = li === 0 && !inSprite;
+                const locked = rowLocked;
                 const transparent = ci === 0;
                 const isEditSel = sel !== null && sel.line === li && sel.idx === ci;
                 // In Sprite mode the paint-selection outline tracks the sprite's
@@ -290,6 +474,12 @@ export default function PaletteEditor() {
                   <div
                     key={ci}
                     title={title}
+                    draggable={ci > 0 && !locked}
+                    onDragStart={() => onSwatchDragStart(c)}
+                    onDragOver={(e) => onSwatchDragOver(e, `z:${li}:${ci}`, ci, locked)}
+                    onDrop={() => onSwatchDrop(li, ci, locked)}
+                    onDragEnd={endDrag}
+                    onContextMenu={(e) => { if (locked) { e.preventDefault(); return; } openSwatchMenu(e, li, ci, c); }}
                     onClick={() => handleSwatchClick(li, ci)}
                     style={{
                       ...styles.swatch,
@@ -299,12 +489,14 @@ export default function PaletteEditor() {
                       ...(locked ? styles.locked : {}),
                       ...(isPaintSel ? styles.paintSel : {}),
                       ...(isEditSel ? styles.editSel : {}),
+                      ...(dropKey === `z:${li}:${ci}` ? styles.dropTarget : {}),
                     }}
                   />
                 );
               })}
             </div>
-          ))
+            );
+          })
         )}
       </div>
 
@@ -341,6 +533,13 @@ export default function PaletteEditor() {
           ))}
         </div>
       )}
+
+      {menu && (
+        <PaletteCopyMenu
+          x={menu.x} y={menu.y} heading={menu.heading} items={menu.items}
+          onClose={() => setMenu(null)}
+        />
+      )}
     </div>
   );
 }
@@ -371,6 +570,19 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: 2,
     cursor: 'pointer',
     boxSizing: 'border-box' as const,
+  },
+  grip: {
+    width: 6,
+    alignSelf: 'stretch',
+    minHeight: 20,
+    borderRadius: 2,
+    background: T.borderStrong,
+    cursor: 'grab',
+    flex: '0 0 auto',
+  },
+  dropTarget: {
+    outline: `2px solid ${T.accent}`,
+    outlineOffset: -1,
   },
   checkerboard: {
     background: `repeating-conic-gradient(${T.textLo} 0% 25%, ${T.borderStrong} 0% 50%) 0 0 / 8px 8px`,
