@@ -6,6 +6,8 @@ import { SECTION_TILES_WIDE, SECTION_TILES_HIGH } from '../../core/model/s4-type
 import { angleDegrees } from '../../core/collision/collision-model';
 import type { CollisionProfile } from '../../core/collision/collision-model';
 import { resolvePlaneWords } from '../../core/collision/collision-cell-resolve';
+import { flipProfile } from '../../core/collision/collision-flip';
+import type { Solidity } from '../../core/collision/collision-model';
 import { classifyProfile, COLLISION_KINDS } from '../../core/collision/collision-classify';
 import type { CollisionKind } from '../../core/collision/collision-classify';
 import { drawCollisionShape } from '../../core/collision/collision-shape-draw';
@@ -17,6 +19,17 @@ import {
 
 const PX = 22;        // thumbnail size
 const PREVIEW = 120;  // big preview canvas size
+
+/** Floor-type picker → the cell's solidity (which sensor directions it stops). */
+const FLOOR_TYPES: ReadonlyArray<{ value: Solidity; label: string; title: string }> = [
+  { value: 'all', label: 'Solid', title: 'Solid from every direction (normal ground/wall)' },
+  { value: 'top', label: 'Jump-thru', title: 'One-way platform: only the top stops you; jump up through it' },
+  { value: 'sides-bottom', label: 'L/R/B', title: 'Solid on left/right/bottom but NOT the top' },
+  { value: 'none', label: 'None', title: 'No collision (bakes to air; keeps the shape for reference)' },
+];
+const FLOOR_LABEL: Record<Solidity, string> = {
+  all: 'solid', top: 'jump-thru', 'sides-bottom': 'L/R/B', none: 'none',
+};
 
 const SHAPE_OPTS: ShapeDrawOpts = {
   fill: COLLISION_SHAPE_FILL,
@@ -49,6 +62,12 @@ export default function CollisionPalette() {
   const brush = useEditorStore((s) => s.collisionBrushSize);
   const setBrush = useEditorStore((s) => s.setCollisionBrushSize);
   const activeSection = useEditorStore((s) => s.activeSectionIndex);
+  const xFlip = useEditorStore((s) => s.selectedCollisionXFlip);
+  const yFlip = useEditorStore((s) => s.selectedCollisionYFlip);
+  const solidity = useEditorStore((s) => s.selectedCollisionSolidity);
+  const setXFlip = useEditorStore((s) => s.setSelectedCollisionXFlip);
+  const setYFlip = useEditorStore((s) => s.setSelectedCollisionYFlip);
+  const setSolidity = useEditorStore((s) => s.setSelectedCollisionSolidity);
 
   const [kind, setKind] = useState<'all' | CollisionKind>('all');
 
@@ -145,7 +164,10 @@ export default function CollisionPalette() {
   if (!profiles) return <div style={styles.note}>Collision tables not found — open a project with collision data.</div>;
 
   const selProfile = selected > 0 && selected < profiles.solidCount ? profiles.profiles[selected] : null;
-  const selDeg = selProfile ? angleDegrees(selProfile) : null;
+  // The big preview shows what actually gets painted + baked: the base shape with
+  // the current flip + solidity applied (thumbnails stay the stable base vocabulary).
+  const previewProfile = selProfile ? { ...flipProfile(selProfile, xFlip, yFlip), solidity } : null;
+  const selDeg = previewProfile ? angleDegrees(previewProfile) : null;
 
   return (
     <div>
@@ -165,6 +187,20 @@ export default function CollisionPalette() {
         <button onClick={clearSection} title={`Erase ALL collision in section ${activeSection} (this plane) — undoable`}
           style={styles.planeBtn}>Clear sec {activeSection}</button>
       </div>
+      <div style={styles.planes}>
+        <span style={styles.planeLabel}>Flip</span>
+        <button onClick={() => setXFlip(!xFlip)} title="Mirror the shape horizontally (the other slope direction)"
+          style={{ ...styles.planeBtn, ...(xFlip ? styles.planeSel : {}) }}>H ⇄</button>
+        <button onClick={() => setYFlip(!yFlip)} title="Flip the shape vertically (floor ↔ ceiling)"
+          style={{ ...styles.planeBtn, ...(yFlip ? styles.planeSel : {}) }}>V ⇅</button>
+      </div>
+      <div style={styles.planes}>
+        <span style={styles.planeLabel}>Floor</span>
+        {FLOOR_TYPES.map(({ value, label, title }) => (
+          <button key={value} onClick={() => setSolidity(value)} title={title}
+            style={{ ...styles.planeBtn, ...(solidity === value ? styles.planeSel : {}) }}>{label}</button>
+        ))}
+      </div>
       <div style={styles.hint}>{brush > 1
         ? `Pick a shape, then paint on the map. Paints the ${brush}×${brush} block area under the cursor.`
         : 'Pick a shape, then paint on the map. Paints every block with the same tiles; hold Alt to paint just one.'}</div>
@@ -177,19 +213,19 @@ export default function CollisionPalette() {
       </div>
 
       <div style={styles.preview}>
-        {selected === 0 || !selProfile ? (
+        {selected === 0 || !previewProfile ? (
           <div style={styles.previewBox}>
             <span style={styles.erase}>∅</span>
           </div>
         ) : (
           <div style={styles.previewBox}>
-            <ShapeCanvas profile={selProfile} size={PREVIEW} />
+            <ShapeCanvas profile={previewProfile} size={PREVIEW} />
           </div>
         )}
         <div style={styles.previewText}>
-          {selected === 0 || !selProfile
+          {selected === 0 || !previewProfile
             ? 'Erase (air)'
-            : `#${selected} · ${classifyProfile(selProfile)} · ${selDeg ?? '—'}° · solid: ${selProfile.solidity}`}
+            : `#${selected}${xFlip ? ' ⇄' : ''}${yFlip ? ' ⇅' : ''} · ${classifyProfile(previewProfile)} · ${selDeg ?? '—'}° · ${FLOOR_LABEL[solidity]}`}
         </div>
       </div>
 
