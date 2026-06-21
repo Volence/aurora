@@ -12,14 +12,20 @@ async function readBin(basePath: string, rel: string): Promise<Uint8Array> {
  */
 export async function loadCollisionProfiles(basePath: string, relDir: string): Promise<CollisionProfileSet | null> {
   const dir = relDir.endsWith('/') ? relDir : `${relDir}/`;
-  try {
-    const [heightmaps, angles, solidity] = await Promise.all([
-      readBin(basePath, `${dir}heightmaps.bin`),
-      readBin(basePath, `${dir}angles.bin`),
-      readBin(basePath, `${dir}solidity.bin`),
-    ]);
-    return s4CollisionAdapter.decodeProfiles({ heightmaps, angles, solidity });
-  } catch {
-    return null;
+  // The palette shows the fixed BASE BANK (the imported S&K vocabulary), not the
+  // sparse interned runtime tables the bake writes to `${dir}*.bin`. Prefer the
+  // base bank; fall back to the flat tables (pre-flag builds / if base absent).
+  for (const sub of [`${dir}base/`, dir]) {
+    try {
+      const [heightmaps, angles, solidity] = await Promise.all([
+        readBin(basePath, `${sub}heightmaps.bin`),
+        readBin(basePath, `${sub}angles.bin`),
+        readBin(basePath, `${sub}solidity.bin`),
+      ]);
+      return s4CollisionAdapter.decodeProfiles({ heightmaps, angles, solidity });
+    } catch {
+      // try the next location
+    }
   }
+  return null;
 }

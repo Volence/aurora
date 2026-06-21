@@ -9,8 +9,8 @@ import {
   OBJECT_BOX_FILL, OBJECT_BOX_STROKE, OBJECT_LABEL, RING_FILL, RING_STROKE,
 } from './canvas-colors';
 import type { CollisionProfileSet, Solidity } from '../../core/collision/collision-model';
-import { isAir, isKnownProfile } from '../../core/collision/collision-model';
 import { columnSolidRun } from '../../core/collision/collision-render';
+import { resolveCell, resolvePlaneWords } from '../../core/collision/collision-cell-resolve';
 
 type Ctx = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
 
@@ -54,8 +54,15 @@ export class OverlayRenderer {
         // "Collision" = path A, "Collision Path B" = path B. When BOTH are on,
         // render path A as the base and outline the cells where B differs, so the
         // dual-layer/loop regions stand out instead of the planes hiding each other.
-        const a = info.section.collisionEdit ?? info.section.engineCollision ?? info.section.tileGrid.collision;
-        const b = info.section.collisionEditB ?? info.section.engineCollisionB ?? null;
+        // Resolve each plane to a uniform array of 16-bit packed cell words
+        // (editable plane verbatim, else the engine baseline packed to words).
+        const len = info.section.collisionEdit?.length
+          ?? info.section.engineCollision?.length
+          ?? info.section.tileGrid.collision.length;
+        const a = resolvePlaneWords(info.section.collisionEdit, info.section.engineCollision, len);
+        const b = (info.section.collisionEditB || info.section.engineCollisionB)
+          ? resolvePlaneWords(info.section.collisionEditB, info.section.engineCollisionB, len)
+          : null;
         if (options.showCollision && options.showCollisionPathB && b) {
           this.drawCollisionOverlay(ctx, viewport, a, info.offsetX, info.offsetY, collisionProfiles ?? null, options.showCollisionAngles, b);
         } else {
@@ -155,12 +162,12 @@ export class OverlayRenderer {
   drawCollisionOverlay(
     ctx: Ctx,
     viewport: { x: number; y: number; width: number; height: number; zoom: number },
-    collision: Uint8Array,
+    collision: Uint16Array,
     offsetX: number,
     offsetY: number,
     profiles: CollisionProfileSet | null,
     showAngles: boolean,
-    diffWith: Uint8Array | null,
+    diffWith: Uint16Array | null,
   ): void {
     const { x: vpX, y: vpY, width, height, zoom } = viewport;
     const vpW = width / zoom, vpH = height / zoom;
@@ -175,23 +182,24 @@ export class OverlayRenderer {
 
     for (let cr = startRow; cr < endRow; cr++) {
       for (let cc = startCol; cc < endCol; cc++) {
-        // Sample the cell's top-left tile (both tiles of a cell share the byte).
+        // Sample the cell's top-left tile (both tiles of a cell share the word).
         const cellIdx = (cr * 2) * SECTION_TILES_WIDE + (cc * 2);
-        const index = collision[cellIdx];
+        const word = collision[cellIdx];
+        const rc = resolveCell(profiles, word);
         // Dual-layer diff: does the other plane differ at this cell? (Computed
         // even for air cells, so a B-only-solid cell still gets highlighted.)
-        const differs = diffWith !== null && diffWith[cellIdx] !== index;
+        const differs = diffWith !== null && diffWith[cellIdx] !== word;
         const cx = cc * 16 + offsetX, cy = cr * 16 + offsetY;
 
-        if (!isAir(profiles, index)) {
+        if (!rc.air) {
           if (!profiles) { // no tables: flat fallback fill
             ctx.fillStyle = COLLISION_FALLBACK;
             ctx.fillRect(cx, cy, 16, 16);
-          } else if (!isKnownProfile(profiles, index)) { // stale / out-of-range
+          } else if (!rc.known) { // stale / out-of-range
             ctx.fillStyle = COLLISION_UNKNOWN;
             ctx.fillRect(cx, cy, 16, 16);
           } else {
-            const p = profiles.profiles[index];
+            const p = rc.profile!;
             ctx.fillStyle = solidityFill(p.solidity);
             // Per-column silhouette.
             for (let c = 0; c < 16; c++) {

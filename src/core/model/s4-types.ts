@@ -81,14 +81,16 @@ export interface Section {
    *  `engineCollisionB` is the alternate plane (dual-layer/loop sections). */
   engineCollision?: Uint8Array | null;
   engineCollisionB?: Uint8Array | null;
-  /** Editable real-attr (0-255) collision plane — the authored path-A collision.
-   *  Seeded from the strips (clone) or a saved .collattr.bin; rendered by the view
-   *  and written by set-collision-edit. Separate from tileGrid.collision (legacy
-   *  chunk/nibble) and engineCollision (read-only strip reference). */
-  collisionEdit?: Uint8Array | null;
+  /** Editable path-A collision plane — one 16-bit packed cell word per 16px cell
+   *  (collision-cell-word.ts: base-bank shape | X/Y-flip | per-plane solidity).
+   *  Seeded from a saved .collattr.bin (16-bit BE) or packed from engineCollision;
+   *  rendered by the view and written by set-collision-edit. The bake resolves the
+   *  flags into the runtime 1-byte attr index. Separate from tileGrid.collision
+   *  (legacy chunk/nibble) and engineCollision (read-only strip reference). */
+  collisionEdit?: Uint16Array | null;
   /** Editable path-B collision plane (the alternate/loop layer), mirror of
    *  collisionEdit. Seeded from engineCollisionB or a saved .collattrb.bin. */
-  collisionEditB?: Uint8Array | null;
+  collisionEditB?: Uint16Array | null;
   objects: ObjectPlacement[];
   rings: RingPlacement[];
   tiles: Tile[] | null;

@@ -22,6 +22,8 @@ import {
 import { angleDegrees, isAir, isKnownProfile } from '../../core/collision/collision-model';
 import { cellTileIndices } from '../../core/collision/collision-cell';
 import { collisionPaintTargets } from '../../core/collision/collision-paint';
+import { packCollisionCell, unpackCollisionCell, AIR_CELL } from '../../core/collision/collision-cell-word';
+import { resolveCell, resolvePlaneWords } from '../../core/collision/collision-cell-resolve';
 import { drawCollisionShape } from '../../core/collision/collision-shape-draw';
 import type { ShapeDrawCtx, ShapeDrawOpts } from '../../core/collision/collision-shape-draw';
 import { heightSparkline } from '../../core/collision/collision-render';
@@ -146,8 +148,13 @@ export default function MapViewport() {
     const offset = sectionRenderer.sectionWorldOffset(hover.sectionIndex);
     const { vpX, vpY, zoom } = useViewStore.getState();
     const erasing = profileIdx === 0;
-    const profile = (!erasing && profiles && profileIdx > 0 && profileIdx < profiles.solidCount)
-      ? profiles.profiles[profileIdx] : null;
+    // Ghost the flipped/solidity-shaded shape exactly as it will paint + bake.
+    const est = useEditorStore.getState();
+    const ghostWord = erasing ? AIR_CELL : packCollisionCell({
+      shape: profileIdx, xFlip: est.selectedCollisionXFlip, yFlip: est.selectedCollisionYFlip,
+      solidity: est.selectedCollisionSolidity,
+    });
+    const profile = erasing ? null : resolveCell(profiles, ghostWord).profile;
 
     ctx.save();
     ctx.imageSmoothingEnabled = false;
@@ -524,13 +531,12 @@ export default function MapViewport() {
     const section = getSectionByIndex(info.sectionIndex);
     if (!section) return;
     const plane = useEditorStore.getState().collisionPaintPlane;
-    // Lazily seed the target plane (clone its engine baseline) if missing.
+    const N = SECTION_TILES_WIDE * SECTION_TILES_HIGH;
+    // Lazily seed the target plane (pack its engine baseline into cell words) if missing.
     if (plane === 'b') {
-      if (!section.collisionEditB) section.collisionEditB = section.engineCollisionB
-        ? new Uint8Array(section.engineCollisionB) : new Uint8Array(SECTION_TILES_WIDE * SECTION_TILES_HIGH);
+      if (!section.collisionEditB) section.collisionEditB = resolvePlaneWords(null, section.engineCollisionB, N);
     } else if (!section.collisionEdit) {
-      section.collisionEdit = section.engineCollision
-        ? new Uint8Array(section.engineCollision) : new Uint8Array(SECTION_TILES_WIDE * SECTION_TILES_HIGH);
+      section.collisionEdit = resolvePlaneWords(null, section.engineCollision, N);
     }
     const ce = (plane === 'b' ? section.collisionEditB : section.collisionEdit)!;
     const cellCol = info.col >> 1, cellRow = info.row >> 1;
@@ -538,16 +544,23 @@ export default function MapViewport() {
     if (lastPaintedCell.current === cellKey) return; // same cursor cell — skip
     lastPaintedCell.current = cellKey;
 
-    const profile = useEditorStore.getState().selectedCollisionProfile;
+    // The painted value is a packed 16-bit cell word: selected shape + flip +
+    // solidity. Air (shape 0 / erase) is always the bare 0 word, never solidity bits.
+    const est = useEditorStore.getState();
+    const shape = est.selectedCollisionProfile;
+    const word = shape === 0 ? AIR_CELL : packCollisionCell({
+      shape, xFlip: est.selectedCollisionXFlip, yFlip: est.selectedCollisionYFlip,
+      solidity: est.selectedCollisionSolidity,
+    });
     const brush = useEditorStore.getState().collisionBrushSize;
     const cellsW = SECTION_TILES_WIDE / 2, cellsH = SECTION_TILES_HIGH / 2;
 
     // Cheap no-op guard for the expensive reuse scan: if the clicked block is
-    // already fully the selected profile, its matches were painted when first
+    // already fully the selected word, its matches were painted when first
     // touched — return before collisionPaintTargets does the per-section scan.
     if (brush === 1 && !justHere) {
       const clicked = cellTileIndices(cellCol, cellRow, SECTION_TILES_WIDE);
-      if (clicked.every((i) => ce[i] === profile)) return;
+      if (clicked.every((i) => ce[i] === word)) return;
     }
 
     // Same target set the hover preview shows (collisionPaintTargets) — paint and
@@ -563,7 +576,7 @@ export default function MapViewport() {
     for (const t of targets) {
       for (const index of cellTileIndices(t.cellCol, t.cellRow, SECTION_TILES_WIDE)) {
         const oldColl = ce[index];
-        if (oldColl !== profile) entries.push({ index, oldColl, newColl: profile });
+        if (oldColl !== word) entries.push({ index, oldColl, newColl: word });
       }
     }
     if (entries.length === 0) return;
@@ -950,22 +963,26 @@ export default function MapViewport() {
             const cellRow = Math.floor(info.row / 2) * 2;
             // In the A/B diff (both overlays on) the base shown is A, so report A.
             const pathB = overlays.showCollisionPathB && !overlays.showCollision;
-            const coll = (pathB
-              ? (section.collisionEditB ?? section.engineCollisionB ?? section.engineCollision)
-              : (section.collisionEdit ?? section.engineCollision)) ?? section.tileGrid.collision;
-            const index = coll[cellRow * SECTION_TILES_WIDE + cellCol];
+            const len = section.engineCollision?.length ?? section.tileGrid.collision.length;
+            const words = pathB
+              ? resolvePlaneWords(section.collisionEditB, section.engineCollisionB ?? section.engineCollision, len)
+              : resolvePlaneWords(section.collisionEdit, section.engineCollision, len);
+            const word = words[cellRow * SECTION_TILES_WIDE + cellCol];
             const profiles = useProjectStore.getState().collisionProfiles;
             const path = pathB ? 'B' : 'A';
-            if (isAir(profiles, index)) {
+            const c = unpackCollisionCell(word);
+            const rc = resolveCell(profiles, word);
+            const flips = `${c.xFlip ? ' ⇄' : ''}${c.yFlip ? ' ⇅' : ''}`;
+            if (rc.air) {
               extra = ` | Coll ${path}: air`;
             } else if (!profiles) {
-              extra = ` | Coll ${path} #${index} (tables not loaded)`;
-            } else if (isKnownProfile(profiles, index)) {
-              const p = profiles.profiles[index];
+              extra = ` | Coll ${path} #${c.shape}${flips} (tables not loaded)`;
+            } else if (rc.known) {
+              const p = rc.profile!;
               const deg = angleDegrees(p);
-              extra = ` | Coll ${path} #${index} ${p.solidity} ${deg === null ? '—' : deg + '°'} ${heightSparkline(p.heights)}`;
+              extra = ` | Coll ${path} #${c.shape}${flips} ${p.solidity} ${deg === null ? '—' : deg + '°'} ${heightSparkline(p.heights)}`;
             } else {
-              extra = ` | Coll ${path} #${index} (unknown)`;
+              extra = ` | Coll ${path} #${c.shape}${flips} (unknown)`;
             }
           }
         }

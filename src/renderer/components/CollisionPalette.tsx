@@ -5,6 +5,7 @@ import { useViewStore } from '../state/viewStore';
 import { SECTION_TILES_WIDE, SECTION_TILES_HIGH } from '../../core/model/s4-types';
 import { angleDegrees } from '../../core/collision/collision-model';
 import type { CollisionProfile } from '../../core/collision/collision-model';
+import { resolvePlaneWords } from '../../core/collision/collision-cell-resolve';
 import { classifyProfile, COLLISION_KINDS } from '../../core/collision/collision-classify';
 import type { CollisionKind } from '../../core/collision/collision-classify';
 import { drawCollisionShape } from '../../core/collision/collision-shape-draw';
@@ -59,11 +60,11 @@ export default function CollisionPalette() {
     const section = level.sections[ed.activeSectionIndex];
     if (!section) return;
     const p = ed.collisionPaintPlane;
-    const blank = () => new Uint8Array(SECTION_TILES_WIDE * SECTION_TILES_HIGH);
+    const N = SECTION_TILES_WIDE * SECTION_TILES_HIGH;
     if (p === 'b') {
-      if (!section.collisionEditB) section.collisionEditB = section.engineCollisionB ? new Uint8Array(section.engineCollisionB) : blank();
+      if (!section.collisionEditB) section.collisionEditB = resolvePlaneWords(null, section.engineCollisionB, N);
     } else if (!section.collisionEdit) {
-      section.collisionEdit = section.engineCollision ? new Uint8Array(section.engineCollision) : blank();
+      section.collisionEdit = resolvePlaneWords(null, section.engineCollision, N);
     }
     const ce = p === 'b' ? section.collisionEditB : section.collisionEdit;
     if (!ce) return;
@@ -88,15 +89,17 @@ export default function CollisionPalette() {
     const p = ed.collisionPaintPlane;
     const engine = p === 'b' ? section.engineCollisionB : section.engineCollision;
     if (!engine) return; // no baseline loaded — re-open the project first
+    // The engine baseline is raw attr indices; pack it to cell words to compare/assign.
+    const engineWords = resolvePlaneWords(null, engine, engine.length);
     if (p === 'b') {
-      if (!section.collisionEditB) section.collisionEditB = new Uint8Array(engine);
+      if (!section.collisionEditB) section.collisionEditB = resolvePlaneWords(null, engine, engine.length);
     } else if (!section.collisionEdit) {
-      section.collisionEdit = new Uint8Array(engine);
+      section.collisionEdit = resolvePlaneWords(null, engine, engine.length);
     }
     const ce = p === 'b' ? section.collisionEditB : section.collisionEdit;
     if (!ce) return;
     const entries: Array<{ index: number; oldColl: number; newColl: number }> = [];
-    for (let i = 0; i < ce.length; i++) if (ce[i] !== engine[i]) entries.push({ index: i, oldColl: ce[i], newColl: engine[i] });
+    for (let i = 0; i < ce.length; i++) if (ce[i] !== engineWords[i]) entries.push({ index: i, oldColl: ce[i], newColl: engineWords[i] });
     if (!entries.length) return;
     executeCommand({
       type: 'set-collision-edit', plane: p,

@@ -22,6 +22,7 @@ import { buildPalette } from '../../core/formats/palette';
 import { parseNametable } from '../../core/formats/s4-nametable';
 import { parseCollision } from '../../core/formats/s4-collision';
 import { parseCollAttr, serializeCollAttr } from '../../core/formats/s4-collattr';
+import { resolvePlaneWords } from '../../core/collision/collision-cell-resolve';
 import { serializeNametable } from '../../core/formats/s4-nametable';
 import { serializeCollision } from '../../core/formats/s4-collision';
 import { serializeRingList } from '../../core/formats/s4-rings';
@@ -437,19 +438,20 @@ async function loadFullProject(config: ReturnType<typeof loadS4Config>): Promise
               }
               section.engineCollision = engineColl;
               section.engineCollisionB = engineCollB;
-              // Editable collision plane: a saved .collattr.bin if present, else a
-              // CLONE of the strip path-A (so paints don't mutate the diff baseline).
+              // Editable collision plane: a saved .collattr.bin (16-bit packed cell
+              // words) if present, else seed by packing the strip path-A baseline
+              // into cell words (so paints don't mutate the diff baseline).
               try {
                 const caRaw = await readFile(basePath, `${prefix}.collattr.bin`);
                 section.collisionEdit = parseCollAttr(caRaw);
               } catch {
-                section.collisionEdit = new Uint8Array(engineColl);
+                section.collisionEdit = resolvePlaneWords(null, engineColl, engineColl.length);
               }
               try {
                 const cbRaw = await readFile(basePath, `${prefix}.collattrb.bin`);
                 section.collisionEditB = parseCollAttr(cbRaw);
               } catch {
-                section.collisionEditB = new Uint8Array(engineCollB);
+                section.collisionEditB = resolvePlaneWords(null, engineCollB, engineCollB.length);
               }
               loaded = true;
             } catch (stripErr) {

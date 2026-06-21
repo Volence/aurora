@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import type { Solidity } from '../../core/collision/collision-model';
 import { EditHistory } from '../../core/editing/history';
 import type { AnyCommand, S4Level } from '../../core/editing/commands';
 import { useArtStore } from './artStore';
@@ -83,7 +84,10 @@ interface EditorState {
   selectedObjectSubtype: number;
   selectedRingPattern: number;
   selectedCollisionType: number;
-  selectedCollisionProfile: number; // 0-255 attr index for the map collision palette
+  selectedCollisionProfile: number; // base-bank shape index for the map collision palette
+  selectedCollisionXFlip: boolean;  // mirror the painted shape horizontally
+  selectedCollisionYFlip: boolean;  // flip the painted shape vertically (floor↔ceiling)
+  selectedCollisionSolidity: Solidity; // floor type painted: all / top (jump-through) / none / sides-bottom
   collisionPaintPlane: 'a' | 'b';
   collisionBrushSize: number; // brush width in 16px blocks; 1 = reuse, >1 = positional N×N area
 
@@ -100,6 +104,9 @@ interface EditorState {
   setSelectedRingPattern: (index: number) => void;
   setSelectedCollisionType: (type: number) => void;
   setSelectedCollisionProfile: (index: number) => void;
+  setSelectedCollisionXFlip: (on: boolean) => void;
+  setSelectedCollisionYFlip: (on: boolean) => void;
+  setSelectedCollisionSolidity: (s: Solidity) => void;
   setCollisionPaintPlane: (plane: 'a' | 'b') => void;
   setCollisionBrushSize: (size: number) => void;
   markDirty: () => void;
@@ -133,6 +140,9 @@ export const useEditorStore = create<EditorState>((set) => ({
   selectedRingPattern: 0,
   selectedCollisionType: 0,
   selectedCollisionProfile: 0,
+  selectedCollisionXFlip: false,
+  selectedCollisionYFlip: false,
+  selectedCollisionSolidity: 'all',
   collisionPaintPlane: 'a',
   collisionBrushSize: 1,
 
@@ -148,7 +158,10 @@ export const useEditorStore = create<EditorState>((set) => ({
   setSelectedObjectTypeId: (id, subtype) => set({ selectedObjectTypeId: id, selectedObjectSubtype: subtype ?? 0 }),
   setSelectedRingPattern: (index) => set({ selectedRingPattern: index }),
   setSelectedCollisionType: (type) => set({ selectedCollisionType: type }),
-  setSelectedCollisionProfile: (index) => set({ selectedCollisionProfile: Math.max(0, Math.min(255, index | 0)) }),
+  setSelectedCollisionProfile: (index) => set({ selectedCollisionProfile: Math.max(0, Math.min(0x3FF, index | 0)) }),
+  setSelectedCollisionXFlip: (on) => set({ selectedCollisionXFlip: !!on }),
+  setSelectedCollisionYFlip: (on) => set({ selectedCollisionYFlip: !!on }),
+  setSelectedCollisionSolidity: (s) => set({ selectedCollisionSolidity: s }),
   setCollisionPaintPlane: (collisionPaintPlane) => set({ collisionPaintPlane }),
   setCollisionBrushSize: (size) => set({ collisionBrushSize: Math.max(1, Math.min(31, size | 0)) }),
   markDirty: () => set({ dirty: true }),
