@@ -164,10 +164,12 @@ export const useEditorStore = create<EditorState>((set) => ({
   setSelectedRingPattern: (index) => set({ selectedRingPattern: index }),
   setSelectedCollisionType: (type) => set({ selectedCollisionType: type }),
   setSelectedCollisionProfile: (index) => set({ selectedCollisionProfile: Math.max(0, Math.min(0x3FF, index | 0)) }),
+  // Picking a shape updates the canonical-mirror baseline but LEAVES the user's
+  // Flip-H / Flip-V toggles untouched — they're sticky "modes" that hold until
+  // pressed again (matching Flip-V, which was already sticky).
   pickCollisionShape: (shape, entryFlipX) => set({
     selectedCollisionProfile: Math.max(0, Math.min(0x3FF, shape | 0)),
     selectedCollisionEntryFlipX: !!entryFlipX,
-    selectedCollisionXFlip: false,
   }),
   setSelectedCollisionXFlip: (on) => set({ selectedCollisionXFlip: !!on }),
   setSelectedCollisionYFlip: (on) => set({ selectedCollisionYFlip: !!on }),
