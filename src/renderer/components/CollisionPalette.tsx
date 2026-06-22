@@ -178,13 +178,9 @@ export default function CollisionPalette() {
       <div style={styles.planes}>
         <span style={styles.planeLabel}>Brush</span>
         {[1, 7, 15, 25].map((n) => (
-          <button key={n} onClick={() => setBrush(n)} title={n === 1 ? 'Single block (reuse matching)' : `${n}×${n} block area`}
-            style={{ ...styles.planeBtn, ...(brush === n ? styles.planeSel : {}) }}>{n === 1 ? '1' : `${n}×${n}`}</button>
+          <button key={n} onClick={() => setBrush(n)} title={n === 1 ? 'Single block (reuses blocks with the same tiles)' : `${n}×${n} block area`}
+            style={{ ...styles.planeBtn, ...(brush === n ? styles.planeSel : {}) }}>{n}</button>
         ))}
-        <button onClick={resetToEngine} title={`Reset section ${activeSection} collision to the real engine baseline (this plane) — undoable`}
-          style={{ ...styles.planeBtn, marginLeft: 'auto' }}>Reset sec {activeSection}</button>
-        <button onClick={clearSection} title={`Erase ALL collision in section ${activeSection} (this plane) — undoable`}
-          style={styles.planeBtn}>Clear sec {activeSection}</button>
       </div>
       <div style={styles.planes}>
         <span style={styles.planeLabel}>Flip</span>
@@ -199,6 +195,13 @@ export default function CollisionPalette() {
           <button key={value} onClick={() => setSolidity(value)} title={title}
             style={{ ...styles.planeBtn, ...(solidity === value ? styles.planeSel : {}) }}>{label}</button>
         ))}
+      </div>
+      <div style={styles.planes}>
+        <span style={styles.planeLabel}>Sec {activeSection}</span>
+        <button onClick={resetToEngine} title={`Reset section ${activeSection} collision (this plane) to the engine baseline — undoable`}
+          style={styles.subtleBtn}>Reset</button>
+        <button onClick={clearSection} title={`Erase ALL collision in section ${activeSection} (this plane) — undoable`}
+          style={styles.subtleBtn}>Clear</button>
       </div>
       <div style={styles.hint}>{brush > 1
         ? `Pick a shape, then paint on the map. Paints the ${brush}×${brush} block area under the cursor.`
@@ -275,8 +278,9 @@ const styles: Record<string, React.CSSProperties> = {
   erase: { color: T.textLo, fontSize: 36 }, // big-preview empty (air) state
 
   degLabel: { fontSize: 8, lineHeight: '8px', color: T.textLo },
-  planes: { display: 'flex', alignItems: 'center', gap: 4, padding: `${T.s2} ${T.s2} 0` },
-  planeLabel: { fontSize: 10, color: T.textLo, marginRight: 2 },
-  planeBtn: { padding: `1px ${T.s2}`, background: T.overlay, color: T.textBase, border: `1px solid ${T.border}`, borderRadius: T.rSm, cursor: 'pointer', fontSize: 11, minWidth: 22 },
+  planes: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 4, padding: `${T.s2} ${T.s2} 0` },
+  planeLabel: { fontSize: 10, color: T.textLo, marginRight: 2, minWidth: 38, flexShrink: 0 },
+  planeBtn: { padding: `2px ${T.s2}`, background: T.overlay, color: T.textBase, border: `1px solid ${T.border}`, borderRadius: T.rSm, cursor: 'pointer', fontSize: 11, minWidth: 26, textAlign: 'center' },
   planeSel: { background: T.accent, color: T.onAccent, borderColor: T.accent },
+  subtleBtn: { padding: `2px ${T.s2}`, background: 'transparent', color: T.textLo, border: `1px solid ${T.border}`, borderRadius: T.rSm, cursor: 'pointer', fontSize: 10 },
 };
