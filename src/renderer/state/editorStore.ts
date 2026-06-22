@@ -85,7 +85,8 @@ interface EditorState {
   selectedRingPattern: number;
   selectedCollisionType: number;
   selectedCollisionProfile: number; // base-bank shape index for the map collision palette
-  selectedCollisionXFlip: boolean;  // mirror the painted shape horizontally
+  selectedCollisionEntryFlipX: boolean; // the picked palette entry's mirror-to-canonical-left flag
+  selectedCollisionXFlip: boolean;  // USER Flip-H toggle (XORs with the entry flag → effective mirror)
   selectedCollisionYFlip: boolean;  // flip the painted shape vertically (floor↔ceiling)
   selectedCollisionSolidity: Solidity; // floor type painted: all / top (jump-through) / none / sides-bottom
   collisionPaintPlane: 'a' | 'b';
@@ -104,6 +105,9 @@ interface EditorState {
   setSelectedRingPattern: (index: number) => void;
   setSelectedCollisionType: (type: number) => void;
   setSelectedCollisionProfile: (index: number) => void;
+  /** Pick a palette entry: its base shape + whether it must mirror to face left.
+   *  Resets the user Flip-H toggle so the freshly-picked shape shows canonical. */
+  pickCollisionShape: (shape: number, entryFlipX: boolean) => void;
   setSelectedCollisionXFlip: (on: boolean) => void;
   setSelectedCollisionYFlip: (on: boolean) => void;
   setSelectedCollisionSolidity: (s: Solidity) => void;
@@ -140,6 +144,7 @@ export const useEditorStore = create<EditorState>((set) => ({
   selectedRingPattern: 0,
   selectedCollisionType: 0,
   selectedCollisionProfile: 0,
+  selectedCollisionEntryFlipX: false,
   selectedCollisionXFlip: false,
   selectedCollisionYFlip: false,
   selectedCollisionSolidity: 'all',
@@ -159,6 +164,11 @@ export const useEditorStore = create<EditorState>((set) => ({
   setSelectedRingPattern: (index) => set({ selectedRingPattern: index }),
   setSelectedCollisionType: (type) => set({ selectedCollisionType: type }),
   setSelectedCollisionProfile: (index) => set({ selectedCollisionProfile: Math.max(0, Math.min(0x3FF, index | 0)) }),
+  pickCollisionShape: (shape, entryFlipX) => set({
+    selectedCollisionProfile: Math.max(0, Math.min(0x3FF, shape | 0)),
+    selectedCollisionEntryFlipX: !!entryFlipX,
+    selectedCollisionXFlip: false,
+  }),
   setSelectedCollisionXFlip: (on) => set({ selectedCollisionXFlip: !!on }),
   setSelectedCollisionYFlip: (on) => set({ selectedCollisionYFlip: !!on }),
   setSelectedCollisionSolidity: (s) => set({ selectedCollisionSolidity: s }),

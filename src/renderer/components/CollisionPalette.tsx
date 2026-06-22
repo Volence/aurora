@@ -7,6 +7,7 @@ import { angleDegrees } from '../../core/collision/collision-model';
 import type { CollisionProfile } from '../../core/collision/collision-model';
 import { resolvePlaneWords } from '../../core/collision/collision-cell-resolve';
 import { flipProfile } from '../../core/collision/collision-flip';
+import { organizePalette, effectiveXFlip } from '../../core/collision/collision-palette-organize';
 import type { Solidity } from '../../core/collision/collision-model';
 import { classifyProfile, COLLISION_KINDS } from '../../core/collision/collision-classify';
 import type { CollisionKind } from '../../core/collision/collision-classify';
@@ -57,7 +58,8 @@ function ShapeCanvas({ profile, size }: { profile: CollisionProfile; size: numbe
 export default function CollisionPalette() {
   const profiles = useProjectStore((s) => s.collisionProfiles);
   const selected = useEditorStore((s) => s.selectedCollisionProfile);
-  const set = useEditorStore((s) => s.setSelectedCollisionProfile);
+  const entryFlipX = useEditorStore((s) => s.selectedCollisionEntryFlipX);
+  const pick = useEditorStore((s) => s.pickCollisionShape);
   const plane = useEditorStore((s) => s.collisionPaintPlane);
   const brush = useEditorStore((s) => s.collisionBrushSize);
   const setBrush = useEditorStore((s) => s.setCollisionBrushSize);
@@ -140,33 +142,30 @@ export default function CollisionPalette() {
     if (!ov.showCollision && !ov.showCollisionPathB) pickPlane(plane);
   }, []);
 
-  // Visible indices: solid profiles (skip 0/air), filtered by the active kind tab,
-  // sorted shallow→steep by display angle (null angle sorts first, as -1).
-  const indices = useMemo(() => {
-    if (!profiles) return [];
-    const out: number[] = [];
-    for (let i = 1; i < profiles.solidCount; i++) {
-      const p = profiles.profiles[i];
-      if (kind === 'all' || classifyProfile(p) === kind) out.push(i);
-    }
-    out.sort((a, b) => (angleDegrees(profiles.profiles[a]) ?? -1) - (angleDegrees(profiles.profiles[b]) ?? -1));
-    return out;
-  }, [profiles, kind]);
+  // Every solid base shape re-oriented to canonical-LEFT, exact mirror-duplicates
+  // collapsed, sorted by angle then fullness (least-full → most-full within an
+  // angle). Display-only: painting stores the real base-bank shape + the mirror as
+  // a flip flag, so the data stays the faithful S&K vocabulary. Filter by kind tab.
+  const allEntries = useMemo(() => organizePalette(profiles), [profiles]);
+  const entries = useMemo(
+    () => (kind === 'all' ? allEntries : allEntries.filter((e) => classifyProfile(e.profile) === kind)),
+    [allEntries, kind],
+  );
 
-  // Only show kind tabs that actually have profiles — e.g. this table has no
-  // ~90° "wall" angled profiles (walls are full solid blocks, in the Solid tab).
+  // Only show kind tabs that actually have shapes (classified on the canonical form).
   const presentKinds = useMemo(() => {
     const s = new Set<CollisionKind>();
-    if (profiles) for (let i = 1; i < profiles.solidCount; i++) s.add(classifyProfile(profiles.profiles[i]));
+    for (const e of allEntries) s.add(classifyProfile(e.profile));
     return s;
-  }, [profiles]);
+  }, [allEntries]);
 
   if (!profiles) return <div style={styles.note}>Collision tables not found — open a project with collision data.</div>;
 
   const selProfile = selected > 0 && selected < profiles.solidCount ? profiles.profiles[selected] : null;
   // The big preview shows what actually gets painted + baked: the base shape with
-  // the current flip + solidity applied (thumbnails stay the stable base vocabulary).
-  const previewProfile = selProfile ? { ...flipProfile(selProfile, xFlip, yFlip), solidity } : null;
+  // the EFFECTIVE flip (entry's canonical mirror XOR the user Flip-H) + solidity.
+  const effXFlip = effectiveXFlip(entryFlipX, xFlip);
+  const previewProfile = selProfile ? { ...flipProfile(selProfile, effXFlip, yFlip), solidity } : null;
   const selDeg = previewProfile ? angleDegrees(previewProfile) : null;
 
   return (
@@ -230,16 +229,18 @@ export default function CollisionPalette() {
       </div>
 
       <div style={styles.grid}>
-        <button title="Erase (air)" onClick={() => set(0)} style={{ ...styles.cellWrap, ...(selected === 0 ? styles.sel : {}) }}>
+        <button title="Erase (air)" onClick={() => pick(0, false)} style={{ ...styles.cellWrap, ...(selected === 0 ? styles.sel : {}) }}>
           <span style={styles.eraseCell}>∅</span>
           <span style={styles.degLabel}>air</span>
         </button>
-        {indices.map((i) => {
-          const deg = angleDegrees(profiles.profiles[i]);
+        {entries.map((e) => {
+          const deg = angleDegrees(e.profile);
+          const isSel = selected === e.shape && entryFlipX === e.mirrorX;
           return (
-            <button key={i} title={`#${i} · ${classifyProfile(profiles.profiles[i])} · ${profiles.profiles[i].solidity}`}
-              onClick={() => set(i)} style={{ ...styles.cellWrap, ...(selected === i ? styles.sel : {}) }}>
-              <ShapeCanvas profile={profiles.profiles[i]} size={PX} />
+            <button key={`${e.shape}:${e.mirrorX ? 'm' : ''}`}
+              title={`#${e.shape}${e.mirrorX ? ' (mirrored to face left)' : ''} · ${classifyProfile(e.profile)} · ${e.profile.solidity}`}
+              onClick={() => pick(e.shape, e.mirrorX)} style={{ ...styles.cellWrap, ...(isSel ? styles.sel : {}) }}>
+              <ShapeCanvas profile={e.profile} size={PX} />
               <span style={styles.degLabel}>{deg === null ? '—' : `${deg}°`}</span>
             </button>
           );

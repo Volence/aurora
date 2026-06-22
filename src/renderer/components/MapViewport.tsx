@@ -24,6 +24,7 @@ import { cellTileIndices } from '../../core/collision/collision-cell';
 import { collisionPaintTargets } from '../../core/collision/collision-paint';
 import { packCollisionCell, unpackCollisionCell, AIR_CELL } from '../../core/collision/collision-cell-word';
 import { resolveCell, resolvePlaneWords } from '../../core/collision/collision-cell-resolve';
+import { effectiveXFlip } from '../../core/collision/collision-palette-organize';
 import { drawCollisionShape } from '../../core/collision/collision-shape-draw';
 import type { ShapeDrawCtx, ShapeDrawOpts } from '../../core/collision/collision-shape-draw';
 import { heightSparkline } from '../../core/collision/collision-render';
@@ -151,8 +152,8 @@ export default function MapViewport() {
     // Ghost the flipped/solidity-shaded shape exactly as it will paint + bake.
     const est = useEditorStore.getState();
     const ghostWord = erasing ? AIR_CELL : packCollisionCell({
-      shape: profileIdx, xFlip: est.selectedCollisionXFlip, yFlip: est.selectedCollisionYFlip,
-      solidity: est.selectedCollisionSolidity,
+      shape: profileIdx, xFlip: effectiveXFlip(est.selectedCollisionEntryFlipX, est.selectedCollisionXFlip),
+      yFlip: est.selectedCollisionYFlip, solidity: est.selectedCollisionSolidity,
     });
     const profile = erasing ? null : resolveCell(profiles, ghostWord).profile;
 
@@ -549,8 +550,8 @@ export default function MapViewport() {
     const est = useEditorStore.getState();
     const shape = est.selectedCollisionProfile;
     const word = shape === 0 ? AIR_CELL : packCollisionCell({
-      shape, xFlip: est.selectedCollisionXFlip, yFlip: est.selectedCollisionYFlip,
-      solidity: est.selectedCollisionSolidity,
+      shape, xFlip: effectiveXFlip(est.selectedCollisionEntryFlipX, est.selectedCollisionXFlip),
+      yFlip: est.selectedCollisionYFlip, solidity: est.selectedCollisionSolidity,
     });
     const brush = useEditorStore.getState().collisionBrushSize;
     const cellsW = SECTION_TILES_WIDE / 2, cellsH = SECTION_TILES_HIGH / 2;
