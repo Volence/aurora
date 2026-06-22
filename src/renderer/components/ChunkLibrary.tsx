@@ -16,6 +16,15 @@ import { CHUNK_LABEL_BG, CHUNK_LABEL_TEXT } from '../canvas/canvas-colors';
 const CHUNK_PX = 128;            // source render resolution (one chunk = 16×16 tiles)
 const SIZES = [56, 88, 120];     // thumbnail display sizes (S / M / L)
 
+/** A chunk with no visible content — every cell references tile 0 (the engine's
+ *  transparent tile). It renders fully transparent, so stamping it ERASES the
+ *  16×16 area (a useful eraser, but easy to pick by mistake). We mark these in the
+ *  palette so an empty thumbnail isn't mistaken for a dark content chunk. */
+function isBlankChunk(chunk: ChunkDef): boolean {
+  for (const w of chunk.nametable) if (unpackNametableWord(w).tileIndex !== 0) return false;
+  return true;
+}
+
 function renderChunkThumbnail(chunk: ChunkDef, tiles: Tile[], palette: Palette): OffscreenCanvas {
   const canvas = new OffscreenCanvas(CHUNK_PX, CHUNK_PX);
   const ctx = canvas.getContext('2d')!;
@@ -54,9 +63,9 @@ function renderChunkThumbnail(chunk: ChunkDef, tiles: Tile[], palette: Palette):
 
 /** One chunk thumbnail: the source render is memoised; only the scaled draw
  *  re-runs when the display size changes. */
-function ChunkThumb({ chunk, tiles, palette, size, selected, label, onClick, onDoubleClick }: {
+function ChunkThumb({ chunk, tiles, palette, size, selected, label, blank, onClick, onDoubleClick }: {
   chunk: ChunkDef; tiles: Tile[]; palette: Palette; size: number; selected: boolean; label: string;
-  onClick: () => void; onDoubleClick: () => void;
+  blank: boolean; onClick: () => void; onDoubleClick: () => void;
 }) {
   const ref = useRef<HTMLCanvasElement>(null);
   const off = useMemo(() => renderChunkThumbnail(chunk, tiles, palette), [chunk, tiles, palette]);
@@ -69,10 +78,12 @@ function ChunkThumb({ chunk, tiles, palette, size, selected, label, onClick, onD
   }, [off, size]);
   return (
     <button
-      onClick={onClick} onDoubleClick={onDoubleClick} title={chunk.name}
-      style={{ ...styles.cell, width: size, height: size, ...(selected ? styles.cellSel : {}) }}
+      onClick={onClick} onDoubleClick={onDoubleClick}
+      title={blank ? `${chunk.name} — blank (transparent) chunk; stamping it erases the area` : chunk.name}
+      style={{ ...styles.cell, width: size, height: size, ...(blank ? styles.cellBlank : {}), ...(selected ? styles.cellSel : {}) }}
     >
       <canvas ref={ref} width={size} height={size} style={styles.thumbCanvas} />
+      {blank && <span style={styles.blankTag}>empty</span>}
       <span style={styles.cellLabel}>{label}</span>
     </button>
   );
@@ -90,6 +101,13 @@ export default function ChunkLibrary() {
   const chunks = project?.chunkLibrary ?? [];
   const tiles = zone?.tileset.tiles ?? [];
   const palette = zone?.palette ?? { lines: [] };
+
+  // Which chunks are fully transparent (eraser chunks) — marked in the palette.
+  const blankIds = useMemo(() => {
+    const s = new Set<string>();
+    for (const c of chunks) if (isBlankChunk(c)) s.add(c.id);
+    return s;
+  }, [chunks]);
 
   const selectChunk = useCallback((chunk: ChunkDef) => {
     useEditorStore.getState().setSelectedChunkId(chunk.id);
@@ -138,8 +156,11 @@ export default function ChunkLibrary() {
       useProjectStore.getState().addChunks(imported);
       useEditorStore.getState().markDirty();
 
-      if (imported.length > 0) {
-        useEditorStore.getState().setSelectedChunkId(imported[0].id);
+      // Default-select the first chunk with actual content (skip blank/eraser
+      // chunks like $00 so a fresh stamp doesn't silently erase).
+      const firstContent = imported.find(c => !isBlankChunk(c)) ?? imported[0];
+      if (firstContent) {
+        useEditorStore.getState().setSelectedChunkId(firstContent.id);
       }
       useToastStore.getState().addToast(`Imported ${imported.length} chunks -- Save to keep`, 'success');
     } catch (err) {
@@ -198,6 +219,7 @@ export default function ChunkLibrary() {
                 key={chunk.id}
                 chunk={chunk} tiles={tiles} palette={palette} size={size}
                 selected={chunk.id === selectedChunkId}
+                blank={blankIds.has(chunk.id)}
                 label={`$${idx.toString(16).toUpperCase().padStart(2, '0')}`}
                 onClick={() => selectChunk(chunk)}
                 onDoubleClick={() => editChunk(chunk)}
@@ -250,6 +272,16 @@ const styles: Record<string, React.CSSProperties> = {
     border: `1px solid ${T.border}`, borderRadius: 3, cursor: 'pointer', overflow: 'hidden',
   },
   cellSel: { outline: `2px solid ${T.accent}`, outlineOffset: -1, borderColor: T.accent },
+  // Blank/eraser chunks: a faint diagonal hatch behind the (transparent) canvas so
+  // an empty thumbnail reads as deliberately empty, not a dark content chunk.
+  cellBlank: {
+    backgroundImage: `repeating-linear-gradient(45deg, transparent, transparent 4px, ${T.border} 4px, ${T.border} 5px)`,
+  },
+  blankTag: {
+    position: 'absolute', top: '50%', left: 0, right: 0, transform: 'translateY(-50%)',
+    textAlign: 'center', fontSize: 8, letterSpacing: 1, textTransform: 'uppercase' as const,
+    color: T.textLo, pointerEvents: 'none',
+  },
   thumbCanvas: { display: 'block', width: '100%', height: '100%', imageRendering: 'pixelated' as const },
   cellLabel: {
     position: 'absolute', left: 0, bottom: 0, right: 0,
