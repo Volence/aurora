@@ -116,6 +116,9 @@ export class SectionRenderer {
     if (!nt.hFlip && !nt.vFlip) {
       this.bg.ctx.putImageData(tileImage, px, py);
     } else {
+      // Clear first: drawImage composites, so a flipped transparent tile would
+      // otherwise leave the previous cell content showing through.
+      this.bg.ctx.clearRect(px, py, 8, 8);
       this.tempCtx.putImageData(tileImage, 0, 0);
       this.bg.ctx.save();
       this.bg.ctx.translate(px + (nt.hFlip ? 8 : 0), py + (nt.vFlip ? 8 : 0));
@@ -243,6 +246,10 @@ export class SectionRenderer {
     if (!nt.hFlip && !nt.vFlip) {
       entry.ctx.putImageData(tileImage, px, py);
     } else {
+      // drawImage composites (source-over) — unlike putImageData it does NOT
+      // replace, so a flipped tile with transparent pixels would leave the
+      // previous cell content showing through. Clear the cell first.
+      entry.ctx.clearRect(px, py, 8, 8);
       this.tempCtx.putImageData(tileImage, 0, 0);
       entry.ctx.save();
       entry.ctx.translate(px + (nt.hFlip ? 8 : 0), py + (nt.vFlip ? 8 : 0));
