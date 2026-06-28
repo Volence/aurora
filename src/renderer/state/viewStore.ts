@@ -7,6 +7,8 @@ export interface OverlayOptions {
   showBlockGrid: boolean;
   showChunkGrid: boolean;
   showCollision: boolean;
+  showCollisionAngles: boolean;
+  showCollisionPathB: boolean;
   showBgPlane: boolean;
 }
 
@@ -35,6 +37,8 @@ export const useViewStore = create<ViewState>((set) => ({
     showBlockGrid: true,
     showChunkGrid: false,
     showCollision: false,
+    showCollisionAngles: false,
+    showCollisionPathB: false,
     showBgPlane: false,
   },
 

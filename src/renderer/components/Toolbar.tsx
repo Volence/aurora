@@ -1,20 +1,13 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useProjectStore, getActiveLevel } from '../state/projectStore';
-import { useViewStore, type OverlayOptions } from '../state/viewStore';
-import { useEditorStore, editHistory, undo, redo, type EditorTool, type EditingLayer, type AppMode } from '../state/editorStore';
+import { useEditorStore, editHistory, undo, redo, type EditingLayer, type AppMode } from '../state/editorStore';
+import { useSpriteStore } from '../state/spriteStore';
+import { spriteModeUndo, spriteModeRedo, spriteModeCanUndo, spriteModeCanRedo } from '../state/sprite-undo';
 import type { S4Level } from '../../core/editing/commands';
 import type { RecentProject } from '../../shared/ipc-types';
 import AuroraMark from './AuroraMark';
-
-// Display-name overrides for overlay toggles whose store keys use engine-
-// internal naming. showBlockGrid draws 128px lines — that's the editor's
-// "chunk" unit (the s4_engine internally calls 128×128 a "block");
-// showChunkGrid draws the 2048px section boundaries. Code identifiers are
-// intentionally NOT renamed.
-const OVERLAY_LABELS: Record<string, string> = {
-  showBlockGrid: 'Chunk Grid (128px)',
-  showChunkGrid: 'Section Grid (2048px)',
-};
+import { T, Chip, IconButton, Divider, Select, Icons } from './ui';
+import ViewMenu from '../shell/ViewMenu';
 
 interface ToolbarProps {
   onOpenProject: () => void;
@@ -27,17 +20,13 @@ export default function Toolbar({ onOpenProject, onOpenRecent, onSave }: Toolbar
   const currentZoneId = useProjectStore((s) => s.currentZoneId);
   const currentActId = useProjectStore((s) => s.currentActId);
   const loading = useProjectStore((s) => s.loading);
-  const zoom = useViewStore((s) => s.zoom);
-  const setZoom = useViewStore((s) => s.setZoom);
-  const overlays = useViewStore((s) => s.overlays);
-  const toggleOverlay = useViewStore((s) => s.toggleOverlay);
-  const tool = useEditorStore((s) => s.tool);
-  const setTool = useEditorStore((s) => s.setTool);
   const dirty = useEditorStore((s) => s.dirty);
   const editingLayer = useEditorStore((s) => s.editingLayer);
   const historyVersion = useEditorStore((s) => s.historyVersion);
   const appMode = useEditorStore((s) => s.appMode);
   const setAppMode = useEditorStore((s) => s.setAppMode);
+  // Re-evaluate sprite Undo/Redo enablement whenever the sprite history changes.
+  const spriteTick = useSpriteStore((s) => s.historyTick);
 
   const [recentOpen, setRecentOpen] = useState(false);
   const [recentProjects, setRecentProjects] = useState<RecentProject[]>([]);
@@ -63,8 +52,6 @@ export default function Toolbar({ onOpenProject, onOpenRecent, onSave }: Toolbar
     return () => document.removeEventListener('mousedown', handler);
   }, [recentOpen]);
 
-  const zoomPercent = Math.round(zoom * 100);
-
   const handleSelectZoneAct = useCallback((value: string) => {
     const [zoneId, actId] = value.split(':');
     if (zoneId && actId) {
@@ -77,280 +64,180 @@ export default function Toolbar({ onOpenProject, onOpenRecent, onSave }: Toolbar
   }
 
   return (
-    <header style={styles.toolbar}>
-      {/* Row 1: Project, zone selector, layer, and tools */}
-      <div style={styles.toolbarRow}>
-        <div style={styles.brand} title="Aurora — visual authoring (Empyrean suite)">
-          <AuroraMark size={20} />
-          <span style={styles.wordmark}>Aurora</span>
-        </div>
-        <div style={{ position: 'relative' }} ref={dropdownRef}>
-          <div style={{ display: 'flex', gap: 0 }}>
-            <button onClick={onOpenProject} style={{ ...styles.button, borderRadius: '4px 0 0 4px' }} disabled={loading}>
-              Open
-            </button>
-            <button
-              onClick={() => setRecentOpen(!recentOpen)}
-              style={{ ...styles.button, borderRadius: '0 4px 4px 0', borderLeft: 'none', padding: '2px 5px' }}
-              disabled={loading}
-            >
-              &#x25BE;
-            </button>
-          </div>
-
-          {recentOpen && (
-            <div style={styles.dropdown}>
-              {recentProjects.length === 0 ? (
-                <div style={styles.dropdownEmpty}>No recent projects</div>
-              ) : (
-                recentProjects.map((project) => (
-                  <button
-                    key={project.path}
-                    style={styles.dropdownItem}
-                    onClick={() => {
-                      setRecentOpen(false);
-                      onOpenRecent(project.path);
-                    }}
-                    title={project.path}
-                  >
-                    <span style={styles.projectName}>{project.name}</span>
-                    <span style={styles.projectPath}>{project.path}</span>
-                  </button>
-                ))
-              )}
-            </div>
-          )}
-        </div>
-
-        {config && (
-          <>
-            <select
-              value={currentZoneId && currentActId ? `${currentZoneId}:${currentActId}` : ''}
-              onChange={(e) => handleSelectZoneAct(e.target.value)}
-              style={styles.select}
-              disabled={loading}
-            >
-              <option value="" disabled>Zone/Act</option>
-              {config.zones.map((zone) =>
-                zone.acts.map((act) => (
-                  <option key={`${zone.id}:${act.id}`} value={`${zone.id}:${act.id}`}>
-                    {zone.name} - {act.id}
-                  </option>
-                ))
-              )}
-            </select>
-
-            <span style={styles.separator} />
-
-            {(['map', 'art', 'sprite'] as AppMode[]).map((mode) => (
-              <button
-                key={mode}
-                style={{
-                  ...styles.smallButton,
-                  ...(appMode === mode ? styles.toolActive : {}),
-                }}
-                onClick={() => setAppMode(mode)}
-                title={mode === 'map' ? 'Map editor' : mode === 'art' ? 'Art editor' : 'Sprite editor'}
-              >
-                {mode === 'map' ? 'Map' : mode === 'art' ? 'Art' : 'Sprite'}
-              </button>
-            ))}
-
-            <span style={styles.separator} />
-
-            {appMode === 'map' && (['fg', 'bg'] as EditingLayer[]).map((layer) => (
-              <button
-                key={layer}
-                style={{
-                  ...styles.smallButton,
-                  ...(editingLayer === layer ? styles.toolActive : {}),
-                }}
-                onClick={() => useEditorStore.getState().setEditingLayer(layer)}
-                title={layer === 'fg' ? 'Foreground layer' : 'Background layer'}
-              >
-                {layer.toUpperCase()}
-              </button>
-            ))}
-
-            {appMode === 'map' && <span style={styles.separator} />}
-
-            {appMode === 'map' && (
-              <div style={styles.buttonGroup}>
-                {([
-                  ['view', 'View'],
-                  ['select', 'Sel'],
-                  ['paint-tile', 'Tile'],
-                  ['paint-block', 'Blk'],
-                  ['stamp-chunk', 'Chk'],
-                  ['paint-collision', 'Col'],
-                  ['place-object', '+Obj'],
-                  ['place-ring', '+Rng'],
-                ] as [EditorTool, string][]).map(([t, label]) => (
-                  <button
-                    key={t}
-                    style={{ ...styles.smallButton, ...(tool === t ? styles.toolActive : {}) }}
-                    onClick={() => setTool(t)}
-                    title={t}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {/* The separator after the Map|Art toggle already precedes this
-                group in Art mode — only add another when the map tool groups
-                (and their trailing content) render between them. */}
-            {appMode === 'map' && <span style={styles.separator} />}
-
-            <div style={styles.buttonGroup}>
-              <button
-                onClick={() => { const l = getLevel(); if (l) undo(l); }}
-                style={styles.smallButton}
-                disabled={!editHistory.canUndo}
-                title="Undo (Ctrl+Z)"
-              >
-                Undo
-              </button>
-              <button
-                onClick={() => { const l = getLevel(); if (l) redo(l); }}
-                style={styles.smallButton}
-                disabled={!editHistory.canRedo}
-                title="Redo (Ctrl+Y)"
-              >
-                Redo
-              </button>
-              <button
-                onClick={async () => {
-                  await onSave();
-                  setSaveFlash(true);
-                  setTimeout(() => setSaveFlash(false), 1500);
-                }}
-                style={{
-                  ...styles.smallButton,
-                  ...(saveFlash ? styles.saveFlash : {}),
-                }}
-                disabled={!dirty && !saveFlash}
-                title="Save (Ctrl+S)"
-              >
-                {saveFlash ? 'Saved!' : 'Save'}
-              </button>
-            </div>
-
-            {dirty && <span style={styles.dirtyBadge}>unsaved</span>}
-          </>
-        )}
-
-        {loading && <span style={styles.loading}>Loading...</span>}
+    <>
+      <div style={styles.brand} title="Aurora — visual authoring (Empyrean suite)">
+        <AuroraMark size={20} />
+        <span style={styles.wordmark}>Aurora</span>
       </div>
 
-      {/* Row 2: Zoom and overlay toggles */}
-      {config && (
-        <div style={styles.toolbarRow}>
-          <div style={styles.buttonGroup}>
-            <button onClick={() => setZoom(zoom / 1.5)} style={styles.smallButton} title="Zoom out">-</button>
-            <span style={styles.zoomLabel}>{zoomPercent}%</span>
-            <button onClick={() => setZoom(zoom * 1.5)} style={styles.smallButton} title="Zoom in">+</button>
+      <div style={{ position: 'relative' }} ref={dropdownRef}>
+        <div style={{ display: 'flex', gap: 0 }}>
+          <button onClick={onOpenProject} style={{ ...styles.button, borderRadius: '4px 0 0 4px' }} disabled={loading}>
+            Open
+          </button>
+          <button
+            onClick={() => setRecentOpen(!recentOpen)}
+            style={{ ...styles.button, borderRadius: '0 4px 4px 0', borderLeft: 'none', padding: '2px 5px' }}
+            disabled={loading}
+          >
+            &#x25BE;
+          </button>
+        </div>
+
+        {recentOpen && (
+          <div style={styles.dropdown}>
+            {recentProjects.length === 0 ? (
+              <div style={styles.dropdownEmpty}>No recent projects</div>
+            ) : (
+              recentProjects.map((project) => (
+                <button
+                  key={project.path}
+                  style={styles.dropdownItem}
+                  onClick={() => {
+                    setRecentOpen(false);
+                    onOpenRecent(project.path);
+                  }}
+                  title={project.path}
+                >
+                  <span style={styles.projectName}>{project.name}</span>
+                  <span style={styles.projectPath}>{project.path}</span>
+                </button>
+              ))
+            )}
           </div>
+        )}
+      </div>
 
-          <span style={styles.separator} />
+      {config && (
+        <>
+          <Select
+            value={currentZoneId && currentActId ? `${currentZoneId}:${currentActId}` : ''}
+            onChange={handleSelectZoneAct}
+            style={{ maxWidth: 180 }}
+          >
+            <option value="" disabled>Zone/Act</option>
+            {config.zones.map((zone) =>
+              zone.acts.map((act) => (
+                <option key={`${zone.id}:${act.id}`} value={`${zone.id}:${act.id}`}>
+                  {zone.name} - {act.id}
+                </option>
+              ))
+            )}
+          </Select>
 
-          {(Object.keys(overlays) as (keyof OverlayOptions)[]).map((key) => (
-            <label key={key} style={styles.checkLabel}>
-              <input
-                type="checkbox"
-                checked={overlays[key]}
-                onChange={() => toggleOverlay(key)}
-                style={{ width: 12, height: 12 }}
-              />
-              {OVERLAY_LABELS[key] ?? key.replace('show', '').replace(/([A-Z])/g, ' $1').trim()}
-            </label>
+          <Divider />
+
+          {(['map', 'art', 'sprite'] as AppMode[]).map((mode) => (
+            <Chip
+              key={mode}
+              active={appMode === mode}
+              onClick={() => setAppMode(mode)}
+            >
+              {mode === 'map' ? 'Map' : mode === 'art' ? 'Art' : 'Sprite'}
+            </Chip>
           ))}
 
-          <div style={{ flex: 1 }} />
-          <span style={{ color: '#6E7589', fontSize: 10 }}>v0.3.0</span>
-        </div>
+          <Divider />
+
+          {appMode === 'map' && (['fg', 'bg'] as EditingLayer[]).map((layer) => (
+            <Chip
+              key={layer}
+              active={editingLayer === layer}
+              onClick={() => useEditorStore.getState().setEditingLayer(layer)}
+            >
+              {layer.toUpperCase()}
+            </Chip>
+          ))}
+
+          {appMode === 'map' && <Divider />}
+
+          <IconButton
+            icon={<Icons.IconUndo size={14} />}
+            label="Undo (Ctrl+Z)"
+            onClick={() => {
+              if (appMode === 'sprite') spriteModeUndo();
+              else { const l = getLevel(); if (l) undo(l); }
+            }}
+            disabled={appMode === 'sprite'
+              ? (void spriteTick, void historyVersion, !spriteModeCanUndo())
+              : !editHistory.canUndo}
+          />
+          <IconButton
+            icon={<Icons.IconRedo size={14} />}
+            label="Redo (Ctrl+Y)"
+            onClick={() => {
+              if (appMode === 'sprite') spriteModeRedo();
+              else { const l = getLevel(); if (l) redo(l); }
+            }}
+            disabled={appMode === 'sprite'
+              ? (void spriteTick, void historyVersion, !spriteModeCanRedo())
+              : !editHistory.canRedo}
+          />
+          <Chip
+            active={saveFlash}
+            disabled={!dirty && !saveFlash}
+            onClick={async () => {
+              await onSave();
+              setSaveFlash(true);
+              setTimeout(() => setSaveFlash(false), 1500);
+            }}
+          >
+            {saveFlash ? 'Saved!' : 'Save'}
+          </Chip>
+
+          {dirty && <span style={styles.dirtyBadge}>unsaved</span>}
+        </>
       )}
-    </header>
+
+      {loading && <span style={styles.loading}>Loading...</span>}
+
+      <div style={{ flex: 1 }} />
+
+      {config && <ViewMenu />}
+    </>
   );
 }
 
 const styles: Record<string, React.CSSProperties> = {
-  toolbar: {
-    display: 'flex', flexDirection: 'column' as const,
-    background: '#0A0C12', borderBottom: '1px solid #2A2F3D',
-    flexShrink: 0,
-  },
-  toolbarRow: {
-    display: 'flex', alignItems: 'center', gap: 6,
-    padding: '3px 8px', flexWrap: 'wrap' as const,
-  },
   brand: {
     display: 'flex', alignItems: 'center', gap: 6, paddingRight: 8, marginRight: 2,
-    borderRight: '1px solid var(--border, #2A2F3D)', userSelect: 'none' as const,
+    borderRight: `1px solid ${T.border}`, userSelect: 'none' as const,
   },
   wordmark: {
     fontSize: 13, fontWeight: 600, letterSpacing: '0.04em',
-    color: 'var(--text-hi, #E8EAF2)',
-  },
-  buttonGroup: {
-    display: 'flex', alignItems: 'center', gap: 2,
+    color: T.textHi,
   },
   button: {
-    padding: '2px 8px', background: '#2A2F3D', color: '#E8EAF2', border: '1px solid #3A4152',
+    padding: '2px 8px', background: T.raised, color: T.textHi, border: `1px solid ${T.borderStrong}`,
     borderRadius: 4, cursor: 'pointer', fontSize: 11, whiteSpace: 'nowrap' as const,
   },
-  smallButton: {
-    padding: '1px 5px', background: '#2A2F3D', color: '#E8EAF2', border: '1px solid #3A4152',
-    borderRadius: 3, cursor: 'pointer', fontSize: 11, minWidth: 22,
-  },
-  toolActive: {
-    background: '#34D399', color: '#12151E', borderColor: '#34D399',
-  },
-  saveFlash: {
-    background: '#a6e3a1', color: '#12151E', borderColor: '#a6e3a1',
-  },
   dirtyBadge: {
-    fontSize: 9, color: '#12151E', background: '#f9e2af',
+    fontSize: 9, color: T.void, background: T.warning,
     padding: '0 4px', borderRadius: 3, lineHeight: '14px', fontWeight: 600,
   },
-  select: {
-    padding: '2px 4px', background: '#2A2F3D', color: '#E8EAF2', border: '1px solid #3A4152',
-    borderRadius: 4, fontSize: 11, maxWidth: 180,
-  },
-  separator: {
-    width: 1, height: 16, background: '#3A4152', flexShrink: 0,
-  },
-  zoomLabel: {
-    fontSize: 11, color: '#B8BECE', minWidth: 32, textAlign: 'center' as const,
-  },
-  checkLabel: {
-    fontSize: 11, color: '#B8BECE', display: 'flex', alignItems: 'center', gap: 2, cursor: 'pointer',
-    whiteSpace: 'nowrap' as const,
-  },
   loading: {
-    fontSize: 11, color: '#f9e2af',
+    fontSize: 11, color: T.warning,
   },
   dropdown: {
     position: 'absolute' as const, top: '100%', left: 0, marginTop: 4,
-    background: '#2A2F3D', border: '1px solid #3A4152', borderRadius: 6,
+    background: T.raised, border: `1px solid ${T.borderStrong}`, borderRadius: 6,
     minWidth: 320, maxHeight: 300, overflow: 'auto', zIndex: 100,
     boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
   },
   dropdownEmpty: {
-    padding: '12px 16px', color: '#6E7589', fontSize: 13,
+    padding: '12px 16px', color: T.textLo, fontSize: 13,
   },
   dropdownItem: {
     display: 'flex', flexDirection: 'column' as const, width: '100%',
     padding: '8px 12px', background: 'transparent', border: 'none',
-    color: '#E8EAF2', cursor: 'pointer', textAlign: 'left' as const,
-    borderBottom: '1px solid #3A4152',
+    color: T.textHi, cursor: 'pointer', textAlign: 'left' as const,
+    borderBottom: `1px solid ${T.borderStrong}`,
   },
   projectName: {
     fontSize: 13, fontWeight: 500,
   },
   projectPath: {
-    fontSize: 11, color: '#6E7589', overflow: 'hidden',
+    fontSize: 11, color: T.textLo, overflow: 'hidden',
     textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const,
   },
 };

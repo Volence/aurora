@@ -4,6 +4,9 @@ export const SECTION_PIXEL_SIZE = 2048;
 export const BLOCK_TILES = 16;
 export const BLOCK_PIXEL_SIZE = 128;
 export const BLOCKS_PER_SECTION = 16;
+/** Engine cap: an act's grid_w * grid_h must be <= this (s4_engine constants.asm
+ *  MAX_ACT_SECTIONS; the ROM build asserts it). The editor must not exceed it. */
+export const MAX_ACT_SECTIONS = 48;
 
 export interface SectionTileGrid {
   width: number;
@@ -71,6 +74,23 @@ export interface Section {
   index: number;
   name: string;
   tileGrid: SectionTileGrid;
+  /** Read-only per-cell engine collision attr indices (0-255), loaded from the
+   *  baked strips — the game's ground-truth collision, independent of the editable
+   *  (and possibly crude/stale) tileGrid.collision. Used by the collision VIEW.
+   *  null when no strip source is available. `engineCollision` is path A;
+   *  `engineCollisionB` is the alternate plane (dual-layer/loop sections). */
+  engineCollision?: Uint8Array | null;
+  engineCollisionB?: Uint8Array | null;
+  /** Editable path-A collision plane — one 16-bit packed cell word per 16px cell
+   *  (collision-cell-word.ts: base-bank shape | X/Y-flip | per-plane solidity).
+   *  Seeded from a saved .collattr.bin (16-bit BE) or packed from engineCollision;
+   *  rendered by the view and written by set-collision-edit. The bake resolves the
+   *  flags into the runtime 1-byte attr index. Separate from tileGrid.collision
+   *  (legacy chunk/nibble) and engineCollision (read-only strip reference). */
+  collisionEdit?: Uint16Array | null;
+  /** Editable path-B collision plane (the alternate/loop layer), mirror of
+   *  collisionEdit. Seeded from engineCollisionB or a saved .collattrb.bin. */
+  collisionEditB?: Uint16Array | null;
   objects: ObjectPlacement[];
   rings: RingPlacement[];
   tiles: Tile[] | null;

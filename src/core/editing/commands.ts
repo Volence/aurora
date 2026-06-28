@@ -24,6 +24,12 @@ export interface SetCollisionCommand extends EditCommand {
   entries: Array<{ index: number; oldColl: number; newColl: number }>;
 }
 
+export interface SetCollisionEditCommand extends EditCommand {
+  type: 'set-collision-edit';
+  plane: 'a' | 'b';
+  entries: Array<{ index: number; oldColl: number; newColl: number }>;
+}
+
 export interface MoveObjectCommand extends EditCommand {
   type: 'move-object';
   objectIndex: number;
@@ -130,6 +136,15 @@ export interface SetSectionBgCommand extends EditCommand {
   newRef: string | null;
 }
 
+export interface SetSectionsCommand extends EditCommand {
+  type: 'set-sections';
+  // Whole-act snapshot of the section grid: width/height plus the flat
+  // row-major sections array. One uniform command makes every structural op
+  // (add/remove/resize/move/paste) undoable. Operates on level.act in place.
+  oldGridWidth: number; oldGridHeight: number; oldSections: (Section | null)[];
+  newGridWidth: number; newGridHeight: number; newSections: (Section | null)[];
+}
+
 /**
  * Groups several commands into one undo step. Children apply in order and undo
  * in reverse. Used for multi-tile pixel edits (a stroke/shape crossing several
@@ -144,6 +159,7 @@ export type AnyCommand =
   | BatchCommand
   | SetTilesCommand
   | SetCollisionCommand
+  | SetCollisionEditCommand
   | MoveObjectCommand
   | AddObjectCommand
   | DeleteObjectCommand
@@ -159,4 +175,5 @@ export type AnyCommand =
   | SetTilesetTilesCommand
   | SetChunkCommand
   | SetBgCommand
-  | SetSectionBgCommand;
+  | SetSectionBgCommand
+  | SetSectionsCommand;

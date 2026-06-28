@@ -3,6 +3,13 @@ import type { PixelBuffer, MirrorMode, DitherPattern } from '../../core/art/pixe
 import { createBuffer, flipH, flipV, rotate90 } from '../../core/art/pixel-ops';
 import type { Color } from '../../core/model/s4-types';
 import type { SpriteFormatId } from '../../core/formats/sprite-format-adapter';
+import { SpriteHistory, type SpriteSnapshot } from '../../core/editing/sprite-history';
+import { registerRedoClearer, invalidateSiblingRedos } from '../../core/editing/undo-bus';
+import type { SpritePaletteMode } from '../../core/art/sprite-palette';
+import { blankStandalonePalette } from '../../core/art/sprite-palette';
+import { copyRegion, clearRegion, pasteRegion, type ClipRegion } from '../../core/art/pixel-clipboard';
+import { diffWrites } from '../../core/art/pixel-edit-controller';
+import { useProjectStore, getCurrentZone } from './projectStore';
 
 export type SpriteTool =
   | 'pencil' | 'eraser' | 'fill' | 'eyedropper' | 'line' | 'rect' | 'select' | 'dither';
@@ -43,6 +50,12 @@ interface SpriteState {
   ditherPattern: DitherPattern;
   ditherSecondary: number;     // 0-15 (0 = transparent)
   selection: SpriteSelection | null;
+  clipboard: ClipRegion | null;
+  /** Each returns true if the action was applicable (had a selection / clipboard),
+   *  so the keyboard handler only swallows the native shortcut when it acted. */
+  copySelection: () => boolean;
+  cutSelection: () => boolean;
+  paste: () => boolean;
   name: string;                // sprite name (export folder + anim label); follows loads
   setName: (name: string) => void;
   exportDplc: boolean;         // export as DPLC (streamed art) vs flat resident art
@@ -64,6 +77,14 @@ interface SpriteState {
   deleteFrame: () => void;
   selectFrame: (i: number) => void;
 
+  // Undo/redo (snapshot-based). `historyTick` bumps on every history change so
+  // the UI re-evaluates canUndo/canRedo.
+  historyTick: number;
+  canUndo: () => boolean;
+  canRedo: () => boolean;
+  undo: () => void;
+  redo: () => void;
+
   // Animation (chunk 3)
   steps: AnimStepUI[];
   playbackMode: PlaybackMode;
@@ -82,9 +103,15 @@ interface SpriteState {
   /** Start a fresh single-frame sprite of the given pixel dimensions. */
   newSprite: (w: number, h: number) => void;
 
-  /** Display-only palette (e.g. a loaded character's own colors). Null = use the zone palette line. */
-  paletteOverride: Color[] | null;
-  setPaletteOverride: (colors: Color[] | null) => void;
+  /** How the sprite is colored: bound to a zone CRAM line, or its own private palette. */
+  paletteMode: SpritePaletteMode;
+  zoneLine: number;
+  standalonePalette: Color[];
+  setPaletteMode: (m: SpritePaletteMode) => void;
+  setZoneLine: (line: number) => void;
+  setStandalonePalette: (colors: Color[]) => void;
+  clearPalette: () => void;
+  clearCanvas: () => void;
 }
 
 const DEFAULT_STEP_DURATION = 6;
@@ -99,7 +126,38 @@ function cloneFrame(b: PixelBuffer): PixelBuffer {
   return { width: b.width, height: b.height, data: new Uint8Array(b.data) };
 }
 
-export const useSpriteStore = create<SpriteState>((set) => ({
+/** Module-level undo/redo history for the working sprite document. Exported so
+ *  sprite-mode undo can be merged with the level command history by recency. */
+export const spriteHistory = new SpriteHistory();
+const history = spriteHistory;
+
+// A new sprite edit invalidates the level history's redo (the merged sprite-mode
+// timeline). Registered here; the editing stores never import each other.
+const clearSpriteRedo = () => spriteHistory.clearRedo();
+registerRedoClearer(clearSpriteRedo);
+
+/** Record a pre-edit snapshot AND invalidate sibling (level) redo — every sprite
+ *  edit funnels through here so the merged sprite-mode timeline stays consistent.
+ *  Not gated on appMode: every store mutator that reaches here is reachable only
+ *  while editing a sprite (i.e. in sprite mode), so the level-redo invalidation
+ *  is always a sprite-session event. */
+function recordEdit(s: SpriteState): void {
+  invalidateSiblingRedos(clearSpriteRedo);
+  history.record(snap(s));
+}
+
+/** Build a snapshot from live state. SpriteHistory deep-clones on record/undo/
+ *  redo, so passing live refs is safe. */
+const snap = (s: SpriteState): SpriteSnapshot => ({
+  frames: s.frames,
+  currentIndex: s.currentIndex,
+  selection: s.selection,
+  paletteMode: s.paletteMode,
+  zoneLine: s.zoneLine,
+  standalonePalette: s.standalonePalette,
+});
+
+export const useSpriteStore = create<SpriteState>((set, get) => ({
   tool: 'pencil',
   zoom: 10,
   frames: [blankFrame()],
@@ -113,9 +171,14 @@ export const useSpriteStore = create<SpriteState>((set) => ({
   ditherPattern: 'checker',
   ditherSecondary: 0,
   selection: null,
+  clipboard: null,
   name: 'NewSprite',
   exportDplc: false,
   format: 's4',
+  historyTick: 0,
+  paletteMode: 'zone',
+  zoneLine: 1,
+  standalonePalette: blankStandalonePalette(),
 
   setName: (name) => set({ name }),
   setExportDplc: (exportDplc) => set({ exportDplc }),
@@ -127,45 +190,112 @@ export const useSpriteStore = create<SpriteState>((set) => ({
   setPixelPerfect: (pixelPerfect) => set({ pixelPerfect }),
   setDither: (ditherPattern, ditherSecondary) => set({ ditherPattern, ditherSecondary }),
   setSelection: (selection) => set({ selection }),
-  applyTransform: (t) => set((s) => {
+  applyTransform: (t) => {
+    const s = get();
     const cur = s.frames[s.currentIndex];
     const buf: PixelBuffer = { width: cur.width, height: cur.height, data: cur.data };
     let next: PixelBuffer;
     if (t === 'flip-h') next = flipH(buf);
     else if (t === 'flip-v') next = flipV(buf);
-    else if (t === 'rotate-90') { if (cur.width !== cur.height) return s; next = rotate90(buf); }
-    else return s;
+    else if (t === 'rotate-90') { if (cur.width !== cur.height) return; next = rotate90(buf); }
+    else return;
+    recordEdit(s); // only records when the transform actually applies
     const frames = s.frames.slice();
     frames[s.currentIndex] = next;
-    return { frames, selection: null }; // marquee coords no longer valid after a transform
-  }),
-  setBuffer: (b) => set((s) => {
+    // marquee coords no longer valid after a transform
+    set({ frames, selection: null, historyTick: s.historyTick + 1 });
+  },
+  setBuffer: (b) => {
+    const s = get();
+    recordEdit(s);
     const frames = s.frames.slice();
     frames[s.currentIndex] = b;
-    // Editing reverts display to the project palette (export uses the active line,
-    // not a loaded character's display override) — keep WYSIWYG honest.
-    return s.paletteOverride ? { frames, paletteOverride: null } : { frames };
-  }),
-  // New frame matches the current canvas size (loaded sprites may not be 32x32).
-  addFrame: () => set((s) => {
+    set({ frames, historyTick: s.historyTick + 1 });
+  },
+  copySelection: () => {
+    const s = get();
+    if (!s.selection) return false;
+    const region = copyRegion(s.frames[s.currentIndex], s.selection);
+    if (!region) return false;
+    set({ clipboard: region });
+    return true;
+  },
+  cutSelection: () => {
+    const s = get();
+    if (!s.selection) return false;
     const cur = s.frames[s.currentIndex];
-    return { frames: [...s.frames, createBuffer(cur.width, cur.height)], currentIndex: s.frames.length };
-  }),
-  duplicateFrame: () => set((s) => {
+    const region = copyRegion(cur, s.selection);
+    if (!region) return false;
+    const cleared = clearRegion(cur, s.selection);
+    // Only push an undo step / clobber redo when pixels actually cleared (an
+    // already-blank region is a no-op edit). Mirrors applyTransform.
+    if (diffWrites(cur, cleared).length > 0) recordEdit(s);
+    const frames = s.frames.slice();
+    frames[s.currentIndex] = cleared;
+    set({ frames, clipboard: region, selection: null, historyTick: s.historyTick + 1 });
+    return true;
+  },
+  paste: () => {
+    const s = get();
+    const clip = s.clipboard;
+    if (!clip) return false;
+    const cur = s.frames[s.currentIndex];
+    // Origin: the selection's top-left if present, else (0,0); clamped so the
+    // region fits (overflow is clipped by pasteRegion regardless).
+    const ox = Math.max(0, Math.min(s.selection?.x ?? 0, Math.max(0, cur.width - clip.w)));
+    const oy = Math.max(0, Math.min(s.selection?.y ?? 0, Math.max(0, cur.height - clip.h)));
+    const pasted = pasteRegion(cur, clip, ox, oy);
+    // Nothing landed (all-transparent / fully-clipped clip): no undo step, no
+    // redo clobber. The clipboard existed, so the shortcut is still "handled".
+    if (diffWrites(cur, pasted).length === 0) return true;
+    recordEdit(s);
+    const frames = s.frames.slice();
+    frames[s.currentIndex] = pasted;
+    // Switch to select and select the pasted rect so it can be dragged next
+    // (setTool would clear the selection, so set tool + selection together here).
+    const w = Math.min(clip.w, cur.width - ox), h = Math.min(clip.h, cur.height - oy);
+    set({ frames, tool: 'select', selection: { x: ox, y: oy, w, h }, historyTick: s.historyTick + 1 });
+    return true;
+  },
+  // New frame matches the current canvas size (loaded sprites may not be 32x32).
+  addFrame: () => {
+    const s = get();
+    recordEdit(s);
+    const cur = s.frames[s.currentIndex];
+    set({ frames: [...s.frames, createBuffer(cur.width, cur.height)], currentIndex: s.frames.length, historyTick: s.historyTick + 1 });
+  },
+  duplicateFrame: () => {
+    const s = get();
+    recordEdit(s);
     const frames = [...s.frames, cloneFrame(s.frames[s.currentIndex])];
-    return { frames, currentIndex: frames.length - 1 };
-  }),
-  deleteFrame: () => set((s) => {
-    if (s.frames.length <= 1) return s; // keep at least one frame
+    set({ frames, currentIndex: frames.length - 1, historyTick: s.historyTick + 1 });
+  },
+  deleteFrame: () => {
+    const s = get();
+    if (s.frames.length <= 1) return; // keep at least one frame
+    recordEdit(s);
     const removed = s.currentIndex;
     const frames = s.frames.filter((_, i) => i !== removed);
     // Drop steps referencing the removed frame; shift higher references down.
     const steps = s.steps
       .filter((st) => st.frameIndex !== removed)
       .map((st) => (st.frameIndex > removed ? { ...st, frameIndex: st.frameIndex - 1 } : st));
-    return { frames, steps, currentIndex: Math.min(removed, frames.length - 1) };
-  }),
+    set({ frames, steps, currentIndex: Math.min(removed, frames.length - 1), historyTick: s.historyTick + 1 });
+  },
   selectFrame: (i) => set((s) => ({ currentIndex: Math.min(Math.max(0, i), s.frames.length - 1) })),
+
+  canUndo: () => history.canUndo,
+  canRedo: () => history.canRedo,
+  undo: () => {
+    const s = get();
+    const prev = history.undo(snap(s));
+    if (prev) set({ frames: prev.frames, currentIndex: prev.currentIndex, selection: prev.selection, paletteMode: prev.paletteMode, zoneLine: prev.zoneLine, standalonePalette: prev.standalonePalette, historyTick: s.historyTick + 1 });
+  },
+  redo: () => {
+    const s = get();
+    const next = history.redo(snap(s));
+    if (next) set({ frames: next.frames, currentIndex: next.currentIndex, selection: next.selection, paletteMode: next.paletteMode, zoneLine: next.zoneLine, standalonePalette: next.standalonePalette, historyTick: s.historyTick + 1 });
+  },
 
   steps: [],
   playbackMode: 'forward',
@@ -180,32 +310,54 @@ export const useSpriteStore = create<SpriteState>((set) => ({
   characterAnims: [],
   setCharacterAnims: (characterAnims) => set({ characterAnims }),
 
-  newSprite: (w, h) => set({
-    frames: [createBuffer(Math.max(8, w | 0), Math.max(8, h | 0))],
-    currentIndex: 0,
-    steps: [],
-    originX: Math.floor(Math.max(8, w | 0) / 2),
-    originY: Math.floor(Math.max(8, h | 0) / 2),
-    paletteOverride: null,
-    characterAnims: [],
-    selection: null,
-    name: 'NewSprite',
-    exportDplc: false,
-    format: 's4',
-  }),
+  newSprite: (w, h) => {
+    history.clear(); // a fresh sprite starts with empty history
+    set({
+      frames: [createBuffer(Math.max(8, w | 0), Math.max(8, h | 0))],
+      currentIndex: 0,
+      steps: [],
+      originX: Math.floor(Math.max(8, w | 0) / 2),
+      originY: Math.floor(Math.max(8, h | 0) / 2),
+      paletteMode: 'zone',
+      zoneLine: 1,
+      standalonePalette: blankStandalonePalette(),
+      characterAnims: [],
+      selection: null,
+      name: 'NewSprite',
+      exportDplc: false,
+      format: 's4',
+      historyTick: 0,
+    });
+  },
 
-  loadSprite: (frames, steps, originX, originY) => set({
-    frames: frames.length ? frames : [blankFrame()],
-    steps,
-    currentIndex: 0,
-    originX,
-    originY,
-    paletteOverride: null,
-    characterAnims: [],
-  }),
+  loadSprite: (frames, steps, originX, originY) => {
+    history.clear(); // a loaded sprite starts with empty history
+    set({
+      frames: frames.length ? frames : [blankFrame()],
+      steps,
+      currentIndex: 0,
+      originX,
+      originY,
+      characterAnims: [],
+      historyTick: 0,
+    });
+  },
 
-  paletteOverride: null,
-  setPaletteOverride: (paletteOverride) => set({ paletteOverride }),
+  setZoneLine: (zoneLine) => set({ zoneLine: Math.max(0, Math.min(3, zoneLine | 0)) }),
+  setStandalonePalette: (standalonePalette) => { const s = get(); recordEdit(s); set({ standalonePalette, historyTick: s.historyTick + 1 }); },
+  setPaletteMode: (mode) => {
+    const s = get(); recordEdit(s);
+    if (mode === 'standalone' && s.paletteMode === 'zone') {
+      const zone = getCurrentZone(useProjectStore.getState());
+      const line = zone?.palette.lines[s.zoneLine]?.colors;
+      const seed = line ? line.map((c) => ({ ...c })) : blankStandalonePalette();
+      set({ paletteMode: 'standalone', standalonePalette: seed, historyTick: s.historyTick + 1 });
+    } else {
+      set({ paletteMode: mode, historyTick: s.historyTick + 1 });
+    }
+  },
+  clearPalette: () => { const s = get(); recordEdit(s); set({ paletteMode: 'standalone', standalonePalette: blankStandalonePalette(), historyTick: s.historyTick + 1 }); },
+  clearCanvas: () => { const s = get(); recordEdit(s); const cur = s.frames[s.currentIndex]; const frames = s.frames.slice(); frames[s.currentIndex] = createBuffer(cur.width, cur.height); set({ frames, historyTick: s.historyTick + 1 }); },
 }));
 
 /** Build the frame-index play order for a playback mode (one full cycle). */

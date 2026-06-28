@@ -1,4 +1,5 @@
 import React from 'react';
+import { T } from './ui';
 
 /**
  * The Aurora mark — a rayed eye-star (the radiant light-bringer), from the
@@ -6,7 +7,7 @@ import React from 'react';
  * `currentColor`; defaults to the emerald accent. Use ≥32px for the full mark.
  * Kept as a component (not an <img>) so it inherits color and never hits CSP.
  */
-export default function AuroraMark({ size = 20, color = 'var(--accent, #34D399)', title = 'Aurora' }: {
+export default function AuroraMark({ size = 20, color = T.accent, title = 'Aurora' }: {
   size?: number; color?: string; title?: string;
 }) {
   return (

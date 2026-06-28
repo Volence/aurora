@@ -6,8 +6,12 @@ import { useProjectStore, getActiveLevel, getCurrentZone } from '../../state/pro
 import { useEditorStore, undo, redo, executeCommand } from '../../state/editorStore';
 import { useToastStore } from '../../state/toastStore';
 import type { ChunkDef } from '../../../core/model/s4-types';
+import { Panel, CollapsibleSection, T } from '../ui';
+import EditorShell from '../../shell/EditorShell';
+import ArtToolDock from '../../shell/ArtToolDock';
+import ArtToolOptions from '../../shell/ArtToolOptions';
+import ArtStatusBar from '../../shell/ArtStatusBar';
 import ComposerCanvas from './ComposerCanvas';
-import ToolColumn from './ToolColumn';
 import TilesetPanel from './TilesetPanel';
 import PaletteEditor from './PaletteEditor';
 import ChunkLibrary from '../ChunkLibrary';
@@ -16,7 +20,7 @@ function slug(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'chunk';
 }
 
-export default function ArtMode() {
+export default function ArtMode({ appBar }: { appBar: React.ReactNode }) {
   const open = useArtStore((s) => s.open);
   const openDocument = useArtStore((s) => s.openDocument);
   const historyVersion = useEditorStore((s) => s.historyVersion);
@@ -208,184 +212,150 @@ export default function ArtMode() {
   const hasSharedTiles = open !== null && open.chunkId !== null
     && open.doc.cells.some((c) => c.atlasTile !== null);
 
-  return (
-    <div style={styles.root}>
-      {/* Left panel: tool column */}
-      <div style={styles.leftPanel}>
-        <div style={styles.panelHeader}>Tools</div>
-        <ToolColumn />
-      </div>
+  // Doc header info (name + dirty badge + shared-tile warning + Save) rides at
+  // the left edge of the tool-options bar.
+  const docHeader = open ? (
+    <span style={styles.docHeader}>
+      <span style={styles.docName}>{open.name}</span>
+      {open.dirty && <span style={styles.dirtyBadge}>unsaved</span>}
+      {hasSharedTiles && (
+        <span style={styles.sharedWarning}>
+          ⚠ pixel edits to existing tiles propagate everywhere they're used
+        </span>
+      )}
+      {showSave && (
+        <button
+          style={{ ...styles.saveButton, ...(open.dirty ? {} : styles.saveDisabled) }}
+          disabled={!open.dirty}
+          onClick={handleSave}
+          title={open.chunkId !== null
+            ? 'Save changes back to this chunk (new tiles are added to the tileset)'
+            : 'Save this document as a new chunk in the library'}
+        >
+          {open.chunkId !== null ? 'Save' : 'Save to library'}
+        </button>
+      )}
+    </span>
+  ) : null;
 
-      {/* Center: composer canvas or new-document launcher */}
-      <div style={styles.center}>
+  return (
+    <EditorShell
+      appBar={appBar}
+      toolDock={<ArtToolDock />}
+      toolOptions={<ArtToolOptions before={docHeader} />}
+      panels={
+        <Panel width={240} scroll>
+          <CollapsibleSection id="art.tileset" title="Tileset">
+            <TilesetPanel />
+          </CollapsibleSection>
+          <CollapsibleSection id="art.palette" title="Palette">
+            <PaletteEditor />
+          </CollapsibleSection>
+          <CollapsibleSection id="art.chunks" title="Chunks">
+            <ChunkLibrary />
+          </CollapsibleSection>
+        </Panel>
+      }
+      status={<ArtStatusBar />}
+    >
+      {/* Fill the shell's canvas slot. The slot is a flex item with a definite
+          height but is not itself a flex container, so an absolutely-positioned
+          full-fill column gives ComposerCanvas (flex:1) a context to expand in —
+          matching how MapViewport fills the same slot. */}
+      <div style={styles.canvasFill}>
         {open ? (
-          <div style={styles.canvasArea}>
-            <div style={styles.docHeader}>
-              <span style={styles.docName}>{open.name}</span>
-              {open.dirty && <span style={styles.dirtyBadge}>unsaved</span>}
-              {hasSharedTiles && (
-                <span style={styles.sharedWarning}>
-                  ⚠ pixel edits to existing tiles propagate everywhere they're used
-                </span>
-              )}
-              {showSave && (
-                <button
-                  style={{ ...styles.saveButton, ...(open.dirty ? {} : styles.saveDisabled) }}
-                  disabled={!open.dirty}
-                  onClick={handleSave}
-                  title={open.chunkId !== null
-                    ? 'Save changes back to this chunk (new tiles are added to the tileset)'
-                    : 'Save this document as a new chunk in the library'}
-                >
-                  {open.chunkId !== null ? 'Save' : 'Save to library'}
-                </button>
-              )}
-            </div>
-            <ComposerCanvas />
-          </div>
+          <ComposerCanvas />
         ) : (
           <div style={styles.launcher}>
             <div style={styles.launcherTitle}>New Document</div>
 
-            <button style={styles.newButton} onClick={handleNewTile}>
-              New Tile <span style={styles.preset}>1×1 (8px)</span>
-            </button>
+          <button style={styles.newButton} onClick={handleNewTile}>
+            New Tile <span style={styles.preset}>1×1 (8px)</span>
+          </button>
 
-            <button style={styles.newButton} onClick={handleNewBlock}>
-              Block <span style={styles.preset}>16×16 px (2×2 tiles)</span>
-            </button>
+          <button style={styles.newButton} onClick={handleNewBlock}>
+            Block <span style={styles.preset}>16×16 px (2×2 tiles)</span>
+          </button>
 
-            <div style={styles.newChunkRow}>
-              <button style={styles.newButton} onClick={handleNewChunk}>
-                New Chunk <span style={styles.preset}>(128×128 px = 16×16 tiles)</span>
-              </button>
-              <label style={styles.dimLabel}>
-                W
-                <input
-                  type="number"
-                  min={1}
-                  max={64}
-                  value={chunkW}
-                  onChange={(e) => setChunkW(clampDim(Number(e.target.value)))}
-                  style={styles.dimInput}
-                />
-              </label>
-              <label style={styles.dimLabel}>
-                H
-                <input
-                  type="number"
-                  min={1}
-                  max={64}
-                  value={chunkH}
-                  onChange={(e) => setChunkH(clampDim(Number(e.target.value)))}
-                  style={styles.dimInput}
-                />
-              </label>
-            </div>
+          <div style={styles.newChunkRow}>
+            <button style={styles.newButton} onClick={handleNewChunk}>
+              New Chunk <span style={styles.preset}>(128×128 px = 16×16 tiles)</span>
+            </button>
+            <label style={styles.dimLabel}>
+              W
+              <input
+                type="number"
+                min={1}
+                max={64}
+                value={chunkW}
+                onChange={(e) => setChunkW(clampDim(Number(e.target.value)))}
+                style={styles.dimInput}
+              />
+            </label>
+            <label style={styles.dimLabel}>
+              H
+              <input
+                type="number"
+                min={1}
+                max={64}
+                value={chunkH}
+                onChange={(e) => setChunkH(clampDim(Number(e.target.value)))}
+                style={styles.dimInput}
+              />
+            </label>
           </div>
+        </div>
         )}
       </div>
-
-      {/* Right panel: tileset + palette + chunk library */}
-      <div style={styles.rightPanel}>
-        <TilesetPanel />
-        <div style={styles.panelHeader}>Palette</div>
-        <PaletteEditor />
-        <ChunkLibrary />
-      </div>
-    </div>
+    </EditorShell>
   );
 }
 
 const styles: Record<string, React.CSSProperties> = {
-  root: {
-    flex: 1,
-    display: 'flex',
-    overflow: 'hidden',
-    background: '#12151E',
-    color: '#E8EAF2',
-  },
-  leftPanel: {
-    width: 56,
-    display: 'flex',
-    flexDirection: 'column',
-    background: '#0A0C12',
-    borderRight: '1px solid #2A2F3D',
-    flexShrink: 0,
-  },
-  rightPanel: {
-    width: 220,
-    display: 'flex',
-    flexDirection: 'column',
-    background: '#0A0C12',
-    borderLeft: '1px solid #2A2F3D',
-    flexShrink: 0,
-    overflow: 'auto',
-  },
-  panelHeader: {
-    padding: '4px 8px',
-    fontSize: 10,
-    fontWeight: 600,
-    color: '#6E7589',
-    textTransform: 'uppercase' as const,
-    letterSpacing: 1,
-    borderBottom: '1px solid #2A2F3D',
-  },
-  center: {
-    flex: 1,
-    display: 'flex',
-    flexDirection: 'column',
-    overflow: 'hidden',
-    background: '#12151E',
-  },
-  canvasArea: {
-    flex: 1,
+  canvasFill: {
+    position: 'absolute',
+    inset: 0,
     display: 'flex',
     flexDirection: 'column',
     overflow: 'hidden',
   },
   docHeader: {
-    display: 'flex',
+    display: 'inline-flex',
     alignItems: 'center',
     gap: 8,
-    padding: '4px 12px',
-    background: '#0A0C12',
-    borderBottom: '1px solid #2A2F3D',
-    flexShrink: 0,
   },
   docName: {
     fontSize: 12,
-    color: '#E8EAF2',
+    color: T.textHi,
     fontWeight: 500,
   },
   sharedWarning: {
     fontSize: 10,
-    color: '#f9e2af',
+    color: T.warning,
   },
   dirtyBadge: {
     fontSize: 9,
-    color: '#12151E',
-    background: '#f9e2af',
+    color: T.onAccent,
+    background: T.warning,
     padding: '0 4px',
     borderRadius: 3,
     lineHeight: '14px',
     fontWeight: 600,
   },
   saveButton: {
-    marginLeft: 'auto',
     padding: '2px 10px',
-    background: '#a6e3a1',
-    color: '#12151E',
-    border: '1px solid #a6e3a1',
+    background: T.success,
+    color: T.onAccent,
+    border: `1px solid ${T.success}`,
     borderRadius: 4,
     cursor: 'pointer',
     fontSize: 11,
     fontWeight: 600,
   },
   saveDisabled: {
-    background: '#2A2F3D',
-    color: '#6E7589',
-    borderColor: '#3A4152',
+    background: T.raised,
+    color: T.textLo,
+    borderColor: T.borderStrong,
     cursor: 'default',
   },
   launcher: {
@@ -396,18 +366,19 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: 'center',
     gap: 12,
     padding: 32,
+    height: '100%',
   },
   launcherTitle: {
     fontSize: 18,
     fontWeight: 600,
-    color: '#E8EAF2',
+    color: T.textHi,
     marginBottom: 8,
   },
   newButton: {
     padding: '8px 20px',
-    background: '#2A2F3D',
-    color: '#E8EAF2',
-    border: '1px solid #3A4152',
+    background: T.raised,
+    color: T.textHi,
+    border: `1px solid ${T.borderStrong}`,
     borderRadius: 6,
     cursor: 'pointer',
     fontSize: 13,
@@ -419,7 +390,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   preset: {
     fontSize: 11,
-    color: '#34D399',
+    color: T.accent,
   },
   newChunkRow: {
     display: 'flex',
@@ -431,14 +402,14 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     gap: 4,
     fontSize: 12,
-    color: '#B8BECE',
+    color: T.textBase,
   },
   dimInput: {
     width: 44,
     padding: '4px 6px',
-    background: '#2A2F3D',
-    color: '#E8EAF2',
-    border: '1px solid #3A4152',
+    background: T.raised,
+    color: T.textHi,
+    border: `1px solid ${T.borderStrong}`,
     borderRadius: 4,
     fontSize: 12,
   },

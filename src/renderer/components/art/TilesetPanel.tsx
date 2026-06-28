@@ -8,6 +8,8 @@ import { docFromTile, sliceForSave } from '../../../core/art/composer-buffer';
 import { tileUsageCounts } from '../../../core/art/usage';
 import { unpackNametableWord } from '../../../core/model/s4-types';
 import type { Tile, Palette } from '../../../core/model/s4-types';
+import { T } from '../ui';
+import { CANVAS_VOID, TILE_SELECTED, TILE_HOVER } from '../../canvas/canvas-colors';
 
 // Pre-rendered tile thumbnail cache (separate from ArtBrowser's — that one
 // stays for Map mode). Keyed on zone/palette-line/history so in-place atlas
@@ -95,7 +97,7 @@ export default function TilesetPanel() {
     if (!ctx) return;
 
     ctx.imageSmoothingEnabled = false;
-    ctx.fillStyle = '#0A0C12';
+    ctx.fillStyle = CANVAS_VOID;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     const cols = Math.max(1, Math.floor(canvas.width / (itemSize + 2)));
@@ -120,7 +122,7 @@ export default function TilesetPanel() {
     const sx = selectedCol * (itemSize + 2);
     const sy = selectedRow * (itemSize + 2) - scrollTop;
     if (sy > -itemSize && sy < canvas.height) {
-      ctx.strokeStyle = '#a6e3a1';
+      ctx.strokeStyle = TILE_SELECTED;
       ctx.lineWidth = 2;
       ctx.strokeRect(sx, sy, itemSize, itemSize);
     }
@@ -187,7 +189,7 @@ export default function TilesetPanel() {
       const drawRow = Math.floor(newIdx / cols);
       const dx = drawCol * (itemSize + 2);
       const dy = drawRow * (itemSize + 2) - scrollTopRef.current;
-      ctx.strokeStyle = '#34D399';
+      ctx.strokeStyle = TILE_HOVER;
       ctx.lineWidth = 2;
       ctx.strokeRect(dx, dy, itemSize, itemSize);
     }
@@ -391,36 +393,36 @@ export default function TilesetPanel() {
 const styles: Record<string, React.CSSProperties> = {
   container: {
     display: 'flex', flexDirection: 'column',
-    background: '#12151E',
+    background: T.surface,
     height: 280, flexShrink: 0,
-    borderBottom: '1px solid #2A2F3D',
+    borderBottom: `1px solid ${T.border}`,
   },
   tabs: {
     display: 'flex', alignItems: 'center', gap: 0,
-    borderBottom: '1px solid #2A2F3D', flexShrink: 0,
+    borderBottom: `1px solid ${T.border}`, flexShrink: 0,
   },
   label: {
-    padding: '6px 8px', fontSize: 11, fontWeight: 600, color: '#B8BECE',
+    padding: '6px 8px', fontSize: 11, fontWeight: 600, color: T.textBase,
     textTransform: 'uppercase' as const, letterSpacing: 1,
   },
   hoverLabel: {
     marginLeft: 'auto', padding: '0 8px',
-    fontSize: 10, fontFamily: 'monospace', color: '#34D399',
+    fontSize: 10, fontFamily: T.fontMono, color: T.accent,
     whiteSpace: 'nowrap' as const, overflow: 'hidden', textOverflow: 'ellipsis',
   },
   headerActions: {
     display: 'flex', alignItems: 'center', flexWrap: 'wrap' as const, gap: 6,
     padding: '4px 8px',
-    borderBottom: '1px solid #2A2F3D', flexShrink: 0,
-    background: '#0A0C12',
+    borderBottom: `1px solid ${T.border}`, flexShrink: 0,
+    background: T.void,
   },
   liveInfo: {
-    fontSize: 10, fontFamily: 'monospace', color: '#f9e2af',
+    fontSize: 10, fontFamily: T.fontMono, color: T.warning,
   },
   actionButton: {
     padding: '2px 8px',
-    background: '#2A2F3D', color: '#E8EAF2',
-    border: '1px solid #3A4152', borderRadius: 4,
+    background: T.border, color: T.textHi,
+    border: `1px solid ${T.borderStrong}`, borderRadius: 4,
     cursor: 'pointer', fontSize: 10,
   },
   canvasWrap: {

@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import type { LoadedS4Config } from '../../core/config/s4-config';
 import type { S4Project, Zone, Act, Tileset, Palette, ObjectDef, ChunkDef, BgLibraryEntry } from '../../core/model/s4-types';
 import type { S4Level } from '../../core/editing/commands';
+import type { CollisionProfileSet } from '../../core/collision/collision-model';
 
 /** A rendered object-preview image + its origin (for centering on the placement point). */
 export interface ObjectPreview {
@@ -19,6 +20,7 @@ interface ProjectState {
   error: string | null;
   /** Object id → rendered preview (from a sprite binding). Empty until built. */
   objectSprites: Map<string, ObjectPreview>;
+  collisionProfiles: CollisionProfileSet | null;
 
   setConfig: (config: LoadedS4Config) => void;
   setProject: (project: S4Project) => void;
@@ -26,13 +28,14 @@ interface ProjectState {
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
   setObjectSprites: (sprites: Map<string, ObjectPreview>) => void;
+  setCollisionProfiles: (profiles: CollisionProfileSet | null) => void;
   addChunks: (chunks: ChunkDef[]) => void;
   addBgToLibrary: (entry: BgLibraryEntry) => void;
   clearChunks: () => void;
   reset: () => void;
 }
 
-export const useProjectStore = create<ProjectState>((set) => ({
+export const useProjectStore = create<ProjectState>((set, get) => ({
   config: null,
   project: null,
   currentZoneId: null,
@@ -40,6 +43,7 @@ export const useProjectStore = create<ProjectState>((set) => ({
   loading: false,
   error: null,
   objectSprites: new Map(),
+  collisionProfiles: null,
 
   setConfig: (config) => set({ config, error: null }),
   setProject: (project) => set({ project }),
@@ -47,6 +51,7 @@ export const useProjectStore = create<ProjectState>((set) => ({
   setLoading: (loading) => set({ loading }),
   setError: (error) => set({ error, loading: false }),
   setObjectSprites: (objectSprites) => set({ objectSprites }),
+  setCollisionProfiles: (collisionProfiles) => set({ collisionProfiles }),
   addChunks: (chunks) => set((state) => {
     if (!state.project) return {};
     return {
@@ -72,7 +77,7 @@ export const useProjectStore = create<ProjectState>((set) => ({
     if (!state.project) return {};
     return { project: { ...state.project, chunkLibrary: [] } };
   }),
-  reset: () => set({ config: null, project: null, currentZoneId: null, currentActId: null, loading: false, error: null, objectSprites: new Map() }),
+  reset: () => set({ config: null, project: null, currentZoneId: null, currentActId: null, loading: false, error: null, objectSprites: new Map(), collisionProfiles: null }),
 }));
 
 export function getCurrentZone(state: ProjectState): Zone | null {

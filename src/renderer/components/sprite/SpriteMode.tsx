@@ -1,20 +1,27 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { useProjectStore, getCurrentZone } from '../../state/projectStore';
+import { useProjectStore } from '../../state/projectStore';
 import { useArtStore } from '../../state/artStore';
 import { useSpriteStore } from '../../state/spriteStore';
+import { spriteModeUndo, spriteModeRedo } from '../../state/sprite-undo';
 import SpriteCanvas from './SpriteCanvasHost';
 import type { OverlayRect } from './SpriteCanvasHost';
-import SpriteToolColumn from './SpriteToolColumn';
 import FrameGrid from './FrameGrid';
 import Timeline from './Timeline';
 import { exportSprite, exportSpriteAsm, loadSpriteByName, listSprites, loadEngineCharacter, openSprite, scanProjectForSprites, openDiscoveredSet, loadSpriteAnimations } from './export-sprite';
 import type { ProjectScan } from './export-sprite';
 import PaletteEditor from '../art/PaletteEditor';
+import SpritePaletteHeader from './SpritePaletteHeader';
+import { useAnchoredZoom } from '../art-shared/use-anchored-zoom';
+import { useHandPan } from '../art-shared/use-hand-pan';
+import { PixelHud, type PixelHudHandle } from '../art-shared/PixelHud';
 import { decomposeFrame } from '../../../core/art/sprite-decompose';
 import type { SpriteFormatId } from '../../../core/formats/sprite-format-adapter';
 import type { CompressionKind } from '../../../core/compress';
-
-const SIZE_PRESETS = [16, 24, 32, 48, 64];
+import { Panel, CollapsibleSection, T } from '../ui';
+import EditorShell from '../../shell/EditorShell';
+import SpriteToolDock from '../../shell/SpriteToolDock';
+import SpriteToolOptions from '../../shell/SpriteToolOptions';
+import SpriteStatusBar from '../../shell/SpriteStatusBar';
 
 const FORMATS: { id: SpriteFormatId; label: string }[] = [
   { id: 's4', label: 'S4 (our engine)' },
@@ -35,9 +42,8 @@ const DEFAULT_COMPRESSION: Record<SpriteFormatId, CompressionKind> = {
   s1: 'nemesis', s2: 'nemesis', s3k: 'kosinski-moduled', s4: 'uncompressed',
 };
 
-export default function SpriteMode() {
+export default function SpriteMode({ appBar }: { appBar: React.ReactNode }) {
   const project = useProjectStore((s) => s.project);
-  const zoom = useSpriteStore((s) => s.zoom);
   const showPieces = useSpriteStore((s) => s.showPieces);
   const frames = useSpriteStore((s) => s.frames);
   const currentIndex = useSpriteStore((s) => s.currentIndex);
@@ -56,10 +62,56 @@ export default function SpriteMode() {
   const [busy, setBusy] = useState(false);
   const [newSize, setNewSize] = useState(32);
   const canvasWrapRef = useRef<HTMLDivElement>(null);
+  const zoom = useSpriteStore((s) => s.zoom);
+  // Cursor-anchored wheel zoom on the sprite canvas (sprite zoom is integer, so
+  // the default 2x step crosses integer boundaries cleanly).
+  useAnchoredZoom(canvasWrapRef, zoom, () => useSpriteStore.getState().zoom, (z) => useSpriteStore.getState().setZoom(z));
+  useHandPan(canvasWrapRef);
+  const spriteHudRef = useRef<PixelHudHandle>(null);
 
   const buffer = frames[currentIndex];
 
   useEffect(() => { listSprites().then(setAvailable).catch(() => setAvailable([])); }, []);
+
+  // Ctrl/Cmd+Z (no shift) → undo; Ctrl/Cmd+Y or Ctrl/Cmd+Shift+Z → redo.
+  // Mirror ArtMode's guard: skip only text-entry inputs so undo works right
+  // after a slider/checkbox commit.
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      const isTextEntry = target.isContentEditable
+        || target.tagName === 'TEXTAREA'
+        || (target.tagName === 'INPUT'
+          && !['range', 'checkbox', 'button', 'radio'].includes((target as HTMLInputElement).type));
+      if (isTextEntry) return;
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) {
+        spriteModeUndo();
+        e.preventDefault();
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key.toLowerCase() === 'z' && e.shiftKey))) {
+        spriteModeRedo();
+        e.preventDefault();
+        return;
+      }
+      // Only swallow the native shortcut when the clipboard action actually
+      // applied (had a selection / a clip); otherwise let the browser handle it.
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c') {
+        if (useSpriteStore.getState().copySelection()) e.preventDefault();
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'x') {
+        if (useSpriteStore.getState().cutSelection()) e.preventDefault();
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'v') {
+        if (useSpriteStore.getState().paste()) e.preventDefault();
+        return;
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
 
   function fitToView() {
     const el = canvasWrapRef.current;
@@ -107,46 +159,28 @@ export default function SpriteMode() {
   if (!project) return <div style={styles.empty}>Open a project to edit sprites.</div>;
 
   return (
-    <div style={styles.root}>
-      <div style={styles.topbar}>
-        <span style={styles.dim}>New</span>
-        {SIZE_PRESETS.map((s) => (
-          <button key={s} style={styles.sizeBtn} title={`New ${s}×${s} sprite`} onClick={() => { useSpriteStore.getState().newSprite(s, s); }}>{s}</button>
-        ))}
-        <input type="number" min={8} max={128} value={newSize} style={styles.sizeInput}
-          onChange={(e) => setNewSize(Math.max(8, Math.min(128, Number(e.target.value) || 8)))} title="custom size (px)" />
-        <button style={styles.sizeBtn} onClick={() => useSpriteStore.getState().newSprite(newSize, newSize)}>New □</button>
-        <span style={styles.sep} />
-        <button style={styles.btn} onClick={fitToView}>Fit</button>
-        <span style={styles.dim}>{zoom}× · {buffer.width}×{buffer.height}px</span>
-        <span style={styles.sep} />
-        <label style={styles.check}>
-          <input type="checkbox" checked={showPieces} onChange={(e) => useSpriteStore.getState().setShowPieces(e.target.checked)} />
-          Show pieces
-        </label>
-      </div>
-
-      <div style={styles.body}>
-        <SpriteToolColumn />
-        <div ref={canvasWrapRef} style={styles.canvasWrap}>
-          <div style={styles.canvasPad}>
-            <SpriteCanvas overlayRects={overlayRects} />
-          </div>
-        </div>
-        <div style={styles.rightPanel}>
+    <EditorShell
+      appBar={appBar}
+      toolDock={<SpriteToolDock />}
+      toolOptions={<SpriteToolOptions newSize={newSize} onNewSize={setNewSize} onFit={fitToView} />}
+      panels={
+        <Panel width={240} scroll>
+          <CollapsibleSection id="sprite.mapping" title="Mapping">
           <div style={styles.section}>
-            <div style={styles.sectionTitle}>Mapping</div>
             <div style={styles.stat}><span>Hardware pieces</span><b>{decomp.pieces.length}</b></div>
             <div style={styles.stat}><span>Unique tiles</span><b>{decomp.tiles.length}</b></div>
           </div>
+          </CollapsibleSection>
+
+          <CollapsibleSection id="sprite.name" title="Sprite">
           <div style={styles.section}>
-            <div style={styles.sectionTitle}>Sprite</div>
             <input style={styles.nameInput} value={spriteName} spellCheck={false}
               onChange={(e) => setSpriteName(e.target.value)} placeholder="SpriteName" />
           </div>
+          </CollapsibleSection>
 
+          <CollapsibleSection id="sprite.open" title="Open — import a sprite to edit or convert">
           <div style={styles.section}>
-            <div style={styles.sectionTitle}>Open — import a sprite to edit or convert</div>
             <label style={styles.fmtRow} title="Read the opened files as this game's format. It also becomes the Save-as target, so you can convert by saving in another format.">
               <span style={styles.dim}>Read as</span>
               <select style={styles.fmtSelect} value={openAs}
@@ -209,9 +243,10 @@ export default function SpriteMode() {
               <button style={{ ...styles.secondary, ...(busy ? styles.disabled : {}) }} disabled={busy} onClick={handleLoad}>Load</button>
             </div>
           </div>
+          </CollapsibleSection>
 
+          <CollapsibleSection id="sprite.export" title="Export to project">
           <div style={styles.section}>
-            <div style={styles.sectionTitle}>Export to project</div>
             <label style={styles.check} title="Streamed art (DPLC) vs all art resident. Characters use DPLC; most objects don't.">
               <input type="checkbox" checked={exportDplc} onChange={(e) => useSpriteStore.getState().setExportDplc(e.target.checked)} />
               DPLC (streamed art)
@@ -230,57 +265,63 @@ export default function SpriteMode() {
                 onClick={async () => { if (busy) return; setBusy(true); try { await exportSpriteAsm(spriteName); } finally { setBusy(false); } }}>Export .asm…</button>
             </div>
           </div>
+          </CollapsibleSection>
 
+          <CollapsibleSection id="sprite.character" title="Load engine character">
           <div style={styles.section}>
-            <div style={styles.sectionTitle}>Load engine character</div>
             <div style={styles.btnRow}>
               {['sonic', 'tails', 'knuckles'].map((c) => (
                 <button key={c} style={styles.secondary} onClick={() => loadEngineCharacter(c)}>{c[0].toUpperCase() + c.slice(1)}</button>
               ))}
             </div>
           </div>
-          <PaletteEditor />
+          </CollapsibleSection>
+
+          <CollapsibleSection id="sprite.palette" title="Palette">
+            <SpritePaletteHeader />
+            <PaletteEditor />
+          </CollapsibleSection>
+        </Panel>
+      }
+      bottomExtra={<><FrameGrid /><Timeline /></>}
+      status={<SpriteStatusBar pieces={decomp.pieces.length} tiles={decomp.tiles.length} />}
+    >
+      {/* Fill the shell's canvas slot — absolute full-fill so the scroll/pad
+          wrapper expands to the slot like ArtMode's canvas does. */}
+      <div ref={canvasWrapRef} style={styles.canvasWrap}>
+        <div style={styles.canvasPad}>
+          <SpriteCanvas overlayRects={overlayRects} hudRef={spriteHudRef} />
         </div>
       </div>
-
-      <FrameGrid />
-      <Timeline />
-    </div>
+      <PixelHud ref={spriteHudRef} />
+    </EditorShell>
   );
 }
 
 const styles: Record<string, React.CSSProperties> = {
-  root: { flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' },
-  empty: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#6E7589' },
-  topbar: { display: 'flex', alignItems: 'center', gap: 6, padding: '5px 10px', background: '#0A0C12', borderBottom: '1px solid #2A2F3D', flexShrink: 0 },
-  dim: { fontSize: 11, color: '#9399b2' },
-  sep: { width: 1, height: 18, background: '#3A4152', margin: '0 4px' },
-  sizeBtn: { padding: '3px 7px', background: '#2A2F3D', color: '#E8EAF2', border: '1px solid #3A4152', borderRadius: 4, cursor: 'pointer', fontSize: 11 },
-  sizeInput: { width: 44, background: '#2A2F3D', color: '#E8EAF2', border: '1px solid #3A4152', borderRadius: 4, fontSize: 11, padding: '2px 4px' },
-  btn: { padding: '3px 10px', background: '#3A4152', color: '#E8EAF2', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 11 },
-  check: { fontSize: 11, color: '#B8BECE', display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' },
-  body: { flex: 1, display: 'flex', overflow: 'hidden' },
-  canvasWrap: { flex: 1, overflow: 'auto', background: '#0A0C12' },
+  empty: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: T.textLo },
+  dim: { fontSize: 11, color: T.textLo },
+  sizeBtn: { padding: '3px 7px', background: T.raised, color: T.textHi, border: `1px solid ${T.borderStrong}`, borderRadius: 4, cursor: 'pointer', fontSize: 11 },
+  canvasWrap: { position: 'absolute', inset: 0, overflow: 'auto', background: T.void },
   canvasPad: { display: 'inline-block', padding: 24 },
-  rightPanel: { width: 240, flexShrink: 0, background: '#12151E', borderLeft: '1px solid #2A2F3D', overflow: 'auto', display: 'flex', flexDirection: 'column' },
-  section: { padding: '10px 12px', borderBottom: '1px solid #2A2F3D', display: 'flex', flexDirection: 'column', gap: 6 },
-  sectionTitle: { fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5, color: '#9399b2' },
-  stat: { display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#E8EAF2' },
-  nameInput: { background: '#2A2F3D', color: '#E8EAF2', border: '1px solid #3A4152', borderRadius: 4, fontSize: 12, padding: '4px 6px' },
+  section: { padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 6 },
+  stat: { display: 'flex', justifyContent: 'space-between', fontSize: 13, color: T.textHi },
+  nameInput: { background: T.raised, color: T.textHi, border: `1px solid ${T.borderStrong}`, borderRadius: 4, fontSize: 12, padding: '4px 6px' },
   btnRow: { display: 'flex', gap: 6 },
-  hint: { fontSize: 10, color: '#7f849c', lineHeight: 1.3 },
-  divider: { height: 1, background: '#3A4152', margin: '2px 0' },
+  check: { fontSize: 11, color: T.textBase, display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' },
+  hint: { fontSize: 10, color: T.textFaint, lineHeight: 1.3 },
+  divider: { height: 1, background: T.borderStrong, margin: '2px 0' },
   fmtRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 },
-  fmtSelect: { flex: 1, background: '#2A2F3D', color: '#E8EAF2', border: '1px solid #3A4152', borderRadius: 4, fontSize: 12, padding: '4px 6px' },
-  scanPanel: { display: 'flex', flexDirection: 'column', gap: 4, marginTop: 4, padding: 6, background: '#12151E', border: '1px solid #3A4152', borderRadius: 4 },
+  fmtSelect: { flex: 1, background: T.raised, color: T.textHi, border: `1px solid ${T.borderStrong}`, borderRadius: 4, fontSize: 12, padding: '4px 6px' },
+  scanPanel: { display: 'flex', flexDirection: 'column', gap: 4, marginTop: 4, padding: 6, background: T.void, border: `1px solid ${T.borderStrong}`, borderRadius: 4 },
   scanList: { display: 'flex', flexDirection: 'column', gap: 2, maxHeight: 220, overflowY: 'auto' },
-  scanRow: { display: 'flex', alignItems: 'center', gap: 6, padding: '2px 4px', borderRadius: 3, background: '#2A2F3D' },
-  scanName: { flex: 1, fontSize: 11, color: '#E8EAF2', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  scanRow: { display: 'flex', alignItems: 'center', gap: 6, padding: '2px 4px', borderRadius: 3, background: T.raised },
+  scanName: { flex: 1, fontSize: 11, color: T.textHi, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   scanBadges: { display: 'flex', alignItems: 'center', gap: 3 },
-  scanGame: { fontSize: 9, color: '#9399b2', fontWeight: 700 },
-  scanTag: { fontSize: 9, color: '#12151E', background: '#34D399', borderRadius: 2, padding: '0 3px', fontWeight: 700 },
-  scanOpen: { padding: '2px 8px', background: '#2A2F3D', color: '#E8EAF2', border: '1px solid #3A4152', borderRadius: 3, cursor: 'pointer', fontSize: 11 },
-  primary: { flex: 1, padding: '5px 8px', background: '#34D399', color: '#12151E', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 12, fontWeight: 600 },
-  secondary: { flex: 1, padding: '5px 8px', background: '#2A2F3D', color: '#E8EAF2', border: '1px solid #3A4152', borderRadius: 4, cursor: 'pointer', fontSize: 12 },
+  scanGame: { fontSize: 9, color: T.textLo, fontWeight: 700 },
+  scanTag: { fontSize: 9, color: T.onAccent, background: T.success, borderRadius: 2, padding: '0 3px', fontWeight: 700 },
+  scanOpen: { padding: '2px 8px', background: T.raised, color: T.textHi, border: `1px solid ${T.borderStrong}`, borderRadius: 3, cursor: 'pointer', fontSize: 11 },
+  primary: { flex: 1, padding: '5px 8px', background: T.success, color: T.onAccent, border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 12, fontWeight: 600 },
+  secondary: { flex: 1, padding: '5px 8px', background: T.raised, color: T.textHi, border: `1px solid ${T.borderStrong}`, borderRadius: 4, cursor: 'pointer', fontSize: 12 },
   disabled: { opacity: 0.5, cursor: 'default' },
 };

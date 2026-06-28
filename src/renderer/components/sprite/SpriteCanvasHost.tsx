@@ -6,17 +6,20 @@ import PixelViewport from '../art-shared/PixelViewport';
 import type { ViewportOverlay } from '../art-shared/PixelViewport';
 import { PixelEditController, diffWrites } from '../../../core/art/pixel-edit-controller';
 import type { GestureResult } from '../../../core/art/pixel-edit-controller';
+import { resolveDisplayPalette } from '../../../core/art/sprite-palette';
+import type { PixelHudHandle } from '../art-shared/PixelHud';
+import { OVERLAY_OUTLINE } from '../../canvas/canvas-colors';
 
 /** A piece outline to overlay, in sprite-pixel coords. */
 export interface OverlayRect { x: number; y: number; w: number; h: number; }
 
 /**
  * Sprite host for the shared PixelViewport + PixelEditController. Bridges the sprite
- * store (frames/tool/mirror/dither/selection/palette override) to the engine, and
+ * store (frames/tool/mirror/dither/selection/palette mode) to the engine, and
  * commits results via setBuffer/setSelection. Replaces the old standalone SpriteCanvas;
  * all drawing logic + rendering now live in the shared core.
  */
-export default function SpriteCanvasHost({ overlayRects }: { overlayRects?: OverlayRect[] }) {
+export default function SpriteCanvasHost({ overlayRects, hudRef }: { overlayRects?: OverlayRect[]; hudRef?: React.RefObject<PixelHudHandle | null> }) {
   const buffer = useSpriteStore((s) => s.frames[s.currentIndex]);
   const zoom = useSpriteStore((s) => s.zoom);
   const tool = useSpriteStore((s) => s.tool);
@@ -25,13 +28,14 @@ export default function SpriteCanvasHost({ overlayRects }: { overlayRects?: Over
   const ditherPattern = useSpriteStore((s) => s.ditherPattern);
   const ditherSecondary = useSpriteStore((s) => s.ditherSecondary);
   const selection = useSpriteStore((s) => s.selection);
-  const override = useSpriteStore((s) => s.paletteOverride);
+  const paletteMode = useSpriteStore((s) => s.paletteMode);
+  const zoneLine = useSpriteStore((s) => s.zoneLine);
+  const standalonePalette = useSpriteStore((s) => s.standalonePalette);
   const selectedColor = useArtStore((s) => s.selectedColor);
-  const paletteLine = useArtStore((s) => s.paletteLine);
-  useArtStore((s) => s.paletteVersion); // re-render on slider edits
+  useArtStore((s) => s.paletteVersion); // re-render on zone-line slider edits
 
   const zone = getCurrentZone(useProjectStore.getState());
-  const palette = override ?? zone?.palette.lines[paletteLine]?.colors ?? [];
+  const palette = resolveDisplayPalette(paletteMode, zoneLine, standalonePalette, zone?.palette.lines ?? []);
 
   // One persistent controller; reconfigured each render with the current tool state.
   const controllerRef = useRef<PixelEditController | null>(null);
@@ -39,12 +43,12 @@ export default function SpriteCanvasHost({ overlayRects }: { overlayRects?: Over
   if (!controllerRef.current) controllerRef.current = new PixelEditController(config);
   controllerRef.current.setConfig(config);
 
-  const overlays: ViewportOverlay[] = (overlayRects ?? []).map((r) => ({ kind: 'outline', x: r.x, y: r.y, w: r.w, h: r.h, color: '#f9e2af' }));
+  const overlays: ViewportOverlay[] = (overlayRects ?? []).map((r) => ({ kind: 'outline', x: r.x, y: r.y, w: r.w, h: r.h, color: OVERLAY_OUTLINE }));
 
   function onCommit(r: GestureResult) {
     const st = useSpriteStore.getState();
     // Only replace the frame when pixels actually changed (a bare marquee mustn't
-    // clear the palette override / bump the frame).
+    // bump the frame / push history).
     if (diffWrites(buffer, r.buffer).length > 0) st.setBuffer(r.buffer);
     if (r.selection !== undefined) st.setSelection(r.selection);
   }
@@ -60,6 +64,15 @@ export default function SpriteCanvasHost({ overlayRects }: { overlayRects?: Over
       overlays={overlays}
       onCommit={onCommit}
       onPick={(v) => useArtStore.getState().setSelectedColor(v)}
+      onHover={(pixel) => {
+        if (!hudRef) return;
+        if (pixel && pixel.x >= 0 && pixel.y >= 0 && pixel.x < buffer.width && pixel.y < buffer.height) {
+          const idx = buffer.data[pixel.y * buffer.width + pixel.x];
+          hudRef.current?.update({ x: pixel.x, y: pixel.y, idx, color: palette[idx] }, zoom);
+        } else {
+          hudRef.current?.update(null, zoom);
+        }
+      }}
     />
   );
 }

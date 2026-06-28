@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useCallback, useMemo, useState } from 'react';
+import React, { useRef, useEffect, useLayoutEffect, useCallback, useMemo, useState } from 'react';
 import { useArtStore } from '../../state/artStore';
 import { useEditorStore, executeCommand } from '../../state/editorStore';
 import {
@@ -20,7 +20,15 @@ import { PixelEditController } from '../../../core/art/pixel-edit-controller';
 import type { GestureResult, ArtTool as CtlArtTool } from '../../../core/art/pixel-edit-controller';
 import PixelViewport from '../art-shared/PixelViewport';
 import type { HostPointer } from '../art-shared/PixelViewport';
+import { useAnchoredZoom } from '../art-shared/use-anchored-zoom';
+import { useHandPan } from '../art-shared/use-hand-pan';
+import { PixelHud, type PixelHudHandle } from '../art-shared/PixelHud';
 import type { Tile, Color } from '../../../core/model/s4-types';
+import { T } from '../ui';
+import {
+  PIXEL_GRID, PIXEL_GRID_TILE, PIXEL_GRID_BLOCK,
+  HUD_CHIP_BG, HUD_CELL_BG, HUD_COLL_ZERO, HUD_COLL_NONZERO,
+} from '../../canvas/canvas-colors';
 
 interface Write { x: number; y: number; value: number; }
 interface SelRect { x: number; y: number; w: number; h: number; }
@@ -65,6 +73,7 @@ export default function ComposerCanvas() {
   const brushTile = useArtStore((s) => s.brushTile);
   const selectedColor = useArtStore((s) => s.selectedColor);
   const mirror = useArtStore((s) => s.mirror);
+  const pixelPerfect = useArtStore((s) => s.pixelPerfect);
   const ditherPattern = useArtStore((s) => s.ditherPattern);
   const ditherSecondary = useArtStore((s) => s.ditherSecondary);
   const selectedCollisionType = useEditorStore((s) => s.selectedCollisionType);
@@ -294,7 +303,7 @@ export default function ComposerCanvas() {
   const ctlTool: CtlArtTool = (tool === 'tile-stamp' || tool === 'collision') ? 'pencil' : tool;
   const config = {
     tool: ctlTool, color: selectedColor, mirror,
-    ditherPattern, ditherSecondary, pixelPerfect: false,
+    ditherPattern, ditherSecondary, pixelPerfect,
   };
   if (!controllerRef.current) controllerRef.current = new PixelEditController(config);
   controllerRef.current.setConfig(config);
@@ -315,16 +324,28 @@ export default function ComposerCanvas() {
     if (doc) useArtStore.getState().setPaletteLine(cellAt(doc, pixel.x >> 3, pixel.y >> 3).pal);
   }, []);
 
+  // On-canvas HUD: updated imperatively in onHover (no re-render / re-blit).
+  const hudRef = useRef<PixelHudHandle>(null);
+  const hudDataRef = useRef({ buffer, paletteLines, lineMap, zoom: effectiveZoom });
+  hudDataRef.current = { buffer, paletteLines, lineMap, zoom: effectiveZoom };
+
   const onHover = useCallback((pixel: { x: number; y: number } | null) => {
     if (pixel) hoverRef.current = pixel;
+    const { buffer: buf, paletteLines: pls, lineMap: lm, zoom: z } = hudDataRef.current;
+    if (pixel && pixel.x >= 0 && pixel.y >= 0 && pixel.x < buf.width && pixel.y < buf.height) {
+      const i = pixel.y * buf.width + pixel.x;
+      const idx = buf.data[i];
+      const line = lm ? lm[i] : 0;
+      hudRef.current?.update({ x: pixel.x, y: pixel.y, idx, color: pls[line]?.[idx] }, z);
+    } else {
+      hudRef.current?.update(null, z);
+    }
   }, []);
 
-  /** Wheel over the canvas: up doubles, down halves (setZoom clamps the range). */
-  const onWheel = useCallback((e: React.WheelEvent) => {
-    e.stopPropagation();
-    const s = useArtStore.getState();
-    s.setZoom(s.zoom * (e.deltaY < 0 ? 2 : 0.5));
-  }, []);
+  // Cursor-anchored wheel zoom (the doc point under the cursor stays put).
+  const scrollerRef = useRef<HTMLDivElement>(null);
+  useAnchoredZoom(scrollerRef, effectiveZoom, () => useArtStore.getState().zoom, (z) => useArtStore.getState().setZoom(z));
+  useHandPan(scrollerRef);
 
   // Tile-space tools (stamp/collision) are tile-space by nature — route them to
   // the host hook whenever selected, regardless of the px/tile tab state.
@@ -371,21 +392,21 @@ export default function ComposerCanvas() {
     if (!doc) return;
     const pxW = doc.widthTiles * 8, pxH = doc.heightTiles * 8;
     if (z >= 8) {
-      ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+      ctx.strokeStyle = PIXEL_GRID;
       ctx.lineWidth = 1;
       ctx.beginPath();
       for (let x = 1; x < pxW; x++) { ctx.moveTo(x * z + 0.5, 0); ctx.lineTo(x * z + 0.5, pxH * z); }
       for (let y = 1; y < pxH; y++) { ctx.moveTo(0, y * z + 0.5); ctx.lineTo(pxW * z, y * z + 0.5); }
       ctx.stroke();
     }
-    ctx.strokeStyle = 'rgba(255,255,255,0.22)';
+    ctx.strokeStyle = PIXEL_GRID_TILE;
     ctx.lineWidth = 1;
     ctx.beginPath();
     for (let x = 8; x < pxW; x += 8) { ctx.moveTo(x * z + 0.5, 0); ctx.lineTo(x * z + 0.5, pxH * z); }
     for (let y = 8; y < pxH; y += 8) { ctx.moveTo(0, y * z + 0.5); ctx.lineTo(pxW * z, y * z + 0.5); }
     ctx.stroke();
     if (doc.widthTiles >= 16) {
-      ctx.strokeStyle = 'rgba(249,226,175,0.45)';
+      ctx.strokeStyle = PIXEL_GRID_BLOCK;
       ctx.beginPath();
       for (let x = 128; x < pxW; x += 128) { ctx.moveTo(x * z + 0.5, 0); ctx.lineTo(x * z + 0.5, pxH * z); }
       for (let y = 128; y < pxH; y += 128) { ctx.moveTo(0, y * z + 0.5); ctx.lineTo(pxW * z, y * z + 0.5); }
@@ -409,9 +430,9 @@ export default function ComposerCanvas() {
         for (let cx = 0; cx < doc.widthTiles; cx++) {
           const coll = doc.cells[cy * doc.widthTiles + cx].coll;
           const tx = (cx * 8 + 4) * z, ty = (cy * 8 + 4) * z;
-          ctx.fillStyle = 'rgba(17,17,27,0.65)';
+          ctx.fillStyle = HUD_CELL_BG;
           ctx.fillRect(tx - z, ty - z * 0.75, z * 2, z * 1.5);
-          ctx.fillStyle = coll === 0 ? '#6E7589' : '#f9e2af';
+          ctx.fillStyle = coll === 0 ? HUD_COLL_ZERO : HUD_COLL_NONZERO;
           ctx.fillText(String(coll), tx, ty);
         }
       }
@@ -429,9 +450,9 @@ export default function ComposerCanvas() {
       : `collision: ${useEditorStore.getState().selectedCollisionType}`;
     ctx.font = '11px monospace';
     const tw = ctx.measureText(hud).width;
-    ctx.fillStyle = 'rgba(17,17,27,0.85)';
+    ctx.fillStyle = HUD_CHIP_BG;
     ctx.fillRect(4, 4, tw + 12, 18);
-    ctx.fillStyle = '#f9e2af';
+    ctx.fillStyle = HUD_COLL_NONZERO;
     ctx.fillText(hud, 10, 17);
     ctx.restore();
   }, [repeatPreview]);
@@ -552,8 +573,9 @@ export default function ComposerCanvas() {
   if (!open) return null;
 
   return (
-    <div style={styles.scroller}>
-      <div style={styles.holder} onWheel={onWheel}>
+    <div style={styles.frame}>
+      <div ref={scrollerRef} style={styles.scroller}>
+      <div style={styles.holder}>
         <PixelViewport
           buffer={buffer}
           palette={paletteLines[0]}
@@ -576,16 +598,21 @@ export default function ComposerCanvas() {
           onHover={onHover}
         />
       </div>
+      </div>
+      <PixelHud ref={hudRef} />
     </div>
   );
 }
 
 const styles: Record<string, React.CSSProperties> = {
+  frame: {
+    flex: 1, position: 'relative', display: 'flex', minWidth: 0, minHeight: 0,
+  },
   scroller: {
     flex: 1,
     overflow: 'auto',
     display: 'flex',
-    background: '#0A0C12',
+    background: T.void,
   },
   holder: {
     margin: 'auto',

@@ -18,14 +18,17 @@ export const WIDE_STRIP_SIZE =
 
 export interface StripData {
   nametable: Uint16Array;
-  collision: Uint8Array;
+  collision: Uint8Array;   // path A
+  collisionB: Uint8Array;  // path B (the alternate plane for dual-layer/loop sections)
   width: number;
   height: number;
 }
 
 /**
  * Parse a section's wide-strip file (column-major) into row-major grids.
- * Collision is read from path A only; each cell byte covers two tile rows.
+ * Both collision planes (path A + path B) are read; each cell byte covers two
+ * tile rows. Path A is the editable/primary plane; path B is the view-only
+ * alternate layer.
  */
 export function parseStrips(data: Uint8Array): StripData {
   const expected = STRIP_COLS * WIDE_STRIP_SIZE;
@@ -37,6 +40,7 @@ export function parseStrips(data: Uint8Array): StripData {
   const height = STRIP_ROWS;
   const nametable = new Uint16Array(width * height);
   const collision = new Uint8Array(width * height);
+  const collisionB = new Uint8Array(width * height);
 
   for (let col = 0; col < STRIP_COLS; col++) {
     const stripOffset = col * WIDE_STRIP_SIZE;
@@ -46,15 +50,19 @@ export function parseStrips(data: Uint8Array): StripData {
       nametable[row * width + col] = (data[wordOffset] << 8) | data[wordOffset + 1];
     }
 
-    const collOffset = stripOffset + NT_BYTES_PER_STRIP;
+    const collOffsetA = stripOffset + NT_BYTES_PER_STRIP;
+    const collOffsetB = collOffsetA + COLL_CELLS_PER_STRIP;
     for (let cell = 0; cell < COLL_CELLS_PER_STRIP; cell++) {
-      const value = data[collOffset + cell];
-      collision[(cell * 2) * width + col] = value;
-      collision[(cell * 2 + 1) * width + col] = value;
+      const a = data[collOffsetA + cell];
+      const b = data[collOffsetB + cell];
+      collision[(cell * 2) * width + col] = a;
+      collision[(cell * 2 + 1) * width + col] = a;
+      collisionB[(cell * 2) * width + col] = b;
+      collisionB[(cell * 2 + 1) * width + col] = b;
     }
   }
 
-  return { nametable, collision, width, height };
+  return { nametable, collision, collisionB, width, height };
 }
 
 /**

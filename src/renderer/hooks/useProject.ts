@@ -2,6 +2,7 @@ import { useCallback } from 'react';
 import { useProjectStore, getCurrentAct, getCurrentZone } from '../state/projectStore';
 import { useViewStore } from '../state/viewStore';
 import { useEditorStore } from '../state/editorStore';
+import { loadCollisionProfiles } from './load-collision';
 
 // Set to true only when migrateChunkTilesIntoTileset ran successfully during
 // the current loadFullProject call. Reset at the top of each load so stale
@@ -20,6 +21,8 @@ import { serializeSectionMeta, parseSectionMeta } from '../../core/formats/secti
 import { buildPalette } from '../../core/formats/palette';
 import { parseNametable } from '../../core/formats/s4-nametable';
 import { parseCollision } from '../../core/formats/s4-collision';
+import { parseCollAttr, serializeCollAttr } from '../../core/formats/s4-collattr';
+import { resolvePlaneWords } from '../../core/collision/collision-cell-resolve';
 import { serializeNametable } from '../../core/formats/s4-nametable';
 import { serializeCollision } from '../../core/formats/s4-collision';
 import { serializeRingList } from '../../core/formats/s4-rings';
@@ -75,6 +78,12 @@ export function useProject() {
       setConfig(config);
       await window.api.addRecentProject(dir, config.name);
       setProject(project);
+
+      // Load the engine's collision tables (read-only view). Missing/unreadable
+      // tables → null → the overlay falls back to flat fills (no crash).
+      const collPath = config.raw.collisionDataPath ?? 'data/collision/';
+      const collisionProfiles = await loadCollisionProfiles(config.basePath, collPath);
+      useProjectStore.getState().setCollisionProfiles(collisionProfiles);
 
       if (config.zones.length > 0) {
         const zone = config.zones[0];
@@ -152,6 +161,17 @@ export function useProject() {
         // Write collision (.coll.bin)
         const collData = serializeCollision(section.tileGrid.collision);
         await window.api.writeBinaryFile(basePath, `${prefix}.coll.bin`, collData.buffer as ArrayBuffer);
+
+        // Write editable collision attr plane (.collattr.bin) — the real authored
+        // collision, separate from the legacy .coll.bin.
+        if (section.collisionEdit) {
+          const caData = serializeCollAttr(section.collisionEdit);
+          await window.api.writeBinaryFile(basePath, `${prefix}.collattr.bin`, caData.buffer as ArrayBuffer);
+        }
+        if (section.collisionEditB) {
+          const cbData = serializeCollAttr(section.collisionEditB);
+          await window.api.writeBinaryFile(basePath, `${prefix}.collattrb.bin`, cbData.buffer as ArrayBuffer);
+        }
 
         // Write objects (.objects.json)
         const objectsJson = JSON.stringify(section.objects, null, 2);
@@ -350,15 +370,20 @@ async function loadFullProject(config: ReturnType<typeof loadS4Config>): Promise
       collisionTypes: new Uint8Array(256), // TODO: load collision type table
     };
 
-    // Load palette — S4 engine loads level palette at CRAM line 1 (offset $20),
-    // line 0 is reserved for player sprites
+    // Load palette — level art at CRAM lines 1–3 (destOffset 16), and the shared
+    // player palette (Sonic/Tails) into line 0, which every zone carries in-game.
     const palData = await readFile(basePath, zoneConfig.palette);
-    const palette = buildPalette([{
-      data: palData,
-      srcOffset: 0,
-      destOffset: 16,
-      length: Math.min(48, Math.floor(palData.length / 2)),
-    }]);
+    const sources = [{ data: palData, srcOffset: 0, destOffset: 16, length: Math.min(48, Math.floor(palData.length / 2)) }];
+    try {
+      const playerPal = await readFile(basePath, 'art/palettes/SonicAndTails.bin');
+      sources.unshift({ data: playerPal, srcOffset: 0, destOffset: 0, length: 16 });
+    } catch {
+      try {
+        const playerPal = await readFile(basePath, 'art/palettes/sonic.bin');
+        sources.unshift({ data: playerPal, srcOffset: 0, destOffset: 0, length: 16 });
+      } catch { /* no player palette — line 0 stays empty */ }
+    }
+    const palette = buildPalette(sources);
 
     // Load acts
     const acts: Act[] = [];
@@ -384,20 +409,49 @@ async function loadFullProject(config: ReturnType<typeof loadS4Config>): Promise
             // No editor files — try strip source
           }
 
-          if (!loaded && actConfig.stripPath) {
+          // The engine's real per-cell collision attr indices come from the baked
+          // strips. Load them into a read-only layer for the collision VIEW —
+          // ALWAYS, independent of the editable .coll.bin above, which may hold a
+          // crude/stale model (e.g. 0/1 solidity) that doesn't match the engine's
+          // heightmap/angle/solidity tables. Also seed tileGrid from strips when no
+          // editor files exist.
+          if (actConfig.stripPath) {
             try {
               const stripPrefix = actConfig.stripPrefix || 'sec';
               const stripFile = `${actConfig.stripPath}${stripPrefix}${i}_strips_source.bin`;
               const stripRaw = await readFile(basePath, stripFile);
               const stripData = parseStrips(stripRaw);
 
+              const engineColl = new Uint8Array(SECTION_TILES_WIDE * SECTION_TILES_HIGH);
+              const engineCollB = new Uint8Array(SECTION_TILES_WIDE * SECTION_TILES_HIGH);
               for (let row = 0; row < STRIP_ROWS; row++) {
                 for (let col = 0; col < STRIP_COLS; col++) {
                   const srcIdx = row * STRIP_COLS + col;
                   const dstIdx = row * SECTION_TILES_WIDE + col;
-                  section.tileGrid.nametable[dstIdx] = stripData.nametable[srcIdx];
-                  section.tileGrid.collision[dstIdx] = stripData.collision[srcIdx];
+                  engineColl[dstIdx] = stripData.collision[srcIdx];
+                  engineCollB[dstIdx] = stripData.collisionB[srcIdx];
+                  if (!loaded) {
+                    section.tileGrid.nametable[dstIdx] = stripData.nametable[srcIdx];
+                    section.tileGrid.collision[dstIdx] = stripData.collision[srcIdx];
+                  }
                 }
+              }
+              section.engineCollision = engineColl;
+              section.engineCollisionB = engineCollB;
+              // Editable collision plane: a saved .collattr.bin (16-bit packed cell
+              // words) if present, else seed by packing the strip path-A baseline
+              // into cell words (so paints don't mutate the diff baseline).
+              try {
+                const caRaw = await readFile(basePath, `${prefix}.collattr.bin`);
+                section.collisionEdit = parseCollAttr(caRaw);
+              } catch {
+                section.collisionEdit = resolvePlaneWords(null, engineColl, engineColl.length);
+              }
+              try {
+                const cbRaw = await readFile(basePath, `${prefix}.collattrb.bin`);
+                section.collisionEditB = parseCollAttr(cbRaw);
+              } catch {
+                section.collisionEditB = resolvePlaneWords(null, engineCollB, engineCollB.length);
               }
               loaded = true;
             } catch (stripErr) {

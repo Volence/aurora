@@ -1,10 +1,14 @@
 import React from 'react';
 import { useToastStore, type ToastType } from '../state/toastStore';
+import { T } from './ui';
 
+// Backgrounds map to the nearest semantic surface token (T.raised) — the
+// Empyrean palette has no per-status tinted backgrounds; the colored border
+// carries the success/info/error distinction.
 const TYPE_COLORS: Record<ToastType, { bg: string; border: string }> = {
-  success: { bg: '#1e3a2f', border: '#a6e3a1' },
-  info: { bg: '#1e2a3a', border: '#34D399' },
-  error: { bg: '#3a1e2a', border: '#f38ba8' },
+  success: { bg: T.raised, border: T.success },
+  info: { bg: T.raised, border: T.info },
+  error: { bg: T.raised, border: T.error },
 };
 
 export default function ToastContainer() {
@@ -41,7 +45,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   toast: {
     padding: '6px 16px', borderRadius: 6, fontSize: 12, fontWeight: 500,
-    color: '#E8EAF2', border: '1px solid', whiteSpace: 'nowrap' as const,
+    color: T.textHi, border: '1px solid', whiteSpace: 'nowrap' as const,
     boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
   },
 };

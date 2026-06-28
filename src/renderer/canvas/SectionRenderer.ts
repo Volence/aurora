@@ -1,6 +1,7 @@
 import type { Tile, PaletteLine, SectionTileGrid } from '../../core/model/s4-types';
 import { unpackNametableWord, SECTION_TILES_WIDE, SECTION_TILES_HIGH, SECTION_PIXEL_SIZE } from '../../core/model/s4-types';
 import { TileRenderer } from './TileRenderer';
+import { CANVAS_BLACK, ACTIVE_SECTION_BORDER } from './canvas-colors';
 
 export interface SectionViewport {
   x: number;
@@ -35,6 +36,11 @@ export class SectionRenderer {
   private gridHeight = 1;
   private tempCanvas = new OffscreenCanvas(8, 8);
   private tempCtx = this.tempCanvas.getContext('2d')!;
+  // Prerendered zone tileset+palette, shared by every section that draws from
+  // the zone atlas (the common case). Built once per reload via prepareTiles()
+  // instead of once PER SECTION — the old per-section prerender re-rendered the
+  // whole tileset N times at load.
+  private sharedTileRenderer: TileRenderer | null = null;
 
   setGrid(width: number, height: number): void {
     this.gridWidth = width;
@@ -110,6 +116,9 @@ export class SectionRenderer {
     if (!nt.hFlip && !nt.vFlip) {
       this.bg.ctx.putImageData(tileImage, px, py);
     } else {
+      // Clear first: drawImage composites, so a flipped transparent tile would
+      // otherwise leave the previous cell content showing through.
+      this.bg.ctx.clearRect(px, py, 8, 8);
       this.tempCtx.putImageData(tileImage, 0, 0);
       this.bg.ctx.save();
       this.bg.ctx.translate(px + (nt.hFlip ? 8 : 0), py + (nt.vFlip ? 8 : 0));
@@ -132,7 +141,7 @@ export class SectionRenderer {
 
     // Always clear the backdrop — even with no BG loaded — so callers on the
     // BG editing layer never composite over a stale frame.
-    ctx.fillStyle = '#000000';
+    ctx.fillStyle = CANVAS_BLACK;
     ctx.fillRect(0, 0, width, height);
 
     if (!this.bg) return;
@@ -146,13 +155,32 @@ export class SectionRenderer {
     ctx.restore();
   }
 
-  loadSection(index: number, tileGrid: SectionTileGrid, tiles: Tile[], paletteLines: PaletteLine[]): void {
+  /**
+   * Prerender the zone tileset+palette once. Call before the loadSection loop;
+   * every section that omits its own tiles reuses this shared cache instead of
+   * re-prerendering the whole tileset per section.
+   */
+  prepareTiles(tiles: Tile[], paletteLines: PaletteLine[]): void {
+    const renderer = new TileRenderer();
+    renderer.prerender(tiles, paletteLines);
+    this.sharedTileRenderer = renderer;
+  }
+
+  loadSection(index: number, tileGrid: SectionTileGrid, tiles?: Tile[], paletteLines?: PaletteLine[]): void {
     const canvas = new OffscreenCanvas(SECTION_PIXEL_SIZE, SECTION_PIXEL_SIZE);
     const ctx = canvas.getContext('2d')!;
     ctx.imageSmoothingEnabled = false;
 
-    const tileRenderer = new TileRenderer();
-    tileRenderer.prerender(tiles, paletteLines);
+    // Per-section art override → its own cache; otherwise the shared zone cache.
+    let tileRenderer: TileRenderer;
+    if (tiles && paletteLines) {
+      tileRenderer = new TileRenderer();
+      tileRenderer.prerender(tiles, paletteLines);
+    } else if (this.sharedTileRenderer) {
+      tileRenderer = this.sharedTileRenderer;
+    } else {
+      return; // no tileset prepared and no override — nothing to draw
+    }
 
     const entry: SectionEntry = {
       tileRenderer,
@@ -218,6 +246,10 @@ export class SectionRenderer {
     if (!nt.hFlip && !nt.vFlip) {
       entry.ctx.putImageData(tileImage, px, py);
     } else {
+      // drawImage composites (source-over) — unlike putImageData it does NOT
+      // replace, so a flipped tile with transparent pixels would leave the
+      // previous cell content showing through. Clear the cell first.
+      entry.ctx.clearRect(px, py, 8, 8);
       this.tempCtx.putImageData(tileImage, 0, 0);
       entry.ctx.save();
       entry.ctx.translate(px + (nt.hFlip ? 8 : 0), py + (nt.vFlip ? 8 : 0));
@@ -251,7 +283,7 @@ export class SectionRenderer {
     const { x: vpX, y: vpY, width, height, zoom } = viewport;
 
     if (clearBackground) {
-      ctx.fillStyle = '#000000';
+      ctx.fillStyle = CANVAS_BLACK;
       ctx.fillRect(0, 0, width, height);
     }
 
@@ -276,7 +308,7 @@ export class SectionRenderer {
     // Draw active section border
     if (activeSectionIndex !== undefined) {
       const offset = this.sectionWorldOffset(activeSectionIndex);
-      ctx.strokeStyle = 'rgba(137, 180, 250, 0.6)';
+      ctx.strokeStyle = ACTIVE_SECTION_BORDER;
       ctx.lineWidth = 2 / zoom;
       ctx.strokeRect(offset.x, offset.y, SECTION_PIXEL_SIZE, SECTION_PIXEL_SIZE);
     }

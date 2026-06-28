@@ -1,6 +1,7 @@
 import React from 'react';
 import { useProjectStore, getCurrentAct } from '../state/projectStore';
 import { useEditorStore } from '../state/editorStore';
+import { T } from './ui';
 
 // Legacy SectionList - replaced by SectionGridNav in the main layout.
 // Kept for compatibility but uses new S4 types.
@@ -44,12 +45,12 @@ export default function SectionList() {
 const styles: Record<string, React.CSSProperties> = {
   container: {
     width: 200, display: 'flex', flexDirection: 'column',
-    background: '#12151E', borderRight: '1px solid #2A2F3D',
+    background: T.surface, borderRight: `1px solid ${T.border}`,
     flexShrink: 0,
   },
   header: {
-    padding: '8px 12px', fontSize: 12, fontWeight: 600, color: '#B8BECE',
-    borderBottom: '1px solid #2A2F3D', textTransform: 'uppercase' as const,
+    padding: '8px 12px', fontSize: 12, fontWeight: 600, color: T.textBase,
+    borderBottom: `1px solid ${T.border}`, textTransform: 'uppercase' as const,
     letterSpacing: 1,
   },
   list: {
@@ -58,19 +59,19 @@ const styles: Record<string, React.CSSProperties> = {
   item: {
     display: 'flex', alignItems: 'center', gap: 8, width: '100%',
     padding: '6px 8px', background: 'transparent', border: 'none',
-    color: '#E8EAF2', cursor: 'pointer', borderRadius: 4, fontSize: 13,
+    color: T.textHi, cursor: 'pointer', borderRadius: 4, fontSize: 13,
     textAlign: 'left' as const,
   },
   active: {
-    background: '#2A2F3D', outline: '1px solid #34D399',
+    background: T.border, outline: `1px solid ${T.accent}`,
   },
   index: {
-    color: '#34D399', fontFamily: 'monospace', fontSize: 12,
+    color: T.accent, fontFamily: 'monospace', fontSize: 12,
   },
   name: {
     flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const,
   },
   empty: {
-    padding: 12, color: '#6E7589', fontSize: 12,
+    padding: 12, color: T.textLo, fontSize: 12,
   },
 };

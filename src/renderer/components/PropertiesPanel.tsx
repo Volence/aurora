@@ -2,6 +2,7 @@ import React from 'react';
 import { useProjectStore, getCurrentAct, getCurrentZone, getActiveLevel } from '../state/projectStore';
 import { useViewStore } from '../state/viewStore';
 import { useEditorStore, executeCommand } from '../state/editorStore';
+import { T } from './ui';
 
 export default function PropertiesPanel() {
   const project = useProjectStore((s) => s.project);
@@ -139,13 +140,13 @@ function Property({ label, value }: { label: string; value: string }) {
 
 const styles: Record<string, React.CSSProperties> = {
   container: {
-    width: 220, display: 'flex', flexDirection: 'column',
-    background: '#12151E', borderLeft: '1px solid #2A2F3D',
+    display: 'flex', flexDirection: 'column',
+    background: T.surface,
     flexShrink: 0,
   },
   header: {
-    padding: '8px 12px', fontSize: 12, fontWeight: 600, color: '#B8BECE',
-    borderBottom: '1px solid #2A2F3D', textTransform: 'uppercase' as const,
+    padding: '8px 12px', fontSize: 12, fontWeight: 600, color: T.textBase,
+    borderBottom: `1px solid ${T.border}`, textTransform: 'uppercase' as const,
     letterSpacing: 1,
   },
   content: {
@@ -155,7 +156,7 @@ const styles: Record<string, React.CSSProperties> = {
     marginBottom: 12,
   },
   sectionTitle: {
-    fontSize: 11, fontWeight: 600, color: '#34D399', marginBottom: 4,
+    fontSize: 11, fontWeight: 600, color: T.accent, marginBottom: 4,
     textTransform: 'uppercase' as const, letterSpacing: 0.5,
   },
   property: {
@@ -163,14 +164,14 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 12,
   },
   propLabel: {
-    color: '#B8BECE',
+    color: T.textBase,
   },
   propValue: {
-    color: '#E8EAF2', fontFamily: 'monospace', fontSize: 11,
+    color: T.textHi, fontFamily: 'monospace', fontSize: 11,
   },
   select: {
     maxWidth: 120, fontSize: 11,
-    background: '#2A2F3D', color: '#E8EAF2',
-    border: '1px solid #3A4152', borderRadius: 2,
+    background: T.border, color: T.textHi,
+    border: `1px solid ${T.borderStrong}`, borderRadius: 2,
   },
 };

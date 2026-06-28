@@ -12,8 +12,34 @@ import type { SectionOverlayInfo } from '../canvas/OverlayRenderer';
 import { SECTION_TILES_WIDE, SECTION_TILES_HIGH, SECTION_PIXEL_SIZE, unpackNametableWord } from '../../core/model/s4-types';
 import { BG_WIDTH } from '../../core/formats/bg-tiles';
 import type { Section, ObjectPlacement, RingPlacement, Act, Tile, BgLibraryEntry } from '../../core/model/s4-types';
+import { T } from './ui';
+import CollisionLegend from './CollisionLegend';
+import {
+  CANVAS_VOID,
+  COLLISION_SHAPE_LINE, COLLISION_SOLID_EDGE, COLLISION_ANGLE_NEEDLE,
+  COLLISION_PREVIEW_FILL, COLLISION_PREVIEW_SCOPE, COLLISION_PREVIEW_PRIMARY, COLLISION_PREVIEW_ERASE,
+} from '../canvas/canvas-colors';
+import { angleDegrees, isAir, isKnownProfile } from '../../core/collision/collision-model';
+import { cellTileIndices } from '../../core/collision/collision-cell';
+import { collisionPaintTargets } from '../../core/collision/collision-paint';
+import { packCollisionCell, unpackCollisionCell, AIR_CELL } from '../../core/collision/collision-cell-word';
+import { resolveCell, resolvePlaneWords } from '../../core/collision/collision-cell-resolve';
+import { effectiveXFlip } from '../../core/collision/collision-palette-organize';
+import { drawCollisionShape } from '../../core/collision/collision-shape-draw';
+import type { ShapeDrawCtx, ShapeDrawOpts } from '../../core/collision/collision-shape-draw';
+import { heightSparkline } from '../../core/collision/collision-render';
 
 export const sectionRenderer = new SectionRenderer();
+
+// Translucent variant of the shape draw opts for the collision paint ghost.
+const COLLISION_PREVIEW_OPTS: ShapeDrawOpts = {
+  fill: COLLISION_PREVIEW_FILL,
+  line: COLLISION_SHAPE_LINE,
+  solidEdge: COLLISION_SOLID_EDGE,
+  needle: COLLISION_ANGLE_NEEDLE,
+  showSolidEdges: true,
+  showNeedle: true,
+};
 const overlayRenderer = new OverlayRenderer();
 
 /**
@@ -46,10 +72,21 @@ interface CtxMenuState {
 
 export default function MapViewport() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const previewCanvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const hoverBarRef = useRef<HTMLDivElement>(null);
+  // The block under the cursor in collision-paint mode (cell units), for the
+  // ghost preview. `alt` latches the live Alt key (paint just this block).
+  const previewHoverRef = useRef<{ sectionIndex: number; cellCol: number; cellRow: number; alt: boolean } | null>(null);
   const isDragging = useRef(false);
+  // Screen pos at mousedown — used to tell a View-mode click (select the section
+  // under the cursor) from a pan-drag.
+  const downPos = useRef<{ x: number; y: number } | null>(null);
   const isPaintDragging = useRef(false);
+  const lastPaintedCell = useRef<string | null>(null);
+  // Collision paint mode latched at mousedown (Alt = paint just the clicked block),
+  // so toggling Alt mid-drag can't switch a single stroke between reuse and local.
+  const paintJustHere = useRef(false);
   const lastMouse = useRef({ x: 0, y: 0 });
   const dragTarget = useRef<{
     type: 'object' | 'ring';
@@ -71,10 +108,79 @@ export default function MapViewport() {
   const currentZoneId = useProjectStore((s) => s.currentZoneId);
   const currentActId = useProjectStore((s) => s.currentActId);
   const objectSprites = useProjectStore((s) => s.objectSprites);
+  const collisionProfiles = useProjectStore((s) => s.collisionProfiles);
   const historyVersion = useEditorStore((s) => s.historyVersion);
   const activeSectionIndex = useEditorStore((s) => s.activeSectionIndex);
   const editingLayer = useEditorStore((s) => s.editingLayer);
   const selection = useEditorStore((s) => s.selection);
+
+  // Collision paint ghost: on a separate canvas layered over the map, draw a
+  // translucent preview of the selected shape under the cursor plus an outline of
+  // every block the stroke would change (reuse set / brush area / erase scope).
+  // Reads everything fresh so it can be called from the render effect (pan/zoom/
+  // version realign) and from mousemove (cell change). Clears when not painting.
+  const drawCollisionPreview = useCallback(() => {
+    const pcv = previewCanvasRef.current, container = containerRef.current;
+    if (!pcv || !container) return;
+    const rect = container.getBoundingClientRect();
+    const w = Math.floor(rect.width), h = Math.floor(rect.height);
+    if (pcv.width !== w || pcv.height !== h) { pcv.width = w; pcv.height = h; }
+    const ctx = pcv.getContext('2d');
+    if (!ctx) return;
+    ctx.clearRect(0, 0, pcv.width, pcv.height);
+
+    const hover = previewHoverRef.current;
+    if (!hover
+      || useEditorStore.getState().tool !== 'paint-collision'
+      || useEditorStore.getState().editingLayer === 'bg') return;
+
+    const act = getCurrentAct(useProjectStore.getState());
+    const section = act?.sections[hover.sectionIndex];
+    if (!section) return;
+
+    const profiles = useProjectStore.getState().collisionProfiles;
+    const profileIdx = useEditorStore.getState().selectedCollisionProfile;
+    const brush = useEditorStore.getState().collisionBrushSize;
+    const cellsW = SECTION_TILES_WIDE / 2, cellsH = SECTION_TILES_HIGH / 2;
+    const { primary, all } = collisionPaintTargets({
+      cellCol: hover.cellCol, cellRow: hover.cellRow, brush, justHere: hover.alt,
+      nametable: section.tileGrid.nametable, width: SECTION_TILES_WIDE, cellsW, cellsH,
+    });
+    const offset = sectionRenderer.sectionWorldOffset(hover.sectionIndex);
+    const { vpX, vpY, zoom } = useViewStore.getState();
+    const erasing = profileIdx === 0;
+    // Ghost the flipped/solidity-shaded shape exactly as it will paint + bake.
+    const est = useEditorStore.getState();
+    const ghostWord = erasing ? AIR_CELL : packCollisionCell({
+      shape: profileIdx, xFlip: effectiveXFlip(est.selectedCollisionEntryFlipX, est.selectedCollisionXFlip),
+      yFlip: est.selectedCollisionYFlip, solidity: est.selectedCollisionSolidity,
+    });
+    const profile = erasing ? null : resolveCell(profiles, ghostWord).profile;
+
+    ctx.save();
+    ctx.imageSmoothingEnabled = false;
+    ctx.scale(zoom, zoom);
+    ctx.translate(-vpX, -vpY);
+
+    // Scope: outline every block the stroke would change (erase tints red).
+    const inset = 0.5 / zoom;
+    for (const t of all) {
+      const wx = offset.x + t.cellCol * 16, wy = offset.y + t.cellRow * 16;
+      if (erasing) { ctx.fillStyle = COLLISION_PREVIEW_ERASE; ctx.fillRect(wx, wy, 16, 16); }
+      ctx.strokeStyle = COLLISION_PREVIEW_SCOPE;
+      ctx.lineWidth = 1 / zoom;
+      ctx.strokeRect(wx + inset, wy + inset, 16 - 2 * inset, 16 - 2 * inset);
+    }
+
+    // The shape ghost at the cursor cell + a brighter outline.
+    const wx = offset.x + primary.cellCol * 16, wy = offset.y + primary.cellRow * 16;
+    if (profile) drawCollisionShape(ctx as unknown as ShapeDrawCtx, wx, wy, 16, profile, COLLISION_PREVIEW_OPTS);
+    ctx.strokeStyle = COLLISION_PREVIEW_PRIMARY;
+    ctx.lineWidth = 1.5 / zoom;
+    ctx.strokeRect(wx + 0.75 / zoom, wy + 0.75 / zoom, 16 - 1.5 / zoom, 16 - 1.5 / zoom);
+
+    ctx.restore();
+  }, []);
 
   // Rebuild only the BG entry from the resolved background of the ACTIVE
   // section (bgLayoutRef -> library entry, else act default). Lighter than
@@ -112,6 +218,9 @@ export default function MapViewport() {
 
     sectionRenderer.setGrid(act.gridWidth, act.gridHeight);
     sectionRenderer.clearSections();
+    // Prerender the zone tileset ONCE; sections share it (the per-section
+    // prerender re-rendered the whole atlas for every section at load).
+    sectionRenderer.prepareTiles(zone.tileset.tiles, zone.palette.lines);
 
     // Unified atlas: section nametables index into the zone tileset. The
     // section.tiles override is kept for future per-section art, but nothing
@@ -119,8 +228,11 @@ export default function MapViewport() {
     for (let i = 0; i < act.sections.length; i++) {
       const section = act.sections[i];
       if (!section) continue;
-      const tiles = section.tiles ?? zone.tileset.tiles;
-      sectionRenderer.loadSection(i, section.tileGrid, tiles, zone.palette.lines);
+      if (section.tiles) {
+        sectionRenderer.loadSection(i, section.tileGrid, section.tiles, zone.palette.lines);
+      } else {
+        sectionRenderer.loadSection(i, section.tileGrid); // reuse shared prerender
+      }
     }
 
     reloadBg();
@@ -149,8 +261,11 @@ export default function MapViewport() {
           break;
         case 'set-tileset-tiles':
         case 'set-palette-line':
+        case 'set-sections':
           // Tile pixels / palette are baked into per-section TileRenderer
-          // caches at load time — re-prerender everything.
+          // caches at load time, and a structural grid change (add/remove/
+          // resize/move/paste) re-indexes the whole grid — re-prerender
+          // everything.
           reloadAllSections();
           break;
         case 'set-bg':
@@ -165,8 +280,9 @@ export default function MapViewport() {
         default:
           // set-chunk thumbnail invalidation is a store concern handled in
           // editorStore (bumpStoreVersions) so it survives Art mode.
-          // Objects/rings are drawn by the OverlayRenderer from live state
-          // every frame; the historyVersion bump already re-renders them.
+          // Objects/rings AND the collision overlay (incl. set-collision-edit)
+          // are drawn by the OverlayRenderer from live state every frame; the
+          // historyVersion bump already re-renders them — no markDirty needed.
           break;
       }
     });
@@ -190,7 +306,7 @@ export default function MapViewport() {
     const state = useProjectStore.getState();
     const act = getCurrentAct(state);
     if (!act) {
-      ctx.fillStyle = '#0A0C12';
+      ctx.fillStyle = CANVAS_VOID;
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       return;
     }
@@ -216,9 +332,11 @@ export default function MapViewport() {
         sectionInfos.push({ section, offsetX: offset.x, offsetY: offset.y });
       }
 
-      overlayRenderer.render(ctx, sectionInfos, overlays, viewport, useProjectStore.getState().objectSprites);
+      overlayRenderer.render(ctx, sectionInfos, overlays, viewport, useProjectStore.getState().objectSprites, useProjectStore.getState().collisionProfiles);
     }
-  }, [vpX, vpY, zoom, overlays, project, currentZoneId, currentActId, activeSectionIndex, editingLayer, historyVersion, selection, objectSprites]);
+    // Realign the collision paint ghost after any pan/zoom/version change.
+    drawCollisionPreview();
+  }, [vpX, vpY, zoom, overlays, project, currentZoneId, currentActId, activeSectionIndex, editingLayer, historyVersion, selection, objectSprites, collisionProfiles, drawCollisionPreview]);
 
   // Handle resize
   useEffect(() => {
@@ -256,7 +374,7 @@ export default function MapViewport() {
           const offset = sectionRenderer.sectionWorldOffset(i);
           sectionInfos.push({ section, offsetX: offset.x, offsetY: offset.y });
         }
-        overlayRenderer.render(ctx, sectionInfos, overlays, viewport);
+        overlayRenderer.render(ctx, sectionInfos, overlays, viewport, undefined, useProjectStore.getState().collisionProfiles);
       }
     });
 
@@ -406,6 +524,75 @@ export default function MapViewport() {
     return getStoreActiveLevel(useProjectStore.getState());
   }
 
+  // Paint collision at the 16px block under `info` with the selected profile.
+  // Default: every block in the section with the SAME tiles (reuse). `justHere`
+  // (Alt): only the clicked block. The block is the 2×2 tiles at (cellCol,cellRow);
+  // a paint sets all four 8px sub-tiles. One undoable set-collision-edit command.
+  function paintCollisionCell(info: { sectionIndex: number; col: number; row: number }, justHere: boolean) {
+    const section = getSectionByIndex(info.sectionIndex);
+    if (!section) return;
+    const plane = useEditorStore.getState().collisionPaintPlane;
+    const N = SECTION_TILES_WIDE * SECTION_TILES_HIGH;
+    // Lazily seed the target plane (pack its engine baseline into cell words) if missing.
+    if (plane === 'b') {
+      if (!section.collisionEditB) section.collisionEditB = resolvePlaneWords(null, section.engineCollisionB, N);
+    } else if (!section.collisionEdit) {
+      section.collisionEdit = resolvePlaneWords(null, section.engineCollision, N);
+    }
+    const ce = (plane === 'b' ? section.collisionEditB : section.collisionEdit)!;
+    const cellCol = info.col >> 1, cellRow = info.row >> 1;
+    const cellKey = `${info.sectionIndex}:${cellCol}:${cellRow}`;
+    if (lastPaintedCell.current === cellKey) return; // same cursor cell — skip
+    lastPaintedCell.current = cellKey;
+
+    // The painted value is a packed 16-bit cell word: selected shape + flip +
+    // solidity. Air (shape 0 / erase) is always the bare 0 word, never solidity bits.
+    const est = useEditorStore.getState();
+    const shape = est.selectedCollisionProfile;
+    const word = shape === 0 ? AIR_CELL : packCollisionCell({
+      shape, xFlip: effectiveXFlip(est.selectedCollisionEntryFlipX, est.selectedCollisionXFlip),
+      yFlip: est.selectedCollisionYFlip, solidity: est.selectedCollisionSolidity,
+    });
+    const brush = useEditorStore.getState().collisionBrushSize;
+    const cellsW = SECTION_TILES_WIDE / 2, cellsH = SECTION_TILES_HIGH / 2;
+
+    // Cheap no-op guard for the expensive reuse scan: if the clicked block is
+    // already fully the selected word, its matches were painted when first
+    // touched — return before collisionPaintTargets does the per-section scan.
+    if (brush === 1 && !justHere) {
+      const clicked = cellTileIndices(cellCol, cellRow, SECTION_TILES_WIDE);
+      if (clicked.every((i) => ce[i] === word)) return;
+    }
+
+    // Same target set the hover preview shows (collisionPaintTargets) — paint and
+    // preview share one source of truth so they can't drift.
+    const { all: targets } = collisionPaintTargets({
+      cellCol, cellRow, brush, justHere,
+      nametable: section.tileGrid.nametable, width: SECTION_TILES_WIDE, cellsW, cellsH,
+    });
+    const label = brush > 1 ? `${brush}×${brush} area`
+      : justHere ? 'this block' : `${targets.length} matching blocks`;
+
+    const entries: Array<{ index: number; oldColl: number; newColl: number }> = [];
+    for (const t of targets) {
+      for (const index of cellTileIndices(t.cellCol, t.cellRow, SECTION_TILES_WIDE)) {
+        const oldColl = ce[index];
+        if (oldColl !== word) entries.push({ index, oldColl, newColl: word });
+      }
+    }
+    if (entries.length === 0) return;
+    const level = getActiveLevel();
+    if (!level) return;
+    executeCommand({
+      type: 'set-collision-edit',
+      plane,
+      description: `Paint collision ${plane.toUpperCase()} (${label})`,
+      sectionIndex: info.sectionIndex,
+      entries,
+    }, level);
+    useEditorStore.getState().setActiveSectionIndex(info.sectionIndex);
+  }
+
   function getSectionByIndex(idx: number): Section | null {
     const state = useProjectStore.getState();
     const act = getCurrentAct(state);
@@ -421,6 +608,7 @@ export default function MapViewport() {
     if (tool === 'view' || e.button === 1) {
       isDragging.current = true;
       lastMouse.current = { x: e.clientX, y: e.clientY };
+      downPos.current = { x: e.clientX, y: e.clientY };
       e.preventDefault();
       return;
     }
@@ -608,20 +796,9 @@ export default function MapViewport() {
     if (tool === 'paint-collision') {
       const info = worldToSectionTile(world.x, world.y);
       if (!info) return;
-      const section = getSectionByIndex(info.sectionIndex);
-      if (!section) return;
-
-      const { selectedCollisionType } = useEditorStore.getState();
-      const oldColl = section.tileGrid.collision[info.tileIndex];
-      if (oldColl !== selectedCollisionType) {
-        executeCommand({
-          type: 'set-collision',
-          description: `Paint collision at (${info.col}, ${info.row})`,
-          sectionIndex: info.sectionIndex,
-          entries: [{ index: info.tileIndex, oldColl, newColl: selectedCollisionType }],
-        }, level);
-      }
-      useEditorStore.getState().setActiveSectionIndex(info.sectionIndex);
+      lastPaintedCell.current = null;
+      paintJustHere.current = e.altKey; // latch the mode for the whole stroke
+      paintCollisionCell(info, paintJustHere.current);
       isPaintDragging.current = true;
       e.preventDefault();
       return;
@@ -721,16 +898,7 @@ export default function MapViewport() {
           sectionRenderer.markDirty(info.sectionIndex, [info.tileIndex]);
         }
       } else {
-        const { selectedCollisionType } = useEditorStore.getState();
-        const oldColl = section.tileGrid.collision[info.tileIndex];
-        if (oldColl !== selectedCollisionType) {
-          executeCommand({
-            type: 'set-collision',
-            description: `Paint collision at (${info.col}, ${info.row})`,
-            sectionIndex: info.sectionIndex,
-            entries: [{ index: info.tileIndex, oldColl, newColl: selectedCollisionType }],
-          }, level);
-        }
+        paintCollisionCell(info, paintJustHere.current); // latched mode (not live Alt)
       }
       return;
     }
@@ -785,15 +953,81 @@ export default function MapViewport() {
     } else {
       const info = worldToSectionTile(world.x, world.y);
       if (info) {
-        bar.innerHTML = `Sec ${info.sectionIndex} | Tile (${info.col}, ${info.row}) | Pos ${Math.floor(world.x)}, ${Math.floor(world.y)}`;
+        let extra = '';
+        const overlays = useViewStore.getState().overlays;
+        if (overlays.showCollision || overlays.showCollisionPathB) {
+          const act = getCurrentAct(useProjectStore.getState());
+          const section = act?.sections[info.sectionIndex] ?? null;
+          if (section) {
+            // Snap to the 16px cell's top-left tile (both tiles share the byte).
+            const cellCol = Math.floor(info.col / 2) * 2;
+            const cellRow = Math.floor(info.row / 2) * 2;
+            // In the A/B diff (both overlays on) the base shown is A, so report A.
+            const pathB = overlays.showCollisionPathB && !overlays.showCollision;
+            const len = section.engineCollision?.length ?? section.tileGrid.collision.length;
+            const words = pathB
+              ? resolvePlaneWords(section.collisionEditB, section.engineCollisionB ?? section.engineCollision, len)
+              : resolvePlaneWords(section.collisionEdit, section.engineCollision, len);
+            const word = words[cellRow * SECTION_TILES_WIDE + cellCol];
+            const profiles = useProjectStore.getState().collisionProfiles;
+            const path = pathB ? 'B' : 'A';
+            const c = unpackCollisionCell(word);
+            const rc = resolveCell(profiles, word);
+            const flips = `${c.xFlip ? ' ⇄' : ''}${c.yFlip ? ' ⇅' : ''}`;
+            if (rc.air) {
+              extra = ` | Coll ${path}: air`;
+            } else if (!profiles) {
+              extra = ` | Coll ${path} #${c.shape}${flips} (tables not loaded)`;
+            } else if (rc.known) {
+              const p = rc.profile!;
+              const deg = angleDegrees(p);
+              extra = ` | Coll ${path} #${c.shape}${flips} ${p.solidity} ${deg === null ? '—' : deg + '°'} ${heightSparkline(p.heights)}`;
+            } else {
+              extra = ` | Coll ${path} #${c.shape}${flips} (unknown)`;
+            }
+          }
+        }
+        bar.innerHTML = `Sec ${info.sectionIndex} | Tile (${info.col}, ${info.row}) | Pos ${Math.floor(world.x)}, ${Math.floor(world.y)}${extra}`;
+
+        // Collision paint ghost: track the hovered block; redraw only when the
+        // cell (or Alt) changes, so it stays cheap while the mouse moves.
+        if (useEditorStore.getState().tool === 'paint-collision') {
+          const cc = info.col >> 1, cr = info.row >> 1;
+          const prev = previewHoverRef.current;
+          if (!prev || prev.sectionIndex !== info.sectionIndex || prev.cellCol !== cc
+              || prev.cellRow !== cr || prev.alt !== e.altKey) {
+            previewHoverRef.current = { sectionIndex: info.sectionIndex, cellCol: cc, cellRow: cr, alt: e.altKey };
+            drawCollisionPreview();
+          }
+        } else if (previewHoverRef.current) {
+          previewHoverRef.current = null;
+          drawCollisionPreview();
+        }
       } else {
         bar.innerHTML = `Pos ${Math.floor(world.x)}, ${Math.floor(world.y)}`;
+        if (previewHoverRef.current) { previewHoverRef.current = null; drawCollisionPreview(); }
       }
     }
-  }, [pan]);
+  }, [pan, drawCollisionPreview]);
 
-  const handleMouseUp = useCallback((_e: React.MouseEvent) => {
+  const handleMouseUp = useCallback((e: React.MouseEvent) => {
     isPaintDragging.current = false;
+
+    // View tool: a click (pointer barely moved) selects the section under the
+    // cursor — a pan-drag does not.
+    if (useEditorStore.getState().tool === 'view' && downPos.current) {
+      const dx = e.clientX - downPos.current.x;
+      const dy = e.clientY - downPos.current.y;
+      if (dx * dx + dy * dy < 25) { // moved < 5px → treat as a click
+        const world = screenToWorld(e.clientX, e.clientY);
+        const secIdx = sectionRenderer.sectionAtWorld(world.x, world.y);
+        const act = getCurrentAct(useProjectStore.getState());
+        if (secIdx >= 0 && act && act.sections[secIdx]) {
+          useEditorStore.getState().setActiveSectionIndex(secIdx);
+        }
+      }
+    }
+    downPos.current = null;
 
     if (dragTarget.current && isDragging.current) {
       const target = dragTarget.current;
@@ -967,11 +1201,14 @@ export default function MapViewport() {
         if (dragTarget.current) dragTarget.current = null;
         isDragging.current = false;
         if (hoverBarRef.current) hoverBarRef.current.style.display = 'none';
+        if (previewHoverRef.current) { previewHoverRef.current = null; drawCollisionPreview(); }
       }}
       onWheel={handleWheel}
       onContextMenu={handleContextMenu}
     >
       <canvas id="map-canvas" ref={canvasRef} style={styles.canvas} />
+      <canvas ref={previewCanvasRef} style={styles.previewCanvas} />
+      <CollisionLegend />
       <div ref={hoverBarRef} style={{ ...styles.hoverBar, display: 'none' }} />
       {ctxMenu && (
         <div
@@ -994,21 +1231,25 @@ export default function MapViewport() {
 const styles: Record<string, React.CSSProperties> = {
   container: {
     flex: 1, position: 'relative', overflow: 'hidden',
-    background: '#0A0C12',
+    background: T.void,
   },
   canvas: {
     position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
     imageRendering: 'pixelated',
   },
+  previewCanvas: {
+    position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
+    imageRendering: 'pixelated', pointerEvents: 'none',
+  },
   empty: {
     flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
-    color: '#6E7589', background: '#0A0C12',
+    color: T.textLo, background: T.void,
   },
   hoverBar: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
     padding: '4px 12px', background: 'rgba(17, 17, 27, 0.9)',
-    borderTop: '1px solid #2A2F3D',
-    fontSize: 11, fontFamily: 'monospace', color: '#B8BECE',
+    borderTop: `1px solid ${T.border}`,
+    fontSize: 11, fontFamily: 'monospace', color: T.textBase,
     gap: 6, alignItems: 'center',
     pointerEvents: 'none',
   },
@@ -1016,12 +1257,12 @@ const styles: Record<string, React.CSSProperties> = {
     position: 'absolute', zIndex: 20,
     display: 'flex', flexDirection: 'column',
     minWidth: 190, padding: 4,
-    background: '#0A0C12', border: '1px solid #3A4152', borderRadius: 6,
+    background: T.void, border: `1px solid ${T.borderStrong}`, borderRadius: 6,
     boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
   },
   ctxItem: {
     padding: '6px 10px', textAlign: 'left' as const,
-    background: 'transparent', color: '#E8EAF2',
+    background: 'transparent', color: T.textHi,
     border: 'none', borderRadius: 4,
     cursor: 'pointer', fontSize: 12,
   },

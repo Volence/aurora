@@ -1,6 +1,9 @@
 import { create } from 'zustand';
+import type { Solidity } from '../../core/collision/collision-model';
 import { EditHistory } from '../../core/editing/history';
 import type { AnyCommand, S4Level } from '../../core/editing/commands';
+import { useArtStore } from './artStore';
+import { registerRedoClearer, invalidateSiblingRedos } from '../../core/editing/undo-bus';
 
 export type EditorTool =
   | 'view' | 'select' | 'paint-tile' | 'paint-block' | 'stamp-chunk'
@@ -81,6 +84,13 @@ interface EditorState {
   selectedObjectSubtype: number;
   selectedRingPattern: number;
   selectedCollisionType: number;
+  selectedCollisionProfile: number; // base-bank shape index for the map collision palette
+  selectedCollisionEntryFlipX: boolean; // the picked palette entry's mirror-to-canonical-left flag
+  selectedCollisionXFlip: boolean;  // USER Flip-H toggle (XORs with the entry flag → effective mirror)
+  selectedCollisionYFlip: boolean;  // flip the painted shape vertically (floor↔ceiling)
+  selectedCollisionSolidity: Solidity; // floor type painted: all / top (jump-through) / none / sides-bottom
+  collisionPaintPlane: 'a' | 'b';
+  collisionBrushSize: number; // brush width in 16px blocks; 1 = reuse, >1 = positional N×N area
 
   setTool: (tool: EditorTool) => void;
   setSelection: (selection: Selection | null) => void;
@@ -94,6 +104,15 @@ interface EditorState {
   setSelectedObjectTypeId: (id: string | null, subtype?: number) => void;
   setSelectedRingPattern: (index: number) => void;
   setSelectedCollisionType: (type: number) => void;
+  setSelectedCollisionProfile: (index: number) => void;
+  /** Pick a palette entry: its base shape + whether it must mirror to face left.
+   *  Resets the user Flip-H toggle so the freshly-picked shape shows canonical. */
+  pickCollisionShape: (shape: number, entryFlipX: boolean) => void;
+  setSelectedCollisionXFlip: (on: boolean) => void;
+  setSelectedCollisionYFlip: (on: boolean) => void;
+  setSelectedCollisionSolidity: (s: Solidity) => void;
+  setCollisionPaintPlane: (plane: 'a' | 'b') => void;
+  setCollisionBrushSize: (size: number) => void;
   markDirty: () => void;
   markClean: () => void;
   bumpVersion: () => void;
@@ -101,6 +120,10 @@ interface EditorState {
 }
 
 export const editHistory = new EditHistory();
+// Let a sibling history (the sprite snapshot history) invalidate this redo when a
+// new sprite edit lands, and vice-versa — so sprite mode behaves as one timeline.
+const clearLevelRedo = () => editHistory.clearRedo();
+registerRedoClearer(clearLevelRedo);
 
 export const useEditorStore = create<EditorState>((set) => ({
   tool: 'view',
@@ -120,6 +143,13 @@ export const useEditorStore = create<EditorState>((set) => ({
   selectedObjectSubtype: 0,
   selectedRingPattern: 0,
   selectedCollisionType: 0,
+  selectedCollisionProfile: 0,
+  selectedCollisionEntryFlipX: false,
+  selectedCollisionXFlip: false,
+  selectedCollisionYFlip: false,
+  selectedCollisionSolidity: 'all',
+  collisionPaintPlane: 'a',
+  collisionBrushSize: 1,
 
   setTool: (tool) => set({ tool, selection: null, multiSelection: null }),
   setSelection: (selection) => set({ selection, multiSelection: null }),
@@ -133,6 +163,19 @@ export const useEditorStore = create<EditorState>((set) => ({
   setSelectedObjectTypeId: (id, subtype) => set({ selectedObjectTypeId: id, selectedObjectSubtype: subtype ?? 0 }),
   setSelectedRingPattern: (index) => set({ selectedRingPattern: index }),
   setSelectedCollisionType: (type) => set({ selectedCollisionType: type }),
+  setSelectedCollisionProfile: (index) => set({ selectedCollisionProfile: Math.max(0, Math.min(0x3FF, index | 0)) }),
+  // Picking a shape updates the canonical-mirror baseline but LEAVES the user's
+  // Flip-H / Flip-V toggles untouched — they're sticky "modes" that hold until
+  // pressed again (matching Flip-V, which was already sticky).
+  pickCollisionShape: (shape, entryFlipX) => set({
+    selectedCollisionProfile: Math.max(0, Math.min(0x3FF, shape | 0)),
+    selectedCollisionEntryFlipX: !!entryFlipX,
+  }),
+  setSelectedCollisionXFlip: (on) => set({ selectedCollisionXFlip: !!on }),
+  setSelectedCollisionYFlip: (on) => set({ selectedCollisionYFlip: !!on }),
+  setSelectedCollisionSolidity: (s) => set({ selectedCollisionSolidity: s }),
+  setCollisionPaintPlane: (collisionPaintPlane) => set({ collisionPaintPlane }),
+  setCollisionBrushSize: (size) => set({ collisionBrushSize: Math.max(1, Math.min(31, size | 0)) }),
   markDirty: () => set({ dirty: true }),
   markClean: () => set({ dirty: false }),
   bumpVersion: () => set((s) => ({ historyVersion: s.historyVersion + 1 })),
@@ -174,6 +217,13 @@ function bumpStoreVersions(cmd: AnyCommand): void {
       || cmd.type === 'set-tileset-tiles') {
     useEditorStore.getState().bumpChunkLibraryVersion();
   }
+  // A committed palette-line change (a slider commit, a copy-bridge write, or its
+  // undo/redo) must repaint every paletteVersion subscriber — notably the sprite
+  // canvas, which watches paletteVersion but not historyVersion. The live slider
+  // preview bumps paletteVersion itself; this covers the commit + undo/redo paths.
+  if (cmd.type === 'set-palette-line') {
+    useArtStore.getState().bumpPaletteVersion();
+  }
 }
 
 /**
@@ -181,6 +231,10 @@ function bumpStoreVersions(cmd: AnyCommand): void {
  */
 export function executeCommand(command: AnyCommand, level: S4Level): void {
   editHistory.execute(command, level);
+  // In sprite mode a palette edit is a new entry in the merged sprite-mode
+  // timeline, so it invalidates the sprite history's redo. Gated on sprite mode
+  // so ordinary level editing (map/art) never disturbs a sprite's redo stack.
+  if (useEditorStore.getState().appMode === 'sprite') invalidateSiblingRedos(clearLevelRedo);
   bumpStoreVersions(command);
   invalidationListener?.(command);
   useEditorStore.getState().markDirty();

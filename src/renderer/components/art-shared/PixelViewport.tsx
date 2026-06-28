@@ -3,6 +3,8 @@ import { pixelAt } from '../../../core/art/viewport-coords';
 import type { PixelEditController, GestureResult, Selection } from '../../../core/art/pixel-edit-controller';
 import type { PixelBuffer } from '../../../core/art/pixel-ops';
 import type { Color } from '../../../core/model/s4-types';
+import { T } from '../ui';
+import { CANVAS_VOID, OVERLAY_OUTLINE, SELECTION_MARQUEE, PREVIEW_STROKE } from '../../canvas/canvas-colors';
 
 export type GridKind = 'pixel' | 'cell8' | 'tile' | 'block';
 export interface ViewportOverlay {
@@ -107,7 +109,7 @@ export default function PixelViewport({
     const cw = tilesX * width * zoom, ch = tilesY * height * zoom;
     ctx.clearRect(0, 0, cw, ch);
     if (repeat) {
-      ctx.fillStyle = '#0A0C12'; ctx.fillRect(0, 0, cw, ch);
+      ctx.fillStyle = CANVAS_VOID; ctx.fillRect(0, 0, cw, ch);
       // faint surrounding copies, then the editable center at full opacity
       ctx.globalAlpha = 1 / 3;
       for (let ty = 0; ty < tilesY; ty++) for (let tx = 0; tx < tilesX; tx++) {
@@ -135,18 +137,18 @@ export default function PixelViewport({
     }
     drawUnderlay?.(ctx, zoom);
     for (const o of overlays ?? []) {
-      ctx.strokeStyle = o.color ?? '#f9e2af';
+      ctx.strokeStyle = o.color ?? OVERLAY_OUTLINE;
       if (o.kind === 'marquee') { ctx.lineWidth = 1; ctx.setLineDash([4, 3]); ctx.strokeRect(o.x * zoom + 0.5, o.y * zoom + 0.5, o.w * zoom, o.h * zoom); ctx.setLineDash([]); }
       else { ctx.lineWidth = 2; ctx.strokeRect(o.x * zoom + 1, o.y * zoom + 1, o.w * zoom - 2, o.h * zoom - 2); }
     }
     if (selection) {
-      ctx.strokeStyle = '#94e2d5'; ctx.lineWidth = 1; ctx.setLineDash([4, 3]);
+      ctx.strokeStyle = SELECTION_MARQUEE; ctx.lineWidth = 1; ctx.setLineDash([4, 3]);
       ctx.strokeRect(selection.x * zoom + 0.5, selection.y * zoom + 0.5, selection.w * zoom, selection.h * zoom);
       ctx.setLineDash([]);
     }
     const pv = controller.preview();
     if (pv.kind !== 'none') {
-      ctx.strokeStyle = '#f5c2e7'; ctx.lineWidth = 1.5;
+      ctx.strokeStyle = PREVIEW_STROKE; ctx.lineWidth = 1.5;
       if (pv.kind === 'line') { ctx.beginPath(); ctx.moveTo((pv.x0 + 0.5) * zoom, (pv.y0 + 0.5) * zoom); ctx.lineTo((pv.x1 + 0.5) * zoom, (pv.y1 + 0.5) * zoom); ctx.stroke(); }
       else if (pv.kind === 'rect' || pv.kind === 'marquee') {
         const nx = Math.min(pv.x0, pv.x1), ny = Math.min(pv.y0, pv.y1), nw = Math.abs(pv.x1 - pv.x0) + 1, nh = Math.abs(pv.y1 - pv.y0) + 1;
@@ -220,7 +222,7 @@ export default function PixelViewport({
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
-      style={{ imageRendering: 'pixelated', cursor: 'crosshair', boxShadow: '0 0 0 1px #3A4152', display: 'block', ...style }}
+      style={{ imageRendering: 'pixelated', cursor: 'crosshair', boxShadow: `0 0 0 1px ${T.borderStrong}`, display: 'block', ...style }}
     />
   );
 }
