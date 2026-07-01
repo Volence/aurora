@@ -7,9 +7,9 @@ is one undo step (Ctrl+Z), and nothing touches disk until you save.
 ## Connect (one time)
 
 1. Launch the editor (`npm run dev`).
-2. Check the port in `~/.sonic-level-editor/mcp.json` (default 38473; falls back
+2. Check the port in `~/.aurora/mcp.json` (default 38473; falls back
    to an ephemeral port if 38473 is in use — always use the file).
-3. `claude mcp add --transport http sonic-editor http://127.0.0.1:38473/mcp`
+3. `claude mcp add --transport http aurora http://127.0.0.1:38473/mcp`
    (substitute the port from the file if it differs).
 
 ## Tools
@@ -52,12 +52,24 @@ the engine build must BINCLUDE the referenced binaries.
 - Over-budget paints are allowed and reported (`fits: false` in the reply); export is
   where overflow hard-fails. Optimize tile reuse before exporting.
 
+## Aether bus
+
+Alongside the MCP server, Aurora serves the **Aether** suite bus on the same port:
+JSON-RPC 2.0 over `/aether` (POST) plus a push event channel at `/aether/events`
+(SSE), behind an `initialize`/capabilities handshake (`protocolVersion: 1`). It
+exposes the same method surface as the MCP tools above, namespaced `editor/*`.
+This lets other suite tools drive Aurora directly, without MCP. (The outbound
+side — Aurora acting as a *client* of another tool's Aether, e.g. the emulator —
+is a later workstream; today Aurora only serves the bus.)
+
 ## Discovery file
 
-`~/.sonic-level-editor/mcp.json` is written on startup and removed on clean quit.
-It contains `{ "url": "...", "port": <n>, "pid": <n> }`. Use the `pid` field to
-detect stale files from crashes: if the process is not running, the file is stale
-and the editor is not active.
+`~/.aurora/mcp.json` is written on startup and removed on clean quit (the legacy
+`~/.sonic-level-editor/mcp.json` is also written during the rename transition).
+It contains `{ "url": "...", "port": <n>, "pid": <n>, "aether": "...",
+"aetherEvents": "...", "protocolVersion": 1 }`. Use the `pid` field to detect
+stale files from crashes: if the process is not running, the file is stale and
+the editor is not active.
 
 ## Troubleshooting
 

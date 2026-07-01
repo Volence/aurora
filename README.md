@@ -51,14 +51,22 @@ palettes and backgrounds; paint regions; stamp and save chunks; capture
 screenshots. Each mutation is one undo step and nothing touches disk until you
 save.
 
-The active port is written to `~/.sonic-level-editor/mcp.json` (default `38473`,
-falling back to an ephemeral port if taken). Connect with:
+The active port is written to `~/.aurora/mcp.json` (default `38473`, falling back
+to an ephemeral port if taken; the legacy `~/.sonic-level-editor/mcp.json` is also
+written during the rename transition). Connect with:
 
 ```bash
-claude mcp add --transport http sonic-editor http://127.0.0.1:38473/mcp
+claude mcp add --transport http aurora http://127.0.0.1:38473/mcp
 ```
 
 Full tool reference and conventions: [`docs/MCP.md`](docs/MCP.md).
+
+Aurora also speaks the **Aether** suite bus directly: the same `editor/*` method
+surface is served as JSON-RPC 2.0 over `/aether` (POST) with a push event channel
+at `/aether/events` (SSE), behind an `initialize`/capabilities handshake
+(`protocolVersion: 1`). The discovery file advertises the `aether` and
+`aetherEvents` endpoints alongside the MCP `url`. This lets non-AI suite tools
+drive Aurora without going through MCP.
 
 ## Architecture
 
