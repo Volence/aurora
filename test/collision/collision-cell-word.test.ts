@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { packCollisionCell, unpackCollisionCell, AIR_CELL } from '../../src/core/collision/collision-cell-word';
+import { packCollisionCell, unpackCollisionCell, selectedCollisionWord, AIR_CELL } from '../../src/core/collision/collision-cell-word';
 
 describe('collision cell word (shape + flip + per-plane 2-bit solidity)', () => {
   it('round-trips all fields', () => {
@@ -25,5 +25,21 @@ describe('collision cell word (shape + flip + per-plane 2-bit solidity)', () => 
   it('AIR_CELL is 0 and unpacks to air (shape 0, no flags)', () => {
     expect(AIR_CELL).toBe(0);
     expect(unpackCollisionCell(0)).toEqual({ shape: 0, xFlip: false, yFlip: false, solidity: 'none' });
+  });
+
+  describe('selectedCollisionWord', () => {
+    it('shape 0 is always the bare AIR_CELL, regardless of solidity/flip selection', () => {
+      expect(selectedCollisionWord({
+        shape: 0, entryFlipX: true, userXFlip: true, yFlip: true, solidity: 'all',
+      })).toBe(AIR_CELL);
+    });
+
+    it('a nonzero shape composes effectiveXFlip(entryFlipX, userXFlip) — entry flip XOR user flip', () => {
+      // entryFlipX=true + userXFlip=true cancel out: no xflip bit in the packed word.
+      const word = selectedCollisionWord({
+        shape: 5, entryFlipX: true, userXFlip: true, yFlip: false, solidity: 'top',
+      });
+      expect(unpackCollisionCell(word)).toEqual({ shape: 5, xFlip: false, yFlip: false, solidity: 'top' });
+    });
   });
 });

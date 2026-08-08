@@ -5,7 +5,8 @@ import { useEditorStore, executeCommand, undo, redo, setCommandInvalidationListe
 import { useArtStore } from '../state/artStore';
 import { openDocumentGuarded } from './art/open-document';
 import { createDoc, docFromTile } from '../../core/art/composer-buffer';
-import type { AnyCommand, S4Level } from '../../core/editing/commands';
+import type { AnyCommand, S4Level, SetTilesCommand } from '../../core/editing/commands';
+import { buildStampCommand } from '../../core/editing/map-stamp';
 import { SectionRenderer } from '../canvas/SectionRenderer';
 import { OverlayRenderer } from '../canvas/OverlayRenderer';
 import type { SectionOverlayInfo } from '../canvas/OverlayRenderer';
@@ -757,33 +758,22 @@ export default function MapViewport() {
       const baseCol = Math.floor(info.col / chunk.widthTiles) * chunk.widthTiles;
       const baseRow = Math.floor(info.row / chunk.heightTiles) * chunk.heightTiles;
 
-      const entries: Array<{ index: number; oldNt: number; newNt: number; oldColl: number; newColl: number }> = [];
-      const dirtyIndices: number[] = [];
+      // Lazily seed both collision planes before stamping — the stamp writes both
+      // (unless Alt/artOnly), mirroring paintCollisionCell's seed-on-first-touch.
+      const N = SECTION_TILES_WIDE * SECTION_TILES_HIGH;
+      if (!section.collisionEditB) section.collisionEditB = resolvePlaneWords(null, section.engineCollisionB, N);
+      if (!section.collisionEdit) section.collisionEdit = resolvePlaneWords(null, section.engineCollision, N);
 
-      for (let r = 0; r < chunk.heightTiles; r++) {
-        for (let c = 0; c < chunk.widthTiles; c++) {
-          const col = baseCol + c;
-          const row = baseRow + r;
-          if (col >= SECTION_TILES_WIDE || row >= SECTION_TILES_HIGH) continue;
-          const idx = row * SECTION_TILES_WIDE + col;
-          const oldNt = section.tileGrid.nametable[idx];
-          const oldColl = section.tileGrid.collision[idx];
-          const newNt = chunk.nametable[r * chunk.widthTiles + c];
-          const newColl = chunk.collision[r * chunk.widthTiles + c];
-          if (oldNt !== newNt || oldColl !== newColl) {
-            entries.push({ index: idx, oldNt, newNt, oldColl, newColl });
-            dirtyIndices.push(idx);
-          }
-        }
-      }
+      const cmd = buildStampCommand({
+        chunk, section, sectionIndex: info.sectionIndex,
+        baseCol, baseRow, artOnly: e.altKey,
+        description: `Stamp chunk ${selectedChunkId} at (${baseCol}, ${baseRow})`,
+      });
 
-      if (entries.length > 0) {
-        executeCommand({
-          type: 'set-tiles',
-          description: `Stamp chunk ${selectedChunkId} at (${baseCol}, ${baseRow})`,
-          sectionIndex: info.sectionIndex,
-          entries,
-        }, level);
+      if (cmd) {
+        executeCommand(cmd, level);
+        const tilesChild = cmd.commands.find((c): c is SetTilesCommand => c.type === 'set-tiles');
+        const dirtyIndices = tilesChild ? tilesChild.entries.map((entry) => entry.index) : [];
         sectionRenderer.markDirty(info.sectionIndex, dirtyIndices);
       }
       useEditorStore.getState().setActiveSectionIndex(info.sectionIndex);

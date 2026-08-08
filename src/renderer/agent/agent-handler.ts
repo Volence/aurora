@@ -12,7 +12,9 @@ import { computeActBudget, canonicalTileHash } from '../../core/agent/budget';
 import { decodeGenesisColor, encodeGenesisColor } from '../../core/formats/palette';
 import { BG_WIDTH } from '../../core/formats/bg-tiles';
 import { makeBgId } from '../../core/formats/bg-library';
-import type { AgentRequest, AgentRequestEnvelope, NametableEntrySpec } from '../../shared/agent-protocol';
+import { buildStampCommand } from '../../core/editing/map-stamp';
+import { resolvePlaneWords } from '../../core/collision/collision-cell-resolve';
+import type { AgentRequest, AgentRequestEnvelope } from '../../shared/agent-protocol';
 
 let registered = false;
 
@@ -286,18 +288,40 @@ async function handle(req: AgentRequest): Promise<unknown> {
       const state = useProjectStore.getState();
       const chunk = state.project!.chunkLibrary.find(c => c.id === req.chunkId);
       if (!chunk) throw new Error(`chunk ${req.chunkId} not found`);
-      // Chunk nametables index into the unified zone tileset — the delegated
-      // paint-region below validates against the same atlas the section renders.
-      const entries: NametableEntrySpec[] = [];
-      for (let i = 0; i < chunk.widthTiles * chunk.heightTiles; i++) {
-        const e = unpackNametableWord(chunk.nametable[i]);
-        entries.push({ tile: e.tileIndex, pal: e.palette, pri: e.priority, hf: e.hFlip, vf: e.vFlip, coll: chunk.collision[i] });
+      if (!Number.isInteger(req.section) || req.section < 0 || req.section >= ctx.act.sections.length) {
+        throw new Error(`section ${req.section} out of range (0-${ctx.act.sections.length - 1})`);
       }
-      return handle({
-        kind: 'paint-region',
-        section: req.section, x: req.x, y: req.y,
-        w: chunk.widthTiles, h: chunk.heightTiles, entries,
+      const section = ctx.act.sections[req.section];
+      if (!section) throw new Error(`section ${req.section} is empty or out of range`);
+      if (!Number.isInteger(req.x) || !Number.isInteger(req.y) || req.x < 0 || req.y < 0 ||
+          req.x + chunk.widthTiles > SECTION_TILES_WIDE || req.y + chunk.heightTiles > SECTION_TILES_HIGH) {
+        throw new Error(`chunk ${chunk.widthTiles}x${chunk.heightTiles} at (${req.x},${req.y}) is out of bounds (section is ${SECTION_TILES_WIDE}x${SECTION_TILES_HIGH} tiles)`);
+      }
+      if (req.x % 2 !== 0 || req.y % 2 !== 0) {
+        throw new Error(`stamp position (${req.x},${req.y}) must be even — collision cells are 16px/2-tile aligned`);
+      }
+
+      // Lazily seed both collision planes before stamping, same as the UI tool.
+      const N = SECTION_TILES_WIDE * SECTION_TILES_HIGH;
+      if (!section.collisionEditB) section.collisionEditB = resolvePlaneWords(null, section.engineCollisionB, N);
+      if (!section.collisionEdit) section.collisionEdit = resolvePlaneWords(null, section.engineCollision, N);
+
+      // Unlike the UI tool, agent stamps do NOT snap to the chunk's own grid —
+      // callers pass explicit tile coords (validated even, above), by design.
+      const cmd = buildStampCommand({
+        chunk, section, sectionIndex: req.section,
+        baseCol: req.x, baseRow: req.y, artOnly: false,
+        description: `agent: stamp ${chunk.id} at (${req.x},${req.y})`,
       });
+
+      let changed = 0;
+      if (cmd) {
+        executeCommand(cmd, ctx.level);
+        for (const c of cmd.commands) {
+          if (c.type === 'set-tiles' || c.type === 'set-collision-edit') changed += c.entries.length;
+        }
+      }
+      return { stamped: true, changed, budget: budgetSummary(ctx) };
     }
 
     case 'goto': {
