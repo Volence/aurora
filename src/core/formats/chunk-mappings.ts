@@ -111,24 +111,27 @@ function blockRefToCollisionWord(ref: BlockRef, fullBlockShape: number): number 
  * Import 128x128 chunk mappings and 16x16 block mappings (both Kosinski-compressed)
  * and produce an array of ChunkDef objects suitable for the editor's chunk library.
  * `fullBlockShape` is the base-bank shape id of a plain solid block (from
- * findFullBlockShapeId); 0 means "profiles unavailable, cannot seed collision".
+ * findFullBlockShapeId). Required — pass 0 explicitly for the "profiles
+ * unavailable, cannot seed collision" sentinel; there's no silent default so a
+ * caller that forgets to thread the profile set fails to compile instead of
+ * silently importing all-air collision.
  */
 export function importChunks(
   chunkFileData: Uint8Array,
   blockFileData: Uint8Array,
   namePrefix: string = 'Chunk',
-  fullBlockShape: number = 0,
+  fullBlockShape: number,
 ): ChunkDef[] {
   const chunkData = kosinskiDecompress(chunkFileData);
   const blockData = kosinskiDecompress(blockFileData);
 
   const chunkCount = Math.floor(chunkData.length / BYTES_PER_CHUNK);
   const chunks: ChunkDef[] = [];
+  const cellCount = chunkCellCount(CHUNK_TILES, CHUNK_TILES);
 
   for (let c = 0; c < chunkCount; c++) {
     const nametable = new Uint16Array(CHUNK_TILES * CHUNK_TILES);
     const collision = new Uint8Array(CHUNK_TILES * CHUNK_TILES);
-    const cellCount = chunkCellCount(CHUNK_TILES, CHUNK_TILES);
     const collisionA = new Uint16Array(cellCount);
     const collisionB = new Uint16Array(cellCount);
     const chunkOffset = c * BYTES_PER_CHUNK;

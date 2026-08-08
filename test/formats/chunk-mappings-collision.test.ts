@@ -26,10 +26,27 @@ function buildFixture(blockRefWord: number): { chunkFileData: Uint8Array; blockF
   };
 }
 
+/** Build a fixture where every block ref is air (0x0000) except one solid
+ *  (0x1000, solidAll) ref at (blockRow, blockCol) — for pinning down exactly
+ *  which cell a given block ref lands in (uniform fixtures can't catch a
+ *  row/col transposition). */
+function buildSingleRefFixture(blockRow: number, blockCol: number): { chunkFileData: Uint8Array; blockFileData: Uint8Array } {
+  const blockRaw = new Uint8Array(BYTES_PER_BLOCK);
+  const chunkRaw = new Uint8Array(BLOCKS_PER_CHUNK * BLOCKS_PER_CHUNK * 2);
+  const wordOffset = (blockRow * BLOCKS_PER_CHUNK + blockCol) * 2;
+  chunkRaw[wordOffset] = 0x10;
+  chunkRaw[wordOffset + 1] = 0x00;
+  return {
+    chunkFileData: kosinskiCompress(chunkRaw),
+    blockFileData: kosinskiCompress(blockRaw),
+  };
+}
+
 describe('importChunks seeds collision word planes from block-ref solidity', () => {
   it('solidAll bit (0x1000) yields solidity "all" on every cell', () => {
     const { chunkFileData, blockFileData } = buildFixture(0x1000);
     const [chunk] = importChunks(chunkFileData, blockFileData, 'Test', FB);
+    expect(chunk.collisionA.length).toBe(64);
     const expected = packCollisionCell({ shape: FB, xFlip: false, yFlip: false, solidity: 'all' });
     expect([...chunk.collisionA].every(w => w === expected)).toBe(true);
   });
@@ -58,5 +75,20 @@ describe('importChunks seeds collision word planes from block-ref solidity', () 
     const [chunk] = importChunks(chunkFileData, blockFileData, 'Test', 0);
     expect([...chunk.collisionA].every(w => w === 0)).toBe(true);
     expect([...chunk.collisionB].every(w => w === 0)).toBe(true);
+  });
+
+  it('places a single solid ref at the correct (blockRow, blockCol) index and nowhere else', () => {
+    // Non-diagonal position: row 2, col 5 -> index 2*8+5 = 21. A row/col
+    // transposition would put it at 5*8+2 = 42 instead.
+    const blockRow = 2, blockCol = 5;
+    const { chunkFileData, blockFileData } = buildSingleRefFixture(blockRow, blockCol);
+    const [chunk] = importChunks(chunkFileData, blockFileData, 'Test', FB);
+    expect(chunk.collisionA.length).toBe(64);
+    const expected = packCollisionCell({ shape: FB, xFlip: false, yFlip: false, solidity: 'all' });
+    const expectedIndex = blockRow * BLOCKS_PER_CHUNK + blockCol;
+    chunk.collisionA.forEach((w, i) => {
+      if (i === expectedIndex) expect(w).toBe(expected);
+      else expect(w).toBe(0);
+    });
   });
 });
