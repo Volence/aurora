@@ -6,7 +6,7 @@ import type { CollisionProfileSet } from './collision-model';
  *  callers must treat 0 as "cannot migrate/seed solid cells". */
 export function findFullBlockShapeId(profiles: CollisionProfileSet | null): number {
   if (!profiles) return 0;
-  for (let i = 1; i < profiles.profiles.length; i++) {
+  for (let i = 1; i < profiles.solidCount; i++) {
     const p = profiles.profiles[i];
     if (p && p.heights.length === 16 && p.heights.every(h => h >= 16)) return i;
   }

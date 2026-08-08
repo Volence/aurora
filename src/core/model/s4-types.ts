@@ -131,6 +131,12 @@ export interface ChunkDef {
   collisionB: Uint16Array;
 }
 
+/** Count of 16px collision cells in a widthTiles x heightTiles chunk (one cell
+ *  per 2x2 tile block). */
+export function chunkCellCount(widthTiles: number, heightTiles: number): number {
+  return (widthTiles >> 1) * (heightTiles >> 1);
+}
+
 export function createChunkDef(
   id: string,
   name: string,
@@ -138,7 +144,7 @@ export function createChunkDef(
   heightTiles: number,
 ): ChunkDef {
   const size = widthTiles * heightTiles;
-  const cellCount = (widthTiles >> 1) * (heightTiles >> 1);
+  const cellCount = chunkCellCount(widthTiles, heightTiles);
   return {
     id,
     name,
