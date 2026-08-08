@@ -1,9 +1,8 @@
 import React from 'react';
 import { useArtStore } from '../state/artStore';
-import { useEditorStore } from '../state/editorStore';
 import { OptionBar, Chip, Divider, T } from '../components/ui';
 import {
-  ToolButton, TransformGrid, DitherConfig, MirrorButton, ZoomControl, Stepper,
+  ToolButton, TransformGrid, DitherConfig, MirrorButton, ZoomControl,
 } from '../components/art-shared/ToolColumnParts';
 
 // Transforms (apply to selection if present, else whole doc). Rotate is
@@ -21,9 +20,11 @@ const TRANSFORMS: Array<{ action: string; glyph: string; label: string }> = [
 
 /**
  * Art-mode tool-options bar. Holds the tool MODIFIERS relocated out of the old
- * ToolColumn — brush-space tabs, per-tool config (dither, collision type,
- * pixel-perfect), mirror, repeat preview, transforms, and zoom. Each control
- * keeps its exact prior behavior; only its host moved (column → option bar).
+ * ToolColumn — brush-space tabs, per-tool config (dither, pixel-perfect),
+ * mirror, repeat preview, transforms, and zoom. Each control keeps its exact
+ * prior behavior; only its host moved (column → option bar). The collision
+ * tool's config (shape/flip/solidity/plane) lives in the side-panel
+ * CollisionPalette instead — see ArtMode.tsx.
  *
  * `before` is rendered at the left edge (the doc header / save info supplied by
  * ArtMode) so the whole option row lives in one OptionBar.
@@ -45,11 +46,6 @@ export default function ArtToolOptions({ before }: { before?: React.ReactNode })
   const setDither = useArtStore((s) => s.setDither);
   const pixelPerfect = useArtStore((s) => s.pixelPerfect);
   const setPixelPerfect = useArtStore((s) => s.setPixelPerfect);
-  // Shared with Map mode's paint-collision tool. Map mode has no bounded
-  // picker, so clamp here: collision types are nibble-sized (0-15) in the
-  // editor's collision grids (per s4-strips).
-  const selectedCollisionType = useEditorStore((s) => s.selectedCollisionType);
-  const setSelectedCollisionType = useEditorStore((s) => s.setSelectedCollisionType);
 
   return (
     <OptionBar>
@@ -72,15 +68,8 @@ export default function ArtToolOptions({ before }: { before?: React.ReactNode })
         />
       )}
 
-      {/* Collision config: type stepper (wraps 0-15, nibble-sized) */}
-      {tool === 'collision' && (
-        <Stepper
-          title="Collision type to paint (0 = none)"
-          value={selectedCollisionType & 0xF}
-          onPrev={() => setSelectedCollisionType((selectedCollisionType + 15) % 16)}
-          onNext={() => setSelectedCollisionType((selectedCollisionType + 1) % 16)}
-        />
-      )}
+      {/* Collision config lives in the side panel (CollisionPalette — shape/flip/
+          solidity/plane), same as Map mode's paint-collision tool. */}
 
       {/* Mirror cycle + repeat preview */}
       <MirrorButton mirror={mirror} onChange={setMirror} />

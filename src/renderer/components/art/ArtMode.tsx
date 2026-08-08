@@ -15,6 +15,7 @@ import ComposerCanvas from './ComposerCanvas';
 import TilesetPanel from './TilesetPanel';
 import PaletteEditor from './PaletteEditor';
 import ChunkLibrary from '../ChunkLibrary';
+import CollisionPalette from '../CollisionPalette';
 
 function slug(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'chunk';
@@ -22,6 +23,7 @@ function slug(name: string): string {
 
 export default function ArtMode({ appBar }: { appBar: React.ReactNode }) {
   const open = useArtStore((s) => s.open);
+  const tool = useArtStore((s) => s.tool);
   const openDocument = useArtStore((s) => s.openDocument);
   const historyVersion = useEditorStore((s) => s.historyVersion);
   const project = useProjectStore((s) => s.project);
@@ -211,6 +213,9 @@ export default function ArtMode({ appBar }: { appBar: React.ReactNode }) {
   }
 
   const showSave = open !== null && open.liveTileIndex === null;
+  // Collision tool needs a tile-space doc (chunk/block/new — not a single live
+  // tile, same guard ComposerCanvas uses to hint-and-bail on live tiles).
+  const showCollisionPanel = tool === 'collision' && showSave;
   // Chunk docs whose cells reference atlas tiles: pixel edits to those cells
   // write the shared tileset tile, so they show up everywhere it's used.
   const hasSharedTiles = open !== null && open.chunkId !== null
@@ -249,6 +254,11 @@ export default function ArtMode({ appBar }: { appBar: React.ReactNode }) {
       toolOptions={<ArtToolOptions before={docHeader} />}
       panels={
         <Panel width={240} scroll>
+          {showCollisionPanel && (
+            <CollapsibleSection id="art.collision" title="Collision">
+              <CollisionPalette />
+            </CollapsibleSection>
+          )}
           <CollapsibleSection id="art.tileset" title="Tileset">
             <TilesetPanel />
           </CollapsibleSection>
