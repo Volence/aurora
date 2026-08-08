@@ -109,18 +109,19 @@ describe('set-chunk command', () => {
     const { level, chunk } = levelWithChunk();
     const history = new EditHistory();
     const newNt = new Uint16Array([1, 2, 3, 4]);
-    const newColl = new Uint8Array([5, 6, 7, 8]);
+    const newCollA = new Uint16Array(chunk.collisionA.length); newCollA[0] = 5;
     history.execute({
       type: 'set-chunk', description: 'edit chunk', sectionIndex: -1,
       chunkId: 'c1',
       oldNametable: new Uint16Array(chunk.nametable), newNametable: newNt,
-      oldCollision: new Uint8Array(chunk.collision), newCollision: newColl,
+      oldCollisionA: new Uint16Array(chunk.collisionA), newCollisionA: newCollA,
+      oldCollisionB: new Uint16Array(chunk.collisionB), newCollisionB: new Uint16Array(chunk.collisionB.length),
     }, level);
     expect(Array.from(chunk.nametable)).toEqual([1, 2, 3, 4]);
-    expect(Array.from(chunk.collision)).toEqual([5, 6, 7, 8]);
+    expect(chunk.collisionA[0]).toBe(5);
     history.undo(level);
     expect(Array.from(chunk.nametable)).toEqual([0, 0, 0, 0]);
-    expect(Array.from(chunk.collision)).toEqual([0, 0, 0, 0]);
+    expect(chunk.collisionA[0]).toBe(0);
     history.redo(level);
     expect(Array.from(chunk.nametable)).toEqual([1, 2, 3, 4]);
   });
@@ -131,7 +132,8 @@ describe('set-chunk command', () => {
     const cmd = {
       type: 'set-chunk' as const, description: 'x', sectionIndex: -1, chunkId: 'nope',
       oldNametable: new Uint16Array(0), newNametable: new Uint16Array(0),
-      oldCollision: new Uint8Array(0), newCollision: new Uint8Array(0),
+      oldCollisionA: new Uint16Array(0), newCollisionA: new Uint16Array(0),
+      oldCollisionB: new Uint16Array(0), newCollisionB: new Uint16Array(0),
     };
     expect(() => history.execute(cmd, level)).toThrow(/chunkLibrary/);
     (level as { chunkLibrary?: unknown }).chunkLibrary = [];

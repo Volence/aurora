@@ -92,7 +92,8 @@ function applyCommand(cmd: AnyCommand, level: S4Level): void {
     const chunk = level.chunkLibrary.find(c => c.id === cmd.chunkId);
     if (!chunk) throw new Error(`set-chunk: unknown chunk ${cmd.chunkId}`);
     chunk.nametable = new Uint16Array(cmd.newNametable);
-    chunk.collision = new Uint8Array(cmd.newCollision);
+    chunk.collisionA = new Uint16Array(cmd.newCollisionA);
+    chunk.collisionB = new Uint16Array(cmd.newCollisionB);
     return;
   }
   if (cmd.type === 'set-bg') {
@@ -212,7 +213,8 @@ function undoCommand(cmd: AnyCommand, level: S4Level): void {
     const chunk = level.chunkLibrary.find(c => c.id === cmd.chunkId);
     if (!chunk) throw new Error(`set-chunk: unknown chunk ${cmd.chunkId}`);
     chunk.nametable = new Uint16Array(cmd.oldNametable);
-    chunk.collision = new Uint8Array(cmd.oldCollision);
+    chunk.collisionA = new Uint16Array(cmd.oldCollisionA);
+    chunk.collisionB = new Uint16Array(cmd.oldCollisionB);
     return;
   }
   if (cmd.type === 'set-bg') {

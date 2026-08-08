@@ -1,5 +1,5 @@
 import type { Tile, ChunkDef } from '../model/s4-types';
-import { unpackNametableWord, packNametableWord } from '../model/s4-types';
+import { unpackNametableWord, packNametableWord, chunkCellCount } from '../model/s4-types';
 import { canonicalizeTile } from '../export/tile-dedup';
 import { flipTile } from '../import/tile-dedup';
 import type { PixelBuffer } from './pixel-ops';
@@ -21,6 +21,9 @@ export interface ComposerDoc {
   cells: ComposerCell[];                  // row-major
   localPixels: Map<number, Uint8Array>;   // localId -> 64 pixels
   nextLocalId: number;
+  /** Dual-plane authored collision words, one per 16px cell (see ChunkDef). */
+  collisionA: Uint16Array;
+  collisionB: Uint16Array;
 }
 
 function emptyCell(): ComposerCell {
@@ -33,6 +36,8 @@ export function createDoc(widthTiles: number, heightTiles: number): ComposerDoc 
     cells: Array.from({ length: widthTiles * heightTiles }, emptyCell),
     localPixels: new Map(),
     nextLocalId: 1,
+    collisionA: new Uint16Array(chunkCellCount(widthTiles, heightTiles)),
+    collisionB: new Uint16Array(chunkCellCount(widthTiles, heightTiles)),
   };
 }
 
@@ -57,6 +62,8 @@ export function docFromChunk(chunk: ChunkDef): ComposerDoc {
       doc.cells[i] = { ...emptyCell(), coll: chunk.collision[i] };
     }
   }
+  doc.collisionA = new Uint16Array(chunk.collisionA);
+  doc.collisionB = new Uint16Array(chunk.collisionB);
   return doc;
 }
 

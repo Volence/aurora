@@ -110,8 +110,10 @@ export interface SetChunkCommand extends EditCommand {
   chunkId: string;
   oldNametable: Uint16Array;
   newNametable: Uint16Array;
-  oldCollision: Uint8Array;
-  newCollision: Uint8Array;
+  oldCollisionA: Uint16Array;
+  newCollisionA: Uint16Array;
+  oldCollisionB: Uint16Array;
+  newCollisionB: Uint16Array;
 }
 
 export interface SetBgCommand extends EditCommand {

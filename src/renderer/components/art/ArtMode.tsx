@@ -171,8 +171,10 @@ export default function ArtMode({ appBar }: { appBar: React.ReactNode }) {
         chunkId: chunk.id,
         oldNametable: new Uint16Array(chunk.nametable),
         newNametable: new Uint16Array(slice.nametable),
-        oldCollision: new Uint8Array(chunk.collision),
-        newCollision: new Uint8Array(slice.collision),
+        oldCollisionA: new Uint16Array(chunk.collisionA),
+        newCollisionA: new Uint16Array(o.doc.collisionA),
+        oldCollisionB: new Uint16Array(chunk.collisionB),
+        newCollisionB: new Uint16Array(o.doc.collisionB),
       }, level);
       saved = chunk;
     } else {
@@ -183,10 +185,8 @@ export default function ArtMode({ appBar }: { appBar: React.ReactNode }) {
         heightTiles: o.doc.heightTiles,
         nametable: new Uint16Array(slice.nametable),
         collision: new Uint8Array(slice.collision),
-        // Word planes are zero-filled here; the composer collision tool (a
-        // later task) is what actually paints them.
-        collisionA: new Uint16Array((o.doc.widthTiles >> 1) * (o.doc.heightTiles >> 1)),
-        collisionB: new Uint16Array((o.doc.widthTiles >> 1) * (o.doc.heightTiles >> 1)),
+        collisionA: new Uint16Array(o.doc.collisionA),
+        collisionB: new Uint16Array(o.doc.collisionB),
       };
       useProjectStore.getState().addChunks([saved]);
       useEditorStore.getState().markDirty();
