@@ -183,6 +183,10 @@ export default function ArtMode({ appBar }: { appBar: React.ReactNode }) {
         heightTiles: o.doc.heightTiles,
         nametable: new Uint16Array(slice.nametable),
         collision: new Uint8Array(slice.collision),
+        // Word planes are zero-filled here; the composer collision tool (a
+        // later task) is what actually paints them.
+        collisionA: new Uint16Array((o.doc.widthTiles >> 1) * (o.doc.heightTiles >> 1)),
+        collisionB: new Uint16Array((o.doc.widthTiles >> 1) * (o.doc.heightTiles >> 1)),
       };
       useProjectStore.getState().addChunks([saved]);
       useEditorStore.getState().markDirty();

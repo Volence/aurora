@@ -3,6 +3,9 @@ import { useProjectStore, getCurrentAct, getCurrentZone } from '../state/project
 import { useViewStore } from '../state/viewStore';
 import { useEditorStore } from '../state/editorStore';
 import { loadCollisionProfiles } from './load-collision';
+import type { CollisionProfileSet } from '../../core/collision/collision-model';
+import { findFullBlockShapeId } from '../../core/collision/full-block-shape';
+import { migrateLegacyChunkCollision } from '../../core/model/chunk-migrate';
 
 // Set to true only when migrateChunkTilesIntoTileset ran successfully during
 // the current loadFullProject call. Reset at the top of each load so stale
@@ -70,19 +73,21 @@ export function useProject() {
       const json = JSON.parse(new TextDecoder().decode(jsonData)) as S4ProjectConfig;
       const config = loadS4Config(json, dir);
 
+      // Load the engine's collision tables (read-only view) BEFORE the full
+      // project: chunk-library load needs the profile set to migrate legacy
+      // collision into word planes. Missing/unreadable tables → null → the
+      // overlay falls back to flat fills (no crash) and migration is skipped.
+      const collPath = config.raw.collisionDataPath ?? 'data/collision/';
+      const collisionProfiles = await loadCollisionProfiles(config.basePath, collPath);
+
       // Load the full project BEFORE committing config to the store: a failed
       // load (e.g. atlas-migration abort) must not leave a new config paired
       // with a stale/absent project, or pollute the recent-projects list.
-      const project = await loadFullProject(config);
+      const project = await loadFullProject(config, collisionProfiles);
 
       setConfig(config);
       await window.api.addRecentProject(dir, config.name);
       setProject(project);
-
-      // Load the engine's collision tables (read-only view). Missing/unreadable
-      // tables → null → the overlay falls back to flat fills (no crash).
-      const collPath = config.raw.collisionDataPath ?? 'data/collision/';
-      const collisionProfiles = await loadCollisionProfiles(config.basePath, collPath);
       useProjectStore.getState().setCollisionProfiles(collisionProfiles);
 
       if (config.zones.length > 0) {
@@ -214,6 +219,8 @@ export function useProject() {
           heightTiles: chunk.heightTiles,
           nametable: Array.from(chunk.nametable),
           collision: Array.from(chunk.collision),
+          collisionA: Array.from(chunk.collisionA),
+          collisionB: Array.from(chunk.collisionB),
         }));
         const chunksJson = JSON.stringify(serializedChunks);
         const chunksBytes = new TextEncoder().encode(chunksJson);
@@ -352,7 +359,10 @@ export function useProject() {
   return { openProject, openProjectByPath: loadFromPath, saveProject };
 }
 
-async function loadFullProject(config: ReturnType<typeof loadS4Config>): Promise<S4Project> {
+async function loadFullProject(
+  config: ReturnType<typeof loadS4Config>,
+  collisionProfiles: CollisionProfileSet | null,
+): Promise<S4Project> {
   // Reset migration flag at the start of every load so a stale true from a
   // prior session cannot incorrectly gate truncation on the next save.
   legacyAtlasMergedThisLoad = false;
@@ -596,15 +606,31 @@ async function loadFullProject(config: ReturnType<typeof loadS4Config>): Promise
       const parsed = JSON.parse(chunkLibText) as Array<{
         id: string; name: string; widthTiles: number; heightTiles: number;
         nametable: number[]; collision: number[];
+        collisionA?: number[]; collisionB?: number[];
       }>;
-      chunkLibrary = parsed.map(c => ({
-        id: c.id,
-        name: c.name,
-        widthTiles: c.widthTiles,
-        heightTiles: c.heightTiles,
-        nametable: new Uint16Array(c.nametable),
-        collision: new Uint8Array(c.collision),
-      }));
+      chunkLibrary = parsed.map(c => {
+        const cellCount = (c.widthTiles >> 1) * (c.heightTiles >> 1);
+        return {
+          id: c.id,
+          name: c.name,
+          widthTiles: c.widthTiles,
+          heightTiles: c.heightTiles,
+          nametable: new Uint16Array(c.nametable),
+          collision: new Uint8Array(c.collision),
+          collisionA: c.collisionA ? new Uint16Array(c.collisionA) : new Uint16Array(cellCount),
+          collisionB: c.collisionB ? new Uint16Array(c.collisionB) : new Uint16Array(cellCount),
+        };
+      });
+
+      // Legacy chunks (saved before word planes existed) migrate their nibble
+      // plane into word planes here, once, at load time. No-op per-chunk when
+      // the word planes are already populated (see migrateLegacyChunkCollision).
+      const fullBlock = findFullBlockShapeId(collisionProfiles);
+      for (const chunk of chunkLibrary) {
+        if (migrateLegacyChunkCollision(chunk, chunk.collision, fullBlock)) {
+          console.log(`[load] chunk ${chunk.id}: legacy collision migrated to word planes`);
+        }
+      }
     } catch {
       // no chunk library
     }

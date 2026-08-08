@@ -123,7 +123,12 @@ export interface ChunkDef {
   widthTiles: number;
   heightTiles: number;
   nametable: Uint16Array;
-  collision: Uint8Array;
+  collision: Uint8Array;      // LEGACY nibble plane — read for migration only (a later task deletes)
+  /** Dual-plane authored collision: one 16-bit cell word (collision-cell-word.ts)
+   *  per 16px cell — (widthTiles/2)*(heightTiles/2) words. Same encoding as
+   *  Section.collisionEdit/collisionEditB, so stamps copy verbatim. */
+  collisionA: Uint16Array;
+  collisionB: Uint16Array;
 }
 
 export function createChunkDef(
@@ -133,6 +138,7 @@ export function createChunkDef(
   heightTiles: number,
 ): ChunkDef {
   const size = widthTiles * heightTiles;
+  const cellCount = (widthTiles >> 1) * (heightTiles >> 1);
   return {
     id,
     name,
@@ -140,6 +146,8 @@ export function createChunkDef(
     heightTiles,
     nametable: new Uint16Array(size),
     collision: new Uint8Array(size),
+    collisionA: new Uint16Array(cellCount),
+    collisionB: new Uint16Array(cellCount),
   };
 }
 

@@ -141,6 +141,10 @@ export function importChunks(
       heightTiles: CHUNK_TILES,
       nametable,
       collision,
+      // Word planes are zero-filled here; seeding them from the imported
+      // solidAll/solidTop data is a later task's job.
+      collisionA: new Uint16Array((CHUNK_TILES >> 1) * (CHUNK_TILES >> 1)),
+      collisionB: new Uint16Array((CHUNK_TILES >> 1) * (CHUNK_TILES >> 1)),
     });
   }
 
