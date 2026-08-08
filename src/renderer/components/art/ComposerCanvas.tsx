@@ -10,6 +10,8 @@ import {
   adoptPaletteLineForEmptyCells, docLineMap,
 } from '../../../core/art/composer-buffer';
 import type { ComposerDoc } from '../../../core/art/composer-buffer';
+import { paintDocCollision } from '../../../core/art/composer-collision';
+import { selectedCollisionWord } from '../../../core/collision/collision-cell-word';
 import {
   createBuffer, flipH, flipV, rotate90, wrapShift,
 } from '../../../core/art/pixel-ops';
@@ -76,7 +78,14 @@ export default function ComposerCanvas() {
   const pixelPerfect = useArtStore((s) => s.pixelPerfect);
   const ditherPattern = useArtStore((s) => s.ditherPattern);
   const ditherSecondary = useArtStore((s) => s.ditherSecondary);
-  const selectedCollisionType = useEditorStore((s) => s.selectedCollisionType);
+  // Subscribed only to force a re-render when the collision-tool HUD needs to
+  // repaint (drawOverlay reads fresh values via getState(), not these).
+  const selectedCollisionProfile = useEditorStore((s) => s.selectedCollisionProfile);
+  const selectedCollisionEntryFlipX = useEditorStore((s) => s.selectedCollisionEntryFlipX);
+  const selectedCollisionXFlip = useEditorStore((s) => s.selectedCollisionXFlip);
+  const selectedCollisionYFlip = useEditorStore((s) => s.selectedCollisionYFlip);
+  const selectedCollisionSolidity = useEditorStore((s) => s.selectedCollisionSolidity);
+  const collisionPaintPlane = useEditorStore((s) => s.collisionPaintPlane);
   // Atlas tiles / palette can change underneath the doc (undo, agent writes).
   const historyVersion = useEditorStore((s) => s.historyVersion);
   // paletteVersion ticks on every live preview step (kept off historyVersion).
@@ -291,7 +300,14 @@ export default function ComposerCanvas() {
         coll: zone?.tileset.collisionTypes?.[s.brushTile] ?? 0,
       });
     } else {
-      cellAt(doc, cx, cy).coll = useEditorStore.getState().selectedCollisionType;
+      // Same packed-word pattern as MapViewport.paintCollisionCell — one palette
+      // drives both surfaces via selectedCollisionWord.
+      const est = useEditorStore.getState();
+      const word = selectedCollisionWord({
+        shape: est.selectedCollisionProfile, entryFlipX: est.selectedCollisionEntryFlipX,
+        userXFlip: est.selectedCollisionXFlip, yFlip: est.selectedCollisionYFlip, solidity: est.selectedCollisionSolidity,
+      });
+      if (!paintDocCollision(doc, est.collisionPaintPlane, cx, cy, word)) return;
     }
     useArtStore.getState().markOpenDirty();
     useArtStore.getState().bumpDoc();
@@ -423,17 +439,22 @@ export default function ComposerCanvas() {
     const pxW = doc.widthTiles * 8, pxH = doc.heightTiles * 8;
 
     if (s.tool === 'collision' && z >= 6) {
+      const plane = useEditorStore.getState().collisionPaintPlane;
+      const cw = doc.widthTiles >> 1;
+      const words = plane === 'b' ? doc.collisionB : doc.collisionA;
       ctx.font = `${Math.max(9, Math.min(14, z))}px monospace`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       for (let cy = 0; cy < doc.heightTiles; cy++) {
         for (let cx = 0; cx < doc.widthTiles; cx++) {
-          const coll = doc.cells[cy * doc.widthTiles + cx].coll;
+          // One 16px-cell word covers 4 tile-space HUD cells (2x2); shown per
+          // 8px tile like the tile-stamp HUD, so all four read the same value.
+          const shape = words[(cy >> 1) * cw + (cx >> 1)] & 0x3FF;
           const tx = (cx * 8 + 4) * z, ty = (cy * 8 + 4) * z;
           ctx.fillStyle = HUD_CELL_BG;
           ctx.fillRect(tx - z, ty - z * 0.75, z * 2, z * 1.5);
-          ctx.fillStyle = coll === 0 ? HUD_COLL_ZERO : HUD_COLL_NONZERO;
-          ctx.fillText(String(coll), tx, ty);
+          ctx.fillStyle = shape === 0 ? HUD_COLL_ZERO : HUD_COLL_NONZERO;
+          ctx.fillText(String(shape), tx, ty);
         }
       }
       ctx.textAlign = 'left';
@@ -445,9 +466,12 @@ export default function ComposerCanvas() {
     const originY = repeatPreview ? pxH * z : 0;
     ctx.save();
     ctx.translate(-originX, -originY);
+    const est = useEditorStore.getState();
     const hud = s.tool === 'tile-stamp'
       ? `stamp #${s.brushTile}  flip[X]:${flipRef.current.hf ? 'H' : '–'} [Y]:${flipRef.current.vf ? 'V' : '–'}`
-      : `collision: ${useEditorStore.getState().selectedCollisionType}`;
+      : `collision[${est.collisionPaintPlane.toUpperCase()}]: ${
+        est.selectedCollisionProfile === 0 ? 'air' : `#${est.selectedCollisionProfile} · ${est.selectedCollisionSolidity}`
+      }`;
     ctx.font = '11px monospace';
     const tw = ctx.measureText(hud).width;
     ctx.fillStyle = HUD_CHIP_BG;

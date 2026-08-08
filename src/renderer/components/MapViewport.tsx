@@ -22,9 +22,8 @@ import {
 import { angleDegrees, isAir, isKnownProfile } from '../../core/collision/collision-model';
 import { cellTileIndices } from '../../core/collision/collision-cell';
 import { collisionPaintTargets } from '../../core/collision/collision-paint';
-import { packCollisionCell, unpackCollisionCell, AIR_CELL } from '../../core/collision/collision-cell-word';
+import { unpackCollisionCell, selectedCollisionWord } from '../../core/collision/collision-cell-word';
 import { resolveCell, resolvePlaneWords } from '../../core/collision/collision-cell-resolve';
-import { effectiveXFlip } from '../../core/collision/collision-palette-organize';
 import { drawCollisionShape } from '../../core/collision/collision-shape-draw';
 import type { ShapeDrawCtx, ShapeDrawOpts } from '../../core/collision/collision-shape-draw';
 import { heightSparkline } from '../../core/collision/collision-render';
@@ -151,8 +150,8 @@ export default function MapViewport() {
     const erasing = profileIdx === 0;
     // Ghost the flipped/solidity-shaded shape exactly as it will paint + bake.
     const est = useEditorStore.getState();
-    const ghostWord = erasing ? AIR_CELL : packCollisionCell({
-      shape: profileIdx, xFlip: effectiveXFlip(est.selectedCollisionEntryFlipX, est.selectedCollisionXFlip),
+    const ghostWord = selectedCollisionWord({
+      shape: profileIdx, entryFlipX: est.selectedCollisionEntryFlipX, userXFlip: est.selectedCollisionXFlip,
       yFlip: est.selectedCollisionYFlip, solidity: est.selectedCollisionSolidity,
     });
     const profile = erasing ? null : resolveCell(profiles, ghostWord).profile;
@@ -548,10 +547,9 @@ export default function MapViewport() {
     // The painted value is a packed 16-bit cell word: selected shape + flip +
     // solidity. Air (shape 0 / erase) is always the bare 0 word, never solidity bits.
     const est = useEditorStore.getState();
-    const shape = est.selectedCollisionProfile;
-    const word = shape === 0 ? AIR_CELL : packCollisionCell({
-      shape, xFlip: effectiveXFlip(est.selectedCollisionEntryFlipX, est.selectedCollisionXFlip),
-      yFlip: est.selectedCollisionYFlip, solidity: est.selectedCollisionSolidity,
+    const word = selectedCollisionWord({
+      shape: est.selectedCollisionProfile, entryFlipX: est.selectedCollisionEntryFlipX,
+      userXFlip: est.selectedCollisionXFlip, yFlip: est.selectedCollisionYFlip, solidity: est.selectedCollisionSolidity,
     });
     const brush = useEditorStore.getState().collisionBrushSize;
     const cellsW = SECTION_TILES_WIDE / 2, cellsH = SECTION_TILES_HIGH / 2;

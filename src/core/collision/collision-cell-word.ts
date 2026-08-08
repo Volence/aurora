@@ -1,4 +1,5 @@
 import type { Solidity } from './collision-model';
+import { effectiveXFlip } from './collision-palette-organize';
 
 /** One authored collision cell, packed into a 16-bit word — the classic Sonic
  *  chunk-entry layout, per collision plane (path A or B):
@@ -29,6 +30,21 @@ export function packCollisionCell(c: CollisionCell): number {
     | (c.xFlip ? 0x400 : 0)
     | (c.yFlip ? 0x800 : 0)
     | (SOLIDITY_BITS[c.solidity] << 12);
+}
+
+/** Build the packed word for the CollisionPalette's current selection — shared by
+ *  every paint site (map, composer) so they can't drift. Air (shape 0) is always
+ *  the bare AIR_CELL word, never solidity/flip bits. */
+export function selectedCollisionWord(sel: {
+  shape: number; entryFlipX: boolean; userXFlip: boolean; yFlip: boolean; solidity: Solidity;
+}): number {
+  if (sel.shape === 0) return AIR_CELL;
+  return packCollisionCell({
+    shape: sel.shape,
+    xFlip: effectiveXFlip(sel.entryFlipX, sel.userXFlip),
+    yFlip: sel.yFlip,
+    solidity: sel.solidity,
+  });
 }
 
 export function unpackCollisionCell(word: number): CollisionCell {
