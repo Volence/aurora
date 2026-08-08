@@ -13,7 +13,7 @@ import { decodeGenesisColor, encodeGenesisColor } from '../../core/formats/palet
 import { BG_WIDTH } from '../../core/formats/bg-tiles';
 import { makeBgId } from '../../core/formats/bg-library';
 import { buildStampCommand } from '../../core/editing/map-stamp';
-import { resolvePlaneWords } from '../../core/collision/collision-cell-resolve';
+import { ensureCollisionPlanes } from '../../core/collision/collision-cell-resolve';
 import type { AgentRequest, AgentRequestEnvelope } from '../../shared/agent-protocol';
 
 let registered = false;
@@ -264,6 +264,9 @@ async function handle(req: AgentRequest): Promise<unknown> {
           req.w < 1 || req.w > 64 || req.h < 1 || req.h > 64) {
         throw new Error(`chunk size must be 1-64 tiles per axis, got ${req.w}x${req.h}`);
       }
+      if (req.w % 2 !== 0 || req.h % 2 !== 0) {
+        throw new Error(`chunk size (${req.w}x${req.h}) must be even — collision cells are 16px/2-tile aligned`);
+      }
       if (!Array.isArray(req.entries) || req.entries.length !== req.w * req.h) {
         throw new Error(`entries length ${Array.isArray(req.entries) ? req.entries.length : typeof req.entries} != ${req.w}x${req.h}`);
       }
@@ -302,9 +305,7 @@ async function handle(req: AgentRequest): Promise<unknown> {
       }
 
       // Lazily seed both collision planes before stamping, same as the UI tool.
-      const N = SECTION_TILES_WIDE * SECTION_TILES_HIGH;
-      if (!section.collisionEditB) section.collisionEditB = resolvePlaneWords(null, section.engineCollisionB, N);
-      if (!section.collisionEdit) section.collisionEdit = resolvePlaneWords(null, section.engineCollision, N);
+      ensureCollisionPlanes(section);
 
       // Unlike the UI tool, agent stamps do NOT snap to the chunk's own grid —
       // callers pass explicit tile coords (validated even, above), by design.

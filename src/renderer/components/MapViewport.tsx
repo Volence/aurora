@@ -3,10 +3,12 @@ import { useViewStore } from '../state/viewStore';
 import { useProjectStore, getCurrentAct, getCurrentZone, getActiveLevel as getStoreActiveLevel } from '../state/projectStore';
 import { useEditorStore, executeCommand, undo, redo, setCommandInvalidationListener, RING_PATTERNS } from '../state/editorStore';
 import { useArtStore } from '../state/artStore';
+import { useToastStore } from '../state/toastStore';
 import { openDocumentGuarded } from './art/open-document';
 import { createDoc, docFromTile } from '../../core/art/composer-buffer';
 import type { AnyCommand, S4Level, SetTilesCommand } from '../../core/editing/commands';
 import { buildStampCommand } from '../../core/editing/map-stamp';
+import { snapMarquee, copyFromSection } from '../../core/editing/map-clipboard';
 import { SectionRenderer } from '../canvas/SectionRenderer';
 import { OverlayRenderer } from '../canvas/OverlayRenderer';
 import type { SectionOverlayInfo } from '../canvas/OverlayRenderer';
@@ -19,12 +21,13 @@ import {
   CANVAS_VOID,
   COLLISION_SHAPE_LINE, COLLISION_SOLID_EDGE, COLLISION_ANGLE_NEEDLE,
   COLLISION_PREVIEW_FILL, COLLISION_PREVIEW_SCOPE, COLLISION_PREVIEW_PRIMARY, COLLISION_PREVIEW_ERASE,
+  SELECTION_MARQUEE, MAP_MARQUEE_FILL,
 } from '../canvas/canvas-colors';
 import { angleDegrees, isAir, isKnownProfile } from '../../core/collision/collision-model';
 import { cellTileIndices } from '../../core/collision/collision-cell';
 import { collisionPaintTargets } from '../../core/collision/collision-paint';
 import { unpackCollisionCell, selectedCollisionWord } from '../../core/collision/collision-cell-word';
-import { resolveCell, resolvePlaneWords } from '../../core/collision/collision-cell-resolve';
+import { resolveCell, resolvePlaneWords, ensureCollisionPlanes } from '../../core/collision/collision-cell-resolve';
 import { drawCollisionShape } from '../../core/collision/collision-shape-draw';
 import type { ShapeDrawCtx, ShapeDrawOpts } from '../../core/collision/collision-shape-draw';
 import { heightSparkline } from '../../core/collision/collision-render';
@@ -87,6 +90,11 @@ export default function MapViewport() {
   // Collision paint mode latched at mousedown (Alt = paint just the clicked block),
   // so toggling Alt mid-drag can't switch a single stroke between reuse and local.
   const paintJustHere = useRef(false);
+  // Marquee tool: the drag-start tile + section, fixed for the whole drag so the
+  // marquee always resolves against the section the drag STARTED in even if the
+  // cursor wanders over another section's world space.
+  const marqueeDragStart = useRef<{ sectionIndex: number; col: number; row: number } | null>(null);
+  const isMarqueeDragging = useRef(false);
   const lastMouse = useRef({ x: 0, y: 0 });
   const dragTarget = useRef<{
     type: 'object' | 'ring';
@@ -128,6 +136,29 @@ export default function MapViewport() {
     const ctx = pcv.getContext('2d');
     if (!ctx) return;
     ctx.clearRect(0, 0, pcv.width, pcv.height);
+
+    // Marquee selection: drawn whenever one is committed, independent of the
+    // active tool (Ctrl+C copy works without the marquee tool staying active,
+    // so the selection stays visible after switching tools).
+    const marquee = useEditorStore.getState().marquee;
+    if (marquee) {
+      const mOffset = sectionRenderer.sectionWorldOffset(marquee.sectionIndex);
+      const { vpX: mvpX, vpY: mvpY, zoom: mZoom } = useViewStore.getState();
+      const mx = mOffset.x + marquee.col * 8, my = mOffset.y + marquee.row * 8;
+      const mw = marquee.w * 8, mh = marquee.h * 8;
+      ctx.save();
+      ctx.imageSmoothingEnabled = false;
+      ctx.scale(mZoom, mZoom);
+      ctx.translate(-mvpX, -mvpY);
+      ctx.fillStyle = MAP_MARQUEE_FILL;
+      ctx.fillRect(mx, my, mw, mh);
+      ctx.strokeStyle = SELECTION_MARQUEE;
+      ctx.lineWidth = 2 / mZoom;
+      ctx.setLineDash([4 / mZoom, 4 / mZoom]);
+      ctx.strokeRect(mx, my, mw, mh);
+      ctx.setLineDash([]);
+      ctx.restore();
+    }
 
     const hover = previewHoverRef.current;
     if (!hover
@@ -402,6 +433,25 @@ export default function MapViewport() {
         return;
       }
 
+      // Copy the marquee selection to the map clipboard. Works regardless of
+      // which tool is active — the marquee tool doesn't need to stay selected
+      // for a copy to land (only Escape-while-marquee-active clears it).
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c') {
+        const marquee = useEditorStore.getState().marquee;
+        if (marquee) {
+          const section = act?.sections[marquee.sectionIndex];
+          if (section) {
+            const clip = copyFromSection(section, marquee.col, marquee.row, marquee.w, marquee.h);
+            useEditorStore.getState().setMapClipboard(clip);
+            useToastStore.getState().addToast(
+              `Copied ${marquee.w / 2}×${marquee.h / 2} blocks`, 'success',
+            );
+          }
+        }
+        e.preventDefault();
+        return;
+      }
+
       if ((e.key === 'Delete' || e.key === 'Backspace') && level) {
         const { selection: sel } = useEditorStore.getState();
         if (sel) {
@@ -440,7 +490,9 @@ export default function MapViewport() {
         case '=': case '+': setZoom(zoom * 1.5); e.preventDefault(); break;
         case '-': setZoom(zoom / 1.5); e.preventDefault(); break;
         case '0': setZoom(1); e.preventDefault(); break;
-        case 'v': useEditorStore.getState().setTool('view'); break;
+        // Ctrl+V is claimed by paste (a later task); guard it here too so it
+        // can't fall through and switch tools out from under a paste shortcut.
+        case 'v': if (!e.ctrlKey) useEditorStore.getState().setTool('view'); break;
         case 's': if (!e.ctrlKey) useEditorStore.getState().setTool('select'); break;
         case 'o': useEditorStore.getState().setTool('place-object'); break;
         case 'r': useEditorStore.getState().setTool('place-ring'); break;
@@ -448,6 +500,13 @@ export default function MapViewport() {
         case 'b': useEditorStore.getState().setTool('paint-block'); break;
         case 'c': if (!e.ctrlKey) useEditorStore.getState().setTool('paint-collision'); break;
         case 'k': useEditorStore.getState().setTool('stamp-chunk'); break;
+        case 'm': useEditorStore.getState().setTool('marquee'); break;
+        case 'Escape':
+          if (useEditorStore.getState().tool === 'marquee' && useEditorStore.getState().marquee) {
+            useEditorStore.getState().setMarquee(null);
+            drawCollisionPreview();
+          }
+          break;
       }
     };
 
@@ -532,13 +591,9 @@ export default function MapViewport() {
     const section = getSectionByIndex(info.sectionIndex);
     if (!section) return;
     const plane = useEditorStore.getState().collisionPaintPlane;
-    const N = SECTION_TILES_WIDE * SECTION_TILES_HIGH;
-    // Lazily seed the target plane (pack its engine baseline into cell words) if missing.
-    if (plane === 'b') {
-      if (!section.collisionEditB) section.collisionEditB = resolvePlaneWords(null, section.engineCollisionB, N);
-    } else if (!section.collisionEdit) {
-      section.collisionEdit = resolvePlaneWords(null, section.engineCollision, N);
-    }
+    // Lazily seed both planes (pack the engine baseline into cell words) if missing —
+    // shared with the stamp paths via ensureCollisionPlanes.
+    ensureCollisionPlanes(section);
     const ce = (plane === 'b' ? section.collisionEditB : section.collisionEdit)!;
     const cellCol = info.col >> 1, cellRow = info.row >> 1;
     const cellKey = `${info.sectionIndex}:${cellCol}:${cellRow}`;
@@ -760,9 +815,7 @@ export default function MapViewport() {
 
       // Lazily seed both collision planes before stamping — the stamp writes both
       // (unless Alt/artOnly), mirroring paintCollisionCell's seed-on-first-touch.
-      const N = SECTION_TILES_WIDE * SECTION_TILES_HIGH;
-      if (!section.collisionEditB) section.collisionEditB = resolvePlaneWords(null, section.engineCollisionB, N);
-      if (!section.collisionEdit) section.collisionEdit = resolvePlaneWords(null, section.engineCollision, N);
+      ensureCollisionPlanes(section);
 
       const cmd = buildStampCommand({
         chunk, section, sectionIndex: info.sectionIndex,
@@ -788,6 +841,21 @@ export default function MapViewport() {
       paintJustHere.current = e.altKey; // latch the mode for the whole stroke
       paintCollisionCell(info, paintJustHere.current);
       isPaintDragging.current = true;
+      e.preventDefault();
+      return;
+    }
+
+    if (tool === 'marquee') {
+      const info = worldToSectionTile(world.x, world.y);
+      if (!info) { e.preventDefault(); return; }
+      const section = getSectionByIndex(info.sectionIndex);
+      if (!section) { e.preventDefault(); return; }
+
+      marqueeDragStart.current = { sectionIndex: info.sectionIndex, col: info.col, row: info.row };
+      isMarqueeDragging.current = true;
+      const snap = snapMarquee(info.col, info.row, info.col, info.row);
+      useEditorStore.getState().setMarquee({ sectionIndex: info.sectionIndex, ...snap });
+      drawCollisionPreview();
       e.preventDefault();
       return;
     }
@@ -853,6 +921,22 @@ export default function MapViewport() {
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     const tool = useEditorStore.getState().tool;
+
+    // Marquee dragging — always resolved against the drag-START section's
+    // local tile space (not whatever section the cursor currently sits over),
+    // so dragging out of the section still extends/clamps the same marquee.
+    // snapMarquee clamps to [0, SECTION_TILES_WIDE/HIGH) itself.
+    if (isMarqueeDragging.current && tool === 'marquee' && marqueeDragStart.current) {
+      const world = screenToWorld(e.clientX, e.clientY);
+      const start = marqueeDragStart.current;
+      const offset = sectionRenderer.sectionWorldOffset(start.sectionIndex);
+      const col = Math.floor((world.x - offset.x) / 8);
+      const row = Math.floor((world.y - offset.y) / 8);
+      const snap = snapMarquee(start.col, start.row, col, row);
+      useEditorStore.getState().setMarquee({ sectionIndex: start.sectionIndex, ...snap });
+      drawCollisionPreview();
+      return;
+    }
 
     // Paint dragging
     if (isPaintDragging.current && (tool === 'paint-tile' || tool === 'paint-collision')) {
@@ -1000,6 +1084,11 @@ export default function MapViewport() {
 
   const handleMouseUp = useCallback((e: React.MouseEvent) => {
     isPaintDragging.current = false;
+    // A click with no drag already committed a 2x2-tile marquee at mousedown —
+    // mouseup just ends the drag; the final marquee (set live on mousemove)
+    // stays in the store.
+    isMarqueeDragging.current = false;
+    marqueeDragStart.current = null;
 
     // View tool: a click (pointer barely moved) selects the section under the
     // cursor — a pan-drag does not.
@@ -1165,6 +1254,7 @@ export default function MapViewport() {
     : tool === 'place-object' || tool === 'place-ring' ? 'crosshair'
     : tool === 'paint-tile' || tool === 'paint-block' || tool === 'paint-collision' ? 'cell'
     : tool === 'stamp-chunk' ? 'cell'
+    : tool === 'marquee' ? 'crosshair'
     : 'default';
 
   const state = useProjectStore.getState();
@@ -1186,6 +1276,8 @@ export default function MapViewport() {
       onMouseUp={handleMouseUp}
       onMouseLeave={() => {
         isPaintDragging.current = false;
+        isMarqueeDragging.current = false;
+        marqueeDragStart.current = null;
         if (dragTarget.current) dragTarget.current = null;
         isDragging.current = false;
         if (hoverBarRef.current) hoverBarRef.current.style.display = 'none';

@@ -2,12 +2,23 @@ import { create } from 'zustand';
 import type { Solidity } from '../../core/collision/collision-model';
 import { EditHistory } from '../../core/editing/history';
 import type { AnyCommand, S4Level } from '../../core/editing/commands';
+import type { MapClipboard, PasteLayers } from '../../core/editing/map-clipboard';
 import { useArtStore } from './artStore';
 import { registerRedoClearer, invalidateSiblingRedos } from '../../core/editing/undo-bus';
 
 export type EditorTool =
   | 'view' | 'select' | 'paint-tile' | 'paint-block' | 'stamp-chunk'
-  | 'paint-collision' | 'eraser' | 'place-object' | 'place-ring';
+  | 'paint-collision' | 'eraser' | 'place-object' | 'place-ring' | 'marquee';
+
+/** An in-progress or committed marquee selection, in tile coords, snapped to
+ *  16px blocks (map-clipboard.ts snapMarquee) and pinned to one section. */
+export interface MarqueeState {
+  sectionIndex: number;
+  col: number;
+  row: number;
+  w: number;
+  h: number;
+}
 
 export interface Selection {
   type: 'object' | 'ring';
@@ -92,6 +103,10 @@ interface EditorState {
   collisionPaintPlane: 'a' | 'b';
   collisionBrushSize: number; // brush width in 16px blocks; 1 = reuse, >1 = positional N×N area
 
+  marquee: MarqueeState | null;
+  mapClipboard: MapClipboard | null;
+  pasteLayers: PasteLayers;
+
   setTool: (tool: EditorTool) => void;
   setSelection: (selection: Selection | null) => void;
   setMultiSelection: (multiSelection: MultiSelection | null) => void;
@@ -113,6 +128,9 @@ interface EditorState {
   setSelectedCollisionSolidity: (s: Solidity) => void;
   setCollisionPaintPlane: (plane: 'a' | 'b') => void;
   setCollisionBrushSize: (size: number) => void;
+  setMarquee: (marquee: MarqueeState | null) => void;
+  setMapClipboard: (clipboard: MapClipboard | null) => void;
+  setPasteLayers: (layers: PasteLayers) => void;
   markDirty: () => void;
   markClean: () => void;
   bumpVersion: () => void;
@@ -151,6 +169,10 @@ export const useEditorStore = create<EditorState>((set) => ({
   collisionPaintPlane: 'a',
   collisionBrushSize: 1,
 
+  marquee: null,
+  mapClipboard: null,
+  pasteLayers: 'both',
+
   setTool: (tool) => set({ tool, selection: null, multiSelection: null }),
   setSelection: (selection) => set({ selection, multiSelection: null }),
   setMultiSelection: (multiSelection) => set({ multiSelection, selection: null }),
@@ -176,6 +198,9 @@ export const useEditorStore = create<EditorState>((set) => ({
   setSelectedCollisionSolidity: (s) => set({ selectedCollisionSolidity: s }),
   setCollisionPaintPlane: (collisionPaintPlane) => set({ collisionPaintPlane }),
   setCollisionBrushSize: (size) => set({ collisionBrushSize: Math.max(1, Math.min(31, size | 0)) }),
+  setMarquee: (marquee) => set({ marquee }),
+  setMapClipboard: (mapClipboard) => set({ mapClipboard }),
+  setPasteLayers: (pasteLayers) => set({ pasteLayers }),
   markDirty: () => set({ dirty: true }),
   markClean: () => set({ dirty: false }),
   bumpVersion: () => set((s) => ({ historyVersion: s.historyVersion + 1 })),

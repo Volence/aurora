@@ -189,4 +189,32 @@ describe('buildStampCommand', () => {
     });
     expect(cmd).toBeNull();
   });
+
+  it('(g) unseeded section planes: collision children are silently omitted, the art child still builds', () => {
+    // Deliberately NOT seededSection() -- collisionEdit/collisionEditB stay null,
+    // pinning buildStampCommand's documented contract ("caller's contract to seed
+    // first") so a future refactor can't accidentally turn this into a crash.
+    const section = createSection(0, 'Test');
+    const level: S4Level = { sections: [section] };
+    const history = new EditHistory();
+
+    const chunk = createChunkDef('c1', 'Chunk', 2, 2);
+    chunk.nametable[0] = 0x2222;
+    chunk.collisionA[0] = WORD_A;
+    chunk.collisionB[0] = WORD_B;
+
+    const baseCol = 12, baseRow = 12;
+    const cmd = buildStampCommand({
+      chunk, section, sectionIndex: 0, baseCol, baseRow, artOnly: false, description: 'stamp unseeded',
+    });
+
+    expect(cmd).not.toBeNull();
+    expect(cmd!.commands).toHaveLength(1);
+    expect(cmd!.commands[0].type).toBe('set-tiles');
+
+    expect(() => history.execute(cmd!, level)).not.toThrow();
+    expect(section.tileGrid.nametable[baseRow * SECTION_TILES_WIDE + baseCol]).toBe(0x2222);
+    expect(section.collisionEdit).toBeUndefined();
+    expect(section.collisionEditB).toBeUndefined();
+  });
 });
