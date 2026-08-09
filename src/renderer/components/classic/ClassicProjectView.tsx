@@ -7,6 +7,8 @@ import ZoneActTree from './ZoneActTree';
 import ClassicLevelViewport from './ClassicLevelViewport';
 import ChunkPicker from './ChunkPicker';
 import ResolutionReportPanel from './ResolutionReportPanel';
+import ObjectInspector from './ObjectInspector';
+import ObjectLibraryPanel from './ObjectLibraryPanel';
 
 /**
  * Read-only surface for an opened classic (disasm) project (Task 9 → Task 11).
@@ -112,6 +114,14 @@ export default function ClassicProjectView({ appBar }: { appBar: React.ReactNode
             Zones &amp; Acts
           </PanelHeader>
           <ZoneActTree refs={zoneTree} selected={selected} onSelect={openAct} />
+          {status === 'ready' && doc && (
+            <>
+              <PanelHeader>Object Inspector</PanelHeader>
+              <ObjectInspector />
+              <PanelHeader>Object Library</PanelHeader>
+              <ObjectLibraryPanel />
+            </>
+          )}
           <PanelHeader>Resolution Report</PanelHeader>
           <ResolutionReportPanel />
         </Panel>

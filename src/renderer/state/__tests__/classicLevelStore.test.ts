@@ -450,3 +450,65 @@ describe('tool + selectedChunkId UI state', () => {
     expect(st().tool).toBe('stamp'); // workflow preference persists
   });
 });
+
+// ---------------------------------------------------------------------------
+// Object-tool UI state (Task 14): selection index + armed place-mode id.
+// ---------------------------------------------------------------------------
+describe('object-tool UI state', () => {
+  it('defaults to no selection and no armed object', () => {
+    expect(st().selectedObjectIndex).toBeNull();
+    expect(st().armedObjectId).toBeNull();
+  });
+
+  it('the object tool is a valid ClassicTool value', () => {
+    openReady();
+    st().setTool('object');
+    expect(st().tool).toBe('object');
+  });
+
+  it('setSelectedObjectIndex sets/clears the selection', () => {
+    openReady();
+    st().setSelectedObjectIndex(0);
+    expect(st().selectedObjectIndex).toBe(0);
+    st().setSelectedObjectIndex(null);
+    expect(st().selectedObjectIndex).toBeNull();
+  });
+
+  it('arming an object clears any live selection (mutually exclusive)', () => {
+    openReady();
+    st().setSelectedObjectIndex(0);
+    st().setArmedObjectId(0x25);
+    expect(st().armedObjectId).toBe(0x25);
+    expect(st().selectedObjectIndex).toBeNull();
+  });
+
+  it('disarming (null) leaves the selection untouched', () => {
+    openReady();
+    st().setArmedObjectId(0x26);
+    st().setSelectedObjectIndex(3);
+    // setArmedObjectId(null) must NOT wipe the selection.
+    st().setArmedObjectId(null);
+    expect(st().armedObjectId).toBeNull();
+    expect(st().selectedObjectIndex).toBe(3);
+  });
+
+  it('is NOT part of an undo snapshot — undo/redo leave selection/arm alone', () => {
+    openReady();
+    st().setSelectedObjectIndex(0);
+    classicSetStart(11, 12); // records a snapshot
+    st().setSelectedObjectIndex(null);
+    st().undo();
+    expect(st().selectedObjectIndex).toBeNull(); // undo restored the doc, not UI state
+  });
+
+  it('opening a new act resets selection + arm but keeps the tool', () => {
+    openReady();
+    st().setTool('object');
+    st().setSelectedObjectIndex(0);
+    st().setArmedObjectId(0x25);
+    void useClassicLevelStore.getState().openAct(REF);
+    expect(st().selectedObjectIndex).toBeNull();
+    expect(st().armedObjectId).toBeNull();
+    expect(st().tool).toBe('object');
+  });
+});

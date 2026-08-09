@@ -6,6 +6,7 @@
 // DOM or canvas. The component is a thin drawing shell over these functions.
 
 import type { LayoutGrid } from '../../../core/level-classic/model';
+import type { S1ObjectEntry } from '../../../core/formats/classic/s1-objpos';
 
 /** A chunk is a 256x256 world-pixel cell in the FG/BG layout grid. */
 export const CHUNK_PX = 256;
@@ -141,6 +142,44 @@ export function stampAccumToCells(
   const out: { x: number; y: number; chunkId: number }[] = [];
   for (const c of acc.values()) out.push({ x: c.x, y: c.y, chunkId });
   return out;
+}
+
+/**
+ * Hit-test the object list against a world-space click (Task 14 object tool).
+ *
+ * Returns the index of the object whose placement anchor (obj.x, obj.y — the
+ * marker centre, and for a ring group the group origin) is nearest the click AND
+ * within `radiusWorld`, or null when none qualifies. The radius is a WORLD
+ * distance: the caller converts its screen-pixel pick tolerance with
+ * `screenPx / zoom` so the grabbable area is a constant on-screen size at any
+ * zoom. Ties (equal distance) resolve to the LATER index — the topmost object,
+ * since later objects draw on top. Squared distances avoid a sqrt per candidate.
+ *
+ * This is FG-plane only by contract: S1 objects live on the foreground plane, so
+ * the caller only invokes this while the FG plane is shown; the function itself
+ * is plane-agnostic (it just scans the one object list the doc has).
+ */
+export function hitTestObject(
+  objects: readonly S1ObjectEntry[],
+  worldX: number,
+  worldY: number,
+  radiusWorld: number,
+): number | null {
+  const r2 = radiusWorld * radiusWorld;
+  let best: number | null = null;
+  let bestD2 = Infinity;
+  for (let i = 0; i < objects.length; i++) {
+    const o = objects[i];
+    const dx = o.x - worldX;
+    const dy = o.y - worldY;
+    const d2 = dx * dx + dy * dy;
+    // `<=` so a later (topmost) object wins an exact tie with an earlier one.
+    if (d2 <= r2 && d2 <= bestD2) {
+      best = i;
+      bestD2 = d2;
+    }
+  }
+  return best;
 }
 
 export interface RingPos {

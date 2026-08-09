@@ -42,11 +42,11 @@ export type CommandResult = { ok: true } | { ok: false; error: string };
 export type LayoutPlane = 'fg' | 'bg';
 
 /**
- * The active layout-editing tool (Task 13). `pan` navigates (drag = pan); `stamp`
- * paints the selected chunk. Named `pan` (not `select`) so Task 14 can add a real
- * object-selection tool without a semantic collision.
+ * The active layout-editing tool. `pan` navigates (drag = pan); `stamp` paints
+ * the selected chunk (Task 13); `object` selects / moves / places / deletes
+ * object placements (Task 14).
  */
-export type ClassicTool = 'pan' | 'stamp';
+export type ClassicTool = 'pan' | 'stamp' | 'object';
 
 interface ClassicLevelState {
   /** The act currently selected in the zone tree (even while loading/errored). */
@@ -88,11 +88,26 @@ interface ClassicLevelState {
   tool: ClassicTool;
   /** The chunk id the stamp tool paints (0..255); also the eyedropper target. */
   selectedChunkId: number;
+  /**
+   * The object tool's current selection: an index into `doc.objects`, or null.
+   * NOT part of an undo snapshot (UI state). Consumers must treat an index that
+   * is out of range for the current list as "no selection" — a delete or undo
+   * can shrink the list under a stale index.
+   */
+  selectedObjectIndex: number | null;
+  /**
+   * The object id armed for placement (the object library's "place mode"), or
+   * null. When set, the next object-tool click on the map places a new object of
+   * this id and clears the arm. UI state, not doc data.
+   */
+  armedObjectId: number | null;
 
   /** Select + load an act. Reads through the open project's handle. */
   openAct: (ref: ZoneActRef) => Promise<void>;
   setTool: (tool: ClassicTool) => void;
   setSelectedChunkId: (chunkId: number) => void;
+  setSelectedObjectIndex: (index: number | null) => void;
+  setArmedObjectId: (id: number | null) => void;
   undo: () => void;
   redo: () => void;
   /**
@@ -123,6 +138,8 @@ const IDLE = {
   historyTick: 0,
   tool: 'pan' as ClassicTool,
   selectedChunkId: 0,
+  selectedObjectIndex: null as number | null,
+  armedObjectId: null as number | null,
 };
 
 // ---------------------------------------------------------------------------
@@ -163,6 +180,10 @@ export const useClassicLevelStore = create<ClassicLevelState>((set, get) => ({
       // Chunk ids are per-act, so a fresh act resets the stamp selection (the tool
       // choice persists — it's a workflow preference, not level data).
       selectedChunkId: 0,
+      // Object selection + place-arm are per-act too (indices/ids into this act's
+      // object list), so a fresh act clears them.
+      selectedObjectIndex: null,
+      armedObjectId: null,
     };
     // Unavailable acts carry their resolution reason — surface it directly rather
     // than attempting a read the handle would reject.
@@ -190,6 +211,12 @@ export const useClassicLevelStore = create<ClassicLevelState>((set, get) => ({
   setSelectedChunkId: (chunkId: number) => {
     if (Number.isInteger(chunkId) && chunkId >= 0 && chunkId <= 0xff) set({ selectedChunkId: chunkId });
   },
+  setSelectedObjectIndex: (index: number | null) => set({ selectedObjectIndex: index }),
+  // Arming an object for placement is mutually exclusive with a live selection:
+  // clear the selection so the inspector reflects the pending placement, not a
+  // still-selected object.
+  setArmedObjectId: (id: number | null) =>
+    set(id === null ? { armedObjectId: null } : { armedObjectId: id, selectedObjectIndex: null }),
 
   // undo/redo are timeline NAVIGATION, not new edits, so (like the aeon history)
   // they do not invalidate sibling redo stacks — only commit() does.

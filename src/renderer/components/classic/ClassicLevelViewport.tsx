@@ -1,12 +1,13 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { T, Chip, OptionBar, Divider } from '../ui';
-import { useClassicLevelStore, classicSetLayoutCells } from '../../state/classicLevelStore';
+import { useClassicLevelStore, classicSetLayoutCells, classicSetObjects } from '../../state/classicLevelStore';
 import { useToastStore } from '../../state/toastStore';
 import { renderChunk } from '../../../core/level-classic/render';
 import type { LevelDoc } from '../../../core/level-classic/model';
+import { s1ObjectName } from '../../../core/project/profiles/s1-objects';
 import {
   CHUNK_PX, visibleChunkRange, layoutCellAt, screenToWorld,
-  worldToLayoutCell, addStampCell, stampAccumToCells, type StampCell,
+  worldToLayoutCell, addStampCell, stampAccumToCells, hitTestObject, type StampCell,
 } from './viewport-math';
 import { drawCollision, drawObjects, drawStart } from './classic-overlays';
 import {
@@ -26,6 +27,13 @@ interface Camera {
   y: number;
   zoom: number;
 }
+
+/** Object-tool pick tolerance in SCREEN pixels (converted to world via /zoom). */
+const OBJECT_PICK_PX = 12;
+/** S1 object coordinate bounds (validateLevelDoc): x is 16-bit, y is 12-bit. */
+const OBJ_X_MAX = 0xffff;
+const OBJ_Y_MAX = 0x0fff;
+const clampInt = (v: number, hi: number) => Math.max(0, Math.min(hi, Math.round(v)));
 
 /**
  * Read-only classic (Sonic 1) level viewport (Task 11). Composes the FG/BG chunk
@@ -51,11 +59,16 @@ export default function ClassicLevelViewport() {
   // (or the whole epoch), so the chunk-art cache below invalidates precisely.
   const chunkVersions = useClassicLevelStore((s) => s.chunkVersions);
   const chunkEpoch = useClassicLevelStore((s) => s.chunkEpoch);
-  // Task 13 layout-editing UI state (select|stamp + the stamp/eyedrop chunk id).
+  // Task 13 layout-editing UI state (pan|stamp + the stamp/eyedrop chunk id).
   const tool = useClassicLevelStore((s) => s.tool);
   const selectedChunkId = useClassicLevelStore((s) => s.selectedChunkId);
   const setTool = useClassicLevelStore((s) => s.setTool);
   const setSelectedChunkId = useClassicLevelStore((s) => s.setSelectedChunkId);
+  // Task 14 object-tool UI state (selection index + armed place-mode id).
+  const selectedObjectIndex = useClassicLevelStore((s) => s.selectedObjectIndex);
+  const armedObjectId = useClassicLevelStore((s) => s.armedObjectId);
+  const setSelectedObjectIndex = useClassicLevelStore((s) => s.setSelectedObjectIndex);
+  const setArmedObjectId = useClassicLevelStore((s) => s.setArmedObjectId);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -181,7 +194,18 @@ export default function ClassicLevelViewport() {
           }
         }
       }
-      if (overlays.objects) drawObjects(ctx, doc, invZoom);
+      if (overlays.objects) {
+        // Selection highlight + live drag preview (Task 14). The selection index
+        // can be stale (a delete/undo shrank the list) — treat out-of-range as
+        // no selection. During a move the drag ref carries the preview position.
+        const selIndex =
+          selectedObjectIndex != null && selectedObjectIndex < doc.objects.length
+            ? selectedObjectIndex
+            : null;
+        const drag = objDragRef.current;
+        const previewPos = drag && drag.index === selIndex ? drag.preview : null;
+        drawObjects(ctx, doc, invZoom, selIndex, previewPos);
+      }
       if (overlays.start) drawStart(ctx, doc, invZoom);
     }
 
@@ -239,15 +263,29 @@ export default function ClassicLevelViewport() {
   // committed on mouseUp. A ref (not state): mutated during the drag, drawn from
   // the render effect, and reset without a partial command on cancel.
   const strokeRef = useRef<Map<number, StampCell> | null>(null);
+  // The active object-move gesture (null when not dragging an object). Like the
+  // stamp stroke it's a ref: mutated during the drag, drawn from the render
+  // effect, committed as ONE classicSetObjects on mouseup, discarded on cancel.
+  // `grabDX/DY` preserve the pointer's offset within the marker so the object
+  // doesn't jump its centre to the cursor; `preview` is the clamped live
+  // position; `moved` distinguishes a click (select only) from a real drag.
+  const objDragRef = useRef<
+    { index: number; grabDX: number; grabDY: number; preview: { x: number; y: number }; moved: boolean } | null
+  >(null);
 
-  // The layout cell (col,row) under a mouse event, using the shared camera math.
-  const cellUnderCursor = useCallback((e: React.MouseEvent): { col: number; row: number } | null => {
+  // The world-pixel coordinate under a mouse event, using the shared camera math.
+  const worldUnderCursor = useCallback((e: React.MouseEvent): { x: number; y: number } | null => {
     const canvas = canvasRef.current;
     if (!canvas) return null;
     const rect = canvas.getBoundingClientRect();
-    const { x, y } = screenToWorld(camRef.current, e.clientX - rect.left, e.clientY - rect.top);
-    return worldToLayoutCell(x, y);
+    return screenToWorld(camRef.current, e.clientX - rect.left, e.clientY - rect.top);
   }, []);
+
+  // The layout cell (col,row) under a mouse event, using the shared camera math.
+  const cellUnderCursor = useCallback((e: React.MouseEvent): { col: number; row: number } | null => {
+    const w = worldUnderCursor(e);
+    return w ? worldToLayoutCell(w.x, w.y) : null;
+  }, [worldUnderCursor]);
 
   const activeGrid = useCallback(() => {
     const d = useClassicLevelStore.getState().doc;
@@ -267,11 +305,61 @@ export default function ClassicLevelViewport() {
       redraw();
       return;
     }
+    // Object tool — only on the FG plane (objects are an FG concept). On BG it
+    // falls through to pan so navigation still works.
+    if (tool === 'object' && plane === 'fg') {
+      const world = worldUnderCursor(e);
+      const d = useClassicLevelStore.getState().doc;
+      if (!world || !d) return;
+      const armed = useClassicLevelStore.getState().armedObjectId;
+      if (armed != null) {
+        // Place a new object of the armed id at the click, default subtype 0, no
+        // flips, respawn off. One classicSetObjects command; then select it and
+        // disarm (reverts to select behaviour, per the click-to-place idiom).
+        const next = [
+          ...d.objects,
+          {
+            x: clampInt(world.x, OBJ_X_MAX), y: clampInt(world.y, OBJ_Y_MAX),
+            xflip: false, yflip: false, respawn: false, id: armed, subtype: 0,
+          },
+        ];
+        const res = classicSetObjects(next);
+        if (!res.ok) { useToastStore.getState().addToast(`Place failed: ${res.error}`, 'error'); return; }
+        setArmedObjectId(null);
+        setSelectedObjectIndex(next.length - 1);
+        redraw();
+        return;
+      }
+      // Hit-test with a constant on-screen tolerance (world radius = px / zoom).
+      const hit = hitTestObject(d.objects, world.x, world.y, OBJECT_PICK_PX / camRef.current.zoom);
+      if (hit == null) { setSelectedObjectIndex(null); redraw(); return; }
+      setSelectedObjectIndex(hit);
+      const o = d.objects[hit];
+      objDragRef.current = {
+        index: hit, grabDX: o.x - world.x, grabDY: o.y - world.y,
+        preview: { x: o.x, y: o.y }, moved: false,
+      };
+      redraw();
+      return;
+    }
     dragging.current = true;
     lastMouse.current = { x: e.clientX, y: e.clientY };
-  }, [tool, activeGrid, cellUnderCursor, redraw]);
+  }, [tool, plane, activeGrid, cellUnderCursor, worldUnderCursor, redraw, setArmedObjectId, setSelectedObjectIndex]);
 
   const onMouseMove = useCallback((e: React.MouseEvent) => {
+    const drag = objDragRef.current;
+    if (drag) {
+      const world = worldUnderCursor(e);
+      if (world) {
+        drag.preview = {
+          x: clampInt(world.x + drag.grabDX, OBJ_X_MAX),
+          y: clampInt(world.y + drag.grabDY, OBJ_Y_MAX),
+        };
+        drag.moved = true;
+        redraw();
+      }
+      return;
+    }
     const stroke = strokeRef.current;
     if (stroke) {
       const grid = activeGrid();
@@ -290,7 +378,24 @@ export default function ClassicLevelViewport() {
     cam.x = Math.max(0, cam.x - d.x);
     cam.y = Math.max(0, cam.y - d.y);
     redraw();
-  }, [activeGrid, cellUnderCursor, redraw]);
+  }, [activeGrid, cellUnderCursor, worldUnderCursor, redraw]);
+
+  // Commit an object-move gesture as ONE classicSetObjects (or none, when the
+  // gesture was a click without movement, or the net position is unchanged).
+  const endObjectDrag = useCallback(() => {
+    const drag = objDragRef.current;
+    objDragRef.current = null;
+    if (!drag || !drag.moved) { redraw(); return; }
+    const d = useClassicLevelStore.getState().doc;
+    const cur = d?.objects[drag.index];
+    if (!d || !cur) { redraw(); return; }
+    if (cur.x === drag.preview.x && cur.y === drag.preview.y) { redraw(); return; }
+    const next = d.objects.map((o, i) =>
+      i === drag.index ? { ...o, x: drag.preview.x, y: drag.preview.y } : o);
+    const res = classicSetObjects(next);
+    if (!res.ok) useToastStore.getState().addToast(`Move failed: ${res.error}`, 'error');
+    redraw();
+  }, [redraw]);
 
   // Commit the stamp gesture as ONE undoable command (or cancel with none pending).
   const endStroke = useCallback(() => {
@@ -306,12 +411,15 @@ export default function ClassicLevelViewport() {
   // Mouse-up ends whichever gesture is active. Mouse-leave CANCELS a stamp stroke
   // cleanly (no partial command) but also ends a pan.
   const onMouseUp = useCallback(() => {
+    if (objDragRef.current) { endObjectDrag(); return; }
     if (strokeRef.current) { endStroke(); return; }
     dragging.current = false;
-  }, [endStroke]);
+  }, [endStroke, endObjectDrag]);
   const onMouseLeave = useCallback(() => {
-    // Abandon an in-progress stamp without committing (spec: mouseleave cancels).
+    // Abandon an in-progress stamp or object move without committing (mouseleave
+    // cancels cleanly). A pan just ends.
     strokeRef.current = null;
+    objDragRef.current = null;
     dragging.current = false;
     redraw();
   }, [redraw]);
@@ -340,11 +448,33 @@ export default function ClassicLevelViewport() {
     }
   }, [activeGrid, cellUnderCursor, setSelectedChunkId]);
 
-  // Escape cancels an in-progress stamp stroke (spec: escape cancels cleanly).
+  // Keyboard: Escape cancels an in-progress gesture / clears armed-place /
+  // deselects; Delete or Backspace removes the selected object. The Delete key is
+  // guarded against text-entry the same way the undo keys are (ClassicProjectView)
+  // so a hex/number field edit can't be hijacked into a deletion.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && strokeRef.current) {
-        strokeRef.current = null;
+      if (e.key === 'Escape') {
+        if (strokeRef.current) { strokeRef.current = null; redraw(); return; }
+        if (objDragRef.current) { objDragRef.current = null; redraw(); return; }
+        const s = useClassicLevelStore.getState();
+        if (s.armedObjectId != null) { s.setArmedObjectId(null); redraw(); return; }
+        if (s.selectedObjectIndex != null) { s.setSelectedObjectIndex(null); redraw(); return; }
+        return;
+      }
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        const t = e.target as HTMLElement;
+        const typing = t.isContentEditable || t.tagName === 'TEXTAREA'
+          || (t.tagName === 'INPUT' && !['range', 'checkbox', 'button', 'radio'].includes((t as HTMLInputElement).type));
+        if (typing) return;
+        const s = useClassicLevelStore.getState();
+        const idx = s.selectedObjectIndex;
+        if (idx == null || !s.doc || idx >= s.doc.objects.length) return;
+        e.preventDefault();
+        const next = s.doc.objects.filter((_, i) => i !== idx);
+        const res = classicSetObjects(next);
+        if (res.ok) s.setSelectedObjectIndex(null);
+        else useToastStore.getState().addToast(`Delete failed: ${res.error}`, 'error');
         redraw();
       }
     };
@@ -376,6 +506,7 @@ export default function ClassicLevelViewport() {
         <span style={{ color: T.textLo }}>Tool</span>
         <Chip active={tool === 'pan'} onClick={() => setTool('pan')} title="Pan / navigate (drag to pan)">Pan</Chip>
         <Chip active={tool === 'stamp'} onClick={() => setTool('stamp')} title="Paint the selected chunk onto layout cells (drag)">Stamp</Chip>
+        <Chip active={tool === 'object'} onClick={() => setTool('object')} title="Select / move / place / delete objects (FG plane)">Object</Chip>
         <Divider />
         <span style={{ color: T.textLo }}>Plane</span>
         <Chip active={plane === 'fg'} onClick={() => setPlane('fg')}>FG</Chip>
@@ -390,7 +521,13 @@ export default function ClassicLevelViewport() {
         <span style={{ color: T.textFaint }}>
           {tool === 'stamp'
             ? `stamp $${selectedChunkId.toString(16).toUpperCase().padStart(2, '0')} · drag to paint · right-click eyedrops · scroll to zoom`
-            : 'drag to pan · right-click eyedrops · scroll to zoom'}
+            : tool === 'object'
+              ? (armedObjectId != null
+                  ? `click to place ${s1ObjectName(armedObjectId)} · Esc cancels`
+                  : (plane === 'fg'
+                      ? 'click selects · drag moves · Del removes · arm an object in the library to place'
+                      : 'objects are FG-only — switch to FG to edit · drag to pan'))
+              : 'drag to pan · right-click eyedrops · scroll to zoom'}
         </span>
       </OptionBar>
       <div
@@ -406,7 +543,12 @@ export default function ClassicLevelViewport() {
             onMouseLeave={onMouseLeave}
             onContextMenu={onContextMenu}
             onWheel={onWheel}
-            style={{ position: 'absolute', inset: 0, cursor: tool === 'stamp' ? 'crosshair' : 'grab' }}
+            style={{
+              position: 'absolute', inset: 0,
+              cursor: tool === 'stamp' ? 'crosshair'
+                : tool === 'object' ? (armedObjectId != null ? 'copy' : 'default')
+                : 'grab',
+            }}
           />
         ) : (
           <div style={{

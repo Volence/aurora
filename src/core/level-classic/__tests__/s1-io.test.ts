@@ -8,6 +8,7 @@ import {
   writeS1Level,
   type ResolvedLevelPaths,
 } from '../s1-io';
+import { decodeS1Objpos } from '../../formats/classic/s1-objpos';
 import { nemesisCompress, nemesisDecompress } from '../../compress/nemesis';
 import { enigmaCompress, enigmaDecompress } from '../../formats/classic/enigma';
 import { kosinskiCompress, kosinskiDecompress } from '../../formats/kosinski';
@@ -426,6 +427,34 @@ describe('s1-io (e) synthetic round-trip with a mutation', () => {
     const { fa, act, paths } = buildSynthetic();
     const state = await readS1Level(act, paths, fa);
     expect(state.read.fileMtimes).toEqual({});
+  });
+
+  it('sorts objects by X at write time (out-of-order doc → sorted on disk)', async () => {
+    const { fa, act, paths, files } = buildSynthetic();
+    const state = await readS1Level(act, paths, fa);
+
+    // Replace the single synthetic object with an intentionally X-unsorted set,
+    // including two equal-X entries to prove the sort is STABLE (keeps order).
+    state.doc.objects = [
+      { x: 300, y: 10, xflip: false, yflip: false, respawn: false, id: 0x0d, subtype: 0 },
+      { x: 100, y: 20, xflip: false, yflip: false, respawn: false, id: 0x25, subtype: 1 }, // equal-X #1
+      { x: 100, y: 21, xflip: false, yflip: false, respawn: false, id: 0x26, subtype: 2 }, // equal-X #2
+      { x: 200, y: 30, xflip: false, yflip: false, respawn: false, id: 0x41, subtype: 3 },
+    ];
+
+    const result = writeS1Level(state, { objects: true });
+    expect(result.errors).toEqual([]);
+
+    // Re-decode the written objpos file: entries must be ascending by X, and the
+    // two equal-X objects must retain their original relative order (stable).
+    const written = result.files.find((f) => f.path === 'objpos/syn.bin')!;
+    const back = decodeS1Objpos(written.bytes);
+    expect(back.map((o) => o.x)).toEqual([100, 100, 200, 300]);
+    // Stable: the y=20/id=0x25 entry precedes y=21/id=0x26 among the equal Xs.
+    expect(back[0].y).toBe(20);
+    expect(back[0].id).toBe(0x25);
+    expect(back[1].y).toBe(21);
+    expect(back[1].id).toBe(0x26);
   });
 
   it('a broken enigma encoder routes the blocks file to errors (synthetic)', async () => {

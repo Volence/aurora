@@ -57,6 +57,8 @@ export const COLLISION_PREVIEW_ERASE = 'rgba(255,90,90,0.4)';    // erase scope 
 export const OBJECT_BOX_FILL = 'rgba(255, 100, 100, 0.7)';
 export const OBJECT_BOX_STROKE = '#ff4444';
 export const OBJECT_LABEL = '#ffffff';
+/** Selection ring around the object-tool's currently-selected marker (Task 14). */
+export const OBJECT_SELECTED_STROKE = '#94e2d5';
 export const RING_FILL = 'rgba(255, 220, 0, 0.8)';
 export const RING_STROKE = '#ffaa00';
 // Classic (S1) level-start spawn marker — pink, distinct from object red + ring yellow.

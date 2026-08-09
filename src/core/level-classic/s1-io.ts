@@ -132,6 +132,15 @@ export interface S1ReadState {
   originalDisplayTiles: Uint8Array;
   animOverlay: AnimOverlay[];
   objposOriginalLength: number;
+  /**
+   * The object list exactly as decoded from disk, in on-disk order. Used by the
+   * writer to keep a zero-edit save byte-identical even for the rare real file
+   * whose entries are not strictly X-ascending (e.g. GHZ act 3 carries one 64px
+   * inversion the engine's streaming loader tolerates): when `doc.objects` still
+   * equals this, the writer emits the original order untouched and only sorts
+   * when the list has actually changed. See the write path for the rationale.
+   */
+  objposOriginal: S1ObjectEntry[];
   paletteOriginals: { component: PaletteComponent; path: string; bytes: Uint8Array }[];
   paths: ResolvedLevelPaths;
   /**
@@ -325,6 +334,7 @@ export async function readS1Level(
       originalDisplayTiles: tiles.slice(),
       animOverlay,
       objposOriginalLength: objposBytes.length,
+      objposOriginal: objects.map((o) => ({ ...o })),
       paletteOriginals,
       paths,
       fileMtimes,
@@ -475,12 +485,27 @@ export function writeS1Level(
   }
 
   // --- objects -------------------------------------------------------------
+  // S1 objpos tables are X-ordered on disk: the engine's object-position manager
+  // (ObjPosLoad) streams entries left-to-right as the camera advances, so a
+  // grossly out-of-order table would drop objects. The editing model does NOT
+  // maintain sort order (the object tool appends new placements at the end), so
+  // we sort HERE at write time — a STABLE sort by X (equal-X objects keep their
+  // relative order).
+  //
+  // BUT not every real file is strictly X-ascending: GHZ act 3 carries one 64px
+  // inversion the loader tolerates. Sorting it would break the byte-identical
+  // zero-edit round-trip. So we sort ONLY when the object list has actually
+  // changed from disk; an untouched list is emitted in its exact original order.
+  // The self-check compares the re-decode against whichever list we emit.
   if (dirty.objects) {
+    const emit = objectsEqual(doc.objects, read.objposOriginal)
+      ? read.objposOriginal
+      : [...doc.objects].sort((a, b) => a.x - b.x);
     emitVerified(
       read.paths.objpos,
-      encodeS1Objpos(doc.objects, read.objposOriginalLength),
+      encodeS1Objpos(emit, read.objposOriginalLength),
       decodeS1Objpos,
-      (b) => objectsEqual(b, doc.objects),
+      (b) => objectsEqual(b, emit),
       'objpos',
     );
   }

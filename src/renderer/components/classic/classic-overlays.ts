@@ -15,6 +15,7 @@ import {
   COLLISION_FILL_ALL, COLLISION_FILL_TOP, COLLISION_FILL_SIDES, COLLISION_FILL_NONE,
   COLLISION_SURFACE_LINE, COLLISION_ANGLE_TICK,
   OBJECT_BOX_FILL, OBJECT_BOX_STROKE, OBJECT_LABEL, RING_FILL, RING_STROKE, START_MARKER,
+  OBJECT_SELECTED_STROKE,
 } from '../../canvas/canvas-colors';
 
 /** S1 ring object id — expands into a visible ring group (Ring_Main rule). */
@@ -102,31 +103,53 @@ export function drawCollision(
   }
 }
 
-/** Draw all object markers (ring groups expand to individual rings). */
-export function drawObjects(ctx: CanvasRenderingContext2D, d: LevelDoc, invZoom: number): void {
+/**
+ * Draw all object markers (ring groups expand to individual rings).
+ *
+ * When `selectedIndex` is a valid index it gets a highlight ring drawn on top;
+ * `previewPos`, if given, overrides that object's centre only (the live position
+ * during an in-progress drag, before the store commit lands on mouseup).
+ */
+export function drawObjects(
+  ctx: CanvasRenderingContext2D,
+  d: LevelDoc,
+  invZoom: number,
+  selectedIndex?: number | null,
+  previewPos?: { x: number; y: number } | null,
+): void {
   ctx.lineWidth = 1 * invZoom;
   ctx.font = `${8 * invZoom}px monospace`;
   ctx.textAlign = 'center';
-  for (const obj of d.objects) {
+  d.objects.forEach((obj, i) => {
+    const isSel = selectedIndex != null && i === selectedIndex;
+    const ox = isSel && previewPos ? previewPos.x : obj.x;
+    const oy = isSel && previewPos ? previewPos.y : obj.y;
     if (obj.id === RING_OBJ_ID) {
       // Expand a ring group to its individual rings (S1 Ring_Main rule).
       ctx.fillStyle = RING_FILL;
       ctx.strokeStyle = RING_STROKE;
-      for (const p of ringGroupPositions(obj.subtype, obj.x, obj.y)) {
+      for (const p of ringGroupPositions(obj.subtype, ox, oy)) {
         ctx.beginPath();
         ctx.arc(p.x, p.y, 6, 0, Math.PI * 2);
         ctx.fill();
         ctx.stroke();
       }
-      continue;
+    } else {
+      ctx.fillStyle = OBJECT_BOX_FILL;
+      ctx.fillRect(ox - 8, oy - 8, 16, 16);
+      ctx.strokeStyle = OBJECT_BOX_STROKE;
+      ctx.strokeRect(ox - 8, oy - 8, 16, 16);
+      ctx.fillStyle = OBJECT_LABEL;
+      ctx.fillText(obj.id.toString(16).toUpperCase().padStart(2, '0'), ox, oy + 3 * invZoom);
     }
-    ctx.fillStyle = OBJECT_BOX_FILL;
-    ctx.fillRect(obj.x - 8, obj.y - 8, 16, 16);
-    ctx.strokeStyle = OBJECT_BOX_STROKE;
-    ctx.strokeRect(obj.x - 8, obj.y - 8, 16, 16);
-    ctx.fillStyle = OBJECT_LABEL;
-    ctx.fillText(obj.id.toString(16).toUpperCase().padStart(2, '0'), obj.x, obj.y + 3 * invZoom);
-  }
+    if (isSel) {
+      // Highlight ring around the marker anchor, drawn last so it sits on top.
+      ctx.strokeStyle = OBJECT_SELECTED_STROKE;
+      ctx.lineWidth = 2 * invZoom;
+      ctx.strokeRect(ox - 11, oy - 11, 22, 22);
+      ctx.lineWidth = 1 * invZoom;
+    }
+  });
 }
 
 /** Draw the player-spawn crosshair marker. */
