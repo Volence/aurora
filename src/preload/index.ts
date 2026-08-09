@@ -1,12 +1,13 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import { IPC_CHANNELS } from '../shared/ipc-types';
+import { IPC_CHANNELS, unwrapBinaryRead } from '../shared/ipc-types';
 import type { RecentProject } from '../shared/ipc-types';
 import { AGENT_REQUEST_CHANNEL, AGENT_RESPONSE_CHANNEL } from '../shared/agent-protocol';
 import type { AgentRequestEnvelope, AgentResponseEnvelope } from '../shared/agent-protocol';
 
 const api = {
   readBinaryFile: (basePath: string, relativePath: string): Promise<ArrayBuffer> =>
-    ipcRenderer.invoke(IPC_CHANNELS.READ_BINARY_FILE, basePath, relativePath),
+    ipcRenderer.invoke(IPC_CHANNELS.READ_BINARY_FILE, basePath, relativePath)
+      .then(unwrapBinaryRead),
 
   selectDirectory: (): Promise<string | null> =>
     ipcRenderer.invoke(IPC_CHANNELS.SELECT_DIRECTORY),

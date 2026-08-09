@@ -18,3 +18,25 @@ export interface RecentProject {
   name: string;
   lastOpened: number; // timestamp
 }
+
+/**
+ * Marker the read-binary IPC handler RESOLVES with for a missing file instead
+ * of rejecting: ipcMain.handle logs every rejected invoke in the main process
+ * ("Error occurred in handler for 'file:read-binary'"), and the renderer's
+ * optional-file probes (section sidecars, bg library, sprite bindings) would
+ * bury real errors in expected-miss spam. The preload unwraps the marker back
+ * into a thrown ENOENT so renderer callers keep their try/catch semantics.
+ */
+export interface MissingFileMarker { __missing: string }
+
+export function isMissingFileMarker(v: unknown): v is MissingFileMarker {
+  return typeof v === 'object' && v !== null && !ArrayBuffer.isView(v)
+    && typeof (v as MissingFileMarker).__missing === 'string';
+}
+
+export function unwrapBinaryRead<T>(result: T | MissingFileMarker): T {
+  if (isMissingFileMarker(result)) {
+    throw new Error(`ENOENT: no such file or directory, open '${result.__missing}'`);
+  }
+  return result;
+}

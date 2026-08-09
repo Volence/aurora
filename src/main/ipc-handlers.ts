@@ -6,8 +6,16 @@ import { getRecentProjects, addRecentProject, removeRecentProject } from './rece
 
 export function registerIpcHandlers(): void {
   ipcMain.handle(IPC_CHANNELS.READ_BINARY_FILE, async (_event, basePath: string, relativePath: string) => {
-    const buffer = await readBinaryFile(basePath, relativePath);
-    return buffer;
+    try {
+      return await readBinaryFile(basePath, relativePath);
+    } catch (err) {
+      // Missing files RESOLVE with a marker (see MissingFileMarker): rejecting
+      // makes Electron log every optional-file probe as a main-process error.
+      // The preload rethrows, so renderer callers still see ENOENT.
+      const e = err as NodeJS.ErrnoException;
+      if (e?.code === 'ENOENT') return { __missing: e.path ?? `${basePath}/${relativePath}` };
+      throw err;
+    }
   });
 
   ipcMain.handle(IPC_CHANNELS.LIST_PROJECT_FILES, async (_event, basePath: string) => {
