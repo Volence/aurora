@@ -32,6 +32,12 @@ const api = {
 
   listProjectFiles: (basePath: string): Promise<string[]> =>
     ipcRenderer.invoke(IPC_CHANNELS.LIST_PROJECT_FILES, basePath),
+
+  pathExists: (basePath: string, relativePath: string): Promise<boolean> =>
+    ipcRenderer.invoke(IPC_CHANNELS.PATH_EXISTS, basePath, relativePath),
+
+  listDir: (basePath: string, relativeDir: string): Promise<string[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.LIST_DIR, basePath, relativeDir),
 };
 
 contextBridge.exposeInMainWorld('api', api);

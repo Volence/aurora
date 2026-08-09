@@ -2,6 +2,7 @@ import { useCallback } from 'react';
 import { useProjectStore, getCurrentAct, getCurrentZone } from '../state/projectStore';
 import { useViewStore } from '../state/viewStore';
 import { useEditorStore } from '../state/editorStore';
+import { useClassicProjectStore } from '../state/classicProjectStore';
 import { loadCollisionProfiles } from './load-collision';
 import type { CollisionProfileSet } from '../../core/collision/collision-model';
 import { findFullBlockShapeId } from '../../core/collision/full-block-shape';
@@ -132,11 +133,21 @@ export function useProject() {
     }
   }, []);
 
+  // Open a directory: try the classic (disasm) project path FIRST. If it's a
+  // classic project the classicProjectStore owns the view; if it's an aeon
+  // project (or the classic detect declines to it) we hand off to the untouched
+  // aeon loader; on an unrecognized dir the classic store already surfaced the
+  // notice, so there is nothing more to do.
+  const openPath = useCallback(async (dir: string) => {
+    const outcome = await useClassicProjectStore.getState().openDirectory(dir);
+    if (outcome === 'not-classic') await loadFromPath(dir);
+  }, [loadFromPath]);
+
   const openProject = useCallback(async () => {
     const dir = await window.api.selectDirectory();
     if (!dir) return;
-    await loadFromPath(dir);
-  }, [loadFromPath]);
+    await openPath(dir);
+  }, [openPath]);
 
   const saveProject = useCallback(async () => {
     const state = useProjectStore.getState();
@@ -358,7 +369,7 @@ export function useProject() {
     }
   }, []);
 
-  return { openProject, openProjectByPath: loadFromPath, saveProject };
+  return { openProject, openProjectByPath: openPath, saveProject };
 }
 
 async function loadFullProject(

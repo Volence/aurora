@@ -171,7 +171,17 @@ async function readSidecar(fa: FileAccess): Promise<ProjectOverrides> {
       typeof (json as { paths: unknown }).paths === 'object' &&
       (json as { paths: unknown }).paths !== null
     ) {
-      return { paths: (json as { paths: Record<string, string> }).paths };
+      // Filter to string values only: an override path that isn't a string
+      // (number, object, null from a hand-edited sidecar) must never reach
+      // fa.exists()/fa.read(), which would coerce it into a bogus path. Drop
+      // such entries so a malformed sidecar degrades gracefully to "no override
+      // for that key" rather than corrupting resolution. (Task 5 review note.)
+      const raw = (json as { paths: Record<string, unknown> }).paths;
+      const paths: Record<string, string> = {};
+      for (const [k, v] of Object.entries(raw)) {
+        if (typeof v === 'string') paths[k] = v;
+      }
+      return { paths };
     }
     return {};
   } catch {

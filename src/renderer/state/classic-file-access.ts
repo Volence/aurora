@@ -1,0 +1,52 @@
+// Renderer-side FileAccess for the classic (disasm) project layer — bridges the
+// core's fs-free FileAccess interface (src/core/project/adapter) over per-file
+// IPC to the main process.
+//
+// WHY RENDERER-SIDE (architecture decision, mirrored in classicProjectStore's
+// header): Aurora's existing aeon project load runs entirely in the renderer
+// (useProject.ts imports the core parsers and reads files via
+// window.api.readBinaryFile; the main process only performs raw file IO). Task 9
+// matches that seam: detect/open run in the renderer against this FileAccess, so
+// the resulting ProjectHandle (with its levels.read/write closures + read-state
+// cache) lives in the renderer store — no ProjectHandle serialization across
+// IPC, and the aeon open path is left 100% untouched.
+//
+// The heavy fs work still lives in the main process (src/main/file-io.ts,
+// rel-path-safe): `read` reuses the existing file:read-binary channel (whose
+// missing-file marker keeps optional probes out of the main error log; the
+// preload unwraps it back into a thrown ENOENT), and exists/list use the
+// file:path-exists / file:list-dir channels added for this bridge.
+
+import type { FileAccess } from '../../core/project/adapter';
+import { isRelPathSafe } from '../../shared/rel-path';
+
+function assertSafe(rel: string): void {
+  if (!isRelPathSafe(rel)) {
+    throw new Error(`unsafe project-relative path (escapes root): '${rel}'`);
+  }
+}
+
+/**
+ * Build a FileAccess rooted at an absolute project directory. Every path is
+ * project-relative POSIX; `assertSafe` rejects any that would escape the root
+ * before it reaches IPC (defense-in-depth: main also guards).
+ */
+export function createIpcFileAccess(dir: string): FileAccess {
+  return {
+    async exists(rel: string): Promise<boolean> {
+      assertSafe(rel);
+      return window.api.pathExists(dir, rel);
+    },
+    async read(rel: string): Promise<Uint8Array> {
+      assertSafe(rel);
+      // readBinaryFile throws ENOENT for a genuine miss (the preload unwraps the
+      // main-process missing-file marker), matching the FileAccess.read contract.
+      const buf = await window.api.readBinaryFile(dir, rel);
+      return new Uint8Array(buf);
+    },
+    async list(relDir: string): Promise<string[]> {
+      assertSafe(relDir);
+      return window.api.listDir(dir, relDir);
+    },
+  };
+}

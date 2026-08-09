@@ -1,0 +1,255 @@
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import {
+  useClassicProjectStore,
+  __setClassicBridgeForTest,
+  __resetClassicBridgeForTest,
+} from '../classicProjectStore';
+import type { ClassicBridge, ClassicOpenResult } from '../classic-bridge';
+import type { ProjectHandle, ZoneActRef } from '../../../core/project/adapter';
+import type { ResolutionReport } from '../../../core/project/report';
+import { createIpcFileAccess } from '../classic-file-access';
+import { ensureAdaptersRegistered } from '../classic-bridge';
+import { openProject, type FileAccess } from '../../../core/project/adapter';
+import { isRelPathSafe } from '../../../shared/rel-path';
+import * as nodeFsMod from 'node:fs';
+import * as nodePath from 'node:path';
+
+// ---------------------------------------------------------------------------
+// Fake handle + bridge
+// ---------------------------------------------------------------------------
+
+const REFS: ZoneActRef[] = [
+  { zone: 'ghz', act: 1, label: 'Green Hill 1', available: true },
+  { zone: 'ghz', act: 2, label: 'Green Hill 2', available: false, reason: 'missing 1 file' },
+];
+
+const REPORT: ResolutionReport = {
+  entries: [
+    { key: 'ghz.act1.fgLayout', path: 'a.bin', status: 'resolved' },
+    { key: 'ghz.act2.fgLayout', path: 'b.bin', status: 'missing' },
+  ],
+  resolved: 1,
+  total: 2,
+};
+
+function fakeHandle(): ProjectHandle {
+  return {
+    type: 's1',
+    capabilities: { levels: 'chunk-hierarchy', sprites: true, objects: 'objpos', build: false },
+    report: REPORT,
+    levels: {
+      list: () => REFS,
+      read: async () => { throw new Error('not used'); },
+      write: async () => { throw new Error('not used'); },
+    },
+  };
+}
+
+function bridgeReturning(result: ClassicOpenResult | (() => Promise<ClassicOpenResult>)): ClassicBridge {
+  return {
+    open: typeof result === 'function' ? result : async () => result,
+  };
+}
+
+beforeEach(() => {
+  useClassicProjectStore.getState().reset();
+});
+afterEach(() => {
+  __resetClassicBridgeForTest();
+});
+
+// ---------------------------------------------------------------------------
+// Store transitions
+// ---------------------------------------------------------------------------
+
+describe('classicProjectStore', () => {
+  it('starts closed and empty', () => {
+    const s = useClassicProjectStore.getState();
+    expect(s.status).toBe('closed');
+    expect(s.dir).toBeNull();
+    expect(s.handle).toBeNull();
+    expect(s.zoneTree).toEqual([]);
+  });
+
+  it('opens an s1 project: status open, report + zoneTree + handle populated', async () => {
+    const handle = fakeHandle();
+    __setClassicBridgeForTest(bridgeReturning({ kind: 'opened', handle }));
+
+    const outcome = await useClassicProjectStore.getState().openDirectory('/proj/s1');
+    expect(outcome).toBe('opened');
+
+    const s = useClassicProjectStore.getState();
+    expect(s.status).toBe('open');
+    expect(s.dir).toBe('/proj/s1');
+    expect(s.type).toBe('s1');
+    expect(s.capabilities).toEqual(handle.capabilities);
+    expect(s.report).toBe(REPORT);
+    expect(s.zoneTree).toEqual(REFS);
+    expect(s.handle).toBe(handle);
+    expect(s.error).toBeNull();
+  });
+
+  it('transitions through "opening" before resolving', async () => {
+    let seenOpening = false;
+    __setClassicBridgeForTest(
+      bridgeReturning(async () => {
+        seenOpening = useClassicProjectStore.getState().status === 'opening';
+        return { kind: 'opened', handle: fakeHandle() };
+      }),
+    );
+    await useClassicProjectStore.getState().openDirectory('/proj/s1');
+    expect(seenOpening).toBe(true);
+  });
+
+  it('returns "not-classic" and stays closed for an aeon dir (defers to aeon loader)', async () => {
+    __setClassicBridgeForTest(bridgeReturning({ kind: 'not-classic', aeon: true }));
+    const outcome = await useClassicProjectStore.getState().openDirectory('/proj/aeon');
+    expect(outcome).toBe('not-classic');
+    const s = useClassicProjectStore.getState();
+    expect(s.status).toBe('closed');
+    expect(s.error).toBeNull();
+  });
+
+  it('returns "error" with a helpful notice for an unrecognized dir', async () => {
+    __setClassicBridgeForTest(bridgeReturning({ kind: 'not-classic', aeon: false }));
+    const outcome = await useClassicProjectStore.getState().openDirectory('/proj/junk');
+    expect(outcome).toBe('error');
+    const s = useClassicProjectStore.getState();
+    expect(s.status).toBe('closed');
+    expect(s.error).toMatch(/not a recognized project/i);
+    expect(s.error).toMatch(/sonic\.asm/);
+    expect(s.error).toMatch(/project\.json/);
+  });
+
+  it('returns "error" and captures the message when the bridge throws', async () => {
+    __setClassicBridgeForTest(
+      bridgeReturning(async () => { throw new Error('disk exploded'); }),
+    );
+    const outcome = await useClassicProjectStore.getState().openDirectory('/proj/x');
+    expect(outcome).toBe('error');
+    expect(useClassicProjectStore.getState().error).toBe('disk exploded');
+    expect(useClassicProjectStore.getState().status).toBe('closed');
+  });
+
+  it('reset() clears an open project', async () => {
+    __setClassicBridgeForTest(bridgeReturning({ kind: 'opened', handle: fakeHandle() }));
+    await useClassicProjectStore.getState().openDirectory('/proj/s1');
+    useClassicProjectStore.getState().reset();
+    const s = useClassicProjectStore.getState();
+    expect(s.status).toBe('closed');
+    expect(s.handle).toBeNull();
+    expect(s.report).toBeNull();
+    expect(s.zoneTree).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Renderer FileAccess bridge — rel-path safety (reject '..' before IPC)
+// ---------------------------------------------------------------------------
+
+describe('createIpcFileAccess rel-path safety', () => {
+  const api = {
+    pathExists: vi.fn(async () => true),
+    readBinaryFile: vi.fn(async () => new ArrayBuffer(4)),
+    listDir: vi.fn(async () => ['a', 'b']),
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    (globalThis as unknown as { window: unknown }).window = { api };
+  });
+  afterEach(() => {
+    delete (globalThis as unknown as { window?: unknown }).window;
+  });
+
+  it('delegates safe paths to the IPC api', async () => {
+    const fa = createIpcFileAccess('/root');
+    expect(await fa.exists('levels/GHZ1.bin')).toBe(true);
+    expect(api.pathExists).toHaveBeenCalledWith('/root', 'levels/GHZ1.bin');
+
+    const bytes = await fa.read('sonic.asm');
+    expect(bytes).toBeInstanceOf(Uint8Array);
+    expect(api.readBinaryFile).toHaveBeenCalledWith('/root', 'sonic.asm');
+
+    expect(await fa.list('artnem')).toEqual(['a', 'b']);
+    expect(api.listDir).toHaveBeenCalledWith('/root', 'artnem');
+  });
+
+  it('rejects escaping paths without hitting IPC', async () => {
+    const fa = createIpcFileAccess('/root');
+    await expect(fa.exists('../etc/passwd')).rejects.toThrow(/escapes root/);
+    await expect(fa.read('a/../../b')).rejects.toThrow(/escapes root/);
+    await expect(fa.list('/abs')).rejects.toThrow(/escapes root/);
+    expect(api.pathExists).not.toHaveBeenCalled();
+    expect(api.readBinaryFile).not.toHaveBeenCalled();
+    expect(api.listDir).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Headless integration — the store's open contract against the REAL s1disasm,
+// through a node-fs FileAccess that mirrors the IPC bridge exactly (only the fs
+// primitives differ). Skipped when the disasm tree is absent.
+// ---------------------------------------------------------------------------
+
+const S1DIR = '/home/volence/sonic_hacks/s1disasm';
+const S1_PRESENT = nodeFsMod.existsSync(S1DIR);
+
+function nodeFileAccess(root: string): FileAccess {
+  return {
+    async exists(rel) {
+      if (!isRelPathSafe(rel)) throw new Error(`escapes root: ${rel}`);
+      return nodeFsMod.existsSync(nodePath.join(root, rel));
+    },
+    async read(rel) {
+      if (!isRelPathSafe(rel)) throw new Error(`escapes root: ${rel}`);
+      return new Uint8Array(nodeFsMod.readFileSync(nodePath.join(root, rel)));
+    },
+    async list(rel) {
+      if (!isRelPathSafe(rel)) throw new Error(`escapes root: ${rel}`);
+      try {
+        return nodeFsMod.readdirSync(nodePath.join(root, rel));
+      } catch {
+        return [];
+      }
+    },
+  };
+}
+
+// A ClassicBridge identical in shape to ipcClassicBridge but backed by node fs.
+const nodeBridge: ClassicBridge = {
+  async open(dir: string): Promise<ClassicOpenResult> {
+    ensureAdaptersRegistered();
+    const fa = nodeFileAccess(dir);
+    const handle = await openProject(fa);
+    if (handle) return { kind: 'opened', handle };
+    return { kind: 'not-classic', aeon: await fa.exists('project.json') };
+  },
+};
+
+describe.skipIf(!S1_PRESENT)('classicProjectStore integration (real s1disasm)', () => {
+  beforeEach(() => {
+    useClassicProjectStore.getState().reset();
+    __setClassicBridgeForTest(nodeBridge);
+  });
+  afterEach(() => __resetClassicBridgeForTest());
+
+  it('opens s1disasm → report 100%, 18 acts, all available', async () => {
+    const outcome = await useClassicProjectStore.getState().openDirectory(S1DIR);
+    expect(outcome).toBe('opened');
+
+    const s = useClassicProjectStore.getState();
+    expect(s.status).toBe('open');
+    expect(s.type).toBe('s1');
+    // 100% resolution.
+    expect(s.report!.resolved).toBe(s.report!.total);
+    // 6 zones x 3 acts, every one available.
+    expect(s.zoneTree).toHaveLength(18);
+    expect(s.zoneTree.every((r) => r.available)).toBe(true);
+    // zoneTree carries the expected zone ids.
+    expect([...new Set(s.zoneTree.map((r) => r.zone))].sort()).toEqual(
+      ['ghz', 'lz', 'mz', 'sbz', 'slz', 'syz'],
+    );
+    expect(s.handle).not.toBeNull();
+  });
+});

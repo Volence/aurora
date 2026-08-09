@@ -14,12 +14,14 @@ import ToastContainer from './components/ToastContainer';
 import CommandPalette, { type Command } from './components/CommandPalette';
 import ArtMode from './components/art/ArtMode';
 import SpriteMode from './components/sprite/SpriteMode';
+import ClassicProjectView from './components/classic/ClassicProjectView';
 import EditorShell from './shell/EditorShell';
 import MapToolDock from './shell/MapToolDock';
 import MapStatusBar from './shell/MapStatusBar';
 import { Panel, CollapsibleSection, T } from './components/ui';
 import { useProject } from './hooks/useProject';
 import { useProjectStore } from './state/projectStore';
+import { useClassicProjectStore } from './state/classicProjectStore';
 import { useEditorStore } from './state/editorStore';
 import { registerAgentHandler } from './agent/agent-handler';
 import { refreshObjectPreviews } from './object-previews';
@@ -27,6 +29,8 @@ import { refreshObjectPreviews } from './object-previews';
 export default function App() {
   const { openProject, openProjectByPath, saveProject } = useProject();
   const error = useProjectStore((s) => s.error);
+  const classicError = useClassicProjectStore((s) => s.error);
+  const classicOpen = useClassicProjectStore((s) => s.status) === 'open';
   const tool = useEditorStore((s) => s.tool);
   const pasting = useEditorStore((s) => s.pasting);
   const appMode = useEditorStore((s) => s.appMode);
@@ -72,11 +76,14 @@ export default function App() {
 
   return (
     <div style={styles.root}>
-      {error && (
+      {(error || classicError) && (
         <div style={styles.error}>
-          {error}
+          <span style={{ whiteSpace: 'pre-line' }}>{error || classicError}</span>
           <button
-            onClick={() => useProjectStore.getState().setError(null)}
+            onClick={() => {
+              if (error) useProjectStore.getState().setError(null);
+              if (classicError) useClassicProjectStore.getState().clearError();
+            }}
             style={styles.dismissButton}
           >
             Dismiss
@@ -84,7 +91,11 @@ export default function App() {
         </div>
       )}
 
-      {appMode === 'art' ? (
+      {classicOpen ? (
+        <ClassicProjectView
+          appBar={<Toolbar onOpenProject={openProject} onOpenRecent={openProjectByPath} onSave={saveProject} />}
+        />
+      ) : appMode === 'art' ? (
         <ArtMode appBar={<Toolbar onOpenProject={openProject} onOpenRecent={openProjectByPath} onSave={saveProject} />} />
       ) : appMode === 'sprite' ? (
         <SpriteMode appBar={<Toolbar onOpenProject={openProject} onOpenRecent={openProjectByPath} onSave={saveProject} />} />

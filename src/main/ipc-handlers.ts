@@ -1,7 +1,7 @@
 import { ipcMain, dialog, BrowserWindow } from 'electron';
 import { writeFileSync } from 'fs';
 import { IPC_CHANNELS } from '../shared/ipc-types';
-import { readBinaryFile, listProjectFiles } from './file-io';
+import { readBinaryFile, listProjectFiles, pathExists, listDir } from './file-io';
 import { getRecentProjects, addRecentProject, removeRecentProject } from './recent-projects';
 
 export function registerIpcHandlers(): void {
@@ -20,6 +20,14 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle(IPC_CHANNELS.LIST_PROJECT_FILES, async (_event, basePath: string) => {
     return listProjectFiles(basePath);
+  });
+
+  ipcMain.handle(IPC_CHANNELS.PATH_EXISTS, async (_event, basePath: string, relativePath: string) => {
+    return pathExists(basePath, relativePath);
+  });
+
+  ipcMain.handle(IPC_CHANNELS.LIST_DIR, async (_event, basePath: string, relativeDir: string) => {
+    return listDir(basePath, relativeDir);
   });
 
   ipcMain.handle(IPC_CHANNELS.SELECT_DIRECTORY, async (event) => {

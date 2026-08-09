@@ -195,6 +195,33 @@ describe('s1Adapter.open overrides', () => {
     const handle = await s1Adapter.open(memFs(files));
     expect(handle.report.resolved).toBe(ENTRIES.length);
   });
+
+  it('filters non-string override values out of the sidecar', async () => {
+    // A hand-edited sidecar with junk values (number, object, null) alongside a
+    // valid string override. Only the string survives; the junk keys fall back
+    // to their profile paths (so everything still resolves).
+    const files = fullFake({
+      '.aurora/project.json': JSON.stringify({
+        paths: {
+          [KEY]: 'custom/sidecar.bin',
+          'ghz.act2.objpos': 42,
+          'ghz.act3.objpos': { nested: 'x' },
+          'mz.act1.objpos': null,
+        },
+      }),
+      'custom/sidecar.bin': 'sidecar',
+    });
+    const handle = await s1Adapter.open(memFs(files));
+    // The string override applied…
+    expect(handle.report.entries.find((e) => e.key === KEY)!.path).toBe('custom/sidecar.bin');
+    // …and the junk-valued keys fell back to their profile paths (still resolved).
+    for (const junkKey of ['ghz.act2.objpos', 'ghz.act3.objpos', 'mz.act1.objpos']) {
+      const e = handle.report.entries.find((x) => x.key === junkKey)!;
+      expect(e.status).toBe('resolved');
+      expect(e.detail).not.toBe('override');
+    }
+    expect(handle.report.resolved).toBe(ENTRIES.length);
+  });
 });
 
 // ---------------------------------------------------------------------------

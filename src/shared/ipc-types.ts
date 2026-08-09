@@ -9,6 +9,10 @@ export const IPC_CHANNELS = {
   WRITE_BINARY_FILE: 'file:write-binary',
   SELECT_FILES: 'dialog:select-files',
   LIST_PROJECT_FILES: 'file:list-project-files',
+  // Directory-level probes backing the classic-project FileAccess bridge (Task
+  // 9). `read` reuses READ_BINARY_FILE; these cover exists/list.
+  PATH_EXISTS: 'file:path-exists',
+  LIST_DIR: 'file:list-dir',
 } as const;
 
 export type IpcChannels = typeof IPC_CHANNELS;
