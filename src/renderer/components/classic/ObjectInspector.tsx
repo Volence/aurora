@@ -5,6 +5,7 @@ import { useToastStore } from '../../state/toastStore';
 import { S1_OBJECT_LIST, s1ObjectName, s1ObjectHex } from '../../../core/project/profiles/s1-objects';
 import { resolveObjectArt } from '../../../core/project/profiles/s1-object-art';
 import { editObjectArt } from '../sprite/export-sprite';
+import { clampInt } from './viewport-math';
 import type { S1ObjectEntry } from '../../../core/formats/classic/s1-objpos';
 
 const MAX_OBJ_X = 0xffff;
@@ -121,11 +122,11 @@ export default function ObjectInspector() {
       </Field>
       <Field label="X">
         <NumberField value={obj.x} min={0} max={MAX_OBJ_X} width={72}
-          onChange={(v) => patchSelected({ x: clamp(v, MAX_OBJ_X) })} />
+          onChange={(v) => patchSelected({ x: clampInt(v, MAX_OBJ_X) })} />
       </Field>
       <Field label="Y">
         <NumberField value={obj.y} min={0} max={MAX_OBJ_Y} width={72}
-          onChange={(v) => patchSelected({ y: clamp(v, MAX_OBJ_Y) })} />
+          onChange={(v) => patchSelected({ y: clampInt(v, MAX_OBJ_Y) })} />
       </Field>
       <div style={styles.checks}>
         <Check label="X-flip" checked={obj.xflip} onChange={(c) => patchSelected({ xflip: c })} />
@@ -152,11 +153,6 @@ function Check({ label, checked, onChange }: { label: string; checked: boolean; 
       <span>{label}</span>
     </label>
   );
-}
-
-function clamp(v: number, hi: number): number {
-  if (!Number.isFinite(v)) return 0;
-  return Math.max(0, Math.min(hi, Math.round(v)));
 }
 
 const styles: Record<string, React.CSSProperties> = {

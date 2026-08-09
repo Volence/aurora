@@ -8,7 +8,6 @@ import {
   worldToLayoutCell,
   addStampCell,
   stampAccumToCells,
-  hitTestObject,
   hitTestObjectFrames,
   hitTestPoint,
   type ObjectHitBounds,
@@ -205,54 +204,6 @@ describe('layoutCellAt', () => {
     const g = grid(2, 2, [1, 2, 3, 4, 99]);
     expect(layoutCellAt(g, 1, 1)).toBe(4); // last in-grid cell
     // The trailing 99 is unreachable through in-grid coordinates.
-  });
-});
-
-// ---------------------------------------------------------------------------
-// hitTestObject — nearest object marker within a world-space pick radius.
-// ---------------------------------------------------------------------------
-describe('hitTestObject', () => {
-  const obj = (x: number, y: number, id = 1): S1ObjectEntry => ({
-    x, y, xflip: false, yflip: false, respawn: false, id, subtype: 0,
-  });
-
-  it('returns null for an empty object list', () => {
-    expect(hitTestObject([], 100, 100, 16)).toBeNull();
-  });
-
-  it('selects an object when the click is within the radius', () => {
-    const objs = [obj(100, 100)];
-    expect(hitTestObject(objs, 105, 103, 16)).toBe(0); // dist ~5.8 < 16
-  });
-
-  it('returns null when the click is outside every radius', () => {
-    const objs = [obj(100, 100)];
-    expect(hitTestObject(objs, 200, 200, 16)).toBeNull();
-  });
-
-  it('picks the NEAREST object when several are in range', () => {
-    const objs = [obj(100, 100), obj(110, 100), obj(90, 100)];
-    // Click at 108,100: nearest is index 1 (dist 2) over 0 (8) and 2 (18).
-    expect(hitTestObject(objs, 108, 100, 32)).toBe(1);
-  });
-
-  it('is inclusive at exactly the radius boundary', () => {
-    const objs = [obj(100, 100)];
-    expect(hitTestObject(objs, 116, 100, 16)).toBe(0); // dist == 16
-    expect(hitTestObject(objs, 117, 100, 16)).toBeNull(); // dist 17 > 16
-  });
-
-  it('resolves an exact tie to the later (topmost) index', () => {
-    // Two objects equidistant from the click — the later one draws on top.
-    const objs = [obj(90, 100), obj(110, 100)];
-    expect(hitTestObject(objs, 100, 100, 16)).toBe(1);
-  });
-
-  it('a smaller radius (higher zoom) still selects a close marker', () => {
-    const objs = [obj(100, 100)];
-    // radius 4 (e.g. 16px tolerance at zoom 4): a 2px-away click still hits.
-    expect(hitTestObject(objs, 102, 100, 4)).toBe(0);
-    expect(hitTestObject(objs, 108, 100, 4)).toBeNull();
   });
 });
 

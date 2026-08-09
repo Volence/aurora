@@ -3,11 +3,11 @@ import { T } from '../ui';
 import { useClassicLevelStore } from '../../state/classicLevelStore';
 import { renderChunk } from '../../../core/level-classic/render';
 import type { LevelDoc } from '../../../core/level-classic/model';
+import { CHUNK_PX } from './viewport-math';
 import { CHUNK_LABEL_BG, CHUNK_LABEL_TEXT, CHUNK_AIR_CHECK_A, CHUNK_AIR_CHECK_B } from '../../canvas/canvas-colors';
 
-// One chunk = 256x256 world px; thumbnails downscale that. Fixed display size
-// (no S/M/L control — the picker is a compact bottom strip).
-const CHUNK_PX = 256;
+// One chunk = 256x256 world px (CHUNK_PX, shared); thumbnails downscale that.
+// Fixed display size (no S/M/L control — the picker is a compact bottom strip).
 const THUMB = 56;
 
 const hex2 = (n: number) => `$${n.toString(16).toUpperCase().padStart(2, '0')}`;

@@ -262,16 +262,22 @@ export default function SpriteMode({ appBar }: { appBar: React.ReactNode }) {
                 </div>
               </div>
             )}
-            <div style={styles.divider} />
-            <div style={styles.dim}>Reopen a sprite you exported:</div>
-            <div style={styles.btnRow}>
-              <select style={{ ...styles.nameInput, flex: 1 }} value=""
-                onChange={(e) => { if (e.target.value) { setSpriteName(e.target.value); } }}>
-                <option value="">{available.length ? `— pick saved (${available.length}) —` : '— none saved yet —'}</option>
-                {available.map((n) => <option key={n} value={n}>{n}</option>)}
-              </select>
-              <button style={{ ...styles.secondary, ...(busy ? styles.disabled : {}) }} disabled={busy} onClick={handleLoad}>Load</button>
-            </div>
+            {/* The exported-sprite index lives in the aeon project's data dir —
+                hide it in a classic (disasm) session that has no aeon project. */}
+            {project && (
+              <>
+                <div style={styles.divider} />
+                <div style={styles.dim}>Reopen a sprite you exported:</div>
+                <div style={styles.btnRow}>
+                  <select style={{ ...styles.nameInput, flex: 1 }} value=""
+                    onChange={(e) => { if (e.target.value) { setSpriteName(e.target.value); } }}>
+                    <option value="">{available.length ? `— pick saved (${available.length}) —` : '— none saved yet —'}</option>
+                    {available.map((n) => <option key={n} value={n}>{n}</option>)}
+                  </select>
+                  <button style={{ ...styles.secondary, ...(busy ? styles.disabled : {}) }} disabled={busy} onClick={handleLoad}>Load</button>
+                </div>
+              </>
+            )}
           </div>
           </CollapsibleSection>
 
@@ -289,6 +295,9 @@ export default function SpriteMode({ appBar }: { appBar: React.ReactNode }) {
             </CollapsibleSection>
           )}
 
+          {/* Export to project + engine-character load target the aeon project;
+              hidden in a classic-only sprite session (edit-art handoff). */}
+          {project && (
           <CollapsibleSection id="sprite.export" title="Export to project">
           <div style={styles.section}>
             <label style={styles.check} title="Streamed art (DPLC) vs all art resident. Characters use DPLC; most objects don't.">
@@ -310,7 +319,9 @@ export default function SpriteMode({ appBar }: { appBar: React.ReactNode }) {
             </div>
           </div>
           </CollapsibleSection>
+          )}
 
+          {project && (
           <CollapsibleSection id="sprite.character" title="Load engine character">
           <div style={styles.section}>
             <div style={styles.btnRow}>
@@ -320,6 +331,7 @@ export default function SpriteMode({ appBar }: { appBar: React.ReactNode }) {
             </div>
           </div>
           </CollapsibleSection>
+          )}
 
           <CollapsibleSection id="sprite.palette" title="Palette">
             <SpritePaletteHeader />

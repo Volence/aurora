@@ -338,7 +338,11 @@ function applySnapshot(
   });
 }
 
-/** Whether a classic edit can currently be undone / redone (for UI affordances). */
+/**
+ * Whether a classic edit can currently be undone / redone. Test support: exported
+ * so command tests can assert undo-stack state directly; the UI re-evaluates its
+ * undo/redo affordances off `historyTick` rather than calling these.
+ */
 export function classicCanUndo(): boolean { return classicHistory.canUndo; }
 export function classicCanRedo(): boolean { return classicHistory.canRedo; }
 

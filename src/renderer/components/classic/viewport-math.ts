@@ -12,6 +12,15 @@ import { objectFrameRect, pointInRect } from '../../../core/level-classic/object
 /** A chunk is a 256x256 world-pixel cell in the FG/BG layout grid. */
 export const CHUNK_PX = 256;
 
+/**
+ * Clamp a value to an integer in [0, hi] (non-finite → 0). The one clamp shared by
+ * the viewport's drag/place clamps and the ObjectInspector's numeric field commits.
+ */
+export function clampInt(v: number, hi: number): number {
+  if (!Number.isFinite(v)) return 0;
+  return Math.max(0, Math.min(hi, Math.round(v)));
+}
+
 export interface ChunkRange {
   startCol: number;
   startRow: number;
@@ -70,28 +79,15 @@ export function layoutCellAt(grid: LayoutGrid, col: number, row: number): number
   return grid.cells[index];
 }
 
-/** A pan/zoom camera: `x/y` is the world coordinate at the canvas top-left. */
-export interface ViewportCamera {
-  x: number;
-  y: number;
-  zoom: number;
-}
-
-export interface WorldPos {
-  x: number;
-  y: number;
-}
-
 /**
- * Convert a screen-space pixel offset (relative to the canvas top-left) to world
- * coordinates under the camera. This is the inverse of the draw transform
- * `scale(zoom); translate(-cam.x, -cam.y)` documented on ClassicLevelViewport:
- * screen→world is `cam.x + screenPx / zoom`. Passing a zero-origin camera
- * (`{x:0, y:0, zoom}`) turns a screen delta into a world delta (used for panning).
+ * Screen→world under a pan/zoom camera (`cam.x/y` = world coord at the canvas
+ * top-left; the inverse of `scale(zoom); translate(-cam.x, -cam.y)`). This is the
+ * shared core camera math — re-exported here so the classic viewport + its tests
+ * keep a single import site while the ONE implementation lives in core/art/camera.
+ * Passing a zero-origin camera (`{x:0, y:0, zoom}`) turns a screen delta into a
+ * world delta (used for panning).
  */
-export function screenToWorld(cam: ViewportCamera, sx: number, sy: number): WorldPos {
-  return { x: cam.x + sx / cam.zoom, y: cam.y + sy / cam.zoom };
-}
+export { screenToWorld } from '../../../core/art/camera';
 
 /** The layout cell (column, row) that contains a world-pixel coordinate. */
 export function worldToLayoutCell(worldX: number, worldY: number): { col: number; row: number } {
@@ -146,54 +142,10 @@ export function stampAccumToCells(
 }
 
 /**
- * Hit-test the object list against a world-space click (Task 14 object tool).
- *
- * Returns the index of the object whose placement anchor (obj.x, obj.y — the
- * marker centre, and for a ring group the group origin) is nearest the click AND
- * within `radiusWorld`, or null when none qualifies. The radius is a WORLD
- * distance: the caller converts its screen-pixel pick tolerance with
- * `screenPx / zoom` so the grabbable area is a constant on-screen size at any
- * zoom. Ties (equal distance) resolve to the LATER index — the topmost object,
- * since later objects draw on top. Squared distances avoid a sqrt per candidate.
- *
- * This is FG-plane only by contract: S1 objects live on the foreground plane, so
- * the caller only invokes this while the FG plane is shown; the function itself
- * is plane-agnostic (it just scans the one object list the doc has).
- *
- * FOLLOW-UP (known limitation): the pick area is the marker ANCHOR only. A ring
- * group (object $25) draws as a spread-out row/column of rings, but only its
- * origin (obj.x, obj.y) is hit-testable — clicking a far ring in the group won't
- * select it. A richer version would test each object's rendered footprint (the
- * ring positions from `ringGroupPositions`, the 16px box for others); that fix
- * would land here, widening the per-object test beyond the single anchor point.
- */
-export function hitTestObject(
-  objects: readonly S1ObjectEntry[],
-  worldX: number,
-  worldY: number,
-  radiusWorld: number,
-): number | null {
-  const r2 = radiusWorld * radiusWorld;
-  let best: number | null = null;
-  let bestD2 = Infinity;
-  for (let i = 0; i < objects.length; i++) {
-    const o = objects[i];
-    const dx = o.x - worldX;
-    const dy = o.y - worldY;
-    const d2 = dx * dx + dy * dy;
-    // `<=` so a later (topmost) object wins an exact tie with an earlier one.
-    if (d2 <= r2 && d2 <= bestD2) {
-      best = i;
-      bestD2 = d2;
-    }
-  }
-  return best;
-}
-
-/**
  * Whether a world-space click lands within `radiusWorld` of a single anchor
- * point (targetX, targetY). The point-marker analogue of `hitTestObject` — used
- * for grabbable single-anchor overlays like the player-start crosshair. Squared
+ * point (targetX, targetY). Used for grabbable single-anchor overlays like the
+ * player-start crosshair (objects use frame-bounds hit-testing — see
+ * hitTestObjectFrames). Squared
  * distances avoid a sqrt; `radiusWorld` is a world distance the caller derives
  * from its screen-pixel tolerance via `screenPx / zoom`, so the grab area is a
  * constant on-screen size at any zoom (matching the object pick tolerance).
@@ -224,7 +176,8 @@ function anchorBounds(radius: number): ObjectHitBounds {
 }
 
 /**
- * Frame-bounds hit-test (Task B1) — the upgrade from anchor-radius `hitTestObject`.
+ * Frame-bounds hit-test (Task B1) — the object-tool pick test (replaced the
+ * earlier anchor-radius nearest-marker test).
  *
  * For each object, `boundsFor(obj, index)` yields its rendered frame bounds (from
  * the object-sprite cache) or null when no sprite is linked; a null falls back to

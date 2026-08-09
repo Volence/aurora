@@ -4,6 +4,7 @@ import { renderTile, renderBlock } from '../../../core/level-classic/render';
 import type { LevelDoc } from '../../../core/level-classic/model';
 import type { Usage } from '../../../core/level-classic/usage-index';
 import { COMPOSER_BADGE_TEXT } from '../../canvas/canvas-colors';
+import { drawBufferScaled } from './composer-shared';
 
 // Reusable art thumbnails for the composer dock's tile picker and block palette
 // (Task B3). Both follow the ChunkPicker caching lesson: the render effect keys
@@ -15,19 +16,7 @@ const hex = (n: number) => `$${n.toString(16).toUpperCase()}`;
 
 /** Draw a small RGBA buffer scaled (nearest-neighbor) to fill a square canvas. */
 function drawScaled(canvas: HTMLCanvasElement | null, buf: Uint8ClampedArray, srcW: number, srcH: number, size: number): void {
-  const ctx = canvas?.getContext('2d');
-  if (!ctx) return;
-  ctx.imageSmoothingEnabled = false;
-  ctx.clearRect(0, 0, size, size);
-  const tmp = document.createElement('canvas');
-  tmp.width = srcW; tmp.height = srcH;
-  const tctx = tmp.getContext('2d');
-  if (tctx) {
-    const img = tctx.createImageData(srcW, srcH);
-    img.data.set(buf);
-    tctx.putImageData(img, 0, 0);
-  }
-  ctx.drawImage(tmp, 0, 0, size, size);
+  drawBufferScaled(canvas, buf, srcW, srcH, size, size);
 }
 
 function usageTitle(kind: string, id: number, u: Usage, unit: string): string {

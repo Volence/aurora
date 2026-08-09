@@ -8,7 +8,7 @@ import { renderChunk } from '../../../core/level-classic/render';
 import type { LevelDoc } from '../../../core/level-classic/model';
 import { s1ObjectName } from '../../../core/project/profiles/s1-objects';
 import {
-  CHUNK_PX, visibleChunkRange, layoutCellAt, screenToWorld,
+  CHUNK_PX, visibleChunkRange, layoutCellAt, screenToWorld, clampInt,
   worldToLayoutCell, addStampCell, stampAccumToCells, hitTestObjectFrames, hitTestPoint,
   type ObjectHitBounds, type StampCell,
 } from './viewport-math';
@@ -47,7 +47,6 @@ const OBJ_Y_MAX = 0x0fff;
  * 0..$FFFF range is valid (matches classicSetStart's validation).
  */
 const START_MAX = 0xffff;
-const clampInt = (v: number, hi: number) => Math.max(0, Math.min(hi, Math.round(v)));
 
 /**
  * Draw the loop-flag corner badge for a layout cell whose top-left is at world
