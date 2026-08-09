@@ -404,3 +404,89 @@ describe('s1-io (e) synthetic round-trip with a mutation', () => {
     expect(result.files.some((f) => f.path === 'map256/syn.kos')).toBe(true);
   });
 });
+
+// ===========================================================================
+// Tile-write rejection paths (anim slots, gaps) + positive control.
+// ===========================================================================
+
+// A synthetic project whose single .nem holds 4 tiles (indices 0..3), plus one
+// animated-art overlay of 1 tile sourced from a .unc file, blitted at
+// `animVramTile`. Choosing animVramTile <= 3 overlays a base tile; choosing it
+// >= 5 leaves a zero-fill gap (index 4) between base art and the anim slot.
+function buildSyntheticWithAnim(animVramTile: number): {
+  fa: FileAccess;
+  act: LevelAct;
+  paths: ResolvedLevelPaths;
+  files: Record<string, Uint8Array>;
+} {
+  const base = buildSynthetic();
+  const unc = new Uint8Array(32).fill(0xab); // one tile
+  const files = { ...base.files, 'artunc/syn.unc': unc };
+  const act: LevelAct = {
+    ...base.act,
+    animatedArt: [{ file: 'artunc/syn.unc', srcTileOffset: 0, vramTileIndex: animVramTile, tileCount: 1 }],
+  };
+  const paths: ResolvedLevelPaths = { ...base.paths, animatedArt: ['artunc/syn.unc'] };
+  return { fa: memFs(files), act, paths, files };
+}
+
+describe('s1-io tile-write rejection paths', () => {
+  it('rejects an edit to an anim-overlaid tile; leaves the .nem written correctly', async () => {
+    // Anim overlays base tile index 2 (inside the .nem span 0..3).
+    const { fa, act, paths } = buildSyntheticWithAnim(2);
+    const state = await readS1Level(act, paths, fa);
+    const doc = state.doc;
+
+    // The overlaid tile reads back as the .unc fill.
+    expect(doc.tiles[2 * 32]).toBe(0xab);
+    // Mutate a byte inside the anim-overlaid tile.
+    doc.tiles[2 * 32 + 4] = 0x99;
+
+    const result = writeS1Level(state, { tiles: true });
+    expect(
+      result.errors.some(
+        (e) => e.path === 'artunc/syn.unc' && e.message === 'animated art slots are not editable in v1',
+      ),
+    ).toBe(true);
+
+    // The .nem file is still emitted, and (since the anim tile is skipped, not
+    // patched) it decodes back to the original 4 base tiles unchanged.
+    const nem = result.files.find((f) => f.path === 'artnem/syn.nem');
+    expect(nem).toBeDefined();
+    expect(bytesEqual(nemesisDecompress(nem!.bytes), state.read.pristineTileFiles[0].bytes)).toBe(true);
+  });
+
+  it("rejects an edit to a zero-fill gap tile with 'unrepresentable gap tile'", async () => {
+    // Anim at tile 6 leaves a gap at tiles 4,5 beyond the .nem span (0..3).
+    const { fa, act, paths } = buildSyntheticWithAnim(6);
+    const state = await readS1Level(act, paths, fa);
+    const doc = state.doc;
+
+    // Gap tile 4 is zero-filled; mutate a byte in it.
+    expect(doc.tiles[4 * 32]).toBe(0x00);
+    doc.tiles[4 * 32] = 0x77;
+
+    const result = writeS1Level(state, { tiles: true });
+    expect(result.errors.some((e) => e.message.includes('unrepresentable gap tile'))).toBe(true);
+    // No anim error was raised (the edit was in the gap, not the anim slot).
+    expect(result.errors.some((e) => e.message.includes('animated art slots'))).toBe(false);
+  });
+
+  it('positive control: an in-span tile edit writes and survives re-read', async () => {
+    const { fa, act, paths, files } = buildSyntheticWithAnim(6);
+    const state = await readS1Level(act, paths, fa);
+    const doc = state.doc;
+
+    // Mutate a byte of base tile 0 (in-span, not anim-overlaid).
+    doc.tiles[0] = (doc.tiles[0] ^ 0x0f) & 0xff;
+    const expected = doc.tiles[0];
+
+    const result = writeS1Level(state, { tiles: true });
+    expect(result.errors).toEqual([]);
+
+    const next: Record<string, Uint8Array> = { ...files };
+    for (const f of result.files) next[f.path] = f.bytes;
+    const state2 = await readS1Level(act, paths, memFs(next));
+    expect(state2.doc.tiles[0]).toBe(expected);
+  });
+});
