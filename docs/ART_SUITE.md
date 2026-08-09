@@ -18,6 +18,25 @@ The Art Suite adds an in-editor Art mode for creating and editing tiles, blocks,
 and chunks (arbitrary-size assemblies of tiles) without leaving the level editor.
 All edits are one undo step (Ctrl+Z), shared with map edits and MCP agent edits.
 
+### Classic (Sonic 1 disassembly) projects
+
+This guide describes the **aeon** Art-mode composer. Opening a Sonic 1
+disassembly (File → Open on the disasm directory) switches Levels into a separate
+classic surface — its own `ClassicLevelViewport`, zone/act tree, chunk picker,
+and object inspector — that shares the undo stack and palette editor but is *not*
+the Art-mode composer described below. The tiles → blocks → chunks → chunk-id
+layout hierarchy edits through the classic level store's commands
+(`classic:edit-tiles` / `classic:edit-block` / `classic:edit-chunk-cells` /
+`classic:set-layout-cells` …), and save writes S1's own native formats (Nemesis
+8×8 art, Enigma blocks, Kosinski chunks) back into the disasm through a guarded
+(mtime-checked) channel — not the aeon `data/editor/` files in Save Flows below.
+Human classic editing today covers layout stamping, the chunk picker, and object
+placement; **wiring the Art-mode pixel/block/chunk composer to classic content
+editing is deferred** (agents already reach it via the `edit_chunk` / `edit_block`
+MCP tools). See `docs/specs/2026-08-09-disasm-project-abstraction-design.md` for
+the classic project layer and `docs/MCP.md` → *Classic project tools* for the
+agent surface.
+
 ---
 
 ## Entering Art Mode

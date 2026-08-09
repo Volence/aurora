@@ -1,5 +1,13 @@
 # Disassembly-as-Project (S1 in-place editing) Implementation Plan
 
+> **STATUS: COMPLETE (v1) — 2026-08-09.** All 18 tasks landed on branch
+> `feature/disasm-project` (~35 commits, each double-reviewed). Boxes below are
+> checked; `DEVIATION:` notes flag where what shipped differs from the plan text.
+> Two scoped deferrals carried into v1 (both noted in the spec header): Task 13's
+> Art-mode composer wiring for classic content editing, and Task 17's aeon
+> marker-only adapter (real loader stays in the renderer). The M5 ROM round-trip
+> gate passes via `scripts/verify-s1-roundtrip.mjs`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Open `/home/volence/sonic_hacks/s1disasm/` as a recognized project and edit levels, object art, and object placement in place, writing S1's native formats back so `build.lua` produces the modified ROM; prove the engine-agnostic `ProjectAdapter` abstraction by migrating aeon behind it.
@@ -34,11 +42,11 @@ export function enigmaCompress(input: Uint8Array): Uint8Array;   // input.length
 
 Encoder may be simple/suboptimal (e.g. mostly inline-copy packets) — correctness gate is decode(encode(x)) == x, not matching original compressor bytes.
 
-- [ ] **Step 1: Write failing tests** — (a) round-trip property on random even-length buffers (seeded PRNG, no Math.random in prod code paths); (b) golden: `enigmaDecompress(fs.readFileSync(S1DIR + '/map16/GHZ.eni'))` returns length divisible by 8 (4 words/block × 2 bytes) and > 0; (c) re-encode golden: `enigmaDecompress(enigmaCompress(decoded))` equals decoded byte-for-byte, for every `map16/*.eni`.
-- [ ] **Step 2: Run tests, verify FAIL** — `npm test -- src/core/formats/classic/__tests__/enigma.test.ts` (module not found).
-- [ ] **Step 3: Implement decode (port SonLVLAPI), run — golden decode passes.**
-- [ ] **Step 4: Implement encode, run — all pass.**
-- [ ] **Step 5: `npx tsc --noEmit`; commit** `feat(classic): enigma codec with round-trip + s1disasm goldens`.
+- [x] **Step 1: Write failing tests** — (a) round-trip property on random even-length buffers (seeded PRNG, no Math.random in prod code paths); (b) golden: `enigmaDecompress(fs.readFileSync(S1DIR + '/map16/GHZ.eni'))` returns length divisible by 8 (4 words/block × 2 bytes) and > 0; (c) re-encode golden: `enigmaDecompress(enigmaCompress(decoded))` equals decoded byte-for-byte, for every `map16/*.eni`.
+- [x] **Step 2: Run tests, verify FAIL** — `npm test -- src/core/formats/classic/__tests__/enigma.test.ts` (module not found).
+- [x] **Step 3: Implement decode (port SonLVLAPI), run — golden decode passes.**
+- [x] **Step 4: Implement encode, run — all pass.**
+- [x] **Step 5: `npx tsc --noEmit`; commit** `feat(classic): enigma codec with round-trip + s1disasm goldens`.
 
 ### Task 2: Existing compressor goldens vs s1disasm
 
@@ -47,9 +55,15 @@ Encoder may be simple/suboptimal (e.g. mostly inline-copy packets) — correctne
 
 Prove the compressors we already own survive real S1 data before anything is built on them.
 
-- [ ] **Step 1: Write tests:** for every `map256/*.kos`: `kosinskiDecompress` succeeds, length divisible by 512 (16×16 block words × 2), and `kosinskiDecompress(kosinskiCompress(d))` equals `d`. For every `artnem/8x8 - *.nem`: `nemesisDecompress` succeeds, length divisible by 32, and round-trips through `nemesisCompress`.
-- [ ] **Step 2: Run; fix any codec bug uncovered (report it in the commit message).**
-- [ ] **Step 3: Commit** `test(classic): kosinski/nemesis goldens over real s1disasm data`.
+> **DEVIATION:** the Nemesis and Kosinski *encoders* already existed
+> (`src/core/compress/nemesis.ts`, `src/core/formats/kosinski.ts` — both
+> decompress+compress), so spec §2.3's planned `nemesis-encode.ts` /
+> `kosinski-encode.ts` files were unnecessary and never created. Only Enigma
+> (Task 1) was a genuinely missing codec. This task stayed pure goldens as written.
+
+- [x] **Step 1: Write tests:** for every `map256/*.kos`: `kosinskiDecompress` succeeds, length divisible by 512 (16×16 block words × 2), and `kosinskiDecompress(kosinskiCompress(d))` equals `d`. For every `artnem/8x8 - *.nem`: `nemesisDecompress` succeeds, length divisible by 32, and round-trips through `nemesisCompress`.
+- [x] **Step 2: Run; fix any codec bug uncovered (report it in the commit message).**
+- [x] **Step 3: Commit** `test(classic): kosinski/nemesis goldens over real s1disasm data`.
 
 ### Task 3: S1 plain-binary codecs
 
@@ -78,9 +92,9 @@ export function encodeS1Objpos(e: S1ObjectEntry[], originalLength?: number): Uin
 // exact layout per SonLVLAPI; used solely for the collision overlay renderer.
 ```
 
-- [ ] **Step 1: Failing tests:** decode every `levels/*.bin` (dims ≤ 64×8? — BG files may differ; assert cells.length === width*height and full-file consumption), every `objpos/*.bin`, every `startpos/*.bin` top-level file; **byte-identical** re-encode for all three classes (`encode(decode(b))` equals `b` exactly — this is the plan's key fidelity gate).
-- [ ] **Step 2: Run FAIL → implement → green.**
-- [ ] **Step 3: tsc; commit** `feat(classic): s1 layout/objpos/startpos/colind/collision-shape codecs, byte-identical goldens`.
+- [x] **Step 1: Failing tests:** decode every `levels/*.bin` (dims ≤ 64×8? — BG files may differ; assert cells.length === width*height and full-file consumption), every `objpos/*.bin`, every `startpos/*.bin` top-level file; **byte-identical** re-encode for all three classes (`encode(decode(b))` equals `b` exactly — this is the plan's key fidelity gate).
+- [x] **Step 2: Run FAIL → implement → green.**
+- [x] **Step 3: tsc; commit** `feat(classic): s1 layout/objpos/startpos/colind/collision-shape codecs, byte-identical goldens`.
 
 ---
 
@@ -112,8 +126,8 @@ export async function detectProject(fa: FileAccess): Promise<ProjectMatch | null
 
 (`ClassicLevelAccess` is defined in Task 7; declare the interface name here with `list/read/write` members so both tasks compile — copy the signature block from Task 7.)
 
-- [ ] **Step 1: Failing tests with an in-memory FileAccess fake:** registry returns null on empty dir; a stub adapter with fingerprint file `sonic.asm` detects only when present; report counts resolved/missing.
-- [ ] **Step 2: Implement → green → tsc → commit** `feat(project): engine-agnostic ProjectAdapter registry + resolution report`.
+- [x] **Step 1: Failing tests with an in-memory FileAccess fake:** registry returns null on empty dir; a stub adapter with fingerprint file `sonic.asm` detects only when present; report counts resolved/missing.
+- [x] **Step 2: Implement → green → tsc → commit** `feat(project): engine-agnostic ProjectAdapter registry + resolution report`.
 
 ### Task 5: S1 profile + S1ProjectAdapter.open
 
@@ -125,8 +139,12 @@ Profile: zone table (GHZ/LZ/MZ/SLZ/SYZ/SBZ; LZ4 = SBZ3; act file stems `ghz1..3`
 
 Fingerprint: `sonic.asm` ∧ `artnem/` ∧ `map256/` ∧ `levels/` all exist. Sidecar: read `.aurora/project.json` if present; `overrides.paths[key]` replaces a profile entry's path.
 
-- [ ] **Step 1: Failing tests:** fake FileAccess mirroring stock layout → detect matches, open resolves all entries; delete one file from the fake → report shows it missing and the owning act flagged unavailable, open still succeeds; override redirects a path. Golden (skipIf): real s1disasm resolves 100% of profile entries — enumerate any misses in the assertion message.
-- [ ] **Step 2: Implement → green → tsc → commit** `feat(project): bundled s1disasm profile + adapter open with loud resolution`.
+- [x] **Step 1: Failing tests:** fake FileAccess mirroring stock layout → detect matches, open resolves all entries; delete one file from the fake → report shows it missing and the owning act flagged unavailable, open still succeeds; override redirects a path. Golden (skipIf): real s1disasm resolves 100% of profile entries — enumerate any misses in the assertion message.
+- [x] **Step 2: Implement → green → tsc → commit** `feat(project): bundled s1disasm profile + adapter open with loud resolution`.
+
+> **DEVIATION (follow-up fix `b126236`):** the first INI transcription gave SBZ act 2
+> animated-art entries it does not actually carry; corrected so the profile matches
+> the INI ground truth. 100% resolution over real s1disasm confirmed after the fix.
 
 ---
 
@@ -140,7 +158,7 @@ Fingerprint: `sonic.asm` ∧ `artnem/` ∧ `map256/` ∧ `levels/` all exist. Si
 
 Types exactly as spec §2.2 (`LevelDoc`, `BlockDef`, `ChunkDef256` with 256 cells of `{block, xf, yf, solidity}`, `LayoutGrid`, `S1ObjectEntry` re-exported from the codec). Plus `validateLevelDoc(doc): string[]` returning human-readable violations of the §2.2 hard-limit list (layout ≤64×8, chunk id ≤ $FF, block id ≤ $3FF, cell/word ranges). Include word pack/unpack helpers: block cell word = `pri<<15 | pal<<13 | yf<<12 | xf<<11 | tile(11b)`; chunk cell word = `solidity<<14? — verify bit layout in SonLVLAPI S1 chunk reader and document it in the code`.
 
-- [ ] Failing tests for pack/unpack round-trip + validator catches each limit → implement → commit `feat(classic): LevelDoc model + validation`.
+- [x] Failing tests for pack/unpack round-trip + validator catches each limit → implement → commit `feat(classic): LevelDoc model + validation`.
 
 ### Task 7: s1-io read/write (files ⇄ LevelDoc)
 
@@ -161,8 +179,8 @@ export interface WriteResult { written: string[]; skipped: string[]; errors: {pa
 
 read(): decode per profile (concat GHZ tile files after nemesis decode; blit artunc animated art into `tiles` at `vramTileIndex*32`; compose palettes per rule; parse chunks into ChunkDef256). write(): encode only dirty domains; **self-check gate** — re-decode every encoded buffer and deep-compare against the source structure before returning it as writable; a mismatch goes in `errors` and the file is withheld. (Actual fs write + atomicity is Task 10, main process.)
 
-- [ ] **Step 1: Failing tests:** GHZ1 golden (skipIf): read → tiles.length ≥ profile-declared count, fg dims match `levels/ghz1.bin` header, objects.length > 0, palette line 0 row 0 came from Sonic.bin. **Zero-edit round-trip over ALL acts of ALL six zones:** read → write(all-dirty) → uncompressed outputs byte-identical to disk originals; compressed outputs decompressed-identical. Self-check test: corrupt one encoded structure via a stubbed encoder → write withholds that file with an error.
-- [ ] **Step 2: Implement → green → tsc → commit** `feat(classic): s1 level io with zero-edit round-trip goldens across all zones`.
+- [x] **Step 1: Failing tests:** GHZ1 golden (skipIf): read → tiles.length ≥ profile-declared count, fg dims match `levels/ghz1.bin` header, objects.length > 0, palette line 0 row 0 came from Sonic.bin. **Zero-edit round-trip over ALL acts of ALL six zones:** read → write(all-dirty) → uncompressed outputs byte-identical to disk originals; compressed outputs decompressed-identical. Self-check test: corrupt one encoded structure via a stubbed encoder → write withholds that file with an error.
+- [x] **Step 2: Implement → green → tsc → commit** `feat(classic): s1 level io with zero-edit round-trip goldens across all zones`.
 
 ### Task 8: Chunk prerender
 
@@ -172,7 +190,7 @@ read(): decode per profile (concat GHZ tile files after nemesis decode; blit art
 
 `renderChunk(doc, chunkId): Uint8ClampedArray` (256×256 RGBA) resolving chunk→block→tile with flips/palette/priority, transparent color-0. Follow the existing tileset-prerender implementation style (find it via `grep -rn "prerender" src/core src/renderer` and reuse its tile-blit helper if importable). Test: hand-built 2-tile doc renders expected pixels (assert specific pixel coordinates, all four flip combos).
 
-- [ ] Failing test → implement → commit `feat(classic): chunk prerender`.
+- [x] Failing test → implement → commit `feat(classic): chunk prerender`.
 
 ---
 
@@ -187,7 +205,7 @@ read(): decode per profile (concat GHZ tile files after nemesis decode; blit art
 
 File → Open Directory: main process supplies a real `FileAccess` rooted at the chosen dir → `detectProject` → aeon type keeps today's path untouched; s1 type populates `classicProjectStore` {handle, report, zoneTree}. Report UI: status-bar summary line ("70/70 level files resolved", warning color when <100%) opening a detail panel listing per-entry status. No behavior change for aeon opens (guard with existing tests).
 
-- [ ] Store tests with fake handle → implement store → wire IPC + menu → manual smoke: `npm run dev`, open s1disasm, see zone tree + report. Commit `feat(ui): open-directory project detection + s1 project store + resolution report`.
+- [x] Store tests with fake handle → implement store → wire IPC + menu → manual smoke: `npm run dev`, open s1disasm, see zone tree + report. Commit `feat(ui): open-directory project detection + s1 project store + resolution report`.
 
 ### Task 10: Save IPC (atomic, mtime-guarded)
 
@@ -197,7 +215,7 @@ File → Open Directory: main process supplies a real `FileAccess` rooted at the
 
 Behavior: for each `WriteResult.written` buffer: refuse if on-disk mtime ≠ mtime captured at open/last save (collect conflicts, write nothing on conflict — dialog lists files); else write tmp file in same dir + rename. Return per-file results to renderer.
 
-- [ ] Guard-logic tests (fake mtimes) → implement → commit `feat(ipc): atomic mtime-guarded classic project save`.
+- [x] Guard-logic tests (fake mtimes) → implement → commit `feat(ipc): atomic mtime-guarded classic project save`.
 
 ### Task 11: ClassicLevelViewport read-only + zone/act tree + overlays
 
@@ -208,7 +226,7 @@ Behavior: for each `WriteResult.written` buffer: refuse if on-disk mtime ≠ mti
 
 Left dock: zone/act tree (zones expandable, unavailable acts greyed with reason tooltip). Viewport: chunk-grid canvas from Task 8 prerenders, FG/BG plane toggle, zoom/pan reusing the map-mode camera hook (find via `grep -rn "useViewportCamera\|camera" src/renderer/hooks`). Overlays (toggleable buttons matching map-mode overlay UI): collision (block→colind→shape height columns, reuse collision drawing helpers from the existing collision renderer), objects (marker + real frame via S1 sprite adapter where it resolves; obj $25 expands its ring row for display per spacing subtype — port count/spacing from SonLVLAPI ring def), start position marker.
 
-- [ ] Implement → manual smoke on GHZ1/MZ1/SBZ1 vs SonLVL screenshots → commit `feat(ui): classic level viewport, zone tree, collision/object overlays`. **Take a screenshot for the morning report.**
+- [x] Implement → manual smoke on GHZ1/MZ1/SBZ1 vs SonLVL screenshots → commit `feat(ui): classic level viewport, zone tree, collision/object overlays`. **Take a screenshot for the morning report.**
 
 ---
 
@@ -222,7 +240,7 @@ Left dock: zone/act tree (zones expandable, unavailable acts greyed with reason 
 
 Commands (each = one undo step, follow editorStore command registration pattern exactly): `classic:set-layout-cells {plane, cells: {x,y,chunkId}[]}`, `classic:edit-chunk-cells {chunkId, cells: {index, word}[]}`, `classic:edit-block {blockId, def}`, `classic:edit-tiles {tileIndex, data}[]`, `classic:set-palette {line, colors}`, `classic:set-colind {blockId, value}[]`, `classic:set-objects {objects: S1ObjectEntry[]}` (whole-list replace — matches gesture granularity), `classic:set-start {x,y}`. Each command: validates via `validateLevelDoc` limits before applying (reject with message, no partial apply), marks its dirty domain, invalidates affected prerenders.
 
-- [ ] Failing tests per command: apply → state + dirty flag; undo → exact prior state; validation rejection leaves state untouched. Implement → commit `feat(classic): editing commands with undo + dirty tracking`.
+- [x] Failing tests per command: apply → state + dirty flag; undo → exact prior state; validation rejection leaves state untouched. Implement → commit `feat(classic): editing commands with undo + dirty tracking`.
 
 ### Task 13: Editing UI — chunk picker, stamp tool, composer wiring, save
 
@@ -233,7 +251,18 @@ Commands (each = one undo step, follow editorStore command registration pattern 
 
 Bottom dock chunk picker (prerendered thumbnails, current selection); click-drag stamps layout cells (one undo step per drag gesture); right-click eyedrops chunk under cursor. Save (Ctrl+S) runs write → IPC → toast with written/conflict summary. Palette editing reuses the existing palette editor bound to `classic:set-palette`.
 
-- [ ] Implement → **end-to-end gate:** edit GHZ1 layout, save, `cd /home/volence/sonic_hacks/s1disasm && lua build.lua` (or `build.bat` equivalent — use whichever runs on this machine; check README.md there), confirm ROM builds; boot in BlastEm (`emulators/blastem64-0.6.2/`) and screenshot the edit in-game. Commit `feat(classic): layout stamping, composer wiring, save-back — s1 ROM round-trip verified`.
+- [x] Implement → **end-to-end gate:** edit GHZ1 layout, save, `cd /home/volence/sonic_hacks/s1disasm && lua build.lua` (or `build.bat` equivalent — use whichever runs on this machine; check README.md there), confirm ROM builds; boot in BlastEm (`emulators/blastem64-0.6.2/`) and screenshot the edit in-game. Commit `feat(classic): layout stamping, composer wiring, save-back — s1 ROM round-trip verified`.
+
+> **DEVIATION:** shipped as `feat(classic): layout stamping, chunk picker, save UX`
+> (`2bc67d3`, +`cb08553`/`3a943a0`). The layout stamp tool, chunk picker,
+> right-click eyedrop, and Ctrl+S save-back all landed. **Composer wiring deferred:**
+> the classic surface (`ClassicLevelViewport` + `ChunkPicker` + object inspector) is
+> its own component set, NOT the Art-mode composer — wiring the Art-mode
+> pixel/block/chunk composer to the classic content-editing commands
+> (`classic:edit-tiles`/`edit-block`/`edit-chunk-cells`) was deferred. Those commands
+> exist (Task 12) and are reachable via the `edit_chunk`/`edit_block` MCP tools (Task
+> 16); only the human Art-mode GUI binding is outstanding. The ROM round-trip gate is
+> covered headlessly by `scripts/verify-s1-roundtrip.mjs` (Part C of Task 18).
 
 ---
 
@@ -248,7 +277,7 @@ Bottom dock chunk picker (prerendered thumbnails, current selection); click-drag
 
 Select/move (drag)/delete (Del)/place (drag from library). Inspector: id (dropdown w/ names), subtype (hex byte), xflip/yflip/respawn checkboxes, x/y numeric. Deliberately mirrors the P1 aeon entity-placement interaction vocabulary (spec §2.4).
 
-- [ ] Implement → commit `feat(classic): object placement editing + s1 object library`.
+- [x] Implement → commit `feat(classic): object placement editing + s1 object library`.
 
 ### Task 15: Object art save-back
 
@@ -258,7 +287,7 @@ Select/move (drag)/delete (Del)/place (drag from library). Inspector: id (dropdo
 
 Edited object art frames → re-encode with `nemesisCompress` → write to the object's `artnem/*.nem` through the Task 10 guarded IPC. Round-trip test: decode `artnem/Signpost.nem`-like file (pick any real one) → re-encode → decompressed-identical. Mappings stay read-only: sprite mode shows a non-blocking "S1 mappings are read-only" notice where edit affordances would apply (match existing notice/toast styling).
 
-- [ ] Implement → commit `feat(sprites): s1 object art nemesis save-back; mappings read-only notice`.
+- [x] Implement → commit `feat(sprites): s1 object art nemesis save-back; mappings read-only notice`.
 
 ### Task 16: MCP tools
 
@@ -268,7 +297,7 @@ Edited object art frames → re-encode with `nemesisCompress` → write to the o
 
 Tools (thin wrappers over existing commands/stores — no new logic): `open_project {dir}`, `get_project_report`, `list_classic_levels`, `get_classic_level {zone, act}`, `set_layout_region {plane, x, y, chunkIds[][]}`, `edit_chunk {chunkId, cells}`, `edit_block {blockId, def}`, `place_object {entry}`, `move_object {index, x, y}`, `delete_object {index}`, `set_colind {entries}`, `save_project`.
 
-- [ ] Tests per tool (happy + validation-rejection) → implement → update MCP.md table → commit `feat(mcp): classic project tools`.
+- [x] Tests per tool (happy + validation-rejection) → implement → update MCP.md table → commit `feat(mcp): classic project tools`.
 
 ---
 
@@ -283,14 +312,38 @@ Tools (thin wrappers over existing commands/stores — no new logic): `open_proj
 
 `AeonProjectAdapter`: detect = aurora-schema `project.json`; open = wrap the existing s4 load path (call it, don't rewrite it), capabilities `{levels:'aeon', sprites:true, objects:'json', build:false}`, report from the existing load results. Zero behavior change: every pre-existing test stays green; manual open of the aeon project looks identical.
 
-- [ ] Implement → `npm test` full suite → manual aeon open smoke → commit `refactor(project): aeon open path behind ProjectAdapter — zero behavior change`.
+- [x] Implement → `npm test` full suite → manual aeon open smoke → commit `refactor(project): aeon open path behind ProjectAdapter — zero behavior change`.
+
+> **DEVIATION:** `AeonProjectAdapter.open()` is a **capability marker**, not a wrapper
+> of the real loader. `detect` keys on `project.json` `engine:"s4"` so aeon joins the
+> single `detectProject` registry (replacing the ad-hoc `fa.exists('project.json')`
+> probe); but `open()` returns a marker handle with an empty report and the renderer
+> still runs the untouched `useProject.loadFromPath` (classic-bridge routes an aeon
+> match to `not-classic`). This delivers the routing unification with genuine zero
+> behavior change. **Wrapping `loadFromPath` behind `open()` (and populating the
+> report) is deferred pending a core-callable aeon loader** — today's loader is
+> renderer-bound and not injectable through the fs-free `FileAccess` seam. Follow-up
+> `ed75f1c` added `explainAeonReject(fa)` so a non-aeon `project.json` (invalid JSON /
+> wrong engine) surfaces its reason in the unrecognized-project notice.
 
 ### Task 18: Docs + final sweep
 
 **Files:**
 - Modify: `docs/ROADMAP.md` (add this work as an active phase; note it pulls P8 Phase A/D forward and shares P1's placement vocabulary), `docs/MCP.md` (verify tool table), `docs/ART_SUITE.md` if it lists modes
-- [ ] Full `npm test` + `npx tsc --noEmit` + `npm run build`; fix anything red.
-- [ ] Commit `docs: roadmap + MCP entries for disasm-as-project phase`.
+- [x] Full `npm test` + `npx tsc --noEmit` + `npm run build`; fix anything red.
+- [x] Commit `docs: roadmap + MCP entries for disasm-as-project phase`.
+
+> **DEVIATION / expansion:** split into two commits. Carried code-review fixes went in
+> `fix(project): invalid project.json diagnostics + MCP guard tests` (`ed75f1c`:
+> `explainAeonReject` diagnostics + the three missing no-level-open MCP guard tests for
+> `edit_block`/`move_object`/`delete_object`); the docs pass shipped as
+> `docs: roadmap + plan closeout for disasm-as-project phase`. MCP.md's classic table
+> was verified against `src/main/editor-methods.ts` (matches — no edit needed).
+> ART_SUITE.md gained a short classic-project section (the Art-mode composer is aeon;
+> classic uses its own surface + the composer wiring deferral above). The spec header
+> moved APPROVED → IMPLEMENTED (v1) with the two deferrals recorded. ROADMAP gained an
+> active-phase section (P-DISASM) and P8 row/note annotations. Final sweep: full vitest
+> + tsc + build green; `scripts/verify-s1-roundtrip.mjs` PASSes.
 
 ---
 

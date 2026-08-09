@@ -1,7 +1,20 @@
 <!--
-Authored 2026-08-09 (Claude Fable 5 + user brainstorm). Status: APPROVED — user approved
-approach + section 1 interactively; sections 2–3 delegated to Claude with instruction to
-proceed to implementation overnight (Opus worker agents, Fable oversight).
+Authored 2026-08-09 (Claude Fable 5 + user brainstorm). Status: IMPLEMENTED (v1),
+2026-08-09 — Milestones M1–M7 landed on branch feature/disasm-project (plan
+docs/plans/2026-08-09-disasm-project-abstraction.md). Two scoped deferrals in v1:
+  • §2.7 aeon migration — `AeonProjectAdapter` is a routing MARKER: detect keys on
+    project.json engine:"s4" so aeon participates in the single detectProject
+    registry, but open() returns a capability-marker handle and the renderer still
+    runs the untouched useProject.loadFromPath (zero behavior change). Wrapping the
+    real aeon loader behind open() (and populating its report) awaits a
+    core-callable aeon loader.
+  • §2.4 composer wiring — the classic surface (ClassicLevelViewport / chunk picker
+    / object inspector) ships, but wiring the Art-mode pixel/block/chunk composer to
+    classic content-editing commands is deferred; those commands exist and are
+    reachable via the edit_chunk/edit_block MCP tools.
+Originally: user approved approach + section 1 interactively; sections 2–3 delegated
+to Claude with instruction to proceed to implementation overnight (Opus worker
+agents, Fable oversight).
 Companion: docs/specs/2026-07-03-multi-game-level-interop-design.md (P8) — this spec
 pulls P8's neutral model + Phase D codecs forward and supersedes P8's assumption that
 donor disasms are import-only. Ground truth for S1 formats verified against

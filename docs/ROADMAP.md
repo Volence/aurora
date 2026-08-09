@@ -79,6 +79,57 @@ until that doc is refreshed — trust `aeon/structs.asm` + the 2026-07-02 specs)
 | 8 | Raster + parallax | 5th AppMode `'raster'`: band/curve/raster-timeline editors → `parallax_gen.py`+`raster_gen.py`; **Aurora's first outbound Aether client** for live 60fps preview via DEBUG RAM overrides; 6 MCP tools |
 | 9 | Object behaviors | Map-mode properties panel: typed per-placement params + behavior picker → `behavior_gen.py`; subtype-as-bundle-index; retire TS entity exporter; 4 MCP tools |
 
+## 2.5 Delivered out of sequence — Disassembly-as-Project (2026-08-09)
+
+**Status: SHIPPED (v1)** — branch `feature/disasm-project`, ~35 double-reviewed
+commits. Spec: `specs/2026-08-09-disasm-project-abstraction-design.md`; plan (with
+per-task deviation notes): `plans/2026-08-09-disasm-project-abstraction.md`. This
+was a motivated pull-forward, not part of the P0–P8 line (see §5) — it proves the
+engine-agnostic project abstraction by opening a **Sonic 1 disassembly and editing
+it in place**.
+
+What landed:
+- **Engine-agnostic `ProjectAdapter` layer** (`core/project/`): fingerprint
+  `detect` → bundled profile → **loud resolution report** (per-entry
+  resolved/missing/ambiguous) → capability manifest → domain accessors. Single
+  `detectProject` registry with disjoint fingerprints; `.aurora/project.json`
+  override sidecar.
+- **S1 in-place editing**: hierarchical `LevelDoc` (tiles → blocks → chunks →
+  chunk-id layout, never flattened) on the shared undo history; levels
+  (layout/chunks/blocks/tiles/palette/colind), object placement, and object
+  sprite art all edit and **save back S1's native formats** so its stock
+  `build.lua` produces the modified ROM. Round-trip is byte-identical
+  (uncompressed) / decompressed-identical (compressed) across all six zones.
+- **Pure codecs** (`core/formats/classic/`): Enigma (the one missing codec) +
+  S1 plain-binary layout/objpos/startpos/colind/collision-shape codecs; Nemesis
+  and Kosinski encoders already existed and were reused.
+- **Guarded save**: atomic tmp+rename, mtime-conflict refusal, encoder self-check
+  (re-decode + structural compare before any file is written).
+- **12 MCP tools** for the classic surface (`open_project` … `save_project`),
+  MCP-parity one-undo-step-per-mutation (`docs/MCP.md` → *Classic project tools*).
+- **Aeon detection unified**: aeon now routes through the same `detectProject`
+  registry (`AeonProjectAdapter`).
+
+**Relationship to the P0–P8 plan:**
+- **Pulls P8 Phase A/D forward.** P8's neutral `LevelDoc` model and its Phase D
+  classic codecs (§4.10) are now built and battle-tested against real S1 data —
+  P8 inherits them and its "donor disasms are import-only" assumption is
+  superseded (edit-in-place proven). See the P8 note in §4.10 and §5.
+- **Shares P1's placement vocabulary.** Classic object placement
+  (select/move/Del/drag-from-library, inspector for id/subtype/flips/respawn)
+  deliberately mirrors the P1 aeon entity-placement interaction (§4.1) so the
+  later aeon work reuses the same UI gestures behind a different backing command.
+
+**Deferrals carried into v1** (both recorded in the spec header):
+- **Aeon adapter is a routing marker.** `AeonProjectAdapter.open()` returns a
+  capability-marker handle; the renderer still runs the untouched
+  `useProject.loadFromPath` (zero behavior change). *Wrapping `loadFromPath` behind
+  `open()` (and populating the report) is deferred pending a core-callable aeon
+  loader.*
+- **Art-mode composer wiring for classic content editing** (tile/block/chunk pixel
+  edits) is deferred; the classic viewport/chunk-picker/object surfaces ship and
+  the commands are reachable via the `edit_chunk`/`edit_block` MCP tools.
+
 ## 3. The domain map
 
 Where each art domain stands and where it goes. ★ = new capability, ☆ = upgrade.
@@ -95,7 +146,7 @@ Where each art domain stands and where it goes. ★ = new capability, ☆ = upgr
 | Object behaviors | Static JSON placement | ★ properties panel + behavior picker (design #9) | aeon spec #9 | P6 |
 | Playtest loop | None | ★ Aether client: palette→CRAM, build→reload, play-from-cursor | `specs/2026-07-03-aether-client-playtest-design.md` | P2 |
 | Import pipeline | None | ★ PNG/sheet import with Genesis quantization | `specs/2026-07-03-png-import-design.md` | P7 |
-| Multi-game levels | Sprites only | ★ level adapters (S1/S2/S3K ⇄ each other ⇄ aeon, both directions) | `specs/2026-07-03-multi-game-level-interop-design.md` | P8 (Phase A unblocked now) |
+| Multi-game levels | Sprites only; **S1 read+write in place shipped** (§2.5) | ★ level adapters (S1/S2/S3K ⇄ each other ⇄ aeon, both directions) | `specs/2026-07-03-multi-game-level-interop-design.md` | P8 (Phase A unblocked now; **Phase A/D substrate landed by §2.5**) |
 
 ### 4.1 Level layout — close the last authoring gaps
 
@@ -238,6 +289,14 @@ Most real art starts life outside Aurora. Add:
 
 ### 4.10 Multi-game levels
 
+> **Substrate landed early (§2.5, 2026-08-09).** The disasm-as-project work built
+> and battle-tested the neutral hierarchical `LevelDoc`, the S1 classic codecs
+> (Phase D), and the engine-agnostic `ProjectAdapter`/registry against real S1 data,
+> and proved **edit-in-place** (superseding this design's original import-only
+> assumption for donor disasms). P8 now inherits that layer; the remaining P8 work is
+> the *cross-game* adapters (S2/S3K ⇄ each other ⇄ aeon, both directions), collision
+> best-match into the shared shape set, object mapping tables, and world assembly.
+
 **Fully designed** — see `specs/2026-07-03-multi-game-level-interop-design.md`:
 hub-and-spoke `LevelDoc` neutral model, per-game adapters driven by SonLVL INI
 manifests (SonLVL's API source in `programs/SonLVL/SonLVLAPI/` is the definitive
@@ -281,7 +340,8 @@ Aurora-side phases; engine dependencies noted. P0–P3 are unblocked **today**.
 | **P5** | Raster mode + live preview (design #8 Aurora half) | aeon #8 tasks 1–4; P2's client | M–L |
 | **P6** | Behaviors properties panel (design #9 Aurora half) + entity-exporter retirement; VRAM budget visualizer v2 | aeon #9 tasks 1–4 | M |
 | **P7** | Import pipeline (PNG/sheet quantization) + craft backlog pulls | none | M |
-| **P8** | Multi-game level adapters (own design cycle) | none hard | XL |
+| **P8** | Multi-game level adapters (own design cycle) — *Phase A/D substrate (neutral LevelDoc + S1 classic codecs + adapter layer) already delivered by §2.5; remaining work is cross-game adapters + world assembly* | none hard | XL |
+| **§2.5** | ✅ **DONE** — Disassembly-as-Project: engine-agnostic `ProjectAdapter` + S1 in-place editing (levels/objects/sprite-art) + guarded save + 12 MCP tools + aeon detection unified. Pulled P8 Phase A/D forward; shares P1's placement vocabulary. Aeon adapter is a marker (real loader deferred); Art-mode composer classic wiring deferred. | delivered 2026-08-09 | L (done) |
 
 Rationale: P1 pays down the drift while executing the one design-week item with zero
 engine gating; P2 lands the suite's keystone (and #8's plumbing) while the engine
