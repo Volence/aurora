@@ -8,6 +8,7 @@ import { importChunks } from '../../core/formats/chunk-mappings';
 import { kosinskiDecompress } from '../../core/formats/kosinski';
 import { parseTiles } from '../../core/formats/tiles';
 import { migrateChunkTilesIntoTileset } from '../../core/art/atlas-migration';
+import { findFullBlockShapeId } from '../../core/collision/full-block-shape';
 import { unpackNametableWord } from '../../core/model/s4-types';
 import type { ChunkDef, Tile, Palette } from '../../core/model/s4-types';
 import { T } from './ui';
@@ -142,7 +143,8 @@ export default function ChunkLibrary() {
       const artData = new Uint8Array(await window.api.readBinaryFile('', artPath));
 
       const namePrefix = chunkPath.split('/').pop()?.replace('.bin', '') ?? 'Chunk';
-      const imported = importChunks(chunkData, blockData, namePrefix);
+      const fullBlockShape = findFullBlockShapeId(useProjectStore.getState().collisionProfiles);
+      const imported = importChunks(chunkData, blockData, namePrefix, fullBlockShape);
 
       const artDecompressed = kosinskiDecompress(artData);
       const artTiles = parseTiles(artDecompressed);

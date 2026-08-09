@@ -1,6 +1,6 @@
 // src/core/formats/s4-collattr.ts
-// Editable collision attr plane — its own file format so it never collides with
-// the legacy crude .coll.bin. Each cell is a 16-bit BIG-ENDIAN packed collision
+// Editable collision attr plane (.collattr.bin/.collattrb.bin) — the single
+// collision model. Each cell is a 16-bit BIG-ENDIAN packed collision
 // cell word (see collision-cell-word.ts): shape | X/Y-flip | per-plane solidity.
 // Big-endian matches the 68k chunk-entry word order the engine bake consumes.
 export function parseCollAttr(data: Uint8Array): Uint16Array {

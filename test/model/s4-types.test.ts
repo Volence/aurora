@@ -16,9 +16,7 @@ describe('s4-types', () => {
       expect(grid.width).toBe(256);
       expect(grid.height).toBe(256);
       expect(grid.nametable.length).toBe(65536);
-      expect(grid.collision.length).toBe(65536);
       expect(grid.nametable[0]).toBe(0);
-      expect(grid.collision[0]).toBe(0);
     });
   });
 
@@ -74,7 +72,8 @@ describe('s4-types', () => {
       expect(chunk.widthTiles).toBe(16);
       expect(chunk.heightTiles).toBe(8);
       expect(chunk.nametable.length).toBe(128);
-      expect(chunk.collision.length).toBe(128);
+      expect(chunk.collisionA.length).toBe(32);
+      expect(chunk.collisionB.length).toBe(32);
     });
   });
 

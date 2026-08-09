@@ -15,6 +15,7 @@ import ComposerCanvas from './ComposerCanvas';
 import TilesetPanel from './TilesetPanel';
 import PaletteEditor from './PaletteEditor';
 import ChunkLibrary from '../ChunkLibrary';
+import CollisionPalette from '../CollisionPalette';
 
 function slug(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'chunk';
@@ -22,6 +23,7 @@ function slug(name: string): string {
 
 export default function ArtMode({ appBar }: { appBar: React.ReactNode }) {
   const open = useArtStore((s) => s.open);
+  const tool = useArtStore((s) => s.tool);
   const openDocument = useArtStore((s) => s.openDocument);
   const historyVersion = useEditorStore((s) => s.historyVersion);
   const project = useProjectStore((s) => s.project);
@@ -171,8 +173,10 @@ export default function ArtMode({ appBar }: { appBar: React.ReactNode }) {
         chunkId: chunk.id,
         oldNametable: new Uint16Array(chunk.nametable),
         newNametable: new Uint16Array(slice.nametable),
-        oldCollision: new Uint8Array(chunk.collision),
-        newCollision: new Uint8Array(slice.collision),
+        oldCollisionA: new Uint16Array(chunk.collisionA),
+        newCollisionA: new Uint16Array(o.doc.collisionA),
+        oldCollisionB: new Uint16Array(chunk.collisionB),
+        newCollisionB: new Uint16Array(o.doc.collisionB),
       }, level);
       saved = chunk;
     } else {
@@ -182,7 +186,8 @@ export default function ArtMode({ appBar }: { appBar: React.ReactNode }) {
         widthTiles: o.doc.widthTiles,
         heightTiles: o.doc.heightTiles,
         nametable: new Uint16Array(slice.nametable),
-        collision: new Uint8Array(slice.collision),
+        collisionA: new Uint16Array(o.doc.collisionA),
+        collisionB: new Uint16Array(o.doc.collisionB),
       };
       useProjectStore.getState().addChunks([saved]);
       useEditorStore.getState().markDirty();
@@ -207,6 +212,9 @@ export default function ArtMode({ appBar }: { appBar: React.ReactNode }) {
   }
 
   const showSave = open !== null && open.liveTileIndex === null;
+  // Collision tool needs a tile-space doc (chunk/block/new — not a single live
+  // tile, same guard ComposerCanvas uses to hint-and-bail on live tiles).
+  const showCollisionPanel = tool === 'collision' && showSave;
   // Chunk docs whose cells reference atlas tiles: pixel edits to those cells
   // write the shared tileset tile, so they show up everywhere it's used.
   const hasSharedTiles = open !== null && open.chunkId !== null
@@ -245,6 +253,11 @@ export default function ArtMode({ appBar }: { appBar: React.ReactNode }) {
       toolOptions={<ArtToolOptions before={docHeader} />}
       panels={
         <Panel width={240} scroll>
+          {showCollisionPanel && (
+            <CollapsibleSection id="art.collision" title="Collision">
+              <CollisionPalette />
+            </CollapsibleSection>
+          )}
           <CollapsibleSection id="art.tileset" title="Tileset">
             <TilesetPanel />
           </CollapsibleSection>

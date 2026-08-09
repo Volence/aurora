@@ -41,7 +41,7 @@ export interface PaintRegionOptions {
   tilesetSize: number;
 }
 
-/** Validate a list of nametable entry specs (tile/pal/coll ranges). */
+/** Validate a list of nametable entry specs (tile/pal ranges). */
 export function validateEntries(entries: NametableEntrySpec[], tilesetSize: number): string | null {
   if (!Array.isArray(entries)) return 'entries must be an array';
   for (let i = 0; i < entries.length; i++) {
@@ -52,9 +52,49 @@ export function validateEntries(entries: NametableEntrySpec[], tilesetSize: numb
     if (!Number.isInteger(e.pal) || e.pal < 0 || e.pal > 3) {
       return `entry ${i}: palette line ${e.pal} out of range 0-3`;
     }
-    if (e.coll !== undefined && (!Number.isInteger(e.coll) || e.coll < 0 || e.coll > 255)) {
-      return `entry ${i}: collision type ${e.coll} out of range 0-255`;
-    }
+  }
+  return null;
+}
+
+/** Validate an optional save_chunk collision payload: length must equal
+ *  (w/2)*(h/2) cells (one packed word per 16px cell). Word range (0-0xFFFF
+ *  integers) is already enforced by the zod param schema; this checks the
+ *  cross-field length zod can't cheaply express against w/h. undefined is
+ *  valid — the chunk's plane defaults to all-air. */
+export function validateChunkCollisionPlane(
+  name: string, arr: number[] | undefined, w: number, h: number,
+): string | null {
+  if (arr === undefined) return null;
+  const expected = (w / 2) * (h / 2);
+  if (!Array.isArray(arr) || arr.length !== expected) {
+    return `${name} length ${Array.isArray(arr) ? arr.length : typeof arr} != ${expected} (chunk is ${w}x${h} tiles = ${w / 2}x${h / 2} cells)`;
+  }
+  return null;
+}
+
+export interface PaintCollisionRectOptions {
+  sectionCount: number;
+  cellsW: number;
+  cellsH: number;
+}
+
+/** Validate a paint_collision rectangle. Coordinates are 16px CELL units
+ *  (half a section's tile dimensions), not tile units — mirrors
+ *  validatePaintRegion's shape/return convention but against cellsW/cellsH. */
+export function validatePaintCollisionRect(
+  section: number,
+  x: number, y: number, w: number, h: number,
+  opts: PaintCollisionRectOptions,
+): string | null {
+  if (!Number.isInteger(section) || section < 0 || section >= opts.sectionCount) {
+    return `section ${section} out of range (0-${opts.sectionCount - 1})`;
+  }
+  if (![x, y, w, h].every(Number.isInteger)) {
+    return `region coords must be integers, got (${x},${y}) ${w}x${h}`;
+  }
+  if (w < 1 || h < 1 || x < 0 || y < 0 ||
+      x + w > opts.cellsW || y + h > opts.cellsH) {
+    return `collision region ${w}x${h} cells at (${x},${y}) is out of bounds (section is ${opts.cellsW}x${opts.cellsH} cells)`;
   }
   return null;
 }

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   validateGenesisColor, validatePaletteLine, validateTilePixels, validatePaintRegion,
+  validatePaintCollisionRect,
 } from '../../src/core/agent/validation';
 
 describe('validateGenesisColor', () => {
@@ -64,6 +65,24 @@ describe('validatePaintRegion', () => {
     expect(validatePaintRegion(0, 0, 0, 2, 2, Array(3).fill({ tile: 1, pal: 1 }), opts)).toMatch(/entries/i);
     expect(validatePaintRegion(0, 0, 0, 1, 1, [{ tile: 100, pal: 1 }], opts)).toMatch(/tile/i);
     expect(validatePaintRegion(0, 0, 0, 1, 1, [{ tile: 1, pal: 4 }], opts)).toMatch(/palette/i);
-    expect(validatePaintRegion(0, 0, 0, 1, 1, [{ tile: 1, pal: 1, coll: 256 }], opts)).toMatch(/collision/i);
+  });
+});
+
+describe('validatePaintCollisionRect', () => {
+  const opts = { sectionCount: 9, cellsW: 128, cellsH: 128 };
+  it('accepts an in-bounds cell rectangle', () => {
+    expect(validatePaintCollisionRect(0, 10, 20, 3, 2, opts)).toBeNull();
+    expect(validatePaintCollisionRect(0, 126, 126, 2, 2, opts)).toBeNull(); // flush against the far edge
+  });
+  it('rejects a rectangle that overflows the section (x+w or y+h past cellsW/cellsH)', () => {
+    expect(validatePaintCollisionRect(0, 127, 0, 2, 1, opts)).toMatch(/bounds/i);
+    expect(validatePaintCollisionRect(0, 0, 127, 1, 2, opts)).toMatch(/bounds/i);
+  });
+  it('rejects an out-of-range section index', () => {
+    expect(validatePaintCollisionRect(9, 0, 0, 1, 1, opts)).toMatch(/section/i);
+  });
+  it('rejects non-integer and NaN coordinates', () => {
+    expect(validatePaintCollisionRect(0, NaN, 0, 1, 1, opts)).toMatch(/integer/i);
+    expect(validatePaintCollisionRect(0, 0.5, 0, 1, 1, opts)).toMatch(/integer/i);
   });
 });

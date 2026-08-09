@@ -127,7 +127,7 @@ describe('exportAct group blobs', () => {
       sections: [secA, null, secB],
       startPosition: { secX: 0, secY: 0, localX: 0, localY: 0 },
       bgLayout: null, bgTiles: null, parallaxRef: null,
-    }, { tiles, collisionTypes: new Uint8Array(0) }, []);
+    }, { tiles }, []);
     const [binA, binB] = result.sectionBinaries;
     expect(binA.tileArt).toEqual(binB.tileArt);
     // slot 0 blank (first 32 bytes zero), then the two used tiles

@@ -1,6 +1,5 @@
 import type { Act, Tileset, ObjectDef } from '../model/s4-types';
 import { serializeNametable } from '../formats/s4-nametable';
-import { serializeCollision } from '../formats/s4-collision';
 import { buildGroupUnions, remapNametableToGroup, serializeTiles } from './tile-dedup';
 import type { SectionTileData } from './tile-dedup';
 import { computeVramColoring, assignVramBases, generateVramBasesAsm } from './vram-coloring';
@@ -10,7 +9,6 @@ import { generateEntityDataAsm } from './entity-data';
 export interface SectionBinary {
   index: number;
   nametable: Uint8Array;
-  collision: Uint8Array;
   tileArt: Uint8Array;
 }
 
@@ -62,7 +60,6 @@ export function exportAct(
     sectionBinaries.push({
       index: i,
       nametable: serializeNametable(remapped),
-      collision: serializeCollision(section.tileGrid.collision),
       tileArt: serializeTiles(unions[color].tiles), // group blob, shared per color
     });
 

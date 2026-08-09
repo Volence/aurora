@@ -3,6 +3,9 @@ import { useProjectStore, getCurrentAct, getCurrentZone } from '../state/project
 import { useViewStore } from '../state/viewStore';
 import { useEditorStore } from '../state/editorStore';
 import { loadCollisionProfiles } from './load-collision';
+import type { CollisionProfileSet } from '../../core/collision/collision-model';
+import { findFullBlockShapeId } from '../../core/collision/full-block-shape';
+import { migrateLegacyChunkCollision } from '../../core/model/chunk-migrate';
 
 // Set to true only when migrateChunkTilesIntoTileset ran successfully during
 // the current loadFullProject call. Reset at the top of each load so stale
@@ -20,11 +23,9 @@ import { bgLibIndexPath, bgLibLayoutPath, bgLibTilesPath, serializeBgLibraryInde
 import { serializeSectionMeta, parseSectionMeta } from '../../core/formats/section-meta';
 import { buildPalette } from '../../core/formats/palette';
 import { parseNametable } from '../../core/formats/s4-nametable';
-import { parseCollision } from '../../core/formats/s4-collision';
 import { parseCollAttr, serializeCollAttr } from '../../core/formats/s4-collattr';
 import { resolvePlaneWords } from '../../core/collision/collision-cell-resolve';
 import { serializeNametable } from '../../core/formats/s4-nametable';
-import { serializeCollision } from '../../core/formats/s4-collision';
 import { serializeRingList } from '../../core/formats/s4-rings';
 import { parseRingList } from '../../core/formats/s4-rings';
 import { parseObjectList } from '../../core/formats/s4-objects';
@@ -70,19 +71,21 @@ export function useProject() {
       const json = JSON.parse(new TextDecoder().decode(jsonData)) as S4ProjectConfig;
       const config = loadS4Config(json, dir);
 
+      // Load the engine's collision tables (read-only view) BEFORE the full
+      // project: chunk-library load needs the profile set to migrate legacy
+      // collision into word planes. Missing/unreadable tables → null → the
+      // overlay falls back to flat fills (no crash) and migration is skipped.
+      const collPath = config.raw.collisionDataPath ?? 'data/collision/';
+      const collisionProfiles = await loadCollisionProfiles(config.basePath, collPath);
+
       // Load the full project BEFORE committing config to the store: a failed
       // load (e.g. atlas-migration abort) must not leave a new config paired
       // with a stale/absent project, or pollute the recent-projects list.
-      const project = await loadFullProject(config);
+      const project = await loadFullProject(config, collisionProfiles);
 
       setConfig(config);
       await window.api.addRecentProject(dir, config.name);
       setProject(project);
-
-      // Load the engine's collision tables (read-only view). Missing/unreadable
-      // tables → null → the overlay falls back to flat fills (no crash).
-      const collPath = config.raw.collisionDataPath ?? 'data/collision/';
-      const collisionProfiles = await loadCollisionProfiles(config.basePath, collPath);
       useProjectStore.getState().setCollisionProfiles(collisionProfiles);
 
       if (config.zones.length > 0) {
@@ -158,12 +161,9 @@ export function useProject() {
         const ntData = serializeNametable(section.tileGrid.nametable);
         await window.api.writeBinaryFile(basePath, `${prefix}.tiles.bin`, ntData.buffer as ArrayBuffer);
 
-        // Write collision (.coll.bin)
-        const collData = serializeCollision(section.tileGrid.collision);
-        await window.api.writeBinaryFile(basePath, `${prefix}.coll.bin`, collData.buffer as ArrayBuffer);
-
-        // Write editable collision attr plane (.collattr.bin) — the real authored
-        // collision, separate from the legacy .coll.bin.
+        // Write editable collision attr plane (.collattr.bin) — the authored
+        // collision. (Legacy .coll.bin is no longer written; stray files from
+        // older saves are ignored on load.)
         if (section.collisionEdit) {
           const caData = serializeCollAttr(section.collisionEdit);
           await window.api.writeBinaryFile(basePath, `${prefix}.collattr.bin`, caData.buffer as ArrayBuffer);
@@ -213,7 +213,8 @@ export function useProject() {
           widthTiles: chunk.widthTiles,
           heightTiles: chunk.heightTiles,
           nametable: Array.from(chunk.nametable),
-          collision: Array.from(chunk.collision),
+          collisionA: Array.from(chunk.collisionA),
+          collisionB: Array.from(chunk.collisionB),
         }));
         const chunksJson = JSON.stringify(serializedChunks);
         const chunksBytes = new TextEncoder().encode(chunksJson);
@@ -333,7 +334,6 @@ export function useProject() {
 
         for (const secBin of result.sectionBinaries) {
           await window.api.writeBinaryFile(basePath, `${exportPath}section_${secBin.index}.tiles.bin`, secBin.nametable.buffer as ArrayBuffer);
-          await window.api.writeBinaryFile(basePath, `${exportPath}section_${secBin.index}.coll.bin`, secBin.collision.buffer as ArrayBuffer);
           await window.api.writeBinaryFile(basePath, `${exportPath}section_${secBin.index}.art.bin`, secBin.tileArt.buffer as ArrayBuffer);
         }
       } catch (exportErr) {
@@ -352,7 +352,10 @@ export function useProject() {
   return { openProject, openProjectByPath: loadFromPath, saveProject };
 }
 
-async function loadFullProject(config: ReturnType<typeof loadS4Config>): Promise<S4Project> {
+async function loadFullProject(
+  config: ReturnType<typeof loadS4Config>,
+  collisionProfiles: CollisionProfileSet | null,
+): Promise<S4Project> {
   // Reset migration flag at the start of every load so a stale true from a
   // prior session cannot incorrectly gate truncation on the next save.
   legacyAtlasMergedThisLoad = false;
@@ -365,10 +368,7 @@ async function loadFullProject(config: ReturnType<typeof loadS4Config>): Promise
     // Load tileset
     const tileData = await readFile(basePath, zoneConfig.tileset);
     const tiles = parseTiles(tileData);
-    const tileset: Tileset = {
-      tiles,
-      collisionTypes: new Uint8Array(256), // TODO: load collision type table
-    };
+    const tileset: Tileset = { tiles };
 
     // Load palette — level art at CRAM lines 1–3 (destOffset 16), and the shared
     // player palette (Sonic/Tails) into line 0, which every zone carries in-game.
@@ -397,24 +397,22 @@ async function loadFullProject(config: ReturnType<typeof loadS4Config>): Promise
         try {
           const section = createSection(i, `Section ${i}`);
 
-          // Try editor files first (user-saved data takes priority), then strip source
+          // Try the editor-saved nametable first (user-saved data takes
+          // priority), then strip source. Nametable load stands alone —
+          // stray legacy .coll.bin files (no longer written) are ignored.
           let loaded = false;
           try {
             const ntRaw = await readFile(basePath, `${prefix}.tiles.bin`);
-            const collRaw = await readFile(basePath, `${prefix}.coll.bin`);
             section.tileGrid.nametable = parseNametable(ntRaw, SECTION_TILES_WIDE, SECTION_TILES_HIGH);
-            section.tileGrid.collision = parseCollision(collRaw, SECTION_TILES_WIDE, SECTION_TILES_HIGH);
             loaded = true;
           } catch {
-            // No editor files — try strip source
+            // No editor nametable — try strip source
           }
 
           // The engine's real per-cell collision attr indices come from the baked
           // strips. Load them into a read-only layer for the collision VIEW —
-          // ALWAYS, independent of the editable .coll.bin above, which may hold a
-          // crude/stale model (e.g. 0/1 solidity) that doesn't match the engine's
-          // heightmap/angle/solidity tables. Also seed tileGrid from strips when no
-          // editor files exist.
+          // ALWAYS, independent of the editor nametable above. Also seed the
+          // nametable from strips when no editor file exists.
           if (actConfig.stripPath) {
             try {
               const stripPrefix = actConfig.stripPrefix || 'sec';
@@ -432,7 +430,6 @@ async function loadFullProject(config: ReturnType<typeof loadS4Config>): Promise
                   engineCollB[dstIdx] = stripData.collisionB[srcIdx];
                   if (!loaded) {
                     section.tileGrid.nametable[dstIdx] = stripData.nametable[srcIdx];
-                    section.tileGrid.collision[dstIdx] = stripData.collision[srcIdx];
                   }
                 }
               }
@@ -595,16 +592,33 @@ async function loadFullProject(config: ReturnType<typeof loadS4Config>): Promise
       const chunkLibText = new TextDecoder().decode(chunkLibRaw);
       const parsed = JSON.parse(chunkLibText) as Array<{
         id: string; name: string; widthTiles: number; heightTiles: number;
-        nametable: number[]; collision: number[];
+        nametable: number[]; collision?: number[];
+        collisionA?: number[]; collisionB?: number[];
       }>;
-      chunkLibrary = parsed.map(c => ({
-        id: c.id,
-        name: c.name,
-        widthTiles: c.widthTiles,
-        heightTiles: c.heightTiles,
-        nametable: new Uint16Array(c.nametable),
-        collision: new Uint8Array(c.collision),
-      }));
+      chunkLibrary = parsed.map(c => {
+        const cellCount = (c.widthTiles >> 1) * (c.heightTiles >> 1);
+        return {
+          id: c.id,
+          name: c.name,
+          widthTiles: c.widthTiles,
+          heightTiles: c.heightTiles,
+          nametable: new Uint16Array(c.nametable),
+          collisionA: c.collisionA ? new Uint16Array(c.collisionA) : new Uint16Array(cellCount),
+          collisionB: c.collisionB ? new Uint16Array(c.collisionB) : new Uint16Array(cellCount),
+        };
+      });
+
+      // Legacy chunks (saved before word planes existed) migrate their nibble
+      // plane into word planes here, once, at load time. The legacy `collision`
+      // array is read straight from the parsed JSON (ChunkDef no longer carries
+      // it, and saves no longer write it). No-op per-chunk when the word planes
+      // are already populated (see migrateLegacyChunkCollision).
+      const fullBlock = findFullBlockShapeId(collisionProfiles);
+      for (let ci = 0; ci < chunkLibrary.length; ci++) {
+        if (migrateLegacyChunkCollision(chunkLibrary[ci], parsed[ci].collision, fullBlock)) {
+          console.log(`[load] chunk ${chunkLibrary[ci].id}: legacy collision migrated to word planes`);
+        }
+      }
     } catch {
       // no chunk library
     }

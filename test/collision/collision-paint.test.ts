@@ -20,29 +20,29 @@ function nametable8(): Uint16Array {
 const base = { nametable: nametable8(), width: 8, cellsW: 4, cellsH: 4 };
 
 describe('collisionPaintTargets', () => {
-  it('brush 1 + justHere → only the cell', () => {
-    const { all } = collisionPaintTargets({ cellCol: 1, cellRow: 1, brush: 1, justHere: true, ...base });
-    expect(all).toEqual([{ cellCol: 1, cellRow: 1 }]);
+  it('brush 1 default (propagate: false) → only the cell, even when other cells share its tiles', () => {
+    const { all } = collisionPaintTargets({ cellCol: 0, cellRow: 0, brush: 1, propagate: false, ...base });
+    expect(all).toEqual([{ cellCol: 0, cellRow: 0 }]);
   });
 
-  it('brush 1 default → every block with the same tiles (reuse)', () => {
-    const { all } = collisionPaintTargets({ cellCol: 0, cellRow: 0, brush: 1, justHere: false, ...base });
+  it('brush 1 + propagate: true → every block with the same tiles (reuse)', () => {
+    const { all } = collisionPaintTargets({ cellCol: 0, cellRow: 0, brush: 1, propagate: true, ...base });
     expect(all).toEqual(expect.arrayContaining([{ cellCol: 0, cellRow: 0 }, { cellCol: 3, cellRow: 3 }]));
     expect(all).toHaveLength(2);
   });
 
-  it('brush 3 → 3×3 area centred on the cell', () => {
-    const { all } = collisionPaintTargets({ cellCol: 1, cellRow: 1, brush: 3, justHere: false, ...base });
+  it('brush 3 → 3×3 area centred on the cell (propagate ignored)', () => {
+    const { all } = collisionPaintTargets({ cellCol: 1, cellRow: 1, brush: 3, propagate: false, ...base });
     expect(all).toHaveLength(9); // fully inside a 4×4 grid
   });
 
   it('brush 3 at a corner → clamped to the section bounds', () => {
-    const { all } = collisionPaintTargets({ cellCol: 0, cellRow: 0, brush: 3, justHere: false, ...base });
+    const { all } = collisionPaintTargets({ cellCol: 0, cellRow: 0, brush: 3, propagate: false, ...base });
     expect(all).toHaveLength(4); // only (0,0),(1,0),(0,1),(1,1)
   });
 
   it('primary is always the cursor cell', () => {
-    const { primary } = collisionPaintTargets({ cellCol: 2, cellRow: 3, brush: 5, justHere: false, ...base });
+    const { primary } = collisionPaintTargets({ cellCol: 2, cellRow: 3, brush: 5, propagate: false, ...base });
     expect(primary).toEqual({ cellCol: 2, cellRow: 3 });
   });
 });

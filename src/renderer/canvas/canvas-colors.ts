@@ -63,6 +63,11 @@ export const RING_STROKE = '#ffaa00';
 // ---------- active-section border (SectionRenderer) ----------
 export const ACTIVE_SECTION_BORDER = 'rgba(137, 180, 250, 0.6)';
 
+// ---------- map marquee tool (MapViewport) ----------
+/** ~10% alpha fill for the map marquee region (stroke reuses SELECTION_MARQUEE,
+ *  the same Catppuccin teal used by the composer's own marquee tool). */
+export const MAP_MARQUEE_FILL = 'rgba(148,226,213,0.1)';
+
 // ---------- pixel-editor grids / overlays (PixelViewport, ComposerCanvas) ----------
 export const PIXEL_GRID = 'rgba(255,255,255,0.08)';     // per-pixel grid (z>=8)
 export const PIXEL_GRID_TILE = 'rgba(255,255,255,0.22)';// 8px tile grid

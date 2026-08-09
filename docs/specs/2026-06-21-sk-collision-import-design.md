@@ -1,3 +1,5 @@
+> **STATUS (2026-08-08):** superseded/completed by docs/specs/2026-08-08-chunk-collision-and-map-clipboard-design.md — chunks now carry dual-plane collision; legacy nibble encodings are deleted.
+
 # S&K Collision Set Import (fresh start) — Design
 
 **Date:** 2026-06-21

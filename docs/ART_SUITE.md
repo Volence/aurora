@@ -59,7 +59,7 @@ The two brush space tabs in the Tool Column switch the canvas between modes:
   at zoom ≥ 8; tile boundaries are drawn as heavier lines every 8 pixels.
 - **Tile space** — clicking or dragging stamps the selected atlas tile into a whole 8×8
   cell at once. Use **X** / **Y** keys to toggle horizontal / vertical flip for the next
-  stamp. The collision value defaults from the tile's collision type in the atlas.
+  stamp.
 
 ---
 
@@ -78,7 +78,7 @@ The two brush space tabs in the Tool Column switch the canvas between modes:
 | **Select** | Drag a marquee; Ctrl+C/V copies/pastes the selection; transforms apply to the selection if one is active, else the whole document |
 | **Dither** | Alternates two colors per a dither pattern (Checker/Sparse25/Sparse75); secondary color set in the dither panel below the tool buttons |
 | **Tile-stamp** (tile space) | Stamp the selected atlas tile into a whole cell |
-| **Collision** | Paint a collision type into a tile cell (shares `selectedCollisionType` with the map editor); a ◀ N ▶ stepper appears below the tool buttons to pick the type (0–15, 0 = none) |
+| **Collision** | Paint a packed collision cell word (shape + flip + solidity) onto the chunk's dual planes, one 16px cell (2×2 tiles) at a time; the shared `CollisionPalette` panel (same as the map editor's) picks the shape/flip/solidity and the A/B plane |
 
 ### Mirror Mode
 

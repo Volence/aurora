@@ -1,10 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import {
-  createDoc, docFromChunk, docFromTile, getPixel, setPixels, stampTile,
+  createDoc, docFromChunk, docFromTile, docFromSectionRegion, getPixel, setPixels, stampTile,
   sliceForSave, cellAt, docToBuffer, bufferToWrites, adoptPaletteLineForEmptyCells,
   docLineMap,
 } from '../../src/core/art/composer-buffer';
-import { packNametableWord, createChunkDef } from '../../src/core/model/s4-types';
+import { packNametableWord, createChunkDef, createSection, SECTION_TILES_WIDE } from '../../src/core/model/s4-types';
 import type { Tile } from '../../src/core/model/s4-types';
 
 const atlas: Tile[] = [
@@ -27,13 +27,31 @@ describe('createDoc / docFromTile / docFromChunk', () => {
   it('docFromChunk decodes nametable words', () => {
     const chunk = createChunkDef('c', 'C', 2, 1);
     chunk.nametable[1] = packNametableWord(1, 2, true, false, true);
-    chunk.collision[1] = 9;
     const doc = docFromChunk(chunk);
     const cell = cellAt(doc, 1, 0);
     expect(cell.atlasTile).toBe(1);
     expect(cell.pal).toBe(2);
     expect(cell.hf).toBe(true);
-    expect(cell.coll).toBe(9);
+  });
+});
+
+describe('docFromSectionRegion', () => {
+  it('decodes a section-relative rect at a nonzero base into a doc of that size', () => {
+    const section = createSection(0, 'Test');
+    const baseCol = 32, baseRow = 16;
+    const idx = (baseRow + 0) * SECTION_TILES_WIDE + (baseCol + 1);
+    section.tileGrid.nametable[idx] = packNametableWord(1, 2, true, false, true);
+
+    const doc = docFromSectionRegion(section, baseCol, baseRow, 4, 2);
+
+    expect(doc.widthTiles).toBe(4);
+    expect(doc.heightTiles).toBe(2);
+    const cell = cellAt(doc, 1, 0);
+    expect(cell.atlasTile).toBe(1);
+    expect(cell.pal).toBe(2);
+    expect(cell.hf).toBe(true);
+    // Untouched cell reads as an empty cell (air).
+    expect(cellAt(doc, 0, 0).atlasTile).toBeNull();
   });
 });
 
@@ -75,11 +93,11 @@ describe('docLineMap', () => {
 describe('stampTile', () => {
   it('writes a cell reference with flips', () => {
     const doc = createDoc(2, 2);
-    stampTile(doc, 1, 0, { tile: 1, pal: 3, hf: true, vf: false, pri: true, coll: 4 });
+    stampTile(doc, 1, 0, { tile: 1, pal: 3, hf: true, vf: false, pri: true });
     const cell = cellAt(doc, 1, 0);
     expect(cell.atlasTile).toBe(1);
     expect(cell.pal).toBe(3);
-    expect(cell.coll).toBe(4);
+    expect(cell.hf).toBe(true);
   });
 
   it('cleans up orphaned local when overwriting a local cell', () => {
@@ -87,7 +105,7 @@ describe('stampTile', () => {
     setPixels(doc, atlas, [{ x: 0, y: 0, value: 9 }]); // creates localId=1
     const oldId = doc.cells[0].localId!;
     expect(doc.localPixels.has(oldId)).toBe(true);
-    stampTile(doc, 0, 0, { tile: 1, pal: 0, hf: false, vf: false, pri: false, coll: 0 });
+    stampTile(doc, 0, 0, { tile: 1, pal: 0, hf: false, vf: false, pri: false });
     expect(doc.localPixels.has(oldId)).toBe(false); // orphan must be deleted
   });
 });
@@ -113,7 +131,7 @@ describe('sliceForSave', () => {
     // cell 0: hand-painted copy of atlas tile 1 -> should dedup, no append
     setPixels(doc, atlas, Array.from({ length: 64 }, (_, i) => ({ x: i % 8, y: Math.floor(i / 8), value: 7 })));
     // cell 1: brand-new art
-    stampTile(doc, 1, 0, { tile: 0, pal: 1, hf: false, vf: false, pri: false, coll: 0 });
+    stampTile(doc, 1, 0, { tile: 0, pal: 1, hf: false, vf: false, pri: false });
     setPixels(doc, atlas, [{ x: 8, y: 0, value: 9 }]); // doc x=8 -> cell 1
     const result = sliceForSave(doc, atlas);
     expect(result.newTiles.length).toBe(1);            // only the genuinely new one

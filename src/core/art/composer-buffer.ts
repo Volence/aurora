@@ -1,5 +1,5 @@
-import type { Tile, ChunkDef } from '../model/s4-types';
-import { unpackNametableWord, packNametableWord } from '../model/s4-types';
+import type { Tile, ChunkDef, Section } from '../model/s4-types';
+import { unpackNametableWord, packNametableWord, chunkCellCount, SECTION_TILES_WIDE } from '../model/s4-types';
 import { canonicalizeTile } from '../export/tile-dedup';
 import { flipTile } from '../import/tile-dedup';
 import type { PixelBuffer } from './pixel-ops';
@@ -12,7 +12,6 @@ export interface ComposerCell {
   hf: boolean;
   vf: boolean;
   pri: boolean;
-  coll: number;
 }
 
 export interface ComposerDoc {
@@ -21,10 +20,13 @@ export interface ComposerDoc {
   cells: ComposerCell[];                  // row-major
   localPixels: Map<number, Uint8Array>;   // localId -> 64 pixels
   nextLocalId: number;
+  /** Dual-plane authored collision words, one per 16px cell (see ChunkDef). */
+  collisionA: Uint16Array;
+  collisionB: Uint16Array;
 }
 
 function emptyCell(): ComposerCell {
-  return { atlasTile: null, localId: null, pal: 0, hf: false, vf: false, pri: false, coll: 0 };
+  return { atlasTile: null, localId: null, pal: 0, hf: false, vf: false, pri: false };
 }
 
 export function createDoc(widthTiles: number, heightTiles: number): ComposerDoc {
@@ -33,6 +35,8 @@ export function createDoc(widthTiles: number, heightTiles: number): ComposerDoc 
     cells: Array.from({ length: widthTiles * heightTiles }, emptyCell),
     localPixels: new Map(),
     nextLocalId: 1,
+    collisionA: new Uint16Array(chunkCellCount(widthTiles, heightTiles)),
+    collisionB: new Uint16Array(chunkCellCount(widthTiles, heightTiles)),
   };
 }
 
@@ -51,10 +55,36 @@ export function docFromChunk(chunk: ChunkDef): ComposerDoc {
       doc.cells[i] = {
         atlasTile: e.tileIndex, localId: null,
         pal: e.palette, hf: e.hFlip, vf: e.vFlip, pri: e.priority,
-        coll: chunk.collision[i],
       };
     } else {
-      doc.cells[i] = { ...emptyCell(), coll: chunk.collision[i] };
+      doc.cells[i] = emptyCell();
+    }
+  }
+  doc.collisionA = new Uint16Array(chunk.collisionA);
+  doc.collisionB = new Uint16Array(chunk.collisionB);
+  return doc;
+}
+
+/** Build a doc (art only — collision is a separate concern, see
+ *  composer-collision.ts's seedDocCollisionFromSection) from a section-relative
+ *  tile rect at (baseCol,baseRow), w x h tiles. Shared by the two capture-from-
+ *  map flows (right-click "edit block" and marquee "save as chunk") so their
+ *  nametable-word decoding can't drift. Out-of-bounds reads are the caller's
+ *  contract to avoid (as with the section's other region readers). */
+export function docFromSectionRegion(
+  section: Section, baseCol: number, baseRow: number, w: number, h: number,
+): ComposerDoc {
+  const doc = createDoc(w, h);
+  for (let r = 0; r < h; r++) {
+    for (let c = 0; c < w; c++) {
+      const idx = (baseRow + r) * SECTION_TILES_WIDE + (baseCol + c);
+      const word = section.tileGrid.nametable[idx];
+      if (word === 0) continue; // leave the emptyCell() default (air)
+      const entry = unpackNametableWord(word);
+      doc.cells[r * w + c] = {
+        atlasTile: entry.tileIndex, localId: null,
+        pal: entry.palette, hf: entry.hFlip, vf: entry.vFlip, pri: entry.priority,
+      };
     }
   }
   return doc;
@@ -180,20 +210,19 @@ export function bufferToWrites(
   return out;
 }
 
-export interface StampSpec { tile: number; pal: number; hf: boolean; vf: boolean; pri: boolean; coll: number; }
+export interface StampSpec { tile: number; pal: number; hf: boolean; vf: boolean; pri: boolean; }
 
 export function stampTile(doc: ComposerDoc, cx: number, cy: number, spec: StampSpec): void {
   const old = doc.cells[cy * doc.widthTiles + cx];
   if (old.localId !== null) doc.localPixels.delete(old.localId);
   doc.cells[cy * doc.widthTiles + cx] = {
     atlasTile: spec.tile, localId: null,
-    pal: spec.pal, hf: spec.hf, vf: spec.vf, pri: spec.pri, coll: spec.coll,
+    pal: spec.pal, hf: spec.hf, vf: spec.vf, pri: spec.pri,
   };
 }
 
 export interface SliceResult {
   nametable: Uint16Array;   // final words; local tiles resolved to atlas.length+K indices
-  collision: Uint8Array;
   newTiles: Tile[];         // tiles to append to the atlas (in order)
 }
 
@@ -212,10 +241,8 @@ export function sliceForSave(doc: ComposerDoc, atlas: Tile[]): SliceResult {
   const newTiles: Tile[] = [];
   const pending = new Map<string, { index: number; fx: boolean; fy: boolean }>();
   const nametable = new Uint16Array(doc.cells.length);
-  const collision = new Uint8Array(doc.cells.length);
 
   doc.cells.forEach((cell, i) => {
-    collision[i] = cell.coll;
     let tileIndex: number; let hf = cell.hf; let vf = cell.vf;
     if (cell.localId !== null) {
       // Snapshot before canonicalizing so the WeakMap cache key is unique
@@ -250,5 +277,5 @@ export function sliceForSave(doc: ComposerDoc, atlas: Tile[]): SliceResult {
     nametable[i] = packNametableWord(tileIndex, cell.pal, cell.pri, vf, hf);
   });
 
-  return { nametable, collision, newTiles };
+  return { nametable, newTiles };
 }

@@ -2,12 +2,23 @@ import { create } from 'zustand';
 import type { Solidity } from '../../core/collision/collision-model';
 import { EditHistory } from '../../core/editing/history';
 import type { AnyCommand, S4Level } from '../../core/editing/commands';
+import type { MapClipboard, PasteLayers } from '../../core/editing/map-clipboard';
 import { useArtStore } from './artStore';
 import { registerRedoClearer, invalidateSiblingRedos } from '../../core/editing/undo-bus';
 
 export type EditorTool =
   | 'view' | 'select' | 'paint-tile' | 'paint-block' | 'stamp-chunk'
-  | 'paint-collision' | 'eraser' | 'place-object' | 'place-ring';
+  | 'paint-collision' | 'eraser' | 'place-object' | 'place-ring' | 'marquee';
+
+/** An in-progress or committed marquee selection, in tile coords, snapped to
+ *  16px blocks (map-clipboard.ts snapMarquee) and pinned to one section. */
+export interface MarqueeState {
+  sectionIndex: number;
+  col: number;
+  row: number;
+  w: number;
+  h: number;
+}
 
 export interface Selection {
   type: 'object' | 'ring';
@@ -83,7 +94,6 @@ interface EditorState {
   selectedObjectTypeId: string | null;
   selectedObjectSubtype: number;
   selectedRingPattern: number;
-  selectedCollisionType: number;
   selectedCollisionProfile: number; // base-bank shape index for the map collision palette
   selectedCollisionEntryFlipX: boolean; // the picked palette entry's mirror-to-canonical-left flag
   selectedCollisionXFlip: boolean;  // USER Flip-H toggle (XORs with the entry flag → effective mirror)
@@ -91,6 +101,17 @@ interface EditorState {
   selectedCollisionSolidity: Solidity; // floor type painted: all / top (jump-through) / none / sides-bottom
   collisionPaintPlane: 'a' | 'b';
   collisionBrushSize: number; // brush width in 16px blocks; 1 = reuse, >1 = positional N×N area
+
+  marquee: MarqueeState | null;
+  mapClipboard: MapClipboard | null;
+  pasteLayers: PasteLayers;
+  /** True while the map paste-ghost/click-to-commit mode is active (entered by
+   *  Ctrl+V, stays active across repeat pastes). Lives in the store (rather
+   *  than a MapViewport-local ref) because the paste-layer options bar
+   *  (App.tsx) and the status bar hint need to react to it from outside
+   *  MapViewport; the hovered footprint position itself is a MapViewport-local
+   *  ref (like the collision-paint hover), since nothing else needs it. */
+  pasting: boolean;
 
   setTool: (tool: EditorTool) => void;
   setSelection: (selection: Selection | null) => void;
@@ -103,7 +124,6 @@ interface EditorState {
   setSelectedChunkId: (id: string | null) => void;
   setSelectedObjectTypeId: (id: string | null, subtype?: number) => void;
   setSelectedRingPattern: (index: number) => void;
-  setSelectedCollisionType: (type: number) => void;
   setSelectedCollisionProfile: (index: number) => void;
   /** Pick a palette entry: its base shape + whether it must mirror to face left.
    *  Resets the user Flip-H toggle so the freshly-picked shape shows canonical. */
@@ -113,6 +133,10 @@ interface EditorState {
   setSelectedCollisionSolidity: (s: Solidity) => void;
   setCollisionPaintPlane: (plane: 'a' | 'b') => void;
   setCollisionBrushSize: (size: number) => void;
+  setMarquee: (marquee: MarqueeState | null) => void;
+  setMapClipboard: (clipboard: MapClipboard | null) => void;
+  setPasteLayers: (layers: PasteLayers) => void;
+  setPasting: (pasting: boolean) => void;
   markDirty: () => void;
   markClean: () => void;
   bumpVersion: () => void;
@@ -142,7 +166,6 @@ export const useEditorStore = create<EditorState>((set) => ({
   selectedObjectTypeId: null,
   selectedObjectSubtype: 0,
   selectedRingPattern: 0,
-  selectedCollisionType: 0,
   selectedCollisionProfile: 0,
   selectedCollisionEntryFlipX: false,
   selectedCollisionXFlip: false,
@@ -151,7 +174,15 @@ export const useEditorStore = create<EditorState>((set) => ({
   collisionPaintPlane: 'a',
   collisionBrushSize: 1,
 
-  setTool: (tool) => set({ tool, selection: null, multiSelection: null }),
+  marquee: null,
+  mapClipboard: null,
+  pasteLayers: 'both',
+  pasting: false,
+
+  // An explicit tool switch cancels an in-progress paste (repeat pastes never
+  // call setTool, so they aren't affected) — picking a different tool while
+  // pasting means the user is done pasting.
+  setTool: (tool) => set({ tool, selection: null, multiSelection: null, pasting: false }),
   setSelection: (selection) => set({ selection, multiSelection: null }),
   setMultiSelection: (multiSelection) => set({ multiSelection, selection: null }),
   setActiveSectionIndex: (index) => set({ activeSectionIndex: index }),
@@ -162,7 +193,6 @@ export const useEditorStore = create<EditorState>((set) => ({
   setSelectedChunkId: (id) => set({ selectedChunkId: id }),
   setSelectedObjectTypeId: (id, subtype) => set({ selectedObjectTypeId: id, selectedObjectSubtype: subtype ?? 0 }),
   setSelectedRingPattern: (index) => set({ selectedRingPattern: index }),
-  setSelectedCollisionType: (type) => set({ selectedCollisionType: type }),
   setSelectedCollisionProfile: (index) => set({ selectedCollisionProfile: Math.max(0, Math.min(0x3FF, index | 0)) }),
   // Picking a shape updates the canonical-mirror baseline but LEAVES the user's
   // Flip-H / Flip-V toggles untouched — they're sticky "modes" that hold until
@@ -176,6 +206,10 @@ export const useEditorStore = create<EditorState>((set) => ({
   setSelectedCollisionSolidity: (s) => set({ selectedCollisionSolidity: s }),
   setCollisionPaintPlane: (collisionPaintPlane) => set({ collisionPaintPlane }),
   setCollisionBrushSize: (size) => set({ collisionBrushSize: Math.max(1, Math.min(31, size | 0)) }),
+  setMarquee: (marquee) => set({ marquee }),
+  setMapClipboard: (mapClipboard) => set({ mapClipboard }),
+  setPasteLayers: (pasteLayers) => set({ pasteLayers }),
+  setPasting: (pasting) => set({ pasting }),
   markDirty: () => set({ dirty: true }),
   markClean: () => set({ dirty: false }),
   bumpVersion: () => set((s) => ({ historyVersion: s.historyVersion + 1 })),

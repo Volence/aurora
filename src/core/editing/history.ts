@@ -92,7 +92,8 @@ function applyCommand(cmd: AnyCommand, level: S4Level): void {
     const chunk = level.chunkLibrary.find(c => c.id === cmd.chunkId);
     if (!chunk) throw new Error(`set-chunk: unknown chunk ${cmd.chunkId}`);
     chunk.nametable = new Uint16Array(cmd.newNametable);
-    chunk.collision = new Uint8Array(cmd.newCollision);
+    chunk.collisionA = new Uint16Array(cmd.newCollisionA);
+    chunk.collisionB = new Uint16Array(cmd.newCollisionB);
     return;
   }
   if (cmd.type === 'set-bg') {
@@ -118,16 +119,10 @@ function applyCommand(cmd: AnyCommand, level: S4Level): void {
     case 'set-tiles':
       for (const e of cmd.entries) {
         section.tileGrid.nametable[e.index] = e.newNt;
-        section.tileGrid.collision[e.index] = e.newColl;
       }
       break;
     case 'set-section-bg':
       section.bgLayoutRef = cmd.newRef;
-      break;
-    case 'set-collision':
-      for (const e of cmd.entries) {
-        section.tileGrid.collision[e.index] = e.newColl;
-      }
       break;
     case 'set-collision-edit': {
       const arr = cmd.plane === 'b' ? section.collisionEditB : section.collisionEdit;
@@ -212,7 +207,8 @@ function undoCommand(cmd: AnyCommand, level: S4Level): void {
     const chunk = level.chunkLibrary.find(c => c.id === cmd.chunkId);
     if (!chunk) throw new Error(`set-chunk: unknown chunk ${cmd.chunkId}`);
     chunk.nametable = new Uint16Array(cmd.oldNametable);
-    chunk.collision = new Uint8Array(cmd.oldCollision);
+    chunk.collisionA = new Uint16Array(cmd.oldCollisionA);
+    chunk.collisionB = new Uint16Array(cmd.oldCollisionB);
     return;
   }
   if (cmd.type === 'set-bg') {
@@ -238,16 +234,10 @@ function undoCommand(cmd: AnyCommand, level: S4Level): void {
     case 'set-tiles':
       for (const e of cmd.entries) {
         section.tileGrid.nametable[e.index] = e.oldNt;
-        section.tileGrid.collision[e.index] = e.oldColl;
       }
       break;
     case 'set-section-bg':
       section.bgLayoutRef = cmd.oldRef;
-      break;
-    case 'set-collision':
-      for (const e of cmd.entries) {
-        section.tileGrid.collision[e.index] = e.oldColl;
-      }
       break;
     case 'set-collision-edit': {
       const arr = cmd.plane === 'b' ? section.collisionEditB : section.collisionEdit;

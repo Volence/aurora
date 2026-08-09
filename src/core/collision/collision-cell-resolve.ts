@@ -2,6 +2,8 @@ import type { CollisionProfile, CollisionProfileSet } from './collision-model';
 import { isKnownProfile } from './collision-model';
 import { unpackCollisionCell, packCollisionCell } from './collision-cell-word';
 import { flipProfile } from './collision-flip';
+import { SECTION_TILES_WIDE, SECTION_TILES_HIGH } from '../model/s4-types';
+import type { Section } from '../model/s4-types';
 
 export interface ResolvedCell {
   /** The base-bank shape index (bits 0-9 of the word). */
@@ -44,4 +46,18 @@ export function resolvePlaneWords(
     }
   }
   return out;
+}
+
+/** Lazily seed a section's editable collision planes (packing each plane's
+ *  engine baseline into cell words) the first time either is touched by a
+ *  write path — paint, stamp, or the agent's stamp handler. Idempotent: a
+ *  plane that's already seeded is left untouched. Seeds BOTH planes even when
+ *  only one is about to be written (paint's per-plane seed used to leave the
+ *  other plane null until it was separately touched — seeding both up front is
+ *  strictly safer, since the data is identical either way, and keeps every
+ *  write path from drifting on which plane got seeded when). */
+export function ensureCollisionPlanes(section: Section): void {
+  const n = SECTION_TILES_WIDE * SECTION_TILES_HIGH;
+  if (!section.collisionEdit) section.collisionEdit = resolvePlaneWords(null, section.engineCollision, n);
+  if (!section.collisionEditB) section.collisionEditB = resolvePlaneWords(null, section.engineCollisionB, n);
 }

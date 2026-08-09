@@ -58,7 +58,7 @@ export class OverlayRenderer {
         // (editable plane verbatim, else the engine baseline packed to words).
         const len = info.section.collisionEdit?.length
           ?? info.section.engineCollision?.length
-          ?? info.section.tileGrid.collision.length;
+          ?? info.section.tileGrid.nametable.length;
         const a = resolvePlaneWords(info.section.collisionEdit, info.section.engineCollision, len);
         const b = (info.section.collisionEditB || info.section.engineCollisionB)
           ? resolvePlaneWords(info.section.collisionEditB, info.section.engineCollisionB, len)

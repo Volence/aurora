@@ -10,36 +10,33 @@ describe('tile painting commands', () => {
     };
   }
 
-  it('set-tile command sets nametable and collision', () => {
+  it('set-tile command sets the nametable word', () => {
     const history = new EditHistory();
     const level = makeLevel();
     history.execute({
       type: 'set-tiles',
       description: 'Paint tile',
       sectionIndex: 0,
-      entries: [{ index: 0, oldNt: 0, newNt: 0x802A, oldColl: 0, newColl: 5 }],
+      entries: [{ index: 0, oldNt: 0, newNt: 0x802A }],
     }, level);
     expect(level.sections[0]!.tileGrid.nametable[0]).toBe(0x802A);
-    expect(level.sections[0]!.tileGrid.collision[0]).toBe(5);
   });
 
   it('undo restores previous values', () => {
     const history = new EditHistory();
     const level = makeLevel();
     level.sections[0]!.tileGrid.nametable[0] = 0x1234;
-    level.sections[0]!.tileGrid.collision[0] = 3;
 
     history.execute({
       type: 'set-tiles',
       description: 'Paint tile',
       sectionIndex: 0,
-      entries: [{ index: 0, oldNt: 0x1234, newNt: 0x802A, oldColl: 3, newColl: 5 }],
+      entries: [{ index: 0, oldNt: 0x1234, newNt: 0x802A }],
     }, level);
     expect(level.sections[0]!.tileGrid.nametable[0]).toBe(0x802A);
 
     history.undo(level);
     expect(level.sections[0]!.tileGrid.nametable[0]).toBe(0x1234);
-    expect(level.sections[0]!.tileGrid.collision[0]).toBe(3);
   });
 
   it('batch set-tiles handles multiple entries', () => {
@@ -50,9 +47,9 @@ describe('tile painting commands', () => {
       description: 'Paint block',
       sectionIndex: 0,
       entries: [
-        { index: 0, oldNt: 0, newNt: 1, oldColl: 0, newColl: 1 },
-        { index: 1, oldNt: 0, newNt: 2, oldColl: 0, newColl: 2 },
-        { index: 256, oldNt: 0, newNt: 3, oldColl: 0, newColl: 3 },
+        { index: 0, oldNt: 0, newNt: 1 },
+        { index: 1, oldNt: 0, newNt: 2 },
+        { index: 256, oldNt: 0, newNt: 3 },
       ],
     }, level);
     expect(level.sections[0]!.tileGrid.nametable[0]).toBe(1);

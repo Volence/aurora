@@ -1,5 +1,7 @@
 import { kosinskiDecompress } from './kosinski';
+import { chunkCellCount } from '../model/s4-types';
 import type { ChunkDef } from '../model/s4-types';
+import { packCollisionCell } from '../collision/collision-cell-word';
 
 const BLOCKS_PER_CHUNK = 8;
 const TILES_PER_BLOCK = 2;
@@ -83,32 +85,45 @@ function resolveBlock(
 }
 
 /**
- * Convert a collision flag pair from chunk block refs into per-tile collision values.
- * solidTop=0x8000, solidAll=0x1000 on the block ref word.
- * Returns a nibble: bit1=solid-top, bit0=solid-all.
+ * Convert a block ref's solidity flags into a dual-plane collision cell word,
+ * using the caller-supplied full-block shape (the plain solid block in the
+ * loaded profile set). fullBlockShape = 0 means profiles are unavailable —
+ * seeding is impossible, so the cell stays air (0) regardless of the flags.
  */
-function blockRefToCollision(ref: BlockRef): number {
-  return (ref.solidTop ? 2 : 0) | (ref.solidAll ? 1 : 0);
+function blockRefToCollisionWord(ref: BlockRef, fullBlockShape: number): number {
+  if (fullBlockShape === 0 || (!ref.solidTop && !ref.solidAll)) return 0;
+  return packCollisionCell({
+    shape: fullBlockShape, xFlip: false, yFlip: false,
+    solidity: ref.solidAll ? 'all' : 'top',
+  });
 }
 
 /**
  * Import 128x128 chunk mappings and 16x16 block mappings (both Kosinski-compressed)
  * and produce an array of ChunkDef objects suitable for the editor's chunk library.
+ * `fullBlockShape` is the base-bank shape id of a plain solid block (from
+ * findFullBlockShapeId). Required — pass 0 explicitly for the "profiles
+ * unavailable, cannot seed collision" sentinel; there's no silent default so a
+ * caller that forgets to thread the profile set fails to compile instead of
+ * silently importing all-air collision.
  */
 export function importChunks(
   chunkFileData: Uint8Array,
   blockFileData: Uint8Array,
   namePrefix: string = 'Chunk',
+  fullBlockShape: number,
 ): ChunkDef[] {
   const chunkData = kosinskiDecompress(chunkFileData);
   const blockData = kosinskiDecompress(blockFileData);
 
   const chunkCount = Math.floor(chunkData.length / BYTES_PER_CHUNK);
   const chunks: ChunkDef[] = [];
+  const cellCount = chunkCellCount(CHUNK_TILES, CHUNK_TILES);
 
   for (let c = 0; c < chunkCount; c++) {
     const nametable = new Uint16Array(CHUNK_TILES * CHUNK_TILES);
-    const collision = new Uint8Array(CHUNK_TILES * CHUNK_TILES);
+    const collisionA = new Uint16Array(cellCount);
+    const collisionB = new Uint16Array(cellCount);
     const chunkOffset = c * BYTES_PER_CHUNK;
 
     for (let blockRow = 0; blockRow < BLOCKS_PER_CHUNK; blockRow++) {
@@ -117,7 +132,6 @@ export function importChunks(
         const word = (chunkData[wordOffset] << 8) | chunkData[wordOffset + 1];
         const ref = parseBlockRef(word);
         const [tl, tr, bl, br] = resolveBlock(blockData, ref);
-        const collValue = blockRefToCollision(ref);
 
         const tileRow = blockRow * 2;
         const tileCol = blockCol * 2;
@@ -127,10 +141,12 @@ export function importChunks(
         nametable[(tileRow + 1) * CHUNK_TILES + tileCol] = bl;
         nametable[(tileRow + 1) * CHUNK_TILES + tileCol + 1] = br;
 
-        collision[tileRow * CHUNK_TILES + tileCol] = collValue;
-        collision[tileRow * CHUNK_TILES + tileCol + 1] = collValue;
-        collision[(tileRow + 1) * CHUNK_TILES + tileCol] = collValue;
-        collision[(tileRow + 1) * CHUNK_TILES + tileCol + 1] = collValue;
+        // One 16px cell per block ref (BLOCKS_PER_CHUNK == cells-per-side).
+        // The donor ROM's block ref carries a single solidity flag pair with
+        // no per-path split, so plane B mirrors plane A verbatim.
+        const collWord = blockRefToCollisionWord(ref, fullBlockShape);
+        collisionA[blockRow * BLOCKS_PER_CHUNK + blockCol] = collWord;
+        collisionB[blockRow * BLOCKS_PER_CHUNK + blockCol] = collWord;
       }
     }
 
@@ -140,7 +156,8 @@ export function importChunks(
       widthTiles: CHUNK_TILES,
       heightTiles: CHUNK_TILES,
       nametable,
-      collision,
+      collisionA,
+      collisionB,
     });
   }
 

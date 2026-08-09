@@ -56,6 +56,12 @@ function ShapeCanvas({ profile, size }: { profile: CollisionProfile; size: numbe
 }
 
 export default function CollisionPalette() {
+  // Shared by Map mode's paint-collision tool and Art mode's chunk collision
+  // tool (ComposerCanvas). The Sec N / Reset / Clear row below acts on the
+  // active MAP SECTION's collisionEdit(B) plane — meaningless (and dangerous:
+  // it would touch the wrong data) when painting a chunk doc in Art mode, so
+  // it's gated on appMode rather than forking the component.
+  const appMode = useEditorStore((s) => s.appMode);
   const profiles = useProjectStore((s) => s.collisionProfiles);
   const selected = useEditorStore((s) => s.selectedCollisionProfile);
   const entryFlipX = useEditorStore((s) => s.selectedCollisionEntryFlipX);
@@ -178,7 +184,7 @@ export default function CollisionPalette() {
       <div style={styles.planes}>
         <span style={styles.planeLabel}>Brush</span>
         {[1, 7, 15, 25].map((n) => (
-          <button key={n} onClick={() => setBrush(n)} title={n === 1 ? 'Single block (reuses blocks with the same tiles)' : `${n}×${n} block area`}
+          <button key={n} onClick={() => setBrush(n)} title={n === 1 ? 'Single block (hold Alt to propagate to blocks with the same tiles)' : `${n}×${n} block area`}
             style={{ ...styles.planeBtn, ...(brush === n ? styles.planeSel : {}) }}>{n}</button>
         ))}
       </div>
@@ -196,16 +202,20 @@ export default function CollisionPalette() {
             style={{ ...styles.planeBtn, ...(solidity === value ? styles.planeSel : {}) }}>{label}</button>
         ))}
       </div>
-      <div style={styles.planes}>
-        <span style={styles.planeLabel}>Sec {activeSection}</span>
-        <button onClick={resetToEngine} title={`Reset section ${activeSection} collision (this plane) to the engine baseline — undoable`}
-          style={styles.subtleBtn}>Reset</button>
-        <button onClick={clearSection} title={`Erase ALL collision in section ${activeSection} (this plane) — undoable`}
-          style={styles.subtleBtn}>Clear</button>
-      </div>
-      <div style={styles.hint}>{brush > 1
-        ? `Pick a shape, then paint on the map. Paints the ${brush}×${brush} block area under the cursor.`
-        : 'Pick a shape, then paint on the map. Paints every block with the same tiles; hold Alt to paint just one.'}</div>
+      {appMode === 'map' && (
+        <div style={styles.planes}>
+          <span style={styles.planeLabel}>Sec {activeSection}</span>
+          <button onClick={resetToEngine} title={`Reset section ${activeSection} collision (this plane) to the engine baseline — undoable`}
+            style={styles.subtleBtn}>Reset</button>
+          <button onClick={clearSection} title={`Erase ALL collision in section ${activeSection} (this plane) — undoable`}
+            style={styles.subtleBtn}>Clear</button>
+        </div>
+      )}
+      <div style={styles.hint}>{appMode === 'map'
+        ? (brush > 1
+          ? `Pick a shape, then paint on the map. Paints the ${brush}×${brush} block area under the cursor.`
+          : 'Pick a shape, then paint on the map. Paints just this block; hold Alt to paint every block with the same tiles.')
+        : 'Pick a shape, then paint on the canvas (tile-space collision tool).'}</div>
 
       <div style={styles.tabs}>
         <button onClick={() => setKind('all')} style={{ ...styles.planeBtn, ...(kind === 'all' ? styles.planeSel : {}) }}>All</button>

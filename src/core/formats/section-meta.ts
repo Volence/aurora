@@ -1,6 +1,6 @@
 // Per-section metadata sidecar ({dataPath}section_N.meta.json).
 //
-// Sections persist as raw binaries (.tiles.bin/.coll.bin) plus JSON sidecars
+// Sections persist as raw binaries (.tiles.bin/.collattr.bin) plus JSON sidecars
 // for objects/rings; there is no general section-meta file. This sidecar holds
 // the scalar refs the binaries can't carry — currently the per-section
 // background assignment (bgLayoutRef: null = act default, else an

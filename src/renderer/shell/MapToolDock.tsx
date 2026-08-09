@@ -2,12 +2,15 @@ import React from 'react';
 import { ToolButton, Icons } from '../components/ui';
 import { useEditorStore, type EditorTool } from '../state/editorStore';
 
-// The 8 map tools, in toolbar order, with their dock glyphs. Mirrors the icon
+// The map tools, in toolbar order, with their dock glyphs. Mirrors the icon
 // mapping specified for the Aurora shell. `eraser` is intentionally not a dock
-// button (it was never one of the toolbar's 8 tools).
+// button (it was never one of the toolbar's tools). `marquee` reuses the
+// dashed-rect select icon (no dedicated marquee glyph exists) — same shape as
+// the composer's own marquee tool.
 const TOOLS: [EditorTool, string, React.FC<{ size?: number }>][] = [
   ['view', 'View', Icons.IconView],
   ['select', 'Select', Icons.IconSelect],
+  ['marquee', 'Marquee', Icons.IconSelect],
   ['paint-tile', 'Paint Tile', Icons.IconPencil],
   ['paint-block', 'Paint Block', Icons.IconRect],
   ['stamp-chunk', 'Stamp Chunk', Icons.IconStamp],

@@ -10,6 +10,9 @@ import {
   adoptPaletteLineForEmptyCells, docLineMap,
 } from '../../../core/art/composer-buffer';
 import type { ComposerDoc } from '../../../core/art/composer-buffer';
+import { paintDocCollision, applyClipboardCollisionToDoc } from '../../../core/art/composer-collision';
+import { copyChunkToClipboard } from '../../../core/editing/map-clipboard';
+import { selectedCollisionWord } from '../../../core/collision/collision-cell-word';
 import {
   createBuffer, flipH, flipV, rotate90, wrapShift,
 } from '../../../core/art/pixel-ops';
@@ -76,7 +79,14 @@ export default function ComposerCanvas() {
   const pixelPerfect = useArtStore((s) => s.pixelPerfect);
   const ditherPattern = useArtStore((s) => s.ditherPattern);
   const ditherSecondary = useArtStore((s) => s.ditherSecondary);
-  const selectedCollisionType = useEditorStore((s) => s.selectedCollisionType);
+  // Subscribed only to force a re-render when the collision-tool HUD needs to
+  // repaint (drawOverlay reads fresh values via getState(), not these).
+  const selectedCollisionProfile = useEditorStore((s) => s.selectedCollisionProfile);
+  const selectedCollisionEntryFlipX = useEditorStore((s) => s.selectedCollisionEntryFlipX);
+  const selectedCollisionXFlip = useEditorStore((s) => s.selectedCollisionXFlip);
+  const selectedCollisionYFlip = useEditorStore((s) => s.selectedCollisionYFlip);
+  const selectedCollisionSolidity = useEditorStore((s) => s.selectedCollisionSolidity);
+  const collisionPaintPlane = useEditorStore((s) => s.collisionPaintPlane);
   // Atlas tiles / palette can change underneath the doc (undo, agent writes).
   const historyVersion = useEditorStore((s) => s.historyVersion);
   // paletteVersion ticks on every live preview step (kept off historyVersion).
@@ -281,17 +291,22 @@ export default function ComposerCanvas() {
     if (cx < 0 || cx >= doc.widthTiles || cy < 0 || cy >= doc.heightTiles) return;
     if (t === 'tile-stamp') {
       const s = useArtStore.getState();
-      const zone = getCurrentZone(useProjectStore.getState());
       stampTile(doc, cx, cy, {
         tile: s.brushTile,
         pal: s.paletteLine,
         hf: flipRef.current.hf,
         vf: flipRef.current.vf,
         pri: false,
-        coll: zone?.tileset.collisionTypes?.[s.brushTile] ?? 0,
       });
     } else {
-      cellAt(doc, cx, cy).coll = useEditorStore.getState().selectedCollisionType;
+      // Same packed-word pattern as MapViewport.paintCollisionCell — one palette
+      // drives both surfaces via selectedCollisionWord.
+      const est = useEditorStore.getState();
+      const word = selectedCollisionWord({
+        shape: est.selectedCollisionProfile, entryFlipX: est.selectedCollisionEntryFlipX,
+        userXFlip: est.selectedCollisionXFlip, yFlip: est.selectedCollisionYFlip, solidity: est.selectedCollisionSolidity,
+      });
+      if (!paintDocCollision(doc, est.collisionPaintPlane, cx, cy, word)) return;
     }
     useArtStore.getState().markOpenDirty();
     useArtStore.getState().bumpDoc();
@@ -423,17 +438,22 @@ export default function ComposerCanvas() {
     const pxW = doc.widthTiles * 8, pxH = doc.heightTiles * 8;
 
     if (s.tool === 'collision' && z >= 6) {
+      const plane = useEditorStore.getState().collisionPaintPlane;
+      const cw = doc.widthTiles >> 1;
+      const words = plane === 'b' ? doc.collisionB : doc.collisionA;
       ctx.font = `${Math.max(9, Math.min(14, z))}px monospace`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       for (let cy = 0; cy < doc.heightTiles; cy++) {
         for (let cx = 0; cx < doc.widthTiles; cx++) {
-          const coll = doc.cells[cy * doc.widthTiles + cx].coll;
+          // One 16px-cell word covers 4 tile-space HUD cells (2x2); shown per
+          // 8px tile like the tile-stamp HUD, so all four read the same value.
+          const shape = words[(cy >> 1) * cw + (cx >> 1)] & 0x3FF;
           const tx = (cx * 8 + 4) * z, ty = (cy * 8 + 4) * z;
           ctx.fillStyle = HUD_CELL_BG;
           ctx.fillRect(tx - z, ty - z * 0.75, z * 2, z * 1.5);
-          ctx.fillStyle = coll === 0 ? HUD_COLL_ZERO : HUD_COLL_NONZERO;
-          ctx.fillText(String(coll), tx, ty);
+          ctx.fillStyle = shape === 0 ? HUD_COLL_ZERO : HUD_COLL_NONZERO;
+          ctx.fillText(String(shape), tx, ty);
         }
       }
       ctx.textAlign = 'left';
@@ -445,9 +465,12 @@ export default function ComposerCanvas() {
     const originY = repeatPreview ? pxH * z : 0;
     ctx.save();
     ctx.translate(-originX, -originY);
+    const est = useEditorStore.getState();
     const hud = s.tool === 'tile-stamp'
       ? `stamp #${s.brushTile}  flip[X]:${flipRef.current.hf ? 'H' : '–'} [Y]:${flipRef.current.vf ? 'V' : '–'}`
-      : `collision: ${useEditorStore.getState().selectedCollisionType}`;
+      : `collision[${est.collisionPaintPlane.toUpperCase()}]: ${
+        est.selectedCollisionProfile === 0 ? 'air' : `#${est.selectedCollisionProfile} · ${est.selectedCollisionSolidity}`
+      }`;
     ctx.font = '11px monospace';
     const tw = ctx.measureText(hud).width;
     ctx.fillStyle = HUD_CHIP_BG;
@@ -520,41 +543,87 @@ export default function ComposerCanvas() {
       if ((e.ctrlKey || e.metaKey) && (e.key === 'c' || e.key === 'x')) {
         const sel = selectionRef.current;
         const doc = getDoc();
-        if (!sel || !doc) return;
-        const buf = docToBuffer(doc, getAtlas());
-        const data = new Uint8Array(sel.w * sel.h);
-        for (let ry = 0; ry < sel.h; ry++) {
-          data.set(buf.data.subarray((sel.y + ry) * buf.width + sel.x,
-            (sel.y + ry) * buf.width + sel.x + sel.w), ry * sel.w);
-        }
-        clipboardRef.current = { w: sel.w, h: sel.h, data };
-        if (e.key === 'x') {
-          // Cut: clear the selected region as one undo step, then drop the marquee.
-          const after = { width: buf.width, height: buf.height, data: new Uint8Array(buf.data) };
+        if (sel && doc) {
+          const buf = docToBuffer(doc, getAtlas());
+          const data = new Uint8Array(sel.w * sel.h);
           for (let ry = 0; ry < sel.h; ry++) {
-            for (let rx = 0; rx < sel.w; rx++) after.data[(sel.y + ry) * after.width + (sel.x + rx)] = 0;
+            data.set(buf.data.subarray((sel.y + ry) * buf.width + sel.x,
+              (sel.y + ry) * buf.width + sel.x + sel.w), ry * sel.w);
           }
-          commitWrites(bufferToWrites(buf, after), true);
-          setSelection(null);
+          clipboardRef.current = { w: sel.w, h: sel.h, data };
+          if (e.key === 'x') {
+            // Cut: clear the selected region as one undo step, then drop the marquee.
+            const after = { width: buf.width, height: buf.height, data: new Uint8Array(buf.data) };
+            for (let ry = 0; ry < sel.h; ry++) {
+              for (let rx = 0; rx < sel.w; rx++) after.data[(sel.y + ry) * after.width + (sel.x + rx)] = 0;
+            }
+            commitWrites(bufferToWrites(buf, after), true);
+            setSelection(null);
+          }
+          e.preventDefault();
+          return;
         }
-        e.preventDefault();
+        // No active pixel selection: Ctrl+C (not Cut — a whole-chunk "cut"
+        // isn't a supported action) on an open CHUNK doc copies the whole
+        // chunk (art + both collision planes) to the MAP clipboard. Copies
+        // from the chunk's SAVED library state, not the doc's live edit
+        // buffer — the buffer can hold unsaved doc-local art (localPixels)
+        // that isn't resolvable to atlas tile indices without a save first,
+        // so only the saved chunk can build a faithful MapClipboard.
+        if (e.key === 'c') {
+          const o = useArtStore.getState().open;
+          if (o && o.chunkId !== null) {
+            const liveProject = useProjectStore.getState().project;
+            const chunk = liveProject?.chunkLibrary.find((c) => c.id === o.chunkId);
+            if (chunk) {
+              useEditorStore.getState().setMapClipboard(copyChunkToClipboard(chunk));
+              useToastStore.getState().addToast(
+                `Copied chunk ${chunk.id} (${chunk.widthTiles}×${chunk.heightTiles})`, 'success');
+              // The copy is sourced from the SAVED chunk (see comment above) —
+              // if the doc has unsaved edits, warn that they were left out.
+              if (o.dirty) {
+                useToastStore.getState().addToast(
+                  'Copied saved chunk state — unsaved edits not included', 'info');
+              }
+              e.preventDefault();
+            }
+          }
+        }
         return;
       }
       if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
         const clip = clipboardRef.current;
         const doc = getDoc();
-        if (!clip || !doc) return;
-        const before = docToBuffer(doc, getAtlas());
-        const px = Math.max(0, Math.min(before.width - clip.w, hoverRef.current.x));
-        const py = Math.max(0, Math.min(before.height - clip.h, hoverRef.current.y));
-        const after = { width: before.width, height: before.height, data: new Uint8Array(before.data) };
-        for (let ry = 0; ry < clip.h; ry++) {
-          after.data.set(clip.data.subarray(ry * clip.w, (ry + 1) * clip.w),
-            (py + ry) * after.width + px);
+        if (clip && doc) {
+          const before = docToBuffer(doc, getAtlas());
+          const px = Math.max(0, Math.min(before.width - clip.w, hoverRef.current.x));
+          const py = Math.max(0, Math.min(before.height - clip.h, hoverRef.current.y));
+          const after = { width: before.width, height: before.height, data: new Uint8Array(before.data) };
+          for (let ry = 0; ry < clip.h; ry++) {
+            after.data.set(clip.data.subarray(ry * clip.w, (ry + 1) * clip.w),
+              (py + ry) * after.width + px);
+          }
+          commitWrites(bufferToWrites(before, after), true);
+          setSelection({ x: px, y: py, w: clip.w, h: clip.h });
+          e.preventDefault();
+          return;
         }
-        commitWrites(bufferToWrites(before, after), true);
-        setSelection({ x: px, y: py, w: clip.w, h: clip.h });
-        e.preventDefault();
+        // No pixel clipboard: apply the MAP clipboard's COLLISION planes onto
+        // the open doc at its origin. Art paste into a doc is out of scope —
+        // chunk art still only comes from stamps or an explicit save. This is
+        // deliberately collision-only, so the map's `pasteLayers` toggle
+        // (both/art/collision) is intentionally ignored here — there is no
+        // "art" or "both" mode for a composer paste.
+        const mapClip = useEditorStore.getState().mapClipboard;
+        if (doc && mapClip) {
+          if (applyClipboardCollisionToDoc(doc, mapClip)) {
+            useArtStore.getState().markOpenDirty();
+            useArtStore.getState().bumpDoc();
+            useToastStore.getState().addToast(
+              'Pasted collision from map clipboard (art paste into chunks isn\'t supported)', 'info');
+          }
+          e.preventDefault();
+        }
       }
     };
     window.addEventListener('keydown', handler);
