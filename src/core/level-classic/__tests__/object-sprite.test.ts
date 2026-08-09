@@ -4,6 +4,7 @@ import * as path from 'node:path';
 import {
   renderObjectFrame,
   renderObjectFrameFromFiles,
+  composeObjectFrames,
   objectFrameRect,
   pointInRect,
 } from '../object-sprite';
@@ -56,6 +57,72 @@ describe('object-sprite pure helpers', () => {
     expect(pointInRect(rect, 29, 29)).toBe(true);
     expect(pointInRect(rect, 30, 30)).toBe(false);
     expect(pointInRect(rect, 9, 20)).toBe(false);
+  });
+
+  describe('composeObjectFrames (subtype-rule compositing)', () => {
+    // A 1x1-cell frame anchored at (0,0) filled with palette index `v` (its own tile).
+    const cell = (v: number): Tile => ({ pixels: new Uint8Array(64).fill(v) });
+    const frameOf = (): SpriteFrame => ({
+      id: 'f', pieces: [
+        { xOffset: 0, yOffset: 0, widthCells: 1, heightCells: 1, tile: 0, palette: 0, priority: false, xFlip: false, yFlip: false },
+      ],
+    });
+
+    it('unions piece bounds and offsets each piece by (dx, dy)', () => {
+      const frames = [frameOf()];
+      const tiles = [cell(1)];
+      // Three 8x8 pieces in a horizontal row at dx 0, 16, 32.
+      const r = composeObjectFrames(frames, tiles, [
+        { frame: 0, dx: 0, dy: 0 }, { frame: 0, dx: 16, dy: 0 }, { frame: 0, dx: 32, dy: 0 },
+      ]);
+      expect(r.width).toBe(8 + 32); // spans [0, 40)
+      expect(r.height).toBe(8);
+      expect(r.originX).toBe(0); // -minX (minX = 0)
+      // The middle gap (x 8..15) is empty; the three cells are opaque.
+      expect(r.indices[0]).toBe(1); // first cell top-left
+      expect(r.indices[16]).toBe(1); // second cell (dx 16) top-left
+    });
+
+    it('a negative dx shifts the origin so the composite stays anchored', () => {
+      const r = composeObjectFrames([frameOf()], [cell(1)], [
+        { frame: 0, dx: -16, dy: 0 }, { frame: 0, dx: 0, dy: 0 },
+      ]);
+      expect(r.width).toBe(24); // [-16, 8)
+      expect(r.originX).toBe(16); // -minX
+    });
+
+    it('per-piece xf mirrors that piece about its own anchor', () => {
+      // Two-cell wide frame: left cell index 1, right cell index 2.
+      const frame: SpriteFrame = { id: 'f', pieces: [
+        { xOffset: 0, yOffset: 0, widthCells: 2, heightCells: 1, tile: 0, palette: 0, priority: false, xFlip: false, yFlip: false },
+      ] };
+      const tiles = [cell(1), cell(2)];
+      const plain = composeObjectFrames([frame], tiles, [{ frame: 0, dx: 0, dy: 0 }]);
+      expect(plain.indices[0]).toBe(1); // left column is index 1
+      const flipped = composeObjectFrames([frame], tiles, [{ frame: 0, dx: 0, dy: 0, xf: true }]);
+      expect(flipped.indices[0]).toBe(2); // mirror: left column is now index 2
+    });
+
+    it('empty piece list yields an 8x8 origin-0 box', () => {
+      const r = composeObjectFrames([frameOf()], [cell(1)], []);
+      expect(r).toMatchObject({ width: 8, height: 8, originX: 0, originY: 0 });
+    });
+  });
+
+  it('renderObjectFrame draws the FIRST mappings piece on top (S1 sprite priority)', () => {
+    // Piece order matters where pieces overlap: piece[0] is the icon (index 2),
+    // piece[1] is an opaque shell (index 1) covering the same cell. S1 draws piece[0]
+    // on top, so the result must be the icon (2), not the shell (1).
+    const frame: SpriteFrame = { id: 'f', pieces: [
+      { xOffset: 0, yOffset: 0, widthCells: 1, heightCells: 1, tile: 1, palette: 0, priority: false, xFlip: false, yFlip: false },
+      { xOffset: 0, yOffset: 0, widthCells: 1, heightCells: 1, tile: 0, palette: 0, priority: false, xFlip: false, yFlip: false },
+    ] };
+    const tiles: Tile[] = [
+      { pixels: new Uint8Array(64).fill(1) }, // tile 0 = shell (index 1)
+      { pixels: new Uint8Array(64).fill(2) }, // tile 1 = icon (index 2)
+    ];
+    const r = renderObjectFrame([frame], tiles, 0);
+    expect(r.indices[0]).toBe(2); // icon wins (first piece on top)
   });
 
   describe.skipIf(!fs.existsSync(S1DIR))('golden render against real s1disasm', () => {

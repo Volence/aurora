@@ -67,7 +67,14 @@ export function renderObjectFrame(
   const { minX, minY, width, height } = frameBounds(frame);
   const originX = -minX;
   const originY = -minY;
-  const indices = renderFrameToIndices(frame, tiles, width, height, originX, originY);
+  // S1 sprite priority: the FIRST mappings piece has the highest priority and is drawn
+  // ON TOP (SonLVL's MapFrameToBmp iterates pieces in reverse for exactly this reason).
+  // renderFrameToIndices composites in array order (a later piece overwrites an earlier
+  // one), so reverse the pieces here — otherwise e.g. a monitor's opaque shell piece
+  // (declared after its icon) would paint over the icon and every subtype would look
+  // identical.
+  const ordered: SpriteFrame = { ...frame, pieces: [...frame.pieces].reverse() };
+  const indices = renderFrameToIndices(ordered, tiles, width, height, originX, originY);
   return { indices, width, height, originX, originY };
 }
 
@@ -78,6 +85,106 @@ export function renderObjectFrameFromFiles(
   const frames = parseAsmMappings(mapAsmText);
   const tiles = decodeObjectArt(artBytes, compression);
   return renderObjectFrame(frames, tiles, frameIndex);
+}
+
+/**
+ * One composited piece of a subtype-aware object: a mappings frame index drawn at
+ * a signed (dx, dy) offset from the composite anchor, with an optional per-piece
+ * flip. This is the render-side shape produced by the subtype-rule table
+ * (object-subtype-rules.ts) — e.g. a bridge's N log frames laid out in a row, or a
+ * swinging platform's chain links plus platform.
+ */
+export interface ObjectPiece {
+  /** Frame index into the object's mappings frame table. */
+  frame: number;
+  /** Signed world offset of this piece's anchor from the composite anchor. */
+  dx: number;
+  dy: number;
+  /** Per-piece horizontal / vertical flip (mirrored about this piece's anchor). */
+  xf?: boolean;
+  yf?: boolean;
+}
+
+/** Mirror a w×h index bitmap horizontally in place-safe (returns a new array). */
+function flipIndicesX(src: Uint8Array, width: number, height: number): Uint8Array {
+  const out = new Uint8Array(src.length);
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) out[y * width + (width - 1 - x)] = src[y * width + x];
+  }
+  return out;
+}
+
+/** Mirror a w×h index bitmap vertically (returns a new array). */
+function flipIndicesY(src: Uint8Array, width: number, height: number): Uint8Array {
+  const out = new Uint8Array(src.length);
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) out[(height - 1 - y) * width + x] = src[y * width + x];
+  }
+  return out;
+}
+
+/**
+ * Compose several mappings frames into ONE indexed bitmap laid out by a subtype
+ * rule. Each piece renders its own frame (via `renderObjectFrame`), is optionally
+ * flipped about its anchor, and is placed with its anchor at `(dx, dy)` relative to
+ * the composite anchor; the returned bitmap is sized to the union of every piece's
+ * bounds with `originX/Y = -min` so `objectFrameRect` treats it exactly like a
+ * single frame (selection box + hit region span the whole composite). Later pieces
+ * paint over earlier ones (transparent pixels never overwrite). Empty pieces yield
+ * an 8×8 origin-0 box so callers never divide by zero.
+ */
+export function composeObjectFrames(
+  frames: SpriteFrame[], tiles: Tile[], pieces: readonly ObjectPiece[],
+): RenderedObjectFrame {
+  if (pieces.length === 0) return { indices: new Uint8Array(64), width: 8, height: 8, originX: 0, originY: 0 };
+  // Render + flip each piece once; track its anchor-relative top-left.
+  const rendered = pieces.map((p) => {
+    const sub = renderObjectFrame(frames, tiles, p.frame);
+    let indices = sub.indices;
+    let oX = sub.originX;
+    let oY = sub.originY;
+    if (p.xf) { indices = flipIndicesX(indices, sub.width, sub.height); oX = sub.width - sub.originX; }
+    if (p.yf) { indices = flipIndicesY(indices, sub.width, sub.height); oY = sub.height - sub.originY; }
+    // Top-left of this piece relative to the composite anchor.
+    return { indices, width: sub.width, height: sub.height, left: p.dx - oX, top: p.dy - oY };
+  });
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const r of rendered) {
+    minX = Math.min(minX, r.left);
+    minY = Math.min(minY, r.top);
+    maxX = Math.max(maxX, r.left + r.width);
+    maxY = Math.max(maxY, r.top + r.height);
+  }
+  const width = maxX - minX;
+  const height = maxY - minY;
+  // `+ 0` normalises a `-0` (when minX/minY is 0) to `+0` so the origin compares
+  // cleanly and never surprises downstream Object.is checks.
+  const originX = -minX + 0;
+  const originY = -minY + 0;
+  const out = new Uint8Array(width * height);
+  for (const r of rendered) {
+    const bx = originX + r.left; // piece top-left in composite buffer coords
+    const by = originY + r.top;
+    for (let y = 0; y < r.height; y++) {
+      for (let x = 0; x < r.width; x++) {
+        const v = r.indices[y * r.width + x];
+        if (v === 0) continue;
+        const dx = bx + x, dy = by + y;
+        if (dx < 0 || dx >= width || dy < 0 || dy >= height) continue;
+        out[dy * width + dx] = v;
+      }
+    }
+  }
+  return { indices: out, width, height, originX, originY };
+}
+
+/** Decode art + parse mappings text + compose the given subtype-rule pieces. */
+export function composeObjectFramesFromFiles(
+  mapAsmText: string, artBytes: Uint8Array, compression: ObjectArtCompression, pieces: readonly ObjectPiece[],
+): RenderedObjectFrame {
+  const frames = parseAsmMappings(mapAsmText);
+  const tiles = decodeObjectArt(artBytes, compression);
+  return composeObjectFrames(frames, tiles, pieces);
 }
 
 /** An axis-aligned world-space rectangle (top-left + size). */

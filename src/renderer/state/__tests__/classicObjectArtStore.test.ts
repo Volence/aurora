@@ -42,13 +42,13 @@ describe('refreshClassicObjectSprites — lifecycle guards', () => {
     // Newer refresh (B) resolves first and publishes.
     builds[1].resolve(fakeSprite(2));
     await pB;
-    expect(useClassicObjectArtStore.getState().sprites.get(1)?.width).toBe(2);
+    expect(useClassicObjectArtStore.getState().sprites.get('1')?.width).toBe(2);
     const versionAfterB = useClassicObjectArtStore.getState().version;
 
     // Older refresh (A) resolves last — its publish must be DROPPED.
     builds[0].resolve(fakeSprite(1));
     await pA;
-    expect(useClassicObjectArtStore.getState().sprites.get(1)?.width).toBe(2); // unchanged
+    expect(useClassicObjectArtStore.getState().sprites.get('1')?.width).toBe(2); // unchanged
     expect(useClassicObjectArtStore.getState().version).toBe(versionAfterB); // no extra publish
   });
 
@@ -88,7 +88,36 @@ describe('refreshClassicObjectSprites — lifecycle guards', () => {
     __setObjectSpriteBuilderForTest(async (id) => (id === 1 ? fakeSprite(3) : null));
     await refreshClassicObjectSprites('dir', fakeDoc([1, 2]), 'ghz', 1);
     const map = useClassicObjectArtStore.getState().sprites;
-    expect(map.get(1)?.width).toBe(3);
-    expect(map.has(2)).toBe(false); // null miss not published
+    expect(map.get('1')?.width).toBe(3);
+    expect(map.has('2')).toBe(false); // null miss not published
+  });
+
+  it('keys subtype-rule objects by subtype, static objects by bare id', async () => {
+    // A doc with two Monitors ($26, subtype rule) of different subtypes + one Crabmeat
+    // ($1F, static). The rule object must publish TWO keyed entries (one per subtype);
+    // the static object publishes ONE regardless of its subtype.
+    __setObjectSpriteBuilderForTest(async () => fakeSprite(8));
+    // These ids are linked, so refresh's prefetch reaches the (Electron-only)
+    // readMany bridge; stub it (the faked builder ignores the returned bytes).
+    const g = globalThis as unknown as { window?: unknown };
+    const prevWindow = g.window;
+    g.window = { api: { readManyFiles: async (_d: string, rels: string[]) => rels.map((r) => ({ relPath: r, bytes: null, mtimeMs: null })) } };
+    const doc = {
+      objects: [
+        { id: 0x26, subtype: 0 }, { id: 0x26, subtype: 6 }, { id: 0x26, subtype: 6 }, // two distinct monitor subtypes
+        { id: 0x1f, subtype: 3 }, { id: 0x1f, subtype: 9 }, // crabmeat: subtype ignored
+      ],
+    } as unknown as LevelDoc;
+    try {
+      await refreshClassicObjectSprites('dir', doc, 'ghz', 1);
+    } finally {
+      g.window = prevWindow;
+    }
+    const map = useClassicObjectArtStore.getState().sprites;
+    expect(map.has('38:0')).toBe(true); // Monitor $26 subtype 0
+    expect(map.has('38:6')).toBe(true); // Monitor $26 subtype 6
+    expect(map.has('31')).toBe(true); // Crabmeat $1F (bare id, no subtype)
+    expect(map.has('31:3')).toBe(false); // static id is NOT subtype-keyed
+    expect(map.size).toBe(3); // 2 monitor subtypes + 1 crabmeat (dupes collapsed)
   });
 });

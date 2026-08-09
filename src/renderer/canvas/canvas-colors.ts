@@ -61,6 +61,11 @@ export const OBJECT_LABEL = '#ffffff';
 export const OBJECT_SELECTED_STROKE = '#94e2d5';
 export const RING_FILL = 'rgba(255, 220, 0, 0.8)';
 export const RING_STROKE = '#ffaa00';
+// Invisible / trigger objects ("ghost markers") — muted blue-gray, dashed, clearly
+// distinct from the red hex-box that flags a not-yet-linked id.
+export const GHOST_BOX_FILL = 'rgba(120, 130, 160, 0.18)';
+export const GHOST_BOX_STROKE = 'rgba(150, 165, 200, 0.7)';
+export const GHOST_LABEL = 'rgba(200, 210, 235, 0.95)';
 // Classic (S1) level-start spawn marker — pink, distinct from object red + ring yellow.
 export const START_MARKER = '#f5c2e7';
 

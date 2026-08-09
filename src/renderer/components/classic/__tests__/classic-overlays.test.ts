@@ -17,7 +17,7 @@ function mockCtx() {
   const calls = { drawImage: 0, fillRect: 0, strokeRect: 0, fillText: 0, arc: 0 };
   const ctx = {
     lineWidth: 0, font: '', textAlign: '' as CanvasTextAlign, fillStyle: '', strokeStyle: '',
-    save() {}, restore() {}, translate() {}, scale() {}, beginPath() {}, fill() {}, stroke() {},
+    save() {}, restore() {}, translate() {}, scale() {}, beginPath() {}, fill() {}, stroke() {}, setLineDash() {},
     drawImage() { calls.drawImage++; },
     fillRect() { calls.fillRect++; },
     strokeRect() { calls.strokeRect++; },
@@ -42,24 +42,46 @@ function sprite(width: number): ObjectSprite {
 describe('drawObjects detached-bitmap guard', () => {
   it('does not throw and skips drawImage when the sprite bitmap is detached (width 0)', () => {
     const { ctx, calls } = mockCtx();
-    const sprites = new Map<number, ObjectSprite>([[0x10, sprite(0)]]); // closed bitmap
-    expect(() => drawObjects(ctx, docWithObject(0x10), 1, sprites)).not.toThrow();
+    const sprites = new Map<string, ObjectSprite>([['16', sprite(0)]]); // closed bitmap ($10 = 16)
+    expect(() => drawObjects(ctx, docWithObject(0x10), 1, sprites, '')).not.toThrow();
     expect(calls.drawImage).toBe(0);   // never blit a detached source
     expect(calls.fillRect).toBeGreaterThan(0); // fell back to the hex box
   });
 
   it('draws the sprite when its bitmap is live (width > 0)', () => {
     const { ctx, calls } = mockCtx();
-    const sprites = new Map<number, ObjectSprite>([[0x10, sprite(16)]]);
-    drawObjects(ctx, docWithObject(0x10), 1, sprites);
+    const sprites = new Map<string, ObjectSprite>([['16', sprite(16)]]);
+    drawObjects(ctx, docWithObject(0x10), 1, sprites, '');
     expect(calls.drawImage).toBe(1);
   });
 
   it('falls back to the ring markers (no drawImage) for a detached ring sprite ($25)', () => {
     const { ctx, calls } = mockCtx();
-    const sprites = new Map<number, ObjectSprite>([[0x25, sprite(0)]]);
-    expect(() => drawObjects(ctx, docWithObject(0x25), 1, sprites)).not.toThrow();
+    const sprites = new Map<string, ObjectSprite>([['37', sprite(0)]]); // $25 = 37
+    expect(() => drawObjects(ctx, docWithObject(0x25), 1, sprites, '')).not.toThrow();
     expect(calls.drawImage).toBe(0);
     expect(calls.arc).toBeGreaterThan(0); // ring circle markers drawn instead
+  });
+
+  it('draws a ghost marker (labelled box, no hex) for an invisible id with no sprite', () => {
+    const { ctx, calls } = mockCtx();
+    // $49 Waterfall Sound Effect — an invisible/trigger id with no linked art.
+    drawObjects(ctx, docWithObject(0x49), 1, new Map(), '');
+    expect(calls.drawImage).toBe(0); // no sprite
+    expect(calls.fillRect).toBeGreaterThan(0); // muted ghost box drawn
+    expect(calls.fillText).toBeGreaterThan(0); // labelled with the object name
+  });
+
+  it('resolves the composed sprite by (id, subtype) key for a rule object', () => {
+    const { ctx, calls } = mockCtx();
+    // Monitor $26 subtype 6 → composed key "38:6". A sprite published under the bare
+    // id ("38") must NOT be picked up (subtype rule keys by subtype).
+    const wrongKey = new Map<string, ObjectSprite>([['38', sprite(16)]]);
+    drawObjects(ctx, { objects: [{ x: 50, y: 50, id: 0x26, subtype: 6, xflip: false, yflip: false, respawn: false }] } as unknown as LevelDoc, 1, wrongKey, 'ghz');
+    expect(calls.drawImage).toBe(0); // bare-id sprite ignored — falls back to hex box
+    const rightKey = new Map<string, ObjectSprite>([['38:6', sprite(16)]]);
+    const r2 = mockCtx();
+    drawObjects(r2.ctx, { objects: [{ x: 50, y: 50, id: 0x26, subtype: 6, xflip: false, yflip: false, respawn: false }] } as unknown as LevelDoc, 1, rightKey, 'ghz');
+    expect(r2.calls.drawImage).toBe(1); // composed sprite drawn
   });
 });

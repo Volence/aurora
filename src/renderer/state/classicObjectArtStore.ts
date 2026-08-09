@@ -20,8 +20,13 @@
 import { create } from 'zustand';
 import { decodeGenesisColor } from '../../core/formats/palette';
 import { indicesToRGBA } from '../../core/art/sprite-render';
-import { renderObjectFrameFromFiles, type RenderedObjectFrame } from '../../core/level-classic/object-sprite';
+import {
+  renderObjectFrameFromFiles, composeObjectFramesFromFiles, type RenderedObjectFrame,
+} from '../../core/level-classic/object-sprite';
 import { resolveObjectArt, type ObjectArtLink } from '../../core/project/profiles/s1-object-art';
+import {
+  resolveObjectPieces, objectHasSubtypeRule, objectArtKey,
+} from '../../core/project/profiles/object-subtype-rules';
 import type { LevelDoc } from '../../core/level-classic/model';
 import type { Color } from '../../core/model/s4-types';
 import { createIpcFileAccess } from './classic-file-access';
@@ -37,19 +42,35 @@ export interface ObjectSprite {
 }
 
 interface ClassicObjectArtState {
-  /** Current-act object id → rendered sprite (present ids only). */
-  sprites: Map<number, ObjectSprite>;
+  /**
+   * Current-act rendered sprites, keyed by `objectArtKey(id, zone, subtype)`:
+   * `${id}` for a plain static object (one sprite per id) and `${id}:${subtype}`
+   * for a subtype-rule object (one composed sprite per distinct subtype present).
+   * `spriteFor` resolves the right key for a placement.
+   */
+  sprites: Map<string, ObjectSprite>;
   /** Bumped whenever `sprites` is republished, so the viewport can redraw. */
   version: number;
-  setSprites: (sprites: Map<number, ObjectSprite>) => void;
+  setSprites: (sprites: Map<string, ObjectSprite>) => void;
   reset: () => void;
 }
 
+/**
+ * Look up the rendered sprite for a placement (id + subtype) in the published map,
+ * honouring subtype rules: rule objects are stored per-subtype, static ids under
+ * their bare id. `zone` decides which of the two keys applies.
+ */
+export function spriteFor(
+  sprites: Map<string, ObjectSprite>, id: number, zone: string, subtype: number,
+): ObjectSprite | undefined {
+  return sprites.get(objectArtKey(id, zone, subtype));
+}
+
 export const useClassicObjectArtStore = create<ClassicObjectArtState>((set, get) => ({
-  sprites: new Map(),
+  sprites: new Map<string, ObjectSprite>(),
   version: 0,
   setSprites: (sprites) => set({ sprites, version: get().version + 1 }),
-  reset: () => set({ sprites: new Map(), version: get().version + 1 }),
+  reset: () => set({ sprites: new Map<string, ObjectSprite>(), version: get().version + 1 }),
 }));
 
 /** Uint16 CRAM line → RGBA Color[] for indicesToRGBA (index 0 stays transparent). */
@@ -74,7 +95,8 @@ interface BuildCtx {
 }
 
 async function buildSpriteFromFiles(
-  dir: string, doc: LevelDoc, link: ObjectArtLink, prefetch?: Map<string, Uint8Array | null>,
+  dir: string, doc: LevelDoc, id: number, zone: string, subtype: number, hasRule: boolean,
+  link: ObjectArtLink, prefetch?: Map<string, Uint8Array | null>,
 ): Promise<ObjectSprite | null> {
   const fa = createIpcFileAccess(dir);
   const readOne = async (p: string): Promise<Uint8Array> => {
@@ -90,9 +112,18 @@ async function buildSpriteFromFiles(
     readOne(link.mapAsm),
   ]);
   const mapText = new TextDecoder('utf-8').decode(mapBytes);
-  const frame: RenderedObjectFrame = renderObjectFrameFromFiles(
-    mapText, artBytes, link.compression, link.frame,
-  );
+  // Subtype-rule objects compose several frames laid out by the rule (bridge logs,
+  // monitor shell + icon, spike rows, chain + platform); static ids render the one
+  // declared frame. `hasRule` is decided by the caller (== the cache-variant test).
+  let frame: RenderedObjectFrame;
+  if (hasRule) {
+    const ruleSet = resolveObjectPieces(id, zone, subtype);
+    frame = ruleSet
+      ? composeObjectFramesFromFiles(mapText, artBytes, link.compression, ruleSet.pieces)
+      : renderObjectFrameFromFiles(mapText, artBytes, link.compression, link.frame);
+  } else {
+    frame = renderObjectFrameFromFiles(mapText, artBytes, link.compression, link.frame);
+  }
   // An all-transparent frame (bad frame index / empty mappings) is not useful —
   // treat it as a failure so the hex box shows instead of an invisible sprite.
   if (frame.width <= 0 || frame.height <= 0) return null;
@@ -106,10 +137,18 @@ async function buildSpriteFromFiles(
 // The default builder (real IO + canvas). Indirected through `buildImpl` so tests
 // can substitute a canvas-free fake (the refresh/stale-publish paths are then
 // unit-testable without a DOM). See __setObjectSpriteBuilderForTest.
-type SpriteBuilder = (id: number, zone: string, ctx: BuildCtx) => Promise<ObjectSprite | null>;
-const defaultBuilder: SpriteBuilder = (id, zone, ctx) => {
+//
+// `variant` is the cache-variant string the store passes down: `''` for a static
+// id (single declared frame) and the subtype string for a subtype-rule id (compose
+// the rule's pieces). It is exactly the signal that decides the composed path, so
+// the builder derives `hasRule`/`subtype` straight from it.
+type SpriteBuilder = (id: number, zone: string, variant: string, ctx: BuildCtx) => Promise<ObjectSprite | null>;
+const defaultBuilder: SpriteBuilder = (id, zone, variant, ctx) => {
   const link = resolveObjectArt(id, zone);
-  return link ? buildSpriteFromFiles(ctx.dir, ctx.doc, link, ctx.prefetch) : Promise.resolve(null);
+  if (!link) return Promise.resolve(null);
+  const hasRule = variant !== '';
+  const subtype = hasRule ? Number(variant) : 0;
+  return buildSpriteFromFiles(ctx.dir, ctx.doc, id, zone, subtype, hasRule, link, ctx.prefetch);
 };
 let buildImpl: SpriteBuilder = defaultBuilder;
 
@@ -125,12 +164,19 @@ export function __resetObjectSpriteArtForTest(): void {
   refreshGen = 0;
 }
 
-// The shared (id, zone, epoch) cache. Unlinked ids resolve to null (a cached
-// miss); the disposer closes the GPU-backed ImageBitmap on eviction/clear.
+// The shared (id, zone, variant, epoch) cache. Static ids use variant `''` (so the
+// key stays effectively id:zone:epoch — no per-subtype explosion); rule ids key by
+// subtype. Unlinked ids resolve to null (a cached miss); the disposer closes the
+// GPU-backed ImageBitmap on eviction/clear.
 const spriteCache = new ObjectSpriteCache<ObjectSprite, BuildCtx>(
-  (id, zone, ctx) => buildImpl(id, zone, ctx),
+  (id, zone, variant, ctx) => buildImpl(id, zone, variant, ctx),
   (sprite) => sprite.bitmap.close(),
 );
+
+/** Cache variant (== publish-key discriminator) for a placement: '' static, subtype-string for rules. */
+function variantFor(id: number, zone: string, subtype: number): string {
+  return objectHasSubtypeRule(id, zone) ? String(subtype) : '';
+}
 
 // The dir the cache currently holds art for; a change wipes the cache (art bytes
 // + palette are dir-specific and epochs from a prior project must not be reused).
@@ -140,14 +186,15 @@ let cacheDir: string | null = null;
 let refreshGen = 0;
 
 /**
- * Ensure the sprite for (id, zone, epoch) is loaded, returning it (or null on a
- * miss/failure). Cached + de-duplicated across concurrent callers.
+ * Ensure the sprite for a placement (id + subtype) is loaded, returning it (or null
+ * on a miss/failure). Static ids ignore subtype (cached under variant `''`); rule
+ * ids compose per-subtype. Cached + de-duplicated across concurrent callers.
  */
 export async function loadObjectSprite(
-  dir: string, doc: LevelDoc, id: number, zone: string, epoch: number,
+  dir: string, doc: LevelDoc, id: number, zone: string, subtype: number, epoch: number,
   prefetch?: Map<string, Uint8Array | null>,
 ): Promise<ObjectSprite | null> {
-  return spriteCache.load(id, zone, epoch, { dir, doc, prefetch });
+  return spriteCache.load(id, zone, variantFor(id, zone, subtype), epoch, { dir, doc, prefetch });
 }
 
 /**
@@ -169,17 +216,25 @@ export async function refreshClassicObjectSprites(
     cacheDir = dir;
   }
   const gen = ++refreshGen;
-  const ids = new Set(doc.objects.map((o) => o.id));
-  // Prefetch every linked id's art + mappings in ONE batch round-trip, then thread
-  // the byte cache through the per-id builds. Without this each un-cached sprite
+  // Distinct PLACEMENTS to render, keyed by the publish key: `${id}` for a static
+  // id (one sprite reused by every placement) and `${id}:${subtype}` for a rule id
+  // (one composed sprite per distinct subtype present). A level with 40 identical
+  // rings + 3 bridge subtypes yields ~2 keys for those, not 43.
+  const wantKeys = new Map<string, { id: number; subtype: number }>();
+  for (const o of doc.objects) {
+    const key = objectArtKey(o.id, zone, o.subtype);
+    if (!wantKeys.has(key)) wantKeys.set(key, { id: o.id, subtype: o.subtype });
+  }
+  // Prefetch every linked art + mappings file in ONE batch round-trip, then thread
+  // the byte cache through the per-key builds. Without this each un-cached sprite
   // issues two separate IPC reads; on a fresh act load (the epoch busts the cache,
-  // so every id rebuilds) that is ~2×N round-trips. `readMany` collapses them to
+  // so every key rebuilds) that is ~2×N round-trips. `readMany` collapses them to
   // one. A superseded refresh still drops via the gen guard below.
   const fa = createIpcFileAccess(dir);
   let prefetch: Map<string, Uint8Array | null> | undefined;
   if (fa.readMany) {
     const wanted = new Set<string>();
-    for (const id of ids) {
+    for (const { id } of wantKeys.values()) {
       const link = resolveObjectArt(id, zone);
       if (link) { wanted.add(link.artFile); wanted.add(link.mapAsm); }
     }
@@ -190,12 +245,15 @@ export async function refreshClassicObjectSprites(
     }
   }
   const entries = await Promise.all(
-    [...ids].map(async (id) => [id, await loadObjectSprite(dir, doc, id, zone, epoch, prefetch)] as const),
+    [...wantKeys.entries()].map(
+      async ([key, { id, subtype }]) =>
+        [key, await loadObjectSprite(dir, doc, id, zone, subtype, epoch, prefetch)] as const,
+    ),
   );
   // Superseded by a newer refresh — drop this (stale) publish entirely.
   if (gen !== refreshGen) return;
-  const map = new Map<number, ObjectSprite>();
-  for (const [id, sprite] of entries) if (sprite) map.set(id, sprite);
+  const map = new Map<string, ObjectSprite>();
+  for (const [key, sprite] of entries) if (sprite) map.set(key, sprite);
   // ONE publish (and therefore ONE version bump) per refresh cycle, regardless of
   // how many sprites were (re)built: we await the whole Promise.all, assemble the
   // full map, and setSprites exactly once. This matters on GPU-poor machines where

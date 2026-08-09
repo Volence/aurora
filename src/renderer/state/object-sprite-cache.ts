@@ -27,26 +27,29 @@ export class ObjectSpriteCache<T, Ctx> {
    *                eviction/clear. Never called on a null entry.
    */
   constructor(
-    private readonly build: (id: number, zone: string, ctx: Ctx) => Promise<T | null>,
+    private readonly build: (id: number, zone: string, variant: string, ctx: Ctx) => Promise<T | null>,
     private readonly dispose: (value: T) => void,
   ) {}
 
-  private static key(id: number, zone: string, epoch: number): string {
-    return `${id}:${zone}:${epoch}`;
+  private static key(id: number, zone: string, variant: string, epoch: number): string {
+    return `${id}:${zone}:${variant}:${epoch}`;
   }
 
   /**
-   * Get (or build) the resource for (id, zone, epoch). Concurrent calls for the
-   * same key share ONE in-flight build (dedup); a cached hit (incl. a cached
-   * failure) returns immediately without rebuilding.
+   * Get (or build) the resource for (id, zone, variant, epoch). `variant` is the
+   * empty string for a plain static object (so its key stays effectively
+   * id:zone:epoch and the cache does not balloon) and the subtype string for a
+   * subtype-rule object, so only rule objects get a per-subtype cache entry.
+   * Concurrent calls for the same key share ONE in-flight build (dedup); a cached
+   * hit (incl. a cached failure) returns immediately without rebuilding.
    */
-  async load(id: number, zone: string, epoch: number, ctx: Ctx): Promise<T | null> {
-    const key = ObjectSpriteCache.key(id, zone, epoch);
+  async load(id: number, zone: string, variant: string, epoch: number, ctx: Ctx): Promise<T | null> {
+    const key = ObjectSpriteCache.key(id, zone, variant, epoch);
     const hit = this.cache.get(key);
     if (hit) return hit.value;
     const existing = this.inFlight.get(key);
     if (existing) return existing;
-    const p = this.build(id, zone, ctx)
+    const p = this.build(id, zone, variant, ctx)
       .catch(() => null)
       .then((value) => {
         this.cache.set(key, { epoch, value });

@@ -60,8 +60,10 @@ async function loadCore() {
     export { s1Adapter } from ${JSON.stringify(path.join(REPO, 'src/core/project/s1/index.ts'))};
     export { renderChunk } from ${JSON.stringify(path.join(REPO, 'src/core/level-classic/render.ts'))};
     export { layoutCellAt, ringGroupPositions } from ${JSON.stringify(path.join(REPO, 'src/renderer/components/classic/viewport-math.ts'))};
-    export { renderObjectFrameFromFiles, objectFrameRect } from ${JSON.stringify(path.join(REPO, 'src/core/level-classic/object-sprite.ts'))};
+    export { renderObjectFrameFromFiles, composeObjectFramesFromFiles, objectFrameRect } from ${JSON.stringify(path.join(REPO, 'src/core/level-classic/object-sprite.ts'))};
     export { resolveObjectArt } from ${JSON.stringify(path.join(REPO, 'src/core/project/profiles/s1-object-art.ts'))};
+    export { resolveObjectPieces, objectHasSubtypeRule, objectArtKey } from ${JSON.stringify(path.join(REPO, 'src/core/project/profiles/object-subtype-rules.ts'))};
+    export { s1ObjectIsInvisible, s1ObjectName } from ${JSON.stringify(path.join(REPO, 'src/core/project/profiles/s1-objects.ts'))};
     export { indicesToRGBA } from ${JSON.stringify(path.join(REPO, 'src/core/art/sprite-render.ts'))};
     export { decodeGenesisColor } from ${JSON.stringify(path.join(REPO, 'src/core/formats/palette.ts'))};
   `;
@@ -141,34 +143,60 @@ function composePlane(doc, renderChunk, layoutCellAt, plane, crop) {
 // files (this is a harness). Ring groups ($25) expand per-ring.
 // ---------------------------------------------------------------------------
 function overlayObjects(img, doc, core, zone, crop) {
-  const { renderObjectFrameFromFiles, objectFrameRect, resolveObjectArt, indicesToRGBA, decodeGenesisColor, ringGroupPositions } = core;
+  const {
+    renderObjectFrameFromFiles, composeObjectFramesFromFiles, objectFrameRect,
+    resolveObjectArt, resolveObjectPieces, objectHasSubtypeRule, objectArtKey,
+    s1ObjectIsInvisible, indicesToRGBA, decodeGenesisColor, ringGroupPositions,
+  } = core;
   const offX = crop ? crop[0] * CHUNK_PX : 0;
   const offY = crop ? crop[1] * CHUNK_PX : 0;
   const { data, width, height } = img;
   const RING_ID = 0x25;
-  let linked = 0, unlinked = 0;
+  let linked = 0, unlinked = 0, composed = 0, ghost = 0;
 
-  // Cache rendered frames by `id` (all placements of an id share art/palette).
+  // Cache rendered frames by the SAME (id, subtype) key the app store uses — static
+  // ids cache once, subtype-rule ids cache per subtype (so bridges of different log
+  // counts each render). Mirrors resolveObjectPieces → compose vs single-frame.
   const frameCache = new Map();
-  const getFrame = (id) => {
-    if (frameCache.has(id)) return frameCache.get(id);
+  const getFrame = (id, subtype) => {
+    const key = objectArtKey(id, zone, subtype);
+    if (frameCache.has(key)) return frameCache.get(key);
     const link = resolveObjectArt(id, zone);
     let entry = null;
     if (link) {
       try {
-        const artBytes = new Uint8Array(fs.readFileSync(path.join(S1DIR, link.artFile)));
+        const rule = objectHasSubtypeRule(id, zone) ? resolveObjectPieces(id, zone, subtype) : null;
+        const useLink = rule ? rule.link : link;
+        const artBytes = new Uint8Array(fs.readFileSync(path.join(S1DIR, useLink.artFile)));
         // Decode mappings the SAME way production does (TextDecoder utf-8).
-        const mapText = new TextDecoder('utf-8').decode(fs.readFileSync(path.join(S1DIR, link.mapAsm)));
-        const f = renderObjectFrameFromFiles(mapText, artBytes, link.compression, link.frame);
-        const colorsLine = doc.palettes[link.pal] ?? doc.palettes[0] ?? new Uint16Array(16);
+        const mapText = new TextDecoder('utf-8').decode(fs.readFileSync(path.join(S1DIR, useLink.mapAsm)));
+        const f = rule
+          ? composeObjectFramesFromFiles(mapText, artBytes, useLink.compression, rule.pieces)
+          : renderObjectFrameFromFiles(mapText, artBytes, useLink.compression, useLink.frame);
+        if (rule) composed++;
+        const colorsLine = doc.palettes[useLink.pal] ?? doc.palettes[0] ?? new Uint16Array(16);
         const colors = [];
         for (let i = 0; i < 16; i++) colors.push(decodeGenesisColor(colorsLine[i] ?? 0));
         const rgba = indicesToRGBA(f.indices, colors);
         entry = { rgba, width: f.width, height: f.height, originX: f.originX, originY: f.originY };
       } catch { entry = null; }
     }
-    frameCache.set(id, entry);
+    frameCache.set(key, entry);
     return entry;
+  };
+
+  // Ghost-marker box for invisible/trigger ids (muted blue-gray fill).
+  const drawGhost = (ax, ay) => {
+    const x0 = Math.round(ax) - offX - 12, y0 = Math.round(ay) - offY - 8;
+    for (let py = 0; py < 16; py++) {
+      for (let px = 0; px < 24; px++) {
+        const dx = x0 + px, dy = y0 + py;
+        if (dx < 0 || dy < 0 || dx >= width || dy >= height) continue;
+        const edge = px === 0 || px === 23 || py === 0 || py === 15;
+        const doff = (dy * width + dx) * 4;
+        data[doff] = edge ? 150 : 90; data[doff + 1] = edge ? 165 : 100; data[doff + 2] = edge ? 200 : 130; data[doff + 3] = 255;
+      }
+    }
   };
 
   // Blit one frame (flip-aware) with its top-left in world coords.
@@ -194,8 +222,12 @@ function overlayObjects(img, doc, core, zone, crop) {
   };
 
   for (const obj of doc.objects) {
-    const frame = getFrame(obj.id);
-    if (!frame) { unlinked++; continue; }
+    const frame = getFrame(obj.id, obj.subtype);
+    if (!frame) {
+      if (s1ObjectIsInvisible(obj.id)) { drawGhost(obj.x, obj.y); ghost++; }
+      else unlinked++;
+      continue;
+    }
     linked++;
     if (obj.id === RING_ID) {
       for (const p of ringGroupPositions(obj.subtype, obj.x, obj.y)) blitFrame(frame, p.x, p.y, obj.xflip, obj.yflip);
@@ -203,7 +235,7 @@ function overlayObjects(img, doc, core, zone, crop) {
       blitFrame(frame, obj.x, obj.y, obj.xflip, obj.yflip);
     }
   }
-  return { linked, unlinked };
+  return { linked, unlinked, composed, ghost };
 }
 
 function scaleNearest(img, scale) {
@@ -300,7 +332,7 @@ async function main() {
     `${args.zone}${args.act} ${args.plane}: grid ${grid.width}x${grid.height} chunks, ` +
     `${doc.chunks.length} chunks / ${doc.blocks.length} blocks / ${doc.objects.length} objects → ` +
     `${img.width}x${img.height}px → ${args.out}` +
-    (objStats ? ` [objects: ${objStats.linked} drawn / ${objStats.unlinked} hex-fallback]` : ''),
+    (objStats ? ` [objects: ${objStats.linked} drawn (${objStats.composed} composed) / ${objStats.ghost} ghost / ${objStats.unlinked} hex-fallback]` : ''),
   );
 }
 

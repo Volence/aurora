@@ -36,7 +36,7 @@ const ObjectThumb = React.memo(function ObjectThumb({
     const doc = useClassicLevelStore.getState().doc;
     if (!doc) return;
     let cancelled = false;
-    void loadObjectSprite(dir, doc, id, zone, epoch).then((sprite) => {
+    void loadObjectSprite(dir, doc, id, zone, 0, epoch).then((sprite) => {
       // bitmap.width === 0 ⇒ the cached bitmap was closed by an epoch eviction
       // between load and draw; skip rather than throw on a detached source.
       if (cancelled || !sprite || sprite.bitmap.width === 0) return;

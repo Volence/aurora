@@ -1,12 +1,51 @@
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import { T, Select, NumberField } from '../ui';
 import { useClassicLevelStore, classicSetObjects } from '../../state/classicLevelStore';
+import { useClassicProjectStore } from '../../state/classicProjectStore';
+import { loadObjectSprite } from '../../state/classicObjectArtStore';
 import { useToastStore } from '../../state/toastStore';
 import { S1_OBJECT_LIST, s1ObjectName, s1ObjectHex } from '../../../core/project/profiles/s1-objects';
 import { resolveObjectArt } from '../../../core/project/profiles/s1-object-art';
 import { editObjectArt } from '../sprite/export-sprite';
 import { clampInt } from './viewport-math';
 import type { S1ObjectEntry } from '../../../core/formats/classic/s1-objpos';
+
+const PREVIEW = 64;
+
+/**
+ * A composed-sprite preview of the selected object that reacts to its subtype: a
+ * subtype-rule object (bridge, monitor, spikes, spring, swinging platform) re-composes
+ * as you edit the Subtype field, so its full composed extent is visible before you
+ * commit. Shares the same (id, subtype)-keyed cache as the viewport. Draws nothing
+ * when the id has no linked art.
+ */
+function ObjectPreview({ id, subtype, zone, epoch, dir }: {
+  id: number; subtype: number; zone: string; epoch: number; dir: string | null;
+}) {
+  const ref = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    const ctx = ref.current?.getContext('2d');
+    if (!ctx) return;
+    ctx.clearRect(0, 0, PREVIEW, PREVIEW);
+    if (!dir) return;
+    const doc = useClassicLevelStore.getState().doc;
+    if (!doc) return;
+    let cancelled = false;
+    void loadObjectSprite(dir, doc, id, zone, subtype, epoch).then((sprite) => {
+      if (cancelled || !sprite || sprite.bitmap.width === 0) return;
+      const c = ref.current?.getContext('2d');
+      if (!c) return;
+      c.imageSmoothingEnabled = false;
+      const scale = Math.min(PREVIEW / sprite.width, PREVIEW / sprite.height, 2);
+      const w = Math.max(1, Math.round(sprite.width * scale));
+      const h = Math.max(1, Math.round(sprite.height * scale));
+      c.clearRect(0, 0, PREVIEW, PREVIEW);
+      c.drawImage(sprite.bitmap, (PREVIEW - w) / 2, (PREVIEW - h) / 2, w, h);
+    });
+    return () => { cancelled = true; };
+  }, [id, subtype, zone, epoch, dir]);
+  return <canvas ref={ref} width={PREVIEW} height={PREVIEW} style={styles.preview} />;
+}
 
 const MAX_OBJ_X = 0xffff;
 const MAX_OBJ_Y = 0x0fff;
@@ -75,8 +114,10 @@ export default function ObjectInspector() {
   const doc = useClassicLevelStore((s) => s.doc);
   const idx = useClassicLevelStore((s) => s.selectedObjectIndex);
   const ref = useClassicLevelStore((s) => s.ref);
+  const chunkEpoch = useClassicLevelStore((s) => s.chunkEpoch);
   const armedObjectId = useClassicLevelStore((s) => s.armedObjectId);
   const setSelectedObjectIndex = useClassicLevelStore((s) => s.setSelectedObjectIndex);
+  const dir = useClassicProjectStore((s) => s.dir);
 
   if (armedObjectId != null) {
     return (
@@ -106,6 +147,11 @@ export default function ObjectInspector() {
         Object #{idx} · {s1ObjectHex(obj.id)}
         <button style={styles.deselect} title="Deselect" onClick={() => setSelectedObjectIndex(null)}>✕</button>
       </div>
+      {linked && (
+        <div style={styles.previewWrap}>
+          <ObjectPreview id={obj.id} subtype={obj.subtype} zone={zone} epoch={chunkEpoch} dir={dir} />
+        </div>
+      )}
       <Field label="Type">
         <Select
           value={String(obj.id)}
@@ -157,6 +203,11 @@ function Check({ label, checked, onChange }: { label: string; checked: boolean; 
 
 const styles: Record<string, React.CSSProperties> = {
   body: { display: 'flex', flexDirection: 'column', gap: 6, padding: 8 },
+  previewWrap: {
+    display: 'flex', justifyContent: 'center', padding: 4,
+    background: T.raised, border: `1px solid ${T.border}`, borderRadius: T.rMd,
+  },
+  preview: { width: PREVIEW, height: PREVIEW, imageRendering: 'pixelated' as const, display: 'block' },
   title: {
     display: 'flex', alignItems: 'center', fontSize: 11, fontWeight: 600,
     color: T.textBase, fontFamily: T.fontMono,

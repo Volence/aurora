@@ -11,13 +11,15 @@
 import { chunkIndexForId, type LevelDoc } from '../../../core/level-classic/model';
 import { columnSolidRun } from '../../../core/collision/collision-render';
 import { objectFrameRect } from '../../../core/level-classic/object-sprite';
+import { objectArtKey } from '../../../core/project/profiles/object-subtype-rules';
+import { s1ObjectIsInvisible, s1ObjectName } from '../../../core/project/profiles/s1-objects';
 import type { ObjectSprite } from '../../state/classicObjectArtStore';
 import { CHUNK_PX, ringGroupPositions } from './viewport-math';
 import {
   COLLISION_FILL_ALL, COLLISION_FILL_TOP, COLLISION_FILL_SIDES, COLLISION_FILL_NONE,
   COLLISION_SURFACE_LINE, COLLISION_ANGLE_TICK,
   OBJECT_BOX_FILL, OBJECT_BOX_STROKE, OBJECT_LABEL, RING_FILL, RING_STROKE, START_MARKER,
-  OBJECT_SELECTED_STROKE,
+  OBJECT_SELECTED_STROKE, GHOST_BOX_FILL, GHOST_BOX_STROKE, GHOST_LABEL,
 } from '../../canvas/canvas-colors';
 
 /** S1 ring object id — expands into a visible ring group (Ring_Main rule). */
@@ -134,7 +136,8 @@ export function drawObjects(
   ctx: CanvasRenderingContext2D,
   d: LevelDoc,
   invZoom: number,
-  sprites: Map<number, ObjectSprite>,
+  sprites: Map<string, ObjectSprite>,
+  zone: string,
   selectedIndex?: number | null,
   previewPos?: { x: number; y: number } | null,
 ): void {
@@ -153,7 +156,7 @@ export function drawObjects(
     // escape the effect and unmount the whole viewport. A closed ImageBitmap reports
     // width/height === 0 (spec), so treat that as "no sprite" and fall back to the
     // hex box / ring markers; the fresh map's live bitmaps redraw on the next frame.
-    const raw = sprites.get(obj.id);
+    const raw = sprites.get(objectArtKey(obj.id, zone, obj.subtype));
     const sprite = raw && raw.bitmap.width > 0 ? raw : null;
     // Selection box: sized to the drawn frame when a sprite is loaded, else the
     // legacy anchor box. Computed per-object so it tracks flips + frame size.
@@ -183,6 +186,19 @@ export function drawObjects(
     } else if (sprite) {
       drawSprite(ctx, sprite, ox, oy, obj.xflip, obj.yflip);
       selRect = objectFrameRect(sprite, ox, oy, obj.xflip, obj.yflip);
+    } else if (s1ObjectIsInvisible(obj.id)) {
+      // Ghost marker: an invisible/trigger object has no real sprite. Draw a muted
+      // dashed box labelled with the object NAME so it reads as a deliberate marker,
+      // not an un-ported hex blob. Still selectable (the box is its hit region).
+      ctx.fillStyle = GHOST_BOX_FILL;
+      ctx.fillRect(ox - 12, oy - 8, 24, 16);
+      ctx.strokeStyle = GHOST_BOX_STROKE;
+      ctx.setLineDash([3 * invZoom, 2 * invZoom]);
+      ctx.strokeRect(ox - 12, oy - 8, 24, 16);
+      ctx.setLineDash([]);
+      ctx.fillStyle = GHOST_LABEL;
+      ctx.fillText(s1ObjectName(obj.id), ox, oy + 3 * invZoom);
+      selRect = { left: ox - 12, top: oy - 8, width: 24, height: 16 };
     } else {
       ctx.fillStyle = OBJECT_BOX_FILL;
       ctx.fillRect(ox - 8, oy - 8, 16, 16);

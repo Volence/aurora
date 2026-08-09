@@ -2,7 +2,7 @@ import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { T, Chip, OptionBar, Divider } from '../ui';
 import { useClassicLevelStore, classicSetLayoutCells, classicSetObjects, classicSetStart } from '../../state/classicLevelStore';
 import { useClassicProjectStore } from '../../state/classicProjectStore';
-import { useClassicObjectArtStore, refreshClassicObjectSprites } from '../../state/classicObjectArtStore';
+import { useClassicObjectArtStore, refreshClassicObjectSprites, spriteFor } from '../../state/classicObjectArtStore';
 import { useToastStore } from '../../state/toastStore';
 import { renderChunk } from '../../../core/level-classic/render';
 import type { LevelDoc } from '../../../core/level-classic/model';
@@ -357,7 +357,7 @@ export default function ClassicLevelViewport() {
         // objectArtVersion is read so this depless render effect re-runs when a
         // sprite finishes loading (the store republishes + bumps version).
         void objectArtVersion;
-        drawObjects(ctx, doc, invZoom, objectSprites, selIndex, previewPos);
+        drawObjects(ctx, doc, invZoom, objectSprites, ref?.zone ?? '', selIndex, previewPos);
       }
       if (overlays.start) {
         // During a start drag the ref carries the live (clamped) preview position.
@@ -513,8 +513,11 @@ export default function ClassicLevelViewport() {
       // hitTestObjectFrames so a far ring in the row/column is grabbable.
       const pickWorld = OBJECT_PICK_PX / camRef.current.zoom;
       const sprites = useClassicObjectArtStore.getState().sprites;
-      const boundsFor = (o: { id: number }): ObjectHitBounds | null => {
-        const s = sprites.get(o.id);
+      const zone = ref?.zone ?? '';
+      const boundsFor = (o: { id: number; subtype: number }): ObjectHitBounds | null => {
+        // Composed sprites are keyed by subtype for rule objects, so the hit region
+        // spans a bridge's whole span / a spike row's full width, not just frame 0.
+        const s = spriteFor(sprites, o.id, zone, o.subtype);
         return s ? { width: s.width, height: s.height, originX: s.originX, originY: s.originY } : null;
       };
       const hit = hitTestObjectFrames(d.objects, world.x, world.y, boundsFor, pickWorld);
