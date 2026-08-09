@@ -48,12 +48,15 @@
 // ---------------------------------------------------------------------------
 // Self-check gate
 // ---------------------------------------------------------------------------
-// Every buffer we would write is immediately re-decoded with the REAL decoder and
-// deep-compared to the doc structure it came from. A mismatch (or a decoder
-// throw) routes that file to `errors` instead of `files`, so a broken encoder can
-// never silently corrupt a level. The three compressors are injectable
-// (`codecs`) purely so tests can prove the gate fires; the decoders used for
-// verification are always the real ones.
+// Every buffer we would write is verified before it is emitted. Compressed and
+// directly-encoded domains are re-decoded with the REAL decoder and deep-compared
+// to the doc structure they came from (`emitCompressed` / `emitVerified`); the
+// palette is the one exception — it is pure byte-placement (no codec), so its
+// gate recomposes the written component files and compares, guarding offset/size
+// consistency only. A mismatch (or a decoder throw) routes that file to `errors`
+// instead of `files`, so a broken encoder can never silently corrupt a level. The
+// three compressors are injectable (`codecs`) purely so tests can prove the gate
+// fires; the decoders used for verification are always the real ones.
 
 import type { FileAccess } from '../project/adapter';
 import type { DirtyDomains } from '../project/adapter';
@@ -339,6 +342,26 @@ export function writeS1Level(
     files.push({ path, bytes: enc });
   };
 
+  /**
+   * Self-check a directly-encoded (uncompressed) buffer: re-decode with the REAL
+   * decoder and confirm it matches the doc structure it came from. Same gate as
+   * emitCompressed, for the domains whose encoder is not a compressor.
+   */
+  const emitVerified = <T>(
+    path: string,
+    enc: Uint8Array,
+    decode: (b: Uint8Array) => T,
+    matches: (decoded: T) => boolean,
+    label: string,
+  ): void => {
+    const back = safeDecode(() => decode(enc));
+    if (!back || !matches(back)) {
+      errors.push({ path, message: `self-check failed: ${label} re-decode differs` });
+      return;
+    }
+    files.push({ path, bytes: enc });
+  };
+
   // --- tiles ---------------------------------------------------------------
   if (dirty.tiles) {
     const orig = read.originalDisplayTiles;
@@ -378,7 +401,7 @@ export function writeS1Level(
     if (gapEdit) {
       errors.push({
         path: read.pristineTileFiles[0]?.path ?? '<tiles>',
-        message: 'edited tile lies outside any source art file (unrepresentable gap tile)',
+        message: 'edited tile lies outside any source art file (gap or appended tile — not writable in v1)',
       });
     }
     // Re-encode every pristine file (patched or not) — preserves the file split.
@@ -413,44 +436,52 @@ export function writeS1Level(
     emitCompressed(read.paths.chunks, raw, codecs.kosinskiCompress, kosinskiDecompress);
   }
 
-  // --- fg / bg (uncompressed; self-check re-decodes to the grid) -----------
-  if (dirty.fg) emitLayout(read.paths.fg, doc.fg, files, errors);
-  if (dirty.bg) emitLayout(read.paths.bg, doc.bg, files, errors);
+  // --- fg / bg (uncompressed; gate re-decodes to the grid) -----------------
+  const layoutMatches = (g: LayoutGrid) => (b: { width: number; height: number; cells: Uint8Array }) =>
+    b.width === g.width && b.height === g.height && bytesEqual(b.cells, g.cells);
+  if (dirty.fg) {
+    emitVerified(read.paths.fg, encodeS1Layout(doc.fg), decodeS1Layout, layoutMatches(doc.fg), 'layout');
+  }
+  if (dirty.bg) {
+    emitVerified(read.paths.bg, encodeS1Layout(doc.bg), decodeS1Layout, layoutMatches(doc.bg), 'layout');
+  }
 
   // --- objects -------------------------------------------------------------
   if (dirty.objects) {
-    const enc = encodeS1Objpos(doc.objects, read.objposOriginalLength);
-    const back = safeDecode(() => decodeS1Objpos(enc));
-    if (!back || !objectsEqual(back, doc.objects)) {
-      errors.push({ path: read.paths.objpos, message: 'self-check failed: objpos re-decode differs' });
-    } else {
-      files.push({ path: read.paths.objpos, bytes: enc });
-    }
+    emitVerified(
+      read.paths.objpos,
+      encodeS1Objpos(doc.objects, read.objposOriginalLength),
+      decodeS1Objpos,
+      (b) => objectsEqual(b, doc.objects),
+      'objpos',
+    );
   }
 
   // --- start ---------------------------------------------------------------
   if (dirty.start) {
-    const enc = encodeS1StartPos(doc.start);
-    const back = safeDecode(() => decodeS1StartPos(enc));
-    if (!back || back.x !== doc.start.x || back.y !== doc.start.y) {
-      errors.push({ path: read.paths.startpos, message: 'self-check failed: startpos re-decode differs' });
-    } else {
-      files.push({ path: read.paths.startpos, bytes: enc });
-    }
+    emitVerified(
+      read.paths.startpos,
+      encodeS1StartPos(doc.start),
+      decodeS1StartPos,
+      (b) => b.x === doc.start.x && b.y === doc.start.y,
+      'startpos',
+    );
   }
 
   // --- colind --------------------------------------------------------------
   if (dirty.colind) {
-    const enc = encodeS1ColInd(doc.collision.colind);
-    const back = safeDecode(() => decodeS1ColInd(enc));
-    if (!back || !bytesEqual(back, doc.collision.colind)) {
-      errors.push({ path: read.paths.colind, message: 'self-check failed: colind re-decode differs' });
-    } else {
-      files.push({ path: read.paths.colind, bytes: enc });
-    }
+    emitVerified(
+      read.paths.colind,
+      encodeS1ColInd(doc.collision.colind),
+      decodeS1ColInd,
+      (b) => bytesEqual(b, doc.collision.colind),
+      'colind',
+    );
   }
 
-  // --- palette: decompose into each component file, then recompose to verify -
+  // --- palette: decompose into each component file, then recompose to verify.
+  // NOTE: unlike every other domain this gate is pure byte-placement (no codec),
+  // so it guards only offset/size consistency of the composition — not a codec.
   if (dirty.palette) {
     const flat = flattenPalettes(doc.palettes);
     const outByFile = new Map<string, Uint8Array>();
@@ -487,21 +518,6 @@ export function writeS1Level(
 // ---------------------------------------------------------------------------
 // write helpers
 // ---------------------------------------------------------------------------
-
-function emitLayout(
-  path: string,
-  g: LayoutGrid,
-  files: { path: string; bytes: Uint8Array }[],
-  errors: { path: string; message: string }[],
-): void {
-  const enc = encodeS1Layout({ width: g.width, height: g.height, cells: g.cells });
-  const back = safeDecode(() => decodeS1Layout(enc));
-  if (!back || back.width !== g.width || back.height !== g.height || !bytesEqual(back.cells, g.cells)) {
-    errors.push({ path, message: 'self-check failed: layout re-decode differs' });
-    return;
-  }
-  files.push({ path, bytes: enc });
-}
 
 function flattenPalettes(lines: Uint16Array[]): Uint16Array {
   const flat = new Uint16Array(64);

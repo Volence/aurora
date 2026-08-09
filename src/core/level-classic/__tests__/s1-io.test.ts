@@ -467,7 +467,7 @@ describe('s1-io tile-write rejection paths', () => {
     doc.tiles[4 * 32] = 0x77;
 
     const result = writeS1Level(state, { tiles: true });
-    expect(result.errors.some((e) => e.message.includes('unrepresentable gap tile'))).toBe(true);
+    expect(result.errors.some((e) => e.message.includes('gap or appended tile'))).toBe(true);
     // No anim error was raised (the edit was in the gap, not the anim slot).
     expect(result.errors.some((e) => e.message.includes('animated art slots'))).toBe(false);
   });
