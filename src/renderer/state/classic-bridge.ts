@@ -6,7 +6,7 @@
 // See classic-file-access.ts for why open/detect run in the renderer.
 
 import { createIpcFileAccess } from './classic-file-access';
-import { openProject, registerAdapter, type ProjectHandle } from '../../core/project/adapter';
+import { detectProject, openProject, registerAdapter, type ProjectHandle } from '../../core/project/adapter';
 import { s1Adapter } from '../../core/project/s1';
 
 // -- Adapter registration (exactly once) ------------------------------------
@@ -26,7 +26,7 @@ export function ensureAdaptersRegistered(): void {
 }
 
 export type ClassicOpenResult =
-  | { kind: 'opened'; handle: ProjectHandle }
+  | { kind: 'opened'; handle: ProjectHandle; label: string }
   | { kind: 'not-classic'; aeon: boolean };
 
 export interface ClassicBridge {
@@ -38,8 +38,13 @@ export const ipcClassicBridge: ClassicBridge = {
   async open(dir: string): Promise<ClassicOpenResult> {
     ensureAdaptersRegistered();
     const fa = createIpcFileAccess(dir);
-    const handle = await openProject(fa);
-    if (handle) return { kind: 'opened', handle };
+    // Detect first for the human label (used as the recent-projects name),
+    // then open. detectProject is a handful of exists/list probes — cheap.
+    const match = await detectProject(fa);
+    if (match) {
+      const handle = await openProject(fa);
+      if (handle) return { kind: 'opened', handle, label: match.label };
+    }
     // Not a classic project. Probe the aeon fingerprint (root project.json) so
     // the caller can route aeon dirs to the untouched aeon loader and reserve
     // the "unrecognized project" notice for dirs that are neither.

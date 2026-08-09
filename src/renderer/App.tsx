@@ -37,6 +37,15 @@ export default function App() {
   const project = useProjectStore((s) => s.project);
   const currentZoneId = useProjectStore((s) => s.currentZoneId);
 
+  // Save is aeon-only for now. While a classic (disasm) project is open, the
+  // app-bar Save / Ctrl+S would otherwise target the STALE aeon project still
+  // resident in projectStore (aeon state isn't reset on classic open), silently
+  // writing the wrong project. No-op until classic write lands in Task 10.
+  const guardedSave = React.useCallback(() => {
+    if (useClassicProjectStore.getState().status === 'open') return;
+    return saveProject();
+  }, [saveProject]);
+
   // Register the MCP agent bridge handler once on mount
   useEffect(() => { registerAgentHandler(); }, []);
 
@@ -48,12 +57,12 @@ export default function App() {
     const handler = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 's') {
         e.preventDefault();
-        saveProject();
+        guardedSave();
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [saveProject]);
+  }, [guardedSave]);
 
   // Window/tab title: `Aurora — <context>` (Empyrean chrome convention).
   useEffect(() => {
@@ -67,12 +76,12 @@ export default function App() {
     const setAppMode = useEditorStore.getState().setAppMode;
     return [
       { id: 'open', label: 'Open Project…', hint: 'project', run: () => openProject() },
-      { id: 'save', label: 'Save Project', hint: 'Ctrl+S', run: () => saveProject() },
+      { id: 'save', label: 'Save Project', hint: 'Ctrl+S', run: () => guardedSave() },
       { id: 'mode-map', label: 'Switch to Map mode', hint: 'mode', run: () => setAppMode('map') },
       { id: 'mode-art', label: 'Switch to Art mode', hint: 'mode', run: () => setAppMode('art') },
       { id: 'mode-sprite', label: 'Switch to Sprite mode', hint: 'mode', run: () => setAppMode('sprite') },
     ];
-  }, [openProject, saveProject]);
+  }, [openProject, guardedSave]);
 
   return (
     <div style={styles.root}>
@@ -93,7 +102,7 @@ export default function App() {
 
       {classicOpen ? (
         <ClassicProjectView
-          appBar={<Toolbar onOpenProject={openProject} onOpenRecent={openProjectByPath} onSave={saveProject} />}
+          appBar={<Toolbar onOpenProject={openProject} onOpenRecent={openProjectByPath} onSave={guardedSave} />}
         />
       ) : appMode === 'art' ? (
         <ArtMode appBar={<Toolbar onOpenProject={openProject} onOpenRecent={openProjectByPath} onSave={saveProject} />} />

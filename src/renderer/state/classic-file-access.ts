@@ -11,11 +11,14 @@
 // cache) lives in the renderer store — no ProjectHandle serialization across
 // IPC, and the aeon open path is left 100% untouched.
 //
-// The heavy fs work still lives in the main process (src/main/file-io.ts,
-// rel-path-safe): `read` reuses the existing file:read-binary channel (whose
-// missing-file marker keeps optional probes out of the main error log; the
-// preload unwraps it back into a thrown ENOENT), and exists/list use the
-// file:path-exists / file:list-dir channels added for this bridge.
+// The heavy fs work runs in the main process. `read` reuses the existing
+// file:read-binary channel (whose missing-file marker keeps optional probes out
+// of the main error log; the preload unwraps it back into a thrown ENOENT) —
+// that channel has NO main-side rel-path guard (adding one would break aeon's
+// absolute-path chunk import), so read is rel-path-safe RENDERER-SIDE ONLY, via
+// assertSafe below. exists/list use the file:path-exists / file:list-dir
+// channels added for this bridge, which ARE guarded on the main side too — so
+// those are rejected on both ends.
 
 import type { FileAccess } from '../../core/project/adapter';
 import { isRelPathSafe } from '../../shared/rel-path';

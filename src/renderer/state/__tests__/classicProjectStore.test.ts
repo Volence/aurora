@@ -9,7 +9,7 @@ import type { ProjectHandle, ZoneActRef } from '../../../core/project/adapter';
 import type { ResolutionReport } from '../../../core/project/report';
 import { createIpcFileAccess } from '../classic-file-access';
 import { ensureAdaptersRegistered } from '../classic-bridge';
-import { openProject, type FileAccess } from '../../../core/project/adapter';
+import { detectProject, openProject, type FileAccess } from '../../../core/project/adapter';
 import { isRelPathSafe } from '../../../shared/rel-path';
 import * as nodeFsMod from 'node:fs';
 import * as nodePath from 'node:path';
@@ -71,9 +71,9 @@ describe('classicProjectStore', () => {
     expect(s.zoneTree).toEqual([]);
   });
 
-  it('opens an s1 project: status open, report + zoneTree + handle populated', async () => {
+  it('opens an s1 project: status open, report + zoneTree + handle + label populated', async () => {
     const handle = fakeHandle();
-    __setClassicBridgeForTest(bridgeReturning({ kind: 'opened', handle }));
+    __setClassicBridgeForTest(bridgeReturning({ kind: 'opened', handle, label: 'Sonic 1 Disassembly' }));
 
     const outcome = await useClassicProjectStore.getState().openDirectory('/proj/s1');
     expect(outcome).toBe('opened');
@@ -82,6 +82,7 @@ describe('classicProjectStore', () => {
     expect(s.status).toBe('open');
     expect(s.dir).toBe('/proj/s1');
     expect(s.type).toBe('s1');
+    expect(s.label).toBe('Sonic 1 Disassembly');
     expect(s.capabilities).toEqual(handle.capabilities);
     expect(s.report).toBe(REPORT);
     expect(s.zoneTree).toEqual(REFS);
@@ -94,7 +95,7 @@ describe('classicProjectStore', () => {
     __setClassicBridgeForTest(
       bridgeReturning(async () => {
         seenOpening = useClassicProjectStore.getState().status === 'opening';
-        return { kind: 'opened', handle: fakeHandle() };
+        return { kind: 'opened', handle: fakeHandle(), label: 'Sonic 1 Disassembly' };
       }),
     );
     await useClassicProjectStore.getState().openDirectory('/proj/s1');
@@ -132,7 +133,7 @@ describe('classicProjectStore', () => {
   });
 
   it('reset() clears an open project', async () => {
-    __setClassicBridgeForTest(bridgeReturning({ kind: 'opened', handle: fakeHandle() }));
+    __setClassicBridgeForTest(bridgeReturning({ kind: 'opened', handle: fakeHandle(), label: 'Sonic 1 Disassembly' }));
     await useClassicProjectStore.getState().openDirectory('/proj/s1');
     useClassicProjectStore.getState().reset();
     const s = useClassicProjectStore.getState();
@@ -221,8 +222,11 @@ const nodeBridge: ClassicBridge = {
   async open(dir: string): Promise<ClassicOpenResult> {
     ensureAdaptersRegistered();
     const fa = nodeFileAccess(dir);
-    const handle = await openProject(fa);
-    if (handle) return { kind: 'opened', handle };
+    const match = await detectProject(fa);
+    if (match) {
+      const handle = await openProject(fa);
+      if (handle) return { kind: 'opened', handle, label: match.label };
+    }
     return { kind: 'not-classic', aeon: await fa.exists('project.json') };
   },
 };
@@ -241,6 +245,8 @@ describe.skipIf(!S1_PRESENT)('classicProjectStore integration (real s1disasm)', 
     const s = useClassicProjectStore.getState();
     expect(s.status).toBe('open');
     expect(s.type).toBe('s1');
+    // Label captured for recent-projects (adapter's detect label).
+    expect(s.label).toBe('Sonic 1 Disassembly (GitHub)');
     // 100% resolution.
     expect(s.report!.resolved).toBe(s.report!.total);
     // 6 zones x 3 acts, every one available.

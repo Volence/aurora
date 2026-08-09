@@ -38,6 +38,8 @@ export type OpenOutcome = 'opened' | 'not-classic' | 'error';
 interface ClassicProjectState {
   status: ClassicStatus;
   dir: string | null;
+  /** Human label of the opened project (adapter's detect label), for recents. */
+  label: string | null;
   type: ProjectType | null;
   capabilities: CapabilityManifest | null;
   report: ResolutionReport | null;
@@ -67,6 +69,7 @@ export function __resetClassicBridgeForTest(): void {
 const CLOSED = {
   status: 'closed' as ClassicStatus,
   dir: null,
+  label: null,
   type: null,
   capabilities: null,
   report: null,
@@ -87,6 +90,7 @@ export const useClassicProjectStore = create<ClassicProjectState>((set) => ({
         set({
           status: 'open',
           dir,
+          label: res.label,
           type: h.type,
           capabilities: h.capabilities,
           report: h.report,

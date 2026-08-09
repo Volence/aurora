@@ -139,8 +139,17 @@ export function useProject() {
   // aeon loader; on an unrecognized dir the classic store already surfaced the
   // notice, so there is nothing more to do.
   const openPath = useCallback(async (dir: string) => {
-    const outcome = await useClassicProjectStore.getState().openDirectory(dir);
-    if (outcome === 'not-classic') await loadFromPath(dir);
+    const classic = useClassicProjectStore.getState();
+    const outcome = await classic.openDirectory(dir);
+    if (outcome === 'opened') {
+      // Register in recent-projects, mirroring the aeon path (loadFromPath calls
+      // addRecentProject on success). Reopening a classic recent routes back
+      // through here classic-first, so it re-detects and refreshes its entry.
+      const name = useClassicProjectStore.getState().label ?? dir;
+      await window.api.addRecentProject(dir, name);
+    } else if (outcome === 'not-classic') {
+      await loadFromPath(dir);
+    }
   }, [loadFromPath]);
 
   const openProject = useCallback(async () => {
