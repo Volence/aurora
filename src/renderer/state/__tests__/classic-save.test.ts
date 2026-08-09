@@ -2,12 +2,16 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   saveClassicWriteResult,
   saveClassicProject,
+  collectDirtyLevels,
+  domainFilePaths,
+  domainsToClear,
   type GuardedWriteApi,
   type DirtyLevel,
 } from '../classic-save';
-import type { WriteResult, ProjectHandle, ZoneActRef } from '../../../core/project/adapter';
+import type { WriteResult, ProjectHandle, ZoneActRef, LevelDoc } from '../../../core/project/adapter';
 import type { GuardedWriteFile, GuardedWriteResult } from '../../../shared/ipc-types';
 import { useClassicProjectStore } from '../classicProjectStore';
+import { useClassicLevelStore } from '../classicLevelStore';
 import { useToastStore } from '../toastStore';
 
 // ---------------------------------------------------------------------------
@@ -239,5 +243,91 @@ describe('saveClassicProject orchestrator', () => {
     expect(out).toEqual({ kind: 'conflict', conflicts: ['a.bin'] });
     expect(updateMtimes).not.toHaveBeenCalled();
     expect(useToastStore.getState().toasts.some((t) => /changed on disk/.test(t.message))).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// collectDirtyLevels wiring + domain→file mapping + partial-save retention.
+// ---------------------------------------------------------------------------
+
+function docWithRefs(): LevelDoc {
+  return {
+    sourceRefs: {
+      'tiles.0': 'artnem/t.nem',
+      blocks: 'map16/b.eni',
+      'palette.0': 'palette/p0.bin',
+      'palette.1': 'palette/p1.bin',
+      start: 'startpos/s.bin',
+    },
+  } as unknown as LevelDoc;
+}
+
+describe('collectDirtyLevels', () => {
+  beforeEach(() => {
+    useClassicLevelStore.getState().reset();
+  });
+
+  it('returns [] when no level is open / no domain is dirty', () => {
+    expect(collectDirtyLevels({} as ProjectHandle)).toEqual([]);
+    useClassicLevelStore.setState({ ref: REF, doc: docWithRefs(), status: 'ready', dirty: {} });
+    expect(collectDirtyLevels({} as ProjectHandle)).toEqual([]);
+  });
+
+  it('returns the open act with its dirty domains + doc', () => {
+    const doc = docWithRefs();
+    useClassicLevelStore.setState({ ref: REF, doc, status: 'ready', dirty: { blocks: true, start: true } });
+    const out = collectDirtyLevels({} as ProjectHandle);
+    expect(out).toHaveLength(1);
+    expect(out[0].ref).toBe(REF);
+    expect(out[0].doc).toBe(doc);
+    expect(out[0].dirty).toEqual({ blocks: true, start: true });
+  });
+});
+
+describe('domainFilePaths + domainsToClear', () => {
+  it('maps multi-file domains (tiles, palette) and single-file domains from sourceRefs', () => {
+    const paths = domainFilePaths(docWithRefs());
+    expect(paths.tiles).toEqual(['artnem/t.nem']);
+    expect(paths.blocks).toEqual(['map16/b.eni']);
+    expect(paths.palette).toEqual(['palette/p0.bin', 'palette/p1.bin']);
+    expect(paths.start).toEqual(['startpos/s.bin']);
+    expect(paths.chunks).toEqual([]); // not present in sourceRefs
+  });
+
+  it('clears a domain only when ALL its files landed (partial-save retention)', () => {
+    const doc = docWithRefs();
+    const dirty = { blocks: true, palette: true, start: true };
+    // palette has two files; only one landed → palette stays dirty.
+    const cleared = domainsToClear(doc, dirty, ['map16/b.eni', 'palette/p0.bin']);
+    expect(cleared.sort()).toEqual(['blocks']);
+  });
+
+  it('clears every fully-landed domain', () => {
+    const doc = docWithRefs();
+    const dirty = { blocks: true, palette: true, start: true };
+    const cleared = domainsToClear(doc, dirty, ['map16/b.eni', 'palette/p0.bin', 'palette/p1.bin', 'startpos/s.bin']);
+    expect(cleared.sort()).toEqual(['blocks', 'palette', 'start']);
+  });
+});
+
+describe('saveClassicProject clears dirty flags on success', () => {
+  it('clears the fully-written domains of the open act', async () => {
+    const doc = docWithRefs();
+    useClassicLevelStore.setState({ ref: REF, doc, status: 'ready', dirty: { blocks: true, start: true } });
+    const writeResult: WriteResult = {
+      written: [], skipped: [], errors: [],
+      files: [
+        { path: 'map16/b.eni', bytes: new Uint8Array([1]) },
+        { path: 'startpos/s.bin', bytes: new Uint8Array([2]) },
+      ],
+      fileMtimes: {},
+    };
+    openStoreWithHandle(handleWith(async () => writeResult, vi.fn()));
+    const api = fakeApi(() => okResult(['map16/b.eni', 'startpos/s.bin'], {}));
+
+    // Use the real store-backed collector for this end-to-end clear check.
+    const out = await saveClassicProject(api);
+    expect(out).toEqual({ kind: 'saved', count: 1 });
+    expect(useClassicLevelStore.getState().dirty).toEqual({});
   });
 });

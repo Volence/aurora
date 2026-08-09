@@ -56,6 +56,10 @@ export default function ClassicLevelViewport() {
   const doc = useClassicLevelStore((s) => s.doc);
   const ref = useClassicLevelStore((s) => s.ref);
   const error = useClassicLevelStore((s) => s.error);
+  // Per-chunk content versions (Task 12): edits bump only the chunks they touch
+  // (or the whole epoch), so the chunk-art cache below invalidates precisely.
+  const chunkVersions = useClassicLevelStore((s) => s.chunkVersions);
+  const chunkEpoch = useClassicLevelStore((s) => s.chunkEpoch);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -74,32 +78,40 @@ export default function ClassicLevelViewport() {
   });
   const toggle = (k: keyof Overlays) => setOverlays((o) => ({ ...o, [k]: !o[k] }));
 
-  // Per-chunk prerender cache (chunkId → offscreen canvas). Rebuilt only when the
-  // doc identity changes (read-only viewport → nothing else invalidates it).
-  const chunkCache = useRef<Map<number, HTMLCanvasElement>>(new Map());
+  // Per-chunk prerender cache (chunkId → {offscreen canvas, version key}). A cached
+  // canvas is reused while its content version is unchanged; edits bump the version
+  // of only the affected chunk(s) (or the epoch, for edits that touch all chunk
+  // art), so a single-chunk edit rebuilds just that one canvas. The whole cache is
+  // wiped only when a DIFFERENT act is loaded (ref identity changes) — edits keep
+  // the same ref, so they never wipe it. (Version values are process-unique, so a
+  // reload's fresh epoch also can't collide with a prior level's cached keys.)
+  const chunkCache = useRef<Map<number, { canvas: HTMLCanvasElement; key: string }>>(new Map());
   useEffect(() => {
     chunkCache.current = new Map();
-  }, [doc]);
+  }, [ref]);
 
-  const getChunkCanvas = useCallback((d: LevelDoc, chunkId: number): HTMLCanvasElement => {
-    const cache = chunkCache.current;
-    let c = cache.get(chunkId);
-    if (c) return c;
-    c = document.createElement('canvas');
-    c.width = CHUNK_PX;
-    c.height = CHUNK_PX;
-    const cctx = c.getContext('2d');
-    if (cctx) {
-      // createImageData + data.set avoids the ImageData ctor's ArrayBuffer-typed
-      // overload rejecting the core's Uint8ClampedArray<ArrayBufferLike> (repo
-      // pattern — see TilesetPanel/ArtBrowser).
-      const img = cctx.createImageData(CHUNK_PX, CHUNK_PX);
-      img.data.set(renderChunk(d, chunkId));
-      cctx.putImageData(img, 0, 0);
-    }
-    cache.set(chunkId, c);
-    return c;
-  }, []);
+  const getChunkCanvas = useCallback(
+    (d: LevelDoc, chunkId: number, key: string): HTMLCanvasElement => {
+      const cache = chunkCache.current;
+      const hit = cache.get(chunkId);
+      if (hit && hit.key === key) return hit.canvas;
+      const c = hit?.canvas ?? document.createElement('canvas');
+      c.width = CHUNK_PX;
+      c.height = CHUNK_PX;
+      const cctx = c.getContext('2d');
+      if (cctx) {
+        // createImageData + data.set avoids the ImageData ctor's ArrayBuffer-typed
+        // overload rejecting the core's Uint8ClampedArray<ArrayBufferLike> (repo
+        // pattern — see TilesetPanel/ArtBrowser).
+        const img = cctx.createImageData(CHUNK_PX, CHUNK_PX);
+        img.data.set(renderChunk(d, chunkId));
+        cctx.putImageData(img, 0, 0);
+      }
+      cache.set(chunkId, { canvas: c, key });
+      return c;
+    },
+    [],
+  );
 
   // Fit the level's height into the canvas on a fresh doc, anchored top-left.
   useEffect(() => {
@@ -262,7 +274,8 @@ export default function ClassicLevelViewport() {
         const cell = layoutCellAt(grid, col, row);
         if (cell === undefined) continue;
         const chunkId = cell & 0x7f; // strip S1's bit-7 loop flag
-        ctx.drawImage(getChunkCanvas(doc, chunkId), col * CHUNK_PX, row * CHUNK_PX);
+        const key = `${chunkEpoch}:${chunkVersions.get(chunkId) ?? 0}`;
+        ctx.drawImage(getChunkCanvas(doc, chunkId, key), col * CHUNK_PX, row * CHUNK_PX);
       }
     }
 

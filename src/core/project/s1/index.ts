@@ -351,6 +351,13 @@ export const s1Adapter: ProjectAdapter = {
         if (!read) return; // never read → nothing cached to refresh
         for (const [p, m] of Object.entries(newMtimes)) read.fileMtimes[p] = m;
       },
+      editableTileRange: (ref: ZoneActRef) => {
+        const read = readStates.get(refKey(ref));
+        if (!read) return null; // never read → no bookkeeping to answer from
+        const baseTileCount = read.pristineTileFiles.reduce((n, f) => n + f.tileCount, 0);
+        const animRanges = read.animOverlay.map((o) => ({ start: o.start, count: o.count }));
+        return { baseTileCount, animRanges };
+      },
     };
 
     return {

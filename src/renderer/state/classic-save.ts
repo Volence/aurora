@@ -11,6 +11,7 @@
 import type { GuardedWriteFile, GuardedWriteResult } from '../../shared/ipc-types';
 import type { WriteResult, ProjectHandle, ZoneActRef, DirtyDomains, LevelDoc } from '../../core/project/adapter';
 import { useClassicProjectStore } from './classicProjectStore';
+import { useClassicLevelStore } from './classicLevelStore';
 import { useToastStore } from './toastStore';
 
 /** The narrow guarded-write capability the save pipe needs (window.api by default). */
@@ -97,14 +98,64 @@ export interface DirtyLevel {
 }
 
 /**
- * Collect the acts with unsaved changes. There is NO classic editing store yet
- * (Tasks 12/13 build it and the Save UX on top of this plumbing), so today this
- * always returns [] — Ctrl+S finds zero dirty domains and no-ops. The pipe below
- * is nonetheless wired and tested end-to-end so those tasks can drop the editing
- * store straight in.
+ * Collect the acts with unsaved changes. The classic editing store (Task 12)
+ * holds exactly one open act; this returns it when it has any dirty domain. The
+ * `handle` is unused (the open doc/dirty live in the level store) but kept in the
+ * signature so the orchestrator stays injectable/testable.
  */
 export function collectDirtyLevels(_handle: ProjectHandle): DirtyLevel[] {
-  return [];
+  const s = useClassicLevelStore.getState();
+  if (s.status !== 'ready' || !s.doc || !s.ref) return [];
+  const hasDirty = Object.values(s.dirty).some(Boolean);
+  if (!hasDirty) return [];
+  return [{ ref: s.ref, doc: s.doc, dirty: { ...s.dirty } }];
+}
+
+/**
+ * Map each domain to the resolved file paths it writes, from `doc.sourceRefs`
+ * (the domain→path index s1-io populates at read). Multi-file domains (tiles,
+ * palette) collect every `<domain>.N` key.
+ */
+export function domainFilePaths(doc: LevelDoc): Record<keyof DirtyDomains, string[]> {
+  const refs = doc.sourceRefs ?? {};
+  const byPrefix = (prefix: string): string[] =>
+    Object.entries(refs)
+      .filter(([k]) => k === prefix || k.startsWith(`${prefix}.`))
+      .map(([, v]) => v);
+  const one = (k: string): string[] => (refs[k] ? [refs[k]] : []);
+  return {
+    tiles: byPrefix('tiles'),
+    blocks: one('blocks'),
+    chunks: one('chunks'),
+    fg: one('fg'),
+    bg: one('bg'),
+    objects: one('objpos'),
+    palette: byPrefix('palette'),
+    colind: one('colind'),
+    start: one('start'),
+  };
+}
+
+/**
+ * Which dirty domains a save may clear given the set of paths that ACTUALLY
+ * landed on disk. Conservative: a domain clears only when it owns at least one
+ * file and EVERY one of its files was written — if any file of a domain failed
+ * (partial save), the domain stays dirty so a retry re-emits it.
+ */
+export function domainsToClear(
+  doc: LevelDoc,
+  dirty: DirtyDomains,
+  writtenPaths: Iterable<string>,
+): (keyof DirtyDomains)[] {
+  const written = new Set(writtenPaths);
+  const paths = domainFilePaths(doc);
+  const out: (keyof DirtyDomains)[] = [];
+  for (const d of Object.keys(dirty) as (keyof DirtyDomains)[]) {
+    if (!dirty[d]) continue;
+    const ps = paths[d];
+    if (ps.length > 0 && ps.every((p) => written.has(p))) out.push(d);
+  }
+  return out;
 }
 
 export type SaveClassicProjectResult =
@@ -150,12 +201,22 @@ export async function saveClassicProject(
         // Refresh the cached read-time mtimes so the next save expects the new
         // on-disk values (no re-read needed).
         levels.updateMtimes?.(dl.ref, outcome.newMtimes);
+        // Clear the dirty flags for the domains whose files all landed.
+        useClassicLevelStore.getState().markDomainsClean(
+          dl.ref,
+          domainsToClear(dl.doc, dl.dirty, outcome.written),
+        );
         saved++;
         break;
       case 'partial':
         // Some files landed — refresh their baseline before stopping so a retry
-        // doesn't spuriously conflict on the already-written ones.
+        // doesn't spuriously conflict on the already-written ones. Clear only the
+        // domains whose files ALL landed; the rest stay dirty for the retry.
         levels.updateMtimes?.(dl.ref, outcome.newMtimes);
+        useClassicLevelStore.getState().markDomainsClean(
+          dl.ref,
+          domainsToClear(dl.doc, dl.dirty, outcome.written),
+        );
         useToastStore.getState().addToast(
           `Save incomplete — write failed at ${outcome.failed.path}; ` +
             `${outcome.written.length} file(s) saved, ${outcome.unwritten.length + 1} not. ` +

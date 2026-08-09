@@ -114,6 +114,21 @@ export interface WriteResult {
   fileMtimes?: Record<string, number>;
 }
 
+/**
+ * Which tile-pool indices of an act are writable, exposed so the editing store
+ * (Task 12) can REJECT a tile edit at edit time rather than letting it fail the
+ * s1-io write self-check (spec §2.2 / s1-io write contract). The overlay ranges
+ * live in the adapter-side read state (S1ReadState), NOT in the LevelDoc, so this
+ * query surfaces them without leaking that bookkeeping into the doc:
+ *  • indices in [0, baseTileCount) come from a pristine source art file → writable
+ *  • indices >= baseTileCount are gap/appended tiles → NOT writable in v1
+ *  • indices inside any `animRanges` span are animated-art overlays → NOT writable
+ */
+export interface EditableTileRange {
+  baseTileCount: number;
+  animRanges: { start: number; count: number }[];
+}
+
 export interface ClassicLevelAccess {
   list(): ZoneActRef[];
   read(ref: ZoneActRef): Promise<LevelDoc>;
@@ -125,6 +140,13 @@ export interface ClassicLevelAccess {
    * read-time values. OPTIONAL — omitted by non-classic adapters and test fakes.
    */
   updateMtimes?(ref: ZoneActRef, newMtimes: Record<string, number>): void;
+  /**
+   * The writable tile-pool span for an act (see EditableTileRange). Returns null
+   * when the act has not been read yet (no cached read state). OPTIONAL — omitted
+   * by non-classic adapters and simple test fakes; when absent the editing store
+   * falls back to the pool-size bound only.
+   */
+  editableTileRange?(ref: ZoneActRef): EditableTileRange | null;
 }
 
 // ---------------------------------------------------------------------------
