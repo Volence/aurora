@@ -13,6 +13,15 @@ export const IPC_CHANNELS = {
   // 9). `read` reuses READ_BINARY_FILE; these cover exists/list.
   PATH_EXISTS: 'file:path-exists',
   LIST_DIR: 'file:list-dir',
+  // Batch read: one IPC round-trip returns bytes + read-time mtime for many
+  // project-relative files. The classic level read fans out ~18 mandatory files
+  // plus its guarded-save mtime baseline; issuing those as individual
+  // renderer→main invokes is ~36 serial round-trips on the act-load critical
+  // path. Batching collapses that to one round-trip (main reads them
+  // concurrently), which is the dominant win on any machine where IPC / fs
+  // latency is non-trivial. Rel-path-guarded per entry; a missing/unsafe path
+  // yields { bytes: null, mtimeMs: null } (no reject, no error-log spam).
+  READ_MANY: 'file:read-many',
   // Classic guarded-save channels (Task 10). MTIME captures the read-time
   // baseline; WRITE_GUARDED performs the atomic, conflict-checked multi-file
   // write. Both are fully rel-path-guarded on the main side (new channels — no
@@ -68,6 +77,18 @@ export type GuardedWriteResult =
  * bury real errors in expected-miss spam. The preload unwraps the marker back
  * into a thrown ENOENT so renderer callers keep their try/catch semantics.
  */
+/**
+ * One entry of a READ_MANY response, aligned by index to the requested paths.
+ * `bytes` survives structured-clone as a typed array; null means the file was
+ * missing or its path was unsafe. `mtimeMs` is the read-time fs.stat mtime (the
+ * guarded-save baseline), null when unavailable.
+ */
+export interface ReadManyEntry {
+  relPath: string;
+  bytes: Uint8Array | null;
+  mtimeMs: number | null;
+}
+
 export interface MissingFileMarker { __missing: string }
 
 export function isMissingFileMarker(v: unknown): v is MissingFileMarker {

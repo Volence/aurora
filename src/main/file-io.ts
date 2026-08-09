@@ -8,6 +8,33 @@ export async function readBinaryFile(basePath: string, relativePath: string): Pr
 }
 
 /**
+ * Batch-read many project-relative files in one call, returning each file's bytes
+ * and read-time mtime. Reads run concurrently (fs is async), so the caller pays
+ * one IPC round-trip instead of one per file — the classic act-load read fans out
+ * ~18 mandatory files whose sequential round-trips otherwise dominate load
+ * latency. Rel-path-safe per entry: an escaping/missing path yields
+ * { bytes: null, mtimeMs: null } (never rejects), matching the tolerant
+ * pathExists/fileMtime probes. Aligned by index to `relativePaths`.
+ */
+export async function readManyFiles(
+  basePath: string,
+  relativePaths: string[],
+): Promise<{ relPath: string; bytes: Buffer | null; mtimeMs: number | null }[]> {
+  return Promise.all(
+    relativePaths.map(async (relPath) => {
+      if (!isRelPathSafe(relPath)) return { relPath, bytes: null, mtimeMs: null };
+      const full = resolve(basePath, relPath);
+      try {
+        const [bytes, st] = await Promise.all([readFile(full), stat(full)]);
+        return { relPath, bytes, mtimeMs: st.mtimeMs };
+      } catch {
+        return { relPath, bytes: null, mtimeMs: null };
+      }
+    }),
+  );
+}
+
+/**
  * Whether a project-relative path exists under `basePath`. Rel-path-safe: an
  * escaping (`..`/absolute) path never touches the fs and reports false. Any fs
  * error (ENOENT/ENOTDIR/permissions) resolves false rather than rejecting, so

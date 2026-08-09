@@ -2,7 +2,7 @@ import { ipcMain, dialog, BrowserWindow } from 'electron';
 import { writeFileSync } from 'fs';
 import { IPC_CHANNELS } from '../shared/ipc-types';
 import type { GuardedWriteFile } from '../shared/ipc-types';
-import { readBinaryFile, listProjectFiles, pathExists, listDir, fileMtime } from './file-io';
+import { readBinaryFile, readManyFiles, listProjectFiles, pathExists, listDir, fileMtime } from './file-io';
 import { performGuardedWrite } from './guarded-write';
 import { getRecentProjects, addRecentProject, removeRecentProject } from './recent-projects';
 
@@ -34,6 +34,10 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle(IPC_CHANNELS.FILE_MTIME, async (_event, basePath: string, relativePath: string) => {
     return fileMtime(basePath, relativePath);
+  });
+
+  ipcMain.handle(IPC_CHANNELS.READ_MANY, async (_event, basePath: string, relativePaths: string[]) => {
+    return readManyFiles(basePath, relativePaths);
   });
 
   // Atomic, mtime-guarded classic save (Task 10). The pure cycle lives in

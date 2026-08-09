@@ -64,15 +64,30 @@ function paletteColors(doc: LevelDoc, line: number): Color[] {
 interface BuildCtx {
   dir: string;
   doc: LevelDoc;
+  /**
+   * Optional byte cache prefetched by the caller in ONE batch round-trip (art +
+   * mappings for every id in a refresh). When present the builder reads from it
+   * instead of issuing two per-sprite IPC reads — collapsing ~2×N sprite reads
+   * into a single round-trip. A missing entry falls back to a direct read.
+   */
+  prefetch?: Map<string, Uint8Array | null>;
 }
 
 async function buildSpriteFromFiles(
-  dir: string, doc: LevelDoc, link: ObjectArtLink,
+  dir: string, doc: LevelDoc, link: ObjectArtLink, prefetch?: Map<string, Uint8Array | null>,
 ): Promise<ObjectSprite | null> {
   const fa = createIpcFileAccess(dir);
+  const readOne = async (p: string): Promise<Uint8Array> => {
+    if (prefetch && prefetch.has(p)) {
+      const b = prefetch.get(p);
+      if (b === null || b === undefined) throw new Error(`ENOENT: no such file or directory, open '${p}'`);
+      return b;
+    }
+    return fa.read(p);
+  };
   const [artBytes, mapBytes] = await Promise.all([
-    fa.read(link.artFile),
-    fa.read(link.mapAsm),
+    readOne(link.artFile),
+    readOne(link.mapAsm),
   ]);
   const mapText = new TextDecoder('utf-8').decode(mapBytes);
   const frame: RenderedObjectFrame = renderObjectFrameFromFiles(
@@ -94,7 +109,7 @@ async function buildSpriteFromFiles(
 type SpriteBuilder = (id: number, zone: string, ctx: BuildCtx) => Promise<ObjectSprite | null>;
 const defaultBuilder: SpriteBuilder = (id, zone, ctx) => {
   const link = resolveObjectArt(id, zone);
-  return link ? buildSpriteFromFiles(ctx.dir, ctx.doc, link) : Promise.resolve(null);
+  return link ? buildSpriteFromFiles(ctx.dir, ctx.doc, link, ctx.prefetch) : Promise.resolve(null);
 };
 let buildImpl: SpriteBuilder = defaultBuilder;
 
@@ -130,8 +145,9 @@ let refreshGen = 0;
  */
 export async function loadObjectSprite(
   dir: string, doc: LevelDoc, id: number, zone: string, epoch: number,
+  prefetch?: Map<string, Uint8Array | null>,
 ): Promise<ObjectSprite | null> {
-  return spriteCache.load(id, zone, epoch, { dir, doc });
+  return spriteCache.load(id, zone, epoch, { dir, doc, prefetch });
 }
 
 /**
@@ -154,8 +170,27 @@ export async function refreshClassicObjectSprites(
   }
   const gen = ++refreshGen;
   const ids = new Set(doc.objects.map((o) => o.id));
+  // Prefetch every linked id's art + mappings in ONE batch round-trip, then thread
+  // the byte cache through the per-id builds. Without this each un-cached sprite
+  // issues two separate IPC reads; on a fresh act load (the epoch busts the cache,
+  // so every id rebuilds) that is ~2×N round-trips. `readMany` collapses them to
+  // one. A superseded refresh still drops via the gen guard below.
+  const fa = createIpcFileAccess(dir);
+  let prefetch: Map<string, Uint8Array | null> | undefined;
+  if (fa.readMany) {
+    const wanted = new Set<string>();
+    for (const id of ids) {
+      const link = resolveObjectArt(id, zone);
+      if (link) { wanted.add(link.artFile); wanted.add(link.mapAsm); }
+    }
+    if (wanted.size > 0) {
+      const got = await fa.readMany([...wanted]);
+      prefetch = new Map();
+      for (const [p, e] of got) prefetch.set(p, e.bytes);
+    }
+  }
   const entries = await Promise.all(
-    [...ids].map(async (id) => [id, await loadObjectSprite(dir, doc, id, zone, epoch)] as const),
+    [...ids].map(async (id) => [id, await loadObjectSprite(dir, doc, id, zone, epoch, prefetch)] as const),
   );
   // Superseded by a newer refresh — drop this (stale) publish entirely.
   if (gen !== refreshGen) return;

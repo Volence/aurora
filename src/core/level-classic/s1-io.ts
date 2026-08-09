@@ -200,12 +200,41 @@ export async function readS1Level(
 ): Promise<S1LevelState> {
   const sourceRefs: Record<string, string> = {};
 
+  // Prefetch every file this read will touch in ONE batch round-trip (when the
+  // FileAccess supports it). The classic read fans out ~18 mandatory files;
+  // issuing them as individual awaits is ~18 sequential renderer→main round-trips
+  // on the act-load critical path — the dominant load cost whenever IPC/fs
+  // latency is non-trivial. `readMany` collapses that to one round-trip (main
+  // reads concurrently) AND returns each file's mtime, so the guarded-save
+  // baseline no longer needs its own per-file stat loop. `readBytes` then serves
+  // decode from the prefetched buffers; without `readMany` (in-memory test fakes)
+  // it falls back to per-file `fa.read`, so behavior is identical either way.
+  const wantPaths: string[] = [
+    ...paths.tiles,
+    ...paths.animatedArt.filter((p): p is string => p !== undefined),
+    paths.blocks, paths.chunks, paths.fg, paths.bg,
+    paths.colind, paths.collisionNormal, paths.collisionAngleMap,
+    ...paths.palette,
+    paths.objpos, paths.startpos,
+  ];
+  const prefetch = fa.readMany ? await fa.readMany([...new Set(wantPaths)]) : null;
+  const readBytes = async (p: string): Promise<Uint8Array> => {
+    if (prefetch) {
+      const e = prefetch.get(p);
+      if (!e || e.bytes === null) {
+        throw new Error(`ENOENT: no such file or directory, open '${p}'`);
+      }
+      return e.bytes;
+    }
+    return fa.read(p);
+  };
+
   // --- tiles: concat decoded .nem files, then blit animated art ------------
   const pristineTileFiles: PristineTileFile[] = [];
   let tileCursor = 0;
   for (let i = 0; i < act.tiles.length; i++) {
     const p = paths.tiles[i];
-    const decoded = nemesisDecompress(await fa.read(p));
+    const decoded = nemesisDecompress(await readBytes(p));
     const tileCount = Math.floor(decoded.length / 32);
     pristineTileFiles.push({ path: p, bytes: decoded, tileStart: tileCursor, tileCount });
     sourceRefs[`tiles.${i}`] = p;
@@ -220,7 +249,7 @@ export async function readS1Level(
     const p = paths.animatedArt[i];
     if (p === undefined) continue; // non-gating anim file did not resolve — skip
     const a = act.animatedArt[i];
-    const src = await fa.read(p);
+    const src = await readBytes(p);
     const slice = src.slice(a.srcTileOffset * 32, a.srcTileOffset * 32 + a.tileCount * 32);
     const destByte = a.vramTileIndex * 32;
     blits.push({ destByte, slice });
@@ -238,7 +267,7 @@ export async function readS1Level(
   for (const b of blits) tiles.set(b.slice, b.destByte);
 
   // --- blocks: Enigma → 4 words each --------------------------------------
-  const blockBytes = enigmaDecompress(await fa.read(paths.blocks));
+  const blockBytes = enigmaDecompress(await readBytes(paths.blocks));
   const blocks: BlockDef[] = [];
   for (let o = 0; o + 8 <= blockBytes.length; o += 8) {
     blocks.push({
@@ -253,7 +282,7 @@ export async function readS1Level(
   sourceRefs.blocks = paths.blocks;
 
   // --- chunks: Kosinski → 256 words each ----------------------------------
-  const chunkBytes = kosinskiDecompress(await fa.read(paths.chunks));
+  const chunkBytes = kosinskiDecompress(await readBytes(paths.chunks));
   const chunks: ChunkDef256[] = [];
   for (let o = 0; o + 512 <= chunkBytes.length; o += 512) {
     const cells = new Array(256);
@@ -263,18 +292,18 @@ export async function readS1Level(
   sourceRefs.chunks = paths.chunks;
 
   // --- fg / bg layouts (verbatim; may be irregular) ------------------------
-  const fgL = decodeS1Layout(await fa.read(paths.fg));
-  const bgL = decodeS1Layout(await fa.read(paths.bg));
+  const fgL = decodeS1Layout(await readBytes(paths.fg));
+  const bgL = decodeS1Layout(await readBytes(paths.bg));
   const fg: LayoutGrid = { width: fgL.width, height: fgL.height, cells: fgL.cells };
   const bg: LayoutGrid = { width: bgL.width, height: bgL.height, cells: bgL.cells };
   sourceRefs.fg = paths.fg;
   sourceRefs.bg = paths.bg;
 
   // --- collision: editable colind + read-only shape tables -----------------
-  const colind = decodeS1ColInd(await fa.read(paths.colind));
+  const colind = decodeS1ColInd(await readBytes(paths.colind));
   const shapes = decodeS1CollisionShapes(
-    await fa.read(paths.collisionNormal),
-    await fa.read(paths.collisionAngleMap),
+    await readBytes(paths.collisionNormal),
+    await readBytes(paths.collisionAngleMap),
   );
   sourceRefs.colind = paths.colind;
   sourceRefs['collision.normal'] = paths.collisionNormal;
@@ -286,7 +315,7 @@ export async function readS1Level(
   for (let i = 0; i < act.palette.length; i++) {
     const c = act.palette[i];
     const p = paths.palette[i];
-    const bytes = await fa.read(p);
+    const bytes = await readBytes(p);
     paletteOriginals.push({ component: c, path: p, bytes });
     for (let w = 0; w < c.length; w++) flat[c.destOffset + w] = beWord(bytes, (c.srcOffset + w) * 2);
     sourceRefs[`palette.${i}`] = p;
@@ -294,9 +323,9 @@ export async function readS1Level(
   const palettes = [0, 1, 2, 3].map((l) => flat.slice(l * 16, l * 16 + 16));
 
   // --- objects / start -----------------------------------------------------
-  const objposBytes = await fa.read(paths.objpos);
+  const objposBytes = await readBytes(paths.objpos);
   const objects = decodeS1Objpos(objposBytes);
-  const start = decodeS1StartPos(await fa.read(paths.startpos));
+  const start = decodeS1StartPos(await readBytes(paths.startpos));
   sourceRefs.objpos = paths.objpos;
   sourceRefs.start = paths.startpos;
 
@@ -316,11 +345,18 @@ export async function readS1Level(
   };
 
   // Capture a read-time mtime for every source file (guarded-save baseline,
-  // Task 10). sourceRefs already enumerates every path we read, so one stat per
-  // unique path covers exactly the files a later write could touch. Skipped
-  // entirely when the FileAccess has no `mtime` (in-memory fakes).
+  // Task 10). sourceRefs enumerates every path we read, so one mtime per unique
+  // path covers exactly the files a later write could touch. When we batch-read
+  // (`prefetch`), each entry already carries its mtime — no extra round-trips.
+  // Otherwise fall back to per-file `fa.mtime` (test fakes may omit it entirely,
+  // in which case capture is skipped and every save is treated as a fresh write).
   const fileMtimes: Record<string, number> = {};
-  if (fa.mtime) {
+  if (prefetch) {
+    for (const p of new Set(Object.values(sourceRefs))) {
+      const m = prefetch.get(p)?.mtime;
+      if (m !== undefined && m !== null) fileMtimes[p] = m;
+    }
+  } else if (fa.mtime) {
     for (const p of new Set(Object.values(sourceRefs))) {
       const m = await fa.mtime(p);
       if (m !== null) fileMtimes[p] = m;

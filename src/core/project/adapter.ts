@@ -32,6 +32,15 @@ export interface FileAccess {
    * a fresh write with no expected mtime).
    */
   mtime?(rel: string): Promise<number | null>;
+  /**
+   * Batch-read many project-relative files in one round-trip, returning each
+   * file's bytes and read-time mtime. OPTIONAL and additive: the fs/IPC-backed
+   * bridge supplies it so a level read (which fans out ~18 mandatory files) pays
+   * one round-trip instead of ~18 sequential ones. When absent (in-memory test
+   * fakes), callers fall back to per-file `read` + `mtime`. A missing/unsafe path
+   * resolves with `bytes: null` (the caller decides whether that is fatal).
+   */
+  readMany?(rels: string[]): Promise<Map<string, { bytes: Uint8Array | null; mtime: number | null }>>;
 }
 
 export type ProjectType = 'aeon' | 's1';

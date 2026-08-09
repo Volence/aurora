@@ -35,7 +35,7 @@ function assertSafe(rel: string): void {
  * before it reaches IPC (defense-in-depth: main also guards).
  */
 export function createIpcFileAccess(dir: string): FileAccess {
-  return {
+  const fa: FileAccess = {
     async exists(rel: string): Promise<boolean> {
       assertSafe(rel);
       return window.api.pathExists(dir, rel);
@@ -57,5 +57,20 @@ export function createIpcFileAccess(dir: string): FileAccess {
       // a miss (rel-path-safe, no error-log spam) — matching FileAccess.mtime.
       return window.api.fileMtime(dir, rel);
     },
+    // Batch read: one round-trip returns bytes + read-time mtime for many files.
+    // The classic level read fans out ~18 mandatory files whose per-file awaits
+    // are otherwise ~18 serial renderer→main round-trips on the act-load critical
+    // path; s1-io calls this to collapse that to one. A missing/unsafe entry
+    // resolves with bytes null (the caller decides whether that is fatal).
+    async readMany(rels: string[]): Promise<Map<string, { bytes: Uint8Array | null; mtime: number | null }>> {
+      for (const rel of rels) assertSafe(rel);
+      const entries = await window.api.readManyFiles(dir, rels);
+      const out = new Map<string, { bytes: Uint8Array | null; mtime: number | null }>();
+      for (const e of entries) {
+        out.set(e.relPath, { bytes: e.bytes ? new Uint8Array(e.bytes) : null, mtime: e.mtimeMs });
+      }
+      return out;
+    },
   };
+  return fa;
 }

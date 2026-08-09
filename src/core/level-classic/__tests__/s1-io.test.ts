@@ -429,6 +429,63 @@ describe('s1-io (e) synthetic round-trip with a mutation', () => {
     expect(state.read.fileMtimes).toEqual({});
   });
 
+  it('batches the whole read through readMany (one round-trip, no per-file read) and derives mtimes from it', async () => {
+    const { act, paths, files } = buildSynthetic();
+    const mtimes: Record<string, number> = {};
+    let t = 5000;
+    for (const p of Object.keys(files)) mtimes[p] = t++;
+
+    let readCalls = 0;
+    let readManyCalls = 0;
+    let batchSize = 0;
+    const base = memFs(files);
+    const fa: FileAccess = {
+      ...base,
+      async read(rel) { readCalls++; return base.read(rel); },
+      async readMany(rels) {
+        readManyCalls++; batchSize = rels.length;
+        const out = new Map<string, { bytes: Uint8Array | null; mtime: number | null }>();
+        for (const r of rels) out.set(r, { bytes: files[r] ?? null, mtime: r in mtimes ? mtimes[r] : null });
+        return out;
+      },
+    };
+
+    // Reference: the same act read through the per-file (no readMany) fake.
+    const ref = await readS1Level(act, paths, memFs(files));
+    const state = await readS1Level(act, paths, fa);
+
+    // Exactly one batch round-trip; the per-file read path is never touched.
+    expect(readManyCalls).toBe(1);
+    expect(readCalls).toBe(0);
+    expect(batchSize).toBeGreaterThanOrEqual(10);
+
+    // The batched doc is identical to the per-file read (byte-for-byte on tiles).
+    expect(Array.from(state.doc.tiles)).toEqual(Array.from(ref.doc.tiles));
+    expect(state.doc.blocks).toEqual(ref.doc.blocks);
+    expect(state.doc.chunks).toEqual(ref.doc.chunks);
+    expect(state.doc.objects).toEqual(ref.doc.objects);
+    expect(state.doc.fg).toEqual(ref.doc.fg);
+    expect(state.doc.palettes.map((l) => Array.from(l))).toEqual(ref.doc.palettes.map((l) => Array.from(l)));
+
+    // The guarded-save mtime baseline comes from the batch — no separate stat loop.
+    expect(state.read.fileMtimes['artnem/syn.nem']).toBe(mtimes['artnem/syn.nem']);
+    expect(state.read.fileMtimes['map256/syn.kos']).toBe(mtimes['map256/syn.kos']);
+    expect(state.read.fileMtimes['palette/Zone.bin']).toBe(mtimes['palette/Zone.bin']);
+  });
+
+  it('readMany that reports a mandatory file missing throws (ENOENT parity with per-file read)', async () => {
+    const { act, paths, files } = buildSynthetic();
+    const fa: FileAccess = {
+      ...memFs(files),
+      async readMany(rels) {
+        const out = new Map<string, { bytes: Uint8Array | null; mtime: number | null }>();
+        for (const r of rels) out.set(r, { bytes: r === paths.blocks ? null : (files[r] ?? null), mtime: null });
+        return out;
+      },
+    };
+    await expect(readS1Level(act, paths, fa)).rejects.toThrow(/ENOENT|no such file/i);
+  });
+
   it('sorts objects by X at write time (out-of-order doc → sorted on disk)', async () => {
     const { fa, act, paths, files } = buildSynthetic();
     const state = await readS1Level(act, paths, fa);
