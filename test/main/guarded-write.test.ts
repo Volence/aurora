@@ -82,6 +82,31 @@ describe('performGuardedWrite', () => {
     expect(readBytes('appeared.bin')).toEqual(new Uint8Array([7]));
   });
 
+  it('partial batch: an fs error mid-write reports {written,failed,unwritten}, cleans up the orphan .tmp, no reject', async () => {
+    // a.bin writes fine; b/ is a DIRECTORY where a file is expected, so rename
+    // onto it fails — a reliable cross-platform fs error. c.bin is never reached.
+    fs.writeFileSync(path.join(dir, 'a.bin'), Buffer.from([1]));
+    fs.mkdirSync(path.join(dir, 'b')); // occupies the target path with a dir
+    const dirMtime = statMtime('b'); // stat of the dir; pass as expected so no conflict
+
+    const res = await performGuardedWrite(dir, [
+      { relPath: 'a.bin', bytes: new Uint8Array([0xaa]), expectedMtimeMs: statMtime('a.bin') },
+      { relPath: 'b', bytes: new Uint8Array([0xbb]), expectedMtimeMs: dirMtime },
+      { relPath: 'c.bin', bytes: new Uint8Array([0xcc]), expectedMtimeMs: null },
+    ]);
+
+    if (!('written' in res)) throw new Error('expected a (partial) write result, not a conflict');
+    expect(res.written).toEqual(['a.bin']); // committed before the failure
+    expect(res.failed?.path).toBe('b');
+    expect(res.failed?.message).toBeTruthy();
+    expect(res.unwritten).toEqual(['c.bin']); // after the failure, never attempted
+    // a.bin really landed; c.bin never created.
+    expect(readBytes('a.bin')).toEqual(new Uint8Array([0xaa]));
+    expect(fs.existsSync(path.join(dir, 'c.bin'))).toBe(false);
+    // No orphaned tmp for the failed file (best-effort unlink).
+    expect(fs.existsSync(path.join(dir, 'b.tmp'))).toBe(false);
+  });
+
   it('full cycle: write → refresh mtimes → external touch → second write conflicts, nothing written', async () => {
     fs.writeFileSync(path.join(dir, 'x.bin'), Buffer.from([1]));
     fs.writeFileSync(path.join(dir, 'y.bin'), Buffer.from([2]));

@@ -21,16 +21,29 @@ export interface GuardedWriteApi {
 export type SaveClassicResult =
   | { kind: 'nothing' }
   | { kind: 'saved'; written: string[]; newMtimes: Record<string, number> }
+  | {
+      // The conflict check passed and writing began, but an fs error interrupted
+      // the batch: `written`/`newMtimes` did land; `failed`/`unwritten` did not.
+      kind: 'partial';
+      written: string[];
+      newMtimes: Record<string, number>;
+      failed: { path: string; message: string };
+      unwritten: string[];
+    }
   | { kind: 'conflict'; conflicts: string[] }
-  | { kind: 'error'; errors: { path: string; message: string }[] };
+  | { kind: 'error'; errors: { path: string; message: string }[] } // pre-write self-check
+  | { kind: 'channel-error'; message: string }; // the IPC call itself rejected
 
 /**
  * Persist ONE act's WriteResult through the guarded channel. Pure w.r.t. the
  * store (takes `dir` + `result` + `api`), so it's unit-tested with a fake api.
+ * Never rejects — every failure mode is a returned variant:
  *
  *  • self-check errors present            → { error } (nothing sent to disk)
  *  • no files to write                    → { nothing }
+ *  • the channel call rejected            → { channel-error } (unknown outcome)
  *  • main reports a conflict              → { conflict } (main wrote nothing)
+ *  • an fs error hit mid-batch            → { partial } (some files landed)
  *  • success                              → { saved, written, newMtimes }
  */
 export async function saveClassicWriteResult(
@@ -54,8 +67,25 @@ export async function saveClassicWriteResult(
     expectedMtimeMs: expected[f.path] ?? null,
   }));
 
-  const res = await api.writeGuarded(dir, payload);
+  let res: GuardedWriteResult;
+  try {
+    res = await api.writeGuarded(dir, payload);
+  } catch (e) {
+    // The IPC/main call itself threw (e.g. an unsafe path slipped through, or the
+    // channel is unavailable). Report rather than letting it become an unhandled
+    // rejection — the disk state is unknown, so we refresh no mtimes.
+    return { kind: 'channel-error', message: e instanceof Error ? e.message : String(e) };
+  }
   if ('conflicts' in res) return { kind: 'conflict', conflicts: res.conflicts };
+  if (res.failed) {
+    return {
+      kind: 'partial',
+      written: res.written,
+      newMtimes: res.newMtimes,
+      failed: res.failed,
+      unwritten: res.unwritten ?? [],
+    };
+  }
   return { kind: 'saved', written: res.written, newMtimes: res.newMtimes };
 }
 
@@ -77,20 +107,38 @@ export function collectDirtyLevels(_handle: ProjectHandle): DirtyLevel[] {
   return [];
 }
 
+export type SaveClassicProjectResult =
+  | { kind: 'nothing' }
+  | { kind: 'saved'; count: number }
+  | { kind: 'conflict'; conflicts: string[] }
+  | { kind: 'partial'; failed: { path: string; message: string }; unwritten: string[] }
+  | { kind: 'error' };
+
 /**
  * Save every dirty act of the open classic project through the guarded channel,
- * refreshing captured mtimes on success and posting a conflict notice on
- * failure. Returns an aggregate outcome (mainly for tests / the caller's Ctrl+S).
+ * refreshing captured mtimes on success and posting a notice on any failure.
+ * Returns an aggregate outcome (mainly for tests / the caller's Ctrl+S).
+ *
+ * CROSS-ACT SEMANTICS: each act is its own guarded batch (one levels.write +
+ * one writeGuarded call). Acts are processed in order and committed as they go;
+ * on the FIRST act that conflicts / errors / partially fails we refresh whatever
+ * did land, post a notice, and RETURN — earlier acts are already committed and
+ * stay committed (there is no cross-act rollback). This is acceptable because
+ * each act's files are disjoint; a later act's failure never corrupts an
+ * earlier, fully-written one.
  */
 export async function saveClassicProject(
   api: GuardedWriteApi = defaultApi(),
-): Promise<{ kind: 'nothing' } | { kind: 'saved'; count: number } | { kind: 'conflict'; conflicts: string[] } | { kind: 'error' }> {
+  // The dirty-level collector is injectable so the per-act loop is testable
+  // before the editing store lands (Tasks 12/13 will pass a store-backed one).
+  collect: (handle: ProjectHandle) => DirtyLevel[] = collectDirtyLevels,
+): Promise<SaveClassicProjectResult> {
   const st = useClassicProjectStore.getState();
   if (st.status !== 'open' || !st.handle || !st.dir || !st.handle.levels) return { kind: 'nothing' };
   const dir = st.dir;
   const levels = st.handle.levels;
 
-  const dirtyLevels = collectDirtyLevels(st.handle);
+  const dirtyLevels = collect(st.handle);
   if (dirtyLevels.length === 0) return { kind: 'nothing' };
 
   let saved = 0;
@@ -104,6 +152,17 @@ export async function saveClassicProject(
         levels.updateMtimes?.(dl.ref, outcome.newMtimes);
         saved++;
         break;
+      case 'partial':
+        // Some files landed — refresh their baseline before stopping so a retry
+        // doesn't spuriously conflict on the already-written ones.
+        levels.updateMtimes?.(dl.ref, outcome.newMtimes);
+        useToastStore.getState().addToast(
+          `Save incomplete — write failed at ${outcome.failed.path}; ` +
+            `${outcome.written.length} file(s) saved, ${outcome.unwritten.length + 1} not. ` +
+            `Fix the error and save again.`,
+          'error',
+        );
+        return { kind: 'partial', failed: outcome.failed, unwritten: outcome.unwritten };
       case 'conflict':
         notifyConflict(outcome.conflicts);
         return { kind: 'conflict', conflicts: outcome.conflicts };
@@ -112,6 +171,9 @@ export async function saveClassicProject(
           `Save blocked: ${outcome.errors.length} file(s) failed self-check`,
           'error',
         );
+        return { kind: 'error' };
+      case 'channel-error':
+        useToastStore.getState().addToast(`Save failed: ${outcome.message}`, 'error');
         return { kind: 'error' };
       case 'nothing':
         break;

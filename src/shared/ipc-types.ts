@@ -42,13 +42,23 @@ export interface GuardedWriteFile {
 }
 
 /**
- * Result of a guarded write: either the conflicting relPaths (nothing written),
- * or the written relPaths plus each one's fresh on-disk mtime so the renderer
- * can refresh its captured baseline without re-reading.
+ * Result of a guarded write. Two shapes:
+ *  • `{ conflicts }` — the conflict check failed; NOTHING was written.
+ *  • `{ written, newMtimes, failed?, unwritten? }` — the conflict check passed
+ *    and writing began. `written`/`newMtimes` cover the files that landed. If an
+ *    fs error interrupted the batch, `failed` names the file that errored and
+ *    `unwritten` lists the files after it that were never attempted — the batch
+ *    is PARTIAL (per-file rename atomicity holds; batch atomicity does not).
+ *    On a fully successful batch `failed`/`unwritten` are absent.
  */
 export type GuardedWriteResult =
   | { conflicts: string[] }
-  | { written: string[]; newMtimes: Record<string, number> };
+  | {
+      written: string[];
+      newMtimes: Record<string, number>;
+      failed?: { path: string; message: string };
+      unwritten?: string[];
+    };
 
 /**
  * Marker the read-binary IPC handler RESOLVES with for a missing file instead

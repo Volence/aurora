@@ -30,10 +30,14 @@
 // save→save with no external change never spuriously conflicts.
 //
 // ---------------------------------------------------------------------------
-// All-or-nothing
+// Conflict check is all-or-nothing (writing is not)
 // ---------------------------------------------------------------------------
 // The plan is computed across ALL files before any write. If ANY file conflicts
-// the caller writes NOTHING and reports the conflict list — never a partial save.
+// the caller writes NOTHING and reports the conflict list. This all-or-nothing
+// guarantee covers the CONFLICT CHECK only — once the plan is `ok` and writing
+// begins, a mid-batch fs error can leave a PARTIAL batch (per-file rename
+// atomicity holds; batch atomicity does not). The writer (main/guarded-write.ts)
+// reports that partial outcome via `failed`/`unwritten`, not this module.
 
 export interface GuardedFileSpec {
   relPath: string;
