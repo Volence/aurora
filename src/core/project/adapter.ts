@@ -64,14 +64,13 @@ export interface ProjectAdapter {
 }
 
 // ---------------------------------------------------------------------------
-// Level access — declared here so Task 6 (which fills LevelDoc in) and this task
-// both compile. LevelDoc is a placeholder alias re-pointed by Task 6; using a
-// named alias (rather than inlining `unknown`) keeps the ClassicLevelAccess
-// signatures readable and gives Task 6 a single line to change.
+// Level access — the classic hierarchical level document lives in
+// core/level-classic/model; re-exported here so ClassicLevelAccess signatures
+// (and downstream adapter callers) reference it through the project layer.
 // ---------------------------------------------------------------------------
 
-/** Placeholder replaced by Task 6 with the real level-document type. */
-export type LevelDoc = unknown;
+export type { LevelDoc } from '../level-classic/model';
+import type { LevelDoc } from '../level-classic/model';
 
 export interface ZoneActRef {
   zone: string;

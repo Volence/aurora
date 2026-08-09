@@ -140,7 +140,8 @@ describe('s1Adapter.open resolution', () => {
     const handle = await s1Adapter.open(memFs(fullFake()));
     const ref = handle.levels!.list()[0];
     await expect(handle.levels!.read(ref)).rejects.toThrow(/later task/);
-    await expect(handle.levels!.write(ref, null, {})).rejects.toThrow(/later task/);
+    // write is a throwing stub; the doc arg is unused, so any placeholder works.
+    await expect(handle.levels!.write(ref, null as never, {})).rejects.toThrow(/later task/);
   });
 });
 
