@@ -9,7 +9,9 @@ import {
   addStampCell,
   stampAccumToCells,
   hitTestObject,
+  hitTestObjectFrames,
   hitTestPoint,
+  type ObjectHitBounds,
   type StampCell,
 } from '../viewport-math';
 import type { LayoutGrid } from '../../../../core/level-classic/model';
@@ -323,5 +325,68 @@ describe('ringGroupPositions', () => {
     expect(ringGroupPositions(0x01, 0, 0)).toHaveLength(2);
     expect(ringGroupPositions(0x05, 0, 0)).toHaveLength(6);
     expect(ringGroupPositions(0x06, 0, 0)).toHaveLength(7);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// hitTestObjectFrames — frame-bounds hit-test (Task B1), incl. ring-group rings.
+// ---------------------------------------------------------------------------
+describe('hitTestObjectFrames', () => {
+  const obj = (x: number, y: number, id = 1, subtype = 0, xflip = false, yflip = false): S1ObjectEntry => ({
+    x, y, xflip, yflip, respawn: false, id, subtype,
+  });
+  const B: ObjectHitBounds = { width: 48, height: 32, originX: 24, originY: 16 };
+
+  it('hits inside the frame rect and misses outside it', () => {
+    const objs = [obj(100, 100)];
+    const bounds = () => B; // rect = left 76, top 84, 48x32
+    expect(hitTestObjectFrames(objs, 90, 90, bounds, 8)).toBe(0);
+    expect(hitTestObjectFrames(objs, 76, 84, bounds, 8)).toBe(0); // top-left corner
+    expect(hitTestObjectFrames(objs, 200, 200, bounds, 8)).toBeNull();
+    // Just left of the box (x < left) misses.
+    expect(hitTestObjectFrames(objs, 75, 100, bounds, 8)).toBeNull();
+  });
+
+  it('falls back to an anchor box when no sprite bounds are given', () => {
+    const objs = [obj(100, 100)];
+    const noBounds = () => null;
+    expect(hitTestObjectFrames(objs, 104, 104, noBounds, 8)).toBe(0); // within ±8
+    expect(hitTestObjectFrames(objs, 120, 100, noBounds, 8)).toBeNull(); // outside
+  });
+
+  it('the topmost (later) object wins when frames overlap', () => {
+    const objs = [obj(100, 100), obj(110, 100)];
+    const bounds = () => B;
+    // Both rects contain (100,100); the later index is chosen.
+    expect(hitTestObjectFrames(objs, 100, 100, bounds, 8)).toBe(1);
+  });
+
+  it('selects a ring GROUP by clicking any expanded ring, not just the origin', () => {
+    // Ring group ($25): subtype 0x02 → count 3, orientation 0 → step (0x10, 0).
+    // Rings at (10,10), (26,10), (42,10). Ring bounds 16x16 centred (origin 8,8).
+    const ring: ObjectHitBounds = { width: 16, height: 16, originX: 8, originY: 8 };
+    const objs = [obj(10, 10, 0x25, 0x02)];
+    const bounds = () => ring;
+    // Far ring at (42,10): its box is left 34..50, top 2..18.
+    expect(hitTestObjectFrames(objs, 42, 10, bounds, 4)).toBe(0);
+    // Middle ring.
+    expect(hitTestObjectFrames(objs, 26, 10, bounds, 4)).toBe(0);
+    // A gap well outside every ring box.
+    expect(hitTestObjectFrames(objs, 200, 200, bounds, 4)).toBeNull();
+  });
+
+  it('respects flips in the frame rect', () => {
+    // xflip mirrors the box about the anchor: left = x - (width - originX).
+    const objs = [obj(100, 100, 1, 0, true, false)];
+    const bounds = () => B; // xflip rect = left 76? no: 100 - (48-24) = 76 too (symmetric here)
+    // Use asymmetric origin to make the flip observable.
+    const asym: ObjectHitBounds = { width: 40, height: 20, originX: 4, originY: 4 };
+    const boundsA = () => asym;
+    // Unflipped rect: left 96..136. Flipped rect: left 100-(40-4)=64 .. 104.
+    expect(hitTestObjectFrames([obj(100, 100)], 130, 100, boundsA, 4)).toBe(0); // unflipped hit right side
+    expect(hitTestObjectFrames([obj(100, 100)], 130, 100, () => asym, 4)).toBe(0);
+    expect(hitTestObjectFrames(objs, 130, 100, boundsA, 4)).toBeNull(); // flipped box doesn't reach 130
+    expect(hitTestObjectFrames(objs, 70, 100, boundsA, 4)).toBe(0); // flipped box covers left side
+    void bounds;
   });
 });

@@ -10,6 +10,8 @@
 
 import { chunkIndexForId, type LevelDoc } from '../../../core/level-classic/model';
 import { columnSolidRun } from '../../../core/collision/collision-render';
+import { objectFrameRect } from '../../../core/level-classic/object-sprite';
+import type { ObjectSprite } from '../../state/classicObjectArtStore';
 import { CHUNK_PX, ringGroupPositions } from './viewport-math';
 import {
   COLLISION_FILL_ALL, COLLISION_FILL_TOP, COLLISION_FILL_SIDES, COLLISION_FILL_NONE,
@@ -108,17 +110,31 @@ export function drawCollision(
   }
 }
 
+/** Blit an object sprite anchored at (ax, ay) with the object's flips. */
+function drawSprite(ctx: CanvasRenderingContext2D, s: ObjectSprite, ax: number, ay: number, xflip: boolean, yflip: boolean): void {
+  ctx.save();
+  ctx.translate(ax, ay);
+  ctx.scale(xflip ? -1 : 1, yflip ? -1 : 1);
+  // With the flip scale applied, drawing at (-origin) lands the object origin at
+  // the anchor; a negative scale mirrors the frame about that anchor.
+  ctx.drawImage(s.bitmap, -s.originX, -s.originY);
+  ctx.restore();
+}
+
 /**
- * Draw all object markers (ring groups expand to individual rings).
+ * Draw all object placements: their real sprite where its art is linked/loaded
+ * (`sprites.get(id)`), else the hex-box fallback. Ring groups ($25) expand to
+ * individual rings, drawing the ring SPRITE at each position when loaded (else
+ * the circle markers). Selection is a box sized to the drawn frame's bounds.
  *
- * When `selectedIndex` is a valid index it gets a highlight ring drawn on top;
- * `previewPos`, if given, overrides that object's centre only (the live position
- * during an in-progress drag, before the store commit lands on mouseup).
+ * `previewPos`, if given, overrides the selected object's centre only (the live
+ * position during an in-progress drag, before the store commit lands on mouseup).
  */
 export function drawObjects(
   ctx: CanvasRenderingContext2D,
   d: LevelDoc,
   invZoom: number,
+  sprites: Map<number, ObjectSprite>,
   selectedIndex?: number | null,
   previewPos?: { x: number; y: number } | null,
 ): void {
@@ -129,16 +145,35 @@ export function drawObjects(
     const isSel = selectedIndex != null && i === selectedIndex;
     const ox = isSel && previewPos ? previewPos.x : obj.x;
     const oy = isSel && previewPos ? previewPos.y : obj.y;
+    const sprite = sprites.get(obj.id) ?? null;
+    // Selection box: sized to the drawn frame when a sprite is loaded, else the
+    // legacy anchor box. Computed per-object so it tracks flips + frame size.
+    let selRect = { left: ox - 11, top: oy - 11, width: 22, height: 22 };
+
     if (obj.id === RING_OBJ_ID) {
-      // Expand a ring group to its individual rings (S1 Ring_Main rule).
-      ctx.fillStyle = RING_FILL;
-      ctx.strokeStyle = RING_STROKE;
-      for (const p of ringGroupPositions(obj.subtype, ox, oy)) {
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, 6, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.stroke();
+      const positions = ringGroupPositions(obj.subtype, ox, oy);
+      if (sprite) {
+        for (const p of positions) drawSprite(ctx, sprite, p.x, p.y, obj.xflip, obj.yflip);
+        // Selection box spans the whole ring row/column footprint.
+        const rects = positions.map((p) => objectFrameRect(sprite, p.x, p.y, obj.xflip, obj.yflip));
+        const l = Math.min(...rects.map((r) => r.left));
+        const t = Math.min(...rects.map((r) => r.top));
+        const r2 = Math.max(...rects.map((r) => r.left + r.width));
+        const b2 = Math.max(...rects.map((r) => r.top + r.height));
+        selRect = { left: l, top: t, width: r2 - l, height: b2 - t };
+      } else {
+        ctx.fillStyle = RING_FILL;
+        ctx.strokeStyle = RING_STROKE;
+        for (const p of positions) {
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, 6, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+        }
       }
+    } else if (sprite) {
+      drawSprite(ctx, sprite, ox, oy, obj.xflip, obj.yflip);
+      selRect = objectFrameRect(sprite, ox, oy, obj.xflip, obj.yflip);
     } else {
       ctx.fillStyle = OBJECT_BOX_FILL;
       ctx.fillRect(ox - 8, oy - 8, 16, 16);
@@ -148,10 +183,11 @@ export function drawObjects(
       ctx.fillText(obj.id.toString(16).toUpperCase().padStart(2, '0'), ox, oy + 3 * invZoom);
     }
     if (isSel) {
-      // Highlight ring around the marker anchor, drawn last so it sits on top.
+      // Highlight box around the drawn frame, drawn last so it sits on top.
       ctx.strokeStyle = OBJECT_SELECTED_STROKE;
       ctx.lineWidth = 2 * invZoom;
-      ctx.strokeRect(ox - 11, oy - 11, 22, 22);
+      const pad = 2 * invZoom;
+      ctx.strokeRect(selRect.left - pad, selRect.top - pad, selRect.width + pad * 2, selRect.height + pad * 2);
       ctx.lineWidth = 1 * invZoom;
     }
   });

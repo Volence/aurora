@@ -7,6 +7,7 @@
 
 import type { LayoutGrid } from '../../../core/level-classic/model';
 import type { S1ObjectEntry } from '../../../core/formats/classic/s1-objpos';
+import { objectFrameRect, pointInRect } from '../../../core/level-classic/object-sprite';
 
 /** A chunk is a 256x256 world-pixel cell in the FG/BG layout grid. */
 export const CHUNK_PX = 256;
@@ -208,6 +209,64 @@ export function hitTestPoint(
   const dy = targetY - worldY;
   return dx * dx + dy * dy <= radiusWorld * radiusWorld;
 }
+
+/** Frame bounds for one object id: size + signed origin of its rendered sprite. */
+export interface ObjectHitBounds {
+  width: number;
+  height: number;
+  originX: number;
+  originY: number;
+}
+
+/** A default anchor-centred box (half-extent) for objects with no linked sprite. */
+function anchorBounds(radius: number): ObjectHitBounds {
+  return { width: radius * 2, height: radius * 2, originX: radius, originY: radius };
+}
+
+/**
+ * Frame-bounds hit-test (Task B1) — the upgrade from anchor-radius `hitTestObject`.
+ *
+ * For each object, `boundsFor(obj, index)` yields its rendered frame bounds (from
+ * the object-sprite cache) or null when no sprite is linked; a null falls back to
+ * an anchor-centred `fallbackRadius` box (so unlinked hex-box objects stay
+ * grabbable at their old tolerance). The hit region is the frame's world rect,
+ * flip-aware (`objectFrameRect`). Object $25 (a ring GROUP) is special-cased:
+ * each expanded ring's own box is tested, so clicking a far ring in the row/column
+ * selects the group — closing the ring-footprint gap the anchor-only test left.
+ *
+ * The LAST (topmost-drawn) object whose region contains the point wins, matching
+ * the draw order (later objects paint over earlier ones).
+ */
+export function hitTestObjectFrames(
+  objects: readonly S1ObjectEntry[],
+  worldX: number,
+  worldY: number,
+  boundsFor: (obj: S1ObjectEntry, index: number) => ObjectHitBounds | null,
+  fallbackRadius: number,
+): number | null {
+  let best: number | null = null;
+  for (let i = 0; i < objects.length; i++) {
+    const o = objects[i];
+    const bounds = boundsFor(o, i) ?? anchorBounds(fallbackRadius);
+    if (o.id === RING_GROUP_OBJ_ID) {
+      // A ring group: test each expanded ring's own box (anchored at that ring).
+      for (const p of ringGroupPositions(o.subtype, o.x, o.y)) {
+        if (pointInRect(objectFrameRect(bounds, p.x, p.y, o.xflip, o.yflip), worldX, worldY)) {
+          best = i;
+          break;
+        }
+      }
+      continue;
+    }
+    if (pointInRect(objectFrameRect(bounds, o.x, o.y, o.xflip, o.yflip), worldX, worldY)) {
+      best = i;
+    }
+  }
+  return best;
+}
+
+/** S1 ring object id — expands into a visible ring group (kept local to avoid a cycle). */
+const RING_GROUP_OBJ_ID = 0x25;
 
 export interface RingPos {
   x: number;

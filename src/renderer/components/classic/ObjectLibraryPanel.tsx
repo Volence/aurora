@@ -1,27 +1,78 @@
-import React from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { T } from '../ui';
 import { useClassicLevelStore } from '../../state/classicLevelStore';
+import { useClassicProjectStore } from '../../state/classicProjectStore';
+import { loadObjectSprite, useClassicObjectArtStore } from '../../state/classicObjectArtStore';
 import { S1_OBJECT_LIST, s1ObjectHex } from '../../../core/project/profiles/s1-objects';
+import { resolveObjectArt } from '../../../core/project/profiles/s1-object-art';
+
+const THUMB = 28;
 
 /**
- * Object library panel (Task 14). A scrollable list of the named S1 objects
- * (id + name text rows — sprite thumbnails are a later registry payoff). Click a
- * row to ARM it for placement: the object tool activates and the next click on
- * the map drops a new object of that id (default subtype 0, no flips). The armed
- * row is highlighted; clicking it again disarms. Placement itself, and the
- * revert-to-select-on-place, live in ClassicLevelViewport.
- *
- * The place idiom mirrors the stamp tool's chunk-selection (selectedChunkId +
- * paint): a persistent armed selection, not an HTML5 drag — the simplest robust
- * option that matches the repo's existing pick-then-act flow.
+ * A row thumbnail for a linked object id (Task B1). Follows the ChunkPicker
+ * ThumbCell pattern: the render effect depends ONLY on the version key
+ * (`id:zone:epoch`), never on doc identity — so it re-renders when the palette
+ * epoch or zone changes, not on every unrelated edit. `loadObjectSprite` reuses
+ * the shared (id, palette-version) cache, so this shares canvases with the
+ * viewport rather than rendering its own copy. Ids with no linked art draw
+ * nothing (the caller shows the hex chip only).
+ */
+const ObjectThumb = React.memo(function ObjectThumb({
+  id, zone, epoch, dir,
+}: {
+  id: number;
+  zone: string;
+  epoch: number;
+  dir: string | null;
+}) {
+  const ref = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    const canvas = ref.current;
+    const ctx = canvas?.getContext('2d');
+    if (!ctx) return;
+    ctx.clearRect(0, 0, THUMB, THUMB);
+    if (!dir) return;
+    const doc = useClassicLevelStore.getState().doc;
+    if (!doc) return;
+    let cancelled = false;
+    void loadObjectSprite(dir, doc, id, zone, epoch).then((sprite) => {
+      if (cancelled || !sprite) return;
+      const c = ref.current?.getContext('2d');
+      if (!c) return;
+      c.imageSmoothingEnabled = false;
+      // Fit the sprite into the THUMB box preserving aspect, centred.
+      const scale = Math.min(THUMB / sprite.width, THUMB / sprite.height, 1);
+      const w = Math.max(1, Math.round(sprite.width * scale));
+      const h = Math.max(1, Math.round(sprite.height * scale));
+      c.clearRect(0, 0, THUMB, THUMB);
+      c.drawImage(sprite.bitmap, (THUMB - w) / 2, (THUMB - h) / 2, w, h);
+    });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, zone, epoch, dir]);
+  return <canvas ref={ref} width={THUMB} height={THUMB} style={styles.thumb} />;
+});
+
+/**
+ * Object library panel (Task 14 + B1 thumbnails). A scrollable list of the named
+ * S1 objects (thumbnail + id + name rows). Click a row to ARM it for placement:
+ * the object tool activates and the next click on the map drops a new object of
+ * that id. The armed row is highlighted; clicking it again disarms.
  */
 export default function ObjectLibraryPanel() {
   const status = useClassicLevelStore((s) => s.status);
+  const ref = useClassicLevelStore((s) => s.ref);
+  const chunkEpoch = useClassicLevelStore((s) => s.chunkEpoch);
   const armedObjectId = useClassicLevelStore((s) => s.armedObjectId);
   const setArmedObjectId = useClassicLevelStore((s) => s.setArmedObjectId);
   const setTool = useClassicLevelStore((s) => s.setTool);
+  const dir = useClassicProjectStore((s) => s.dir);
+  // Redraw thumbnails when object-art republishes (shared cache warms up).
+  const [, setTick] = useState(0);
+  useEffect(() => useClassicObjectArtStore.subscribe(() => setTick((n) => n + 1)), []);
 
   if (status !== 'ready') return null;
+  const zone = ref?.zone ?? '';
 
   const arm = (id: number) => {
     if (armedObjectId === id) {
@@ -36,6 +87,7 @@ export default function ObjectLibraryPanel() {
     <div style={styles.list} role="listbox" aria-label="Object library">
       {S1_OBJECT_LIST.map(({ id, name }) => {
         const armed = armedObjectId === id;
+        const linked = resolveObjectArt(id, zone) !== undefined;
         return (
           <button
             key={id}
@@ -45,6 +97,9 @@ export default function ObjectLibraryPanel() {
             title={`Place ${name} (${s1ObjectHex(id)})`}
             style={{ ...styles.row, ...(armed ? styles.rowArmed : {}) }}
           >
+            <span style={styles.thumbWrap}>
+              {linked ? <ObjectThumb id={id} zone={zone} epoch={chunkEpoch} dir={dir} /> : null}
+            </span>
             <span style={{ ...styles.hex, ...(armed ? styles.hexArmed : {}) }}>{s1ObjectHex(id)}</span>
             <span style={styles.name}>{name}</span>
           </button>
@@ -62,6 +117,13 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: T.rMd, cursor: 'pointer', textAlign: 'left', color: T.textBase,
   },
   rowArmed: { background: T.accent, borderColor: T.accent, color: T.onAccent },
+  thumbWrap: {
+    width: THUMB, height: THUMB, flexShrink: 0, display: 'flex',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  thumb: {
+    width: THUMB, height: THUMB, imageRendering: 'pixelated' as const, display: 'block',
+  },
   hex: {
     fontFamily: T.fontMono, fontSize: 10, color: T.textLo, width: 30, flexShrink: 0,
   },

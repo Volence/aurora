@@ -1,13 +1,16 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { T, Chip, OptionBar, Divider } from '../ui';
 import { useClassicLevelStore, classicSetLayoutCells, classicSetObjects, classicSetStart } from '../../state/classicLevelStore';
+import { useClassicProjectStore } from '../../state/classicProjectStore';
+import { useClassicObjectArtStore, refreshClassicObjectSprites } from '../../state/classicObjectArtStore';
 import { useToastStore } from '../../state/toastStore';
 import { renderChunk } from '../../../core/level-classic/render';
 import type { LevelDoc } from '../../../core/level-classic/model';
 import { s1ObjectName } from '../../../core/project/profiles/s1-objects';
 import {
   CHUNK_PX, visibleChunkRange, layoutCellAt, screenToWorld,
-  worldToLayoutCell, addStampCell, stampAccumToCells, hitTestObject, hitTestPoint, type StampCell,
+  worldToLayoutCell, addStampCell, stampAccumToCells, hitTestObjectFrames, hitTestPoint,
+  type ObjectHitBounds, type StampCell,
 } from './viewport-math';
 import { drawCollision, drawObjects, drawStart } from './classic-overlays';
 import {
@@ -79,6 +82,12 @@ export default function ClassicLevelViewport() {
   const armedObjectId = useClassicLevelStore((s) => s.armedObjectId);
   const setSelectedObjectIndex = useClassicLevelStore((s) => s.setSelectedObjectIndex);
   const setArmedObjectId = useClassicLevelStore((s) => s.setArmedObjectId);
+  // Task B1 object sprites: real art keyed by object id. The published map +
+  // version are read by the render pass; `version` bumps on every republish (a
+  // sprite finished loading), which re-runs the depless render effect below.
+  const objectSprites = useClassicObjectArtStore((s) => s.sprites);
+  const objectArtVersion = useClassicObjectArtStore((s) => s.version);
+  const projectDir = useClassicProjectStore((s) => s.dir);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -138,6 +147,23 @@ export default function ClassicLevelViewport() {
     },
     [],
   );
+
+  // Object-sprite refresh (Task B1): render (or reuse cached) the real art for
+  // every linked object id in the act, against the live palette. Keyed by the
+  // distinct object-id set, the palette epoch (chunkEpoch bumps on palette edits),
+  // the act ref, and the project dir — so it re-runs when a new id is placed, the
+  // palette changes, or a different act loads, but NOT on every drag frame. The
+  // refresh itself is idempotent (cached per id:zone:epoch).
+  const objectIdSig = doc
+    ? [...new Set(doc.objects.map((o) => o.id))].sort((a, b) => a - b).join(',')
+    : '';
+  useEffect(() => {
+    const d = useClassicLevelStore.getState().doc;
+    const r = useClassicLevelStore.getState().ref;
+    if (!d || !r || !projectDir) return;
+    void refreshClassicObjectSprites(projectDir, d, r.zone, chunkEpoch);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [objectIdSig, chunkEpoch, projectDir, ref]);
 
   // Fit the level's height into the canvas on a fresh doc, anchored top-left.
   useEffect(() => {
@@ -217,7 +243,10 @@ export default function ClassicLevelViewport() {
             : null;
         const drag = objDragRef.current;
         const previewPos = drag && drag.index === selIndex ? drag.preview : null;
-        drawObjects(ctx, doc, invZoom, selIndex, previewPos);
+        // objectArtVersion is read so this depless render effect re-runs when a
+        // sprite finishes loading (the store republishes + bumps version).
+        void objectArtVersion;
+        drawObjects(ctx, doc, invZoom, objectSprites, selIndex, previewPos);
       }
       if (overlays.start) {
         // During a start drag the ref carries the live (clamped) preview position.
@@ -354,9 +383,17 @@ export default function ClassicLevelViewport() {
         redraw();
         return;
       }
-      // Hit-test with a constant on-screen tolerance (world radius = px / zoom).
+      // Hit-test with frame bounds where a sprite is loaded (else a constant
+      // on-screen anchor tolerance, world radius = px / zoom). The bounds resolver
+      // reads the live sprite map; a ring group ($25) is expanded per-ring inside
+      // hitTestObjectFrames so a far ring in the row/column is grabbable.
       const pickWorld = OBJECT_PICK_PX / camRef.current.zoom;
-      const hit = hitTestObject(d.objects, world.x, world.y, pickWorld);
+      const sprites = useClassicObjectArtStore.getState().sprites;
+      const boundsFor = (o: { id: number }): ObjectHitBounds | null => {
+        const s = sprites.get(o.id);
+        return s ? { width: s.width, height: s.height, originX: s.originX, originY: s.originY } : null;
+      };
+      const hit = hitTestObjectFrames(d.objects, world.x, world.y, boundsFor, pickWorld);
       if (hit == null) {
         // No object under the cursor — try the start marker (only while it's
         // visible, so you can only grab what you can see). Objects win ties: an

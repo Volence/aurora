@@ -36,7 +36,7 @@ const CHUNK_PX = 256;
 // Arg parsing
 // ---------------------------------------------------------------------------
 function parseArgs(argv) {
-  const a = { zone: 'GHZ', act: 1, plane: 'fg', out: null, crop: null, scale: 1 };
+  const a = { zone: 'GHZ', act: 1, plane: 'fg', out: null, crop: null, scale: 1, objects: false };
   for (let i = 0; i < argv.length; i++) {
     const k = argv[i];
     const v = argv[i + 1];
@@ -46,6 +46,7 @@ function parseArgs(argv) {
     else if (k === '--out') { a.out = v; i++; }
     else if (k === '--crop') { a.crop = v.split(',').map(Number); i++; }
     else if (k === '--scale') { a.scale = Number(v); i++; }
+    else if (k === '--objects') { a.objects = true; }
   }
   if (!a.out) throw new Error('--out <path> is required');
   return a;
@@ -58,7 +59,11 @@ async function loadCore() {
   const entry = `
     export { s1Adapter } from ${JSON.stringify(path.join(REPO, 'src/core/project/s1/index.ts'))};
     export { renderChunk } from ${JSON.stringify(path.join(REPO, 'src/core/level-classic/render.ts'))};
-    export { layoutCellAt } from ${JSON.stringify(path.join(REPO, 'src/renderer/components/classic/viewport-math.ts'))};
+    export { layoutCellAt, ringGroupPositions } from ${JSON.stringify(path.join(REPO, 'src/renderer/components/classic/viewport-math.ts'))};
+    export { renderObjectFrameFromFiles, objectFrameRect } from ${JSON.stringify(path.join(REPO, 'src/core/level-classic/object-sprite.ts'))};
+    export { resolveObjectArt } from ${JSON.stringify(path.join(REPO, 'src/core/project/profiles/s1-object-art.ts'))};
+    export { indicesToRGBA } from ${JSON.stringify(path.join(REPO, 'src/core/art/sprite-render.ts'))};
+    export { decodeGenesisColor } from ${JSON.stringify(path.join(REPO, 'src/core/formats/palette.ts'))};
   `;
   const outfile = path.join(os.tmpdir(), `classic-core-${process.pid}.mjs`);
   await build({
@@ -129,6 +134,77 @@ function composePlane(doc, renderChunk, layoutCellAt, plane, crop) {
   return { data: out, width: W, height: H };
 }
 
+// ---------------------------------------------------------------------------
+// Object overlay — draws the REAL object sprites onto the composed plane using
+// the SAME core helpers the app viewport uses (resolveObjectArt linkage +
+// renderObjectFrameFromFiles + objectFrameRect + palette). fs reads the art/map
+// files (this is a harness). Ring groups ($25) expand per-ring.
+// ---------------------------------------------------------------------------
+function overlayObjects(img, doc, core, zone, crop) {
+  const { renderObjectFrameFromFiles, objectFrameRect, resolveObjectArt, indicesToRGBA, decodeGenesisColor, ringGroupPositions } = core;
+  const offX = crop ? crop[0] * CHUNK_PX : 0;
+  const offY = crop ? crop[1] * CHUNK_PX : 0;
+  const { data, width, height } = img;
+  const RING_ID = 0x25;
+  let linked = 0, unlinked = 0;
+
+  // Cache rendered frames by `id` (all placements of an id share art/palette).
+  const frameCache = new Map();
+  const getFrame = (id) => {
+    if (frameCache.has(id)) return frameCache.get(id);
+    const link = resolveObjectArt(id, zone);
+    let entry = null;
+    if (link) {
+      try {
+        const artBytes = new Uint8Array(fs.readFileSync(path.join(S1DIR, link.artFile)));
+        const mapText = fs.readFileSync(path.join(S1DIR, link.mapAsm), 'latin1');
+        const f = renderObjectFrameFromFiles(mapText, artBytes, link.compression, link.frame);
+        const colorsLine = doc.palettes[link.pal] ?? doc.palettes[0] ?? new Uint16Array(16);
+        const colors = [];
+        for (let i = 0; i < 16; i++) colors.push(decodeGenesisColor(colorsLine[i] ?? 0));
+        const rgba = indicesToRGBA(f.indices, colors);
+        entry = { rgba, width: f.width, height: f.height, originX: f.originX, originY: f.originY };
+      } catch { entry = null; }
+    }
+    frameCache.set(id, entry);
+    return entry;
+  };
+
+  // Blit one frame (flip-aware) with its top-left in world coords.
+  const blitFrame = (frame, anchorX, anchorY, xflip, yflip) => {
+    const rect = objectFrameRect(frame, anchorX, anchorY, xflip, yflip);
+    const sx0 = Math.round(rect.left) - offX;
+    const sy0 = Math.round(rect.top) - offY;
+    for (let py = 0; py < frame.height; py++) {
+      for (let px = 0; px < frame.width; px++) {
+        const srcX = xflip ? frame.width - 1 - px : px;
+        const srcY = yflip ? frame.height - 1 - py : py;
+        const so = (srcY * frame.width + srcX) * 4;
+        if (frame.rgba[so + 3] === 0) continue;
+        const dx = sx0 + px, dy = sy0 + py;
+        if (dx < 0 || dy < 0 || dx >= width || dy >= height) continue;
+        const doff = (dy * width + dx) * 4;
+        data[doff] = frame.rgba[so];
+        data[doff + 1] = frame.rgba[so + 1];
+        data[doff + 2] = frame.rgba[so + 2];
+        data[doff + 3] = 255;
+      }
+    }
+  };
+
+  for (const obj of doc.objects) {
+    const frame = getFrame(obj.id);
+    if (!frame) { unlinked++; continue; }
+    linked++;
+    if (obj.id === RING_ID) {
+      for (const p of ringGroupPositions(obj.subtype, obj.x, obj.y)) blitFrame(frame, p.x, p.y, obj.xflip, obj.yflip);
+    } else {
+      blitFrame(frame, obj.x, obj.y, obj.xflip, obj.yflip);
+    }
+  }
+  return { linked, unlinked };
+}
+
 function scaleNearest(img, scale) {
   if (scale <= 1) return img;
   const W = img.width * scale;
@@ -196,7 +272,8 @@ async function main() {
   const args = parseArgs(process.argv.slice(2));
   if (!fs.existsSync(S1DIR)) throw new Error(`s1disasm not found at ${S1DIR}`);
 
-  const { s1Adapter, renderChunk, layoutCellAt } = await loadCore();
+  const core = await loadCore();
+  const { s1Adapter, renderChunk, layoutCellAt } = core;
   const fa = realFs(S1DIR);
   const match = await s1Adapter.detect(fa);
   if (!match) throw new Error('s1disasm did not fingerprint as an S1 project');
@@ -210,6 +287,10 @@ async function main() {
   const doc = await handle.levels.read(ref);
   const grid = args.plane === 'bg' ? doc.bg : doc.fg;
   let img = composePlane(doc, renderChunk, layoutCellAt, args.plane, args.crop);
+  let objStats = null;
+  if (args.objects && args.plane === 'fg') {
+    objStats = overlayObjects(img, doc, core, ref.zone, args.crop);
+  }
   img = scaleNearest(img, args.scale);
 
   fs.mkdirSync(path.dirname(args.out), { recursive: true });
@@ -217,7 +298,8 @@ async function main() {
   console.log(
     `${args.zone}${args.act} ${args.plane}: grid ${grid.width}x${grid.height} chunks, ` +
     `${doc.chunks.length} chunks / ${doc.blocks.length} blocks / ${doc.objects.length} objects → ` +
-    `${img.width}x${img.height}px → ${args.out}`,
+    `${img.width}x${img.height}px → ${args.out}` +
+    (objStats ? ` [objects: ${objStats.linked} drawn / ${objStats.unlinked} hex-fallback]` : ''),
   );
 }
 
