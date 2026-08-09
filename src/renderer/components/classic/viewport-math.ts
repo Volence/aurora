@@ -158,6 +158,13 @@ export function stampAccumToCells(
  * This is FG-plane only by contract: S1 objects live on the foreground plane, so
  * the caller only invokes this while the FG plane is shown; the function itself
  * is plane-agnostic (it just scans the one object list the doc has).
+ *
+ * FOLLOW-UP (known limitation): the pick area is the marker ANCHOR only. A ring
+ * group (object $25) draws as a spread-out row/column of rings, but only its
+ * origin (obj.x, obj.y) is hit-testable — clicking a far ring in the group won't
+ * select it. A richer version would test each object's rendered footprint (the
+ * ring positions from `ringGroupPositions`, the 16px box for others); that fix
+ * would land here, widening the per-object test beyond the single anchor point.
  */
 export function hitTestObject(
   objects: readonly S1ObjectEntry[],

@@ -457,6 +457,35 @@ describe('s1-io (e) synthetic round-trip with a mutation', () => {
     expect(back[1].id).toBe(0x26);
   });
 
+  it('preserves an X-inverted original order verbatim when the list is unchanged', async () => {
+    // The preservation branch of the conditional sort: some real S1 files carry a
+    // minor X inversion the loader tolerates (GHZ act 3). A dirty-but-unchanged
+    // objpos save (e.g. saving with ALL domains dirty while only tiles were
+    // edited) must emit the ORIGINAL order untouched, NOT a sorted one — otherwise
+    // the zero-edit round-trip would stop being byte-identical for those files.
+    const { fa, act, paths } = buildSynthetic();
+    const state = await readS1Level(act, paths, fa);
+
+    // Install a deliberately X-inverted original (as if decoded from such a file),
+    // and set doc.objects to the SAME list (content-equal → the sort is skipped).
+    const inverted = [
+      { x: 300, y: 10, xflip: false, yflip: false, respawn: false, id: 0x0d, subtype: 0 },
+      { x: 200, y: 20, xflip: false, yflip: false, respawn: false, id: 0x25, subtype: 1 }, // 200 < 300: inverted
+      { x: 250, y: 30, xflip: false, yflip: false, respawn: false, id: 0x41, subtype: 2 },
+    ];
+    state.read.objposOriginal = inverted.map((o) => ({ ...o }));
+    state.doc.objects = inverted.map((o) => ({ ...o }));
+
+    const result = writeS1Level(state, { objects: true });
+    expect(result.errors).toEqual([]);
+
+    // The written file must reproduce the inverted order EXACTLY (no sort).
+    const written = result.files.find((f) => f.path === 'objpos/syn.bin')!;
+    const back = decodeS1Objpos(written.bytes);
+    expect(back.map((o) => o.x)).toEqual([300, 200, 250]);
+    expect(back.map((o) => o.id)).toEqual([0x0d, 0x25, 0x41]);
+  });
+
   it('a broken enigma encoder routes the blocks file to errors (synthetic)', async () => {
     const { fa, act, paths } = buildSynthetic();
     const state = await readS1Level(act, paths, fa);

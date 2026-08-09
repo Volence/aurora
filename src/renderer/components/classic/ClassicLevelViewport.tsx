@@ -453,8 +453,15 @@ export default function ClassicLevelViewport() {
   // guarded against text-entry the same way the undo keys are (ClassicProjectView)
   // so a hex/number field edit can't be hijacked into a deletion.
   useEffect(() => {
+    const isTyping = (t: HTMLElement): boolean =>
+      t.isContentEditable || t.tagName === 'TEXTAREA'
+      || (t.tagName === 'INPUT' && !['range', 'checkbox', 'button', 'radio'].includes((t as HTMLInputElement).type));
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
+        // While editing an inspector field, Escape belongs to that field (revert /
+        // blur) — the viewport must not clear the selection and unmount the field
+        // mid-edit. Guarded like the Delete keys.
+        if (isTyping(e.target as HTMLElement)) return;
         if (strokeRef.current) { strokeRef.current = null; redraw(); return; }
         if (objDragRef.current) { objDragRef.current = null; redraw(); return; }
         const s = useClassicLevelStore.getState();
@@ -463,10 +470,7 @@ export default function ClassicLevelViewport() {
         return;
       }
       if (e.key === 'Delete' || e.key === 'Backspace') {
-        const t = e.target as HTMLElement;
-        const typing = t.isContentEditable || t.tagName === 'TEXTAREA'
-          || (t.tagName === 'INPUT' && !['range', 'checkbox', 'button', 'radio'].includes((t as HTMLInputElement).type));
-        if (typing) return;
+        if (isTyping(e.target as HTMLElement)) return;
         const s = useClassicLevelStore.getState();
         const idx = s.selectedObjectIndex;
         if (idx == null || !s.doc || idx >= s.doc.objects.length) return;
