@@ -7,7 +7,7 @@ import {
   packNametableWord, unpackNametableWord, createChunkDef,
 } from '../../core/model/s4-types';
 import type { Tile, Zone, Act } from '../../core/model/s4-types';
-import { validatePaletteLine, validateTilePixels, validatePaintRegion, validateEntries, validateChunkCollisionPlane } from '../../core/agent/validation';
+import { validatePaletteLine, validateTilePixels, validatePaintRegion, validateEntries, validateChunkCollisionPlane, validatePaintCollisionRect } from '../../core/agent/validation';
 import { computeActBudget, canonicalTileHash } from '../../core/agent/budget';
 import { decodeGenesisColor, encodeGenesisColor } from '../../core/formats/palette';
 import { BG_WIDTH } from '../../core/formats/bg-tiles';
@@ -258,19 +258,13 @@ async function handle(req: AgentRequest): Promise<unknown> {
 
     case 'paint-collision': {
       const ctx = requireProject();
-      if (!Number.isInteger(req.section) || req.section < 0 || req.section >= ctx.act.sections.length) {
-        throw new Error(`section ${req.section} out of range (0-${ctx.act.sections.length - 1})`);
-      }
+      const err = validatePaintCollisionRect(req.section, req.x, req.y, req.w, req.h, {
+        sectionCount: ctx.act.sections.length,
+        cellsW: SECTION_TILES_WIDE / 2, cellsH: SECTION_TILES_HIGH / 2,
+      });
+      if (err) throw new Error(err);
       const section = ctx.act.sections[req.section];
       if (!section) throw new Error(`section ${req.section} is empty`);
-      const cellsW = SECTION_TILES_WIDE / 2, cellsH = SECTION_TILES_HIGH / 2;
-      if (![req.x, req.y, req.w, req.h].every(Number.isInteger)) {
-        throw new Error(`region coords must be integers, got (${req.x},${req.y}) ${req.w}x${req.h}`);
-      }
-      if (req.w < 1 || req.h < 1 || req.x < 0 || req.y < 0 ||
-          req.x + req.w > cellsW || req.y + req.h > cellsH) {
-        throw new Error(`collision region ${req.w}x${req.h} cells at (${req.x},${req.y}) is out of bounds (section is ${cellsW}x${cellsH} cells)`);
-      }
       ensureCollisionPlanes(section);
       const plane = req.plane === 'b' ? section.collisionEditB! : section.collisionEdit!;
       const entries = paintCollisionRectEntries({

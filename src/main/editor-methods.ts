@@ -51,12 +51,12 @@ export const EDITOR_METHODS: EditorMethod[] = [
     params: {
       section: z.number().int().min(0),
       plane: z.enum(['a', 'b']),
-      x: z.number().int().min(0).describe('cell col (16px units, 0-127)'),
-      y: z.number().int().min(0).describe('cell row (16px units, 0-127)'),
+      x: z.number().int().min(0).max(127).describe('cell col (16px units, 0-127)'),
+      y: z.number().int().min(0).max(127).describe('cell row (16px units, 0-127)'),
       w: z.number().int().min(1).max(128), h: z.number().int().min(1).max(128),
       word: z.number().int().min(0).max(0xFFFF).describe('packed collision cell word (shape 9:0, xflip 10, yflip 11, solidity 13:12); 0 = air'),
     },
-    description: 'Fill a w*h CELL rectangle (16px units) of one collision plane with a packed cell word. One undo step.' },
+    description: 'Fill a w*h CELL rectangle (16px units) of one collision plane with a packed cell word. One undo step. Reply\'s "painted" counts 8px sub-tile entries actually changed, up to 4 per cell.' },
   { name: 'save_chunk', kind: 'save-chunk', result: 'json',
     params: {
       name: z.string().min(1), w: z.number().int().min(1).max(64), h: z.number().int().min(1).max(64), entries: z.array(entrySchema),

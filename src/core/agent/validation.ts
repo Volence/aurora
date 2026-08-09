@@ -72,6 +72,33 @@ export function validateChunkCollisionPlane(
   return null;
 }
 
+export interface PaintCollisionRectOptions {
+  sectionCount: number;
+  cellsW: number;
+  cellsH: number;
+}
+
+/** Validate a paint_collision rectangle. Coordinates are 16px CELL units
+ *  (half a section's tile dimensions), not tile units — mirrors
+ *  validatePaintRegion's shape/return convention but against cellsW/cellsH. */
+export function validatePaintCollisionRect(
+  section: number,
+  x: number, y: number, w: number, h: number,
+  opts: PaintCollisionRectOptions,
+): string | null {
+  if (!Number.isInteger(section) || section < 0 || section >= opts.sectionCount) {
+    return `section ${section} out of range (0-${opts.sectionCount - 1})`;
+  }
+  if (![x, y, w, h].every(Number.isInteger)) {
+    return `region coords must be integers, got (${x},${y}) ${w}x${h}`;
+  }
+  if (w < 1 || h < 1 || x < 0 || y < 0 ||
+      x + w > opts.cellsW || y + h > opts.cellsH) {
+    return `collision region ${w}x${h} cells at (${x},${y}) is out of bounds (section is ${opts.cellsW}x${opts.cellsH} cells)`;
+  }
+  return null;
+}
+
 export function validatePaintRegion(
   section: number,
   x: number, y: number, w: number, h: number,
