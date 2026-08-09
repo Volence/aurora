@@ -37,7 +37,9 @@ const ObjectThumb = React.memo(function ObjectThumb({
     if (!doc) return;
     let cancelled = false;
     void loadObjectSprite(dir, doc, id, zone, epoch).then((sprite) => {
-      if (cancelled || !sprite) return;
+      // bitmap.width === 0 ⇒ the cached bitmap was closed by an epoch eviction
+      // between load and draw; skip rather than throw on a detached source.
+      if (cancelled || !sprite || sprite.bitmap.width === 0) return;
       const c = ref.current?.getContext('2d');
       if (!c) return;
       c.imageSmoothingEnabled = false;

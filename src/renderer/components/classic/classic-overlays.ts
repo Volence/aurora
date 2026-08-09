@@ -145,7 +145,16 @@ export function drawObjects(
     const isSel = selectedIndex != null && i === selectedIndex;
     const ox = isSel && previewPos ? previewPos.x : obj.x;
     const oy = isSel && previewPos ? previewPos.y : obj.y;
-    const sprite = sprites.get(obj.id) ?? null;
+    // Detached-bitmap guard: an act switch publishes the new-epoch sprite map and
+    // then closes the PRIOR epoch's ImageBitmaps (classicObjectArtStore.evictStale).
+    // The main render effect has no dep array, so a render that committed with the
+    // previous map can still flush its draw AFTER those bitmaps were closed — and
+    // drawImage on a closed (detached) bitmap throws InvalidStateError, which would
+    // escape the effect and unmount the whole viewport. A closed ImageBitmap reports
+    // width/height === 0 (spec), so treat that as "no sprite" and fall back to the
+    // hex box / ring markers; the fresh map's live bitmaps redraw on the next frame.
+    const raw = sprites.get(obj.id);
+    const sprite = raw && raw.bitmap.width > 0 ? raw : null;
     // Selection box: sized to the drawn frame when a sprite is loaded, else the
     // legacy anchor box. Computed per-object so it tracks flips + frame size.
     let selRect = { left: ox - 11, top: oy - 11, width: 22, height: 22 };
