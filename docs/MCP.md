@@ -100,6 +100,8 @@ commands do, so an agent never loops single-cell calls.
 | `move_object`\* | `{ index, x, y }` | Moves the object at `index`. |
 | `delete_object`\* | `{ index }` | Deletes the object at `index`. |
 | `set_colind`\* | `{ entries: [{blockId, value}] }` | Sets block→collision-shape indices. |
+| `set_level_palette`\* | `{ line, colors: [16] }` | Writes one classic-level palette line (0-3) as 16 Genesis CRAM words (`0000BBB0GGG0RRR0`; index 0 transparent). Bumps the palette epoch so chunk art + object sprites refresh. Named `set_level_palette` (not `set_palette`) because the aeon `set_palette` already owns that name in the shared tool registry and the classic surface allows line 0. |
+| `set_start`\* | `{ x, y }` | Moves the player spawn point to `(x,y)` (both 16-bit; the startpos file has no terminator sentinel). |
 | `save_project` | `{}` | Saves every dirty act through the guarded (mtime-checked) write channel. Structured outcome: `saved` / `conflict` / `partial` / `error` / `nothing`. |
 
 \* One classic undo step each. Editing tools require a classic project AND an

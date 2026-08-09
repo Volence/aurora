@@ -120,22 +120,28 @@ What landed:
   deliberately mirrors the P1 aeon entity-placement interaction (§4.1) so the
   later aeon work reuses the same UI gestures behind a different backing command.
 
-**Deferrals carried into v1** (both recorded in the spec header):
-- **Aeon adapter is a routing marker.** `AeonProjectAdapter.open()` returns a
-  capability-marker handle; the renderer still runs the untouched
-  `useProject.loadFromPath` (zero behavior change). *Wrapping `loadFromPath` behind
-  `open()` (and populating the report) is deferred pending a core-callable aeon
-  loader.*
-- **Art-mode composer wiring for classic content editing** (tile/block/chunk pixel
-  edits) is deferred; the classic viewport/chunk-picker/object surfaces ship and
-  the commands are reachable via the `edit_chunk`/`edit_block` MCP tools.
-- **Palette editing UI** is deferred. `classicSetPalette` exists (validated + undo-
-  integrated + tested), but it is unreached: the Art-mode `PaletteEditor` is
-  aeon-store-coupled (reads projectStore/artStore/spriteStore + `executeCommand`, no
-  lines+callback props), so reuse needs a non-trivial extraction and was not forced.
-  It is also **MCP-reachable via no tool yet** — `agent-handler` wires
-  layout/chunk/block/object/colind but not palette (nor `set-start`) — so classic
-  palettes are editable neither in the UI nor over MCP. Wiring either is follow-up.
+**Deferrals — status after v1.1** (2026-08-09 afternoon, Tasks B1–B4 on the same
+branch; plan `plans/2026-08-09-classic-v1.1-batch.md`):
+- **Aeon adapter is a routing marker** — *STILL DEFERRED.* `AeonProjectAdapter.open()`
+  returns a capability-marker handle; the renderer still runs the untouched
+  `useProject.loadFromPath` (zero behavior change). Wrapping `loadFromPath` behind
+  `open()` (and populating the report) awaits a core-callable aeon loader.
+- **Composer wiring for classic content editing** — *CLOSED (v1.1 B3).* A
+  self-contained `ClassicComposerDock` (Chunk/Block/Tile tabs) edits tile pixels,
+  blocks, and chunks in the classic view with shared-structure UX (usage counts +
+  shared-edit warnings + duplicate-then-edit) — deliberately NOT wired into aeon's
+  Art mode.
+- **Palette editing UI + MCP** — *CLOSED (v1.1 B4).* A `ClassicPalettePanel` (4×16
+  swatch grid) edits the act palette through a reusable Genesis RGB-slider control
+  (extracted from `PaletteEditor`'s idiom, decoupled from the aeon stores); each
+  color commits one `classicSetPalette`, whose epoch bump refreshes chunk art +
+  object sprites + thumbnails live. MCP now wires `set_level_palette` (classic
+  `set_palette` — renamed to avoid the aeon `set_palette` name in the flat tool
+  registry) and `set_start`.
+- **Object art + loop authoring** — *CLOSED (v1.1 B1/B4).* Placed objects render
+  their real S1 sprite art in the viewport (B1); loop-de-loop layout cells are
+  authorable (the chunk picker's Loop toggle stamps S1's bit-7 flag; the viewport
+  draws a corner glyph; the eyedropper preserves the flag) (B4).
 
 ## 3. The domain map
 

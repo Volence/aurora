@@ -1,7 +1,22 @@
 <!--
-Authored 2026-08-09 (Claude Fable 5 + user brainstorm). Status: IMPLEMENTED (v1),
+Authored 2026-08-09 (Claude Fable 5 + user brainstorm). Status: IMPLEMENTED (v1.1),
 2026-08-09 — Milestones M1–M7 landed on branch feature/disasm-project (plan
-docs/plans/2026-08-09-disasm-project-abstraction.md). Two scoped deferrals in v1:
+docs/plans/2026-08-09-disasm-project-abstraction.md), then the v1.1 batch (Tasks
+B1–B4, plan docs/plans/2026-08-09-classic-v1.1-batch.md) closed the composer +
+palette deferrals below (plus object-art rendering and loop-chunk authoring). The
+only deferral still open is §2.7 aeon migration.
+
+  v1.1 CLOSURE:
+  • §2.4 composer wiring — CLOSED (B3). A self-contained ClassicComposerDock
+    (Chunk/Block/Tile tabs) edits tile pixels/blocks/chunks in the classic view with
+    shared-structure UX; deliberately NOT wired into aeon's Art mode.
+  • §2.4 palette editing UI + MCP — CLOSED (B4). ClassicPalettePanel (4×16 swatches)
+    edits the act palette via a reusable Genesis RGB-slider control extracted from
+    PaletteEditor's idiom (decoupled from the aeon stores); MCP wires set_level_palette
+    (the classic set_palette, renamed to dodge the aeon set_palette name in the flat
+    tool registry) and set_start.
+
+Original v1 deferrals (of which only the first remains):
   • §2.7 aeon migration — `AeonProjectAdapter` is a routing MARKER: detect keys on
     project.json engine:"s4" so aeon participates in the single detectProject
     registry, but open() returns a capability-marker handle and the renderer still
