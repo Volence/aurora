@@ -471,7 +471,10 @@ export const s1Profile: ClassicProfile = {
           objpos: v('objpos/sbz2.bin'),
           startpos: v('startpos/sbz2.bin'),
           palette: basePalette('SBZ Act 2.bin'),
-          animatedArt: SBZ_ANIM,
+          // [Scrap Brain Zone Act 2] lists NO animtiles in the INI — only Act 1
+          // does. Unlike GHZ/MZ (which repeat their animtiles on every act), SBZ
+          // does not, so Act 2 must stay empty.
+          animatedArt: [],
         },
         {
           // Scrap Brain Zone Act 3 is internally Labyrinth-style (the engine's
