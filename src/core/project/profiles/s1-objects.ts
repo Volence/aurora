@@ -96,6 +96,28 @@ export const S1_OBJECT_NAMES: Readonly<Record<number, string>> = {
   0x7d: 'Hidden Point Bonus',
 };
 
+/**
+ * Ids that are invisible / trigger objects in-game — they have no real sprite (SonLVL
+ * marks them `debug=True` and draws a placeholder box, or they are pure triggers /
+ * invisible controllers). The viewport draws these as a muted "ghost marker" labelled
+ * with the object NAME (distinct from the red hex box that flags a not-yet-linked id),
+ * so an author can see and grab them without mistaking them for un-ported art.
+ * Transcribed from the SonLVL objdefs (Common/*.xml `debug=True`, per-zone INIs).
+ */
+export const S1_INVISIBLE_OBJECT_IDS: ReadonlySet<number> = new Set<number>([
+  0x13, // Fireball Spawner (Common/FireballSpawner.xml, debug — invisible spawner)
+  0x49, // Waterfall Sound Effect (objGHZ.ini debug=True, no art — SFX trigger)
+  0x54, // Invisible Lava Marker (Common/Invisible lava marker.xml, debug region marker)
+  0x68, // Conveyor Belt Controller (SBZ/ConveyorBelt.cs debug — invisible controller)
+  0x71, // Invisible Block (Common/InvisibleBlock.cs debug — invisible solid)
+  0x72, // Teleporter (objSBZ.ini debug=True, no art — trigger)
+]);
+
+/** Whether an id is an invisible / trigger object (ghost-marker styling). */
+export function s1ObjectIsInvisible(id: number): boolean {
+  return S1_INVISIBLE_OBJECT_IDS.has(id);
+}
+
 /** Uppercase `$XX` hex for an object id. */
 export function s1ObjectHex(id: number): string {
   return `$${(id & 0xff).toString(16).toUpperCase().padStart(2, '0')}`;

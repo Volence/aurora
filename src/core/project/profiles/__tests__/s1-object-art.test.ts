@@ -71,6 +71,22 @@ describe('s1-object-art linkage table', () => {
     expect(resolveObjectArt(0x1e, 'sbz')?.artFile).toContain('Ball Hog'); // SBZ
   });
 
+  it('links the B5 sweep additions (rule + static) across zones', () => {
+    // Rule objects gained a base art link so their composite can render.
+    expect(resolveObjectArt(0x11, 'ghz')?.mapAsm).toContain('Bridge'); // Bridge
+    expect(resolveObjectArt(0x15, 'ghz')?.artFile).toContain('Swinging Platform'); // Swinging Platform
+    expect(resolveObjectArt(0x44, 'ghz')?.artFile).toContain('Edge Wall'); // Wall Barrier
+    expect(resolveObjectArt(0x3c, 'ghz')?.artFile).toContain('Breakable Wall'); // GHZ Breakable Wall
+    // New static single-frame links.
+    expect(resolveObjectArt(0x0b, 'lz')?.artFile).toContain('Breakable Pole'); // LZ Pole
+    expect(resolveObjectArt(0x16, 'lz')?.frame).toBe(3); // Harpoon default = vertical (frame 3)
+    expect(resolveObjectArt(0x64, 'lz')?.frame).toBe(19); // Bubbles (img1 = frame 19)
+    expect(resolveObjectArt(0x32, 'mz')?.artFile).toContain('MZ Switch'); // MZ Switch
+    expect(resolveObjectArt(0x6d, 'sbz')?.frame).toBe(9); // SBZ Flamethrower (frame 9)
+    expect(resolveObjectArt(0x52, 'sbz')?.pal).toBe(1); // SBZ stomper (frame2special, pal 1)
+    expect(resolveObjectArt(0x5d, 'slz')?.artFile).toContain('Fan'); // SLZ Fan
+  });
+
   it('linkedObjectIds includes the base ids plus the zone overrides', () => {
     const ghz = linkedObjectIds('ghz');
     expect(ghz).toContain(0x26); // Monitor (base)

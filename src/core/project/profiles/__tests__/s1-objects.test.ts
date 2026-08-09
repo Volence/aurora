@@ -2,8 +2,10 @@ import { describe, it, expect } from 'vitest';
 import {
   S1_OBJECT_NAMES,
   S1_OBJECT_LIST,
+  S1_INVISIBLE_OBJECT_IDS,
   s1ObjectName,
   s1ObjectHex,
+  s1ObjectIsInvisible,
 } from '../s1-objects';
 
 describe('s1-objects name table', () => {
@@ -32,6 +34,19 @@ describe('s1-objects name table', () => {
       const id = Number(k);
       expect(id).toBeGreaterThanOrEqual(0);
       expect(id).toBeLessThanOrEqual(0x7f);
+    }
+  });
+
+  it('flags invisible / trigger ids and names them (ghost markers)', () => {
+    expect(s1ObjectIsInvisible(0x49)).toBe(true); // Waterfall Sound Effect
+    expect(s1ObjectIsInvisible(0x54)).toBe(true); // Invisible Lava Marker
+    expect(s1ObjectIsInvisible(0x71)).toBe(true); // Invisible Block
+    expect(s1ObjectIsInvisible(0x72)).toBe(true); // Teleporter
+    expect(s1ObjectIsInvisible(0x1f)).toBe(false); // Crabmeat (a real sprite)
+    expect(s1ObjectIsInvisible(0x11)).toBe(false); // Bridge (a real sprite)
+    // Every invisible id is named, so the ghost marker shows a NAME not just hex.
+    for (const id of S1_INVISIBLE_OBJECT_IDS) {
+      expect(S1_OBJECT_NAMES[id], `invisible $${id.toString(16)} must be named`).toBeDefined();
     }
   });
 
