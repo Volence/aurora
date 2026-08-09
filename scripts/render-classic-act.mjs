@@ -58,6 +58,7 @@ async function loadCore() {
   const entry = `
     export { s1Adapter } from ${JSON.stringify(path.join(REPO, 'src/core/project/s1/index.ts'))};
     export { renderChunk } from ${JSON.stringify(path.join(REPO, 'src/core/level-classic/render.ts'))};
+    export { layoutCellAt } from ${JSON.stringify(path.join(REPO, 'src/renderer/components/classic/viewport-math.ts'))};
   `;
   const outfile = path.join(os.tmpdir(), `classic-core-${process.pid}.mjs`);
   await build({
@@ -85,18 +86,11 @@ function realFs(root) {
 }
 
 // ---------------------------------------------------------------------------
-// Layout composition — identical policy to viewport-math.ts / the viewport.
+// Layout composition — uses the SHARED layoutCellAt bundled from viewport-math.ts
+// (passed in), so the defensive min(cells.length, w*h) policy is defined once.
 // ---------------------------------------------------------------------------
-function layoutCellAt(grid, col, row) {
-  if (col < 0 || row < 0 || col >= grid.width || row >= grid.height) return undefined;
-  const bound = Math.min(grid.cells.length, grid.width * grid.height);
-  const index = row * grid.width + col;
-  if (index >= bound) return undefined;
-  return grid.cells[index];
-}
-
 // Compose a chunk rectangle of a plane into a flat RGBA buffer.
-function composePlane(doc, renderChunk, plane, crop) {
+function composePlane(doc, renderChunk, layoutCellAt, plane, crop) {
   const grid = plane === 'bg' ? doc.bg : doc.fg;
   const cx = crop ? crop[0] : 0;
   const cy = crop ? crop[1] : 0;
@@ -202,7 +196,7 @@ async function main() {
   const args = parseArgs(process.argv.slice(2));
   if (!fs.existsSync(S1DIR)) throw new Error(`s1disasm not found at ${S1DIR}`);
 
-  const { s1Adapter, renderChunk } = await loadCore();
+  const { s1Adapter, renderChunk, layoutCellAt } = await loadCore();
   const fa = realFs(S1DIR);
   const match = await s1Adapter.detect(fa);
   if (!match) throw new Error('s1disasm did not fingerprint as an S1 project');
@@ -215,7 +209,7 @@ async function main() {
 
   const doc = await handle.levels.read(ref);
   const grid = args.plane === 'bg' ? doc.bg : doc.fg;
-  let img = composePlane(doc, renderChunk, args.plane, args.crop);
+  let img = composePlane(doc, renderChunk, layoutCellAt, args.plane, args.crop);
   img = scaleNearest(img, args.scale);
 
   fs.mkdirSync(path.dirname(args.out), { recursive: true });

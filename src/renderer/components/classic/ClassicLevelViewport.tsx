@@ -4,7 +4,7 @@ import { useClassicLevelStore } from '../../state/classicLevelStore';
 import { renderChunk } from '../../../core/level-classic/render';
 import { columnSolidRun } from '../../../core/collision/collision-render';
 import type { LevelDoc } from '../../../core/level-classic/model';
-import { CHUNK_PX, visibleChunkRange, layoutCellAt, ringGroupPositions } from './viewport-math';
+import { CHUNK_PX, visibleChunkRange, layoutCellAt, ringGroupPositions, screenToWorld } from './viewport-math';
 import {
   CANVAS_VOID,
   COLLISION_FILL_ALL, COLLISION_FILL_TOP, COLLISION_FILL_SIDES, COLLISION_FILL_NONE,
@@ -60,6 +60,11 @@ export default function ClassicLevelViewport() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const camRef = useRef<Camera>({ x: 0, y: 0, zoom: 1 });
+  // Cached canvas backing-store size. Written ONLY by the measure/ResizeObserver
+  // path below — the render pass reads it and never resizes the canvas (assigning
+  // width/height reinitializes the backing store) nor forces layout via
+  // getBoundingClientRect, so drags stay cheap.
+  const sizeRef = useRef<{ w: number; h: number }>({ w: 0, h: 0 });
   const [, forceRedraw] = useState(0);
   const redraw = useCallback(() => forceRedraw((n) => n + 1), []);
 
@@ -224,21 +229,22 @@ export default function ClassicLevelViewport() {
   }, []);
 
   // ---- main render effect --------------------------------------------------
+  // Pure draw pass: clears + composes using the cached size. It never resizes the
+  // canvas or calls getBoundingClientRect (see measure() below), so redraws during
+  // a drag do no synchronous layout and don't reallocate the backing store.
   useEffect(() => {
     const canvas = canvasRef.current;
-    const container = containerRef.current;
-    if (!canvas || !container) return;
+    if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    const rect = container.getBoundingClientRect();
-    canvas.width = Math.max(1, Math.floor(rect.width));
-    canvas.height = Math.max(1, Math.floor(rect.height));
+    const { w, h } = sizeRef.current;
+    if (w === 0 || h === 0) return; // not yet measured — measure() will redraw
     ctx.imageSmoothingEnabled = false;
 
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.fillStyle = CANVAS_VOID;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillRect(0, 0, w, h);
     if (!doc) return;
 
     const cam = camRef.current;
@@ -248,7 +254,7 @@ export default function ClassicLevelViewport() {
     ctx.scale(cam.zoom, cam.zoom);
     ctx.translate(-cam.x, -cam.y);
 
-    const range = visibleChunkRange(cam.x, cam.y, canvas.width, canvas.height, cam.zoom, grid.width, grid.height);
+    const range = visibleChunkRange(cam.x, cam.y, w, h, cam.zoom, grid.width, grid.height);
 
     // Chunk layer.
     for (let row = range.startRow; row < range.endRow; row++) {
@@ -260,32 +266,54 @@ export default function ClassicLevelViewport() {
       }
     }
 
-    // Collision overlay (per visible chunk).
-    if (overlays.collision) {
-      for (let row = range.startRow; row < range.endRow; row++) {
-        for (let col = range.startCol; col < range.endCol; col++) {
-          const cell = layoutCellAt(grid, col, row);
-          if (cell === undefined) continue;
-          drawCollision(ctx, doc, col, row, cell & 0x7f, overlays.angles);
+    // Collision / object / start overlays are all FG concepts (S1 collision,
+    // object placement and the spawn point live on the foreground plane).
+    if (plane === 'fg') {
+      // Collision overlay (per visible chunk).
+      if (overlays.collision) {
+        for (let row = range.startRow; row < range.endRow; row++) {
+          for (let col = range.startCol; col < range.endCol; col++) {
+            const cell = layoutCellAt(grid, col, row);
+            if (cell === undefined) continue;
+            drawCollision(ctx, doc, col, row, cell & 0x7f, overlays.angles);
+          }
         }
       }
-    }
-
-    // Object + start overlays are only meaningful over the FG plane.
-    if (plane === 'fg') {
       if (overlays.objects) drawObjects(ctx, doc, invZoom);
       if (overlays.start) drawStart(ctx, doc, invZoom);
     }
   });
 
-  // ---- resize → redraw -----------------------------------------------------
+  // ---- resize → measure → redraw -------------------------------------------
+  // The ONLY place the canvas backing store is (re)sized. It reads the container
+  // rect (forcing layout) here, off the render path, then triggers a redraw. Runs
+  // on mount, whenever the container resizes, and when `status` flips (the canvas
+  // is conditionally mounted, so a fresh element needs re-measuring).
   useEffect(() => {
+    const measure = () => {
+      const canvas = canvasRef.current;
+      const container = containerRef.current;
+      if (!canvas || !container) return;
+      const rect = container.getBoundingClientRect();
+      const w = Math.max(1, Math.floor(rect.width));
+      const h = Math.max(1, Math.floor(rect.height));
+      const prev = sizeRef.current;
+      sizeRef.current = { w, h };
+      // Assigning width/height reinitializes the backing store — only do it when
+      // the size actually changed (or the canvas element was just remounted).
+      if (canvas.width !== w || canvas.height !== h || prev.w !== w || prev.h !== h) {
+        canvas.width = w;
+        canvas.height = h;
+      }
+      redraw();
+    };
+    measure();
     const container = containerRef.current;
     if (!container) return;
-    const ro = new ResizeObserver(() => redraw());
+    const ro = new ResizeObserver(measure);
     ro.observe(container);
     return () => ro.disconnect();
-  }, [redraw]);
+  }, [redraw, status]);
 
   // ---- pan / zoom ----------------------------------------------------------
   const dragging = useRef(false);
@@ -301,8 +329,11 @@ export default function ClassicLevelViewport() {
     const dx = e.clientX - lastMouse.current.x;
     const dy = e.clientY - lastMouse.current.y;
     lastMouse.current = { x: e.clientX, y: e.clientY };
-    cam.x = Math.max(0, cam.x - dx / cam.zoom);
-    cam.y = Math.max(0, cam.y - dy / cam.zoom);
+    // A screen drag delta is a world delta scaled by 1/zoom: convert it with the
+    // shared screenToWorld using a zero-origin camera, then pan by its negation.
+    const d = screenToWorld({ x: 0, y: 0, zoom: cam.zoom }, dx, dy);
+    cam.x = Math.max(0, cam.x - d.x);
+    cam.y = Math.max(0, cam.y - d.y);
     redraw();
   }, [redraw]);
   const endDrag = useCallback(() => { dragging.current = false; }, []);
@@ -317,8 +348,7 @@ export default function ClassicLevelViewport() {
     // Zoom about the cursor: keep the world point under the pointer fixed.
     const sx = e.clientX - rect.left;
     const sy = e.clientY - rect.top;
-    const worldX = cam.x + sx / cam.zoom;
-    const worldY = cam.y + sy / cam.zoom;
+    const { x: worldX, y: worldY } = screenToWorld(cam, sx, sy);
     cam.x = Math.max(0, worldX - sx / newZoom);
     cam.y = Math.max(0, worldY - sy / newZoom);
     cam.zoom = newZoom;

@@ -4,6 +4,7 @@ import {
   visibleChunkRange,
   layoutCellAt,
   ringGroupPositions,
+  screenToWorld,
 } from '../viewport-math';
 import type { LayoutGrid } from '../../../../core/level-classic/model';
 
@@ -47,6 +48,40 @@ describe('visibleChunkRange', () => {
 
   it('exposes CHUNK_PX = 256', () => {
     expect(CHUNK_PX).toBe(256);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// screenToWorld — inverse of the camera's draw transform (cam.x + px/zoom).
+// The convention is documented at ClassicLevelViewport.tsx:39-53.
+// ---------------------------------------------------------------------------
+describe('screenToWorld', () => {
+  it('at zoom 1 with no pan, screen == world', () => {
+    expect(screenToWorld({ x: 0, y: 0, zoom: 1 }, 40, 30)).toEqual({ x: 40, y: 30 });
+  });
+
+  it('adds the camera world origin (pan)', () => {
+    expect(screenToWorld({ x: 100, y: 200, zoom: 1 }, 40, 30)).toEqual({ x: 140, y: 230 });
+  });
+
+  it('divides the screen offset by zoom', () => {
+    // zoom 2: a 100px screen offset spans 50 world px; origin at (10, 20).
+    expect(screenToWorld({ x: 10, y: 20, zoom: 2 }, 100, 80)).toEqual({ x: 60, y: 60 });
+  });
+
+  it('round-trips a world point through the draw transform under zoom + pan', () => {
+    // Forward transform: screenPx = (world - cam) * zoom. screenToWorld inverts it.
+    const cam = { x: 137, y: 512, zoom: 4 };
+    for (const [wx, wy] of [[137, 512], [200, 700], [1000, 900]] as const) {
+      const sx = (wx - cam.x) * cam.zoom;
+      const sy = (wy - cam.y) * cam.zoom;
+      expect(screenToWorld(cam, sx, sy)).toEqual({ x: wx, y: wy });
+    }
+  });
+
+  it('with a zero-origin camera, converts a screen delta into a world delta', () => {
+    // The panning usage: drag delta (dx, dy) → world delta (dx/zoom, dy/zoom).
+    expect(screenToWorld({ x: 0, y: 0, zoom: 4 }, 40, 80)).toEqual({ x: 10, y: 20 });
   });
 });
 
@@ -113,7 +148,7 @@ describe('ringGroupPositions', () => {
     ]);
   });
 
-  it('orientation nibble picks the spacing vector: $3 = down, medium (0, 0x18)', () => {
+  it('orientation nibble picks the spacing vector: $3 = down, short (0, 0x10)', () => {
     // subtype 0x31 → orientation 3 (down short 0x10), count 2.
     const pts = ringGroupPositions(0x31, 10, 20);
     expect(pts).toEqual([

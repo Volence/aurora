@@ -68,6 +68,29 @@ export function layoutCellAt(grid: LayoutGrid, col: number, row: number): number
   return grid.cells[index];
 }
 
+/** A pan/zoom camera: `x/y` is the world coordinate at the canvas top-left. */
+export interface ViewportCamera {
+  x: number;
+  y: number;
+  zoom: number;
+}
+
+export interface WorldPos {
+  x: number;
+  y: number;
+}
+
+/**
+ * Convert a screen-space pixel offset (relative to the canvas top-left) to world
+ * coordinates under the camera. This is the inverse of the draw transform
+ * `scale(zoom); translate(-cam.x, -cam.y)` documented on ClassicLevelViewport:
+ * screen→world is `cam.x + screenPx / zoom`. Passing a zero-origin camera
+ * (`{x:0, y:0, zoom}`) turns a screen delta into a world delta (used for panning).
+ */
+export function screenToWorld(cam: ViewportCamera, sx: number, sy: number): WorldPos {
+  return { x: cam.x + sx / cam.zoom, y: cam.y + sy / cam.zoom };
+}
+
 export interface RingPos {
   x: number;
   y: number;
