@@ -16,7 +16,7 @@ let legacyAtlasMergedThisLoad = false;
 function legacyAtlasPath(chunkLibraryPath: string): string {
   return chunkLibraryPath.replace('.json', '_tiles.bin');
 }
-import { loadS4Config, type S4ProjectConfig } from '../../core/config/s4-config';
+import { loadS4Config, collisionDataPathCandidates, type S4ProjectConfig } from '../../core/config/s4-config';
 import { parseTiles } from '../../core/formats/tiles';
 import { parseBgTiles, serializeBgTiles, normalizeBgLayout, BG_TILE_BASE_SLOT, BG_WIDTH } from '../../core/formats/bg-tiles';
 import { bgLibIndexPath, bgLibLayoutPath, bgLibTilesPath, serializeBgLibraryIndex, parseBgLibraryIndex } from '../../core/formats/bg-library';
@@ -73,10 +73,16 @@ export function useProject() {
 
       // Load the engine's collision tables (read-only view) BEFORE the full
       // project: chunk-library load needs the profile set to migrate legacy
-      // collision into word planes. Missing/unreadable tables → null → the
-      // overlay falls back to flat fills (no crash) and migration is skipped.
-      const collPath = config.raw.collisionDataPath ?? 'data/collision/';
-      const collisionProfiles = await loadCollisionProfiles(config.basePath, collPath);
+      // collision into word planes. Probe the candidate dirs (explicit config
+      // → derived from the act dataPath → legacy root-relative) so post-split
+      // engine layouts (games/<game>/data/collision/) resolve. All misses →
+      // null → the overlay falls back to flat fills (no crash) and migration
+      // is skipped.
+      let collisionProfiles: CollisionProfileSet | null = null;
+      for (const collPath of collisionDataPathCandidates(config.raw)) {
+        collisionProfiles = await loadCollisionProfiles(config.basePath, collPath);
+        if (collisionProfiles) break;
+      }
 
       // Load the full project BEFORE committing config to the store: a failed
       // load (e.g. atlas-migration abort) must not leave a new config paired

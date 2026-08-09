@@ -72,3 +72,28 @@ export function loadS4Config(json: S4ProjectConfig, basePath: string): LoadedS4C
     raw: json,
   };
 }
+
+/**
+ * Candidate dirs for the engine's collision tables, most specific first:
+ * the explicit `collisionDataPath` if set, then `<dataRoot>/collision/`
+ * derived from each act's dataPath (engine repos keep all game data under one
+ * `data/` root — e.g. `games/sonic4/data/editor/...` → `games/sonic4/data/`),
+ * then the legacy root-relative `data/collision/`. The loader probes each
+ * until one yields tables, so pre-split and post-split repo layouts both
+ * resolve without project.json edits.
+ */
+export function collisionDataPathCandidates(raw: S4ProjectConfig): string[] {
+  const out: string[] = [];
+  const push = (p: string) => { if (p && !out.includes(p)) out.push(p); };
+  if (raw.collisionDataPath) push(raw.collisionDataPath);
+  for (const zone of raw.zones ?? []) {
+    for (const act of zone.acts ?? []) {
+      const dp = act.dataPath ?? '';
+      const root = dp.startsWith('data/') ? 'data/'
+        : (() => { const i = dp.indexOf('/data/'); return i >= 0 ? dp.slice(0, i + 6) : null; })();
+      if (root) push(`${root}collision/`);
+    }
+  }
+  push('data/collision/');
+  return out;
+}
