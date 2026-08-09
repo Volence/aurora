@@ -196,6 +196,11 @@ export async function refreshClassicObjectSprites(
   if (gen !== refreshGen) return;
   const map = new Map<number, ObjectSprite>();
   for (const [id, sprite] of entries) if (sprite) map.set(id, sprite);
+  // ONE publish (and therefore ONE version bump) per refresh cycle, regardless of
+  // how many sprites were (re)built: we await the whole Promise.all, assemble the
+  // full map, and setSprites exactly once. This matters on GPU-poor machines where
+  // each version bump forces a full viewport redraw — a per-sprite publish would be
+  // ~N slow repaints (many seconds) instead of one. Locked by a regression test.
   useClassicObjectArtStore.getState().setSprites(map);
   // Evict prior-epoch bitmaps now that the current-epoch map is live.
   spriteCache.evictStale(epoch);

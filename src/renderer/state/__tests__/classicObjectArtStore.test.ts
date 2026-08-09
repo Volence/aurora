@@ -73,6 +73,17 @@ describe('refreshClassicObjectSprites — lifecycle guards', () => {
     expect(close).toHaveBeenCalledTimes(1);
   });
 
+  it('bumps the version exactly ONCE per refresh regardless of sprite count', async () => {
+    // Each version bump forces a full viewport redraw; on GPU-poor machines a
+    // per-sprite publish would be N slow repaints. A refresh of N sprites must
+    // publish (and bump) exactly once.
+    __setObjectSpriteBuilderForTest(async (id) => fakeSprite(id));
+    const before = useClassicObjectArtStore.getState().version;
+    await refreshClassicObjectSprites('dir', fakeDoc([1, 2, 3, 4, 5, 6, 7, 8]), 'ghz', 1);
+    expect(useClassicObjectArtStore.getState().version).toBe(before + 1);
+    expect(useClassicObjectArtStore.getState().sprites.size).toBe(8);
+  });
+
   it('publishes only linked (non-null) sprites, skipping misses', async () => {
     __setObjectSpriteBuilderForTest(async (id) => (id === 1 ? fakeSprite(3) : null));
     await refreshClassicObjectSprites('dir', fakeDoc([1, 2]), 'ghz', 1);
