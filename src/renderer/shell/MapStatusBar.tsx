@@ -13,7 +13,7 @@ const TOOL_INFO: Record<EditorTool, { label: string; hint: string }> = {
   'stamp-chunk': { label: 'Stamp Chunk', hint: 'Select a chunk from the library, then click to stamp — Alt: art only' },
   'paint-collision': { label: 'Paint Collision', hint: 'Click to set collision type on tiles' },
   'eraser': { label: 'Eraser', hint: 'Click to erase tiles' },
-  'marquee': { label: 'Marquee', hint: 'drag to select · Ctrl+C copy · Ctrl+V paste · Esc clear' },
+  'marquee': { label: 'Marquee', hint: 'drag to select · Ctrl+C copy · Ctrl+V paste · S save as chunk · Esc clear' },
   'place-object': { label: 'Place Object', hint: 'Click to place selected object type' },
   'place-ring': { label: 'Place Ring', hint: 'Click to place ring pattern' },
 };

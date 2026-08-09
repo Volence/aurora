@@ -1,7 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import { createDoc } from '../../src/core/art/composer-buffer';
-import { paintDocCollision, applyClipboardCollisionToDoc } from '../../src/core/art/composer-collision';
+import {
+  paintDocCollision, applyClipboardCollisionToDoc, seedDocCollisionFromSection,
+} from '../../src/core/art/composer-collision';
 import type { MapClipboard } from '../../src/core/editing/map-clipboard';
+import { createSection, SECTION_TILES_WIDE } from '../../src/core/model/s4-types';
+import { packCollisionCell } from '../../src/core/collision/collision-cell-word';
 
 describe('paintDocCollision', () => {
   it('maps an 8px tile coord to its 16px cell index', () => {
@@ -85,5 +89,56 @@ describe('applyClipboardCollisionToDoc', () => {
     const clip = clip2x2();
     expect(applyClipboardCollisionToDoc(doc, clip)).toBe(true);
     expect(applyClipboardCollisionToDoc(doc, clip)).toBe(false);
+  });
+});
+
+describe('seedDocCollisionFromSection', () => {
+  const WORD_A = packCollisionCell({ shape: 5, xFlip: false, yFlip: false, solidity: 'all' });
+  const WORD_B = packCollisionCell({ shape: 9, xFlip: true, yFlip: false, solidity: 'top' });
+
+  it('copies section cell words into the doc footprint at a nonzero base, both planes', () => {
+    const section = createSection(0, 'Test');
+    section.collisionEdit = new Uint16Array(65536);
+    section.collisionEditB = new Uint16Array(65536);
+
+    // Doc is a 4x4-tile (2x2-cell) capture whose map origin is (col=32,row=16).
+    const baseCol = 32, baseRow = 16;
+    const doc = createDoc(4, 4);
+
+    // Cell (cx=1,cy=0) of the footprint -> section cell top-left tile
+    // (baseCol+2, baseRow) = (34,16).
+    const cellTileIdx = baseRow * SECTION_TILES_WIDE + (baseCol + 2);
+    section.collisionEdit[cellTileIdx] = WORD_A;
+    section.collisionEditB[cellTileIdx] = WORD_B;
+
+    const changed = seedDocCollisionFromSection(doc, section, baseCol, baseRow);
+
+    expect(changed).toBe(true);
+    expect(doc.collisionA[1]).toBe(WORD_A);
+    expect(doc.collisionB[1]).toBe(WORD_B);
+    // Untouched cell (cx=0,cy=0) reads air.
+    expect(doc.collisionA[0]).toBe(0);
+    expect(doc.collisionB[0]).toBe(0);
+  });
+
+  it('unseeded section collision planes read as air', () => {
+    const section = createSection(0, 'Test');
+    expect(section.collisionEdit).toBeUndefined();
+    expect(section.collisionEditB).toBeUndefined();
+    const doc = createDoc(4, 4);
+    doc.collisionA.fill(0x1234);
+    doc.collisionB.fill(0x5678);
+
+    const changed = seedDocCollisionFromSection(doc, section, 8, 8);
+
+    expect(changed).toBe(true);
+    expect(Array.from(doc.collisionA)).toEqual([0, 0, 0, 0]);
+    expect(Array.from(doc.collisionB)).toEqual([0, 0, 0, 0]);
+  });
+
+  it('returns false when the section already matches the doc (both air)', () => {
+    const section = createSection(0, 'Test');
+    const doc = createDoc(4, 4); // starts as air
+    expect(seedDocCollisionFromSection(doc, section, 0, 0)).toBe(false);
   });
 });

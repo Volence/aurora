@@ -1,10 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import {
-  createDoc, docFromChunk, docFromTile, getPixel, setPixels, stampTile,
+  createDoc, docFromChunk, docFromTile, docFromSectionRegion, getPixel, setPixels, stampTile,
   sliceForSave, cellAt, docToBuffer, bufferToWrites, adoptPaletteLineForEmptyCells,
   docLineMap,
 } from '../../src/core/art/composer-buffer';
-import { packNametableWord, createChunkDef } from '../../src/core/model/s4-types';
+import { packNametableWord, createChunkDef, createSection, SECTION_TILES_WIDE } from '../../src/core/model/s4-types';
 import type { Tile } from '../../src/core/model/s4-types';
 
 const atlas: Tile[] = [
@@ -32,6 +32,26 @@ describe('createDoc / docFromTile / docFromChunk', () => {
     expect(cell.atlasTile).toBe(1);
     expect(cell.pal).toBe(2);
     expect(cell.hf).toBe(true);
+  });
+});
+
+describe('docFromSectionRegion', () => {
+  it('decodes a section-relative rect at a nonzero base into a doc of that size', () => {
+    const section = createSection(0, 'Test');
+    const baseCol = 32, baseRow = 16;
+    const idx = (baseRow + 0) * SECTION_TILES_WIDE + (baseCol + 1);
+    section.tileGrid.nametable[idx] = packNametableWord(1, 2, true, false, true);
+
+    const doc = docFromSectionRegion(section, baseCol, baseRow, 4, 2);
+
+    expect(doc.widthTiles).toBe(4);
+    expect(doc.heightTiles).toBe(2);
+    const cell = cellAt(doc, 1, 0);
+    expect(cell.atlasTile).toBe(1);
+    expect(cell.pal).toBe(2);
+    expect(cell.hf).toBe(true);
+    // Untouched cell reads as an empty cell (air).
+    expect(cellAt(doc, 0, 0).atlasTile).toBeNull();
   });
 });
 

@@ -17,12 +17,16 @@ export interface RegionSource {
 /** Build the atomic region-write command shared by stamp (chunk -> section)
  *  and paste (clipboard -> section): `source` nametable + `writeCollision`'s
  *  two collision planes written over the footprint at (baseCol,baseRow) tile
- *  coords (assumed even/chunk-aligned by the caller). The source is
- *  AUTHORITATIVE for its footprint: air words/tiles clear the destination.
- *  writeArt/writeCollision independently gate the two kinds of children.
- *  Returns null when nothing changes. Requires the section's collisionEdit
- *  planes to be seeded when writeCollision is true (caller seeds, as
- *  paintCollisionCell does). */
+ *  coords (assumed NON-NEGATIVE and even/chunk-aligned by the caller — every
+ *  call site snaps/validates before reaching here: context-menu block origin,
+ *  marquee snapMarquee, agent stamp_chunk/paste x/y validation; a negative
+ *  base is not re-checked here and would read/write out-of-range indices into
+ *  the flat section arrays rather than fail loudly, so don't skip caller-side
+ *  validation when adding a new entry point). The source is AUTHORITATIVE for
+ *  its footprint: air words/tiles clear the destination. writeArt/writeCollision
+ *  independently gate the two kinds of children. Returns null when nothing
+ *  changes. Requires the section's collisionEdit planes to be seeded when
+ *  writeCollision is true (caller seeds, as paintCollisionCell does). */
 export function buildRegionWriteCommand(args: {
   source: RegionSource; section: Section; sectionIndex: number;
   baseCol: number; baseRow: number;

@@ -1,5 +1,5 @@
-import type { Tile, ChunkDef } from '../model/s4-types';
-import { unpackNametableWord, packNametableWord, chunkCellCount } from '../model/s4-types';
+import type { Tile, ChunkDef, Section } from '../model/s4-types';
+import { unpackNametableWord, packNametableWord, chunkCellCount, SECTION_TILES_WIDE } from '../model/s4-types';
 import { canonicalizeTile } from '../export/tile-dedup';
 import { flipTile } from '../import/tile-dedup';
 import type { PixelBuffer } from './pixel-ops';
@@ -62,6 +62,31 @@ export function docFromChunk(chunk: ChunkDef): ComposerDoc {
   }
   doc.collisionA = new Uint16Array(chunk.collisionA);
   doc.collisionB = new Uint16Array(chunk.collisionB);
+  return doc;
+}
+
+/** Build a doc (art only — collision is a separate concern, see
+ *  composer-collision.ts's seedDocCollisionFromSection) from a section-relative
+ *  tile rect at (baseCol,baseRow), w x h tiles. Shared by the two capture-from-
+ *  map flows (right-click "edit block" and marquee "save as chunk") so their
+ *  nametable-word decoding can't drift. Out-of-bounds reads are the caller's
+ *  contract to avoid (as with the section's other region readers). */
+export function docFromSectionRegion(
+  section: Section, baseCol: number, baseRow: number, w: number, h: number,
+): ComposerDoc {
+  const doc = createDoc(w, h);
+  for (let r = 0; r < h; r++) {
+    for (let c = 0; c < w; c++) {
+      const idx = (baseRow + r) * SECTION_TILES_WIDE + (baseCol + c);
+      const word = section.tileGrid.nametable[idx];
+      if (word === 0) continue; // leave the emptyCell() default (air)
+      const entry = unpackNametableWord(word);
+      doc.cells[r * w + c] = {
+        atlasTile: entry.tileIndex, localId: null,
+        pal: entry.palette, hf: entry.hFlip, vf: entry.vFlip, pri: entry.priority,
+      };
+    }
+  }
   return doc;
 }
 

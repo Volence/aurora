@@ -44,7 +44,7 @@ of 8px sub-tile entries actually changed (up to 4 per cell).
 
 `save_chunk` optionally carries `collisionA`/`collisionB`: packed cell words,
 row-major, `(w/2)*(h/2)` entries each (chunk dimensions must be even tiles
-per axis — already required for art). Omit either array to leave that plane
+per axis so collision cells stay 16px/2-tile aligned). Omit either array to leave that plane
 air. `stamp_chunk` places a chunk's art AND collision atomically (one undo
 step covering both) and requires even x/y, since collision cells are
 16px/2-tile aligned; there is no art-only agent stamp (the UI's Alt-stamp

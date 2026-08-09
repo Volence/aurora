@@ -5,7 +5,8 @@ import { useEditorStore, executeCommand, undo, redo, setCommandInvalidationListe
 import { useArtStore } from '../state/artStore';
 import { useToastStore } from '../state/toastStore';
 import { openDocumentGuarded } from './art/open-document';
-import { createDoc, docFromTile } from '../../core/art/composer-buffer';
+import { docFromTile, docFromSectionRegion } from '../../core/art/composer-buffer';
+import { seedDocCollisionFromSection } from '../../core/art/composer-collision';
 import type { AnyCommand, S4Level, SetTilesCommand } from '../../core/editing/commands';
 import { buildStampCommand } from '../../core/editing/map-stamp';
 import { snapMarquee, copyFromSection, buildPasteCommand } from '../../core/editing/map-clipboard';
@@ -528,6 +529,37 @@ export default function MapViewport() {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'v') {
         if (useEditorStore.getState().mapClipboard) {
           useEditorStore.getState().setPasting(true);
+          e.preventDefault();
+          return;
+        }
+      }
+
+      // Save the marquee region as a new chunk composer document — the
+      // marquee-tool counterpart to Ctrl+C's clipboard copy (design #6 §4.1's
+      // "save as chunk" commit). Plain 's' normally switches to the select
+      // tool (see the switch below); conflict-free binding chosen deliberately:
+      // Ctrl+S/Cmd+S is the browser save dialog, so when the marquee TOOL is
+      // active and a marquee is committed, unmodified 's' means "save as
+      // chunk" instead of "switch to select" (switching tools away from
+      // marquee via 's' is moot anyway — you're already using it).
+      if (e.key.toLowerCase() === 's' && !e.ctrlKey && !e.metaKey) {
+        const ed = useEditorStore.getState();
+        if (ed.tool === 'marquee' && ed.marquee) {
+          const marquee = ed.marquee;
+          const section = act?.sections[marquee.sectionIndex];
+          if (section) {
+            const doc = docFromSectionRegion(section, marquee.col, marquee.row, marquee.w, marquee.h);
+            seedDocCollisionFromSection(doc, section, marquee.col, marquee.row);
+            if (openDocumentGuarded({
+              doc,
+              liveTileIndex: null,
+              chunkId: null,
+              name: `marquee (${marquee.col},${marquee.row})`,
+              dirty: true, // copied off the map and not yet in the library
+            })) {
+              useEditorStore.getState().setAppMode('art');
+            }
+          }
           e.preventDefault();
           return;
         }
@@ -1364,22 +1396,12 @@ export default function MapViewport() {
     if (!section) return;
     const bx = Math.floor(m.col / 16);
     const by = Math.floor(m.row / 16);
-    const doc = createDoc(16, 16);
-    for (let r = 0; r < 16; r++) {
-      for (let c = 0; c < 16; c++) {
-        const idx = (by * 16 + r) * SECTION_TILES_WIDE + (bx * 16 + c);
-        const word = section.tileGrid.nametable[idx];
-        const cell = doc.cells[r * 16 + c];
-        if (word !== 0) {
-          const entry = unpackNametableWord(word);
-          cell.atlasTile = entry.tileIndex;
-          cell.pal = entry.palette;
-          cell.hf = entry.hFlip;
-          cell.vf = entry.vFlip;
-          cell.pri = entry.priority;
-        }
-      }
-    }
+    const baseCol = bx * 16, baseRow = by * 16;
+    const doc = docFromSectionRegion(section, baseCol, baseRow, 16, 16);
+    // Carry the map's real collision into the doc so Save writes it to the
+    // chunk — without this, capture -> save -> stamp-back would ERASE map
+    // collision (chunk air is authoritative over its footprint on stamp).
+    seedDocCollisionFromSection(doc, section, baseCol, baseRow);
     if (!openDocumentGuarded({
       doc,
       liveTileIndex: null,
