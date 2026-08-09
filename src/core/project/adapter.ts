@@ -23,6 +23,15 @@ export interface FileAccess {
   read(rel: string): Promise<Uint8Array>;
   /** List immediate entry names under a project-relative directory. */
   list(relDir: string): Promise<string[]>;
+  /**
+   * The file's last-modified time in floating-point milliseconds (fs.stat's
+   * `mtimeMs`), or null when it is missing/unknown. OPTIONAL and additive
+   * (Task 10, spec §2.6): the fs-backed bridge supplies it so s1-io can capture
+   * a read-time mtime per file for the guarded-save conflict check; in-memory
+   * test fakes may omit it (capture is then skipped and every save is treated as
+   * a fresh write with no expected mtime).
+   */
+  mtime?(rel: string): Promise<number | null>;
 }
 
 export type ProjectType = 'aeon' | 's1';
@@ -91,15 +100,31 @@ export interface WriteResult {
   /**
    * The actual buffers to persist, keyed by resolved path (a superset accounting
    * of `written`). Pure-core produces these; Task 10's IPC layer does the real fs
-   * writes. Optional so non-classic adapters need not supply it.
+   * writes. This — NOT `written` — is the SOURCE OF TRUTH the renderer save path
+   * consumes for bytes; `written` is display metadata only. Optional so
+   * non-classic adapters need not supply it.
    */
   files?: { path: string; bytes: Uint8Array }[];
+  /**
+   * Read-time mtime (fs.stat `mtimeMs`) captured for each written path, for the
+   * guarded-save conflict check (Task 10, spec §2.6). A path absent here (or the
+   * whole map absent, when the FileAccess had no `mtime`) means "no expected
+   * mtime" → the renderer sends `expectedMtimeMs: null` for that file.
+   */
+  fileMtimes?: Record<string, number>;
 }
 
 export interface ClassicLevelAccess {
   list(): ZoneActRef[];
   read(ref: ZoneActRef): Promise<LevelDoc>;
   write(ref: ZoneActRef, doc: LevelDoc, dirty: DirtyDomains): Promise<WriteResult>;
+  /**
+   * Refresh the cached read-time mtimes for an act after a successful guarded
+   * write (Task 10): the freshly-written files now have new on-disk mtimes, so
+   * the NEXT write's conflict check must expect these rather than the original
+   * read-time values. OPTIONAL — omitted by non-classic adapters and test fakes.
+   */
+  updateMtimes?(ref: ZoneActRef, newMtimes: Record<string, number>): void;
 }
 
 // ---------------------------------------------------------------------------

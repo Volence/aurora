@@ -16,6 +16,12 @@
 // flatten"). The bookkeeping is invariant across edits, so a caller (the adapter)
 // can cache it at read time and re-pair it with the current doc at write time.
 //
+// The bookkeeping also carries `fileMtimes` (Task 10, spec §2.6): the read-time
+// mtime of every source file, captured when the injected FileAccess supplies the
+// optional `mtime`. It is the "expected" baseline for the guarded save's conflict
+// check — the adapter exposes it on WriteResult and refreshes it after a
+// successful write so back-to-back saves never spuriously conflict.
+//
 // ---------------------------------------------------------------------------
 // Tile write contract (the subtle one — read this before touching tiles)
 // ---------------------------------------------------------------------------
@@ -128,6 +134,15 @@ export interface S1ReadState {
   objposOriginalLength: number;
   paletteOriginals: { component: PaletteComponent; path: string; bytes: Uint8Array }[];
   paths: ResolvedLevelPaths;
+  /**
+   * Read-time mtime (fs.stat `mtimeMs`) of every source file we read, keyed by
+   * resolved path — the "expected" side of Task 10's guarded-save conflict check
+   * (spec §2.6). Populated only when the FileAccess supplies `mtime`; otherwise
+   * empty (in-memory test fakes), and the guarded write treats those files as
+   * having no expected mtime. Mutated in place by the adapter's updateMtimes()
+   * after a successful write so subsequent saves expect the new on-disk mtimes.
+   */
+  fileMtimes: Record<string, number>;
 }
 
 /** LevelDoc plus the read-side bookkeeping the writer consumes. */
@@ -291,6 +306,18 @@ export async function readS1Level(
     sourceRefs,
   };
 
+  // Capture a read-time mtime for every source file (guarded-save baseline,
+  // Task 10). sourceRefs already enumerates every path we read, so one stat per
+  // unique path covers exactly the files a later write could touch. Skipped
+  // entirely when the FileAccess has no `mtime` (in-memory fakes).
+  const fileMtimes: Record<string, number> = {};
+  if (fa.mtime) {
+    for (const p of new Set(Object.values(sourceRefs))) {
+      const m = await fa.mtime(p);
+      if (m !== null) fileMtimes[p] = m;
+    }
+  }
+
   return {
     doc,
     read: {
@@ -300,6 +327,7 @@ export async function readS1Level(
       objposOriginalLength: objposBytes.length,
       paletteOriginals,
       paths,
+      fileMtimes,
     },
   };
 }

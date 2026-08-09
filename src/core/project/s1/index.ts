@@ -328,6 +328,14 @@ export const s1Adapter: ProjectAdapter = {
           throw new Error(`act ${ref.zone}/${ref.act} must be read before it can be written`);
         }
         const result = writeS1Level({ doc, read }, dirty);
+        // Expected mtime for each written path = the value captured at read (or
+        // refreshed by a prior updateMtimes). A path with no captured mtime is
+        // simply omitted → the renderer sends expectedMtimeMs null for it.
+        const fileMtimes: Record<string, number> = {};
+        for (const f of result.files) {
+          const m = read.fileMtimes[f.path];
+          if (m !== undefined) fileMtimes[f.path] = m;
+        }
         return {
           written: result.files.map((f) => f.path),
           skipped: Object.entries(dirty)
@@ -335,7 +343,13 @@ export const s1Adapter: ProjectAdapter = {
             .map(([k]) => k),
           errors: result.errors,
           files: result.files,
+          fileMtimes,
         };
+      },
+      updateMtimes: (ref: ZoneActRef, newMtimes: Record<string, number>): void => {
+        const read = readStates.get(refKey(ref));
+        if (!read) return; // never read → nothing cached to refresh
+        for (const [p, m] of Object.entries(newMtimes)) read.fileMtimes[p] = m;
       },
     };
 

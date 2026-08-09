@@ -1,7 +1,9 @@
 import { ipcMain, dialog, BrowserWindow } from 'electron';
 import { writeFileSync } from 'fs';
 import { IPC_CHANNELS } from '../shared/ipc-types';
-import { readBinaryFile, listProjectFiles, pathExists, listDir } from './file-io';
+import type { GuardedWriteFile } from '../shared/ipc-types';
+import { readBinaryFile, listProjectFiles, pathExists, listDir, fileMtime } from './file-io';
+import { performGuardedWrite } from './guarded-write';
 import { getRecentProjects, addRecentProject, removeRecentProject } from './recent-projects';
 
 export function registerIpcHandlers(): void {
@@ -28,6 +30,16 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle(IPC_CHANNELS.LIST_DIR, async (_event, basePath: string, relativeDir: string) => {
     return listDir(basePath, relativeDir);
+  });
+
+  ipcMain.handle(IPC_CHANNELS.FILE_MTIME, async (_event, basePath: string, relativePath: string) => {
+    return fileMtime(basePath, relativePath);
+  });
+
+  // Atomic, mtime-guarded classic save (Task 10). The pure cycle lives in
+  // guarded-write.ts; this is the thin IPC seam.
+  ipcMain.handle(IPC_CHANNELS.WRITE_GUARDED, async (_event, basePath: string, files: GuardedWriteFile[]) => {
+    return performGuardedWrite(basePath, files);
   });
 
   ipcMain.handle(IPC_CHANNELS.SELECT_DIRECTORY, async (event) => {

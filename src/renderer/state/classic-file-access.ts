@@ -51,5 +51,11 @@ export function createIpcFileAccess(dir: string): FileAccess {
       assertSafe(relDir);
       return window.api.listDir(dir, relDir);
     },
+    async mtime(rel: string): Promise<number | null> {
+      assertSafe(rel);
+      // Read-time baseline for the guarded save (Task 10). Main returns null for
+      // a miss (rel-path-safe, no error-log spam) — matching FileAccess.mtime.
+      return window.api.fileMtime(dir, rel);
+    },
   };
 }

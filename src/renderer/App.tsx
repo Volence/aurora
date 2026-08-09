@@ -22,6 +22,7 @@ import { Panel, CollapsibleSection, T } from './components/ui';
 import { useProject } from './hooks/useProject';
 import { useProjectStore } from './state/projectStore';
 import { useClassicProjectStore } from './state/classicProjectStore';
+import { saveClassicProject } from './state/classic-save';
 import { useEditorStore } from './state/editorStore';
 import { registerAgentHandler } from './agent/agent-handler';
 import { refreshObjectPreviews } from './object-previews';
@@ -37,12 +38,17 @@ export default function App() {
   const project = useProjectStore((s) => s.project);
   const currentZoneId = useProjectStore((s) => s.currentZoneId);
 
-  // Save is aeon-only for now. While a classic (disasm) project is open, the
-  // app-bar Save / Ctrl+S would otherwise target the STALE aeon project still
-  // resident in projectStore (aeon state isn't reset on classic open), silently
-  // writing the wrong project. No-op until classic write lands in Task 10.
+  // Save routes by which project is open. While a classic (disasm) project is
+  // open, the app-bar Save / Ctrl+S must NOT target the stale aeon project still
+  // resident in projectStore (aeon state isn't reset on classic open) — it runs
+  // the classic guarded save instead (Task 10). Today the classic editing store
+  // doesn't exist yet (Tasks 12/13), so saveClassicProject finds zero dirty
+  // levels and no-ops; the plumbing is wired and tested end-to-end regardless.
   const guardedSave = React.useCallback(() => {
-    if (useClassicProjectStore.getState().status === 'open') return;
+    if (useClassicProjectStore.getState().status === 'open') {
+      void saveClassicProject();
+      return;
+    }
     return saveProject();
   }, [saveProject]);
 

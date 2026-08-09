@@ -13,6 +13,12 @@ export const IPC_CHANNELS = {
   // 9). `read` reuses READ_BINARY_FILE; these cover exists/list.
   PATH_EXISTS: 'file:path-exists',
   LIST_DIR: 'file:list-dir',
+  // Classic guarded-save channels (Task 10). MTIME captures the read-time
+  // baseline; WRITE_GUARDED performs the atomic, conflict-checked multi-file
+  // write. Both are fully rel-path-guarded on the main side (new channels — no
+  // legacy absolute-path exception).
+  FILE_MTIME: 'file:mtime',
+  WRITE_GUARDED: 'file:write-guarded',
 } as const;
 
 export type IpcChannels = typeof IPC_CHANNELS;
@@ -22,6 +28,27 @@ export interface RecentProject {
   name: string;
   lastOpened: number; // timestamp
 }
+
+/**
+ * One file in a guarded write (Task 10). `expectedMtimeMs` is the mtime captured
+ * when the file was last read/written (null when it did not exist at read); the
+ * main side refuses the whole batch if the on-disk mtime disagrees. `bytes`
+ * survives structured-clone across IPC as a typed array.
+ */
+export interface GuardedWriteFile {
+  relPath: string;
+  bytes: Uint8Array;
+  expectedMtimeMs: number | null;
+}
+
+/**
+ * Result of a guarded write: either the conflicting relPaths (nothing written),
+ * or the written relPaths plus each one's fresh on-disk mtime so the renderer
+ * can refresh its captured baseline without re-reading.
+ */
+export type GuardedWriteResult =
+  | { conflicts: string[] }
+  | { written: string[]; newMtimes: Record<string, number> };
 
 /**
  * Marker the read-binary IPC handler RESOLVES with for a missing file instead

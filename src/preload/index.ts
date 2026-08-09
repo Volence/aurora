@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import { IPC_CHANNELS, unwrapBinaryRead } from '../shared/ipc-types';
-import type { RecentProject } from '../shared/ipc-types';
+import type { RecentProject, GuardedWriteFile, GuardedWriteResult } from '../shared/ipc-types';
 import { AGENT_REQUEST_CHANNEL, AGENT_RESPONSE_CHANNEL } from '../shared/agent-protocol';
 import type { AgentRequestEnvelope, AgentResponseEnvelope } from '../shared/agent-protocol';
 
@@ -38,6 +38,12 @@ const api = {
 
   listDir: (basePath: string, relativeDir: string): Promise<string[]> =>
     ipcRenderer.invoke(IPC_CHANNELS.LIST_DIR, basePath, relativeDir),
+
+  fileMtime: (basePath: string, relativePath: string): Promise<number | null> =>
+    ipcRenderer.invoke(IPC_CHANNELS.FILE_MTIME, basePath, relativePath),
+
+  writeGuarded: (basePath: string, files: GuardedWriteFile[]): Promise<GuardedWriteResult> =>
+    ipcRenderer.invoke(IPC_CHANNELS.WRITE_GUARDED, basePath, files),
 };
 
 contextBridge.exposeInMainWorld('api', api);

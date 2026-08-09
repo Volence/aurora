@@ -26,6 +26,22 @@ export async function pathExists(basePath: string, relativePath: string): Promis
 }
 
 /**
+ * The last-modified time (fs.stat `mtimeMs`, float ms) of a project-relative
+ * file, or null when it is missing / the path escapes the root / any stat error.
+ * Rel-path-safe and never rejects — the guarded-save baseline (Task 10, spec
+ * §2.6) probes optional files the same tolerant way as pathExists, keeping the
+ * main error log clean (consistent with the 39d90e2 no-log-spam pattern).
+ */
+export async function fileMtime(basePath: string, relativePath: string): Promise<number | null> {
+  if (!isRelPathSafe(relativePath)) return null;
+  try {
+    return (await stat(resolve(basePath, relativePath))).mtimeMs;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * List the immediate entry names under a project-relative directory. Rel-path-
  * safe; a missing dir / non-directory / escaping path resolves to `[]` (never
  * rejects), matching the FileAccess.list contract's tolerant callers

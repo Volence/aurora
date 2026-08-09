@@ -33,6 +33,16 @@ function memFs(files: Record<string, Uint8Array>): FileAccess {
   };
 }
 
+/** memFs plus an mtime provider driven by a path→mtimeMs table (missing → null). */
+function memFsWithMtime(files: Record<string, Uint8Array>, mtimes: Record<string, number>): FileAccess {
+  return {
+    ...memFs(files),
+    async mtime(rel) {
+      return rel in mtimes ? mtimes[rel] : null;
+    },
+  };
+}
+
 const S1DIR = '/home/volence/sonic_hacks/s1disasm';
 const S1_PRESENT = fs.existsSync(S1DIR);
 
@@ -389,6 +399,33 @@ describe('s1-io (e) synthetic round-trip with a mutation', () => {
     // The compressed block file is decode-identical to the packed mutated words.
     const blk = result.files.find((f) => f.path === 'map16/syn.eni')!;
     expect(doc2.blocks.length).toBe(doc.blocks.length);
+  });
+
+  it('captures a read-time mtime for every source file when fa.mtime exists', async () => {
+    const { act, paths, files } = buildSynthetic();
+    // Give every source file a distinct mtime; leave the read-only collision
+    // tables out to prove missing → not captured (rather than captured as 0).
+    const mtimes: Record<string, number> = {};
+    let t = 1000;
+    for (const p of Object.keys(files)) {
+      if (p === 'collide/normal.bin' || p === 'collide/angle.bin') continue;
+      mtimes[p] = t++;
+    }
+    const fa = memFsWithMtime(files, mtimes);
+    const state = await readS1Level(act, paths, fa);
+
+    // Every writable source path carries its mtime.
+    expect(state.read.fileMtimes['artnem/syn.nem']).toBe(mtimes['artnem/syn.nem']);
+    expect(state.read.fileMtimes['map16/syn.eni']).toBe(mtimes['map16/syn.eni']);
+    expect(state.read.fileMtimes['palette/Zone.bin']).toBe(mtimes['palette/Zone.bin']);
+    // A file whose mtime resolved null is simply absent (not stored as 0).
+    expect('collide/normal.bin' in state.read.fileMtimes).toBe(false);
+  });
+
+  it('omits fileMtimes entirely when fa has no mtime (in-memory fake)', async () => {
+    const { fa, act, paths } = buildSynthetic();
+    const state = await readS1Level(act, paths, fa);
+    expect(state.read.fileMtimes).toEqual({});
   });
 
   it('a broken enigma encoder routes the blocks file to errors (synthetic)', async () => {
