@@ -18,6 +18,15 @@ if (process.env.AURORA_NO_GPU === '1') {
   app.disableHardwareAcceleration();
 }
 
+// Dev/investigation-only: open a Chrome DevTools Protocol endpoint on loopback so
+// the headless crash/perf harnesses can drive the renderer. Gated on the env var
+// (unset in every normal run), and paired with the VITE_AURORA_DEBUG window.__dbg
+// hook. Must be set before app is ready.
+if (process.env.AURORA_DEBUG_PORT) {
+  app.commandLine.appendSwitch('remote-debugging-port', process.env.AURORA_DEBUG_PORT);
+  app.commandLine.appendSwitch('remote-debugging-address', '127.0.0.1');
+}
+
 let mainWindow: BrowserWindow | null = null;
 
 function createWindow(): BrowserWindow {
