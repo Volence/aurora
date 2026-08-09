@@ -23,7 +23,10 @@ function fullScratch(): { canvas: HTMLCanvasElement; ctx: CanvasRenderingContext
     sharedFull.width = CHUNK_PX;
     sharedFull.height = CHUNK_PX;
   }
-  return { canvas: sharedFull, ctx: sharedFull.getContext('2d') };
+  // willReadFrequently keeps the shared scratch CPU-backed (it's only ever filled
+  // by putImageData then downscale-blitted) — the same GPU-poor-resilient strategy
+  // as the classic viewport's chunk cache.
+  return { canvas: sharedFull, ctx: sharedFull.getContext('2d', { willReadFrequently: true }) };
 }
 
 const hex2 = (n: number) => `$${n.toString(16).toUpperCase().padStart(2, '0')}`;
@@ -79,7 +82,7 @@ const ThumbCell = React.memo(function ThumbCell({
 
   useEffect(() => {
     if (!visible) return;
-    const ctx = ref.current?.getContext('2d');
+    const ctx = ref.current?.getContext('2d', { willReadFrequently: true });
     if (!ctx) return;
     ctx.imageSmoothingEnabled = false;
     ctx.clearRect(0, 0, THUMB, THUMB);

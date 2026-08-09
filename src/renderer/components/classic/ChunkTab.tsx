@@ -42,7 +42,10 @@ export default function ChunkTab({ doc, usage }: { doc: LevelDoc; usage: UsageIn
   // Render base art + preview + solidity tint + grid.
   useEffect(() => {
     const canvas = canvasRef.current;
-    const ctx = canvas?.getContext('2d');
+    // willReadFrequently keeps this editor canvas CPU-backed (GPU-poor resilience,
+    // same as the classic viewport). Set on the first getContext for the canvas so
+    // the option is honored (drawBufferScaled below reuses this same context).
+    const ctx = canvas?.getContext('2d', { willReadFrequently: true });
     if (!canvas || !ctx) return;
     ctx.imageSmoothingEnabled = false;
     ctx.clearRect(0, 0, CHUNK_SIZE, CHUNK_SIZE);
@@ -66,7 +69,7 @@ export default function ChunkTab({ doc, usage }: { doc: LevelDoc; usage: UsageIn
       const blockBuf = renderBlock(doc, composerBlockId);
       const tmp = document.createElement('canvas');
       tmp.width = 16; tmp.height = 16;
-      const tctx = tmp.getContext('2d');
+      const tctx = tmp.getContext('2d', { willReadFrequently: true });
       if (tctx) { const img = tctx.createImageData(16, 16); img.data.set(blockBuf); tctx.putImageData(img, 0, 0); }
       ctx.strokeStyle = STAMP_PREVIEW_STROKE;
       ctx.lineWidth = 1;

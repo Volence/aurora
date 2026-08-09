@@ -174,7 +174,17 @@ export default function ClassicLevelViewport() {
       const c = hit?.canvas ?? document.createElement('canvas');
       c.width = CHUNK_PX;
       c.height = CHUNK_PX;
-      const cctx = c.getContext('2d');
+      // willReadFrequently keeps Chromium's 2D backing store in CPU memory rather
+      // than promoting it to a GPU texture. These per-chunk caches are only ever
+      // filled by putImageData (a CPU write) and then blitted into the main canvas;
+      // a GPU texture buys nothing and, on GPU-poor machines (e.g. NVIDIA drivers
+      // failing NVKMS/GEM allocations), each promotion/blit hits a failure/stall
+      // path that turns a full viewport paint into seconds. Software canvas at this
+      // scale (≤ ~60 chunk blits/frame, pixel-art, smoothing off) is comfortably
+      // 60fps AND independent of GPU allocation health. The chunk-picker thumbs are
+      // already CPU-backed via a shared scratch canvas — the same lesson, applied
+      // to the viewport.
+      const cctx = c.getContext('2d', { willReadFrequently: true });
       if (cctx) {
         // createImageData + data.set avoids the ImageData ctor's ArrayBuffer-typed
         // overload rejecting the core's Uint8ClampedArray<ArrayBufferLike> (repo
@@ -226,7 +236,13 @@ export default function ClassicLevelViewport() {
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const ctx = canvas.getContext('2d');
+    // willReadFrequently forces this main viewport canvas CPU-backed too (see the
+    // chunk-cache note in getChunkCanvas). It composes ~60 CPU-backed chunk blits
+    // plus vector overlays per rAF-coalesced frame; keeping it software makes the
+    // whole paint independent of GPU allocation health — the fix for the NVKMS-
+    // failure stall. Sprite overlays draw ImageBitmaps, which decode once and blit
+    // fine into a software canvas, so the sprite cache stays ImageBitmap-backed.
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
     if (!ctx) return;
 
     const { w, h } = sizeRef.current;

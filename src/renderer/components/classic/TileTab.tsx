@@ -35,7 +35,10 @@ export default function TileTab({ doc, usage }: { doc: LevelDoc; usage: UsageInd
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    const ctx = canvas?.getContext('2d');
+    // willReadFrequently keeps this editor canvas CPU-backed (GPU-poor resilience,
+    // same as the classic viewport). Set on the first getContext for the canvas so
+    // the option is honored.
+    const ctx = canvas?.getContext('2d', { willReadFrequently: true });
     if (!canvas || !ctx) return;
     ctx.clearRect(0, 0, PX * 8, PX * 8);
     if (composerTileIndex >= tileCount) return;

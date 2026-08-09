@@ -87,13 +87,21 @@ export function drawBufferScaled(
   canvas: HTMLCanvasElement | null, buf: Uint8ClampedArray,
   srcW: number, srcH: number, dstW: number, dstH: number,
 ): void {
-  const ctx = canvas?.getContext('2d');
+  // willReadFrequently keeps both the destination (composer tab / thumbnail) canvas
+  // and the temp upscale-source CPU-backed. These are pixel-art putImageData +
+  // nearest-neighbor blits — a GPU texture buys nothing, and on GPU-poor machines
+  // (NVKMS/GEM allocation failures) canvas promotion is a stall path. Matches the
+  // classic viewport's CPU-canvas strategy. NOTE: getContext options only apply on
+  // the FIRST call for a canvas — the tab editors that call getContext directly
+  // (before drawBufferScaled) set the same option there so their context is CPU-
+  // backed too.
+  const ctx = canvas?.getContext('2d', { willReadFrequently: true });
   if (!ctx) return;
   ctx.imageSmoothingEnabled = false;
   ctx.clearRect(0, 0, dstW, dstH);
   const tmp = document.createElement('canvas');
   tmp.width = srcW; tmp.height = srcH;
-  const tctx = tmp.getContext('2d');
+  const tctx = tmp.getContext('2d', { willReadFrequently: true });
   if (!tctx) return;
   const img = tctx.createImageData(srcW, srcH);
   img.data.set(buf);

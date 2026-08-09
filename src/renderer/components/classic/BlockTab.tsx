@@ -32,7 +32,10 @@ export default function BlockTab({ doc, usage }: { doc: LevelDoc; usage: UsageIn
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    const ctx = canvas?.getContext('2d');
+    // willReadFrequently keeps this editor canvas CPU-backed (GPU-poor resilience,
+    // same as the classic viewport). Set on the first getContext for the canvas so
+    // the option is honored (drawBufferScaled below reuses this same context).
+    const ctx = canvas?.getContext('2d', { willReadFrequently: true });
     if (!canvas || !ctx || !block) return;
     ctx.imageSmoothingEnabled = false;
     drawBufferScaled(canvas, renderBlock(doc, composerBlockId), 16, 16, BLOCK_CELL * 2, BLOCK_CELL * 2);
