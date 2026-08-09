@@ -94,6 +94,8 @@ export const TILE_SELECTED = '#a6e3a1';                 // selected brush tile o
 export const TILE_HOVER = '#34D399';                    // hovered tile outline (mirrors --accent)
 export const CHUNK_LABEL_BG = 'rgba(0,0,0,0.6)';        // chunk index label backdrop
 export const CHUNK_LABEL_TEXT = '#E8EAF2';              // chunk index label (mirrors --text-hi)
+export const CHUNK_AIR_CHECK_A = '#2A2F3A';             // air ($00) picker checker — light square
+export const CHUNK_AIR_CHECK_B = '#1B1E26';             // air ($00) picker checker — dark square
 
 // ---------- classic layout stamp tool (ClassicLevelViewport) ----------
 /** Fill wash over cells an in-progress stamp gesture has painted (pre-commit). */

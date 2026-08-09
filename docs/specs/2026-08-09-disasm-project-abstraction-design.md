@@ -74,8 +74,8 @@ this is not (yet) a shippable community tool.
 |---|---|---|---|
 | 8×8 tiles | `artnem/8x8 - {ZONE}.nem` (GHZ split in two: GHZ1+GHZ2) | **Nemesis** | concatenated in VRAM order |
 | 16×16 blocks | `map16/{ZONE}.eni` | **Enigma** | 8 bytes/block: 4 tile words (pri/pal/xf/yf/tile) |
-| 256×256 chunks | `map256/{ZONE}.kos` | **Kosinski** | 16×16 grid of block words per chunk; word carries block id + xf/yf + solidity bits |
-| FG/BG layout | `levels/{zone}{act}.bin`, `levels/{zone}bg.bin` | uncompressed | byte 0 = width−1, byte 1 = height−1, then row-major chunk ids; max 64×8 (INI: levelwidthmax/levelheightmax) |
+| 256×256 chunks | `map256/{ZONE}.kos` | **Kosinski** | 16×16 grid of block words per chunk; word carries block id + xf/yf + solidity bits. **Layout ids are 1-based** (below): the file's first chunk is layout id $01, since id $00 is the implicit blank/air chunk (SonLVLAPI `LoadLevelChunks` prepends an empty Chunk at index 0 for S1/SCD) |
+| FG/BG layout | `levels/{zone}{act}.bin`, `levels/{zone}bg.bin` | uncompressed | byte 0 = width−1, byte 1 = height−1, then row-major chunk ids; max 64×8 (INI: levelwidthmax/levelheightmax). Chunk id $00 = blank/air (bit 7 = loop flag); id N≥1 → the (N−1)-th map256 chunk |
 | Objects | `objpos/{zone}{act}.bin` | uncompressed | 6 bytes/entry: x word, y word (flags in high bits: yflip bit15, xflip bit14), id byte (bit7 = respawn), subtype byte; terminated $FFFF. REV01 variants exist for some acts |
 | Start positions | `startpos/{zone}{act}.bin` (+ credits-demo variants) | uncompressed | x word, y word |
 | Palettes | `palette/*.bin` | raw CRAM words | composed per profile rule, e.g. GHZ = `Sonic.bin` line 0 + `Green Hill Zone.bin` lines 1–3 |

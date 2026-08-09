@@ -3,7 +3,7 @@ import { T } from '../ui';
 import { useClassicLevelStore } from '../../state/classicLevelStore';
 import { renderChunk } from '../../../core/level-classic/render';
 import type { LevelDoc } from '../../../core/level-classic/model';
-import { CHUNK_LABEL_BG, CHUNK_LABEL_TEXT } from '../../canvas/canvas-colors';
+import { CHUNK_LABEL_BG, CHUNK_LABEL_TEXT, CHUNK_AIR_CHECK_A, CHUNK_AIR_CHECK_B } from '../../canvas/canvas-colors';
 
 // One chunk = 256x256 world px; thumbnails downscale that. Fixed display size
 // (no S/M/L control — the picker is a compact bottom strip).
@@ -11,6 +11,17 @@ const CHUNK_PX = 256;
 const THUMB = 56;
 
 const hex2 = (n: number) => `$${n.toString(16).toUpperCase().padStart(2, '0')}`;
+
+/** Paint a small checkerboard so the air ($00) cell reads as "empty / erase". */
+function drawAirChecker(ctx: CanvasRenderingContext2D): void {
+  const cell = 8;
+  for (let y = 0; y < THUMB; y += cell) {
+    for (let x = 0; x < THUMB; x += cell) {
+      ctx.fillStyle = ((x / cell + y / cell) & 1) ? CHUNK_AIR_CHECK_A : CHUNK_AIR_CHECK_B;
+      ctx.fillRect(x, y, cell, cell);
+    }
+  }
+}
 
 /**
  * One chunk thumbnail. The `renderChunk` prerender is (re)run only when the
@@ -33,6 +44,15 @@ const ThumbCell = React.memo(function ThumbCell({
   useEffect(() => {
     const ctx = ref.current?.getContext('2d');
     if (!ctx) return;
+    ctx.imageSmoothingEnabled = false;
+    ctx.clearRect(0, 0, THUMB, THUMB);
+    // Engine id 0 is air/blank (renderChunk composes nothing) — draw a checker so
+    // it reads as "erase", not a black chunk. Still a selectable entry so the
+    // Stamp tool can paint air to clear a cell.
+    if (chunkId === 0) {
+      drawAirChecker(ctx);
+      return;
+    }
     // Render the chunk at full res into a temp canvas, then draw it scaled into
     // the (persistent) thumbnail canvas. The temp canvas is GC'd, so only the
     // small THUMB×THUMB backing store is retained per cell.
@@ -47,8 +67,6 @@ const ThumbCell = React.memo(function ThumbCell({
       img.data.set(renderChunk(doc, chunkId));
       fctx.putImageData(img, 0, 0);
     }
-    ctx.imageSmoothingEnabled = false;
-    ctx.clearRect(0, 0, THUMB, THUMB);
     ctx.drawImage(full, 0, 0, THUMB, THUMB);
     // `doc` is read via closure but deliberately OMITTED from the deps: its
     // identity churns on EVERY edit (layout stamps bump no chunk versions yet
@@ -63,11 +81,11 @@ const ThumbCell = React.memo(function ThumbCell({
   return (
     <button
       onClick={() => onSelect(chunkId)}
-      title={`Chunk ${hex2(chunkId)}`}
+      title={chunkId === 0 ? 'Air ($00) — stamp to erase a cell' : `Chunk ${hex2(chunkId)}`}
       style={{ ...styles.cell, ...(selected ? styles.cellSel : {}) }}
     >
       <canvas ref={ref} width={THUMB} height={THUMB} style={styles.thumbCanvas} />
-      <span style={styles.cellLabel}>{hex2(chunkId)}</span>
+      <span style={styles.cellLabel}>{chunkId === 0 ? 'air' : hex2(chunkId)}</span>
     </button>
   );
 });
@@ -96,7 +114,10 @@ export default function ChunkPicker() {
         <span style={styles.hint}>click to select · right-click viewport to eyedrop</span>
       </div>
       <div style={styles.strip}>
-        {doc.chunks.map((_, id) => (
+        {/* Engine-id space: a leading air ($00) entry, then $01..N mapping to the
+            file's chunks[0..N-1] (S1 layout ids are 1-based). versionKey stays
+            engine-id-keyed, exactly like the viewport's offscreen cache. */}
+        {Array.from({ length: doc.chunks.length + 1 }, (_, id) => (
           <ThumbCell
             key={id}
             doc={doc}

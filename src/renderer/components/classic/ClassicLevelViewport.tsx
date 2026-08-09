@@ -185,7 +185,10 @@ export default function ClassicLevelViewport() {
       for (let col = range.startCol; col < range.endCol; col++) {
         const cell = layoutCellAt(grid, col, row);
         if (cell === undefined) continue;
-        const chunkId = cell & 0x7f; // strip S1's bit-7 loop flag
+        // Engine chunk id: strip S1's bit-7 loop flag. id 0 = air (renderChunk
+        // composes nothing); 1..N map to chunks[id-1]. Cache + versions are keyed
+        // by this engine id, matching classicEditChunkCells' version bump.
+        const chunkId = cell & 0x7f;
         const key = `${chunkEpoch}:${chunkVersions.get(chunkId) ?? 0}`;
         ctx.drawImage(getChunkCanvas(doc, chunkId, key), col * CHUNK_PX, row * CHUNK_PX);
       }

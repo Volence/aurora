@@ -22,7 +22,7 @@
 //   re-deriving the bit math here.
 
 import { decodeGenesisColor } from '../formats/palette';
-import type { LevelDoc } from './model';
+import { chunkIndexForId, type LevelDoc } from './model';
 
 const TILE_PX = 8;
 const BLOCK_PX = 16;
@@ -125,15 +125,19 @@ function renderBlock(doc: LevelDoc, blockId: number): Uint8ClampedArray {
 }
 
 /**
- * Render a chunk to a 256x256 RGBA buffer (262144 bytes). Resolves each of the
- * 256 chunk cells (16x16, row-major) to a block, applies the chunk cell's
- * xf/yf to the whole 16x16 block, and tiles the results. Out-of-range block
- * refs and a missing chunk id render transparent — never throws (the renderer
- * tolerates transient invalid state during editing).
+ * Render a chunk to a 256x256 RGBA buffer (262144 bytes). `chunkId` is the S1
+ * ENGINE id (1-based; $00 = air): it is resolved to a file-order chunk index via
+ * chunkIndexForId, so id 0 and any id past the pool render fully transparent.
+ * Resolves each of the 256 chunk cells (16x16, row-major) to a block, applies the
+ * chunk cell's xf/yf to the whole 16x16 block, and tiles the results. Out-of-range
+ * block refs also render transparent — never throws (the renderer tolerates
+ * transient invalid state during editing).
  */
 export function renderChunk(doc: LevelDoc, chunkId: number): Uint8ClampedArray {
   const out = new Uint8ClampedArray(CHUNK_PX * CHUNK_PX * 4);
-  const chunk = doc.chunks[chunkId];
+  const index = chunkIndexForId(doc, chunkId);
+  if (index === null) return out; // air ($00) or out-of-range → transparent
+  const chunk = doc.chunks[index];
   if (!chunk) return out;
 
   // Memo distinct block renders for this call: a chunk has up to 256 cells but

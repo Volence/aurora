@@ -172,49 +172,81 @@ describe('classic:set-layout-cells', () => {
     expect(st().dirty.fg).toBeUndefined();
   });
 
-  it('rejects out-of-bounds cells and chunkId > 255 (atomic)', () => {
-    openReady();
+  it('rejects out-of-bounds cells and a chunkId past the chunk pool (atomic)', () => {
+    openReady(); // fixture has 2 chunks → engine ids 0(air)..2 valid
     expect(classicSetLayoutCells('fg', [{ x: 5, y: 0, chunkId: 0 }]).ok).toBe(false);
+    expect(classicSetLayoutCells('fg', [{ x: 0, y: 0, chunkId: 3 }]).ok).toBe(false); // > chunks.length
     expect(classicSetLayoutCells('fg', [{ x: 0, y: 0, chunkId: 256 }]).ok).toBe(false);
     expect(st().dirty.fg).toBeUndefined();
     expect(classicCanUndo()).toBe(false);
   });
+
+  it('accepts air ($00) and the last engine id (chunks.length)', () => {
+    openReady(); // 2 chunks → engine ids 1,2 real; 0 = air
+    expect(classicSetLayoutCells('fg', [{ x: 0, y: 0, chunkId: 0 }, { x: 1, y: 0, chunkId: 2 }]).ok).toBe(true);
+    expect(Array.from(st().doc!.fg.cells)).toEqual([0, 2, 0, 1]);
+  });
 });
 
 describe('classic:edit-chunk-cells', () => {
-  it('edits cells, marks chunks dirty, bumps ONLY that chunk version', () => {
+  // chunkId is an ENGINE id: id 1 → chunks[0], id 2 → chunks[1] (S1 1-based),
+  // and id 0 (air/blank) is not editable. chunkVersions are keyed by engine id
+  // so the viewport/picker caches (also engine-id-keyed) line up.
+  it('edits cells (engine id 1 → chunks[0]), marks chunks dirty, bumps ONLY that engine-id version', () => {
     openReady();
     const word = packChunkCell({ block: 1, xf: true, yf: false, solidity: 2 });
-    expect(classicEditChunkCells(0, [{ index: 5, word }]).ok).toBe(true);
+    expect(classicEditChunkCells(1, [{ index: 5, word }]).ok).toBe(true);
     expect(st().doc!.chunks[0].cells[5]).toEqual(unpackChunkCell(word));
     expect(st().doc!.chunks[1].cells[5]).toEqual({ block: 0, xf: false, yf: false, solidity: 0 });
     expect(st().dirty.chunks).toBe(true);
-    expect(st().chunkVersions.get(0)).toBeGreaterThan(0);
-    expect(st().chunkVersions.has(1)).toBe(false); // untouched chunk not bumped
+    expect(st().chunkVersions.get(1)).toBeGreaterThan(0); // engine id 1
+    expect(st().chunkVersions.has(2)).toBe(false); // engine id 2 (chunks[1]) not bumped
   });
 
   it('undo restores the chunkVersions map exactly; redo re-bumps', () => {
     openReady();
     const word = packChunkCell({ block: 1, xf: false, yf: false, solidity: 0 });
-    classicEditChunkCells(0, [{ index: 0, word }]);
-    const v = st().chunkVersions.get(0);
+    classicEditChunkCells(1, [{ index: 0, word }]);
+    const v = st().chunkVersions.get(1);
     st().undo();
-    expect(st().chunkVersions.has(0)).toBe(false);
+    expect(st().chunkVersions.has(1)).toBe(false);
     st().redo();
-    expect(st().chunkVersions.get(0)).toBe(v);
+    expect(st().chunkVersions.get(1)).toBe(v);
   });
 
   it('rejects a nonexistent chunk, an out-of-range cell index, and a bad word (atomic)', () => {
     openReady();
     expect(classicEditChunkCells(99, [{ index: 0, word: 0 }]).ok).toBe(false);
-    expect(classicEditChunkCells(0, [{ index: 999, word: 0 }]).ok).toBe(false);
-    expect(classicEditChunkCells(0, [{ index: 0, word: 0x1ffff }]).ok).toBe(false); // > 0xFFFF
+    expect(classicEditChunkCells(1, [{ index: 999, word: 0 }]).ok).toBe(false);
+    expect(classicEditChunkCells(1, [{ index: 0, word: 0x1ffff }]).ok).toBe(false); // > 0xFFFF
     expect(st().dirty.chunks).toBeUndefined();
+  });
+
+  it('rejects editing the blank chunk (engine id 0 = air) with a clear message', () => {
+    openReady();
+    const r = classicEditChunkCells(0, [{ index: 0, word: 0 }]);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toMatch(/blank chunk|not editable/i);
+    expect(st().dirty.chunks).toBeUndefined();
+  });
+
+  it('rejects engine id past the last chunk (chunks.length + 1)', () => {
+    openReady(); // fixture has 2 chunks → engine ids 1..2 valid, 3 is past the end
+    expect(classicEditChunkCells(3, [{ index: 0, word: 0 }]).ok).toBe(false);
+    expect(st().dirty.chunks).toBeUndefined();
+  });
+
+  it('accepts the last engine id (chunks.length → chunks[length-1])', () => {
+    openReady();
+    const word = packChunkCell({ block: 1, xf: false, yf: false, solidity: 0 });
+    expect(classicEditChunkCells(2, [{ index: 0, word }]).ok).toBe(true); // engine id 2 → chunks[1]
+    expect(st().doc!.chunks[1].cells[0]).toEqual(unpackChunkCell(word));
+    expect(st().chunkVersions.get(2)).toBeGreaterThan(0);
   });
 
   it('accepts the max valid block ref ($3FF)', () => {
     openReady();
-    const r = classicEditChunkCells(0, [{ index: 0, word: packChunkCell({ block: 0x3ff, xf: false, yf: false, solidity: 0 }) }]);
+    const r = classicEditChunkCells(1, [{ index: 0, word: packChunkCell({ block: 0x3ff, xf: false, yf: false, solidity: 0 }) }]);
     expect(r.ok).toBe(true);
   });
 });
@@ -373,25 +405,25 @@ describe('command guards + undo/redo triple consistency', () => {
   it('undo/redo restore doc + dirty + versions together across multiple edits', () => {
     openReady();
     classicSetStart(1, 2);            // dirty.start, no version
-    classicEditChunkCells(0, [{ index: 0, word: packChunkCell({ block: 1, xf: false, yf: false, solidity: 0 }) }]); // chunk version
+    classicEditChunkCells(1, [{ index: 0, word: packChunkCell({ block: 1, xf: false, yf: false, solidity: 0 }) }]); // chunk version (engine id 1)
     classicEditBlock(1, { cells: Array.from({ length: 4 }, () => ({ tile: 0, xf: false, yf: false, pal: 0, pri: false })) }); // epoch
 
     const afterDirty = { ...st().dirty };
     expect(afterDirty).toEqual({ start: true, chunks: true, blocks: true });
     const afterEpoch = st().chunkEpoch;
-    const afterChunkV = st().chunkVersions.get(0);
+    const afterChunkV = st().chunkVersions.get(1);
 
     // Undo the block edit → blocks clean, epoch reverts, chunk version stays.
     st().undo();
     expect(st().dirty.blocks).toBeUndefined();
     expect(st().dirty.chunks).toBe(true);
     expect(st().chunkEpoch).toBeLessThan(afterEpoch);
-    expect(st().chunkVersions.get(0)).toBe(afterChunkV);
+    expect(st().chunkVersions.get(1)).toBe(afterChunkV);
 
     // Undo the chunk edit → chunks clean, chunk version gone.
     st().undo();
     expect(st().dirty.chunks).toBeUndefined();
-    expect(st().chunkVersions.has(0)).toBe(false);
+    expect(st().chunkVersions.has(1)).toBe(false);
 
     // Undo the start edit → fully clean.
     st().undo();
@@ -403,7 +435,7 @@ describe('command guards + undo/redo triple consistency', () => {
     st().redo(); st().redo(); st().redo();
     expect(st().dirty).toEqual(afterDirty);
     expect(st().chunkEpoch).toBe(afterEpoch);
-    expect(st().chunkVersions.get(0)).toBe(afterChunkV);
+    expect(st().chunkVersions.get(1)).toBe(afterChunkV);
   });
 
   it('a rejected command records no undo step and leaves historyTick untouched', () => {

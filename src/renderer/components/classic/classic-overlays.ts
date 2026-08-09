@@ -8,7 +8,7 @@
 // world coordinates. They hold no state and touch no React — behaviour is
 // identical to the inline versions they replaced.
 
-import type { LevelDoc } from '../../../core/level-classic/model';
+import { chunkIndexForId, type LevelDoc } from '../../../core/level-classic/model';
 import { columnSolidRun } from '../../../core/collision/collision-render';
 import { CHUNK_PX, ringGroupPositions } from './viewport-math';
 import {
@@ -30,7 +30,10 @@ function solidityFill(solidity: number): string {
   }
 }
 
-/** Draw the collision overlay for one visible chunk at layout cell (col, row). */
+/**
+ * Draw the collision overlay for one visible chunk at layout cell (col, row).
+ * `chunkId` is the S1 engine id (1-based; $00 = air draws no collision).
+ */
 export function drawCollision(
   ctx: CanvasRenderingContext2D,
   d: LevelDoc,
@@ -39,7 +42,9 @@ export function drawCollision(
   chunkId: number,
   showAngles: boolean,
 ): void {
-  const chunk = d.chunks[chunkId];
+  const index = chunkIndexForId(d, chunkId);
+  if (index === null) return; // air / out-of-range → no collision to draw
+  const chunk = d.chunks[index];
   if (!chunk) return;
   const baseX = col * CHUNK_PX;
   const baseY = row * CHUNK_PX;

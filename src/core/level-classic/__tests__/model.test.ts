@@ -6,6 +6,7 @@ import {
   packChunkCell,
   unpackChunkCell,
   validateLevelDoc,
+  chunkIndexForId,
   type BlockCell,
   type ChunkCell,
   type BlockDef,
@@ -115,6 +116,41 @@ describe('chunk cell pack/unpack', () => {
     // Bit 15 and bit 10 are unused in S1: a word with them set ignores them but
     // still recovers every real field.
     expect(unpackChunkCell(0x7fff)).toEqual({ block: 0x3ff, xf: true, yf: true, solidity: 3 });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// chunkIndexForId — S1 layout ids are 1-based (SonLVLAPI LevelData.cs:576
+// prepends a blank chunk at id 0 for S1/SCD): id 0 = air/blank; id N≥1 maps to
+// doc.chunks[N-1]; anything past the last chunk (or negative) is null.
+// ---------------------------------------------------------------------------
+
+describe('chunkIndexForId', () => {
+  // A doc whose chunk count is what matters (3 chunks → valid ids 1..3).
+  const doc: LevelDoc = { ...validDoc(), chunks: [chunk(), chunk(), chunk()] };
+
+  it('maps id 0 to null (blank/air — no chunk drawn)', () => {
+    expect(chunkIndexForId(doc, 0)).toBeNull();
+  });
+
+  it('maps id 1 to chunk index 0 (the file\'s first chunk)', () => {
+    expect(chunkIndexForId(doc, 1)).toBe(0);
+  });
+
+  it('maps id N to chunk index N-1', () => {
+    expect(chunkIndexForId(doc, 3)).toBe(2);
+  });
+
+  it('maps id N+1 (past the last chunk) to null', () => {
+    expect(chunkIndexForId(doc, 4)).toBeNull();
+  });
+
+  it('maps a negative id to null', () => {
+    expect(chunkIndexForId(doc, -1)).toBeNull();
+  });
+
+  it('maps a non-integer id to null', () => {
+    expect(chunkIndexForId(doc, 1.5)).toBeNull();
   });
 });
 

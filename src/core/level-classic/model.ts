@@ -113,6 +113,36 @@ export interface LevelDoc {
 }
 
 // ---------------------------------------------------------------------------
+// Layout chunk-id semantics
+// ---------------------------------------------------------------------------
+
+/**
+ * Resolve an S1 layout chunk id to an index into `doc.chunks`, or null when the
+ * cell draws nothing.
+ *
+ * S1 (and SCD) layout chunk ids are 1-BASED: SonLVLAPI's LoadLevelChunks
+ * (LevelData.cs:576) prepends an empty Chunk at index 0 for EngineVersion.S1/SCD
+ * before loading the file's chunks, so layout byte $00 = blank/air and byte N≥1
+ * = the (N−1)-th chunk in the map256 file. Blocks and tiles have no such prepend
+ * (0-based). `doc.chunks` is kept in FILE order (byte-identity on save), so this
+ * helper is the ONE place the +1 shift lives — every consumer routes through it.
+ *
+ *   id 0            → null (air; renderers compose nothing)
+ *   1..chunks.length → chunks[id-1]
+ *   anything else (negative, non-integer, past the pool) → null
+ *
+ * Game-keyed for a future S2 adapter (S2 layouts are 0-based — no prepend); for
+ * now `doc.game` is always 's1'.
+ */
+export function chunkIndexForId(doc: LevelDoc, id: number): number | null {
+  if (!Number.isInteger(id)) return null;
+  // Future: `if (doc.game !== 's1') return id in [0, chunks.length) ? id : null;`
+  const index = id - 1;
+  if (index < 0 || index >= doc.chunks.length) return null;
+  return index;
+}
+
+// ---------------------------------------------------------------------------
 // Word pack / unpack
 // ---------------------------------------------------------------------------
 

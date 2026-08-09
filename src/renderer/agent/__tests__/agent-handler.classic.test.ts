@@ -185,9 +185,10 @@ describe('classic-get-level', () => {
 describe('classic-set-layout-region', () => {
   it('stamps a 2D chunk-id grid as one undo step', async () => {
     openReady();
-    const res = await handleAgentRequest({ kind: 'classic-set-layout-region', plane: 'fg', x: 0, y: 0, chunkIds: [[1, 2], [3, 4]] });
+    // Engine ids (fixture has 2 chunks → valid ids 0=air,1,2).
+    const res = await handleAgentRequest({ kind: 'classic-set-layout-region', plane: 'fg', x: 0, y: 0, chunkIds: [[0, 1], [2, 1]] });
     expect(res).toEqual({ plane: 'fg', cells: 4 });
-    expect(Array.from(lvl().doc!.fg.cells)).toEqual([1, 2, 3, 4]);
+    expect(Array.from(lvl().doc!.fg.cells)).toEqual([0, 1, 2, 1]);
     lvl().undo();
     expect(Array.from(lvl().doc!.fg.cells)).toEqual([0, 1, 0, 1]);
   });
@@ -202,11 +203,15 @@ describe('classic-set-layout-region', () => {
 });
 
 describe('classic-edit-chunk', () => {
-  it('edits chunk cells as one undo step', async () => {
+  it('edits chunk cells as one undo step (engine id 1 → chunks[0])', async () => {
     openReady();
-    const res = await handleAgentRequest({ kind: 'classic-edit-chunk', chunkId: 0, cells: [{ index: 5, word: 1 }] });
-    expect(res).toEqual({ chunkId: 0, cells: 1 });
+    const res = await handleAgentRequest({ kind: 'classic-edit-chunk', chunkId: 1, cells: [{ index: 5, word: 1 }] });
+    expect(res).toEqual({ chunkId: 1, cells: 1 });
     expect(lvl().doc!.chunks[0].cells[5].block).toBe(1);
+  });
+  it('rejects editing the blank chunk (engine id 0 = air)', async () => {
+    openReady();
+    await expect(handleAgentRequest({ kind: 'classic-edit-chunk', chunkId: 0, cells: [{ index: 0, word: 0 }] })).rejects.toThrow(/blank chunk|not editable/i);
   });
   it('rejects a nonexistent chunk', async () => {
     openReady();

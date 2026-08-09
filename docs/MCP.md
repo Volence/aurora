@@ -90,9 +90,9 @@ commands do, so an agent never loops single-cell calls.
 | `open_project` | `{ dir }` | Opens a directory, classic-first (the same flow as File→Open). A Sonic 1 disasm opens the classic surface and returns `{ type, label, report: {resolved,total}, zoneTree }`; a real aeon project is left unchanged (`{ type: "aeon", opened: false }`); an unrecognized directory errors. |
 | `get_project_report` | `{}` | The full `ResolutionReport` of the open classic project (per-file resolved/missing/ambiguous + counts). |
 | `list_classic_levels` | `{}` | `{ levels }` — the project's zone/act refs (`zone, act, label, available`). |
-| `get_classic_level` | `{ zone, act }` | Opens + reads one act. Summary only: `dims` (fg/bg w×h), `counts` (tiles/blocks/chunks/objects), `palettes` (4×16 CRAM words), `objects`, `start`, and `layout` (fg/bg chunk-id grids as nested row arrays). Not the raw tile/block/chunk buffers. |
-| `set_layout_region`\* | `{ plane, x, y, chunkIds }` | Stamps a 2D grid of chunk ids into a layout plane (`fg`/`bg`), top-left at `(x,y)`. |
-| `edit_chunk`\* | `{ chunkId, cells: [{index, word}] }` | Sets individual 16×16 block cells of one chunk (packed S1 chunk-block words). |
+| `get_classic_level` | `{ zone, act }` | Opens + reads one act. Summary only: `dims` (fg/bg w×h), `counts` (tiles/blocks/chunks/objects), `palettes` (4×16 CRAM words), `objects`, `start`, and `layout` (fg/bg chunk-id grids as nested row arrays; S1 ids are 1-based — `0` = air, `1..N` = the N chunks). Not the raw tile/block/chunk buffers. |
+| `set_layout_region`\* | `{ plane, x, y, chunkIds }` | Stamps a 2D grid of chunk ids into a layout plane (`fg`/`bg`), top-left at `(x,y)`. Chunk ids are 1-based: `0` = air/blank (erases the cell), `1..N` reference the N map256 chunks. |
+| `edit_chunk`\* | `{ chunkId, cells: [{index, word}] }` | Sets individual 16×16 block cells of one chunk (packed S1 chunk-block words). `chunkId` is a 1-based engine id (min `1`; `0` is air/blank and not editable). |
 | `edit_block`\* | `{ blockId, def: {cells: [4]} }` | Replaces one 16×16 block's 4-tile-cell definition. |
 | `place_object`\* | `{ entry }` | Appends one object placement; reply includes the new `index`. |
 | `move_object`\* | `{ index, x, y }` | Moves the object at `index`. |

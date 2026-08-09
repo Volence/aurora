@@ -28,7 +28,7 @@
 import { create } from 'zustand';
 import type { DirtyDomains, EditableTileRange, LevelDoc, ZoneActRef } from '../../core/project/adapter';
 import type { BlockDef, ChunkCell } from '../../core/level-classic/model';
-import { validateLevelDoc, unpackChunkCell } from '../../core/level-classic/model';
+import { validateLevelDoc, unpackChunkCell, chunkIndexForId } from '../../core/level-classic/model';
 import type { S1ObjectEntry } from '../../core/formats/classic/s1-objpos';
 import { ClassicHistory, type ClassicSnapshot } from '../../core/editing/classic-history';
 import { registerRedoClearer, invalidateSiblingRedos } from '../../core/editing/undo-bus';
@@ -383,8 +383,11 @@ export function classicSetLayoutCells(
     if (index >= bound) {
       return err(`${plane} cell (${c.x},${c.y}) is outside the writable layout region`);
     }
-    if (!isInt(c.chunkId) || c.chunkId < 0 || c.chunkId > 0xff) {
-      return err(`chunk id ${c.chunkId} out of range 0..255`);
+    // chunkId is the S1 ENGINE id: $00 = air (valid — erases the cell), and
+    // 1..chunks.length map to chunks[id-1]. Anything past the pool can't render,
+    // so reject it here rather than baking an un-drawable id into the layout.
+    if (!isInt(c.chunkId) || c.chunkId < 0 || c.chunkId > doc.chunks.length) {
+      return err(`chunk id ${c.chunkId} out of range 0..${doc.chunks.length} (0 = air)`);
     }
   }
   const nextCells = new Uint8Array(grid.cells);
@@ -398,17 +401,26 @@ export function classicSetLayoutCells(
   return { ok: true };
 }
 
-/** classic:edit-chunk-cells — set individual block cells of one chunk. */
+/**
+ * classic:edit-chunk-cells — set individual block cells of one chunk.
+ *
+ * `chunkId` is the S1 ENGINE id (1-based; $00 = the blank/air chunk, which is not
+ * a real map256 entry and cannot be edited). It resolves to a file-order chunk
+ * index via chunkIndexForId. chunkVersions are keyed by ENGINE id so the
+ * viewport / picker caches (which key on the layout byte) invalidate correctly.
+ */
 export function classicEditChunkCells(
   chunkId: number,
   cells: { index: number; word: number }[],
 ): CommandResult {
   const doc = requireDoc();
   if (!doc) return err('no classic level is open');
-  if (!isInt(chunkId) || chunkId < 0 || chunkId >= doc.chunks.length) {
-    return err(`chunk ${chunkId} does not exist (0..${doc.chunks.length - 1})`);
+  const chunkIndex = chunkIndexForId(doc, chunkId);
+  if (chunkIndex === null) {
+    if (chunkId === 0) return err('the blank chunk (engine id 0 = air) is not editable');
+    return err(`chunk ${chunkId} does not exist (1..${doc.chunks.length})`);
   }
-  const src = doc.chunks[chunkId];
+  const src = doc.chunks[chunkIndex];
   const nextCells: ChunkCell[] = src.cells.slice();
   for (const { index, word } of cells) {
     if (!isInt(index) || index < 0 || index > 255) {
@@ -420,10 +432,11 @@ export function classicEditChunkCells(
     nextCells[index] = unpackChunkCell(word);
   }
   const nextChunks = doc.chunks.slice();
-  nextChunks[chunkId] = { cells: nextCells };
+  nextChunks[chunkIndex] = { cells: nextCells };
   const newDoc: LevelDoc = { ...doc, chunks: nextChunks };
   const e = structuralError(newDoc);
   if (e) return err(e);
+  // Version keyed by ENGINE id (the layout byte the viewport/picker cache on).
   commit(newDoc, { chunks: true }, { kind: 'chunk', id: chunkId });
   return { ok: true };
 }

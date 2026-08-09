@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
+import * as fs from 'fs';
 import { renderChunk, renderTile } from '../render';
+import { s1Adapter } from '../../project/s1';
 import type {
   LevelDoc,
   BlockDef,
@@ -178,13 +180,29 @@ describe('renderChunk', () => {
   const doc = makeDoc();
 
   it('produces a 256x256 RGBA buffer', () => {
-    const buf = renderChunk(doc, 0);
+    const buf = renderChunk(doc, 1);
     expect(buf.length).toBe(256 * 256 * 4);
     expect(buf).toBeInstanceOf(Uint8ClampedArray);
   });
 
-  it('resolves block 0 through all four block-cell flip combos to four corners', () => {
+  it('renders engine id 0 (air) as a fully transparent buffer (S1 layout is 1-based)', () => {
+    // The hand-built doc has ONE chunk. Under 1-based S1 semantics engine id 1
+    // draws it; id 0 is blank/air and must compose to nothing, even though
+    // doc.chunks[0] is a real, non-empty chunk.
     const buf = renderChunk(doc, 0);
+    expect(buf.length).toBe(256 * 256 * 4);
+    expect(buf.every((v) => v === 0)).toBe(true);
+  });
+
+  it('draws the file\'s first chunk at engine id 1, not id 0', () => {
+    // Same marker the four-corner test checks, but asserted here as the id-1↔
+    // chunks[0] contract: id 1 is non-empty, id 0 is empty.
+    expect(px(renderChunk(doc, 1), 0, 0)).toEqual(RED);
+    expect(px(renderChunk(doc, 0), 0, 0)).toEqual([0, 0, 0, 0]);
+  });
+
+  it('resolves block 0 through all four block-cell flip combos to four corners', () => {
+    const buf = renderChunk(doc, 1);
     expect(px(buf, 0, 0)).toEqual(RED); // TL no flip
     expect(px(buf, 15, 0)).toEqual(RED); // TR xf
     expect(px(buf, 0, 15)).toEqual(RED); // BL yf
@@ -197,21 +215,21 @@ describe('renderChunk', () => {
   it('chunk-cell x-flip mirrors the whole 16x16 block', () => {
     // block1 marker at block-local (0,0), chunk cell (1,0) with xf.
     // xf: (0,0) → (15,0); cell x offset 16 → (31,0).
-    const buf = renderChunk(doc, 0);
+    const buf = renderChunk(doc, 1);
     expect(px(buf, 31, 0)).toEqual(RED);
     expect(px(buf, 16, 0)).toEqual([0, 0, 0, 0]); // marker is NOT at the unflipped spot
   });
 
   it('chunk-cell y-flip mirrors the whole 16x16 block', () => {
     // cell (2,0) yf: (0,0) → (0,15); x offset 32 → (32,15).
-    const buf = renderChunk(doc, 0);
+    const buf = renderChunk(doc, 1);
     expect(px(buf, 32, 15)).toEqual(RED);
     expect(px(buf, 32, 0)).toEqual([0, 0, 0, 0]);
   });
 
   it('chunk-cell x+y flip mirrors to the opposite corner', () => {
     // cell (3,0) xf+yf: (0,0) → (15,15); x offset 48 → (63,15).
-    const buf = renderChunk(doc, 0);
+    const buf = renderChunk(doc, 1);
     expect(px(buf, 63, 15)).toEqual(RED);
     expect(px(buf, 48, 0)).toEqual([0, 0, 0, 0]);
   });
@@ -223,7 +241,7 @@ describe('renderChunk', () => {
     //   (left edge of the RIGHT 8x8 slot). Cell y offset 16 → chunk (8,16).
     // Two x-flips cancel to the tile's natural left-edge pixel, but the tile has
     // moved from the left half to the right half — mirrored cell position.
-    const buf = renderChunk(doc, 0);
+    const buf = renderChunk(doc, 1);
     expect(px(buf, 8, 16)).toEqual(RED);
     // NOT at block2's un-composed marker spot (7,16), NOR the origin (0,16).
     expect(px(buf, 7, 16)).toEqual([0, 0, 0, 0]);
@@ -232,13 +250,13 @@ describe('renderChunk', () => {
 
   it('selects the correct palette line and color index', () => {
     // block3 TL: tile2 (index 2), palette line 1 → pal1[2] = white at (80,0).
-    const buf = renderChunk(doc, 0);
+    const buf = renderChunk(doc, 1);
     expect(px(buf, 80, 0)).toEqual(WHITE);
   });
 
   it('renders an out-of-range block ref as transparent without throwing', () => {
     // cell (4,0) holds block ref 900 (past the 4-entry block array).
-    const buf = renderChunk(doc, 0);
+    const buf = renderChunk(doc, 1);
     for (let y = 0; y < 16; y++) {
       for (let x = 64; x < 80; x++) {
         expect(px(buf, x, y)).toEqual([0, 0, 0, 0]);
@@ -250,5 +268,52 @@ describe('renderChunk', () => {
     const buf = renderChunk(doc, 99);
     expect(buf.length).toBe(256 * 256 * 4);
     expect(buf.every((v) => v === 0)).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Golden: real GHZ1 through the S1 adapter. Cell (0,0) of the FG layout is byte
+// $00 → air, so composing that cell must be transparent; a known ground cell
+// (first non-zero layout id) must render something. Proves the 1-based mapping
+// end-to-end against actual game data. skipIf-gated so CI without the disasm
+// tree stays green.
+// ---------------------------------------------------------------------------
+
+const S1DIR = '/home/volence/sonic_hacks/s1disasm';
+
+function realFs(root: string) {
+  return {
+    async exists(rel: string) { return fs.existsSync(`${root}/${rel}`); },
+    async read(rel: string) { return new Uint8Array(fs.readFileSync(`${root}/${rel}`)); },
+    async list(rel: string) { return fs.readdirSync(`${root}/${rel}`); },
+  };
+}
+
+const anyOpaque = (buf: Uint8ClampedArray): boolean => {
+  for (let i = 3; i < buf.length; i += 4) if (buf[i] !== 0) return true;
+  return false;
+};
+
+describe.skipIf(!fs.existsSync(`${S1DIR}/levels/ghz1.bin`))('renderChunk golden (real GHZ1)', () => {
+  it('cell (0,0) is air (id 0) → transparent, and a ground cell renders opaque', async () => {
+    const fa = realFs(S1DIR);
+    const handle = await s1Adapter.open(fa);
+    const ref = handle.levels!.list().find((r) => r.zone === 'ghz' && r.act === 1 && r.available);
+    expect(ref).toBeDefined();
+    const doc = await handle.levels!.read(ref!);
+
+    // Top-left of GHZ1's FG is open sky → layout byte $00 = air.
+    const topLeft = doc.fg.cells[0] & 0x7f;
+    expect(topLeft).toBe(0);
+    expect(anyOpaque(renderChunk(doc, topLeft))).toBe(false);
+
+    // First non-air layout cell → a real chunk that draws something.
+    let groundId = 0;
+    for (let i = 0; i < doc.fg.cells.length; i++) {
+      const id = doc.fg.cells[i] & 0x7f;
+      if (id !== 0) { groundId = id; break; }
+    }
+    expect(groundId).toBeGreaterThan(0);
+    expect(anyOpaque(renderChunk(doc, groundId))).toBe(true);
   });
 });
