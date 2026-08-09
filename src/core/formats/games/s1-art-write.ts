@@ -41,6 +41,7 @@ function cloneTiles(tiles: Tile[]): Tile[] {
  * (VDP column-major `tile + col*heightCells + row`, whole-piece xFlip/yFlip) but
  * copies FROM the canvas INTO `tiles` (mutated in place). All covered pixels are
  * written — including 0 — so an erase to transparent is captured.
+ * See the module-header CAVEAT for the destructive-overlap limitation.
  */
 function applyFrameEditsToTiles(
   frame: SpriteFrame,

@@ -48,6 +48,30 @@ describe('s1 object art save-back (Nemesis)', () => {
     expect(tiles[0].pixels[0]).toBe(synthTile(0).pixels[0]);
   });
 
+  it('inverts flipped pieces (xFlip / yFlip / both) byte-for-byte — CI-safe, no fixtures', () => {
+    // Four x-adjacent 2x2-cell pieces, one per flip combination, over 16 tiles.
+    // Locks the hand-mirrored forward/inverse flip coupling WITHOUT s1disasm.
+    const tiles = Array.from({ length: 16 }, (_, i) => synthTile(i));
+    const mkPiece = (col: number, tile: number, xFlip: boolean, yFlip: boolean) => ({
+      xOffset: col * 16, yOffset: 0, widthCells: 2, heightCells: 2, tile,
+      palette: 0, priority: false, xFlip, yFlip,
+    });
+    const frame: SpriteFrame = {
+      id: 'flips',
+      pieces: [
+        mkPiece(0, 0, false, false),
+        mkPiece(1, 4, true, false),
+        mkPiece(2, 8, false, true),
+        mkPiece(3, 12, true, true),
+      ],
+    };
+    // Wide enough for 4 x-adjacent 2-cell (16px) pieces at origin 0.
+    const width = 64, height = 16;
+    const canvas = renderCanvas(frame, tiles, width, height);
+    const out = buildEditedTiles(tiles, [canvas], [frame], 0, 0);
+    expect(serializeTiles(out)).toEqual(serializeTiles(tiles));
+  });
+
   it('encodeS1ArtWriteBack: zero-edit round-trips decode-identical', () => {
     const tiles = [0, 1, 2, 3].map(synthTile);
     const mapping = synthMapping();
