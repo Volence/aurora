@@ -182,7 +182,7 @@ async function captureS1ArtSource(
   try {
     const originalTiles = parseTiles(compressionFor('nemesis').decompress(artBytes));
     const expectedMtimeMs = await window.api.fileMtime(basePath, relPath);
-    useSpriteStore.getState().setS1ArtSource({ basePath, relPath, expectedMtimeMs, originalTiles, mappings, originX, originY });
+    useSpriteStore.getState().setS1ArtSource({ basePath, relPath, expectedMtimeMs, originalTiles, mappings, originX, originY, frameCount: mappings.length });
   } catch { /* leave s1ArtSource null — sprite is still editable, just not save-back-able */ }
 }
 
@@ -201,6 +201,13 @@ export async function saveSpriteArt(): Promise<void> {
   if (!src) { toast('This sprite has no S1 art source to save back to', 'error'); return; }
 
   const { frames } = useSpriteStore.getState();
+  // Frames pair to mappings BY INDEX; a changed frame count means add/delete/
+  // reorder happened, which would write pixels into the wrong tiles. Refuse
+  // rather than silently corrupt art (mappings can't grow/shrink for S1 in v1).
+  if (frames.length !== src.frameCount) {
+    toast(`Frame add/remove isn't writable for S1 (opened ${src.frameCount}, now ${frames.length}) — revert frame changes to save art`, 'error');
+    return;
+  }
   const editedFrames: EditedFrame[] = frames.map((f) => ({ indices: f.data, width: f.width, height: f.height }));
   const res = encodeS1ArtWriteBack(src.originalTiles, editedFrames, src.mappings, src.originX, src.originY);
   if (!res.ok) { toast(`Art save failed: ${res.error}`, 'error'); return; }

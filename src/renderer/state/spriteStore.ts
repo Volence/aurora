@@ -38,6 +38,10 @@ export interface S1ArtSource {
   mappings: SpriteFrame[];       // read-only mappings that drive the inverse render
   originX: number;
   originY: number;
+  /** Frame count at open (== mappings.length). Save refuses if the editor's
+   *  frame count has since changed — index-paired frames→mappings would otherwise
+   *  write pixels into the wrong tiles (add/delete/reorder is not S1-writable). */
+  frameCount: number;
 }
 
 /** One animation step: a reference to a frame + how long it holds (in 1/60s ticks). */

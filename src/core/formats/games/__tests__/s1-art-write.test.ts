@@ -4,6 +4,8 @@ import { nemesisCompress, nemesisDecompress } from '../../../compress/nemesis';
 import { parseTiles } from '../../tiles';
 import { serializeTiles } from '../../../export/tile-dedup';
 import { renderFrameToIndices } from '../../../art/sprite-render';
+import { parseAsmMappings } from '../../../import/asm-mappings';
+import { reconstructFromFrames } from '../../../import/sprite-import';
 import type { Tile } from '../../../model/s4-types';
 import type { SpriteFrame } from '../../../model/sprite-types';
 import { buildEditedTiles, encodeS1ArtWriteBack, type EditedFrame } from '../s1-art-write';
@@ -97,5 +99,25 @@ describe('s1 object art save-back (Nemesis)', () => {
     const decoded = nemesisDecompress(raw);
     const back = nemesisDecompress(nemesisCompress(decoded));
     expect(back).toEqual(decoded);
+  });
+
+  // The real risk in the inverse render is flips + multi-piece layout, not the
+  // trivial single unflipped piece above. Jaws is a 4-frame, 2-piece-per-frame
+  // sprite whose pieces are x-adjacent and whose open2/shut2 second piece is
+  // yflipped — decode the real art + parse the real _maps mappings, render each
+  // frame forward through the actual open path, then prove a zero-edit inversion
+  // reproduces the whole 32-tile pool byte-for-byte.
+  it.skipIf(!hasS1)('real-shape zero-edit inversion reproduces the tile pool (2-piece + yflip)', () => {
+    const artBytes = new Uint8Array(fs.readFileSync(`${S1DIR}/artnem/Enemy Jaws.nem`));
+    const mappings = parseAsmMappings(fs.readFileSync(`${S1DIR}/_maps/Jaws.asm`, 'utf8'));
+    expect(mappings.length).toBe(4);
+    expect(mappings.every((f) => f.pieces.length === 2)).toBe(true);
+    expect(mappings.some((f) => f.pieces.some((p) => p.yFlip))).toBe(true); // exercises the flip path
+
+    const originalTiles = parseTiles(nemesisDecompress(artBytes));
+    const recon = reconstructFromFrames(mappings, artBytes, 'nemesis'); // forward render, real open path
+    const editedFrames: EditedFrame[] = recon.frames.map((data) => ({ indices: data, width: recon.width, height: recon.height }));
+    const out = buildEditedTiles(originalTiles, editedFrames, mappings, recon.originX, recon.originY);
+    expect(serializeTiles(out)).toEqual(serializeTiles(originalTiles));
   });
 });
