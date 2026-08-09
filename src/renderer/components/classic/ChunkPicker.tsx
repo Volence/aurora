@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { T } from '../ui';
 import { useClassicLevelStore } from '../../state/classicLevelStore';
 import { renderChunk } from '../../../core/level-classic/render';
@@ -9,6 +9,22 @@ import { CHUNK_LABEL_BG, CHUNK_LABEL_TEXT, CHUNK_AIR_CHECK_A, CHUNK_AIR_CHECK_B 
 // One chunk = 256x256 world px (CHUNK_PX, shared); thumbnails downscale that.
 // Fixed display size (no S/M/L control — the picker is a compact bottom strip).
 const THUMB = 56;
+
+// ONE shared full-resolution scratch canvas for every ThumbCell's downscale-blit
+// source. Rendering is synchronous, so a single reused 256x256 canvas is safe —
+// and it caps transient canvas allocation: without it, mounting ~N ThumbCells on
+// an act load would create N throwaway 256x256 canvases in one burst (per-frame GPU
+// canvas churn). Lazily created on first use (never on the server / a canvas-less
+// env), reused thereafter.
+let sharedFull: HTMLCanvasElement | null = null;
+function fullScratch(): { canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D | null } {
+  if (!sharedFull) {
+    sharedFull = document.createElement('canvas');
+    sharedFull.width = CHUNK_PX;
+    sharedFull.height = CHUNK_PX;
+  }
+  return { canvas: sharedFull, ctx: sharedFull.getContext('2d') };
+}
 
 const hex2 = (n: number) => `$${n.toString(16).toUpperCase().padStart(2, '0')}`;
 
@@ -41,7 +57,28 @@ const ThumbCell = React.memo(function ThumbCell({
   onSelect: (id: number) => void;
 }) {
   const ref = useRef<HTMLCanvasElement>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  // Lazy paint: only render a thumbnail once it scrolls into the strip's viewport.
+  // On an act load ChunkPicker mounts every chunk's cell at once; painting each one
+  // eagerly (renderChunk 256×256 + putImageData + downscale-blit, ~N of them) is a
+  // synchronous main-thread burst that janks first paint. An IntersectionObserver
+  // gates painting on visibility, so the initial burst is only the handful of cells
+  // actually on-screen; the rest paint as the strip is scrolled. `visible` latches
+  // once true (a painted cell stays painted); `versionKey` re-paints on art change.
+  const [visible, setVisible] = useState(false);
   useEffect(() => {
+    const el = btnRef.current;
+    if (!el) return;
+    if (typeof IntersectionObserver === 'undefined') { setVisible(true); return; }
+    const io = new IntersectionObserver((entries) => {
+      if (entries.some((e) => e.isIntersecting)) setVisible(true);
+    }, { rootMargin: '64px' });
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (!visible) return;
     const ctx = ref.current?.getContext('2d');
     if (!ctx) return;
     ctx.imageSmoothingEnabled = false;
@@ -53,13 +90,11 @@ const ThumbCell = React.memo(function ThumbCell({
       drawAirChecker(ctx);
       return;
     }
-    // Render the chunk at full res into a temp canvas, then draw it scaled into
-    // the (persistent) thumbnail canvas. The temp canvas is GC'd, so only the
-    // small THUMB×THUMB backing store is retained per cell.
-    const full = document.createElement('canvas');
-    full.width = CHUNK_PX;
-    full.height = CHUNK_PX;
-    const fctx = full.getContext('2d');
+    // Render the chunk at full res into the ONE shared scratch canvas, then draw it
+    // scaled into this (persistent) thumbnail canvas. The scratch is reused across
+    // all cells, so only the small THUMB×THUMB backing store is retained per cell
+    // and no per-cell 256×256 canvas is allocated.
+    const { canvas: full, ctx: fctx } = fullScratch();
     if (fctx) {
       // createImageData + data.set avoids the ImageData ctor rejecting the core's
       // Uint8ClampedArray<ArrayBufferLike> (repo pattern — see the viewport).
@@ -76,10 +111,11 @@ const ThumbCell = React.memo(function ThumbCell({
     // chunkEpoch, moving every key. `doc` is always current here because a render
     // with a new versionKey necessarily re-ran with the new doc in scope.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chunkId, versionKey]);
+  }, [chunkId, versionKey, visible]);
 
   return (
     <button
+      ref={btnRef}
       onClick={() => onSelect(chunkId)}
       title={chunkId === 0 ? 'Air ($00) — stamp to erase a cell' : `Chunk ${hex2(chunkId)}`}
       style={{ ...styles.cell, ...(selected ? styles.cellSel : {}) }}
