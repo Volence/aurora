@@ -189,6 +189,26 @@ export function hitTestObject(
   return best;
 }
 
+/**
+ * Whether a world-space click lands within `radiusWorld` of a single anchor
+ * point (targetX, targetY). The point-marker analogue of `hitTestObject` — used
+ * for grabbable single-anchor overlays like the player-start crosshair. Squared
+ * distances avoid a sqrt; `radiusWorld` is a world distance the caller derives
+ * from its screen-pixel tolerance via `screenPx / zoom`, so the grab area is a
+ * constant on-screen size at any zoom (matching the object pick tolerance).
+ */
+export function hitTestPoint(
+  worldX: number,
+  worldY: number,
+  targetX: number,
+  targetY: number,
+  radiusWorld: number,
+): boolean {
+  const dx = targetX - worldX;
+  const dy = targetY - worldY;
+  return dx * dx + dy * dy <= radiusWorld * radiusWorld;
+}
+
 export interface RingPos {
   x: number;
   y: number;

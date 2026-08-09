@@ -152,9 +152,20 @@ export function drawObjects(
   });
 }
 
-/** Draw the player-spawn crosshair marker. */
-export function drawStart(ctx: CanvasRenderingContext2D, d: LevelDoc, invZoom: number): void {
-  const { x, y } = d.start;
+/**
+ * Draw the player-spawn crosshair marker.
+ *
+ * `previewPos`, if given, overrides the spawn point's drawn position (the live
+ * position during an in-progress start drag, before the store commit lands on
+ * mouseup) — mirroring `drawObjects`' preview override.
+ */
+export function drawStart(
+  ctx: CanvasRenderingContext2D,
+  d: LevelDoc,
+  invZoom: number,
+  previewPos?: { x: number; y: number } | null,
+): void {
+  const { x, y } = previewPos ?? d.start;
   ctx.strokeStyle = START_MARKER;
   ctx.fillStyle = START_MARKER;
   ctx.lineWidth = 2 * invZoom;

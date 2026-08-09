@@ -169,7 +169,12 @@ const PALETTE_LINES = 4;
 const PALETTE_LINE_LEN = 16;
 const MAX_OBJ_ID = 0x7f;
 const MAX_OBJ_SUBTYPE = 0xff;
-const MAX_OBJ_X = 0xffff;
+// Object X is a big-endian word, but $FFFF is the objpos terminator sentinel — an
+// object holding it would re-decode as the end-of-table marker (dropping it and
+// everything after), which the encoder self-check rejects downstream. Cap edit-time
+// validation at $FFFE so an unencodable X is caught here, not at save. (Start
+// position lives in a separate startpos file with no terminator → its own 0..$FFFF.)
+const MAX_OBJ_X = 0xfffe;
 const MAX_OBJ_Y = 0x0fff;
 
 /**

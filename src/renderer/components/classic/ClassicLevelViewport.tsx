@@ -1,13 +1,13 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { T, Chip, OptionBar, Divider } from '../ui';
-import { useClassicLevelStore, classicSetLayoutCells, classicSetObjects } from '../../state/classicLevelStore';
+import { useClassicLevelStore, classicSetLayoutCells, classicSetObjects, classicSetStart } from '../../state/classicLevelStore';
 import { useToastStore } from '../../state/toastStore';
 import { renderChunk } from '../../../core/level-classic/render';
 import type { LevelDoc } from '../../../core/level-classic/model';
 import { s1ObjectName } from '../../../core/project/profiles/s1-objects';
 import {
   CHUNK_PX, visibleChunkRange, layoutCellAt, screenToWorld,
-  worldToLayoutCell, addStampCell, stampAccumToCells, hitTestObject, type StampCell,
+  worldToLayoutCell, addStampCell, stampAccumToCells, hitTestObject, hitTestPoint, type StampCell,
 } from './viewport-math';
 import { drawCollision, drawObjects, drawStart } from './classic-overlays';
 import {
@@ -30,9 +30,19 @@ interface Camera {
 
 /** Object-tool pick tolerance in SCREEN pixels (converted to world via /zoom). */
 const OBJECT_PICK_PX = 12;
-/** S1 object coordinate bounds (validateLevelDoc): x is 16-bit, y is 12-bit. */
-const OBJ_X_MAX = 0xffff;
+/**
+ * S1 object coordinate bounds (validateLevelDoc): x is 16-bit but the top value
+ * $FFFF is the objpos terminator sentinel (an object can't hold it — the encoder
+ * self-check rejects it downstream), so edit-time clamps to $FFFE; y is 12-bit.
+ */
+const OBJ_X_MAX = 0xfffe;
 const OBJ_Y_MAX = 0x0fff;
+/**
+ * Player-start coordinate bound. Start lives in its own startpos file (two 16-bit
+ * words), NOT the objpos table, so it has no terminator sentinel — the full
+ * 0..$FFFF range is valid (matches classicSetStart's validation).
+ */
+const START_MAX = 0xffff;
 const clampInt = (v: number, hi: number) => Math.max(0, Math.min(hi, Math.round(v)));
 
 /**
@@ -206,7 +216,11 @@ export default function ClassicLevelViewport() {
         const previewPos = drag && drag.index === selIndex ? drag.preview : null;
         drawObjects(ctx, doc, invZoom, selIndex, previewPos);
       }
-      if (overlays.start) drawStart(ctx, doc, invZoom);
+      if (overlays.start) {
+        // During a start drag the ref carries the live (clamped) preview position.
+        const sdrag = startDragRef.current;
+        drawStart(ctx, doc, invZoom, sdrag ? sdrag.preview : null);
+      }
     }
 
     // Stamp-gesture preview: highlight the cells the in-progress drag has painted
@@ -272,6 +286,13 @@ export default function ClassicLevelViewport() {
   const objDragRef = useRef<
     { index: number; grabDX: number; grabDY: number; preview: { x: number; y: number }; moved: boolean } | null
   >(null);
+  // The active player-start move gesture (null when not dragging the spawn point).
+  // Mirrors objDragRef exactly (grab offset, clamped live preview, moved flag) but
+  // carries no index — there is one start point — and commits as ONE classicSetStart
+  // on mouseup, discarded on cancel (Esc / mouseleave). Spec §2.3 start-position drag.
+  const startDragRef = useRef<
+    { grabDX: number; grabDY: number; preview: { x: number; y: number }; moved: boolean } | null
+  >(null);
 
   // The world-pixel coordinate under a mouse event, using the shared camera math.
   const worldUnderCursor = useCallback((e: React.MouseEvent): { x: number; y: number } | null => {
@@ -331,8 +352,24 @@ export default function ClassicLevelViewport() {
         return;
       }
       // Hit-test with a constant on-screen tolerance (world radius = px / zoom).
-      const hit = hitTestObject(d.objects, world.x, world.y, OBJECT_PICK_PX / camRef.current.zoom);
-      if (hit == null) { setSelectedObjectIndex(null); redraw(); return; }
+      const pickWorld = OBJECT_PICK_PX / camRef.current.zoom;
+      const hit = hitTestObject(d.objects, world.x, world.y, pickWorld);
+      if (hit == null) {
+        // No object under the cursor — try the start marker (only while it's
+        // visible, so you can only grab what you can see). Objects win ties: an
+        // object drawn over the spawn point stays grabbable. Begins a start drag
+        // that commits ONE classicSetStart on mouseup (spec §2.3).
+        if (overlays.start && hitTestPoint(world.x, world.y, d.start.x, d.start.y, pickWorld)) {
+          setSelectedObjectIndex(null);
+          startDragRef.current = {
+            grabDX: d.start.x - world.x, grabDY: d.start.y - world.y,
+            preview: { x: d.start.x, y: d.start.y }, moved: false,
+          };
+          redraw();
+          return;
+        }
+        setSelectedObjectIndex(null); redraw(); return;
+      }
       setSelectedObjectIndex(hit);
       const o = d.objects[hit];
       objDragRef.current = {
@@ -344,9 +381,22 @@ export default function ClassicLevelViewport() {
     }
     dragging.current = true;
     lastMouse.current = { x: e.clientX, y: e.clientY };
-  }, [tool, plane, activeGrid, cellUnderCursor, worldUnderCursor, redraw, setArmedObjectId, setSelectedObjectIndex]);
+  }, [tool, plane, overlays.start, activeGrid, cellUnderCursor, worldUnderCursor, redraw, setArmedObjectId, setSelectedObjectIndex]);
 
   const onMouseMove = useCallback((e: React.MouseEvent) => {
+    const sdrag = startDragRef.current;
+    if (sdrag) {
+      const world = worldUnderCursor(e);
+      if (world) {
+        sdrag.preview = {
+          x: clampInt(world.x + sdrag.grabDX, START_MAX),
+          y: clampInt(world.y + sdrag.grabDY, START_MAX),
+        };
+        sdrag.moved = true;
+        redraw();
+      }
+      return;
+    }
     const drag = objDragRef.current;
     if (drag) {
       const world = worldUnderCursor(e);
@@ -397,6 +447,22 @@ export default function ClassicLevelViewport() {
     redraw();
   }, [redraw]);
 
+  // Commit a start-move gesture as ONE classicSetStart (or none, when the gesture
+  // was a click without movement, or the net position is unchanged — the store's
+  // no-op guard also elides an identical write, but skipping here avoids the round
+  // trip). Cancel paths (Esc / mouseleave) discard the ref without committing.
+  const endStartDrag = useCallback(() => {
+    const sdrag = startDragRef.current;
+    startDragRef.current = null;
+    if (!sdrag || !sdrag.moved) { redraw(); return; }
+    const d = useClassicLevelStore.getState().doc;
+    if (!d) { redraw(); return; }
+    if (d.start.x === sdrag.preview.x && d.start.y === sdrag.preview.y) { redraw(); return; }
+    const res = classicSetStart(sdrag.preview.x, sdrag.preview.y);
+    if (!res.ok) useToastStore.getState().addToast(`Move start failed: ${res.error}`, 'error');
+    redraw();
+  }, [redraw]);
+
   // Commit the stamp gesture as ONE undoable command (or cancel with none pending).
   const endStroke = useCallback(() => {
     const stroke = strokeRef.current;
@@ -411,15 +477,17 @@ export default function ClassicLevelViewport() {
   // Mouse-up ends whichever gesture is active. Mouse-leave CANCELS a stamp stroke
   // cleanly (no partial command) but also ends a pan.
   const onMouseUp = useCallback(() => {
+    if (startDragRef.current) { endStartDrag(); return; }
     if (objDragRef.current) { endObjectDrag(); return; }
     if (strokeRef.current) { endStroke(); return; }
     dragging.current = false;
-  }, [endStroke, endObjectDrag]);
+  }, [endStroke, endObjectDrag, endStartDrag]);
   const onMouseLeave = useCallback(() => {
-    // Abandon an in-progress stamp or object move without committing (mouseleave
-    // cancels cleanly). A pan just ends.
+    // Abandon an in-progress stamp / object move / start move without committing
+    // (mouseleave cancels cleanly). A pan just ends.
     strokeRef.current = null;
     objDragRef.current = null;
+    startDragRef.current = null;
     dragging.current = false;
     redraw();
   }, [redraw]);
@@ -464,6 +532,7 @@ export default function ClassicLevelViewport() {
         if (isTyping(e.target as HTMLElement)) return;
         if (strokeRef.current) { strokeRef.current = null; redraw(); return; }
         if (objDragRef.current) { objDragRef.current = null; redraw(); return; }
+        if (startDragRef.current) { startDragRef.current = null; redraw(); return; }
         const s = useClassicLevelStore.getState();
         if (s.armedObjectId != null) { s.setArmedObjectId(null); redraw(); return; }
         if (s.selectedObjectIndex != null) { s.setSelectedObjectIndex(null); redraw(); return; }
@@ -529,7 +598,7 @@ export default function ClassicLevelViewport() {
               ? (armedObjectId != null
                   ? `click to place ${s1ObjectName(armedObjectId)} · Esc cancels`
                   : (plane === 'fg'
-                      ? 'click selects · drag moves · Del removes · arm an object in the library to place'
+                      ? 'click selects · drag moves · drag START to move spawn · Del removes · arm to place'
                       : 'objects are FG-only — switch to FG to edit · drag to pan'))
               : 'drag to pan · right-click eyedrops · scroll to zoom'}
         </span>

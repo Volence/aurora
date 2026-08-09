@@ -12,6 +12,14 @@ docs/plans/2026-08-09-disasm-project-abstraction.md). Two scoped deferrals in v1
     / object inspector) ships, but wiring the Art-mode pixel/block/chunk composer to
     classic content-editing commands is deferred; those commands exist and are
     reachable via the edit_chunk/edit_block MCP tools.
+  • §2.4 palette editing UI — the `classicSetPalette` command exists and is tested,
+    but is NOT surfaced anywhere: the Art-mode PaletteEditor is aeon-store-coupled
+    (projectStore/getCurrentZone/editorStore.executeCommand/artStore/spriteStore +
+    the s4 Color type), so it takes no lines+callback props and reusing it here means
+    a non-trivial extraction — deliberately not forced. There is also NO MCP/agent
+    tool reaching classicSetPalette (agent-handler exposes layout/chunk/block/object/
+    colind but not palette or start), so classic palettes are currently un-editable in
+    both the UI and MCP surfaces. Wiring either is follow-up work.
 Originally: user approved approach + section 1 interactively; sections 2–3 delegated
 to Claude with instruction to proceed to implementation overnight (Opus worker
 agents, Fable oversight).

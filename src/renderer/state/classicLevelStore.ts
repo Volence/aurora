@@ -331,6 +331,28 @@ function isInt(n: number): boolean {
   return Number.isInteger(n);
 }
 
+// NO-OP MUTATION GUARDS (cheap-to-compare commands only). A command whose built
+// doc would be content-identical returns ok:true WITHOUT recording an undo step,
+// so an accidental identical write (e.g. a drag that lands back on the same spot,
+// or an inspector re-commit) doesn't pollute the timeline with empty steps. Only
+// the O(small) commands guard: set-start (two numbers), set-colind (the touched
+// entries), set-objects (a field compare over the list). The heavier domains
+// (tiles/chunks/blocks/layout) are intentionally NOT guarded — a full deep
+// compare of tile pixels / chunk cells / layout grids would cost as much as the
+// edit itself, so those always record a step (an identical stamp is a rare,
+// cheap-to-undo case not worth the per-edit scan).
+
+/** Field-compare two S1 object entries (no objectsEqual export exists to reuse). */
+function objectEntryEqual(a: S1ObjectEntry, b: S1ObjectEntry): boolean {
+  return a.x === b.x && a.y === b.y && a.xflip === b.xflip && a.yflip === b.yflip
+    && a.respawn === b.respawn && a.id === b.id && a.subtype === b.subtype;
+}
+
+/** Whether two object lists are element-wise field-identical (order-sensitive). */
+function objectListsEqual(a: readonly S1ObjectEntry[], b: readonly S1ObjectEntry[]): boolean {
+  return a.length === b.length && a.every((o, i) => objectEntryEqual(o, b[i]));
+}
+
 /** The writable tile span for the open act, or null when unknown (fakes/no handle). */
 function editableTileRange(): EditableTileRange | null {
   const { ref } = useClassicLevelStore.getState();
@@ -491,6 +513,8 @@ export function classicSetColind(entries: { blockId: number; value: number }[]):
       return err(`colind value ${value} out of range 0..255`);
     }
   }
+  // No-op guard: every touched entry already holds its target value → no undo step.
+  if (entries.every(({ blockId, value }) => colind[blockId] === value)) return { ok: true };
   const nextColind = new Uint8Array(colind);
   for (const { blockId, value } of entries) nextColind[blockId] = value;
   const newDoc: LevelDoc = { ...doc, collision: { ...doc.collision, colind: nextColind } };
@@ -506,6 +530,10 @@ export function classicSetObjects(objects: S1ObjectEntry[]): CommandResult {
   const doc = requireDoc();
   if (!doc) return err('no classic level is open');
   if (!Array.isArray(objects)) return err('objects must be an array');
+  // No-op guard: an identical list (e.g. a move that netted zero displacement)
+  // records no undo step. The current list is already validated, so a match is
+  // safe to accept without re-running structuralError.
+  if (objectListsEqual(doc.objects, objects)) return { ok: true };
   const newDoc: LevelDoc = { ...doc, objects: objects.map((o) => ({ ...o })) };
   const e = structuralError(newDoc);
   if (e) return err(e);
@@ -520,6 +548,8 @@ export function classicSetStart(x: number, y: number): CommandResult {
   if (!isInt(x) || !isInt(y) || x < 0 || x > 0xffff || y < 0 || y > 0xffff) {
     return err(`start position (${x},${y}) out of range 0..65535`);
   }
+  // No-op guard: an unchanged spawn point records no undo step.
+  if (doc.start.x === x && doc.start.y === y) return { ok: true };
   const newDoc: LevelDoc = { ...doc, start: { x, y } };
   const e = structuralError(newDoc);
   if (e) return err(e);

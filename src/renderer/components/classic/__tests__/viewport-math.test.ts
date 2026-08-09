@@ -9,6 +9,7 @@ import {
   addStampCell,
   stampAccumToCells,
   hitTestObject,
+  hitTestPoint,
   type StampCell,
 } from '../viewport-math';
 import type { LayoutGrid } from '../../../../core/level-classic/model';
@@ -250,6 +251,27 @@ describe('hitTestObject', () => {
     // radius 4 (e.g. 16px tolerance at zoom 4): a 2px-away click still hits.
     expect(hitTestObject(objs, 102, 100, 4)).toBe(0);
     expect(hitTestObject(objs, 108, 100, 4)).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// hitTestPoint — single-anchor grab test (player-start crosshair drag).
+// ---------------------------------------------------------------------------
+
+describe('hitTestPoint', () => {
+  it('hits inside the radius and misses outside it', () => {
+    expect(hitTestPoint(103, 104, 100, 100, 16)).toBe(true); // dist 5 < 16
+    expect(hitTestPoint(120, 100, 100, 100, 16)).toBe(false); // dist 20 > 16
+  });
+
+  it('treats the radius as inclusive (dist == radius hits)', () => {
+    expect(hitTestPoint(116, 100, 100, 100, 16)).toBe(true); // dist == 16
+    expect(hitTestPoint(117, 100, 100, 100, 16)).toBe(false); // dist 17 > 16
+  });
+
+  it('a smaller radius (higher zoom) shrinks the grab area', () => {
+    expect(hitTestPoint(102, 100, 100, 100, 4)).toBe(true);
+    expect(hitTestPoint(108, 100, 100, 100, 4)).toBe(false);
   });
 });
 

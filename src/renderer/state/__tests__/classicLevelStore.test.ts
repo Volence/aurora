@@ -136,6 +136,16 @@ describe('classic:set-start', () => {
     expect(st().dirty.start).toBeUndefined();
     expect(classicCanUndo()).toBe(false);
   });
+
+  it('an identical write is a no-op: ok:true but no undo step recorded', () => {
+    openReady();
+    const doc = st().doc; // start is (50, 50) in the fixture
+    const depth = classicHistory.depth;
+    expect(classicSetStart(50, 50)).toEqual({ ok: true });
+    expect(st().doc).toBe(doc); // no new doc built
+    expect(classicHistory.depth).toBe(depth); // no history entry
+    expect(classicCanUndo()).toBe(false);
+  });
 });
 
 describe('classic:set-layout-cells', () => {
@@ -297,6 +307,16 @@ describe('classic:set-colind', () => {
     expect(classicSetColind([{ blockId: 9, value: 0 }]).ok).toBe(false);
     expect(st().dirty.colind).toBeUndefined();
   });
+
+  it('an all-unchanged entry set is a no-op: ok:true but no undo step', () => {
+    openReady(); // colind is [0, 0] in the fixture
+    const doc = st().doc;
+    const depth = classicHistory.depth;
+    expect(classicSetColind([{ blockId: 0, value: 0 }, { blockId: 1, value: 0 }])).toEqual({ ok: true });
+    expect(st().doc).toBe(doc);
+    expect(classicHistory.depth).toBe(depth);
+    expect(st().dirty.colind).toBeUndefined();
+  });
 });
 
 describe('classic:set-objects', () => {
@@ -317,6 +337,18 @@ describe('classic:set-objects', () => {
     openReady();
     const bad: S1ObjectEntry[] = [{ x: 0, y: 0, xflip: false, yflip: false, respawn: false, id: 0xff, subtype: 0 }];
     expect(classicSetObjects(bad).ok).toBe(false);
+    expect(st().dirty.objects).toBeUndefined();
+  });
+
+  it('a field-identical list (e.g. a zero-displacement move) is a no-op: no undo step', () => {
+    openReady();
+    const doc = st().doc;
+    const depth = classicHistory.depth;
+    // A fresh array of fresh entries equal field-for-field to the fixture list.
+    const same = doc!.objects.map((o) => ({ ...o }));
+    expect(classicSetObjects(same)).toEqual({ ok: true });
+    expect(st().doc).toBe(doc); // no new doc built
+    expect(classicHistory.depth).toBe(depth);
     expect(st().dirty.objects).toBeUndefined();
   });
 });

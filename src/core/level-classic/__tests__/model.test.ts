@@ -233,11 +233,19 @@ describe('validateLevelDoc', () => {
     );
   });
 
-  it('flags an object x > $FFFF', () => {
+  it('flags an object x of $FFFF (the objpos terminator sentinel — not a real X)', () => {
     const d = validDoc();
-    d.objects[0].x = 0x10000;
+    d.objects[0].x = 0xffff;
     expect(validateLevelDoc(d)).toContainEqual(
-      expect.stringMatching(/x 65536 out of range 0\.\.65535/),
+      expect.stringMatching(/x 65535 out of range 0\.\.65534/),
+    );
+  });
+
+  it('accepts the max encodable object x ($FFFE)', () => {
+    const d = validDoc();
+    d.objects[0].x = 0xfffe;
+    expect(validateLevelDoc(d)).not.toContainEqual(
+      expect.stringMatching(/object 0 x .* out of range/),
     );
   });
 
@@ -245,7 +253,7 @@ describe('validateLevelDoc', () => {
     const d = validDoc();
     d.objects[0].x = -1;
     expect(validateLevelDoc(d)).toContainEqual(
-      expect.stringMatching(/x -1 out of range 0\.\.65535/),
+      expect.stringMatching(/x -1 out of range 0\.\.65534/),
     );
   });
 

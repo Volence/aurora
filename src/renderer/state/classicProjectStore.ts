@@ -10,8 +10,9 @@
 //   • No ProjectHandle / LevelDoc serialization across IPC (the alternative
 //     "handle in main + narrow IPC calls" design is unnecessary here).
 //   • The aeon open path is left 100% untouched; this is a parallel store.
-//   • Later tasks (11/12) read levels via handle.levels.read() directly, in the
-//     renderer — this store intentionally holds NO level-doc state.
+//   • The classic level store reads levels via handle.levels.read() directly, in
+//     the renderer (classicLevelStore.openAct) — this store intentionally holds
+//     NO level-doc state.
 //
 // The open ORCHESTRATION lives in classic-bridge.ts (injectable for tests);
 // this store is the state container + transitions.

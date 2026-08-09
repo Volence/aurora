@@ -129,6 +129,13 @@ What landed:
 - **Art-mode composer wiring for classic content editing** (tile/block/chunk pixel
   edits) is deferred; the classic viewport/chunk-picker/object surfaces ship and
   the commands are reachable via the `edit_chunk`/`edit_block` MCP tools.
+- **Palette editing UI** is deferred. `classicSetPalette` exists (validated + undo-
+  integrated + tested), but it is unreached: the Art-mode `PaletteEditor` is
+  aeon-store-coupled (reads projectStore/artStore/spriteStore + `executeCommand`, no
+  lines+callback props), so reuse needs a non-trivial extraction and was not forced.
+  It is also **MCP-reachable via no tool yet** — `agent-handler` wires
+  layout/chunk/block/object/colind but not palette (nor `set-start`) — so classic
+  palettes are editable neither in the UI nor over MCP. Wiring either is follow-up.
 
 ## 3. The domain map
 
