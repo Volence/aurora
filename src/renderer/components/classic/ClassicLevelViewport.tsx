@@ -13,6 +13,7 @@ import {
   type ObjectHitBounds, type StampCell,
 } from './viewport-math';
 import { drawCollision, drawObjects, drawStart } from './classic-overlays';
+import { isTypingTarget } from './composer-shared';
 import {
   CANVAS_VOID,
   STAMP_PREVIEW_FILL, STAMP_PREVIEW_STROKE,
@@ -589,15 +590,12 @@ export default function ClassicLevelViewport() {
   // guarded against text-entry the same way the undo keys are (ClassicProjectView)
   // so a hex/number field edit can't be hijacked into a deletion.
   useEffect(() => {
-    const isTyping = (t: HTMLElement): boolean =>
-      t.isContentEditable || t.tagName === 'TEXTAREA'
-      || (t.tagName === 'INPUT' && !['range', 'checkbox', 'button', 'radio'].includes((t as HTMLInputElement).type));
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         // While editing an inspector field, Escape belongs to that field (revert /
         // blur) — the viewport must not clear the selection and unmount the field
         // mid-edit. Guarded like the Delete keys.
-        if (isTyping(e.target as HTMLElement)) return;
+        if (isTypingTarget(e.target as HTMLElement)) return;
         if (strokeRef.current) { strokeRef.current = null; redraw(); return; }
         if (objDragRef.current) { objDragRef.current = null; redraw(); return; }
         if (startDragRef.current) { startDragRef.current = null; redraw(); return; }
@@ -607,7 +605,7 @@ export default function ClassicLevelViewport() {
         return;
       }
       if (e.key === 'Delete' || e.key === 'Backspace') {
-        if (isTyping(e.target as HTMLElement)) return;
+        if (isTypingTarget(e.target as HTMLElement)) return;
         const s = useClassicLevelStore.getState();
         const idx = s.selectedObjectIndex;
         if (idx == null || !s.doc || idx >= s.doc.objects.length) return;

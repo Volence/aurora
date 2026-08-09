@@ -11,6 +11,7 @@ import ResolutionReportPanel from './ResolutionReportPanel';
 import ObjectInspector from './ObjectInspector';
 import ObjectLibraryPanel from './ObjectLibraryPanel';
 import ClassicPalettePanel from './ClassicPalettePanel';
+import { isTypingTarget } from './composer-shared';
 import type { ProjectHandle } from '../../../core/project/adapter';
 
 // The handle the classic level store was last reset for. Module scope (survives
@@ -64,10 +65,7 @@ export default function ClassicProjectView({ appBar }: { appBar: React.ReactNode
   // Ctrl+Shift+Z / Ctrl+Y redo, ignored while typing in a text field.
   React.useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      const t = e.target as HTMLElement;
-      const typing = t.isContentEditable || t.tagName === 'TEXTAREA'
-        || (t.tagName === 'INPUT' && !['range', 'checkbox', 'button', 'radio'].includes((t as HTMLInputElement).type));
-      if (typing) return;
+      if (isTypingTarget(e.target as HTMLElement)) return;
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) {
         e.preventDefault();
         useClassicLevelStore.getState().undo();

@@ -27,7 +27,7 @@ function withChannel(word: number, channel: 'r' | 'g' | 'b', level3: number): nu
   return encodeGenesisColor({ r: levels.r * 255 / 7, g: levels.g * 255 / 7, b: levels.b * 255 / 7 });
 }
 
-export function fmtGenesisWord(word: number): string {
+function fmtGenesisWord(word: number): string {
   return '$' + word.toString(16).toUpperCase().padStart(4, '0');
 }
 
@@ -40,10 +40,13 @@ export default function GenesisColorSliders({
   heading?: React.ReactNode;
 }) {
   const color = decodeGenesisColor(word);
-  const commit = (e?: React.SyntheticEvent) => {
-    (e?.currentTarget as HTMLElement | undefined)?.blur?.();
-    onCommit(word);
-  };
+  // Commit on release WITHOUT blurring the slider. The aeon PaletteEditor blurs
+  // here so a post-commit Ctrl+Z reaches its keydown handler past an INPUT guard,
+  // but blur() re-enters this same onBlur handler synchronously → onCommit twice,
+  // AND drops focus after one arrow-key press (breaking fine-tuning). We skip it:
+  // the classic undo guard (ClassicProjectView) already excludes type:'range', so
+  // a focused slider never blocks undo — no blur needed.
+  const commit = () => { onCommit(word); };
   return (
     <div style={styles.panel}>
       {heading !== undefined && (

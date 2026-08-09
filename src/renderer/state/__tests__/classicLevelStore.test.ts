@@ -331,6 +331,23 @@ describe('classic:set-palette', () => {
     expect(classicSetPalette(0, new Uint16Array(15)).ok).toBe(false);
     expect(st().dirty.palette).toBeUndefined();
   });
+
+  it('no-op guard: an identical line records NO undo step', () => {
+    openReady();
+    const colors = new Uint16Array(16).fill(0x0e0e);
+    expect(classicSetPalette(1, colors).ok).toBe(true);
+    const epoch1 = st().chunkEpoch;
+    expect(classicCanUndo()).toBe(true);
+    // Re-writing the SAME colors succeeds but records no history entry / no epoch
+    // bump — this also elides the double commit a slider release could produce.
+    expect(classicSetPalette(1, new Uint16Array(colors)).ok).toBe(true);
+    expect(st().chunkEpoch).toBe(epoch1);
+    // Exactly one undoable step exists: undo restores the pre-edit line, and there
+    // is nothing left to undo (a second identical write did not stack a step).
+    st().undo();
+    expect(st().doc!.palettes[1][0]).toBe(0);
+    expect(classicCanUndo()).toBe(false);
+  });
 });
 
 describe('classic:set-colind', () => {

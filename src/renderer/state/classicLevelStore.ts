@@ -577,6 +577,12 @@ export function classicSetPalette(line: number, colors: Uint16Array): CommandRes
   if (!(colors instanceof Uint16Array) || colors.length !== 16) {
     return err(`palette line must have 16 colors (got ${colors?.length})`);
   }
+  // No-op guard (cheap 16-word compare): an identical line records no undo step —
+  // consistent with set-start/set-colind/set-objects. Also elides the double
+  // commit a slider release could otherwise produce (the picker fires onChange
+  // then onCommit with the same final word), keeping one undo step per color edit.
+  const cur = doc.palettes[line];
+  if (cur && cur.length === 16 && colors.every((c, i) => c === cur[i])) return { ok: true };
   const nextPalettes = doc.palettes.slice();
   nextPalettes[line] = new Uint16Array(colors);
   const newDoc: LevelDoc = { ...doc, palettes: nextPalettes };
