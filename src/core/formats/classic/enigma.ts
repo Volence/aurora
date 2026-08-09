@@ -2,6 +2,12 @@ export class EnigmaError extends Error {
   constructor(message: string) { super(message); this.name = 'EnigmaError'; }
 }
 
+// A raw-copy (action 5) packet carries its word count in a 4-bit field (count-1),
+// so it can encode at most 15 words. The otherwise-unreachable count of 16 (0x10)
+// paired with action 5 is therefore repurposed as the stream terminator.
+const MAX_RAW_RUN = 15;
+const TERMINATOR_COUNT = MAX_RAW_RUN + 1; // 0x10
+
 // Enigma is Sonic 1's compression for 16x16 block ("map16") definitions — a
 // bitstream of big-endian words. Ported from ClownLZSS's enigma.h (the same
 // algorithm KensSharp/SonLVL use). The stream is a 6-byte header followed by
@@ -64,7 +70,7 @@ export function enigmaDecompress(input: Uint8Array): Uint8Array {
     const action = popBit() ? 2 + popBits(2) : popBit();
     const count = popBits(4) + 1;
 
-    if (count === 0x10 && action === 5) break; // terminator: 1111111
+    if (count === TERMINATOR_COUNT && action === 5) break; // terminator: 1111111
 
     switch (action) {
       case 0:
@@ -103,13 +109,15 @@ export function enigmaDecompress(input: Uint8Array): Uint8Array {
 // (action 5) with all 16 bits inline, so no analysis of runs or special words is
 // needed. NOT byte-identical to Sega's compressor; correctness is guaranteed by
 // enigmaDecompress(enigmaCompress(x)) === x.
+//
+// Because it never exploits runs or special words, the output is slightly LARGER
+// than the uncompressed input (~17 bits/word plus a 6-byte header). That is fine
+// for disasm file-based builds, but callers must not assume a re-encoded stream
+// still fits a fixed-size ROM region.
 
 // Full-width inline values: mask = top 5 bits, 11-bit tile index → all 16 bits.
 const TOTAL_INLINE_BITS = 11;
 const RENDER_FLAGS_MASK = 0x1f;
-// Raw-copy count is 4 bits (+1); a count of 16 with action 5 is the terminator,
-// so raw packets carry at most 15 words.
-const MAX_RAW_RUN = 15;
 
 /** Compress big-endian 16-bit words into an Enigma stream. `input.length` must be even. */
 export function enigmaCompress(input: Uint8Array): Uint8Array {
