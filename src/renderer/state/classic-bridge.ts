@@ -8,19 +8,34 @@
 import { createIpcFileAccess } from './classic-file-access';
 import { detectProject, openProject, registerAdapter, type ProjectHandle } from '../../core/project/adapter';
 import { s1Adapter } from '../../core/project/s1';
+import { aeonAdapter } from '../../core/project/aeon';
 
 // -- Adapter registration (exactly once) ------------------------------------
 // The registry lives in core (adapter.ts). registerAdapter throws on a
 // duplicate `type`, so a module-level guard makes this idempotent; the try/catch
 // additionally tolerates an HMR reload of THIS module that leaves the core
 // registry (a different module) already populated.
+//
+// Registration order is priority, but s1's and aeon's fingerprints are DISJOINT
+// (s1 keys on sonic.asm + data dirs and never reads project.json; aeon keys on a
+// project.json with engine:"s4" and has no sonic.asm), so the order can never
+// resolve a genuine tie — it is chosen s1-then-aeon only to mirror the original
+// classic-first probe. Registering aeon is what lets the old ad-hoc
+// `fa.exists('project.json')` aeon probe below collapse into a single
+// detectProject call (Task 17, spec §2.7).
 let adaptersReady = false;
 export function ensureAdaptersRegistered(): void {
   if (adaptersReady) return;
-  try {
-    registerAdapter(s1Adapter);
-  } catch {
-    // Already registered (HMR / re-entry) — the registry is authoritative.
+  // Register each independently: an HMR reload can leave the core registry with
+  // one adapter already present, and a single shared try/catch would let that
+  // adapter's duplicate-throw skip the others. A per-adapter catch keeps them
+  // independent — the registry is authoritative and end state is both present.
+  for (const a of [s1Adapter, aeonAdapter]) {
+    try {
+      registerAdapter(a);
+    } catch {
+      // Already registered (HMR / re-entry).
+    }
   }
   adaptersReady = true;
 }
@@ -38,17 +53,20 @@ export const ipcClassicBridge: ClassicBridge = {
   async open(dir: string): Promise<ClassicOpenResult> {
     ensureAdaptersRegistered();
     const fa = createIpcFileAccess(dir);
-    // Detect first for the human label (used as the recent-projects name),
-    // then open. detectProject is a handful of exists/list probes — cheap.
+    // A single registry fingerprint decides the route (Task 17, spec §2.7):
+    //  • a classic adapter (s1) → open into a ProjectHandle this store owns;
+    //  • an aeon match → NOT opened here — reported as not-classic so the caller
+    //    runs the untouched renderer aeon loader (useProject.loadFromPath),
+    //    exactly as before. This replaces the old ad-hoc
+    //    `fa.exists('project.json')` probe: it stays 'not-classic aeon:true' for a
+    //    real aeon project (engine:"s4" → loadFromPath opens/errors identically),
+    //    while a non-aurora or malformed project.json no longer misroutes into the
+    //    aeon loader — it falls through to the unrecognized-project notice.
     const match = await detectProject(fa);
-    if (match) {
+    if (match && match.type !== 'aeon') {
       const handle = await openProject(fa);
       if (handle) return { kind: 'opened', handle, label: match.label };
     }
-    // Not a classic project. Probe the aeon fingerprint (root project.json) so
-    // the caller can route aeon dirs to the untouched aeon loader and reserve
-    // the "unrecognized project" notice for dirs that are neither.
-    const aeon = await fa.exists('project.json');
-    return { kind: 'not-classic', aeon };
+    return { kind: 'not-classic', aeon: match?.type === 'aeon' };
   },
 };

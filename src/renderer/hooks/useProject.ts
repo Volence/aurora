@@ -133,11 +133,11 @@ export function useProject() {
     }
   }, []);
 
-  // Open a directory: try the classic (disasm) project path FIRST. If it's a
-  // classic project the classicProjectStore owns the view; if it's an aeon
-  // project (or the classic detect declines to it) we hand off to the untouched
-  // aeon loader; on an unrecognized dir the classic store already surfaced the
-  // notice, so there is nothing more to do.
+  // Open a directory. A single project-registry fingerprint (Task 17) routes it:
+  // a classic (disasm) project → 'opened', classicProjectStore owns the view; an
+  // aeon match → 'not-classic', so we hand off to the untouched aeon loader; an
+  // unrecognized dir → 'error', the classic store already surfaced the notice, so
+  // there is nothing more to do here.
   const openPath = useCallback(async (dir: string) => {
     const classic = useClassicProjectStore.getState();
     const outcome = await classic.openDirectory(dir);
