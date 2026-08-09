@@ -27,7 +27,7 @@
 
 import { create } from 'zustand';
 import type { DirtyDomains, EditableTileRange, LevelDoc, ZoneActRef } from '../../core/project/adapter';
-import type { BlockDef, ChunkCell } from '../../core/level-classic/model';
+import type { BlockDef, ChunkCell, ChunkDef256 } from '../../core/level-classic/model';
 import { validateLevelDoc, unpackChunkCell, chunkIndexForId } from '../../core/level-classic/model';
 import type { S1ObjectEntry } from '../../core/formats/classic/s1-objpos';
 import { ClassicHistory, type ClassicSnapshot } from '../../core/editing/classic-history';
@@ -38,6 +38,17 @@ export type ClassicLevelStatus = 'idle' | 'loading' | 'ready' | 'error';
 
 /** Outcome of a classic editing command: applied, or atomically rejected. */
 export type CommandResult = { ok: true } | { ok: false; error: string };
+
+/**
+ * Outcome of a GROW command (add chunk / add block). Like CommandResult but the
+ * success case carries the new entity's id so the caller (Duplicate button / MCP
+ * tool) can select it. Structurally assignable to CommandResult, so assertCommand
+ * accepts it.
+ */
+export type AddResult = { ok: true; id: number } | { ok: false; error: string };
+
+/** Which composer tab is active (shared selection context, Task B3). */
+export type ComposerTab = 'chunk' | 'block' | 'tile';
 
 export type LayoutPlane = 'fg' | 'bg';
 
@@ -102,12 +113,32 @@ interface ClassicLevelState {
    */
   armedObjectId: number | null;
 
+  // --- Composer dock UI state (Task B3) — shared selection across the three
+  // tabs; UI state, NOT part of an undo snapshot. Out-of-range values after an
+  // undo/redo are clamped/cleared by the dock (an added chunk/block can be
+  // undone away under a stale selection). ---
+  /** Whether the composer dock is expanded (a workflow preference; persists across acts). */
+  composerOpen: boolean;
+  /** Which composer tab is active (persists across acts). */
+  composerTab: ComposerTab;
+  /** The block id the composer edits / paints (0-based; blocks are 0-based in S1). */
+  composerBlockId: number;
+  /** The tile-pool index the composer edits (0-based). */
+  composerTileIndex: number;
+  /** The palette line (0-3) the tile editor colors with (seeded from block context). */
+  composerPalLine: number;
+
   /** Select + load an act. Reads through the open project's handle. */
   openAct: (ref: ZoneActRef) => Promise<void>;
   setTool: (tool: ClassicTool) => void;
   setSelectedChunkId: (chunkId: number) => void;
   setSelectedObjectIndex: (index: number | null) => void;
   setArmedObjectId: (id: number | null) => void;
+  setComposerOpen: (open: boolean) => void;
+  setComposerTab: (tab: ComposerTab) => void;
+  setComposerBlockId: (id: number) => void;
+  setComposerTileIndex: (index: number) => void;
+  setComposerPalLine: (line: number) => void;
   undo: () => void;
   redo: () => void;
   /**
@@ -140,6 +171,11 @@ const IDLE = {
   selectedChunkId: 0,
   selectedObjectIndex: null as number | null,
   armedObjectId: null as number | null,
+  composerOpen: false,
+  composerTab: 'chunk' as ComposerTab,
+  composerBlockId: 0,
+  composerTileIndex: 0,
+  composerPalLine: 0,
 };
 
 // ---------------------------------------------------------------------------
@@ -184,6 +220,12 @@ export const useClassicLevelStore = create<ClassicLevelState>((set, get) => ({
       // object list), so a fresh act clears them.
       selectedObjectIndex: null,
       armedObjectId: null,
+      // Composer block/tile/palette selections index THIS act's data, so a fresh
+      // act resets them to 0 (the dock open/tab state are workflow preferences and
+      // persist — they're not touched here).
+      composerBlockId: 0,
+      composerTileIndex: 0,
+      composerPalLine: 0,
     };
     // Unavailable acts carry their resolution reason — surface it directly rather
     // than attempting a read the handle would reject.
@@ -217,6 +259,18 @@ export const useClassicLevelStore = create<ClassicLevelState>((set, get) => ({
   // still-selected object.
   setArmedObjectId: (id: number | null) =>
     set(id === null ? { armedObjectId: null } : { armedObjectId: id, selectedObjectIndex: null }),
+
+  setComposerOpen: (open: boolean) => set({ composerOpen: open }),
+  setComposerTab: (tab: ComposerTab) => set({ composerTab: tab }),
+  setComposerBlockId: (id: number) => {
+    if (Number.isInteger(id) && id >= 0) set({ composerBlockId: id });
+  },
+  setComposerTileIndex: (index: number) => {
+    if (Number.isInteger(index) && index >= 0) set({ composerTileIndex: index });
+  },
+  setComposerPalLine: (line: number) => {
+    if (Number.isInteger(line) && line >= 0 && line <= 3) set({ composerPalLine: line });
+  },
 
   // undo/redo are timeline NAVIGATION, not new edits, so (like the aeon history)
   // they do not invalidate sibling redo stacks — only commit() does.
@@ -313,7 +367,7 @@ function commit(newDoc: LevelDoc, dirtyPatch: DirtyDomains, ve: VersionEffect): 
 // Validation helpers
 // ---------------------------------------------------------------------------
 
-const err = (error: string): CommandResult => ({ ok: false, error });
+const err = (error: string): { ok: false; error: string } => ({ ok: false, error });
 
 /** The open doc, or null (commands reject cleanly when no level is open). */
 function requireDoc(): LevelDoc | null {
@@ -552,6 +606,80 @@ export function classicSetObjects(objects: S1ObjectEntry[]): CommandResult {
   if (e) return err(e);
   commit(newDoc, { objects: true }, { kind: 'none' });
   return { ok: true };
+}
+
+// GROW-command capacity limits (format hard limits, enforced HERE not just in the
+// UI so the MCP path is bounded too):
+//   • Chunks are addressed by the layout byte, whose bit 7 is S1's loop flag — so
+//     only engine ids 1..$7F are stampable. doc.chunks is file-order (0-based);
+//     engine id = index + 1, so at most 127 chunks can be addressed.
+//   • Chunk cells reference blocks with a 10-bit field → at most $400 = 1024 blocks.
+const MAX_ADDRESSABLE_CHUNKS = 0x7f; // 127 (engine ids 1..$7F)
+const MAX_BLOCKS_TOTAL = 0x400; // 1024 (10-bit block ref)
+
+/**
+ * classic:add-chunk — append a NEW 256-cell chunk (grows doc.chunks). Optional
+ * sparse `cells` (index+packed word) seed it over a blank base — Duplicate passes
+ * the source chunk's cells as words; New-blank passes nothing. Returns the new
+ * ENGINE id (file index + 1) so the caller can select it.
+ *
+ * The classicEditChunkCells command edits an EXISTING chunk's cells only; growing
+ * the pool needs its own append + cap check (unaddressable at $80+).
+ */
+export function classicAddChunk(cells?: { index: number; word: number }[]): AddResult {
+  const doc = requireDoc();
+  if (!doc) return err('no classic level is open');
+  if (doc.chunks.length >= MAX_ADDRESSABLE_CHUNKS) {
+    return err(
+      `chunk capacity reached: ${MAX_ADDRESSABLE_CHUNKS} chunks max — engine ids 1..$7F, ` +
+        `the layout loop bit (bit 7) makes $80+ unaddressable`,
+    );
+  }
+  // Blank base: 256 cells of block 0, no flips, solidity 0.
+  const nextCells: ChunkCell[] = Array.from({ length: 256 }, () => ({ block: 0, xf: false, yf: false, solidity: 0 }));
+  if (cells) {
+    for (const { index, word } of cells) {
+      if (!isInt(index) || index < 0 || index > 255) return err(`chunk cell index ${index} out of range 0..255`);
+      if (!isInt(word) || word < 0 || word > 0xffff) return err(`chunk cell word ${word} out of range 0..65535`);
+      nextCells[index] = unpackChunkCell(word);
+    }
+  }
+  const newChunk: ChunkDef256 = { cells: nextCells };
+  const nextChunks = [...doc.chunks, newChunk];
+  const newDoc: LevelDoc = { ...doc, chunks: nextChunks };
+  const e = structuralError(newDoc);
+  if (e) return err(e);
+  const newEngineId = nextChunks.length; // file index (length-1) + 1 = length
+  commit(newDoc, { chunks: true }, { kind: 'chunk', id: newEngineId });
+  return { ok: true, id: newEngineId };
+}
+
+/**
+ * classic:add-block — append a NEW 4-cell block (grows doc.blocks). Optional `def`
+ * seeds it (Duplicate passes the source block's def; New-blank passes nothing →
+ * four tile-0 cells). Returns the new block id (file index; blocks are 0-based).
+ */
+export function classicAddBlock(def?: BlockDef): AddResult {
+  const doc = requireDoc();
+  if (!doc) return err('no classic level is open');
+  if (doc.blocks.length >= MAX_BLOCKS_TOTAL) {
+    return err(`block capacity reached: ${MAX_BLOCKS_TOTAL} blocks max (chunk cells reference blocks with a 10-bit field)`);
+  }
+  let cells: BlockDef['cells'];
+  if (def) {
+    if (!Array.isArray(def.cells) || def.cells.length !== 4) return err('block must have exactly 4 cells');
+    cells = def.cells.map((c) => ({ ...c }));
+  } else {
+    cells = Array.from({ length: 4 }, () => ({ tile: 0, xf: false, yf: false, pal: 0, pri: false }));
+  }
+  const nextBlocks = [...doc.blocks, { cells }];
+  const newDoc: LevelDoc = { ...doc, blocks: nextBlocks };
+  const e = structuralError(newDoc);
+  if (e) return err(e);
+  // A brand-new block is referenced by no chunk yet → no chunk art changes; the
+  // block palette re-reads on the new doc identity. No version bump needed.
+  commit(newDoc, { blocks: true }, { kind: 'none' });
+  return { ok: true, id: nextBlocks.length - 1 };
 }
 
 /** classic:set-start — move the player spawn point. */

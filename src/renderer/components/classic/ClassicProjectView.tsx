@@ -6,6 +6,7 @@ import { useClassicLevelStore } from '../../state/classicLevelStore';
 import ZoneActTree from './ZoneActTree';
 import ClassicLevelViewport from './ClassicLevelViewport';
 import ChunkPicker from './ChunkPicker';
+import ClassicComposerDock from './ClassicComposerDock';
 import ResolutionReportPanel from './ResolutionReportPanel';
 import ObjectInspector from './ObjectInspector';
 import ObjectLibraryPanel from './ObjectLibraryPanel';
@@ -117,7 +118,7 @@ export default function ClassicProjectView({ appBar }: { appBar: React.ReactNode
     <EditorShell
       appBar={appBar}
       toolDock={null}
-      bottomExtra={<ChunkPicker />}
+      bottomExtra={<><ClassicComposerDock /><ChunkPicker /></>}
       status={<StatusBar left={statusLeft} right={statusRight} />}
       panels={
         <Panel width={260} scroll>

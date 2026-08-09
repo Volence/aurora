@@ -240,6 +240,65 @@ describe('classic-edit-block', () => {
   });
 });
 
+describe('classic-add-chunk', () => {
+  it('appends a blank chunk and returns the new 1-based engine id + count', async () => {
+    openReady(); // 2 chunks → new engine id 3
+    const res = await handleAgentRequest({ kind: 'classic-add-chunk' });
+    expect(res).toEqual({ chunkId: 3, count: 3 });
+    expect(lvl().doc!.chunks).toHaveLength(3);
+    lvl().undo();
+    expect(lvl().doc!.chunks).toHaveLength(2);
+  });
+  it('seeds cells from a sparse word list', async () => {
+    openReady();
+    const res = await handleAgentRequest({ kind: 'classic-add-chunk', cells: [{ index: 0, word: 1 }] }) as { chunkId: number };
+    expect(res.chunkId).toBe(3);
+    expect(lvl().doc!.chunks[2].cells[0].block).toBe(1);
+  });
+  it('refuses at the 127-chunk cap (structured error)', async () => {
+    const doc = makeDoc();
+    doc.chunks = Array.from({ length: 127 }, () => ({
+      cells: Array.from({ length: 256 }, () => ({ block: 0, xf: false, yf: false, solidity: 0 })),
+    }));
+    openReady(doc);
+    await expect(handleAgentRequest({ kind: 'classic-add-chunk' })).rejects.toThrow(/capacity/i);
+    expect(lvl().doc!.chunks).toHaveLength(127);
+  });
+  it('errors when no level is open', async () => {
+    await expect(handleAgentRequest({ kind: 'classic-add-chunk' })).rejects.toThrow(/no classic level is open/);
+  });
+});
+
+describe('classic-add-block', () => {
+  it('appends a blank block and returns the new 0-based id + count', async () => {
+    openReady(); // 2 blocks → new id 2
+    const res = await handleAgentRequest({ kind: 'classic-add-block' });
+    expect(res).toEqual({ blockId: 2, count: 3 });
+    expect(lvl().doc!.blocks).toHaveLength(3);
+    lvl().undo();
+    expect(lvl().doc!.blocks).toHaveLength(2);
+  });
+  it('seeds cells from a def', async () => {
+    openReady();
+    const def = { cells: Array.from({ length: 4 }, () => ({ tile: 1, xf: true, yf: false, pal: 3, pri: true })) };
+    const res = await handleAgentRequest({ kind: 'classic-add-block', def }) as { blockId: number };
+    expect(res.blockId).toBe(2);
+    expect(lvl().doc!.blocks[2].cells[0]).toEqual({ tile: 1, xf: true, yf: false, pal: 3, pri: true });
+  });
+  it('refuses at the 1024-block cap (structured error)', async () => {
+    const doc = makeDoc();
+    doc.blocks = Array.from({ length: 0x400 }, () => ({
+      cells: Array.from({ length: 4 }, () => ({ tile: 0, xf: false, yf: false, pal: 0, pri: false })),
+    }));
+    openReady(doc);
+    await expect(handleAgentRequest({ kind: 'classic-add-block' })).rejects.toThrow(/capacity/i);
+    expect(lvl().doc!.blocks).toHaveLength(0x400);
+  });
+  it('errors when no level is open', async () => {
+    await expect(handleAgentRequest({ kind: 'classic-add-block' })).rejects.toThrow(/no classic level is open/);
+  });
+});
+
 describe('classic object tools', () => {
   const entry: S1ObjectEntry = { x: 10, y: 20, xflip: false, yflip: false, respawn: true, id: 0x25, subtype: 4 };
 

@@ -99,9 +99,10 @@ function blit(
 
 /**
  * Render a 16x16 block (4 tile cells in TL, TR, BL, BR order) to an RGBA buffer.
- * A missing block yields a transparent buffer.
+ * A missing block yields a transparent buffer. Exported for the composer dock's
+ * block thumbnails / block-tab preview (renderChunk uses it internally per cell).
  */
-function renderBlock(doc: LevelDoc, blockId: number): Uint8ClampedArray {
+export function renderBlock(doc: LevelDoc, blockId: number): Uint8ClampedArray {
   const out = new Uint8ClampedArray(BLOCK_PX * BLOCK_PX * 4);
   const block = doc.blocks[blockId];
   if (!block) return out;

@@ -94,6 +94,8 @@ commands do, so an agent never loops single-cell calls.
 | `set_layout_region`\* | `{ plane, x, y, chunkIds }` | Stamps a 2D grid of chunk ids into a layout plane (`fg`/`bg`), top-left at `(x,y)`. Chunk ids are 1-based: `0` = air/blank (erases the cell), `1..N` reference the N map256 chunks. |
 | `edit_chunk`\* | `{ chunkId, cells: [{index, word}] }` | Sets individual 16×16 block cells of one chunk (packed S1 chunk-block words). `chunkId` is a 1-based engine id (min `1`; `0` is air/blank and not editable). |
 | `edit_block`\* | `{ blockId, def: {cells: [4]} }` | Replaces one 16×16 block's 4-tile-cell definition. |
+| `add_chunk`\* | `{ cells?: [{index, word}] }` | Appends a NEW 256-cell chunk (grows the pool). Optional sparse `cells` seed it over a blank base; reply gives the new 1-based engine `chunkId`. Refuses at the 127-chunk cap ($80+ is unaddressable — the layout loop bit). |
+| `add_block`\* | `{ def?: {cells: [4]} }` | Appends a NEW 16×16 block (grows the pool). Optional `def` seeds it (else four blank tile-0 cells); reply gives the new 0-based `blockId`. Refuses at the 1024-block cap (10-bit block refs). |
 | `place_object`\* | `{ entry }` | Appends one object placement; reply includes the new `index`. |
 | `move_object`\* | `{ index, x, y }` | Moves the object at `index`. |
 | `delete_object`\* | `{ index }` | Deletes the object at `index`. |

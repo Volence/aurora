@@ -10,6 +10,8 @@ import {
   classicSetColind,
   classicSetObjects,
   classicSetStart,
+  classicAddChunk,
+  classicAddBlock,
   classicCanUndo,
   classicCanRedo,
 } from '../classicLevelStore';
@@ -574,5 +576,131 @@ describe('object-tool UI state', () => {
     expect(st().selectedObjectIndex).toBeNull();
     expect(st().armedObjectId).toBeNull();
     expect(st().tool).toBe('object');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// GROW commands: classicAddChunk / classicAddBlock (Task B3).
+// ---------------------------------------------------------------------------
+
+describe('classic:add-chunk', () => {
+  it('appends a blank chunk, marks chunks dirty, one undo step; returns the new engine id', () => {
+    openReady(); // fixture has 2 chunks → engine ids 1,2 → new id 3
+    const tick0 = st().historyTick;
+    const res = classicAddChunk();
+    expect(res).toEqual({ ok: true, id: 3 });
+    expect(st().doc!.chunks.length).toBe(3);
+    // Blank: every cell is block 0 / no flips / solidity 0.
+    expect(st().doc!.chunks[2].cells.every((c) => c.block === 0 && !c.xf && !c.yf && c.solidity === 0)).toBe(true);
+    expect(st().dirty.chunks).toBe(true);
+    expect(st().historyTick).toBe(tick0 + 1);
+    // New engine id gets a content version (keyed by engine id).
+    expect(st().chunkVersions.get(3)).toBeGreaterThan(0);
+    expect(classicCanUndo()).toBe(true);
+  });
+
+  it('seeds cells from a sparse word list (Duplicate path)', () => {
+    openReady();
+    // block 1, xflip, solidity 2 → pack via the model helper the store uses.
+    const word = packChunkCell({ block: 1, xf: true, yf: false, solidity: 2 });
+    const res = classicAddChunk([{ index: 0, word }, { index: 255, word }]);
+    expect(res.ok).toBe(true);
+    const nc = st().doc!.chunks[2].cells;
+    expect(unpackChunkCell(packChunkCell(nc[0]))).toEqual({ block: 1, xf: true, yf: false, solidity: 2 });
+    expect(nc[1]).toEqual({ block: 0, xf: false, yf: false, solidity: 0 }); // untouched
+    expect(nc[255].block).toBe(1);
+  });
+
+  it('undo removes the appended chunk exactly; redo re-adds it', () => {
+    openReady();
+    classicAddChunk();
+    expect(st().doc!.chunks.length).toBe(3);
+    st().undo();
+    expect(st().doc!.chunks.length).toBe(2);
+    expect(st().dirty.chunks).toBeUndefined();
+    st().redo();
+    expect(st().doc!.chunks.length).toBe(3);
+    expect(st().dirty.chunks).toBe(true);
+  });
+
+  it('refuses at the 127-chunk cap ($80+ unaddressable) with no state change', () => {
+    // Build a doc already at the cap.
+    const doc = makeDoc();
+    doc.chunks = Array.from({ length: 127 }, () => ({
+      cells: Array.from({ length: 256 }, () => ({ block: 0, xf: false, yf: false, solidity: 0 })),
+    }));
+    openReady(doc);
+    const before = st().doc;
+    const res = classicAddChunk();
+    expect(res.ok).toBe(false);
+    if (!res.ok) expect(res.error).toMatch(/capacity/i);
+    expect(st().doc).toBe(before); // untouched identity
+    expect(classicCanUndo()).toBe(false);
+  });
+
+  it('rejects with no open level', () => {
+    useClassicLevelStore.getState().reset();
+    expect(classicAddChunk().ok).toBe(false);
+  });
+});
+
+describe('classic:add-block', () => {
+  it('appends a blank block, marks blocks dirty, one undo step; returns the new id', () => {
+    openReady(); // fixture has 2 blocks → new id 2
+    const tick0 = st().historyTick;
+    const res = classicAddBlock();
+    expect(res).toEqual({ ok: true, id: 2 });
+    expect(st().doc!.blocks.length).toBe(3);
+    expect(st().doc!.blocks[2].cells).toHaveLength(4);
+    expect(st().doc!.blocks[2].cells.every((c) => c.tile === 0)).toBe(true);
+    expect(st().dirty.blocks).toBe(true);
+    expect(st().historyTick).toBe(tick0 + 1);
+    expect(classicCanUndo()).toBe(true);
+  });
+
+  it('seeds cells from a def (Duplicate path)', () => {
+    openReady();
+    const def: BlockDef = {
+      cells: [
+        { tile: 1, xf: true, yf: false, pal: 2, pri: true },
+        { tile: 0, xf: false, yf: false, pal: 0, pri: false },
+        { tile: 1, xf: false, yf: true, pal: 1, pri: false },
+        { tile: 0, xf: false, yf: false, pal: 0, pri: false },
+      ],
+    };
+    const res = classicAddBlock(def);
+    expect(res).toEqual({ ok: true, id: 2 });
+    expect(st().doc!.blocks[2].cells[0]).toEqual({ tile: 1, xf: true, yf: false, pal: 2, pri: true });
+  });
+
+  it('undo removes the appended block; redo re-adds it', () => {
+    openReady();
+    classicAddBlock();
+    expect(st().doc!.blocks.length).toBe(3);
+    st().undo();
+    expect(st().doc!.blocks.length).toBe(2);
+    st().redo();
+    expect(st().doc!.blocks.length).toBe(3);
+  });
+
+  it('rejects a bad def (wrong cell count) atomically', () => {
+    openReady();
+    const before = st().doc;
+    const res = classicAddBlock({ cells: [{ tile: 0, xf: false, yf: false, pal: 0, pri: false }] } as BlockDef);
+    expect(res.ok).toBe(false);
+    expect(st().doc).toBe(before);
+  });
+
+  it('refuses at the 1024-block cap with no state change', () => {
+    const doc = makeDoc();
+    doc.blocks = Array.from({ length: 0x400 }, () => ({
+      cells: Array.from({ length: 4 }, () => ({ tile: 0, xf: false, yf: false, pal: 0, pri: false })),
+    }));
+    openReady(doc);
+    const before = st().doc;
+    const res = classicAddBlock();
+    expect(res.ok).toBe(false);
+    if (!res.ok) expect(res.error).toMatch(/capacity/i);
+    expect(st().doc).toBe(before);
   });
 });

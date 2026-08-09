@@ -109,3 +109,15 @@ export const CHECKER_A = '#2a2a3a';
 export const CHECKER_B = '#33334a';
 /** Out-of-palette / undefined color marker. */
 export const OOB_MARKER = '#ff00ff';
+
+// ---------- classic composer dock (ClassicComposerDock, composer-thumbs) ----------
+/** Selected block-cell highlight outline in the block-tab 2x2 preview. */
+export const COMPOSER_SEL_CELL = '#4FD1C5';
+/** Transparent-pixel checker in the tile-tab editor (light / dark squares). */
+export const COMPOSER_CHECK_A = '#2A2A2A';
+export const COMPOSER_CHECK_B = '#1C1C1C';
+/** Usage-count badge text on thumbnails. */
+export const COMPOSER_BADGE_TEXT = '#FFFFFF';
+/** Swatch-0 (transparent) checker squares in the color row. */
+export const COMPOSER_SWATCH_A = '#333333';
+export const COMPOSER_SWATCH_B = '#222222';

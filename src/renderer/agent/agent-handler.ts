@@ -20,6 +20,7 @@ import { useClassicProjectStore } from '../state/classicProjectStore';
 import {
   useClassicLevelStore,
   classicSetLayoutCells, classicEditChunkCells, classicEditBlock,
+  classicAddChunk, classicAddBlock,
   classicSetObjects, classicSetColind,
   type CommandResult,
 } from '../state/classicLevelStore';
@@ -645,6 +646,20 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
       requireClassicDoc();
       assertCommand(classicEditBlock(req.blockId, req.def));
       return { blockId: req.blockId };
+    }
+
+    case 'classic-add-chunk': {
+      requireClassicDoc();
+      const res = classicAddChunk(req.cells);
+      if (!res.ok) throw new Error(res.error);
+      return { chunkId: res.id, count: requireClassicDoc().chunks.length };
+    }
+
+    case 'classic-add-block': {
+      requireClassicDoc();
+      const res = classicAddBlock(req.def);
+      if (!res.ok) throw new Error(res.error);
+      return { blockId: res.id, count: requireClassicDoc().blocks.length };
     }
 
     case 'classic-place-object': {

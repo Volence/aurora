@@ -49,6 +49,8 @@ export type AgentRequest =
   | { kind: 'classic-set-layout-region'; plane: 'fg' | 'bg'; x: number; y: number; chunkIds: number[][] }
   | { kind: 'classic-edit-chunk'; chunkId: number; cells: { index: number; word: number }[] }
   | { kind: 'classic-edit-block'; blockId: number; def: BlockDef }
+  | { kind: 'classic-add-chunk'; cells?: { index: number; word: number }[] }
+  | { kind: 'classic-add-block'; def?: BlockDef }
   | { kind: 'classic-place-object'; entry: S1ObjectEntry }
   | { kind: 'classic-move-object'; index: number; x: number; y: number }
   | { kind: 'classic-delete-object'; index: number }
