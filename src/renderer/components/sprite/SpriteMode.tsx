@@ -7,7 +7,7 @@ import SpriteCanvas from './SpriteCanvasHost';
 import type { OverlayRect } from './SpriteCanvasHost';
 import FrameGrid from './FrameGrid';
 import Timeline from './Timeline';
-import { exportSprite, exportSpriteAsm, loadSpriteByName, listSprites, loadEngineCharacter, openSprite, scanProjectForSprites, openDiscoveredSet, loadSpriteAnimations } from './export-sprite';
+import { exportSprite, exportSpriteAsm, loadSpriteByName, listSprites, loadEngineCharacter, openSprite, scanProjectForSprites, openDiscoveredSet, loadSpriteAnimations, saveSpriteArt } from './export-sprite';
 import type { ProjectScan } from './export-sprite';
 import PaletteEditor from '../art/PaletteEditor';
 import SpritePaletteHeader from './SpritePaletteHeader';
@@ -54,6 +54,7 @@ export default function SpriteMode({ appBar }: { appBar: React.ReactNode }) {
   const setSpriteName = (n: string) => useSpriteStore.getState().setName(n);
   const exportDplc = useSpriteStore((s) => s.exportDplc);
   const format = useSpriteStore((s) => s.format);
+  const s1ArtSource = useSpriteStore((s) => s.s1ArtSource);
   const [openAs, setOpenAs] = useState<SpriteFormatId>('s2');
   const [openComp, setOpenComp] = useState<CompressionKind>('nemesis');
   const [available, setAvailable] = useState<string[]>([]);
@@ -137,6 +138,11 @@ export default function SpriteMode({ appBar }: { appBar: React.ReactNode }) {
     if (busy) return;
     setBusy(true);
     try { const r = await scanProjectForSprites(); if (r) { setScan(r); setScanFilter(''); } } finally { setBusy(false); }
+  }
+  async function handleSaveArt() {
+    if (busy) return;
+    setBusy(true);
+    try { await saveSpriteArt(); } finally { setBusy(false); }
   }
 
   const scanMatches = useMemo(() => {
@@ -245,6 +251,20 @@ export default function SpriteMode({ appBar }: { appBar: React.ReactNode }) {
           </div>
           </CollapsibleSection>
 
+          {s1ArtSource && (
+            <CollapsibleSection id="sprite.save-source" title="Save to source (S1)">
+            <div style={styles.section}>
+              <button style={{ ...styles.primary, ...(busy ? styles.disabled : {}) }} disabled={busy}
+                title="Re-encode the edited pixels with Nemesis and write them back to the source .nem art file (mtime-guarded)."
+                onClick={handleSaveArt}>Save art → {s1ArtSource.relPath}</button>
+              <div style={styles.notice}>
+                S1 mappings are read-only in v1 — pixel edits save back to the source art;
+                piece, shape, and added/removed-frame changes are not written.
+              </div>
+            </div>
+            </CollapsibleSection>
+          )}
+
           <CollapsibleSection id="sprite.export" title="Export to project">
           <div style={styles.section}>
             <label style={styles.check} title="Streamed art (DPLC) vs all art resident. Characters use DPLC; most objects don't.">
@@ -310,6 +330,7 @@ const styles: Record<string, React.CSSProperties> = {
   btnRow: { display: 'flex', gap: 6 },
   check: { fontSize: 11, color: T.textBase, display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' },
   hint: { fontSize: 10, color: T.textFaint, lineHeight: 1.3 },
+  notice: { fontSize: 10, color: T.textLo, lineHeight: 1.35, padding: '5px 7px', background: T.void, border: `1px solid ${T.borderStrong}`, borderRadius: 4 },
   divider: { height: 1, background: T.borderStrong, margin: '2px 0' },
   fmtRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 },
   fmtSelect: { flex: 1, background: T.raised, color: T.textHi, border: `1px solid ${T.borderStrong}`, borderRadius: 4, fontSize: 12, padding: '4px 6px' },

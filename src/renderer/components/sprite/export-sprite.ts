@@ -9,6 +9,9 @@ import { assembleSprite } from '../../../core/art/sprite-decompose';
 import { writeAsmMappings, writeAsmDPLC } from '../../../core/export/sprite-asm-export';
 import { reconstructDPLCSprite, reconstructWithAdapter, reconstructFromFrames } from '../../../core/import/sprite-import';
 import { getAdapter } from '../../../core/formats/games';
+import { parseTiles } from '../../../core/formats/tiles';
+import { compressionFor } from '../../../core/compress';
+import { encodeS1ArtWriteBack, type EditedFrame } from '../../../core/formats/games/s1-art-write';
 import { parseAsmMappings, parseAsmDPLC, assembleDataAsm } from '../../../core/import/asm-mappings';
 import type { SpriteFrame } from '../../../core/model/sprite-types';
 import type { SpriteFormatAdapter } from '../../../core/formats/sprite-format-adapter';
@@ -151,6 +154,76 @@ function nameFromPath(path: string): string {
 
 const isAsm = (path: string) => /\.asm$/i.test(path);
 
+/** Parent dir of a (possibly absolute) path — the guarded-write basePath. */
+const dirOf = (p: string) => { const n = p.replace(/\\/g, '/'); const i = n.lastIndexOf('/'); return i < 0 ? '' : n.slice(0, i); };
+/** Final path segment — the rel-path-safe filename under its parent dir. */
+const baseOf = (p: string) => p.replace(/\\/g, '/').split('/').filter(Boolean).pop() ?? p;
+
+/**
+ * Capture the in-place ART save-back target after an S1 object sprite opens
+ * (Task 15). Only S1, non-DPLC, Nemesis art gets a target — the write-back
+ * re-encodes with Nemesis and keeps the read-only mappings, so any other shape
+ * (DPLC, non-Nemesis, other games) is left with no source (edit/export only).
+ * `loadSprite` already cleared any prior source, so a skip here leaves it null.
+ * Non-fatal: a decode/stat failure just means no in-place save, not a broken open.
+ */
+async function captureS1ArtSource(
+  game: SpriteFormatId,
+  artCompression: CompressionKind,
+  artBytes: Uint8Array,
+  mappings: SpriteFrame[],
+  originX: number,
+  originY: number,
+  hasDplc: boolean,
+  basePath: string,
+  relPath: string,
+): Promise<void> {
+  if (game !== 's1' || hasDplc || artCompression !== 'nemesis') return;
+  try {
+    const originalTiles = parseTiles(compressionFor('nemesis').decompress(artBytes));
+    const expectedMtimeMs = await window.api.fileMtime(basePath, relPath);
+    useSpriteStore.getState().setS1ArtSource({ basePath, relPath, expectedMtimeMs, originalTiles, mappings, originX, originY });
+  } catch { /* leave s1ArtSource null — sprite is still editable, just not save-back-able */ }
+}
+
+/**
+ * Save edited S1 object ART back to its source `artnem/*.nem` (Task 15, spec §2.4).
+ * Re-encodes the current frames' pixels into the original tile layout with Nemesis
+ * behind a self-check gate (encodeS1ArtWriteBack), then writes through the guarded
+ * IPC (mtime conflict check). MAPPINGS ARE READ-ONLY: only art pixels save; shape/
+ * frame changes the mappings can't express are silently not captured (the success
+ * toast states the read-only limitation). Mirrors the S4 export path's history
+ * handling — the write does NOT touch spriteHistory / any dirty flag (there is none).
+ */
+export async function saveSpriteArt(): Promise<void> {
+  const toast = useToastStore.getState().addToast;
+  const src = useSpriteStore.getState().s1ArtSource;
+  if (!src) { toast('This sprite has no S1 art source to save back to', 'error'); return; }
+
+  const { frames } = useSpriteStore.getState();
+  const editedFrames: EditedFrame[] = frames.map((f) => ({ indices: f.data, width: f.width, height: f.height }));
+  const res = encodeS1ArtWriteBack(src.originalTiles, editedFrames, src.mappings, src.originX, src.originY);
+  if (!res.ok) { toast(`Art save failed: ${res.error}`, 'error'); return; }
+
+  let out;
+  try {
+    out = await window.api.writeGuarded(src.basePath, [{ relPath: src.relPath, bytes: res.bytes, expectedMtimeMs: src.expectedMtimeMs }]);
+  } catch (e) {
+    toast(`Art save failed: ${e instanceof Error ? e.message : String(e)}`, 'error');
+    return;
+  }
+  if ('conflicts' in out) {
+    toast(`Save aborted — ${src.relPath} changed on disk since it was opened. Reopen to pick up external changes.`, 'error');
+    return;
+  }
+  if (out.failed) { toast(`Art save failed at ${out.failed.path}: ${out.failed.message}`, 'error'); return; }
+
+  // Refresh the guarded-write baseline so a follow-up save doesn't spuriously conflict.
+  const nm = out.newMtimes[src.relPath];
+  useSpriteStore.getState().setS1ArtSource({ ...src, expectedMtimeMs: nm ?? src.expectedMtimeMs });
+  toast(`Saved art to ${src.relPath} — S1 mappings are read-only in v1`, 'success');
+}
+
 /** Frames from a mapping file: macro call-sites if present, else assemble raw dc.b/.w. */
 function framesFromMapping(path: string, bytes: Uint8Array, adapter: SpriteFormatAdapter): SpriteFrame[] {
   if (!isAsm(path)) return adapter.readMappings(bytes);
@@ -187,7 +260,8 @@ export async function openSprite(sourceFormat: SpriteFormatId = 's2', artCompres
     if (frames.length === 0) { toast('No sprite mappings found in that file', 'error'); return; }
 
     const dplc = dplcPath ? dplcFromFile(dplcPath, await readAbsolute(dplcPath), adapter) : undefined;
-    const recon = reconstructFromFrames(frames, await readAbsolute(artPath), artCompression, dplc);
+    const artBytes = await readAbsolute(artPath);
+    const recon = reconstructFromFrames(frames, artBytes, artCompression, dplc);
     const frameBufs = recon.frames.map((data) => ({ width: recon.width, height: recon.height, data }));
 
     const name = nameFromPath(mapPath);
@@ -195,6 +269,7 @@ export async function openSprite(sourceFormat: SpriteFormatId = 's2', artCompres
     useSpriteStore.getState().setName(name);
     useSpriteStore.getState().setExportDplc(!!dplc);
     useSpriteStore.getState().setFormat(sourceFormat);
+    await captureS1ArtSource(sourceFormat, artCompression, artBytes, frames, recon.originX, recon.originY, !!dplc, dirOf(artPath), baseOf(artPath));
     toast(`Imported "${name}" as ${sourceFormat.toUpperCase()}: ${frameBufs.length} frames${dplc ? ' (DPLC)' : ''}`, 'success');
   } catch (e) {
     toast(`Import failed: ${e instanceof Error ? e.message : String(e)}`, 'error');
@@ -270,12 +345,15 @@ export async function openDiscoveredSet(baseDir: string, set: DiscoveredSpriteSe
     if (frames.length === 0) { toast(`"${set.name}" has no readable sprite mappings`, 'error'); return; }
 
     let artBytes: Uint8Array;
+    let artBase: string, artRel: string; // guarded-write target for the save-back path
     if (set.art) {
       artBytes = new Uint8Array(await window.api.readBinaryFile(baseDir, set.art));
+      artBase = baseDir; artRel = set.art;
     } else {
       const artPath = await window.api.selectFile(`Select art for "${set.name}" (Nemesis .nem / .bin)`, [{ name: 'Art', extensions: ['nem', 'bin'] }]);
       if (!artPath) { toast('Art file required to open the sprite', 'error'); return; }
       artBytes = await readAbsolute(artPath);
+      artBase = dirOf(artPath); artRel = baseOf(artPath);
     }
     const dplc = set.dplc
       ? dplcFromFile(set.dplc, new Uint8Array(await window.api.readBinaryFile(baseDir, set.dplc)), adapter)
@@ -288,6 +366,7 @@ export async function openDiscoveredSet(baseDir: string, set: DiscoveredSpriteSe
     useSpriteStore.getState().setName(name);
     useSpriteStore.getState().setExportDplc(!!dplc);
     useSpriteStore.getState().setFormat(set.game);
+    await captureS1ArtSource(set.game, artCompression, artBytes, frames, recon.originX, recon.originY, !!dplc, artBase, artRel);
     toast(`Opened "${set.name}" (${set.game.toUpperCase()}): ${frameBufs.length} frames${dplc ? ' (DPLC)' : ''}`, 'success');
   } catch (e) {
     toast(`Open "${set.name}" failed: ${e instanceof Error ? e.message : String(e)}`, 'error');

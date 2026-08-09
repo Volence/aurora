@@ -3,6 +3,8 @@ import type { PixelBuffer, MirrorMode, DitherPattern } from '../../core/art/pixe
 import { createBuffer, flipH, flipV, rotate90 } from '../../core/art/pixel-ops';
 import type { Color } from '../../core/model/s4-types';
 import type { SpriteFormatId } from '../../core/formats/sprite-format-adapter';
+import type { Tile } from '../../core/model/s4-types';
+import type { SpriteFrame } from '../../core/model/sprite-types';
 import { SpriteHistory, type SpriteSnapshot } from '../../core/editing/sprite-history';
 import { registerRedoClearer, invalidateSiblingRedos } from '../../core/editing/undo-bus';
 import type { SpritePaletteMode } from '../../core/art/sprite-palette';
@@ -20,6 +22,23 @@ export type SpriteTransform = 'flip-h' | 'flip-v' | 'rotate-90';
 export interface SpriteSelection { x: number; y: number; w: number; h: number; }
 
 export type PlaybackMode = 'forward' | 'reverse' | 'pingpong';
+
+/**
+ * Provenance for an in-place ART save-back (Task 15): the source Nemesis `.nem`
+ * file plus the read-time data the writer needs to invert the render. Set ONLY
+ * when an S1 (non-DPLC, Nemesis) object sprite was opened from disk; null for
+ * new/editor/other-format sprites (no in-place save target). The mappings are
+ * READ-ONLY — only art pixels save back. `expectedMtimeMs` is the guarded-write
+ * conflict baseline, refreshed after each successful save. */
+export interface S1ArtSource {
+  basePath: string;              // absolute parent dir of the .nem (guarded-write root)
+  relPath: string;               // .nem filename (rel-path-safe under basePath)
+  expectedMtimeMs: number | null;
+  originalTiles: Tile[];         // decoded pool at open (invariant across edits)
+  mappings: SpriteFrame[];       // read-only mappings that drive the inverse render
+  originX: number;
+  originY: number;
+}
 
 /** One animation step: a reference to a frame + how long it holds (in 1/60s ticks). */
 export interface AnimStepUI {
@@ -62,6 +81,9 @@ interface SpriteState {
   setExportDplc: (v: boolean) => void;
   format: SpriteFormatId;      // game format to interpret on open / write on export
   setFormat: (f: SpriteFormatId) => void;
+  /** In-place art save-back target (S1 objects only); null when there is none. */
+  s1ArtSource: S1ArtSource | null;
+  setS1ArtSource: (src: S1ArtSource | null) => void;
 
   setTool: (t: SpriteTool) => void;
   setZoom: (z: number) => void;
@@ -175,6 +197,7 @@ export const useSpriteStore = create<SpriteState>((set, get) => ({
   name: 'NewSprite',
   exportDplc: false,
   format: 's4',
+  s1ArtSource: null,
   historyTick: 0,
   paletteMode: 'zone',
   zoneLine: 1,
@@ -183,6 +206,7 @@ export const useSpriteStore = create<SpriteState>((set, get) => ({
   setName: (name) => set({ name }),
   setExportDplc: (exportDplc) => set({ exportDplc }),
   setFormat: (format) => set({ format }),
+  setS1ArtSource: (s1ArtSource) => set({ s1ArtSource }),
   setTool: (tool) => set((s) => ({ tool, selection: tool === 'select' ? s.selection : null })),
   setZoom: (zoom) => set({ zoom: Math.min(48, Math.max(1, Math.round(zoom))) }),
   setShowPieces: (showPieces) => set({ showPieces }),
@@ -326,12 +350,15 @@ export const useSpriteStore = create<SpriteState>((set, get) => ({
       name: 'NewSprite',
       exportDplc: false,
       format: 's4',
+      s1ArtSource: null,
       historyTick: 0,
     });
   },
 
   loadSprite: (frames, steps, originX, originY) => {
     history.clear(); // a loaded sprite starts with empty history
+    // Clear any prior in-place save-back target; the S1 open path re-captures it
+    // (with the new source file + mtime) immediately after this call.
     set({
       frames: frames.length ? frames : [blankFrame()],
       steps,
@@ -339,6 +366,7 @@ export const useSpriteStore = create<SpriteState>((set, get) => ({
       originX,
       originY,
       characterAnims: [],
+      s1ArtSource: null,
       historyTick: 0,
     });
   },
