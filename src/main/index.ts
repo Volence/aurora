@@ -7,6 +7,17 @@ import { startMcpServer, stopMcpServer } from './mcp-server';
 // The main bundle is ESM (.mjs), where __dirname doesn't exist.
 const moduleDir = dirname(fileURLToPath(import.meta.url));
 
+// GPU escape hatch (must run BEFORE app is ready). On machines whose GL/GPU stack
+// fails Chromium's canvas allocations — e.g. NVIDIA drivers logging "Failed to
+// allocate NVKMS memory for GEM object" while the classic viewport blits its chunk
+// canvases — hardware acceleration turns paints into multi-second stalls. Launch
+// with AURORA_NO_GPU=1 to force the whole renderer onto the software compositor.
+// The classic viewport is already CPU-canvas resilient (willReadFrequently), so
+// this is a last resort for when even that isn't enough (e.g. WebGL surfaces).
+if (process.env.AURORA_NO_GPU === '1') {
+  app.disableHardwareAcceleration();
+}
+
 let mainWindow: BrowserWindow | null = null;
 
 function createWindow(): BrowserWindow {

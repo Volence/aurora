@@ -43,6 +43,19 @@ npm run test:watch # vitest in watch mode
 npm run gen:theme  # regenerate theme tokens (scripts/gen-theme.mjs)
 ```
 
+### GPU / paint troubleshooting env vars
+
+The classic (Sonic 1) level viewport composes its chunk layout on CPU-backed
+canvases so paint stays fast even on machines whose GPU stack fails Chromium's
+canvas allocations. Two escape hatches help when a machine is still struggling:
+
+```bash
+AURORA_NO_GPU=1 npm run dev   # disable hardware acceleration entirely (software
+                              # compositor). Last resort for GPU/GL stacks that
+                              # stall Aurora's paints — e.g. NVIDIA drivers logging
+                              # "Failed to allocate NVKMS memory for GEM object".
+```
+
 ## MCP / agent integration
 
 While running, Aurora embeds an MCP server (Streamable HTTP) that exposes
