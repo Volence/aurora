@@ -581,6 +581,12 @@ export default function ComposerCanvas() {
               useEditorStore.getState().setMapClipboard(copyChunkToClipboard(chunk));
               useToastStore.getState().addToast(
                 `Copied chunk ${chunk.id} (${chunk.widthTiles}×${chunk.heightTiles})`, 'success');
+              // The copy is sourced from the SAVED chunk (see comment above) —
+              // if the doc has unsaved edits, warn that they were left out.
+              if (o.dirty) {
+                useToastStore.getState().addToast(
+                  'Copied saved chunk state — unsaved edits not included', 'info');
+              }
               e.preventDefault();
             }
           }
@@ -606,7 +612,10 @@ export default function ComposerCanvas() {
         }
         // No pixel clipboard: apply the MAP clipboard's COLLISION planes onto
         // the open doc at its origin. Art paste into a doc is out of scope —
-        // chunk art still only comes from stamps or an explicit save.
+        // chunk art still only comes from stamps or an explicit save. This is
+        // deliberately collision-only, so the map's `pasteLayers` toggle
+        // (both/art/collision) is intentionally ignored here — there is no
+        // "art" or "both" mode for a composer paste.
         const mapClip = useEditorStore.getState().mapClipboard;
         if (doc && mapClip) {
           if (applyClipboardCollisionToDoc(doc, mapClip)) {

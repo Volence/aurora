@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { createSection, SECTION_TILES_WIDE } from '../../src/core/model/s4-types';
+import { createSection, SECTION_TILES_WIDE, SECTION_TILES_HIGH } from '../../src/core/model/s4-types';
 import type { S4Level } from '../../src/core/editing/commands';
 import { EditHistory } from '../../src/core/editing/history';
 import { buildPasteCommand, copyFromSection } from '../../src/core/editing/map-clipboard';
@@ -206,7 +206,7 @@ describe('buildPasteCommand', () => {
     const history = new EditHistory();
 
     const baseCol = SECTION_TILES_WIDE - 2; // only the left 2-tile column fits
-    const baseRow = SECTION_TILES_WIDE - 2; // only the top 2-tile row fits
+    const baseRow = SECTION_TILES_HIGH - 2; // only the top 2-tile row fits
 
     expect(() => {
       const cmd = buildPasteCommand({

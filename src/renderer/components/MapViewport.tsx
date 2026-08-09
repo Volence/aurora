@@ -754,7 +754,8 @@ export default function MapViewport() {
 
     // Paste mode takes priority over whatever tool is active — a click commits
     // the paste and STAYS in paste mode for repeat pastes (Escape exits).
-    if (useEditorStore.getState().pasting) {
+    // Left-click only (button 0) — middle-click must still fall through to pan.
+    if (useEditorStore.getState().pasting && e.button === 0) {
       const clip = useEditorStore.getState().mapClipboard;
       const hover = pasteHoverRef.current;
       const level = getActiveLevel();
