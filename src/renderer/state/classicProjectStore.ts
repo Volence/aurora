@@ -108,11 +108,13 @@ export const useClassicProjectStore = create<ClassicProjectState>((set) => ({
         return 'not-classic';
       }
       // Neither classic nor aeon — surface a helpful notice about what each
-      // known project type expects.
+      // known project type expects, plus the specific aeon-reject reason when a
+      // project.json was present but unusable (invalid JSON / wrong engine).
       const msg =
         `"${dir}" is not a recognized project.\n` +
         `• Sonic 1 disassembly expects: sonic.asm + artnem/ + map256/ + levels/\n` +
-        `• Aeon project expects: project.json (engine "s4")`;
+        `• Aeon project expects: project.json (engine "s4")` +
+        (res.detail ? `\n${res.detail}` : '');
       set({ ...CLOSED, error: msg });
       return 'error';
     } catch (e) {

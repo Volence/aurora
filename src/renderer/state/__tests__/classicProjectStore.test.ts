@@ -122,6 +122,36 @@ describe('classicProjectStore', () => {
     expect(s.error).toMatch(/project\.json/);
   });
 
+  it('surfaces the aeon-reject reason for a dir with malformed project.json', async () => {
+    __setClassicBridgeForTest(
+      bridgeReturning({
+        kind: 'not-classic',
+        aeon: false,
+        detail: 'project.json found but contains invalid JSON',
+      }),
+    );
+    const outcome = await useClassicProjectStore.getState().openDirectory('/proj/badjson');
+    expect(outcome).toBe('error');
+    const s = useClassicProjectStore.getState();
+    expect(s.error).toMatch(/not a recognized project/i);
+    expect(s.error).toMatch(/project\.json found but contains invalid JSON/);
+  });
+
+  it('surfaces the aeon-reject reason for a dir whose project.json has the wrong engine', async () => {
+    __setClassicBridgeForTest(
+      bridgeReturning({
+        kind: 'not-classic',
+        aeon: false,
+        detail: 'project.json found but engine is "godot", expected "s4"',
+      }),
+    );
+    const outcome = await useClassicProjectStore.getState().openDirectory('/proj/godot');
+    expect(outcome).toBe('error');
+    const s = useClassicProjectStore.getState();
+    expect(s.error).toMatch(/not a recognized project/i);
+    expect(s.error).toMatch(/engine is "godot", expected "s4"/);
+  });
+
   it('returns "error" and captures the message when the bridge throws', async () => {
     __setClassicBridgeForTest(
       bridgeReturning(async () => { throw new Error('disk exploded'); }),

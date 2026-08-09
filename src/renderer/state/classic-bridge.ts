@@ -8,7 +8,7 @@
 import { createIpcFileAccess } from './classic-file-access';
 import { detectProject, openProject, registerAdapter, type ProjectHandle } from '../../core/project/adapter';
 import { s1Adapter } from '../../core/project/s1';
-import { aeonAdapter } from '../../core/project/aeon';
+import { aeonAdapter, explainAeonReject } from '../../core/project/aeon';
 
 // -- Adapter registration (exactly once) ------------------------------------
 // The registry lives in core (adapter.ts). registerAdapter throws on a
@@ -42,7 +42,9 @@ export function ensureAdaptersRegistered(): void {
 
 export type ClassicOpenResult =
   | { kind: 'opened'; handle: ProjectHandle; label: string }
-  | { kind: 'not-classic'; aeon: boolean };
+  // `detail` (only when aeon:false) carries the reason a project.json-bearing dir
+  // was rejected as aeon, so the unrecognized-project notice can surface it.
+  | { kind: 'not-classic'; aeon: boolean; detail?: string };
 
 export interface ClassicBridge {
   open(dir: string): Promise<ClassicOpenResult>;
@@ -67,6 +69,10 @@ export const ipcClassicBridge: ClassicBridge = {
       const handle = await openProject(fa);
       if (handle) return { kind: 'opened', handle, label: match.label };
     }
-    return { kind: 'not-classic', aeon: match?.type === 'aeon' };
+    if (match?.type === 'aeon') return { kind: 'not-classic', aeon: true };
+    // Neither classic nor aeon: if a project.json is present but was rejected,
+    // explain why so the notice doesn't hide the reason (invalid JSON / wrong engine).
+    const detail = await explainAeonReject(fa);
+    return { kind: 'not-classic', aeon: false, ...(detail ? { detail } : {}) };
   },
 };

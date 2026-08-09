@@ -6,7 +6,7 @@ import {
   detectProject,
   openProject,
 } from '../../adapter';
-import { aeonAdapter } from '../index';
+import { aeonAdapter, explainAeonReject } from '../index';
 import { s1Adapter } from '../../s1/index';
 
 // ---------------------------------------------------------------------------
@@ -100,6 +100,39 @@ describe('aeonAdapter.detect', () => {
 
   it('returns null for a malformed (unparseable) project.json', async () => {
     expect(await aeonAdapter.detect(memFs({ 'project.json': '{ not valid json' }))).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// explainAeonReject — the reason text behind a rejected project.json
+// ---------------------------------------------------------------------------
+
+describe('explainAeonReject', () => {
+  it('returns null when there is no project.json (nothing aeon-specific to add)', async () => {
+    expect(await explainAeonReject(memFs(s1Tree()))).toBeNull();
+    expect(await explainAeonReject(memFs({}))).toBeNull();
+  });
+
+  it('reports invalid JSON when project.json does not parse', async () => {
+    expect(await explainAeonReject(memFs({ 'project.json': '{ not valid json' }))).toBe(
+      'project.json found but contains invalid JSON',
+    );
+  });
+
+  it('reports the wrong engine when project.json parses but engine ≠ "s4"', async () => {
+    expect(
+      await explainAeonReject(memFs({ 'project.json': JSON.stringify({ engine: 'godot' }) })),
+    ).toBe('project.json found but engine is "godot", expected "s4"');
+  });
+
+  it('covers a missing engine field under the engine-mismatch detail', async () => {
+    expect(
+      await explainAeonReject(memFs({ 'project.json': JSON.stringify({ name: 'some tool' }) })),
+    ).toBe('project.json found but engine is "undefined", expected "s4"');
+  });
+
+  it('returns null for a valid aeon project.json (engine "s4" — not a reject)', async () => {
+    expect(await explainAeonReject(memFs({ 'project.json': aeonJson() }))).toBeNull();
   });
 });
 

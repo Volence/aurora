@@ -229,6 +229,10 @@ describe('classic-edit-block', () => {
     const def = { cells: Array.from({ length: 4 }, () => ({ tile: 0, xf: false, yf: false, pal: 0, pri: false })) };
     await expect(handleAgentRequest({ kind: 'classic-edit-block', blockId: 9, def })).rejects.toThrow(/block 9/);
   });
+  it('errors when no level is open', async () => {
+    const def = { cells: Array.from({ length: 4 }, () => ({ tile: 0, xf: false, yf: false, pal: 0, pri: false })) };
+    await expect(handleAgentRequest({ kind: 'classic-edit-block', blockId: 0, def })).rejects.toThrow(/no classic level is open/);
+  });
 });
 
 describe('classic object tools', () => {
@@ -262,6 +266,12 @@ describe('classic object tools', () => {
   });
   it('place errors when no level is open', async () => {
     await expect(handleAgentRequest({ kind: 'classic-place-object', entry })).rejects.toThrow(/no classic level is open/);
+  });
+  it('move errors when no level is open', async () => {
+    await expect(handleAgentRequest({ kind: 'classic-move-object', index: 0, x: 0, y: 0 })).rejects.toThrow(/no classic level is open/);
+  });
+  it('delete errors when no level is open', async () => {
+    await expect(handleAgentRequest({ kind: 'classic-delete-object', index: 0 })).rejects.toThrow(/no classic level is open/);
   });
 });
 

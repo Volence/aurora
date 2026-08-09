@@ -54,6 +54,44 @@ async function readEngine(fa: FileAccess): Promise<string | null> {
   }
 }
 
+/**
+ * Explain WHY a directory that carries a `project.json` was NOT recognized as an
+ * aeon project, for the unrecognized-project notice (store + MCP open_project).
+ * `detect` stays deliberately null-returning (a clean routing signal); this helper
+ * reconstructs the human reason so the notice doesn't hide it:
+ *   • no project.json at all → null (the dir isn't aeon-adjacent; the generic
+ *     "not a recognized project" text already explains what each type expects);
+ *   • project.json present but unparseable → invalid-JSON detail;
+ *   • project.json parses but engine ≠ "s4" → engine-mismatch detail (shows what
+ *     was found), which also covers a missing / non-string engine field;
+ *   • engine === "s4" → null (this is a valid aeon match — no reject to explain).
+ * Returning null means "nothing aeon-specific to add"; a string is appended to the
+ * generic notice. Kept next to detect so the two stay in lockstep.
+ */
+export async function explainAeonReject(fa: FileAccess): Promise<string | null> {
+  let raw: Uint8Array;
+  try {
+    if (!(await fa.exists('project.json'))) return null;
+    raw = await fa.read('project.json');
+  } catch {
+    // project.json vanished / unreadable between detect and here — nothing to add.
+    return null;
+  }
+  let json: unknown;
+  try {
+    json = JSON.parse(new TextDecoder().decode(raw));
+  } catch {
+    return 'project.json found but contains invalid JSON';
+  }
+  const engine =
+    json !== null && typeof json === 'object' && 'engine' in json
+      ? (json as { engine: unknown }).engine
+      : undefined;
+  if (engine === 's4') return null; // a valid aeon match — not a reject
+  const shown = typeof engine === 'string' ? engine : String(engine);
+  return `project.json found but engine is "${shown}", expected "s4"`;
+}
+
 export const aeonAdapter: ProjectAdapter = {
   type: 'aeon',
 
