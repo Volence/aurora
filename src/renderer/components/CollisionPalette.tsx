@@ -184,7 +184,7 @@ export default function CollisionPalette() {
       <div style={styles.planes}>
         <span style={styles.planeLabel}>Brush</span>
         {[1, 7, 15, 25].map((n) => (
-          <button key={n} onClick={() => setBrush(n)} title={n === 1 ? 'Single block (reuses blocks with the same tiles)' : `${n}×${n} block area`}
+          <button key={n} onClick={() => setBrush(n)} title={n === 1 ? 'Single block (hold Alt to propagate to blocks with the same tiles)' : `${n}×${n} block area`}
             style={{ ...styles.planeBtn, ...(brush === n ? styles.planeSel : {}) }}>{n}</button>
         ))}
       </div>
@@ -214,7 +214,7 @@ export default function CollisionPalette() {
       <div style={styles.hint}>{appMode === 'map'
         ? (brush > 1
           ? `Pick a shape, then paint on the map. Paints the ${brush}×${brush} block area under the cursor.`
-          : 'Pick a shape, then paint on the map. Paints every block with the same tiles; hold Alt to paint just one.')
+          : 'Pick a shape, then paint on the map. Paints just this block; hold Alt to paint every block with the same tiles.')
         : 'Pick a shape, then paint on the canvas (tile-space collision tool).'}</div>
 
       <div style={styles.tabs}>

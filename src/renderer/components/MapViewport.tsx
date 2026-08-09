@@ -80,7 +80,7 @@ export default function MapViewport() {
   const containerRef = useRef<HTMLDivElement>(null);
   const hoverBarRef = useRef<HTMLDivElement>(null);
   // The block under the cursor in collision-paint mode (cell units), for the
-  // ghost preview. `alt` latches the live Alt key (paint just this block).
+  // ghost preview. `alt` latches the live Alt key (propagate to matching blocks).
   const previewHoverRef = useRef<{ sectionIndex: number; cellCol: number; cellRow: number; alt: boolean } | null>(null);
   const isDragging = useRef(false);
   // Screen pos at mousedown — used to tell a View-mode click (select the section
@@ -88,9 +88,10 @@ export default function MapViewport() {
   const downPos = useRef<{ x: number; y: number } | null>(null);
   const isPaintDragging = useRef(false);
   const lastPaintedCell = useRef<string | null>(null);
-  // Collision paint mode latched at mousedown (Alt = paint just the clicked block),
-  // so toggling Alt mid-drag can't switch a single stroke between reuse and local.
-  const paintJustHere = useRef(false);
+  // Collision paint mode latched at mousedown (Alt = propagate to every matching
+  // block; default = just the clicked block), so toggling Alt mid-drag can't
+  // switch a single stroke between local and reuse.
+  const paintPropagate = useRef(false);
   // Marquee tool: the drag-start tile + section, fixed for the whole drag so the
   // marquee always resolves against the section the drag STARTED in even if the
   // cursor wanders over another section's world space.
@@ -130,7 +131,7 @@ export default function MapViewport() {
 
   // Collision paint ghost: on a separate canvas layered over the map, draw a
   // translucent preview of the selected shape under the cursor plus an outline of
-  // every block the stroke would change (reuse set / brush area / erase scope).
+  // every block the stroke would change (single block / propagate set / brush area).
   // Reads everything fresh so it can be called from the render effect (pan/zoom/
   // version realign) and from mousemove (cell change). Clears when not painting.
   const drawCollisionPreview = useCallback(() => {
@@ -222,7 +223,7 @@ export default function MapViewport() {
     const brush = useEditorStore.getState().collisionBrushSize;
     const cellsW = SECTION_TILES_WIDE / 2, cellsH = SECTION_TILES_HIGH / 2;
     const { primary, all } = collisionPaintTargets({
-      cellCol: hover.cellCol, cellRow: hover.cellRow, brush, justHere: hover.alt,
+      cellCol: hover.cellCol, cellRow: hover.cellRow, brush, propagate: hover.alt,
       nametable: section.tileGrid.nametable, width: SECTION_TILES_WIDE, cellsW, cellsH,
     });
     const offset = sectionRenderer.sectionWorldOffset(hover.sectionIndex);
@@ -677,10 +678,11 @@ export default function MapViewport() {
   }
 
   // Paint collision at the 16px block under `info` with the selected profile.
-  // Default: every block in the section with the SAME tiles (reuse). `justHere`
-  // (Alt): only the clicked block. The block is the 2×2 tiles at (cellCol,cellRow);
-  // a paint sets all four 8px sub-tiles. One undoable set-collision-edit command.
-  function paintCollisionCell(info: { sectionIndex: number; col: number; row: number }, justHere: boolean) {
+  // Default: only the clicked block ("just here"). `propagate` (Alt): every
+  // block in the section with the SAME tiles (reuse), explicit opt-in. The
+  // block is the 2×2 tiles at (cellCol,cellRow); a paint sets all four 8px
+  // sub-tiles. One undoable set-collision-edit command.
+  function paintCollisionCell(info: { sectionIndex: number; col: number; row: number }, propagate: boolean) {
     const section = getSectionByIndex(info.sectionIndex);
     if (!section) return;
     const plane = useEditorStore.getState().collisionPaintPlane;
@@ -706,7 +708,7 @@ export default function MapViewport() {
     // Cheap no-op guard for the expensive reuse scan: if the clicked block is
     // already fully the selected word, its matches were painted when first
     // touched — return before collisionPaintTargets does the per-section scan.
-    if (brush === 1 && !justHere) {
+    if (brush === 1 && propagate) {
       const clicked = cellTileIndices(cellCol, cellRow, SECTION_TILES_WIDE);
       if (clicked.every((i) => ce[i] === word)) return;
     }
@@ -714,11 +716,11 @@ export default function MapViewport() {
     // Same target set the hover preview shows (collisionPaintTargets) — paint and
     // preview share one source of truth so they can't drift.
     const { all: targets } = collisionPaintTargets({
-      cellCol, cellRow, brush, justHere,
+      cellCol, cellRow, brush, propagate,
       nametable: section.tileGrid.nametable, width: SECTION_TILES_WIDE, cellsW, cellsH,
     });
     const label = brush > 1 ? `${brush}×${brush} area`
-      : justHere ? 'this block' : `${targets.length} matching blocks`;
+      : propagate ? `${targets.length} matching blocks` : 'this block';
 
     const entries: Array<{ index: number; oldColl: number; newColl: number }> = [];
     for (const t of targets) {
@@ -963,8 +965,8 @@ export default function MapViewport() {
       const info = worldToSectionTile(world.x, world.y);
       if (!info) return;
       lastPaintedCell.current = null;
-      paintJustHere.current = e.altKey; // latch the mode for the whole stroke
-      paintCollisionCell(info, paintJustHere.current);
+      paintPropagate.current = e.altKey; // latch the mode for the whole stroke
+      paintCollisionCell(info, paintPropagate.current);
       isPaintDragging.current = true;
       e.preventDefault();
       return;
@@ -1116,7 +1118,7 @@ export default function MapViewport() {
           sectionRenderer.markDirty(info.sectionIndex, [info.tileIndex]);
         }
       } else {
-        paintCollisionCell(info, paintJustHere.current); // latched mode (not live Alt)
+        paintCollisionCell(info, paintPropagate.current); // latched mode (not live Alt)
       }
       return;
     }
