@@ -13,6 +13,10 @@
 //   mirrors both the 2x2 tile arrangement AND each tile's pixels. Two flips that
 //   land on the same axis cancel to natural pixels but a mirrored cell position.
 //
+// BlockCell.pri is intentionally ignored here: priority only affects plane/
+// sprite compositing at draw time, not this flat per-chunk image. The flat chunk
+// bitmap this returns carries no low/high plane split, so pri has no effect.
+//
 // CRAM→RGB conversion is delegated to the shared decodeGenesisColor helper
 //   (src/core/formats/palette.ts) — a 0BGR 3-3-3 word decoder — rather than
 //   re-deriving the bit math here.
@@ -132,6 +136,11 @@ export function renderChunk(doc: LevelDoc, chunkId: number): Uint8ClampedArray {
   const chunk = doc.chunks[chunkId];
   if (!chunk) return out;
 
+  // Memo distinct block renders for this call: a chunk has up to 256 cells but
+  // usually far fewer distinct blocks. Flips are applied per-cell in blit below,
+  // so the cached unflipped block buffer is safe to reuse across cells.
+  const blockCache = new Map<number, Uint8ClampedArray>();
+
   const cellsPerRow = CHUNK_PX / BLOCK_PX; // 16
   for (let i = 0; i < chunk.cells.length && i < cellsPerRow * cellsPerRow; i++) {
     const cell = chunk.cells[i];
@@ -140,7 +149,11 @@ export function renderChunk(doc: LevelDoc, chunkId: number): Uint8ClampedArray {
 
     const cx = i % cellsPerRow;
     const cy = (i / cellsPerRow) | 0;
-    const blockBuf = renderBlock(doc, cell.block);
+    let blockBuf = blockCache.get(cell.block);
+    if (blockBuf === undefined) {
+      blockBuf = renderBlock(doc, cell.block);
+      blockCache.set(cell.block, blockBuf);
+    }
     blit(out, CHUNK_PX, blockBuf, BLOCK_PX, BLOCK_PX, cx * BLOCK_PX, cy * BLOCK_PX, cell.xf, cell.yf);
   }
   return out;
