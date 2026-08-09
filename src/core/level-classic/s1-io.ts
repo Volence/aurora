@@ -1,0 +1,546 @@
+// s1-io — the classic (Sonic 1) file ⇄ LevelDoc bridge (Task 7 of the disasm-
+// project abstraction, spec §2.2/§2.3/§2.6). It turns a resolved set of on-disk
+// paths into the hierarchical LevelDoc (`readS1Level`) and re-encodes a doc's
+// dirty domains back into file buffers (`writeS1Level`). Pure core: it reads
+// bytes through the injected FileAccess and returns buffers — no fs writes (that
+// is Task 10's IPC). It never re-resolves: the adapter passes fully resolved
+// paths (post REV-fallback / override) so the profile's *declared* paths are
+// irrelevant here.
+//
+// ---------------------------------------------------------------------------
+// The S1LevelState wrapper
+// ---------------------------------------------------------------------------
+// `readS1Level` returns an `S1LevelState`, not a bare LevelDoc. The state carries
+// the LevelDoc plus read-side bookkeeping that `writeS1Level` needs but that must
+// NOT pollute the editing model (LevelDoc stays clean — spec §2.2 "never
+// flatten"). The bookkeeping is invariant across edits, so a caller (the adapter)
+// can cache it at read time and re-pair it with the current doc at write time.
+//
+// ---------------------------------------------------------------------------
+// Tile write contract (the subtle one — read this before touching tiles)
+// ---------------------------------------------------------------------------
+// A level's tile pool is built from one or more Nemesis art files (GHZ ships two)
+// concatenated in profile order, then animated-art `.unc` slices blitted on top
+// at their vram tile indices. On save we must reproduce the ORIGINAL per-file
+// split exactly and we must NOT try to write animated-art slots back into `.nem`
+// files (they never came from those files).
+//
+// Approach (implemented exactly as documented):
+//   * read keeps `pristineTileFiles: {path, bytes(decoded), tileStart, tileCount}`
+//     — the raw decoded tiles of each source `.nem`, and its [tileStart,+count)
+//     span within the concatenated pool.
+//   * read keeps `originalDisplayTiles` — a copy of the full pool AFTER anim blits
+//     (i.e. exactly `doc.tiles` at read time) and `animOverlay` — the set of tile
+//     indices covered by an anim blit, tagged with the source `.unc` path.
+//   * writeS1Level('tiles') diffs `doc.tiles` against `originalDisplayTiles`
+//     tile-by-tile. For every differing tile index T:
+//       - if T is anim-overlaid  → WriteResult error 'animated art slots are not
+//         editable in v1' (keyed to the anim source file); the tile is dropped.
+//       - if T lies in a pristine file's span → patch that file's decoded copy at
+//         (T-tileStart)*32.
+//       - if T is neither (a zero-filled gap tile between base art and an anim
+//         region) → WriteResult error; not representable.
+//   * every pristine `.nem` file is then re-encoded (Nemesis) from its — possibly
+//     patched — decoded copy and emitted. This preserves the two-file split. A
+//     zero-edit save re-encodes the pristine bytes unchanged, so the self-check
+//     (decode == pristine) always passes and the round-trip is decode-identical.
+//
+// ---------------------------------------------------------------------------
+// Self-check gate
+// ---------------------------------------------------------------------------
+// Every buffer we would write is immediately re-decoded with the REAL decoder and
+// deep-compared to the doc structure it came from. A mismatch (or a decoder
+// throw) routes that file to `errors` instead of `files`, so a broken encoder can
+// never silently corrupt a level. The three compressors are injectable
+// (`codecs`) purely so tests can prove the gate fires; the decoders used for
+// verification are always the real ones.
+
+import type { FileAccess } from '../project/adapter';
+import type { DirtyDomains } from '../project/adapter';
+import type { LevelAct, PaletteComponent } from '../project/profiles/s1';
+import { nemesisCompress, nemesisDecompress } from '../compress/nemesis';
+import { enigmaCompress, enigmaDecompress } from '../formats/classic/enigma';
+import { kosinskiCompress, kosinskiDecompress } from '../formats/kosinski';
+import { decodeS1Layout, encodeS1Layout } from '../formats/classic/s1-layout';
+import { decodeS1Objpos, encodeS1Objpos, type S1ObjectEntry } from '../formats/classic/s1-objpos';
+import { decodeS1StartPos, encodeS1StartPos } from '../formats/classic/s1-startpos';
+import { decodeS1ColInd, encodeS1ColInd } from '../formats/classic/s1-colind';
+import { decodeS1CollisionShapes } from '../formats/classic/s1-collision-shapes';
+import {
+  unpackBlockCell,
+  packBlockCell,
+  unpackChunkCell,
+  packChunkCell,
+  type BlockDef,
+  type ChunkDef256,
+  type LayoutGrid,
+  type LevelDoc,
+} from './model';
+
+// ---------------------------------------------------------------------------
+// Inputs / outputs
+// ---------------------------------------------------------------------------
+
+/**
+ * Fully resolved on-disk paths for one act, aligned with the profile act's
+ * arrays (tiles[i]/palette[i]/animatedArt[i]). Anim slots may be undefined when a
+ * (non-gating) animated-art file did not resolve — read skips those. The adapter
+ * builds this from its resolution table so s1-io never re-resolves.
+ */
+export interface ResolvedLevelPaths {
+  tiles: string[];
+  blocks: string;
+  chunks: string;
+  colind: string;
+  fg: string;
+  bg: string;
+  objpos: string;
+  startpos: string;
+  palette: string[];
+  animatedArt: (string | undefined)[];
+  collisionNormal: string;
+  collisionAngleMap: string;
+}
+
+/** One source art file's decoded tiles and its span within the concatenated pool. */
+interface PristineTileFile {
+  path: string;
+  bytes: Uint8Array; // decoded 4bpp tiles, 32 bytes/tile
+  tileStart: number;
+  tileCount: number;
+}
+
+/** A range of pool tile indices covered by an animated-art blit. */
+interface AnimOverlay {
+  path: string;
+  start: number; // first tile index (== vramTileIndex)
+  count: number;
+}
+
+/** Read-side bookkeeping the writer needs; invariant across edits, cacheable. */
+export interface S1ReadState {
+  pristineTileFiles: PristineTileFile[];
+  originalDisplayTiles: Uint8Array;
+  animOverlay: AnimOverlay[];
+  objposOriginalLength: number;
+  paletteOriginals: { component: PaletteComponent; path: string; bytes: Uint8Array }[];
+  paths: ResolvedLevelPaths;
+}
+
+/** LevelDoc plus the read-side bookkeeping the writer consumes. */
+export interface S1LevelState {
+  doc: LevelDoc;
+  read: S1ReadState;
+}
+
+/** Injectable compressors — defaults are the real codecs. Decoders stay real. */
+export interface S1WriteCodecs {
+  nemesisCompress: (b: Uint8Array) => Uint8Array;
+  enigmaCompress: (b: Uint8Array) => Uint8Array;
+  kosinskiCompress: (b: Uint8Array) => Uint8Array;
+}
+
+const REAL_CODECS: S1WriteCodecs = { nemesisCompress, enigmaCompress, kosinskiCompress };
+
+/** Pure write result: the buffers to persist, plus per-file failures. */
+export interface S1WriteResult {
+  files: { path: string; bytes: Uint8Array }[];
+  errors: { path: string; message: string }[];
+}
+
+// ---------------------------------------------------------------------------
+// Small byte helpers
+// ---------------------------------------------------------------------------
+
+function beWord(b: Uint8Array, o: number): number {
+  return ((b[o] << 8) | b[o + 1]) & 0xffff;
+}
+
+function bytesEqual(a: Uint8Array, b: Uint8Array): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+  return true;
+}
+
+// ---------------------------------------------------------------------------
+// read
+// ---------------------------------------------------------------------------
+
+export async function readS1Level(
+  act: LevelAct,
+  paths: ResolvedLevelPaths,
+  fa: FileAccess,
+): Promise<S1LevelState> {
+  const sourceRefs: Record<string, string> = {};
+
+  // --- tiles: concat decoded .nem files, then blit animated art ------------
+  const pristineTileFiles: PristineTileFile[] = [];
+  let tileCursor = 0;
+  for (let i = 0; i < act.tiles.length; i++) {
+    const p = paths.tiles[i];
+    const decoded = nemesisDecompress(await fa.read(p));
+    const tileCount = Math.floor(decoded.length / 32);
+    pristineTileFiles.push({ path: p, bytes: decoded, tileStart: tileCursor, tileCount });
+    sourceRefs[`tiles.${i}`] = p;
+    tileCursor += tileCount;
+  }
+  const baseLen = pristineTileFiles.reduce((n, f) => n + f.bytes.length, 0);
+
+  const animOverlay: AnimOverlay[] = [];
+  const blits: { destByte: number; slice: Uint8Array }[] = [];
+  let poolLen = baseLen;
+  for (let i = 0; i < act.animatedArt.length; i++) {
+    const p = paths.animatedArt[i];
+    if (p === undefined) continue; // non-gating anim file did not resolve — skip
+    const a = act.animatedArt[i];
+    const src = await fa.read(p);
+    const slice = src.slice(a.srcTileOffset * 32, a.srcTileOffset * 32 + a.tileCount * 32);
+    const destByte = a.vramTileIndex * 32;
+    blits.push({ destByte, slice });
+    animOverlay.push({ path: p, start: a.vramTileIndex, count: a.tileCount });
+    poolLen = Math.max(poolLen, destByte + a.tileCount * 32);
+    sourceRefs[`anim.${i}`] = p;
+  }
+
+  const tiles = new Uint8Array(poolLen);
+  let off = 0;
+  for (const f of pristineTileFiles) {
+    tiles.set(f.bytes, off);
+    off += f.bytes.length;
+  }
+  for (const b of blits) tiles.set(b.slice, b.destByte);
+
+  // --- blocks: Enigma → 4 words each --------------------------------------
+  const blockBytes = enigmaDecompress(await fa.read(paths.blocks));
+  const blocks: BlockDef[] = [];
+  for (let o = 0; o + 8 <= blockBytes.length; o += 8) {
+    blocks.push({
+      cells: [
+        unpackBlockCell(beWord(blockBytes, o)),
+        unpackBlockCell(beWord(blockBytes, o + 2)),
+        unpackBlockCell(beWord(blockBytes, o + 4)),
+        unpackBlockCell(beWord(blockBytes, o + 6)),
+      ],
+    });
+  }
+  sourceRefs.blocks = paths.blocks;
+
+  // --- chunks: Kosinski → 256 words each ----------------------------------
+  const chunkBytes = kosinskiDecompress(await fa.read(paths.chunks));
+  const chunks: ChunkDef256[] = [];
+  for (let o = 0; o + 512 <= chunkBytes.length; o += 512) {
+    const cells = new Array(256);
+    for (let c = 0; c < 256; c++) cells[c] = unpackChunkCell(beWord(chunkBytes, o + c * 2));
+    chunks.push({ cells });
+  }
+  sourceRefs.chunks = paths.chunks;
+
+  // --- fg / bg layouts (verbatim; may be irregular) ------------------------
+  const fgL = decodeS1Layout(await fa.read(paths.fg));
+  const bgL = decodeS1Layout(await fa.read(paths.bg));
+  const fg: LayoutGrid = { width: fgL.width, height: fgL.height, cells: fgL.cells };
+  const bg: LayoutGrid = { width: bgL.width, height: bgL.height, cells: bgL.cells };
+  sourceRefs.fg = paths.fg;
+  sourceRefs.bg = paths.bg;
+
+  // --- collision: editable colind + read-only shape tables -----------------
+  const colind = decodeS1ColInd(await fa.read(paths.colind));
+  const shapes = decodeS1CollisionShapes(
+    await fa.read(paths.collisionNormal),
+    await fa.read(paths.collisionAngleMap),
+  );
+  sourceRefs.colind = paths.colind;
+  sourceRefs['collision.normal'] = paths.collisionNormal;
+  sourceRefs['collision.angleMap'] = paths.collisionAngleMap;
+
+  // --- palette: compose components into a 64-word CRAM space ---------------
+  const flat = new Uint16Array(64);
+  const paletteOriginals: S1ReadState['paletteOriginals'] = [];
+  for (let i = 0; i < act.palette.length; i++) {
+    const c = act.palette[i];
+    const p = paths.palette[i];
+    const bytes = await fa.read(p);
+    paletteOriginals.push({ component: c, path: p, bytes });
+    for (let w = 0; w < c.length; w++) flat[c.destOffset + w] = beWord(bytes, (c.srcOffset + w) * 2);
+    sourceRefs[`palette.${i}`] = p;
+  }
+  const palettes = [0, 1, 2, 3].map((l) => flat.slice(l * 16, l * 16 + 16));
+
+  // --- objects / start -----------------------------------------------------
+  const objposBytes = await fa.read(paths.objpos);
+  const objects = decodeS1Objpos(objposBytes);
+  const start = decodeS1StartPos(await fa.read(paths.startpos));
+  sourceRefs.objpos = paths.objpos;
+  sourceRefs.start = paths.startpos;
+
+  const doc: LevelDoc = {
+    game: 's1',
+    tiles,
+    blocks,
+    chunks,
+    fg,
+    bg,
+    collision: { colind, shapes },
+    palettes,
+    paletteSources: act.palette,
+    objects,
+    start,
+    sourceRefs,
+  };
+
+  return {
+    doc,
+    read: {
+      pristineTileFiles,
+      originalDisplayTiles: tiles.slice(),
+      animOverlay,
+      objposOriginalLength: objposBytes.length,
+      paletteOriginals,
+      paths,
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// write
+// ---------------------------------------------------------------------------
+
+export function writeS1Level(
+  state: S1LevelState,
+  dirty: DirtyDomains,
+  codecs: S1WriteCodecs = REAL_CODECS,
+): S1WriteResult {
+  const files: { path: string; bytes: Uint8Array }[] = [];
+  const errors: { path: string; message: string }[] = [];
+  const { doc, read } = state;
+
+  /**
+   * Self-check a compressed buffer: re-decode with the REAL decoder and compare
+   * to the pre-compression bytes. Routes to files or errors accordingly.
+   */
+  const emitCompressed = (
+    path: string,
+    raw: Uint8Array,
+    compress: (b: Uint8Array) => Uint8Array,
+    decompress: (b: Uint8Array) => Uint8Array,
+  ): void => {
+    let enc: Uint8Array;
+    try {
+      enc = compress(raw);
+      const dec = decompress(enc);
+      if (!bytesEqual(dec, raw)) {
+        errors.push({ path, message: 'self-check failed: re-decoded output differs from source' });
+        return;
+      }
+    } catch (e) {
+      errors.push({ path, message: `self-check failed: ${(e as Error).message}` });
+      return;
+    }
+    files.push({ path, bytes: enc });
+  };
+
+  // --- tiles ---------------------------------------------------------------
+  if (dirty.tiles) {
+    const orig = read.originalDisplayTiles;
+    const cur = doc.tiles;
+    // Anim-overlaid tile-index → source path (last blit wins on overlap).
+    const animOf = new Map<number, string>();
+    for (const ov of read.animOverlay) {
+      for (let t = ov.start; t < ov.start + ov.count; t++) animOf.set(t, ov.path);
+    }
+    // Work on patchable copies of each pristine file.
+    const copies = read.pristineTileFiles.map((f) => ({ file: f, buf: f.bytes.slice() }));
+    const findSpan = (t: number) => copies.find((c) => t >= c.file.tileStart && t < c.file.tileStart + c.file.tileCount);
+
+    const animErrs = new Set<string>();
+    let gapEdit = false;
+    const tileCount = Math.floor(cur.length / 32);
+    for (let t = 0; t < tileCount; t++) {
+      const cs = cur.subarray(t * 32, t * 32 + 32);
+      const os = orig.subarray(t * 32, t * 32 + 32); // zero-length past orig's end
+      if (bytesEqual(cs, os)) continue;
+      const animPath = animOf.get(t);
+      if (animPath !== undefined) {
+        animErrs.add(animPath);
+        continue;
+      }
+      const span = findSpan(t);
+      if (!span) {
+        gapEdit = true;
+        continue;
+      }
+      span.buf.set(cs, (t - span.file.tileStart) * 32);
+    }
+
+    for (const p of animErrs) {
+      errors.push({ path: p, message: 'animated art slots are not editable in v1' });
+    }
+    if (gapEdit) {
+      errors.push({
+        path: read.pristineTileFiles[0]?.path ?? '<tiles>',
+        message: 'edited tile lies outside any source art file (unrepresentable gap tile)',
+      });
+    }
+    // Re-encode every pristine file (patched or not) — preserves the file split.
+    for (const c of copies) {
+      emitCompressed(c.file.path, c.buf, codecs.nemesisCompress, nemesisDecompress);
+    }
+  }
+
+  // --- blocks --------------------------------------------------------------
+  if (dirty.blocks) {
+    const raw = new Uint8Array(doc.blocks.length * 8);
+    doc.blocks.forEach((b, i) => {
+      for (let w = 0; w < 4; w++) {
+        const word = packBlockCell(b.cells[w]);
+        raw[i * 8 + w * 2] = (word >> 8) & 0xff;
+        raw[i * 8 + w * 2 + 1] = word & 0xff;
+      }
+    });
+    emitCompressed(read.paths.blocks, raw, codecs.enigmaCompress, enigmaDecompress);
+  }
+
+  // --- chunks --------------------------------------------------------------
+  if (dirty.chunks) {
+    const raw = new Uint8Array(doc.chunks.length * 512);
+    doc.chunks.forEach((ch, i) => {
+      for (let c = 0; c < 256; c++) {
+        const word = packChunkCell(ch.cells[c]);
+        raw[i * 512 + c * 2] = (word >> 8) & 0xff;
+        raw[i * 512 + c * 2 + 1] = word & 0xff;
+      }
+    });
+    emitCompressed(read.paths.chunks, raw, codecs.kosinskiCompress, kosinskiDecompress);
+  }
+
+  // --- fg / bg (uncompressed; self-check re-decodes to the grid) -----------
+  if (dirty.fg) emitLayout(read.paths.fg, doc.fg, files, errors);
+  if (dirty.bg) emitLayout(read.paths.bg, doc.bg, files, errors);
+
+  // --- objects -------------------------------------------------------------
+  if (dirty.objects) {
+    const enc = encodeS1Objpos(doc.objects, read.objposOriginalLength);
+    const back = safeDecode(() => decodeS1Objpos(enc));
+    if (!back || !objectsEqual(back, doc.objects)) {
+      errors.push({ path: read.paths.objpos, message: 'self-check failed: objpos re-decode differs' });
+    } else {
+      files.push({ path: read.paths.objpos, bytes: enc });
+    }
+  }
+
+  // --- start ---------------------------------------------------------------
+  if (dirty.start) {
+    const enc = encodeS1StartPos(doc.start);
+    const back = safeDecode(() => decodeS1StartPos(enc));
+    if (!back || back.x !== doc.start.x || back.y !== doc.start.y) {
+      errors.push({ path: read.paths.startpos, message: 'self-check failed: startpos re-decode differs' });
+    } else {
+      files.push({ path: read.paths.startpos, bytes: enc });
+    }
+  }
+
+  // --- colind --------------------------------------------------------------
+  if (dirty.colind) {
+    const enc = encodeS1ColInd(doc.collision.colind);
+    const back = safeDecode(() => decodeS1ColInd(enc));
+    if (!back || !bytesEqual(back, doc.collision.colind)) {
+      errors.push({ path: read.paths.colind, message: 'self-check failed: colind re-decode differs' });
+    } else {
+      files.push({ path: read.paths.colind, bytes: enc });
+    }
+  }
+
+  // --- palette: decompose into each component file, then recompose to verify -
+  if (dirty.palette) {
+    const flat = flattenPalettes(doc.palettes);
+    const outByFile = new Map<string, Uint8Array>();
+    for (const { component, path, bytes } of read.paletteOriginals) {
+      const copy = outByFile.get(path)?.slice() ?? bytes.slice();
+      for (let w = 0; w < component.length; w++) {
+        const word = flat[component.destOffset + w];
+        const bo = (component.srcOffset + w) * 2;
+        copy[bo] = (word >> 8) & 0xff;
+        copy[bo + 1] = word & 0xff;
+      }
+      outByFile.set(path, copy);
+    }
+    // Recompose from the produced buffers and compare to the doc palette.
+    const recomposed = new Uint16Array(64);
+    for (const { component, path } of read.paletteOriginals) {
+      const b = outByFile.get(path)!;
+      for (let w = 0; w < component.length; w++) {
+        recomposed[component.destOffset + w] = beWord(b, (component.srcOffset + w) * 2);
+      }
+    }
+    if (!u16Equal(recomposed, flat)) {
+      for (const path of outByFile.keys()) {
+        errors.push({ path, message: 'self-check failed: recomposed palette differs' });
+      }
+    } else {
+      for (const [path, bytes] of outByFile) files.push({ path, bytes });
+    }
+  }
+
+  return { files, errors };
+}
+
+// ---------------------------------------------------------------------------
+// write helpers
+// ---------------------------------------------------------------------------
+
+function emitLayout(
+  path: string,
+  g: LayoutGrid,
+  files: { path: string; bytes: Uint8Array }[],
+  errors: { path: string; message: string }[],
+): void {
+  const enc = encodeS1Layout({ width: g.width, height: g.height, cells: g.cells });
+  const back = safeDecode(() => decodeS1Layout(enc));
+  if (!back || back.width !== g.width || back.height !== g.height || !bytesEqual(back.cells, g.cells)) {
+    errors.push({ path, message: 'self-check failed: layout re-decode differs' });
+    return;
+  }
+  files.push({ path, bytes: enc });
+}
+
+function flattenPalettes(lines: Uint16Array[]): Uint16Array {
+  const flat = new Uint16Array(64);
+  for (let l = 0; l < lines.length && l < 4; l++) {
+    for (let w = 0; w < 16 && w < lines[l].length; w++) flat[l * 16 + w] = lines[l][w];
+  }
+  return flat;
+}
+
+function u16Equal(a: Uint16Array, b: Uint16Array): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+  return true;
+}
+
+function objectsEqual(a: S1ObjectEntry[], b: S1ObjectEntry[]): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    const x = a[i];
+    const y = b[i];
+    if (
+      x.x !== y.x ||
+      x.y !== y.y ||
+      x.xflip !== y.xflip ||
+      x.yflip !== y.yflip ||
+      x.respawn !== y.respawn ||
+      x.id !== y.id ||
+      x.subtype !== y.subtype
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function safeDecode<T>(fn: () => T): T | null {
+  try {
+    return fn();
+  } catch {
+    return null;
+  }
+}

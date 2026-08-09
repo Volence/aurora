@@ -136,12 +136,18 @@ describe('s1Adapter.open resolution', () => {
     expect(handle.levels!.list().find((r) => r.zone === 'ghz' && r.act === 3)!.available).toBe(true);
   });
 
-  it('read/write are stubbed until a later task', async () => {
+  it('read rejects an unavailable act with its reason', async () => {
+    const files = fullFake();
+    delete files[entry('ghz.act1.fgLayout').variant.path];
+    const handle = await s1Adapter.open(memFs(files));
+    const ref = handle.levels!.list().find((r) => r.zone === 'ghz' && r.act === 1)!;
+    await expect(handle.levels!.read(ref)).rejects.toThrow(/unavailable/);
+  });
+
+  it('write before read rejects (no cached read state)', async () => {
     const handle = await s1Adapter.open(memFs(fullFake()));
     const ref = handle.levels!.list()[0];
-    await expect(handle.levels!.read(ref)).rejects.toThrow(/later task/);
-    // write is a throwing stub; the doc arg is unused, so any placeholder works.
-    await expect(handle.levels!.write(ref, null as never, {})).rejects.toThrow(/later task/);
+    await expect(handle.levels!.write(ref, null as never, {})).rejects.toThrow(/must be read/);
   });
 });
 

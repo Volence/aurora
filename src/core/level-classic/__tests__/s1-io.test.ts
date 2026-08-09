@@ -1,0 +1,406 @@
+import { describe, it, expect } from 'vitest';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import type { FileAccess } from '../../project/adapter';
+import { s1Profile, type LevelAct } from '../../project/profiles/s1';
+import {
+  readS1Level,
+  writeS1Level,
+  type ResolvedLevelPaths,
+} from '../s1-io';
+import { nemesisCompress, nemesisDecompress } from '../../compress/nemesis';
+import { enigmaCompress, enigmaDecompress } from '../../formats/classic/enigma';
+import { kosinskiCompress, kosinskiDecompress } from '../../formats/kosinski';
+
+// ---------------------------------------------------------------------------
+// Fakes / helpers
+// ---------------------------------------------------------------------------
+
+function memFs(files: Record<string, Uint8Array>): FileAccess {
+  const map = new Map(Object.entries(files));
+  return {
+    async exists(rel) {
+      return map.has(rel);
+    },
+    async read(rel) {
+      const b = map.get(rel);
+      if (!b) throw new Error(`no such file: ${rel}`);
+      return b;
+    },
+    async list() {
+      return [];
+    },
+  };
+}
+
+const S1DIR = '/home/volence/sonic_hacks/s1disasm';
+const S1_PRESENT = fs.existsSync(S1DIR);
+
+function realFs(root: string): FileAccess {
+  return {
+    async exists(rel) {
+      return fs.existsSync(path.join(root, rel));
+    },
+    async read(rel) {
+      return new Uint8Array(fs.readFileSync(path.join(root, rel)));
+    },
+    async list(rel) {
+      return fs.readdirSync(path.join(root, rel));
+    },
+  };
+}
+
+/** Mirror the adapter's REV/exists resolution against real disk. */
+function resolveVariant(v: { path: string; rev00Path?: string }): string {
+  if (fs.existsSync(path.join(S1DIR, v.path))) return v.path;
+  if (v.rev00Path && fs.existsSync(path.join(S1DIR, v.rev00Path))) return v.rev00Path;
+  return v.path; // caller will fail loudly on a genuine miss
+}
+function resolveSingle(p: string): string | undefined {
+  return fs.existsSync(path.join(S1DIR, p)) ? p : undefined;
+}
+
+function realPaths(act: LevelAct): ResolvedLevelPaths {
+  return {
+    tiles: act.tiles.map((t) => resolveSingle(t)!),
+    blocks: resolveVariant(act.blocks),
+    chunks: resolveVariant(act.chunks),
+    colind: resolveVariant(act.colind),
+    fg: resolveVariant(act.fgLayout),
+    bg: resolveVariant(act.bgLayout),
+    objpos: resolveVariant(act.objpos),
+    startpos: resolveVariant(act.startpos),
+    palette: act.palette.map((c) => resolveSingle(c.file)!),
+    animatedArt: act.animatedArt.map((a) => resolveSingle(a.file)),
+    collisionNormal: s1Profile.collision.normal,
+    collisionAngleMap: s1Profile.collision.angleMap,
+  };
+}
+
+interface ActRef {
+  zone: string;
+  act: LevelAct;
+}
+function allActs(): ActRef[] {
+  const out: ActRef[] = [];
+  for (const z of s1Profile.zones) for (const a of z.acts) out.push({ zone: z.id, act: a });
+  return out;
+}
+
+const ALL_DIRTY = {
+  tiles: true,
+  blocks: true,
+  chunks: true,
+  fg: true,
+  bg: true,
+  objects: true,
+  palette: true,
+  colind: true,
+  start: true,
+} as const;
+
+function readDisk(rel: string): Uint8Array {
+  return new Uint8Array(fs.readFileSync(path.join(S1DIR, rel)));
+}
+
+function bytesEqual(a: Uint8Array, b: Uint8Array): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+  return true;
+}
+
+// ===========================================================================
+// (a) GHZ1 golden
+// ===========================================================================
+
+describe('s1-io (a) GHZ1 golden', () => {
+  it.skipIf(!S1_PRESENT)('reads a full GHZ act 1 LevelDoc from real files', async () => {
+    const fa = realFs(S1DIR);
+    const act = s1Profile.zones[0].acts[0];
+    const { doc } = await readS1Level(act, realPaths(act), fa);
+
+    // tiles: at least the concatenated two-file decoded size.
+    const concat = act.tiles.reduce((n, t) => n + nemesisDecompress(readDisk(t)).length, 0);
+    expect(doc.tiles.length).toBeGreaterThanOrEqual(concat);
+
+    // fg dims read straight from the header bytes of levels/ghz1.bin.
+    const fgRaw = readDisk('levels/ghz1.bin');
+    expect(doc.fg.width).toBe(fgRaw[0] + 1);
+    expect(doc.fg.height).toBe(fgRaw[1] + 1);
+    expect(doc.fg.width).toBe(48);
+    expect(doc.fg.height).toBe(5);
+
+    expect(doc.objects.length).toBeGreaterThan(0);
+
+    // palette: line0 word0 from Sonic.bin, line1 word0 from Green Hill Zone.bin.
+    const son = readDisk('palette/Sonic.bin');
+    const ghz = readDisk('palette/Green Hill Zone.bin');
+    expect(doc.palettes[0][0]).toBe((son[0] << 8) | son[1]);
+    expect(doc.palettes[1][0]).toBe((ghz[0] << 8) | ghz[1]);
+
+    // blocks / chunks sanity.
+    expect(doc.blocks.length).toBeGreaterThan(0);
+    doc.blocks.forEach((b) => expect(b.cells.length).toBe(4));
+    expect(doc.chunks.length).toBeGreaterThan(0);
+    doc.chunks.forEach((c) => expect(c.cells.length).toBe(256));
+
+    // sourceRefs populated.
+    expect(Object.keys(doc.sourceRefs).length).toBeGreaterThan(5);
+    expect(doc.sourceRefs.blocks).toBe('map16/GHZ.eni');
+  });
+});
+
+// ===========================================================================
+// (b) Numeric-transcription audit across ALL 18 acts
+// ===========================================================================
+
+describe('s1-io (b) numeric audit (all 18 acts)', () => {
+  it('palette components never overlap on destOffset within an act', () => {
+    for (const { zone, act } of allActs()) {
+      const covered = new Set<number>();
+      for (const c of act.palette) {
+        for (let w = 0; w < c.length; w++) {
+          const d = c.destOffset + w;
+          expect(covered.has(d), `${zone} act${act.act} palette dest ${d} overlaps`).toBe(false);
+          covered.add(d);
+          expect(d).toBeGreaterThanOrEqual(0);
+          expect(d).toBeLessThan(64);
+        }
+      }
+    }
+  });
+
+  it('animated-art tile ranges never overlap within an act', () => {
+    for (const { zone, act } of allActs()) {
+      const covered = new Set<number>();
+      for (const a of act.animatedArt) {
+        for (let t = a.vramTileIndex; t < a.vramTileIndex + a.tileCount; t++) {
+          expect(
+            covered.has(t),
+            `${zone} act${act.act} anim tile ${t.toString(16)} overlaps`,
+          ).toBe(false);
+          covered.add(t);
+        }
+      }
+    }
+  });
+
+  it.skipIf(!S1_PRESENT)('read() succeeds on every act', async () => {
+    const fa = realFs(S1DIR);
+    for (const { zone, act } of allActs()) {
+      const { doc } = await readS1Level(act, realPaths(act), fa);
+      expect(doc.game, `${zone} act${act.act}`).toBe('s1');
+      expect(doc.blocks.length).toBeGreaterThan(0);
+      expect(doc.chunks.length).toBeGreaterThan(0);
+      expect(doc.palettes.length).toBe(4);
+    }
+  });
+});
+
+// ===========================================================================
+// (c) Zero-edit round-trip across ALL 18 acts
+// ===========================================================================
+
+function isCompressed(p: string): 'nem' | 'eni' | 'kos' | null {
+  if (p.endsWith('.nem')) return 'nem';
+  if (p.endsWith('.eni')) return 'eni';
+  if (p.endsWith('.kos')) return 'kos';
+  return null;
+}
+function decodeFor(kind: 'nem' | 'eni' | 'kos', b: Uint8Array): Uint8Array {
+  if (kind === 'nem') return nemesisDecompress(b);
+  if (kind === 'eni') return enigmaDecompress(b);
+  return kosinskiDecompress(b);
+}
+
+describe('s1-io (c) zero-edit round-trip (all 18 acts)', () => {
+  it.skipIf(!S1_PRESENT)('re-encodes every domain identically (decode-identical for compressed)', async () => {
+    const fa = realFs(S1DIR);
+    for (const { zone, act } of allActs()) {
+      const state = await readS1Level(act, realPaths(act), fa);
+      const result = writeS1Level(state, ALL_DIRTY);
+      expect(result.errors, `${zone} act${act.act}: ${JSON.stringify(result.errors)}`).toEqual([]);
+
+      for (const f of result.files) {
+        const disk = readDisk(f.path);
+        const kind = isCompressed(f.path);
+        if (kind) {
+          expect(
+            bytesEqual(decodeFor(kind, f.bytes), decodeFor(kind, disk)),
+            `${zone} act${act.act} ${f.path}: decode mismatch`,
+          ).toBe(true);
+        } else {
+          expect(bytesEqual(f.bytes, disk), `${zone} act${act.act} ${f.path}: byte mismatch`).toBe(
+            true,
+          );
+        }
+      }
+    }
+  });
+});
+
+// ===========================================================================
+// (d) Self-check gate: a corrupting encoder routes its file to errors only
+// ===========================================================================
+
+describe('s1-io (d) self-check gate', () => {
+  it.skipIf(!S1_PRESENT)('a broken nemesis encoder fails tiles but not blocks/chunks', async () => {
+    const fa = realFs(S1DIR);
+    const act = s1Profile.zones[0].acts[0];
+    const state = await readS1Level(act, realPaths(act), fa);
+
+    const brokenNemesis = (): Uint8Array => new Uint8Array([0, 0, 0, 0]); // will not decode back
+    const result = writeS1Level(
+      state,
+      { tiles: true, blocks: true, chunks: true },
+      { nemesisCompress: brokenNemesis, enigmaCompress, kosinskiCompress },
+    );
+
+    // Every tiles (.nem) file landed in errors; none in files.
+    const tilePaths = state.read.pristineTileFiles.map((f) => f.path);
+    for (const tp of tilePaths) {
+      expect(result.errors.some((e) => e.path === tp)).toBe(true);
+      expect(result.files.some((f) => f.path === tp)).toBe(false);
+    }
+    // blocks + chunks survived (real encoders).
+    expect(result.files.some((f) => f.path.endsWith('.eni'))).toBe(true);
+    expect(result.files.some((f) => f.path.endsWith('.kos'))).toBe(true);
+    expect(result.errors.every((e) => e.message.includes('self-check'))).toBe(true);
+  });
+});
+
+// ===========================================================================
+// (e) CI-safe synthetic project: read → mutate → write → re-read
+// ===========================================================================
+
+function beBytes(words: number[]): Uint8Array {
+  const b = new Uint8Array(words.length * 2);
+  words.forEach((w, i) => {
+    b[i * 2] = (w >> 8) & 0xff;
+    b[i * 2 + 1] = w & 0xff;
+  });
+  return b;
+}
+
+function buildSynthetic(): {
+  fa: FileAccess;
+  act: LevelAct;
+  paths: ResolvedLevelPaths;
+  files: Record<string, Uint8Array>;
+} {
+  // 4 tiles of distinct fill, 2 blocks, 1 chunk, tiny layouts, one object.
+  const tiles = new Uint8Array(4 * 32).map((_, i) => (i * 7) & 0x0f);
+  const blockWords = [10, 0x800 | 11, 0x1000 | 12, 0x2000 | 13, 1, 2, 3, 4]; // 2 blocks
+  const chunkWords = new Array(256).fill(0).map((_, i) => (i % 3) | ((i % 4) << 13)); // 1 chunk
+  const fg = new Uint8Array([1, 0, 0, 1]); // w2 h1, cells [0,1]
+  const bg = new Uint8Array([0, 0, 0]); // w1 h1, cell [0]
+  const objpos = new Uint8Array([0, 0x10, 0x02, 0x20, 0x05, 0x03, 0xff, 0xff, 0, 0, 0, 0]);
+  const startpos = new Uint8Array([0x01, 0x00, 0x02, 0x00]);
+  const colind = new Uint8Array([0, 1]);
+  const sonic = beBytes(new Array(16).fill(0).map((_, i) => 0x100 + i));
+  const zonePal = beBytes(new Array(48).fill(0).map((_, i) => 0x200 + i));
+  const colNormal = new Uint8Array(4096).map((_, i) => i & 0xff);
+  const angleMap = new Uint8Array(256).map((_, i) => i & 0xff);
+
+  const files: Record<string, Uint8Array> = {
+    'artnem/syn.nem': nemesisCompress(tiles),
+    'map16/syn.eni': enigmaCompress(beBytes(blockWords)),
+    'map256/syn.kos': kosinskiCompress(beBytes(chunkWords)),
+    'levels/syn_fg.bin': fg,
+    'levels/syn_bg.bin': bg,
+    'objpos/syn.bin': objpos,
+    'startpos/syn.bin': startpos,
+    'collide/syn.bin': colind,
+    'palette/Sonic.bin': sonic,
+    'palette/Zone.bin': zonePal,
+    'collide/normal.bin': colNormal,
+    'collide/angle.bin': angleMap,
+  };
+
+  const act: LevelAct = {
+    act: 1,
+    name: 'Synthetic',
+    tiles: ['artnem/syn.nem'],
+    blocks: { path: 'map16/syn.eni' },
+    chunks: { path: 'map256/syn.kos' },
+    colind: { path: 'collide/syn.bin' },
+    fgLayout: { path: 'levels/syn_fg.bin' },
+    bgLayout: { path: 'levels/syn_bg.bin' },
+    objpos: { path: 'objpos/syn.bin' },
+    startpos: { path: 'startpos/syn.bin' },
+    palette: [
+      { file: 'palette/Sonic.bin', srcOffset: 0, destOffset: 0, length: 16 },
+      { file: 'palette/Zone.bin', srcOffset: 0, destOffset: 16, length: 48 },
+    ],
+    animatedArt: [],
+  };
+
+  const paths: ResolvedLevelPaths = {
+    tiles: ['artnem/syn.nem'],
+    blocks: 'map16/syn.eni',
+    chunks: 'map256/syn.kos',
+    colind: 'collide/syn.bin',
+    fg: 'levels/syn_fg.bin',
+    bg: 'levels/syn_bg.bin',
+    objpos: 'objpos/syn.bin',
+    startpos: 'startpos/syn.bin',
+    palette: ['palette/Sonic.bin', 'palette/Zone.bin'],
+    animatedArt: [],
+    collisionNormal: 'collide/normal.bin',
+    collisionAngleMap: 'collide/angle.bin',
+  };
+
+  return { fa: memFs(files), act, paths, files };
+}
+
+describe('s1-io (e) synthetic round-trip with a mutation', () => {
+  it('mutating one block survives write→re-read; untouched domains stay identical', async () => {
+    const { fa, act, paths, files } = buildSynthetic();
+    const state = await readS1Level(act, paths, fa);
+    const doc = state.doc;
+
+    // Baseline snapshots of untouched domains.
+    const chunk0 = doc.chunks[0].cells.map((c) => ({ ...c }));
+    const pal = doc.palettes.map((l) => Array.from(l));
+    const objs = doc.objects.map((o) => ({ ...o }));
+
+    // Mutate one block cell's tile index.
+    expect(doc.blocks[0].cells[0].tile).not.toBe(42);
+    doc.blocks[0].cells[0] = { ...doc.blocks[0].cells[0], tile: 42 };
+
+    const result = writeS1Level(state, ALL_DIRTY);
+    expect(result.errors).toEqual([]);
+
+    // Feed the produced buffers back in and re-read.
+    const next: Record<string, Uint8Array> = { ...files };
+    for (const f of result.files) next[f.path] = f.bytes;
+    const state2 = await readS1Level(act, paths, memFs(next));
+    const doc2 = state2.doc;
+
+    // Mutation present.
+    expect(doc2.blocks[0].cells[0].tile).toBe(42);
+
+    // Untouched domains identical.
+    expect(doc2.chunks[0].cells).toEqual(chunk0);
+    expect(doc2.palettes.map((l) => Array.from(l))).toEqual(pal);
+    expect(doc2.objects).toEqual(objs);
+    expect(doc2.fg).toEqual(doc.fg);
+
+    // The compressed block file is decode-identical to the packed mutated words.
+    const blk = result.files.find((f) => f.path === 'map16/syn.eni')!;
+    expect(doc2.blocks.length).toBe(doc.blocks.length);
+  });
+
+  it('a broken enigma encoder routes the blocks file to errors (synthetic)', async () => {
+    const { fa, act, paths } = buildSynthetic();
+    const state = await readS1Level(act, paths, fa);
+    const result = writeS1Level(
+      state,
+      { blocks: true, chunks: true },
+      { nemesisCompress, enigmaCompress: () => new Uint8Array([1, 2, 3]), kosinskiCompress },
+    );
+    expect(result.errors.some((e) => e.path === 'map16/syn.eni')).toBe(true);
+    expect(result.files.some((f) => f.path === 'map16/syn.eni')).toBe(false);
+    expect(result.files.some((f) => f.path === 'map256/syn.kos')).toBe(true);
+  });
+});

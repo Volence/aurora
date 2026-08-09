@@ -15,9 +15,18 @@ import type {
   ProjectOverrides,
   ZoneActRef,
   ClassicLevelAccess,
+  DirtyDomains,
+  WriteResult,
+  LevelDoc,
 } from '../adapter';
 import { buildReport, type ResolutionEntry, type EntryStatus } from '../report';
-import { s1Profile, type ClassicProfile, type VariantPath } from '../profiles/s1';
+import { s1Profile, type ClassicProfile, type VariantPath, type LevelAct } from '../profiles/s1';
+import {
+  readS1Level,
+  writeS1Level,
+  type ResolvedLevelPaths,
+  type S1ReadState,
+} from '../../level-classic/s1-io';
 
 const LABEL = 'Sonic 1 Disassembly (GitHub)';
 const SIDECAR = '.aurora/project.json';
@@ -241,13 +250,82 @@ export const s1Adapter: ProjectAdapter = {
 
     const report = buildReport(resolved.map((r) => r.entry));
 
+    // Path lookup by report key, for building resolved level paths without
+    // re-resolving. Only entries that actually resolved are included; a gating
+    // miss makes its act unavailable (guarded in read), and a non-gating miss
+    // (e.g. an animated-art file) simply resolves to undefined below.
+    const pathByKey = new Map<string, string>();
+    for (const r of resolved) {
+      if (r.entry.status === 'resolved') pathByKey.set(r.entry.key, r.entry.path);
+    }
+    const global = (key: string): string => {
+      const p = pathByKey.get(key);
+      if (p === undefined) throw new Error(`required collision table '${key}' did not resolve`);
+      return p;
+    };
+
+    const findAct = (ref: ZoneActRef): { zone: string; act: LevelAct } => {
+      const zone = s1Profile.zones.find((z) => z.id === ref.zone);
+      const act = zone?.acts.find((a) => a.act === ref.act);
+      if (!zone || !act) throw new Error(`unknown act ${ref.zone}/${ref.act}`);
+      return { zone: zone.id, act };
+    };
+
+    const buildPaths = (zoneId: string, act: LevelAct): ResolvedLevelPaths => {
+      const p = (field: string): string => {
+        const key = `${zoneId}.act${act.act}.${field}`;
+        const path = pathByKey.get(key);
+        if (path === undefined) throw new Error(`entry '${key}' did not resolve`);
+        return path;
+      };
+      return {
+        tiles: act.tiles.map((_, i) => p(`tiles.${i}`)),
+        blocks: p('blocks'),
+        chunks: p('chunks'),
+        colind: p('colind'),
+        fg: p('fgLayout'),
+        bg: p('bgLayout'),
+        objpos: p('objpos'),
+        startpos: p('startpos'),
+        palette: act.palette.map((_, i) => p(`palette.${i}`)),
+        animatedArt: act.animatedArt.map((_, i) =>
+          pathByKey.get(`${zoneId}.act${act.act}.anim.${i}`),
+        ),
+        collisionNormal: global('collision.normal'),
+        collisionAngleMap: global('collision.angleMap'),
+      };
+    };
+
+    // Read-side bookkeeping cached per act so write() can re-pair it with the
+    // (edited) doc the store hands back without re-reading from disk.
+    const readStates = new Map<string, S1ReadState>();
+    const refKey = (ref: ZoneActRef): string => `${ref.zone}/${ref.act}`;
+
     const levels: ClassicLevelAccess = {
       list: () => refs,
-      read: async () => {
-        throw new Error('implemented in a later task');
+      read: async (ref: ZoneActRef): Promise<LevelDoc> => {
+        const meta = refs.find((r) => r.zone === ref.zone && r.act === ref.act);
+        if (!meta) throw new Error(`unknown act ${ref.zone}/${ref.act}`);
+        if (!meta.available) throw new Error(`act ${ref.zone}/${ref.act} unavailable: ${meta.reason}`);
+        const { zone, act } = findAct(ref);
+        const state = await readS1Level(act, buildPaths(zone, act), fa);
+        readStates.set(refKey(ref), state.read);
+        return state.doc;
       },
-      write: async () => {
-        throw new Error('implemented in a later task');
+      write: async (ref: ZoneActRef, doc: LevelDoc, dirty: DirtyDomains): Promise<WriteResult> => {
+        const read = readStates.get(refKey(ref));
+        if (!read) {
+          throw new Error(`act ${ref.zone}/${ref.act} must be read before it can be written`);
+        }
+        const result = writeS1Level({ doc, read }, dirty);
+        return {
+          written: result.files.map((f) => f.path),
+          skipped: Object.entries(dirty)
+            .filter(([, v]) => !v)
+            .map(([k]) => k),
+          errors: result.errors,
+          files: result.files,
+        };
       },
     };
 

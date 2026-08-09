@@ -88,6 +88,12 @@ export interface WriteResult {
   written: string[];
   skipped: string[];
   errors: { path: string; message: string }[];
+  /**
+   * The actual buffers to persist, keyed by resolved path (a superset accounting
+   * of `written`). Pure-core produces these; Task 10's IPC layer does the real fs
+   * writes. Optional so non-classic adapters need not supply it.
+   */
+  files?: { path: string; bytes: Uint8Array }[];
 }
 
 export interface ClassicLevelAccess {
