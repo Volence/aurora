@@ -18,6 +18,9 @@ Query: `get_project_info`, `get_palette`, `get_tiles`, `get_nametable_region`, `
 Mutate (one undo step each): `set_palette`, `write_tiles`, `paint_region`, `paint_collision`, `save_chunk`*, `stamp_chunk`, `set_bg`*, `assign_section_bg`
 View: `goto`, `screenshot`
 
+The tools above operate on an **aeon** project. The classic (Sonic 1 disassembly)
+project surface is a separate group — see [Classic project tools](#classic-project-tools).
+
 *`save_chunk` adds to the chunk library outside undo history (additive only),
 matching the existing chunk-library behavior. `set_bg` with a `name` argument
 likewise ADDS the background to the project BG library (outside undo history)
@@ -69,6 +72,43 @@ its assigned BG. Assignments are one undo step each and persist in per-section
 `.meta.json` sidecars; library entries persist under `data/editor/` on save.
 Export emits `{zone}_BG_{id}` labels in the act descriptor's section table —
 the engine build must BINCLUDE the referenced binaries.
+
+## Classic project tools
+
+A **classic** project is an on-disk Sonic 1 disassembly (the `tiles → blocks →
+chunks → chunk-id layout` hierarchy). These tools open one, read acts, and edit
+them in memory; nothing touches disk until `save_project`. Every mutation is one
+classic undo step (Ctrl+Z), sharing the classic undo timeline with human edits —
+exactly like the aeon tools above share the aeon undo stack. A classic and an
+aeon project are never open at once.
+
+Batched shapes: the mutation tools take arrays where the underlying editing
+commands do, so an agent never loops single-cell calls.
+
+| Tool | Params | Result |
+|---|---|---|
+| `open_project` | `{ dir }` | Opens a directory, classic-first (the same flow as File→Open). A Sonic 1 disasm opens the classic surface and returns `{ type, label, report: {resolved,total}, zoneTree }`; a real aeon project is left unchanged (`{ type: "aeon", opened: false }`); an unrecognized directory errors. |
+| `get_project_report` | `{}` | The full `ResolutionReport` of the open classic project (per-file resolved/missing/ambiguous + counts). |
+| `list_classic_levels` | `{}` | `{ levels }` — the project's zone/act refs (`zone, act, label, available`). |
+| `get_classic_level` | `{ zone, act }` | Opens + reads one act. Summary only: `dims` (fg/bg w×h), `counts` (tiles/blocks/chunks/objects), `palettes` (4×16 CRAM words), `objects`, `start`, and `layout` (fg/bg chunk-id grids as nested row arrays). Not the raw tile/block/chunk buffers. |
+| `set_layout_region`\* | `{ plane, x, y, chunkIds }` | Stamps a 2D grid of chunk ids into a layout plane (`fg`/`bg`), top-left at `(x,y)`. |
+| `edit_chunk`\* | `{ chunkId, cells: [{index, word}] }` | Sets individual 16×16 block cells of one chunk (packed S1 chunk-block words). |
+| `edit_block`\* | `{ blockId, def: {cells: [4]} }` | Replaces one 16×16 block's 4-tile-cell definition. |
+| `place_object`\* | `{ entry }` | Appends one object placement; reply includes the new `index`. |
+| `move_object`\* | `{ index, x, y }` | Moves the object at `index`. |
+| `delete_object`\* | `{ index }` | Deletes the object at `index`. |
+| `set_colind`\* | `{ entries: [{blockId, value}] }` | Sets block→collision-shape indices. |
+| `save_project` | `{}` | Saves every dirty act through the guarded (mtime-checked) write channel. Structured outcome: `saved` / `conflict` / `partial` / `error` / `nothing`. |
+
+\* One classic undo step each. Editing tools require a classic project AND an
+open act (`get_classic_level` first); they error cleanly otherwise. A command's
+validation rejection (out-of-range chunk id, nonexistent block, invalid object,
+…) surfaces as a structured MCP error carrying the command's human message —
+nothing is mutated and no undo step is recorded.
+
+`save_project` never overwrites blindly: it uses the same read-time mtime guard
+as Ctrl+S. On a `conflict` (a file changed on disk since open) nothing is
+written; on a `partial` some files landed and the rest stay dirty for a retry.
 
 ## Constraints enforced at the tool boundary
 

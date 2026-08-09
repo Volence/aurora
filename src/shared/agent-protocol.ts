@@ -1,6 +1,11 @@
 // Wire protocol between the MCP server (main process) and the renderer's
 // agent handler. Everything must be structured-clone serializable.
 
+// Type-only imports (erased at compile) so the classic tool payloads reference
+// the real core shapes and can never drift from the command signatures they feed.
+import type { BlockDef } from '../core/level-classic/model';
+import type { S1ObjectEntry } from '../core/formats/classic/s1-objpos';
+
 export const AGENT_REQUEST_CHANNEL = 'agent:request';
 export const AGENT_RESPONSE_CHANNEL = 'agent:response';
 
@@ -32,7 +37,23 @@ export type AgentRequest =
   | { kind: 'set-bg'; layout: number[]; tiles: number[][]; name?: string }
   | { kind: 'assign-section-bg'; section: number; bgId: string | null }  // null = act default
   | { kind: 'list-bgs' }
-  | { kind: 'screenshot'; region?: { x: number; y: number; w: number; h: number }; showBg?: boolean };
+  | { kind: 'screenshot'; region?: { x: number; y: number; w: number; h: number }; showBg?: boolean }
+  // ---- Classic (Sonic 1 disassembly) project surface (Task 16) ----
+  // Thin wrappers over the classic open bridge + the Task-12 editing commands;
+  // every mutation is one classic undo step. Batched shapes (arrays where the
+  // commands take arrays) so an agent never loops single-cell calls.
+  | { kind: 'classic-open-project'; dir: string }
+  | { kind: 'classic-get-project-report' }
+  | { kind: 'classic-list-levels' }
+  | { kind: 'classic-get-level'; zone: string; act: number }
+  | { kind: 'classic-set-layout-region'; plane: 'fg' | 'bg'; x: number; y: number; chunkIds: number[][] }
+  | { kind: 'classic-edit-chunk'; chunkId: number; cells: { index: number; word: number }[] }
+  | { kind: 'classic-edit-block'; blockId: number; def: BlockDef }
+  | { kind: 'classic-place-object'; entry: S1ObjectEntry }
+  | { kind: 'classic-move-object'; index: number; x: number; y: number }
+  | { kind: 'classic-delete-object'; index: number }
+  | { kind: 'classic-set-colind'; entries: { blockId: number; value: number }[] }
+  | { kind: 'classic-save-project' };
 
 export interface AgentRequestEnvelope {
   id: number;

@@ -16,6 +16,26 @@ export const entrySchema = z.object({
   vf: z.boolean().optional().describe('vertical flip'),
 });
 
+// ---- Classic (Sonic 1) schemas ----
+// A 16x16 block's 8x8 tile cell (Mega Drive pattern-name fields).
+const blockCellSchema = z.object({
+  tile: z.number().int().min(0).describe('tile-pool index'),
+  xf: z.boolean(),
+  yf: z.boolean(),
+  pal: z.number().int().min(0).max(3).describe('palette line 0-3'),
+  pri: z.boolean().describe('priority bit'),
+});
+// One object placement in an S1 objpos list.
+const s1ObjectSchema = z.object({
+  x: z.number().int().min(0).max(0xffff),
+  y: z.number().int().min(0).max(0x0fff),
+  xflip: z.boolean(),
+  yflip: z.boolean(),
+  respawn: z.boolean().describe('remember-state / respawn flag'),
+  id: z.number().int().min(0).max(0x7f).describe('object id (7-bit)'),
+  subtype: z.number().int().min(0).max(0xff),
+});
+
 export interface EditorMethod {
   name: string;                 // snake_case; MCP tool name + Aether `editor/<name>`
   kind: AgentRequest['kind'];   // renderer agent-bridge request kind
@@ -83,4 +103,39 @@ export const EDITOR_METHODS: EditorMethod[] = [
   { name: 'screenshot', kind: 'screenshot', result: 'image',
     params: { region: z.object({ x: z.number().int().min(0), y: z.number().int().min(0), w: z.number().int().min(1), h: z.number().int().min(1) }).optional(), showBg: z.boolean().optional().describe('render the background plane during capture') },
     description: 'PNG of the map canvas (current viewport). Optional region crop in canvas device pixels (not tile/world coords).' },
+
+  // ---- Classic (Sonic 1 disassembly) project surface (Task 16) ----
+  { name: 'open_project', kind: 'classic-open-project', result: 'json',
+    params: { dir: z.string().min(1).describe('absolute path to the project directory') },
+    description: 'Open a project directory (classic-first detection, the same flow as File→Open). A Sonic 1 disassembly opens into the classic surface (reply: type/label/report/zoneTree); an aeon project is left unchanged for the aeon loader; an unrecognized directory errors.' },
+  { name: 'get_project_report', kind: 'classic-get-project-report', result: 'json', params: {},
+    description: 'The full ResolutionReport of the open classic project (which expected files resolved / are missing / were ambiguous, plus resolved/total counts).' },
+  { name: 'list_classic_levels', kind: 'classic-list-levels', result: 'json', params: {},
+    description: 'List the open classic project\'s zone/act references (zone, act, label, availability).' },
+  { name: 'get_classic_level', kind: 'classic-get-level', result: 'json',
+    params: { zone: z.string().min(1), act: z.number().int().min(0) },
+    description: 'Open and read one act. Returns a summary: fg/bg dims, tile/block/chunk/object counts, the 4 palette lines (CRAM words), the object list, the player start, and the fg/bg chunk-id layout grids as nested row arrays.' },
+  { name: 'set_layout_region', kind: 'classic-set-layout-region', result: 'json',
+    params: { plane: z.enum(['fg', 'bg']), x: z.number().int().min(0), y: z.number().int().min(0), chunkIds: z.array(z.array(z.number().int().min(0).max(255))).describe('row-major 2D grid of chunk ids placed with the top-left cell at (x,y)') },
+    description: 'Stamp a rectangular region of a layout plane with a 2D grid of chunk ids (top-left at x,y). One undo step.' },
+  { name: 'edit_chunk', kind: 'classic-edit-chunk', result: 'json',
+    params: { chunkId: z.number().int().min(0).max(255), cells: z.array(z.object({ index: z.number().int().min(0).max(255), word: z.number().int().min(0).max(0xffff) })).describe('block-cell edits: cell index 0-255, packed S1 chunk-block word') },
+    description: 'Set individual 16x16 block cells of one chunk (batched). One undo step.' },
+  { name: 'edit_block', kind: 'classic-edit-block', result: 'json',
+    params: { blockId: z.number().int().min(0), def: z.object({ cells: z.array(blockCellSchema).length(4).describe('exactly 4 tile cells, TL/TR/BL/BR') }) },
+    description: 'Replace one 16x16 block\'s 4-tile-cell definition. One undo step.' },
+  { name: 'place_object', kind: 'classic-place-object', result: 'json',
+    params: { entry: s1ObjectSchema },
+    description: 'Append one object placement to the open act. One undo step; reply includes the new object index.' },
+  { name: 'move_object', kind: 'classic-move-object', result: 'json',
+    params: { index: z.number().int().min(0), x: z.number().int().min(0).max(0xffff), y: z.number().int().min(0).max(0x0fff) },
+    description: 'Move the object at the given index to (x,y). One undo step.' },
+  { name: 'delete_object', kind: 'classic-delete-object', result: 'json',
+    params: { index: z.number().int().min(0) },
+    description: 'Delete the object placement at the given index. One undo step.' },
+  { name: 'set_colind', kind: 'classic-set-colind', result: 'json',
+    params: { entries: z.array(z.object({ blockId: z.number().int().min(0), value: z.number().int().min(0).max(255) })).describe('block id → collision-shape index edits') },
+    description: 'Set block→collision-shape indices (batched). One undo step.' },
+  { name: 'save_project', kind: 'classic-save-project', result: 'json', params: {},
+    description: 'Save every dirty act of the open classic project through the guarded (mtime-checked) write channel. Returns a structured outcome: saved / conflict / partial / error / nothing.' },
 ];

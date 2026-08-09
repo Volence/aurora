@@ -16,6 +16,15 @@ import { buildStampCommand } from '../../core/editing/map-stamp';
 import { ensureCollisionPlanes } from '../../core/collision/collision-cell-resolve';
 import { paintCollisionRectEntries } from '../../core/collision/collision-paint';
 import type { AgentRequest, AgentRequestEnvelope } from '../../shared/agent-protocol';
+import { useClassicProjectStore } from '../state/classicProjectStore';
+import {
+  useClassicLevelStore,
+  classicSetLayoutCells, classicEditChunkCells, classicEditBlock,
+  classicSetObjects, classicSetColind,
+  type CommandResult,
+} from '../state/classicLevelStore';
+import { saveClassicProject } from '../state/classic-save';
+import type { LevelDoc, LayoutGrid } from '../../core/level-classic/model';
 
 let registered = false;
 
@@ -32,7 +41,7 @@ export function registerAgentHandler(): void {
   registered = true;
   window.agentBridge.onRequest(async (envelope: AgentRequestEnvelope) => {
     try {
-      const result = await handle(envelope.payload);
+      const result = await handleAgentRequest(envelope.payload);
       window.agentBridge.respond({ id: envelope.id, ok: true, result });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
@@ -75,7 +84,53 @@ async function ensureMapMode(): Promise<void> {
   }
 }
 
-async function handle(req: AgentRequest): Promise<unknown> {
+// ---------------------------------------------------------------------------
+// Classic (Sonic 1 disassembly) surface — thin wrappers over the classic open
+// bridge (classicProjectStore) and the Task-12 editing commands. Guard rails and
+// error surfacing match the aeon tools: a missing project/level throws (→ MCP
+// structured error), and a CommandResult rejection re-throws its human message.
+// ---------------------------------------------------------------------------
+
+/** The open classic project store, or throw the standard "no project" error. */
+function requireClassicProject() {
+  const s = useClassicProjectStore.getState();
+  if (s.status !== 'open' || !s.handle) throw new Error('no classic project is open');
+  return s;
+}
+
+/** The currently-open, ready classic level document, or throw. */
+function requireClassicDoc(): LevelDoc {
+  const s = useClassicLevelStore.getState();
+  if (s.status !== 'ready' || !s.doc) throw new Error('no classic level is open');
+  return s.doc;
+}
+
+/** Turn a command rejection into the repo's standard thrown-Error idiom. */
+function assertCommand(res: CommandResult): void {
+  if (!res.ok) throw new Error(res.error);
+}
+
+/** A layout plane's chunk-id cells as nested row arrays, clamped to w*h. */
+function layoutToGrid(g: LayoutGrid): number[][] {
+  const rows: number[][] = [];
+  for (let y = 0; y < g.height; y++) {
+    const row: number[] = [];
+    for (let x = 0; x < g.width; x++) {
+      const idx = y * g.width + x;
+      row.push(idx < g.cells.length ? g.cells[idx] : 0);
+    }
+    rows.push(row);
+  }
+  return rows;
+}
+
+/**
+ * Dispatch one agent request to the live editing session. Returns the tool's
+ * result, or throws an Error whose message becomes the MCP/Aether structured
+ * error. Exported for unit tests (the MCP server + Aether adapter drive it
+ * through the IPC bridge in production).
+ */
+export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
   switch (req.kind) {
     case 'get-project-info': {
       const ctx = requireProject();
@@ -502,6 +557,132 @@ async function handle(req: AgentRequest): Promise<unknown> {
       } finally {
         if (req.showBg) useViewStore.getState().setOverlay('showBgPlane', prevShowBg);
       }
+    }
+
+    // ---- Classic (Sonic 1) project surface (Task 16) ----
+
+    case 'classic-open-project': {
+      // Reuse the Task-9 open bridge exactly (no duplicated open logic): the store
+      // detects classic-first and, for a real aeon dir, leaves aeon untouched.
+      const outcome = await useClassicProjectStore.getState().openDirectory(req.dir);
+      const s = useClassicProjectStore.getState();
+      if (outcome === 'opened') {
+        // Mirror File→Open's recent-projects registration when the shell api is
+        // available (absent in unit tests / headless).
+        if (typeof window !== 'undefined' && window.api?.addRecentProject) {
+          try { await window.api.addRecentProject(req.dir, s.label ?? req.dir); } catch { /* non-fatal */ }
+        }
+        return {
+          type: s.type,
+          label: s.label,
+          report: s.report ? { resolved: s.report.resolved, total: s.report.total } : null,
+          zoneTree: s.zoneTree,
+        };
+      }
+      if (outcome === 'not-classic') {
+        // A real aeon project — this tool does not drive the aeon loader.
+        return { type: 'aeon', opened: false, note: 'aeon project left unchanged; open it with the aeon loader' };
+      }
+      // Unrecognized directory (or the bridge threw): surface the store's notice.
+      throw new Error(s.error ?? 'could not open project');
+    }
+
+    case 'classic-get-project-report': {
+      const s = requireClassicProject();
+      if (!s.report) throw new Error('no resolution report available');
+      return s.report;
+    }
+
+    case 'classic-list-levels': {
+      const s = requireClassicProject();
+      return { levels: s.zoneTree };
+    }
+
+    case 'classic-get-level': {
+      const s = requireClassicProject();
+      const ref = s.zoneTree.find(r => r.zone === req.zone && r.act === req.act);
+      if (!ref) throw new Error(`level ${req.zone}/${req.act} not found in this project`);
+      await useClassicLevelStore.getState().openAct(ref);
+      const ls = useClassicLevelStore.getState();
+      if (ls.status !== 'ready' || !ls.doc) throw new Error(ls.error ?? `level ${req.zone}/${req.act} failed to load`);
+      const doc = ls.doc;
+      return {
+        zone: ref.zone, act: ref.act, label: ref.label,
+        dims: { fg: { width: doc.fg.width, height: doc.fg.height }, bg: { width: doc.bg.width, height: doc.bg.height } },
+        counts: {
+          tiles: Math.floor(doc.tiles.length / 32),
+          blocks: doc.blocks.length,
+          chunks: doc.chunks.length,
+          objects: doc.objects.length,
+        },
+        palettes: doc.palettes.map(line => Array.from(line)),
+        objects: doc.objects.map(o => ({ ...o })),
+        start: { ...doc.start },
+        layout: { fg: layoutToGrid(doc.fg), bg: layoutToGrid(doc.bg) },
+      };
+    }
+
+    case 'classic-set-layout-region': {
+      requireClassicDoc();
+      const cells: { x: number; y: number; chunkId: number }[] = [];
+      for (let dy = 0; dy < req.chunkIds.length; dy++) {
+        const row = req.chunkIds[dy];
+        for (let dx = 0; dx < row.length; dx++) {
+          cells.push({ x: req.x + dx, y: req.y + dy, chunkId: row[dx] });
+        }
+      }
+      assertCommand(classicSetLayoutCells(req.plane, cells));
+      return { plane: req.plane, cells: cells.length };
+    }
+
+    case 'classic-edit-chunk': {
+      requireClassicDoc();
+      assertCommand(classicEditChunkCells(req.chunkId, req.cells));
+      return { chunkId: req.chunkId, cells: req.cells.length };
+    }
+
+    case 'classic-edit-block': {
+      requireClassicDoc();
+      assertCommand(classicEditBlock(req.blockId, req.def));
+      return { blockId: req.blockId };
+    }
+
+    case 'classic-place-object': {
+      const doc = requireClassicDoc();
+      const objects = [...doc.objects, req.entry];
+      assertCommand(classicSetObjects(objects));
+      return { index: objects.length - 1, count: objects.length };
+    }
+
+    case 'classic-move-object': {
+      const doc = requireClassicDoc();
+      if (!Number.isInteger(req.index) || req.index < 0 || req.index >= doc.objects.length) {
+        throw new Error(`object index ${req.index} out of range (0..${doc.objects.length - 1})`);
+      }
+      const objects = doc.objects.map((o, i) => i === req.index ? { ...o, x: req.x, y: req.y } : o);
+      assertCommand(classicSetObjects(objects));
+      return { index: req.index, x: req.x, y: req.y };
+    }
+
+    case 'classic-delete-object': {
+      const doc = requireClassicDoc();
+      if (!Number.isInteger(req.index) || req.index < 0 || req.index >= doc.objects.length) {
+        throw new Error(`object index ${req.index} out of range (0..${doc.objects.length - 1})`);
+      }
+      const objects = doc.objects.filter((_, i) => i !== req.index);
+      assertCommand(classicSetObjects(objects));
+      return { deleted: req.index, count: objects.length };
+    }
+
+    case 'classic-set-colind': {
+      requireClassicDoc();
+      assertCommand(classicSetColind(req.entries));
+      return { entries: req.entries.length };
+    }
+
+    case 'classic-save-project': {
+      requireClassicProject();
+      return saveClassicProject();
     }
 
     default: {
