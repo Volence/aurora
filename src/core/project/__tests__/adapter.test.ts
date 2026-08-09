@@ -3,9 +3,11 @@ import {
   registerAdapter,
   clearAdapters,
   detectProject,
+  openProject,
   type FileAccess,
   type ProjectAdapter,
   type ProjectHandle,
+  type ProjectOverrides,
 } from '../adapter';
 import { buildReport, type ResolutionEntry } from '../report';
 
@@ -43,18 +45,20 @@ function memFs(files: Record<string, Uint8Array | string>): FileAccess {
 }
 
 // A stub adapter that fingerprints on the presence of a single file and produces
-// an empty (but well-formed) handle when opened.
+// an empty (but well-formed) handle when opened. It records the overrides it was
+// opened with so tests can assert pass-through.
 function stubAdapter(
   type: 'aeon' | 's1',
   fingerprintFile: string,
   label: string,
-): ProjectAdapter {
-  return {
+): ProjectAdapter & { openedWith?: ProjectOverrides } {
+  const adapter: ProjectAdapter & { openedWith?: ProjectOverrides } = {
     type,
     async detect(fa) {
       return (await fa.exists(fingerprintFile)) ? { type, label } : null;
     },
-    async open(): Promise<ProjectHandle> {
+    async open(_fa, overrides): Promise<ProjectHandle> {
+      adapter.openedWith = overrides;
       return {
         type,
         capabilities: { levels: null, sprites: false, objects: null, build: false },
@@ -63,6 +67,7 @@ function stubAdapter(
       };
     },
   };
+  return adapter;
 }
 
 describe('detectProject registry', () => {
@@ -100,6 +105,40 @@ describe('detectProject registry', () => {
     registerAdapter(stubAdapter('s1', 'sonic.asm', 'Sonic 1'));
     const fa = memFs({ 'sonic.asm': 'x' });
     expect(await detectProject(fa)).toEqual({ type: 's1', label: 'Sonic 1' });
+  });
+
+  it('throws on duplicate-type registration', () => {
+    registerAdapter(stubAdapter('s1', 'sonic.asm', 'Sonic 1'));
+    expect(() => registerAdapter(stubAdapter('s1', 'other.asm', 'Sonic 1 (dup)'))).toThrow(
+      /already registered/,
+    );
+  });
+});
+
+describe('openProject', () => {
+  beforeEach(() => clearAdapters());
+
+  it('returns the matched adapter handle, null when nothing matches', async () => {
+    registerAdapter(stubAdapter('s1', 'sonic.asm', 'Sonic 1'));
+    const handle = await openProject(memFs({ 'sonic.asm': 'x' }));
+    expect(handle?.type).toBe('s1');
+    expect(handle?.capabilities.build).toBe(false);
+    expect(await openProject(memFs({ 'readme.txt': 'x' }))).toBeNull();
+  });
+
+  it('passes overrides through to the adapter open()', async () => {
+    const s1 = stubAdapter('s1', 'sonic.asm', 'Sonic 1');
+    registerAdapter(s1);
+    const overrides: ProjectOverrides = { paths: { layout: 'custom/layout' } };
+    await openProject(memFs({ 'sonic.asm': 'x' }), overrides);
+    expect(s1.openedWith).toBe(overrides);
+  });
+
+  it('opens the first matching adapter in registration order', async () => {
+    registerAdapter(stubAdapter('aeon', 'aeon.asm', 'Aeon'));
+    registerAdapter(stubAdapter('s1', 'sonic.asm', 'Sonic 1'));
+    const handle = await openProject(memFs({ 'aeon.asm': 'x', 'sonic.asm': 'x' }));
+    expect(handle?.type).toBe('aeon');
   });
 });
 

@@ -106,7 +106,15 @@ export interface ClassicLevelAccess {
 
 const adapters: ProjectAdapter[] = [];
 
+/**
+ * Register an adapter. Registration is controlled startup code, so a second
+ * adapter claiming an already-registered `type` is always a bug, not a runtime
+ * condition to tolerate — we throw rather than silently shadow or duplicate it.
+ */
 export function registerAdapter(a: ProjectAdapter): void {
+  if (adapters.some((x) => x.type === a.type)) {
+    throw new Error(`ProjectAdapter for type '${a.type}' is already registered`);
+  }
   adapters.push(a);
 }
 
@@ -123,6 +131,24 @@ export async function detectProject(fa: FileAccess): Promise<ProjectMatch | null
   for (const a of adapters) {
     const match = await a.detect(fa);
     if (match) return match;
+  }
+  return null;
+}
+
+/**
+ * Detect and open in one step: fingerprint in registration order, then open the
+ * first matching adapter, returning its ProjectHandle (or null if nothing
+ * matches). This is the standard entry point for consumers (Task 9's open flow)
+ * — `detectProject` remains available for detect-only callers, e.g. an open
+ * dialog that wants to name/preview a project before committing to opening it.
+ */
+export async function openProject(
+  fa: FileAccess,
+  overrides?: ProjectOverrides,
+): Promise<ProjectHandle | null> {
+  for (const a of adapters) {
+    const match = await a.detect(fa);
+    if (match) return a.open(fa, overrides);
   }
   return null;
 }
