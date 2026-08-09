@@ -140,6 +140,16 @@ describe('object-subtype-rules', () => {
       // platform at 8 + 16*length = 56.
       expect(set.pieces[4]).toMatchObject({ frame: 0, dx: 0, dy: 56 });
     });
+    it('length = subtype & 0xF (max 15, no clamp — matches engine andi.w #$F,d1)', () => {
+      // 15 chain links + anchor + platform = 17 pieces.
+      const set = resolveObjectPieces(0x15, 'ghz', 0x0f)!;
+      expect(set.pieces).toHaveLength(1 + 15 + 1);
+      // The 15th chain link sits at y = 16 + 16*14 = 240; platform at 8 + 16*15 = 248.
+      expect(set.pieces[15]).toMatchObject({ frame: 1, dx: 0, dy: 240 });
+      expect(set.pieces[16]).toMatchObject({ frame: 0, dx: 0, dy: 248 });
+      // Only the low nibble counts (high bits ignored).
+      expect(resolveObjectPieces(0x15, 'ghz', 0x1f)!.pieces).toHaveLength(1 + 15 + 1);
+    });
     it('applies in GHZ/MZ/SLZ/SBZ (all four zones)', () => {
       for (const z of ['ghz', 'mz', 'slz', 'sbz']) expect(objectHasSubtypeRule(0x15, z)).toBe(true);
     });

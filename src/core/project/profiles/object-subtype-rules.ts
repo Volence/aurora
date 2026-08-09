@@ -87,15 +87,17 @@ const GHZ_RULES: Readonly<Record<number, Rule>> = {
     for (let i = 0; i < n; i++) pieces.push({ frame: 0, dx: st + i * 16, dy: 0 });
     return { pieces, link: base };
   },
-  // Swinging Platform (also MZ) — length = subtype & 0x0F chain links (clamp 0x0D):
-  // anchor (frame 2) at origin; a chain link (frame 1) every 16px down from y=16;
-  // platform (frame 0) at y = 8 + 16*length (GHZ/SwingingPlatform.cs GetSprite).
+  // Swinging Platform (also MZ) — length = subtype & 0x0F chain links (max 15, no
+  // clamp: matches SwingingPlatform.cs and the engine's `andi.w #$F,d1` in
+  // _incObj/15 Swinging Platforms.asm). Anchor (frame 2) at origin; a chain link
+  // (frame 1) every 16px down from y=16; platform (frame 0) at y = 8 + 16*length
+  // (GHZ/SwingingPlatform.cs GetSprite).
   // NOTE: SonLVL palettes the chain link on line 0 and the anchor/platform on line 2,
   // and swaps the platform for a wrecking ball when subtype & 0x10; the composer uses
   // ONE palette line, so all pieces render on the platform's line 2 and the
   // wrecking-ball variant is not modelled (documented follow-up).
   0x15: (subtype, base) => {
-    const length = Math.min(0x0d, subtype & 0x0f);
+    const length = subtype & 0x0f;
     const pieces: ObjectPiece[] = [{ frame: 2, dx: 0, dy: 0 }];
     let yoff = 16;
     for (let i = 0; i < length; i++) { pieces.push({ frame: 1, dx: 0, dy: yoff }); yoff += 16; }
