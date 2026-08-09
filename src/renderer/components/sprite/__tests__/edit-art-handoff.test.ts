@@ -24,12 +24,14 @@ const DIR = '/home/user/s1disasm';
 type OpenCall = { baseDir: string; set: DiscoveredSpriteSet; comp: CompressionKind };
 
 /** A stub opener that records its call and loads `frameCount` blank frames so
- *  frame preselection (selectFrame) has real frames to clamp against. */
+ *  frame preselection (selectFrame) has real frames to clamp against. Returns
+ *  true to mirror a successful real open. */
 function stubOpener(calls: OpenCall[], frameCount = 4) {
   return async (baseDir: string, set: DiscoveredSpriteSet, comp: CompressionKind) => {
     calls.push({ baseDir, set, comp });
     const frames = Array.from({ length: frameCount }, () => createBuffer(16, 16));
     useSpriteStore.getState().loadSprite(frames, [], 8, 8);
+    return true;
   };
 }
 
@@ -53,7 +55,7 @@ describe('editObjectArt handoff', () => {
     const ok = await editObjectArt(0x0d, 'ghz'); // Signpost (base linkage)
 
     expect(ok).toBe(true);
-    expect(useEditorStore.getState().appMode).toBe('sprite');
+    expect(useEditorStore.getState().appMode).toBe('sprite'); // switched only after a successful open
     expect(calls).toHaveLength(1);
     expect(calls[0].baseDir).toBe(DIR);
     expect(calls[0].comp).toBe('nemesis');
@@ -109,6 +111,17 @@ describe('editObjectArt handoff', () => {
     expect(s.standalonePalette[0].a).toBe(0); // index 0 forced transparent
     expect(s.standalonePalette[1].a).toBe(255);
     expect(s.standalonePalette[1].r).toBeGreaterThan(0);
+  });
+
+  it('does NOT switch to sprite mode when the open fails', async () => {
+    // Opener reports failure (a toast fired in the real path) — the user must be
+    // left in the level view, not stranded on a blank/stale sprite.
+    __setSpriteSetOpenerForTest(async () => false);
+
+    const ok = await editObjectArt(0x0d, 'ghz');
+
+    expect(ok).toBe(false);
+    expect(useEditorStore.getState().appMode).toBe('map');
   });
 
   it('is a no-op for an unlinked id (no open, no mode switch)', async () => {

@@ -22,7 +22,7 @@ import { Panel, CollapsibleSection, T } from './components/ui';
 import { useProject } from './hooks/useProject';
 import { useProjectStore } from './state/projectStore';
 import { useClassicProjectStore } from './state/classicProjectStore';
-import { saveClassicProject } from './state/classic-save';
+import { routeClassicSave } from './state/save-routing';
 import { useEditorStore } from './state/editorStore';
 import { registerAgentHandler } from './agent/agent-handler';
 import { refreshObjectPreviews } from './object-previews';
@@ -38,18 +38,15 @@ export default function App() {
   const project = useProjectStore((s) => s.project);
   const currentZoneId = useProjectStore((s) => s.currentZoneId);
 
-  // Save routes by which project is open. While a classic (disasm) project is
-  // open, the app-bar Save / Ctrl+S must NOT target the stale aeon project still
-  // resident in projectStore (aeon state isn't reset on classic open) — it runs
-  // the classic guarded save instead (Task 10). saveClassicProject collects the
-  // classic editing store's dirty acts (Task 12) and writes them through the
-  // mtime-guarded channel, toasting the outcome (saved / conflict / partial);
-  // Task 13's stamp + chunk-picker edits are what make those acts dirty.
+  // Save routes by which context is active (see state/save-routing.ts):
+  //   • Sprite mode editing an S1 object's art (Task B2 handoff) → save art back
+  //     through the guarded channel — otherwise Ctrl+S would fall to the classic
+  //     level save and silently no-op, losing the pixel edits.
+  //   • A classic (disasm) project open → the classic guarded level save (must
+  //     NOT target the stale aeon project still resident in projectStore).
+  //   • Otherwise → the aeon project save.
   const guardedSave = React.useCallback(() => {
-    if (useClassicProjectStore.getState().status === 'open') {
-      void saveClassicProject();
-      return;
-    }
+    if (routeClassicSave()) return;
     return saveProject();
   }, [saveProject]);
 

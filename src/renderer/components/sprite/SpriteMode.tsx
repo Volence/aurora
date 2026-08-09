@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useProjectStore } from '../../state/projectStore';
 import { useClassicProjectStore } from '../../state/classicProjectStore';
+import { useEditorStore } from '../../state/editorStore';
 import { useArtStore } from '../../state/artStore';
 import { useSpriteStore } from '../../state/spriteStore';
 import { spriteModeUndo, spriteModeRedo } from '../../state/sprite-undo';
@@ -177,6 +178,23 @@ export default function SpriteMode({ appBar }: { appBar: React.ReactNode }) {
       toolOptions={<SpriteToolOptions newSize={newSize} onNewSize={setNewSize} onFit={fitToView} />}
       panels={
         <Panel width={240} scroll>
+          {/* In a classic session the Toolbar mode chips are gated on the aeon
+              project config, so Sprite mode has no visible way back to the level
+              editor (Ctrl+K aside). This button returns to the classic default
+              (Map) view — the classic stores survive the round trip, so unsaved
+              edits + undo history are intact; save art back first (below) to keep
+              pixel edits. */}
+          {classicOpen && (
+            <div style={styles.backBar}>
+              <button
+                style={styles.backBtn}
+                title="Return to the classic level editor (Save art → first to keep pixel edits)"
+                onClick={() => useEditorStore.getState().setAppMode('map')}
+              >
+                ← Back to level
+              </button>
+            </div>
+          )}
           <CollapsibleSection id="sprite.mapping" title="Mapping">
           <div style={styles.section}>
             <div style={styles.stat}><span>Hardware pieces</span><b>{decomp.pieces.length}</b></div>
@@ -326,6 +344,12 @@ export default function SpriteMode({ appBar }: { appBar: React.ReactNode }) {
 
 const styles: Record<string, React.CSSProperties> = {
   empty: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: T.textLo },
+  backBar: { padding: '8px 10px 4px', borderBottom: `1px solid ${T.borderStrong}` },
+  backBtn: {
+    width: '100%', padding: '6px 8px', background: T.raised, color: T.textHi,
+    border: `1px solid ${T.borderStrong}`, borderRadius: 4, cursor: 'pointer',
+    fontSize: 12, fontWeight: 600, textAlign: 'left',
+  },
   dim: { fontSize: 11, color: T.textLo },
   sizeBtn: { padding: '3px 7px', background: T.raised, color: T.textHi, border: `1px solid ${T.borderStrong}`, borderRadius: 4, cursor: 'pointer', fontSize: 11 },
   canvasWrap: { position: 'absolute', inset: 0, overflow: 'auto', background: T.void },

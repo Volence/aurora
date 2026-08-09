@@ -348,14 +348,17 @@ export async function scanProjectForSprites(): Promise<ProjectScan | null> {
  * Open a discovered sprite set: read its mapping (+ DPLC) .asm and art relative to
  * the scanned base dir, parse the macro call-sites, and load. If the art file was
  * not auto-paired (s1/s2 store art under unrelated names), prompt for it manually.
+ * Returns true when a sprite actually loaded, false on any handled failure (a
+ * toast has already fired) — callers that switch UI on open (the edit-art handoff)
+ * gate on it so a failed open doesn't strand the user on a blank/stale sprite.
  */
-export async function openDiscoveredSet(baseDir: string, set: DiscoveredSpriteSet, artCompression: CompressionKind = 'nemesis'): Promise<void> {
+export async function openDiscoveredSet(baseDir: string, set: DiscoveredSpriteSet, artCompression: CompressionKind = 'nemesis'): Promise<boolean> {
   const toast = useToastStore.getState().addToast;
   try {
     const adapter = getAdapter(set.game);
     const mapBytes = new Uint8Array(await window.api.readBinaryFile(baseDir, set.mappings));
     const frames = framesFromMapping(set.mappings, mapBytes, adapter);
-    if (frames.length === 0) { toast(`"${set.name}" has no readable sprite mappings`, 'error'); return; }
+    if (frames.length === 0) { toast(`"${set.name}" has no readable sprite mappings`, 'error'); return false; }
 
     let artBytes: Uint8Array;
     let artBase: string, artRel: string; // guarded-write target for the save-back path
@@ -364,7 +367,7 @@ export async function openDiscoveredSet(baseDir: string, set: DiscoveredSpriteSe
       artBase = baseDir; artRel = set.art;
     } else {
       const artPath = await window.api.selectFile(`Select art for "${set.name}" (Nemesis .nem / .bin)`, [{ name: 'Art', extensions: ['nem', 'bin'] }]);
-      if (!artPath) { toast('Art file required to open the sprite', 'error'); return; }
+      if (!artPath) { toast('Art file required to open the sprite', 'error'); return false; }
       artBytes = await readAbsolute(artPath);
       artBase = dirOf(artPath); artRel = baseOf(artPath);
     }
@@ -381,8 +384,10 @@ export async function openDiscoveredSet(baseDir: string, set: DiscoveredSpriteSe
     useSpriteStore.getState().setFormat(set.game);
     await captureS1ArtSource(set.game, artCompression, artBytes, frames, recon.originX, recon.originY, !!dplc, artBase, artRel);
     toast(`Opened "${set.name}" (${set.game.toUpperCase()}): ${frameBufs.length} frames${dplc ? ' (DPLC)' : ''}`, 'success');
+    return true;
   } catch (e) {
     toast(`Open "${set.name}" failed: ${e instanceof Error ? e.message : String(e)}`, 'error');
+    return false;
   }
 }
 
@@ -393,7 +398,7 @@ export async function openDiscoveredSet(baseDir: string, set: DiscoveredSpriteSe
 // substitute a canvas/IPC-free fake to verify the wiring (correct absolute base
 // dir + disasm-relative paths). Mirrors the classic stores' `__set…ForTest`
 // convention.
-type SpriteSetOpener = (baseDir: string, set: DiscoveredSpriteSet, comp: CompressionKind) => Promise<void>;
+type SpriteSetOpener = (baseDir: string, set: DiscoveredSpriteSet, comp: CompressionKind) => Promise<boolean>;
 let openSetImpl: SpriteSetOpener = openDiscoveredSet;
 export function __setSpriteSetOpenerForTest(fn: SpriteSetOpener): void { openSetImpl = fn; }
 export function __resetSpriteSetOpenerForTest(): void { openSetImpl = openDiscoveredSet; }
@@ -406,6 +411,10 @@ export function __resetSpriteSetOpenerForTest(): void { openSetImpl = openDiscov
  * guarded save-back (captureS1ArtSource) is captured EXACTLY as a manual pick's.
  * Returns false (a no-op) for an unlinked id or when no classic project is open —
  * the calling buttons only render for linked ids, so that path is a guard.
+ *
+ * The mode switch happens only AFTER a successful open — a failed open leaves the
+ * user in the level view with an error toast rather than stranded on a blank/stale
+ * sprite (the async open runs while the classic view is still up).
  *
  * PRESELECTION: the objdef's declared `frame` is selected (frame selection is
  * supported). The declared palette LINE (`pal`) can't bind to a zone CRAM line —
@@ -424,9 +433,10 @@ export async function editObjectArt(id: number, zone: string): Promise<boolean> 
   const comp: CompressionKind = link.compression === 'uncompressed' ? 'uncompressed' : 'nemesis';
   const set: DiscoveredSpriteSet = { name, game: 's1', mappings: link.mapAsm, art: link.artFile };
 
-  useEditorStore.getState().setAppMode('sprite');
-  await openSetImpl(dir, set, comp);
+  const opened = await openSetImpl(dir, set, comp);
+  if (!opened) return false; // open failed (a toast already fired) — stay in the level view
 
+  useEditorStore.getState().setAppMode('sprite');
   useSpriteStore.getState().selectFrame(link.frame);
 
   const doc = useClassicLevelStore.getState().doc;
