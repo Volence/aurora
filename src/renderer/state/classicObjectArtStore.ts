@@ -25,7 +25,7 @@ import {
 } from '../../core/level-classic/object-sprite';
 import { resolveObjectArt, type ObjectArtLink } from '../../core/project/profiles/s1-object-art';
 import {
-  resolveObjectPieces, objectHasSubtypeRule, objectArtKey,
+  resolveEffectiveObjectArt, objectHasSubtypeRule, objectArtKey,
 } from '../../core/project/profiles/object-subtype-rules';
 import type { LevelDoc } from '../../core/level-classic/model';
 import type { Color } from '../../core/model/s4-types';
@@ -95,9 +95,15 @@ interface BuildCtx {
 }
 
 async function buildSpriteFromFiles(
-  dir: string, doc: LevelDoc, id: number, zone: string, subtype: number, hasRule: boolean,
-  link: ObjectArtLink, prefetch?: Map<string, Uint8Array | null>,
+  dir: string, doc: LevelDoc, id: number, zone: string, subtype: number,
+  base: ObjectArtLink, prefetch?: Map<string, Uint8Array | null>,
 ): Promise<ObjectSprite | null> {
+  // Resolve the EFFECTIVE link FIRST: a subtype rule can override the art file,
+  // mappings, compression, and palette line (Spring $41 horizontal → Spring
+  // Vertical.nem frame 3; Spring color + Newtron $42 flying → other palette lines).
+  // Reading/decoding/palletizing against `base` here would render an override's
+  // frame against the wrong tiles/palette. Mirrors scripts/render-classic-act.mjs.
+  const { link: effLink, pieces } = resolveEffectiveObjectArt(id, zone, subtype, base);
   const fa = createIpcFileAccess(dir);
   const readOne = async (p: string): Promise<Uint8Array> => {
     if (prefetch && prefetch.has(p)) {
@@ -108,26 +114,19 @@ async function buildSpriteFromFiles(
     return fa.read(p);
   };
   const [artBytes, mapBytes] = await Promise.all([
-    readOne(link.artFile),
-    readOne(link.mapAsm),
+    readOne(effLink.artFile),
+    readOne(effLink.mapAsm),
   ]);
   const mapText = new TextDecoder('utf-8').decode(mapBytes);
-  // Subtype-rule objects compose several frames laid out by the rule (bridge logs,
-  // monitor shell + icon, spike rows, chain + platform); static ids render the one
-  // declared frame. `hasRule` is decided by the caller (== the cache-variant test).
-  let frame: RenderedObjectFrame;
-  if (hasRule) {
-    const ruleSet = resolveObjectPieces(id, zone, subtype);
-    frame = ruleSet
-      ? composeObjectFramesFromFiles(mapText, artBytes, link.compression, ruleSet.pieces)
-      : renderObjectFrameFromFiles(mapText, artBytes, link.compression, link.frame);
-  } else {
-    frame = renderObjectFrameFromFiles(mapText, artBytes, link.compression, link.frame);
-  }
+  // A rule with pieces composes several frames (bridge logs, monitor shell + icon,
+  // spike rows, chain + platform); otherwise render the one declared frame.
+  const frame: RenderedObjectFrame = pieces
+    ? composeObjectFramesFromFiles(mapText, artBytes, effLink.compression, pieces)
+    : renderObjectFrameFromFiles(mapText, artBytes, effLink.compression, effLink.frame);
   // An all-transparent frame (bad frame index / empty mappings) is not useful —
   // treat it as a failure so the hex box shows instead of an invisible sprite.
   if (frame.width <= 0 || frame.height <= 0) return null;
-  const rgba = indicesToRGBA(frame.indices, paletteColors(doc, link.pal));
+  const rgba = indicesToRGBA(frame.indices, paletteColors(doc, effLink.pal));
   if (!rgba.some((v, i) => i % 4 === 3 && v !== 0)) return null; // fully transparent
   const img = new ImageData(new Uint8ClampedArray(rgba), frame.width, frame.height);
   const bitmap = await createImageBitmap(img);
@@ -144,11 +143,12 @@ async function buildSpriteFromFiles(
 // the builder derives `hasRule`/`subtype` straight from it.
 type SpriteBuilder = (id: number, zone: string, variant: string, ctx: BuildCtx) => Promise<ObjectSprite | null>;
 const defaultBuilder: SpriteBuilder = (id, zone, variant, ctx) => {
-  const link = resolveObjectArt(id, zone);
-  if (!link) return Promise.resolve(null);
-  const hasRule = variant !== '';
-  const subtype = hasRule ? Number(variant) : 0;
-  return buildSpriteFromFiles(ctx.dir, ctx.doc, id, zone, subtype, hasRule, link, ctx.prefetch);
+  const base = resolveObjectArt(id, zone);
+  if (!base) return Promise.resolve(null);
+  // variant carries the subtype for rule ids ('' for static → subtype 0, which
+  // resolveEffectiveObjectArt maps to the single-frame base link).
+  const subtype = variant !== '' ? Number(variant) : 0;
+  return buildSpriteFromFiles(ctx.dir, ctx.doc, id, zone, subtype, base, ctx.prefetch);
 };
 let buildImpl: SpriteBuilder = defaultBuilder;
 
@@ -234,9 +234,13 @@ export async function refreshClassicObjectSprites(
   let prefetch: Map<string, Uint8Array | null> | undefined;
   if (fa.readMany) {
     const wanted = new Set<string>();
-    for (const { id } of wantKeys.values()) {
-      const link = resolveObjectArt(id, zone);
-      if (link) { wanted.add(link.artFile); wanted.add(link.mapAsm); }
+    for (const { id, subtype } of wantKeys.values()) {
+      const base = resolveObjectArt(id, zone);
+      if (!base) continue;
+      // Prefetch the EFFECTIVE files so a rule's art-file override (e.g. Spring
+      // Vertical.nem) batches too, instead of falling back to a per-sprite read.
+      const { link } = resolveEffectiveObjectArt(id, zone, subtype, base);
+      wanted.add(link.artFile); wanted.add(link.mapAsm);
     }
     if (wanted.size > 0) {
       const got = await fa.readMany([...wanted]);

@@ -25,6 +25,13 @@ import {
 /** S1 ring object id — expands into a visible ring group (Ring_Main rule). */
 export const RING_OBJ_ID = 0x25;
 
+/**
+ * Bounds of the ghost marker drawn for an invisible/trigger object (a 24×16 box
+ * centred on the anchor). Shared by drawObjects (the visual) and the viewport's
+ * hit-test (the grab region) so grabbing matches what's drawn.
+ */
+export const GHOST_MARKER_BOUNDS = { width: 24, height: 16, originX: 12, originY: 8 };
+
 function solidityFill(solidity: number): string {
   switch (solidity) {
     case 1: return COLLISION_FILL_TOP;
@@ -190,15 +197,17 @@ export function drawObjects(
       // Ghost marker: an invisible/trigger object has no real sprite. Draw a muted
       // dashed box labelled with the object NAME so it reads as a deliberate marker,
       // not an un-ported hex blob. Still selectable (the box is its hit region).
+      const gw = GHOST_MARKER_BOUNDS.width, gh = GHOST_MARKER_BOUNDS.height;
+      const gl = ox - GHOST_MARKER_BOUNDS.originX, gt = oy - GHOST_MARKER_BOUNDS.originY;
       ctx.fillStyle = GHOST_BOX_FILL;
-      ctx.fillRect(ox - 12, oy - 8, 24, 16);
+      ctx.fillRect(gl, gt, gw, gh);
       ctx.strokeStyle = GHOST_BOX_STROKE;
       ctx.setLineDash([3 * invZoom, 2 * invZoom]);
-      ctx.strokeRect(ox - 12, oy - 8, 24, 16);
+      ctx.strokeRect(gl, gt, gw, gh);
       ctx.setLineDash([]);
       ctx.fillStyle = GHOST_LABEL;
       ctx.fillText(s1ObjectName(obj.id), ox, oy + 3 * invZoom);
-      selRect = { left: ox - 12, top: oy - 8, width: 24, height: 16 };
+      selRect = { left: gl, top: gt, width: gw, height: gh };
     } else {
       ctx.fillStyle = OBJECT_BOX_FILL;
       ctx.fillRect(ox - 8, oy - 8, 16, 16);

@@ -189,6 +189,26 @@ export function resolveObjectPieces(id: number, zone: string, subtype: number): 
   return set;
 }
 
+/**
+ * The effective art + optional composed pieces for a placement, resolving a rule's
+ * LINK OVERRIDE (not just its pieces): Spring $41 horizontal swaps the art file to
+ * Spring Vertical.nem, Spring color + Newtron $42 flying swap the palette line. The
+ * builder (and the render harness) MUST read files, decode, and palette against this
+ * `link`, never the bare `resolveObjectArt` base — otherwise an override renders
+ * against the wrong tiles/palette (garbled). `pieces` is null for the single-frame
+ * path (render `link.frame`); non-null for a composite.
+ *
+ * Pure: the file IO / rasterization lives in the caller. `base` is the caller's
+ * already-resolved `resolveObjectArt(id, zone)` (passed in so this stays free of the
+ * "unlinked id" decision — a null base is the caller's cue to draw the hex box).
+ */
+export function resolveEffectiveObjectArt(
+  id: number, zone: string, subtype: number, base: ObjectArtLink,
+): { link: ObjectArtLink; pieces: ObjectPiece[] | null } {
+  const set = resolveObjectPieces(id, zone, subtype);
+  return set ? { link: set.link, pieces: set.pieces } : { link: base, pieces: null };
+}
+
 /** Every id that has a subtype rule in the given zone (base ∪ zone), ascending. */
 export function ruleObjectIds(zone?: string): number[] {
   const ids = new Set<number>(Object.keys(RULES_BASE).map(Number));

@@ -13,6 +13,7 @@ import {
   type ObjectHitBounds,
   type StampCell,
 } from '../viewport-math';
+import { GHOST_MARKER_BOUNDS } from '../classic-overlays';
 import type { LayoutGrid } from '../../../../core/level-classic/model';
 import type { S1ObjectEntry } from '../../../../core/formats/classic/s1-objpos';
 
@@ -303,6 +304,19 @@ describe('hitTestObjectFrames', () => {
     const noBounds = () => null;
     expect(hitTestObjectFrames(objs, 104, 104, noBounds, 8)).toBe(0); // within ±8
     expect(hitTestObjectFrames(objs, 120, 100, noBounds, 8)).toBeNull(); // outside
+  });
+
+  it('ghost-marker bounds make the full drawn 24x16 box grabbable', () => {
+    // The viewport hands an invisible id the GHOST_MARKER_BOUNDS so the grab region
+    // matches the drawn box (originX 12, originY 8 → left 88, top 92, 24x16).
+    const objs = [obj(100, 100, 0x49)];
+    const ghost = () => ({ ...GHOST_MARKER_BOUNDS });
+    expect(hitTestObjectFrames(objs, 88, 92, ghost, 2)).toBe(0); // top-left corner of the box
+    expect(hitTestObjectFrames(objs, 111, 107, ghost, 2)).toBe(0); // bottom-right, inside
+    expect(hitTestObjectFrames(objs, 112, 100, ghost, 2)).toBeNull(); // just past the right edge
+    // The tiny anchor-radius fallback (2px) would MISS the box corner — the ghost
+    // bounds are what widen it to the drawn extent.
+    expect(hitTestObjectFrames(objs, 88, 92, () => null, 2)).toBeNull();
   });
 
   it('the topmost (later) object wins when frames overlap', () => {

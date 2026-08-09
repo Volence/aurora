@@ -3,6 +3,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import {
   resolveObjectPieces,
+  resolveEffectiveObjectArt,
   objectHasSubtypeRule,
   objectArtKey,
   ruleObjectIdsAnyZone,
@@ -179,6 +180,41 @@ describe('object-subtype-rules', () => {
     });
   });
 
+  describe('resolveEffectiveObjectArt (rule LINK overrides — the app render path)', () => {
+    it('a static id returns the base link, no pieces', () => {
+      const base = resolveObjectArt(0x1f, 'ghz')!; // Crabmeat
+      const eff = resolveEffectiveObjectArt(0x1f, 'ghz', 0, base);
+      expect(eff.link).toBe(base);
+      expect(eff.pieces).toBeNull();
+    });
+
+    it('Spring $41 horizontal OVERRIDES the art file to Spring Vertical.nem (frame 3)', () => {
+      const base = resolveObjectArt(0x41, 'ghz')!;
+      expect(base.artFile).toContain('Spring Horizontal'); // base is the UP art
+      const eff = resolveEffectiveObjectArt(0x41, 'ghz', 0x10, base);
+      expect(eff.link.artFile).toContain('Spring Vertical'); // override applied
+      expect(eff.link.artFile).not.toBe(base.artFile);
+      expect(eff.pieces).not.toBeNull();
+      expect(eff.pieces![0].frame).toBe(3);
+    });
+
+    it('Spring $41 color and Newtron $42 flying OVERRIDE the palette line', () => {
+      const spBase = resolveObjectArt(0x41, 'ghz')!;
+      expect(resolveEffectiveObjectArt(0x41, 'ghz', 0x00, spBase).link.pal).toBe(0); // red
+      expect(resolveEffectiveObjectArt(0x41, 'ghz', 0x02, spBase).link.pal).toBe(1); // yellow
+      const ntBase = resolveObjectArt(0x42, 'ghz')!;
+      expect(resolveEffectiveObjectArt(0x42, 'ghz', 0, ntBase).link.pal).toBe(0); // grounded
+      expect(resolveEffectiveObjectArt(0x42, 'ghz', 1, ntBase).link.pal).toBe(1); // flying
+    });
+
+    it('a composite rule returns the base link (no art swap) + its pieces', () => {
+      const base = resolveObjectArt(0x11, 'ghz')!; // Bridge
+      const eff = resolveEffectiveObjectArt(0x11, 'ghz', 0x0c, base);
+      expect(eff.link).toBe(base);
+      expect(eff.pieces).toHaveLength(12);
+    });
+  });
+
   describe('every rule object is art-linked (a rule needs a base art link)', () => {
     it('resolveObjectArt resolves for every rule id in every zone it rules', () => {
       const zones = ['ghz', 'mz', 'syz', 'lz', 'slz', 'sbz'];
@@ -204,6 +240,29 @@ describe('object-subtype-rules', () => {
       expect(frame.height).toBe(16);
       // Non-empty: at least one opaque pixel.
       expect(frame.indices.some((v) => v !== 0)).toBe(true);
+    });
+
+    it('a horizontal spring composes through the EFFECTIVE link (Spring Vertical art), not the base', async () => {
+      const { composeObjectFramesFromFiles } = await import('../../../level-classic/object-sprite');
+      const compose = (link: { artFile: string; mapAsm: string; compression: 'nemesis' | 'uncompressed' }, pieces: { frame: number; dx: number; dy: number }[]) => {
+        const art = new Uint8Array(fs.readFileSync(path.join(S1DIR, link.artFile)));
+        const map = new TextDecoder('utf-8').decode(fs.readFileSync(path.join(S1DIR, link.mapAsm)));
+        return composeObjectFramesFromFiles(map, art, link.compression, pieces);
+      };
+      const base = resolveObjectArt(0x41, 'ghz')!; // Spring Horizontal.nem (the UP art)
+      const eff = resolveEffectiveObjectArt(0x41, 'ghz', 0x10, base); // horizontal
+      // Resolution picked the Spring Vertical art (the horizontal frame's real tiles).
+      expect(eff.link.artFile).toContain('Spring Vertical');
+
+      const good = compose(eff.link, eff.pieces!); // frame 3 against Spring Vertical.nem
+      // Composing frame 3 against the BASE (wrong) art is what the pre-fix app path did.
+      const garbled = compose(base, eff.pieces!); // frame 3 against Spring Horizontal.nem
+
+      // The correct composition is non-empty…
+      expect(good.indices.some((v) => v !== 0)).toBe(true);
+      // …and demonstrably differs from the wrong-art composition (the bug this guards).
+      const key = (f: { indices: Uint8Array }) => Array.from(f.indices).join(',');
+      expect(key(good)).not.toBe(key(garbled));
     });
   });
 });

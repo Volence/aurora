@@ -6,13 +6,13 @@ import { useClassicObjectArtStore, refreshClassicObjectSprites, spriteFor } from
 import { useToastStore } from '../../state/toastStore';
 import { renderChunk } from '../../../core/level-classic/render';
 import type { LevelDoc } from '../../../core/level-classic/model';
-import { s1ObjectName } from '../../../core/project/profiles/s1-objects';
+import { s1ObjectName, s1ObjectIsInvisible } from '../../../core/project/profiles/s1-objects';
 import {
   CHUNK_PX, visibleChunkRange, layoutCellAt, screenToWorld, clampInt,
   worldToLayoutCell, addStampCell, stampAccumToCells, hitTestObjectFrames, hitTestPoint,
   type ObjectHitBounds, type StampCell,
 } from './viewport-math';
-import { drawCollision, drawObjects, drawStart } from './classic-overlays';
+import { drawCollision, drawObjects, drawStart, GHOST_MARKER_BOUNDS } from './classic-overlays';
 import { isTypingTarget } from './composer-shared';
 import {
   CANVAS_VOID,
@@ -518,7 +518,11 @@ export default function ClassicLevelViewport() {
         // Composed sprites are keyed by subtype for rule objects, so the hit region
         // spans a bridge's whole span / a spike row's full width, not just frame 0.
         const s = spriteFor(sprites, o.id, zone, o.subtype);
-        return s ? { width: s.width, height: s.height, originX: s.originX, originY: s.originY } : null;
+        if (s) return { width: s.width, height: s.height, originX: s.originX, originY: s.originY };
+        // Invisible/trigger objects draw a fixed ghost box — grab that same region so
+        // the hit area matches the visual (else it would fall back to the anchor box).
+        if (s1ObjectIsInvisible(o.id)) return { ...GHOST_MARKER_BOUNDS };
+        return null; // unlinked → anchor-radius fallback in hitTestObjectFrames
       };
       const hit = hitTestObjectFrames(d.objects, world.x, world.y, boundsFor, pickWorld);
       if (hit == null) {
