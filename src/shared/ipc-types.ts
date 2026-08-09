@@ -28,6 +28,11 @@ export const IPC_CHANNELS = {
   // legacy absolute-path exception).
   FILE_MTIME: 'file:mtime',
   WRITE_GUARDED: 'file:write-guarded',
+  // Env-guarded paint instrumentation (AURORA_PERF=1). The renderer posts one
+  // summary line per act load; main prints it to the launch terminal so we get
+  // real paint numbers off the user's machine without a CDP session. Fire-and-
+  // forget (send, not invoke) — never on a hot path, no-op when perf is off.
+  PERF_LOG: 'perf:log',
 } as const;
 
 export type IpcChannels = typeof IPC_CHANNELS;

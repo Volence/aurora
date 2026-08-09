@@ -56,6 +56,13 @@ AURORA_NO_GPU=1 npm run dev   # disable hardware acceleration entirely (software
                               # "Failed to allocate NVKMS memory for GEM object".
 ```
 
+```bash
+AURORA_PERF=1 npm run dev     # log one paint-timing line per act load to THIS
+                              # terminal: store-ready ms, first-paint ms, draw
+                              # count, avg/max draw ms over the first 2s. Off (and
+                              # zero-overhead) by default. Look for "[aurora-perf]".
+```
+
 ## MCP / agent integration
 
 While running, Aurora embeds an MCP server (Streamable HTTP) that exposes

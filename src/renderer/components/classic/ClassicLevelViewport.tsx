@@ -33,6 +33,17 @@ interface Camera {
   zoom: number;
 }
 
+/**
+ * Env-guarded paint instrumentation switch (AURORA_PERF=1, read in main, surfaced
+ * as a preload boolean). When off (the default) every perf hook below short-
+ * circuits on this constant — zero overhead. When on, the viewport logs ONE line
+ * per act load to the MAIN-process terminal (store-ready ms, first-paint ms, draw
+ * count, avg/max draw ms over the first 2s), so we can read real paint numbers off
+ * a user's GPU-poor machine without a CDP session. Cheap: performance.now diffs,
+ * no profiler.
+ */
+const PERF = typeof window !== 'undefined' && !!window.api?.perfEnabled;
+
 /** Object-tool pick tolerance in SCREEN pixels (converted to world via /zoom). */
 const OBJECT_PICK_PX = 12;
 /**
@@ -166,6 +177,43 @@ export default function ClassicLevelViewport() {
     chunkCache.current = new Map();
   }, [ref]);
 
+  // ---- paint instrumentation (AURORA_PERF=1) -------------------------------
+  // The current act load's paint accumulator (null when perf is off). Written by
+  // the render effect (draw count + timings) and the ready-transition effect
+  // (store-ready ms); flushed as one main-process log line 2s after the load
+  // starts. Everything is gated on PERF, so this whole block is inert by default.
+  const perfRef = useRef<{
+    loadStart: number; ready: number | null; firstPaint: number | null;
+    draws: number; sum: number; max: number; reported: boolean;
+  } | null>(null);
+  const perfTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (!PERF) return;
+    if (perfTimer.current != null) clearTimeout(perfTimer.current);
+    const acc = { loadStart: performance.now(), ready: null as number | null, firstPaint: null as number | null, draws: 0, sum: 0, max: 0, reported: false };
+    perfRef.current = acc;
+    const r = ref;
+    // Flush after a 2s measurement window (captures the load burst; a faster act
+    // switch cancels this incomplete window and starts a fresh one).
+    perfTimer.current = setTimeout(() => {
+      acc.reported = true;
+      const label = r ? `${r.zone}${r.act}` : '?';
+      const avg = acc.draws ? acc.sum / acc.draws : 0;
+      const n = (v: number | null) => (v == null ? 'n/a' : `${v.toFixed(1)}ms`);
+      window.api?.perfLog(
+        `${label} storeReady=${n(acc.ready)} firstPaint=${n(acc.firstPaint)} ` +
+        `draws=${acc.draws} avgDraw=${avg.toFixed(2)}ms maxDraw=${acc.max.toFixed(2)}ms (first 2s)`,
+      );
+    }, 2000);
+    return () => { if (perfTimer.current != null) { clearTimeout(perfTimer.current); perfTimer.current = null; } };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ref]);
+  useEffect(() => {
+    if (!PERF) return;
+    const acc = perfRef.current;
+    if (acc && acc.ready == null && status === 'ready') acc.ready = performance.now() - acc.loadStart;
+  }, [status]);
+
   const getChunkCanvas = useCallback(
     (d: LevelDoc, chunkId: number, key: string): HTMLCanvasElement => {
       const cache = chunkCache.current;
@@ -248,6 +296,8 @@ export default function ClassicLevelViewport() {
     const { w, h } = sizeRef.current;
     if (w === 0 || h === 0) return; // not yet measured — measure() will redraw
     ctx.imageSmoothingEnabled = false;
+    // Paint timing start (AURORA_PERF): inert when off.
+    const perfDraw0 = PERF ? performance.now() : 0;
 
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.fillStyle = CANVAS_VOID;
@@ -327,6 +377,19 @@ export default function ClassicLevelViewport() {
       for (const c of stroke.values()) {
         ctx.fillRect(c.x * CHUNK_PX, c.y * CHUNK_PX, CHUNK_PX, CHUNK_PX);
         ctx.strokeRect(c.x * CHUNK_PX, c.y * CHUNK_PX, CHUNK_PX, CHUNK_PX);
+      }
+    }
+
+    // Paint timing record (AURORA_PERF): accumulate this full compose into the
+    // current act-load window. First real paint stamps first-paint latency.
+    if (PERF) {
+      const acc = perfRef.current;
+      if (acc && !acc.reported) {
+        if (acc.firstPaint == null) acc.firstPaint = perfDraw0 - acc.loadStart;
+        const dt = performance.now() - perfDraw0;
+        acc.draws++;
+        acc.sum += dt;
+        if (dt > acc.max) acc.max = dt;
       }
     }
   });

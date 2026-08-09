@@ -7,6 +7,13 @@ import { performGuardedWrite } from './guarded-write';
 import { getRecentProjects, addRecentProject, removeRecentProject } from './recent-projects';
 
 export function registerIpcHandlers(): void {
+  // Env-guarded paint instrumentation sink (AURORA_PERF=1). The renderer only
+  // sends when perf is enabled; print each summary line to the launch terminal.
+  // Fire-and-forget (.on, not .handle) — cheap, and a no-op when perf is off.
+  ipcMain.on(IPC_CHANNELS.PERF_LOG, (_event, line: string) => {
+    console.log('[aurora-perf]', line);
+  });
+
   ipcMain.handle(IPC_CHANNELS.READ_BINARY_FILE, async (_event, basePath: string, relativePath: string) => {
     try {
       return await readBinaryFile(basePath, relativePath);

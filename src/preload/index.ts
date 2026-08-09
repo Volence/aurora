@@ -47,6 +47,13 @@ const api = {
 
   writeGuarded: (basePath: string, files: GuardedWriteFile[]): Promise<GuardedWriteResult> =>
     ipcRenderer.invoke(IPC_CHANNELS.WRITE_GUARDED, basePath, files),
+
+  // Env-guarded paint instrumentation (AURORA_PERF=1). The flag is read from the
+  // process env here (the renderer process inherits main's env), exposed as a
+  // static boolean so the classic viewport can no-op with zero overhead when off.
+  // `perfLog` posts one summary line per act load to the main-process terminal.
+  perfEnabled: process.env.AURORA_PERF === '1',
+  perfLog: (line: string): void => { ipcRenderer.send(IPC_CHANNELS.PERF_LOG, line); },
 };
 
 contextBridge.exposeInMainWorld('api', api);
