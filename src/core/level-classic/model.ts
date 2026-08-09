@@ -172,17 +172,22 @@ const MAX_OBJ_SUBTYPE = 0xff;
 const MAX_OBJ_X = 0xffff;
 const MAX_OBJ_Y = 0x0fff;
 
+/**
+ * Push a violation when `val` falls outside the inclusive [lo, hi] range. Guards
+ * BOTH bounds: every packed field wraps under its mask if fed a negative value
+ * (tile:-1, block:-1, x:-1, …), so the lower bound matters as much as the upper.
+ */
+function inRange(out: string[], label: string, val: number, lo: number, hi: number): void {
+  if (val < lo || val > hi) {
+    out.push(`${label} ${val} out of range ${lo}..${hi}`);
+  }
+}
+
 function validateLayout(name: string, g: LayoutGrid, out: string[]): void {
   // cells.length may legitimately differ from width*height (irregular files);
   // only the declared dimensions are bounded.
-  if (g.width < 1 || g.height < 1) {
-    out.push(`${name} dims must be >= 1x1 (got ${g.width}x${g.height})`);
-  }
-  if (g.width > MAX_LAYOUT_W || g.height > MAX_LAYOUT_H) {
-    out.push(
-      `${name} dims exceed ${MAX_LAYOUT_W}x${MAX_LAYOUT_H} (got ${g.width}x${g.height})`,
-    );
-  }
+  inRange(out, `${name} width`, g.width, 1, MAX_LAYOUT_W);
+  inRange(out, `${name} height`, g.height, 1, MAX_LAYOUT_H);
 }
 
 /**
@@ -204,9 +209,9 @@ export function validateLevelDoc(doc: LevelDoc): string[] {
       out.push(`block ${i} must have exactly 4 cells (got ${b.cells.length})`);
     }
     b.cells.forEach((c, j) => {
-      if (c.tile >= tileCount) {
-        out.push(`block ${i} cell ${j} tile ${c.tile} >= tile count ${tileCount}`);
-      }
+      // tile pool holds indices 0..tileCount-1 (an empty pool admits nothing).
+      inRange(out, `block ${i} cell ${j} tile`, c.tile, 0, tileCount - 1);
+      inRange(out, `block ${i} cell ${j} pal`, c.pal, 0, PAL_MASK);
     });
   });
 
@@ -219,12 +224,8 @@ export function validateLevelDoc(doc: LevelDoc): string[] {
       out.push(`chunk ${i} must have exactly 256 cells (got ${ch.cells.length})`);
     }
     ch.cells.forEach((c, j) => {
-      if (c.block > MAX_BLOCK_REF) {
-        out.push(`chunk ${i} cell ${j} block ref ${c.block} > $${MAX_BLOCK_REF.toString(16)}`);
-      }
-      if (c.solidity < 0 || c.solidity > 3) {
-        out.push(`chunk ${i} cell ${j} solidity ${c.solidity} out of range 0..3`);
-      }
+      inRange(out, `chunk ${i} cell ${j} block ref`, c.block, 0, MAX_BLOCK_REF);
+      inRange(out, `chunk ${i} cell ${j} solidity`, c.solidity, 0, SOLIDITY_MASK);
     });
   });
 
@@ -244,12 +245,10 @@ export function validateLevelDoc(doc: LevelDoc): string[] {
 
   // Objects
   doc.objects.forEach((o, i) => {
-    if (o.id > MAX_OBJ_ID) out.push(`object ${i} id ${o.id} > $${MAX_OBJ_ID.toString(16)}`);
-    if (o.subtype > MAX_OBJ_SUBTYPE) {
-      out.push(`object ${i} subtype ${o.subtype} > $${MAX_OBJ_SUBTYPE.toString(16)}`);
-    }
-    if (o.x > MAX_OBJ_X) out.push(`object ${i} x ${o.x} > $${MAX_OBJ_X.toString(16)}`);
-    if (o.y > MAX_OBJ_Y) out.push(`object ${i} y ${o.y} > $${MAX_OBJ_Y.toString(16)}`);
+    inRange(out, `object ${i} id`, o.id, 0, MAX_OBJ_ID);
+    inRange(out, `object ${i} subtype`, o.subtype, 0, MAX_OBJ_SUBTYPE);
+    inRange(out, `object ${i} x`, o.x, 0, MAX_OBJ_X);
+    inRange(out, `object ${i} y`, o.y, 0, MAX_OBJ_Y);
   });
 
   return out;

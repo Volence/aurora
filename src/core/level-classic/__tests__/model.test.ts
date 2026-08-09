@@ -142,7 +142,19 @@ describe('validateLevelDoc', () => {
   it('flags a block tile ref beyond the tile pool', () => {
     const d = validDoc();
     d.blocks[0].cells[0] = blockCell({ tile: 4 }); // pool holds tiles 0..3
-    expect(validateLevelDoc(d)).toContainEqual(expect.stringMatching(/tile 4 >= tile count 4/));
+    expect(validateLevelDoc(d)).toContainEqual(expect.stringMatching(/tile 4 out of range 0\.\.3/));
+  });
+
+  it('flags a negative block tile ref (would wrap under the pack mask)', () => {
+    const d = validDoc();
+    d.blocks[0].cells[0] = blockCell({ tile: -1 });
+    expect(validateLevelDoc(d)).toContainEqual(expect.stringMatching(/tile -1 out of range 0\.\.3/));
+  });
+
+  it('flags a block cell pal out of range 0..3', () => {
+    const d = validDoc();
+    d.blocks[0].cells[0] = blockCell({ pal: 5 });
+    expect(validateLevelDoc(d)).toContainEqual(expect.stringMatching(/pal 5 out of range 0\.\.3/));
   });
 
   it('flags too many chunks (> 256)', () => {
@@ -160,31 +172,37 @@ describe('validateLevelDoc', () => {
   it('flags a chunk block ref > $3FF', () => {
     const d = validDoc();
     d.chunks[0].cells[0] = chunkCell({ block: 0x400 });
-    expect(validateLevelDoc(d)).toContainEqual(expect.stringMatching(/block ref 1024 > \$3ff/));
+    expect(validateLevelDoc(d)).toContainEqual(
+      expect.stringMatching(/block ref 1024 out of range 0\.\.1023/),
+    );
   });
 
   it('flags a chunk cell solidity out of range 0..3', () => {
     const d = validDoc();
     d.chunks[0].cells[0] = chunkCell({ solidity: 4 });
-    expect(validateLevelDoc(d)).toContainEqual(expect.stringMatching(/solidity 4 out of range/));
+    expect(validateLevelDoc(d)).toContainEqual(expect.stringMatching(/solidity 4 out of range 0\.\.3/));
   });
 
-  it('flags fg dims below 1x1', () => {
+  it('flags fg width below 1', () => {
     const d = validDoc();
     d.fg = { width: 0, height: 2, cells: new Uint8Array(0) };
-    expect(validateLevelDoc(d)).toContainEqual(expect.stringMatching(/fg dims must be >= 1x1/));
+    expect(validateLevelDoc(d)).toContainEqual(expect.stringMatching(/fg width 0 out of range 1\.\.64/));
   });
 
-  it('flags fg dims above 64x8', () => {
+  it('flags fg width above 64', () => {
     const d = validDoc();
     d.fg = { width: 65, height: 2, cells: new Uint8Array(130) };
-    expect(validateLevelDoc(d)).toContainEqual(expect.stringMatching(/fg dims exceed 64x8/));
+    expect(validateLevelDoc(d)).toContainEqual(
+      expect.stringMatching(/fg width 65 out of range 1\.\.64/),
+    );
   });
 
-  it('flags bg dims above 64x8 (height)', () => {
+  it('flags bg height above 8', () => {
     const d = validDoc();
     d.bg = { width: 4, height: 9, cells: new Uint8Array(36) };
-    expect(validateLevelDoc(d)).toContainEqual(expect.stringMatching(/bg dims exceed 64x8/));
+    expect(validateLevelDoc(d)).toContainEqual(
+      expect.stringMatching(/bg height 9 out of range 1\.\.8/),
+    );
   });
 
   it('flags a palette without exactly 4 lines', () => {
@@ -202,25 +220,41 @@ describe('validateLevelDoc', () => {
   it('flags an object id > $7F', () => {
     const d = validDoc();
     d.objects[0].id = 0x80;
-    expect(validateLevelDoc(d)).toContainEqual(expect.stringMatching(/object 0 id 128 > \$7f/));
+    expect(validateLevelDoc(d)).toContainEqual(
+      expect.stringMatching(/object 0 id 128 out of range 0\.\.127/),
+    );
   });
 
   it('flags an object subtype > $FF', () => {
     const d = validDoc();
     d.objects[0].subtype = 0x100;
-    expect(validateLevelDoc(d)).toContainEqual(expect.stringMatching(/subtype 256 > \$ff/));
+    expect(validateLevelDoc(d)).toContainEqual(
+      expect.stringMatching(/subtype 256 out of range 0\.\.255/),
+    );
   });
 
   it('flags an object x > $FFFF', () => {
     const d = validDoc();
     d.objects[0].x = 0x10000;
-    expect(validateLevelDoc(d)).toContainEqual(expect.stringMatching(/x 65536 > \$ffff/));
+    expect(validateLevelDoc(d)).toContainEqual(
+      expect.stringMatching(/x 65536 out of range 0\.\.65535/),
+    );
+  });
+
+  it('flags a negative object x (would wrap under the pack mask)', () => {
+    const d = validDoc();
+    d.objects[0].x = -1;
+    expect(validateLevelDoc(d)).toContainEqual(
+      expect.stringMatching(/x -1 out of range 0\.\.65535/),
+    );
   });
 
   it('flags an object y > $0FFF', () => {
     const d = validDoc();
     d.objects[0].y = 0x1000;
-    expect(validateLevelDoc(d)).toContainEqual(expect.stringMatching(/y 4096 > \$fff/));
+    expect(validateLevelDoc(d)).toContainEqual(
+      expect.stringMatching(/y 4096 out of range 0\.\.4095/),
+    );
   });
 });
 
