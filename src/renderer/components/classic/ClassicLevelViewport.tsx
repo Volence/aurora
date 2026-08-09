@@ -14,6 +14,7 @@ import {
   COLLISION_FILL_ALL, COLLISION_FILL_TOP, COLLISION_FILL_SIDES, COLLISION_FILL_NONE,
   COLLISION_SURFACE_LINE, COLLISION_ANGLE_TICK,
   OBJECT_BOX_FILL, OBJECT_BOX_STROKE, OBJECT_LABEL, RING_FILL, RING_STROKE, START_MARKER,
+  STAMP_PREVIEW_FILL, STAMP_PREVIEW_STROKE,
 } from '../../canvas/canvas-colors';
 
 const RING_OBJ_ID = 0x25;
@@ -317,8 +318,8 @@ export default function ClassicLevelViewport() {
     // whenever the stroke calls redraw(). Nothing draws when not stamping.
     const stroke = strokeRef.current;
     if (stroke && stroke.size > 0) {
-      ctx.fillStyle = 'rgba(120,180,255,0.30)';
-      ctx.strokeStyle = 'rgba(150,200,255,0.95)';
+      ctx.fillStyle = STAMP_PREVIEW_FILL;
+      ctx.strokeStyle = STAMP_PREVIEW_STROKE;
       ctx.lineWidth = 2 * invZoom;
       for (const c of stroke.values()) {
         ctx.fillRect(c.x * CHUNK_PX, c.y * CHUNK_PX, CHUNK_PX, CHUNK_PX);
@@ -455,6 +456,16 @@ export default function ClassicLevelViewport() {
     const raw = layoutCellAt(grid, cell.col, cell.row);
     if (raw === undefined) return;
     setSelectedChunkId(raw & 0x7f);
+    // S1's bit-7 loop flag is masked off here (stamping never carries it in v1).
+    // If the eyedropped cell had it set, say so, so the picked chunk pasting
+    // WITHOUT the loop flag isn't a silent surprise.
+    if (raw & 0x80) {
+      useToastStore.getState().addToast(
+        `Eyedropped chunk $${(raw & 0x7f).toString(16).toUpperCase().padStart(2, '0')} — ` +
+          `the loop flag on that cell isn't carried by stamping (v1)`,
+        'info',
+      );
+    }
   }, [activeGrid, cellUnderCursor, setSelectedChunkId]);
 
   // Escape cancels an in-progress stamp stroke (spec: escape cancels cleanly).
@@ -491,7 +502,7 @@ export default function ClassicLevelViewport() {
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0 }}>
       <OptionBar>
         <span style={{ color: T.textLo }}>Tool</span>
-        <Chip active={tool === 'select'} onClick={() => setTool('select')} title="Pan / navigate (drag to pan)">Select</Chip>
+        <Chip active={tool === 'pan'} onClick={() => setTool('pan')} title="Pan / navigate (drag to pan)">Pan</Chip>
         <Chip active={tool === 'stamp'} onClick={() => setTool('stamp')} title="Paint the selected chunk onto layout cells (drag)">Stamp</Chip>
         <Divider />
         <span style={{ color: T.textLo }}>Plane</span>

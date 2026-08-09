@@ -41,9 +41,10 @@ export default function App() {
   // Save routes by which project is open. While a classic (disasm) project is
   // open, the app-bar Save / Ctrl+S must NOT target the stale aeon project still
   // resident in projectStore (aeon state isn't reset on classic open) — it runs
-  // the classic guarded save instead (Task 10). Today the classic editing store
-  // doesn't exist yet (Tasks 12/13), so saveClassicProject finds zero dirty
-  // levels and no-ops; the plumbing is wired and tested end-to-end regardless.
+  // the classic guarded save instead (Task 10). saveClassicProject collects the
+  // classic editing store's dirty acts (Task 12) and writes them through the
+  // mtime-guarded channel, toasting the outcome (saved / conflict / partial);
+  // Task 13's stamp + chunk-picker edits are what make those acts dirty.
   const guardedSave = React.useCallback(() => {
     if (useClassicProjectStore.getState().status === 'open') {
       void saveClassicProject();

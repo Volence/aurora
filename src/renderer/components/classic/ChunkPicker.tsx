@@ -50,9 +50,15 @@ const ThumbCell = React.memo(function ThumbCell({
     ctx.imageSmoothingEnabled = false;
     ctx.clearRect(0, 0, THUMB, THUMB);
     ctx.drawImage(full, 0, 0, THUMB, THUMB);
-    // versionKey participates in the cache key even though it isn't read in the body.
+    // `doc` is read via closure but deliberately OMITTED from the deps: its
+    // identity churns on EVERY edit (layout stamps bump no chunk versions yet
+    // replace the doc), so depending on it would re-render all ~256 thumbnails per
+    // stamp. versionKey alone (chunkEpoch + this chunk's version) gates re-render,
+    // so only chunks whose ART actually changed rebuild — and a fresh act bumps
+    // chunkEpoch, moving every key. `doc` is always current here because a render
+    // with a new versionKey necessarily re-ran with the new doc in scope.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [doc, chunkId, versionKey]);
+  }, [chunkId, versionKey]);
 
   return (
     <button

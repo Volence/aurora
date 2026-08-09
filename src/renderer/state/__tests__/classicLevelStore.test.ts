@@ -410,8 +410,8 @@ describe('command guards + undo/redo triple consistency', () => {
 // Layout-editing UI state (Task 13): tool + selected chunk id.
 // ---------------------------------------------------------------------------
 describe('tool + selectedChunkId UI state', () => {
-  it('defaults to select tool + chunk 0', () => {
-    expect(st().tool).toBe('select');
+  it('defaults to pan tool + chunk 0', () => {
+    expect(st().tool).toBe('pan');
     expect(st().selectedChunkId).toBe(0);
   });
 

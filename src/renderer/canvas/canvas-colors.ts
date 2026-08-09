@@ -93,6 +93,12 @@ export const TILE_HOVER = '#34D399';                    // hovered tile outline 
 export const CHUNK_LABEL_BG = 'rgba(0,0,0,0.6)';        // chunk index label backdrop
 export const CHUNK_LABEL_TEXT = '#E8EAF2';              // chunk index label (mirrors --text-hi)
 
+// ---------- classic layout stamp tool (ClassicLevelViewport) ----------
+/** Fill wash over cells an in-progress stamp gesture has painted (pre-commit). */
+export const STAMP_PREVIEW_FILL = 'rgba(120,180,255,0.30)';
+/** Outline of those same preview cells. */
+export const STAMP_PREVIEW_STROKE = 'rgba(150,200,255,0.95)';
+
 // ---------- sprite/frame thumbnails (FrameGrid, Timeline) ----------
 /** Transparent-pixel checkerboard cells for the sprite/frame thumbnails. */
 export const CHECKER_A = '#2a2a3a';

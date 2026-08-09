@@ -41,8 +41,12 @@ export type CommandResult = { ok: true } | { ok: false; error: string };
 
 export type LayoutPlane = 'fg' | 'bg';
 
-/** The active layout-editing tool (Task 13). `select` = pan; `stamp` = paint. */
-export type ClassicTool = 'select' | 'stamp';
+/**
+ * The active layout-editing tool (Task 13). `pan` navigates (drag = pan); `stamp`
+ * paints the selected chunk. Named `pan` (not `select`) so Task 14 can add a real
+ * object-selection tool without a semantic collision.
+ */
+export type ClassicTool = 'pan' | 'stamp';
 
 interface ClassicLevelState {
   /** The act currently selected in the zone tree (even while loading/errored). */
@@ -117,7 +121,7 @@ const IDLE = {
   chunkVersions: new Map<number, number>(),
   chunkEpoch: 0,
   historyTick: 0,
-  tool: 'select' as ClassicTool,
+  tool: 'pan' as ClassicTool,
   selectedChunkId: 0,
 };
 
