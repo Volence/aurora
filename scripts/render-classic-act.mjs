@@ -157,7 +157,8 @@ function overlayObjects(img, doc, core, zone, crop) {
     if (link) {
       try {
         const artBytes = new Uint8Array(fs.readFileSync(path.join(S1DIR, link.artFile)));
-        const mapText = fs.readFileSync(path.join(S1DIR, link.mapAsm), 'latin1');
+        // Decode mappings the SAME way production does (TextDecoder utf-8).
+        const mapText = new TextDecoder('utf-8').decode(fs.readFileSync(path.join(S1DIR, link.mapAsm)));
         const f = renderObjectFrameFromFiles(mapText, artBytes, link.compression, link.frame);
         const colorsLine = doc.palettes[link.pal] ?? doc.palettes[0] ?? new Uint16Array(16);
         const colors = [];

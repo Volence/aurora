@@ -63,7 +63,8 @@ describe('object-sprite pure helpers', () => {
       const link = resolveObjectArt(id, zone);
       if (!link) throw new Error(`no link for $${id.toString(16)}`);
       const artBytes = new Uint8Array(fs.readFileSync(path.join(S1DIR, link.artFile)));
-      const mapText = fs.readFileSync(path.join(S1DIR, link.mapAsm), 'latin1');
+      // Decode mappings text the SAME way production does (TextDecoder utf-8).
+      const mapText = new TextDecoder('utf-8').decode(fs.readFileSync(path.join(S1DIR, link.mapAsm)));
       return renderObjectFrameFromFiles(mapText, artBytes, link.compression, link.frame);
     }
 

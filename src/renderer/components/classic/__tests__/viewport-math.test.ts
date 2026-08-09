@@ -376,17 +376,15 @@ describe('hitTestObjectFrames', () => {
   });
 
   it('respects flips in the frame rect', () => {
-    // xflip mirrors the box about the anchor: left = x - (width - originX).
-    const objs = [obj(100, 100, 1, 0, true, false)];
-    const bounds = () => B; // xflip rect = left 76? no: 100 - (48-24) = 76 too (symmetric here)
-    // Use asymmetric origin to make the flip observable.
+    // Asymmetric origin makes the flip observable: xflip mirrors the box about the
+    // anchor (left = x - (width - originX)).
     const asym: ObjectHitBounds = { width: 40, height: 20, originX: 4, originY: 4 };
-    const boundsA = () => asym;
-    // Unflipped rect: left 96..136. Flipped rect: left 100-(40-4)=64 .. 104.
-    expect(hitTestObjectFrames([obj(100, 100)], 130, 100, boundsA, 4)).toBe(0); // unflipped hit right side
-    expect(hitTestObjectFrames([obj(100, 100)], 130, 100, () => asym, 4)).toBe(0);
-    expect(hitTestObjectFrames(objs, 130, 100, boundsA, 4)).toBeNull(); // flipped box doesn't reach 130
-    expect(hitTestObjectFrames(objs, 70, 100, boundsA, 4)).toBe(0); // flipped box covers left side
-    void bounds;
+    const bounds = () => asym;
+    // Unflipped rect: left 96..136 (x=100, origin 4). A click at 130 is inside.
+    expect(hitTestObjectFrames([obj(100, 100)], 130, 100, bounds, 4)).toBe(0);
+    // Flipped rect: left 100-(40-4)=64 .. 104. 130 is now outside; 70 is inside.
+    const flipped = [obj(100, 100, 1, 0, true, false)];
+    expect(hitTestObjectFrames(flipped, 130, 100, bounds, 4)).toBeNull();
+    expect(hitTestObjectFrames(flipped, 70, 100, bounds, 4)).toBe(0);
   });
 });

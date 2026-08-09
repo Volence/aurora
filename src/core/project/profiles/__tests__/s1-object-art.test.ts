@@ -62,6 +62,15 @@ describe('s1-object-art linkage table', () => {
     expect(resolveObjectArt(0x0e, 'ghz')).toBeUndefined();
   });
 
+  it('links the remaining straightforward badniks (Newtron/Jaws/Orbinaut/Ball Hog)', () => {
+    expect(resolveObjectArt(0x42, 'ghz')?.artFile).toContain('Newtron'); // GHZ
+    expect(resolveObjectArt(0x42, 'ghz')?.frame).toBe(3); // img1 = frame 3
+    expect(resolveObjectArt(0x2c, 'lz')?.artFile).toContain('Jaws'); // LZ
+    expect(resolveObjectArt(0x60, 'lz')?.artFile).toContain('Orbinaut'); // LZ
+    expect(resolveObjectArt(0x60, 'slz')?.pal).toBe(1); // SLZ startpal 1
+    expect(resolveObjectArt(0x1e, 'sbz')?.artFile).toContain('Ball Hog'); // SBZ
+  });
+
   it('linkedObjectIds includes the base ids plus the zone overrides', () => {
     const ghz = linkedObjectIds('ghz');
     expect(ghz).toContain(0x26); // Monitor (base)

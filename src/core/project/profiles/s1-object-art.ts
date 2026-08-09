@@ -13,14 +13,16 @@
 //   • `codetype=`/`codefile=` C# sources — the object's default `Image` is a
 //     `MapASMToBmp(art, mapAsm, frame, startpal)` call; those four args map here.
 //
-// CURATION: this is a solid top-40 (all named badniks, monitors, springs,
-// signpost, egg prison, spikes, common platforms/scenery), NOT an exhaustive
-// port. Ids whose objdef is `art=LevelArt` (renders from the level's own tile
-// pool — GHZ/SYZ/SLZ Platform, Siren Light, SYZ floating blocks), a binary-map
-// debug marker (Invisible lava marker), an invisible/no-art helper (Invisible
-// Block, conveyor barriers), or a multi-art composite whose default frame is
-// ambiguous (Swinging Platform, Sideways Stomper, Flamethrower) are deliberately
-// LEFT OUT — unlinked ids keep the viewport's hex-box fallback.
+// CURATION: this is a solid top-40 — every named badnik (incl. Newtron, Jaws,
+// Orbinaut, Ball Hog), monitors, springs, signpost, egg prison, spikes, and the
+// common platforms/scenery — NOT an exhaustive port. Ids whose objdef is
+// `art=LevelArt` (renders from the level's own tile pool — GHZ/SYZ/SLZ Platform,
+// Siren Light, SYZ floating blocks), a binary-map debug marker (Invisible lava
+// marker), an invisible/no-art helper (Invisible Block, conveyor barriers), or a
+// multi-art composite whose default frame is ambiguous (Swinging Platform,
+// Sideways Stomper, Flamethrower) are deliberately LEFT OUT — unlinked ids keep
+// the viewport's hex-box fallback. Orbinaut's XML default is a spikeball+body
+// composite; we preview its recognizable body frame (frame 0) alone.
 //
 // ZONE SCOPING: SonLVL merges a base `obj.ini` with a per-zone `objXXX.ini` that
 // can REDEFINE an id (e.g. $1C is GHZ's "Bridge stump" but SLZ's "Fireball
@@ -96,6 +98,7 @@ export const S1_OBJECT_ART_ZONE: Readonly<Record<string, Readonly<Record<number,
     0x2b: nem('artnem/Enemy Chopper.nem', '_maps/Chopper.asm', 0, 0), // Chopper
     0x3b: nem('artnem/GHZ Purple Rock.nem', '_maps/Purple Rock.asm', 0, 3), // Purple rock
     0x40: nem('artnem/Enemy Motobug.nem', '_maps/Moto Bug.asm', 0, 0), // Moto Bug
+    0x42: nem('artnem/Enemy Newtron.nem', '_maps/Newtron.asm', 3, 0), // Newtron (img1 = frame 3)
   },
   mz: {
     0x22: BUZZ_BOMBER,
@@ -117,8 +120,10 @@ export const S1_OBJECT_ART_ZONE: Readonly<Record<string, Readonly<Record<number,
     0x78: CATERKILLER,
   },
   lz: {
+    0x2c: nem('artnem/Enemy Jaws.nem', '_maps/Jaws.asm', 0, 1), // Jaws (Jaws.xml)
     0x2d: nem('artnem/Enemy Burrobot.nem', '_maps/Burrobot.asm', 2, 0), // Burrobot (frame 2)
     0x57: nem('artnem/LZ Spiked Ball & Chain.nem', '_maps/Spiked Ball and Chain (LZ).asm', 1, 0), // Spikeball (frame 1)
+    0x60: nem('artnem/Enemy Orbinaut.nem', '_maps/Orbinaut.asm', 0, 0), // Orbinaut (body frame)
     0x62: nem('artnem/LZ Gargoyle & Fireball.nem', '_maps/Gargoyle.asm', 0, 2), // Gargoyle
   },
   slz: {
@@ -127,11 +132,14 @@ export const S1_OBJECT_ART_ZONE: Readonly<Record<string, Readonly<Record<number,
     0x53: nem('artnem/SLZ 32x32 Block.nem', '_maps/Collapsing Floors.asm', 2, 2), // Collapsing floor (frame 2)
     0x5c: nem('artnem/SLZ Pylon.nem', '_maps/Pylon.asm', 0, 0), // Foreground metal pylon
     0x5f: BOMB,
+    0x60: nem('artnem/Enemy Orbinaut.nem', '_maps/Orbinaut.asm', 0, 1), // Orbinaut (body frame, pal 1)
   },
   sbz: {
+    0x1e: nem('artnem/Enemy Ball Hog.nem', '_maps/Ball Hog.asm', 0, 1), // Ball Hog (BallHog.xml)
     0x2a: nem('artnem/SBZ Small Vertical Door.nem', '_maps/SBZ Small Door.asm', 0, 2), // One-way barrier
     0x53: nem('artnem/SBZ Collapsing Floor.nem', '_maps/Collapsing Floors.asm', 0, 2), // Collapsing floor
     0x5f: BOMB,
+    0x60: nem('artnem/Enemy Orbinaut.nem', '_maps/Orbinaut.asm', 0, 0), // Orbinaut (body frame, LZ/Orbinaut.xml)
     0x67: nem('artnem/SBZ Running Disc.nem', '_maps/Running Disc.asm', 0, 2), // Running disc
     0x6c: nem('artnem/SBZ Vanishing Block.nem', '_maps/SBZ Vanishing Platforms.asm', 0, 2), // Vanishing platform
     0x6e: nem('artnem/SBZ Electrocuter.nem', '_maps/Electrocuter.asm', 0, 0), // Electrocuter
