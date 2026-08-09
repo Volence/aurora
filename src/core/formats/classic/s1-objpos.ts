@@ -9,9 +9,17 @@
 //   [5]    subtype
 //
 // Terminator: any entry whose first word is 0xFFFF ends the table (SonLVL writes
-// it as FF FF 00 00 00 00). All real S1 objpos files end exactly at that
-// terminator with no trailing bytes, but `encodeS1Objpos` accepts an
-// originalLength to pad with 0xFF for byte-identical round-trips just in case.
+// it as FF FF 00 00 00 00). A well-formed table MUST contain that terminator;
+// `decodeS1Objpos` throws on a buffer that ends without one, or on a would-be
+// entry with fewer than 6 bytes remaining, rather than fabricating a partial
+// entry from out-of-bounds reads.
+//
+// Round-trip contract: every real S1 objpos file ends exactly at the terminator
+// with NO trailing bytes. When `encodeS1Objpos` is given `originalLength`, the
+// pad it writes past the terminator is 0xFF — this padding is load-bearing for
+// byte-identity (it reproduces the source file's exact length), not a "just in
+// case": a caller round-tripping a real file passes originalLength = file.length
+// and relies on the 0xFF fill to match.
 
 export interface S1ObjectEntry {
   x: number;
@@ -32,7 +40,15 @@ const RESPAWN_BIT = 0x80;
 
 export function decodeS1Objpos(b: Uint8Array): S1ObjectEntry[] {
   const entries: S1ObjectEntry[] = [];
-  for (let o = 0; o + 1 < b.length; o += ENTRY_SIZE) {
+  let o = 0;
+  for (;;) {
+    if (o + ENTRY_SIZE > b.length) {
+      // Ran out of bytes before finding a terminator. A trailing chunk shorter
+      // than a full entry (length not a multiple of 6) lands here too.
+      throw new Error(
+        `S1 objpos is malformed: reached end of buffer at offset ${o} without a 0xFFFF terminator`,
+      );
+    }
     const x = (b[o] << 8) | b[o + 1];
     if (x === 0xffff) break; // terminator
     const yw = (b[o + 2] << 8) | b[o + 3];
@@ -46,6 +62,7 @@ export function decodeS1Objpos(b: Uint8Array): S1ObjectEntry[] {
       id: idByte & ID_MASK,
       subtype: b[o + 5],
     });
+    o += ENTRY_SIZE;
   }
   return entries;
 }

@@ -101,6 +101,27 @@ describe('s1 objpos round-trip vectors (CI-safe, no fixtures)', () => {
     expect(Array.from(encodeS1Objpos(e, buf.length))).toEqual(Array.from(buf));
   });
 
+  it('throws on a buffer that ends without a terminator', () => {
+    // one complete entry, no terminator
+    const buf = bytes(0x00, 0x01, 0x00, 0x02, 0x03, 0x04);
+    expect(() => decodeS1Objpos(buf)).toThrow(/terminator/);
+  });
+
+  it('throws on a buffer that ends mid-entry', () => {
+    // a full entry followed by 3 stray bytes (would-be entry < 6 bytes, no terminator)
+    const buf = bytes(0x00, 0x01, 0x00, 0x02, 0x03, 0x04, 0x00, 0x05, 0x00);
+    expect(() => decodeS1Objpos(buf)).toThrow(/terminator/);
+  });
+
+  it('throws when the length is not a multiple of 6 and lacks a terminator', () => {
+    const buf = bytes(0x00, 0x01, 0x00); // 3 bytes, no terminator
+    expect(() => decodeS1Objpos(buf)).toThrow(/terminator/);
+  });
+
+  it('throws on an empty buffer', () => {
+    expect(() => decodeS1Objpos(new Uint8Array(0))).toThrow(/terminator/);
+  });
+
   it('pads to originalLength with 0xff past the terminator', () => {
     const out = encodeS1Objpos([{ x: 1, y: 2, xflip: false, yflip: false, respawn: false, id: 3, subtype: 4 }], 18);
     expect(out.length).toBe(18);
