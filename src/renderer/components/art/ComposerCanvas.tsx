@@ -291,14 +291,12 @@ export default function ComposerCanvas() {
     if (cx < 0 || cx >= doc.widthTiles || cy < 0 || cy >= doc.heightTiles) return;
     if (t === 'tile-stamp') {
       const s = useArtStore.getState();
-      const zone = getCurrentZone(useProjectStore.getState());
       stampTile(doc, cx, cy, {
         tile: s.brushTile,
         pal: s.paletteLine,
         hf: flipRef.current.hf,
         vf: flipRef.current.vf,
         pri: false,
-        coll: zone?.tileset.collisionTypes?.[s.brushTile] ?? 0,
       });
     } else {
       // Same packed-word pattern as MapViewport.paintCollisionCell — one palette

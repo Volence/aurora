@@ -1,3 +1,5 @@
+> **STATUS (2026-08-08):** superseded/completed by docs/specs/2026-08-08-chunk-collision-and-map-clipboard-design.md — chunks now carry dual-plane collision; legacy nibble encodings are deleted.
+
 # Spec — Collision Authoring v2: block-keyed, hierarchy-flexible, ROM-bound
 
 Status: **design, awaiting user review** · 2026-06-20

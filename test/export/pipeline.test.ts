@@ -26,7 +26,6 @@ describe('export pipeline', () => {
 
     const tileset: Tileset = {
       tiles: [makeTile(0), makeTile(1)],
-      collisionTypes: new Uint8Array([0, 5]),
     };
 
     const palette: Palette = { lines: [{ colors: Array(16).fill({ r: 0, g: 0, b: 0, a: 255 }) }] };
@@ -47,7 +46,6 @@ describe('export pipeline', () => {
     expect(result.vramBasesAsm).toContain('OJZ_SEC0_VRAM');
     expect(result.sectionBinaries.length).toBe(1); // only sec0 is active
     expect(result.sectionBinaries[0].nametable.length).toBe(131072);
-    expect(result.sectionBinaries[0].collision.length).toBe(65536);
     expect(result.sectionBinaries[0].tileArt.length).toBeGreaterThan(0);
   });
 

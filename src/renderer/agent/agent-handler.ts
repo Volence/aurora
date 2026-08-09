@@ -142,7 +142,7 @@ async function handle(req: AgentRequest): Promise<unknown> {
         for (let c = 0; c < req.w; c++) {
           const idx = (req.y + r) * SECTION_TILES_WIDE + (req.x + c);
           const e = unpackNametableWord(section.tileGrid.nametable[idx]);
-          row.push({ ...e, coll: section.tileGrid.collision[idx] });
+          row.push({ ...e });
         }
         rows.push(row);
       }
@@ -239,13 +239,10 @@ async function handle(req: AgentRequest): Promise<unknown> {
           const spec = req.entries[r * req.w + c];
           const idx = (req.y + r) * SECTION_TILES_WIDE + (req.x + c);
           const oldNt = section.tileGrid.nametable[idx];
-          const oldColl = section.tileGrid.collision[idx];
           entries.push({
             index: idx,
             oldNt,
             newNt: packNametableWord(spec.tile, spec.pal, !!spec.pri, !!spec.vf, !!spec.hf),
-            oldColl,
-            newColl: spec.coll ?? oldColl,
           });
         }
       }
@@ -276,9 +273,10 @@ async function handle(req: AgentRequest): Promise<unknown> {
       if (entriesErr) throw new Error(entriesErr);
       const id = `agent-${Date.now()}-${state.project!.chunkLibrary.length}`;
       const chunk = createChunkDef(id, req.name, req.w, req.h);
+      // Collision planes stay air: entries carry art only. Task 11 (MCP/Aether
+      // collision surface) adds an explicit collision payload for save-chunk.
       req.entries.forEach((spec, i) => {
         chunk.nametable[i] = packNametableWord(spec.tile, spec.pal, !!spec.pri, !!spec.vf, !!spec.hf);
-        chunk.collision[i] = spec.coll ?? 0;
       });
       state.addChunks([chunk]);
       // Note: chunk library additions are not part of EditHistory (matches

@@ -12,7 +12,6 @@ export interface SectionTileGrid {
   width: number;
   height: number;
   nametable: Uint16Array;
-  collision: Uint8Array;
 }
 
 export function createSectionTileGrid(): SectionTileGrid {
@@ -20,7 +19,6 @@ export function createSectionTileGrid(): SectionTileGrid {
     width: SECTION_TILES_WIDE,
     height: SECTION_TILES_HIGH,
     nametable: new Uint16Array(SECTION_TILES_WIDE * SECTION_TILES_HIGH),
-    collision: new Uint8Array(SECTION_TILES_WIDE * SECTION_TILES_HIGH),
   };
 }
 
@@ -75,8 +73,8 @@ export interface Section {
   name: string;
   tileGrid: SectionTileGrid;
   /** Read-only per-cell engine collision attr indices (0-255), loaded from the
-   *  baked strips — the game's ground-truth collision, independent of the editable
-   *  (and possibly crude/stale) tileGrid.collision. Used by the collision VIEW.
+   *  baked strips — the game's ground-truth collision. Used by the collision VIEW
+   *  and as the seed for collisionEdit when no .collattr.bin exists.
    *  null when no strip source is available. `engineCollision` is path A;
    *  `engineCollisionB` is the alternate plane (dual-layer/loop sections). */
   engineCollision?: Uint8Array | null;
@@ -85,8 +83,8 @@ export interface Section {
    *  (collision-cell-word.ts: base-bank shape | X/Y-flip | per-plane solidity).
    *  Seeded from a saved .collattr.bin (16-bit BE) or packed from engineCollision;
    *  rendered by the view and written by set-collision-edit. The bake resolves the
-   *  flags into the runtime 1-byte attr index. Separate from tileGrid.collision
-   *  (legacy chunk/nibble) and engineCollision (read-only strip reference). */
+   *  flags into the runtime 1-byte attr index. Separate from engineCollision
+   *  (read-only strip reference). */
   collisionEdit?: Uint16Array | null;
   /** Editable path-B collision plane (the alternate/loop layer), mirror of
    *  collisionEdit. Seeded from engineCollisionB or a saved .collattrb.bin. */
@@ -123,7 +121,6 @@ export interface ChunkDef {
   widthTiles: number;
   heightTiles: number;
   nametable: Uint16Array;
-  collision: Uint8Array;      // LEGACY nibble plane — read for migration only (a later task deletes)
   /** Dual-plane authored collision: one 16-bit cell word (collision-cell-word.ts)
    *  per 16px cell — (widthTiles/2)*(heightTiles/2) words. Same encoding as
    *  Section.collisionEdit/collisionEditB, so stamps copy verbatim. */
@@ -151,7 +148,6 @@ export function createChunkDef(
     widthTiles,
     heightTiles,
     nametable: new Uint16Array(size),
-    collision: new Uint8Array(size),
     collisionA: new Uint16Array(cellCount),
     collisionB: new Uint16Array(cellCount),
   };
@@ -187,7 +183,6 @@ export interface Palette {
 
 export interface Tileset {
   tiles: Tile[];
-  collisionTypes: Uint8Array;
 }
 
 export interface Act {

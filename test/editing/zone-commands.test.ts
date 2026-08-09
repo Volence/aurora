@@ -11,7 +11,7 @@ function makeLevel(): S4Level {
     })),
   };
   const tiles: Tile[] = [{ pixels: new Uint8Array(64) }];
-  return { sections: [], tileset: { tiles, collisionTypes: new Uint8Array(0) }, palette };
+  return { sections: [], tileset: { tiles }, palette };
 }
 
 describe('set-palette-line command', () => {

@@ -14,7 +14,6 @@ export const entrySchema = z.object({
   pri: z.boolean().optional().describe('VDP priority bit'),
   hf: z.boolean().optional().describe('horizontal flip'),
   vf: z.boolean().optional().describe('vertical flip'),
-  coll: z.number().int().min(0).max(255).optional().describe('collision type; omit to keep existing'),
 });
 
 export interface EditorMethod {
@@ -35,7 +34,7 @@ export const EDITOR_METHODS: EditorMethod[] = [
     description: 'Read raw 8x8 tiles as 64 palette indices each (max 256 per call).' },
   { name: 'get_nametable_region', kind: 'get-nametable-region', result: 'json',
     params: { section: z.number().int().min(0), x: z.number().int().min(0), y: z.number().int().min(0), w: z.number().int().min(1).max(64), h: z.number().int().min(1).max(64) },
-    description: 'Decoded nametable entries (tileIndex, palette, flips, priority, collision) for a tile-coordinate rectangle of a section.' },
+    description: 'Decoded nametable entries (tileIndex, palette, flips, priority) for a tile-coordinate rectangle of a section.' },
   { name: 'check_budget', kind: 'check-budget', result: 'json',
     params: { section: z.number().int().min(0).optional() },
     description: 'Flip-aware unique-tile counts per section and per VRAM color group vs the 1024-tile FG pool. fits=false means export will fail.' },

@@ -1,3 +1,5 @@
+> **STATUS (2026-08-08):** superseded/completed by docs/specs/2026-08-08-chunk-collision-and-map-clipboard-design.md — chunks now carry dual-plane collision; legacy nibble encodings are deleted.
+
 # Spec — Collision Authoring (Phase 2): draw real collision on the map
 
 Status: **design, autonomous (user asleep) — to be adversarially verified before build** · 2026-06-20

@@ -21,7 +21,6 @@ export function cloneSection(sec: Section, index: number, name?: string): Sectio
       width: sec.tileGrid.width,
       height: sec.tileGrid.height,
       nametable: new Uint16Array(sec.tileGrid.nametable),
-      collision: new Uint8Array(sec.tileGrid.collision),
     },
     objects: sec.objects.map((o) => ({ ...o })),
     rings: sec.rings.map((r) => ({ ...r })),

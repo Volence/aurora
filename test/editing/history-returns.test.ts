@@ -12,7 +12,7 @@ function makeCommand(): AnyCommand {
     type: 'set-tiles',
     description: 'test paint',
     sectionIndex: 0,
-    entries: [{ index: 0, oldNt: 0, newNt: 0x1234, oldColl: 0, newColl: 1 }],
+    entries: [{ index: 0, oldNt: 0, newNt: 0x1234 }],
   };
 }
 

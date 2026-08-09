@@ -186,7 +186,6 @@ export default function ArtMode({ appBar }: { appBar: React.ReactNode }) {
         widthTiles: o.doc.widthTiles,
         heightTiles: o.doc.heightTiles,
         nametable: new Uint16Array(slice.nametable),
-        collision: new Uint8Array(slice.collision),
         collisionA: new Uint16Array(o.doc.collisionA),
         collisionB: new Uint16Array(o.doc.collisionB),
       };

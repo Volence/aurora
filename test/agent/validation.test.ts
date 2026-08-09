@@ -64,6 +64,5 @@ describe('validatePaintRegion', () => {
     expect(validatePaintRegion(0, 0, 0, 2, 2, Array(3).fill({ tile: 1, pal: 1 }), opts)).toMatch(/entries/i);
     expect(validatePaintRegion(0, 0, 0, 1, 1, [{ tile: 100, pal: 1 }], opts)).toMatch(/tile/i);
     expect(validatePaintRegion(0, 0, 0, 1, 1, [{ tile: 1, pal: 4 }], opts)).toMatch(/palette/i);
-    expect(validatePaintRegion(0, 0, 0, 1, 1, [{ tile: 1, pal: 1, coll: 256 }], opts)).toMatch(/collision/i);
   });
 });

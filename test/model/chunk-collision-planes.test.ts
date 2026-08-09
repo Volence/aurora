@@ -38,4 +38,24 @@ describe('ChunkDef collision planes', () => {
     expect(c.collisionA[0]).toBe(0x1234);
     expect(c.collisionA[1]).toBe(0);
   });
+
+  // Post-retirement load seam: the legacy `collision` array comes straight off
+  // the parsed chunks.json (ChunkDef no longer carries it), so the migration
+  // must accept a plain number[] and tolerate the field being absent entirely
+  // (chunks saved after the retirement).
+  it('accepts a raw number[] legacy plane (parsed JSON input)', () => {
+    const c = createChunkDef('x', 'X', 4, 4);
+    const legacy = new Array(16).fill(0);
+    legacy[0] = legacy[1] = legacy[4] = legacy[5] = 1; // cell(0,0) solidAll
+    expect(migrateLegacyChunkCollision(c, legacy, FB)).toBe(true);
+    const all = packCollisionCell({ shape: FB, xFlip: false, yFlip: false, solidity: 'all' });
+    expect(c.collisionA[0]).toBe(all);
+    expect(c.collisionB[0]).toBe(all);
+  });
+
+  it('no-ops (returns false) when the legacy plane is absent', () => {
+    const c = createChunkDef('x', 'X', 4, 4);
+    expect(migrateLegacyChunkCollision(c, undefined, FB)).toBe(false);
+    expect([...c.collisionA].every(w => w === 0)).toBe(true);
+  });
 });

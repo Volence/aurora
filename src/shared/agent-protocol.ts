@@ -10,7 +10,6 @@ export interface NametableEntrySpec {
   pri?: boolean;
   hf?: boolean;
   vf?: boolean;
-  coll?: number;       // collision type 0-255; omitted = keep existing
 }
 
 export type AgentRequest =

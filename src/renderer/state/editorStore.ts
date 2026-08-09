@@ -94,7 +94,6 @@ interface EditorState {
   selectedObjectTypeId: string | null;
   selectedObjectSubtype: number;
   selectedRingPattern: number;
-  selectedCollisionType: number;
   selectedCollisionProfile: number; // base-bank shape index for the map collision palette
   selectedCollisionEntryFlipX: boolean; // the picked palette entry's mirror-to-canonical-left flag
   selectedCollisionXFlip: boolean;  // USER Flip-H toggle (XORs with the entry flag → effective mirror)
@@ -125,7 +124,6 @@ interface EditorState {
   setSelectedChunkId: (id: string | null) => void;
   setSelectedObjectTypeId: (id: string | null, subtype?: number) => void;
   setSelectedRingPattern: (index: number) => void;
-  setSelectedCollisionType: (type: number) => void;
   setSelectedCollisionProfile: (index: number) => void;
   /** Pick a palette entry: its base shape + whether it must mirror to face left.
    *  Resets the user Flip-H toggle so the freshly-picked shape shows canonical. */
@@ -168,7 +166,6 @@ export const useEditorStore = create<EditorState>((set) => ({
   selectedObjectTypeId: null,
   selectedObjectSubtype: 0,
   selectedRingPattern: 0,
-  selectedCollisionType: 0,
   selectedCollisionProfile: 0,
   selectedCollisionEntryFlipX: false,
   selectedCollisionXFlip: false,
@@ -196,7 +193,6 @@ export const useEditorStore = create<EditorState>((set) => ({
   setSelectedChunkId: (id) => set({ selectedChunkId: id }),
   setSelectedObjectTypeId: (id, subtype) => set({ selectedObjectTypeId: id, selectedObjectSubtype: subtype ?? 0 }),
   setSelectedRingPattern: (index) => set({ selectedRingPattern: index }),
-  setSelectedCollisionType: (type) => set({ selectedCollisionType: type }),
   setSelectedCollisionProfile: (index) => set({ selectedCollisionProfile: Math.max(0, Math.min(0x3FF, index | 0)) }),
   // Picking a shape updates the canonical-mirror baseline but LEAVES the user's
   // Flip-H / Flip-V toggles untouched — they're sticky "modes" that hold until

@@ -2,13 +2,16 @@ import type { ChunkDef } from './s4-types';
 import { packCollisionCell } from '../collision/collision-cell-word';
 
 /** Seed the word planes from the legacy per-tile nibble plane (bit0 solidAll,
- *  bit1 solidTop; solidAll wins). Sampling: top-left tile of each 2x2 cell (the
- *  import wrote all four tiles identically). No-op if any plane word is already
- *  set (already-migrated chunk) or fullBlockShape is 0 (profiles missing). */
+ *  bit1 solidTop; solidAll wins). `legacy` is the raw `collision` array parsed
+ *  straight from an old chunks.json (ChunkDef no longer carries the field —
+ *  the legacy encoding survives ONLY as migration input here). Sampling:
+ *  top-left tile of each 2x2 cell (the import wrote all four tiles
+ *  identically). No-op if `legacy` is absent, any plane word is already set
+ *  (already-migrated chunk), or fullBlockShape is 0 (profiles missing). */
 export function migrateLegacyChunkCollision(
-  chunk: ChunkDef, legacy: Uint8Array, fullBlockShape: number,
+  chunk: ChunkDef, legacy: Uint8Array | number[] | undefined, fullBlockShape: number,
 ): boolean {
-  if (fullBlockShape === 0) return false;
+  if (!legacy || fullBlockShape === 0) return false;
   if (chunk.collisionA.some(w => w !== 0) || chunk.collisionB.some(w => w !== 0)) return false;
   const cw = chunk.widthTiles >> 1, ch = chunk.heightTiles >> 1;
   let wrote = false;

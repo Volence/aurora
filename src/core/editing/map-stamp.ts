@@ -34,9 +34,6 @@ export function buildRegionWriteCommand(args: {
   const commands: AnyCommand[] = [];
 
   if (writeArt) {
-    // Legacy tileGrid.collision nibble is a passthrough (oldColl === newColl)
-    // — that plane no longer records authored collision (collisionEdit/B do),
-    // it stays put until Task 10 removes it. Only the nametable word can diff.
     const tileEntries: SetTilesCommand['entries'] = [];
     for (let r = 0; r < source.heightTiles; r++) {
       for (let c = 0; c < source.widthTiles; c++) {
@@ -46,8 +43,7 @@ export function buildRegionWriteCommand(args: {
         const oldNt = section.tileGrid.nametable[idx];
         const newNt = source.nametable[r * source.widthTiles + c];
         if (oldNt === newNt) continue;
-        const oldColl = section.tileGrid.collision[idx];
-        tileEntries.push({ index: idx, oldNt, newNt, oldColl, newColl: oldColl });
+        tileEntries.push({ index: idx, oldNt, newNt });
       }
     }
     if (tileEntries.length > 0) {

@@ -85,15 +85,6 @@ function resolveBlock(
 }
 
 /**
- * Convert a collision flag pair from chunk block refs into per-tile collision values.
- * solidTop=0x8000, solidAll=0x1000 on the block ref word.
- * Returns a nibble: bit1=solid-top, bit0=solid-all.
- */
-function blockRefToCollision(ref: BlockRef): number {
-  return (ref.solidTop ? 2 : 0) | (ref.solidAll ? 1 : 0);
-}
-
-/**
  * Convert a block ref's solidity flags into a dual-plane collision cell word,
  * using the caller-supplied full-block shape (the plain solid block in the
  * loaded profile set). fullBlockShape = 0 means profiles are unavailable —
@@ -131,7 +122,6 @@ export function importChunks(
 
   for (let c = 0; c < chunkCount; c++) {
     const nametable = new Uint16Array(CHUNK_TILES * CHUNK_TILES);
-    const collision = new Uint8Array(CHUNK_TILES * CHUNK_TILES);
     const collisionA = new Uint16Array(cellCount);
     const collisionB = new Uint16Array(cellCount);
     const chunkOffset = c * BYTES_PER_CHUNK;
@@ -142,7 +132,6 @@ export function importChunks(
         const word = (chunkData[wordOffset] << 8) | chunkData[wordOffset + 1];
         const ref = parseBlockRef(word);
         const [tl, tr, bl, br] = resolveBlock(blockData, ref);
-        const collValue = blockRefToCollision(ref);
 
         const tileRow = blockRow * 2;
         const tileCol = blockCol * 2;
@@ -151,11 +140,6 @@ export function importChunks(
         nametable[tileRow * CHUNK_TILES + tileCol + 1] = tr;
         nametable[(tileRow + 1) * CHUNK_TILES + tileCol] = bl;
         nametable[(tileRow + 1) * CHUNK_TILES + tileCol + 1] = br;
-
-        collision[tileRow * CHUNK_TILES + tileCol] = collValue;
-        collision[tileRow * CHUNK_TILES + tileCol + 1] = collValue;
-        collision[(tileRow + 1) * CHUNK_TILES + tileCol] = collValue;
-        collision[(tileRow + 1) * CHUNK_TILES + tileCol + 1] = collValue;
 
         // One 16px cell per block ref (BLOCKS_PER_CHUNK == cells-per-side).
         // The donor ROM's block ref carries a single solidity flag pair with
@@ -172,7 +156,6 @@ export function importChunks(
       widthTiles: CHUNK_TILES,
       heightTiles: CHUNK_TILES,
       nametable,
-      collision,
       collisionA,
       collisionB,
     });

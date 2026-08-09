@@ -16,12 +16,7 @@ export interface EditCommand {
 
 export interface SetTilesCommand extends EditCommand {
   type: 'set-tiles';
-  entries: Array<{ index: number; oldNt: number; newNt: number; oldColl: number; newColl: number }>;
-}
-
-export interface SetCollisionCommand extends EditCommand {
-  type: 'set-collision';
-  entries: Array<{ index: number; oldColl: number; newColl: number }>;
+  entries: Array<{ index: number; oldNt: number; newNt: number }>;
 }
 
 export interface SetCollisionEditCommand extends EditCommand {
@@ -160,7 +155,6 @@ export interface BatchCommand extends EditCommand {
 export type AnyCommand =
   | BatchCommand
   | SetTilesCommand
-  | SetCollisionCommand
   | SetCollisionEditCommand
   | MoveObjectCommand
   | AddObjectCommand

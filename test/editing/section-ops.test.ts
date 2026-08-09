@@ -15,7 +15,6 @@ import {
 function sec(index: number, marker: number): Section {
   const s = createSection(index, `Section ${index}`);
   s.tileGrid.nametable[0] = marker;
-  s.tileGrid.collision[0] = marker & 0xff;
   s.objects.push({ x: 1, y: 2, typeId: 'ring-monitor', subtype: marker & 0xff });
   s.rings.push({ x: 3, y: 4 });
   return s;
@@ -36,7 +35,6 @@ describe('cloneSection', () => {
     expect(clone.tileGrid.nametable[0]).toBe(0x1234);
     // Independent arrays
     expect(clone.tileGrid.nametable).not.toBe(src.tileGrid.nametable);
-    expect(clone.tileGrid.collision).not.toBe(src.tileGrid.collision);
     clone.tileGrid.nametable[0] = 0xffff;
     expect(src.tileGrid.nametable[0]).toBe(0x1234);
     // Independent object/ring arrays + elements

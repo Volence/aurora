@@ -119,16 +119,10 @@ function applyCommand(cmd: AnyCommand, level: S4Level): void {
     case 'set-tiles':
       for (const e of cmd.entries) {
         section.tileGrid.nametable[e.index] = e.newNt;
-        section.tileGrid.collision[e.index] = e.newColl;
       }
       break;
     case 'set-section-bg':
       section.bgLayoutRef = cmd.newRef;
-      break;
-    case 'set-collision':
-      for (const e of cmd.entries) {
-        section.tileGrid.collision[e.index] = e.newColl;
-      }
       break;
     case 'set-collision-edit': {
       const arr = cmd.plane === 'b' ? section.collisionEditB : section.collisionEdit;
@@ -240,16 +234,10 @@ function undoCommand(cmd: AnyCommand, level: S4Level): void {
     case 'set-tiles':
       for (const e of cmd.entries) {
         section.tileGrid.nametable[e.index] = e.oldNt;
-        section.tileGrid.collision[e.index] = e.oldColl;
       }
       break;
     case 'set-section-bg':
       section.bgLayoutRef = cmd.oldRef;
-      break;
-    case 'set-collision':
-      for (const e of cmd.entries) {
-        section.tileGrid.collision[e.index] = e.oldColl;
-      }
       break;
     case 'set-collision-edit': {
       const arr = cmd.plane === 'b' ? section.collisionEditB : section.collisionEdit;

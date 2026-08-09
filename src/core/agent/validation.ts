@@ -41,7 +41,7 @@ export interface PaintRegionOptions {
   tilesetSize: number;
 }
 
-/** Validate a list of nametable entry specs (tile/pal/coll ranges). */
+/** Validate a list of nametable entry specs (tile/pal ranges). */
 export function validateEntries(entries: NametableEntrySpec[], tilesetSize: number): string | null {
   if (!Array.isArray(entries)) return 'entries must be an array';
   for (let i = 0; i < entries.length; i++) {
@@ -51,9 +51,6 @@ export function validateEntries(entries: NametableEntrySpec[], tilesetSize: numb
     }
     if (!Number.isInteger(e.pal) || e.pal < 0 || e.pal > 3) {
       return `entry ${i}: palette line ${e.pal} out of range 0-3`;
-    }
-    if (e.coll !== undefined && (!Number.isInteger(e.coll) || e.coll < 0 || e.coll > 255)) {
-      return `entry ${i}: collision type ${e.coll} out of range 0-255`;
     }
   }
   return null;

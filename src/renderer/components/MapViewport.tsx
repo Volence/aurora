@@ -347,7 +347,6 @@ export default function MapViewport() {
     setCommandInvalidationListener((cmd: AnyCommand) => {
       switch (cmd.type) {
         case 'set-tiles':
-        case 'set-collision':
           sectionRenderer.markDirty(cmd.sectionIndex, cmd.entries.map(e => e.index));
           break;
         case 'set-tileset-tiles':
@@ -865,14 +864,13 @@ export default function MapViewport() {
 
       const { selectedTileIndex, selectedPaletteLine } = useEditorStore.getState();
       const oldNt = section.tileGrid.nametable[info.tileIndex];
-      const oldColl = section.tileGrid.collision[info.tileIndex];
       const newNt = (selectedTileIndex & 0x7FF) | ((selectedPaletteLine & 0x3) << 13);
       if (oldNt !== newNt) {
         executeCommand({
           type: 'set-tiles',
           description: `Paint tile at (${info.col}, ${info.row})`,
           sectionIndex: info.sectionIndex,
-          entries: [{ index: info.tileIndex, oldNt, newNt, oldColl, newColl: oldColl }],
+          entries: [{ index: info.tileIndex, oldNt, newNt }],
         }, level);
         sectionRenderer.markDirty(info.sectionIndex, [info.tileIndex]);
       }
@@ -891,7 +889,7 @@ export default function MapViewport() {
       const baseCol = Math.floor(info.col / 2) * 2;
       const baseRow = Math.floor(info.row / 2) * 2;
       const { selectedTileIndex, selectedPaletteLine } = useEditorStore.getState();
-      const entries: Array<{ index: number; oldNt: number; newNt: number; oldColl: number; newColl: number }> = [];
+      const entries: Array<{ index: number; oldNt: number; newNt: number }> = [];
       const dirtyIndices: number[] = [];
 
       for (let dr = 0; dr < 2; dr++) {
@@ -901,11 +899,10 @@ export default function MapViewport() {
           if (c >= SECTION_TILES_WIDE || r >= SECTION_TILES_HIGH) continue;
           const idx = r * SECTION_TILES_WIDE + c;
           const oldNt = section.tileGrid.nametable[idx];
-          const oldColl = section.tileGrid.collision[idx];
           const tileOffset = dr * 2 + dc;
           const newNt = ((selectedTileIndex + tileOffset) & 0x7FF) | ((selectedPaletteLine & 0x3) << 13);
           if (oldNt !== newNt) {
-            entries.push({ index: idx, oldNt, newNt, oldColl, newColl: oldColl });
+            entries.push({ index: idx, oldNt, newNt });
             dirtyIndices.push(idx);
           }
         }
@@ -1106,14 +1103,13 @@ export default function MapViewport() {
       if (tool === 'paint-tile') {
         const { selectedTileIndex, selectedPaletteLine } = useEditorStore.getState();
         const oldNt = section.tileGrid.nametable[info.tileIndex];
-        const oldColl = section.tileGrid.collision[info.tileIndex];
         const newNt = (selectedTileIndex & 0x7FF) | ((selectedPaletteLine & 0x3) << 13);
         if (oldNt !== newNt) {
           executeCommand({
             type: 'set-tiles',
             description: `Paint tile at (${info.col}, ${info.row})`,
             sectionIndex: info.sectionIndex,
-            entries: [{ index: info.tileIndex, oldNt, newNt, oldColl, newColl: oldColl }],
+            entries: [{ index: info.tileIndex, oldNt, newNt }],
           }, level);
           sectionRenderer.markDirty(info.sectionIndex, [info.tileIndex]);
         }
@@ -1184,7 +1180,7 @@ export default function MapViewport() {
             const cellRow = Math.floor(info.row / 2) * 2;
             // In the A/B diff (both overlays on) the base shown is A, so report A.
             const pathB = overlays.showCollisionPathB && !overlays.showCollision;
-            const len = section.engineCollision?.length ?? section.tileGrid.collision.length;
+            const len = section.engineCollision?.length ?? section.tileGrid.nametable.length;
             const words = pathB
               ? resolvePlaneWords(section.collisionEditB, section.engineCollisionB ?? section.engineCollision, len)
               : resolvePlaneWords(section.collisionEdit, section.engineCollision, len);
@@ -1382,7 +1378,6 @@ export default function MapViewport() {
           cell.vf = entry.vFlip;
           cell.pri = entry.priority;
         }
-        cell.coll = section.tileGrid.collision[idx];
       }
     }
     if (!openDocumentGuarded({
