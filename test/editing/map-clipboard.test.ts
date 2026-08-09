@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { createSection, SECTION_TILES_WIDE } from '../../src/core/model/s4-types';
-import { snapMarquee, copyFromSection } from '../../src/core/editing/map-clipboard';
+import { createSection, createChunkDef, SECTION_TILES_WIDE } from '../../src/core/model/s4-types';
+import { snapMarquee, copyFromSection, copyChunkToClipboard } from '../../src/core/editing/map-clipboard';
 import { packCollisionCell } from '../../src/core/collision/collision-cell-word';
 
 describe('snapMarquee', () => {
@@ -72,5 +72,28 @@ describe('copyFromSection', () => {
     expect(clip.nametable[0]).toBe(0xABCD);
     expect(Array.from(clip.collisionA)).toEqual([0]);
     expect(Array.from(clip.collisionB)).toEqual([0]);
+  });
+});
+
+describe('copyChunkToClipboard', () => {
+  it('carries the nametable + both collision planes, copying rather than aliasing', () => {
+    const chunk = createChunkDef('c1', 'C1', 4, 4); // 2x2 cells
+    chunk.nametable[0] = 0xBEEF;
+    chunk.collisionA[0] = packCollisionCell({ shape: 5, xFlip: false, yFlip: false, solidity: 'all' });
+    chunk.collisionB[0] = packCollisionCell({ shape: 9, xFlip: true, yFlip: false, solidity: 'top' });
+
+    const clip = copyChunkToClipboard(chunk);
+
+    expect(clip.widthTiles).toBe(4);
+    expect(clip.heightTiles).toBe(4);
+    expect(clip.nametable[0]).toBe(0xBEEF);
+    expect(clip.collisionA[0]).toBe(chunk.collisionA[0]);
+    expect(clip.collisionB[0]).toBe(chunk.collisionB[0]);
+
+    // Mutating the clip must not leak back into the chunk (a copy, not an alias).
+    clip.nametable[0] = 0;
+    clip.collisionA[0] = 0;
+    expect(chunk.nametable[0]).toBe(0xBEEF);
+    expect(chunk.collisionA[0]).not.toBe(0);
   });
 });

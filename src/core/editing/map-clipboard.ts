@@ -1,5 +1,7 @@
 import { SECTION_TILES_WIDE, SECTION_TILES_HIGH } from '../model/s4-types';
-import type { Section } from '../model/s4-types';
+import type { Section, ChunkDef } from '../model/s4-types';
+import { buildRegionWriteCommand } from './map-stamp';
+import type { BatchCommand } from './commands';
 
 /** A copied map region: art + both collision planes, footprint-aligned to 16px
  *  (2-tile) blocks so cells never straddle a paste boundary. */
@@ -64,4 +66,34 @@ export function copyFromSection(section: Section, col: number, row: number,
   }
 
   return { widthTiles: w, heightTiles: h, nametable, collisionA, collisionB };
+}
+
+/** Thin pure adapter: a chunk's nametable + both collision planes as a
+ *  MapClipboard, so a chunk can seed the map clipboard (Art mode Ctrl+C on a
+ *  chunk doc). Copies, never aliases, the chunk's arrays. */
+export function copyChunkToClipboard(chunk: ChunkDef): MapClipboard {
+  return {
+    widthTiles: chunk.widthTiles,
+    heightTiles: chunk.heightTiles,
+    nametable: new Uint16Array(chunk.nametable),
+    collisionA: new Uint16Array(chunk.collisionA),
+    collisionB: new Uint16Array(chunk.collisionB),
+  };
+}
+
+/** Build the atomic paste command at (baseCol,baseRow) tile coords (snapped to
+ *  even by the caller). Clipboard is authoritative over its footprint in the
+ *  pasted layers (air clears); out-of-bounds cells are dropped. Shares its
+ *  region-diffing internals with buildStampCommand (map-stamp.ts) — same
+ *  shapes (nametable + two cell-word planes over a footprint), different
+ *  source object. Returns null when nothing changes. */
+export function buildPasteCommand(args: {
+  clip: MapClipboard; section: Section; sectionIndex: number;
+  baseCol: number; baseRow: number; layers: PasteLayers; description: string;
+}): BatchCommand | null {
+  const { clip, section, sectionIndex, baseCol, baseRow, layers, description } = args;
+  return buildRegionWriteCommand({
+    source: clip, section, sectionIndex, baseCol, baseRow,
+    writeArt: layers !== 'collision', writeCollision: layers !== 'art', description,
+  });
 }

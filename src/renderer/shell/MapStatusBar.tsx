@@ -13,7 +13,7 @@ const TOOL_INFO: Record<EditorTool, { label: string; hint: string }> = {
   'stamp-chunk': { label: 'Stamp Chunk', hint: 'Select a chunk from the library, then click to stamp — Alt: art only' },
   'paint-collision': { label: 'Paint Collision', hint: 'Click to set collision type on tiles' },
   'eraser': { label: 'Eraser', hint: 'Click to erase tiles' },
-  'marquee': { label: 'Marquee', hint: 'drag to select · Ctrl+C copy · Esc clear' },
+  'marquee': { label: 'Marquee', hint: 'drag to select · Ctrl+C copy · Ctrl+V paste · Esc clear' },
   'place-object': { label: 'Place Object', hint: 'Click to place selected object type' },
   'place-ring': { label: 'Place Ring', hint: 'Click to place ring pattern' },
 };
@@ -43,8 +43,13 @@ export default function MapStatusBar() {
   const zone = getCurrentZone(useProjectStore.getState());
 
   const selectedChunkId = useEditorStore((s) => s.selectedChunkId);
+  // Pasting is independent of the active tool (Ctrl+V doesn't switch tools),
+  // so its label/hint overrides whatever TOOL_INFO would otherwise show.
+  const pasting = useEditorStore((s) => s.pasting);
 
-  const info = TOOL_INFO[tool];
+  const info = pasting
+    ? { label: 'Paste', hint: 'Click to paste · Alt: art only · Shift: collision only · Esc to stop' }
+    : TOOL_INFO[tool];
   const zoomPercent = Math.round(zoom * 100);
 
   const chunkCount = project?.chunkLibrary.length ?? 0;

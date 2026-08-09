@@ -8,7 +8,8 @@ import { openDocumentGuarded } from './art/open-document';
 import { createDoc, docFromTile } from '../../core/art/composer-buffer';
 import type { AnyCommand, S4Level, SetTilesCommand } from '../../core/editing/commands';
 import { buildStampCommand } from '../../core/editing/map-stamp';
-import { snapMarquee, copyFromSection } from '../../core/editing/map-clipboard';
+import { snapMarquee, copyFromSection, buildPasteCommand } from '../../core/editing/map-clipboard';
+import type { PasteLayers } from '../../core/editing/map-clipboard';
 import { SectionRenderer } from '../canvas/SectionRenderer';
 import { OverlayRenderer } from '../canvas/OverlayRenderer';
 import type { SectionOverlayInfo } from '../canvas/OverlayRenderer';
@@ -95,6 +96,11 @@ export default function MapViewport() {
   // cursor wanders over another section's world space.
   const marqueeDragStart = useRef<{ sectionIndex: number; col: number; row: number } | null>(null);
   const isMarqueeDragging = useRef(false);
+  // Paste mode (editorStore `pasting`): the hovered section + even-snapped
+  // footprint origin for the ghost preview and click-to-commit. Purely local
+  // render state (like previewHoverRef) — nothing outside MapViewport needs
+  // the exact hovered cell, only whether pasting is active (store).
+  const pasteHoverRef = useRef<{ sectionIndex: number; baseCol: number; baseRow: number } | null>(null);
   const lastMouse = useRef({ x: 0, y: 0 });
   const dragTarget = useRef<{
     type: 'object' | 'ring';
@@ -158,6 +164,48 @@ export default function MapViewport() {
       ctx.strokeRect(mx, my, mw, mh);
       ctx.setLineDash([]);
       ctx.restore();
+    }
+
+    // Paste ghost: the clipboard footprint as a translucent fill + outline at
+    // the hovered even-snapped origin, plus per-cell shading where the
+    // clipboard's collision is nonzero when a collision overlay is visible.
+    // Footprint-only — deliberately NOT a full art preview (placement aid).
+    if (useEditorStore.getState().pasting) {
+      const pasteHover = pasteHoverRef.current;
+      const clip = useEditorStore.getState().mapClipboard;
+      if (pasteHover && clip) {
+        const pOffset = sectionRenderer.sectionWorldOffset(pasteHover.sectionIndex);
+        const { vpX: pvpX, vpY: pvpY, zoom: pZoom } = useViewStore.getState();
+        const px = pOffset.x + pasteHover.baseCol * 8, py = pOffset.y + pasteHover.baseRow * 8;
+        const pw = clip.widthTiles * 8, ph = clip.heightTiles * 8;
+        ctx.save();
+        ctx.imageSmoothingEnabled = false;
+        ctx.scale(pZoom, pZoom);
+        ctx.translate(-pvpX, -pvpY);
+        ctx.fillStyle = MAP_MARQUEE_FILL;
+        ctx.fillRect(px, py, pw, ph);
+
+        const ov = useViewStore.getState().overlays;
+        if (ov.showCollision || ov.showCollisionPathB) {
+          const showB = ov.showCollisionPathB && !ov.showCollision;
+          const plane = showB ? clip.collisionB : clip.collisionA;
+          const cellsW = clip.widthTiles >> 1, cellsH = clip.heightTiles >> 1;
+          ctx.fillStyle = COLLISION_PREVIEW_FILL;
+          for (let cy = 0; cy < cellsH; cy++) {
+            for (let cx = 0; cx < cellsW; cx++) {
+              if (plane[cy * cellsW + cx] === 0) continue;
+              ctx.fillRect(px + cx * 16, py + cy * 16, 16, 16);
+            }
+          }
+        }
+
+        ctx.strokeStyle = SELECTION_MARQUEE;
+        ctx.lineWidth = 2 / pZoom;
+        ctx.setLineDash([4 / pZoom, 4 / pZoom]);
+        ctx.strokeRect(px, py, pw, ph);
+        ctx.setLineDash([]);
+        ctx.restore();
+      }
     }
 
     const hover = previewHoverRef.current;
@@ -273,6 +321,17 @@ export default function MapViewport() {
   useEffect(() => {
     reloadAllSections();
   }, [project, currentZoneId, currentActId, reloadAllSections]);
+
+  // A marquee/paste from a different act or zone is stale (and pasting into
+  // the wrong act would be actively dangerous) — clear both whenever the
+  // act/zone identity changes. Deliberately NOT keyed on `project` (which the
+  // effect above IS keyed on for reload) — edits mutate the project in place
+  // without changing this identity, so this only fires on an actual act/zone
+  // switch, not on every command.
+  useEffect(() => {
+    useEditorStore.getState().setMarquee(null);
+    useEditorStore.getState().setPasting(false);
+  }, [currentZoneId, currentActId]);
 
   // Re-resolve the displayed BG when the active section changes — its
   // bgLayoutRef may point at a different library entry (or the act default).
@@ -416,6 +475,14 @@ export default function MapViewport() {
   // Keyboard shortcuts
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      // Typing into an input/textarea/contentEditable (e.g. the CommandPalette
+      // search box) must not fire map shortcuts — 'm' switching to the marquee
+      // tool mid-keystroke was the reported symptom.
+      const target = e.target as HTMLElement | null;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
+        return;
+      }
+
       const state = useProjectStore.getState();
       const act = getCurrentAct(state);
       // Must include zone tileset/palette so undo/redo of zone commands
@@ -447,9 +514,23 @@ export default function MapViewport() {
               `Copied ${marquee.w / 2}×${marquee.h / 2} blocks`, 'success',
             );
           }
+          // Only claim the shortcut (and swallow browser text-copy) when there was
+          // actually a marquee to copy — a no-op Ctrl+C (nothing selected) falls
+          // through so text selections elsewhere on the page still copy normally.
+          e.preventDefault();
+          return;
         }
-        e.preventDefault();
-        return;
+      }
+
+      // Enter paste mode (ghost preview + click-to-commit, see handleMouseDown/
+      // handleMouseMove) when there's something to paste. A no-op Ctrl+V (empty
+      // map clipboard) falls through, mirroring the Ctrl+C no-op above.
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'v') {
+        if (useEditorStore.getState().mapClipboard) {
+          useEditorStore.getState().setPasting(true);
+          e.preventDefault();
+          return;
+        }
       }
 
       if ((e.key === 'Delete' || e.key === 'Backspace') && level) {
@@ -490,8 +571,8 @@ export default function MapViewport() {
         case '=': case '+': setZoom(zoom * 1.5); e.preventDefault(); break;
         case '-': setZoom(zoom / 1.5); e.preventDefault(); break;
         case '0': setZoom(1); e.preventDefault(); break;
-        // Ctrl+V is claimed by paste (a later task); guard it here too so it
-        // can't fall through and switch tools out from under a paste shortcut.
+        // Ctrl+V is claimed by paste above (returns before reaching this
+        // switch) — guard here too so a stray Ctrl+V can't switch tools.
         case 'v': if (!e.ctrlKey) useEditorStore.getState().setTool('view'); break;
         case 's': if (!e.ctrlKey) useEditorStore.getState().setTool('select'); break;
         case 'o': useEditorStore.getState().setTool('place-object'); break;
@@ -501,12 +582,24 @@ export default function MapViewport() {
         case 'c': if (!e.ctrlKey) useEditorStore.getState().setTool('paint-collision'); break;
         case 'k': useEditorStore.getState().setTool('stamp-chunk'); break;
         case 'm': useEditorStore.getState().setTool('marquee'); break;
-        case 'Escape':
-          if (useEditorStore.getState().tool === 'marquee' && useEditorStore.getState().marquee) {
-            useEditorStore.getState().setMarquee(null);
+        case 'Escape': {
+          // Pasting wins first: Escape exits paste mode without touching the
+          // marquee (Ctrl+C leaves the marquee committed for repeat copies, and
+          // exiting paste shouldn't discard it). Otherwise Escape clears a
+          // committed marquee regardless of the active tool — the marquee stays
+          // visible/copyable after switching tools (see the Ctrl+C comment
+          // above), so Escape must be able to clear it from any tool too.
+          const ed = useEditorStore.getState();
+          if (ed.pasting) {
+            ed.setPasting(false);
+            pasteHoverRef.current = null;
+            drawCollisionPreview();
+          } else if (ed.marquee) {
+            ed.setMarquee(null);
             drawCollisionPreview();
           }
           break;
+        }
       }
     };
 
@@ -658,6 +751,37 @@ export default function MapViewport() {
 
     // Right-click opens the context menu; never paint/drag from it.
     if (e.button === 2) return;
+
+    // Paste mode takes priority over whatever tool is active — a click commits
+    // the paste and STAYS in paste mode for repeat pastes (Escape exits).
+    if (useEditorStore.getState().pasting) {
+      const clip = useEditorStore.getState().mapClipboard;
+      const hover = pasteHoverRef.current;
+      const level = getActiveLevel();
+      if (clip && hover && level) {
+        const section = getSectionByIndex(hover.sectionIndex);
+        if (section) {
+          ensureCollisionPlanes(section);
+          // Modifiers override the sticky pasteLayers setting for THIS click only.
+          const layers: PasteLayers = e.altKey ? 'art' : e.shiftKey ? 'collision'
+            : useEditorStore.getState().pasteLayers;
+          const cmd = buildPasteCommand({
+            clip, section, sectionIndex: hover.sectionIndex,
+            baseCol: hover.baseCol, baseRow: hover.baseRow, layers,
+            description: `Paste ${clip.widthTiles / 2}×${clip.heightTiles / 2} blocks at (${hover.baseCol}, ${hover.baseRow})`,
+          });
+          if (cmd) {
+            executeCommand(cmd, level);
+            const tilesChild = cmd.commands.find((c): c is SetTilesCommand => c.type === 'set-tiles');
+            const dirtyIndices = tilesChild ? tilesChild.entries.map((entry) => entry.index) : [];
+            sectionRenderer.markDirty(hover.sectionIndex, dirtyIndices);
+          }
+          useEditorStore.getState().setActiveSectionIndex(hover.sectionIndex);
+        }
+      }
+      e.preventDefault();
+      return;
+    }
 
     if (tool === 'view' || e.button === 1) {
       isDragging.current = true;
@@ -921,6 +1045,27 @@ export default function MapViewport() {
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     const tool = useEditorStore.getState().tool;
+
+    // Paste mode: track the hovered even-snapped footprint origin for the
+    // ghost preview. Independent of the active tool — takes priority over any
+    // drag state so the ghost can't get stuck showing a stale cell.
+    if (useEditorStore.getState().pasting) {
+      const world = screenToWorld(e.clientX, e.clientY);
+      const info = worldToSectionTile(world.x, world.y);
+      if (info) {
+        const baseCol = Math.floor(info.col / 2) * 2;
+        const baseRow = Math.floor(info.row / 2) * 2;
+        const prev = pasteHoverRef.current;
+        if (!prev || prev.sectionIndex !== info.sectionIndex || prev.baseCol !== baseCol || prev.baseRow !== baseRow) {
+          pasteHoverRef.current = { sectionIndex: info.sectionIndex, baseCol, baseRow };
+          drawCollisionPreview();
+        }
+      } else if (pasteHoverRef.current) {
+        pasteHoverRef.current = null;
+        drawCollisionPreview();
+      }
+      return;
+    }
 
     // Marquee dragging — always resolved against the drag-START section's
     // local tile space (not whatever section the cursor currently sits over),
@@ -1282,6 +1427,7 @@ export default function MapViewport() {
         isDragging.current = false;
         if (hoverBarRef.current) hoverBarRef.current.style.display = 'none';
         if (previewHoverRef.current) { previewHoverRef.current = null; drawCollisionPreview(); }
+        if (pasteHoverRef.current) { pasteHoverRef.current = null; drawCollisionPreview(); }
       }}
       onWheel={handleWheel}
       onContextMenu={handleContextMenu}

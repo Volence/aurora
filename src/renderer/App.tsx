@@ -6,6 +6,7 @@ import ChunkLibrary from './components/ChunkLibrary';
 import ObjectPalette from './components/ObjectPalette';
 import RingPatternPalette from './components/RingPatternPalette';
 import CollisionPalette from './components/CollisionPalette';
+import MarqueePasteOptions from './components/MarqueePasteOptions';
 import ArtBrowser from './components/ArtBrowser';
 import PaletteViewer from './components/PaletteViewer';
 import PropertiesPanel from './components/PropertiesPanel';
@@ -27,6 +28,7 @@ export default function App() {
   const { openProject, openProjectByPath, saveProject } = useProject();
   const error = useProjectStore((s) => s.error);
   const tool = useEditorStore((s) => s.tool);
+  const pasting = useEditorStore((s) => s.pasting);
   const appMode = useEditorStore((s) => s.appMode);
   const project = useProjectStore((s) => s.project);
   const currentZoneId = useProjectStore((s) => s.currentZoneId);
@@ -95,12 +97,17 @@ export default function App() {
               <CollapsibleSection id="map.sections" title="Sections">
                 <SectionGridNav />
               </CollapsibleSection>
-              {tool === 'stamp-chunk' && (
+              {/* Paste mode isn't tied to the active tool (Ctrl+V doesn't switch
+                  tools), so it's checked first and suppresses every other
+                  tool's options panel — otherwise pasting while e.g.
+                  stamp-chunk is still selected would render two panels
+                  sharing the "map.palette" collapse-state id at once. */}
+              {!pasting && tool === 'stamp-chunk' && (
                 <CollapsibleSection id="map.palette" title="Chunks">
                   <ChunkLibrary />
                 </CollapsibleSection>
               )}
-              {tool === 'place-object' && (
+              {!pasting && tool === 'place-object' && (
                 <CollapsibleSection id="map.palette" title="Objects">
                   <ObjectPalette
                     selectedType={0}
@@ -108,7 +115,7 @@ export default function App() {
                   />
                 </CollapsibleSection>
               )}
-              {tool === 'place-ring' && (
+              {!pasting && tool === 'place-ring' && (
                 <CollapsibleSection id="map.palette" title="Ring Patterns">
                   <RingPatternPalette
                     selectedIndex={useEditorStore.getState().selectedRingPattern}
@@ -116,9 +123,14 @@ export default function App() {
                   />
                 </CollapsibleSection>
               )}
-              {tool === 'paint-collision' && (
+              {!pasting && tool === 'paint-collision' && (
                 <CollapsibleSection id="map.palette" title="Collision">
                   <CollisionPalette />
+                </CollapsibleSection>
+              )}
+              {(tool === 'marquee' || pasting) && (
+                <CollapsibleSection id="map.palette" title={pasting ? 'Paste' : 'Marquee'}>
+                  <MarqueePasteOptions />
                 </CollapsibleSection>
               )}
               <CollapsibleSection id="map.art" title="Art">

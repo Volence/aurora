@@ -106,6 +106,13 @@ interface EditorState {
   marquee: MarqueeState | null;
   mapClipboard: MapClipboard | null;
   pasteLayers: PasteLayers;
+  /** True while the map paste-ghost/click-to-commit mode is active (entered by
+   *  Ctrl+V, stays active across repeat pastes). Lives in the store (rather
+   *  than a MapViewport-local ref) because the paste-layer options bar
+   *  (App.tsx) and the status bar hint need to react to it from outside
+   *  MapViewport; the hovered footprint position itself is a MapViewport-local
+   *  ref (like the collision-paint hover), since nothing else needs it. */
+  pasting: boolean;
 
   setTool: (tool: EditorTool) => void;
   setSelection: (selection: Selection | null) => void;
@@ -131,6 +138,7 @@ interface EditorState {
   setMarquee: (marquee: MarqueeState | null) => void;
   setMapClipboard: (clipboard: MapClipboard | null) => void;
   setPasteLayers: (layers: PasteLayers) => void;
+  setPasting: (pasting: boolean) => void;
   markDirty: () => void;
   markClean: () => void;
   bumpVersion: () => void;
@@ -172,8 +180,12 @@ export const useEditorStore = create<EditorState>((set) => ({
   marquee: null,
   mapClipboard: null,
   pasteLayers: 'both',
+  pasting: false,
 
-  setTool: (tool) => set({ tool, selection: null, multiSelection: null }),
+  // An explicit tool switch cancels an in-progress paste (repeat pastes never
+  // call setTool, so they aren't affected) — picking a different tool while
+  // pasting means the user is done pasting.
+  setTool: (tool) => set({ tool, selection: null, multiSelection: null, pasting: false }),
   setSelection: (selection) => set({ selection, multiSelection: null }),
   setMultiSelection: (multiSelection) => set({ multiSelection, selection: null }),
   setActiveSectionIndex: (index) => set({ activeSectionIndex: index }),
@@ -201,6 +213,7 @@ export const useEditorStore = create<EditorState>((set) => ({
   setMarquee: (marquee) => set({ marquee }),
   setMapClipboard: (mapClipboard) => set({ mapClipboard }),
   setPasteLayers: (pasteLayers) => set({ pasteLayers }),
+  setPasting: (pasting) => set({ pasting }),
   markDirty: () => set({ dirty: true }),
   markClean: () => set({ dirty: false }),
   bumpVersion: () => set((s) => ({ historyVersion: s.historyVersion + 1 })),

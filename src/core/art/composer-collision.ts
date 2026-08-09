@@ -1,4 +1,5 @@
 import type { ComposerDoc } from './composer-buffer';
+import type { MapClipboard } from '../editing/map-clipboard';
 
 /** Write one packed cell word into a composer doc plane at 8px-tile coords
  *  (tx,ty) — mapped to the 16px cell (tx>>1, ty>>1). Returns true if changed. */
@@ -14,4 +15,27 @@ export function paintDocCollision(
   if (arr[idx] === word) return false;
   arr[idx] = word;
   return true;
+}
+
+/** Paste a MapClipboard's collision planes onto a composer doc at the origin
+ *  (cell 0,0) — art is out of scope (chunk art still comes from stamps/save).
+ *  Size-clamped to the smaller of the clipboard's and the doc's cell grids so
+ *  an oversized clipboard silently truncates instead of overflowing. Returns
+ *  true if anything changed. */
+export function applyClipboardCollisionToDoc(doc: ComposerDoc, clip: MapClipboard): boolean {
+  const docCellsW = doc.widthTiles >> 1, docCellsH = doc.heightTiles >> 1;
+  const clipCellsW = clip.widthTiles >> 1, clipCellsH = clip.heightTiles >> 1;
+  const w = Math.min(docCellsW, clipCellsW);
+  const h = Math.min(docCellsH, clipCellsH);
+  let changed = false;
+  for (let cy = 0; cy < h; cy++) {
+    for (let cx = 0; cx < w; cx++) {
+      const srcIdx = cy * clipCellsW + cx;
+      const dstIdx = cy * docCellsW + cx;
+      const a = clip.collisionA[srcIdx], b = clip.collisionB[srcIdx];
+      if (doc.collisionA[dstIdx] !== a) { doc.collisionA[dstIdx] = a; changed = true; }
+      if (doc.collisionB[dstIdx] !== b) { doc.collisionB[dstIdx] = b; changed = true; }
+    }
+  }
+  return changed;
 }
