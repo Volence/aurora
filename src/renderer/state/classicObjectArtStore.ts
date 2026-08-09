@@ -7,11 +7,14 @@
 // LIVE palette line, and cache the resulting ImageBitmap for the viewport draw.
 //
 // CACHE KEY = `id:zone:epoch`. `epoch` is the store's `chunkEpoch`, which bumps on
-// any palette edit (classicSetPalette → version-effect 'all'); object sprite colors
-// come straight from `doc.palettes[link.pal]`, so re-keying on chunkEpoch is exactly
-// the palette-version signal, no extra counter needed. There is therefore ONE cached
-// canvas per (id, palette-version), never one per placement — every placement of the
-// same id in a zone reuses the one bitmap.
+// any palette edit AND any tile/block edit (classicSetPalette / classicEditTiles /
+// classicEditBlock all commit with version-effect 'all'). Object sprite colors come
+// from `doc.palettes[link.pal]`, and B6 LevelArt sprites ALSO draw from `doc.tiles`,
+// so re-keying on chunkEpoch covers both dependencies: a tile edit bumps the epoch,
+// the viewport re-runs the refresh with the fresh doc, and LevelArt sprites rebuild
+// against the edited pool. (File-backed static sprites also re-key on the epoch bump
+// and rebuild from cache-cold — a cheap, correct over-invalidation.) There is ONE
+// cached canvas per (id, subtype-variant, epoch), never one per placement.
 //
 // The published `sprites` map (id → ObjectSprite) is what the viewport / hit-test /
 // library thumbnails read synchronously; a miss falls back to the hex box and kicks
@@ -21,7 +24,7 @@ import { create } from 'zustand';
 import { decodeGenesisColor } from '../../core/formats/palette';
 import { indicesToRGBA } from '../../core/art/sprite-render';
 import {
-  renderObjectFrameFromFiles, composeObjectFramesFromFiles, type RenderedObjectFrame,
+  renderResolvedObjectFrame, type RenderedObjectFrame,
 } from '../../core/level-classic/object-sprite';
 import { resolveObjectArt, type ObjectArtLink } from '../../core/project/profiles/s1-object-art';
 import {
@@ -113,16 +116,26 @@ async function buildSpriteFromFiles(
     }
     return fa.read(p);
   };
+  // LevelArt objects draw from the act's own tile pool (doc.tiles), NOT a .nem — so
+  // read only the mappings; the tile source is doc.tiles (offset-shifted per the
+  // link). File-backed objects read + decode their art file.
+  const isLevelArt = effLink.artSource === 'levelArt';
   const [artBytes, mapBytes] = await Promise.all([
-    readOne(effLink.artFile),
+    isLevelArt ? Promise.resolve<Uint8Array | null>(null) : readOne(effLink.artFile),
     readOne(effLink.mapAsm),
   ]);
   const mapText = new TextDecoder('utf-8').decode(mapBytes);
-  // A rule with pieces composes several frames (bridge logs, monitor shell + icon,
-  // spike rows, chain + platform); otherwise render the one declared frame.
-  const frame: RenderedObjectFrame = pieces
-    ? composeObjectFramesFromFiles(mapText, artBytes, effLink.compression, pieces)
-    : renderObjectFrameFromFiles(mapText, artBytes, effLink.compression, effLink.frame);
+  // ONE shared render path (renderResolvedObjectFrame): resolves the tile pool from
+  // the art source + offset, then renders the single frame or composes rule pieces
+  // (bridge logs, monitor shell + icon, stairs, LZ cork variants, …). Same call the
+  // headless render harness makes — app + harness cannot diverge.
+  const frame: RenderedObjectFrame = renderResolvedObjectFrame(
+    {
+      artSource: effLink.artSource, compression: effLink.compression,
+      tileIndexOffset: effLink.tileIndexOffset, frame: effLink.frame, pieces,
+    },
+    mapText, artBytes, isLevelArt ? doc.tiles : null,
+  );
   // An all-transparent frame (bad frame index / empty mappings) is not useful —
   // treat it as a failure so the hex box shows instead of an invisible sprite.
   if (frame.width <= 0 || frame.height <= 0) return null;
@@ -240,7 +253,10 @@ export async function refreshClassicObjectSprites(
       // Prefetch the EFFECTIVE files so a rule's art-file override (e.g. Spring
       // Vertical.nem) batches too, instead of falling back to a per-sprite read.
       const { link } = resolveEffectiveObjectArt(id, zone, subtype, base);
-      wanted.add(link.artFile); wanted.add(link.mapAsm);
+      // LevelArt links have no real art file (sentinel 'LevelArt') — prefetch only
+      // the mappings; the tiles come from doc.tiles at build time.
+      if (link.artSource === 'file') wanted.add(link.artFile);
+      wanted.add(link.mapAsm);
     }
     if (wanted.size > 0) {
       const got = await fa.readMany([...wanted]);

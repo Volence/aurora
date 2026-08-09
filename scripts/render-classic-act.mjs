@@ -60,9 +60,9 @@ async function loadCore() {
     export { s1Adapter } from ${JSON.stringify(path.join(REPO, 'src/core/project/s1/index.ts'))};
     export { renderChunk } from ${JSON.stringify(path.join(REPO, 'src/core/level-classic/render.ts'))};
     export { layoutCellAt, ringGroupPositions } from ${JSON.stringify(path.join(REPO, 'src/renderer/components/classic/viewport-math.ts'))};
-    export { renderObjectFrameFromFiles, composeObjectFramesFromFiles, objectFrameRect } from ${JSON.stringify(path.join(REPO, 'src/core/level-classic/object-sprite.ts'))};
+    export { renderResolvedObjectFrame, objectFrameRect } from ${JSON.stringify(path.join(REPO, 'src/core/level-classic/object-sprite.ts'))};
     export { resolveObjectArt } from ${JSON.stringify(path.join(REPO, 'src/core/project/profiles/s1-object-art.ts'))};
-    export { resolveObjectPieces, objectHasSubtypeRule, objectArtKey } from ${JSON.stringify(path.join(REPO, 'src/core/project/profiles/object-subtype-rules.ts'))};
+    export { resolveEffectiveObjectArt, objectArtKey } from ${JSON.stringify(path.join(REPO, 'src/core/project/profiles/object-subtype-rules.ts'))};
     export { s1ObjectIsInvisible, s1ObjectName } from ${JSON.stringify(path.join(REPO, 'src/core/project/profiles/s1-objects.ts'))};
     export { indicesToRGBA } from ${JSON.stringify(path.join(REPO, 'src/core/art/sprite-render.ts'))};
     export { decodeGenesisColor } from ${JSON.stringify(path.join(REPO, 'src/core/formats/palette.ts'))};
@@ -144,8 +144,8 @@ function composePlane(doc, renderChunk, layoutCellAt, plane, crop) {
 // ---------------------------------------------------------------------------
 function overlayObjects(img, doc, core, zone, crop) {
   const {
-    renderObjectFrameFromFiles, composeObjectFramesFromFiles, objectFrameRect,
-    resolveObjectArt, resolveObjectPieces, objectHasSubtypeRule, objectArtKey,
+    renderResolvedObjectFrame, objectFrameRect,
+    resolveObjectArt, resolveEffectiveObjectArt, objectArtKey,
     s1ObjectIsInvisible, indicesToRGBA, decodeGenesisColor, ringGroupPositions,
   } = core;
   const offX = crop ? crop[0] * CHUNK_PX : 0;
@@ -161,20 +161,24 @@ function overlayObjects(img, doc, core, zone, crop) {
   const getFrame = (id, subtype) => {
     const key = objectArtKey(id, zone, subtype);
     if (frameCache.has(key)) return frameCache.get(key);
-    const link = resolveObjectArt(id, zone);
+    const base = resolveObjectArt(id, zone);
     let entry = null;
-    if (link) {
+    if (base) {
       try {
-        const rule = objectHasSubtypeRule(id, zone) ? resolveObjectPieces(id, zone, subtype) : null;
-        const useLink = rule ? rule.link : link;
-        const artBytes = new Uint8Array(fs.readFileSync(path.join(S1DIR, useLink.artFile)));
+        // SAME resolution + render path the app store uses (resolveEffectiveObjectArt
+        // → renderResolvedObjectFrame): LevelArt draws from doc.tiles, offset-art
+        // shifts the pool, rules compose pieces.
+        const { link, pieces } = resolveEffectiveObjectArt(id, zone, subtype, base);
+        const isLevelArt = link.artSource === 'levelArt';
+        const artBytes = isLevelArt ? null : new Uint8Array(fs.readFileSync(path.join(S1DIR, link.artFile)));
         // Decode mappings the SAME way production does (TextDecoder utf-8).
-        const mapText = new TextDecoder('utf-8').decode(fs.readFileSync(path.join(S1DIR, useLink.mapAsm)));
-        const f = rule
-          ? composeObjectFramesFromFiles(mapText, artBytes, useLink.compression, rule.pieces)
-          : renderObjectFrameFromFiles(mapText, artBytes, useLink.compression, useLink.frame);
-        if (rule) composed++;
-        const colorsLine = doc.palettes[useLink.pal] ?? doc.palettes[0] ?? new Uint16Array(16);
+        const mapText = new TextDecoder('utf-8').decode(fs.readFileSync(path.join(S1DIR, link.mapAsm)));
+        const f = renderResolvedObjectFrame(
+          { artSource: link.artSource, compression: link.compression, tileIndexOffset: link.tileIndexOffset, frame: link.frame, pieces },
+          mapText, artBytes, isLevelArt ? doc.tiles : null,
+        );
+        if (pieces) composed++;
+        const colorsLine = doc.palettes[link.pal] ?? doc.palettes[0] ?? new Uint16Array(16);
         const colors = [];
         for (let i = 0; i < 16; i++) colors.push(decodeGenesisColor(colorsLine[i] ?? 0));
         const rgba = indicesToRGBA(f.indices, colors);

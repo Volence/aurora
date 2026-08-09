@@ -180,6 +180,65 @@ describe('object-subtype-rules', () => {
     });
   });
 
+  describe('B6 LevelArt / offset-art subtype rules', () => {
+    it('GHZ $18 Platform: "Large" (movement 0x0A) → frame 1, else frame 0', () => {
+      expect(resolveObjectPieces(0x18, 'ghz', 0x00)!.pieces[0].frame).toBe(0); // Stationary
+      expect(resolveObjectPieces(0x18, 'ghz', 0x05)!.pieces[0].frame).toBe(0); // Left->Right
+      expect(resolveObjectPieces(0x18, 'ghz', 0x0a)!.pieces[0].frame).toBe(1); // Large
+      // The rule reuses the LevelArt link (tiles from doc.tiles).
+      expect(resolveObjectPieces(0x18, 'ghz', 0)!.link.artSource).toBe('levelArt');
+      // SLZ/SYZ Platform ($18) have no "Large" variant → NO rule (static frame 0).
+      expect(objectHasSubtypeRule(0x18, 'slz')).toBe(false);
+      expect(objectHasSubtypeRule(0x18, 'syz')).toBe(false);
+    });
+
+    it('GHZ $1A Collapsing Cliff: subtype bit0 → light (0) / shadow (1)', () => {
+      expect(resolveObjectPieces(0x1a, 'ghz', 0)!.pieces[0].frame).toBe(0);
+      expect(resolveObjectPieces(0x1a, 'ghz', 1)!.pieces[0].frame).toBe(1);
+    });
+
+    it('MZ $2F Grass Platform: Sprite bits4-5 → frame 0/1/2 (Symmetrical/Asym/Column)', () => {
+      expect(resolveObjectPieces(0x2f, 'mz', 0x00)!.pieces[0].frame).toBe(0);
+      expect(resolveObjectPieces(0x2f, 'mz', 0x10)!.pieces[0].frame).toBe(1);
+      expect(resolveObjectPieces(0x2f, 'mz', 0x20)!.pieces[0].frame).toBe(2);
+    });
+
+    it('SYZ $56 Block: frame = (subtype & 0x70) >> 4', () => {
+      expect(resolveObjectPieces(0x56, 'syz', 0x00)!.pieces[0].frame).toBe(0);
+      expect(resolveObjectPieces(0x56, 'syz', 0x30)!.pieces[0].frame).toBe(3);
+      expect(resolveObjectPieces(0x56, 'syz', 0x70)!.pieces[0].frame).toBe(7);
+      // Low nibble (switch id) is ignored for the frame.
+      expect(resolveObjectPieces(0x56, 'syz', 0x2f)!.pieces[0].frame).toBe(2);
+    });
+
+    it('SLZ $5B Stairs: fixed 4-step composite (frame 0 at X 0/32/64/96)', () => {
+      const set = resolveObjectPieces(0x5b, 'slz', 0)!;
+      expect(set.pieces.map((p) => p.dx)).toEqual([0, 32, 64, 96]);
+      expect(set.pieces.every((p) => p.frame === 0)).toBe(true);
+    });
+
+    it('LZ $61 Block/Cork: each subtype selects its own art file + byte offset + frame', () => {
+      const cork = resolveEffectiveObjectArt(0x61, 'lz', 0x27, resolveObjectArt(0x61, 'lz')!);
+      expect(cork.link.artFile).toContain('LZ Cork.nem');
+      expect(cork.link.tileIndexOffset).toBe(282);
+      expect(cork.pieces![0].frame).toBe(2);
+
+      const falling = resolveEffectiveObjectArt(0x61, 'lz', 0x01, resolveObjectArt(0x61, 'lz')!);
+      expect(falling.link.artFile).toContain('LZ Horizontal Door.nem');
+      expect(falling.link.tileIndexOffset).toBe(0);
+      expect(falling.pieces![0].frame).toBe(0);
+
+      const rising = resolveEffectiveObjectArt(0x61, 'lz', 0x13, resolveObjectArt(0x61, 'lz')!);
+      expect(rising.link.artFile).toContain('LZ Rising Platform.nem');
+      expect(rising.link.tileIndexOffset).toBe(105); // 3360 / 32
+
+      const block = resolveEffectiveObjectArt(0x61, 'lz', 0x30, resolveObjectArt(0x61, 'lz')!);
+      expect(block.link.artFile).toContain('LZ 32x32 Block.nem');
+      expect(block.link.tileIndexOffset).toBe(1530); // 48960 / 32
+      expect(block.link.pal).toBe(3);
+    });
+  });
+
   describe('resolveEffectiveObjectArt (rule LINK overrides — the app render path)', () => {
     it('a static id returns the base link, no pieces', () => {
       const base = resolveObjectArt(0x1f, 'ghz')!; // Crabmeat

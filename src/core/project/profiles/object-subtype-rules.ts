@@ -116,6 +116,13 @@ const GHZ_RULES: Readonly<Record<number, Rule>> = {
     for (let i = 0; i < n; i++) pieces.push({ frame: i & 7, dx: -start + i * 16, dy: 0 });
     return { pieces, link: base };
   },
+  // Platform (LevelArt, GHZ/Platform.xml) — Movement = bits0-3; value 0x0A "Large"
+  // draws img2 = frame 1 (the large column platform), every other movement img1 =
+  // frame 0. (SLZ/SYZ Platform have no img2 → static frame 0, no rule.)
+  0x18: (subtype, base) => one((subtype & 0x0f) === 0x0a ? 1 : 0, base),
+  // Collapsing Cliff (LevelArt, GHZ/CollapsingCliff.xml) — subtype 00 light (frame 0)
+  // / 01 shadow (frame 1).
+  0x1a: (subtype, base) => one(subtype & 1, base),
   // Breakable Wall — subtype bits0-3: 0 Left / 1 Middle / 2 Right (GHZ/BreakableWall.xml).
   0x3c: (subtype, base) => one(Math.min(2, subtype & 0x0f), base),
   // Newtron — 00 grounded (frame 3, pal 0) / 01 flying (frame 1, pal 1) (GHZ/Newtron.xml).
@@ -131,8 +138,21 @@ const RULES_ZONE: Readonly<Record<string, Readonly<Record<number, Rule>>>> = {
   // $15 Swinging Platform / Swinging Spikeball reuses the same GetSprite geometry in
   // every zone (SwingingPlatform.cs / SBZ SwingingSpikeball.cs); only the art link
   // (zone-scoped in s1-object-art) differs. Each map has the 3 frames the rule needs.
-  mz: { 0x15: GHZ_RULES[0x15] },
-  slz: { 0x15: GHZ_RULES[0x15] },
+  mz: {
+    0x15: GHZ_RULES[0x15],
+    // Grass Platform (LevelArt, MZ/MovingPlatform.xml) — Sprite = bits4-5: 0
+    // Symmetrical (frame 0) / 1 Asymmetrical (frame 1) / 2 Column (frame 2).
+    0x2f: (subtype, base) => one(Math.min(2, (subtype >> 4) & 3), base),
+  },
+  slz: {
+    0x15: GHZ_RULES[0x15],
+    // Stairs (LevelArt, SLZ/Stairs.xml) — the Display draws frame 0 four times at
+    // X = 0/32/64/96 (a fixed 4-step staircase, subtype-independent).
+    0x5b: (_subtype, base) => ({
+      pieces: [0, 32, 64, 96].map((dx) => ({ frame: 0, dx, dy: 0 })),
+      link: base,
+    }),
+  },
   sbz: { 0x15: GHZ_RULES[0x15] },
   // SYZ Spikeball chain — length = (subtype & 0x0F) + 1 balls stacked straight up
   // (frame 0, 16px pitch) (SYZ/SpikeballChain.cs GetSprite).
@@ -143,6 +163,26 @@ const RULES_ZONE: Readonly<Record<string, Readonly<Record<number, Rule>>>> = {
       let dy = 0;
       for (let i = 0; i < length; i++) { pieces.push({ frame: 0, dx: 0, dy }); dy -= 16; }
       return { pieces, link: base };
+    },
+    // Block/Platform (LevelArt, SYZ/Block.cs) — SubtypeImage: frame = (subtype &
+    // 0x70) >> 4 (0..7) into Floating Blocks and Doors.asm.
+    0x56: (subtype, base) => one((subtype & 0x70) >> 4, base),
+  },
+  // LZ Block/Cork (LZ/Block.xml) — each subtype uses a DIFFERENT .nem + byte offset
+  // + frame + palette (a per-variant offset-art switch). The base link is the "Cork"
+  // default (subtype 0x27); the rule overrides art/frame/pal/offset for the others.
+  lz: {
+    0x61: (subtype, base) => {
+      switch (subtype) {
+        case 0x01: // Falling Platform — LZ Horizontal Door.nem, no offset, frame 0.
+          return { pieces: [{ frame: 0, dx: 0, dy: 0 }], link: withLink(base, { artFile: 'artnem/LZ Horizontal Door.nem', frame: 0, pal: 2, tileIndexOffset: 0 }) };
+        case 0x13: // Rising Platform — LZ Rising Platform.nem, offset 3360 (+105 tiles), frame 1.
+          return { pieces: [{ frame: 1, dx: 0, dy: 0 }], link: withLink(base, { artFile: 'artnem/LZ Rising Platform.nem', frame: 1, pal: 2, tileIndexOffset: 3360 / 32 }) };
+        case 0x30: // Block — LZ 32x32 Block.nem, offset 48960 (+1530 tiles), frame 3, pal 3.
+          return { pieces: [{ frame: 3, dx: 0, dy: 0 }], link: withLink(base, { artFile: 'artnem/LZ 32x32 Block.nem', frame: 3, pal: 3, tileIndexOffset: 48960 / 32 }) };
+        default: // Cork (0x27) — base link (LZ Cork.nem, offset 9024 = +282 tiles, frame 2).
+          return one(2, base);
+      }
     },
   },
 };

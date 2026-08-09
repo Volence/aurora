@@ -29,8 +29,13 @@ describe('s1-object-art linkage table', () => {
       // Object ids are 7-bit.
       expect(id, tag).toBeGreaterThanOrEqual(0);
       expect(id, tag).toBeLessThanOrEqual(0x7f);
-      // Art file: artnem/*.nem (nemesis) or artunc/*.unc (uncompressed).
-      if (link.compression === 'nemesis') {
+      // artSource is always one of the two known kinds (B6).
+      expect(['file', 'levelArt'], tag).toContain(link.artSource);
+      if (link.artSource === 'levelArt') {
+        // LevelArt draws from doc.tiles: sentinel art file, no real path on disk.
+        expect(link.artFile, tag).toBe('LevelArt');
+      } else if (link.compression === 'nemesis') {
+        // Art file: artnem/*.nem (nemesis) or artunc/*.unc (uncompressed).
         expect(link.artFile, tag).toMatch(/^artnem\/.+\.nem$/);
       } else {
         expect(link.artFile, tag).toMatch(/^artunc\/.+\.unc$/);
@@ -44,6 +49,10 @@ describe('s1-object-art linkage table', () => {
       expect(Number.isInteger(link.frame) && link.frame >= 0, tag).toBe(true);
       expect(link.pal, tag).toBeGreaterThanOrEqual(0);
       expect(link.pal, tag).toBeLessThanOrEqual(3);
+      // tileIndexOffset, when present, is an integer (tiles = byte offset / 32).
+      if (link.tileIndexOffset !== undefined) {
+        expect(Number.isInteger(link.tileIndexOffset), tag).toBe(true);
+      }
     }
   });
 
@@ -87,6 +96,46 @@ describe('s1-object-art linkage table', () => {
     expect(resolveObjectArt(0x5d, 'slz')?.artFile).toContain('Fan'); // SLZ Fan
   });
 
+  it('B6: LevelArt objects are linked with artSource=levelArt (tiles from doc.tiles)', () => {
+    // GHZ Platform ($18) + Collapsing Cliff ($1A).
+    const plat = resolveObjectArt(0x18, 'ghz');
+    expect(plat?.artSource).toBe('levelArt');
+    expect(plat?.artFile).toBe('LevelArt');
+    expect(plat?.mapAsm).toContain('Platforms (GHZ)');
+    expect(resolveObjectArt(0x1a, 'ghz')?.artSource).toBe('levelArt');
+    // MZ Grass Platform ($2F) + Brick ($46).
+    expect(resolveObjectArt(0x2f, 'mz')?.artSource).toBe('levelArt');
+    expect(resolveObjectArt(0x46, 'mz')?.mapAsm).toContain('MZ Bricks');
+    // SLZ Platform/Elevator/Circling/Stairs.
+    expect(resolveObjectArt(0x18, 'slz')?.artSource).toBe('levelArt');
+    expect(resolveObjectArt(0x59, 'slz')?.mapAsm).toContain('Elevators');
+    expect(resolveObjectArt(0x5a, 'slz')?.mapAsm).toContain('Circling');
+    expect(resolveObjectArt(0x5b, 'slz')?.mapAsm).toContain('Staircase');
+    // SYZ Siren Light ($12, frame 1) + Platform ($18) + Block ($56).
+    expect(resolveObjectArt(0x12, 'syz')?.mapAsm).toContain('Light');
+    expect(resolveObjectArt(0x12, 'syz')?.frame).toBe(1);
+    expect(resolveObjectArt(0x18, 'syz')?.artSource).toBe('levelArt');
+    expect(resolveObjectArt(0x56, 'syz')?.mapAsm).toContain('Floating Blocks');
+  });
+
+  it('B6: offset-art objects carry the tile-index shift (byte offset / 32)', () => {
+    // Common Switch ($32) offset=-128 → -4 tiles, in LZ/SBZ/SYZ.
+    for (const zone of ['lz', 'sbz', 'syz']) {
+      const sw = resolveObjectArt(0x32, zone);
+      expect(sw?.artFile, zone).toContain('Switch.nem');
+      expect(sw?.artSource, zone).toBe('file');
+      expect(sw?.tileIndexOffset, zone).toBe(-4);
+    }
+    // MZ $32 is a DIFFERENT switch (own art, no offset) — must NOT be shifted.
+    expect(resolveObjectArt(0x32, 'mz')?.artFile).toContain('MZ Switch');
+    expect(resolveObjectArt(0x32, 'mz')?.tileIndexOffset).toBeUndefined();
+    // LZ Block/Cork ($61) default = Cork, offset=9024 → +282 tiles.
+    const cork = resolveObjectArt(0x61, 'lz');
+    expect(cork?.artFile).toContain('LZ Cork.nem');
+    expect(cork?.frame).toBe(2);
+    expect(cork?.tileIndexOffset).toBe(282);
+  });
+
   it('linkedObjectIds includes the base ids plus the zone overrides', () => {
     const ghz = linkedObjectIds('ghz');
     expect(ghz).toContain(0x26); // Monitor (base)
@@ -101,7 +150,9 @@ describe('s1-object-art linkage table', () => {
     it('every linked art + mappings file exists on disk', () => {
       const missing: string[] = [];
       for (const { where, id, link } of allLinks()) {
-        for (const rel of [link.artFile, link.mapAsm]) {
+        // LevelArt has no on-disk art file (sentinel) — only its mappings exist.
+        const files = link.artSource === 'levelArt' ? [link.mapAsm] : [link.artFile, link.mapAsm];
+        for (const rel of files) {
           if (!fs.existsSync(path.join(S1DIR, rel))) missing.push(`${where}:$${id.toString(16)} → ${rel}`);
         }
       }

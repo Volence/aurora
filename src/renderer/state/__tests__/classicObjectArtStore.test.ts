@@ -13,6 +13,13 @@ function fakeDoc(ids: number[]): LevelDoc {
   return { objects: ids.map((id) => ({ id })) } as unknown as LevelDoc;
 }
 
+// A doc carrying a one-byte tile pool marker, for the cache-invalidation test: the
+// fake builder reads ctx.doc.tiles[0] so a "tile edit" (a different marker) is
+// observable in the built sprite.
+function fakeDocWithTiles(ids: number[], marker: number): LevelDoc {
+  return { objects: ids.map((id) => ({ id, subtype: 0 })), tiles: new Uint8Array([marker]) } as unknown as LevelDoc;
+}
+
 function fakeSprite(width: number, close = () => {}): ObjectSprite {
   return { bitmap: { close } as unknown as ImageBitmap, width, height: width, originX: 0, originY: 0 };
 }
@@ -82,6 +89,26 @@ describe('refreshClassicObjectSprites — lifecycle guards', () => {
     await refreshClassicObjectSprites('dir', fakeDoc([1, 2, 3, 4, 5, 6, 7, 8]), 'ghz', 1);
     expect(useClassicObjectArtStore.getState().version).toBe(before + 1);
     expect(useClassicObjectArtStore.getState().sprites.size).toBe(8);
+  });
+
+  it('B6: a tile edit (epoch bump) rebuilds LevelArt sprites against the new doc.tiles', async () => {
+    // LevelArt sprites draw from doc.tiles, so a tile edit must invalidate their
+    // cache. classicEditTiles bumps chunkEpoch (VersionEffect 'all') and the viewport
+    // re-runs refresh with the fresh doc at the new epoch. Here the fake builder maps
+    // ctx.doc.tiles[0] → sprite width, so the rebuild is observable.
+    __setObjectSpriteBuilderForTest(async (_id, _zone, _variant, ctx) => fakeSprite(ctx.doc.tiles[0]));
+
+    // Epoch 1 with tile marker 5 → sprite width 5.
+    await refreshClassicObjectSprites('dir', fakeDocWithTiles([1], 5), 'ghz', 1);
+    expect(useClassicObjectArtStore.getState().sprites.get('1')?.width).toBe(5);
+
+    // Same epoch, edited tiles (marker 9) → CACHED: width unchanged (epoch is the key).
+    await refreshClassicObjectSprites('dir', fakeDocWithTiles([1], 9), 'ghz', 1);
+    expect(useClassicObjectArtStore.getState().sprites.get('1')?.width).toBe(5);
+
+    // Tile edit bumps the epoch → rebuild picks up the new pool: width 9.
+    await refreshClassicObjectSprites('dir', fakeDocWithTiles([1], 9), 'ghz', 2);
+    expect(useClassicObjectArtStore.getState().sprites.get('1')?.width).toBe(9);
   });
 
   it('publishes only linked (non-null) sprites, skipping misses', async () => {

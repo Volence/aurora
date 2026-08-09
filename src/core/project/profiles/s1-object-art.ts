@@ -23,15 +23,24 @@
 // chain length, …) get COMPOSED frames from object-subtype-rules.ts on top of the
 // single default frame here.
 //
+// B6 CLOSEOUT: the two families the B5 skip list bucketed as "needs a separate
+// pipeline" are now LINKED. LevelArt objects use `artSource:'levelArt'` (tiles from
+// `LevelDoc.tiles`, the act's VRAM-ordered pool — mirrors SonLVLAPI ObjectHelper.
+// LevelArt); offset-art objects use `off()` (tile pool shifted by the SonLVL byte
+// `offset=`, exactly as MultiFileIndexer<byte> does). Now linked:
+//   • LevelArt: GHZ Platform ($18: rule → "Large"=frame1) + Collapsing Cliff ($1A:
+//     subtype→frame), MZ Grass Platform ($2F: Sprite bits→frame) + Brick ($46), SLZ
+//     Platform ($18) + Elevator ($59) + Circling Platform ($5A) + Stairs ($5B:
+//     4-piece composite), SYZ Siren Light ($12) + Platform ($18) + Block ($56: rule
+//     → (subtype&0x70)>>4 frame).
+//   • offset-art: Switch ($32, offset −128 = skip 4 tiles) in LZ/SBZ/SYZ; LZ Block/
+//     Cork ($61, Cork offset 9024 = +282 tiles default; subtype rule for the other
+//     three variants — each its own .nem + offset).
+//
 // Deliberately UNLINKED (keep the viewport's hex-box fallback), with reasons:
-//   • art=LevelArt (cut from the level's own tile pool, not a .nem): GHZ/SLZ/SYZ
-//     Platform ($18), GHZ Collapsing Cliff ($1A), MZ Grass Platform ($2F) + Brick
-//     ($46), SLZ Elevator ($59)/Circling Platform ($5A)/Stairs ($5B), SYZ Siren
-//     Light ($12) + Block ($56). A LevelArt renderer is a separate pipeline.
-//   • offset-art (art uses a byte-skip `offset=` our nemesis decoder can't honour):
-//     Switch ($32) in LZ/SBZ/SYZ (offset -128), LZ Block/Cork ($61).
-//   • dual/multi-art default (composites several different art files): MZ Sideways
-//     Stomper ($45), SBZ Rotating Junction ($66).
+//   • dual/multi-art default (composites several DIFFERENT art files in one image —
+//     not a single-file tile pool + offset): MZ Sideways Stomper ($45), SBZ Rotating
+//     Junction ($66). A per-image multi-file art indexer is out of B6 scope.
 //   • debug / invisible / trigger markers (drawn as ghost markers, see
 //     s1-objects.ts S1_INVISIBLE_OBJECT_IDS): Fireball Spawner ($13), Waterfall SFX
 //     ($49), Invisible Lava Marker ($54), Conveyor Controller ($68), Invisible Block
@@ -59,10 +68,31 @@
 export type ObjectArtCompression = 'nemesis' | 'uncompressed';
 
 /**
+ * Where an object's tile art comes from (B6):
+ *   • `'file'`     — a standalone `.nem`/`.unc` art file (`artFile`) decoded on its own.
+ *   • `'levelArt'` — the ACT's own VRAM-ordered tile pool (`LevelDoc.tiles`); the
+ *     mappings' tile indices point straight into that pool. Mirrors SonLVLAPI's
+ *     `ObjectHelper.LevelArt` (= `LevelData.TileArray`, the whole level tile blob),
+ *     which `MapASMToBmp` indexes exactly like a file. `artFile` is the sentinel
+ *     `'LevelArt'` and is NOT read from disk.
+ */
+export type ObjectArtSource = 'file' | 'levelArt';
+
+/**
  * The art + mappings needed to render one object's default preview frame. Paths
  * are disasm-relative POSIX. `pal` is the palette LINE (0..3) — the objdef's
  * `pal=` / XML `startpal` / C# `MapASMToBmp` startpal arg — used to pick
  * `doc.palettes[pal]`. `frame` indexes the mappings' frame table.
+ *
+ * `artSource` selects the tile pool (see ObjectArtSource). `tileIndexOffset` is a
+ * TILE shift derived from SonLVL's XML `offset=` byte value as `offset / 32` (all
+ * real S1 offsets are multiples of 32). The renderer builds the effective tile pool
+ * EXACTLY as SonLVLAPI's `MultiFileIndexer<byte>` does: `combined[i] = raw[i −
+ * offsetBytes]`, so mapping tile T resolves to raw tile `T − tileIndexOffset`. A
+ * negative offset (Switch `offset="-128"` → −4) drops the first N leading tiles; a
+ * positive offset (LZ Cork `offset="9024"` → +282) prepends N blank tiles. `0` /
+ * absent = the mappings index the pool directly (every LevelArt def, and plain
+ * `.nem` files).
  */
 export interface ObjectArtLink {
   artFile: string;
@@ -70,15 +100,38 @@ export interface ObjectArtLink {
   frame: number;
   pal: number;
   compression: ObjectArtCompression;
+  artSource: ObjectArtSource;
+  tileIndexOffset?: number;
 }
 
 const nem = (
   artFile: string, mapAsm: string, frame: number, pal: number,
-): ObjectArtLink => ({ artFile, mapAsm, frame, pal, compression: 'nemesis' });
+): ObjectArtLink => ({ artFile, mapAsm, frame, pal, compression: 'nemesis', artSource: 'file' });
 
 const unc = (
   artFile: string, mapAsm: string, frame: number, pal: number,
-): ObjectArtLink => ({ artFile, mapAsm, frame, pal, compression: 'uncompressed' });
+): ObjectArtLink => ({ artFile, mapAsm, frame, pal, compression: 'uncompressed', artSource: 'file' });
+
+/**
+ * A LevelArt-backed link: tiles come from `LevelDoc.tiles` (the act's own pool), not
+ * a `.nem`. `artFile` is the SonLVL sentinel `'LevelArt'` (never read from disk);
+ * `compression` is irrelevant for this source but kept `uncompressed` for shape.
+ */
+const lvl = (
+  mapAsm: string, frame: number, pal: number,
+): ObjectArtLink => ({ artFile: 'LevelArt', mapAsm, frame, pal, compression: 'uncompressed', artSource: 'levelArt' });
+
+/**
+ * An offset-art `.nem` link: `offsetBytes` is the SonLVL XML `offset=` value in
+ * BYTES (e.g. Switch −128, LZ Cork 9024); stored here as `tileIndexOffset =
+ * offsetBytes / 32` tiles. See ObjectArtLink for the exact tile-pool math.
+ */
+const off = (
+  artFile: string, mapAsm: string, frame: number, pal: number, offsetBytes: number,
+): ObjectArtLink => ({
+  artFile, mapAsm, frame, pal, compression: 'nemesis', artSource: 'file',
+  tileIndexOffset: offsetBytes / 32,
+});
 
 // --- Badniks / scenery shared across several zones (deduped constants) -------
 const CRABMEAT = nem('artnem/Enemy Crabmeat.nem', '_maps/Crabmeat.asm', 0, 0);
@@ -117,6 +170,8 @@ export const S1_OBJECT_ART_ZONE: Readonly<Record<string, Readonly<Record<number,
     0x11: nem('artnem/GHZ Bridge.nem', '_maps/Bridge.asm', 0, 2), // Bridge (Bridge.cs; subtype rule)
     0x15: SWINGING_PLATFORM, // Swinging Platform (SwingingPlatform.cs; subtype rule)
     0x17: nem('artnem/GHZ Spiked Log.nem', '_maps/Spiked Pole Helix.asm', 0, 2), // Spiked pole (SpikedPole.cs; subtype rule)
+    0x18: lvl('_maps/Platforms (GHZ).asm', 0, 2), // Platform (Platform.xml LevelArt; subtype rule: "Large" → frame 1)
+    0x1a: lvl('_maps/Collapsing Ledge.asm', 0, 2), // Collapsing Cliff (CollapsingCliff.xml LevelArt; subtype 1 → shadow frame 1)
     0x1c: nem('artnem/GHZ Bridge.nem', '_maps/Bridge.asm', 1, 2), // Bridge stump (frame 1)
     0x1f: CRABMEAT,
     0x22: BUZZ_BOMBER,
@@ -130,8 +185,10 @@ export const S1_OBJECT_ART_ZONE: Readonly<Record<string, Readonly<Record<number,
   mz: {
     0x15: SWINGING_PLATFORM, // Swinging Platform (reuses GHZ art/class; subtype rule)
     0x22: BUZZ_BOMBER,
+    0x2f: lvl('_maps/MZ Large Grassy Platforms.asm', 0, 2), // Grass Platform (MovingPlatform.xml LevelArt; Sprite bits4-5 → frame 0/1/2)
     0x30: nem('artnem/MZ Green Glass Block.nem', '_maps/MZ Large Green Glass Blocks.asm', 0, 2), // Large glass pillar
-    0x32: nem('artnem/MZ Switch.nem', '_maps/Button.asm', 0, 2), // Switch (MZ/Switch.xml)
+    0x32: nem('artnem/MZ Switch.nem', '_maps/Button.asm', 0, 2), // Switch (MZ/Switch.xml — own art, no offset)
+    0x46: lvl('_maps/MZ Bricks.asm', 0, 2), // Brick (Brick.xml LevelArt)
     0x33: nem('artnem/MZ Green Pushable Block.nem', '_maps/Pushable Blocks.asm', 0, 2), // Pushable block (PushableBlocks.xml)
     0x51: nem('artnem/MZ Green Pushable Block.nem', '_maps/Smashable Green Block.asm', 0, 2), // Smashable block (SmashableBlock.xml)
     0x52: nem('artnem/MZ Green Pushable Block.nem', '_maps/Moving Blocks (MZ and SBZ).asm', 0, 2), // Moving block (MovingBlocks.xml)
@@ -142,11 +199,15 @@ export const S1_OBJECT_ART_ZONE: Readonly<Record<string, Readonly<Record<number,
     0x78: CATERKILLER,
   },
   syz: {
+    0x12: lvl('_maps/Light.asm', 1, 0), // Siren Light (objSYZ.ini art=LevelArt frame=1 pal=0)
+    0x18: lvl('_maps/Platforms (SYZ).asm', 0, 2), // Platform (Platform.xml LevelArt; single frame)
     0x1f: CRABMEAT,
     0x22: BUZZ_BOMBER,
+    0x32: off('artnem/Switch.nem', '_maps/Button.asm', 0, 0, -128), // Switch (Common/Switch.xml offset=-128 → skip 4 tiles)
     0x43: nem('artnem/Enemy Roller.nem', '_maps/Roller.asm', 0, 0), // Roller
     0x47: nem('artnem/SYZ Bumper.nem', '_maps/Bumper.asm', 0, 0), // Bumper
     0x50: YADRIN,
+    0x56: lvl('_maps/Floating Blocks and Doors.asm', 0, 2), // Block/Platform (SYZ/Block.cs LevelArt; frame = (subtype&0x70)>>4)
     0x57: nem('artnem/SYZ Small Spikeball.nem', '_maps/Spiked Ball and Chain (SYZ).asm', 0, 0), // Spikeball chain
     0x58: nem('artnem/SYZ Large Spikeball.nem', '_maps/Big Spiked Ball.asm', 0, 0), // Big spiked ball
     0x78: CATERKILLER,
@@ -155,6 +216,8 @@ export const S1_OBJECT_ART_ZONE: Readonly<Record<string, Readonly<Record<number,
     0x0b: nem('artnem/LZ Breakable Pole.nem', '_maps/Pole that Breaks.asm', 0, 2), // Pole (Pole.xml)
     0x0c: nem('artnem/LZ Flapping Door.nem', '_maps/Flapping Door.asm', 0, 2), // Flapping Door (FlappingDoor.xml)
     0x16: nem('artnem/LZ Harpoon.nem', '_maps/Harpoon.asm', 3, 0), // Harpoon (Harpoon.xml, default "vertical" = frame 3)
+    0x32: off('artnem/Switch.nem', '_maps/Button.asm', 0, 0, -128), // Switch (Common/Switch.xml offset=-128 → skip 4 tiles)
+    0x61: off('artnem/LZ Cork.nem', '_maps/LZ Blocks.asm', 2, 2, 9024), // Block/Cork (LZ/Block.xml default "Cork" offset=9024 → +282 tiles; subtype rule for other variants)
     0x52: nem('artnem/LZ 32x16 Block.nem', '_maps/Moving Blocks (LZ).asm', 0, 2), // Moving Block (MovingBlocks.xml)
     0x56: nem('artnem/LZ Vertical Door.nem', '_maps/Floating Blocks and Doors.asm', 6, 2), // Door (Door.xml, "vertical" = frame 6)
     0x63: nem('artnem/LZ Wheel.nem', '_maps/LZ Conveyor.asm', 0, 0), // Conveyor Belt wheel (ConveyorBelt.xml)
@@ -171,8 +234,12 @@ export const S1_OBJECT_ART_ZONE: Readonly<Record<string, Readonly<Record<number,
     0x5d: nem('artnem/SLZ Fan.nem', '_maps/Fan.asm', 0, 2), // Fan (Fan.xml)
     0x5e: nem('artnem/SLZ Seesaw.nem', '_maps/Seesaw.asm', 0, 0), // Seesaw (Seesaw.xml)
     0x1c: nem('artnem/SLZ Cannon.nem', '_maps/Scenery.asm', 0, 2), // Fireball thrower (overrides GHZ $1C)
+    0x18: lvl('_maps/Platforms (SLZ).asm', 0, 2), // Platform (Platform.xml LevelArt; single frame)
     0x3c: nem('artnem/SLZ Breakable Wall.nem', '_maps/Smashable Walls.asm', 1, 2), // Breakable wall (frame 1)
     0x53: nem('artnem/SLZ 32x32 Block.nem', '_maps/Collapsing Floors.asm', 2, 2), // Collapsing floor (frame 2)
+    0x59: lvl('_maps/SLZ Elevators.asm', 0, 2), // Elevator (Elevator.xml LevelArt)
+    0x5a: lvl('_maps/SLZ Circling Platform.asm', 0, 2), // Rotating/Circling Platform (CirclingPlatform.xml LevelArt)
+    0x5b: lvl('_maps/Staircase.asm', 0, 2), // Stairs (Stairs.xml LevelArt; 4-piece composite via subtype rule)
     0x5c: nem('artnem/SLZ Pylon.nem', '_maps/Pylon.asm', 0, 0), // Foreground metal pylon
     0x5f: BOMB,
     0x60: nem('artnem/Enemy Orbinaut.nem', '_maps/Orbinaut.asm', 0, 1), // Orbinaut (body frame, pal 1)
@@ -181,6 +248,7 @@ export const S1_OBJECT_ART_ZONE: Readonly<Record<string, Readonly<Record<number,
     0x15: nem('artnem/SYZ Large Spikeball.nem', '_maps/Big Spiked Ball.asm', 0, 0), // Swinging Spikeball (SwingingSpikeball.cs; subtype rule)
     0x1e: nem('artnem/Enemy Ball Hog.nem', '_maps/Ball Hog.asm', 0, 1), // Ball Hog (BallHog.xml)
     0x2a: nem('artnem/SBZ Small Vertical Door.nem', '_maps/SBZ Small Door.asm', 0, 2), // One-way barrier
+    0x32: off('artnem/Switch.nem', '_maps/Button.asm', 0, 0, -128), // Switch (Common/Switch.xml offset=-128 → skip 4 tiles)
     0x52: nem('artnem/SBZ Stomper.nem', '_maps/Moving Blocks (MZ and SBZ).asm', 2, 1), // Moving block / stomper (MovingBlocks.xml, frame2special)
     0x69: nem('artnem/SBZ Spinning Platform.nem', '_maps/SBZ Spinning Platforms.asm', 0, 0), // Spinning Platform (SpinningPlatform.xml)
     0x6a: nem('artnem/SBZ Pizza Cutter.nem', '_maps/Saws and Pizza Cutters.asm', 0, 2), // Saws / Pizza Cutters (SawsandPizzaCutters.xml)

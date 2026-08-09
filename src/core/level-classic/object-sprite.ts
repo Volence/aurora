@@ -13,7 +13,7 @@ import { parseAsmMappings } from '../import/asm-mappings';
 import { parseTiles } from '../formats/tiles';
 import { nemesisDecompress } from '../compress/nemesis';
 import { renderFrameToIndices } from '../art/sprite-render';
-import type { ObjectArtCompression } from '../project/profiles/s1-object-art';
+import type { ObjectArtCompression, ObjectArtSource } from '../project/profiles/s1-object-art';
 import type { SpriteFrame } from '../model/sprite-types';
 import type { Tile } from '../model/s4-types';
 import type { S1ObjectEntry } from '../formats/classic/s1-objpos';
@@ -78,13 +78,13 @@ export function renderObjectFrame(
   return { indices, width, height, originX, originY };
 }
 
-/** Convenience: decode art + parse mappings text + render the declared frame. */
+/** Convenience: decode a standalone art file + parse mappings + render one frame. */
 export function renderObjectFrameFromFiles(
   mapAsmText: string, artBytes: Uint8Array, compression: ObjectArtCompression, frameIndex: number,
 ): RenderedObjectFrame {
-  const frames = parseAsmMappings(mapAsmText);
-  const tiles = decodeObjectArt(artBytes, compression);
-  return renderObjectFrame(frames, tiles, frameIndex);
+  return renderResolvedObjectFrame(
+    { artSource: 'file', compression, frame: frameIndex, pieces: null }, mapAsmText, artBytes, null,
+  );
 }
 
 /**
@@ -178,13 +178,96 @@ export function composeObjectFrames(
   return { indices: out, width, height, originX, originY };
 }
 
-/** Decode art + parse mappings text + compose the given subtype-rule pieces. */
+/** Decode a standalone art file + parse mappings + compose the given rule pieces. */
 export function composeObjectFramesFromFiles(
   mapAsmText: string, artBytes: Uint8Array, compression: ObjectArtCompression, pieces: readonly ObjectPiece[],
 ): RenderedObjectFrame {
+  return renderResolvedObjectFrame(
+    { artSource: 'file', compression, frame: 0, pieces }, mapAsmText, artBytes, null,
+  );
+}
+
+// ---------------------------------------------------------------------------
+// B6: LevelArt-backed + offset-art. THE single resolved render path — both the
+// app store builder (classicObjectArtStore) and the headless render harness
+// (render-classic-act.mjs) resolve to `ResolvedObjectArt` and call
+// `renderResolvedObjectFrame`, so app + harness cannot diverge.
+// ---------------------------------------------------------------------------
+
+/**
+ * Shift a raw byte pool exactly as SonLVLAPI's `MultiFileIndexer<byte>` does when a
+ * file is added at `offsetBytes`: the combined array C has `C[i] = raw[i −
+ * offsetBytes]` for indices whose source byte exists, else 0 (a blank byte). C spans
+ * `0 .. offsetBytes + raw.length − 1` (MultiFileIndexer.Count for one file). A
+ * positive offset prepends `offsetBytes` zero bytes; a negative offset drops the
+ * first `-offsetBytes` bytes.
+ */
+function applyByteOffset(raw: Uint8Array, offsetBytes: number): Uint8Array {
+  const count = offsetBytes + raw.length;
+  if (count <= 0) return new Uint8Array(0);
+  const out = new Uint8Array(count);
+  for (let i = 0; i < count; i++) {
+    const j = i - offsetBytes;
+    if (j >= 0 && j < raw.length) out[i] = raw[j];
+  }
+  return out;
+}
+
+/**
+ * Build the effective 4bpp tile pool a mappings frame renders against, for either art
+ * source, applying the SonLVL byte offset via `applyByteOffset`:
+ *   • source 'file'     → decode `artBytes` (nemesis or raw 4bpp).
+ *   • source 'levelArt' → use `levelTiles` (LevelDoc.tiles) as the raw byte pool.
+ * `tileIndexOffset` is in TILES; the byte offset is `tileIndexOffset * 32`. Mapping
+ * tile T then resolves to raw tile `T − tileIndexOffset` (out-of-range → transparent).
+ */
+export function objectArtTiles(
+  source: ObjectArtSource,
+  artBytes: Uint8Array | null,
+  compression: ObjectArtCompression,
+  levelTiles: Uint8Array | null,
+  tileIndexOffset = 0,
+): Tile[] {
+  let raw: Uint8Array;
+  if (source === 'levelArt') {
+    raw = levelTiles ?? new Uint8Array(0);
+  } else {
+    const b = artBytes ?? new Uint8Array(0);
+    raw = compression === 'nemesis' ? nemesisDecompress(b) : b;
+  }
+  const offsetBytes = tileIndexOffset * 32;
+  if (offsetBytes !== 0) raw = applyByteOffset(raw, offsetBytes);
+  return parseTiles(raw);
+}
+
+/**
+ * The resolved art a render needs: the subset of ObjectArtLink that decides the tile
+ * pool + which frame(s) to draw. `pieces` non-null composes a subtype rule; null
+ * renders the single `frame`.
+ */
+export interface ResolvedObjectArt {
+  artSource: ObjectArtSource;
+  compression: ObjectArtCompression;
+  tileIndexOffset?: number;
+  frame: number;
+  pieces: readonly ObjectPiece[] | null;
+}
+
+/**
+ * THE shared object-render entry (B6): resolve the tile pool from the art source +
+ * offset, parse the mappings, then render one frame or compose the rule pieces.
+ * `artBytes` is the on-disk file for source 'file' (ignored for 'levelArt');
+ * `levelTiles` is `LevelDoc.tiles` for source 'levelArt' (ignored for 'file').
+ */
+export function renderResolvedObjectFrame(
+  art: ResolvedObjectArt, mapAsmText: string,
+  artBytes: Uint8Array | null, levelTiles: Uint8Array | null,
+): RenderedObjectFrame {
+  const tiles = objectArtTiles(art.artSource, artBytes, art.compression, levelTiles, art.tileIndexOffset);
   const frames = parseAsmMappings(mapAsmText);
-  const tiles = decodeObjectArt(artBytes, compression);
-  return composeObjectFrames(frames, tiles, pieces);
+  return art.pieces
+    ? composeObjectFrames(frames, tiles, art.pieces)
+    : renderObjectFrame(frames, tiles, art.frame);
 }
 
 /** An axis-aligned world-space rectangle (top-left + size). */
