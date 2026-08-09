@@ -5,10 +5,12 @@ import {
 } from '../../src/core/formats/bg-library';
 
 describe('bg library persistence helpers', () => {
-  it('builds editor-owned paths in the local-index convention directory', () => {
-    expect(bgLibIndexPath('OJZ')).toBe('data/editor/OJZ_bglib.json');
-    expect(bgLibLayoutPath('OJZ', 'forest-1718000000')).toBe('data/editor/OJZ_bg_forest-1718000000.bin');
-    expect(bgLibTilesPath('OJZ', 'forest-1718000000')).toBe('data/editor/OJZ_bg_forest-1718000000_tiles.bin');
+  it('builds editor-owned paths under the given project data root', () => {
+    expect(bgLibIndexPath('data/', 'OJZ')).toBe('data/editor/OJZ_bglib.json');
+    expect(bgLibLayoutPath('data/', 'OJZ', 'forest-1718000000')).toBe('data/editor/OJZ_bg_forest-1718000000.bin');
+    expect(bgLibTilesPath('data/', 'OJZ', 'forest-1718000000')).toBe('data/editor/OJZ_bg_forest-1718000000_tiles.bin');
+    // Post-split engine layout: the library lands inside the game's data tree.
+    expect(bgLibIndexPath('games/sonic4/data/', 'ojz')).toBe('games/sonic4/data/editor/ojz_bglib.json');
   });
 
   it('round-trips the index (id/name metadata only)', () => {

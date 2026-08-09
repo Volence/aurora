@@ -5,7 +5,14 @@ import { indicesToRGBA } from '../core/art/sprite-render';
 import type { SpriteManifest } from '../core/export/sprite-export';
 import type { Palette } from '../core/model/s4-types';
 
-const BINDINGS_PATH = 'data/sprites/object-bindings.json';
+import { projectDataRoot } from '../core/config/s4-config';
+
+/** Bindings live beside the saved sprites under the project data root. */
+function bindingsPath(): string {
+  const raw = useProjectStore.getState().config?.raw;
+  const root = raw ? projectDataRoot(raw) : 'data/';
+  return `${root}sprites/object-bindings.json`;
+}
 
 /** objectId → saved-sprite name. Persisted editor-side (objectLibrary isn't saved). */
 export type ObjectBindings = Record<string, string>;
@@ -20,17 +27,18 @@ async function readJson<T>(base: string, rel: string): Promise<T | null> {
 }
 
 export async function readObjectBindings(base: string): Promise<ObjectBindings> {
-  return (await readJson<ObjectBindings>(base, BINDINGS_PATH)) ?? {};
+  return (await readJson<ObjectBindings>(base, bindingsPath())) ?? {};
 }
 
 async function writeObjectBindings(base: string, bindings: ObjectBindings): Promise<void> {
   const bytes = new TextEncoder().encode(JSON.stringify(bindings, null, 2));
-  await window.api.writeBinaryFile(base, BINDINGS_PATH, bytes.slice().buffer);
+  await window.api.writeBinaryFile(base, bindingsPath(), bytes.slice().buffer);
 }
 
 /** Render frame 0 of a saved sprite to an ImageBitmap + its origin. */
 async function renderPreview(base: string, spriteName: string, palette: Palette): Promise<ObjectPreview | null> {
-  const dir = `data/sprites/${spriteName}`;
+  const raw = useProjectStore.getState().config?.raw;
+  const dir = `${raw ? projectDataRoot(raw) : 'data/'}sprites/${spriteName}`;
   const map = await tryRead(base, `${dir}/mappings.bin`);
   const art = await tryRead(base, `${dir}/art.bin`);
   if (!map || !art) return null;

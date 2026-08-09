@@ -9,16 +9,19 @@
 // tiles via serializeBgTiles, both in the LOCAL index convention (tile 0 =
 // first blob tile), so load(save(state)) reproduces the in-memory arrays.
 
-export function bgLibIndexPath(zoneId: string): string {
-  return `data/editor/${zoneId}_bglib.json`;
+// Paths take the project's data root (projectDataRoot — 'games/<game>/data/'
+// post-split, 'data/' legacy) so the library lands inside the game's data
+// tree, never at the engine repo root.
+export function bgLibIndexPath(dataRoot: string, zoneId: string): string {
+  return `${dataRoot}editor/${zoneId}_bglib.json`;
 }
 
-export function bgLibLayoutPath(zoneId: string, id: string): string {
-  return `data/editor/${zoneId}_bg_${id}.bin`;
+export function bgLibLayoutPath(dataRoot: string, zoneId: string, id: string): string {
+  return `${dataRoot}editor/${zoneId}_bg_${id}.bin`;
 }
 
-export function bgLibTilesPath(zoneId: string, id: string): string {
-  return `data/editor/${zoneId}_bg_${id}_tiles.bin`;
+export function bgLibTilesPath(dataRoot: string, zoneId: string, id: string): string {
+  return `${dataRoot}editor/${zoneId}_bg_${id}_tiles.bin`;
 }
 
 export interface BgLibraryIndexEntry {

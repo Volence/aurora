@@ -88,12 +88,35 @@ export function collisionDataPathCandidates(raw: S4ProjectConfig): string[] {
   if (raw.collisionDataPath) push(raw.collisionDataPath);
   for (const zone of raw.zones ?? []) {
     for (const act of zone.acts ?? []) {
-      const dp = act.dataPath ?? '';
-      const root = dp.startsWith('data/') ? 'data/'
-        : (() => { const i = dp.indexOf('/data/'); return i >= 0 ? dp.slice(0, i + 6) : null; })();
+      const root = dataRootOfPath(act.dataPath ?? '');
       if (root) push(`${root}collision/`);
     }
   }
   push('data/collision/');
   return out;
+}
+
+/** The `data/` root a project-relative path lives under ('games/sonic4/data/'
+ *  post-split, 'data/' legacy), or null if the path has no data/ segment. */
+function dataRootOfPath(p: string): string | null {
+  if (p.startsWith('data/')) return 'data/';
+  const i = p.indexOf('/data/');
+  return i >= 0 ? p.slice(0, i + 6) : null;
+}
+
+/**
+ * The project's single data root, derived from the first act dataPath —
+ * 'games/<game>/data/' for post-split engine repos, 'data/' for legacy
+ * layouts (and as the fallback when nothing is derivable). Editor-owned
+ * trees (editor/, sprites/) hang off this root, so saves land inside the
+ * game's data dir instead of the repo root.
+ */
+export function projectDataRoot(raw: S4ProjectConfig): string {
+  for (const zone of raw.zones ?? []) {
+    for (const act of zone.acts ?? []) {
+      const root = dataRootOfPath(act.dataPath ?? '');
+      if (root) return root;
+    }
+  }
+  return 'data/';
 }

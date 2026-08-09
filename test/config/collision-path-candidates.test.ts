@@ -1,5 +1,24 @@
 import { describe, it, expect } from 'vitest';
-import { collisionDataPathCandidates } from '../../src/core/config/s4-config';
+import { collisionDataPathCandidates, projectDataRoot } from '../../src/core/config/s4-config';
+
+describe('projectDataRoot', () => {
+  it('derives the data root from the first act dataPath', () => {
+    const raw = {
+      zones: [{ acts: [{ dataPath: 'games/sonic4/data/editor/ojz/act1/' }] }],
+    } as never;
+    expect(projectDataRoot(raw)).toBe('games/sonic4/data/');
+  });
+
+  it('root-relative dataPath yields the legacy root', () => {
+    const raw = { zones: [{ acts: [{ dataPath: 'data/editor/ojz/act1/' }] }] } as never;
+    expect(projectDataRoot(raw)).toBe('data/');
+  });
+
+  it('falls back to data/ when nothing is derivable (gamedata/ is not a data/ segment)', () => {
+    const raw = { zones: [{ acts: [{ dataPath: 'gamedata/levels/act1/' }] }] } as never;
+    expect(projectDataRoot(raw)).toBe('data/');
+  });
+});
 
 // The engine repo's engine/game split moved data/ under games/<game>/ — the
 // old root-relative 'data/collision/' default silently 404s there, so the

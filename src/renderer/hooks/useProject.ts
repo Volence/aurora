@@ -16,7 +16,7 @@ let legacyAtlasMergedThisLoad = false;
 function legacyAtlasPath(chunkLibraryPath: string): string {
   return chunkLibraryPath.replace('.json', '_tiles.bin');
 }
-import { loadS4Config, collisionDataPathCandidates, type S4ProjectConfig } from '../../core/config/s4-config';
+import { loadS4Config, collisionDataPathCandidates, projectDataRoot, type S4ProjectConfig } from '../../core/config/s4-config';
 import { parseTiles } from '../../core/formats/tiles';
 import { parseBgTiles, serializeBgTiles, normalizeBgLayout, BG_TILE_BASE_SLOT, BG_WIDTH } from '../../core/formats/bg-tiles';
 import { bgLibIndexPath, bgLibLayoutPath, bgLibTilesPath, serializeBgLibraryIndex, parseBgLibraryIndex } from '../../core/formats/bg-library';
@@ -230,11 +230,14 @@ export function useProject() {
       // Persist each zone's tileset to an editor-owned path. The configured
       // tileset may point into the engine's regenerated data/generated tree
       // (or even alias the legacy chunks_tiles.bin), so we always write to
-      // data/editor/ and retarget project.json to it. Without this, MCP
-      // write_tiles and imported/merged art vanish on reload.
+      // <dataRoot>editor/ and retarget project.json to it. Without this, MCP
+      // write_tiles and imported/merged art vanish on reload. The root is
+      // derived from the project layout (projectDataRoot) so post-split engine
+      // repos get games/<game>/data/editor/, never a repo-root data/ dir.
+      const dataRoot = projectDataRoot(config.raw);
       let configChanged = false;
       for (const projZone of project.zones) {
-        const editorTilesetPath = `data/editor/${projZone.id}_tiles.bin`;
+        const editorTilesetPath = `${dataRoot}editor/${projZone.id}_tiles.bin`;
         const tileBytes = serializeTiles(projZone.tileset.tiles);
         await window.api.writeBinaryFile(basePath, editorTilesetPath, tileBytes.buffer as ArrayBuffer);
 
@@ -250,8 +253,8 @@ export function useProject() {
       // may point into the engine's regenerated data/generated tree, so edits
       // (set-bg commands, BG-layer painting) would vanish on reload otherwise.
       if (act.bgLayout && act.bgTiles) {
-        const editorBgLayoutPath = `data/editor/${zone.id}_${act.id}_bg.bin`;
-        const editorBgTilesPath = `data/editor/${zone.id}_${act.id}_bg_tiles.bin`;
+        const editorBgLayoutPath = `${dataRoot}editor/${zone.id}_${act.id}_bg.bin`;
+        const editorBgTilesPath = `${dataRoot}editor/${zone.id}_${act.id}_bg_tiles.bin`;
         // Editor-owned BG files stay in the LOCAL index convention (in-memory
         // arrays serialized verbatim) — the engine build pipeline regenerates
         // its own VRAM-absolute files. On reload, normalizeBgLayout detects
@@ -279,12 +282,12 @@ export function useProject() {
       // keyed here under the current zone's id.
       if (project.bgLibrary.length > 0) {
         const indexBytes = new TextEncoder().encode(serializeBgLibraryIndex(project.bgLibrary));
-        await window.api.writeBinaryFile(basePath, bgLibIndexPath(zone.id), indexBytes.buffer as ArrayBuffer);
+        await window.api.writeBinaryFile(basePath, bgLibIndexPath(dataRoot, zone.id), indexBytes.buffer as ArrayBuffer);
         for (const entry of project.bgLibrary) {
           const layoutBytes = serializeNametable(entry.layout);
-          await window.api.writeBinaryFile(basePath, bgLibLayoutPath(zone.id, entry.id), layoutBytes.buffer as ArrayBuffer);
+          await window.api.writeBinaryFile(basePath, bgLibLayoutPath(dataRoot, zone.id, entry.id), layoutBytes.buffer as ArrayBuffer);
           const tileBytes = serializeBgTiles(entry.tiles);
-          await window.api.writeBinaryFile(basePath, bgLibTilesPath(zone.id, entry.id), tileBytes.buffer as ArrayBuffer);
+          await window.api.writeBinaryFile(basePath, bgLibTilesPath(dataRoot, zone.id, entry.id), tileBytes.buffer as ArrayBuffer);
         }
       }
 
@@ -554,12 +557,13 @@ async function loadFullProject(
     // (parseBgTiles still detects the blob header shape). Entries accumulate
     // into the project-level library (single-zone assumption, like chunks).
     try {
-      const idxRaw = await readFile(basePath, bgLibIndexPath(zoneConfig.id));
+      const dataRoot = projectDataRoot(config.raw);
+      const idxRaw = await readFile(basePath, bgLibIndexPath(dataRoot, zoneConfig.id));
       const indexEntries = parseBgLibraryIndex(new TextDecoder().decode(idxRaw));
       for (const meta of indexEntries) {
         try {
-          const layoutRaw = await readFile(basePath, bgLibLayoutPath(zoneConfig.id, meta.id));
-          const tilesRaw = await readFile(basePath, bgLibTilesPath(zoneConfig.id, meta.id));
+          const layoutRaw = await readFile(basePath, bgLibLayoutPath(dataRoot, zoneConfig.id, meta.id));
+          const tilesRaw = await readFile(basePath, bgLibTilesPath(dataRoot, zoneConfig.id, meta.id));
           const height = Math.floor(layoutRaw.length / (BG_WIDTH * 2));
           if (height < 1) continue;
           bgLibrary.push({

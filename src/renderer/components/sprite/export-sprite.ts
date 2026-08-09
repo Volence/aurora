@@ -25,8 +25,15 @@ const DYNAMIC_PREVIEW_HOLD = 5;
 import type { RawFrame } from '../../../core/art/sprite-decompose';
 import type { PerFrameAnimation } from '../../../core/export/sprite-anim-export';
 
-const SPRITES_DIR = 'data/sprites';
-const INDEX_PATH = `${SPRITES_DIR}/index.json`;
+import { projectDataRoot } from '../../../core/config/s4-config';
+
+/** The saved-sprites dir under the open project's data root (games/<game>/data/
+ *  sprites post-split, data/sprites legacy) — never the engine repo root. */
+function spritesDir(): string {
+  const raw = useProjectStore.getState().config?.raw;
+  return raw ? `${projectDataRoot(raw)}sprites` : 'data/sprites';
+}
+function spriteIndexPath(): string { return `${spritesDir()}/index.json`; }
 
 interface SpriteIndexEntry { name: string; frameCount: number; tileCount: number; }
 
@@ -72,7 +79,7 @@ export async function exportSprite(name: string): Promise<void> {
   try {
     const out = buildSpriteExport(name, rawFrames, anim, { dplc: exportDplc, targetFormat: format });
     const base = project.basePath;
-    const dir = `data/sprites/${name}`;
+    const dir = `${spritesDir()}/${name}`;
     const enc = new TextEncoder();
     await window.api.writeBinaryFile(base, `${dir}/mappings.bin`, toArrayBuffer(out.mappings));
     await window.api.writeBinaryFile(base, `${dir}/art.bin`, toArrayBuffer(out.art));
@@ -81,10 +88,10 @@ export async function exportSprite(name: string): Promise<void> {
     await window.api.writeBinaryFile(base, `${dir}/sprite.json`, toArrayBuffer(enc.encode(JSON.stringify(out.manifest, null, 2))));
 
     // Upsert the sprite index so Load can list it.
-    const index = (await readJson<{ sprites: SpriteIndexEntry[] }>(base, INDEX_PATH)) ?? { sprites: [] };
+    const index = (await readJson<{ sprites: SpriteIndexEntry[] }>(base, spriteIndexPath())) ?? { sprites: [] };
     const entry: SpriteIndexEntry = { name, frameCount: out.manifest.frameCount, tileCount: out.manifest.tileCount };
     index.sprites = [...index.sprites.filter((s) => s.name !== name), entry].sort((a, b) => a.name.localeCompare(b.name));
-    await window.api.writeBinaryFile(base, INDEX_PATH, toArrayBuffer(enc.encode(JSON.stringify(index, null, 2))));
+    await window.api.writeBinaryFile(base, spriteIndexPath(), toArrayBuffer(enc.encode(JSON.stringify(index, null, 2))));
 
     toast(`Exported "${name}" as ${format.toUpperCase()}: ${out.manifest.frameCount} frames, ${out.manifest.tileCount} tiles → ${dir}/`, 'success');
   } catch (e) {
@@ -291,7 +298,7 @@ export async function openDiscoveredSet(baseDir: string, set: DiscoveredSpriteSe
 export async function listSprites(): Promise<string[]> {
   const project = useProjectStore.getState().project;
   if (!project) return [];
-  const index = await readJson<{ sprites: SpriteIndexEntry[] }>(project.basePath, INDEX_PATH);
+  const index = await readJson<{ sprites: SpriteIndexEntry[] }>(project.basePath, spriteIndexPath());
   return (index?.sprites ?? []).map((s) => s.name);
 }
 
@@ -306,7 +313,7 @@ export async function loadSpriteByName(name: string): Promise<void> {
   const project = useProjectStore.getState().project;
   if (!project) { toast('No project open', 'error'); return; }
   const base = project.basePath;
-  const dir = `${SPRITES_DIR}/${name}`;
+  const dir = `${spritesDir()}/${name}`;
   try {
     const mappings = new Uint8Array(await window.api.readBinaryFile(base, `${dir}/mappings.bin`));
     const art = new Uint8Array(await window.api.readBinaryFile(base, `${dir}/art.bin`));
