@@ -405,3 +405,48 @@ describe('command guards + undo/redo triple consistency', () => {
     expect(classicCanUndo()).toBe(false);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Layout-editing UI state (Task 13): tool + selected chunk id.
+// ---------------------------------------------------------------------------
+describe('tool + selectedChunkId UI state', () => {
+  it('defaults to select tool + chunk 0', () => {
+    expect(st().tool).toBe('select');
+    expect(st().selectedChunkId).toBe(0);
+  });
+
+  it('setTool / setSelectedChunkId update state', () => {
+    openReady();
+    st().setTool('stamp');
+    expect(st().tool).toBe('stamp');
+    st().setSelectedChunkId(0x2a);
+    expect(st().selectedChunkId).toBe(0x2a);
+  });
+
+  it('setSelectedChunkId rejects out-of-byte-range ids (no change)', () => {
+    openReady();
+    st().setSelectedChunkId(0x10);
+    st().setSelectedChunkId(-1);
+    expect(st().selectedChunkId).toBe(0x10);
+    st().setSelectedChunkId(256);
+    expect(st().selectedChunkId).toBe(0x10);
+  });
+
+  it('is NOT part of an undo snapshot — undo/redo leave the selection alone', () => {
+    openReady();
+    st().setSelectedChunkId(7);
+    classicSetStart(11, 12); // records a snapshot with selection == 7
+    st().setSelectedChunkId(9); // change AFTER the edit
+    st().undo();
+    expect(st().selectedChunkId).toBe(9); // undo restored the doc, not the selection
+  });
+
+  it('opening a new act resets the selection but keeps the tool', () => {
+    openReady();
+    st().setTool('stamp');
+    st().setSelectedChunkId(5);
+    void useClassicLevelStore.getState().openAct(REF);
+    expect(st().selectedChunkId).toBe(0); // per-act chunk set → reset
+    expect(st().tool).toBe('stamp'); // workflow preference persists
+  });
+});

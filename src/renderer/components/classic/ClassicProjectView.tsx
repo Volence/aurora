@@ -5,6 +5,7 @@ import { useClassicProjectStore } from '../../state/classicProjectStore';
 import { useClassicLevelStore } from '../../state/classicLevelStore';
 import ZoneActTree from './ZoneActTree';
 import ClassicLevelViewport from './ClassicLevelViewport';
+import ChunkPicker from './ChunkPicker';
 import ResolutionReportPanel from './ResolutionReportPanel';
 
 /**
@@ -24,12 +25,42 @@ export default function ClassicProjectView({ appBar }: { appBar: React.ReactNode
   const doc = useClassicLevelStore((s) => s.doc);
   const status = useClassicLevelStore((s) => s.status);
   const openAct = useClassicLevelStore((s) => s.openAct);
+  const dirty = useClassicLevelStore((s) => s.dirty);
+  const isDirty = Object.values(dirty).some(Boolean);
 
   // Opening a different project must not leave a stale act selected/loaded — the
   // old doc was read through the previous handle.
   React.useEffect(() => {
     useClassicLevelStore.getState().reset();
   }, [dir]);
+
+  // Undo/redo keyboard for the classic view (Task 13). A DIRECT binding to the
+  // classic level store's undo/redo — sprite (s1-object) editing isn't reachable
+  // inside a classic project yet, so the sprite-undo-style recency coordinator
+  // (src/renderer/state/sprite-undo.ts) isn't needed until Task 12's object
+  // editing lands; when it does, this becomes a coordinator over both histories.
+  // Matches the repo's binding scheme (SpriteMode/ArtMode): Ctrl+Z undo,
+  // Ctrl+Shift+Z / Ctrl+Y redo, ignored while typing in a text field.
+  React.useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement;
+      const typing = t.isContentEditable || t.tagName === 'TEXTAREA'
+        || (t.tagName === 'INPUT' && !['range', 'checkbox', 'button', 'radio'].includes((t as HTMLInputElement).type));
+      if (typing) return;
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        useClassicLevelStore.getState().undo();
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key.toLowerCase() === 'z' && e.shiftKey))) {
+        e.preventDefault();
+        useClassicLevelStore.getState().redo();
+        return;
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   const full = report ? report.resolved === report.total : true;
   const statusLeft = (
@@ -38,8 +69,14 @@ export default function ClassicProjectView({ appBar }: { appBar: React.ReactNode
       {!selected ? (
         <span style={{ color: T.textLo }}>no act selected</span>
       ) : status === 'ready' && doc ? (
-        <span style={{ color: T.textBase }}>
-          {selected.label} — {doc.fg.width}×{doc.fg.height} chunks · {doc.chunks.length} chunks ·{' '}
+        <span style={{ color: T.textBase, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+          {isDirty && (
+            <span
+              title="Unsaved changes — Ctrl+S to save"
+              style={{ width: 7, height: 7, borderRadius: '50%', background: T.warning, flexShrink: 0 }}
+            />
+          )}
+          {selected.label}{isDirty ? ' •' : ''} — {doc.fg.width}×{doc.fg.height} chunks · {doc.chunks.length} chunks ·{' '}
           {doc.blocks.length} blocks · {doc.objects.length} objects
         </span>
       ) : status === 'loading' ? (
@@ -61,6 +98,7 @@ export default function ClassicProjectView({ appBar }: { appBar: React.ReactNode
     <EditorShell
       appBar={appBar}
       toolDock={null}
+      bottomExtra={<ChunkPicker />}
       status={<StatusBar left={statusLeft} right={statusRight} />}
       panels={
         <Panel width={260} scroll>

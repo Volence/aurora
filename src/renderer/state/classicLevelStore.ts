@@ -41,6 +41,9 @@ export type CommandResult = { ok: true } | { ok: false; error: string };
 
 export type LayoutPlane = 'fg' | 'bg';
 
+/** The active layout-editing tool (Task 13). `select` = pan; `stamp` = paint. */
+export type ClassicTool = 'select' | 'stamp';
+
 interface ClassicLevelState {
   /** The act currently selected in the zone tree (even while loading/errored). */
   ref: ZoneActRef | null;
@@ -57,8 +60,11 @@ interface ClassicLevelState {
    * by chunkId; keying additionally on this version lets a single-chunk edit
    * invalidate only that chunk. Values are drawn from a process-monotonic clock so
    * a (chunkEpoch, version) pair uniquely identifies a chunk's content across the
-   * session — undo/redo RESTORE the map, so pre-edit renders in the cache stay
-   * valid and are reused rather than rebuilt.
+   * session. Undo/redo RESTORE the recorded version values, so the KEY a restored
+   * chunk hashes to is exact/stable — but the viewport cache stores only the
+   * latest canvas per chunk id, so an undo that reverts to an older key still
+   * triggers a re-render (see ClassicLevelViewport's cache note). Correctness is
+   * unaffected; it just isn't a zero-cost reuse.
    */
   chunkVersions: Map<number, number>;
   /**
@@ -71,14 +77,32 @@ interface ClassicLevelState {
   /** Bumped on every history change so undo/redo affordances re-evaluate. */
   historyTick: number;
 
+  /**
+   * Layout-editing UI state (Task 13, spec §3 M5). Not doc data and NOT part of
+   * an undo snapshot: undo/redo restore the document, never the tool/selection.
+   */
+  tool: ClassicTool;
+  /** The chunk id the stamp tool paints (0..255); also the eyedropper target. */
+  selectedChunkId: number;
+
   /** Select + load an act. Reads through the open project's handle. */
   openAct: (ref: ZoneActRef) => Promise<void>;
+  setTool: (tool: ClassicTool) => void;
+  setSelectedChunkId: (chunkId: number) => void;
   undo: () => void;
   redo: () => void;
   /**
    * Clear the given dirty domains for `ref` after a successful save. NOT an
-   * undoable edit (it does not touch history), so undoing past a save re-marks
-   * those domains dirty — the conventional editor behavior.
+   * undoable edit (it does not touch history).
+   *
+   * DIRTY vs DISK (corrected — this is subtle): undo/redo RESTORE a recorded
+   * `dirty` snapshot, they do not re-derive it. In the common single-edit case
+   * (edit → save → undo) the snapshot recorded before that edit had dirty={}, so
+   * undoing back to it leaves dirty={} even though the doc now differs from the
+   * (edited) bytes on disk. So the dirty flags are NOT a doc≠disk oracle after a
+   * save+undo. The Save UX must not lean on undo "re-dirtying" to reflect that
+   * divergence — the dirty indicator simply reads these flags, which is an
+   * accepted v1 limitation (a true doc-vs-disk hash comparison is out of scope).
    */
   markDomainsClean: (ref: ZoneActRef, domains: (keyof DirtyDomains)[]) => void;
   reset: () => void;
@@ -93,6 +117,8 @@ const IDLE = {
   chunkVersions: new Map<number, number>(),
   chunkEpoch: 0,
   historyTick: 0,
+  tool: 'select' as ClassicTool,
+  selectedChunkId: 0,
 };
 
 // ---------------------------------------------------------------------------
@@ -130,6 +156,9 @@ export const useClassicLevelStore = create<ClassicLevelState>((set, get) => ({
       chunkVersions: new Map<number, number>(),
       chunkEpoch: nextVersion(),
       historyTick: get().historyTick + 1,
+      // Chunk ids are per-act, so a fresh act resets the stamp selection (the tool
+      // choice persists — it's a workflow preference, not level data).
+      selectedChunkId: 0,
     };
     // Unavailable acts carry their resolution reason — surface it directly rather
     // than attempting a read the handle would reject.
@@ -151,6 +180,11 @@ export const useClassicLevelStore = create<ClassicLevelState>((set, get) => ({
       if (token !== loadToken) return;
       set({ ref, doc: null, status: 'error', error: e instanceof Error ? e.message : String(e) });
     }
+  },
+
+  setTool: (tool: ClassicTool) => set({ tool }),
+  setSelectedChunkId: (chunkId: number) => {
+    if (Number.isInteger(chunkId) && chunkId >= 0 && chunkId <= 0xff) set({ selectedChunkId: chunkId });
   },
 
   // undo/redo are timeline NAVIGATION, not new edits, so (like the aeon history)

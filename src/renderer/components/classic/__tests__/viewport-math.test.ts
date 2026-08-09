@@ -5,6 +5,10 @@ import {
   layoutCellAt,
   ringGroupPositions,
   screenToWorld,
+  worldToLayoutCell,
+  addStampCell,
+  stampAccumToCells,
+  type StampCell,
 } from '../viewport-math';
 import type { LayoutGrid } from '../../../../core/level-classic/model';
 
@@ -48,6 +52,78 @@ describe('visibleChunkRange', () => {
 
   it('exposes CHUNK_PX = 256', () => {
     expect(CHUNK_PX).toBe(256);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// worldToLayoutCell / stamp-gesture accumulation (Task 13) — the pure logic
+// behind the stamp tool: one undo step per drag via dedupe + in-bounds clamping.
+// ---------------------------------------------------------------------------
+describe('worldToLayoutCell', () => {
+  it('floors world pixels to the 256px cell', () => {
+    expect(worldToLayoutCell(0, 0)).toEqual({ col: 0, row: 0 });
+    expect(worldToLayoutCell(255, 255)).toEqual({ col: 0, row: 0 });
+    expect(worldToLayoutCell(256, 512)).toEqual({ col: 1, row: 2 });
+    expect(worldToLayoutCell(700, 300)).toEqual({ col: 2, row: 1 });
+  });
+
+  it('clamps toward negative for off-grid coords (caller drops them)', () => {
+    expect(worldToLayoutCell(-1, -1)).toEqual({ col: -1, row: -1 });
+  });
+});
+
+describe('addStampCell / stampAccumToCells', () => {
+  const grid = { w: 4, h: 3 };
+
+  it('adds a new in-bounds cell and reports it as added', () => {
+    const acc = new Map<number, StampCell>();
+    expect(addStampCell(acc, 1, 2, grid.w, grid.h)).toBe(true);
+    expect(acc.size).toBe(1);
+    expect([...acc.values()]).toEqual([{ x: 1, y: 2 }]);
+  });
+
+  it('dedupes a re-touched cell (one write per cell → one undo step)', () => {
+    const acc = new Map<number, StampCell>();
+    addStampCell(acc, 2, 1, grid.w, grid.h);
+    expect(addStampCell(acc, 2, 1, grid.w, grid.h)).toBe(false); // same cell again
+    expect(acc.size).toBe(1);
+  });
+
+  it('drops cells outside the grid (drag wandered off the level)', () => {
+    const acc = new Map<number, StampCell>();
+    expect(addStampCell(acc, -1, 0, grid.w, grid.h)).toBe(false);
+    expect(addStampCell(acc, 0, -1, grid.w, grid.h)).toBe(false);
+    expect(addStampCell(acc, 4, 0, grid.w, grid.h)).toBe(false); // col == width
+    expect(addStampCell(acc, 0, 3, grid.w, grid.h)).toBe(false); // row == height
+    expect(acc.size).toBe(0);
+  });
+
+  it('rejects non-integer coordinates', () => {
+    const acc = new Map<number, StampCell>();
+    expect(addStampCell(acc, 1.5, 0, grid.w, grid.h)).toBe(false);
+    expect(acc.size).toBe(0);
+  });
+
+  it('distinct cells on the same row do not collide in the linear key', () => {
+    const acc = new Map<number, StampCell>();
+    addStampCell(acc, 0, 0, grid.w, grid.h);
+    addStampCell(acc, 1, 0, grid.w, grid.h);
+    addStampCell(acc, 0, 1, grid.w, grid.h);
+    expect(acc.size).toBe(3);
+  });
+
+  it('flattens the accumulator into a chunk-stamped command payload', () => {
+    const acc = new Map<number, StampCell>();
+    addStampCell(acc, 1, 0, grid.w, grid.h);
+    addStampCell(acc, 2, 1, grid.w, grid.h);
+    expect(stampAccumToCells(acc, 0x05)).toEqual([
+      { x: 1, y: 0, chunkId: 0x05 },
+      { x: 2, y: 1, chunkId: 0x05 },
+    ]);
+  });
+
+  it('an empty accumulator flattens to an empty payload (no command)', () => {
+    expect(stampAccumToCells(new Map(), 3)).toEqual([]);
   });
 });
 

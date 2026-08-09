@@ -91,6 +91,58 @@ export function screenToWorld(cam: ViewportCamera, sx: number, sy: number): Worl
   return { x: cam.x + sx / cam.zoom, y: cam.y + sy / cam.zoom };
 }
 
+/** The layout cell (column, row) that contains a world-pixel coordinate. */
+export function worldToLayoutCell(worldX: number, worldY: number): { col: number; row: number } {
+  return { col: Math.floor(worldX / CHUNK_PX), row: Math.floor(worldY / CHUNK_PX) };
+}
+
+/** One accumulated stamp cell (grid column/row). */
+export interface StampCell {
+  x: number;
+  y: number;
+}
+
+/**
+ * Add layout cell (col,row) to an in-progress stamp-gesture accumulator (Task 13).
+ *
+ * The accumulator is a Map keyed by the linear cell index (`row*gridW+col`), so
+ * re-touching a cell as the drag wiggles over it is a no-op — the whole gesture
+ * collapses to at most one write per cell, which is exactly one undo step's worth
+ * of `classicSetLayoutCells` on mouseup. Cells outside the declared grid are
+ * dropped (a drag may wander past the level edge; only in-bounds cells paint, and
+ * the store command would otherwise reject the whole gesture on an out-of-bounds
+ * cell). Returns true iff a NEW in-bounds cell was added, so the caller can redraw
+ * the stamp preview only when something changed.
+ */
+export function addStampCell(
+  acc: Map<number, StampCell>,
+  col: number,
+  row: number,
+  gridW: number,
+  gridH: number,
+): boolean {
+  if (!Number.isInteger(col) || !Number.isInteger(row)) return false;
+  if (col < 0 || row < 0 || col >= gridW || row >= gridH) return false;
+  const key = row * gridW + col;
+  if (acc.has(key)) return false;
+  acc.set(key, { x: col, y: row });
+  return true;
+}
+
+/**
+ * Flatten a stamp-gesture accumulator into the `classicSetLayoutCells` payload,
+ * stamping the given chunk id into every accumulated cell. Insertion order is
+ * preserved (Map iteration order), though the command result is order-independent.
+ */
+export function stampAccumToCells(
+  acc: Map<number, StampCell>,
+  chunkId: number,
+): { x: number; y: number; chunkId: number }[] {
+  const out: { x: number; y: number; chunkId: number }[] = [];
+  for (const c of acc.values()) out.push({ x: c.x, y: c.y, chunkId });
+  return out;
+}
+
 export interface RingPos {
   x: number;
   y: number;

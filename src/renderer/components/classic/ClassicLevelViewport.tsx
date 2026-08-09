@@ -1,10 +1,14 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { T, Chip, OptionBar, Divider } from '../ui';
-import { useClassicLevelStore } from '../../state/classicLevelStore';
+import { useClassicLevelStore, classicSetLayoutCells } from '../../state/classicLevelStore';
+import { useToastStore } from '../../state/toastStore';
 import { renderChunk } from '../../../core/level-classic/render';
 import { columnSolidRun } from '../../../core/collision/collision-render';
 import type { LevelDoc } from '../../../core/level-classic/model';
-import { CHUNK_PX, visibleChunkRange, layoutCellAt, ringGroupPositions, screenToWorld } from './viewport-math';
+import {
+  CHUNK_PX, visibleChunkRange, layoutCellAt, ringGroupPositions, screenToWorld,
+  worldToLayoutCell, addStampCell, stampAccumToCells, type StampCell,
+} from './viewport-math';
 import {
   CANVAS_VOID,
   COLLISION_FILL_ALL, COLLISION_FILL_TOP, COLLISION_FILL_SIDES, COLLISION_FILL_NONE,
@@ -60,6 +64,11 @@ export default function ClassicLevelViewport() {
   // (or the whole epoch), so the chunk-art cache below invalidates precisely.
   const chunkVersions = useClassicLevelStore((s) => s.chunkVersions);
   const chunkEpoch = useClassicLevelStore((s) => s.chunkEpoch);
+  // Task 13 layout-editing UI state (select|stamp + the stamp/eyedrop chunk id).
+  const tool = useClassicLevelStore((s) => s.tool);
+  const selectedChunkId = useClassicLevelStore((s) => s.selectedChunkId);
+  const setTool = useClassicLevelStore((s) => s.setTool);
+  const setSelectedChunkId = useClassicLevelStore((s) => s.setSelectedChunkId);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -85,6 +94,13 @@ export default function ClassicLevelViewport() {
   // wiped only when a DIFFERENT act is loaded (ref identity changes) — edits keep
   // the same ref, so they never wipe it. (Version values are process-unique, so a
   // reload's fresh epoch also can't collide with a prior level's cached keys.)
+  //
+  // UNDO CAVEAT (tempered): this holds only the LATEST canvas per chunk id, keyed
+  // by its current version. Undo/redo restore an OLDER version value, whose key
+  // won't match the stored one, so an undo re-renders the affected chunk(s) rather
+  // than reusing a retained pre-edit canvas. That is correct (the render is
+  // deterministic in the doc), just not free — a bounded LRU keyed by version
+  // would make undo a cache hit, but isn't worth the memory for v1.
   const chunkCache = useRef<Map<number, { canvas: HTMLCanvasElement; key: string }>>(new Map());
   useEffect(() => {
     chunkCache.current = new Map();
@@ -295,6 +311,20 @@ export default function ClassicLevelViewport() {
       if (overlays.objects) drawObjects(ctx, doc, invZoom);
       if (overlays.start) drawStart(ctx, doc, invZoom);
     }
+
+    // Stamp-gesture preview: highlight the cells the in-progress drag has painted
+    // so far (the store commit lands on mouseup). Read from a ref, so it repaints
+    // whenever the stroke calls redraw(). Nothing draws when not stamping.
+    const stroke = strokeRef.current;
+    if (stroke && stroke.size > 0) {
+      ctx.fillStyle = 'rgba(120,180,255,0.30)';
+      ctx.strokeStyle = 'rgba(150,200,255,0.95)';
+      ctx.lineWidth = 2 * invZoom;
+      for (const c of stroke.values()) {
+        ctx.fillRect(c.x * CHUNK_PX, c.y * CHUNK_PX, CHUNK_PX, CHUNK_PX);
+        ctx.strokeRect(c.x * CHUNK_PX, c.y * CHUNK_PX, CHUNK_PX, CHUNK_PX);
+      }
+    }
   });
 
   // ---- resize → measure → redraw -------------------------------------------
@@ -328,15 +358,54 @@ export default function ClassicLevelViewport() {
     return () => ro.disconnect();
   }, [redraw, status]);
 
-  // ---- pan / zoom ----------------------------------------------------------
+  // ---- pan / zoom / stamp --------------------------------------------------
   const dragging = useRef(false);
   const lastMouse = useRef({ x: 0, y: 0 });
+  // The active stamp gesture's accumulated cells (null when not stamping). Keyed
+  // by linear cell index so wiggling over a cell dedupes → ONE undo step per drag,
+  // committed on mouseUp. A ref (not state): mutated during the drag, drawn from
+  // the render effect, and reset without a partial command on cancel.
+  const strokeRef = useRef<Map<number, StampCell> | null>(null);
+
+  // The layout cell (col,row) under a mouse event, using the shared camera math.
+  const cellUnderCursor = useCallback((e: React.MouseEvent): { col: number; row: number } | null => {
+    const canvas = canvasRef.current;
+    if (!canvas) return null;
+    const rect = canvas.getBoundingClientRect();
+    const { x, y } = screenToWorld(camRef.current, e.clientX - rect.left, e.clientY - rect.top);
+    return worldToLayoutCell(x, y);
+  }, []);
+
+  const activeGrid = useCallback(() => {
+    const d = useClassicLevelStore.getState().doc;
+    if (!d) return null;
+    return plane === 'bg' ? d.bg : d.fg;
+  }, [plane]);
 
   const onMouseDown = useCallback((e: React.MouseEvent) => {
+    if (e.button !== 0) return; // left button only; right-click eyedrops (below)
+    if (tool === 'stamp') {
+      const grid = activeGrid();
+      const cell = cellUnderCursor(e);
+      if (!grid || !cell) return;
+      const acc = new Map<number, StampCell>();
+      addStampCell(acc, cell.col, cell.row, grid.width, grid.height);
+      strokeRef.current = acc;
+      redraw();
+      return;
+    }
     dragging.current = true;
     lastMouse.current = { x: e.clientX, y: e.clientY };
-  }, []);
+  }, [tool, activeGrid, cellUnderCursor, redraw]);
+
   const onMouseMove = useCallback((e: React.MouseEvent) => {
+    const stroke = strokeRef.current;
+    if (stroke) {
+      const grid = activeGrid();
+      const cell = cellUnderCursor(e);
+      if (grid && cell && addStampCell(stroke, cell.col, cell.row, grid.width, grid.height)) redraw();
+      return;
+    }
     if (!dragging.current) return;
     const cam = camRef.current;
     const dx = e.clientX - lastMouse.current.x;
@@ -348,8 +417,57 @@ export default function ClassicLevelViewport() {
     cam.x = Math.max(0, cam.x - d.x);
     cam.y = Math.max(0, cam.y - d.y);
     redraw();
+  }, [activeGrid, cellUnderCursor, redraw]);
+
+  // Commit the stamp gesture as ONE undoable command (or cancel with none pending).
+  const endStroke = useCallback(() => {
+    const stroke = strokeRef.current;
+    strokeRef.current = null;
+    if (!stroke || stroke.size === 0) { redraw(); return; }
+    const cells = stampAccumToCells(stroke, useClassicLevelStore.getState().selectedChunkId);
+    const res = classicSetLayoutCells(plane, cells);
+    if (!res.ok) useToastStore.getState().addToast(`Stamp failed: ${res.error}`, 'error');
+    redraw();
+  }, [plane, redraw]);
+
+  // Mouse-up ends whichever gesture is active. Mouse-leave CANCELS a stamp stroke
+  // cleanly (no partial command) but also ends a pan.
+  const onMouseUp = useCallback(() => {
+    if (strokeRef.current) { endStroke(); return; }
+    dragging.current = false;
+  }, [endStroke]);
+  const onMouseLeave = useCallback(() => {
+    // Abandon an in-progress stamp without committing (spec: mouseleave cancels).
+    strokeRef.current = null;
+    dragging.current = false;
+    redraw();
   }, [redraw]);
-  const endDrag = useCallback(() => { dragging.current = false; }, []);
+
+  // Right-click eyedrops the chunk under the cursor into the stamp selection. It
+  // reads the ACTIVE plane's layout cell (the same id used when stamping either
+  // plane), stripping S1's bit-7 loop flag. preventDefault suppresses the browser
+  // context menu.
+  const onContextMenu = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    const grid = activeGrid();
+    const cell = cellUnderCursor(e);
+    if (!grid || !cell) return;
+    const raw = layoutCellAt(grid, cell.col, cell.row);
+    if (raw === undefined) return;
+    setSelectedChunkId(raw & 0x7f);
+  }, [activeGrid, cellUnderCursor, setSelectedChunkId]);
+
+  // Escape cancels an in-progress stamp stroke (spec: escape cancels cleanly).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && strokeRef.current) {
+        strokeRef.current = null;
+        redraw();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [redraw]);
 
   const onWheel = useCallback((e: React.WheelEvent) => {
     const canvas = canvasRef.current;
@@ -372,6 +490,10 @@ export default function ClassicLevelViewport() {
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0 }}>
       <OptionBar>
+        <span style={{ color: T.textLo }}>Tool</span>
+        <Chip active={tool === 'select'} onClick={() => setTool('select')} title="Pan / navigate (drag to pan)">Select</Chip>
+        <Chip active={tool === 'stamp'} onClick={() => setTool('stamp')} title="Paint the selected chunk onto layout cells (drag)">Stamp</Chip>
+        <Divider />
         <span style={{ color: T.textLo }}>Plane</span>
         <Chip active={plane === 'fg'} onClick={() => setPlane('fg')}>FG</Chip>
         <Chip active={plane === 'bg'} onClick={() => setPlane('bg')}>BG</Chip>
@@ -382,7 +504,11 @@ export default function ClassicLevelViewport() {
         <Chip active={overlays.objects} onClick={() => toggle('objects')}>Objects</Chip>
         <Chip active={overlays.start} onClick={() => toggle('start')}>Start</Chip>
         <span style={{ flex: 1 }} />
-        <span style={{ color: T.textFaint }}>drag to pan · scroll to zoom</span>
+        <span style={{ color: T.textFaint }}>
+          {tool === 'stamp'
+            ? `stamp $${selectedChunkId.toString(16).toUpperCase().padStart(2, '0')} · drag to paint · right-click eyedrops · scroll to zoom`
+            : 'drag to pan · right-click eyedrops · scroll to zoom'}
+        </span>
       </OptionBar>
       <div
         ref={containerRef}
@@ -393,10 +519,11 @@ export default function ClassicLevelViewport() {
             ref={canvasRef}
             onMouseDown={onMouseDown}
             onMouseMove={onMouseMove}
-            onMouseUp={endDrag}
-            onMouseLeave={endDrag}
+            onMouseUp={onMouseUp}
+            onMouseLeave={onMouseLeave}
+            onContextMenu={onContextMenu}
             onWheel={onWheel}
-            style={{ position: 'absolute', inset: 0, cursor: 'grab' }}
+            style={{ position: 'absolute', inset: 0, cursor: tool === 'stamp' ? 'crosshair' : 'grab' }}
           />
         ) : (
           <div style={{
