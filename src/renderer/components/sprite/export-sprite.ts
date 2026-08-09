@@ -19,8 +19,14 @@ import { discoverSpriteSets } from '../../../core/import/sprite-discovery';
 import type { DiscoveredSpriteSet } from '../../../core/import/sprite-discovery';
 import type { SpriteFormatId } from '../../../core/formats/sprite-format-adapter';
 import type { CompressionKind } from '../../../core/compress';
-import { parsePaletteLine } from '../../../core/formats/palette';
+import { parsePaletteLine, decodeGenesisColor } from '../../../core/formats/palette';
 import { parseCharacterAnims, parseAnyAnimScript } from '../../../core/import/anim-import';
+import { useEditorStore } from '../../state/editorStore';
+import { useClassicProjectStore } from '../../state/classicProjectStore';
+import { useClassicLevelStore } from '../../state/classicLevelStore';
+import { resolveObjectArt } from '../../../core/project/profiles/s1-object-art';
+import { s1ObjectName, s1ObjectHex } from '../../../core/project/profiles/s1-objects';
+import type { Color } from '../../../core/model/s4-types';
 import type { ParsedAnim } from '../../../core/import/anim-import';
 
 /** DUR_DYNAMIC (speed-scaled in-game) has no fixed hold — use this for editor playback. */
@@ -378,6 +384,61 @@ export async function openDiscoveredSet(baseDir: string, set: DiscoveredSpriteSe
   } catch (e) {
     toast(`Open "${set.name}" failed: ${e instanceof Error ? e.message : String(e)}`, 'error');
   }
+}
+
+// --- Edit-art handoff (Task B2) --------------------------------------------
+//
+// Injectable seam: the handoff opens through the SAME discovered-set path a
+// manual pick uses (openDiscoveredSet — do NOT fork a parallel open), but tests
+// substitute a canvas/IPC-free fake to verify the wiring (correct absolute base
+// dir + disasm-relative paths). Mirrors the classic stores' `__set…ForTest`
+// convention.
+type SpriteSetOpener = (baseDir: string, set: DiscoveredSpriteSet, comp: CompressionKind) => Promise<void>;
+let openSetImpl: SpriteSetOpener = openDiscoveredSet;
+export function __setSpriteSetOpenerForTest(fn: SpriteSetOpener): void { openSetImpl = fn; }
+export function __resetSpriteSetOpenerForTest(): void { openSetImpl = openDiscoveredSet; }
+
+/**
+ * Switch to Sprite mode and open the given classic object's art + mappings for
+ * editing (Task B2). id + zone resolve to an `ObjectArtLink` (profiles/
+ * s1-object-art.ts); the link's disasm-relative `artFile`/`mapAsm` are opened
+ * against the open project's dir through `openDiscoveredSet`, so the S1 Nemesis
+ * guarded save-back (captureS1ArtSource) is captured EXACTLY as a manual pick's.
+ * Returns false (a no-op) for an unlinked id or when no classic project is open —
+ * the calling buttons only render for linked ids, so that path is a guard.
+ *
+ * PRESELECTION: the objdef's declared `frame` is selected (frame selection is
+ * supported). The declared palette LINE (`pal`) can't bind to a zone CRAM line —
+ * a classic session has no aeon zone — so instead the sprite's STANDALONE palette
+ * is seeded from the classic doc's `palettes[pal]`, which is the correct-colors
+ * outcome. It is set directly (not via setStandalonePalette) because loadSprite
+ * just cleared history and this must not record an undo step — mirroring
+ * loadEngineCharacter's direct zone-bind setState.
+ */
+export async function editObjectArt(id: number, zone: string): Promise<boolean> {
+  const dir = useClassicProjectStore.getState().dir;
+  const link = resolveObjectArt(id, zone);
+  if (!dir || !link) return false;
+
+  const name = sanitizeName(s1ObjectName(id) || s1ObjectHex(id));
+  const comp: CompressionKind = link.compression === 'uncompressed' ? 'uncompressed' : 'nemesis';
+  const set: DiscoveredSpriteSet = { name, game: 's1', mappings: link.mapAsm, art: link.artFile };
+
+  useEditorStore.getState().setAppMode('sprite');
+  await openSetImpl(dir, set, comp);
+
+  useSpriteStore.getState().selectFrame(link.frame);
+
+  const doc = useClassicLevelStore.getState().doc;
+  const words = doc?.palettes[link.pal] ?? doc?.palettes[0];
+  if (words) {
+    const colors: Color[] = Array.from({ length: 16 }, (_, i) => {
+      const c = decodeGenesisColor(words[i] ?? 0);
+      return i === 0 ? { ...c, a: 0 } : c; // index 0 is transparent (sprite convention)
+    });
+    useSpriteStore.setState({ paletteMode: 'standalone', standalonePalette: colors });
+  }
+  return true;
 }
 
 /** Names of sprites the editor knows about (from data/sprites/index.json). */

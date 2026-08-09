@@ -3,6 +3,8 @@ import { T, Select, NumberField } from '../ui';
 import { useClassicLevelStore, classicSetObjects } from '../../state/classicLevelStore';
 import { useToastStore } from '../../state/toastStore';
 import { S1_OBJECT_LIST, s1ObjectName, s1ObjectHex } from '../../../core/project/profiles/s1-objects';
+import { resolveObjectArt } from '../../../core/project/profiles/s1-object-art';
+import { editObjectArt } from '../sprite/export-sprite';
 import type { S1ObjectEntry } from '../../../core/formats/classic/s1-objpos';
 
 const MAX_OBJ_X = 0xffff;
@@ -71,6 +73,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 export default function ObjectInspector() {
   const doc = useClassicLevelStore((s) => s.doc);
   const idx = useClassicLevelStore((s) => s.selectedObjectIndex);
+  const ref = useClassicLevelStore((s) => s.ref);
   const armedObjectId = useClassicLevelStore((s) => s.armedObjectId);
   const setSelectedObjectIndex = useClassicLevelStore((s) => s.setSelectedObjectIndex);
 
@@ -86,6 +89,10 @@ export default function ObjectInspector() {
     return <div style={styles.hint}>No object selected. Use the Object tool and click a marker.</div>;
   }
   const obj = doc.objects[idx];
+  const zone = ref?.zone ?? '';
+  // "Edit art" is offered only for ids that resolve linked art in THIS zone —
+  // the same predicate the library thumbnails use (Task B2).
+  const linked = resolveObjectArt(obj.id, zone) !== undefined;
 
   // Dropdown options: every named id, plus the current id if it isn't named (so
   // an unknown id round-trips instead of silently snapping to a named one).
@@ -125,6 +132,15 @@ export default function ObjectInspector() {
         <Check label="Y-flip" checked={obj.yflip} onChange={(c) => patchSelected({ yflip: c })} />
         <Check label="Respawn" checked={obj.respawn} onChange={(c) => patchSelected({ respawn: c })} />
       </div>
+      {linked && (
+        <button
+          style={styles.editArt}
+          title={`Open ${s1ObjectName(obj.id)}'s art + mappings in Sprite mode`}
+          onClick={() => { void editObjectArt(obj.id, zone); }}
+        >
+          Edit art…
+        </button>
+      )}
     </div>
   );
 }
@@ -158,4 +174,9 @@ const styles: Record<string, React.CSSProperties> = {
   checks: { display: 'flex', flexDirection: 'column', gap: 4, marginTop: 2 },
   check: { display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: T.textBase, cursor: 'pointer' },
   hint: { padding: 10, fontSize: 11, color: T.textLo, lineHeight: 1.5 },
+  editArt: {
+    marginTop: 4, padding: '5px 8px', background: T.raised, color: T.textHi,
+    border: `1px solid ${T.borderStrong}`, borderRadius: T.rMd, cursor: 'pointer',
+    fontSize: 11, fontWeight: 600,
+  },
 };

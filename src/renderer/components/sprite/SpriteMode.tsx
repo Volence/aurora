@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useProjectStore } from '../../state/projectStore';
+import { useClassicProjectStore } from '../../state/classicProjectStore';
 import { useArtStore } from '../../state/artStore';
 import { useSpriteStore } from '../../state/spriteStore';
 import { spriteModeUndo, spriteModeRedo } from '../../state/sprite-undo';
@@ -44,6 +45,11 @@ const DEFAULT_COMPRESSION: Record<SpriteFormatId, CompressionKind> = {
 
 export default function SpriteMode({ appBar }: { appBar: React.ReactNode }) {
   const project = useProjectStore((s) => s.project);
+  // Sprite mode is reachable from a classic (disasm) project via the Task B2
+  // edit-art handoff, which has no aeon project loaded. Accept that context too;
+  // the sprite is colored from its opened standalone palette (the handoff seeds
+  // it from the classic doc's declared line) since there is no aeon zone to bind.
+  const classicOpen = useClassicProjectStore((s) => s.status) === 'open';
   const showPieces = useSpriteStore((s) => s.showPieces);
   const frames = useSpriteStore((s) => s.frames);
   const currentIndex = useSpriteStore((s) => s.currentIndex);
@@ -162,7 +168,7 @@ export default function SpriteMode({ appBar }: { appBar: React.ReactNode }) {
     return decomp.pieces.map((p) => ({ x: p.xOffset + ox, y: p.yOffset + oy, w: p.widthCells * 8, h: p.heightCells * 8 }));
   }, [showPieces, decomp, buffer]);
 
-  if (!project) return <div style={styles.empty}>Open a project to edit sprites.</div>;
+  if (!project && !classicOpen) return <div style={styles.empty}>Open a project to edit sprites.</div>;
 
   return (
     <EditorShell

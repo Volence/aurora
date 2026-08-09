@@ -9,6 +9,12 @@ import ChunkPicker from './ChunkPicker';
 import ResolutionReportPanel from './ResolutionReportPanel';
 import ObjectInspector from './ObjectInspector';
 import ObjectLibraryPanel from './ObjectLibraryPanel';
+import type { ProjectHandle } from '../../../core/project/adapter';
+
+// The handle the classic level store was last reset for. Module scope (survives
+// this view's unmount/remount on a Map⇄Sprite mode round trip) so returning from
+// Sprite mode does NOT re-run the stale-doc reset — see the effect below.
+let lastResetHandle: ProjectHandle | null = null;
 
 /**
  * Read-only surface for an opened classic (disasm) project (Task 9 → Task 11).
@@ -23,6 +29,8 @@ export default function ClassicProjectView({ appBar }: { appBar: React.ReactNode
   const zoneTree = useClassicProjectStore((s) => s.zoneTree);
   const report = useClassicProjectStore((s) => s.report);
 
+  const handle = useClassicProjectStore((s) => s.handle);
+
   const selected = useClassicLevelStore((s) => s.ref);
   const doc = useClassicLevelStore((s) => s.doc);
   const status = useClassicLevelStore((s) => s.status);
@@ -31,10 +39,19 @@ export default function ClassicProjectView({ appBar }: { appBar: React.ReactNode
   const isDirty = Object.values(dirty).some(Boolean);
 
   // Opening a different project must not leave a stale act selected/loaded — the
-  // old doc was read through the previous handle.
+  // old doc was read through the previous handle. Keyed on HANDLE IDENTITY, not
+  // `dir`, and guarded by a module-level marker so a remount does NOT reset:
+  // this view unmounts whenever the user hops to Sprite mode (App routes classic
+  // + appMode==='sprite' → SpriteMode) and remounts on return; a dir-keyed
+  // mount effect would wipe the classic level store (doc + undo history + unsaved
+  // edits) on every such round trip. A new project always produces a NEW handle
+  // object, so comparing handles resets on a genuine project change only.
   React.useEffect(() => {
-    useClassicLevelStore.getState().reset();
-  }, [dir]);
+    if (handle !== lastResetHandle) {
+      lastResetHandle = handle;
+      useClassicLevelStore.getState().reset();
+    }
+  }, [handle]);
 
   // Undo/redo keyboard for the classic view (Task 13). A DIRECT binding to the
   // classic level store's undo/redo — sprite (s1-object) editing isn't reachable

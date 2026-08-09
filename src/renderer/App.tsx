@@ -107,7 +107,15 @@ export default function App() {
         </div>
       )}
 
-      {classicOpen ? (
+      {/* While a classic (disasm) project is open, the classic view owns the
+          screen — EXCEPT Sprite mode, which the edit-art handoff (Task B2)
+          switches into to edit an object's art. SpriteMode then renders over the
+          classic project (its guard accepts a classic project too); switching
+          back to any non-sprite mode (command palette "Switch to Map mode")
+          returns here. The classic stores are module-level singletons, so the
+          round trip preserves the open act, unsaved edits, and undo history —
+          only the classic viewport's local pan/zoom is lost (acceptable v1). */}
+      {classicOpen && appMode !== 'sprite' ? (
         <ClassicProjectView
           appBar={<Toolbar onOpenProject={openProject} onOpenRecent={openProjectByPath} onSave={guardedSave} />}
         />

@@ -3,8 +3,9 @@ import { T } from '../ui';
 import { useClassicLevelStore } from '../../state/classicLevelStore';
 import { useClassicProjectStore } from '../../state/classicProjectStore';
 import { loadObjectSprite, useClassicObjectArtStore } from '../../state/classicObjectArtStore';
-import { S1_OBJECT_LIST, s1ObjectHex } from '../../../core/project/profiles/s1-objects';
+import { S1_OBJECT_LIST, s1ObjectHex, s1ObjectName } from '../../../core/project/profiles/s1-objects';
 import { resolveObjectArt } from '../../../core/project/profiles/s1-object-art';
+import { editObjectArt } from '../sprite/export-sprite';
 
 const THUMB = 28;
 
@@ -88,21 +89,40 @@ export default function ObjectLibraryPanel() {
       {S1_OBJECT_LIST.map(({ id, name }) => {
         const armed = armedObjectId === id;
         const linked = resolveObjectArt(id, zone) !== undefined;
+        // A row is a container (role=option) holding the arm button plus, for
+        // linked ids, an "Edit art" button — nested <button>s are invalid, so the
+        // arm target is its own <button> sibling rather than the whole row.
         return (
-          <button
+          <div
             key={id}
             role="option"
             aria-selected={armed}
-            onClick={() => arm(id)}
-            title={`Place ${name} (${s1ObjectHex(id)})`}
             style={{ ...styles.row, ...(armed ? styles.rowArmed : {}) }}
           >
-            <span style={styles.thumbWrap}>
-              {linked ? <ObjectThumb id={id} zone={zone} epoch={chunkEpoch} dir={dir} /> : null}
-            </span>
-            <span style={{ ...styles.hex, ...(armed ? styles.hexArmed : {}) }}>{s1ObjectHex(id)}</span>
-            <span style={styles.name}>{name}</span>
-          </button>
+            <button
+              type="button"
+              onClick={() => arm(id)}
+              title={`Place ${name} (${s1ObjectHex(id)})`}
+              style={styles.rowMain}
+            >
+              <span style={styles.thumbWrap}>
+                {linked ? <ObjectThumb id={id} zone={zone} epoch={chunkEpoch} dir={dir} /> : null}
+              </span>
+              <span style={{ ...styles.hex, ...(armed ? styles.hexArmed : {}) }}>{s1ObjectHex(id)}</span>
+              <span style={styles.name}>{name}</span>
+            </button>
+            {linked && (
+              <button
+                type="button"
+                onClick={() => { void editObjectArt(id, zone); }}
+                title={`Edit ${s1ObjectName(id)}'s art in Sprite mode`}
+                aria-label={`Edit ${name} art`}
+                style={{ ...styles.editBtn, ...(armed ? styles.editBtnArmed : {}) }}
+              >
+                ✎
+              </button>
+            )}
+          </div>
         );
       })}
     </div>
@@ -112,10 +132,21 @@ export default function ObjectLibraryPanel() {
 const styles: Record<string, React.CSSProperties> = {
   list: { display: 'flex', flexDirection: 'column', padding: 4, gap: 2 },
   row: {
-    display: 'flex', alignItems: 'center', gap: 8, width: '100%',
-    padding: '3px 6px', background: 'transparent', border: '1px solid transparent',
-    borderRadius: T.rMd, cursor: 'pointer', textAlign: 'left', color: T.textBase,
+    display: 'flex', alignItems: 'center', gap: 4, width: '100%',
+    padding: '2px 4px', background: 'transparent', border: '1px solid transparent',
+    borderRadius: T.rMd, textAlign: 'left', color: T.textBase,
   },
+  rowMain: {
+    display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0,
+    padding: '1px 2px', background: 'transparent', border: 'none',
+    cursor: 'pointer', textAlign: 'left', color: 'inherit',
+  },
+  editBtn: {
+    flexShrink: 0, padding: '2px 6px', background: 'transparent',
+    border: `1px solid ${T.border}`, borderRadius: T.rMd, cursor: 'pointer',
+    color: T.textLo, fontSize: 12, lineHeight: 1,
+  },
+  editBtnArmed: { color: T.onAccent, borderColor: T.onAccent },
   rowArmed: { background: T.accent, borderColor: T.accent, color: T.onAccent },
   thumbWrap: {
     width: THUMB, height: THUMB, flexShrink: 0, display: 'flex',
