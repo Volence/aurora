@@ -124,7 +124,22 @@ export default function ClassicLevelViewport() {
   // getBoundingClientRect, so drags stay cheap.
   const sizeRef = useRef<{ w: number; h: number }>({ w: 0, h: 0 });
   const [, forceRedraw] = useState(0);
-  const redraw = useCallback(() => forceRedraw((n) => n + 1), []);
+  // Coalesce redraws through requestAnimationFrame: a pan/stamp/object drag can
+  // fire redraw() on every mousemove (a high-poll mouse emits hundreds/sec), and
+  // each redraw is a full clear+recompose. Without coalescing that is a redraw
+  // storm — many draws per displayed frame, all but the last wasted. rafRef holds
+  // the pending frame handle; the first redraw of a frame schedules one draw, and
+  // further redraws before it fires are absorbed (the trailing state bump still
+  // reflects the latest ref-based camera/stroke state). Cancelled on unmount.
+  const rafRef = useRef<number | null>(null);
+  const redraw = useCallback(() => {
+    if (rafRef.current != null) return;
+    rafRef.current = requestAnimationFrame(() => {
+      rafRef.current = null;
+      forceRedraw((n) => n + 1);
+    });
+  }, []);
+  useEffect(() => () => { if (rafRef.current != null) cancelAnimationFrame(rafRef.current); }, []);
 
   const [plane, setPlane] = useState<Plane>('fg');
   const [overlays, setOverlays] = useState<Overlays>({
