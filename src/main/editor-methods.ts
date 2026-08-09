@@ -142,6 +142,16 @@ export const EDITOR_METHODS: EditorMethod[] = [
   { name: 'set_colind', kind: 'classic-set-colind', result: 'json',
     params: { entries: z.array(z.object({ blockId: z.number().int().min(0), value: z.number().int().min(0).max(255) })).describe('block id → collision-shape index edits') },
     description: 'Set block→collision-shape indices (batched). One undo step.' },
+  // NOTE: named `set_level_palette` (not `set_palette`) — the aeon `set_palette`
+  // tool already owns that name in this flat registry, and MCP tool names must be
+  // globally unique. The classic surface allows palette line 0 (a real level line,
+  // not sprite-reserved), so it is a distinct tool from the aeon one.
+  { name: 'set_level_palette', kind: 'classic-set-palette', result: 'json',
+    params: { line: z.number().int().min(0).max(3), colors: z.array(z.number().int().min(0).max(0xffff)).length(16) },
+    description: 'Write one classic-level palette line (0-3) as 16 Genesis CRAM words (0000BBB0GGG0RRR0). Index 0 is transparent. One classic undo step; bumps the palette epoch so chunk art + object sprites refresh.' },
+  { name: 'set_start', kind: 'classic-set-start', result: 'json',
+    params: { x: z.number().int().min(0).max(0xffff), y: z.number().int().min(0).max(0xffff) },
+    description: 'Move the player spawn point to (x,y). Both are 16-bit (the startpos file has no terminator sentinel). One classic undo step.' },
   { name: 'save_project', kind: 'classic-save-project', result: 'json', params: {},
     description: 'Save every dirty act of the open classic project through the guarded (mtime-checked) write channel. Returns a structured outcome: saved / conflict / partial / error / nothing.' },
 ];

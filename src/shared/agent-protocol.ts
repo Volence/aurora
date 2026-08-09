@@ -55,6 +55,8 @@ export type AgentRequest =
   | { kind: 'classic-move-object'; index: number; x: number; y: number }
   | { kind: 'classic-delete-object'; index: number }
   | { kind: 'classic-set-colind'; entries: { blockId: number; value: number }[] }
+  | { kind: 'classic-set-palette'; line: number; colors: number[] }
+  | { kind: 'classic-set-start'; x: number; y: number }
   | { kind: 'classic-save-project' };
 
 export interface AgentRequestEnvelope {

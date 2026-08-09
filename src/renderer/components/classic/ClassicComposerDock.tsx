@@ -25,6 +25,29 @@ import {
 
 const hex = (n: number) => `$${n.toString(16).toUpperCase()}`;
 
+/** Whether a keyboard event targets a text-entry field (Escape belongs to it). */
+function isTypingTarget(t: HTMLElement): boolean {
+  return t.isContentEditable || t.tagName === 'TEXTAREA'
+    || (t.tagName === 'INPUT' && !['range', 'checkbox', 'button', 'radio'].includes((t as HTMLInputElement).type));
+}
+
+/**
+ * Register a window Escape handler that cancels an in-progress canvas gesture
+ * (a `strokeRef` Map, mutated during the drag) — matching the viewport's gesture
+ * cancel. Guarded against text-entry so an Escape in a field isn't hijacked.
+ */
+function useEscapeCancel(strokeRef: React.MutableRefObject<Map<number, number> | null>, redraw: () => void): void {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      if (isTypingTarget(e.target as HTMLElement)) return;
+      if (strokeRef.current) { strokeRef.current = null; redraw(); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [strokeRef, redraw]);
+}
+
 // Solidity vocabulary — verified against SonLVLAPI's Solidity enum
 //   /home/volence/sonic_hacks/programs/SonLVL/SonLVLAPI/DataTypes.cs:400
 //   0 NotSolid, 1 TopSolid, 2 LRBSolid, 3 AllSolid.
@@ -132,6 +155,7 @@ function ChunkTab({ doc, usage }: { doc: LevelDoc; usage: UsageIndex }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const strokeRef = useRef<Map<number, number> | null>(null); // cell index → packed word
   const chunkIndex = chunkIndexForId(doc, selectedChunkId);
+  useEscapeCancel(strokeRef, redraw); // Esc cancels an in-progress chunk paint
 
   // Render base art + preview + solidity tint + grid.
   useEffect(() => {
@@ -260,6 +284,9 @@ function ChunkTab({ doc, usage }: { doc: LevelDoc; usage: UsageIndex }) {
           <span style={styles.title}>Chunk {selectedChunkId === 0 ? 'air ($00)' : hex(selectedChunkId)}</span>
           <span style={styles.count}>placed {placements}×</span>
           <span style={{ flex: 1 }} />
+          {chunkIndex !== null && (
+            <button onClick={duplicateChunk} style={styles.smallBtn} title="Copy this chunk to a new id">Duplicate</button>
+          )}
           <button onClick={newBlankChunk} style={styles.smallBtn}>+ New blank</button>
         </div>
         {selectedChunkId === 0 || chunkIndex === null ? (
@@ -401,6 +428,7 @@ function BlockTab({ doc, usage }: { doc: LevelDoc; usage: UsageIndex }) {
           <span style={styles.title}>Block {hex(composerBlockId)}</span>
           <span style={styles.count}>in {blockUse.containers} chunk{blockUse.containers === 1 ? '' : 's'} · {blockUse.cells} cell{blockUse.cells === 1 ? '' : 's'}</span>
           <span style={{ flex: 1 }} />
+          <button onClick={duplicateBlock} style={styles.smallBtn} title="Copy this block to a new id">Duplicate</button>
           <button onClick={newBlankBlock} style={styles.smallBtn}>+ New blank</button>
         </div>
         {blockUse.cells > 1 && (
@@ -467,6 +495,7 @@ function TileTab({ doc, usage }: { doc: LevelDoc; usage: UsageIndex }) {
   const redraw = useCallback(() => force((n) => n + 1), []);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const strokeRef = useRef<Map<number, number> | null>(null); // pixel index → color index
+  useEscapeCancel(strokeRef, redraw); // Esc cancels an in-progress tile stroke
 
   const lockReason = tileLockReason(range, composerTileIndex);
   const locked = lockReason !== null;

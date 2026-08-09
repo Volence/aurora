@@ -16,6 +16,7 @@ import { drawCollision, drawObjects, drawStart } from './classic-overlays';
 import {
   CANVAS_VOID,
   STAMP_PREVIEW_FILL, STAMP_PREVIEW_STROKE,
+  LOOP_GLYPH_FILL, LOOP_GLYPH_TEXT,
 } from '../../canvas/canvas-colors';
 
 type Plane = 'fg' | 'bg';
@@ -49,6 +50,29 @@ const START_MAX = 0xffff;
 const clampInt = (v: number, hi: number) => Math.max(0, Math.min(hi, Math.round(v)));
 
 /**
+ * Draw the loop-flag corner badge for a layout cell whose top-left is at world
+ * (x0,y0). Sized in world units × invZoom so it stays a constant on-screen size
+ * regardless of camera zoom. A filled amber disc with an "∞" glyph — distinct
+ * from the object/ring/stamp overlays.
+ */
+function drawLoopGlyph(ctx: CanvasRenderingContext2D, x0: number, y0: number, invZoom: number): void {
+  const r = 8 * invZoom;
+  const cx = x0 + r + 2 * invZoom;
+  const cy = y0 + r + 2 * invZoom;
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.fillStyle = LOOP_GLYPH_FILL;
+  ctx.fill();
+  ctx.fillStyle = LOOP_GLYPH_TEXT;
+  ctx.font = `bold ${11 * invZoom}px sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('∞', cx, cy + 0.5 * invZoom);
+  ctx.textAlign = 'start';
+  ctx.textBaseline = 'alphabetic';
+}
+
+/**
  * Read-only classic (Sonic 1) level viewport (Task 11). Composes the FG/BG chunk
  * layout from `renderChunk` prerenders (cached per chunk id — read-only, so the
  * cache is only invalidated when the whole doc changes), with a pan/zoom camera
@@ -75,8 +99,10 @@ export default function ClassicLevelViewport() {
   // Task 13 layout-editing UI state (pan|stamp + the stamp/eyedrop chunk id).
   const tool = useClassicLevelStore((s) => s.tool);
   const selectedChunkId = useClassicLevelStore((s) => s.selectedChunkId);
+  const stampLoop = useClassicLevelStore((s) => s.stampLoop);
   const setTool = useClassicLevelStore((s) => s.setTool);
   const setSelectedChunkId = useClassicLevelStore((s) => s.setSelectedChunkId);
+  const setStampLoop = useClassicLevelStore((s) => s.setStampLoop);
   // Task 14 object-tool UI state (selection index + armed place-mode id).
   const selectedObjectIndex = useClassicLevelStore((s) => s.selectedObjectIndex);
   const armedObjectId = useClassicLevelStore((s) => s.armedObjectId);
@@ -217,6 +243,10 @@ export default function ClassicLevelViewport() {
         const chunkId = cell & 0x7f;
         const key = `${chunkEpoch}:${chunkVersions.get(chunkId) ?? 0}`;
         ctx.drawImage(getChunkCanvas(doc, chunkId, key), col * CHUNK_PX, row * CHUNK_PX);
+        // Loop-flag glyph (Task B4): a small top-left corner badge on cells whose
+        // layout byte carries S1's bit-7 loop flag, kept a constant on-screen size
+        // (world units × invZoom) so it reads at any zoom.
+        if (cell & 0x80) drawLoopGlyph(ctx, col * CHUNK_PX, row * CHUNK_PX, invZoom);
       }
     }
 
@@ -508,7 +538,12 @@ export default function ClassicLevelViewport() {
     const stroke = strokeRef.current;
     strokeRef.current = null;
     if (!stroke || stroke.size === 0) { redraw(); return; }
-    const cells = stampAccumToCells(stroke, useClassicLevelStore.getState().selectedChunkId);
+    const s = useClassicLevelStore.getState();
+    // Loop flag (Task B4): OR in S1's bit 7 when the Loop toggle is armed AND the
+    // selected id is a real engine id (1..$7F) — air ($00) never loops.
+    const id = s.selectedChunkId;
+    const stampByte = s.stampLoop && id >= 1 && id <= 0x7f ? id | 0x80 : id;
+    const cells = stampAccumToCells(stroke, stampByte);
     const res = classicSetLayoutCells(plane, cells);
     if (!res.ok) useToastStore.getState().addToast(`Stamp failed: ${res.error}`, 'error');
     redraw();
@@ -544,17 +579,11 @@ export default function ClassicLevelViewport() {
     const raw = layoutCellAt(grid, cell.col, cell.row);
     if (raw === undefined) return;
     setSelectedChunkId(raw & 0x7f);
-    // S1's bit-7 loop flag is masked off here (stamping never carries it in v1).
-    // If the eyedropped cell had it set, say so, so the picked chunk pasting
-    // WITHOUT the loop flag isn't a silent surprise.
-    if (raw & 0x80) {
-      useToastStore.getState().addToast(
-        `Eyedropped chunk $${(raw & 0x7f).toString(16).toUpperCase().padStart(2, '0')} — ` +
-          `the loop flag on that cell isn't carried by stamping (v1)`,
-        'info',
-      );
-    }
-  }, [activeGrid, cellUnderCursor, setSelectedChunkId]);
+    // Preserve S1's bit-7 loop flag into the armed stamp state (Task B4) so
+    // re-stamping the eyedropped cell reproduces it. Air ($00) can't loop, so a
+    // loop-flagged air byte (never legitimately written) syncs the toggle off.
+    setStampLoop((raw & 0x80) !== 0 && (raw & 0x7f) >= 1);
+  }, [activeGrid, cellUnderCursor, setSelectedChunkId, setStampLoop]);
 
   // Keyboard: Escape cancels an in-progress gesture / clears armed-place /
   // deselects; Delete or Backspace removes the selected object. The Delete key is
@@ -633,7 +662,7 @@ export default function ClassicLevelViewport() {
         <span style={{ flex: 1 }} />
         <span style={{ color: T.textFaint }}>
           {tool === 'stamp'
-            ? `stamp $${selectedChunkId.toString(16).toUpperCase().padStart(2, '0')} · drag to paint · right-click eyedrops · scroll to zoom`
+            ? `stamp $${selectedChunkId.toString(16).toUpperCase().padStart(2, '0')}${stampLoop && selectedChunkId >= 1 && selectedChunkId <= 0x7f ? ' ∞loop' : ''} · drag to paint · right-click eyedrops · scroll to zoom`
             : tool === 'object'
               ? (armedObjectId != null
                   ? `click to place ${s1ObjectName(armedObjectId)} · Esc cancels`

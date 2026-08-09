@@ -102,6 +102,9 @@ export const CHUNK_AIR_CHECK_B = '#1B1E26';             // air ($00) picker chec
 export const STAMP_PREVIEW_FILL = 'rgba(120,180,255,0.30)';
 /** Outline of those same preview cells. */
 export const STAMP_PREVIEW_STROKE = 'rgba(150,200,255,0.95)';
+/** Corner glyph marking a layout cell that carries S1's bit-7 loop flag. */
+export const LOOP_GLYPH_FILL = 'rgba(255,196,60,0.92)';
+export const LOOP_GLYPH_TEXT = '#1A1206';
 
 // ---------- sprite/frame thumbnails (FrameGrid, Timeline) ----------
 /** Transparent-pixel checkerboard cells for the sprite/frame thumbnails. */

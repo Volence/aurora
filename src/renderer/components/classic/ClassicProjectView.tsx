@@ -10,6 +10,7 @@ import ClassicComposerDock from './ClassicComposerDock';
 import ResolutionReportPanel from './ResolutionReportPanel';
 import ObjectInspector from './ObjectInspector';
 import ObjectLibraryPanel from './ObjectLibraryPanel';
+import ClassicPalettePanel from './ClassicPalettePanel';
 import type { ProjectHandle } from '../../../core/project/adapter';
 
 // The handle the classic level store was last reset for. Module scope (survives
@@ -138,6 +139,8 @@ export default function ClassicProjectView({ appBar }: { appBar: React.ReactNode
               <ObjectInspector />
               <PanelHeader>Object Library</PanelHeader>
               <ObjectLibraryPanel />
+              <PanelHeader>Palette</PanelHeader>
+              <ClassicPalettePanel />
             </>
           )}
           <PanelHeader>Resolution Report</PanelHeader>

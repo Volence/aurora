@@ -354,6 +354,43 @@ describe('classic-set-colind', () => {
   });
 });
 
+describe('classic-set-palette', () => {
+  it('writes one palette line as one undo step', async () => {
+    openReady();
+    const colors = Array.from({ length: 16 }, (_, i) => i * 2); // arbitrary CRAM words
+    const epoch0 = lvl().chunkEpoch;
+    expect(await handleAgentRequest({ kind: 'classic-set-palette', line: 2, colors })).toEqual({ line: 2 });
+    expect(Array.from(lvl().doc!.palettes[2])).toEqual(colors);
+    expect(lvl().chunkEpoch).toBeGreaterThan(epoch0); // palette bump refreshes chunk art + sprites
+    lvl().undo();
+    expect(Array.from(lvl().doc!.palettes[2])).toEqual(Array(16).fill(0));
+  });
+  it('rejects an out-of-range line (structured error)', async () => {
+    openReady();
+    await expect(handleAgentRequest({ kind: 'classic-set-palette', line: 4, colors: Array(16).fill(0) })).rejects.toThrow(/palette line/);
+  });
+  it('errors when no level is open', async () => {
+    await expect(handleAgentRequest({ kind: 'classic-set-palette', line: 0, colors: Array(16).fill(0) })).rejects.toThrow(/no classic level is open/);
+  });
+});
+
+describe('classic-set-start', () => {
+  it('moves the player start as one undo step', async () => {
+    openReady();
+    expect(await handleAgentRequest({ kind: 'classic-set-start', x: 200, y: 300 })).toEqual({ x: 200, y: 300 });
+    expect(lvl().doc!.start).toEqual({ x: 200, y: 300 });
+    lvl().undo();
+    expect(lvl().doc!.start).toEqual({ x: 50, y: 50 });
+  });
+  it('rejects an out-of-range coordinate (structured error)', async () => {
+    openReady();
+    await expect(handleAgentRequest({ kind: 'classic-set-start', x: -1, y: 0 })).rejects.toThrow(/out of range/);
+  });
+  it('errors when no level is open', async () => {
+    await expect(handleAgentRequest({ kind: 'classic-set-start', x: 0, y: 0 })).rejects.toThrow(/no classic level is open/);
+  });
+});
+
 // ---------------------------------------------------------------------------
 // save_project — structured outcome
 // ---------------------------------------------------------------------------

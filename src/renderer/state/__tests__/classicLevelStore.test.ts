@@ -188,6 +188,16 @@ describe('classic:set-layout-cells', () => {
     expect(classicSetLayoutCells('fg', [{ x: 0, y: 0, chunkId: 0 }, { x: 1, y: 0, chunkId: 2 }]).ok).toBe(true);
     expect(Array.from(st().doc!.fg.cells)).toEqual([0, 2, 0, 1]);
   });
+
+  it('accepts a loop-flagged byte (bit 7) and stores it raw — engine id validated masked (Task B4)', () => {
+    openReady(); // 2 chunks → engine ids 1,2 real
+    // 0x81 = engine id 1 | loop flag: masked id 1 is in the pool, so it is accepted
+    // and the RAW byte (loop flag intact) is written — survives to save byte-for-byte.
+    expect(classicSetLayoutCells('fg', [{ x: 0, y: 0, chunkId: 0x81 }]).ok).toBe(true);
+    expect(st().doc!.fg.cells[0]).toBe(0x81);
+    // A loop-flagged byte whose MASKED id is past the pool is still rejected.
+    expect(classicSetLayoutCells('fg', [{ x: 1, y: 0, chunkId: 0x83 }]).ok).toBe(false); // (0x83 & 0x7f)=3 > 2
+  });
 });
 
 describe('classic:edit-chunk-cells', () => {

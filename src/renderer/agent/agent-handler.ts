@@ -22,6 +22,7 @@ import {
   classicSetLayoutCells, classicEditChunkCells, classicEditBlock,
   classicAddChunk, classicAddBlock,
   classicSetObjects, classicSetColind,
+  classicSetPalette, classicSetStart,
   type CommandResult,
 } from '../state/classicLevelStore';
 import { saveClassicProject } from '../state/classic-save';
@@ -693,6 +694,18 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
       requireClassicDoc();
       assertCommand(classicSetColind(req.entries));
       return { entries: req.entries.length };
+    }
+
+    case 'classic-set-palette': {
+      requireClassicDoc();
+      assertCommand(classicSetPalette(req.line, Uint16Array.from(req.colors)));
+      return { line: req.line };
+    }
+
+    case 'classic-set-start': {
+      requireClassicDoc();
+      assertCommand(classicSetStart(req.x, req.y));
+      return { x: req.x, y: req.y };
     }
 
     case 'classic-save-project': {

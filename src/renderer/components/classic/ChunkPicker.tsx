@@ -103,14 +103,29 @@ export default function ChunkPicker() {
   const chunkEpoch = useClassicLevelStore((s) => s.chunkEpoch);
   const selectedChunkId = useClassicLevelStore((s) => s.selectedChunkId);
   const setSelectedChunkId = useClassicLevelStore((s) => s.setSelectedChunkId);
+  const stampLoop = useClassicLevelStore((s) => s.stampLoop);
+  const setStampLoop = useClassicLevelStore((s) => s.setStampLoop);
 
   if (status !== 'ready' || !doc) return null;
+
+  // S1's bit-7 loop flag is only meaningful for a real engine id (1..$7F); air
+  // ($00) can't loop, so the toggle only shows for an armed stampable chunk.
+  const loopable = selectedChunkId >= 1 && selectedChunkId <= 0x7f;
 
   return (
     <div style={styles.container}>
       <div style={styles.header}>
         <span style={styles.label}>Chunks ({doc.chunks.length})</span>
         <span style={styles.selBadge}>{hex2(selectedChunkId)}</span>
+        {loopable && (
+          <button
+            onClick={() => setStampLoop(!stampLoop)}
+            title="Stamp this chunk with S1's loop flag (bit 7) — used for loop-de-loop layout cells"
+            style={{ ...styles.loopBtn, ...(stampLoop ? styles.loopBtnOn : {}) }}
+          >
+            ∞ Loop
+          </button>
+        )}
         <span style={styles.hint}>click to select · right-click viewport to eyedrop</span>
       </div>
       <div style={styles.strip}>
@@ -149,6 +164,12 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 10, fontWeight: 600, color: T.onAccent, background: T.accent,
     padding: '0 6px', borderRadius: 3, lineHeight: '16px', fontFamily: T.fontMono,
   },
+  loopBtn: {
+    fontSize: 10, fontWeight: 600, color: T.textLo, background: T.overlay,
+    border: `1px solid ${T.border}`, borderRadius: 3, padding: '0 6px',
+    lineHeight: '16px', cursor: 'pointer',
+  },
+  loopBtnOn: { color: T.onAccent, background: T.warning, borderColor: T.warning },
   hint: { fontSize: 9, color: T.textFaint, marginLeft: 'auto' },
   // Horizontal scrollable strip of thumbnails.
   strip: {

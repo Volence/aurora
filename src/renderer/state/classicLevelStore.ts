@@ -100,6 +100,12 @@ interface ClassicLevelState {
   /** The chunk id the stamp tool paints (0..255); also the eyedropper target. */
   selectedChunkId: number;
   /**
+   * Whether the stamp tool writes S1's bit-7 loop flag alongside the chunk id
+   * (Task B4). Only meaningful for an armed engine id 1..$7F — air ($00) never
+   * loops. UI state (not doc data); the eyedropper syncs it from the picked cell.
+   */
+  stampLoop: boolean;
+  /**
    * The object tool's current selection: an index into `doc.objects`, or null.
    * NOT part of an undo snapshot (UI state). Consumers must treat an index that
    * is out of range for the current list as "no selection" — a delete or undo
@@ -132,6 +138,7 @@ interface ClassicLevelState {
   openAct: (ref: ZoneActRef) => Promise<void>;
   setTool: (tool: ClassicTool) => void;
   setSelectedChunkId: (chunkId: number) => void;
+  setStampLoop: (loop: boolean) => void;
   setSelectedObjectIndex: (index: number | null) => void;
   setArmedObjectId: (id: number | null) => void;
   setComposerOpen: (open: boolean) => void;
@@ -169,6 +176,7 @@ const IDLE = {
   historyTick: 0,
   tool: 'pan' as ClassicTool,
   selectedChunkId: 0,
+  stampLoop: false,
   selectedObjectIndex: null as number | null,
   armedObjectId: null as number | null,
   composerOpen: false,
@@ -216,6 +224,7 @@ export const useClassicLevelStore = create<ClassicLevelState>((set, get) => ({
       // Chunk ids are per-act, so a fresh act resets the stamp selection (the tool
       // choice persists — it's a workflow preference, not level data).
       selectedChunkId: 0,
+      stampLoop: false,
       // Object selection + place-arm are per-act too (indices/ids into this act's
       // object list), so a fresh act clears them.
       selectedObjectIndex: null,
@@ -253,6 +262,7 @@ export const useClassicLevelStore = create<ClassicLevelState>((set, get) => ({
   setSelectedChunkId: (chunkId: number) => {
     if (Number.isInteger(chunkId) && chunkId >= 0 && chunkId <= 0xff) set({ selectedChunkId: chunkId });
   },
+  setStampLoop: (loop: boolean) => set({ stampLoop: loop }),
   setSelectedObjectIndex: (index: number | null) => set({ selectedObjectIndex: index }),
   // Arming an object for placement is mutually exclusive with a live selection:
   // clear the selection so the inspector reflects the pending placement, not a
@@ -437,11 +447,17 @@ export function classicSetLayoutCells(
     if (index >= bound) {
       return err(`${plane} cell (${c.x},${c.y}) is outside the writable layout region`);
     }
-    // chunkId is the S1 ENGINE id: $00 = air (valid — erases the cell), and
-    // 1..chunks.length map to chunks[id-1]. Anything past the pool can't render,
-    // so reject it here rather than baking an un-drawable id into the layout.
-    if (!isInt(c.chunkId) || c.chunkId < 0 || c.chunkId > doc.chunks.length) {
-      return err(`chunk id ${c.chunkId} out of range 0..${doc.chunks.length} (0 = air)`);
+    // chunkId is a RAW layout byte: bits 0-6 = the S1 engine id, bit 7 = S1's
+    // loop flag (kept in-band; loop-chunk authoring, Task B4). $00 = air (valid —
+    // erases the cell), and engine ids 1..chunks.length map to chunks[id-1].
+    // Validate the MASKED engine id against the pool (an un-drawable id can't be
+    // baked in) while accepting the full 0..$FF byte range so the loop bit rides
+    // along. render/collision both consume `cell & 0x7f`.
+    if (!isInt(c.chunkId) || c.chunkId < 0 || c.chunkId > 0xff) {
+      return err(`chunk id byte ${c.chunkId} out of range 0..255 (bit 7 = loop flag)`);
+    }
+    if ((c.chunkId & 0x7f) > doc.chunks.length) {
+      return err(`chunk id ${c.chunkId & 0x7f} out of range 0..${doc.chunks.length} (0 = air)`);
     }
   }
   const nextCells = new Uint8Array(grid.cells);
