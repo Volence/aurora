@@ -59,6 +59,8 @@ export const OBJECT_BOX_STROKE = '#ff4444';
 export const OBJECT_LABEL = '#ffffff';
 export const RING_FILL = 'rgba(255, 220, 0, 0.8)';
 export const RING_STROKE = '#ffaa00';
+// Classic (S1) level-start spawn marker — pink, distinct from object red + ring yellow.
+export const START_MARKER = '#f5c2e7';
 
 // ---------- active-section border (SectionRenderer) ----------
 export const ACTIVE_SECTION_BORDER = 'rgba(137, 180, 250, 0.6)';
