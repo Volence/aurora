@@ -15,13 +15,40 @@ is one undo step (Ctrl+Z), and nothing touches disk until you save.
 ## Tools
 
 Query: `get_project_info`, `get_palette`, `get_tiles`, `get_nametable_region`, `check_budget`, `get_bg`, `list_bgs`
-Mutate (one undo step each): `set_palette`, `write_tiles`, `paint_region`, `save_chunk`*, `stamp_chunk`, `set_bg`*, `assign_section_bg`
+Mutate (one undo step each): `set_palette`, `write_tiles`, `paint_region`, `paint_collision`, `save_chunk`*, `stamp_chunk`, `set_bg`*, `assign_section_bg`
 View: `goto`, `screenshot`
 
 *`save_chunk` adds to the chunk library outside undo history (additive only),
 matching the existing chunk-library behavior. `set_bg` with a `name` argument
 likewise ADDS the background to the project BG library (outside undo history)
 instead of replacing the act default; the reply includes the generated id.
+
+## Collision
+
+`paint_collision` fills a rectangle of one collision plane (`a` or `b`) with a
+single packed cell word. Coordinates are in 16px CELL units (0-127 per axis,
+half a section's 256x256 tiles), not tile units — a section is 128x128 cells.
+The word is the same packed cell encoding used throughout the editor
+(`src/core/collision/collision-cell-word.ts`):
+
+- bits 0-9: shape index (0..1023; 0 = air — the rest of the word is ignored)
+- bit 10: X-flip, bit 11: Y-flip
+- bits 12-13: solidity for this plane (0=none, 1=top, 2=sides-bottom, 3=all)
+- bits 14-15: spare
+
+Painting seeds both of the section's collision planes on first touch (lazily
+packing the engine baseline into cell words), same as the human paint tool,
+then diffs the rectangle against the plane's current words — cells already
+equal to `word` are left alone, and the reply's `painted` count is the number
+of 8px sub-tile entries actually changed (up to 4 per cell).
+
+`save_chunk` optionally carries `collisionA`/`collisionB`: packed cell words,
+row-major, `(w/2)*(h/2)` entries each (chunk dimensions must be even tiles
+per axis — already required for art). Omit either array to leave that plane
+air. `stamp_chunk` places a chunk's art AND collision atomically (one undo
+step covering both) and requires even x/y, since collision cells are
+16px/2-tile aligned; there is no art-only agent stamp (the UI's Alt-stamp
+art-only mode is a human-only shortcut).
 
 `get_bg`/`set_bg` operate on the zone-wide background (Plane B): a 64x32 tile
 nametable plus its own tile blob (max 512 tiles) — a separate tile space from
@@ -95,7 +122,3 @@ visible for screenshots. See `docs/ART_SUITE.md` for the full human-facing art w
 
 - Tile atlases were unified (2026-06): rendering, export, budget, and MCP all use
   the zone tileset.
-- Odd-tile-row collision edits are dropped on strip serialization: the engine format
-  stores one collision byte per 16px cell (every two tile rows), so only even tile
-  rows are authoritative. Edits to odd rows are written to the in-memory grid but
-  are overwritten when the strip file is serialized.

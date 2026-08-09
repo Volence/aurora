@@ -7,13 +7,14 @@ import {
   packNametableWord, unpackNametableWord, createChunkDef,
 } from '../../core/model/s4-types';
 import type { Tile, Zone, Act } from '../../core/model/s4-types';
-import { validatePaletteLine, validateTilePixels, validatePaintRegion, validateEntries } from '../../core/agent/validation';
+import { validatePaletteLine, validateTilePixels, validatePaintRegion, validateEntries, validateChunkCollisionPlane } from '../../core/agent/validation';
 import { computeActBudget, canonicalTileHash } from '../../core/agent/budget';
 import { decodeGenesisColor, encodeGenesisColor } from '../../core/formats/palette';
 import { BG_WIDTH } from '../../core/formats/bg-tiles';
 import { makeBgId } from '../../core/formats/bg-library';
 import { buildStampCommand } from '../../core/editing/map-stamp';
 import { ensureCollisionPlanes } from '../../core/collision/collision-cell-resolve';
+import { paintCollisionRectEntries } from '../../core/collision/collision-paint';
 import type { AgentRequest, AgentRequestEnvelope } from '../../shared/agent-protocol';
 
 let registered = false;
@@ -142,7 +143,7 @@ async function handle(req: AgentRequest): Promise<unknown> {
         for (let c = 0; c < req.w; c++) {
           const idx = (req.y + r) * SECTION_TILES_WIDE + (req.x + c);
           const e = unpackNametableWord(section.tileGrid.nametable[idx]);
-          row.push({ ...e });
+          row.push(e);
         }
         rows.push(row);
       }
@@ -255,6 +256,39 @@ async function handle(req: AgentRequest): Promise<unknown> {
       return { painted: entries.length, budget: budgetSummary(ctx) };
     }
 
+    case 'paint-collision': {
+      const ctx = requireProject();
+      if (!Number.isInteger(req.section) || req.section < 0 || req.section >= ctx.act.sections.length) {
+        throw new Error(`section ${req.section} out of range (0-${ctx.act.sections.length - 1})`);
+      }
+      const section = ctx.act.sections[req.section];
+      if (!section) throw new Error(`section ${req.section} is empty`);
+      const cellsW = SECTION_TILES_WIDE / 2, cellsH = SECTION_TILES_HIGH / 2;
+      if (![req.x, req.y, req.w, req.h].every(Number.isInteger)) {
+        throw new Error(`region coords must be integers, got (${req.x},${req.y}) ${req.w}x${req.h}`);
+      }
+      if (req.w < 1 || req.h < 1 || req.x < 0 || req.y < 0 ||
+          req.x + req.w > cellsW || req.y + req.h > cellsH) {
+        throw new Error(`collision region ${req.w}x${req.h} cells at (${req.x},${req.y}) is out of bounds (section is ${cellsW}x${cellsH} cells)`);
+      }
+      ensureCollisionPlanes(section);
+      const plane = req.plane === 'b' ? section.collisionEditB! : section.collisionEdit!;
+      const entries = paintCollisionRectEntries({
+        x: req.x, y: req.y, w: req.w, h: req.h, word: req.word,
+        plane, tileWidth: SECTION_TILES_WIDE,
+      });
+      if (entries.length > 0) {
+        executeCommand({
+          type: 'set-collision-edit',
+          plane: req.plane,
+          description: `agent: paint collision ${req.plane.toUpperCase()} ${req.w}x${req.h} at (${req.x},${req.y})`,
+          sectionIndex: req.section,
+          entries,
+        }, ctx.level);
+      }
+      return { painted: entries.length };
+    }
+
     case 'save-chunk': {
       const ctx = requireProject();
       if (!Number.isInteger(req.w) || !Number.isInteger(req.h) ||
@@ -271,13 +305,19 @@ async function handle(req: AgentRequest): Promise<unknown> {
       // Chunk nametables index into the unified zone tileset.
       const entriesErr = validateEntries(req.entries, ctx.zone.tileset.tiles.length);
       if (entriesErr) throw new Error(entriesErr);
+      const collAErr = validateChunkCollisionPlane('collisionA', req.collisionA, req.w, req.h);
+      if (collAErr) throw new Error(collAErr);
+      const collBErr = validateChunkCollisionPlane('collisionB', req.collisionB, req.w, req.h);
+      if (collBErr) throw new Error(collBErr);
       const id = `agent-${Date.now()}-${state.project!.chunkLibrary.length}`;
       const chunk = createChunkDef(id, req.name, req.w, req.h);
-      // Collision planes stay air: entries carry art only. Task 11 (MCP/Aether
-      // collision surface) adds an explicit collision payload for save-chunk.
       req.entries.forEach((spec, i) => {
         chunk.nametable[i] = packNametableWord(spec.tile, spec.pal, !!spec.pri, !!spec.vf, !!spec.hf);
       });
+      // Collision planes default to air (createChunkDef); an explicit payload
+      // overrides either plane independently.
+      if (req.collisionA) chunk.collisionA = Uint16Array.from(req.collisionA);
+      if (req.collisionB) chunk.collisionB = Uint16Array.from(req.collisionB);
       state.addChunks([chunk]);
       // Note: chunk library additions are not part of EditHistory (matches
       // existing ChunkLibrary behavior); they are additive and non-destructive.

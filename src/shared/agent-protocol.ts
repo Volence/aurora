@@ -21,7 +21,8 @@ export type AgentRequest =
   | { kind: 'set-palette'; line: number; colors: number[] }   // 16 Genesis CRAM words
   | { kind: 'write-tiles'; tiles: number[][]; at?: number }   // each tile: 64 values 0-15
   | { kind: 'paint-region'; section: number; x: number; y: number; w: number; h: number; entries: NametableEntrySpec[] }
-  | { kind: 'save-chunk'; name: string; w: number; h: number; entries: NametableEntrySpec[] }
+  | { kind: 'paint-collision'; section: number; plane: 'a' | 'b'; x: number; y: number; w: number; h: number; word: number }
+  | { kind: 'save-chunk'; name: string; w: number; h: number; entries: NametableEntrySpec[]; collisionA?: number[]; collisionB?: number[] }
   | { kind: 'stamp-chunk'; chunkId: string; section: number; x: number; y: number }
   | { kind: 'goto'; section: number; x?: number; y?: number; zoom?: number }
   | { kind: 'get-bg' }

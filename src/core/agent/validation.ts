@@ -56,6 +56,22 @@ export function validateEntries(entries: NametableEntrySpec[], tilesetSize: numb
   return null;
 }
 
+/** Validate an optional save_chunk collision payload: length must equal
+ *  (w/2)*(h/2) cells (one packed word per 16px cell). Word range (0-0xFFFF
+ *  integers) is already enforced by the zod param schema; this checks the
+ *  cross-field length zod can't cheaply express against w/h. undefined is
+ *  valid — the chunk's plane defaults to all-air. */
+export function validateChunkCollisionPlane(
+  name: string, arr: number[] | undefined, w: number, h: number,
+): string | null {
+  if (arr === undefined) return null;
+  const expected = (w / 2) * (h / 2);
+  if (!Array.isArray(arr) || arr.length !== expected) {
+    return `${name} length ${Array.isArray(arr) ? arr.length : typeof arr} != ${expected} (chunk is ${w}x${h} tiles = ${w / 2}x${h / 2} cells)`;
+  }
+  return null;
+}
+
 export function validatePaintRegion(
   section: number,
   x: number, y: number, w: number, h: number,

@@ -1,4 +1,5 @@
 import { findMatchingBlockCells } from './collision-block';
+import { cellTileIndices } from './collision-cell';
 
 export interface CellRC { cellCol: number; cellRow: number; }
 
@@ -34,4 +35,30 @@ export function collisionPaintTargets(args: {
   }
   if (!propagate) return { primary, all: [primary] };
   return { primary, all: findMatchingBlockCells(nametable, cellCol, cellRow, width, cellsW, cellsH) };
+}
+
+export interface CollisionEditEntry { index: number; oldColl: number; newColl: number; }
+
+/** Build the diffed set-collision-edit entries for filling a w*h CELL rectangle
+ *  (16px units, top-left at x,y) of one collision plane with a single packed
+ *  word — the core of the agent's paint_collision tool. Expands each cell to
+ *  its four 8px sub-tile indices via cellTileIndices (same expansion
+ *  MapViewport.paintCollisionCell uses), and skips indices already equal to
+ *  `word` so the emitted command only touches what actually changes. Rect
+ *  bounds are pre-validated by the caller (agent-handler). */
+export function paintCollisionRectEntries(args: {
+  x: number; y: number; w: number; h: number; word: number;
+  plane: Uint16Array; tileWidth: number;
+}): CollisionEditEntry[] {
+  const { x, y, w, h, word, plane, tileWidth } = args;
+  const entries: CollisionEditEntry[] = [];
+  for (let r = 0; r < h; r++) {
+    for (let c = 0; c < w; c++) {
+      for (const index of cellTileIndices(x + c, y + r, tileWidth)) {
+        const oldColl = plane[index];
+        if (oldColl !== word) entries.push({ index, oldColl, newColl: word });
+      }
+    }
+  }
+  return entries;
 }
