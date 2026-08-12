@@ -35,7 +35,13 @@ const REPORT: ResolutionReport = {
 function fakeHandle(): ProjectHandle {
   return {
     type: 's1',
-    capabilities: { levels: 'chunk-hierarchy', sprites: true, objects: 'objpos', build: false },
+    capabilities: {
+      levels: 'chunk-hierarchy',
+      sprites: true,
+      objects: 'objpos',
+      build: false,
+      facets: ['layout', 'art', 'objects', 'collision', 'palette'],
+    },
     report: REPORT,
     levels: {
       list: () => REFS,

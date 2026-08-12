@@ -38,4 +38,11 @@ describe('facets', () => {
     const ids = facetsFor(['layout', 'parallax', 'collision']).map((f) => f.id);
     expect(ids).toEqual(['layout', 'parallax', 'collision']);
   });
+
+  it('S1 capability list yields no rings facet; aeon yields rings', () => {
+    const s1Facets = facetsFor(['layout', 'art', 'objects', 'collision', 'palette']);
+    const aeonFacets = facetsFor(['layout', 'art', 'objects', 'rings', 'collision', 'palette']);
+    expect(s1Facets.some((f) => f.id === 'rings')).toBe(false);
+    expect(aeonFacets.some((f) => f.id === 'rings')).toBe(true);
+  });
 });

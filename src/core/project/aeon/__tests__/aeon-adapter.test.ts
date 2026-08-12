@@ -149,6 +149,7 @@ describe('aeonAdapter.open', () => {
       sprites: true,
       objects: 'json',
       build: false,
+      facets: ['layout', 'art', 'objects', 'rings', 'collision', 'palette'],
     });
     expect(handle.levels).toBeNull();
     expect(handle.report).toEqual({ entries: [], resolved: 0, total: 0 });

@@ -61,7 +61,7 @@ function stubAdapter(
       adapter.openedWith = overrides;
       return {
         type,
-        capabilities: { levels: null, sprites: false, objects: null, build: false },
+        capabilities: { levels: null, sprites: false, objects: null, build: false, facets: [] },
         report: buildReport([]),
         levels: null,
       };

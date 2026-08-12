@@ -109,7 +109,13 @@ export const aeonAdapter: ProjectAdapter = {
     // does not apply — aeon owns its own level model in the renderer store.
     return {
       type: 'aeon',
-      capabilities: { levels: 'aeon', sprites: true, objects: 'json', build: false },
+      capabilities: {
+        levels: 'aeon',
+        sprites: true,
+        objects: 'json',
+        build: false,
+        facets: ['layout', 'art', 'objects', 'rings', 'collision', 'palette'],
+      },
       report: buildReport([]),
       levels: null,
     };

@@ -12,6 +12,7 @@
 // aeon behind it. Keep it minimal — no exports beyond what those tasks need.
 
 import type { ResolutionReport } from './report';
+import type { FacetCapability } from '../shell/facets';
 
 /**
  * The narrow file-system view core code is allowed to use. Paths are always
@@ -61,6 +62,9 @@ export interface CapabilityManifest {
   objects: 'objpos' | 'json' | null;
   /** Aurora never drives the assembler; build is always false for now. */
   build: false;
+  /** Which level-workspace facets this project's levels get (spec §4/§7).
+   *  The shell renders registered-facets ∩ this list and nothing else. */
+  facets: FacetCapability[];
 }
 
 /** Sidecar `.aurora/project.json` shape: user path overrides for resolution. */
@@ -89,6 +93,8 @@ export interface ProjectAdapter {
 
 export type { LevelDoc } from '../level-classic/model';
 import type { LevelDoc } from '../level-classic/model';
+
+export type { FacetCapability } from '../shell/facets';
 
 export interface ZoneActRef {
   zone: string;

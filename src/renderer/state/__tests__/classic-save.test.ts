@@ -161,7 +161,13 @@ function handleWith(
 ): ProjectHandle {
   return {
     type: 's1',
-    capabilities: { levels: 'chunk-hierarchy', sprites: true, objects: 'objpos', build: false },
+    capabilities: {
+      levels: 'chunk-hierarchy',
+      sprites: true,
+      objects: 'objpos',
+      build: false,
+      facets: ['layout', 'art', 'objects', 'collision', 'palette'],
+    },
     report: { entries: [], resolved: 0, total: 0 },
     levels: {
       list: () => [REF],
