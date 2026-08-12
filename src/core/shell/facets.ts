@@ -5,13 +5,9 @@
 // descriptor and the gating rule, so it stays fs- and React-free.
 
 import { createRegistry, type Registry } from './registry';
+import type { FacetCapability } from '../project/adapter';
 
-/** Capability keys a profile may grant (spec §7). Superset of built-in facets:
- *  parallax/events/preview are declared now so profiles can be authored against
- *  them, but have no built-in facet until their stages land (no dead chrome). */
-export type FacetCapability =
-  | 'layout' | 'art' | 'objects' | 'rings' | 'collision' | 'palette'
-  | 'parallax' | 'events' | 'preview';
+export type { FacetCapability } from '../project/adapter';
 
 export interface FacetDescriptor {
   readonly id: FacetCapability;

@@ -12,7 +12,6 @@
 // aeon behind it. Keep it minimal — no exports beyond what those tasks need.
 
 import type { ResolutionReport } from './report';
-import type { FacetCapability } from '../shell/facets';
 
 /**
  * The narrow file-system view core code is allowed to use. Paths are always
@@ -51,6 +50,15 @@ export interface ProjectMatch {
   type: ProjectType;
   label: string;
 }
+
+/** Capability keys a profile may grant (spec §7): which level-workspace facets
+ *  its levels get. Superset of the facets built so far — parallax/events/preview
+ *  are declared now so profiles can be authored against them before those
+ *  facets exist (the shell renders registered-facets ∩ granted, so an
+ *  unbuilt capability simply renders nothing). */
+export type FacetCapability =
+  | 'layout' | 'art' | 'objects' | 'rings' | 'collision' | 'palette'
+  | 'parallax' | 'events' | 'preview';
 
 /**
  * What an opened project can do. Fields are null/false when the capability is
@@ -93,8 +101,6 @@ export interface ProjectAdapter {
 
 export type { LevelDoc } from '../level-classic/model';
 import type { LevelDoc } from '../level-classic/model';
-
-export type { FacetCapability } from '../shell/facets';
 
 export interface ZoneActRef {
   zone: string;
