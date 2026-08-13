@@ -1,7 +1,36 @@
 import type { Tile, PaletteLine, SectionTileGrid } from '../../core/model/s4-types';
 import { unpackNametableWord, SECTION_TILES_WIDE, SECTION_TILES_HIGH, SECTION_PIXEL_SIZE } from '../../core/model/s4-types';
 import { TileRenderer } from './TileRenderer';
+import { composeNametable, type TilePixelLookup } from './compose-nametable';
 import { CANVAS_BLACK, ACTIVE_SECTION_BORDER } from './canvas-colors';
+
+/**
+ * Above this many dirty cells, rebuilding the whole section with one
+ * putImageData beats poking them one at a time: the per-cell path costs a
+ * ~50us GPU round-trip each, while a full recompose is a few tens of ms for
+ * the entire 65,536-cell section. Keeps a big paste/fill off the slow path.
+ */
+const RECOMPOSE_DIRTY_THRESHOLD = 2000;
+
+/**
+ * Wrap a TileRenderer as a `TilePixelLookup` with a numeric-keyed memo.
+ * The composer asks per CELL (up to 65,536 times per section); TileRenderer.get
+ * builds a `${tileIndex}:${palette}` string for every call, so memoising on a
+ * packed integer key keeps composition off the string-allocation path.
+ * The memo is owned by the caller and thrown away whenever the underlying
+ * TileRenderer is re-prerendered, so it can never serve stale pixels.
+ */
+function pixelLookupFor(tileRenderer: TileRenderer): TilePixelLookup {
+  const memo = new Map<number, Uint8ClampedArray | null>();
+  return (tileIndex: number, palette: number) => {
+    const key = (tileIndex << 2) | palette;
+    const hit = memo.get(key);
+    if (hit !== undefined) return hit;
+    const pixels = tileRenderer.get(tileIndex, palette)?.data ?? null;
+    memo.set(key, pixels);
+    return pixels;
+  };
+}
 
 export interface SectionViewport {
   x: number;
@@ -13,6 +42,8 @@ export interface SectionViewport {
 
 interface SectionEntry {
   tileRenderer: TileRenderer;
+  /** Memoised pixel accessor over `tileRenderer`; rebuilt whenever it is. */
+  lookup: TilePixelLookup;
   canvas: OffscreenCanvas;
   ctx: OffscreenCanvasRenderingContext2D;
   tileGrid: SectionTileGrid;
@@ -21,6 +52,7 @@ interface SectionEntry {
 
 interface BgEntry {
   tileRenderer: TileRenderer;
+  lookup: TilePixelLookup;
   canvas: OffscreenCanvas;
   ctx: OffscreenCanvasRenderingContext2D;
   nametable: Uint16Array;
@@ -41,6 +73,28 @@ export class SectionRenderer {
   // instead of once PER SECTION — the old per-section prerender re-rendered the
   // whole tileset N times at load.
   private sharedTileRenderer: TileRenderer | null = null;
+  // One 2048x2048 RGBA staging buffer (16 MB) shared by EVERY section compose,
+  // allocated on first use and never freed. Composition writes here and the
+  // canvas gets one putImageData — see compose-nametable.ts for why.
+  private sectionScratch: { data: Uint8ClampedArray; image: ImageData } | null = null;
+  // Same idea for the BG plane, whose pixel size varies with the layout.
+  private bgScratch: { data: Uint8ClampedArray; image: ImageData; width: number; height: number } | null = null;
+
+  private sectionScratchBuffer(): { data: Uint8ClampedArray; image: ImageData } {
+    if (!this.sectionScratch) {
+      const data = new Uint8ClampedArray(SECTION_PIXEL_SIZE * SECTION_PIXEL_SIZE * 4);
+      this.sectionScratch = { data, image: new ImageData(data, SECTION_PIXEL_SIZE, SECTION_PIXEL_SIZE) };
+    }
+    return this.sectionScratch;
+  }
+
+  private bgScratchBuffer(width: number, height: number): { data: Uint8ClampedArray; image: ImageData } {
+    if (!this.bgScratch || this.bgScratch.width !== width || this.bgScratch.height !== height) {
+      const data = new Uint8ClampedArray(width * height * 4);
+      this.bgScratch = { data, image: new ImageData(data, width, height), width, height };
+    }
+    return this.bgScratch;
+  }
 
   setGrid(width: number, height: number): void {
     this.gridWidth = width;
@@ -64,7 +118,12 @@ export class SectionRenderer {
     const tileRenderer = new TileRenderer();
     tileRenderer.prerender(tiles, paletteLines);
 
-    this.bg = { tileRenderer, canvas, ctx, nametable, width, height, dirtyTiles: new Set() };
+    this.bg = {
+      tileRenderer,
+      lookup: pixelLookupFor(tileRenderer),
+      canvas, ctx, nametable, width, height,
+      dirtyTiles: new Set(),
+    };
     this.renderFullBg();
   }
 
@@ -86,11 +145,18 @@ export class SectionRenderer {
     for (const idx of tileIndices) this.bg.dirtyTiles.add(idx);
   }
 
+  /**
+   * Compose the whole BG plane in JS and upload it with ONE putImageData
+   * instead of one canvas op per cell. 64x32 cells is small next to a section,
+   * but the per-cell path still measured ~90ms on a GPU-backed canvas.
+   */
   private renderFullBg(): void {
     if (!this.bg) return;
-    for (let i = 0; i < this.bg.nametable.length; i++) {
-      this.renderBgTileAt(i);
-    }
+    const pixelW = this.bg.width * 8;
+    const pixelH = this.bg.height * 8;
+    const scratch = this.bgScratchBuffer(pixelW, pixelH);
+    composeNametable(scratch.data, pixelW, pixelH, this.bg.nametable, this.bg.width, this.bg.lookup);
+    this.bg.ctx.putImageData(scratch.image, 0, 0);
   }
 
   private renderBgTileAt(index: number): void {
@@ -130,8 +196,12 @@ export class SectionRenderer {
 
   private flushBgDirty(): void {
     if (!this.bg || this.bg.dirtyTiles.size === 0) return;
-    for (const idx of this.bg.dirtyTiles) {
-      this.renderBgTileAt(idx);
+    if (this.bg.dirtyTiles.size >= RECOMPOSE_DIRTY_THRESHOLD) {
+      this.renderFullBg();
+    } else {
+      for (const idx of this.bg.dirtyTiles) {
+        this.renderBgTileAt(idx);
+      }
     }
     this.bg.dirtyTiles.clear();
   }
@@ -167,10 +237,6 @@ export class SectionRenderer {
   }
 
   loadSection(index: number, tileGrid: SectionTileGrid, tiles?: Tile[], paletteLines?: PaletteLine[]): void {
-    const canvas = new OffscreenCanvas(SECTION_PIXEL_SIZE, SECTION_PIXEL_SIZE);
-    const ctx = canvas.getContext('2d')!;
-    ctx.imageSmoothingEnabled = false;
-
     // Per-section art override → its own cache; otherwise the shared zone cache.
     let tileRenderer: TileRenderer;
     if (tiles && paletteLines) {
@@ -182,8 +248,25 @@ export class SectionRenderer {
       return; // no tileset prepared and no override — nothing to draw
     }
 
+    // Reuse the canvas already held for this index. Each one is a 2048x2048
+    // backing store (16 MB); reloading a 9-section act used to throw all of
+    // them away and allocate nine more. renderFullSection overwrites every
+    // pixel, so nothing stale can survive the reuse.
+    const existing = this.sections.get(index);
+    let canvas: OffscreenCanvas;
+    let ctx: OffscreenCanvasRenderingContext2D;
+    if (existing && existing.canvas.width === SECTION_PIXEL_SIZE && existing.canvas.height === SECTION_PIXEL_SIZE) {
+      canvas = existing.canvas;
+      ctx = existing.ctx;
+    } else {
+      canvas = new OffscreenCanvas(SECTION_PIXEL_SIZE, SECTION_PIXEL_SIZE);
+      ctx = canvas.getContext('2d')!;
+      ctx.imageSmoothingEnabled = false;
+    }
+
     const entry: SectionEntry = {
       tileRenderer,
+      lookup: pixelLookupFor(tileRenderer),
       canvas,
       ctx,
       tileGrid,
@@ -193,6 +276,9 @@ export class SectionRenderer {
     this.sections.set(index, entry);
     this.renderFullSection(entry);
   }
+
+  /** How many section canvases are currently loaded. */
+  sectionCount(): number { return this.sections.size; }
 
   markDirty(sectionIndex: number, tileIndices: number[]): void {
     const entry = this.sections.get(sectionIndex);
@@ -211,17 +297,37 @@ export class SectionRenderer {
   private flushAllDirty(): void {
     for (const entry of this.sections.values()) {
       if (entry.dirtyTiles.size === 0) continue;
-      for (const idx of entry.dirtyTiles) {
-        this.renderTileAt(entry, idx);
+      if (entry.dirtyTiles.size >= RECOMPOSE_DIRTY_THRESHOLD) {
+        // A big paste/fill: one recompose beats thousands of GPU round-trips.
+        // The nametable is the source of truth, so this is exactly equivalent
+        // to poking each dirty cell (and repaints the clean ones identically).
+        this.renderFullSection(entry);
+      } else {
+        for (const idx of entry.dirtyTiles) {
+          this.renderTileAt(entry, idx);
+        }
       }
       entry.dirtyTiles.clear();
     }
   }
 
+  /**
+   * Compose the entire section in JS and upload it with ONE putImageData.
+   * The old per-cell loop issued ~11,300 putImageData + ~54,200 clearRect per
+   * section; on a GPU-backed canvas that is ~430ms EACH, ~3.9s for a 9-section
+   * act, on every palette commit. See compose-nametable.ts.
+   */
   private renderFullSection(entry: SectionEntry): void {
-    for (let i = 0; i < entry.tileGrid.nametable.length; i++) {
-      this.renderTileAt(entry, i);
-    }
+    const scratch = this.sectionScratchBuffer();
+    composeNametable(
+      scratch.data,
+      SECTION_PIXEL_SIZE,
+      SECTION_PIXEL_SIZE,
+      entry.tileGrid.nametable,
+      SECTION_TILES_WIDE,
+      entry.lookup,
+    );
+    entry.ctx.putImageData(scratch.image, 0, 0);
   }
 
   private renderTileAt(entry: SectionEntry, index: number): void {
