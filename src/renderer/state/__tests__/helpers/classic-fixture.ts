@@ -6,8 +6,9 @@
 //   • 5 tiles in the pool; the adapter reports baseTileCount 4 (so tile 4 is a
 //     "gap/appended" tile) and an anim overlay at tile 2 → tiles 0,1,3 editable.
 
-import { useClassicLevelStore, classicHistory } from '../../classicLevelStore';
+import { useClassicLevelStore } from '../../classicLevelStore';
 import { useClassicProjectStore } from '../../classicProjectStore';
+import { documentHistoryHub } from '../../history-hub';
 import type { LevelDoc } from '../../../../core/level-classic/model';
 import type { ProjectHandle, ZoneActRef, EditableTileRange } from '../../../../core/project/adapter';
 
@@ -69,10 +70,15 @@ export function fakeHandle(): ProjectHandle {
   };
 }
 
-/** Put both classic stores in a clean 'ready' editing session over a fresh doc. */
+/**
+ * Put both classic stores in a clean 'ready' editing session over a fresh doc.
+ * The project store must read as OPEN before any undo stack is built: the hub's
+ * `level:`/`zoneart:` factories dispatch on it (history-factories.ts).
+ */
 export function openReady(doc = makeDoc()): void {
   useClassicProjectStore.setState({ status: 'open', dir: '/p', handle: fakeHandle() } as never);
-  classicHistory.clear();
+  // Fresh session ⇒ fresh undo documents (what a real project switch does).
+  documentHistoryHub.clearAll();
   useClassicLevelStore.setState({
     ref: REF,
     doc,

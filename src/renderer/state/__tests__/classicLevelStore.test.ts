@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   useClassicLevelStore,
-  classicHistory,
+  layoutDocIdForCurrentAct,
+  zoneArtDocIdForCurrentZone,
   classicSetLayoutCells,
   classicEditChunkCells,
   classicEditBlock,
@@ -16,7 +17,8 @@ import {
   classicCanRedo,
 } from '../classicLevelStore';
 import { useClassicProjectStore } from '../classicProjectStore';
-import { registerRedoClearer } from '../../../core/editing/undo-bus';
+import { documentHistoryHub } from '../history-hub';
+import { registerRedoClearer, invalidateSiblingRedos } from '../../../core/editing/undo-bus';
 import { packChunkCell, unpackChunkCell, type BlockDef } from '../../../core/level-classic/model';
 import type { S1ObjectEntry } from '../../../core/formats/classic/s1-objpos';
 // Shared with history-routing.test.ts — one fixture, so both suites drive the
@@ -25,10 +27,15 @@ import { TILE_COUNT, REF, makeDoc, openReady } from './helpers/classic-fixture';
 
 const st = () => useClassicLevelStore.getState();
 
+// The open act's two undo documents (spec §4.3): layout is act-scoped, art is
+// zone-scoped. `historyFor` get-or-creates, so reading one never records a step.
+const layoutStack = () => documentHistoryHub.historyFor(layoutDocIdForCurrentAct()!);
+const artStack = () => documentHistoryHub.historyFor(zoneArtDocIdForCurrentZone()!);
+
 beforeEach(() => {
   useClassicProjectStore.getState().reset();
   useClassicLevelStore.getState().reset();
-  classicHistory.clear();
+  documentHistoryHub.clearAll();
 });
 
 // ---------------------------------------------------------------------------
@@ -70,10 +77,9 @@ describe('classic:set-start', () => {
   it('an identical write is a no-op: ok:true but no undo step recorded', () => {
     openReady();
     const doc = st().doc; // start is (50, 50) in the fixture
-    const depth = classicHistory.depth;
     expect(classicSetStart(50, 50)).toEqual({ ok: true });
     expect(st().doc).toBe(doc); // no new doc built
-    expect(classicHistory.depth).toBe(depth); // no history entry
+    expect(layoutStack().canUndo).toBe(false); // no history entry
     expect(classicCanUndo()).toBe(false);
   });
 });
@@ -300,10 +306,9 @@ describe('classic:set-colind', () => {
   it('an all-unchanged entry set is a no-op: ok:true but no undo step', () => {
     openReady(); // colind is [0, 0] in the fixture
     const doc = st().doc;
-    const depth = classicHistory.depth;
     expect(classicSetColind([{ blockId: 0, value: 0 }, { blockId: 1, value: 0 }])).toEqual({ ok: true });
     expect(st().doc).toBe(doc);
-    expect(classicHistory.depth).toBe(depth);
+    expect(artStack().canUndo).toBe(false);
     expect(st().dirty.colind).toBeUndefined();
   });
 });
@@ -332,12 +337,11 @@ describe('classic:set-objects', () => {
   it('a field-identical list (e.g. a zero-displacement move) is a no-op: no undo step', () => {
     openReady();
     const doc = st().doc;
-    const depth = classicHistory.depth;
     // A fresh array of fresh entries equal field-for-field to the fixture list.
     const same = doc!.objects.map((o) => ({ ...o }));
     expect(classicSetObjects(same)).toEqual({ ok: true });
     expect(st().doc).toBe(doc); // no new doc built
-    expect(classicHistory.depth).toBe(depth);
+    expect(layoutStack().canUndo).toBe(false);
     expect(st().dirty.objects).toBeUndefined();
   });
 });
@@ -361,9 +365,9 @@ describe('command guards + undo/redo triple consistency', () => {
 
   it('undo/redo restore doc + dirty + versions together across multiple edits', () => {
     openReady();
-    classicSetStart(1, 2);            // dirty.start, no version
-    classicEditChunkCells(1, [{ index: 0, word: packChunkCell({ block: 1, xf: false, yf: false, solidity: 0 }) }]); // chunk version (engine id 1)
-    classicEditBlock(1, { cells: Array.from({ length: 4 }, () => ({ tile: 0, xf: false, yf: false, pal: 0, pri: false })) }); // epoch
+    classicSetStart(1, 2);            // LAYOUT: dirty.start, no version
+    classicEditChunkCells(1, [{ index: 0, word: packChunkCell({ block: 1, xf: false, yf: false, solidity: 0 }) }]); // ART: chunk version (engine id 1)
+    classicEditBlock(1, { cells: Array.from({ length: 4 }, () => ({ tile: 0, xf: false, yf: false, pal: 0, pri: false })) }); // ART: epoch
 
     const afterDirty = { ...st().dirty };
     expect(afterDirty).toEqual({ start: true, chunks: true, blocks: true });
@@ -371,25 +375,29 @@ describe('command guards + undo/redo triple consistency', () => {
     const afterChunkV = st().chunkVersions.get(1);
 
     // Undo the block edit → blocks clean, epoch reverts, chunk version stays.
-    st().undo();
+    artStack().undo();
     expect(st().dirty.blocks).toBeUndefined();
     expect(st().dirty.chunks).toBe(true);
     expect(st().chunkEpoch).toBeLessThan(afterEpoch);
     expect(st().chunkVersions.get(1)).toBe(afterChunkV);
 
     // Undo the chunk edit → chunks clean, chunk version gone.
-    st().undo();
+    artStack().undo();
     expect(st().dirty.chunks).toBeUndefined();
     expect(st().chunkVersions.has(1)).toBe(false);
+    expect(artStack().canUndo).toBe(false); // art timeline exhausted...
+    expect(layoutStack().canUndo).toBe(true); // ...the layout one is untouched
 
-    // Undo the start edit → fully clean.
-    st().undo();
+    // Undo the start edit on the OTHER document → fully clean.
+    layoutStack().undo();
     expect(st().dirty).toEqual({});
     expect(st().doc!.start).toEqual({ x: 50, y: 50 });
-    expect(classicCanUndo()).toBe(false);
 
-    // Redo everything back.
-    st().redo(); st().redo(); st().redo();
+    // Redo everything back. Order matters across documents: each snapshot carries
+    // the whole `dirty` map as it stood when the snapshot was taken, so redoing
+    // the older (layout) step last would stomp the art flags. Oldest-first here.
+    layoutStack().redo();
+    artStack().redo(); artStack().redo();
     expect(st().dirty).toEqual(afterDirty);
     expect(st().chunkEpoch).toBe(afterEpoch);
     expect(st().chunkVersions.get(1)).toBe(afterChunkV);
@@ -399,30 +407,44 @@ describe('command guards + undo/redo triple consistency', () => {
     openReady();
     classicSetStart(1, 1);
     const tick = st().historyTick;
-    const depth = classicHistory.depth;
     classicSetStart(-5, -5); // rejected
     expect(st().historyTick).toBe(tick);
-    expect(classicHistory.depth).toBe(depth);
+    // Exactly one step on the layout stack: one undo lands back on the fixture.
+    layoutStack().undo();
+    expect(st().doc!.start).toEqual({ x: 50, y: 50 });
+    expect(layoutStack().canUndo).toBe(false);
   });
 
-  it('joins the shared undo timeline: an edit invalidates a sibling history redo', () => {
+  it('no longer joins the undo-bus: a classic edit leaves sibling redos alone', () => {
+    // Per-document stacks retire the sibling-invalidation dance — there are no
+    // siblings to invalidate, only documents (spec §4.3).
     openReady();
     const siblingClearRedo = vi.fn();
     const unregister = registerRedoClearer(siblingClearRedo);
     try {
       classicSetStart(9, 9);
-      expect(siblingClearRedo).toHaveBeenCalled();
+      expect(siblingClearRedo).not.toHaveBeenCalled();
+      // ...and a sibling's edit no longer clears a classic redo either.
+      layoutStack().undo();
+      expect(layoutStack().canRedo).toBe(true);
+      invalidateSiblingRedos(vi.fn());
+      expect(layoutStack().canRedo).toBe(true);
     } finally {
       unregister();
     }
   });
 
-  it('loading a new act clears the classic history', () => {
+  it('loading a new act clears both of the act\'s undo documents', () => {
     openReady();
     classicSetStart(1, 1);
-    expect(classicCanUndo()).toBe(true);
-    // A fresh openAct resets the session.
+    classicSetPalette(1, new Uint16Array(16).fill(0x0e0e));
+    expect(layoutStack().canUndo).toBe(true);
+    expect(artStack().canUndo).toBe(true);
+    // A fresh openAct resets the session: the snapshots reference the doc that is
+    // about to be replaced, so neither may survive the load.
     void useClassicLevelStore.getState().openAct(REF);
+    expect(layoutStack().canUndo).toBe(false);
+    expect(artStack().canUndo).toBe(false);
     expect(classicCanUndo()).toBe(false);
   });
 });

@@ -5,7 +5,8 @@ import {
   __setClassicBridgeForTest,
   __resetClassicBridgeForTest,
 } from '../../state/classicProjectStore';
-import { useClassicLevelStore, classicHistory } from '../../state/classicLevelStore';
+import { useClassicLevelStore } from '../../state/classicLevelStore';
+import { documentHistoryHub } from '../../state/history-hub';
 import { useEditorStore } from '../../state/editorStore';
 import type { ClassicBridge } from '../../state/classic-bridge';
 import type { LevelDoc } from '../../../core/level-classic/model';
@@ -76,7 +77,7 @@ function openReady(doc = makeDoc()): void {
     capabilities: fakeHandle().capabilities, report: REPORT,
     zoneTree: [REF], handle: fakeHandle(), error: null,
   } as never);
-  classicHistory.clear();
+  documentHistoryHub.clearAll();
   useClassicLevelStore.setState({
     ref: REF, doc, status: 'ready', error: null,
     dirty: {}, chunkVersions: new Map(), chunkEpoch: 1, historyTick: 0,
@@ -93,7 +94,7 @@ const lvl = () => useClassicLevelStore.getState();
 beforeEach(() => {
   useClassicProjectStore.getState().reset();
   useClassicLevelStore.getState().reset();
-  classicHistory.clear();
+  documentHistoryHub.clearAll();
 });
 afterEach(() => {
   __resetClassicBridgeForTest();

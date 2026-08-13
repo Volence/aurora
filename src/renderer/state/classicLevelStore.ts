@@ -1,6 +1,6 @@
 // classicLevelStore — the currently-open classic (Sonic 1) level: which act is
 // selected, its loaded LevelDoc, per-domain dirty tracking, chunk content
-// versions, and the classic editing commands on the shared undo history.
+// versions, and the classic editing commands on the per-document undo stacks.
 //
 // READ PATH (Task 11): selecting an act calls `openAct`, which reads the LevelDoc
 // through the ProjectHandle held in classicProjectStore (handle.levels.read(ref))
@@ -16,14 +16,14 @@
 //   • bumps chunk content versions where the edit changes rendered chunk art,
 //   • records ONE undo step.
 //
-// UNDO INTEGRATION: classic editing joins the shared undo timeline as a SIBLING
-// history (ClassicHistory), the same pattern sprite editing uses — see
-// core/editing/classic-history.ts for the full rationale (the aeon EditHistory is
-// hardcoded to S4Level and cannot carry a LevelDoc without refactoring aeon core;
-// the repo's sanctioned way for a different data model to share one uniform Ctrl+Z
-// is a sibling snapshot history on the neutral undo-bus + edit-seq). A classic and
-// an aeon project are never open at once; within a classic session classic-level
-// and (s1 object) sprite edits interleave by recency.
+// UNDO INTEGRATION (spec §4.3): classic editing has TWO undo documents, not one.
+// Layout data (fg, bg, objects, start) is act-scoped and lives on the act's
+// `level:<zone>:<act>` stack; zone art (tiles, blocks, chunks, palette, colind)
+// is zone-scoped and lives on `zoneart:<zone>`. Both stacks hang off the
+// DocumentHistoryHub, so a palette edit no longer invalidates a layout redo —
+// which is exactly what the old single ClassicHistory + undo-bus did. Classic
+// therefore no longer registers a redo-clearer: there are no siblings to
+// invalidate, only documents.
 
 import { create } from 'zustand';
 import type { DirtyDomains, EditableTileRange, LevelDoc, ZoneActRef } from '../../core/project/adapter';
@@ -31,8 +31,14 @@ import type { BlockDef, ChunkCell, ChunkDef256 } from '../../core/level-classic/
 import { validateLevelDoc, unpackChunkCell, chunkIndexForId } from '../../core/level-classic/model';
 import { firstEditableNonBlankTile, firstNonBlankBlock } from '../../core/level-classic/tile-pick';
 import type { S1ObjectEntry } from '../../core/formats/classic/s1-objpos';
-import { ClassicHistory, type ClassicSnapshot } from '../../core/editing/classic-history';
-import { registerRedoClearer, invalidateSiblingRedos } from '../../core/editing/undo-bus';
+import {
+  LAYOUT_DOMAINS, ART_DOMAINS,
+  type ClassicArtHistory, type ClassicLayoutHistory,
+  type ClassicArtSnapshot, type ClassicLayoutSnapshot,
+} from '../../core/editing/classic-domain-history';
+import type { UndoStack } from '../../core/editing/undo-stack';
+import { classicLevelTab, zoneArtDocId } from '../shell/tabs';
+import { documentHistoryHub } from './history-hub';
 import { useClassicProjectStore } from './classicProjectStore';
 
 export type ClassicLevelStatus = 'idle' | 'loading' | 'ready' | 'error';
@@ -203,15 +209,45 @@ const IDLE = {
 };
 
 // ---------------------------------------------------------------------------
-// Shared undo history + version clock
+// Undo documents + version clock
 // ---------------------------------------------------------------------------
 
-/** The classic editing undo/redo stack (a sibling of the aeon + sprite ones). */
-export const classicHistory = new ClassicHistory();
-const clearClassicRedo = () => classicHistory.clearRedo();
-// Joining the shared timeline: a new edit on a sibling history (e.g. an s1 object
-// sprite edit) invalidates our redo, and vice-versa (see undo-bus.ts).
-registerRedoClearer(clearClassicRedo);
+/** The layout doc id for the act currently loaded in this store, or null. */
+export function layoutDocIdForCurrentAct(): string | null {
+  const { ref } = useClassicLevelStore.getState();
+  return ref ? classicLevelTab(ref).id : null;
+}
+
+/** The zone-art doc id for the zone currently loaded in this store, or null. */
+export function zoneArtDocIdForCurrentZone(): string | null {
+  const { ref } = useClassicLevelStore.getState();
+  return ref ? zoneArtDocId(ref.zone) : null;
+}
+
+/**
+ * Drop `ref`'s two undo stacks. Undo never crosses a level load: the snapshots
+ * hold references into the doc that was loaded when they were taken, so replaying
+ * them onto a freshly-read doc would splice one act's data into another.
+ */
+function disposeStacksFor(ref: ZoneActRef | null): void {
+  if (!ref) return;
+  documentHistoryHub.dispose(classicLevelTab(ref).id);
+  documentHistoryHub.dispose(zoneArtDocId(ref.zone));
+}
+
+/**
+ * TRANSITIONAL: the document the store's own undo()/redo() act on — the one most
+ * recently committed to. The end state is focus-driven (undo follows the focused
+ * facet, spec §10), which needs the shell wiring that lands with the focused-undo
+ * task; until then "the document you last edited" keeps the classic toolbar and
+ * Ctrl+Z behaving. Reset on act load / store reset.
+ */
+let lastEditedDocId: string | null = null;
+
+/** The stack the store's undo()/redo() drive, or null when nothing was edited. */
+function lastEditedStack(): UndoStack | null {
+  return lastEditedDocId ? documentHistoryHub.historyFor(lastEditedDocId) : null;
+}
 
 // Process-monotonic content-version allocator. NEVER rewound: undo/redo restore
 // recorded version VALUES, but every fresh allocation is globally unique, so
@@ -230,8 +266,11 @@ export const useClassicLevelStore = create<ClassicLevelState>((set, get) => ({
     const token = ++loadToken;
     // A fresh act load starts a clean editing session: no dirty domains, a fresh
     // chunk epoch (busts the viewport cache for the new level's chunk art), and an
-    // empty history (undo never crosses a level load).
-    classicHistory.clear();
+    // empty history (undo never crosses a level load) — for the act being left as
+    // well as the one being entered, since both docs are about to be re-read.
+    disposeStacksFor(get().ref);
+    disposeStacksFor(ref);
+    lastEditedDocId = null;
     const fresh = {
       dirty: {} as DirtyDomains,
       chunkVersions: new Map<number, number>(),
@@ -317,22 +356,17 @@ export const useClassicLevelStore = create<ClassicLevelState>((set, get) => ({
     if (px === null || px.length === 64) set({ tileClipboard: px });
   },
 
-  // undo/redo are timeline NAVIGATION, not new edits, so (like the aeon history)
-  // they do not invalidate sibling redo stacks — only commit() does.
+  // Undo/redo the last-edited document (see lastEditedDocId). Restoring the
+  // snapshot is the stack's job — it calls back into writeLayoutSnapshot /
+  // writeArtSnapshot, which are what actually touch this store.
   undo: () => {
-    const s = get();
-    if (!s.doc) return;
-    const target = classicHistory.undo(currentSnapshot(s));
-    if (!target) return;
-    applySnapshot(set, target, s.historyTick);
+    if (!get().doc) return;
+    lastEditedStack()?.undo();
   },
 
   redo: () => {
-    const s = get();
-    if (!s.doc) return;
-    const target = classicHistory.redo(currentSnapshot(s));
-    if (!target) return;
-    applySnapshot(set, target, s.historyTick);
+    if (!get().doc) return;
+    lastEditedStack()?.redo();
   },
 
   markDomainsClean: (ref, domains) => {
@@ -346,53 +380,120 @@ export const useClassicLevelStore = create<ClassicLevelState>((set, get) => ({
 
   reset: () => {
     loadToken++; // invalidate any in-flight read
-    classicHistory.clear();
+    disposeStacksFor(get().ref);
+    lastEditedDocId = null;
     set({ ...IDLE, chunkVersions: new Map(), historyTick: get().historyTick + 1 });
   },
 }));
 
 // ---------------------------------------------------------------------------
-// History helpers
+// Snapshot read/write — the stacks' window onto this store. Exported because
+// history-factories.ts hands them to the ClassicLayoutHistory / ClassicArtHistory
+// it builds; that is the only non-test caller.
 // ---------------------------------------------------------------------------
 
-function currentSnapshot(s: ClassicLevelState): ClassicSnapshot {
-  return { doc: s.doc!, dirty: s.dirty, chunkVersions: s.chunkVersions, chunkEpoch: s.chunkEpoch };
+export function readLayoutSnapshot(): ClassicLayoutSnapshot {
+  const s = useClassicLevelStore.getState();
+  const doc = s.doc!;
+  return { fg: doc.fg, bg: doc.bg, objects: doc.objects, start: doc.start, dirty: s.dirty };
 }
 
-function applySnapshot(
-  set: (partial: Partial<ClassicLevelState>) => void,
-  snap: ClassicSnapshot,
-  historyTick: number,
-): void {
-  set({
-    doc: snap.doc,
+export function writeLayoutSnapshot(snap: ClassicLayoutSnapshot): void {
+  useClassicLevelStore.setState((s) => ({
+    doc: { ...s.doc!, fg: snap.fg, bg: snap.bg, objects: snap.objects, start: snap.start },
+    dirty: snap.dirty,
+    historyTick: s.historyTick + 1,
+  }));
+}
+
+export function readArtSnapshot(): ClassicArtSnapshot {
+  const s = useClassicLevelStore.getState();
+  const doc = s.doc!;
+  return {
+    chunks: doc.chunks, blocks: doc.blocks, tiles: doc.tiles,
+    palettes: doc.palettes, colind: doc.collision.colind,
+    chunkVersions: s.chunkVersions, chunkEpoch: s.chunkEpoch, dirty: s.dirty,
+  };
+}
+
+export function writeArtSnapshot(snap: ClassicArtSnapshot): void {
+  useClassicLevelStore.setState((s) => ({
+    doc: {
+      ...s.doc!,
+      chunks: snap.chunks, blocks: snap.blocks, tiles: snap.tiles, palettes: snap.palettes,
+      collision: { ...s.doc!.collision, colind: snap.colind },
+    },
     dirty: snap.dirty,
     chunkVersions: snap.chunkVersions,
     chunkEpoch: snap.chunkEpoch,
-    historyTick: historyTick + 1,
-  });
+    historyTick: s.historyTick + 1,
+  }));
 }
 
 /**
- * Whether a classic edit can currently be undone / redone. Test support: exported
- * so command tests can assert undo-stack state directly; the UI re-evaluates its
- * undo/redo affordances off `historyTick` rather than calling these.
+ * Whether the last-edited classic document can be undone / redone. Test support:
+ * exported so command tests can assert undo-stack state directly; the UI
+ * re-evaluates its undo/redo affordances off `historyTick` rather than calling
+ * these. Both retire with lastEditedDocId when focus-driven undo lands.
  */
-export function classicCanUndo(): boolean { return classicHistory.canUndo; }
-export function classicCanRedo(): boolean { return classicHistory.canRedo; }
+export function classicCanUndo(): boolean { return lastEditedStack()?.canUndo ?? false; }
+export function classicCanRedo(): boolean { return lastEditedStack()?.canRedo ?? false; }
 
 // ---------------------------------------------------------------------------
 // Commit — the ONE place a validated edit becomes state: records a single undo
-// step, joins the shared timeline (sibling-redo invalidation), applies the new
-// doc + dirty flags + version bump.
+// step on the edited DOCUMENT's stack, then applies the new doc + dirty flags +
+// version bump. Layout and art commit separately so their timelines are
+// independent (spec §4.3).
 // ---------------------------------------------------------------------------
 
 type VersionEffect = { kind: 'none' } | { kind: 'chunk'; id: number } | { kind: 'all' };
 
-function commit(newDoc: LevelDoc, dirtyPatch: DirtyDomains, ve: VersionEffect): void {
+/**
+ * The split is only sound while every commit site is single-domain: a patch that
+ * spans both lists would be recorded on one stack and silently un-undoable from
+ * the other. Fail loudly instead of letting a future call site rot the invariant.
+ */
+function assertSingleDomain(
+  fn: 'commitLayout' | 'commitArt',
+  dirtyPatch: DirtyDomains,
+  allowed: readonly string[],
+): void {
+  for (const key of Object.keys(dirtyPatch)) {
+    if (!allowed.includes(key)) {
+      throw new Error(
+        `${fn} was given the dirty domain '${key}', which belongs to the other classic ` +
+          `undo document (allowed here: ${allowed.join(', ')}). Split the edit into one ` +
+          `commit per document.`,
+      );
+    }
+  }
+}
+
+/** Commit an act-scoped layout edit (fg / bg / objects / start). */
+export function commitLayout(newDoc: LevelDoc, dirtyPatch: DirtyDomains, ve: VersionEffect): void {
+  assertSingleDomain('commitLayout', dirtyPatch, LAYOUT_DOMAINS);
+  const id = layoutDocIdForCurrentAct();
+  if (id) {
+    (documentHistoryHub.historyFor(id) as ClassicLayoutHistory).record(readLayoutSnapshot());
+    lastEditedDocId = id;
+  }
+  applyCommit(newDoc, dirtyPatch, ve);
+}
+
+/** Commit a zone-scoped art edit (tiles / blocks / chunks / palette / colind). */
+export function commitArt(newDoc: LevelDoc, dirtyPatch: DirtyDomains, ve: VersionEffect): void {
+  assertSingleDomain('commitArt', dirtyPatch, ART_DOMAINS);
+  const id = zoneArtDocIdForCurrentZone();
+  if (id) {
+    (documentHistoryHub.historyFor(id) as ClassicArtHistory).record(readArtSnapshot());
+    lastEditedDocId = id;
+  }
+  applyCommit(newDoc, dirtyPatch, ve);
+}
+
+/** Apply a committed edit to the store (shared by both domains; no history). */
+function applyCommit(newDoc: LevelDoc, dirtyPatch: DirtyDomains, ve: VersionEffect): void {
   const s = useClassicLevelStore.getState();
-  classicHistory.record(currentSnapshot(s));
-  invalidateSiblingRedos(clearClassicRedo);
 
   let chunkVersions = s.chunkVersions;
   let chunkEpoch = s.chunkEpoch;
@@ -506,7 +607,7 @@ export function classicSetLayoutCells(
   const e = structuralError(newDoc);
   if (e) return err(e);
   // Layout isn't chunk content → no chunk version bump.
-  commit(newDoc, plane === 'bg' ? { bg: true } : { fg: true }, { kind: 'none' });
+  commitLayout(newDoc, plane === 'bg' ? { bg: true } : { fg: true }, { kind: 'none' });
   return { ok: true };
 }
 
@@ -546,7 +647,7 @@ export function classicEditChunkCells(
   const e = structuralError(newDoc);
   if (e) return err(e);
   // Version keyed by ENGINE id (the layout byte the viewport/picker cache on).
-  commit(newDoc, { chunks: true }, { kind: 'chunk', id: chunkId });
+  commitArt(newDoc, { chunks: true }, { kind: 'chunk', id: chunkId });
   return { ok: true };
 }
 
@@ -566,7 +667,7 @@ export function classicEditBlock(blockId: number, def: BlockDef): CommandResult 
   const e = structuralError(newDoc);
   if (e) return err(e);
   // A block change repaints every chunk that references it — bump the whole epoch.
-  commit(newDoc, { blocks: true }, { kind: 'all' });
+  commitArt(newDoc, { blocks: true }, { kind: 'all' });
   return { ok: true };
 }
 
@@ -600,7 +701,7 @@ export function classicEditTiles(edits: { tileIndex: number; data: Uint8Array }[
   const e = structuralError(newDoc);
   if (e) return err(e);
   // Any tile-pixel change repaints every chunk that uses it — bump the epoch.
-  commit(newDoc, { tiles: true }, { kind: 'all' });
+  commitArt(newDoc, { tiles: true }, { kind: 'all' });
   return { ok: true };
 }
 
@@ -624,7 +725,7 @@ export function classicSetPalette(line: number, colors: Uint16Array): CommandRes
   const e = structuralError(newDoc);
   if (e) return err(e);
   // Palette colors are baked into chunk art renders — bump the epoch.
-  commit(newDoc, { palette: true }, { kind: 'all' });
+  commitArt(newDoc, { palette: true }, { kind: 'all' });
   return { ok: true };
 }
 
@@ -649,7 +750,7 @@ export function classicSetColind(entries: { blockId: number; value: number }[]):
   const e = structuralError(newDoc);
   if (e) return err(e);
   // colind drives the (live-drawn) collision overlay, not cached chunk art.
-  commit(newDoc, { colind: true }, { kind: 'none' });
+  commitArt(newDoc, { colind: true }, { kind: 'none' });
   return { ok: true };
 }
 
@@ -665,7 +766,7 @@ export function classicSetObjects(objects: S1ObjectEntry[]): CommandResult {
   const newDoc: LevelDoc = { ...doc, objects: objects.map((o) => ({ ...o })) };
   const e = structuralError(newDoc);
   if (e) return err(e);
-  commit(newDoc, { objects: true }, { kind: 'none' });
+  commitLayout(newDoc, { objects: true }, { kind: 'none' });
   return { ok: true };
 }
 
@@ -711,7 +812,7 @@ export function classicAddChunk(cells?: { index: number; word: number }[]): AddR
   const e = structuralError(newDoc);
   if (e) return err(e);
   const newEngineId = nextChunks.length; // file index (length-1) + 1 = length
-  commit(newDoc, { chunks: true }, { kind: 'chunk', id: newEngineId });
+  commitArt(newDoc, { chunks: true }, { kind: 'chunk', id: newEngineId });
   return { ok: true, id: newEngineId };
 }
 
@@ -739,7 +840,7 @@ export function classicAddBlock(def?: BlockDef): AddResult {
   if (e) return err(e);
   // A brand-new block is referenced by no chunk yet → no chunk art changes; the
   // block palette re-reads on the new doc identity. No version bump needed.
-  commit(newDoc, { blocks: true }, { kind: 'none' });
+  commitArt(newDoc, { blocks: true }, { kind: 'none' });
   return { ok: true, id: nextBlocks.length - 1 };
 }
 
@@ -755,6 +856,6 @@ export function classicSetStart(x: number, y: number): CommandResult {
   const newDoc: LevelDoc = { ...doc, start: { x, y } };
   const e = structuralError(newDoc);
   if (e) return err(e);
-  commit(newDoc, { start: true }, { kind: 'none' });
+  commitLayout(newDoc, { start: true }, { kind: 'none' });
   return { ok: true };
 }
