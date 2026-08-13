@@ -5,6 +5,7 @@ import TabStrip from './shell/TabStrip';
 import Explorer from './shell/Explorer';
 import ConfirmDialog from './shell/ConfirmDialog';
 import LegacyWorkspace from './shell/LegacyWorkspace';
+import LevelWorkspace from './workspace/LevelWorkspace';
 import HomeTab from './components/home/HomeTab';
 import ProjectSetupTab from './components/setup/ProjectSetupTab';
 import { T } from './components/ui';
@@ -15,6 +16,7 @@ import { useClassicLevelStore } from './state/classicLevelStore';
 import { useSessionStore } from './state/sessionStore';
 import { useShellStore } from './state/shellStore';
 import { ensureSaversRegistered, saveAllDirty } from './state/project-runtime';
+import { registerAeonFacetModules } from './workspace/register-facets';
 import { useSessionLifecycle, useActTabSync } from './shell/session-lifecycle';
 import { requestOpenTab, requestFocusIndex } from './shell/tab-activation';
 import { buildCommands } from './shell/commands';
@@ -45,7 +47,7 @@ export default function App() {
   const activeTab = tabs.find((t) => t.id === activeId);
 
   // -- runtime wiring ------------------------------------------------------
-  useEffect(() => { registerAgentHandler(); ensureSaversRegistered(); }, []);
+  useEffect(() => { registerAgentHandler(); ensureSaversRegistered(); registerAeonFacetModules(); }, []);
   useSessionLifecycle();
   useActTabSync();
 
@@ -140,11 +142,11 @@ export default function App() {
               </div>
             ))}
             <div style={{ ...styles.tabPane, display: activeTab?.kind === 'level' ? 'flex' : 'none' }}>
-              <LegacyWorkspace
-                onOpenProject={openProject}
-                onOpenRecent={openProjectByPath}
-                onSave={saveAllDirty}
-              />
+              {classicOpen ? (
+                <LegacyWorkspace onOpenProject={openProject} onOpenRecent={openProjectByPath} onSave={saveAllDirty} />
+              ) : config ? (
+                <LevelWorkspace />
+              ) : null}
             </div>
           </div>
         </div>
