@@ -124,10 +124,11 @@ Task 11 absorbed two live gaps plus its own scope. Deviations worth keeping:
   document — the value `recordEdit` records against — so a second marker could
   only drift. `getLoadedSpriteDocId()` now derives from it.
 - **Ctrl+S saves every dirty sprite document with an art target**
-  (`saveAllSpriteArt` → `saveSpriteDocArt`, which checks the target out for the
-  write and restores the previous checkout). Reporting only the checked-out
+  (`saveAllSpriteArt` → `saveSpriteDocArt`). Reporting only the checked-out
   document would have left a background tab dirty after a save the user believed
-  covered everything.
+  covered everything. *(Task 11 implemented this by checking the target out for
+  the write and restoring the previous checkout; the final review replaced that
+  with by-id addressing — see "Final-review fixes" below.)*
 - `resetProjectRuntime()` now calls `closeAll()`. The Task-7 concern (blanking
   the canvas on project switch) is resolved by the wiring: session restore runs
   immediately after and re-activates the restored sprite tab, which loads its
@@ -137,6 +138,93 @@ Still open after Task 11 (pre-existing, not introduced here): the sprite UI's
 Load / New / Import buttons replace the CHECKED-OUT document's content in place,
 so they can leave a tab titled for one sprite holding another. They predate
 multi-document and were left alone.
+
+## Final-review fixes
+
+Four findings from the pre-handoff review, in the order they were fixed.
+
+### 1. Commands have a SCOPE, and ambient callers route by it
+
+`executeCommand` resolves its document from FOCUS (`focusedDocId`) and throws
+when the focused document owns no aeon command history. Two caller groups are
+not focus-driven and broke on it:
+
+- `PaletteEditor` is mounted inside the sprite pane (`SpriteMode` renders it
+  with `context="sprite"`), still renders ZONE palette rows there, unlocks line
+  0, and builds "Copy to ▸ Zone line N" targets unconditionally. With an aeon
+  sprite-doc tab active all three of its zone writes threw inside a React event
+  handler. (Classic was only accidentally safe: `getCurrentZone()` is null, so
+  the guards early-returned.)
+- Every aeon agent edit tool. `activeHistory()` derived the act from
+  `projectStore`; `focusedDocId` derives from `sessionStore.activeId`, so
+  `set-palette` / `write-tiles` / `stamp-chunk` / … failed as MCP errors
+  whenever the active tab was Home, a tool tab, or a sprite doc — a silent,
+  untested narrowing of the agent API.
+
+`executeAmbientCommand` (editorStore) resolves the document from the COMMAND's
+scope using `projectStore`'s current zone/act, as `activeHistory()` did.
+
+**The act/zone split is read off `core/editing/history.ts`, not guessed:**
+`set-palette-line`, `set-tileset-tiles` and `set-chunk` are the only members of
+`AnyCommand` whose apply/undo touch `level.palette` / `level.tileset` /
+`level.chunkLibrary` — the zone-level fields of `S4Level`. Everything else
+writes `level.sections[...]` or `level.act`. A `batch` is zone-scoped only when
+every leaf is; one act-scoped child pins the step to the act. Keep
+`ZONE_SCOPED_COMMAND_TYPES` in step with `applyCommand`.
+
+This also stops a zone-scoped ambient edit made while the layout facet happens
+to be focused from landing on the ACT stack, where closing that act tab would
+have discarded it.
+
+`focusedHistory()` stays focus-driven — correct for the undo/redo controls,
+which must reach back into what the user was looking at.
+
+### 2. The sprite art save no longer clears a dirty flag over unwritten bytes
+
+`saveSpriteArt` read `frames` synchronously, awaited `writeGuarded`, then cleared
+`unsavedEdits` unconditionally. A stroke committed during the await went through
+`recordEdit` into the document being saved, was not in the bytes on disk, and
+was then marked clean — no dirty dot, discarded on close with no prompt.
+
+It also read and wrote the store ROOT, so saving a parked document checked it
+out for the duration of the write. The old comment claimed nothing flickers
+because "the sprite pane renders only the active tab's document" — **wrong**:
+the pane renders the store root and `activateSpriteDoc` is a `setState`, so the
+user's canvas repainted with another sprite for the whole write and any stroke
+in that window landed in the wrong document.
+
+`saveSpriteArt(docId?)` now addresses its document by id in both directions —
+`spriteDocState` to read, the new `patchSpriteDoc` to write back — so **no
+checkout happens at all**. After the write it re-reads the document (it may have
+moved or closed across the await) and clears `unsavedEdits` only when its pixels
+still match what was written; otherwise the save succeeds, the mtime baseline
+refreshes, and the document stays dirty with a toast saying so.
+`saveSpriteDocArt` is now a thin alias.
+
+Still open (pre-existing, unchanged): palette and timeline edits also set
+`unsavedEdits`, and this path writes art bytes only — so an art save still
+over-clears those. Narrow, and separate from the race.
+
+### 3. Classic commits check the stack type instead of casting
+
+`commitLayout`/`commitArt` cast `historyFor(id)`. The hub's `level:`/`zoneart:`
+factories pick the stack type from `classicIsOpen()` at CONSTRUCTION time, so a
+stack built outside a classic `'open'` status is an aeon `BoundEditHistory` and
+`.record(...)` blew up as "record is not a function", naming nothing. Now an
+`instanceof` check naming the doc id, what it found and what it wanted. No live
+repro is constructible (timing saves it); the test forces the shape by building
+the stack with the project store in `'opening'`.
+
+### 4. `BoundEditHistory.onCommand` is covered
+
+It is the whole aeon repaint path (`notifyCommandApplied` → `bumpStoreVersions`
++ the invalidation listener) and every existing construction omitted the third
+constructor argument. Now asserted on execute, undo and redo, with the command
+each step actually moved. Verified by mutation.
+
+**Deliberately NOT changed** (owner decisions): `focusedHistory()`'s focus-driven
+routing; closing a dirty level tab still drops its undo stack without warning;
+`parseZoneArtDocId` stays unused.
 
 ## Live behaviour changes already in the branch
 
@@ -160,3 +248,7 @@ multi-document and were left alone.
 | Tasks 8+9+10 | 161 | 1394 | 2 | 0 |
 | Task 11 (gap 1: classic facet) | 162 | 1406 | 2 | 0 |
 | Task 11 (complete) | 163 | 1428 | 2 | 0 |
+| Final-review fix 1 (ambient commands) | 164 | 1438 | 2 | 0 |
+| Final-review fix 2 (sprite save) | 165 | 1442 | 2 | 0 |
+| Final-review fix 3 (classic cast) | 165 | 1444 | 2 | 0 |
+| Final-review fix 4 (onCommand) | 165 | 1448 | 2 | 0 |
