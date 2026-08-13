@@ -2,6 +2,7 @@ import React from 'react';
 import { useArtStore } from '../state/artStore';
 import { useProjectStore, getCurrentZone } from '../state/projectStore';
 import { useEditorStore } from '../state/editorStore';
+import { useHistoryVersion } from '../hooks/useHistoryVersion';
 import { OptionBar, Chip, Divider, T } from '../components/ui';
 import {
   ToolButton, TransformGrid, DitherConfig, MirrorButton, ZoomControl,
@@ -43,7 +44,7 @@ function lineGradient(colors: Color[]): string {
  */
 function PaletteLinePicker() {
   useProjectStore((s) => s.project);
-  useEditorStore((s) => s.historyVersion);
+  useHistoryVersion();
   useArtStore((s) => s.paletteVersion);
   const paletteLine = useArtStore((s) => s.paletteLine);
   const setPaletteLine = useArtStore((s) => s.setPaletteLine);

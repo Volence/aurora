@@ -4,7 +4,7 @@ import { useClassicProjectStore } from '../../state/classicProjectStore';
 import S1ObjectSection from './S1ObjectSection';
 import { useArtStore } from '../../state/artStore';
 import { useSpriteStore } from '../../state/spriteStore';
-import { spriteModeUndo, spriteModeRedo } from '../../state/sprite-undo';
+import { focusedHistory } from '../../state/editorStore';
 import SpriteCanvas from './SpriteCanvasHost';
 import type { OverlayRect } from './SpriteCanvasHost';
 import FrameGrid from './FrameGrid';
@@ -93,12 +93,12 @@ export default function SpriteMode({ appBar }: { appBar: React.ReactNode }) {
           && !['range', 'checkbox', 'button', 'radio'].includes((target as HTMLInputElement).type));
       if (isTextEntry) return;
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) {
-        spriteModeUndo();
+        focusedHistory()?.undo();
         e.preventDefault();
         return;
       }
       if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key.toLowerCase() === 'z' && e.shiftKey))) {
-        spriteModeRedo();
+        focusedHistory()?.redo();
         e.preventDefault();
         return;
       }

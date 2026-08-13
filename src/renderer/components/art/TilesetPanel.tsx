@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useProjectStore, getCurrentZone, getCurrentAct, getActiveLevel } from '../../state/projectStore';
 import { useEditorStore, executeCommand } from '../../state/editorStore';
+import { useHistoryVersion } from '../../hooks/useHistoryVersion';
 import { useArtStore } from '../../state/artStore';
 import { openDocumentGuarded } from './open-document';
 import { useToastStore } from '../../state/toastStore';
@@ -43,7 +44,7 @@ function ensureTileCache(tiles: Tile[], palette: Palette, key: string) {
 export default function TilesetPanel() {
   const currentZoneId = useProjectStore((s) => s.currentZoneId);
   const currentActId = useProjectStore((s) => s.currentActId);
-  const historyVersion = useEditorStore((s) => s.historyVersion);
+  const historyVersion = useHistoryVersion();
   const brushTile = useArtStore((s) => s.brushTile);
   const setBrushTile = useArtStore((s) => s.setBrushTile);
   const paletteLine = useArtStore((s) => s.paletteLine);

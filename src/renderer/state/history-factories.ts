@@ -18,6 +18,7 @@ import {
 } from './classicLevelStore';
 import { readSpriteSnapshot, writeSpriteSnapshot } from './spriteStore';
 import { useProjectStore, getActiveLevel } from './projectStore';
+import { notifyCommandApplied } from './editorStore';
 
 /**
  * Classic and aeon share the `level:` prefix (tabs.ts) — a classic act tab is
@@ -31,9 +32,15 @@ function classicIsOpen(): boolean {
 }
 
 // The level supplier is re-read per call (not captured) because the project
-// store hands out a fresh S4Level object on every act load.
+// store hands out a fresh S4Level object on every act load. notifyCommandApplied
+// is what makes an UNDO repaint: the UndoStack contract is argument-free, so the
+// stack itself has to announce the command it just reverted.
 function aeonLevelHistory(): UndoStack {
-  return new BoundEditHistory(new EditHistory(), () => getActiveLevel(useProjectStore.getState()));
+  return new BoundEditHistory(
+    new EditHistory(),
+    () => getActiveLevel(useProjectStore.getState()),
+    notifyCommandApplied,
+  );
 }
 
 /**

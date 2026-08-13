@@ -1,6 +1,7 @@
 import React, { useRef, useEffect, useLayoutEffect, useCallback, useMemo, useState } from 'react';
 import { useArtStore } from '../../state/artStore';
 import { useEditorStore, executeCommand } from '../../state/editorStore';
+import { useHistoryVersion } from '../../hooks/useHistoryVersion';
 import {
   useProjectStore, getCurrentZone, getActiveLevel, getCurrentAct,
 } from '../../state/projectStore';
@@ -95,7 +96,7 @@ export default function ComposerCanvas() {
   const selectedCollisionSolidity = useEditorStore((s) => s.selectedCollisionSolidity);
   const collisionPaintPlane = useEditorStore((s) => s.collisionPaintPlane);
   // Atlas tiles / palette can change underneath the doc (undo, agent writes).
-  const historyVersion = useEditorStore((s) => s.historyVersion);
+  const historyVersion = useHistoryVersion();
   // paletteVersion ticks on every live preview step (kept off historyVersion).
   const paletteVersion = useArtStore((s) => s.paletteVersion);
 

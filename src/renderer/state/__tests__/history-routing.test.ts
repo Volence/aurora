@@ -16,6 +16,10 @@ import {
   classicSetPalette,
   classicSetLayoutCells,
 } from '../classicLevelStore';
+import { focusedHistory } from '../editorStore';
+import { useSessionStore } from '../sessionStore';
+import { useSpriteStore, openSpriteDoc } from '../spriteStore';
+import { useWorkspaceStore } from '../../workspace/workspaceStore';
 import { openReady } from './helpers/classic-fixture';
 
 const st = () => useClassicLevelStore.getState();
@@ -136,5 +140,75 @@ describe('classic dirty-flag ownership across the two stacks', () => {
 
     expect(st().dirty.start).toBeUndefined();
     expect(st().dirty.palette).toBe(true);
+  });
+});
+
+// --- Focus routing -------------------------------------------------------
+// The UI has ONE undo entry point (focusedHistory); which document it drives is
+// decided here, by the active tab plus the focused facet.
+
+describe('focusedHistory', () => {
+  beforeEach(() => {
+    documentHistoryHub.clearAll();
+    documentHistoryHub.clearFactories();
+    registerHistoryFactories();
+    useWorkspaceStore.getState().reset();
+    useSpriteStore.getState().closeAll();
+    openReady();
+  });
+
+  it('returns the LAYOUT doc stack when a map facet is focused', () => {
+    useSessionStore.setState({ activeId: 'level:ghz:1' });
+    useWorkspaceStore.getState().setFacet('level:ghz:1', 'layout');
+    expect(focusedHistory()).toBe(documentHistoryHub.historyFor('level:ghz:1'));
+  });
+
+  it('returns the ZONE-ART doc stack when the art facet is focused', () => {
+    useSessionStore.setState({ activeId: 'level:ghz:1' });
+    useWorkspaceStore.getState().setFacet('level:ghz:1', 'art');
+    expect(focusedHistory()).toBe(documentHistoryHub.historyFor('zoneart:ghz'));
+  });
+
+  it('returns the ZONE-ART doc stack for the palette facet too', () => {
+    useSessionStore.setState({ activeId: 'level:ghz:1' });
+    useWorkspaceStore.getState().setFacet('level:ghz:1', 'palette');
+    expect(focusedHistory()).toBe(documentHistoryHub.historyFor('zoneart:ghz'));
+  });
+
+  it('returns the SPRITE doc stack when a sprite tab is active', () => {
+    useSessionStore.setState({ activeId: 'doc:sprite:s1:18' });
+    expect(focusedHistory()).toBe(documentHistoryHub.historyFor('doc:sprite:s1:18'));
+  });
+
+  it('returns null when no document is focused', () => {
+    useSessionStore.setState({ activeId: 'tool:project-setup' });
+    expect(focusedHistory()).toBeNull();
+  });
+
+  // The two tests below are the point of the whole exercise: the SAME keystroke
+  // must revert a different edit depending on what the user is looking at.
+
+  it('undo with the art facet focused reverts the ART edit, leaving the layout edit', () => {
+    useSessionStore.setState({ activeId: 'level:ghz:1' });
+    classicSetLayoutCells('fg', [{ x: 0, y: 0, chunkId: 1 }]);   // LAYOUT
+    classicSetPalette(1, new Uint16Array(16).fill(0x0e0e));      // ART
+
+    useWorkspaceStore.getState().setFacet('level:ghz:1', 'art');
+    focusedHistory()!.undo();
+
+    expect(st().doc!.palettes[1][0]).toBe(0);      // the art edit is gone
+    expect(st().doc!.fg.cells[0]).toBe(1);         // the layout edit survives
+  });
+
+  it('undo with a sprite tab focused reverts THAT sprite document', () => {
+    const docId = 'doc:sprite:s1:18';
+    openSpriteDoc(docId, { width: 8, height: 8 });
+    useSessionStore.setState({ activeId: docId });
+
+    useSpriteStore.getState().setBuffer({ width: 8, height: 8, data: new Uint8Array(64).fill(3) });
+    expect(useSpriteStore.getState().frames[0].data[0]).toBe(3);
+
+    focusedHistory()!.undo();
+    expect(useSpriteStore.getState().frames[0].data[0]).toBe(0);
   });
 });

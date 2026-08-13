@@ -13,6 +13,7 @@ import ObjectLibraryPanel from './ObjectLibraryPanel';
 import ClassicPalettePanel from './ClassicPalettePanel';
 import { isTypingTarget } from './composer-shared';
 import { levelKeysEnabled } from '../../workspace/level-keys';
+import { focusedHistory } from '../../state/editorStore';
 import type { ProjectHandle } from '../../../core/project/adapter';
 
 // The handle the classic level store was last reset for. Module scope (survives
@@ -63,14 +64,12 @@ export default function ClassicProjectView({ appBar }: { appBar: React.ReactNode
     }
   }, [handle]);
 
-  // Undo/redo keyboard for the classic view (Task 13). A DIRECT binding to the
-  // classic level store's undo/redo. Sprite (s1-object) editing IS now reachable
-  // from a classic project — the edit-art context menu opens an s1 sprite-doc
-  // tab, which mounts SpriteMode and hides (keep-alive) this pane. The
-  // levelKeysEnabled() gate below is the mitigation: while that sprite tab owns
-  // the keyboard this handler stays inert, so Ctrl+Z doesn't fire both classic
-  // and sprite undo (finding 1). A future in-classic object editor may instead
-  // route through a recency coordinator over both histories.
+  // Undo/redo keyboard for the classic view (Task 13), through the ONE focused-
+  // document entry point. Sprite (s1-object) editing IS reachable from a classic
+  // project — the edit-art context menu opens an s1 sprite-doc tab, which mounts
+  // SpriteMode and hides (keep-alive) this pane. The levelKeysEnabled() gate
+  // below is the mitigation: while that sprite tab owns the keyboard this handler
+  // stays inert, so Ctrl+Z doesn't fire both this and SpriteMode's binding.
   // Matches the repo's binding scheme (SpriteMode / the facet canvases): Ctrl+Z
   // undo, Ctrl+Shift+Z / Ctrl+Y redo, ignored while typing in a text field.
   React.useEffect(() => {
@@ -79,12 +78,12 @@ export default function ClassicProjectView({ appBar }: { appBar: React.ReactNode
       if (isTypingTarget(e.target as HTMLElement)) return;
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) {
         e.preventDefault();
-        useClassicLevelStore.getState().undo();
+        focusedHistory()?.undo();
         return;
       }
       if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key.toLowerCase() === 'z' && e.shiftKey))) {
         e.preventDefault();
-        useClassicLevelStore.getState().redo();
+        focusedHistory()?.redo();
         return;
       }
     };
