@@ -209,17 +209,19 @@ export default function PaletteEditor() {
    * line FIRST, then run the set-palette-line command — so history's undo
    * snapshot is the pre-drag state, not the mid-drag preview.
    *
-   * Blurs the active slider after commit so Ctrl+Z (ArtMode's keydown handler)
-   * is not blocked by the INPUT early-return guard on the next undo.
+   * Blurs the active slider after commit so Ctrl+Z (art-facet.tsx ArtCanvas's
+   * keydown binding) is not blocked by the INPUT early-return guard on the next
+   * undo.
    *
    * Note: MapViewport's invalidation listener handles set-palette-line →
    * reloadAllSections for the MAP repaint, but in Art mode it is unmounted —
    * the composer repaints via historyVersion, and the map re-prerenders on
-   * remount (MapViewport's mount effect). Established pattern; see ArtMode.
+   * remount (MapViewport's mount effect). Established pattern; see
+   * workspace/facets/art-facet.tsx (ArtCanvas).
    */
   function commitDrag(e?: React.SyntheticEvent) {
-    // Blur the slider so post-commit Ctrl+Z reaches ArtMode's keydown handler
-    // without being swallowed by the INPUT guard.
+    // Blur the slider so post-commit Ctrl+Z reaches art-facet.tsx ArtCanvas's
+    // keydown binding without being swallowed by the INPUT guard.
     (e?.currentTarget as HTMLElement | undefined)?.blur?.();
     const pre = preDragRef.current;
     preDragRef.current = null;

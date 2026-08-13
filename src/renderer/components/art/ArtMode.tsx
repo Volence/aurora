@@ -1,3 +1,4 @@
+// DEAD CODE — superseded by workspace/facets/art-facet.tsx (the live copy). Do not edit; kept only because LegacyWorkspace's unreachable aeon branch still imports it. Deleted with that branch in the stage-3 cleanup task.
 import React, { useState, useEffect } from 'react';
 import { useArtStore } from '../../state/artStore';
 import { openDocumentGuarded } from './open-document';

@@ -24,10 +24,11 @@ const TRANSFORMS: Array<{ action: string; glyph: string; label: string }> = [
  * mirror, repeat preview, transforms, and zoom. Each control keeps its exact
  * prior behavior; only its host moved (column → option bar). The collision
  * tool's config (shape/flip/solidity/plane) lives in the side-panel
- * CollisionPalette instead — see ArtMode.tsx.
+ * CollisionPalette instead — see workspace/facets/art-facet.tsx (ArtPanels).
  *
  * `before` is rendered at the left edge (the doc header / save info supplied by
- * ArtMode) so the whole option row lives in one OptionBar.
+ * workspace/facets/art-facet.tsx's ArtOptions) so the whole option row lives in
+ * one OptionBar.
  */
 export default function ArtToolOptions({ before }: { before?: React.ReactNode }) {
   const tool = useArtStore((s) => s.tool);
