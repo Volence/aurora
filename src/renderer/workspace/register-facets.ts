@@ -4,6 +4,7 @@
 import { registerBuiltinFacets } from '../../core/shell/facets';
 import { registerFacetModule } from './facet-registry';
 import { layoutFacet } from './facets/layout-facet';
+import { artFacet } from './facets/art-facet';
 import { objectsFacet } from './facets/objects-facet';
 import { ringsFacet } from './facets/rings-facet';
 import { collisionFacet } from './facets/collision-facet';
@@ -12,6 +13,7 @@ import { paletteFacet } from './facets/palette-facet';
 export function registerAeonFacetModules(): void {
   registerBuiltinFacets();
   registerFacetModule(layoutFacet);
+  registerFacetModule(artFacet);
   registerFacetModule(objectsFacet);
   registerFacetModule(ringsFacet);
   registerFacetModule(collisionFacet);

@@ -3,6 +3,8 @@ import { useViewStore } from '../state/viewStore';
 import { useProjectStore, getCurrentAct, getCurrentZone, getActiveLevel as getStoreActiveLevel } from '../state/projectStore';
 import { useEditorStore, executeCommand, undo, redo, setCommandInvalidationListener, RING_PATTERNS } from '../state/editorStore';
 import { useArtStore } from '../state/artStore';
+import { useSessionStore } from '../state/sessionStore';
+import { switchFacet } from '../workspace/facet-tools';
 import { useToastStore } from '../state/toastStore';
 import { openDocumentGuarded } from './art/open-document';
 import { docFromTile, docFromSectionRegion } from '../../core/art/composer-buffer';
@@ -557,7 +559,7 @@ export default function MapViewport() {
               name: `marquee (${marquee.col},${marquee.row})`,
               dirty: true, // copied off the map and not yet in the library
             })) {
-              useEditorStore.getState().setAppMode('art');
+              switchFacet(useSessionStore.getState().activeId, 'art');
             }
           }
           e.preventDefault();
@@ -1382,7 +1384,7 @@ export default function MapViewport() {
       name: `tile #${tileIndex}`,
       dirty: false,
     })) return;
-    useEditorStore.getState().setAppMode('art');
+    switchFacet(useSessionStore.getState().activeId, 'art');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -1409,7 +1411,7 @@ export default function MapViewport() {
       name: `block (${bx},${by})`,
       dirty: true, // copied off the map and not yet in the library
     })) return;
-    useEditorStore.getState().setAppMode('art');
+    switchFacet(useSessionStore.getState().activeId, 'art');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

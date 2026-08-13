@@ -1,5 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { useEditorStore } from '../state/editorStore';
+import { useSessionStore } from '../state/sessionStore';
+import { switchFacet } from '../workspace/facet-tools';
 import { useProjectStore, getCurrentZone } from '../state/projectStore';
 import { useToastStore } from '../state/toastStore';
 import { openDocumentGuarded } from './art/open-document';
@@ -119,7 +121,7 @@ export default function ChunkLibrary() {
     if (!openDocumentGuarded({
       doc: docFromChunk(chunk), liveTileIndex: null, chunkId: chunk.id, name: chunk.name, dirty: false,
     })) return;
-    useEditorStore.getState().setAppMode('art');
+    switchFacet(useSessionStore.getState().activeId, 'art');
   }, []);
 
   const handleImport = useCallback(async () => {

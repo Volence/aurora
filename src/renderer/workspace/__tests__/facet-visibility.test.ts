@@ -14,8 +14,8 @@ describe('facet visibility (registered descriptors ∩ granted ∩ has module)',
     const granted = ['layout', 'art', 'objects', 'rings', 'collision', 'palette'] as const;
     const visible = facetsFor([...granted]).filter((f) => facetModules.get(f.id));
     // Grows as facet-module tasks land: Task 10 = ['layout']; Task 11 adds
-    // objects/rings/collision/palette; Task 12 adds art (full six).
-    expect(visible.map((f) => f.id)).toEqual(['layout', 'objects', 'rings', 'collision', 'palette']);
+    // objects/rings/collision/palette; Task 12 adds art — full six, in order.
+    expect(visible.map((f) => f.id)).toEqual(['layout', 'art', 'objects', 'rings', 'collision', 'palette']);
   });
 
   it('a facet without a registered module renders nothing (no dead chrome)', () => {
