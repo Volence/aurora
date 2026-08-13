@@ -16,6 +16,7 @@ import {
   classicSetPalette,
   classicSetLayoutCells,
 } from '../classicLevelStore';
+import { useClassicProjectStore } from '../classicProjectStore';
 import { focusedHistory } from '../editorStore';
 import { useSessionStore } from '../sessionStore';
 import { useSpriteStore, openSpriteDoc } from '../spriteStore';
@@ -90,6 +91,24 @@ describe('classic commit routing', () => {
   it('commitArt rejects a dirty patch carrying a layout domain', () => {
     expect(() => commitArt(st().doc!, { fg: true }, { kind: 'none' }))
       .toThrow(/commitArt.*fg/);
+  });
+
+  // The hub's level:/zoneart: factories pick the stack type from classicIsOpen()
+  // at CONSTRUCTION time, so a stack built outside a classic 'open' status is an
+  // aeon BoundEditHistory with no .record. The commits used to cast, which turned
+  // that into "record is not a function" from deep inside an edit. No live repro
+  // is constructible today (timing saves it), so this test forces the shape.
+  it.each([
+    ['commitLayout', () => commitLayout(st().doc!, { fg: true }, { kind: 'none' }), layoutDocIdForCurrentAct],
+    ['commitArt', () => commitArt(st().doc!, { palette: true }, { kind: 'none' }), zoneArtDocIdForCurrentZone],
+  ])('%s names the document when its stack was built for the other engine', (_name, commit, docId) => {
+    documentHistoryHub.clearAll();
+    // Build the stack while classic is NOT open — the aeon branch of the factory.
+    useClassicProjectStore.setState({ status: 'opening' } as never);
+    documentHistoryHub.historyFor(docId()!);
+    useClassicProjectStore.setState({ status: 'open' } as never);
+
+    expect(commit).toThrow(new RegExp(`${docId()}.*BoundEditHistory`));
   });
 });
 

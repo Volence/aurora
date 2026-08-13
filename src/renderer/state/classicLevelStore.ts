@@ -34,7 +34,7 @@ import { firstEditableNonBlankTile, firstNonBlankBlock } from '../../core/level-
 import type { S1ObjectEntry } from '../../core/formats/classic/s1-objpos';
 import {
   LAYOUT_DOMAINS, ART_DOMAINS, pickDomainDirty, restoreDomainDirty,
-  type ClassicArtHistory, type ClassicLayoutHistory,
+  ClassicArtHistory, ClassicLayoutHistory,
   type ClassicArtSnapshot, type ClassicLayoutSnapshot,
 } from '../../core/editing/classic-domain-history';
 import { classicLevelTab, zoneArtDocId } from '../shell/tabs';
@@ -427,12 +427,37 @@ function assertSingleDomain(
   }
 }
 
+/**
+ * The hub's `level:`/`zoneart:` factories dispatch on `classicIsOpen()` at stack
+ * CONSTRUCTION time (history-factories.ts), so a stack built while the classic
+ * project store is anything but 'open' — the `status: 'opening'` window, say,
+ * with a previous project's level tabs still in the strip — is an aeon
+ * BoundEditHistory with no `record` method. A cast would hand that back and blow
+ * up as "record is not a function" deep inside an edit, naming nothing. Check
+ * instead, and say which document produced what.
+ */
+function requireClassicHistory<T>(
+  id: string,
+  ctor: new (...args: never[]) => T,
+  stack: unknown,
+): T {
+  if (!(stack instanceof ctor)) {
+    throw new Error(
+      `classic commit: document '${id}' holds a ${(stack as object)?.constructor?.name ?? typeof stack}, ` +
+        `not a ${ctor.name} — the history factory built it for a different engine ` +
+        `(is the classic project actually open?).`,
+    );
+  }
+  return stack;
+}
+
 /** Commit an act-scoped layout edit (fg / bg / objects / start). */
 export function commitLayout(newDoc: LevelDoc, dirtyPatch: DirtyDomains, ve: VersionEffect): void {
   assertSingleDomain('commitLayout', dirtyPatch, LAYOUT_DOMAINS);
   const id = layoutDocIdForCurrentAct();
   if (id) {
-    (documentHistoryHub.historyFor(id) as ClassicLayoutHistory).record(readLayoutSnapshot());
+    requireClassicHistory(id, ClassicLayoutHistory, documentHistoryHub.historyFor(id))
+      .record(readLayoutSnapshot());
   }
   applyCommit(newDoc, dirtyPatch, ve);
 }
@@ -442,7 +467,8 @@ export function commitArt(newDoc: LevelDoc, dirtyPatch: DirtyDomains, ve: Versio
   assertSingleDomain('commitArt', dirtyPatch, ART_DOMAINS);
   const id = zoneArtDocIdForCurrentZone();
   if (id) {
-    (documentHistoryHub.historyFor(id) as ClassicArtHistory).record(readArtSnapshot());
+    requireClassicHistory(id, ClassicArtHistory, documentHistoryHub.historyFor(id))
+      .record(readArtSnapshot());
   }
   applyCommit(newDoc, dirtyPatch, ve);
 }
