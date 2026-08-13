@@ -1,6 +1,14 @@
 // Per-tab workspace UI state (active facet, viewport snapshot) — the renderer
 // half of core/shell/session-persistence's WorkspaceRecord. Keyed by tab id.
 // Session restore seeds it (Task 16); the facet bar and tab activation write it.
+//
+// Usage note: facetFor/viewFor are keyed getters, not plain state fields —
+// components MUST select the RETURN VALUE, e.g.
+// `useWorkspaceStore((s) => s.facetFor(tabId))`, never the function reference
+// (`s.facetFor` alone). A bare function reference never changes identity
+// across set() calls, so selecting it silently skips re-renders (stale UI,
+// no error). This store is the codebase's first keyed-getter-in-state shape,
+// so there's no existing precedent to copy from.
 
 import { create } from 'zustand';
 import type { FacetCapability } from '../../core/project/adapter';

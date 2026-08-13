@@ -2,6 +2,10 @@
 // module supplies the workspace's slot components for one facet id; the
 // LevelWorkspace (Task 10) renders registered ∩ profile-granted (the core
 // facetsFor rule) and mounts the active facet's slots in its one EditorShell.
+//
+// id/label/order stay on core FacetDescriptor (core/shell/facets.ts); this
+// registry supplies only the renderer-side slot components — do not add a
+// label/order field here to "fix" the apparent gap.
 
 import type { ComponentType } from 'react';
 import { createRegistry, type Registry } from '../../core/shell/registry';
