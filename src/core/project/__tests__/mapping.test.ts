@@ -65,6 +65,8 @@ describe('project mapping config', () => {
     })));
     expect(Object.keys(config.assets!)).toEqual(['ok']);
     expect(issues.map((i) => i.where).sort()).toEqual(['assets.bad', 'assets.typo']);
+    const typoIssue = issues.find((i) => i.where === 'assets.typo')!;
+    expect(typoIssue.message.toLowerCase()).toContain('pth'); // zod's unrecognized-key diagnosis surfaces
   });
 
   it('preserves unknown top-level fields through a round-trip', () => {

@@ -67,7 +67,7 @@ export function readProjectConfig(bytes: Uint8Array | null): SidecarState {
 
   if ('base' in json && typeof json.base !== 'string') {
     delete out.base;
-    issues.push({ where: 'base', message: `expected a string profile id, got ${typeof json.base} — entry ignored` });
+    issues.push({ where: 'base', message: `expected a string profile id, got ${json.base === null ? 'null' : typeof json.base} — entry ignored` });
   }
 
   if ('paths' in json) {
@@ -93,7 +93,11 @@ export function readProjectConfig(bytes: Uint8Array | null): SidecarState {
       for (const [k, v] of Object.entries(json.assets)) {
         const res = assetOverrideSchema.safeParse(v);
         if (res.success) assets[k] = res.data;
-        else issues.push({ where: `assets.${k}`, message: `invalid override shape — entry ignored` });
+        else {
+          const zi = res.error.issues[0];
+          const at = zi && zi.path.length > 0 ? `${zi.path.join('.')}: ` : '';
+          issues.push({ where: `assets.${k}`, message: `${at}${zi?.message ?? 'invalid override shape'} — entry ignored` });
+        }
       }
       out.assets = assets;
     }
