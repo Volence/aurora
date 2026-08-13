@@ -27,6 +27,11 @@ import type {
 } from '../../core/project/adapter';
 import type { ResolutionReport } from '../../core/project/report';
 import { ipcClassicBridge, type ClassicBridge } from './classic-bridge';
+// classicLevelStore.ts imports useClassicProjectStore back from this module —
+// an intentional lazy (function-body-only) circular reference: both stores
+// only reach into each other inside action bodies (openDirectory below,
+// openAct/editableTileRange over there), never at module-eval time, so the
+// cycle resolves fine regardless of which module's top level runs first.
 import { useClassicLevelStore } from './classicLevelStore';
 
 export type ClassicStatus = 'closed' | 'opening' | 'open';
