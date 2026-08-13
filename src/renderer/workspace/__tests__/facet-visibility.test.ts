@@ -1,9 +1,14 @@
 // The OffscreenCanvas global that register-facets → MapViewport needs at import
 // time is installed by vitest setupFiles (src/test/offscreen-canvas-stub.ts).
 import { describe, it, expect, beforeEach } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { facetsFor, facetRegistry, registerBuiltinFacets } from '../../../core/shell/facets';
 import { facetModules } from '../facet-registry';
 import { registerAeonFacetModules } from '../register-facets';
+import { openCapabilities } from '../../state/open-project';
+import { useProjectStore } from '../../state/projectStore';
+import { useClassicProjectStore } from '../../state/classicProjectStore';
 
 describe('facet visibility (registered descriptors ∩ granted ∩ has module)', () => {
   beforeEach(() => { facetRegistry.clear(); facetModules.clear(); });
@@ -22,5 +27,48 @@ describe('facet visibility (registered descriptors ∩ granted ∩ has module)',
     registerBuiltinFacets();
     // No modules registered at all:
     expect(facetsFor(['layout']).filter((f) => facetModules.get(f.id))).toEqual([]);
+  });
+});
+
+// The grants the two profiles actually declare, kept as literals so a profile
+// edit has to come through here (same style as the adapter tests).
+const AEON_GRANT = ['layout', 'art', 'objects', 'rings', 'collision', 'palette']; // core/project/aeon/index.ts
+// NOTE: s1 grants `collision` even though classic has no collision editor yet
+// (classicSetColind has no component callers). That mismatch is a known OPEN
+// product decision — spec §3.0.3 — and is deliberately NOT resolved here:
+// classic still renders through LegacyWorkspace, so nothing user-visible reads
+// this grant. Asserted as-is.
+const S1_GRANT = ['layout', 'art', 'objects', 'collision', 'palette']; // core/project/s1/index.ts
+
+function resetProjectStores() {
+  useClassicProjectStore.setState({ status: 'closed', capabilities: null } as never);
+  useProjectStore.setState({ project: null, config: null, capabilities: null } as never);
+}
+
+describe("the facet bar's granted list comes from the OPEN engine's manifest", () => {
+  // LevelWorkspace itself cannot be rendered here — the renderer has no
+  // DOM/component test harness (see components/classic/__tests__/
+  // classic-surface.test.ts for the same constraint). So this pairs a
+  // behavioural test of the seam with a source-level guard on its consumer.
+  beforeEach(resetProjectStores);
+
+  it('aeon open → the aeon profile grant', () => {
+    useProjectStore.setState({ project: {}, capabilities: { facets: AEON_GRANT } } as never);
+    expect(openCapabilities()?.facets ?? []).toEqual(AEON_GRANT);
+  });
+
+  it('classic open → the s1 profile grant, even though projectStore is empty', () => {
+    useClassicProjectStore.setState({ status: 'open', capabilities: { facets: S1_GRANT } } as never);
+    // A classic open never populates the aeon project store, so the old direct
+    // `useProjectStore((s) => s.capabilities?.facets ?? [])` read resolved to []
+    // — a facet bar with no pills at all.
+    expect(useProjectStore.getState().capabilities).toBeNull();
+    expect(openCapabilities()?.facets ?? []).toEqual(S1_GRANT);
+  });
+
+  it('LevelWorkspace resolves it through that seam, not projectStore', () => {
+    const source = readFileSync(join(__dirname, '..', 'LevelWorkspace.tsx'), 'utf8');
+    expect(source).toContain('useOpenCapabilities()');
+    expect(source).not.toMatch(/useProjectStore\([^)]*capabilities/);
   });
 });

@@ -10,9 +10,8 @@ import FacetBar from './FacetBar';
 import { facetModules } from './facet-registry';
 import { canvasFor } from './facet-canvases';
 import { useWorkspaceStore } from './workspaceStore';
-import { useOpenEngine } from '../state/open-project';
+import { useOpenEngine, useOpenCapabilities } from '../state/open-project';
 import { useSessionStore } from '../state/sessionStore';
-import { useProjectStore } from '../state/projectStore';
 import { useEditorStore, focusedHistory } from '../state/editorStore';
 import { useHistoryVersion } from '../hooks/useHistoryVersion';
 import { Chip } from '../components/ui';
@@ -20,7 +19,11 @@ import type { EditingLayer } from '../state/editorStore';
 
 export default function LevelWorkspace() {
   const activeId = useSessionStore((s) => s.activeId);
-  const granted = useProjectStore((s) => s.capabilities?.facets ?? []);
+  // The OPEN engine's grant, not the aeon store's — a classic open never
+  // populates projectStore, so reading it directly would render an empty facet
+  // bar the moment classic re-homes here (spec §3.0). For aeon this resolves to
+  // exactly the same manifest it always did.
+  const granted = useOpenCapabilities()?.facets ?? [];
   const facetId = useWorkspaceStore((s) => s.facetFor(activeId));
   // Undo/redo enabledness re-evaluates on any stack change; focus moves (a facet
   // switch, a tab switch) are covered by the facetId/activeId subscriptions above,
