@@ -20,6 +20,7 @@ import { focusedHistory } from '../editorStore';
 import { useSessionStore } from '../sessionStore';
 import { useSpriteStore, openSpriteDoc } from '../spriteStore';
 import { useWorkspaceStore } from '../../workspace/workspaceStore';
+import { focusClassicSurface } from '../../components/classic/classic-surface';
 import { openReady } from './helpers/classic-fixture';
 
 const st = () => useClassicLevelStore.getState();
@@ -198,6 +199,44 @@ describe('focusedHistory', () => {
 
     expect(st().doc!.palettes[1][0]).toBe(0);      // the art edit is gone
     expect(st().doc!.fg.cells[0]).toBe(1);         // the layout edit survives
+  });
+
+  // --- Classic surfaces drive the facet -----------------------------------
+  // The classic view has no facet bar, so nothing used to call setFacet for a
+  // classic tab: facetFor fell back to 'layout' and a Ctrl+Z after an art edit
+  // reverted an unrelated LAYOUT step while leaving the art edit in place. The
+  // classic surfaces now claim the facet as the user works in them.
+
+  it('working in the classic ART surface routes undo to the zone-art document', () => {
+    useSessionStore.setState({ activeId: 'level:ghz:1' });
+    focusClassicSurface('art');
+    expect(focusedHistory()).toBe(documentHistoryHub.historyFor('zoneart:ghz'));
+  });
+
+  it('working in the classic MAP surface routes undo back to the act layout document', () => {
+    useSessionStore.setState({ activeId: 'level:ghz:1' });
+    focusClassicSurface('art');
+    focusClassicSurface('map');
+    expect(focusedHistory()).toBe(documentHistoryHub.historyFor('level:ghz:1'));
+  });
+
+  it('undo after a classic art edit reverts the ART edit, leaving the layout edit', () => {
+    useSessionStore.setState({ activeId: 'level:ghz:1' });
+    focusClassicSurface('map');
+    classicSetLayoutCells('fg', [{ x: 0, y: 0, chunkId: 1 }]);   // in the map surface
+    focusClassicSurface('art');
+    classicSetPalette(1, new Uint16Array(16).fill(0x0e0e));      // in the composer/palette
+
+    focusedHistory()!.undo();
+
+    expect(st().doc!.palettes[1][0]).toBe(0);      // the art edit is gone
+    expect(st().doc!.fg.cells[0]).toBe(1);         // the layout edit survives
+  });
+
+  it('leaves the facet alone when the active tab is not a level tab', () => {
+    useSessionStore.setState({ activeId: 'doc:sprite:s1:18' });
+    focusClassicSurface('art');
+    expect(useWorkspaceStore.getState().record['doc:sprite:s1:18']).toBeUndefined();
   });
 
   it('undo with a sprite tab focused reverts THAT sprite document', () => {

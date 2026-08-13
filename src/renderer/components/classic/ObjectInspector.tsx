@@ -8,6 +8,7 @@ import { S1_OBJECT_LIST, s1ObjectName, s1ObjectHex } from '../../../core/project
 import { resolveObjectArt } from '../../../core/project/profiles/s1-object-art';
 import { editObjectArt } from '../sprite/export-sprite';
 import { clampInt } from './viewport-math';
+import { classicSurfaceProps } from './classic-surface';
 import type { S1ObjectEntry } from '../../../core/formats/classic/s1-objpos';
 
 const PREVIEW = 64;
@@ -142,7 +143,11 @@ export default function ObjectInspector() {
   const options = ids.includes(obj.id) ? ids : [...ids, obj.id].sort((a, b) => a - b);
 
   return (
-    <div style={styles.body}>
+    // Object placements are act LAYOUT data, so editing here claims the layout
+    // facet for undo routing (see classic-surface.ts) — otherwise a Ctrl+Z right
+    // after an inspector edit would still be pointed at the zone-art document by
+    // whatever art surface the user touched last.
+    <div {...classicSurfaceProps('map')} style={styles.body}>
       <div style={styles.title}>
         Object #{idx} · {s1ObjectHex(obj.id)}
         <button style={styles.deselect} title="Deselect" onClick={() => setSelectedObjectIndex(null)}>✕</button>

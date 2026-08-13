@@ -6,6 +6,7 @@ import { loadObjectSprite, useClassicObjectArtStore } from '../../state/classicO
 import { S1_OBJECT_LIST, s1ObjectHex, s1ObjectName } from '../../../core/project/profiles/s1-objects';
 import { resolveObjectArt } from '../../../core/project/profiles/s1-object-art';
 import { editObjectArt } from '../sprite/export-sprite';
+import { classicSurfaceProps } from './classic-surface';
 
 const THUMB = 28;
 
@@ -87,7 +88,10 @@ export default function ObjectLibraryPanel() {
   };
 
   return (
-    <div style={styles.list} role="listbox" aria-label="Object library">
+    // Arming an object is the first half of a layout edit (the placement click
+    // lands on the map), so this claims the layout facet too — see
+    // classic-surface.ts.
+    <div {...classicSurfaceProps('map')} style={styles.list} role="listbox" aria-label="Object library">
       {S1_OBJECT_LIST.map(({ id, name }) => {
         const armed = armedObjectId === id;
         const linked = resolveObjectArt(id, zone) !== undefined;
