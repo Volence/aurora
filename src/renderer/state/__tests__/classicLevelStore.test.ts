@@ -393,11 +393,12 @@ describe('command guards + undo/redo triple consistency', () => {
     expect(st().dirty).toEqual({});
     expect(st().doc!.start).toEqual({ x: 50, y: 50 });
 
-    // Redo everything back. Order matters across documents: each snapshot carries
-    // the whole `dirty` map as it stood when the snapshot was taken, so redoing
-    // the older (layout) step last would stomp the art flags. Oldest-first here.
-    layoutStack().redo();
+    // Redo everything back. Order across documents does NOT matter: each snapshot
+    // carries only its own document's dirty flags and restores only those, so a
+    // redo on one stack can't stomp the other's. (Within a stack, order is the
+    // stack's own — these go oldest-first.)
     artStack().redo(); artStack().redo();
+    layoutStack().redo();
     expect(st().dirty).toEqual(afterDirty);
     expect(st().chunkEpoch).toBe(afterEpoch);
     expect(st().chunkVersions.get(1)).toBe(afterChunkV);

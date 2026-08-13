@@ -20,11 +20,47 @@ import type { UndoStack } from './undo-stack';
 export const LAYOUT_DOMAINS = ['fg', 'bg', 'objects', 'start'] as const;
 export const ART_DOMAINS = ['tiles', 'blocks', 'chunks', 'palette', 'colind'] as const;
 
+/**
+ * The dirty flags a document OWNS, dropped from the store-wide map. A snapshot
+ * must never carry a flag it doesn't own: the two stacks are independent, so a
+ * snapshot that captured the whole map would restore the OTHER document's flags
+ * to whatever they happened to be when this document was last edited — wiping a
+ * real unsaved edit and telling the UI there is nothing to save.
+ */
+export function pickDomainDirty(
+  dirty: DirtyDomains,
+  domains: readonly (keyof DirtyDomains)[],
+): DirtyDomains {
+  const out: DirtyDomains = {};
+  for (const d of domains) if (dirty[d]) out[d] = true;
+  return out;
+}
+
+/**
+ * Replace exactly `domains`' flags from a snapshot, leaving the other document's
+ * flags alone. Must both SET and CLEAR within its own domains — a plain merge
+ * could only ever set, so undoing back to a pristine state would leave the
+ * document permanently dirty.
+ */
+export function restoreDomainDirty(
+  current: DirtyDomains,
+  snapshot: DirtyDomains,
+  domains: readonly (keyof DirtyDomains)[],
+): DirtyDomains {
+  const next = { ...current };
+  for (const d of domains) {
+    if (snapshot[d]) next[d] = true;
+    else delete next[d];
+  }
+  return next;
+}
+
 export interface ClassicLayoutSnapshot {
   fg: LayoutGrid;
   bg: LayoutGrid;
   objects: S1ObjectEntry[];
   start: { x: number; y: number };
+  /** LAYOUT_DOMAINS flags only (see pickDomainDirty / restoreDomainDirty). */
   dirty: DirtyDomains;
 }
 
@@ -36,6 +72,7 @@ export interface ClassicArtSnapshot {
   colind: Uint8Array;
   chunkVersions: Map<number, number>;
   chunkEpoch: number;
+  /** ART_DOMAINS flags only (see pickDomainDirty / restoreDomainDirty). */
   dirty: DirtyDomains;
 }
 

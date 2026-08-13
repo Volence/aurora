@@ -32,7 +32,7 @@ import { validateLevelDoc, unpackChunkCell, chunkIndexForId } from '../../core/l
 import { firstEditableNonBlankTile, firstNonBlankBlock } from '../../core/level-classic/tile-pick';
 import type { S1ObjectEntry } from '../../core/formats/classic/s1-objpos';
 import {
-  LAYOUT_DOMAINS, ART_DOMAINS,
+  LAYOUT_DOMAINS, ART_DOMAINS, pickDomainDirty, restoreDomainDirty,
   type ClassicArtHistory, type ClassicLayoutHistory,
   type ClassicArtSnapshot, type ClassicLayoutSnapshot,
 } from '../../core/editing/classic-domain-history';
@@ -395,13 +395,16 @@ export const useClassicLevelStore = create<ClassicLevelState>((set, get) => ({
 export function readLayoutSnapshot(): ClassicLayoutSnapshot {
   const s = useClassicLevelStore.getState();
   const doc = s.doc!;
-  return { fg: doc.fg, bg: doc.bg, objects: doc.objects, start: doc.start, dirty: s.dirty };
+  return {
+    fg: doc.fg, bg: doc.bg, objects: doc.objects, start: doc.start,
+    dirty: pickDomainDirty(s.dirty, LAYOUT_DOMAINS),
+  };
 }
 
 export function writeLayoutSnapshot(snap: ClassicLayoutSnapshot): void {
   useClassicLevelStore.setState((s) => ({
     doc: { ...s.doc!, fg: snap.fg, bg: snap.bg, objects: snap.objects, start: snap.start },
-    dirty: snap.dirty,
+    dirty: restoreDomainDirty(s.dirty, snap.dirty, LAYOUT_DOMAINS),
     historyTick: s.historyTick + 1,
   }));
 }
@@ -412,7 +415,8 @@ export function readArtSnapshot(): ClassicArtSnapshot {
   return {
     chunks: doc.chunks, blocks: doc.blocks, tiles: doc.tiles,
     palettes: doc.palettes, colind: doc.collision.colind,
-    chunkVersions: s.chunkVersions, chunkEpoch: s.chunkEpoch, dirty: s.dirty,
+    chunkVersions: s.chunkVersions, chunkEpoch: s.chunkEpoch,
+    dirty: pickDomainDirty(s.dirty, ART_DOMAINS),
   };
 }
 
@@ -423,7 +427,7 @@ export function writeArtSnapshot(snap: ClassicArtSnapshot): void {
       chunks: snap.chunks, blocks: snap.blocks, tiles: snap.tiles, palettes: snap.palettes,
       collision: { ...s.doc!.collision, colind: snap.colind },
     },
-    dirty: snap.dirty,
+    dirty: restoreDomainDirty(s.dirty, snap.dirty, ART_DOMAINS),
     chunkVersions: snap.chunkVersions,
     chunkEpoch: snap.chunkEpoch,
     historyTick: s.historyTick + 1,
