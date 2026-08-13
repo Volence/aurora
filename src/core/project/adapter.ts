@@ -12,6 +12,7 @@
 // aeon behind it. Keep it minimal — no exports beyond what those tasks need.
 
 import type { ResolutionReport } from './report';
+import type { SidecarState } from './mapping';
 
 /**
  * The narrow file-system view core code is allowed to use. Paths are always
@@ -85,6 +86,9 @@ export interface ProjectHandle {
   capabilities: CapabilityManifest;
   report: ResolutionReport;
   levels: ClassicLevelAccess | null;
+  /** Parsed `.aurora/project.json` + per-entry diagnostics (spec §7), for the
+   *  Project Setup tab. Absent on adapters that read no sidecar (aeon v1). */
+  sidecar?: SidecarState;
 }
 
 export interface ProjectAdapter {
@@ -101,6 +105,8 @@ export interface ProjectAdapter {
 
 export type { LevelDoc } from '../level-classic/model';
 import type { LevelDoc } from '../level-classic/model';
+
+export type { SidecarState, ConfigIssue, ProjectConfig } from './mapping';
 
 export interface ZoneActRef {
   zone: string;
