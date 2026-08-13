@@ -55,6 +55,62 @@ A band's 8 `phases` banks are not hand-drawn frames: bank *k* is the pattern pre
 
 ## 3. Facet architecture
 
+> **AMENDED 2026-08-13, after Plan 1 shipped.** A reconnaissance pass over the
+> real code (`master` @ `149a627`) overturned three claims in this section. They
+> are corrected in §3.0 below; the original text of §3.1, §3.3–3.4 and §10 is
+> left in place for provenance but **must be read through those corrections**.
+> Same failure mode as §2: assumptions written before contact with the code.
+
+### 3.0 Corrections to §3 (post-Plan-1 recon)
+
+**3.0.1 — "Only the Canvas is engine-keyed" is wrong. The other slots are not
+shared today; they are aeon-store-coupled.** §3.1 assumes `facetModules` already
+holds engine-neutral slots and that a Canvas registry is the whole job. In fact
+every slot component imports aeon stores directly — `MapStatusBar`,
+`MapFacetDock`, `ArtToolOptions`, `TilesetPanel`, `ChunkLibrary`,
+`CollisionPalette`, `PropertiesPanel`, `ObjectPalette`, `PaletteEditor`,
+`ComposerCanvas` — and several call `executeCommand` / `executeAmbientCommand`,
+which **throw** when the focused document is not an aeon command history
+(`editorStore.ts`). Making the shell engine-neutral is roughly ten components'
+worth of data-source abstraction, not a registry key. This is the single largest
+under-estimate in the original §3 and it dominates the schedule.
+
+**3.0.2 — The `pooled` flag in §3.3–3.4 is mislabelled and would mislead an
+implementer.** Aeon's chunk tier *is* pooled and id-addressed (`chunkLibrary`,
+string ids, the `ChunkLibrary` panel, `set-chunk`). The property that actually
+selects the affordances is **flattened-on-stamp vs referenced-by-id**: aeon
+stamping *copies* a chunk into the section nametable, so there is no shared-edit
+propagation and usage counts / shared-banner / duplicate are genuinely
+meaningless there — whereas classic layout cells *hold* the chunk id, so editing
+one chunk changes every placement. Name the flag `shared` (or `flattenOnStamp`),
+not `pooled`. §2.1 remains correct that the *engine's* 128×128 block is
+positional and build-time — but that is not the editor's chunk tier, and
+conflating them is what produced the wrong flag name.
+
+**3.0.3 — Classic has no collision-editing UI at all, yet the s1 profile grants
+the `collision` facet.** `classicSetColind` has zero component callers (only the
+agent handler); classic's only collision affordance is a read-only overlay. The
+moment classic reads its own capability manifest, a Collision pill appears over
+an aeon-only `CollisionPalette`. Either drop `collision` from the s1 grant or
+build a `colind` editor — the original §3 assumed neither was necessary. This is
+an open product decision, not a detail.
+
+**3.0.4 — §10's parity test as written is not implementable.** The renderer
+suite is node-only: `vitest.config.ts` collects `test/**/*.test.ts` and
+`src/**/__tests__/**/*.test.ts`, there is no jsdom or RTL, and **`.tsx` test
+files are not collected at all**. "Asserting the same component tree shapes
+render" cannot be done. Respecify parity as descriptor/registry-level assertions
+(per engine: which facets resolve, which slots are non-null, which tools each
+dock offers, which tier ladder is declared) plus source-grep guard tests in the
+style of `src/renderer/components/classic/__tests__/classic-surface.test.ts`.
+Anything that only manifests in a rendered tree stays eyeball-only and belongs
+in an explicit smoke-test script, as Plan 1 did.
+
+**Known dead end:** `src/renderer/state/toolStore.ts` has zero production
+consumers and is kept alive only by `test/renderer/tool-store.test.ts`. It is a
+stale duplicate of `artStore`. An implementer looking for "the engine-neutral
+tool store" will find it first — do not build on it.
+
 ### 3.1 Engine-neutral shell, engine-keyed canvas
 
 `facetModules` stays keyed by facet id and holds the shared slots. A second registry, keyed `(engine, facetId)`, resolves the Canvas slot only:
