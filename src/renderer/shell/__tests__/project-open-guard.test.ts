@@ -4,7 +4,7 @@ import {
   __setOpenGuardSaveForTest, __resetOpenGuardSaveForTest,
 } from '../project-open-guard';
 import { useEditorStore } from '../../state/editorStore';
-import { useSpriteStore, spriteHistory } from '../../state/spriteStore';
+import { useSpriteStore, activeSpriteHistory } from '../../state/spriteStore';
 import { useClassicLevelStore } from '../../state/classicLevelStore';
 import { useConfirmStore } from '../../state/confirmStore';
 import { useToastStore } from '../../state/toastStore';
@@ -35,7 +35,7 @@ describe('confirmProjectOpen', () => {
     useEditorStore.getState().markClean();
     useSpriteStore.getState().setS1ArtSource(null);
     useSpriteStore.getState().setUnsavedEdits(false); // spriteDirty keys on this flag now
-    spriteHistory.clear();
+    activeSpriteHistory().clear();
     useConfirmStore.getState().answer('cancel'); // clear any leftover pending request
   });
 
@@ -46,7 +46,7 @@ describe('confirmProjectOpen', () => {
     useEditorStore.getState().markClean();
     useSpriteStore.getState().setS1ArtSource(null);
     useSpriteStore.getState().setUnsavedEdits(false);
-    spriteHistory.clear();
+    activeSpriteHistory().clear();
   });
 
   it('resolves true immediately when nothing is dirty (no confirm asked)', async () => {
@@ -74,7 +74,7 @@ describe('confirmProjectOpen', () => {
     // s1ArtSource — the OLD s1ArtSource-only predicate would have silently
     // discarded it on open (finding 3). Now it must trigger the confirm.
     useSpriteStore.getState().clearCanvas(); // records an undo step; leaves s1ArtSource null
-    expect(spriteHistory.canUndo).toBe(true);
+    expect(activeSpriteHistory().canUndo).toBe(true);
     expect(useSpriteStore.getState().s1ArtSource).toBeNull();
 
     const p = confirmProjectOpen();
@@ -83,7 +83,7 @@ describe('confirmProjectOpen', () => {
     await expect(p).resolves.toBe(true);
 
     // Discard must clear the history too, else the phantom-dirty trap recurs via canUndo.
-    expect(spriteHistory.canUndo).toBe(false);
+    expect(activeSpriteHistory().canUndo).toBe(false);
   });
 
   it("'discard' resolves true and clears aeon dirty + sprite checkout", async () => {

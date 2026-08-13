@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { EditHistory } from '../../src/core/editing/history';
-import { SpriteHistory, type SpriteSnapshot } from '../../src/core/editing/sprite-history';
+import { SpriteDocHistory, type SpriteSnapshot } from '../../src/core/editing/sprite-history';
 import type { S4Level } from '../../src/core/editing/commands';
 
 function miniLevel(): S4Level {
@@ -16,6 +16,11 @@ function paletteCmd(r: number) {
 }
 function snap(): SpriteSnapshot {
   return { frames: [], currentIndex: 0, selection: null, paletteMode: 'zone', zoneLine: 0, standalonePalette: [] };
+}
+/** A sprite-document history over one mutable cell (see sprite-history.test.ts). */
+function spriteHistory(): SpriteDocHistory {
+  let live = snap();
+  return new SpriteDocHistory(() => live, (s) => { live = s; });
 }
 
 describe('EditHistory edit-sequence stamps', () => {
@@ -51,16 +56,16 @@ describe('EditHistory edit-sequence stamps', () => {
   });
 });
 
-describe('SpriteHistory edit-sequence stamps', () => {
+describe('SpriteDocHistory edit-sequence stamps', () => {
   it('topUndoSeq tracks records and undo moves it to redo', () => {
-    const h = new SpriteHistory();
+    const h = spriteHistory();
     expect(h.topUndoSeq()).toBe(-1);
     h.record(snap());
     const a = h.topUndoSeq();
     h.record(snap());
     const b = h.topUndoSeq();
     expect(b).toBeGreaterThan(a);
-    h.undo(snap());
+    h.undo();
     expect(h.topUndoSeq()).toBe(a);
     expect(h.topRedoSeq()).toBe(b);
   });
@@ -69,7 +74,7 @@ describe('SpriteHistory edit-sequence stamps', () => {
 describe('cross-history recency (global monotonic clock)', () => {
   it('a later edit on either history has a strictly larger seq', () => {
     const level = new EditHistory();
-    const sprite = new SpriteHistory();
+    const sprite = spriteHistory();
     level.execute(paletteCmd(1), miniLevel());
     const levelSeq = level.topUndoSeq();
     sprite.record(snap());

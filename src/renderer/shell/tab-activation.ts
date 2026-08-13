@@ -26,7 +26,7 @@ import { useWorkspaceStore } from '../workspace/workspaceStore';
 import { useConfirmStore } from '../state/confirmStore';
 import { useToastStore } from '../state/toastStore';
 import { saveClassicProject, type SaveClassicProjectResult } from '../state/classic-save';
-import { useSpriteStore, spriteHistory } from '../state/spriteStore';
+import { useSpriteStore, activeSpriteHistory } from '../state/spriteStore';
 import { parseLevelTabId, parseSpriteDocTabId } from './tabs';
 import { HOME_TAB, type TabDescriptor } from '../../core/shell/session';
 
@@ -115,7 +115,7 @@ export function spriteEditorDirty(): boolean {
 export function resetSpriteEditor(): void {
   markSpriteDocLoaded(null);
   useSpriteStore.getState().setS1ArtSource(null);
-  spriteHistory.clear();
+  activeSpriteHistory().clear();
   useSpriteStore.getState().setUnsavedEdits(false);
 }
 

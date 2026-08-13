@@ -5,18 +5,18 @@
 // Called explicitly at app bootstrap (App.tsx's runtime-wiring effect) rather
 // than at import time, so importing a store never mutates hub state; the vitest
 // setup calls it too, standing in for that bootstrap.
-//
-// The sprite factory lands with the sprite doc history.
 
 import { BoundEditHistory } from '../../core/editing/bound-edit-history';
 import { ClassicArtHistory, ClassicLayoutHistory } from '../../core/editing/classic-domain-history';
 import { EditHistory } from '../../core/editing/history';
+import { SpriteDocHistory } from '../../core/editing/sprite-history';
 import type { UndoStack } from '../../core/editing/undo-stack';
 import { documentHistoryHub } from './history-hub';
 import { useClassicProjectStore } from './classicProjectStore';
 import {
   readArtSnapshot, readLayoutSnapshot, writeArtSnapshot, writeLayoutSnapshot,
 } from './classicLevelStore';
+import { readSpriteSnapshot, writeSpriteSnapshot } from './spriteStore';
 import { useProjectStore, getActiveLevel } from './projectStore';
 
 /**
@@ -55,4 +55,14 @@ export function registerHistoryFactories(): void {
     classicIsOpen()
       ? new ClassicArtHistory(readArtSnapshot, writeArtSnapshot)
       : aeonLevelHistory());
+
+  // One stack per sprite document. Unlike the two above this needs no engine
+  // dispatch — the sprite editor's document model is the same for s1 and aeon.
+  // The closures capture the DOC ID, not "the active document", so a stack can
+  // restore a sprite that isn't currently checked out.
+  documentHistoryHub.registerFactory('doc:sprite:', (docId) =>
+    new SpriteDocHistory(
+      () => readSpriteSnapshot(docId),
+      (snapshot) => writeSpriteSnapshot(docId, snapshot),
+    ));
 }

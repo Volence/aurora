@@ -15,7 +15,7 @@
 import type { BlockDef, ChunkDef256, LayoutGrid } from '../level-classic/model';
 import type { S1ObjectEntry } from '../formats/classic/s1-objpos';
 import type { DirtyDomains } from '../project/adapter';
-import type { UndoStack } from './undo-stack';
+import { SnapshotHistory } from './snapshot-history';
 
 export const LAYOUT_DOMAINS = ['fg', 'bg', 'objects', 'start'] as const;
 export const ART_DOMAINS = ['tiles', 'blocks', 'chunks', 'palette', 'colind'] as const;
@@ -76,67 +76,7 @@ export interface ClassicArtSnapshot {
   dirty: DirtyDomains;
 }
 
-const MAX_DEPTH = 200;
-
-/**
- * Shared machinery for both classic domain stacks. `read` returns the live slice,
- * `write` installs a restored one; the store supplies both, which is what makes
- * undo/redo argument-free.
- */
-abstract class ClassicDomainHistory<S> implements UndoStack {
-  private undoStack: S[] = [];
-  private redoStack: S[] = [];
-  private listeners: Array<() => void> = [];
-
-  constructor(
-    protected readonly read: () => S,
-    protected readonly write: (snapshot: S) => void,
-  ) {}
-
-  protected abstract clone(s: S): S;
-
-  get canUndo(): boolean { return this.undoStack.length > 0; }
-  get canRedo(): boolean { return this.redoStack.length > 0; }
-
-  /** Record the BEFORE snapshot of an edit. The store applies the edit itself. */
-  record(before: S): void {
-    this.undoStack.push(this.clone(before));
-    if (this.undoStack.length > MAX_DEPTH) this.undoStack.shift();
-    this.redoStack = [];
-    this.notify();
-  }
-
-  undo(): void {
-    const prev = this.undoStack.pop();
-    if (!prev) return;
-    this.redoStack.push(this.clone(this.read()));
-    this.write(this.clone(prev));
-    this.notify();
-  }
-
-  redo(): void {
-    const next = this.redoStack.pop();
-    if (!next) return;
-    this.undoStack.push(this.clone(this.read()));
-    this.write(this.clone(next));
-    this.notify();
-  }
-
-  clear(): void {
-    this.undoStack = [];
-    this.redoStack = [];
-    this.notify();
-  }
-
-  onChange(cb: () => void): () => void {
-    this.listeners.push(cb);
-    return () => { this.listeners = this.listeners.filter((l) => l !== cb); };
-  }
-
-  private notify(): void { for (const l of this.listeners) l(); }
-}
-
-export class ClassicLayoutHistory extends ClassicDomainHistory<ClassicLayoutSnapshot> {
+export class ClassicLayoutHistory extends SnapshotHistory<ClassicLayoutSnapshot> {
   protected clone(s: ClassicLayoutSnapshot): ClassicLayoutSnapshot {
     return {
       fg: s.fg,               // immutable by convention
@@ -148,7 +88,7 @@ export class ClassicLayoutHistory extends ClassicDomainHistory<ClassicLayoutSnap
   }
 }
 
-export class ClassicArtHistory extends ClassicDomainHistory<ClassicArtSnapshot> {
+export class ClassicArtHistory extends SnapshotHistory<ClassicArtSnapshot> {
   protected clone(s: ClassicArtSnapshot): ClassicArtSnapshot {
     return {
       chunks: s.chunks,       // immutable by convention

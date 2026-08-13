@@ -2,8 +2,9 @@ import type { PixelBuffer } from '../art/pixel-ops';
 import type { Color } from '../model/s4-types';
 import type { SpritePaletteMode } from '../art/sprite-palette';
 import { nextEditSeq } from './edit-seq';
+import { SnapshotHistory } from './snapshot-history';
 
-/** A full snapshot of the sprite document for undo/redo. */
+/** A full snapshot of one sprite document for undo/redo. */
 export interface SpriteSnapshot {
   frames: PixelBuffer[];
   currentIndex: number;
@@ -16,7 +17,7 @@ export interface SpriteSnapshot {
 function cloneBuf(b: PixelBuffer): PixelBuffer {
   return { width: b.width, height: b.height, data: new Uint8Array(b.data) };
 }
-function cloneSnap(s: SpriteSnapshot): SpriteSnapshot {
+export function cloneSpriteSnapshot(s: SpriteSnapshot): SpriteSnapshot {
   return {
     frames: s.frames.map(cloneBuf),
     currentIndex: s.currentIndex,
@@ -27,60 +28,61 @@ function cloneSnap(s: SpriteSnapshot): SpriteSnapshot {
   };
 }
 
+/** Sprite frames are dense pixel buffers cloned in full on every entry, so the
+ *  cap is far tighter than the shared default. */
+const SPRITE_MAX_DEPTH = 50;
+
 /**
- * Snapshot-based undo/redo for the sprite document. `record(before)` is called
- * with the state BEFORE an edit; `undo(current)`/`redo(current)` stash the live
- * state and hand back the cloned target state. Mirrors EditHistory's
- * canUndo/canRedo/undo/redo surface (not its command model). Bounded depth.
+ * One sprite DOCUMENT's undo stack. Bound at construction to that document's
+ * read/write closures (never to "the active document") so a background tab's
+ * edits can be undone without checking it out first.
+ *
+ * Carries edit-sequence stamps on top of the shared snapshot machinery: sprite
+ * mode still merges its timeline with the level command history by recency (see
+ * renderer/state/sprite-undo.ts). Classic's domain stacks deliberately have no
+ * stamps — this is the last consumer of edit-seq, and it retires with that
+ * coordinator.
  */
-export class SpriteHistory {
-  private undoStack: SpriteSnapshot[] = [];
-  private redoStack: SpriteSnapshot[] = [];
-  // Edit-sequence stamps (see edit-seq.ts), index-aligned with the stacks, so
-  // sprite-mode undo can be merged with the level history by recency.
+export class SpriteDocHistory extends SnapshotHistory<SpriteSnapshot> {
+  // Index-aligned with the base's undo/redo stacks; every override below moves a
+  // stamp exactly when the base moves the entry it belongs to.
   private undoSeq: number[] = [];
   private redoSeq: number[] = [];
 
-  constructor(private cap = 50) {}
+  constructor(read: () => SpriteSnapshot, write: (s: SpriteSnapshot) => void) {
+    super(read, write, SPRITE_MAX_DEPTH);
+  }
 
-  get canUndo(): boolean { return this.undoStack.length > 0; }
-  get canRedo(): boolean { return this.redoStack.length > 0; }
-  get depth(): number { return this.undoStack.length; }
+  protected clone(s: SpriteSnapshot): SpriteSnapshot { return cloneSpriteSnapshot(s); }
 
   /** Edit-seq of the top undo entry, or -1. */
   topUndoSeq(): number { return this.undoSeq.length ? this.undoSeq[this.undoSeq.length - 1] : -1; }
   /** Edit-seq of the top redo entry, or -1. */
   topRedoSeq(): number { return this.redoSeq.length ? this.redoSeq[this.redoSeq.length - 1] : -1; }
-  /** Drop the redo stack (a new edit on a sibling history invalidates it). */
-  clearRedo(): void { this.redoStack = []; this.redoSeq = []; }
 
-  record(snapshot: SpriteSnapshot): void {
-    this.undoStack.push(cloneSnap(snapshot));
+  override record(before: SpriteSnapshot): void {
+    super.record(before);
     this.undoSeq.push(nextEditSeq());
-    if (this.undoStack.length > this.cap) { this.undoStack.shift(); this.undoSeq.shift(); }
-    this.redoStack = [];
+    if (this.undoSeq.length > SPRITE_MAX_DEPTH) this.undoSeq.shift();
     this.redoSeq = [];
   }
 
-  undo(current: SpriteSnapshot): SpriteSnapshot | null {
-    const prev = this.undoStack.pop();
-    if (!prev) return null;
-    this.redoStack.push(cloneSnap(current));
-    this.redoSeq.push(this.undoSeq.pop()!);
-    return cloneSnap(prev);
+  override undo(): void {
+    if (!this.canUndo) return;
+    const seq = this.undoSeq.pop()!;
+    super.undo();
+    this.redoSeq.push(seq);
   }
 
-  redo(current: SpriteSnapshot): SpriteSnapshot | null {
-    const next = this.redoStack.pop();
-    if (!next) return null;
-    this.undoStack.push(cloneSnap(current));
-    this.undoSeq.push(this.redoSeq.pop()!);
-    return cloneSnap(next);
+  override redo(): void {
+    if (!this.canRedo) return;
+    const seq = this.redoSeq.pop()!;
+    super.redo();
+    this.undoSeq.push(seq);
   }
 
-  clear(): void {
-    this.undoStack = [];
-    this.redoStack = [];
+  override clear(): void {
+    super.clear();
     this.undoSeq = [];
     this.redoSeq = [];
   }

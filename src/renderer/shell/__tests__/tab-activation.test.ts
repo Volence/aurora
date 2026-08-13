@@ -11,7 +11,7 @@ import { useSessionStore } from '../../state/sessionStore';
 import { useProjectStore } from '../../state/projectStore';
 import { useViewStore } from '../../state/viewStore';
 import { useWorkspaceStore } from '../../workspace/workspaceStore';
-import { useSpriteStore, spriteHistory } from '../../state/spriteStore';
+import { useSpriteStore, activeSpriteHistory } from '../../state/spriteStore';
 import { classicLevelTab, spriteDocTab } from '../tabs';
 import { createBuffer } from '../../../core/art/pixel-ops';
 import type { ZoneActRef } from '../../../core/project/adapter';
@@ -305,7 +305,7 @@ describe('requestCloseTab — loaded sprite-doc cleanup', () => {
   it('closing the loaded DIRTY sprite tab asks, and on discard clears marker+checkout+history', async () => {
     loadEditor(SPRITE_TAB.id, true);
     useSessionStore.setState({ tabs: [HOME, SPRITE_TAB], activeId: SPRITE_TAB.id });
-    expect(spriteHistory.canUndo).toBe(true);
+    expect(activeSpriteHistory().canUndo).toBe(true);
 
     const p = requestCloseTab(SPRITE_TAB.id);
     expect(useConfirmStore.getState().request).not.toBeNull(); // a discard confirm was raised
@@ -316,7 +316,7 @@ describe('requestCloseTab — loaded sprite-doc cleanup', () => {
     expect(getLoadedSpriteDocId()).toBeNull();
     expect(useSpriteStore.getState().s1ArtSource).toBeNull();
     expect(useSpriteStore.getState().unsavedEdits).toBe(false);
-    expect(spriteHistory.canUndo).toBe(false);
+    expect(activeSpriteHistory().canUndo).toBe(false);
   });
 
   it('cancelling the discard leaves the tab open and the editor untouched', async () => {
