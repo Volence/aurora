@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useProjectStore, getActiveLevel } from '../state/projectStore';
-import { useEditorStore, editHistory, undo, redo, type EditingLayer, type AppMode } from '../state/editorStore';
+import { useEditorStore, activeHistory, undo, redo, type EditingLayer, type AppMode } from '../state/editorStore';
 import { useSpriteStore } from '../state/spriteStore';
 import { spriteModeUndo, spriteModeRedo, spriteModeCanUndo, spriteModeCanRedo } from '../state/sprite-undo';
 import { useClassicProjectStore } from '../state/classicProjectStore';
@@ -172,7 +172,7 @@ export default function Toolbar({ onOpenProject, onOpenRecent, onSave }: Toolbar
             }}
             disabled={appMode === 'sprite'
               ? (void spriteTick, void historyVersion, !spriteModeCanUndo())
-              : !editHistory.canUndo}
+              : !activeHistory().canUndo}
           />
           <IconButton
             icon={<Icons.IconRedo size={14} />}
@@ -183,7 +183,7 @@ export default function Toolbar({ onOpenProject, onOpenRecent, onSave }: Toolbar
             }}
             disabled={appMode === 'sprite'
               ? (void spriteTick, void historyVersion, !spriteModeCanRedo())
-              : !editHistory.canRedo}
+              : !activeHistory().canRedo}
           />
           <Chip
             active={saveFlash}

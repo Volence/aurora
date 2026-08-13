@@ -1,10 +1,12 @@
 import { create } from 'zustand';
 import type { Solidity } from '../../core/collision/collision-model';
-import { EditHistory } from '../../core/editing/history';
+import type { EditHistory } from '../../core/editing/history';
 import type { AnyCommand, S4Level } from '../../core/editing/commands';
 import type { MapClipboard, PasteLayers } from '../../core/editing/map-clipboard';
 import { useArtStore } from './artStore';
 import { registerRedoClearer, invalidateSiblingRedos } from '../../core/editing/undo-bus';
+import { documentHistoryHub } from './history-hub';
+import { useProjectStore } from './projectStore';
 
 export type EditorTool =
   | 'view' | 'select' | 'paint-tile' | 'paint-block' | 'stamp-chunk'
@@ -143,10 +145,24 @@ interface EditorState {
   bumpChunkLibraryVersion: () => void;
 }
 
-export const editHistory = new EditHistory();
-// Let a sibling history (the sprite snapshot history) invalidate this redo when a
-// new sprite edit lands, and vice-versa — so sprite mode behaves as one timeline.
-const clearLevelRedo = () => editHistory.clearRedo();
+/**
+ * The focused aeon document's history — hub-keyed by the current act's tab id
+ * (per-document undo, spec §10; stage-2 watch-list #4). Zone-scoped commands
+ * (tileset/palette/chunks) land in the history of the act tab they were made
+ * in: accepted v1 — undoing them happens from that tab.
+ */
+export function activeHistory(): EditHistory {
+  const s = useProjectStore.getState();
+  const id = s.currentZoneId && s.currentActId
+    ? `level:${s.currentZoneId}:${s.currentActId}`
+    : 'level:aeon:none';
+  return documentHistoryHub.historyFor(id);
+}
+
+// Let a sibling history (the sprite snapshot history) invalidate the ACTIVE
+// document's redo when a new sprite edit lands, and vice-versa — so sprite mode
+// behaves as one timeline.
+const clearLevelRedo = () => activeHistory().clearRedo();
 registerRedoClearer(clearLevelRedo);
 
 export const useEditorStore = create<EditorState>((set) => ({
@@ -264,7 +280,8 @@ function bumpStoreVersions(cmd: AnyCommand): void {
  * Execute a command against the current level, updating history and triggering re-render.
  */
 export function executeCommand(command: AnyCommand, level: S4Level): void {
-  editHistory.execute(command, level);
+  const h = activeHistory();
+  h.execute(command, level);
   // In sprite mode a palette edit is a new entry in the merged sprite-mode
   // timeline, so it invalidates the sprite history's redo. Gated on sprite mode
   // so ordinary level editing (map/art) never disturbs a sprite's redo stack.
@@ -276,7 +293,8 @@ export function executeCommand(command: AnyCommand, level: S4Level): void {
 }
 
 export function undo(level: S4Level): void {
-  const cmd = editHistory.undo(level);
+  const h = activeHistory();
+  const cmd = h.undo(level);
   if (cmd) {
     bumpStoreVersions(cmd);
     invalidationListener?.(cmd);
@@ -285,7 +303,8 @@ export function undo(level: S4Level): void {
 }
 
 export function redo(level: S4Level): void {
-  const cmd = editHistory.redo(level);
+  const h = activeHistory();
+  const cmd = h.redo(level);
   if (cmd) {
     bumpStoreVersions(cmd);
     invalidationListener?.(cmd);

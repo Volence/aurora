@@ -1,6 +1,8 @@
 // Project-scoped runtime singletons (watch-list #4 / spec §10): the ONE
-// SaveCoordinator behind Ctrl+S and the ONE DocumentHistoryHub the per-document
-// undo rewiring (Stages 3–4) will hang off. The three savers reproduce the
+// SaveCoordinator behind Ctrl+S. The ONE DocumentHistoryHub now lives in
+// history-hub.ts (import-free, to break the editorStore→project-runtime cycle)
+// and is re-exported below; this module still owns resetProjectRuntime's
+// clearAll on project switch. The three savers reproduce the
 // retired save router's semantics — fire-when-context-open, not
 // fire-when-strictly-dirty — so save behavior cannot regress in this stage:
 //   • sprite-art: whenever an S1 object's art is checked out (s1ArtSource set);
@@ -14,7 +16,7 @@
 // Honest per-surface dirtiness (for tab dots) lives in dirty-tabs.ts, not here.
 
 import { SaveCoordinator, type SaveAllResult } from '../../core/editing/save-coordinator';
-import { DocumentHistoryHub } from '../../core/editing/document-history';
+import { documentHistoryHub } from './history-hub';
 import { useClassicProjectStore } from './classicProjectStore';
 import { useProjectStore } from './projectStore';
 import { useSpriteStore } from './spriteStore';
@@ -24,7 +26,9 @@ import { saveSpriteArt } from '../components/sprite/export-sprite';
 import { saveAeonProject } from './aeon-save';
 
 export const saveCoordinator = new SaveCoordinator();
-export const documentHistoryHub = new DocumentHistoryHub();
+// Re-exported so existing importers (project-runtime.test) keep working; the
+// instance itself lives in history-hub.ts and is used by resetProjectRuntime.
+export { documentHistoryHub };
 
 // -- Injectable savers (test seam, mirroring the retired save router's convention) --
 type SaveFn = () => Promise<unknown> | unknown;

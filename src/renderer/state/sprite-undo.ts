@@ -16,7 +16,12 @@
 // This is sprite-mode-only glue; map/art mode keeps calling the level history
 // directly. Both histories still own their own apply/undo — this only chooses
 // which one to drive next.
-import { editHistory, undo as levelUndo, redo as levelRedo, useEditorStore } from './editorStore';
+//
+// "Level history" here means the ACTIVE aeon document's history (activeHistory,
+// hub-keyed by the current act) — resolved once per call; the active act cannot
+// change mid-function (all synchronous).
+import { activeHistory, undo as levelUndo, redo as levelRedo, useEditorStore } from './editorStore';
+import type { EditHistory } from '../../core/editing/history';
 import { spriteHistory, useSpriteStore } from './spriteStore';
 import { useProjectStore, getActiveLevel } from './projectStore';
 import { peekEditSeq } from '../../core/editing/edit-seq';
@@ -31,25 +36,26 @@ useEditorStore.subscribe((state) => {
 });
 
 /** Level history has a sprite-session undo entry (one made after entering sprite mode). */
-function levelHasUndo(): boolean {
-  return editHistory.canUndo && editHistory.topUndoSeq() > levelBaselineSeq;
+function levelHasUndo(h: EditHistory): boolean {
+  return h.canUndo && h.topUndoSeq() > levelBaselineSeq;
 }
 /** Level history has a sprite-session redo entry. */
-function levelHasRedo(): boolean {
-  return editHistory.canRedo && editHistory.topRedoSeq() > levelBaselineSeq;
+function levelHasRedo(h: EditHistory): boolean {
+  return h.canRedo && h.topRedoSeq() > levelBaselineSeq;
 }
 
 export function spriteModeCanUndo(): boolean {
-  return spriteHistory.canUndo || levelHasUndo();
+  return spriteHistory.canUndo || levelHasUndo(activeHistory());
 }
 export function spriteModeCanRedo(): boolean {
-  return spriteHistory.canRedo || levelHasRedo();
+  return spriteHistory.canRedo || levelHasRedo(activeHistory());
 }
 
 /** Undo the most-recent edit across the sprite and (this-session) level histories. */
 export function spriteModeUndo(): void {
+  const h = activeHistory();
   const level = getActiveLevel(useProjectStore.getState());
-  const levelSeq = level && levelHasUndo() ? editHistory.topUndoSeq() : -1;
+  const levelSeq = level && levelHasUndo(h) ? h.topUndoSeq() : -1;
   const spriteSeq = spriteHistory.canUndo ? spriteHistory.topUndoSeq() : -1;
   if (levelSeq < 0 && spriteSeq < 0) return;
   if (levelSeq > spriteSeq) levelUndo(level!);   // newest edit is a palette edit
@@ -62,8 +68,9 @@ export function spriteModeUndo(): void {
  * redo-top with the SMALLEST edit-seq. Empty redo stacks count as +Infinity.
  */
 export function spriteModeRedo(): void {
+  const h = activeHistory();
   const level = getActiveLevel(useProjectStore.getState());
-  const levelSeq = level && levelHasRedo() ? editHistory.topRedoSeq() : Infinity;
+  const levelSeq = level && levelHasRedo(h) ? h.topRedoSeq() : Infinity;
   const spriteSeq = spriteHistory.canRedo ? spriteHistory.topRedoSeq() : Infinity;
   if (levelSeq === Infinity && spriteSeq === Infinity) return;
   if (levelSeq < spriteSeq) levelRedo(level!);
