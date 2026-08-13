@@ -8,18 +8,21 @@ import { renderBlock } from '../../../core/level-classic/render';
 import type { LevelDoc, BlockDef } from '../../../core/level-classic/model';
 import type { UsageIndex } from '../../../core/level-classic/usage-index';
 import { cellIndexAt } from './composer-math';
-import { TileThumb } from './composer-thumbs';
+import { TileThumb, BlockThumb } from './composer-thumbs';
 import { COMPOSER_SEL_CELL } from '../../canvas/canvas-colors';
 import { hex, SharedBanner, useEditableTileRange, tileLockReason, drawBufferScaled, styles } from './composer-shared';
 
-// Block tab — 4-tile (2x2) composer for the selected block. Tile picker from the
-// act pool + flips + palette line + priority; one classicEditBlock per commit.
+// Block tab — 4-tile (2x2) composer for the selected block. Two right-hand
+// strips with opposite click semantics: a BROWSE-ONLY block strip (pick which
+// block to edit — mirrors the Tile tab's strip) and the tile "set cell" strip
+// (clicking ASSIGNS the tile to the selected cell). Flips + palette line +
+// priority per cell; one classicEditBlock per commit.
 
 const BLOCK_CELL = 64; // px per 8x8 tile cell → 128px block preview
 
 export default function BlockTab({ doc, usage }: { doc: LevelDoc; usage: UsageIndex }) {
   const composerBlockId = useClassicLevelStore((s) => s.composerBlockId);
-  const composerTileIndex = useClassicLevelStore((s) => s.composerTileIndex);
+  const setComposerBlockId = useClassicLevelStore((s) => s.setComposerBlockId);
   const setComposerTileIndex = useClassicLevelStore((s) => s.setComposerTileIndex);
   const setComposerPalLine = useClassicLevelStore((s) => s.setComposerPalLine);
   const chunkEpoch = useClassicLevelStore((s) => s.chunkEpoch);
@@ -116,6 +119,16 @@ export default function BlockTab({ doc, usage }: { doc: LevelDoc; usage: UsageIn
         />
         <div style={styles.rowWrap}>
           <span style={styles.dim}>Cell {['TL', 'TR', 'BL', 'BR'][selCell]} · tile {hex(cell.tile)}</span>
+          <span style={{ flex: 1 }} />
+          <button
+            onClick={() => {
+              setComposerTileIndex(cell.tile);
+              setComposerPalLine(cell.pal);
+              useClassicLevelStore.getState().setComposerTab('tile');
+            }}
+            style={styles.smallBtn}
+            title={`Open tile ${hex(cell.tile)} in the Tile tab`}
+          >Edit pixels →</button>
         </div>
         <div style={styles.rowWrap}>
           <Chip active={cell.xf} onClick={() => editCell({ xf: !cell.xf })}>X flip</Chip>
@@ -129,6 +142,18 @@ export default function BlockTab({ doc, usage }: { doc: LevelDoc; usage: UsageIn
         </div>
       </div>
       <div style={styles.paletteCol}>
+        <div style={styles.paletteHead}>Blocks ({doc.blocks.length}) · click to edit</div>
+        <div style={{ ...styles.paletteStrip, maxHeight: 140 }}>
+          {doc.blocks.map((_, id) => (
+            <BlockThumb
+              key={id} doc={doc} blockId={id} size={34} versionKey={versionKey}
+              selected={id === composerBlockId} usage={usage.blockUsage(id)} onSelect={setComposerBlockId}
+            />
+          ))}
+        </div>
+        <div style={styles.hintRow}>browse-only — selecting never edits</div>
+      </div>
+      <div style={styles.paletteCol}>
         <div style={styles.paletteHead}>Tiles ({tileCount}) · click to set cell {['TL', 'TR', 'BL', 'BR'][selCell]}</div>
         <div style={styles.paletteStrip}>
           {Array.from({ length: tileCount }, (_, id) => (
@@ -140,7 +165,7 @@ export default function BlockTab({ doc, usage }: { doc: LevelDoc; usage: UsageIn
             />
           ))}
         </div>
-        <div style={styles.hintRow}>selected tile {hex(composerTileIndex)} · switch to the Tile tab to edit its pixels</div>
+        <div style={styles.hintRow}>⚠ clicking here REWRITES cell {['TL', 'TR', 'BL', 'BR'][selCell]} — to browse tiles without editing, use the Tile tab's strip</div>
       </div>
     </div>
   );

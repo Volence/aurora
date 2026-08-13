@@ -30,12 +30,41 @@ layout hierarchy edits through the classic level store's commands
 `classic:set-layout-cells` …), and save writes S1's own native formats (Nemesis
 8×8 art, Enigma blocks, Kosinski chunks) back into the disasm through a guarded
 (mtime-checked) channel — not the aeon `data/editor/` files in Save Flows below.
-Human classic editing today covers layout stamping, the chunk picker, and object
-placement; **wiring the Art-mode pixel/block/chunk composer to classic content
-editing is deferred** (agents already reach it via the `edit_chunk` / `edit_block`
-MCP tools). See `docs/specs/2026-08-09-disasm-project-abstraction-design.md` for
-the classic project layer and `docs/MCP.md` → *Classic project tools* for the
-agent surface.
+Human classic level-art editing lives in the **Composer dock** (the collapsible
+▸ COMPOSER bar above the chunk picker — v1.1 Task B3, deliberately self-contained
+rather than wired into aeon's Art mode): three tabs over one shared selection,
+shown as a clickable **Chunk › Block › Tile trail** in the dock header.
+
+- **Chunk tab** — paint blocks into the selected chunk's 16×16 grid (brush
+  carries flips + solidity; right-click a cell to eyedrop). Duplicate / new
+  blank chunk, capacity-aware (≤ $7F).
+- **Block tab** — compose the 2×2 tile cells (flips, palette line, priority).
+  Two strips with opposite semantics: the **browse-only block strip** picks
+  which block to edit, while ⚠ the tile strip *assigns* the clicked tile to
+  the selected cell; the **Edit pixels →** button jumps to the Tile tab.
+- **Tile tab** — 8×8 pixel editor: pencil + flood fill, right-click eyedrops a
+  color, tile Copy/Paste (the clipboard survives act switches), and a
+  **browse-only** tile strip with usage counts (no badge = unused, safe to
+  repurpose; 🔒 = anim/gap slot, view-only in v1).
+
+The classic app bar (both views) carries a persistent **zone/act selector** and
+**Level | Sprite** mode chips — Sprite mode is reachable without selecting an
+object, and acts switch from either surface. Object sprite art also opens
+directly via "Edit art…" on a selected object, or ✎ in the Object Library.
+In Sprite mode, the disasm context is the primary tool cluster: a
+sticky **← Back to \<act\>** bar, the zone's **object list** (hop between
+objects without a level round trip; confirm guards unsaved edits), and **Save to
+source** (Nemesis re-encode into the original .nem, mtime-guarded). The generic
+open/import/convert flow stays below as the secondary tool, collapsed by default
+in classic sessions.
+
+Everything shows usage counts and warns before shared edits (duplicate-then-edit
+offered); each stroke/fill/paste is one undo step on the shared Ctrl+Z stack.
+True tile *creation* (growing a Nemesis art file) stays deferred. Palettes edit
+in the right sidebar's Palette panel (B4). Agents reach the same commands via the
+`edit_chunk` / `edit_block` MCP tools. See
+`docs/specs/2026-08-09-disasm-project-abstraction-design.md` for the classic
+project layer and `docs/MCP.md` → *Classic project tools* for the agent surface.
 
 ---
 

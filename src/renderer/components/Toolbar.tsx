@@ -3,6 +3,8 @@ import { useProjectStore, getActiveLevel } from '../state/projectStore';
 import { useEditorStore, editHistory, undo, redo, type EditingLayer, type AppMode } from '../state/editorStore';
 import { useSpriteStore } from '../state/spriteStore';
 import { spriteModeUndo, spriteModeRedo, spriteModeCanUndo, spriteModeCanRedo } from '../state/sprite-undo';
+import { useClassicProjectStore } from '../state/classicProjectStore';
+import { useClassicLevelStore, classicCanUndo, classicCanRedo } from '../state/classicLevelStore';
 import type { S4Level } from '../../core/editing/commands';
 import type { RecentProject } from '../../shared/ipc-types';
 import AuroraMark from './AuroraMark';
@@ -27,6 +29,16 @@ export default function Toolbar({ onOpenProject, onOpenRecent, onSave }: Toolbar
   const setAppMode = useEditorStore((s) => s.setAppMode);
   // Re-evaluate sprite Undo/Redo enablement whenever the sprite history changes.
   const spriteTick = useSpriteStore((s) => s.historyTick);
+
+  // Classic (disasm) session state — the toolbar's classic twin of the aeon
+  // block below: persistent zone/act selector + Level/Sprite mode chips +
+  // undo/redo/save, visible in BOTH the level view and Sprite mode so the two
+  // surfaces stay visibly part of one app.
+  const classicOpen = useClassicProjectStore((s) => s.status) === 'open';
+  const zoneTree = useClassicProjectStore((s) => s.zoneTree);
+  const classicRef = useClassicLevelStore((s) => s.ref);
+  const classicDirty = useClassicLevelStore((s) => Object.values(s.dirty).some(Boolean));
+  const classicHistoryTick = useClassicLevelStore((s) => s.historyTick);
 
   const [recentOpen, setRecentOpen] = useState(false);
   const [recentProjects, setRecentProjects] = useState<RecentProject[]>([]);
@@ -186,6 +198,69 @@ export default function Toolbar({ onOpenProject, onOpenRecent, onSave }: Toolbar
           </Chip>
 
           {dirty && <span style={styles.dirtyBadge}>unsaved</span>}
+        </>
+      )}
+
+      {classicOpen && !config && (
+        <>
+          <Select
+            value={classicRef ? `${classicRef.zone}:${classicRef.act}` : ''}
+            onChange={(v) => {
+              const target = zoneTree.find((r) => `${r.zone}:${r.act}` === v);
+              if (target) void useClassicLevelStore.getState().openAct(target);
+            }}
+            style={{ maxWidth: 200 }}
+          >
+            <option value="" disabled>Zone/Act</option>
+            {zoneTree.map((r) => (
+              <option key={`${r.zone}:${r.act}`} value={`${r.zone}:${r.act}`} disabled={!r.available}>
+                {r.label}
+              </option>
+            ))}
+          </Select>
+
+          <Divider />
+
+          <Chip active={appMode !== 'sprite'} onClick={() => setAppMode('map')}>Level</Chip>
+          <Chip active={appMode === 'sprite'} onClick={() => setAppMode('sprite')}>Sprite</Chip>
+
+          <Divider />
+
+          <IconButton
+            icon={<Icons.IconUndo size={14} />}
+            label="Undo (Ctrl+Z)"
+            onClick={() => {
+              if (appMode === 'sprite') spriteModeUndo();
+              else useClassicLevelStore.getState().undo();
+            }}
+            disabled={appMode === 'sprite'
+              ? (void spriteTick, !spriteModeCanUndo())
+              : (void classicHistoryTick, !classicCanUndo())}
+          />
+          <IconButton
+            icon={<Icons.IconRedo size={14} />}
+            label="Redo (Ctrl+Y)"
+            onClick={() => {
+              if (appMode === 'sprite') spriteModeRedo();
+              else useClassicLevelStore.getState().redo();
+            }}
+            disabled={appMode === 'sprite'
+              ? (void spriteTick, !spriteModeCanRedo())
+              : (void classicHistoryTick, !classicCanRedo())}
+          />
+          <Chip
+            active={saveFlash}
+            disabled={!classicDirty && !saveFlash}
+            onClick={async () => {
+              await onSave();
+              setSaveFlash(true);
+              setTimeout(() => setSaveFlash(false), 1500);
+            }}
+          >
+            {saveFlash ? 'Saved!' : 'Save'}
+          </Chip>
+
+          {classicDirty && <span style={styles.dirtyBadge}>unsaved</span>}
         </>
       )}
 

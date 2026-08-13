@@ -471,7 +471,15 @@ export default function ClassicLevelViewport() {
   }, [plane]);
 
   const onMouseDown = useCallback((e: React.MouseEvent) => {
-    if (e.button !== 0) return; // left button only; right-click eyedrops (below)
+    // Middle-drag always pans, whatever the active tool — matching the aeon
+    // MapViewport convention. preventDefault suppresses Chromium's autoscroll.
+    if (e.button === 1) {
+      e.preventDefault();
+      dragging.current = true;
+      lastMouse.current = { x: e.clientX, y: e.clientY };
+      return;
+    }
+    if (e.button !== 0) return; // left drags tools; right-click eyedrops (below)
     if (tool === 'stamp') {
       const grid = activeGrid();
       const cell = cellUnderCursor(e);

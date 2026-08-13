@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { cellIndexAt, readTilePixels, packTilePixels } from '../composer-math';
+import { cellIndexAt, readTilePixels, packTilePixels, floodFillTile } from '../composer-math';
 
 describe('cellIndexAt', () => {
   it('maps coords to a row-major index in a 16x16 chunk grid', () => {
@@ -74,5 +74,49 @@ describe('readTilePixels / packTilePixels (4bpp nibble packing)', () => {
   it('returns all-zero pixels for an out-of-range tile index (no throw)', () => {
     const tiles = new Uint8Array(32);
     expect(Array.from(readTilePixels(tiles, 5))).toEqual(Array(64).fill(0));
+  });
+});
+
+describe('floodFillTile', () => {
+  const grid = () => new Uint8Array(64); // all color 0
+
+  it('fills the whole tile when it is one region', () => {
+    const fill = floodFillTile(grid(), 0, 5);
+    expect(fill.size).toBe(64);
+    expect([...fill.values()].every((c) => c === 5)).toBe(true);
+  });
+
+  it('stops at a color boundary (fills only the connected region)', () => {
+    const px = grid();
+    for (let y = 0; y < 8; y++) px[y * 8 + 3] = 9; // vertical wall at x=3
+    const fill = floodFillTile(px, 0, 5); // left of the wall
+    expect(fill.size).toBe(24); // 3 columns x 8 rows
+    expect(fill.has(4)).toBe(false); // right of the wall untouched
+    expect(fill.has(3)).toBe(false); // the wall itself untouched
+  });
+
+  it('is 4-connected — diagonals do not leak', () => {
+    // Checkerboard of 0/1: from a 0 pixel, only that single pixel matches
+    // 4-connected (all orthogonal neighbors are 1s).
+    const px = grid();
+    for (let i = 0; i < 64; i++) px[i] = (((i % 8) + ((i / 8) | 0)) & 1) as 0 | 1;
+    const fill = floodFillTile(px, 0, 5);
+    expect(fill.size).toBe(1);
+  });
+
+  it('returns an empty map when the region already has the fill color (no-op, no undo step)', () => {
+    const px = grid();
+    expect(floodFillTile(px, 10, 0).size).toBe(0);
+  });
+
+  it('returns an empty map for out-of-range starts and wrong-size buffers', () => {
+    expect(floodFillTile(grid(), -1, 5).size).toBe(0);
+    expect(floodFillTile(grid(), 64, 5).size).toBe(0);
+    expect(floodFillTile(new Uint8Array(32), 0, 5).size).toBe(0);
+  });
+
+  it('masks the fill color to 4 bits', () => {
+    const fill = floodFillTile(grid(), 0, 0x15);
+    expect(fill.get(0)).toBe(5);
   });
 });

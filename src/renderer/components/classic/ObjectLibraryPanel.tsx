@@ -18,7 +18,7 @@ const THUMB = 28;
  * viewport rather than rendering its own copy. Ids with no linked art draw
  * nothing (the caller shows the hex chip only).
  */
-const ObjectThumb = React.memo(function ObjectThumb({
+export const ObjectThumb = React.memo(function ObjectThumb({
   id, zone, epoch, dir,
 }: {
   id: number;

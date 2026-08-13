@@ -119,7 +119,9 @@ export default function App() {
       ) : appMode === 'art' ? (
         <ArtMode appBar={<Toolbar onOpenProject={openProject} onOpenRecent={openProjectByPath} onSave={saveProject} />} />
       ) : appMode === 'sprite' ? (
-        <SpriteMode appBar={<Toolbar onOpenProject={openProject} onOpenRecent={openProjectByPath} onSave={saveProject} />} />
+        /* guardedSave, not saveProject: in a classic session Sprite mode's Save
+           must route to the classic level save, never the stale aeon project. */
+        <SpriteMode appBar={<Toolbar onOpenProject={openProject} onOpenRecent={openProjectByPath} onSave={guardedSave} />} />
       ) : (
         <EditorShell
           appBar={<Toolbar onOpenProject={openProject} onOpenRecent={openProjectByPath} onSave={saveProject} />}

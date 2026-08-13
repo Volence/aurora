@@ -45,8 +45,11 @@
 //     s1-objects.ts S1_INVISIBLE_OBJECT_IDS): Fireball Spawner ($13), Waterfall SFX
 //     ($49), Invisible Lava Marker ($54), Conveyor Controller ($68), Invisible Block
 //     ($71), Teleporter ($72).
-//   • name-only BLOBs (INI has no art/map/xml/code at all): SBZ Stomper-and-Door
-//     ($6B), Platform Conveyor Belt ($6F).
+//   (Post-B6 red-box sweep: $6B/$6F — formerly bucketed as name-only INI blobs —
+//   plus MZ $31/$4C and SLZ $56 are now linked by transcribing art/mappings from
+//   the disasm SOURCE (_incObj obMap/obGfx + PLCs) where SonLVL has no objdef at
+//   all; and SBZ aliases the LZ links SBZ3 places, since SBZ3 is the engine's
+//   "LZ act 4". Rules aliased accordingly in object-subtype-rules.ts.)
 //   • Ending Animals ($28): the ending act is not a placeable zone in this profile
 //     (zones are ghz/mz/syz/lz/slz/sbz), so there is nowhere to scope it.
 // Orbinaut's XML default is a spikeball+body composite; we preview its recognizable
@@ -161,6 +164,29 @@ export const S1_OBJECT_ART_BASE: Readonly<Record<number, ObjectArtLink>> = {
 };
 
 /**
+ * The LZ zone links, hoisted to a named map because Scrap Brain Act 3 is the
+ * engine's "LZ act 4" (the profile keeps it under zone 'sbz' but its objpos
+ * places LZ objects) — the sbz map below aliases the entries SBZ3 actually uses.
+ */
+const LZ_LINKS: Readonly<Record<number, ObjectArtLink>> = {
+  0x0b: nem('artnem/LZ Breakable Pole.nem', '_maps/Pole that Breaks.asm', 0, 2), // Pole (Pole.xml)
+  0x0c: nem('artnem/LZ Flapping Door.nem', '_maps/Flapping Door.asm', 0, 2), // Flapping Door (FlappingDoor.xml)
+  0x16: nem('artnem/LZ Harpoon.nem', '_maps/Harpoon.asm', 3, 0), // Harpoon (Harpoon.xml, default "vertical" = frame 3)
+  0x32: off('artnem/Switch.nem', '_maps/Button.asm', 0, 0, -128), // Switch (Common/Switch.xml offset=-128 → skip 4 tiles)
+  0x61: off('artnem/LZ Cork.nem', '_maps/LZ Blocks.asm', 2, 2, 9024), // Block/Cork (LZ/Block.xml default "Cork" offset=9024 → +282 tiles; subtype rule for other variants)
+  0x52: nem('artnem/LZ 32x16 Block.nem', '_maps/Moving Blocks (LZ).asm', 0, 2), // Moving Block (MovingBlocks.xml)
+  0x56: nem('artnem/LZ Vertical Door.nem', '_maps/Floating Blocks and Doors.asm', 6, 2), // Door (Door.xml, "vertical" = frame 6)
+  0x63: nem('artnem/LZ Wheel.nem', '_maps/LZ Conveyor.asm', 0, 0), // Conveyor Belt wheel (ConveyorBelt.xml)
+  0x64: nem('artnem/LZ Bubbles & Countdown.nem', '_maps/Bubbles.asm', 19, 0), // Bubbles (Bubbles.xml, img1 = frame 19)
+  0x65: nem('artnem/LZ Water & Splashes.nem', '_maps/Waterfalls.asm', 9, 2), // Waterfall (Waterfall.xml, img10 = frame 9)
+  0x2c: nem('artnem/Enemy Jaws.nem', '_maps/Jaws.asm', 0, 1), // Jaws (Jaws.xml)
+  0x2d: nem('artnem/Enemy Burrobot.nem', '_maps/Burrobot.asm', 2, 0), // Burrobot (frame 2)
+  0x57: nem('artnem/LZ Spiked Ball & Chain.nem', '_maps/Spiked Ball and Chain (LZ).asm', 1, 0), // Spikeball (frame 1)
+  0x60: nem('artnem/Enemy Orbinaut.nem', '_maps/Orbinaut.asm', 0, 0), // Orbinaut (body frame)
+  0x62: nem('artnem/LZ Gargoyle & Fireball.nem', '_maps/Gargoyle.asm', 0, 2), // Gargoyle
+};
+
+/**
  * Per-zone overrides / additions, keyed by the profile zone id (lowercase, as in
  * `ZoneActRef.zone`: ghz/mz/syz/lz/slz/sbz). An entry here wins over the base map
  * for the same id in that zone.
@@ -185,6 +211,15 @@ export const S1_OBJECT_ART_ZONE: Readonly<Record<string, Readonly<Record<number,
   mz: {
     0x15: SWINGING_PLATFORM, // Swinging Platform (reuses GHZ art/class; subtype rule)
     0x22: BUZZ_BOMBER,
+    // NOT IN SonLVL: the stock INIs define no [31]/[4C] at all (SonLVL draws them
+    // as unknown boxes too). Transcribed directly from the disasm source instead:
+    //   _incObj/31: obGfx = ArtTile_MZ_Spike_Stomper (no pal bits → line 0); PLC_MZ
+    //     loads Nem_MzMetal there; Map_CStom = _maps/Chained Stompers.asm, frame 0
+    //     (.wideblock — frames: 0 block / 1 spikes / 2 ceiling base / 3.. chain).
+    //   _incObj/4C: obMap = Map_Geyser (_maps/Lava Geyser.asm), obGfx =
+    //     ArtTile_MZ_Lava|Tile_Pal4 → MZ Lava.nem, palette line 3.
+    0x31: nem('artnem/MZ Metal Blocks.nem', '_maps/Chained Stompers.asm', 0, 0), // Chained Stompers
+    0x4c: nem('artnem/MZ Lava.nem', '_maps/Lava Geyser.asm', 0, 3), // Lava Geyser Maker
     0x2f: lvl('_maps/MZ Large Grassy Platforms.asm', 0, 2), // Grass Platform (MovingPlatform.xml LevelArt; Sprite bits4-5 → frame 0/1/2)
     0x30: nem('artnem/MZ Green Glass Block.nem', '_maps/MZ Large Green Glass Blocks.asm', 0, 2), // Large glass pillar
     0x32: nem('artnem/MZ Switch.nem', '_maps/Button.asm', 0, 2), // Switch (MZ/Switch.xml — own art, no offset)
@@ -212,23 +247,7 @@ export const S1_OBJECT_ART_ZONE: Readonly<Record<string, Readonly<Record<number,
     0x58: nem('artnem/SYZ Large Spikeball.nem', '_maps/Big Spiked Ball.asm', 0, 0), // Big spiked ball
     0x78: CATERKILLER,
   },
-  lz: {
-    0x0b: nem('artnem/LZ Breakable Pole.nem', '_maps/Pole that Breaks.asm', 0, 2), // Pole (Pole.xml)
-    0x0c: nem('artnem/LZ Flapping Door.nem', '_maps/Flapping Door.asm', 0, 2), // Flapping Door (FlappingDoor.xml)
-    0x16: nem('artnem/LZ Harpoon.nem', '_maps/Harpoon.asm', 3, 0), // Harpoon (Harpoon.xml, default "vertical" = frame 3)
-    0x32: off('artnem/Switch.nem', '_maps/Button.asm', 0, 0, -128), // Switch (Common/Switch.xml offset=-128 → skip 4 tiles)
-    0x61: off('artnem/LZ Cork.nem', '_maps/LZ Blocks.asm', 2, 2, 9024), // Block/Cork (LZ/Block.xml default "Cork" offset=9024 → +282 tiles; subtype rule for other variants)
-    0x52: nem('artnem/LZ 32x16 Block.nem', '_maps/Moving Blocks (LZ).asm', 0, 2), // Moving Block (MovingBlocks.xml)
-    0x56: nem('artnem/LZ Vertical Door.nem', '_maps/Floating Blocks and Doors.asm', 6, 2), // Door (Door.xml, "vertical" = frame 6)
-    0x63: nem('artnem/LZ Wheel.nem', '_maps/LZ Conveyor.asm', 0, 0), // Conveyor Belt wheel (ConveyorBelt.xml)
-    0x64: nem('artnem/LZ Bubbles & Countdown.nem', '_maps/Bubbles.asm', 19, 0), // Bubbles (Bubbles.xml, img1 = frame 19)
-    0x65: nem('artnem/LZ Water & Splashes.nem', '_maps/Waterfalls.asm', 9, 2), // Waterfall (Waterfall.xml, img10 = frame 9)
-    0x2c: nem('artnem/Enemy Jaws.nem', '_maps/Jaws.asm', 0, 1), // Jaws (Jaws.xml)
-    0x2d: nem('artnem/Enemy Burrobot.nem', '_maps/Burrobot.asm', 2, 0), // Burrobot (frame 2)
-    0x57: nem('artnem/LZ Spiked Ball & Chain.nem', '_maps/Spiked Ball and Chain (LZ).asm', 1, 0), // Spikeball (frame 1)
-    0x60: nem('artnem/Enemy Orbinaut.nem', '_maps/Orbinaut.asm', 0, 0), // Orbinaut (body frame)
-    0x62: nem('artnem/LZ Gargoyle & Fireball.nem', '_maps/Gargoyle.asm', 0, 2), // Gargoyle
-  },
+  lz: LZ_LINKS,
   slz: {
     0x15: nem('artnem/SLZ Swinging Platform.nem', '_maps/Swinging Platforms (SLZ).asm', 0, 2), // Swinging Platform (SwingingPlatform.cs; subtype rule)
     0x5d: nem('artnem/SLZ Fan.nem', '_maps/Fan.asm', 0, 2), // Fan (Fan.xml)
@@ -243,6 +262,11 @@ export const S1_OBJECT_ART_ZONE: Readonly<Record<string, Readonly<Record<number,
     0x5c: nem('artnem/SLZ Pylon.nem', '_maps/Pylon.asm', 0, 0), // Foreground metal pylon
     0x5f: BOMB,
     0x60: nem('artnem/Enemy Orbinaut.nem', '_maps/Orbinaut.asm', 0, 1), // Orbinaut (body frame, pal 1)
+    // NOT IN SonLVL (no [56] in objSLZ.ini). From the disasm source (_incObj/56):
+    // SLZ's rotating stairway block draws LevelArt (ArtTile_Level|Tile_Pal3 →
+    // line 2) from Map_FBlock; SLZ subtypes are $5x/$Dx → frame 5 (shared
+    // (subtype&0x70)>>4 rule, aliased into slz in object-subtype-rules.ts).
+    0x56: lvl('_maps/Floating Blocks and Doors.asm', 5, 2), // Stairway Block
   },
   sbz: {
     0x15: nem('artnem/SYZ Large Spikeball.nem', '_maps/Big Spiked Ball.asm', 0, 0), // Swinging Spikeball (SwingingSpikeball.cs; subtype rule)
@@ -261,6 +285,27 @@ export const S1_OBJECT_ART_ZONE: Readonly<Record<string, Readonly<Record<number,
     0x6e: nem('artnem/SBZ Electrocuter.nem', '_maps/Electrocuter.asm', 0, 0), // Electrocuter
     0x70: nem('artnem/SBZ Crushing Girder.nem', '_maps/Girder Block.asm', 0, 2), // Girder block
     0x78: CATERKILLER,
+    // NOT IN SonLVL (name-only INI blobs) — transcribed from the disasm source:
+    //   _incObj/6B: Map_Stomp = _maps/SBZ Stomper and Door.asm (frames: 0 door /
+    //     1.. stomper), obGfx = ArtTile_SBZ_Moving_Block_Short|Tile_Pal2 →
+    //     Nem_Stomper (SBZ Stomper.nem), line 1. (SBZ3 swaps to a LevelArt door
+    //     in-engine; the .nem preview beats a red box there.)
+    //   _incObj/6F: Map_Spin = _maps/SBZ Spinning Platforms.asm (shared with $69),
+    //     obGfx = ArtTile_SBZ_Spinning_Platform → SBZ Spinning Platform.nem, line 0.
+    0x6b: nem('artnem/SBZ Stomper.nem', '_maps/SBZ Stomper and Door.asm', 0, 1), // Stomper and Door
+    0x6f: nem('artnem/SBZ Spinning Platform.nem', '_maps/SBZ Spinning Platforms.asm', 0, 0), // Platform Conveyor Belt
+    // SBZ3 = the engine's "LZ act 4" (its objpos places these LZ objects while
+    // the profile keys the act under zone 'sbz') — alias the LZ links so they
+    // render there. sbz1/2 never place these ids, so the aliases are inert there.
+    0x0c: LZ_LINKS[0x0c], // Flapping Door
+    0x16: LZ_LINKS[0x16], // Harpoon
+    0x2c: LZ_LINKS[0x2c], // Jaws
+    0x2d: LZ_LINKS[0x2d], // Burrobot
+    0x56: LZ_LINKS[0x56], // Door
+    0x57: LZ_LINKS[0x57], // Spikeball
+    0x61: LZ_LINKS[0x61], // Block/Cork (subtype rule aliased in object-subtype-rules.ts)
+    0x62: LZ_LINKS[0x62], // Gargoyle
+    0x64: LZ_LINKS[0x64], // Bubbles
   },
 };
 

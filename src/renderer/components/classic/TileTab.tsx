@@ -5,23 +5,33 @@ import { useToastStore } from '../../state/toastStore';
 import type { LevelDoc } from '../../../core/level-classic/model';
 import type { UsageIndex } from '../../../core/level-classic/usage-index';
 import { decodeGenesisColor } from '../../../core/formats/palette';
-import { cellIndexAt, readTilePixels, packTilePixels } from './composer-math';
+import { cellIndexAt, readTilePixels, packTilePixels, floodFillTile } from './composer-math';
+import { TileThumb } from './composer-thumbs';
 import { COMPOSER_CHECK_A, COMPOSER_CHECK_B, COMPOSER_SWATCH_A, COMPOSER_SWATCH_B } from '../../canvas/canvas-colors';
 import { hex, SharedBanner, useEditableTileRange, tileLockReason, useEscapeCancel, styles } from './composer-shared';
 
 // Tile tab — 8x8 pixel editor for the selected tile (16-color row from the act
-// palette; pencil only). One classicEditTiles per stroke. Anim/gap tiles lock.
+// palette; pencil + fill, right-click eyedrops a pixel's color). One
+// classicEditTiles per stroke/fill/paste. Anim/gap tiles lock. The right column
+// is a BROWSE-ONLY tile strip (unlike the Block tab's strip, which assigns the
+// clicked tile to a block cell) — selecting here never mutates anything.
 
 const PX = 26; // px per pixel → 208px editor
 
+type TileTool = 'pencil' | 'fill';
+
 export default function TileTab({ doc, usage }: { doc: LevelDoc; usage: UsageIndex }) {
   const composerTileIndex = useClassicLevelStore((s) => s.composerTileIndex);
+  const setComposerTileIndex = useClassicLevelStore((s) => s.setComposerTileIndex);
   const composerPalLine = useClassicLevelStore((s) => s.composerPalLine);
   const setComposerPalLine = useClassicLevelStore((s) => s.setComposerPalLine);
+  const tileClipboard = useClassicLevelStore((s) => s.tileClipboard);
+  const setTileClipboard = useClassicLevelStore((s) => s.setTileClipboard);
   const chunkEpoch = useClassicLevelStore((s) => s.chunkEpoch);
   const range = useEditableTileRange();
 
   const [colorIndex, setColorIndex] = useState(1);
+  const [tool, setTool] = useState<TileTool>('pencil');
   const [, force] = useState(0);
   const redraw = useCallback(() => force((n) => n + 1), []);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -78,20 +88,30 @@ export default function TileTab({ doc, usage }: { doc: LevelDoc; usage: UsageInd
     if (e.button !== 0 || locked) return;
     const i = pixelAt(e);
     if (i === null) return;
+    if (tool === 'fill') {
+      // A fill is a click gesture: stage the region as a stroke so Esc still
+      // cancels it and the shared endStroke commit path applies (one undo step).
+      const px = readTilePixels(doc.tiles, composerTileIndex);
+      const region = floodFillTile(px, i, colorIndex);
+      if (!region.size) return;
+      strokeRef.current = region;
+      redraw();
+      return;
+    }
     const acc = new Map<number, number>();
     acc.set(i, colorIndex);
     strokeRef.current = acc;
     redraw();
-  }, [pixelAt, locked, colorIndex, redraw]);
+  }, [pixelAt, locked, tool, doc, composerTileIndex, colorIndex, redraw]);
 
   const onMove = useCallback((e: React.MouseEvent) => {
     const stroke = strokeRef.current;
-    if (!stroke) return;
+    if (!stroke || tool === 'fill') return; // a fill region is not extendable by drag
     const i = pixelAt(e);
     if (i === null || stroke.get(i) === colorIndex) return;
     stroke.set(i, colorIndex);
     redraw();
-  }, [pixelAt, colorIndex, redraw]);
+  }, [pixelAt, tool, colorIndex, redraw]);
 
   const endStroke = useCallback(() => {
     const stroke = strokeRef.current;
@@ -104,7 +124,29 @@ export default function TileTab({ doc, usage }: { doc: LevelDoc; usage: UsageInd
     redraw();
   }, [doc, composerTileIndex, redraw]);
 
+  // Right-click eyedrops the pixel's palette index into the pencil (matches the
+  // chunk tab's right-click-eyedrop idiom). Works on locked tiles too — reading
+  // a color is not an edit.
+  const onContext = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    const i = pixelAt(e);
+    if (i === null) return;
+    setColorIndex(readTilePixels(doc.tiles, composerTileIndex)[i]);
+  }, [pixelAt, doc, composerTileIndex]);
+
+  const copyTile = useCallback(() => {
+    setTileClipboard(readTilePixels(doc.tiles, composerTileIndex));
+    useToastStore.getState().addToast(`Copied tile ${hex(composerTileIndex)} — select another tile and Paste`, 'info');
+  }, [doc, composerTileIndex, setTileClipboard]);
+
+  const pasteTile = useCallback(() => {
+    if (!tileClipboard || locked) return;
+    const res = classicEditTiles([{ tileIndex: composerTileIndex, data: packTilePixels(tileClipboard) }]);
+    if (!res.ok) useToastStore.getState().addToast(`Paste failed: ${res.error}`, 'error');
+  }, [tileClipboard, locked, composerTileIndex]);
+
   const tileUse = usage.tileUsage(composerTileIndex);
+  const versionKey = String(chunkEpoch);
 
   return (
     <div style={styles.tabBody}>
@@ -112,6 +154,14 @@ export default function TileTab({ doc, usage }: { doc: LevelDoc; usage: UsageInd
         <div style={styles.rowWrap}>
           <span style={styles.title}>Tile {hex(composerTileIndex)}</span>
           <span style={styles.count}>in {tileUse.containers} block{tileUse.containers === 1 ? '' : 's'} · {tileUse.cells} cell{tileUse.cells === 1 ? '' : 's'}</span>
+          <span style={{ flex: 1 }} />
+          <button onClick={copyTile} style={styles.smallBtn} title="Copy this tile's pixels">Copy</button>
+          <button
+            onClick={pasteTile}
+            disabled={!tileClipboard || locked}
+            style={{ ...styles.smallBtn, ...(!tileClipboard || locked ? { opacity: 0.4, cursor: 'default' } : {}) }}
+            title={tileClipboard ? `Paste the copied pixels onto tile ${hex(composerTileIndex)}` : 'Nothing copied yet'}
+          >Paste</button>
         </div>
         {locked && (
           <div style={{ ...styles.banner, background: 'rgba(255,70,70,0.12)', borderColor: 'rgba(255,70,70,0.4)' }}>
@@ -129,6 +179,7 @@ export default function TileTab({ doc, usage }: { doc: LevelDoc; usage: UsageInd
           onMouseMove={onMove}
           onMouseUp={endStroke}
           onMouseLeave={() => { strokeRef.current = null; redraw(); }}
+          onContextMenu={onContext}
           style={{ ...styles.gridCanvas, cursor: locked ? 'not-allowed' : 'crosshair', opacity: locked ? 0.6 : 1 }}
         />
         <div style={styles.rowWrap}>
@@ -137,7 +188,8 @@ export default function TileTab({ doc, usage }: { doc: LevelDoc; usage: UsageInd
             <Chip key={p} active={composerPalLine === p} onClick={() => setComposerPalLine(p)}>{p}</Chip>
           ))}
           <Divider />
-          <span style={styles.dim}>Pencil</span>
+          <Chip active={tool === 'pencil'} onClick={() => setTool('pencil')}>Pencil</Chip>
+          <Chip active={tool === 'fill'} onClick={() => setTool('fill')} title="Flood-fill the clicked region">Fill</Chip>
         </div>
         <div style={{ ...styles.swatchRow, maxWidth: PX * 8 }}>
           {Array.from({ length: 16 }, (_, i) => {
@@ -160,6 +212,21 @@ export default function TileTab({ doc, usage }: { doc: LevelDoc; usage: UsageInd
             );
           })}
         </div>
+        <div style={styles.hintRow}>right-click the canvas to eyedrop a color</div>
+      </div>
+      <div style={styles.paletteCol}>
+        <div style={styles.paletteHead}>Tiles ({tileCount}) · click to edit</div>
+        <div style={styles.paletteStrip}>
+          {Array.from({ length: tileCount }, (_, id) => (
+            <TileThumb
+              key={id} doc={doc} tileIndex={id} palLine={composerPalLine} size={26} versionKey={versionKey}
+              selected={id === composerTileIndex} locked={tileLockReason(range, id) !== null}
+              usage={usage.tileUsage(id)}
+              onSelect={setComposerTileIndex}
+            />
+          ))}
+        </div>
+        <div style={styles.hintRow}>browse-only — selecting never edits · badge = used-in count · no badge = unused (safe to repurpose) · 🔒 = view-only</div>
       </div>
     </div>
   );

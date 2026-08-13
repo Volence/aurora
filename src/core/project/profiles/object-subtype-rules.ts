@@ -133,6 +133,27 @@ const GHZ_RULES: Readonly<Record<number, Rule>> = {
   0x44: (subtype, base) => one(Math.min(2, subtype & 0x0f), base),
 };
 
+// Floating Block (Map_FBlock consumers: SYZ Block.cs, SLZ stairway block) —
+// SubtypeImage: frame = (subtype & 0x70) >> 4 (0..7).
+const FBLOCK_RULE: Rule = (subtype, base) => one((subtype & 0x70) >> 4, base);
+
+// LZ Block/Cork (LZ/Block.xml) — each subtype uses a DIFFERENT .nem + byte offset
+// + frame + palette (a per-variant offset-art switch). The base link is the "Cork"
+// default (subtype 0x27); the rule overrides art/frame/pal/offset for the others.
+// Shared with 'sbz' because SBZ3 (the engine's LZ act 4) places the same object.
+const LZ_BLOCK_RULE: Rule = (subtype, base) => {
+  switch (subtype) {
+    case 0x01: // Falling Platform — LZ Horizontal Door.nem, no offset, frame 0.
+      return { pieces: [{ frame: 0, dx: 0, dy: 0 }], link: withLink(base, { artFile: 'artnem/LZ Horizontal Door.nem', frame: 0, pal: 2, tileIndexOffset: 0 }) };
+    case 0x13: // Rising Platform — LZ Rising Platform.nem, offset 3360 (+105 tiles), frame 1.
+      return { pieces: [{ frame: 1, dx: 0, dy: 0 }], link: withLink(base, { artFile: 'artnem/LZ Rising Platform.nem', frame: 1, pal: 2, tileIndexOffset: 3360 / 32 }) };
+    case 0x30: // Block — LZ 32x32 Block.nem, offset 48960 (+1530 tiles), frame 3, pal 3.
+      return { pieces: [{ frame: 3, dx: 0, dy: 0 }], link: withLink(base, { artFile: 'artnem/LZ 32x32 Block.nem', frame: 3, pal: 3, tileIndexOffset: 48960 / 32 }) };
+    default: // Cork (0x27) — base link (LZ Cork.nem, offset 9024 = +282 tiles, frame 2).
+      return one(2, base);
+  }
+};
+
 const RULES_ZONE: Readonly<Record<string, Readonly<Record<number, Rule>>>> = {
   ghz: GHZ_RULES,
   // $15 Swinging Platform / Swinging Spikeball reuses the same GetSprite geometry in
@@ -152,8 +173,10 @@ const RULES_ZONE: Readonly<Record<string, Readonly<Record<number, Rule>>>> = {
       pieces: [0, 32, 64, 96].map((dx) => ({ frame: 0, dx, dy: 0 })),
       link: base,
     }),
+    0x56: FBLOCK_RULE, // Stairway Block (LevelArt; SLZ subtypes $5x/$Dx → frame 5)
   },
-  sbz: { 0x15: GHZ_RULES[0x15] },
+  // 0x61 aliased for SBZ3 (the engine's LZ act 4 — see s1-object-art.ts).
+  sbz: { 0x15: GHZ_RULES[0x15], 0x61: LZ_BLOCK_RULE },
   // SYZ Spikeball chain — length = (subtype & 0x0F) + 1 balls stacked straight up
   // (frame 0, 16px pitch) (SYZ/SpikeballChain.cs GetSprite).
   syz: {
@@ -166,24 +189,10 @@ const RULES_ZONE: Readonly<Record<string, Readonly<Record<number, Rule>>>> = {
     },
     // Block/Platform (LevelArt, SYZ/Block.cs) — SubtypeImage: frame = (subtype &
     // 0x70) >> 4 (0..7) into Floating Blocks and Doors.asm.
-    0x56: (subtype, base) => one((subtype & 0x70) >> 4, base),
+    0x56: FBLOCK_RULE,
   },
-  // LZ Block/Cork (LZ/Block.xml) — each subtype uses a DIFFERENT .nem + byte offset
-  // + frame + palette (a per-variant offset-art switch). The base link is the "Cork"
-  // default (subtype 0x27); the rule overrides art/frame/pal/offset for the others.
   lz: {
-    0x61: (subtype, base) => {
-      switch (subtype) {
-        case 0x01: // Falling Platform — LZ Horizontal Door.nem, no offset, frame 0.
-          return { pieces: [{ frame: 0, dx: 0, dy: 0 }], link: withLink(base, { artFile: 'artnem/LZ Horizontal Door.nem', frame: 0, pal: 2, tileIndexOffset: 0 }) };
-        case 0x13: // Rising Platform — LZ Rising Platform.nem, offset 3360 (+105 tiles), frame 1.
-          return { pieces: [{ frame: 1, dx: 0, dy: 0 }], link: withLink(base, { artFile: 'artnem/LZ Rising Platform.nem', frame: 1, pal: 2, tileIndexOffset: 3360 / 32 }) };
-        case 0x30: // Block — LZ 32x32 Block.nem, offset 48960 (+1530 tiles), frame 3, pal 3.
-          return { pieces: [{ frame: 3, dx: 0, dy: 0 }], link: withLink(base, { artFile: 'artnem/LZ 32x32 Block.nem', frame: 3, pal: 3, tileIndexOffset: 48960 / 32 }) };
-        default: // Cork (0x27) — base link (LZ Cork.nem, offset 9024 = +282 tiles, frame 2).
-          return one(2, base);
-      }
-    },
+    0x61: LZ_BLOCK_RULE,
   },
 };
 

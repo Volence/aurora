@@ -8,6 +8,7 @@ import {
   linkedObjectIds,
   type ObjectArtLink,
 } from '../s1-object-art';
+import { objectHasSubtypeRule } from '../object-subtype-rules';
 
 const S1DIR = '/home/volence/sonic_hacks/s1disasm';
 
@@ -158,5 +159,36 @@ describe('s1-object-art linkage table', () => {
       }
       expect(missing, `missing files:\n${missing.join('\n')}`).toEqual([]);
     });
+  });
+});
+
+describe('red-box sweep closeout (post-B6)', () => {
+  it('links the SonLVL-less MZ objects transcribed from the disasm source', () => {
+    expect(resolveObjectArt(0x31, 'mz')?.artFile).toContain('MZ Metal Blocks'); // Chained Stompers
+    expect(resolveObjectArt(0x31, 'mz')?.pal).toBe(0); // no Tile_Pal bits → line 0
+    expect(resolveObjectArt(0x4c, 'mz')?.artFile).toContain('MZ Lava'); // Lava Geyser Maker
+    expect(resolveObjectArt(0x4c, 'mz')?.pal).toBe(3); // Tile_Pal4 → line 3
+  });
+
+  it('links the SLZ stairway block as LevelArt frame 5 with the FBlock rule', () => {
+    const link = resolveObjectArt(0x56, 'slz');
+    expect(link?.artSource).toBe('levelArt');
+    expect(link?.frame).toBe(5); // SLZ subtypes are $5x/$Dx → (subtype&0x70)>>4 = 5
+    expect(objectHasSubtypeRule(0x56, 'slz')).toBe(true);
+  });
+
+  it('aliases the LZ links + rules into sbz for SBZ3 (the engine LZ act 4)', () => {
+    for (const id of [0x0c, 0x16, 0x2c, 0x2d, 0x56, 0x57, 0x61, 0x62, 0x64]) {
+      expect(resolveObjectArt(id, 'sbz'), `sbz $${id.toString(16)}`).toBeDefined();
+      expect(resolveObjectArt(id, 'sbz')).toBe(resolveObjectArt(id, 'lz')); // identical link objects
+    }
+    expect(objectHasSubtypeRule(0x61, 'sbz')).toBe(true); // Block/Cork variants
+  });
+
+  it('links the formerly name-only SBZ machines from the disasm source', () => {
+    expect(resolveObjectArt(0x6b, 'sbz')?.artFile).toContain('SBZ Stomper'); // Stomper and Door
+    expect(resolveObjectArt(0x6f, 'sbz')?.mapAsm).toContain('SBZ Spinning Platforms'); // Platform Conveyor
+    // $66 Rotating Junction stays a red box: a true multi-art composite.
+    expect(resolveObjectArt(0x66, 'sbz')).toBeUndefined();
   });
 });

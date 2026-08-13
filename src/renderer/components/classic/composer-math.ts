@@ -59,3 +59,30 @@ export function packTilePixels(px: Uint8Array): Uint8Array {
   }
   return out;
 }
+
+/**
+ * 4-connected flood fill over an 8x8 tile's 64 palette indices (row-major).
+ * Returns pixel index → color — the same Map shape as a pencil stroke, so the
+ * Tile tab commits both through the identical endStroke path. Empty when the
+ * start is out of range or the region is already the fill color (a no-op fill
+ * must not produce an undo step).
+ */
+export function floodFillTile(px: Uint8Array, start: number, color: number): Map<number, number> {
+  const out = new Map<number, number>();
+  if (px.length !== 64 || start < 0 || start >= 64) return out;
+  const target = px[start];
+  if (target === (color & 0xf)) return out;
+  const stack = [start];
+  const seen = new Set<number>(stack);
+  while (stack.length) {
+    const i = stack.pop()!;
+    if (px[i] !== target) continue;
+    out.set(i, color & 0xf);
+    const x = i % 8;
+    const nbrs = [x > 0 ? i - 1 : -1, x < 7 ? i + 1 : -1, i - 8, i + 8];
+    for (const n of nbrs) {
+      if (n >= 0 && n < 64 && !seen.has(n)) { seen.add(n); stack.push(n); }
+    }
+  }
+  return out;
+}

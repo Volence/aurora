@@ -1,10 +1,11 @@
 import React, { useEffect, useMemo } from 'react';
+import { T } from '../ui';
 import { useClassicLevelStore, type ComposerTab } from '../../state/classicLevelStore';
 import { buildUsageIndex } from '../../../core/level-classic/usage-index';
 import ChunkTab from './ChunkTab';
 import BlockTab from './BlockTab';
 import TileTab from './TileTab';
-import { styles } from './composer-shared';
+import { hex, styles } from './composer-shared';
 
 // ---------------------------------------------------------------------------
 // Dock shell
@@ -15,6 +16,45 @@ const TABS: { id: ComposerTab; label: string }[] = [
   { id: 'block', label: 'Block' },
   { id: 'tile', label: 'Tile' },
 ];
+
+/**
+ * The shared-selection trail (chunk › block › tile) rendered in the dock header.
+ * The three tabs share one selection context but nothing used to SHOW it, which
+ * made the drill-down (viewport/picker → chunk cell → block cell → tile) hard to
+ * discover. Each segment jumps to its tab; the active tab's segment is lit.
+ */
+function SelectionTrail() {
+  const tab = useClassicLevelStore((s) => s.composerTab);
+  const setTab = useClassicLevelStore((s) => s.setComposerTab);
+  const selectedChunkId = useClassicLevelStore((s) => s.selectedChunkId);
+  const composerBlockId = useClassicLevelStore((s) => s.composerBlockId);
+  const composerTileIndex = useClassicLevelStore((s) => s.composerTileIndex);
+  const segs: { id: ComposerTab; label: string }[] = [
+    { id: 'chunk', label: `Chunk ${selectedChunkId === 0 ? 'air' : hex(selectedChunkId)}` },
+    { id: 'block', label: `Block ${hex(composerBlockId)}` },
+    { id: 'tile', label: `Tile ${hex(composerTileIndex)}` },
+  ];
+  return (
+    <span style={trailStyle}>
+      {segs.map((s, i) => (
+        <React.Fragment key={s.id}>
+          {i > 0 && <span style={{ color: T.textFaint }}>›</span>}
+          <button
+            onClick={() => setTab(s.id)}
+            title={`Open the ${s.id} tab`}
+            style={{ ...trailBtn, ...(tab === s.id ? { color: T.accent } : {}) }}
+          >{s.label}</button>
+        </React.Fragment>
+      ))}
+    </span>
+  );
+}
+
+const trailStyle: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 4, fontFamily: T.fontMono, fontSize: 10 };
+const trailBtn: React.CSSProperties = {
+  background: 'transparent', border: 'none', color: T.textLo, cursor: 'pointer',
+  fontFamily: T.fontMono, fontSize: 10, padding: '1px 2px',
+};
 
 /**
  * The classic composer dock (Task B3): tile/block/chunk content editing with a
@@ -69,6 +109,7 @@ export default function ClassicComposerDock() {
             ))}
           </div>
         )}
+        {open && <SelectionTrail />}
         <span style={{ flex: 1 }} />
         {open && <span style={styles.dockHint}>shared tile/block/chunk editing — usage counts warn before shared edits</span>}
       </div>

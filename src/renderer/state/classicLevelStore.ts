@@ -29,6 +29,7 @@ import { create } from 'zustand';
 import type { DirtyDomains, EditableTileRange, LevelDoc, ZoneActRef } from '../../core/project/adapter';
 import type { BlockDef, ChunkCell, ChunkDef256 } from '../../core/level-classic/model';
 import { validateLevelDoc, unpackChunkCell, chunkIndexForId } from '../../core/level-classic/model';
+import { firstEditableNonBlankTile, firstNonBlankBlock } from '../../core/level-classic/tile-pick';
 import type { S1ObjectEntry } from '../../core/formats/classic/s1-objpos';
 import { ClassicHistory, type ClassicSnapshot } from '../../core/editing/classic-history';
 import { registerRedoClearer, invalidateSiblingRedos } from '../../core/editing/undo-bus';
@@ -133,6 +134,12 @@ interface ClassicLevelState {
   composerTileIndex: number;
   /** The palette line (0-3) the tile editor colors with (seeded from block context). */
   composerPalLine: number;
+  /**
+   * The Tile tab's copy/paste buffer: 64 palette indices, or null. Pixels are
+   * palette-agnostic, so the clipboard deliberately survives act switches
+   * (copying GHZ art into MZ is a feature). A workflow preference, not doc data.
+   */
+  tileClipboard: Uint8Array | null;
 
   /** Select + load an act. Reads through the open project's handle. */
   openAct: (ref: ZoneActRef) => Promise<void>;
@@ -146,6 +153,7 @@ interface ClassicLevelState {
   setComposerBlockId: (id: number) => void;
   setComposerTileIndex: (index: number) => void;
   setComposerPalLine: (line: number) => void;
+  setTileClipboard: (px: Uint8Array | null) => void;
   undo: () => void;
   redo: () => void;
   /**
@@ -184,6 +192,7 @@ const IDLE = {
   composerBlockId: 0,
   composerTileIndex: 0,
   composerPalLine: 0,
+  tileClipboard: null as Uint8Array | null,
 };
 
 // ---------------------------------------------------------------------------
@@ -251,7 +260,15 @@ export const useClassicLevelStore = create<ClassicLevelState>((set, get) => ({
     try {
       const doc = await handle.levels.read(ref);
       if (token !== loadToken) return; // superseded by a newer selection
-      set({ ref, doc, status: 'ready', error: null });
+      // Land the Block/Tile tabs on something visible: block $000 / tile $000
+      // are blank in every stock act, and an empty black square / checkerboard
+      // on first open reads as "broken".
+      const range = handle.levels.editableTileRange?.(ref) ?? null;
+      set({
+        ref, doc, status: 'ready', error: null,
+        composerTileIndex: firstEditableNonBlankTile(doc.tiles, range),
+        composerBlockId: firstNonBlankBlock(doc.blocks),
+      });
     } catch (e) {
       if (token !== loadToken) return;
       set({ ref, doc: null, status: 'error', error: e instanceof Error ? e.message : String(e) });
@@ -280,6 +297,9 @@ export const useClassicLevelStore = create<ClassicLevelState>((set, get) => ({
   },
   setComposerPalLine: (line: number) => {
     if (Number.isInteger(line) && line >= 0 && line <= 3) set({ composerPalLine: line });
+  },
+  setTileClipboard: (px: Uint8Array | null) => {
+    if (px === null || px.length === 64) set({ tileClipboard: px });
   },
 
   // undo/redo are timeline NAVIGATION, not new edits, so (like the aeon history)
