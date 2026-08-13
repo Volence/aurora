@@ -1,13 +1,15 @@
 // AeonProjectAdapter — fingerprints an Aurora "aeon" project directory (the
-// engine's s4 project.json) and exposes a capability-marker ProjectHandle for it.
+// engine's s4 project.json) and opens it into a full-profile ProjectHandle.
 //
-// Task 17 of the disasm-project abstraction (spec §2.7): migrate the aeon open
-// path behind the ProjectAdapter seam with ZERO behavior change. Deliberately
-// MINIMAL — the real aeon load still runs in the renderer via
-// useProject.loadFromPath. This adapter exists so aeon participates in the single
-// `detectProject` registry (routing) instead of an ad-hoc `fa.exists('project.json')`
-// probe; its open() does NOT re-implement the aeon loader. See classic-bridge.ts
-// for how the renderer routes an aeon match back to the untouched loader.
+// Task 4 of the Stage 3 plan (spec §7): open() now performs the real project
+// load — the load itself lives in core (./load.ts, ported from the renderer's
+// old useProject.loadFromPath behind the FileAccess seam by Task 2) — and
+// returns the loaded project on `handle.aeon`. Loader errors propagate
+// unchanged: detect() deliberately matches on `engine: "s4"` alone (see below)
+// so the loader's own validation errors surface here, identical to the old
+// renderer path. This adapter is what lets aeon participate in the single
+// `detectProject` registry (routing) instead of an ad-hoc
+// `fa.exists('project.json')` probe.
 //
 // Pure core: no fs / Electron imports — all IO goes through the injected FileAccess.
 
@@ -19,6 +21,7 @@ import type {
   ProjectOverrides,
 } from '../adapter';
 import { buildReport } from '../report';
+import { loadAeonProject } from './load';
 
 const LABEL = 'Aeon Project';
 
@@ -99,14 +102,17 @@ export const aeonAdapter: ProjectAdapter = {
     return (await readEngine(fa)) === 's4' ? { type: 'aeon', label: LABEL } : null;
   },
 
-  async open(_fa: FileAccess, _overrides?: ProjectOverrides): Promise<ProjectHandle> {
-    // v1 marker handle. The renderer never opens aeon through this path — it
-    // detects the aeon match and runs the EXISTING useProject.loadFromPath
-    // unchanged (see classic-bridge.ts). Reporting is intentionally NOT bolted
-    // onto aeon in this task, so the report is empty; capabilities describe what
-    // the aeon editor already supports so any future capability-gated UI has a
-    // truthful manifest to read. `levels: null` because classic level access
-    // does not apply — aeon owns its own level model in the renderer store.
+  async open(fa: FileAccess, _overrides?: ProjectOverrides): Promise<ProjectHandle> {
+    // Full profile open (spec §7): the load itself now lives in core (load.ts);
+    // this returns the loaded project on handle.aeon. Loader errors propagate
+    // — detect() deliberately matched on engine:"s4" alone so the loader's own
+    // validation errors surface here, identical to the old renderer path.
+    // Reporting is intentionally NOT bolted onto aeon in this task, so the
+    // report is empty; capabilities describe what the aeon editor already
+    // supports so any future capability-gated UI has a truthful manifest to
+    // read. `levels: null` because classic level access does not apply — aeon
+    // owns its own level model via `handle.aeon`.
+    const aeon = await loadAeonProject(fa, fa.rootDir ?? '');
     return {
       type: 'aeon',
       capabilities: {
@@ -118,6 +124,7 @@ export const aeonAdapter: ProjectAdapter = {
       },
       report: buildReport([]),
       levels: null,
+      aeon,
     };
   },
 };

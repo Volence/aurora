@@ -45,6 +45,11 @@ export interface FileAccess {
    * resolves with `bytes: null` (the caller decides whether that is fatal).
    */
   readMany?(rels: string[]): Promise<Map<string, { bytes: Uint8Array | null; mtime: number | null }>>;
+  /** Absolute directory this FileAccess is rooted at, when known. Additive
+   *  (aeon open records it as config.basePath); in-memory fakes may omit it,
+   *  in which case basePath is '' and renderer-side writes are impossible —
+   *  fine for tests. */
+  rootDir?: string;
 }
 
 export type ProjectType = 'aeon' | 's1';
