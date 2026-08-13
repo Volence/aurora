@@ -141,9 +141,10 @@ function handleSave() {
     useProjectStore.getState().addChunks([saved]);
     useEditorStore.getState().markDirty();
   }
-  // Thumbnail invalidation: the set-chunk path bumps chunkLibraryVersion in
-  // editorStore (bumpStoreVersions); the addChunks path changes chunks.length,
-  // which is part of ChunkLibrary's thumb cache key. No explicit bump needed.
+  // Thumbnail invalidation: the set-chunk path bumps THIS chunk's version in
+  // editorStore (bumpStoreVersions → chunkIdsAffectedByCommand); the addChunks
+  // path mints a timestamped id, so the grid mounts a fresh cell that paints on
+  // first sight and cannot inherit a stale key. No explicit bump needed.
 
   // Re-open from the saved source so locals collapse to atlas references.
   useArtStore.getState().openDocument({
