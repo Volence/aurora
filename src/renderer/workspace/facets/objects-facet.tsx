@@ -4,16 +4,21 @@
 // layout-editing context, not object-placement context (spec §4).
 
 import React from 'react';
-import ObjectPalette from '../../components/ObjectPalette';
+import ObjectList from '../../components/shared/ObjectList';
+import { useAeonObjectListPort } from '../../providers/object-list-aeon';
 import PropertiesPanel from '../../components/PropertiesPanel';
 import { Panel, CollapsibleSection } from '../../components/ui';
 import { mapFacet, type FacetModule } from '../facet-registry';
 
 function ObjectsPanels() {
+  // ObjectPalette became the neutral shared/ObjectList (stage-4 plan 3): the
+  // rows, the arm/disarm toggle and the sprite-binding footer now arrive through
+  // the aeon port, and the list itself is the same one classic renders.
+  const objectListPort = useAeonObjectListPort();
   return (
     <Panel width={240} scroll>
       <CollapsibleSection id="map.palette" title="Objects">
-        <ObjectPalette />
+        <ObjectList port={objectListPort} label="Object palette" />
       </CollapsibleSection>
       <CollapsibleSection id="map.props" title="Properties"><PropertiesPanel /></CollapsibleSection>
     </Panel>

@@ -93,6 +93,9 @@ describe('classic surfaces claim their facet', () => {
   it('the object library arms placements on the layout surface', () => {
     // Not an edit site itself (arming is UI state), but the placement click it
     // sets up lands on the map — so it must not leave undo pointed at the art doc.
-    expect(read('components/classic/ObjectLibraryPanel.tsx')).toContain("classicSurfaceProps('map')");
+    // The panel is now the engine-neutral shared/ObjectList, which imports no
+    // store: the claim rides in on the classic port's `rootProps`, so THAT is
+    // what has to keep declaring it.
+    expect(read('providers/object-list-classic.ts')).toContain("classicSurfaceProps('map')");
   });
 });

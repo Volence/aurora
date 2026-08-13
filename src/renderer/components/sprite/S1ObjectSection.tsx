@@ -6,7 +6,7 @@ import { useSpriteStore } from '../../state/spriteStore';
 import { S1_OBJECT_LIST, s1ObjectHex } from '../../../core/project/profiles/s1-objects';
 import { resolveObjectArt } from '../../../core/project/profiles/s1-object-art';
 import { editObjectArt } from './export-sprite';
-import { ObjectThumb } from '../classic/ObjectLibraryPanel';
+import { ObjectThumb } from '../classic/ObjectThumb';
 
 /**
  * The disasm's own object list, INSIDE Sprite mode (classic sessions only) — so

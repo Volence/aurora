@@ -9,7 +9,8 @@ import ChunkPicker from './ChunkPicker';
 import ClassicComposerDock from './ClassicComposerDock';
 import ResolutionReportPanel from './ResolutionReportPanel';
 import ObjectInspector from './ObjectInspector';
-import ObjectLibraryPanel from './ObjectLibraryPanel';
+import ObjectList from '../shared/ObjectList';
+import { useClassicObjectListPort } from '../../providers/object-list-classic';
 import ClassicPalettePanel from './ClassicPalettePanel';
 import { isTypingTarget } from './composer-shared';
 import { levelKeysEnabled } from '../../workspace/level-keys';
@@ -35,6 +36,13 @@ export default function ClassicProjectView({ appBar }: { appBar: React.ReactNode
   const report = useClassicProjectStore((s) => s.report);
 
   const handle = useClassicProjectStore((s) => s.handle);
+
+  // ObjectLibraryPanel became the neutral shared/ObjectList (stage-4 plan 3).
+  // The port is resolved here, unconditionally, because the list itself renders
+  // inside the `status === 'ready'` branch below and a hook may not be called
+  // from inside a conditional. It claims the layout surface through the port's
+  // rootProps — see providers/object-list-classic.ts.
+  const objectListPort = useClassicObjectListPort();
 
   const selected = useClassicLevelStore((s) => s.ref);
   const doc = useClassicLevelStore((s) => s.doc);
@@ -146,7 +154,7 @@ export default function ClassicProjectView({ appBar }: { appBar: React.ReactNode
               <PanelHeader>Object Inspector</PanelHeader>
               <ObjectInspector />
               <PanelHeader>Object Library</PanelHeader>
-              <ObjectLibraryPanel />
+              <ObjectList port={objectListPort} label="Object library" />
               <PanelHeader>Palette</PanelHeader>
               <ClassicPalettePanel />
             </>
