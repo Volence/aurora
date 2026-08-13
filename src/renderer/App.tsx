@@ -1,91 +1,110 @@
-import React, { useEffect } from 'react';
-import Toolbar from './components/Toolbar';
-import MapViewport from './components/MapViewport';
-import SectionGridNav from './components/SectionGridNav';
-import ChunkLibrary from './components/ChunkLibrary';
-import ObjectPalette from './components/ObjectPalette';
-import RingPatternPalette from './components/RingPatternPalette';
-import CollisionPalette from './components/CollisionPalette';
-import MarqueePasteOptions from './components/MarqueePasteOptions';
-import ArtBrowser from './components/ArtBrowser';
-import PaletteViewer from './components/PaletteViewer';
-import PropertiesPanel from './components/PropertiesPanel';
+import React, { useEffect, useMemo, useState } from 'react';
 import ToastContainer from './components/ToastContainer';
-import CommandPalette, { type Command } from './components/CommandPalette';
-import ArtMode from './components/art/ArtMode';
-import SpriteMode from './components/sprite/SpriteMode';
-import ClassicProjectView from './components/classic/ClassicProjectView';
-import EditorShell from './shell/EditorShell';
-import MapToolDock from './shell/MapToolDock';
-import MapStatusBar from './shell/MapStatusBar';
-import { Panel, CollapsibleSection, T } from './components/ui';
+import CommandPalette from './components/CommandPalette';
+import TabStrip from './shell/TabStrip';
+import Explorer from './shell/Explorer';
+import ConfirmDialog from './shell/ConfirmDialog';
+import LegacyWorkspace from './shell/LegacyWorkspace';
+import HomeTab from './components/home/HomeTab';
+import ProjectSetupTab from './components/setup/ProjectSetupTab';
+import { T } from './components/ui';
 import { useProject } from './hooks/useProject';
 import { useProjectStore } from './state/projectStore';
 import { useClassicProjectStore } from './state/classicProjectStore';
-import { routeClassicSave } from './state/save-routing';
-import { useEditorStore } from './state/editorStore';
+import { useClassicLevelStore } from './state/classicLevelStore';
+import { useSessionStore } from './state/sessionStore';
+import { useShellStore } from './state/shellStore';
+import { ensureSaversRegistered, registerAeonSaver, saveAllDirty } from './state/project-runtime';
+import { useSessionLifecycle, useActTabSync } from './shell/session-lifecycle';
+import { requestOpenTab, requestFocusIndex } from './shell/tab-activation';
+import { buildCommands } from './shell/commands';
+import { classicLevelTab, aeonLevelTab, PROJECT_SETUP_TAB } from './shell/tabs';
+import { S1_OBJECT_LIST, s1ObjectHex } from '../core/project/profiles/s1-objects';
+import { resolveObjectArt } from '../core/project/profiles/s1-object-art';
+import { editObjectArt } from './components/sprite/export-sprite';
 import { registerAgentHandler } from './agent/agent-handler';
 import { refreshObjectPreviews } from './object-previews';
+import type { RecentProject } from '../shared/ipc-types';
 
 export default function App() {
   const { openProject, openProjectByPath, saveProject } = useProject();
   const error = useProjectStore((s) => s.error);
   const classicError = useClassicProjectStore((s) => s.error);
-  const classicOpen = useClassicProjectStore((s) => s.status) === 'open';
-  const tool = useEditorStore((s) => s.tool);
-  const pasting = useEditorStore((s) => s.pasting);
-  const appMode = useEditorStore((s) => s.appMode);
   const project = useProjectStore((s) => s.project);
+  const config = useProjectStore((s) => s.config);
   const currentZoneId = useProjectStore((s) => s.currentZoneId);
+  const classicOpen = useClassicProjectStore((s) => s.status) === 'open';
+  const classicLabel = useClassicProjectStore((s) => s.label);
+  const zoneTree = useClassicProjectStore((s) => s.zoneTree);
+  const classicZone = useClassicLevelStore((s) => s.ref?.zone ?? null);
+  const docReady = useClassicLevelStore((s) => s.status) === 'ready';
+  const tabs = useSessionStore((s) => s.tabs);
+  const activeId = useSessionStore((s) => s.activeId);
+  const toggleExplorer = useShellStore((s) => s.toggleExplorer);
 
-  // Save routes by which context is active (see state/save-routing.ts):
-  //   • Sprite mode editing an S1 object's art (Task B2 handoff) → save art back
-  //     through the guarded channel — otherwise Ctrl+S would fall to the classic
-  //     level save and silently no-op, losing the pixel edits.
-  //   • A classic (disasm) project open → the classic guarded level save (must
-  //     NOT target the stale aeon project still resident in projectStore).
-  //   • Otherwise → the aeon project save.
-  const guardedSave = React.useCallback(() => {
-    if (routeClassicSave()) return;
-    return saveProject();
-  }, [saveProject]);
+  const activeTab = tabs.find((t) => t.id === activeId);
 
-  // Register the MCP agent bridge handler once on mount
-  useEffect(() => { registerAgentHandler(); }, []);
+  // -- runtime wiring ------------------------------------------------------
+  useEffect(() => { registerAgentHandler(); ensureSaversRegistered(); }, []);
+  useEffect(() => { registerAeonSaver(saveProject); return () => registerAeonSaver(null); }, [saveProject]);
+  useSessionLifecycle();
+  useActTabSync();
 
   // Build object preview images (from sprite bindings) when a project/zone loads.
   useEffect(() => { if (project && currentZoneId) refreshObjectPreviews().catch(() => {}); }, [project, currentZoneId]);
 
-  // Global Ctrl+S handler
+  // -- global keys: Ctrl+S save-all, Ctrl+B explorer, Ctrl+1..9 tab jump ---
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+      if (!(e.ctrlKey || e.metaKey)) return;
+      if ((e.key === 's' || e.key === 'S') && !e.shiftKey && !e.altKey) { e.preventDefault(); void saveAllDirty(); }
+      else if ((e.key === 'b' || e.key === 'B') && !e.shiftKey && !e.altKey) { e.preventDefault(); toggleExplorer(); }
+      else if (e.key >= '1' && e.key <= '9' && !e.shiftKey && !e.altKey) {
         e.preventDefault();
-        guardedSave();
+        void requestFocusIndex(Number(e.key));
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [guardedSave]);
+  }, [toggleExplorer]);
 
-  // Window/tab title: `Aurora — <context>` (Empyrean chrome convention).
+  // -- window title: Aurora — <project> — <tab> ----------------------------
   useEffect(() => {
-    const modeLabel = appMode === 'art' ? 'Art' : appMode === 'sprite' ? 'Sprite' : 'Map';
-    const ctx = project ? [currentZoneId, modeLabel].filter(Boolean).join(' · ') : null;
-    document.title = ctx ? `Aurora — ${ctx}` : 'Aurora';
-  }, [project, currentZoneId, appMode]);
+    const projectName = classicOpen ? classicLabel : config?.name;
+    const parts = ['Aurora', projectName, activeTab && activeTab.kind !== 'home' ? activeTab.title : null];
+    document.title = parts.filter(Boolean).join(' — ');
+  }, [classicOpen, classicLabel, config, activeTab]);
 
-  // Command palette (Ctrl/Cmd-K) entries.
-  const commands: Command[] = React.useMemo(() => {
-    const setAppMode = useEditorStore.getState().setAppMode;
-    return [
-      { id: 'open', label: 'Open Project…', hint: 'project', run: () => openProject() },
-      { id: 'save', label: 'Save Project', hint: 'Ctrl+S', run: () => guardedSave() },
-      { id: 'mode-map', label: 'Switch to Map mode', hint: 'mode', run: () => setAppMode('map') },
-      { id: 'mode-art', label: 'Switch to Art mode', hint: 'mode', run: () => setAppMode('art') },
-      { id: 'mode-sprite', label: 'Switch to Sprite mode', hint: 'mode', run: () => setAppMode('sprite') },
-    ];
-  }, [openProject, guardedSave]);
+  // -- ⌘K ------------------------------------------------------------------
+  const engine = classicOpen ? ('s1' as const) : config ? ('aeon' as const) : null;
+  const [recents, setRecents] = useState<RecentProject[]>([]);
+  useEffect(() => {
+    if (engine === null) window.api.getRecentProjects().then(setRecents).catch(() => setRecents([]));
+  }, [engine]);
+  const commands = useMemo(() => {
+    const levelTabs = classicOpen
+      ? zoneTree.filter((r) => r.available).map(classicLevelTab)
+      : config
+        ? config.zones.flatMap((z) => z.acts.map((a) => aeonLevelTab(z.id, z.name, a.id)))
+        : [];
+    const objects = classicOpen && docReady && classicZone
+      ? S1_OBJECT_LIST
+          .filter(({ id }) => resolveObjectArt(id, classicZone) !== undefined)
+          .map(({ id, name }) => ({ id, name, hex: s1ObjectHex(id) }))
+      : [];
+    return buildCommands(
+      { tabs, activeId, engine, levelTabs, objects, recents },
+      {
+        openProjectDialog: () => void openProject(),
+        saveAll: () => void saveAllDirty(),
+        toggleExplorer,
+        openTab: (tab) => void requestOpenTab(tab),
+        editObjectArt: (id) => { if (classicZone) void editObjectArt(id, classicZone); },
+        openRecent: (path) => void openProjectByPath(path),
+      },
+    );
+  }, [tabs, activeId, engine, classicOpen, zoneTree, config, docReady, classicZone, recents,
+      openProject, openProjectByPath, toggleExplorer]);
 
   return (
     <div style={styles.root}>
@@ -104,85 +123,37 @@ export default function App() {
         </div>
       )}
 
-      {/* While a classic (disasm) project is open, the classic view owns the
-          screen — EXCEPT Sprite mode, which the edit-art handoff (Task B2)
-          switches into to edit an object's art. SpriteMode then renders over the
-          classic project (its guard accepts a classic project too); switching
-          back to any non-sprite mode (command palette "Switch to Map mode")
-          returns here. The classic stores are module-level singletons, so the
-          round trip preserves the open act, unsaved edits, and undo history —
-          only the classic viewport's local pan/zoom is lost (acceptable v1). */}
-      {classicOpen && appMode !== 'sprite' ? (
-        <ClassicProjectView
-          appBar={<Toolbar onOpenProject={openProject} onOpenRecent={openProjectByPath} onSave={guardedSave} />}
-        />
-      ) : appMode === 'art' ? (
-        <ArtMode appBar={<Toolbar onOpenProject={openProject} onOpenRecent={openProjectByPath} onSave={saveProject} />} />
-      ) : appMode === 'sprite' ? (
-        /* guardedSave, not saveProject: in a classic session Sprite mode's Save
-           must route to the classic level save, never the stale aeon project. */
-        <SpriteMode appBar={<Toolbar onOpenProject={openProject} onOpenRecent={openProjectByPath} onSave={guardedSave} />} />
-      ) : (
-        <EditorShell
-          appBar={<Toolbar onOpenProject={openProject} onOpenRecent={openProjectByPath} onSave={saveProject} />}
-          toolDock={<MapToolDock />}
-          panels={
-            <Panel width={240} scroll>
-              <CollapsibleSection id="map.sections" title="Sections">
-                <SectionGridNav />
-              </CollapsibleSection>
-              {/* Paste mode isn't tied to the active tool (Ctrl+V doesn't switch
-                  tools), so it's checked first and suppresses every other
-                  tool's options panel — otherwise pasting while e.g.
-                  stamp-chunk is still selected would render two panels
-                  sharing the "map.palette" collapse-state id at once. */}
-              {!pasting && tool === 'stamp-chunk' && (
-                <CollapsibleSection id="map.palette" title="Chunks">
-                  <ChunkLibrary />
-                </CollapsibleSection>
-              )}
-              {!pasting && tool === 'place-object' && (
-                <CollapsibleSection id="map.palette" title="Objects">
-                  <ObjectPalette
-                    selectedType={0}
-                    onSelectType={(type, subtype) => useEditorStore.getState().setSelectedObjectTypeId(String(type), subtype)}
-                  />
-                </CollapsibleSection>
-              )}
-              {!pasting && tool === 'place-ring' && (
-                <CollapsibleSection id="map.palette" title="Ring Patterns">
-                  <RingPatternPalette
-                    selectedIndex={useEditorStore.getState().selectedRingPattern}
-                    onSelect={(index) => useEditorStore.getState().setSelectedRingPattern(index)}
-                  />
-                </CollapsibleSection>
-              )}
-              {!pasting && tool === 'paint-collision' && (
-                <CollapsibleSection id="map.palette" title="Collision">
-                  <CollisionPalette />
-                </CollapsibleSection>
-              )}
-              {(tool === 'marquee' || pasting) && (
-                <CollapsibleSection id="map.palette" title={pasting ? 'Paste' : 'Marquee'}>
-                  <MarqueePasteOptions />
-                </CollapsibleSection>
-              )}
-              <CollapsibleSection id="map.art" title="Art">
-                <ArtBrowser />
-              </CollapsibleSection>
-              <CollapsibleSection id="map.props" title="Properties">
-                <PropertiesPanel />
-              </CollapsibleSection>
-            </Panel>
-          }
-          bottomExtra={<PaletteViewer />}
-          status={<MapStatusBar />}
-        >
-          <MapViewport />
-        </EditorShell>
-      )}
+      <div style={styles.body}>
+        <Explorer onOpenProject={openProject} onOpenRecent={openProjectByPath} />
+        <div style={styles.main}>
+          <TabStrip />
+          <div style={styles.content}>
+            {/* Keep-alive: every non-level tab stays mounted; hidden via display:none
+                so its state survives (spec §3). Level tabs all share the ONE
+                LegacyWorkspace singleton below until Stages 3–4. */}
+            {tabs.filter((t) => t.kind !== 'level').map((tab) => (
+              <div key={tab.id} style={{ ...styles.tabPane, display: tab.id === activeId ? 'flex' : 'none' }}>
+                {tab.kind === 'home' ? (
+                  <HomeTab onOpenProject={openProject} onOpenRecent={openProjectByPath} />
+                ) : tab.id === PROJECT_SETUP_TAB.id ? (
+                  <ProjectSetupTab />
+                ) : null}
+              </div>
+            ))}
+            <div style={{ ...styles.tabPane, display: activeTab?.kind === 'level' ? 'flex' : 'none' }}>
+              <LegacyWorkspace
+                onOpenProject={openProject}
+                onOpenRecent={openProjectByPath}
+                onSave={saveAllDirty}
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
       <ToastContainer />
       <CommandPalette commands={commands} />
+      <ConfirmDialog />
     </div>
   );
 }
@@ -192,6 +163,10 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex', flexDirection: 'column', height: '100vh',
     background: T.surface, color: T.textHi,
   },
+  body: { flex: 1, display: 'flex', overflow: 'hidden' },
+  main: { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' },
+  content: { flex: 1, display: 'flex', overflow: 'hidden', position: 'relative' },
+  tabPane: { flex: 1, minWidth: 0, overflow: 'hidden' },
   error: {
     padding: '6px 12px', background: T.error, color: T.void,
     fontSize: 13, display: 'flex', alignItems: 'center', gap: 8,

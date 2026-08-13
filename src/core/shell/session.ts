@@ -53,3 +53,17 @@ export function closeTab(state: SessionState, id: string): SessionState {
 export function retitleTab(state: SessionState, id: string, title: string): SessionState {
   return { ...state, tabs: state.tabs.map((t) => (t.id === id ? { ...t, title } : t)) };
 }
+
+/**
+ * Drop tabs whose targets no longer exist (project switch / stale persisted
+ * session). Home is always kept and never offered to the predicate; a pruned
+ * activeId falls back to Home.
+ */
+export function pruneSession(
+  state: SessionState,
+  isValid: (tab: TabDescriptor) => boolean,
+): SessionState {
+  const tabs = state.tabs.filter((t) => t.id === HOME_TAB.id || isValid(t));
+  const activeId = tabs.some((t) => t.id === state.activeId) ? state.activeId : HOME_TAB.id;
+  return { tabs, activeId };
+}

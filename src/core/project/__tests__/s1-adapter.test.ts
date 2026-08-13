@@ -223,6 +223,45 @@ describe('s1Adapter.open overrides', () => {
     }
     expect(handle.report.resolved).toBe(ENTRIES.length);
   });
+
+  it('surfaces the parsed sidecar config + per-entry issues on the handle', async () => {
+    const files = fullFake({
+      '.aurora/project.json': JSON.stringify({
+        base: 's1-github',
+        paths: { 'ghz.act1.fgLayout': 'levels/custom-ghz1.bin', broken: 42 },
+      }),
+      'levels/custom-ghz1.bin': '',
+    });
+    const handle = await s1Adapter.open(memFs(files));
+    expect(handle.sidecar).toBeDefined();
+    expect(handle.sidecar!.config.base).toBe('s1-github');
+    expect(handle.sidecar!.config.paths).toEqual({ 'ghz.act1.fgLayout': 'levels/custom-ghz1.bin' });
+    expect(handle.sidecar!.issues).toEqual([
+      { where: 'paths.broken', message: expect.any(String) },
+    ]);
+  });
+
+  it('a missing sidecar yields an empty sidecar state, not undefined', async () => {
+    const handle = await s1Adapter.open(memFs(fullFake()));
+    expect(handle.sidecar).toEqual({ config: {}, issues: [] });
+  });
+
+  it('a sidecar that exists but fails to read is treated as unreadable, not a parse failure', async () => {
+    const files = fullFake({
+      '.aurora/project.json': JSON.stringify({ base: 's1-github' }),
+    });
+    const fa = memFs(files);
+    const realRead = fa.read.bind(fa);
+    fa.read = async (rel: string) => {
+      if (rel === '.aurora/project.json') throw new Error('EACCES');
+      return realRead(rel);
+    };
+    const handle = await s1Adapter.open(fa);
+    expect(handle.sidecar).toEqual({
+      config: {},
+      issues: [{ where: '$', message: expect.stringContaining('unreadable') }],
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------

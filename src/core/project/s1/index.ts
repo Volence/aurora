@@ -21,6 +21,7 @@ import type {
 } from '../adapter';
 import { buildReport, type ResolutionEntry, type EntryStatus } from '../report';
 import { s1Profile, type ClassicProfile, type VariantPath, type LevelAct } from '../profiles/s1';
+import { readProjectConfig, type SidecarState } from '../mapping';
 import {
   readS1Level,
   writeS1Level,
@@ -154,41 +155,18 @@ function mk(source: ProfileEntry, path: string, status: EntryStatus, detail?: st
 // ---------------------------------------------------------------------------
 
 /**
- * Read `.aurora/project.json` overrides through the FileAccess. Precedence: the
- * sidecar is the base, and the `overrides` param passed to open() (what the main
- * process supplies) merges ON TOP of it — param keys win. A missing or malformed
- * sidecar is treated as empty (open never fails over a bad sidecar).
+ * Read `.aurora/project.json` through the shared mapping parser (spec §7).
+ * Never fails an open: a missing file is an empty config; malformed content
+ * degrades per entry, with the drops reported as issues on the handle.
  */
-// Sibling parser: core/project/mapping.ts models the same file's v2 shape
-// (base + assets); the two merge in the Stage 2 Project Setup work.
-async function readSidecar(fa: FileAccess): Promise<ProjectOverrides> {
+async function readSidecarState(fa: FileAccess): Promise<SidecarState> {
+  let bytes: Uint8Array | null;
   try {
-    if (!(await fa.exists(SIDECAR))) return {};
-    const raw = await fa.read(SIDECAR);
-    const json: unknown = JSON.parse(new TextDecoder().decode(raw));
-    if (
-      json !== null &&
-      typeof json === 'object' &&
-      'paths' in json &&
-      typeof (json as { paths: unknown }).paths === 'object' &&
-      (json as { paths: unknown }).paths !== null
-    ) {
-      // Filter to string values only: an override path that isn't a string
-      // (number, object, null from a hand-edited sidecar) must never reach
-      // fa.exists()/fa.read(), which would coerce it into a bogus path. Drop
-      // such entries so a malformed sidecar degrades gracefully to "no override
-      // for that key" rather than corrupting resolution. (Task 5 review note.)
-      const raw = (json as { paths: Record<string, unknown> }).paths;
-      const paths: Record<string, string> = {};
-      for (const [k, v] of Object.entries(raw)) {
-        if (typeof v === 'string') paths[k] = v;
-      }
-      return { paths };
-    }
-    return {};
+    bytes = (await fa.exists(SIDECAR)) ? await fa.read(SIDECAR) : null;
   } catch {
-    return {};
+    return { config: {}, issues: [{ where: '$', message: 'sidecar unreadable — ignoring it' }] };
   }
+  return readProjectConfig(bytes);
 }
 
 function mergeOverrides(
@@ -225,8 +203,8 @@ export const s1Adapter: ProjectAdapter = {
   },
 
   async open(fa: FileAccess, overrides?: ProjectOverrides): Promise<ProjectHandle> {
-    const sidecar = await readSidecar(fa);
-    const effective = mergeOverrides(sidecar, overrides);
+    const sidecar = await readSidecarState(fa);
+    const effective = mergeOverrides({ paths: sidecar.config.paths }, overrides);
 
     const entries = enumerateProfileEntries(s1Profile);
     const resolved = await Promise.all(entries.map((e) => resolveEntry(fa, e, effective)));
@@ -373,6 +351,7 @@ export const s1Adapter: ProjectAdapter = {
       },
       report,
       levels,
+      sidecar,
     };
   },
 };

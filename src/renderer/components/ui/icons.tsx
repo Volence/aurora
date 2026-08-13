@@ -26,3 +26,12 @@ export const IconRing      = svg(<circle cx="8" cy="8" r="4.5" />);
 export const IconUndo      = svg(<path d="M6 4L3 7l3 3M3 7h7a3 3 0 010 6H7" />);
 export const IconRedo      = svg(<path d="M10 4l3 3-3 3M13 7H6a3 3 0 000 6h3" />);
 export const IconChevron   = svg(<path d="M4 6l4 4 4-4" />);
+
+// Shell chrome (Task 13): explorer groups, tab strip, filter, panel toggle.
+export const IconHome    = svg(<path d="M3 8l5-5 5 5v5h-3.5v-3h-3v3H3z" />);
+export const IconLayers  = svg(<><path d="M8 2l6 3-6 3-6-3z" /><path d="M2 8.5l6 3 6-3" /><path d="M2 11.5l6 3 6-3" /></>);
+export const IconTools   = svg(<path d="M10 2a3.5 3.5 0 00-3.3 4.7L2 11.4V14h2.6l4.7-4.7A3.5 3.5 0 0014 6l-2 2-2-2 2-2a3.5 3.5 0 00-2-2z" />);
+export const IconClock   = svg(<><circle cx="8" cy="8" r="6" /><path d="M8 4.5V8l2.5 1.5" /></>);
+export const IconClose   = svg(<path d="M4 4l8 8M12 4l-8 8" />);
+export const IconSearch  = svg(<><circle cx="7" cy="7" r="4" /><path d="M10 10l4 4" /></>);
+export const IconPanelToggle = svg(<><rect x="2" y="3" width="12" height="10" rx="1" /><path d="M6 3v10" /></>);

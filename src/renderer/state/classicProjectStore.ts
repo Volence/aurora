@@ -23,6 +23,7 @@ import type {
   ProjectType,
   CapabilityManifest,
   ZoneActRef,
+  SidecarState,
 } from '../../core/project/adapter';
 import type { ResolutionReport } from '../../core/project/report';
 import { ipcClassicBridge, type ClassicBridge } from './classic-bridge';
@@ -52,6 +53,8 @@ interface ClassicProjectState {
    * tasks read/write levels through this.
    */
   handle: ProjectHandle | null;
+  /** Parsed .aurora/project.json + issues, from the opened handle (null when closed/aeon). */
+  sidecar: SidecarState | null;
 
   openDirectory: (dir: string) => Promise<OpenOutcome>;
   clearError: () => void;
@@ -77,6 +80,7 @@ const CLOSED = {
   zoneTree: [] as ZoneActRef[],
   error: null,
   handle: null,
+  sidecar: null,
 };
 
 export const useClassicProjectStore = create<ClassicProjectState>((set) => ({
@@ -97,6 +101,7 @@ export const useClassicProjectStore = create<ClassicProjectState>((set) => ({
           report: h.report,
           zoneTree: h.levels ? h.levels.list() : [],
           handle: h,
+          sidecar: h.sidecar ?? null,
           error: null,
         });
         return 'opened';

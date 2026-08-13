@@ -264,9 +264,14 @@ export default function ClassicLevelViewport() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [objectIdSig, chunkEpoch, projectDir, ref]);
 
-  // Fit the level's height into the canvas on a fresh doc, anchored top-left.
+  // Fit the level's height into the canvas when an act finishes loading (and on
+  // plane switches), anchored top-left. Keyed on load status + act + plane, NOT
+  // on doc identity: commit() replaces the doc object on every edit, so a
+  // doc-keyed fit resets the user's pan/zoom on every committed gesture —
+  // invisible at the default fit view, but a hard camera reset the moment you
+  // zoom in and then move an object / stamp a chunk / undo.
   useEffect(() => {
-    if (!doc) return;
+    if (status !== 'ready' || !doc) return;
     const grid = plane === 'bg' ? doc.bg : doc.fg;
     const container = containerRef.current;
     const h = container?.clientHeight ?? 600;
@@ -275,7 +280,7 @@ export default function ClassicLevelViewport() {
     camRef.current = { x: 0, y: 0, zoom };
     redraw();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [doc, plane]);
+  }, [status, ref, plane]);
 
   // ---- main render effect --------------------------------------------------
   // Pure draw pass: clears + composes using the cached size. It never resizes the
@@ -366,6 +371,48 @@ export default function ClassicLevelViewport() {
       }
     }
 
+    // Hover ghost preview: a translucent preview of what a click would paint/place
+    // right now, positioned via the SAME refs the hover-tracking in onMouseMove
+    // computed (which itself uses the click handlers' own cell/world helpers) —
+    // so it can't desync from the actual paint/place target. Never drawn mid-
+    // gesture (the refs are only written when none is active) or off-canvas
+    // (cleared on mouse-leave).
+    if (tool === 'stamp') {
+      const hc = hoverCellRef.current;
+      if (hc) {
+        const hx = hc.col * CHUNK_PX;
+        const hy = hc.row * CHUNK_PX;
+        ctx.save();
+        if (selectedChunkId !== 0) {
+          // Air (id 0) has no art to draw — outline-only cell in that case.
+          const key = `${chunkEpoch}:${chunkVersions.get(selectedChunkId) ?? 0}`;
+          ctx.globalAlpha = 0.6;
+          ctx.drawImage(getChunkCanvas(doc, selectedChunkId, key), hx, hy);
+          ctx.globalAlpha = 1;
+        }
+        ctx.strokeStyle = STAMP_PREVIEW_STROKE;
+        ctx.lineWidth = 1 * invZoom;
+        ctx.strokeRect(hx, hy, CHUNK_PX, CHUNK_PX);
+        ctx.restore();
+      }
+    } else if (tool === 'object' && plane === 'fg' && armedObjectId != null) {
+      const hw = hoverWorldRef.current;
+      if (hw) {
+        // Same shape + clamp constants as the click-to-place object in
+        // onMouseDown, so the ghost lands exactly where that click would.
+        const ghostObj = {
+          x: clampInt(hw.x, OBJ_X_MAX), y: clampInt(hw.y, OBJ_Y_MAX),
+          xflip: false, yflip: false, respawn: false, id: armedObjectId, subtype: 0,
+        };
+        ctx.save();
+        ctx.globalAlpha = 0.6;
+        // Reuse drawObjects' own sprite/fallback draw math via a one-object doc,
+        // rather than duplicating the sprite/ghost-marker/hex-box branching here.
+        drawObjects(ctx, { ...doc, objects: [ghostObj] }, invZoom, objectSprites, ref?.zone ?? '', null, null);
+        ctx.restore();
+      }
+    }
+
     // Stamp-gesture preview: highlight the cells the in-progress drag has painted
     // so far (the store commit lands on mouseup). Read from a ref, so it repaints
     // whenever the stroke calls redraw(). Nothing draws when not stamping.
@@ -449,6 +496,16 @@ export default function ClassicLevelViewport() {
   const startDragRef = useRef<
     { grabDX: number; grabDY: number; preview: { x: number; y: number }; moved: boolean } | null
   >(null);
+  // Hover ghost preview (stamp chunk / armed object). Refs, not state — mirrors
+  // camRef/strokeRef: mousemove writes these directly and redraws only when the
+  // tracked value actually changed, so a stationary cursor doesn't redraw storm.
+  // hoverCellRef is the stamp tool's hovered layout cell (discrete — one redraw
+  // per cell crossed); hoverWorldRef is the object tool's raw world position
+  // (continuous — redraws on every changed pixel, coalesced by rAF like drags).
+  // Both are only written when NO gesture owns the move (see onMouseMove) and are
+  // cleared on mouse-leave, so the ghost never renders mid-drag.
+  const hoverCellRef = useRef<{ col: number; row: number } | null>(null);
+  const hoverWorldRef = useRef<{ x: number; y: number } | null>(null);
 
   // The world-pixel coordinate under a mouse event, using the shared camera math.
   const worldUnderCursor = useCallback((e: React.MouseEvent): { x: number; y: number } | null => {
@@ -563,6 +620,38 @@ export default function ClassicLevelViewport() {
   }, [tool, plane, overlays.start, activeGrid, cellUnderCursor, worldUnderCursor, redraw, setArmedObjectId, setSelectedObjectIndex]);
 
   const onMouseMove = useCallback((e: React.MouseEvent) => {
+    // Hover ghost tracking — BEFORE the drag/stroke dispatch below, and gated on
+    // no gesture being active (a pan/stamp/object/start drag already owns this
+    // move's redraw + its own preview; the ghost must not also update or render
+    // during one). Uses the SAME cellUnderCursor/worldUnderCursor helpers the
+    // click handlers use, so the ghost can't desync from where a click would
+    // actually paint/place.
+    if (!dragging.current && !startDragRef.current && !objDragRef.current && !strokeRef.current) {
+      if (tool === 'stamp') {
+        const grid = activeGrid();
+        const cell = cellUnderCursor(e);
+        const inBounds =
+          grid && cell && cell.col >= 0 && cell.row >= 0 && cell.col < grid.width && cell.row < grid.height
+            ? cell
+            : null;
+        const prev = hoverCellRef.current;
+        if (inBounds?.col !== prev?.col || inBounds?.row !== prev?.row) {
+          hoverCellRef.current = inBounds;
+          redraw();
+        }
+      } else if (tool === 'object' && plane === 'fg' && armedObjectId != null) {
+        const world = worldUnderCursor(e);
+        const prev = hoverWorldRef.current;
+        if (world?.x !== prev?.x || world?.y !== prev?.y) {
+          hoverWorldRef.current = world;
+          redraw();
+        }
+      } else if (hoverCellRef.current != null || hoverWorldRef.current != null) {
+        hoverCellRef.current = null;
+        hoverWorldRef.current = null;
+        redraw();
+      }
+    }
     const sdrag = startDragRef.current;
     if (sdrag) {
       const world = worldUnderCursor(e);
@@ -607,7 +696,7 @@ export default function ClassicLevelViewport() {
     cam.x = Math.max(0, cam.x - d.x);
     cam.y = Math.max(0, cam.y - d.y);
     redraw();
-  }, [activeGrid, cellUnderCursor, worldUnderCursor, redraw]);
+  }, [tool, plane, armedObjectId, activeGrid, cellUnderCursor, worldUnderCursor, redraw]);
 
   // Commit an object-move gesture as ONE classicSetObjects (or none, when the
   // gesture was a click without movement, or the net position is unchanged).
@@ -668,10 +757,13 @@ export default function ClassicLevelViewport() {
   }, [endStroke, endObjectDrag, endStartDrag]);
   const onMouseLeave = useCallback(() => {
     // Abandon an in-progress stamp / object move / start move without committing
-    // (mouseleave cancels cleanly). A pan just ends.
+    // (mouseleave cancels cleanly). A pan just ends. Also clears the hover ghost —
+    // there's no cursor position off-canvas for it to preview.
     strokeRef.current = null;
     objDragRef.current = null;
     startDragRef.current = null;
+    hoverCellRef.current = null;
+    hoverWorldRef.current = null;
     dragging.current = false;
     redraw();
   }, [redraw]);
