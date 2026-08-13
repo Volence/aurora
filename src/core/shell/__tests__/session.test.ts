@@ -71,7 +71,10 @@ describe('tab session', () => {
   });
 
   it('pruneSession never asks the predicate about Home', () => {
-    const pruned = pruneSession(initialSession(), () => false);
+    const seen: string[] = [];
+    const s = openTab(initialSession(), level('level:ghz:1', 'GHZ Act 1'));
+    const pruned = pruneSession(s, (t) => { seen.push(t.id); return false; });
+    expect(seen).toEqual(['level:ghz:1']);   // Home never offered
     expect(pruned.tabs).toEqual([HOME_TAB]);
     expect(pruned.activeId).toBe('home');
   });
