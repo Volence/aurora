@@ -3,6 +3,7 @@ import type { LoadedS4Config } from '../../core/config/s4-config';
 import type { S4Project, Zone, Act, Tileset, Palette, ObjectDef, ChunkDef, BgLibraryEntry } from '../../core/model/s4-types';
 import type { S4Level } from '../../core/editing/commands';
 import type { CollisionProfileSet } from '../../core/collision/collision-model';
+import type { CapabilityManifest } from '../../core/project/adapter';
 
 /** A rendered object-preview image + its origin (for centering on the placement point). */
 export interface ObjectPreview {
@@ -21,6 +22,8 @@ interface ProjectState {
   /** Object id → rendered preview (from a sprite binding). Empty until built. */
   objectSprites: Map<string, ObjectPreview>;
   collisionProfiles: CollisionProfileSet | null;
+  capabilities: CapabilityManifest | null;
+  legacyAtlasMerged: boolean;
 
   setConfig: (config: LoadedS4Config) => void;
   setProject: (project: S4Project) => void;
@@ -29,6 +32,14 @@ interface ProjectState {
   setError: (error: string | null) => void;
   setObjectSprites: (sprites: Map<string, ObjectPreview>) => void;
   setCollisionProfiles: (profiles: CollisionProfileSet | null) => void;
+  /** Atomic full-project commit (aeon open). ONE set so no subscriber ever
+   *  observes config-without-project — the gap behind the aeon→aeon session-
+   *  restore sliver (stage-3 notes gap #2). */
+  openLoaded: (p: {
+    config: LoadedS4Config; project: S4Project;
+    collisionProfiles: CollisionProfileSet | null;
+    capabilities: CapabilityManifest | null; legacyAtlasMerged: boolean;
+  }) => void;
   addChunks: (chunks: ChunkDef[]) => void;
   addBgToLibrary: (entry: BgLibraryEntry) => void;
   clearChunks: () => void;
@@ -44,6 +55,8 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   error: null,
   objectSprites: new Map(),
   collisionProfiles: null,
+  capabilities: null,
+  legacyAtlasMerged: false,
 
   setConfig: (config) => set({ config, error: null }),
   setProject: (project) => set({ project }),
@@ -52,6 +65,8 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   setError: (error) => set({ error, loading: false }),
   setObjectSprites: (objectSprites) => set({ objectSprites }),
   setCollisionProfiles: (collisionProfiles) => set({ collisionProfiles }),
+  openLoaded: ({ config, project, collisionProfiles, capabilities, legacyAtlasMerged }) =>
+    set({ config, project, collisionProfiles, capabilities, legacyAtlasMerged, loading: false, error: null }),
   addChunks: (chunks) => set((state) => {
     if (!state.project) return {};
     return {
@@ -77,7 +92,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     if (!state.project) return {};
     return { project: { ...state.project, chunkLibrary: [] } };
   }),
-  reset: () => set({ config: null, project: null, currentZoneId: null, currentActId: null, loading: false, error: null, objectSprites: new Map(), collisionProfiles: null }),
+  reset: () => set({ config: null, project: null, currentZoneId: null, currentActId: null, loading: false, error: null, objectSprites: new Map(), collisionProfiles: null, capabilities: null, legacyAtlasMerged: false }),
 }));
 
 export function getCurrentZone(state: ProjectState): Zone | null {
