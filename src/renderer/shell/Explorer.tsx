@@ -4,7 +4,8 @@
 // toggles full width ↔ a 44px icon rail. Group models come from the tested
 // builders in explorer-data.ts; this component only renders and routes clicks
 // by item-id prefix: 'level:' → guarded tab open, 'obj:' → edit-art handoff,
-// 'tool:' → tool tab, 'recent:' → open recent project.
+// 'doc:sprite:' → sprite-doc tab open (aeon Object Library), 'tool:' → tool
+// tab, 'recent:' → open recent project.
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { T, Icons, CollapsibleSection } from '../components/ui';
@@ -14,9 +15,9 @@ import { useClassicProjectStore } from '../state/classicProjectStore';
 import { useClassicLevelStore } from '../state/classicLevelStore';
 import { useProjectStore } from '../state/projectStore';
 import { filterExplorer, type ExplorerGroupModel, type ExplorerItemModel } from '../../core/shell/explorer';
-import { classicExplorerGroups, aeonExplorerGroups, noProjectExplorerGroups, type ClassicObjectRow } from './explorer-data';
+import { classicExplorerGroups, aeonExplorerGroups, noProjectExplorerGroups, type ClassicObjectRow, type AeonObjectRow } from './explorer-data';
 import { requestOpenTab } from './tab-activation';
-import { classicLevelTab, aeonLevelTab, parseLevelTabId, PROJECT_SETUP_TAB } from './tabs';
+import { classicLevelTab, aeonLevelTab, parseLevelTabId, spriteDocTab, parseSpriteDocTabId, PROJECT_SETUP_TAB } from './tabs';
 import { S1_OBJECT_LIST, s1ObjectHex } from '../../core/project/profiles/s1-objects';
 import { resolveObjectArt } from '../../core/project/profiles/s1-object-art';
 import { editObjectArt } from '../components/sprite/export-sprite';
@@ -67,6 +68,7 @@ export default function Explorer({ onOpenProject, onOpenRecent }: ExplorerProps)
   const classicZone = useClassicLevelStore((s) => s.ref?.zone ?? null);
   const docReady = useClassicLevelStore((s) => s.status) === 'ready';
   const config = useProjectStore((s) => s.config);
+  const project = useProjectStore((s) => s.project);
 
   const [recents, setRecents] = useState<RecentProject[]>([]);
   const noProject = !classicOpen && !config;
@@ -85,12 +87,15 @@ export default function Explorer({ onOpenProject, onOpenRecent }: ExplorerProps)
       return classicExplorerGroups(zoneTree, objects, docReady);
     }
     if (config) {
+      const objects: AeonObjectRow[] = (project?.objectLibrary ?? []).map((o) => ({
+        id: o.id, name: o.name, sprite: o.sprite,
+      }));
       return aeonExplorerGroups(config.zones.map((z) => ({
         id: z.id, name: z.name, acts: z.acts.map((a) => ({ id: a.id })),
-      })));
+      })), objects);
     }
     return noProjectExplorerGroups(recents);
-  }, [classicOpen, zoneTree, classicZone, docReady, config, recents]);
+  }, [classicOpen, zoneTree, classicZone, docReady, config, project, recents]);
 
   const filtered = useMemo(() => filterExplorer(groups, query), [groups, query]);
 
@@ -108,6 +113,9 @@ export default function Explorer({ onOpenProject, onOpenRecent }: ExplorerProps)
     } else if (item.id.startsWith('obj:')) {
       const id = Number(item.id.slice('obj:'.length));
       void editObjectArt(id);
+    } else if (item.id.startsWith('doc:sprite:')) {
+      const p = parseSpriteDocTabId(item.id);
+      if (p) void requestOpenTab(spriteDocTab(p.engine, p.ref, item.label));
     } else if (item.id === PROJECT_SETUP_TAB.id) {
       void requestOpenTab(PROJECT_SETUP_TAB);
     } else if (item.id.startsWith('recent:')) {

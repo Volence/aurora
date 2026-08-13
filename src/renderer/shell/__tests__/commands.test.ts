@@ -15,6 +15,7 @@ const emptySnapshot: CommandSnapshot = {
   engine: null,
   levelTabs: [],
   objects: [],
+  aeonSprites: [],
   recents: [],
 };
 
@@ -77,6 +78,19 @@ describe('buildCommands', () => {
     expect(edit.hint).toBe('$4B');
     edit.run();
     expect(a.editObjectArt).toHaveBeenCalledWith(0x4b);
+  });
+
+  it('offers "Edit sprite" commands for aeon library entries', () => {
+    const a = actions();
+    const cmds = buildCommands({
+      ...emptySnapshot,
+      engine: 'aeon',
+      aeonSprites: [{ name: 'Moto Bug', sprite: 'motobug' }],
+    }, a);
+    const c = cmds.find((x) => x.id === 'edit-sprite:motobug')!;
+    expect(c.label).toBe('Edit sprite: Moto Bug');
+    c.run();
+    expect(a.openTab).toHaveBeenCalledWith({ id: 'doc:sprite:aeon:motobug', kind: 'sprite-doc', title: 'Moto Bug' });
   });
 
   it('offers recents only when no project is open', () => {

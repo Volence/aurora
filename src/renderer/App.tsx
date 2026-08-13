@@ -95,8 +95,11 @@ export default function App() {
           .filter(({ id }) => resolveObjectArt(id, classicZone) !== undefined)
           .map(({ id, name }) => ({ id, name, hex: s1ObjectHex(id) }))
       : [];
+    const aeonSprites = (project?.objectLibrary ?? [])
+      .filter((o): o is typeof o & { sprite: string } => !!o.sprite)
+      .map((o) => ({ name: o.name, sprite: o.sprite }));
     return buildCommands(
-      { tabs, activeId, engine, levelTabs, objects, recents },
+      { tabs, activeId, engine, levelTabs, objects, aeonSprites, recents },
       {
         openProjectDialog: () => void openProject(),
         saveAll: () => void saveAllDirty(),
@@ -106,7 +109,7 @@ export default function App() {
         openRecent: (path) => void openProjectByPath(path),
       },
     );
-  }, [tabs, activeId, engine, classicOpen, zoneTree, config, docReady, classicZone, recents,
+  }, [tabs, activeId, engine, classicOpen, zoneTree, config, docReady, classicZone, project, recents,
       openProject, openProjectByPath, toggleExplorer]);
 
   return (
