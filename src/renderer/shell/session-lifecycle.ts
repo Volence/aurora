@@ -125,7 +125,11 @@ export function useSessionLifecycle(): void {
     // viewport, so the seed must land first or the restore sees an empty record.
     useWorkspaceStore.getState().seed(storedWorkspace);
     if (parseSpriteDocTabId(next.activeId)) void activateSpriteDocTarget(next.activeId);
-    else if (next.activeId.startsWith('level:')) void activateLevelTarget(next.activeId);
+    // skipViewSnapshot: this is a restore, not a user switch — the "outgoing" act
+    // is the loader default with viewStore at its fresh default, so snapshotting
+    // would clobber that act's just-seeded viewport. The restore branch still
+    // applies the target act's seeded view.
+    else if (next.activeId.startsWith('level:')) void activateLevelTarget(next.activeId, { skipViewSnapshot: true });
   }, [projectKey]);
 }
 

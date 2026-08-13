@@ -208,7 +208,10 @@ function classicOpenAct(zone: string, act: number): boolean {
  * Point the singleton editor at a level tab's target. Resolves true when the
  * tab may take focus (false = user cancelled / target unavailable).
  */
-export async function activateLevelTarget(tabId: string): Promise<boolean> {
+export async function activateLevelTarget(
+  tabId: string,
+  opts?: { skipViewSnapshot?: boolean },
+): Promise<boolean> {
   const myGen = ++activationGen;
   const classic = useClassicLevelStore.getState();
   const plan = planLevelActivation({
@@ -221,18 +224,27 @@ export async function activateLevelTarget(tabId: string): Promise<boolean> {
     case 'none':
       return true;
     case 'aeon-switch': {
-      // Snapshot the outgoing act's viewport, restore the incoming act's (spec
-      // §10: viewport persists per tab). Runs entirely synchronously around the
-      // act switch. On BOOT restore the outgoing act is the loader's default
-      // (setCurrentAct(zones[0].acts[0]) ran before this dispatch), so the
-      // snapshot captures its 0,0 view and the restore applies the seeded view
-      // for the target act (session-lifecycle seeds the record BEFORE dispatch).
-      const prev = useProjectStore.getState();
-      if (prev.currentZoneId && prev.currentActId) {
-        const v = useViewStore.getState();
-        useWorkspaceStore.getState().setView(
-          `level:${prev.currentZoneId}:${prev.currentActId}`,
-          { x: v.vpX, y: v.vpY, zoom: v.zoom });
+      // Snapshot the OUTGOING act's viewport into its record, then restore the
+      // INCOMING act's (spec §10: viewport persists per tab). Runs entirely
+      // synchronously around the act switch.
+      //
+      // The snapshot only makes sense for a USER-initiated switch, where the
+      // outgoing act is the one the user was actually viewing (live viewStore =
+      // that act's state). On the BOOT-restore dispatch, session-lifecycle passes
+      // skipViewSnapshot: the "outgoing" act is merely the loader's default
+      // (setCurrentAct(zones[0].acts[0]) ran before this dispatch) and viewStore
+      // still holds its fresh default, NOT user state — snapshotting it would
+      // clobber that act's just-seeded viewport in the record (and the workspace
+      // subscription would persist the clobbered value). The restore branch below
+      // still runs so the target act's seeded viewport is applied.
+      if (!opts?.skipViewSnapshot) {
+        const prev = useProjectStore.getState();
+        if (prev.currentZoneId && prev.currentActId) {
+          const v = useViewStore.getState();
+          useWorkspaceStore.getState().setView(
+            `level:${prev.currentZoneId}:${prev.currentActId}`,
+            { x: v.vpX, y: v.vpY, zoom: v.zoom });
+        }
       }
       useProjectStore.getState().setCurrentAct(plan.zone, plan.act);
       const view = useWorkspaceStore.getState().viewFor(tabId);

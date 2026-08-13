@@ -7,6 +7,9 @@ import { useClassicProjectStore } from '../../state/classicProjectStore';
 import { useClassicLevelStore } from '../../state/classicLevelStore';
 import { useConfirmStore } from '../../state/confirmStore';
 import { useSessionStore } from '../../state/sessionStore';
+import { useProjectStore } from '../../state/projectStore';
+import { useViewStore } from '../../state/viewStore';
+import { useWorkspaceStore } from '../../workspace/workspaceStore';
 import { classicLevelTab } from '../tabs';
 import type { ZoneActRef } from '../../../core/project/adapter';
 import type { SaveClassicProjectResult } from '../../state/classic-save';
@@ -135,6 +138,62 @@ describe('activateLevelTarget (executor)', () => {
     await expect(first).resolves.toBe(false);
     expect(saveSpy).not.toHaveBeenCalled();
     expect(openActSpy).not.toHaveBeenCalled();
+  });
+});
+
+// aeon-switch viewport persistence (Task 16): a USER switch snapshots the
+// outgoing act's live viewport into its record and restores the incoming act's
+// seeded view; the BOOT-restore dispatch passes skipViewSnapshot so it does NOT
+// snapshot the loader-default act (viewStore holds the default, not user state —
+// snapshotting would clobber that act's just-seeded viewport).
+describe('activateLevelTarget aeon viewport snapshot/restore', () => {
+  beforeEach(() => {
+    useClassicProjectStore.getState().reset(); // status stays !== 'open' → engine is aeon
+    useProjectStore.getState().reset();
+    useWorkspaceStore.getState().reset();
+    // A resident aeon project (project !== null) makes currentEngine() 'aeon';
+    // start "viewing" act1.
+    useProjectStore.setState({ project: {} as never, currentZoneId: 'ehz', currentActId: 'act1' });
+  });
+
+  afterEach(() => {
+    useProjectStore.getState().reset();
+    useWorkspaceStore.getState().reset();
+    useClassicProjectStore.getState().reset();
+    useViewStore.setState({ vpX: 0, vpY: 0, zoom: 1 });
+  });
+
+  it('user switch snapshots the outgoing act and restores the incoming act', async () => {
+    useWorkspaceStore.getState().seed({
+      'level:ehz:act1': { view: { x: 1, y: 2, zoom: 1 } },
+      'level:ehz:act2': { view: { x: 30, y: 40, zoom: 2 } },
+    });
+    // Live viewport while viewing act1 (distinct from its seeded record):
+    useViewStore.setState({ vpX: 11, vpY: 22, zoom: 4 });
+
+    await activateLevelTarget('level:ehz:act2');
+
+    // act1's record now holds the LIVE snapshot, not its stale seeded value:
+    expect(useWorkspaceStore.getState().viewFor('level:ehz:act1')).toEqual({ x: 11, y: 22, zoom: 4 });
+    // viewStore restored to act2's seeded view:
+    const v = useViewStore.getState();
+    expect({ x: v.vpX, y: v.vpY, zoom: v.zoom }).toEqual({ x: 30, y: 40, zoom: 2 });
+  });
+
+  it('restore dispatch (skipViewSnapshot) leaves the outgoing act untouched', async () => {
+    useWorkspaceStore.getState().seed({
+      'level:ehz:act1': { view: { x: 1, y: 2, zoom: 1 } },
+      'level:ehz:act2': { view: { x: 30, y: 40, zoom: 2 } },
+    });
+    useViewStore.setState({ vpX: 11, vpY: 22, zoom: 4 }); // loader default, not user state
+
+    await activateLevelTarget('level:ehz:act2', { skipViewSnapshot: true });
+
+    // act1's seeded record is NOT overwritten by the (default) viewStore state:
+    expect(useWorkspaceStore.getState().viewFor('level:ehz:act1')).toEqual({ x: 1, y: 2, zoom: 1 });
+    // Incoming act2's seeded view is still applied:
+    const v = useViewStore.getState();
+    expect({ x: v.vpX, y: v.vpY, zoom: v.zoom }).toEqual({ x: 30, y: 40, zoom: 2 });
   });
 });
 
