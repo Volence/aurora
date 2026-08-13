@@ -548,6 +548,32 @@ describe('tool + selectedChunkId UI state', () => {
     expect(st().selectedChunkId).toBe(0); // per-act chunk set → reset
     expect(st().tool).toBe('stamp'); // workflow preference persists
   });
+
+  it('selectChunkForStamp sets the chunk AND arms the stamp tool from pan', () => {
+    openReady();
+    expect(st().tool).toBe('pan');
+    st().selectChunkForStamp(0x2a);
+    expect(st().selectedChunkId).toBe(0x2a);
+    expect(st().tool).toBe('stamp');
+  });
+
+  it('selectChunkForStamp switches to stamp from any other tool (e.g. object)', () => {
+    openReady();
+    st().setTool('object');
+    st().selectChunkForStamp(3);
+    expect(st().selectedChunkId).toBe(3);
+    expect(st().tool).toBe('stamp'); // picking a chunk arms stamp over object too
+  });
+
+  it('selectChunkForStamp rejects out-of-byte-range ids (no change to chunk or tool)', () => {
+    openReady();
+    st().selectChunkForStamp(-1);
+    expect(st().selectedChunkId).toBe(0);
+    expect(st().tool).toBe('pan');
+    st().selectChunkForStamp(256);
+    expect(st().selectedChunkId).toBe(0);
+    expect(st().tool).toBe('pan');
+  });
 });
 
 // ---------------------------------------------------------------------------
