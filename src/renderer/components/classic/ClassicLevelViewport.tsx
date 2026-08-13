@@ -264,9 +264,14 @@ export default function ClassicLevelViewport() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [objectIdSig, chunkEpoch, projectDir, ref]);
 
-  // Fit the level's height into the canvas on a fresh doc, anchored top-left.
+  // Fit the level's height into the canvas when an act finishes loading (and on
+  // plane switches), anchored top-left. Keyed on load status + act + plane, NOT
+  // on doc identity: commit() replaces the doc object on every edit, so a
+  // doc-keyed fit resets the user's pan/zoom on every committed gesture —
+  // invisible at the default fit view, but a hard camera reset the moment you
+  // zoom in and then move an object / stamp a chunk / undo.
   useEffect(() => {
-    if (!doc) return;
+    if (status !== 'ready' || !doc) return;
     const grid = plane === 'bg' ? doc.bg : doc.fg;
     const container = containerRef.current;
     const h = container?.clientHeight ?? 600;
@@ -275,7 +280,7 @@ export default function ClassicLevelViewport() {
     camRef.current = { x: 0, y: 0, zoom };
     redraw();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [doc, plane]);
+  }, [status, ref, plane]);
 
   // ---- main render effect --------------------------------------------------
   // Pure draw pass: clears + composes using the cached size. It never resizes the
