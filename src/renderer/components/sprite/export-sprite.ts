@@ -415,10 +415,12 @@ export function __resetSpriteSetOpenerForTest(): void { openSetImpl = openDiscov
  * no open level — the calling buttons only render for linked ids, so those are
  * guards. A failed open leaves the user where they were with an error toast.
  *
- * This does NOT open a tab — it only retargets the editor and records the loaded
- * doc id via markSpriteDocLoaded so a re-focus of the sprite-doc tab no-ops. The
- * tab surfacing is the `editObjectArt` wrapper's job (and the sprite-doc
- * activation path calls THIS directly, since the tab is already being focused).
+ * This does NOT open a tab and does NOT touch the loaded-doc marker — it only
+ * retargets the editor (checkout = load only, no marker semantics). Marking the
+ * loaded doc belongs to the CALLER that wins: the `editObjectArt` wrapper (a
+ * direct user action) marks before opening the tab, and the sprite-doc
+ * activation path marks only after its activationGen check passes — so a
+ * superseded checkout never leaves a stale marker.
  *
  * PRESELECTION: the objdef's declared `frame` is selected. The declared palette
  * LINE (`pal`) can't bind to a zone CRAM line — a classic session has no aeon
@@ -452,15 +454,17 @@ export async function editObjectArtCheckout(id: number): Promise<boolean> {
     });
     useSpriteStore.setState({ paletteMode: 'standalone', standalonePalette: colors });
   }
-  markSpriteDocLoaded('doc:sprite:s1:' + id);
   return true;
 }
 
 export async function editObjectArt(id: number): Promise<boolean> {
-  // Checkout, then surface as a sprite-doc tab (the activation guard sees the
-  // doc already loaded — markSpriteDocLoaded above — and no-ops the reload).
+  // Checkout, then surface as a sprite-doc tab. This is a direct user action, not
+  // racing an activation, so we own the loaded-doc mark here: setting it before
+  // requestOpenTab makes the follow-up sprite-doc activation see the doc already
+  // loaded and no-op the reload.
   const ok = await editObjectArtCheckout(id);
   if (ok) {
+    markSpriteDocLoaded('doc:sprite:s1:' + id);
     const name = s1ObjectName(id); // named object, or its $XX hex fallback
     await requestOpenTab(spriteDocTab('s1', String(id), name));
   }

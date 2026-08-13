@@ -69,7 +69,7 @@ describe('editObjectArtCheckout', () => {
     const ok = await editObjectArtCheckout(0x0d); // Signpost (base linkage)
 
     expect(ok).toBe(true);
-    expect(getLoadedSpriteDocId()).toBe('doc:sprite:s1:13'); // recorded only after a successful open
+    expect(getLoadedSpriteDocId()).toBeNull(); // checkout is load-only — the winning caller owns the marker
     expect(calls).toHaveLength(1);
     expect(calls[0].baseDir).toBe(DIR);
     expect(calls[0].comp).toBe('nemesis');
@@ -129,7 +129,7 @@ describe('editObjectArtCheckout', () => {
     expect(s.standalonePalette[1].r).toBeGreaterThan(0);
   });
 
-  it('does NOT record a loaded doc when the open fails', async () => {
+  it('returns false when the open fails (checkout never marks in either case)', async () => {
     // Opener reports failure (a toast fired in the real path) — the user must be
     // left where they were, not stranded on a blank/stale sprite.
     __setSpriteSetOpenerForTest(async () => false);
@@ -181,6 +181,7 @@ describe('editObjectArt wrapper', () => {
     const ok = await editObjectArt(0x0d); // Signpost
 
     expect(ok).toBe(true);
+    expect(getLoadedSpriteDocId()).toBe('doc:sprite:s1:13'); // the wrapper owns the marker
     const session = useSessionStore.getState();
     expect(session.activeId).toBe('doc:sprite:s1:13');
     expect(session.tabs.find((t) => t.id === 'doc:sprite:s1:13')).toMatchObject({

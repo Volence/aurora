@@ -154,6 +154,11 @@ export async function activateSpriteDocTarget(tabId: string): Promise<boolean> {
     return false; // loadSpriteByName rejected — stay put
   }
   if (myGen !== activationGen) return false; // superseded while the load was in flight
+  // Mark the loaded doc ONLY here, after the final gen check passes — for BOTH
+  // engine branches. A superseded flow may still have mutated the sprite editor
+  // via its loader (inherent: the loader IS the await), but it never reaches this
+  // mark, so loadedSpriteDocId always reflects the newest WINNING activation; a
+  // stale editor view self-heals on the next activation.
   markSpriteDocLoaded(tabId);
   return true;
 }
