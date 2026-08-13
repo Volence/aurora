@@ -27,6 +27,7 @@ import {
 } from '../state/classicLevelStore';
 import { saveClassicProject } from '../state/classic-save';
 import type { LevelDoc, LayoutGrid } from '../../core/level-classic/model';
+import { planProjectOpen, currentOpenDirtySnapshot } from '../shell/project-open-guard';
 
 let registered = false;
 
@@ -564,6 +565,16 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
     // ---- Classic (Sonic 1) project surface (Task 16) ----
 
     case 'classic-open-project': {
+      // Fail closed on unsaved work (stage-3 Task 7 follow-up): an agent-driven
+      // open has no UI to confirm through, so — unlike useProject.openPath, which
+      // offers Save & open / Discard & open / Cancel — this tool refuses outright
+      // rather than silently destroying unsaved classic/aeon/sprite edits.
+      if (planProjectOpen(currentOpenDirtySnapshot()).kind === 'confirm') {
+        throw new Error(
+          'Unsaved changes present (classic/aeon/sprite). Save first (Ctrl+S / save tools) ' +
+          'or have the user discard, then retry.',
+        );
+      }
       // Reuse the Task-9 open bridge exactly (no duplicated open logic): the store
       // detects classic-first and, for a real aeon dir, leaves aeon untouched.
       const outcome = await useClassicProjectStore.getState().openDirectory(req.dir);
