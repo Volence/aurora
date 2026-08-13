@@ -3,7 +3,7 @@ import { useProjectStore } from '../../state/projectStore';
 import { useClassicProjectStore } from '../../state/classicProjectStore';
 import { useClassicLevelStore } from '../../state/classicLevelStore';
 import S1ObjectSection from './S1ObjectSection';
-import { useEditorStore } from '../../state/editorStore';
+import { requestFocusTabId } from '../../shell/tab-activation';
 import { useArtStore } from '../../state/artStore';
 import { useSpriteStore } from '../../state/spriteStore';
 import { spriteModeUndo, spriteModeRedo } from '../../state/sprite-undo';
@@ -199,21 +199,20 @@ export default function SpriteMode({ appBar }: { appBar: React.ReactNode }) {
       toolOptions={<SpriteToolOptions newSize={newSize} onNewSize={setNewSize} onFit={fitToView} />}
       panels={
         <Panel width={240} scroll>
-          {/* In a classic session the Toolbar mode chips are gated on the aeon
-              project config, so Sprite mode has no visible way back to the level
-              editor (Ctrl+K aside). This STICKY bar (it must survive panel
-              scroll — users read "no way back" when it scrolls off) returns to
-              the classic view — the classic stores survive the round trip, so
-              unsaved edits + undo history are intact; save art back first to
-              keep pixel edits. The disasm context (object list + save-to-source)
-              is the PRIMARY tool cluster here; the generic import/convert flow
-              below stays available as the secondary tool. */}
+          {/* Sprite editing runs in its own sprite-doc tab; this STICKY bar (it
+              must survive panel scroll — users read "no way back" when it scrolls
+              off) FOCUSES the classic level tab this object was checked out from.
+              The classic stores survive the round trip, so unsaved edits + undo
+              history are intact; save art back first to keep pixel edits. The
+              disasm context (object list + save-to-source) is the PRIMARY tool
+              cluster here; the generic import/convert flow below stays available
+              as the secondary tool. */}
           {classicOpen && (
             <div style={styles.backBar}>
               <button
                 style={styles.backBtn}
                 title="Return to the classic level editor (Save art → first to keep pixel edits)"
-                onClick={() => useEditorStore.getState().setAppMode('map')}
+                onClick={() => { const ref = useClassicLevelStore.getState().ref; if (ref) void requestFocusTabId(`level:${ref.zone}:${ref.act}`); }}
               >
                 ← Back to {classicRef?.label ?? 'level'}
               </button>
@@ -353,7 +352,7 @@ export default function SpriteMode({ appBar }: { appBar: React.ReactNode }) {
 
           <CollapsibleSection id="sprite.palette" title="Palette">
             <SpritePaletteHeader />
-            <PaletteEditor />
+            <PaletteEditor context="sprite" />
           </CollapsibleSection>
         </Panel>
       }

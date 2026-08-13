@@ -52,11 +52,14 @@ function sameColors(a: Color[], b: Color[]): boolean {
  * Index 0 of every line is transparent (locked for editing but clickable as the
  * eraser-equivalent paint color).
  *
- * Mount invariant: PaletteEditor only renders in Art and Sprite modes.
- * MapViewport's keydown handler lacks the INPUT-type guard, so mid-drag Ctrl+Z
- * while a slider has focus is not a reachable code path.
+ * The `context` prop selects sprite behavior (mode 2/3 above) — the sprite-doc
+ * SpriteMode pane passes `context="sprite"`; the Art and Palette facets pass
+ * nothing (zone-line editing, mode 1). Mount invariant: PaletteEditor only
+ * renders in the Art/Palette facets and the sprite editor. MapViewport's keydown
+ * handler lacks the INPUT-type guard, so mid-drag Ctrl+Z while a slider has focus
+ * is not a reachable code path.
  */
-export default function PaletteEditor() {
+export default function PaletteEditor({ context }: { context?: 'sprite' }) {
   // Subscribe to paletteVersion for live-preview repaint during slider drags.
   // historyVersion re-renders swatches after undo/redo restores colors and
   // after committed commands (set-palette-line bumps both).
@@ -68,11 +71,10 @@ export default function PaletteEditor() {
   const paintColor = useArtStore((s) => s.selectedColor);
   const paintLine = useArtStore((s) => s.paletteLine);
 
-  const appMode = useEditorStore((s) => s.appMode);
   const spriteMode = useSpriteStore((s) => s.paletteMode);
   const spriteZoneLine = useSpriteStore((s) => s.zoneLine);
   const standalone = useSpriteStore((s) => s.standalonePalette);
-  const inSprite = appMode === 'sprite';
+  const inSprite = context === 'sprite';
 
   const [sel, setSel] = useState<SwatchSel | null>(null);
   const [menu, setMenu] = useState<{ x: number; y: number; heading: string; items: CopyMenuItem[] } | null>(null);

@@ -107,7 +107,7 @@ export default function Explorer({ onOpenProject, onOpenRecent }: ExplorerProps)
       }
     } else if (item.id.startsWith('obj:')) {
       const id = Number(item.id.slice('obj:'.length));
-      if (classicZone) void editObjectArt(id, classicZone);
+      void editObjectArt(id);
     } else if (item.id === PROJECT_SETUP_TAB.id) {
       void requestOpenTab(PROJECT_SETUP_TAB);
     } else if (item.id.startsWith('recent:')) {

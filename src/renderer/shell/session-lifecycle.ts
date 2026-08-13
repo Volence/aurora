@@ -23,8 +23,8 @@ import { useClassicLevelStore } from '../state/classicLevelStore';
 import { useProjectStore } from '../state/projectStore';
 import { resetProjectRuntime } from '../state/project-runtime';
 import { loadStoredSession, saveStoredSession, defaultProjectSession } from './session-storage';
-import { classicLevelTab, aeonLevelTab, PROJECT_SETUP_TAB } from './tabs';
-import { activateLevelTarget } from './tab-activation';
+import { classicLevelTab, aeonLevelTab, parseSpriteDocTabId, PROJECT_SETUP_TAB } from './tabs';
+import { activateLevelTarget, activateSpriteDocTarget } from './tab-activation';
 import type { TabDescriptor } from '../../core/shell/session';
 
 function projectLevelTabs(): TabDescriptor[] {
@@ -84,12 +84,24 @@ export function useSessionLifecycle(): void {
       PROJECT_SETUP_TAB.id,
       ...projectLevelTabs().map((t) => t.id),
     ]);
-    const stored = loadStoredSession(localStorage, projectKey, (t) => validIds.has(t.id));
+    // Sprite-doc tabs aren't enumerable (aeon sprites are named library entries;
+    // s1 checkouts are per-object), so accept them by predicate: a sprite-doc id
+    // survives the prune when its engine matches the open project kind. Content
+    // is NOT loaded here — activation runs only when the tab is focused (below).
+    const classicOpen = classicDir !== null;
+    const aeonOpen = aeonBase !== null;
+    const isValid = (t: TabDescriptor): boolean => {
+      if (validIds.has(t.id)) return true;
+      const sd = parseSpriteDocTabId(t.id);
+      return sd !== null && ((sd.engine === 'aeon' && aeonOpen) || (sd.engine === 's1' && classicOpen));
+    };
+    const stored = loadStoredSession(localStorage, projectKey, isValid);
     const next =
       stored ?? (projectKey !== null ? defaultProjectSession(firstOpenableLevelTab()) : undefined) ??
       { tabs: useSessionStore.getState().tabs.slice(0, 1), activeId: 'home' };
     useSessionStore.getState().replace(next);
-    if (next.activeId.startsWith('level:')) void activateLevelTarget(next.activeId);
+    if (parseSpriteDocTabId(next.activeId)) void activateSpriteDocTarget(next.activeId);
+    else if (next.activeId.startsWith('level:')) void activateLevelTarget(next.activeId);
   }, [projectKey]);
 }
 

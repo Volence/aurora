@@ -6,12 +6,13 @@
 // came last, so we merge the two timelines by the global edit-sequence stamp
 // each history records (see core/editing/edit-seq.ts).
 //
-// The level command history is a GLOBAL stack shared with map/art mode and is
-// NOT cleared on entering sprite mode. To avoid sprite-mode undo reaching back
-// into pre-existing map/art edits (which would change the level silently — the
-// map isn't even mounted in sprite mode), we capture a baseline of the edit
-// clock each time sprite mode is entered and only consider level edits newer
-// than it. Sprite pixel/frame edits are always the sprite document's own.
+// The level command history is a GLOBAL stack shared with map/art editing and
+// is NOT cleared when a sprite-doc tab takes focus. To avoid sprite-mode undo
+// reaching back into pre-existing map/art edits (which would change the level
+// silently — the map isn't even mounted while a sprite-doc tab is active), we
+// capture a baseline of the edit clock each time focus moves ONTO a sprite-doc
+// tab and only consider level edits newer than it. Sprite pixel/frame edits are
+// always the sprite document's own.
 //
 // This is sprite-mode-only glue; map/art mode keeps calling the level history
 // directly. Both histories still own their own apply/undo — this only chooses
@@ -20,19 +21,28 @@
 // "Level history" here means the ACTIVE aeon document's history (activeHistory,
 // hub-keyed by the current act) — resolved once per call; the active act cannot
 // change mid-function (all synchronous).
-import { activeHistory, undo as levelUndo, redo as levelRedo, useEditorStore } from './editorStore';
+import { activeHistory, undo as levelUndo, redo as levelRedo } from './editorStore';
 import type { EditHistory } from '../../core/editing/history';
 import { spriteHistory, useSpriteStore } from './spriteStore';
 import { useProjectStore, getActiveLevel } from './projectStore';
+import { useSessionStore } from './sessionStore';
+import { parseSpriteDocTabId } from '../shell/tabs';
 import { peekEditSeq } from '../../core/editing/edit-seq';
 
 // Edits with seq <= this existed before the current sprite session began; the
-// coordinator never touches them. Re-captured on each entry into sprite mode.
+// coordinator never touches them. Re-captured each time focus moves onto a
+// sprite-doc tab.
 let levelBaselineSeq = peekEditSeq();
-let prevAppMode = useEditorStore.getState().appMode;
-useEditorStore.subscribe((state) => {
-  if (state.appMode === 'sprite' && prevAppMode !== 'sprite') levelBaselineSeq = peekEditSeq();
-  prevAppMode = state.appMode;
+useSessionStore.subscribe((state, prevState) => {
+  // Re-baseline when focus moves ONTO a sprite-doc tab from a non-sprite tab.
+  //
+  // The baseline + merge operate against the ACTIVE act's history; switching act
+  // tabs mid-sprite-session makes pre-switch level edits invisible to the merged
+  // timeline (they live in the other act's history) — a direct consequence of
+  // per-document undo, accepted.
+  if (parseSpriteDocTabId(state.activeId) !== null && parseSpriteDocTabId(prevState.activeId) === null) {
+    levelBaselineSeq = peekEditSeq();
+  }
 });
 
 /** Level history has a sprite-session undo entry (one made after entering sprite mode). */

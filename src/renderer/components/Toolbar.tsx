@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useProjectStore, getActiveLevel } from '../state/projectStore';
-import { useEditorStore, activeHistory, undo, redo, type EditingLayer, type AppMode } from '../state/editorStore';
+import { useEditorStore, activeHistory, undo, redo } from '../state/editorStore';
+import { useSessionStore } from '../state/sessionStore';
+import { parseSpriteDocTabId } from '../shell/tabs';
 import { useSpriteStore } from '../state/spriteStore';
 import { spriteModeUndo, spriteModeRedo, spriteModeCanUndo, spriteModeCanRedo } from '../state/sprite-undo';
 import { useClassicProjectStore } from '../state/classicProjectStore';
@@ -23,17 +25,20 @@ export default function Toolbar({ onOpenProject, onOpenRecent, onSave }: Toolbar
   const currentActId = useProjectStore((s) => s.currentActId);
   const loading = useProjectStore((s) => s.loading);
   const dirty = useEditorStore((s) => s.dirty);
-  const editingLayer = useEditorStore((s) => s.editingLayer);
   const historyVersion = useEditorStore((s) => s.historyVersion);
-  const appMode = useEditorStore((s) => s.appMode);
-  const setAppMode = useEditorStore((s) => s.setAppMode);
+  // Sprite editing runs in a sprite-doc tab; when one is active the undo/redo
+  // controls drive the merged sprite timeline (this Toolbar is the sprite-doc
+  // pane's app bar). Otherwise they drive the active level's history.
+  const activeId = useSessionStore((s) => s.activeId);
+  const isSpriteDoc = parseSpriteDocTabId(activeId) !== null;
   // Re-evaluate sprite Undo/Redo enablement whenever the sprite history changes.
   const spriteTick = useSpriteStore((s) => s.historyTick);
 
   // Classic (disasm) session state — the toolbar's classic twin of the aeon
-  // block below: persistent zone/act selector + Level/Sprite mode chips +
-  // undo/redo/save, visible in BOTH the level view and Sprite mode so the two
-  // surfaces stay visibly part of one app.
+  // block below: persistent zone/act selector + undo/redo/save, rendered in BOTH
+  // the classic level view (ClassicProjectView's app bar) and the sprite-doc pane
+  // (App's SpriteMode app bar) so the two surfaces stay visibly part of one app.
+  // Sprite mode is now reached by opening a sprite-doc tab, not a mode chip.
   const classicOpen = useClassicProjectStore((s) => s.status) === 'open';
   const zoneTree = useClassicProjectStore((s) => s.zoneTree);
   const classicRef = useClassicLevelStore((s) => s.ref);
@@ -139,38 +144,14 @@ export default function Toolbar({ onOpenProject, onOpenRecent, onSave }: Toolbar
 
           <Divider />
 
-          {(['map', 'art', 'sprite'] as AppMode[]).map((mode) => (
-            <Chip
-              key={mode}
-              active={appMode === mode}
-              onClick={() => setAppMode(mode)}
-            >
-              {mode === 'map' ? 'Map' : mode === 'art' ? 'Art' : 'Sprite'}
-            </Chip>
-          ))}
-
-          <Divider />
-
-          {appMode === 'map' && (['fg', 'bg'] as EditingLayer[]).map((layer) => (
-            <Chip
-              key={layer}
-              active={editingLayer === layer}
-              onClick={() => useEditorStore.getState().setEditingLayer(layer)}
-            >
-              {layer.toUpperCase()}
-            </Chip>
-          ))}
-
-          {appMode === 'map' && <Divider />}
-
           <IconButton
             icon={<Icons.IconUndo size={14} />}
             label="Undo (Ctrl+Z)"
             onClick={() => {
-              if (appMode === 'sprite') spriteModeUndo();
+              if (isSpriteDoc) spriteModeUndo();
               else { const l = getLevel(); if (l) undo(l); }
             }}
-            disabled={appMode === 'sprite'
+            disabled={isSpriteDoc
               ? (void spriteTick, void historyVersion, !spriteModeCanUndo())
               : !activeHistory().canUndo}
           />
@@ -178,10 +159,10 @@ export default function Toolbar({ onOpenProject, onOpenRecent, onSave }: Toolbar
             icon={<Icons.IconRedo size={14} />}
             label="Redo (Ctrl+Y)"
             onClick={() => {
-              if (appMode === 'sprite') spriteModeRedo();
+              if (isSpriteDoc) spriteModeRedo();
               else { const l = getLevel(); if (l) redo(l); }
             }}
-            disabled={appMode === 'sprite'
+            disabled={isSpriteDoc
               ? (void spriteTick, void historyVersion, !spriteModeCanRedo())
               : !activeHistory().canRedo}
           />
@@ -221,19 +202,14 @@ export default function Toolbar({ onOpenProject, onOpenRecent, onSave }: Toolbar
 
           <Divider />
 
-          <Chip active={appMode !== 'sprite'} onClick={() => setAppMode('map')}>Level</Chip>
-          <Chip active={appMode === 'sprite'} onClick={() => setAppMode('sprite')}>Sprite</Chip>
-
-          <Divider />
-
           <IconButton
             icon={<Icons.IconUndo size={14} />}
             label="Undo (Ctrl+Z)"
             onClick={() => {
-              if (appMode === 'sprite') spriteModeUndo();
+              if (isSpriteDoc) spriteModeUndo();
               else useClassicLevelStore.getState().undo();
             }}
-            disabled={appMode === 'sprite'
+            disabled={isSpriteDoc
               ? (void spriteTick, !spriteModeCanUndo())
               : (void classicHistoryTick, !classicCanUndo())}
           />
@@ -241,10 +217,10 @@ export default function Toolbar({ onOpenProject, onOpenRecent, onSave }: Toolbar
             icon={<Icons.IconRedo size={14} />}
             label="Redo (Ctrl+Y)"
             onClick={() => {
-              if (appMode === 'sprite') spriteModeRedo();
+              if (isSpriteDoc) spriteModeRedo();
               else useClassicLevelStore.getState().redo();
             }}
-            disabled={appMode === 'sprite'
+            disabled={isSpriteDoc
               ? (void spriteTick, !spriteModeCanRedo())
               : (void classicHistoryTick, !classicCanRedo())}
           />

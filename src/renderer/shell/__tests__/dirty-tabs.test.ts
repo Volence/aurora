@@ -3,7 +3,7 @@ import { tabHasDirtyDot, type DirtySnapshot } from '../dirty-tabs';
 
 const base: DirtySnapshot = {
   classicOpen: false, classicRef: null, classicDirty: false,
-  aeonOpen: false, aeonDirty: false, spriteArtPending: false,
+  aeonOpen: false, aeonDirty: false, loadedSpriteDocId: null, spriteDirty: false,
 };
 
 describe('tabHasDirtyDot', () => {
@@ -20,12 +20,24 @@ describe('tabHasDirtyDot', () => {
     expect(tabHasDirtyDot('level:ghz:1', 'level', { ...s, classicDirty: false })).toBe(false);
   });
 
-  it('classic: pending sprite-art edits dot the loaded act tab too', () => {
+  it('classic: a checked-out sprite does NOT dot its origin level tab (it dots the sprite-doc tab instead)', () => {
+    // Sprite editor is dirty, but the level itself is clean — the level tab stays undotted.
     const s = {
       ...base, classicOpen: true, classicRef: { zone: 'ghz', act: 1 },
-      spriteArtPending: true,
+      loadedSpriteDocId: 'doc:sprite:s1:13', spriteDirty: true,
     };
-    expect(tabHasDirtyDot('level:ghz:1', 'level', s)).toBe(true);
+    expect(tabHasDirtyDot('level:ghz:1', 'level', s)).toBe(false);
+  });
+
+  it('sprite-doc: only the LOADED sprite-doc tab dots, and only when dirty', () => {
+    const s = { ...base, loadedSpriteDocId: 'doc:sprite:s1:13', spriteDirty: true };
+    expect(tabHasDirtyDot('doc:sprite:s1:13', 'sprite-doc', s)).toBe(true);
+    // A different sprite-doc tab (not the loaded one) never dots.
+    expect(tabHasDirtyDot('doc:sprite:aeon:motobug', 'sprite-doc', s)).toBe(false);
+    // The loaded tab is clean → no dot.
+    expect(tabHasDirtyDot('doc:sprite:s1:13', 'sprite-doc', { ...s, spriteDirty: false })).toBe(false);
+    // No sprite loaded at all → no dot.
+    expect(tabHasDirtyDot('doc:sprite:s1:13', 'sprite-doc', { ...base, spriteDirty: true })).toBe(false);
   });
 
   it('aeon: project-wide dirtiness dots every level tab (honest aggregate, spec §10)', () => {

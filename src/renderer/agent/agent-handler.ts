@@ -28,6 +28,10 @@ import {
 import { saveClassicProject } from '../state/classic-save';
 import type { LevelDoc, LayoutGrid } from '../../core/level-classic/model';
 import { planProjectOpen, currentOpenDirtySnapshot } from '../shell/project-open-guard';
+import { useSessionStore } from '../state/sessionStore';
+import { parseLevelTabId } from '../shell/tabs';
+import { switchFacet } from '../workspace/facet-tools';
+import { useWorkspaceStore } from '../workspace/workspaceStore';
 
 let registered = false;
 
@@ -75,14 +79,17 @@ function budgetSummary(ctx: Ctx) {
 }
 
 /**
- * Ensure the app is showing the map viewport before operations that read or
- * write its canvas (goto, screenshot). MapViewport and its canvas are unmounted
- * while in Art mode, so we switch back to Map and wait two frames for the
- * component to mount and paint before proceeding.
+ * Ensure the layout facet (its MapViewport + canvas) is showing before agent
+ * operations that read or write that canvas (goto, screenshot): agent edits
+ * target the map, so make the layout facet visible if a level tab is up. A level
+ * tab on a non-layout facet leaves MapViewport unmounted, so switch the active
+ * level tab to its layout facet and wait two frames for the component to mount
+ * and paint before proceeding.
  */
 async function ensureMapMode(): Promise<void> {
-  if (useEditorStore.getState().appMode !== 'map') {
-    useEditorStore.getState().setAppMode('map');
+  const activeId = useSessionStore.getState().activeId;
+  if (parseLevelTabId(activeId) && useWorkspaceStore.getState().facetFor(activeId) !== 'layout') {
+    switchFacet(activeId, 'layout');
     await new Promise<void>(r => requestAnimationFrame(() => requestAnimationFrame(() => r())));
   }
 }

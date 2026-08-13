@@ -36,7 +36,7 @@ export default function S1ObjectSection({ busy, onBusy }: { busy: boolean; onBus
       'Switching objects discards unsaved sprite edits (use Save art → first to keep them). Switch anyway?',
     )) return;
     onBusy(true);
-    try { await editObjectArt(id, zone); } finally { onBusy(false); }
+    try { await editObjectArt(id); } finally { onBusy(false); }
   };
 
   return (

@@ -6,6 +6,8 @@ import Explorer from './shell/Explorer';
 import ConfirmDialog from './shell/ConfirmDialog';
 import LegacyWorkspace from './shell/LegacyWorkspace';
 import LevelWorkspace from './workspace/LevelWorkspace';
+import SpriteMode from './components/sprite/SpriteMode';
+import Toolbar from './components/Toolbar';
 import HomeTab from './components/home/HomeTab';
 import ProjectSetupTab from './components/setup/ProjectSetupTab';
 import { T } from './components/ui';
@@ -100,7 +102,7 @@ export default function App() {
         saveAll: () => void saveAllDirty(),
         toggleExplorer,
         openTab: (tab) => void requestOpenTab(tab),
-        editObjectArt: (id) => { if (classicZone) void editObjectArt(id, classicZone); },
+        editObjectArt: (id) => { void editObjectArt(id); },
         openRecent: (path) => void openProjectByPath(path),
       },
     );
@@ -131,8 +133,10 @@ export default function App() {
           <div style={styles.content}>
             {/* Keep-alive: every non-level tab stays mounted; hidden via display:none
                 so its state survives (spec §3). Level tabs all share the ONE
-                LegacyWorkspace singleton below until Stages 3–4. */}
-            {tabs.filter((t) => t.kind !== 'level').map((tab) => (
+                LegacyWorkspace singleton below until Stages 3–4. Sprite-doc tabs
+                are EXCLUDED here — SpriteMode has exactly one mounting point (see
+                below), mounted only while a sprite-doc tab is active. */}
+            {tabs.filter((t) => t.kind !== 'level' && t.kind !== 'sprite-doc').map((tab) => (
               <div key={tab.id} style={{ ...styles.tabPane, display: tab.id === activeId ? 'flex' : 'none' }}>
                 {tab.kind === 'home' ? (
                   <HomeTab onOpenProject={openProject} onOpenRecent={openProjectByPath} />
@@ -148,6 +152,16 @@ export default function App() {
                 <LevelWorkspace />
               ) : null}
             </div>
+            {/* SpriteMode's ONE mounting point — mounted ONLY while a sprite-doc
+                tab is active, NOT keep-alive: two live SpriteMode instances would
+                double-register its window keydown handler and double-fire undo.
+                Sprite state lives in the module-level spriteStore, so a remount is
+                lossless. */}
+            {activeTab?.kind === 'sprite-doc' && (
+              <div style={{ ...styles.tabPane, display: 'flex' }}>
+                <SpriteMode appBar={<Toolbar onOpenProject={openProject} onOpenRecent={openProjectByPath} onSave={() => { void saveAllDirty(); }} />} />
+              </div>
+            )}
           </div>
         </div>
       </div>

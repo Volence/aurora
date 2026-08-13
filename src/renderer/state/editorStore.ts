@@ -7,6 +7,8 @@ import { useArtStore } from './artStore';
 import { registerRedoClearer, invalidateSiblingRedos } from '../../core/editing/undo-bus';
 import { documentHistoryHub } from './history-hub';
 import { useProjectStore } from './projectStore';
+import { useSessionStore } from './sessionStore';
+import { parseSpriteDocTabId } from '../shell/tabs';
 
 export type EditorTool =
   | 'view' | 'select' | 'paint-tile' | 'paint-block' | 'stamp-chunk'
@@ -76,8 +78,6 @@ export const RING_PATTERNS: RingPattern[] = [
 
 export type EditingLayer = 'fg' | 'bg';
 
-export type AppMode = 'map' | 'art' | 'sprite';
-
 interface EditorState {
   tool: EditorTool;
   selection: Selection | null;
@@ -85,7 +85,6 @@ interface EditorState {
   dirty: boolean;
   historyVersion: number;
   chunkLibraryVersion: number;
-  appMode: AppMode;
 
   // S4 tool state
   activeSectionIndex: number;
@@ -120,7 +119,6 @@ interface EditorState {
   setMultiSelection: (multiSelection: MultiSelection | null) => void;
   setActiveSectionIndex: (index: number) => void;
   setEditingLayer: (layer: EditingLayer) => void;
-  setAppMode: (mode: AppMode) => void;
   setSelectedTileIndex: (index: number) => void;
   setSelectedPaletteLine: (line: number) => void;
   setSelectedChunkId: (id: string | null) => void;
@@ -172,7 +170,6 @@ export const useEditorStore = create<EditorState>((set) => ({
   dirty: false,
   historyVersion: 0,
   chunkLibraryVersion: 0,
-  appMode: 'map' as AppMode,
 
   activeSectionIndex: 0,
   editingLayer: 'fg',
@@ -203,7 +200,6 @@ export const useEditorStore = create<EditorState>((set) => ({
   setMultiSelection: (multiSelection) => set({ multiSelection, selection: null }),
   setActiveSectionIndex: (index) => set({ activeSectionIndex: index }),
   setEditingLayer: (layer) => set({ editingLayer: layer }),
-  setAppMode: (mode) => set({ appMode: mode }),
   setSelectedTileIndex: (index) => set({ selectedTileIndex: index }),
   setSelectedPaletteLine: (line) => set({ selectedPaletteLine: line }),
   setSelectedChunkId: (id) => set({ selectedChunkId: id }),
@@ -282,10 +278,11 @@ function bumpStoreVersions(cmd: AnyCommand): void {
 export function executeCommand(command: AnyCommand, level: S4Level): void {
   const h = activeHistory();
   h.execute(command, level);
-  // In sprite mode a palette edit is a new entry in the merged sprite-mode
-  // timeline, so it invalidates the sprite history's redo. Gated on sprite mode
-  // so ordinary level editing (map/art) never disturbs a sprite's redo stack.
-  if (useEditorStore.getState().appMode === 'sprite') invalidateSiblingRedos(clearLevelRedo);
+  // While a sprite-doc tab is active a palette edit is a new entry in the merged
+  // sprite-mode timeline, so it invalidates the sprite history's redo. Gated on
+  // that so ordinary level editing (map/art facets) never disturbs a sprite's
+  // redo stack.
+  if (parseSpriteDocTabId(useSessionStore.getState().activeId) !== null) invalidateSiblingRedos(clearLevelRedo);
   bumpStoreVersions(command);
   invalidationListener?.(command);
   useEditorStore.getState().markDirty();

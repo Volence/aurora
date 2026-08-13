@@ -12,7 +12,8 @@ import { useProjectStore } from '../state/projectStore';
 import { useConfirmStore } from '../state/confirmStore';
 import { useToastStore } from '../state/toastStore';
 import { saveClassicProject, type SaveClassicProjectResult } from '../state/classic-save';
-import { parseLevelTabId } from './tabs';
+import { useSpriteStore, spriteHistory } from '../state/spriteStore';
+import { parseLevelTabId, parseSpriteDocTabId } from './tabs';
 import { HOME_TAB, type TabDescriptor } from '../../core/shell/session';
 
 // The save call is behind a seam (mirrors the retired save router's convention) so the
@@ -66,6 +67,95 @@ function currentEngine(): 's1' | 'aeon' | null {
   if (useClassicProjectStore.getState().status === 'open') return 's1';
   if (useProjectStore.getState().project !== null) return 'aeon';
   return null;
+}
+
+// --- Sprite-doc activation -------------------------------------------------
+//
+// The sprite editor has ONE mounting point (an App-level pane rendered only
+// while a sprite-doc tab is active). Only one sprite is loaded at a time, so
+// focusing a different sprite-doc tab RETARGETS that single editor — which
+// discards the current sprite's edits + undo history (loadSprite clears both).
+// loadedSpriteDocId tracks which sprite the editor currently shows so a re-focus
+// of the same doc no-ops instead of reloading.
+
+let loadedSpriteDocId: string | null = null;
+export function markSpriteDocLoaded(id: string | null): void { loadedSpriteDocId = id; }
+export function getLoadedSpriteDocId(): string | null { return loadedSpriteDocId; }
+
+export function spriteEditorDirty(): boolean {
+  // s1ArtSource = checked-out classic art (Ctrl+S would write it);
+  // spriteHistory.canUndo = any edit since the doc opened. canUndo survives a
+  // successful save-art (history isn't cleared on save) so this can over-ask —
+  // fails safe.
+  return useSpriteStore.getState().s1ArtSource !== null || spriteHistory.canUndo;
+}
+
+export type SpriteDocPlan =
+  | { kind: 'none' }
+  | { kind: 'open'; engine: 's1' | 'aeon'; ref: string }
+  | { kind: 'confirm'; engine: 's1' | 'aeon'; ref: string };
+
+export function planSpriteDocActivation(input: {
+  tabId: string;
+  loadedDocId: string | null;
+  spriteDirty: boolean;
+}): SpriteDocPlan {
+  const ref = parseSpriteDocTabId(input.tabId);
+  if (!ref) return { kind: 'none' };
+  if (input.loadedDocId === input.tabId) return { kind: 'none' };
+  return input.spriteDirty
+    ? { kind: 'confirm', engine: ref.engine, ref: ref.ref }
+    : { kind: 'open', engine: ref.engine, ref: ref.ref };
+}
+
+/**
+ * Point the singleton sprite editor at a sprite-doc tab's target. Resolves true
+ * when the tab may take focus (false = user cancelled / open failed). Shares the
+ * module's activationGen counter with activateLevelTarget so a newer activation
+ * of either kind supersedes an older one mid-await.
+ *
+ * IMPORT CYCLE: export-sprite statically imports this module (markSpriteDocLoaded
+ * + requestOpenTab, for the classic edit-art handoff), so this module must NOT
+ * statically import export-sprite back. The two sprite loaders are pulled in via
+ * a dynamic import() at call time to break that cycle.
+ */
+export async function activateSpriteDocTarget(tabId: string): Promise<boolean> {
+  const myGen = ++activationGen;
+  const plan = planSpriteDocActivation({
+    tabId,
+    loadedDocId: loadedSpriteDocId,
+    spriteDirty: spriteEditorDirty(),
+  });
+  if (plan.kind === 'none') return true;
+
+  if (plan.kind === 'confirm') {
+    const answer = await useConfirmStore.getState().ask({
+      title: 'Unsaved sprite edits',
+      body: 'Opening another sprite reloads the editor and discards unsaved sprite edits and undo history.',
+      buttons: [
+        { key: 'discard', label: 'Discard & open', tone: 'danger' },
+        { key: 'cancel', label: 'Cancel' },
+      ],
+    });
+    if (myGen !== activationGen) return false; // superseded while the dialog was open
+    if (answer !== 'discard') return false; // 'cancel' (or any unrecognized key)
+  }
+
+  // Dynamic import breaks the export-sprite ↔ tab-activation cycle (see above).
+  const { loadSpriteByName, editObjectArtCheckout } = await import('../components/sprite/export-sprite');
+  if (myGen !== activationGen) return false; // superseded while the module loaded
+  try {
+    if (plan.engine === 'aeon') {
+      await loadSpriteByName(plan.ref);
+    } else if (!(await editObjectArtCheckout(Number(plan.ref)))) {
+      return false; // checkout failed (a toast already fired) — leave the editor as-is
+    }
+  } catch {
+    return false; // loadSpriteByName rejected — stay put
+  }
+  if (myGen !== activationGen) return false; // superseded while the load was in flight
+  markSpriteDocLoaded(tabId);
+  return true;
 }
 
 function classicOpenAct(zone: string, act: number): boolean {
@@ -132,9 +222,10 @@ export async function activateLevelTarget(tabId: string): Promise<boolean> {
   }
 }
 
-/** Open (or focus) a tab, running the level-activation guard first. */
+/** Open (or focus) a tab, running the level/sprite-doc activation guard first. */
 export async function requestOpenTab(tab: TabDescriptor): Promise<void> {
   if (tab.kind === 'level' && !(await activateLevelTarget(tab.id))) return;
+  if (tab.kind === 'sprite-doc' && !(await activateSpriteDocTarget(tab.id))) return;
   useSessionStore.getState().open(tab);
 }
 
@@ -162,6 +253,7 @@ export async function requestCloseTab(id: string): Promise<void> {
   const remaining = session.tabs.filter((t) => t.id !== id);
   const promoted = remaining[idx] ?? remaining[idx - 1] ?? remaining[0];
   if (promoted && promoted.kind === 'level' && !(await activateLevelTarget(promoted.id))) return;
+  if (promoted && promoted.kind === 'sprite-doc' && !(await activateSpriteDocTarget(promoted.id))) return;
   useSessionStore.getState().close(id);
 }
 

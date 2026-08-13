@@ -164,9 +164,9 @@ registerRedoClearer(clearSpriteRedo);
 
 /** Record a pre-edit snapshot AND invalidate sibling (level) redo — every sprite
  *  edit funnels through here so the merged sprite-mode timeline stays consistent.
- *  Not gated on appMode: every store mutator that reaches here is reachable only
- *  while editing a sprite (i.e. in sprite mode), so the level-redo invalidation
- *  is always a sprite-session event. */
+ *  Ungated: every store mutator that reaches here is reachable only while editing
+ *  a sprite (i.e. a sprite-doc tab is active), so the level-redo invalidation is
+ *  always a sprite-session event. */
 function recordEdit(s: SpriteState): void {
   invalidateSiblingRedos(clearSpriteRedo);
   history.record(snap(s));

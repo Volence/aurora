@@ -14,7 +14,7 @@ import { useProjectStore } from '../state/projectStore';
 import { useEditorStore } from '../state/editorStore';
 import { useSpriteStore } from '../state/spriteStore';
 import { tabHasDirtyDot, type DirtySnapshot } from './dirty-tabs';
-import { requestFocusTabId, requestCloseTab } from './tab-activation';
+import { requestFocusTabId, requestCloseTab, getLoadedSpriteDocId, spriteEditorDirty } from './tab-activation';
 import type { TabDescriptor } from '../../core/shell/session';
 
 function useDirtySnapshot(): DirtySnapshot {
@@ -23,7 +23,12 @@ function useDirtySnapshot(): DirtySnapshot {
   const classicDirty = useClassicLevelStore((s) => Object.values(s.dirty).some(Boolean));
   const aeonOpen = useProjectStore((s) => s.project) !== null;
   const aeonDirty = useEditorStore((s) => s.dirty);
-  const spriteArtPending = useSpriteStore((s) => s.s1ArtSource) !== null;
+  // Subscribe to the sprite pieces so the strip re-renders as sprite edits land
+  // (historyTick) or art is checked out/released (s1ArtSource); the dirty verdict
+  // itself is spriteEditorDirty() over live state. The loaded sprite-doc id
+  // changes in lockstep with a tab open/focus (activeId subscription re-renders).
+  useSpriteStore((s) => s.historyTick);
+  useSpriteStore((s) => s.s1ArtSource);
   return {
     classicOpen,
     // classicRef = the LOADED act (store's ref), not a tree selection — dirty dots must track the doc that owns the edits.
@@ -31,7 +36,8 @@ function useDirtySnapshot(): DirtySnapshot {
     classicDirty,
     aeonOpen,
     aeonDirty,
-    spriteArtPending,
+    loadedSpriteDocId: getLoadedSpriteDocId(),
+    spriteDirty: spriteEditorDirty(),
   };
 }
 

@@ -43,18 +43,18 @@ export default function ClassicProjectView({ appBar }: { appBar: React.ReactNode
 
   // Opening a different project must not leave a stale act selected/loaded — the
   // old doc was read through the previous handle. Keyed on HANDLE IDENTITY, not
-  // `dir`, and guarded by a module-level marker so a remount does NOT reset:
-  // this view unmounts whenever the user hops to Sprite mode (App routes classic
-  // + appMode==='sprite' → SpriteMode) and remounts on return; a dir-keyed
-  // mount effect would wipe the classic level store (doc + undo history + unsaved
-  // edits) on every such round trip. A new project always produces a NEW handle
-  // object, so comparing handles resets on a genuine project change only.
+  // `dir`, and guarded by a module-level marker so a remount does NOT reset: the
+  // level pane (this view's host) can remount across tab switches, and a
+  // dir-keyed mount effect would wipe the classic level store (doc + undo history
+  // + unsaved edits) on every such round trip. A new project always produces a
+  // NEW handle object, so comparing handles resets on a genuine project change
+  // only.
   // NOTE (Task 7): classicProjectStore.openDirectory now calls
   // useClassicLevelStore.reset() itself as soon as a switch begins, closing the
-  // stale-handle window that existed if this view was unmounted mid-switch (e.g.
-  // switching away from sprite mode). This effect's reset is now redundant for
-  // that case but stays as a harmless idempotent backstop — it still owns the
-  // "remount without a real handle change should not reset" guard above.
+  // stale-handle window that existed if this view was unmounted mid-switch. This
+  // effect's reset is now redundant for that case but stays as a harmless
+  // idempotent backstop — it still owns the "remount without a real handle change
+  // should not reset" guard above.
   React.useEffect(() => {
     if (handle !== lastResetHandle) {
       lastResetHandle = handle;
@@ -67,8 +67,8 @@ export default function ClassicProjectView({ appBar }: { appBar: React.ReactNode
   // inside a classic project yet, so the sprite-undo-style recency coordinator
   // (src/renderer/state/sprite-undo.ts) isn't needed until Task 12's object
   // editing lands; when it does, this becomes a coordinator over both histories.
-  // Matches the repo's binding scheme (SpriteMode/ArtMode): Ctrl+Z undo,
-  // Ctrl+Shift+Z / Ctrl+Y redo, ignored while typing in a text field.
+  // Matches the repo's binding scheme (SpriteMode / the facet canvases): Ctrl+Z
+  // undo, Ctrl+Shift+Z / Ctrl+Y redo, ignored while typing in a text field.
   React.useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (isTypingTarget(e.target as HTMLElement)) return;
