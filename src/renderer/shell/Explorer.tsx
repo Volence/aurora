@@ -22,6 +22,13 @@ import { S1_OBJECT_LIST, s1ObjectHex } from '../../core/project/profiles/s1-obje
 import { resolveObjectArt } from '../../core/project/profiles/s1-object-art';
 import { editObjectArt } from '../components/sprite/export-sprite';
 import type { RecentProject } from '../../shared/ipc-types';
+import type { ObjectDef } from '../../core/model/s4-types';
+
+// Referentially-stable fallback: a fresh `[]` per render would defeat the
+// zustand selector's equality check and rebuild the whole groups memo on
+// every unrelated project mutation (addChunks/addBgToLibrary spread a new
+// project object even though objectLibrary itself didn't change).
+const EMPTY_LIBRARY: ObjectDef[] = [];
 
 const GROUP_ICONS: Record<string, React.ComponentType<{ size?: number }>> = {
   levels: Icons.IconLayers,
@@ -68,7 +75,7 @@ export default function Explorer({ onOpenProject, onOpenRecent }: ExplorerProps)
   const classicZone = useClassicLevelStore((s) => s.ref?.zone ?? null);
   const docReady = useClassicLevelStore((s) => s.status) === 'ready';
   const config = useProjectStore((s) => s.config);
-  const project = useProjectStore((s) => s.project);
+  const objectLibrary = useProjectStore((s) => s.project?.objectLibrary ?? EMPTY_LIBRARY);
 
   const [recents, setRecents] = useState<RecentProject[]>([]);
   const noProject = !classicOpen && !config;
@@ -87,7 +94,7 @@ export default function Explorer({ onOpenProject, onOpenRecent }: ExplorerProps)
       return classicExplorerGroups(zoneTree, objects, docReady);
     }
     if (config) {
-      const objects: AeonObjectRow[] = (project?.objectLibrary ?? []).map((o) => ({
+      const objects: AeonObjectRow[] = objectLibrary.map((o) => ({
         id: o.id, name: o.name, sprite: o.sprite,
       }));
       return aeonExplorerGroups(config.zones.map((z) => ({
@@ -95,7 +102,7 @@ export default function Explorer({ onOpenProject, onOpenRecent }: ExplorerProps)
       })), objects);
     }
     return noProjectExplorerGroups(recents);
-  }, [classicOpen, zoneTree, classicZone, docReady, config, project, recents]);
+  }, [classicOpen, zoneTree, classicZone, docReady, config, objectLibrary, recents]);
 
   const filtered = useMemo(() => filterExplorer(groups, query), [groups, query]);
 

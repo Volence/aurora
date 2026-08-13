@@ -29,12 +29,17 @@ import { editObjectArt } from './components/sprite/export-sprite';
 import { registerAgentHandler } from './agent/agent-handler';
 import { refreshObjectPreviews } from './object-previews';
 import type { RecentProject } from '../shared/ipc-types';
+import type { ObjectDef } from '../core/model/s4-types';
+
+// Referentially-stable fallback — see the matching constant in shell/Explorer.tsx.
+const EMPTY_LIBRARY: ObjectDef[] = [];
 
 export default function App() {
   const { openProject, openProjectByPath } = useProject();
   const error = useProjectStore((s) => s.error);
   const classicError = useClassicProjectStore((s) => s.error);
   const project = useProjectStore((s) => s.project);
+  const objectLibrary = useProjectStore((s) => s.project?.objectLibrary ?? EMPTY_LIBRARY);
   const config = useProjectStore((s) => s.config);
   const currentZoneId = useProjectStore((s) => s.currentZoneId);
   const classicOpen = useClassicProjectStore((s) => s.status) === 'open';
@@ -95,8 +100,8 @@ export default function App() {
           .filter(({ id }) => resolveObjectArt(id, classicZone) !== undefined)
           .map(({ id, name }) => ({ id, name, hex: s1ObjectHex(id) }))
       : [];
-    const aeonSprites = (project?.objectLibrary ?? [])
-      .filter((o): o is typeof o & { sprite: string } => !!o.sprite)
+    const aeonSprites = objectLibrary
+      .filter((o): o is ObjectDef & { sprite: string } => !!o.sprite)
       .map((o) => ({ name: o.name, sprite: o.sprite }));
     return buildCommands(
       { tabs, activeId, engine, levelTabs, objects, aeonSprites, recents },
@@ -109,7 +114,7 @@ export default function App() {
         openRecent: (path) => void openProjectByPath(path),
       },
     );
-  }, [tabs, activeId, engine, classicOpen, zoneTree, config, docReady, classicZone, project, recents,
+  }, [tabs, activeId, engine, classicOpen, zoneTree, config, docReady, classicZone, objectLibrary, recents,
       openProject, openProjectByPath, toggleExplorer]);
 
   return (
