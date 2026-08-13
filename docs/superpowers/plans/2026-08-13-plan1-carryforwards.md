@@ -14,7 +14,8 @@ Plan order was 1..12. Executed order:
 5. Task 6 (route classic commits) — `1ba64d8`, `2920652`
 6. **Task 6b (unplanned bugfix)** — `ff42962`
 7. Task 7 (multi-doc sprite store) — `2fcd171`
-8. Tasks 8+9+10 combined (see below)
+8. Tasks 8+9+10 combined (see below) — `d3b900c`, `3f6d3dc`
+9. Task 11 + two live gaps — `30412b3`, `cec2acf`, `bde1efd`
 
 ### Why Task 3b existed
 
@@ -68,11 +69,12 @@ matters.
   function's list. The ten-site audit was independently re-verified twice
   during execution and holds.
 
-## Open items for Task 11 (grew well beyond "dispose on tab close")
+## Open items for Task 11 — ALL CLOSED (see "what actually landed" below)
 
-Task 7 built the multi-document sprite capability but left it **dormant** —
-`openSpriteDoc` / `activateSpriteDoc` / `closeSpriteDoc` have no production
-caller. Task 11 must wire tab activation to them, and while doing so:
+As handed to Task 11 (each item's resolution is in the next section). Task 7
+built the multi-document sprite capability but left it **dormant** —
+`openSpriteDoc` / `activateSpriteDoc` / `closeSpriteDoc` had no production
+caller. Task 11 wired tab activation to them, and while doing so:
 
 - `planSpriteDocActivation` must check out an already-open doc instead of
   reloading it. Its "Discard & open" confirm becomes a lie once switching no
@@ -85,6 +87,56 @@ caller. Task 11 must wire tab activation to them, and while doing so:
 - `resetProjectRuntime()` clears hub stacks but not `spriteStore.docs`;
   Task 11 should call `closeAll()` on project close. Deferred from Task 7
   because adding it there would blank the canvas on project switch.
+
+## Task 11 — what actually landed (all four open items closed)
+
+Task 11 absorbed two live gaps plus its own scope. Deviations worth keeping:
+
+- **Classic facet signal (unplanned, highest priority).** Classic art edits
+  recorded on `zoneart:<zone>` but `focusedHistory()` read `facetFor(tab)`,
+  which only aeon's FacetBar ever wrote — so a classic tab always read
+  `'layout'` and Ctrl+Z after an art edit reverted an unrelated layout step.
+  Fixed with `components/classic/classic-surface.ts`: each classic surface
+  claims its facet on pointer-down (capture) + focus-in. Composer dock and
+  palette panel claim `art`; map viewport, object inspector and object library
+  claim `layout`. It writes `setFacet` directly, NOT `switchFacet`, because
+  switchFacet also re-scopes the aeon `editorStore.tool` and classic runs its
+  own tool system. A source-level guard test
+  (`classic/__tests__/classic-surface.test.ts`) fails if a component that issues
+  a classic command stops declaring a surface — the renderer suite is node-only,
+  so there is no component test that could see the wiring otherwise.
+- **The sprite switch confirm is gone, not reworded.** Once activation parks the
+  outgoing document, switching discards nothing, so there is nothing to confirm.
+  The confirm moved to `requestCloseTab` (the only sprite path that still
+  destroys work) as Save & close / Discard & close / Cancel.
+- **Save is offered only when the document has an `s1ArtSource`.** The plan
+  assumed a context-free `saveSpriteDoc(docId)`; there isn't one. An aeon sprite
+  document's "save" is Export, which needs a name and ≥1 animation step and can
+  fail for reasons a close dialog can't resolve — so that dialog states there is
+  no save-back file instead of offering a button it can't honour. Worth
+  revisiting if sprite Export ever becomes a plain save.
+- **Sprite activations are serialized** (`spriteActivations` promise chain)
+  rather than generation-cancelled. The loaders write into whatever document is
+  checked out when their awaits resolve; with one editor that produced a stale
+  view, but with per-tab documents it would have spliced one sprite's pixels AND
+  its save-back target into another's document.
+- **`loadedSpriteDocId` deleted.** `spriteStore.activeDocId` is the checked-out
+  document — the value `recordEdit` records against — so a second marker could
+  only drift. `getLoadedSpriteDocId()` now derives from it.
+- **Ctrl+S saves every dirty sprite document with an art target**
+  (`saveAllSpriteArt` → `saveSpriteDocArt`, which checks the target out for the
+  write and restores the previous checkout). Reporting only the checked-out
+  document would have left a background tab dirty after a save the user believed
+  covered everything.
+- `resetProjectRuntime()` now calls `closeAll()`. The Task-7 concern (blanking
+  the canvas on project switch) is resolved by the wiring: session restore runs
+  immediately after and re-activates the restored sprite tab, which loads its
+  document again.
+
+Still open after Task 11 (pre-existing, not introduced here): the sprite UI's
+Load / New / Import buttons replace the CHECKED-OUT document's content in place,
+so they can leave a tab titled for one sprite holding another. They predate
+multi-document and were left alone.
 
 ## Live behaviour changes already in the branch
 
@@ -105,3 +157,6 @@ caller. Task 11 must wire tab activation to them, and while doing so:
 | Task 6 | 161 | 1383 | 2 | 0 |
 | Task 6b | 161 | 1386 | 2 | 0 |
 | Task 7 | 162 | 1392 | 2 | 0 |
+| Tasks 8+9+10 | 161 | 1394 | 2 | 0 |
+| Task 11 (gap 1: classic facet) | 162 | 1406 | 2 | 0 |
+| Task 11 (complete) | 163 | 1428 | 2 | 0 |
