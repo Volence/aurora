@@ -350,6 +350,22 @@ export function spriteDocState(docId: string): SpriteDoc | null {
   return s.docs.get(docId) ?? null;
 }
 
+/** The write-side twin of spriteDocState: patch a document wherever it lives —
+ *  the checked-out one on the root, a parked one in the map. Lets a caller that
+ *  operates on a document BY ID (the art save-back) update that document's own
+ *  fields without checking it out, so nothing the user is looking at moves and no
+ *  edit can be misattributed to the document that happens to be active. No-op for
+ *  a document that isn't open. */
+export function patchSpriteDoc(docId: string, patch: Partial<SpriteDoc>): void {
+  const s = useSpriteStore.getState();
+  if (docId === s.activeDocId) { useSpriteStore.setState(patch); return; }
+  const doc = s.docs.get(docId);
+  if (!doc) return;
+  const docs = new Map(s.docs);
+  docs.set(docId, { ...doc, ...patch });
+  useSpriteStore.setState({ docs });
+}
+
 /** Every open document with unsaved edits — parked ones included. A background
  *  tab's edits are as real as the checked-out tab's: these are the documents the
  *  strip dots and the project-open guard must refuse to discard silently. */

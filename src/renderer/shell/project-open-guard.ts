@@ -95,7 +95,9 @@ export async function confirmProjectOpen(): Promise<boolean> {
     // failed (it already toasted). Abort instead of destroying the edits — and
     // say so; a silent abort here would look like the Open button did nothing.
     // (A saved sprite checkout no longer re-blocks: saveSpriteArt clears
-    // unsavedEdits, so spriteDirty goes false.)
+    // unsavedEdits, so spriteDirty goes false. It deliberately does NOT clear it
+    // when an edit landed mid-write — that edit isn't on disk, so aborting here
+    // is the correct outcome, not a false positive.)
     if (planProjectOpen(currentOpenDirtySnapshot()).kind === 'confirm') {
       useToastStore.getState().addToast(
         'Open cancelled — unsaved changes remain (save or discard them first).',

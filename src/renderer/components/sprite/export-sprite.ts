@@ -1,7 +1,8 @@
 import { useProjectStore, getCurrentZone } from '../../state/projectStore';
 import { useArtStore } from '../../state/artStore';
-import { useSpriteStore, activateSpriteDoc, saveableDirtySpriteDocIds } from '../../state/spriteStore';
+import { useSpriteStore, spriteDocState, patchSpriteDoc, saveableDirtySpriteDocIds } from '../../state/spriteStore';
 import type { AnimStepUI } from '../../state/spriteStore';
+import type { PixelBuffer } from '../../../core/art/pixel-ops';
 import { useToastStore } from '../../state/toastStore';
 import { buildSpriteExport, buildDPLCData } from '../../../core/export/sprite-export';
 import type { SpriteManifest } from '../../../core/export/sprite-export';
@@ -196,21 +197,52 @@ async function captureS1ArtSource(
   } catch { /* leave s1ArtSource null — sprite is still editable, just not save-back-able */ }
 }
 
+/** Are these the same pixels, buffer for buffer? Used to decide whether the
+ *  document a save just wrote is still byte-identical to what went to disk. */
+function framesEqual(a: PixelBuffer[], b: PixelBuffer[]): boolean {
+  if (a === b) return true;
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    const x = a[i], y = b[i];
+    if (x === y) continue;
+    if (x.width !== y.width || x.height !== y.height) return false;
+    if (x.data.length !== y.data.length) return false;
+    for (let j = 0; j < x.data.length; j++) if (x.data[j] !== y.data[j]) return false;
+  }
+  return true;
+}
+
 /**
  * Save edited S1 object ART back to its source `artnem/*.nem` (Task 15, spec §2.4).
- * Re-encodes the current frames' pixels into the original tile layout with Nemesis
- * behind a self-check gate (encodeS1ArtWriteBack), then writes through the guarded
- * IPC (mtime conflict check). MAPPINGS ARE READ-ONLY: only art pixels save; shape/
+ * Re-encodes the frames' pixels into the original tile layout with Nemesis behind
+ * a self-check gate (encodeS1ArtWriteBack), then writes through the guarded IPC
+ * (mtime conflict check). MAPPINGS ARE READ-ONLY: only art pixels save; shape/
  * frame changes the mappings can't express are silently not captured (the success
- * toast states the read-only limitation). Mirrors the S4 export path's history
- * handling — the write does NOT touch spriteHistory / any dirty flag (there is none).
+ * toast states the read-only limitation).
+ *
+ * `docId` names the document to write and defaults to the checked-out one. The
+ * document is read BY ID (spriteDocState) and written back BY ID (patchSpriteDoc),
+ * so saving a background tab needs NO checkout: the sprite pane renders the store
+ * root, so a checkout would repaint the user's canvas with someone else's sprite
+ * for the whole guarded write, and any stroke landing in that window would be
+ * committed into the wrong document.
+ *
+ * DIRTY FLAG: `frames` is read synchronously, before the await. A stroke committed
+ * while the write is in flight is therefore NOT in the bytes on disk, so the flag
+ * is cleared only when the document's pixels still match what was written —
+ * otherwise the save would park real work with no dirty dot, and closing the tab
+ * would discard it without a prompt. (Palette/timeline edits are a separate,
+ * pre-existing over-clear: this path writes art bytes only.)
  */
-export async function saveSpriteArt(): Promise<void> {
+export async function saveSpriteArt(docId?: string): Promise<void> {
   const toast = useToastStore.getState().addToast;
-  const src = useSpriteStore.getState().s1ArtSource;
+  const targetId = docId ?? useSpriteStore.getState().activeDocId;
+  const doc = spriteDocState(targetId);
+  if (!doc) return; // not open — nothing to save, and nothing to say about it
+  const src = doc.s1ArtSource;
   if (!src) { toast('This sprite has no S1 art source to save back to', 'error'); return; }
 
-  const { frames } = useSpriteStore.getState();
+  const frames = doc.frames;
   // Frames pair to mappings BY INDEX; a changed frame count means add/delete/
   // reorder happened, which would write pixels into the wrong tiles. Refuse
   // rather than silently corrupt art (mappings can't grow/shrink for S1 in v1).
@@ -235,33 +267,37 @@ export async function saveSpriteArt(): Promise<void> {
   }
   if (out.failed) { toast(`Art save failed at ${out.failed.path}: ${out.failed.message}`, 'error'); return; }
 
-  // Refresh the guarded-write baseline so a follow-up save doesn't spuriously conflict.
+  // The document may have moved (checked out, parked, or edited) across the await
+  // — re-read it rather than trusting the pre-write snapshot. A document closed
+  // mid-write has nothing left to update.
+  const after = spriteDocState(targetId);
+  if (!after) { toast(`Saved art to ${src.relPath} — S1 mappings are read-only in v1`, 'success'); return; }
+
+  // Refresh the guarded-write baseline so a follow-up save doesn't spuriously
+  // conflict. Rebuilt from the document's CURRENT source (not the captured one)
+  // so a concurrent reopen isn't clobbered by a stale snapshot.
   const nm = out.newMtimes[src.relPath];
-  useSpriteStore.getState().setS1ArtSource({ ...src, expectedMtimeMs: nm ?? src.expectedMtimeMs });
-  // The edits are now on disk — clear the unsaved flag (success path only; every
-  // failure/conflict branch above returned before reaching here).
-  useSpriteStore.getState().setUnsavedEdits(false);
-  toast(`Saved art to ${src.relPath} — S1 mappings are read-only in v1`, 'success');
+  const liveSrc = after.s1ArtSource ?? src;
+  patchSpriteDoc(targetId, { s1ArtSource: { ...liveSrc, expectedMtimeMs: nm ?? liveSrc.expectedMtimeMs } });
+
+  const stillMatches = framesEqual(after.frames, frames);
+  if (stillMatches) patchSpriteDoc(targetId, { unsavedEdits: false });
+  toast(
+    stillMatches
+      ? `Saved art to ${src.relPath} — S1 mappings are read-only in v1`
+      : `Saved art to ${src.relPath}, but edits made during the save are still unsaved — save again`,
+    stillMatches ? 'success' : 'info',
+  );
 }
 
 /**
- * Save ONE sprite document's art back to its source file. saveSpriteArt only ever
- * sees the CHECKED-OUT document (it reads the store root), so a parked document is
- * checked out for the write and the previous one checked back out afterwards —
- * both swaps are synchronous state moves, and the sprite pane renders only the
- * active tab's document, so nothing flickers through the intermediate checkout.
+ * Save ONE sprite document's art back to its source file, named by doc id. A thin
+ * alias for saveSpriteArt(docId) — which addresses documents by id and needs no
+ * checkout — kept as the name the save coordinator and tab-close path call.
  * A no-op for a document that isn't open.
  */
 export async function saveSpriteDocArt(docId: string): Promise<void> {
-  const previousDocId = useSpriteStore.getState().activeDocId;
-  if (previousDocId === docId) { await saveSpriteArt(); return; }
-  if (!useSpriteStore.getState().isOpen(docId)) return;
-  activateSpriteDoc(docId);
-  try {
-    await saveSpriteArt();
-  } finally {
-    activateSpriteDoc(previousDocId); // restore even if the write threw
-  }
+  await saveSpriteArt(docId);
 }
 
 /**

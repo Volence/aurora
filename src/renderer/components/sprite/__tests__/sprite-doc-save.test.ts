@@ -1,8 +1,9 @@
-// saveSpriteArt writes the CHECKED-OUT document (it reads the store root), so
-// saving a background sprite tab means checking it out for the write and putting
-// the previous one back. Getting that wrong is a data-integrity bug in both
-// directions: one tab's pixels written into another tab's file, or a save that
-// silently writes nothing.
+// saveSpriteArt addresses its document BY ID (spriteDocState / patchSpriteDoc),
+// so saving a background sprite tab writes that tab without checking it out.
+// Getting the targeting wrong is a data-integrity bug in both directions: one
+// tab's pixels written into another tab's file, or a save that silently writes
+// nothing. See save-art-dirty-window.test.ts for why the checkout that used to
+// stand in for this had to go.
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { saveSpriteDocArt, saveAllSpriteArt } from '../export-sprite';
@@ -44,7 +45,7 @@ describe('saveSpriteDocArt', () => {
     expect(lastToast()?.type).toBe('error');
   });
 
-  it('restores the previously checked-out document afterwards', async () => {
+  it('leaves the checked-out document exactly where it was', async () => {
     openSpriteDoc(PARKED, { width: 8, height: 8 });
     openSpriteDoc(CHECKED_OUT, { width: 8, height: 8 });
     useSpriteStore.getState().setS1ArtSource(FAKE_SOURCE);
