@@ -5,6 +5,7 @@ import type { AnyCommand, S4Level } from '../../core/editing/commands';
 import type { MapClipboard, PasteLayers } from '../../core/editing/map-clipboard';
 import { useArtStore } from './artStore';
 import { registerRedoClearer, invalidateSiblingRedos } from '../../core/editing/undo-bus';
+import { BoundEditHistory } from '../../core/editing/bound-edit-history';
 import { documentHistoryHub } from './history-hub';
 import { useProjectStore } from './projectStore';
 import { useSessionStore } from './sessionStore';
@@ -154,7 +155,15 @@ export function activeHistory(): EditHistory {
   const id = s.currentZoneId && s.currentActId
     ? `level:${s.currentZoneId}:${s.currentActId}`
     : 'level:aeon:none';
-  return documentHistoryHub.historyFor(id);
+  const stack = documentHistoryHub.historyFor(id);
+  // `level:` stacks are always aeon command histories (history-factories.ts).
+  // Aeon callers need the RAW EditHistory: execute/undo/redo take an S4Level and
+  // return the command they applied, and clearRedo/topUndoSeq exist only there —
+  // none of which the argument-free UndoStack contract exposes.
+  if (!(stack instanceof BoundEditHistory)) {
+    throw new Error(`Document '${id}' is not an aeon command history`);
+  }
+  return stack.raw;
 }
 
 // Let a sibling history (the sprite snapshot history) invalidate the ACTIVE

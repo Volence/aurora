@@ -18,6 +18,7 @@ import { useClassicLevelStore } from './state/classicLevelStore';
 import { useSessionStore } from './state/sessionStore';
 import { useShellStore } from './state/shellStore';
 import { ensureSaversRegistered, saveAllDirty } from './state/project-runtime';
+import { registerHistoryFactories } from './state/history-factories';
 import { registerAeonFacetModules } from './workspace/register-facets';
 import { useSessionLifecycle, useActTabSync } from './shell/session-lifecycle';
 import { requestOpenTab, requestFocusIndex } from './shell/tab-activation';
@@ -54,7 +55,12 @@ export default function App() {
   const activeTab = tabs.find((t) => t.id === activeId);
 
   // -- runtime wiring ------------------------------------------------------
-  useEffect(() => { registerAgentHandler(); ensureSaversRegistered(); registerAeonFacetModules(); }, []);
+  useEffect(() => {
+    registerAgentHandler();
+    ensureSaversRegistered();
+    registerHistoryFactories();   // must precede any edit: the hub builds no stack without it
+    registerAeonFacetModules();
+  }, []);
   useSessionLifecycle();
   useActTabSync();
 
