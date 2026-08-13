@@ -3,6 +3,11 @@
 // session; a session missing Home gets it re-injected; a dangling activeId
 // falls back to Home. Storage itself (keyed by project path) is wired in the
 // Stage 2 shell — these stay pure.
+//
+// Also owns the per-tab workspace record (facet + viewport), serialized
+// alongside the session as an optional field. Its restore is defensive at the
+// ENTRY level instead — a corrupt workspace entry drops just that entry,
+// rather than restoreSession's whole-payload fallback to initialSession().
 
 import { z } from 'zod';
 import { HOME_TAB, initialSession, TAB_KINDS, type SessionState, type TabDescriptor } from './session';
@@ -72,7 +77,7 @@ export function restoreWorkspace(json: string): WorkspaceRecord {
   let parsed: unknown;
   try { parsed = JSON.parse(json); } catch { return {}; }
   const ws = (parsed as { workspace?: unknown })?.workspace;
-  if (ws === null || typeof ws !== 'object') return {};
+  if (ws === null || typeof ws !== 'object' || Array.isArray(ws)) return {};
   const out: WorkspaceRecord = {};
   for (const [id, entry] of Object.entries(ws as Record<string, unknown>)) {
     const res = persistedWorkspaceSchema.safeParse(entry);

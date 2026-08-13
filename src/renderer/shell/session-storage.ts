@@ -3,8 +3,12 @@
 // (localStorage in the app; a Map in tests — the vitest env has no DOM).
 // The stored payload format is owned by core/shell/session-persistence; this
 // module owns only WHERE it lives and the restore-time pruning against the
-// currently-open project. Key carries v1 so a future per-tab-state format
-// (Stage 3: facet + viewport) can re-key without misparsing old payloads.
+// currently-open project. The per-tab workspace record (Stage 3: facet +
+// viewport) rides in the SAME aurora.session.v1 payload as an optional field,
+// not a re-key: legacy payloads restore fine because restoreSession's
+// looseObject schema ignores an unknown `workspace` key and restoreWorkspace
+// returns {} when it's absent. The v1 key remains available for a genuinely
+// breaking future format.
 
 import {
   initialSession, openTab, pruneSession,
