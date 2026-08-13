@@ -51,6 +51,15 @@ export interface ProjectMatch {
   label: string;
 }
 
+/** Capability keys a profile may grant (spec §7): which level-workspace facets
+ *  its levels get. Superset of the facets built so far — parallax/events/preview
+ *  are declared now so profiles can be authored against them before those
+ *  facets exist (the shell renders registered-facets ∩ granted, so an
+ *  unbuilt capability simply renders nothing). */
+export type FacetCapability =
+  | 'layout' | 'art' | 'objects' | 'rings' | 'collision' | 'palette'
+  | 'parallax' | 'events' | 'preview';
+
 /**
  * What an opened project can do. Fields are null/false when the capability is
  * absent so callers can feature-gate UI without probing the adapter further.
@@ -61,6 +70,9 @@ export interface CapabilityManifest {
   objects: 'objpos' | 'json' | null;
   /** Aurora never drives the assembler; build is always false for now. */
   build: false;
+  /** Which level-workspace facets this project's levels get (spec §4/§7).
+   *  The shell renders registered-facets ∩ this list and nothing else. */
+  facets: FacetCapability[];
 }
 
 /** Sidecar `.aurora/project.json` shape: user path overrides for resolution. */

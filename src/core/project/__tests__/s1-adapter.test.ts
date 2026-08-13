@@ -87,6 +87,7 @@ describe('s1Adapter.open resolution', () => {
       sprites: true,
       objects: 'objpos',
       build: false,
+      facets: ['layout', 'art', 'objects', 'collision', 'palette'],
     });
     expect(handle.report.total).toBe(ENTRIES.length);
     expect(handle.report.resolved).toBe(ENTRIES.length);
