@@ -87,6 +87,5 @@ export function openReady(doc = makeDoc()): void {
     dirty: {},
     chunkVersions: new Map(),
     chunkEpoch: 1,
-    historyTick: 0,
   });
 }

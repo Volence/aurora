@@ -97,7 +97,7 @@ export default function ComposerCanvas() {
   const collisionPaintPlane = useEditorStore((s) => s.collisionPaintPlane);
   // Atlas tiles / palette can change underneath the doc (undo, agent writes).
   const historyVersion = useHistoryVersion();
-  // paletteVersion ticks on every live preview step (kept off historyVersion).
+  // paletteVersion ticks on every live preview step (kept off the history clock).
   const paletteVersion = useArtStore((s) => s.paletteVersion);
 
   /** Pending H/V flips for the tile-stamp brush (X/Y keys toggle, HUD shows). */

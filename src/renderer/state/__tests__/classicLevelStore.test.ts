@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import {
   useClassicLevelStore,
   layoutDocIdForCurrentAct,
@@ -13,12 +13,9 @@ import {
   classicSetStart,
   classicAddChunk,
   classicAddBlock,
-  classicCanUndo,
-  classicCanRedo,
 } from '../classicLevelStore';
 import { useClassicProjectStore } from '../classicProjectStore';
 import { documentHistoryHub } from '../history-hub';
-import { registerRedoClearer, invalidateSiblingRedos } from '../../../core/editing/undo-bus';
 import { packChunkCell, unpackChunkCell, type BlockDef } from '../../../core/level-classic/model';
 import type { S1ObjectEntry } from '../../../core/formats/classic/s1-objpos';
 // Shared with history-routing.test.ts — one fixture, so both suites drive the
@@ -46,20 +43,18 @@ describe('classic:set-start', () => {
   it('applies, marks start dirty, one undo step; undo/redo restore exactly', () => {
     openReady();
     const before = st().doc!.start;
-    const tick0 = st().historyTick;
 
     expect(classicSetStart(200, 300)).toEqual({ ok: true });
     expect(st().doc!.start).toEqual({ x: 200, y: 300 });
     expect(st().dirty.start).toBe(true);
-    expect(st().historyTick).toBe(tick0 + 1);
-    expect(classicCanUndo()).toBe(true);
+    expect(layoutStack().canUndo).toBe(true);
 
-    st().undo();
+    layoutStack().undo();
     expect(st().doc!.start).toEqual(before);
     expect(st().dirty.start).toBeUndefined();
-    expect(classicCanRedo()).toBe(true);
+    expect(layoutStack().canRedo).toBe(true);
 
-    st().redo();
+    layoutStack().redo();
     expect(st().doc!.start).toEqual({ x: 200, y: 300 });
     expect(st().dirty.start).toBe(true);
   });
@@ -71,7 +66,7 @@ describe('classic:set-start', () => {
     expect(r.ok).toBe(false);
     expect(st().doc).toBe(doc); // untouched identity
     expect(st().dirty.start).toBeUndefined();
-    expect(classicCanUndo()).toBe(false);
+    expect(layoutStack().canUndo).toBe(false);
   });
 
   it('an identical write is a no-op: ok:true but no undo step recorded', () => {
@@ -80,7 +75,6 @@ describe('classic:set-start', () => {
     expect(classicSetStart(50, 50)).toEqual({ ok: true });
     expect(st().doc).toBe(doc); // no new doc built
     expect(layoutStack().canUndo).toBe(false); // no history entry
-    expect(classicCanUndo()).toBe(false);
   });
 });
 
@@ -95,7 +89,7 @@ describe('classic:set-layout-cells', () => {
     expect(st().chunkEpoch).toBe(epoch0); // layout is not chunk content
     expect(st().chunkVersions).toBe(versions0);
 
-    st().undo();
+    layoutStack().undo();
     expect(Array.from(st().doc!.fg.cells)).toEqual([0, 1, 0, 1]);
     expect(st().dirty.fg).toBeUndefined();
   });
@@ -114,7 +108,7 @@ describe('classic:set-layout-cells', () => {
     expect(classicSetLayoutCells('fg', [{ x: 0, y: 0, chunkId: 3 }]).ok).toBe(false); // > chunks.length
     expect(classicSetLayoutCells('fg', [{ x: 0, y: 0, chunkId: 256 }]).ok).toBe(false);
     expect(st().dirty.fg).toBeUndefined();
-    expect(classicCanUndo()).toBe(false);
+    expect(layoutStack().canUndo).toBe(false);
   });
 
   it('accepts air ($00) and the last engine id (chunks.length)', () => {
@@ -154,9 +148,9 @@ describe('classic:edit-chunk-cells', () => {
     const word = packChunkCell({ block: 1, xf: false, yf: false, solidity: 0 });
     classicEditChunkCells(1, [{ index: 0, word }]);
     const v = st().chunkVersions.get(1);
-    st().undo();
+    artStack().undo();
     expect(st().chunkVersions.has(1)).toBe(false);
-    st().redo();
+    artStack().redo();
     expect(st().chunkVersions.get(1)).toBe(v);
   });
 
@@ -207,7 +201,7 @@ describe('classic:edit-block', () => {
     expect(st().dirty.blocks).toBe(true);
     expect(st().chunkEpoch).toBeGreaterThan(epoch0);
 
-    st().undo();
+    artStack().undo();
     expect(st().chunkEpoch).toBe(epoch0);
     expect(st().doc!.blocks[0].cells[0].tile).toBe(0);
   });
@@ -230,7 +224,7 @@ describe('classic:edit-tiles', () => {
     expect(Array.from(st().doc!.tiles.subarray(0, 32))).toEqual(Array.from(data));
     expect(st().dirty.tiles).toBe(true);
     expect(st().chunkEpoch).toBeGreaterThan(epoch0);
-    st().undo();
+    artStack().undo();
     expect(st().doc!.tiles[0]).toBe(0);
     expect(st().chunkEpoch).toBe(epoch0);
   });
@@ -242,7 +236,7 @@ describe('classic:edit-tiles', () => {
     expect(classicEditTiles([{ tileIndex: 0, data: new Uint8Array(16) }]).ok).toBe(false); // not 32 bytes
     expect(classicEditTiles([{ tileIndex: 99, data: new Uint8Array(32) }]).ok).toBe(false); // not in pool
     expect(st().dirty.tiles).toBeUndefined();
-    expect(classicCanUndo()).toBe(false);
+    expect(artStack().canUndo).toBe(false);
   });
 });
 
@@ -255,7 +249,7 @@ describe('classic:set-palette', () => {
     expect(Array.from(st().doc!.palettes[2])).toEqual(Array.from(colors));
     expect(st().dirty.palette).toBe(true);
     expect(st().chunkEpoch).toBeGreaterThan(epoch0);
-    st().undo();
+    artStack().undo();
     expect(st().doc!.palettes[2][0]).toBe(0);
   });
 
@@ -271,16 +265,16 @@ describe('classic:set-palette', () => {
     const colors = new Uint16Array(16).fill(0x0e0e);
     expect(classicSetPalette(1, colors).ok).toBe(true);
     const epoch1 = st().chunkEpoch;
-    expect(classicCanUndo()).toBe(true);
+    expect(artStack().canUndo).toBe(true);
     // Re-writing the SAME colors succeeds but records no history entry / no epoch
     // bump — this also elides the double commit a slider release could produce.
     expect(classicSetPalette(1, new Uint16Array(colors)).ok).toBe(true);
     expect(st().chunkEpoch).toBe(epoch1);
     // Exactly one undoable step exists: undo restores the pre-edit line, and there
     // is nothing left to undo (a second identical write did not stack a step).
-    st().undo();
+    artStack().undo();
     expect(st().doc!.palettes[1][0]).toBe(0);
-    expect(classicCanUndo()).toBe(false);
+    expect(artStack().canUndo).toBe(false);
   });
 });
 
@@ -292,7 +286,7 @@ describe('classic:set-colind', () => {
     expect(Array.from(st().doc!.collision.colind)).toEqual([7, 200]);
     expect(st().dirty.colind).toBe(true);
     expect(st().chunkEpoch).toBe(epoch0);
-    st().undo();
+    artStack().undo();
     expect(Array.from(st().doc!.collision.colind)).toEqual([0, 0]);
   });
 
@@ -323,7 +317,7 @@ describe('classic:set-objects', () => {
     expect(st().doc!.objects).toHaveLength(1);
     expect(st().doc!.objects[0].id).toBe(0x25);
     expect(st().dirty.objects).toBe(true);
-    st().undo();
+    layoutStack().undo();
     expect(st().doc!.objects[0].id).toBe(1); // original fixture object
   });
 
@@ -404,35 +398,14 @@ describe('command guards + undo/redo triple consistency', () => {
     expect(st().chunkVersions.get(1)).toBe(afterChunkV);
   });
 
-  it('a rejected command records no undo step and leaves historyTick untouched', () => {
+  it('a rejected command records no undo step', () => {
     openReady();
     classicSetStart(1, 1);
-    const tick = st().historyTick;
     classicSetStart(-5, -5); // rejected
-    expect(st().historyTick).toBe(tick);
     // Exactly one step on the layout stack: one undo lands back on the fixture.
     layoutStack().undo();
     expect(st().doc!.start).toEqual({ x: 50, y: 50 });
     expect(layoutStack().canUndo).toBe(false);
-  });
-
-  it('no longer joins the undo-bus: a classic edit leaves sibling redos alone', () => {
-    // Per-document stacks retire the sibling-invalidation dance — there are no
-    // siblings to invalidate, only documents (spec §4.3).
-    openReady();
-    const siblingClearRedo = vi.fn();
-    const unregister = registerRedoClearer(siblingClearRedo);
-    try {
-      classicSetStart(9, 9);
-      expect(siblingClearRedo).not.toHaveBeenCalled();
-      // ...and a sibling's edit no longer clears a classic redo either.
-      layoutStack().undo();
-      expect(layoutStack().canRedo).toBe(true);
-      invalidateSiblingRedos(vi.fn());
-      expect(layoutStack().canRedo).toBe(true);
-    } finally {
-      unregister();
-    }
   });
 
   it('loading a new act clears both of the act\'s undo documents', () => {
@@ -446,7 +419,6 @@ describe('command guards + undo/redo triple consistency', () => {
     void useClassicLevelStore.getState().openAct(REF);
     expect(layoutStack().canUndo).toBe(false);
     expect(artStack().canUndo).toBe(false);
-    expect(classicCanUndo()).toBe(false);
   });
 });
 
@@ -481,7 +453,7 @@ describe('tool + selectedChunkId UI state', () => {
     st().setSelectedChunkId(7);
     classicSetStart(11, 12); // records a snapshot with selection == 7
     st().setSelectedChunkId(9); // change AFTER the edit
-    st().undo();
+    layoutStack().undo();
     expect(st().selectedChunkId).toBe(9); // undo restored the doc, not the selection
   });
 
@@ -567,7 +539,7 @@ describe('object-tool UI state', () => {
     st().setSelectedObjectIndex(0);
     classicSetStart(11, 12); // records a snapshot
     st().setSelectedObjectIndex(null);
-    st().undo();
+    layoutStack().undo();
     expect(st().selectedObjectIndex).toBeNull(); // undo restored the doc, not UI state
   });
 
@@ -590,17 +562,15 @@ describe('object-tool UI state', () => {
 describe('classic:add-chunk', () => {
   it('appends a blank chunk, marks chunks dirty, one undo step; returns the new engine id', () => {
     openReady(); // fixture has 2 chunks → engine ids 1,2 → new id 3
-    const tick0 = st().historyTick;
     const res = classicAddChunk();
     expect(res).toEqual({ ok: true, id: 3 });
     expect(st().doc!.chunks.length).toBe(3);
     // Blank: every cell is block 0 / no flips / solidity 0.
     expect(st().doc!.chunks[2].cells.every((c) => c.block === 0 && !c.xf && !c.yf && c.solidity === 0)).toBe(true);
     expect(st().dirty.chunks).toBe(true);
-    expect(st().historyTick).toBe(tick0 + 1);
     // New engine id gets a content version (keyed by engine id).
     expect(st().chunkVersions.get(3)).toBeGreaterThan(0);
-    expect(classicCanUndo()).toBe(true);
+    expect(artStack().canUndo).toBe(true);
   });
 
   it('seeds cells from a sparse word list (Duplicate path)', () => {
@@ -619,10 +589,10 @@ describe('classic:add-chunk', () => {
     openReady();
     classicAddChunk();
     expect(st().doc!.chunks.length).toBe(3);
-    st().undo();
+    artStack().undo();
     expect(st().doc!.chunks.length).toBe(2);
     expect(st().dirty.chunks).toBeUndefined();
-    st().redo();
+    artStack().redo();
     expect(st().doc!.chunks.length).toBe(3);
     expect(st().dirty.chunks).toBe(true);
   });
@@ -639,7 +609,7 @@ describe('classic:add-chunk', () => {
     expect(res.ok).toBe(false);
     if (!res.ok) expect(res.error).toMatch(/capacity/i);
     expect(st().doc).toBe(before); // untouched identity
-    expect(classicCanUndo()).toBe(false);
+    expect(artStack().canUndo).toBe(false);
   });
 
   it('rejects with no open level', () => {
@@ -651,15 +621,13 @@ describe('classic:add-chunk', () => {
 describe('classic:add-block', () => {
   it('appends a blank block, marks blocks dirty, one undo step; returns the new id', () => {
     openReady(); // fixture has 2 blocks → new id 2
-    const tick0 = st().historyTick;
     const res = classicAddBlock();
     expect(res).toEqual({ ok: true, id: 2 });
     expect(st().doc!.blocks.length).toBe(3);
     expect(st().doc!.blocks[2].cells).toHaveLength(4);
     expect(st().doc!.blocks[2].cells.every((c) => c.tile === 0)).toBe(true);
     expect(st().dirty.blocks).toBe(true);
-    expect(st().historyTick).toBe(tick0 + 1);
-    expect(classicCanUndo()).toBe(true);
+    expect(artStack().canUndo).toBe(true);
   });
 
   it('seeds cells from a def (Duplicate path)', () => {
@@ -681,9 +649,9 @@ describe('classic:add-block', () => {
     openReady();
     classicAddBlock();
     expect(st().doc!.blocks.length).toBe(3);
-    st().undo();
+    artStack().undo();
     expect(st().doc!.blocks.length).toBe(2);
-    st().redo();
+    artStack().redo();
     expect(st().doc!.blocks.length).toBe(3);
   });
 

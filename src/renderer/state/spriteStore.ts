@@ -158,11 +158,9 @@ interface SpriteState extends SpriteDoc {
   deleteFrame: () => void;
   selectFrame: (i: number) => void;
 
-  // Undo/redo now belongs to the active document's stack on the hub — the store
-  // has no undo()/redo() of its own. `historyTick` survives as the re-render
-  // signal: it bumps on every history change so the UI re-evaluates canUndo/
-  // canRedo (the UI entry points are rewired separately).
-  historyTick: number;
+  // Undo/redo belong to the active document's stack on the hub — the store has no
+  // undo()/redo() of its own, and no repaint clock either: the UI re-evaluates
+  // canUndo/canRedo through hooks/useHistoryVersion, which the hub drives.
 
   // Animation (chunk 3)
   playbackMode: PlaybackMode;
@@ -270,7 +268,7 @@ export function activeSpriteHistory(): SpriteDocHistory {
  *  stacks have no siblings to invalidate. */
 function recordEdit(s: SpriteState): void {
   activeSpriteHistory().record(snap(s));
-  useSpriteStore.setState({ unsavedEdits: true, historyTick: s.historyTick + 1 });
+  useSpriteStore.setState({ unsavedEdits: true });
 }
 
 /** Build a snapshot from live state. SpriteDocHistory deep-clones on record/undo/
@@ -303,7 +301,6 @@ export function openSpriteDoc(docId: string, size: { width: number; height: numb
     docs,
     activeDocId: docId,
     ...blankDoc(size.width, size.height),
-    historyTick: s.historyTick + 1,
   });
 }
 
@@ -317,7 +314,7 @@ export function activateSpriteDoc(docId: string): void {
   const docs = new Map(s.docs);
   docs.set(s.activeDocId, parkedDoc(s));
   docs.delete(docId);
-  useSpriteStore.setState({ docs, activeDocId: docId, ...incoming, historyTick: s.historyTick + 1 });
+  useSpriteStore.setState({ docs, activeDocId: docId, ...incoming });
 }
 
 /** Drop a document and its undo stack. Closing the checked-out document falls
@@ -334,7 +331,6 @@ export function closeSpriteDoc(docId: string): void {
       docs,
       activeDocId: UNTITLED_SPRITE_DOC_ID,
       ...(untitled ?? blankDoc(DEFAULT_FRAME_SIZE, DEFAULT_FRAME_SIZE)),
-      historyTick: s.historyTick + 1,
     });
   } else if (s.docs.has(docId)) {
     const docs = new Map(s.docs);
@@ -359,14 +355,14 @@ export function readSpriteSnapshot(docId: string): SpriteSnapshot {
 export function writeSpriteSnapshot(docId: string, snapshot: SpriteSnapshot): void {
   const s = useSpriteStore.getState();
   if (docId === s.activeDocId) {
-    useSpriteStore.setState({ ...snapshot, historyTick: s.historyTick + 1 });
+    useSpriteStore.setState(snapshot);
     return;
   }
   const doc = s.docs.get(docId);
   if (!doc) return;
   const docs = new Map(s.docs);
   docs.set(docId, { ...doc, ...snapshot });
-  useSpriteStore.setState({ docs, historyTick: s.historyTick + 1 });
+  useSpriteStore.setState({ docs });
 }
 
 export const useSpriteStore = create<SpriteState>((set, get) => ({
@@ -383,7 +379,6 @@ export const useSpriteStore = create<SpriteState>((set, get) => ({
   ditherPattern: 'checker',
   ditherSecondary: 0,
   clipboard: null,
-  historyTick: 0,
 
   activeFrames: () => get().frames,
   isOpen: (docId) => { const s = get(); return docId === s.activeDocId || s.docs.has(docId); },
@@ -399,7 +394,6 @@ export const useSpriteStore = create<SpriteState>((set, get) => ({
       docs: new Map(),
       activeDocId: UNTITLED_SPRITE_DOC_ID,
       ...blankDoc(DEFAULT_FRAME_SIZE, DEFAULT_FRAME_SIZE),
-      historyTick: 0,
     });
   },
 
@@ -428,14 +422,14 @@ export const useSpriteStore = create<SpriteState>((set, get) => ({
     const frames = s.frames.slice();
     frames[s.currentIndex] = next;
     // marquee coords no longer valid after a transform
-    set({ frames, selection: null, historyTick: s.historyTick + 1 });
+    set({ frames, selection: null });
   },
   setBuffer: (b) => {
     const s = get();
     recordEdit(s);
     const frames = s.frames.slice();
     frames[s.currentIndex] = b;
-    set({ frames, historyTick: s.historyTick + 1 });
+    set({ frames });
   },
   copySelection: () => {
     const s = get();
@@ -457,7 +451,7 @@ export const useSpriteStore = create<SpriteState>((set, get) => ({
     if (diffWrites(cur, cleared).length > 0) recordEdit(s);
     const frames = s.frames.slice();
     frames[s.currentIndex] = cleared;
-    set({ frames, clipboard: region, selection: null, historyTick: s.historyTick + 1 });
+    set({ frames, clipboard: region, selection: null });
     return true;
   },
   paste: () => {
@@ -479,7 +473,7 @@ export const useSpriteStore = create<SpriteState>((set, get) => ({
     // Switch to select and select the pasted rect so it can be dragged next
     // (setTool would clear the selection, so set tool + selection together here).
     const w = Math.min(clip.w, cur.width - ox), h = Math.min(clip.h, cur.height - oy);
-    set({ frames, tool: 'select', selection: { x: ox, y: oy, w, h }, historyTick: s.historyTick + 1 });
+    set({ frames, tool: 'select', selection: { x: ox, y: oy, w, h } });
     return true;
   },
   // New frame matches the current canvas size (loaded sprites may not be 32x32).
@@ -487,13 +481,13 @@ export const useSpriteStore = create<SpriteState>((set, get) => ({
     const s = get();
     recordEdit(s);
     const cur = s.frames[s.currentIndex];
-    set({ frames: [...s.frames, createBuffer(cur.width, cur.height)], currentIndex: s.frames.length, historyTick: s.historyTick + 1 });
+    set({ frames: [...s.frames, createBuffer(cur.width, cur.height)], currentIndex: s.frames.length });
   },
   duplicateFrame: () => {
     const s = get();
     recordEdit(s);
     const frames = [...s.frames, cloneFrame(s.frames[s.currentIndex])];
-    set({ frames, currentIndex: frames.length - 1, historyTick: s.historyTick + 1 });
+    set({ frames, currentIndex: frames.length - 1 });
   },
   deleteFrame: () => {
     const s = get();
@@ -505,7 +499,7 @@ export const useSpriteStore = create<SpriteState>((set, get) => ({
     const steps = s.steps
       .filter((st) => st.frameIndex !== removed)
       .map((st) => (st.frameIndex > removed ? { ...st, frameIndex: st.frameIndex - 1 } : st));
-    set({ frames, steps, currentIndex: Math.min(removed, frames.length - 1), historyTick: s.historyTick + 1 });
+    set({ frames, steps, currentIndex: Math.min(removed, frames.length - 1) });
   },
   selectFrame: (i) => set((s) => ({ currentIndex: Math.min(Math.max(0, i), s.frames.length - 1) })),
 
@@ -532,7 +526,7 @@ export const useSpriteStore = create<SpriteState>((set, get) => ({
     // A fresh sprite starts with empty history — on the ACTIVE document's stack,
     // so a background document's undo survives.
     activeSpriteHistory().clear();
-    set({ ...blankDoc(w, h), historyTick: 0 });
+    set({ ...blankDoc(w, h) });
   },
 
   loadSprite: (frames, steps, originX, originY) => {
@@ -548,25 +542,24 @@ export const useSpriteStore = create<SpriteState>((set, get) => ({
       characterAnims: [],
       s1ArtSource: null,
       unsavedEdits: false,
-      historyTick: 0,
-    });
+        });
   },
 
   setZoneLine: (zoneLine) => set({ zoneLine: Math.max(0, Math.min(3, zoneLine | 0)) }),
-  setStandalonePalette: (standalonePalette) => { const s = get(); recordEdit(s); set({ standalonePalette, historyTick: s.historyTick + 1 }); },
+  setStandalonePalette: (standalonePalette) => { const s = get(); recordEdit(s); set({ standalonePalette }); },
   setPaletteMode: (mode) => {
     const s = get(); recordEdit(s);
     if (mode === 'standalone' && s.paletteMode === 'zone') {
       const zone = getCurrentZone(useProjectStore.getState());
       const line = zone?.palette.lines[s.zoneLine]?.colors;
       const seed = line ? line.map((c) => ({ ...c })) : blankStandalonePalette();
-      set({ paletteMode: 'standalone', standalonePalette: seed, historyTick: s.historyTick + 1 });
+      set({ paletteMode: 'standalone', standalonePalette: seed });
     } else {
-      set({ paletteMode: mode, historyTick: s.historyTick + 1 });
+      set({ paletteMode: mode });
     }
   },
-  clearPalette: () => { const s = get(); recordEdit(s); set({ paletteMode: 'standalone', standalonePalette: blankStandalonePalette(), historyTick: s.historyTick + 1 }); },
-  clearCanvas: () => { const s = get(); recordEdit(s); const cur = s.frames[s.currentIndex]; const frames = s.frames.slice(); frames[s.currentIndex] = createBuffer(cur.width, cur.height); set({ frames, historyTick: s.historyTick + 1 }); },
+  clearPalette: () => { const s = get(); recordEdit(s); set({ paletteMode: 'standalone', standalonePalette: blankStandalonePalette() }); },
+  clearCanvas: () => { const s = get(); recordEdit(s); const cur = s.frames[s.currentIndex]; const frames = s.frames.slice(); frames[s.currentIndex] = createBuffer(cur.width, cur.height); set({ frames }); },
 }));
 
 /** Build the frame-index play order for a playback mode (one full cycle). */

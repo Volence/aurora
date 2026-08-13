@@ -21,9 +21,10 @@
 // `level:<zone>:<act>` stack; zone art (tiles, blocks, chunks, palette, colind)
 // is zone-scoped and lives on `zoneart:<zone>`. Both stacks hang off the
 // DocumentHistoryHub, so a palette edit no longer invalidates a layout redo —
-// which is exactly what the old single ClassicHistory + undo-bus did. Classic
-// therefore no longer registers a redo-clearer: there are no siblings to
-// invalidate, only documents.
+// which is exactly what the old single whole-document classic history did.
+// Undo/redo are not store actions at all: the UI drives the FOCUSED document's
+// stack (editorStore.focusedHistory), and the stack calls back into the snapshot
+// writers below.
 
 import { create } from 'zustand';
 import type { DirtyDomains, EditableTileRange, LevelDoc, ZoneActRef } from '../../core/project/adapter';
@@ -36,7 +37,6 @@ import {
   type ClassicArtHistory, type ClassicLayoutHistory,
   type ClassicArtSnapshot, type ClassicLayoutSnapshot,
 } from '../../core/editing/classic-domain-history';
-import type { UndoStack } from '../../core/editing/undo-stack';
 import { classicLevelTab, zoneArtDocId } from '../shell/tabs';
 import { documentHistoryHub } from './history-hub';
 import { useClassicProjectStore } from './classicProjectStore';
@@ -96,8 +96,6 @@ interface ClassicLevelState {
    * `${chunkEpoch}:${chunkVersions.get(id) ?? 0}`.
    */
   chunkEpoch: number;
-  /** Bumped on every history change so undo/redo affordances re-evaluate. */
-  historyTick: number;
 
   /**
    * Layout-editing UI state (Task 13, spec §3 M5). Not doc data and NOT part of
@@ -167,8 +165,6 @@ interface ClassicLevelState {
   setComposerTileIndex: (index: number) => void;
   setComposerPalLine: (line: number) => void;
   setTileClipboard: (px: Uint8Array | null) => void;
-  undo: () => void;
-  redo: () => void;
   /**
    * Clear the given dirty domains for `ref` after a successful save. NOT an
    * undoable edit (it does not touch history).
@@ -194,7 +190,6 @@ const IDLE = {
   dirty: {} as DirtyDomains,
   chunkVersions: new Map<number, number>(),
   chunkEpoch: 0,
-  historyTick: 0,
   tool: 'pan' as ClassicTool,
   selectedChunkId: 0,
   stampLoop: false,
@@ -235,20 +230,6 @@ function disposeStacksFor(ref: ZoneActRef | null): void {
   documentHistoryHub.dispose(zoneArtDocId(ref.zone));
 }
 
-/**
- * TRANSITIONAL: the document the store's own undo()/redo() act on — the one most
- * recently committed to. The end state is focus-driven (undo follows the focused
- * facet, spec §10), which needs the shell wiring that lands with the focused-undo
- * task; until then "the document you last edited" keeps the classic toolbar and
- * Ctrl+Z behaving. Reset on act load / store reset.
- */
-let lastEditedDocId: string | null = null;
-
-/** The stack the store's undo()/redo() drive, or null when nothing was edited. */
-function lastEditedStack(): UndoStack | null {
-  return lastEditedDocId ? documentHistoryHub.historyFor(lastEditedDocId) : null;
-}
-
 // Process-monotonic content-version allocator. NEVER rewound: undo/redo restore
 // recorded version VALUES, but every fresh allocation is globally unique, so
 // (chunkEpoch, perChunkVersion) → content is a stable bijection for the session.
@@ -270,12 +251,10 @@ export const useClassicLevelStore = create<ClassicLevelState>((set, get) => ({
     // well as the one being entered, since both docs are about to be re-read.
     disposeStacksFor(get().ref);
     disposeStacksFor(ref);
-    lastEditedDocId = null;
     const fresh = {
       dirty: {} as DirtyDomains,
       chunkVersions: new Map<number, number>(),
       chunkEpoch: nextVersion(),
-      historyTick: get().historyTick + 1,
       // Chunk ids are per-act, so a fresh act resets the stamp selection (the tool
       // choice persists — it's a workflow preference, not level data).
       selectedChunkId: 0,
@@ -356,19 +335,6 @@ export const useClassicLevelStore = create<ClassicLevelState>((set, get) => ({
     if (px === null || px.length === 64) set({ tileClipboard: px });
   },
 
-  // Undo/redo the last-edited document (see lastEditedDocId). Restoring the
-  // snapshot is the stack's job — it calls back into writeLayoutSnapshot /
-  // writeArtSnapshot, which are what actually touch this store.
-  undo: () => {
-    if (!get().doc) return;
-    lastEditedStack()?.undo();
-  },
-
-  redo: () => {
-    if (!get().doc) return;
-    lastEditedStack()?.redo();
-  },
-
   markDomainsClean: (ref, domains) => {
     const s = get();
     // Only touch the currently-open act (the saver clears exactly what it wrote).
@@ -381,8 +347,7 @@ export const useClassicLevelStore = create<ClassicLevelState>((set, get) => ({
   reset: () => {
     loadToken++; // invalidate any in-flight read
     disposeStacksFor(get().ref);
-    lastEditedDocId = null;
-    set({ ...IDLE, chunkVersions: new Map(), historyTick: get().historyTick + 1 });
+    set({ ...IDLE, chunkVersions: new Map() });
   },
 }));
 
@@ -405,7 +370,6 @@ export function writeLayoutSnapshot(snap: ClassicLayoutSnapshot): void {
   useClassicLevelStore.setState((s) => ({
     doc: { ...s.doc!, fg: snap.fg, bg: snap.bg, objects: snap.objects, start: snap.start },
     dirty: restoreDomainDirty(s.dirty, snap.dirty, LAYOUT_DOMAINS),
-    historyTick: s.historyTick + 1,
   }));
 }
 
@@ -430,18 +394,8 @@ export function writeArtSnapshot(snap: ClassicArtSnapshot): void {
     dirty: restoreDomainDirty(s.dirty, snap.dirty, ART_DOMAINS),
     chunkVersions: snap.chunkVersions,
     chunkEpoch: snap.chunkEpoch,
-    historyTick: s.historyTick + 1,
   }));
 }
-
-/**
- * Whether the last-edited classic document can be undone / redone. Test support:
- * exported so command tests can assert undo-stack state directly; the UI
- * re-evaluates its undo/redo affordances off `historyTick` rather than calling
- * these. Both retire with lastEditedDocId when focus-driven undo lands.
- */
-export function classicCanUndo(): boolean { return lastEditedStack()?.canUndo ?? false; }
-export function classicCanRedo(): boolean { return lastEditedStack()?.canRedo ?? false; }
 
 // ---------------------------------------------------------------------------
 // Commit — the ONE place a validated edit becomes state: records a single undo
@@ -479,7 +433,6 @@ export function commitLayout(newDoc: LevelDoc, dirtyPatch: DirtyDomains, ve: Ver
   const id = layoutDocIdForCurrentAct();
   if (id) {
     (documentHistoryHub.historyFor(id) as ClassicLayoutHistory).record(readLayoutSnapshot());
-    lastEditedDocId = id;
   }
   applyCommit(newDoc, dirtyPatch, ve);
 }
@@ -490,7 +443,6 @@ export function commitArt(newDoc: LevelDoc, dirtyPatch: DirtyDomains, ve: Versio
   const id = zoneArtDocIdForCurrentZone();
   if (id) {
     (documentHistoryHub.historyFor(id) as ClassicArtHistory).record(readArtSnapshot());
-    lastEditedDocId = id;
   }
   applyCommit(newDoc, dirtyPatch, ve);
 }
@@ -513,7 +465,6 @@ function applyCommit(newDoc: LevelDoc, dirtyPatch: DirtyDomains, ve: VersionEffe
     dirty: { ...s.dirty, ...dirtyPatch },
     chunkVersions,
     chunkEpoch,
-    historyTick: s.historyTick + 1,
   });
 }
 

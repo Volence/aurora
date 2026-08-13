@@ -32,9 +32,9 @@ interface ArtState {
   open: OpenDocument | null;
   docVersion: number;           // bump to re-render the canvas
   /** Incremented on every live palette preview tick (slider drag). Separate
-   *  from historyVersion so per-tick repaint of the composer/swatches does NOT
-   *  trigger expensive cache rebuilds (TilesetPanel, ChunkLibrary thumbnails)
-   *  that are keyed on historyVersion. Only bumped by committed commands. */
+   *  from the history clock (hooks/useHistoryVersion) so per-tick repaint of the
+   *  composer/swatches does NOT trigger the expensive cache rebuilds
+   *  (TilesetPanel, ChunkLibrary thumbnails) that are keyed on that clock. */
   paletteVersion: number;
   /** One-shot transform request (e.g. 'flip-h') consumed by ComposerCanvas. */
   pendingAction: string | null;

@@ -5,7 +5,9 @@ import {
   __setClassicBridgeForTest,
   __resetClassicBridgeForTest,
 } from '../../state/classicProjectStore';
-import { useClassicLevelStore } from '../../state/classicLevelStore';
+import {
+  useClassicLevelStore, layoutDocIdForCurrentAct, zoneArtDocIdForCurrentZone,
+} from '../../state/classicLevelStore';
 import { documentHistoryHub } from '../../state/history-hub';
 import { useEditorStore } from '../../state/editorStore';
 import type { ClassicBridge } from '../../state/classic-bridge';
@@ -80,7 +82,7 @@ function openReady(doc = makeDoc()): void {
   documentHistoryHub.clearAll();
   useClassicLevelStore.setState({
     ref: REF, doc, status: 'ready', error: null,
-    dirty: {}, chunkVersions: new Map(), chunkEpoch: 1, historyTick: 0,
+    dirty: {}, chunkVersions: new Map(), chunkEpoch: 1,
   });
 }
 
@@ -90,6 +92,10 @@ function bridgeReturning(open: ClassicBridge['open']): ClassicBridge {
 
 const proj = () => useClassicProjectStore.getState();
 const lvl = () => useClassicLevelStore.getState();
+// Classic undo is per-document (spec §4.3): layout edits and zone-art edits land
+// on different stacks, so a test undoes the one its command wrote to.
+const layoutStack = () => documentHistoryHub.historyFor(layoutDocIdForCurrentAct()!);
+const artStack = () => documentHistoryHub.historyFor(zoneArtDocIdForCurrentZone()!);
 
 beforeEach(() => {
   useClassicProjectStore.getState().reset();
@@ -217,7 +223,7 @@ describe('classic-set-layout-region', () => {
     const res = await handleAgentRequest({ kind: 'classic-set-layout-region', plane: 'fg', x: 0, y: 0, chunkIds: [[0, 1], [2, 1]] });
     expect(res).toEqual({ plane: 'fg', cells: 4 });
     expect(Array.from(lvl().doc!.fg.cells)).toEqual([0, 1, 2, 1]);
-    lvl().undo();
+    layoutStack().undo();
     expect(Array.from(lvl().doc!.fg.cells)).toEqual([0, 1, 0, 1]);
   });
   it('rejects an out-of-range chunk id (structured error)', async () => {
@@ -274,7 +280,7 @@ describe('classic-add-chunk', () => {
     const res = await handleAgentRequest({ kind: 'classic-add-chunk' });
     expect(res).toEqual({ chunkId: 3, count: 3 });
     expect(lvl().doc!.chunks).toHaveLength(3);
-    lvl().undo();
+    artStack().undo();
     expect(lvl().doc!.chunks).toHaveLength(2);
   });
   it('seeds cells from a sparse word list', async () => {
@@ -303,7 +309,7 @@ describe('classic-add-block', () => {
     const res = await handleAgentRequest({ kind: 'classic-add-block' });
     expect(res).toEqual({ blockId: 2, count: 3 });
     expect(lvl().doc!.blocks).toHaveLength(3);
-    lvl().undo();
+    artStack().undo();
     expect(lvl().doc!.blocks).toHaveLength(2);
   });
   it('seeds cells from a def', async () => {
@@ -390,7 +396,7 @@ describe('classic-set-palette', () => {
     expect(await handleAgentRequest({ kind: 'classic-set-palette', line: 2, colors })).toEqual({ line: 2 });
     expect(Array.from(lvl().doc!.palettes[2])).toEqual(colors);
     expect(lvl().chunkEpoch).toBeGreaterThan(epoch0); // palette bump refreshes chunk art + sprites
-    lvl().undo();
+    artStack().undo();
     expect(Array.from(lvl().doc!.palettes[2])).toEqual(Array(16).fill(0));
   });
   it('rejects an out-of-range line (structured error)', async () => {
@@ -407,7 +413,7 @@ describe('classic-set-start', () => {
     openReady();
     expect(await handleAgentRequest({ kind: 'classic-set-start', x: 200, y: 300 })).toEqual({ x: 200, y: 300 });
     expect(lvl().doc!.start).toEqual({ x: 200, y: 300 });
-    lvl().undo();
+    layoutStack().undo();
     expect(lvl().doc!.start).toEqual({ x: 50, y: 50 });
   });
   it('rejects an out-of-range coordinate (structured error)', async () => {
@@ -452,7 +458,7 @@ describe('classic-save-project', () => {
     useClassicProjectStore.setState({ status: 'open', dir: '/p', handle, zoneTree: [REF], report: REPORT, type: 's1' } as never);
     useClassicLevelStore.setState({
       ref: REF, doc: makeDoc(), status: 'ready', error: null,
-      dirty: { start: true }, chunkVersions: new Map(), chunkEpoch: 1, historyTick: 0,
+      dirty: { start: true }, chunkVersions: new Map(), chunkEpoch: 1,
     });
 
     const res = await handleAgentRequest({ kind: 'classic-save-project' });
