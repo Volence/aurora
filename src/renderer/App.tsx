@@ -14,7 +14,7 @@ import { useClassicProjectStore } from './state/classicProjectStore';
 import { useClassicLevelStore } from './state/classicLevelStore';
 import { useSessionStore } from './state/sessionStore';
 import { useShellStore } from './state/shellStore';
-import { ensureSaversRegistered, registerAeonSaver, saveAllDirty } from './state/project-runtime';
+import { ensureSaversRegistered, saveAllDirty } from './state/project-runtime';
 import { useSessionLifecycle, useActTabSync } from './shell/session-lifecycle';
 import { requestOpenTab, requestFocusIndex } from './shell/tab-activation';
 import { buildCommands } from './shell/commands';
@@ -27,7 +27,7 @@ import { refreshObjectPreviews } from './object-previews';
 import type { RecentProject } from '../shared/ipc-types';
 
 export default function App() {
-  const { openProject, openProjectByPath, saveProject } = useProject();
+  const { openProject, openProjectByPath } = useProject();
   const error = useProjectStore((s) => s.error);
   const classicError = useClassicProjectStore((s) => s.error);
   const project = useProjectStore((s) => s.project);
@@ -46,7 +46,6 @@ export default function App() {
 
   // -- runtime wiring ------------------------------------------------------
   useEffect(() => { registerAgentHandler(); ensureSaversRegistered(); }, []);
-  useEffect(() => { registerAeonSaver(saveProject); return () => registerAeonSaver(null); }, [saveProject]);
   useSessionLifecycle();
   useActTabSync();
 

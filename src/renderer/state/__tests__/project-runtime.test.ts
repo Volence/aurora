@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import {
   saveCoordinator, documentHistoryHub, ensureSaversRegistered, saveAllDirty,
-  registerAeonSaver, resetProjectRuntime,
+  resetProjectRuntime,
   __setRuntimeSaversForTest, __resetRuntimeSaversForTest,
 } from '../project-runtime';
 import { useClassicProjectStore } from '../classicProjectStore';
@@ -14,7 +14,7 @@ describe('project runtime', () => {
     useClassicProjectStore.getState().reset();
     useProjectStore.getState().reset();
     useSpriteStore.setState({ s1ArtSource: null });
-    registerAeonSaver(null);
+    __resetRuntimeSaversForTest();
   });
   afterEach(() => {
     __resetRuntimeSaversForTest();
@@ -60,7 +60,7 @@ describe('project runtime', () => {
 
   it('aeon saver fires only when an aeon project is open and classic is NOT', async () => {
     const log: string[] = [];
-    registerAeonSaver(async () => { log.push('aeon'); });
+    __setRuntimeSaversForTest({ aeon: async () => { log.push('aeon'); } });
     useProjectStore.setState({ project: {} as never });
     await saveAllDirty();
     expect(log).toEqual(['aeon']);
@@ -70,6 +70,18 @@ describe('project runtime', () => {
     __setRuntimeSaversForTest({ classic: async () => {} });
     await saveAllDirty();
     expect(log).toEqual([]); // classic open → the resident aeon project is stale
+  });
+
+  it('aeon saver is registered statically (no App-mount registration required)', async () => {
+    // With an aeon project resident and classic closed, saveAll must invoke the
+    // aeon saver even though nothing ever called a register function — the impl
+    // is a static module import (saveAeonProject), not an App-mount injection.
+    const log: string[] = [];
+    __setRuntimeSaversForTest({ aeon: async () => { log.push('aeon'); } });
+    useProjectStore.setState({ project: {} as never });
+    const r = await saveAllDirty();
+    expect(log).toEqual(['aeon']);
+    expect(r.saved).toEqual(['aeon-project']);
   });
 
   it('a failing saver is reported but does not block the others', async () => {

@@ -9,7 +9,8 @@
 //     clean domains internally).
 //   • aeon-project: whenever an aeon project is resident AND no classic project
 //     is open — a classic open means projectStore holds a STALE aeon project
-//     and must not be written.
+//     and must not be written. Statically registered like the others (its impl,
+//     saveAeonProject, is a module import — no App-mount registration step).
 // Honest per-surface dirtiness (for tab dots) lives in dirty-tabs.ts, not here.
 
 import { SaveCoordinator, type SaveAllResult } from '../../core/editing/save-coordinator';
@@ -20,6 +21,7 @@ import { useSpriteStore } from './spriteStore';
 import { useToastStore } from './toastStore';
 import { saveClassicProject } from './classic-save';
 import { saveSpriteArt } from '../components/sprite/export-sprite';
+import { saveAeonProject } from './aeon-save';
 
 export const saveCoordinator = new SaveCoordinator();
 export const documentHistoryHub = new DocumentHistoryHub();
@@ -28,20 +30,17 @@ export const documentHistoryHub = new DocumentHistoryHub();
 type SaveFn = () => Promise<unknown> | unknown;
 let spriteArtImpl: SaveFn = saveSpriteArt;
 let classicImpl: SaveFn = saveClassicProject;
-let aeonImpl: SaveFn | null = null;
+let aeonImpl: SaveFn = saveAeonProject;
 
-export function __setRuntimeSaversForTest(over: { spriteArt?: SaveFn; classic?: SaveFn }): void {
+export function __setRuntimeSaversForTest(over: { spriteArt?: SaveFn; classic?: SaveFn; aeon?: SaveFn }): void {
   if (over.spriteArt) spriteArtImpl = over.spriteArt;
   if (over.classic) classicImpl = over.classic;
+  if (over.aeon) aeonImpl = over.aeon;
 }
 export function __resetRuntimeSaversForTest(): void {
   spriteArtImpl = saveSpriteArt;
   classicImpl = saveClassicProject;
-}
-
-/** The aeon save lives in the useProject hook; App registers it on mount. */
-export function registerAeonSaver(fn: SaveFn | null): void {
-  aeonImpl = fn;
+  aeonImpl = saveAeonProject;
 }
 
 let registered = false;
@@ -64,9 +63,8 @@ export function ensureSaversRegistered(): void {
     id: 'aeon-project',
     isDirty: () =>
       useClassicProjectStore.getState().status !== 'open' &&
-      useProjectStore.getState().project !== null &&
-      aeonImpl !== null,
-    save: async () => { if (aeonImpl) await aeonImpl(); },
+      useProjectStore.getState().project !== null,
+    save: async () => { await aeonImpl(); },
   });
 }
 
