@@ -6,7 +6,7 @@
 
 import type { ZoneActRef } from '../../core/project/adapter';
 import type { RecentProject } from '../../shared/ipc-types';
-import type { ExplorerGroupModel, ExplorerItemModel } from '../../core/shell/explorer';
+import type { ExplorerGroupModel } from '../../core/shell/explorer';
 import { PROJECT_SETUP_TAB } from './tabs';
 
 export interface ClassicObjectRow {
@@ -26,7 +26,7 @@ const TOOLS_GROUP: ExplorerGroupModel = Object.freeze({
   label: 'Tools',
   items: Object.freeze([
     { id: PROJECT_SETUP_TAB.id, label: PROJECT_SETUP_TAB.title },
-  ]) as unknown as ExplorerItemModel[],
+  ]),
 });
 
 export function classicExplorerGroups(

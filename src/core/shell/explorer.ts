@@ -17,7 +17,7 @@ export interface ExplorerItemModel {
 export interface ExplorerGroupModel {
   id: string;
   label: string;
-  items: ExplorerItemModel[];
+  items: readonly ExplorerItemModel[];
 }
 
 /** Case-insensitive substring over label + hint; empty groups drop out.

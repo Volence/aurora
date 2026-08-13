@@ -144,6 +144,24 @@ export async function requestFocusTabId(id: string): Promise<void> {
   if (tab) await requestOpenTab(tab);
 }
 
+/**
+ * Close a tab through the activation guard: closing the ACTIVE tab promotes a
+ * neighbor (core closeTab picks right-then-left), so the promoted level tab
+ * must pass the same activation gate as a click on it — on cancel/failed
+ * activation the close is abandoned and the tab stays. Closing an inactive
+ * tab never changes the active document and closes directly.
+ */
+export async function requestCloseTab(id: string): Promise<void> {
+  const session = useSessionStore.getState();
+  if (session.activeId !== id) { session.close(id); return; }
+  const idx = session.tabs.findIndex((t) => t.id === id);
+  if (idx === -1) return;
+  const remaining = session.tabs.filter((t) => t.id !== id);
+  const promoted = remaining[idx] ?? remaining[idx - 1] ?? remaining[0];
+  if (promoted && promoted.kind === 'level' && !(await activateLevelTarget(promoted.id))) return;
+  useSessionStore.getState().close(id);
+}
+
 /** Ctrl+1..9 — 1-based over the whole strip (1 = Home). */
 export async function requestFocusIndex(oneBased: number): Promise<void> {
   const tab = useSessionStore.getState().tabs[oneBased - 1];

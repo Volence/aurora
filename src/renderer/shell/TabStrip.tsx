@@ -14,7 +14,7 @@ import { useProjectStore } from '../state/projectStore';
 import { useEditorStore } from '../state/editorStore';
 import { useSpriteStore } from '../state/spriteStore';
 import { tabHasDirtyDot, type DirtySnapshot } from './dirty-tabs';
-import { requestFocusTabId } from './tab-activation';
+import { requestFocusTabId, requestCloseTab } from './tab-activation';
 import type { TabDescriptor } from '../../core/shell/session';
 
 function useDirtySnapshot(): DirtySnapshot {
@@ -36,7 +36,6 @@ function useDirtySnapshot(): DirtySnapshot {
 }
 
 function Tab({ tab, active, dirty }: { tab: TabDescriptor; active: boolean; dirty: boolean }) {
-  const close = useSessionStore((s) => s.close);
   const [hover, setHover] = React.useState(false);
   const closeable = tab.kind !== 'home';
   return (
@@ -56,7 +55,7 @@ function Tab({ tab, active, dirty }: { tab: TabDescriptor; active: boolean; dirt
       {dirty && <span style={styles.dot} title="Unsaved changes — Ctrl+S to save" />}
       {closeable && (
         <span
-          onMouseDown={(e) => { e.stopPropagation(); close(tab.id); }}
+          onMouseDown={(e) => { e.stopPropagation(); if (e.button === 0) void requestCloseTab(tab.id); }}
           title="Close tab"
           style={{ ...styles.close, opacity: hover || active ? 1 : 0 }}
         >

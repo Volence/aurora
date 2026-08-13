@@ -1350,6 +1350,26 @@ export async function requestFocusIndex(oneBased: number): Promise<void> {
   const tab = useSessionStore.getState().tabs[oneBased - 1];
   if (tab) await requestOpenTab(tab);
 }
+
+/**
+ * Close a tab through the activation guard: closing the ACTIVE tab promotes a
+ * neighbor (core closeTab picks right-then-left), so the promoted level tab
+ * must pass the same activation gate as a click on it — on cancel/failed
+ * activation the close is abandoned and the tab stays. Closing an inactive
+ * tab never changes the active document and closes directly.
+ * (Added in code review of Task 13 — the tab strip's close X must route
+ * through this, not sessionStore.close directly.)
+ */
+export async function requestCloseTab(id: string): Promise<void> {
+  const session = useSessionStore.getState();
+  if (session.activeId !== id) { session.close(id); return; }
+  const idx = session.tabs.findIndex((t) => t.id === id);
+  if (idx === -1) return;
+  const remaining = session.tabs.filter((t) => t.id !== id);
+  const promoted = remaining[idx] ?? remaining[idx - 1] ?? remaining[0];
+  if (promoted && promoted.kind === 'level' && !(await activateLevelTarget(promoted.id))) return;
+  useSessionStore.getState().close(id);
+}
 ```
 
 - [ ] **Step 6: Run tests to verify they pass**
@@ -2610,6 +2630,12 @@ const styles: Record<string, React.CSSProperties> = {
 ```
 
 Note: item rows use plain hover-free buttons here; if the file-level lint or visual pass wants hover states, add them the way `Tab` does (local hover state) — do not add a CSS file.
+
+**Code-review amendments (applied to the committed files — Task 16 inherits these):**
+1. `CollapsibleSection` (`src/renderer/components/ui/CollapsibleSection.tsx`) gained an optional `collapsedOverride?: boolean` prop: when defined it wins over both persisted panel-state and `defaultCollapsed`, and the header toggle becomes a no-op (does not write to panel-state) while overridden. Reason: `defaultCollapsed={query.trim() === ''}` alone doesn't force-expand a group the user has ever manually collapsed (persisted state wins over `defaultCollapsed` in `isCollapsed`). Explorer now passes a fixed `defaultCollapsed` (collapsed by default, spec §3) and `collapsedOverride={query.trim() !== '' ? false : undefined}` — an active filter always shows matches regardless of the persisted toggle; the section `id` does not vary with the query.
+2. `TabStrip`'s close X calls `requestCloseTab(tab.id)` (new export in `tab-activation.ts`, Task 7's module — see that task's code block) instead of `sessionStore.close` directly, and checks `e.button === 0` before closing (was previously firing on any mouse button). `requestCloseTab` re-runs the activation guard on the neighbor `closeTab` promotes when the CLOSED tab was active, so switching the loaded classic doc via a close can still be cancelled/discarded like a click.
+3. `Explorer`'s item rows are a local `ExplorerItem` component (mirrors `Tab`'s pattern) with local hover state (`T.raised` background), skipped when `item.disabled`.
+4. `ExplorerGroupModel.items` (`src/core/shell/explorer.ts`) is typed `readonly ExplorerItemModel[]`; `explorer-data.ts`'s `TOOLS_GROUP` singleton (and its `items` array) are `Object.freeze`d with no cast needed against the readonly type.
 
 - [ ] **Step 5: Typecheck and commit**
 

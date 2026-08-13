@@ -4,15 +4,29 @@ import { PanelHeader } from './primitives';
 import { IconChevron } from './icons';
 import { loadPanelState, savePanelState, isCollapsed, togglePanel } from '../../shell/panel-state';
 
-export function CollapsibleSection({ id, title, right, defaultCollapsed = false, children }: {
-  id: string; title: string; right?: React.ReactNode; defaultCollapsed?: boolean; children: React.ReactNode;
+export function CollapsibleSection({ id, title, right, defaultCollapsed = false, collapsedOverride, children }: {
+  id: string; title: string; right?: React.ReactNode; defaultCollapsed?: boolean;
+  /**
+   * When defined, wins over both persisted state and defaultCollapsed (e.g. an
+   * active filter force-expanding a group the user previously collapsed). The
+   * header toggle becomes a no-op while overridden — it must not write through
+   * to panel-state, or the user's persisted preference would be clobbered by a
+   * click that only makes sense in the filtered view.
+   */
+  collapsedOverride?: boolean;
+  children: React.ReactNode;
 }) {
   const [state, setState] = useState(loadPanelState);
-  const collapsed = isCollapsed(state, id, defaultCollapsed);
+  const collapsed = collapsedOverride ?? isCollapsed(state, id, defaultCollapsed);
   // Re-load the latest persisted state on each toggle (instead of writing this
   // section's mount-time snapshot) so collapsing one section never clobbers
   // another section's persisted collapse state.
-  const toggle = () => { const next = togglePanel(loadPanelState(), id, defaultCollapsed); savePanelState(next); setState(next); };
+  const toggle = () => {
+    if (collapsedOverride !== undefined) return; // overridden — not a real toggle
+    const next = togglePanel(loadPanelState(), id, defaultCollapsed);
+    savePanelState(next);
+    setState(next);
+  };
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
       <div onClick={toggle} style={{ cursor: 'pointer' }}>

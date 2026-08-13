@@ -175,7 +175,8 @@ export default function Explorer({ onOpenProject, onOpenRecent }: ExplorerProps)
             key={g.id}
             id={`explorer.${g.id}`}
             title={g.label}
-            defaultCollapsed={query.trim() === ''}
+            defaultCollapsed
+            collapsedOverride={query.trim() !== '' ? false : undefined}
             right={<span style={styles.count}>{g.items.length}</span>}
           >
             <div style={styles.items}>

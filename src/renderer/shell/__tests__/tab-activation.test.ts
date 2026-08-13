@@ -1,11 +1,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
-  planLevelActivation, activateLevelTarget,
+  planLevelActivation, activateLevelTarget, requestCloseTab,
   __setActivationSaveForTest, __resetActivationSaveForTest,
 } from '../tab-activation';
 import { useClassicProjectStore } from '../../state/classicProjectStore';
 import { useClassicLevelStore } from '../../state/classicLevelStore';
 import { useConfirmStore } from '../../state/confirmStore';
+import { useSessionStore } from '../../state/sessionStore';
+import { classicLevelTab } from '../tabs';
 import type { ZoneActRef } from '../../../core/project/adapter';
 import type { SaveClassicProjectResult } from '../../state/classic-save';
 
@@ -132,6 +134,75 @@ describe('activateLevelTarget (executor)', () => {
     useConfirmStore.getState().answer('save');
     await expect(first).resolves.toBe(false);
     expect(saveSpy).not.toHaveBeenCalled();
+    expect(openActSpy).not.toHaveBeenCalled();
+  });
+});
+
+// requestCloseTab (Task 13 fix): closing the ACTIVE tab promotes a neighbor
+// (core closeTab's right-then-left-then-Home rule), and that promotion must
+// pass through the SAME activation guard a click on the neighbor would — else
+// a promoted classic level tab could silently swap the loaded doc out from
+// under a dirty edit with no confirm.
+describe('requestCloseTab', () => {
+  const LOADED_REF: ZoneActRef = { zone: 'ghz', act: 1, label: 'Green Hill 1', available: true };
+  const TARGET_REF: ZoneActRef = { zone: 'mz', act: 2, label: 'Marble 2', available: true };
+  const HOME = { id: 'home', kind: 'home' as const, title: 'Home' };
+  const TAB_GHZ = classicLevelTab(LOADED_REF); // 'level:ghz:1'
+  const TAB_MZ = classicLevelTab(TARGET_REF); // 'level:mz:2'
+  let openActSpy: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    useClassicProjectStore.getState().reset();
+    useClassicLevelStore.getState().reset();
+    useSessionStore.getState().reset();
+    useClassicProjectStore.setState({ status: 'open', zoneTree: [LOADED_REF, TARGET_REF] } as never);
+    openActSpy = vi.fn(async () => {});
+    useClassicLevelStore.setState({ ref: LOADED_REF, dirty: { tiles: true }, openAct: openActSpy } as never);
+    useConfirmStore.getState().answer('cancel'); // clear any leftover pending request
+  });
+
+  afterEach(() => {
+    __resetActivationSaveForTest();
+    useConfirmStore.getState().answer('cancel');
+    useClassicProjectStore.getState().reset();
+    useClassicLevelStore.getState().reset();
+    useSessionStore.getState().reset();
+  });
+
+  it('closing an inactive tab closes immediately without any confirm', async () => {
+    useSessionStore.setState({ tabs: [HOME, TAB_GHZ, TAB_MZ], activeId: TAB_GHZ.id });
+    await requestCloseTab(TAB_MZ.id);
+    expect(useSessionStore.getState().tabs.map((t) => t.id)).toEqual([HOME.id, TAB_GHZ.id]);
+    expect(useSessionStore.getState().activeId).toBe(TAB_GHZ.id); // untouched — the active doc never changed
+    expect(openActSpy).not.toHaveBeenCalled();
+  });
+
+  it('closing the active dirty classic level tab, neighbor is another level tab, cancel leaves it open', async () => {
+    useSessionStore.setState({ tabs: [HOME, TAB_GHZ, TAB_MZ], activeId: TAB_GHZ.id });
+    const p = requestCloseTab(TAB_GHZ.id);
+    useConfirmStore.getState().answer('cancel');
+    await p;
+    expect(useSessionStore.getState().tabs.map((t) => t.id)).toEqual([HOME.id, TAB_GHZ.id, TAB_MZ.id]);
+    expect(useSessionStore.getState().activeId).toBe(TAB_GHZ.id);
+    expect(openActSpy).not.toHaveBeenCalled();
+  });
+
+  it('closing the active dirty classic level tab, discard closes it and opens the promoted neighbor', async () => {
+    useSessionStore.setState({ tabs: [HOME, TAB_GHZ, TAB_MZ], activeId: TAB_GHZ.id });
+    const p = requestCloseTab(TAB_GHZ.id);
+    useConfirmStore.getState().answer('discard');
+    await p;
+    expect(openActSpy).toHaveBeenCalledWith(TARGET_REF);
+    expect(useSessionStore.getState().tabs.map((t) => t.id)).toEqual([HOME.id, TAB_MZ.id]);
+    expect(useSessionStore.getState().activeId).toBe(TAB_MZ.id);
+  });
+
+  it('closing the active tab with only Home remaining closes without any confirm', async () => {
+    const TOOL_TAB = { id: 'tool:project-setup', kind: 'tool' as const, title: 'Project Setup' };
+    useSessionStore.setState({ tabs: [HOME, TOOL_TAB], activeId: TOOL_TAB.id });
+    await requestCloseTab(TOOL_TAB.id);
+    expect(useSessionStore.getState().tabs.map((t) => t.id)).toEqual([HOME.id]);
+    expect(useSessionStore.getState().activeId).toBe(HOME.id);
     expect(openActSpy).not.toHaveBeenCalled();
   });
 });
