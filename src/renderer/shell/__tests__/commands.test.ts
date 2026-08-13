@@ -5,7 +5,7 @@ import { buildCommands, type CommandSnapshot, type CommandActions } from '../com
 function actions(): CommandActions {
   return {
     openProjectDialog: vi.fn(), save: vi.fn(), saveAll: vi.fn(), toggleExplorer: vi.fn(),
-    openTab: vi.fn(), editObjectArt: vi.fn(), openRecent: vi.fn(),
+    openTab: vi.fn(), editObjectArt: vi.fn(), newSprite: vi.fn(), openRecent: vi.fn(),
   };
 }
 
@@ -108,6 +108,25 @@ describe('buildCommands', () => {
     expect(c.label).toBe('Edit sprite: Moto Bug');
     c.run();
     expect(a.openTab).toHaveBeenCalledWith({ id: 'doc:sprite:aeon:motobug', kind: 'sprite-doc', title: 'Moto Bug' });
+  });
+
+  it('offers "New Sprite…" in an aeon project, even with no sprites bound', () => {
+    // The only way into the sprite editor before a single sprite exists: every
+    // other route is gated on an object already bound to a saved sprite, and
+    // Export (which creates one) lives inside that editor.
+    const a = actions();
+    const cmds = buildCommands({ ...emptySnapshot, engine: 'aeon' }, a);
+    const c = cmds.find((x) => x.id === 'new-sprite')!;
+    expect(c.label).toBe('New Sprite…');
+    c.run();
+    expect(a.newSprite).toHaveBeenCalled();
+  });
+
+  it('does NOT offer "New Sprite…" for classic or with no project open', () => {
+    expect(buildCommands({ ...emptySnapshot, engine: 's1' }, actions())
+      .some((c) => c.id === 'new-sprite')).toBe(false);
+    expect(buildCommands(emptySnapshot, actions())
+      .some((c) => c.id === 'new-sprite')).toBe(false);
   });
 
   it('offers recents only when no project is open', () => {

@@ -9,8 +9,11 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import {
   planSpriteDocActivation,
   activateSpriteDocTarget,
+  requestCloseTab,
   __setSpriteModuleForTest,
 } from '../tab-activation';
+import { untitledSpriteTab, UNTITLED_SPRITE_TAB_ID } from '../tabs';
+import { useConfirmStore } from '../../state/confirmStore';
 import { useSpriteStore, UNTITLED_SPRITE_DOC_ID } from '../../state/spriteStore';
 import { documentHistoryHub } from '../../state/history-hub';
 import { focusedHistory } from '../../state/editorStore';
@@ -43,6 +46,18 @@ describe('planSpriteDocActivation', () => {
   it('rejects malformed ids', () => {
     expect(planSpriteDocActivation({
       tabId: 'doc:sprite:junk', activeDocId: UNTITLED_SPRITE_DOC_ID, isOpen: false,
+    })).toEqual({ kind: 'none' });
+  });
+
+  it('the untitled tab is its OWN case — never a loader ref', () => {
+    // There is nothing on disk called "untitled": routing it down the load path
+    // would toast a bogus failure and roll the tab straight back.
+    expect(planSpriteDocActivation({
+      tabId: UNTITLED_SPRITE_TAB_ID, activeDocId: 'doc:sprite:aeon:motobug', isOpen: false,
+    })).toEqual({ kind: 'untitled' });
+    // …and it is still a no-op when already checked out.
+    expect(planSpriteDocActivation({
+      tabId: UNTITLED_SPRITE_TAB_ID, activeDocId: UNTITLED_SPRITE_TAB_ID, isOpen: true,
     })).toEqual({ kind: 'none' });
   });
 });
@@ -230,5 +245,90 @@ describe('activateSpriteDocTarget', () => {
     expect(s.activeDocId).toBe(S1_TAB);
     expect(s.frames[0].data[0]).toBe(2);                       // S1 content
     expect(s.docs.get(AEON_TAB)!.frames[0].data[0]).toBe(1);   // aeon content, uncorrupted
+  });
+});
+
+// --- The untitled "New Sprite…" tab ----------------------------------------
+//
+// Without it a pure-aeon project with no bindings yet can never reach the sprite
+// editor at all: SpriteMode mounts only for an active sprite-doc tab, and every
+// creator of one is gated on an object already bound to a saved sprite — which
+// only Export, inside that editor, can produce.
+
+const HOME = { id: 'home', kind: 'home' as const, title: 'Home' };
+
+describe('the untitled sprite tab', () => {
+  it('checks out the untitled document without touching any loader', async () => {
+    const calls = stubLoaders();
+    await activateSpriteDocTarget(AEON_TAB);          // something else in front
+
+    expect(await activateSpriteDocTarget(UNTITLED_SPRITE_TAB_ID)).toBe(true);
+
+    expect(calls).toEqual(['aeon:motobug']);          // nothing new was loaded
+    expect(useSpriteStore.getState().activeDocId).toBe(UNTITLED_SPRITE_DOC_ID);
+  });
+
+  it('keeps its pixels while parked behind another sprite tab', async () => {
+    stubLoaders();
+    useSpriteStore.getState().setBuffer(frameFilledWith(9)); // draw on the untitled doc
+    await activateSpriteDocTarget(AEON_TAB);
+    expect(useSpriteStore.getState().frames[0].data[0]).toBe(1);
+
+    await activateSpriteDocTarget(UNTITLED_SPRITE_TAB_ID);
+    expect(useSpriteStore.getState().frames[0].data[0]).toBe(9);
+  });
+
+  it('does not collide with a real sprite tab — both stay open, each with its own pixels', async () => {
+    stubLoaders();
+    useSpriteStore.getState().setBuffer(frameFilledWith(9));
+    await activateSpriteDocTarget(AEON_TAB);
+
+    const s = useSpriteStore.getState();
+    expect(s.isOpen(UNTITLED_SPRITE_TAB_ID)).toBe(true);
+    expect(s.isOpen(AEON_TAB)).toBe(true);
+    expect(s.docs.get(UNTITLED_SPRITE_TAB_ID)!.frames[0].data[0]).toBe(9);
+  });
+
+  it('closing it confirms (no save-back target), and Cancel keeps the tab', async () => {
+    useSessionStore.setState({ tabs: [HOME, untitledSpriteTab()], activeId: UNTITLED_SPRITE_TAB_ID });
+    useSpriteStore.getState().setBuffer(frameFilledWith(9)); // dirty, unsaveable
+
+    const p = requestCloseTab(UNTITLED_SPRITE_TAB_ID);
+    useConfirmStore.getState().answer('cancel');
+    await p;
+
+    expect(useSessionStore.getState().tabs.map((t) => t.id))
+      .toEqual([HOME.id, UNTITLED_SPRITE_TAB_ID]);
+    expect(useSpriteStore.getState().frames[0].data[0]).toBe(9); // work intact
+  });
+
+  it('Discard closes it and drops the document + its undo stack', async () => {
+    useSessionStore.setState({ tabs: [HOME, untitledSpriteTab()], activeId: UNTITLED_SPRITE_TAB_ID });
+    useSpriteStore.getState().setBuffer(frameFilledWith(9));
+
+    const p = requestCloseTab(UNTITLED_SPRITE_TAB_ID);
+    useConfirmStore.getState().answer('discard');
+    await p;
+
+    expect(useSessionStore.getState().tabs.map((t) => t.id)).toEqual([HOME.id]);
+    expect(documentHistoryHub.has(UNTITLED_SPRITE_TAB_ID)).toBe(false);
+    // The store always holds SOME untitled document (it is the fallback for a
+    // closed checkout) — but a blank one, not the discarded drawing.
+    expect(useSpriteStore.getState().frames[0].data[0]).toBe(0);
+  });
+
+  it('reopening after a discard gives a fresh blank document, not a dead checkout', async () => {
+    useSessionStore.setState({ tabs: [HOME, untitledSpriteTab()], activeId: UNTITLED_SPRITE_TAB_ID });
+    stubLoaders();
+    await activateSpriteDocTarget(AEON_TAB);  // park the untitled doc…
+    await requestCloseTab(UNTITLED_SPRITE_TAB_ID);   // …clean, so no confirm; drops it from the map
+
+    expect(useSpriteStore.getState().isOpen(UNTITLED_SPRITE_TAB_ID)).toBe(false);
+
+    // A plain activateSpriteDoc would silently no-op here and leave the AEON doc
+    // checked out under an "Untitled Sprite" tab.
+    expect(await activateSpriteDocTarget(UNTITLED_SPRITE_TAB_ID)).toBe(true);
+    expect(useSpriteStore.getState().activeDocId).toBe(UNTITLED_SPRITE_DOC_ID);
+    expect(useSpriteStore.getState().frames[0].data[0]).toBe(0);
   });
 });
