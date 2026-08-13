@@ -255,7 +255,7 @@ export default function ArtMode({ appBar }: { appBar: React.ReactNode }) {
         <Panel width={240} scroll>
           {showCollisionPanel && (
             <CollapsibleSection id="art.collision" title="Collision">
-              <CollisionPalette />
+              <CollisionPalette variant="art" />
             </CollapsibleSection>
           )}
           <CollapsibleSection id="art.tileset" title="Tileset">
