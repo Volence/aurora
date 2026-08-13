@@ -13,12 +13,17 @@ export const PROJECT_SETUP_TAB: TabDescriptor = {
   title: 'Project Setup',
 };
 
+/** The act-scoped document id for a zone/act pair — also the level TAB id. */
+export function levelDocId(zone: string, act: string): string {
+  return `level:${zone}:${act}`;
+}
+
 export function classicLevelTab(ref: ZoneActRef): TabDescriptor {
-  return { id: `level:${ref.zone}:${ref.act}`, kind: 'level', title: ref.label };
+  return { id: levelDocId(ref.zone, String(ref.act)), kind: 'level', title: ref.label };
 }
 
 export function aeonLevelTab(zoneId: string, zoneName: string, actId: string): TabDescriptor {
-  return { id: `level:${zoneId}:${actId}`, kind: 'level', title: `${zoneName} · ${actId}` };
+  return { id: levelDocId(zoneId, actId), kind: 'level', title: `${zoneName} · ${actId}` };
 }
 
 export function parseLevelTabId(id: string): { zone: string; act: string } | null {

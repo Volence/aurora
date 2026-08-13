@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useProjectStore, getCurrentZone, getActiveLevel, getCurrentAct } from '../../state/projectStore';
-import { executeCommand } from '../../state/editorStore';
+import { executeAmbientCommand } from '../../state/editorStore';
 import { useHistoryVersion } from '../../hooks/useHistoryVersion';
 import { useArtStore } from '../../state/artStore';
 import { useSpriteStore } from '../../state/spriteStore';
@@ -217,6 +217,14 @@ export default function PaletteEditor({ context }: { context?: 'sprite' }) {
    * keydown binding) is not blocked by the INPUT early-return guard on the next
    * undo.
    *
+   * AMBIENT, not focused: this editor edits ZONE palette lines from inside the
+   * sprite pane too (SpriteMode mounts it with context="sprite", where line 0 is
+   * unlocked and the "Copy to ▸ Zone line N" bridge writes zone CRAM). Focus
+   * there is the sprite DOCUMENT, which owns no command history — routing by
+   * focus threw inside the event handler. executeAmbientCommand records on the
+   * zone-art document the colors actually live in. Same reasoning for
+   * applyZoneSwatchCopy / applyZoneLineCopy below.
+   *
    * Note: MapViewport's invalidation listener handles set-palette-line →
    * reloadAllSections for the MAP repaint, but in Art mode it is unmounted —
    * the composer repaints via the history clock, and the map re-prerenders on
@@ -246,7 +254,7 @@ export default function PaletteEditor({ context }: { context?: 'sprite' }) {
       encodeGenesisColor(c) !== encodeGenesisColor(pre.colors[i]) || c.a !== pre.colors[i].a);
     if (!changed) return; // click without movement — no history entry
 
-    executeCommand({
+    executeAmbientCommand({
       type: 'set-palette-line',
       line: pre.line,
       oldColors: pre.colors,
@@ -266,7 +274,7 @@ export default function PaletteEditor({ context }: { context?: 'sprite' }) {
     const old = z.palette.lines[line].colors.map((c) => ({ ...c }));
     const edited = copySwatchInto(old, idx, src);
     if (sameColors(edited, old)) return;
-    executeCommand({
+    executeAmbientCommand({
       type: 'set-palette-line', line, oldColors: old, newColors: edited,
       sectionIndex: -1, description: `copy color into line ${line} idx ${idx}`,
     }, level);
@@ -281,7 +289,7 @@ export default function PaletteEditor({ context }: { context?: 'sprite' }) {
     const old = z.palette.lines[line].colors.map((c) => ({ ...c }));
     const edited = copyLineInto(old, src);
     if (sameColors(edited, old)) return;
-    executeCommand({
+    executeAmbientCommand({
       type: 'set-palette-line', line, oldColors: old, newColors: edited,
       sectionIndex: -1, description: `copy palette line into ${line}`,
     }, level);

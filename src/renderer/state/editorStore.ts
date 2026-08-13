@@ -6,9 +6,10 @@ import type { UndoStack } from '../../core/editing/undo-stack';
 import { useArtStore } from './artStore';
 import { BoundEditHistory } from '../../core/editing/bound-edit-history';
 import { documentHistoryHub } from './history-hub';
+import { useProjectStore } from './projectStore';
 import { useSessionStore } from './sessionStore';
 import { useWorkspaceStore } from '../workspace/workspaceStore';
-import { parseLevelTabId, parseSpriteDocTabId, zoneArtDocId } from '../shell/tabs';
+import { levelDocId, parseLevelTabId, parseSpriteDocTabId, zoneArtDocId } from '../shell/tabs';
 
 export type EditorTool =
   | 'view' | 'select' | 'paint-tile' | 'paint-block' | 'stamp-chunk'
@@ -323,6 +324,84 @@ export function executeCommand(command: AnyCommand, level: S4Level): void {
   if (!(stack instanceof BoundEditHistory)) {
     throw new Error(
       `executeCommand: the focused document '${focusedDocId() ?? '(none)'}' is not an aeon command history`,
+    );
+  }
+  stack.execute(command, level);   // notifies notifyCommandApplied
+  useEditorStore.getState().markDirty();
+}
+
+// --- Ambient (non-focused) commands ----------------------------------------
+
+/**
+ * Commands whose data lives on the ZONE rather than the act. Derived from what
+ * core/editing/history.ts actually mutates: these three are the only members of
+ * AnyCommand that touch `level.palette` / `level.tileset` / `level.chunkLibrary`
+ * (all zone-level fields of S4Level). Every other command writes
+ * `level.sections[...]` or `level.act`, both act-scoped. Keep this in step with
+ * applyCommand — a new zone-level command that isn't listed here would be
+ * recorded on the act stack and lost when that act tab closes.
+ */
+const ZONE_SCOPED_COMMAND_TYPES = new Set<AnyCommand['type']>([
+  'set-palette-line',
+  'set-tileset-tiles',
+  'set-chunk',
+]);
+
+/**
+ * A batch is zone-scoped only when EVERY leaf is — one act-scoped child pins the
+ * whole step to the act, because a step that half-lives on a stack the act tab's
+ * close would discard is worse than one recorded a level too narrowly. No mixed
+ * batch is constructed today (map-stamp builds act-scoped children, ComposerCanvas
+ * zone-scoped ones); the rule exists so a future one can't silently split.
+ */
+export function isZoneScopedCommand(command: AnyCommand): boolean {
+  if (command.type === 'batch') {
+    return command.commands.length > 0 && command.commands.every(isZoneScopedCommand);
+  }
+  return ZONE_SCOPED_COMMAND_TYPES.has(command.type);
+}
+
+/**
+ * The document a command's DATA belongs to, from the project store's current
+ * zone/act (which tab activation keeps pointed at the last activated level tab).
+ * Null when no act is current, i.e. there is no level to edit at all.
+ */
+export function commandDocId(command: AnyCommand): string | null {
+  const { currentZoneId, currentActId } = useProjectStore.getState();
+  if (!currentZoneId) return null;
+  if (isZoneScopedCommand(command)) return zoneArtDocId(currentZoneId);
+  return currentActId ? levelDocId(currentZoneId, currentActId) : null;
+}
+
+/**
+ * Execute a command that does NOT originate from the focused surface, recording
+ * it on the document its data belongs to (commandDocId).
+ *
+ * executeCommand routes by FOCUS, which is right for an editing surface — the
+ * user's Ctrl+Z reaches back into the thing they were just looking at. It is
+ * wrong for ambient callers, which edit the project irrespective of focus:
+ *
+ *  - the agent handler's edit tools, which run against whatever act is loaded
+ *    while the active tab may be Home, a tool tab, or a sprite doc — none of
+ *    which own a command history, so focus routing THREW (the MCP call failed);
+ *  - PaletteEditor's zone-palette rows and "Copy to ▸ Zone line N" bridges,
+ *    which write zone CRAM from inside the sprite pane (same throw).
+ *
+ * Scope routing also stops a zone-scoped edit made while the layout facet
+ * happens to be focused from being recorded on the ACT stack, where closing
+ * that act tab would discard a zone edit that outlives it.
+ */
+export function executeAmbientCommand(command: AnyCommand, level: S4Level): void {
+  const docId = commandDocId(command);
+  if (!docId) {
+    throw new Error(
+      `executeAmbientCommand: no current act — '${command.type}' has no document to record on`,
+    );
+  }
+  const stack = documentHistoryHub.historyFor(docId);
+  if (!(stack instanceof BoundEditHistory)) {
+    throw new Error(
+      `executeAmbientCommand: document '${docId}' is not an aeon command history`,
     );
   }
   stack.execute(command, level);   // notifies notifyCommandApplied
