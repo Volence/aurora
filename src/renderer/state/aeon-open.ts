@@ -6,6 +6,7 @@
 import { aeonAdapter } from '../../core/project/aeon';
 import { dominantPaletteLine } from '../../core/project/aeon/load';
 import { createIpcFileAccess } from './classic-file-access';
+import { documentHistoryHub } from './history-hub';
 import { useProjectStore } from './projectStore';
 import { useEditorStore } from './editorStore';
 import { useViewStore } from './viewStore';
@@ -23,6 +24,12 @@ export async function openAeonProject(dir: string): Promise<boolean> {
     // strictly safer than the old ordering — if addRecentProject throws, nothing
     // has been committed (the old path could fail with config set, project null).
     await window.api.addRecentProject(dir, aeon.config.name);
+    // Every aeon open starts fresh histories: the loaded project data is
+    // fresh-from-disk, so pre-open histories must never be applied to it. Covers
+    // the same-dir reopen case, where session-lifecycle's key-change reset never
+    // fires (different-dir switches get a second, idempotent clear from the
+    // lifecycle).
+    documentHistoryHub.clearAll();
     // No await may sit between openLoaded and setCurrentAct: the atomic commit
     // flips the session projectKey, and an interleaved await lets the restore
     // effect run before the default-act selection — which would then clobber the
