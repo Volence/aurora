@@ -158,6 +158,38 @@ export function adoptPaletteLineForEmptyCells(
 }
 
 /**
+ * Rewrite the palette-line bits (13–14) of a nametable word, preserving the
+ * tile index, flip, and priority bits. Empty cells (word 0) stay empty — a
+ * no-op — so air never becomes a stamp of tile #0. Pure word-level primitive;
+ * the composer's palette-apply tool works on the decoded cell model
+ * (adoptPaletteLineForEmptyCells / applyPaletteLineToDocCell) and this is the
+ * matching operation for callers that hold packed section/chunk words.
+ */
+export function applyPaletteLineToWord(word: number, line: number): number {
+  if (word === 0) return 0;
+  return ((word & ~0x6000) | ((line & 0x3) << 13)) & 0xFFFF;
+}
+
+/**
+ * Apply a palette line to an OCCUPIED doc cell (references an atlas tile or
+ * holds local pixels), leaving tile index and flips intact. Empty cells (no
+ * atlas, no local) are a no-op — consistent with applyPaletteLineToWord's
+ * treatment of word 0. Returns true when the cell's line actually changed (so
+ * the caller can mark the doc dirty), false otherwise.
+ */
+export function applyPaletteLineToDocCell(
+  doc: ComposerDoc, cx: number, cy: number, line: number,
+): boolean {
+  if (cx < 0 || cx >= doc.widthTiles || cy < 0 || cy >= doc.heightTiles) return false;
+  const cell = cellAt(doc, cx, cy);
+  if (cell.atlasTile === null && cell.localId === null) return false; // empty → no-op
+  const pal = line & 0x3;
+  if (cell.pal === pal) return false;
+  cell.pal = pal;
+  return true;
+}
+
+/**
  * Flatten the whole document into one PixelBuffer (doc orientation — cell
  * flips applied). Used by whole-doc operations (fill, shapes, transforms,
  * selection move/paste) that run pure pixel-ops and then diff back to writes.

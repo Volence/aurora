@@ -7,7 +7,7 @@ import {
 import { useToastStore } from '../../state/toastStore';
 import {
   cellAt, setPixels, docToBuffer, bufferToWrites, stampTile,
-  adoptPaletteLineForEmptyCells, docLineMap,
+  adoptPaletteLineForEmptyCells, docLineMap, applyPaletteLineToDocCell,
 } from '../../../core/art/composer-buffer';
 import type { ComposerDoc } from '../../../core/art/composer-buffer';
 import { paintDocCollision, applyClipboardCollisionToDoc } from '../../../core/art/composer-collision';
@@ -284,8 +284,9 @@ export default function ComposerCanvas() {
     useArtStore.getState().bumpDoc();
   }
 
-  /** Apply one tile-space tool action to a doc cell (stamp or collision). */
-  function applyTileCell(t: 'tile-stamp' | 'collision', cx: number, cy: number) {
+  /** Apply one tile-space tool action to a doc cell (stamp / collision /
+   *  palette-apply). */
+  function applyTileCell(t: 'tile-stamp' | 'collision' | 'palette-apply', cx: number, cy: number) {
     const o = useArtStore.getState().open;
     if (!o) return;
     const doc = o.doc;
@@ -299,6 +300,11 @@ export default function ComposerCanvas() {
         vf: flipRef.current.vf,
         pri: false,
       });
+    } else if (t === 'palette-apply') {
+      // Re-line an already-placed cell: same palette-line source as tile
+      // placement (artStore.paletteLine). Empty cells are a no-op; unchanged
+      // cells skip the dirty/repaint below.
+      if (!applyPaletteLineToDocCell(doc, cx, cy, useArtStore.getState().paletteLine)) return;
     } else {
       // Same packed-word pattern as MapViewport.paintCollisionCell — one palette
       // drives both surfaces via selectedCollisionWord.
@@ -316,7 +322,7 @@ export default function ComposerCanvas() {
   // ---------- shared drawing engine ----------
 
   const controllerRef = useRef<PixelEditController | null>(null);
-  const ctlTool: CtlArtTool = (tool === 'tile-stamp' || tool === 'collision') ? 'pencil' : tool;
+  const ctlTool: CtlArtTool = (tool === 'tile-stamp' || tool === 'collision' || tool === 'palette-apply') ? 'pencil' : tool;
   const config = {
     tool: ctlTool, color: selectedColor, mirror,
     ditherPattern, ditherSecondary, pixelPerfect,
@@ -365,10 +371,10 @@ export default function ComposerCanvas() {
 
   // Tile-space tools (stamp/collision) are tile-space by nature — route them to
   // the host hook whenever selected, regardless of the px/tile tab state.
-  const tileTools = tool === 'tile-stamp' || tool === 'collision';
+  const tileTools = tool === 'tile-stamp' || tool === 'collision' || tool === 'palette-apply';
   const hostPointer: HostPointer | null = useMemo(() => {
     if (!tileTools) return null;
-    const t = tool as 'tile-stamp' | 'collision';
+    const t = tool as 'tile-stamp' | 'collision' | 'palette-apply';
     return {
       down(p) {
         const o = useArtStore.getState().open;
@@ -435,7 +441,7 @@ export default function ComposerCanvas() {
     const doc = getDoc();
     if (!doc) return;
     const s = useArtStore.getState();
-    if (!(s.tool === 'tile-stamp' || s.tool === 'collision')) return;
+    if (!(s.tool === 'tile-stamp' || s.tool === 'collision' || s.tool === 'palette-apply')) return;
     const pxW = doc.widthTiles * 8, pxH = doc.heightTiles * 8;
 
     if (s.tool === 'collision' && z >= 6) {
@@ -469,6 +475,8 @@ export default function ComposerCanvas() {
     const est = useEditorStore.getState();
     const hud = s.tool === 'tile-stamp'
       ? `stamp #${s.brushTile}  flip[X]:${flipRef.current.hf ? 'H' : '–'} [Y]:${flipRef.current.vf ? 'V' : '–'}`
+      : s.tool === 'palette-apply'
+      ? `palette line ${s.paletteLine} → cells`
       : `collision[${est.collisionPaintPlane.toUpperCase()}]: ${
         est.selectedCollisionProfile === 0 ? 'air' : `#${est.selectedCollisionProfile} · ${est.selectedCollisionSolidity}`
       }`;

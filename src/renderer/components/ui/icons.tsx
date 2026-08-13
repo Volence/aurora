@@ -21,6 +21,7 @@ export const IconDither    = svg(<path d="M3 3h2v2H3zM7 3h2v2H7zM11 3h2v2h-2zM5 
 export const IconView      = svg(<><circle cx="8" cy="8" r="2.5" /><path d="M1 8s3-5 7-5 7 5 7 5-3 5-7 5-7-5-7-5z" /></>);
 export const IconStamp     = svg(<path d="M5 9h6l1 4H4zM6 9V5a2 2 0 014 0v4" />);
 export const IconCollision = svg(<path d="M2 11l4-6 3 4 2-3 3 5z" />);
+export const IconPalette   = svg(<><path d="M8 2a6 6 0 000 12 1.4 1.4 0 001-2.4 1.4 1.4 0 011-2.4h1.5A3 3 0 0014 6 6 6 0 008 2z" /><circle cx="5.5" cy="6" r="0.6" fill="currentColor" stroke="none" /><circle cx="8" cy="4.8" r="0.6" fill="currentColor" stroke="none" /><circle cx="10.5" cy="6" r="0.6" fill="currentColor" stroke="none" /></>);
 export const IconObject    = svg(<><rect x="4" y="4" width="8" height="8" /><path d="M4 4l8 8" /></>);
 export const IconRing      = svg(<circle cx="8" cy="8" r="4.5" />);
 export const IconUndo      = svg(<path d="M6 4L3 7l3 3M3 7h7a3 3 0 010 6H7" />);
