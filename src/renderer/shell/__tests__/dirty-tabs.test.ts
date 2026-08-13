@@ -3,7 +3,7 @@ import { tabHasDirtyDot, type DirtySnapshot } from '../dirty-tabs';
 
 const base: DirtySnapshot = {
   classicOpen: false, classicRef: null, classicDirty: false,
-  aeonOpen: false, aeonDirty: false, loadedSpriteDocId: null, spriteDirty: false,
+  aeonOpen: false, aeonDirty: false, dirtySpriteDocIds: [],
 };
 
 describe('tabHasDirtyDot', () => {
@@ -24,20 +24,27 @@ describe('tabHasDirtyDot', () => {
     // Sprite editor is dirty, but the level itself is clean — the level tab stays undotted.
     const s = {
       ...base, classicOpen: true, classicRef: { zone: 'ghz', act: 1 },
-      loadedSpriteDocId: 'doc:sprite:s1:13', spriteDirty: true,
+      dirtySpriteDocIds: ['doc:sprite:s1:13'],
     };
     expect(tabHasDirtyDot('level:ghz:1', 'level', s)).toBe(false);
   });
 
-  it('sprite-doc: only the LOADED sprite-doc tab dots, and only when dirty', () => {
-    const s = { ...base, loadedSpriteDocId: 'doc:sprite:s1:13', spriteDirty: true };
+  it('sprite-doc: a tab dots exactly when its own document has unsaved edits', () => {
+    const s = { ...base, dirtySpriteDocIds: ['doc:sprite:s1:13'] };
     expect(tabHasDirtyDot('doc:sprite:s1:13', 'sprite-doc', s)).toBe(true);
-    // A different sprite-doc tab (not the loaded one) never dots.
+    // A clean sprite-doc tab never dots.
     expect(tabHasDirtyDot('doc:sprite:aeon:motobug', 'sprite-doc', s)).toBe(false);
-    // The loaded tab is clean → no dot.
-    expect(tabHasDirtyDot('doc:sprite:s1:13', 'sprite-doc', { ...s, spriteDirty: false })).toBe(false);
-    // No sprite loaded at all → no dot.
-    expect(tabHasDirtyDot('doc:sprite:s1:13', 'sprite-doc', { ...base, spriteDirty: true })).toBe(false);
+    // Nothing dirty at all → no dot.
+    expect(tabHasDirtyDot('doc:sprite:s1:13', 'sprite-doc', base)).toBe(false);
+  });
+
+  it('sprite-doc: a BACKGROUND (parked) document dots its tab too', () => {
+    // The regression this guards: dotting only the checked-out document left a
+    // dirty background sprite tab looking saved, so closing it discarded edits
+    // with no warning at all.
+    const s = { ...base, dirtySpriteDocIds: ['doc:sprite:s1:13', 'doc:sprite:aeon:motobug'] };
+    expect(tabHasDirtyDot('doc:sprite:s1:13', 'sprite-doc', s)).toBe(true);
+    expect(tabHasDirtyDot('doc:sprite:aeon:motobug', 'sprite-doc', s)).toBe(true);
   });
 
   it('aeon: project-wide dirtiness dots every level tab (honest aggregate, spec §10)', () => {

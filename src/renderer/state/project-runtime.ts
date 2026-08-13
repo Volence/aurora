@@ -5,10 +5,10 @@
 // clearAll on project switch. The three savers reproduce the
 // retired save router's semantics — fire-when-context-open, not
 // fire-when-strictly-dirty — so save behavior cannot regress in this stage:
-//   • sprite-art: when an S1 object's art is checked out (s1ArtSource set) AND it
-//     has unsaved edits — writing back an untouched checkout would be a pointless
-//     identical-bytes write + mtime churn. Registered FIRST so pixel edits are
-//     never lost behind a level-save error.
+//   • sprite-art: for every open sprite document whose art is checked out
+//     (s1ArtSource set) AND has unsaved edits — writing back an untouched checkout
+//     would be a pointless identical-bytes write + mtime churn. Registered FIRST
+//     so pixel edits are never lost behind a level-save error.
 //   • classic-level: whenever a classic project is open (its own writer skips
 //     clean domains internally).
 //   • aeon-project: whenever an aeon project is resident AND no classic project
@@ -21,10 +21,10 @@ import { SaveCoordinator, type SaveAllResult } from '../../core/editing/save-coo
 import { documentHistoryHub } from './history-hub';
 import { useClassicProjectStore } from './classicProjectStore';
 import { useProjectStore } from './projectStore';
-import { useSpriteStore } from './spriteStore';
+import { useSpriteStore, saveableDirtySpriteDocIds } from './spriteStore';
 import { useToastStore } from './toastStore';
 import { saveClassicProject } from './classic-save';
-import { saveSpriteArt } from '../components/sprite/export-sprite';
+import { saveAllSpriteArt } from '../components/sprite/export-sprite';
 import { saveAeonProject } from './aeon-save';
 
 export const saveCoordinator = new SaveCoordinator();
@@ -34,7 +34,7 @@ export { documentHistoryHub };
 
 // -- Injectable savers (test seam, mirroring the retired save router's convention) --
 type SaveFn = () => Promise<unknown> | unknown;
-let spriteArtImpl: SaveFn = saveSpriteArt;
+let spriteArtImpl: SaveFn = saveAllSpriteArt;
 let classicImpl: SaveFn = saveClassicProject;
 let aeonImpl: SaveFn = saveAeonProject;
 
@@ -44,7 +44,7 @@ export function __setRuntimeSaversForTest(over: { spriteArt?: SaveFn; classic?: 
   if (over.aeon) aeonImpl = over.aeon;
 }
 export function __resetRuntimeSaversForTest(): void {
-  spriteArtImpl = saveSpriteArt;
+  spriteArtImpl = saveAllSpriteArt;
   classicImpl = saveClassicProject;
   aeonImpl = saveAeonProject;
 }
@@ -58,8 +58,10 @@ export function ensureSaversRegistered(): void {
   saveCoordinator.register({
     id: 'sprite-art',
     // Only fire on a checkout that has actual unsaved edits — a bare checkout is
-    // not dirty (identical-bytes write + mtime churn otherwise).
-    isDirty: () => useSpriteStore.getState().s1ArtSource !== null && useSpriteStore.getState().unsavedEdits,
+    // not dirty (identical-bytes write + mtime churn otherwise). Counts EVERY open
+    // sprite document, not just the checked-out one: background sprite tabs hold
+    // real edits, and saveAllSpriteArt writes them all back.
+    isDirty: () => saveableDirtySpriteDocIds().length > 0,
     save: async () => { await spriteArtImpl(); },
   });
   saveCoordinator.register({
@@ -91,7 +93,15 @@ export async function saveAllDirty(): Promise<SaveAllResult> {
   return result;
 }
 
-/** Project switch/close: drop all per-document histories. */
+/**
+ * Project switch/close: drop all per-document histories AND every open sprite
+ * document. The sprite documents have to go with them — a document that outlived
+ * its project keeps an s1ArtSource pointing at the OLD project's file by absolute
+ * path, so a later Ctrl+S would write across projects. Safe to blank the editor
+ * here (the concern that deferred this in Task 7): session restore runs right
+ * after and re-activates the restored sprite tab, which loads its document again.
+ */
 export function resetProjectRuntime(): void {
   documentHistoryHub.clearAll();
+  useSpriteStore.getState().closeAll();
 }

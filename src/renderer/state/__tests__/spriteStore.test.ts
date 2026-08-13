@@ -5,7 +5,7 @@ import { createBuffer } from '../../../core/art/pixel-ops';
 // unsavedEdits is the honest sprite-dirtiness signal (Fix A): TRUE only when the
 // working sprite has edits not yet persisted. recordEdit (the single edit choke
 // point) sets it; loadSprite/newSprite reset it; non-mutating actions must NOT
-// touch it. spriteEditorDirty()/the tab dot/the discard guards all read it.
+// touch it. dirtySpriteDocIds()/the tab dot/the close guard all read it.
 describe('spriteStore unsavedEdits lifecycle', () => {
   beforeEach(() => {
     // A fresh load zeroes history + the flag — the cleanest reset between cases.

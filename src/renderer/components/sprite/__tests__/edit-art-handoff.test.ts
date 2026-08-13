@@ -5,9 +5,10 @@
 // The opener is stubbed via the module's injectable seam (mirrors the classic
 // stores' __set…ForTest convention), so no window.api / canvas is needed.
 //
-// editObjectArtCheckout retargets the singleton sprite editor and derives its
-// zone from the open classic level's `ref` (no longer a caller argument); the
-// thin editObjectArt wrapper additionally surfaces the sprite-doc tab.
+// editObjectArtCheckout loads an object's art into the CHECKED-OUT sprite document
+// and derives its zone from the open classic level's `ref` (no longer a caller
+// argument); the thin editObjectArt wrapper just surfaces the sprite-doc tab and
+// lets sprite-doc activation own the document lifecycle.
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
@@ -23,7 +24,7 @@ import { useClassicLevelStore } from '../../../state/classicLevelStore';
 import { useSpriteStore } from '../../../state/spriteStore';
 import { useSessionStore } from '../../../state/sessionStore';
 import { useConfirmStore } from '../../../state/confirmStore';
-import { markSpriteDocLoaded, getLoadedSpriteDocId } from '../../../shell/tab-activation';
+import { getLoadedSpriteDocId, __setSpriteModuleForTest } from '../../../shell/tab-activation';
 import { HOME_TAB } from '../../../../core/shell/session';
 import { createBuffer } from '../../../../core/art/pixel-ops';
 
@@ -54,12 +55,17 @@ function setZone(zone: string): void {
 beforeEach(() => {
   useClassicProjectStore.setState({ dir: DIR, status: 'open' });
   setZone('ghz');
-  useSpriteStore.getState().newSprite(32, 32);
+  useSpriteStore.getState().closeAll();
   useSessionStore.getState().replace({ tabs: [HOME_TAB], activeId: HOME_TAB.id });
-  markSpriteDocLoaded(null);
+  // editObjectArt goes through sprite-doc activation, which pulls the loaders in
+  // by dynamic import; point that at THIS module so the stub opener above is the
+  // one that runs (the seam takes a partial module — only these two are used).
+  __setSpriteModuleForTest({ editObjectArtCheckout, loadSpriteByName: async () => {} });
 });
 
 afterEach(() => {
+  __setSpriteModuleForTest(null);
+  useSpriteStore.getState().closeAll();
   __resetSpriteSetOpenerForTest();
   useConfirmStore.setState({ ask: realAsk }); // undo any stubbed confirm
   vi.restoreAllMocks();
@@ -73,7 +79,7 @@ describe('editObjectArtCheckout', () => {
     const ok = await editObjectArtCheckout(0x0d); // Signpost (base linkage)
 
     expect(ok).toBe(true);
-    expect(getLoadedSpriteDocId()).toBeNull(); // checkout is load-only — the winning caller owns the marker
+    expect(getLoadedSpriteDocId()).toBeNull(); // checkout is load-only — it opens no document of its own
     expect(calls).toHaveLength(1);
     expect(calls[0].baseDir).toBe(DIR);
     expect(calls[0].comp).toBe('nemesis');
@@ -185,7 +191,7 @@ describe('editObjectArt wrapper', () => {
     const ok = await editObjectArt(0x0d); // Signpost
 
     expect(ok).toBe(true);
-    expect(getLoadedSpriteDocId()).toBe('doc:sprite:s1:13'); // the wrapper owns the marker
+    expect(getLoadedSpriteDocId()).toBe('doc:sprite:s1:13'); // activation checked the document out
     const session = useSessionStore.getState();
     expect(session.activeId).toBe('doc:sprite:s1:13');
     expect(session.tabs.find((t) => t.id === 'doc:sprite:s1:13')).toMatchObject({
@@ -203,57 +209,55 @@ describe('editObjectArt wrapper', () => {
   });
 });
 
-describe('editObjectArt dirty-discard guard', () => {
-  it('dirty + cancel → checkout NOT called, marker unchanged', async () => {
+// Multi-document (Task 11): a second object's art opens ALONGSIDE the first
+// instead of retargeting a singleton editor, so "Edit art…" never discards and
+// never asks. The old dirty-discard confirm this block used to cover is gone
+// with the singleton it protected.
+describe('editObjectArt with several objects open', () => {
+  it('opens a second object without asking, keeping the first document intact', async () => {
     const calls: OpenCall[] = [];
     __setSpriteSetOpenerForTest(stubOpener(calls));
-    await editObjectArt(0x0d); // load Signpost (13)
-    useSpriteStore.getState().clearCanvas(); // now dirty
-    expect(getLoadedSpriteDocId()).toBe('doc:sprite:s1:13');
-
-    calls.length = 0;
+    await editObjectArt(0x0d);                  // Signpost (13)
+    useSpriteStore.getState().clearCanvas();    // edit it → dirty
     const askSpy = vi.fn(async () => 'cancel');
     useConfirmStore.setState({ ask: askSpy });
 
-    const ok = await editObjectArt(0x1c); // try a DIFFERENT object (Bridge, id 28)
-
-    expect(ok).toBe(false);
-    expect(askSpy).toHaveBeenCalledTimes(1);
-    expect(calls).toHaveLength(0); // checkout never ran
-    expect(getLoadedSpriteDocId()).toBe('doc:sprite:s1:13'); // marker unchanged
-  });
-
-  it('dirty + discard → proceeds with the new checkout', async () => {
-    const calls: OpenCall[] = [];
-    __setSpriteSetOpenerForTest(stubOpener(calls));
-    await editObjectArt(0x0d);
-    useSpriteStore.getState().clearCanvas(); // dirty
-
-    calls.length = 0;
-    useConfirmStore.setState({ ask: async () => 'discard' });
-
-    const ok = await editObjectArt(0x1c);
+    const ok = await editObjectArt(0x1c);       // Bridge (28) — a DIFFERENT object
 
     expect(ok).toBe(true);
-    expect(calls).toHaveLength(1); // checkout ran
+    expect(askSpy).not.toHaveBeenCalled();      // nothing is being discarded
     expect(getLoadedSpriteDocId()).toBe('doc:sprite:s1:28');
+    const s = useSpriteStore.getState();
+    expect(s.isOpen('doc:sprite:s1:13')).toBe(true);   // the first sprite is parked, not gone
+    expect(s.isDirty('doc:sprite:s1:13')).toBe(true);  // with its unsaved edits
   });
 
-  it('re-clicking the loaded object while dirty does NOT confirm or reload', async () => {
+  it('re-clicking an already-open object checks it back out without reloading', async () => {
+    const calls: OpenCall[] = [];
+    __setSpriteSetOpenerForTest(stubOpener(calls));
+    await editObjectArt(0x0d);
+    await editObjectArt(0x1c);
+    calls.length = 0;
+
+    const ok = await editObjectArt(0x0d); // back to the first object
+
+    expect(ok).toBe(true);
+    expect(calls).toHaveLength(0);        // no checkout re-ran
+    expect(getLoadedSpriteDocId()).toBe('doc:sprite:s1:13');
+  });
+
+  it('re-clicking the CHECKED-OUT object is a no-op reload that still surfaces its tab', async () => {
     const calls: OpenCall[] = [];
     __setSpriteSetOpenerForTest(stubOpener(calls));
     await editObjectArt(0x0d);
     useSpriteStore.getState().clearCanvas(); // dirty
-
     calls.length = 0;
-    const askSpy = vi.fn(async () => 'cancel');
-    useConfirmStore.setState({ ask: askSpy });
 
     const ok = await editObjectArt(0x0d); // SAME object
 
     expect(ok).toBe(true);
-    expect(askSpy).not.toHaveBeenCalled(); // same-doc check precedes the prompt
-    expect(calls).toHaveLength(0); // no reload
-    expect(getLoadedSpriteDocId()).toBe('doc:sprite:s1:13');
+    expect(calls).toHaveLength(0);        // never reloaded over its own edits
+    expect(useSpriteStore.getState().unsavedEdits).toBe(true);
+    expect(useSessionStore.getState().activeId).toBe('doc:sprite:s1:13');
   });
 });

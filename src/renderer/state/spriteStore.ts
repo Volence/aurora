@@ -340,6 +340,34 @@ export function closeSpriteDoc(docId: string): void {
   documentHistoryHub.dispose(docId);
 }
 
+/** A document's state wherever it lives — the checked-out one off the root, a
+ *  parked one out of the map. Null when the document isn't open at all. The ONE
+ *  lookup for "what does document X hold?", so no caller has to know whether X
+ *  happens to be the checked-out one. */
+export function spriteDocState(docId: string): SpriteDoc | null {
+  const s = useSpriteStore.getState();
+  if (docId === s.activeDocId) return parkedDoc(s);
+  return s.docs.get(docId) ?? null;
+}
+
+/** Every open document with unsaved edits — parked ones included. A background
+ *  tab's edits are as real as the checked-out tab's: these are the documents the
+ *  strip dots and the project-open guard must refuse to discard silently. */
+export function dirtySpriteDocIds(): string[] {
+  const s = useSpriteStore.getState();
+  const ids = s.unsavedEdits ? [s.activeDocId] : [];
+  for (const [id, doc] of s.docs) if (doc.unsavedEdits) ids.push(id);
+  return ids;
+}
+
+/** The dirty documents Ctrl+S can actually write back: those with an in-place
+ *  art target (S1 object checkouts). A dirty document without one has no
+ *  destination — the sprite UI's Export is the only way to persist it — so the
+ *  save coordinator must not claim it as savable work. */
+export function saveableDirtySpriteDocIds(): string[] {
+  return dirtySpriteDocIds().filter((id) => spriteDocState(id)?.s1ArtSource != null);
+}
+
 /** Read a document's undo snapshot — the checked-out one off the root, a parked
  *  one out of the map. Keyed by doc id, never by "active": undo has to reach a
  *  background document (a dirty tab can be undone from its close confirm). */

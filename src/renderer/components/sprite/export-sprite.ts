@@ -1,6 +1,6 @@
 import { useProjectStore, getCurrentZone } from '../../state/projectStore';
 import { useArtStore } from '../../state/artStore';
-import { useSpriteStore } from '../../state/spriteStore';
+import { useSpriteStore, activateSpriteDoc, saveableDirtySpriteDocIds } from '../../state/spriteStore';
 import type { AnimStepUI } from '../../state/spriteStore';
 import { useToastStore } from '../../state/toastStore';
 import { buildSpriteExport, buildDPLCData } from '../../../core/export/sprite-export';
@@ -21,7 +21,7 @@ import type { SpriteFormatId } from '../../../core/formats/sprite-format-adapter
 import type { CompressionKind } from '../../../core/compress';
 import { parsePaletteLine, decodeGenesisColor } from '../../../core/formats/palette';
 import { parseCharacterAnims, parseAnyAnimScript } from '../../../core/import/anim-import';
-import { markSpriteDocLoaded, getLoadedSpriteDocId, requestOpenTab, spriteEditorDirty, confirmDiscardSpriteEdits } from '../../shell/tab-activation';
+import { requestOpenTab } from '../../shell/tab-activation';
 import { spriteDocTab } from '../../shell/tabs';
 import { useClassicProjectStore } from '../../state/classicProjectStore';
 import { useClassicLevelStore } from '../../state/classicLevelStore';
@@ -244,6 +244,36 @@ export async function saveSpriteArt(): Promise<void> {
   toast(`Saved art to ${src.relPath} — S1 mappings are read-only in v1`, 'success');
 }
 
+/**
+ * Save ONE sprite document's art back to its source file. saveSpriteArt only ever
+ * sees the CHECKED-OUT document (it reads the store root), so a parked document is
+ * checked out for the write and the previous one checked back out afterwards —
+ * both swaps are synchronous state moves, and the sprite pane renders only the
+ * active tab's document, so nothing flickers through the intermediate checkout.
+ * A no-op for a document that isn't open.
+ */
+export async function saveSpriteDocArt(docId: string): Promise<void> {
+  const previousDocId = useSpriteStore.getState().activeDocId;
+  if (previousDocId === docId) { await saveSpriteArt(); return; }
+  if (!useSpriteStore.getState().isOpen(docId)) return;
+  activateSpriteDoc(docId);
+  try {
+    await saveSpriteArt();
+  } finally {
+    activateSpriteDoc(previousDocId); // restore even if the write threw
+  }
+}
+
+/**
+ * Ctrl+S is Save ALL: write back every open sprite document that has unsaved
+ * edits AND an in-place art target, not just whichever one happens to be checked
+ * out. A background sprite tab's edits are real, and its dirty dot would
+ * otherwise survive a save the user reasonably believed covered it.
+ */
+export async function saveAllSpriteArt(): Promise<void> {
+  for (const docId of saveableDirtySpriteDocIds()) await saveSpriteDocArt(docId);
+}
+
 /** Frames from a mapping file: macro call-sites if present, else assemble raw dc.b/.w. */
 function framesFromMapping(path: string, bytes: Uint8Array, adapter: SpriteFormatAdapter): SpriteFrame[] {
   if (!isAsm(path)) return adapter.readMappings(bytes);
@@ -411,7 +441,7 @@ export function __setSpriteSetOpenerForTest(fn: SpriteSetOpener): void { openSet
 export function __resetSpriteSetOpenerForTest(): void { openSetImpl = openDiscoveredSet; }
 
 /**
- * Check out a classic object's art + mappings into the singleton sprite editor
+ * Load a classic object's art + mappings into the CHECKED-OUT sprite document
  * (Task B2 / Task 14). The object id resolves to an `ObjectArtLink` (profiles/
  * s1-object-art.ts) against the OPEN classic level's zone (derived from the
  * classic level store's `ref` — no longer a caller argument); the link's
@@ -421,12 +451,10 @@ export function __resetSpriteSetOpenerForTest(): void { openSetImpl = openDiscov
  * no open level — the calling buttons only render for linked ids, so those are
  * guards. A failed open leaves the user where they were with an error toast.
  *
- * This does NOT open a tab and does NOT touch the loaded-doc marker — it only
- * retargets the editor (checkout = load only, no marker semantics). Marking the
- * loaded doc belongs to the CALLER that wins: the `editObjectArt` wrapper (a
- * direct user action) marks before opening the tab, and the sprite-doc
- * activation path marks only after its activationGen check passes — so a
- * superseded checkout never leaves a stale marker.
+ * This does NOT open a tab and does NOT open a document of its own — it loads
+ * into whichever document is currently checked out. Sprite-doc activation is what
+ * checks out the object's own document first, so the pixels land there; calling
+ * this directly loads over whatever the editor is showing.
  *
  * PRESELECTION: the objdef's declared `frame` is selected. The declared palette
  * LINE (`pal`) can't bind to a zone CRAM line — a classic session has no aeon
@@ -463,33 +491,21 @@ export async function editObjectArtCheckout(id: number): Promise<boolean> {
   return true;
 }
 
+/**
+ * "Edit art…" from the classic object UI: surface the object's sprite-doc tab.
+ *
+ * Opening the tab is the WHOLE action — sprite-doc activation owns the document
+ * lifecycle (check out an already-open one, or open a fresh one and run
+ * editObjectArtCheckout into it), so this no longer checks out by hand and no
+ * longer needs a discard confirm: a second object's art now opens ALONGSIDE the
+ * first instead of replacing it. Returns whether the object's document ended up
+ * checked out (false = the checkout failed and already toasted).
+ */
 export async function editObjectArt(id: number): Promise<boolean> {
   const tabId = 'doc:sprite:s1:' + id;
   const name = s1ObjectName(id); // named object, or its $XX hex fallback
-
-  // Re-clicking the object that's ALREADY loaded stays a no-op reload — just
-  // (re)surface its tab. Checked BEFORE the dirty prompt so re-clicking the same
-  // object never asks and never discards its own edits.
-  if (getLoadedSpriteDocId() === tabId) {
-    await requestOpenTab(spriteDocTab('s1', String(id), name));
-    return true;
-  }
-
-  // This is the highest-traffic edit-art entry (ObjectInspector /
-  // ObjectLibraryPanel "Edit art…"). editObjectArtCheckout retargets the
-  // singleton editor and discards the loaded sprite's edits + undo history, so
-  // guard it with the SAME confirm sprite-doc activation uses. Cancel → return
-  // false without touching anything.
-  if (spriteEditorDirty() && !(await confirmDiscardSpriteEdits())) return false;
-
-  const ok = await editObjectArtCheckout(id);
-  if (ok) {
-    // Direct user action, not racing an activation — own the mark here so the
-    // follow-up sprite-doc activation sees the doc already loaded and no-ops.
-    markSpriteDocLoaded(tabId);
-    await requestOpenTab(spriteDocTab('s1', String(id), name));
-  }
-  return ok;
+  await requestOpenTab(spriteDocTab('s1', String(id), name));
+  return useSpriteStore.getState().activeDocId === tabId;
 }
 
 /** Names of sprites the editor knows about (from data/sprites/index.json). */

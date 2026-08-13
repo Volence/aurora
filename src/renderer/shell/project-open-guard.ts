@@ -10,20 +10,23 @@ import { useEditorStore } from '../state/editorStore';
 import { useConfirmStore } from '../state/confirmStore';
 import { useToastStore } from '../state/toastStore';
 import { saveAllDirty } from '../state/project-runtime';
-// spriteEditorDirty is the SAME predicate the dot/tab-switch guard uses; sharing
-// it keeps the open-guard from being narrower than the tab-switch guard (finding
-// 3). resetSpriteEditor tears down the singleton editor on a proceed (see below).
+// anySpriteDocDirty is the SAME predicate the tab dots use; sharing it keeps the
+// open-guard from being narrower than what the strip shows (finding 3), and it
+// now covers PARKED sprite documents too — a background sprite tab's edits die
+// with the project just as surely as the checked-out one's. closeAllSpriteDocs
+// tears the whole sprite session down on a proceed (see below).
 // No cycle: tab-activation does not import project-open-guard (this module is
 // a leaf imported only by useProject/agent-handler).
-import { spriteEditorDirty, resetSpriteEditor } from './tab-activation';
+import { anySpriteDocDirty, closeAllSpriteDocs } from './tab-activation';
 
 export interface OpenDirtySnapshot {
   classicDirty: boolean;  // any classicLevelStore dirty domain
   aeonDirty: boolean;     // editorStore.dirty (aeon project-wide)
-  // spriteEditorDirty(): the sprite editor's honest unsavedEdits flag. Was
-  // s1ArtSource-only, which both silently discarded an edited aeon/new sprite on
-  // open (finding 3) AND phantom-blocked the open on a freshly-opened, unedited
-  // checkout — the flag now tracks actual unsaved edits, not the checkout target.
+  // anySpriteDocDirty(): the honest unsavedEdits flag of every OPEN sprite
+  // document. Was s1ArtSource-only, which both silently discarded an edited
+  // aeon/new sprite on open (finding 3) AND phantom-blocked the open on a
+  // freshly-opened, unedited checkout — the flag tracks actual unsaved edits, not
+  // the checkout target.
   spriteDirty: boolean;
 }
 
@@ -40,7 +43,7 @@ export function currentOpenDirtySnapshot(): OpenDirtySnapshot {
   return {
     classicDirty: Object.values(useClassicLevelStore.getState().dirty).some(Boolean),
     aeonDirty: useEditorStore.getState().dirty,
-    spriteDirty: spriteEditorDirty(),
+    spriteDirty: anySpriteDocDirty(),
   };
 }
 
@@ -68,10 +71,10 @@ export function __resetOpenGuardSaveForTest(): void { saveImpl = saveAllDirty; }
 export async function confirmProjectOpen(): Promise<boolean> {
   const snap = currentOpenDirtySnapshot();
   if (planProjectOpen(snap).kind === 'proceed') {
-    // Clean path still resets the sprite editor: a surviving (unedited) checkout
+    // Clean path still ends the sprite session: a surviving (unedited) checkout
     // points at the OLD project's .nem via an absolute basePath, so leaving it
     // would let a later Ctrl+S in the NEW project write into the old file.
-    resetSpriteEditor();
+    closeAllSpriteDocs();
     return true;
   }
 
@@ -102,7 +105,7 @@ export async function confirmProjectOpen(): Promise<boolean> {
     }
     // Everything persisted — reset the editor so no checkout survives into the
     // new project (same cross-project write hazard as the clean path above).
-    resetSpriteEditor();
+    closeAllSpriteDocs();
     return true;
   }
 
@@ -115,10 +118,10 @@ export async function confirmProjectOpen(): Promise<boolean> {
     // calls useClassicLevelStore.getState().reset() as soon as the switch begins
     // (Task 7), which zeroes every dirty domain.
     useEditorStore.getState().markClean();
-    // resetSpriteEditor clears the checkout + history + unsaved flag, which also
+    // closeAllSpriteDocs drops every document + its history + unsaved flag, which also
     // closes the cross-project hazard: the surviving s1ArtSource points at the
     // OLD project's .nem, and the sprite-art saver would otherwise fire on it.
-    resetSpriteEditor();
+    closeAllSpriteDocs();
     return true;
   }
 
