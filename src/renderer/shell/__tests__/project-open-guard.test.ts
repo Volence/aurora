@@ -17,7 +17,7 @@ describe('planProjectOpen', () => {
   it.each([
     ['classic level edits', { classicDirty: true, aeonDirty: false, spriteDirty: false }],
     ['aeon project edits', { classicDirty: false, aeonDirty: true, spriteDirty: false }],
-    ['a dirty sprite (checkout or history)', { classicDirty: false, aeonDirty: false, spriteDirty: true }],
+    ['a dirty sprite (unsaved edits)', { classicDirty: false, aeonDirty: false, spriteDirty: true }],
   ] as const)('asks before opening over %s', (_label, snap) => {
     expect(planProjectOpen(snap)).toEqual({ kind: 'confirm' });
   });
@@ -34,7 +34,8 @@ describe('confirmProjectOpen', () => {
     useClassicLevelStore.getState().reset();
     useEditorStore.getState().markClean();
     useSpriteStore.getState().setS1ArtSource(null);
-    spriteHistory.clear(); // spriteDirty now includes canUndo — start empty
+    useSpriteStore.getState().setUnsavedEdits(false); // spriteDirty keys on this flag now
+    spriteHistory.clear();
     useConfirmStore.getState().answer('cancel'); // clear any leftover pending request
   });
 
@@ -44,6 +45,7 @@ describe('confirmProjectOpen', () => {
     useClassicLevelStore.getState().reset();
     useEditorStore.getState().markClean();
     useSpriteStore.getState().setS1ArtSource(null);
+    useSpriteStore.getState().setUnsavedEdits(false);
     spriteHistory.clear();
   });
 

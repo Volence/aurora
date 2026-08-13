@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   planLevelActivation, activateLevelTarget, requestCloseTab,
+  markSpriteDocLoaded, getLoadedSpriteDocId,
   __setActivationSaveForTest, __resetActivationSaveForTest,
 } from '../tab-activation';
 import { useClassicProjectStore } from '../../state/classicProjectStore';
@@ -10,7 +11,9 @@ import { useSessionStore } from '../../state/sessionStore';
 import { useProjectStore } from '../../state/projectStore';
 import { useViewStore } from '../../state/viewStore';
 import { useWorkspaceStore } from '../../workspace/workspaceStore';
-import { classicLevelTab } from '../tabs';
+import { useSpriteStore, spriteHistory } from '../../state/spriteStore';
+import { classicLevelTab, spriteDocTab } from '../tabs';
+import { createBuffer } from '../../../core/art/pixel-ops';
 import type { ZoneActRef } from '../../../core/project/adapter';
 import type { SaveClassicProjectResult } from '../../state/classic-save';
 
@@ -263,5 +266,96 @@ describe('requestCloseTab', () => {
     expect(useSessionStore.getState().tabs.map((t) => t.id)).toEqual([HOME.id]);
     expect(useSessionStore.getState().activeId).toBe(HOME.id);
     expect(openActSpy).not.toHaveBeenCalled();
+  });
+});
+
+// Fix B: closing the tab whose sprite is loaded in the singleton editor must
+// leave nothing stale behind (the phantom-dirty ghost the smoke test hit —
+// closing the sprite tab used to keep the checkout + history and re-trip the
+// discard dialog with no sprite tab even open).
+describe('requestCloseTab — loaded sprite-doc cleanup', () => {
+  const HOME = { id: 'home', kind: 'home' as const, title: 'Home' };
+  const SPRITE_TAB = spriteDocTab('s1', '13', 'Signpost'); // 'doc:sprite:s1:13'
+  const OTHER_SPRITE = spriteDocTab('s1', '28', 'Bridge');  // 'doc:sprite:s1:28'
+  const FAKE_SOURCE = { basePath: '/p', relPath: 'X.nem' } as never;
+
+  /** Load a sprite into the editor and mark it as the doc for `tabId`; when
+   *  `dirty`, record a real edit so unsavedEdits + history are set. */
+  function loadEditor(tabId: string, dirty: boolean): void {
+    useSpriteStore.getState().loadSprite([createBuffer(16, 16)], [], 8, 8);
+    useSpriteStore.getState().setS1ArtSource(FAKE_SOURCE);
+    if (dirty) useSpriteStore.getState().clearCanvas(); // records an edit → unsavedEdits + canUndo
+    markSpriteDocLoaded(tabId);
+  }
+
+  beforeEach(() => {
+    useSessionStore.getState().reset();
+    useSpriteStore.getState().loadSprite([createBuffer(16, 16)], [], 8, 8); // clean slate
+    markSpriteDocLoaded(null);
+    useConfirmStore.getState().answer('cancel');
+  });
+
+  afterEach(() => {
+    useConfirmStore.getState().answer('cancel');
+    useSessionStore.getState().reset();
+    useSpriteStore.getState().loadSprite([createBuffer(16, 16)], [], 8, 8);
+    markSpriteDocLoaded(null);
+  });
+
+  it('closing the loaded DIRTY sprite tab asks, and on discard clears marker+checkout+history', async () => {
+    loadEditor(SPRITE_TAB.id, true);
+    useSessionStore.setState({ tabs: [HOME, SPRITE_TAB], activeId: SPRITE_TAB.id });
+    expect(spriteHistory.canUndo).toBe(true);
+
+    const p = requestCloseTab(SPRITE_TAB.id);
+    expect(useConfirmStore.getState().request).not.toBeNull(); // a discard confirm was raised
+    useConfirmStore.getState().answer('discard');
+    await p;
+
+    expect(useSessionStore.getState().tabs.map((t) => t.id)).toEqual([HOME.id]); // closed
+    expect(getLoadedSpriteDocId()).toBeNull();
+    expect(useSpriteStore.getState().s1ArtSource).toBeNull();
+    expect(useSpriteStore.getState().unsavedEdits).toBe(false);
+    expect(spriteHistory.canUndo).toBe(false);
+  });
+
+  it('cancelling the discard leaves the tab open and the editor untouched', async () => {
+    loadEditor(SPRITE_TAB.id, true);
+    useSessionStore.setState({ tabs: [HOME, SPRITE_TAB], activeId: SPRITE_TAB.id });
+
+    const p = requestCloseTab(SPRITE_TAB.id);
+    useConfirmStore.getState().answer('cancel');
+    await p;
+
+    expect(useSessionStore.getState().tabs.map((t) => t.id)).toEqual([HOME.id, SPRITE_TAB.id]); // still open
+    expect(getLoadedSpriteDocId()).toBe(SPRITE_TAB.id); // marker intact
+    expect(useSpriteStore.getState().s1ArtSource).toBe(FAKE_SOURCE);
+    expect(useSpriteStore.getState().unsavedEdits).toBe(true);
+  });
+
+  it('closing a CLEAN loaded sprite tab resets the editor silently (no confirm)', async () => {
+    loadEditor(SPRITE_TAB.id, false); // checkout, but no edits
+    useSessionStore.setState({ tabs: [HOME, SPRITE_TAB], activeId: SPRITE_TAB.id });
+
+    await requestCloseTab(SPRITE_TAB.id);
+
+    expect(useConfirmStore.getState().request).toBeNull(); // never asked
+    expect(useSessionStore.getState().tabs.map((t) => t.id)).toEqual([HOME.id]);
+    expect(getLoadedSpriteDocId()).toBeNull();
+    expect(useSpriteStore.getState().s1ArtSource).toBeNull();
+  });
+
+  it('closing a NON-loaded sprite tab does not touch the editor', async () => {
+    loadEditor(SPRITE_TAB.id, true); // SPRITE_TAB is the loaded doc
+    // Close a DIFFERENT (inactive) sprite tab — its sprite isn't in the editor.
+    useSessionStore.setState({ tabs: [HOME, SPRITE_TAB, OTHER_SPRITE], activeId: SPRITE_TAB.id });
+
+    await requestCloseTab(OTHER_SPRITE.id);
+
+    expect(useConfirmStore.getState().request).toBeNull(); // no confirm for a non-loaded tab
+    expect(useSessionStore.getState().tabs.map((t) => t.id)).toEqual([HOME.id, SPRITE_TAB.id]);
+    expect(getLoadedSpriteDocId()).toBe(SPRITE_TAB.id); // editor marker unchanged
+    expect(useSpriteStore.getState().s1ArtSource).toBe(FAKE_SOURCE);
+    expect(useSpriteStore.getState().unsavedEdits).toBe(true);
   });
 });

@@ -103,6 +103,9 @@ export async function exportSprite(name: string): Promise<void> {
     index.sprites = [...index.sprites.filter((s) => s.name !== name), entry].sort((a, b) => a.name.localeCompare(b.name));
     await window.api.writeBinaryFile(base, spriteIndexPath(), toArrayBuffer(enc.encode(JSON.stringify(index, null, 2))));
 
+    // Exporting IS persisting the working sprite — clear the unsaved-edits flag
+    // (reached only on the success path, after every write above resolved).
+    useSpriteStore.getState().setUnsavedEdits(false);
     toast(`Exported "${name}" as ${format.toUpperCase()}: ${out.manifest.frameCount} frames, ${out.manifest.tileCount} tiles → ${dir}/`, 'success');
   } catch (e) {
     toast(`Export failed: ${e instanceof Error ? e.message : String(e)}`, 'error');
@@ -235,6 +238,9 @@ export async function saveSpriteArt(): Promise<void> {
   // Refresh the guarded-write baseline so a follow-up save doesn't spuriously conflict.
   const nm = out.newMtimes[src.relPath];
   useSpriteStore.getState().setS1ArtSource({ ...src, expectedMtimeMs: nm ?? src.expectedMtimeMs });
+  // The edits are now on disk — clear the unsaved flag (success path only; every
+  // failure/conflict branch above returned before reaching here).
+  useSpriteStore.getState().setUnsavedEdits(false);
   toast(`Saved art to ${src.relPath} — S1 mappings are read-only in v1`, 'success');
 }
 

@@ -1,9 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useProjectStore } from '../../state/projectStore';
 import { useClassicProjectStore } from '../../state/classicProjectStore';
-import { useClassicLevelStore } from '../../state/classicLevelStore';
 import S1ObjectSection from './S1ObjectSection';
-import { requestFocusTabId } from '../../shell/tab-activation';
 import { useArtStore } from '../../state/artStore';
 import { useSpriteStore } from '../../state/spriteStore';
 import { spriteModeUndo, spriteModeRedo } from '../../state/sprite-undo';
@@ -53,7 +51,6 @@ export default function SpriteMode({ appBar }: { appBar: React.ReactNode }) {
   // the sprite is colored from its opened standalone palette (the handoff seeds
   // it from the classic doc's declared line) since there is no aeon zone to bind.
   const classicOpen = useClassicProjectStore((s) => s.status) === 'open';
-  const classicRef = useClassicLevelStore((s) => s.ref);
   const showPieces = useSpriteStore((s) => s.showPieces);
   const frames = useSpriteStore((s) => s.frames);
   const currentIndex = useSpriteStore((s) => s.currentIndex);
@@ -199,25 +196,11 @@ export default function SpriteMode({ appBar }: { appBar: React.ReactNode }) {
       toolOptions={<SpriteToolOptions newSize={newSize} onNewSize={setNewSize} onFit={fitToView} />}
       panels={
         <Panel width={240} scroll>
-          {/* Sprite editing runs in its own sprite-doc tab; this STICKY bar (it
-              must survive panel scroll — users read "no way back" when it scrolls
-              off) FOCUSES the classic level tab this object was checked out from.
-              The classic stores survive the round trip, so unsaved edits + undo
-              history are intact; save art back first to keep pixel edits. The
-              disasm context (object list + save-to-source) is the PRIMARY tool
-              cluster here; the generic import/convert flow below stays available
-              as the secondary tool. */}
-          {classicOpen && (
-            <div style={styles.backBar}>
-              <button
-                style={styles.backBtn}
-                title="Return to the classic level editor (Save art → first to keep pixel edits)"
-                onClick={() => { const ref = useClassicLevelStore.getState().ref; if (ref) void requestFocusTabId(`level:${ref.zone}:${ref.act}`); }}
-              >
-                ← Back to {classicRef?.label ?? 'level'}
-              </button>
-            </div>
-          )}
+          {/* Sprite editing runs in its own sprite-doc tab; tabs + explorer + ⌘K
+              provide the way back to the classic level (the old sticky "← Back"
+              bar was removed on user feedback). The disasm context (object list +
+              save-to-source) is the PRIMARY tool cluster here; the generic
+              import/convert flow below stays available as the secondary tool. */}
           {classicOpen && <S1ObjectSection busy={busy} onBusy={setBusy} />}
           {classicOpen && saveSourceSec}
           <CollapsibleSection id="sprite.mapping" title="Mapping">
@@ -373,17 +356,6 @@ export default function SpriteMode({ appBar }: { appBar: React.ReactNode }) {
 
 const styles: Record<string, React.CSSProperties> = {
   empty: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: T.textLo },
-  backBar: {
-    // Sticky: the one affordance back to the level editor must survive panel
-    // scroll (an off-screen back button reads as "there is no way back").
-    position: 'sticky', top: 0, zIndex: 3, background: T.void,
-    padding: '8px 10px 6px', borderBottom: `1px solid ${T.borderStrong}`,
-  },
-  backBtn: {
-    width: '100%', padding: '6px 8px', background: T.accent, color: T.onAccent,
-    border: `1px solid ${T.accent}`, borderRadius: 4, cursor: 'pointer',
-    fontSize: 12, fontWeight: 600, textAlign: 'left',
-  },
   dim: { fontSize: 11, color: T.textLo },
   sizeBtn: { padding: '3px 7px', background: T.raised, color: T.textHi, border: `1px solid ${T.borderStrong}`, borderRadius: 4, cursor: 'pointer', fontSize: 11 },
   canvasWrap: { position: 'absolute', inset: 0, overflow: 'auto', background: T.void },

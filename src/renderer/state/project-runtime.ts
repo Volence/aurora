@@ -5,8 +5,10 @@
 // clearAll on project switch. The three savers reproduce the
 // retired save router's semantics — fire-when-context-open, not
 // fire-when-strictly-dirty — so save behavior cannot regress in this stage:
-//   • sprite-art: whenever an S1 object's art is checked out (s1ArtSource set);
-//     registered FIRST so pixel edits are never lost behind a level-save error.
+//   • sprite-art: when an S1 object's art is checked out (s1ArtSource set) AND it
+//     has unsaved edits — writing back an untouched checkout would be a pointless
+//     identical-bytes write + mtime churn. Registered FIRST so pixel edits are
+//     never lost behind a level-save error.
 //   • classic-level: whenever a classic project is open (its own writer skips
 //     clean domains internally).
 //   • aeon-project: whenever an aeon project is resident AND no classic project
@@ -55,7 +57,9 @@ export function ensureSaversRegistered(): void {
   registered = true;
   saveCoordinator.register({
     id: 'sprite-art',
-    isDirty: () => useSpriteStore.getState().s1ArtSource !== null,
+    // Only fire on a checkout that has actual unsaved edits — a bare checkout is
+    // not dirty (identical-bytes write + mtime churn otherwise).
+    isDirty: () => useSpriteStore.getState().s1ArtSource !== null && useSpriteStore.getState().unsavedEdits,
     save: async () => { await spriteArtImpl(); },
   });
   saveCoordinator.register({

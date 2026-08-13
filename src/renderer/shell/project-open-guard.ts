@@ -7,22 +7,23 @@
 
 import { useClassicLevelStore } from '../state/classicLevelStore';
 import { useEditorStore } from '../state/editorStore';
-import { useSpriteStore, spriteHistory } from '../state/spriteStore';
 import { useConfirmStore } from '../state/confirmStore';
 import { useToastStore } from '../state/toastStore';
 import { saveAllDirty } from '../state/project-runtime';
 // spriteEditorDirty is the SAME predicate the dot/tab-switch guard uses; sharing
 // it keeps the open-guard from being narrower than the tab-switch guard (finding
-// 3). No cycle: tab-activation does not import project-open-guard (this module is
+// 3). resetSpriteEditor tears down the singleton editor on a proceed (see below).
+// No cycle: tab-activation does not import project-open-guard (this module is
 // a leaf imported only by useProject/agent-handler).
-import { spriteEditorDirty } from './tab-activation';
+import { spriteEditorDirty, resetSpriteEditor } from './tab-activation';
 
 export interface OpenDirtySnapshot {
   classicDirty: boolean;  // any classicLevelStore dirty domain
   aeonDirty: boolean;     // editorStore.dirty (aeon project-wide)
-  // spriteEditorDirty(): an s1ArtSource checkout OR sprite history (canUndo).
-  // Was s1ArtSource-only, which let an edited aeon/new sprite (dots + blocks tab
-  // switches via canUndo) be silently discarded on a project open (finding 3).
+  // spriteEditorDirty(): the sprite editor's honest unsavedEdits flag. Was
+  // s1ArtSource-only, which both silently discarded an edited aeon/new sprite on
+  // open (finding 3) AND phantom-blocked the open on a freshly-opened, unedited
+  // checkout — the flag now tracks actual unsaved edits, not the checkout target.
   spriteDirty: boolean;
 }
 
@@ -66,20 +67,17 @@ export function __resetOpenGuardSaveForTest(): void { saveImpl = saveAllDirty; }
  */
 export async function confirmProjectOpen(): Promise<boolean> {
   const snap = currentOpenDirtySnapshot();
-  if (planProjectOpen(snap).kind === 'proceed') return true;
+  if (planProjectOpen(snap).kind === 'proceed') {
+    // Clean path still resets the sprite editor: a surviving (unedited) checkout
+    // points at the OLD project's .nem via an absolute basePath, so leaving it
+    // would let a later Ctrl+S in the NEW project write into the old file.
+    resetSpriteEditor();
+    return true;
+  }
 
-  // The caveat is specifically about a CHECKED-OUT sprite (s1ArtSource), which
-  // survives a save and keeps re-blocking the open. snap.spriteDirty is broader
-  // now (also true for a canUndo-only aeon/new sprite, which a save/discard DOES
-  // clear), so key the sentence on the live checkout, not the broad flag.
-  const hasSpriteCheckout = useSpriteStore.getState().s1ArtSource !== null;
   const answer = await useConfirmStore.getState().ask({
     title: 'Unsaved changes',
-    body:
-      'Opening a project discards unsaved edits and undo history in the current one.' +
-      (hasSpriteCheckout
-        ? ' A checked-out sprite keeps the open blocked after saving — close it from the Sprite editor first.'
-        : ''),
+    body: 'Opening a project discards unsaved edits and undo history in the current one.',
     buttons: [
       { key: 'save', label: 'Save & open', tone: 'primary' },
       { key: 'discard', label: 'Discard & open', tone: 'danger' },
@@ -91,10 +89,10 @@ export async function confirmProjectOpen(): Promise<boolean> {
     await saveImpl();
     // saveAllDirty's `saved` only means the savers RAN (stage-3 notes item 7):
     // the honest gate is to re-snapshot — if anything is STILL dirty, a saver
-    // failed (it already toasted) or a sprite checkout is still open (the
-    // sprite saver never clears s1ArtSource). Abort instead of destroying the
-    // edits — and say so; a silent abort here would look like the Open button
-    // just did nothing.
+    // failed (it already toasted). Abort instead of destroying the edits — and
+    // say so; a silent abort here would look like the Open button did nothing.
+    // (A saved sprite checkout no longer re-blocks: saveSpriteArt clears
+    // unsavedEdits, so spriteDirty goes false.)
     if (planProjectOpen(currentOpenDirtySnapshot()).kind === 'confirm') {
       useToastStore.getState().addToast(
         'Open cancelled — some changes could not be saved (see earlier save errors).',
@@ -102,29 +100,25 @@ export async function confirmProjectOpen(): Promise<boolean> {
       );
       return false;
     }
+    // Everything persisted — reset the editor so no checkout survives into the
+    // new project (same cross-project write hazard as the clean path above).
+    resetSpriteEditor();
     return true;
   }
 
   if (answer === 'discard') {
-    // Actually discard, not just proceed: leaving either flag set means the
-    // NEXT open (of anything) sees phantom dirtiness it can never clear —
-    // 'Save & open' would re-run the (now no-op) savers forever and the
-    // re-snapshot check above would keep aborting.
+    // Actually discard, not just proceed: a leftover aeon-dirty flag means the
+    // NEXT open sees phantom dirtiness 'Save & open' can never clear (re-runs the
+    // no-op savers forever; the re-snapshot keeps aborting).
     //
     // classicDirty needs no explicit clear here: classicProjectStore.openDirectory
     // calls useClassicLevelStore.getState().reset() as soon as the switch begins
     // (Task 7), which zeroes every dirty domain.
     useEditorStore.getState().markClean();
-    // Clearing s1ArtSource also closes a real cross-project hazard: a surviving
-    // s1ArtSource points at the OLD project's .nem file via an absolute
-    // basePath, and the sprite-art saver fires whenever it's set — so Ctrl+S in
-    // the NEW project would silently write edited pixels into the OLD
-    // project's file on disk.
-    useSpriteStore.getState().setS1ArtSource(null);
-    // Also clear the sprite undo history: spriteDirty now includes canUndo, so a
-    // leftover history would re-trip the same phantom-dirty trap as the flags
-    // above (the next open would keep asking / re-snapshotting as confirm).
-    spriteHistory.clear();
+    // resetSpriteEditor clears the checkout + history + unsaved flag, which also
+    // closes the cross-project hazard: the surviving s1ArtSource points at the
+    // OLD project's .nem, and the sprite-art saver would otherwise fire on it.
+    resetSpriteEditor();
     return true;
   }
 

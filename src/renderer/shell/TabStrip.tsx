@@ -23,10 +23,13 @@ function useDirtySnapshot(): DirtySnapshot {
   const classicDirty = useClassicLevelStore((s) => Object.values(s.dirty).some(Boolean));
   const aeonOpen = useProjectStore((s) => s.project) !== null;
   const aeonDirty = useEditorStore((s) => s.dirty);
-  // Subscribe to the sprite pieces so the strip re-renders as sprite edits land
-  // (historyTick) or art is checked out/released (s1ArtSource); the dirty verdict
-  // itself is spriteEditorDirty() over live state. The loaded sprite-doc id
-  // changes in lockstep with a tab open/focus (activeId subscription re-renders).
+  // Subscribe to the sprite pieces so the strip re-renders as the dirty verdict
+  // changes: unsavedEdits IS that verdict (spriteEditorDirty() reads it), so it
+  // must be subscribed — a save/export clears it without touching historyTick.
+  // historyTick + s1ArtSource are kept as belt-and-braces re-render triggers for
+  // edits landing / art checkout-release. The loaded sprite-doc id changes in
+  // lockstep with a tab open/focus (activeId subscription re-renders).
+  useSpriteStore((s) => s.unsavedEdits);
   useSpriteStore((s) => s.historyTick);
   useSpriteStore((s) => s.s1ArtSource);
   return {

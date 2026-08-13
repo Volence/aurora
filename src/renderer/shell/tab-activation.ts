@@ -97,11 +97,26 @@ export function markSpriteDocLoaded(id: string | null): void { loadedSpriteDocId
 export function getLoadedSpriteDocId(): string | null { return loadedSpriteDocId; }
 
 export function spriteEditorDirty(): boolean {
-  // s1ArtSource = checked-out classic art (Ctrl+S would write it);
-  // spriteHistory.canUndo = any edit since the doc opened. canUndo survives a
-  // successful save-art (history isn't cleared on save) so this can over-ask —
-  // fails safe.
-  return useSpriteStore.getState().s1ArtSource !== null || spriteHistory.canUndo;
+  // Honest dirtiness: TRUE only when the working sprite has edits not yet
+  // persisted. recordEdit sets the flag; loadSprite/newSprite and a successful
+  // save/export clear it. A bare checkout (s1ArtSource set, no edits) is NOT
+  // dirty — that was the phantom-dirty bug where a freshly-opened, unedited S1
+  // sprite dotted its tab and re-asked the discard dialog on every switch.
+  return useSpriteStore.getState().unsavedEdits;
+}
+
+/**
+ * Tear down the singleton sprite editor's loaded-doc state so nothing stale is
+ * left behind when its doc is closed or discarded (the phantom-dirty ghost the
+ * smoke test hit: a closed sprite tab whose checkout + history kept re-tripping
+ * the discard dialog). Clears the loaded-doc marker, the save-back checkout, the
+ * undo history, and the unsaved-edits flag.
+ */
+export function resetSpriteEditor(): void {
+  markSpriteDocLoaded(null);
+  useSpriteStore.getState().setS1ArtSource(null);
+  spriteHistory.clear();
+  useSpriteStore.getState().setUnsavedEdits(false);
 }
 
 /**
@@ -112,8 +127,10 @@ export function spriteEditorDirty(): boolean {
  */
 export async function confirmDiscardSpriteEdits(): Promise<boolean> {
   const answer = await useConfirmStore.getState().ask({
+    // Context-neutral copy: this dialog fronts BOTH a sprite retarget (open
+    // another) and a sprite-doc CLOSE, so it can't say "Opening another sprite".
     title: 'Unsaved sprite edits',
-    body: 'Opening another sprite reloads the editor and discards unsaved sprite edits and undo history.',
+    body: 'This discards unsaved sprite edits and undo history.',
     buttons: [
       { key: 'discard', label: 'Discard & open', tone: 'danger' },
       { key: 'cancel', label: 'Cancel' },
@@ -303,6 +320,18 @@ export async function requestCloseTab(id: string): Promise<void> {
   // Home is uncloseable (core closeTab no-ops on it) — bail before the
   // activation guard so a future non-TabStrip caller can't run it either.
   if (id === HOME_TAB.id) return;
+
+  // Closing the tab whose sprite is loaded in the singleton editor must not leave
+  // the editor state behind (the phantom-dirty ghost). If it has unsaved edits,
+  // confirm the discard first (cancel → abort the close); then reset the editor.
+  // Runs BEFORE neighbor-promotion so a promoted sprite-doc reloads cleanly and a
+  // promoted level tab isn't blocked by a now-stale sprite prompt. A NON-loaded
+  // sprite-doc tab (its sprite isn't in the editor) closes through the path below.
+  if (parseSpriteDocTabId(id) !== null && id === getLoadedSpriteDocId()) {
+    if (spriteEditorDirty() && !(await confirmDiscardSpriteEdits())) return;
+    resetSpriteEditor();
+  }
+
   const session = useSessionStore.getState();
   if (session.activeId !== id) { session.close(id); return; }
   const idx = session.tabs.findIndex((t) => t.id === id);

@@ -88,6 +88,14 @@ interface SpriteState {
   /** In-place art save-back target (S1 objects only); null when there is none. */
   s1ArtSource: S1ArtSource | null;
   setS1ArtSource: (src: S1ArtSource | null) => void;
+  /** TRUE only when the working sprite has edits not yet persisted — the single
+   *  signal for the tab dot, the sprite-switch discard guard, and the
+   *  project-open guard. Distinct from `s1ArtSource`: a checkout target is merely
+   *  where a save WOULD write, not itself unsaved work, so opening an unedited
+   *  checkout must NOT read as dirty. Set true by recordEdit (the one edit choke
+   *  point); reset false by loadSprite/newSprite and by a successful save/export. */
+  unsavedEdits: boolean;
+  setUnsavedEdits: (v: boolean) => void;
 
   setTool: (t: SpriteTool) => void;
   setZoom: (z: number) => void;
@@ -166,10 +174,13 @@ registerRedoClearer(clearSpriteRedo);
  *  edit funnels through here so the merged sprite-mode timeline stays consistent.
  *  Ungated: every store mutator that reaches here is reachable only while editing
  *  a sprite (i.e. a sprite-doc tab is active), so the level-redo invalidation is
- *  always a sprite-session event. */
+ *  always a sprite-session event. As the sole edit choke point it is ALSO where
+ *  `unsavedEdits` flips true — every mutating action funnels through here, and
+ *  the non-mutating ones (selectFrame, setTool, zoom, …) deliberately do not. */
 function recordEdit(s: SpriteState): void {
   invalidateSiblingRedos(clearSpriteRedo);
   history.record(snap(s));
+  useSpriteStore.setState({ unsavedEdits: true });
 }
 
 /** Build a snapshot from live state. SpriteHistory deep-clones on record/undo/
@@ -202,6 +213,7 @@ export const useSpriteStore = create<SpriteState>((set, get) => ({
   exportDplc: false,
   format: 's4',
   s1ArtSource: null,
+  unsavedEdits: false,
   historyTick: 0,
   paletteMode: 'zone',
   zoneLine: 1,
@@ -211,6 +223,7 @@ export const useSpriteStore = create<SpriteState>((set, get) => ({
   setExportDplc: (exportDplc) => set({ exportDplc }),
   setFormat: (format) => set({ format }),
   setS1ArtSource: (s1ArtSource) => set({ s1ArtSource }),
+  setUnsavedEdits: (unsavedEdits) => set({ unsavedEdits }),
   setTool: (tool) => set((s) => ({ tool, selection: tool === 'select' ? s.selection : null })),
   setZoom: (zoom) => set({ zoom: Math.min(48, Math.max(1, Math.round(zoom))) }),
   setShowPieces: (showPieces) => set({ showPieces }),
@@ -355,6 +368,7 @@ export const useSpriteStore = create<SpriteState>((set, get) => ({
       exportDplc: false,
       format: 's4',
       s1ArtSource: null,
+      unsavedEdits: false,
       historyTick: 0,
     });
   },
@@ -371,6 +385,7 @@ export const useSpriteStore = create<SpriteState>((set, get) => ({
       originY,
       characterAnims: [],
       s1ArtSource: null,
+      unsavedEdits: false,
       historyTick: 0,
     });
   },
