@@ -7,6 +7,7 @@ import { openDocumentGuarded } from './open-document';
 import { useToastStore } from '../../state/toastStore';
 import { docFromTile, sliceForSave } from '../../../core/art/composer-buffer';
 import { tileUsageCounts } from '../../../core/art/usage';
+import { lutForPaletteLine, rasterizeTile } from '../../../core/art/rasterize';
 import { unpackNametableWord } from '../../../core/model/s4-types';
 import type { Tile, Palette } from '../../../core/model/s4-types';
 import { T } from '../ui';
@@ -23,19 +24,15 @@ function ensureTileCache(tiles: Tile[], palette: Palette, key: string) {
   cacheKey = key;
 
   const palLine = Number(key.split('|')[1]);
-  const pal = palette.lines[palLine]?.colors ?? palette.lines[0]?.colors ?? [];
+  // One RGBA lookup for the whole atlas; pixels come from the shared core
+  // rasterizer, this loop only owns the canvas hand-off.
+  const lut = lutForPaletteLine(palette, palLine);
 
   tileCache = tiles.map((tile) => {
     const c = new OffscreenCanvas(8, 8);
     const ctx = c.getContext('2d')!;
     const img = ctx.createImageData(8, 8);
-    for (let i = 0; i < 64; i++) {
-      const color = pal[tile.pixels[i]] ?? { r: 0, g: 0, b: 0, a: 255 };
-      img.data[i * 4] = color.r;
-      img.data[i * 4 + 1] = color.g;
-      img.data[i * 4 + 2] = color.b;
-      img.data[i * 4 + 3] = color.a;
-    }
+    img.data.set(rasterizeTile(tile.pixels, lut));
     ctx.putImageData(img, 0, 0);
     return c;
   });

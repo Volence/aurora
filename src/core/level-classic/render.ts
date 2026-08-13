@@ -2,9 +2,21 @@
 // flat 256x256 RGBA buffer by walking chunk → block → tile, composing chunk-cell
 // and block-cell flips, applying palette lines, and honoring transparent color 0.
 //
-// Pure core: no canvas, no DOM, no ImageData. Callers (Task 11's viewport, Task
-// 13's chunk-picker thumbnails) wrap the returned Uint8ClampedArray in ImageData
-// themselves. Called per chunk on invalidation, so a plain double loop is fine.
+// Pure core: no canvas, no DOM, no ImageData. Callers (the classic viewport, the
+// chunk-picker thumbnails, the composer docks) wrap the returned
+// Uint8ClampedArray in ImageData themselves. Called per chunk on invalidation,
+// so a plain double loop is fine.
+//
+// This module is now classic's ADAPTER onto the shared rasterizer in
+// `core/art/rasterize.ts` — it owns the S1-specific shape (4bpp packed pool,
+// block indirection, 1-based chunk ids, raw CRAM palettes) and delegates the
+// per-pixel and per-rect work. `core/art/__tests__/rasterize.test.ts` proves the
+// output is byte-identical to the pre-extraction implementation.
+//
+// Classic palettes stay raw CRAM words the whole way: they are converted
+// straight to an RGBA lookup table by `lutFromCramWords` and never pass through
+// the aeon `Color` model, which is lossy in both directions and would break the
+// byte-identity the save path's recompose self-check depends on.
 //
 // Flip composition mirrors SonLVLAPI's RedrawChunk / RedrawBlock
 //   /home/volence/sonic_hacks/programs/SonLVL/SonLVLAPI/LevelData.cs (2691, 2729):
@@ -16,19 +28,39 @@
 // BlockCell.pri is intentionally ignored here: priority only affects plane/
 // sprite compositing at draw time, not this flat per-chunk image. The flat chunk
 // bitmap this returns carries no low/high plane split, so pri has no effect.
-//
-// CRAM→RGB conversion is delegated to the shared decodeGenesisColor helper
-//   (src/core/formats/palette.ts) — a 0BGR 3-3-3 word decoder — rather than
-//   re-deriving the bit math here.
 
-import { decodeGenesisColor } from '../formats/palette';
+import {
+  TILE_PX,
+  TILE_RGBA_BYTES,
+  blitRgba,
+  drawTileInto,
+  lutFromCramWords,
+  rasterizeTile,
+  unpack4bppTile,
+  type PaletteLut,
+} from '../art/rasterize';
 import { chunkIndexForId, type LevelDoc } from './model';
 
-const TILE_PX = 8;
 const BLOCK_PX = 16;
 const CHUNK_PX = 256;
-const TILE_BYTES = 32; // 8x8 @ 4bpp packed
-const TILE_ROW_BYTES = 4; // 8 px / 2 px-per-byte
+
+/**
+ * Lazily built LUT per palette line, reused across a whole chunk render. The
+ * pre-extraction code decoded a CRAM word per non-transparent PIXEL — up to a
+ * quarter of a million `decodeGenesisColor` calls (each allocating an object)
+ * for one 256x256 chunk.
+ */
+function lutCache(doc: LevelDoc): (pal: number) => PaletteLut {
+  const cache: (PaletteLut | undefined)[] = [];
+  return (pal) => {
+    let lut = cache[pal];
+    if (lut === undefined) {
+      lut = lutFromCramWords(doc.palettes[pal] ?? doc.palettes[0] ?? new Uint16Array(16));
+      cache[pal] = lut;
+    }
+    return lut;
+  };
+}
 
 /**
  * Render a single 8x8 tile with a palette line to an RGBA buffer (256 bytes).
@@ -43,66 +75,13 @@ export function renderTile(
   xf: boolean,
   yf: boolean,
 ): Uint8ClampedArray {
-  const out = new Uint8ClampedArray(TILE_PX * TILE_PX * 4); // zeroed = transparent
-  const base = tileIndex * TILE_BYTES;
-  if (tileIndex < 0 || base + TILE_BYTES > tiles.length) return out;
-
-  for (let y = 0; y < TILE_PX; y++) {
-    for (let x = 0; x < TILE_PX; x++) {
-      // 4bpp packed: high nibble is the left (even-x) pixel.
-      const byte = tiles[base + y * TILE_ROW_BYTES + (x >> 1)];
-      const index = (x & 1) === 0 ? (byte >> 4) & 0xf : byte & 0xf;
-      if (index === 0) continue; // transparent — leave alpha 0
-
-      const dx = xf ? TILE_PX - 1 - x : x;
-      const dy = yf ? TILE_PX - 1 - y : y;
-      const o = (dy * TILE_PX + dx) * 4;
-      const c = decodeGenesisColor(palette[index] ?? 0);
-      out[o] = c.r;
-      out[o + 1] = c.g;
-      out[o + 2] = c.b;
-      out[o + 3] = 255;
-    }
-  }
-  return out;
+  const indices = unpack4bppTile(tiles, tileIndex);
+  if (!indices) return new Uint8ClampedArray(TILE_RGBA_BYTES); // zeroed = transparent
+  return rasterizeTile(indices, lutFromCramWords(palette), xf, yf);
 }
 
-/**
- * Copy an RGBA source rect into a destination buffer at (dx, dy), optionally
- * mirroring the source horizontally/vertically. Straight overwrite (chunk cells
- * tile disjoint regions, so no compositing is needed).
- */
-function blit(
-  dest: Uint8ClampedArray,
-  destW: number,
-  src: Uint8ClampedArray,
-  srcW: number,
-  srcH: number,
-  dx: number,
-  dy: number,
-  xf: boolean,
-  yf: boolean,
-): void {
-  for (let y = 0; y < srcH; y++) {
-    const sy = yf ? srcH - 1 - y : y;
-    for (let x = 0; x < srcW; x++) {
-      const sx = xf ? srcW - 1 - x : x;
-      const so = (sy * srcW + sx) * 4;
-      const doff = ((dy + y) * destW + (dx + x)) * 4;
-      dest[doff] = src[so];
-      dest[doff + 1] = src[so + 1];
-      dest[doff + 2] = src[so + 2];
-      dest[doff + 3] = src[so + 3];
-    }
-  }
-}
-
-/**
- * Render a 16x16 block (4 tile cells in TL, TR, BL, BR order) to an RGBA buffer.
- * A missing block yields a transparent buffer. Exported for the composer dock's
- * block thumbnails / block-tab preview (renderChunk uses it internally per cell).
- */
-export function renderBlock(doc: LevelDoc, blockId: number): Uint8ClampedArray {
+/** Shared body of renderBlock, with the caller's per-render palette LUT cache. */
+function drawBlock(doc: LevelDoc, blockId: number, lutFor: (pal: number) => PaletteLut): Uint8ClampedArray {
   const out = new Uint8ClampedArray(BLOCK_PX * BLOCK_PX * 4);
   const block = doc.blocks[blockId];
   if (!block) return out;
@@ -114,15 +93,24 @@ export function renderBlock(doc: LevelDoc, blockId: number): Uint8ClampedArray {
     [0, 1],
     [1, 1],
   ];
+  const indices = new Uint8Array(TILE_PX * TILE_PX); // scratch, reused per cell
   for (let i = 0; i < 4; i++) {
     const cell = block.cells[i];
     if (!cell) continue;
+    if (!unpack4bppTile(doc.tiles, cell.tile, indices)) continue; // out of pool → transparent
     const [bx, by] = positions[i];
-    const palette = doc.palettes[cell.pal] ?? doc.palettes[0] ?? new Uint16Array(16);
-    const tileBuf = renderTile(doc.tiles, cell.tile, palette, cell.xf, cell.yf);
-    blit(out, BLOCK_PX, tileBuf, TILE_PX, TILE_PX, bx * TILE_PX, by * TILE_PX, false, false);
+    drawTileInto(out, BLOCK_PX, bx * TILE_PX, by * TILE_PX, indices, lutFor(cell.pal), cell.xf, cell.yf);
   }
   return out;
+}
+
+/**
+ * Render a 16x16 block (4 tile cells in TL, TR, BL, BR order) to an RGBA buffer.
+ * A missing block yields a transparent buffer. Exported for the composer dock's
+ * block thumbnails / block-tab preview (renderChunk uses it internally per cell).
+ */
+export function renderBlock(doc: LevelDoc, blockId: number): Uint8ClampedArray {
+  return drawBlock(doc, blockId, lutCache(doc));
 }
 
 /**
@@ -141,9 +129,11 @@ export function renderChunk(doc: LevelDoc, chunkId: number): Uint8ClampedArray {
   const chunk = doc.chunks[index];
   if (!chunk) return out;
 
+  const lutFor = lutCache(doc);
+
   // Memo distinct block renders for this call: a chunk has up to 256 cells but
-  // usually far fewer distinct blocks. Flips are applied per-cell in blit below,
-  // so the cached unflipped block buffer is safe to reuse across cells.
+  // usually far fewer distinct blocks. Flips are applied per-cell in blitRgba
+  // below, so the cached unflipped block buffer is safe to reuse across cells.
   const blockCache = new Map<number, Uint8ClampedArray>();
 
   const cellsPerRow = CHUNK_PX / BLOCK_PX; // 16
@@ -156,10 +146,10 @@ export function renderChunk(doc: LevelDoc, chunkId: number): Uint8ClampedArray {
     const cy = (i / cellsPerRow) | 0;
     let blockBuf = blockCache.get(cell.block);
     if (blockBuf === undefined) {
-      blockBuf = renderBlock(doc, cell.block);
+      blockBuf = drawBlock(doc, cell.block, lutFor);
       blockCache.set(cell.block, blockBuf);
     }
-    blit(out, CHUNK_PX, blockBuf, BLOCK_PX, BLOCK_PX, cx * BLOCK_PX, cy * BLOCK_PX, cell.xf, cell.yf);
+    blitRgba(out, CHUNK_PX, blockBuf, BLOCK_PX, BLOCK_PX, cx * BLOCK_PX, cy * BLOCK_PX, cell.xf, cell.yf);
   }
   return out;
 }

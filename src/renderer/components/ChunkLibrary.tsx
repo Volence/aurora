@@ -10,6 +10,7 @@ import { importChunks } from '../../core/formats/chunk-mappings';
 import { kosinskiDecompress } from '../../core/formats/kosinski';
 import { parseTiles } from '../../core/formats/tiles';
 import { migrateChunkTilesIntoTileset } from '../../core/art/atlas-migration';
+import { rasterizeNametableChunk } from '../../core/art/rasterize';
 import { findFullBlockShapeId } from '../../core/collision/full-block-shape';
 import { unpackNametableWord } from '../../core/model/s4-types';
 import type { ChunkDef, Tile, Palette } from '../../core/model/s4-types';
@@ -28,38 +29,13 @@ function isBlankChunk(chunk: ChunkDef): boolean {
   return true;
 }
 
+/** Pixels come from the shared core rasterizer; this wrapper only owns the
+ *  canvas hand-off (one putImageData for the whole thumbnail). */
 function renderChunkThumbnail(chunk: ChunkDef, tiles: Tile[], palette: Palette): OffscreenCanvas {
   const canvas = new OffscreenCanvas(CHUNK_PX, CHUNK_PX);
   const ctx = canvas.getContext('2d')!;
   const img = ctx.createImageData(CHUNK_PX, CHUNK_PX);
-
-  for (let tileRow = 0; tileRow < chunk.heightTiles; tileRow++) {
-    for (let tileCol = 0; tileCol < chunk.widthTiles; tileCol++) {
-      const word = chunk.nametable[tileRow * chunk.widthTiles + tileCol];
-      const entry = unpackNametableWord(word);
-      const tile = tiles[entry.tileIndex];
-      if (!tile) continue;
-
-      const palLine = palette.lines[entry.palette]?.colors ?? palette.lines[0]?.colors ?? [];
-
-      for (let py = 0; py < 8; py++) {
-        for (let px = 0; px < 8; px++) {
-          const srcX = entry.hFlip ? 7 - px : px;
-          const srcY = entry.vFlip ? 7 - py : py;
-          const colorIdx = tile.pixels[srcY * 8 + srcX];
-          const color = palLine[colorIdx] ?? { r: 0, g: 0, b: 0, a: 255 };
-          const destX = tileCol * 8 + px;
-          const destY = tileRow * 8 + py;
-          const offset = (destY * CHUNK_PX + destX) * 4;
-          img.data[offset] = color.r;
-          img.data[offset + 1] = color.g;
-          img.data[offset + 2] = color.b;
-          img.data[offset + 3] = color.a;
-        }
-      }
-    }
-  }
-
+  img.data.set(rasterizeNametableChunk(chunk, tiles, palette, CHUNK_PX, CHUNK_PX));
   ctx.putImageData(img, 0, 0);
   return canvas;
 }
