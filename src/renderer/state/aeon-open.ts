@@ -17,15 +17,25 @@ export async function openAeonProject(dir: string): Promise<boolean> {
     store.setLoading(true);
     const handle = await aeonAdapter.open(createIpcFileAccess(dir));
     const aeon = handle.aeon!;
+    // Register in recents BEFORE the atomic commit: openLoaded flips the session
+    // projectKey, and no await may sit between it and the first-act selection
+    // below (see the constraint comment there). Front-loading this await is also
+    // strictly safer than the old ordering — if addRecentProject throws, nothing
+    // has been committed (the old path could fail with config set, project null).
+    await window.api.addRecentProject(dir, aeon.config.name);
+    // No await may sit between openLoaded and setCurrentAct: the atomic commit
+    // flips the session projectKey, and an interleaved await lets the restore
+    // effect run before the default-act selection — which would then clobber the
+    // restored focus (session-lifecycle.ts restore race).
     useProjectStore.getState().openLoaded({
       config: aeon.config, project: aeon.project,
       collisionProfiles: aeon.collisionProfiles,
       capabilities: handle.capabilities, legacyAtlasMerged: aeon.legacyAtlasMerged,
     });
-    await window.api.addRecentProject(dir, aeon.config.name);
-    // First-act selection AFTER the atomic commit (parity with the old loader's
-    // ordering: config→project→setCurrentAct). The session restore that runs on
-    // the project-key change will re-point this if a stored session exists.
+    // First-act selection immediately after the atomic commit (parity with the
+    // old loader's synchronous config→project→setCurrentAct block). The session
+    // restore that runs on the project-key change will re-point this if a stored
+    // session exists.
     const zone = aeon.config.zones[0];
     if (zone && zone.acts.length > 0) {
       useProjectStore.getState().setCurrentAct(zone.id, zone.acts[0].id);
