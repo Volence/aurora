@@ -21,8 +21,9 @@ import { useSessionStore } from '../state/sessionStore';
 import { useClassicProjectStore } from '../state/classicProjectStore';
 import { useClassicLevelStore } from '../state/classicLevelStore';
 import { useProjectStore } from '../state/projectStore';
+import { useWorkspaceStore } from '../workspace/workspaceStore';
 import { resetProjectRuntime } from '../state/project-runtime';
-import { loadStoredSession, saveStoredSession, defaultProjectSession } from './session-storage';
+import { loadStoredSession, saveStoredSession, loadStoredWorkspace, defaultProjectSession } from './session-storage';
 import { classicLevelTab, aeonLevelTab, parseSpriteDocTabId, PROJECT_SETUP_TAB } from './tabs';
 import { activateLevelTarget, activateSpriteDocTarget } from './tab-activation';
 import type { TabDescriptor } from '../../core/shell/session';
@@ -67,11 +68,21 @@ export function useSessionLifecycle(): void {
   // clobber a stored one during boot.
   const keyRef = useRef<string | null | undefined>(undefined);
 
+  // Persist BOTH the tab session and the per-tab workspace record (facet +
+  // viewport) under the current key, on any change to either store. Stays quiet
+  // until the first restore has adopted a key (keyRef.current === undefined), so
+  // a default/empty state can't clobber a stored one during boot.
   useEffect(() => {
-    return useSessionStore.subscribe((s) => {
+    const persist = (): void => {
       if (keyRef.current === undefined) return;
-      saveStoredSession(localStorage, keyRef.current, { tabs: s.tabs, activeId: s.activeId });
-    });
+      const { tabs, activeId } = useSessionStore.getState();
+      saveStoredSession(
+        localStorage, keyRef.current, { tabs, activeId },
+        useWorkspaceStore.getState().record);
+    };
+    const unsubSession = useSessionStore.subscribe(persist);
+    const unsubWorkspace = useWorkspaceStore.subscribe(persist);
+    return () => { unsubSession(); unsubWorkspace(); };
   }, []);
 
   useEffect(() => {
@@ -95,11 +106,24 @@ export function useSessionLifecycle(): void {
       const sd = parseSpriteDocTabId(t.id);
       return sd !== null && ((sd.engine === 'aeon' && aeonOpen) || (sd.engine === 's1' && classicOpen));
     };
+    // Read BOTH stored payloads BEFORE mutating any store below. replace() and
+    // seed() fire the persist subscriptions SYNCHRONOUSLY (zustand), and persist
+    // serializes whatever the stores CURRENTLY hold — a not-yet-seeded (empty)
+    // workspace record serializes WITHOUT the `workspace` field, which strips the
+    // stored workspace from localStorage. Capturing both reads up front makes
+    // those interleaved writes harmless (they re-persist values we already hold;
+    // the final seed write is correct). seed() also subsumes any per-switch reset:
+    // it replaces the WHOLE record, so a new project with nothing stored gets {}.
     const stored = loadStoredSession(localStorage, projectKey, isValid);
+    const storedWorkspace = loadStoredWorkspace(localStorage, projectKey);
     const next =
       stored ?? (projectKey !== null ? defaultProjectSession(firstOpenableLevelTab()) : undefined) ??
       { tabs: useSessionStore.getState().tabs.slice(0, 1), activeId: 'home' };
     useSessionStore.getState().replace(next);
+    // ORDER: seed the workspace record BEFORE the activation dispatch below. The
+    // aeon-switch activation path reads viewFor(activeId) to restore the seeded
+    // viewport, so the seed must land first or the restore sees an empty record.
+    useWorkspaceStore.getState().seed(storedWorkspace);
     if (parseSpriteDocTabId(next.activeId)) void activateSpriteDocTarget(next.activeId);
     else if (next.activeId.startsWith('level:')) void activateLevelTarget(next.activeId);
   }, [projectKey]);

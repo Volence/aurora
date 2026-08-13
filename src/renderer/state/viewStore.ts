@@ -21,6 +21,9 @@ interface ViewState {
   pan: (dx: number, dy: number) => void;
   setZoom: (zoom: number, centerX?: number, centerY?: number) => void;
   setPosition: (x: number, y: number) => void;
+  /** Restore a snapshotted viewport (position + zoom) in one set — used by the
+   *  per-tab viewport restore on aeon act switch. */
+  setViewport: (x: number, y: number, zoom: number) => void;
   toggleOverlay: (key: keyof OverlayOptions) => void;
   setOverlay: (key: keyof OverlayOptions, value: boolean) => void;
 }
@@ -62,6 +65,12 @@ export const useViewStore = create<ViewState>((set) => ({
   }),
 
   setPosition: (x, y) => set({ vpX: Math.max(0, x), vpY: Math.max(0, y) }),
+
+  setViewport: (x, y, zoom) => set({
+    vpX: Math.max(0, x),
+    vpY: Math.max(0, y),
+    zoom: Math.max(0.125, Math.min(8, zoom)),
+  }),
 
   toggleOverlay: (key) => set((state) => ({
     overlays: { ...state.overlays, [key]: !state.overlays[key] },

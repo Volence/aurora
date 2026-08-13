@@ -21,6 +21,8 @@ import { useSessionStore } from '../state/sessionStore';
 import { useClassicProjectStore } from '../state/classicProjectStore';
 import { useClassicLevelStore } from '../state/classicLevelStore';
 import { useProjectStore } from '../state/projectStore';
+import { useViewStore } from '../state/viewStore';
+import { useWorkspaceStore } from '../workspace/workspaceStore';
 import { useConfirmStore } from '../state/confirmStore';
 import { useToastStore } from '../state/toastStore';
 import { saveClassicProject, type SaveClassicProjectResult } from '../state/classic-save';
@@ -219,7 +221,22 @@ export async function activateLevelTarget(tabId: string): Promise<boolean> {
     case 'none':
       return true;
     case 'aeon-switch': {
+      // Snapshot the outgoing act's viewport, restore the incoming act's (spec
+      // §10: viewport persists per tab). Runs entirely synchronously around the
+      // act switch. On BOOT restore the outgoing act is the loader's default
+      // (setCurrentAct(zones[0].acts[0]) ran before this dispatch), so the
+      // snapshot captures its 0,0 view and the restore applies the seeded view
+      // for the target act (session-lifecycle seeds the record BEFORE dispatch).
+      const prev = useProjectStore.getState();
+      if (prev.currentZoneId && prev.currentActId) {
+        const v = useViewStore.getState();
+        useWorkspaceStore.getState().setView(
+          `level:${prev.currentZoneId}:${prev.currentActId}`,
+          { x: v.vpX, y: v.vpY, zoom: v.zoom });
+      }
       useProjectStore.getState().setCurrentAct(plan.zone, plan.act);
+      const view = useWorkspaceStore.getState().viewFor(tabId);
+      if (view) useViewStore.getState().setViewport(view.x, view.y, view.zoom);
       return true;
     }
     case 'classic-open':
