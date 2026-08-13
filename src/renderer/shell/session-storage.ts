@@ -10,7 +10,7 @@ import {
   initialSession, openTab, pruneSession,
   type SessionState, type TabDescriptor,
 } from '../../core/shell/session';
-import { serializeSession, restoreSession } from '../../core/shell/session-persistence';
+import { serializeSession, restoreSession, restoreWorkspace, type WorkspaceRecord } from '../../core/shell/session-persistence';
 
 export interface StorageLike {
   getItem(key: string): string | null;
@@ -41,12 +41,21 @@ export function saveStoredSession(
   storage: StorageLike,
   projectKey: string | null,
   state: SessionState,
+  workspace?: WorkspaceRecord,
 ): void {
   try {
-    storage.setItem(sessionKeyFor(projectKey), serializeSession(state));
+    storage.setItem(sessionKeyFor(projectKey), serializeSession(state, workspace));
   } catch {
     // Storage unavailable (quota/privacy) — session just won't restore.
   }
+}
+
+/** {} when nothing stored / storage unavailable. */
+export function loadStoredWorkspace(storage: StorageLike, projectKey: string | null): WorkspaceRecord {
+  let raw: string | null;
+  try { raw = storage.getItem(sessionKeyFor(projectKey)); } catch { return {}; }
+  if (raw === null) return {};
+  return restoreWorkspace(raw);
 }
 
 /** First open of a project with no stored session: Home + its first level, focused. */

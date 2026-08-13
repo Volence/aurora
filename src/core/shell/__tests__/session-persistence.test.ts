@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { serializeSession, restoreSession } from '../session-persistence';
+import { serializeSession, restoreSession, restoreWorkspace } from '../session-persistence';
 import { HOME_TAB, initialSession, openTab } from '../session';
 
 describe('session persistence', () => {
@@ -50,5 +50,31 @@ describe('session persistence', () => {
       activeId: 'level:ghz:1',
     }));
     expect(restored.tabs.map((t) => t.title)).toEqual(['Home', 'GHZ Act 1']);
+  });
+
+  it('round-trips the per-tab workspace record (facet + viewport)', () => {
+    const s = openTab(initialSession(), { id: 'level:ojz:act1', kind: 'level', title: 'OJZ act1' });
+    const ws = { 'level:ojz:act1': { facet: 'collision', view: { x: 128, y: 64, zoom: 2 } } } as const;
+    const json = serializeSession(s, ws);
+    expect(restoreSession(json).tabs).toHaveLength(2);
+    expect(restoreWorkspace(json)).toEqual(ws);
+  });
+
+  it('restoreWorkspace is defensive: corrupt entries and unknown facets are dropped', () => {
+    const json = JSON.stringify({
+      tabs: [], activeId: 'home',
+      workspace: {
+        ok: { facet: 'layout' },
+        badFacet: { facet: 'nonsense' },
+        badView: { view: { x: 'NaN' } },
+      },
+    });
+    expect(restoreWorkspace(json)).toEqual({ ok: { facet: 'layout' } });
+  });
+
+  it('restoreWorkspace on a legacy payload (no workspace key) is empty, and legacy sessions still restore', () => {
+    const legacy = JSON.stringify({ tabs: [], activeId: 'home' });
+    expect(restoreWorkspace(legacy)).toEqual({});
+    expect(restoreSession(legacy).tabs).toEqual([HOME_TAB]);
   });
 });
