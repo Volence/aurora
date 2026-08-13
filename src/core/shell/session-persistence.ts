@@ -32,8 +32,17 @@ export function restoreSession(json: string): SessionState {
   const res = persistedSessionSchema.safeParse(parsed);
   if (!res.success) return initialSession();
 
-  let tabs: TabDescriptor[] = res.data.tabs;
-  if (!tabs.some((t) => t.id === HOME_TAB.id)) tabs = [HOME_TAB, ...tabs];
+  // Normalize (hand-edited/corrupt storage only — openTab can't produce
+  // these): the canonical Home tab is always index 0, any persisted
+  // home-kinded or home-id'd variant is replaced by it, and duplicate ids
+  // keep their first occurrence.
+  const seen = new Set<string>([HOME_TAB.id]);
+  const tabs: TabDescriptor[] = [HOME_TAB];
+  for (const t of res.data.tabs) {
+    if (t.kind === 'home' || seen.has(t.id)) continue;
+    seen.add(t.id);
+    tabs.push(t);
+  }
   const activeId = tabs.some((t) => t.id === res.data.activeId) ? res.data.activeId : HOME_TAB.id;
   return { tabs, activeId };
 }

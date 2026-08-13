@@ -30,4 +30,25 @@ describe('session persistence', () => {
     }));
     expect(restored.activeId).toBe('home');
   });
+
+  it('normalizes a mismatched home-kind tab instead of duplicating Home', () => {
+    const restored = restoreSession(JSON.stringify({
+      tabs: [{ id: 'home2', kind: 'home', title: 'Home' }],
+      activeId: 'home2',
+    }));
+    expect(restored.tabs).toEqual([HOME_TAB]);
+    expect(restored.activeId).toBe('home');
+  });
+
+  it('drops duplicate tab ids, keeping the first occurrence', () => {
+    const restored = restoreSession(JSON.stringify({
+      tabs: [
+        HOME_TAB,
+        { id: 'level:ghz:1', kind: 'level', title: 'GHZ Act 1' },
+        { id: 'level:ghz:1', kind: 'level', title: 'GHZ copy' },
+      ],
+      activeId: 'level:ghz:1',
+    }));
+    expect(restored.tabs.map((t) => t.title)).toEqual(['Home', 'GHZ Act 1']);
+  });
 });
