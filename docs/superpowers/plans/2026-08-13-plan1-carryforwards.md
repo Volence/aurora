@@ -325,3 +325,72 @@ the history clock, so both already invalidated on undo.
 | After | Files | Passed | Skipped | Failed |
 |---|---|---|---|---|
 | Smoke-test fixes A+B | 167 | 1457 | 2 | 0 |
+
+## Smoke-test round 2 — Ctrl+S is the CURRENT document (owner request)
+
+### C. Save split: Ctrl+S = this document, Ctrl+Shift+S = everything
+
+Reported: edit sprite A, switch to sprite B, edit B, Ctrl+S — and A got written
+too. These files are build inputs; writing one the user wasn't ready to commit
+is a real cost. `saveAllDirty()` did exactly that by design (three savers, all
+dirty surfaces).
+
+The split is at the **SaveCoordinator seam**, not in the components — the
+scattered per-target save routing an earlier stage deleted stays deleted. A
+`Saver` may now declare a `scope { owns(tabId), isDirty(tabId), save(tabId) }`,
+and `saveCoordinator.saveActive(tabId)` runs the ONE saver that owns the active
+tab. `project-runtime.saveActive()/canSaveActive()` are the app-facing entry
+points beside `saveAllDirty()`. Mapping (all of it in `project-runtime.ts`):
+
+| Active tab | Saver | Scoped save |
+|---|---|---|
+| `doc:sprite:*` | `sprite-art` | `saveSpriteDocArt(tabId)` — that document only |
+| `level:*`, classic open | `classic-level` | `saveClassicProject()` |
+| `level:*`, aeon resident, classic closed | `aeon-project` | `saveAeonProject()` |
+| `home`, `tool:*` | none | no-op (never throws) |
+
+Save is deliberately COARSER than undo: a classic level tab's `level:` and
+`zoneart:` documents are two undo stacks but one project save, so the tab id is
+all the routing needed and `focusedDocId()` is not involved. Ctrl+Shift+S is the
+unchanged `saveAllDirty()`; it was unbound before this. ⌘K now lists both,
+labelled "Save" (Ctrl+S) and "Save All" (Ctrl+Shift+S).
+
+Per-tab dirtiness reuses the tab strip's dot rule rather than defining "dirty" a
+second time: `dirty-tabs.ts` keeps the pure rule, and the new
+`shell/dirty-snapshot.ts` owns the store read (`currentDirtySnapshot()` for the
+savers, `useDirtySnapshot()` — moved out of `TabStrip` — for React).
+
+Behaviour note: `saveActive` skips a clean tab, so Ctrl+S on an undirty aeon act
+no longer rewrites the project files (`saveAllDirty` still does). Classic is
+unaffected either way — `collectDirtyLevels` already returned `nothing` when the
+loaded act was clean.
+
+### D. The app-bar Save button contradicted its own click
+
+`Toolbar` rendered two mutually-exclusive Save chips gated on LEVEL dirtiness
+(`editorStore.dirty` / `classicLevelStore.dirty`) while both clicks ran
+`saveAllDirty`, which also writes sprite art — so with only a sprite dirty the
+button sat inert over an available, meaningful operation (pre-existing, not a
+regression; `Chip` with `disabled` drops the handler entirely). Now: ONE chip,
+`onClick` = save the current document, `disabled` = `!canSaveActive(activeId)` —
+the coordinator's own verdict, so predicate and click cannot disagree. The
+"unsaved" badge is `tabHasDirtyDot` on the active tab, which is a hair wider
+than the button: a dirty sprite with no save-back file reads unsaved but cannot
+be saved (Export is its only destination), and the chip's title says so.
+
+### E. A failed aeon sprite load opened a blank tab
+
+`tab-activation` set `loaded = true` unconditionally on the aeon branch, but
+`loadSpriteByName` toasts its failures and resolves — it never rejects — so a
+failed load skipped the `closeSpriteDoc` + refuse-focus rollback and stranded
+the user on the blank 32x32 placeholder document. `loadSpriteByName` now returns
+`Promise<boolean>` like `editObjectArtCheckout`, and both branches read it.
+
+**Not covered automatically:** the renderer suite is node-only (no jsdom/RTL), so
+nothing clicks the Toolbar chip or presses a real Ctrl+S — the App keydown
+mapping and the chip's enabled/disabled rendering are eyeball-only. The seam
+underneath both (`saveActive`/`canSaveActive`) is covered.
+
+| After | Files | Passed | Skipped | Failed |
+|---|---|---|---|---|
+| Save split C+D+E | 167 | 1473 | 2 | 0 |
