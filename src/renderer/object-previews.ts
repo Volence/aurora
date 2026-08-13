@@ -54,13 +54,30 @@ async function renderPreview(base: string, spriteName: string, palette: Palette)
   return { bitmap, originX: recon.originX, originY: recon.originY };
 }
 
-/** Read bindings, render each bound sprite's preview, and publish to the store. */
+/**
+ * Read the bindings sidecar and publish it to projectStore. Split out of
+ * refreshObjectPreviews on purpose: that function renders thumbnails and so
+ * early-returns without a zone/palette, but the Explorer's Object Library needs
+ * only the sprite NAMES. Loading the names here, ahead of the palette gate, is
+ * what stops the library sitting greyed out ("no sprite bound") until the user
+ * happens to open a level.
+ */
+export async function loadObjectBindings(): Promise<ObjectBindings> {
+  const project = useProjectStore.getState().project;
+  if (!project) return {};
+  const bindings = await readObjectBindings(project.basePath);
+  useProjectStore.getState().setObjectBindings(bindings);
+  return bindings;
+}
+
+/** Publish bindings, then render each bound sprite's preview into the store.
+ *  Only the RENDER half needs a zone (for its palette). */
 export async function refreshObjectPreviews(): Promise<void> {
+  const bindings = await loadObjectBindings();
   const project = useProjectStore.getState().project;
   const zone = getCurrentZone(useProjectStore.getState());
   if (!project || !zone) return;
   const base = project.basePath;
-  const bindings = await readObjectBindings(base);
   const out = new Map<string, ObjectPreview>();
   for (const [objId, spriteName] of Object.entries(bindings)) {
     try {

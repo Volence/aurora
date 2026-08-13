@@ -20,6 +20,7 @@ import { useClassicProjectStore } from '../classicProjectStore';
 import { focusedHistory } from '../editorStore';
 import { useSessionStore } from '../sessionStore';
 import { useSpriteStore, openSpriteDoc } from '../spriteStore';
+import { UNTITLED_SPRITE_TAB_ID } from '../../shell/tabs';
 import { useWorkspaceStore } from '../../workspace/workspaceStore';
 import { focusClassicSurface } from '../../components/classic/classic-surface';
 import { openReady } from './helpers/classic-fixture';
@@ -198,6 +199,14 @@ describe('focusedHistory', () => {
   it('returns the SPRITE doc stack when a sprite tab is active', () => {
     useSessionStore.setState({ activeId: 'doc:sprite:s1:18' });
     expect(focusedHistory()).toBe(documentHistoryHub.historyFor('doc:sprite:s1:18'));
+  });
+
+  it('returns the UNTITLED sprite doc stack when the "New Sprite…" tab is active', () => {
+    // Its tab id IS its document id, so the same rule applies; without it the
+    // toolbar's undo reads "nothing undoable" while SpriteMode's Ctrl+Z happily
+    // undoes on that document.
+    useSessionStore.setState({ activeId: UNTITLED_SPRITE_TAB_ID });
+    expect(focusedHistory()).toBe(documentHistoryHub.historyFor(UNTITLED_SPRITE_TAB_ID));
   });
 
   it('returns null when no document is focused', () => {

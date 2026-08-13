@@ -15,9 +15,12 @@ import { useClassicProjectStore } from '../state/classicProjectStore';
 import { useClassicLevelStore } from '../state/classicLevelStore';
 import { useProjectStore } from '../state/projectStore';
 import { filterExplorer, type ExplorerGroupModel, type ExplorerItemModel } from '../../core/shell/explorer';
-import { classicExplorerGroups, aeonExplorerGroups, noProjectExplorerGroups, type ClassicObjectRow, type AeonObjectRow } from './explorer-data';
+import {
+  classicExplorerGroups, aeonExplorerGroups, noProjectExplorerGroups, resolveObjectSprite,
+  NEW_SPRITE_ITEM_ID, type ClassicObjectRow, type AeonObjectRow,
+} from './explorer-data';
 import { requestOpenTab } from './tab-activation';
-import { classicLevelTab, aeonLevelTab, parseLevelTabId, spriteDocTab, parseSpriteDocTabId, PROJECT_SETUP_TAB } from './tabs';
+import { classicLevelTab, aeonLevelTab, parseLevelTabId, spriteDocTab, parseSpriteDocTabId, untitledSpriteTab, PROJECT_SETUP_TAB } from './tabs';
 import { S1_OBJECT_LIST, s1ObjectHex } from '../../core/project/profiles/s1-objects';
 import { resolveObjectArt } from '../../core/project/profiles/s1-object-art';
 import { editObjectArt } from '../components/sprite/export-sprite';
@@ -76,6 +79,7 @@ export default function Explorer({ onOpenProject, onOpenRecent }: ExplorerProps)
   const docReady = useClassicLevelStore((s) => s.status) === 'ready';
   const config = useProjectStore((s) => s.config);
   const objectLibrary = useProjectStore((s) => s.project?.objectLibrary ?? EMPTY_LIBRARY);
+  const objectBindings = useProjectStore((s) => s.objectBindings);
 
   const [recents, setRecents] = useState<RecentProject[]>([]);
   const noProject = !classicOpen && !config;
@@ -95,14 +99,14 @@ export default function Explorer({ onOpenProject, onOpenRecent }: ExplorerProps)
     }
     if (config) {
       const objects: AeonObjectRow[] = objectLibrary.map((o) => ({
-        id: o.id, name: o.name, sprite: o.sprite,
+        id: o.id, name: o.name, sprite: resolveObjectSprite(o, objectBindings),
       }));
       return aeonExplorerGroups(config.zones.map((z) => ({
         id: z.id, name: z.name, acts: z.acts.map((a) => ({ id: a.id })),
       })), objects);
     }
     return noProjectExplorerGroups(recents);
-  }, [classicOpen, zoneTree, classicZone, docReady, config, objectLibrary, recents]);
+  }, [classicOpen, zoneTree, classicZone, docReady, config, objectLibrary, objectBindings, recents]);
 
   const filtered = useMemo(() => filterExplorer(groups, query), [groups, query]);
 
@@ -120,6 +124,8 @@ export default function Explorer({ onOpenProject, onOpenRecent }: ExplorerProps)
     } else if (item.id.startsWith('obj:')) {
       const id = Number(item.id.slice('obj:'.length));
       void editObjectArt(id);
+    } else if (item.id === NEW_SPRITE_ITEM_ID) {
+      void requestOpenTab(untitledSpriteTab());
     } else if (item.id.startsWith('doc:sprite:')) {
       const p = parseSpriteDocTabId(item.id);
       if (p) void requestOpenTab(spriteDocTab(p.engine, p.ref, item.label));

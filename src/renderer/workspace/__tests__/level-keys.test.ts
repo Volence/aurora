@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { levelKeysEnabled } from '../level-keys';
 import { useSessionStore } from '../../state/sessionStore';
-import { aeonLevelTab, spriteDocTab } from '../../shell/tabs';
+import { aeonLevelTab, spriteDocTab, untitledSpriteTab } from '../../shell/tabs';
 
 // levelKeysEnabled() gates the (keep-alive, hidden) level editors' window keydown
 // handlers: inert whenever a sprite-doc tab is active, so SpriteMode alone owns
@@ -35,6 +35,16 @@ describe('levelKeysEnabled', () => {
     expect(levelKeysEnabled()).toBe(false);
     useSessionStore.getState().focus(level.id); // back to the level
     expect(levelKeysEnabled()).toBe(true);
+  });
+
+  it('is disabled while the UNTITLED sprite tab is active', () => {
+    // "New Sprite…" mounts SpriteMode exactly like an engine-bound sprite tab,
+    // so the hidden level handlers must be just as inert — otherwise one Ctrl+Z
+    // drives both the sprite stack and a hidden level document's.
+    const untitled = untitledSpriteTab();
+    useSessionStore.getState().open(untitled);
+    expect(useSessionStore.getState().activeId).toBe(untitled.id);
+    expect(levelKeysEnabled()).toBe(false);
   });
 
   it('stays enabled on the Home tab (keep-alive semantics preserved)', () => {

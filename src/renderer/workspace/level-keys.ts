@@ -5,8 +5,11 @@
 // canvas handler shares one definition.
 
 import { useSessionStore } from '../state/sessionStore';
-import { parseSpriteDocTabId } from '../shell/tabs';
+import { isSpriteDocTabId } from '../shell/tabs';
 
 export function levelKeysEnabled(): boolean {
-  return parseSpriteDocTabId(useSessionStore.getState().activeId) === null;
+  // isSpriteDocTabId, not parseSpriteDocTabId: the "New Sprite…" tab mounts
+  // SpriteMode exactly like an engine-bound one, so the level handlers must be
+  // just as inert under it or one Ctrl+Z fires both.
+  return !isSpriteDocTabId(useSessionStore.getState().activeId);
 }

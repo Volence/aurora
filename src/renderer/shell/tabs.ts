@@ -47,6 +47,34 @@ export function parseSpriteDocTabId(id: string): { engine: 's1' | 'aeon'; ref: s
   return m ? { engine: m[1] as 's1' | 'aeon', ref: m[2] } : null;
 }
 
+/**
+ * The UNTITLED sprite document's tab id — "New Sprite…". This is the same
+ * string spriteStore has always used for the document the editor holds before
+ * any tab claims it (spriteStore re-exports it as UNTITLED_SPRITE_DOC_ID), so
+ * the tab and the document are one and the same: undo, the dirty dot and the
+ * close confirm all key off the tab id and find the right document with no
+ * extra mapping.
+ *
+ * It deliberately does NOT parse as an engine-bound sprite-doc id, so it can
+ * never collide with a real `doc:sprite:<engine>:<ref>` tab — which is also why
+ * every "is this a sprite tab?" test must go through isSpriteDocTabId rather
+ * than parseSpriteDocTabId alone.
+ */
+export const UNTITLED_SPRITE_TAB_ID = 'doc:sprite:untitled';
+
+/** The "New Sprite…" tab: an empty aeon sprite document with no save-back
+ *  target (Export in the sprite editor is how it becomes a real sprite). */
+export function untitledSpriteTab(): TabDescriptor {
+  return { id: UNTITLED_SPRITE_TAB_ID, kind: 'sprite-doc', title: 'Untitled Sprite' };
+}
+
+/** TRUE for any tab hosting the sprite editor — engine-bound OR untitled. The
+ *  predicate every caller that only cares "is the sprite editor showing?" must
+ *  use; parseSpriteDocTabId answers the narrower "which sprite does it load?". */
+export function isSpriteDocTabId(id: string): boolean {
+  return id === UNTITLED_SPRITE_TAB_ID || parseSpriteDocTabId(id) !== null;
+}
+
 // Zone-art doc ids — 'zoneart:<zone>'. Unlike the others this is NOT a tab id:
 // zone art (chunks, blocks, tiles, palettes) is edited from act-scoped tabs but
 // is zone-scoped data, so it owns its own undo document (spec §4.2). One zone's
