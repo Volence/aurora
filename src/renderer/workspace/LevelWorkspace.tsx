@@ -12,7 +12,7 @@ import { useWorkspaceStore } from './workspaceStore';
 import { useSessionStore } from '../state/sessionStore';
 import { useProjectStore, getActiveLevel } from '../state/projectStore';
 import { useEditorStore, undo, redo, editHistory } from '../state/editorStore'; // editHistory → activeHistory() in the undo re-home task
-import { T } from '../components/ui';
+import { Chip } from '../components/ui';
 import type { EditingLayer } from '../state/editorStore';
 
 export default function LevelWorkspace() {
@@ -21,6 +21,12 @@ export default function LevelWorkspace() {
   const facetId = useWorkspaceStore((s) => s.facetFor(activeId));
   useEditorStore((s) => s.historyVersion); // repaint undo/redo enabledness
   const editingLayer = useEditorStore((s) => s.editingLayer);
+  // App's mount effect calls registerAeonFacetModules() before any project can
+  // load (project open is async, gated behind the same mount), so a facet module
+  // is always present by the time an aeon level tab renders — the 'layout'
+  // fallback then this null-guard only fire if that ordering is ever broken (the
+  // workspace would render blank permanently). Keep registration ahead of any
+  // synchronous hydrate.
   const mod = facetModules.get(facetId) ?? facetModules.get('layout');
   if (!mod) return null;
 
@@ -31,13 +37,13 @@ export default function LevelWorkspace() {
       <FacetBar tabId={activeId} granted={granted} />
       <span style={{ flex: 1 }} />
       {showPlane && (['fg', 'bg'] as EditingLayer[]).map((l) => (
-        <button key={l} style={{ ...styles.chip, ...(editingLayer === l ? styles.chipActive : {}) }}
-          onClick={() => useEditorStore.getState().setEditingLayer(l)}>{l.toUpperCase()}</button>
+        <Chip key={l} active={editingLayer === l}
+          onClick={() => useEditorStore.getState().setEditingLayer(l)}>{l.toUpperCase()}</Chip>
       ))}
-      <button style={styles.chip} disabled={!editHistory.canUndo}
-        onClick={() => { const lv = level(); if (lv) undo(lv); }}>Undo</button>
-      <button style={styles.chip} disabled={!editHistory.canRedo}
-        onClick={() => { const lv = level(); if (lv) redo(lv); }}>Redo</button>
+      <Chip disabled={!editHistory.canUndo}
+        onClick={() => { const lv = level(); if (lv) undo(lv); }}>Undo</Chip>
+      <Chip disabled={!editHistory.canRedo}
+        onClick={() => { const lv = level(); if (lv) redo(lv); }}>Redo</Chip>
     </div>
   );
 
@@ -58,7 +64,4 @@ export default function LevelWorkspace() {
 
 const styles: Record<string, React.CSSProperties> = {
   header: { display: 'flex', alignItems: 'center', gap: 8, width: '100%' },
-  chip: { padding: '3px 10px', fontSize: 11, borderRadius: 5, cursor: 'pointer',
-    background: T.raised, color: T.textBase, border: `1px solid ${T.border}` },
-  chipActive: { background: T.surface, color: T.textHi, fontWeight: 600 },
 };

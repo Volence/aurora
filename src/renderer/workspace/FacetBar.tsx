@@ -8,14 +8,7 @@ import { facetsFor } from '../../core/shell/facets';
 import type { FacetCapability } from '../../core/project/adapter';
 import { facetModules } from './facet-registry';
 import { useWorkspaceStore } from './workspaceStore';
-import { useEditorStore } from '../state/editorStore';
-import { toolForFacet } from './facet-tools';
-
-/** Facet switch: remember per-tab facet + fix the tool to the facet's set. */
-export function switchFacet(tabId: string, facet: FacetCapability): void {
-  useWorkspaceStore.getState().setFacet(tabId, facet);
-  useEditorStore.getState().setTool(toolForFacet(facet, useEditorStore.getState().tool));
-}
+import { switchFacet } from './facet-tools';
 
 export default function FacetBar({ tabId, granted }: { tabId: string; granted: readonly FacetCapability[] }) {
   const active = useWorkspaceStore((s) => s.facetFor(tabId));

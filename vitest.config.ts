@@ -11,5 +11,8 @@ export default defineConfig({
   test: {
     globals: true,
     include: ['test/**/*.test.ts', 'src/**/__tests__/**/*.test.ts'],
+    // Node-env global stubs for renderer modules that construct canvases at
+    // import time (see the file header). Guarded to only define missing globals.
+    setupFiles: ['src/test/offscreen-canvas-stub.ts'],
   },
 });

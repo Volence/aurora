@@ -1,7 +1,5 @@
-// Installs the OffscreenCanvas global before the component modules load below
-// (register-facets pulls in MapViewport, which touches it at import). Must be
-// the first import — ESM evaluates imports in source order.
-import './offscreen-canvas-stub';
+// The OffscreenCanvas global that register-facets → MapViewport needs at import
+// time is installed by vitest setupFiles (src/test/offscreen-canvas-stub.ts).
 import { describe, it, expect, beforeEach } from 'vitest';
 import { facetsFor, facetRegistry, registerBuiltinFacets } from '../../../core/shell/facets';
 import { facetModules } from '../facet-registry';
