@@ -14,12 +14,16 @@ import { MapFacetDock } from '../MapFacetDock';
 import type { FacetModule } from '../facet-registry';
 
 function RingsPanels() {
+  // Upgraded from the legacy branch's getState() read to a subscription: the
+  // legacy branch's non-reactive read is a pre-existing stale-highlight bug
+  // there (survives until Task 17 deletes it) that this facet doesn't need to
+  // inherit, since nothing else in the tree subscribes to selectedRingPattern.
+  const selectedRingPattern = useEditorStore((s) => s.selectedRingPattern);
   return (
     <Panel width={240} scroll>
       <CollapsibleSection id="map.palette" title="Ring Patterns">
-        {/* selectedIndex via getState() — verbatim from the legacy map branch; its non-reactivity is pre-existing behavior */}
         <RingPatternPalette
-          selectedIndex={useEditorStore.getState().selectedRingPattern}
+          selectedIndex={selectedRingPattern}
           onSelect={(index) => useEditorStore.getState().setSelectedRingPattern(index)}
         />
       </CollapsibleSection>
