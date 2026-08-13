@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { classicLevelTab, aeonLevelTab, parseLevelTabId, spriteDocTab, parseSpriteDocTabId, PROJECT_SETUP_TAB } from '../tabs';
+import { classicLevelTab, aeonLevelTab, parseLevelTabId, spriteDocTab, parseSpriteDocTabId, PROJECT_SETUP_TAB, zoneArtDocId, parseZoneArtDocId } from '../tabs';
 
 describe('level tab helpers', () => {
   it('classicLevelTab builds id from zone + act number and titles from the ref label', () => {
@@ -36,5 +36,20 @@ describe('level tab helpers', () => {
     expect(parseSpriteDocTabId('doc:sprite:s1:42')).toEqual({ engine: 's1', ref: '42' });
     expect(parseSpriteDocTabId('level:ojz:act1')).toBeNull();
     expect(parseSpriteDocTabId('doc:sprite:s1:')).toBeNull();
+  });
+});
+
+describe('zone-art doc ids', () => {
+  it('builds an id from a zone', () => {
+    expect(zoneArtDocId('ghz')).toBe('zoneart:ghz');
+  });
+
+  it('round-trips', () => {
+    expect(parseZoneArtDocId(zoneArtDocId('ojz'))).toEqual({ zone: 'ojz' });
+  });
+
+  it('rejects other doc kinds', () => {
+    expect(parseZoneArtDocId('level:ghz:1')).toBeNull();
+    expect(parseZoneArtDocId('zoneart:')).toBeNull();
   });
 });

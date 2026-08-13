@@ -41,3 +41,18 @@ export function parseSpriteDocTabId(id: string): { engine: 's1' | 'aeon'; ref: s
   const m = /^doc:sprite:(s1|aeon):(.+)$/.exec(id);
   return m ? { engine: m[1] as 's1' | 'aeon', ref: m[2] } : null;
 }
+
+// Zone-art doc ids — 'zoneart:<zone>'. Unlike the others this is NOT a tab id:
+// zone art (chunks, blocks, tiles, palettes) is edited from act-scoped tabs but
+// is zone-scoped data, so it owns its own undo document (spec §4.2). One zone's
+// art stack is shared by every act tab of that zone, which is the point: a
+// palette edit made from act 1 is undoable from act 2.
+export function zoneArtDocId(zone: string): string {
+  return `zoneart:${zone}`;
+}
+
+export function parseZoneArtDocId(id: string): { zone: string } | null {
+  if (!id.startsWith('zoneart:')) return null;
+  const zone = id.slice('zoneart:'.length);
+  return zone.length > 0 ? { zone } : null;
+}
