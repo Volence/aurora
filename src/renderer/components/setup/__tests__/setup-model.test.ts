@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildSetupRows, applyPathEdits } from '../setup-model';
+import { buildSetupRows, applyPathEdits, pendingEditCount } from '../setup-model';
 import { buildReport } from '../../../../core/project/report';
 import type { ProjectConfig } from '../../../../core/project/mapping';
 
@@ -59,5 +59,27 @@ describe('applyPathEdits', () => {
     expect(next.assets).toEqual({ x: { path: 'p' } });
     expect((next as Record<string, unknown>).future).toBe(1);
     expect(next.paths).toEqual({ k: 'v' });
+  });
+});
+
+describe('pendingEditCount', () => {
+  it('counts removing an unknown override (a key no report row carries)', () => {
+    const config: ProjectConfig = { paths: { 'ghz.act1.blcoks': 'oops.bin' } };
+    expect(pendingEditCount(config, { 'ghz.act1.blcoks': '' })).toBe(1);
+  });
+
+  it('does not count an edit reverted back to the original override', () => {
+    const config: ProjectConfig = { paths: { a: 'orig.bin' } };
+    expect(pendingEditCount(config, { a: 'orig.bin' })).toBe(0);
+  });
+
+  it('does not count clearing a stock (no-override) field to empty', () => {
+    const config: ProjectConfig = {};
+    expect(pendingEditCount(config, { a: '' })).toBe(0);
+  });
+
+  it('counts a genuine new edit', () => {
+    const config: ProjectConfig = { paths: { a: 'orig.bin' } };
+    expect(pendingEditCount(config, { a: 'new.bin', b: 'new2.bin' })).toBe(2);
   });
 });

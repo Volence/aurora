@@ -54,6 +54,13 @@ export function buildSetupRows(
   return { groups, unknownOverrides };
 }
 
+/** Keys whose edited value differs from the sidecar's current override ('' = cleared).
+ *  Compares against config.paths directly (NOT report rows) so removing an
+ *  unknown override — a key no report row carries — still counts as pending. */
+export function pendingEditCount(config: ProjectConfig, edits: Record<string, string>): number {
+  return Object.keys(edits).filter((k) => edits[k] !== (config.paths?.[k] ?? '')).length;
+}
+
 /**
  * Apply row edits onto the config: string sets an override, null / empty
  * string clears it. Returns a new config; every other field passes through.

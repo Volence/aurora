@@ -7,14 +7,14 @@
 // overrides matching no profile entry render above the rows. Aeon shows an
 // info card until it becomes a full profile (Stage 3).
 
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { T, CollapsibleSection } from '../ui';
 import { useClassicProjectStore } from '../../state/classicProjectStore';
 import { useClassicLevelStore } from '../../state/classicLevelStore';
 import { useProjectStore } from '../../state/projectStore';
 import { useConfirmStore } from '../../state/confirmStore';
 import { useToastStore } from '../../state/toastStore';
-import { buildSetupRows, applyPathEdits, type SetupRow } from './setup-model';
+import { buildSetupRows, applyPathEdits, pendingEditCount, type SetupRow } from './setup-model';
 import { serializeProjectConfig } from '../../../core/project/mapping';
 import type { EntryStatus } from '../../../core/project/report';
 
@@ -42,16 +42,26 @@ function useLiveCheck(dir: string | null) {
         .catch(() => setChecks((c) => ({ ...c, [key]: false })));
     }, 300));
   };
-  return { checks, check };
+  // Clears every pending timer + the checks map (project switch, successful Apply).
+  const reset = () => {
+    timers.current.forEach((t) => clearTimeout(t));
+    timers.current.clear();
+    setChecks({});
+  };
+  // Unmount cleanup: this component is normally kept alive (see the tab-level
+  // effect below), so this mainly guards tests/hot-reload, but a leaked timer
+  // firing setState after unmount is a real bug either way.
+  useEffect(() => () => { timers.current.forEach((t) => clearTimeout(t)); }, []);
+  return { checks, check, reset };
 }
 
 function Row({ row, edit, live, onEdit }: {
   row: SetupRow;
-  edit: string | null | undefined;          // undefined = untouched this session
+  edit: string | undefined;                  // undefined = untouched this session
   live: boolean | 'pending' | undefined;
   onEdit: (key: string, value: string) => void;
 }) {
-  const value = edit !== undefined ? (edit ?? '') : (row.override ?? '');
+  const value = edit !== undefined ? edit : (row.override ?? '');
   const lightColor =
     live === 'pending' ? T.textFaint
     : live === true ? T.success
@@ -86,7 +96,21 @@ export default function ProjectSetupTab() {
   // key → edited value ('' = clear the override). Cleared on Apply/re-open.
   const [edits, setEdits] = useState<Record<string, string>>({});
   const [applying, setApplying] = useState(false);
-  const { checks, check } = useLiveCheck(dir);
+  const { checks, check, reset: resetChecks } = useLiveCheck(dir);
+
+  // This tab is mounted keep-alive (display:none) in the shell — it never
+  // unmounts across a project switch — so pending edits/checks from project A
+  // would otherwise survive into project B and Apply would write A's overrides
+  // into B's .aurora/project.json (data corruption). Reset on project identity
+  // change. Keyed on `dir` (not handle identity, cf. ClassicProjectView's
+  // module-scoped handle marker): unlike that view, this tab is never
+  // unmounted/remounted while the SAME project stays open, so there is no
+  // remount-without-a-project-change case to guard against here.
+  useEffect(() => {
+    setEdits({});
+    resetChecks();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dir]);
 
   const model = useMemo(() => {
     if (!report || !sidecar) return null;
@@ -125,16 +149,11 @@ export default function ProjectSetupTab() {
     check(key, value);
   };
 
-  // Compare each edited key against the CURRENT effective override from the
-  // sidecar config directly, not a row lookup: keys from model.unknownOverrides
-  // (typo'd overrides matching no profile entry) appear in NO group's rows, so
-  // looking them up there would never register their removal (onEdit(key, ''))
-  // as a pending change and Apply would stay disabled. A row's `override` and
-  // sidecar.config.paths[key] are the same value for known keys, so comparing
-  // against the sidecar directly is strictly more general and covers both.
-  const pendingCount = Object.keys(edits).filter(
-    (k) => edits[k] !== (sidecar.config.paths?.[k] ?? ''),
-  ).length;
+  // See pendingEditCount's doc comment: compares against the sidecar's
+  // config.paths directly (not a row lookup) so removing an unknown override
+  // — a key model.unknownOverrides carries but no report row does — still
+  // registers as pending and doesn't leave Apply stuck disabled.
+  const pendingCount = pendingEditCount(sidecar.config, edits);
 
   const apply = async () => {
     if (classicDirty) {
@@ -168,6 +187,7 @@ export default function ProjectSetupTab() {
       const bytes = serializeProjectConfig(next);
       await window.api.writeBinaryFile(dir, '.aurora/project.json', bytes.buffer as ArrayBuffer);
       setEdits({});
+      resetChecks(); // row lights fall back to the fresh report status, not stale live-check colors
       const outcome = await useClassicProjectStore.getState().openDirectory(dir);
       useToastStore.getState().addToast(
         outcome === 'opened' ? 'Setup applied — project re-validated' : 'Setup written, but re-open failed',
