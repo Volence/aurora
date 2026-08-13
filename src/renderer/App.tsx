@@ -14,6 +14,7 @@ import { T } from './components/ui';
 import { useProject } from './hooks/useProject';
 import { useProjectStore } from './state/projectStore';
 import { useClassicProjectStore } from './state/classicProjectStore';
+import { useOpenEngine } from './state/open-project';
 import { useClassicLevelStore } from './state/classicLevelStore';
 import { useSessionStore } from './state/sessionStore';
 import { useShellStore } from './state/shellStore';
@@ -105,7 +106,11 @@ export default function App() {
   }, [classicOpen, classicLabel, config, activeTab]);
 
   // -- ⌘K ------------------------------------------------------------------
-  const engine = classicOpen ? ('s1' as const) : config ? ('aeon' as const) : null;
+  // ONE shared derivation (state/open-project.ts) — App used to key aeon off
+  // `config` while save routing and tab activation keyed off `project`, and the
+  // two disagree mid-load. The `config` reads below are a different question
+  // ("what data is loaded", for enumerating zones) and stay as they are.
+  const engine = useOpenEngine();
   const [recents, setRecents] = useState<RecentProject[]>([]);
   useEffect(() => {
     if (engine === null) window.api.getRecentProjects().then(setRecents).catch(() => setRecents([]));

@@ -121,6 +121,14 @@ export const aeonAdapter: ProjectAdapter = {
         objects: 'json',
         build: false,
         facets: ['layout', 'art', 'objects', 'rings', 'collision', 'palette'],
+        // No 16px middle tier: the aeon ENGINE's 128px "block" is positional and
+        // build-time, not an editor tier (spec §2.1). The editor's chunk is a
+        // variable W×H stamp from the chunk library — pooled by id, but FLATTENED
+        // into the section nametable on stamp, hence shared: false (spec §3.0.2).
+        artTiers: [
+          { id: 'chunk', label: 'Chunk', pixelSize: null, shared: false },
+          { id: 'tile', label: 'Tile', pixelSize: 8, shared: true },
+        ],
       },
       report: buildReport([]),
       levels: null,

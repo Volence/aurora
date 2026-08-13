@@ -348,6 +348,14 @@ export const s1Adapter: ProjectAdapter = {
         objects: 'objpos',
         build: false,
         facets: ['layout', 'art', 'objects', 'collision', 'palette'],
+        // Classic's three rungs are all id-addressed: a layout cell HOLDS a
+        // chunk id and a chunk cell HOLDS a block id, so an edit at any tier
+        // propagates to every placement (spec §3.0.2).
+        artTiers: [
+          { id: 'chunk', label: 'Chunk', pixelSize: 256, shared: true },
+          { id: 'block', label: 'Block', pixelSize: 16, shared: true },
+          { id: 'tile', label: 'Tile', pixelSize: 8, shared: true },
+        ],
       },
       report,
       levels,

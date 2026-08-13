@@ -33,8 +33,7 @@
 
 import { SaveCoordinator, type SaveAllResult } from '../../core/editing/save-coordinator';
 import { documentHistoryHub } from './history-hub';
-import { useClassicProjectStore } from './classicProjectStore';
-import { useProjectStore } from './projectStore';
+import { openEngine } from './open-project';
 import { useSessionStore } from './sessionStore';
 import { useSpriteStore, saveableDirtySpriteDocIds } from './spriteStore';
 import { useToastStore } from './toastStore';
@@ -99,31 +98,27 @@ export function ensureSaversRegistered(): void {
   });
   saveCoordinator.register({
     id: 'classic-level',
-    isDirty: () => useClassicProjectStore.getState().status === 'open',
+    isDirty: () => openEngine() === 's1',
     save: async () => { await classicImpl(); },
     // Save is COARSER than undo: a classic level tab's layout doc and its zone-art
     // doc are separate undo documents but one classic project save, so the tab id
     // is all the routing needed (saveClassicProject writes the loaded act).
     scope: {
-      owns: (tabId) =>
-        parseLevelTabId(tabId) !== null && useClassicProjectStore.getState().status === 'open',
+      owns: (tabId) => parseLevelTabId(tabId) !== null && openEngine() === 's1',
       isDirty: (tabId) => tabHasDirtyDot(tabId, 'level', currentDirtySnapshot()),
       save: async () => { await classicImpl(); },
     },
   });
   saveCoordinator.register({
     id: 'aeon-project',
-    isDirty: () =>
-      useClassicProjectStore.getState().status !== 'open' &&
-      useProjectStore.getState().project !== null,
+    // openEngine() encodes the precedence this saver has always used: classic
+    // wins the tie, so a classic open means the resident aeon project is STALE
+    // and must not be written (it reports 's1', never 'aeon').
+    isDirty: () => openEngine() === 'aeon',
     save: async () => { await aeonImpl(); },
-    // Same ownership test as isDirty (a classic open means the resident aeon
-    // project is STALE and must not be written), narrowed to level tabs.
+    // Same ownership test as isDirty, narrowed to level tabs.
     scope: {
-      owns: (tabId) =>
-        parseLevelTabId(tabId) !== null &&
-        useClassicProjectStore.getState().status !== 'open' &&
-        useProjectStore.getState().project !== null,
+      owns: (tabId) => parseLevelTabId(tabId) !== null && openEngine() === 'aeon',
       isDirty: (tabId) => tabHasDirtyDot(tabId, 'level', currentDirtySnapshot()),
       save: async () => { await aeonImpl(); },
     },
