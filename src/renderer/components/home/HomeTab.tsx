@@ -28,11 +28,17 @@ export default function HomeTab({ onOpenProject, onOpenRecent }: HomeTabProps) {
   const sidecar = useClassicProjectStore((s) => s.sidecar);
   const config = useProjectStore((s) => s.config);
 
-  const [recents, setRecents] = useState<RecentProject[]>([]);
   const noProject = !classicOpen && !config;
+  // Current project's identity, for excluding it from the with-project recents
+  // list below (classic → workspace dir; aeon → config.basePath).
+  const currentPath = classicOpen ? dir : (config?.basePath ?? null);
+
+  const [recents, setRecents] = useState<RecentProject[]>([]);
   useEffect(() => {
-    if (noProject) window.api.getRecentProjects().then(setRecents).catch(() => setRecents([]));
-  }, [noProject]);
+    // Fetched in both states now (not just no-project): the with-project view
+    // below offers switching to a different recent project too.
+    window.api.getRecentProjects().then(setRecents).catch(() => setRecents([]));
+  }, [noProject, currentPath]);
 
   if (noProject) {
     return (
@@ -81,6 +87,8 @@ export default function HomeTab({ onOpenProject, onOpenRecent }: HomeTabProps) {
   const health = report
     ? { resolved: report.resolved, total: report.total, issues: sidecar?.issues.length ?? 0 }
     : null;
+  // Recents minus the project already open — switching "to" it would be a no-op.
+  const otherRecents = recents.filter((r) => r.path !== currentPath);
 
   return (
     <div style={styles.scroll}>
@@ -123,6 +131,24 @@ export default function HomeTab({ onOpenProject, onOpenRecent }: HomeTabProps) {
             )}
           </button>
         </div>
+
+        <div style={styles.sectionTitle}>Switch project</div>
+        <div style={styles.cards}>
+          <button onClick={onOpenProject} style={styles.card}>
+            <Icons.IconLayers size={16} />
+            <span style={styles.cardLabel}>Open project…</span>
+          </button>
+        </div>
+        {otherRecents.length > 0 && (
+          <div style={styles.recentList}>
+            {otherRecents.map((r) => (
+              <button key={r.path} onClick={() => onOpenRecent(r.path)} style={styles.recentRow} title={r.path}>
+                <span style={styles.recentName}>{r.name}</span>
+                <span style={styles.recentPath}>{r.path}</span>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

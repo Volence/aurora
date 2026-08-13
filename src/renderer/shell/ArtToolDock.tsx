@@ -15,6 +15,7 @@ const TOOLS: [ArtTool, string, React.FC<{ size?: number }>][] = [
   ['dither', 'Dither brush', Icons.IconDither],
   ['tile-stamp', 'Tile stamp', Icons.IconStamp],
   ['collision', 'Collision paint', Icons.IconCollision],
+  ['palette-apply', 'Palette line (apply selected line to cells)', Icons.IconPalette],
 ];
 
 export default function ArtToolDock() {

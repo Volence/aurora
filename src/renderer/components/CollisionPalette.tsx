@@ -55,13 +55,12 @@ function ShapeCanvas({ profile, size }: { profile: CollisionProfile; size: numbe
   return <canvas ref={ref} width={size} height={size} style={{ display: 'block' }} />;
 }
 
-export default function CollisionPalette() {
-  // Shared by Map mode's paint-collision tool and Art mode's chunk collision
+export default function CollisionPalette({ variant = 'map' }: { variant?: 'map' | 'art' }) {
+  // Shared by the map facet's collision tool and Art mode's chunk collision
   // tool (ComposerCanvas). The Sec N / Reset / Clear row below acts on the
   // active MAP SECTION's collisionEdit(B) plane — meaningless (and dangerous:
   // it would touch the wrong data) when painting a chunk doc in Art mode, so
-  // it's gated on appMode rather than forking the component.
-  const appMode = useEditorStore((s) => s.appMode);
+  // it's gated on the variant prop rather than forking the component.
   const profiles = useProjectStore((s) => s.collisionProfiles);
   const selected = useEditorStore((s) => s.selectedCollisionProfile);
   const entryFlipX = useEditorStore((s) => s.selectedCollisionEntryFlipX);
@@ -202,7 +201,7 @@ export default function CollisionPalette() {
             style={{ ...styles.planeBtn, ...(solidity === value ? styles.planeSel : {}) }}>{label}</button>
         ))}
       </div>
-      {appMode === 'map' && (
+      {variant === 'map' && (
         <div style={styles.planes}>
           <span style={styles.planeLabel}>Sec {activeSection}</span>
           <button onClick={resetToEngine} title={`Reset section ${activeSection} collision (this plane) to the engine baseline — undoable`}
@@ -211,7 +210,7 @@ export default function CollisionPalette() {
             style={styles.subtleBtn}>Clear</button>
         </div>
       )}
-      <div style={styles.hint}>{appMode === 'map'
+      <div style={styles.hint}>{variant === 'map'
         ? (brush > 1
           ? `Pick a shape, then paint on the map. Paints the ${brush}×${brush} block area under the cursor.`
           : 'Pick a shape, then paint on the map. Paints just this block; hold Alt to paint every block with the same tiles.')

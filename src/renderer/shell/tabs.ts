@@ -28,3 +28,16 @@ export function parseLevelTabId(id: string): { zone: string; act: string } | nul
   if (sep <= 0 || sep === rest.length - 1) return null;
   return { zone: rest.slice(0, sep), act: rest.slice(sep + 1) };
 }
+
+// Sprite-doc tab ids — 'doc:sprite:<engine>:<ref>' — host the sprite editor.
+// <engine> is 's1' (classic object-art checkout, <ref> = numeric object id) or
+// 'aeon' (a saved library sprite, <ref> = its name). The App-level SpriteMode
+// pane mounts only while one of these is the active tab (Task 14).
+export function spriteDocTab(engine: 's1' | 'aeon', ref: string, title: string): TabDescriptor {
+  return { id: `doc:sprite:${engine}:${ref}`, kind: 'sprite-doc', title };
+}
+
+export function parseSpriteDocTabId(id: string): { engine: 's1' | 'aeon'; ref: string } | null {
+  const m = /^doc:sprite:(s1|aeon):(.+)$/.exec(id);
+  return m ? { engine: m[1] as 's1' | 'aeon', ref: m[2] } : null;
+}

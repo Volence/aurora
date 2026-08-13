@@ -1,23 +1,33 @@
-// Task B2 — edit-art handoff wiring. Verifies the classic object UI → Sprite mode
-// handoff resolves the correct art linkage and opens it through the SAME
-// discovered-set path a manual pick uses, with the right absolute base dir +
+// Task B2 / Task 14 — edit-art handoff wiring. Verifies the classic object UI →
+// sprite-doc handoff resolves the correct art linkage and opens it through the
+// SAME discovered-set path a manual pick uses, with the right absolute base dir +
 // disasm-relative paths, frame preselection, and standalone-palette seeding.
 // The opener is stubbed via the module's injectable seam (mirrors the classic
 // stores' __set…ForTest convention), so no window.api / canvas is needed.
+//
+// editObjectArtCheckout retargets the singleton sprite editor and derives its
+// zone from the open classic level's `ref` (no longer a caller argument); the
+// thin editObjectArt wrapper additionally surfaces the sprite-doc tab.
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   editObjectArt,
+  editObjectArtCheckout,
   __setSpriteSetOpenerForTest,
   __resetSpriteSetOpenerForTest,
 } from '../export-sprite';
 import type { DiscoveredSpriteSet } from '../../../../core/import/sprite-discovery';
 import type { CompressionKind } from '../../../../core/compress';
-import { useEditorStore } from '../../../state/editorStore';
 import { useClassicProjectStore } from '../../../state/classicProjectStore';
 import { useClassicLevelStore } from '../../../state/classicLevelStore';
 import { useSpriteStore } from '../../../state/spriteStore';
+import { useSessionStore } from '../../../state/sessionStore';
+import { useConfirmStore } from '../../../state/confirmStore';
+import { markSpriteDocLoaded, getLoadedSpriteDocId } from '../../../shell/tab-activation';
+import { HOME_TAB } from '../../../../core/shell/session';
 import { createBuffer } from '../../../../core/art/pixel-ops';
+
+const realAsk = useConfirmStore.getState().ask;
 
 const DIR = '/home/user/s1disasm';
 
@@ -35,27 +45,35 @@ function stubOpener(calls: OpenCall[], frameCount = 4) {
   };
 }
 
+/** Point the classic level store at an open act in `zone` (the checkout derives
+ *  its zone from this ref). */
+function setZone(zone: string): void {
+  useClassicLevelStore.setState({ ref: { zone, act: 1, label: `${zone} 1`, available: true }, doc: null });
+}
+
 beforeEach(() => {
-  useEditorStore.getState().setAppMode('map');
   useClassicProjectStore.setState({ dir: DIR, status: 'open' });
-  useClassicLevelStore.setState({ doc: null });
+  setZone('ghz');
   useSpriteStore.getState().newSprite(32, 32);
+  useSessionStore.getState().replace({ tabs: [HOME_TAB], activeId: HOME_TAB.id });
+  markSpriteDocLoaded(null);
 });
 
 afterEach(() => {
   __resetSpriteSetOpenerForTest();
+  useConfirmStore.setState({ ask: realAsk }); // undo any stubbed confirm
   vi.restoreAllMocks();
 });
 
-describe('editObjectArt handoff', () => {
+describe('editObjectArtCheckout', () => {
   it('opens a base-linked id through the discovered-set path with correct paths', async () => {
     const calls: OpenCall[] = [];
     __setSpriteSetOpenerForTest(stubOpener(calls));
 
-    const ok = await editObjectArt(0x0d, 'ghz'); // Signpost (base linkage)
+    const ok = await editObjectArtCheckout(0x0d); // Signpost (base linkage)
 
     expect(ok).toBe(true);
-    expect(useEditorStore.getState().appMode).toBe('sprite'); // switched only after a successful open
+    expect(getLoadedSpriteDocId()).toBeNull(); // checkout is load-only — the winning caller owns the marker
     expect(calls).toHaveLength(1);
     expect(calls[0].baseDir).toBe(DIR);
     expect(calls[0].comp).toBe('nemesis');
@@ -72,11 +90,13 @@ describe('editObjectArt handoff', () => {
     __setSpriteSetOpenerForTest(stubOpener(calls));
 
     // $1C is GHZ "Bridge stump" but SLZ "Fireball Thrower" — the zone wins.
-    await editObjectArt(0x1c, 'slz');
+    setZone('slz');
+    await editObjectArtCheckout(0x1c);
     expect(calls[0].set).toMatchObject({ mappings: '_maps/Scenery.asm', art: 'artnem/SLZ Cannon.nem' });
 
     calls.length = 0;
-    await editObjectArt(0x1c, 'ghz');
+    setZone('ghz');
+    await editObjectArtCheckout(0x1c);
     expect(calls[0].set).toMatchObject({ mappings: '_maps/Bridge.asm', art: 'artnem/GHZ Bridge.nem' });
   });
 
@@ -84,7 +104,7 @@ describe('editObjectArt handoff', () => {
     const calls: OpenCall[] = [];
     __setSpriteSetOpenerForTest(stubOpener(calls));
 
-    await editObjectArt(0x4b, 'ghz'); // Giant Ring (uncompressed)
+    await editObjectArtCheckout(0x4b); // Giant Ring (uncompressed)
     expect(calls[0].comp).toBe('uncompressed');
   });
 
@@ -92,7 +112,7 @@ describe('editObjectArt handoff', () => {
     const calls: OpenCall[] = [];
     __setSpriteSetOpenerForTest(stubOpener(calls, 4));
 
-    await editObjectArt(0x7d, 'ghz'); // Point bonus, declared frame 3
+    await editObjectArtCheckout(0x7d); // Point bonus, declared frame 3
     expect(useSpriteStore.getState().currentIndex).toBe(3);
   });
 
@@ -101,9 +121,9 @@ describe('editObjectArt handoff', () => {
     // Signpost declares pal line 0. Give line 0 a distinctive first non-zero color.
     const line0 = new Uint16Array(16);
     line0[1] = 0x0eee; // near-white
-    useClassicLevelStore.setState({ doc: { palettes: [line0] } as never });
+    useClassicLevelStore.setState({ ref: { zone: 'ghz', act: 1, label: 'ghz 1', available: true }, doc: { palettes: [line0] } as never });
 
-    await editObjectArt(0x0d, 'ghz');
+    await editObjectArtCheckout(0x0d);
 
     const s = useSpriteStore.getState();
     expect(s.paletteMode).toBe('standalone');
@@ -113,26 +133,26 @@ describe('editObjectArt handoff', () => {
     expect(s.standalonePalette[1].r).toBeGreaterThan(0);
   });
 
-  it('does NOT switch to sprite mode when the open fails', async () => {
+  it('returns false when the open fails (checkout never marks in either case)', async () => {
     // Opener reports failure (a toast fired in the real path) — the user must be
-    // left in the level view, not stranded on a blank/stale sprite.
+    // left where they were, not stranded on a blank/stale sprite.
     __setSpriteSetOpenerForTest(async () => false);
 
-    const ok = await editObjectArt(0x0d, 'ghz');
+    const ok = await editObjectArtCheckout(0x0d);
 
     expect(ok).toBe(false);
-    expect(useEditorStore.getState().appMode).toBe('map');
+    expect(getLoadedSpriteDocId()).toBeNull();
   });
 
-  it('is a no-op for an unlinked id (no open, no mode switch)', async () => {
+  it('is a no-op for an unlinked id (no open, no loaded doc)', async () => {
     const calls: OpenCall[] = [];
     __setSpriteSetOpenerForTest(stubOpener(calls));
 
-    const ok = await editObjectArt(0x02, 'ghz'); // not linked in any zone
+    const ok = await editObjectArtCheckout(0x02); // not linked in any zone
 
     expect(ok).toBe(false);
     expect(calls).toHaveLength(0);
-    expect(useEditorStore.getState().appMode).toBe('map');
+    expect(getLoadedSpriteDocId()).toBeNull();
   });
 
   it('is a no-op when no classic project dir is open', async () => {
@@ -140,9 +160,100 @@ describe('editObjectArt handoff', () => {
     const calls: OpenCall[] = [];
     __setSpriteSetOpenerForTest(stubOpener(calls));
 
-    const ok = await editObjectArt(0x0d, 'ghz'); // linked, but no dir
+    const ok = await editObjectArtCheckout(0x0d); // linked, but no dir
     expect(ok).toBe(false);
     expect(calls).toHaveLength(0);
-    expect(useEditorStore.getState().appMode).toBe('map');
+    expect(getLoadedSpriteDocId()).toBeNull();
+  });
+
+  it('is a no-op when no classic level is open (no zone)', async () => {
+    useClassicLevelStore.setState({ ref: null, doc: null });
+    const calls: OpenCall[] = [];
+    __setSpriteSetOpenerForTest(stubOpener(calls));
+
+    const ok = await editObjectArtCheckout(0x0d);
+    expect(ok).toBe(false);
+    expect(calls).toHaveLength(0);
+    expect(getLoadedSpriteDocId()).toBeNull();
+  });
+});
+
+describe('editObjectArt wrapper', () => {
+  it('opens and focuses a sprite-doc tab after a successful checkout', async () => {
+    __setSpriteSetOpenerForTest(stubOpener([]));
+
+    const ok = await editObjectArt(0x0d); // Signpost
+
+    expect(ok).toBe(true);
+    expect(getLoadedSpriteDocId()).toBe('doc:sprite:s1:13'); // the wrapper owns the marker
+    const session = useSessionStore.getState();
+    expect(session.activeId).toBe('doc:sprite:s1:13');
+    expect(session.tabs.find((t) => t.id === 'doc:sprite:s1:13')).toMatchObject({
+      kind: 'sprite-doc', title: 'Signpost',
+    });
+  });
+
+  it('opens no tab when the checkout fails', async () => {
+    __setSpriteSetOpenerForTest(async () => false);
+
+    const ok = await editObjectArt(0x0d);
+
+    expect(ok).toBe(false);
+    expect(useSessionStore.getState().tabs.some((t) => t.kind === 'sprite-doc')).toBe(false);
+  });
+});
+
+describe('editObjectArt dirty-discard guard', () => {
+  it('dirty + cancel → checkout NOT called, marker unchanged', async () => {
+    const calls: OpenCall[] = [];
+    __setSpriteSetOpenerForTest(stubOpener(calls));
+    await editObjectArt(0x0d); // load Signpost (13)
+    useSpriteStore.getState().clearCanvas(); // now dirty
+    expect(getLoadedSpriteDocId()).toBe('doc:sprite:s1:13');
+
+    calls.length = 0;
+    const askSpy = vi.fn(async () => 'cancel');
+    useConfirmStore.setState({ ask: askSpy });
+
+    const ok = await editObjectArt(0x1c); // try a DIFFERENT object (Bridge, id 28)
+
+    expect(ok).toBe(false);
+    expect(askSpy).toHaveBeenCalledTimes(1);
+    expect(calls).toHaveLength(0); // checkout never ran
+    expect(getLoadedSpriteDocId()).toBe('doc:sprite:s1:13'); // marker unchanged
+  });
+
+  it('dirty + discard → proceeds with the new checkout', async () => {
+    const calls: OpenCall[] = [];
+    __setSpriteSetOpenerForTest(stubOpener(calls));
+    await editObjectArt(0x0d);
+    useSpriteStore.getState().clearCanvas(); // dirty
+
+    calls.length = 0;
+    useConfirmStore.setState({ ask: async () => 'discard' });
+
+    const ok = await editObjectArt(0x1c);
+
+    expect(ok).toBe(true);
+    expect(calls).toHaveLength(1); // checkout ran
+    expect(getLoadedSpriteDocId()).toBe('doc:sprite:s1:28');
+  });
+
+  it('re-clicking the loaded object while dirty does NOT confirm or reload', async () => {
+    const calls: OpenCall[] = [];
+    __setSpriteSetOpenerForTest(stubOpener(calls));
+    await editObjectArt(0x0d);
+    useSpriteStore.getState().clearCanvas(); // dirty
+
+    calls.length = 0;
+    const askSpy = vi.fn(async () => 'cancel');
+    useConfirmStore.setState({ ask: askSpy });
+
+    const ok = await editObjectArt(0x0d); // SAME object
+
+    expect(ok).toBe(true);
+    expect(askSpy).not.toHaveBeenCalled(); // same-doc check precedes the prompt
+    expect(calls).toHaveLength(0); // no reload
+    expect(getLoadedSpriteDocId()).toBe('doc:sprite:s1:13');
   });
 });

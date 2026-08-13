@@ -8,6 +8,73 @@ import {
 } from '../../adapter';
 import { aeonAdapter, explainAeonReject } from '../index';
 import { s1Adapter } from '../../s1/index';
+import { serializeNametable } from '../../../formats/s4-nametable';
+import { serializeTiles } from '../../../export/tile-dedup';
+import { SECTION_TILES_WIDE, SECTION_TILES_HIGH } from '../../../model/s4-types';
+import type { Tile } from '../../../model/s4-types';
+
+// ---------------------------------------------------------------------------
+// Full-load fixture helpers — copied VERBATIM from aeon-load.test.ts (tests
+// must not import each other), with memFa additionally setting `rootDir` so
+// open() records a real basePath.
+// ---------------------------------------------------------------------------
+
+function tile(fill: number): Tile {
+  return { pixels: new Uint8Array(64).fill(fill) };
+}
+
+/** In-memory FileAccess over a Map<rel, bytes>. read() throws on a miss, like the IPC bridge. */
+function memFa(files: Map<string, Uint8Array>): FileAccess {
+  return {
+    exists: async (rel) => files.has(rel),
+    read: async (rel) => {
+      const b = files.get(rel);
+      if (!b) throw new Error(`ENOENT: ${rel}`);
+      return b;
+    },
+    list: async () => [],
+    rootDir: '/proj',
+  };
+}
+
+const PROJECT_JSON = {
+  name: 'Test Project',
+  engine: 's4',
+  objectLibrary: 'data/objects.json',
+  chunkLibrary: '',
+  zones: [{
+    id: 'ojz', name: 'OJ Zone',
+    tileset: 'data/ojz_tiles.bin',
+    palette: 'data/ojz_pal.bin',
+    acts: [{
+      id: 'act1', gridWidth: 1, gridHeight: 1,
+      dataPath: 'data/ojz/act1/',
+      bgLayout: '', bgTiles: '', parallax: null,
+      startPosition: { secX: 0, secY: 0, localX: 64, localY: 64 },
+    }],
+  }],
+};
+
+function fixtureFiles(): Map<string, Uint8Array> {
+  const files = new Map<string, Uint8Array>();
+  files.set('project.json', new TextEncoder().encode(JSON.stringify(PROJECT_JSON)));
+  files.set('data/ojz_tiles.bin', serializeTiles([tile(0), tile(1)]));
+  // Palette: 48 words (3 CRAM lines) of Genesis 0x0EEE-style colors.
+  const pal = new Uint8Array(96);
+  for (let i = 0; i < 48; i++) { pal[i * 2] = 0x0E; pal[i * 2 + 1] = 0xEE; }
+  files.set('data/ojz_pal.bin', pal);
+  // One saved section: nametable referencing tile 1 on palette line 2.
+  const nt = new Uint16Array(SECTION_TILES_WIDE * SECTION_TILES_HIGH);
+  nt[0] = (2 << 13) | 1;
+  files.set('data/ojz/act1/section_0.tiles.bin', serializeNametable(nt));
+  files.set('data/ojz/act1/section_0.objects.json',
+    new TextEncoder().encode(JSON.stringify([{ id: 'o1', typeId: 'ring-monitor', x: 8, y: 8 }])));
+  files.set('data/objects.json',
+    new TextEncoder().encode(JSON.stringify([
+      { id: 'ring-monitor', name: 'Ring Monitor', codeLabel: 'Obj_Monitor', defaultSubtype: 0, properties: {} },
+    ])));
+  return files;
+}
 
 // ---------------------------------------------------------------------------
 // In-memory FileAccess fake (same pattern as adapter.test.ts / s1-adapter.test.ts).
@@ -137,22 +204,25 @@ describe('explainAeonReject', () => {
 });
 
 // ---------------------------------------------------------------------------
-// open — marker handle
+// open — full project load
 // ---------------------------------------------------------------------------
 
 describe('aeonAdapter.open', () => {
-  it('returns a minimal capability-marker handle (no levels, empty report)', async () => {
-    const handle = await aeonAdapter.open(memFs({ 'project.json': aeonJson() }));
+  it('open() loads the full project and returns it on handle.aeon', async () => {
+    const handle = await aeonAdapter.open(memFa(fixtureFiles()));
     expect(handle.type).toBe('aeon');
-    expect(handle.capabilities).toEqual({
-      levels: 'aeon',
-      sprites: true,
-      objects: 'json',
-      build: false,
-      facets: ['layout', 'art', 'objects', 'rings', 'collision', 'palette'],
-    });
     expect(handle.levels).toBeNull();
-    expect(handle.report).toEqual({ entries: [], resolved: 0, total: 0 });
+    expect(handle.capabilities.facets).toEqual(['layout', 'art', 'objects', 'rings', 'collision', 'palette']);
+    expect(handle.aeon).toBeDefined();
+    expect(handle.aeon!.project.zones).toHaveLength(1);
+    expect(handle.aeon!.config.name).toBe('Test Project');
+    expect(handle.aeon!.config.basePath).toBe('/proj'); // from fa.rootDir
+  });
+
+  it('open() surfaces loader errors (broken-but-s4 project.json still matches detect, then open throws)', async () => {
+    const files = fixtureFiles();
+    files.set('project.json', new TextEncoder().encode(JSON.stringify({ engine: 's4' }))); // missing name/zones
+    await expect(aeonAdapter.open(memFa(files))).rejects.toThrow('Project config missing "name"');
   });
 });
 
@@ -197,12 +267,13 @@ describe('aeon + s1 registry routing (disjoint fingerprints)', () => {
     expect((await detectProject(memFs({ 'project.json': aeonJson() })))?.type).toBe('aeon');
   });
 
-  it('openProject opens the aeon marker handle for an aeon tree', async () => {
+  it('openProject opens (loads) the aeon project for an aeon tree', async () => {
     registerAdapter(s1Adapter);
     registerAdapter(aeonAdapter);
-    const handle = await openProject(memFs({ 'project.json': aeonJson() }));
+    const handle = await openProject(memFa(fixtureFiles()));
     expect(handle?.type).toBe('aeon');
     expect(handle?.levels).toBeNull();
     expect(handle?.capabilities.levels).toBe('aeon');
+    expect(handle?.aeon).toBeDefined();
   });
 });

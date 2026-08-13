@@ -7,7 +7,7 @@ import {
 import { useToastStore } from '../../state/toastStore';
 import {
   cellAt, setPixels, docToBuffer, bufferToWrites, stampTile,
-  adoptPaletteLineForEmptyCells, docLineMap,
+  adoptPaletteLineForEmptyCells, docLineMap, applyPaletteLineToDocCell,
 } from '../../../core/art/composer-buffer';
 import type { ComposerDoc } from '../../../core/art/composer-buffer';
 import { paintDocCollision, applyClipboardCollisionToDoc } from '../../../core/art/composer-collision';
@@ -25,6 +25,7 @@ import PixelViewport from '../art-shared/PixelViewport';
 import type { HostPointer } from '../art-shared/PixelViewport';
 import { useAnchoredZoom } from '../art-shared/use-anchored-zoom';
 import { useHandPan } from '../art-shared/use-hand-pan';
+import { levelKeysEnabled } from '../../workspace/level-keys';
 import { PixelHud, type PixelHudHandle } from '../art-shared/PixelHud';
 import type { Tile, Color } from '../../../core/model/s4-types';
 import { T } from '../ui';
@@ -79,6 +80,12 @@ export default function ComposerCanvas() {
   const pixelPerfect = useArtStore((s) => s.pixelPerfect);
   const ditherPattern = useArtStore((s) => s.ditherPattern);
   const ditherSecondary = useArtStore((s) => s.ditherSecondary);
+  // Subscribed only to force a re-render when the palette-apply HUD needs to
+  // repaint (drawOverlay reads s.paletteLine fresh via getState(), not this) —
+  // e.g. the options-bar line picker sets paletteLine alone, with no other
+  // tracked field changing, so without this the corner HUD text goes stale
+  // until an unrelated re-render happens to occur.
+  const paletteLine = useArtStore((s) => s.paletteLine);
   // Subscribed only to force a re-render when the collision-tool HUD needs to
   // repaint (drawOverlay reads fresh values via getState(), not these).
   const selectedCollisionProfile = useEditorStore((s) => s.selectedCollisionProfile);
@@ -283,8 +290,9 @@ export default function ComposerCanvas() {
     useArtStore.getState().bumpDoc();
   }
 
-  /** Apply one tile-space tool action to a doc cell (stamp or collision). */
-  function applyTileCell(t: 'tile-stamp' | 'collision', cx: number, cy: number) {
+  /** Apply one tile-space tool action to a doc cell (stamp / collision /
+   *  palette-apply). */
+  function applyTileCell(t: 'tile-stamp' | 'collision' | 'palette-apply', cx: number, cy: number) {
     const o = useArtStore.getState().open;
     if (!o) return;
     const doc = o.doc;
@@ -298,6 +306,11 @@ export default function ComposerCanvas() {
         vf: flipRef.current.vf,
         pri: false,
       });
+    } else if (t === 'palette-apply') {
+      // Re-line an already-placed cell: same palette-line source as tile
+      // placement (artStore.paletteLine). Empty cells are a no-op; unchanged
+      // cells skip the dirty/repaint below.
+      if (!applyPaletteLineToDocCell(doc, cx, cy, useArtStore.getState().paletteLine)) return;
     } else {
       // Same packed-word pattern as MapViewport.paintCollisionCell — one palette
       // drives both surfaces via selectedCollisionWord.
@@ -315,7 +328,7 @@ export default function ComposerCanvas() {
   // ---------- shared drawing engine ----------
 
   const controllerRef = useRef<PixelEditController | null>(null);
-  const ctlTool: CtlArtTool = (tool === 'tile-stamp' || tool === 'collision') ? 'pencil' : tool;
+  const ctlTool: CtlArtTool = (tool === 'tile-stamp' || tool === 'collision' || tool === 'palette-apply') ? 'pencil' : tool;
   const config = {
     tool: ctlTool, color: selectedColor, mirror,
     ditherPattern, ditherSecondary, pixelPerfect,
@@ -364,10 +377,10 @@ export default function ComposerCanvas() {
 
   // Tile-space tools (stamp/collision) are tile-space by nature — route them to
   // the host hook whenever selected, regardless of the px/tile tab state.
-  const tileTools = tool === 'tile-stamp' || tool === 'collision';
+  const tileTools = tool === 'tile-stamp' || tool === 'collision' || tool === 'palette-apply';
   const hostPointer: HostPointer | null = useMemo(() => {
     if (!tileTools) return null;
-    const t = tool as 'tile-stamp' | 'collision';
+    const t = tool as 'tile-stamp' | 'collision' | 'palette-apply';
     return {
       down(p) {
         const o = useArtStore.getState().open;
@@ -434,7 +447,7 @@ export default function ComposerCanvas() {
     const doc = getDoc();
     if (!doc) return;
     const s = useArtStore.getState();
-    if (!(s.tool === 'tile-stamp' || s.tool === 'collision')) return;
+    if (!(s.tool === 'tile-stamp' || s.tool === 'collision' || s.tool === 'palette-apply')) return;
     const pxW = doc.widthTiles * 8, pxH = doc.heightTiles * 8;
 
     if (s.tool === 'collision' && z >= 6) {
@@ -468,6 +481,8 @@ export default function ComposerCanvas() {
     const est = useEditorStore.getState();
     const hud = s.tool === 'tile-stamp'
       ? `stamp #${s.brushTile}  flip[X]:${flipRef.current.hf ? 'H' : '–'} [Y]:${flipRef.current.vf ? 'V' : '–'}`
+      : s.tool === 'palette-apply'
+      ? `palette line ${s.paletteLine} → cells`
       : `collision[${est.collisionPaintPlane.toUpperCase()}]: ${
         est.selectedCollisionProfile === 0 ? 'air' : `#${est.selectedCollisionProfile} · ${est.selectedCollisionSolidity}`
       }`;
@@ -525,6 +540,9 @@ export default function ComposerCanvas() {
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      // Keep-alive under a sprite-doc tab: bail so the composer's clipboard keys
+      // (Ctrl+C/X/V) don't double-fire alongside SpriteMode's (finding 1).
+      if (!levelKeysEnabled()) return;
       if ((e.target as HTMLElement).tagName === 'INPUT') return;
 
       // X/Y: toggle pending flips for the tile-stamp brush (guard !e.repeat so

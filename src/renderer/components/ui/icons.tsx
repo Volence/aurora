@@ -21,7 +21,15 @@ export const IconDither    = svg(<path d="M3 3h2v2H3zM7 3h2v2H7zM11 3h2v2h-2zM5 
 export const IconView      = svg(<><circle cx="8" cy="8" r="2.5" /><path d="M1 8s3-5 7-5 7 5 7 5-3 5-7 5-7-5-7-5z" /></>);
 export const IconStamp     = svg(<path d="M5 9h6l1 4H4zM6 9V5a2 2 0 014 0v4" />);
 export const IconCollision = svg(<path d="M2 11l4-6 3 4 2-3 3 5z" />);
-export const IconObject    = svg(<><rect x="4" y="4" width="8" height="8" /><path d="M4 4l8 8" /></>);
+export const IconPalette   = svg(<><path d="M8 2a6 6 0 000 12 1.4 1.4 0 001-2.4 1.4 1.4 0 011-2.4h1.5A3 3 0 0014 6 6 6 0 008 2z" /><circle cx="5.5" cy="6" r="0.6" fill="currentColor" stroke="none" /><circle cx="8" cy="4.8" r="0.6" fill="currentColor" stroke="none" /><circle cx="10.5" cy="6" r="0.6" fill="currentColor" stroke="none" /></>);
+// Cursor arrow (classic pointer) — the "select" tool in the map docks, kept
+// distinct from IconSelect's dashed-rect "marquee".
+export const IconCursor    = svg(<path d="M3 2l8.5 5.5-4 1.2 2.3 4.3-1.7.9-2.3-4.3L3 12z" />);
+// A 3D box = a placeable object / the Explorer "objects" group. (Was a box with
+// a diagonal slash, which read as a prohibition sign.)
+export const IconObject    = svg(<><path d="M8 2l5 2.75v5.5L8 13 3 10.25v-5.5z" /><path d="M3 4.75L8 7.5l5-2.75M8 7.5V13" /></>);
+// Box with a "+" badge = place a new object at a spot (the place-object tool).
+export const IconPlaceObject = svg(<><rect x="2" y="2.5" width="8" height="8" rx="1" /><path d="M12 9v5M9.5 11.5h5" /></>);
 export const IconRing      = svg(<circle cx="8" cy="8" r="4.5" />);
 export const IconUndo      = svg(<path d="M6 4L3 7l3 3M3 7h7a3 3 0 010 6H7" />);
 export const IconRedo      = svg(<path d="M10 4l3 3-3 3M13 7H6a3 3 0 000 6h3" />);

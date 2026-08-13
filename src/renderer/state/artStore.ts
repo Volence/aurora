@@ -4,7 +4,7 @@ import type { DitherPattern, MirrorMode } from '../../core/art/pixel-ops';
 
 export type ArtTool =
   | 'pencil' | 'eraser' | 'fill' | 'eyedropper' | 'line' | 'rect' | 'select'
-  | 'dither' | 'tile-stamp' | 'collision';
+  | 'dither' | 'tile-stamp' | 'collision' | 'palette-apply';
 
 export type BrushSpace = 'pixel' | 'tile';
 
@@ -68,9 +68,10 @@ export const useArtStore = create<ArtState>((set) => ({
   paletteVersion: 0,
   pendingAction: null, brushTile: 0,
 
-  // Selecting a tool implies its brush space (tile-stamp/collision are tile-space,
-  // everything else paints pixels) so the px/tile tab always reflects reality.
-  setTool: (tool) => set({ tool, brushSpace: (tool === 'tile-stamp' || tool === 'collision') ? 'tile' : 'pixel' }),
+  // Selecting a tool implies its brush space (tile-stamp/collision/palette-apply
+  // are tile-space, everything else paints pixels) so the px/tile tab always
+  // reflects reality.
+  setTool: (tool) => set({ tool, brushSpace: (tool === 'tile-stamp' || tool === 'collision' || tool === 'palette-apply') ? 'tile' : 'pixel' }),
   setBrushSpace: (brushSpace) => set({ brushSpace }),
   setSelectedColor: (selectedColor) => set({ selectedColor }),
   setPaletteLine: (paletteLine) => set({ paletteLine }),

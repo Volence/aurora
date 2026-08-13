@@ -1,7 +1,7 @@
 // src/renderer/shell/__tests__/session-storage.test.ts
 import { describe, it, expect } from 'vitest';
-import { sessionKeyFor, loadStoredSession, saveStoredSession, defaultProjectSession, type StorageLike } from '../session-storage';
-import { initialSession, openTab, type SessionState } from '../../../core/shell/session';
+import { sessionKeyFor, loadStoredSession, saveStoredSession, defaultProjectSession, loadStoredWorkspace, type StorageLike } from '../session-storage';
+import { HOME_TAB, initialSession, openTab, type SessionState } from '../../../core/shell/session';
 
 function memStorage(): StorageLike & { map: Map<string, string> } {
   const map = new Map<string, string>();
@@ -57,5 +57,29 @@ describe('session storage', () => {
     expect(s.tabs.map((t) => t.id)).toEqual(['home', 'level:ghz:1']);
     expect(s.activeId).toBe('level:ghz:1');
     expect(defaultProjectSession(null)).toEqual(initialSession());
+  });
+
+  it('stores and restores the workspace record beside the session', () => {
+    const storage = memStorage();
+    saveStoredSession(storage, '/p', { tabs: [HOME_TAB], activeId: 'home' },
+      { 'level:ojz:act1': { facet: 'art', view: { x: 5, y: 6, zoom: 1 } } });
+    expect(loadStoredWorkspace(storage, '/p')).toEqual(
+      { 'level:ojz:act1': { facet: 'art', view: { x: 5, y: 6, zoom: 1 } } });
+    // And a legacy payload (saved without workspace) restores as empty:
+    saveStoredSession(storage, '/q', { tabs: [HOME_TAB], activeId: 'home' });
+    expect(loadStoredWorkspace(storage, '/q')).toEqual({});
+  });
+
+  it('re-saving with an empty workspace strips a previously stored one', () => {
+    // Pins the mechanic that forces the restore effect to read the stored
+    // workspace BEFORE it mutates the stores: replace()/seed() fire the persist
+    // subscription synchronously, and a persist whose workspace record is still
+    // empty overwrites the key with no `workspace` field, dropping what was there.
+    const storage = memStorage();
+    saveStoredSession(storage, '/p', { tabs: [HOME_TAB], activeId: 'home' },
+      { 'level:ojz:act1': { facet: 'art' } });
+    expect(loadStoredWorkspace(storage, '/p')).toEqual({ 'level:ojz:act1': { facet: 'art' } });
+    saveStoredSession(storage, '/p', { tabs: [HOME_TAB], activeId: 'home' }, {});
+    expect(loadStoredWorkspace(storage, '/p')).toEqual({});
   });
 });

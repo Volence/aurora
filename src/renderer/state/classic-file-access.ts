@@ -36,6 +36,11 @@ function assertSafe(rel: string): void {
  */
 export function createIpcFileAccess(dir: string): FileAccess {
   const fa: FileAccess = {
+    // The absolute root this bridge is rooted at. aeon open records it as
+    // config.basePath (via loadS4Config), which the renderer later uses as the
+    // root for real IPC file IO — a missing rootDir would silently resolve
+    // paths against the main-process cwd (see FileAccess.rootDir in adapter.ts).
+    rootDir: dir,
     async exists(rel: string): Promise<boolean> {
       assertSafe(rel);
       return window.api.pathExists(dir, rel);

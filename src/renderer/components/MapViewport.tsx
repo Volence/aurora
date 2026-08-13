@@ -1,8 +1,12 @@
 import React, { useRef, useEffect, useCallback, useState } from 'react';
 import { useViewStore } from '../state/viewStore';
 import { useProjectStore, getCurrentAct, getCurrentZone, getActiveLevel as getStoreActiveLevel } from '../state/projectStore';
-import { useEditorStore, executeCommand, undo, redo, setCommandInvalidationListener, RING_PATTERNS } from '../state/editorStore';
+import { useEditorStore, executeCommand, undo, redo, setCommandInvalidationListener, RING_PATTERNS, type EditorTool } from '../state/editorStore';
 import { useArtStore } from '../state/artStore';
+import { useSessionStore } from '../state/sessionStore';
+import { switchFacet, FACET_TOOLS } from '../workspace/facet-tools';
+import { useWorkspaceStore } from '../workspace/workspaceStore';
+import { levelKeysEnabled } from '../workspace/level-keys';
 import { useToastStore } from '../state/toastStore';
 import { openDocumentGuarded } from './art/open-document';
 import { docFromTile, docFromSectionRegion } from '../../core/art/composer-buffer';
@@ -476,6 +480,12 @@ export default function MapViewport() {
   // Keyboard shortcuts
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      // The level pane is keep-alive (display:none) under an active sprite-doc
+      // tab, so this window handler stays registered. Bail while sprite mode
+      // owns the keyboard so one Ctrl+Z can't fire BOTH sprite undo and this
+      // hidden level undo (finding 1). See workspace/level-keys.ts.
+      if (!levelKeysEnabled()) return;
+
       // Typing into an input/textarea/contentEditable (e.g. the CommandPalette
       // search box) must not fire map shortcuts — 'm' switching to the marquee
       // tool mid-keystroke was the reported symptom.
@@ -557,7 +567,7 @@ export default function MapViewport() {
               name: `marquee (${marquee.col},${marquee.row})`,
               dirty: true, // copied off the map and not yet in the library
             })) {
-              useEditorStore.getState().setAppMode('art');
+              switchFacet(useSessionStore.getState().activeId, 'art');
             }
           }
           e.preventDefault();
@@ -594,6 +604,20 @@ export default function MapViewport() {
         }
       }
 
+      // Facet-scoped tool hotkeys: only switch to a tool the ACTIVE facet's
+      // dock offers (FACET_TOOLS), so e.g. 'o' in the palette facet doesn't
+      // silently arm place-object with no dock highlight (finding 2). Matching
+      // the dock, hotkeys for OTHER facets' tools are simply ignored (they do
+      // NOT switch facets). `allowed` undefined (the 'art' facet runs its own
+      // tool system and never mounts MapViewport, plus any future non-facet
+      // context) => default-allow, so nothing non-facet breaks.
+      const setToolScoped = (t: EditorTool) => {
+        const facet = useWorkspaceStore.getState().facetFor(useSessionStore.getState().activeId);
+        const allowed = FACET_TOOLS[facet];
+        if (allowed && !allowed.includes(t)) return;
+        useEditorStore.getState().setTool(t);
+      };
+
       const step = 64;
       switch (e.key) {
         case 'ArrowLeft': pan(step, 0); e.preventDefault(); break;
@@ -605,15 +629,15 @@ export default function MapViewport() {
         case '0': setZoom(1); e.preventDefault(); break;
         // Ctrl+V is claimed by paste above (returns before reaching this
         // switch) — guard here too so a stray Ctrl+V can't switch tools.
-        case 'v': if (!e.ctrlKey) useEditorStore.getState().setTool('view'); break;
-        case 's': if (!e.ctrlKey) useEditorStore.getState().setTool('select'); break;
-        case 'o': useEditorStore.getState().setTool('place-object'); break;
-        case 'r': useEditorStore.getState().setTool('place-ring'); break;
-        case 't': useEditorStore.getState().setTool('paint-tile'); break;
-        case 'b': useEditorStore.getState().setTool('paint-block'); break;
-        case 'c': if (!e.ctrlKey) useEditorStore.getState().setTool('paint-collision'); break;
-        case 'k': useEditorStore.getState().setTool('stamp-chunk'); break;
-        case 'm': useEditorStore.getState().setTool('marquee'); break;
+        case 'v': if (!e.ctrlKey) setToolScoped('view'); break;
+        case 's': if (!e.ctrlKey) setToolScoped('select'); break;
+        case 'o': setToolScoped('place-object'); break;
+        case 'r': setToolScoped('place-ring'); break;
+        case 't': setToolScoped('paint-tile'); break;
+        case 'b': setToolScoped('paint-block'); break;
+        case 'c': if (!e.ctrlKey) setToolScoped('paint-collision'); break;
+        case 'k': setToolScoped('stamp-chunk'); break;
+        case 'm': setToolScoped('marquee'); break;
         case 'Escape': {
           // Pasting wins first: Escape exits paste mode without touching the
           // marquee (Ctrl+C leaves the marquee committed for repeat copies, and
@@ -1359,7 +1383,10 @@ export default function MapViewport() {
   useEffect(() => {
     if (!ctxMenu) return;
     const onDown = () => setCtxMenu(null);
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setCtxMenu(null); };
+    // Inert under a sprite-doc tab like the main handler above (finding 1) — the
+    // hidden map can't have an open context menu anyway, but keep every level
+    // window keydown gated by the one predicate.
+    const onKey = (e: KeyboardEvent) => { if (!levelKeysEnabled()) return; if (e.key === 'Escape') setCtxMenu(null); };
     window.addEventListener('mousedown', onDown);
     window.addEventListener('keydown', onKey);
     return () => {
@@ -1382,7 +1409,7 @@ export default function MapViewport() {
       name: `tile #${tileIndex}`,
       dirty: false,
     })) return;
-    useEditorStore.getState().setAppMode('art');
+    switchFacet(useSessionStore.getState().activeId, 'art');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -1409,7 +1436,7 @@ export default function MapViewport() {
       name: `block (${bx},${by})`,
       dirty: true, // copied off the map and not yet in the library
     })) return;
-    useEditorStore.getState().setAppMode('art');
+    switchFacet(useSessionStore.getState().activeId, 'art');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

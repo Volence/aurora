@@ -4,6 +4,7 @@ import { useClassicLevelStore } from '../../state/classicLevelStore';
 import { useClassicProjectStore } from '../../state/classicProjectStore';
 import type { EditableTileRange } from '../../../core/project/adapter';
 import { CANVAS_BLACK } from '../../canvas/canvas-colors';
+import { levelKeysEnabled } from '../../workspace/level-keys';
 
 // Shared building blocks for the composer dock's three tabs (Task B3/B4). The dock
 // was split into ChunkTab/BlockTab/TileTab sibling files (a mechanical move, no
@@ -69,6 +70,9 @@ export function isTypingTarget(t: HTMLElement): boolean {
 export function useEscapeCancel(strokeRef: React.MutableRefObject<Map<number, number> | null>, redraw: () => void): void {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      // Inert while a sprite-doc tab owns the keyboard (the classic composer is
+      // keep-alive/hidden then) — see workspace/level-keys.ts (finding 1).
+      if (!levelKeysEnabled()) return;
       if (e.key !== 'Escape') return;
       if (isTypingTarget(e.target as HTMLElement)) return;
       if (strokeRef.current) { strokeRef.current = null; redraw(); }

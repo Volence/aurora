@@ -116,7 +116,7 @@ export default function ObjectLibraryPanel() {
             {linked && (
               <button
                 type="button"
-                onClick={() => { void editObjectArt(id, zone); }}
+                onClick={() => { void editObjectArt(id); }}
                 title={`Edit ${s1ObjectName(id)}'s art in Sprite mode`}
                 aria-label={`Edit ${name} art`}
                 style={{ ...styles.editBtn, ...(armed ? styles.editBtnArmed : {}) }}

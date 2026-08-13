@@ -21,7 +21,8 @@ import type { SpriteFormatId } from '../../../core/formats/sprite-format-adapter
 import type { CompressionKind } from '../../../core/compress';
 import { parsePaletteLine, decodeGenesisColor } from '../../../core/formats/palette';
 import { parseCharacterAnims, parseAnyAnimScript } from '../../../core/import/anim-import';
-import { useEditorStore } from '../../state/editorStore';
+import { markSpriteDocLoaded, getLoadedSpriteDocId, requestOpenTab, spriteEditorDirty, confirmDiscardSpriteEdits } from '../../shell/tab-activation';
+import { spriteDocTab } from '../../shell/tabs';
 import { useClassicProjectStore } from '../../state/classicProjectStore';
 import { useClassicLevelStore } from '../../state/classicLevelStore';
 import { resolveObjectArt } from '../../../core/project/profiles/s1-object-art';
@@ -102,6 +103,9 @@ export async function exportSprite(name: string): Promise<void> {
     index.sprites = [...index.sprites.filter((s) => s.name !== name), entry].sort((a, b) => a.name.localeCompare(b.name));
     await window.api.writeBinaryFile(base, spriteIndexPath(), toArrayBuffer(enc.encode(JSON.stringify(index, null, 2))));
 
+    // Exporting IS persisting the working sprite — clear the unsaved-edits flag
+    // (reached only on the success path, after every write above resolved).
+    useSpriteStore.getState().setUnsavedEdits(false);
     toast(`Exported "${name}" as ${format.toUpperCase()}: ${out.manifest.frameCount} frames, ${out.manifest.tileCount} tiles → ${dir}/`, 'success');
   } catch (e) {
     toast(`Export failed: ${e instanceof Error ? e.message : String(e)}`, 'error');
@@ -234,6 +238,9 @@ export async function saveSpriteArt(): Promise<void> {
   // Refresh the guarded-write baseline so a follow-up save doesn't spuriously conflict.
   const nm = out.newMtimes[src.relPath];
   useSpriteStore.getState().setS1ArtSource({ ...src, expectedMtimeMs: nm ?? src.expectedMtimeMs });
+  // The edits are now on disk — clear the unsaved flag (success path only; every
+  // failure/conflict branch above returned before reaching here).
+  useSpriteStore.getState().setUnsavedEdits(false);
   toast(`Saved art to ${src.relPath} — S1 mappings are read-only in v1`, 'success');
 }
 
@@ -404,27 +411,33 @@ export function __setSpriteSetOpenerForTest(fn: SpriteSetOpener): void { openSet
 export function __resetSpriteSetOpenerForTest(): void { openSetImpl = openDiscoveredSet; }
 
 /**
- * Switch to Sprite mode and open the given classic object's art + mappings for
- * editing (Task B2). id + zone resolve to an `ObjectArtLink` (profiles/
- * s1-object-art.ts); the link's disasm-relative `artFile`/`mapAsm` are opened
- * against the open project's dir through `openDiscoveredSet`, so the S1 Nemesis
- * guarded save-back (captureS1ArtSource) is captured EXACTLY as a manual pick's.
- * Returns false (a no-op) for an unlinked id or when no classic project is open —
- * the calling buttons only render for linked ids, so that path is a guard.
+ * Check out a classic object's art + mappings into the singleton sprite editor
+ * (Task B2 / Task 14). The object id resolves to an `ObjectArtLink` (profiles/
+ * s1-object-art.ts) against the OPEN classic level's zone (derived from the
+ * classic level store's `ref` — no longer a caller argument); the link's
+ * disasm-relative `artFile`/`mapAsm` are opened through `openDiscoveredSet`, so
+ * the S1 Nemesis guarded save-back (captureS1ArtSource) is captured EXACTLY as a
+ * manual pick's. Returns false (a no-op) for an unlinked id, no open project, or
+ * no open level — the calling buttons only render for linked ids, so those are
+ * guards. A failed open leaves the user where they were with an error toast.
  *
- * The mode switch happens only AFTER a successful open — a failed open leaves the
- * user in the level view with an error toast rather than stranded on a blank/stale
- * sprite (the async open runs while the classic view is still up).
+ * This does NOT open a tab and does NOT touch the loaded-doc marker — it only
+ * retargets the editor (checkout = load only, no marker semantics). Marking the
+ * loaded doc belongs to the CALLER that wins: the `editObjectArt` wrapper (a
+ * direct user action) marks before opening the tab, and the sprite-doc
+ * activation path marks only after its activationGen check passes — so a
+ * superseded checkout never leaves a stale marker.
  *
- * PRESELECTION: the objdef's declared `frame` is selected (frame selection is
- * supported). The declared palette LINE (`pal`) can't bind to a zone CRAM line —
- * a classic session has no aeon zone — so instead the sprite's STANDALONE palette
- * is seeded from the classic doc's `palettes[pal]`, which is the correct-colors
- * outcome. It is set directly (not via setStandalonePalette) because loadSprite
- * just cleared history and this must not record an undo step — mirroring
- * loadEngineCharacter's direct zone-bind setState.
+ * PRESELECTION: the objdef's declared `frame` is selected. The declared palette
+ * LINE (`pal`) can't bind to a zone CRAM line — a classic session has no aeon
+ * zone — so instead the sprite's STANDALONE palette is seeded from the classic
+ * doc's `palettes[pal]`, the correct-colors outcome. It is set directly (not via
+ * setStandalonePalette) because loadSprite just cleared history and this must not
+ * record an undo step — mirroring loadEngineCharacter's direct zone-bind setState.
  */
-export async function editObjectArt(id: number, zone: string): Promise<boolean> {
+export async function editObjectArtCheckout(id: number): Promise<boolean> {
+  const zone = useClassicLevelStore.getState().ref?.zone;
+  if (!zone) { useToastStore.getState().addToast('Open a classic level before editing object art', 'error'); return false; }
   const dir = useClassicProjectStore.getState().dir;
   const link = resolveObjectArt(id, zone);
   if (!dir || !link) return false;
@@ -436,7 +449,6 @@ export async function editObjectArt(id: number, zone: string): Promise<boolean> 
   const opened = await openSetImpl(dir, set, comp);
   if (!opened) return false; // open failed (a toast already fired) — stay in the level view
 
-  useEditorStore.getState().setAppMode('sprite');
   useSpriteStore.getState().selectFrame(link.frame);
 
   const doc = useClassicLevelStore.getState().doc;
@@ -449,6 +461,35 @@ export async function editObjectArt(id: number, zone: string): Promise<boolean> 
     useSpriteStore.setState({ paletteMode: 'standalone', standalonePalette: colors });
   }
   return true;
+}
+
+export async function editObjectArt(id: number): Promise<boolean> {
+  const tabId = 'doc:sprite:s1:' + id;
+  const name = s1ObjectName(id); // named object, or its $XX hex fallback
+
+  // Re-clicking the object that's ALREADY loaded stays a no-op reload — just
+  // (re)surface its tab. Checked BEFORE the dirty prompt so re-clicking the same
+  // object never asks and never discards its own edits.
+  if (getLoadedSpriteDocId() === tabId) {
+    await requestOpenTab(spriteDocTab('s1', String(id), name));
+    return true;
+  }
+
+  // This is the highest-traffic edit-art entry (ObjectInspector /
+  // ObjectLibraryPanel "Edit art…"). editObjectArtCheckout retargets the
+  // singleton editor and discards the loaded sprite's edits + undo history, so
+  // guard it with the SAME confirm sprite-doc activation uses. Cancel → return
+  // false without touching anything.
+  if (spriteEditorDirty() && !(await confirmDiscardSpriteEdits())) return false;
+
+  const ok = await editObjectArtCheckout(id);
+  if (ok) {
+    // Direct user action, not racing an activation — own the mark here so the
+    // follow-up sprite-doc activation sees the doc already loaded and no-ops.
+    markSpriteDocLoaded(tabId);
+    await requestOpenTab(spriteDocTab('s1', String(id), name));
+  }
+  return ok;
 }
 
 /** Names of sprites the editor knows about (from data/sprites/index.json). */
@@ -542,6 +583,9 @@ export async function loadEngineCharacter(name: string): Promise<void> {
       if (charAnims[0]) useSpriteStore.getState().setSteps(charAnims[0].steps); // auto-load the first
       animCount = charAnims.length;
     } catch { /* anim script optional */ }
+    // A fresh load-from-disk is not unsaved work (mirrors loadSprite): the
+    // setSteps above dirties, so clear it back to clean here.
+    useSpriteStore.getState().setUnsavedEdits(false);
 
     toast(`Loaded ${name}: ${frames.length} frames${animCount ? `, ${animCount} animations` : ''} (${recon.width}×${recon.height})`, 'success');
   } catch (e) {

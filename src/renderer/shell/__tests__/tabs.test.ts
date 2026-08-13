@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { classicLevelTab, aeonLevelTab, parseLevelTabId, PROJECT_SETUP_TAB } from '../tabs';
+import { classicLevelTab, aeonLevelTab, parseLevelTabId, spriteDocTab, parseSpriteDocTabId, PROJECT_SETUP_TAB } from '../tabs';
 
 describe('level tab helpers', () => {
   it('classicLevelTab builds id from zone + act number and titles from the ref label', () => {
@@ -27,5 +27,14 @@ describe('level tab helpers', () => {
 
   it('exposes the Project Setup tool tab descriptor', () => {
     expect(PROJECT_SETUP_TAB).toEqual({ id: 'tool:project-setup', kind: 'tool', title: 'Project Setup' });
+  });
+
+  it('builds and parses sprite-doc tab ids for both engines', () => {
+    expect(spriteDocTab('s1', '42', 'Buzz Bomber')).toEqual(
+      { id: 'doc:sprite:s1:42', kind: 'sprite-doc', title: 'Buzz Bomber' });
+    expect(parseSpriteDocTabId('doc:sprite:aeon:motobug')).toEqual({ engine: 'aeon', ref: 'motobug' });
+    expect(parseSpriteDocTabId('doc:sprite:s1:42')).toEqual({ engine: 's1', ref: '42' });
+    expect(parseSpriteDocTabId('level:ojz:act1')).toBeNull();
+    expect(parseSpriteDocTabId('doc:sprite:s1:')).toBeNull();
   });
 });

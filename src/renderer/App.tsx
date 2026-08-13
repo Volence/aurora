@@ -5,6 +5,9 @@ import TabStrip from './shell/TabStrip';
 import Explorer from './shell/Explorer';
 import ConfirmDialog from './shell/ConfirmDialog';
 import LegacyWorkspace from './shell/LegacyWorkspace';
+import LevelWorkspace from './workspace/LevelWorkspace';
+import SpriteMode from './components/sprite/SpriteMode';
+import Toolbar from './components/Toolbar';
 import HomeTab from './components/home/HomeTab';
 import ProjectSetupTab from './components/setup/ProjectSetupTab';
 import { T } from './components/ui';
@@ -14,7 +17,8 @@ import { useClassicProjectStore } from './state/classicProjectStore';
 import { useClassicLevelStore } from './state/classicLevelStore';
 import { useSessionStore } from './state/sessionStore';
 import { useShellStore } from './state/shellStore';
-import { ensureSaversRegistered, registerAeonSaver, saveAllDirty } from './state/project-runtime';
+import { ensureSaversRegistered, saveAllDirty } from './state/project-runtime';
+import { registerAeonFacetModules } from './workspace/register-facets';
 import { useSessionLifecycle, useActTabSync } from './shell/session-lifecycle';
 import { requestOpenTab, requestFocusIndex } from './shell/tab-activation';
 import { buildCommands } from './shell/commands';
@@ -25,12 +29,17 @@ import { editObjectArt } from './components/sprite/export-sprite';
 import { registerAgentHandler } from './agent/agent-handler';
 import { refreshObjectPreviews } from './object-previews';
 import type { RecentProject } from '../shared/ipc-types';
+import type { ObjectDef } from '../core/model/s4-types';
+
+// Referentially-stable fallback — see the matching constant in shell/Explorer.tsx.
+const EMPTY_LIBRARY: ObjectDef[] = [];
 
 export default function App() {
-  const { openProject, openProjectByPath, saveProject } = useProject();
+  const { openProject, openProjectByPath } = useProject();
   const error = useProjectStore((s) => s.error);
   const classicError = useClassicProjectStore((s) => s.error);
   const project = useProjectStore((s) => s.project);
+  const objectLibrary = useProjectStore((s) => s.project?.objectLibrary ?? EMPTY_LIBRARY);
   const config = useProjectStore((s) => s.config);
   const currentZoneId = useProjectStore((s) => s.currentZoneId);
   const classicOpen = useClassicProjectStore((s) => s.status) === 'open';
@@ -45,8 +54,7 @@ export default function App() {
   const activeTab = tabs.find((t) => t.id === activeId);
 
   // -- runtime wiring ------------------------------------------------------
-  useEffect(() => { registerAgentHandler(); ensureSaversRegistered(); }, []);
-  useEffect(() => { registerAeonSaver(saveProject); return () => registerAeonSaver(null); }, [saveProject]);
+  useEffect(() => { registerAgentHandler(); ensureSaversRegistered(); registerAeonFacetModules(); }, []);
   useSessionLifecycle();
   useActTabSync();
 
@@ -92,18 +100,21 @@ export default function App() {
           .filter(({ id }) => resolveObjectArt(id, classicZone) !== undefined)
           .map(({ id, name }) => ({ id, name, hex: s1ObjectHex(id) }))
       : [];
+    const aeonSprites = objectLibrary
+      .filter((o): o is ObjectDef & { sprite: string } => !!o.sprite)
+      .map((o) => ({ name: o.name, sprite: o.sprite }));
     return buildCommands(
-      { tabs, activeId, engine, levelTabs, objects, recents },
+      { tabs, activeId, engine, levelTabs, objects, aeonSprites, recents },
       {
         openProjectDialog: () => void openProject(),
         saveAll: () => void saveAllDirty(),
         toggleExplorer,
         openTab: (tab) => void requestOpenTab(tab),
-        editObjectArt: (id) => { if (classicZone) void editObjectArt(id, classicZone); },
+        editObjectArt: (id) => { void editObjectArt(id); },
         openRecent: (path) => void openProjectByPath(path),
       },
     );
-  }, [tabs, activeId, engine, classicOpen, zoneTree, config, docReady, classicZone, recents,
+  }, [tabs, activeId, engine, classicOpen, zoneTree, config, docReady, classicZone, objectLibrary, recents,
       openProject, openProjectByPath, toggleExplorer]);
 
   return (
@@ -130,8 +141,10 @@ export default function App() {
           <div style={styles.content}>
             {/* Keep-alive: every non-level tab stays mounted; hidden via display:none
                 so its state survives (spec §3). Level tabs all share the ONE
-                LegacyWorkspace singleton below until Stages 3–4. */}
-            {tabs.filter((t) => t.kind !== 'level').map((tab) => (
+                LegacyWorkspace singleton below until Stages 3–4. Sprite-doc tabs
+                are EXCLUDED here — SpriteMode has exactly one mounting point (see
+                below), mounted only while a sprite-doc tab is active. */}
+            {tabs.filter((t) => t.kind !== 'level' && t.kind !== 'sprite-doc').map((tab) => (
               <div key={tab.id} style={{ ...styles.tabPane, display: tab.id === activeId ? 'flex' : 'none' }}>
                 {tab.kind === 'home' ? (
                   <HomeTab onOpenProject={openProject} onOpenRecent={openProjectByPath} />
@@ -141,12 +154,30 @@ export default function App() {
               </div>
             ))}
             <div style={{ ...styles.tabPane, display: activeTab?.kind === 'level' ? 'flex' : 'none' }}>
-              <LegacyWorkspace
-                onOpenProject={openProject}
-                onOpenRecent={openProjectByPath}
-                onSave={saveAllDirty}
-              />
+              {classicOpen ? (
+                <LegacyWorkspace onOpenProject={openProject} onOpenRecent={openProjectByPath} onSave={saveAllDirty} />
+              ) : config ? (
+                <LevelWorkspace />
+              ) : null}
             </div>
+            {/* SpriteMode's ONE mounting point — mounted ONLY while a sprite-doc
+                tab is active, NOT keep-alive: two live SpriteMode instances would
+                double-register its window keydown handler and double-fire undo.
+                Sprite state lives in the module-level spriteStore, so a remount is
+                lossless.
+
+                The level pane above stays MOUNTED (display:none) while this sprite
+                tab is active, so its editors' window keydown handlers (MapViewport,
+                the art facet, the classic view/composer) are still registered
+                alongside SpriteMode's. Those level-side handlers are gated by
+                levelKeysEnabled() (workspace/level-keys.ts) — inert whenever a
+                sprite-doc tab is active — so one Ctrl+Z can't fire both sprite and
+                the hidden level undo (finding 1). */}
+            {activeTab?.kind === 'sprite-doc' && (
+              <div style={{ ...styles.tabPane, display: 'flex' }}>
+                <SpriteMode appBar={<Toolbar onOpenProject={openProject} onOpenRecent={openProjectByPath} onSave={() => { void saveAllDirty(); }} />} />
+              </div>
+            )}
           </div>
         </div>
       </div>

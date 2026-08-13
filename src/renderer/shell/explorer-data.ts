@@ -1,8 +1,9 @@
 // Builders: project snapshots → ExplorerGroupModel[]. Pure functions over
 // plain inputs so the group shapes are unit-testable; the Explorer component
-// supplies store data and routes item-id prefixes to actions. Stage 2 renders
-// only groups with live data sources (spec §3, no dead chrome): Level Art /
-// Palettes / UI & Screens arrive with Stages 3–4.
+// supplies store data and routes item-id prefixes to actions. Only groups
+// with live data sources render (spec §3, no dead chrome): aeon's Object
+// Library (Task 15) is live; Level Art / Palettes / UI & Screens are still
+// pending.
 
 import type { ZoneActRef } from '../../core/project/adapter';
 import type { RecentProject } from '../../shared/ipc-types';
@@ -62,10 +63,13 @@ export function classicExplorerGroups(
   ];
 }
 
+export interface AeonObjectRow { id: string; name: string; sprite: string | undefined }
+
 export function aeonExplorerGroups(
   zones: { id: string; name: string; acts: { id: string }[] }[],
+  objects: AeonObjectRow[],
 ): ExplorerGroupModel[] {
-  return [
+  const groups: ExplorerGroupModel[] = [
     {
       id: 'levels',
       label: 'Levels',
@@ -73,8 +77,20 @@ export function aeonExplorerGroups(
         z.acts.map((a) => ({ id: `level:${z.id}:${a.id}`, label: `${z.name} · ${a.id}` })),
       ),
     },
-    TOOLS_GROUP,
   ];
+  if (objects.length > 0) {
+    groups.push({
+      id: 'objects',
+      label: 'Object Library',
+      items: objects.map((o) =>
+        o.sprite
+          ? { id: `doc:sprite:aeon:${o.sprite}`, label: o.name }
+          : { id: `doc:sprite:aeon:${o.id}`, label: o.name, disabled: true, reason: 'no sprite bound' },
+      ),
+    });
+  }
+  groups.push(TOOLS_GROUP);
+  return groups;
 }
 
 export function noProjectExplorerGroups(recents: RecentProject[]): ExplorerGroupModel[] {

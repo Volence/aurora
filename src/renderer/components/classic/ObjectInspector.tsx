@@ -183,7 +183,7 @@ export default function ObjectInspector() {
         <button
           style={styles.editArt}
           title={`Open ${s1ObjectName(obj.id)}'s art + mappings in Sprite mode`}
-          onClick={() => { void editObjectArt(obj.id, zone); }}
+          onClick={() => { void editObjectArt(obj.id); }}
         >
           Edit art…
         </button>

@@ -145,6 +145,13 @@ interface ClassicLevelState {
   openAct: (ref: ZoneActRef) => Promise<void>;
   setTool: (tool: ClassicTool) => void;
   setSelectedChunkId: (chunkId: number) => void;
+  /**
+   * The Composer picker's plain left-click select: sets the chunk AND arms the
+   * stamp tool (unless it's already active). Distinct from setSelectedChunkId
+   * because the viewport's right-click eyedrop also sets the selection and must
+   * NOT force a tool switch mid-pan/mid-object-edit.
+   */
+  selectChunkForStamp: (chunkId: number) => void;
   setStampLoop: (loop: boolean) => void;
   setSelectedObjectIndex: (index: number | null) => void;
   setArmedObjectId: (id: number | null) => void;
@@ -278,6 +285,14 @@ export const useClassicLevelStore = create<ClassicLevelState>((set, get) => ({
   setTool: (tool: ClassicTool) => set({ tool }),
   setSelectedChunkId: (chunkId: number) => {
     if (Number.isInteger(chunkId) && chunkId >= 0 && chunkId <= 0xff) set({ selectedChunkId: chunkId });
+  },
+  selectChunkForStamp: (chunkId: number) => {
+    if (!Number.isInteger(chunkId) || chunkId < 0 || chunkId > 0xff) return;
+    const patch: Partial<ClassicLevelState> = { selectedChunkId: chunkId };
+    // Selecting a chunk expresses intent to stamp it (user feedback, stage-3
+    // smoke test) — arm the stamp tool, but only if it isn't already active.
+    if (get().tool !== 'stamp') patch.tool = 'stamp';
+    set(patch);
   },
   setStampLoop: (loop: boolean) => set({ stampLoop: loop }),
   setSelectedObjectIndex: (index: number | null) => set({ selectedObjectIndex: index }),

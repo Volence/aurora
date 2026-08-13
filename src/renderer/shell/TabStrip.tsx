@@ -14,7 +14,7 @@ import { useProjectStore } from '../state/projectStore';
 import { useEditorStore } from '../state/editorStore';
 import { useSpriteStore } from '../state/spriteStore';
 import { tabHasDirtyDot, type DirtySnapshot } from './dirty-tabs';
-import { requestFocusTabId, requestCloseTab } from './tab-activation';
+import { requestFocusTabId, requestCloseTab, getLoadedSpriteDocId, spriteEditorDirty } from './tab-activation';
 import type { TabDescriptor } from '../../core/shell/session';
 
 function useDirtySnapshot(): DirtySnapshot {
@@ -23,7 +23,15 @@ function useDirtySnapshot(): DirtySnapshot {
   const classicDirty = useClassicLevelStore((s) => Object.values(s.dirty).some(Boolean));
   const aeonOpen = useProjectStore((s) => s.project) !== null;
   const aeonDirty = useEditorStore((s) => s.dirty);
-  const spriteArtPending = useSpriteStore((s) => s.s1ArtSource) !== null;
+  // Subscribe to the sprite pieces so the strip re-renders as the dirty verdict
+  // changes: unsavedEdits IS that verdict (spriteEditorDirty() reads it), so it
+  // must be subscribed — a save/export clears it without touching historyTick.
+  // historyTick + s1ArtSource are kept as belt-and-braces re-render triggers for
+  // edits landing / art checkout-release. The loaded sprite-doc id changes in
+  // lockstep with a tab open/focus (activeId subscription re-renders).
+  useSpriteStore((s) => s.unsavedEdits);
+  useSpriteStore((s) => s.historyTick);
+  useSpriteStore((s) => s.s1ArtSource);
   return {
     classicOpen,
     // classicRef = the LOADED act (store's ref), not a tree selection — dirty dots must track the doc that owns the edits.
@@ -31,7 +39,8 @@ function useDirtySnapshot(): DirtySnapshot {
     classicDirty,
     aeonOpen,
     aeonDirty,
-    spriteArtPending,
+    loadedSpriteDocId: getLoadedSpriteDocId(),
+    spriteDirty: spriteEditorDirty(),
   };
 }
 

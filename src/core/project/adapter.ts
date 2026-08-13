@@ -13,6 +13,9 @@
 
 import type { ResolutionReport } from './report';
 import type { SidecarState } from './mapping';
+import type { LoadedS4Config } from '../config/s4-config';
+import type { S4Project } from '../model/s4-types';
+import type { CollisionProfileSet } from '../collision/collision-model';
 
 /**
  * The narrow file-system view core code is allowed to use. Paths are always
@@ -42,6 +45,15 @@ export interface FileAccess {
    * resolves with `bytes: null` (the caller decides whether that is fatal).
    */
   readMany?(rels: string[]): Promise<Map<string, { bytes: Uint8Array | null; mtime: number | null }>>;
+  /** Absolute directory this FileAccess is rooted at, when known. aeon open
+   *  records it as config.basePath, which the renderer later uses as the root
+   *  for real IPC file IO — a missing rootDir there would make path resolution
+   *  (`path.resolve(basePath, relPath)` in file-io.ts / guarded-write.ts) silently
+   *  fall back to the main process's cwd, i.e. reads/writes against the WRONG
+   *  directory, not a safe failure. Every PRODUCTION FileAccess MUST set it (the
+   *  IPC bridge does); in-memory test fakes may omit it only when nothing
+   *  downstream performs real IO. */
+  rootDir?: string;
 }
 
 export type ProjectType = 'aeon' | 's1';
@@ -56,10 +68,16 @@ export interface ProjectMatch {
  *  its levels get. Superset of the facets built so far — parallax/events/preview
  *  are declared now so profiles can be authored against them before those
  *  facets exist (the shell renders registered-facets ∩ granted, so an
- *  unbuilt capability simply renders nothing). */
-export type FacetCapability =
-  | 'layout' | 'art' | 'objects' | 'rings' | 'collision' | 'palette'
-  | 'parallax' | 'events' | 'preview';
+ *  unbuilt capability simply renders nothing).
+ *
+ *  Runtime list backing FacetCapability, exported so zod schemas and facet
+ *  registries can enumerate/validate without duplicating the union. Canonical
+ *  home of the facet vocabulary (import from here, not core/shell/facets). */
+export const FACET_CAPABILITIES = [
+  'layout', 'art', 'objects', 'rings', 'collision', 'palette',
+  'parallax', 'events', 'preview',
+] as const;
+export type FacetCapability = (typeof FACET_CAPABILITIES)[number];
 
 /**
  * What an opened project can do. Fields are null/false when the capability is
@@ -81,6 +99,23 @@ export interface ProjectOverrides {
   paths?: Record<string, string>;
 }
 
+/**
+ * The fully-loaded aeon project an aeon adapter open() returns (spec §7:
+ * "loading logic moves out of the renderer"). Aeon's level model is all-acts-
+ * resident, so the handle carries the whole project rather than a per-act
+ * read/write access like classic's `levels`.
+ */
+export interface AeonProjectData {
+  config: LoadedS4Config;
+  project: S4Project;
+  collisionProfiles: CollisionProfileSet | null;
+  /** Human notices produced during load (e.g. atlas unification), for toasts. */
+  notices: string[];
+  /** True when the legacy chunk-tiles atlas was merged THIS load — gates the
+   *  save-time truncation of chunks_tiles.bin (see buildAeonSavePlan). */
+  legacyAtlasMerged: boolean;
+}
+
 export interface ProjectHandle {
   type: ProjectType;
   capabilities: CapabilityManifest;
@@ -89,6 +124,8 @@ export interface ProjectHandle {
   /** Parsed `.aurora/project.json` + per-entry diagnostics (spec §7), for the
    *  Project Setup tab. Absent on adapters that read no sidecar (aeon v1). */
   sidecar?: SidecarState;
+  /** The loaded aeon project (aeon adapter only; absent on classic handles). */
+  aeon?: AeonProjectData;
 }
 
 export interface ProjectAdapter {

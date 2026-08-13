@@ -1,13 +1,19 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   planLevelActivation, activateLevelTarget, requestCloseTab,
+  markSpriteDocLoaded, getLoadedSpriteDocId,
   __setActivationSaveForTest, __resetActivationSaveForTest,
 } from '../tab-activation';
 import { useClassicProjectStore } from '../../state/classicProjectStore';
 import { useClassicLevelStore } from '../../state/classicLevelStore';
 import { useConfirmStore } from '../../state/confirmStore';
 import { useSessionStore } from '../../state/sessionStore';
-import { classicLevelTab } from '../tabs';
+import { useProjectStore } from '../../state/projectStore';
+import { useViewStore } from '../../state/viewStore';
+import { useWorkspaceStore } from '../../workspace/workspaceStore';
+import { useSpriteStore, spriteHistory } from '../../state/spriteStore';
+import { classicLevelTab, spriteDocTab } from '../tabs';
+import { createBuffer } from '../../../core/art/pixel-ops';
 import type { ZoneActRef } from '../../../core/project/adapter';
 import type { SaveClassicProjectResult } from '../../state/classic-save';
 
@@ -138,6 +144,62 @@ describe('activateLevelTarget (executor)', () => {
   });
 });
 
+// aeon-switch viewport persistence (Task 16): a USER switch snapshots the
+// outgoing act's live viewport into its record and restores the incoming act's
+// seeded view; the BOOT-restore dispatch passes skipViewSnapshot so it does NOT
+// snapshot the loader-default act (viewStore holds the default, not user state —
+// snapshotting would clobber that act's just-seeded viewport).
+describe('activateLevelTarget aeon viewport snapshot/restore', () => {
+  beforeEach(() => {
+    useClassicProjectStore.getState().reset(); // status stays !== 'open' → engine is aeon
+    useProjectStore.getState().reset();
+    useWorkspaceStore.getState().reset();
+    // A resident aeon project (project !== null) makes currentEngine() 'aeon';
+    // start "viewing" act1.
+    useProjectStore.setState({ project: {} as never, currentZoneId: 'ehz', currentActId: 'act1' });
+  });
+
+  afterEach(() => {
+    useProjectStore.getState().reset();
+    useWorkspaceStore.getState().reset();
+    useClassicProjectStore.getState().reset();
+    useViewStore.setState({ vpX: 0, vpY: 0, zoom: 1 });
+  });
+
+  it('user switch snapshots the outgoing act and restores the incoming act', async () => {
+    useWorkspaceStore.getState().seed({
+      'level:ehz:act1': { view: { x: 1, y: 2, zoom: 1 } },
+      'level:ehz:act2': { view: { x: 30, y: 40, zoom: 2 } },
+    });
+    // Live viewport while viewing act1 (distinct from its seeded record):
+    useViewStore.setState({ vpX: 11, vpY: 22, zoom: 4 });
+
+    await activateLevelTarget('level:ehz:act2');
+
+    // act1's record now holds the LIVE snapshot, not its stale seeded value:
+    expect(useWorkspaceStore.getState().viewFor('level:ehz:act1')).toEqual({ x: 11, y: 22, zoom: 4 });
+    // viewStore restored to act2's seeded view:
+    const v = useViewStore.getState();
+    expect({ x: v.vpX, y: v.vpY, zoom: v.zoom }).toEqual({ x: 30, y: 40, zoom: 2 });
+  });
+
+  it('restore dispatch (skipViewSnapshot) leaves the outgoing act untouched', async () => {
+    useWorkspaceStore.getState().seed({
+      'level:ehz:act1': { view: { x: 1, y: 2, zoom: 1 } },
+      'level:ehz:act2': { view: { x: 30, y: 40, zoom: 2 } },
+    });
+    useViewStore.setState({ vpX: 11, vpY: 22, zoom: 4 }); // loader default, not user state
+
+    await activateLevelTarget('level:ehz:act2', { skipViewSnapshot: true });
+
+    // act1's seeded record is NOT overwritten by the (default) viewStore state:
+    expect(useWorkspaceStore.getState().viewFor('level:ehz:act1')).toEqual({ x: 1, y: 2, zoom: 1 });
+    // Incoming act2's seeded view is still applied:
+    const v = useViewStore.getState();
+    expect({ x: v.vpX, y: v.vpY, zoom: v.zoom }).toEqual({ x: 30, y: 40, zoom: 2 });
+  });
+});
+
 // requestCloseTab (Task 13 fix): closing the ACTIVE tab promotes a neighbor
 // (core closeTab's right-then-left-then-Home rule), and that promotion must
 // pass through the SAME activation guard a click on the neighbor would — else
@@ -204,5 +266,96 @@ describe('requestCloseTab', () => {
     expect(useSessionStore.getState().tabs.map((t) => t.id)).toEqual([HOME.id]);
     expect(useSessionStore.getState().activeId).toBe(HOME.id);
     expect(openActSpy).not.toHaveBeenCalled();
+  });
+});
+
+// Fix B: closing the tab whose sprite is loaded in the singleton editor must
+// leave nothing stale behind (the phantom-dirty ghost the smoke test hit —
+// closing the sprite tab used to keep the checkout + history and re-trip the
+// discard dialog with no sprite tab even open).
+describe('requestCloseTab — loaded sprite-doc cleanup', () => {
+  const HOME = { id: 'home', kind: 'home' as const, title: 'Home' };
+  const SPRITE_TAB = spriteDocTab('s1', '13', 'Signpost'); // 'doc:sprite:s1:13'
+  const OTHER_SPRITE = spriteDocTab('s1', '28', 'Bridge');  // 'doc:sprite:s1:28'
+  const FAKE_SOURCE = { basePath: '/p', relPath: 'X.nem' } as never;
+
+  /** Load a sprite into the editor and mark it as the doc for `tabId`; when
+   *  `dirty`, record a real edit so unsavedEdits + history are set. */
+  function loadEditor(tabId: string, dirty: boolean): void {
+    useSpriteStore.getState().loadSprite([createBuffer(16, 16)], [], 8, 8);
+    useSpriteStore.getState().setS1ArtSource(FAKE_SOURCE);
+    if (dirty) useSpriteStore.getState().clearCanvas(); // records an edit → unsavedEdits + canUndo
+    markSpriteDocLoaded(tabId);
+  }
+
+  beforeEach(() => {
+    useSessionStore.getState().reset();
+    useSpriteStore.getState().loadSprite([createBuffer(16, 16)], [], 8, 8); // clean slate
+    markSpriteDocLoaded(null);
+    useConfirmStore.getState().answer('cancel');
+  });
+
+  afterEach(() => {
+    useConfirmStore.getState().answer('cancel');
+    useSessionStore.getState().reset();
+    useSpriteStore.getState().loadSprite([createBuffer(16, 16)], [], 8, 8);
+    markSpriteDocLoaded(null);
+  });
+
+  it('closing the loaded DIRTY sprite tab asks, and on discard clears marker+checkout+history', async () => {
+    loadEditor(SPRITE_TAB.id, true);
+    useSessionStore.setState({ tabs: [HOME, SPRITE_TAB], activeId: SPRITE_TAB.id });
+    expect(spriteHistory.canUndo).toBe(true);
+
+    const p = requestCloseTab(SPRITE_TAB.id);
+    expect(useConfirmStore.getState().request).not.toBeNull(); // a discard confirm was raised
+    useConfirmStore.getState().answer('discard');
+    await p;
+
+    expect(useSessionStore.getState().tabs.map((t) => t.id)).toEqual([HOME.id]); // closed
+    expect(getLoadedSpriteDocId()).toBeNull();
+    expect(useSpriteStore.getState().s1ArtSource).toBeNull();
+    expect(useSpriteStore.getState().unsavedEdits).toBe(false);
+    expect(spriteHistory.canUndo).toBe(false);
+  });
+
+  it('cancelling the discard leaves the tab open and the editor untouched', async () => {
+    loadEditor(SPRITE_TAB.id, true);
+    useSessionStore.setState({ tabs: [HOME, SPRITE_TAB], activeId: SPRITE_TAB.id });
+
+    const p = requestCloseTab(SPRITE_TAB.id);
+    useConfirmStore.getState().answer('cancel');
+    await p;
+
+    expect(useSessionStore.getState().tabs.map((t) => t.id)).toEqual([HOME.id, SPRITE_TAB.id]); // still open
+    expect(getLoadedSpriteDocId()).toBe(SPRITE_TAB.id); // marker intact
+    expect(useSpriteStore.getState().s1ArtSource).toBe(FAKE_SOURCE);
+    expect(useSpriteStore.getState().unsavedEdits).toBe(true);
+  });
+
+  it('closing a CLEAN loaded sprite tab resets the editor silently (no confirm)', async () => {
+    loadEditor(SPRITE_TAB.id, false); // checkout, but no edits
+    useSessionStore.setState({ tabs: [HOME, SPRITE_TAB], activeId: SPRITE_TAB.id });
+
+    await requestCloseTab(SPRITE_TAB.id);
+
+    expect(useConfirmStore.getState().request).toBeNull(); // never asked
+    expect(useSessionStore.getState().tabs.map((t) => t.id)).toEqual([HOME.id]);
+    expect(getLoadedSpriteDocId()).toBeNull();
+    expect(useSpriteStore.getState().s1ArtSource).toBeNull();
+  });
+
+  it('closing a NON-loaded sprite tab does not touch the editor', async () => {
+    loadEditor(SPRITE_TAB.id, true); // SPRITE_TAB is the loaded doc
+    // Close a DIFFERENT (inactive) sprite tab — its sprite isn't in the editor.
+    useSessionStore.setState({ tabs: [HOME, SPRITE_TAB, OTHER_SPRITE], activeId: SPRITE_TAB.id });
+
+    await requestCloseTab(OTHER_SPRITE.id);
+
+    expect(useConfirmStore.getState().request).toBeNull(); // no confirm for a non-loaded tab
+    expect(useSessionStore.getState().tabs.map((t) => t.id)).toEqual([HOME.id, SPRITE_TAB.id]);
+    expect(getLoadedSpriteDocId()).toBe(SPRITE_TAB.id); // editor marker unchanged
+    expect(useSpriteStore.getState().s1ArtSource).toBe(FAKE_SOURCE);
+    expect(useSpriteStore.getState().unsavedEdits).toBe(true);
   });
 });

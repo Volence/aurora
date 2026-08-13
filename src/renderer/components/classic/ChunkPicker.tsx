@@ -141,7 +141,10 @@ export default function ChunkPicker() {
   const chunkVersions = useClassicLevelStore((s) => s.chunkVersions);
   const chunkEpoch = useClassicLevelStore((s) => s.chunkEpoch);
   const selectedChunkId = useClassicLevelStore((s) => s.selectedChunkId);
-  const setSelectedChunkId = useClassicLevelStore((s) => s.setSelectedChunkId);
+  // Plain left-click select: also arms the stamp tool (see the store action's
+  // doc comment) — right-click eyedrop in the viewport calls setSelectedChunkId
+  // directly and is untouched by this.
+  const selectChunkForStamp = useClassicLevelStore((s) => s.selectChunkForStamp);
   const stampLoop = useClassicLevelStore((s) => s.stampLoop);
   const setStampLoop = useClassicLevelStore((s) => s.setStampLoop);
 
@@ -178,7 +181,7 @@ export default function ChunkPicker() {
             chunkId={id}
             versionKey={`${chunkEpoch}:${chunkVersions.get(id) ?? 0}`}
             selected={id === selectedChunkId}
-            onSelect={setSelectedChunkId}
+            onSelect={selectChunkForStamp}
           />
         ))}
       </div>

@@ -27,6 +27,11 @@ import {
 } from '../state/classicLevelStore';
 import { saveClassicProject } from '../state/classic-save';
 import type { LevelDoc, LayoutGrid } from '../../core/level-classic/model';
+import { planProjectOpen, currentOpenDirtySnapshot } from '../shell/project-open-guard';
+import { useSessionStore } from '../state/sessionStore';
+import { parseLevelTabId } from '../shell/tabs';
+import { switchFacet } from '../workspace/facet-tools';
+import { useWorkspaceStore } from '../workspace/workspaceStore';
 
 let registered = false;
 
@@ -74,14 +79,17 @@ function budgetSummary(ctx: Ctx) {
 }
 
 /**
- * Ensure the app is showing the map viewport before operations that read or
- * write its canvas (goto, screenshot). MapViewport and its canvas are unmounted
- * while in Art mode, so we switch back to Map and wait two frames for the
- * component to mount and paint before proceeding.
+ * Ensure the layout facet (its MapViewport + canvas) is showing before agent
+ * operations that read or write that canvas (goto, screenshot): agent edits
+ * target the map, so make the layout facet visible if a level tab is up. A level
+ * tab on a non-layout facet leaves MapViewport unmounted, so switch the active
+ * level tab to its layout facet and wait two frames for the component to mount
+ * and paint before proceeding.
  */
-async function ensureMapMode(): Promise<void> {
-  if (useEditorStore.getState().appMode !== 'map') {
-    useEditorStore.getState().setAppMode('map');
+async function ensureLayoutFacet(): Promise<void> {
+  const activeId = useSessionStore.getState().activeId;
+  if (parseLevelTabId(activeId) && useWorkspaceStore.getState().facetFor(activeId) !== 'layout') {
+    switchFacet(activeId, 'layout');
     await new Promise<void>(r => requestAnimationFrame(() => requestAnimationFrame(() => r())));
   }
 }
@@ -415,7 +423,7 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
     }
 
     case 'goto': {
-      await ensureMapMode();
+      await ensureLayoutFacet();
       const ctx = requireProject();
       if (!Number.isInteger(req.section) || req.section < 0 || req.section >= ctx.act.sections.length) {
         throw new Error(`section ${req.section} out of range`);
@@ -532,7 +540,7 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
     }
 
     case 'screenshot': {
-      await ensureMapMode();
+      await ensureLayoutFacet();
       requireProject();
       const canvas = document.getElementById('map-canvas') as HTMLCanvasElement | null;
       if (!canvas) throw new Error('map canvas not found — is the viewport mounted?');
@@ -564,6 +572,16 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
     // ---- Classic (Sonic 1) project surface (Task 16) ----
 
     case 'classic-open-project': {
+      // Fail closed on unsaved work (stage-3 Task 7 follow-up): an agent-driven
+      // open has no UI to confirm through, so — unlike useProject.openPath, which
+      // offers Save & open / Discard & open / Cancel — this tool refuses outright
+      // rather than silently destroying unsaved classic/aeon/sprite edits.
+      if (planProjectOpen(currentOpenDirtySnapshot()).kind === 'confirm') {
+        throw new Error(
+          'Unsaved changes present (classic/aeon/sprite). Save first (Ctrl+S / save tools) ' +
+          'or have the user discard, then retry.',
+        );
+      }
       // Reuse the Task-9 open bridge exactly (no duplicated open logic): the store
       // detects classic-first and, for a real aeon dir, leaves aeon untouched.
       const outcome = await useClassicProjectStore.getState().openDirectory(req.dir);

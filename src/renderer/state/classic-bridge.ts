@@ -58,10 +58,10 @@ export const ipcClassicBridge: ClassicBridge = {
     // A single registry fingerprint decides the route (Task 17, spec §2.7):
     //  • a classic adapter (s1) → open into a ProjectHandle this store owns;
     //  • an aeon match → NOT opened here — reported as not-classic so the caller
-    //    runs the untouched renderer aeon loader (useProject.loadFromPath),
+    //    runs the renderer aeon loader (state/aeon-open.ts openAeonProject),
     //    exactly as before. This replaces the old ad-hoc
     //    `fa.exists('project.json')` probe: it stays 'not-classic aeon:true' for a
-    //    real aeon project (engine:"s4" → loadFromPath opens/errors identically),
+    //    real aeon project (engine:"s4" → openAeonProject opens/errors identically),
     //    while a non-aurora or malformed project.json no longer misroutes into the
     //    aeon loader — it falls through to the unrecognized-project notice.
     const match = await detectProject(fa);

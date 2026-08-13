@@ -8,6 +8,7 @@ import type { ClassicBridge, ClassicOpenResult } from '../classic-bridge';
 import type { ProjectHandle, ZoneActRef } from '../../../core/project/adapter';
 import type { ResolutionReport } from '../../../core/project/report';
 import { createIpcFileAccess } from '../classic-file-access';
+import { useClassicLevelStore } from '../classicLevelStore';
 import { ensureAdaptersRegistered } from '../classic-bridge';
 import { detectProject, openProject, type FileAccess } from '../../../core/project/adapter';
 import { isRelPathSafe } from '../../../shared/rel-path';
@@ -59,9 +60,11 @@ function bridgeReturning(result: ClassicOpenResult | (() => Promise<ClassicOpenR
 
 beforeEach(() => {
   useClassicProjectStore.getState().reset();
+  useClassicLevelStore.getState().reset();
 });
 afterEach(() => {
   __resetClassicBridgeForTest();
+  useClassicLevelStore.getState().reset();
 });
 
 // ---------------------------------------------------------------------------
@@ -177,6 +180,32 @@ describe('classicProjectStore', () => {
     expect(s.handle).toBeNull();
     expect(s.report).toBeNull();
     expect(s.zoneTree).toEqual([]);
+  });
+
+  // Task 7 follow-up: openDirectory must invalidate the loaded classic doc AS
+  // SOON as a switch begins, not later via a view-layer effect — otherwise a
+  // stale doc (read through the previous, now-dead handle) stays live if the
+  // view unmounted mid-switch. Arrange a dirty level state left over from a
+  // "previous project", then confirm openDirectory resets it back to idle.
+  it('openDirectory resets useClassicLevelStore (closes the stale-handle window)', async () => {
+    useClassicLevelStore.setState({
+      ref: { zone: 'ghz', act: 1, label: 'Green Hill 1', available: true },
+      doc: { game: 's1' } as never,
+      status: 'ready',
+      error: null,
+      dirty: { tiles: true },
+    } as never);
+    expect(useClassicLevelStore.getState().status).toBe('ready');
+    expect(useClassicLevelStore.getState().dirty).toEqual({ tiles: true });
+
+    __setClassicBridgeForTest(bridgeReturning({ kind: 'opened', handle: fakeHandle(), label: 'Sonic 1 Disassembly' }));
+    await useClassicProjectStore.getState().openDirectory('/proj/s1');
+
+    const lvl = useClassicLevelStore.getState();
+    expect(lvl.status).toBe('idle');
+    expect(lvl.doc).toBeNull();
+    expect(lvl.ref).toBeNull();
+    expect(lvl.dirty).toEqual({});
   });
 });
 

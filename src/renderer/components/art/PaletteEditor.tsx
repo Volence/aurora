@@ -52,11 +52,15 @@ function sameColors(a: Color[], b: Color[]): boolean {
  * Index 0 of every line is transparent (locked for editing but clickable as the
  * eraser-equivalent paint color).
  *
- * Mount invariant: PaletteEditor only renders in Art and Sprite modes.
- * MapViewport's keydown handler lacks the INPUT-type guard, so mid-drag Ctrl+Z
- * while a slider has focus is not a reachable code path.
+ * The `context` prop selects sprite behavior (mode 2/3 above) — the sprite-doc
+ * SpriteMode pane passes `context="sprite"`; the Art and Palette facets pass
+ * nothing (zone-line editing, mode 1). Mount invariant: PaletteEditor only
+ * renders in the Art/Palette facets and the sprite editor. MapViewport's keydown
+ * handler HAS an INPUT-type guard (it skips INPUT/TEXTAREA/contentEditable
+ * targets), so a mid-drag Ctrl+Z while a palette slider (an INPUT) has focus is
+ * swallowed there — the map-undo path isn't reachable from a focused slider.
  */
-export default function PaletteEditor() {
+export default function PaletteEditor({ context }: { context?: 'sprite' }) {
   // Subscribe to paletteVersion for live-preview repaint during slider drags.
   // historyVersion re-renders swatches after undo/redo restores colors and
   // after committed commands (set-palette-line bumps both).
@@ -68,11 +72,10 @@ export default function PaletteEditor() {
   const paintColor = useArtStore((s) => s.selectedColor);
   const paintLine = useArtStore((s) => s.paletteLine);
 
-  const appMode = useEditorStore((s) => s.appMode);
   const spriteMode = useSpriteStore((s) => s.paletteMode);
   const spriteZoneLine = useSpriteStore((s) => s.zoneLine);
   const standalone = useSpriteStore((s) => s.standalonePalette);
-  const inSprite = appMode === 'sprite';
+  const inSprite = context === 'sprite';
 
   const [sel, setSel] = useState<SwatchSel | null>(null);
   const [menu, setMenu] = useState<{ x: number; y: number; heading: string; items: CopyMenuItem[] } | null>(null);
@@ -209,17 +212,19 @@ export default function PaletteEditor() {
    * line FIRST, then run the set-palette-line command — so history's undo
    * snapshot is the pre-drag state, not the mid-drag preview.
    *
-   * Blurs the active slider after commit so Ctrl+Z (ArtMode's keydown handler)
-   * is not blocked by the INPUT early-return guard on the next undo.
+   * Blurs the active slider after commit so Ctrl+Z (art-facet.tsx ArtCanvas's
+   * keydown binding) is not blocked by the INPUT early-return guard on the next
+   * undo.
    *
    * Note: MapViewport's invalidation listener handles set-palette-line →
    * reloadAllSections for the MAP repaint, but in Art mode it is unmounted —
    * the composer repaints via historyVersion, and the map re-prerenders on
-   * remount (MapViewport's mount effect). Established pattern; see ArtMode.
+   * remount (MapViewport's mount effect). Established pattern; see
+   * workspace/facets/art-facet.tsx (ArtCanvas).
    */
   function commitDrag(e?: React.SyntheticEvent) {
-    // Blur the slider so post-commit Ctrl+Z reaches ArtMode's keydown handler
-    // without being swallowed by the INPUT guard.
+    // Blur the slider so post-commit Ctrl+Z reaches art-facet.tsx ArtCanvas's
+    // keydown binding without being swallowed by the INPUT guard.
     (e?.currentTarget as HTMLElement | undefined)?.blur?.();
     const pre = preDragRef.current;
     preDragRef.current = null;

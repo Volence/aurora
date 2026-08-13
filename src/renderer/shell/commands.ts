@@ -2,7 +2,8 @@
 // ⌘K content (spec §3: search everything — commands, tabs, levels, objects,
 // tools). Pure builder: snapshot + injected actions → the Command[] the
 // existing CommandPalette renders. Ordering: global commands, then go-to-tab,
-// then open-level, then edit-art, then recents — cheapest wayfinding first.
+// then open-level, then edit-art, then edit-sprite (aeon Object Library),
+// then recents — cheapest wayfinding first.
 
 import type { Command } from '../components/CommandPalette';
 import type { TabDescriptor } from '../../core/shell/session';
@@ -17,6 +18,8 @@ export interface CommandSnapshot {
   levelTabs: TabDescriptor[];
   /** Classic art-linked objects (empty for aeon / no project / doc not ready). */
   objects: { id: number; name: string; hex: string }[];
+  /** aeon Object Library defs bound to a saved sprite (empty for classic / no project). */
+  aeonSprites: { name: string; sprite: string }[];
   /** Recent projects (only offered when no project is open). */
   recents: RecentProject[];
 }
@@ -51,6 +54,13 @@ export function buildCommands(s: CommandSnapshot, a: CommandActions): Command[] 
 
   for (const o of s.objects) {
     cmds.push({ id: `edit-art:${o.id}`, label: `Edit art: ${o.name}`, hint: o.hex, run: () => a.editObjectArt(o.id) });
+  }
+
+  for (const sp of s.aeonSprites) {
+    cmds.push({
+      id: `edit-sprite:${sp.sprite}`, label: `Edit sprite: ${sp.name}`, hint: 'sprite',
+      run: () => a.openTab({ id: `doc:sprite:aeon:${sp.sprite}`, kind: 'sprite-doc', title: sp.name }),
+    });
   }
 
   if (s.engine === null) {

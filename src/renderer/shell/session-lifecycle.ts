@@ -21,10 +21,11 @@ import { useSessionStore } from '../state/sessionStore';
 import { useClassicProjectStore } from '../state/classicProjectStore';
 import { useClassicLevelStore } from '../state/classicLevelStore';
 import { useProjectStore } from '../state/projectStore';
+import { useWorkspaceStore } from '../workspace/workspaceStore';
 import { resetProjectRuntime } from '../state/project-runtime';
-import { loadStoredSession, saveStoredSession, defaultProjectSession } from './session-storage';
-import { classicLevelTab, aeonLevelTab, PROJECT_SETUP_TAB } from './tabs';
-import { activateLevelTarget } from './tab-activation';
+import { loadStoredSession, saveStoredSession, loadStoredWorkspace, defaultProjectSession } from './session-storage';
+import { classicLevelTab, aeonLevelTab, parseSpriteDocTabId, PROJECT_SETUP_TAB } from './tabs';
+import { activateLevelTarget, activateSpriteDocTarget } from './tab-activation';
 import type { TabDescriptor } from '../../core/shell/session';
 
 function projectLevelTabs(): TabDescriptor[] {
@@ -49,17 +50,14 @@ function firstOpenableLevelTab(): TabDescriptor | null {
 export function useSessionLifecycle(): void {
   const classicDir = useClassicProjectStore((s) => (s.status === 'open' ? s.dir : null));
   // The aeon key gates on the PROJECT being resident, not just the config:
-  // useProject.loadFromPath commits setConfig FIRST, then awaits
-  // addRecentProject (React can flush renders/effects in that gap), then
-  // setProject, then unconditionally setCurrentAct(zones[0].acts[0]). Keyed on
-  // config alone, the restore would run inside that gap — project still null,
-  // so currentEngine() is null and activateLevelTarget plans 'none' — and the
-  // loader's first-act setCurrentAct would then open/focus the first-act tab
-  // over the restored activeId (and the save subscription would persist it,
-  // converging the stored session to first-act on every reopen). Keyed on
-  // project-resident, the restore runs AFTER the loader's default-act
-  // selection; the transient first-act tab that selection opened under the
-  // previous key is healed by the restore's replace+prune.
+  // openAeonProject (state/aeon-open.ts) commits config+project atomically via
+  // projectStore.openLoaded, so there is no config-without-project gap for the
+  // key to observe mid-open. Immediately after that atomic commit (no await in
+  // between), the loader still does its own first-act selection
+  // (setCurrentAct(zone[0].acts[0])), so the restore effect below — which only
+  // fires once the key changes — always runs AFTER that default-act pick. The
+  // transient first-act tab the loader opened is healed by the restore's
+  // replace+prune, converging on the stored session (or the default, if none).
   const aeonBase = useProjectStore((s) => (s.project !== null ? s.config?.basePath ?? null : null));
   const projectKey = classicDir ?? aeonBase;
   // undefined = "no project key adopted yet" — the save subscription stays
@@ -67,11 +65,21 @@ export function useSessionLifecycle(): void {
   // clobber a stored one during boot.
   const keyRef = useRef<string | null | undefined>(undefined);
 
+  // Persist BOTH the tab session and the per-tab workspace record (facet +
+  // viewport) under the current key, on any change to either store. Stays quiet
+  // until the first restore has adopted a key (keyRef.current === undefined), so
+  // a default/empty state can't clobber a stored one during boot.
   useEffect(() => {
-    return useSessionStore.subscribe((s) => {
+    const persist = (): void => {
       if (keyRef.current === undefined) return;
-      saveStoredSession(localStorage, keyRef.current, { tabs: s.tabs, activeId: s.activeId });
-    });
+      const { tabs, activeId } = useSessionStore.getState();
+      saveStoredSession(
+        localStorage, keyRef.current, { tabs, activeId },
+        useWorkspaceStore.getState().record);
+    };
+    const unsubSession = useSessionStore.subscribe(persist);
+    const unsubWorkspace = useWorkspaceStore.subscribe(persist);
+    return () => { unsubSession(); unsubWorkspace(); };
   }, []);
 
   useEffect(() => {
@@ -84,12 +92,41 @@ export function useSessionLifecycle(): void {
       PROJECT_SETUP_TAB.id,
       ...projectLevelTabs().map((t) => t.id),
     ]);
-    const stored = loadStoredSession(localStorage, projectKey, (t) => validIds.has(t.id));
+    // Sprite-doc tabs aren't enumerable (aeon sprites are named library entries;
+    // s1 checkouts are per-object), so accept them by predicate: a sprite-doc id
+    // survives the prune when its engine matches the open project kind. Content
+    // is NOT loaded here — activation runs only when the tab is focused (below).
+    const classicOpen = classicDir !== null;
+    const aeonOpen = aeonBase !== null;
+    const isValid = (t: TabDescriptor): boolean => {
+      if (validIds.has(t.id)) return true;
+      const sd = parseSpriteDocTabId(t.id);
+      return sd !== null && ((sd.engine === 'aeon' && aeonOpen) || (sd.engine === 's1' && classicOpen));
+    };
+    // Read BOTH stored payloads BEFORE mutating any store below. replace() and
+    // seed() fire the persist subscriptions SYNCHRONOUSLY (zustand), and persist
+    // serializes whatever the stores CURRENTLY hold — a not-yet-seeded (empty)
+    // workspace record serializes WITHOUT the `workspace` field, which strips the
+    // stored workspace from localStorage. Capturing both reads up front makes
+    // those interleaved writes harmless (they re-persist values we already hold;
+    // the final seed write is correct). seed() also subsumes any per-switch reset:
+    // it replaces the WHOLE record, so a new project with nothing stored gets {}.
+    const stored = loadStoredSession(localStorage, projectKey, isValid);
+    const storedWorkspace = loadStoredWorkspace(localStorage, projectKey);
     const next =
       stored ?? (projectKey !== null ? defaultProjectSession(firstOpenableLevelTab()) : undefined) ??
       { tabs: useSessionStore.getState().tabs.slice(0, 1), activeId: 'home' };
     useSessionStore.getState().replace(next);
-    if (next.activeId.startsWith('level:')) void activateLevelTarget(next.activeId);
+    // ORDER: seed the workspace record BEFORE the activation dispatch below. The
+    // aeon-switch activation path reads viewFor(activeId) to restore the seeded
+    // viewport, so the seed must land first or the restore sees an empty record.
+    useWorkspaceStore.getState().seed(storedWorkspace);
+    if (parseSpriteDocTabId(next.activeId)) void activateSpriteDocTarget(next.activeId);
+    // skipViewSnapshot: this is a restore, not a user switch — the "outgoing" act
+    // is the loader default with viewStore at its fresh default, so snapshotting
+    // would clobber that act's just-seeded viewport. The restore branch still
+    // applies the target act's seeded view.
+    else if (next.activeId.startsWith('level:')) void activateLevelTarget(next.activeId, { skipViewSnapshot: true });
   }, [projectKey]);
 }
 

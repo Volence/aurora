@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import {
   saveCoordinator, documentHistoryHub, ensureSaversRegistered, saveAllDirty,
-  registerAeonSaver, resetProjectRuntime,
+  resetProjectRuntime,
   __setRuntimeSaversForTest, __resetRuntimeSaversForTest,
 } from '../project-runtime';
 import { useClassicProjectStore } from '../classicProjectStore';
@@ -13,8 +13,8 @@ describe('project runtime', () => {
     ensureSaversRegistered();
     useClassicProjectStore.getState().reset();
     useProjectStore.getState().reset();
-    useSpriteStore.setState({ s1ArtSource: null });
-    registerAeonSaver(null);
+    useSpriteStore.setState({ s1ArtSource: null, unsavedEdits: false });
+    __resetRuntimeSaversForTest();
   });
   afterEach(() => {
     __resetRuntimeSaversForTest();
@@ -44,23 +44,36 @@ describe('project runtime', () => {
     expect(r.saved).toEqual(['classic-level']);
   });
 
-  it('sprite-art saver fires whenever s1ArtSource is set, alongside classic', async () => {
+  it('sprite-art saver fires on a checkout WITH unsaved edits, alongside classic', async () => {
     const log: string[] = [];
     __setRuntimeSaversForTest({
       classic: async () => { log.push('classic'); },
       spriteArt: async () => { log.push('sprite'); },
     });
     useClassicProjectStore.setState({ status: 'open' });
-    useSpriteStore.setState({ s1ArtSource: {} as never });
+    // A checkout is only dirty once it has unsaved edits (Fix A) — set both.
+    useSpriteStore.setState({ s1ArtSource: {} as never, unsavedEdits: true });
     const r = await saveAllDirty();
     // Registration order: sprite-art first (art must never be lost to a level save race).
     expect(log).toEqual(['sprite', 'classic']);
     expect(r.saved).toEqual(['sprite-art', 'classic-level']);
   });
 
+  it('sprite-art saver SKIPS a bare checkout with no unsaved edits (Fix A)', async () => {
+    const log: string[] = [];
+    __setRuntimeSaversForTest({ spriteArt: async () => { log.push('sprite'); } });
+    // Checked out but untouched — writing it back would be an identical-bytes
+    // write + mtime churn, so the saver must skip it.
+    useSpriteStore.setState({ s1ArtSource: {} as never, unsavedEdits: false });
+    const r = await saveAllDirty();
+    expect(log).toEqual([]);
+    expect(r.saved).not.toContain('sprite-art');
+    expect(r.skipped).toContain('sprite-art');
+  });
+
   it('aeon saver fires only when an aeon project is open and classic is NOT', async () => {
     const log: string[] = [];
-    registerAeonSaver(async () => { log.push('aeon'); });
+    __setRuntimeSaversForTest({ aeon: async () => { log.push('aeon'); } });
     useProjectStore.setState({ project: {} as never });
     await saveAllDirty();
     expect(log).toEqual(['aeon']);
@@ -72,13 +85,25 @@ describe('project runtime', () => {
     expect(log).toEqual([]); // classic open → the resident aeon project is stale
   });
 
+  it('aeon saver is registered statically (no App-mount registration required)', async () => {
+    // With an aeon project resident and classic closed, saveAll must invoke the
+    // aeon saver even though nothing ever called a register function — the impl
+    // is a static module import (saveAeonProject), not an App-mount injection.
+    const log: string[] = [];
+    __setRuntimeSaversForTest({ aeon: async () => { log.push('aeon'); } });
+    useProjectStore.setState({ project: {} as never });
+    const r = await saveAllDirty();
+    expect(log).toEqual(['aeon']);
+    expect(r.saved).toEqual(['aeon-project']);
+  });
+
   it('a failing saver is reported but does not block the others', async () => {
     __setRuntimeSaversForTest({
       classic: async () => { throw new Error('disk on fire'); },
       spriteArt: async () => {},
     });
     useClassicProjectStore.setState({ status: 'open' });
-    useSpriteStore.setState({ s1ArtSource: {} as never });
+    useSpriteStore.setState({ s1ArtSource: {} as never, unsavedEdits: true });
     const r = await saveAllDirty();
     expect(r.saved).toEqual(['sprite-art']);
     expect(r.failed).toEqual([{ id: 'classic-level', message: 'disk on fire' }]);

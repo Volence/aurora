@@ -6,6 +6,7 @@ import {
   __resetClassicBridgeForTest,
 } from '../../state/classicProjectStore';
 import { useClassicLevelStore, classicHistory } from '../../state/classicLevelStore';
+import { useEditorStore } from '../../state/editorStore';
 import type { ClassicBridge } from '../../state/classic-bridge';
 import type { LevelDoc } from '../../../core/level-classic/model';
 import type { ProjectHandle, ZoneActRef, WriteResult } from '../../../core/project/adapter';
@@ -127,6 +128,26 @@ describe('classic-open-project', () => {
     __setClassicBridgeForTest(bridgeReturning(async () => ({ kind: 'not-classic', aeon: false })));
     await expect(handleAgentRequest({ kind: 'classic-open-project', dir: '/proj/junk' }))
       .rejects.toThrow(/not a recognized project/i);
+  });
+
+  // Stage-3 Task 7 follow-up: an agent-driven open has no UI to confirm
+  // through, so it must fail closed on unsaved work rather than silently
+  // discarding it (the exact pre-guard bug, reachable via the agent path).
+  it('fails closed on unsaved (aeon) changes without invoking the open bridge', async () => {
+    useEditorStore.getState().markDirty();
+    let openCalled = false;
+    __setClassicBridgeForTest(bridgeReturning(async () => {
+      openCalled = true;
+      return { kind: 'opened', handle: fakeHandle(), label: 'Sonic 1 Disassembly' };
+    }));
+    try {
+      await expect(handleAgentRequest({ kind: 'classic-open-project', dir: '/proj/s1' }))
+        .rejects.toThrow(/unsaved changes/i);
+      expect(openCalled).toBe(false);
+      expect(proj().status).toBe('closed');
+    } finally {
+      useEditorStore.getState().markClean();
+    }
   });
 });
 

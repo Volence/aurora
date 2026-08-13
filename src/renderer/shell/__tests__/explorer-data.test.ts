@@ -43,14 +43,39 @@ describe('classicExplorerGroups', () => {
 });
 
 describe('aeonExplorerGroups', () => {
-  it('builds Levels (zone-name · act) and Tools', () => {
-    const groups = aeonExplorerGroups([
-      { id: 'ehz', name: 'Emerald Hill', acts: [{ id: 'act1' }, { id: 'act2' }] },
-    ]);
+  it('builds Levels (zone-name · act) and Tools when the object library is empty', () => {
+    const groups = aeonExplorerGroups(
+      [{ id: 'ehz', name: 'Emerald Hill', acts: [{ id: 'act1' }, { id: 'act2' }] }],
+      [],
+    );
     expect(groups.map((g) => g.id)).toEqual(['levels', 'tools']);
     expect(groups[0].items).toEqual([
       { id: 'level:ehz:act1', label: 'Emerald Hill · act1' },
       { id: 'level:ehz:act2', label: 'Emerald Hill · act2' },
+    ]);
+  });
+
+  it('an empty object library omits the Object Library group entirely (no dead chrome)', () => {
+    const groups = aeonExplorerGroups(
+      [{ id: 'ehz', name: 'Emerald Hill', acts: [{ id: 'act1' }] }],
+      [],
+    );
+    expect(groups.some((g) => g.id === 'objects')).toBe(false);
+  });
+
+  it('aeon groups include an Object Library of sprite-bound definitions', () => {
+    const groups = aeonExplorerGroups(
+      [{ id: 'ojz', name: 'OJ Zone', acts: [{ id: 'act1' }] }],
+      [
+        { id: 'motobug', name: 'Moto Bug', sprite: 'motobug' },
+        { id: 'spring', name: 'Spring', sprite: undefined },
+      ],
+    );
+    const lib = groups.find((g) => g.id === 'objects')!;
+    expect(lib.label).toBe('Object Library');
+    expect(lib.items).toEqual([
+      { id: 'doc:sprite:aeon:motobug', label: 'Moto Bug' },
+      { id: 'doc:sprite:aeon:spring', label: 'Spring', disabled: true, reason: 'no sprite bound' },
     ]);
   });
 });

@@ -14,6 +14,7 @@ import {
 } from './viewport-math';
 import { drawCollision, drawObjects, drawStart, GHOST_MARKER_BOUNDS } from './classic-overlays';
 import { isTypingTarget } from './composer-shared';
+import { levelKeysEnabled } from '../../workspace/level-keys';
 import {
   CANVAS_VOID,
   STAMP_PREVIEW_FILL, STAMP_PREVIEW_STROKE,
@@ -792,6 +793,9 @@ export default function ClassicLevelViewport() {
   // so a hex/number field edit can't be hijacked into a deletion.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      // Keep-alive under a sprite-doc tab: bail so Escape/Delete can't act on the
+      // hidden classic level while SpriteMode owns the keyboard (finding 1).
+      if (!levelKeysEnabled()) return;
       if (e.key === 'Escape') {
         // While editing an inspector field, Escape belongs to that field (revert /
         // blur) — the viewport must not clear the selection and unmount the field
