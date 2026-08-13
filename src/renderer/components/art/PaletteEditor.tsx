@@ -56,8 +56,9 @@ function sameColors(a: Color[], b: Color[]): boolean {
  * SpriteMode pane passes `context="sprite"`; the Art and Palette facets pass
  * nothing (zone-line editing, mode 1). Mount invariant: PaletteEditor only
  * renders in the Art/Palette facets and the sprite editor. MapViewport's keydown
- * handler lacks the INPUT-type guard, so mid-drag Ctrl+Z while a slider has focus
- * is not a reachable code path.
+ * handler HAS an INPUT-type guard (it skips INPUT/TEXTAREA/contentEditable
+ * targets), so a mid-drag Ctrl+Z while a palette slider (an INPUT) has focus is
+ * swallowed there — the map-undo path isn't reachable from a focused slider.
  */
 export default function PaletteEditor({ context }: { context?: 'sprite' }) {
   // Subscribe to paletteVersion for live-preview repaint during slider drags.

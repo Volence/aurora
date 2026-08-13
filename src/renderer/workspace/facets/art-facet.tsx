@@ -23,6 +23,7 @@ import PaletteEditor from '../../components/art/PaletteEditor';
 import ChunkLibrary from '../../components/ChunkLibrary';
 import CollisionPalette from '../../components/CollisionPalette';
 import type { FacetModule } from '../facet-registry';
+import { levelKeysEnabled } from '../level-keys';
 
 function slug(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'chunk';
@@ -193,6 +194,9 @@ function ArtCanvas() {
   // includes the zone tileset/palette so zone commands undo correctly.
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      // Keep-alive under a sprite-doc tab: bail so Ctrl+Z doesn't fire both
+      // this hidden level-art undo and SpriteMode's undo (finding 1).
+      if (!levelKeysEnabled()) return;
       // Skip undo/redo only for text-entry inputs; allow range/checkbox/button/
       // radio so Ctrl+Z works immediately after a palette slider commit.
       const target = e.target as HTMLElement;

@@ -25,6 +25,7 @@ import PixelViewport from '../art-shared/PixelViewport';
 import type { HostPointer } from '../art-shared/PixelViewport';
 import { useAnchoredZoom } from '../art-shared/use-anchored-zoom';
 import { useHandPan } from '../art-shared/use-hand-pan';
+import { levelKeysEnabled } from '../../workspace/level-keys';
 import { PixelHud, type PixelHudHandle } from '../art-shared/PixelHud';
 import type { Tile, Color } from '../../../core/model/s4-types';
 import { T } from '../ui';
@@ -525,6 +526,9 @@ export default function ComposerCanvas() {
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      // Keep-alive under a sprite-doc tab: bail so the composer's clipboard keys
+      // (Ctrl+C/X/V) don't double-fire alongside SpriteMode's (finding 1).
+      if (!levelKeysEnabled()) return;
       if ((e.target as HTMLElement).tagName === 'INPUT') return;
 
       // X/Y: toggle pending flips for the tile-stamp brush (guard !e.repeat so

@@ -7,21 +7,29 @@
 
 import { useClassicLevelStore } from '../state/classicLevelStore';
 import { useEditorStore } from '../state/editorStore';
-import { useSpriteStore } from '../state/spriteStore';
+import { useSpriteStore, spriteHistory } from '../state/spriteStore';
 import { useConfirmStore } from '../state/confirmStore';
 import { useToastStore } from '../state/toastStore';
 import { saveAllDirty } from '../state/project-runtime';
+// spriteEditorDirty is the SAME predicate the dot/tab-switch guard uses; sharing
+// it keeps the open-guard from being narrower than the tab-switch guard (finding
+// 3). No cycle: tab-activation does not import project-open-guard (this module is
+// a leaf imported only by useProject/agent-handler).
+import { spriteEditorDirty } from './tab-activation';
 
 export interface OpenDirtySnapshot {
-  classicDirty: boolean;      // any classicLevelStore dirty domain
-  aeonDirty: boolean;         // editorStore.dirty (aeon project-wide)
-  spriteArtPending: boolean;  // spriteStore.s1ArtSource !== null
+  classicDirty: boolean;  // any classicLevelStore dirty domain
+  aeonDirty: boolean;     // editorStore.dirty (aeon project-wide)
+  // spriteEditorDirty(): an s1ArtSource checkout OR sprite history (canUndo).
+  // Was s1ArtSource-only, which let an edited aeon/new sprite (dots + blocks tab
+  // switches via canUndo) be silently discarded on a project open (finding 3).
+  spriteDirty: boolean;
 }
 
 export type ProjectOpenPlan = { kind: 'proceed' } | { kind: 'confirm' };
 
 export function planProjectOpen(s: OpenDirtySnapshot): ProjectOpenPlan {
-  return s.classicDirty || s.aeonDirty || s.spriteArtPending
+  return s.classicDirty || s.aeonDirty || s.spriteDirty
     ? { kind: 'confirm' }
     : { kind: 'proceed' };
 }
@@ -31,7 +39,7 @@ export function currentOpenDirtySnapshot(): OpenDirtySnapshot {
   return {
     classicDirty: Object.values(useClassicLevelStore.getState().dirty).some(Boolean),
     aeonDirty: useEditorStore.getState().dirty,
-    spriteArtPending: useSpriteStore.getState().s1ArtSource !== null,
+    spriteDirty: spriteEditorDirty(),
   };
 }
 
@@ -60,14 +68,16 @@ export async function confirmProjectOpen(): Promise<boolean> {
   const snap = currentOpenDirtySnapshot();
   if (planProjectOpen(snap).kind === 'proceed') return true;
 
+  // The caveat is specifically about a CHECKED-OUT sprite (s1ArtSource), which
+  // survives a save and keeps re-blocking the open. snap.spriteDirty is broader
+  // now (also true for a canUndo-only aeon/new sprite, which a save/discard DOES
+  // clear), so key the sentence on the live checkout, not the broad flag.
+  const hasSpriteCheckout = useSpriteStore.getState().s1ArtSource !== null;
   const answer = await useConfirmStore.getState().ask({
     title: 'Unsaved changes',
     body:
       'Opening a project discards unsaved edits and undo history in the current one.' +
-      // Only true when THIS triggering snapshot actually has a sprite checkout
-      // open — otherwise the sentence is misleading noise on a classic/aeon-only
-      // dirty prompt.
-      (snap.spriteArtPending
+      (hasSpriteCheckout
         ? ' A checked-out sprite keeps the open blocked after saving — close it from the Sprite editor first.'
         : ''),
     buttons: [
@@ -111,6 +121,10 @@ export async function confirmProjectOpen(): Promise<boolean> {
     // the NEW project would silently write edited pixels into the OLD
     // project's file on disk.
     useSpriteStore.getState().setS1ArtSource(null);
+    // Also clear the sprite undo history: spriteDirty now includes canUndo, so a
+    // leftover history would re-trip the same phantom-dirty trap as the flags
+    // above (the next open would keep asking / re-snapshotting as confirm).
+    spriteHistory.clear();
     return true;
   }
 

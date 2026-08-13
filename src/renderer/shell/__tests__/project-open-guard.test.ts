@@ -4,20 +4,20 @@ import {
   __setOpenGuardSaveForTest, __resetOpenGuardSaveForTest,
 } from '../project-open-guard';
 import { useEditorStore } from '../../state/editorStore';
-import { useSpriteStore } from '../../state/spriteStore';
+import { useSpriteStore, spriteHistory } from '../../state/spriteStore';
 import { useClassicLevelStore } from '../../state/classicLevelStore';
 import { useConfirmStore } from '../../state/confirmStore';
 import { useToastStore } from '../../state/toastStore';
 
 describe('planProjectOpen', () => {
   it('proceeds when nothing is dirty', () => {
-    expect(planProjectOpen({ classicDirty: false, aeonDirty: false, spriteArtPending: false }))
+    expect(planProjectOpen({ classicDirty: false, aeonDirty: false, spriteDirty: false }))
       .toEqual({ kind: 'proceed' });
   });
   it.each([
-    ['classic level edits', { classicDirty: true, aeonDirty: false, spriteArtPending: false }],
-    ['aeon project edits', { classicDirty: false, aeonDirty: true, spriteArtPending: false }],
-    ['checked-out sprite art', { classicDirty: false, aeonDirty: false, spriteArtPending: true }],
+    ['classic level edits', { classicDirty: true, aeonDirty: false, spriteDirty: false }],
+    ['aeon project edits', { classicDirty: false, aeonDirty: true, spriteDirty: false }],
+    ['a dirty sprite (checkout or history)', { classicDirty: false, aeonDirty: false, spriteDirty: true }],
   ] as const)('asks before opening over %s', (_label, snap) => {
     expect(planProjectOpen(snap)).toEqual({ kind: 'confirm' });
   });
@@ -34,6 +34,7 @@ describe('confirmProjectOpen', () => {
     useClassicLevelStore.getState().reset();
     useEditorStore.getState().markClean();
     useSpriteStore.getState().setS1ArtSource(null);
+    spriteHistory.clear(); // spriteDirty now includes canUndo — start empty
     useConfirmStore.getState().answer('cancel'); // clear any leftover pending request
   });
 
@@ -43,6 +44,7 @@ describe('confirmProjectOpen', () => {
     useClassicLevelStore.getState().reset();
     useEditorStore.getState().markClean();
     useSpriteStore.getState().setS1ArtSource(null);
+    spriteHistory.clear();
   });
 
   it('resolves true immediately when nothing is dirty (no confirm asked)', async () => {
@@ -63,6 +65,23 @@ describe('confirmProjectOpen', () => {
     expect(saveSpy).not.toHaveBeenCalled();
     expect(useEditorStore.getState().dirty).toBe(true);
     expect(useSpriteStore.getState().s1ArtSource).toEqual(FAKE_ART_SOURCE);
+  });
+
+  it('asks before opening over an edited aeon/new sprite (history, no checkout)', async () => {
+    // An edited aeon/new sprite dots + blocks tab switches via canUndo but has no
+    // s1ArtSource — the OLD s1ArtSource-only predicate would have silently
+    // discarded it on open (finding 3). Now it must trigger the confirm.
+    useSpriteStore.getState().clearCanvas(); // records an undo step; leaves s1ArtSource null
+    expect(spriteHistory.canUndo).toBe(true);
+    expect(useSpriteStore.getState().s1ArtSource).toBeNull();
+
+    const p = confirmProjectOpen();
+    expect(useConfirmStore.getState().request).not.toBeNull(); // a confirm was asked, not a silent proceed
+    useConfirmStore.getState().answer('discard');
+    await expect(p).resolves.toBe(true);
+
+    // Discard must clear the history too, else the phantom-dirty trap recurs via canUndo.
+    expect(spriteHistory.canUndo).toBe(false);
   });
 
   it("'discard' resolves true and clears aeon dirty + sprite checkout", async () => {

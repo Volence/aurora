@@ -164,7 +164,15 @@ export default function App() {
                 tab is active, NOT keep-alive: two live SpriteMode instances would
                 double-register its window keydown handler and double-fire undo.
                 Sprite state lives in the module-level spriteStore, so a remount is
-                lossless. */}
+                lossless.
+
+                The level pane above stays MOUNTED (display:none) while this sprite
+                tab is active, so its editors' window keydown handlers (MapViewport,
+                the art facet, the classic view/composer) are still registered
+                alongside SpriteMode's. Those level-side handlers are gated by
+                levelKeysEnabled() (workspace/level-keys.ts) — inert whenever a
+                sprite-doc tab is active — so one Ctrl+Z can't fire both sprite and
+                the hidden level undo (finding 1). */}
             {activeTab?.kind === 'sprite-doc' && (
               <div style={{ ...styles.tabPane, display: 'flex' }}>
                 <SpriteMode appBar={<Toolbar onOpenProject={openProject} onOpenRecent={openProjectByPath} onSave={() => { void saveAllDirty(); }} />} />
