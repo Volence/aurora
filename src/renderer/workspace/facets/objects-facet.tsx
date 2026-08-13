@@ -7,17 +7,13 @@ import React from 'react';
 import ObjectPalette from '../../components/ObjectPalette';
 import PropertiesPanel from '../../components/PropertiesPanel';
 import { Panel, CollapsibleSection } from '../../components/ui';
-import { useEditorStore } from '../../state/editorStore';
 import { mapFacet, type FacetModule } from '../facet-registry';
 
 function ObjectsPanels() {
   return (
     <Panel width={240} scroll>
       <CollapsibleSection id="map.palette" title="Objects">
-        <ObjectPalette
-          selectedType={0}
-          onSelectType={(type, subtype) => useEditorStore.getState().setSelectedObjectTypeId(String(type), subtype)}
-        />
+        <ObjectPalette />
       </CollapsibleSection>
       <CollapsibleSection id="map.props" title="Properties"><PropertiesPanel /></CollapsibleSection>
     </Panel>

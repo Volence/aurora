@@ -31,12 +31,6 @@ export interface Selection {
   index: number;
 }
 
-export interface MultiSelection {
-  sectionIndex: number;
-  objects: number[];
-  rings: number[];
-}
-
 export interface RingPattern {
   name: string;
   offsets: Array<{ dx: number; dy: number }>;
@@ -82,7 +76,6 @@ export type EditingLayer = 'fg' | 'bg';
 interface EditorState {
   tool: EditorTool;
   selection: Selection | null;
-  multiSelection: MultiSelection | null;
   dirty: boolean;
   /**
    * Repaint clock for level mutations that DON'T go through a command and so
@@ -123,7 +116,6 @@ interface EditorState {
 
   setTool: (tool: EditorTool) => void;
   setSelection: (selection: Selection | null) => void;
-  setMultiSelection: (multiSelection: MultiSelection | null) => void;
   setActiveSectionIndex: (index: number) => void;
   setEditingLayer: (layer: EditingLayer) => void;
   setSelectedTileIndex: (index: number) => void;
@@ -195,7 +187,6 @@ export function focusedHistory(): UndoStack | null {
 export const useEditorStore = create<EditorState>((set) => ({
   tool: 'view',
   selection: null,
-  multiSelection: null,
   dirty: false,
   liveEditVersion: 0,
   chunkLibraryVersion: 0,
@@ -224,9 +215,8 @@ export const useEditorStore = create<EditorState>((set) => ({
   // An explicit tool switch cancels an in-progress paste (repeat pastes never
   // call setTool, so they aren't affected) — picking a different tool while
   // pasting means the user is done pasting.
-  setTool: (tool) => set({ tool, selection: null, multiSelection: null, pasting: false }),
-  setSelection: (selection) => set({ selection, multiSelection: null }),
-  setMultiSelection: (multiSelection) => set({ multiSelection, selection: null }),
+  setTool: (tool) => set({ tool, selection: null, pasting: false }),
+  setSelection: (selection) => set({ selection }),
   setActiveSectionIndex: (index) => set({ activeSectionIndex: index }),
   setEditingLayer: (layer) => set({ editingLayer: layer }),
   setSelectedTileIndex: (index) => set({ selectedTileIndex: index }),

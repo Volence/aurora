@@ -5,12 +5,7 @@ import { listSprites } from './sprite/export-sprite';
 import { readObjectBindings, setObjectBinding } from '../object-previews';
 import { T } from './ui';
 
-interface ObjectPaletteProps {
-  selectedType: number;
-  onSelectType: (type: number, subtype?: number) => void;
-}
-
-export default function ObjectPalette({ selectedType, onSelectType }: ObjectPaletteProps) {
+export default function ObjectPalette() {
   const filterRef = useRef<HTMLInputElement>(null);
   const [filter, setFilter] = React.useState('');
   const project = useProjectStore((s) => s.project);
