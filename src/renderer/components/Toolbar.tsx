@@ -1,14 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useProjectStore } from '../state/projectStore';
-import { useEditorStore, focusedHistory } from '../state/editorStore';
+import { focusedHistory } from '../state/editorStore';
 import { useHistoryVersion } from '../hooks/useHistoryVersion';
 import { useSessionStore } from '../state/sessionStore';
 import { useClassicProjectStore } from '../state/classicProjectStore';
-import { useClassicLevelStore } from '../state/classicLevelStore';
 import type { RecentProject } from '../../shared/ipc-types';
 import AuroraMark from './AuroraMark';
 import { T, Chip, IconButton, Divider, Icons } from './ui';
 import ViewMenu from '../shell/ViewMenu';
+import { useDirtySnapshot } from '../shell/dirty-snapshot';
+import { tabHasDirtyDot } from '../shell/dirty-tabs';
+import { canSaveActive } from '../state/project-runtime';
 
 interface ToolbarProps {
   onOpenProject: () => void;
@@ -19,15 +21,26 @@ interface ToolbarProps {
 export default function Toolbar({ onOpenProject, onOpenRecent, onSave }: ToolbarProps) {
   const config = useProjectStore((s) => s.config);
   const loading = useProjectStore((s) => s.loading);
-  const dirty = useEditorStore((s) => s.dirty);
   // ONE undo/redo pair for every surface this app bar fronts (aeon level, classic
   // level, sprite doc): which document it drives is focusedHistory()'s decision,
   // and the hub clock re-evaluates its enabledness. The activeId subscription is
   // what re-renders when focus MOVES between documents (the hub only fires when a
   // stack changes, which switching tabs does not).
-  useSessionStore((s) => s.activeId);
+  const activeId = useSessionStore((s) => s.activeId);
   useHistoryVersion();
   const history = focusedHistory();
+
+  // ONE Save chip for whatever document is in front, matching Ctrl+S exactly.
+  // It used to be two chips whose enabledness knew only about LEVEL dirtiness
+  // while their click ran save-all (which writes sprite art too): with only a
+  // sprite dirty the button sat inert over an operation that was available and
+  // meaningful. Enabledness is now the coordinator's own verdict on the active
+  // tab, and the "unsaved" badge reuses the tab strip's dot rule — no second
+  // definition of dirty anywhere.
+  const dirtySnap = useDirtySnapshot();
+  const activeKind = useSessionStore((s) => s.tabs.find((t) => t.id === s.activeId)?.kind);
+  const activeDirty = activeKind ? tabHasDirtyDot(activeId, activeKind, dirtySnap) : false;
+  const canSave = canSaveActive(activeId);
 
   // Classic (disasm) session state — the toolbar's classic twin of the aeon
   // block below: save + dirty badge, rendered in BOTH the classic level view
@@ -37,7 +50,6 @@ export default function Toolbar({ onOpenProject, onOpenRecent, onSave }: Toolbar
   // rendered oddly inside the sprite-doc pane's app bar. Sprite mode is reached
   // by opening a sprite-doc tab, not a mode chip.
   const classicOpen = useClassicProjectStore((s) => s.status) === 'open';
-  const classicDirty = useClassicLevelStore((s) => Object.values(s.dirty).some(Boolean));
 
   const [recentOpen, setRecentOpen] = useState(false);
   const [recentProjects, setRecentProjects] = useState<RecentProject[]>([]);
@@ -128,16 +140,19 @@ export default function Toolbar({ onOpenProject, onOpenRecent, onSave }: Toolbar
         </>
       )}
 
-      {/* Aeon save block: currently UNREACHABLE — aeon level tabs render
-          LevelWorkspace (not Toolbar), and sprite-docs are classic-only until the
-          aeon Object Library task lands. Kept for that upcoming aeon sprite-doc
-          app bar. The zone/act selector was removed (Fix D — the explorer + tab
-          strip own level navigation). */}
-      {config && (
+      {/* Save = the CURRENT document (Ctrl+S). Save All is Ctrl+Shift+S / ⌘K,
+          deliberately not a chip: the app bar's job is the thing in front of you.
+          The disabled title says why when a dirty sprite has nowhere to write. */}
+      {(config || classicOpen) && (
         <>
           <Chip
             active={saveFlash}
-            disabled={!dirty && !saveFlash}
+            disabled={!canSave && !saveFlash}
+            title={
+              canSave ? 'Save this document (Ctrl+S) — Save All is Ctrl+Shift+S'
+                : activeDirty ? 'This document has no save-back file — export it from the sprite editor'
+                  : 'Nothing to save in this document'
+            }
             onClick={async () => {
               await onSave();
               setSaveFlash(true);
@@ -147,25 +162,7 @@ export default function Toolbar({ onOpenProject, onOpenRecent, onSave }: Toolbar
             {saveFlash ? 'Saved!' : 'Save'}
           </Chip>
 
-          {dirty && <span style={styles.dirtyBadge}>unsaved</span>}
-        </>
-      )}
-
-      {classicOpen && !config && (
-        <>
-          <Chip
-            active={saveFlash}
-            disabled={!classicDirty && !saveFlash}
-            onClick={async () => {
-              await onSave();
-              setSaveFlash(true);
-              setTimeout(() => setSaveFlash(false), 1500);
-            }}
-          >
-            {saveFlash ? 'Saved!' : 'Save'}
-          </Chip>
-
-          {classicDirty && <span style={styles.dirtyBadge}>unsaved</span>}
+          {activeDirty && <span style={styles.dirtyBadge}>unsaved</span>}
         </>
       )}
 
