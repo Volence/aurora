@@ -7,15 +7,15 @@ import type { FacetCapability } from '../../core/project/adapter';
 // Glyph/label map — superset of the old MapToolDock TOOLS list (same icons).
 const TOOL_META: Record<EditorTool, [string, React.FC<{ size?: number }>]> = {
   view: ['View', Icons.IconView],
-  select: ['Select', Icons.IconSelect],
+  select: ['Select', Icons.IconCursor],
   marquee: ['Marquee', Icons.IconSelect],
   'paint-tile': ['Paint Tile', Icons.IconPencil],
   'paint-block': ['Paint Block', Icons.IconRect],
   'stamp-chunk': ['Stamp Chunk', Icons.IconStamp],
   'paint-collision': ['Paint Collision', Icons.IconCollision],
-  'place-object': ['Place Object', Icons.IconObject],
+  'place-object': ['Place Object', Icons.IconPlaceObject],
   'place-ring': ['Place Ring', Icons.IconRing],
-  eraser: ['Eraser', Icons.IconPencil],
+  eraser: ['Eraser', Icons.IconEraser],
 };
 
 export function MapFacetDock({ facet }: { facet: FacetCapability }) {
