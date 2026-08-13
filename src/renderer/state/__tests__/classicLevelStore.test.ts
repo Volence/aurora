@@ -17,89 +17,11 @@ import {
 } from '../classicLevelStore';
 import { useClassicProjectStore } from '../classicProjectStore';
 import { registerRedoClearer } from '../../../core/editing/undo-bus';
-import { packChunkCell, unpackChunkCell, type BlockDef, type LevelDoc } from '../../../core/level-classic/model';
-import type { ProjectHandle, ZoneActRef, EditableTileRange } from '../../../core/project/adapter';
+import { packChunkCell, unpackChunkCell, type BlockDef } from '../../../core/level-classic/model';
 import type { S1ObjectEntry } from '../../../core/formats/classic/s1-objpos';
-
-// ---------------------------------------------------------------------------
-// Fixtures — a minimal but validateLevelDoc-clean LevelDoc.
-//   • 5 tiles in the pool; the adapter reports baseTileCount 4 (so tile 4 is a
-//     "gap/appended" tile) and an anim overlay at tile 2 → tiles 0,1,3 editable.
-// ---------------------------------------------------------------------------
-
-const TILE_COUNT = 5;
-const EDITABLE: EditableTileRange = { baseTileCount: 4, animRanges: [{ start: 2, count: 1 }] };
-
-function makeDoc(): LevelDoc {
-  const chunkCells = () =>
-    Array.from({ length: 256 }, () => ({ block: 0, xf: false, yf: false, solidity: 0 }));
-  return {
-    game: 's1',
-    tiles: new Uint8Array(TILE_COUNT * 32),
-    blocks: [
-      { cells: Array.from({ length: 4 }, () => ({ tile: 0, xf: false, yf: false, pal: 0, pri: false })) },
-      { cells: Array.from({ length: 4 }, () => ({ tile: 1, xf: false, yf: false, pal: 1, pri: false })) },
-    ],
-    chunks: [{ cells: chunkCells() }, { cells: chunkCells() }],
-    fg: { width: 2, height: 2, cells: new Uint8Array([0, 1, 0, 1]) },
-    bg: { width: 2, height: 2, cells: new Uint8Array([0, 0, 0, 0]) },
-    collision: { colind: new Uint8Array([0, 0]), shapes: { heights: [new Int8Array(16)], angles: new Uint8Array(1) } },
-    palettes: [0, 1, 2, 3].map(() => new Uint16Array(16)),
-    paletteSources: [],
-    objects: [{ x: 100, y: 100, xflip: false, yflip: false, respawn: false, id: 1, subtype: 0 }],
-    start: { x: 50, y: 50 },
-    sourceRefs: {
-      'tiles.0': 'artnem/t.nem',
-      blocks: 'map16/b.eni',
-      chunks: 'map256/c.kos',
-      fg: 'levels/fg.bin',
-      bg: 'levels/bg.bin',
-      objpos: 'objpos/o.bin',
-      start: 'startpos/s.bin',
-      colind: 'colind/ci.bin',
-      'palette.0': 'palette/p0.bin',
-      'palette.1': 'palette/p1.bin',
-    },
-  };
-}
-
-const REF: ZoneActRef = { zone: 'ghz', act: 1, label: 'Green Hill 1', available: true };
-
-function fakeHandle(): ProjectHandle {
-  return {
-    type: 's1',
-    capabilities: {
-      levels: 'chunk-hierarchy',
-      sprites: true,
-      objects: 'objpos',
-      build: false,
-      facets: ['layout', 'art', 'objects', 'collision', 'palette'],
-    },
-    report: { entries: [], resolved: 0, total: 0 },
-    levels: {
-      list: () => [REF],
-      read: async () => makeDoc(),
-      write: async () => ({ written: [], skipped: [], errors: [] }),
-      editableTileRange: (): EditableTileRange => EDITABLE,
-    },
-  };
-}
-
-/** Put the store in a clean 'ready' editing session over a fresh doc. */
-function openReady(doc = makeDoc()): void {
-  useClassicProjectStore.setState({ status: 'open', dir: '/p', handle: fakeHandle() } as never);
-  classicHistory.clear();
-  useClassicLevelStore.setState({
-    ref: REF,
-    doc,
-    status: 'ready',
-    error: null,
-    dirty: {},
-    chunkVersions: new Map(),
-    chunkEpoch: 1,
-    historyTick: 0,
-  });
-}
+// Shared with history-routing.test.ts — one fixture, so both suites drive the
+// store through the same doc/handle shape.
+import { TILE_COUNT, REF, makeDoc, openReady } from './helpers/classic-fixture';
 
 const st = () => useClassicLevelStore.getState();
 
