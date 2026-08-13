@@ -9,6 +9,30 @@
 // it never overrides a real (jsdom/browser) OffscreenCanvas, leaving every
 // existing test's behavior unchanged.
 
+// ImageData is likewise absent from the node env. TileRenderer.renderTile and
+// SectionRenderer's compose staging buffer both construct one, so a plain data
+// holder (which is all ImageData is) lets those run under vitest. Same guard:
+// it only DEFINES a missing global, never overrides a real browser one.
+if (typeof (globalThis as { ImageData?: unknown }).ImageData === 'undefined') {
+  class ImageDataStub {
+    data: Uint8ClampedArray;
+    width: number;
+    height: number;
+    constructor(a: Uint8ClampedArray | number, b: number, c?: number) {
+      if (typeof a === 'number') {
+        this.width = a;
+        this.height = b;
+        this.data = new Uint8ClampedArray(a * b * 4);
+      } else {
+        this.data = a;
+        this.width = b;
+        this.height = c ?? a.length / 4 / b;
+      }
+    }
+  }
+  (globalThis as { ImageData?: unknown }).ImageData = ImageDataStub;
+}
+
 if (typeof (globalThis as { OffscreenCanvas?: unknown }).OffscreenCanvas === 'undefined') {
   const noopCtx = new Proxy({}, { get: () => () => undefined });
   class OffscreenCanvasStub {
