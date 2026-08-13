@@ -557,11 +557,16 @@ export async function listSprites(): Promise<string[]> {
  * frame bitmaps from mappings.bin + art.bin, and restore the timeline from the
  * manifest. Works for editor-exported sprites and any non-DPLC sprite whose art
  * is fully present in art.bin.
+ *
+ * Resolves TRUE when a sprite was actually loaded. Failures are toasted, not
+ * thrown (this is also a direct UI action), so the boolean is the only honest
+ * signal a CALLER has: the sprite-doc activation path used to assume success and
+ * opened the tab onto a blank 32×32 document instead of rolling back.
  */
-export async function loadSpriteByName(name: string): Promise<void> {
+export async function loadSpriteByName(name: string): Promise<boolean> {
   const toast = useToastStore.getState().addToast;
   const project = useProjectStore.getState().project;
-  if (!project) { toast('No project open', 'error'); return; }
+  if (!project) { toast('No project open', 'error'); return false; }
   const base = project.basePath;
   const dir = `${spritesDir()}/${name}`;
   try {
@@ -582,8 +587,10 @@ export async function loadSpriteByName(name: string): Promise<void> {
     useSpriteStore.getState().setExportDplc(!!manifest?.dplc); // default export mode to how it was saved
     useSpriteStore.getState().setFormat(fmt);
     toast(`Loaded "${name}" (${fmt.toUpperCase()}): ${frames.length} frames${steps.length ? `, ${steps.length} anim steps` : ''}`, 'success');
+    return true;
   } catch (e) {
     toast(`Load failed for "${name}": ${e instanceof Error ? e.message : String(e)}`, 'error');
+    return false;
   }
 }
 

@@ -61,14 +61,20 @@ function frameFilledWith(value: number) {
   return buf;
 }
 
-/** Stub loaders that load a one-frame sprite whose pixels identify the sprite. */
-function stubLoaders(opts: { aeonOk?: boolean; s1Ok?: boolean } = {}) {
+/**
+ * Stub loaders that load a one-frame sprite whose pixels identify the sprite.
+ * `aeonOk: false` reports failure the way the REAL loader does — it toasts and
+ * resolves false rather than rejecting; `aeonThrows` is the rarer hard failure.
+ */
+function stubLoaders(opts: { aeonOk?: boolean; aeonThrows?: boolean; s1Ok?: boolean } = {}) {
   const calls: string[] = [];
   __setSpriteModuleForTest({
     loadSpriteByName: async (name: string) => {
       calls.push(`aeon:${name}`);
-      if (opts.aeonOk === false) throw new Error('load failed');
+      if (opts.aeonThrows) throw new Error('load failed');
+      if (opts.aeonOk === false) return false;
       useSpriteStore.getState().loadSprite([frameFilledWith(1)], [], 4, 4);
+      return true;
     },
     editObjectArtCheckout: async (id: number) => {
       calls.push(`s1:${id}`);
@@ -171,12 +177,42 @@ describe('activateSpriteDocTarget', () => {
   });
 
   it('a rejecting loader rolls back the same way', async () => {
-    stubLoaders({ aeonOk: false });
+    stubLoaders({ aeonThrows: true });
 
     expect(await activateSpriteDocTarget(AEON_TAB)).toBe(false);
 
     expect(useSpriteStore.getState().activeDocId).toBe(UNTITLED_SPRITE_DOC_ID);
     expect(useSpriteStore.getState().isOpen(AEON_TAB)).toBe(false);
+  });
+
+  it('a FAILED aeon sprite load rolls back instead of opening a blank document', async () => {
+    // loadSpriteByName toasts its failures and resolves — it never rejects — so
+    // the aeon branch used to set loaded = true regardless and strand the user on
+    // the blank 32x32 placeholder document this flow creates before loading.
+    stubLoaders({ aeonOk: false });
+
+    expect(await activateSpriteDocTarget(AEON_TAB)).toBe(false);
+
+    const s = useSpriteStore.getState();
+    expect(s.isOpen(AEON_TAB)).toBe(false);                  // no empty doc left behind
+    expect(s.activeDocId).toBe(UNTITLED_SPRITE_DOC_ID);
+    expect(documentHistoryHub.has(AEON_TAB)).toBe(false);
+  });
+
+  it('a failed aeon load from a live document puts that document back', async () => {
+    stubLoaders({ s1Ok: true });
+    await activateSpriteDocTarget(S1_TAB);          // a real document in front
+    __setSpriteModuleForTest({
+      loadSpriteByName: async () => false,          // …and an aeon sprite that won't load
+      editObjectArtCheckout: async () => true,
+    });
+
+    expect(await activateSpriteDocTarget(AEON_TAB)).toBe(false);
+
+    const s = useSpriteStore.getState();
+    expect(s.activeDocId).toBe(S1_TAB);
+    expect(s.frames[0].data[0]).toBe(2);            // showing its content, not a blank canvas
+    expect(s.isOpen(AEON_TAB)).toBe(false);
   });
 
   it('serializes overlapping activations so a load can never land in the other document', async () => {

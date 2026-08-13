@@ -60,7 +60,7 @@ beforeEach(() => {
   // editObjectArt goes through sprite-doc activation, which pulls the loaders in
   // by dynamic import; point that at THIS module so the stub opener above is the
   // one that runs (the seam takes a partial module — only these two are used).
-  __setSpriteModuleForTest({ editObjectArtCheckout, loadSpriteByName: async () => {} });
+  __setSpriteModuleForTest({ editObjectArtCheckout, loadSpriteByName: async () => true });
 });
 
 afterEach(() => {

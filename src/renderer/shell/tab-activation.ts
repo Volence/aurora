@@ -218,13 +218,13 @@ async function runSpriteActivation(tabId: string): Promise<boolean> {
   const { loadSpriteByName, editObjectArtCheckout } = await spriteModule();
   let loaded = false;
   try {
-    if (plan.engine === 'aeon') {
-      await loadSpriteByName(plan.ref);
-      loaded = true;
-    } else {
-      // A failed checkout has already toasted; treat it like a rejection.
-      loaded = await editObjectArtCheckout(Number(plan.ref));
-    }
+    // Both loaders swallow their own failures into a toast and resolve, so the
+    // returned boolean — not "it didn't throw" — is what decides whether this tab
+    // has a document. Assuming success here opened the tab onto the blank 32×32
+    // placeholder document instead of taking the rollback below.
+    loaded = plan.engine === 'aeon'
+      ? await loadSpriteByName(plan.ref)
+      : await editObjectArtCheckout(Number(plan.ref));
   } catch {
     loaded = false; // loadSpriteByName rejected — stay put
   }
