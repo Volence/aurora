@@ -298,18 +298,39 @@ export default function MapViewport() {
     }
   }, []);
 
-  // Reload (re-prerender) every section + bg from current project state.
-  // Stable callback: reads stores via getState so it can also be invoked from
-  // the command-invalidation listener (palette/tileset changes invalidate the
-  // prerendered tile bitmaps baked into each section's TileRenderer).
-  const reloadAllSections = useCallback(() => {
+  // Re-prerender the tile art and repaint every section + bg from current
+  // project state. Stable callback: reads stores via getState so it can also be
+  // invoked from the command-invalidation listener (palette/tileset changes
+  // invalidate the prerendered tile bitmaps baked into each TileRenderer).
+  //
+  // `structural` distinguishes the two reasons the canvases go stale:
+  //  • true  — the GRID changed (sections added/removed/resized/moved/pasted),
+  //    or we are loading a different act/project. The section->canvas map has
+  //    to be torn down and the grid dimensions reset.
+  //  • false — only COLOURS or TILE PIXELS changed (set-palette-line,
+  //    set-tileset-tiles). Every nametable, every grid dimension and every
+  //    section->canvas binding is still valid, so the canvases are repainted
+  //    in place: no setGrid, no clearSections, and loadSection reuses the
+  //    existing 16 MB OffscreenCanvas instead of allocating a new one.
+  const loadAllSections = useCallback((structural: boolean) => {
     const state = useProjectStore.getState();
     const zone = getCurrentZone(state);
     const act = getCurrentAct(state);
     if (!zone || !act) return;
 
-    sectionRenderer.setGrid(act.gridWidth, act.gridHeight);
-    sectionRenderer.clearSections();
+    // Defence in depth: an in-place rebuild is only sound while the renderer's
+    // idea of the grid still matches the act. Anything else falls back to the
+    // full structural path rather than painting into a stale layout.
+    const inPlace = structural
+      ? false
+      : sectionRenderer.sectionCount() > 0
+        && sectionRenderer.getGridWidth() === act.gridWidth
+        && sectionRenderer.getGridHeight() === act.gridHeight;
+
+    if (!inPlace) {
+      sectionRenderer.setGrid(act.gridWidth, act.gridHeight);
+      sectionRenderer.clearSections();
+    }
     // Prerender the zone tileset ONCE; sections share it (the per-section
     // prerender re-rendered the whole atlas for every section at load).
     sectionRenderer.prepareTiles(zone.tileset.tiles, zone.palette.lines);
@@ -329,6 +350,16 @@ export default function MapViewport() {
 
     reloadBg();
   }, [reloadBg]);
+
+  /** Full rebuild — for structural (grid/section-set) changes and act loads. */
+  const reloadAllSections = useCallback(() => loadAllSections(true), [loadAllSections]);
+
+  /**
+   * Colour/pixel-only rebuild. set-palette-line and set-tileset-tiles change
+   * what tiles LOOK like, never where they are, so the grid and the section
+   * canvases survive; only the baked bitmaps have to be redrawn.
+   */
+  const rebuildTileArt = useCallback(() => loadAllSections(false), [loadAllSections]);
 
   // Load all sections + bg when project/act changes
   useEffect(() => {
@@ -363,11 +394,15 @@ export default function MapViewport() {
           break;
         case 'set-tileset-tiles':
         case 'set-palette-line':
+          // Colours / tile pixels only. These are baked into the prerendered
+          // bitmaps, so the sections must be repainted — but the nametables and
+          // the grid are untouched, so this takes the in-place path rather than
+          // tearing down and reallocating every section canvas.
+          rebuildTileArt();
+          break;
         case 'set-sections':
-          // Tile pixels / palette are baked into per-section TileRenderer
-          // caches at load time, and a structural grid change (add/remove/
-          // resize/move/paste) re-indexes the whole grid — re-prerender
-          // everything.
+          // A structural grid change (add/remove/resize/move/paste) re-indexes
+          // the whole grid — full rebuild.
           reloadAllSections();
           break;
         case 'set-bg':
@@ -389,7 +424,7 @@ export default function MapViewport() {
       }
     });
     return () => setCommandInvalidationListener(null);
-  }, [reloadAllSections, reloadBg]);
+  }, [reloadAllSections, rebuildTileArt, reloadBg]);
 
   // Re-render when anything visual changes
   useEffect(() => {
