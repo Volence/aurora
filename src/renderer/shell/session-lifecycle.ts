@@ -48,7 +48,19 @@ function firstOpenableLevelTab(): TabDescriptor | null {
 
 export function useSessionLifecycle(): void {
   const classicDir = useClassicProjectStore((s) => (s.status === 'open' ? s.dir : null));
-  const aeonBase = useProjectStore((s) => s.config?.basePath ?? null);
+  // The aeon key gates on the PROJECT being resident, not just the config:
+  // useProject.loadFromPath commits setConfig FIRST, then awaits
+  // addRecentProject (React can flush renders/effects in that gap), then
+  // setProject, then unconditionally setCurrentAct(zones[0].acts[0]). Keyed on
+  // config alone, the restore would run inside that gap — project still null,
+  // so currentEngine() is null and activateLevelTarget plans 'none' — and the
+  // loader's first-act setCurrentAct would then open/focus the first-act tab
+  // over the restored activeId (and the save subscription would persist it,
+  // converging the stored session to first-act on every reopen). Keyed on
+  // project-resident, the restore runs AFTER the loader's default-act
+  // selection; the transient first-act tab that selection opened under the
+  // previous key is healed by the restore's replace+prune.
+  const aeonBase = useProjectStore((s) => (s.project !== null ? s.config?.basePath ?? null : null));
   const projectKey = classicDir ?? aeonBase;
   // undefined = "no project key adopted yet" — the save subscription stays
   // quiet until the first restore has run, so a default session can never

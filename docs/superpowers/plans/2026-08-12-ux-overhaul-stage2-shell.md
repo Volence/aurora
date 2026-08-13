@@ -3259,7 +3259,16 @@ function firstOpenableLevelTab(): TabDescriptor | null {
 
 export function useSessionLifecycle(): void {
   const classicDir = useClassicProjectStore((s) => (s.status === 'open' ? s.dir : null));
-  const aeonBase = useProjectStore((s) => s.config?.basePath ?? null);
+  // The aeon key gates on the PROJECT being resident, not just the config:
+  // useProject.loadFromPath commits setConfig FIRST, then awaits
+  // addRecentProject (React can flush in that gap), then setProject, then
+  // unconditionally setCurrentAct(zones[0].acts[0]). Keyed on config alone,
+  // the restore would run inside that gap (project null → activation plans
+  // 'none') and the loader's first-act setCurrentAct would overwrite the
+  // restored activeId, converging the stored session to first-act. Keyed on
+  // project-resident, the restore runs AFTER the default-act selection and
+  // its transient first-act tab is healed by the restore's replace+prune.
+  const aeonBase = useProjectStore((s) => (s.project !== null ? s.config?.basePath ?? null : null));
   const projectKey = classicDir ?? aeonBase;
   // undefined = "no project key adopted yet" — the save subscription stays
   // quiet until the first restore has run, so a default session can never
@@ -3375,8 +3384,8 @@ export default function App() {
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (!(e.ctrlKey || e.metaKey)) return;
-      if (e.key === 's' || e.key === 'S') { e.preventDefault(); void saveAllDirty(); }
-      else if (e.key === 'b' || e.key === 'B') { e.preventDefault(); toggleExplorer(); }
+      if ((e.key === 's' || e.key === 'S') && !e.shiftKey && !e.altKey) { e.preventDefault(); void saveAllDirty(); }
+      else if ((e.key === 'b' || e.key === 'B') && !e.shiftKey && !e.altKey) { e.preventDefault(); toggleExplorer(); }
       else if (e.key >= '1' && e.key <= '9' && !e.shiftKey && !e.altKey) {
         e.preventDefault();
         void requestFocusIndex(Number(e.key));

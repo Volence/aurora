@@ -57,8 +57,8 @@ export default function App() {
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (!(e.ctrlKey || e.metaKey)) return;
-      if (e.key === 's' || e.key === 'S') { e.preventDefault(); void saveAllDirty(); }
-      else if (e.key === 'b' || e.key === 'B') { e.preventDefault(); toggleExplorer(); }
+      if ((e.key === 's' || e.key === 'S') && !e.shiftKey && !e.altKey) { e.preventDefault(); void saveAllDirty(); }
+      else if ((e.key === 'b' || e.key === 'B') && !e.shiftKey && !e.altKey) { e.preventDefault(); toggleExplorer(); }
       else if (e.key >= '1' && e.key <= '9' && !e.shiftKey && !e.altKey) {
         e.preventDefault();
         void requestFocusIndex(Number(e.key));
