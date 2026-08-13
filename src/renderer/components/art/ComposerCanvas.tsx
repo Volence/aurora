@@ -80,6 +80,12 @@ export default function ComposerCanvas() {
   const pixelPerfect = useArtStore((s) => s.pixelPerfect);
   const ditherPattern = useArtStore((s) => s.ditherPattern);
   const ditherSecondary = useArtStore((s) => s.ditherSecondary);
+  // Subscribed only to force a re-render when the palette-apply HUD needs to
+  // repaint (drawOverlay reads s.paletteLine fresh via getState(), not this) —
+  // e.g. the options-bar line picker sets paletteLine alone, with no other
+  // tracked field changing, so without this the corner HUD text goes stale
+  // until an unrelated re-render happens to occur.
+  const paletteLine = useArtStore((s) => s.paletteLine);
   // Subscribed only to force a re-render when the collision-tool HUD needs to
   // repaint (drawOverlay reads fresh values via getState(), not these).
   const selectedCollisionProfile = useEditorStore((s) => s.selectedCollisionProfile);
