@@ -6,14 +6,14 @@ import {
 } from '../project-runtime';
 import { useClassicProjectStore } from '../classicProjectStore';
 import { useProjectStore } from '../projectStore';
-import { useSpriteStore } from '../spriteStore';
+import { useSpriteStore, openSpriteDoc } from '../spriteStore';
 
 describe('project runtime', () => {
   beforeEach(() => {
     ensureSaversRegistered();
     useClassicProjectStore.getState().reset();
     useProjectStore.getState().reset();
-    useSpriteStore.setState({ s1ArtSource: null, unsavedEdits: false });
+    useSpriteStore.getState().closeAll();
     __resetRuntimeSaversForTest();
   });
   afterEach(() => {
@@ -69,6 +69,37 @@ describe('project runtime', () => {
     expect(log).toEqual([]);
     expect(r.saved).not.toContain('sprite-art');
     expect(r.skipped).toContain('sprite-art');
+  });
+
+  it('sprite-art saver fires for a BACKGROUND document with unsaved art edits', async () => {
+    // The under-report this closes: reporting only the CHECKED-OUT document let
+    // Ctrl+S quietly skip a dirty sprite tab the user wasn't looking at, leaving
+    // its dot up and its edits on the floor.
+    const log: string[] = [];
+    __setRuntimeSaversForTest({ spriteArt: async () => { log.push('sprite'); } });
+    openSpriteDoc('doc:sprite:s1:13', { width: 16, height: 16 });
+    useSpriteStore.setState({ s1ArtSource: {} as never, unsavedEdits: true });
+    openSpriteDoc('doc:sprite:s1:28', { width: 16, height: 16 }); // parks the dirty one
+
+    expect(useSpriteStore.getState().unsavedEdits).toBe(false);   // the visible doc is clean
+    const r = await saveAllDirty();
+
+    expect(log).toEqual(['sprite']);
+    expect(r.saved).toEqual(['sprite-art']);
+  });
+
+  it('resetProjectRuntime also drops the open sprite documents', async () => {
+    // A document that outlives its project keeps an s1ArtSource pointing into the
+    // OLD project by absolute path — a later Ctrl+S would write across projects.
+    openSpriteDoc('doc:sprite:s1:13', { width: 16, height: 16 });
+    useSpriteStore.setState({ s1ArtSource: {} as never, unsavedEdits: true });
+
+    resetProjectRuntime();
+
+    const s = useSpriteStore.getState();
+    expect(s.isOpen('doc:sprite:s1:13')).toBe(false);
+    expect(s.s1ArtSource).toBeNull();
+    expect(s.unsavedEdits).toBe(false);
   });
 
   it('aeon saver fires only when an aeon project is open and classic is NOT', async () => {
