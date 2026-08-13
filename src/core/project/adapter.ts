@@ -45,10 +45,14 @@ export interface FileAccess {
    * resolves with `bytes: null` (the caller decides whether that is fatal).
    */
   readMany?(rels: string[]): Promise<Map<string, { bytes: Uint8Array | null; mtime: number | null }>>;
-  /** Absolute directory this FileAccess is rooted at, when known. Additive
-   *  (aeon open records it as config.basePath); in-memory fakes may omit it,
-   *  in which case basePath is '' and renderer-side writes are impossible —
-   *  fine for tests. */
+  /** Absolute directory this FileAccess is rooted at, when known. aeon open
+   *  records it as config.basePath, which the renderer later uses as the root
+   *  for real IPC file IO — a missing rootDir there would make path resolution
+   *  (`path.resolve(basePath, relPath)` in file-io.ts / guarded-write.ts) silently
+   *  fall back to the main process's cwd, i.e. reads/writes against the WRONG
+   *  directory, not a safe failure. Every PRODUCTION FileAccess MUST set it (the
+   *  IPC bridge does); in-memory test fakes may omit it only when nothing
+   *  downstream performs real IO. */
   rootDir?: string;
 }
 

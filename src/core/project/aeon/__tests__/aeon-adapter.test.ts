@@ -222,7 +222,7 @@ describe('aeonAdapter.open', () => {
   it('open() surfaces loader errors (broken-but-s4 project.json still matches detect, then open throws)', async () => {
     const files = fixtureFiles();
     files.set('project.json', new TextEncoder().encode(JSON.stringify({ engine: 's4' }))); // missing name/zones
-    await expect(aeonAdapter.open(memFa(files))).rejects.toThrow();
+    await expect(aeonAdapter.open(memFa(files))).rejects.toThrow('Project config missing "name"');
   });
 });
 
