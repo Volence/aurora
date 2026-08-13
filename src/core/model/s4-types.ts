@@ -79,8 +79,13 @@ export interface Section {
    *  `engineCollisionB` is the alternate plane (dual-layer/loop sections). */
   engineCollision?: Uint8Array | null;
   engineCollisionB?: Uint8Array | null;
-  /** Editable path-A collision plane — one 16-bit packed cell word per 16px cell
-   *  (collision-cell-word.ts: base-bank shape | X/Y-flip | per-plane solidity).
+  /** Editable path-A collision plane — TILE-indexed: widthTiles*heightTiles
+   *  16-bit words, one per 8px TILE, with all four sub-tiles of a 16px cell
+   *  holding the same word (collision-cell-word.ts: base-bank shape | X/Y-flip |
+   *  per-plane solidity). The authored resolution is 16px; the array is at tile
+   *  resolution because that is what the strip codec and overlay sample. Keep
+   *  every write 2x2-uniform — ChunkDef.collisionA is CELL-indexed, so crossing
+   *  between them needs cellTileIndices, never a raw copy.
    *  Seeded from a saved .collattr.bin (16-bit BE) or packed from engineCollision;
    *  rendered by the view and written by set-collision-edit. The bake resolves the
    *  flags into the runtime 1-byte attr index. Separate from engineCollision
@@ -122,8 +127,14 @@ export interface ChunkDef {
   heightTiles: number;
   nametable: Uint16Array;
   /** Dual-plane authored collision: one 16-bit cell word (collision-cell-word.ts)
-   *  per 16px cell — (widthTiles/2)*(heightTiles/2) words. Same encoding as
-   *  Section.collisionEdit/collisionEditB, so stamps copy verbatim. */
+   *  per 16px cell — (widthTiles/2)*(heightTiles/2) words, i.e. CELL-indexed.
+   *
+   *  NOT the same indexing as Section.collisionEdit/collisionEditB, which are
+   *  TILE-indexed (widthTiles*heightTiles, 4x larger, every cell's four
+   *  sub-tiles holding the same word). A stamp must EXPAND cell -> 4 tiles via
+   *  collision/collision-cell.ts's cellTileIndices; a copyWithin/set() fast path
+   *  between the two silently corrupts the plane. (An earlier version of this
+   *  comment claimed they "copy verbatim" — they do not.) */
   collisionA: Uint16Array;
   collisionB: Uint16Array;
 }

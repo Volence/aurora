@@ -384,7 +384,36 @@ Doc-only, landed independently of the Aurora branch:
 
 These are the likely origin of the parent spec's §4 misstatement (§2.1).
 
-### 9.2 Collision cell geometry — verify before acting
+### 9.2 Collision cell geometry — VERIFIED 2026-08-13, no bug
+
+> **Resolved. Aurora is correct; there is nothing to change.** The engine's
+> `BLOCK_COLL_COLS = 16` / `BLOCK_COLL_ROWS = 8` describe **byte storage**, not
+> logical geometry: one byte per 8px tile *column* × one byte per 16px *row*.
+> A collision cell is logically 16×16px, stored duplicated across the two tile
+> columns of each cell. Aurora's `chunkCellCount = (w>>1)*(h>>1)` counts logical
+> cells and every Aurora↔disk boundary does the 2× expand/sample explicitly
+> (`core/collision/collision-cell.ts`).
+>
+> Evidence: `Collision_GetType` shifts X by 3 and Y by 4 total; on-disk sizes
+> match exactly (`sec0_strips_a.bin` = 256 × 776 B; each `.collattr.bin` =
+> 256×256×2 B); 128 of 128 column pairs in the baked strip are byte-identical;
+> all 18 editor files are 2×2-uniform with zero non-uniform cells; and a section-0
+> round trip matches 546 sampled non-air cells against 546 strip bytes with zero
+> mismatches. **Blast radius: zero — no corrupt data exists and none was written.**
+>
+> The alarm was traced to two stale docblocks in `core/model/s4-types.ts`, since
+> corrected. One claimed `ChunkDef.collisionA` and `Section.collisionEdit` share
+> an encoding "so stamps copy verbatim" — they do not; the former is cell-indexed
+> and the latter tile-indexed and 4× larger.
+>
+> **Latent capability gap (not a bug):** the engine format genuinely supports 8px
+> *horizontal* collision variation, and Aurora's tile-resolution array would
+> preserve it through a load→save round trip — but the overlay renders only each
+> cell's top-left sub-tile, and any paint or stamp flattens the cell to a uniform
+> word. Moot today (all shipped data is pairwise-duplicated), but it would bite if
+> the engine ever authored 8px-horizontal collision.
+
+The original open question, for provenance:
 
 Aurora's `chunkCellCount = (w>>1) * (h>>1)` yields 16×16-px collision cells in both axes. The engine is `BLOCK_COLL_COLS = 16`, `BLOCK_COLL_ROWS = 8` per 16×16-tile block — full column resolution, halved vertically (`aeon/engine/system/constants.emp:632-633`; `LEVEL_EDITOR_SPEC.md:510`). `aeon/tools/ojz_strip_gen.py:1514-1568` reads the editor file as "one per 8px tile column × 16px collision row", agreeing with the engine, not with `chunkCellCount`.
 
