@@ -25,6 +25,7 @@ import { useSessionStore } from '../state/sessionStore';
 import { useClassicProjectStore } from '../state/classicProjectStore';
 import { useClassicLevelStore } from '../state/classicLevelStore';
 import { useProjectStore } from '../state/projectStore';
+import { openEngine } from '../state/open-project';
 import { useViewStore } from '../state/viewStore';
 import { useWorkspaceStore } from '../workspace/workspaceStore';
 import { useConfirmStore } from '../state/confirmStore';
@@ -85,12 +86,6 @@ export function planLevelActivation(input: {
   if (loaded && loaded.zone === ref.zone && loaded.act === act) return { kind: 'none' };
   if (loaded && input.classicDirty) return { kind: 'classic-confirm', zone: ref.zone, act };
   return { kind: 'classic-open', zone: ref.zone, act };
-}
-
-function currentEngine(): 's1' | 'aeon' | null {
-  if (useClassicProjectStore.getState().status === 'open') return 's1';
-  if (useProjectStore.getState().project !== null) return 'aeon';
-  return null;
 }
 
 // --- Sprite-doc activation -------------------------------------------------
@@ -291,7 +286,7 @@ export async function activateLevelTarget(
   const classic = useClassicLevelStore.getState();
   const plan = planLevelActivation({
     tabId,
-    engine: currentEngine(),
+    engine: openEngine(),
     classicLoadedRef: classic.ref ? { zone: classic.ref.zone, act: classic.ref.act } : null,
     classicDirty: Object.values(classic.dirty).some(Boolean),
   });

@@ -227,6 +227,30 @@ describe('project runtime', () => {
     expect(r.saved).toEqual(['aeon-project']);
   });
 
+  it('Ctrl+S with a stale aeon project still resident routes at CLASSIC', async () => {
+    // Both savers claim "level:*" tabs, so the tie-break decides which files get
+    // written. A classic open means projectStore holds the PREVIOUS project —
+    // writing it would save the wrong project's files. Same precedence the
+    // whole-window save uses (openEngine reports 's1', never 'aeon', here).
+    const log: string[] = [];
+    __setRuntimeSaversForTest({
+      classic: async () => { log.push('classic'); },
+      aeon: async () => { log.push('aeon'); },
+    });
+    useProjectStore.setState({ project: {} as never });   // stale, left over
+    useClassicProjectStore.setState({ status: 'open' });
+    useClassicLevelStore.setState({
+      ref: { zone: 'ghz', act: 1, label: 'GHZ 1' } as never,
+      dirty: { fg: true } as never,
+    });
+    focusTab('level:ghz:1', 'level');
+
+    const r = await saveActive();
+
+    expect(log).toEqual(['classic']);
+    expect(r.saved).toEqual(['classic-level']);
+  });
+
   it('Ctrl+S on a tool tab or Home is a safe no-op', async () => {
     const log: string[] = [];
     __setRuntimeSaversForTest({

@@ -14,6 +14,7 @@ import { useShellStore } from '../state/shellStore';
 import { useClassicProjectStore } from '../state/classicProjectStore';
 import { useClassicLevelStore } from '../state/classicLevelStore';
 import { useProjectStore } from '../state/projectStore';
+import { useOpenEngine } from '../state/open-project';
 import { filterExplorer, type ExplorerGroupModel, type ExplorerItemModel } from '../../core/shell/explorer';
 import {
   classicExplorerGroups, aeonExplorerGroups, noProjectExplorerGroups, resolveObjectSprite,
@@ -72,6 +73,7 @@ export default function Explorer({ onOpenProject, onOpenRecent }: ExplorerProps)
   const toggle = useShellStore((s) => s.toggleExplorer);
   const [query, setQuery] = useState('');
 
+  const engine = useOpenEngine();
   const classicOpen = useClassicProjectStore((s) => s.status) === 'open';
   const zoneTree = useClassicProjectStore((s) => s.zoneTree);
   const classicLabel = useClassicProjectStore((s) => s.label);
@@ -114,11 +116,13 @@ export default function Explorer({ onOpenProject, onOpenRecent }: ExplorerProps)
     if (item.disabled) return;
     if (item.id.startsWith('level:')) {
       const ref = parseLevelTabId(item.id)!;
-      if (classicOpen) {
+      // Engine identity comes from the shared selector; `config`/`zoneTree` are
+      // only consulted for the zone lookup once the engine is known.
+      if (engine === 's1') {
         const target = zoneTree.find((r) => r.zone === ref.zone && String(r.act) === ref.act);
         if (target) void requestOpenTab(classicLevelTab(target));
-      } else if (config) {
-        const zone = config.zones.find((z) => z.id === ref.zone);
+      } else if (engine === 'aeon') {
+        const zone = config?.zones.find((z) => z.id === ref.zone);
         if (zone) void requestOpenTab(aeonLevelTab(zone.id, zone.name, ref.act));
       }
     } else if (item.id.startsWith('obj:')) {
