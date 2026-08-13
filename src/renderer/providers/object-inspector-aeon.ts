@@ -74,6 +74,26 @@ export function aeonObjectSchema(
   ];
 }
 
+/**
+ * Does this type have art the inspector can actually draw?
+ *
+ * Aeon binds sprites per object type and a project may bind few or none, so
+ * "selected" does not imply "previewable". A missing entry, a null bitmap and a
+ * CLOSED bitmap (width 0 — the publisher revoked it between republish and draw)
+ * all mean nothing to draw, and the port must then hand over no Preview at all:
+ * the shared inspector frames whatever Preview it is given, so an always-present
+ * one that renders a blank canvas shows as an empty bordered box. Classic makes
+ * the same call from `resolveObjectArt`; this is aeon's equivalent predicate.
+ */
+export function hasAeonObjectPreview(
+  sprites: ReadonlyMap<string, { bitmap: { width: number; height: number } | null }>,
+  typeId: string | null | undefined,
+): boolean {
+  if (!typeId) return false;
+  const bitmap = sprites.get(typeId)?.bitmap;
+  return !!bitmap && bitmap.width > 0 && bitmap.height > 0;
+}
+
 /** Project a placement onto the schema. Flips are optional on the model (acts
  *  saved before they existed omit them), so they surface as explicit `false`. */
 export function aeonObjectFields(obj: ObjectPlacement): Record<string, FieldValue> {
@@ -173,7 +193,15 @@ export function useAeonObjectInspectorPort(): ObjectInspectorPort {
     [library, obj?.typeId],
   );
 
+  // Only offered when the selected type ACTUALLY has a drawable sprite. Aeon
+  // binds sprites per object type and most projects bind few (or none), so an
+  // unconditional Preview drew a 64px bordered frame around a blank canvas —
+  // dead chrome, and the single loudest thing wrong with the aeon panel. The
+  // shared inspector already omits the whole preview area when the port has no
+  // Preview (classic does exactly this for an id with no linked art).
+  const hasPreview = hasAeonObjectPreview(objectSprites, obj?.typeId);
   const Preview = React.useMemo(() => {
+    if (!hasPreview) return undefined;
     const C = ({ fields }: { fields: Readonly<Record<string, FieldValue>> }): React.ReactElement =>
       React.createElement(BitmapThumb, {
         bitmap: objectSprites.get(String(fields.typeId))?.bitmap ?? null,
@@ -181,7 +209,7 @@ export function useAeonObjectInspectorPort(): ObjectInspectorPort {
       });
     C.displayName = 'AeonObjectPreview';
     return C;
-  }, [objectSprites]);
+  }, [hasPreview, objectSprites]);
 
   const commit = React.useCallback((key: string, patch: Readonly<Record<string, FieldValue>>): CommitResult => {
     // Re-read rather than closing over: a blur can land after the selection

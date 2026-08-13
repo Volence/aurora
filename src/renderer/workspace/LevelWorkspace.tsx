@@ -14,6 +14,7 @@ import { useOpenEngine, useOpenCapabilities } from '../state/open-project';
 import { useSessionStore } from '../state/sessionStore';
 import { useEditorStore, focusedHistory } from '../state/editorStore';
 import { useHistoryVersion } from '../hooks/useHistoryVersion';
+import ViewMenu from '../shell/ViewMenu';
 import { Chip } from '../components/ui';
 import type { EditingLayer } from '../state/editorStore';
 
@@ -52,6 +53,14 @@ export default function LevelWorkspace() {
         <Chip key={l} active={editingLayer === l}
           onClick={() => useEditorStore.getState().setEditingLayer(l)}>{l.toUpperCase()}</Chip>
       ))}
+      {/* The overlay toggles live HERE, next to the canvas they paint on. They
+          used to ride the legacy Toolbar, which aeon level tabs stopped
+          rendering when they moved onto this workspace (ead6eaf) — after that
+          the only Toolbar left standing was the sprite-doc tab's, so the toggles
+          were reachable only from a tab where the map is not on screen and
+          "nothing happens" was the honest result. Map facets only: the art
+          facet's canvas never reads viewStore.overlays. */}
+      {mod.mapOverlays && <ViewMenu />}
       <Chip disabled={!history?.canUndo} onClick={() => history?.undo()}>Undo</Chip>
       <Chip disabled={!history?.canRedo} onClick={() => history?.redo()}>Redo</Chip>
     </div>

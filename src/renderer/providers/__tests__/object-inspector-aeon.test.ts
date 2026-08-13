@@ -5,6 +5,7 @@ import {
   aeonObjectFields,
   applyAeonPatch,
   commitAeonPatch,
+  hasAeonObjectPreview,
 } from '../object-inspector-aeon';
 import { EditHistory } from '../../../core/editing/history';
 import type { AnyCommand, S4Level } from '../../../core/editing/commands';
@@ -160,5 +161,41 @@ describe('commitAeonPatch', () => {
     const exec = (cmd: AnyCommand, l: S4Level): void => { history.execute(cmd, l); };
     expect(commitAeonPatch(exec, lvl, 0, 0, { respawn: true }, schema)).toEqual({ ok: true });
     expect(history.canUndo).toBe(false);
+  });
+});
+
+describe('hasAeonObjectPreview', () => {
+  // The port must hand the shared inspector NO Preview when there is nothing to
+  // draw, because the inspector frames whatever Preview it is given: an
+  // always-present one that renders a blank canvas showed as a large empty
+  // bordered box above the fields. Classic decides the same thing from
+  // resolveObjectArt; this is aeon's predicate.
+  const sprite = (w: number, h: number) => ({ bitmap: { width: w, height: h } });
+
+  it('is true for a type with a drawable bitmap', () => {
+    expect(hasAeonObjectPreview(new Map([['ring', sprite(16, 16)]]), 'ring')).toBe(true);
+  });
+
+  it('is false for a type the sprite map does not carry — the common aeon case', () => {
+    expect(hasAeonObjectPreview(new Map([['ring', sprite(16, 16)]]), 'spike')).toBe(false);
+  });
+
+  it('is false for an empty sprite map', () => {
+    expect(hasAeonObjectPreview(new Map(), 'ring')).toBe(false);
+  });
+
+  it('is false with no selection at all', () => {
+    expect(hasAeonObjectPreview(new Map([['ring', sprite(16, 16)]]), null)).toBe(false);
+    expect(hasAeonObjectPreview(new Map([['ring', sprite(16, 16)]]), undefined)).toBe(false);
+    expect(hasAeonObjectPreview(new Map([['', sprite(16, 16)]]), '')).toBe(false);
+  });
+
+  it('is false for a CLOSED bitmap — width 0 means the publisher revoked it', () => {
+    expect(hasAeonObjectPreview(new Map([['ring', sprite(0, 0)]]), 'ring')).toBe(false);
+    expect(hasAeonObjectPreview(new Map([['ring', sprite(16, 0)]]), 'ring')).toBe(false);
+  });
+
+  it('is false for a null bitmap rather than throwing', () => {
+    expect(hasAeonObjectPreview(new Map([['ring', { bitmap: null }]]), 'ring')).toBe(false);
   });
 });

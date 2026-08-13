@@ -25,7 +25,7 @@ export default function PropertiesPanel() {
   if (!project || !act) {
     return (
       <div style={styles.container}>
-        <div style={styles.header}>Properties</div>
+        <div style={styles.content}><span style={styles.propLabel}>No act loaded.</span></div>
       </div>
     );
   }
@@ -45,7 +45,10 @@ export default function PropertiesPanel() {
 
   return (
     <div style={styles.container}>
-      <div style={styles.header}>Properties</div>
+      {/* No title of its own: every call site already wraps this in a
+          CollapsibleSection titled "Properties" (layout/objects/rings/collision
+          facets), and rendering a second header made the aeon panel read
+          "PROPERTIES / PROPERTIES". The section header IS this panel's title. */}
       <div style={styles.content}>
         {/* Selection details */}
         {selectedRing && (
@@ -140,11 +143,6 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex', flexDirection: 'column',
     background: T.surface,
     flexShrink: 0,
-  },
-  header: {
-    padding: '8px 12px', fontSize: 12, fontWeight: 600, color: T.textBase,
-    borderBottom: `1px solid ${T.border}`, textTransform: 'uppercase' as const,
-    letterSpacing: 1,
   },
   content: {
     flex: 1, overflow: 'auto', padding: 8,

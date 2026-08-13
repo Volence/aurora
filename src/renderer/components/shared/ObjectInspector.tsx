@@ -162,12 +162,14 @@ function HexByteField({ value, onCommit, title, max }: {
   );
 }
 
-const PREVIEW_BOX = 64;
-
 const styles: Record<string, React.CSSProperties> = {
   body: { display: 'flex', flexDirection: 'column', gap: 6, padding: 8 },
+  // No minHeight: the frame sizes to whatever the port's Preview draws. A port
+  // with nothing to show must return no Preview (the block above then renders
+  // nothing), not a component that draws blank — a reserved 64px box around
+  // empty pixels is exactly the dead chrome this panel design forbids.
   previewWrap: {
-    display: 'flex', justifyContent: 'center', padding: 4, minHeight: PREVIEW_BOX,
+    display: 'flex', justifyContent: 'center', padding: 4,
     background: T.raised, border: `1px solid ${T.border}`, borderRadius: T.rMd,
   },
   title: {
