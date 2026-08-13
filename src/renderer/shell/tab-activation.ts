@@ -1,9 +1,21 @@
-// EVERY tab open/focus flows through requestOpenTab/requestFocusTabId so the
-// classic dirty-switch guard cannot be bypassed: classicLevelStore.openAct
-// resets doc + dirty + undo history, so switching away from a dirty classic act
-// must confirm first (Save & switch / Discard / Cancel). Aeon act switches are
-// pointer moves over the resident S4Project — always safe. planLevelActivation
-// is the pure, tested decision; the exported request* functions are glue.
+// EVERY tab open/focus flows through requestOpenTab/requestFocusTabId, so TWO
+// dirty-switch guard systems live here and cannot be bypassed:
+//
+//   1. Classic LEVEL activation (planLevelActivation + activateLevelTarget):
+//      classicLevelStore.openAct resets doc + dirty + undo history, so switching
+//      away from a dirty classic act must confirm first (Save & switch / Discard
+//      / Cancel). Aeon act switches are pointer moves over the resident
+//      S4Project — always safe.
+//
+//   2. SPRITE-DOC activation (planSpriteDocActivation + activateSpriteDocTarget,
+//      plus the loaded-doc marker markSpriteDocLoaded/getLoadedSpriteDocId):
+//      the sprite editor is a singleton, so retargeting it discards the current
+//      sprite's edits + undo history; a dirty retarget must confirm first
+//      (Discard & open / Cancel — confirmDiscardSpriteEdits).
+//
+// Each planner is the pure, tested decision; the exported request*/activate*
+// functions are the glue. The shared confirm copy lives in
+// confirmDiscardSpriteEdits so the edit-art wrapper shows the identical dialog.
 
 import { useSessionStore } from '../state/sessionStore';
 import { useClassicProjectStore } from '../state/classicProjectStore';
@@ -90,6 +102,24 @@ export function spriteEditorDirty(): boolean {
   return useSpriteStore.getState().s1ArtSource !== null || spriteHistory.canUndo;
 }
 
+/**
+ * Ask whether to discard the loaded sprite's unsaved edits. Resolves true on
+ * 'discard', false on cancel. The copy lives here so BOTH the sprite-doc
+ * activation guard and the edit-art wrapper (export-sprite.editObjectArt) show
+ * the identical dialog.
+ */
+export async function confirmDiscardSpriteEdits(): Promise<boolean> {
+  const answer = await useConfirmStore.getState().ask({
+    title: 'Unsaved sprite edits',
+    body: 'Opening another sprite reloads the editor and discards unsaved sprite edits and undo history.',
+    buttons: [
+      { key: 'discard', label: 'Discard & open', tone: 'danger' },
+      { key: 'cancel', label: 'Cancel' },
+    ],
+  });
+  return answer === 'discard';
+}
+
 export type SpriteDocPlan =
   | { kind: 'none' }
   | { kind: 'open'; engine: 's1' | 'aeon'; ref: string }
@@ -129,16 +159,9 @@ export async function activateSpriteDocTarget(tabId: string): Promise<boolean> {
   if (plan.kind === 'none') return true;
 
   if (plan.kind === 'confirm') {
-    const answer = await useConfirmStore.getState().ask({
-      title: 'Unsaved sprite edits',
-      body: 'Opening another sprite reloads the editor and discards unsaved sprite edits and undo history.',
-      buttons: [
-        { key: 'discard', label: 'Discard & open', tone: 'danger' },
-        { key: 'cancel', label: 'Cancel' },
-      ],
-    });
+    const discard = await confirmDiscardSpriteEdits();
     if (myGen !== activationGen) return false; // superseded while the dialog was open
-    if (answer !== 'discard') return false; // 'cancel' (or any unrecognized key)
+    if (!discard) return false; // cancelled
   }
 
   // Dynamic import breaks the export-sprite ↔ tab-activation cycle (see above).

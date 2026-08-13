@@ -3,7 +3,6 @@ import { T, CollapsibleSection } from '../ui';
 import { useClassicLevelStore } from '../../state/classicLevelStore';
 import { useClassicProjectStore } from '../../state/classicProjectStore';
 import { useSpriteStore } from '../../state/spriteStore';
-import { spriteModeCanUndo } from '../../state/sprite-undo';
 import { S1_OBJECT_LIST, s1ObjectHex } from '../../../core/project/profiles/s1-objects';
 import { resolveObjectArt } from '../../../core/project/profiles/s1-object-art';
 import { editObjectArt } from './export-sprite';
@@ -15,7 +14,8 @@ import { ObjectThumb } from '../classic/ObjectLibraryPanel';
  * view's Object Library. Rows are the zone-linked objects (same registry the
  * edit-art handoff uses); clicking one opens its art + mappings in place. The
  * row whose art file is currently open is highlighted. Switching discards
- * unsaved pixel edits, so a confirm guards it while undo history is non-empty.
+ * unsaved pixel edits — editObjectArt guards that with the shared sprite discard
+ * confirm (re-clicking the open row stays a no-op), so no ad hoc prompt here.
  */
 export default function S1ObjectSection({ busy, onBusy }: { busy: boolean; onBusy: (b: boolean) => void }) {
   const ref = useClassicLevelStore((s) => s.ref);
@@ -32,9 +32,8 @@ export default function S1ObjectSection({ busy, onBusy }: { busy: boolean; onBus
 
   const pick = async (id: number) => {
     if (busy) return;
-    if (spriteModeCanUndo() && !window.confirm(
-      'Switching objects discards unsaved sprite edits (use Save art → first to keep them). Switch anyway?',
-    )) return;
+    // editObjectArt owns the dirty-discard confirm (shared with sprite-doc
+    // activation) and no-ops a re-click of the already-open object.
     onBusy(true);
     try { await editObjectArt(id); } finally { onBusy(false); }
   };

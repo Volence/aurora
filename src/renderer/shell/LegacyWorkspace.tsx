@@ -20,6 +20,9 @@ export interface LegacyWorkspaceProps {
 }
 
 export default function LegacyWorkspace({ onOpenProject, onOpenRecent, onSave }: LegacyWorkspaceProps) {
+  // Defensive backstop: App already gates this mount on classicOpen (the level
+  // pane only renders LegacyWorkspace when a classic project is open), so this
+  // guard is belt-and-suspenders, not the primary gate.
   const classicOpen = useClassicProjectStore((s) => s.status) === 'open';
   // Toolbar's onSave is `() => void | Promise<void>`; adapt the wider
   // `Promise<unknown>`-returning prop (saveAllDirty returns a result).

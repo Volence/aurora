@@ -125,6 +125,9 @@ export default function Toolbar({ onOpenProject, onOpenRecent, onSave }: Toolbar
         )}
       </div>
 
+      {/* Aeon block: currently UNREACHABLE — aeon level tabs render LevelWorkspace
+          (not Toolbar), and sprite-docs are classic-only until the aeon Object
+          Library task lands. Kept for that upcoming aeon sprite-doc app bar. */}
       {config && (
         <>
           <Select

@@ -86,7 +86,7 @@ function budgetSummary(ctx: Ctx) {
  * level tab to its layout facet and wait two frames for the component to mount
  * and paint before proceeding.
  */
-async function ensureMapMode(): Promise<void> {
+async function ensureLayoutFacet(): Promise<void> {
   const activeId = useSessionStore.getState().activeId;
   if (parseLevelTabId(activeId) && useWorkspaceStore.getState().facetFor(activeId) !== 'layout') {
     switchFacet(activeId, 'layout');
@@ -423,7 +423,7 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
     }
 
     case 'goto': {
-      await ensureMapMode();
+      await ensureLayoutFacet();
       const ctx = requireProject();
       if (!Number.isInteger(req.section) || req.section < 0 || req.section >= ctx.act.sections.length) {
         throw new Error(`section ${req.section} out of range`);
@@ -540,7 +540,7 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
     }
 
     case 'screenshot': {
-      await ensureMapMode();
+      await ensureLayoutFacet();
       requireProject();
       const canvas = document.getElementById('map-canvas') as HTMLCanvasElement | null;
       if (!canvas) throw new Error('map canvas not found — is the viewport mounted?');

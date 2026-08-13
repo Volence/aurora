@@ -21,7 +21,7 @@ import type { SpriteFormatId } from '../../../core/formats/sprite-format-adapter
 import type { CompressionKind } from '../../../core/compress';
 import { parsePaletteLine, decodeGenesisColor } from '../../../core/formats/palette';
 import { parseCharacterAnims, parseAnyAnimScript } from '../../../core/import/anim-import';
-import { markSpriteDocLoaded, requestOpenTab } from '../../shell/tab-activation';
+import { markSpriteDocLoaded, getLoadedSpriteDocId, requestOpenTab, spriteEditorDirty, confirmDiscardSpriteEdits } from '../../shell/tab-activation';
 import { spriteDocTab } from '../../shell/tabs';
 import { useClassicProjectStore } from '../../state/classicProjectStore';
 import { useClassicLevelStore } from '../../state/classicLevelStore';
@@ -458,14 +458,29 @@ export async function editObjectArtCheckout(id: number): Promise<boolean> {
 }
 
 export async function editObjectArt(id: number): Promise<boolean> {
-  // Checkout, then surface as a sprite-doc tab. This is a direct user action, not
-  // racing an activation, so we own the loaded-doc mark here: setting it before
-  // requestOpenTab makes the follow-up sprite-doc activation see the doc already
-  // loaded and no-op the reload.
+  const tabId = 'doc:sprite:s1:' + id;
+  const name = s1ObjectName(id); // named object, or its $XX hex fallback
+
+  // Re-clicking the object that's ALREADY loaded stays a no-op reload — just
+  // (re)surface its tab. Checked BEFORE the dirty prompt so re-clicking the same
+  // object never asks and never discards its own edits.
+  if (getLoadedSpriteDocId() === tabId) {
+    await requestOpenTab(spriteDocTab('s1', String(id), name));
+    return true;
+  }
+
+  // This is the highest-traffic edit-art entry (ObjectInspector /
+  // ObjectLibraryPanel "Edit art…"). editObjectArtCheckout retargets the
+  // singleton editor and discards the loaded sprite's edits + undo history, so
+  // guard it with the SAME confirm sprite-doc activation uses. Cancel → return
+  // false without touching anything.
+  if (spriteEditorDirty() && !(await confirmDiscardSpriteEdits())) return false;
+
   const ok = await editObjectArtCheckout(id);
   if (ok) {
-    markSpriteDocLoaded('doc:sprite:s1:' + id);
-    const name = s1ObjectName(id); // named object, or its $XX hex fallback
+    // Direct user action, not racing an activation — own the mark here so the
+    // follow-up sprite-doc activation sees the doc already loaded and no-ops.
+    markSpriteDocLoaded(tabId);
     await requestOpenTab(spriteDocTab('s1', String(id), name));
   }
   return ok;

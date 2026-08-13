@@ -22,9 +22,12 @@ import { useClassicProjectStore } from '../../../state/classicProjectStore';
 import { useClassicLevelStore } from '../../../state/classicLevelStore';
 import { useSpriteStore } from '../../../state/spriteStore';
 import { useSessionStore } from '../../../state/sessionStore';
+import { useConfirmStore } from '../../../state/confirmStore';
 import { markSpriteDocLoaded, getLoadedSpriteDocId } from '../../../shell/tab-activation';
 import { HOME_TAB } from '../../../../core/shell/session';
 import { createBuffer } from '../../../../core/art/pixel-ops';
+
+const realAsk = useConfirmStore.getState().ask;
 
 const DIR = '/home/user/s1disasm';
 
@@ -58,6 +61,7 @@ beforeEach(() => {
 
 afterEach(() => {
   __resetSpriteSetOpenerForTest();
+  useConfirmStore.setState({ ask: realAsk }); // undo any stubbed confirm
   vi.restoreAllMocks();
 });
 
@@ -196,5 +200,60 @@ describe('editObjectArt wrapper', () => {
 
     expect(ok).toBe(false);
     expect(useSessionStore.getState().tabs.some((t) => t.kind === 'sprite-doc')).toBe(false);
+  });
+});
+
+describe('editObjectArt dirty-discard guard', () => {
+  it('dirty + cancel → checkout NOT called, marker unchanged', async () => {
+    const calls: OpenCall[] = [];
+    __setSpriteSetOpenerForTest(stubOpener(calls));
+    await editObjectArt(0x0d); // load Signpost (13)
+    useSpriteStore.getState().clearCanvas(); // now dirty
+    expect(getLoadedSpriteDocId()).toBe('doc:sprite:s1:13');
+
+    calls.length = 0;
+    const askSpy = vi.fn(async () => 'cancel');
+    useConfirmStore.setState({ ask: askSpy });
+
+    const ok = await editObjectArt(0x1c); // try a DIFFERENT object (Bridge, id 28)
+
+    expect(ok).toBe(false);
+    expect(askSpy).toHaveBeenCalledTimes(1);
+    expect(calls).toHaveLength(0); // checkout never ran
+    expect(getLoadedSpriteDocId()).toBe('doc:sprite:s1:13'); // marker unchanged
+  });
+
+  it('dirty + discard → proceeds with the new checkout', async () => {
+    const calls: OpenCall[] = [];
+    __setSpriteSetOpenerForTest(stubOpener(calls));
+    await editObjectArt(0x0d);
+    useSpriteStore.getState().clearCanvas(); // dirty
+
+    calls.length = 0;
+    useConfirmStore.setState({ ask: async () => 'discard' });
+
+    const ok = await editObjectArt(0x1c);
+
+    expect(ok).toBe(true);
+    expect(calls).toHaveLength(1); // checkout ran
+    expect(getLoadedSpriteDocId()).toBe('doc:sprite:s1:28');
+  });
+
+  it('re-clicking the loaded object while dirty does NOT confirm or reload', async () => {
+    const calls: OpenCall[] = [];
+    __setSpriteSetOpenerForTest(stubOpener(calls));
+    await editObjectArt(0x0d);
+    useSpriteStore.getState().clearCanvas(); // dirty
+
+    calls.length = 0;
+    const askSpy = vi.fn(async () => 'cancel');
+    useConfirmStore.setState({ ask: askSpy });
+
+    const ok = await editObjectArt(0x0d); // SAME object
+
+    expect(ok).toBe(true);
+    expect(askSpy).not.toHaveBeenCalled(); // same-doc check precedes the prompt
+    expect(calls).toHaveLength(0); // no reload
+    expect(getLoadedSpriteDocId()).toBe('doc:sprite:s1:13');
   });
 });
