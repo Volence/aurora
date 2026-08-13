@@ -93,6 +93,22 @@ describe('DocumentHistoryHub', () => {
     expect(fired).toBe(2);
   });
 
+  // The payload is what lets an expensive subscriber (the tileset thumbnail
+  // atlas, a section prerender) ignore documents it doesn't render. Without it
+  // every listener is woken by every document's edits.
+  it('tells listeners WHICH document changed', () => {
+    hub.registerFactory('level:', (id) => fakeStack(id, log));
+    hub.registerFactory('doc:sprite:', (id) => fakeStack(id, log));
+    const changed: string[] = [];
+    hub.onChange((docId) => { changed.push(docId); });
+
+    hub.historyFor('level:ghz:1').undo();
+    hub.historyFor('doc:sprite:s1:sonic').undo();
+    hub.historyFor('level:ghz:1').undo();
+
+    expect(changed).toEqual(['level:ghz:1', 'doc:sprite:s1:sonic', 'level:ghz:1']);
+  });
+
   it('stops re-emitting from a disposed stack', () => {
     hub.registerFactory('level:', (id) => fakeStack(id, log));
     let fired = 0;

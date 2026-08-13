@@ -252,3 +252,76 @@ routing; closing a dirty level tab still drops its undo stack without warning;
 | Final-review fix 2 (sprite save) | 165 | 1442 | 2 | 0 |
 | Final-review fix 3 (classic cast) | 165 | 1444 | 2 | 0 |
 | Final-review fix 4 (onCommand) | 165 | 1448 | 2 | 0 |
+
+## Smoke-test fixes (two owner-reported regressions)
+
+### A. The repaint clock was too wide — but not as wide as it looked
+
+Reported as "editing the palette / anything that affects the map is mega slow"
+in an aeon project, with the suspicion that `useHistoryVersion`'s 14 consumers
+were the cause. **The census refutes that as the aeon story.** Master's clock
+(`editorStore.historyVersion`) already had ELEVEN of those twelve components
+subscribed, and it ticked on every aeon command *and* on every live-drag tick
+(`bumpVersion` in MapViewport's object/ring drag and BG tile write). The branch
+split those drag ticks onto `liveEditVersion`, which only MapViewport and
+PropertiesPanel read — so for an aeon drag the branch renders FEWER components
+than master, and for an aeon command it adds exactly one (TabStrip, cheap).
+
+What the branch did genuinely widen is CROSS-DOCUMENT. On master the aeon
+canvases could not see `spriteStore.historyTick` or
+`classicLevelStore.historyTick`, and there was one aeon clock for all acts. On
+the hub they see everything: a sprite brush stroke, a classic edit, or a
+background act tab's undo all woke every aeon surface — including the three that
+rebuild an expensive cache on that signal:
+
+| Surface | What one tick costs |
+|---|---|
+| `TilesetPanel` | one `OffscreenCanvas` + `putImageData` **per tile in the zone**, plus a `tileUsageCounts` scan of every section nametable |
+| `MapViewport` | `reloadAllSections` — re-prerender the whole atlas and every section |
+| `ComposerCanvas` | re-derive the document's entire pixel buffer from the atlas |
+
+Fix: `DocumentHistoryHub.onChange` now passes the CHANGED DOC ID, and
+`hooks/useHistoryVersion` keeps two hooks — `useHistoryVersion()` (any document,
+for the focus-following affordances: Toolbar, TabStrip, LevelWorkspace, and the
+cheap panels) and `useAeonHistoryVersion()` (the current zone-art + act
+documents only), which the four heavy surfaces now use. It is a strict narrowing
+of the hub signal, never a widening: it drops sprite documents, classic and
+background acts, and every aeon command still lands on one of the two watched
+documents because `executeCommand` (focus) and `executeAmbientCommand` (scope)
+both resolve against the same zone/act. As a side effect those surfaces now
+subscribe to `currentZoneId`/`currentActId`, which SectionGridNav previously
+lacked.
+
+**Not claimed:** that this is the whole of the owner's slowness. The three costs
+in the table are PRE-EXISTING and fire once per aeon command on master too;
+`TilesetPanel.ensureTileCache` allocating one OffscreenCanvas per tile on every
+committed art edit is the most suspicious of them and is untouched here. The
+renderer suite is node-only, so no test can count re-renders — the hub payload
+and the per-document counters are what is covered
+(`hooks/__tests__/useHistoryVersion.test.ts`).
+
+### B. Chunk thumbnails never invalidated at all
+
+Reported as "undo doesn't refresh the chunk thumbnails". Root cause is older
+than this branch and is not undo-specific: `ChunkLibrary`'s `ChunkThumb`
+memoised its `OffscreenCanvas` on `[chunk, tiles, palette]` — the three prop
+IDENTITIES — but every one of those is mutated IN PLACE by `history.ts`
+(`chunk.nametable = …`, `tiles[i] = …`, `palette.lines[n].colors = …` on the
+objects it was handed). So the memo never invalidated in either direction; the
+thumbnails were pinned to the art as it stood when the panel mounted.
+`chunkLibraryVersion` — bumped by `bumpStoreVersions` for exactly the three
+commands that can change the render, on execute/undo/redo alike — was subscribed
+but never threaded into the key. Now it is, for the thumbnail and for the
+`blankIds` "empty" tags (a `set-chunk` can make a chunk blank in place).
+
+Measured cost of the rebuild that this turns back on: ~6 ms of pixel work for
+128 chunks, ~12 ms for 256 (node, pixel loops only), plus one OffscreenCanvas per
+chunk. Acceptable, and it is what the surrounding comments already claimed was
+happening.
+
+TilesetPanel and ComposerCanvas do NOT share the bug — both key their caches on
+the history clock, so both already invalidated on undo.
+
+| After | Files | Passed | Skipped | Failed |
+|---|---|---|---|---|
+| Smoke-test fixes A+B | 167 | 1457 | 2 | 0 |

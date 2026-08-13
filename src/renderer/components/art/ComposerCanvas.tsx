@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useLayoutEffect, useCallback, useMemo, useState } from 'react';
 import { useArtStore } from '../../state/artStore';
 import { useEditorStore, executeCommand } from '../../state/editorStore';
-import { useHistoryVersion } from '../../hooks/useHistoryVersion';
+import { useAeonHistoryVersion } from '../../hooks/useHistoryVersion';
 import {
   useProjectStore, getCurrentZone, getActiveLevel, getCurrentAct,
 } from '../../state/projectStore';
@@ -96,7 +96,9 @@ export default function ComposerCanvas() {
   const selectedCollisionSolidity = useEditorStore((s) => s.selectedCollisionSolidity);
   const collisionPaintPlane = useEditorStore((s) => s.collisionPaintPlane);
   // Atlas tiles / palette can change underneath the doc (undo, agent writes).
-  const historyVersion = useHistoryVersion();
+  // Aeon-scoped: it re-derives the whole pixel buffer from the atlas, so only
+  // this zone's art/layout stacks may tick it.
+  const historyVersion = useAeonHistoryVersion();
   // paletteVersion ticks on every live preview step (kept off the history clock).
   const paletteVersion = useArtStore((s) => s.paletteVersion);
 

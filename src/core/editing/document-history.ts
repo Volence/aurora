@@ -15,11 +15,14 @@ import type { UndoStack } from './undo-stack';
 
 export type UndoStackFactory = (docId: string) => UndoStack;
 
+/** Notified with the doc id of the stack that changed. */
+export type HubListener = (docId: string) => void;
+
 export class DocumentHistoryHub {
   private stacks = new Map<string, UndoStack>();
   private unsubs = new Map<string, () => void>();
   private factories: Array<{ prefix: string; make: UndoStackFactory }> = [];
-  private listeners: Array<() => void> = [];
+  private listeners: Array<HubListener> = [];
 
   /** Register the factory for a doc-id prefix. Longest matching prefix wins. */
   registerFactory(prefix: string, make: UndoStackFactory): void {
@@ -39,7 +42,7 @@ export class DocumentHistoryHub {
 
     const stack = factory.make(docId);
     this.stacks.set(docId, stack);
-    this.unsubs.set(docId, stack.onChange(() => this.notify()));
+    this.unsubs.set(docId, stack.onChange(() => this.notify(docId)));
     return stack;
   }
 
@@ -58,8 +61,16 @@ export class DocumentHistoryHub {
     for (const docId of [...this.stacks.keys()]) this.dispose(docId);
   }
 
-  /** Subscribe to "some stack changed". Returns an unsubscribe function. */
-  onChange(cb: () => void): () => void {
+  /**
+   * Subscribe to "a stack changed", told WHICH document's stack it was. The doc
+   * id is what lets a subscriber ignore documents it doesn't render: without it
+   * every listener is woken by every other document's edits, and the expensive
+   * per-document caches (the tileset thumbnail atlas, a section prerender) get
+   * rebuilt because an unrelated sprite or act tab moved its undo pointer.
+   *
+   * Returns an unsubscribe function.
+   */
+  onChange(cb: HubListener): () => void {
     this.listeners.push(cb);
     return () => { this.listeners = this.listeners.filter((l) => l !== cb); };
   }
@@ -67,5 +78,5 @@ export class DocumentHistoryHub {
   /** Test support: forget registered factories so tests don't leak into each other. */
   clearFactories(): void { this.factories = []; }
 
-  private notify(): void { for (const l of this.listeners) l(); }
+  private notify(docId: string): void { for (const l of this.listeners) l(docId); }
 }

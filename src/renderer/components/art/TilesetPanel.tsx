@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useProjectStore, getCurrentZone, getCurrentAct, getActiveLevel } from '../../state/projectStore';
 import { useEditorStore, executeCommand } from '../../state/editorStore';
-import { useHistoryVersion } from '../../hooks/useHistoryVersion';
+import { useAeonHistoryVersion } from '../../hooks/useHistoryVersion';
 import { useArtStore } from '../../state/artStore';
 import { openDocumentGuarded } from './open-document';
 import { useToastStore } from '../../state/toastStore';
@@ -44,7 +44,11 @@ function ensureTileCache(tiles: Tile[], palette: Palette, key: string) {
 export default function TilesetPanel() {
   const currentZoneId = useProjectStore((s) => s.currentZoneId);
   const currentActId = useProjectStore((s) => s.currentActId);
-  const historyVersion = useHistoryVersion();
+  // Aeon-scoped: this value is the tile-thumbnail cache key AND the usage-scan
+  // key, so every tick rebuilds one OffscreenCanvas per tile in the zone and
+  // rescans every section nametable. Only this zone's own art/layout stacks may
+  // trigger that.
+  const historyVersion = useAeonHistoryVersion();
   const brushTile = useArtStore((s) => s.brushTile);
   const setBrushTile = useArtStore((s) => s.setBrushTile);
   const paletteLine = useArtStore((s) => s.paletteLine);

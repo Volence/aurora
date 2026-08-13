@@ -64,14 +64,29 @@ function renderChunkThumbnail(chunk: ChunkDef, tiles: Tile[], palette: Palette):
   return canvas;
 }
 
-/** One chunk thumbnail: the source render is memoised; only the scaled draw
- *  re-runs when the display size changes. */
-function ChunkThumb({ chunk, tiles, palette, size, selected, label, blank, onClick, onDoubleClick }: {
-  chunk: ChunkDef; tiles: Tile[]; palette: Palette; size: number; selected: boolean; label: string;
-  blank: boolean; onClick: () => void; onDoubleClick: () => void;
+/**
+ * One chunk thumbnail: the source render is memoised; only the scaled draw
+ * re-runs when the display size changes.
+ *
+ * `revision` is the cache key and it is NOT optional. Every input this thumbnail
+ * bakes — the chunk's nametable, the tiles it references, the palette lines
+ * those tiles color through — is mutated IN PLACE by the command layer
+ * (history.ts writes `chunk.nametable = …`, `tiles[i] = …`,
+ * `palette.lines[n].colors = …` on the objects it was handed). The prop
+ * identities therefore never change, so keying the memo on them alone pins the
+ * thumbnail to whatever the art looked like when the panel mounted — through
+ * edits AND through the undo that reverts them. editorStore.chunkLibraryVersion
+ * is the store-side signal bumped for exactly the three commands that can change
+ * this render (set-chunk / set-tileset-tiles / set-palette-line) on execute,
+ * undo and redo alike; threading it in is what makes the memo honest.
+ */
+function ChunkThumb({ chunk, tiles, palette, revision, size, selected, label, blank, onClick, onDoubleClick }: {
+  chunk: ChunkDef; tiles: Tile[]; palette: Palette; revision: number; size: number; selected: boolean;
+  label: string; blank: boolean; onClick: () => void; onDoubleClick: () => void;
 }) {
   const ref = useRef<HTMLCanvasElement>(null);
-  const off = useMemo(() => renderChunkThumbnail(chunk, tiles, palette), [chunk, tiles, palette]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- revision stands in for the in-place mutations
+  const off = useMemo(() => renderChunkThumbnail(chunk, tiles, palette), [chunk, tiles, palette, revision]);
   useEffect(() => {
     const ctx = ref.current?.getContext('2d');
     if (!ctx) return;
@@ -106,11 +121,15 @@ export default function ChunkLibrary() {
   const palette = zone?.palette ?? { lines: [] };
 
   // Which chunks are fully transparent (eraser chunks) — marked in the palette.
+  // Keyed on chunkLibraryVersion for the same reason ChunkThumb is: set-chunk
+  // rewrites `chunk.nametable` in place, so a chunk can become blank (or stop
+  // being blank) without the array or the chunk object changing identity.
   const blankIds = useMemo(() => {
     const s = new Set<string>();
     for (const c of chunks) if (isBlankChunk(c)) s.add(c.id);
     return s;
-  }, [chunks]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- see above
+  }, [chunks, chunkLibraryVersion]);
 
   const selectChunk = useCallback((chunk: ChunkDef) => {
     useEditorStore.getState().setSelectedChunkId(chunk.id);
@@ -221,7 +240,8 @@ export default function ChunkLibrary() {
             {chunks.map((chunk, idx) => (
               <ChunkThumb
                 key={chunk.id}
-                chunk={chunk} tiles={tiles} palette={palette} size={size}
+                chunk={chunk} tiles={tiles} palette={palette}
+                revision={chunkLibraryVersion} size={size}
                 selected={chunk.id === selectedChunkId}
                 blank={blankIds.has(chunk.id)}
                 label={`$${idx.toString(16).toUpperCase().padStart(2, '0')}`}

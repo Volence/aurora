@@ -2,7 +2,7 @@ import React, { useRef, useEffect, useCallback, useState } from 'react';
 import { useViewStore } from '../state/viewStore';
 import { useProjectStore, getCurrentAct, getCurrentZone, getActiveLevel as getStoreActiveLevel } from '../state/projectStore';
 import { useEditorStore, executeCommand, focusedHistory, setCommandInvalidationListener, RING_PATTERNS, type EditorTool } from '../state/editorStore';
-import { useHistoryVersion } from '../hooks/useHistoryVersion';
+import { useAeonHistoryVersion } from '../hooks/useHistoryVersion';
 import { useArtStore } from '../state/artStore';
 import { useSessionStore } from '../state/sessionStore';
 import { switchFacet, FACET_TOOLS } from '../workspace/facet-tools';
@@ -132,7 +132,10 @@ export default function MapViewport() {
   const collisionProfiles = useProjectStore((s) => s.collisionProfiles);
   // Two repaint clocks: committed edits arrive through the undo hub, live ones
   // (a drag in flight, a direct BG tile write) through the editor store.
-  const historyVersion = useHistoryVersion();
+  // Scoped to this act's layout + zone-art documents: every dependency of this
+  // effect chain is a full section re-prerender, so an unrelated document's
+  // undo pointer must not reach it.
+  const historyVersion = useAeonHistoryVersion();
   const liveEditVersion = useEditorStore((s) => s.liveEditVersion);
   const activeSectionIndex = useEditorStore((s) => s.activeSectionIndex);
   const editingLayer = useEditorStore((s) => s.editingLayer);

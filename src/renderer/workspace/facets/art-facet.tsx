@@ -11,7 +11,7 @@ import { openDocumentGuarded } from '../../components/art/open-document';
 import { createDoc, docFromChunk, sliceForSave } from '../../../core/art/composer-buffer';
 import { useProjectStore, getActiveLevel, getCurrentZone } from '../../state/projectStore';
 import { useEditorStore, focusedHistory, executeCommand } from '../../state/editorStore';
-import { useHistoryVersion } from '../../hooks/useHistoryVersion';
+import { useAeonHistoryVersion } from '../../hooks/useHistoryVersion';
 import { useToastStore } from '../../state/toastStore';
 import type { ChunkDef } from '../../../core/model/s4-types';
 import { Panel, CollapsibleSection, T } from '../../components/ui';
@@ -162,7 +162,7 @@ function handleSave() {
 
 function ArtCanvas() {
   const open = useArtStore((s) => s.open);
-  const historyVersion = useHistoryVersion();
+  const historyVersion = useAeonHistoryVersion();
   const project = useProjectStore((s) => s.project);
 
   // State for the "New Chunk" W/H inputs (default = one 128×128 px chunk)
