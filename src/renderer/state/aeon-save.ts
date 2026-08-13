@@ -1,7 +1,8 @@
 // Aeon save glue — replaces useProject.saveProject. Core builds the plan
 // (all serialization); this writes the files over IPC and owns the store
 // effects (loading flag, markClean, toasts). Result is a VARIANT, not a
-// throw (house isSaveSuccess convention — see stage-3 notes item 7).
+// throw — consumers judge success from the variant themselves (matching
+// classic-save.ts's convention, where the caller owns its success check).
 
 import { buildAeonSavePlan } from '../../core/project/aeon/save';
 import { createIpcFileAccess } from './classic-file-access';
@@ -13,10 +14,6 @@ export type AeonSaveResult =
   | { kind: 'saved' }
   | { kind: 'nothing' }          // no project / no current act — nothing to write
   | { kind: 'error'; message: string };
-
-export function isAeonSaveSuccess(r: AeonSaveResult): boolean {
-  return r.kind === 'saved' || r.kind === 'nothing';
-}
 
 export async function saveAeonProject(): Promise<AeonSaveResult> {
   const s = useProjectStore.getState();
