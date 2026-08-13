@@ -1212,9 +1212,33 @@ import { useClassicLevelStore } from '../state/classicLevelStore';
 import { useProjectStore } from '../state/projectStore';
 import { useConfirmStore } from '../state/confirmStore';
 import { useToastStore } from '../state/toastStore';
-import { saveClassicProject } from '../state/classic-save';
+import { saveClassicProject, type SaveClassicProjectResult } from '../state/classic-save';
 import { parseLevelTabId } from './tabs';
 import type { TabDescriptor } from '../../core/shell/session';
+
+// The save call is behind a seam (mirrors save-routing.ts's convention) so the
+// save-failure path is unit-testable without driving a real guarded write.
+type Saver = () => Promise<SaveClassicProjectResult>;
+let saveImpl: Saver = saveClassicProject;
+
+/** Substitute the classic save call (tests only). */
+export function __setActivationSaveForTest(fn: Saver): void { saveImpl = fn; }
+/** Restore the real save call (tests only). */
+export function __resetActivationSaveForTest(): void { saveImpl = saveClassicProject; }
+
+// saveClassicProject NEVER rejects — every failure mode (conflict/partial/error)
+// is encoded in the returned variant (see classic-save.ts). Only 'saved' and
+// 'nothing' (nothing was dirty) mean it's safe to proceed to openAct, which
+// resets doc+dirty+undo — a failed save must NOT fall through to that, or the
+// edits the user clicked "Save & switch" to protect are destroyed.
+function isSaveSuccess(r: SaveClassicProjectResult): boolean {
+  return r.kind === 'saved' || r.kind === 'nothing';
+}
+
+// One activation flow completes at a time: a newer call bumps this counter, so
+// an older flow that was awaiting a confirm answer or a save aborts instead of
+// racing its openAct in after the user's newer choice already landed.
+let activationGen = 0;
 
 export type ActivationPlan =
   | { kind: 'none' }
@@ -1248,7 +1272,10 @@ function currentEngine(): 's1' | 'aeon' | null {
 function classicOpenAct(zone: string, act: number): boolean {
   const target = useClassicProjectStore.getState().zoneTree
     .find((r) => r.zone === zone && r.act === act);
-  if (!target) return false;
+  if (!target) {
+    useToastStore.getState().addToast(`Level not found in this project (${zone} act ${act})`, 'error');
+    return false;
+  }
   if (!target.available) {
     useToastStore.getState().addToast(
       `${target.label} is unavailable: ${target.reason ?? 'missing files'}`, 'error');
@@ -1263,6 +1290,7 @@ function classicOpenAct(zone: string, act: number): boolean {
  * tab may take focus (false = user cancelled / target unavailable).
  */
 export async function activateLevelTarget(tabId: string): Promise<boolean> {
+  const myGen = ++activationGen;
   const classic = useClassicLevelStore.getState();
   const plan = planLevelActivation({
     tabId,
@@ -1290,8 +1318,16 @@ export async function activateLevelTarget(tabId: string): Promise<boolean> {
           { key: 'cancel', label: 'Cancel' },
         ],
       });
-      if (answer === 'save') await saveClassicProject();
-      else if (answer !== 'discard') return false;
+      if (myGen !== activationGen) return false; // superseded while the dialog was open
+      if (answer === 'save') {
+        const result = await saveImpl();
+        if (myGen !== activationGen) return false; // superseded while the save was in flight
+        // The save layer already toasted the failure — don't duplicate it here,
+        // just stop before openAct discards the edits it was trying to protect.
+        if (!isSaveSuccess(result)) return false;
+      } else if (answer !== 'discard') {
+        return false; // 'cancel' (or any unrecognized key, treated as cancel)
+      }
       return classicOpenAct(plan.zone, plan.act);
     }
   }
