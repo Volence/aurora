@@ -5,8 +5,8 @@
 // Parsing is LENIENT with per-entry diagnostics: a bad entry is dropped and
 // reported as a ConfigIssue, never allowed to discard the rest of the file —
 // the Project Setup tab renders these issues so the user can see exactly which
-// entry is wrong (Stage 2; replaces the Stage 1 all-or-nothing null parse and
-// s1/index.ts's private readSidecar()). Unknown top-level fields are preserved
+// entry is wrong (Stage 2; retired the Stage 1 all-or-nothing null parse and
+// the s1 adapter's private sidecar reader). Unknown top-level fields are preserved
 // so configs written by newer Auroras survive a round-trip through older ones.
 
 import { z } from 'zod';

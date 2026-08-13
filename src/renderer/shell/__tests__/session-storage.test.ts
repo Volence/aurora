@@ -46,6 +46,11 @@ describe('session storage', () => {
     expect(() => saveStoredSession(bad, '/p', initialSession())).not.toThrow();
   });
 
+  it('a throwing getItem loads as null (broken storage never breaks boot)', () => {
+    const bad: StorageLike = { getItem: () => { throw new Error('denied'); }, setItem: () => {} };
+    expect(loadStoredSession(bad, '/p', () => true)).toBeNull();
+  });
+
   it('defaultProjectSession opens and focuses the first level tab when given one', () => {
     const tab = { id: 'level:ghz:1', kind: 'level' as const, title: 'GHZ Act 1' };
     const s: SessionState = defaultProjectSession(tab);

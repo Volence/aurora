@@ -245,6 +245,23 @@ describe('s1Adapter.open overrides', () => {
     const handle = await s1Adapter.open(memFs(fullFake()));
     expect(handle.sidecar).toEqual({ config: {}, issues: [] });
   });
+
+  it('a sidecar that exists but fails to read is treated as unreadable, not a parse failure', async () => {
+    const files = fullFake({
+      '.aurora/project.json': JSON.stringify({ base: 's1-github' }),
+    });
+    const fa = memFs(files);
+    const realRead = fa.read.bind(fa);
+    fa.read = async (rel: string) => {
+      if (rel === '.aurora/project.json') throw new Error('EACCES');
+      return realRead(rel);
+    };
+    const handle = await s1Adapter.open(fa);
+    expect(handle.sidecar).toEqual({
+      config: {},
+      issues: [{ where: '$', message: expect.stringContaining('unreadable') }],
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------

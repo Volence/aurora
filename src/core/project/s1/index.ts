@@ -160,12 +160,13 @@ function mk(source: ProfileEntry, path: string, status: EntryStatus, detail?: st
  * degrades per entry, with the drops reported as issues on the handle.
  */
 async function readSidecarState(fa: FileAccess): Promise<SidecarState> {
+  let bytes: Uint8Array | null;
   try {
-    if (!(await fa.exists(SIDECAR))) return readProjectConfig(null);
-    return readProjectConfig(await fa.read(SIDECAR));
+    bytes = (await fa.exists(SIDECAR)) ? await fa.read(SIDECAR) : null;
   } catch {
     return { config: {}, issues: [{ where: '$', message: 'sidecar unreadable — ignoring it' }] };
   }
+  return readProjectConfig(bytes);
 }
 
 function mergeOverrides(

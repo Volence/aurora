@@ -90,8 +90,9 @@ describe('project runtime', () => {
     expect(documentHistoryHub.has('level:ghz:1')).toBe(false);
   });
 
-  it('coordinator and hub are stable singletons', () => {
-    expect(saveCoordinator).toBe(saveCoordinator);
-    expect(documentHistoryHub).toBe(documentHistoryHub);
+  it('coordinator and hub are stable module singletons', async () => {
+    const again = await import('../project-runtime');
+    expect(again.saveCoordinator).toBe(saveCoordinator);
+    expect(again.documentHistoryHub).toBe(documentHistoryHub);
   });
 });

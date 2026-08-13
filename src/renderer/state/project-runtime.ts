@@ -70,7 +70,13 @@ export function ensureSaversRegistered(): void {
   });
 }
 
-/** Ctrl+S / app-bar Save entry point. Failures surface as toasts. */
+/**
+ * Ctrl+S / app-bar Save entry point. Failures surface as toasts.
+ * NOTE: `saved` means the saver RAN — the classic/sprite savers encode failures
+ * in their return values (and toast them) rather than throwing, so `failed`
+ * being empty is not proof everything persisted; do not gate destructive
+ * actions on it.
+ */
 export async function saveAllDirty(): Promise<SaveAllResult> {
   const result = await saveCoordinator.saveAll();
   for (const f of result.failed) {
