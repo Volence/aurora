@@ -13,9 +13,9 @@ import { useConfirmStore } from '../state/confirmStore';
 import { useToastStore } from '../state/toastStore';
 import { saveClassicProject, type SaveClassicProjectResult } from '../state/classic-save';
 import { parseLevelTabId } from './tabs';
-import type { TabDescriptor } from '../../core/shell/session';
+import { HOME_TAB, type TabDescriptor } from '../../core/shell/session';
 
-// The save call is behind a seam (mirrors save-routing.ts's convention) so the
+// The save call is behind a seam (mirrors the retired save router's convention) so the
 // save-failure path is unit-testable without driving a real guarded write.
 type Saver = () => Promise<SaveClassicProjectResult>;
 let saveImpl: Saver = saveClassicProject;
@@ -152,6 +152,9 @@ export async function requestFocusTabId(id: string): Promise<void> {
  * tab never changes the active document and closes directly.
  */
 export async function requestCloseTab(id: string): Promise<void> {
+  // Home is uncloseable (core closeTab no-ops on it) — bail before the
+  // activation guard so a future non-TabStrip caller can't run it either.
+  if (id === HOME_TAB.id) return;
   const session = useSessionStore.getState();
   if (session.activeId !== id) { session.close(id); return; }
   const idx = session.tabs.findIndex((t) => t.id === id);

@@ -1,7 +1,7 @@
 // Project-scoped runtime singletons (watch-list #4 / spec §10): the ONE
 // SaveCoordinator behind Ctrl+S and the ONE DocumentHistoryHub the per-document
 // undo rewiring (Stages 3–4) will hang off. The three savers reproduce the
-// save-routing.ts semantics — fire-when-context-open, not
+// retired save router's semantics — fire-when-context-open, not
 // fire-when-strictly-dirty — so save behavior cannot regress in this stage:
 //   • sprite-art: whenever an S1 object's art is checked out (s1ArtSource set);
 //     registered FIRST so pixel edits are never lost behind a level-save error.
@@ -24,7 +24,7 @@ import { saveSpriteArt } from '../components/sprite/export-sprite';
 export const saveCoordinator = new SaveCoordinator();
 export const documentHistoryHub = new DocumentHistoryHub();
 
-// -- Injectable savers (test seam, mirroring save-routing's convention) ------
+// -- Injectable savers (test seam, mirroring the retired save router's convention) --
 type SaveFn = () => Promise<unknown> | unknown;
 let spriteArtImpl: SaveFn = saveSpriteArt;
 let classicImpl: SaveFn = saveClassicProject;

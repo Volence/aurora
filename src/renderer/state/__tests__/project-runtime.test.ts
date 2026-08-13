@@ -35,7 +35,7 @@ describe('project runtime', () => {
     expect(r.failed).toEqual([]);
   });
 
-  it('classic open → classic saver fires (mirrors retired save-routing)', async () => {
+  it('classic open → classic saver fires (mirrors the retired save router)', async () => {
     const log: string[] = [];
     __setRuntimeSaversForTest({ classic: async () => { log.push('classic'); } });
     useClassicProjectStore.setState({ status: 'open' });
