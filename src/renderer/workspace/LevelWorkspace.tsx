@@ -8,7 +8,9 @@ import React from 'react';
 import EditorShell from '../shell/EditorShell';
 import FacetBar from './FacetBar';
 import { facetModules } from './facet-registry';
+import { canvasFor } from './facet-canvases';
 import { useWorkspaceStore } from './workspaceStore';
+import { useOpenEngine } from '../state/open-project';
 import { useSessionStore } from '../state/sessionStore';
 import { useProjectStore } from '../state/projectStore';
 import { useEditorStore, focusedHistory } from '../state/editorStore';
@@ -26,6 +28,9 @@ export default function LevelWorkspace() {
   useHistoryVersion();
   const history = focusedHistory();
   const editingLayer = useEditorStore((s) => s.editingLayer);
+  // Hoisted above the `mod` null-guard below: a hook may not sit after an early
+  // return. Used only to resolve the Canvas slot (see the destructure below).
+  const engine = useOpenEngine();
   // App's mount effect calls registerAeonFacetModules() before any project can
   // load (project open is async, gated behind the same mount), so a facet module
   // is always present by the time an aeon level tab renders — the 'layout'
@@ -49,7 +54,13 @@ export default function LevelWorkspace() {
     </div>
   );
 
-  const { Canvas, ToolDock, ToolOptions, RightPanel, BottomExtra, StatusBar } = mod;
+  const { ToolDock, ToolOptions, RightPanel, BottomExtra, StatusBar } = mod;
+  // Engine-keyed canvas (spec §3.1); mod.Canvas is the fallback until every
+  // engine registers one — aeon registers its module's own Canvas, so this
+  // resolves to exactly what the destructure used to yield. NOTE: only the
+  // CANVAS is engine-keyed — the other slots are still aeon-coupled (spec
+  // §3.0.1) and neutralising them is a separate step.
+  const Canvas = canvasFor(engine, mod.id) ?? mod.Canvas;
   return (
     <EditorShell
       appBar={header}
