@@ -20,6 +20,12 @@
 // system (classicLevelStore.tool) — so switchFacet here would mutate an unrelated
 // store's tool on every click in the classic view.
 //
+// Some panels are deliberately NOT surfaces: the chunk picker and the zone/act
+// tree only change selections, and the picker's selection feeds BOTH the map's
+// stamp tool and the composer's Chunk tab. Claiming a facet from an ambiguous
+// selection would repoint undo without the user editing anything, so they leave
+// the facet on whichever surface the user was last actually working in.
+//
 // Spread `classicSurfaceProps(...)` onto a surface's root element rather than
 // calling focusClassicSurface by hand, so every surface claims focus the same
 // two ways: pointer-down (capture phase, so a child that stops propagation still
