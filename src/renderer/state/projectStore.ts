@@ -21,6 +21,16 @@ interface ProjectState {
   error: string | null;
   /** Object id → rendered preview (from a sprite binding). Empty until built. */
   objectSprites: Map<string, ObjectPreview>;
+  /**
+   * Object id → bound saved-sprite NAME, from the editor-side sidecar
+   * (`<dataRoot>sprites/object-bindings.json`). This is the authoritative
+   * object→sprite link: `ObjectDef.sprite` comes from the hand-authored
+   * objects.json that Aurora never writes, so the sidecar is what any UI
+   * binding produces. Published on project open — deliberately NOT gated on a
+   * zone/palette the way objectSprites is, because the Explorer's Object
+   * Library needs only the NAME and must not stay greyed until a level opens.
+   */
+  objectBindings: Record<string, string>;
   collisionProfiles: CollisionProfileSet | null;
   capabilities: CapabilityManifest | null;
   legacyAtlasMerged: boolean;
@@ -31,6 +41,7 @@ interface ProjectState {
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
   setObjectSprites: (sprites: Map<string, ObjectPreview>) => void;
+  setObjectBindings: (bindings: Record<string, string>) => void;
   setCollisionProfiles: (profiles: CollisionProfileSet | null) => void;
   /** Atomic full-project commit (aeon open). ONE set so no subscriber ever
    *  observes config-without-project — the gap behind the aeon→aeon session-
@@ -54,6 +65,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   loading: false,
   error: null,
   objectSprites: new Map(),
+  objectBindings: {},
   collisionProfiles: null,
   capabilities: null,
   legacyAtlasMerged: false,
@@ -64,6 +76,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   setLoading: (loading) => set({ loading }),
   setError: (error) => set({ error, loading: false }),
   setObjectSprites: (objectSprites) => set({ objectSprites }),
+  setObjectBindings: (objectBindings) => set({ objectBindings }),
   setCollisionProfiles: (collisionProfiles) => set({ collisionProfiles }),
   openLoaded: ({ config, project, collisionProfiles, capabilities, legacyAtlasMerged }) =>
     set({ config, project, collisionProfiles, capabilities, legacyAtlasMerged, loading: false, error: null }),
@@ -92,7 +105,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     if (!state.project) return {};
     return { project: { ...state.project, chunkLibrary: [] } };
   }),
-  reset: () => set({ config: null, project: null, currentZoneId: null, currentActId: null, loading: false, error: null, objectSprites: new Map(), collisionProfiles: null, capabilities: null, legacyAtlasMerged: false }),
+  reset: () => set({ config: null, project: null, currentZoneId: null, currentActId: null, loading: false, error: null, objectSprites: new Map(), objectBindings: {}, collisionProfiles: null, capabilities: null, legacyAtlasMerged: false }),
 }));
 
 export function getCurrentZone(state: ProjectState): Zone | null {

@@ -23,7 +23,8 @@ import { registerAeonFacetModules } from './workspace/register-facets';
 import { useSessionLifecycle, useActTabSync } from './shell/session-lifecycle';
 import { requestOpenTab, requestFocusIndex } from './shell/tab-activation';
 import { buildCommands } from './shell/commands';
-import { classicLevelTab, aeonLevelTab, PROJECT_SETUP_TAB } from './shell/tabs';
+import { classicLevelTab, aeonLevelTab, untitledSpriteTab, PROJECT_SETUP_TAB } from './shell/tabs';
+import { resolveObjectSprite } from './shell/explorer-data';
 import { S1_OBJECT_LIST, s1ObjectHex } from '../core/project/profiles/s1-objects';
 import { resolveObjectArt } from '../core/project/profiles/s1-object-art';
 import { editObjectArt } from './components/sprite/export-sprite';
@@ -41,6 +42,7 @@ export default function App() {
   const classicError = useClassicProjectStore((s) => s.error);
   const project = useProjectStore((s) => s.project);
   const objectLibrary = useProjectStore((s) => s.project?.objectLibrary ?? EMPTY_LIBRARY);
+  const objectBindings = useProjectStore((s) => s.objectBindings);
   const config = useProjectStore((s) => s.config);
   const currentZoneId = useProjectStore((s) => s.currentZoneId);
   const classicOpen = useClassicProjectStore((s) => s.status) === 'open';
@@ -64,8 +66,13 @@ export default function App() {
   useSessionLifecycle();
   useActTabSync();
 
-  // Build object preview images (from sprite bindings) when a project/zone loads.
-  useEffect(() => { if (project && currentZoneId) refreshObjectPreviews().catch(() => {}); }, [project, currentZoneId]);
+  // Load the object→sprite bindings (and, once a zone gives us a palette, their
+  // preview images) whenever a project or act loads. Gated on `project` ALONE:
+  // refreshObjectPreviews publishes the bindings before its own zone/palette
+  // check, and the Explorer's Object Library needs the names — waiting for a
+  // zone here is what used to leave every entry greyed as "no sprite bound"
+  // until a level happened to be open.
+  useEffect(() => { if (project) refreshObjectPreviews().catch(() => {}); }, [project, currentZoneId]);
 
   // -- global keys: Ctrl+S save current doc, Ctrl+Shift+S save all,
   //    Ctrl+B explorer, Ctrl+1..9 tab jump ---------------------------------
@@ -115,8 +122,8 @@ export default function App() {
           .map(({ id, name }) => ({ id, name, hex: s1ObjectHex(id) }))
       : [];
     const aeonSprites = objectLibrary
-      .filter((o): o is ObjectDef & { sprite: string } => !!o.sprite)
-      .map((o) => ({ name: o.name, sprite: o.sprite }));
+      .map((o) => ({ name: o.name, sprite: resolveObjectSprite(o, objectBindings) }))
+      .filter((o): o is { name: string; sprite: string } => !!o.sprite);
     return buildCommands(
       { tabs, activeId, engine, levelTabs, objects, aeonSprites, recents },
       {
@@ -126,11 +133,12 @@ export default function App() {
         toggleExplorer,
         openTab: (tab) => void requestOpenTab(tab),
         editObjectArt: (id) => { void editObjectArt(id); },
+        newSprite: () => void requestOpenTab(untitledSpriteTab()),
         openRecent: (path) => void openProjectByPath(path),
       },
     );
-  }, [tabs, activeId, engine, classicOpen, zoneTree, config, docReady, classicZone, objectLibrary, recents,
-      openProject, openProjectByPath, toggleExplorer]);
+  }, [tabs, activeId, engine, classicOpen, zoneTree, config, docReady, classicZone, objectLibrary,
+      objectBindings, recents, openProject, openProjectByPath, toggleExplorer]);
 
   return (
     <div style={styles.root}>

@@ -33,6 +33,8 @@ export interface CommandActions {
   toggleExplorer: () => void;
   openTab: (tab: TabDescriptor) => void;
   editObjectArt: (id: number) => void;
+  /** Open an empty, untitled sprite document (aeon). */
+  newSprite: () => void;
   openRecent: (path: string) => void;
 }
 
@@ -46,6 +48,15 @@ export function buildCommands(s: CommandSnapshot, a: CommandActions): Command[] 
     { id: 'toggle-explorer', label: 'Toggle Explorer', hint: 'Ctrl+B', run: a.toggleExplorer },
     { id: 'open-setup', label: 'Project Setup', hint: 'tool', run: () => a.openTab(PROJECT_SETUP_TAB) },
   ];
+
+  // aeon only, and unconditional within it: every other route into the sprite
+  // editor needs an object that is ALREADY bound to a saved sprite, and the only
+  // way to create that sprite is Export from inside the editor. Without this
+  // command a project with no sprites yet can never author its first one.
+  // (Classic has its own entry — "Edit art" per object — and no library sprites.)
+  if (s.engine === 'aeon') {
+    cmds.push({ id: 'new-sprite', label: 'New Sprite…', hint: 'sprite', run: a.newSprite });
+  }
 
   for (const tab of s.tabs) {
     if (tab.id === s.activeId) continue;

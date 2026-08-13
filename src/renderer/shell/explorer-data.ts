@@ -65,6 +65,30 @@ export function classicExplorerGroups(
 
 export interface AeonObjectRow { id: string; name: string; sprite: string | undefined }
 
+/** The Object Library row that opens an empty sprite document. Its own item id
+ *  (not a tab id) so the Explorer's `doc:sprite:` branch can't swallow it. */
+export const NEW_SPRITE_ITEM_ID = 'new-sprite';
+
+/**
+ * Which saved sprite an aeon object def is bound to, or undefined for none.
+ *
+ * TWO sources, deliberately ranked. `bindings` is the editor-side sidecar
+ * (`sprites/object-bindings.json`) that the Objects facet's "Preview sprite"
+ * dropdown writes — the only binding UI there is, and the only one Aurora may
+ * write, since objects.json is hand-authored alongside the object's assembly.
+ * `ObjectDef.sprite` is that hand-edited escape hatch, kept as the fallback so
+ * anything already declared in JSON keeps working.
+ *
+ * An empty-string binding (a stale sidecar; the writer deletes rather than
+ * blanks) falls through to the fallback rather than reading as "bound to ''".
+ */
+export function resolveObjectSprite(
+  o: { id: string; sprite?: string },
+  bindings: Record<string, string>,
+): string | undefined {
+  return bindings[o.id] || o.sprite;
+}
+
 export function aeonExplorerGroups(
   zones: { id: string; name: string; acts: { id: string }[] }[],
   objects: AeonObjectRow[],
@@ -82,11 +106,19 @@ export function aeonExplorerGroups(
     groups.push({
       id: 'objects',
       label: 'Object Library',
-      items: objects.map((o) =>
-        o.sprite
-          ? { id: `doc:sprite:aeon:${o.sprite}`, label: o.name }
-          : { id: `doc:sprite:aeon:${o.id}`, label: o.name, disabled: true, reason: 'no sprite bound' },
-      ),
+      items: [
+        // FIRST, and always enabled: in a project whose objects are all still
+        // unbound every row below is greyed, and the sprite editor is otherwise
+        // unreachable — nothing opens a sprite-doc tab without a binding, and
+        // Export (which creates the sprite the binding would point at) lives
+        // inside that editor. This row breaks that circle.
+        { id: NEW_SPRITE_ITEM_ID, label: 'New Sprite…', hint: 'new' },
+        ...objects.map((o) =>
+          o.sprite
+            ? { id: `doc:sprite:aeon:${o.sprite}`, label: o.name }
+            : { id: `doc:sprite:aeon:${o.id}`, label: o.name, disabled: true, reason: 'no sprite bound' },
+        ),
+      ],
     });
   }
   groups.push(TOOLS_GROUP);

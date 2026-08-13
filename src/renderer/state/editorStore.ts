@@ -9,7 +9,7 @@ import { documentHistoryHub } from './history-hub';
 import { useProjectStore } from './projectStore';
 import { useSessionStore } from './sessionStore';
 import { useWorkspaceStore } from '../workspace/workspaceStore';
-import { levelDocId, parseLevelTabId, parseSpriteDocTabId, zoneArtDocId } from '../shell/tabs';
+import { levelDocId, parseLevelTabId, isSpriteDocTabId, zoneArtDocId } from '../shell/tabs';
 
 export type EditorTool =
   | 'view' | 'select' | 'paint-tile' | 'paint-block' | 'stamp-chunk'
@@ -166,8 +166,11 @@ export function focusedDocId(): string | null {
   const activeId = useSessionStore.getState().activeId;
   if (!activeId) return null;
 
-  // A sprite-doc tab IS its document; no facet refinement applies.
-  if (parseSpriteDocTabId(activeId)) return activeId;
+  // A sprite-doc tab IS its document; no facet refinement applies. Includes the
+  // untitled "New Sprite…" tab, whose id is its document id too — otherwise the
+  // toolbar's undo would read as "nothing undoable" while SpriteMode's own
+  // Ctrl+Z happily undid on that document's stack.
+  if (isSpriteDocTabId(activeId)) return activeId;
 
   const level = parseLevelTabId(activeId);
   if (!level) return null;

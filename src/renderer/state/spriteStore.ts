@@ -7,6 +7,7 @@ import type { Tile } from '../../core/model/s4-types';
 import type { SpriteFrame } from '../../core/model/sprite-types';
 import { SpriteDocHistory, type SpriteSnapshot } from '../../core/editing/sprite-history';
 import { documentHistoryHub } from './history-hub';
+import { UNTITLED_SPRITE_TAB_ID } from '../shell/tabs';
 import type { SpritePaletteMode } from '../../core/art/sprite-palette';
 import { blankStandalonePalette } from '../../core/art/sprite-palette';
 import { copyRegion, clearRegion, pasteRegion, type ClipRegion } from '../../core/art/pixel-clipboard';
@@ -205,9 +206,14 @@ function cloneFrame(b: PixelBuffer): PixelBuffer {
  * active document) keeps ONE code path: every edit always has a document and
  * therefore an undo stack. It deliberately does not parse as a sprite-doc TAB id
  * (parseSpriteDocTabId requires an s1/aeon engine), so it can never collide with
- * one; it retires when tab activation opens a document for every sprite shown.
+ * one.
+ *
+ * It IS, however, the id of the "New Sprite…" TAB (shell/tabs.ts) — the entry
+ * point that lets a project with no sprites yet reach the editor at all. Same
+ * string, one document: the tab hosts exactly this document, so no mapping layer
+ * exists to drift.
  */
-export const UNTITLED_SPRITE_DOC_ID = 'doc:sprite:untitled';
+export const UNTITLED_SPRITE_DOC_ID = UNTITLED_SPRITE_TAB_ID;
 
 /** A pristine document of the given pixel size. */
 function blankDoc(w: number, h: number): SpriteDoc {

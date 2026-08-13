@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { classicExplorerGroups, aeonExplorerGroups, noProjectExplorerGroups } from '../explorer-data';
+import {
+  classicExplorerGroups, aeonExplorerGroups, noProjectExplorerGroups,
+  resolveObjectSprite, NEW_SPRITE_ITEM_ID,
+} from '../explorer-data';
 
 describe('classicExplorerGroups', () => {
   const zoneTree = [
@@ -74,9 +77,63 @@ describe('aeonExplorerGroups', () => {
     const lib = groups.find((g) => g.id === 'objects')!;
     expect(lib.label).toBe('Object Library');
     expect(lib.items).toEqual([
+      { id: NEW_SPRITE_ITEM_ID, label: 'New Sprite…', hint: 'new' },
       { id: 'doc:sprite:aeon:motobug', label: 'Moto Bug' },
       { id: 'doc:sprite:aeon:spring', label: 'Spring', disabled: true, reason: 'no sprite bound' },
     ]);
+  });
+
+  it('offers New Sprite… first, and enabled, even when EVERY object is unbound', () => {
+    // The chicken-and-egg case: no object has a sprite, so every other row is
+    // greyed and nothing else in the app opens a sprite-doc tab. If this row is
+    // missing or disabled, the first sprite can only be authored by hand-editing
+    // JSON on disk.
+    const lib = aeonExplorerGroups(
+      [{ id: 'ojz', name: 'OJ Zone', acts: [{ id: 'act1' }] }],
+      [{ id: 'spring', name: 'Spring', sprite: undefined }],
+    ).find((g) => g.id === 'objects')!;
+    expect(lib.items[0]).toEqual({ id: NEW_SPRITE_ITEM_ID, label: 'New Sprite…', hint: 'new' });
+    expect(lib.items[0].disabled).toBeUndefined();
+    // Not a tab id: the Explorer routes 'doc:sprite:' items into a sprite-doc
+    // tab open, and this row must not be swallowed by that branch.
+    expect(NEW_SPRITE_ITEM_ID.startsWith('doc:sprite:')).toBe(false);
+  });
+});
+
+describe('resolveObjectSprite', () => {
+  it('prefers the editor-side binding sidecar over ObjectDef.sprite', () => {
+    // The sidecar is what the ONLY binding UI writes; objects.json is
+    // hand-authored and Aurora never writes it.
+    expect(resolveObjectSprite({ id: 'motobug', sprite: 'stale' }, { motobug: 'motobug_v2' }))
+      .toBe('motobug_v2');
+  });
+
+  it('falls back to ObjectDef.sprite when nothing is bound', () => {
+    expect(resolveObjectSprite({ id: 'motobug', sprite: 'motobug' }, {})).toBe('motobug');
+  });
+
+  it('is undefined when neither source has one', () => {
+    expect(resolveObjectSprite({ id: 'spring' }, {})).toBeUndefined();
+    expect(resolveObjectSprite({ id: 'spring' }, { other: 'x' })).toBeUndefined();
+  });
+
+  it('treats an empty-string binding as unbound (stale sidecar), not as a name', () => {
+    expect(resolveObjectSprite({ id: 'spring', sprite: 'spring' }, { spring: '' })).toBe('spring');
+    expect(resolveObjectSprite({ id: 'spring' }, { spring: '' })).toBeUndefined();
+  });
+
+  it('ungreys the Object Library when only the sidecar has the binding', () => {
+    // End-to-end for the reported bug: binding through the Objects facet wrote
+    // the sidecar and the Explorer entry stayed greyed, because the group was
+    // built from ObjectDef.sprite alone.
+    const bindings = { spring: 'spring_up' };
+    const lib = aeonExplorerGroups(
+      [{ id: 'ojz', name: 'OJ Zone', acts: [{ id: 'act1' }] }],
+      [{ id: 'spring', name: 'Spring' }].map((o) => ({
+        id: o.id, name: o.name, sprite: resolveObjectSprite(o, bindings),
+      })),
+    ).find((g) => g.id === 'objects')!;
+    expect(lib.items[1]).toEqual({ id: 'doc:sprite:aeon:spring_up', label: 'Spring' });
   });
 });
 

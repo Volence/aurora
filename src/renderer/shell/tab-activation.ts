@@ -35,7 +35,9 @@ import {
   dirtySpriteDocIds, spriteDocState, DEFAULT_FRAME_SIZE,
 } from '../state/spriteStore';
 import { documentHistoryHub } from '../state/history-hub';
-import { parseLevelTabId, parseSpriteDocTabId, zoneArtDocId } from './tabs';
+import {
+  parseLevelTabId, parseSpriteDocTabId, isSpriteDocTabId, zoneArtDocId, UNTITLED_SPRITE_TAB_ID,
+} from './tabs';
 import { HOME_TAB, type TabDescriptor } from '../../core/shell/session';
 
 // The save call is behind a seam (mirrors the retired save router's convention) so the
@@ -104,8 +106,10 @@ function currentEngine(): 's1' | 'aeon' | null {
 // `spriteStore.activeDocId` IS the loaded-doc marker (it is what recordEdit
 // records against), so there is no second copy to drift out of sync.
 
-/** The sprite-doc TAB whose document is checked out, or null when the editor
- *  holds the untitled document — which deliberately isn't a tab id. */
+/** The ENGINE-BOUND sprite-doc tab whose document is checked out, or null when
+ *  the editor holds the untitled document. (The untitled document now has a tab
+ *  of its own — "New Sprite…" — but it is bound to no sprite on disk, which is
+ *  the question this answers, so it still reports null.) */
 export function getLoadedSpriteDocId(): string | null {
   const id = useSpriteStore.getState().activeDocId;
   return parseSpriteDocTabId(id) ? id : null;
@@ -137,20 +141,29 @@ export function closeAllSpriteDocs(): void {
 export type SpriteDocPlan =
   | { kind: 'none' }
   | { kind: 'checkout' }
+  | { kind: 'untitled' }
   | { kind: 'open'; engine: 's1' | 'aeon'; ref: string };
 
 /**
- * What focusing a sprite-doc tab has to do. Three cases, no confirm among them:
- * it is already checked out (nothing), it is open in the background (check it
- * out — its content and history are still there, so RELOADING it would throw
- * away exactly what multi-document exists to keep), or it has never been opened
+ * What focusing a sprite-doc tab has to do. No confirm among the cases: it is
+ * already checked out (nothing), it is open in the background (check it out —
+ * its content and history are still there, so RELOADING it would throw away
+ * exactly what multi-document exists to keep), or it has never been opened
  * (load it into a fresh document).
+ *
+ * The "New Sprite…" tab is its own case: there is nothing on disk to load, and
+ * its document may be checked out, parked, or (after the tab was closed once)
+ * gone entirely — so the glue hands it to openSpriteDoc, which covers all three
+ * without ever reaching a loader.
  */
 export function planSpriteDocActivation(input: {
   tabId: string;
   activeDocId: string;
   isOpen: boolean;
 }): SpriteDocPlan {
+  if (input.tabId === UNTITLED_SPRITE_TAB_ID) {
+    return input.activeDocId === input.tabId ? { kind: 'none' } : { kind: 'untitled' };
+  }
   const ref = parseSpriteDocTabId(input.tabId);
   if (!ref) return { kind: 'none' };
   if (input.activeDocId === input.tabId) return { kind: 'none' };
@@ -205,6 +218,14 @@ async function runSpriteActivation(tabId: string): Promise<boolean> {
   if (plan.kind === 'none') return true;
   if (plan.kind === 'checkout') {
     activateSpriteDoc(tabId); // synchronous state swap — nothing to supersede
+    return true;
+  }
+  if (plan.kind === 'untitled') {
+    // openSpriteDoc covers every state the untitled document can be in: parked
+    // (checked out again, pixels and history intact) or absent, because the tab
+    // was closed earlier and closeSpriteDoc dropped it (a fresh blank document).
+    // Synchronous, so nothing can supersede it.
+    openSpriteDoc(tabId, { width: DEFAULT_FRAME_SIZE, height: DEFAULT_FRAME_SIZE });
     return true;
   }
 
@@ -399,7 +420,7 @@ async function confirmCloseSpriteDoc(docId: string): Promise<boolean> {
  * would silently throw away undo for art edits still visible in act 2.
  */
 function disposeStacksForClosedTab(id: string): void {
-  if (parseSpriteDocTabId(id)) { closeSpriteDoc(id); return; }
+  if (isSpriteDocTabId(id)) { closeSpriteDoc(id); return; }
   const level = parseLevelTabId(id);
   if (!level) return;
   documentHistoryHub.dispose(id);
@@ -426,7 +447,7 @@ export async function requestCloseTab(id: string): Promise<void> {
   // one or a parked background one — so every sprite-doc close is confirmed when
   // it has unsaved edits. Runs BEFORE neighbor-promotion so a promoted level tab
   // isn't blocked by a now-stale sprite prompt.
-  if (parseSpriteDocTabId(id) !== null && !(await confirmCloseSpriteDoc(id))) return;
+  if (isSpriteDocTabId(id) && !(await confirmCloseSpriteDoc(id))) return;
 
   const session = useSessionStore.getState();
   if (session.activeId !== id) {
