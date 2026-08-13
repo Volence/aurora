@@ -26,6 +26,9 @@ export interface CommandSnapshot {
 
 export interface CommandActions {
   openProjectDialog: () => void;
+  /** Ctrl+S — the active tab's document only. */
+  save: () => void;
+  /** Ctrl+Shift+S — every dirty surface. */
   saveAll: () => void;
   toggleExplorer: () => void;
   openTab: (tab: TabDescriptor) => void;
@@ -36,7 +39,10 @@ export interface CommandActions {
 export function buildCommands(s: CommandSnapshot, a: CommandActions): Command[] {
   const cmds: Command[] = [
     { id: 'open-project', label: 'Open Project…', hint: 'project', run: a.openProjectDialog },
-    { id: 'save-all', label: 'Save All', hint: 'Ctrl+S', run: a.saveAll },
+    // Both save bindings are listed, and labelled apart: "Save" writes only what
+    // you are looking at, "Save All" writes every dirty surface.
+    { id: 'save', label: 'Save', hint: 'Ctrl+S', run: a.save },
+    { id: 'save-all', label: 'Save All', hint: 'Ctrl+Shift+S', run: a.saveAll },
     { id: 'toggle-explorer', label: 'Toggle Explorer', hint: 'Ctrl+B', run: a.toggleExplorer },
     { id: 'open-setup', label: 'Project Setup', hint: 'tool', run: () => a.openTab(PROJECT_SETUP_TAB) },
   ];

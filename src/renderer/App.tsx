@@ -17,7 +17,7 @@ import { useClassicProjectStore } from './state/classicProjectStore';
 import { useClassicLevelStore } from './state/classicLevelStore';
 import { useSessionStore } from './state/sessionStore';
 import { useShellStore } from './state/shellStore';
-import { ensureSaversRegistered, saveAllDirty } from './state/project-runtime';
+import { ensureSaversRegistered, saveAllDirty, saveActive } from './state/project-runtime';
 import { registerHistoryFactories } from './state/history-factories';
 import { registerAeonFacetModules } from './workspace/register-facets';
 import { useSessionLifecycle, useActTabSync } from './shell/session-lifecycle';
@@ -67,11 +67,19 @@ export default function App() {
   // Build object preview images (from sprite bindings) when a project/zone loads.
   useEffect(() => { if (project && currentZoneId) refreshObjectPreviews().catch(() => {}); }, [project, currentZoneId]);
 
-  // -- global keys: Ctrl+S save-all, Ctrl+B explorer, Ctrl+1..9 tab jump ---
+  // -- global keys: Ctrl+S save current doc, Ctrl+Shift+S save all,
+  //    Ctrl+B explorer, Ctrl+1..9 tab jump ---------------------------------
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (!(e.ctrlKey || e.metaKey)) return;
-      if ((e.key === 's' || e.key === 'S') && !e.shiftKey && !e.altKey) { e.preventDefault(); void saveAllDirty(); }
+      // Ctrl+S is the ACTIVE document only (the coordinator decides which saver
+      // owns it); Ctrl+Shift+S is the old save-everything-dirty. Writing a
+      // background document the user hadn't finished with is a real cost —
+      // these files are build inputs.
+      if ((e.key === 's' || e.key === 'S') && !e.altKey) {
+        e.preventDefault();
+        void (e.shiftKey ? saveAllDirty() : saveActive());
+      }
       else if ((e.key === 'b' || e.key === 'B') && !e.shiftKey && !e.altKey) { e.preventDefault(); toggleExplorer(); }
       else if (e.key >= '1' && e.key <= '9' && !e.shiftKey && !e.altKey) {
         e.preventDefault();
@@ -113,6 +121,7 @@ export default function App() {
       { tabs, activeId, engine, levelTabs, objects, aeonSprites, recents },
       {
         openProjectDialog: () => void openProject(),
+        save: () => void saveActive(),
         saveAll: () => void saveAllDirty(),
         toggleExplorer,
         openTab: (tab) => void requestOpenTab(tab),
@@ -161,7 +170,7 @@ export default function App() {
             ))}
             <div style={{ ...styles.tabPane, display: activeTab?.kind === 'level' ? 'flex' : 'none' }}>
               {classicOpen ? (
-                <LegacyWorkspace onOpenProject={openProject} onOpenRecent={openProjectByPath} onSave={saveAllDirty} />
+                <LegacyWorkspace onOpenProject={openProject} onOpenRecent={openProjectByPath} onSave={saveActive} />
               ) : config ? (
                 <LevelWorkspace />
               ) : null}
@@ -181,7 +190,7 @@ export default function App() {
                 the hidden level undo (finding 1). */}
             {activeTab?.kind === 'sprite-doc' && (
               <div style={{ ...styles.tabPane, display: 'flex' }}>
-                <SpriteMode appBar={<Toolbar onOpenProject={openProject} onOpenRecent={openProjectByPath} onSave={() => { void saveAllDirty(); }} />} />
+                <SpriteMode appBar={<Toolbar onOpenProject={openProject} onOpenRecent={openProjectByPath} onSave={() => { void saveActive(); }} />} />
               </div>
             )}
           </div>

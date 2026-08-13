@@ -8,43 +8,10 @@
 import React from 'react';
 import { T, Icons } from '../components/ui';
 import { useSessionStore } from '../state/sessionStore';
-import { useClassicProjectStore } from '../state/classicProjectStore';
-import { useClassicLevelStore } from '../state/classicLevelStore';
-import { useProjectStore } from '../state/projectStore';
-import { useEditorStore } from '../state/editorStore';
-import { useSpriteStore, dirtySpriteDocIds } from '../state/spriteStore';
-import { useHistoryVersion } from '../hooks/useHistoryVersion';
-import { tabHasDirtyDot, type DirtySnapshot } from './dirty-tabs';
+import { tabHasDirtyDot } from './dirty-tabs';
+import { useDirtySnapshot } from './dirty-snapshot';
 import { requestFocusTabId, requestCloseTab } from './tab-activation';
 import type { TabDescriptor } from '../../core/shell/session';
-
-function useDirtySnapshot(): DirtySnapshot {
-  const classicOpen = useClassicProjectStore((s) => s.status) === 'open';
-  const classicRefState = useClassicLevelStore((s) => s.ref);
-  const classicDirty = useClassicLevelStore((s) => Object.values(s.dirty).some(Boolean));
-  const aeonOpen = useProjectStore((s) => s.project) !== null;
-  const aeonDirty = useEditorStore((s) => s.dirty);
-  // Subscribe to the sprite pieces so the strip re-renders as the dirty verdict
-  // changes: unsavedEdits IS that verdict for the checked-out document, `docs`
-  // carries it for the parked ones, and activeDocId decides which is which — a
-  // save/export clears the flag without touching any history, so all three must
-  // be subscribed. The history clock + s1ArtSource are belt-and-braces re-render
-  // triggers for edits landing / art checkout-release.
-  useSpriteStore((s) => s.unsavedEdits);
-  useSpriteStore((s) => s.docs);
-  useSpriteStore((s) => s.activeDocId);
-  useHistoryVersion();
-  useSpriteStore((s) => s.s1ArtSource);
-  return {
-    classicOpen,
-    // classicRef = the LOADED act (store's ref), not a tree selection — dirty dots must track the doc that owns the edits.
-    classicRef: classicRefState ? { zone: classicRefState.zone, act: classicRefState.act } : null,
-    classicDirty,
-    aeonOpen,
-    aeonDirty,
-    dirtySpriteDocIds: dirtySpriteDocIds(),
-  };
-}
 
 function Tab({ tab, active, dirty }: { tab: TabDescriptor; active: boolean; dirty: boolean }) {
   const [hover, setHover] = React.useState(false);

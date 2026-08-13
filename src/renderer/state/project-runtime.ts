@@ -1,5 +1,5 @@
 // Project-scoped runtime singletons (watch-list #4 / spec §10): the ONE
-// SaveCoordinator behind Ctrl+S. The ONE DocumentHistoryHub now lives in
+// SaveCoordinator behind Ctrl+S / Ctrl+Shift+S. The ONE DocumentHistoryHub now lives in
 // history-hub.ts (import-free, to break the editorStore→project-runtime cycle)
 // and is re-exported below; this module still owns resetProjectRuntime's
 // clearAll on project switch. The three savers reproduce the
@@ -16,16 +16,34 @@
 //     and must not be written. Statically registered like the others (its impl,
 //     saveAeonProject, is a module import — no App-mount registration step).
 // Honest per-surface dirtiness (for tab dots) lives in dirty-tabs.ts, not here.
+//
+// Ctrl+S is NOT save-all (that is Ctrl+Shift+S): it saves the ACTIVE tab's
+// document only. Each saver above declares a `scope` — which tabs it owns, when
+// one of them is dirty, and how to save just that one — so the active-tab →
+// save-target mapping lives HERE, once, at the coordinator seam. Components call
+// saveActive()/canSaveActive() and stay ignorant of save targets (an earlier
+// stage deliberately deleted the scattered per-target save routing; don't bring
+// it back). The mapping:
+//   • sprite-doc tab   → that ONE sprite document (saveSpriteDocArt(tabId))
+//   • classic level tab → the classic project save
+//   • aeon level tab    → the aeon project save
+//   • Home / tool tabs  → nothing owns them: no-op
+// Per-tab dirtiness reuses the tab strip's dot rule (dirty-tabs.tabHasDirtyDot)
+// rather than inventing a second definition of "dirty".
 
 import { SaveCoordinator, type SaveAllResult } from '../../core/editing/save-coordinator';
 import { documentHistoryHub } from './history-hub';
 import { useClassicProjectStore } from './classicProjectStore';
 import { useProjectStore } from './projectStore';
+import { useSessionStore } from './sessionStore';
 import { useSpriteStore, saveableDirtySpriteDocIds } from './spriteStore';
 import { useToastStore } from './toastStore';
 import { saveClassicProject } from './classic-save';
-import { saveAllSpriteArt } from '../components/sprite/export-sprite';
+import { saveAllSpriteArt, saveSpriteDocArt } from '../components/sprite/export-sprite';
 import { saveAeonProject } from './aeon-save';
+import { parseLevelTabId, parseSpriteDocTabId } from '../shell/tabs';
+import { tabHasDirtyDot } from '../shell/dirty-tabs';
+import { currentDirtySnapshot } from '../shell/dirty-snapshot';
 
 export const saveCoordinator = new SaveCoordinator();
 // Re-exported so existing importers (project-runtime.test) keep working; the
@@ -34,17 +52,23 @@ export { documentHistoryHub };
 
 // -- Injectable savers (test seam, mirroring the retired save router's convention) --
 type SaveFn = () => Promise<unknown> | unknown;
+type SaveDocFn = (docId: string) => Promise<unknown> | unknown;
 let spriteArtImpl: SaveFn = saveAllSpriteArt;
+let spriteDocImpl: SaveDocFn = saveSpriteDocArt;
 let classicImpl: SaveFn = saveClassicProject;
 let aeonImpl: SaveFn = saveAeonProject;
 
-export function __setRuntimeSaversForTest(over: { spriteArt?: SaveFn; classic?: SaveFn; aeon?: SaveFn }): void {
+export function __setRuntimeSaversForTest(
+  over: { spriteArt?: SaveFn; spriteDoc?: SaveDocFn; classic?: SaveFn; aeon?: SaveFn },
+): void {
   if (over.spriteArt) spriteArtImpl = over.spriteArt;
+  if (over.spriteDoc) spriteDocImpl = over.spriteDoc;
   if (over.classic) classicImpl = over.classic;
   if (over.aeon) aeonImpl = over.aeon;
 }
 export function __resetRuntimeSaversForTest(): void {
   spriteArtImpl = saveAllSpriteArt;
+  spriteDocImpl = saveSpriteDocArt;
   classicImpl = saveClassicProject;
   aeonImpl = saveAeonProject;
 }
@@ -63,11 +87,29 @@ export function ensureSaversRegistered(): void {
     // real edits, and saveAllSpriteArt writes them all back.
     isDirty: () => saveableDirtySpriteDocIds().length > 0,
     save: async () => { await spriteArtImpl(); },
+    // Ctrl+S in a sprite tab writes THAT sprite and no other — the whole point
+    // of the split. A dirty document with no in-place art target is not savable
+    // work (Export is its only destination), so Save stays inert for it rather
+    // than toasting a failure the user can't act on from here.
+    scope: {
+      owns: (tabId) => parseSpriteDocTabId(tabId) !== null,
+      isDirty: (tabId) => saveableDirtySpriteDocIds().includes(tabId),
+      save: async (tabId) => { await spriteDocImpl(tabId); },
+    },
   });
   saveCoordinator.register({
     id: 'classic-level',
     isDirty: () => useClassicProjectStore.getState().status === 'open',
     save: async () => { await classicImpl(); },
+    // Save is COARSER than undo: a classic level tab's layout doc and its zone-art
+    // doc are separate undo documents but one classic project save, so the tab id
+    // is all the routing needed (saveClassicProject writes the loaded act).
+    scope: {
+      owns: (tabId) =>
+        parseLevelTabId(tabId) !== null && useClassicProjectStore.getState().status === 'open',
+      isDirty: (tabId) => tabHasDirtyDot(tabId, 'level', currentDirtySnapshot()),
+      save: async () => { await classicImpl(); },
+    },
   });
   saveCoordinator.register({
     id: 'aeon-project',
@@ -75,11 +117,21 @@ export function ensureSaversRegistered(): void {
       useClassicProjectStore.getState().status !== 'open' &&
       useProjectStore.getState().project !== null,
     save: async () => { await aeonImpl(); },
+    // Same ownership test as isDirty (a classic open means the resident aeon
+    // project is STALE and must not be written), narrowed to level tabs.
+    scope: {
+      owns: (tabId) =>
+        parseLevelTabId(tabId) !== null &&
+        useClassicProjectStore.getState().status !== 'open' &&
+        useProjectStore.getState().project !== null,
+      isDirty: (tabId) => tabHasDirtyDot(tabId, 'level', currentDirtySnapshot()),
+      save: async () => { await aeonImpl(); },
+    },
   });
 }
 
 /**
- * Ctrl+S / app-bar Save entry point. Failures surface as toasts.
+ * Ctrl+Shift+S / "Save All" entry point. Failures surface as toasts.
  * NOTE: `saved` means the saver RAN — the classic/sprite savers encode failures
  * in their return values (and toast them) rather than throwing, so `failed`
  * being empty is not proof everything persisted; do not gate destructive
@@ -91,6 +143,33 @@ export async function saveAllDirty(): Promise<SaveAllResult> {
     useToastStore.getState().addToast(`Save failed (${f.id}): ${f.message}`, 'error');
   }
   return result;
+}
+
+/** The tab whose document Ctrl+S and the app-bar Save button act on. */
+function activeTabId(): string | null {
+  return useSessionStore.getState().activeId || null;
+}
+
+/**
+ * Ctrl+S / app-bar Save entry point: save ONLY the active tab's document.
+ * A tab nothing owns (Home, Project Setup) or a clean one is a silent no-op —
+ * pressing Save must never write a document the user wasn't looking at.
+ * Same `saved`-is-not-proof-of-persistence caveat as saveAllDirty.
+ */
+export async function saveActive(tabId: string | null = activeTabId()): Promise<SaveAllResult> {
+  ensureSaversRegistered(); // order-independent: a Save that predates App's mount effect still routes
+  const result = await saveCoordinator.saveActive(tabId);
+  for (const f of result.failed) {
+    useToastStore.getState().addToast(`Save failed (${f.id}): ${f.message}`, 'error');
+  }
+  return result;
+}
+
+/** Would saveActive() write anything? The app-bar Save button's enabledness —
+ *  so the button and its click can no longer disagree. */
+export function canSaveActive(tabId: string | null = activeTabId()): boolean {
+  ensureSaversRegistered(); // called from render, which can precede App's mount effect
+  return saveCoordinator.canSaveActive(tabId);
 }
 
 /**

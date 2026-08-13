@@ -1,12 +1,15 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import {
   saveCoordinator, documentHistoryHub, ensureSaversRegistered, saveAllDirty,
-  resetProjectRuntime,
+  saveActive, canSaveActive, resetProjectRuntime,
   __setRuntimeSaversForTest, __resetRuntimeSaversForTest,
 } from '../project-runtime';
 import { useClassicProjectStore } from '../classicProjectStore';
+import { useClassicLevelStore } from '../classicLevelStore';
 import { useProjectStore } from '../projectStore';
-import { useSpriteStore, openSpriteDoc } from '../spriteStore';
+import { useSessionStore } from '../sessionStore';
+import { useEditorStore } from '../editorStore';
+import { useSpriteStore, openSpriteDoc, patchSpriteDoc } from '../spriteStore';
 
 describe('project runtime', () => {
   beforeEach(() => {
@@ -14,6 +17,9 @@ describe('project runtime', () => {
     useClassicProjectStore.getState().reset();
     useProjectStore.getState().reset();
     useSpriteStore.getState().closeAll();
+    useSessionStore.getState().reset();
+    useClassicLevelStore.setState({ ref: null, dirty: {} as never });
+    useEditorStore.setState({ dirty: false });
     __resetRuntimeSaversForTest();
   });
   afterEach(() => {
@@ -138,6 +144,135 @@ describe('project runtime', () => {
     const r = await saveAllDirty();
     expect(r.saved).toEqual(['sprite-art']);
     expect(r.failed).toEqual([{ id: 'classic-level', message: 'disk on fire' }]);
+  });
+
+  // -- Ctrl+S: the ACTIVE document only (Ctrl+Shift+S stays save-all) --------
+
+  /** Open a sprite doc tab + document with unsaved edits and an art target. */
+  function openDirtySprite(docId: string): void {
+    openSpriteDoc(docId, { width: 16, height: 16 });
+    useSpriteStore.setState({ s1ArtSource: {} as never, unsavedEdits: true });
+  }
+  function focusTab(id: string, kind: 'level' | 'sprite-doc' | 'tool' = 'sprite-doc'): void {
+    useSessionStore.getState().open({ id, kind, title: id });
+  }
+
+  it('REGRESSION: Ctrl+S in sprite B does not write dirty sprite A', async () => {
+    // The owner's exact complaint: edit sprite A, switch to B, edit B, Ctrl+S —
+    // and A (a build input they weren't ready to commit) got written too.
+    const saved: string[] = [];
+    __setRuntimeSaversForTest({ spriteDoc: async (id) => { saved.push(id); } });
+    openDirtySprite('doc:sprite:s1:13');           // A
+    openDirtySprite('doc:sprite:s1:28');           // B (parks A, still dirty)
+    focusTab('doc:sprite:s1:28');
+
+    const r = await saveActive();
+
+    expect(saved).toEqual(['doc:sprite:s1:28']);   // only B
+    expect(r.saved).toEqual(['sprite-art']);
+    // A is untouched and still dirty — its dot stays up, nothing was committed.
+    expect(useSpriteStore.getState().isDirty('doc:sprite:s1:13')).toBe(true);
+  });
+
+  it('Ctrl+Shift+S (save all) still reaches the background sprite', async () => {
+    const log: string[] = [];
+    __setRuntimeSaversForTest({
+      // the save-ALL sprite writer — that it covers every dirty document is
+      // sprite-doc-save.test.ts's subject; here it only has to be the one that runs
+      spriteArt: async () => { log.push('sprite-all'); },
+      spriteDoc: async (id) => { log.push(`one:${id}`); },
+      classic: async () => { log.push('classic'); },
+    });
+    useClassicProjectStore.setState({ status: 'open' });
+    openDirtySprite('doc:sprite:s1:13');
+    openDirtySprite('doc:sprite:s1:28');
+    focusTab('doc:sprite:s1:28');
+
+    const r = await saveAllDirty();
+
+    expect(log).toEqual(['sprite-all', 'classic']);
+    expect(r.saved).toEqual(['sprite-art', 'classic-level']);
+  });
+
+  it('Ctrl+S on a classic level tab saves the classic project', async () => {
+    const log: string[] = [];
+    __setRuntimeSaversForTest({
+      classic: async () => { log.push('classic'); },
+      spriteDoc: async (id) => { log.push(`sprite:${id}`); },
+    });
+    useClassicProjectStore.setState({ status: 'open' });
+    useClassicLevelStore.setState({
+      ref: { zone: 'ghz', act: 1, label: 'GHZ 1' } as never,
+      dirty: { fg: true } as never,
+    });
+    openDirtySprite('doc:sprite:s1:13');   // dirty in the background — must NOT be written
+    focusTab('level:ghz:1', 'level');
+
+    const r = await saveActive();
+
+    expect(log).toEqual(['classic']);
+    expect(r.saved).toEqual(['classic-level']);
+  });
+
+  it('Ctrl+S on an aeon level tab saves the aeon project', async () => {
+    const log: string[] = [];
+    __setRuntimeSaversForTest({ aeon: async () => { log.push('aeon'); } });
+    useProjectStore.setState({ project: {} as never });
+    useEditorStore.setState({ dirty: true });
+    focusTab('level:ehz:act1', 'level');
+
+    const r = await saveActive();
+
+    expect(log).toEqual(['aeon']);
+    expect(r.saved).toEqual(['aeon-project']);
+  });
+
+  it('Ctrl+S on a tool tab or Home is a safe no-op', async () => {
+    const log: string[] = [];
+    __setRuntimeSaversForTest({
+      classic: async () => { log.push('classic'); },
+      spriteDoc: async (id) => { log.push(`sprite:${id}`); },
+    });
+    useClassicProjectStore.setState({ status: 'open' });
+    openDirtySprite('doc:sprite:s1:13');
+
+    focusTab('tool:project-setup', 'tool');
+    expect(await saveActive()).toEqual({ saved: [], skipped: [], failed: [] });
+    useSessionStore.setState({ activeId: 'home' });
+    expect(await saveActive()).toEqual({ saved: [], skipped: [], failed: [] });
+
+    expect(log).toEqual([]);
+  });
+
+  it('Ctrl+S on a clean level tab writes nothing', async () => {
+    const log: string[] = [];
+    __setRuntimeSaversForTest({ classic: async () => { log.push('classic'); } });
+    useClassicProjectStore.setState({ status: 'open' });
+    useClassicLevelStore.setState({ ref: { zone: 'ghz', act: 1 } as never, dirty: {} as never });
+    focusTab('level:ghz:1', 'level');
+
+    const r = await saveActive();
+
+    expect(log).toEqual([]);
+    expect(r.skipped).toEqual(['classic-level']);
+  });
+
+  it('canSaveActive tracks the ACTIVE document, sprites included', () => {
+    openDirtySprite('doc:sprite:s1:13');
+    openSpriteDoc('doc:sprite:s1:28', { width: 16, height: 16 }); // clean, parks the dirty one
+
+    focusTab('doc:sprite:s1:28');
+    expect(canSaveActive()).toBe(false);   // this document has nothing to write
+    focusTab('doc:sprite:s1:13');
+    expect(canSaveActive()).toBe(true);    // …but this one does
+
+    // A dirty sprite with no in-place art target has no destination — Export is
+    // the only way to persist it, so Save must not claim it.
+    patchSpriteDoc('doc:sprite:s1:13', { s1ArtSource: null });
+    expect(canSaveActive()).toBe(false);
+
+    useSessionStore.setState({ activeId: 'home' });
+    expect(canSaveActive()).toBe(false);
   });
 
   it('resetProjectRuntime clears the history hub', () => {
