@@ -135,6 +135,6 @@ describe('confirmProjectOpen', () => {
     const toasts = useToastStore.getState().toasts;
     expect(toasts.length).toBe(toastCountBefore + 1);
     expect(toasts[toasts.length - 1]).toMatchObject({ type: 'error' });
-    expect(toasts[toasts.length - 1].message).toMatch(/could not be saved/i);
+    expect(toasts[toasts.length - 1].message).toMatch(/unsaved changes remain/i);
   });
 });

@@ -92,8 +92,11 @@ interface SpriteState {
    *  signal for the tab dot, the sprite-switch discard guard, and the
    *  project-open guard. Distinct from `s1ArtSource`: a checkout target is merely
    *  where a save WOULD write, not itself unsaved work, so opening an unedited
-   *  checkout must NOT read as dirty. Set true by recordEdit (the one edit choke
-   *  point); reset false by loadSprite/newSprite and by a successful save/export. */
+   *  checkout must NOT read as dirty. Set true by recordEdit (the one pixel/
+   *  palette choke point) and by timeline-only edits (steps live outside the
+   *  snapshot history); reset false by loadSprite/newSprite and by a successful
+   *  save/export. Undoing back to a pristine state still reads dirty — it fails
+   *  safe (over-asks rather than risk a silent discard). */
   unsavedEdits: boolean;
   setUnsavedEdits: (v: boolean) => void;
 
@@ -340,13 +343,21 @@ export const useSpriteStore = create<SpriteState>((set, get) => ({
 
   steps: [],
   playbackMode: 'forward',
-  addStep: (frameIndex) => set((s) => ({ steps: [...s.steps, { frameIndex, duration: DEFAULT_STEP_DURATION }] })),
-  removeStep: (i) => set((s) => ({ steps: s.steps.filter((_, idx) => idx !== i) })),
+  // Timeline edits mutate persisted data (exportSprite writes steps to
+  // <name>_anims.asm), so they dirty the doc — but steps live OUTSIDE the snapshot
+  // history (snap() omits them), so they set unsavedEdits DIRECTLY rather than via
+  // recordEdit (recording would push a snapshot that can't restore steps, a
+  // misleading undo entry). Pre-existing history gap; noted for Stage 4.
+  // playbackMode is preview-only (export hardcodes control:{kind:'loop'}), so it
+  // does NOT dirty.
+  addStep: (frameIndex) => set((s) => ({ steps: [...s.steps, { frameIndex, duration: DEFAULT_STEP_DURATION }], unsavedEdits: true })),
+  removeStep: (i) => set((s) => ({ steps: s.steps.filter((_, idx) => idx !== i), unsavedEdits: true })),
   setStepDuration: (i, duration) => set((s) => ({
     steps: s.steps.map((st, idx) => (idx === i ? { ...st, duration: Math.min(0x7f, Math.max(1, Math.round(duration) || 1)) } : st)),
+    unsavedEdits: true,
   })),
   setPlaybackMode: (playbackMode) => set({ playbackMode }),
-  setSteps: (steps) => set({ steps }),
+  setSteps: (steps) => set({ steps, unsavedEdits: true }),
 
   characterAnims: [],
   setCharacterAnims: (characterAnims) => set({ characterAnims }),

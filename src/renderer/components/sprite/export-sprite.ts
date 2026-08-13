@@ -583,6 +583,9 @@ export async function loadEngineCharacter(name: string): Promise<void> {
       if (charAnims[0]) useSpriteStore.getState().setSteps(charAnims[0].steps); // auto-load the first
       animCount = charAnims.length;
     } catch { /* anim script optional */ }
+    // A fresh load-from-disk is not unsaved work (mirrors loadSprite): the
+    // setSteps above dirties, so clear it back to clean here.
+    useSpriteStore.getState().setUnsavedEdits(false);
 
     toast(`Loaded ${name}: ${frames.length} frames${animCount ? `, ${animCount} animations` : ''} (${recon.width}×${recon.height})`, 'success');
   } catch (e) {

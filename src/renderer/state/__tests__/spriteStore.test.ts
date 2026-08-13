@@ -60,4 +60,29 @@ describe('spriteStore unsavedEdits lifecycle', () => {
     useSpriteStore.getState().setUnsavedEdits(false);
     expect(useSpriteStore.getState().unsavedEdits).toBe(false);
   });
+
+  // Timeline edits mutate persisted data (exportSprite writes steps to
+  // <name>_anims.asm) so they must dirty the doc — even though they sit outside
+  // the snapshot history and so leave no undo entry.
+  it('addStep sets it true (timeline is persisted data)', () => {
+    useSpriteStore.getState().addStep(0);
+    expect(useSpriteStore.getState().unsavedEdits).toBe(true);
+  });
+
+  it('setStepDuration sets it true', () => {
+    useSpriteStore.getState().addStep(0);
+    useSpriteStore.getState().setUnsavedEdits(false); // isolate the setStepDuration effect
+    useSpriteStore.getState().setStepDuration(0, 12);
+    expect(useSpriteStore.getState().unsavedEdits).toBe(true);
+  });
+
+  it('setSteps sets it true', () => {
+    useSpriteStore.getState().setSteps([{ frameIndex: 0, duration: 6 }]);
+    expect(useSpriteStore.getState().unsavedEdits).toBe(true);
+  });
+
+  it('setPlaybackMode does NOT set it (preview-only; not persisted in export)', () => {
+    useSpriteStore.getState().setPlaybackMode('pingpong');
+    expect(useSpriteStore.getState().unsavedEdits).toBe(false);
+  });
 });

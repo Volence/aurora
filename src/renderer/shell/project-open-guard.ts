@@ -95,7 +95,7 @@ export async function confirmProjectOpen(): Promise<boolean> {
     // unsavedEdits, so spriteDirty goes false.)
     if (planProjectOpen(currentOpenDirtySnapshot()).kind === 'confirm') {
       useToastStore.getState().addToast(
-        'Open cancelled — some changes could not be saved (see earlier save errors).',
+        'Open cancelled — unsaved changes remain (save or discard them first).',
         'error',
       );
       return false;
