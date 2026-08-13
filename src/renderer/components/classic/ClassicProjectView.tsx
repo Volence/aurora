@@ -49,6 +49,12 @@ export default function ClassicProjectView({ appBar }: { appBar: React.ReactNode
   // mount effect would wipe the classic level store (doc + undo history + unsaved
   // edits) on every such round trip. A new project always produces a NEW handle
   // object, so comparing handles resets on a genuine project change only.
+  // NOTE (Task 7): classicProjectStore.openDirectory now calls
+  // useClassicLevelStore.reset() itself as soon as a switch begins, closing the
+  // stale-handle window that existed if this view was unmounted mid-switch (e.g.
+  // switching away from sprite mode). This effect's reset is now redundant for
+  // that case but stays as a harmless idempotent backstop — it still owns the
+  // "remount without a real handle change should not reset" guard above.
   React.useEffect(() => {
     if (handle !== lastResetHandle) {
       lastResetHandle = handle;

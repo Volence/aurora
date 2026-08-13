@@ -27,6 +27,7 @@ import type {
 } from '../../core/project/adapter';
 import type { ResolutionReport } from '../../core/project/report';
 import { ipcClassicBridge, type ClassicBridge } from './classic-bridge';
+import { useClassicLevelStore } from './classicLevelStore';
 
 export type ClassicStatus = 'closed' | 'opening' | 'open';
 
@@ -88,6 +89,11 @@ export const useClassicProjectStore = create<ClassicProjectState>((set) => ({
 
   openDirectory: async (dir: string): Promise<OpenOutcome> => {
     set({ ...CLOSED, status: 'opening', dir });
+    // A project switch invalidates the loaded classic doc NOW — previously the
+    // reset lived in ClassicProjectView's handle-identity effect, leaving a
+    // window where a stale doc (with a dead handle) was still live if the view
+    // was unmounted mid-switch (e.g. switching away from sprite mode).
+    useClassicLevelStore.getState().reset();
     try {
       const res = await bridge.open(dir);
       if (res.kind === 'opened') {
