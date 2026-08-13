@@ -6,7 +6,7 @@
 
 import type { ZoneActRef } from '../../core/project/adapter';
 import type { RecentProject } from '../../shared/ipc-types';
-import type { ExplorerGroupModel } from '../../core/shell/explorer';
+import type { ExplorerGroupModel, ExplorerItemModel } from '../../core/shell/explorer';
 import { PROJECT_SETUP_TAB } from './tabs';
 
 export interface ClassicObjectRow {
@@ -18,11 +18,16 @@ export interface ClassicObjectRow {
   linked: boolean;
 }
 
-const TOOLS_GROUP: ExplorerGroupModel = {
+// Frozen: this singleton is spread into every classic/aeon groups() result, so
+// an accidental mutation through one caller (e.g. a future in-place sort/push)
+// would silently corrupt the Tools group everywhere else it's shared.
+const TOOLS_GROUP: ExplorerGroupModel = Object.freeze({
   id: 'tools',
   label: 'Tools',
-  items: [{ id: PROJECT_SETUP_TAB.id, label: PROJECT_SETUP_TAB.title }],
-};
+  items: Object.freeze([
+    { id: PROJECT_SETUP_TAB.id, label: PROJECT_SETUP_TAB.title },
+  ]) as unknown as ExplorerItemModel[],
+});
 
 export function classicExplorerGroups(
   zoneTree: ZoneActRef[],
