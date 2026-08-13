@@ -88,6 +88,11 @@ describe('s1Adapter.open resolution', () => {
       objects: 'objpos',
       build: false,
       facets: ['layout', 'art', 'objects', 'collision', 'palette'],
+      artTiers: [
+        { id: 'chunk', label: 'Chunk', pixelSize: 256, shared: true },
+        { id: 'block', label: 'Block', pixelSize: 16, shared: true },
+        { id: 'tile', label: 'Tile', pixelSize: 8, shared: true },
+      ],
     });
     expect(handle.report.total).toBe(ENTRIES.length);
     expect(handle.report.resolved).toBe(ENTRIES.length);

@@ -213,6 +213,12 @@ describe('aeonAdapter.open', () => {
     expect(handle.type).toBe('aeon');
     expect(handle.levels).toBeNull();
     expect(handle.capabilities.facets).toEqual(['layout', 'art', 'objects', 'rings', 'collision', 'palette']);
+    // Aeon's ladder has no 16px middle tier and its chunk tier is flattened on
+    // stamp, so `shared: false` (spec §2.1 / §3.0.2).
+    expect(handle.capabilities.artTiers).toEqual([
+      { id: 'chunk', label: 'Chunk', pixelSize: null, shared: false },
+      { id: 'tile', label: 'Tile', pixelSize: 8, shared: true },
+    ]);
     expect(handle.aeon).toBeDefined();
     expect(handle.aeon!.project.zones).toHaveLength(1);
     expect(handle.aeon!.config.name).toBe('Test Project');

@@ -80,6 +80,31 @@ export const FACET_CAPABILITIES = [
 export type FacetCapability = (typeof FACET_CAPABILITIES)[number];
 
 /**
+ * One rung of a profile's art hierarchy, outermost first. The breadcrumb in the
+ * Art facet has exactly one segment per tier, so this list IS the navigable
+ * depth — a profile with no middle tier simply declares two rungs.
+ */
+export interface ArtTier {
+  /** Stable id: 'chunk' | 'block' | 'tile' today. Used for behaviour lookups. */
+  readonly id: string;
+  /** Breadcrumb label. */
+  readonly label: string;
+  /** Edge length in px of one unit, or null when the tier is variable-size. */
+  readonly pixelSize: number | null;
+  /**
+   * True when placements REFERENCE a unit by id, so editing it changes every
+   * placement — which is what makes usage counts, a shared-edit banner and
+   * Duplicate meaningful. False when a placement FLATTENS a copy at stamp time
+   * (aeon chunks), where those affordances are meaningless and clipboard /
+   * save-to-library take their place.
+   *
+   * NOT named `pooled`: aeon's chunk tier IS a pooled id-addressed library; it
+   * is the STAMP that copies. See spec §3.0.2.
+   */
+  readonly shared: boolean;
+}
+
+/**
  * What an opened project can do. Fields are null/false when the capability is
  * absent so callers can feature-gate UI without probing the adapter further.
  */
@@ -92,6 +117,9 @@ export interface CapabilityManifest {
   /** Which level-workspace facets this project's levels get (spec §4/§7).
    *  The shell renders registered-facets ∩ this list and nothing else. */
   facets: FacetCapability[];
+  /** This profile's art hierarchy, outermost tier first (spec §3.3 as amended
+   *  by §3.0.2). Optional: absent means the profile declares no ladder yet. */
+  artTiers?: readonly ArtTier[];
 }
 
 /** Sidecar `.aurora/project.json` shape: user path overrides for resolution. */
