@@ -1,5 +1,7 @@
 // Objects facet — instance placement (spec §5): same canvas, object tools only,
-// object palette + inspector on the right.
+// object palette + inspector on the right. Deliberate delta from the legacy
+// every-tool panel set: the map.art ArtBrowser section is dropped here — it's
+// layout-editing context, not object-placement context (spec §4).
 
 import React from 'react';
 import MapViewport from '../../components/MapViewport';

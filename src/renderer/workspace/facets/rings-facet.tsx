@@ -1,5 +1,7 @@
 // Rings facet — ring-pattern placement (spec §5): same canvas, ring tools only,
-// ring pattern palette + inspector on the right.
+// ring pattern palette + inspector on the right. Deliberate delta from the
+// legacy every-tool panel set: the map.art ArtBrowser section is dropped here
+// — it's layout-editing context, not ring-placement context (spec §4).
 
 import React from 'react';
 import MapViewport from '../../components/MapViewport';
