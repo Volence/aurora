@@ -4,20 +4,15 @@
 // — it's layout-editing context, not ring-placement context (spec §4).
 
 import React from 'react';
-import MapViewport from '../../components/MapViewport';
 import RingPatternPalette from '../../components/RingPatternPalette';
 import PropertiesPanel from '../../components/PropertiesPanel';
-import MapStatusBar from '../../shell/MapStatusBar';
 import { Panel, CollapsibleSection } from '../../components/ui';
 import { useEditorStore } from '../../state/editorStore';
-import { MapFacetDock } from '../MapFacetDock';
-import type { FacetModule } from '../facet-registry';
+import { mapFacet, type FacetModule } from '../facet-registry';
 
 function RingsPanels() {
-  // Upgraded from the legacy branch's getState() read to a subscription: the
-  // legacy branch's non-reactive read is a pre-existing stale-highlight bug
-  // there (survives until Task 17 deletes it) that this facet doesn't need to
-  // inherit, since nothing else in the tree subscribes to selectedRingPattern.
+  // Reactive subscription (not a getState() read) so the highlighted swatch
+  // stays in sync with selection changes made elsewhere.
   const selectedRingPattern = useEditorStore((s) => s.selectedRingPattern);
   return (
     <Panel width={240} scroll>
@@ -32,10 +27,4 @@ function RingsPanels() {
   );
 }
 
-export const ringsFacet: FacetModule = {
-  id: 'rings',
-  Canvas: MapViewport,
-  ToolDock: () => <MapFacetDock facet="rings" />,
-  RightPanel: RingsPanels,
-  StatusBar: MapStatusBar,
-};
+export const ringsFacet: FacetModule = mapFacet('rings', { RightPanel: RingsPanels });

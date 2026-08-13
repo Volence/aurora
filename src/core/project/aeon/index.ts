@@ -31,9 +31,9 @@ const LABEL = 'Aeon Project';
  * field `loadS4Config` (core/config/s4-config) treats as its hard gate
  * (`engine !== 's4'` → throw). We sniff ONLY that field and defer all other
  * validation (name, zones, act shapes) to the existing loader, so:
- *   • a valid aeon project → detect matches → renderer runs loadFromPath (identical);
+ *   • a valid aeon project → detect matches → renderer runs openAeonProject (identical);
  *   • an aeon project.json that is engine:"s4" but otherwise broken → still matches
- *     here, so loadFromPath runs and surfaces its usual error (identical);
+ *     here, so openAeonProject runs and surfaces its usual error (identical);
  *   • a non-aurora project.json (another tool's, or malformed JSON) → engine is not
  *     "s4" (or unparseable) → detect returns null → the unrecognized-project notice.
  *

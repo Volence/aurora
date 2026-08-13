@@ -2,12 +2,9 @@
 // single palette editor (spec §4) as the panel content.
 
 import React from 'react';
-import MapViewport from '../../components/MapViewport';
 import PaletteEditor from '../../components/art/PaletteEditor';
-import MapStatusBar from '../../shell/MapStatusBar';
 import { Panel, CollapsibleSection } from '../../components/ui';
-import { MapFacetDock } from '../MapFacetDock';
-import type { FacetModule } from '../facet-registry';
+import { mapFacet, type FacetModule } from '../facet-registry';
 
 function PalettePanels() {
   return (
@@ -19,10 +16,4 @@ function PalettePanels() {
   );
 }
 
-export const paletteFacet: FacetModule = {
-  id: 'palette',
-  Canvas: MapViewport,
-  ToolDock: () => <MapFacetDock facet="palette" />,
-  RightPanel: PalettePanels,
-  StatusBar: MapStatusBar,
-};
+export const paletteFacet: FacetModule = mapFacet('palette', { RightPanel: PalettePanels });

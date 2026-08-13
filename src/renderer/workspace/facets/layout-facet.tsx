@@ -3,18 +3,15 @@
 // dock is tool-scoped by FACET_TOOLS.layout.
 
 import React from 'react';
-import MapViewport from '../../components/MapViewport';
 import SectionGridNav from '../../components/SectionGridNav';
 import ChunkLibrary from '../../components/ChunkLibrary';
 import MarqueePasteOptions from '../../components/MarqueePasteOptions';
 import ArtBrowser from '../../components/ArtBrowser';
 import PaletteViewer from '../../components/PaletteViewer';
 import PropertiesPanel from '../../components/PropertiesPanel';
-import MapStatusBar from '../../shell/MapStatusBar';
 import { Panel, CollapsibleSection } from '../../components/ui';
 import { useEditorStore } from '../../state/editorStore';
-import { MapFacetDock } from '../MapFacetDock';
-import type { FacetModule } from '../facet-registry';
+import { mapFacet, type FacetModule } from '../facet-registry';
 
 function LayoutPanels() {
   const tool = useEditorStore((s) => s.tool);
@@ -38,11 +35,7 @@ function LayoutPanels() {
   );
 }
 
-export const layoutFacet: FacetModule = {
-  id: 'layout',
-  Canvas: MapViewport,
-  ToolDock: () => <MapFacetDock facet="layout" />,
+export const layoutFacet: FacetModule = mapFacet('layout', {
   RightPanel: LayoutPanels,
   BottomExtra: PaletteViewer,
-  StatusBar: MapStatusBar,
-};
+});

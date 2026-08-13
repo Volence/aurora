@@ -4,14 +4,11 @@
 // layout-editing context, not object-placement context (spec §4).
 
 import React from 'react';
-import MapViewport from '../../components/MapViewport';
 import ObjectPalette from '../../components/ObjectPalette';
 import PropertiesPanel from '../../components/PropertiesPanel';
-import MapStatusBar from '../../shell/MapStatusBar';
 import { Panel, CollapsibleSection } from '../../components/ui';
 import { useEditorStore } from '../../state/editorStore';
-import { MapFacetDock } from '../MapFacetDock';
-import type { FacetModule } from '../facet-registry';
+import { mapFacet, type FacetModule } from '../facet-registry';
 
 function ObjectsPanels() {
   return (
@@ -27,10 +24,4 @@ function ObjectsPanels() {
   );
 }
 
-export const objectsFacet: FacetModule = {
-  id: 'objects',
-  Canvas: MapViewport,
-  ToolDock: () => <MapFacetDock facet="objects" />,
-  RightPanel: ObjectsPanels,
-  StatusBar: MapStatusBar,
-};
+export const objectsFacet: FacetModule = mapFacet('objects', { RightPanel: ObjectsPanels });

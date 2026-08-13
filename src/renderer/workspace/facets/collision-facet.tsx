@@ -6,13 +6,10 @@
 // layout-editing context, not collision context (spec §4).
 
 import React from 'react';
-import MapViewport from '../../components/MapViewport';
 import CollisionPalette from '../../components/CollisionPalette';
 import PropertiesPanel from '../../components/PropertiesPanel';
-import MapStatusBar from '../../shell/MapStatusBar';
 import { Panel, CollapsibleSection } from '../../components/ui';
-import { MapFacetDock } from '../MapFacetDock';
-import type { FacetModule } from '../facet-registry';
+import { mapFacet, type FacetModule } from '../facet-registry';
 
 function CollisionPanels() {
   return (
@@ -25,10 +22,4 @@ function CollisionPanels() {
   );
 }
 
-export const collisionFacet: FacetModule = {
-  id: 'collision',
-  Canvas: MapViewport,
-  ToolDock: () => <MapFacetDock facet="collision" />,
-  RightPanel: CollisionPanels,
-  StatusBar: MapStatusBar,
-};
+export const collisionFacet: FacetModule = mapFacet('collision', { RightPanel: CollisionPanels });

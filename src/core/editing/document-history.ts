@@ -1,9 +1,10 @@
 // Per-document undo (spec §10): every document owns one undo history; undo/
-// redo follows the focused document. Today the hub holds EditHistory (the
-// aeon command history) only — sprite docs (sprite-history) and classic docs
-// (classic-history) CANNOT live here until Stages 3–4 either generalize the
-// hub over a minimal undo-stack interface or unify the three history classes.
-// That rewiring also retires the undo-bus sibling-invalidation scheme.
+// redo follows the focused document. Aeon histories are resident here since
+// Stage 3 (editorStore.activeHistory keys into the hub by act tab id) —
+// sprite docs (sprite-history) and classic docs (classic-history) still live
+// outside it until Stage 4 either generalizes the hub over a minimal
+// undo-stack interface or unifies the three history classes. That rewiring
+// also retires the undo-bus sibling-invalidation scheme.
 //
 // Doc ids are the session tab ids ('level:ghz:1', 'doc:buzzbomber', …) so a
 // tab and its history share one identity.
