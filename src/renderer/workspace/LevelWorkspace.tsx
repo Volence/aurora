@@ -10,8 +10,9 @@ import FacetBar from './FacetBar';
 import { facetModules } from './facet-registry';
 import { useWorkspaceStore } from './workspaceStore';
 import { useSessionStore } from '../state/sessionStore';
-import { useProjectStore, getActiveLevel } from '../state/projectStore';
-import { useEditorStore, undo, redo, activeHistory } from '../state/editorStore';
+import { useProjectStore } from '../state/projectStore';
+import { useEditorStore, focusedHistory } from '../state/editorStore';
+import { useHistoryVersion } from '../hooks/useHistoryVersion';
 import { Chip } from '../components/ui';
 import type { EditingLayer } from '../state/editorStore';
 
@@ -19,14 +20,11 @@ export default function LevelWorkspace() {
   const activeId = useSessionStore((s) => s.activeId);
   const granted = useProjectStore((s) => s.capabilities?.facets ?? []);
   const facetId = useWorkspaceStore((s) => s.facetFor(activeId));
-  useEditorStore((s) => s.historyVersion); // repaint undo/redo enabledness on edit
-  // activeHistory() is hub-keyed by the current act; setCurrentAct does NOT bump
-  // historyVersion, so subscribe to currentActId directly to repaint undo/redo
-  // enabledness when the act switches. (In practice requestOpenTab calls
-  // setCurrentAct just before it flips activeId, so the activeId subscription
-  // above already covers tab-driven switches — this makes the act→enabledness
-  // dependency explicit rather than relying on that call ordering.)
-  useProjectStore((s) => s.currentActId);
+  // Undo/redo enabledness re-evaluates on any stack change; focus moves (a facet
+  // switch, a tab switch) are covered by the facetId/activeId subscriptions above,
+  // which is exactly what focusedHistory() keys on.
+  useHistoryVersion();
+  const history = focusedHistory();
   const editingLayer = useEditorStore((s) => s.editingLayer);
   // App's mount effect calls registerAeonFacetModules() before any project can
   // load (project open is async, gated behind the same mount), so a facet module
@@ -38,7 +36,6 @@ export default function LevelWorkspace() {
   if (!mod) return null;
 
   const showPlane = facetId === 'layout' || facetId === 'collision';
-  const level = () => getActiveLevel(useProjectStore.getState());
   const header = (
     <div style={styles.header}>
       <FacetBar tabId={activeId} granted={granted} />
@@ -47,10 +44,8 @@ export default function LevelWorkspace() {
         <Chip key={l} active={editingLayer === l}
           onClick={() => useEditorStore.getState().setEditingLayer(l)}>{l.toUpperCase()}</Chip>
       ))}
-      <Chip disabled={!activeHistory().canUndo}
-        onClick={() => { const lv = level(); if (lv) undo(lv); }}>Undo</Chip>
-      <Chip disabled={!activeHistory().canRedo}
-        onClick={() => { const lv = level(); if (lv) redo(lv); }}>Redo</Chip>
+      <Chip disabled={!history?.canUndo} onClick={() => history?.undo()}>Undo</Chip>
+      <Chip disabled={!history?.canRedo} onClick={() => history?.redo()}>Redo</Chip>
     </div>
   );
 

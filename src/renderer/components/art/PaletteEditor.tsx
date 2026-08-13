@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useProjectStore, getCurrentZone, getActiveLevel, getCurrentAct } from '../../state/projectStore';
-import { useEditorStore, executeCommand } from '../../state/editorStore';
+import { executeAmbientCommand } from '../../state/editorStore';
+import { useHistoryVersion } from '../../hooks/useHistoryVersion';
 import { useArtStore } from '../../state/artStore';
 import { useSpriteStore } from '../../state/spriteStore';
 import { encodeGenesisColor, decodeGenesisColor } from '../../../core/formats/palette';
@@ -62,11 +63,11 @@ function sameColors(a: Color[], b: Color[]): boolean {
  */
 export default function PaletteEditor({ context }: { context?: 'sprite' }) {
   // Subscribe to paletteVersion for live-preview repaint during slider drags.
-  // historyVersion re-renders swatches after undo/redo restores colors and
-  // after committed commands (set-palette-line bumps both).
+  // The history clock re-renders swatches after undo/redo restores colors and
+  // after committed commands, for the zone AND the sprite palettes alike — both
+  // documents' stacks report through the same hub.
   useArtStore((s) => s.paletteVersion);
-  useEditorStore((s) => s.historyVersion);
-  useSpriteStore((s) => s.historyTick); // re-render after sprite undo/redo
+  useHistoryVersion();
   const project = useProjectStore((s) => s.project);
   const zone = getCurrentZone(useProjectStore.getState());
   const paintColor = useArtStore((s) => s.selectedColor);
@@ -189,8 +190,8 @@ export default function PaletteEditor({ context }: { context?: 'sprite' }) {
   /**
    * Live preview: write the quantized color directly into the palette object
    * and bump docVersion + paletteVersion so the composer canvas (and the
-   * swatch grid) repaint immediately without touching historyVersion — keeping
-   * TilesetPanel's tile-thumb cache (keyed on historyVersion) silent per tick.
+   * swatch grid) repaint immediately without touching the history clock — keeping
+   * TilesetPanel's tile-thumb cache (keyed on that clock) silent per tick.
    */
   function previewChange(line: number, idx: number, channel: 'r' | 'g' | 'b', level3: number) {
     const z = getCurrentZone(useProjectStore.getState());
@@ -216,9 +217,17 @@ export default function PaletteEditor({ context }: { context?: 'sprite' }) {
    * keydown binding) is not blocked by the INPUT early-return guard on the next
    * undo.
    *
+   * AMBIENT, not focused: this editor edits ZONE palette lines from inside the
+   * sprite pane too (SpriteMode mounts it with context="sprite", where line 0 is
+   * unlocked and the "Copy to ▸ Zone line N" bridge writes zone CRAM). Focus
+   * there is the sprite DOCUMENT, which owns no command history — routing by
+   * focus threw inside the event handler. executeAmbientCommand records on the
+   * zone-art document the colors actually live in. Same reasoning for
+   * applyZoneSwatchCopy / applyZoneLineCopy below.
+   *
    * Note: MapViewport's invalidation listener handles set-palette-line →
    * reloadAllSections for the MAP repaint, but in Art mode it is unmounted —
-   * the composer repaints via historyVersion, and the map re-prerenders on
+   * the composer repaints via the history clock, and the map re-prerenders on
    * remount (MapViewport's mount effect). Established pattern; see
    * workspace/facets/art-facet.tsx (ArtCanvas).
    */
@@ -245,7 +254,7 @@ export default function PaletteEditor({ context }: { context?: 'sprite' }) {
       encodeGenesisColor(c) !== encodeGenesisColor(pre.colors[i]) || c.a !== pre.colors[i].a);
     if (!changed) return; // click without movement — no history entry
 
-    executeCommand({
+    executeAmbientCommand({
       type: 'set-palette-line',
       line: pre.line,
       oldColors: pre.colors,
@@ -265,7 +274,7 @@ export default function PaletteEditor({ context }: { context?: 'sprite' }) {
     const old = z.palette.lines[line].colors.map((c) => ({ ...c }));
     const edited = copySwatchInto(old, idx, src);
     if (sameColors(edited, old)) return;
-    executeCommand({
+    executeAmbientCommand({
       type: 'set-palette-line', line, oldColors: old, newColors: edited,
       sectionIndex: -1, description: `copy color into line ${line} idx ${idx}`,
     }, level);
@@ -280,7 +289,7 @@ export default function PaletteEditor({ context }: { context?: 'sprite' }) {
     const old = z.palette.lines[line].colors.map((c) => ({ ...c }));
     const edited = copyLineInto(old, src);
     if (sameColors(edited, old)) return;
-    executeCommand({
+    executeAmbientCommand({
       type: 'set-palette-line', line, oldColors: old, newColors: edited,
       sectionIndex: -1, description: `copy palette line into ${line}`,
     }, level);

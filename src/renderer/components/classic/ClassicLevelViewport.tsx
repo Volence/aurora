@@ -14,6 +14,7 @@ import {
 } from './viewport-math';
 import { drawCollision, drawObjects, drawStart, GHOST_MARKER_BOUNDS } from './classic-overlays';
 import { isTypingTarget } from './composer-shared';
+import { classicSurfaceProps } from './classic-surface';
 import { levelKeysEnabled } from '../../workspace/level-keys';
 import {
   CANVAS_VOID,
@@ -845,7 +846,12 @@ export default function ClassicLevelViewport() {
 
   // ---- render --------------------------------------------------------------
   return (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0 }}>
+    // Working in the map claims the LAYOUT facet, so Ctrl+Z here reverts this
+    // act's layout document (see classic-surface.ts).
+    <div
+      {...classicSurfaceProps('map')}
+      style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0 }}
+    >
       <OptionBar>
         <span style={{ color: T.textLo }}>Tool</span>
         <Chip active={tool === 'pan'} onClick={() => setTool('pan')} title="Pan / navigate (drag to pan)">Pan</Chip>

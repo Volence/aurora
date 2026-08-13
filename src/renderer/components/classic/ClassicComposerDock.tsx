@@ -6,6 +6,7 @@ import ChunkTab from './ChunkTab';
 import BlockTab from './BlockTab';
 import TileTab from './TileTab';
 import { hex, styles } from './composer-shared';
+import { classicSurfaceProps } from './classic-surface';
 
 // ---------------------------------------------------------------------------
 // Dock shell
@@ -93,7 +94,9 @@ export default function ClassicComposerDock() {
   if (status !== 'ready' || !doc || !usage) return null;
 
   return (
-    <div style={styles.dock}>
+    // Everything in this dock edits the ZONE-ART document (tiles/blocks/chunks),
+    // so working here claims the art facet for undo routing (classic-surface.ts).
+    <div {...classicSurfaceProps('art')} style={styles.dock}>
       <div style={styles.dockHead}>
         <button onClick={() => setOpen(!open)} style={styles.collapseBtn} title={open ? 'Collapse composer' : 'Expand composer'}>
           {open ? '▾' : '▸'} Composer

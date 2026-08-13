@@ -4,7 +4,7 @@ import { buildCommands, type CommandSnapshot, type CommandActions } from '../com
 
 function actions(): CommandActions {
   return {
-    openProjectDialog: vi.fn(), saveAll: vi.fn(), toggleExplorer: vi.fn(),
+    openProjectDialog: vi.fn(), save: vi.fn(), saveAll: vi.fn(), toggleExplorer: vi.fn(),
     openTab: vi.fn(), editObjectArt: vi.fn(), openRecent: vi.fn(),
   };
 }
@@ -24,9 +24,26 @@ describe('buildCommands', () => {
     const cmds = buildCommands(emptySnapshot, actions());
     const ids = cmds.map((c) => c.id);
     expect(ids).toContain('open-project');
+    expect(ids).toContain('save');
     expect(ids).toContain('save-all');
     expect(ids).toContain('toggle-explorer');
     expect(ids).toContain('open-setup');
+  });
+
+  it('offers BOTH save bindings, distinctly labelled and hinted', () => {
+    // The two are different operations now — the palette is where a user
+    // discovers that Ctrl+S is not save-everything.
+    const a = actions();
+    const cmds = buildCommands(emptySnapshot, a);
+    const save = cmds.find((c) => c.id === 'save')!;
+    const saveAll = cmds.find((c) => c.id === 'save-all')!;
+    expect([save.label, save.hint]).toEqual(['Save', 'Ctrl+S']);
+    expect([saveAll.label, saveAll.hint]).toEqual(['Save All', 'Ctrl+Shift+S']);
+    save.run();
+    expect(a.save).toHaveBeenCalled();
+    expect(a.saveAll).not.toHaveBeenCalled();
+    saveAll.run();
+    expect(a.saveAll).toHaveBeenCalled();
   });
 
   it('offers "Go to tab" for every open non-active tab', () => {

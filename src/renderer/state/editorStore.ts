@@ -1,14 +1,15 @@
 import { create } from 'zustand';
 import type { Solidity } from '../../core/collision/collision-model';
-import type { EditHistory } from '../../core/editing/history';
 import type { AnyCommand, S4Level } from '../../core/editing/commands';
 import type { MapClipboard, PasteLayers } from '../../core/editing/map-clipboard';
+import type { UndoStack } from '../../core/editing/undo-stack';
 import { useArtStore } from './artStore';
-import { registerRedoClearer, invalidateSiblingRedos } from '../../core/editing/undo-bus';
+import { BoundEditHistory } from '../../core/editing/bound-edit-history';
 import { documentHistoryHub } from './history-hub';
 import { useProjectStore } from './projectStore';
 import { useSessionStore } from './sessionStore';
-import { parseSpriteDocTabId } from '../shell/tabs';
+import { useWorkspaceStore } from '../workspace/workspaceStore';
+import { levelDocId, parseLevelTabId, parseSpriteDocTabId, zoneArtDocId } from '../shell/tabs';
 
 export type EditorTool =
   | 'view' | 'select' | 'paint-tile' | 'paint-block' | 'stamp-chunk'
@@ -83,7 +84,13 @@ interface EditorState {
   selection: Selection | null;
   multiSelection: MultiSelection | null;
   dirty: boolean;
-  historyVersion: number;
+  /**
+   * Repaint clock for level mutations that DON'T go through a command and so
+   * never reach an undo stack: an object/ring drag in progress, a direct BG tile
+   * write. History-driven repaint is not here — it comes from the hub, via
+   * hooks/useHistoryVersion.
+   */
+  liveEditVersion: number;
   chunkLibraryVersion: number;
 
   // S4 tool state
@@ -139,36 +146,55 @@ interface EditorState {
   setPasting: (pasting: boolean) => void;
   markDirty: () => void;
   markClean: () => void;
-  bumpVersion: () => void;
+  bumpLiveEdit: () => void;
   bumpChunkLibraryVersion: () => void;
 }
 
+/** Facets whose edits belong to the ZONE-ART document rather than the act's
+ *  layout: art and palette are zone-scoped data edited from an act tab. */
+const ZONE_ART_FACETS = new Set<string>(['art', 'palette']);
+
 /**
- * The focused aeon document's history — hub-keyed by the current act's tab id
- * (per-document undo, spec §10; stage-2 watch-list #4). Zone-scoped commands
- * (tileset/palette/chunks) land in the history of the act tab they were made
- * in: accepted v1 — undoing them happens from that tab.
+ * The document the user is currently editing: the active tab, refined by the
+ * facet focused within it (spec §4.2). Null when the active tab is not a
+ * document at all (a tool tab, or nothing open).
+ *
+ * The ONE resolution — focusedHistory and executeCommand both go through it, so
+ * a command can never be recorded on a document that undo would not reach.
  */
-export function activeHistory(): EditHistory {
-  const s = useProjectStore.getState();
-  const id = s.currentZoneId && s.currentActId
-    ? `level:${s.currentZoneId}:${s.currentActId}`
-    : 'level:aeon:none';
-  return documentHistoryHub.historyFor(id);
+export function focusedDocId(): string | null {
+  const activeId = useSessionStore.getState().activeId;
+  if (!activeId) return null;
+
+  // A sprite-doc tab IS its document; no facet refinement applies.
+  if (parseSpriteDocTabId(activeId)) return activeId;
+
+  const level = parseLevelTabId(activeId);
+  if (!level) return null;
+
+  const facet = useWorkspaceStore.getState().facetFor(activeId);
+  return ZONE_ART_FACETS.has(facet) ? zoneArtDocId(level.zone) : activeId;
 }
 
-// Let a sibling history (the sprite snapshot history) invalidate the ACTIVE
-// document's redo when a new sprite edit lands, and vice-versa — so sprite mode
-// behaves as one timeline.
-const clearLevelRedo = () => activeHistory().clearRedo();
-registerRedoClearer(clearLevelRedo);
+/**
+ * The undo stack for whatever the user is looking at (spec §4.2) — the ONE undo
+ * entry point every keybinding and toolbar button drives. Null when nothing
+ * undoable is focused, which the UI renders as a disabled control.
+ *
+ * Replaces activeHistory(), which keyed off projectStore's current act and so
+ * was aeon-coupled and blind to the focused facet.
+ */
+export function focusedHistory(): UndoStack | null {
+  const docId = focusedDocId();
+  return docId ? documentHistoryHub.historyFor(docId) : null;
+}
 
 export const useEditorStore = create<EditorState>((set) => ({
   tool: 'view',
   selection: null,
   multiSelection: null,
   dirty: false,
-  historyVersion: 0,
+  liveEditVersion: 0,
   chunkLibraryVersion: 0,
 
   activeSectionIndex: 0,
@@ -224,7 +250,7 @@ export const useEditorStore = create<EditorState>((set) => ({
   setPasting: (pasting) => set({ pasting }),
   markDirty: () => set({ dirty: true }),
   markClean: () => set({ dirty: false }),
-  bumpVersion: () => set((s) => ({ historyVersion: s.historyVersion + 1 })),
+  bumpLiveEdit: () => set((s) => ({ liveEditVersion: s.liveEditVersion + 1 })),
   bumpChunkLibraryVersion: () => set((s) => ({ chunkLibraryVersion: s.chunkLibraryVersion + 1 })),
 }));
 
@@ -265,7 +291,7 @@ function bumpStoreVersions(cmd: AnyCommand): void {
   }
   // A committed palette-line change (a slider commit, a copy-bridge write, or its
   // undo/redo) must repaint every paletteVersion subscriber — notably the sprite
-  // canvas, which watches paletteVersion but not historyVersion. The live slider
+  // canvas, which watches paletteVersion but not the history clock. The live slider
   // preview bumps paletteVersion itself; this covers the commit + undo/redo paths.
   if (cmd.type === 'set-palette-line') {
     useArtStore.getState().bumpPaletteVersion();
@@ -273,38 +299,111 @@ function bumpStoreVersions(cmd: AnyCommand): void {
 }
 
 /**
- * Execute a command against the current level, updating history and triggering re-render.
+ * A command was applied or reverted: refresh everything that caches level data.
+ * The aeon undo stacks call this themselves (history-factories wires it in), so
+ * an undo repaints exactly like the edit that made it — see BoundEditHistory,
+ * whose argument-free undo()/redo() cannot return the command to their caller.
  */
-export function executeCommand(command: AnyCommand, level: S4Level): void {
-  const h = activeHistory();
-  h.execute(command, level);
-  // While a sprite-doc tab is active a palette edit is a new entry in the merged
-  // sprite-mode timeline, so it invalidates the sprite history's redo. Gated on
-  // that so ordinary level editing (map/art facets) never disturbs a sprite's
-  // redo stack.
-  if (parseSpriteDocTabId(useSessionStore.getState().activeId) !== null) invalidateSiblingRedos(clearLevelRedo);
+export function notifyCommandApplied(command: AnyCommand): void {
   bumpStoreVersions(command);
   invalidationListener?.(command);
+}
+
+/**
+ * Execute a command against the current level, recording it on the FOCUSED
+ * document's undo stack (focusedDocId) so the same Ctrl+Z that the user reaches
+ * for reverts it.
+ *
+ * Commands are aeon's editing model, so the focused document must be an aeon
+ * command history. Anything else is a wiring bug (a level command issued while a
+ * sprite doc or tool tab owns the focus) and is loud rather than silent: a
+ * swallowed command would edit the level with no way to undo it.
+ */
+export function executeCommand(command: AnyCommand, level: S4Level): void {
+  const stack = focusedHistory();
+  if (!(stack instanceof BoundEditHistory)) {
+    throw new Error(
+      `executeCommand: the focused document '${focusedDocId() ?? '(none)'}' is not an aeon command history`,
+    );
+  }
+  stack.execute(command, level);   // notifies notifyCommandApplied
   useEditorStore.getState().markDirty();
-  useEditorStore.getState().bumpVersion();
 }
 
-export function undo(level: S4Level): void {
-  const h = activeHistory();
-  const cmd = h.undo(level);
-  if (cmd) {
-    bumpStoreVersions(cmd);
-    invalidationListener?.(cmd);
+// --- Ambient (non-focused) commands ----------------------------------------
+
+/**
+ * Commands whose data lives on the ZONE rather than the act. Derived from what
+ * core/editing/history.ts actually mutates: these three are the only members of
+ * AnyCommand that touch `level.palette` / `level.tileset` / `level.chunkLibrary`
+ * (all zone-level fields of S4Level). Every other command writes
+ * `level.sections[...]` or `level.act`, both act-scoped. Keep this in step with
+ * applyCommand — a new zone-level command that isn't listed here would be
+ * recorded on the act stack and lost when that act tab closes.
+ */
+const ZONE_SCOPED_COMMAND_TYPES = new Set<AnyCommand['type']>([
+  'set-palette-line',
+  'set-tileset-tiles',
+  'set-chunk',
+]);
+
+/**
+ * A batch is zone-scoped only when EVERY leaf is — one act-scoped child pins the
+ * whole step to the act, because a step that half-lives on a stack the act tab's
+ * close would discard is worse than one recorded a level too narrowly. No mixed
+ * batch is constructed today (map-stamp builds act-scoped children, ComposerCanvas
+ * zone-scoped ones); the rule exists so a future one can't silently split.
+ */
+export function isZoneScopedCommand(command: AnyCommand): boolean {
+  if (command.type === 'batch') {
+    return command.commands.length > 0 && command.commands.every(isZoneScopedCommand);
   }
-  useEditorStore.getState().bumpVersion();
+  return ZONE_SCOPED_COMMAND_TYPES.has(command.type);
 }
 
-export function redo(level: S4Level): void {
-  const h = activeHistory();
-  const cmd = h.redo(level);
-  if (cmd) {
-    bumpStoreVersions(cmd);
-    invalidationListener?.(cmd);
+/**
+ * The document a command's DATA belongs to, from the project store's current
+ * zone/act (which tab activation keeps pointed at the last activated level tab).
+ * Null when no act is current, i.e. there is no level to edit at all.
+ */
+export function commandDocId(command: AnyCommand): string | null {
+  const { currentZoneId, currentActId } = useProjectStore.getState();
+  if (!currentZoneId) return null;
+  if (isZoneScopedCommand(command)) return zoneArtDocId(currentZoneId);
+  return currentActId ? levelDocId(currentZoneId, currentActId) : null;
+}
+
+/**
+ * Execute a command that does NOT originate from the focused surface, recording
+ * it on the document its data belongs to (commandDocId).
+ *
+ * executeCommand routes by FOCUS, which is right for an editing surface — the
+ * user's Ctrl+Z reaches back into the thing they were just looking at. It is
+ * wrong for ambient callers, which edit the project irrespective of focus:
+ *
+ *  - the agent handler's edit tools, which run against whatever act is loaded
+ *    while the active tab may be Home, a tool tab, or a sprite doc — none of
+ *    which own a command history, so focus routing THREW (the MCP call failed);
+ *  - PaletteEditor's zone-palette rows and "Copy to ▸ Zone line N" bridges,
+ *    which write zone CRAM from inside the sprite pane (same throw).
+ *
+ * Scope routing also stops a zone-scoped edit made while the layout facet
+ * happens to be focused from being recorded on the ACT stack, where closing
+ * that act tab would discard a zone edit that outlives it.
+ */
+export function executeAmbientCommand(command: AnyCommand, level: S4Level): void {
+  const docId = commandDocId(command);
+  if (!docId) {
+    throw new Error(
+      `executeAmbientCommand: no current act — '${command.type}' has no document to record on`,
+    );
   }
-  useEditorStore.getState().bumpVersion();
+  const stack = documentHistoryHub.historyFor(docId);
+  if (!(stack instanceof BoundEditHistory)) {
+    throw new Error(
+      `executeAmbientCommand: document '${docId}' is not an aeon command history`,
+    );
+  }
+  stack.execute(command, level);   // notifies notifyCommandApplied
+  useEditorStore.getState().markDirty();
 }

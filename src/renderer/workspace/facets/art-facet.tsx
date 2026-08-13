@@ -10,7 +10,8 @@ import { useArtStore } from '../../state/artStore';
 import { openDocumentGuarded } from '../../components/art/open-document';
 import { createDoc, docFromChunk, sliceForSave } from '../../../core/art/composer-buffer';
 import { useProjectStore, getActiveLevel, getCurrentZone } from '../../state/projectStore';
-import { useEditorStore, undo, redo, executeCommand } from '../../state/editorStore';
+import { useEditorStore, focusedHistory, executeCommand } from '../../state/editorStore';
+import { useAeonHistoryVersion } from '../../hooks/useHistoryVersion';
 import { useToastStore } from '../../state/toastStore';
 import type { ChunkDef } from '../../../core/model/s4-types';
 import { Panel, CollapsibleSection, T } from '../../components/ui';
@@ -161,7 +162,7 @@ function handleSave() {
 
 function ArtCanvas() {
   const open = useArtStore((s) => s.open);
-  const historyVersion = useEditorStore((s) => s.historyVersion);
+  const historyVersion = useAeonHistoryVersion();
   const project = useProjectStore((s) => s.project);
 
   // State for the "New Chunk" W/H inputs (default = one 128×128 px chunk)
@@ -190,8 +191,8 @@ function ArtCanvas() {
 
   // Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y: MapViewport (which owns the map-mode
   // handler) is unmounted while in Art mode, so undo/redo must be re-bound
-  // here. Same call pattern as MapViewport's keyboard path — the level view
-  // includes the zone tileset/palette so zone commands undo correctly.
+  // here. focusedHistory() resolves to the ZONE-ART document while this facet is
+  // focused, so art undo is independent of the act's layout timeline.
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       // Keep-alive under a sprite-doc tab: bail so Ctrl+Z doesn't fire both
@@ -203,14 +204,13 @@ function ArtCanvas() {
       if (target.tagName === 'INPUT'
           && !['range', 'checkbox', 'button', 'radio'].includes(
             (target as HTMLInputElement).type)) return;
-      const level = getActiveLevel(useProjectStore.getState());
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) {
-        if (level) undo(level);
+        focusedHistory()?.undo();
         e.preventDefault();
         return;
       }
       if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key.toLowerCase() === 'z' && e.shiftKey))) {
-        if (level) redo(level);
+        focusedHistory()?.redo();
         e.preventDefault();
       }
     };

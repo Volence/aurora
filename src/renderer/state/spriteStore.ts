@@ -5,8 +5,8 @@ import type { Color } from '../../core/model/s4-types';
 import type { SpriteFormatId } from '../../core/formats/sprite-format-adapter';
 import type { Tile } from '../../core/model/s4-types';
 import type { SpriteFrame } from '../../core/model/sprite-types';
-import { SpriteHistory, type SpriteSnapshot } from '../../core/editing/sprite-history';
-import { registerRedoClearer, invalidateSiblingRedos } from '../../core/editing/undo-bus';
+import { SpriteDocHistory, type SpriteSnapshot } from '../../core/editing/sprite-history';
+import { documentHistoryHub } from './history-hub';
 import type { SpritePaletteMode } from '../../core/art/sprite-palette';
 import { blankStandalonePalette } from '../../core/art/sprite-palette';
 import { copyRegion, clearRegion, pasteRegion, type ClipRegion } from '../../core/art/pixel-clipboard';
@@ -51,44 +51,28 @@ export interface AnimStepUI {
 }
 
 /**
- * Sprite-mode editing state (chunk 2: multiple frames + decomposition overlay).
- * Paint color + palette line are SHARED with Art mode via artStore (so the
- * existing PaletteEditor doubles as the sprite color picker). Animation and
- * export land in later chunks.
+ * ONE sprite document. Everything here belongs to a particular sprite: its
+ * pixels, its timeline, its palette binding, its save-back target and its
+ * dirtiness. Tool/view state (tool, zoom, brush settings, clipboard) is NOT here
+ * — it belongs to the editor, which shows one document at a time.
+ *
+ * More than the six fields undo restores (SpriteSnapshot) live here: `name`,
+ * `originX/Y`, `exportDplc`, `format` and `characterAnims` all follow a load and
+ * are written by export, so they are part of a document's identity. Leaving them
+ * out of the per-document slice would let one sprite's name/origin/format leak
+ * onto another the moment the editor switched documents.
  */
-interface SpriteState {
-  tool: SpriteTool;
-  zoom: number;            // device px per sprite pixel
+export interface SpriteDoc {
   frames: PixelBuffer[];   // each frame's 4bpp indices
   currentIndex: number;
-  showPieces: boolean;     // overlay auto-decomposition piece outlines
-  /** Object origin within the frame canvas (px). Preserved across load→export so
-   *  non-centered sprites round-trip without shifting piece offsets. */
-  originX: number;
-  originY: number;
-
-  // Brush/craft state (matches Art mode's tool model)
-  mirror: MirrorMode | null;
-  pixelPerfect: boolean;
-  ditherPattern: DitherPattern;
-  ditherSecondary: number;     // 0-15 (0 = transparent)
   selection: SpriteSelection | null;
-  clipboard: ClipRegion | null;
-  /** Each returns true if the action was applicable (had a selection / clipboard),
-   *  so the keyboard handler only swallows the native shortcut when it acted. */
-  copySelection: () => boolean;
-  cutSelection: () => boolean;
-  paste: () => boolean;
-  name: string;                // sprite name (export folder + anim label); follows loads
-  setName: (name: string) => void;
-  exportDplc: boolean;         // export as DPLC (streamed art) vs flat resident art
-  setExportDplc: (v: boolean) => void;
-  format: SpriteFormatId;      // game format to interpret on open / write on export
-  setFormat: (f: SpriteFormatId) => void;
+  paletteMode: SpritePaletteMode;
+  zoneLine: number;
+  standalonePalette: Color[];
+  steps: AnimStepUI[];
   /** In-place art save-back target (S1 objects only); null when there is none. */
   s1ArtSource: S1ArtSource | null;
-  setS1ArtSource: (src: S1ArtSource | null) => void;
-  /** TRUE only when the working sprite has edits not yet persisted — the single
+  /** TRUE only when this document has edits not yet persisted — the single
    *  signal for the tab dot, the sprite-switch discard guard, and the
    *  project-open guard. Distinct from `s1ArtSource`: a checkout target is merely
    *  where a save WOULD write, not itself unsaved work, so opening an unedited
@@ -98,7 +82,67 @@ interface SpriteState {
    *  save/export. Undoing back to a pristine state still reads dirty — it fails
    *  safe (over-asks rather than risk a silent discard). */
   unsavedEdits: boolean;
+  name: string;                // sprite name (export folder + anim label); follows loads
+  /** Object origin within the frame canvas (px). Preserved across load→export so
+   *  non-centered sprites round-trip without shifting piece offsets. */
+  originX: number;
+  originY: number;
+  exportDplc: boolean;         // export as DPLC (streamed art) vs flat resident art
+  format: SpriteFormatId;      // game format to interpret on open / write on export
+  /** Named animations loaded from a character's script (empty for new/editor sprites). */
+  characterAnims: { name: string; steps: AnimStepUI[] }[];
+}
+
+/**
+ * Sprite-mode editing state (chunk 2: multiple frames + decomposition overlay).
+ * Paint color + palette line are SHARED with Art mode via artStore (so the
+ * existing PaletteEditor doubles as the sprite color picker).
+ *
+ * MULTI-DOCUMENT (spec §4.4): several sprite-doc tabs can be open at once, each
+ * with its own pixels and its own undo stack on the DocumentHistoryHub. The
+ * ACTIVE document is checked OUT of `docs` and hoisted onto the store root, so
+ * `docs` holds only the PARKED (background) documents — every document's state
+ * therefore has exactly one home at any moment and the two can't drift apart.
+ * Hoisting the checked-out document is what lets the whole sprite view layer and
+ * the loaders in export-sprite.ts keep reading `frames`/`name`/… directly: there
+ * is only ever one visible sprite editor, and the root IS that editor.
+ */
+interface SpriteState extends SpriteDoc {
+  /** Parked background documents, keyed by doc id. Excludes the active one. */
+  docs: Map<string, SpriteDoc>;
+  /** The document checked out onto the root. Never null — see UNTITLED_SPRITE_DOC_ID. */
+  activeDocId: string;
+
+  // --- Editor (view) state: one sprite editor, so these stay global ---
+  tool: SpriteTool;
+  zoom: number;            // device px per sprite pixel
+  showPieces: boolean;     // overlay auto-decomposition piece outlines
+
+  // Brush/craft state (matches Art mode's tool model)
+  mirror: MirrorMode | null;
+  pixelPerfect: boolean;
+  ditherPattern: DitherPattern;
+  ditherSecondary: number;     // 0-15 (0 = transparent)
+  clipboard: ClipRegion | null;
+  /** Each returns true if the action was applicable (had a selection / clipboard),
+   *  so the keyboard handler only swallows the native shortcut when it acted. */
+  copySelection: () => boolean;
+  cutSelection: () => boolean;
+  paste: () => boolean;
+  setName: (name: string) => void;
+  setExportDplc: (v: boolean) => void;
+  setFormat: (f: SpriteFormatId) => void;
+  setS1ArtSource: (src: S1ArtSource | null) => void;
   setUnsavedEdits: (v: boolean) => void;
+
+  /** The checked-out document's frames (the plan's `activeFrames()` selector). */
+  activeFrames: () => PixelBuffer[];
+  /** Is this document open (checked out or parked)? */
+  isOpen: (docId: string) => boolean;
+  /** Per-document dirtiness — background documents keep their own flag. */
+  isDirty: (docId: string) => boolean;
+  /** Drop every document and its undo stack (project close / test reset). */
+  closeAll: () => void;
 
   setTool: (t: SpriteTool) => void;
   setZoom: (z: number) => void;
@@ -114,16 +158,11 @@ interface SpriteState {
   deleteFrame: () => void;
   selectFrame: (i: number) => void;
 
-  // Undo/redo (snapshot-based). `historyTick` bumps on every history change so
-  // the UI re-evaluates canUndo/canRedo.
-  historyTick: number;
-  canUndo: () => boolean;
-  canRedo: () => boolean;
-  undo: () => void;
-  redo: () => void;
+  // Undo/redo belong to the active document's stack on the hub — the store has no
+  // undo()/redo() of its own, and no repaint clock either: the UI re-evaluates
+  // canUndo/canRedo through hooks/useHistoryVersion, which the hub drives.
 
   // Animation (chunk 3)
-  steps: AnimStepUI[];
   playbackMode: PlaybackMode;
   addStep: (frameIndex: number) => void;
   removeStep: (i: number) => void;
@@ -131,8 +170,6 @@ interface SpriteState {
   setPlaybackMode: (m: PlaybackMode) => void;
   setSteps: (steps: AnimStepUI[]) => void;
 
-  /** Named animations loaded from a character's script (empty for new/editor sprites). */
-  characterAnims: { name: string; steps: AnimStepUI[] }[];
   setCharacterAnims: (anims: { name: string; steps: AnimStepUI[] }[]) => void;
 
   // Load (replace the whole working sprite)
@@ -140,10 +177,8 @@ interface SpriteState {
   /** Start a fresh single-frame sprite of the given pixel dimensions. */
   newSprite: (w: number, h: number) => void;
 
-  /** How the sprite is colored: bound to a zone CRAM line, or its own private palette. */
-  paletteMode: SpritePaletteMode;
-  zoneLine: number;
-  standalonePalette: Color[];
+  // How the sprite is colored (paletteMode / zoneLine / standalonePalette) is
+  // per-document; only the setters live here.
   setPaletteMode: (m: SpritePaletteMode) => void;
   setZoneLine: (line: number) => void;
   setStandalonePalette: (colors: Color[]) => void;
@@ -163,32 +198,82 @@ function cloneFrame(b: PixelBuffer): PixelBuffer {
   return { width: b.width, height: b.height, data: new Uint8Array(b.data) };
 }
 
-/** Module-level undo/redo history for the working sprite document. Exported so
- *  sprite-mode undo can be merged with the level command history by recency. */
-export const spriteHistory = new SpriteHistory();
-const history = spriteHistory;
+/**
+ * The document the editor works on before any sprite-doc tab has claimed it —
+ * "New sprite" from a bare editor, and every path that loads a sprite without
+ * going through a tab. Giving it a real doc id (rather than allowing a null
+ * active document) keeps ONE code path: every edit always has a document and
+ * therefore an undo stack. It deliberately does not parse as a sprite-doc TAB id
+ * (parseSpriteDocTabId requires an s1/aeon engine), so it can never collide with
+ * one; it retires when tab activation opens a document for every sprite shown.
+ */
+export const UNTITLED_SPRITE_DOC_ID = 'doc:sprite:untitled';
 
-// A new sprite edit invalidates the level history's redo (the merged sprite-mode
-// timeline). Registered here; the editing stores never import each other.
-const clearSpriteRedo = () => spriteHistory.clearRedo();
-registerRedoClearer(clearSpriteRedo);
+/** A pristine document of the given pixel size. */
+function blankDoc(w: number, h: number): SpriteDoc {
+  const width = Math.max(8, w | 0);
+  const height = Math.max(8, h | 0);
+  return {
+    frames: [createBuffer(width, height)],
+    currentIndex: 0,
+    selection: null,
+    paletteMode: 'zone',
+    zoneLine: 1,
+    standalonePalette: blankStandalonePalette(),
+    steps: [],
+    s1ArtSource: null,
+    unsavedEdits: false,
+    name: 'NewSprite',
+    originX: Math.floor(width / 2),
+    originY: Math.floor(height / 2),
+    exportDplc: false,
+    format: 's4',
+    characterAnims: [],
+  };
+}
 
-/** Record a pre-edit snapshot AND invalidate sibling (level) redo — every sprite
- *  edit funnels through here so the merged sprite-mode timeline stays consistent.
- *  Ungated: every store mutator that reaches here is reachable only while editing
- *  a sprite (i.e. a sprite-doc tab is active), so the level-redo invalidation is
- *  always a sprite-session event. As the sole edit choke point it is ALSO where
- *  `unsavedEdits` flips true — every mutating action funnels through here, and
- *  the non-mutating ones (selectFrame, setTool, zoom, …) deliberately do not. */
+/** Lift the checked-out document off the store root so it can be parked. Written
+ *  out field by field on purpose: the compiler then rejects any SpriteDoc field
+ *  that a future change forgets to carry across a document switch. */
+function parkedDoc(s: SpriteState): SpriteDoc {
+  return {
+    frames: s.frames,
+    currentIndex: s.currentIndex,
+    selection: s.selection,
+    paletteMode: s.paletteMode,
+    zoneLine: s.zoneLine,
+    standalonePalette: s.standalonePalette,
+    steps: s.steps,
+    s1ArtSource: s.s1ArtSource,
+    unsavedEdits: s.unsavedEdits,
+    name: s.name,
+    originX: s.originX,
+    originY: s.originY,
+    exportDplc: s.exportDplc,
+    format: s.format,
+    characterAnims: s.characterAnims,
+  };
+}
+
+/** The active document's undo stack. Exported so sprite-mode undo and the
+ *  editor-reset path can reach it without knowing the hub's keying. */
+export function activeSpriteHistory(): SpriteDocHistory {
+  return documentHistoryHub.historyFor(useSpriteStore.getState().activeDocId) as SpriteDocHistory;
+}
+
+/** Record a pre-edit snapshot on the ACTIVE document's stack. Every mutating
+ *  action funnels through here, which is also why this is where `unsavedEdits`
+ *  flips true — the non-mutating ones (selectFrame, setTool, zoom, …)
+ *  deliberately do not. No sibling-redo invalidation any more: per-document
+ *  stacks have no siblings to invalidate. */
 function recordEdit(s: SpriteState): void {
-  invalidateSiblingRedos(clearSpriteRedo);
-  history.record(snap(s));
+  activeSpriteHistory().record(snap(s));
   useSpriteStore.setState({ unsavedEdits: true });
 }
 
-/** Build a snapshot from live state. SpriteHistory deep-clones on record/undo/
+/** Build a snapshot from live state. SpriteDocHistory deep-clones on record/undo/
  *  redo, so passing live refs is safe. */
-const snap = (s: SpriteState): SpriteSnapshot => ({
+const snap = (s: SpriteDoc): SpriteSnapshot => ({
   frames: s.frames,
   currentIndex: s.currentIndex,
   selection: s.selection,
@@ -197,30 +282,164 @@ const snap = (s: SpriteState): SpriteSnapshot => ({
   standalonePalette: s.standalonePalette,
 });
 
+// --- Document lifecycle ----------------------------------------------------
+//
+// Each open sprite document owns an undo stack on the DocumentHistoryHub, keyed
+// by the same doc id. Switching documents parks the outgoing one whole; nothing
+// is discarded and no history is cleared, which is what stops two open sprite
+// tabs from stomping each other.
+
+/** Open a new, blank document and check it out. Re-opening an already-open
+ *  document just checks it out (its pixels and history survive). */
+export function openSpriteDoc(docId: string, size: { width: number; height: number }): void {
+  const s = useSpriteStore.getState();
+  if (s.activeDocId === docId) return;
+  if (s.docs.has(docId)) { activateSpriteDoc(docId); return; }
+  const docs = new Map(s.docs);
+  docs.set(s.activeDocId, parkedDoc(s));
+  useSpriteStore.setState({
+    docs,
+    activeDocId: docId,
+    ...blankDoc(size.width, size.height),
+  });
+}
+
+/** Check out an already-open document, parking the outgoing one. No-op for a
+ *  document that was never opened — openSpriteDoc is what creates them. */
+export function activateSpriteDoc(docId: string): void {
+  const s = useSpriteStore.getState();
+  if (s.activeDocId === docId) return;
+  const incoming = s.docs.get(docId);
+  if (!incoming) return;
+  const docs = new Map(s.docs);
+  docs.set(s.activeDocId, parkedDoc(s));
+  docs.delete(docId);
+  useSpriteStore.setState({ docs, activeDocId: docId, ...incoming });
+}
+
+/** Drop a document and its undo stack. Closing the checked-out document falls
+ *  back to the untitled document (restoring it if one was parked) rather than
+ *  promoting some other tab's sprite — which document takes focus is the tab
+ *  layer's decision, not the store's. */
+export function closeSpriteDoc(docId: string): void {
+  const s = useSpriteStore.getState();
+  if (s.activeDocId === docId) {
+    const docs = new Map(s.docs);
+    const untitled = docs.get(UNTITLED_SPRITE_DOC_ID);
+    docs.delete(UNTITLED_SPRITE_DOC_ID);
+    useSpriteStore.setState({
+      docs,
+      activeDocId: UNTITLED_SPRITE_DOC_ID,
+      ...(untitled ?? blankDoc(DEFAULT_FRAME_SIZE, DEFAULT_FRAME_SIZE)),
+    });
+  } else if (s.docs.has(docId)) {
+    const docs = new Map(s.docs);
+    docs.delete(docId);
+    useSpriteStore.setState({ docs });
+  }
+  documentHistoryHub.dispose(docId);
+}
+
+/** A document's state wherever it lives — the checked-out one off the root, a
+ *  parked one out of the map. Null when the document isn't open at all. The ONE
+ *  lookup for "what does document X hold?", so no caller has to know whether X
+ *  happens to be the checked-out one. */
+export function spriteDocState(docId: string): SpriteDoc | null {
+  const s = useSpriteStore.getState();
+  if (docId === s.activeDocId) return parkedDoc(s);
+  return s.docs.get(docId) ?? null;
+}
+
+/** The write-side twin of spriteDocState: patch a document wherever it lives —
+ *  the checked-out one on the root, a parked one in the map. Lets a caller that
+ *  operates on a document BY ID (the art save-back) update that document's own
+ *  fields without checking it out, so nothing the user is looking at moves and no
+ *  edit can be misattributed to the document that happens to be active. No-op for
+ *  a document that isn't open. */
+export function patchSpriteDoc(docId: string, patch: Partial<SpriteDoc>): void {
+  const s = useSpriteStore.getState();
+  if (docId === s.activeDocId) { useSpriteStore.setState(patch); return; }
+  const doc = s.docs.get(docId);
+  if (!doc) return;
+  const docs = new Map(s.docs);
+  docs.set(docId, { ...doc, ...patch });
+  useSpriteStore.setState({ docs });
+}
+
+/** Every open document with unsaved edits — parked ones included. A background
+ *  tab's edits are as real as the checked-out tab's: these are the documents the
+ *  strip dots and the project-open guard must refuse to discard silently. */
+export function dirtySpriteDocIds(): string[] {
+  const s = useSpriteStore.getState();
+  const ids = s.unsavedEdits ? [s.activeDocId] : [];
+  for (const [id, doc] of s.docs) if (doc.unsavedEdits) ids.push(id);
+  return ids;
+}
+
+/** The dirty documents Ctrl+S can actually write back: those with an in-place
+ *  art target (S1 object checkouts). A dirty document without one has no
+ *  destination — the sprite UI's Export is the only way to persist it — so the
+ *  save coordinator must not claim it as savable work. */
+export function saveableDirtySpriteDocIds(): string[] {
+  return dirtySpriteDocIds().filter((id) => spriteDocState(id)?.s1ArtSource != null);
+}
+
+/** Read a document's undo snapshot — the checked-out one off the root, a parked
+ *  one out of the map. Keyed by doc id, never by "active": undo has to reach a
+ *  background document (a dirty tab can be undone from its close confirm). */
+export function readSpriteSnapshot(docId: string): SpriteSnapshot {
+  const s = useSpriteStore.getState();
+  const doc = docId === s.activeDocId ? s : s.docs.get(docId);
+  return snap(doc ?? blankDoc(DEFAULT_FRAME_SIZE, DEFAULT_FRAME_SIZE));
+}
+
+/** Install a restored snapshot into a document, checked out or parked.
+ *  Deliberately leaves `unsavedEdits` alone: undoing back to a pristine state
+ *  still reads dirty, which over-asks rather than risking a silent discard. */
+export function writeSpriteSnapshot(docId: string, snapshot: SpriteSnapshot): void {
+  const s = useSpriteStore.getState();
+  if (docId === s.activeDocId) {
+    useSpriteStore.setState(snapshot);
+    return;
+  }
+  const doc = s.docs.get(docId);
+  if (!doc) return;
+  const docs = new Map(s.docs);
+  docs.set(docId, { ...doc, ...snapshot });
+  useSpriteStore.setState({ docs });
+}
+
 export const useSpriteStore = create<SpriteState>((set, get) => ({
+  // The untitled document, checked out onto the root (see UNTITLED_SPRITE_DOC_ID).
+  docs: new Map(),
+  activeDocId: UNTITLED_SPRITE_DOC_ID,
+  ...blankDoc(DEFAULT_FRAME_SIZE, DEFAULT_FRAME_SIZE),
+
   tool: 'pencil',
   zoom: 10,
-  frames: [blankFrame()],
-  currentIndex: 0,
   showPieces: false,
-  originX: DEFAULT_FRAME_SIZE / 2,
-  originY: DEFAULT_FRAME_SIZE / 2,
-
   mirror: null,
   pixelPerfect: true,
   ditherPattern: 'checker',
   ditherSecondary: 0,
-  selection: null,
   clipboard: null,
-  name: 'NewSprite',
-  exportDplc: false,
-  format: 's4',
-  s1ArtSource: null,
-  unsavedEdits: false,
-  historyTick: 0,
-  paletteMode: 'zone',
-  zoneLine: 1,
-  standalonePalette: blankStandalonePalette(),
+
+  activeFrames: () => get().frames,
+  isOpen: (docId) => { const s = get(); return docId === s.activeDocId || s.docs.has(docId); },
+  isDirty: (docId) => {
+    const s = get();
+    return docId === s.activeDocId ? s.unsavedEdits : (s.docs.get(docId)?.unsavedEdits ?? false);
+  },
+  closeAll: () => {
+    const s = get();
+    for (const id of s.docs.keys()) documentHistoryHub.dispose(id);
+    documentHistoryHub.dispose(s.activeDocId);
+    set({
+      docs: new Map(),
+      activeDocId: UNTITLED_SPRITE_DOC_ID,
+      ...blankDoc(DEFAULT_FRAME_SIZE, DEFAULT_FRAME_SIZE),
+    });
+  },
 
   setName: (name) => set({ name }),
   setExportDplc: (exportDplc) => set({ exportDplc }),
@@ -247,14 +466,14 @@ export const useSpriteStore = create<SpriteState>((set, get) => ({
     const frames = s.frames.slice();
     frames[s.currentIndex] = next;
     // marquee coords no longer valid after a transform
-    set({ frames, selection: null, historyTick: s.historyTick + 1 });
+    set({ frames, selection: null });
   },
   setBuffer: (b) => {
     const s = get();
     recordEdit(s);
     const frames = s.frames.slice();
     frames[s.currentIndex] = b;
-    set({ frames, historyTick: s.historyTick + 1 });
+    set({ frames });
   },
   copySelection: () => {
     const s = get();
@@ -276,7 +495,7 @@ export const useSpriteStore = create<SpriteState>((set, get) => ({
     if (diffWrites(cur, cleared).length > 0) recordEdit(s);
     const frames = s.frames.slice();
     frames[s.currentIndex] = cleared;
-    set({ frames, clipboard: region, selection: null, historyTick: s.historyTick + 1 });
+    set({ frames, clipboard: region, selection: null });
     return true;
   },
   paste: () => {
@@ -298,7 +517,7 @@ export const useSpriteStore = create<SpriteState>((set, get) => ({
     // Switch to select and select the pasted rect so it can be dragged next
     // (setTool would clear the selection, so set tool + selection together here).
     const w = Math.min(clip.w, cur.width - ox), h = Math.min(clip.h, cur.height - oy);
-    set({ frames, tool: 'select', selection: { x: ox, y: oy, w, h }, historyTick: s.historyTick + 1 });
+    set({ frames, tool: 'select', selection: { x: ox, y: oy, w, h } });
     return true;
   },
   // New frame matches the current canvas size (loaded sprites may not be 32x32).
@@ -306,13 +525,13 @@ export const useSpriteStore = create<SpriteState>((set, get) => ({
     const s = get();
     recordEdit(s);
     const cur = s.frames[s.currentIndex];
-    set({ frames: [...s.frames, createBuffer(cur.width, cur.height)], currentIndex: s.frames.length, historyTick: s.historyTick + 1 });
+    set({ frames: [...s.frames, createBuffer(cur.width, cur.height)], currentIndex: s.frames.length });
   },
   duplicateFrame: () => {
     const s = get();
     recordEdit(s);
     const frames = [...s.frames, cloneFrame(s.frames[s.currentIndex])];
-    set({ frames, currentIndex: frames.length - 1, historyTick: s.historyTick + 1 });
+    set({ frames, currentIndex: frames.length - 1 });
   },
   deleteFrame: () => {
     const s = get();
@@ -324,24 +543,10 @@ export const useSpriteStore = create<SpriteState>((set, get) => ({
     const steps = s.steps
       .filter((st) => st.frameIndex !== removed)
       .map((st) => (st.frameIndex > removed ? { ...st, frameIndex: st.frameIndex - 1 } : st));
-    set({ frames, steps, currentIndex: Math.min(removed, frames.length - 1), historyTick: s.historyTick + 1 });
+    set({ frames, steps, currentIndex: Math.min(removed, frames.length - 1) });
   },
   selectFrame: (i) => set((s) => ({ currentIndex: Math.min(Math.max(0, i), s.frames.length - 1) })),
 
-  canUndo: () => history.canUndo,
-  canRedo: () => history.canRedo,
-  undo: () => {
-    const s = get();
-    const prev = history.undo(snap(s));
-    if (prev) set({ frames: prev.frames, currentIndex: prev.currentIndex, selection: prev.selection, paletteMode: prev.paletteMode, zoneLine: prev.zoneLine, standalonePalette: prev.standalonePalette, historyTick: s.historyTick + 1 });
-  },
-  redo: () => {
-    const s = get();
-    const next = history.redo(snap(s));
-    if (next) set({ frames: next.frames, currentIndex: next.currentIndex, selection: next.selection, paletteMode: next.paletteMode, zoneLine: next.zoneLine, standalonePalette: next.standalonePalette, historyTick: s.historyTick + 1 });
-  },
-
-  steps: [],
   playbackMode: 'forward',
   // Timeline edits mutate persisted data (exportSprite writes steps to
   // <name>_anims.asm), so they dirty the doc — but steps live OUTSIDE the snapshot
@@ -359,33 +564,17 @@ export const useSpriteStore = create<SpriteState>((set, get) => ({
   setPlaybackMode: (playbackMode) => set({ playbackMode }),
   setSteps: (steps) => set({ steps, unsavedEdits: true }),
 
-  characterAnims: [],
   setCharacterAnims: (characterAnims) => set({ characterAnims }),
 
   newSprite: (w, h) => {
-    history.clear(); // a fresh sprite starts with empty history
-    set({
-      frames: [createBuffer(Math.max(8, w | 0), Math.max(8, h | 0))],
-      currentIndex: 0,
-      steps: [],
-      originX: Math.floor(Math.max(8, w | 0) / 2),
-      originY: Math.floor(Math.max(8, h | 0) / 2),
-      paletteMode: 'zone',
-      zoneLine: 1,
-      standalonePalette: blankStandalonePalette(),
-      characterAnims: [],
-      selection: null,
-      name: 'NewSprite',
-      exportDplc: false,
-      format: 's4',
-      s1ArtSource: null,
-      unsavedEdits: false,
-      historyTick: 0,
-    });
+    // A fresh sprite starts with empty history — on the ACTIVE document's stack,
+    // so a background document's undo survives.
+    activeSpriteHistory().clear();
+    set({ ...blankDoc(w, h) });
   },
 
   loadSprite: (frames, steps, originX, originY) => {
-    history.clear(); // a loaded sprite starts with empty history
+    activeSpriteHistory().clear(); // a loaded sprite starts with empty history
     // Clear any prior in-place save-back target; the S1 open path re-captures it
     // (with the new source file + mtime) immediately after this call.
     set({
@@ -397,25 +586,24 @@ export const useSpriteStore = create<SpriteState>((set, get) => ({
       characterAnims: [],
       s1ArtSource: null,
       unsavedEdits: false,
-      historyTick: 0,
-    });
+        });
   },
 
   setZoneLine: (zoneLine) => set({ zoneLine: Math.max(0, Math.min(3, zoneLine | 0)) }),
-  setStandalonePalette: (standalonePalette) => { const s = get(); recordEdit(s); set({ standalonePalette, historyTick: s.historyTick + 1 }); },
+  setStandalonePalette: (standalonePalette) => { const s = get(); recordEdit(s); set({ standalonePalette }); },
   setPaletteMode: (mode) => {
     const s = get(); recordEdit(s);
     if (mode === 'standalone' && s.paletteMode === 'zone') {
       const zone = getCurrentZone(useProjectStore.getState());
       const line = zone?.palette.lines[s.zoneLine]?.colors;
       const seed = line ? line.map((c) => ({ ...c })) : blankStandalonePalette();
-      set({ paletteMode: 'standalone', standalonePalette: seed, historyTick: s.historyTick + 1 });
+      set({ paletteMode: 'standalone', standalonePalette: seed });
     } else {
-      set({ paletteMode: mode, historyTick: s.historyTick + 1 });
+      set({ paletteMode: mode });
     }
   },
-  clearPalette: () => { const s = get(); recordEdit(s); set({ paletteMode: 'standalone', standalonePalette: blankStandalonePalette(), historyTick: s.historyTick + 1 }); },
-  clearCanvas: () => { const s = get(); recordEdit(s); const cur = s.frames[s.currentIndex]; const frames = s.frames.slice(); frames[s.currentIndex] = createBuffer(cur.width, cur.height); set({ frames, historyTick: s.historyTick + 1 }); },
+  clearPalette: () => { const s = get(); recordEdit(s); set({ paletteMode: 'standalone', standalonePalette: blankStandalonePalette() }); },
+  clearCanvas: () => { const s = get(); recordEdit(s); const cur = s.frames[s.currentIndex]; const frames = s.frames.slice(); frames[s.currentIndex] = createBuffer(cur.width, cur.height); set({ frames }); },
 }));
 
 /** Build the frame-index play order for a playback mode (one full cycle). */

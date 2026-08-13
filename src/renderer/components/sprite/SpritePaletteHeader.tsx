@@ -2,7 +2,7 @@
 import React, { useMemo } from 'react';
 import { useSpriteStore } from '../../state/spriteStore';
 import { useProjectStore, getCurrentAct } from '../../state/projectStore';
-import { useEditorStore } from '../../state/editorStore';
+import { useHistoryVersion } from '../../hooks/useHistoryVersion';
 import { paletteLineUsageCounts } from '../../../core/art/usage';
 import { T, Chip } from '../ui';
 
@@ -36,7 +36,7 @@ export default function SpritePaletteHeader() {
   const mode = useSpriteStore((s) => s.paletteMode);
   const zoneLine = useSpriteStore((s) => s.zoneLine);
   const st = useSpriteStore.getState;
-  const historyVersion = useEditorStore((s) => s.historyVersion); // recompute after level edits
+  const historyVersion = useHistoryVersion(); // recompute after level edits
   const currentActId = useProjectStore((s) => s.currentActId);
   const lineNote = useMemo(() => {
     if (mode !== 'zone') return null;

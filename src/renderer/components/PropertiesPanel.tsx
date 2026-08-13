@@ -2,6 +2,7 @@ import React from 'react';
 import { useProjectStore, getCurrentAct, getCurrentZone, getActiveLevel } from '../state/projectStore';
 import { useViewStore } from '../state/viewStore';
 import { useEditorStore, executeCommand } from '../state/editorStore';
+import { useHistoryVersion } from '../hooks/useHistoryVersion';
 import { T } from './ui';
 
 export default function PropertiesPanel() {
@@ -12,7 +13,10 @@ export default function PropertiesPanel() {
   const selection = useEditorStore((s) => s.selection);
   const tool = useEditorStore((s) => s.tool);
   const activeSectionIndex = useEditorStore((s) => s.activeSectionIndex);
-  const historyVersion = useEditorStore((s) => s.historyVersion);
+  // Re-read the selected object's live coordinates after a committed edit and
+  // during an in-flight drag (which mutates the object without a command).
+  useHistoryVersion();
+  useEditorStore((s) => s.liveEditVersion);
 
   const state = useProjectStore.getState();
   const zone = getCurrentZone(state);

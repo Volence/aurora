@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useEditorStore, executeCommand } from '../state/editorStore';
+import { useAeonHistoryVersion } from '../hooks/useHistoryVersion';
 import { useViewStore } from '../state/viewStore';
 import { useProjectStore, getCurrentAct, getActiveLevel } from '../state/projectStore';
 import { SECTION_PIXEL_SIZE, MAX_ACT_SECTIONS } from '../../core/model/s4-types';
@@ -20,9 +21,9 @@ interface MenuState {
 
 export default function SectionGridNav() {
   const activeSectionIndex = useEditorStore(s => s.activeSectionIndex);
-  // historyVersion: re-render badges when set-section-bg / set-sections
-  // executes/undoes.
-  useEditorStore(s => s.historyVersion);
+  // Re-render the badges when set-section-bg / set-sections executes or undoes.
+  // Aeon-scoped: those are act-scoped commands, so no other document can move them.
+  useAeonHistoryVersion();
   const project = useProjectStore(s => s.project);
   const state = useProjectStore.getState();
   const act = getCurrentAct(state);

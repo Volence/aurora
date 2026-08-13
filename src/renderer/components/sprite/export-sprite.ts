@@ -1,7 +1,8 @@
 import { useProjectStore, getCurrentZone } from '../../state/projectStore';
 import { useArtStore } from '../../state/artStore';
-import { useSpriteStore } from '../../state/spriteStore';
+import { useSpriteStore, spriteDocState, patchSpriteDoc, saveableDirtySpriteDocIds } from '../../state/spriteStore';
 import type { AnimStepUI } from '../../state/spriteStore';
+import type { PixelBuffer } from '../../../core/art/pixel-ops';
 import { useToastStore } from '../../state/toastStore';
 import { buildSpriteExport, buildDPLCData } from '../../../core/export/sprite-export';
 import type { SpriteManifest } from '../../../core/export/sprite-export';
@@ -21,7 +22,7 @@ import type { SpriteFormatId } from '../../../core/formats/sprite-format-adapter
 import type { CompressionKind } from '../../../core/compress';
 import { parsePaletteLine, decodeGenesisColor } from '../../../core/formats/palette';
 import { parseCharacterAnims, parseAnyAnimScript } from '../../../core/import/anim-import';
-import { markSpriteDocLoaded, getLoadedSpriteDocId, requestOpenTab, spriteEditorDirty, confirmDiscardSpriteEdits } from '../../shell/tab-activation';
+import { requestOpenTab } from '../../shell/tab-activation';
 import { spriteDocTab } from '../../shell/tabs';
 import { useClassicProjectStore } from '../../state/classicProjectStore';
 import { useClassicLevelStore } from '../../state/classicLevelStore';
@@ -196,21 +197,52 @@ async function captureS1ArtSource(
   } catch { /* leave s1ArtSource null — sprite is still editable, just not save-back-able */ }
 }
 
+/** Are these the same pixels, buffer for buffer? Used to decide whether the
+ *  document a save just wrote is still byte-identical to what went to disk. */
+function framesEqual(a: PixelBuffer[], b: PixelBuffer[]): boolean {
+  if (a === b) return true;
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    const x = a[i], y = b[i];
+    if (x === y) continue;
+    if (x.width !== y.width || x.height !== y.height) return false;
+    if (x.data.length !== y.data.length) return false;
+    for (let j = 0; j < x.data.length; j++) if (x.data[j] !== y.data[j]) return false;
+  }
+  return true;
+}
+
 /**
  * Save edited S1 object ART back to its source `artnem/*.nem` (Task 15, spec §2.4).
- * Re-encodes the current frames' pixels into the original tile layout with Nemesis
- * behind a self-check gate (encodeS1ArtWriteBack), then writes through the guarded
- * IPC (mtime conflict check). MAPPINGS ARE READ-ONLY: only art pixels save; shape/
+ * Re-encodes the frames' pixels into the original tile layout with Nemesis behind
+ * a self-check gate (encodeS1ArtWriteBack), then writes through the guarded IPC
+ * (mtime conflict check). MAPPINGS ARE READ-ONLY: only art pixels save; shape/
  * frame changes the mappings can't express are silently not captured (the success
- * toast states the read-only limitation). Mirrors the S4 export path's history
- * handling — the write does NOT touch spriteHistory / any dirty flag (there is none).
+ * toast states the read-only limitation).
+ *
+ * `docId` names the document to write and defaults to the checked-out one. The
+ * document is read BY ID (spriteDocState) and written back BY ID (patchSpriteDoc),
+ * so saving a background tab needs NO checkout: the sprite pane renders the store
+ * root, so a checkout would repaint the user's canvas with someone else's sprite
+ * for the whole guarded write, and any stroke landing in that window would be
+ * committed into the wrong document.
+ *
+ * DIRTY FLAG: `frames` is read synchronously, before the await. A stroke committed
+ * while the write is in flight is therefore NOT in the bytes on disk, so the flag
+ * is cleared only when the document's pixels still match what was written —
+ * otherwise the save would park real work with no dirty dot, and closing the tab
+ * would discard it without a prompt. (Palette/timeline edits are a separate,
+ * pre-existing over-clear: this path writes art bytes only.)
  */
-export async function saveSpriteArt(): Promise<void> {
+export async function saveSpriteArt(docId?: string): Promise<void> {
   const toast = useToastStore.getState().addToast;
-  const src = useSpriteStore.getState().s1ArtSource;
+  const targetId = docId ?? useSpriteStore.getState().activeDocId;
+  const doc = spriteDocState(targetId);
+  if (!doc) return; // not open — nothing to save, and nothing to say about it
+  const src = doc.s1ArtSource;
   if (!src) { toast('This sprite has no S1 art source to save back to', 'error'); return; }
 
-  const { frames } = useSpriteStore.getState();
+  const frames = doc.frames;
   // Frames pair to mappings BY INDEX; a changed frame count means add/delete/
   // reorder happened, which would write pixels into the wrong tiles. Refuse
   // rather than silently corrupt art (mappings can't grow/shrink for S1 in v1).
@@ -235,13 +267,47 @@ export async function saveSpriteArt(): Promise<void> {
   }
   if (out.failed) { toast(`Art save failed at ${out.failed.path}: ${out.failed.message}`, 'error'); return; }
 
-  // Refresh the guarded-write baseline so a follow-up save doesn't spuriously conflict.
+  // The document may have moved (checked out, parked, or edited) across the await
+  // — re-read it rather than trusting the pre-write snapshot. A document closed
+  // mid-write has nothing left to update.
+  const after = spriteDocState(targetId);
+  if (!after) { toast(`Saved art to ${src.relPath} — S1 mappings are read-only in v1`, 'success'); return; }
+
+  // Refresh the guarded-write baseline so a follow-up save doesn't spuriously
+  // conflict. Rebuilt from the document's CURRENT source (not the captured one)
+  // so a concurrent reopen isn't clobbered by a stale snapshot.
   const nm = out.newMtimes[src.relPath];
-  useSpriteStore.getState().setS1ArtSource({ ...src, expectedMtimeMs: nm ?? src.expectedMtimeMs });
-  // The edits are now on disk — clear the unsaved flag (success path only; every
-  // failure/conflict branch above returned before reaching here).
-  useSpriteStore.getState().setUnsavedEdits(false);
-  toast(`Saved art to ${src.relPath} — S1 mappings are read-only in v1`, 'success');
+  const liveSrc = after.s1ArtSource ?? src;
+  patchSpriteDoc(targetId, { s1ArtSource: { ...liveSrc, expectedMtimeMs: nm ?? liveSrc.expectedMtimeMs } });
+
+  const stillMatches = framesEqual(after.frames, frames);
+  if (stillMatches) patchSpriteDoc(targetId, { unsavedEdits: false });
+  toast(
+    stillMatches
+      ? `Saved art to ${src.relPath} — S1 mappings are read-only in v1`
+      : `Saved art to ${src.relPath}, but edits made during the save are still unsaved — save again`,
+    stillMatches ? 'success' : 'info',
+  );
+}
+
+/**
+ * Save ONE sprite document's art back to its source file, named by doc id. A thin
+ * alias for saveSpriteArt(docId) — which addresses documents by id and needs no
+ * checkout — kept as the name the save coordinator and tab-close path call.
+ * A no-op for a document that isn't open.
+ */
+export async function saveSpriteDocArt(docId: string): Promise<void> {
+  await saveSpriteArt(docId);
+}
+
+/**
+ * Ctrl+S is Save ALL: write back every open sprite document that has unsaved
+ * edits AND an in-place art target, not just whichever one happens to be checked
+ * out. A background sprite tab's edits are real, and its dirty dot would
+ * otherwise survive a save the user reasonably believed covered it.
+ */
+export async function saveAllSpriteArt(): Promise<void> {
+  for (const docId of saveableDirtySpriteDocIds()) await saveSpriteDocArt(docId);
 }
 
 /** Frames from a mapping file: macro call-sites if present, else assemble raw dc.b/.w. */
@@ -411,7 +477,7 @@ export function __setSpriteSetOpenerForTest(fn: SpriteSetOpener): void { openSet
 export function __resetSpriteSetOpenerForTest(): void { openSetImpl = openDiscoveredSet; }
 
 /**
- * Check out a classic object's art + mappings into the singleton sprite editor
+ * Load a classic object's art + mappings into the CHECKED-OUT sprite document
  * (Task B2 / Task 14). The object id resolves to an `ObjectArtLink` (profiles/
  * s1-object-art.ts) against the OPEN classic level's zone (derived from the
  * classic level store's `ref` — no longer a caller argument); the link's
@@ -421,12 +487,10 @@ export function __resetSpriteSetOpenerForTest(): void { openSetImpl = openDiscov
  * no open level — the calling buttons only render for linked ids, so those are
  * guards. A failed open leaves the user where they were with an error toast.
  *
- * This does NOT open a tab and does NOT touch the loaded-doc marker — it only
- * retargets the editor (checkout = load only, no marker semantics). Marking the
- * loaded doc belongs to the CALLER that wins: the `editObjectArt` wrapper (a
- * direct user action) marks before opening the tab, and the sprite-doc
- * activation path marks only after its activationGen check passes — so a
- * superseded checkout never leaves a stale marker.
+ * This does NOT open a tab and does NOT open a document of its own — it loads
+ * into whichever document is currently checked out. Sprite-doc activation is what
+ * checks out the object's own document first, so the pixels land there; calling
+ * this directly loads over whatever the editor is showing.
  *
  * PRESELECTION: the objdef's declared `frame` is selected. The declared palette
  * LINE (`pal`) can't bind to a zone CRAM line — a classic session has no aeon
@@ -463,33 +527,21 @@ export async function editObjectArtCheckout(id: number): Promise<boolean> {
   return true;
 }
 
+/**
+ * "Edit art…" from the classic object UI: surface the object's sprite-doc tab.
+ *
+ * Opening the tab is the WHOLE action — sprite-doc activation owns the document
+ * lifecycle (check out an already-open one, or open a fresh one and run
+ * editObjectArtCheckout into it), so this no longer checks out by hand and no
+ * longer needs a discard confirm: a second object's art now opens ALONGSIDE the
+ * first instead of replacing it. Returns whether the object's document ended up
+ * checked out (false = the checkout failed and already toasted).
+ */
 export async function editObjectArt(id: number): Promise<boolean> {
   const tabId = 'doc:sprite:s1:' + id;
   const name = s1ObjectName(id); // named object, or its $XX hex fallback
-
-  // Re-clicking the object that's ALREADY loaded stays a no-op reload — just
-  // (re)surface its tab. Checked BEFORE the dirty prompt so re-clicking the same
-  // object never asks and never discards its own edits.
-  if (getLoadedSpriteDocId() === tabId) {
-    await requestOpenTab(spriteDocTab('s1', String(id), name));
-    return true;
-  }
-
-  // This is the highest-traffic edit-art entry (ObjectInspector /
-  // ObjectLibraryPanel "Edit art…"). editObjectArtCheckout retargets the
-  // singleton editor and discards the loaded sprite's edits + undo history, so
-  // guard it with the SAME confirm sprite-doc activation uses. Cancel → return
-  // false without touching anything.
-  if (spriteEditorDirty() && !(await confirmDiscardSpriteEdits())) return false;
-
-  const ok = await editObjectArtCheckout(id);
-  if (ok) {
-    // Direct user action, not racing an activation — own the mark here so the
-    // follow-up sprite-doc activation sees the doc already loaded and no-ops.
-    markSpriteDocLoaded(tabId);
-    await requestOpenTab(spriteDocTab('s1', String(id), name));
-  }
-  return ok;
+  await requestOpenTab(spriteDocTab('s1', String(id), name));
+  return useSpriteStore.getState().activeDocId === tabId;
 }
 
 /** Names of sprites the editor knows about (from data/sprites/index.json). */
@@ -505,11 +557,16 @@ export async function listSprites(): Promise<string[]> {
  * frame bitmaps from mappings.bin + art.bin, and restore the timeline from the
  * manifest. Works for editor-exported sprites and any non-DPLC sprite whose art
  * is fully present in art.bin.
+ *
+ * Resolves TRUE when a sprite was actually loaded. Failures are toasted, not
+ * thrown (this is also a direct UI action), so the boolean is the only honest
+ * signal a CALLER has: the sprite-doc activation path used to assume success and
+ * opened the tab onto a blank 32×32 document instead of rolling back.
  */
-export async function loadSpriteByName(name: string): Promise<void> {
+export async function loadSpriteByName(name: string): Promise<boolean> {
   const toast = useToastStore.getState().addToast;
   const project = useProjectStore.getState().project;
-  if (!project) { toast('No project open', 'error'); return; }
+  if (!project) { toast('No project open', 'error'); return false; }
   const base = project.basePath;
   const dir = `${spritesDir()}/${name}`;
   try {
@@ -530,8 +587,10 @@ export async function loadSpriteByName(name: string): Promise<void> {
     useSpriteStore.getState().setExportDplc(!!manifest?.dplc); // default export mode to how it was saved
     useSpriteStore.getState().setFormat(fmt);
     toast(`Loaded "${name}" (${fmt.toUpperCase()}): ${frames.length} frames${steps.length ? `, ${steps.length} anim steps` : ''}`, 'success');
+    return true;
   } catch (e) {
     toast(`Load failed for "${name}": ${e instanceof Error ? e.message : String(e)}`, 'error');
+    return false;
   }
 }
 

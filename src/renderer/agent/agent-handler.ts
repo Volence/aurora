@@ -1,5 +1,5 @@
 import { useProjectStore, getCurrentZone, getCurrentAct, getActiveLevel } from '../state/projectStore';
-import { useEditorStore, executeCommand } from '../state/editorStore';
+import { useEditorStore, executeAmbientCommand } from '../state/editorStore';
 import { useViewStore } from '../state/viewStore';
 import type { S4Level, SetTilesCommand } from '../../core/editing/commands';
 import {
@@ -236,7 +236,7 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
       if (err) throw new Error(err);
       const newColors = req.colors.map(w => decodeGenesisColor(w));
       newColors[0] = { ...newColors[0], a: 0 }; // index 0 transparent
-      executeCommand({
+      executeAmbientCommand({
         type: 'set-palette-line',
         description: `agent: set palette line ${req.line}`,
         sectionIndex: -1,
@@ -277,7 +277,7 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
       }
       const oldTiles = newTiles.map((_, i) =>
         at + i < tiles.length ? { pixels: new Uint8Array(tiles[at + i].pixels) } : null);
-      executeCommand({
+      executeAmbientCommand({
         type: 'set-tileset-tiles',
         description: `agent: write ${newTiles.length} tiles at ${at}`,
         sectionIndex: -1,
@@ -312,7 +312,7 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
           });
         }
       }
-      executeCommand({
+      executeAmbientCommand({
         type: 'set-tiles',
         description: `agent: paint ${req.w}x${req.h} at (${req.x},${req.y})`,
         sectionIndex: req.section,
@@ -337,7 +337,7 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
         plane, tileWidth: SECTION_TILES_WIDE,
       });
       if (entries.length > 0) {
-        executeCommand({
+        executeAmbientCommand({
           type: 'set-collision-edit',
           plane: req.plane,
           description: `agent: paint collision ${req.plane.toUpperCase()} ${req.w}x${req.h} at (${req.x},${req.y})`,
@@ -414,7 +414,7 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
 
       let changed = 0;
       if (cmd) {
-        executeCommand(cmd, ctx.level);
+        executeAmbientCommand(cmd, ctx.level);
         for (const c of cmd.commands) {
           if (c.type === 'set-tiles' || c.type === 'set-collision-edit') changed += c.entries.length;
         }
@@ -487,7 +487,7 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
         return { id, name, tiles: newTiles.length, uniqueWords: new Set(newLayout).size };
       }
 
-      executeCommand({
+      executeAmbientCommand({
         type: 'set-bg',
         description: `agent: set background (${newTiles.length} tiles)`,
         sectionIndex: -1,
@@ -517,7 +517,7 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
         // changing anything.
         return { section: req.section, bgId: req.bgId, changed: false };
       }
-      executeCommand({
+      executeAmbientCommand({
         type: 'set-section-bg',
         description: `agent: section ${req.section} bg -> ${req.bgId ?? 'act default'}`,
         sectionIndex: req.section,

@@ -1,17 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useProjectStore, getActiveLevel } from '../state/projectStore';
-import { useEditorStore, activeHistory, undo, redo } from '../state/editorStore';
+import { useProjectStore } from '../state/projectStore';
+import { focusedHistory } from '../state/editorStore';
+import { useHistoryVersion } from '../hooks/useHistoryVersion';
 import { useSessionStore } from '../state/sessionStore';
-import { parseSpriteDocTabId } from '../shell/tabs';
-import { useSpriteStore } from '../state/spriteStore';
-import { spriteModeUndo, spriteModeRedo, spriteModeCanUndo, spriteModeCanRedo } from '../state/sprite-undo';
 import { useClassicProjectStore } from '../state/classicProjectStore';
-import { useClassicLevelStore, classicCanUndo, classicCanRedo } from '../state/classicLevelStore';
-import type { S4Level } from '../../core/editing/commands';
 import type { RecentProject } from '../../shared/ipc-types';
 import AuroraMark from './AuroraMark';
 import { T, Chip, IconButton, Divider, Icons } from './ui';
 import ViewMenu from '../shell/ViewMenu';
+import { useDirtySnapshot } from '../shell/dirty-snapshot';
+import { tabHasDirtyDot } from '../shell/dirty-tabs';
+import { canSaveActive } from '../state/project-runtime';
 
 interface ToolbarProps {
   onOpenProject: () => void;
@@ -22,26 +21,35 @@ interface ToolbarProps {
 export default function Toolbar({ onOpenProject, onOpenRecent, onSave }: ToolbarProps) {
   const config = useProjectStore((s) => s.config);
   const loading = useProjectStore((s) => s.loading);
-  const dirty = useEditorStore((s) => s.dirty);
-  const historyVersion = useEditorStore((s) => s.historyVersion);
-  // Sprite editing runs in a sprite-doc tab; when one is active the undo/redo
-  // controls drive the merged sprite timeline (this Toolbar is the sprite-doc
-  // pane's app bar). Otherwise they drive the active level's history.
+  // ONE undo/redo pair for every surface this app bar fronts (aeon level, classic
+  // level, sprite doc): which document it drives is focusedHistory()'s decision,
+  // and the hub clock re-evaluates its enabledness. The activeId subscription is
+  // what re-renders when focus MOVES between documents (the hub only fires when a
+  // stack changes, which switching tabs does not).
   const activeId = useSessionStore((s) => s.activeId);
-  const isSpriteDoc = parseSpriteDocTabId(activeId) !== null;
-  // Re-evaluate sprite Undo/Redo enablement whenever the sprite history changes.
-  const spriteTick = useSpriteStore((s) => s.historyTick);
+  useHistoryVersion();
+  const history = focusedHistory();
+
+  // ONE Save chip for whatever document is in front, matching Ctrl+S exactly.
+  // It used to be two chips whose enabledness knew only about LEVEL dirtiness
+  // while their click ran save-all (which writes sprite art too): with only a
+  // sprite dirty the button sat inert over an operation that was available and
+  // meaningful. Enabledness is now the coordinator's own verdict on the active
+  // tab, and the "unsaved" badge reuses the tab strip's dot rule — no second
+  // definition of dirty anywhere.
+  const dirtySnap = useDirtySnapshot();
+  const activeKind = useSessionStore((s) => s.tabs.find((t) => t.id === s.activeId)?.kind);
+  const activeDirty = activeKind ? tabHasDirtyDot(activeId, activeKind, dirtySnap) : false;
+  const canSave = canSaveActive(activeId);
 
   // Classic (disasm) session state — the toolbar's classic twin of the aeon
-  // block below: undo/redo/save, rendered in BOTH the classic level view
+  // block below: save + dirty badge, rendered in BOTH the classic level view
   // (ClassicProjectView's app bar) and the sprite-doc pane (App's SpriteMode app
   // bar) so the two surfaces stay visibly part of one app. The zone/act selector
   // was removed (Fix D): it duplicated the explorer LEVELS list + tab strip and
   // rendered oddly inside the sprite-doc pane's app bar. Sprite mode is reached
   // by opening a sprite-doc tab, not a mode chip.
   const classicOpen = useClassicProjectStore((s) => s.status) === 'open';
-  const classicDirty = useClassicLevelStore((s) => Object.values(s.dirty).some(Boolean));
-  const classicHistoryTick = useClassicLevelStore((s) => s.historyTick);
 
   const [recentOpen, setRecentOpen] = useState(false);
   const [recentProjects, setRecentProjects] = useState<RecentProject[]>([]);
@@ -66,10 +74,6 @@ export default function Toolbar({ onOpenProject, onOpenRecent, onSave }: Toolbar
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, [recentOpen]);
-
-  function getLevel(): S4Level | null {
-    return getActiveLevel(useProjectStore.getState());
-  }
 
   return (
     <>
@@ -116,82 +120,39 @@ export default function Toolbar({ onOpenProject, onOpenRecent, onSave }: Toolbar
         )}
       </div>
 
-      {/* Aeon block: currently UNREACHABLE — aeon level tabs render LevelWorkspace
-          (not Toolbar), and sprite-docs are classic-only until the aeon Object
-          Library task lands. Kept for that upcoming aeon sprite-doc app bar. The
-          zone/act selector was removed (Fix D — the explorer + tab strip own
-          level navigation). */}
-      {config && (
+      {/* The undo/redo pair, once, for whichever document has focus. */}
+      {(config || classicOpen) && (
         <>
           <Divider />
 
           <IconButton
             icon={<Icons.IconUndo size={14} />}
             label="Undo (Ctrl+Z)"
-            onClick={() => {
-              if (isSpriteDoc) spriteModeUndo();
-              else { const l = getLevel(); if (l) undo(l); }
-            }}
-            disabled={isSpriteDoc
-              ? (void spriteTick, void historyVersion, !spriteModeCanUndo())
-              : !activeHistory().canUndo}
+            onClick={() => history?.undo()}
+            disabled={!history?.canUndo}
           />
           <IconButton
             icon={<Icons.IconRedo size={14} />}
             label="Redo (Ctrl+Y)"
-            onClick={() => {
-              if (isSpriteDoc) spriteModeRedo();
-              else { const l = getLevel(); if (l) redo(l); }
-            }}
-            disabled={isSpriteDoc
-              ? (void spriteTick, void historyVersion, !spriteModeCanRedo())
-              : !activeHistory().canRedo}
+            onClick={() => history?.redo()}
+            disabled={!history?.canRedo}
           />
-          <Chip
-            active={saveFlash}
-            disabled={!dirty && !saveFlash}
-            onClick={async () => {
-              await onSave();
-              setSaveFlash(true);
-              setTimeout(() => setSaveFlash(false), 1500);
-            }}
-          >
-            {saveFlash ? 'Saved!' : 'Save'}
-          </Chip>
-
-          {dirty && <span style={styles.dirtyBadge}>unsaved</span>}
         </>
       )}
 
-      {classicOpen && !config && (
+      {/* Save = the CURRENT document (Ctrl+S). Save All is Ctrl+Shift+S / ⌘K,
+          deliberately not a chip: the app bar's job is the thing in front of you.
+          The disabled title says why when a dirty sprite has nowhere to write. */}
+      {(config || classicOpen) && (
         <>
-          <Divider />
-
-          <IconButton
-            icon={<Icons.IconUndo size={14} />}
-            label="Undo (Ctrl+Z)"
-            onClick={() => {
-              if (isSpriteDoc) spriteModeUndo();
-              else useClassicLevelStore.getState().undo();
-            }}
-            disabled={isSpriteDoc
-              ? (void spriteTick, !spriteModeCanUndo())
-              : (void classicHistoryTick, !classicCanUndo())}
-          />
-          <IconButton
-            icon={<Icons.IconRedo size={14} />}
-            label="Redo (Ctrl+Y)"
-            onClick={() => {
-              if (isSpriteDoc) spriteModeRedo();
-              else useClassicLevelStore.getState().redo();
-            }}
-            disabled={isSpriteDoc
-              ? (void spriteTick, !spriteModeCanRedo())
-              : (void classicHistoryTick, !classicCanRedo())}
-          />
           <Chip
             active={saveFlash}
-            disabled={!classicDirty && !saveFlash}
+            disabled={!canSave && !saveFlash}
+            title={
+              canSave ? 'Save this document (Ctrl+S) — Save All is Ctrl+Shift+S'
+                : activeDirty ? 'This document has no save-back file — export it from the sprite editor'
+                  : 'Nothing to save in this document'
+            }
             onClick={async () => {
               await onSave();
               setSaveFlash(true);
@@ -201,7 +162,7 @@ export default function Toolbar({ onOpenProject, onOpenRecent, onSave }: Toolbar
             {saveFlash ? 'Saved!' : 'Save'}
           </Chip>
 
-          {classicDirty && <span style={styles.dirtyBadge}>unsaved</span>}
+          {activeDirty && <span style={styles.dirtyBadge}>unsaved</span>}
         </>
       )}
 

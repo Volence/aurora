@@ -5,6 +5,7 @@ import { useToastStore } from '../../state/toastStore';
 import { decodeGenesisColor } from '../../../core/formats/palette';
 import GenesisColorSliders from '../art-shared/GenesisColorSliders';
 import { COMPOSER_SWATCH_A, COMPOSER_SWATCH_B } from '../../canvas/canvas-colors';
+import { classicSurfaceProps } from './classic-surface';
 
 // The classic (Sonic 1) palette panel (Task B4): a 4×16 swatch grid over the open
 // act's four CRAM lines. Clicking an editable swatch (index 1-15) opens the shared
@@ -51,7 +52,9 @@ export default function ClassicPalettePanel() {
   }
 
   return (
-    <div style={styles.body}>
+    // Palette edits belong to the ZONE-ART document, so working here claims the
+    // art facet for undo routing (see classic-surface.ts).
+    <div {...classicSurfaceProps('art')} style={styles.body}>
       <div style={styles.grid}>
         {doc.palettes.map((line, li) => (
           <div key={li} style={styles.row}>

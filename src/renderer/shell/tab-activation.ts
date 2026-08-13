@@ -7,15 +7,19 @@
 //      / Cancel). Aeon act switches are pointer moves over the resident
 //      S4Project — always safe.
 //
-//   2. SPRITE-DOC activation (planSpriteDocActivation + activateSpriteDocTarget,
-//      plus the loaded-doc marker markSpriteDocLoaded/getLoadedSpriteDocId):
-//      the sprite editor is a singleton, so retargeting it discards the current
-//      sprite's edits + undo history; a dirty retarget must confirm first
-//      (Discard & open / Cancel — confirmDiscardSpriteEdits).
+//   2. SPRITE-DOC activation (planSpriteDocActivation + activateSpriteDocTarget):
+//      each sprite-doc tab owns a document, so focusing one CHECKS IT OUT and
+//      parks the outgoing one — a switch discards nothing and asks nothing. The
+//      only sprite path that still destroys work is CLOSING a tab, so that is
+//      where the confirm now lives (confirmCloseSpriteDoc — Save / Discard /
+//      Cancel).
 //
 // Each planner is the pure, tested decision; the exported request*/activate*
-// functions are the glue. The shared confirm copy lives in
-// confirmDiscardSpriteEdits so the edit-art wrapper shows the identical dialog.
+// functions are the glue.
+//
+// Tab close is also where per-document undo stacks are DISPOSED (spec §4.1): a
+// closed document's stack is unreachable, and keeping it would both leak and let
+// a reopened tab inherit the history of a document the user already threw away.
 
 import { useSessionStore } from '../state/sessionStore';
 import { useClassicProjectStore } from '../state/classicProjectStore';
@@ -26,8 +30,12 @@ import { useWorkspaceStore } from '../workspace/workspaceStore';
 import { useConfirmStore } from '../state/confirmStore';
 import { useToastStore } from '../state/toastStore';
 import { saveClassicProject, type SaveClassicProjectResult } from '../state/classic-save';
-import { useSpriteStore, spriteHistory } from '../state/spriteStore';
-import { parseLevelTabId, parseSpriteDocTabId } from './tabs';
+import {
+  useSpriteStore, openSpriteDoc, activateSpriteDoc, closeSpriteDoc,
+  dirtySpriteDocIds, spriteDocState, DEFAULT_FRAME_SIZE,
+} from '../state/spriteStore';
+import { documentHistoryHub } from '../state/history-hub';
+import { parseLevelTabId, parseSpriteDocTabId, zoneArtDocId } from './tabs';
 import { HOME_TAB, type TabDescriptor } from '../../core/shell/session';
 
 // The save call is behind a seam (mirrors the retired save router's convention) so the
@@ -85,124 +93,153 @@ function currentEngine(): 's1' | 'aeon' | null {
 
 // --- Sprite-doc activation -------------------------------------------------
 //
-// The sprite editor has ONE mounting point (an App-level pane rendered only
-// while a sprite-doc tab is active). Only one sprite is loaded at a time, so
-// focusing a different sprite-doc tab RETARGETS that single editor — which
-// discards the current sprite's edits + undo history (loadSprite clears both).
-// loadedSpriteDocId tracks which sprite the editor currently shows so a re-focus
-// of the same doc no-ops instead of reloading.
+// MULTI-DOCUMENT (spec §4.4): every sprite-doc tab owns a document in
+// spriteStore plus an undo stack on the hub, both keyed by the tab id. The
+// sprite editor still has ONE mounting point, but focusing a tab now CHECKS OUT
+// its document and PARKS the outgoing one whole — pixels, palette, save-back
+// target, dirty flag and undo stack all survive in the background. So a tab
+// switch discards nothing and asks nothing; only a CLOSE discards, and that
+// confirm lives in requestCloseTab.
+//
+// `spriteStore.activeDocId` IS the loaded-doc marker (it is what recordEdit
+// records against), so there is no second copy to drift out of sync.
 
-let loadedSpriteDocId: string | null = null;
-export function markSpriteDocLoaded(id: string | null): void { loadedSpriteDocId = id; }
-export function getLoadedSpriteDocId(): string | null { return loadedSpriteDocId; }
-
-export function spriteEditorDirty(): boolean {
-  // Honest dirtiness: TRUE only when the working sprite has edits not yet
-  // persisted. recordEdit sets the flag; loadSprite/newSprite and a successful
-  // save/export clear it. A bare checkout (s1ArtSource set, no edits) is NOT
-  // dirty — that was the phantom-dirty bug where a freshly-opened, unedited S1
-  // sprite dotted its tab and re-asked the discard dialog on every switch.
-  return useSpriteStore.getState().unsavedEdits;
+/** The sprite-doc TAB whose document is checked out, or null when the editor
+ *  holds the untitled document — which deliberately isn't a tab id. */
+export function getLoadedSpriteDocId(): string | null {
+  const id = useSpriteStore.getState().activeDocId;
+  return parseSpriteDocTabId(id) ? id : null;
 }
 
 /**
- * Tear down the singleton sprite editor's loaded-doc state so nothing stale is
- * left behind when its doc is closed or discarded (the phantom-dirty ghost the
- * smoke test hit: a closed sprite tab whose checkout + history kept re-tripping
- * the discard dialog). Clears the loaded-doc marker, the save-back checkout, the
- * undo history, and the unsaved-edits flag.
+ * TRUE when ANY open sprite document has unsaved edits — parked documents
+ * included. Honest dirtiness: recordEdit sets the flag, loadSprite/newSprite and
+ * a successful save/export clear it. A bare checkout (s1ArtSource set, no edits)
+ * is NOT dirty — that was the phantom-dirty bug where a freshly-opened, unedited
+ * S1 sprite dotted its tab and re-asked the discard dialog on every switch.
  */
-export function resetSpriteEditor(): void {
-  markSpriteDocLoaded(null);
-  useSpriteStore.getState().setS1ArtSource(null);
-  spriteHistory.clear();
-  useSpriteStore.getState().setUnsavedEdits(false);
+export function anySpriteDocDirty(): boolean {
+  return dirtySpriteDocIds().length > 0;
 }
 
 /**
- * Ask whether to discard the loaded sprite's unsaved edits. Resolves true on
- * 'discard', false on cancel. The copy lives here so BOTH the sprite-doc
- * activation guard and the edit-art wrapper (export-sprite.editObjectArt) show
- * the identical dialog.
+ * End the whole sprite editing session: drop every open document, its undo stack
+ * and its save-back checkout, leaving a blank untitled document. Used when the
+ * project underneath them goes away — a surviving checkout points at the OLD
+ * project's file by absolute path, so a later Ctrl+S would write across projects.
+ * (Named for what it now does: Task 7 made this a multi-document store, so
+ * resetting "the editor" alone would leave parked documents behind.)
  */
-export async function confirmDiscardSpriteEdits(): Promise<boolean> {
-  const answer = await useConfirmStore.getState().ask({
-    // Context-neutral copy: this dialog fronts BOTH a sprite retarget (open
-    // another) and a sprite-doc CLOSE, so it can't say "Opening another sprite".
-    title: 'Unsaved sprite edits',
-    body: 'This discards unsaved sprite edits and undo history.',
-    buttons: [
-      { key: 'discard', label: 'Discard & open', tone: 'danger' },
-      { key: 'cancel', label: 'Cancel' },
-    ],
-  });
-  return answer === 'discard';
+export function closeAllSpriteDocs(): void {
+  useSpriteStore.getState().closeAll();
 }
 
 export type SpriteDocPlan =
   | { kind: 'none' }
-  | { kind: 'open'; engine: 's1' | 'aeon'; ref: string }
-  | { kind: 'confirm'; engine: 's1' | 'aeon'; ref: string };
+  | { kind: 'checkout' }
+  | { kind: 'open'; engine: 's1' | 'aeon'; ref: string };
 
+/**
+ * What focusing a sprite-doc tab has to do. Three cases, no confirm among them:
+ * it is already checked out (nothing), it is open in the background (check it
+ * out — its content and history are still there, so RELOADING it would throw
+ * away exactly what multi-document exists to keep), or it has never been opened
+ * (load it into a fresh document).
+ */
 export function planSpriteDocActivation(input: {
   tabId: string;
-  loadedDocId: string | null;
-  spriteDirty: boolean;
+  activeDocId: string;
+  isOpen: boolean;
 }): SpriteDocPlan {
   const ref = parseSpriteDocTabId(input.tabId);
   if (!ref) return { kind: 'none' };
-  if (input.loadedDocId === input.tabId) return { kind: 'none' };
-  return input.spriteDirty
-    ? { kind: 'confirm', engine: ref.engine, ref: ref.ref }
-    : { kind: 'open', engine: ref.engine, ref: ref.ref };
+  if (input.activeDocId === input.tabId) return { kind: 'none' };
+  if (input.isOpen) return { kind: 'checkout' };
+  return { kind: 'open', engine: ref.engine, ref: ref.ref };
 }
 
+// IMPORT CYCLE: export-sprite statically imports this module (requestOpenTab, for
+// the classic edit-art handoff), so this module must NOT statically import
+// export-sprite back — it is pulled in by dynamic import() at call time. The
+// type-only `typeof import` below is erased at compile time, so it adds no edge.
+type SpriteModule = typeof import('../components/sprite/export-sprite');
+let spriteModuleImpl: SpriteModule | null = null;
+/** Substitute the sprite loader/saver module (tests only) — avoids needing
+ *  window.api + a real canvas to drive the activation flow. */
+export function __setSpriteModuleForTest(m: Partial<SpriteModule> | null): void {
+  spriteModuleImpl = m as SpriteModule | null;
+}
+function spriteModule(): Promise<SpriteModule> {
+  return spriteModuleImpl
+    ? Promise.resolve(spriteModuleImpl)
+    : import('../components/sprite/export-sprite');
+}
+
+// Sprite activations run ONE AT A TIME. The loaders write into whichever document
+// is checked out when their awaits resolve, so two overlapping loads would splice
+// one sprite's pixels (and its save-back target) into the other's document — a
+// later Ctrl+S would then write sprite A's art from sprite B's tab. The level
+// path can cancel a superseded flow mid-await because openAct is a single
+// synchronous commit at the end; a sprite load has no such seam, so it is
+// serialized instead of cancelled.
+let spriteActivations: Promise<unknown> = Promise.resolve();
+
 /**
- * Point the singleton sprite editor at a sprite-doc tab's target. Resolves true
- * when the tab may take focus (false = user cancelled / open failed). Shares the
- * module's activationGen counter with activateLevelTarget so a newer activation
- * of either kind supersedes an older one mid-await.
- *
- * IMPORT CYCLE: export-sprite statically imports this module (markSpriteDocLoaded
- * + requestOpenTab, for the classic edit-art handoff), so this module must NOT
- * statically import export-sprite back. The two sprite loaders are pulled in via
- * a dynamic import() at call time to break that cycle.
+ * Check out (or first load) a sprite-doc tab's document. Resolves true when the
+ * tab may take focus (false = load failed / superseded).
  */
-export async function activateSpriteDocTarget(tabId: string): Promise<boolean> {
+export function activateSpriteDocTarget(tabId: string): Promise<boolean> {
+  const run = spriteActivations.then(() => runSpriteActivation(tabId), () => runSpriteActivation(tabId));
+  spriteActivations = run.catch(() => undefined);
+  return run;
+}
+
+async function runSpriteActivation(tabId: string): Promise<boolean> {
   const myGen = ++activationGen;
+  const store = useSpriteStore.getState();
   const plan = planSpriteDocActivation({
     tabId,
-    loadedDocId: loadedSpriteDocId,
-    spriteDirty: spriteEditorDirty(),
+    activeDocId: store.activeDocId,
+    isOpen: store.isOpen(tabId),
   });
   if (plan.kind === 'none') return true;
-
-  if (plan.kind === 'confirm') {
-    const discard = await confirmDiscardSpriteEdits();
-    if (myGen !== activationGen) return false; // superseded while the dialog was open
-    if (!discard) return false; // cancelled
+  if (plan.kind === 'checkout') {
+    activateSpriteDoc(tabId); // synchronous state swap — nothing to supersede
+    return true;
   }
 
-  // Dynamic import breaks the export-sprite ↔ tab-activation cycle (see above).
-  const { loadSpriteByName, editObjectArtCheckout } = await import('../components/sprite/export-sprite');
-  if (myGen !== activationGen) return false; // superseded while the module loaded
+  // First open: park the outgoing document and check out a fresh one for THIS
+  // tab, so everything the loader writes below lands in this tab's document (and
+  // on this tab's undo stack). The size is provisional — the loader replaces the
+  // frames wholesale.
+  const previousDocId = store.activeDocId;
+  openSpriteDoc(tabId, { width: DEFAULT_FRAME_SIZE, height: DEFAULT_FRAME_SIZE });
+
+  const { loadSpriteByName, editObjectArtCheckout } = await spriteModule();
+  let loaded = false;
   try {
-    if (plan.engine === 'aeon') {
-      await loadSpriteByName(plan.ref);
-    } else if (!(await editObjectArtCheckout(Number(plan.ref)))) {
-      return false; // checkout failed (a toast already fired) — leave the editor as-is
-    }
+    // Both loaders swallow their own failures into a toast and resolve, so the
+    // returned boolean — not "it didn't throw" — is what decides whether this tab
+    // has a document. Assuming success here opened the tab onto the blank 32×32
+    // placeholder document instead of taking the rollback below.
+    loaded = plan.engine === 'aeon'
+      ? await loadSpriteByName(plan.ref)
+      : await editObjectArtCheckout(Number(plan.ref));
   } catch {
-    return false; // loadSpriteByName rejected — stay put
+    loaded = false; // loadSpriteByName rejected — stay put
   }
-  if (myGen !== activationGen) return false; // superseded while the load was in flight
-  // Mark the loaded doc ONLY here, after the final gen check passes — for BOTH
-  // engine branches. A superseded flow may still have mutated the sprite editor
-  // via its loader (inherent: the loader IS the await), but it never reaches this
-  // mark, so loadedSpriteDocId always reflects the newest WINNING activation; a
-  // stale editor view self-heals on the next activation.
-  markSpriteDocLoaded(tabId);
-  return true;
+  if (!loaded) {
+    // Nothing was loaded, so this tab has no document — drop the empty one and
+    // put the user back on the document they were looking at, rather than
+    // stranding them on a blank canvas that belongs to a tab they never reached.
+    closeSpriteDoc(tabId);
+    if (useSpriteStore.getState().activeDocId !== previousDocId) activateSpriteDoc(previousDocId);
+    return false;
+  }
+  // Superseded by a LEVEL activation while the load was in flight: the document
+  // itself is fine (it is this tab's own), but the user has moved on, so the tab
+  // must not steal focus.
+  return myGen === activationGen;
 }
 
 function classicOpenAct(zone: string, act: number): boolean {
@@ -310,6 +347,70 @@ export async function requestFocusTabId(id: string): Promise<void> {
 }
 
 /**
+ * Ask what to do about a sprite document that is about to be CLOSED with unsaved
+ * edits — the one sprite path that genuinely destroys work now that switching
+ * parks instead of discarding. Resolves true when the close may proceed.
+ *
+ * Save is offered only when the document has an in-place art target to write
+ * back to (an S1 object checkout). A document without one has no destination —
+ * persisting it means Export in the sprite UI, with a name and animation steps
+ * to choose — so a Save button here would be a promise the dialog can't keep.
+ */
+async function confirmCloseSpriteDoc(docId: string): Promise<boolean> {
+  const doc = spriteDocState(docId);
+  if (!doc || !doc.unsavedEdits) return true; // nothing to lose
+  const canSave = doc.s1ArtSource !== null;
+
+  const answer = await useConfirmStore.getState().ask({
+    title: 'Unsaved sprite edits',
+    body: canSave
+      ? 'Closing this sprite tab discards its unsaved edits and undo history.'
+      : 'Closing this sprite tab discards its unsaved edits and undo history. '
+        + 'This sprite has no save-back file — export it from the sprite editor to keep the edits.',
+    buttons: [
+      ...(canSave ? [{ key: 'save', label: 'Save & close', tone: 'primary' as const }] : []),
+      { key: 'discard', label: 'Discard & close', tone: 'danger' as const },
+      { key: 'cancel', label: 'Cancel' },
+    ],
+  });
+
+  if (answer === 'save') {
+    const { saveSpriteDocArt } = await spriteModule();
+    await saveSpriteDocArt(docId);
+    // The savers encode failure as a toast, not a rejection, so the honest gate
+    // is to re-read the flag (same pattern as the project-open guard): still
+    // dirty ⇒ the save failed, and closing would destroy what it was meant to
+    // protect. Abort and say so — a silent abort looks like a dead button.
+    if (spriteDocState(docId)?.unsavedEdits) {
+      useToastStore.getState().addToast(
+        'Close cancelled — the sprite art could not be saved.', 'error');
+      return false;
+    }
+    return true;
+  }
+  return answer === 'discard';
+}
+
+/**
+ * Drop the undo stacks a closed tab leaves unreachable (Task 11). A sprite doc's
+ * stack goes with its document (closeSpriteDoc). A level tab disposes only its
+ * OWN layout document: the zone-art document is shared by every act tab of that
+ * zone, so it survives until the last of them closes — otherwise closing act 1
+ * would silently throw away undo for art edits still visible in act 2.
+ */
+function disposeStacksForClosedTab(id: string): void {
+  if (parseSpriteDocTabId(id)) { closeSpriteDoc(id); return; }
+  const level = parseLevelTabId(id);
+  if (!level) return;
+  documentHistoryHub.dispose(id);
+  const zoneStillOpen = useSessionStore.getState().tabs.some((t) => {
+    const other = parseLevelTabId(t.id);
+    return other !== null && other.zone === level.zone;
+  });
+  if (!zoneStillOpen) documentHistoryHub.dispose(zoneArtDocId(level.zone));
+}
+
+/**
  * Close a tab through the activation guard: closing the ACTIVE tab promotes a
  * neighbor (core closeTab picks right-then-left), so the promoted level tab
  * must pass the same activation gate as a click on it — on cancel/failed
@@ -321,19 +422,18 @@ export async function requestCloseTab(id: string): Promise<void> {
   // activation guard so a future non-TabStrip caller can't run it either.
   if (id === HOME_TAB.id) return;
 
-  // Closing the tab whose sprite is loaded in the singleton editor must not leave
-  // the editor state behind (the phantom-dirty ghost). If it has unsaved edits,
-  // confirm the discard first (cancel → abort the close); then reset the editor.
-  // Runs BEFORE neighbor-promotion so a promoted sprite-doc reloads cleanly and a
-  // promoted level tab isn't blocked by a now-stale sprite prompt. A NON-loaded
-  // sprite-doc tab (its sprite isn't in the editor) closes through the path below.
-  if (parseSpriteDocTabId(id) !== null && id === getLoadedSpriteDocId()) {
-    if (spriteEditorDirty() && !(await confirmDiscardSpriteEdits())) return;
-    resetSpriteEditor();
-  }
+  // Closing a sprite-doc tab discards its document — whether it is the checked-out
+  // one or a parked background one — so every sprite-doc close is confirmed when
+  // it has unsaved edits. Runs BEFORE neighbor-promotion so a promoted level tab
+  // isn't blocked by a now-stale sprite prompt.
+  if (parseSpriteDocTabId(id) !== null && !(await confirmCloseSpriteDoc(id))) return;
 
   const session = useSessionStore.getState();
-  if (session.activeId !== id) { session.close(id); return; }
+  if (session.activeId !== id) {
+    session.close(id);
+    disposeStacksForClosedTab(id);
+    return;
+  }
   const idx = session.tabs.findIndex((t) => t.id === id);
   if (idx === -1) return;
   const remaining = session.tabs.filter((t) => t.id !== id);
@@ -341,6 +441,9 @@ export async function requestCloseTab(id: string): Promise<void> {
   if (promoted && promoted.kind === 'level' && !(await activateLevelTarget(promoted.id))) return;
   if (promoted && promoted.kind === 'sprite-doc' && !(await activateSpriteDocTarget(promoted.id))) return;
   useSessionStore.getState().close(id);
+  // AFTER the session close: disposeStacksForClosedTab reads the surviving tabs
+  // to decide whether the zone-art document still has an owner.
+  disposeStacksForClosedTab(id);
 }
 
 /** Ctrl+1..9 — 1-based over the whole strip (1 = Home). */

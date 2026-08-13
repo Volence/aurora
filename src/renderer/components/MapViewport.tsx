@@ -1,7 +1,8 @@
 import React, { useRef, useEffect, useCallback, useState } from 'react';
 import { useViewStore } from '../state/viewStore';
 import { useProjectStore, getCurrentAct, getCurrentZone, getActiveLevel as getStoreActiveLevel } from '../state/projectStore';
-import { useEditorStore, executeCommand, undo, redo, setCommandInvalidationListener, RING_PATTERNS, type EditorTool } from '../state/editorStore';
+import { useEditorStore, executeCommand, focusedHistory, setCommandInvalidationListener, RING_PATTERNS, type EditorTool } from '../state/editorStore';
+import { useAeonHistoryVersion } from '../hooks/useHistoryVersion';
 import { useArtStore } from '../state/artStore';
 import { useSessionStore } from '../state/sessionStore';
 import { switchFacet, FACET_TOOLS } from '../workspace/facet-tools';
@@ -129,7 +130,13 @@ export default function MapViewport() {
   const currentActId = useProjectStore((s) => s.currentActId);
   const objectSprites = useProjectStore((s) => s.objectSprites);
   const collisionProfiles = useProjectStore((s) => s.collisionProfiles);
-  const historyVersion = useEditorStore((s) => s.historyVersion);
+  // Two repaint clocks: committed edits arrive through the undo hub, live ones
+  // (a drag in flight, a direct BG tile write) through the editor store.
+  // Scoped to this act's layout + zone-art documents: every dependency of this
+  // effect chain is a full section re-prerender, so an unrelated document's
+  // undo pointer must not reach it.
+  const historyVersion = useAeonHistoryVersion();
+  const liveEditVersion = useEditorStore((s) => s.liveEditVersion);
   const activeSectionIndex = useEditorStore((s) => s.activeSectionIndex);
   const editingLayer = useEditorStore((s) => s.editingLayer);
   const selection = useEditorStore((s) => s.selection);
@@ -377,7 +384,7 @@ export default function MapViewport() {
           // editorStore (bumpStoreVersions) so it survives Art mode.
           // Objects/rings AND the collision overlay (incl. set-collision-edit)
           // are drawn by the OverlayRenderer from live state every frame; the
-          // historyVersion bump already re-renders them — no markDirty needed.
+          // history-clock bump already re-renders them — no markDirty needed.
           break;
       }
     });
@@ -431,7 +438,7 @@ export default function MapViewport() {
     }
     // Realign the collision paint ghost after any pan/zoom/version change.
     drawCollisionPreview();
-  }, [vpX, vpY, zoom, overlays, project, currentZoneId, currentActId, activeSectionIndex, editingLayer, historyVersion, selection, objectSprites, collisionProfiles, drawCollisionPreview]);
+  }, [vpX, vpY, zoom, overlays, project, currentZoneId, currentActId, activeSectionIndex, editingLayer, historyVersion, liveEditVersion, selection, objectSprites, collisionProfiles, drawCollisionPreview]);
 
   // Handle resize
   useEffect(() => {
@@ -475,7 +482,7 @@ export default function MapViewport() {
 
     observer.observe(container);
     return () => observer.disconnect();
-  }, [vpX, vpY, zoom, overlays, project, currentZoneId, currentActId, editingLayer, historyVersion]);
+  }, [vpX, vpY, zoom, overlays, project, currentZoneId, currentActId, editingLayer, historyVersion, liveEditVersion]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -496,17 +503,17 @@ export default function MapViewport() {
 
       const state = useProjectStore.getState();
       const act = getCurrentAct(state);
-      // Must include zone tileset/palette so undo/redo of zone commands
-      // (set-palette-line / set-tileset-tiles) works from the keyboard path.
+      // Must include zone tileset/palette so the commands issued below reach the
+      // zone data (set-palette-line / set-tileset-tiles) as well as the act's.
       const level: S4Level | null = getStoreActiveLevel(state);
 
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) {
-        if (level) undo(level);
+        focusedHistory()?.undo();
         e.preventDefault();
         return;
       }
       if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key.toLowerCase() === 'z' && e.shiftKey))) {
-        if (level) redo(level);
+        focusedHistory()?.redo();
         e.preventDefault();
         return;
       }
@@ -724,7 +731,7 @@ export default function MapViewport() {
       resolved.layout[tile.tileIndex] = newNt;
       sectionRenderer.markBgDirty([tile.tileIndex]);
       useEditorStore.getState().markDirty();
-      useEditorStore.getState().bumpVersion();
+      useEditorStore.getState().bumpLiveEdit();
     }
   }
 
@@ -1196,7 +1203,7 @@ export default function MapViewport() {
           ring.y = Math.round(world.y - offset.y);
         }
       }
-      useEditorStore.getState().bumpVersion();
+      useEditorStore.getState().bumpLiveEdit();
       return;
     }
 
