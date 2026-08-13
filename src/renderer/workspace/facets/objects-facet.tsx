@@ -6,6 +6,8 @@
 import React from 'react';
 import ObjectList from '../../components/shared/ObjectList';
 import { useAeonObjectListPort } from '../../providers/object-list-aeon';
+import ObjectInspector from '../../components/shared/ObjectInspector';
+import { useAeonObjectInspectorPort } from '../../providers/object-inspector-aeon';
 import PropertiesPanel from '../../components/PropertiesPanel';
 import { Panel, CollapsibleSection } from '../../components/ui';
 import { mapFacet, type FacetModule } from '../facet-registry';
@@ -15,10 +17,18 @@ function ObjectsPanels() {
   // rows, the arm/disarm toggle and the sprite-binding footer now arrive through
   // the aeon port, and the list itself is the same one classic renders.
   const objectListPort = useAeonObjectListPort();
+  // NEW capability: aeon had no object property editor at all — PropertiesPanel's
+  // "Selected Object" block was four lines of uneditable text (now removed, since
+  // this supersedes it). The form is classic's, shared; the aeon port supplies the
+  // fields aeon actually has and converts executeCommand's throw into a result.
+  const objectInspectorPort = useAeonObjectInspectorPort();
   return (
     <Panel width={240} scroll>
       <CollapsibleSection id="map.palette" title="Objects">
         <ObjectList port={objectListPort} label="Object palette" />
+      </CollapsibleSection>
+      <CollapsibleSection id="map.object" title="Selected Object">
+        <ObjectInspector port={objectInspectorPort} />
       </CollapsibleSection>
       <CollapsibleSection id="map.props" title="Properties"><PropertiesPanel /></CollapsibleSection>
     </Panel>

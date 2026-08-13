@@ -8,7 +8,8 @@ import ClassicLevelViewport from './ClassicLevelViewport';
 import ChunkPicker from './ChunkPicker';
 import ClassicComposerDock from './ClassicComposerDock';
 import ResolutionReportPanel from './ResolutionReportPanel';
-import ObjectInspector from './ObjectInspector';
+import ObjectInspector from '../shared/ObjectInspector';
+import { useClassicObjectInspectorPort } from '../../providers/object-inspector-classic';
 import ObjectList from '../shared/ObjectList';
 import { useClassicObjectListPort } from '../../providers/object-list-classic';
 import ClassicPalettePanel from './ClassicPalettePanel';
@@ -43,6 +44,9 @@ export default function ClassicProjectView({ appBar }: { appBar: React.ReactNode
   // from inside a conditional. It claims the layout surface through the port's
   // rootProps — see providers/object-list-classic.ts.
   const objectListPort = useClassicObjectListPort();
+  // Same story for the inspector, which became the neutral shared/ObjectInspector
+  // in the same pass — and is the port that now issues classicSetObjects.
+  const objectInspectorPort = useClassicObjectInspectorPort();
 
   const selected = useClassicLevelStore((s) => s.ref);
   const doc = useClassicLevelStore((s) => s.doc);
@@ -152,7 +156,7 @@ export default function ClassicProjectView({ appBar }: { appBar: React.ReactNode
           {status === 'ready' && doc && (
             <>
               <PanelHeader>Object Inspector</PanelHeader>
-              <ObjectInspector />
+              <ObjectInspector port={objectInspectorPort} />
               <PanelHeader>Object Library</PanelHeader>
               <ObjectList port={objectListPort} label="Object library" />
               <PanelHeader>Palette</PanelHeader>

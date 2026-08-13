@@ -122,6 +122,12 @@ function applyCommand(cmd: AnyCommand, level: S4Level): void {
     case 'delete-object':
       section.objects.splice(cmd.objectIndex, 1);
       break;
+    case 'set-object':
+      // Assign a COPY, never the command's own object: the command must keep an
+      // untouched record of both states or a later drag (which mutates the
+      // placement in place) would rewrite its own undo entry.
+      if (section.objects[cmd.objectIndex]) section.objects[cmd.objectIndex] = { ...cmd.newObject };
+      break;
     case 'move-ring': {
       const ring = section.rings[cmd.ringIndex];
       if (ring) { ring.x = cmd.newX; ring.y = cmd.newY; }
@@ -236,6 +242,9 @@ function undoCommand(cmd: AnyCommand, level: S4Level): void {
       break;
     case 'delete-object':
       section.objects.splice(cmd.objectIndex, 0, { ...cmd.object });
+      break;
+    case 'set-object':
+      if (section.objects[cmd.objectIndex]) section.objects[cmd.objectIndex] = { ...cmd.oldObject };
       break;
     case 'move-ring': {
       const ring = section.rings[cmd.ringIndex];

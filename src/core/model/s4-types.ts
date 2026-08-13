@@ -57,10 +57,18 @@ export function unpackNametableWord(word: number): NametableEntry {
 }
 
 export interface ObjectPlacement {
+  /** Section-LOCAL pixel coordinates, 0..$7FF (SECTION_PIXEL_SIZE - 1). The
+   *  exporter hard-fails outside that range (core/export/entity-data.ts). */
   x: number;
   y: number;
   typeId: string;
   subtype: number;
+  /** Horizontal / vertical mirror, packed into the placement word's OEF_XFLIP /
+   *  OEF_YFLIP bits on export. Optional because every act saved before these
+   *  existed omits them, and `.objects.json` is a straight JSON round-trip of
+   *  this interface — absent reads back as undefined and exports as unflipped. */
+  xflip?: boolean;
+  yflip?: boolean;
 }
 
 export interface RingPlacement {

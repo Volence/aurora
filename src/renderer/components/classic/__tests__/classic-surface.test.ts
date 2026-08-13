@@ -49,8 +49,31 @@ function sourceFiles(roots: readonly string[]): string[] {
   return out;
 }
 
-/** Any call to one of the exported classic:* editing commands. */
-const COMMAND_CALL = /\bclassic(?:Set|Edit|Add)[A-Za-z]*\(/;
+/**
+ * Source with comments stripped, so the guard reads CODE and not prose. Two
+ * things depend on it: a file that merely names a command in a comment must not
+ * be demanded to claim a surface, and a claim that has been commented out must
+ * not still satisfy one.
+ *
+ * (The `[^:]` guard keeps a `https://` inside a string from truncating its line.
+ * Nothing subtler is needed — this only decides which identifiers are visible.)
+ */
+function code(file: string): string {
+  return read(file)
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/(^|[^:])\/\/.*$/gm, '$1');
+}
+
+/**
+ * Any REFERENCE to one of the exported classic:* editing commands — not just a
+ * call. This used to require a following `(`, which meant a file that passed
+ * `classicSetObjects` as a callback issued the command while reading as clean.
+ * That is not hypothetical: making the object inspector engine-neutral turned its
+ * direct call into exactly such a reference (providers/object-inspector-classic.ts
+ * hands it to a pure commit helper), and the narrower regex let it through.
+ * Importing one of these IS committing to a surface.
+ */
+const COMMAND_CALL = /\bclassic(?:Set|Edit|Add)[A-Za-z]*\b/;
 
 /**
  * Every component that commits a classic edit, and the surface whose facet its
@@ -60,7 +83,11 @@ const COMMAND_CALL = /\bclassic(?:Set|Edit|Add)[A-Za-z]*\(/;
  */
 const COMMAND_SITES: Record<string, ClassicSurface | { inside: string }> = {
   'components/classic/ClassicLevelViewport.tsx': 'map',
-  'components/classic/ObjectInspector.tsx': 'map',
+  // Was components/classic/ObjectInspector.tsx until stage-4 plan 3 task 5 made
+  // the inspector engine-neutral: the classicSetObjects call moved INTO the port,
+  // so this entry moved with it. The widened scan root above is what makes that a
+  // rename here rather than a silent loss of coverage.
+  'providers/object-inspector-classic.ts': 'map',
   'components/classic/ClassicPalettePanel.tsx': 'art',
   'components/classic/ChunkTab.tsx': { inside: 'components/classic/ClassicComposerDock.tsx' },
   'components/classic/BlockTab.tsx': { inside: 'components/classic/ClassicComposerDock.tsx' },
@@ -75,7 +102,7 @@ const CONTAINER_SURFACES: Record<string, ClassicSurface> = {
 describe('classic surfaces claim their facet', () => {
   it('knows about every component that commits a classic edit', () => {
     const found = sourceFiles(SCAN_ROOTS)
-      .filter((f) => COMMAND_CALL.test(read(f)))
+      .filter((f) => COMMAND_CALL.test(code(f)))
       .sort();
     // A NEW editing component must be given a surface here (and be wired to
     // classicSurfaceProps), or its edits will be undone from the wrong document.
@@ -85,8 +112,8 @@ describe('classic surfaces claim their facet', () => {
   it.each(Object.entries(COMMAND_SITES))('%s claims its surface', (file, site) => {
     const [source, surface] =
       typeof site === 'string'
-        ? [read(file), site]
-        : [read(site.inside), CONTAINER_SURFACES[site.inside]];
+        ? [code(file), site]
+        : [code(site.inside), CONTAINER_SURFACES[site.inside]];
     expect(source).toContain(`classicSurfaceProps('${surface}')`);
   });
 
@@ -96,6 +123,6 @@ describe('classic surfaces claim their facet', () => {
     // The panel is now the engine-neutral shared/ObjectList, which imports no
     // store: the claim rides in on the classic port's `rootProps`, so THAT is
     // what has to keep declaring it.
-    expect(read('providers/object-list-classic.ts')).toContain("classicSurfaceProps('map')");
+    expect(code('providers/object-list-classic.ts')).toContain("classicSurfaceProps('map')");
   });
 });

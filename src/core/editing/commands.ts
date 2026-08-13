@@ -43,6 +43,23 @@ export interface DeleteObjectCommand extends EditCommand {
   object: ObjectPlacement;
 }
 
+/**
+ * Replace one placement's PROPERTIES in place — type, subtype, flips, and the
+ * coordinates a drag would otherwise carry. Whole-placement swap rather than a
+ * field delta, so a multi-field edit is still one undo step and the object keeps
+ * its index (a delete+add pair would re-order the section's object list, which
+ * the exporter's first-encounter type table is sensitive to).
+ *
+ * Distinct from `move-object`, which stays a coordinate-only command because the
+ * viewport's drag path coalesces on it.
+ */
+export interface SetObjectCommand extends EditCommand {
+  type: 'set-object';
+  objectIndex: number;
+  oldObject: ObjectPlacement;
+  newObject: ObjectPlacement;
+}
+
 export interface MoveRingCommand extends EditCommand {
   type: 'move-ring';
   ringIndex: number;
@@ -159,6 +176,7 @@ export type AnyCommand =
   | MoveObjectCommand
   | AddObjectCommand
   | DeleteObjectCommand
+  | SetObjectCommand
   | MoveRingCommand
   | AddRingCommand
   | AddRingsCommand

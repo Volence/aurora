@@ -32,12 +32,15 @@ export default function PropertiesPanel() {
 
   const section = act.sections[activeSectionIndex];
 
-  // Get selected item details
-  let selectedObj = null;
+  // Get selected item details. Objects are deliberately absent: their read-only
+  // block here was superseded by the real editor in the Objects facet
+  // (shared/ObjectInspector + providers/object-inspector-aeon, stage-4 plan 3
+  // task 5), and showing the same four values uneditably beside an editable form
+  // is the dead chrome that panel design forbids. Rings still have no editor, so
+  // their readout stays.
   let selectedRing = null;
-  if (selection && section) {
-    if (selection.type === 'object') selectedObj = section.objects[selection.index];
-    if (selection.type === 'ring') selectedRing = section.rings[selection.index];
+  if (selection && section && selection.type === 'ring') {
+    selectedRing = section.rings[selection.index];
   }
 
   return (
@@ -45,16 +48,6 @@ export default function PropertiesPanel() {
       <div style={styles.header}>Properties</div>
       <div style={styles.content}>
         {/* Selection details */}
-        {selectedObj && (
-          <div style={styles.section}>
-            <div style={styles.sectionTitle}>Selected Object</div>
-            <Property label="Section" value={String(activeSectionIndex)} />
-            <Property label="Position" value={`${selectedObj.x}, ${selectedObj.y}`} />
-            <Property label="Type" value={selectedObj.typeId} />
-            <Property label="Subtype" value={`$${selectedObj.subtype.toString(16).toUpperCase().padStart(2, '0')}`} />
-          </div>
-        )}
-
         {selectedRing && (
           <div style={styles.section}>
             <div style={styles.sectionTitle}>Selected Ring</div>
