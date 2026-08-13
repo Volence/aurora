@@ -159,6 +159,8 @@ function mk(source: ProfileEntry, path: string, status: EntryStatus, detail?: st
  * process supplies) merges ON TOP of it — param keys win. A missing or malformed
  * sidecar is treated as empty (open never fails over a bad sidecar).
  */
+// Sibling parser: core/project/mapping.ts models the same file's v2 shape
+// (base + assets); the two merge in the Stage 2 Project Setup work.
 async function readSidecar(fa: FileAccess): Promise<ProjectOverrides> {
   try {
     if (!(await fa.exists(SIDECAR))) return {};

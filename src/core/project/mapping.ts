@@ -3,6 +3,14 @@
 // compression) for hacks that diverge from stock. Loose at the top level so
 // configs written by newer Auroras survive a round-trip through older ones;
 // strict inside each asset override so typos fail loudly at parse time.
+//
+// NOTE: s1/index.ts's readSidecar() currently hand-parses the same physical
+// file (.aurora/project.json) into ProjectOverrides with a
+// tolerate-and-filter error posture. The two parsers are siblings destined
+// to merge when the Project Setup surface lands (spec §7 / Stage 2), which
+// will also revisit this schema's all-or-nothing failure mode in favor of
+// per-entry diagnostics. Until then, mapping.ts is NOT wired into project
+// opening — readSidecar remains authoritative for the paths channel.
 
 import { z } from 'zod';
 

@@ -46,4 +46,10 @@ describe('project mapping config', () => {
     expect(text.endsWith('\n')).toBe(true);
     expect(text).toContain('  "base": "aeon"');
   });
+
+  it('rejects an unknown key inside an asset override (typos fail loudly)', () => {
+    expect(parseProjectConfig(enc(JSON.stringify({
+      assets: { sprites: { path: 'a', compresion: 'zx0' } },
+    })))).toBeNull();
+  });
 });
