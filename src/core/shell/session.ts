@@ -8,7 +8,8 @@
 // Dirty state is NOT session state — documents/savers own dirtiness; the tab
 // strip reads it from there at render time.
 
-export type TabKind = 'home' | 'level' | 'sprite-doc' | 'art-doc' | 'palette-doc' | 'tool';
+export const TAB_KINDS = ['home', 'level', 'sprite-doc', 'art-doc', 'palette-doc', 'tool'] as const;
+export type TabKind = (typeof TAB_KINDS)[number];
 
 export interface TabDescriptor {
   readonly id: string;

@@ -1,7 +1,9 @@
-// Per-document undo (spec §10): every document (level layout doc, zone art
-// doc, sprite doc) owns one EditHistory; undo/redo follows the focused
-// document. Stages 3–4 rewire the existing stores onto a shared hub instance,
-// retiring the undo-bus sibling-invalidation scheme.
+// Per-document undo (spec §10): every document owns one undo history; undo/
+// redo follows the focused document. Today the hub holds EditHistory (the
+// aeon command history) only — sprite docs (sprite-history) and classic docs
+// (classic-history) CANNOT live here until Stages 3–4 either generalize the
+// hub over a minimal undo-stack interface or unify the three history classes.
+// That rewiring also retires the undo-bus sibling-invalidation scheme.
 //
 // Doc ids are the session tab ids ('level:ghz:1', 'doc:buzzbomber', …) so a
 // tab and its history share one identity.

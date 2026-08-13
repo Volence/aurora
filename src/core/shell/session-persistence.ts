@@ -5,11 +5,11 @@
 // Stage 2 shell — these stay pure.
 
 import { z } from 'zod';
-import { HOME_TAB, initialSession, type SessionState, type TabDescriptor } from './session';
+import { HOME_TAB, initialSession, TAB_KINDS, type SessionState, type TabDescriptor } from './session';
 
 const persistedTabSchema = z.strictObject({
   id: z.string().min(1),
-  kind: z.enum(['home', 'level', 'sprite-doc', 'art-doc', 'palette-doc', 'tool']),
+  kind: z.enum(TAB_KINDS),
   title: z.string(),
 });
 
