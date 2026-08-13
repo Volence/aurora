@@ -2984,10 +2984,15 @@ export default function ProjectSetupTab() {
     check(key, value);
   };
 
-  const pendingCount = Object.keys(edits).filter((k) => {
-    const row = model.groups.flatMap((g) => g.rows).find((r) => r.key === k);
-    return (row?.override ?? '') !== edits[k];
-  }).length;
+  // Compare each edited key against the CURRENT effective override from the
+  // sidecar config directly, not a row lookup: keys from model.unknownOverrides
+  // appear in NO group's rows, so removing an unknown override (onEdit(key, ''))
+  // would never register as pending under a row-lookup comparison. A row's
+  // `override` and sidecar.config.paths[key] are the same value for known keys,
+  // so this is strictly more general and covers unknown-override removals too.
+  const pendingCount = Object.keys(edits).filter(
+    (k) => edits[k] !== (sidecar.config.paths?.[k] ?? ''),
+  ).length;
 
   const apply = async () => {
     if (classicDirty) {
