@@ -1,0 +1,81 @@
+// The overlay set became SHARED state when classic's viewport stopped keeping
+// its four toggles in component-local useState. Two things follow, and neither
+// is visible to the type system:
+//
+//  - a key can be listed for an engine but misspelled, in which case the View
+//    menu renders a checkbox bound to `undefined` and the toggle silently does
+//    nothing;
+//  - a key can be added to OverlayOptions and listed for NO engine, in which
+//    case it is unreachable from the menu entirely.
+//
+// Both are one-character mistakes with no compile error and no runtime throw.
+
+import { describe, it, expect } from 'vitest';
+import { useViewStore, OVERLAY_KEYS_BY_ENGINE, type OverlayOptions } from '../viewStore';
+
+const defaults = (): OverlayOptions => useViewStore.getState().overlays;
+
+describe('overlay defaults', () => {
+  it('shows the player start by default, as classic\'s local state did', () => {
+    expect(defaults().showStart).toBe(true);
+  });
+
+  it('keeps the rest of classic\'s former local defaults', () => {
+    // The three keys classic already shared a name with, so that moving its
+    // toggles onto the store could not quietly change what a fresh act shows.
+    expect(defaults().showObjects).toBe(true);
+    expect(defaults().showCollision).toBe(false);
+    expect(defaults().showCollisionAngles).toBe(false);
+  });
+
+  it('toggleOverlay flips showStart', () => {
+    const before = defaults().showStart;
+    useViewStore.getState().toggleOverlay('showStart');
+    expect(defaults().showStart).toBe(!before);
+    useViewStore.getState().toggleOverlay('showStart');
+    expect(defaults().showStart).toBe(before);
+  });
+});
+
+describe('OVERLAY_KEYS_BY_ENGINE', () => {
+  const allKeys = Object.keys(defaults()) as (keyof OverlayOptions)[];
+
+  it('lists only keys that actually exist on OverlayOptions', () => {
+    for (const [engine, keys] of Object.entries(OVERLAY_KEYS_BY_ENGINE)) {
+      for (const key of keys) {
+        expect(allKeys, `${engine} lists a key that is not an overlay`).toContain(key);
+      }
+    }
+  });
+
+  it('reaches every overlay from at least one engine', () => {
+    const listed = new Set(Object.values(OVERLAY_KEYS_BY_ENGINE).flat());
+    const orphans = allKeys.filter((k) => !listed.has(k));
+    // An overlay no engine lists cannot be toggled from the View menu at all.
+    expect(orphans).toEqual([]);
+  });
+
+  it('gives the player start to classic and NOT to aeon', () => {
+    // The reason the filter exists: aeon's level model has no spawn point, so an
+    // unfiltered menu would show it a checkbox that renders nothing.
+    expect(OVERLAY_KEYS_BY_ENGINE.s1).toContain('showStart');
+    expect(OVERLAY_KEYS_BY_ENGINE.aeon).not.toContain('showStart');
+  });
+
+  it('keeps aeon-only overlays out of classic', () => {
+    // Rings, the section grid and the BG-plane overlay are aeon concepts;
+    // classic's viewport draws none of them.
+    for (const key of ['showRings', 'showChunkGrid', 'showBgPlane'] as const) {
+      expect(OVERLAY_KEYS_BY_ENGINE.s1).not.toContain(key);
+      expect(OVERLAY_KEYS_BY_ENGINE.aeon).toContain(key);
+    }
+  });
+
+  it('lists exactly the four overlays classic\'s chip row offers', () => {
+    // Classic's OptionBar and the View menu must agree — the chips are the same
+    // four toggles, and a key in one and not the other reads as a broken menu.
+    expect([...OVERLAY_KEYS_BY_ENGINE.s1].sort()).toEqual(
+      ['showCollision', 'showCollisionAngles', 'showObjects', 'showStart'],
+    );
+  });
+});

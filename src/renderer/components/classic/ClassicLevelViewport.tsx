@@ -2,6 +2,7 @@ import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { T, Chip, OptionBar, Divider } from '../ui';
 import { useClassicLevelStore, classicSetLayoutCells, classicSetObjects, classicSetStart } from '../../state/classicLevelStore';
 import { useEditorStore } from '../../state/editorStore';
+import { useViewStore } from '../../state/viewStore';
 import { armedPlacementId } from '../../state/classic-placement';
 import { toolsForFacet } from '../../workspace/facet-tools';
 import { TOOL_LABELS, TOOL_HINTS } from '../../workspace/tool-meta';
@@ -26,13 +27,6 @@ import {
   LOOP_GLYPH_FILL, LOOP_GLYPH_TEXT,
 } from '../../canvas/canvas-colors';
 
-type Plane = 'fg' | 'bg';
-interface Overlays {
-  collision: boolean;
-  objects: boolean;
-  start: boolean;
-  angles: boolean;
-}
 interface Camera {
   x: number;
   y: number;
@@ -171,11 +165,14 @@ export default function ClassicLevelViewport() {
   }, []);
   useEffect(() => () => { if (rafRef.current != null) cancelAnimationFrame(rafRef.current); }, []);
 
-  const [plane, setPlane] = useState<Plane>('fg');
-  const [overlays, setOverlays] = useState<Overlays>({
-    collision: false, objects: true, start: true, angles: false,
-  });
-  const toggle = (k: keyof Overlays) => setOverlays((o) => ({ ...o, [k]: !o[k] }));
+  // Plane and overlays are shared state now (spec §3.6), not viewport-local:
+  // unreachable from outside the component is exactly what stopped a shared
+  // plane control and shared overlay toggles from serving both engines. The
+  // plane IS aeon's editingLayer — same 'fg' | 'bg' union, same meaning.
+  const plane = useEditorStore((s) => s.editingLayer);
+  const setPlane = useEditorStore((s) => s.setEditingLayer);
+  const overlays = useViewStore((s) => s.overlays);
+  const toggle = useViewStore((s) => s.toggleOverlay);
 
   // Per-chunk prerender cache (chunkId → {offscreen canvas, version key}). A cached
   // canvas is reused while its content version is unchanged; edits bump the version
@@ -366,16 +363,16 @@ export default function ClassicLevelViewport() {
     // object placement and the spawn point live on the foreground plane).
     if (plane === 'fg') {
       // Collision overlay (per visible chunk).
-      if (overlays.collision) {
+      if (overlays.showCollision) {
         for (let row = range.startRow; row < range.endRow; row++) {
           for (let col = range.startCol; col < range.endCol; col++) {
             const cell = layoutCellAt(grid, col, row);
             if (cell === undefined) continue;
-            drawCollision(ctx, doc, col, row, cell & 0x7f, overlays.angles);
+            drawCollision(ctx, doc, col, row, cell & 0x7f, overlays.showCollisionAngles);
           }
         }
       }
-      if (overlays.objects) {
+      if (overlays.showObjects) {
         // Selection highlight + live drag preview (Task 14). The selection index
         // can be stale (a delete/undo shrank the list) — treat out-of-range as
         // no selection. During a move the drag ref carries the preview position.
@@ -390,7 +387,7 @@ export default function ClassicLevelViewport() {
         void objectArtVersion;
         drawObjects(ctx, doc, invZoom, objectSprites, ref?.zone ?? '', selIndex, previewPos);
       }
-      if (overlays.start) {
+      if (overlays.showStart) {
         // During a start drag the ref carries the live (clamped) preview position.
         const sdrag = startDragRef.current;
         drawStart(ctx, doc, invZoom, sdrag ? sdrag.preview : null);
@@ -629,7 +626,7 @@ export default function ClassicLevelViewport() {
         // visible, so you can only grab what you can see). Objects win ties: an
         // object drawn over the spawn point stays grabbable. Begins a start drag
         // that commits ONE classicSetStart on mouseup (spec §2.3).
-        if (overlays.start && hitTestPoint(world.x, world.y, d.start.x, d.start.y, pickWorld)) {
+        if (overlays.showStart && hitTestPoint(world.x, world.y, d.start.x, d.start.y, pickWorld)) {
           setSelectedObjectIndex(null);
           startDragRef.current = {
             grabDX: d.start.x - world.x, grabDY: d.start.y - world.y,
@@ -651,7 +648,7 @@ export default function ClassicLevelViewport() {
     }
     dragging.current = true;
     lastMouse.current = { x: e.clientX, y: e.clientY };
-  }, [tool, plane, overlays.start, activeGrid, cellUnderCursor, worldUnderCursor, redraw, setArmedObjectId, setSelectedObjectIndex, setTool]);
+  }, [tool, plane, overlays.showStart, activeGrid, cellUnderCursor, worldUnderCursor, redraw, setArmedObjectId, setSelectedObjectIndex, setTool]);
 
   const onMouseMove = useCallback((e: React.MouseEvent) => {
     // Hover ghost tracking — BEFORE the drag/stroke dispatch below, and gated on
@@ -906,10 +903,10 @@ export default function ClassicLevelViewport() {
         <Chip active={plane === 'bg'} onClick={() => setPlane('bg')}>BG</Chip>
         <Divider />
         <span style={{ color: T.textLo }}>Overlays</span>
-        <Chip active={overlays.collision} onClick={() => toggle('collision')}>Collision</Chip>
-        <Chip active={overlays.angles} onClick={() => toggle('angles')} disabled={!overlays.collision}>Angles</Chip>
-        <Chip active={overlays.objects} onClick={() => toggle('objects')}>Objects</Chip>
-        <Chip active={overlays.start} onClick={() => toggle('start')}>Start</Chip>
+        <Chip active={overlays.showCollision} onClick={() => toggle('showCollision')}>Collision</Chip>
+        <Chip active={overlays.showCollisionAngles} onClick={() => toggle('showCollisionAngles')} disabled={!overlays.showCollision}>Angles</Chip>
+        <Chip active={overlays.showObjects} onClick={() => toggle('showObjects')}>Objects</Chip>
+        <Chip active={overlays.showStart} onClick={() => toggle('showStart')}>Start</Chip>
         <span style={{ flex: 1 }} />
         <span style={{ color: T.textFaint }}>
           {tool === 'stamp-chunk'

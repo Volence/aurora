@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import type { OpenEngine } from './open-project';
 
 export interface OverlayOptions {
   showObjects: boolean;
@@ -10,7 +11,32 @@ export interface OverlayOptions {
   showCollisionAngles: boolean;
   showCollisionPathB: boolean;
   showBgPlane: boolean;
+  /** The player-start marker. Classic-only so far — aeon has no spawn point in
+   *  its level model — which is what OVERLAY_KEYS_BY_ENGINE below is for. */
+  showStart: boolean;
 }
+
+/**
+ * Which overlays each engine actually renders.
+ *
+ * The overlay set is shared state now that classic's viewport reads it, but the
+ * two engines do not draw the same things: classic has a spawn marker and aeon
+ * does not; aeon has rings, sections and a BG-plane overlay classic has no
+ * concept of. Listing them per engine keeps a key one engine needs from
+ * becoming dead chrome in the other's View menu (parent §4).
+ *
+ * Declared here rather than on CapabilityManifest — unlike facetTools, whose
+ * vocabulary lives in core, OverlayOptions is a renderer type, so a manifest
+ * field would carry loose strings. It joins the manifest when the shared
+ * overlay bar lands and classic's OptionBar stops declaring its own.
+ */
+export const OVERLAY_KEYS_BY_ENGINE: Record<OpenEngine, readonly (keyof OverlayOptions)[]> = {
+  s1: ['showObjects', 'showStart', 'showCollision', 'showCollisionAngles'],
+  aeon: [
+    'showObjects', 'showRings', 'showTileGrid', 'showBlockGrid', 'showChunkGrid',
+    'showCollision', 'showCollisionAngles', 'showCollisionPathB', 'showBgPlane',
+  ],
+};
 
 interface ViewState {
   vpX: number;
@@ -43,6 +69,9 @@ export const useViewStore = create<ViewState>((set) => ({
     showCollisionAngles: false,
     showCollisionPathB: false,
     showBgPlane: false,
+    // On by default, matching the local default classic's viewport carried
+    // before the overlays became shared state.
+    showStart: true,
   },
 
   pan: (dx, dy) => set((state) => ({
