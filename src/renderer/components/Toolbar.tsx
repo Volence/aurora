@@ -7,7 +7,6 @@ import { useClassicProjectStore } from '../state/classicProjectStore';
 import type { RecentProject } from '../../shared/ipc-types';
 import AuroraMark from './AuroraMark';
 import { T, Chip, IconButton, Divider, Icons } from './ui';
-import ViewMenu from '../shell/ViewMenu';
 import { useDirtySnapshot } from '../shell/dirty-snapshot';
 import { tabHasDirtyDot } from '../shell/dirty-tabs';
 import { canSaveActive } from '../state/project-runtime';
@@ -170,7 +169,10 @@ export default function Toolbar({ onOpenProject, onOpenRecent, onSave }: Toolbar
 
       <div style={{ flex: 1 }} />
 
-      {config && <ViewMenu />}
+      {/* The View (overlay) menu used to sit here. It moved to LevelWorkspace's
+          header: this Toolbar is now the app bar of the CLASSIC workspace and of
+          sprite-doc tabs only, and viewStore.overlays paints on aeon's
+          MapViewport — which neither of those has on screen. */}
     </>
   );
 }

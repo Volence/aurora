@@ -57,7 +57,7 @@ const styles: Record<string, React.CSSProperties> = {
   buttons: { display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 16 },
   button: {
     padding: '4px 12px', fontSize: 12, background: T.raised, color: T.textBase,
-    border: `1px solid ${T.border}`, borderRadius: T.rMd, cursor: 'pointer',
+    borderWidth: 1, borderStyle: 'solid', borderColor: T.border, borderRadius: T.rMd, cursor: 'pointer',
   },
   primary: { background: T.accent, borderColor: T.accent, color: T.onAccent, fontWeight: 600 },
   danger: { color: T.warning, borderColor: T.warning },

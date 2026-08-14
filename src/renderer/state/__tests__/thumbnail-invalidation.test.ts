@@ -1,11 +1,14 @@
-// Chunk-thumbnail invalidation. ChunkLibrary bakes tile pixels and palette
-// colors into an OffscreenCanvas per chunk and memoises it; every input it bakes
-// is mutated IN PLACE by history.ts (`chunk.nametable = …`, `tiles[i] = …`,
+// Chunk-thumbnail invalidation, coarse clock. The chunk grid bakes tile pixels
+// and palette colors into a thumbnail per chunk and caches it; every input it
+// bakes is mutated IN PLACE by history.ts (`chunk.nametable = …`, `tiles[i] = …`,
 // `palette.lines[n].colors = …` on the very objects it was handed), so prop
-// identity can never be the cache key. editorStore.chunkLibraryVersion is the
-// key, and these tests pin the contract the memo depends on: it must advance for
-// UNDO and REDO exactly as it does for the edit — a thumbnail that only tracks
-// the forward direction shows art the document no longer contains.
+// identity can never be the cache key.
+//
+// These tests pin editorStore.chunkLibraryVersion, the library-wide "something
+// baked changed" clock: it must advance for UNDO and REDO exactly as it does for
+// the edit — a cache that only tracks the forward direction shows art the
+// document no longer contains. Thumbnails themselves now key on the sharp
+// per-chunk clock beside it; see chunk-version-clocks.test.ts.
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useProjectStore, getActiveLevel } from '../projectStore';

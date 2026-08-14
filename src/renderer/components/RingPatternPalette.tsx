@@ -77,7 +77,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   item: {
     display: 'flex', alignItems: 'center', gap: 8,
-    padding: '4px 8px', background: 'transparent', border: '1px solid transparent',
+    padding: '4px 8px', background: 'transparent', borderWidth: 1, borderStyle: 'solid', borderColor: 'transparent',
     color: T.textHi, cursor: 'pointer', borderRadius: 4,
     textAlign: 'left' as const, width: '100%',
   },

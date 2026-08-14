@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { Solidity } from '../../core/collision/collision-model';
 import type { AnyCommand, S4Level } from '../../core/editing/commands';
+import { chunkIdsAffectedByCommand } from '../../core/editing/chunk-invalidation';
 import type { MapClipboard, PasteLayers } from '../../core/editing/map-clipboard';
 import type { UndoStack } from '../../core/editing/undo-stack';
 import { useArtStore } from './artStore';
@@ -29,12 +30,6 @@ export interface Selection {
   type: 'object' | 'ring';
   sectionIndex: number;
   index: number;
-}
-
-export interface MultiSelection {
-  sectionIndex: number;
-  objects: number[];
-  rings: number[];
 }
 
 export interface RingPattern {
@@ -82,7 +77,6 @@ export type EditingLayer = 'fg' | 'bg';
 interface EditorState {
   tool: EditorTool;
   selection: Selection | null;
-  multiSelection: MultiSelection | null;
   dirty: boolean;
   /**
    * Repaint clock for level mutations that DON'T go through a command and so
@@ -91,7 +85,29 @@ interface EditorState {
    * hooks/useHistoryVersion.
    */
   liveEditVersion: number;
+  /**
+   * Coarse "some chunk thumbnail changed" clock: bumped for every command a
+   * thumbnail bakes (set-chunk / set-tileset-tiles / set-palette-line), on
+   * execute, undo and redo alike. Still the right key for anything that has to
+   * rescan the WHOLE library — the grid's blank-chunk set, say — but too blunt to
+   * key a thumbnail on: see chunkVersions.
+   */
   chunkLibraryVersion: number;
+  /**
+   * Per-chunk revision, keyed by chunk id. Advanced only for the chunks a
+   * command can actually reach (core/editing/chunk-invalidation.ts), so one
+   * tile-pixel edit repaints the handful of thumbnails that draw that tile
+   * instead of all 256. Mirrors classicLevelStore.chunkVersions — both engines'
+   * chunk grids now key their paint on `${epoch}:${revision}`.
+   */
+  chunkVersions: Map<string, number>;
+  /**
+   * Bumped when the chunk library is REPLACED rather than edited (import,
+   * clear). Chunk ids are derived from the source filename, so a clear-then-
+   * import can reuse an id for different art; without an epoch the revision
+   * would fall back to 0 and a stale thumbnail would keep its key.
+   */
+  chunkEpoch: number;
 
   // S4 tool state
   activeSectionIndex: number;
@@ -123,7 +139,6 @@ interface EditorState {
 
   setTool: (tool: EditorTool) => void;
   setSelection: (selection: Selection | null) => void;
-  setMultiSelection: (multiSelection: MultiSelection | null) => void;
   setActiveSectionIndex: (index: number) => void;
   setEditingLayer: (layer: EditingLayer) => void;
   setSelectedTileIndex: (index: number) => void;
@@ -148,6 +163,10 @@ interface EditorState {
   markClean: () => void;
   bumpLiveEdit: () => void;
   bumpChunkLibraryVersion: () => void;
+  /** Advance the given chunks' revisions. A no-op for an empty list. */
+  bumpChunkVersions: (ids: readonly string[]) => void;
+  /** The library was replaced: drop every revision and move the epoch. */
+  resetChunkVersions: () => void;
 }
 
 /** Facets whose edits belong to the ZONE-ART document rather than the act's
@@ -195,10 +214,11 @@ export function focusedHistory(): UndoStack | null {
 export const useEditorStore = create<EditorState>((set) => ({
   tool: 'view',
   selection: null,
-  multiSelection: null,
   dirty: false,
   liveEditVersion: 0,
   chunkLibraryVersion: 0,
+  chunkVersions: new Map<string, number>(),
+  chunkEpoch: 0,
 
   activeSectionIndex: 0,
   editingLayer: 'fg',
@@ -224,9 +244,8 @@ export const useEditorStore = create<EditorState>((set) => ({
   // An explicit tool switch cancels an in-progress paste (repeat pastes never
   // call setTool, so they aren't affected) — picking a different tool while
   // pasting means the user is done pasting.
-  setTool: (tool) => set({ tool, selection: null, multiSelection: null, pasting: false }),
-  setSelection: (selection) => set({ selection, multiSelection: null }),
-  setMultiSelection: (multiSelection) => set({ multiSelection, selection: null }),
+  setTool: (tool) => set({ tool, selection: null, pasting: false }),
+  setSelection: (selection) => set({ selection }),
   setActiveSectionIndex: (index) => set({ activeSectionIndex: index }),
   setEditingLayer: (layer) => set({ editingLayer: layer }),
   setSelectedTileIndex: (index) => set({ selectedTileIndex: index }),
@@ -255,6 +274,16 @@ export const useEditorStore = create<EditorState>((set) => ({
   markClean: () => set({ dirty: false }),
   bumpLiveEdit: () => set((s) => ({ liveEditVersion: s.liveEditVersion + 1 })),
   bumpChunkLibraryVersion: () => set((s) => ({ chunkLibraryVersion: s.chunkLibraryVersion + 1 })),
+  bumpChunkVersions: (ids) => set((s) => {
+    if (ids.length === 0) return {};
+    const next = new Map(s.chunkVersions);
+    for (const id of ids) next.set(id, (next.get(id) ?? 0) + 1);
+    return { chunkVersions: next };
+  }),
+  resetChunkVersions: () => set((s) => ({
+    chunkVersions: new Map<string, number>(),
+    chunkEpoch: s.chunkEpoch + 1,
+  })),
 }));
 
 /**
@@ -275,12 +304,14 @@ export function setCommandInvalidationListener(fn: ((cmd: AnyCommand) => void) |
  * above (owned by MapViewport, unmounted in Art mode), these version bumps are
  * pure store concerns and must fire for every execute/undo/redo regardless of
  * which mode is active — e.g. undoing a set-chunk in Art mode must still bust
- * the ChunkLibrary thumbnail cache.
+ * the chunk grid's thumbnail cache.
  *
- * chunkLibraryVersion is also bumped for set-palette-line and set-tileset-tiles
- * because chunk thumbnails bake both palette colors and tile pixels: in-place
- * tile edits keep tiles.length constant but change pixels, and palette edits
- * change colors used by the baked thumbs.
+ * Both clocks are bumped for set-palette-line and set-tileset-tiles as well as
+ * set-chunk, because chunk thumbnails bake palette colors and tile pixels too:
+ * in-place tile edits keep tiles.length constant but change pixels, and palette
+ * edits change colors used by the baked thumbs. The difference is reach —
+ * chunkLibraryVersion says "something changed", chunkVersions says WHICH chunks,
+ * and only the second is fit to key a thumbnail on.
  */
 function bumpStoreVersions(cmd: AnyCommand): void {
   if (cmd.type === 'batch') {
@@ -290,7 +321,14 @@ function bumpStoreVersions(cmd: AnyCommand): void {
   if (cmd.type === 'set-chunk'
       || cmd.type === 'set-palette-line'
       || cmd.type === 'set-tileset-tiles') {
-    useEditorStore.getState().bumpChunkLibraryVersion();
+    const editor = useEditorStore.getState();
+    editor.bumpChunkLibraryVersion();
+    // …and the sharp clock beside it: only the chunks this command can actually
+    // reach. The grid keys each thumbnail's paint on its own revision, so the
+    // library-wide bump above no longer implies a library-wide re-rasterize.
+    editor.bumpChunkVersions(
+      chunkIdsAffectedByCommand(cmd, useProjectStore.getState().project?.chunkLibrary ?? []),
+    );
   }
   // A committed palette-line change (a slider commit, a copy-bridge write, or its
   // undo/redo) must repaint every paletteVersion subscriber — notably the sprite

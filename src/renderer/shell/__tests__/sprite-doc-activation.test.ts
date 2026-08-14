@@ -14,6 +14,8 @@ import {
 } from '../tab-activation';
 import { untitledSpriteTab, UNTITLED_SPRITE_TAB_ID } from '../tabs';
 import { useConfirmStore } from '../../state/confirmStore';
+import { useClassicLevelStore } from '../../state/classicLevelStore';
+import { useToastStore } from '../../state/toastStore';
 import { useSpriteStore, UNTITLED_SPRITE_DOC_ID } from '../../state/spriteStore';
 import { documentHistoryHub } from '../../state/history-hub';
 import { focusedHistory } from '../../state/editorStore';
@@ -23,29 +25,29 @@ import { createBuffer } from '../../../core/art/pixel-ops';
 describe('planSpriteDocActivation', () => {
   it('no-op when the doc is already checked out', () => {
     expect(planSpriteDocActivation({
-      tabId: 'doc:sprite:aeon:motobug', activeDocId: 'doc:sprite:aeon:motobug', isOpen: true,
+      tabId: 'doc:sprite:aeon:motobug', activeDocId: 'doc:sprite:aeon:motobug', isOpen: true, classicActLoaded: true,
     })).toEqual({ kind: 'none' });
   });
   it('CHECKS OUT an already-open doc instead of reloading it', () => {
     // Reloading would throw away the very edits + history multi-document exists
     // to keep, which is why the old "Discard & open" confirm had to go.
     expect(planSpriteDocActivation({
-      tabId: 'doc:sprite:aeon:motobug', activeDocId: UNTITLED_SPRITE_DOC_ID, isOpen: true,
+      tabId: 'doc:sprite:aeon:motobug', activeDocId: UNTITLED_SPRITE_DOC_ID, isOpen: true, classicActLoaded: true,
     })).toEqual({ kind: 'checkout' });
   });
   it('opens a doc that has never been opened', () => {
     expect(planSpriteDocActivation({
-      tabId: 'doc:sprite:aeon:motobug', activeDocId: UNTITLED_SPRITE_DOC_ID, isOpen: false,
+      tabId: 'doc:sprite:aeon:motobug', activeDocId: UNTITLED_SPRITE_DOC_ID, isOpen: false, classicActLoaded: true,
     })).toEqual({ kind: 'open', engine: 'aeon', ref: 'motobug' });
   });
   it('opens regardless of dirtiness — parking the outgoing doc discards nothing', () => {
     expect(planSpriteDocActivation({
-      tabId: 'doc:sprite:s1:42', activeDocId: 'doc:sprite:aeon:motobug', isOpen: false,
+      tabId: 'doc:sprite:s1:42', activeDocId: 'doc:sprite:aeon:motobug', isOpen: false, classicActLoaded: true,
     })).toEqual({ kind: 'open', engine: 's1', ref: '42' });
   });
   it('rejects malformed ids', () => {
     expect(planSpriteDocActivation({
-      tabId: 'doc:sprite:junk', activeDocId: UNTITLED_SPRITE_DOC_ID, isOpen: false,
+      tabId: 'doc:sprite:junk', activeDocId: UNTITLED_SPRITE_DOC_ID, isOpen: false, classicActLoaded: true,
     })).toEqual({ kind: 'none' });
   });
 
@@ -53,11 +55,11 @@ describe('planSpriteDocActivation', () => {
     // There is nothing on disk called "untitled": routing it down the load path
     // would toast a bogus failure and roll the tab straight back.
     expect(planSpriteDocActivation({
-      tabId: UNTITLED_SPRITE_TAB_ID, activeDocId: 'doc:sprite:aeon:motobug', isOpen: false,
+      tabId: UNTITLED_SPRITE_TAB_ID, activeDocId: 'doc:sprite:aeon:motobug', isOpen: false, classicActLoaded: true,
     })).toEqual({ kind: 'untitled' });
     // …and it is still a no-op when already checked out.
     expect(planSpriteDocActivation({
-      tabId: UNTITLED_SPRITE_TAB_ID, activeDocId: UNTITLED_SPRITE_TAB_ID, isOpen: true,
+      tabId: UNTITLED_SPRITE_TAB_ID, activeDocId: UNTITLED_SPRITE_TAB_ID, isOpen: true, classicActLoaded: true,
     })).toEqual({ kind: 'none' });
   });
 });
@@ -69,6 +71,13 @@ describe('planSpriteDocActivation', () => {
 
 const AEON_TAB = 'doc:sprite:aeon:motobug';
 const S1_TAB = 'doc:sprite:s1:13';
+const OTHER_S1_TAB = 'doc:sprite:s1:28';
+// An s1 sprite doc resolves its art against the OPEN act's zone, so "an act is
+// loaded" is the baseline fixture for these tests; the boot-order case that
+// clears it has its own describe near the bottom.
+const LOADED_ACT = { zone: 'ghz', act: 1, label: 'GHZ 1', available: true };
+const spriteTab = (id: string, title: string) =>
+  ({ id, kind: 'sprite-doc' as const, title });
 
 function frameFilledWith(value: number) {
   const buf = createBuffer(8, 8);
@@ -105,11 +114,14 @@ beforeEach(() => {
   useSpriteStore.getState().closeAll();
   documentHistoryHub.clearAll();
   useSessionStore.getState().reset();
+  useClassicLevelStore.setState({ ref: LOADED_ACT });
 });
 
 afterEach(() => {
   __setSpriteModuleForTest(null);
   useSpriteStore.getState().closeAll();
+  useClassicLevelStore.setState({ ref: null });
+  useConfirmStore.getState().answer('cancel');
 });
 
 describe('activateSpriteDocTarget', () => {
@@ -330,5 +342,122 @@ describe('the untitled sprite tab', () => {
     expect(await activateSpriteDocTarget(UNTITLED_SPRITE_TAB_ID)).toBe(true);
     expect(useSpriteStore.getState().activeDocId).toBe(UNTITLED_SPRITE_DOC_ID);
     expect(useSpriteStore.getState().frames[0].data[0]).toBe(0);
+  });
+});
+
+// --- A sprite tab with no document behind it -------------------------------
+//
+// The blocking bug: session restore reopened two s1 sprite tabs in a classic
+// project with no act loaded yet, their checkouts failed, and the tabs then
+// could not be closed — closing one PROMOTED the other, whose activation failed
+// again and vetoed the close, re-toasting every time. A tab must be closable
+// whatever state its document is in.
+
+describe('closing a sprite-doc tab whose load failed', () => {
+  it('closes it, even with no document open for it at all', async () => {
+    stubLoaders({ s1Ok: false });
+    useSessionStore.setState({ tabs: [HOME, spriteTab(S1_TAB, 'Signpost')], activeId: S1_TAB });
+    expect(await activateSpriteDocTarget(S1_TAB)).toBe(false);
+    expect(useSpriteStore.getState().isOpen(S1_TAB)).toBe(false);
+
+    await requestCloseTab(S1_TAB);
+
+    expect(useSessionStore.getState().tabs.map((t) => t.id)).toEqual([HOME.id]);
+  });
+
+  it('closes even when the PROMOTED neighbour is another sprite tab that cannot load', async () => {
+    // The reported blocker exactly: "Signpost" and "Bridge" side by side, neither
+    // loadable. Promotion runs the same activation, and its failure used to
+    // `return` out of requestCloseTab with the tab still there.
+    stubLoaders({ s1Ok: false });
+    useSessionStore.setState({
+      tabs: [HOME, spriteTab(S1_TAB, 'Signpost'), spriteTab(OTHER_S1_TAB, 'Bridge')],
+      activeId: S1_TAB,
+    });
+
+    await requestCloseTab(S1_TAB);
+
+    expect(useSessionStore.getState().tabs.map((t) => t.id)).toEqual([HOME.id, OTHER_S1_TAB]);
+
+    // …and the survivor is closable too, so the strip can always be emptied.
+    await requestCloseTab(OTHER_S1_TAB);
+    expect(useSessionStore.getState().tabs.map((t) => t.id)).toEqual([HOME.id]);
+  });
+});
+
+// --- s1 sprite tabs restored before any act is loaded ----------------------
+//
+// An s1 object's art is resolved against the OPEN act's zone, so a restored
+// `doc:sprite:s1:<id>` tab genuinely cannot load until one is open. That is the
+// EXPECTED boot order, not an error: defer the checkout (silently) and let the
+// next focus — after the user opens a level — do it for real.
+
+describe('an s1 sprite tab activated with no classic act loaded', () => {
+  beforeEach(() => { useClassicLevelStore.setState({ ref: null }); });
+  afterEach(() => { useClassicLevelStore.setState({ ref: null }); });
+
+  it('defers: no loader call, no toast, no half-open document', async () => {
+    const calls = stubLoaders({ s1Ok: false });
+    useToastStore.setState({ toasts: [] });
+
+    // True: the tab may take focus. It just has no document yet, and App renders
+    // it inert rather than showing whatever else is checked out.
+    expect(await activateSpriteDocTarget(S1_TAB)).toBe(true);
+
+    expect(calls).toEqual([]);                            // the loader was never reached…
+    expect(useToastStore.getState().toasts).toEqual([]);  // …so it could not toast
+    expect(useSpriteStore.getState().isOpen(S1_TAB)).toBe(false);
+    expect(useSpriteStore.getState().activeDocId).toBe(UNTITLED_SPRITE_DOC_ID);
+  });
+
+  it('loads for real on the next focus, once an act IS open', async () => {
+    const calls = stubLoaders();
+    await activateSpriteDocTarget(S1_TAB);
+    expect(calls).toEqual([]);
+
+    useClassicLevelStore.setState({ ref: LOADED_ACT });
+
+    expect(await activateSpriteDocTarget(S1_TAB)).toBe(true);
+    expect(calls).toEqual(['s1:13']);
+    expect(useSpriteStore.getState().activeDocId).toBe(S1_TAB);
+  });
+
+  it('does not defer AEON sprite tabs — library sprites need no act', async () => {
+    const calls = stubLoaders();
+
+    expect(await activateSpriteDocTarget(AEON_TAB)).toBe(true);
+
+    expect(calls).toEqual(['aeon:motobug']);
+    expect(useSpriteStore.getState().activeDocId).toBe(AEON_TAB);
+  });
+
+  it('still CHECKS OUT an s1 document that is already open', async () => {
+    // Deferral is about the first load only: a document already in memory needs
+    // nothing from the act, so losing the act must not make its tab go inert.
+    const calls = stubLoaders();
+    useClassicLevelStore.setState({ ref: LOADED_ACT });
+    await activateSpriteDocTarget(S1_TAB);
+    await activateSpriteDocTarget(AEON_TAB);        // park it
+    useClassicLevelStore.setState({ ref: null });
+    calls.length = 0;
+
+    expect(await activateSpriteDocTarget(S1_TAB)).toBe(true);
+
+    expect(calls).toEqual([]);
+    expect(useSpriteStore.getState().activeDocId).toBe(S1_TAB);
+  });
+
+  it('leaves the deferred tab closable', async () => {
+    stubLoaders();
+    useSessionStore.setState({
+      tabs: [HOME, spriteTab(S1_TAB, 'Signpost'), spriteTab(OTHER_S1_TAB, 'Bridge')],
+      activeId: S1_TAB,
+    });
+    await activateSpriteDocTarget(S1_TAB);
+
+    await requestCloseTab(S1_TAB);
+
+    expect(useSessionStore.getState().tabs.map((t) => t.id)).toEqual([HOME.id, OTHER_S1_TAB]);
+    expect(useConfirmStore.getState().request).toBeNull(); // nothing to lose, nothing asked
   });
 });

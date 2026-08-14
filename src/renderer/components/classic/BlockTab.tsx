@@ -7,10 +7,10 @@ import { useToastStore } from '../../state/toastStore';
 import { renderBlock } from '../../../core/level-classic/render';
 import type { LevelDoc, BlockDef } from '../../../core/level-classic/model';
 import type { UsageIndex } from '../../../core/level-classic/usage-index';
-import { cellIndexAt } from './composer-math';
+import { canvasCellIndexAt } from './composer-math';
 import { TileThumb, BlockThumb } from './composer-thumbs';
 import { COMPOSER_SEL_CELL } from '../../canvas/canvas-colors';
-import { hex, SharedBanner, useEditableTileRange, tileLockReason, drawBufferScaled, styles } from './composer-shared';
+import { hex, SharedBanner, useEditableTileRange, tileLockReason, drawBufferScaled, canvasGeom, styles } from './composer-shared';
 
 // Block tab — 4-tile (2x2) composer for the selected block. Two right-hand
 // strips with opposite click semantics: a BROWSE-ONLY block strip (pick which
@@ -57,15 +57,35 @@ export default function BlockTab({ doc, usage }: { doc: LevelDoc; usage: UsageIn
     const b = doc.blocks[composerBlockId];
     if (!b) return;
     const def: BlockDef = { cells: b.cells.map((c, i) => (i === selCell ? { ...c, ...patch } : { ...c })) };
-    const res = classicEditBlock(composerBlockId, def);
+    // Nothing may escape this handler — see the note on TileTab's endStroke: the
+    // command's own invariant guards throw, and an uncaught throw out of a React
+    // event handler is what turns a refused edit into a frozen window.
+    let res;
+    try {
+      res = classicEditBlock(composerBlockId, def);
+    } catch (e) {
+      res = { ok: false as const, error: e instanceof Error ? e.message : String(e) };
+    }
     if (!res.ok) useToastStore.getState().addToast(`Block edit failed: ${res.error}`, 'error');
   }, [doc, composerBlockId, selCell]);
+
+  // The tile strip's "assign this tile to the selected cell" click, as a
+  // REFERENTIALLY STABLE callback. `editCell` closes over doc/blockId/selCell and
+  // so is rebuilt on every commit; handing that straight to ~965 memoized
+  // TileThumbs would break their memo on every edit (the thousand-re-render storm
+  // composer-thumbs' prop note describes). Same latest-ref idiom as
+  // composer-shared's useWindowStrokeEnd.
+  const editCellRef = useRef(editCell);
+  useEffect(() => { editCellRef.current = editCell; }, [editCell]);
+  const assignTileToCell = useCallback((t: number) => {
+    editCellRef.current({ tile: t });
+    setComposerTileIndex(t);
+  }, [setComposerTileIndex]);
 
   const onCellClick = useCallback((e: React.MouseEvent) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const rect = canvas.getBoundingClientRect();
-    const idx = cellIndexAt(e.clientX - rect.left, e.clientY - rect.top, BLOCK_CELL, 2, 2);
+    const idx = canvasCellIndexAt(e.clientX, e.clientY, canvasGeom(canvas), BLOCK_CELL, 2, 2);
     if (idx === null) return;
     setSelCell(idx);
     const cell = doc.blocks[composerBlockId]?.cells[idx];
@@ -146,8 +166,10 @@ export default function BlockTab({ doc, usage }: { doc: LevelDoc; usage: UsageIn
         <div style={{ ...styles.paletteStrip, maxHeight: 140 }}>
           {doc.blocks.map((_, id) => (
             <BlockThumb
-              key={id} doc={doc} blockId={id} size={34} versionKey={versionKey}
-              selected={id === composerBlockId} usage={usage.blockUsage(id)} onSelect={setComposerBlockId}
+              key={id} blockId={id} size={34} versionKey={versionKey}
+              selected={id === composerBlockId}
+              containers={usage.blockUsage(id).containers} cells={usage.blockUsage(id).cells}
+              onSelect={setComposerBlockId}
             />
           ))}
         </div>
@@ -158,10 +180,10 @@ export default function BlockTab({ doc, usage }: { doc: LevelDoc; usage: UsageIn
         <div style={styles.paletteStrip}>
           {Array.from({ length: tileCount }, (_, id) => (
             <TileThumb
-              key={id} doc={doc} tileIndex={id} palLine={cell.pal} size={26} versionKey={versionKey}
+              key={id} tileIndex={id} palLine={cell.pal} size={26} versionKey={versionKey}
               selected={id === cell.tile} locked={tileLockReason(range, id) !== null}
-              usage={usage.tileUsage(id)}
-              onSelect={(t) => { editCell({ tile: t }); setComposerTileIndex(t); }}
+              containers={usage.tileUsage(id).containers} cells={usage.tileUsage(id).cells}
+              onSelect={assignTileToCell}
             />
           ))}
         </div>

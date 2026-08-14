@@ -101,3 +101,30 @@ describe('buildUsageIndex — chunk placements', () => {
     expect(idx.chunkPlacementCount(7)).toBe(0);
   });
 });
+
+describe('Usage object identity (React.memo contract)', () => {
+  const idx = buildUsageIndex(makeDoc());
+
+  // These Usage objects are passed straight into React.memo'd thumbnails as a
+  // prop. Returning a fresh object per call made the prop reference-unequal on
+  // every render, so the memo never held and ~800 tile thumbnails re-rendered on
+  // any unrelated store change. Identity must be stable for a given index.
+  it('returns the SAME object across repeated calls for a used tile', () => {
+    expect(idx.tileUsage(5)).toBe(idx.tileUsage(5));
+    expect(idx.tileUsage(6)).toBe(idx.tileUsage(6));
+  });
+
+  it('returns the SAME object across repeated calls for an unused tile', () => {
+    expect(idx.tileUsage(4)).toBe(idx.tileUsage(4));
+  });
+
+  it('returns the SAME object across repeated calls for blocks', () => {
+    expect(idx.blockUsage(0)).toBe(idx.blockUsage(0));
+    expect(idx.blockUsage(1)).toBe(idx.blockUsage(1));
+  });
+
+  it('still distinguishes different indices by value', () => {
+    expect(idx.tileUsage(5)).not.toBe(idx.tileUsage(6));
+    expect(idx.tileUsage(5)).not.toEqual(idx.tileUsage(6));
+  });
+});

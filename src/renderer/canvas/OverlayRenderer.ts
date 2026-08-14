@@ -267,7 +267,19 @@ export class OverlayRenderer {
       if (preview) {
         // Sprite preview, origin aligned to the placement point.
         ctx.imageSmoothingEnabled = false;
-        ctx.drawImage(preview.bitmap, wx - preview.originX, wy - preview.originY);
+        if (obj.xflip || obj.yflip) {
+          // Mirror about the placement point, so the origin stays put and the
+          // map shows what the OEF_XFLIP/OEF_YFLIP bits will do on hardware.
+          const sx = obj.xflip ? -1 : 1;
+          const sy = obj.yflip ? -1 : 1;
+          ctx.save();
+          ctx.translate(wx, wy);
+          ctx.scale(sx, sy);
+          ctx.drawImage(preview.bitmap, -preview.originX, -preview.originY);
+          ctx.restore();
+        } else {
+          ctx.drawImage(preview.bitmap, wx - preview.originX, wy - preview.originY);
+        }
         continue;
       }
 

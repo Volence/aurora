@@ -22,6 +22,13 @@ export interface FacetModule {
   readonly RightPanel?: ComponentType;
   readonly BottomExtra?: ComponentType;
   readonly StatusBar?: ComponentType;
+  /**
+   * True for the facets whose canvas is the shared map viewport — i.e. the ones
+   * `viewStore.overlays` actually paints on. The workspace header shows the View
+   * menu only for those; the art facet's canvas ignores overlays entirely, so a
+   * toggle there would be a control that visibly does nothing.
+   */
+  readonly mapOverlays?: boolean;
 }
 
 export const facetModules: Registry<FacetModule> = createRegistry<FacetModule>('FacetModule');
@@ -42,6 +49,7 @@ export function mapFacet(id: FacetCapability, slots: Pick<FacetModule, 'RightPan
     Canvas: MapViewport,
     ToolDock: () => React.createElement(MapFacetDock, { facet: id }),
     StatusBar: MapStatusBar,
+    mapOverlays: true,
     ...slots,
   };
 }

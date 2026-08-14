@@ -7,6 +7,7 @@ import ConfirmDialog from './shell/ConfirmDialog';
 import LegacyWorkspace from './shell/LegacyWorkspace';
 import LevelWorkspace from './workspace/LevelWorkspace';
 import SpriteMode from './components/sprite/SpriteMode';
+import SpriteDocUnloaded from './components/sprite/SpriteDocUnloaded';
 import Toolbar from './components/Toolbar';
 import HomeTab from './components/home/HomeTab';
 import ProjectSetupTab from './components/setup/ProjectSetupTab';
@@ -17,6 +18,7 @@ import { useClassicProjectStore } from './state/classicProjectStore';
 import { useOpenEngine } from './state/open-project';
 import { useClassicLevelStore } from './state/classicLevelStore';
 import { useSessionStore } from './state/sessionStore';
+import { useSpriteStore } from './state/spriteStore';
 import { useShellStore } from './state/shellStore';
 import { ensureSaversRegistered, saveAllDirty, saveActive } from './state/project-runtime';
 import { registerHistoryFactories } from './state/history-factories';
@@ -53,6 +55,9 @@ export default function App() {
   const docReady = useClassicLevelStore((s) => s.status) === 'ready';
   const tabs = useSessionStore((s) => s.tabs);
   const activeId = useSessionStore((s) => s.activeId);
+  // Which sprite document the editor currently holds — the sprite pane below
+  // mounts only when it is the active tab's own (see the comment there).
+  const spriteDocId = useSpriteStore((s) => s.activeDocId);
   const toggleExplorer = useShellStore((s) => s.toggleExplorer);
 
   const activeTab = tabs.find((t) => t.id === activeId);
@@ -203,7 +208,19 @@ export default function App() {
                 the hidden level undo (finding 1). */}
             {activeTab?.kind === 'sprite-doc' && (
               <div style={{ ...styles.tabPane, display: 'flex' }}>
-                <SpriteMode appBar={<Toolbar onOpenProject={openProject} onOpenRecent={openProjectByPath} onSave={() => { void saveActive(); }} />} />
+                {/* SpriteMode renders whatever document is CHECKED OUT, so it may
+                    only mount when that is THIS tab's document. A sprite-doc tab
+                    can legitimately have none — an s1 object tab restored before
+                    any act is open (its art resolves per zone), or a checkout that
+                    failed and rolled back. Mounting SpriteMode anyway showed the
+                    blank untitled canvas under the tab's name, which read as data
+                    loss. Activation sets activeDocId synchronously before it
+                    awaits a loader, so an in-flight load does NOT flash this. */}
+                {spriteDocId === activeTab.id ? (
+                  <SpriteMode appBar={<Toolbar onOpenProject={openProject} onOpenRecent={openProjectByPath} onSave={() => { void saveActive(); }} />} />
+                ) : (
+                  <SpriteDocUnloaded tabId={activeTab.id} title={activeTab.title} />
+                )}
               </div>
             )}
           </div>

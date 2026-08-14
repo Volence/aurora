@@ -71,7 +71,7 @@ export default function ClassicPalettePanel() {
                   title={transparent ? 'index 0 — transparent' : `line ${li}, index ${ci}`}
                   style={{
                     ...styles.swatch,
-                    background: transparent ? undefined : `rgb(${c.r},${c.g},${c.b})`,
+                    backgroundColor: transparent ? undefined : `rgb(${c.r},${c.g},${c.b})`,
                     backgroundImage: transparent
                       ? `linear-gradient(45deg,${COMPOSER_SWATCH_A} 25%,transparent 25%,transparent 75%,${COMPOSER_SWATCH_A} 75%),linear-gradient(45deg,${COMPOSER_SWATCH_A} 25%,${COMPOSER_SWATCH_B} 25%,${COMPOSER_SWATCH_B} 75%,${COMPOSER_SWATCH_A} 75%)`
                       : undefined,
@@ -109,7 +109,7 @@ const styles: Record<string, React.CSSProperties> = {
   lineLabel: { fontSize: 10, color: T.textLo, width: 10, fontFamily: T.fontMono, flexShrink: 0 },
   swatch: {
     width: 13, height: 16, minWidth: 0, flex: '1 1 0', padding: 0,
-    border: `1px solid ${T.border}`, borderRadius: 2, cursor: 'pointer', boxSizing: 'border-box',
+    borderWidth: 1, borderStyle: 'solid', borderColor: T.border, borderRadius: 2, cursor: 'pointer', boxSizing: 'border-box',
   },
   swatchSel: { outline: `2px solid ${T.accent}`, outlineOffset: -1, borderColor: T.accent },
   note: { fontSize: 10, color: T.textLo, padding: '4px 2px' },

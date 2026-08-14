@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useProjectStore, getCurrentZone } from '../state/projectStore';
 import { useEditorStore } from '../state/editorStore';
 import type { Tile, Palette } from '../../core/model/s4-types';
+import { lutForPaletteLine, rasterizeTile } from '../../core/art/rasterize';
 import { T } from './ui';
 import { CANVAS_VOID, TILE_SELECTED, TILE_HOVER } from '../canvas/canvas-colors';
 
@@ -15,19 +16,15 @@ function ensureTileCache(tiles: Tile[], palette: Palette, zoneId: string, palett
   cacheZoneId = zoneId;
   cachePalLine = paletteLine;
 
-  const pal = palette.lines[paletteLine]?.colors ?? palette.lines[0]?.colors ?? [];
+  // One RGBA lookup for the whole atlas; pixels come from the shared core
+  // rasterizer, this loop only owns the canvas hand-off.
+  const lut = lutForPaletteLine(palette, paletteLine);
 
   tileCache = tiles.map((tile) => {
     const c = new OffscreenCanvas(8, 8);
     const ctx = c.getContext('2d')!;
     const img = ctx.createImageData(8, 8);
-    for (let i = 0; i < 64; i++) {
-      const color = pal[tile.pixels[i]] ?? { r: 0, g: 0, b: 0, a: 255 };
-      img.data[i * 4] = color.r;
-      img.data[i * 4 + 1] = color.g;
-      img.data[i * 4 + 2] = color.b;
-      img.data[i * 4 + 3] = color.a;
-    }
+    img.data.set(rasterizeTile(tile.pixels, lut));
     ctx.putImageData(img, 0, 0);
     return c;
   });

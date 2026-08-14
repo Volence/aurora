@@ -5,6 +5,7 @@ import { useClassicProjectStore } from '../../state/classicProjectStore';
 import type { EditableTileRange } from '../../../core/project/adapter';
 import { CANVAS_BLACK } from '../../canvas/canvas-colors';
 import { levelKeysEnabled } from '../../workspace/level-keys';
+import type { CanvasGeom } from './composer-math';
 
 // Shared building blocks for the composer dock's three tabs (Task B3/B4). The dock
 // was split into ChunkTab/BlockTab/TileTab sibling files (a mechanical move, no
@@ -35,14 +36,12 @@ export function useEditableTileRange(): EditableTileRange | null {
   }, [ref, handle]);
 }
 
-export function tileLockReason(range: EditableTileRange | null, tileIndex: number): string | null {
-  if (!range) return null;
-  if (tileIndex >= range.baseTileCount) return 'gap/appended tile — not editable in v1';
-  if (range.animRanges.some((r) => tileIndex >= r.start && tileIndex < r.start + r.count)) {
-    return 'animated-art slot — not editable in v1';
-  }
-  return null;
-}
+// The lock predicate itself lives in core (project/editable-tiles) so the UI and
+// the command that actually refuses the commit cannot drift, and so it is
+// reachable from the node-only test suite — this file is .tsx, which vitest does
+// not collect. Re-exported here because every composer tab imports it from the
+// shared module.
+export { tileLockReason } from '../../../core/project/editable-tiles';
 
 /** An inline shared-edit warning banner with an optional Duplicate action. */
 export function SharedBanner({ text, onDuplicate, dupLabel }: { text: string; onDuplicate?: () => void; dupLabel?: string }) {
@@ -80,6 +79,49 @@ export function useEscapeCancel(strokeRef: React.MutableRefObject<Map<number, nu
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [strokeRef, redraw]);
+}
+
+/**
+ * Finish an in-progress canvas gesture on the window's mouseup — wherever the
+ * button is actually released.
+ *
+ * WHY: the tab editors are small canvases (the Tile tab's is 208px square), so a
+ * pencil drag leaves them constantly. They used to hang the commit off the
+ * canvas's own `onMouseUp` and additionally DISCARD the whole stroke on
+ * `onMouseLeave`, which meant any drag that crossed the edge silently threw the
+ * user's work away — no commit, no message, nothing on the canvas. Ending on the
+ * window instead is what every paint tool does, and it leaves Escape
+ * (useEscapeCancel) as the ONE deliberate cancel.
+ *
+ * `endStroke` must be idempotent — the canvas's own onMouseUp may fire first.
+ */
+export function useWindowStrokeEnd(endStroke: () => void): void {
+  const latest = React.useRef(endStroke);
+  useEffect(() => { latest.current = endStroke; }, [endStroke]);
+  useEffect(() => {
+    const onUp = (): void => latest.current();
+    window.addEventListener('mouseup', onUp);
+    return () => window.removeEventListener('mouseup', onUp);
+  }, []);
+}
+
+/**
+ * Read a canvas's live box geometry for the hit-test math in composer-math.
+ *
+ * Kept as a one-liner DOM reader so the actual mapping stays pure and node-
+ * testable (this file is .tsx, which vitest does not collect — same reason
+ * tileLockReason lives in core). `clientLeft`/`clientTop` ARE the left/top
+ * border widths, and `clientWidth`/`clientHeight` the rendered content size, so
+ * no getComputedStyle parse is needed on this per-mousemove path.
+ */
+export function canvasGeom(canvas: HTMLCanvasElement): CanvasGeom {
+  const rect = canvas.getBoundingClientRect();
+  return {
+    left: rect.left, top: rect.top,
+    borderLeft: canvas.clientLeft, borderTop: canvas.clientTop,
+    cssWidth: canvas.clientWidth, cssHeight: canvas.clientHeight,
+    width: canvas.width, height: canvas.height,
+  };
 }
 
 /**
@@ -122,7 +164,7 @@ export const styles: Record<string, React.CSSProperties> = {
   },
   tabBar: { display: 'flex', gap: 2 },
   tabBtn: {
-    background: 'transparent', border: `1px solid transparent`, color: T.textLo,
+    background: 'transparent', borderWidth: 1, borderStyle: 'solid', borderColor: 'transparent', color: T.textLo,
     padding: '2px 12px', fontSize: 11, cursor: 'pointer', borderRadius: 3,
   },
   tabBtnActive: { background: T.accent, color: T.onAccent, borderColor: T.accent, fontWeight: 600 },
@@ -145,7 +187,7 @@ export const styles: Record<string, React.CSSProperties> = {
   notice: { fontSize: 11, color: T.textLo, padding: '12px 4px', maxWidth: 320, lineHeight: 1.5 },
   banner: {
     display: 'flex', alignItems: 'center', gap: 8, fontSize: 10, color: T.textBase,
-    background: 'rgba(255,170,60,0.12)', border: '1px solid rgba(255,170,60,0.4)',
+    background: 'rgba(255,170,60,0.12)', borderWidth: 1, borderStyle: 'solid', borderColor: 'rgba(255,170,60,0.4)',
     borderRadius: 3, padding: '4px 8px', maxWidth: 340,
   },
   dupBtn: {

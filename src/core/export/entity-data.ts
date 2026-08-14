@@ -72,6 +72,8 @@ export function generateEntityDataAsm(
     const xHex = obj.x.toString(16).toUpperCase().padStart(4, '0');
     const yHex = obj.y.toString(16).toUpperCase().padStart(4, '0');
     const flags =
+      (obj.xflip ? 1 << OEF_XFLIP : 0) |
+      (obj.yflip ? 1 << OEF_YFLIP : 0) |
       ((typeIndex & OEF_TYPE_MASK) << OEF_TYPE_SHIFT) |
       (obj.subtype & OEF_SUBTYPE_MASK);
     const flagsHex = flags.toString(16).toUpperCase().padStart(4, '0');

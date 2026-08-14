@@ -54,3 +54,18 @@ describe('registerAeonFacetModules registers every aeon canvas', () => {
     expect(canvasFor('s1', 'layout')).toBeNull();
   });
 });
+
+// The View menu's overlay toggles paint on MapViewport and nothing else, so the
+// workspace header shows them only for facets built by mapFacet(). This is the
+// data behind that gate — the header itself is .tsx and not collected.
+describe('mapOverlays marks the facets viewStore.overlays actually paints on', () => {
+  it('is set on every map facet and absent on the art facet', async () => {
+    const { registerAeonFacetModules } = await import('../register-facets');
+    const { facetModules } = await import('../facet-registry');
+    registerAeonFacetModules();
+    for (const f of ['layout', 'objects', 'rings', 'collision', 'palette'] as const) {
+      expect(facetModules.get(f)?.mapOverlays, `${f}.mapOverlays`).toBe(true);
+    }
+    expect(facetModules.get('art')?.mapOverlays).toBeFalsy();
+  });
+});

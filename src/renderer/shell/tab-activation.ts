@@ -137,6 +137,7 @@ export type SpriteDocPlan =
   | { kind: 'none' }
   | { kind: 'checkout' }
   | { kind: 'untitled' }
+  | { kind: 'deferred' }
   | { kind: 'open'; engine: 's1' | 'aeon'; ref: string };
 
 /**
@@ -150,11 +151,23 @@ export type SpriteDocPlan =
  * its document may be checked out, parked, or (after the tab was closed once)
  * gone entirely — so the glue hands it to openSpriteDoc, which covers all three
  * without ever reaching a loader.
+ *
+ * DEFERRED is the fifth case, and it is about boot order. An s1 tab's ref is a
+ * bare object id: editObjectArtCheckout resolves its art against the OPEN act's
+ * ZONE, so with no act loaded there is nothing to resolve against and the
+ * checkout can only fail. Session restore hits this every time it reopens an s1
+ * sprite tab as the active tab — the level tabs are restored alongside it but
+ * nothing has LOADED one yet — so it is the expected order of events, not an
+ * error. Deferring means: touch no document, run no loader (hence toast
+ * nothing), and let the next focus, after the user opens an act, do the real
+ * checkout. Only a FIRST load defers; an already-open document needs nothing
+ * from the act, so it still checks out (that is why this sits below `isOpen`).
  */
 export function planSpriteDocActivation(input: {
   tabId: string;
   activeDocId: string;
   isOpen: boolean;
+  classicActLoaded: boolean;
 }): SpriteDocPlan {
   if (input.tabId === UNTITLED_SPRITE_TAB_ID) {
     return input.activeDocId === input.tabId ? { kind: 'none' } : { kind: 'untitled' };
@@ -163,6 +176,7 @@ export function planSpriteDocActivation(input: {
   if (!ref) return { kind: 'none' };
   if (input.activeDocId === input.tabId) return { kind: 'none' };
   if (input.isOpen) return { kind: 'checkout' };
+  if (ref.engine === 's1' && !input.classicActLoaded) return { kind: 'deferred' };
   return { kind: 'open', engine: ref.engine, ref: ref.ref };
 }
 
@@ -195,6 +209,10 @@ let spriteActivations: Promise<unknown> = Promise.resolve();
 /**
  * Check out (or first load) a sprite-doc tab's document. Resolves true when the
  * tab may take focus (false = load failed / superseded).
+ *
+ * NOTE for callers that gate on the result: false means "this tab has no
+ * document". That is a reason not to FOCUS it; it is never a reason to keep a
+ * tab the user asked to CLOSE — see requestCloseTab.
  */
 export function activateSpriteDocTarget(tabId: string): Promise<boolean> {
   const run = spriteActivations.then(() => runSpriteActivation(tabId), () => runSpriteActivation(tabId));
@@ -209,8 +227,16 @@ async function runSpriteActivation(tabId: string): Promise<boolean> {
     tabId,
     activeDocId: store.activeDocId,
     isOpen: store.isOpen(tabId),
+    classicActLoaded: useClassicLevelStore.getState().ref !== null,
   });
   if (plan.kind === 'none') return true;
+  if (plan.kind === 'deferred') {
+    // TRUE on purpose: the tab is legitimate and keeps its place in the strip —
+    // it just has no document yet. App renders a sprite-doc tab whose id is not
+    // the checked-out doc id as an inert "waiting for a level" pane, so nothing
+    // pretends the blank untitled canvas is this object's art.
+    return true;
+  }
   if (plan.kind === 'checkout') {
     activateSpriteDoc(tabId); // synchronous state swap — nothing to supersede
     return true;
@@ -429,9 +455,22 @@ function disposeStacksForClosedTab(id: string): void {
 /**
  * Close a tab through the activation guard: closing the ACTIVE tab promotes a
  * neighbor (core closeTab picks right-then-left), so the promoted level tab
- * must pass the same activation gate as a click on it — on cancel/failed
- * activation the close is abandoned and the tab stays. Closing an inactive
- * tab never changes the active document and closes directly.
+ * must pass the same activation gate as a click on it — on cancel the close is
+ * abandoned and the tab stays. Closing an inactive tab never changes the active
+ * document and closes directly.
+ *
+ * The promoted-tab gate is asymmetric, deliberately:
+ *
+ *   LEVEL promotion CAN veto — activateLevelTarget's false means the user hit
+ *   Cancel in the "unsaved changes in this act" confirm, i.e. "don't switch",
+ *   and switching is exactly what closing this tab would force.
+ *
+ *   SPRITE-DOC promotion CANNOT veto. Its false means the neighbour's document
+ *   failed to load, which says nothing about the tab being closed. Letting it
+ *   veto is what wedged the strip: two restored s1 sprite tabs, neither able to
+ *   check out with no act loaded, each vetoing the other's close and re-toasting
+ *   on every attempt. A tab must be closable whatever state its document is in,
+ *   so the promotion runs for its effect only and the close proceeds regardless.
  */
 export async function requestCloseTab(id: string): Promise<void> {
   // Home is uncloseable (core closeTab no-ops on it) — bail before the
@@ -455,7 +494,10 @@ export async function requestCloseTab(id: string): Promise<void> {
   const remaining = session.tabs.filter((t) => t.id !== id);
   const promoted = remaining[idx] ?? remaining[idx - 1] ?? remaining[0];
   if (promoted && promoted.kind === 'level' && !(await activateLevelTarget(promoted.id))) return;
-  if (promoted && promoted.kind === 'sprite-doc' && !(await activateSpriteDocTarget(promoted.id))) return;
+  // Runs BEFORE the close (so the promoted tab never renders for a frame holding
+  // someone else's document) but its result is discarded — see the asymmetry
+  // note above.
+  if (promoted && promoted.kind === 'sprite-doc') await activateSpriteDocTarget(promoted.id);
   useSessionStore.getState().close(id);
   // AFTER the session close: disposeStacksForClosedTab reads the surviving tabs
   // to decide whether the zone-art document still has an owner.

@@ -25,36 +25,32 @@ export default function PropertiesPanel() {
   if (!project || !act) {
     return (
       <div style={styles.container}>
-        <div style={styles.header}>Properties</div>
+        <div style={styles.content}><span style={styles.propLabel}>No act loaded.</span></div>
       </div>
     );
   }
 
   const section = act.sections[activeSectionIndex];
 
-  // Get selected item details
-  let selectedObj = null;
+  // Get selected item details. Objects are deliberately absent: their read-only
+  // block here was superseded by the real editor in the Objects facet
+  // (shared/ObjectInspector + providers/object-inspector-aeon, stage-4 plan 3
+  // task 5), and showing the same four values uneditably beside an editable form
+  // is the dead chrome that panel design forbids. Rings still have no editor, so
+  // their readout stays.
   let selectedRing = null;
-  if (selection && section) {
-    if (selection.type === 'object') selectedObj = section.objects[selection.index];
-    if (selection.type === 'ring') selectedRing = section.rings[selection.index];
+  if (selection && section && selection.type === 'ring') {
+    selectedRing = section.rings[selection.index];
   }
 
   return (
     <div style={styles.container}>
-      <div style={styles.header}>Properties</div>
+      {/* No title of its own: every call site already wraps this in a
+          CollapsibleSection titled "Properties" (layout/objects/rings/collision
+          facets), and rendering a second header made the aeon panel read
+          "PROPERTIES / PROPERTIES". The section header IS this panel's title. */}
       <div style={styles.content}>
         {/* Selection details */}
-        {selectedObj && (
-          <div style={styles.section}>
-            <div style={styles.sectionTitle}>Selected Object</div>
-            <Property label="Section" value={String(activeSectionIndex)} />
-            <Property label="Position" value={`${selectedObj.x}, ${selectedObj.y}`} />
-            <Property label="Type" value={selectedObj.typeId} />
-            <Property label="Subtype" value={`$${selectedObj.subtype.toString(16).toUpperCase().padStart(2, '0')}`} />
-          </div>
-        )}
-
         {selectedRing && (
           <div style={styles.section}>
             <div style={styles.sectionTitle}>Selected Ring</div>
@@ -147,11 +143,6 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex', flexDirection: 'column',
     background: T.surface,
     flexShrink: 0,
-  },
-  header: {
-    padding: '8px 12px', fontSize: 12, fontWeight: 600, color: T.textBase,
-    borderBottom: `1px solid ${T.border}`, textTransform: 'uppercase' as const,
-    letterSpacing: 1,
   },
   content: {
     flex: 1, overflow: 'auto', padding: 8,

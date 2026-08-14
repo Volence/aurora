@@ -60,10 +60,24 @@ export class ObjectSpriteCache<T, Ctx> {
     return p;
   }
 
-  /** Dispose + drop every cached entry NOT at `currentEpoch` (stale bitmaps). */
-  evictStale(currentEpoch: number): void {
+  /** True when (id, zone, variant, epoch) is already resolved in the cache. */
+  has(id: number, zone: string, variant: string, epoch: number): boolean {
+    return this.cache.has(ObjectSpriteCache.key(id, zone, variant, epoch));
+  }
+
+  /**
+   * Dispose + drop every cached entry whose epoch is not in `live` (stale bitmaps).
+   *
+   * Takes a SET, not a single epoch, because entries are no longer all keyed on
+   * one clock: a file-backed sprite is keyed on the palette epoch while a
+   * LevelArt sprite is keyed on palette-or-tiles (see
+   * core/level-classic/object-sprite-clock). With a single-epoch check the two
+   * groups would evict each other on every refresh — permanently cache-cold,
+   * i.e. the exact rebuild storm this split removes.
+   */
+  evictStale(live: ReadonlySet<number>): void {
     for (const [key, entry] of this.cache) {
-      if (entry.epoch !== currentEpoch) {
+      if (!live.has(entry.epoch)) {
         if (entry.value !== null) this.dispose(entry.value);
         this.cache.delete(key);
       }

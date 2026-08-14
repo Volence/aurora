@@ -45,7 +45,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   toast: {
     padding: '6px 16px', borderRadius: 6, fontSize: 12, fontWeight: 500,
-    color: T.textHi, border: '1px solid', whiteSpace: 'nowrap' as const,
+    color: T.textHi, borderWidth: 1, borderStyle: 'solid', whiteSpace: 'nowrap' as const,
     boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
   },
 };

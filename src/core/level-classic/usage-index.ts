@@ -103,19 +103,40 @@ export function buildUsageIndex(doc: LevelDoc): UsageIndex {
   const blockToChunks = new Map<number, number[]>();
   for (const [block, set] of blockChunkSets) blockToChunks.set(block, [...set].sort((a, b) => a - b));
 
+  // Memo tables for the Usage accessors below — filled lazily so an index that is
+  // never queried costs nothing, and stable by identity once filled.
+  const tileUsageCache = new Map<number, Usage>();
+  const blockUsageCache = new Map<number, Usage>();
+
   return {
     tileToBlocks,
     blockToChunks,
     chunkPlacements,
+    // Usage objects are built ONCE per index and handed out by identity, so a
+    // caller that queries the same id repeatedly (the composer tabs do, once per
+    // thumbnail per render) allocates nothing after the first hit. The index is
+    // rebuilt whenever the doc changes, so caching here is safe: an entry can
+    // never outlive the content it describes.
+    //
+    // NOTE this identity is NOT what keeps the thumbnails' `React.memo` holding
+    // across an edit — it cannot be, since a commit builds a whole new index. The
+    // thumbnails take `containers`/`cells` as NUMBERS for exactly that reason;
+    // see the prop note in renderer/components/classic/composer-thumbs.tsx.
     tileUsage(tileIndex: number): Usage {
-      const containers = tileToBlocks.get(tileIndex)?.length ?? 0;
+      let u = tileUsageCache.get(tileIndex);
+      if (u) return u;
       const cells = tileCells.get(tileIndex) ?? 0;
-      return cells === 0 ? EMPTY : { containers, cells };
+      u = cells === 0 ? EMPTY : { containers: tileToBlocks.get(tileIndex)?.length ?? 0, cells };
+      tileUsageCache.set(tileIndex, u);
+      return u;
     },
     blockUsage(blockId: number): Usage {
-      const containers = blockToChunks.get(blockId)?.length ?? 0;
+      let u = blockUsageCache.get(blockId);
+      if (u) return u;
       const cells = blockCells.get(blockId) ?? 0;
-      return cells === 0 ? EMPTY : { containers, cells };
+      u = cells === 0 ? EMPTY : { containers: blockToChunks.get(blockId)?.length ?? 0, cells };
+      blockUsageCache.set(blockId, u);
+      return u;
     },
     chunkPlacementCount(chunkId: number): number {
       // Normalize an engine id the same way tallyPlacements keyed it (strip the

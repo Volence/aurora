@@ -7,10 +7,13 @@ import { useToastStore } from '../../state/toastStore';
 import { renderChunk, renderBlock } from '../../../core/level-classic/render';
 import { chunkIndexForId, packChunkCell, type LevelDoc } from '../../../core/level-classic/model';
 import type { UsageIndex } from '../../../core/level-classic/usage-index';
-import { cellIndexAt } from './composer-math';
+import { canvasCellIndexAt } from './composer-math';
 import { BlockThumb } from './composer-thumbs';
 import { STAMP_PREVIEW_STROKE } from '../../canvas/canvas-colors';
-import { hex, SOLIDITY, SharedBanner, useEscapeCancel, drawBufferScaled, styles } from './composer-shared';
+import {
+  hex, SOLIDITY, SharedBanner, useEscapeCancel, useWindowStrokeEnd, drawBufferScaled,
+  canvasGeom, styles,
+} from './composer-shared';
 
 // Chunk tab — 16x16 block-grid editor for the selected chunk. Paint = pick block
 // + flips + solidity; one classicEditChunkCells per gesture. Duplicate / new-blank
@@ -31,7 +34,9 @@ export default function ChunkTab({ doc, usage }: { doc: LevelDoc; usage: UsageIn
   const [brushYf, setBrushYf] = useState(false);
   const [brushSolidity, setBrushSolidity] = useState(0);
   const [showSolidity, setShowSolidity] = useState(true);
-  const [, force] = useState(0);
+  // See TileTab: the in-progress paint lives in a ref, so this counter is what
+  // tells the paint effect the ref moved. It MUST stay in that effect's deps.
+  const [strokeVersion, force] = useState(0);
   const redraw = useCallback(() => force((n) => n + 1), []);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -92,13 +97,12 @@ export default function ChunkTab({ doc, usage }: { doc: LevelDoc; usage: UsageIn
       ctx.beginPath(); ctx.moveTo(0, i * CHUNK_CELL); ctx.lineTo(CHUNK_SIZE, i * CHUNK_CELL); ctx.stroke();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [doc, selectedChunkId, chunkIndex, chunkEpoch, chunkVersions, composerBlockId, brushXf, brushYf, showSolidity]);
+  }, [doc, selectedChunkId, chunkIndex, chunkEpoch, chunkVersions, composerBlockId, brushXf, brushYf, showSolidity, strokeVersion]);
 
   const cellAt = useCallback((e: React.MouseEvent): number | null => {
     const canvas = canvasRef.current;
     if (!canvas) return null;
-    const rect = canvas.getBoundingClientRect();
-    return cellIndexAt(e.clientX - rect.left, e.clientY - rect.top, CHUNK_CELL, 16, 16);
+    return canvasCellIndexAt(e.clientX, e.clientY, canvasGeom(canvas), CHUNK_CELL, 16, 16);
   }, []);
 
   const brushWord = () => packChunkCell({ block: composerBlockId, xf: brushXf, yf: brushYf, solidity: brushSolidity });
@@ -124,15 +128,24 @@ export default function ChunkTab({ doc, usage }: { doc: LevelDoc; usage: UsageIn
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cellAt, composerBlockId, brushXf, brushYf, brushSolidity, redraw]);
 
+  // Idempotent (canvas onMouseUp + the window-level end can both fire); nothing
+  // may throw out of it — see the same note in TileTab.
   const endStroke = useCallback(() => {
     const stroke = strokeRef.current;
+    if (!stroke) return; // nothing in flight — a stray release elsewhere in the app
     strokeRef.current = null;
-    if (!stroke || !stroke.size) { redraw(); return; }
+    if (!stroke.size) { redraw(); return; }
     const cells = [...stroke.entries()].map(([index, word]) => ({ index, word }));
-    const res = classicEditChunkCells(selectedChunkId, cells);
+    let res;
+    try {
+      res = classicEditChunkCells(selectedChunkId, cells);
+    } catch (e) {
+      res = { ok: false as const, error: e instanceof Error ? e.message : String(e) };
+    }
     if (!res.ok) useToastStore.getState().addToast(`Chunk edit failed: ${res.error}`, 'error');
     redraw();
   }, [selectedChunkId, redraw]);
+  useWindowStrokeEnd(endStroke);
 
   // Right-click eyedrops the cell's block + flips + solidity into the brush.
   const onContext = useCallback((e: React.MouseEvent) => {
@@ -195,7 +208,6 @@ export default function ChunkTab({ doc, usage }: { doc: LevelDoc; usage: UsageIn
               onMouseDown={onDown}
               onMouseMove={onMove}
               onMouseUp={endStroke}
-              onMouseLeave={() => { strokeRef.current = null; redraw(); }}
               onContextMenu={onContext}
               style={{ ...styles.gridCanvas, cursor: 'crosshair' }}
             />
@@ -219,8 +231,10 @@ export default function ChunkTab({ doc, usage }: { doc: LevelDoc; usage: UsageIn
         <div style={styles.paletteStrip}>
           {doc.blocks.map((_, id) => (
             <BlockThumb
-              key={id} doc={doc} blockId={id} size={34} versionKey={versionKey}
-              selected={id === composerBlockId} usage={usage.blockUsage(id)} onSelect={setComposerBlockId}
+              key={id} blockId={id} size={34} versionKey={versionKey}
+              selected={id === composerBlockId}
+              containers={usage.blockUsage(id).containers} cells={usage.blockUsage(id).cells}
+              onSelect={setComposerBlockId}
             />
           ))}
         </div>

@@ -6,15 +6,23 @@
 // FileAccess the project loader uses), render the declared frame against the act's
 // LIVE palette line, and cache the resulting ImageBitmap for the viewport draw.
 //
-// CACHE KEY = `id:zone:epoch`. `epoch` is the store's `chunkEpoch`, which bumps on
-// any palette edit AND any tile/block edit (classicSetPalette / classicEditTiles /
-// classicEditBlock all commit with version-effect 'all'). Object sprite colors come
-// from `doc.palettes[link.pal]`, and B6 LevelArt sprites ALSO draw from `doc.tiles`,
-// so re-keying on chunkEpoch covers both dependencies: a tile edit bumps the epoch,
-// the viewport re-runs the refresh with the fresh doc, and LevelArt sprites rebuild
-// against the edited pool. (File-backed static sprites also re-key on the epoch bump
-// and rebuild from cache-cold — a cheap, correct over-invalidation.) There is ONE
-// cached canvas per (id, subtype-variant, epoch), never one per placement.
+// CACHE KEY = `id:zone:variant:epoch`, where `epoch` is now DERIVED PER SPRITE by
+// `objectSpriteEpoch` from the store's two fine clocks (paletteEpoch, tileEpoch)
+// rather than taken from the coarse `chunkEpoch`.
+//
+// Why: a sprite reads its palette line, and — only when `artSource:'levelArt'` —
+// the act's tile pool. It never reads blocks or chunks. But `chunkEpoch` bumps on
+// palette AND tile AND block edits, so keying on it meant every pencil stroke in
+// the tile composer evicted and rebuilt EVERY sprite in the act (measured on GHZ
+// act 1: 32 linked sprites, 34 files / ~41 KiB re-read over IPC, 25 Nemesis
+// re-decodes, 32 fresh `createImageBitmap`s), and a block edit did all of that
+// while changing no sprite at all. That per-stroke GPU-bitmap churn is what made
+// the composer freeze after a few strokes on a GPU-poor machine.
+//
+// Now: a tile edit rebuilds only the LevelArt sprites (7 of 32 on GHZ act 1), a
+// block edit rebuilds none, and a palette edit still rebuilds all — which is the
+// one case that genuinely must. There is ONE cached canvas per
+// (id, subtype-variant, epoch), never one per placement.
 //
 // The published `sprites` map (id → ObjectSprite) is what the viewport / hit-test /
 // library thumbnails read synchronously; a miss falls back to the hex box and kicks
@@ -30,6 +38,7 @@ import { resolveObjectArt, type ObjectArtLink } from '../../core/project/profile
 import {
   resolveEffectiveObjectArt, objectHasSubtypeRule, objectArtKey,
 } from '../../core/project/profiles/object-subtype-rules';
+import { objectSpriteEpoch, type SpriteClocks } from '../../core/level-classic/object-sprite-clock';
 import type { LevelDoc } from '../../core/level-classic/model';
 import type { Color } from '../../core/model/s4-types';
 import { createIpcFileAccess } from './classic-file-access';
@@ -222,7 +231,7 @@ export async function loadObjectSprite(
  * (so the viewport never draws a just-closed bitmap).
  */
 export async function refreshClassicObjectSprites(
-  dir: string, doc: LevelDoc, zone: string, epoch: number,
+  dir: string, doc: LevelDoc, zone: string, clocks: SpriteClocks,
 ): Promise<void> {
   if (dir !== cacheDir) {
     spriteCache.clear();
@@ -243,6 +252,12 @@ export async function refreshClassicObjectSprites(
   // issues two separate IPC reads; on a fresh act load (the epoch busts the cache,
   // so every key rebuilds) that is ~2×N round-trips. `readMany` collapses them to
   // one. A superseded refresh still drops via the gen guard below.
+  //
+  // Only keys that will actually REBUILD are prefetched. Previously this batch
+  // ran unconditionally, so even a refresh where every sprite was already cached
+  // still re-read every art + mappings file over IPC. With the clocks split, a
+  // tile edit leaves all file-backed sprites cached, and this loop then asks for
+  // (usually) nothing at all.
   const fa = createIpcFileAccess(dir);
   let prefetch: Map<string, Uint8Array | null> | undefined;
   if (fa.readMany) {
@@ -250,6 +265,11 @@ export async function refreshClassicObjectSprites(
     for (const { id, subtype } of wantKeys.values()) {
       const base = resolveObjectArt(id, zone);
       if (!base) continue;
+      // Already cached at ITS epoch ⇒ load() will hit; reading its bytes again
+      // would be pure waste.
+      if (spriteCache.has(id, zone, variantFor(id, zone, subtype), objectSpriteEpoch(id, zone, subtype, clocks))) {
+        continue;
+      }
       // Prefetch the EFFECTIVE files so a rule's art-file override (e.g. Spring
       // Vertical.nem) batches too, instead of falling back to a per-sprite read.
       const { link } = resolveEffectiveObjectArt(id, zone, subtype, base);
@@ -264,11 +284,15 @@ export async function refreshClassicObjectSprites(
       for (const [p, e] of got) prefetch.set(p, e.bytes);
     }
   }
+  // Each sprite is loaded at ITS OWN epoch, so file-backed sprites survive a tile
+  // edit while LevelArt ones rebuild against the edited pool.
+  const live = new Set<number>();
   const entries = await Promise.all(
-    [...wantKeys.entries()].map(
-      async ([key, { id, subtype }]) =>
-        [key, await loadObjectSprite(dir, doc, id, zone, subtype, epoch, prefetch)] as const,
-    ),
+    [...wantKeys.entries()].map(async ([key, { id, subtype }]) => {
+      const epoch = objectSpriteEpoch(id, zone, subtype, clocks);
+      live.add(epoch);
+      return [key, await loadObjectSprite(dir, doc, id, zone, subtype, epoch, prefetch)] as const;
+    }),
   );
   // Superseded by a newer refresh — drop this (stale) publish entirely.
   if (gen !== refreshGen) return;
@@ -280,8 +304,11 @@ export async function refreshClassicObjectSprites(
   // each version bump forces a full viewport redraw — a per-sprite publish would be
   // ~N slow repaints (many seconds) instead of one. Locked by a regression test.
   useClassicObjectArtStore.getState().setSprites(map);
-  // Evict prior-epoch bitmaps now that the current-epoch map is live.
-  spriteCache.evictStale(epoch);
+  // Evict prior-epoch bitmaps now that the current-epoch map is live. `live` holds
+  // every epoch this refresh legitimately used (the palette epoch for file-backed
+  // sprites, the palette-or-tiles epoch for LevelArt ones) — evicting on a single
+  // epoch would drop one of those two groups on every refresh.
+  spriteCache.evictStale(live);
 }
 
 /** Wipe the cache + published map (project close / dir change). Test seam too. */
