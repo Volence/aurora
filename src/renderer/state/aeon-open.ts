@@ -5,9 +5,12 @@
 
 import { aeonAdapter } from '../../core/project/aeon';
 import { dominantPaletteLine } from '../../core/project/aeon/load';
+import { firstEditableChunk } from '../../core/art/chunk-pick';
+import { docFromChunk } from '../../core/art/composer-buffer';
 import { createIpcFileAccess } from './classic-file-access';
 import { documentHistoryHub } from './history-hub';
 import { useProjectStore } from './projectStore';
+import { useArtStore } from './artStore';
 import { useEditorStore } from './editorStore';
 import { useViewStore } from './viewStore';
 import { useToastStore } from './toastStore';
@@ -47,7 +50,44 @@ export async function openAeonProject(dir: string): Promise<boolean> {
     if (zone && zone.acts.length > 0) {
       useProjectStore.getState().setCurrentAct(zone.id, zone.acts[0].id);
     }
-    useEditorStore.getState().setSelectedPaletteLine(dominantPaletteLine(aeon.project));
+    // ONE palette line for both tile strips. `selectedPaletteLine` (editorStore)
+    // is what the Layout facet's ArtBrowser previews tiles under; `paletteLine`
+    // (artStore) is what the Art facet's TilesetPanel previews them under AND
+    // what the composer paints with. They defaulted to the act's dominant line
+    // and to a hardcoded 1 respectively, so the SAME tileset rendered
+    // green/orange in one column and blue in the other, two facets apart, and
+    // one of the two was necessarily lying about what the art looks like.
+    //
+    // Not unified into one field, which is the deeper fix and a bigger one: the
+    // two genuinely mean different things (a VIEW line and a PAINT line) and
+    // diverge again the moment the user picks either. Agreeing at rest is what
+    // was actually wrong.
+    const line = dominantPaletteLine(aeon.project);
+    useEditorStore.getState().setSelectedPaletteLine(line);
+    useArtStore.getState().setPaletteLine(line);
+    // The Art facet opens on a chunk rather than on the New Document launcher.
+    // The launcher was the resting state for a project whose zone had 919 tiles,
+    // a palette and 71 chunks sitting in the right rail — a facet greeting you
+    // with "create something" while showing you everything it already has.
+    //
+    // AT PROJECT OPEN, not on facet entry, for the reason classic's equivalent
+    // landed in openAct: a facet-entry heal would rewrite a deliberate choice
+    // (closing the document to start a new one is a real thing to want), where
+    // an open-time default overrides nothing. openDocument directly, not
+    // openDocumentGuarded — nothing can be dirty one statement after the project
+    // was committed, so there is no discard to confirm.
+    const first = firstEditableChunk(aeon.project.chunkLibrary);
+    if (first) {
+      useArtStore.getState().openDocument({
+        doc: docFromChunk(first), liveTileIndex: null,
+        chunkId: first.id, name: first.name, dirty: false,
+      });
+    } else {
+      // An empty library genuinely has nothing to open, and the launcher is the
+      // honest screen. Clear rather than leave the PREVIOUS project's document
+      // standing over this one's stores.
+      useArtStore.getState().closeDocument();
+    }
     useViewStore.getState().setPosition(0, 0);
     for (const n of aeon.notices) useToastStore.getState().addToast(n, 'success');
     useToastStore.getState().addToast(`Opened ${aeon.config.name}`, 'success');

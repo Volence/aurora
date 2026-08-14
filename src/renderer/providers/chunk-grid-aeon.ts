@@ -15,8 +15,8 @@ import React from 'react';
 import type { ChunkGridPort, ChunkEmptyKind } from '../components/shared/chunk-grid-model';
 import { hexLabel } from '../components/shared/chunk-grid-model';
 import type { ChunkDef, Palette, Tile } from '../../core/model/s4-types';
-import { unpackNametableWord } from '../../core/model/s4-types';
 import { rasterizeNametableChunk } from '../../core/art/rasterize';
+import { isBlankChunk } from '../../core/art/chunk-pick';
 import { useEditorStore } from '../state/editorStore';
 import { useProjectStore, getCurrentZone } from '../state/projectStore';
 import { useSessionStore } from '../state/sessionStore';
@@ -30,17 +30,10 @@ export const AEON_CHUNK_PX = 128;
 /** Thumbnail display sizes (S / M / L). */
 export const AEON_THUMB_SIZES = [56, 88, 120];
 
-/**
- * A chunk with no visible content — every cell references tile 0, the engine's
- * conventionally-transparent tile. It is a REAL chunk with real data (OJZ's
- * $00/$2A/$2B/$45 are legitimately blank, not corrupt); the flag exists because
- * stamping one ERASES the 16x16 area, which is a useful eraser and an easy
- * mis-click. Distinct from classic's air, which is not a chunk at all.
- */
-export function isBlankChunk(chunk: ChunkDef): boolean {
-  for (const w of chunk.nametable) if (unpackNametableWord(w).tileIndex !== 0) return false;
-  return true;
-}
+/** Moved to core/art/chunk-pick.ts, where the project-open path can reach it
+ *  without importing this module's component graph. Re-exported so the callers
+ *  and tests that already name it here keep resolving. */
+export { isBlankChunk };
 
 export function aeonBlankIds(chunks: readonly ChunkDef[]): Set<string> {
   const s = new Set<string>();

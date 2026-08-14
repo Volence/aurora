@@ -7,7 +7,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useArtStore } from '../../state/artStore';
-import { openDocumentGuarded } from '../../components/art/open-document';
+import { openDocumentGuarded, closeDocumentGuarded } from '../../components/art/open-document';
 import { createDoc, docFromChunk, sliceForSave } from '../../../core/art/composer-buffer';
 import { useProjectStore, getActiveLevel, getCurrentZone } from '../../state/projectStore';
 import { useEditorStore, executeCommand } from '../../state/editorStore';
@@ -279,6 +279,14 @@ function ArtOptions() {
           {open.chunkId !== null ? 'Save' : 'Save to library'}
         </button>
       )}
+      {/* The only route back to the New Document launcher, which is the facet's
+          no-document state. It used to be reachable by simply not having opened
+          anything; a project open now lands on the first chunk, so without this
+          button "new tile / new block / new chunk" would be unreachable. */}
+      <button style={styles.newDocButton} onClick={closeDocumentGuarded}
+        title="Close this document and show the New Document options">
+        New…
+      </button>
     </span>
   ) : null;
 
@@ -362,6 +370,15 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: 'pointer',
     fontSize: 11,
     fontWeight: 600,
+  },
+  newDocButton: {
+    padding: '2px 10px',
+    background: T.raised,
+    color: T.textBase,
+    border: `1px solid ${T.borderStrong}`,
+    borderRadius: 4,
+    cursor: 'pointer',
+    fontSize: 11,
   },
   saveDisabled: {
     background: T.raised,
