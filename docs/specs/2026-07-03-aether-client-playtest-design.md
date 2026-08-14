@@ -32,7 +32,7 @@ A4 object-click sync (later, small once events flow); any Seraph/DAW coupling.
 - **Conventions**: addresses/payloads as hex strings (protocol D9); methods are
   `emulator/<name>`.
 - **Events**: subscribe to notifications (`emulator/stopped`, `emulator/resumed`,
-  `emulator/rom_reloaded`); forward to renderer via IPC push.
+  `emulator/romReloaded`); forward to renderer via IPC push.
 - **Symbol resolution (non-negotiable)**: every RAM address via
   `emulator/lookup_symbol`, resolved fresh after every connect and every
   `load_symbols`. Cache per build only; symbols provably drift between builds
