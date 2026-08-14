@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { Solidity } from '../../core/collision/collision-model';
+import type { ToolId } from '../../core/project/adapter';
 import type { AnyCommand, S4Level } from '../../core/editing/commands';
 import { chunkIdsAffectedByCommand } from '../../core/editing/chunk-invalidation';
 import type { MapClipboard, PasteLayers } from '../../core/editing/map-clipboard';
@@ -12,9 +13,17 @@ import { useSessionStore } from './sessionStore';
 import { useWorkspaceStore } from '../workspace/workspaceStore';
 import { levelDocId, parseLevelTabId, isSpriteDocTabId, zoneArtDocId } from '../shell/tabs';
 
-export type EditorTool =
-  | 'view' | 'select' | 'paint-tile' | 'paint-block' | 'stamp-chunk'
-  | 'paint-collision' | 'eraser' | 'place-object' | 'place-ring' | 'marquee';
+/**
+ * The editing tool, for BOTH engines (spec §3.6 — one tool vocabulary). Classic
+ * used to run its own three-value `ClassicTool`; it reads this store now, with
+ * `pan → view`, `stamp → stamp-chunk`, and its dual-purpose `object` split into
+ * the two aeon tools it always was — `select` unarmed, `place-object` armed.
+ *
+ * An alias of core's `ToolId`, which is where the vocabulary is declared so a
+ * profile can name it (CapabilityManifest.facetTools). Kept exported under this
+ * name because it is what the renderer has always called it.
+ */
+export type EditorTool = ToolId;
 
 /** An in-progress or committed marquee selection, in tile coords, snapped to
  *  16px blocks (map-clipboard.ts snapMarquee) and pinned to one section. */

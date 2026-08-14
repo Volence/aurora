@@ -356,6 +356,16 @@ export const s1Adapter: ProjectAdapter = {
           { id: 'block', label: 'Block', pixelSize: 16, shared: true },
           { id: 'tile', label: 'Tile', pixelSize: 8, shared: true },
         ],
+        // Classic's map is ONE surface with one chip row until the workspace
+        // re-home splits it into per-facet docks, so `layout` carries all four
+        // tools that surface can drive. The shell default is wrong for classic
+        // in both directions: it offers marquee / paint-tile / paint-block,
+        // none of which classic implements, and omits place-object, which is
+        // classic's armed placement (spec §3.6). Only `layout` is declared —
+        // every other granted facet's default set is already right.
+        facetTools: {
+          layout: ['view', 'stamp-chunk', 'select', 'place-object'],
+        },
       },
       report,
       levels,

@@ -10,8 +10,12 @@
 
 import type { FacetCapability } from '../../core/project/adapter';
 import { useEditorStore, type EditorTool } from '../state/editorStore';
+import { openCapabilities } from '../state/open-project';
 import { useWorkspaceStore } from './workspaceStore';
 
+/** The SHELL's default tool set per facet — what a facet offers when the open
+ *  profile declares nothing for it. Written for aeon, which is why aeon's
+ *  manifest declares no facetTools of its own. */
 export const FACET_TOOLS: Partial<Record<FacetCapability, readonly EditorTool[]>> = {
   layout: ['stamp-chunk', 'select', 'view', 'marquee', 'paint-tile', 'paint-block'],
   objects: ['place-object', 'select', 'view'],
@@ -21,12 +25,30 @@ export const FACET_TOOLS: Partial<Record<FacetCapability, readonly EditorTool[]>
   // 'art' is absent: the Art facet runs the artStore tool system, not EditorTool.
 };
 
+/**
+ * The tools the OPEN project's `facet` actually offers: the profile's
+ * declaration when its manifest names this facet, else the shell default above.
+ *
+ * The ONE reader of `CapabilityManifest.facetTools`. Every consumer of "which
+ * tools exist here" — the dock, the keyboard scoping, the facet-switch
+ * re-scope, classic's chip row — goes through this, so a profile cannot offer a
+ * tool in one place and have it rejected in another.
+ *
+ * Declaration REPLACES the default (see the manifest's docblock): classic's
+ * layout needs `place-object`, which the default set does not contain, so
+ * intersecting would delete the tool the declaration exists to add.
+ */
+export function toolsForFacet(facet: FacetCapability): readonly EditorTool[] {
+  return openCapabilities()?.facetTools?.[facet] ?? FACET_TOOLS[facet] ?? [];
+}
+
 /** Facet switch rule: keep the current tool when the target facet allows it,
  *  else the facet default (spec §4 — switching facets keeps context where
- *  meaningful). */
+ *  meaningful). Reads the EFFECTIVE set, so a switch under classic can never
+ *  land on a tool classic has no implementation for. */
 export function toolForFacet(facet: FacetCapability, current: EditorTool): EditorTool {
-  const tools = FACET_TOOLS[facet];
-  if (!tools || tools.length === 0) return current;
+  const tools = toolsForFacet(facet);
+  if (tools.length === 0) return current;
   return tools.includes(current) ? current : tools[0];
 }
 
