@@ -1,6 +1,6 @@
 import React from 'react';
 import { RING_PATTERNS } from '../state/editorStore';
-import { T } from './ui';
+import { T, SECTION_LIST_MAX_HEIGHT } from './ui';
 
 interface RingPatternPaletteProps {
   selectedIndex: number;
@@ -74,8 +74,12 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '6px 8px', fontSize: 10, color: T.textLo,
     borderBottom: `1px solid ${T.border}`,
   },
+  // Bounded, or `overflow: auto` is a no-op: `flex: 1` fills a parent with a
+  // height, and a CollapsibleSection inside a scrolling Panel is sized by its
+  // content — so this grew with RING_PATTERNS and pushed the sections under it
+  // down the column instead of scrolling. See SECTION_LIST_MAX_HEIGHT.
   list: {
-    flex: 1, overflow: 'auto', padding: 4,
+    flex: 1, maxHeight: SECTION_LIST_MAX_HEIGHT, overflow: 'auto', padding: 4,
     display: 'flex', flexDirection: 'column', gap: 2,
   },
   item: {

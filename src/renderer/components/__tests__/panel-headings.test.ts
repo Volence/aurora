@@ -26,6 +26,10 @@
 // section to a facet adds its panel to this test with no edit here, and there
 // is no way to mount a panel in a titled section without this seeing it.
 //
+// The derivation itself moved to `./helpers/section-panels` once a SECOND rule
+// about these same panels needed it (panel-scrollers.test.ts). One derivation,
+// or the next rule gets a third list to forget something in.
+//
 // A SOURCE scan, like shared-purity.test.ts and classic-surface.test.ts: these
 // are .tsx, the suite is node-only, and nothing renders them. `uppercase` +
 // `fontWeight: 600` is the marker for heading type in this codebase — it is what
@@ -33,100 +37,11 @@
 // it, because it IS the section header.
 
 import { describe, it, expect } from 'vitest';
-import { readFileSync, readdirSync, existsSync } from 'node:fs';
-import { join, dirname, resolve } from 'node:path';
-
-const COMPONENTS = join(__dirname, '..');
-const FACETS = join(__dirname, '..', '..', 'workspace', 'facets');
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { COMPONENTS, derivePanels, panelName } from './helpers/section-panels';
 
 const read = (file: string): string => readFileSync(file, 'utf8');
-
-/**
- * Every component rendered as the direct child of a CollapsibleSection in one
- * facet module, as a `<Name` capture. Self-closing (`<ChunkPicker pick="edit"
- * />`) and wrapping forms both appear in these files, and props may span lines,
- * so the match is "the first JSX tag after the section's opening tag".
- */
-function sectionChildren(source: string): string[] {
-  const names: string[] = [];
-  for (const m of source.matchAll(/<CollapsibleSection[^>]*>\s*(?:\{[^}]*\}\s*)?<([A-Z]\w*)/g)) {
-    names.push(m[1]);
-  }
-  return names;
-}
-
-/** Where `name` is imported from in `source`, as a module specifier. */
-function importSpecifier(source: string, name: string): string | null {
-  const m = source.match(
-    new RegExp(`import\\s+(?:${name}\\b[^;]*|\\{[^}]*\\b${name}\\b[^}]*\\})\\s+from\\s+['"]([^'"]+)['"]`),
-  );
-  return m ? m[1] : null;
-}
-
-/** Resolve a relative module specifier from `fromFile` to a real .tsx panel
- *  file, or null (a .ts module has no JSX to title anything with). */
-function resolvePanel(fromFile: string, spec: string): string | null {
-  if (!spec.startsWith('.')) return null;
-  const abs = resolve(dirname(fromFile), spec);
-  for (const candidate of [`${abs}.tsx`, join(abs, 'index.tsx')]) {
-    if (existsSync(candidate)) return candidate;
-  }
-  return null;
-}
-
-/** Every component this file renders — the direct children of its own JSX. */
-function renderedComponents(source: string): string[] {
-  return [...source.matchAll(/<([A-Z]\w*)/g)].map((m) => m[1]);
-}
-
-/**
- * The panels the facet modules mount inside a titled section, TRANSITIVELY, as
- * absolute paths under components/.
- *
- * Transitive is what the rule actually says: ChunkGrid is not mounted by a facet
- * at all, it is what ChunkLibrary and ChunkPicker are made of — and it is one of
- * the panels that WAS drawing a second title. A direct-children-only scan would
- * have missed it exactly the way the hand-written list missed
- * RingPatternPalette.
- *
- * components/ui is excluded and nothing else is: PanelHeader lives there, it IS
- * the section header, and it is the one place entitled to heading type.
- */
-function derivePanels(): string[] {
-  const found = new Set<string>();
-  const facetFiles = readdirSync(FACETS).filter((f) => f.endsWith('.tsx'));
-  // A rename or a move of the facets directory must not silently empty this.
-  expect(facetFiles.length, 'no facet modules found').toBeGreaterThan(0);
-
-  const queue: string[] = [];
-  for (const file of facetFiles) {
-    const path = join(FACETS, file);
-    const source = read(path);
-    for (const name of sectionChildren(source)) {
-      // A section child with no import is defined in the facet file itself (a
-      // local wrapper) and has no separate panel file to scan.
-      const spec = importSpecifier(source, name);
-      const panel = spec ? resolvePanel(path, spec) : null;
-      if (panel) queue.push(panel);
-    }
-  }
-
-  const seen = new Set<string>();
-  while (queue.length > 0) {
-    const file = queue.pop()!;
-    if (seen.has(file)) continue;
-    seen.add(file);
-    if (file.startsWith(join(COMPONENTS, 'ui'))) continue;
-    found.add(file);
-    const source = read(file);
-    for (const name of renderedComponents(source)) {
-      const spec = importSpecifier(source, name);
-      const next = spec ? resolvePanel(file, spec) : null;
-      if (next) queue.push(next);
-    }
-  }
-  return [...found].sort();
-}
 
 const PANELS = derivePanels();
 
@@ -152,7 +67,7 @@ describe('a panel inside a CollapsibleSection does not title itself', () => {
     // The failure mode two earlier source guards in this repo actually had — a
     // path that stopped resolving and made every case pass vacuously. Named
     // here in full, so a derivation that silently stops finding them fails.
-    const names = PANELS.map((p) => p.slice(COMPONENTS.length + 1));
+    const names = PANELS.map(panelName);
     expect(names).toContain('shared/ChunkGrid.tsx');
     expect(names).toContain('art/TilesetPanel.tsx');
     expect(names).toContain('ArtBrowser.tsx');
@@ -161,7 +76,7 @@ describe('a panel inside a CollapsibleSection does not title itself', () => {
   });
 
   it('finds panels across BOTH engines (a classic-only scan would pass vacuously)', () => {
-    const names = PANELS.map((p) => p.slice(COMPONENTS.length + 1));
+    const names = PANELS.map(panelName);
     expect(names.some((n) => n.startsWith('classic/'))).toBe(true);
     expect(names.some((n) => !n.startsWith('classic/'))).toBe(true);
   });
@@ -184,7 +99,7 @@ describe('a panel inside a CollapsibleSection does not title itself', () => {
   const SUBHEADING_PANELS = ['shared/PropertiesPanel.tsx'];
 
   it.each(PANELS)('%s renders no heading-type text of its own', (file) => {
-    const name = file.slice(COMPONENTS.length + 1);
+    const name = panelName(file);
     if (SUBHEADING_PANELS.includes(name)) return;
     expect(headingTypeStyles(read(file))).toEqual([]);
   });
@@ -192,7 +107,7 @@ describe('a panel inside a CollapsibleSection does not title itself', () => {
   it('every allowlisted panel is one the derivation still reaches', () => {
     // Otherwise an exemption outlives the panel it was written for and quietly
     // covers whatever takes that path later.
-    const names = PANELS.map((p) => p.slice(COMPONENTS.length + 1));
+    const names = PANELS.map(panelName);
     for (const allowed of SUBHEADING_PANELS) expect(names).toContain(allowed);
   });
 

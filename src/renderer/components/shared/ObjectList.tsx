@@ -1,5 +1,5 @@
 import React from 'react';
-import { T } from '../ui';
+import { T, SECTION_LIST_MAX_HEIGHT } from '../ui';
 import { filterRows, type ObjectListPort, type ObjectRow } from './object-list-model';
 
 /**
@@ -136,8 +136,10 @@ const THUMB = 28;
 
 const styles: Record<string, React.CSSProperties> = {
   container: { display: 'flex', flexDirection: 'column', minWidth: 0 },
-  // Sticky so the filter stays reachable while scrolling 82 classic rows — the
-  // scroller is the enclosing Panel, not this list.
+  // Outside the scroller below, so the filter is always on screen with the rows
+  // it filters. (It is `sticky` as well, which now only matters for the enclosing
+  // Panel's own scroll — harmless, and one less thing to re-derive if the list
+  // ever hosts its own header row.)
   header: {
     position: 'sticky', top: 0, zIndex: 1, background: T.void,
     padding: '6px 8px', borderBottom: `1px solid ${T.border}`,
@@ -147,7 +149,16 @@ const styles: Record<string, React.CSSProperties> = {
     background: T.border, color: T.textHi,
     border: `1px solid ${T.borderStrong}`, borderRadius: T.rMd, fontSize: 12,
   },
-  list: { display: 'flex', flexDirection: 'column', padding: 4, gap: 2 },
+  // Bounded, so the rows scroll INSIDE the section instead of growing it. This
+  // list is one of three sections in classic's Layout column since the Objects
+  // merge (workspace/facets/s1-facets.tsx); unbounded, 82 rows would push
+  // whatever a later task adds below it off the bottom of the world — the same
+  // failure that hid the palette editor under the chunk grid. See
+  // SECTION_LIST_MAX_HEIGHT for why the cap is a fixed px and not a vh share.
+  list: {
+    display: 'flex', flexDirection: 'column', padding: 4, gap: 2,
+    maxHeight: SECTION_LIST_MAX_HEIGHT, overflowY: 'auto',
+  },
   empty: { padding: 12, color: T.textLo, fontSize: 12 },
   row: {
     display: 'flex', alignItems: 'center', gap: 4, width: '100%',

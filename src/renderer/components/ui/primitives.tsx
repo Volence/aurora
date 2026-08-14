@@ -2,6 +2,30 @@
 import React from 'react';
 import { T } from './theme';
 
+/**
+ * THE HEIGHT CAP FOR A LIST OR GRID INSIDE A CollapsibleSection, in px.
+ *
+ * A right-hand column is a scrolling stack of titled sections, and a section
+ * whose content grows with the DATA silently buries every section under it: the
+ * classic Art column mounts an 82-chunk grid (~900px of thumbnails in a 260px
+ * column) above its palette editor, and the palette editor was reported as not
+ * existing. Nobody scrolls past nine screens of chunks to find out.
+ *
+ * So a panel whose item count is data-driven scrolls INSIDE its section instead
+ * of growing it. Then the column's own scroll only has to travel a few hundred
+ * px per section and every section HEADER is reachable without reading a grid.
+ *
+ * A fixed number rather than a fraction of the viewport, deliberately. The
+ * competing option was a `vh` share, which sounds adaptive and is not: these
+ * sections are 1-of-3 in a column whose height nobody knows at style time, so a
+ * share that fits three sections leaves one section looking arbitrarily
+ * truncated when it is the only one expanded — and the collapse state that
+ * decides which is which lives in localStorage. 260 is five rows of the chunk
+ * grid's default 48px cell, or roughly eight object rows: enough to browse in,
+ * short enough that the next header is on screen with it.
+ */
+export const SECTION_LIST_MAX_HEIGHT = 260;
+
 export function Panel({ children, width, scroll = false, style }: {
   children: React.ReactNode; width?: number; scroll?: boolean; style?: React.CSSProperties;
 }) {

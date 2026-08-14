@@ -6,7 +6,7 @@ import { useProjectStore, getCurrentAct, getActiveLevel } from '../state/project
 import { SECTION_PIXEL_SIZE, MAX_ACT_SECTIONS } from '../../core/model/s4-types';
 import type { Section } from '../../core/model/s4-types';
 import * as ops from '../../core/editing/section-ops';
-import { T } from './ui';
+import { T, SECTION_LIST_MAX_HEIGHT } from './ui';
 
 // Module-level clipboard: a deep-cloned section survives re-renders and lets
 // the user paste into any slot (even after switching the active section).
@@ -234,7 +234,12 @@ export default function SectionGridNav() {
 const styles: Record<string, React.CSSProperties> = {
   container: { padding: 8, borderBottom: `1px solid ${T.border}` },
   header: { fontSize: 11, color: T.textLo, marginBottom: 4 },
-  grid: { display: 'grid', gap: 2 },
+  // Bounded like every other data-driven grid in a panel column (see
+  // SECTION_LIST_MAX_HEIGHT): an act may hold MAX_ACT_SECTIONS = 48 slots, and
+  // at a grid width of 2 that is 24 rows — enough to push Chunks, Art and
+  // Properties below it out of reach in aeon's Layout column. Typical acts are
+  // wider and shorter than the cap, so this normally does nothing at all.
+  grid: { display: 'grid', gap: 2, maxHeight: SECTION_LIST_MAX_HEIGHT, overflowY: 'auto' },
   cell: {
     padding: '4px 0', textAlign: 'center', fontSize: 10,
     background: T.border, border: `1px solid ${T.borderStrong}`, borderRadius: 2,

@@ -1,5 +1,5 @@
 import React from 'react';
-import { T } from '../ui';
+import { T, SECTION_LIST_MAX_HEIGHT } from '../ui';
 import type { ChunkEmptyKind, ChunkGridPort } from './chunk-grid-model';
 import {
   CHUNK_LABEL_BG, CHUNK_LABEL_TEXT, CHUNK_AIR_CHECK_A, CHUNK_AIR_CHECK_B,
@@ -293,8 +293,15 @@ const styles: Record<string, React.CSSProperties> = {
   // The scrollable wall: native overflow gives a real scrollbar, flex-wrap lays
   // out every chunk, minHeight:0 lets it shrink inside the flex column so it
   // actually scrolls instead of growing the panel.
+  //
+  // `maxHeight` is what makes the scroll REAL in a panel column. `flex: 1` only
+  // fills a parent that has a height of its own, and a CollapsibleSection inside
+  // a scrolling Panel is sized by its content — so with 82 chunks this grew to
+  // ~900px and `overflowY` never fired. Everything below it in the column
+  // (classic's palette editor; aeon's Art and Properties) was then nine screens
+  // down, which is how the palette editor came to be believed not to exist.
   gridPanel: {
-    flex: 1, minHeight: 0, overflowY: 'auto',
+    flex: 1, minHeight: 0, maxHeight: SECTION_LIST_MAX_HEIGHT, overflowY: 'auto',
     display: 'flex', flexWrap: 'wrap', alignContent: 'flex-start', gap: 4, padding: 4,
   },
   gridStrip: {
