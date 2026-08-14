@@ -31,6 +31,9 @@ export default function TileTab({ doc, usage }: { doc: LevelDoc; usage: UsageInd
   const tileClipboard = useClassicLevelStore((s) => s.tileClipboard);
   const setTileClipboard = useClassicLevelStore((s) => s.setTileClipboard);
   const chunkEpoch = useClassicLevelStore((s) => s.chunkEpoch);
+  // Fine clocks for the browse-only tile strip's per-thumbnail version key.
+  const paletteEpoch = useClassicLevelStore((s) => s.paletteEpoch);
+  const tileVersions = useClassicLevelStore((s) => s.tileVersions);
   const range = useEditableTileRange();
 
   const [colorIndex, setColorIndex] = useState(1);
@@ -174,7 +177,13 @@ export default function TileTab({ doc, usage }: { doc: LevelDoc; usage: UsageInd
   }, [tileClipboard, locked, composerTileIndex]);
 
   const tileUse = usage.tileUsage(composerTileIndex);
-  const versionKey = String(chunkEpoch);
+  // A tile thumbnail bakes exactly two things: the tile's own 32 bytes and the
+  // selected palette line. So it invalidates on the palette clock plus that
+  // tile's own version — NOT on `chunkEpoch`, which also bumps for block edits
+  // (which cannot change a tile) and for edits to any OTHER tile. Keying the
+  // whole strip on chunkEpoch repainted all 965 thumbnails on every committed
+  // pencil stroke; this repaints the one tile the stroke actually wrote.
+  const versionKeyFor = (id: number) => `${paletteEpoch}:${tileVersions.get(id) ?? 0}`;
 
   return (
     <div style={styles.tabBody}>
@@ -246,7 +255,7 @@ export default function TileTab({ doc, usage }: { doc: LevelDoc; usage: UsageInd
         <div style={styles.paletteStrip}>
           {Array.from({ length: tileCount }, (_, id) => (
             <TileThumb
-              key={id} doc={doc} tileIndex={id} palLine={composerPalLine} size={26} versionKey={versionKey}
+              key={id} doc={doc} tileIndex={id} palLine={composerPalLine} size={26} versionKey={versionKeyFor(id)}
               selected={id === composerTileIndex} locked={tileLockReason(range, id) !== null}
               usage={usage.tileUsage(id)}
               onSelect={setComposerTileIndex}

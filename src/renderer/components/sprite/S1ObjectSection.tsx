@@ -19,7 +19,8 @@ import { ObjectThumb } from '../classic/ObjectThumb';
  */
 export default function S1ObjectSection({ busy, onBusy }: { busy: boolean; onBusy: (b: boolean) => void }) {
   const ref = useClassicLevelStore((s) => s.ref);
-  const chunkEpoch = useClassicLevelStore((s) => s.chunkEpoch);
+  const paletteEpoch = useClassicLevelStore((s) => s.paletteEpoch);
+  const tileEpoch = useClassicLevelStore((s) => s.tileEpoch);
   const dir = useClassicProjectStore((s) => s.dir);
   const openRelPath = useSpriteStore((s) => s.s1ArtSource?.relPath ?? null);
   const zone = ref?.zone ?? '';
@@ -52,7 +53,7 @@ export default function S1ObjectSection({ busy, onBusy }: { busy: boolean; onBus
               style={{ ...styles.row, ...(current ? styles.rowCurrent : {}), ...(busy ? styles.busy : {}) }}
             >
               <span style={styles.thumbWrap}>
-                <ObjectThumb id={id} zone={zone} epoch={chunkEpoch} dir={dir} />
+                <ObjectThumb id={id} zone={zone} paletteEpoch={paletteEpoch} tileEpoch={tileEpoch} dir={dir} />
               </span>
               <span style={{ ...styles.hex, ...(current ? styles.onCur : {}) }}>{s1ObjectHex(id)}</span>
               <span style={styles.name}>{name}</span>

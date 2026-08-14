@@ -109,6 +109,11 @@ export default function ClassicLevelViewport() {
   // (or the whole epoch), so the chunk-art cache below invalidates precisely.
   const chunkVersions = useClassicLevelStore((s) => s.chunkVersions);
   const chunkEpoch = useClassicLevelStore((s) => s.chunkEpoch);
+  // Fine content clocks for the object-sprite refresh below. Chunk art keeps
+  // using the coarse chunkEpoch above (it genuinely bakes tiles+blocks+palette);
+  // sprites do not, so they read the narrower signals.
+  const paletteEpoch = useClassicLevelStore((s) => s.paletteEpoch);
+  const tileEpoch = useClassicLevelStore((s) => s.tileEpoch);
   // Task 13 layout-editing UI state (pan|stamp + the stamp/eyedrop chunk id).
   const tool = useClassicLevelStore((s) => s.tool);
   const selectedChunkId = useClassicLevelStore((s) => s.selectedChunkId);
@@ -250,11 +255,18 @@ export default function ClassicLevelViewport() {
   );
 
   // Object-sprite refresh (Task B1): render (or reuse cached) the real art for
-  // every linked object id in the act, against the live palette. Keyed by the
-  // distinct object-id set, the palette epoch (chunkEpoch bumps on palette edits),
-  // the act ref, and the project dir — so it re-runs when a new id is placed, the
-  // palette changes, or a different act loads, but NOT on every drag frame. The
-  // refresh itself is idempotent (cached per id:zone:epoch).
+  // every linked object id in the act, against the live palette.
+  //
+  // Keyed on the distinct object-id set, the act ref, the project dir, and the
+  // two FINE content clocks — deliberately NOT `chunkEpoch`. `chunkEpoch` bumps
+  // on block edits too, which change no sprite whatsoever, and it cannot tell a
+  // tile edit from a palette edit; keying on it re-ran a full rebuild of every
+  // sprite in the act on every committed composer stroke (IPC re-read + Nemesis
+  // re-decode + a fresh createImageBitmap each). `paletteEpoch`/`tileEpoch` let
+  // `objectSpriteEpoch` invalidate exactly the sprites whose inputs moved.
+  //
+  // The refresh stays idempotent (cached per id:zone:variant:epoch), so a bump
+  // that changes no sprite's own epoch now resolves entirely from cache.
   const objectIdSig = doc
     ? [...new Set(doc.objects.map((o) => o.id))].sort((a, b) => a - b).join(',')
     : '';
@@ -262,9 +274,9 @@ export default function ClassicLevelViewport() {
     const d = useClassicLevelStore.getState().doc;
     const r = useClassicLevelStore.getState().ref;
     if (!d || !r || !projectDir) return;
-    void refreshClassicObjectSprites(projectDir, d, r.zone, chunkEpoch);
+    void refreshClassicObjectSprites(projectDir, d, r.zone, { palette: paletteEpoch, tile: tileEpoch });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [objectIdSig, chunkEpoch, projectDir, ref]);
+  }, [objectIdSig, paletteEpoch, tileEpoch, projectDir, ref]);
 
   // Fit the level's height into the canvas when an act finishes loading (and on
   // plane switches), anchored top-left. Keyed on load status + act + plane, NOT

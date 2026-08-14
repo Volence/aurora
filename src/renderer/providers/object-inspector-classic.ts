@@ -119,7 +119,8 @@ export function useClassicObjectInspectorPort(): ObjectInspectorPort {
   const doc = useClassicLevelStore((s) => s.doc);
   const idx = useClassicLevelStore((s) => s.selectedObjectIndex);
   const ref = useClassicLevelStore((s) => s.ref);
-  const chunkEpoch = useClassicLevelStore((s) => s.chunkEpoch);
+  const paletteEpoch = useClassicLevelStore((s) => s.paletteEpoch);
+  const tileEpoch = useClassicLevelStore((s) => s.tileEpoch);
   const armedObjectId = useClassicLevelStore((s) => s.armedObjectId);
   const setSelectedObjectIndex = useClassicLevelStore((s) => s.setSelectedObjectIndex);
   const dir = useClassicProjectStore((s) => s.dir);
@@ -146,12 +147,13 @@ export function useClassicObjectInspectorPort(): ObjectInspectorPort {
         id: Number(fields.id),
         subtype: Number(fields.subtype),
         zone,
-        epoch: chunkEpoch,
+        paletteEpoch,
+        tileEpoch,
         dir,
       });
     C.displayName = 'ClassicObjectPreview';
     return C;
-  }, [linked, zone, chunkEpoch, dir]);
+  }, [linked, zone, paletteEpoch, tileEpoch, dir]);
 
   const rootProps = React.useMemo(() => classicSurfaceProps('map'), []);
 
@@ -189,12 +191,12 @@ export function useClassicObjectInspectorPort(): ObjectInspectorPort {
     emptyHint: armedObjectId != null
       ? `Placing ${s1ObjectName(armedObjectId)} — click the map to drop it, or press Esc to cancel.`
       : 'No object selected. Use the Object tool and click a marker.',
-    versionKey: `${zone}:${chunkEpoch}:${artVersion}`,
+    versionKey: `${zone}:${paletteEpoch}:${tileEpoch}:${artVersion}`,
     Preview,
     onDeselect: obj ? (): void => setSelectedObjectIndex(null) : undefined,
     action,
     rootProps,
-  }), [obj, idx, schema, commit, armedObjectId, zone, chunkEpoch, artVersion, Preview, setSelectedObjectIndex, action, rootProps]);
+  }), [obj, idx, schema, commit, armedObjectId, zone, paletteEpoch, tileEpoch, artVersion, Preview, setSelectedObjectIndex, action, rootProps]);
 }
 
 /** Index plus the id it pointed at — enough to notice the list shifted under a

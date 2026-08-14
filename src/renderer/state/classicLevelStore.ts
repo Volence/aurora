@@ -98,6 +98,39 @@ interface ClassicLevelState {
    */
   chunkEpoch: number;
 
+  // --- Finer content clocks -------------------------------------------------
+  // `chunkEpoch` above is deliberately COARSE: chunk art bakes blocks, tiles and
+  // palette, so all three must invalidate it. But most consumers do NOT depend on
+  // all three, and re-keying them on the coarse epoch is pure redundant work —
+  // a single pencil stroke in the tile composer was rebuilding every object
+  // sprite in the act (IPC re-read + Nemesis re-decode + createImageBitmap) and
+  // repainting all ~965 tile thumbnails.
+  //
+  // These clocks are ADDITIVE — `chunkEpoch` keeps its exact prior meaning and
+  // every existing consumer of it is untouched. They are drawn from the SAME
+  // monotonic allocator as `chunkEpoch`/`chunkVersions`, so values are directly
+  // comparable across clocks (see core/level-classic/object-sprite-clock).
+
+  /**
+   * Bumps ONLY when a palette line is written. Every object sprite and every
+   * tile/block thumbnail bakes palette colors, so all of them key on this.
+   */
+  paletteEpoch: number;
+  /**
+   * Bumps ONLY when tile-pool pixels are written. LevelArt-sourced object
+   * sprites (GHZ platforms, collapsing ledges, MZ bricks, …) draw from
+   * `doc.tiles` and so depend on this; file-backed (`.nem`) sprites do not.
+   */
+  tileEpoch: number;
+  /**
+   * Per-tile content version, the tile-pool analogue of `chunkVersions`: a
+   * pencil stroke bumps only the tile(s) it wrote, so the composer's tile strip
+   * repaints one thumbnail instead of all of them. Not snapshotted — an
+   * undo/redo instead allocates fresh epochs (see writeArtSnapshot), which
+   * invalidates everything and is correct, if coarse, for a rare operation.
+   */
+  tileVersions: Map<number, number>;
+
   /**
    * Layout-editing UI state (Task 13, spec §3 M5). Not doc data and NOT part of
    * an undo snapshot: undo/redo restore the document, never the tool/selection.
@@ -191,6 +224,9 @@ const IDLE = {
   dirty: {} as DirtyDomains,
   chunkVersions: new Map<number, number>(),
   chunkEpoch: 0,
+  paletteEpoch: 0,
+  tileEpoch: 0,
+  tileVersions: new Map<number, number>(),
   tool: 'pan' as ClassicTool,
   selectedChunkId: 0,
   stampLoop: false,
@@ -256,6 +292,11 @@ export const useClassicLevelStore = create<ClassicLevelState>((set, get) => ({
       dirty: {} as DirtyDomains,
       chunkVersions: new Map<number, number>(),
       chunkEpoch: nextVersion(),
+      // Fresh finer clocks too: a new act has a new palette and a new tile pool,
+      // so every sprite/thumbnail cached against the old act's clocks is stale.
+      paletteEpoch: nextVersion(),
+      tileEpoch: nextVersion(),
+      tileVersions: new Map<number, number>(),
       // Chunk ids are per-act, so a fresh act resets the stamp selection (the tool
       // choice persists — it's a workflow preference, not level data).
       selectedChunkId: 0,
@@ -395,6 +436,16 @@ export function writeArtSnapshot(snap: ClassicArtSnapshot): void {
     dirty: restoreDomainDirty(s.dirty, snap.dirty, ART_DOMAINS),
     chunkVersions: snap.chunkVersions,
     chunkEpoch: snap.chunkEpoch,
+    // The finer clocks are NOT snapshotted: an art undo/redo can revert tiles,
+    // blocks, AND palette in one step, so the cheapest correct thing is to
+    // allocate fresh epochs and let everything re-derive. That over-invalidates
+    // (a full sprite + thumbnail rebuild) but only on an explicit, rare undo —
+    // never on the per-stroke path this split exists to keep cheap. Keeping a
+    // snapshot of them would have to ripple through ClassicArtSnapshot for no
+    // benefit on the hot path.
+    paletteEpoch: nextVersion(),
+    tileEpoch: nextVersion(),
+    tileVersions: new Map<number, number>(),
   }));
 }
 
@@ -405,7 +456,16 @@ export function writeArtSnapshot(snap: ClassicArtSnapshot): void {
 // independent (spec §4.3).
 // ---------------------------------------------------------------------------
 
-type VersionEffect = { kind: 'none' } | { kind: 'chunk'; id: number } | { kind: 'all' };
+type VersionEffect =
+  | { kind: 'none' }
+  | { kind: 'chunk'; id: number }
+  /**
+   * Every chunk's art changed. `tiles` optionally names the tile-pool indices
+   * that were rewritten, so the composer's tile strip can repaint just those
+   * thumbnails instead of the whole pool. Omitting it is always safe (the strip
+   * then falls back to the palette clock); it is purely a narrowing hint.
+   */
+  | { kind: 'all'; tiles?: readonly number[] };
 
 /**
  * The split is only sound while every commit site is single-domain: a patch that
@@ -487,11 +547,35 @@ function applyCommit(newDoc: LevelDoc, dirtyPatch: DirtyDomains, ve: VersionEffe
     chunkEpoch = nextVersion();
   }
 
+  // The finer clocks move on WHAT changed, read straight off the dirty patch —
+  // which every commit already states truthfully (assertSingleDomain enforces
+  // exactly one domain per commit). Deriving them here rather than threading a
+  // second signal through every command keeps the commands unchanged and makes
+  // it impossible for the two to disagree.
+  //
+  // Note a block edit bumps NEITHER: no object sprite and no tile thumbnail
+  // bakes block data, so a block edit must invalidate none of them (it still
+  // bumps chunkEpoch above, which is what repaints chunk art).
+  let paletteEpoch = s.paletteEpoch;
+  let tileEpoch = s.tileEpoch;
+  let tileVersions = s.tileVersions;
+  if (dirtyPatch.palette) paletteEpoch = nextVersion();
+  if (dirtyPatch.tiles) {
+    tileEpoch = nextVersion();
+    if (ve.kind === 'all' && ve.tiles) {
+      tileVersions = new Map(s.tileVersions);
+      for (const t of ve.tiles) tileVersions.set(t, nextVersion());
+    }
+  }
+
   useClassicLevelStore.setState({
     doc: newDoc,
     dirty: { ...s.dirty, ...dirtyPatch },
     chunkVersions,
     chunkEpoch,
+    paletteEpoch,
+    tileEpoch,
+    tileVersions,
   });
 }
 
@@ -679,7 +763,9 @@ export function classicEditTiles(edits: { tileIndex: number; data: Uint8Array }[
   const e = structuralError(newDoc);
   if (e) return err(e);
   // Any tile-pixel change repaints every chunk that uses it — bump the epoch.
-  commitArt(newDoc, { tiles: true }, { kind: 'all' });
+  // Naming the written tiles additionally lets the composer's tile strip repaint
+  // only those thumbnails (a pencil stroke touches one tile, not the pool).
+  commitArt(newDoc, { tiles: true }, { kind: 'all', tiles: edits.map((e) => e.tileIndex) });
   return { ok: true };
 }
 

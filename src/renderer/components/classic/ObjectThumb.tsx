@@ -1,6 +1,7 @@
 import React, { useRef, useEffect } from 'react';
 import { useClassicLevelStore } from '../../state/classicLevelStore';
 import { loadObjectSprite } from '../../state/classicObjectArtStore';
+import { objectSpriteEpoch } from '../../../core/level-classic/object-sprite-clock';
 
 export const THUMB = 28;
 
@@ -20,14 +21,22 @@ export const THUMB = 28;
  * S1ObjectSection renders it directly.
  */
 export const ObjectThumb = React.memo(function ObjectThumb({
-  id, zone, epoch, dir,
+  id, zone, paletteEpoch, tileEpoch, dir,
 }: {
   id: number;
   zone: string;
-  epoch: number;
+  /** Palette clock — see core/level-classic/object-sprite-clock. */
+  paletteEpoch: number;
+  /** Tile-pool clock; only affects LevelArt-sourced ids. */
+  tileEpoch: number;
   dir: string | null;
 }) {
   const ref = useRef<HTMLCanvasElement>(null);
+  // Derive the SAME per-sprite epoch the viewport's refresh uses. Taking the
+  // coarse chunkEpoch here (as this once did) would key these thumbnails into
+  // cache slots the viewport's eviction immediately drops — the two would
+  // invalidate each other's bitmaps on every edit.
+  const epoch = objectSpriteEpoch(id, zone, 0, { palette: paletteEpoch, tile: tileEpoch });
   useEffect(() => {
     const canvas = ref.current;
     const ctx = canvas?.getContext('2d');

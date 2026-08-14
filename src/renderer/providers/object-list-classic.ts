@@ -57,7 +57,8 @@ const SECONDARY_ACTION = {
 
 export function useClassicObjectListPort(): ObjectListPort {
   const ref = useClassicLevelStore((s) => s.ref);
-  const chunkEpoch = useClassicLevelStore((s) => s.chunkEpoch);
+  const paletteEpoch = useClassicLevelStore((s) => s.paletteEpoch);
+  const tileEpoch = useClassicLevelStore((s) => s.tileEpoch);
   const armedObjectId = useClassicLevelStore((s) => s.armedObjectId);
   const dir = useClassicProjectStore((s) => s.dir);
   // Object art republishes asynchronously (the shared cache warms up after the
@@ -70,10 +71,10 @@ export function useClassicObjectListPort(): ObjectListPort {
 
   const Thumb = React.useMemo(() => {
     const C = ({ rowKey }: { rowKey: string }): React.ReactElement =>
-      React.createElement(ObjectThumb, { id: Number(rowKey), zone, epoch: chunkEpoch, dir });
+      React.createElement(ObjectThumb, { id: Number(rowKey), zone, paletteEpoch, tileEpoch, dir });
     C.displayName = 'ClassicObjectThumb';
     return C;
-  }, [zone, chunkEpoch, dir]);
+  }, [zone, paletteEpoch, tileEpoch, dir]);
 
   // Arming an object is the first half of a layout edit (the placement click
   // lands on the map), so this claims the layout facet too — see
@@ -90,8 +91,8 @@ export function useClassicObjectListPort(): ObjectListPort {
       secondaryAction: SECONDARY_ACTION,
       rootProps,
       emptyMessage: 'No objects',
-      versionKey: `${zone}:${chunkEpoch}:${artVersion}`,
+      versionKey: `${zone}:${paletteEpoch}:${tileEpoch}:${artVersion}`,
     }),
-    [rows, armedObjectId, Thumb, rootProps, zone, chunkEpoch, artVersion],
+    [rows, armedObjectId, Thumb, rootProps, zone, paletteEpoch, tileEpoch, artVersion],
   );
 }

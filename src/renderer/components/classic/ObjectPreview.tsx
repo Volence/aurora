@@ -2,6 +2,7 @@ import React, { useRef, useEffect } from 'react';
 import { T } from '../ui';
 import { useClassicLevelStore } from '../../state/classicLevelStore';
 import { loadObjectSprite } from '../../state/classicObjectArtStore';
+import { objectSpriteEpoch } from '../../../core/level-classic/object-sprite-clock';
 
 export const PREVIEW = 64;
 
@@ -19,11 +20,19 @@ export const PREVIEW = 64;
  * classic port's `Preview`.
  */
 export const ObjectPreview = React.memo(function ObjectPreview({
-  id, subtype, zone, epoch, dir,
+  id, subtype, zone, paletteEpoch, tileEpoch, dir,
 }: {
-  id: number; subtype: number; zone: string; epoch: number; dir: string | null;
+  id: number; subtype: number; zone: string;
+  /** Palette clock — see core/level-classic/object-sprite-clock. */
+  paletteEpoch: number;
+  /** Tile-pool clock; only affects LevelArt-sourced ids. */
+  tileEpoch: number;
+  dir: string | null;
 }) {
   const ref = useRef<HTMLCanvasElement>(null);
+  // Same per-sprite epoch the viewport refresh uses, so this preview SHARES its
+  // cached bitmap instead of keying into a slot the viewport then evicts.
+  const epoch = objectSpriteEpoch(id, zone, subtype, { palette: paletteEpoch, tile: tileEpoch });
   useEffect(() => {
     const ctx = ref.current?.getContext('2d');
     if (!ctx) return;

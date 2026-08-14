@@ -53,7 +53,7 @@ describe('ObjectSpriteCache', () => {
     await nullMiss.load(9, 'ghz', '', 1, undefined);
     expect(cache.size).toBe(2);
 
-    cache.evictStale(2);
+    cache.evictStale(new Set([2]));
     // Only the epoch-1 entry is evicted + disposed; the epoch-2 entry survives.
     expect(dispose).toHaveBeenCalledTimes(1);
     expect(dispose).toHaveBeenCalledWith(s1);
@@ -62,7 +62,7 @@ describe('ObjectSpriteCache', () => {
     expect(build).toHaveBeenCalledTimes(2);
 
     // A null (failure) entry is dropped on eviction but NOT disposed.
-    nullMiss.evictStale(2);
+    nullMiss.evictStale(new Set([2]));
     expect(dispose).toHaveBeenCalledTimes(1);
     expect(nullMiss.size).toBe(0);
   });

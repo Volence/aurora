@@ -707,3 +707,85 @@ describe('classic:add-block', () => {
     expect(st().doc).toBe(before);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Fine content clocks (the composer-freeze fix)
+//
+// `chunkEpoch` is deliberately coarse — chunk art bakes blocks + tiles + palette,
+// so all three must bump it, and these tests do NOT change that. What they lock is
+// the ADDITIVE narrower clocks that let object sprites and tile thumbnails
+// invalidate on only the inputs they actually read. Keying those on `chunkEpoch`
+// is what made every pencil stroke rebuild every object sprite in the act.
+// ---------------------------------------------------------------------------
+describe('fine content clocks (paletteEpoch / tileEpoch / tileVersions)', () => {
+  it('a TILE edit bumps the tile clock but NOT the palette clock', () => {
+    openReady();
+    const pal0 = st().paletteEpoch;
+    const tile0 = st().tileEpoch;
+    expect(classicEditTiles([{ tileIndex: 0, data: new Uint8Array(32).fill(0xab) }]).ok).toBe(true);
+    expect(st().tileEpoch).toBeGreaterThan(tile0);
+    expect(st().paletteEpoch).toBe(pal0); // file-backed sprites stay cached
+    expect(st().chunkEpoch).toBeGreaterThan(0); // coarse clock still bumps
+  });
+
+  it('a PALETTE edit bumps the palette clock but NOT the tile clock', () => {
+    openReady();
+    const pal0 = st().paletteEpoch;
+    const tile0 = st().tileEpoch;
+    expect(classicSetPalette(2, new Uint16Array(16).fill(0x0e0e)).ok).toBe(true);
+    expect(st().paletteEpoch).toBeGreaterThan(pal0); // every sprite re-renders
+    expect(st().tileEpoch).toBe(tile0);
+  });
+
+  it('a BLOCK edit bumps NEITHER fine clock (no sprite or tile thumb bakes blocks)', () => {
+    openReady();
+    const pal0 = st().paletteEpoch;
+    const tile0 = st().tileEpoch;
+    const epoch0 = st().chunkEpoch;
+    const def: BlockDef = { cells: Array.from({ length: 4 }, () => ({ tile: 3, xf: false, yf: true, pal: 2, pri: false })) };
+    expect(classicEditBlock(0, def).ok).toBe(true);
+    expect(st().chunkEpoch).toBeGreaterThan(epoch0); // chunk art DOES change
+    expect(st().paletteEpoch).toBe(pal0);
+    expect(st().tileEpoch).toBe(tile0);
+  });
+
+  it('a tile edit versions ONLY the tiles it wrote', () => {
+    openReady();
+    expect(st().tileVersions.size).toBe(0);
+    expect(classicEditTiles([{ tileIndex: 0, data: new Uint8Array(32).fill(1) }]).ok).toBe(true);
+    // Exactly one tile is now versioned, so the composer strip repaints one
+    // thumbnail instead of the whole pool.
+    expect(st().tileVersions.size).toBe(1);
+    expect(st().tileVersions.has(0)).toBe(true);
+    expect(st().tileVersions.has(1)).toBe(false);
+
+    const v0 = st().tileVersions.get(0);
+    expect(classicEditTiles([{ tileIndex: 1, data: new Uint8Array(32).fill(2) }]).ok).toBe(true);
+    expect(st().tileVersions.get(0)).toBe(v0); // untouched tile keeps its version
+    expect(st().tileVersions.get(1)).toBeDefined();
+  });
+
+  it('a layout edit bumps no clock at all', () => {
+    openReady();
+    const pal0 = st().paletteEpoch;
+    const tile0 = st().tileEpoch;
+    expect(classicSetStart(200, 300).ok).toBe(true);
+    expect(st().paletteEpoch).toBe(pal0);
+    expect(st().tileEpoch).toBe(tile0);
+  });
+
+  it('an art undo re-derives the fine clocks so nothing renders stale', () => {
+    // The clocks are NOT snapshotted: an art undo can revert tiles, blocks and
+    // palette in one step, so it allocates fresh epochs and lets everything
+    // rebuild. Over-invalidating, but only on an explicit, rare operation.
+    openReady();
+    expect(classicEditTiles([{ tileIndex: 0, data: new Uint8Array(32).fill(0xab) }]).ok).toBe(true);
+    const pal1 = st().paletteEpoch;
+    const tile1 = st().tileEpoch;
+    artStack().undo();
+    expect(st().doc!.tiles[0]).toBe(0);
+    expect(st().paletteEpoch).toBeGreaterThan(pal1);
+    expect(st().tileEpoch).toBeGreaterThan(tile1);
+    expect(st().tileVersions.size).toBe(0);
+  });
+});
