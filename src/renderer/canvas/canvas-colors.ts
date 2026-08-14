@@ -124,6 +124,18 @@ export const COMPOSER_SEL_CELL = '#4FD1C5';
 /** Transparent-pixel checker in the tile-tab editor (light / dark squares). */
 export const COMPOSER_CHECK_A = '#2A2A2A';
 export const COMPOSER_CHECK_B = '#1C1C1C';
+/**
+ * The same two squares as RGB channel triples, for PixelViewport's
+ * `checkerColors`: that compositor writes ImageData bytes, so it takes channels
+ * rather than a CSS color string.
+ *
+ * ORDER IS [even cell, odd cell] — PixelViewport paints `(x+y)` EVEN with element
+ * 0, whereas the hand-rolled painter this replaced used the light square for the
+ * ODD cell. So the darker B comes first here; swapping them inverts the checker's
+ * phase (harmless to read, but it is a visible change, not a cleanup).
+ */
+export const COMPOSER_CHECK_RGB: [[number, number, number], [number, number, number]] =
+  [[0x1C, 0x1C, 0x1C], [0x2A, 0x2A, 0x2A]];
 /** Usage-count badge text on thumbnails. */
 export const COMPOSER_BADGE_TEXT = '#FFFFFF';
 /** Swatch-0 (transparent) checker squares in the color row. */

@@ -1,27 +1,50 @@
-import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { T, Chip, Divider } from '../ui';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { T, Chip } from '../ui';
 import { useClassicLevelStore, classicEditTiles } from '../../state/classicLevelStore';
+import { useArtStore } from '../../state/artStore';
 import { useToastStore } from '../../state/toastStore';
 import type { LevelDoc } from '../../../core/level-classic/model';
 import type { UsageIndex } from '../../../core/level-classic/usage-index';
 import { decodeGenesisColor } from '../../../core/formats/palette';
-import { canvasCellIndexAt, readTilePixels, packTilePixels, floodFillTile } from './composer-math';
+import { PixelEditController } from '../../../core/art/pixel-edit-controller';
+import type { GestureResult, Selection } from '../../../core/art/pixel-edit-controller';
+import { toolConfigFrom } from '../../../core/art/tool-config';
+import { tileToBuffer, packTilePixels } from '../../../core/art/classic-tile-buffer';
+import { resolveTileGesture } from '../../../core/art/classic-tile-gesture';
+import { pixelAt } from '../../../core/art/viewport-coords';
+import PixelViewport from '../art-shared/PixelViewport';
+import type { HostPointer } from '../art-shared/PixelViewport';
 import { TileThumb } from './composer-thumbs';
-import { COMPOSER_CHECK_A, COMPOSER_CHECK_B, COMPOSER_SWATCH_A, COMPOSER_SWATCH_B } from '../../canvas/canvas-colors';
-import {
-  hex, SharedBanner, useEditableTileRange, tileLockReason, useEscapeCancel,
-  useWindowStrokeEnd, canvasGeom, styles,
-} from './composer-shared';
+import { COMPOSER_CHECK_RGB, COMPOSER_SWATCH_A, COMPOSER_SWATCH_B } from '../../canvas/canvas-colors';
+import { hex, SharedBanner, useEditableTileRange, tileLockReason, styles } from './composer-shared';
 
-// Tile tab — 8x8 pixel editor for the selected tile (16-color row from the act
-// palette; pencil + fill, right-click eyedrops a pixel's color). One
-// classicEditTiles per stroke/fill/paste. Anim/gap tiles lock. The right column
-// is a BROWSE-ONLY tile strip (unlike the Block tab's strip, which assigns the
-// clicked tile to a block cell) — selecting here never mutates anything.
+// Tile tab — 8x8 pixel editor for the selected tile, drawn and edited through the
+// SHARED pixel substrate (PixelViewport + PixelEditController), the same engine
+// the sprite editor and aeon's composer use. It renders the tile through one
+// 16-color row of the act palette; the armed tool comes from `artStore` (pencil,
+// eraser, fill, eyedropper, line, rect, marquee select, dither). Anim/gap tiles
+// lock. The right column is a BROWSE-ONLY tile strip (unlike the Block tab's
+// strip, which assigns the clicked tile to a block cell) — selecting here never
+// mutates anything.
+//
+// ONE GESTURE = ONE `classicEditTiles` = ONE UNDO ENTRY. That is the constraint
+// this host exists to satisfy, and it is why this tab does NOT copy aeon's
+// copy-on-write staging (`localPixels` + an explicit Save). Staged writes are not
+// commands, and classic's per-document undo stack (`zoneart:<zone>`) is built on
+// every edit being one — staging here would quietly break Ctrl+Z on the whole Art
+// facet. The controller's own snapshot/working buffers during a drag are NOT
+// staging: they live inside a single gesture and resolve at `end()`.
+//
+// What is deliberately NOT merged: `composerPalLine` (the chips below the canvas)
+// is a VIEW LENS — it picks which of the four 16-color rows the tile is RENDERED
+// through and writes nothing. `artStore.paletteLine` is aeon's paint modifier and
+// BlockTab's per-cell `pal` is a third, per-cell, meaning. Three different things
+// that all read "palette line"; keep them apart.
 
-const PX = 26; // px per pixel → 208px editor
+const PX = 26; // px per pixel → 208px editor. Pan/zoom is a later task.
 
-type TileTool = 'pencil' | 'fill';
+/** Tools that only READ the tile, so a locked tile may still run them. */
+const READ_ONLY_TOOLS = new Set(['eyedropper', 'select']);
 
 export default function TileTab({ doc, usage }: { doc: LevelDoc; usage: UsageIndex }) {
   const composerTileIndex = useClassicLevelStore((s) => s.composerTileIndex);
@@ -30,108 +53,58 @@ export default function TileTab({ doc, usage }: { doc: LevelDoc; usage: UsageInd
   const setComposerPalLine = useClassicLevelStore((s) => s.setComposerPalLine);
   const tileClipboard = useClassicLevelStore((s) => s.tileClipboard);
   const setTileClipboard = useClassicLevelStore((s) => s.setTileClipboard);
-  const chunkEpoch = useClassicLevelStore((s) => s.chunkEpoch);
   // Fine clocks for the browse-only tile strip's per-thumbnail version key.
   const paletteEpoch = useClassicLevelStore((s) => s.paletteEpoch);
   const tileVersions = useClassicLevelStore((s) => s.tileVersions);
   const range = useEditableTileRange();
 
-  const [colorIndex, setColorIndex] = useState(1);
-  const [tool, setTool] = useState<TileTool>('pencil');
-  // The in-progress stroke lives in a REF (mutated per pixel, no re-render per
-  // move), so `strokeVersion` is what tells the paint effect below that the ref
-  // moved. It MUST stay in that effect's dep list: without it `redraw()` bumped a
-  // state nothing depended on, the effect never re-ran, and the pencil drew
-  // nothing at all until the commit replaced `doc`.
-  const [strokeVersion, force] = useState(0);
-  const redraw = useCallback(() => force((n) => n + 1), []);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const strokeRef = useRef<Map<number, number> | null>(null); // pixel index → color index
-  useEscapeCancel(strokeRef, redraw); // Esc cancels an in-progress tile stroke
+  // The drawing config is the ART STORE's, not this tab's: the swatch row below,
+  // the tool dock and the tool options must all mean the same "current color" and
+  // "current tool". `toolConfigFrom` is the one place a tile-space tool left armed
+  // from aeon's facet gets coerced to something this controller can execute.
+  const tool = useArtStore((s) => s.tool);
+  const selectedColor = useArtStore((s) => s.selectedColor);
+  const mirror = useArtStore((s) => s.mirror);
+  const ditherPattern = useArtStore((s) => s.ditherPattern);
+  const ditherSecondary = useArtStore((s) => s.ditherSecondary);
+  const pixelPerfect = useArtStore((s) => s.pixelPerfect);
 
   const lockReason = tileLockReason(range, composerTileIndex);
   const locked = lockReason !== null;
-  const palette = doc.palettes[composerPalLine] ?? doc.palettes[0] ?? new Uint16Array(16);
   const tileCount = Math.floor(doc.tiles.length / 32);
 
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    // willReadFrequently keeps this editor canvas CPU-backed (GPU-poor resilience,
-    // same as the classic viewport). Set on the first getContext for the canvas so
-    // the option is honored.
-    const ctx = canvas?.getContext('2d', { willReadFrequently: true });
-    if (!canvas || !ctx) return;
-    ctx.clearRect(0, 0, PX * 8, PX * 8);
-    if (composerTileIndex >= tileCount) return;
-    const px = readTilePixels(doc.tiles, composerTileIndex);
-    const stroke = strokeRef.current;
-    if (stroke) for (const [i, ci] of stroke) px[i] = ci;
-    for (let i = 0; i < 64; i++) {
-      const x = (i % 8) * PX, y = ((i / 8) | 0) * PX;
-      const idx = px[i];
-      if (idx === 0) {
-        // transparent → checker
-        ctx.fillStyle = ((i % 8 + ((i / 8) | 0)) & 1) ? COMPOSER_CHECK_A : COMPOSER_CHECK_B;
-        ctx.fillRect(x, y, PX, PX);
-      } else {
-        const c = decodeGenesisColor(palette[idx] ?? 0);
-        ctx.fillStyle = `rgb(${c.r},${c.g},${c.b})`;
-        ctx.fillRect(x, y, PX, PX);
-      }
-    }
-    ctx.strokeStyle = 'rgba(255,255,255,0.10)';
-    ctx.lineWidth = 1;
-    for (let i = 0; i <= 8; i++) {
-      ctx.beginPath(); ctx.moveTo(i * PX, 0); ctx.lineTo(i * PX, PX * 8); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(0, i * PX); ctx.lineTo(PX * 8, i * PX); ctx.stroke();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [doc, composerTileIndex, composerPalLine, chunkEpoch, tileCount, strokeVersion]);
+  const config = toolConfigFrom({ tool, selectedColor, mirror, ditherPattern, ditherSecondary, pixelPerfect });
+  const controllerRef = useRef<PixelEditController | null>(null);
+  if (!controllerRef.current) controllerRef.current = new PixelEditController(config);
+  controllerRef.current.setConfig(config);
 
-  const pixelAt = useCallback((e: React.MouseEvent): number | null => {
-    const canvas = canvasRef.current;
-    if (!canvas) return null;
-    return canvasCellIndexAt(e.clientX, e.clientY, canvasGeom(canvas), PX, 8, 8);
-  }, []);
+  // `classicEditTiles` replaces `doc` (and its `tiles`) on every commit, so keying
+  // the buffer on `doc.tiles` is what re-reads the tile after an edit — no epoch
+  // needed, and no rebuild on unrelated store ticks.
+  const buffer = useMemo(() => tileToBuffer(doc.tiles, composerTileIndex), [doc.tiles, composerTileIndex]);
+  const paletteWords = useMemo(
+    () => doc.palettes[composerPalLine] ?? doc.palettes[0] ?? new Uint16Array(16),
+    [doc.palettes, composerPalLine],
+  );
+  const paletteColors = useMemo(
+    () => Array.from({ length: 16 }, (_, i) => decodeGenesisColor(paletteWords[i] ?? 0)),
+    [paletteWords],
+  );
 
-  const onDown = useCallback((e: React.MouseEvent) => {
-    if (e.button !== 0 || locked) return;
-    const i = pixelAt(e);
-    if (i === null) return;
-    if (tool === 'fill') {
-      // A fill is a click gesture: stage the region as a stroke so Esc still
-      // cancels it and the shared endStroke commit path applies (one undo step).
-      const px = readTilePixels(doc.tiles, composerTileIndex);
-      const region = floodFillTile(px, i, colorIndex);
-      if (!region.size) return;
-      strokeRef.current = region;
-      redraw();
-      return;
-    }
-    const acc = new Map<number, number>();
-    acc.set(i, colorIndex);
-    strokeRef.current = acc;
-    redraw();
-  }, [pixelAt, locked, tool, doc, composerTileIndex, colorIndex, redraw]);
+  const [selection, setSelection] = useState<Selection | null>(null);
+  // A marquee is a region of ONE tile; browsing to another tile leaves it behind.
+  // Deliberately keyed on the tile index only, NOT on `doc` — `doc` is a new object
+  // after every commit, so that would drop the selection on each stroke.
+  useEffect(() => { setSelection(null); }, [composerTileIndex]);
 
-  const onMove = useCallback((e: React.MouseEvent) => {
-    const stroke = strokeRef.current;
-    if (!stroke || tool === 'fill') return; // a fill region is not extendable by drag
-    const i = pixelAt(e);
-    if (i === null || stroke.get(i) === colorIndex) return;
-    stroke.set(i, colorIndex);
-    redraw();
-  }, [pixelAt, tool, colorIndex, redraw]);
-
-  // Idempotent: the canvas's own onMouseUp and the window-level end (below) can
-  // both fire for one release, and the second call finds no stroke in flight.
-  const endStroke = useCallback(() => {
-    const stroke = strokeRef.current;
-    if (!stroke) return; // nothing in flight — a stray release elsewhere in the app
-    strokeRef.current = null;
-    if (!stroke.size) { redraw(); return; }
-    const px = readTilePixels(doc.tiles, composerTileIndex);
-    for (const [i, ci] of stroke) px[i] = ci;
+  const onCommit = useCallback((result: GestureResult) => {
+    // Order matters: the marquee answer is applied BEFORE the lock is consulted, so
+    // selecting still works on a view-only tile. `resolveTileGesture` owns that rule
+    // and the undefined-vs-null one (see its docblock — it is unit-tested; this
+    // callback is not, because the suite cannot load .tsx at all).
+    const out = resolveTileGesture(buffer, result, locked);
+    if (out.applySelection) setSelection(out.selection);
+    if (!out.bytes) return;
     // NOTHING may escape a pointer handler here. An uncaught throw mid-gesture
     // leaves React's event dispatch half-unwound and the whole window reads as
     // frozen, which is a far worse failure than a refused edit — so the command's
@@ -140,29 +113,46 @@ export default function TileTab({ doc, usage }: { doc: LevelDoc; usage: UsageInd
     // clean refusal gets.
     let res;
     try {
-      res = classicEditTiles([{ tileIndex: composerTileIndex, data: packTilePixels(px) }]);
+      res = classicEditTiles([{ tileIndex: composerTileIndex, data: out.bytes }]);
     } catch (e) {
       res = { ok: false as const, error: e instanceof Error ? e.message : String(e) };
     }
     if (!res.ok) useToastStore.getState().addToast(`Tile edit failed: ${res.error}`, 'error');
-    redraw();
-  }, [doc, composerTileIndex, redraw]);
-  useWindowStrokeEnd(endStroke);
+  }, [buffer, locked, composerTileIndex]);
 
-  // Right-click eyedrops the pixel's palette index into the pencil (matches the
-  // chunk tab's right-click-eyedrop idiom). Works on locked tiles too — reading
-  // a color is not an edit.
-  const onContext = useCallback((e: React.MouseEvent) => {
+  // Eyedropper → the shared selected color. Reading a pixel is not an edit, so this
+  // is NOT gated on `locked`.
+  const onPick = useCallback((value: number) => {
+    useArtStore.getState().setSelectedColor(value);
+  }, []);
+
+  // A locked tile must not even PREVIEW a stroke: the controller would happily show
+  // a live working buffer for a drag whose commit is then refused, which reads as
+  // "the pencil is broken" rather than "this tile is view-only". PixelViewport routes
+  // every pointer event to `hostPointer` when one is supplied, so an inert host hook
+  // is how a tile refuses input outright — while eyedropper and marquee select (both
+  // read-only) keep going straight to the controller.
+  const inertPointer = useMemo<HostPointer>(() => ({ down() {}, move() {}, up() {} }), []);
+  const hostPointer = locked && !READ_ONLY_TOOLS.has(config.tool) ? inertPointer : null;
+
+  // Right-click eyedrop, kept from the hand-rolled editor (it matches the chunk
+  // tab's idiom and is the only way to sample a color until the tool dock lands).
+  // PixelViewport ignores non-primary buttons and exposes no coordinate hook, so
+  // the mapping is redone here from the canvas's own rect — the same rect and the
+  // same pure `pixelAt` the viewport uses, so the two agree pixel for pixel.
+  const onContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
-    const i = pixelAt(e);
-    if (i === null) return;
-    setColorIndex(readTilePixels(doc.tiles, composerTileIndex)[i]);
-  }, [pixelAt, doc, composerTileIndex]);
+    const el = e.target as HTMLElement;
+    if (el.tagName !== 'CANVAS') return;
+    const r = el.getBoundingClientRect();
+    const p = pixelAt(e.clientX - r.left, e.clientY - r.top, PX, 8, 8);
+    if (p) useArtStore.getState().setSelectedColor(buffer.data[p.y * 8 + p.x]);
+  }, [buffer]);
 
   const copyTile = useCallback(() => {
-    setTileClipboard(readTilePixels(doc.tiles, composerTileIndex));
+    setTileClipboard(new Uint8Array(buffer.data));
     useToastStore.getState().addToast(`Copied tile ${hex(composerTileIndex)} — select another tile and Paste`, 'info');
-  }, [doc, composerTileIndex, setTileClipboard]);
+  }, [buffer, composerTileIndex, setTileClipboard]);
 
   const pasteTile = useCallback(() => {
     if (!tileClipboard || locked) return;
@@ -174,6 +164,16 @@ export default function TileTab({ doc, usage }: { doc: LevelDoc; usage: UsageInd
     }
     if (!res.ok) useToastStore.getState().addToast(`Paste failed: ${res.error}`, 'error');
   }, [tileClipboard, locked, composerTileIndex]);
+
+  // The composer's 1px BORDER is dropped and PixelViewport's own 1px ring left to
+  // stand in for it — not cosmetics: a border is inside `getBoundingClientRect()`,
+  // and PixelViewport's hit-test subtracts only `rect.left/top`, so a border would
+  // shift every click one CSS pixel and put the leftmost/topmost column of the
+  // 26px grid on the wrong pixel. The ring is a box-shadow, which takes no layout.
+  const canvasStyle: React.CSSProperties = {
+    ...styles.gridCanvas, border: 'none',
+    cursor: locked ? 'not-allowed' : 'crosshair', opacity: locked ? 0.6 : 1,
+  };
 
   const tileUse = usage.tileUsage(composerTileIndex);
   // A tile thumbnail bakes exactly two things: the tile's own 32 bytes and the
@@ -207,33 +207,40 @@ export default function TileTab({ doc, usage }: { doc: LevelDoc; usage: UsageInd
         {!locked && tileUse.cells > 1 && (
           <SharedBanner text={`tile ${hex(composerTileIndex)} is used in ${tileUse.cells} block cells — edits affect all uses`} />
         )}
-        <canvas
-          ref={canvasRef}
-          width={PX * 8}
-          height={PX * 8}
-          onMouseDown={onDown}
-          onMouseMove={onMove}
-          onMouseUp={endStroke}
-          onContextMenu={onContext}
-          style={{ ...styles.gridCanvas, cursor: locked ? 'not-allowed' : 'crosshair', opacity: locked ? 0.6 : 1 }}
-        />
+        {/* The wrapper carries the right-click handler AND keeps the canvas out of
+            the flex column: as a direct flex item it was align-stretch'd to the
+            column's width (the header row above can be wider than 208px), which
+            scaled the bitmap — the old hand-rolled hit-test compensated for that,
+            PixelViewport's does not. Inside a block wrapper the canvas is a
+            replaced element at its intrinsic 208px, so 1 canvas px = 1 CSS px. */}
+        <div onContextMenu={onContextMenu} style={{ lineHeight: 0 }}>
+          <PixelViewport
+            buffer={buffer}
+            palette={paletteColors}
+            zoom={PX}
+            controller={controllerRef.current}
+            selection={selection}
+            layers={{ checkerboard: true, checkerScale: 1, checkerColors: COMPOSER_CHECK_RGB, grids: ['pixel'] }}
+            hostPointer={hostPointer}
+            onCommit={onCommit}
+            onPick={onPick}
+            style={canvasStyle}
+          />
+        </div>
         <div style={styles.rowWrap}>
           <span style={styles.dim}>Line:</span>
           {[0, 1, 2, 3].map((p) => (
             <Chip key={p} active={composerPalLine === p} onClick={() => setComposerPalLine(p)}>{p}</Chip>
           ))}
-          <Divider />
-          <Chip active={tool === 'pencil'} onClick={() => setTool('pencil')}>Pencil</Chip>
-          <Chip active={tool === 'fill'} onClick={() => setTool('fill')} title="Flood-fill the clicked region">Fill</Chip>
         </div>
         <div style={{ ...styles.swatchRow, maxWidth: PX * 8 }}>
           {Array.from({ length: 16 }, (_, i) => {
-            const c = decodeGenesisColor(palette[i] ?? 0);
+            const c = paletteColors[i];
             const bg = i === 0 ? 'transparent' : `rgb(${c.r},${c.g},${c.b})`;
             return (
               <button
                 key={i}
-                onClick={() => setColorIndex(i)}
+                onClick={() => useArtStore.getState().setSelectedColor(i)}
                 title={i === 0 ? 'index 0 — transparent' : `index ${i}`}
                 style={{
                   width: 22, height: 22, flexShrink: 0, cursor: 'pointer', borderRadius: 3,
@@ -241,7 +248,7 @@ export default function TileTab({ doc, usage }: { doc: LevelDoc; usage: UsageInd
                   backgroundImage: i === 0 ? `linear-gradient(45deg,${COMPOSER_SWATCH_A} 25%,transparent 25%,transparent 75%,${COMPOSER_SWATCH_A} 75%),linear-gradient(45deg,${COMPOSER_SWATCH_A} 25%,${COMPOSER_SWATCH_B} 25%,${COMPOSER_SWATCH_B} 75%,${COMPOSER_SWATCH_A} 75%)` : undefined,
                   backgroundSize: i === 0 ? '8px 8px' : undefined,
                   backgroundPosition: i === 0 ? '0 0,4px 4px' : undefined,
-                  border: colorIndex === i ? `2px solid ${T.accent}` : `1px solid ${T.border}`,
+                  border: selectedColor === i ? `2px solid ${T.accent}` : `1px solid ${T.border}`,
                 }}
               />
             );
