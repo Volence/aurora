@@ -11,23 +11,25 @@
 // This module owns BOTH directions of that 4bpp packing for the classic art-edit
 // path. `packTilePixels` used to live in renderer/components/classic/composer-math.ts;
 // it moved here so core can reach it (core must never import the renderer — see
-// the note at src/core/project/adapter.ts:87). composer-math re-exports it, so
-// every existing caller keeps its import path. `bufferToTileBytes` MUST stay
-// equivalent to `packTilePixels` — it wraps it rather than reimplementing, and the
-// "bufferToTileBytes agrees with packTilePixels" case enforces that by importing
-// the packer through composer-math's re-export, so the seam fails loudly if it is
-// rewired. That case lives in the RENDERER's
-// src/renderer/components/classic/__tests__/composer-math.test.ts, not next to
-// this module: it asserts a cross-layer contract, and keeping it there is what
-// lets this module's own tests import nothing from src/renderer.
+// the note at src/core/project/adapter.ts:87). composer-math kept a re-export
+// through H1.3–H1.6 so its existing callers did not have to move; H1.7 deleted it
+// once TileTab — the last one — imported straight from here. There is now exactly
+// ONE import path for the packer, which is this file.
+//
+// `bufferToTileBytes` MUST stay equivalent to `packTilePixels`: it wraps it rather
+// than reimplementing, so equivalence is by construction, not by test. (A case
+// asserting it once lived in the renderer suite, importing the packer through the
+// re-export so it was not f(x) === f(x). With the re-export gone that is the only
+// spelling left and the case could no longer fail, so it went with it. The
+// round-trip below still pins the nibble order, and rasterize.test.ts pins
+// `unpack4bppTile`'s.)
 //
 // SCOPE OF THAT CLAIM: "one implementation" holds for the classic art-edit path
-// ONLY — it is NOT true of the codebase. This format is decoded in four places and
+// ONLY — it is NOT true of the codebase. This format is decoded in three places and
 // written in two. The others are recorded here, not fixed; none is reachable from
 // this module:
 //   decoders
 //     rasterize.ts unpack4bppTile        — canonical; new code should use this one
-//     composer-math.ts readTilePixels    — now a thin delegate to the above
 //     formats/tiles.ts parseTiles        — bulk decode of a whole pool
 //     formats/sprite-mappings.ts         — inline inside renderSpriteFrame, decodes
 //                                          straight to RGBA and shares no helper
@@ -49,8 +51,8 @@ const TILE_BYTES = TILE_PIXELS / 2;
  * (even-x) pixel, the low nibble the right — the inverse of `unpack4bppTile`.
  *
  * This is the SOLE pixels->bytes path for classic art edits, so the nibble order
- * is pinned by unit tests in both composer-math.test.ts (via the re-export) and
- * this module's own round-trip case: a swap would silently corrupt every art edit.
+ * is pinned by this module's own round-trip case: a swap would silently corrupt
+ * every art edit.
  */
 export function packTilePixels(px: Uint8Array): Uint8Array {
   const out = new Uint8Array(TILE_BYTES);
@@ -66,8 +68,8 @@ export function packTilePixels(px: Uint8Array): Uint8Array {
  * Read one 8x8 tile out of a packed tile-pool blob as a `PixelBuffer`.
  *
  * An out-of-range `tileIndex` yields a zero-filled 8x8 buffer rather than null.
- * That is deliberate on two counts: it preserves the contract `readTilePixels`
- * has always had (so no existing caller's behaviour changes), and `PixelViewport`
+ * That is deliberate on two counts: it preserves the contract the tile tab's old
+ * `readTilePixels` had (so no caller's behaviour changed), and `PixelViewport`
  * takes a non-nullable `buffer` prop — returning null would force a guard at
  * every call site to express what a blank tile already says. Index 0 is the
  * transparent entry, so a missing tile simply renders as nothing, which is

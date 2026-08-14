@@ -1,7 +1,6 @@
 import React from 'react';
 import { useArtStore } from '../state/artStore';
 import { useProjectStore, getCurrentZone } from '../state/projectStore';
-import { useEditorStore } from '../state/editorStore';
 import { useHistoryVersion } from '../hooks/useHistoryVersion';
 import { OptionBar, Chip, Divider, T } from '../components/ui';
 import {

@@ -3,10 +3,10 @@ import { tileToBuffer, bufferToTileBytes } from '../classic-tile-buffer';
 
 // This file imports NOTHING from src/renderer — core must be testable in
 // isolation, and a test that reaches across the layer undercuts that even when
-// the production code does not. The case that pins composer-math's re-export of
-// `packTilePixels` therefore lives on the renderer side, where a cross-layer
-// import is natural: see "bufferToTileBytes agrees with packTilePixels" in
-// src/renderer/components/classic/__tests__/composer-math.test.ts.
+// the production code does not. Nothing forces one now: composer-math's
+// re-export of `packTilePixels` was deleted in H1.7 (no caller left), and with it
+// the renderer-side case that pinned the re-export. `bufferToTileBytes` is a
+// one-line wrapper over the packer, so the round-trip below covers both.
 
 describe('tileToBuffer', () => {
   it('is 8x8 and reads the tile at its index', () => {
@@ -28,9 +28,9 @@ describe('tileToBuffer', () => {
   });
 
   // An out-of-range index must still yield a USABLE buffer, not null: PixelViewport
-  // takes a non-nullable `buffer` prop, and this preserves readTilePixels' existing
-  // zero-fill contract (composer-math.test.ts pins the same behaviour there). A
-  // zero-filled tile renders fully transparent, which is what happens today.
+  // takes a non-nullable `buffer` prop, and this preserves the zero-fill contract
+  // the tile tab's old `readTilePixels` had. A zero-filled tile renders fully
+  // transparent, which is what happens today.
   it('yields a zero-filled 8x8 buffer for an out-of-range index (no throw, not null)', () => {
     const tiles = new Uint8Array(32); // one tile only; index 5 is well past the end
     const b = tileToBuffer(tiles, 5);

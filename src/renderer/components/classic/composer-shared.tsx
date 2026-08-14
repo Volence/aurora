@@ -102,15 +102,21 @@ export function useEscapeCancel(strokeRef: React.MutableRefObject<Map<number, nu
  * Finish an in-progress canvas gesture on the window's mouseup — wherever the
  * button is actually released.
  *
- * WHY: the tab editors are small canvases (the Tile tab's is 208px square), so a
- * pencil drag leaves them constantly. They used to hang the commit off the
- * canvas's own `onMouseUp` and additionally DISCARD the whole stroke on
- * `onMouseLeave`, which meant any drag that crossed the edge silently threw the
- * user's work away — no commit, no message, nothing on the canvas. Ending on the
- * window instead is what every paint tool does, and it leaves Escape
- * (useEscapeCancel) as the ONE deliberate cancel.
+ * WHY: the hand-rolled tab editors are small canvases (the Chunk tab's grid is
+ * 320px square), so a paint drag leaves them constantly. They used to hang the
+ * commit off the canvas's own `onMouseUp` and additionally DISCARD the whole
+ * stroke on `onMouseLeave`, which meant any drag that crossed the edge silently
+ * threw the user's work away — no commit, no message, nothing on the canvas.
+ * Ending on the window instead is what every paint tool does, and it leaves
+ * Escape (useEscapeCancel) as the ONE deliberate cancel.
  *
  * `endStroke` must be idempotent — the canvas's own onMouseUp may fire first.
+ *
+ * ONE CALLER TODAY: ChunkTab. BlockTab commits per click rather than per drag
+ * and only borrows the latest-ref idiom (see its note); the Tile tab's release
+ * is PixelViewport's pointer capture, which needs no window listener. Kept
+ * shared because the two hand-rolled tabs remain a pair and either could grow a
+ * drag back.
  */
 export function useWindowStrokeEnd(endStroke: () => void): void {
   const latest = React.useRef(endStroke);

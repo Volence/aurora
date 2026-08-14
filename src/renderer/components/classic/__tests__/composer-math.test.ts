@@ -1,9 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-  cellIndexAt, canvasLocalPoint, canvasCellIndexAt, type CanvasGeom,
-  readTilePixels, packTilePixels, floodFillTile,
-} from '../composer-math';
-import { bufferToTileBytes } from '../../../../core/art/classic-tile-buffer';
+import { cellIndexAt, canvasLocalPoint, canvasCellIndexAt, type CanvasGeom } from '../composer-math';
 
 describe('cellIndexAt', () => {
   it('maps coords to a row-major index in a 16x16 chunk grid', () => {
@@ -39,15 +35,20 @@ describe('cellIndexAt', () => {
   });
 });
 
-// Regression: the composer canvases carry a 1px border (styles.gridCanvas), and
-// getBoundingClientRect() reports the BORDER box while canvas drawing coords
-// start at the CONTENT box. All three tabs used to hit-test with a bare
+// Regression: the chunk/block canvases carry a 1px border (styles.gridCanvas),
+// and getBoundingClientRect() reports the BORDER box while canvas drawing coords
+// start at the CONTENT box. Every composer tab used to hit-test with a bare
 // `clientX - rect.left`, so every read was one CSS px right/down of the cursor —
 // the tile drawn sat off from the crosshair. These pin the corrected mapping.
 //
-// The Tile tab's real geometry: an 8x8 grid at PX=26 → a 208px backing store,
-// rendered 1:1, inside a 1px border, positioned at viewport (100, 50). So the
-// canvas's drawing-space origin is at client (101, 51).
+// THIS FIXTURE IS SYNTHETIC, not a live tab's geometry. It replays the Tile
+// tab's RETIRED shape — an 8x8 grid at 26px/pixel → a 208px backing store,
+// rendered 1:1, inside a 1px border, positioned at viewport (100, 50), so the
+// drawing-space origin is client (101, 51). That tab now draws through
+// PixelViewport at `artStore.zoom` and never calls this module (H1.3/H1.6); the
+// numbers are kept only because they exercise the mapping at a cell size that
+// divides the canvas evenly, which the live callers (chunk 20px/320, block
+// 64px/128) also do. Nothing here needs updating when a tab's px changes.
 const TILE_GEOM: CanvasGeom = {
   left: 100, top: 50,
   borderLeft: 1, borderTop: 1,
@@ -109,108 +110,5 @@ describe('canvasCellIndexAt (the composer tabs\' hit-test)', () => {
     expect(at(101 + 208, 51)).toBeNull();    // past the right edge
     expect(at(101, 51 + 208)).toBeNull();    // past the bottom edge
     expect(at(0, 0)).toBeNull();             // far outside
-  });
-});
-
-describe('readTilePixels / packTilePixels (4bpp nibble packing)', () => {
-  it('reads the HIGH nibble as the LEFT (even-x) pixel', () => {
-    // One tile, first byte 0x1F → left pixel = 1 (high nibble), right pixel = F.
-    const tiles = new Uint8Array(32);
-    tiles[0] = 0x1f;
-    const px = readTilePixels(tiles, 0);
-    expect(px[0]).toBe(0x1); // even x → high nibble
-    expect(px[1]).toBe(0xf); // odd x  → low nibble
-  });
-
-  it('pins a known byte pattern across a full row', () => {
-    // Row 0 bytes 0x12 0x34 0x56 0x78 → pixels 1 2 3 4 5 6 7 8.
-    const tiles = new Uint8Array(32);
-    tiles.set([0x12, 0x34, 0x56, 0x78], 0);
-    const px = readTilePixels(tiles, 0);
-    expect(Array.from(px.slice(0, 8))).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
-  });
-
-  it('packTilePixels is the exact inverse of readTilePixels (round-trip)', () => {
-    const tiles = new Uint8Array(64);
-    for (let i = 0; i < 64; i++) tiles[i] = (i * 37) & 0xff; // two tiles of varied bytes
-    for (const t of [0, 1]) {
-      const px = readTilePixels(tiles, t);
-      const bytes = packTilePixels(px);
-      expect(Array.from(bytes)).toEqual(Array.from(tiles.slice(t * 32, t * 32 + 32)));
-    }
-  });
-
-  it('round-trips an arbitrary pixel array back to itself', () => {
-    const px = new Uint8Array(64);
-    for (let i = 0; i < 64; i++) px[i] = (i * 7) & 0xf;
-    const bytes = packTilePixels(px);
-    const back = readTilePixels(bytes, 0);
-    expect(Array.from(back)).toEqual(Array.from(px));
-  });
-
-  it('returns all-zero pixels for an out-of-range tile index (no throw)', () => {
-    const tiles = new Uint8Array(32);
-    expect(Array.from(readTilePixels(tiles, 5))).toEqual(Array(64).fill(0));
-  });
-
-  // Moved here from src/core/art/__tests__/classic-tile-buffer.test.ts, which was
-  // the only test under src/core/art importing from src/renderer. The contract it
-  // pins is a RENDERER-side one — that composer-math still re-exports the core
-  // packer — so it belongs on this side of the layer, and core stays testable in
-  // isolation.
-  //
-  // The import above must keep coming from '../composer-math' (the re-export),
-  // NOT from core: sourcing both symbols from one module would reduce this to
-  // f(x) === f(x), which cannot fail. As written it fails if the re-export is
-  // dropped or rewired to a different packer — verified by removing it.
-  it('bufferToTileBytes agrees with packTilePixels', () => {
-    const px = new Uint8Array(64);
-    for (let i = 0; i < 64; i++) px[i] = i & 0x0f;
-    const b = { width: 8, height: 8, data: px };
-    expect(Array.from(bufferToTileBytes(b))).toEqual(Array.from(packTilePixels(px)));
-  });
-});
-
-describe('floodFillTile', () => {
-  const grid = () => new Uint8Array(64); // all color 0
-
-  it('fills the whole tile when it is one region', () => {
-    const fill = floodFillTile(grid(), 0, 5);
-    expect(fill.size).toBe(64);
-    expect([...fill.values()].every((c) => c === 5)).toBe(true);
-  });
-
-  it('stops at a color boundary (fills only the connected region)', () => {
-    const px = grid();
-    for (let y = 0; y < 8; y++) px[y * 8 + 3] = 9; // vertical wall at x=3
-    const fill = floodFillTile(px, 0, 5); // left of the wall
-    expect(fill.size).toBe(24); // 3 columns x 8 rows
-    expect(fill.has(4)).toBe(false); // right of the wall untouched
-    expect(fill.has(3)).toBe(false); // the wall itself untouched
-  });
-
-  it('is 4-connected — diagonals do not leak', () => {
-    // Checkerboard of 0/1: from a 0 pixel, only that single pixel matches
-    // 4-connected (all orthogonal neighbors are 1s).
-    const px = grid();
-    for (let i = 0; i < 64; i++) px[i] = (((i % 8) + ((i / 8) | 0)) & 1) as 0 | 1;
-    const fill = floodFillTile(px, 0, 5);
-    expect(fill.size).toBe(1);
-  });
-
-  it('returns an empty map when the region already has the fill color (no-op, no undo step)', () => {
-    const px = grid();
-    expect(floodFillTile(px, 10, 0).size).toBe(0);
-  });
-
-  it('returns an empty map for out-of-range starts and wrong-size buffers', () => {
-    expect(floodFillTile(grid(), -1, 5).size).toBe(0);
-    expect(floodFillTile(grid(), 64, 5).size).toBe(0);
-    expect(floodFillTile(new Uint8Array(32), 0, 5).size).toBe(0);
-  });
-
-  it('masks the fill color to 4 bits', () => {
-    const fill = floodFillTile(grid(), 0, 0x15);
-    expect(fill.get(0)).toBe(5);
   });
 });
