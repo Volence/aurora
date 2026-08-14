@@ -18,14 +18,23 @@
 // (core/project/s1/index.ts).
 //
 // ---------------------------------------------------------------------------
-// KNOWN CHROME GAPS — ALL FIVE ARE NOW ON SCREEN (task 9 flipped the shell)
+// KNOWN CHROME GAPS — 1-3 OPEN, 4 AND 5 CLOSED AT TASK 9
 // ---------------------------------------------------------------------------
-// None is fixed here, because all five are step-H shaped: they are about how
-// classic's composer becomes a first-class canvas, which is the piece the spec
-// flags as the hardest and possibly not fully shareable. Recorded together so
-// whoever takes step H reads one list instead of rediscovering them one screen
-// at a time. All five are confined to the ART and PALETTE facets — the two map
-// facets took the flip with full chrome (dock, options, status bar, panels).
+// All of these became visible when task 9 flipped the shell, and all are
+// confined to the ART and PALETTE facets — the two map facets took the flip with
+// full chrome (dock, options, status bar, panels).
+//
+// 1-3 STAY OPEN for step H: each is about how classic's composer becomes a
+// first-class canvas, which the spec flags as the hardest piece and possibly not
+// fully shareable. Recorded together so whoever takes step H reads one list
+// instead of rediscovering them one screen at a time.
+//
+// 4 AND 5 WERE FIXED AT TASK 9, because neither is really about the redesign.
+// 5 was a workflow that came out of the re-home SLOWER than the shell it
+// replaced, which is a regression rather than unfinished work; 4 was a blank
+// window that read as a crash. Both fixes are recorded at their sites below
+// (ClassicArtPanels and ClassicComposerCanvas) and kept here so the numbering
+// still matches anything that cites this list.
 //
 //  1. **No status bar on art/palette.** The slot is empty, so the bottom of the
 //     screen goes blank when you leave a map facet. Giving them the map bar
@@ -43,18 +52,18 @@
 //     stray rule above it and a large empty region below. ClassicComposerCanvas
 //     below fixes only the flex sizing — the rest is the dock's own styling and
 //     belongs to whoever redesigns it.
-//  4. **Both classic surfaces render nothing before an act loads.** ClassicComposerDock
-//     and ClassicPalettePanel each `return null` when the doc is not ready. As a
-//     bottom strip that was an absent strip; as the whole canvas it is a blank
-//     screen with no explanation. An empty state is wanted here.
-//  5. **The art facet has no chunk picker, so picking WHICH chunk to edit means
-//     a trip to Layout.** `selectedChunkId` is one piece of state serving two
-//     jobs — the map's stamp and the composer's Chunk tab — and task 7 put its
-//     one selector in the Layout panel. In the legacy shell both were on screen
-//     at once, so this was free. Aeon has the same section in both places
-//     (`map.palette` and `art.chunks`, one ChunkLibrary); classic could simply
-//     mount ChunkPicker in ClassicArtPanels too, but choosing that is choosing
-//     what classic's art facet IS, which is step H's call and not this one's.
+//  4. FIXED (task 9). **The composer rendered nothing before an act loaded.**
+//     ClassicComposerDock `return null`s until the doc is ready — an absent
+//     bottom strip before, a blank window as the canvas. ClassicComposerCanvas
+//     now carries the same three-state empty message the map viewport does.
+//     ClassicPalettePanel still `return null`s, but it sits in a titled
+//     CollapsibleSection, so it reads as an empty section rather than a blank
+//     screen; left alone.
+//  5. FIXED (task 9). **The art facet had no chunk picker**, so picking WHICH
+//     chunk to edit meant a trip to Layout — slower than the legacy shell, where
+//     the picker sat under the composer. ChunkPicker is now mounted in
+//     ClassicArtPanels as well, under `classic.artChunks`; the argument is at
+//     that function.
 
 import React from 'react';
 import ClassicLevelViewport from '../../components/classic/ClassicLevelViewport';
@@ -66,7 +75,8 @@ import ClassicObjectList from '../../components/classic/ClassicObjectList';
 import ChunkPicker from '../../components/classic/ChunkPicker';
 import MapStatusBar from '../../components/shared/MapStatusBar';
 import { useClassicMapStatusPort } from '../../providers/map-status-classic';
-import { Panel, CollapsibleSection } from '../../components/ui';
+import { useClassicLevelStore } from '../../state/classicLevelStore';
+import { Panel, CollapsibleSection, StatusBar, T } from '../../components/ui';
 import { mapFacet, type FacetModule } from '../facet-registry';
 
 /** The neutral status bar bound to CLASSIC's port. The aeon default baked into
@@ -78,88 +88,166 @@ function ClassicMapStatusBar(): React.ReactElement {
 }
 
 /**
+ * The composer facets' status bar (gap 1, closed at task 9).
+ *
+ * NOT the map's. MapStatusBar speaks the LEVEL tool vocabulary and carries a zoom
+ * control bound to viewStore.zoom, which the composer never reads — mounting it
+ * here would put a row of controls under the composer that visibly do nothing,
+ * which is worse than the blank slot it replaces. So this reports and does not
+ * act: the open act on the left, the ART POOL SIZES on the right.
+ *
+ * The pools are the composer's actual subject — tiles, blocks and chunks are the
+ * three things its three tabs edit — and they are NOT what the breadcrumb in the
+ * dock header says. That says which ONE of each is selected; this says how many
+ * there are. Repeating the breadcrumb down here is the duplication
+ * map-status-classic already refused for the stamp hint.
+ *
+ * `doc.tiles` is a raw byte buffer at 32 bytes per 8x8 4bpp tile — the same
+ * arithmetic ClassicComposerDock does to clamp its tile selection.
+ */
+function ClassicComposerStatusBar(): React.ReactElement {
+  const ref = useClassicLevelStore((s) => s.ref);
+  const doc = useClassicLevelStore((s) => s.doc);
+  const left = (
+    <span style={{ color: T.textBase }}>
+      <span style={{ color: T.accent, fontWeight: 600 }}>S1</span>
+      {ref ? ` · ${ref.label}` : ''}
+    </span>
+  );
+  const right = doc ? (
+    <span>
+      {Math.floor(doc.tiles.length / 32)} tiles · {doc.blocks.length} blocks · {doc.chunks.length} chunks
+    </span>
+  ) : null;
+  return <StatusBar left={left} right={right} />;
+}
+
+/**
  * The classic composer as a canvas. The fill wrapper is layout, not decoration:
  * the shell's canvas slot is a ROW flex container, and the dock's own style is
- * `flexShrink: 0` in a column — written for the bottom strip it currently lives
- * in — so dropped in bare it would size to its content's width and leave the
- * rest of the canvas blank. A column that grows gives it the same footing
- * MapViewport and ComposerCanvas get.
+ * `flexShrink: 0` in a column — written for the bottom strip it used to live in
+ * — so dropped in bare it would size to its content's width and leave the rest
+ * of the canvas blank. A column that grows gives it the same footing MapViewport
+ * and ComposerCanvas get.
  *
  * `overflow: auto` because the dock is as tall as its open tab needs; the map
  * canvases scroll their own content, this one does not.
+ *
+ * THE EMPTY STATE IS THIS COMPONENT'S JOB, not the dock's (gap 4, closed at task
+ * 9). ClassicComposerDock returns null until the doc is ready, which as a bottom
+ * strip was an absent strip — fine — but as the whole canvas was a blank window
+ * under a facet bar, with the map facet's own empty state next door making it
+ * read as a crash rather than as nothing-open-yet. The three branches and their
+ * wording mirror ClassicLevelViewport's deliberately: it is the same three
+ * states of the same store, and the user should not have to learn that the two
+ * screens describe them differently.
+ *
+ * The store reads sit HERE rather than in the panel column above — the leaf rule
+ * (see ClassicObjectInspector's docblock). `status` and `doc` are exactly what
+ * the dock itself subscribes to, so this adds no new churn.
  */
 function ClassicComposerCanvas(): React.ReactElement {
+  const status = useClassicLevelStore((s) => s.status);
+  const doc = useClassicLevelStore((s) => s.doc);
+  const ref = useClassicLevelStore((s) => s.ref);
+  const error = useClassicLevelStore((s) => s.error);
+  const ready = status === 'ready' && doc !== null;
   return (
     <div style={styles.canvasFill}>
-      <ClassicComposerDock />
+      {ready ? (
+        <ClassicComposerDock />
+      ) : (
+        <div style={{ ...styles.empty, color: status === 'error' ? T.error : T.textLo }}>
+          {status === 'loading' && `Loading ${ref?.label ?? 'level'}…`}
+          {status === 'error' && (
+            <span style={{ whiteSpace: 'pre-line' }}>{error ?? 'Failed to load level'}</span>
+          )}
+          {status === 'idle' && 'Open a level from the Explorer, or press Ctrl+K.'}
+        </div>
+      )}
     </div>
   );
 }
 
 /**
- * The right-hand column for both map facets. `chunks` is the ONE delta between
- * them: the chunk picker is layout's, matching aeon, whose ChunkLibrary sits in
- * the same slot of the same column (facets/layout-facet.tsx). Everything below it
- * is shared — classic has ONE object surface, and the inspector plus the library
- * are what it puts beside the map on either facet.
+ * LAYOUT's right-hand column: the chunk picker, and nothing else.
+ *
+ * ---------------------------------------------------------------------------
+ * WHY THE OBJECT LIST AND INSPECTOR ARE NOT HERE (task 9)
+ * ---------------------------------------------------------------------------
+ * They were, until Objects turned out to be a strict SUBSET of Layout: classic's
+ * `facetTools.layout` still carried `place-object`, and this column carried the
+ * list and the inspector, so there was no task you could do in the Objects facet
+ * that you could not do in Layout — which makes the pill dead weight.
+ *
+ * The root cause was a declaration that predicted its own staleness. The s1
+ * manifest's comment said layout carried all four tools "until the workspace
+ * re-home splits it into per-facet docks"; the re-home landed and the
+ * declaration did not move with it. It has now: layout is
+ * `view / stamp-chunk / select` (core/project/s1/index.ts), matching aeon's
+ * split, where layout is TERRAIN and objects owns PLACEMENT. You still see
+ * objects while editing terrain — that is the View menu's Objects overlay.
+ *
+ * `select` stays on layout, as it does on aeon's, so an object can be nudged or
+ * deleted without leaving terrain work. KNOWN CONSEQUENCE, flagged rather than
+ * papered over: aeon's layout pairs `select` with a read-only Properties readout
+ * (`AeonPropertiesPanel showObjectSelection`), and classic has no equivalent —
+ * providers/properties-classic.ts exists precisely to say classic has no
+ * properties to show. So a selection made on classic's Layout shows in the
+ * CANVAS (the viewport draws the highlight) but has no panel readout. That is a
+ * step-H question — what classic's properties surface is — not one to answer by
+ * putting the whole inspector back and recreating the subset.
  *
  * Every section mounts a LEAF that resolves its own port, never a port hook in
  * this column — see the wrappers' docblocks and ChunkLibrary.tsx:12-15.
  *
  * ---------------------------------------------------------------------------
- * THREE DECISIONS THIS SECTION MAKES (stage-4 plan 5, task 7)
+ * TWO DECISIONS THE CHUNK SECTION MAKES (stage-4 plan 5, task 7)
  * ---------------------------------------------------------------------------
- * **1. `layout: 'panel'`, not the bottom strip's `'strip'`.** Classic's thumbs are
- * a fixed 56px, so four fit a row of this 260px column with room to spare; the
- * strip's 148px-capped wall in a column that has the whole window's height would
- * be a worse picker than the one it replaces. The port takes the layout as an
- * argument because it is a fact about the SLOT, not about S1 — see the hook.
- *
- * **2. No visibility gate. Aeon's is `tool === 'stamp-chunk' && !pasting`; this
+ * **1. No visibility gate. Aeon's is `tool === 'stamp-chunk' && !pasting`; this
  * is mounted unconditionally, and the divergence is deliberate.**
  *   - Aeon's gate is a SLOT ARBITER, not a stamp-visibility rule: its Chunks,
  *     Marquee and Paste sections all share the id `map.palette` and are mutually
- *     exclusive contents of one section. Classic's `facetTools.layout` is
- *     `view / stamp-chunk / select / place-object` (core/project/s1/index.ts) —
- *     no marquee, no paste — so there is nothing to arbitrate and the gate would
- *     be pure subtraction.
+ *     exclusive contents of one section. Classic's layout set is
+ *     `view / stamp-chunk / select` — no marquee, no paste — so there is nothing
+ *     to arbitrate and the gate would be pure subtraction.
  *   - Selecting a chunk ARMS the stamp tool (classicLevelStore.selectChunkForStamp
  *     calls editor.setTool('stamp-chunk') when it is not already active), so the
  *     picker is the way INTO stamping. Gating it on stamping is circular: pick
  *     `select`, and the panel that re-arms stamp is the thing that disappears.
- *     (The tool dock's stamp button is still a way back, so this is a detour
- *     rather than a dead end — but it is a detour aeon does not have to take,
- *     because aeon's selection does not arm anything.)
  *   - `selectedChunkId` is not stamp state at all: it is also which chunk the
  *     composer's Chunk tab EDITS (components/classic/ChunkTab.tsx). Hiding the
  *     selector for a map tool would hide an art control.
  *
- * **3. `id="classic.chunks"` — a CONTENT id, classic's convention, not aeon's
+ * **2. `id="classic.chunks"` — a CONTENT id, classic's convention, not aeon's
  * slot-position `map.palette`.** A section id is a key in ONE global panel-state
- * map (shell/panel-state.ts), and the two engines are moving into one shell, so
- * a shared id is shared COLLAPSE STATE ACROSS ENGINES: `map.palette` here would
- * mean collapsing classic's Chunks also collapses aeon's Marquee options, which
- * is not a preference anyone expressed. Aeon's reuse is coherent within aeon
+ * map (shell/panel-state.ts), and the two engines are in one shell, so a shared
+ * id is shared COLLAPSE STATE ACROSS ENGINES: `map.palette` here would mean
+ * collapsing classic's Chunks also collapses aeon's Marquee options, which is
+ * not a preference anyone expressed. Aeon's reuse is coherent within aeon
  * precisely because those three are one section that retitles itself — and even
  * aeon does not carry it across facet FAMILIES (its art facet files the same
- * ChunkLibrary under `art.chunks`). So: engine-scoped prefix, named for the
- * thing, matching the three `classic.*` ids already here rather than making a
- * fourth section redefine them.
- *
- * One consequence of splitting the column in two: the facets no longer share a
- * RightPanel component identity, so switching layout⇄objects now REMOUNTS it and
- * the object list's filter box resets. That is what aeon already does (its two
- * map facets have separate panel components), and the alternative is a column
- * that reads the active facet to decide its own contents.
+ * ChunkLibrary under `art.chunks`).
  */
-function ClassicMapPanels({ chunks }: { chunks?: boolean }): React.ReactElement {
+function ClassicLayoutPanels(): React.ReactElement {
   return (
     <Panel width={260} scroll>
-      {chunks && (
-        <CollapsibleSection id="classic.chunks" title="Chunks">
-          <ChunkPicker />
-        </CollapsibleSection>
-      )}
+      <CollapsibleSection id="classic.chunks" title="Chunks">
+        <ChunkPicker />
+      </CollapsibleSection>
+    </Panel>
+  );
+}
+
+/**
+ * OBJECTS' right-hand column: the inspector and the library, which are now this
+ * facet's alone. Together with `place-object` (the shell default set, which
+ * classic does not override) they are what makes Objects a facet rather than a
+ * second name for Layout.
+ */
+function ClassicObjectsPanels(): React.ReactElement {
+  return (
+    <Panel width={260} scroll>
       <CollapsibleSection id="classic.object" title="Selected Object">
         <ClassicObjectInspector />
       </CollapsibleSection>
@@ -170,21 +258,37 @@ function ClassicMapPanels({ chunks }: { chunks?: boolean }): React.ReactElement 
   );
 }
 
-// Two module-level identities, so each facet's RightPanel is a stable component
-// type rather than a fresh closure per render (which would remount the column on
-// every parent render, not just on a facet switch).
-function ClassicLayoutPanels(): React.ReactElement {
-  return <ClassicMapPanels chunks />;
-}
-
-function ClassicObjectsPanels(): React.ReactElement {
-  return <ClassicMapPanels />;
-}
-
-/** The right-hand column for both art facets. */
+/**
+ * The right-hand column for both art facets.
+ *
+ * THE CHUNK PICKER IS HERE TOO (gap 5, closed at task 9). `selectedChunkId` is
+ * one piece of state doing two jobs — the map's stamp target and the chunk the
+ * composer's Chunk tab EDITS (ChunkTab.tsx) — and task 7 gave it a single home in
+ * the Layout column. In the legacy bottom strip the picker sat under the composer
+ * so both were on screen at once; with one selector in the other facet, choosing
+ * which chunk to edit became Layout → click → Art, which is SLOWER than the shell
+ * being replaced. A re-home that makes a workflow worse than the thing it
+ * replaces is not a re-home, so the picker is mounted in both columns.
+ *
+ * That is also what aeon does: one ChunkLibrary, filed under `map.palette` beside
+ * the map and `art.chunks` beside the composer. So this is not a new decision
+ * about what classic's art facet IS — it is the decision aeon already made,
+ * applied to the engine that needs it more (aeon's composer opens a document; the
+ * classic Chunk tab edits whatever `selectedChunkId` points at, so without a
+ * selector here the facet has no way to change its own subject).
+ *
+ * `classic.artChunks`, not the layout column's `classic.chunks`: section ids key
+ * ONE global panel-state map (shell/panel-state.ts), so a shared id would mean
+ * collapsing the picker beside the composer also collapses it beside the map.
+ * Same reasoning that kept classic off aeon's `map.palette` — engine-scoped
+ * prefix, named for the thing, one id per slot.
+ */
 function ClassicArtPanels(): React.ReactElement {
   return (
     <Panel width={260} scroll>
+      <CollapsibleSection id="classic.artChunks" title="Chunks">
+        <ChunkPicker />
+      </CollapsibleSection>
       <CollapsibleSection id="classic.palette" title="Palette">
         <ClassicPalettePanel />
       </CollapsibleSection>
@@ -219,14 +323,17 @@ export const s1ObjectsFacet: FacetModule = mapFacet('objects', {
 // Written out rather than built with mapFacet: these are NOT map-canvas facets.
 // mapFacet hardcodes `mapOverlays: true` and a MapFacetDock, and both would be
 // wrong here — the composer never reads viewStore.overlays, so a View menu over
-// it is a control that visibly does nothing, and it drives its own tabs rather
-// than editorStore.tool. No StatusBar either: classic's status line reports the
-// open ACT, which the composer is not editing at that granularity, and inventing
-// a composer status bar is new UI this step does not write.
+// it is a control that visibly does nothing, and it drives its own tier tabs
+// rather than editorStore.tool.
+//
+// NO ToolDock ON PURPOSE, and that is now a real absence rather than an empty
+// one: LevelWorkspace passes `undefined` for a missing dock and EditorShell drops
+// the 44px rail instead of drawing a bordered empty column (gap 2).
 const composerFacet = (id: 'art' | 'palette'): FacetModule => ({
   id,
   Canvas: ClassicComposerCanvas,
   RightPanel: ClassicArtPanels,
+  StatusBar: ClassicComposerStatusBar,
 });
 
 export const s1ArtFacet: FacetModule = composerFacet('art');
@@ -234,4 +341,9 @@ export const s1PaletteFacet: FacetModule = composerFacet('palette');
 
 const styles: Record<string, React.CSSProperties> = {
   canvasFill: { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'auto' },
+  // Centred in the canvas the same way ClassicLevelViewport centres its own.
+  empty: {
+    flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
+    fontSize: 13, textAlign: 'center', padding: 24,
+  },
 };

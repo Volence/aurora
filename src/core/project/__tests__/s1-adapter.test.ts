@@ -93,12 +93,14 @@ describe('s1Adapter.open resolution', () => {
         { id: 'block', label: 'Block', pixelSize: 16, shared: true },
         { id: 'tile', label: 'Tile', pixelSize: 8, shared: true },
       ],
-      // Only `layout` is declared: classic's map is one surface with one chip
-      // row, and the shell default for it both offers tools classic cannot
-      // drive and omits place-object. Every other granted facet keeps the
-      // default. See CapabilityManifest.facetTools — declaring REPLACES.
+      // Only `layout` is declared, and only to REMOVE the shell default's
+      // marquee / paint-tile / paint-block, none of which classic implements.
+      // No place-object: that is the Objects facet's, which keeps the shell
+      // default (['place-object','select','view']) — carrying it on layout too
+      // made Objects a strict subset of Layout (task 9). See
+      // CapabilityManifest.facetTools — declaring REPLACES.
       facetTools: {
-        layout: ['view', 'stamp-chunk', 'select', 'place-object'],
+        layout: ['view', 'stamp-chunk', 'select'],
       },
     });
     expect(handle.report.total).toBe(ENTRIES.length);

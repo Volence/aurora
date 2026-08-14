@@ -4,7 +4,17 @@ import { T } from '../components/ui';
 export interface EditorShellProps {
   appBar: React.ReactNode;
   toolOptions?: React.ReactNode;
-  toolDock: React.ReactNode;
+  /**
+   * The 44px tool rail. OPTIONAL, and omitting it removes the rail rather than
+   * emptying it: a facet whose tools live somewhere else (classic's composer
+   * drives its own tier tabs, not editorStore.tool) used to be given a `<span />`
+   * here, which reserved the full 44px and drew a bordered empty column down the
+   * left of the screen — correct as data, broken-looking as chrome.
+   *
+   * No aeon facet is affected: all six supply a dock (five through mapFacet's
+   * MapFacetDock, art through ArtToolDock), so the rail is unchanged there.
+   */
+  toolDock?: React.ReactNode;
   children: React.ReactNode;     // canvas slot
   panels: React.ReactNode;       // right column
   bottomExtra?: React.ReactNode; // e.g. palette strip / sprite timeline, above status bar
@@ -19,9 +29,11 @@ export default function EditorShell(p: EditorShellProps) {
       </div>
       {p.toolOptions != null && p.toolOptions}
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
-        <div style={{ width: 44, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, padding: '6px 0', background: T.void, borderRight: `1px solid ${T.border}`, flexShrink: 0 }}>
-          {p.toolDock}
-        </div>
+        {p.toolDock != null && (
+          <div style={{ width: 44, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, padding: '6px 0', background: T.void, borderRight: `1px solid ${T.border}`, flexShrink: 0 }}>
+            {p.toolDock}
+          </div>
+        )}
         {/* display:flex so a flow child (e.g. MapViewport's flex:1 root) stretches to
             fill; still position:relative so absolute-inset:0 children (Art/Sprite
             canvases) fill it too. Without display:flex, MapViewport collapses to 0 height. */}

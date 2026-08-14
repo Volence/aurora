@@ -156,12 +156,15 @@ export function drawBufferScaled(
 }
 
 export const styles: Record<string, React.CSSProperties> = {
-  dock: { display: 'flex', flexDirection: 'column', borderTop: `1px solid ${T.border}`, background: T.void, flexShrink: 0 },
+  // THE CANVAS, not a bottom strip. Until task 9 this carried `borderTop` (the
+  // rule separating it from the map above) and `flexShrink: 0` (so it kept its
+  // content height in a column that also held the viewport). In the shell's
+  // canvas slot both were wrong: the border read as a stray rule across the top
+  // of the screen, and not growing left the composer a bordered card floating
+  // above two thirds of empty window. `flex: 1` + `minHeight: 0` is what
+  // MapViewport gets in the same slot.
+  dock: { display: 'flex', flexDirection: 'column', background: T.void, flex: 1, minHeight: 0 },
   dockHead: { display: 'flex', alignItems: 'center', gap: 10, padding: '2px 8px', borderBottom: `1px solid ${T.border}` },
-  collapseBtn: {
-    background: 'transparent', border: 'none', color: T.textBase, cursor: 'pointer',
-    fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1, padding: '2px 4px',
-  },
   tabBar: { display: 'flex', gap: 2 },
   tabBtn: {
     background: 'transparent', borderWidth: 1, borderStyle: 'solid', borderColor: 'transparent', color: T.textLo,
@@ -169,7 +172,11 @@ export const styles: Record<string, React.CSSProperties> = {
   },
   tabBtnActive: { background: T.accent, color: T.onAccent, borderColor: T.accent, fontWeight: 600 },
   dockHint: { fontSize: 9, color: T.textFaint },
-  dockContent: { maxHeight: 380, overflowY: 'auto', overflowX: 'auto' },
+  // `maxHeight: 380` was the strip's cap on how much of the window it could take
+  // from the map. As the canvas there is no map to protect, and the cap left a
+  // hard edge with empty space below it — so it grows instead, and scrolls
+  // inside itself when the open tier needs more room than the slot has.
+  dockContent: { flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'auto' },
   tabBody: { display: 'flex', gap: 12, padding: 10, alignItems: 'flex-start' },
   editorCol: { display: 'flex', flexDirection: 'column', gap: 6, flexShrink: 0 },
   paletteCol: { display: 'flex', flexDirection: 'column', gap: 4, minWidth: 220, maxWidth: 360, flex: 1 },

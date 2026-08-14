@@ -189,7 +189,7 @@ const LEVEL_TAB = 'level:ghz:1';
 
 /** The s1 profile's real declaration (core/project/s1/index.ts), as a literal so
  *  a profile edit has to come through here — the style facet-tools.test.ts uses. */
-const S1_LAYOUT_TOOLS = ['view', 'stamp-chunk', 'select', 'place-object'];
+const S1_LAYOUT_TOOLS = ['view', 'stamp-chunk', 'select'];
 
 /** No project open ⇒ toolsForFacet falls to the SHELL defaults. `openClassic`
  *  below is how a test asks for classic's declared sets instead. */
@@ -303,10 +303,9 @@ describe('focusClassicSurface and the shared tool', () => {
   });
 
   it('does not touch the tool when the facet is already served', () => {
-    // `place-object` is the sharp case: it is in classic's DECLARED layout set
-    // but not in the shell default, so a leaked switchFacet('layout') would be
-    // visible either way — kept here, clobbered to 'stamp-chunk' if the profile
-    // declaration were being ignored. Both are wrong; neither may happen.
+    // `place-object` is the sharp case: it belongs to OBJECTS and is absent from
+    // classic's declared layout set, so a leaked switchFacet('layout') would
+    // clamp it away to 'view' — loudly visible. Staying put is the whole point.
     useWorkspaceStore.getState().setFacet(LEVEL_TAB, 'objects');
     useEditorStore.getState().setTool('place-object');
     focusClassicSurface('map');
@@ -315,12 +314,26 @@ describe('focusClassicSurface and the shared tool', () => {
   });
 
   it('re-scopes the tool to CLASSIC\'s declared set on a real surface change', () => {
-    // Coming back to the map from the composer, `place-object` survives — the s1
-    // manifest declares it for layout even though the shell default omits it.
+    // Coming back to the map from the composer lands on LAYOUT, whose declared
+    // set is terrain-only since task 9 — so a resident `place-object` is clamped
+    // to the layout default rather than left armed on a facet with no button for
+    // it. (Before task 9 classic's layout declared place-object and this
+    // asserted it survived; the split is what changed the right answer.)
     useWorkspaceStore.getState().setFacet(LEVEL_TAB, 'art');
     useEditorStore.getState().setTool('place-object');
     focusClassicSurface('map');
     expect(facet()).toBe('layout');
+    expect(tool()).toBe('view');
+  });
+
+  it('but a placement survives when the map claim lands on OBJECTS', () => {
+    // The mirror of the case above, and the reason the clamp is not a loss:
+    // Objects is where place-object lives, so working there and clicking the map
+    // keeps the armed tool.
+    useWorkspaceStore.getState().setFacet(LEVEL_TAB, 'objects');
+    useEditorStore.getState().setTool('place-object');
+    focusClassicSurface('map');
+    expect(facet()).toBe('objects');
     expect(tool()).toBe('place-object');
   });
 

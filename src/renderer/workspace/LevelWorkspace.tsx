@@ -147,7 +147,7 @@ export default function LevelWorkspace() {
   // tab would be the only exit.
   if (!mod) {
     return (
-      <EditorShell appBar={header} toolDock={<span />} panels={<span />}>
+      <EditorShell appBar={header} panels={<span />}>
         <FacetUnavailable engine={engine} facetId={facetId} />
       </EditorShell>
     );
@@ -158,7 +158,10 @@ export default function LevelWorkspace() {
     <EditorShell
       appBar={header}
       toolOptions={ToolOptions ? <ToolOptions /> : undefined}
-      toolDock={ToolDock ? <ToolDock /> : <span />}
+      // `undefined`, not `<span />`: EditorShell drops the 44px rail entirely
+      // when a facet has no dock, rather than drawing an empty column. Classic's
+      // composer facets are the only ones this reaches.
+      toolDock={ToolDock ? <ToolDock /> : undefined}
       panels={RightPanel ? <RightPanel /> : <span />}
       bottomExtra={BottomExtra ? <BottomExtra /> : undefined}
       status={StatusBar ? <StatusBar /> : undefined}

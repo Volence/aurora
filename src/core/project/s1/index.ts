@@ -362,15 +362,24 @@ export const s1Adapter: ProjectAdapter = {
           { id: 'block', label: 'Block', pixelSize: 16, shared: true },
           { id: 'tile', label: 'Tile', pixelSize: 8, shared: true },
         ],
-        // Classic's map is ONE surface with one chip row until the workspace
-        // re-home splits it into per-facet docks, so `layout` carries all four
-        // tools that surface can drive. The shell default is wrong for classic
-        // in both directions: it offers marquee / paint-tile / paint-block,
-        // none of which classic implements, and omits place-object, which is
-        // classic's armed placement (spec §3.6). Only `layout` is declared —
-        // every other granted facet's default set is already right.
+        // `layout` is declared because the SHELL default offers marquee /
+        // paint-tile / paint-block, none of which classic implements. It is
+        // otherwise the same shape as aeon's: terrain tools plus `select`, and
+        // NO `place-object`.
+        //
+        // This used to carry place-object as well, with a comment saying it did
+        // so "until the workspace re-home splits it into per-facet docks". The
+        // re-home landed at task 9 and the declaration did not move with it,
+        // which left Objects a strict SUBSET of Layout — placement, the object
+        // list and the inspector were all on both, so there was nothing you
+        // could do in Objects that you could not do in Layout, and the pill was
+        // dead weight. Placement is the Objects facet's job; you still SEE
+        // objects while editing terrain, through the View menu's Objects overlay.
+        //
+        // `objects` stays undeclared on purpose: the shell default is
+        // ['place-object', 'select', 'view'], and classic implements all three.
         facetTools: {
-          layout: ['view', 'stamp-chunk', 'select', 'place-object'],
+          layout: ['view', 'stamp-chunk', 'select'],
         },
       },
       report,

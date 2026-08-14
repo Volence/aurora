@@ -203,7 +203,7 @@ describe('registerS1FacetModules registers every facet the s1 profile grants', (
 // The facet columns are .tsx and never rendered by the suite, so WHAT is in them
 // can only be checked at the source level. Comments are stripped first, so the
 // long rationale docblock in that file cannot satisfy any of these.
-describe('the s1 layout column mounts the chunk picker', () => {
+describe('the s1 columns mount the chunk picker', () => {
   const source = readFileSync(join(__dirname, '..', 'facets', 's1-facets.tsx'), 'utf8')
     .replace(/\/\*[\s\S]*?\*\//g, '')
     .replace(/(^|[^:])\/\/.*$/gm, '$1');
@@ -223,6 +223,21 @@ describe('the s1 layout column mounts the chunk picker', () => {
     // make collapsing classic's Chunks collapse aeon's Marquee options too.
     expect(source).toContain('id="classic.chunks"');
     expect(source).not.toMatch(/id="map\./);
+  });
+
+  it('mounts it in BOTH columns, under DISTINCT section ids', () => {
+    // The picker sits beside the map (its stamp target) and beside the composer
+    // (the chunk the Chunk tab edits) — one selection, two jobs, so one mount is
+    // a trip to the other facet every time you change subject (task 9, gap 5).
+    const mounts = source.match(/<ChunkPicker \/>/g) ?? [];
+    expect(mounts).toHaveLength(2);
+    // Distinctness is the whole point of having two ids: panel-state is ONE
+    // global map, so a shared id would make collapsing the picker beside the
+    // composer also collapse it beside the map — the same leak that kept classic
+    // off aeon's `map.palette`.
+    expect(source).toContain('id="classic.artChunks"');
+    const ids = source.match(/id="classic\.[A-Za-z]+"/g) ?? [];
+    expect(new Set(ids).size).toBe(ids.length);
   });
 
   it('mounts it unconditionally — no `tool === stamp-chunk` gate', () => {

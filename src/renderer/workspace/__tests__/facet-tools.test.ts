@@ -9,7 +9,7 @@ import { useClassicProjectStore } from '../../state/classicProjectStore';
 
 /** The s1 profile's real declaration (core/project/s1/index.ts), as a literal so
  *  a profile edit has to come through here — same style as the adapter tests. */
-const S1_LAYOUT_TOOLS = ['view', 'stamp-chunk', 'select', 'place-object'];
+const S1_LAYOUT_TOOLS = ['view', 'stamp-chunk', 'select'];
 
 function closeProjects() {
   useClassicProjectStore.setState({ status: 'closed', capabilities: null } as never);
@@ -54,9 +54,13 @@ describe('facet tool sets', () => {
 
 // The profile seam (spec §3.6): a profile declares the tools its facets offer,
 // and that declaration REPLACES the shell default rather than intersecting it.
-// The intersect rule the spec's prose asked for would delete `place-object`
-// from classic's layout — the one tool the declaration exists to add — so these
-// cases are the guard on that direction, not just on the plumbing.
+//
+// The worked example used to be classic's layout carrying `place-object`, which
+// an intersection would have deleted. Task 9 removed it — it made Objects a
+// strict subset of Layout — so s1's real declaration is now a SUBSET of the
+// default and no longer distinguishes replace from intersect on its own. The
+// guard is kept with a SYNTHETIC declaration below, because the seam is still
+// the thing that would break silently.
 describe('toolsForFacet — profile declaration over shell default', () => {
   afterEach(closeProjects);
 
@@ -71,13 +75,25 @@ describe('toolsForFacet — profile declaration over shell default', () => {
     expect(toolsForFacet('layout')).toEqual(S1_LAYOUT_TOOLS);
   });
 
-  it('keeps place-object, which an intersection with the default would drop', () => {
-    // The regression this whole seam exists to prevent: the shell's default
-    // layout set has no place-object, so intersecting would leave classic's map
-    // unable to arm a placement at all.
+  it('keeps a declared tool the shell default does NOT have (replace, not intersect)', () => {
+    // Synthetic, and deliberately so: no shipping profile currently declares a
+    // tool outside the default, so an intersect regression would pass every
+    // other test in this file. place-object is the right probe because the shell
+    // default for layout genuinely lacks it.
     expect(FACET_TOOLS.layout).not.toContain('place-object');
+    openClassic({ layout: ['view', 'place-object'] });
+    expect(toolsForFacet('layout')).toEqual(['view', 'place-object']);
+  });
+
+  it("s1's real layout declaration drops the tools classic cannot drive", () => {
+    // The direction the declaration is actually used for today: subtracting
+    // marquee / paint-tile / paint-block, which classic has no implementation of.
     openClassic({ layout: S1_LAYOUT_TOOLS });
-    expect(toolsForFacet('layout')).toContain('place-object');
+    for (const t of ['marquee', 'paint-tile', 'paint-block']) {
+      expect(toolsForFacet('layout')).not.toContain(t);
+    }
+    // …and place-object is on OBJECTS, undeclared, straight from the default.
+    expect(toolsForFacet('objects')).toContain('place-object');
   });
 
   it('a declared profile still gets the default for facets it does NOT name', () => {
@@ -106,8 +122,13 @@ describe('toolsForFacet — profile declaration over shell default', () => {
     // implementation for; the declared default (first entry) takes over.
     expect(toolForFacet('layout', 'marquee')).toBe('view');
     expect(toolForFacet('layout', 'paint-block')).toBe('view');
-    // …while a declared tool is still kept across the switch.
-    expect(toolForFacet('layout', 'place-object')).toBe('place-object');
+    // …and place-object, which is now the OBJECTS facet's, is clamped away on a
+    // switch to layout rather than left resident with no button to show it.
+    // This is the exact stranding the clamp exists for, and task 9 created the
+    // case by removing place-object from classic's layout declaration.
+    expect(toolForFacet('layout', 'place-object')).toBe('view');
+    // It survives a switch to the facet that DOES declare it.
+    expect(toolForFacet('objects', 'place-object')).toBe('place-object');
   });
 });
 

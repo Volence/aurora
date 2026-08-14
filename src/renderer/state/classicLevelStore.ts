@@ -164,8 +164,6 @@ interface ClassicLevelState {
   // tabs; UI state, NOT part of an undo snapshot. Out-of-range values after an
   // undo/redo are clamped/cleared by the dock (an added chunk/block can be
   // undone away under a stale selection). ---
-  /** Whether the composer dock is expanded (a workflow preference; persists across acts). */
-  composerOpen: boolean;
   /** Which composer tab is active (persists across acts). */
   composerTab: ComposerTab;
   /** The block id the composer edits / paints (0-based; blocks are 0-based in S1). */
@@ -194,7 +192,6 @@ interface ClassicLevelState {
   setStampLoop: (loop: boolean) => void;
   setSelectedObjectIndex: (index: number | null) => void;
   setArmedObjectId: (id: number | null) => void;
-  setComposerOpen: (open: boolean) => void;
   setComposerTab: (tab: ComposerTab) => void;
   setComposerBlockId: (id: number) => void;
   setComposerTileIndex: (index: number) => void;
@@ -232,7 +229,6 @@ const IDLE = {
   stampLoop: false,
   selectedObjectIndex: null as number | null,
   armedObjectId: null as number | null,
-  composerOpen: false,
   composerTab: 'chunk' as ComposerTab,
   composerBlockId: 0,
   composerTileIndex: 0,
@@ -364,7 +360,6 @@ export const useClassicLevelStore = create<ClassicLevelState>((set, get) => ({
   setArmedObjectId: (id: number | null) =>
     set(id === null ? { armedObjectId: null } : { armedObjectId: id, selectedObjectIndex: null }),
 
-  setComposerOpen: (open: boolean) => set({ composerOpen: open }),
   setComposerTab: (tab: ComposerTab) => set({ composerTab: tab }),
   setComposerBlockId: (id: number) => {
     if (Number.isInteger(id) && id >= 0) set({ composerBlockId: id });
