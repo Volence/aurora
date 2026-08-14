@@ -15,10 +15,19 @@
 // colind); `map` covers the act's layout (fg/bg/objects/start).
 //
 // It writes workspaceStore.setFacet directly rather than going through
-// facet-tools.switchFacet: switchFacet additionally re-scopes the AEON tool
-// (editorStore.tool) to the facet's tool set, and classic runs its own tool
-// system (classicLevelStore.tool) — so switchFacet here would mutate an unrelated
-// store's tool on every click in the classic view.
+// facet-tools.switchFacet. This comment used to justify that by claiming "classic
+// runs its own tool system (classicLevelStore.tool)". THAT IS FALSE and has been
+// since the two tool vocabularies were deliberately merged: classicLevelStore has
+// no `tool` state at all (its one setTool reference writes to editorStore),
+// ClassicLevelViewport reads editorStore.tool/setTool exactly as aeon does, and
+// toolsForFacet already resolves each engine's button set from the OPEN profile's
+// `facetTools` — switchFacet's re-scope is engine-safe for the same reason (see
+// toolForFacet's docblock). The stale claim sent two separate agents down the
+// wrong path, so it is corrected here rather than left for the task that owns
+// the call site.
+//
+// The direct setFacet therefore has no engine-level justification left; it is
+// simply not yet migrated. Moving it to switchFacet is deferred to its own task.
 //
 // Some panels are deliberately NOT surfaces: the chunk picker and the zone/act
 // tree only change selections, and the picker's selection feeds BOTH the map's
