@@ -380,9 +380,14 @@ export default function ComposerCanvas() {
     }
   }, []);
 
-  // Cursor-anchored wheel zoom (the doc point under the cursor stays put).
+  // Cursor-anchored wheel zoom (the doc point under the cursor stays put). The
+  // canvas ref is not optional decoration: `styles.holder` pads by 24 and centres
+  // (`margin: auto`) whatever is smaller than the viewport, so the canvas's origin
+  // is 24..(24 + half the slack) into the scrolled content and the anchor has to
+  // be measured off the canvas itself — see use-anchored-zoom's docblock.
   const scrollerRef = useRef<HTMLDivElement>(null);
-  useAnchoredZoom(scrollerRef, effectiveZoom, () => useArtStore.getState().zoom, (z) => useArtStore.getState().setZoom(z));
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  useAnchoredZoom(scrollerRef, canvasRef, effectiveZoom, () => useArtStore.getState().zoom, (z) => useArtStore.getState().setZoom(z));
   useHandPan(scrollerRef);
 
   // Tile-space tools (stamp/collision) are tile-space by nature — route them to
@@ -674,6 +679,7 @@ export default function ComposerCanvas() {
       <div ref={scrollerRef} style={styles.scroller}>
       <div style={styles.holder}>
         <PixelViewport
+          canvasRef={canvasRef}
           buffer={buffer}
           palette={paletteLines[0]}
           paletteLines={paletteLines}

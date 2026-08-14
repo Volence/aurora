@@ -20,7 +20,14 @@ export interface OverlayRect { x: number; y: number; w: number; h: number; }
  * commits results via setBuffer/setSelection. Replaces the old standalone SpriteCanvas;
  * all drawing logic + rendering now live in the shared core.
  */
-export default function SpriteCanvasHost({ overlayRects, hudRef }: { overlayRects?: OverlayRect[]; hudRef?: React.RefObject<PixelHudHandle | null> }) {
+export default function SpriteCanvasHost({ overlayRects, hudRef, canvasRef }: {
+  overlayRects?: OverlayRect[];
+  hudRef?: React.RefObject<PixelHudHandle | null>;
+  /** Handed straight to PixelViewport so SpriteMode's `useAnchoredZoom` can
+   *  measure the anchor off the canvas — `styles.canvasPad` puts it 24px into
+   *  the scrolled content, which is 24/zoom art px of anchor error if ignored. */
+  canvasRef?: React.MutableRefObject<HTMLCanvasElement | null>;
+}) {
   const buffer = useSpriteStore((s) => s.frames[s.currentIndex]);
   const zoom = useSpriteStore((s) => s.zoom);
   const tool = useSpriteStore((s) => s.tool);
@@ -60,6 +67,7 @@ export default function SpriteCanvasHost({ overlayRects, hudRef }: { overlayRect
 
   return (
     <PixelViewport
+      canvasRef={canvasRef}
       buffer={buffer}
       palette={palette}
       zoom={zoom}

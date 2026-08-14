@@ -146,8 +146,16 @@ export default function TileTab({ doc, usage }: { doc: LevelDoc; usage: UsageInd
   // scroll offsets, so they need the overflow:auto box below — not the canvas.
   // `getZoom` reads the store fresh (the wheel handler is bound once) while the
   // capped value is what the post-zoom scroll fix measures against.
+  //
+  // The zoom hook also needs the CANVAS, not just the scroller: it anchors the
+  // art pixel under the cursor, and the canvas sits `padding + centring margin`
+  // into the scrolled content — 6px when the canvas overflows the 240px box, 56
+  // at zoom 16 where an 8x8 tile is only 128px wide and `margin: auto` splits the
+  // slack. Anchoring against the scroller's content origin instead mislocates the
+  // point by K/zoom and drifts by up to ~2.4 art px per notch here.
   const scrollerRef = useRef<HTMLDivElement>(null);
-  useAnchoredZoom(scrollerRef, effectiveZoom, () => useArtStore.getState().zoom, (z) => useArtStore.getState().setZoom(z));
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  useAnchoredZoom(scrollerRef, canvasRef, effectiveZoom, () => useArtStore.getState().zoom, (z) => useArtStore.getState().setZoom(z));
   useHandPan(scrollerRef);
 
   const [selection, setSelection] = useState<Selection | null>(null);
@@ -343,6 +351,7 @@ export default function TileTab({ doc, usage }: { doc: LevelDoc; usage: UsageInd
         <div ref={scrollerRef} style={TILE_SCROLLER}>
           <div style={TILE_HOLDER}>
             <PixelViewport
+              canvasRef={canvasRef}
               buffer={buffer}
               palette={paletteColors}
               zoom={effectiveZoom}

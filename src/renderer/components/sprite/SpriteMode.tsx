@@ -70,10 +70,14 @@ export default function SpriteMode({ appBar }: { appBar: React.ReactNode }) {
   const [busy, setBusy] = useState(false);
   const [newSize, setNewSize] = useState(32);
   const canvasWrapRef = useRef<HTMLDivElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const zoom = useSpriteStore((s) => s.zoom);
   // Cursor-anchored wheel zoom on the sprite canvas (sprite zoom is integer, so
-  // the default 2x step crosses integer boundaries cleanly).
-  useAnchoredZoom(canvasWrapRef, zoom, () => useSpriteStore.getState().zoom, (z) => useSpriteStore.getState().setZoom(z));
+  // the default 2x step crosses integer boundaries cleanly). The canvas ref is
+  // what the anchor is measured against: `styles.canvasPad` inset it by 24px,
+  // which the hook used to ignore (24/zoom art px of drift per notch — 6 whole
+  // pixels going 4x -> 8x).
+  useAnchoredZoom(canvasWrapRef, canvasRef, zoom, () => useSpriteStore.getState().zoom, (z) => useSpriteStore.getState().setZoom(z));
   useHandPan(canvasWrapRef);
   const spriteHudRef = useRef<PixelHudHandle>(null);
 
@@ -346,7 +350,7 @@ export default function SpriteMode({ appBar }: { appBar: React.ReactNode }) {
           wrapper expands to the slot like ArtMode's canvas does. */}
       <div ref={canvasWrapRef} style={styles.canvasWrap}>
         <div style={styles.canvasPad}>
-          <SpriteCanvas overlayRects={overlayRects} hudRef={spriteHudRef} />
+          <SpriteCanvas overlayRects={overlayRects} hudRef={spriteHudRef} canvasRef={canvasRef} />
         </div>
       </div>
       <PixelHud ref={spriteHudRef} />
