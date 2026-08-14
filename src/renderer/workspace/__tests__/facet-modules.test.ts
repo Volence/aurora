@@ -170,7 +170,6 @@ describe('registerS1FacetModules registers every facet the s1 profile grants', (
     // on the TOOL, not the facet — every tool the objects facet offers has a
     // branch in it, including the one that explains a click that did nothing on
     // BG — so withholding it from `objects` would hide it where it helps most.
-    // (Layout's RightPanel is still missing ChunkPicker; that is Task 7.)
     const { registerS1FacetModules, registerAeonFacetModules } = await import('../register-facets');
     registerS1FacetModules();
     const layout = moduleFor('s1', 'layout')?.ToolOptions;
@@ -184,6 +183,53 @@ describe('registerS1FacetModules registers every facet the s1 profile grants', (
     expect(moduleFor('aeon', 'layout')).not.toBeNull();
     expect(moduleFor('aeon', 'layout')?.ToolOptions).toBeUndefined();
     expect(moduleFor('aeon', 'objects')?.ToolOptions).toBeUndefined();
+  });
+
+  it('gives layout its own right panel — the chunk picker is layout-only', async () => {
+    // Task 7. The two map facets share a canvas and a hint line but NOT a panel:
+    // the picker belongs to the facet that stamps, which is where aeon puts its
+    // ChunkLibrary too. Identity, not content, is all a node test can see here —
+    // the source assertions below cover what is actually in the column.
+    const { registerS1FacetModules } = await import('../register-facets');
+    registerS1FacetModules();
+    const layout = moduleFor('s1', 'layout')?.RightPanel;
+    const objects = moduleFor('s1', 'objects')?.RightPanel;
+    expect(layout).toBeTypeOf('function');
+    expect(objects).toBeTypeOf('function');
+    expect(layout).not.toBe(objects);
+  });
+});
+
+// The facet columns are .tsx and never rendered by the suite, so WHAT is in them
+// can only be checked at the source level. Comments are stripped first, so the
+// long rationale docblock in that file cannot satisfy any of these.
+describe('the s1 layout column mounts the chunk picker', () => {
+  const source = readFileSync(join(__dirname, '..', 'facets', 's1-facets.tsx'), 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/(^|[^:])\/\/.*$/gm, '$1');
+
+  it('mounts ChunkPicker with no layout override, taking its panel default', () => {
+    // `layout="strip"` is the legacy bottom dock's business (ClassicProjectView,
+    // deleted at task 9). In a 260px column the strip caps the wall at 148px and
+    // crams the badge, the hint and the loop toggle onto the heading row.
+    expect(source).toContain('<ChunkPicker />');
+    expect(source).not.toMatch(/<ChunkPicker\s+layout/);
+  });
+
+  it('files the section under a classic.* content id, not aeon\'s map.palette', () => {
+    // Section ids are keys in ONE global panel-state map (shell/panel-state.ts),
+    // and both engines are moving into one shell: reusing aeon's slot id would
+    // make collapsing classic's Chunks collapse aeon's Marquee options too.
+    expect(source).toContain('id="classic.chunks"');
+    expect(source).not.toMatch(/id="map\./);
+  });
+
+  it('mounts it unconditionally — no `tool === stamp-chunk` gate', () => {
+    // Aeon's gate arbitrates a shared slot (Chunks / Marquee / Paste, all
+    // `map.palette`); classic grants neither marquee nor paste, and its picker
+    // ARMS the stamp tool, so gating it on stamping is circular. Asserted on the
+    // one identifier that could only appear here to build such a gate.
+    expect(source).not.toContain('stamp-chunk');
   });
 });
 

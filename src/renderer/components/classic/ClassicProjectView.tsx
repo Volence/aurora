@@ -139,7 +139,14 @@ export default function ClassicProjectView({ appBar }: { appBar: React.ReactNode
     <EditorShell
       appBar={appBar}
       toolDock={null}
-      bottomExtra={<><ClassicComposerDock /><ChunkPicker /></>}
+      bottomExtra={
+        // `layout="strip"` is this shell's only remaining claim on the picker.
+        // Its real home is now the s1 Layout facet's right panel (task 7); the
+        // grid's panel styling is `flex: 1`, which down here would take half the
+        // window off the canvas row. Task 9 deletes this file, and the prop with
+        // it.
+        <><ClassicComposerDock /><ChunkPicker layout="strip" /></>
+      }
       status={<StatusBar left={statusLeft} right={statusRight} />}
       panels={
         <Panel width={260} scroll>

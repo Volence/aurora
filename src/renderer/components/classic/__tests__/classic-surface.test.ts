@@ -117,6 +117,26 @@ describe('classic surfaces claim their facet', () => {
     expect(source).toContain(`classicSurfaceProps('${surface}')`);
   });
 
+  it('the chunk picker deliberately claims NOTHING', () => {
+    // The inverse of the test below, and just as deliberate — asserted so the
+    // absence reads as a decision rather than as a claim somebody forgot. One
+    // selection feeds TWO surfaces: the map's stamp tool and the composer's
+    // Chunk tab (ChunkTab.tsx edits `selectedChunkId`). Claiming `map` would
+    // repoint undo at the layout every time the user picked a chunk to EDIT;
+    // claiming `art` would do the mirror-image damage to stamping. So the picker
+    // leaves the facet on whichever surface the user was last working in — see
+    // classic-surface.ts's header.
+    //
+    // Both files, because either could do it: the component through its own root
+    // element, the port through `rootProps` (chunk-grid-model.ts). Moving the
+    // picker into the Layout facet's right panel (stage-4 plan 5, task 7) does
+    // not change the answer — the panel sits BESIDE the composer, so a claim
+    // there steals focus from it.
+    for (const file of ['components/classic/ChunkPicker.tsx', 'providers/chunk-grid-classic.ts']) {
+      expect(code(file), file).not.toContain('classicSurfaceProps');
+    }
+  });
+
   it('the object library arms placements on the layout surface', () => {
     // Not an edit site itself (arming is UI state), but the placement click it
     // sets up lands on the map — so it must not leave undo pointed at the art doc.

@@ -19,7 +19,7 @@
 // property (LayoutGrid), not a chunk-pool one — it never reaches this port.
 
 import React from 'react';
-import type { ChunkEmptyKind, ChunkGridPort } from '../components/shared/chunk-grid-model';
+import type { ChunkEmptyKind, ChunkGridLayout, ChunkGridPort } from '../components/shared/chunk-grid-model';
 import { hexLabel } from '../components/shared/chunk-grid-model';
 import { chunkIndexForId, type LevelDoc } from '../../core/level-classic/model';
 import { renderChunk } from '../../core/level-classic/render';
@@ -29,7 +29,12 @@ import ChunkPickerHeader from '../components/classic/ChunkPickerHeader';
 
 /** Source render resolution for one classic chunk (16x16 blocks of 16px). */
 export const CLASSIC_CHUNK_PX = CHUNK_PX;
-/** The picker is a compact bottom strip: one fixed thumbnail size, no S/M/L. */
+/**
+ * One fixed thumbnail size, no S/M/L — `sizes` with a single entry is what hides
+ * the size control. 56px is small enough that four cells fit a row of the 260px
+ * facet panel, so the panel home needs no new size scale; giving classic aeon's
+ * S/M/L is a separate call nobody has asked for.
+ */
 export const CLASSIC_THUMB = 56;
 
 /** Engine ids in display order: air ($00) then $01..N for the file's chunks. */
@@ -78,8 +83,29 @@ export function rasterizeClassicChunk(doc: LevelDoc, id: string): Uint8ClampedAr
   return renderChunk(doc, n);
 }
 
-/** Null when no act is loaded — the picker renders nothing at all then. */
-export function useClassicChunkGridPort(): ChunkGridPort | null {
+/**
+ * Null when no act is loaded — the picker renders nothing at all then.
+ *
+ * ---------------------------------------------------------------------------
+ * WHY `layout` IS A PARAMETER AND NOT A CONSTANT (stage-4 plan 5, task 7)
+ * ---------------------------------------------------------------------------
+ * Every other field here is an ENGINE fact. `layout` is not: it says how wide
+ * the slot the grid was dropped into is, and classic has two live slots until
+ * the shell flip deletes the legacy one.
+ *
+ *  - `'panel'` — the picker's real home, the s1 LAYOUT facet's 260px right
+ *    column, beside aeon's ChunkLibrary in the same slot of the same shell.
+ *    This is the DEFAULT, so the surviving mount is the one you get for free.
+ *  - `'strip'` — the legacy bottom dock (ClassicProjectView, deleted at task 9),
+ *    which is the only caller that passes it. `containerPanel` is `flex: 1`, so
+ *    a hardcoded `'panel'` would have made the legacy picker fight EditorShell's
+ *    canvas row for half the window height for as long as the two shells
+ *    coexist. **Delete the parameter with that call site.**
+ *
+ * Aeon never had to answer this: both of ITS slots (layout panel, art panel) are
+ * panels, so a constant was enough.
+ */
+export function useClassicChunkGridPort(layout: ChunkGridLayout = 'panel'): ChunkGridPort | null {
   const doc = useClassicLevelStore((s) => s.doc);
   const status = useClassicLevelStore((s) => s.status);
   const chunkVersions = useClassicLevelStore((s) => s.chunkVersions);
@@ -88,6 +114,11 @@ export function useClassicChunkGridPort(): ChunkGridPort | null {
   // Plain left-click select also ARMS the stamp tool (see the store action's doc
   // comment); the viewport's right-click eyedrop calls setSelectedChunkId
   // directly and is untouched by this.
+  //
+  // That force-arm is why classic's picker is mounted UNCONDITIONALLY rather than
+  // behind aeon's `tool === 'stamp-chunk'` gate — the picker is the way INTO
+  // stamping, so gating it on stamping is circular. The full argument is at the
+  // mount site (workspace/facets/s1-facets.tsx).
   const selectChunkForStamp = useClassicLevelStore((s) => s.selectChunkForStamp);
 
   const ready = status === 'ready' && doc !== null;
@@ -101,7 +132,7 @@ export function useClassicChunkGridPort(): ChunkGridPort | null {
       sourcePx: CLASSIC_CHUNK_PX,
       sizes: [CLASSIC_THUMB],
       defaultSize: CLASSIC_THUMB,
-      layout: 'strip',
+      layout,
       selectedId: String(selectedChunkId),
       statusBadge: hexLabel(selectedChunkId),
       statusHint: 'click to select · right-click viewport to eyedrop',
@@ -120,5 +151,5 @@ export function useClassicChunkGridPort(): ChunkGridPort | null {
       emptyKind: classicEmptyKind,
       select: (id) => selectChunkForStamp(Number(id)),
     };
-  }, [ready, doc, ids, selectedChunkId, chunkEpoch, chunkVersions, selectChunkForStamp]);
+  }, [ready, doc, ids, layout, selectedChunkId, chunkEpoch, chunkVersions, selectChunkForStamp]);
 }

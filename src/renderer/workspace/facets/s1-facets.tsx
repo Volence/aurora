@@ -46,6 +46,14 @@
 //     and ClassicPalettePanel each `return null` when the doc is not ready. As a
 //     bottom strip that was an absent strip; as the whole canvas it is a blank
 //     screen with no explanation. An empty state is wanted here.
+//  5. **The art facet has no chunk picker, so picking WHICH chunk to edit means
+//     a trip to Layout.** `selectedChunkId` is one piece of state serving two
+//     jobs — the map's stamp and the composer's Chunk tab — and task 7 put its
+//     one selector in the Layout panel. In the legacy shell both were on screen
+//     at once, so this was free. Aeon has the same section in both places
+//     (`map.palette` and `art.chunks`, one ChunkLibrary); classic could simply
+//     mount ChunkPicker in ClassicArtPanels too, but choosing that is choosing
+//     what classic's art facet IS, which is step H's call and not this one's.
 
 import React from 'react';
 import ClassicLevelViewport from '../../components/classic/ClassicLevelViewport';
@@ -54,6 +62,7 @@ import ClassicComposerDock from '../../components/classic/ClassicComposerDock';
 import ClassicPalettePanel from '../../components/classic/ClassicPalettePanel';
 import ClassicObjectInspector from '../../components/classic/ClassicObjectInspector';
 import ClassicObjectList from '../../components/classic/ClassicObjectList';
+import ChunkPicker from '../../components/classic/ChunkPicker';
 import MapStatusBar from '../../components/shared/MapStatusBar';
 import { useClassicMapStatusPort } from '../../providers/map-status-classic';
 import { Panel, CollapsibleSection } from '../../components/ui';
@@ -87,19 +96,69 @@ function ClassicComposerCanvas(): React.ReactElement {
 }
 
 /**
- * The right-hand column for both map facets. Identical for layout and objects
- * for now — classic has ONE object surface, and the inspector plus the library
- * are what it puts beside the map. The one delta the plan still reserves is Task
- * 7 (layout's ChunkPicker section, which is still mounted by the legacy shell).
- * It is not forward-referenced here — importing a component that does not exist
- * yet does not compile, so this file only ever names what is already written.
+ * The right-hand column for both map facets. `chunks` is the ONE delta between
+ * them: the chunk picker is layout's, matching aeon, whose ChunkLibrary sits in
+ * the same slot of the same column (facets/layout-facet.tsx). Everything below it
+ * is shared — classic has ONE object surface, and the inspector plus the library
+ * are what it puts beside the map on either facet.
  *
- * Both sections mount a LEAF that resolves its own port, never a port hook in
+ * Every section mounts a LEAF that resolves its own port, never a port hook in
  * this column — see the wrappers' docblocks and ChunkLibrary.tsx:12-15.
+ *
+ * ---------------------------------------------------------------------------
+ * THREE DECISIONS THIS SECTION MAKES (stage-4 plan 5, task 7)
+ * ---------------------------------------------------------------------------
+ * **1. `layout: 'panel'`, not the bottom strip's `'strip'`.** Classic's thumbs are
+ * a fixed 56px, so four fit a row of this 260px column with room to spare; the
+ * strip's 148px-capped wall in a column that has the whole window's height would
+ * be a worse picker than the one it replaces. The port takes the layout as an
+ * argument because it is a fact about the SLOT, not about S1 — see the hook.
+ *
+ * **2. No visibility gate. Aeon's is `tool === 'stamp-chunk' && !pasting`; this
+ * is mounted unconditionally, and the divergence is deliberate.**
+ *   - Aeon's gate is a SLOT ARBITER, not a stamp-visibility rule: its Chunks,
+ *     Marquee and Paste sections all share the id `map.palette` and are mutually
+ *     exclusive contents of one section. Classic's `facetTools.layout` is
+ *     `view / stamp-chunk / select / place-object` (core/project/s1/index.ts) —
+ *     no marquee, no paste — so there is nothing to arbitrate and the gate would
+ *     be pure subtraction.
+ *   - Selecting a chunk ARMS the stamp tool (classicLevelStore.selectChunkForStamp
+ *     calls editor.setTool('stamp-chunk') when it is not already active), so the
+ *     picker is the way INTO stamping. Gating it on stamping is circular: pick
+ *     `select`, and the panel that re-arms stamp is the thing that disappears.
+ *     (The tool dock's stamp button is still a way back, so this is a detour
+ *     rather than a dead end — but it is a detour aeon does not have to take,
+ *     because aeon's selection does not arm anything.)
+ *   - `selectedChunkId` is not stamp state at all: it is also which chunk the
+ *     composer's Chunk tab EDITS (components/classic/ChunkTab.tsx). Hiding the
+ *     selector for a map tool would hide an art control.
+ *
+ * **3. `id="classic.chunks"` — a CONTENT id, classic's convention, not aeon's
+ * slot-position `map.palette`.** A section id is a key in ONE global panel-state
+ * map (shell/panel-state.ts), and the two engines are moving into one shell, so
+ * a shared id is shared COLLAPSE STATE ACROSS ENGINES: `map.palette` here would
+ * mean collapsing classic's Chunks also collapses aeon's Marquee options, which
+ * is not a preference anyone expressed. Aeon's reuse is coherent within aeon
+ * precisely because those three are one section that retitles itself — and even
+ * aeon does not carry it across facet FAMILIES (its art facet files the same
+ * ChunkLibrary under `art.chunks`). So: engine-scoped prefix, named for the
+ * thing, matching the three `classic.*` ids already here rather than making a
+ * fourth section redefine them.
+ *
+ * One consequence of splitting the column in two: the facets no longer share a
+ * RightPanel component identity, so switching layout⇄objects now REMOUNTS it and
+ * the object list's filter box resets. That is what aeon already does (its two
+ * map facets have separate panel components), and the alternative is a column
+ * that reads the active facet to decide its own contents.
  */
-function ClassicMapPanels(): React.ReactElement {
+function ClassicMapPanels({ chunks }: { chunks?: boolean }): React.ReactElement {
   return (
     <Panel width={260} scroll>
+      {chunks && (
+        <CollapsibleSection id="classic.chunks" title="Chunks">
+          <ChunkPicker />
+        </CollapsibleSection>
+      )}
       <CollapsibleSection id="classic.object" title="Selected Object">
         <ClassicObjectInspector />
       </CollapsibleSection>
@@ -108,6 +167,17 @@ function ClassicMapPanels(): React.ReactElement {
       </CollapsibleSection>
     </Panel>
   );
+}
+
+// Two module-level identities, so each facet's RightPanel is a stable component
+// type rather than a fresh closure per render (which would remount the column on
+// every parent render, not just on a facet switch).
+function ClassicLayoutPanels(): React.ReactElement {
+  return <ClassicMapPanels chunks />;
+}
+
+function ClassicObjectsPanels(): React.ReactElement {
+  return <ClassicMapPanels />;
 }
 
 /** The right-hand column for both art facets. */
@@ -135,14 +205,14 @@ export const s1LayoutFacet: FacetModule = mapFacet('layout', {
   Canvas: ClassicLevelViewport,
   ToolOptions: ClassicMapToolOptions,
   StatusBar: ClassicMapStatusBar,
-  RightPanel: ClassicMapPanels,
+  RightPanel: ClassicLayoutPanels,
 });
 
 export const s1ObjectsFacet: FacetModule = mapFacet('objects', {
   Canvas: ClassicLevelViewport,
   ToolOptions: ClassicMapToolOptions,
   StatusBar: ClassicMapStatusBar,
-  RightPanel: ClassicMapPanels,
+  RightPanel: ClassicObjectsPanels,
 });
 
 // Written out rather than built with mapFacet: these are NOT map-canvas facets.
