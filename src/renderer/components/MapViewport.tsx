@@ -1054,6 +1054,19 @@ export default function MapViewport() {
     if (tool === 'paint-collision') {
       const info = worldToSectionTile(world.x, world.y);
       if (!info) return;
+      // Claim the section HERE, before painting, not only inside
+      // paintCollisionCell's success path. That call is real (it is the last
+      // line of the function) but it sits behind four early returns — the
+      // same-cell dedupe, the already-that-shape guard, an empty entry list and
+      // a null level — so a click that changed nothing left `activeSectionIndex`
+      // pointing at whatever the last OTHER tool touched.
+      //
+      // That matters because the Collision facet has no SectionGridNav and its
+      // palette carries two WHOLESALE destructive buttons keyed on that index
+      // (CollisionPalette's Reset and Clear), so a Clear could wipe a section
+      // the user was not looking at. Every other tool branch in this handler
+      // claims its section unconditionally; this one now does too.
+      useEditorStore.getState().setActiveSectionIndex(info.sectionIndex);
       lastPaintedCell.current = null;
       paintPropagate.current = e.altKey; // latch the mode for the whole stroke
       paintCollisionCell(info, paintPropagate.current);
