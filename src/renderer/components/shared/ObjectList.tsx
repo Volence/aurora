@@ -72,7 +72,20 @@ export default function ObjectList({
   );
 }
 
-function Row({
+/**
+ * Memoized, and it genuinely bites: every prop below is referentially stable
+ * across a re-render of the enclosing panel column. Both ports build `rows`
+ * (hence each `row`) and `Thumb` under useMemo, `onSelect` is a useCallback with
+ * no deps (aeon) or a module-level function (classic), `secondaryAction` is a
+ * module constant or undefined, and `selected`/`versionKey` are a boolean and a
+ * string. So a re-render driven by something the list does not read — a
+ * live-edit tick during an object drag, a viewport pan — re-runs ObjectList but
+ * skips all ~82 classic rows, each ~5 elements deep.
+ *
+ * No canvas cost either way: the thumbnail is `<Thumb key={versionKey}>`, and
+ * versionKey only changes when the art it draws actually republished.
+ */
+const Row = React.memo(function Row({
   row, selected, onSelect, Thumb, versionKey, secondaryAction,
 }: {
   row: ObjectRow;
@@ -117,7 +130,7 @@ function Row({
       )}
     </div>
   );
-}
+});
 
 const THUMB = 28;
 
