@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useCallback, useState } from 'react';
 import { useViewStore } from '../state/viewStore';
 import { useProjectStore, getCurrentAct, getCurrentZone, getActiveLevel as getStoreActiveLevel } from '../state/projectStore';
-import { useEditorStore, executeCommand, focusedHistory, setCommandInvalidationListener, RING_PATTERNS, type EditorTool } from '../state/editorStore';
+import { useEditorStore, executeCommand, setCommandInvalidationListener, RING_PATTERNS, type EditorTool } from '../state/editorStore';
 import { useAeonHistoryVersion } from '../hooks/useHistoryVersion';
 import { useArtStore } from '../state/artStore';
 import { useSessionStore } from '../state/sessionStore';
@@ -542,16 +542,8 @@ export default function MapViewport() {
       // zone data (set-palette-line / set-tileset-tiles) as well as the act's.
       const level: S4Level | null = getStoreActiveLevel(state);
 
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) {
-        focusedHistory()?.undo();
-        e.preventDefault();
-        return;
-      }
-      if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key.toLowerCase() === 'z' && e.shiftKey))) {
-        focusedHistory()?.redo();
-        e.preventDefault();
-        return;
-      }
+      // Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y are NOT handled here — LevelWorkspace
+      // owns the one level-undo binding for both engines (see its comment).
 
       // Copy the marquee selection to the map clipboard. Works regardless of
       // which tool is active — the marquee tool doesn't need to stay selected

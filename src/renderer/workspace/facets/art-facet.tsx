@@ -10,7 +10,7 @@ import { useArtStore } from '../../state/artStore';
 import { openDocumentGuarded } from '../../components/art/open-document';
 import { createDoc, docFromChunk, sliceForSave } from '../../../core/art/composer-buffer';
 import { useProjectStore, getActiveLevel, getCurrentZone } from '../../state/projectStore';
-import { useEditorStore, focusedHistory, executeCommand } from '../../state/editorStore';
+import { useEditorStore, executeCommand } from '../../state/editorStore';
 import { useAeonHistoryVersion } from '../../hooks/useHistoryVersion';
 import { useToastStore } from '../../state/toastStore';
 import type { ChunkDef } from '../../../core/model/s4-types';
@@ -24,7 +24,6 @@ import PaletteEditor from '../../components/art/PaletteEditor';
 import ChunkLibrary from '../../components/ChunkLibrary';
 import CollisionPalette from '../../components/CollisionPalette';
 import type { FacetModule } from '../facet-registry';
-import { levelKeysEnabled } from '../level-keys';
 
 function slug(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'chunk';
@@ -190,34 +189,13 @@ function ArtCanvas() {
     }
   }, [historyVersion, project]);
 
-  // Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y: MapViewport (which owns the map-mode
-  // handler) is unmounted while in Art mode, so undo/redo must be re-bound
-  // here. focusedHistory() resolves to the ZONE-ART document while this facet is
-  // focused, so art undo is independent of the act's layout timeline.
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      // Keep-alive under a sprite-doc tab: bail so Ctrl+Z doesn't fire both
-      // this hidden level-art undo and SpriteMode's undo (finding 1).
-      if (!levelKeysEnabled()) return;
-      // Skip undo/redo only for text-entry inputs; allow range/checkbox/button/
-      // radio so Ctrl+Z works immediately after a palette slider commit.
-      const target = e.target as HTMLElement;
-      if (target.tagName === 'INPUT'
-          && !['range', 'checkbox', 'button', 'radio'].includes(
-            (target as HTMLInputElement).type)) return;
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) {
-        focusedHistory()?.undo();
-        e.preventDefault();
-        return;
-      }
-      if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key.toLowerCase() === 'z' && e.shiftKey))) {
-        focusedHistory()?.redo();
-        e.preventDefault();
-      }
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, []);
+  // Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y are NOT bound here — LevelWorkspace, which
+  // hosts every facet, owns the one binding (see its comment).
+  // focusedHistory() there still resolves to the ZONE-ART document
+  // while this facet is focused, so art undo stays independent of the act's
+  // layout timeline; its isTypingTarget() guard keeps the same range/checkbox/
+  // button/radio exception this handler had, so Ctrl+Z still works immediately
+  // after a palette slider commit.
 
   // Fill the shell's canvas slot. The slot is a flex item with a definite
   // height but is not itself a flex container, so an absolutely-positioned

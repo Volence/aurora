@@ -14,6 +14,8 @@ import { useOpenEngine, useOpenCapabilities, type OpenEngine } from '../state/op
 import { useSessionStore } from '../state/sessionStore';
 import { useEditorStore, focusedHistory } from '../state/editorStore';
 import { useHistoryVersion } from '../hooks/useHistoryVersion';
+import { levelKeysEnabled } from './level-keys';
+import { isTypingTarget } from '../components/classic/composer-shared';
 import ViewMenu from '../shell/ViewMenu';
 import { Chip, T } from '../components/ui';
 import type { EditingLayer } from '../state/editorStore';
@@ -53,6 +55,35 @@ export default function LevelWorkspace() {
   React.useEffect(() => {
     if (resolved !== null && resolved !== facetId) switchFacet(activeId, resolved);
   }, [activeId, facetId, resolved]);
+
+  // ONE level-undo binding for both engines. It was duplicated per canvas
+  // (MapViewport, art-facet) plus once in the legacy classic shell, which this
+  // branch deletes — its copy was classic's ONLY Ctrl+Z, so it is re-homed here
+  // rather than lost with the file. With classic and aeon under this workspace,
+  // two window bindings would mean one Ctrl+Z undoing twice. SpriteMode keeps
+  // its own — different pane, and levelKeysEnabled() is what keeps this one
+  // inert under a sprite tab. Nothing here is facet-specific: focusedHistory()
+  // resolves the focused document (the act's layout, or the zone-art doc under
+  // an art/palette facet), and returns null on a non-document tab, so this is
+  // exactly as live as the header's Undo/Redo chips above.
+  React.useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!levelKeysEnabled()) return;
+      if (isTypingTarget(e.target as HTMLElement)) return;
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        focusedHistory()?.undo();
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key.toLowerCase() === 'z' && e.shiftKey))) {
+        e.preventDefault();
+        focusedHistory()?.redo();
+        return;
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   // The FG/BG chips write editorStore.setEditingLayer, so they must not be live
   // over a facet that has no editor — any facet an engine grants but does not
