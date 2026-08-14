@@ -101,9 +101,12 @@ import ClassicPalettePanel from '../../components/classic/ClassicPalettePanel';
 import ClassicObjectInspector from '../../components/classic/ClassicObjectInspector';
 import ClassicObjectList from '../../components/classic/ClassicObjectList';
 import ChunkPicker from '../../components/classic/ChunkPicker';
+import ClassicArtToolDock from '../../components/classic/ClassicArtToolDock';
+import ArtToolOptions, { CLASSIC_TILE_CAPS } from '../../shell/ArtToolOptions';
 import MapStatusBar from '../../components/shared/MapStatusBar';
 import { useClassicMapStatusPort } from '../../providers/map-status-classic';
 import { useClassicLevelStore } from '../../state/classicLevelStore';
+import { isClassicPixelTier } from '../level-presence';
 import { Panel, CollapsibleSection, StatusBar, T } from '../../components/ui';
 import { mapFacet, type FacetModule } from '../facet-registry';
 
@@ -367,6 +370,27 @@ function ClassicArtPanels(): React.ReactElement {
   );
 }
 
+/**
+ * The composer's tool-options bar — the SHARED one, on classic's capability set.
+ *
+ * Gated on the tile tier for the same reason ClassicArtToolDock is (read its
+ * header): mirror, dither and pixel-perfect are pixel modifiers, and the Chunk
+ * and Block tiers have no pixels. Drawing the row over them would put three live
+ * controls above a canvas that ignores all three.
+ *
+ * `before` is deliberately not passed. Aeon fills it with a document header —
+ * name, dirty badge, Save — and classic has none of those three: the composer
+ * edits the open ACT through `classicEditTiles`, which is a command on the
+ * classic undo stack, so there is no per-document dirty flag and no Save button
+ * to put there. The act's own save state is the workspace's, and the workspace
+ * header already says it.
+ */
+function ClassicArtOptions(): React.ReactElement | null {
+  const composerTab = useClassicLevelStore((s) => s.composerTab);
+  if (!isClassicPixelTier(composerTab)) return null;
+  return <ArtToolOptions caps={CLASSIC_TILE_CAPS} />;
+}
+
 // mapFacet supplies the engine-neutral MapFacetDock (which resolves classic's
 // button set from the s1 manifest's facetTools.layout via toolsForFacet) and
 // `mapOverlays: true` — right for both of these, since ClassicLevelViewport IS
@@ -440,9 +464,20 @@ export const s1PaletteFacet: FacetModule = mapFacet('palette', {
 // it is a control that visibly does nothing, and it drives its own tier tabs
 // rather than editorStore.tool.
 //
-// NO ToolDock ON PURPOSE, and that is now a real absence rather than an empty
-// one: LevelWorkspace passes `undefined` for a missing dock and EditorShell drops
-// the 44px rail instead of drawing a bordered empty column (gap 2).
+// A ToolDock AND ToolOptions, BOTH OF WHICH DRAW ONLY ON THE TILE TIER. There
+// was no dock here at all until the tile editor moved onto the shared pixel
+// substrate (PixelViewport + PixelEditController), which is also what made the
+// absence a bug rather than a choice: TileTab's own Pencil/Fill chips went away
+// in that move and tool selection became `artStore.tool`, whose only writer was
+// aeon's rail — so classic could draw with whatever tool happened to be armed
+// and could not change it. These two slots are what close that.
+//
+// The gate lives in the two components (ClassicArtToolDock, ClassicArtOptions),
+// not here, because a FacetModule slot is a component reference and the tier is
+// live store state. LevelWorkspace still mounts both; they return null off the
+// tile tier, and EditorShell's rail collapses the same way it did when the slot
+// was genuinely absent — see facet-chrome.ts on why an empty bordered column is
+// worse than no column.
 //
 // ONE COMPOSER FACET, and `palette` is not it. There was a `composerFacet(id)`
 // factory here producing an `art` and a `palette` module that differed in `id`
@@ -454,6 +489,8 @@ export const s1PaletteFacet: FacetModule = mapFacet('palette', {
 export const s1ArtFacet: FacetModule = {
   id: 'art',
   Canvas: ClassicComposerCanvas,
+  ToolDock: ClassicArtToolDock,
+  ToolOptions: ClassicArtOptions,
   RightPanel: ClassicArtPanels,
   StatusBar: ClassicComposerStatusBar,
 };

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo } from 'react';
 import { T } from '../ui';
 import { useClassicLevelStore } from '../../state/classicLevelStore';
 import { useClassicProjectStore } from '../../state/classicProjectStore';
@@ -62,23 +62,40 @@ export function isTypingTarget(t: HTMLElement): boolean {
 }
 
 /**
- * Register a window Escape handler that cancels an in-progress canvas gesture
- * (a `strokeRef` Map, mutated during the drag) — matching the viewport's gesture
- * cancel. Guarded against text-entry so an Escape in a field isn't hijacked.
+ * Register a window Escape handler for a composer tab, under the two guards
+ * every one of them needs: inert while a sprite-doc tab owns the keyboard (the
+ * classic composer is keep-alive/hidden then — see workspace/level-keys.ts,
+ * finding 1), and inert while a text field has focus, where Escape belongs to
+ * the field.
+ *
+ * The guards are here rather than in each tab because they are what makes an
+ * Escape binding SAFE, and a tab that reimplemented the keydown would be a tab
+ * that could forget one. `handler` decides only whether there is anything to
+ * cancel.
  */
-export function useEscapeCancel(strokeRef: React.MutableRefObject<Map<number, number> | null>, redraw: () => void): void {
+export function useEscapeKey(handler: () => void): void {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      // Inert while a sprite-doc tab owns the keyboard (the classic composer is
-      // keep-alive/hidden then) — see workspace/level-keys.ts (finding 1).
       if (!levelKeysEnabled()) return;
       if (e.key !== 'Escape') return;
       if (isTypingTarget(e.target as HTMLElement)) return;
-      if (strokeRef.current) { strokeRef.current = null; redraw(); }
+      handler();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [strokeRef, redraw]);
+  }, [handler]);
+}
+
+/**
+ * Escape cancels an in-progress canvas gesture held as a `strokeRef` Map (the
+ * Chunk and Block tabs' hand-rolled paint) — matching the viewport's gesture
+ * cancel. The Tile tab's stroke lives inside a PixelEditController instead and
+ * cancels through `useEscapeKey` directly.
+ */
+export function useEscapeCancel(strokeRef: React.MutableRefObject<Map<number, number> | null>, redraw: () => void): void {
+  useEscapeKey(useCallback(() => {
+    if (strokeRef.current) { strokeRef.current = null; redraw(); }
+  }, [strokeRef, redraw]));
 }
 
 /**

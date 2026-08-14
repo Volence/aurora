@@ -82,6 +82,63 @@ function PaletteLinePicker() {
 }
 
 /**
+ * WHICH OPTION CONTROLS THE HOST CAN ACTUALLY ACT ON.
+ *
+ * The bar is shared, its store is a CROSS-ENGINE SINGLETON, and its hosts are
+ * not equally capable: every field here is read back by aeon's ComposerCanvas,
+ * and only some of them by classic's TileTab (which consumes exactly `tool`,
+ * `selectedColor`, `mirror`, `ditherPattern`, `ditherSecondary`,
+ * `pixelPerfect` — see components/classic/TileTab.tsx). Drawing the rest for
+ * classic would be facet-chrome.ts's dead chrome, and two of them are worse than
+ * dead:
+ *
+ *   - `transforms` writes `artStore.pendingAction`, and the ONLY consumer is
+ *     aeon's ComposerCanvas. From classic the click sets a flag nothing clears,
+ *     so it is armed for the next aeon document rather than lost. (Today the
+ *     grid is `disabled` under a null `open`, which hides that — but a disabled
+ *     seven-button grid is still seven buttons that never do anything.)
+ *   - `zoom` moves aeon's canvas zoom. Classic's tile editor draws at a fixed
+ *     26px/pixel and does not read `artStore.zoom`, so the readout would count
+ *     up beside a canvas that never changes size.
+ *
+ * `brushSpace` and `repeatPreview` are simply aeon-only (ComposerCanvas is the
+ * sole reader of both), and `paletteLine` belongs to the `palette-apply` tool,
+ * which is tile-space and not in CLASSIC_TILE_TOOLS — its picker also reads
+ * `projectStore`, null under a classic open, so it would render four empty
+ * swatch strips.
+ *
+ * Flags rather than a host enum: this file must not learn who its hosts are, and
+ * a host that gains a capability (H1.5 transforms, H1.6 zoom) flips one boolean.
+ */
+export interface ArtOptionCaps {
+  /** px / tile brush-space tabs. */
+  readonly brushSpace: boolean;
+  /** The 3x3 seamless repeat preview toggle. */
+  readonly repeatPreview: boolean;
+  /** The palette-line picker for the `palette-apply` tool. */
+  readonly paletteLine: boolean;
+  /** The flip / rotate / wrap-shift grid (via `artStore.pendingAction`). */
+  readonly transforms: boolean;
+  /** The zoom in/out readout (via `artStore.zoom`). */
+  readonly zoom: boolean;
+}
+
+/** Everything — aeon's Art facet, whose canvas reads every field. */
+export const FULL_CAPS: ArtOptionCaps = {
+  brushSpace: true, repeatPreview: true, paletteLine: true, transforms: true, zoom: true,
+};
+
+/**
+ * Classic's composer tile tier: mirror, dither and pixel-perfect only — the
+ * three modifiers `toolConfigFrom` actually hands the PixelEditController.
+ * Transforms and zoom turn on in H1.5 / H1.6, and this constant is the one line
+ * either task edits.
+ */
+export const CLASSIC_TILE_CAPS: ArtOptionCaps = {
+  brushSpace: false, repeatPreview: false, paletteLine: false, transforms: false, zoom: false,
+};
+
+/**
  * Art-mode tool-options bar. Holds the tool MODIFIERS relocated out of the old
  * ToolColumn — brush-space tabs, per-tool config (dither, pixel-perfect),
  * mirror, repeat preview, transforms, and zoom. Each control keeps its exact
@@ -92,8 +149,10 @@ function PaletteLinePicker() {
  * `before` is rendered at the left edge (the doc header / save info supplied by
  * workspace/facets/art-facet.tsx's ArtOptions) so the whole option row lives in
  * one OptionBar.
+ *
+ * `caps` says which controls the HOST can act on — see ArtOptionCaps.
  */
-export default function ArtToolOptions({ before }: { before?: React.ReactNode }) {
+export default function ArtToolOptions({ before, caps = FULL_CAPS }: { before?: React.ReactNode; caps?: ArtOptionCaps }) {
   const tool = useArtStore((s) => s.tool);
   const brushSpace = useArtStore((s) => s.brushSpace);
   const setBrushSpace = useArtStore((s) => s.setBrushSpace);
@@ -116,12 +175,15 @@ export default function ArtToolOptions({ before }: { before?: React.ReactNode })
       {before}
 
       {/* Brush space tabs */}
-      <span style={{ display: 'inline-flex', gap: 4 }}>
-        <Chip active={brushSpace === 'pixel'} onClick={() => setBrushSpace('pixel')}>px</Chip>
-        <Chip active={brushSpace === 'tile'} onClick={() => setBrushSpace('tile')}>tile</Chip>
-      </span>
-
-      <Divider />
+      {caps.brushSpace && (
+        <>
+          <span style={{ display: 'inline-flex', gap: 4 }}>
+            <Chip active={brushSpace === 'pixel'} onClick={() => setBrushSpace('pixel')}>px</Chip>
+            <Chip active={brushSpace === 'tile'} onClick={() => setBrushSpace('tile')}>tile</Chip>
+          </span>
+          <Divider />
+        </>
+      )}
 
       {/* Dither config: pattern + secondary color (0 = transparent) */}
       {tool === 'dither' && (
@@ -133,14 +195,16 @@ export default function ArtToolOptions({ before }: { before?: React.ReactNode })
       )}
 
       {/* Palette-line picker: which zone line palette-apply paints onto. */}
-      {tool === 'palette-apply' && <PaletteLinePicker />}
+      {caps.paletteLine && tool === 'palette-apply' && <PaletteLinePicker />}
 
       {/* Collision config lives in the side panel (CollisionPalette — shape/flip/
           solidity/plane), same as Map mode's paint-collision tool. */}
 
       {/* Mirror cycle + repeat preview */}
       <MirrorButton mirror={mirror} onChange={setMirror} />
-      <ToolButton glyph="Rpt" small active={repeatPreview} title="Toggle 3×3 repeat preview" onClick={toggleRepeatPreview} />
+      {caps.repeatPreview && (
+        <ToolButton glyph="Rpt" small active={repeatPreview} title="Toggle 3×3 repeat preview" onClick={toggleRepeatPreview} />
+      )}
 
       {/* Pixel-perfect mode (pencil / line only) */}
       {(tool === 'pencil' || tool === 'line') && (
@@ -150,24 +214,33 @@ export default function ArtToolOptions({ before }: { before?: React.ReactNode })
         </label>
       )}
 
-      <Divider />
+      {/* Transforms (apply to selection if present, else whole doc). `open` is
+          aeon's open document and is ALWAYS null under a classic open — the
+          guard below already short-circuits on it, so no host needs a fake
+          document to render this row safely. */}
+      {caps.transforms && (
+        <>
+          <Divider />
+          <span style={{ display: 'inline-flex', gap: 2 }}>
+            <TransformGrid
+              items={TRANSFORMS.map((t) => ({
+                ...t,
+                disabled: !open || (t.action === 'rotate-90' && open.doc.widthTiles !== open.doc.heightTiles),
+              }))}
+              onAction={requestAction}
+            />
+          </span>
+        </>
+      )}
 
-      {/* Transforms (apply to selection if present, else whole doc). */}
-      <span style={{ display: 'inline-flex', gap: 2 }}>
-        <TransformGrid
-          items={TRANSFORMS.map((t) => ({
-            ...t,
-            disabled: !open || (t.action === 'rotate-90' && open.doc.widthTiles !== open.doc.heightTiles),
-          }))}
-          onAction={requestAction}
-        />
-      </span>
-
-      <Divider />
-
-      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginLeft: 'auto' }}>
-        <ZoomControl zoom={zoom} onZoomIn={() => setZoom(zoom * 2)} onZoomOut={() => setZoom(zoom / 2)} />
-      </span>
+      {caps.zoom && (
+        <>
+          <Divider />
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginLeft: 'auto' }}>
+            <ZoomControl zoom={zoom} onZoomIn={() => setZoom(zoom * 2)} onZoomOut={() => setZoom(zoom / 2)} />
+          </span>
+        </>
+      )}
     </OptionBar>
   );
 }

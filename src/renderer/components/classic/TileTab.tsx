@@ -11,19 +11,22 @@ import type { GestureResult, Selection } from '../../../core/art/pixel-edit-cont
 import { toolConfigFrom } from '../../../core/art/tool-config';
 import { tileToBuffer, packTilePixels } from '../../../core/art/classic-tile-buffer';
 import { resolveTileGesture } from '../../../core/art/classic-tile-gesture';
-import { pixelAt } from '../../../core/art/viewport-coords';
 import PixelViewport from '../art-shared/PixelViewport';
 import type { HostPointer } from '../art-shared/PixelViewport';
 import { TileThumb } from './composer-thumbs';
 import { COMPOSER_CHECK_RGB, COMPOSER_SWATCH_A, COMPOSER_SWATCH_B } from '../../canvas/canvas-colors';
-import { hex, SharedBanner, useEditableTileRange, tileLockReason, styles } from './composer-shared';
+import { hex, SharedBanner, useEditableTileRange, useEscapeKey, tileLockReason, styles } from './composer-shared';
 
 // Tile tab — 8x8 pixel editor for the selected tile, drawn and edited through the
 // SHARED pixel substrate (PixelViewport + PixelEditController), the same engine
 // the sprite editor and aeon's composer use. It renders the tile through one
 // 16-color row of the act palette; the armed tool comes from `artStore` (pencil,
-// eraser, fill, eyedropper, line, rect, marquee select, dither). Anim/gap tiles
-// lock. The right column is a BROWSE-ONLY tile strip (unlike the Block tab's
+// eraser, fill, eyedropper, line, rect, marquee select, dither), set on the
+// facet's own rail — ClassicArtToolDock, which draws only while this tab is the
+// active tier, and the modifiers beside it (mirror / dither / pixel-perfect) on
+// the shared ArtToolOptions. Anim/gap tiles lock. Right-click does nothing here:
+// sampling a colour is the dock's eyedropper, one input path with one hit-test.
+// The right column is a BROWSE-ONLY tile strip (unlike the Block tab's
 // strip, which assigns the clicked tile to a block cell) — selecting here never
 // mutates anything.
 //
@@ -97,7 +100,17 @@ export default function TileTab({ doc, usage }: { doc: LevelDoc; usage: UsageInd
   // after every commit, so that would drop the selection on each stroke.
   useEffect(() => { setSelection(null); }, [composerTileIndex]);
 
+  // Set by the Escape handler below and read by onCommit; declared up here so the
+  // two sit either side of the ref rather than the callback closing over a
+  // binding that appears further down the body.
+  const cancelledRef = useRef(false);
+  const [, bumpFrame] = useState(0);
+
   const onCommit = useCallback((result: GestureResult) => {
+    // Escape already ended this gesture and threw its result away; this is the
+    // release that follows, carrying PixelViewport's second `end()`. Drop it
+    // whole — a cancelled stroke changes neither the tile nor the marquee.
+    if (cancelledRef.current) { cancelledRef.current = false; return; }
     // Order matters: the marquee answer is applied BEFORE the lock is consulted, so
     // selecting still works on a view-only tile. `resolveTileGesture` owns that rule
     // and the undefined-vs-null one (see its docblock — it is unit-tested; this
@@ -135,19 +148,36 @@ export default function TileTab({ doc, usage }: { doc: LevelDoc; usage: UsageInd
   const inertPointer = useMemo<HostPointer>(() => ({ down() {}, move() {}, up() {} }), []);
   const hostPointer = locked && !READ_ONLY_TOOLS.has(config.tool) ? inertPointer : null;
 
-  // Right-click eyedrop, kept from the hand-rolled editor (it matches the chunk
-  // tab's idiom and is the only way to sample a color until the tool dock lands).
-  // PixelViewport ignores non-primary buttons and exposes no coordinate hook, so
-  // the mapping is redone here from the canvas's own rect — the same rect and the
-  // same pure `pixelAt` the viewport uses, so the two agree pixel for pixel.
-  const onContextMenu = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    const el = e.target as HTMLElement;
-    if (el.tagName !== 'CANVAS') return;
-    const r = el.getBoundingClientRect();
-    const p = pixelAt(e.clientX - r.left, e.clientY - r.top, PX, 8, 8);
-    if (p) useArtStore.getState().setSelectedColor(buffer.data[p.y * 8 + p.x]);
-  }, [buffer]);
+  // ESCAPE CANCELS AN IN-PROGRESS STROKE — the behaviour the hand-rolled editor
+  // had through `useEscapeCancel` and that the move to PixelViewport dropped
+  // silently (ChunkTab and BlockTab still have it; the viewport has no keyboard
+  // handling at all).
+  //
+  // TWO STEPS, because the gesture state is split across two owners. Ending the
+  // controller is what kills the stroke: `end()` resets its snapshot, path and
+  // preview, so the next render's `shown` falls back to the committed buffer and
+  // `move()` becomes a no-op for the rest of the drag (it returns early when not
+  // active). Its RESULT is thrown away — that is the cancel. But PixelViewport
+  // owns a `drawing` ref this cannot reach, so it will still call `end()` again
+  // on the release and hand us that second result; `cancelledRef` is what makes
+  // onCommit drop it. A double `end()` is safe by inspection — every branch of
+  // the controller's `finishInner` is guarded on `this.start`/`moveRegion`, both
+  // null after a reset, so it yields a buffer-less result rather than throwing —
+  // but onCommit never looks, because the flag is checked first.
+  //
+  // THE CLEAN FIX IS NOT HERE. Escape belongs in PixelViewport (a `cancel()` on
+  // the controller plus clearing `drawing` and releasing pointer capture), which
+  // would fix the sprite editor and aeon's composer in the same stroke — they
+  // lost it too, and neither has noticed. That is a change to the shared
+  // substrate under three hosts and is deliberately left to be decided on its
+  // own rather than smuggled in under a classic dock task.
+  useEscapeKey(useCallback(() => {
+    const ctl = controllerRef.current;
+    if (!ctl?.isActive) return;   // nothing in progress — do not arm the flag
+    ctl.end(0, 0);
+    cancelledRef.current = true;
+    bumpFrame((n) => n + 1);      // repaint without the working buffer / preview
+  }, []));
 
   const copyTile = useCallback(() => {
     setTileClipboard(new Uint8Array(buffer.data));
@@ -207,13 +237,13 @@ export default function TileTab({ doc, usage }: { doc: LevelDoc; usage: UsageInd
         {!locked && tileUse.cells > 1 && (
           <SharedBanner text={`tile ${hex(composerTileIndex)} is used in ${tileUse.cells} block cells — edits affect all uses`} />
         )}
-        {/* The wrapper carries the right-click handler AND keeps the canvas out of
-            the flex column: as a direct flex item it was align-stretch'd to the
-            column's width (the header row above can be wider than 208px), which
-            scaled the bitmap — the old hand-rolled hit-test compensated for that,
-            PixelViewport's does not. Inside a block wrapper the canvas is a
-            replaced element at its intrinsic 208px, so 1 canvas px = 1 CSS px. */}
-        <div onContextMenu={onContextMenu} style={{ lineHeight: 0 }}>
+        {/* The wrapper keeps the canvas out of the flex column: as a direct flex
+            item it was align-stretch'd to the column's width (the header row
+            above can be wider than 208px), which scaled the bitmap — the old
+            hand-rolled hit-test compensated for that, PixelViewport's does not.
+            Inside a block wrapper the canvas is a replaced element at its
+            intrinsic 208px, so 1 canvas px = 1 CSS px. */}
+        <div style={{ lineHeight: 0 }}>
           <PixelViewport
             buffer={buffer}
             palette={paletteColors}
@@ -254,7 +284,6 @@ export default function TileTab({ doc, usage }: { doc: LevelDoc; usage: UsageInd
             );
           })}
         </div>
-        <div style={styles.hintRow}>right-click the canvas to eyedrop a color</div>
       </div>
       <div style={styles.paletteCol}>
         <div style={styles.paletteHead}>Tiles ({tileCount}) · click to edit</div>
