@@ -13,7 +13,7 @@ import { renderChunk } from '../../../core/level-classic/render';
 import type { LevelDoc } from '../../../core/level-classic/model';
 import { s1ObjectIsInvisible } from '../../../core/project/profiles/s1-objects';
 import {
-  CHUNK_PX, visibleChunkRange, layoutCellAt, screenToWorld, clampInt,
+  CHUNK_PX, visibleChunkRange, layoutCellAt, screenToWorld, clampInt, fitCamera,
   worldToLayoutCell, addStampCell, stampAccumToCells, hitTestObjectFrames, hitTestPoint,
   type ObjectHitBounds, type StampCell,
 } from './viewport-math';
@@ -349,8 +349,9 @@ export default function ClassicLevelViewport() {
     // A REMEMBERED viewport beats fit-to-height, but only on an act load — that
     // is the per-tab restore (tab-activation wrote viewStore just before this
     // act started loading, and the adopt-subscription has already applied it).
-    // A plane switch still refits, because FG and BG grids differ in height and
-    // the fit is what keeps the whole plane on screen.
+    // A plane switch does NOT refit: fitCamera preserves the camera and only
+    // zooms out when the new plane is too tall for it (viewport-math.ts, which
+    // carries the reasoning and the guard).
     const tabId = ref ? levelDocId(ref.zone, String(ref.act)) : null;
     const isActLoad = lastFitTabRef.current !== tabId;
     lastFitTabRef.current = tabId;
@@ -358,14 +359,13 @@ export default function ClassicLevelViewport() {
     const grid = plane === 'bg' ? doc.bg : doc.fg;
     const container = containerRef.current;
     const h = container?.clientHeight ?? 600;
-    const levelPxH = grid.height * CHUNK_PX;
-    const zoom = Math.max(0.125, Math.min(2, levelPxH > 0 ? h / levelPxH : 1));
-    camRef.current = { x: 0, y: 0, zoom };
-    // Publish the fit immediately rather than waiting for the first drag, so the
-    // store never sits holding the PREVIOUS act's camera — which anything
-    // reading it between load and first gesture would otherwise believe.
-    syncedRef.current = { x: 0, y: 0, zoom };
-    useViewStore.getState().setViewport(0, 0, zoom);
+    const cam = fitCamera(h, grid.height * CHUNK_PX, isActLoad ? null : camRef.current);
+    camRef.current = { ...cam };
+    // Publish immediately rather than waiting for the first drag, so the store
+    // never sits holding the PREVIOUS act's camera — which anything reading it
+    // between load and first gesture would otherwise believe.
+    syncedRef.current = { ...cam };
+    useViewStore.getState().setViewport(cam.x, cam.y, cam.zoom);
     redraw();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status, ref, plane]);
