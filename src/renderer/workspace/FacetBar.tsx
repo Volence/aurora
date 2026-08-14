@@ -1,18 +1,32 @@
 // The facet bar: a pill segmented control (spec §11 — tabs are page-shaped with
 // a top accent; facets are pills; the two rows must never look alike). Renders
-// registered-descriptors ∩ granted ∩ has-module, in descriptor order.
+// registered-descriptors ∩ granted ∩ has-a-module-FOR-THIS-ENGINE, in descriptor
+// order.
+//
+// The has-module filter is engine-keyed, not engine-blind: a facet the manifest
+// grants but the renderer cannot serve for the open engine gets no pill, so
+// there is no chrome that lands on FacetUnavailable when clicked. (s1 grants
+// `collision` with no collision editor built — engine-blind, that pill would be
+// live the moment classic re-homes here.)
 
 import React from 'react';
 import { T } from '../components/ui';
 import { facetsFor } from '../../core/shell/facets';
 import type { FacetCapability } from '../../core/project/adapter';
-import { facetModules } from './facet-registry';
+import type { OpenEngine } from '../state/open-project';
+import { moduleFor } from './facet-registry';
 import { useWorkspaceStore } from './workspaceStore';
 import { switchFacet } from './facet-tools';
 
-export default function FacetBar({ tabId, granted }: { tabId: string; granted: readonly FacetCapability[] }) {
+export default function FacetBar(
+  { tabId, granted, engine }: {
+    tabId: string;
+    granted: readonly FacetCapability[];
+    engine: OpenEngine | null;
+  },
+) {
   const active = useWorkspaceStore((s) => s.facetFor(tabId));
-  const visible = facetsFor(granted).filter((f) => facetModules.get(f.id));
+  const visible = facetsFor(granted).filter((f) => moduleFor(engine, f.id));
   return (
     <div style={styles.bar} role="group" aria-label="Facets">
       {visible.map((f) => (

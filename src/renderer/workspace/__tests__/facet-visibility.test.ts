@@ -4,20 +4,22 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { facetsFor, facetRegistry, registerBuiltinFacets } from '../../../core/shell/facets';
-import { facetModules } from '../facet-registry';
+import { facetModules, moduleFor, registerFacetModule } from '../facet-registry';
 import { registerAeonFacetModules } from '../register-facets';
 import { openCapabilities } from '../../state/open-project';
 import { useProjectStore } from '../../state/projectStore';
 import { useClassicProjectStore } from '../../state/classicProjectStore';
 
-describe('facet visibility (registered descriptors ∩ granted ∩ has module)', () => {
+// FacetBar.tsx is .tsx and not collected, so this covers its filter expression
+// rather than its render: facetsFor(granted).filter((f) => moduleFor(engine, f.id)).
+describe('facet visibility (registered descriptors ∩ granted ∩ has module for the open engine)', () => {
   beforeEach(() => { facetRegistry.clear(); facetModules.clear(); });
 
   it('aeon manifest shows every facet with a registered module, in order', () => {
     registerBuiltinFacets();
     registerAeonFacetModules();
     const granted = ['layout', 'art', 'objects', 'rings', 'collision', 'palette'] as const;
-    const visible = facetsFor([...granted]).filter((f) => facetModules.get(f.id));
+    const visible = facetsFor([...granted]).filter((f) => moduleFor('aeon', f.id));
     // Grows as facet-module tasks land: Task 10 = ['layout']; Task 11 adds
     // objects/rings/collision/palette; Task 12 adds art — full six, in order.
     expect(visible.map((f) => f.id)).toEqual(['layout', 'art', 'objects', 'rings', 'collision', 'palette']);
@@ -26,7 +28,18 @@ describe('facet visibility (registered descriptors ∩ granted ∩ has module)',
   it('a facet without a registered module renders nothing (no dead chrome)', () => {
     registerBuiltinFacets();
     // No modules registered at all:
-    expect(facetsFor(['layout']).filter((f) => facetModules.get(f.id))).toEqual([]);
+    expect(facetsFor(['layout']).filter((f) => moduleFor('aeon', f.id))).toEqual([]);
+  });
+
+  it('a facet granted but module-less FOR THIS ENGINE gets no pill', () => {
+    registerBuiltinFacets();
+    registerFacetModule(['aeon'], { id: 'layout', Canvas: () => null });
+    // s1's profile grants `collision` with no collision editor built. The filter
+    // is engine-keyed, so classic shows neither that nor aeon's layout pill —
+    // an engine-blind `facetModules.get(f.id)` would have shown both.
+    expect(facetsFor(['layout', 'collision']).filter((f) => moduleFor('s1', f.id))).toEqual([]);
+    expect(facetsFor(['layout', 'collision']).filter((f) => moduleFor('aeon', f.id)).map((f) => f.id))
+      .toEqual(['layout']);
   });
 });
 
