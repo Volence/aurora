@@ -64,10 +64,15 @@ export function toolForFacet(facet: FacetCapability, current: EditorTool): Edito
  * when the open engine both grants and serves it, else the first facet in the
  * grant that it does serve, else null.
  *
- * A facet is "served" only if it is BOTH granted and registered — the same
- * intersection FacetBar filters its pills on. Registration alone is not enough:
- * a session saved while s1 still granted `collision` reopens naming a facet with
- * no pill, and honouring it would put a screen up that the bar cannot represent.
+ * A facet is "served" only if it is BOTH granted and has a module. That is the
+ * same set FacetBar shows pills for: the bar's extra term — the facet
+ * DESCRIPTOR registry — cannot narrow it, because registerBuiltinFacets
+ * registers a descriptor for every FacetCapability there is and both register
+ * functions call it.
+ *
+ * Registration alone is not enough: a session saved while s1 still granted
+ * `collision` reopens naming a facet with no pill, and honouring it would put a
+ * screen up that the bar cannot represent.
  *
  * Lives here rather than in LevelWorkspace because a decision inside a component
  * is a decision the node-only suite cannot test — and the interesting cases

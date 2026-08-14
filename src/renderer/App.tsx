@@ -22,7 +22,7 @@ import { useSpriteStore } from './state/spriteStore';
 import { useShellStore } from './state/shellStore';
 import { ensureSaversRegistered, saveAllDirty, saveActive } from './state/project-runtime';
 import { registerHistoryFactories } from './state/history-factories';
-import { registerAeonFacetModules } from './workspace/register-facets';
+import { registerAeonFacetModules, registerS1FacetModules } from './workspace/register-facets';
 import { useSessionLifecycle, useActTabSync } from './shell/session-lifecycle';
 import { requestOpenTab, requestFocusIndex } from './shell/tab-activation';
 import { buildCommands } from './shell/commands';
@@ -68,6 +68,7 @@ export default function App() {
     ensureSaversRegistered();
     registerHistoryFactories();   // must precede any edit: the hub builds no stack without it
     registerAeonFacetModules();
+    registerS1FacetModules();
   }, []);
   useSessionLifecycle();
   useActTabSync();

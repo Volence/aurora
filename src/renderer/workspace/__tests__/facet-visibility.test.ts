@@ -5,7 +5,8 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { facetsFor, facetRegistry, registerBuiltinFacets } from '../../../core/shell/facets';
 import { facetModules, moduleFor, registerFacetModule } from '../facet-registry';
-import { registerAeonFacetModules } from '../register-facets';
+import { registerAeonFacetModules, registerS1FacetModules } from '../register-facets';
+import type { FacetCapability } from '../../../core/project/adapter';
 import { openCapabilities } from '../../state/open-project';
 import { useProjectStore } from '../../state/projectStore';
 import { useClassicProjectStore } from '../../state/classicProjectStore';
@@ -23,6 +24,16 @@ describe('facet visibility (registered descriptors ∩ granted ∩ has module fo
     // Grows as facet-module tasks land: Task 10 = ['layout']; Task 11 adds
     // objects/rings/collision/palette; Task 12 adds art — full six, in order.
     expect(visible.map((f) => f.id)).toEqual(['layout', 'art', 'objects', 'rings', 'collision', 'palette']);
+  });
+
+  it('s1 manifest shows its four facets with a registered module, in order', () => {
+    registerBuiltinFacets();
+    registerS1FacetModules();
+    const visible = facetsFor([...S1_GRANT] as FacetCapability[]).filter((f) => moduleFor('s1', f.id));
+    // Registry order, not grant order — `art` sits between layout and objects in
+    // core/shell/facets, and the pills follow the registry so the bar reads the
+    // same way under both engines.
+    expect(visible.map((f) => f.id)).toEqual(['layout', 'art', 'objects', 'palette']);
   });
 
   it('a facet without a registered module renders nothing (no dead chrome)', () => {
