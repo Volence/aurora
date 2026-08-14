@@ -8,6 +8,7 @@ import React from 'react';
 import EditorShell from '../shell/EditorShell';
 import FacetBar from './FacetBar';
 import { moduleFor } from './facet-registry';
+import { resolveFacet, switchFacet } from './facet-tools';
 import { useWorkspaceStore } from './workspaceStore';
 import { useOpenEngine, useOpenCapabilities, type OpenEngine } from '../state/open-project';
 import { useSessionStore } from '../state/sessionStore';
@@ -35,19 +36,29 @@ export default function LevelWorkspace() {
   // Hoisted above the `mod` null-guard below: a hook may not sit after an early
   // return.
   const engine = useOpenEngine();
-  // One engine-keyed resolve, and no fallback of any kind. Falling back to
-  // aeon's module (what the old canvas registry did) renders aeon's viewport
-  // against an empty store; falling back to the layout facet answers a question
-  // nobody asked. Both are the same lie, so an unregistered pair says so
-  // instead. App's mount effect registers before any project can load, so for
-  // aeon this is always non-null.
-  const mod = moduleFor(engine, facetId);
+  // One engine-keyed resolve, and no fallback of any kind ACROSS ENGINES.
+  // Falling back to aeon's module (what the old canvas registry did) renders
+  // aeon's viewport against an empty store — a lie about the data. resolveFacet
+  // only ever answers with another facet OF THIS ENGINE, which is a different
+  // thing: a change of selection, not of subject. App's mount effect registers
+  // before any project can load, so for aeon this is always non-null.
+  const resolved = resolveFacet(engine, granted, facetId);
+  const mod = resolved !== null ? moduleFor(engine, resolved) : null;
+
+  // …and the heal is written back, so the lit pill matches what is on screen.
+  // In an effect, never during render: switchFacet writes two stores, and a
+  // store write inside a render body updates a component while another is
+  // rendering. Idempotent by construction — resolveFacet(resolved) === resolved
+  // (facet-tools.test.ts) — so the re-render this causes does not fire it again.
+  React.useEffect(() => {
+    if (resolved !== null && resolved !== facetId) switchFacet(activeId, resolved);
+  }, [activeId, facetId, resolved]);
 
   // The FG/BG chips write editorStore.setEditingLayer, so they must not be live
   // over a facet that has no editor — any facet an engine grants but does not
   // serve — and chips that mutate an aeon store from a classic screen with no
   // canvas are exactly the dead chrome this branch is removing.
-  const showPlane = mod != null && (facetId === 'layout' || facetId === 'collision');
+  const showPlane = mod != null && (resolved === 'layout' || resolved === 'collision');
   const header = (
     <div style={styles.header}>
       <FacetBar tabId={activeId} granted={granted} engine={engine} />
@@ -104,10 +115,11 @@ export default function LevelWorkspace() {
  *
  * Rendered as the shell's CHILD, keeping the facet bar on screen. The bar filters
  * on the same (engine, facet) resolve, so no pill leads here — only a restored
- * session record naming a facet this engine dropped can — but the way out has to
- * exist for the case that does happen. Auto-healing to a served facet is a later
- * task; this stays the terminal state either way, since the served set can
- * legitimately be empty.
+ * session record naming a facet this engine dropped can, and resolveFacet now
+ * heals that case to a served facet before it reaches this component. What is
+ * left is the case healing CANNOT fix: an engine that serves nothing it grants,
+ * where there is no other facet to send anyone to. So it names the facet the
+ * user actually asked for, not the resolve's null.
  */
 function FacetUnavailable(
   { engine, facetId }: { engine: OpenEngine | null; facetId: FacetCapability },

@@ -1,7 +1,8 @@
-import { describe, it, expect, afterEach } from 'vitest';
-import { FACET_TOOLS, toolsForFacet, toolForFacet, switchFacet } from '../facet-tools';
+import { describe, it, expect, afterEach, beforeEach } from 'vitest';
+import { FACET_TOOLS, toolsForFacet, toolForFacet, switchFacet, resolveFacet } from '../facet-tools';
 import { TOOL_LABELS } from '../tool-meta';
-import { TOOL_IDS } from '../../../core/project/adapter';
+import { TOOL_IDS, type FacetCapability } from '../../../core/project/adapter';
+import { facetModules, registerFacetModule } from '../facet-registry';
 import { useWorkspaceStore } from '../workspaceStore';
 import { useEditorStore } from '../../state/editorStore';
 import { useProjectStore } from '../../state/projectStore';
@@ -108,6 +109,78 @@ describe('toolsForFacet — profile declaration over shell default', () => {
     expect(toolForFacet('layout', 'paint-block')).toBe('view');
     // …while a declared tool is still kept across the switch.
     expect(toolForFacet('layout', 'place-object')).toBe('place-object');
+  });
+});
+
+// The auto-heal for a facet the open engine cannot serve. Deliberately NOT the
+// deleted aeon fallback: that one lied about the DATA (aeon's viewport over an
+// empty classic store while still claiming to be the requested facet). This
+// changes the SELECTION, to another facet of the SAME engine, and LevelWorkspace
+// makes it non-silent by writing it back through switchFacet so the lit pill
+// matches the screen.
+describe('resolveFacet', () => {
+  const S1_GRANT: readonly FacetCapability[] = ['layout', 'art', 'objects', 'palette'];
+  const stub = (id: FacetCapability) => ({ id, Canvas: () => null });
+
+  beforeEach(() => { facetModules.clear(); });
+  afterEach(() => { facetModules.clear(); });
+
+  it('keeps the requested facet when this engine serves it', () => {
+    registerFacetModule(['s1'], stub('layout'));
+    registerFacetModule(['s1'], stub('objects'));
+    expect(resolveFacet('s1', S1_GRANT, 'objects')).toBe('objects');
+  });
+
+  it('heals a granted-but-unserved facet to the first served one', () => {
+    // `art` granted, no s1 art module — the restored-session case.
+    registerFacetModule(['s1'], stub('layout'));
+    expect(resolveFacet('s1', S1_GRANT, 'art')).toBe('layout');
+  });
+
+  it('heals a facet this engine no longer grants, even if a module exists', () => {
+    // The exact shape of the dropped collision grant: a session saved while s1
+    // still granted `collision` reopens naming a facet outside the new grant.
+    // Registration alone must not be enough to keep it, or the shell would show
+    // a screen with no pill to match it.
+    registerFacetModule(['s1'], stub('layout'));
+    registerFacetModule(['s1'], stub('collision'));
+    expect(resolveFacet('s1', S1_GRANT, 'collision')).toBe('layout');
+  });
+
+  it('takes the first GRANTED facet that is served, in the grant order', () => {
+    // layout is granted first but unserved; the answer is the next served grant,
+    // not the first registered module.
+    registerFacetModule(['s1'], stub('palette'));
+    registerFacetModule(['s1'], stub('objects'));
+    expect(resolveFacet('s1', S1_GRANT, 'layout')).toBe('objects');
+  });
+
+  it('resolves against the OPEN engine, not any engine', () => {
+    registerFacetModule(['aeon'], stub('layout'));
+    expect(resolveFacet('s1', S1_GRANT, 'layout')).toBeNull();
+    expect(resolveFacet('aeon', S1_GRANT, 'layout')).toBe('layout');
+  });
+
+  it('is null when the engine serves nothing granted — FacetUnavailable stays', () => {
+    expect(resolveFacet('s1', S1_GRANT, 'layout')).toBeNull();
+    registerFacetModule(['s1'], stub('rings')); // served but not granted
+    expect(resolveFacet('s1', S1_GRANT, 'layout')).toBeNull();
+  });
+
+  it('is null with no engine open and with an empty grant', () => {
+    registerFacetModule(['s1'], stub('layout'));
+    expect(resolveFacet(null, S1_GRANT, 'layout')).toBeNull();
+    expect(resolveFacet('s1', [], 'layout')).toBeNull();
+  });
+
+  it('is idempotent, so the write-back cannot loop', () => {
+    // LevelWorkspace calls switchFacet(tab, resolved) from an effect, which
+    // re-renders with facetId === resolved. If resolving THAT produced a
+    // different answer the effect would fire again, forever.
+    registerFacetModule(['s1'], stub('objects'));
+    const once = resolveFacet('s1', S1_GRANT, 'layout');
+    expect(once).toBe('objects');
+    expect(resolveFacet('s1', S1_GRANT, once!)).toBe(once);
   });
 });
 

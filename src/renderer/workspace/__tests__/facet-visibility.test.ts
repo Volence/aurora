@@ -106,7 +106,31 @@ describe('both production call sites resolve against the OPEN engine, not a lite
   it('LevelWorkspace resolves the module on the open engine', () => {
     const source = read('LevelWorkspace.tsx');
     expect(source).toContain('useOpenEngine()');
-    expect(source).toContain('moduleFor(engine, facetId)');
+    // On the RESOLVED facet, not the requested one — otherwise the auto-heal
+    // below would change the pill and leave the screen where it was.
+    expect(source).toContain('moduleFor(engine, resolved)');
     expect(source).not.toMatch(/moduleFor\(\s*['"]/);
+  });
+});
+
+// resolveFacet's own behaviour is covered in facet-tools.test.ts. What no test
+// can RUN is its consumer — LevelWorkspace is .tsx — so the two properties the
+// helper's correctness rests on are asserted at the source level: that the heal
+// is written back at all (otherwise the pill and the screen disagree), and that
+// the write happens in an effect (a store write in a render body updates one
+// component while another renders).
+describe("the unserved-facet heal is wired, and wired outside render", () => {
+  const source = readFileSync(join(__dirname, '..', 'LevelWorkspace.tsx'), 'utf8');
+
+  it('resolves the requested facet against the open grant', () => {
+    expect(source).toContain('resolveFacet(engine, granted, facetId)');
+  });
+
+  it('writes the heal back through switchFacet, from inside an effect', () => {
+    // The effect BODY has to contain the call — a `switchFacet(...)` sitting in
+    // the render body would satisfy a bare `toContain`.
+    expect(source).toMatch(
+      /React\.useEffect\(\(\) => \{[^}]*switchFacet\(activeId, resolved\)/,
+    );
   });
 });
