@@ -10,7 +10,11 @@ interface RingPatternPaletteProps {
 export default function RingPatternPalette({ selectedIndex, onSelect }: RingPatternPaletteProps) {
   return (
     <div style={styles.container}>
-      <div style={styles.header}>Ring Patterns</div>
+      {/* A COUNT, not a heading — see TilesetPanel's copy of this note. The
+          CollapsibleSection this always mounts inside (workspace/facets/
+          rings-facet.tsx) already says RING PATTERNS; in heading type this row
+          said RING PATTERNS again, one row down. */}
+      <div style={styles.count}>{RING_PATTERNS.length} patterns</div>
       <div style={styles.list}>
         {RING_PATTERNS.map((pattern, i) => (
           <button
@@ -66,10 +70,9 @@ const styles: Record<string, React.CSSProperties> = {
     background: T.surface, borderRight: `1px solid ${T.border}`,
     flexShrink: 0, overflow: 'hidden',
   },
-  header: {
-    padding: '8px 12px', fontSize: 12, fontWeight: 600, color: T.textBase,
-    borderBottom: `1px solid ${T.border}`, textTransform: 'uppercase' as const,
-    letterSpacing: 1,
+  count: {
+    padding: '6px 8px', fontSize: 10, color: T.textLo,
+    borderBottom: `1px solid ${T.border}`,
   },
   list: {
     flex: 1, overflow: 'auto', padding: 4,
