@@ -2,7 +2,11 @@
 
 Everything below is on `master` and pushed to `origin`. Working tree clean,
 no open worktrees, `npx tsc --noEmit` clean, `npx vitest run` =
-**188 test files / 1726 passed / 3 skipped / 0 failed**.
+**191 test files (190 passed, 1 skipped) / 1755 tests (1752 passed, 3 skipped)
+/ 0 failed**.
+
+> Count the passes and the skips separately — the earlier revision of this line
+> read "1726 passed / 3 skipped", which double-counted.
 
 ## What Stage 4 is
 
@@ -22,6 +26,7 @@ the open project is classic (S1 disassembly) or aeon.
 | `66763cc` | **Aeon sprite binding.** Explorer respects UI bindings; "New Sprite…" breaks the chicken-and-egg. |
 | `5c1d564` | **Plan 2 — facet foundations.** `open-project.ts`, `artTiers`, `facetCanvases`. |
 | `152cff8` | **Plan 3 — slot neutrality.** Shared ObjectList / ObjectInspector / ChunkGrid / rasterizer. |
+| *(plan 4)* | **Steps D + E.** One tool vocabulary; classic's plane/overlays/camera to the stores; per-tab viewport restore for classic. |
 
 Plus `0db582d` (spec §3 amendment) and `3c81e81` (collision docblock fixes,
 §9.2 resolved).
@@ -46,19 +51,25 @@ Live examples to copy: `components/shared/ObjectList.tsx` +
 
 ## Remaining re-home steps
 
-Eight steps were identified; 0–3 are done.
+Eight steps were identified; 0–3, D and E are done.
 
-- **D — classic viewport state to stores.** `plane`/`overlays`/`camRef` are
-  component-local `useState` in `ClassicLevelViewport.tsx`. Prerequisite for G
-  (per-tab viewport restore is aeon-only today).
-- **E — tool vocabulary merge.** `ClassicTool` → `EditorTool`; classic's
-  `object` is really two aeon tools (unarmed select/move/delete vs armed
-  place). **Must land before** switching `classic-surface.ts` from `setFacet`
-  to `switchFacet` — `switchFacet` also re-scopes aeon's `editorStore.tool`.
+- ~~**D — classic viewport state to stores.**~~ Done (plan 4). `plane` is
+  `editorStore.editingLayer`, the four overlays are `viewStore` keys
+  (`showStart` is new, and `OVERLAY_KEYS_BY_ENGINE` keeps it out of aeon's View
+  menu), and the camera publishes to `viewStore` once per painted frame while
+  staying a ref. Per-tab viewport restore now works for classic too.
+- ~~**E — tool vocabulary merge.**~~ Done (plan 4). `ClassicTool` is gone;
+  `ToolId` lives in `core/project/adapter.ts` beside `FacetCapability` and the
+  s1 manifest declares `facetTools.layout`. **`classic-surface.ts` may now move
+  from `setFacet` to `switchFacet`** — that was E's whole purpose, and it is
+  Step G's to do.
 - **F-remainder** — the other aeon-coupled slots. See §3.0.1.
 - **G — classic into `LevelWorkspace`.** Delete `LegacyWorkspace`,
   `ClassicProjectView`, `ZoneActTree`, `Toolbar`. This is the commit where
   classic stops feeling like a different app. Forces the collision decision.
+  Plan 4 left it two drop-ins: classic's chip row already renders from
+  `toolsForFacet('layout')`, so swapping in `MapFacetDock` is a presentation
+  change; and `TOOL_LABELS`/`TOOL_HINTS` are already shared.
 - **H — shared Art facet.** Hardest, and possibly shouldn't be fully shared:
   classic's Chunk › Block › Tile drill-down with usage counts suits a pooled
   format; aeon's staged pixel doc with marquee/transforms suits a flat one.
@@ -75,10 +86,9 @@ Do **not** try to share `CollisionPalette`.
    collision UI (`classicSetColind` has zero component callers). Forced at
    step G. The owner wants the editor built, so the grant can stay if the
    editor lands first.
-2. **`PropertiesPanel`'s "Selected Object" readout** was removed as
-   superseded. Cost: objects are also selectable with the `select` tool in
-   the Layout facet, where that readout was the only display. Offered to
-   restore; not yet answered.
+2. ~~**`PropertiesPanel`'s "Selected Object" readout.**~~ CLOSED — restored in
+   plan 4, prop-gated (`showObjectSelection`) and passed by the layout facet
+   only, so the Objects facet keeps its editor without a duplicate readout.
 3. **Classic chunk picker claims no facet** deliberately, so clicking a chunk
    doesn't steal focus from the composer beside it. Confirmed working by
    smoke test; revisit if it ever feels wrong.
@@ -104,6 +114,24 @@ Do **not** try to share `CollisionPalette`.
   to avoid ~3.7k LUT rebuilds per zone.
 - **Aeon has no palette persistence** — `aeon/save.ts` writes no palette
   bytes. Don't promise durability the engine side doesn't keep.
+- **`editorStore.tool` and `viewStore` are now CROSS-ENGINE singletons.** A
+  test that leaves a tool set leaks into the next one (`editorStore` has no
+  `reset()`; `classicLevelStore.test.ts` puts it back by hand in `beforeEach`).
+- **Classic's camera must not be a `useViewStore` selector.** The viewport's
+  render effect has no dependency array, so a subscribed camera repaints on
+  every mousemove — the storm the perf commits removed. It publishes from
+  inside the rAF and adopts external writes via `subscribe`; a guard test
+  (`components/classic/__tests__/classic-camera.test.ts`) protects the absence,
+  because absence is what a later reader will "tidy" away.
+- **Classic's fit-to-height defers to a remembered viewport on ACT LOAD only.**
+  A plane switch still refits (FG and BG grids differ in height). The effect
+  tracks the tab it last fitted to tell those apart — collapse that and either
+  restore breaks or BG opens off-screen.
+- **CDP harness selectors: the ui kit's `Chip` is a `<span>`, not a button, and
+  the object-library rows are buttons that WRAP spans.** Both of plan 4's
+  smoke-harness "failures" were the harness. Verify a harness fails on a
+  planted violation before believing it — both new source guards were checked
+  that way.
 
 ## Process notes
 
@@ -116,3 +144,10 @@ Do **not** try to share `CollisionPalette`.
 - Don't run two subagents in the same worktree concurrently. Doing so once
   swept one agent's work into another's commit.
 - Every plan's stated baseline test counts go stale fast. Verify, don't trust.
+- Plan 4 ran as ONE worker on one branch rather than fanning out: every task
+  edited `ClassicLevelViewport.tsx`, so parallelism bought nothing and would
+  have re-run the two-agents-one-worktree collision recorded above.
+- The node suite cannot see canvas, React or event ordering. Plan 4's three
+  scratchpad CDP harnesses (`camera-`, `restore-`, `tool-split-`) are how the
+  camera coalescing, the restore-vs-fit ordering and the tool split were
+  actually confirmed. Reach for that before reasoning from symptoms.
