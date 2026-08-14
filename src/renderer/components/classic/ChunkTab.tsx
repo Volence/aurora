@@ -7,11 +7,12 @@ import { useToastStore } from '../../state/toastStore';
 import { renderChunk, renderBlock } from '../../../core/level-classic/render';
 import { chunkIndexForId, packChunkCell, type LevelDoc } from '../../../core/level-classic/model';
 import type { UsageIndex } from '../../../core/level-classic/usage-index';
-import { cellIndexAt } from './composer-math';
+import { canvasCellIndexAt } from './composer-math';
 import { BlockThumb } from './composer-thumbs';
 import { STAMP_PREVIEW_STROKE } from '../../canvas/canvas-colors';
 import {
-  hex, SOLIDITY, SharedBanner, useEscapeCancel, useWindowStrokeEnd, drawBufferScaled, styles,
+  hex, SOLIDITY, SharedBanner, useEscapeCancel, useWindowStrokeEnd, drawBufferScaled,
+  canvasGeom, styles,
 } from './composer-shared';
 
 // Chunk tab — 16x16 block-grid editor for the selected chunk. Paint = pick block
@@ -101,8 +102,7 @@ export default function ChunkTab({ doc, usage }: { doc: LevelDoc; usage: UsageIn
   const cellAt = useCallback((e: React.MouseEvent): number | null => {
     const canvas = canvasRef.current;
     if (!canvas) return null;
-    const rect = canvas.getBoundingClientRect();
-    return cellIndexAt(e.clientX - rect.left, e.clientY - rect.top, CHUNK_CELL, 16, 16);
+    return canvasCellIndexAt(e.clientX, e.clientY, canvasGeom(canvas), CHUNK_CELL, 16, 16);
   }, []);
 
   const brushWord = () => packChunkCell({ block: composerBlockId, xf: brushXf, yf: brushYf, solidity: brushSolidity });

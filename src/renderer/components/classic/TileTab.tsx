@@ -5,12 +5,12 @@ import { useToastStore } from '../../state/toastStore';
 import type { LevelDoc } from '../../../core/level-classic/model';
 import type { UsageIndex } from '../../../core/level-classic/usage-index';
 import { decodeGenesisColor } from '../../../core/formats/palette';
-import { cellIndexAt, readTilePixels, packTilePixels, floodFillTile } from './composer-math';
+import { canvasCellIndexAt, readTilePixels, packTilePixels, floodFillTile } from './composer-math';
 import { TileThumb } from './composer-thumbs';
 import { COMPOSER_CHECK_A, COMPOSER_CHECK_B, COMPOSER_SWATCH_A, COMPOSER_SWATCH_B } from '../../canvas/canvas-colors';
 import {
   hex, SharedBanner, useEditableTileRange, tileLockReason, useEscapeCancel,
-  useWindowStrokeEnd, styles,
+  useWindowStrokeEnd, canvasGeom, styles,
 } from './composer-shared';
 
 // Tile tab — 8x8 pixel editor for the selected tile (16-color row from the act
@@ -91,8 +91,7 @@ export default function TileTab({ doc, usage }: { doc: LevelDoc; usage: UsageInd
   const pixelAt = useCallback((e: React.MouseEvent): number | null => {
     const canvas = canvasRef.current;
     if (!canvas) return null;
-    const rect = canvas.getBoundingClientRect();
-    return cellIndexAt(e.clientX - rect.left, e.clientY - rect.top, PX, 8, 8);
+    return canvasCellIndexAt(e.clientX, e.clientY, canvasGeom(canvas), PX, 8, 8);
   }, []);
 
   const onDown = useCallback((e: React.MouseEvent) => {

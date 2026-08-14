@@ -7,10 +7,10 @@ import { useToastStore } from '../../state/toastStore';
 import { renderBlock } from '../../../core/level-classic/render';
 import type { LevelDoc, BlockDef } from '../../../core/level-classic/model';
 import type { UsageIndex } from '../../../core/level-classic/usage-index';
-import { cellIndexAt } from './composer-math';
+import { canvasCellIndexAt } from './composer-math';
 import { TileThumb, BlockThumb } from './composer-thumbs';
 import { COMPOSER_SEL_CELL } from '../../canvas/canvas-colors';
-import { hex, SharedBanner, useEditableTileRange, tileLockReason, drawBufferScaled, styles } from './composer-shared';
+import { hex, SharedBanner, useEditableTileRange, tileLockReason, drawBufferScaled, canvasGeom, styles } from './composer-shared';
 
 // Block tab — 4-tile (2x2) composer for the selected block. Two right-hand
 // strips with opposite click semantics: a BROWSE-ONLY block strip (pick which
@@ -85,8 +85,7 @@ export default function BlockTab({ doc, usage }: { doc: LevelDoc; usage: UsageIn
   const onCellClick = useCallback((e: React.MouseEvent) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const rect = canvas.getBoundingClientRect();
-    const idx = cellIndexAt(e.clientX - rect.left, e.clientY - rect.top, BLOCK_CELL, 2, 2);
+    const idx = canvasCellIndexAt(e.clientX, e.clientY, canvasGeom(canvas), BLOCK_CELL, 2, 2);
     if (idx === null) return;
     setSelCell(idx);
     const cell = doc.blocks[composerBlockId]?.cells[idx];

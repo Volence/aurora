@@ -5,6 +5,7 @@ import { useClassicProjectStore } from '../../state/classicProjectStore';
 import type { EditableTileRange } from '../../../core/project/adapter';
 import { CANVAS_BLACK } from '../../canvas/canvas-colors';
 import { levelKeysEnabled } from '../../workspace/level-keys';
+import type { CanvasGeom } from './composer-math';
 
 // Shared building blocks for the composer dock's three tabs (Task B3/B4). The dock
 // was split into ChunkTab/BlockTab/TileTab sibling files (a mechanical move, no
@@ -102,6 +103,25 @@ export function useWindowStrokeEnd(endStroke: () => void): void {
     window.addEventListener('mouseup', onUp);
     return () => window.removeEventListener('mouseup', onUp);
   }, []);
+}
+
+/**
+ * Read a canvas's live box geometry for the hit-test math in composer-math.
+ *
+ * Kept as a one-liner DOM reader so the actual mapping stays pure and node-
+ * testable (this file is .tsx, which vitest does not collect — same reason
+ * tileLockReason lives in core). `clientLeft`/`clientTop` ARE the left/top
+ * border widths, and `clientWidth`/`clientHeight` the rendered content size, so
+ * no getComputedStyle parse is needed on this per-mousemove path.
+ */
+export function canvasGeom(canvas: HTMLCanvasElement): CanvasGeom {
+  const rect = canvas.getBoundingClientRect();
+  return {
+    left: rect.left, top: rect.top,
+    borderLeft: canvas.clientLeft, borderTop: canvas.clientTop,
+    cssWidth: canvas.clientWidth, cssHeight: canvas.clientHeight,
+    width: canvas.width, height: canvas.height,
+  };
 }
 
 /**
