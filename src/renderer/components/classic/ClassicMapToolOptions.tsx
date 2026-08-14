@@ -52,7 +52,15 @@ export default function ClassicMapToolOptions(): React.ReactElement {
               ? 'no object armed — pick one from the Objects panel · Esc cancels'
               : tool === 'select'
                 ? (plane === 'fg'
-                    ? 'click selects · drag moves · drag START to move spawn · Del removes · arm to place'
+                    // "switch to Objects to place", not the old "arm to place":
+                    // this bar mounts on BOTH map facets, and since the
+                    // Layout/Objects split (task 9) there is no way to arm from
+                    // Layout — `place-object` is not in facetTools.layout and the
+                    // object library is in ClassicObjectsPanels only. The old
+                    // clause named an action unreachable from the screen showing
+                    // it. On the Objects facet the sentence is still true and now
+                    // also names where you already are.
+                    ? 'click selects · drag moves · drag START to move spawn · Del removes · switch to Objects to place'
                     : 'objects are FG-only — switch to FG to edit · drag to pan')
                 : 'drag to pan · right-click eyedrops · scroll to zoom'}
       </span>

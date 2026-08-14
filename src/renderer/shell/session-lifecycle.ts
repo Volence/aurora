@@ -10,11 +10,21 @@
 // (classic dir / aeon config.basePath) — no normalization happens here, so
 // every caller that derives a session key must key on that same string.
 //
-// useActTabSync — the legacy Toolbar's zone/act selectors switch acts without
-// touching the session; these subscriptions reflect any act switch back into
-// an open+focused tab so the strip never lies about what the editor shows.
-// They call sessionStore.open directly (NOT requestOpenTab): the act is
-// already loaded, so the activation guard would be a no-op self-recursion.
+// useActTabSync — some act switches do NOT come from the tab strip, and these
+// subscriptions reflect those back into an open+focused tab so the strip never
+// lies about what the editor shows. They call sessionStore.open directly (NOT
+// requestOpenTab): the act is already loaded, so the activation guard would be
+// a no-op self-recursion.
+//
+// STILL LOAD-BEARING — do not delete as scaffolding. The example this used to
+// name (the legacy Toolbar's zone/act selectors) is gone, but three real callers
+// switch acts behind the strip's back:
+//   • agent/agent-handler.ts — the MCP/agent surface opens acts directly;
+//   • renderer/debug-hooks.ts — __dbg.openAct, which the CDP harnesses drive;
+//   • state/aeon-open.ts — the loader's own first-act pick, which the restore
+//     effect below (see the projectKey comment) explicitly depends on running
+//     first.
+// Remove this and agent-driven act switching silently stops updating the tabs.
 
 import { useEffect, useRef } from 'react';
 import { useSessionStore } from '../state/sessionStore';

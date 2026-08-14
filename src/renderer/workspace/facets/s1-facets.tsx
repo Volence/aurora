@@ -18,52 +18,42 @@
 // (core/project/s1/index.ts).
 //
 // ---------------------------------------------------------------------------
-// KNOWN CHROME GAPS — 1-3 OPEN, 4 AND 5 CLOSED AT TASK 9
+// WHAT IS STILL OPEN FOR STEP H
 // ---------------------------------------------------------------------------
-// All of these became visible when task 9 flipped the shell, and all are
-// confined to the ART and PALETTE facets — the two map facets took the flip with
-// full chrome (dock, options, status bar, panels).
+// This block used to be a five-item gap list written before the shell flip. All
+// five are now CLOSED, in this file and its neighbours, so the list is gone
+// rather than left to contradict the code beside it — a stale "no status bar
+// here" three lines above ClassicComposerStatusBar is how a reviewer ends up
+// recommending work that already exists, which has burned this branch twice.
 //
-// 1-3 STAY OPEN for step H: each is about how classic's composer becomes a
-// first-class canvas, which the spec flags as the hardest piece and possibly not
-// fully shareable. Recorded together so whoever takes step H reads one list
-// instead of rediscovering them one screen at a time.
+// Closed at task 9, for the record: the missing status bar (ClassicComposerStatusBar
+// below), the empty 44px rail (LevelWorkspace passes `undefined`, EditorShell
+// drops the rail), the bottom-strip styling (composer-shared's `dock` is
+// `flex: 1` with no borderTop, `dockContent` no longer caps at 380), the blank
+// pre-act canvas (ClassicComposerCanvas's empty state), the missing chunk picker
+// (ClassicArtPanels), and the collapse toggle that could empty the whole facet.
 //
-// 4 AND 5 WERE FIXED AT TASK 9, because neither is really about the redesign.
-// 5 was a workflow that came out of the re-home SLOWER than the shell it
-// replaced, which is a regression rather than unfinished work; 4 was a blank
-// window that read as a crash. Both fixes are recorded at their sites below
-// (ClassicArtPanels and ClassicComposerCanvas) and kept here so the numbering
-// still matches anything that cites this list.
+// STILL OPEN, and genuinely step-H shaped:
 //
-//  1. **No status bar on art/palette.** The slot is empty, so the bottom of the
-//     screen goes blank when you leave a map facet. Giving them the map bar
-//     would be worse, not better: it speaks the LEVEL tool vocabulary and its
-//     zoom control drives viewStore.zoom, which the composer does not read — a
-//     bar of controls that visibly do nothing. The composer needs its own.
-//  2. **No tool dock on art/palette.** LevelWorkspace fills the slot with a
-//     `<span />`, so EditorShell's 44px rail renders as an empty vertical strip
-//     down the left edge. Correct as data — the composer drives its own internal
-//     tabs, not editorStore.tool — but it reads as a broken column.
-//  3. **The composer is styled as a bottom strip, not a canvas.** ClassicComposerDock's
-//     `styles.dock` (components/classic/composer-shared.tsx) carries a `borderTop`
-//     for the strip it currently sits in, and `dockContent` is capped at
-//     `maxHeight: 380`. In the canvas slot that is a top-anchored panel with a
-//     stray rule above it and a large empty region below. ClassicComposerCanvas
-//     below fixes only the flex sizing — the rest is the dock's own styling and
-//     belongs to whoever redesigns it.
-//  4. FIXED (task 9). **The composer rendered nothing before an act loaded.**
-//     ClassicComposerDock `return null`s until the doc is ready — an absent
-//     bottom strip before, a blank window as the canvas. ClassicComposerCanvas
-//     now carries the same three-state empty message the map viewport does.
-//     ClassicPalettePanel still `return null`s, but it sits in a titled
-//     CollapsibleSection, so it reads as an empty section rather than a blank
-//     screen; left alone.
-//  5. FIXED (task 9). **The art facet had no chunk picker**, so picking WHICH
-//     chunk to edit meant a trip to Layout — slower than the legacy shell, where
-//     the picker sat under the composer. ChunkPicker is now mounted in
-//     ClassicArtPanels as well, under `classic.artChunks`; the argument is at
-//     that function.
+//  1. **Art and Palette are the same screen.** composerFacet('art') and
+//     composerFacet('palette') differ only in `id`, and nothing downstream reads
+//     it — the composer's tabs are chunk/block/tile, there is no palette tier.
+//     The Palette pill navigates to a pixel-identical facet. The fix is probably
+//     to drop the `palette` grant the way `collision` was dropped, but that is a
+//     statement about what classic's art surface IS.
+//  2. **The composer's default selection is `air` ($00), the one chunk that
+//     cannot be edited.** So the Art facet's resting state is a message saying
+//     it is not editable. Picking a better default (the first real chunk? the
+//     last one stamped?) is a design call.
+//  3. **The tab body does not fill the height it is given.** `dockContent` grows
+//     now, but `tabBody` is `alignItems: flex-start`, so the content is
+//     top-anchored under a large empty region. Making the tiers fill their canvas
+//     is the composer redesign proper.
+//  4. **The section headings say their name twice** — the CollapsibleSection
+//     header renders "CHUNKS" and ChunkGrid's own heading renders "CHUNKS (82)"
+//     directly beneath it. Shared with aeon (TILESET / TILES (919)), so it is a
+//     ChunkGrid/Panel question, not a classic one.
+
 
 import React from 'react';
 import ClassicLevelViewport from '../../components/classic/ClassicLevelViewport';
