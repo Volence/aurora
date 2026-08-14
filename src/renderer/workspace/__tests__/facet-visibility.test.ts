@@ -85,3 +85,26 @@ describe("the facet bar's granted list comes from the OPEN engine's manifest", (
     expect(source).not.toMatch(/useProjectStore\([^)]*capabilities/);
   });
 });
+
+// The tests above re-implement the filter rather than running the components,
+// which the node-only suite cannot mount. That leaves one gap they cannot close:
+// a call site that resolves against a LITERAL engine still satisfies every
+// behavioural assertion here, because the assertions call moduleFor themselves.
+// This is the guard for that — the same source-level shape as the seam check
+// above, applied to the two places the engine is actually threaded through.
+describe('both production call sites resolve against the OPEN engine, not a literal', () => {
+  const read = (f: string) => readFileSync(join(__dirname, '..', f), 'utf8');
+
+  it("FacetBar filters pills on its engine prop", () => {
+    const source = read('FacetBar.tsx');
+    expect(source).toContain('moduleFor(engine, f.id)');
+    expect(source).not.toMatch(/moduleFor\(\s*['"]/);
+  });
+
+  it('LevelWorkspace resolves the module on the open engine', () => {
+    const source = read('LevelWorkspace.tsx');
+    expect(source).toContain('useOpenEngine()');
+    expect(source).toContain('moduleFor(engine, facetId)');
+    expect(source).not.toMatch(/moduleFor\(\s*['"]/);
+  });
+});

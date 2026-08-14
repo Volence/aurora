@@ -1,7 +1,7 @@
 // The OffscreenCanvas global that register-facets → MapViewport needs at import
 // time is installed by vitest setupFiles (src/test/offscreen-canvas-stub.ts).
 import { describe, it, expect, beforeEach } from 'vitest';
-import { facetModules, registerFacetModule, moduleFor } from '../facet-registry';
+import { facetModules, registerFacetModule, moduleFor, mapFacet } from '../facet-registry';
 
 const Stub = () => null;
 
@@ -35,6 +35,42 @@ describe('engine-keyed facet modules', () => {
   it('returns null when no engine is open', () => {
     registerFacetModule(['aeon'], { id: 'layout', Canvas: Stub });
     expect(moduleFor(null, 'layout')).toBeNull();
+  });
+
+  it('throws on an empty engine list rather than registering nothing', () => {
+    // Otherwise the facet just has no pill anywhere, which is indistinguishable
+    // from "not built yet" — a registration bug is always a bug.
+    expect(() => registerFacetModule([], { id: 'layout', Canvas: Stub })).toThrow(/no engines/);
+    expect(moduleFor('aeon', 'layout')).toBeNull();
+  });
+});
+
+// The defaults mapFacet fills in are AEON's: MapViewport, and a status bar over
+// useAeonMapStatusPort (which reads projectStore — null for a classic open, so
+// it degrades to aeon vocabulary over an empty store rather than throwing).
+// Every one of them must therefore be overridable, which is why they live in the
+// spread-last slots object and not in positional parameters.
+describe('mapFacet slots override the aeon defaults', () => {
+  it('takes the caller Canvas and StatusBar over the built-in ones', () => {
+    const Own = () => null;
+    const OwnBar = () => null;
+    const dflt = mapFacet('layout', { RightPanel: Stub });
+    const mine = mapFacet('layout', { Canvas: Own, StatusBar: OwnBar, RightPanel: Stub });
+    expect(mine.Canvas).toBe(Own);
+    expect(mine.StatusBar).toBe(OwnBar);
+    expect(mine.Canvas).not.toBe(dflt.Canvas);
+    expect(mine.StatusBar).not.toBe(dflt.StatusBar);
+  });
+
+  it('keeps the shared shape an override does not touch', () => {
+    const m = mapFacet('collision', { Canvas: () => null, RightPanel: Stub });
+    expect(m.id).toBe('collision');
+    expect(m.mapOverlays).toBe(true);
+    // MapFacetDock is engine-neutral (shared editorStore.tool + toolsForFacet on
+    // the open profile), so it is NOT something an engine has to replace.
+    expect(m.ToolDock).toBeTypeOf('function');
+    // Un-overridden, so still aeon's bar — the thing Task 4 must remember to pass.
+    expect(m.StatusBar).toBe(mapFacet('layout', {}).StatusBar);
   });
 });
 

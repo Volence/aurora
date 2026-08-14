@@ -42,9 +42,12 @@ export default function LevelWorkspace() {
   // instead. App's mount effect registers before any project can load, so for
   // aeon this is always non-null.
   const mod = moduleFor(engine, facetId);
-  if (!mod) return <FacetUnavailable engine={engine} facetId={facetId} />;
 
-  const showPlane = facetId === 'layout' || facetId === 'collision';
+  // The FG/BG chips write editorStore.setEditingLayer, so they must not be live
+  // over a facet that has no editor — `collision` is the likely case (s1 grants
+  // it with nothing built), and chips that mutate an aeon store from a classic
+  // screen with no canvas are exactly the dead chrome this branch is removing.
+  const showPlane = mod != null && (facetId === 'layout' || facetId === 'collision');
   const header = (
     <div style={styles.header}>
       <FacetBar tabId={activeId} granted={granted} engine={engine} />
@@ -60,11 +63,23 @@ export default function LevelWorkspace() {
           were reachable only from a tab where the map is not on screen and
           "nothing happens" was the honest result. Map facets only: the art
           facet's canvas never reads viewStore.overlays. */}
-      {mod.mapOverlays && <ViewMenu />}
+      {mod?.mapOverlays && <ViewMenu />}
       <Chip disabled={!history?.canUndo} onClick={() => history?.undo()}>Undo</Chip>
       <Chip disabled={!history?.canRedo} onClick={() => history?.redo()}>Redo</Chip>
     </div>
   );
+
+  // Unserved facet: the shell and its header stay, so the facet bar is still
+  // there to click away with. An early `return <FacetUnavailable/>` instead
+  // would strand the user on a screen with no navigation at all — closing the
+  // tab would be the only exit.
+  if (!mod) {
+    return (
+      <EditorShell appBar={header} toolDock={<span />} panels={<span />}>
+        <FacetUnavailable engine={engine} facetId={facetId} />
+      </EditorShell>
+    );
+  }
 
   const { Canvas, ToolDock, ToolOptions, RightPanel, BottomExtra, StatusBar } = mod;
   return (
@@ -85,9 +100,14 @@ export default function LevelWorkspace() {
  * A granted facet with no module for the open engine. That is a PROFILE bug —
  * the manifest granted something the renderer cannot serve — so it is stated
  * rather than left blank, which is what a silent `return null` gave and what
- * made the old aeon fallback so hard to notice. The facet bar filters on the
- * same (engine, facet) resolve, so no pill leads here; only a restored session
- * record pointing at a facet this engine dropped can.
+ * made the old aeon fallback so hard to notice.
+ *
+ * Rendered as the shell's CHILD, keeping the facet bar on screen. The bar filters
+ * on the same (engine, facet) resolve, so no pill leads here — only a restored
+ * session record naming a facet this engine dropped can — but the way out has to
+ * exist for the case that does happen. Auto-healing to a served facet is a later
+ * task; this stays the terminal state either way, since the served set can
+ * legitimately be empty.
  */
 function FacetUnavailable(
   { engine, facetId }: { engine: OpenEngine | null; facetId: FacetCapability },
@@ -101,8 +121,10 @@ function FacetUnavailable(
 
 const styles: Record<string, React.CSSProperties> = {
   header: { display: 'flex', alignItems: 'center', gap: 8, width: '100%' },
+  // flex:1 is load-bearing — the shell's content area is a flex container, so
+  // without it this is a non-growing item and justifyContent centres nothing.
   unavailable: {
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
     height: '100%', color: T.textLo, fontSize: 12,
   },
 };

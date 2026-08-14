@@ -46,10 +46,13 @@ export interface FacetModule {
 const key = (engine: OpenEngine, facet: FacetCapability) => `${engine}:${facet}`;
 
 /**
- * A composite-key store, deliberately NOT core/shell/registry's createRegistry:
- * that helper keys strictly on `item.id` and throws on a duplicate, so one
- * module registered for two engines — the converged case this whole registry
- * exists to express — would be a hard error there.
+ * A composite-key store, deliberately NOT core/shell/registry's createRegistry.
+ * Not because that helper cannot hold a composite key — it is generic over
+ * `RegistryItem` and would happily store `{ id: 'aeon:layout', module }`. The
+ * reason is that the key here is NOT a property of the thing being stored: one
+ * module registers under several engines, so `id` cannot be the composite. Using
+ * the helper would mean a wrapper type per entry and a `get('aeon:layout')`
+ * whose string every caller has to build by hand, instead of `get(engine, facet)`.
  */
 class FacetModuleRegistry {
   private modules = new Map<string, FacetModule>();
@@ -74,6 +77,13 @@ export const facetModules = new FacetModuleRegistry();
 
 /** Register one module for every engine that renders this facet that way. */
 export function registerFacetModule(engines: readonly OpenEngine[], m: FacetModule): void {
+  // An empty list registers nothing and the facet silently loses its pill —
+  // indistinguishable from "not built yet" at every call site. Registration is
+  // controlled startup code, so this is always a bug (core/shell/registry.ts's
+  // house rule, and the reason that helper throws on a duplicate id).
+  if (engines.length === 0) {
+    throw new Error(`FacetModule '${m.id}' was registered for no engines`);
+  }
   for (const engine of engines) facetModules.register(engine, m);
 }
 
@@ -86,19 +96,33 @@ export function moduleFor(
   return facetModules.get(engine, facet);
 }
 
-/** The five map-canvas facets (layout/objects/rings/collision/palette) share
- *  the same ToolDock and StatusBar — only the right panel (and layout's bottom
- *  strip) differ. `Canvas` defaults to aeon's map viewport; classic passes its
- *  own so it can reuse this shape. Do NOT use this for the art facet, which has
- *  its own canvas/dock. */
+/**
+ * The five map-canvas facets (layout/objects/rings/collision/palette) share a
+ * canvas, dock and status bar — only the right panel (and layout's bottom strip)
+ * differ. Do NOT use this for the art facet, which has its own canvas/dock.
+ *
+ * THE DEFAULTS ARE AEON-BOUND. `Canvas` is aeon's MapViewport and `StatusBar`
+ * reads `useAeonMapStatusPort()`, which resolves off `projectStore.project` —
+ * null for a classic open, so it would render aeon vocabulary ('Section 0') over
+ * an empty store rather than throwing. An engine reusing this shape MUST pass
+ * its own `Canvas` and `StatusBar` in `slots`; that is why they are in the slots
+ * object (spread last, so it overrides) rather than a positional parameter that
+ * can only reach one of them.
+ *
+ * `ToolDock` is the exception: MapFacetDock is already engine-neutral — it reads
+ * the shared `editorStore.tool`, and `toolsForFacet` resolves the button set
+ * from the OPEN engine's `facetTools`. It is overridable for uniformity, not
+ * because classic needs to.
+ */
 export function mapFacet(
   id: FacetCapability,
-  slots: Pick<FacetModule, 'RightPanel' | 'BottomExtra'>,
-  Canvas: ComponentType = MapViewport,
+  // Partial, not a bare Pick: FacetModule.Canvas is required, so a bare Pick
+  // would force every existing aeon call site to restate the default.
+  slots: Partial<Pick<FacetModule, 'Canvas' | 'ToolDock' | 'StatusBar' | 'RightPanel' | 'BottomExtra'>>,
 ): FacetModule {
   return {
     id,
-    Canvas,
+    Canvas: MapViewport,
     ToolDock: () => React.createElement(MapFacetDock, { facet: id }),
     StatusBar: AeonMapStatusBar,
     mapOverlays: true,
