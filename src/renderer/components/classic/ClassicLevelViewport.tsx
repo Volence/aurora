@@ -884,7 +884,7 @@ export default function ClassicLevelViewport() {
 
   // Keyboard: Escape cancels an in-progress gesture / clears armed-place /
   // deselects; Delete or Backspace removes the selected object. The Delete key is
-  // guarded against text-entry the same way the undo keys are (ClassicProjectView)
+  // guarded against text-entry the same way the undo keys are (LevelWorkspace)
   // so a hex/number field edit can't be hijacked into a deletion.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -991,7 +991,11 @@ export default function ClassicLevelViewport() {
           }}>
             {status === 'loading' && `Loading ${ref?.label ?? 'level'}…`}
             {status === 'error' && <span style={{ whiteSpace: 'pre-line' }}>{error ?? 'Failed to load level'}</span>}
-            {status === 'idle' && 'Select an act from the tree to view it.'}
+            {/* Names the two ways in that still exist. The zone/act TREE this
+                used to point at was the legacy shell's right-dock panel, deleted
+                with it at task 9 — its job is the Explorer's Levels group, which
+                routes through the same openAct (shell/tab-activation.ts). */}
+            {status === 'idle' && 'Open a level from the Explorer, or press Ctrl+K.'}
           </div>
         )}
       </div>

@@ -190,12 +190,7 @@ function ArtCanvas() {
   }, [historyVersion, project]);
 
   // Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y are NOT bound here — LevelWorkspace, which
-  // hosts every facet, owns the one binding (see its comment).
-  // focusedHistory() there still resolves to the ZONE-ART document
-  // while this facet is focused, so art undo stays independent of the act's
-  // layout timeline; its isTypingTarget() guard keeps the same range/checkbox/
-  // button/radio exception this handler had, so Ctrl+Z still works immediately
-  // after a palette slider commit.
+  // hosts every facet, owns the one binding.
 
   // Fill the shell's canvas slot. The slot is a flex item with a definite
   // height but is not itself a flex container, so an absolutely-positioned

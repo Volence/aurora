@@ -19,7 +19,7 @@
 // property (LayoutGrid), not a chunk-pool one — it never reaches this port.
 
 import React from 'react';
-import type { ChunkEmptyKind, ChunkGridLayout, ChunkGridPort } from '../components/shared/chunk-grid-model';
+import type { ChunkEmptyKind, ChunkGridPort } from '../components/shared/chunk-grid-model';
 import { hexLabel } from '../components/shared/chunk-grid-model';
 import { chunkIndexForId, type LevelDoc } from '../../core/level-classic/model';
 import { renderChunk } from '../../core/level-classic/render';
@@ -86,26 +86,14 @@ export function rasterizeClassicChunk(doc: LevelDoc, id: string): Uint8ClampedAr
 /**
  * Null when no act is loaded — the picker renders nothing at all then.
  *
- * ---------------------------------------------------------------------------
- * WHY `layout` IS A PARAMETER AND NOT A CONSTANT (stage-4 plan 5, task 7)
- * ---------------------------------------------------------------------------
- * Every other field here is an ENGINE fact. `layout` is not: it says how wide
- * the slot the grid was dropped into is, and classic has two live slots until
- * the shell flip deletes the legacy one.
- *
- *  - `'panel'` — the picker's real home, the s1 LAYOUT facet's 260px right
- *    column, beside aeon's ChunkLibrary in the same slot of the same shell.
- *    This is the DEFAULT, so the surviving mount is the one you get for free.
- *  - `'strip'` — the legacy bottom dock (ClassicProjectView, deleted at task 9),
- *    which is the only caller that passes it. `containerPanel` is `flex: 1`, so
- *    a hardcoded `'panel'` would have made the legacy picker fight EditorShell's
- *    canvas row for half the window height for as long as the two shells
- *    coexist. **Delete the parameter with that call site.**
- *
- * Aeon never had to answer this: both of ITS slots (layout panel, art panel) are
- * panels, so a constant was enough.
+ * `layout` is a constant again, matching aeon's port. It was briefly a parameter
+ * (stage-4 plan 5, task 7) because classic had two live picker slots at once —
+ * the s1 Layout facet's 260px column and the legacy bottom dock, which needed
+ * `'strip'` to stop `containerPanel`'s `flex: 1` from taking half the window off
+ * the canvas row. Task 9 deleted that dock, so there is one slot and it is a
+ * panel.
  */
-export function useClassicChunkGridPort(layout: ChunkGridLayout = 'panel'): ChunkGridPort | null {
+export function useClassicChunkGridPort(): ChunkGridPort | null {
   const doc = useClassicLevelStore((s) => s.doc);
   const status = useClassicLevelStore((s) => s.status);
   const chunkVersions = useClassicLevelStore((s) => s.chunkVersions);
@@ -132,7 +120,7 @@ export function useClassicChunkGridPort(layout: ChunkGridLayout = 'panel'): Chun
       sourcePx: CLASSIC_CHUNK_PX,
       sizes: [CLASSIC_THUMB],
       defaultSize: CLASSIC_THUMB,
-      layout,
+      layout: 'panel',
       selectedId: String(selectedChunkId),
       statusBadge: hexLabel(selectedChunkId),
       statusHint: 'click to select · right-click viewport to eyedrop',
@@ -151,5 +139,5 @@ export function useClassicChunkGridPort(layout: ChunkGridLayout = 'panel'): Chun
       emptyKind: classicEmptyKind,
       select: (id) => selectChunkForStamp(Number(id)),
     };
-  }, [ready, doc, ids, layout, selectedChunkId, chunkEpoch, chunkVersions, selectChunkForStamp]);
+  }, [ready, doc, ids, selectedChunkId, chunkEpoch, chunkVersions, selectChunkForStamp]);
 }

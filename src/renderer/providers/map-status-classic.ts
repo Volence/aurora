@@ -1,10 +1,9 @@
 // Classic (S1 disasm) port for the neutral shared/MapStatusBar.
 //
-// The eventual replacement for the bespoke statusLeft/statusRight built inline
-// in ClassicProjectView. NOTHING RENDERS THIS YET: the two coexist until classic
-// moves onto the shared LevelWorkspace shell and ClassicProjectView is deleted,
-// which is what removes the duplicate. Until then, a change to what classic's
-// status bar says has to be made in BOTH places.
+// The replacement for the bespoke statusLeft/statusRight that used to be built
+// inline in ClassicProjectView. Live since the shell flip (stage-4 plan 5, task
+// 9) deleted that view: both s1 MAP facets render it (workspace/facets/
+// s1-facets.tsx), and it is now the only place classic's status line is said.
 //
 // Reads only — the bar reports, it never edits, so nothing here calls a classic
 // command (and so it does not appear in classic-surface.test.ts's COMMAND_SITES).
@@ -98,7 +97,7 @@ export function useClassicMapStatusPort(): MapStatusPort {
     zoneName: ref ? `S1 · ${ref.label}` : 'S1',
     scopeInfo,
     // Carries the red the old bar drew a failed load in — the one thing on this
-    // line that is not a fact about the act (ClassicProjectView.tsx:118).
+    // line that is not a fact about the act (the old bespoke classic bar).
     scopeTone,
     // Empty on purpose: classic's stamp context already rides its own hint line
     // in the chunk picker, and repeating it here would say it twice.

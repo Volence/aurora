@@ -1,6 +1,5 @@
 import React from 'react';
 import ChunkGrid from '../shared/ChunkGrid';
-import type { ChunkGridLayout } from '../shared/chunk-grid-model';
 import { useClassicChunkGridPort } from '../../providers/chunk-grid-classic';
 
 /**
@@ -12,15 +11,12 @@ import { useClassicChunkGridPort } from '../../providers/chunk-grid-classic';
  * The wrapper survives only because the port is null until an act is loaded, and
  * hooks cannot be called conditionally at the call site.
  *
- * `layout` defaults to the picker's real home — the s1 Layout facet's right panel
- * (stage-4 plan 5, task 7). The one caller that passes `'strip'` is the legacy
- * bottom dock, which task 9 deletes; DELETE THIS PROP WITH IT. See the port hook
- * for why the slot, not the engine, owns this choice.
+ * It takes no props: there is exactly ONE mount, the s1 Layout facet's right
+ * panel (stage-4 plan 5, task 7). The `layout` prop that briefly existed here
+ * served the legacy bottom dock, and went with it at task 9.
  */
-export default function ChunkPicker({ layout = 'panel' }: {
-  layout?: ChunkGridLayout;
-}): React.ReactElement | null {
-  const port = useClassicChunkGridPort(layout);
+export default function ChunkPicker(): React.ReactElement | null {
+  const port = useClassicChunkGridPort();
   if (!port) return null;
   return <ChunkGrid port={port} />;
 }

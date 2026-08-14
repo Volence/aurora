@@ -209,9 +209,10 @@ describe('the s1 layout column mounts the chunk picker', () => {
     .replace(/(^|[^:])\/\/.*$/gm, '$1');
 
   it('mounts ChunkPicker with no layout override, taking its panel default', () => {
-    // `layout="strip"` is the legacy bottom dock's business (ClassicProjectView,
-    // deleted at task 9). In a 260px column the strip caps the wall at 148px and
-    // crams the badge, the hint and the loop toggle onto the heading row.
+    // `layout="strip"` was the legacy bottom dock's business (ClassicProjectView,
+    // deleted at task 9 along with the prop itself). In a 260px column the strip
+    // caps the wall at 148px and crams the badge, the hint and the loop toggle
+    // onto the heading row.
     expect(source).toContain('<ChunkPicker />');
     expect(source).not.toMatch(/<ChunkPicker\s+layout/);
   });

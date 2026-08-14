@@ -44,7 +44,7 @@ export default function GenesisColorSliders({
   // here so a post-commit Ctrl+Z reaches its keydown handler past an INPUT guard,
   // but blur() re-enters this same onBlur handler synchronously → onCommit twice,
   // AND drops focus after one arrow-key press (breaking fine-tuning). We skip it:
-  // the classic undo guard (ClassicProjectView) already excludes type:'range', so
+  // the level undo guard (LevelWorkspace) already excludes type:'range', so
   // a focused slider never blocks undo — no blur needed.
   const commit = () => { onCommit(word); };
   return (

@@ -102,10 +102,10 @@ export default function ProjectSetupTab() {
   // unmounts across a project switch — so pending edits/checks from project A
   // would otherwise survive into project B and Apply would write A's overrides
   // into B's .aurora/project.json (data corruption). Reset on project identity
-  // change. Keyed on `dir` (not handle identity, cf. ClassicProjectView's
-  // module-scoped handle marker): unlike that view, this tab is never
+  // change. Keyed on `dir` rather than on handle identity: this tab is never
   // unmounted/remounted while the SAME project stays open, so there is no
-  // remount-without-a-project-change case to guard against here.
+  // remount-without-a-project-change case to guard against here. (The deleted
+  // classic view needed a module-scoped handle marker for exactly that case.)
   useEffect(() => {
     setEdits({});
     resetChecks();

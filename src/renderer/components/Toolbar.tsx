@@ -42,10 +42,12 @@ export default function Toolbar({ onOpenProject, onOpenRecent, onSave }: Toolbar
   const canSave = canSaveActive(activeId);
 
   // Classic (disasm) session state — the toolbar's classic twin of the aeon
-  // block below: save + dirty badge, rendered in BOTH the classic level view
-  // (ClassicProjectView's app bar) and the sprite-doc pane (App's SpriteMode app
-  // bar) so the two surfaces stay visibly part of one app. The zone/act selector
-  // was removed (Fix D): it duplicated the explorer LEVELS list + tab strip and
+  // block below: save + dirty badge. It used to render in the classic level view's
+  // app bar as well; since the shell flip (stage-4 plan 5, task 9) deleted that
+  // view, App's SpriteMode app bar is this component's ONLY mount, so every
+  // level-side control here is now unreachable. Task 10 deletes the Toolbar and
+  // gives the sprite-doc pane a header of its own. The zone/act selector went
+  // earlier (Fix D): it duplicated the explorer LEVELS list + tab strip and
   // rendered oddly inside the sprite-doc pane's app bar. Sprite mode is reached
   // by opening a sprite-doc tab, not a mode chip.
   const classicOpen = useClassicProjectStore((s) => s.status) === 'open';

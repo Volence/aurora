@@ -1,8 +1,9 @@
 // Classic (S1 disasm) facet modules — the four facets the s1 profile grants,
-// composed entirely from components that already exist. No new UI is written
-// here: this task populates the registry, and Task 9 is what flips classic off
-// LegacyWorkspace onto it. Nothing user-visible changes yet, which is the point
-// — a failure in the registration is isolated from a failure in the switch-on.
+// composed entirely from components that already exist. No new UI was written
+// here: task 4 populated the registry and task 9 flipped classic off the legacy
+// shell onto it, in two commits, so a failure in the registration stayed
+// isolated from a failure in the switch-on. This IS what a classic level tab
+// renders now.
 //
 // ART AND PALETTE SHARE ONE CANVAS. Classic's composer is a single surface with
 // its own internal Chunk/Block/Tile tabs, and its palette grid edits the same
@@ -17,14 +18,14 @@
 // (core/project/s1/index.ts).
 //
 // ---------------------------------------------------------------------------
-// KNOWN CHROME GAPS FOR THE SHELL FLIP (Task 9)
+// KNOWN CHROME GAPS — ALL FIVE ARE NOW ON SCREEN (task 9 flipped the shell)
 // ---------------------------------------------------------------------------
-// None of these is visible yet — classic still renders through LegacyWorkspace —
-// and none is fixed here, because all four are step-H shaped: they are about how
+// None is fixed here, because all five are step-H shaped: they are about how
 // classic's composer becomes a first-class canvas, which is the piece the spec
 // flags as the hardest and possibly not fully shareable. Recorded together so
-// whoever flips the shell reads one list instead of rediscovering them one
-// screen at a time.
+// whoever takes step H reads one list instead of rediscovering them one screen
+// at a time. All five are confined to the ART and PALETTE facets — the two map
+// facets took the flip with full chrome (dock, options, status bar, panels).
 //
 //  1. **No status bar on art/palette.** The slot is empty, so the bottom of the
 //     screen goes blank when you leave a map facet. Giving them the map bar
