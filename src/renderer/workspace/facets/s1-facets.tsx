@@ -41,15 +41,11 @@
 //     The Palette pill navigates to a pixel-identical facet. The fix is probably
 //     to drop the `palette` grant the way `collision` was dropped, but that is a
 //     statement about what classic's art surface IS.
-//  2. **The composer's default selection is `air` ($00), the one chunk that
-//     cannot be edited.** So the Art facet's resting state is a message saying
-//     it is not editable. Picking a better default (the first real chunk? the
-//     last one stamped?) is a design call.
-//  3. **The tab body does not fill the height it is given.** `dockContent` grows
+//  2. **The tab body does not fill the height it is given.** `dockContent` grows
 //     now, but `tabBody` is `alignItems: flex-start`, so the content is
 //     top-anchored under a large empty region. Making the tiers fill their canvas
 //     is the composer redesign proper.
-//  4. **The section headings say their name twice** — the CollapsibleSection
+//  3. **The section headings say their name twice** — the CollapsibleSection
 //     header renders "CHUNKS" and ChunkGrid's own heading renders "CHUNKS (82)"
 //     directly beneath it. Shared with aeon (TILESET / TILES (919)), so it is a
 //     ChunkGrid/Panel question, not a classic one.

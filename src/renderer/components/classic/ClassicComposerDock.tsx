@@ -86,7 +86,11 @@ export default function ClassicComposerDock() {
     const tileCount = Math.floor(doc.tiles.length / 32);
     if (s.composerBlockId >= doc.blocks.length) s.setComposerBlockId(Math.max(0, doc.blocks.length - 1));
     if (s.composerTileIndex >= tileCount) s.setComposerTileIndex(Math.max(0, tileCount - 1));
-    if (s.selectedChunkId > doc.chunks.length) s.setSelectedChunkId(0);
+    // To the LAST valid id, not to 0: ids are 1-based over doc.chunks, so
+    // doc.chunks.length is the highest real chunk and 0 is air — the one id the
+    // Chunk tab cannot edit. Clamping to air answered "your chunk was undone
+    // away" with the facet's dead resting state (see firstEditableChunkId).
+    if (s.selectedChunkId > doc.chunks.length) s.setSelectedChunkId(doc.chunks.length);
   }, [doc]);
 
   if (status !== 'ready' || !doc || !usage) return null;

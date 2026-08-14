@@ -1,10 +1,12 @@
 import type { EditableTileRange } from '../project/adapter';
 import { isTileEditable } from '../project/editable-tiles';
-import type { BlockDef } from './model';
+import type { BlockDef, ChunkDef256 } from './model';
 
 // Default composer selections for act open. Tile $000 and block $000 are blank
 // in every stock act, so landing there shows an empty checkerboard/black square
 // that reads as "broken" — pick the first entity a user can actually see.
+// Chunk $00 is worse than blank: it is AIR, which is not a chunk at all and
+// cannot be edited, so firstEditableChunkId picks around it for the same reason.
 
 /** True when the 32-byte span for tileIndex is all zero (renders fully transparent). */
 export function isBlankTile(tiles: Uint8Array, tileIndex: number): boolean {
@@ -41,4 +43,27 @@ export function firstNonBlankBlock(blocks: BlockDef[]): number {
     if (blocks[b].cells.some((c) => c.tile !== 0 || c.xf || c.yf || c.pal !== 0 || c.pri)) return b;
   }
   return 0;
+}
+
+/**
+ * The chunk ENGINE ID the composer should land on when an act opens. Same rule
+ * as the two above with one extra constraint that makes it not merely cosmetic:
+ * id $00 is AIR, which has no data behind it at all (providers/chunk-grid-
+ * classic.ts), so the Chunk tab's only possible response to it is the message
+ * saying it cannot be edited. Landing there made the whole Art facet open
+ * announcing it could not work.
+ *
+ * Engine ids are 1-based over `chunks` (chunkIndexForId owns the shift), so the
+ * return is an id, not an index: chunk `chunks[i]` is id `i + 1`.
+ *
+ * Falls back to the first chunk when every chunk is blank, and only to air ($00)
+ * when the pool is empty — at which point there is nothing editable to pick and
+ * the message is the honest screen.
+ */
+export function firstEditableChunkId(chunks: ChunkDef256[]): number {
+  if (chunks.length === 0) return 0;
+  for (let i = 0; i < chunks.length; i++) {
+    if (chunks[i].cells.some((c) => c.block !== 0 || c.xf || c.yf || c.solidity !== 0)) return i + 1;
+  }
+  return 1;
 }

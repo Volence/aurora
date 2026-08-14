@@ -501,8 +501,22 @@ describe('tool + selectedChunkId UI state', () => {
     tool().setTool('stamp-chunk');
     st().setSelectedChunkId(5);
     void useClassicLevelStore.getState().openAct(REF);
+    // Synchronous phase, before the read resolves: there is no pool to pick
+    // from yet, so the reset value is air.
     expect(st().selectedChunkId).toBe(0); // per-act chunk set → reset
     expect(tool().tool).toBe('stamp-chunk'); // workflow preference persists
+  });
+
+  it('a loaded act lands the selection on a real chunk, never on air', () => {
+    // The Art facet's Chunk tab cannot edit $00 (air has no data behind it), so
+    // landing there made the facet's resting state a "not editable" message.
+    // Same rule as composerBlockId/composerTileIndex — see tile-pick.ts.
+    openReady();
+    st().setSelectedChunkId(0);
+    return useClassicLevelStore.getState().openAct(REF).then(() => {
+      expect(st().status).toBe('ready');
+      expect(st().selectedChunkId).toBe(1);
+    });
   });
 
   it('selectChunkForStamp sets the chunk AND arms the stamp tool from view', () => {

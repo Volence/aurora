@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { isBlankTile, firstEditableNonBlankTile, firstNonBlankBlock } from '../tile-pick';
-import type { BlockDef } from '../model';
+import {
+  isBlankTile, firstEditableNonBlankTile, firstNonBlankBlock, firstEditableChunkId,
+} from '../tile-pick';
+import type { BlockDef, ChunkDef256 } from '../model';
 
 /** A pool of `n` tiles; `filled` indices get a non-zero byte. */
 function pool(n: number, filled: number[]): Uint8Array {
@@ -62,5 +64,37 @@ describe('firstNonBlankBlock', () => {
   it('falls back to 0 when every block is blank (or the list is empty)', () => {
     expect(firstNonBlankBlock([blank(), blank()])).toBe(0);
     expect(firstNonBlankBlock([])).toBe(0);
+  });
+});
+
+describe('firstEditableChunkId', () => {
+  const cell = (block = 0, extra: Partial<ChunkDef256['cells'][number]> = {}) =>
+    ({ block, xf: false, yf: false, solidity: 0, ...extra });
+  const chunk = (...cells: ChunkDef256['cells']): ChunkDef256 => ({
+    cells: [...cells, ...Array.from({ length: 256 - cells.length }, () => cell())],
+  });
+  const blank = (): ChunkDef256 => chunk();
+
+  it('returns an ENGINE ID, not an index — chunks[0] is $01', () => {
+    expect(firstEditableChunkId([chunk(cell(4))])).toBe(1);
+  });
+
+  it('skips leading blank chunks', () => {
+    expect(firstEditableChunkId([blank(), blank(), chunk(cell(9))])).toBe(3);
+  });
+
+  it('counts a flip/solidity-only cell as non-blank (it behaves differently)', () => {
+    expect(firstEditableChunkId([blank(), chunk(cell(0, { solidity: 1 }))])).toBe(2);
+    expect(firstEditableChunkId([blank(), chunk(cell(0, { xf: true }))])).toBe(2);
+  });
+
+  it('falls back to the first REAL chunk when every chunk is blank — never to air', () => {
+    // Air is the one id the Chunk tab cannot edit, so an all-blank pool still
+    // lands on something editable. Blank chunks are legitimate data.
+    expect(firstEditableChunkId([blank(), blank()])).toBe(1);
+  });
+
+  it('answers air only when there is no chunk at all', () => {
+    expect(firstEditableChunkId([])).toBe(0);
   });
 });
