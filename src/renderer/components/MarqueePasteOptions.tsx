@@ -79,7 +79,7 @@ export default function MarqueePasteOptions() {
 const styles: Record<string, React.CSSProperties> = {
   planes: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 4, padding: `${T.s2} ${T.s2} 0` },
   planeLabel: { fontSize: 10, color: T.textLo, marginRight: 2, minWidth: 38, flexShrink: 0 },
-  planeBtn: { padding: `2px ${T.s2}`, background: T.overlay, color: T.textBase, border: `1px solid ${T.border}`, borderRadius: T.rSm, cursor: 'pointer', fontSize: 11, minWidth: 26, textAlign: 'center' },
+  planeBtn: { padding: `2px ${T.s2}`, background: T.overlay, color: T.textBase, borderWidth: 1, borderStyle: 'solid', borderColor: T.border, borderRadius: T.rSm, cursor: 'pointer', fontSize: 11, minWidth: 26, textAlign: 'center' },
   planeSel: { background: T.accent, color: T.onAccent, borderColor: T.accent },
   hint: { fontSize: 10, color: T.textLo, padding: `${T.s2} ${T.s2} ${T.s2}` },
   saveRow: { display: 'flex', alignItems: 'center', gap: 4, padding: `0 ${T.s2} ${T.s2}` },

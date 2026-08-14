@@ -271,7 +271,7 @@ const styles: Record<string, React.CSSProperties> = {
   sizeCtl: { display: 'flex', gap: 2, flexShrink: 0 },
   sizeBtn: {
     padding: '0 6px', background: T.overlay, color: T.textBase,
-    border: `1px solid ${T.border}`, borderRadius: 3, cursor: 'pointer', fontSize: 10, lineHeight: '16px',
+    borderWidth: 1, borderStyle: 'solid', borderColor: T.border, borderRadius: 3, cursor: 'pointer', fontSize: 10, lineHeight: '16px',
   },
   sizeBtnSel: { background: T.accent, color: T.onAccent, borderColor: T.accent },
   // The scrollable wall: native overflow gives a real scrollbar, flex-wrap lays
@@ -291,8 +291,8 @@ const styles: Record<string, React.CSSProperties> = {
   },
   emptyHint: { fontSize: 9, color: T.borderStrong },
   cell: {
-    position: 'relative', padding: 0, flexShrink: 0, background: T.overlay,
-    border: `1px solid ${T.border}`, borderRadius: 3, cursor: 'pointer', overflow: 'hidden',
+    position: 'relative', padding: 0, flexShrink: 0, backgroundColor: T.overlay,
+    borderWidth: 1, borderStyle: 'solid', borderColor: T.border, borderRadius: 3, cursor: 'pointer', overflow: 'hidden',
   },
   cellSel: { outline: `2px solid ${T.accent}`, outlineOffset: -1, borderColor: T.accent },
   // Blank/eraser chunks: a faint diagonal hatch behind the canvas so an empty

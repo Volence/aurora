@@ -144,7 +144,7 @@ const styles: Record<string, React.CSSProperties> = {
   select: { background: T.raised, color: T.textHi, border: `1px solid ${T.borderStrong}`, borderRadius: 4, fontSize: 11, padding: '3px 4px' },
   steps: { display: 'flex', gap: 6, overflowX: 'auto', alignItems: 'flex-start', flex: 1 },
   hint: { fontSize: 12, color: T.textLo, alignSelf: 'center' },
-  stepCell: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, padding: 3, background: T.void, border: `1px solid ${T.borderStrong}`, borderRadius: 4 },
+  stepCell: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, padding: 3, background: T.void, borderWidth: 1, borderStyle: 'solid', borderColor: T.borderStrong, borderRadius: 4 },
   stepLive: { borderColor: T.success, boxShadow: `0 0 0 1px ${T.success}` },
   stepMeta: { display: 'flex', alignItems: 'center', gap: 2 },
   stepLabel: { fontSize: 10, color: T.textBase },

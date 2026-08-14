@@ -144,7 +144,7 @@ export const styles: Record<string, React.CSSProperties> = {
   },
   tabBar: { display: 'flex', gap: 2 },
   tabBtn: {
-    background: 'transparent', border: `1px solid transparent`, color: T.textLo,
+    background: 'transparent', borderWidth: 1, borderStyle: 'solid', borderColor: 'transparent', color: T.textLo,
     padding: '2px 12px', fontSize: 11, cursor: 'pointer', borderRadius: 3,
   },
   tabBtnActive: { background: T.accent, color: T.onAccent, borderColor: T.accent, fontWeight: 600 },
@@ -167,7 +167,7 @@ export const styles: Record<string, React.CSSProperties> = {
   notice: { fontSize: 11, color: T.textLo, padding: '12px 4px', maxWidth: 320, lineHeight: 1.5 },
   banner: {
     display: 'flex', alignItems: 'center', gap: 8, fontSize: 10, color: T.textBase,
-    background: 'rgba(255,170,60,0.12)', border: '1px solid rgba(255,170,60,0.4)',
+    background: 'rgba(255,170,60,0.12)', borderWidth: 1, borderStyle: 'solid', borderColor: 'rgba(255,170,60,0.4)',
     borderRadius: 3, padding: '4px 8px', maxWidth: 340,
   },
   dupBtn: {

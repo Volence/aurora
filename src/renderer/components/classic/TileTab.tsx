@@ -229,7 +229,7 @@ export default function TileTab({ doc, usage }: { doc: LevelDoc; usage: UsageInd
                 title={i === 0 ? 'index 0 — transparent' : `index ${i}`}
                 style={{
                   width: 22, height: 22, flexShrink: 0, cursor: 'pointer', borderRadius: 3,
-                  background: bg,
+                  backgroundColor: bg,
                   backgroundImage: i === 0 ? `linear-gradient(45deg,${COMPOSER_SWATCH_A} 25%,transparent 25%,transparent 75%,${COMPOSER_SWATCH_A} 75%),linear-gradient(45deg,${COMPOSER_SWATCH_A} 25%,${COMPOSER_SWATCH_B} 25%,${COMPOSER_SWATCH_B} 75%,${COMPOSER_SWATCH_A} 75%)` : undefined,
                   backgroundSize: i === 0 ? '8px 8px' : undefined,
                   backgroundPosition: i === 0 ? '0 0,4px 4px' : undefined,

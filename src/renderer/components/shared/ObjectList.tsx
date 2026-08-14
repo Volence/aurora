@@ -138,7 +138,7 @@ const styles: Record<string, React.CSSProperties> = {
   empty: { padding: 12, color: T.textLo, fontSize: 12 },
   row: {
     display: 'flex', alignItems: 'center', gap: 4, width: '100%',
-    padding: '2px 4px', background: 'transparent', border: '1px solid transparent',
+    padding: '2px 4px', background: 'transparent', borderWidth: 1, borderStyle: 'solid', borderColor: 'transparent',
     borderRadius: T.rMd, textAlign: 'left', color: T.textBase,
   },
   rowSelected: { background: T.accent, borderColor: T.accent, color: T.onAccent },
@@ -159,7 +159,7 @@ const styles: Record<string, React.CSSProperties> = {
   label: { fontSize: 11, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   secondary: {
     flexShrink: 0, padding: '2px 6px', background: 'transparent',
-    border: `1px solid ${T.border}`, borderRadius: T.rMd, cursor: 'pointer',
+    borderWidth: 1, borderStyle: 'solid', borderColor: T.border, borderRadius: T.rMd, cursor: 'pointer',
     color: T.textLo, fontSize: 12, lineHeight: 1,
   },
   secondarySelected: { color: T.onAccent, borderColor: T.onAccent },

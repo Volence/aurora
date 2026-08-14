@@ -147,7 +147,7 @@ export function Divider() {
 export const S: Record<string, React.CSSProperties> = {
   toolButton: {
     width: 40, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center',
-    background: T.border, color: T.textHi, border: `1px solid ${T.borderStrong}`, borderRadius: 4,
+    background: T.border, color: T.textHi, borderWidth: 1, borderStyle: 'solid', borderColor: T.borderStrong, borderRadius: 4,
     cursor: 'pointer', fontSize: 14, lineHeight: 1, flexShrink: 0,
   },
   toolActive: { background: T.accent, color: T.surface, borderColor: T.accent },
@@ -156,7 +156,7 @@ export const S: Record<string, React.CSSProperties> = {
   config: { display: 'inline-flex', alignItems: 'center', gap: 2 },
   ditherButton: {
     width: 40, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center',
-    background: T.border, color: T.textHi, border: `1px solid ${T.borderStrong}`, borderRadius: 4,
+    background: T.border, color: T.textHi, borderWidth: 1, borderStyle: 'solid', borderColor: T.borderStrong, borderRadius: 4,
     cursor: 'pointer', fontSize: 10, lineHeight: 1, flexShrink: 0,
   },
   stepper: { display: 'flex', alignItems: 'center', gap: 2, width: 40, justifyContent: 'space-between' },

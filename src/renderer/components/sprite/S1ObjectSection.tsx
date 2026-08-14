@@ -69,7 +69,7 @@ const styles: Record<string, React.CSSProperties> = {
   list: { display: 'flex', flexDirection: 'column', gap: 2, padding: 4, maxHeight: 240, overflowY: 'auto' },
   row: {
     display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '1px 4px',
-    background: 'transparent', border: '1px solid transparent', borderRadius: T.rMd,
+    background: 'transparent', borderWidth: 1, borderStyle: 'solid', borderColor: 'transparent', borderRadius: T.rMd,
     cursor: 'pointer', textAlign: 'left', color: T.textBase,
   },
   rowCurrent: { background: T.accent, borderColor: T.accent, color: T.onAccent },
