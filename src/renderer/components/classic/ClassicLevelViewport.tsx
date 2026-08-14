@@ -5,9 +5,14 @@ import { useEditorStore } from '../../state/editorStore';
 import { useViewStore } from '../../state/viewStore';
 import { useWorkspaceStore } from '../../workspace/workspaceStore';
 import { levelDocId } from '../../shell/tabs';
-import { armedPlacementId } from '../../state/classic-placement';
+import { armedPlacementId, PLACEMENT_SUBTYPE } from '../../state/classic-placement';
 import { useClassicProjectStore } from '../../state/classicProjectStore';
-import { useClassicObjectArtStore, refreshClassicObjectSprites, spriteFor } from '../../state/classicObjectArtStore';
+import {
+  useClassicObjectArtStore, refreshClassicObjectSprites, spriteFor, loadObjectSprite,
+  type ObjectSprite,
+} from '../../state/classicObjectArtStore';
+import { objectArtKey } from '../../../core/project/profiles/object-subtype-rules';
+import { objectSpriteEpoch } from '../../../core/level-classic/object-sprite-clock';
 import { useToastStore } from '../../state/toastStore';
 import { renderChunk } from '../../../core/level-classic/render';
 import type { LevelDoc } from '../../../core/level-classic/model';
@@ -327,8 +332,20 @@ export default function ClassicLevelViewport() {
   //
   // The refresh stays idempotent (cached per id:zone:variant:epoch), so a bump
   // that changes no sprite's own epoch now resolves entirely from cache.
-  const objectIdSig = doc
-    ? [...new Set(doc.objects.map((o) => o.id))].sort((a, b) => a - b).join(',')
+  //
+  // THE SIGNATURE IS THE SET OF PUBLISH KEYS, NOT OF IDS. `refreshClassicObjectSprites`
+  // publishes one sprite per `objectArtKey(id, zone, subtype)` — per SUBTYPE for a
+  // subtype-rule object — so a distinct-id signature could not see a placement
+  // that introduced a NEW SUBTYPE of an id the act already had. Measured on GHZ1:
+  // placing a Spring ($41, a rule object present at other subtypes) left it drawn
+  // as the red fallback box, because the id set had not changed and nothing
+  // republished. It corrected itself only on the next unrelated palette or tile
+  // edit, which reads as "sometimes the art loads".
+  //
+  // Still one entry per DISTINCT key, so 40 identical rings are one signature
+  // entry and this re-runs exactly when a sprite the map lacks becomes needed.
+  const objectIdSig = doc && ref
+    ? [...new Set(doc.objects.map((o) => objectArtKey(o.id, ref.zone, o.subtype)))].sort().join(',')
     : '';
   useEffect(() => {
     const d = useClassicLevelStore.getState().doc;
@@ -337,6 +354,43 @@ export default function ClassicLevelViewport() {
     void refreshClassicObjectSprites(projectDir, d, r.zone, { palette: paletteEpoch, tile: tileEpoch });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [objectIdSig, paletteEpoch, tileEpoch, projectDir, ref]);
+
+  // THE ARMED OBJECT'S SPRITE, warmed for the placement ghost.
+  //
+  // The refresh above publishes exactly the (id, zone, subtype) keys PRESENT IN
+  // THE ACT. That is right for drawing the act and wrong for drawing something
+  // that is not in it yet: an armed id the level does not already contain — or
+  // contains only under other subtypes, since a subtype-rule object keys one
+  // sprite per subtype and a placement always drops PLACEMENT_SUBTYPE — has no
+  // entry at all, so the ghost fell through drawObjects' 16x16 red fallback
+  // marker. Measured on GHZ1: the ghost drew an 11x11 box where the very next
+  // click produced a 34x21 sprite. The art was never missing; nobody had asked
+  // for it.
+  //
+  // Through `loadObjectSprite`, which is the SAME cache the Objects list's row
+  // thumbnails load from (components/classic/ObjectThumb) — so an id that draws
+  // a sprite in the list draws one under the cursor, by construction rather than
+  // by two code paths agreeing. Nothing new is rendered: a hit is a map lookup.
+  //
+  // Keyed, and only replaced on success, so a re-run (any doc commit re-runs
+  // this) never blanks a good ghost for a frame. A bitmap the act refresh's
+  // epoch eviction closed reports width 0 and drawObjects falls back to the
+  // marker for one frame, until this effect's reload lands.
+  const ghostArtKey = armedId != null && ref
+    ? objectArtKey(armedId, ref.zone, PLACEMENT_SUBTYPE)
+    : null;
+  const ghostSpriteRef = useRef<{ key: string; sprites: Map<string, ObjectSprite> } | null>(null);
+  useEffect(() => {
+    if (armedId == null || ghostArtKey == null || !projectDir || !doc || !ref) return;
+    let cancelled = false;
+    const epoch = objectSpriteEpoch(armedId, ref.zone, PLACEMENT_SUBTYPE, { palette: paletteEpoch, tile: tileEpoch });
+    void loadObjectSprite(projectDir, doc, armedId, ref.zone, PLACEMENT_SUBTYPE, epoch).then((sprite) => {
+      if (cancelled || !sprite || sprite.bitmap.width === 0) return;
+      ghostSpriteRef.current = { key: ghostArtKey, sprites: new Map([[ghostArtKey, sprite]]) };
+      redraw();
+    });
+    return () => { cancelled = true; };
+  }, [armedId, ghostArtKey, projectDir, doc, ref, paletteEpoch, tileEpoch, redraw]);
 
   // Fit the level's height into the canvas when an act finishes loading (and on
   // plane switches), anchored top-left. Keyed on load status + act + plane, NOT
@@ -490,13 +544,24 @@ export default function ClassicLevelViewport() {
         // onMouseDown, so the ghost lands exactly where that click would.
         const ghostObj = {
           x: clampInt(hw.x, OBJ_X_MAX), y: clampInt(hw.y, OBJ_Y_MAX),
-          xflip: false, yflip: false, respawn: false, id: armedId, subtype: 0,
+          xflip: false, yflip: false, respawn: false, id: armedId, subtype: PLACEMENT_SUBTYPE,
         };
+        // The warmed one-entry map when it is for THIS id, else the act's own
+        // published map — which is what the ghost used to rely on alone, and why
+        // an id absent from the act previewed as a red box.
+        const warm = ghostSpriteRef.current;
+        const ghostSprites = warm && warm.key === ghostArtKey ? warm.sprites : objectSprites;
         ctx.save();
+        // The one thing that says PREVIEW rather than PLACED. Same 0.6 as the
+        // chunk-stamp ghost above, deliberately: they are the same affordance
+        // for the two things this map can place, and aeon has no object ghost of
+        // its own to match (it places straight off the click).
         ctx.globalAlpha = 0.6;
         // Reuse drawObjects' own sprite/fallback draw math via a one-object doc,
         // rather than duplicating the sprite/ghost-marker/hex-box branching here.
-        drawObjects(ctx, { ...doc, objects: [ghostObj] }, invZoom, objectSprites, ref?.zone ?? '', null, null);
+        // The fallback marker is still correct for an id whose art genuinely does
+        // not resolve, and for the invisible/trigger ids that have none.
+        drawObjects(ctx, { ...doc, objects: [ghostObj] }, invZoom, ghostSprites, ref?.zone ?? '', null, null);
         ctx.restore();
       }
     }
@@ -651,7 +716,7 @@ export default function ClassicLevelViewport() {
           ...d.objects,
           {
             x: clampInt(world.x, OBJ_X_MAX), y: clampInt(world.y, OBJ_Y_MAX),
-            xflip: false, yflip: false, respawn: false, id: armed, subtype: 0,
+            xflip: false, yflip: false, respawn: false, id: armed, subtype: PLACEMENT_SUBTYPE,
           },
         ];
         const res = classicSetObjects(next);

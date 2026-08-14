@@ -14,7 +14,7 @@
 import { describe, it, expect } from 'vitest';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { armedPlacementId } from '../classic-placement';
+import { armedPlacementId, PLACEMENT_SUBTYPE } from '../classic-placement';
 
 describe('armedPlacementId', () => {
   it('is the armed id only under the place-object tool', () => {
@@ -98,5 +98,56 @@ describe('no call site reads the armed id raw', () => {
     expect(scanned).toContain('components/classic/ClassicLevelViewport.tsx');
     expect(scanned).toContain('providers/object-list-classic.ts');
     expect(scanned).toContain('providers/object-inspector-classic.ts');
+  });
+});
+
+// THE GHOST MUST PREVIEW WHAT THE CLICK WILL ACTUALLY PLACE.
+//
+// The placement ghost draws through the same `drawObjects` the placed objects
+// use, which resolves art by `objectArtKey(id, zone, subtype)`. For a
+// subtype-rule object that key selects a DIFFERENT SPRITE PER SUBTYPE — so if
+// the ghost's literal subtype and the click handler's literal subtype ever
+// drift apart, the preview shows art the click will not produce. A preview that
+// lies is worse than no preview, and nothing in the type system notices: both
+// are `number`, and the two literals sit ~150 lines apart in one file.
+//
+// The other half is the arming: a ghost drawn off the raw `armedObjectId` would
+// keep hovering after a tool switch, which the guard above already covers for
+// every reader — this pins that the viewport is one of them.
+describe('the placement ghost and the placement agree', () => {
+  const VIEWPORT = join(RENDERER, 'components/classic/ClassicLevelViewport.tsx');
+
+  it('is the subtype the click drops', () => {
+    // Named here as well as in the module, so a change to the value is a change
+    // to a test rather than a silent change to what a preview means.
+    expect(PLACEMENT_SUBTYPE).toBe(0);
+  });
+
+  it('the viewport writes the subtype through the shared constant, twice', () => {
+    const src = code(VIEWPORT);
+    // Once in the ghost's one-object doc, once in the object the click commits.
+    const shared = [...src.matchAll(/subtype:\s*PLACEMENT_SUBTYPE\b/g)].length;
+    expect(shared, 'the ghost and the placement no longer share a subtype').toBeGreaterThanOrEqual(2);
+    // …and neither of them has drifted back to a bare literal.
+    expect(src, 'a placement subtype is written as a bare literal again')
+      .not.toMatch(/subtype:\s*\d/);
+  });
+
+  it('the ghost resolves its art through the loader the Objects list uses', () => {
+    // The bug this replaced: the ghost read ONLY the act-wide published map,
+    // which holds the keys PRESENT IN THE ACT — so an armed id the level did not
+    // already contain fell through to drawObjects' red fallback box, while the
+    // very same id drew a sprite in the list beside it. Both sides must reach
+    // the same cache, or "resolves in one place, not the other" comes back.
+    const viewport = code(VIEWPORT);
+    const thumb = code(join(RENDERER, 'components/classic/ObjectThumb.tsx'));
+    for (const [name, src] of [['the viewport', viewport], ['the list thumbnail', thumb]] as const) {
+      expect(src, `${name} no longer loads object art through loadObjectSprite`)
+        .toMatch(/loadObjectSprite\(/);
+    }
+    // And the ghost draw must be able to SEE the warmed sprite — a load whose
+    // result never reaches drawObjects is the bug with extra steps.
+    expect(viewport, 'the warmed ghost sprite is not handed to drawObjects')
+      .toMatch(/drawObjects\([^)]*ghostSprites/);
   });
 });
