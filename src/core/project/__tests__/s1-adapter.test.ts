@@ -87,23 +87,24 @@ describe('s1Adapter.open resolution', () => {
       sprites: true,
       objects: 'objpos',
       build: false,
-      // Neither `collision` nor `palette`: classic has no collision editor, and
-      // its `palette` facet was a second pill over the identical art screen.
-      // Both absences are argued at the grant itself (core/project/s1/index.ts).
-      facets: ['layout', 'art', 'objects'],
+      // Three pills, and `objects` is not one of them: it merged INTO layout
+      // (owner, 2026-08-14), which is also why place-object is declared below.
+      // `palette` is back, on the MAP canvas rather than as a second name for
+      // art. `collision` and `rings` stay out. Every one of those is argued at
+      // the grant itself (core/project/s1/index.ts).
+      facets: ['layout', 'art', 'palette'],
       artTiers: [
         { id: 'chunk', label: 'Chunk', pixelSize: 256, shared: true },
         { id: 'block', label: 'Block', pixelSize: 16, shared: true },
         { id: 'tile', label: 'Tile', pixelSize: 8, shared: true },
       ],
-      // Only `layout` is declared, and only to REMOVE the shell default's
-      // marquee / paint-tile / paint-block, none of which classic implements.
-      // No place-object: that is the Objects facet's, which keeps the shell
-      // default (['place-object','select','view']) — carrying it on layout too
-      // made Objects a strict subset of Layout (task 9). See
-      // CapabilityManifest.facetTools — declaring REPLACES.
+      // Only `layout` is declared, and it both REMOVES the shell default's
+      // marquee / paint-tile / paint-block (classic implements none of them) and
+      // ADDS place-object, which the shell default for layout does not carry.
+      // That second half is the live proof that declaring REPLACES rather than
+      // intersects — see CapabilityManifest.facetTools.
       facetTools: {
-        layout: ['view', 'stamp-chunk', 'select'],
+        layout: ['view', 'stamp-chunk', 'select', 'place-object'],
       },
     });
     expect(handle.report.total).toBe(ENTRIES.length);

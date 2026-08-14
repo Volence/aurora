@@ -58,22 +58,26 @@ const NOTHING: FacetChrome = {
  * LevelWorkspace with its reasoning, which is a list of the FAILURES each
  * omission causes rather than a taxonomy:
  *
- *  - `objects` is load-bearing under BOTH engines (guarded in
- *    __tests__/facet-visibility.test.ts). Classic gates object editing on the
- *    plane outright — select and place-object only act on FG, and fall through
- *    to pan on BG — so an objects facet with no plane control is one whose tools
- *    silently do nothing whenever the plane was left on BG. Aeon does not gate
- *    the placement, but renders only Plane B on BG and draws the object overlay
- *    solely in the FG branch, so the same omission strands you on a canvas where
- *    every object is invisible.
+ *  - `objects` is load-bearing for AEON, which still has the facet: aeon renders
+ *    only Plane B on BG and draws the object overlay solely in the FG branch, so
+ *    omitting the chip strands you on a canvas where every object is invisible.
+ *    It stays on this list although CLASSIC no longer grants the facet (it
+ *    merged into `layout`, 2026-08-14) — the list is keyed on the facet, not on
+ *    the engine, and classic's own object gating rode over to `layout` with the
+ *    tools: select and place-object act only on FG and fall through to pan on
+ *    BG, so a classic Layout with no plane control is one whose object tools
+ *    silently do nothing whenever the plane was left on BG.
  *  - `rings` is the IDENTICAL aeon bug: the ring overlay draws only in the FG
  *    branch and `place-ring` carries no plane guard, so on BG the facet is a
  *    canvas with no rings and a tool writing invisible ones.
- *  - `palette` is view-only, so nothing writes invisibly — but its canvas is
- *    still the plane-gated map, and with no chip a plane left on BG shows Plane
- *    B under a palette editor for art you cannot see. It is on the list because
- *    the chip is LIVE there, which is the actual rule; a chip is dead chrome
- *    only where the canvas ignores it.
+ *  - `palette` is view-only under both engines (its only tool is `view`), so
+ *    nothing writes invisibly — but its canvas is the plane-gated map under
+ *    both, aeon's MapViewport and classic's ClassicLevelViewport, and with no
+ *    chip a plane left on BG shows Plane B under a palette editor for art you
+ *    cannot see. That is the sharpest case there is for classic, whose palette
+ *    facet exists precisely so a recolour can be judged against the act. It is
+ *    on the list because the chip is LIVE there, which is the actual rule; a
+ *    chip is dead chrome only where the canvas ignores it.
  *
  * That leaves exactly one served facet off: `art`, whose canvas is a composer
  * under both engines and reads no plane at all.

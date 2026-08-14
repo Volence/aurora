@@ -106,14 +106,28 @@ describe('classicScopeTone', () => {
 // Drop the bar from either facet and the flag becomes a silent hole where the
 // tool is explained nowhere at all.
 describe('the bar defers because classic\'s map facets speak for themselves', () => {
-  it('both s1 map modules mount a ToolOptions hint line', async () => {
-    const [{ registerS1FacetModules }, { moduleFor, facetModules }] = await Promise.all([
-      import('../../workspace/register-facets'), import('../../workspace/facet-registry'),
-    ]);
+  it('EVERY s1 map module mounts a ToolOptions hint line', async () => {
+    // Derived from the registry rather than named one by one: the flag is a
+    // claim about the whole set, and the set changes. It was layout+objects;
+    // objects merged into layout and `palette` arrived on the same canvas
+    // (2026-08-14), and the palette module was written WITHOUT this bar until
+    // this test failed — which is the hole the flag creates, exactly as
+    // described above, on a facet whose only tool would then go unexplained.
+    const [{ registerS1FacetModules }, { moduleFor, facetModules }, { S1_FACETS }] =
+      await Promise.all([
+        import('../../workspace/register-facets'),
+        import('../../workspace/facet-registry'),
+        import('../../../core/project/s1'),
+      ]);
     facetModules.clear();
     registerS1FacetModules();
-    expect(moduleFor('s1', 'layout')?.ToolOptions).toBeTypeOf('function');
-    expect(moduleFor('s1', 'objects')?.ToolOptions).toBeTypeOf('function');
+    const mapFacets = S1_FACETS.filter((f) => moduleFor('s1', f)?.mapOverlays === true);
+    // The composer is not a map facet and has no such bar; if this ever empties,
+    // the loop below would pass by testing nothing.
+    expect(mapFacets).toEqual(['layout', 'palette']);
+    for (const f of mapFacets) {
+      expect(moduleFor('s1', f)?.ToolOptions, `s1/${f}`).toBeTypeOf('function');
+    }
   });
 
   it('…and the port therefore suppresses the generic hint', () => {

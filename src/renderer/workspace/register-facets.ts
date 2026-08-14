@@ -9,7 +9,7 @@ import { objectsFacet } from './facets/objects-facet';
 import { ringsFacet } from './facets/rings-facet';
 import { collisionFacet } from './facets/collision-facet';
 import { paletteFacet } from './facets/palette-facet';
-import { s1LayoutFacet, s1ObjectsFacet, s1ArtFacet } from './facets/s1-facets';
+import { s1LayoutFacet, s1ArtFacet, s1PaletteFacet } from './facets/s1-facets';
 
 export function registerAeonFacetModules(): void {
   registerBuiltinFacets();
@@ -32,7 +32,7 @@ export function registerAeonFacetModules(): void {
  */
 export function registerS1FacetModules(): void {
   registerBuiltinFacets();
-  for (const m of [s1LayoutFacet, s1ArtFacet, s1ObjectsFacet]) {
+  for (const m of [s1LayoutFacet, s1ArtFacet, s1PaletteFacet]) {
     registerFacetModule(['s1'], m);
   }
 }

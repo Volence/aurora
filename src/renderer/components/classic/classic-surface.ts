@@ -55,34 +55,44 @@ export type ClassicSurface = 'map' | 'art';
 
 /**
  * The facets each surface SERVES, primary first. Deliberately not a 1:1 map:
- * classic has two surfaces and more facets than that, because one surface can be
- * the canvas of SEVERAL —
+ * classic has two surfaces and three facets, because one surface can be the
+ * canvas of SEVERAL —
  *
- *   • `map`  → `layout` + `objects`. One ClassicLevelViewport is the canvas of
- *     both (workspace/facets/s1-facets.tsx). They differ in their RIGHT COLUMN,
- *     which is the whole point of the split: layout has the chunk picker,
- *     objects has the object list and the inspector. (This sentence used to say
- *     the list and inspector sat in both columns. They did once; the Layout/
- *     Objects split moved them, and the stale claim here is what a later reader
- *     took as licence to make Objects a subset of Layout again.)
- *   • `art`  → `art` (+ `palette`, see below). One ClassicComposerDock is the
- *     canvas, with ClassicPalettePanel a section in its column.
+ *   • `map`  → `layout` + `palette`. One ClassicLevelViewport is the canvas of
+ *     both (workspace/facets/s1-facets.tsx). They differ in their RIGHT COLUMN
+ *     and in their tools: layout is the chunk picker / inspector / object
+ *     library over `view / stamp-chunk / select / place-object`; palette is the
+ *     CRAM grid over `view` alone, judging a recolour against the whole act.
+ *   • `art`  → `art` + `palette`. One ClassicComposerDock is the canvas, with
+ *     ClassicPalettePanel a section in its column.
  *
  * So the surface a pointer-down lands in genuinely CANNOT say which of them the
  * user means — it is literally the same component either way. A 1:1 map made the
- * non-primary facet unreachable in practice: light the Objects pill, click
- * anywhere in the map, and the claim wrote `layout` straight back and the pill
- * jumped under the pointer.
+ * non-primary facet unreachable in practice: light the Palette pill, click
+ * anywhere in the map, and the claim writes `layout` straight back and the pill
+ * jumps under the pointer.
  *
- * `palette` STAYS IN THE ART SET although the s1 profile no longer grants it
- * (core/project/s1/index.ts — it was a second pill over the identical art
- * screen). This map states which DOCUMENT a facet edits, not which pills exist:
- * `palette` edits the zone-art document under either engine, which is exactly
- * what editorStore's ZONE_ART_FACETS says, and those two must agree (see the
- * drift test below). Dropping it here would also mean a restored session record
- * naming `palette` claims `art` on the first click — repointing undo before
- * resolveFacet has healed the record — for no gain, since an ungranted facet
- * renders FacetUnavailable and has no composer to click in.
+ * ---------------------------------------------------------------------------
+ * `palette` IS IN BOTH SETS, AND THAT IS NOT A BUG (2026-08-14)
+ * ---------------------------------------------------------------------------
+ * This comment used to say the map "states which DOCUMENT a facet edits", which
+ * held only while each facet had one surface. The palette facet has TWO parts on
+ * two surfaces: its CANVAS is the map (ClassicLevelViewport, whose root claims
+ * `map`) and its EDITOR is the palette grid (ClassicPalettePanel, whose root
+ * claims `art`, because a palette edit belongs to the zone-art document). Both
+ * claims land while the user is on the Palette facet and both must be no-ops, so
+ * `palette` has to be in both sets. Take it out of `map` and panning the act you
+ * are recolouring throws you onto Layout.
+ *
+ * SO THIS MAP NO LONGER STATES WHICH DOCUMENT ANYTHING EDITS. editorStore's
+ * ZONE_ART_FACETS is the sole statement of that, and it is keyed on the FACET,
+ * which is the thing that is unambiguous — a palette edit routes to `zoneart:`
+ * whichever surface the pointer was in. history-routing.test.ts reads both and
+ * asserts exactly that, rather than the surface→document equation it used to.
+ *
+ * There is no risk of a LAYOUT edit routing to zone-art from the palette facet:
+ * `palette` declares no facetTools, so it takes the shell default `['view']` and
+ * its canvas has no tool that writes.
  *
  * Hence: a surface claims only when the current facet is OUTSIDE its set. Inside
  * it, the user is already where they said they were and the surface has nothing
@@ -91,13 +101,10 @@ export type ClassicSurface = 'map' | 'art';
  * is the only thing that knows which half was meant. Primary-first is what a
  * genuine cross-surface move lands on.
  *
- * Exported so the routing tests can read the real thing rather than a copy: this
- * and editorStore's ZONE_ART_FACETS are two statements of one fact (which
- * document a facet edits), and drift between them repoints Ctrl+Z with no other
- * symptom — see history-routing.test.ts.
+ * Exported so the routing tests can read the real thing rather than a copy.
  */
 export const SURFACE_FACETS: Record<ClassicSurface, readonly FacetCapability[]> = {
-  map: ['layout', 'objects'],
+  map: ['layout', 'palette'],
   art: ['art', 'palette'],
 };
 

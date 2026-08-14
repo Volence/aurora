@@ -179,17 +179,18 @@ describe('classic surfaces claim their facet', () => {
 // ---------------------------------------------------------------------------
 // The claim itself. Everything above is source-level wiring; this is behaviour.
 // ---------------------------------------------------------------------------
-// Classic has FOUR facets and TWO surfaces, because each surface is the canvas
-// of a pair (layout+objects share ClassicLevelViewport; art+palette share the
-// composer). A surface claiming ONE facet made the other half of each pair
-// unreachable: the claim fires on every pointer-down, so lighting the Objects
-// pill and then clicking the map wrote `layout` straight back.
+// Classic has THREE facets and TWO surfaces, because each surface is the canvas
+// of a pair (layout+palette share ClassicLevelViewport; art+palette share the
+// composer — `palette` is in both sets, see SURFACE_FACETS for why). A surface
+// claiming ONE facet made the other half of each pair unreachable: the claim
+// fires on every pointer-down, so lighting the Palette pill and then panning the
+// map would write `layout` straight back.
 
 const LEVEL_TAB = 'level:ghz:1';
 
 /** The s1 profile's real declaration (core/project/s1/index.ts), as a literal so
  *  a profile edit has to come through here — the style facet-tools.test.ts uses. */
-const S1_LAYOUT_TOOLS = ['view', 'stamp-chunk', 'select'];
+const S1_LAYOUT_TOOLS = ['view', 'stamp-chunk', 'select', 'place-object'];
 
 /** No project open ⇒ toolsForFacet falls to the SHELL defaults. `openClassic`
  *  below is how a test asks for classic's declared sets instead. */
@@ -202,7 +203,7 @@ function openClassic(): void {
   useClassicProjectStore.setState({
     status: 'open',
     capabilities: {
-      facets: ['layout', 'art', 'objects', 'palette'],
+      facets: ['layout', 'art', 'palette'],
       facetTools: { layout: S1_LAYOUT_TOOLS },
     },
   } as never);
@@ -237,12 +238,16 @@ describe('focusClassicSurface', () => {
     expect(facet()).toBe('art');
   });
 
-  // The two the 1:1 map got wrong. Without them, Objects and Palette are pills
-  // you can light but not work in.
-  it('leaves OBJECTS alone when the user clicks in the map', () => {
-    useWorkspaceStore.getState().setFacet(LEVEL_TAB, 'objects');
+  // The two the 1:1 map got wrong. Without them, the non-primary facet of each
+  // pair is a pill you can light but not work in.
+  it('leaves PALETTE alone when the user pans the MAP', () => {
+    // The case the palette facet's map canvas created (2026-08-14): its canvas
+    // claims `map` and its editor claims `art`, so BOTH sets have to contain it.
+    // Drop it from `map` and panning the act you are recolouring throws you onto
+    // Layout — with the tool re-scoped out from under you as it goes.
+    useWorkspaceStore.getState().setFacet(LEVEL_TAB, 'palette');
     focusClassicSurface('map');
-    expect(facet()).toBe('objects');
+    expect(facet()).toBe('palette');
   });
 
   it('leaves PALETTE alone when the user clicks in the composer', () => {
@@ -258,7 +263,7 @@ describe('focusClassicSurface', () => {
     // cases above, which is why those are spelled out separately: this says
     // nothing about WHICH of the pair, and a 1:1 map would satisfy it too. What
     // it catches is a set gaining a facet its surface cannot actually edit.
-    for (const start of ['layout', 'objects', 'art', 'palette'] as const) {
+    for (const start of ['layout', 'art', 'palette'] as const) {
       for (const [surface, served] of Object.entries(SURFACE_FACETS)) {
         useWorkspaceStore.getState().setFacet(LEVEL_TAB, start);
         focusClassicSurface(surface as ClassicSurface);
@@ -268,7 +273,7 @@ describe('focusClassicSurface', () => {
   });
 
   it('writes nothing at all when the facet is already served', () => {
-    useWorkspaceStore.getState().setFacet(LEVEL_TAB, 'objects');
+    useWorkspaceStore.getState().setFacet(LEVEL_TAB, 'palette');
     const before = useWorkspaceStore.getState().record;
     focusClassicSurface('map');
     // Object identity, not equality: a redundant setFacet would replace the
@@ -303,37 +308,47 @@ describe('focusClassicSurface and the shared tool', () => {
   });
 
   it('does not touch the tool when the facet is already served', () => {
-    // `place-object` is the sharp case: it belongs to OBJECTS and is absent from
-    // classic's declared layout set, so a leaked switchFacet('layout') would
-    // clamp it away to 'view' — loudly visible. Staying put is the whole point.
-    useWorkspaceStore.getState().setFacet(LEVEL_TAB, 'objects');
-    useEditorStore.getState().setTool('place-object');
+    // The probe has to be a tool the LEAK would visibly change, or the test
+    // passes whether or not the claim short-circuits. A leak here calls
+    // switchFacet(tab, the map surface's primary) = layout, so the probe is a tool
+    // outside classic's declared layout set: `paint-tile` is clamped to 'view'
+    // by that switch and left alone by the no-op.
+    //
+    // Set by hand, like `never leaves the user holding a tool the dock will not
+    // show` below: no classic UI arms paint-tile, which is exactly why it is a
+    // clean tripwire. (It used to be place-object on the Objects facet, which
+    // was a real user state — the merge into Layout put place-object INSIDE
+    // layout's set, so it no longer discriminates.)
+    useWorkspaceStore.getState().setFacet(LEVEL_TAB, 'palette');
+    useEditorStore.setState({ tool: 'paint-tile' } as never);
     focusClassicSurface('map');
-    expect(facet()).toBe('objects');
-    expect(tool()).toBe('place-object');
+    expect(facet()).toBe('palette');
+    expect(tool()).toBe('paint-tile');
   });
 
   it('re-scopes the tool to CLASSIC\'s declared set on a real surface change', () => {
-    // Coming back to the map from the composer lands on LAYOUT, whose declared
-    // set is terrain-only since task 9 — so a resident `place-object` is clamped
-    // to the layout default rather than left armed on a facet with no button for
-    // it. (Before task 9 classic's layout declared place-object and this
-    // asserted it survived; the split is what changed the right answer.)
+    // Coming back to the map from the composer lands on LAYOUT, which declares
+    // no `paint-block` — so a resident one is clamped to the layout default
+    // rather than left armed on a facet with no button for it.
     useWorkspaceStore.getState().setFacet(LEVEL_TAB, 'art');
-    useEditorStore.getState().setTool('place-object');
+    useEditorStore.setState({ tool: 'paint-block' } as never);
     focusClassicSurface('map');
     expect(facet()).toBe('layout');
     expect(tool()).toBe('view');
   });
 
-  it('but a placement survives when the map claim lands on OBJECTS', () => {
-    // The mirror of the case above, and the reason the clamp is not a loss:
-    // Objects is where place-object lives, so working there and clicking the map
-    // keeps the armed tool.
-    useWorkspaceStore.getState().setFacet(LEVEL_TAB, 'objects');
+  it('but a PLACEMENT survives that same move, because Layout declares it', () => {
+    // This assertion has flipped twice with the manifest, which is why it is
+    // spelled out rather than folded into the case above. While Objects existed,
+    // place-object was absent from layout's declared set and a switch to layout
+    // clamped it to 'view'; the merge (2026-08-14) put it back, so arming a
+    // placement, dipping into the composer and clicking the map returns you to
+    // the map still holding it.
+    expect(S1_LAYOUT_TOOLS).toContain('place-object');
+    useWorkspaceStore.getState().setFacet(LEVEL_TAB, 'art');
     useEditorStore.getState().setTool('place-object');
     focusClassicSurface('map');
-    expect(facet()).toBe('objects');
+    expect(facet()).toBe('layout');
     expect(tool()).toBe('place-object');
   });
 

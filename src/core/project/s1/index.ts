@@ -42,23 +42,41 @@ const SIDECAR = '.aurora/project.json';
  * assertion, so they could not fail by construction. They read this now, which
  * turns them into cross-checks between the real grant and the facet registry.
  *
- * TWO FACETS ARE DELIBERATELY ABSENT, both reversible by putting the id back in
- * this list (and its module back in the renderer's register-facets):
+ * THREE PILLS: Layout / Art / Palette. What is in the list and what is not, and
+ * why, all of it reversible by editing this list (and the renderer's
+ * register-facets to match):
  *
- *  - `collision`. Classic has no collision-editing UI: classicSetColind's only
- *    caller is the agent handler, and classic's sole collision affordance is a
- *    read-only overlay. Granting it would put a Collision pill over an aeon-only
+ *  - `layout` is THE MAP FACET, terrain and placement together. It absorbed
+ *    `objects` (owner decision 2026-08-14) — see facetTools.layout below for the
+ *    argument, which is that a facet you can select and MOVE an object in but
+ *    not ADD one to is incoherent, and that "browse objects, open one for art
+ *    editing" already has two homes that both open a sprite-doc TAB (the
+ *    Explorer's Object Library group, and Ctrl+K). Object art is edited through
+ *    tabs, not through a facet; a third home would be duplication.
+ *  - `art` is the composer — the tile/block/chunk tiers of the zone-art doc.
+ *  - `palette` is BACK, in a form that is not a second name for `art`. It was
+ *    dropped because both pills rendered the same composer, the same right
+ *    column and the same status bar, differing in `id` alone. It returns with
+ *    the MAP as its canvas (renderer's workspace/facets/s1-facets.tsx): a
+ *    Genesis palette line is shared by everything drawn with it, so "did that
+ *    recolour break anything?" is a question only the whole act can answer, and
+ *    the composer's 256px chunk cannot. That is exactly why aeon's palette facet
+ *    survived the same review. It is also classic's ONLY reachable palette
+ *    editor for a palette-only hack: the Art column's grid sits under an
+ *    82-chunk wall, which is how it came to be believed not to exist at all.
+ *
+ *  - `objects` is ABSENT, and that is the merge above rather than a gap. Aeon
+ *    keeps its Objects facet: aeon's layout column is already five sections deep
+ *    and its objects facet carries a real properties editor classic has no
+ *    equivalent of (providers/properties-classic.ts).
+ *  - `collision` is ABSENT. Classic has no collision-editing UI: classicSetColind's
+ *    only caller is the agent handler, and classic's sole collision affordance is
+ *    a read-only overlay. Granting it would put a Collision pill over an aeon-only
  *    CollisionPalette (spec §3.0.3). Owner decision 2026-08-13; restore when the
  *    classic collision editor lands as its own designed feature.
- *  - `palette`. It was a SECOND NAME for `art`: both pills rendered the same
- *    composer, the same right column and the same status bar — the two modules
- *    differed in `id` alone and nothing downstream read it (the renderer's
- *    workspace/facets/s1-facets.tsx). Classic's palette grid is a section INSIDE
- *    the art column, not a surface of its own, so the pill navigated to a
- *    pixel-identical screen. Restore when classic's art surface is redesigned in
- *    step H and there is a palette screen that differs from the art one.
+ *  - `rings` is ABSENT: S1 rings are objects in objpos, not a separate layer.
  */
-export const S1_FACETS = ['layout', 'art', 'objects'] as const satisfies readonly FacetCapability[];
+export const S1_FACETS = ['layout', 'art', 'palette'] as const satisfies readonly FacetCapability[];
 
 // ---------------------------------------------------------------------------
 // Profile enumeration — flattens the profile into an ordered list of resolvable
@@ -388,24 +406,32 @@ export const s1Adapter: ProjectAdapter = {
           { id: 'block', label: 'Block', pixelSize: 16, shared: true },
           { id: 'tile', label: 'Tile', pixelSize: 8, shared: true },
         ],
-        // `layout` is declared because the SHELL default offers marquee /
-        // paint-tile / paint-block, none of which classic implements. It is
-        // otherwise the same shape as aeon's: terrain tools plus `select`, and
-        // NO `place-object`.
+        // `layout` is declared for two reasons. It SUBTRACTS marquee /
+        // paint-tile / paint-block, which the shell default offers and classic
+        // has no implementation of; and it ADDS `place-object`, which the shell
+        // default for layout does not carry (that is why this declaration is
+        // also the live proof that a profile declaration REPLACES the default
+        // rather than intersecting it — see workspace/facet-tools.ts).
         //
-        // This used to carry place-object as well, with a comment saying it did
-        // so "until the workspace re-home splits it into per-facet docks". The
-        // re-home landed at task 9 and the declaration did not move with it,
-        // which left Objects a strict SUBSET of Layout — placement, the object
-        // list and the inspector were all on both, so there was nothing you
-        // could do in Objects that you could not do in Layout, and the pill was
-        // dead weight. Placement is the Objects facet's job; you still SEE
-        // objects while editing terrain, through the View menu's Objects overlay.
+        // THE HISTORY OF THIS ONE LINE, because it has now been wrong in both
+        // directions and each time the comment beside it was the reason:
+        //   1. It carried place-object with a comment saying it did so "until
+        //      the workspace re-home splits it into per-facet docks". The
+        //      re-home landed and the declaration did not move, leaving Objects
+        //      a strict SUBSET of Layout — same tools, and the list and the
+        //      inspector on both columns — so the Objects pill was dead weight.
+        //   2. It was removed, which split the facets cleanly but left Layout
+        //      able to SELECT, MOVE and DELETE an object while unable to ADD
+        //      one. That is not a smaller task, it is half of one task.
+        // The resolution (owner, 2026-08-14) is the merge: Layout is the map
+        // facet, and everything you do TO the map — terrain and placements —
+        // is on it. `objects` is no longer granted at all.
         //
-        // `objects` stays undeclared on purpose: the shell default is
-        // ['place-object', 'select', 'view'], and classic implements all three.
+        // Order is dock order and the first entry is the facet DEFAULT, so
+        // `view` stays first: switching to Layout must not land you holding a
+        // tool that writes.
         facetTools: {
-          layout: ['view', 'stamp-chunk', 'select'],
+          layout: ['view', 'stamp-chunk', 'select', 'place-object'],
         },
       },
       report,
