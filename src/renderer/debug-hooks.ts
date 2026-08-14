@@ -39,6 +39,14 @@ interface DebugApi {
    */
   activate(zone: string, act: number): Promise<boolean>;
   /**
+   * Put the classic level store back to IDLE while leaving the level TAB open —
+   * the "a level tab is focused but no act is loaded" state. A cold open cannot
+   * be photographed in it (session-lifecycle restores an act immediately, and the
+   * load beats any CDP round-trip), so a screenshot harness has no other way in
+   * and the facets' empty renders had never been looked at.
+   */
+  resetLevel(): void;
+  /**
    * Stub for the richer read/mtime instrumentation the investigation harness once
    * carried. The load/paint numbers the harnesses actually assert on come from
    * levelState()/artState() and a self-installed setTransform draw counter, so
@@ -74,6 +82,7 @@ export function installDebugHooks(): void {
     },
     setView: (x, y, zoom) => useViewStore.getState().setViewport(x, y, zoom),
     activate: (zone, act) => activateLevelTarget(levelDocId(zone, String(act))),
+    resetLevel: () => useClassicLevelStore.getState().reset(),
     perf: () => ({ marks: [], readCount: 0, readTotalMs: 0, mtimeCount: 0, mtimeTotalMs: 0 }),
   };
   (window as unknown as { __dbg: DebugApi }).__dbg = dbg;
