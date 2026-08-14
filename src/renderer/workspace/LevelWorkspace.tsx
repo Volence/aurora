@@ -1,8 +1,9 @@
 // The facet-based level workspace (spec §4) — aeon-only until Stage 4 re-homes
 // classic. Owns the ONE EditorShell; the active facet module fills its slots.
 // The workspace header (EditorShell's appBar slot) carries the facet bar plus
-// the workspace controls that used to live on the legacy Toolbar: FG/BG plane
-// toggle (layout+collision) and undo/redo for the focused document.
+// the workspace controls that used to live on the legacy Toolbar: the FG/BG
+// plane toggle (on every facet whose canvas is plane-gated — see showPlane) and
+// undo/redo for the focused document.
 
 import React from 'react';
 import EditorShell from '../shell/EditorShell';
