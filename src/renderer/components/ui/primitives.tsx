@@ -3,35 +3,37 @@ import React from 'react';
 import { T } from './theme';
 
 /**
- * THE HEIGHT CAP FOR A LIST OR GRID INSIDE A CollapsibleSection, in px.
+ * A facet's right-hand column: A FULL-HEIGHT FLEX COLUMN THAT ITS SECTIONS
+ * SHARE.
  *
- * A right-hand column is a scrolling stack of titled sections, and a section
- * whose content grows with the DATA silently buries every section under it: the
- * classic Art column mounts an 82-chunk grid (~900px of thumbnails in a 260px
- * column) above its palette editor, and the palette editor was reported as not
- * existing. Nobody scrolls past nine screens of chunks to find out.
+ * EditorShell already hands this box a definite height — it is a flex item in
+ * the `flex: 1; overflow: hidden` canvas row, so it stretches to the row — and
+ * `minHeight: 0` is what lets that height actually bind. Without it a flex item
+ * refuses to shrink below its content, so the column silently grows past the
+ * bottom of the window and every "fill the remaining space" rule inside it
+ * measures against a height nobody can see. That is what a `maxHeight: 260px`
+ * cap on each list was standing in for, and why the cap looked necessary: `flex`
+ * inside a column with no usable height does nothing, so a fixed pixel number
+ * was the only thing left that worked.
  *
- * So a panel whose item count is data-driven scrolls INSIDE its section instead
- * of growing it. Then the column's own scroll only has to travel a few hundred
- * px per section and every section HEADER is reachable without reading a grid.
+ * With the height bound, sections divide it (see ui/CollapsibleSection):
+ *   - a CONTENT section (a form, a toggle row) takes its natural height and
+ *     never stretches;
+ *   - a LIST section (`variant="list"`) claims an equal share of whatever is
+ *     left and scrolls inside that share, or takes its natural height if that
+ *     is smaller and hands the surplus back.
  *
- * A fixed number rather than a fraction of the viewport, deliberately. The
- * competing option was a `vh` share, which sounds adaptive and is not: these
- * sections are 1-of-3 in a column whose height nobody knows at style time, so a
- * share that fits three sections leaves one section looking arbitrarily
- * truncated when it is the only one expanded — and the collapse state that
- * decides which is which lives in localStorage. 260 is five rows of the chunk
- * grid's default 48px cell, or roughly eight object rows: enough to browse in,
- * short enough that the next header is on screen with it.
+ * `scroll` stays, and is the escape hatch rather than the plan: a column whose
+ * CONTENT sections alone over-subscribe it (SpriteMode mounts six) has nothing
+ * left to divide, and scrolling the column is the correct degradation. When the
+ * sections fit, nothing overflows and the scrollbar never appears.
  */
-export const SECTION_LIST_MAX_HEIGHT = 260;
-
 export function Panel({ children, width, scroll = false, style }: {
   children: React.ReactNode; width?: number; scroll?: boolean; style?: React.CSSProperties;
 }) {
   return (
     <div style={{
-      display: 'flex', flexDirection: 'column', background: T.void,
+      display: 'flex', flexDirection: 'column', minHeight: 0, background: T.void,
       borderLeft: `1px solid ${T.border}`, flexShrink: 0,
       ...(width ? { width } : {}), ...(scroll ? { overflow: 'auto' } : {}), ...style,
     }}>{children}</div>

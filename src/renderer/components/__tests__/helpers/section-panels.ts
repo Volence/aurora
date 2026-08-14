@@ -33,11 +33,41 @@ const read = (file: string): string => readFileSync(file, 'utf8');
  * so the match is "the first JSX tag after the section's opening tag".
  */
 function sectionChildren(source: string): string[] {
-  const names: string[] = [];
-  for (const m of source.matchAll(/<CollapsibleSection[^>]*>\s*(?:\{[^}]*\}\s*)?<([A-Z]\w*)/g)) {
-    names.push(m[1]);
+  return sectionTags(source).map((s) => s.child);
+}
+
+/** One `<CollapsibleSection …>` in a facet module, with what it declares itself to be. */
+export interface SectionTag {
+  /** The facet module's filename, for failure messages. */
+  facet: string;
+  /** `id="…"`, the panel-state key — the readable name for this slot. */
+  id: string;
+  /** `variant="…"`, defaulting to `content` exactly as the component does. */
+  variant: 'content' | 'list';
+  /** The component it mounts, as a JSX tag name. */
+  child: string;
+}
+
+/**
+ * Every titled section a facet module mounts, with its declared VARIANT.
+ *
+ * The variant is what the column's layout is built out of (ui/CollapsibleSection),
+ * so a rule about "can a long list bury what is under it" has to be able to read
+ * it back off the call site — that is the whole reason the kind is declared
+ * there instead of inferred from the component.
+ */
+function sectionTags(source: string): SectionTag[] {
+  const out: SectionTag[] = [];
+  for (const m of source.matchAll(/<CollapsibleSection([^>]*)>\s*(?:\{[^}]*\}\s*)?<([A-Z]\w*)/g)) {
+    const attrs = m[1];
+    out.push({
+      facet: '',
+      id: attrs.match(/\bid="([^"]*)"/)?.[1] ?? '(no id)',
+      variant: /\bvariant="list"/.test(attrs) ? 'list' : 'content',
+      child: m[2],
+    });
   }
-  return names;
+  return out;
 }
 
 /** Where `name` is imported from in `source`, as a module specifier. */
@@ -115,3 +145,57 @@ export function derivePanels(): string[] {
 
 /** A derived panel path as it reads in a failure message. */
 export const panelName = (file: string): string => file.slice(COMPONENTS.length + 1);
+
+/** A facet section plus every panel file it reaches, transitively. */
+export interface FacetSection extends SectionTag {
+  /** Absolute paths under components/ — `panelName`-able. */
+  reaches: string[];
+}
+
+/**
+ * EVERY SECTION IN EVERY FACET COLUMN, with its variant and the panels beneath
+ * it — the same derivation `derivePanels` walks, kept per-section instead of
+ * flattened.
+ *
+ * This is what lets a rule say "the chunk grid is only ever mounted in a section
+ * that claims a share of the column", which is the invariant that replaced the
+ * fixed 260px cap. Reaching a panel transitively is essential and not
+ * incidental: no facet mounts ChunkGrid: they mount ChunkPicker and
+ * ChunkLibrary, two-line adapters over it.
+ */
+export function deriveSections(): FacetSection[] {
+  const facetFiles = readdirSync(FACETS).filter((f) => f.endsWith('.tsx'));
+  expect(facetFiles.length, 'no facet modules found').toBeGreaterThan(0);
+
+  const sections: FacetSection[] = [];
+  for (const file of facetFiles) {
+    const path = join(FACETS, file);
+    const source = read(path);
+    for (const tag of sectionTags(source)) {
+      const spec = importSpecifier(source, tag.child);
+      const panel = spec ? resolvePanel(path, spec) : null;
+      sections.push({ ...tag, facet: file, reaches: panel ? closure(panel) : [] });
+    }
+  }
+  return sections;
+}
+
+/** Every panel file reachable from `entry`, itself included. Same walk as derivePanels. */
+function closure(entry: string): string[] {
+  const seen = new Set<string>();
+  const queue = [entry];
+  while (queue.length > 0) {
+    const file = queue.pop()!;
+    if (seen.has(file)) continue;
+    seen.add(file);
+    // ui/ is shared chrome (PanelHeader, fields) — reached from everything, and
+    // never the data-driven thing a layout rule is about.
+    if (file.startsWith(join(COMPONENTS, 'ui'))) continue;
+    for (const name of renderedComponents(read(file))) {
+      const spec = importSpecifier(read(file), name);
+      const next = spec ? resolvePanel(file, spec) : null;
+      if (next) queue.push(next);
+    }
+  }
+  return [...seen].filter((f) => !f.startsWith(join(COMPONENTS, 'ui')));
+}

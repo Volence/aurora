@@ -82,9 +82,9 @@
 //     the Palette facet's column — which is right for now (same editor, two
 //     judging surfaces) but is the same question aeon's palette facet has open.
 //     Whether the two hosts should diverge is step H's to answer.
-//  3. **Layout's column is ONE section.** With the object sections back on
-//     Objects, and the chunk grid capped at SECTION_LIST_MAX_HEIGHT (260px), the
-//     Layout column is a 260px picker over a lot of empty 260px-wide column.
+//  3. **Layout's column is ONE section.** It is now a chunk grid that fills the
+//     column (`variant="list"`), which is what CLOSED the half-empty-column
+//     complaint the 260px cap created — but one section is still one section.
 //     That is not a reason to move sections back into it — a column filled to
 //     look busy is how Objects became a subset of Layout the first time — but it
 //     IS the honest state of the screen. The two candidates are both step-H
@@ -267,7 +267,7 @@ function ClassicComposerCanvas(): React.ReactElement {
 function ClassicLayoutPanels(): React.ReactElement {
   return (
     <Panel width={260} scroll>
-      <CollapsibleSection id="classic.chunks" title="Chunks">
+      <CollapsibleSection id="classic.chunks" title="Chunks" variant="list">
         <ChunkPicker pick="stamp" />
       </CollapsibleSection>
     </Panel>
@@ -282,9 +282,12 @@ function ClassicLayoutPanels(): React.ReactElement {
  *
  * THE INSPECTOR SITS ABOVE THE LIBRARY because it is about the thing you just
  * clicked, and burying a readout under a 23-row list is how it stops being read.
- * The list bounds its own height (shared/ObjectList, SECTION_LIST_MAX_HEIGHT), so
- * neither section is behind a wall of the other — the failure that hid the Art
- * column's palette grid so thoroughly it was reported as missing.
+ * The inspector is a CONTENT section and the library a LIST one, so the form
+ * takes its natural height and the rows take everything under it: neither
+ * section is behind a wall of the other — the failure that hid the Art column's
+ * palette grid so thoroughly it was reported as missing — and neither is a
+ * short box over an empty column, which is what capping the list at a fixed
+ * 260px did to this exact screen.
  */
 function ClassicObjectsPanels(): React.ReactElement {
   return (
@@ -292,7 +295,7 @@ function ClassicObjectsPanels(): React.ReactElement {
       <CollapsibleSection id="classic.object" title="Selected Object">
         <ClassicObjectInspector />
       </CollapsibleSection>
-      <CollapsibleSection id="classic.objects" title="Objects">
+      <CollapsibleSection id="classic.objects" title="Objects" variant="list">
         <ClassicObjectList />
       </CollapsibleSection>
     </Panel>
@@ -354,7 +357,7 @@ function ClassicPalettePanels(): React.ReactElement {
 function ClassicArtPanels(): React.ReactElement {
   return (
     <Panel width={260} scroll>
-      <CollapsibleSection id="classic.artChunks" title="Chunks">
+      <CollapsibleSection id="classic.artChunks" title="Chunks" variant="list">
         <ChunkPicker pick="edit" />
       </CollapsibleSection>
       <CollapsibleSection id="classic.palette" title="Palette">

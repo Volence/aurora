@@ -1,6 +1,6 @@
 import React from 'react';
 import { RING_PATTERNS } from '../state/editorStore';
-import { T, SECTION_LIST_MAX_HEIGHT } from './ui';
+import { T } from './ui';
 
 interface RingPatternPaletteProps {
   selectedIndex: number;
@@ -65,21 +65,25 @@ function PatternPreview({ pattern, selected }: { pattern: typeof RING_PATTERNS[0
 }
 
 const styles: Record<string, React.CSSProperties> = {
+  // `flex: 1 1 auto; minHeight: 0` rather than the old `flexShrink: 0`: this
+  // fills its CollapsibleSection's share of the column and is allowed to be
+  // shorter than its patterns, which is what lets `list` below scroll at all.
   container: {
     width: 180, display: 'flex', flexDirection: 'column',
     background: T.surface, borderRight: `1px solid ${T.border}`,
-    flexShrink: 0, overflow: 'hidden',
+    flex: '1 1 auto', minHeight: 0, overflow: 'hidden',
   },
   count: {
     padding: '6px 8px', fontSize: 10, color: T.textLo,
-    borderBottom: `1px solid ${T.border}`,
+    borderBottom: `1px solid ${T.border}`, flexShrink: 0,
   },
-  // Bounded, or `overflow: auto` is a no-op: `flex: 1` fills a parent with a
-  // height, and a CollapsibleSection inside a scrolling Panel is sized by its
-  // content — so this grew with RING_PATTERNS and pushed the sections under it
-  // down the column instead of scrolling. See SECTION_LIST_MAX_HEIGHT.
+  // Scrolls inside the section instead of growing it. `flex: 1` alone was a
+  // no-op while nothing above it had a height — a CollapsibleSection in an
+  // unbounded Panel is sized by its content — so this grew with RING_PATTERNS
+  // and pushed Properties down the column. The height comes from the section
+  // now (variant="list"), and `minHeight: 0` is the permission to shrink into it.
   list: {
-    flex: 1, maxHeight: SECTION_LIST_MAX_HEIGHT, overflow: 'auto', padding: 4,
+    flex: '1 1 auto', minHeight: 0, overflow: 'auto', padding: 4,
     display: 'flex', flexDirection: 'column', gap: 2,
   },
   item: {

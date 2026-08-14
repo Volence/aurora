@@ -18,7 +18,7 @@ function LayoutPanels() {
   const pasting = useEditorStore((s) => s.pasting);
   return (
     <Panel width={240} scroll>
-      <CollapsibleSection id="aeon.sections" title="Sections"><SectionGridNav /></CollapsibleSection>
+      <CollapsibleSection id="aeon.sections" title="Sections" variant="list"><SectionGridNav /></CollapsibleSection>
       {/* Same paste-suppression rule as the old map branch (see the original
           LegacyWorkspace comment): pasting overrides every tool's options panel. */}
       {/* ONE id for these two, and that reuse IS deliberate: they are mutually
@@ -31,7 +31,7 @@ function LayoutPanels() {
           over. Engine-scoped and named for the slot, per the convention
           classic's `classic.chunks` / `classic.artChunks` established. */}
       {!pasting && tool === 'stamp-chunk' && (
-        <CollapsibleSection id="aeon.layoutOptions" title="Chunks"><ChunkLibrary /></CollapsibleSection>
+        <CollapsibleSection id="aeon.layoutOptions" title="Chunks" variant="list"><ChunkLibrary /></CollapsibleSection>
       )}
       {(tool === 'marquee' || pasting) && (
         <CollapsibleSection id="aeon.layoutOptions" title={pasting ? 'Paste' : 'Marquee'}>

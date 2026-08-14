@@ -1,5 +1,5 @@
 import React from 'react';
-import { T, SECTION_LIST_MAX_HEIGHT } from '../ui';
+import { T } from '../ui';
 import { filterRows, type ObjectListPort, type ObjectRow } from './object-list-model';
 
 /**
@@ -135,7 +135,8 @@ const Row = React.memo(function Row({
 const THUMB = 28;
 
 const styles: Record<string, React.CSSProperties> = {
-  container: { display: 'flex', flexDirection: 'column', minWidth: 0 },
+  // Fills the section and may be shorter than its rows — see `list` below.
+  container: { display: 'flex', flexDirection: 'column', minWidth: 0, flex: '1 1 auto', minHeight: 0 },
   // Outside the scroller below, so the filter is always on screen with the rows
   // it filters. (It is `sticky` as well, which now only matters for the enclosing
   // Panel's own scroll — harmless, and one less thing to re-derive if the list
@@ -149,15 +150,20 @@ const styles: Record<string, React.CSSProperties> = {
     background: T.border, color: T.textHi,
     border: `1px solid ${T.borderStrong}`, borderRadius: T.rMd, fontSize: 12,
   },
-  // Bounded, so the rows scroll INSIDE the section instead of growing it. This
-  // list is one of three sections in classic's Layout column since the Objects
-  // merge (workspace/facets/s1-facets.tsx); unbounded, 82 rows would push
-  // whatever a later task adds below it off the bottom of the world — the same
-  // failure that hid the palette editor under the chunk grid. See
-  // SECTION_LIST_MAX_HEIGHT for why the cap is a fixed px and not a vh share.
+  // The rows scroll INSIDE the section rather than growing it: 23 classic rows
+  // (3084px, measured) would otherwise push the sections under them off the
+  // bottom of the world, which is the failure that hid the Art column's palette
+  // editor so thoroughly it was reported as missing.
+  //
+  // What bounds it is the SECTION, not a number here: the mounting
+  // CollapsibleSection is `variant="list"`, so it takes a share of a Panel with
+  // a real height and this shrinks into it. `minHeight: 0` is the permission to
+  // shrink; without it a flex item refuses to go below its content and the
+  // `overflowY` never engages. A short filter result stays short — the section's
+  // `maxHeight: max-content` hands the surplus back.
   list: {
     display: 'flex', flexDirection: 'column', padding: 4, gap: 2,
-    maxHeight: SECTION_LIST_MAX_HEIGHT, overflowY: 'auto',
+    flex: '1 1 auto', minHeight: 0, overflowY: 'auto',
   },
   empty: { padding: 12, color: T.textLo, fontSize: 12 },
   row: {

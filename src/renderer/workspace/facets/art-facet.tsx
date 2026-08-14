@@ -312,7 +312,7 @@ function ArtPanels() {
       <CollapsibleSection id="art.palette" title="Palette">
         <PaletteEditor />
       </CollapsibleSection>
-      <CollapsibleSection id="art.chunks" title="Chunks">
+      <CollapsibleSection id="art.chunks" title="Chunks" variant="list">
         <ChunkLibrary />
       </CollapsibleSection>
     </Panel>

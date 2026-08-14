@@ -16,7 +16,7 @@ function RingsPanels() {
   const selectedRingPattern = useEditorStore((s) => s.selectedRingPattern);
   return (
     <Panel width={240} scroll>
-      <CollapsibleSection id="aeon.ringPatterns" title="Ring Patterns">
+      <CollapsibleSection id="aeon.ringPatterns" title="Ring Patterns" variant="list">
         <RingPatternPalette
           selectedIndex={selectedRingPattern}
           onSelect={(index) => useEditorStore.getState().setSelectedRingPattern(index)}

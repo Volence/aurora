@@ -25,7 +25,7 @@ function ObjectsPanels() {
   // every mousemove of an object drag.
   return (
     <Panel width={240} scroll>
-      <CollapsibleSection id="aeon.objects" title="Objects">
+      <CollapsibleSection id="aeon.objects" title="Objects" variant="list">
         <ObjectList port={objectListPort} label="Object palette" />
       </CollapsibleSection>
       <CollapsibleSection id="aeon.selectedObject" title="Selected Object">

@@ -1,5 +1,5 @@
 import React from 'react';
-import { T, SECTION_LIST_MAX_HEIGHT } from '../ui';
+import { T } from '../ui';
 import type { ChunkEmptyKind, ChunkGridPort } from './chunk-grid-model';
 import {
   CHUNK_LABEL_BG, CHUNK_LABEL_TEXT, CHUNK_AIR_CHECK_A, CHUNK_AIR_CHECK_B,
@@ -252,10 +252,15 @@ const ChunkCell = React.memo(function ChunkCell({
 });
 
 const styles: Record<string, React.CSSProperties> = {
+  // Fills its CollapsibleSection and, crucially, is allowed to be SHORTER than
+  // its content: `flexShrink: 0` + `minHeight: 120` here meant the grid pushed
+  // its own section open no matter what the column had to spare, so the
+  // section's share was decided by the chunk count. The section is the thing
+  // that owns the height now (ui/CollapsibleSection, variant="list").
   containerPanel: {
     display: 'flex', flexDirection: 'column',
     borderTop: `1px solid ${T.border}`,
-    flex: 1, minHeight: 120, flexShrink: 0,
+    flex: '1 1 auto', minHeight: 0,
   },
   containerStrip: {
     display: 'flex', flexDirection: 'column',
@@ -294,14 +299,17 @@ const styles: Record<string, React.CSSProperties> = {
   // out every chunk, minHeight:0 lets it shrink inside the flex column so it
   // actually scrolls instead of growing the panel.
   //
-  // `maxHeight` is what makes the scroll REAL in a panel column. `flex: 1` only
-  // fills a parent that has a height of its own, and a CollapsibleSection inside
-  // a scrolling Panel is sized by its content — so with 82 chunks this grew to
-  // ~900px and `overflowY` never fired. Everything below it in the column
-  // (classic's palette editor; aeon's Art and Properties) was then nine screens
-  // down, which is how the palette editor came to be believed not to exist.
+  // NO `maxHeight`. `flex: 1` only fills a parent that has a height of its own,
+  // and for a while nothing above this had one — a CollapsibleSection inside a
+  // Panel with no bound height is sized by its content, so with 82 chunks this
+  // grew to ~900px, `overflowY` never fired, and classic's palette editor ended
+  // up nine screens down (which is how it came to be believed not to exist).
+  // The fix for that was a 260px cap here; the fix for THAT is that the height
+  // now arrives from above — Panel is a `minHeight: 0` flex column and the
+  // section claims a share of it — so `flex: 1` finally means something and the
+  // grid gets the whole column when it is the only list in it.
   gridPanel: {
-    flex: 1, minHeight: 0, maxHeight: SECTION_LIST_MAX_HEIGHT, overflowY: 'auto',
+    flex: '1 1 auto', minHeight: 0, overflowY: 'auto',
     display: 'flex', flexWrap: 'wrap', alignContent: 'flex-start', gap: 4, padding: 4,
   },
   gridStrip: {
