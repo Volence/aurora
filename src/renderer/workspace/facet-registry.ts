@@ -97,6 +97,46 @@ export function moduleFor(
 }
 
 /**
+ * Which facet the shell can ACTUALLY show for `requested`: `requested` itself
+ * when the open engine both grants and serves it, else the first facet in the
+ * grant that it does serve, else null.
+ *
+ * A facet is "served" only if it is BOTH granted and has a module. That is the
+ * same set FacetBar shows pills for: the bar's extra term — the facet
+ * DESCRIPTOR registry — cannot narrow it, because registerBuiltinFacets
+ * registers a descriptor for every FacetCapability there is and both register
+ * functions call it.
+ *
+ * Registration alone is not enough: a session record naming a facet its engine
+ * has since stopped granting reopens with no pill, and honouring it would put a
+ * screen up that the bar cannot represent.
+ *
+ * Lives beside the registry it queries — it is a (registry, grant) question with
+ * no tool content in it. NOT in facet-tools: that module is imported by
+ * MapFacetDock, which this file imports, so a copy there would close an import
+ * cycle for nothing. And NOT in LevelWorkspace, because a decision inside a
+ * component is a decision the node-only suite cannot test — and the interesting
+ * cases (grant and registration disagreeing, the idempotence the write-back
+ * effect's loop-freedom rests on) are all in this function.
+ *
+ * Null is a real answer, not a failure to find one: the served set can
+ * legitimately be empty — a new engine whose modules are not written yet — and
+ * LevelWorkspace's FacetUnavailable is the honest terminal state for that.
+ */
+export function resolveFacet(
+  engine: OpenEngine | null,
+  granted: readonly FacetCapability[],
+  requested: FacetCapability,
+): FacetCapability | null {
+  if (!engine) return null;
+  const served = (f: FacetCapability) => granted.includes(f) && moduleFor(engine, f) !== null;
+  if (served(requested)) return requested;
+  // Grant order, not registry order: the grant is the profile's own statement of
+  // what this engine leads with, and `granted` is what the caller already has.
+  return granted.find(served) ?? null;
+}
+
+/**
  * The five map-canvas facets (layout/objects/rings/collision/palette) share a
  * canvas, dock and status bar — only the right panel (and layout's bottom strip)
  * differ. Do NOT use this for the art facet, which has its own canvas/dock.

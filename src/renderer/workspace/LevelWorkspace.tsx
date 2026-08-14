@@ -7,8 +7,8 @@
 import React from 'react';
 import EditorShell from '../shell/EditorShell';
 import FacetBar from './FacetBar';
-import { moduleFor } from './facet-registry';
-import { resolveFacet, switchFacet } from './facet-tools';
+import { moduleFor, resolveFacet } from './facet-registry';
+import { switchFacet } from './facet-tools';
 import { useWorkspaceStore } from './workspaceStore';
 import { useOpenEngine, useOpenCapabilities, type OpenEngine } from '../state/open-project';
 import { useSessionStore } from '../state/sessionStore';

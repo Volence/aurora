@@ -15,6 +15,37 @@
 //
 // `collision` has no module here on purpose: the s1 profile no longer grants it
 // (core/project/s1/index.ts).
+//
+// ---------------------------------------------------------------------------
+// KNOWN CHROME GAPS FOR THE SHELL FLIP (Task 9)
+// ---------------------------------------------------------------------------
+// None of these is visible yet — classic still renders through LegacyWorkspace —
+// and none is fixed here, because all four are step-H shaped: they are about how
+// classic's composer becomes a first-class canvas, which is the piece the spec
+// flags as the hardest and possibly not fully shareable. Recorded together so
+// whoever flips the shell reads one list instead of rediscovering them one
+// screen at a time.
+//
+//  1. **No status bar on art/palette.** The slot is empty, so the bottom of the
+//     screen goes blank when you leave a map facet. Giving them the map bar
+//     would be worse, not better: it speaks the LEVEL tool vocabulary and its
+//     zoom control drives viewStore.zoom, which the composer does not read — a
+//     bar of controls that visibly do nothing. The composer needs its own.
+//  2. **No tool dock on art/palette.** LevelWorkspace fills the slot with a
+//     `<span />`, so EditorShell's 44px rail renders as an empty vertical strip
+//     down the left edge. Correct as data — the composer drives its own internal
+//     tabs, not editorStore.tool — but it reads as a broken column.
+//  3. **The composer is styled as a bottom strip, not a canvas.** ClassicComposerDock's
+//     `styles.dock` (components/classic/composer-shared.tsx) carries a `borderTop`
+//     for the strip it currently sits in, and `dockContent` is capped at
+//     `maxHeight: 380`. In the canvas slot that is a top-anchored panel with a
+//     stray rule above it and a large empty region below. ClassicComposerCanvas
+//     below fixes only the flex sizing — the rest is the dock's own styling and
+//     belongs to whoever redesigns it.
+//  4. **Both classic surfaces render nothing before an act loads.** ClassicComposerDock
+//     and ClassicPalettePanel each `return null` when the doc is not ready. As a
+//     bottom strip that was an absent strip; as the whole canvas it is a blank
+//     screen with no explanation. An empty state is wanted here.
 
 import React from 'react';
 import ClassicLevelViewport from '../../components/classic/ClassicLevelViewport';

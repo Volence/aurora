@@ -39,9 +39,23 @@ describe('statusLabel', () => {
 describe('MapStatusBar consumes scopeTone', () => {
   const source = readFileSync(join(__dirname, '..', 'MapStatusBar.tsx'), 'utf8');
 
-  it('colours the scope span on the tone rather than always T.textLo', () => {
-    expect(source).toContain("port.scopeTone === 'error' ? T.error : T.textLo");
-    // The pre-change line, which the guard must not still match.
-    expect(source).not.toMatch(/color:\s*T\.textLo\s*\}\}>\{port\.scopeInfo\}/);
+  // Asserted as three properties rather than one verbatim expression: hoisting
+  // the ternary into a `const scopeColor` is a zero-behaviour-change refactor,
+  // and a guard that a refactor can break is a guard people learn to edit
+  // without thinking. Each of these still fails if the bar goes back to ignoring
+  // the field.
+  it('reads the tone off the port', () => {
+    expect(source).toContain('port.scopeTone');
+  });
+
+  it('has an error colour to render it in', () => {
+    expect(source).toContain('T.error');
+  });
+
+  it('does not pin the scope span to the low-contrast colour', () => {
+    // A NEGATIVE on the exact pre-change shape, so any other formatting or a
+    // hoisted const passes while a revert does not. (Negatives only fail when
+    // they match, so looser source formatting can never trip this.)
+    expect(source).not.toMatch(/color:\s*T\.textLo\s*\}\}>\s*\{port\.scopeInfo\}/);
   });
 });

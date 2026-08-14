@@ -1,9 +1,10 @@
 // The OffscreenCanvas global that register-facets → MapViewport needs at import
 // time is installed by vitest setupFiles (src/test/offscreen-canvas-stub.ts).
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { facetModules, registerFacetModule, moduleFor, mapFacet } from '../facet-registry';
+import { facetModules, registerFacetModule, moduleFor, mapFacet, resolveFacet } from '../facet-registry';
+import type { FacetCapability } from '../../../core/project/adapter';
 
 const Stub = () => null;
 
@@ -175,6 +176,78 @@ describe('registerS1FacetModules registers every facet the s1 profile grants', (
   });
 });
 
+// The auto-heal for a facet the open engine cannot serve. Deliberately NOT the
+// deleted aeon fallback: that one lied about the DATA (aeon's viewport over an
+// empty classic store while still claiming to be the requested facet). This
+// changes the SELECTION, to another facet of the SAME engine, and LevelWorkspace
+// makes it non-silent by writing it back through switchFacet so the lit pill
+// matches the screen.
+describe('resolveFacet', () => {
+  const S1_GRANT: readonly FacetCapability[] = ['layout', 'art', 'objects', 'palette'];
+  const stub = (id: FacetCapability) => ({ id, Canvas: () => null });
+
+  beforeEach(() => { facetModules.clear(); });
+  afterEach(() => { facetModules.clear(); });
+
+  it('keeps the requested facet when this engine serves it', () => {
+    registerFacetModule(['s1'], stub('layout'));
+    registerFacetModule(['s1'], stub('objects'));
+    expect(resolveFacet('s1', S1_GRANT, 'objects')).toBe('objects');
+  });
+
+  it('heals a granted-but-unserved facet to the first served one', () => {
+    // `art` granted, no s1 art module — the restored-session case.
+    registerFacetModule(['s1'], stub('layout'));
+    expect(resolveFacet('s1', S1_GRANT, 'art')).toBe('layout');
+  });
+
+  it('heals a facet this engine no longer grants, even if a module exists', () => {
+    // The exact shape of the dropped collision grant: a session saved while s1
+    // still granted `collision` reopens naming a facet outside the new grant.
+    // Registration alone must not be enough to keep it, or the shell would show
+    // a screen with no pill to match it.
+    registerFacetModule(['s1'], stub('layout'));
+    registerFacetModule(['s1'], stub('collision'));
+    expect(resolveFacet('s1', S1_GRANT, 'collision')).toBe('layout');
+  });
+
+  it('takes the first GRANTED facet that is served, in the grant order', () => {
+    // layout is granted first but unserved; the answer is the next served grant,
+    // not the first registered module.
+    registerFacetModule(['s1'], stub('palette'));
+    registerFacetModule(['s1'], stub('objects'));
+    expect(resolveFacet('s1', S1_GRANT, 'layout')).toBe('objects');
+  });
+
+  it('resolves against the OPEN engine, not any engine', () => {
+    registerFacetModule(['aeon'], stub('layout'));
+    expect(resolveFacet('s1', S1_GRANT, 'layout')).toBeNull();
+    expect(resolveFacet('aeon', S1_GRANT, 'layout')).toBe('layout');
+  });
+
+  it('is null when the engine serves nothing granted — FacetUnavailable stays', () => {
+    expect(resolveFacet('s1', S1_GRANT, 'layout')).toBeNull();
+    registerFacetModule(['s1'], stub('rings')); // served but not granted
+    expect(resolveFacet('s1', S1_GRANT, 'layout')).toBeNull();
+  });
+
+  it('is null with no engine open and with an empty grant', () => {
+    registerFacetModule(['s1'], stub('layout'));
+    expect(resolveFacet(null, S1_GRANT, 'layout')).toBeNull();
+    expect(resolveFacet('s1', [], 'layout')).toBeNull();
+  });
+
+  it('is idempotent, so the write-back cannot loop', () => {
+    // LevelWorkspace calls switchFacet(tab, resolved) from an effect, which
+    // re-renders with facetId === resolved. If resolving THAT produced a
+    // different answer the effect would fire again, forever.
+    registerFacetModule(['s1'], stub('objects'));
+    const once = resolveFacet('s1', S1_GRANT, 'layout');
+    expect(once).toBe('objects');
+    expect(resolveFacet('s1', S1_GRANT, once!)).toBe(once);
+  });
+});
+
 // Every test above calls the register functions ITSELF, so all of them stay
 // green against an App that calls neither — and the registry is empty in
 // production, every pill vanishes, and the workspace says the engine has no
@@ -188,13 +261,23 @@ describe('App registers both engines at mount, before any project can load', () 
     expect(source).toContain('registerS1FacetModules();');
   });
 
-  it('calls them from the mount effect, not from a project-open path', () => {
-    // `useEffect(..., [])` — a registration hung off a load would race the first
-    // render of a restored session's workspace.
-    const mount = source.match(/useEffect\(\(\) => \{([\s\S]*?)\}, \[\]\);/);
-    expect(mount, 'App has no mount effect').not.toBeNull();
-    expect(mount![1]).toContain('registerAeonFacetModules();');
-    expect(mount![1]).toContain('registerS1FacetModules();');
+  it('calls them from a mount effect, not from a project-open path', () => {
+    // A registration hung off a load would race the first render of a restored
+    // session's workspace, so the calls have to sit in a `[]`-dep effect.
+    //
+    // Every effect in the file, each matched INDEPENDENTLY: the body is
+    // tempered so it cannot swallow another `useEffect(`. A plain non-greedy
+    // `[\s\S]*?` anchored on the first effect would, the moment an effect with a
+    // real dep list is added above this one, run from that effect's opening to
+    // the mount effect's `}, []);` — spanning both, and quietly proving nothing.
+    const EFFECT = /useEffect\(\(\) => \{((?:(?!useEffect\()[\s\S])*?)\}, \[([^\]]*)\]\);/g;
+    const mountBodies = [...source.matchAll(EFFECT)]
+      .filter(([, , deps]) => deps.trim() === '')
+      .map(([, body]) => body);
+
+    expect(mountBodies.length, 'App has no []-dep effect at all').toBeGreaterThan(0);
+    expect(mountBodies.some((b) => b.includes('registerAeonFacetModules();')
+      && b.includes('registerS1FacetModules();'))).toBe(true);
   });
 });
 

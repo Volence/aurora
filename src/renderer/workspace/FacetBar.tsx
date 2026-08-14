@@ -5,9 +5,13 @@
 //
 // The has-module filter is engine-keyed, not engine-blind: a facet the manifest
 // grants but the renderer cannot serve for the open engine gets no pill, so
-// there is no chrome that lands on FacetUnavailable when clicked. (s1 grants
-// `collision` with no collision editor built — engine-blind, that pill would be
-// live the moment classic re-homes here.)
+// there is no chrome that lands on FacetUnavailable when clicked.
+//
+// Nothing is in that state today — both profiles' grants are fully served (s1's
+// `collision` grant, which used to be the standing example, was dropped rather
+// than left unbacked). The filter is what keeps the next partly-built engine
+// from showing a pill before its module exists, which is the normal way a facet
+// arrives: the grant lands in the profile a task before the renderer catches up.
 
 import React from 'react';
 import { T } from '../components/ui';

@@ -10,15 +10,8 @@
 
 import type { FacetCapability } from '../../core/project/adapter';
 import { useEditorStore, type EditorTool } from '../state/editorStore';
-import { openCapabilities, type OpenEngine } from '../state/open-project';
+import { openCapabilities } from '../state/open-project';
 import { useWorkspaceStore } from './workspaceStore';
-// Import cycle, on purpose and benign: facet-registry → MapFacetDock →
-// facet-tools → facet-registry. Nothing here reads a facet-registry binding at
-// module-init time — `moduleFor` is called only from inside resolveFacet — so
-// the partially-initialised module a cycle hands back is never observed. The
-// alternative was a `served` predicate parameter every call site would have to
-// build from moduleFor anyway, which moves the coupling without removing it.
-import { moduleFor } from './facet-registry';
 
 /** The SHELL's default tool set per facet — what a facet offers when the open
  *  profile declares nothing for it. Written for aeon, which is why aeon's
@@ -57,43 +50,6 @@ export function toolForFacet(facet: FacetCapability, current: EditorTool): Edito
   const tools = toolsForFacet(facet);
   if (tools.length === 0) return current;
   return tools.includes(current) ? current : tools[0];
-}
-
-/**
- * Which facet the shell can ACTUALLY show for `requested`: `requested` itself
- * when the open engine both grants and serves it, else the first facet in the
- * grant that it does serve, else null.
- *
- * A facet is "served" only if it is BOTH granted and has a module. That is the
- * same set FacetBar shows pills for: the bar's extra term — the facet
- * DESCRIPTOR registry — cannot narrow it, because registerBuiltinFacets
- * registers a descriptor for every FacetCapability there is and both register
- * functions call it.
- *
- * Registration alone is not enough: a session saved while s1 still granted
- * `collision` reopens naming a facet with no pill, and honouring it would put a
- * screen up that the bar cannot represent.
- *
- * Lives here rather than in LevelWorkspace because a decision inside a component
- * is a decision the node-only suite cannot test — and the interesting cases
- * (grant/registration disagreeing, the idempotence the effect's loop-freedom
- * rests on) are all in this function.
- *
- * Null is a real answer, not a failure to find one: the served set can
- * legitimately be empty — a new engine whose modules are not written yet — and
- * LevelWorkspace's FacetUnavailable is the honest terminal state for that.
- */
-export function resolveFacet(
-  engine: OpenEngine | null,
-  granted: readonly FacetCapability[],
-  requested: FacetCapability,
-): FacetCapability | null {
-  if (!engine) return null;
-  const served = (f: FacetCapability) => granted.includes(f) && moduleFor(engine, f) !== null;
-  if (served(requested)) return requested;
-  // Grant order, not registry order: the grant is the profile's own statement of
-  // what this engine leads with, and `granted` is what the caller already has.
-  return granted.find(served) ?? null;
 }
 
 /** Facet switch action: remember the per-tab facet + fix the tool to the
