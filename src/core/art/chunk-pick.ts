@@ -40,3 +40,29 @@ export function firstEditableChunk(chunks: readonly ChunkDef[]): ChunkDef | null
   if (chunks.length === 0) return null;
   return chunks.find((c) => !isBlankChunk(c)) ?? chunks[0];
 }
+
+/** Roughly the composer canvas' usable edge, in screen pixels. A constant
+ *  rather than a measurement: the landing zoom is chosen at PROJECT OPEN, before
+ *  the Art facet has ever been mounted, so there is no canvas to measure. */
+const COMPOSER_FIT_PX = 640;
+
+/**
+ * The composer zoom (screen pixels per art pixel) that lands a whole document
+ * on screen.
+ *
+ * The other half of opening on a chunk instead of the New Document launcher.
+ * artStore's default zoom is 24, written for editing a single 8px tile — at
+ * which a 128x128px chunk is 3072px across, so auto-opening one put you at its
+ * top-left corner, which for the first chunk of a jungle zone is 40 rows of sky.
+ * An empty checkerboard is not a better resting state than the launcher; it is a
+ * worse one, because it looks like the document failed to load.
+ *
+ * Clamped to at least 1 so a huge document still renders at 1:1 rather than
+ * vanishing, and to at most artStore's own 24 so a 1x1 tile does not open
+ * absurdly magnified.
+ */
+export function fitComposerZoom(widthTiles: number, heightTiles: number): number {
+  const px = Math.max(widthTiles, heightTiles) * 8;
+  if (px <= 0) return 24;
+  return Math.max(1, Math.min(24, Math.floor(COMPOSER_FIT_PX / px)));
+}

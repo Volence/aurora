@@ -5,7 +5,7 @@
 
 import { aeonAdapter } from '../../core/project/aeon';
 import { dominantPaletteLine } from '../../core/project/aeon/load';
-import { firstEditableChunk } from '../../core/art/chunk-pick';
+import { firstEditableChunk, fitComposerZoom } from '../../core/art/chunk-pick';
 import { docFromChunk } from '../../core/art/composer-buffer';
 import { createIpcFileAccess } from './classic-file-access';
 import { documentHistoryHub } from './history-hub';
@@ -78,6 +78,11 @@ export async function openAeonProject(dir: string): Promise<boolean> {
     // was committed, so there is no discard to confirm.
     const first = firstEditableChunk(aeon.project.chunkLibrary);
     if (first) {
+      // Zoom BEFORE the open, so the facet's first paint is already the fitted
+      // one. artStore's default 24 is a single-tile zoom; at it a 128px chunk is
+      // 3072px across and the composer opens on its top-left corner, which for
+      // the first chunk of a jungle zone is sky. See fitComposerZoom.
+      useArtStore.getState().setZoom(fitComposerZoom(first.widthTiles, first.heightTiles));
       useArtStore.getState().openDocument({
         doc: docFromChunk(first), liveTileIndex: null,
         chunkId: first.id, name: first.name, dirty: false,
