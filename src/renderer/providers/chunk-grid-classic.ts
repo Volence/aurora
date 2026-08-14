@@ -153,7 +153,9 @@ export function useClassicChunkGridPort(pick: ClassicChunkPick): ChunkGridPort |
       // can do, and neither points at a surface that is not there.
       statusHint: pick === 'stamp'
         ? 'click to select · right-click viewport to eyedrop'
-        : 'click to open that chunk in the Chunk tab',
+        // Not "opens" it: the click changes the SUBJECT the Chunk tab is
+        // already showing, and does not switch tabs from Block or Tile.
+        : 'click to pick the chunk the Chunk tab edits',
       HeaderExtra: ChunkPickerHeader,
       // `doc` is read at PAINT time through the store rather than closed over:
       // its identity churns on every edit (a layout stamp replaces the doc while
