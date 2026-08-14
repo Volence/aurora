@@ -180,3 +180,52 @@ red/blue on the Tile tier — which is the same bug round 3 just fixed for aeon.
    them at all needed a dev-only `__dbg.resetLevel()`. They turned out to be the worst
    screens in the app, and round 3 rewrote all of them; they have now had that deliberate
    look. Treat "a state I cannot reach by clicking" as "a state nobody has ever seen".
+
+---
+
+## Round 4 — the last polish pass, and two premises that were wrong
+
+Six small screenshot-verified defects. Suite `1974 → 1982 passed / 0 failed / 3 skipped`,
+`tsc` clean. Branch head after this round: `8ca604e`, still unmerged and unpushed.
+
+**Fixed (3).** Classic's no-act Art canvas painted `T.surface` where the map painted
+`T.void` — the three "empty" screens are now byte-identical below the app bar. Aeon's
+no-act canvas said *"Open a project to view sections"* when a project was already open;
+it now says classic's true sentence. And classic rendered the same tile strip in two
+palettes one tier apart — the Block tier keys on the cell's assigned line (data), the Tile
+tier on the paint line, which was only ever written by a click *inside* the Block tier, so
+a cold open left it at 0 against the Block tier's 2. Seeded at open from the block just
+picked; deliberately **not** merged, same reasoning as the aeon fix.
+
+**Premise falsified — the red badnik below the act is not a bug.** It is GHZ1 objpos entry
+#9, a real Chopper at world (1184, 1120), inside an act that is 12288×1280. Verified
+independently: the max object y across all 214 entries is 1206. What ends at y≈700 on
+screen is the *terrain* — chunk row 4 is air for columns 0–22, so art stops at world
+y=1024 while the act runs to 1280. **Nothing draws the act's extent**, so "past the last
+row of terrain" is visually indistinguishable from "outside the level". The fix is to
+stroke the act rect, which is a persistent new visual element on every classic map screen
+— a design call, not a defect fix, so it was correctly left alone. A sweep of every S1 act
+found exactly one genuinely out-of-rect object, in SYZ2 (y=2746 vs H=1536).
+
+**Premise falsified — `OBJECT LIBRARY` 23 → 9 is the correct count.** The list is
+`filter(o.linked)` where linked means the object's art resolves *in the current zone*, so
+it is zone-scoped by construction: no zone 9, ghz 23, mz 25, syz 21, lz 24, slz 23, sbz 36,
+of 81 total. It moves between levels too, not only when the act unloads. The number is
+honest; the **label** over-promises a project-scoped catalog. Left alone deliberately,
+because renaming it would break the parallel with aeon's `Object Library`, which genuinely
+*is* project-scoped — one label, two meanings, and reconciling that is bigger than a string.
+
+**Premise confirmed and fixed — the act→tab sync really could open a tab for an act that
+does not exist.** Not a harness artifact. The aeon branch of `activateLevelTarget` looked
+up the *zone* and passed the act straight through, where the classic branch had always
+checked. The reachable path is a **same-directory re-open**: the session prune is keyed on
+`config.basePath` and early-returns when unchanged, so an act removed from `project.json`
+leaves a stale tab in the strip, one click from the unguarded branch. Guarded, returning
+`false` rather than a `'none'` plan (which resolves true and would have opened the tab
+anyway).
+
+**The pattern worth keeping.** Three of the four fix rounds corrected at least one premise
+I had stated confidently, and this round corrected two of the three I had explicitly
+flagged as uncertain. Marking a premise as unsure, and asking for the cause to be verified
+before the fix, was the single highest-yield habit of the whole plan — higher than any
+individual review.
