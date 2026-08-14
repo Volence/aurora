@@ -25,6 +25,7 @@ const DOCK = read('..', 'components', 'classic', 'ClassicArtToolDock.tsx');
 const SHARED_DOCK = read('..', 'shell', 'ArtToolDock.tsx');
 const S1_FACETS = read('facets', 's1-facets.tsx');
 const WORKSPACE = read('LevelWorkspace.tsx');
+const TILE_TAB = read('..', 'components', 'classic', 'TileTab.tsx');
 
 /** The three tools artStore holds that the PixelEditController cannot execute —
  *  they act on a document CELL and route through aeon's composer. Spelled out
@@ -99,10 +100,29 @@ describe('s1ArtFacet mounts the pixel chrome', () => {
 
   it('gates its options bar on the same predicate as the dock', () => {
     expect(S1_FACETS).toMatch(/if\s*\(\s*!isClassicPixelTier\([^)]*\)\s*\)\s*return\s+null/);
-    // Classic's capability set, not aeon's full bar: transforms write a
-    // pendingAction only aeon's ComposerCanvas consumes, and the zoom control
-    // moves a zoom classic's fixed-26px tile canvas never reads.
+    // Classic's capability set, not aeon's full bar — the zoom control moves a
+    // zoom classic's fixed-26px tile canvas never reads.
     expect(S1_FACETS).toMatch(/caps=\{CLASSIC_TILE_CAPS\}/);
+  });
+
+  // THE CROSS-ENGINE SLOT. `artStore.pendingAction` is one string every art host
+  // shares. Turning classic's transform capability on is only safe while classic
+  // also CONSUMES it, and consuming it is only safe while the slot is cleared on
+  // every path — an action left behind fires on whatever art host mounts next,
+  // against a document the user was not looking at when they clicked. Neither
+  // half can be executed here (TileTab is .tsx), so both are pinned by scan.
+  it('classic declares the transform capability and TileTab consumes the action', async () => {
+    const { CLASSIC_TILE_CAPS } = await import('../../shell/ArtToolOptions');
+    expect(CLASSIC_TILE_CAPS.transforms, 'transforms are off again').not.toBe(false);
+    expect(TILE_TAB, 'TileTab does not read pendingAction').toMatch(/s\.pendingAction/);
+    expect(TILE_TAB, 'TileTab does not resolve the action').toMatch(/resolveTileTransform\(/);
+  });
+
+  it('clears the pending action unconditionally, not only after a successful write', () => {
+    // `finally` is the assertion: a `clearAction()` sitting after an early
+    // `return` (locked tile, refused rotate, unknown action) is the exact bug
+    // this shape exists to prevent.
+    expect(TILE_TAB).toMatch(/finally\s*\{\s*useArtStore\.getState\(\)\.clearAction\(\);\s*\}/);
   });
 
   it('suppresses the rail CONTAINER, not just its contents', () => {

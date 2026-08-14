@@ -10,8 +10,9 @@ import {
 import type { Color } from '../../core/model/s4-types';
 
 // Transforms (apply to selection if present, else whole doc). Rotate is
-// disabled for non-square docs; selection squareness is still guarded
-// canvas-side (non-square selections silently skip).
+// disabled here for non-square docs; SELECTION squareness is not knowable from
+// this bar (the marquee lives in the host), so it stays a host-side guard —
+// aeon's ComposerCanvas skips silently, classic's TileTab toasts.
 const TRANSFORMS: Array<{ action: string; glyph: string; label: string }> = [
   { action: 'flip-h', glyph: '⇋', label: 'Flip horizontal' },
   { action: 'flip-v', glyph: '⇵', label: 'Flip vertical' },
@@ -88,15 +89,10 @@ function PaletteLinePicker() {
  * not equally capable: every field here is read back by aeon's ComposerCanvas,
  * and only some of them by classic's TileTab (which consumes exactly `tool`,
  * `selectedColor`, `mirror`, `ditherPattern`, `ditherSecondary`,
- * `pixelPerfect` — see components/classic/TileTab.tsx). Drawing the rest for
- * classic would be facet-chrome.ts's dead chrome, and two of them are worse than
- * dead:
+ * `pixelPerfect` and — since H1.5 — `pendingAction`; see
+ * components/classic/TileTab.tsx). Drawing the rest for classic would be
+ * facet-chrome.ts's dead chrome, and one of them is worse than dead:
  *
- *   - `transforms` writes `artStore.pendingAction`, and the ONLY consumer is
- *     aeon's ComposerCanvas. From classic the click sets a flag nothing clears,
- *     so it is armed for the next aeon document rather than lost. (Today the
- *     grid is `disabled` under a null `open`, which hides that — but a disabled
- *     seven-button grid is still seven buttons that never do anything.)
  *   - `zoom` moves aeon's canvas zoom. Classic's tile editor draws at a fixed
  *     26px/pixel and does not read `artStore.zoom`, so the readout would count
  *     up beside a canvas that never changes size.
@@ -107,8 +103,23 @@ function PaletteLinePicker() {
  * `projectStore`, null under a classic open, so it would render four empty
  * swatch strips.
  *
+ * `transforms` used to be off here for a sharper reason than chrome: it writes
+ * `artStore.pendingAction`, a single CROSS-ENGINE slot, and while aeon's
+ * ComposerCanvas was its only consumer a click from classic armed a transform
+ * for the next aeon document instead of doing nothing. classic-tile-transform.ts
+ * plus TileTab's effect is that consumer now, and it clears the slot on every
+ * path — so the capability is on, and it is a THREE-WAY value rather than a
+ * boolean because the two hosts disagree about what the grid may act on:
+ *
+ *   - `'doc'` — the target is `artStore.open`'s document, so the grid is dead
+ *     without one and rotate is dead on a non-square one.
+ *   - `'fixed-square'` — the host's target is always present and always square
+ *     (classic's 8x8 tile), so `open` says nothing about it and reading `open`
+ *     here would disable the whole grid permanently. Rotate on a non-square
+ *     MARQUEE is still refused, but host-side, where the marquee is known.
+ *
  * Flags rather than a host enum: this file must not learn who its hosts are, and
- * a host that gains a capability (H1.5 transforms, H1.6 zoom) flips one boolean.
+ * a host that gains a capability (H1.6 zoom) edits one field.
  */
 export interface ArtOptionCaps {
   /** px / tile brush-space tabs. */
@@ -117,25 +128,27 @@ export interface ArtOptionCaps {
   readonly repeatPreview: boolean;
   /** The palette-line picker for the `palette-apply` tool. */
   readonly paletteLine: boolean;
-  /** The flip / rotate / wrap-shift grid (via `artStore.pendingAction`). */
-  readonly transforms: boolean;
+  /** The flip / rotate / wrap-shift grid (via `artStore.pendingAction`), and
+   *  what its enablement is read from. `false` = the host cannot consume the
+   *  action at all, so the grid must not be drawn. */
+  readonly transforms: false | 'doc' | 'fixed-square';
   /** The zoom in/out readout (via `artStore.zoom`). */
   readonly zoom: boolean;
 }
 
 /** Everything — aeon's Art facet, whose canvas reads every field. */
 export const FULL_CAPS: ArtOptionCaps = {
-  brushSpace: true, repeatPreview: true, paletteLine: true, transforms: true, zoom: true,
+  brushSpace: true, repeatPreview: true, paletteLine: true, transforms: 'doc', zoom: true,
 };
 
 /**
- * Classic's composer tile tier: mirror, dither and pixel-perfect only — the
- * three modifiers `toolConfigFrom` actually hands the PixelEditController.
- * Transforms and zoom turn on in H1.5 / H1.6, and this constant is the one line
- * either task edits.
+ * Classic's composer tile tier: mirror, dither, pixel-perfect and the transform
+ * grid — the modifiers `toolConfigFrom` hands the PixelEditController, plus the
+ * pending-action slot TileTab consumes. Zoom turns on in H1.6, and this constant
+ * is the one line that task edits.
  */
 export const CLASSIC_TILE_CAPS: ArtOptionCaps = {
-  brushSpace: false, repeatPreview: false, paletteLine: false, transforms: false, zoom: false,
+  brushSpace: false, repeatPreview: false, paletteLine: false, transforms: 'fixed-square', zoom: false,
 };
 
 /**
@@ -214,18 +227,20 @@ export default function ArtToolOptions({ before, caps = FULL_CAPS }: { before?: 
         </label>
       )}
 
-      {/* Transforms (apply to selection if present, else whole doc). `open` is
-          aeon's open document and is ALWAYS null under a classic open — the
-          guard below already short-circuits on it, so no host needs a fake
-          document to render this row safely. */}
-      {caps.transforms && (
+      {/* Transforms (apply to selection if present, else the whole target).
+          `open` is aeon's open document and is ALWAYS null under a classic open,
+          so it may only gate the grid for a `'doc'` host — asking it under
+          `'fixed-square'` would render seven permanently-disabled buttons over a
+          tile that is perfectly transformable. */}
+      {caps.transforms !== false && (
         <>
           <Divider />
           <span style={{ display: 'inline-flex', gap: 2 }}>
             <TransformGrid
               items={TRANSFORMS.map((t) => ({
                 ...t,
-                disabled: !open || (t.action === 'rotate-90' && open.doc.widthTiles !== open.doc.heightTiles),
+                disabled: caps.transforms === 'doc'
+                  && (!open || (t.action === 'rotate-90' && open.doc.widthTiles !== open.doc.heightTiles)),
               }))}
               onAction={requestAction}
             />

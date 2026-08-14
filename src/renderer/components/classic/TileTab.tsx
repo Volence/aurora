@@ -11,6 +11,7 @@ import type { GestureResult, Selection } from '../../../core/art/pixel-edit-cont
 import { toolConfigFrom } from '../../../core/art/tool-config';
 import { tileToBuffer, packTilePixels } from '../../../core/art/classic-tile-buffer';
 import { resolveTileGesture } from '../../../core/art/classic-tile-gesture';
+import { resolveTileTransform } from '../../../core/art/classic-tile-transform';
 import PixelViewport from '../art-shared/PixelViewport';
 import type { HostPointer } from '../art-shared/PixelViewport';
 import { TileThumb } from './composer-thumbs';
@@ -23,8 +24,10 @@ import { hex, SharedBanner, useEditableTileRange, useEscapeKey, tileLockReason, 
 // 16-color row of the act palette; the armed tool comes from `artStore` (pencil,
 // eraser, fill, eyedropper, line, rect, marquee select, dither), set on the
 // facet's own rail — ClassicArtToolDock, which draws only while this tab is the
-// active tier, and the modifiers beside it (mirror / dither / pixel-perfect) on
-// the shared ArtToolOptions. Anim/gap tiles lock. Right-click does nothing here:
+// active tier, and the modifiers beside it (mirror / dither / pixel-perfect) plus
+// the flip/rotate/wrap-shift grid on the shared ArtToolOptions; that grid arrives
+// here as `artStore.pendingAction`, consumed by the effect below.
+// Anim/gap tiles lock. Right-click does nothing here:
 // sampling a colour is the dock's eyedropper, one input path with one hit-test.
 // The right column is a BROWSE-ONLY tile strip (unlike the Block tab's
 // strip, which assigns the clicked tile to a block cell) — selecting here never
@@ -106,6 +109,26 @@ export default function TileTab({ doc, usage }: { doc: LevelDoc; usage: UsageInd
   const cancelledRef = useRef(false);
   const [, bumpFrame] = useState(0);
 
+  // THE ONE WRITE PATH. Every edit this tab makes — stroke, paste, transform —
+  // goes through here, so every edit is exactly one `classicEditTiles`, i.e. one
+  // undo entry (the constraint in this file's header).
+  //
+  // NOTHING may escape it. An uncaught throw out of a pointer handler leaves
+  // React's event dispatch half-unwound and the whole window reads as frozen,
+  // which is a far worse failure than a refused edit — so the command's own
+  // invariant guards (classicLevelStore's assertSingleDomain /
+  // requireClassicHistory both throw) are turned into the same visible toast a
+  // clean refusal gets. `what` names the action in that toast.
+  const commitTileBytes = useCallback((bytes: Uint8Array, what: string) => {
+    let res;
+    try {
+      res = classicEditTiles([{ tileIndex: composerTileIndex, data: bytes }]);
+    } catch (e) {
+      res = { ok: false as const, error: e instanceof Error ? e.message : String(e) };
+    }
+    if (!res.ok) useToastStore.getState().addToast(`${what} failed: ${res.error}`, 'error');
+  }, [composerTileIndex]);
+
   const onCommit = useCallback((result: GestureResult) => {
     // Escape already ended this gesture and threw its result away; this is the
     // release that follows, carrying PixelViewport's second `end()`. Drop it
@@ -117,21 +140,39 @@ export default function TileTab({ doc, usage }: { doc: LevelDoc; usage: UsageInd
     // callback is not, because the suite cannot load .tsx at all).
     const out = resolveTileGesture(buffer, result, locked);
     if (out.applySelection) setSelection(out.selection);
-    if (!out.bytes) return;
-    // NOTHING may escape a pointer handler here. An uncaught throw mid-gesture
-    // leaves React's event dispatch half-unwound and the whole window reads as
-    // frozen, which is a far worse failure than a refused edit — so the command's
-    // own invariant guards (classicLevelStore's assertSingleDomain /
-    // requireClassicHistory both throw) are turned into the same visible toast a
-    // clean refusal gets.
-    let res;
+    if (out.bytes) commitTileBytes(out.bytes, 'Tile edit');
+  }, [buffer, locked, commitTileBytes]);
+
+  // ---------- transforms via artStore.pendingAction ----------
+  //
+  // The shared option bar's transform grid does not call anything; it writes ONE
+  // STRING into `artStore.pendingAction` and waits for a host to notice. That
+  // slot is a CROSS-ENGINE SINGLETON — aeon's ComposerCanvas has the mirror of
+  // this effect (ComposerCanvas.tsx:508) — so the rule this effect must not break
+  // is that `clearAction()` runs on EVERY path, including the ones that write
+  // nothing. Leave a string behind and it fires on whichever art host mounts
+  // next, against a document the user was not looking at when they clicked.
+  // `App` gates classic and aeon so only one is ever mounted, but that is a
+  // property of today's shell, not a guarantee this effect may lean on: hence
+  // `finally`, which also covers a throw out of the pure resolver.
+  //
+  // The locked case is the sharp one. A locked tile REFUSES THE WRITE BUT STILL
+  // CLEARS — swallow the clear instead and the transform would fire the instant
+  // the user browsed to an unlocked tile, silently editing the wrong tile. The
+  // refusal is toasted rather than silent because the button gave no other
+  // feedback; aeon skips silently in the same situation and that is a papercut
+  // there, not a contract worth copying.
+  const pendingAction = useArtStore((s) => s.pendingAction);
+  useEffect(() => {
+    if (!pendingAction) return;
     try {
-      res = classicEditTiles([{ tileIndex: composerTileIndex, data: out.bytes }]);
-    } catch (e) {
-      res = { ok: false as const, error: e instanceof Error ? e.message : String(e) };
+      const out = resolveTileTransform(buffer, pendingAction, selection, locked);
+      if (out.bytes) commitTileBytes(out.bytes, 'Transform');
+      else if (out.refusal) useToastStore.getState().addToast(out.refusal, 'info');
+    } finally {
+      useArtStore.getState().clearAction();
     }
-    if (!res.ok) useToastStore.getState().addToast(`Tile edit failed: ${res.error}`, 'error');
-  }, [buffer, locked, composerTileIndex]);
+  }, [pendingAction, buffer, selection, locked, commitTileBytes]);
 
   // Eyedropper → the shared selected color. Reading a pixel is not an edit, so this
   // is NOT gated on `locked`.
@@ -186,14 +227,8 @@ export default function TileTab({ doc, usage }: { doc: LevelDoc; usage: UsageInd
 
   const pasteTile = useCallback(() => {
     if (!tileClipboard || locked) return;
-    let res;
-    try {
-      res = classicEditTiles([{ tileIndex: composerTileIndex, data: packTilePixels(tileClipboard) }]);
-    } catch (e) {
-      res = { ok: false as const, error: e instanceof Error ? e.message : String(e) };
-    }
-    if (!res.ok) useToastStore.getState().addToast(`Paste failed: ${res.error}`, 'error');
-  }, [tileClipboard, locked, composerTileIndex]);
+    commitTileBytes(packTilePixels(tileClipboard), 'Paste');
+  }, [tileClipboard, locked, commitTileBytes]);
 
   // The composer's 1px BORDER is dropped and PixelViewport's own 1px ring left to
   // stand in for it — not cosmetics: a border is inside `getBoundingClientRect()`,
