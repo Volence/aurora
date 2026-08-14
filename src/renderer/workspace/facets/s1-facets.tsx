@@ -337,9 +337,17 @@ export const s1ArtFacet: FacetModule = {
 
 const styles: Record<string, React.CSSProperties> = {
   canvasFill: { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'auto' },
-  // Centred in the canvas the same way ClassicLevelViewport centres its own.
+  // Centred in the canvas the same way ClassicLevelViewport centres its own —
+  // and painted the same colour, which is what `background` is doing here.
+  // Without it this inherited the shell's `T.surface`, so with no act loaded the
+  // Art facet's canvas sat ~8 levels lighter than the pixel-identical Layout and
+  // Objects screens next to it (ClassicLevelViewport paints `T.void`). Three
+  // "nothing is open" screens that are not the same screen.
+  // On `empty` and not on `canvasFill`: with a document open the canvas belongs
+  // to ClassicComposerDock, which paints its own panels, and a colour applied to
+  // the wrapper would be a second decision about a surface that is not empty.
   empty: {
     flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
-    fontSize: 13, textAlign: 'center', padding: 24,
+    fontSize: 13, textAlign: 'center', padding: 24, background: T.void,
   },
 };

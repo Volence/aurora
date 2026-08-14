@@ -98,3 +98,35 @@ describe('LevelWorkspace routes every slot through it', () => {
     expect(source).toContain(`chrome.${slot}`);
   });
 });
+
+// ---------------------------------------------------------------------------
+// The no-act CANVAS. facetChrome strips the chrome; what is left is one centred
+// sentence on one background, and that is all the user sees. Both halves of it
+// were wrong in a way only a screenshot caught.
+// ---------------------------------------------------------------------------
+describe('every no-act canvas is the same screen', () => {
+  const s1Facets = readFileSync(join(__dirname, '..', 'facets', 's1-facets.tsx'), 'utf8');
+  const classicViewport = readFileSync(
+    join(__dirname, '..', '..', 'components', 'classic', 'ClassicLevelViewport.tsx'), 'utf8');
+  const mapViewport = readFileSync(
+    join(__dirname, '..', '..', 'components', 'MapViewport.tsx'), 'utf8');
+
+  const COPY = 'Open a level from the Explorer, or press Ctrl+K.';
+
+  it('classic paints its empty composer canvas the same colour as its empty map', () => {
+    // Layout and Objects (ClassicLevelViewport) painted T.void; Art inherited
+    // the shell's T.surface, ~8 levels lighter across the whole 1160x792 canvas.
+    // Three "nothing is open" screens that were not the same screen.
+    expect(classicViewport).toContain('background: T.void');
+    expect(s1Facets).toMatch(/empty: \{[^}]*background: T\.void/s);
+  });
+
+  it('both engines say the same true thing', () => {
+    // aeon said "Open a project to view sections" — false wherever it can be
+    // seen, since a MapViewport only mounts inside a level tab of an OPEN
+    // project. The act is what is missing, and the copy is classic's verbatim.
+    expect(classicViewport).toContain(COPY);
+    expect(mapViewport).toContain(COPY);
+    expect(mapViewport).not.toContain('<span>Open a project to view sections</span>');
+  });
+});

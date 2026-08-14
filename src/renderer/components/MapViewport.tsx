@@ -1504,7 +1504,16 @@ export default function MapViewport() {
   if (!act) {
     return (
       <div style={styles.empty}>
-        <span>Open a project to view sections</span>
+        {/* Says the true thing. This read "Open a project to view sections",
+            which is false wherever it can actually be seen: a MapViewport only
+            mounts inside a LEVEL TAB, and a level tab only exists once a project
+            is open — its name is in the title bar and its Explorer is on the
+            left. What is missing is the ACT (a read that failed, a restore still
+            in flight, `__dbg.resetLevel()` — see workspace/level-presence.ts).
+            Word-for-word classic's ClassicLevelViewport copy, because these are
+            the same state of the same shell and the user should not have to
+            learn that the two engines describe it differently. */}
+        <span>Open a level from the Explorer, or press Ctrl+K.</span>
       </div>
     );
   }

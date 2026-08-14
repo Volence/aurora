@@ -11,7 +11,7 @@
 //   - classic: `status === 'ready' && doc !== null`, which is exactly
 //     ClassicComposerCanvas's `ready` and ClassicLevelViewport's own guard.
 //   - aeon: `getCurrentAct(state) !== null`, which is exactly the condition
-//     MapViewport falls back to its "Open a project to view sections" state on.
+//     MapViewport falls back to its "Open a level from the Explorer" state on.
 //
 // A hook, so both subscriptions are live and a load completing re-renders the
 // workspace. Both stores are read UNCONDITIONALLY — the engine branch is on the
