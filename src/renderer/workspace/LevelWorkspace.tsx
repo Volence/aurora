@@ -2,14 +2,21 @@
 // classic. Owns the ONE EditorShell; the active facet module fills its slots.
 // The workspace header (EditorShell's appBar slot) carries the facet bar plus
 // the workspace controls that used to live on the legacy Toolbar: the FG/BG
-// plane toggle (on every facet whose canvas is plane-gated — see showPlane) and
-// undo/redo for the focused document.
+// plane toggle (on every facet whose canvas is plane-gated) and undo/redo for
+// the focused document.
+//
+// WHICH SLOTS GET FILLED IS NOT DECIDED HERE. facet-chrome.ts owns it — both the
+// plane-gated facet list and the rule that a facet with no act loaded draws
+// nothing but its canvas — because a decision inside a .tsx is a decision the
+// node-only suite cannot test.
 
 import React from 'react';
 import EditorShell from '../shell/EditorShell';
 import FacetBar from './FacetBar';
 import { moduleFor, resolveFacet } from './facet-registry';
 import { switchFacet } from './facet-tools';
+import { facetChrome } from './facet-chrome';
+import { useActLoaded } from './level-presence';
 import { useWorkspaceStore } from './workspaceStore';
 import { useOpenEngine, useOpenCapabilities, type OpenEngine } from '../state/open-project';
 import { useSessionStore } from '../state/sessionStore';
@@ -103,44 +110,24 @@ export default function LevelWorkspace() {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
-  // The FG/BG chips write editorStore.setEditingLayer, so they must not be live
-  // over a facet that has no editor — any facet an engine grants but does not
-  // serve — and chips that mutate an aeon store from a classic screen with no
-  // canvas are exactly the dead chrome this branch is removing.
-  //
-  // THE LIST IS EVERY FACET WHOSE CANVAS IS THE MAP, and it is a list of the
-  // FAILURES each omission causes, not a taxonomy:
-  //
-  //  - `objects` is load-bearing under BOTH engines — see the guard in
-  //    __tests__/facet-visibility.test.ts. Classic gates object editing on the
-  //    plane outright (ClassicLevelViewport: select and place-object only act
-  //    when the plane is FG; on BG they fall through to pan), so an objects
-  //    facet with no plane control is an objects facet whose tools silently do
-  //    nothing whenever the plane was left on BG. Aeon does not gate the
-  //    placement itself, but it renders only Plane B on BG and draws the object
-  //    overlay solely in the FG branch (MapViewport) — so there the same missing
-  //    control strands you on a canvas where every object is invisible.
-  //  - `rings` is the IDENTICAL aeon bug, and it was simply left off this list
-  //    when objects was added. MapViewport draws the ring overlay only in the FG
-  //    branch and `place-ring` carries no plane guard, so on BG the facet is a
-  //    canvas with no rings on it and a tool that keeps writing invisible ones.
-  //  - `palette` is view-only, so nothing writes invisibly there — but its canvas
-  //    is still the plane-gated map, and with no chip a plane left on BG shows
-  //    Plane B under a palette editor for art you cannot see. It is on the list
-  //    because the chip is LIVE there (it visibly changes the canvas), which is
-  //    the actual rule; a chip is dead chrome only where the canvas ignores it.
-  //
-  // That leaves exactly one served facet off: `art`, whose canvas is a composer
-  // under both engines and reads no plane at all.
-  const showPlane = mod != null && (
-    resolved === 'layout' || resolved === 'collision' || resolved === 'objects'
-    || resolved === 'rings' || resolved === 'palette'
-  );
+  // WHICH SLOTS ARE LIVE. The whole decision — including which facets the FG/BG
+  // chips do anything on, and the "no act loaded" suppression that stops a facet
+  // from drawing its entire frame around nothing — is facet-chrome.ts, a pure
+  // module the node-only suite can actually test. Nothing here re-derives it.
+  const actLoaded = useActLoaded(engine);
+  const chrome = facetChrome(actLoaded, mod ? resolved : null, {
+    toolDock: mod?.ToolDock != null,
+    toolOptions: mod?.ToolOptions != null,
+    rightPanel: mod?.RightPanel != null,
+    bottomExtra: mod?.BottomExtra != null,
+    statusBar: mod?.StatusBar != null,
+    mapOverlays: mod?.mapOverlays === true,
+  });
   const header = (
     <div style={styles.header}>
       <FacetBar tabId={activeId} granted={granted} engine={engine} />
       <span style={{ flex: 1 }} />
-      {showPlane && (['fg', 'bg'] as EditingLayer[]).map((l) => (
+      {chrome.planeChips && (['fg', 'bg'] as EditingLayer[]).map((l) => (
         <Chip key={l} active={editingLayer === l}
           onClick={() => useEditorStore.getState().setEditingLayer(l)}>{l.toUpperCase()}</Chip>
       ))}
@@ -151,7 +138,11 @@ export default function LevelWorkspace() {
           were reachable only from a tab where the map is not on screen and
           "nothing happens" was the honest result. Map facets only: the art
           facet's canvas never reads viewStore.overlays. */}
-      {mod?.mapOverlays && <ViewMenu />}
+      {chrome.viewMenu && <ViewMenu />}
+      {/* Undo/Redo survive the no-act state on purpose: they are the only two
+          controls here that are not about the absent document — focusedHistory()
+          resolves to null and they render disabled, which is a true statement
+          rather than dead chrome. Dropping them would make the header jump. */}
       <Chip disabled={!history?.canUndo} onClick={() => history?.undo()}>Undo</Chip>
       <Chip disabled={!history?.canRedo} onClick={() => history?.redo()}>Redo</Chip>
     </div>
@@ -173,14 +164,15 @@ export default function LevelWorkspace() {
   return (
     <EditorShell
       appBar={header}
-      toolOptions={ToolOptions ? <ToolOptions /> : undefined}
+      toolOptions={chrome.toolOptions && ToolOptions ? <ToolOptions /> : undefined}
       // `undefined`, not `<span />`: EditorShell drops the 44px rail entirely
       // when a facet has no dock, rather than drawing an empty column. Classic's
-      // composer facets are the only ones this reaches.
-      toolDock={ToolDock ? <ToolDock /> : undefined}
-      panels={RightPanel ? <RightPanel /> : <span />}
-      bottomExtra={BottomExtra ? <BottomExtra /> : undefined}
-      status={StatusBar ? <StatusBar /> : undefined}
+      // composer facets are the only ones this reaches — plus every facet of
+      // both engines while no act is loaded.
+      toolDock={chrome.toolDock && ToolDock ? <ToolDock /> : undefined}
+      panels={chrome.rightPanel && RightPanel ? <RightPanel /> : <span />}
+      bottomExtra={chrome.bottomExtra && BottomExtra ? <BottomExtra /> : undefined}
+      status={chrome.statusBar && StatusBar ? <StatusBar /> : undefined}
     >
       <Canvas />
     </EditorShell>

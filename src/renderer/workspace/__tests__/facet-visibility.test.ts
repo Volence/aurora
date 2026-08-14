@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { facetsFor, facetRegistry, registerBuiltinFacets } from '../../../core/shell/facets';
 import { facetModules, moduleFor, registerFacetModule, resolveFacet } from '../facet-registry';
+import { facetChrome, isPlaneGated } from '../facet-chrome';
 import { registerAeonFacetModules, registerS1FacetModules } from '../register-facets';
 import type { FacetCapability } from '../../../core/project/adapter';
 import { S1_FACETS } from '../../../core/project/s1';
@@ -89,6 +90,13 @@ describe('facet visibility (registered descriptors ∩ granted ∩ has module fo
 const AEON_GRANT = ['layout', 'art', 'objects', 'rings', 'collision', 'palette']; // core/project/aeon/index.ts
 const S1_GRANT = S1_FACETS; // core/project/s1/index.ts — the real thing
 
+/** A module that fills every slot — so a `false` below is the RULE's doing. */
+const ALL_SLOTS = {
+  toolDock: true, toolOptions: true, rightPanel: true,
+  bottomExtra: true, statusBar: true, mapOverlays: true,
+} as const;
+const chromeWithAct = (facet: FacetCapability) => facetChrome(true, facet, ALL_SLOTS);
+
 function resetProjectStores() {
   useClassicProjectStore.setState({ status: 'closed', capabilities: null } as never);
   useProjectStore.setState({ project: null, config: null, capabilities: null } as never);
@@ -164,31 +172,35 @@ describe('both production call sites resolve against the OPEN engine, not a lite
 //     canvas where every object is invisible.
 //
 // Neither failure throws, logs, or fails another test, which is why this one
-// exists. It reads the EXPRESSION rather than the whole line, so reordering the
-// facets or reformatting the condition keeps it green.
+// exists. It used to read LevelWorkspace's `showPlane` EXPRESSION out of the
+// source, because the decision lived inside a .tsx the suite cannot collect. It
+// is a pure function now (facet-chrome.ts), so this runs it.
 describe('the header offers the plane control on every facet whose canvas is plane-gated', () => {
-  const showPlaneExpr = (): string => {
-    const source = readFileSync(join(__dirname, '..', 'LevelWorkspace.tsx'), 'utf8');
-    const m = source.match(/const showPlane\s*=([\s\S]*?);/);
-    // A rename would make every assertion below vacuous, so it fails loudly.
-    expect(m, 'LevelWorkspace no longer declares `showPlane`').not.toBeNull();
-    return m![1];
-  };
-
-  it.each(['layout', 'collision', 'objects', 'rings', 'palette'])('%s can switch plane', (facet) => {
-    expect(showPlaneExpr()).toContain(`'${facet}'`);
-  });
+  it.each(['layout', 'collision', 'objects', 'rings', 'palette'] as const)(
+    '%s can switch plane', (facet) => {
+      expect(isPlaneGated(facet)).toBe(true);
+      expect(chromeWithAct(facet).planeChips).toBe(true);
+    });
 
   it('and `art` does NOT — its canvas is a composer that reads no plane', () => {
     // The other half of the rule. Without it this guard only ever grows, and a
     // chip over the art facet would write editorStore for a canvas that ignores
     // it — the dead chrome the list exists to prevent.
-    expect(showPlaneExpr()).not.toContain("'art'");
+    expect(isPlaneGated('art')).toBe(false);
+    expect(chromeWithAct('art').planeChips).toBe(false);
   });
 
   it('is still gated on the facet being served at all', () => {
     // Chips that write editorStore over a facet with no canvas are dead chrome.
-    expect(showPlaneExpr()).toContain('mod != null');
+    // LevelWorkspace passes `mod ? resolved : null`, so null IS "unserved".
+    expect(facetChrome(true, null, ALL_SLOTS).planeChips).toBe(false);
+  });
+
+  it('LevelWorkspace routes the chips through it rather than re-deriving them', () => {
+    const source = readFileSync(join(__dirname, '..', 'LevelWorkspace.tsx'), 'utf8');
+    expect(source).toContain('chrome.planeChips');
+    // The old inline list must not come back beside the shared one.
+    expect(source).not.toMatch(/const showPlane\s*=/);
   });
 });
 
