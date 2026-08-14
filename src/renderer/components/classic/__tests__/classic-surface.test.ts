@@ -106,6 +106,12 @@ const COMMAND_SITES: Record<string, ClassicSurface | { inside: string }> = {
   // rename here rather than a silent loss of coverage.
   'providers/object-inspector-classic.ts': 'map',
   'components/classic/ClassicPalettePanel.tsx': 'art',
+  // The palette panel's port (stage-4 plan 6). A palette edit belongs to the
+  // ZONE-ART document, so the classicSetPalette call has to keep the art claim
+  // with it — and the shared grid it feeds lives in components/art-shared/, which
+  // has no engine of its own to claim for. Same shape as the object list above:
+  // the claim rides in on the port's `rootProps`.
+  'providers/palette-classic.ts': 'art',
   'components/classic/ChunkTab.tsx': { inside: 'components/classic/ClassicComposerDock.tsx' },
   'components/classic/BlockTab.tsx': { inside: 'components/classic/ClassicComposerDock.tsx' },
   'components/classic/TileTab.tsx': { inside: 'components/classic/ClassicComposerDock.tsx' },

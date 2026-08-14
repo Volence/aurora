@@ -1,6 +1,7 @@
 import React from 'react';
 import { T } from '../ui';
-import { encodeGenesisColor, decodeGenesisColor, fmtGenesisWord } from '../../../core/formats/palette';
+import { decodeGenesisColor, fmtGenesisWord } from '../../../core/formats/palette';
+import { channelLevel, withChannel } from './palette-grid-model';
 
 // The Genesis palette color-picker CONTROL — three 3-bit R/G/B sliders (0-7 per
 // channel) over a single CRAM word. It is pure UI: it holds no state, operates
@@ -21,17 +22,11 @@ import { encodeGenesisColor, decodeGenesisColor, fmtGenesisWord } from '../../..
 const CHANNELS = ['r', 'g', 'b'] as const;
 const CHANNEL_COLORS: Record<string, string> = { r: T.error, g: T.success, b: T.info };
 
-/** 8-bit channel → Genesis 3-bit level (0-7). */
-function to3(v: number): number {
-  return Math.round(Math.min(255, Math.max(0, v)) / 255 * 7);
-}
-
-/** Rebuild a CRAM word from `word` with one channel replaced by a 0-7 level. */
-function withChannel(word: number, channel: 'r' | 'g' | 'b', level3: number): number {
-  const c = decodeGenesisColor(word);
-  const levels = { r: to3(c.r), g: to3(c.g), b: to3(c.b), [channel]: level3 };
-  return encodeGenesisColor({ r: levels.r * 255 / 7, g: levels.g * 255 / 7, b: levels.b * 255 / 7 });
-}
+// `channelLevel` (8-bit → the Genesis 3-bit level) and `withChannel` (rebuild a
+// CRAM word with one channel replaced) live in palette-grid-model.ts, next to the
+// rest of the word arithmetic and where they can be run by a test. This file used
+// to declare private copies; they are the same two helpers the grid needs, and two
+// copies of a `>> 9 & 7` is how the palette panels drifted the first time.
 
 export default function GenesisColorSliders({
   word, onChange, onCommit, heading,
@@ -62,14 +57,14 @@ export default function GenesisColorSliders({
         <div key={ch} style={styles.sliderRow}>
           <span style={{ ...styles.channelLabel, color: CHANNEL_COLORS[ch] }}>{ch.toUpperCase()}</span>
           <input
-            type="range" min={0} max={7} step={1} value={to3(color[ch])}
+            type="range" min={0} max={7} step={1} value={channelLevel(color[ch])}
             onChange={(e) => onChange(withChannel(word, ch, Number(e.target.value)))}
             onPointerUp={commit}
             onKeyUp={commit}
             onBlur={commit}
             style={styles.slider}
           />
-          <span style={styles.channelValue}>{to3(color[ch])}</span>
+          <span style={styles.channelValue}>{channelLevel(color[ch])}</span>
         </div>
       ))}
     </div>
