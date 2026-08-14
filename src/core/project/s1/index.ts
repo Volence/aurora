@@ -347,13 +347,24 @@ export const s1Adapter: ProjectAdapter = {
         sprites: true,
         objects: 'objpos',
         build: false,
-        // Classic has no collision-editing UI: classicSetColind's only caller is
-        // the agent handler, and classic's sole collision affordance is a
-        // read-only overlay. Granting the facet would put a Collision pill over
-        // an aeon-only CollisionPalette (spec §3.0.3). Owner decision 2026-08-13:
-        // drop the grant now, restore this entry when the classic collision
-        // editor lands as its own designed feature.
-        facets: ['layout', 'art', 'objects', 'palette'],
+        // TWO FACETS ARE DELIBERATELY ABSENT, both reversible by putting the id
+        // back in this list (and its module back in register-facets):
+        //
+        //  - `collision`. Classic has no collision-editing UI: classicSetColind's
+        //    only caller is the agent handler, and classic's sole collision
+        //    affordance is a read-only overlay. Granting it would put a Collision
+        //    pill over an aeon-only CollisionPalette (spec §3.0.3). Owner
+        //    decision 2026-08-13; restore when the classic collision editor lands
+        //    as its own designed feature.
+        //  - `palette`. It was a SECOND NAME for `art`: both pills rendered the
+        //    same composer, the same right column and the same status bar —
+        //    composerFacet('art') and composerFacet('palette') differed in `id`
+        //    alone and nothing downstream read it (workspace/facets/s1-facets.tsx).
+        //    Classic's palette grid is a section INSIDE the art column, not a
+        //    surface of its own, so the pill navigated to a pixel-identical
+        //    screen. Restore when classic's art surface is redesigned in step H
+        //    and there is a palette screen that differs from the art one.
+        facets: ['layout', 'art', 'objects'],
         // Classic's three rungs are all id-addressed: a layout cell HOLDS a
         // chunk id and a chunk cell HOLDS a block id, so an edit at any tier
         // propagates to every placement (spec §3.0.2).

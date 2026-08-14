@@ -4,7 +4,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { facetsFor, facetRegistry, registerBuiltinFacets } from '../../../core/shell/facets';
-import { facetModules, moduleFor, registerFacetModule } from '../facet-registry';
+import { facetModules, moduleFor, registerFacetModule, resolveFacet } from '../facet-registry';
 import { registerAeonFacetModules, registerS1FacetModules } from '../register-facets';
 import type { FacetCapability } from '../../../core/project/adapter';
 import { openCapabilities } from '../../state/open-project';
@@ -26,20 +26,32 @@ describe('facet visibility (registered descriptors ∩ granted ∩ has module fo
     expect(visible.map((f) => f.id)).toEqual(['layout', 'art', 'objects', 'rings', 'collision', 'palette']);
   });
 
-  it('s1 manifest shows its four facets with a registered module, in order', () => {
+  it('s1 manifest shows its three facets with a registered module, in order', () => {
     registerBuiltinFacets();
     registerS1FacetModules();
     const visible = facetsFor([...S1_GRANT] as FacetCapability[]).filter((f) => moduleFor('s1', f.id));
     // Registry order, not grant order — `art` sits between layout and objects in
     // core/shell/facets, and the pills follow the registry so the bar reads the
     // same way under both engines.
-    expect(visible.map((f) => f.id)).toEqual(['layout', 'art', 'objects', 'palette']);
+    expect(visible.map((f) => f.id)).toEqual(['layout', 'art', 'objects']);
   });
 
   it('a facet without a registered module renders nothing (no dead chrome)', () => {
     registerBuiltinFacets();
     // No modules registered at all:
     expect(facetsFor(['layout']).filter((f) => moduleFor('aeon', f.id))).toEqual([]);
+  });
+
+  it('a session record naming the dropped `palette` facet heals to a served one', () => {
+    // What the grant drop has to survive: a workspace record persisted while
+    // classic still granted `palette`. There is no pill for it now, so the only
+    // way in is a restored record — and the answer must be another CLASSIC facet,
+    // never null (which is FacetUnavailable) and never aeon's module.
+    registerBuiltinFacets();
+    registerS1FacetModules();
+    expect(resolveFacet('s1', [...S1_GRANT] as FacetCapability[], 'palette')).toBe('layout');
+    // Same for the other dropped grant, which is the case this heal was built for.
+    expect(resolveFacet('s1', [...S1_GRANT] as FacetCapability[], 'collision')).toBe('layout');
   });
 
   it('a facet granted but module-less FOR THIS ENGINE gets no pill', () => {
@@ -59,12 +71,11 @@ describe('facet visibility (registered descriptors ∩ granted ∩ has module fo
 // The grants the two profiles actually declare, kept as literals so a profile
 // edit has to come through here (same style as the adapter tests).
 const AEON_GRANT = ['layout', 'art', 'objects', 'rings', 'collision', 'palette']; // core/project/aeon/index.ts
-// NOTE: `collision` is NOT in this list. s1 used to grant it with nothing built
-// behind it (classicSetColind has no component callers); the pill would have
-// opened an aeon-only CollisionPalette. Owner decision 2026-08-13 dropped the
-// grant — see the comment on the grant itself in core/project/s1/index.ts — to
-// be restored when a classic collision editor exists.
-const S1_GRANT = ['layout', 'art', 'objects', 'palette']; // core/project/s1/index.ts
+// NOTE: neither `collision` nor `palette` is in this list — the first had
+// nothing built behind it, the second had the ART facet built behind it and
+// nothing else. Both absences are argued on the grant itself; both are
+// reversible there.
+const S1_GRANT = ['layout', 'art', 'objects']; // core/project/s1/index.ts
 
 function resetProjectStores() {
   useClassicProjectStore.setState({ status: 'closed', capabilities: null } as never);

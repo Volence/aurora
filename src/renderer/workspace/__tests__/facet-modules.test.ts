@@ -102,18 +102,23 @@ describe('registerAeonFacetModules registers every aeon facet', () => {
 describe('registerS1FacetModules registers every facet the s1 profile grants', () => {
   // The s1 profile's real grant (core/project/s1/index.ts), as a literal so a
   // profile edit has to come through here — the house style for these.
-  const S1_GRANT = ['layout', 'art', 'objects', 'palette'] as const;
+  const S1_GRANT = ['layout', 'art', 'objects'] as const;
 
   beforeEach(() => { facetModules.clear(); });
 
-  it('serves all four, and nothing outside the grant', async () => {
+  it('serves all three, and nothing outside the grant', async () => {
     const { registerS1FacetModules } = await import('../register-facets');
     registerS1FacetModules();
     for (const f of S1_GRANT) expect(moduleFor('s1', f), `s1/${f}`).not.toBeNull();
     // A module for an ungranted facet is dead code with no pill: FacetBar shows
     // granted ∩ registered, so it could only ever be reached by a stale session
     // record — and resolveFacet exists to heal exactly that away.
-    for (const f of ['rings', 'collision'] as const) {
+    //
+    // `palette` is in this list as of the grant drop: it used to be registered
+    // with a module identical to `art`'s in every slot, so the pill led to a
+    // pixel-identical screen. Keeping the module after dropping the grant would
+    // have left exactly the dead registry entry this assertion is for.
+    for (const f of ['rings', 'collision', 'palette'] as const) {
       expect(moduleFor('s1', f), `s1/${f}`).toBeNull();
     }
   });
@@ -145,24 +150,27 @@ describe('registerS1FacetModules registers every facet the s1 profile grants', (
 
   it('marks only the map facets as overlay-painting', async () => {
     // The composer never reads viewStore.overlays, so a View menu over the art
-    // and palette facets would be a control that visibly does nothing.
+    // facet would be a control that visibly does nothing.
     const { registerS1FacetModules } = await import('../register-facets');
     registerS1FacetModules();
     expect(moduleFor('s1', 'layout')?.mapOverlays).toBe(true);
     expect(moduleFor('s1', 'objects')?.mapOverlays).toBe(true);
     expect(moduleFor('s1', 'art')?.mapOverlays).toBeFalsy();
-    expect(moduleFor('s1', 'palette')?.mapOverlays).toBeFalsy();
   });
 
-  it('shares one composer surface between art and palette', async () => {
-    // Classic's composer is ONE surface with its own internal tabs; merging it
-    // with aeon's staged pixel document is step H. Asserted so the sharing reads
-    // as a decision rather than a copy-paste nobody meant.
+  it('shares one canvas between the two MAP facets, and serves art from its own', async () => {
+    // Classic has two canvases for three facets. The pair that shares one is
+    // layout+objects (one ClassicLevelViewport); `art` is the other canvas.
+    //
+    // It used to be two pairs: `palette` was a third module over the SAME
+    // composer canvas, which is what made it a duplicate screen rather than a
+    // facet. The assertion that pinned that sharing has been replaced by the
+    // absence check above — sharing a canvas is fine (layout/objects do it and
+    // differ by panel), sharing EVERY slot is what was wrong.
     const { registerS1FacetModules } = await import('../register-facets');
     registerS1FacetModules();
-    expect(moduleFor('s1', 'art')?.Canvas).toBe(moduleFor('s1', 'palette')?.Canvas);
-    // …and the two map facets likewise share classic's one level viewport.
     expect(moduleFor('s1', 'layout')?.Canvas).toBe(moduleFor('s1', 'objects')?.Canvas);
+    expect(moduleFor('s1', 'art')?.Canvas).not.toBe(moduleFor('s1', 'layout')?.Canvas);
   });
 
   it('mounts the contextual hint line on BOTH map facets', async () => {

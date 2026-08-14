@@ -87,7 +87,10 @@ describe('s1Adapter.open resolution', () => {
       sprites: true,
       objects: 'objpos',
       build: false,
-      facets: ['layout', 'art', 'objects', 'palette'],
+      // Neither `collision` nor `palette`: classic has no collision editor, and
+      // its `palette` facet was a second pill over the identical art screen.
+      // Both absences are argued at the grant itself (core/project/s1/index.ts).
+      facets: ['layout', 'art', 'objects'],
       artTiers: [
         { id: 'chunk', label: 'Chunk', pixelSize: 256, shared: true },
         { id: 'block', label: 'Block', pixelSize: 16, shared: true },

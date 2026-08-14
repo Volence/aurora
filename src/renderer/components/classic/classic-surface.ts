@@ -14,10 +14,10 @@
 // in aeon. `art` covers the whole zone-art document (tiles/blocks/chunks/palette/
 // colind); `map` covers the act's layout (fg/bg/objects/start).
 //
-// TWO SURFACES, FOUR FACETS — see SURFACE_FACETS. A surface claims a SET, and
-// only speaks up when the current facet is outside it, because classic's four
-// facets are served by two components and a pointer-down cannot tell the halves
-// of a pair apart.
+// TWO SURFACES, MORE FACETS THAN THAT — see SURFACE_FACETS. A surface claims a
+// SET, and only speaks up when the current facet is outside it, because classic's
+// facets are served by two components and a pointer-down cannot tell the facets
+// sharing one component apart.
 //
 // switchFacet, not setFacet: it also re-scopes editorStore.tool via
 // toolForFacet(). That was WRONG while classic ran its own tool vocabulary — it
@@ -55,22 +55,34 @@ export type ClassicSurface = 'map' | 'art';
 
 /**
  * The facets each surface SERVES, primary first. Deliberately not a 1:1 map:
- * classic grants four facets (core/project/s1/index.ts) and has two surfaces,
- * because each surface is the canvas of a PAIR of them —
+ * classic has two surfaces and more facets than that, because one surface can be
+ * the canvas of SEVERAL —
  *
  *   • `map`  → `layout` + `objects`. One ClassicLevelViewport is the canvas of
- *     both (workspace/facets/s1-facets.tsx), and the object list and inspector
- *     sit in both facets' right column. The two differ only by which pill is lit
- *     and whether the chunk picker is in the panel.
- *   • `art`  → `art` + `palette`. One ClassicComposerDock is the canvas of both,
- *     and ClassicPalettePanel is in both facets' right column. Splitting them is
- *     step H's job, not this module's.
+ *     both (workspace/facets/s1-facets.tsx). They differ in their RIGHT COLUMN,
+ *     which is the whole point of the split: layout has the chunk picker,
+ *     objects has the object list and the inspector. (This sentence used to say
+ *     the list and inspector sat in both columns. They did once; the Layout/
+ *     Objects split moved them, and the stale claim here is what a later reader
+ *     took as licence to make Objects a subset of Layout again.)
+ *   • `art`  → `art` (+ `palette`, see below). One ClassicComposerDock is the
+ *     canvas, with ClassicPalettePanel a section in its column.
  *
- * So the surface a pointer-down lands in genuinely CANNOT say which half of the
- * pair the user means — it is literally the same component either way. A 1:1 map
- * therefore made two of the four facets unreachable in practice: light the
- * Objects pill, click anywhere in the map, and the claim wrote `layout` straight
- * back and the pill jumped under the pointer. Mirror-image for Palette.
+ * So the surface a pointer-down lands in genuinely CANNOT say which of them the
+ * user means — it is literally the same component either way. A 1:1 map made the
+ * non-primary facet unreachable in practice: light the Objects pill, click
+ * anywhere in the map, and the claim wrote `layout` straight back and the pill
+ * jumped under the pointer.
+ *
+ * `palette` STAYS IN THE ART SET although the s1 profile no longer grants it
+ * (core/project/s1/index.ts — it was a second pill over the identical art
+ * screen). This map states which DOCUMENT a facet edits, not which pills exist:
+ * `palette` edits the zone-art document under either engine, which is exactly
+ * what editorStore's ZONE_ART_FACETS says, and those two must agree (see the
+ * drift test below). Dropping it here would also mean a restored session record
+ * naming `palette` claims `art` on the first click — repointing undo before
+ * resolveFacet has healed the record — for no gain, since an ungranted facet
+ * renders FacetUnavailable and has no composer to click in.
  *
  * Hence: a surface claims only when the current facet is OUTSIDE its set. Inside
  * it, the user is already where they said they were and the surface has nothing

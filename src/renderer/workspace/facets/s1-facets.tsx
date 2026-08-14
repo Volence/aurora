@@ -1,21 +1,21 @@
-// Classic (S1 disasm) facet modules — the four facets the s1 profile grants,
+// Classic (S1 disasm) facet modules — the three facets the s1 profile grants,
 // composed entirely from components that already exist. No new UI was written
 // here: task 4 populated the registry and task 9 flipped classic off the legacy
 // shell onto it, in two commits, so a failure in the registration stayed
 // isolated from a failure in the switch-on. This IS what a classic level tab
 // renders now.
 //
-// ART AND PALETTE SHARE ONE CANVAS. Classic's composer is a single surface with
-// its own internal Chunk/Block/Tile tabs, and its palette grid edits the same
-// zone-art document; splitting them across two canvases would mean inventing a
-// classic art surface this step has no mandate to design. Merging that composer
-// with aeon's staged pixel document is step H, which the spec flags as the
-// hardest piece of the overhaul and possibly not fully shareable. This step
-// re-homes it unchanged and leaves the two facets pointing at the same surface,
-// distinguished only by which pill is lit.
+// ART IS ONE SURFACE, AND IT INCLUDES THE PALETTE. Classic's composer is a
+// single canvas with its own internal Chunk/Block/Tile tabs, and its palette
+// grid is a SECTION IN THE SAME COLUMN editing the same zone-art document.
+// There used to be a second facet over it: `palette`, identical in every slot,
+// differing in `id` alone. It is gone with its grant (core/project/s1/index.ts).
+// Splitting palette back out means inventing a classic palette surface, which is
+// step H's business — the same step that decides whether this composer and
+// aeon's staged pixel document can be one screen at all.
 //
-// `collision` has no module here on purpose: the s1 profile no longer grants it
-// (core/project/s1/index.ts).
+// `collision` and `palette` have no module here on purpose: the s1 profile
+// grants neither (core/project/s1/index.ts, where both absences are argued).
 //
 // ---------------------------------------------------------------------------
 // WHAT IS STILL OPEN FOR STEP H
@@ -35,20 +35,14 @@
 //
 // STILL OPEN, and genuinely step-H shaped:
 //
-//  1. **Art and Palette are the same screen.** composerFacet('art') and
-//     composerFacet('palette') differ only in `id`, and nothing downstream reads
-//     it — the composer's tabs are chunk/block/tile, there is no palette tier.
-//     The Palette pill navigates to a pixel-identical facet. The fix is probably
-//     to drop the `palette` grant the way `collision` was dropped, but that is a
-//     statement about what classic's art surface IS.
-//  2. **The tab body does not fill the height it is given.** `dockContent` grows
+//  1. **The tab body does not fill the height it is given.** `dockContent` grows
 //     now, but `tabBody` is `alignItems: flex-start`, so the content is
 //     top-anchored under a large empty region. Making the tiers fill their canvas
 //     is the composer redesign proper.
-//  3. **The section headings say their name twice** — the CollapsibleSection
-//     header renders "CHUNKS" and ChunkGrid's own heading renders "CHUNKS (82)"
-//     directly beneath it. Shared with aeon (TILESET / TILES (919)), so it is a
-//     ChunkGrid/Panel question, not a classic one.
+//  2. **What classic's palette surface should BE.** Dropping the duplicate
+//     `palette` facet says what it is not; it does not say what a palette-first
+//     screen for classic looks like, or whether one is wanted. That is step H's
+//     to answer, next to the same question for aeon's composer.
 
 
 import React from 'react';
@@ -318,7 +312,7 @@ export const s1ObjectsFacet: FacetModule = mapFacet('objects', {
   RightPanel: ClassicObjectsPanels,
 });
 
-// Written out rather than built with mapFacet: these are NOT map-canvas facets.
+// Written out rather than built with mapFacet: this is NOT a map-canvas facet.
 // mapFacet hardcodes `mapOverlays: true` and a MapFacetDock, and both would be
 // wrong here — the composer never reads viewStore.overlays, so a View menu over
 // it is a control that visibly does nothing, and it drives its own tier tabs
@@ -327,15 +321,20 @@ export const s1ObjectsFacet: FacetModule = mapFacet('objects', {
 // NO ToolDock ON PURPOSE, and that is now a real absence rather than an empty
 // one: LevelWorkspace passes `undefined` for a missing dock and EditorShell drops
 // the 44px rail instead of drawing a bordered empty column (gap 2).
-const composerFacet = (id: 'art' | 'palette'): FacetModule => ({
-  id,
+//
+// ONE composer facet, not two. There was a `composerFacet(id)` factory here
+// producing an `art` and a `palette` module that differed in `id` and in nothing
+// else — same canvas, same column, same status bar — and nothing downstream read
+// the id, so the Palette pill navigated to a pixel-identical screen. The s1
+// profile has stopped granting `palette` (core/project/s1/index.ts); a module
+// with no grant is unreachable, so it went with the grant rather than sitting
+// here as dead registry weight.
+export const s1ArtFacet: FacetModule = {
+  id: 'art',
   Canvas: ClassicComposerCanvas,
   RightPanel: ClassicArtPanels,
   StatusBar: ClassicComposerStatusBar,
-});
-
-export const s1ArtFacet: FacetModule = composerFacet('art');
-export const s1PaletteFacet: FacetModule = composerFacet('palette');
+};
 
 const styles: Record<string, React.CSSProperties> = {
   canvasFill: { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'auto' },
