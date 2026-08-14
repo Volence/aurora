@@ -1,8 +1,11 @@
-// Classic port for the neutral MapStatusBar. Nothing renders this port yet — it
-// lands before the workspace task that consumes it — so these branches are the
-// only thing standing between a typo and a status bar that is wired blind.
+// Classic port for the neutral MapStatusBar. Both s1 map facets render it
+// (workspace/facets/s1-facets.tsx), but the port is a hook and the suite has no
+// renderer, so these branches are the only thing standing between a typo and a
+// status bar that is wired blind.
 
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { classicScopeInfo, classicScopeTone, type ScopeDoc } from '../map-status-classic';
 import type { ClassicLevelStatus } from '../../state/classicLevelStore';
 import type { ZoneActRef } from '../../../core/project/adapter';
@@ -93,5 +96,36 @@ describe('classicScopeTone', () => {
           .toBe(classicScopeInfo(ref, status, null) === 'load failed');
       }
     }
+  });
+});
+
+// `ownHintLine` is a claim about the FACETS, made in the port: "every classic
+// map facet mounts a hint line of its own, so the bar must not add a generic
+// one". Two files have to agree for that to be true, and only one of them says
+// it — so this pairs the port's flag with the modules' actual ToolOptions slot.
+// Drop the bar from either facet and the flag becomes a silent hole where the
+// tool is explained nowhere at all.
+describe('the bar defers because classic\'s map facets speak for themselves', () => {
+  it('both s1 map modules mount a ToolOptions hint line', async () => {
+    const [{ registerS1FacetModules }, { moduleFor, facetModules }] = await Promise.all([
+      import('../../workspace/register-facets'), import('../../workspace/facet-registry'),
+    ]);
+    facetModules.clear();
+    registerS1FacetModules();
+    expect(moduleFor('s1', 'layout')?.ToolOptions).toBeTypeOf('function');
+    expect(moduleFor('s1', 'objects')?.ToolOptions).toBeTypeOf('function');
+  });
+
+  it('…and the port therefore suppresses the generic hint', () => {
+    // Source-level: the port is a hook, and the suite has no renderer. Comments
+    // stripped so the rationale above the field cannot satisfy the assertion.
+    const src = readFileSync(join(__dirname, '..', 'map-status-classic.ts'), 'utf8')
+      .replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
+    expect(src).toMatch(/ownHintLine:\s*true/);
+  });
+
+  it('aeon does NOT suppress it — its map facets have no such bar', () => {
+    const src = readFileSync(join(__dirname, '..', 'map-status-aeon.ts'), 'utf8');
+    expect(src).not.toContain('ownHintLine');
   });
 });

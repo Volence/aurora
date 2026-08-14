@@ -100,8 +100,20 @@ export function useClassicMapStatusPort(): MapStatusPort {
     // line that is not a fact about the act (the old bespoke classic bar).
     scopeTone,
     // Empty on purpose: classic's stamp context already rides its own hint line
-    // in the chunk picker, and repeating it here would say it twice.
+    // — ClassicMapToolOptions, the bar directly above the canvas, which prints
+    // `stamp $2A ∞loop · drag to paint · right-click eyedrops` — and repeating it
+    // here would say it twice. (It is NOT the chunk picker's status line, which
+    // this comment claimed for a while; that one says how to use the picker.)
     contextInfo: '',
+    // …and for the same reason the bar must not fall back to the generic tool
+    // hint either. BOTH classic map facets mount that ToolOptions bar
+    // (workspace/facets/s1-facets.tsx), so every tool classic offers is already
+    // explained one row above — by a line that knows the PLANE, which the
+    // generic hint does not. With `select` on BG the two flatly contradicted
+    // each other: the options bar said "objects are FG-only — switch to FG to
+    // edit · drag to pan" (what the canvas does) and this bar said "Click to
+    // select, drag to move, Del to remove" (what it does not).
+    ownHintLine: true,
     zoom,
     onZoom: setZoom,
     // No Aether bus for classic.

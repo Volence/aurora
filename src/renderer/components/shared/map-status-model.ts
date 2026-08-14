@@ -39,6 +39,23 @@ export interface MapStatusPort {
   readonly scopeTone?: 'normal' | 'error';
   /** Overrides the tool hint when non-empty — engine-specific context. */
   readonly contextInfo: string;
+  /**
+   * True when the FACET already mounts a hint line of its own (a `ToolOptions`
+   * bar), so the bar must not fall back to the generic per-tool hint.
+   *
+   * Not a style preference — the two lines CONTRADICTED each other. Classic's
+   * map facets mount ClassicMapToolOptions, whose `select` branch on the BG
+   * plane says "objects are FG-only — switch to FG to edit · drag to pan",
+   * which is what the canvas actually does; one row below, this bar's generic
+   * TOOL_HINTS.select said "Click to select, drag to move, Del to remove",
+   * which on BG is false. The generic hint is a fallback for a facet with
+   * nowhere else to say it, so the fix is at that level rather than special-
+   * casing the plane: a facet that speaks for itself is not spoken over.
+   *
+   * Absent/false for aeon's map facets, which mount no ToolOptions at all — the
+   * bar is the only place their tool is explained, and it keeps saying so.
+   */
+  readonly ownHintLine?: boolean;
   readonly zoom: number;
   onZoom(zoom: number): void;
   /** Engine-only trailing content (aeon's Aether bus indicator). */
@@ -55,4 +72,21 @@ export function statusLabel(s: { tool: ToolId; pasting: boolean }): StatusLabel 
     };
   }
   return { label: TOOL_LABELS[s.tool], hint: TOOL_HINTS[s.tool] };
+}
+
+/**
+ * The trailing span of the bar's left half, in one place rather than inline in
+ * MapStatusBar.tsx — .tsx is not collected by this node-only suite, so a
+ * decision left in the component is a decision no test can reach.
+ *
+ * Three cases, in priority order:
+ *   1. the port's own `contextInfo` (aeon's live stamp target);
+ *   2. nothing, when the facet mounts its own hint line (see `ownHintLine`);
+ *   3. the generic per-tool hint.
+ */
+export function statusContext(
+  port: Pick<MapStatusPort, 'tool' | 'pasting' | 'contextInfo' | 'ownHintLine'>,
+): string {
+  if (port.contextInfo) return port.contextInfo;
+  return port.ownHintLine === true ? '' : statusLabel(port).hint;
 }

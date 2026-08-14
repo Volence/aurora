@@ -9,10 +9,13 @@
 
 import React from 'react';
 import { StatusBar, T, IconButton } from '../ui';
-import { statusLabel, type MapStatusPort } from './map-status-model';
+import { statusContext, statusLabel, type MapStatusPort } from './map-status-model';
 
 export default function MapStatusBar({ port }: { port: MapStatusPort }): React.ReactElement {
   const info = statusLabel(port);
+  // The tool label stays whatever the tool is; only the trailing HINT defers —
+  // see statusContext, which owns the three cases so a node test can reach them.
+  const context = statusContext(port);
   const zoomPercent = Math.round(port.zoom * 100);
 
   const left = (
@@ -21,7 +24,7 @@ export default function MapStatusBar({ port }: { port: MapStatusPort }): React.R
       <span style={{ color: T.textBase }}>{port.layer.toUpperCase()}</span>
       <span style={{ color: T.textLo }}>{port.zoneName}</span>
       <span style={{ color: port.scopeTone === 'error' ? T.error : T.textLo }}>{port.scopeInfo}</span>
-      <span style={{ color: T.textLo }}>{port.contextInfo || info.hint}</span>
+      <span style={{ color: T.textLo }}>{context}</span>
     </span>
   );
 
