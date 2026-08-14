@@ -6,11 +6,15 @@
 // library, the Aether bus) live on this side of the line.
 
 import React from 'react';
-import type { MapStatusPort } from '../components/shared/MapStatusBar';
+import type { MapStatusPort } from '../components/shared/map-status-model';
 import { useEditorStore } from '../state/editorStore';
 import { useViewStore } from '../state/viewStore';
 import { useProjectStore, getCurrentZone } from '../state/projectStore';
 import AetherStatus from '../components/AetherStatus';
+
+/** Aeon's trailing status content. An element, not a component, because it takes
+ *  no props and never varies — hoisting it keeps the port's identity stable. */
+const AETHER = React.createElement(AetherStatus);
 
 /**
  * The stamp tool's context line: which chunk is armed, or why nothing can be
@@ -20,11 +24,7 @@ import AetherStatus from '../components/AetherStatus';
  * implement it — which is exactly why it rides this engine-specific line rather
  * than the shared hint in workspace/tool-meta.ts.
  */
-/** Aeon's trailing status content. An element, not a component, because it takes
- *  no props and never varies — hoisting it keeps the port's identity stable. */
-const AETHER = React.createElement(AetherStatus);
-
-function stampContext(chunkCount: number, selectedChunkId: string | null): string {
+export function stampContext(chunkCount: number, selectedChunkId: string | null): string {
   if (chunkCount === 0) return 'No chunks loaded — import chunks first';
   if (!selectedChunkId) return 'Select a chunk from the library panel';
   return `Chunk: ${selectedChunkId} — Alt: art only`;

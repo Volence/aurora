@@ -1,10 +1,13 @@
 // Classic (S1 disasm) port for the neutral shared/MapStatusBar.
 //
-// Replaces the bespoke statusLeft/statusRight built inline in
-// ClassicProjectView, which dies when classic renders through the shared
-// LevelWorkspace shell. Reads only — the bar reports, it never edits, so nothing
-// here calls a classic command (and so it does not appear in
-// classic-surface.test.ts's COMMAND_SITES).
+// The eventual replacement for the bespoke statusLeft/statusRight built inline
+// in ClassicProjectView. NOTHING RENDERS THIS YET: the two coexist until classic
+// moves onto the shared LevelWorkspace shell and ClassicProjectView is deleted,
+// which is what removes the duplicate. Until then, a change to what classic's
+// status bar says has to be made in BOTH places.
+//
+// Reads only — the bar reports, it never edits, so nothing here calls a classic
+// command (and so it does not appear in classic-surface.test.ts's COMMAND_SITES).
 //
 // Two things from the old bar deliberately do NOT come across:
 //
@@ -17,7 +20,7 @@
 //    engine-only trailing content and is empty for classic (no Aether bus).
 
 import React from 'react';
-import type { MapStatusPort } from '../components/shared/MapStatusBar';
+import type { MapStatusPort } from '../components/shared/map-status-model';
 import type { LevelDoc } from '../../core/level-classic/model';
 import { useEditorStore } from '../state/editorStore';
 import { useViewStore } from '../state/viewStore';
@@ -27,9 +30,9 @@ import type { ZoneActRef } from '../../core/project/adapter';
 /**
  * What sits to the right of the act name: the act's shape and contents once it
  * is loaded, and the load state itself before that. The old bar folded these
- * into one span; they are the same four cases.
+ * into one span; they are the same five cases.
  */
-function classicScopeInfo(
+export function classicScopeInfo(
   ref: ZoneActRef | null,
   status: ClassicLevelStatus,
   doc: LevelDoc | null,
@@ -56,7 +59,6 @@ export function useClassicMapStatusPort(): MapStatusPort {
   const ref = useClassicLevelStore((s) => s.ref);
   const doc = useClassicLevelStore((s) => s.doc);
   const status = useClassicLevelStore((s) => s.status);
-  const chunkEpoch = useClassicLevelStore((s) => s.chunkEpoch);
 
   const scopeInfo = classicScopeInfo(ref, status, doc);
 
@@ -76,8 +78,5 @@ export function useClassicMapStatusPort(): MapStatusPort {
     onZoom: setZoom,
     // No Aether bus for classic.
     right: undefined,
-    // Classic swaps an immutable doc rather than mutating one, so doc identity
-    // plus the art epoch is the whole repaint signal.
-    versionKey: `${ref?.zone ?? ''}/${ref?.act ?? ''}:${status}:${chunkEpoch}`,
-  }), [tool, pasting, editingLayer, ref, scopeInfo, zoom, setZoom, status, chunkEpoch]);
+  }), [tool, pasting, editingLayer, ref, scopeInfo, zoom, setZoom]);
 }

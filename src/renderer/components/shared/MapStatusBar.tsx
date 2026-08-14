@@ -9,29 +9,9 @@
 
 import React from 'react';
 import { StatusBar, T, IconButton } from '../ui';
-import { statusLabel } from './map-status-model';
-import type { EditorTool } from '../../state/editorStore';
+import { statusLabel, type MapStatusPort } from './map-status-model';
 
-export interface MapStatusPort {
-  tool: EditorTool;
-  pasting: boolean;
-  /** Uppercased by the bar; engines pass their own plane vocabulary. */
-  layer: string;
-  zoneName: string;
-  /** Right of the zone name. Aeon passes `Section N`; classic passes its dims. */
-  scopeInfo: string;
-  /** Overrides the tool hint when non-empty — engine-specific context. */
-  contextInfo: string;
-  zoom: number;
-  onZoom(zoom: number): void;
-  /** Engine-only trailing content (aeon's Aether bus indicator). */
-  right?: React.ReactNode;
-  /** Repaint signal: aeon mutates in place and ticks a clock, classic swaps an
-   *  immutable doc. Nothing shared can straddle that, so it is explicit. */
-  versionKey?: unknown;
-}
-
-export default function MapStatusBar({ port }: { port: MapStatusPort }) {
+export default function MapStatusBar({ port }: { port: MapStatusPort }): React.ReactElement {
   const info = statusLabel(port);
   const zoomPercent = Math.round(port.zoom * 100);
 
