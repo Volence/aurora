@@ -1,16 +1,22 @@
 import React from 'react';
 import { T } from '../ui';
-import { encodeGenesisColor, decodeGenesisColor } from '../../../core/formats/palette';
+import { encodeGenesisColor, decodeGenesisColor, fmtGenesisWord } from '../../../core/formats/palette';
 
 // The Genesis palette color-picker CONTROL — three 3-bit R/G/B sliders (0-7 per
-// channel) over a single CRAM word — extracted from PaletteEditor's slider panel
-// so it can be reused decoupled from the aeon art/sprite stores (Task B4). It is
-// pure UI: it holds no state, operates only on a `word` (0000BBB0GGG0RRR0), and
-// reports edits through callbacks so each host wires its own commit/undo path.
+// channel) over a single CRAM word. It is pure UI: it holds no state, operates
+// only on a `word` (0000BBB0GGG0RRR0), and reports edits through callbacks so
+// each host wires its own commit/undo path. BOTH palette panels render it:
+// classic's ClassicPalettePanel and aeon's PaletteEditor (whose inlined second
+// copy — same to3, same word formatter, same channel table, same six styles —
+// this replaced).
 //
 //   • onChange(word) fires per slider tick — a live PREVIEW (no history).
 //   • onCommit(word) fires on release (pointerup / keyup / blur) — the host
 //     records exactly one undo step there.
+//
+// onCommit CAN FIRE MORE THAN ONCE per drag: pointerup commits, and the blur
+// when focus later leaves commits again. Hosts must make the second call a
+// no-op (both do, by clearing their pre-drag snapshot on the first).
 
 const CHANNELS = ['r', 'g', 'b'] as const;
 const CHANNEL_COLORS: Record<string, string> = { r: T.error, g: T.success, b: T.info };
@@ -27,10 +33,6 @@ function withChannel(word: number, channel: 'r' | 'g' | 'b', level3: number): nu
   return encodeGenesisColor({ r: levels.r * 255 / 7, g: levels.g * 255 / 7, b: levels.b * 255 / 7 });
 }
 
-function fmtGenesisWord(word: number): string {
-  return '$' + word.toString(16).toUpperCase().padStart(4, '0');
-}
-
 export default function GenesisColorSliders({
   word, onChange, onCommit, heading,
 }: {
@@ -40,12 +42,13 @@ export default function GenesisColorSliders({
   heading?: React.ReactNode;
 }) {
   const color = decodeGenesisColor(word);
-  // Commit on release WITHOUT blurring the slider. The aeon PaletteEditor blurs
-  // here so a post-commit Ctrl+Z reaches its keydown handler past an INPUT guard,
-  // but blur() re-enters this same onBlur handler synchronously → onCommit twice,
-  // AND drops focus after one arrow-key press (breaking fine-tuning). We skip it:
-  // the level undo guard (LevelWorkspace) already excludes type:'range', so
-  // a focused slider never blocks undo — no blur needed.
+  // Commit on release WITHOUT blurring the slider. PaletteEditor used to blur
+  // here so a post-commit Ctrl+Z reached its keydown handler past an INPUT guard.
+  // That guard is gone: BOTH surviving level-side undo bindings — LevelWorkspace
+  // (via isTypingTarget) and SpriteMode's own keydown — exempt type:'range', so a
+  // focused slider never blocks undo. And blurring costs: blur() re-enters this
+  // same onBlur handler synchronously → onCommit twice, and it drops focus after
+  // one arrow-key press, so a slider cannot be fine-tuned by keyboard.
   const commit = () => { onCommit(word); };
   return (
     <div style={styles.panel}>

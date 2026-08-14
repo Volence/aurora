@@ -26,6 +26,11 @@ export function encodeGenesisColor(color: { r: number; g: number; b: number }): 
   return (to3(color.b) << 9) | (to3(color.g) << 5) | (to3(color.r) << 1);
 }
 
+/** Render a CRAM word the way the editor shows it: `$0EEE`. */
+export function fmtGenesisWord(word: number): string {
+  return '$' + word.toString(16).toUpperCase().padStart(4, '0');
+}
+
 /**
  * Parse raw Genesis palette data into a PaletteLine (16 colors).
  * Each color is a big-endian 16-bit word.

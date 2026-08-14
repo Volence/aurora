@@ -3,30 +3,20 @@ import { useProjectStore, getCurrentZone, getActiveLevel, getCurrentAct } from '
 import { executeAmbientCommand } from '../../state/editorStore';
 import { useHistoryVersion } from '../../hooks/useHistoryVersion';
 import { useArtStore } from '../../state/artStore';
-import { useSpriteStore } from '../../state/spriteStore';
-import { encodeGenesisColor, decodeGenesisColor } from '../../../core/formats/palette';
+import { useSpriteStore, patchSpriteDoc } from '../../state/spriteStore';
+import { encodeGenesisColor, decodeGenesisColor, fmtGenesisWord } from '../../../core/formats/palette';
 import { copySwatchInto, copyLineInto } from '../../../core/art/palette-copy';
+import { resolvePaletteDragEnd } from '../../../core/art/palette-drag';
 import { paletteLineUsageCounts } from '../../../core/art/usage';
-import type { Color } from '../../../core/model/s4-types';
+import type { Color, Zone } from '../../../core/model/s4-types';
 import { T } from '../ui';
+import GenesisColorSliders from '../art-shared/GenesisColorSliders';
 import PaletteCopyMenu, { type CopyMenuItem } from './PaletteCopyMenu';
-
-/** 8-bit channel → Genesis 3-bit level (0-7). */
-function to3(v: number): number {
-  return Math.round(Math.min(255, Math.max(0, v)) / 255 * 7);
-}
-
-function fmtWord(word: number): string {
-  return '$' + word.toString(16).toUpperCase().padStart(4, '0');
-}
 
 interface SwatchSel {
   line: number;
   idx: number;
 }
-
-const CHANNELS = ['r', 'g', 'b'] as const;
-const CHANNEL_COLORS: Record<string, string> = { r: T.error, g: T.success, b: T.info };
 
 /** Source carried by an in-progress swatch/line drag (HTML5 DnD; payload in a
  *  module ref, mirroring SectionGridNav — no dataTransfer). */
@@ -56,10 +46,14 @@ function sameColors(a: Color[], b: Color[]): boolean {
  * The `context` prop selects sprite behavior (mode 2/3 above) — the sprite-doc
  * SpriteMode pane passes `context="sprite"`; the Art and Palette facets pass
  * nothing (zone-line editing, mode 1). Mount invariant: PaletteEditor only
- * renders in the Art/Palette facets and the sprite editor. MapViewport's keydown
- * handler HAS an INPUT-type guard (it skips INPUT/TEXTAREA/contentEditable
- * targets), so a mid-drag Ctrl+Z while a palette slider (an INPUT) has focus is
- * swallowed there — the map-undo path isn't reachable from a focused slider.
+ * renders in the Art/Palette facets and the sprite editor.
+ *
+ * The channel sliders are the SHARED GenesisColorSliders — the same control
+ * classic's ClassicPalettePanel renders. This file used to inline a second copy
+ * of it (its own to3, word formatter, channel table and six styles) because the
+ * shared one deliberately does not blur on commit; the guard that made blurring
+ * necessary is gone, and both surviving level-side undo bindings (LevelWorkspace
+ * via isTypingTarget, and SpriteMode's own keydown) exempt type:'range'.
  */
 export default function PaletteEditor({ context }: { context?: 'sprite' }) {
   // Subscribe to paletteVersion for live-preview repaint during slider drags.
@@ -83,12 +77,16 @@ export default function PaletteEditor({ context }: { context?: 'sprite' }) {
   // Highlighted drop target during a drag: `${kind}:${line}:${idx}`.
   const [dropKey, setDropKey] = useState<string | null>(null);
   // Pre-drag deep copy of the edited line so the committed undo snapshot is
-  // the true pre-drag state (live preview mutates the palette in place).
-  const preDragRef = useRef<{ line: number; colors: Color[] } | null>(null);
+  // the true pre-drag state (live preview mutates the palette in place). It
+  // carries the ZONE OBJECT it was taken from, not just the line index: a drag
+  // that ends after the act/zone switched must restore the line it actually
+  // mutated, never whatever line N of the newly-current zone happens to be.
+  const preDragRef = useRef<{ zone: Zone; line: number; idx: number; colors: Color[] } | null>(null);
   // Separate pre-drag copy for the standalone path (keyed to no zone line — the
   // standalone palette is a flat 16-color array on the sprite store, not the
   // zone). Kept distinct from preDragRef so the two commit paths never collide.
-  const preDragStandaloneRef = useRef<Color[] | null>(null);
+  // Carries the sprite doc id for the same reason preDragRef carries the zone.
+  const preDragStandaloneRef = useRef<{ docId: string; colors: Color[] } | null>(null);
 
   const standaloneSprite = inSprite && spriteMode === 'standalone';
   // The open swatch selection (sel) is per-context: a standalone sel (line 0,
@@ -96,6 +94,34 @@ export default function PaletteEditor({ context }: { context?: 'sprite' }) {
   // the zone's first line. Reset it whenever the render context flips so the
   // slider panel and edit highlight never target the wrong palette.
   useEffect(() => { setSel(null); }, [standaloneSprite]);
+
+  /**
+   * EVERY WAY A DRAG CAN END, including the ones the DOM never announces.
+   *
+   * The sliders commit on pointerup/keyup/blur, and that covers a drag the user
+   * finishes. It does NOT cover a drag the app ends for them: Chrome does not
+   * fire `blur` when a focused element is REMOVED from the DOM, so unmounting the
+   * slider panel mid-drag used to strand the preview mutation — the palette kept
+   * the change with no undo entry and no dirty flag, unreachable by any user
+   * action. There are three such removals and this one effect catches all of
+   * them, because all three change `panelKey` or unmount the editor: the swatch
+   * selection closing (the setSel(null) directly above, on a sprite palette-mode
+   * flip), the selection moving to another swatch, and a facet/act/tab change
+   * taking the whole editor away.
+   *
+   * It drains BOTH paths unconditionally rather than picking by the current mode:
+   * at cleanup time `standaloneSprite` may already have flipped to the value that
+   * unmounted the panel, so choosing by it would run the wrong ender. Each is a
+   * no-op with no snapshot outstanding, and only one is ever outstanding.
+   *
+   * This cannot double-commit a normal release: the first ender clears its
+   * snapshot, so the blur that follows a pointerup — and this teardown after it —
+   * both take the 'noop' branch.
+   */
+  const drainRef = useRef<() => void>(() => {});
+  drainRef.current = () => { endZoneDrag(); endStandaloneDrag(); };
+  const panelKey = sel ? `${standaloneSprite ? 'sa' : 'z'}:${sel.line}:${sel.idx}` : null;
+  useEffect(() => () => { drainRef.current(); }, [panelKey]);
 
   // Standalone mode reads the sprite's private palette, not the zone — so it
   // renders without a zone. Every other path needs the zone's palette lines.
@@ -127,10 +153,18 @@ export default function PaletteEditor({ context }: { context?: 'sprite' }) {
     if (idx > 0) setSel({ line: 0, idx });
   }
 
-  /** Capture the pre-drag standalone copy (pointerdown, or lazily on first change). */
+  /** Capture the pre-drag standalone copy, lazily on the first previewed tick. */
   function beginStandaloneDrag() {
-    if (preDragStandaloneRef.current) return;
-    preDragStandaloneRef.current = useSpriteStore.getState().standalonePalette.map((c) => ({ ...c }));
+    const docId = useSpriteStore.getState().activeDocId;
+    const cur = preDragStandaloneRef.current;
+    if (cur) {
+      if (cur.docId === docId) return; // the same drag continuing
+      endStandaloneDrag();             // another doc's snapshot must not be dropped
+    }
+    preDragStandaloneRef.current = {
+      docId,
+      colors: useSpriteStore.getState().standalonePalette.map((c) => ({ ...c })),
+    };
   }
 
   /**
@@ -139,50 +173,60 @@ export default function PaletteEditor({ context }: { context?: 'sprite' }) {
    * setStandalonePalette) so a drag is silent per tick. bumpPaletteVersion
    * repaints the canvas + thumbnails. Index 0 stays transparent.
    */
-  function previewStandalone(idx: number, channel: 'r' | 'g' | 'b', level3: number) {
+  function previewStandalone(idx: number, word: number) {
     beginStandaloneDrag();
     const cur = useSpriteStore.getState().standalonePalette;
-    const prev = cur[idx];
-    const channels = { r: to3(prev.r), g: to3(prev.g), b: to3(prev.b), [channel]: level3 };
-    const next = decodeGenesisColor(encodeGenesisColor({
-      r: channels.r * 255 / 7, g: channels.g * 255 / 7, b: channels.b * 255 / 7,
-    }));
-    const edited = cur.map((c, i) => (i === idx ? next : { ...c }));
+    const edited = cur.map((c, i) => (i === idx ? decodeGenesisColor(word) : { ...c }));
     edited[0] = { ...edited[0], a: 0 }; // index 0 stays transparent
     useSpriteStore.setState({ standalonePalette: edited });
     useArtStore.getState().bumpPaletteVersion();
   }
 
   /**
-   * Commit a standalone drag: restore the pre-drag array FIRST, then call
-   * setStandalonePalette ONCE so the sprite history records exactly the
-   * pre-drag→edited step (a single undo). Mirrors the zone commitDrag pattern.
+   * End a standalone drag. Restores the pre-drag array FIRST in every outcome,
+   * then — when the drag is committable — calls setStandalonePalette ONCE so the
+   * sprite history records exactly the pre-drag→edited step (a single undo).
+   * Mirrors endZoneDrag; see resolvePaletteDragEnd for the commit/revert rule.
+   *
+   * The restore goes through patchSpriteDoc rather than setState because a doc
+   * switch mid-drag PARKS the previewed palette into the outgoing doc — the
+   * active store field would then be a different sprite's, and setState would
+   * paint this drag's pre-drag colors onto it.
    */
-  function commitStandalone(e?: React.SyntheticEvent) {
-    // Blur the slider so post-commit Ctrl+Z reaches the keydown handler.
-    (e?.currentTarget as HTMLElement | undefined)?.blur?.();
+  function endStandaloneDrag() {
     const pre = preDragStandaloneRef.current;
     preDragStandaloneRef.current = null;
     if (!pre) return;
-    const edited = useSpriteStore.getState().standalonePalette.map((c) => ({ ...c }));
-    edited[0] = { ...edited[0], a: 0 }; // index 0 stays transparent
+    const sameDocument = useSpriteStore.getState().activeDocId === pre.docId;
+    const edited = sameDocument
+      ? useSpriteStore.getState().standalonePalette.map((c) => ({ ...c }))
+      : null;
+    if (edited) edited[0] = { ...edited[0], a: 0 }; // index 0 stays transparent
+    const changed = edited !== null && edited.some((c, i) =>
+      encodeGenesisColor(c) !== encodeGenesisColor(pre.colors[i]) || c.a !== pre.colors[i].a);
 
-    const changed = edited.some((c, i) =>
-      encodeGenesisColor(c) !== encodeGenesisColor(pre[i]) || c.a !== pre[i].a);
-    // Restore the pre-drag array before recording, so the undo step transitions
-    // pre-drag → edited and undo restores the true pre-drag colors.
-    useSpriteStore.setState({ standalonePalette: pre.map((c) => ({ ...c })) });
-    if (!changed) return; // click without movement — no history entry
-    useSpriteStore.getState().setStandalonePalette(edited);
+    const outcome = resolvePaletteDragEnd({ hasSnapshot: true, sameDocument, changed });
+    patchSpriteDoc(pre.docId, { standalonePalette: pre.colors.map((c) => ({ ...c })) });
+    if (outcome === 'commit' && edited) {
+      useSpriteStore.getState().setStandalonePalette(edited);
+    } else if (changed) {
+      useArtStore.getState().bumpPaletteVersion(); // repaint away the dropped preview
+    }
   }
 
-  /** Capture the pre-drag line copy (pointerdown, or lazily on first change). */
-  function beginDrag(line: number) {
-    if (preDragRef.current && preDragRef.current.line === line) return;
+  /** Capture the pre-drag line copy, lazily on the first previewed tick. */
+  function beginDrag(line: number, idx: number) {
     const z = getCurrentZone(useProjectStore.getState());
     if (!z) return;
+    const cur = preDragRef.current;
+    if (cur) {
+      if (cur.zone === z && cur.line === line) return; // the same drag continuing
+      endZoneDrag();                                   // another line's snapshot must not be dropped
+    }
     preDragRef.current = {
+      zone: z,
       line,
+      idx,
       colors: z.palette.lines[line].colors.map((c) => ({ ...c })),
     };
   }
@@ -192,30 +236,36 @@ export default function PaletteEditor({ context }: { context?: 'sprite' }) {
    * and bump docVersion + paletteVersion so the composer canvas (and the
    * swatch grid) repaint immediately without touching the history clock — keeping
    * TilesetPanel's tile-thumb cache (keyed on that clock) silent per tick.
+   *
+   * This MUTATES THE OPEN DOCUMENT outside the command system, which is only
+   * sound because endZoneDrag is guaranteed to run — see the drain effect above.
    */
-  function previewChange(line: number, idx: number, channel: 'r' | 'g' | 'b', level3: number) {
+  function previewChange(line: number, idx: number, word: number) {
     const z = getCurrentZone(useProjectStore.getState());
     if (!z) return;
-    beginDrag(line);
-    const cur = z.palette.lines[line].colors[idx];
-    const channels = { r: to3(cur.r), g: to3(cur.g), b: to3(cur.b), [channel]: level3 };
-    const next = decodeGenesisColor(encodeGenesisColor({
-      r: channels.r * 255 / 7, g: channels.g * 255 / 7, b: channels.b * 255 / 7,
-    }));
-    z.palette.lines[line].colors[idx] = next;
+    beginDrag(line, idx);
+    z.palette.lines[line].colors[idx] = decodeGenesisColor(word);
     useArtStore.getState().bumpDoc();
     useArtStore.getState().bumpPaletteVersion();
   }
 
   /**
-   * Commit on slider release (pointerup), keyboard release (keyup — arrow keys
-   * fire onChange but no pointerup), or focus loss (blur). Restore the pre-drag
-   * line FIRST, then run the set-palette-line command — so history's undo
+   * End a zone-line drag: on slider release (pointerup), keyboard release (keyup
+   * — arrow keys fire onChange but no pointerup), focus loss (blur), or the drain
+   * effect's teardown. Restores the pre-drag line FIRST in every outcome, then
+   * runs the set-palette-line command when committable — so history's undo
    * snapshot is the pre-drag state, not the mid-drag preview.
    *
-   * Blurs the active slider after commit so Ctrl+Z (art-facet.tsx ArtCanvas's
-   * keydown binding) is not blocked by the INPUT early-return guard on the next
-   * undo.
+   * COMMIT vs REVERT is resolvePaletteDragEnd's call, and the interesting input is
+   * `sameDocument`: the zone object the snapshot came from must still be the
+   * current one. If the act switched under the drag there is no stack this step
+   * belongs on (commandDocId reads the CURRENT zone), so the preview is rolled
+   * back off the zone it was written to instead of being recorded onto the wrong
+   * document — or, worse, left stranded.
+   *
+   * No blur() here. The sliders deliberately keep focus (GenesisColorSliders
+   * explains why), and the INPUT guard that once made a blur necessary now exempts
+   * type:'range' in both level-side undo bindings.
    *
    * AMBIENT, not focused: this editor edits ZONE palette lines from inside the
    * sprite pane too (SpriteMode mounts it with context="sprite", where line 0 is
@@ -228,40 +278,41 @@ export default function PaletteEditor({ context }: { context?: 'sprite' }) {
    * Note: MapViewport's invalidation listener handles set-palette-line →
    * reloadAllSections for the MAP repaint, but in Art mode it is unmounted —
    * the composer repaints via the history clock, and the map re-prerenders on
-   * remount (MapViewport's mount effect). Established pattern; see
-   * workspace/facets/art-facet.tsx (ArtCanvas).
+   * remount (MapViewport's mount effect).
    */
-  function commitDrag(e?: React.SyntheticEvent) {
-    // Blur the slider so post-commit Ctrl+Z reaches art-facet.tsx ArtCanvas's
-    // keydown binding without being swallowed by the INPUT guard.
-    (e?.currentTarget as HTMLElement | undefined)?.blur?.();
+  function endZoneDrag() {
     const pre = preDragRef.current;
     preDragRef.current = null;
     if (!pre) return;
     const state = useProjectStore.getState();
-    const z = getCurrentZone(state);
     const level = getActiveLevel(state);
-    if (!z || !level) return;
+    const sameDocument = getCurrentZone(state) === pre.zone && level !== null;
 
-    const edited = z.palette.lines[pre.line].colors.map((c) => ({ ...c }));
+    // Read the previewed line off the zone the snapshot was taken from, never
+    // off whatever zone is current now.
+    const edited = pre.zone.palette.lines[pre.line].colors.map((c) => ({ ...c }));
     edited[0] = { ...edited[0], a: 0 }; // index 0 stays transparent
-
-    // Restore the pre-drag line before executing, so apply() transitions
-    // pre-drag → edited and undo restores the true pre-drag colors.
-    z.palette.lines[pre.line].colors = pre.colors.map((c) => ({ ...c }));
-
     const changed = edited.some((c, i) =>
       encodeGenesisColor(c) !== encodeGenesisColor(pre.colors[i]) || c.a !== pre.colors[i].a);
-    if (!changed) return; // click without movement — no history entry
 
-    executeAmbientCommand({
-      type: 'set-palette-line',
-      line: pre.line,
-      oldColors: pre.colors,
-      newColors: edited,
-      sectionIndex: -1,
-      description: `art: edit palette line ${pre.line} color ${sel?.idx ?? '?'}`,
-    }, level);
+    const outcome = resolvePaletteDragEnd({ hasSnapshot: true, sameDocument, changed });
+    // Restore before executing, so apply() transitions pre-drag → edited and undo
+    // restores the true pre-drag colors. On a revert this IS the whole job.
+    pre.zone.palette.lines[pre.line].colors = pre.colors.map((c) => ({ ...c }));
+
+    if (outcome === 'commit' && level) {
+      executeAmbientCommand({
+        type: 'set-palette-line',
+        line: pre.line,
+        oldColors: pre.colors,
+        newColors: edited,
+        sectionIndex: -1,
+        description: `art: edit palette line ${pre.line} color ${pre.idx}`,
+      }, level);
+    } else if (changed) {
+      useArtStore.getState().bumpDoc();            // repaint away the dropped preview
+      useArtStore.getState().bumpPaletteVersion();
+    }
   }
 
   /** Copy a single color into a zone line index, via the undoable set-palette-line command. */
@@ -429,7 +480,7 @@ export default function PaletteEditor({ context }: { context?: 'sprite' }) {
               const isPaintSel = paintColor === ci;
               const title = transparent
                 ? 'transparent (index 0)'
-                : `sprite palette, index ${ci} — ${fmtWord(encodeGenesisColor(c))}`;
+                : `sprite palette, index ${ci} — ${fmtGenesisWord(encodeGenesisColor(c))}`;
               return (
                 <div
                   key={ci}
@@ -483,7 +534,7 @@ export default function PaletteEditor({ context }: { context?: 'sprite' }) {
                   ? 'sprite-reserved (line 0)'
                   : transparent
                     ? 'transparent (index 0)'
-                    : `line ${li}, index ${ci} — ${fmtWord(encodeGenesisColor(c))}`;
+                    : `line ${li}, index ${ci} — ${fmtGenesisWord(encodeGenesisColor(c))}`;
                 return (
                   <div
                     key={ci}
@@ -515,37 +566,14 @@ export default function PaletteEditor({ context }: { context?: 'sprite' }) {
       </div>
 
       {sel && selColor && (
-        <div style={styles.editPanel}>
-          <div style={styles.editHeader}>
-            <span>
-              {standaloneSprite ? `Sprite · Index ${sel.idx}` : `Line ${sel.line} · Index ${sel.idx}`}
-            </span>
-            <span style={styles.word}>{fmtWord(selWord)}</span>
-          </div>
-          {CHANNELS.map((ch) => (
-            <div key={ch} style={styles.sliderRow}>
-              <span style={{ ...styles.channelLabel, color: CHANNEL_COLORS[ch] }}>
-                {ch.toUpperCase()}
-              </span>
-              <input
-                type="range"
-                min={0}
-                max={7}
-                step={1}
-                value={to3(selColor[ch])}
-                onPointerDown={() => (standaloneSprite ? beginStandaloneDrag() : beginDrag(sel.line))}
-                onChange={(e) => (standaloneSprite
-                  ? previewStandalone(sel.idx, ch, Number(e.target.value))
-                  : previewChange(sel.line, sel.idx, ch, Number(e.target.value)))}
-                onPointerUp={standaloneSprite ? commitStandalone : commitDrag}
-                onKeyUp={standaloneSprite ? commitStandalone : commitDrag}
-                onBlur={standaloneSprite ? commitStandalone : commitDrag}
-                style={styles.slider}
-              />
-              <span style={styles.channelValue}>{to3(selColor[ch])}</span>
-            </div>
-          ))}
-        </div>
+        <GenesisColorSliders
+          word={selWord}
+          heading={standaloneSprite ? `Sprite · Index ${sel.idx}` : `Line ${sel.line} · Index ${sel.idx}`}
+          onChange={(w) => (standaloneSprite
+            ? previewStandalone(sel.idx, w)
+            : previewChange(sel.line, sel.idx, w))}
+          onCommit={() => (standaloneSprite ? endStandaloneDrag() : endZoneDrag())}
+        />
       )}
 
       {menu && (
@@ -612,45 +640,6 @@ const styles: Record<string, React.CSSProperties> = {
   editSel: {
     border: `2px solid ${T.textHi}`,
   },
-  editPanel: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 4,
-    padding: 6,
-    background: T.void,
-    border: `1px solid ${T.border}`,
-    borderRadius: 4,
-  },
-  editHeader: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    fontSize: 10,
-    color: T.textBase,
-    marginBottom: 2,
-  },
-  word: {
-    fontFamily: T.fontMono,
-    color: T.warning,
-  },
-  sliderRow: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 6,
-  },
-  channelLabel: {
-    fontSize: 10,
-    fontWeight: 700,
-    width: 10,
-  },
-  slider: {
-    flex: 1,
-    minWidth: 0,
-  },
-  channelValue: {
-    fontSize: 10,
-    fontFamily: T.fontMono,
-    color: T.textHi,
-    width: 10,
-    textAlign: 'right' as const,
-  },
+  // No slider-panel styles here: the panel is GenesisColorSliders, which owns
+  // its own. A second copy of them is what made the two palette panels drift.
 };
