@@ -27,6 +27,17 @@ const S1_FACETS = read('facets', 's1-facets.tsx');
 const WORKSPACE = read('LevelWorkspace.tsx');
 const TILE_TAB = read('..', 'components', 'classic', 'TileTab.tsx');
 
+/**
+ * TileTab with comments stripped. The zoom guards below ask whether the file
+ * DOES something, and TileTab's docblocks discuss `artStore.zoom`, the old 26px
+ * grid and the hooks at length — every one of those assertions would pass on
+ * prose alone if it read the raw source. (Same helper, same reason, as
+ * components/classic/__tests__/classic-surface.test.ts.)
+ */
+const TILE_TAB_CODE = TILE_TAB
+  .replace(/\/\*[\s\S]*?\*\//g, '')
+  .replace(/(^|[^:])\/\/.*$/gm, '$1');
+
 /** The three tools artStore holds that the PixelEditController cannot execute —
  *  they act on a document CELL and route through aeon's composer. Spelled out
  *  HERE on purpose: this file is the one that is allowed to name them, because
@@ -100,8 +111,8 @@ describe('s1ArtFacet mounts the pixel chrome', () => {
 
   it('gates its options bar on the same predicate as the dock', () => {
     expect(S1_FACETS).toMatch(/if\s*\(\s*!isClassicPixelTier\([^)]*\)\s*\)\s*return\s+null/);
-    // Classic's capability set, not aeon's full bar — the zoom control moves a
-    // zoom classic's fixed-26px tile canvas never reads.
+    // Classic's capability set, not aeon's full bar: `brushSpace`,
+    // `repeatPreview` and `paletteLine` are controls TileTab does not read.
     expect(S1_FACETS).toMatch(/caps=\{CLASSIC_TILE_CAPS\}/);
   });
 
@@ -131,5 +142,79 @@ describe('s1ArtFacet mounts the pixel chrome', () => {
     // exists to describe. LevelWorkspace has to fold the tier into `has`.
     expect(WORKSPACE).toMatch(/toolDock:\s*mod\?\.ToolDock != null && pixelToolsLive/);
     expect(WORKSPACE).toMatch(/toolOptions:\s*mod\?\.ToolOptions != null && pixelToolsLive/);
+  });
+});
+
+// A CAPABILITY IS A CLAIM ABOUT THE HOST. `CLASSIC_TILE_CAPS.zoom` says "my
+// canvas answers to `artStore.zoom`" — turn it on over a canvas that draws at a
+// constant and the bar grows a readout that counts up beside a picture that
+// never moves, which is exactly the state H1.5 shipped and H1.6 fixed. The two
+// halves cannot be executed together here (the cap is a .ts value, the canvas is
+// .tsx and there is no DOM), so the cap is imported and RUN while the wiring on
+// the other side is pinned by scan. Neither half is worth much alone.
+describe('the tile editor zooms and pans', () => {
+  it('declares the zoom capability', async () => {
+    const { CLASSIC_TILE_CAPS } = await import('../../shell/ArtToolOptions');
+    expect(CLASSIC_TILE_CAPS.zoom, 'the zoom control is hidden from classic again').toBe(true);
+  });
+
+  it('renders at the store zoom, not a constant', () => {
+    // The subscription: without it the canvas would not even re-render when the
+    // option bar's +/- moved the number.
+    expect(TILE_TAB_CODE, 'TileTab does not subscribe to artStore.zoom')
+      .toMatch(/useArtStore\(\(s\)\s*=>\s*s\.zoom\)/);
+    // And the zoom prop actually handed to the viewport. A number here — the old
+    // `zoom={PX}` shape — is the whole regression: it compiles, it draws, and the
+    // readout silently stops meaning anything.
+    const prop = /<PixelViewport[\s\S]*?\bzoom=\{([^}]*)\}/.exec(TILE_TAB_CODE);
+    expect(prop, 'no PixelViewport zoom prop found at all').not.toBeNull();
+    expect(prop![1].trim(), 'the viewport is drawn at a hardcoded zoom').not.toMatch(/\d/);
+  });
+
+  it('keeps no canvas dimension of its own', () => {
+    // `PX = 26` (→ a 208px canvas) and anything sized off it. The tile strip's
+    // `size={26}` thumbnails are NOT this — they are a browse strip, not the
+    // canvas — so this asks about declared constants rather than the digits.
+    const decls = [...TILE_TAB_CODE.matchAll(/const\s+([A-Za-z_$][\w$]*)\s*=\s*(\d+)\s*;/g)];
+    for (const [, name, value] of decls) {
+      expect(Number(value), `const ${name} = ${value} — a canvas is ${'`8 * zoom`'}, not a constant`)
+        .not.toBeOneOf([26, 208]);
+    }
+  });
+
+  it('caps the zoom through the shared rule', () => {
+    // An 8x8 tile cannot reach the ceiling from a 2..64 store clamp — the point
+    // is that the host does not REASON about that. `cappedZoom` is the same rule
+    // aeon's composer applies, and the value it returns must be the one the
+    // viewport renders AND hit-tests with.
+    expect(TILE_TAB_CODE, 'TileTab does not import the shared cap')
+      .toMatch(/import\s*\{\s*cappedZoom\s*\}\s*from\s*'\.\.\/art-shared\/zoom-cap'/);
+    expect(TILE_TAB_CODE).toMatch(/cappedZoom\(\s*zoom\s*,/);
+  });
+
+  it('adopts the shared pan/zoom hooks over one scroller', () => {
+    // Both hooks drive a scroll container, so they must be handed the SAME ref,
+    // and that ref must be attached to something. A hook pointed at a ref that
+    // is never mounted is a silent no-op: `scrollerRef.current` is null in the
+    // effect, it returns early, and no listener is ever bound.
+    expect(TILE_TAB_CODE).toMatch(/useAnchoredZoom\(\s*scrollerRef\s*,/);
+    expect(TILE_TAB_CODE).toMatch(/useHandPan\(\s*scrollerRef\s*\)/);
+    expect(TILE_TAB_CODE, 'scrollerRef is never attached to an element').toMatch(/ref=\{scrollerRef\}/);
+  });
+
+  it('does not reintroduce a canvas border', () => {
+    // PixelViewport's hit-test subtracts only `rect.left/top`, and a border is
+    // INSIDE that rect — one CSS px of border offsets every click, which at low
+    // zoom is a whole art pixel. The ring has to stay a box-shadow.
+    expect(TILE_TAB_CODE, "the canvas style must keep border: 'none'").toMatch(/border:\s*'none'/);
+  });
+
+  it('does not repaint the tile strip on zoom', () => {
+    // The browse strip is ~1000 thumbnails keyed on two fine clocks. Folding a
+    // zoom into that key would redraw all of them on every wheel notch, for a
+    // strip whose thumbnails are a fixed size and cannot change with zoom.
+    const key = /const versionKeyFor\s*=[^\n]*\n?/.exec(TILE_TAB_CODE);
+    expect(key, 'versionKeyFor is gone — check what the strip is keyed on now').not.toBeNull();
+    expect(key![0], 'the tile strip key depends on zoom').not.toMatch(/zoom/i);
   });
 });

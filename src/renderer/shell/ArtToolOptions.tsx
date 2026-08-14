@@ -89,13 +89,15 @@ function PaletteLinePicker() {
  * not equally capable: every field here is read back by aeon's ComposerCanvas,
  * and only some of them by classic's TileTab (which consumes exactly `tool`,
  * `selectedColor`, `mirror`, `ditherPattern`, `ditherSecondary`,
- * `pixelPerfect` and — since H1.5 — `pendingAction`; see
+ * `pixelPerfect`, `pendingAction` (H1.5) and `zoom` (H1.6); see
  * components/classic/TileTab.tsx). Drawing the rest for classic would be
- * facet-chrome.ts's dead chrome, and one of them is worse than dead:
+ * facet-chrome.ts's dead chrome.
  *
- *   - `zoom` moves aeon's canvas zoom. Classic's tile editor draws at a fixed
- *     26px/pixel and does not read `artStore.zoom`, so the readout would count
- *     up beside a canvas that never changes size.
+ * `zoom` is the worked example of a capability EARNING its flag rather than
+ * being granted one: while the tile canvas drew at a fixed 26px/pixel the
+ * readout counted up beside a canvas that never changed size, so the cap was
+ * false; H1.6 made the canvas render at `artStore.zoom` (with the shared
+ * cursor-anchored wheel zoom and hand-pan), and the same one field turned true.
  *
  * `brushSpace` and `repeatPreview` are simply aeon-only (ComposerCanvas is the
  * sole reader of both), and `paletteLine` belongs to the `palette-apply` tool,
@@ -119,7 +121,7 @@ function PaletteLinePicker() {
  *     MARQUEE is still refused, but host-side, where the marquee is known.
  *
  * Flags rather than a host enum: this file must not learn who its hosts are, and
- * a host that gains a capability (H1.6 zoom) edits one field.
+ * a host that gains a capability edits one field.
  */
 export interface ArtOptionCaps {
   /** px / tile brush-space tabs. */
@@ -142,13 +144,19 @@ export const FULL_CAPS: ArtOptionCaps = {
 };
 
 /**
- * Classic's composer tile tier: mirror, dither, pixel-perfect and the transform
- * grid — the modifiers `toolConfigFrom` hands the PixelEditController, plus the
- * pending-action slot TileTab consumes. Zoom turns on in H1.6, and this constant
- * is the one line that task edits.
+ * Classic's composer tile tier: mirror, dither, pixel-perfect, the transform
+ * grid and zoom — the modifiers `toolConfigFrom` hands the PixelEditController,
+ * plus the pending-action slot TileTab consumes and the `artStore.zoom` its
+ * canvas now renders at.
+ *
+ * Zoom was OFF until H1.6 for a specific reason worth remembering: the tile
+ * canvas was a hardcoded 26px-per-pixel grid that never read the store, so the
+ * control moved a number nothing on screen answered to. A capability here is a
+ * claim about the HOST, not a preference — turn one on without the host
+ * consuming it and the bar grows a dead control.
  */
 export const CLASSIC_TILE_CAPS: ArtOptionCaps = {
-  brushSpace: false, repeatPreview: false, paletteLine: false, transforms: 'fixed-square', zoom: false,
+  brushSpace: false, repeatPreview: false, paletteLine: false, transforms: 'fixed-square', zoom: true,
 };
 
 /**

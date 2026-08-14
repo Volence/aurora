@@ -27,6 +27,7 @@ import PixelViewport from '../art-shared/PixelViewport';
 import type { HostPointer } from '../art-shared/PixelViewport';
 import { useAnchoredZoom } from '../art-shared/use-anchored-zoom';
 import { useHandPan } from '../art-shared/use-hand-pan';
+import { cappedZoom } from '../art-shared/zoom-cap';
 import { levelKeysEnabled } from '../../workspace/level-keys';
 import { PixelHud, type PixelHudHandle } from '../art-shared/PixelHud';
 import type { Tile, Color } from '../../../core/model/s4-types';
@@ -132,15 +133,16 @@ export default function ComposerCanvas() {
   }
 
   /**
-   * Effective zoom: capped so the composed canvas never exceeds 16000px on its
-   * wider axis. The same value feeds the viewport's render AND its pointer
-   * mapping, so clicks always land on the correct pixel.
+   * Effective zoom: capped by the shared `cappedZoom` so the composed canvas
+   * never exceeds the platform's maximum edge. The same value feeds the
+   * viewport's render AND its pointer mapping, so clicks always land on the
+   * correct pixel. (The rule used to be inline here; classic's tile host applies
+   * the same one, so it now lives in art-shared/zoom-cap and is unit-tested.)
    */
   const effectiveZoom = useMemo(() => {
     const doc = open?.doc;
     if (!doc) return zoom;
-    const docPxWidth = doc.widthTiles * 8;
-    return Math.max(1, Math.min(zoom, Math.floor(16000 / (docPxWidth * (repeatPreview ? 3 : 1)))));
+    return cappedZoom(zoom, doc.widthTiles * 8 * (repeatPreview ? 3 : 1));
   }, [open, zoom, repeatPreview]);
 
   // ---------- resolved render inputs ----------

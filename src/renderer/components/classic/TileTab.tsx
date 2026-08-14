@@ -14,6 +14,9 @@ import { resolveTileGesture } from '../../../core/art/classic-tile-gesture';
 import { resolveTileTransform } from '../../../core/art/classic-tile-transform';
 import PixelViewport from '../art-shared/PixelViewport';
 import type { HostPointer } from '../art-shared/PixelViewport';
+import { useAnchoredZoom } from '../art-shared/use-anchored-zoom';
+import { useHandPan } from '../art-shared/use-hand-pan';
+import { cappedZoom } from '../art-shared/zoom-cap';
 import { TileThumb } from './composer-thumbs';
 import { COMPOSER_CHECK_RGB, COMPOSER_SWATCH_A, COMPOSER_SWATCH_B } from '../../canvas/canvas-colors';
 import { hex, SharedBanner, useEditableTileRange, useEscapeKey, tileLockReason, styles } from './composer-shared';
@@ -47,7 +50,25 @@ import { hex, SharedBanner, useEditableTileRange, useEscapeKey, tileLockReason, 
 // BlockTab's per-cell `pal` is a third, per-cell, meaning. Three different things
 // that all read "palette line"; keep them apart.
 
-const PX = 26; // px per pixel → 208px editor. Pan/zoom is a later task.
+/**
+ * The editor's VIEWPORT box, in CSS px — the window the tile is seen through,
+ * NOT the tile's size. The canvas inside it is `8 * zoom` and can be smaller
+ * (zoom 2 → 16px, centred) or far larger (zoom 64 → 512px, scrolled). Nothing
+ * here may be derived from a zoom: this is the one size in the tab that must
+ * stay put while the canvas grows, or the whole column would reflow on every
+ * wheel notch.
+ */
+const TILE_VIEW_PX = 240;
+
+/** The overflow:auto box the pan/zoom hooks drive. Fixed on BOTH axes so the
+ *  surrounding column never reflows as the canvas changes size. */
+const TILE_SCROLLER: React.CSSProperties = {
+  width: TILE_VIEW_PX, height: TILE_VIEW_PX, overflow: 'auto',
+  display: 'flex', background: T.void, borderRadius: 3,
+};
+/** Centres a canvas smaller than the box; contributes no offset the hit-test
+ *  cares about (that is measured from the canvas's own rect). */
+const TILE_HOLDER: React.CSSProperties = { margin: 'auto', padding: 6, lineHeight: 0 };
 
 /** Tools that only READ the tile, so a locked tile may still run them. */
 const READ_ONLY_TOOLS = new Set(['eyedropper', 'select']);
@@ -74,6 +95,19 @@ export default function TileTab({ doc, usage }: { doc: LevelDoc; usage: UsageInd
   const ditherPattern = useArtStore((s) => s.ditherPattern);
   const ditherSecondary = useArtStore((s) => s.ditherSecondary);
   const pixelPerfect = useArtStore((s) => s.pixelPerfect);
+  // ZOOM IS THE ART STORE'S TOO, and for the same reason as the tool: the option
+  // bar's ZoomControl (ArtToolOptions, gated by CLASSIC_TILE_CAPS.zoom) reads and
+  // writes exactly this field, so a classic-local zoom would leave that readout
+  // counting against a canvas it no longer moves — the state the previous commit
+  // deliberately hid the control to avoid. `setZoom` clamps to 2..64.
+  //
+  // It is a CROSS-ENGINE SINGLETON: zooming here also zooms aeon's composer, and
+  // both default to 24 (8x8 tile → 192px, 128px chunk → its usual working view),
+  // so the shared default is sane at both ends. The cost is that a tile pushed to
+  // 64 leaves aeon's next chunk at 64 as well. Judged worth it over a second zoom
+  // state the shared control cannot see; if that changes, the fix is a per-tier
+  // zoom map INSIDE artStore, not a private useState here.
+  const zoom = useArtStore((s) => s.zoom);
 
   const lockReason = tileLockReason(range, composerTileIndex);
   const locked = lockReason !== null;
@@ -96,6 +130,25 @@ export default function TileTab({ doc, usage }: { doc: LevelDoc; usage: UsageInd
     () => Array.from({ length: 16 }, (_, i) => decodeGenesisColor(paletteWords[i] ?? 0)),
     [paletteWords],
   );
+
+  // The zoom that is DRAWN. An 8x8 tile cannot reach the canvas ceiling at the
+  // store's own 64 cap — but the cap is applied anyway, because `cappedZoom` is
+  // the shared rule (aeon's composer applies the identical one) and because the
+  // number it guards against is the buffer's, not this tier's: the day a classic
+  // host renders something bigger than a tile through here, the guard is already
+  // in place. Capping on the LARGER axis covers a future non-square buffer.
+  // Whatever value this yields must be the value handed to PixelViewport, since
+  // the viewport hit-tests with the zoom it renders at.
+  const effectiveZoom = cappedZoom(zoom, Math.max(buffer.width, buffer.height));
+
+  // Cursor-anchored wheel zoom + Space/middle-drag pan, the SHARED hooks aeon's
+  // composer and the sprite canvas use. Both work by adjusting the scroller's
+  // scroll offsets, so they need the overflow:auto box below — not the canvas.
+  // `getZoom` reads the store fresh (the wheel handler is bound once) while the
+  // capped value is what the post-zoom scroll fix measures against.
+  const scrollerRef = useRef<HTMLDivElement>(null);
+  useAnchoredZoom(scrollerRef, effectiveZoom, () => useArtStore.getState().zoom, (z) => useArtStore.getState().setZoom(z));
+  useHandPan(scrollerRef);
 
   const [selection, setSelection] = useState<Selection | null>(null);
   // A marquee is a region of ONE tile; browsing to another tile leaves it behind.
@@ -234,7 +287,9 @@ export default function TileTab({ doc, usage }: { doc: LevelDoc; usage: UsageInd
   // stand in for it — not cosmetics: a border is inside `getBoundingClientRect()`,
   // and PixelViewport's hit-test subtracts only `rect.left/top`, so a border would
   // shift every click one CSS pixel and put the leftmost/topmost column of the
-  // 26px grid on the wrong pixel. The ring is a box-shadow, which takes no layout.
+  // grid on the wrong pixel. The ring is a box-shadow, which takes no layout.
+  // This got WORSE with zoom, not better: one CSS pixel of border is a whole art
+  // pixel of error at zoom 1..2 and never stops being an error above that.
   const canvasStyle: React.CSSProperties = {
     ...styles.gridCanvas, border: 'none',
     cursor: locked ? 'not-allowed' : 'crosshair', opacity: locked ? 0.6 : 1,
@@ -272,25 +327,34 @@ export default function TileTab({ doc, usage }: { doc: LevelDoc; usage: UsageInd
         {!locked && tileUse.cells > 1 && (
           <SharedBanner text={`tile ${hex(composerTileIndex)} is used in ${tileUse.cells} block cells — edits affect all uses`} />
         )}
-        {/* The wrapper keeps the canvas out of the flex column: as a direct flex
-            item it was align-stretch'd to the column's width (the header row
-            above can be wider than 208px), which scaled the bitmap — the old
-            hand-rolled hit-test compensated for that, PixelViewport's does not.
-            Inside a block wrapper the canvas is a replaced element at its
-            intrinsic 208px, so 1 canvas px = 1 CSS px. */}
-        <div style={{ lineHeight: 0 }}>
-          <PixelViewport
-            buffer={buffer}
-            palette={paletteColors}
-            zoom={PX}
-            controller={controllerRef.current}
-            selection={selection}
-            layers={{ checkerboard: true, checkerScale: 1, checkerColors: COMPOSER_CHECK_RGB, grids: ['pixel'] }}
-            hostPointer={hostPointer}
-            onCommit={onCommit}
-            onPick={onPick}
-            style={canvasStyle}
-          />
+        {/* SCROLLER + HOLDER, the shape both shared hooks are written against
+            (see ComposerCanvas's frame/scroller/holder) — the pan hook adjusts
+            THIS element's scrollLeft/Top and catches its pointerdown in the
+            capture phase, and the zoom hook measures the anchor against its
+            rect. The fixed box is also what keeps the canvas out of the flex
+            column: as a direct flex item it was align-stretch'd to the column's
+            width, which SCALED the bitmap and broke the hit-test (PixelViewport
+            maps clicks through `zoom` alone and cannot see a CSS scale).
+            `margin: auto` centres a canvas smaller than the box; when it is
+            larger, flex resolves auto margins to 0, so the top-left stays
+            reachable. Padding/margins here are safe for the hit-test — it is
+            measured from the CANVAS's own rect, and only a border ON THE CANVAS
+            would shift it (which is why the ring is a box-shadow). */}
+        <div ref={scrollerRef} style={TILE_SCROLLER}>
+          <div style={TILE_HOLDER}>
+            <PixelViewport
+              buffer={buffer}
+              palette={paletteColors}
+              zoom={effectiveZoom}
+              controller={controllerRef.current}
+              selection={selection}
+              layers={{ checkerboard: true, checkerScale: 1, checkerColors: COMPOSER_CHECK_RGB, grids: ['pixel'] }}
+              hostPointer={hostPointer}
+              onCommit={onCommit}
+              onPick={onPick}
+              style={canvasStyle}
+            />
+          </div>
         </div>
         <div style={styles.rowWrap}>
           <span style={styles.dim}>Line:</span>
@@ -298,7 +362,10 @@ export default function TileTab({ doc, usage }: { doc: LevelDoc; usage: UsageInd
             <Chip key={p} active={composerPalLine === p} onClick={() => setComposerPalLine(p)}>{p}</Chip>
           ))}
         </div>
-        <div style={{ ...styles.swatchRow, maxWidth: PX * 8 }}>
+        {/* Wraps to the VIEWPORT's width, not the canvas's — the canvas is now a
+            zoom away from any width at all, and a swatch row that reflowed on a
+            wheel notch would move the colour under the cursor. */}
+        <div style={{ ...styles.swatchRow, maxWidth: TILE_VIEW_PX }}>
           {Array.from({ length: 16 }, (_, i) => {
             const c = paletteColors[i];
             const bg = i === 0 ? 'transparent' : `rgb(${c.r},${c.g},${c.b})`;
