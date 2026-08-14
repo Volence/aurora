@@ -836,6 +836,14 @@ Walk `ClassicProjectView`'s five owned behaviours (pre-flight fact 2 and the rec
 
 **If any row has no home, stop — do not delete the file.**
 
+- [ ] **Step 3b: Delete the transition-only scaffolding Tasks 6 and 7 left behind**
+
+Both are flagged in-source, but nothing *forces* the cleanup — do it here:
+
+1. **`useClassicChunkGridPort`'s `layout` parameter.** Task 7 made the grid layout an argument rather than a constant, because the facet mount wants `'panel'` while the legacy `bottomExtra` mount needs `'strip'` — `ChunkGrid`'s `containerPanel` is `flex: 1`, so a hardcoded `'panel'` would have given the legacy picker roughly half the window height. With `ClassicProjectView` deleted there is one mount and one layout. Delete the parameter and the `layout="strip"` call site.
+2. **`art-facet.tsx`'s tombstone comment** (the seven lines restating the typing-guard rationale for a handler that now lives on `LevelWorkspace`). Fold it down.
+3. **`ClassicProjectView`'s undo/redo keydown effect** goes with the file — see the acceptance criterion below.
+
 - [ ] **Step 4: Delete**
 
 ```bash
