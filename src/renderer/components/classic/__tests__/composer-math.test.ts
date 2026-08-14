@@ -3,6 +3,7 @@ import {
   cellIndexAt, canvasLocalPoint, canvasCellIndexAt, type CanvasGeom,
   readTilePixels, packTilePixels, floodFillTile,
 } from '../composer-math';
+import { bufferToTileBytes } from '../../../../core/art/classic-tile-buffer';
 
 describe('cellIndexAt', () => {
   it('maps coords to a row-major index in a 16x16 chunk grid', () => {
@@ -150,6 +151,23 @@ describe('readTilePixels / packTilePixels (4bpp nibble packing)', () => {
   it('returns all-zero pixels for an out-of-range tile index (no throw)', () => {
     const tiles = new Uint8Array(32);
     expect(Array.from(readTilePixels(tiles, 5))).toEqual(Array(64).fill(0));
+  });
+
+  // Moved here from src/core/art/__tests__/classic-tile-buffer.test.ts, which was
+  // the only test under src/core/art importing from src/renderer. The contract it
+  // pins is a RENDERER-side one — that composer-math still re-exports the core
+  // packer — so it belongs on this side of the layer, and core stays testable in
+  // isolation.
+  //
+  // The import above must keep coming from '../composer-math' (the re-export),
+  // NOT from core: sourcing both symbols from one module would reduce this to
+  // f(x) === f(x), which cannot fail. As written it fails if the re-export is
+  // dropped or rewired to a different packer — verified by removing it.
+  it('bufferToTileBytes agrees with packTilePixels', () => {
+    const px = new Uint8Array(64);
+    for (let i = 0; i < 64; i++) px[i] = i & 0x0f;
+    const b = { width: 8, height: 8, data: px };
+    expect(Array.from(bufferToTileBytes(b))).toEqual(Array.from(packTilePixels(px)));
   });
 });
 

@@ -14,9 +14,12 @@
 // the note at src/core/project/adapter.ts:87). composer-math re-exports it, so
 // every existing caller keeps its import path. `bufferToTileBytes` MUST stay
 // equivalent to `packTilePixels` — it wraps it rather than reimplementing, and the
-// "bufferToTileBytes agrees with packTilePixels" case in
-// __tests__/classic-tile-buffer.test.ts enforces that by importing the packer
-// through composer-math's re-export, so the seam fails loudly if it is rewired.
+// "bufferToTileBytes agrees with packTilePixels" case enforces that by importing
+// the packer through composer-math's re-export, so the seam fails loudly if it is
+// rewired. That case lives in the RENDERER's
+// src/renderer/components/classic/__tests__/composer-math.test.ts, not next to
+// this module: it asserts a cross-layer contract, and keeping it there is what
+// lets this module's own tests import nothing from src/renderer.
 //
 // SCOPE OF THAT CLAIM: "one implementation" holds for the classic art-edit path
 // ONLY — it is NOT true of the codebase. This format is decoded in four places and
@@ -47,7 +50,7 @@ const TILE_BYTES = TILE_PIXELS / 2;
  *
  * This is the SOLE pixels->bytes path for classic art edits, so the nibble order
  * is pinned by unit tests in both composer-math.test.ts (via the re-export) and
- * this module's tests: a swap would silently corrupt every art edit.
+ * this module's own round-trip case: a swap would silently corrupt every art edit.
  */
 export function packTilePixels(px: Uint8Array): Uint8Array {
   const out = new Uint8Array(TILE_BYTES);

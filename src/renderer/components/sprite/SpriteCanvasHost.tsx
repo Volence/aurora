@@ -6,6 +6,7 @@ import PixelViewport from '../art-shared/PixelViewport';
 import type { ViewportOverlay } from '../art-shared/PixelViewport';
 import { PixelEditController, diffWrites } from '../../../core/art/pixel-edit-controller';
 import type { GestureResult } from '../../../core/art/pixel-edit-controller';
+import { toolConfigFrom } from '../../../core/art/tool-config';
 import { resolveDisplayPalette } from '../../../core/art/sprite-palette';
 import type { PixelHudHandle } from '../art-shared/PixelHud';
 import { OVERLAY_OUTLINE } from '../../canvas/canvas-colors';
@@ -39,7 +40,11 @@ export default function SpriteCanvasHost({ overlayRects, hudRef }: { overlayRect
 
   // One persistent controller; reconfigured each render with the current tool state.
   const controllerRef = useRef<PixelEditController | null>(null);
-  const config = { tool, color: selectedColor, mirror, ditherPattern, ditherSecondary, pixelPerfect };
+  // Shared builder — same `selectedColor`->`color` rename this used to spell out
+  // inline. The tile-space coercion inside it is a no-op here: `SpriteTool`
+  // (spriteStore.ts) is exactly the eight pixel tools, so nothing the sprite
+  // store can hold ever hits the fallback.
+  const config = toolConfigFrom({ tool, selectedColor, mirror, ditherPattern, ditherSecondary, pixelPerfect });
   if (!controllerRef.current) controllerRef.current = new PixelEditController(config);
   controllerRef.current.setConfig(config);
 

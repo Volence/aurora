@@ -21,7 +21,8 @@ import type { PixelBuffer } from '../../../core/art/pixel-ops';
 import { tileUsageCounts } from '../../../core/art/usage';
 import type { AnyCommand, SetTilesetTilesCommand } from '../../../core/editing/commands';
 import { PixelEditController } from '../../../core/art/pixel-edit-controller';
-import type { GestureResult, ArtTool as CtlArtTool } from '../../../core/art/pixel-edit-controller';
+import type { GestureResult } from '../../../core/art/pixel-edit-controller';
+import { toolConfigFrom } from '../../../core/art/tool-config';
 import PixelViewport from '../art-shared/PixelViewport';
 import type { HostPointer } from '../art-shared/PixelViewport';
 import { useAnchoredZoom } from '../art-shared/use-anchored-zoom';
@@ -331,11 +332,15 @@ export default function ComposerCanvas() {
   // ---------- shared drawing engine ----------
 
   const controllerRef = useRef<PixelEditController | null>(null);
-  const ctlTool: CtlArtTool = (tool === 'tile-stamp' || tool === 'collision' || tool === 'palette-apply') ? 'pencil' : tool;
-  const config = {
-    tool: ctlTool, color: selectedColor, mirror,
-    ditherPattern, ditherSecondary, pixelPerfect,
-  };
+  // Coercion of the three tile-space tools to 'pencil' now lives in the shared
+  // builder (see its docblock) — this component's inline ternary said exactly the
+  // same thing, and moving it means classic's tile editor gets it for free. No
+  // behaviour change here: whenever `tool` is tile-space, `hostPointer` below is
+  // non-null and PixelViewport routes every pointer event to it, so the
+  // controller never receives a gesture and its tool field goes unread.
+  const config = toolConfigFrom({
+    tool, selectedColor, mirror, ditherPattern, ditherSecondary, pixelPerfect,
+  });
   if (!controllerRef.current) controllerRef.current = new PixelEditController(config);
   controllerRef.current.setConfig(config);
 

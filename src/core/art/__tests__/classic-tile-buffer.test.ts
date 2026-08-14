@@ -1,12 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import { tileToBuffer, bufferToTileBytes } from '../classic-tile-buffer';
-// Deliberately imported through composer-math's RE-EXPORT, not from the module
-// under test. Both symbols sourced from one module would make the agreement case
-// below assert f(x) === f(x) — it cannot fail, as a mutation of the nibble order
-// confirmed. Coming through the re-export, it instead guards the cross-layer seam:
-// it fails if the re-export is dropped or rewired to a different packer. A test
-// asserting a cross-layer contract may import across layers; core CODE may not.
-import { packTilePixels } from '../../../renderer/components/classic/composer-math';
+
+// This file imports NOTHING from src/renderer — core must be testable in
+// isolation, and a test that reaches across the layer undercuts that even when
+// the production code does not. The case that pins composer-math's re-export of
+// `packTilePixels` therefore lives on the renderer side, where a cross-layer
+// import is natural: see "bufferToTileBytes agrees with packTilePixels" in
+// src/renderer/components/classic/__tests__/composer-math.test.ts.
 
 describe('tileToBuffer', () => {
   it('is 8x8 and reads the tile at its index', () => {
@@ -25,13 +25,6 @@ describe('tileToBuffer', () => {
     for (let i = 0; i < 32; i++) tiles[i] = (i * 7) & 0xff;
     const b = tileToBuffer(tiles, 0);
     expect(Array.from(bufferToTileBytes(b))).toEqual(Array.from(tiles));
-  });
-
-  it('bufferToTileBytes agrees with packTilePixels', () => {
-    const px = new Uint8Array(64);
-    for (let i = 0; i < 64; i++) px[i] = i & 0x0f;
-    const b = { width: 8, height: 8, data: px };
-    expect(Array.from(bufferToTileBytes(b))).toEqual(Array.from(packTilePixels(px)));
   });
 
   // An out-of-range index must still yield a USABLE buffer, not null: PixelViewport
