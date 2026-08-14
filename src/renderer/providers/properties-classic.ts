@@ -13,8 +13,8 @@
 //  - the loading / load-failed states → the status bar's scope line;
 //  - the unsaved-changes dot → the tab strip (shell/dirty-tabs.ts), which is
 //    where map-status-classic already declined to repeat it;
-//  - "N/M files resolved" → a project-level fact, owned by the resolution
-//    report, not by a panel about the open act;
+//  - "N/M files resolved" → a project-level fact, owned by the Project Setup
+//    tab's info card, not by a panel about the open act;
 //  - the selected object's fields → shared/ObjectInspector, which classic has
 //    mounted since plan 3 and which EDITS them rather than printing them.
 //

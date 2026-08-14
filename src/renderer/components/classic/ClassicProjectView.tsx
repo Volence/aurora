@@ -7,7 +7,6 @@ import ZoneActTree from './ZoneActTree';
 import ClassicLevelViewport from './ClassicLevelViewport';
 import ChunkPicker from './ChunkPicker';
 import ClassicComposerDock from './ClassicComposerDock';
-import ResolutionReportPanel from './ResolutionReportPanel';
 import ObjectInspector from '../shared/ObjectInspector';
 import { useClassicObjectInspectorPort } from '../../providers/object-inspector-classic';
 import ObjectList from '../shared/ObjectList';
@@ -170,8 +169,6 @@ export default function ClassicProjectView({ appBar }: { appBar: React.ReactNode
               <ClassicPalettePanel />
             </>
           )}
-          <PanelHeader>Resolution Report</PanelHeader>
-          <ResolutionReportPanel />
         </Panel>
       }
     >

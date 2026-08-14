@@ -15,8 +15,9 @@
 //    (shell/dirty-tabs.ts); showing it twice was a legacy-shell artifact from
 //    when classic had no tabs of its own.
 //  - **The resolution summary** ("N/M files resolved"), which is a project-level
-//    fact rather than a map-level one and belongs to whatever surface owns the
-//    resolution report — not to the `right` slot, which is reserved for
+//    fact rather than a map-level one. Its home is the Project Setup tab's info
+//    card (setup/ProjectSetupTab.tsx), which prints the same roll-up above the
+//    editable path rows — not the `right` slot, which is reserved for
 //    engine-only trailing content and is empty for classic (no Aether bus).
 
 import React from 'react';
