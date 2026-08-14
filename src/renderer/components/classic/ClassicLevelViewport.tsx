@@ -89,14 +89,18 @@ function drawLoopGlyph(ctx: CanvasRenderingContext2D, x0: number, y0: number, in
  * cache is only invalidated when the whole doc changes), with a pan/zoom camera
  * and toggleable collision / object / start overlays.
  *
- * CAMERA MATH is duplicated (not shared) from the map viewport's `useViewStore` +
- * MapViewport render effect (src/renderer/state/viewStore.ts): `cam.x/cam.y` is
- * the world coordinate at the canvas top-left, `zoom` scales world→screen, so the
- * draw transform is `scale(zoom); translate(-cam.x, -cam.y)` and screen→world is
- * `cam.x + screenPx/zoom`. That store is coupled to aeon's overlay set and
- * projectStore, so per the task we keep an isolated local copy rather than
- * refactoring the aeon camera this task. The visible-chunk / layout-index /
- * ring-expansion logic lives in the unit-tested `./viewport-math`.
+ * CAMERA MATH matches the map viewport's (src/renderer/state/viewStore.ts):
+ * `cam.x/cam.y` is the world coordinate at the canvas top-left, `zoom` scales
+ * world→screen, so the draw transform is `scale(zoom); translate(-cam.x,
+ * -cam.y)` and screen→world is `cam.x + screenPx/zoom`. The visible-chunk /
+ * layout-index / ring-expansion logic lives in the unit-tested `./viewport-math`.
+ *
+ * The camera is a REF that publishes to `viewStore` once per painted frame, and
+ * adopts writes that came from elsewhere — not a subscribed selector. Both
+ * halves matter: the store is what makes the camera addressable from outside
+ * (agent goto, per-tab restore), and the ref is what keeps a drag from
+ * re-rendering this component on every mousemove. Reverting the ref to state
+ * rebuilds the redraw storm three perf commits removed; there is a guard test.
  */
 export default function ClassicLevelViewport() {
   const status = useClassicLevelStore((s) => s.status);
@@ -156,14 +160,48 @@ export default function ClassicLevelViewport() {
   // further redraws before it fires are absorbed (the trailing state bump still
   // reflects the latest ref-based camera/stroke state). Cancelled on unmount.
   const rafRef = useRef<number | null>(null);
+  // The camera values last pushed to viewStore. Two jobs: it keeps the push
+  // below to frames where the camera actually moved, and it is what lets the
+  // adopt-subscription tell OUR OWN echo from a genuine external write.
+  const syncedRef = useRef<Camera>({ x: 0, y: 0, zoom: 1 });
   const redraw = useCallback(() => {
     if (rafRef.current != null) return;
     rafRef.current = requestAnimationFrame(() => {
       rafRef.current = null;
+      // Publish the camera ONCE PER PAINTED FRAME (spec §3.6 / step D). The ref
+      // stays the hot path — a drag mutates it on every mousemove and this rAF
+      // is what a high-poll mouse's hundreds of events per second collapse
+      // into. Subscribing to vpX/vpY/zoom with a selector instead would
+      // re-render this component per mousemove and rebuild exactly the redraw
+      // storm the perf work removed (see the guard test in __tests__).
+      const cam = camRef.current;
+      const last = syncedRef.current;
+      if (cam.x !== last.x || cam.y !== last.y || cam.zoom !== last.zoom) {
+        syncedRef.current = { ...cam };
+        useViewStore.getState().setViewport(cam.x, cam.y, cam.zoom);
+      }
       forceRedraw((n) => n + 1);
     });
   }, []);
   useEffect(() => () => { if (rafRef.current != null) cancelAnimationFrame(rafRef.current); }, []);
+
+  // Adopt camera writes that did NOT come from this component — the agent
+  // handler's goto, a per-tab viewport restore, any future shared zoom control.
+  // Imperative subscribe, not a selector hook, for the reason above.
+  //
+  // Self-echo is filtered by exact equality against what we just published: the
+  // push writes those three numbers verbatim, and setViewport's clamps match the
+  // bounds the wheel handler already applies, so a value that survived our own
+  // push comes back identical. No epsilon, no in-flight flag, no feedback loop.
+  useEffect(() => useViewStore.subscribe((s) => {
+    const cam = camRef.current;
+    if (s.vpX === cam.x && s.vpY === cam.y && s.zoom === cam.zoom) return;
+    cam.x = s.vpX;
+    cam.y = s.vpY;
+    cam.zoom = s.zoom;
+    syncedRef.current = { ...cam };
+    redraw();
+  }), [redraw]);
 
   // Plane and overlays are shared state now (spec §3.6), not viewport-local:
   // unreachable from outside the component is exactly what stopped a shared
@@ -301,6 +339,11 @@ export default function ClassicLevelViewport() {
     const levelPxH = grid.height * CHUNK_PX;
     const zoom = Math.max(0.125, Math.min(2, levelPxH > 0 ? h / levelPxH : 1));
     camRef.current = { x: 0, y: 0, zoom };
+    // Publish the fit immediately rather than waiting for the first drag, so the
+    // store never sits holding the PREVIOUS act's camera — which anything
+    // reading it between load and first gesture would otherwise believe.
+    syncedRef.current = { x: 0, y: 0, zoom };
+    useViewStore.getState().setViewport(0, 0, zoom);
     redraw();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status, ref, plane]);

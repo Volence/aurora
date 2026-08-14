@@ -13,6 +13,7 @@
 import { useClassicProjectStore } from './state/classicProjectStore';
 import { useClassicLevelStore } from './state/classicLevelStore';
 import { useClassicObjectArtStore } from './state/classicObjectArtStore';
+import { useViewStore } from './state/viewStore';
 
 interface DebugApi {
   openDir(dir: string): Promise<string>;
@@ -20,6 +21,14 @@ interface DebugApi {
   openAct(zone: string, act: number): Promise<void>;
   levelState(): { status: string; zone: string | null; act: number | null };
   artState(): { version: number; sprites: number };
+  /**
+   * The shared camera. Classic's viewport keeps its own `camRef` as the hot path
+   * and publishes here once per painted frame, so `view()` is how a harness sees
+   * that publish, and `setView()` is how it drives the adopt-subscription — the
+   * two halves of the camera seam, neither of which the node suite can reach.
+   */
+  view(): { x: number; y: number; zoom: number };
+  setView(x: number, y: number, zoom: number): void;
   /**
    * Stub for the richer read/mtime instrumentation the investigation harness once
    * carried. The load/paint numbers the harnesses actually assert on come from
@@ -50,6 +59,11 @@ export function installDebugHooks(): void {
       const s = useClassicObjectArtStore.getState();
       return { version: s.version, sprites: s.sprites.size };
     },
+    view: () => {
+      const v = useViewStore.getState();
+      return { x: v.vpX, y: v.vpY, zoom: v.zoom };
+    },
+    setView: (x, y, zoom) => useViewStore.getState().setViewport(x, y, zoom),
     perf: () => ({ marks: [], readCount: 0, readTotalMs: 0, mtimeCount: 0, mtimeTotalMs: 0 }),
   };
   (window as unknown as { __dbg: DebugApi }).__dbg = dbg;
