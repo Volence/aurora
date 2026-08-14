@@ -14,6 +14,8 @@ import { useClassicProjectStore } from './state/classicProjectStore';
 import { useClassicLevelStore } from './state/classicLevelStore';
 import { useClassicObjectArtStore } from './state/classicObjectArtStore';
 import { useViewStore } from './state/viewStore';
+import { activateLevelTarget } from './shell/tab-activation';
+import { levelDocId } from './shell/tabs';
 
 interface DebugApi {
   openDir(dir: string): Promise<string>;
@@ -29,6 +31,13 @@ interface DebugApi {
    */
   view(): { x: number; y: number; zoom: number };
   setView(x: number, y: number, zoom: number): void;
+  /**
+   * Open an act the way the UI does — through the tab activation guard, which is
+   * what carries the per-tab viewport snapshot/restore. `openAct` above goes
+   * straight to the store and bypasses all of it, so a harness testing restore
+   * must use this one.
+   */
+  activate(zone: string, act: number): Promise<boolean>;
   /**
    * Stub for the richer read/mtime instrumentation the investigation harness once
    * carried. The load/paint numbers the harnesses actually assert on come from
@@ -64,6 +73,7 @@ export function installDebugHooks(): void {
       return { x: v.vpX, y: v.vpY, zoom: v.zoom };
     },
     setView: (x, y, zoom) => useViewStore.getState().setViewport(x, y, zoom),
+    activate: (zone, act) => activateLevelTarget(levelDocId(zone, String(act))),
     perf: () => ({ marks: [], readCount: 0, readTotalMs: 0, mtimeCount: 0, mtimeTotalMs: 0 }),
   };
   (window as unknown as { __dbg: DebugApi }).__dbg = dbg;

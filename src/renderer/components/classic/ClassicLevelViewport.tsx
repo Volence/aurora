@@ -3,6 +3,8 @@ import { T, Chip, OptionBar, Divider } from '../ui';
 import { useClassicLevelStore, classicSetLayoutCells, classicSetObjects, classicSetStart } from '../../state/classicLevelStore';
 import { useEditorStore } from '../../state/editorStore';
 import { useViewStore } from '../../state/viewStore';
+import { useWorkspaceStore } from '../../workspace/workspaceStore';
+import { levelDocId } from '../../shell/tabs';
 import { armedPlacementId } from '../../state/classic-placement';
 import { toolsForFacet } from '../../workspace/facet-tools';
 import { TOOL_LABELS, TOOL_HINTS } from '../../workspace/tool-meta';
@@ -164,6 +166,9 @@ export default function ClassicLevelViewport() {
   // below to frames where the camera actually moved, and it is what lets the
   // adopt-subscription tell OUR OWN echo from a genuine external write.
   const syncedRef = useRef<Camera>({ x: 0, y: 0, zoom: 1 });
+  // The tab the fit effect last ran for, so it can tell an ACT LOAD from a plane
+  // switch — only the former defers to a remembered viewport.
+  const lastFitTabRef = useRef<string | null>(null);
   const redraw = useCallback(() => {
     if (rafRef.current != null) return;
     rafRef.current = requestAnimationFrame(() => {
@@ -333,6 +338,15 @@ export default function ClassicLevelViewport() {
   // zoom in and then move an object / stamp a chunk / undo.
   useEffect(() => {
     if (status !== 'ready' || !doc) return;
+    // A REMEMBERED viewport beats fit-to-height, but only on an act load — that
+    // is the per-tab restore (tab-activation wrote viewStore just before this
+    // act started loading, and the adopt-subscription has already applied it).
+    // A plane switch still refits, because FG and BG grids differ in height and
+    // the fit is what keeps the whole plane on screen.
+    const tabId = ref ? levelDocId(ref.zone, String(ref.act)) : null;
+    const isActLoad = lastFitTabRef.current !== tabId;
+    lastFitTabRef.current = tabId;
+    if (isActLoad && tabId && useWorkspaceStore.getState().viewFor(tabId)) return;
     const grid = plane === 'bg' ? doc.bg : doc.fg;
     const container = containerRef.current;
     const h = container?.clientHeight ?? 600;

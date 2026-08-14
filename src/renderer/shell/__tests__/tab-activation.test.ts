@@ -201,6 +201,74 @@ describe('activateLevelTarget aeon viewport snapshot/restore', () => {
   });
 });
 
+// The same per-tab viewport persistence for CLASSIC, which only became possible
+// once its camera stopped being a component-local ref (stage-4 plan 4, step D).
+// Mirrors the aeon cases above deliberately: the two engines' branches are
+// separate code, and the point is that they behave identically.
+describe('activateLevelTarget classic viewport snapshot/restore', () => {
+  const LOADED_REF: ZoneActRef = { zone: 'ghz', act: 1, label: 'Green Hill 1', available: true };
+  const TARGET_REF: ZoneActRef = { zone: 'mz', act: 2, label: 'Marble 2', available: true };
+
+  beforeEach(() => {
+    useProjectStore.getState().reset();
+    useWorkspaceStore.getState().reset();
+    useClassicProjectStore.getState().reset();
+    useClassicLevelStore.getState().reset();
+    useClassicProjectStore.setState({ status: 'open', zoneTree: [LOADED_REF, TARGET_REF] } as never);
+    // Clean (not dirty) so the plan is 'classic-open' and no confirm intervenes.
+    useClassicLevelStore.setState({ ref: LOADED_REF, dirty: {}, openAct: vi.fn(async () => {}) } as never);
+  });
+
+  afterEach(() => {
+    useWorkspaceStore.getState().reset();
+    useClassicProjectStore.getState().reset();
+    useClassicLevelStore.getState().reset();
+    useViewStore.setState({ vpX: 0, vpY: 0, zoom: 1 });
+  });
+
+  it('user switch snapshots the outgoing act and restores the incoming act', async () => {
+    useWorkspaceStore.getState().seed({
+      'level:ghz:1': { view: { x: 1, y: 2, zoom: 1 } },
+      'level:mz:2': { view: { x: 30, y: 40, zoom: 2 } },
+    });
+    useViewStore.setState({ vpX: 11, vpY: 22, zoom: 4 }); // live while viewing ghz1
+
+    await activateLevelTarget('level:mz:2');
+
+    expect(useWorkspaceStore.getState().viewFor('level:ghz:1')).toEqual({ x: 11, y: 22, zoom: 4 });
+    const v = useViewStore.getState();
+    expect({ x: v.vpX, y: v.vpY, zoom: v.zoom }).toEqual({ x: 30, y: 40, zoom: 2 });
+  });
+
+  it('restore dispatch (skipViewSnapshot) leaves the outgoing act untouched', async () => {
+    useWorkspaceStore.getState().seed({
+      'level:ghz:1': { view: { x: 1, y: 2, zoom: 1 } },
+      'level:mz:2': { view: { x: 30, y: 40, zoom: 2 } },
+    });
+    useViewStore.setState({ vpX: 11, vpY: 22, zoom: 4 }); // loader default, not user state
+
+    await activateLevelTarget('level:mz:2', { skipViewSnapshot: true });
+
+    expect(useWorkspaceStore.getState().viewFor('level:ghz:1')).toEqual({ x: 1, y: 2, zoom: 1 });
+    const v = useViewStore.getState();
+    expect({ x: v.vpX, y: v.vpY, zoom: v.zoom }).toEqual({ x: 30, y: 40, zoom: 2 });
+  });
+
+  it('an act with no remembered viewport leaves the camera for fit-to-height', async () => {
+    // First-ever open: nothing to restore, so viewStore is NOT written and the
+    // viewport's fit-on-load runs as it always did. Writing a default here
+    // instead would silently disable fit for every act.
+    useViewStore.setState({ vpX: 11, vpY: 22, zoom: 4 });
+
+    await activateLevelTarget('level:mz:2');
+
+    const v = useViewStore.getState();
+    expect({ x: v.vpX, y: v.vpY, zoom: v.zoom }).toEqual({ x: 11, y: 22, zoom: 4 });
+    // …and the outgoing act was still snapshotted, so returning to it restores.
+    expect(useWorkspaceStore.getState().viewFor('level:ghz:1')).toEqual({ x: 11, y: 22, zoom: 4 });
+  });
+});
+
 // requestCloseTab (Task 13 fix): closing the ACTIVE tab promotes a neighbor
 // (core closeTab's right-then-left-then-Home rule), and that promotion must
 // pass through the SAME activation guard a click on the neighbor would — else
