@@ -158,9 +158,16 @@ const INSTALL_HELPERS = String.raw`
   };
 
   // ---- the tile canvas (inside TileTab's fixed 240x240 overflow:auto box) ----
-  H.scroller = () => [...document.querySelectorAll('div')].find(
-    (d) => d.style && d.style.width === '240px' && d.style.height === '240px' && d.style.overflow === 'auto');
-  H.canvas = () => { const s = H.scroller(); return s ? s.querySelector('canvas') : null; };
+  // Found via the HOLDER (the margin:auto centring div), not by a literal
+  // '240px' box: H3.1 made the viewport take the editor column's size, so the
+  // old style-string match would silently find nothing and every zoom/pan/hit
+  // check below would report "no tile canvas" rather than a result.
+  H.canvas = () => {
+    const holder = [...document.querySelectorAll('div')].find(
+      (d) => d.style && d.style.margin === 'auto' && d.querySelector('canvas'));
+    return holder ? holder.querySelector('canvas') : null;
+  };
+  H.scroller = () => { const c = H.canvas(); return c ? c.parentElement.parentElement : null; };
   H.zoom = () => { const c = H.canvas(); return c ? c.width / 8 : null; };
   H.ctx = () => { const c = H.canvas(); return c ? c.getContext('2d', { willReadFrequently: true }) : null; };
   H.grid = () => {
@@ -617,7 +624,10 @@ async function runChecks(c) {
     const before = await c.json(`window.__h.zoom()`);
     const box = await c.json(`(() => { const s = window.__h.scroller(), c = window.__h.canvas();
       const sr = s.getBoundingClientRect(), cr = c.getBoundingClientRect();
-      return { canvasW: cr.width, boxW: sr.width, centred: cr.width < sr.width, offsetInScroller: Math.round(cr.left - sr.left + s.scrollLeft) }; })()`);
+      return { canvasW: cr.width, boxW: sr.width, canvasH: cr.height, boxH: sr.height,
+               centred: cr.width < sr.width,
+               fitsBoth: cr.width <= s.clientWidth && cr.height <= s.clientHeight,
+               offsetInScroller: Math.round(cr.left - sr.left + s.scrollLeft) }; })()`);
     const pt = await c.json(`window.__h.point(${px}, ${py})`);
     const pxBefore = await c.json(`window.__h.pixelAtScreen(${pt.x}, ${pt.y})`);
     await c.send('Input.dispatchMouseEvent', { type: 'mouseWheel', x: pt.x, y: pt.y, deltaX: 0, deltaY: -120, button: 'none', buttons: 0 });
@@ -627,10 +637,30 @@ async function runChecks(c) {
     return { before, after, pxBefore, pxAfter, box, pt,
              held: !!pxBefore && !!pxAfter && pxAfter.x === pxBefore.x && pxAfter.y === pxBefore.y };
   };
-  const anchorSmall = await anchorTest(6, 6);          // default zoom: canvas SMALLER than the 240px box
-  check('10', 'wheel zoom works AND keeps the pixel under the cursor fixed (anchored zoom)',
-    anchorSmall.after > anchorSmall.before && anchorSmall.held,
-    `zoom ${anchorSmall.before} -> ${anchorSmall.after}; pixel under the cursor `
+  // THE INVARIANT IS CONDITIONAL, and H3.1 is what made that visible. An anchor
+  // is held by adjusting the scroller's scroll offsets, so it can only be held
+  // when there is scroll room to spend: while the canvas FITS the viewport the
+  // holder's `margin: auto` centres it, `scrollLeft` is pinned at 0, and a zoom
+  // simply grows the picture about the centre. That is the correct behaviour for
+  // a picture that is entirely on screen (every image editor does it), and it
+  // used to be unobservable here only because the box was 240px, so an 8x8 tile
+  // overflowed it at any zoom above 30. With the box at 549x590 the tile fits up
+  // to zoom 64, so the centred branch is now the normal one — hence: zoom must
+  // change, and the pixel must be held IF the canvas overflows, else the view
+  // must still be centred rather than jumping to a corner.
+  const anchorSmall = await anchorTest(6, 6);          // default zoom: canvas well inside the box
+  // BOTH axes: the box is 549x590 and the canvas grows square, so "fits" has to
+  // mean fits, not fits-horizontally. (10b's shrunk window fits on width and
+  // overflows on height, which is exactly the case a width-only test would
+  // mislabel.)
+  const fits = anchorSmall.box.fitsBoth;
+  // `fits || held` — and 10b below, which runs the SAME probe against a window
+  // short enough to overflow and requires `held`, is what stops this being a
+  // hole: the anchoring path is still asserted, just where it can apply.
+  check('10', 'wheel zoom works, and holds the pixel under the cursor whenever there is scroll room to hold it',
+    anchorSmall.after > anchorSmall.before && (fits || anchorSmall.held),
+    `canvas FITS the viewport=${fits} (so the view is centred and there is no scroll to anchor with); held=${anchorSmall.held}; `
+    + `zoom ${anchorSmall.before} -> ${anchorSmall.after}; pixel under the cursor `
     + `${JSON.stringify(anchorSmall.pxBefore)} -> ${JSON.stringify(anchorSmall.pxAfter)}; `
     + `canvas ${anchorSmall.box.canvasW}px inside a ${anchorSmall.box.boxW}px box (centred=${anchorSmall.box.centred}, `
     + `canvas origin sits ${anchorSmall.box.offsetInScroller}px into the scroller's content box)`);
@@ -644,12 +674,26 @@ async function runChecks(c) {
   // 2..64 clamp — so it parked the editor ON the ceiling and the wheel notch that
   // follows could not raise the zoom at all. `after > before` was then
   // unsatisfiable and 10b failed for a reason that had nothing to do with
-  // anchoring. Check 10 above already left it at 48, i.e. a 384px canvas in a
-  // 240px box: overflowing, un-centred, and with exactly one notch of headroom.
+  // anchoring. Check 10 above already left it at 48, i.e. a 384px canvas.
+  //
+  // THE WINDOW IS SHRUNK FIRST, and that is new with H3.1. The viewport box was
+  // a fixed 240x240, so a 384px canvas overflowed it by construction; the box
+  // now takes the editor column (measured 549x590 at 1400x872), and an 8x8 tile
+  // cannot exceed that at ANY zoom — 64 is only 512px. So the overflow-and-pan
+  // path, which 10b/11a/11b are entirely about, is unreachable at a full-size
+  // window and has to be produced by making the window short. That also
+  // exercises the refit: the box is now resize-driven.
+  await c.send('Emulation.setDeviceMetricsOverride', { width: 1400, height: 560, deviceScaleFactor: 1, mobile: false });
+  await sleep(700); await reinstall();
+  note('C10z', 'window shrunk to 1400x560 for the overflow/pan checks',
+    JSON.stringify(await c.json(`(() => { const s = window.__h.scroller(), v = window.__h.canvas();
+      return { box: [Math.round(s.clientWidth), Math.round(s.clientHeight)], canvas: [v.width, v.height] }; })()`)));
   const anchorBig = await anchorTest(4, 4);
-  check('10b', 'anchored zoom when the canvas OVERFLOWS its box (no auto-centring offset)',
-    anchorBig.after > anchorBig.before && anchorBig.held,
-    `zoom ${anchorBig.before} -> ${anchorBig.after}; pixel under the cursor `
+  check('10b', 'anchored zoom HOLDS the pixel when the canvas overflows its box',
+    anchorBig.after > anchorBig.before && anchorBig.held && anchorBig.box.fitsBoth === false,
+    `the canvas genuinely overflows here (fitsBoth=${anchorBig.box.fitsBoth}, canvas ${anchorBig.box.canvasW}x${anchorBig.box.canvasH} `
+    + `in a ${Math.round(anchorBig.box.boxW)}x${Math.round(anchorBig.box.boxH)} box) — so this is the branch check 10 cannot reach; `
+    + `zoom ${anchorBig.before} -> ${anchorBig.after}; pixel under the cursor `
     + `${JSON.stringify(anchorBig.pxBefore)} -> ${JSON.stringify(anchorBig.pxAfter)}; `
     + `canvas ${anchorBig.box.canvasW}px inside a ${anchorBig.box.boxW}px box (centred=${anchorBig.box.centred}, `
     + `canvas origin ${anchorBig.box.offsetInScroller}px into the scroller's content box)`);
@@ -744,6 +788,10 @@ async function runChecks(c) {
 
   for (let i = 0; i < 12; i++) { const z = await c.evalExpr('window.__h.zoom()'); if (z <= 24) break; await c.evalExpr('window.__h.clickBar("Zoom out")'); await sleep(300); }
   await sleep(400);
+  // Back to the real window for section D. Leaving the override on would mean
+  // the locked-tile checks ran against a layout no user has.
+  await c.send('Emulation.clearDeviceMetricsOverride');
+  await sleep(700); await reinstall();
 
   // ===== D: locked tiles =====
   await c.evalExpr('window.__h.copy()'); await sleep(450);

@@ -1,8 +1,8 @@
-// Pure grid-hit math for the composer dock (Task B3). The two HAND-ROLLED tabs
-// map a local pixel coordinate inside a fixed-scale canvas to a row-major cell
-// index:
-//   • chunk tab — 16x16 block cells at 20px
-//   • block tab — 2x2 tile cells at 64px
+// Pure grid math for the composer dock (Task B3). The two HAND-ROLLED tabs map a
+// local pixel coordinate inside a grid canvas to a row-major cell index, and
+// (since H3.1) size that canvas to the room they are given:
+//   • chunk tab — 16x16 block cells, 20px..48px
+//   • block tab — 2x2 tile cells, 64px..192px
 // Kept pure + unit-tested; the GUI stays a thin caller.
 //
 // THE TILE TAB IS NOT ONE OF THEM ANY MORE. It moved onto the shared pixel
@@ -12,6 +12,46 @@
 // old pencil's `readTilePixels`/`packTilePixels` re-export and its
 // `floodFillTile`) went with it in H1.7. The packing itself is unchanged and
 // lives in core/art/classic-tile-buffer.ts.
+
+/**
+ * The largest WHOLE-PIXEL cell size at which a `cols`x`rows` grid fits inside an
+ * `availW`x`availH` box, clamped to `[min, max]`.
+ *
+ * WHY A CELL SIZE AND NOT A CSS SCALE. The chunk and block canvases are
+ * `imageRendering: pixelated` bitmaps whose backing store is `cell * cols` — the
+ * grid lines, the solidity tint rects and the hit-test (`cellIndexAt` above) are
+ * all in cell units. Stretching the CSS box instead resamples an already-drawn
+ * bitmap at a fractional ratio, which is what the composer was doing before
+ * H3.1: a 320px chunk canvas presented in a 385px box, and a 128px block canvas
+ * in a 340px one, because both are direct children of a `flexDirection: column`
+ * flex container and were being align-stretched to its width. Changing the CELL
+ * keeps one pixel of backing store per pixel on screen.
+ *
+ * WHOLE PIXELS, NOT WHOLE ART PIXELS, and that is a compromise worth naming. A
+ * chunk cell is 16 art px, so the only cell sizes with a whole-number ART scale
+ * are 16/32/48 — i.e. the whole grid may only be 256, 512 or 768 wide, and the
+ * editor column is ~500px, so the choice would be "smaller than it is today" or
+ * "wider than the column". Whole CSS pixels is the achievable rung: the cell
+ * boundaries the user actually interacts with are exact, and the residual is the
+ * uneven art-pixel width the 20px cell already had (20/16 = 1.25).
+ *
+ * `min` is today's size and acts as a floor, so a box too small to measure — or
+ * not yet measured, where `availW`/`availH` are 0 on the first render — yields
+ * the size the tab has always had rather than a degenerate one.
+ */
+export function fitCellSize(
+  availW: number,
+  availH: number,
+  cols: number,
+  rows: number,
+  min: number,
+  max: number,
+): number {
+  if (!(cols > 0) || !(rows > 0) || !(max >= min)) return min;
+  const fit = Math.min(Math.floor(availW / cols), Math.floor(availH / rows));
+  if (!Number.isFinite(fit)) return min;
+  return Math.max(min, Math.min(max, fit));
+}
 
 /**
  * Map a local pixel coordinate (relative to a grid canvas's top-left) to a
@@ -72,11 +112,16 @@ export interface CanvasGeom {
  *     (The tile canvas takes the same `styles.gridCanvas` but overrides
  *     `border: 'none'`, because PixelViewport's own hit-test does NOT make this
  *     correction — see the note at TileTab's `canvasStyle`.)
- *  2. CSS content size vs backing-store size. These are 1:1 for the composer
- *     today (the canvases are sized by their width/height attributes with no CSS
- *     width), so this term is the identity — but deriving it rather than
- *     assuming it means a later CSS-sized or DPR-scaled canvas cannot silently
- *     reintroduce a SCALE-dependent version of the same bug.
+ *  2. CSS content size vs backing-store size. This term was believed to be the
+ *     identity ("the canvases are sized by their width/height attributes with no
+ *     CSS width") and MEASURED NOT TO BE: until H3.1 the chunk canvas drew 320
+ *     backing px into a 385px box and the block canvas 128 into 340, because
+ *     both are direct children of a column flex container and were being
+ *     align-stretched to its width. Deriving the term rather than assuming it is
+ *     the only reason the hit-test stayed correct through that. It is the
+ *     identity again now (the fit box centres rather than stretches — see
+ *     `fitCellSize`), and this correction is what will keep the next accidental
+ *     stretch from also being a mis-click.
  *
  * Degenerate geometry (a zero-size or detached canvas) falls back to scale 1
  * rather than producing NaN/Infinity, which `cellIndexAt` would not reject.

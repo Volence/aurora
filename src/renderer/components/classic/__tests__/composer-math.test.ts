@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { cellIndexAt, canvasLocalPoint, canvasCellIndexAt, type CanvasGeom } from '../composer-math';
+import { cellIndexAt, canvasLocalPoint, canvasCellIndexAt, fitCellSize, type CanvasGeom } from '../composer-math';
 
 describe('cellIndexAt', () => {
   it('maps coords to a row-major index in a 16x16 chunk grid', () => {
@@ -110,5 +110,64 @@ describe('canvasCellIndexAt (the composer tabs\' hit-test)', () => {
     expect(at(101 + 208, 51)).toBeNull();    // past the right edge
     expect(at(101, 51 + 208)).toBeNull();    // past the bottom edge
     expect(at(0, 0)).toBeNull();             // far outside
+  });
+});
+
+// ---------------------------------------------------------------------------
+// fitCellSize — the Chunk/Block tiers' answer to "the composer does not fill
+// the canvas it is given" (H3.1). The tabs measure their box with a
+// ResizeObserver and hand the numbers here; everything about WHICH size is
+// chosen is decided in this function, so it is the part that can be executed.
+// ---------------------------------------------------------------------------
+describe('fitCellSize', () => {
+  it('picks the largest whole-pixel cell that fits, on the binding axis', () => {
+    // 16x16 chunk grid: 496px of width is 31px per cell; a taller box does not
+    // make the cell any bigger, because the grid is square.
+    expect(fitCellSize(496, 660, 16, 16, 20, 48)).toBe(31);
+    expect(fitCellSize(660, 496, 16, 16, 20, 48)).toBe(31);
+    // 2x2 block grid: 285px is 142px per cell.
+    expect(fitCellSize(285, 700, 2, 2, 64, 192)).toBe(142);
+  });
+
+  it('floors at the size the tab shipped with, so a fit can never SHRINK it', () => {
+    // The whole point of the floor: a narrow window must leave the chunk grid
+    // at 320px (cell 20) and hand the overflow to the dock's scrollbar, not
+    // quietly draw a 16x16 grid of 8px cells.
+    expect(fitCellSize(140, 140, 16, 16, 20, 48)).toBe(20);
+    expect(fitCellSize(0, 0, 16, 16, 20, 48)).toBe(20);       // not yet measured
+    expect(fitCellSize(-50, 900, 2, 2, 64, 192)).toBe(64);    // detached box
+  });
+
+  it('caps at the maximum, so a huge window does not draw a 2000px grid', () => {
+    expect(fitCellSize(4000, 4000, 16, 16, 20, 48)).toBe(48);
+    expect(fitCellSize(4000, 4000, 2, 2, 64, 192)).toBe(192);
+  });
+
+  it('returns a whole number for any input, including fractional box sizes', () => {
+    // getBoundingClientRect-derived sizes are fractional in a flex layout, and
+    // a fractional cell is the fractional CSS scale this function exists to
+    // avoid: the canvas is `cell * cols` and must be an integer bitmap.
+    for (const w of [383.5, 496.34, 549.328125, 700.99]) {
+      const cell = fitCellSize(w, 900, 16, 16, 20, 48);
+      expect(Number.isInteger(cell), `cell ${cell} from width ${w}`).toBe(true);
+      expect(cell * 16, `a ${cell}px cell must fit in ${w}px`).toBeLessThanOrEqual(Math.ceil(w));
+    }
+  });
+
+  it('never returns a size the grid does not fit in, once above the floor', () => {
+    for (let w = 320; w <= 800; w += 7) {
+      const cell = fitCellSize(w, 10000, 16, 16, 20, 48);
+      expect(cell * 16, `cell ${cell} overflows a ${w}px box`).toBeLessThanOrEqual(Math.max(w, 320));
+    }
+  });
+
+  it('degenerate grids and an inverted clamp fall back to the floor', () => {
+    expect(fitCellSize(500, 500, 0, 16, 20, 48)).toBe(20);
+    expect(fitCellSize(500, 500, 16, 0, 20, 48)).toBe(20);
+    expect(fitCellSize(500, 500, 16, 16, 48, 20)).toBe(48); // max < min
+    expect(fitCellSize(Number.NaN, 500, 16, 16, 20, 48)).toBe(20);
+    // A non-finite box is a broken measurement, not a very large one — the
+    // floor is the safe answer, and it is the one the max clamp would NOT give.
+    expect(fitCellSize(Infinity, Infinity, 16, 16, 20, 48)).toBe(20);
   });
 });

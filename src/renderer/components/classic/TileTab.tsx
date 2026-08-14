@@ -52,19 +52,28 @@ import { levelKeysEnabled } from '../../workspace/level-keys';
 // that all read "palette line"; keep them apart.
 
 /**
- * The editor's VIEWPORT box, in CSS px — the window the tile is seen through,
- * NOT the tile's size. The canvas inside it is `8 * zoom` and can be smaller
- * (zoom 2 → 16px, centred) or far larger (zoom 64 → 512px, scrolled). Nothing
- * here may be derived from a zoom: this is the one size in the tab that must
- * stay put while the canvas grows, or the whole column would reflow on every
- * wheel notch.
+ * The FLOOR on the editor's viewport box, in CSS px — not the box, and not the
+ * tile's size. The canvas inside is `8 * zoom` and can be smaller (zoom 2 → 16px,
+ * centred) or far larger (zoom 64 → 512px, scrolled).
+ *
+ * THE INVARIANT IS UNCHANGED AND IS NOT "FIXED". Nothing here may be derived
+ * from a ZOOM: the box must not move while the canvas grows, or the column would
+ * reflow on every wheel notch and the swatch row would slide under the cursor.
+ * A box derived from the LAYOUT satisfies that — it changes when the window
+ * changes, which is not a wheel notch — and this was the one tier the H3.1
+ * measurement had an easy answer for: it already zooms and pans, so the only
+ * thing it needed was the room. It had a 240x240 box in a 719px slot with 325px
+ * of the slot empty; it now gets the column (measured after: 549x590 on a
+ * 1400x872 window), which is the difference between zoom 64 fitting the whole
+ * tile and zoom 30 already needing a pan.
  */
 const TILE_VIEW_PX = 240;
 
-/** The overflow:auto box the pan/zoom hooks drive. Fixed on BOTH axes so the
- *  surrounding column never reflows as the canvas changes size. */
+/** The overflow:auto box the pan/zoom hooks drive. It takes the editor column's
+ *  width (the column is align-stretch by default) and the height the column has
+ *  left after the rows around it, never less than TILE_VIEW_PX on either axis. */
 const TILE_SCROLLER: React.CSSProperties = {
-  width: TILE_VIEW_PX, height: TILE_VIEW_PX, overflow: 'auto',
+  minWidth: TILE_VIEW_PX, minHeight: TILE_VIEW_PX, flex: '1 1 0', overflow: 'auto',
   display: 'flex', background: T.void, borderRadius: 3,
 };
 /** Centres a canvas smaller than the box; contributes no offset the hit-test
@@ -387,10 +396,15 @@ export default function TileTab({ doc, usage }: { doc: LevelDoc; usage: UsageInd
             (see ComposerCanvas's frame/scroller/holder) — the pan hook adjusts
             THIS element's scrollLeft/Top and catches its pointerdown in the
             capture phase, and the zoom hook measures the anchor against its
-            rect. The fixed box is also what keeps the canvas out of the flex
-            column: as a direct flex item it was align-stretch'd to the column's
-            width, which SCALED the bitmap and broke the hit-test (PixelViewport
-            maps clicks through `zoom` alone and cannot see a CSS scale).
+            rect. The box is also what keeps the canvas out of the flex column:
+            as a direct flex item it was align-stretch'd to the column's width,
+            which SCALED the bitmap and broke the hit-test (PixelViewport maps
+            clicks through `zoom` alone and cannot see a CSS scale). The box now
+            takes the column's size instead of a fixed 240 — that is the SAME
+            protection, because the canvas is still two boxes down: the scroller
+            is a flex row and the holder's `margin: auto` absorbs the cross-axis
+            slack rather than stretching. (The Chunk and Block tiers had no such
+            insulation and were being stretched — see styles.fitBox.)
             `margin: auto` centres a canvas smaller than the box; when it is
             larger, flex resolves auto margins to 0, so the top-left stays
             reachable. Padding/margins here are safe for the hit-test — it is
@@ -420,10 +434,14 @@ export default function TileTab({ doc, usage }: { doc: LevelDoc; usage: UsageInd
             <Chip key={p} active={composerPalLine === p} onClick={() => setComposerPalLine(p)}>{p}</Chip>
           ))}
         </div>
-        {/* Wraps to the VIEWPORT's width, not the canvas's — the canvas is now a
-            zoom away from any width at all, and a swatch row that reflowed on a
-            wheel notch would move the colour under the cursor. */}
-        <div style={{ ...styles.swatchRow, maxWidth: TILE_VIEW_PX }}>
+        {/* Wraps to the COLUMN's width, not the canvas's — the canvas is a zoom
+            away from any width at all, and a swatch row that reflowed on a wheel
+            notch would move the colour under the cursor. This was `maxWidth:
+            TILE_VIEW_PX`, which meant the same thing while the viewport was a
+            fixed 240px box; now that the viewport takes the column, a hard 240
+            would be two wrapped rows of swatches beside a 464px viewport. `100%`
+            is still zoom-independent, which is the property that matters. */}
+        <div style={{ ...styles.swatchRow, maxWidth: '100%' }}>
           {Array.from({ length: 16 }, (_, i) => {
             const c = paletteColors[i];
             const bg = i === 0 ? 'transparent' : `rgb(${c.r},${c.g},${c.b})`;
