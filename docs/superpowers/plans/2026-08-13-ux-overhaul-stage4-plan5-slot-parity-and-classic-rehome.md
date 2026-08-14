@@ -307,6 +307,8 @@ cd /home/volence/sonic_hacks/aurora/.claude/worktrees/ux-plan5 && \
 
 **Files:** Create `src/renderer/components/shared/PropertiesPanel.tsx`, `src/renderer/providers/properties-aeon.ts`, `src/renderer/providers/properties-classic.ts`. Delete `src/renderer/components/PropertiesPanel.tsx`. Modify `layout-facet.tsx`, `objects-facet.tsx`.
 
+> **PLAN BUG, found during execution:** `PropertiesPanel` is mounted at **four** facets, not two — `rings-facet.tsx` and `collision-facet.tsx` mount it too. All four must be repointed; leaving two pointed at a deleted module does not compile. The "Modify" line above was written from the spec's facet table rather than from a grep. **Grep for mount sites before trusting any file list in this plan.**
+
 **Contract — the neutral component:**
 
 ```ts
@@ -501,6 +503,15 @@ cd /home/volence/sonic_hacks/aurora/.claude/worktrees/ux-plan5 && \
 cd /home/volence/sonic_hacks/aurora/.claude/worktrees/ux-plan5 && \
   git add -A && git commit -m "refactor(workspace): facet modules key by engine; drop the silent aeon canvas fallback"
 ```
+
+- [ ] **Step 10: Two carry-forwards from Task 2's review, since this task rewrites `objects-facet.tsx` anyway**
+
+Both were deliberately kept out of Task 2 — its change added **zero** delta to either, and folding an unrelated pre-existing fix into that diff would have muddied it.
+
+1. **Leaf-wrap `useAeonObjectInspectorPort`.** `providers/object-inspector-aeon.ts:182` is called from `ObjectsPanels`, i.e. the whole panel column, so `liveEditVersion` — bumped **per mousemove during an object drag** — re-renders the column. Wrap the mount the way `ChunkLibrary.tsx:12-15` documents and Task 2 did for `AeonPropertiesPanel`: subscriptions belong in a leaf, not the column. The leaf also unmounts when the user collapses the section, which the hoisted call does not.
+2. **`React.memo` the `Row` in `components/shared/ObjectList.tsx:75`.** It is the expensive sibling in that column — roughly 82 rows × ~5 elements re-rendering per mousemove during a drag. (No canvas cost: `versionKey` is stable, so `<Thumb key={versionKey}>` is not remounted.)
+
+Neither is a perf emergency — the measured cost is small against a full-viewport repaint — but this is the commit where they are free.
 
 ---
 
