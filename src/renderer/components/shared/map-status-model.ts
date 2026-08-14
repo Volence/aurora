@@ -24,6 +24,19 @@ export interface MapStatusPort {
   readonly zoneName: string;
   /** Right of the zone name. Aeon passes `Section N`; classic passes its dims. */
   readonly scopeInfo: string;
+  /**
+   * How `scopeInfo` should READ, not what it says — the bar owns the colours.
+   * Absent means `'normal'` (T.textLo), which is what every scope line was
+   * before: a plain fact about the open document.
+   *
+   * `'error'` exists because one of classic's five scope strings is not a fact
+   * but a failure ('load failed'), and the legacy bar drew that one in T.error
+   * (ClassicProjectView.tsx). Folding it into the neutral bar's low-contrast
+   * span would have made the state the user most needs to notice the quietest
+   * thing on screen — a silent downgrade, and exactly the kind the re-home is
+   * supposed to catch rather than ship.
+   */
+  readonly scopeTone?: 'normal' | 'error';
   /** Overrides the tool hint when non-empty — engine-specific context. */
   readonly contextInfo: string;
   readonly zoom: number;

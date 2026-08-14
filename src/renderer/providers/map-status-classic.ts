@@ -53,6 +53,22 @@ export function classicScopeInfo(
     + `${doc.blocks.length} blocks · ${doc.objects.length} objects`;
 }
 
+/**
+ * Whether that scope string is a fact or a failure. Split out rather than folded
+ * into classicScopeInfo's return so the string function keeps its narrow
+ * signature (and its doc parameter, which the tone does not need); the test
+ * pairs them over every (ref, status) so the two cannot drift apart.
+ */
+export function classicScopeTone(
+  ref: ZoneActRef | null,
+  status: ClassicLevelStatus,
+): 'normal' | 'error' {
+  // `ref === null` first, matching classicScopeInfo: with no act selected the
+  // line reads 'no act selected' whatever the load state, and there is no
+  // failure being reported to colour.
+  return ref !== null && status === 'error' ? 'error' : 'normal';
+}
+
 export function useClassicMapStatusPort(): MapStatusPort {
   // The tool vocabulary and the editing plane are shared with aeon (plan 4), so
   // these are the same three editorStore reads the aeon port makes.
@@ -69,6 +85,7 @@ export function useClassicMapStatusPort(): MapStatusPort {
   const status = useClassicLevelStore((s) => s.status);
 
   const scopeInfo = classicScopeInfo(ref, status, doc);
+  const scopeTone = classicScopeTone(ref, status);
 
   return React.useMemo((): MapStatusPort => ({
     tool,
@@ -79,6 +96,9 @@ export function useClassicMapStatusPort(): MapStatusPort {
     // the act, not a heading of its own.
     zoneName: ref ? `S1 · ${ref.label}` : 'S1',
     scopeInfo,
+    // Carries the red the old bar drew a failed load in — the one thing on this
+    // line that is not a fact about the act (ClassicProjectView.tsx:118).
+    scopeTone,
     // Empty on purpose: classic's stamp context already rides its own hint line
     // in the chunk picker, and repeating it here would say it twice.
     contextInfo: '',
@@ -86,5 +106,5 @@ export function useClassicMapStatusPort(): MapStatusPort {
     onZoom: setZoom,
     // No Aether bus for classic.
     right: undefined,
-  }), [tool, pasting, editingLayer, ref, scopeInfo, zoom, setZoom]);
+  }), [tool, pasting, editingLayer, ref, scopeInfo, scopeTone, zoom, setZoom]);
 }

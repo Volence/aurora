@@ -3,7 +3,8 @@
 // only thing standing between a typo and a status bar that is wired blind.
 
 import { describe, it, expect } from 'vitest';
-import { classicScopeInfo, type ScopeDoc } from '../map-status-classic';
+import { classicScopeInfo, classicScopeTone, type ScopeDoc } from '../map-status-classic';
+import type { ClassicLevelStatus } from '../../state/classicLevelStore';
 import type { ZoneActRef } from '../../../core/project/adapter';
 
 const REF: ZoneActRef = { zone: 'GHZ', act: 1, label: 'Green Hill 1', available: true };
@@ -60,4 +61,37 @@ describe('classicScopeInfo', () => {
   // Reading BG's dimensions instead of FG's is no longer testable: ScopeDoc does
   // not include `bg`, so that mistake is now a compile error rather than a wrong
   // string. That is the point of narrowing the parameter.
+});
+
+// The old classic bar drew a failed load in T.error (ClassicProjectView.tsx);
+// the neutral bar draws every scope string in T.textLo, which would have made
+// the ONE state the user most needs to notice the quietest thing on screen.
+// `scopeTone` is what carries the red across.
+describe('classicScopeTone', () => {
+  const STATUSES: readonly ClassicLevelStatus[] = ['idle', 'loading', 'ready', 'error'];
+
+  it('is error only for a failed load of a selected act', () => {
+    expect(classicScopeTone(REF, 'error')).toBe('error');
+    expect(classicScopeTone(REF, 'loading')).toBe('normal');
+    expect(classicScopeTone(REF, 'ready')).toBe('normal');
+    expect(classicScopeTone(REF, 'idle')).toBe('normal');
+  });
+
+  it('stays normal with no act selected, even in the error state', () => {
+    // classicScopeInfo says 'no act selected' there, not 'load failed' — a red
+    // "no act selected" would announce a failure that is not being reported.
+    expect(classicScopeTone(null, 'error')).toBe('normal');
+  });
+
+  // The two functions are separate so the string one keeps its narrow signature,
+  // which means they CAN drift. This is the guard: the tone is red exactly when
+  // the text says the load failed, over every (ref, status) pair there is.
+  it('is red exactly when the text reads "load failed"', () => {
+    for (const ref of [null, REF]) {
+      for (const status of STATUSES) {
+        expect(classicScopeTone(ref, status) === 'error')
+          .toBe(classicScopeInfo(ref, status, null) === 'load failed');
+      }
+    }
+  });
 });
