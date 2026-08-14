@@ -149,10 +149,16 @@ export interface CapabilityManifest {
    * (renderer `FACET_TOOLS`); `toolsForFacet` is the one reader.
    *
    * REPLACES the default rather than intersecting it. Spec §3.6 says intersect,
-   * written before contact with the code — but the default `layout` set has no
-   * `place-object`, and that is precisely the tool classic's map needs for an
-   * armed placement, so an intersection would silently delete it. Replacement
-   * also lets a profile ORDER its tools (first entry is the facet default).
+   * written before contact with the code: a declaration must be able to NAME a
+   * tool the default set lacks, or it can only ever subtract. The example that
+   * settled it was classic's layout carrying `place-object`, which the default
+   * layout set has no entry for — that declaration is since gone (it made the
+   * Objects facet a strict subset of Layout), so today every shipping profile
+   * happens to declare a SUBSET and nothing real distinguishes the two rules.
+   * The renderer keeps a synthetic guard for it — workspace/__tests__/
+   * facet-tools.test.ts, "keeps a declared tool the shell default does NOT have".
+   * Replacement also lets a profile ORDER its tools (first entry is the facet
+   * default).
    */
   facetTools?: Partial<Record<FacetCapability, readonly ToolId[]>>;
 }

@@ -34,9 +34,17 @@ export const FACET_TOOLS: Partial<Record<FacetCapability, readonly EditorTool[]>
  * re-scope, classic's chip row — goes through this, so a profile cannot offer a
  * tool in one place and have it rejected in another.
  *
- * Declaration REPLACES the default (see the manifest's docblock): classic's
- * layout needs `place-object`, which the default set does not contain, so
- * intersecting would delete the tool the declaration exists to add.
+ * Declaration REPLACES the default (see the manifest's docblock) — it does not
+ * intersect it, so a profile can name a tool the default set lacks.
+ *
+ * The worked example used to be classic's layout carrying `place-object`, which
+ * an intersection would have deleted. That declaration is gone (it made Objects
+ * a strict subset of Layout), and s1's real list is now a strict SUBSET of the
+ * default — which means NO shipping profile distinguishes replace from intersect
+ * any more, and an intersect regression would pass every real-profile test there
+ * is. The rule is still right, so the guard is a SYNTHETIC declaration:
+ * __tests__/facet-tools.test.ts, "keeps a declared tool the shell default does
+ * NOT have". That test is the reason this sentence can still be trusted.
  */
 export function toolsForFacet(facet: FacetCapability): readonly EditorTool[] {
   return openCapabilities()?.facetTools?.[facet] ?? FACET_TOOLS[facet] ?? [];

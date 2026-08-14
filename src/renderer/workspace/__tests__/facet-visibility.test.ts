@@ -7,6 +7,7 @@ import { facetsFor, facetRegistry, registerBuiltinFacets } from '../../../core/s
 import { facetModules, moduleFor, registerFacetModule, resolveFacet } from '../facet-registry';
 import { registerAeonFacetModules, registerS1FacetModules } from '../register-facets';
 import type { FacetCapability } from '../../../core/project/adapter';
+import { S1_FACETS } from '../../../core/project/s1';
 import { openCapabilities } from '../../state/open-project';
 import { useProjectStore } from '../../state/projectStore';
 import { useClassicProjectStore } from '../../state/classicProjectStore';
@@ -42,6 +43,16 @@ describe('facet visibility (registered descriptors ∩ granted ∩ has module fo
     expect(facetsFor(['layout']).filter((f) => moduleFor('aeon', f.id))).toEqual([]);
   });
 
+  it('every facet the REAL s1 manifest grants has a module — no pill leads nowhere', () => {
+    // The cross-check the old literal could not make: this reads the profile
+    // (core/project/s1/index.ts) on one side and the renderer's registration on
+    // the other, so granting a facet nobody built fails HERE rather than at
+    // runtime on a FacetUnavailable screen.
+    registerBuiltinFacets();
+    registerS1FacetModules();
+    for (const f of S1_FACETS) expect(moduleFor('s1', f), `s1/${f}`).not.toBeNull();
+  });
+
   it('a session record naming the dropped `palette` facet heals to a served one', () => {
     // What the grant drop has to survive: a workspace record persisted while
     // classic still granted `palette`. There is no pill for it now, so the only
@@ -68,14 +79,15 @@ describe('facet visibility (registered descriptors ∩ granted ∩ has module fo
   });
 });
 
-// The grants the two profiles actually declare, kept as literals so a profile
-// edit has to come through here (same style as the adapter tests).
+// The aeon grant is still a literal (same style as the adapter tests). The s1
+// one is THE REAL MANIFEST, imported at the top of this file: it used to be a
+// literal here too, and the test below that "checked" it fed that literal into
+// the store and then asserted the store returned it — an assertion that could
+// not fail. Importing the grant makes these cross-checks between the profile
+// and the facet registry, with the EXPECTATIONS left as literals so drift
+// still has to be typed out by whoever causes it.
 const AEON_GRANT = ['layout', 'art', 'objects', 'rings', 'collision', 'palette']; // core/project/aeon/index.ts
-// NOTE: neither `collision` nor `palette` is in this list — the first had
-// nothing built behind it, the second had the ART facet built behind it and
-// nothing else. Both absences are argued on the grant itself; both are
-// reversible there.
-const S1_GRANT = ['layout', 'art', 'objects']; // core/project/s1/index.ts
+const S1_GRANT = S1_FACETS; // core/project/s1/index.ts — the real thing
 
 function resetProjectStores() {
   useClassicProjectStore.setState({ status: 'closed', capabilities: null } as never);
@@ -100,7 +112,9 @@ describe("the facet bar's granted list comes from the OPEN engine's manifest", (
     // `useProjectStore((s) => s.capabilities?.facets ?? [])` read resolved to []
     // — a facet bar with no pills at all.
     expect(useProjectStore.getState().capabilities).toBeNull();
-    expect(openCapabilities()?.facets ?? []).toEqual(S1_GRANT);
+    // The REAL grant goes in and a LITERAL comes out. Both sides being S1_GRANT
+    // is what made this test unable to fail, whatever the manifest said.
+    expect(openCapabilities()?.facets ?? []).toEqual(['layout', 'art', 'objects']);
   });
 
   it('LevelWorkspace resolves it through that seam, not projectStore', () => {

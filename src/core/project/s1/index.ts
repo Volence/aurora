@@ -18,6 +18,7 @@ import type {
   DirtyDomains,
   WriteResult,
   LevelDoc,
+  FacetCapability,
 } from '../adapter';
 import { buildReport, type ResolutionEntry, type EntryStatus } from '../report';
 import { s1Profile, type ClassicProfile, type VariantPath, type LevelAct } from '../profiles/s1';
@@ -31,6 +32,33 @@ import {
 
 const LABEL = 'Sonic 1 Disassembly (GitHub)';
 const SIDECAR = '.aurora/project.json';
+
+/**
+ * THE s1 FACET GRANT — the one statement of it, spread into the manifest below.
+ *
+ * Exported because the grant was previously written out in five places and only
+ * ONE of them failed when it drifted (s1-adapter.test.ts). Two workspace tests
+ * kept their own `S1_GRANT` literal and used it on BOTH sides of their own
+ * assertion, so they could not fail by construction. They read this now, which
+ * turns them into cross-checks between the real grant and the facet registry.
+ *
+ * TWO FACETS ARE DELIBERATELY ABSENT, both reversible by putting the id back in
+ * this list (and its module back in the renderer's register-facets):
+ *
+ *  - `collision`. Classic has no collision-editing UI: classicSetColind's only
+ *    caller is the agent handler, and classic's sole collision affordance is a
+ *    read-only overlay. Granting it would put a Collision pill over an aeon-only
+ *    CollisionPalette (spec §3.0.3). Owner decision 2026-08-13; restore when the
+ *    classic collision editor lands as its own designed feature.
+ *  - `palette`. It was a SECOND NAME for `art`: both pills rendered the same
+ *    composer, the same right column and the same status bar — the two modules
+ *    differed in `id` alone and nothing downstream read it (the renderer's
+ *    workspace/facets/s1-facets.tsx). Classic's palette grid is a section INSIDE
+ *    the art column, not a surface of its own, so the pill navigated to a
+ *    pixel-identical screen. Restore when classic's art surface is redesigned in
+ *    step H and there is a palette screen that differs from the art one.
+ */
+export const S1_FACETS = ['layout', 'art', 'objects'] as const satisfies readonly FacetCapability[];
 
 // ---------------------------------------------------------------------------
 // Profile enumeration — flattens the profile into an ordered list of resolvable
@@ -347,24 +375,11 @@ export const s1Adapter: ProjectAdapter = {
         sprites: true,
         objects: 'objpos',
         build: false,
-        // TWO FACETS ARE DELIBERATELY ABSENT, both reversible by putting the id
-        // back in this list (and its module back in register-facets):
-        //
-        //  - `collision`. Classic has no collision-editing UI: classicSetColind's
-        //    only caller is the agent handler, and classic's sole collision
-        //    affordance is a read-only overlay. Granting it would put a Collision
-        //    pill over an aeon-only CollisionPalette (spec §3.0.3). Owner
-        //    decision 2026-08-13; restore when the classic collision editor lands
-        //    as its own designed feature.
-        //  - `palette`. It was a SECOND NAME for `art`: both pills rendered the
-        //    same composer, the same right column and the same status bar —
-        //    composerFacet('art') and composerFacet('palette') differed in `id`
-        //    alone and nothing downstream read it (workspace/facets/s1-facets.tsx).
-        //    Classic's palette grid is a section INSIDE the art column, not a
-        //    surface of its own, so the pill navigated to a pixel-identical
-        //    screen. Restore when classic's art surface is redesigned in step H
-        //    and there is a palette screen that differs from the art one.
-        facets: ['layout', 'art', 'objects'],
+        // Spread, not the constant itself: `facets` is a mutable array on the
+        // manifest, and handing every open handle the same array instance would
+        // let one of them edit the grant for all of them. See S1_FACETS above
+        // for what is in it and what is deliberately not.
+        facets: [...S1_FACETS],
         // Classic's three rungs are all id-addressed: a layout cell HOLDS a
         // chunk id and a chunk cell HOLDS a block id, so an edit at any tier
         // propagates to every placement (spec §3.0.2).
