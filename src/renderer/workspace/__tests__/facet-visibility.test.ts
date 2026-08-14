@@ -124,6 +124,42 @@ describe('both production call sites resolve against the OPEN engine, not a lite
   });
 });
 
+// The FG/BG plane control is a HEADER control now — the copies the classic
+// viewport used to draw above its canvas are gone (stage-4 plan 5, task 6). That
+// makes the facets it is offered on the only thing standing between a user and a
+// plane they cannot change, and the facet most easily forgotten is `objects`,
+// which reads like a facet about placements rather than about planes. It is not:
+//
+//   - classic gates object editing on the plane (ClassicLevelViewport: select /
+//     place-object act only on FG, and fall through to PAN on BG), so without a
+//     plane control the objects facet's own tools silently do nothing whenever
+//     the plane was last left on BG — a dead tool with no visible cause;
+//   - aeon renders only Plane B on BG and draws the object overlay solely in the
+//     FG branch (MapViewport), so the same omission strands an aeon user on a
+//     canvas where every object is invisible.
+//
+// Neither failure throws, logs, or fails another test, which is why this one
+// exists. It reads the EXPRESSION rather than the whole line, so reordering the
+// facets or reformatting the condition keeps it green.
+describe('the header offers the plane control on every facet whose canvas is plane-gated', () => {
+  const showPlaneExpr = (): string => {
+    const source = readFileSync(join(__dirname, '..', 'LevelWorkspace.tsx'), 'utf8');
+    const m = source.match(/const showPlane\s*=([\s\S]*?);/);
+    // A rename would make every assertion below vacuous, so it fails loudly.
+    expect(m, 'LevelWorkspace no longer declares `showPlane`').not.toBeNull();
+    return m![1];
+  };
+
+  it.each(['layout', 'collision', 'objects'])('%s can switch plane', (facet) => {
+    expect(showPlaneExpr()).toContain(`'${facet}'`);
+  });
+
+  it('is still gated on the facet being served at all', () => {
+    // Chips that write editorStore over a facet with no canvas are dead chrome.
+    expect(showPlaneExpr()).toContain('mod != null');
+  });
+});
+
 // resolveFacet's own behaviour is covered in facet-tools.test.ts. What no test
 // can RUN is its consumer — LevelWorkspace is .tsx — so the two properties the
 // helper's correctness rests on are asserted at the source level: that the heal

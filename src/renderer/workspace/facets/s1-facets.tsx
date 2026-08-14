@@ -49,6 +49,7 @@
 
 import React from 'react';
 import ClassicLevelViewport from '../../components/classic/ClassicLevelViewport';
+import ClassicMapToolOptions from '../../components/classic/ClassicMapToolOptions';
 import ClassicComposerDock from '../../components/classic/ClassicComposerDock';
 import ClassicPalettePanel from '../../components/classic/ClassicPalettePanel';
 import ClassicObjectInspector from '../../components/classic/ClassicObjectInspector';
@@ -88,12 +89,10 @@ function ClassicComposerCanvas(): React.ReactElement {
 /**
  * The right-hand column for both map facets. Identical for layout and objects
  * for now — classic has ONE object surface, and the inspector plus the library
- * are what it puts beside the map. The deltas the plan reserves are Task 6
- * (layout's ToolOptions: the contextual hint line still inside the viewport's
- * OptionBar) and Task 7 (layout's ChunkPicker section, which is still mounted by
- * the legacy shell). Neither is forward-referenced here — importing a component
- * that does not exist yet does not compile, so this file only ever names what is
- * already written.
+ * are what it puts beside the map. The one delta the plan still reserves is Task
+ * 7 (layout's ChunkPicker section, which is still mounted by the legacy shell).
+ * It is not forward-referenced here — importing a component that does not exist
+ * yet does not compile, so this file only ever names what is already written.
  *
  * Both sections mount a LEAF that resolves its own port, never a port hook in
  * this column — see the wrappers' docblocks and ChunkLibrary.tsx:12-15.
@@ -126,14 +125,22 @@ function ClassicArtPanels(): React.ReactElement {
 // button set from the s1 manifest's facetTools.layout via toolsForFacet) and
 // `mapOverlays: true`. Canvas and StatusBar are overridden because its defaults
 // are aeon-bound; ToolDock is not, because it is already neutral.
+//
+// ToolOptions carries classic's contextual hint line, on BOTH map facets rather
+// than layout alone: the hint is keyed on the TOOL, not the facet, and every
+// tool the objects facet offers (place-object, select, view) has a branch in it
+// — including the one that explains why a click did nothing on BG. Withholding
+// it from objects would hide the hint exactly where it is most needed.
 export const s1LayoutFacet: FacetModule = mapFacet('layout', {
   Canvas: ClassicLevelViewport,
+  ToolOptions: ClassicMapToolOptions,
   StatusBar: ClassicMapStatusBar,
   RightPanel: ClassicMapPanels,
 });
 
 export const s1ObjectsFacet: FacetModule = mapFacet('objects', {
   Canvas: ClassicLevelViewport,
+  ToolOptions: ClassicMapToolOptions,
   StatusBar: ClassicMapStatusBar,
   RightPanel: ClassicMapPanels,
 });

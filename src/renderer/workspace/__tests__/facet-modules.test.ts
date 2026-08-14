@@ -165,14 +165,25 @@ describe('registerS1FacetModules registers every facet the s1 profile grants', (
     expect(moduleFor('s1', 'layout')?.Canvas).toBe(moduleFor('s1', 'objects')?.Canvas);
   });
 
-  it("leaves the slots Tasks 6 and 7 fill empty rather than half-built", async () => {
-    // Layout's ToolOptions is classic's contextual hint line, still inside the
-    // viewport's OptionBar (Task 6); layout's RightPanel is missing ChunkPicker
-    // (Task 7). Both are recorded as absent so the next task can see what it
-    // owes, and so "undefined" here reads as pending rather than as an oversight.
-    const { registerS1FacetModules } = await import('../register-facets');
+  it('mounts the contextual hint line on BOTH map facets', async () => {
+    // Task 6 filled the slot this test used to assert empty. The hint is keyed
+    // on the TOOL, not the facet — every tool the objects facet offers has a
+    // branch in it, including the one that explains a click that did nothing on
+    // BG — so withholding it from `objects` would hide it where it helps most.
+    // (Layout's RightPanel is still missing ChunkPicker; that is Task 7.)
+    const { registerS1FacetModules, registerAeonFacetModules } = await import('../register-facets');
     registerS1FacetModules();
-    expect(moduleFor('s1', 'layout')?.ToolOptions).toBeUndefined();
+    const layout = moduleFor('s1', 'layout')?.ToolOptions;
+    expect(layout).toBeDefined();
+    expect(moduleFor('s1', 'objects')?.ToolOptions).toBe(layout);
+    // Not aeon's: its map facets have no tool-options bar at all, and inheriting
+    // classic's hint vocabulary would be a lie about that canvas. Aeon is
+    // registered explicitly — `moduleFor` on an unregistered engine answers
+    // null, which would make this assertion pass without proving anything.
+    registerAeonFacetModules();
+    expect(moduleFor('aeon', 'layout')).not.toBeNull();
+    expect(moduleFor('aeon', 'layout')?.ToolOptions).toBeUndefined();
+    expect(moduleFor('aeon', 'objects')?.ToolOptions).toBeUndefined();
   });
 });
 

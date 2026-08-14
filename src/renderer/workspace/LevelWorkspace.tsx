@@ -106,7 +106,19 @@ export default function LevelWorkspace() {
   // over a facet that has no editor — any facet an engine grants but does not
   // serve — and chips that mutate an aeon store from a classic screen with no
   // canvas are exactly the dead chrome this branch is removing.
-  const showPlane = mod != null && (resolved === 'layout' || resolved === 'collision');
+  //
+  // `objects` IS on this list, and it is load-bearing under BOTH engines — see
+  // the guard in __tests__/facet-visibility.test.ts. Classic gates object
+  // editing on the plane outright (ClassicLevelViewport: select and
+  // place-object only act when the plane is FG; on BG they fall through to
+  // pan), so an objects facet with no plane control is an objects facet whose
+  // tools silently do nothing whenever the plane was left on BG. Aeon does not
+  // gate the placement itself, but it renders only Plane B on BG and draws the
+  // object overlay solely in the FG branch (MapViewport) — so there the same
+  // missing control strands you on a canvas where every object is invisible.
+  // Different failure, same cure.
+  const showPlane = mod != null
+    && (resolved === 'layout' || resolved === 'collision' || resolved === 'objects');
   const header = (
     <div style={styles.header}>
       <FacetBar tabId={activeId} granted={granted} engine={engine} />

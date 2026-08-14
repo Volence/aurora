@@ -158,7 +158,11 @@ export function mapFacet(
   id: FacetCapability,
   // Partial, not a bare Pick: FacetModule.Canvas is required, so a bare Pick
   // would force every existing aeon call site to restate the default.
-  slots: Partial<Pick<FacetModule, 'Canvas' | 'ToolDock' | 'StatusBar' | 'RightPanel' | 'BottomExtra'>>,
+  // `ToolOptions` is in the list with no default beside it: mapFacet supplies
+  // none (the slot renders nothing when undefined), but classic's map facets
+  // mount their contextual hint line there, so it has to be reachable.
+  slots: Partial<Pick<FacetModule,
+    'Canvas' | 'ToolDock' | 'ToolOptions' | 'StatusBar' | 'RightPanel' | 'BottomExtra'>>,
 ): FacetModule {
   return {
     id,
