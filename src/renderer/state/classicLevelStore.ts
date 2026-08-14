@@ -348,7 +348,7 @@ export const useClassicLevelStore = create<ClassicLevelState>((set, get) => ({
         ref, doc, status: 'ready', error: null,
         selectedChunkId: firstEditableChunkId(doc.chunks),
         composerTileIndex: firstEditableNonBlankTile(doc.tiles, range),
-        composerBlockId: firstNonBlankBlock(doc.blocks),
+        composerBlockId: firstNonBlankBlock(doc.blocks, doc.tiles),
       });
     } catch (e) {
       if (token !== loadToken) return;

@@ -51,19 +51,36 @@ describe('firstNonBlankBlock', () => {
   const cell = (tile = 0, extra: Partial<BlockDef['cells'][number]> = {}) =>
     ({ tile, xf: false, yf: false, pal: 0, pri: false, ...extra });
   const blank = (): BlockDef => ({ cells: [cell(), cell(), cell(), cell()] });
+  // Tile 0 blank, tiles 5 and 9 have art — the stock shape.
+  const TILES = pool(16, [5, 9]);
 
   it('skips leading blank blocks (the stock $000 case)', () => {
     const blocks = [blank(), blank(), { cells: [cell(5), cell(), cell(), cell()] }];
-    expect(firstNonBlankBlock(blocks)).toBe(2);
+    expect(firstNonBlankBlock(blocks, TILES)).toBe(2);
   });
 
-  it('counts a flip/pal/pri-only cell as non-blank (it renders/behaves differently)', () => {
-    expect(firstNonBlankBlock([blank(), { cells: [cell(0, { pal: 2 }), cell(), cell(), cell()] }])).toBe(1);
+  it('does NOT count a flip/pal/pri-only cell — none of those draws a pixel', () => {
+    // THE BUG. S1 Green Hill's block $000 has cells on palette line 2 pointing
+    // at the blank tile $000, so the old "non-default cell" rule landed the
+    // Block tier on four black quadrants — with no message any source guard
+    // could have caught.
+    const decorated = { cells: [cell(0, { pal: 2, xf: true, pri: true }), cell(), cell(), cell()] };
+    expect(firstNonBlankBlock([decorated, { cells: [cell(9), cell(), cell(), cell()] }], TILES)).toBe(1);
+  });
+
+  it('is decided by the TILE POOL, not the cell record', () => {
+    // The same block is blank or not depending on whether tile 5 has pixels —
+    // which is the whole reason this takes the pool.
+    const blocks = [{ cells: [cell(5), cell(), cell(), cell()] }];
+    expect(firstNonBlankBlock(blocks, pool(16, [5]))).toBe(0);
+    expect(firstNonBlankBlock(blocks, pool(16, []))).toBe(0); // fallback, all blank
+    expect(firstNonBlankBlock([blank(), blocks[0]], pool(16, []))).toBe(0);
+    expect(firstNonBlankBlock([blank(), blocks[0]], pool(16, [5]))).toBe(1);
   });
 
   it('falls back to 0 when every block is blank (or the list is empty)', () => {
-    expect(firstNonBlankBlock([blank(), blank()])).toBe(0);
-    expect(firstNonBlankBlock([])).toBe(0);
+    expect(firstNonBlankBlock([blank(), blank()], TILES)).toBe(0);
+    expect(firstNonBlankBlock([], TILES)).toBe(0);
   });
 });
 

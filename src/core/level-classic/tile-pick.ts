@@ -35,12 +35,25 @@ export function firstEditableNonBlankTile(tiles: Uint8Array, range: EditableTile
 
 /**
  * The block id the composer should land on when an act opens: the first block
- * with any non-default cell (a cell referencing tile 0 with no flips/pal/pri is
- * the blank pattern). Falls back to 0 when every block is blank.
+ * that DRAWS something — one with a cell referencing a tile that has pixels in
+ * it. Falls back to 0 when every block is blank.
+ *
+ * "DRAWS SOMETHING" IS THE WHOLE POINT, and the first version of this rule
+ * missed it. It asked for a non-DEFAULT cell — `tile !== 0 || xf || yf ||
+ * pal !== 0 || pri` — and S1's Green Hill block $000 has cells on palette line
+ * 2 pointing at tile $000. Non-default, entirely invisible. So the Block tier
+ * still opened on four black quadrants, which is the exact impression the
+ * landing pick exists to prevent, and it printed no message a source guard
+ * could have caught.
+ *
+ * Flips, palette line and priority are all properties of HOW a tile is drawn,
+ * so none of them can make a blank tile visible. Only the tile can, which is why
+ * this now needs the pool and shares `isBlankTile` with the tile pick above
+ * rather than re-deriving blankness from the cell record.
  */
-export function firstNonBlankBlock(blocks: BlockDef[]): number {
+export function firstNonBlankBlock(blocks: BlockDef[], tiles: Uint8Array): number {
   for (let b = 0; b < blocks.length; b++) {
-    if (blocks[b].cells.some((c) => c.tile !== 0 || c.xf || c.yf || c.pal !== 0 || c.pri)) return b;
+    if (blocks[b].cells.some((c) => !isBlankTile(tiles, c.tile))) return b;
   }
   return 0;
 }
