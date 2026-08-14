@@ -28,6 +28,14 @@ import { useClassicLevelStore, type ClassicLevelStatus } from '../state/classicL
 import type { ZoneActRef } from '../../core/project/adapter';
 
 /**
+ * The four fields the scope line reads, and no more. Narrower than `LevelDoc` on
+ * purpose: it states exactly what the bar depends on, and it lets the test build
+ * an honest fixture instead of casting eight unrelated fields away — a cast that
+ * would keep compiling if `fg` were renamed out from under this function.
+ */
+export type ScopeDoc = Pick<LevelDoc, 'fg' | 'chunks' | 'blocks' | 'objects'>;
+
+/**
  * What sits to the right of the act name: the act's shape and contents once it
  * is loaded, and the load state itself before that. The old bar folded these
  * into one span; they are the same five cases.
@@ -35,7 +43,7 @@ import type { ZoneActRef } from '../../core/project/adapter';
 export function classicScopeInfo(
   ref: ZoneActRef | null,
   status: ClassicLevelStatus,
-  doc: LevelDoc | null,
+  doc: ScopeDoc | null,
 ): string {
   if (!ref) return 'no act selected';
   if (status === 'loading') return 'loading…';

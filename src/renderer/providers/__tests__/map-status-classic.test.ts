@@ -3,21 +3,26 @@
 // only thing standing between a typo and a status bar that is wired blind.
 
 import { describe, it, expect } from 'vitest';
-import { classicScopeInfo } from '../map-status-classic';
-import type { LevelDoc } from '../../../core/level-classic/model';
+import { classicScopeInfo, type ScopeDoc } from '../map-status-classic';
 import type { ZoneActRef } from '../../../core/project/adapter';
 
 const REF: ZoneActRef = { zone: 'GHZ', act: 1, label: 'Green Hill 1', available: true };
 
-/** Only the four counts the bar reads; the rest of a LevelDoc is irrelevant to
- *  it, so the fixture stays a shape rather than a whole level. */
-function doc(fg: { width: number; height: number }, chunks: number, blocks: number, objects: number): LevelDoc {
+const OBJECT = { x: 0, y: 0, xflip: false, yflip: false, respawn: false, id: 0, subtype: 0 };
+
+/**
+ * Only what the scope line reads — which is exactly what `ScopeDoc` says, so
+ * this is type-checked against the real LevelDoc field types with NO cast. A
+ * rename or retype of `fg`/`chunks`/`blocks`/`objects` breaks the build here
+ * rather than letting a green test hide it.
+ */
+function doc(fg: { width: number; height: number }, chunks: number, blocks: number, objects: number): ScopeDoc {
   return {
     fg: { ...fg, cells: new Uint8Array(fg.width * fg.height) },
     chunks: Array.from({ length: chunks }, () => ({ cells: [] })),
     blocks: Array.from({ length: blocks }, () => ({ cells: [] })),
-    objects: Array.from({ length: objects }, () => ({})),
-  } as unknown as LevelDoc;
+    objects: Array.from({ length: objects }, () => ({ ...OBJECT })),
+  };
 }
 
 describe('classicScopeInfo', () => {
@@ -44,9 +49,15 @@ describe('classicScopeInfo', () => {
       .toBe('40×8 chunks · 3 chunks · 5 blocks · 7 objects');
   });
 
-  it('reads the FG plane, not BG — the layout dimensions the map is drawn at', () => {
+  it('reports the DECLARED grid size, not the payload length', () => {
+    // The two differ for four real S1 files (LayoutGrid's header note: some carry
+    // a trailing byte, ending.bin is truncated), so cells.length is not the shape.
     const d = doc({ width: 40, height: 8 }, 0, 0, 0);
-    (d as { bg: unknown }).bg = { width: 99, height: 99, cells: new Uint8Array(0) };
+    d.fg.cells = new Uint8Array(321);
     expect(classicScopeInfo(REF, 'ready', d)).toContain('40×8 chunks');
   });
+
+  // Reading BG's dimensions instead of FG's is no longer testable: ScopeDoc does
+  // not include `bg`, so that mistake is now a compile error rather than a wrong
+  // string. That is the point of narrowing the parameter.
 });

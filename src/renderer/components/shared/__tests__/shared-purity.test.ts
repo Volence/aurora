@@ -38,12 +38,19 @@ function sourceFiles(): string[] {
 }
 
 /**
- * Any import whose specifier reaches `state/` — `../../state/editorStore`,
- * `import type { … } from '.../state/x'`, a bare `import '.../state/x'` for its
- * side effects, or a dynamic `import('.../state/x')`. Matching the SPECIFIER
- * rather than the statement is what makes all four forms one rule.
+ * Any import whose specifier reaches `state/`: `import { x } from` it, `import
+ * type` it, `export … from` it, `import` it bare for its side effects, or
+ * `import()` it dynamically. Matching the SPECIFIER — the quoted path — rather
+ * than the statement shape is what makes all of those one rule.
+ *
+ * Both quote styles and a backtick, deliberately. An earlier version hardcoded
+ * `'`, and a DOUBLE-QUOTED store import walked straight through it: the repo has
+ * no ESLint and no Prettier, so single quotes are a habit, not a guarantee. The
+ * planted-violation check that vets this regex must vary the quote as well as
+ * the statement form — constraining a dimension the check never varies is how a
+ * guard ends up green and useless.
  */
-const STATE_IMPORT = /from\s+'[^']*\/state\/|import\s*\(\s*'[^']*\/state\/|import\s+'[^']*\/state\//;
+const STATE_IMPORT = /(?:from|import)\s*\(?\s*["'`](?:[^"'`]*\/)?state\//;
 
 describe('components/shared imports no store', () => {
   it('finds the shared components at all', () => {
