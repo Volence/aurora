@@ -150,14 +150,24 @@ describe('activateLevelTarget (executor)', () => {
 // seeded view; the BOOT-restore dispatch passes skipViewSnapshot so it does NOT
 // snapshot the loader-default act (viewStore holds the default, not user state —
 // snapshotting would clobber that act's just-seeded viewport).
+/** The manifest half of an open aeon project: one zone, two acts. Only the
+ *  fields the activation path reads (zone id/name, act ids) are real. */
+const AEON_CONFIG = {
+  zones: [{ id: 'ehz', name: 'Emerald Hill', acts: [{ id: 'act1' }, { id: 'act2' }] }],
+} as never;
+
 describe('activateLevelTarget aeon viewport snapshot/restore', () => {
   beforeEach(() => {
     useClassicProjectStore.getState().reset(); // status stays !== 'open' → engine is aeon
     useProjectStore.getState().reset();
     useWorkspaceStore.getState().reset();
     // A resident aeon project (project !== null) makes currentEngine() 'aeon';
-    // start "viewing" act1.
-    useProjectStore.setState({ project: {} as never, currentZoneId: 'ehz', currentActId: 'act1' });
+    // start "viewing" act1. The CONFIG is what the activation guard resolves the
+    // act against, so it has to name the acts these cases switch between.
+    useProjectStore.setState({
+      project: {} as never, currentZoneId: 'ehz', currentActId: 'act1',
+      config: AEON_CONFIG,
+    });
   });
 
   afterEach(() => {
@@ -182,6 +192,28 @@ describe('activateLevelTarget aeon viewport snapshot/restore', () => {
     // viewStore restored to act2's seeded view:
     const v = useViewStore.getState();
     expect({ x: v.vpX, y: v.vpY, zoom: v.zoom }).toEqual({ x: 30, y: 40, zoom: 2 });
+  });
+
+  it('refuses an act id the project does not have — and touches nothing', async () => {
+    // The bug: nothing checked, so setCurrentAct wrote a phantom id and
+    // useActTabSync opened a tab titled for it, hosting an editor whose
+    // getCurrentAct() is null. Reachable without the debug hook: a level tab
+    // survives a SAME-DIR re-open (the session prune is keyed on basePath and
+    // early-returns), so an act deleted from project.json leaves its tab in the
+    // strip, one click from here.
+    useWorkspaceStore.getState().seed({ 'level:ehz:act1': { view: { x: 1, y: 2, zoom: 1 } } });
+    useViewStore.setState({ vpX: 11, vpY: 22, zoom: 4 });
+
+    expect(await activateLevelTarget('level:ehz:__none__')).toBe(false);
+
+    // Still on act1, and its record was not snapshotted over on the way out.
+    expect(useProjectStore.getState().currentActId).toBe('act1');
+    expect(useWorkspaceStore.getState().viewFor('level:ehz:act1')).toEqual({ x: 1, y: 2, zoom: 1 });
+  });
+
+  it('refuses a zone the project does not have', async () => {
+    expect(await activateLevelTarget('level:__gone__:act1')).toBe(false);
+    expect(useProjectStore.getState().currentZoneId).toBe('ehz');
   });
 
   it('restore dispatch (skipViewSnapshot) leaves the outgoing act untouched', async () => {
