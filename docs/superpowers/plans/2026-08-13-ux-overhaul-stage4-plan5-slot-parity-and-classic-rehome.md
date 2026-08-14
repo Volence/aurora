@@ -40,6 +40,31 @@ Tasks 2, 7 and 8 carry complete **contracts** — interfaces, test names, accept
 
 ---
 
+## Two cross-task landmines, found by Task 4's review — READ BEFORE TASKS 6, 9 AND 11
+
+Neither is a bug in the task that surfaced them. Both are places where code this plan has *already landed* disagrees with code still standing, and both stay invisible until the shell flips. **They are why Task 11 now runs before Task 9** (see the reorder note below).
+
+### L1 — `classic-surface`'s surface→facet map is 2-valued; classic now has four facets
+
+`classic-surface.ts:52-55` is `{ map: 'layout', art: 'art' }`, and `focusClassicSurface` writes `setFacet(tabId, facet)` on **every pointer-down**. But Task 4 registered `ClassicLevelViewport` as the canvas of **both** `layout` and `objects`, and the composer as the canvas of **both** `art` and `palette`. The map cannot distinguish the pairs, because the surface component is literally the same one. After Task 9:
+
+- Click the **Objects** pill → click anywhere in the map → `setFacet('layout')` → **the pill jumps back**. The right panel does it too: `object-list-classic.ts:91` and `object-inspector-classic.ts:164` both claim `'map'`.
+- Click the **Palette** pill → click a swatch → `setFacet('art')`.
+
+Two of the four classic facets are unreachable in practice. **The fix belongs to Task 11**, which owns this file: a surface must claim a facet only when the *current* facet is not already one that surface serves. Model it as surface → set of served facets, and no-op when `facetFor(tabId)` is already in that set; otherwise fall back to the set's primary. **Do not** keep a 1:1 map.
+
+### L2 — the Objects facet has no plane control, and classic object editing is FG-gated
+
+`LevelWorkspace.tsx:63` sets `showPlane` for `layout` and `collision` only. But `ClassicLevelViewport.tsx:633` gates object editing on the plane — `if (plane === 'fg' && (tool === 'place-object' || tool === 'select'))`; on BG both fall through to pan.
+
+This is harmless **only** because the viewport still renders its own FG/BG chips (`ClassicLevelViewport.tsx:959-960`). **Task 6 deletes that OptionBar.** The moment it does, the Objects facet has no plane control, and with the plane left on BG `place-object` silently pans — a dead tool with no visible cause.
+
+**Task 6 must resolve this**, either by adding `objects` to `showPlane` or by keeping a plane control in the slot it moves the hint line into. Adding `objects` to `showPlane` is the cheaper fix and is correct for aeon too.
+
+### Reorder: Task 11 runs before Task 9
+
+Task 11 (`classic-surface` → `switchFacet`, widen the guard scan to `workspace/`) has no dependency on Task 9 and fixes L1, which Task 9 makes user-visible. Running it first also gets the widened guard in place before Task 9 moves more classic code around. **New order: 5, 6, 7, 8, 11, 9, 10, 12.**
+
 ## Pre-flight facts
 
 Established by reading `master` @ `0ed2a8c`. **Verify anything you depend on; line numbers rot.**
