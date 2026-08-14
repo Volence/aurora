@@ -9,15 +9,24 @@
 // So this is a source-level wiring guard: every file that issues a classic edit
 // command must either claim a surface itself or sit inside one that does.
 //
-// SCAN ROOT (stage-4 plan 3, task 4): this used to read only
-// `components/classic`, which meant moving a classic call site into a shared
-// component or a provider silently escaped the guard — exactly what the
-// engine-neutral slot work does. It now walks ALL of `components/**` and
-// `providers/**`, `.ts` as well as `.tsx`, so relocating a call site cannot
-// smuggle it out of coverage; it can only change which key it is listed under.
-// `state/**` and `agent/**` stay out on purpose: the stores are where the
-// commands are DEFINED and the agent handler is not a UI surface, so neither has
-// a facet to claim.
+// SCAN ROOTS: this has now been widened TWICE, each time after a relocation
+// walked a call site out of the scan rather than out of the codebase.
+//   • stage-4 plan 3, task 4: `components/classic` → all of `components/**` and
+//     `providers/**`, `.ts` as well as `.tsx` — the engine-neutral slot work
+//     moves call sites into shared components and ports.
+//   • stage-4 plan 5, task 11: + `workspace/**`. The facet modules live there
+//     (`workspace/facets/s1-facets.tsx` composes every classic surface), so a
+//     classic command reached from a facet module — the obvious place to put
+//     one once classic renders through the shell — was outside the scan.
+// Relocating a call site can therefore only change which key it is listed under,
+// never whether it is covered. `state/**` and `agent/**` stay out on purpose:
+// the stores are where the commands are DEFINED and the agent handler is not a
+// UI surface, so neither has a facet to claim.
+//
+// A widened root that finds nothing new passes for the wrong reason, so
+// `every scan root actually contributes files` below asserts each root is real.
+// It is deliberately not a filename assertion — the files under these roots move
+// every other task; a root going missing is the failure worth catching.
 
 import { describe, it, expect } from 'vitest';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
@@ -26,7 +35,7 @@ import type { ClassicSurface } from '../classic-surface';
 
 /** `src/renderer` — paths below are relative to it, POSIX-separated. */
 const RENDERER = join(__dirname, '..', '..', '..');
-const SCAN_ROOTS = ['components', 'providers'];
+const SCAN_ROOTS = ['components', 'providers', 'workspace'];
 const read = (file: string): string => readFileSync(join(RENDERER, file), 'utf8');
 
 /** Every source file under `roots`, recursively, excluding test directories. */
@@ -34,9 +43,9 @@ function sourceFiles(roots: readonly string[]): string[] {
   const out: string[] = [];
   const walk = (rel: string): void => {
     const abs = join(RENDERER, rel);
-    // A root that does not exist yet contributes nothing. This cannot defang the
-    // guard: the enumeration test below asserts an exact file list, so a root
-    // that disappears takes its known call sites with it and fails loudly.
+    // A root that does not exist yet contributes nothing, so a root can be
+    // listed ahead of the directory. `every scan root actually contributes
+    // files` is what stops that tolerance from quietly defanging the guard.
     if (!existsSync(abs)) return;
     for (const entry of readdirSync(abs, { withFileTypes: true })) {
       if (entry.name === '__tests__') continue;
@@ -100,6 +109,18 @@ const CONTAINER_SURFACES: Record<string, ClassicSurface> = {
 };
 
 describe('classic surfaces claim their facet', () => {
+  it('every scan root actually contributes files', () => {
+    // `sourceFiles` tolerates a missing root so that a root can be added ahead of
+    // the directory existing — which also means a typo, or a directory that gets
+    // renamed out from under this list, silently shrinks the scan back down. The
+    // enumeration test below would keep passing, because a shrunken scan finds
+    // FEWER files, and COMMAND_SITES would just be pruned to match. So assert the
+    // roots themselves, per root, with the root named in the failure.
+    for (const root of SCAN_ROOTS) {
+      expect(sourceFiles([root]), root).not.toEqual([]);
+    }
+  });
+
   it('knows about every component that commits a classic edit', () => {
     const found = sourceFiles(SCAN_ROOTS)
       .filter((f) => COMMAND_CALL.test(code(f)))
