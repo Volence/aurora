@@ -89,9 +89,16 @@ export type FacetCapability = (typeof FACET_CAPABILITIES)[number];
  *
  *  Runtime list exported so exhaustiveness checks (label maps, icon maps) can
  *  enumerate the vocabulary without duplicating it. */
+// `eraser` was in this list with nothing behind it: no FACET_TOOLS entry, no
+// profile's facetTools, and no branch in either engine's canvas — so the only
+// thing it could ever do was carry a label, a hint ("Click to erase tiles") and
+// a dock icon for a button no facet offered. Deleted rather than implemented:
+// stamping classic's air chunk and aeon's blank chunk is how each engine already
+// erases, and a vocabulary entry no canvas answers is a promise to the profile
+// author that nothing keeps.
 export const TOOL_IDS = [
   'view', 'select', 'paint-tile', 'paint-block', 'stamp-chunk',
-  'paint-collision', 'eraser', 'place-object', 'place-ring', 'marquee',
+  'paint-collision', 'place-object', 'place-ring', 'marquee',
 ] as const;
 export type ToolId = (typeof TOOL_IDS)[number];
 

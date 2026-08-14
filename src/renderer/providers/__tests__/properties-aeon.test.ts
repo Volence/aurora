@@ -203,7 +203,7 @@ describe('aeonPropertySections — the paint tool readout', () => {
     const shown = { selectedTileIndex: 7, selectedPaletteLine: 2 };
     expect(titles(input({ ...shown, tool: 'paint-tile' }))[0]).toBe('Paint Tool');
     expect(titles(input({ ...shown, tool: 'paint-block' }))[0]).toBe('Paint Tool');
-    for (const tool of ['view', 'select', 'stamp-chunk', 'place-object', 'eraser'] as const) {
+    for (const tool of ['view', 'select', 'stamp-chunk', 'place-object'] as const) {
       expect(titles(input({ ...shown, tool }))).not.toContain('Paint Tool');
     }
   });

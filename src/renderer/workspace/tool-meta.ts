@@ -24,7 +24,6 @@ export const TOOL_LABELS: Record<ToolId, string> = {
   'paint-collision': 'Paint Collision',
   'place-object': 'Place Object',
   'place-ring': 'Place Ring',
-  eraser: 'Eraser',
 };
 
 /**
@@ -47,7 +46,6 @@ export const TOOL_HINTS: Record<ToolId, string> = {
   'paint-collision': 'Click to set the collision type on tiles',
   'place-object': 'Click to place the selected object type',
   'place-ring': 'Click to place the selected ring pattern',
-  eraser: 'Click to erase tiles',
 };
 
 /** Every tool id, in vocabulary order. Re-exported so callers that only need

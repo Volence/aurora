@@ -18,7 +18,6 @@ const TOOL_ICONS: Record<EditorTool, React.FC<{ size?: number }>> = {
   'paint-collision': Icons.IconCollision,
   'place-object': Icons.IconPlaceObject,
   'place-ring': Icons.IconRing,
-  eraser: Icons.IconEraser,
 };
 
 export function MapFacetDock({ facet }: { facet: FacetCapability }) {
