@@ -10,6 +10,8 @@ import type { ObjectListPort, ObjectRow } from '../components/shared/object-list
 import { S1_OBJECT_LIST, s1ObjectHex, s1ObjectName } from '../../core/project/profiles/s1-objects';
 import { resolveObjectArt } from '../../core/project/profiles/s1-object-art';
 import { useClassicLevelStore } from '../state/classicLevelStore';
+import { useEditorStore } from '../state/editorStore';
+import { armedPlacementId } from '../state/classic-placement';
 import { useClassicProjectStore } from '../state/classicProjectStore';
 import { useClassicObjectArtStore } from '../state/classicObjectArtStore';
 import { classicSurfaceProps } from '../components/classic/classic-surface';
@@ -32,20 +34,22 @@ export function classicObjectRows(zone: string): ObjectRow[] {
   }));
 }
 
-/** Arm/disarm the given row for placement. Toggling off leaves the tool alone —
- *  only arming implies the object tool is what you want next. */
+/**
+ * Arm/disarm the given row for placement.
+ *
+ * Arming picks the `place-object` tool; disarming drops back to `select`, which
+ * is where the place-then-disarm and Esc paths also land. That second half is
+ * not optional bookkeeping: leaving the tool on `place-object` with nothing
+ * armed would give the user a map that silently ignores clicks.
+ */
 function armObject(key: string | null): void {
   const st = useClassicLevelStore.getState();
-  if (key === null) {
-    st.setArmedObjectId(null);
-    return;
-  }
+  const editor = useEditorStore.getState();
+  const disarm = (): void => { st.setArmedObjectId(null); editor.setTool('select'); };
+  if (key === null) return disarm();
   const id = Number(key);
-  if (st.armedObjectId === id) {
-    st.setArmedObjectId(null);
-    return;
-  }
-  st.setTool('object');
+  if (armedPlacementId(editor.tool, st.armedObjectId) === id) return disarm();
+  editor.setTool('place-object');
   st.setArmedObjectId(id);
 }
 
@@ -60,6 +64,10 @@ export function useClassicObjectListPort(): ObjectListPort {
   const paletteEpoch = useClassicLevelStore((s) => s.paletteEpoch);
   const tileEpoch = useClassicLevelStore((s) => s.tileEpoch);
   const armedObjectId = useClassicLevelStore((s) => s.armedObjectId);
+  const tool = useEditorStore((s) => s.tool);
+  // Gate the highlight on the tool: switching away from place-object disarms,
+  // so the row must stop reading as armed at the same moment the map does.
+  const armedId = armedPlacementId(tool, armedObjectId);
   const dir = useClassicProjectStore((s) => s.dir);
   // Object art republishes asynchronously (the shared cache warms up after the
   // act loads), and the rows' thumbnails are drawn from it — so its version is
@@ -85,7 +93,7 @@ export function useClassicObjectListPort(): ObjectListPort {
   return React.useMemo(
     (): ObjectListPort => ({
       rows,
-      selectedKey: armedObjectId === null ? null : String(armedObjectId),
+      selectedKey: armedId === null ? null : String(armedId),
       select: armObject,
       Thumb,
       secondaryAction: SECONDARY_ACTION,
@@ -93,6 +101,6 @@ export function useClassicObjectListPort(): ObjectListPort {
       emptyMessage: 'No objects',
       versionKey: `${zone}:${paletteEpoch}:${tileEpoch}:${artVersion}`,
     }),
-    [rows, armedObjectId, Thumb, rootProps, zone, paletteEpoch, tileEpoch, artVersion],
+    [rows, armedId, Thumb, rootProps, zone, paletteEpoch, tileEpoch, artVersion],
   );
 }

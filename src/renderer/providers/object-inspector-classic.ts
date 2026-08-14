@@ -23,6 +23,8 @@ import {
 import { S1_OBJECT_LIST, s1ObjectHex, s1ObjectName } from '../../core/project/profiles/s1-objects';
 import { resolveObjectArt } from '../../core/project/profiles/s1-object-art';
 import { useClassicLevelStore, classicSetObjects } from '../state/classicLevelStore';
+import { useEditorStore } from '../state/editorStore';
+import { armedPlacementId } from '../state/classic-placement';
 import { useClassicProjectStore } from '../state/classicProjectStore';
 import { useClassicObjectArtStore } from '../state/classicObjectArtStore';
 import { classicSurfaceProps } from '../components/classic/classic-surface';
@@ -122,6 +124,10 @@ export function useClassicObjectInspectorPort(): ObjectInspectorPort {
   const paletteEpoch = useClassicLevelStore((s) => s.paletteEpoch);
   const tileEpoch = useClassicLevelStore((s) => s.tileEpoch);
   const armedObjectId = useClassicLevelStore((s) => s.armedObjectId);
+  const tool = useEditorStore((s) => s.tool);
+  // Gated on the tool, so switching away from place-object stops the panel
+  // announcing a placement the map would no longer make (classic-placement.ts).
+  const armedId = armedPlacementId(tool, armedObjectId);
   const setSelectedObjectIndex = useClassicLevelStore((s) => s.setSelectedObjectIndex);
   const dir = useClassicProjectStore((s) => s.dir);
   const artVersion = useClassicObjectArtStore((s) => s.version);
@@ -131,7 +137,7 @@ export function useClassicObjectInspectorPort(): ObjectInspectorPort {
   // about to drop an object, the panel says so rather than showing a form for
   // whatever was selected before (selecting and arming are independent state, so
   // both can be set at once).
-  const obj = armedObjectId == null && doc && idx != null && idx < doc.objects.length
+  const obj = armedId == null && doc && idx != null && idx < doc.objects.length
     ? doc.objects[idx]
     : null;
   const schema = React.useMemo(() => classicObjectSchema(obj?.id ?? 0), [obj?.id]);
@@ -188,15 +194,15 @@ export function useClassicObjectInspectorPort(): ObjectInspectorPort {
     schema,
     commit,
     title: obj && idx != null ? `Object #${idx} · ${s1ObjectHex(obj.id)}` : '',
-    emptyHint: armedObjectId != null
-      ? `Placing ${s1ObjectName(armedObjectId)} — click the map to drop it, or press Esc to cancel.`
-      : 'No object selected. Use the Object tool and click a marker.',
+    emptyHint: armedId != null
+      ? `Placing ${s1ObjectName(armedId)} — click the map to drop it, or press Esc to cancel.`
+      : 'No object selected. Pick the Select tool and click a marker.',
     versionKey: `${zone}:${paletteEpoch}:${tileEpoch}:${artVersion}`,
     Preview,
     onDeselect: obj ? (): void => setSelectedObjectIndex(null) : undefined,
     action,
     rootProps,
-  }), [obj, idx, schema, commit, armedObjectId, zone, paletteEpoch, tileEpoch, artVersion, Preview, setSelectedObjectIndex, action, rootProps]);
+  }), [obj, idx, schema, commit, armedId, zone, paletteEpoch, tileEpoch, artVersion, Preview, setSelectedObjectIndex, action, rootProps]);
 }
 
 /** Index plus the id it pointed at — enough to notice the list shifted under a

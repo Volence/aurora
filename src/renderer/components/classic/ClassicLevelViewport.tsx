@@ -1,6 +1,10 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { T, Chip, OptionBar, Divider } from '../ui';
 import { useClassicLevelStore, classicSetLayoutCells, classicSetObjects, classicSetStart } from '../../state/classicLevelStore';
+import { useEditorStore } from '../../state/editorStore';
+import { armedPlacementId } from '../../state/classic-placement';
+import { toolsForFacet } from '../../workspace/facet-tools';
+import { TOOL_LABELS, TOOL_HINTS } from '../../workspace/tool-meta';
 import { useClassicProjectStore } from '../../state/classicProjectStore';
 import { useClassicObjectArtStore, refreshClassicObjectSprites, spriteFor } from '../../state/classicObjectArtStore';
 import { useToastStore } from '../../state/toastStore';
@@ -114,11 +118,12 @@ export default function ClassicLevelViewport() {
   // sprites do not, so they read the narrower signals.
   const paletteEpoch = useClassicLevelStore((s) => s.paletteEpoch);
   const tileEpoch = useClassicLevelStore((s) => s.tileEpoch);
-  // Task 13 layout-editing UI state (pan|stamp + the stamp/eyedrop chunk id).
-  const tool = useClassicLevelStore((s) => s.tool);
+  // The tool is engine-neutral now (spec §3.6): classic's pan/stamp/object are
+  // view / stamp-chunk / (select | place-object) in the one vocabulary.
+  const tool = useEditorStore((s) => s.tool);
+  const setTool = useEditorStore((s) => s.setTool);
   const selectedChunkId = useClassicLevelStore((s) => s.selectedChunkId);
   const stampLoop = useClassicLevelStore((s) => s.stampLoop);
-  const setTool = useClassicLevelStore((s) => s.setTool);
   const setSelectedChunkId = useClassicLevelStore((s) => s.setSelectedChunkId);
   const setStampLoop = useClassicLevelStore((s) => s.setStampLoop);
   // Task 14 object-tool UI state (selection index + armed place-mode id).
@@ -126,6 +131,13 @@ export default function ClassicLevelViewport() {
   const armedObjectId = useClassicLevelStore((s) => s.armedObjectId);
   const setSelectedObjectIndex = useClassicLevelStore((s) => s.setSelectedObjectIndex);
   const setArmedObjectId = useClassicLevelStore((s) => s.setArmedObjectId);
+  // The armed id, gated on the place-object tool — switching tools disarms
+  // without any call site having to clear it (classic-placement.ts).
+  const armedId = armedPlacementId(tool, armedObjectId);
+  // The chips this profile's layout facet offers, declared by the s1 manifest
+  // rather than hardcoded here, so the shared dock in the workspace re-home is a
+  // drop-in replacement for the row below.
+  const layoutTools = toolsForFacet('layout');
   // Task B1 object sprites: real art keyed by object id. The published map +
   // version are read by the render pass; `version` bumps on every republish (a
   // sprite finished loading), which re-runs the depless render effect below.
@@ -391,7 +403,7 @@ export default function ClassicLevelViewport() {
     // so it can't desync from the actual paint/place target. Never drawn mid-
     // gesture (the refs are only written when none is active) or off-canvas
     // (cleared on mouse-leave).
-    if (tool === 'stamp') {
+    if (tool === 'stamp-chunk') {
       const hc = hoverCellRef.current;
       if (hc) {
         const hx = hc.col * CHUNK_PX;
@@ -409,14 +421,14 @@ export default function ClassicLevelViewport() {
         ctx.strokeRect(hx, hy, CHUNK_PX, CHUNK_PX);
         ctx.restore();
       }
-    } else if (tool === 'object' && plane === 'fg' && armedObjectId != null) {
+    } else if (armedId != null && plane === 'fg') {
       const hw = hoverWorldRef.current;
       if (hw) {
         // Same shape + clamp constants as the click-to-place object in
         // onMouseDown, so the ghost lands exactly where that click would.
         const ghostObj = {
           x: clampInt(hw.x, OBJ_X_MAX), y: clampInt(hw.y, OBJ_Y_MAX),
-          xflip: false, yflip: false, respawn: false, id: armedObjectId, subtype: 0,
+          xflip: false, yflip: false, respawn: false, id: armedId, subtype: 0,
         };
         ctx.save();
         ctx.globalAlpha = 0.6;
@@ -551,7 +563,7 @@ export default function ClassicLevelViewport() {
       return;
     }
     if (e.button !== 0) return; // left drags tools; right-click eyedrops (below)
-    if (tool === 'stamp') {
+    if (tool === 'stamp-chunk') {
       const grid = activeGrid();
       const cell = cellUnderCursor(e);
       if (!grid || !cell) return;
@@ -561,13 +573,14 @@ export default function ClassicLevelViewport() {
       redraw();
       return;
     }
-    // Object tool — only on the FG plane (objects are an FG concept). On BG it
-    // falls through to pan so navigation still works.
-    if (tool === 'object' && plane === 'fg') {
+    // The object tools — only on the FG plane (objects are an FG concept). On BG
+    // both fall through to pan so navigation still works. `place-object` drops a
+    // new one; `select` picks / moves / (via the Delete key) removes.
+    if (plane === 'fg' && (tool === 'place-object' || tool === 'select')) {
       const world = worldUnderCursor(e);
       const d = useClassicLevelStore.getState().doc;
       if (!world || !d) return;
-      const armed = useClassicLevelStore.getState().armedObjectId;
+      const armed = armedPlacementId(tool, useClassicLevelStore.getState().armedObjectId);
       if (armed != null) {
         // Place a new object of the armed id at the click, default subtype 0, no
         // flips, respawn off. One classicSetObjects command; then select it and
@@ -581,11 +594,18 @@ export default function ClassicLevelViewport() {
         ];
         const res = classicSetObjects(next);
         if (!res.ok) { useToastStore.getState().addToast(`Place failed: ${res.error}`, 'error'); return; }
+        // Disarm and fall back to select — the click-to-place idiom, which used
+        // to be "clear the armed id and let the dual-purpose object tool mean
+        // select again" and is now literally that tool switch.
         setArmedObjectId(null);
+        setTool('select');
         setSelectedObjectIndex(next.length - 1);
         redraw();
         return;
       }
+      // Armed but with nothing to drop (place-object with no id) does nothing
+      // rather than falling through to a pan the user did not ask for.
+      if (tool === 'place-object') return;
       // Hit-test with frame bounds where a sprite is loaded (else a constant
       // on-screen anchor tolerance, world radius = px / zoom). The bounds resolver
       // reads the live sprite map; a ring group ($25) is expanded per-ring inside
@@ -631,7 +651,7 @@ export default function ClassicLevelViewport() {
     }
     dragging.current = true;
     lastMouse.current = { x: e.clientX, y: e.clientY };
-  }, [tool, plane, overlays.start, activeGrid, cellUnderCursor, worldUnderCursor, redraw, setArmedObjectId, setSelectedObjectIndex]);
+  }, [tool, plane, overlays.start, activeGrid, cellUnderCursor, worldUnderCursor, redraw, setArmedObjectId, setSelectedObjectIndex, setTool]);
 
   const onMouseMove = useCallback((e: React.MouseEvent) => {
     // Hover ghost tracking — BEFORE the drag/stroke dispatch below, and gated on
@@ -641,7 +661,7 @@ export default function ClassicLevelViewport() {
     // click handlers use, so the ghost can't desync from where a click would
     // actually paint/place.
     if (!dragging.current && !startDragRef.current && !objDragRef.current && !strokeRef.current) {
-      if (tool === 'stamp') {
+      if (tool === 'stamp-chunk') {
         const grid = activeGrid();
         const cell = cellUnderCursor(e);
         const inBounds =
@@ -653,7 +673,7 @@ export default function ClassicLevelViewport() {
           hoverCellRef.current = inBounds;
           redraw();
         }
-      } else if (tool === 'object' && plane === 'fg' && armedObjectId != null) {
+      } else if (armedId != null && plane === 'fg') {
         const world = worldUnderCursor(e);
         const prev = hoverWorldRef.current;
         if (world?.x !== prev?.x || world?.y !== prev?.y) {
@@ -710,7 +730,7 @@ export default function ClassicLevelViewport() {
     cam.x = Math.max(0, cam.x - d.x);
     cam.y = Math.max(0, cam.y - d.y);
     redraw();
-  }, [tool, plane, armedObjectId, activeGrid, cellUnderCursor, worldUnderCursor, redraw]);
+  }, [tool, plane, armedId, activeGrid, cellUnderCursor, worldUnderCursor, redraw]);
 
   // Commit an object-move gesture as ONE classicSetObjects (or none, when the
   // gesture was a click without movement, or the net position is unchanged).
@@ -818,7 +838,16 @@ export default function ClassicLevelViewport() {
         if (objDragRef.current) { objDragRef.current = null; redraw(); return; }
         if (startDragRef.current) { startDragRef.current = null; redraw(); return; }
         const s = useClassicLevelStore.getState();
-        if (s.armedObjectId != null) { s.setArmedObjectId(null); redraw(); return; }
+        const editor = useEditorStore.getState();
+        // Cancelling a pending placement drops back to select, the same landing
+        // the place-then-disarm path takes — Esc must not leave the tool armed
+        // with nothing to place.
+        if (armedPlacementId(editor.tool, s.armedObjectId) != null) {
+          s.setArmedObjectId(null);
+          editor.setTool('select');
+          redraw();
+          return;
+        }
         if (s.selectedObjectIndex != null) { s.setSelectedObjectIndex(null); redraw(); return; }
         return;
       }
@@ -866,9 +895,11 @@ export default function ClassicLevelViewport() {
     >
       <OptionBar>
         <span style={{ color: T.textLo }}>Tool</span>
-        <Chip active={tool === 'pan'} onClick={() => setTool('pan')} title="Pan / navigate (drag to pan)">Pan</Chip>
-        <Chip active={tool === 'stamp'} onClick={() => setTool('stamp')} title="Paint the selected chunk onto layout cells (drag)">Stamp</Chip>
-        <Chip active={tool === 'object'} onClick={() => setTool('object')} title="Select / move / place / delete objects (FG plane)">Object</Chip>
+        {layoutTools.map((t) => (
+          <Chip key={t} active={tool === t} onClick={() => setTool(t)} title={TOOL_HINTS[t]}>
+            {TOOL_LABELS[t]}
+          </Chip>
+        ))}
         <Divider />
         <span style={{ color: T.textLo }}>Plane</span>
         <Chip active={plane === 'fg'} onClick={() => setPlane('fg')}>FG</Chip>
@@ -881,15 +912,17 @@ export default function ClassicLevelViewport() {
         <Chip active={overlays.start} onClick={() => toggle('start')}>Start</Chip>
         <span style={{ flex: 1 }} />
         <span style={{ color: T.textFaint }}>
-          {tool === 'stamp'
+          {tool === 'stamp-chunk'
             ? `stamp $${selectedChunkId.toString(16).toUpperCase().padStart(2, '0')}${stampLoop && selectedChunkId >= 1 && selectedChunkId <= 0x7f ? ' ∞loop' : ''} · drag to paint · right-click eyedrops · scroll to zoom`
-            : tool === 'object'
-              ? (armedObjectId != null
-                  ? `click to place ${s1ObjectName(armedObjectId)} · Esc cancels`
-                  : (plane === 'fg'
+            : armedId != null
+              ? `click to place ${s1ObjectName(armedId)} · Esc cancels`
+              : tool === 'place-object'
+                ? 'no object armed — pick one from the Objects panel · Esc cancels'
+                : tool === 'select'
+                  ? (plane === 'fg'
                       ? 'click selects · drag moves · drag START to move spawn · Del removes · arm to place'
-                      : 'objects are FG-only — switch to FG to edit · drag to pan'))
-              : 'drag to pan · right-click eyedrops · scroll to zoom'}
+                      : 'objects are FG-only — switch to FG to edit · drag to pan')
+                  : 'drag to pan · right-click eyedrops · scroll to zoom'}
         </span>
       </OptionBar>
       <div
@@ -907,8 +940,9 @@ export default function ClassicLevelViewport() {
             onWheel={onWheel}
             style={{
               position: 'absolute', inset: 0,
-              cursor: tool === 'stamp' ? 'crosshair'
-                : tool === 'object' ? (armedObjectId != null ? 'copy' : 'default')
+              cursor: tool === 'stamp-chunk' ? 'crosshair'
+                : armedId != null ? 'copy'
+                : tool === 'select' || tool === 'place-object' ? 'default'
                 : 'grab',
             }}
           />
