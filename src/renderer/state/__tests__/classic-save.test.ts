@@ -166,7 +166,7 @@ function handleWith(
       sprites: true,
       objects: 'objpos',
       build: false,
-      facets: ['layout', 'art', 'objects', 'collision', 'palette'],
+      facets: ['layout', 'art', 'objects', 'palette'],
     },
     report: { entries: [], resolved: 0, total: 0 },
     levels: {

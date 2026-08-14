@@ -347,7 +347,13 @@ export const s1Adapter: ProjectAdapter = {
         sprites: true,
         objects: 'objpos',
         build: false,
-        facets: ['layout', 'art', 'objects', 'collision', 'palette'],
+        // Classic has no collision-editing UI: classicSetColind's only caller is
+        // the agent handler, and classic's sole collision affordance is a
+        // read-only overlay. Granting the facet would put a Collision pill over
+        // an aeon-only CollisionPalette (spec §3.0.3). Owner decision 2026-08-13:
+        // drop the grant now, restore this entry when the classic collision
+        // editor lands as its own designed feature.
+        facets: ['layout', 'art', 'objects', 'palette'],
         // Classic's three rungs are all id-addressed: a layout cell HOLDS a
         // chunk id and a chunk cell HOLDS a block id, so an edit at any tier
         // propagates to every placement (spec §3.0.2).

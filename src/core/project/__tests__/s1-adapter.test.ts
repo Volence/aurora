@@ -87,7 +87,7 @@ describe('s1Adapter.open resolution', () => {
       sprites: true,
       objects: 'objpos',
       build: false,
-      facets: ['layout', 'art', 'objects', 'collision', 'palette'],
+      facets: ['layout', 'art', 'objects', 'palette'],
       artTiers: [
         { id: 'chunk', label: 'Chunk', pixelSize: 256, shared: true },
         { id: 'block', label: 'Block', pixelSize: 16, shared: true },

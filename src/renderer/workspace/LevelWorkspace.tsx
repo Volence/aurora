@@ -44,9 +44,9 @@ export default function LevelWorkspace() {
   const mod = moduleFor(engine, facetId);
 
   // The FG/BG chips write editorStore.setEditingLayer, so they must not be live
-  // over a facet that has no editor — `collision` is the likely case (s1 grants
-  // it with nothing built), and chips that mutate an aeon store from a classic
-  // screen with no canvas are exactly the dead chrome this branch is removing.
+  // over a facet that has no editor — any facet an engine grants but does not
+  // serve — and chips that mutate an aeon store from a classic screen with no
+  // canvas are exactly the dead chrome this branch is removing.
   const showPlane = mod != null && (facetId === 'layout' || facetId === 'collision');
   const header = (
     <div style={styles.header}>

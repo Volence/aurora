@@ -19,9 +19,11 @@ describe('facets', () => {
   });
 
   it('facetsFor returns only capability-granted facets, in order', () => {
-    // S1 profile: no rings facet (S1 rings are objects — spec §4)
-    const s1 = facetsFor(['layout', 'art', 'objects', 'collision', 'palette']);
-    expect(s1.map((f) => f.id)).toEqual(['layout', 'art', 'objects', 'collision', 'palette']);
+    // S1 profile: no rings facet (S1 rings are objects — spec §4) and no
+    // collision facet (classic has no collision editor — see the grant's
+    // comment in core/project/s1/index.ts).
+    const s1 = facetsFor(['layout', 'art', 'objects', 'palette']);
+    expect(s1.map((f) => f.id)).toEqual(['layout', 'art', 'objects', 'palette']);
   });
 
   it('facetsFor includes rings for an aeon-style capability list', () => {
@@ -40,7 +42,7 @@ describe('facets', () => {
   });
 
   it('S1 capability list yields no rings facet; aeon yields rings', () => {
-    const s1Facets = facetsFor(['layout', 'art', 'objects', 'collision', 'palette']);
+    const s1Facets = facetsFor(['layout', 'art', 'objects', 'palette']);
     const aeonFacets = facetsFor(['layout', 'art', 'objects', 'rings', 'collision', 'palette']);
     expect(s1Facets.some((f) => f.id === 'rings')).toBe(false);
     expect(aeonFacets.some((f) => f.id === 'rings')).toBe(true);

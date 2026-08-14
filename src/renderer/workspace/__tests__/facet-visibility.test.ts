@@ -34,9 +34,11 @@ describe('facet visibility (registered descriptors ∩ granted ∩ has module fo
   it('a facet granted but module-less FOR THIS ENGINE gets no pill', () => {
     registerBuiltinFacets();
     registerFacetModule(['aeon'], { id: 'layout', Canvas: () => null });
-    // s1's profile grants `collision` with no collision editor built. The filter
-    // is engine-keyed, so classic shows neither that nor aeon's layout pill —
-    // an engine-blind `facetModules.get(f.id)` would have shown both.
+    // The stand-in for any facet an engine grants but does not serve. The filter
+    // is engine-keyed, so classic shows neither `collision` nor aeon's layout
+    // pill — an engine-blind `facetModules.get(f.id)` would have shown both.
+    // (s1's own grant no longer names collision; this asserts the MECHANISM,
+    // which is what has to keep working for the next unserved grant.)
     expect(facetsFor(['layout', 'collision']).filter((f) => moduleFor('s1', f.id))).toEqual([]);
     expect(facetsFor(['layout', 'collision']).filter((f) => moduleFor('aeon', f.id)).map((f) => f.id))
       .toEqual(['layout']);
@@ -46,12 +48,12 @@ describe('facet visibility (registered descriptors ∩ granted ∩ has module fo
 // The grants the two profiles actually declare, kept as literals so a profile
 // edit has to come through here (same style as the adapter tests).
 const AEON_GRANT = ['layout', 'art', 'objects', 'rings', 'collision', 'palette']; // core/project/aeon/index.ts
-// NOTE: s1 grants `collision` even though classic has no collision editor yet
-// (classicSetColind has no component callers). That mismatch is a known OPEN
-// product decision — spec §3.0.3 — and is deliberately NOT resolved here:
-// classic still renders through LegacyWorkspace, so nothing user-visible reads
-// this grant. Asserted as-is.
-const S1_GRANT = ['layout', 'art', 'objects', 'collision', 'palette']; // core/project/s1/index.ts
+// NOTE: `collision` is NOT in this list. s1 used to grant it with nothing built
+// behind it (classicSetColind has no component callers); the pill would have
+// opened an aeon-only CollisionPalette. Owner decision 2026-08-13 dropped the
+// grant — see the comment on the grant itself in core/project/s1/index.ts — to
+// be restored when a classic collision editor exists.
+const S1_GRANT = ['layout', 'art', 'objects', 'palette']; // core/project/s1/index.ts
 
 function resetProjectStores() {
   useClassicProjectStore.setState({ status: 'closed', capabilities: null } as never);
