@@ -10,6 +10,9 @@ import {
   stampAccumToCells,
   hitTestObjectFrames,
   hitTestPoint,
+  fitCamera,
+  FIT_ZOOM_MIN,
+  FIT_ZOOM_MAX,
   type ObjectHitBounds,
   type StampCell,
 } from '../viewport-math';
@@ -351,5 +354,63 @@ describe('hitTestObjectFrames', () => {
     const flipped = [obj(100, 100, 1, 0, true, false)];
     expect(hitTestObjectFrames(flipped, 130, 100, bounds, 4)).toBeNull();
     expect(hitTestObjectFrames(flipped, 70, 100, bounds, 4)).toBe(0);
+  });
+});
+
+describe('fitCamera', () => {
+  // Green Hill Act 1 at 900px of canvas: the FG plane is 16 chunks tall, the BG
+  // plane 4 — the exact shape that made a plane toggle jump 58% -> 200%.
+  const CANVAS = 900;
+  const FG_H = 16 * CHUNK_PX;
+  const BG_H = 4 * CHUNK_PX;
+
+  it('an act load fits the plane to the canvas, anchored top-left', () => {
+    expect(fitCamera(CANVAS, FG_H, null)).toEqual({ x: 0, y: 0, zoom: CANVAS / FG_H });
+  });
+
+  it('clamps the act-load fit to the zoom bounds', () => {
+    // The BG plane through the OLD code path: canvasH/planeH is well past the
+    // ceiling, so the clamp handed back 2x — which is where the 200% came from.
+    expect(fitCamera(CANVAS, BG_H, null).zoom).toBeLessThan(FIT_ZOOM_MAX);
+    expect(fitCamera(CANVAS, 10, null).zoom).toBe(FIT_ZOOM_MAX);
+    expect(fitCamera(CANVAS, 1e9, null).zoom).toBe(FIT_ZOOM_MIN);
+    // A degenerate plane must not produce Infinity/NaN.
+    expect(fitCamera(CANVAS, 0, null).zoom).toBe(1);
+  });
+
+  it('a plane switch NEVER changes the zoom — the 58% -> 200% bug', () => {
+    for (const planeH of [BG_H, FG_H, CHUNK_PX, 32 * CHUNK_PX]) {
+      for (const zoom of [FIT_ZOOM_MIN, 0.3, 0.58, 1, FIT_ZOOM_MAX, 8]) {
+        expect(fitCamera(CANVAS, planeH, { x: 0, y: 0, zoom }).zoom, `${planeH}@${zoom}`)
+          .toBe(zoom);
+      }
+    }
+  });
+
+  it('a plane switch keeps the pan, so the planes can be compared in place', () => {
+    // Zoomed in on the FG, mid-plane: everything survives untouched.
+    const before = { x: 300, y: 120, zoom: 1 };
+    expect(fitCamera(CANVAS, FG_H, before)).toEqual(before);
+  });
+
+  it('pans back into bounds when the new plane is too short to hold the camera', () => {
+    // Near the bottom of the tall FG, then switching to the short BG: keeping y
+    // would leave the camera below the plane entirely, looking at void.
+    const before = { x: 40, y: FG_H - 200, zoom: 1 };
+    const after = fitCamera(CANVAS, BG_H, before);
+    expect(after.y).toBe(BG_H - CANVAS);
+    expect(after.y).toBeLessThan(before.y);
+    expect(after.x).toBe(40);
+    expect(after.zoom).toBe(1);
+  });
+
+  it('never pans to a negative y for a plane shorter than the visible height', () => {
+    expect(fitCamera(CANVAS, CHUNK_PX, { x: 0, y: 5000, zoom: 1 }).y).toBe(0);
+  });
+
+  it('the bound is in WORLD units — zoom changes how much plane is visible', () => {
+    // canvasH/zoom, not canvasH: at 2x only half the canvas height of world is
+    // on screen, so more of a short plane is legitimately scrollable.
+    expect(fitCamera(CANVAS, BG_H, { x: 0, y: 9999, zoom: 2 }).y).toBe(BG_H - CANVAS / 2);
   });
 });

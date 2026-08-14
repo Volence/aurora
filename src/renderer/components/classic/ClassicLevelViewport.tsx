@@ -1,21 +1,24 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { T, Chip, OptionBar, Divider } from '../ui';
+import { T } from '../ui';
 import { useClassicLevelStore, classicSetLayoutCells, classicSetObjects, classicSetStart } from '../../state/classicLevelStore';
 import { useEditorStore } from '../../state/editorStore';
 import { useViewStore } from '../../state/viewStore';
 import { useWorkspaceStore } from '../../workspace/workspaceStore';
 import { levelDocId } from '../../shell/tabs';
-import { armedPlacementId } from '../../state/classic-placement';
-import { toolsForFacet } from '../../workspace/facet-tools';
-import { TOOL_LABELS, TOOL_HINTS } from '../../workspace/tool-meta';
+import { armedPlacementId, PLACEMENT_SUBTYPE } from '../../state/classic-placement';
 import { useClassicProjectStore } from '../../state/classicProjectStore';
-import { useClassicObjectArtStore, refreshClassicObjectSprites, spriteFor } from '../../state/classicObjectArtStore';
+import {
+  useClassicObjectArtStore, refreshClassicObjectSprites, spriteFor, loadObjectSprite,
+  type ObjectSprite,
+} from '../../state/classicObjectArtStore';
+import { objectArtKey } from '../../../core/project/profiles/object-subtype-rules';
+import { objectSpriteEpoch } from '../../../core/level-classic/object-sprite-clock';
 import { useToastStore } from '../../state/toastStore';
 import { renderChunk } from '../../../core/level-classic/render';
 import type { LevelDoc } from '../../../core/level-classic/model';
-import { s1ObjectName, s1ObjectIsInvisible } from '../../../core/project/profiles/s1-objects';
+import { s1ObjectIsInvisible } from '../../../core/project/profiles/s1-objects';
 import {
-  CHUNK_PX, visibleChunkRange, layoutCellAt, screenToWorld, clampInt,
+  CHUNK_PX, visibleChunkRange, layoutCellAt, screenToWorld, clampInt, fitCamera,
   worldToLayoutCell, addStampCell, stampAccumToCells, hitTestObjectFrames, hitTestPoint,
   type ObjectHitBounds, type StampCell,
 } from './viewport-math';
@@ -89,7 +92,13 @@ function drawLoopGlyph(ctx: CanvasRenderingContext2D, x0: number, y0: number, in
  * Read-only classic (Sonic 1) level viewport (Task 11). Composes the FG/BG chunk
  * layout from `renderChunk` prerenders (cached per chunk id — read-only, so the
  * cache is only invalidated when the whole doc changes), with a pan/zoom camera
- * and toggleable collision / object / start overlays.
+ * and the collision / object / start overlays the shared View menu toggles.
+ *
+ * JUST THE CANVAS. It renders no chrome of its own: the tool buttons, the FG/BG
+ * plane control and the overlay toggles it used to stack above the canvas are
+ * the shared shell's (tool dock + workspace header), reading the same stores it
+ * reads. The contextual hint line that was genuinely classic's own lives in
+ * ClassicMapToolOptions, mounted in the facet's toolOptions slot.
  *
  * CAMERA MATH matches the map viewport's (src/renderer/state/viewStore.ts):
  * `cam.x/cam.y` is the world coordinate at the canvas top-left, `zoom` scales
@@ -123,7 +132,11 @@ export default function ClassicLevelViewport() {
   const tool = useEditorStore((s) => s.tool);
   const setTool = useEditorStore((s) => s.setTool);
   const selectedChunkId = useClassicLevelStore((s) => s.selectedChunkId);
-  const stampLoop = useClassicLevelStore((s) => s.stampLoop);
+  // No `stampLoop` subscription: nothing this component DRAWS depends on it (the
+  // loop badge comes from the layout byte, the hover ghost from the chunk art),
+  // and the commit path reads it through getState at stamp time. The hint line
+  // that used to render it moved out (ClassicMapToolOptions), so subscribing
+  // here would only re-render the canvas host for a toggle it cannot show.
   const setSelectedChunkId = useClassicLevelStore((s) => s.setSelectedChunkId);
   const setStampLoop = useClassicLevelStore((s) => s.setStampLoop);
   // Task 14 object-tool UI state (selection index + armed place-mode id).
@@ -134,10 +147,6 @@ export default function ClassicLevelViewport() {
   // The armed id, gated on the place-object tool — switching tools disarms
   // without any call site having to clear it (classic-placement.ts).
   const armedId = armedPlacementId(tool, armedObjectId);
-  // The chips this profile's layout facet offers, declared by the s1 manifest
-  // rather than hardcoded here, so the shared dock in the workspace re-home is a
-  // drop-in replacement for the row below.
-  const layoutTools = toolsForFacet('layout');
   // Task B1 object sprites: real art keyed by object id. The published map +
   // version are read by the render pass; `version` bumps on every republish (a
   // sprite finished loading), which re-runs the depless render effect below.
@@ -212,10 +221,14 @@ export default function ClassicLevelViewport() {
   // unreachable from outside the component is exactly what stopped a shared
   // plane control and shared overlay toggles from serving both engines. The
   // plane IS aeon's editingLayer — same 'fg' | 'bg' union, same meaning.
+  //
+  // READ-ONLY here now. The writers are the workspace header's FG/BG chips and
+  // its View menu; this component only reacts to them. Note that object editing
+  // below is gated on `plane === 'fg'`, which is why the header offers the plane
+  // control on the OBJECTS facet as well as layout (LevelWorkspace's showPlane)
+  // — without it, place-object on BG would silently pan.
   const plane = useEditorStore((s) => s.editingLayer);
-  const setPlane = useEditorStore((s) => s.setEditingLayer);
   const overlays = useViewStore((s) => s.overlays);
-  const toggle = useViewStore((s) => s.toggleOverlay);
 
   // Per-chunk prerender cache (chunkId → {offscreen canvas, version key}). A cached
   // canvas is reused while its content version is unchanged; edits bump the version
@@ -319,8 +332,20 @@ export default function ClassicLevelViewport() {
   //
   // The refresh stays idempotent (cached per id:zone:variant:epoch), so a bump
   // that changes no sprite's own epoch now resolves entirely from cache.
-  const objectIdSig = doc
-    ? [...new Set(doc.objects.map((o) => o.id))].sort((a, b) => a - b).join(',')
+  //
+  // THE SIGNATURE IS THE SET OF PUBLISH KEYS, NOT OF IDS. `refreshClassicObjectSprites`
+  // publishes one sprite per `objectArtKey(id, zone, subtype)` — per SUBTYPE for a
+  // subtype-rule object — so a distinct-id signature could not see a placement
+  // that introduced a NEW SUBTYPE of an id the act already had. Measured on GHZ1:
+  // placing a Spring ($41, a rule object present at other subtypes) left it drawn
+  // as the red fallback box, because the id set had not changed and nothing
+  // republished. It corrected itself only on the next unrelated palette or tile
+  // edit, which reads as "sometimes the art loads".
+  //
+  // Still one entry per DISTINCT key, so 40 identical rings are one signature
+  // entry and this re-runs exactly when a sprite the map lacks becomes needed.
+  const objectIdSig = doc && ref
+    ? [...new Set(doc.objects.map((o) => objectArtKey(o.id, ref.zone, o.subtype)))].sort().join(',')
     : '';
   useEffect(() => {
     const d = useClassicLevelStore.getState().doc;
@@ -329,6 +354,43 @@ export default function ClassicLevelViewport() {
     void refreshClassicObjectSprites(projectDir, d, r.zone, { palette: paletteEpoch, tile: tileEpoch });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [objectIdSig, paletteEpoch, tileEpoch, projectDir, ref]);
+
+  // THE ARMED OBJECT'S SPRITE, warmed for the placement ghost.
+  //
+  // The refresh above publishes exactly the (id, zone, subtype) keys PRESENT IN
+  // THE ACT. That is right for drawing the act and wrong for drawing something
+  // that is not in it yet: an armed id the level does not already contain — or
+  // contains only under other subtypes, since a subtype-rule object keys one
+  // sprite per subtype and a placement always drops PLACEMENT_SUBTYPE — has no
+  // entry at all, so the ghost fell through drawObjects' 16x16 red fallback
+  // marker. Measured on GHZ1: the ghost drew an 11x11 box where the very next
+  // click produced a 34x21 sprite. The art was never missing; nobody had asked
+  // for it.
+  //
+  // Through `loadObjectSprite`, which is the SAME cache the Objects list's row
+  // thumbnails load from (components/classic/ObjectThumb) — so an id that draws
+  // a sprite in the list draws one under the cursor, by construction rather than
+  // by two code paths agreeing. Nothing new is rendered: a hit is a map lookup.
+  //
+  // Keyed, and only replaced on success, so a re-run (any doc commit re-runs
+  // this) never blanks a good ghost for a frame. A bitmap the act refresh's
+  // epoch eviction closed reports width 0 and drawObjects falls back to the
+  // marker for one frame, until this effect's reload lands.
+  const ghostArtKey = armedId != null && ref
+    ? objectArtKey(armedId, ref.zone, PLACEMENT_SUBTYPE)
+    : null;
+  const ghostSpriteRef = useRef<{ key: string; sprites: Map<string, ObjectSprite> } | null>(null);
+  useEffect(() => {
+    if (armedId == null || ghostArtKey == null || !projectDir || !doc || !ref) return;
+    let cancelled = false;
+    const epoch = objectSpriteEpoch(armedId, ref.zone, PLACEMENT_SUBTYPE, { palette: paletteEpoch, tile: tileEpoch });
+    void loadObjectSprite(projectDir, doc, armedId, ref.zone, PLACEMENT_SUBTYPE, epoch).then((sprite) => {
+      if (cancelled || !sprite || sprite.bitmap.width === 0) return;
+      ghostSpriteRef.current = { key: ghostArtKey, sprites: new Map([[ghostArtKey, sprite]]) };
+      redraw();
+    });
+    return () => { cancelled = true; };
+  }, [armedId, ghostArtKey, projectDir, doc, ref, paletteEpoch, tileEpoch, redraw]);
 
   // Fit the level's height into the canvas when an act finishes loading (and on
   // plane switches), anchored top-left. Keyed on load status + act + plane, NOT
@@ -341,8 +403,9 @@ export default function ClassicLevelViewport() {
     // A REMEMBERED viewport beats fit-to-height, but only on an act load — that
     // is the per-tab restore (tab-activation wrote viewStore just before this
     // act started loading, and the adopt-subscription has already applied it).
-    // A plane switch still refits, because FG and BG grids differ in height and
-    // the fit is what keeps the whole plane on screen.
+    // A plane switch does NOT refit: fitCamera preserves the camera and only
+    // zooms out when the new plane is too tall for it (viewport-math.ts, which
+    // carries the reasoning and the guard).
     const tabId = ref ? levelDocId(ref.zone, String(ref.act)) : null;
     const isActLoad = lastFitTabRef.current !== tabId;
     lastFitTabRef.current = tabId;
@@ -350,14 +413,13 @@ export default function ClassicLevelViewport() {
     const grid = plane === 'bg' ? doc.bg : doc.fg;
     const container = containerRef.current;
     const h = container?.clientHeight ?? 600;
-    const levelPxH = grid.height * CHUNK_PX;
-    const zoom = Math.max(0.125, Math.min(2, levelPxH > 0 ? h / levelPxH : 1));
-    camRef.current = { x: 0, y: 0, zoom };
-    // Publish the fit immediately rather than waiting for the first drag, so the
-    // store never sits holding the PREVIOUS act's camera — which anything
-    // reading it between load and first gesture would otherwise believe.
-    syncedRef.current = { x: 0, y: 0, zoom };
-    useViewStore.getState().setViewport(0, 0, zoom);
+    const cam = fitCamera(h, grid.height * CHUNK_PX, isActLoad ? null : camRef.current);
+    camRef.current = { ...cam };
+    // Publish immediately rather than waiting for the first drag, so the store
+    // never sits holding the PREVIOUS act's camera — which anything reading it
+    // between load and first gesture would otherwise believe.
+    syncedRef.current = { ...cam };
+    useViewStore.getState().setViewport(cam.x, cam.y, cam.zoom);
     redraw();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status, ref, plane]);
@@ -482,13 +544,24 @@ export default function ClassicLevelViewport() {
         // onMouseDown, so the ghost lands exactly where that click would.
         const ghostObj = {
           x: clampInt(hw.x, OBJ_X_MAX), y: clampInt(hw.y, OBJ_Y_MAX),
-          xflip: false, yflip: false, respawn: false, id: armedId, subtype: 0,
+          xflip: false, yflip: false, respawn: false, id: armedId, subtype: PLACEMENT_SUBTYPE,
         };
+        // The warmed one-entry map when it is for THIS id, else the act's own
+        // published map — which is what the ghost used to rely on alone, and why
+        // an id absent from the act previewed as a red box.
+        const warm = ghostSpriteRef.current;
+        const ghostSprites = warm && warm.key === ghostArtKey ? warm.sprites : objectSprites;
         ctx.save();
+        // The one thing that says PREVIEW rather than PLACED. Same 0.6 as the
+        // chunk-stamp ghost above, deliberately: they are the same affordance
+        // for the two things this map can place, and aeon has no object ghost of
+        // its own to match (it places straight off the click).
         ctx.globalAlpha = 0.6;
         // Reuse drawObjects' own sprite/fallback draw math via a one-object doc,
         // rather than duplicating the sprite/ghost-marker/hex-box branching here.
-        drawObjects(ctx, { ...doc, objects: [ghostObj] }, invZoom, objectSprites, ref?.zone ?? '', null, null);
+        // The fallback marker is still correct for an id whose art genuinely does
+        // not resolve, and for the invisible/trigger ids that have none.
+        drawObjects(ctx, { ...doc, objects: [ghostObj] }, invZoom, ghostSprites, ref?.zone ?? '', null, null);
         ctx.restore();
       }
     }
@@ -643,7 +716,7 @@ export default function ClassicLevelViewport() {
           ...d.objects,
           {
             x: clampInt(world.x, OBJ_X_MAX), y: clampInt(world.y, OBJ_Y_MAX),
-            xflip: false, yflip: false, respawn: false, id: armed, subtype: 0,
+            xflip: false, yflip: false, respawn: false, id: armed, subtype: PLACEMENT_SUBTYPE,
           },
         ];
         const res = classicSetObjects(next);
@@ -876,7 +949,7 @@ export default function ClassicLevelViewport() {
 
   // Keyboard: Escape cancels an in-progress gesture / clears armed-place /
   // deselects; Delete or Backspace removes the selected object. The Delete key is
-  // guarded against text-entry the same way the undo keys are (ClassicProjectView)
+  // guarded against text-entry the same way the undo keys are (LevelWorkspace)
   // so a hex/number field edit can't be hijacked into a deletion.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -947,38 +1020,14 @@ export default function ClassicLevelViewport() {
       {...classicSurfaceProps('map')}
       style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0 }}
     >
-      <OptionBar>
-        <span style={{ color: T.textLo }}>Tool</span>
-        {layoutTools.map((t) => (
-          <Chip key={t} active={tool === t} onClick={() => setTool(t)} title={TOOL_HINTS[t]}>
-            {TOOL_LABELS[t]}
-          </Chip>
-        ))}
-        <Divider />
-        <span style={{ color: T.textLo }}>Plane</span>
-        <Chip active={plane === 'fg'} onClick={() => setPlane('fg')}>FG</Chip>
-        <Chip active={plane === 'bg'} onClick={() => setPlane('bg')}>BG</Chip>
-        <Divider />
-        <span style={{ color: T.textLo }}>Overlays</span>
-        <Chip active={overlays.showCollision} onClick={() => toggle('showCollision')}>Collision</Chip>
-        <Chip active={overlays.showCollisionAngles} onClick={() => toggle('showCollisionAngles')} disabled={!overlays.showCollision}>Angles</Chip>
-        <Chip active={overlays.showObjects} onClick={() => toggle('showObjects')}>Objects</Chip>
-        <Chip active={overlays.showStart} onClick={() => toggle('showStart')}>Start</Chip>
-        <span style={{ flex: 1 }} />
-        <span style={{ color: T.textFaint }}>
-          {tool === 'stamp-chunk'
-            ? `stamp $${selectedChunkId.toString(16).toUpperCase().padStart(2, '0')}${stampLoop && selectedChunkId >= 1 && selectedChunkId <= 0x7f ? ' ∞loop' : ''} · drag to paint · right-click eyedrops · scroll to zoom`
-            : armedId != null
-              ? `click to place ${s1ObjectName(armedId)} · Esc cancels`
-              : tool === 'place-object'
-                ? 'no object armed — pick one from the Objects panel · Esc cancels'
-                : tool === 'select'
-                  ? (plane === 'fg'
-                      ? 'click selects · drag moves · drag START to move spawn · Del removes · arm to place'
-                      : 'objects are FG-only — switch to FG to edit · drag to pan')
-                  : 'drag to pan · right-click eyedrops · scroll to zoom'}
-        </span>
-      </OptionBar>
+      {/* NO OPTION BAR HERE. The Tool chips, the FG/BG plane group and the
+          overlay toggles that used to sit above the canvas were live copies of
+          controls the shared shell already renders from the same stores — the
+          workspace header (plane + View menu) and the facet tool dock (the same
+          toolsForFacet list). Two copies of one control is two places to fix a
+          bug and two places for the lit state to disagree. The one thing that
+          was NOT a duplicate, the contextual hint line, moved to the facet's
+          toolOptions slot: ClassicMapToolOptions. */}
       <div
         ref={containerRef}
         style={{ flex: 1, position: 'relative', overflow: 'hidden', minHeight: 0, background: T.void }}
@@ -1007,7 +1056,11 @@ export default function ClassicLevelViewport() {
           }}>
             {status === 'loading' && `Loading ${ref?.label ?? 'level'}…`}
             {status === 'error' && <span style={{ whiteSpace: 'pre-line' }}>{error ?? 'Failed to load level'}</span>}
-            {status === 'idle' && 'Select an act from the tree to view it.'}
+            {/* Names the two ways in that still exist. The zone/act TREE this
+                used to point at was the legacy shell's right-dock panel, deleted
+                with it at task 9 — its job is the Explorer's Levels group, which
+                routes through the same openAct (shell/tab-activation.ts). */}
+            {status === 'idle' && 'Open a level from the Explorer, or press Ctrl+K.'}
           </div>
         )}
       </div>

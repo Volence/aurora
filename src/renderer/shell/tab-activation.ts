@@ -338,6 +338,33 @@ export async function activateLevelTarget(
     case 'none':
       return true;
     case 'aeon-switch': {
+      // THE ACT MUST EXIST. This is classicOpenAct's zoneTree lookup, which the
+      // aeon branch never had — so `level:<zone>:<act>` in the tab strip was
+      // taken as authoritative, setCurrentAct wrote an id nothing resolves, and
+      // useActTabSync (shell/session-lifecycle.ts) dutifully opened a tab titled
+      // for it. getCurrentAct then answers null, so the tab hosts an editor with
+      // no act behind it: a level tab that can never load.
+      //
+      // The reachable route is not the debug hook it was found with. A level tab
+      // survives a SAME-DIRECTORY re-open (Home recents / Open Project… on the
+      // project already open) because session-lifecycle's prune is keyed on
+      // config.basePath and early-returns when the key has not changed. Delete or
+      // rename an act in project.json, re-open the project in the live window,
+      // and its stale tab is still in the strip — one click away from here.
+      //
+      // Checked against config.zones[].acts[], the MANIFEST, which openLoaded
+      // commits atomically with the project — not against loaded act data. So a
+      // valid act whose data is still in flight (the boot-restore dispatch)
+      // passes, as it must.
+      const zoneCfg = useProjectStore.getState().config?.zones.find((z) => z.id === plan.zone);
+      if (!zoneCfg || !zoneCfg.acts.some((a) => a.id === plan.act)) {
+        useToastStore.getState().addToast(
+          `Level not found in this project (${plan.zone} ${plan.act})`, 'error');
+        // FALSE, not a 'none' plan: 'none' resolves true, and requestOpenTab
+        // opens the tab on a true resolution — which is the tab this exists to
+        // prevent.
+        return false;
+      }
       // Snapshot the OUTGOING act's viewport into its record, then restore the
       // INCOMING act's (spec §10: viewport persists per tab). Runs entirely
       // synchronously around the act switch.

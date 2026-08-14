@@ -198,7 +198,7 @@ export default function ArtBrowser() {
     return (
       <div style={styles.container}>
         <div style={styles.tabs}>
-          <span style={styles.label}>Tile Browser</span>
+          <span style={styles.label}>no zone open</span>
         </div>
       </div>
     );
@@ -208,7 +208,7 @@ export default function ArtBrowser() {
     <div style={styles.container}>
       <div style={styles.tabs}>
         <span style={styles.label}>
-          Tiles ({itemCount})
+          {itemCount} tiles
         </span>
         <span ref={hoverLabelRef} style={styles.hoverLabel} />
       </div>
@@ -237,9 +237,12 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex', alignItems: 'center', gap: 0,
     borderBottom: `1px solid ${T.border}`, flexShrink: 0,
   },
+  // A COUNT, not a heading. This panel is always mounted inside a
+  // CollapsibleSection that names it (layout-facet.tsx: "Art"), and in heading
+  // type this row read as a second, disagreeing title stacked under the first —
+  // the same doubling ChunkGrid's countLabel fixed.
   label: {
-    padding: '6px 12px', fontSize: 12, fontWeight: 600, color: T.textBase,
-    textTransform: 'uppercase' as const, letterSpacing: 1,
+    padding: '6px 12px', fontSize: 10, color: T.textLo,
   },
   hoverLabel: {
     marginLeft: 'auto', padding: '0 12px',

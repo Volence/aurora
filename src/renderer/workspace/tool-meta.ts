@@ -24,7 +24,6 @@ export const TOOL_LABELS: Record<ToolId, string> = {
   'paint-collision': 'Paint Collision',
   'place-object': 'Place Object',
   'place-ring': 'Place Ring',
-  eraser: 'Eraser',
 };
 
 /**
@@ -47,8 +46,26 @@ export const TOOL_HINTS: Record<ToolId, string> = {
   'paint-collision': 'Click to set the collision type on tiles',
   'place-object': 'Click to place the selected object type',
   'place-ring': 'Click to place the selected ring pattern',
-  eraser: 'Click to erase tiles',
 };
+
+/**
+ * The dock's BUTTON ORDER, which is not the facet's tool order.
+ *
+ * `toolsForFacet` answers a different question — its FIRST entry is the facet's
+ * default tool (facet-tools.ts, toolForFacet) — and the two profiles disagree
+ * about where View goes in that list: classic declares layout as
+ * `view / stamp-chunk / select` so View is its default, while the shell default
+ * for objects is `place-object / select / view`. Rendering in that order put
+ * View at the TOP of the rail on Layout and the BOTTOM on Objects, so the armed
+ * tool moved under the cursor on every facet switch.
+ *
+ * Sorting the buttons by the one vocabulary order (core's TOOL_IDS) decouples
+ * the two: a profile still says what a facet leads with, and the rail still
+ * looks the same everywhere.
+ */
+export function dockOrder(tools: readonly ToolId[]): ToolId[] {
+  return [...tools].sort((a, b) => TOOL_IDS.indexOf(a) - TOOL_IDS.indexOf(b));
+}
 
 /** Every tool id, in vocabulary order. Re-exported so callers that only need
  *  labels don't reach past this module into the adapter. */

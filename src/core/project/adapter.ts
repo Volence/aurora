@@ -89,9 +89,16 @@ export type FacetCapability = (typeof FACET_CAPABILITIES)[number];
  *
  *  Runtime list exported so exhaustiveness checks (label maps, icon maps) can
  *  enumerate the vocabulary without duplicating it. */
+// `eraser` was in this list with nothing behind it: no FACET_TOOLS entry, no
+// profile's facetTools, and no branch in either engine's canvas — so the only
+// thing it could ever do was carry a label, a hint ("Click to erase tiles") and
+// a dock icon for a button no facet offered. Deleted rather than implemented:
+// stamping classic's air chunk and aeon's blank chunk is how each engine already
+// erases, and a vocabulary entry no canvas answers is a promise to the profile
+// author that nothing keeps.
 export const TOOL_IDS = [
   'view', 'select', 'paint-tile', 'paint-block', 'stamp-chunk',
-  'paint-collision', 'eraser', 'place-object', 'place-ring', 'marquee',
+  'paint-collision', 'place-object', 'place-ring', 'marquee',
 ] as const;
 export type ToolId = (typeof TOOL_IDS)[number];
 
@@ -142,10 +149,16 @@ export interface CapabilityManifest {
    * (renderer `FACET_TOOLS`); `toolsForFacet` is the one reader.
    *
    * REPLACES the default rather than intersecting it. Spec §3.6 says intersect,
-   * written before contact with the code — but the default `layout` set has no
-   * `place-object`, and that is precisely the tool classic's map needs for an
-   * armed placement, so an intersection would silently delete it. Replacement
-   * also lets a profile ORDER its tools (first entry is the facet default).
+   * written before contact with the code: a declaration must be able to NAME a
+   * tool the default set lacks, or it can only ever subtract. The example that
+   * settled it was classic's layout carrying `place-object`, which the default
+   * layout set has no entry for — that declaration is since gone (it made the
+   * Objects facet a strict subset of Layout), so today every shipping profile
+   * happens to declare a SUBSET and nothing real distinguishes the two rules.
+   * The renderer keeps a synthetic guard for it — workspace/__tests__/
+   * facet-tools.test.ts, "keeps a declared tool the shell default does NOT have".
+   * Replacement also lets a profile ORDER its tools (first entry is the facet
+   * default).
    */
   facetTools?: Partial<Record<FacetCapability, readonly ToolId[]>>;
 }

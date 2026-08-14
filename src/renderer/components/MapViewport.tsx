@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useCallback, useState } from 'react';
 import { useViewStore } from '../state/viewStore';
 import { useProjectStore, getCurrentAct, getCurrentZone, getActiveLevel as getStoreActiveLevel } from '../state/projectStore';
-import { useEditorStore, executeCommand, focusedHistory, setCommandInvalidationListener, RING_PATTERNS, type EditorTool } from '../state/editorStore';
+import { useEditorStore, executeCommand, setCommandInvalidationListener, RING_PATTERNS, type EditorTool } from '../state/editorStore';
 import { useAeonHistoryVersion } from '../hooks/useHistoryVersion';
 import { useArtStore } from '../state/artStore';
 import { useSessionStore } from '../state/sessionStore';
@@ -542,16 +542,8 @@ export default function MapViewport() {
       // zone data (set-palette-line / set-tileset-tiles) as well as the act's.
       const level: S4Level | null = getStoreActiveLevel(state);
 
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) {
-        focusedHistory()?.undo();
-        e.preventDefault();
-        return;
-      }
-      if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key.toLowerCase() === 'z' && e.shiftKey))) {
-        focusedHistory()?.redo();
-        e.preventDefault();
-        return;
-      }
+      // Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y are NOT handled here — LevelWorkspace
+      // owns the one level-undo binding for both engines (see its comment).
 
       // Copy the marquee selection to the map clipboard. Works regardless of
       // which tool is active — the marquee tool doesn't need to stay selected
@@ -1062,6 +1054,19 @@ export default function MapViewport() {
     if (tool === 'paint-collision') {
       const info = worldToSectionTile(world.x, world.y);
       if (!info) return;
+      // Claim the section HERE, before painting, not only inside
+      // paintCollisionCell's success path. That call is real (it is the last
+      // line of the function) but it sits behind four early returns — the
+      // same-cell dedupe, the already-that-shape guard, an empty entry list and
+      // a null level — so a click that changed nothing left `activeSectionIndex`
+      // pointing at whatever the last OTHER tool touched.
+      //
+      // That matters because the Collision facet has no SectionGridNav and its
+      // palette carries two WHOLESALE destructive buttons keyed on that index
+      // (CollisionPalette's Reset and Clear), so a Clear could wipe a section
+      // the user was not looking at. Every other tool branch in this handler
+      // claims its section unconditionally; this one now does too.
+      useEditorStore.getState().setActiveSectionIndex(info.sectionIndex);
       lastPaintedCell.current = null;
       paintPropagate.current = e.altKey; // latch the mode for the whole stroke
       paintCollisionCell(info, paintPropagate.current);
@@ -1499,7 +1504,16 @@ export default function MapViewport() {
   if (!act) {
     return (
       <div style={styles.empty}>
-        <span>Open a project to view sections</span>
+        {/* Says the true thing. This read "Open a project to view sections",
+            which is false wherever it can actually be seen: a MapViewport only
+            mounts inside a LEVEL TAB, and a level tab only exists once a project
+            is open — its name is in the title bar and its Explorer is on the
+            left. What is missing is the ACT (a read that failed, a restore still
+            in flight, `__dbg.resetLevel()` — see workspace/level-presence.ts).
+            Word-for-word classic's ClassicLevelViewport copy, because these are
+            the same state of the same shell and the user should not have to
+            learn that the two engines describe it differently. */}
+        <span>Open a level from the Explorer, or press Ctrl+K.</span>
       </div>
     );
   }

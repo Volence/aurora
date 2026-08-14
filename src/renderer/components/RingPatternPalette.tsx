@@ -10,7 +10,11 @@ interface RingPatternPaletteProps {
 export default function RingPatternPalette({ selectedIndex, onSelect }: RingPatternPaletteProps) {
   return (
     <div style={styles.container}>
-      <div style={styles.header}>Ring Patterns</div>
+      {/* A COUNT, not a heading — see TilesetPanel's copy of this note. The
+          CollapsibleSection this always mounts inside (workspace/facets/
+          rings-facet.tsx) already says RING PATTERNS; in heading type this row
+          said RING PATTERNS again, one row down. */}
+      <div style={styles.count}>{RING_PATTERNS.length} patterns</div>
       <div style={styles.list}>
         {RING_PATTERNS.map((pattern, i) => (
           <button
@@ -61,18 +65,25 @@ function PatternPreview({ pattern, selected }: { pattern: typeof RING_PATTERNS[0
 }
 
 const styles: Record<string, React.CSSProperties> = {
+  // `flex: 1 1 auto; minHeight: 0` rather than the old `flexShrink: 0`: this
+  // fills its CollapsibleSection's share of the column and is allowed to be
+  // shorter than its patterns, which is what lets `list` below scroll at all.
   container: {
     width: 180, display: 'flex', flexDirection: 'column',
     background: T.surface, borderRight: `1px solid ${T.border}`,
-    flexShrink: 0, overflow: 'hidden',
+    flex: '1 1 auto', minHeight: 0, overflow: 'hidden',
   },
-  header: {
-    padding: '8px 12px', fontSize: 12, fontWeight: 600, color: T.textBase,
-    borderBottom: `1px solid ${T.border}`, textTransform: 'uppercase' as const,
-    letterSpacing: 1,
+  count: {
+    padding: '6px 8px', fontSize: 10, color: T.textLo,
+    borderBottom: `1px solid ${T.border}`, flexShrink: 0,
   },
+  // Scrolls inside the section instead of growing it. `flex: 1` alone was a
+  // no-op while nothing above it had a height — a CollapsibleSection in an
+  // unbounded Panel is sized by its content — so this grew with RING_PATTERNS
+  // and pushed Properties down the column. The height comes from the section
+  // now (variant="list"), and `minHeight: 0` is the permission to shrink into it.
   list: {
-    flex: 1, overflow: 'auto', padding: 4,
+    flex: '1 1 auto', minHeight: 0, overflow: 'auto', padding: 4,
     display: 'flex', flexDirection: 'column', gap: 2,
   },
   item: {

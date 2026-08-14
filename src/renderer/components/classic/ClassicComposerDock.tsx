@@ -69,8 +69,6 @@ const trailBtn: React.CSSProperties = {
 export default function ClassicComposerDock() {
   const status = useClassicLevelStore((s) => s.status);
   const doc = useClassicLevelStore((s) => s.doc);
-  const open = useClassicLevelStore((s) => s.composerOpen);
-  const setOpen = useClassicLevelStore((s) => s.setComposerOpen);
   const tab = useClassicLevelStore((s) => s.composerTab);
   const setTab = useClassicLevelStore((s) => s.setComposerTab);
 
@@ -88,7 +86,11 @@ export default function ClassicComposerDock() {
     const tileCount = Math.floor(doc.tiles.length / 32);
     if (s.composerBlockId >= doc.blocks.length) s.setComposerBlockId(Math.max(0, doc.blocks.length - 1));
     if (s.composerTileIndex >= tileCount) s.setComposerTileIndex(Math.max(0, tileCount - 1));
-    if (s.selectedChunkId > doc.chunks.length) s.setSelectedChunkId(0);
+    // To the LAST valid id, not to 0: ids are 1-based over doc.chunks, so
+    // doc.chunks.length is the highest real chunk and 0 is air — the one id the
+    // Chunk tab cannot edit. Clamping to air answered "your chunk was undone
+    // away" with the facet's dead resting state (see firstEditableChunkId).
+    if (s.selectedChunkId > doc.chunks.length) s.setSelectedChunkId(doc.chunks.length);
   }, [doc]);
 
   if (status !== 'ready' || !doc || !usage) return null;
@@ -97,32 +99,34 @@ export default function ClassicComposerDock() {
     // Everything in this dock edits the ZONE-ART document (tiles/blocks/chunks),
     // so working here claims the art facet for undo routing (classic-surface.ts).
     <div {...classicSurfaceProps('art')} style={styles.dock}>
+      {/* The header bar is the TIER STRIP: which of chunk/block/tile you are
+          editing, which one is selected, and the shared-edit warning. It used to
+          also carry a "▾ COMPOSER" collapse toggle — removed with the bottom
+          strip it belonged to. Collapsing made sense when this sat BESIDE the
+          map and you wanted the map back; as the canvas itself there is nothing
+          behind it to reveal, so the only thing the control could do was empty
+          the facet with no affordance explaining how to undo that. The word
+          "Composer" went with it: the Art pill already says where you are and
+          the tier tabs say what you are editing. */}
       <div style={styles.dockHead}>
-        <button onClick={() => setOpen(!open)} style={styles.collapseBtn} title={open ? 'Collapse composer' : 'Expand composer'}>
-          {open ? '▾' : '▸'} Composer
-        </button>
-        {open && (
-          <div style={styles.tabBar}>
-            {TABS.map((t) => (
-              <button
-                key={t.id}
-                onClick={() => setTab(t.id)}
-                style={{ ...styles.tabBtn, ...(tab === t.id ? styles.tabBtnActive : {}) }}
-              >{t.label}</button>
-            ))}
-          </div>
-        )}
-        {open && <SelectionTrail />}
-        <span style={{ flex: 1 }} />
-        {open && <span style={styles.dockHint}>shared tile/block/chunk editing — usage counts warn before shared edits</span>}
-      </div>
-      {open && (
-        <div style={styles.dockContent}>
-          {tab === 'chunk' && <ChunkTab doc={doc} usage={usage} />}
-          {tab === 'block' && <BlockTab doc={doc} usage={usage} />}
-          {tab === 'tile' && <TileTab doc={doc} usage={usage} />}
+        <div style={styles.tabBar}>
+          {TABS.map((t) => (
+            <button
+              key={t.id}
+              onClick={() => setTab(t.id)}
+              style={{ ...styles.tabBtn, ...(tab === t.id ? styles.tabBtnActive : {}) }}
+            >{t.label}</button>
+          ))}
         </div>
-      )}
+        <SelectionTrail />
+        <span style={{ flex: 1 }} />
+        <span style={styles.dockHint}>shared tile/block/chunk editing — usage counts warn before shared edits</span>
+      </div>
+      <div style={styles.dockContent}>
+        {tab === 'chunk' && <ChunkTab doc={doc} usage={usage} />}
+        {tab === 'block' && <BlockTab doc={doc} usage={usage} />}
+        {tab === 'tile' && <TileTab doc={doc} usage={usage} />}
+      </div>
     </div>
   );
 }

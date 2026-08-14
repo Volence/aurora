@@ -22,3 +22,19 @@ import type { EditorTool } from './editorStore';
 export function armedPlacementId(tool: EditorTool, armedObjectId: number | null): number | null {
   return tool === 'place-object' ? armedObjectId : null;
 }
+
+/**
+ * The subtype a click-to-place drops, and therefore the subtype the PLACEMENT
+ * GHOST must preview.
+ *
+ * Shared rather than written `0` twice, because the two `0`s are one decision
+ * and they are 150 lines apart: the ghost resolves its art through
+ * `objectArtKey(id, zone, subtype)`, and a subtype-rule object keys a DIFFERENT
+ * sprite per subtype. Let the two drift and the ghost previews art the click
+ * will not produce — a preview that lies, which is worse than no preview.
+ *
+ * (Placing at a fixed subtype is the existing behaviour; the inspector is where
+ * a subtype gets chosen afterwards. This constant names it, it does not change
+ * it.)
+ */
+export const PLACEMENT_SUBTYPE = 0;

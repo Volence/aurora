@@ -35,7 +35,7 @@ export default function SectionGridNav() {
   // Right-click context menu (copy / paste / remove).
   const [menu, setMenu] = useState<MenuState | null>(null);
 
-  // Close the context menu on any outside click (mirrors Toolbar's dropdown).
+  // Close the context menu on any outside click.
   useEffect(() => {
     if (!menu) return;
     const handler = () => setMenu(null);
@@ -232,9 +232,21 @@ export default function SectionGridNav() {
 }
 
 const styles: Record<string, React.CSSProperties> = {
-  container: { padding: 8, borderBottom: `1px solid ${T.border}` },
-  header: { fontSize: 11, color: T.textLo, marginBottom: 4 },
-  grid: { display: 'grid', gap: 2 },
+  // A flex column so the SLOT GRID is the part that gives, not the dimension
+  // controls or the Add button under it: those are chrome and must stay on
+  // screen with the grid they operate on.
+  container: {
+    display: 'flex', flexDirection: 'column', flex: '1 1 auto', minHeight: 0,
+    padding: 8, borderBottom: `1px solid ${T.border}`,
+  },
+  header: { fontSize: 11, color: T.textLo, marginBottom: 4, flexShrink: 0 },
+  // Scrolls inside its section like every other data-driven grid in a panel
+  // column: an act may hold MAX_ACT_SECTIONS = 48 slots, and at a grid width of
+  // 2 that is 24 rows — enough to push Chunks, Art and Properties below it out
+  // of reach in aeon's Layout column. Typical acts are wider and shorter than
+  // the share the column gives it, and then `maxHeight: max-content` on the
+  // section means this takes only what it needs and the rest goes to Chunks.
+  grid: { display: 'grid', gap: 2, flex: '1 1 auto', minHeight: 0, overflowY: 'auto' },
   cell: {
     padding: '4px 0', textAlign: 'center', fontSize: 10,
     background: T.border, border: `1px solid ${T.borderStrong}`, borderRadius: 2,
@@ -250,7 +262,7 @@ const styles: Record<string, React.CSSProperties> = {
   dropTarget: { outline: `2px solid ${T.accent}`, outlineOffset: -1 },
   gridControls: {
     display: 'flex', alignItems: 'center', gap: 3, marginTop: 6,
-    fontSize: 10, color: T.textLo,
+    fontSize: 10, color: T.textLo, flexShrink: 0,
   },
   ctrlLabel: { marginLeft: 4 },
   ctrlVal: { minWidth: 12, textAlign: 'center', color: T.textBase },
@@ -261,7 +273,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   sBtnDisabled: { opacity: 0.4, cursor: 'default' },
   addBtn: {
-    marginTop: 6, width: '100%', padding: '4px 0', fontSize: 11,
+    marginTop: 6, width: '100%', padding: '4px 0', fontSize: 11, flexShrink: 0,
     background: T.overlay, color: T.textBase, border: `1px solid ${T.border}`,
     borderRadius: 3, cursor: 'pointer',
   },

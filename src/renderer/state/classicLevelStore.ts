@@ -31,7 +31,9 @@ import type { DirtyDomains, EditableTileRange, LevelDoc, ZoneActRef } from '../.
 import { tileLockReason } from '../../core/project/editable-tiles';
 import type { BlockDef, ChunkCell, ChunkDef256 } from '../../core/level-classic/model';
 import { validateLevelDoc, unpackChunkCell, chunkIndexForId } from '../../core/level-classic/model';
-import { firstEditableNonBlankTile, firstNonBlankBlock } from '../../core/level-classic/tile-pick';
+import {
+  firstEditableChunkId, firstEditableNonBlankTile, firstNonBlankBlock, landingPaletteLine,
+} from '../../core/level-classic/tile-pick';
 import type { S1ObjectEntry } from '../../core/formats/classic/s1-objpos';
 import {
   LAYOUT_DOMAINS, ART_DOMAINS, pickDomainDirty, restoreDomainDirty,
@@ -164,8 +166,6 @@ interface ClassicLevelState {
   // tabs; UI state, NOT part of an undo snapshot. Out-of-range values after an
   // undo/redo are clamped/cleared by the dock (an added chunk/block can be
   // undone away under a stale selection). ---
-  /** Whether the composer dock is expanded (a workflow preference; persists across acts). */
-  composerOpen: boolean;
   /** Which composer tab is active (persists across acts). */
   composerTab: ComposerTab;
   /** The block id the composer edits / paints (0-based; blocks are 0-based in S1). */
@@ -194,7 +194,6 @@ interface ClassicLevelState {
   setStampLoop: (loop: boolean) => void;
   setSelectedObjectIndex: (index: number | null) => void;
   setArmedObjectId: (id: number | null) => void;
-  setComposerOpen: (open: boolean) => void;
   setComposerTab: (tab: ComposerTab) => void;
   setComposerBlockId: (id: number) => void;
   setComposerTileIndex: (index: number) => void;
@@ -232,7 +231,6 @@ const IDLE = {
   stampLoop: false,
   selectedObjectIndex: null as number | null,
   armedObjectId: null as number | null,
-  composerOpen: false,
   composerTab: 'chunk' as ComposerTab,
   composerBlockId: 0,
   composerTileIndex: 0,
@@ -298,7 +296,10 @@ export const useClassicLevelStore = create<ClassicLevelState>((set, get) => ({
       tileEpoch: nextVersion(),
       tileVersions: new Map<number, number>(),
       // Chunk ids are per-act, so a fresh act resets the stamp selection (the tool
-      // choice persists — it's a workflow preference, not level data).
+      // choice persists — it's a workflow preference, not level data). $00 (air)
+      // is the value for the states BELOW this line — loading, and the two error
+      // paths, where there is no pool to pick from; a successful read replaces it
+      // with firstEditableChunkId(doc.chunks).
       selectedChunkId: 0,
       stampLoop: false,
       // Object selection + place-arm are per-act too (indices/ids into this act's
@@ -327,14 +328,36 @@ export const useClassicLevelStore = create<ClassicLevelState>((set, get) => ({
     try {
       const doc = await handle.levels.read(ref);
       if (token !== loadToken) return; // superseded by a newer selection
-      // Land the Block/Tile tabs on something visible: block $000 / tile $000
-      // are blank in every stock act, and an empty black square / checkerboard
-      // on first open reads as "broken".
+      // Land the Chunk/Block/Tile tabs on something visible: block $000 / tile
+      // $000 are blank in every stock act, and an empty black square /
+      // checkerboard on first open reads as "broken".
+      //
+      // The CHUNK one is not cosmetic. `fresh` above resets the selection to $00
+      // because chunk ids are per-act — but $00 is air, the one id with no data
+      // behind it, so the Art facet's whole resting state was the Chunk tab's
+      // "not editable" message over an empty preview. Landing on the first real
+      // chunk is the same "pick something a user can see" rule the other two
+      // already followed, applied to the tier that needed it most.
+      //
+      // It lands here rather than in the Art facet on entry BECAUSE the
+      // selection is shared with the map's stamp target: a facet-entry effect
+      // would rewrite a choice the user made on Layout (picking air to erase
+      // with is a real choice), where an open-time default overrides nothing.
       const range = handle.levels.editableTileRange?.(ref) ?? null;
+      // The palette line goes with them, and for the same reason one tier down:
+      // the Block and Tile tiers draw the SAME tile strip under two different
+      // fields (the landing block's cell pal vs `composerPalLine`), and
+      // `composerPalLine` had no seed at all — so a cold open showed Green Hill's
+      // tileset green on Block and red on Tile, one tab click apart. Seeded from
+      // the block that was just picked, not merged with it; see
+      // core/level-classic/tile-pick.ts:landingPaletteLine.
+      const blockId = firstNonBlankBlock(doc.blocks, doc.tiles);
       set({
         ref, doc, status: 'ready', error: null,
+        selectedChunkId: firstEditableChunkId(doc.chunks),
         composerTileIndex: firstEditableNonBlankTile(doc.tiles, range),
-        composerBlockId: firstNonBlankBlock(doc.blocks),
+        composerBlockId: blockId,
+        composerPalLine: landingPaletteLine(doc.blocks, blockId),
       });
     } catch (e) {
       if (token !== loadToken) return;
@@ -364,7 +387,6 @@ export const useClassicLevelStore = create<ClassicLevelState>((set, get) => ({
   setArmedObjectId: (id: number | null) =>
     set(id === null ? { armedObjectId: null } : { armedObjectId: id, selectedObjectIndex: null }),
 
-  setComposerOpen: (open: boolean) => set({ composerOpen: open }),
   setComposerTab: (tab: ComposerTab) => set({ composerTab: tab }),
   setComposerBlockId: (id: number) => {
     if (Number.isInteger(id) && id >= 0) set({ composerBlockId: id });

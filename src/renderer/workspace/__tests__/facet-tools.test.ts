@@ -1,15 +1,15 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { FACET_TOOLS, toolsForFacet, toolForFacet, switchFacet } from '../facet-tools';
-import { TOOL_LABELS } from '../tool-meta';
+import { TOOL_LABELS, dockOrder } from '../tool-meta';
 import { TOOL_IDS } from '../../../core/project/adapter';
 import { useWorkspaceStore } from '../workspaceStore';
-import { useEditorStore } from '../../state/editorStore';
+import { useEditorStore, type EditorTool } from '../../state/editorStore';
 import { useProjectStore } from '../../state/projectStore';
 import { useClassicProjectStore } from '../../state/classicProjectStore';
 
 /** The s1 profile's real declaration (core/project/s1/index.ts), as a literal so
  *  a profile edit has to come through here — same style as the adapter tests. */
-const S1_LAYOUT_TOOLS = ['view', 'stamp-chunk', 'select', 'place-object'];
+const S1_LAYOUT_TOOLS = ['view', 'stamp-chunk', 'select'];
 
 function closeProjects() {
   useClassicProjectStore.setState({ status: 'closed', capabilities: null } as never);
@@ -54,9 +54,15 @@ describe('facet tool sets', () => {
 
 // The profile seam (spec §3.6): a profile declares the tools its facets offer,
 // and that declaration REPLACES the shell default rather than intersecting it.
-// The intersect rule the spec's prose asked for would delete `place-object`
-// from classic's layout — the one tool the declaration exists to add — so these
-// cases are the guard on that direction, not just on the plumbing.
+//
+// The worked example used to be classic's layout carrying `place-object`, which
+// an intersection would have deleted. It has come and gone three times now —
+// removed when Objects was split off Layout, restored when Objects merged back
+// in, removed again when that merge was reversed (2026-08-14) — so s1's real
+// declaration is a strict SUBSET of the default again and no longer
+// distinguishes replace from intersect on its own. The SYNTHETIC guard below is
+// what holds the rule, and the churn above is why it is not hung on a shipping
+// profile.
 describe('toolsForFacet — profile declaration over shell default', () => {
   afterEach(closeProjects);
 
@@ -71,13 +77,26 @@ describe('toolsForFacet — profile declaration over shell default', () => {
     expect(toolsForFacet('layout')).toEqual(S1_LAYOUT_TOOLS);
   });
 
-  it('keeps place-object, which an intersection with the default would drop', () => {
-    // The regression this whole seam exists to prevent: the shell's default
-    // layout set has no place-object, so intersecting would leave classic's map
-    // unable to arm a placement at all.
+  it('keeps a declared tool the shell default does NOT have (replace, not intersect)', () => {
+    // Synthetic, and deliberately so: no shipping profile currently declares a
+    // tool outside the default, so an intersect regression would pass every
+    // other test in this file. place-object is the right probe because the shell
+    // default for layout genuinely lacks it.
     expect(FACET_TOOLS.layout).not.toContain('place-object');
+    openClassic({ layout: ['view', 'place-object'] });
+    expect(toolsForFacet('layout')).toEqual(['view', 'place-object']);
+  });
+
+  it("s1's real layout declaration drops the tools classic cannot drive", () => {
+    // The direction the declaration is actually used for today: subtracting
+    // marquee / paint-tile / paint-block, which classic has no implementation of.
     openClassic({ layout: S1_LAYOUT_TOOLS });
-    expect(toolsForFacet('layout')).toContain('place-object');
+    for (const t of ['marquee', 'paint-tile', 'paint-block']) {
+      expect(toolsForFacet('layout')).not.toContain(t);
+    }
+    // …and place-object is on OBJECTS, undeclared, straight from the default.
+    expect(toolsForFacet('layout')).not.toContain('place-object');
+    expect(toolsForFacet('objects')).toContain('place-object');
   });
 
   it('a declared profile still gets the default for facets it does NOT name', () => {
@@ -106,8 +125,15 @@ describe('toolsForFacet — profile declaration over shell default', () => {
     // implementation for; the declared default (first entry) takes over.
     expect(toolForFacet('layout', 'marquee')).toBe('view');
     expect(toolForFacet('layout', 'paint-block')).toBe('view');
-    // …while a declared tool is still kept across the switch.
-    expect(toolForFacet('layout', 'place-object')).toBe('place-object');
+    // …and place-object, which is the OBJECTS facet's, is clamped away on a
+    // switch to layout rather than left resident with no button to show it.
+    // This is the exact stranding the clamp exists for. The assertion has
+    // flipped with the manifest twice; it is spelled out on both facets rather
+    // than folded together so the next flip has to state which way it went.
+    expect(toolForFacet('layout', 'place-object')).toBe('view');
+    // It survives a switch to the facet that DOES offer it (undeclared, so the
+    // shell default ['place-object','select','view']).
+    expect(toolForFacet('objects', 'place-object')).toBe('place-object');
   });
 });
 
@@ -118,5 +144,39 @@ describe('tool labels', () => {
     // (which type-checks only until someone widens the map's type).
     expect(Object.keys(TOOL_LABELS).sort()).toEqual([...TOOL_IDS].sort());
     expect(new Set(Object.values(TOOL_LABELS)).size).toBe(TOOL_IDS.length);
+  });
+});
+
+// The RAIL's order, which is not the facet's tool order. `toolsForFacet` puts
+// the facet DEFAULT first, and the two profiles disagree about where View sits
+// in that list — classic declares layout as `view / stamp-chunk / select`, the
+// shell default for objects is `place-object / select / view`. Rendered in that
+// order, View was the top button on Layout and the bottom button on Objects, so
+// the armed tool moved under the cursor on every facet switch.
+describe('dockOrder', () => {
+  it('is stable across facets whose sets overlap', () => {
+    const layout = dockOrder(['view', 'stamp-chunk', 'select']);
+    const objects = dockOrder(['place-object', 'select', 'view']);
+    // Every tool both rails carry appears in the same relative order on both.
+    const shared = layout.filter((t) => objects.includes(t));
+    expect(shared).toEqual(objects.filter((t) => layout.includes(t)));
+    // And specifically: View is not first on one rail and last on the other.
+    expect(layout.indexOf('view')).toBe(0);
+    expect(objects.indexOf('view')).toBe(0);
+  });
+
+  it('does not change WHICH tools a facet offers', () => {
+    const set: readonly EditorTool[] = ['place-ring', 'select', 'view'];
+    expect([...dockOrder(set)].sort()).toEqual([...set].sort());
+  });
+
+  it('leaves the facet DEFAULT alone — that is toolsForFacet\'s first entry', () => {
+    // The two orders are decoupled on purpose: sorting the buttons must not
+    // change what a facet arms when you switch to it.
+    expect(toolForFacet('objects', 'stamp-chunk')).toBe('place-object');
+  });
+
+  it('orders by the one vocabulary, so an unknown tool cannot reshuffle a rail', () => {
+    expect(dockOrder([...TOOL_IDS])).toEqual([...TOOL_IDS]);
   });
 });

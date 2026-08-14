@@ -87,18 +87,27 @@ describe('s1Adapter.open resolution', () => {
       sprites: true,
       objects: 'objpos',
       build: false,
-      facets: ['layout', 'art', 'objects', 'collision', 'palette'],
+      // Four pills, in the order the bar shows them: `art` is LAST because it is
+      // the only classic facet that swaps the canvas, and the three before it
+      // are lenses over one map. `objects` merged into `layout` for a day and
+      // was reversed once the reorder made the split read correctly.
+      // `collision` and `rings` stay out. Every one of those is argued at the
+      // grant itself (core/project/s1/index.ts).
+      facets: ['layout', 'objects', 'palette', 'art'],
       artTiers: [
         { id: 'chunk', label: 'Chunk', pixelSize: 256, shared: true },
         { id: 'block', label: 'Block', pixelSize: 16, shared: true },
         { id: 'tile', label: 'Tile', pixelSize: 8, shared: true },
       ],
-      // Only `layout` is declared: classic's map is one surface with one chip
-      // row, and the shell default for it both offers tools classic cannot
-      // drive and omits place-object. Every other granted facet keeps the
-      // default. See CapabilityManifest.facetTools — declaring REPLACES.
+      // Only `layout` is declared, and only to REMOVE the shell default's
+      // marquee / paint-tile / paint-block, none of which classic implements.
+      // No place-object: that is the Objects facet's, which keeps the shell
+      // default (['place-object','select','view']). Carrying it on layout too
+      // made Objects a strict subset of Layout, and is what the 2026-08-14 merge
+      // briefly re-created. See CapabilityManifest.facetTools — declaring
+      // REPLACES.
       facetTools: {
-        layout: ['view', 'stamp-chunk', 'select', 'place-object'],
+        layout: ['view', 'stamp-chunk', 'select'],
       },
     });
     expect(handle.report.total).toBe(ENTRIES.length);

@@ -6,9 +6,8 @@
 import React from 'react';
 import ObjectList from '../../components/shared/ObjectList';
 import { useAeonObjectListPort } from '../../providers/object-list-aeon';
-import ObjectInspector from '../../components/shared/ObjectInspector';
-import { useAeonObjectInspectorPort } from '../../providers/object-inspector-aeon';
-import PropertiesPanel from '../../components/PropertiesPanel';
+import AeonObjectInspector from '../../components/AeonObjectInspector';
+import AeonPropertiesPanel from '../../components/AeonPropertiesPanel';
 import { Panel, CollapsibleSection } from '../../components/ui';
 import { mapFacet, type FacetModule } from '../facet-registry';
 
@@ -21,16 +20,20 @@ function ObjectsPanels() {
   // "Selected Object" block was four lines of uneditable text (now removed, since
   // this supersedes it). The form is classic's, shared; the aeon port supplies the
   // fields aeon actually has and converts executeCommand's throw into a result.
-  const objectInspectorPort = useAeonObjectInspectorPort();
+  // Its port hook stays in the AeonObjectInspector LEAF — it subscribes to
+  // liveEditVersion, so calling it here would re-render this whole column on
+  // every mousemove of an object drag.
   return (
     <Panel width={240} scroll>
-      <CollapsibleSection id="map.palette" title="Objects">
+      <CollapsibleSection id="aeon.objects" title="Objects" variant="list">
         <ObjectList port={objectListPort} label="Object palette" />
       </CollapsibleSection>
-      <CollapsibleSection id="map.object" title="Selected Object">
-        <ObjectInspector port={objectInspectorPort} />
+      <CollapsibleSection id="aeon.selectedObject" title="Selected Object">
+        <AeonObjectInspector />
       </CollapsibleSection>
-      <CollapsibleSection id="map.props" title="Properties"><PropertiesPanel /></CollapsibleSection>
+      {/* No showObjectSelection: the inspector above IS the selected-object
+          readout. Subscriptions live in the AeonPropertiesPanel leaf. */}
+      <CollapsibleSection id="aeon.props" title="Properties"><AeonPropertiesPanel /></CollapsibleSection>
     </Panel>
   );
 }

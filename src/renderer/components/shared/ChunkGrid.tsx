@@ -47,21 +47,36 @@ export default function ChunkGrid({ port }: { port: ChunkGridPort }): React.Reac
 
   const badge = port.statusBadge !== null ? <span style={styles.selBadge}>{port.statusBadge}</span> : null;
   const hint = <span style={styles.hint}>{port.statusHint}</span>;
+  const count = <span style={styles.count}>{port.countLabel}</span>;
 
   return (
     // rootProps first: a port contributes behaviour, not layout, and must not be
     // able to override the grid's own styling.
     <div {...port.rootProps} style={strip ? styles.containerStrip : styles.containerPanel}>
-      <div style={styles.header}>
-        <span style={styles.heading}>{port.heading}</span>
-        {/* A strip is wide enough for one row; a narrow panel wraps the status
-            line under the header controls, which is where each engine already
-            put them. */}
-        {strip && badge}
-        {HeaderExtra && <HeaderExtra />}
-        {strip && hint}
-        {strip && sizeControl}
-      </div>
+      {/* NO TITLE HERE. Every mount of this grid is inside a CollapsibleSection
+          that already names it (Chunks), and rendering `Chunks (82)` in heading
+          type directly under a CHUNKS header made both engines' panels say their
+          name twice. The count moved to the status line below, where it is data
+          beside the selection rather than a second heading.
+
+          The row survives for HeaderExtra — aeon's Import/Clear, classic's loop
+          toggle — and is skipped entirely by a port that supplies none, rather
+          than drawing an empty bordered strip. It sits OUTSIDE the empty-state
+          branch on purpose: with no chunks loaded, Import is the one control
+          that matters.
+
+          A strip is wide enough for one row; a narrow panel wraps the status
+          line under the header controls, which is where each engine already put
+          them. */}
+      {(strip || HeaderExtra) && (
+        <div style={styles.header}>
+          {strip && count}
+          {strip && badge}
+          {HeaderExtra && <HeaderExtra />}
+          {strip && hint}
+          {strip && sizeControl}
+        </div>
+      )}
       {port.ids.length === 0 && port.emptyState ? (
         <div style={styles.empty}>
           <span>{port.emptyState.message}</span>
@@ -71,6 +86,7 @@ export default function ChunkGrid({ port }: { port: ChunkGridPort }): React.Reac
         <>
           {!strip && (
             <div style={styles.toolbar}>
+              {count}
               {badge}
               {hint}
               {sizeControl}
@@ -236,10 +252,15 @@ const ChunkCell = React.memo(function ChunkCell({
 });
 
 const styles: Record<string, React.CSSProperties> = {
+  // Fills its CollapsibleSection and, crucially, is allowed to be SHORTER than
+  // its content: `flexShrink: 0` + `minHeight: 120` here meant the grid pushed
+  // its own section open no matter what the column had to spare, so the
+  // section's share was decided by the chunk count. The section is the thing
+  // that owns the height now (ui/CollapsibleSection, variant="list").
   containerPanel: {
     display: 'flex', flexDirection: 'column',
     borderTop: `1px solid ${T.border}`,
-    flex: 1, minHeight: 120, flexShrink: 0,
+    flex: '1 1 auto', minHeight: 0,
   },
   containerStrip: {
     display: 'flex', flexDirection: 'column',
@@ -249,10 +270,10 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex', alignItems: 'center', gap: 6,
     padding: '3px 8px', borderBottom: `1px solid ${T.border}`, flexShrink: 0,
   },
-  heading: {
-    fontSize: 11, fontWeight: 600, color: T.textBase,
-    textTransform: 'uppercase' as const, letterSpacing: 1, flexShrink: 0,
-  },
+  // Deliberately NOT heading type (no uppercase, no letter-spacing, no bold):
+  // this is a count on the status line, and styling it like the old heading is
+  // how it would read as a second section title again.
+  count: { fontSize: 10, color: T.textLo, flexShrink: 0 },
   toolbar: {
     display: 'flex', alignItems: 'center', gap: 6,
     padding: '3px 8px', borderBottom: `1px solid ${T.border}`, flexShrink: 0,
@@ -277,8 +298,18 @@ const styles: Record<string, React.CSSProperties> = {
   // The scrollable wall: native overflow gives a real scrollbar, flex-wrap lays
   // out every chunk, minHeight:0 lets it shrink inside the flex column so it
   // actually scrolls instead of growing the panel.
+  //
+  // NO `maxHeight`. `flex: 1` only fills a parent that has a height of its own,
+  // and for a while nothing above this had one — a CollapsibleSection inside a
+  // Panel with no bound height is sized by its content, so with 82 chunks this
+  // grew to ~900px, `overflowY` never fired, and classic's palette editor ended
+  // up nine screens down (which is how it came to be believed not to exist).
+  // The fix for that was a 260px cap here; the fix for THAT is that the height
+  // now arrives from above — Panel is a `minHeight: 0` flex column and the
+  // section claims a share of it — so `flex: 1` finally means something and the
+  // grid gets the whole column when it is the only list in it.
   gridPanel: {
-    flex: 1, minHeight: 0, overflowY: 'auto',
+    flex: '1 1 auto', minHeight: 0, overflowY: 'auto',
     display: 'flex', flexWrap: 'wrap', alignContent: 'flex-start', gap: 4, padding: 4,
   },
   gridStrip: {

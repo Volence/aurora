@@ -58,7 +58,7 @@ export function fakeHandle(): ProjectHandle {
       sprites: true,
       objects: 'objpos',
       build: false,
-      facets: ['layout', 'art', 'objects', 'collision', 'palette'],
+      facets: ['layout', 'art', 'objects'],
     },
     report: { entries: [], resolved: 0, total: 0 },
     levels: {

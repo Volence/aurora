@@ -13,6 +13,7 @@ import { classifyProfile, COLLISION_KINDS } from '../../core/collision/collision
 import type { CollisionKind } from '../../core/collision/collision-classify';
 import { drawCollisionShape } from '../../core/collision/collision-shape-draw';
 import type { ShapeDrawOpts, ShapeDrawCtx } from '../../core/collision/collision-shape-draw';
+import { claimCollisionOverlay } from './collision-overlay-scope';
 import { T } from './ui';
 import {
   COLLISION_SHAPE_FILL, COLLISION_SHAPE_LINE, COLLISION_SOLID_EDGE, COLLISION_ANGLE_NEEDLE,
@@ -140,11 +141,27 @@ export default function CollisionPalette({ variant = 'map' }: { variant?: 'map' 
     v.setOverlay('showCollision', p === 'a');        // show the plane you're editing,
     v.setOverlay('showCollisionPathB', p === 'b');   // hide the other (diff is in the View menu)
   }
-  // Show the active plane when the collision tool opens — but only if no collision
-  // overlay is on yet, so an A/B-diff view the user set up in the View menu survives.
+  // Show the active plane when the collision tool opens, and PUT IT BACK on the
+  // way out. The whole rule — including why the art variant claims nothing, and
+  // why a view the user set up in the View menu is neither overridden on entry
+  // nor cleared on exit — is collision-overlay-scope.ts, which the node-only
+  // suite can actually run. Without the cleanup this overlay leaked to every
+  // other map facet for the rest of the session (the COLLISION legend drawn over
+  // the Palette facet's map is what caught it).
   useEffect(() => {
-    const ov = useViewStore.getState().overlays;
-    if (!ov.showCollision && !ov.showCollisionPathB) pickPlane(plane);
+    const v = useViewStore.getState();
+    return claimCollisionOverlay({
+      anyOn: () => {
+        const ov = useViewStore.getState().overlays;
+        return ov.showCollision || ov.showCollisionPathB;
+      },
+      show: (p) => pickPlane(p),
+      hideAll: () => {
+        v.setOverlay('showCollision', false);
+        v.setOverlay('showCollisionPathB', false);
+      },
+    }, plane, variant) ?? undefined;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Every solid base shape re-oriented to canonical-LEFT, exact mirror-duplicates

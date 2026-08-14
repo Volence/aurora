@@ -4,11 +4,10 @@ import CommandPalette from './components/CommandPalette';
 import TabStrip from './shell/TabStrip';
 import Explorer from './shell/Explorer';
 import ConfirmDialog from './shell/ConfirmDialog';
-import LegacyWorkspace from './shell/LegacyWorkspace';
 import LevelWorkspace from './workspace/LevelWorkspace';
 import SpriteMode from './components/sprite/SpriteMode';
 import SpriteDocUnloaded from './components/sprite/SpriteDocUnloaded';
-import Toolbar from './components/Toolbar';
+import SpriteDocHeader from './shell/SpriteDocHeader';
 import HomeTab from './components/home/HomeTab';
 import ProjectSetupTab from './components/setup/ProjectSetupTab';
 import { T } from './components/ui';
@@ -22,7 +21,7 @@ import { useSpriteStore } from './state/spriteStore';
 import { useShellStore } from './state/shellStore';
 import { ensureSaversRegistered, saveAllDirty, saveActive } from './state/project-runtime';
 import { registerHistoryFactories } from './state/history-factories';
-import { registerAeonFacetModules } from './workspace/register-facets';
+import { registerAeonFacetModules, registerS1FacetModules } from './workspace/register-facets';
 import { useSessionLifecycle, useActTabSync } from './shell/session-lifecycle';
 import { requestOpenTab, requestFocusIndex } from './shell/tab-activation';
 import { buildCommands } from './shell/commands';
@@ -68,6 +67,7 @@ export default function App() {
     ensureSaversRegistered();
     registerHistoryFactories();   // must precede any edit: the hub builds no stack without it
     registerAeonFacetModules();
+    registerS1FacetModules();
   }, []);
   useSessionLifecycle();
   useActTabSync();
@@ -174,9 +174,11 @@ export default function App() {
           <div style={styles.content}>
             {/* Keep-alive: every non-level tab stays mounted; hidden via display:none
                 so its state survives (spec §3). Level tabs all share the ONE
-                LegacyWorkspace singleton below until Stages 3–4. Sprite-doc tabs
-                are EXCLUDED here — SpriteMode has exactly one mounting point (see
-                below), mounted only while a sprite-doc tab is active. */}
+                LevelWorkspace singleton below — the editor is a singleton pointed
+                at the active tab's target (shell/tab-activation.ts), not one
+                instance per tab. Sprite-doc tabs are EXCLUDED here — SpriteMode has
+                exactly one mounting point (see below), mounted only while a
+                sprite-doc tab is active. */}
             {tabs.filter((t) => t.kind !== 'level' && t.kind !== 'sprite-doc').map((tab) => (
               <div key={tab.id} style={{ ...styles.tabPane, display: tab.id === activeId ? 'flex' : 'none' }}>
                 {tab.kind === 'home' ? (
@@ -187,11 +189,11 @@ export default function App() {
               </div>
             ))}
             <div style={{ ...styles.tabPane, display: activeTab?.kind === 'level' ? 'flex' : 'none' }}>
-              {classicOpen ? (
-                <LegacyWorkspace onOpenProject={openProject} onOpenRecent={openProjectByPath} onSave={saveActive} />
-              ) : config ? (
-                <LevelWorkspace />
-              ) : null}
+              {/* One workspace, both engines. The old ternary keyed the classic
+                  branch off classicProjectStore and the aeon branch off
+                  projectStore.config — two derivations that disagree mid-load,
+                  which is what open-project.ts was built to end. */}
+              {engine ? <LevelWorkspace /> : null}
             </div>
             {/* SpriteMode's ONE mounting point — mounted ONLY while a sprite-doc
                 tab is active, NOT keep-alive: two live SpriteMode instances would
@@ -217,7 +219,7 @@ export default function App() {
                     loss. Activation sets activeDocId synchronously before it
                     awaits a loader, so an in-flight load does NOT flash this. */}
                 {spriteDocId === activeTab.id ? (
-                  <SpriteMode appBar={<Toolbar onOpenProject={openProject} onOpenRecent={openProjectByPath} onSave={() => { void saveActive(); }} />} />
+                  <SpriteMode appBar={<SpriteDocHeader onSave={() => { void saveActive(); }} />} />
                 ) : (
                   <SpriteDocUnloaded tabId={activeTab.id} title={activeTab.title} />
                 )}

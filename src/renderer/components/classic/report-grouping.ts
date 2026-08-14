@@ -1,6 +1,9 @@
-// Pure presentation logic for the resolution-report detail panel: bucket a flat
-// ResolutionReport's entries by their owning zone. Extracted from the component
-// so it can be unit-tested without a DOM.
+// Pure presentation logic for the resolution report: bucket a flat
+// ResolutionReport's entries by their owning zone. Extracted from a component so
+// it can be unit-tested without a DOM. Its one consumer is now the Project Setup
+// tab (setup/setup-model.ts), which groups the same entries into editable
+// path-override rows; the read-only ResolutionReportPanel it was written for was
+// deleted once Setup was shown to cover everything it rendered.
 
 import type { ResolutionEntry } from '../../../core/project/report';
 

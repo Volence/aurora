@@ -21,6 +21,61 @@ export function clampInt(v: number, hi: number): number {
   return Math.max(0, Math.min(hi, Math.round(v)));
 }
 
+/** Zoom bounds the fit is allowed to produce. Widening past 2 would let a short
+ *  BG plane fill the canvas at absurd magnification; below 1/8 nothing is legible. */
+export const FIT_ZOOM_MIN = 0.125;
+export const FIT_ZOOM_MAX = 2;
+
+/** The camera the viewport publishes: world coordinate at the canvas top-left,
+ *  plus the world→screen scale. */
+export interface FitCamera {
+  readonly x: number;
+  readonly y: number;
+  readonly zoom: number;
+}
+
+/**
+ * Where the camera should be after the level's height changes under it.
+ *
+ * TWO CASES, AND THEY ARE NOT THE SAME OPERATION:
+ *
+ * **An act load** fits the plane's height to the canvas, anchored top-left.
+ * There is no previous camera worth keeping — it belonged to another level.
+ *
+ * **A plane switch** must PRESERVE the camera, and this is the bug it fixes:
+ * the fit ran unconditionally, so toggling FG→BG on Green Hill went from 58% to
+ * 200% with nothing else changed. That is not a refit, it is a reset — the BG
+ * plane is a few chunks tall, `canvasH / planeH` is enormous, and the clamp
+ * hands back the 2x ceiling. It also destroys the toggle's main use: you cannot
+ * compare the two planes in place if the camera jumps three stops between them.
+ *
+ * The original justification — "FG and BG grids differ in height and the fit is
+ * what keeps the whole plane on screen" — was answering a question the act-load
+ * fit already answers. Once the reset is gone, the ONLY way to reach a zoom that
+ * does not show the whole plane is for the user to have scrolled there
+ * deliberately, and preserving a deliberate zoom is the correct response to a
+ * plane toggle, not something to undo.
+ *
+ * The camera's Y IS clamped into the new plane's bounds, which is the one thing
+ * pure preservation gets wrong: S1's BG planes are a quarter the height of their
+ * FG, so a camera near the bottom of the FG would land on void. KNOWN COST,
+ * stated rather than hidden — switching down to a short BG and back does not
+ * return you to the same Y, because the position did not survive the trip. Void
+ * with no indication there is content above it is the worse of the two.
+ *
+ * @param canvasH  the viewport's pixel height
+ * @param planeH   the new plane's height in world pixels
+ * @param current  the live camera, or null on an act load
+ */
+export function fitCamera(canvasH: number, planeH: number, current: FitCamera | null): FitCamera {
+  if (current === null) {
+    const fit = Math.max(FIT_ZOOM_MIN, Math.min(FIT_ZOOM_MAX, planeH > 0 ? canvasH / planeH : 1));
+    return { x: 0, y: 0, zoom: fit };
+  }
+  const maxY = Math.max(0, planeH - canvasH / current.zoom);
+  return { x: current.x, y: Math.max(0, Math.min(current.y, maxY)), zoom: current.zoom };
+}
+
 export interface ChunkRange {
   startCol: number;
   startRow: number;

@@ -178,9 +178,21 @@ interface EditorState {
   resetChunkVersions: () => void;
 }
 
-/** Facets whose edits belong to the ZONE-ART document rather than the act's
- *  layout: art and palette are zone-scoped data edited from an act tab. */
-const ZONE_ART_FACETS = new Set<string>(['art', 'palette']);
+/**
+ * Facets whose edits belong to the ZONE-ART document rather than the act's
+ * layout: art and palette are zone-scoped data edited from an act tab.
+ *
+ * THE SOLE STATEMENT OF WHICH DOCUMENT A FACET EDITS, and keyed on the FACET
+ * because that is the unambiguous thing. Classic's SURFACE_FACETS used to be a
+ * second statement of the same fact, which held only while each facet had one
+ * surface; classic's palette facet has its canvas on the map surface and its
+ * editor on the art surface, so the surface a pointer-down landed in stopped
+ * answering the question. It routes from here whichever surface was clicked —
+ * see components/classic/classic-surface.ts and history-routing.test.ts.
+ *
+ * Exported for that test, so it reads the real set rather than a copy of it.
+ */
+export const ZONE_ART_FACETS = new Set<string>(['art', 'palette']);
 
 /**
  * The document the user is currently editing: the active tab, refined by the

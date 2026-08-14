@@ -72,7 +72,20 @@ export default function ObjectList({
   );
 }
 
-function Row({
+/**
+ * Memoized, and it genuinely bites: every prop below is referentially stable
+ * across a re-render of the enclosing panel column. Both ports build `rows`
+ * (hence each `row`) and `Thumb` under useMemo, `onSelect` is a useCallback with
+ * no deps (aeon) or a module-level function (classic), `secondaryAction` is a
+ * module constant or undefined, and `selected`/`versionKey` are a boolean and a
+ * string. So a re-render driven by something the list does not read — a
+ * live-edit tick during an object drag, a viewport pan — re-runs ObjectList but
+ * skips all ~82 classic rows, each ~5 elements deep.
+ *
+ * No canvas cost either way: the thumbnail is `<Thumb key={versionKey}>`, and
+ * versionKey only changes when the art it draws actually republished.
+ */
+const Row = React.memo(function Row({
   row, selected, onSelect, Thumb, versionKey, secondaryAction,
 }: {
   row: ObjectRow;
@@ -117,14 +130,17 @@ function Row({
       )}
     </div>
   );
-}
+});
 
 const THUMB = 28;
 
 const styles: Record<string, React.CSSProperties> = {
-  container: { display: 'flex', flexDirection: 'column', minWidth: 0 },
-  // Sticky so the filter stays reachable while scrolling 82 classic rows — the
-  // scroller is the enclosing Panel, not this list.
+  // Fills the section and may be shorter than its rows — see `list` below.
+  container: { display: 'flex', flexDirection: 'column', minWidth: 0, flex: '1 1 auto', minHeight: 0 },
+  // Outside the scroller below, so the filter is always on screen with the rows
+  // it filters. (It is `sticky` as well, which now only matters for the enclosing
+  // Panel's own scroll — harmless, and one less thing to re-derive if the list
+  // ever hosts its own header row.)
   header: {
     position: 'sticky', top: 0, zIndex: 1, background: T.void,
     padding: '6px 8px', borderBottom: `1px solid ${T.border}`,
@@ -134,7 +150,21 @@ const styles: Record<string, React.CSSProperties> = {
     background: T.border, color: T.textHi,
     border: `1px solid ${T.borderStrong}`, borderRadius: T.rMd, fontSize: 12,
   },
-  list: { display: 'flex', flexDirection: 'column', padding: 4, gap: 2 },
+  // The rows scroll INSIDE the section rather than growing it: 23 classic rows
+  // (3084px, measured) would otherwise push the sections under them off the
+  // bottom of the world, which is the failure that hid the Art column's palette
+  // editor so thoroughly it was reported as missing.
+  //
+  // What bounds it is the SECTION, not a number here: the mounting
+  // CollapsibleSection is `variant="list"`, so it takes a share of a Panel with
+  // a real height and this shrinks into it. `minHeight: 0` is the permission to
+  // shrink; without it a flex item refuses to go below its content and the
+  // `overflowY` never engages. A short filter result stays short — the section's
+  // `maxHeight: max-content` hands the surplus back.
+  list: {
+    display: 'flex', flexDirection: 'column', padding: 4, gap: 2,
+    flex: '1 1 auto', minHeight: 0, overflowY: 'auto',
+  },
   empty: { padding: 12, color: T.textLo, fontSize: 12 },
   row: {
     display: 'flex', alignItems: 'center', gap: 4, width: '100%',

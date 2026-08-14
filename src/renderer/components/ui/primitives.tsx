@@ -2,12 +2,38 @@
 import React from 'react';
 import { T } from './theme';
 
+/**
+ * A facet's right-hand column: A FULL-HEIGHT FLEX COLUMN THAT ITS SECTIONS
+ * SHARE.
+ *
+ * EditorShell already hands this box a definite height — it is a flex item in
+ * the `flex: 1; overflow: hidden` canvas row, so it stretches to the row — and
+ * `minHeight: 0` is what lets that height actually bind. Without it a flex item
+ * refuses to shrink below its content, so the column silently grows past the
+ * bottom of the window and every "fill the remaining space" rule inside it
+ * measures against a height nobody can see. That is what a `maxHeight: 260px`
+ * cap on each list was standing in for, and why the cap looked necessary: `flex`
+ * inside a column with no usable height does nothing, so a fixed pixel number
+ * was the only thing left that worked.
+ *
+ * With the height bound, sections divide it (see ui/CollapsibleSection):
+ *   - a CONTENT section (a form, a toggle row) takes its natural height and
+ *     never stretches;
+ *   - a LIST section (`variant="list"`) claims an equal share of whatever is
+ *     left and scrolls inside that share, or takes its natural height if that
+ *     is smaller and hands the surplus back.
+ *
+ * `scroll` stays, and is the escape hatch rather than the plan: a column whose
+ * CONTENT sections alone over-subscribe it (SpriteMode mounts six) has nothing
+ * left to divide, and scrolling the column is the correct degradation. When the
+ * sections fit, nothing overflows and the scrollbar never appears.
+ */
 export function Panel({ children, width, scroll = false, style }: {
   children: React.ReactNode; width?: number; scroll?: boolean; style?: React.CSSProperties;
 }) {
   return (
     <div style={{
-      display: 'flex', flexDirection: 'column', background: T.void,
+      display: 'flex', flexDirection: 'column', minHeight: 0, background: T.void,
       borderLeft: `1px solid ${T.border}`, flexShrink: 0,
       ...(width ? { width } : {}), ...(scroll ? { overflow: 'auto' } : {}), ...style,
     }}>{children}</div>

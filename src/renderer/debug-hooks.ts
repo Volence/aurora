@@ -13,6 +13,7 @@
 import { useClassicProjectStore } from './state/classicProjectStore';
 import { useClassicLevelStore } from './state/classicLevelStore';
 import { useClassicObjectArtStore } from './state/classicObjectArtStore';
+import { useProjectStore } from './state/projectStore';
 import { useViewStore } from './state/viewStore';
 import { activateLevelTarget } from './shell/tab-activation';
 import { levelDocId } from './shell/tabs';
@@ -38,6 +39,27 @@ interface DebugApi {
    * must use this one.
    */
   activate(zone: string, act: number): Promise<boolean>;
+  /**
+   * Put the classic level store back to IDLE while leaving the level TAB open —
+   * the "a level tab is focused but no act is loaded" state. A cold open cannot
+   * be photographed in it (session-lifecycle restores an act immediately, and the
+   * load beats any CDP round-trip), so a screenshot harness has no other way in
+   * and the facets' empty renders had never been looked at.
+   */
+  resetLevel(): void;
+  /**
+   * aeon's counterpart to resetLevel: point the project at NO act while leaving
+   * the level tab open, which is what makes `useActLoaded` false for aeon
+   * (workspace/level-presence.ts reads getCurrentAct).
+   *
+   * IT EXISTS BECAUSE THE OLD ROUTE IN WAS A BUG. Harnesses used to reach this
+   * state with `activate(zone, '__none__')`, which worked only because the aeon
+   * activation path never checked that the act resolved — it opened a TAB for
+   * the phantom id too, so the screenshots came with a spurious tab in the
+   * strip. That hole is now closed (shell/tab-activation.ts), and closing it
+   * would otherwise have made aeon's no-act screen unphotographable.
+   */
+  resetAct(): void;
   /**
    * Stub for the richer read/mtime instrumentation the investigation harness once
    * carried. The load/paint numbers the harnesses actually assert on come from
@@ -74,6 +96,10 @@ export function installDebugHooks(): void {
     },
     setView: (x, y, zoom) => useViewStore.getState().setViewport(x, y, zoom),
     activate: (zone, act) => activateLevelTarget(levelDocId(zone, String(act))),
+    resetLevel: () => useClassicLevelStore.getState().reset(),
+    // setState rather than setCurrentAct: the store action takes an act id, and
+    // "no act" is exactly the value it has no way to express.
+    resetAct: () => useProjectStore.setState({ currentActId: null }),
     perf: () => ({ marks: [], readCount: 0, readTotalMs: 0, mtimeCount: 0, mtimeTotalMs: 0 }),
   };
   (window as unknown as { __dbg: DebugApi }).__dbg = dbg;

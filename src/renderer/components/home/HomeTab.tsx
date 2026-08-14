@@ -133,22 +133,24 @@ export default function HomeTab({ onOpenProject, onOpenRecent }: HomeTabProps) {
         </div>
 
         <div style={styles.sectionTitle}>Switch project</div>
+        {/* The recents sit IN the card grid, not in a list below it. They were a
+            flex column outside it, which on this page — where every other card
+            is one grid column — made a single recent project span all three, a
+            layout escape rather than emphasis. They are cards doing what the
+            card beside them does (open a project), so they are shaped like it. */}
         <div style={styles.cards}>
           <button onClick={onOpenProject} style={styles.card}>
             <Icons.IconLayers size={16} />
             <span style={styles.cardLabel}>Open project…</span>
           </button>
+          {otherRecents.map((r) => (
+            <button key={r.path} onClick={() => onOpenRecent(r.path)}
+              style={styles.recentCard} title={r.path}>
+              <span style={styles.recentName}>{r.name}</span>
+              <span style={styles.recentPath}>{r.path}</span>
+            </button>
+          ))}
         </div>
-        {otherRecents.length > 0 && (
-          <div style={styles.recentList}>
-            {otherRecents.map((r) => (
-              <button key={r.path} onClick={() => onOpenRecent(r.path)} style={styles.recentRow} title={r.path}>
-                <span style={styles.recentName}>{r.name}</span>
-                <span style={styles.recentPath}>{r.path}</span>
-              </button>
-            ))}
-          </div>
-        )}
       </div>
     </div>
   );
@@ -176,6 +178,14 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 2,
     padding: '8px 12px', background: T.void, border: `1px solid ${T.border}`,
     borderRadius: T.rMd, cursor: 'pointer', textAlign: 'left' as const,
+  },
+  // A recentRow shaped to sit in the `cards` grid: same padding, radius and
+  // border as `card`, stacked because it carries a path under the name.
+  recentCard: {
+    display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 2,
+    minWidth: 0, padding: '12px 14px', background: T.void,
+    border: `1px solid ${T.border}`, borderRadius: T.rLg,
+    cursor: 'pointer', textAlign: 'left' as const,
   },
   recentName: { fontSize: 13, color: T.textHi, fontWeight: 500 },
   recentPath: {

@@ -17,12 +17,14 @@ import {
   classicSetLayoutCells,
 } from '../classicLevelStore';
 import { useClassicProjectStore } from '../classicProjectStore';
-import { focusedHistory } from '../editorStore';
+import { focusedHistory, useEditorStore, ZONE_ART_FACETS } from '../editorStore';
 import { useSessionStore } from '../sessionStore';
 import { useSpriteStore, openSpriteDoc } from '../spriteStore';
 import { UNTITLED_SPRITE_TAB_ID } from '../../shell/tabs';
 import { useWorkspaceStore } from '../../workspace/workspaceStore';
-import { focusClassicSurface } from '../../components/classic/classic-surface';
+import {
+  focusClassicSurface, SURFACE_FACETS, type ClassicSurface,
+} from '../../components/classic/classic-surface';
 import { openReady } from './helpers/classic-fixture';
 
 const st = () => useClassicLevelStore.getState();
@@ -175,6 +177,10 @@ describe('focusedHistory', () => {
     registerHistoryFactories();
     useWorkspaceStore.getState().reset();
     useSpriteStore.getState().closeAll();
+    // focusClassicSurface goes through switchFacet, which re-scopes the tool.
+    // editorStore has no reset() and `tool` is a cross-engine singleton, so it is
+    // restored by hand — same as classicLevelStore.test.ts's beforeEach.
+    useEditorStore.setState({ tool: 'view', selection: null, pasting: false } as never);
     openReady();
   });
 
@@ -230,10 +236,16 @@ describe('focusedHistory', () => {
   });
 
   // --- Classic surfaces drive the facet -----------------------------------
-  // The classic view has no facet bar, so nothing used to call setFacet for a
-  // classic tab: facetFor fell back to 'layout' and a Ctrl+Z after an art edit
-  // reverted an unrelated LAYOUT step while leaving the art edit in place. The
-  // classic surfaces now claim the facet as the user works in them.
+  // Classic had no facet bar, so nothing ever recorded a facet for a classic
+  // tab: facetFor fell back to 'layout' and a Ctrl+Z after an art edit reverted
+  // an unrelated LAYOUT step while leaving the art edit in place. The classic
+  // surfaces now claim the facet as the user works in them (classic-surface.ts,
+  // via facet-tools.switchFacet).
+  //
+  // These four exercise the ROUTING consequence — which document Ctrl+Z lands
+  // on. What a claim does to the facet itself, including the cases where it
+  // deliberately does nothing (classic's four facets are served by two
+  // surfaces), belongs to components/classic/__tests__/classic-surface.ts.
 
   it('working in the classic ART surface routes undo to the zone-art document', () => {
     useSessionStore.setState({ activeId: 'level:ghz:1' });
@@ -265,6 +277,45 @@ describe('focusedHistory', () => {
     useSessionStore.setState({ activeId: 'doc:sprite:s1:18' });
     focusClassicSurface('art');
     expect(useWorkspaceStore.getState().record['doc:sprite:s1:18']).toBeUndefined();
+  });
+
+  it('EVERY facet a classic surface serves keeps routing by FACET, not by surface', () => {
+    // The two tests above only exercise each surface's PRIMARY facet. A surface
+    // serves a pair, and the pairs overlap: classic's `palette` facet has its
+    // CANVAS on the map surface and its EDITOR on the art surface, so it is in
+    // both sets (components/classic/classic-surface.ts).
+    //
+    // THAT IS WHY THIS NO LONGER ASSERTS surface → document. It used to, on the
+    // reading that SURFACE_FACETS and ZONE_ART_FACETS were two statements of one
+    // fact; the palette facet's map canvas broke the equation, because the same
+    // surface now serves a level-document facet and a zone-art one. The fact has
+    // ONE statement again — ZONE_ART_FACETS, keyed on the facet — and this reads
+    // both real sets to assert exactly that: whichever surface you touch, the
+    // undo stack follows the FACET you are on.
+    //
+    // The claim-is-a-no-op half is unchanged and still load-bearing: a claim that
+    // moved the facet would repoint undo before the user edited anything.
+    useSessionStore.setState({ activeId: 'level:ghz:1' });
+    for (const [surface, facets] of Object.entries(SURFACE_FACETS)) {
+      for (const facet of facets) {
+        useWorkspaceStore.getState().setFacet('level:ghz:1', facet);
+        focusClassicSurface(surface as ClassicSurface);
+        // The claim must not have moved the facet — it already serves this one.
+        expect(useWorkspaceStore.getState().facetFor('level:ghz:1'), facet).toBe(facet);
+        const doc = ZONE_ART_FACETS.has(facet) ? 'zoneart:ghz' : 'level:ghz:1';
+        expect(focusedHistory(), `${surface}/${facet}`)
+          .toBe(documentHistoryHub.historyFor(doc));
+      }
+    }
+    // A guard against the loop above proving nothing: both documents must
+    // actually have been reached, which is what makes the by-facet routing
+    // observable at all.
+    const all = Object.values(SURFACE_FACETS).flat();
+    expect(all.some((f) => ZONE_ART_FACETS.has(f))).toBe(true);
+    expect(all.some((f) => !ZONE_ART_FACETS.has(f))).toBe(true);
+    // …and that the overlap this rewrite exists for is real: one facet, two
+    // surfaces, one document.
+    expect(SURFACE_FACETS.map.filter((f) => SURFACE_FACETS.art.includes(f))).toEqual(['palette']);
   });
 
   it('undo with a sprite tab focused reverts THAT sprite document', () => {
