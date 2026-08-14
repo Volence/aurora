@@ -64,8 +64,25 @@ export default function LevelWorkspace() {
   // its own — different pane, and levelKeysEnabled() is what keeps this one
   // inert under a sprite tab. Nothing here is facet-specific: focusedHistory()
   // resolves the focused document (the act's layout, or the zone-art doc under
-  // an art/palette facet), and returns null on a non-document tab, so this is
-  // exactly as live as the header's Undo/Redo chips above.
+  // an art/palette facet), and returns null on a non-document tab, which is the
+  // same resolution the header's Undo/Redo chips above use. Not IDENTICAL to
+  // them, though: preventDefault runs before that null check, so on a Home or
+  // Project Setup tab — where this pane stays mounted keep-alive — Ctrl+Z is
+  // swallowed while the chips merely render disabled. Pre-existing (the
+  // MapViewport copy did the same from the same pane) and harmless: there is no
+  // other Ctrl+Z on those tabs to swallow.
+  //
+  // isTypingTarget is deliberately LAXER than the guard the map canvases used
+  // to carry, which blocked on any focused <input>: it exempts range/checkbox/
+  // button/radio, the exception the art facet added so Ctrl+Z works right after
+  // a palette-slider commit. Hoisting extends that exemption to the map facets,
+  // where exactly three controls are reachable: PaletteEditor's range (palette
+  // commits ARE undoable on the zone-art doc — this is the win, Ctrl+Z after a
+  // slider used to do nothing), ObjectInspector's checkbox (runs onCommit, so
+  // undoing straight after is right), and ViewMenu's overlay checkboxes, which
+  // are NOT undoable — there Ctrl+Z now undoes the last map EDIT instead of
+  // doing nothing. Mildly surprising, not destructive, and known rather than
+  // overlooked.
   React.useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (!levelKeysEnabled()) return;

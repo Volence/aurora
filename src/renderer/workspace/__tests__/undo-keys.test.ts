@@ -1,6 +1,13 @@
 // Source-grep guard: the suite is node-only (no jsdom/RTL) and .tsx files are
 // not collected, so a rendering test of these components would silently never
 // run. Grepping the source is the house pattern (see classic-surface.test.ts).
+//
+// What this does NOT prove, so the next reader doesn't over-trust it: it
+// matches one exact call expression, so `const h = focusedHistory(); h?.undo();`
+// in a canvas would slip through, and it bounds only these two files — a third
+// binding added by a future facet module goes unnoticed. It catches the
+// regression that actually threatens this refactor (someone re-adding the
+// obvious line to a canvas), not every possible way to bind undo twice.
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
