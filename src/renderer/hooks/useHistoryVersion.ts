@@ -13,7 +13,8 @@
 // different questions:
 //
 //  • useHistoryVersion()      — any document. For affordances that speak for
-//    whatever has focus (Toolbar, TabStrip, LevelWorkspace) and for cheap panels.
+//    whatever has focus (TabStrip, LevelWorkspace, SpriteDocHeader) and for
+//    cheap panels.
 //  • useAeonHistoryVersion()  — only the aeon documents the level view renders.
 //    For the surfaces whose re-render rebuilds an expensive cache: a tileset
 //    thumbnail atlas (one OffscreenCanvas per tile), a full section prerender,

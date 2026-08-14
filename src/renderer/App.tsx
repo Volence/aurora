@@ -7,7 +7,7 @@ import ConfirmDialog from './shell/ConfirmDialog';
 import LevelWorkspace from './workspace/LevelWorkspace';
 import SpriteMode from './components/sprite/SpriteMode';
 import SpriteDocUnloaded from './components/sprite/SpriteDocUnloaded';
-import Toolbar from './components/Toolbar';
+import SpriteDocHeader from './shell/SpriteDocHeader';
 import HomeTab from './components/home/HomeTab';
 import ProjectSetupTab from './components/setup/ProjectSetupTab';
 import { T } from './components/ui';
@@ -219,7 +219,7 @@ export default function App() {
                     loss. Activation sets activeDocId synchronously before it
                     awaits a loader, so an in-flight load does NOT flash this. */}
                 {spriteDocId === activeTab.id ? (
-                  <SpriteMode appBar={<Toolbar onOpenProject={openProject} onOpenRecent={openProjectByPath} onSave={() => { void saveActive(); }} />} />
+                  <SpriteMode appBar={<SpriteDocHeader onSave={() => { void saveActive(); }} />} />
                 ) : (
                   <SpriteDocUnloaded tabId={activeTab.id} title={activeTab.title} />
                 )}

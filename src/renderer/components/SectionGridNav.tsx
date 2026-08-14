@@ -35,7 +35,7 @@ export default function SectionGridNav() {
   // Right-click context menu (copy / paste / remove).
   const [menu, setMenu] = useState<MenuState | null>(null);
 
-  // Close the context menu on any outside click (mirrors Toolbar's dropdown).
+  // Close the context menu on any outside click.
   useEffect(() => {
     if (!menu) return;
     const handler = () => setMenu(null);
