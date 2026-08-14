@@ -5,6 +5,8 @@
 //   • tile tab  — 8x8 pixels
 // Kept pure + unit-tested; the GUI stays a thin caller.
 
+import { TILE_PIXELS, unpack4bppTile } from '../../../core/art/rasterize';
+
 /**
  * Map a local pixel coordinate (relative to a grid canvas's top-left) to a
  * row-major cell index in a `cols`x`rows` grid whose cells are `cellPx` square,
@@ -104,34 +106,30 @@ export function canvasCellIndexAt(
 // 4bpp tile pixel <-> byte packing (the composer's Tile-tab pencil path)
 // ---------------------------------------------------------------------------
 // A Mega Drive 8x8 tile is 32 bytes: 4 bytes/row, 2 pixels/byte. The HIGH nibble
-// is the LEFT (even-x) pixel, the low nibble the right — cross-checked against
-// the decoder in src/core/formats/tiles.ts (high nybble → col*2, low → col*2+1)
-// and the core renderer. These are the SOLE pencil→bytes path, so the nibble
-// order is pinned by unit tests: a swap would silently corrupt every art edit.
+// is the LEFT (even-x) pixel, the low nibble the right.
+//
+// Both halves now live in core (src/core/art/), because the shared pixel-editing
+// substrate needs them and core must never import the renderer. Nothing about the
+// format changed and no caller has to move: `packTilePixels` is re-exported from
+// its new home, and `readTilePixels` is a thin wrapper over core's identical
+// `unpack4bppTile`. Keeping ONE implementation of a bit format is the whole point
+// — two would drift, and a nibble swap silently corrupts every art edit.
+//
+// (src/core/formats/tiles.ts `parseTiles` still decodes this format in bulk; it
+// is deliberately out of scope here rather than overlooked.)
 
-const TILE_BYTES = 32;
+export { packTilePixels } from '../../../core/art/classic-tile-buffer';
 
-/** Read one 8x8 tile's 64 palette indices (row-major) from a tile-pool blob. */
+/**
+ * Read one 8x8 tile's 64 palette indices (row-major) from a tile-pool blob.
+ *
+ * Delegates to core's `unpack4bppTile`, which is byte-for-byte identical in
+ * range. The only difference is the out-of-range contract — core returns null,
+ * this returns all-zero pixels — so the zero-fill is this wrapper's job, pinned
+ * by the "out-of-range tile index" case in __tests__/composer-math.test.ts.
+ */
 export function readTilePixels(tiles: Uint8Array, tileIndex: number): Uint8Array {
-  const px = new Uint8Array(64);
-  const base = tileIndex * TILE_BYTES;
-  if (base < 0 || base + TILE_BYTES > tiles.length) return px;
-  for (let i = 0; i < 64; i++) {
-    const byte = tiles[base + (i >> 1)];
-    px[i] = (i & 1) === 0 ? (byte >> 4) & 0xf : byte & 0xf;
-  }
-  return px;
-}
-
-/** Pack 64 palette indices back into one tile's 32 bytes (inverse of readTilePixels). */
-export function packTilePixels(px: Uint8Array): Uint8Array {
-  const out = new Uint8Array(TILE_BYTES);
-  for (let i = 0; i < 64; i++) {
-    const b = i >> 1;
-    if ((i & 1) === 0) out[b] = (out[b] & 0x0f) | ((px[i] & 0xf) << 4);
-    else out[b] = (out[b] & 0xf0) | (px[i] & 0xf);
-  }
-  return out;
+  return unpack4bppTile(tiles, tileIndex) ?? new Uint8Array(TILE_PIXELS);
 }
 
 /**
