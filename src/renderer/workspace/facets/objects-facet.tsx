@@ -25,15 +25,15 @@ function ObjectsPanels() {
   // every mousemove of an object drag.
   return (
     <Panel width={240} scroll>
-      <CollapsibleSection id="map.palette" title="Objects">
+      <CollapsibleSection id="aeon.objects" title="Objects">
         <ObjectList port={objectListPort} label="Object palette" />
       </CollapsibleSection>
-      <CollapsibleSection id="map.object" title="Selected Object">
+      <CollapsibleSection id="aeon.selectedObject" title="Selected Object">
         <AeonObjectInspector />
       </CollapsibleSection>
       {/* No showObjectSelection: the inspector above IS the selected-object
           readout. Subscriptions live in the AeonPropertiesPanel leaf. */}
-      <CollapsibleSection id="map.props" title="Properties"><AeonPropertiesPanel /></CollapsibleSection>
+      <CollapsibleSection id="aeon.props" title="Properties"><AeonPropertiesPanel /></CollapsibleSection>
     </Panel>
   );
 }

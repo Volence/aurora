@@ -187,8 +187,8 @@ function ClassicComposerCanvas(): React.ReactElement {
  * **1. No visibility gate. Aeon's is `tool === 'stamp-chunk' && !pasting`; this
  * is mounted unconditionally, and the divergence is deliberate.**
  *   - Aeon's gate is a SLOT ARBITER, not a stamp-visibility rule: its Chunks,
- *     Marquee and Paste sections all share the id `map.palette` and are mutually
- *     exclusive contents of one section. Classic's layout set is
+ *     Marquee and Paste sections all share the id `aeon.layoutOptions` and are
+ *     mutually exclusive contents of one section. Classic's layout set is
  *     `view / stamp-chunk / select` — no marquee, no paste — so there is nothing
  *     to arbitrate and the gate would be pure subtraction.
  *   - Selecting a chunk HERE arms the stamp tool (`pick="stamp"` →
@@ -205,15 +205,14 @@ function ClassicComposerCanvas(): React.ReactElement {
  *     composer's Chunk tab EDITS (components/classic/ChunkTab.tsx). Hiding the
  *     selector for a map tool would hide an art control.
  *
- * **2. `id="classic.chunks"` — a CONTENT id, classic's convention, not aeon's
- * slot-position `map.palette`.** A section id is a key in ONE global panel-state
- * map (shell/panel-state.ts), and the two engines are in one shell, so a shared
- * id is shared COLLAPSE STATE ACROSS ENGINES: `map.palette` here would mean
- * collapsing classic's Chunks also collapses aeon's Marquee options, which is
- * not a preference anyone expressed. Aeon's reuse is coherent within aeon
- * precisely because those three are one section that retitles itself — and even
- * aeon does not carry it across facet FAMILIES (its art facet files the same
- * ChunkLibrary under `art.chunks`).
+ * **2. `id="classic.chunks"` — engine-scoped and named for the content.** A
+ * section id is a key in ONE global panel-state map (shell/panel-state.ts), and
+ * the two engines are in one shell, so a shared id is shared COLLAPSE STATE: an
+ * unprefixed slot id here would mean collapsing classic's Chunks also collapses
+ * aeon's Marquee options, which is not a preference anyone expressed. Aeon has
+ * since moved onto the same convention throughout (`aeon.*`), keeping one
+ * deliberate reuse — `aeon.layoutOptions`, its self-retitling tool-options slot
+ * — and __tests__/section-ids.test.ts is what holds the line now.
  */
 function ClassicLayoutPanels(): React.ReactElement {
   return (
@@ -256,8 +255,8 @@ function ClassicObjectsPanels(): React.ReactElement {
  * being replaced. A re-home that makes a workflow worse than the thing it
  * replaces is not a re-home, so the picker is mounted in both columns.
  *
- * That is also what aeon does: one ChunkLibrary, filed under `map.palette` beside
- * the map and `art.chunks` beside the composer. So this is not a new decision
+ * That is also what aeon does: one ChunkLibrary, filed under
+ * `aeon.layoutOptions` beside the map and `art.chunks` beside the composer. So this is not a new decision
  * about what classic's art facet IS — it is the decision aeon already made,
  * applied to the engine that needs it more (aeon's composer opens a document; the
  * classic Chunk tab edits whatever `selectedChunkId` points at, so without a
@@ -272,8 +271,8 @@ function ClassicObjectsPanels(): React.ReactElement {
  * `classic.artChunks`, not the layout column's `classic.chunks`: section ids key
  * ONE global panel-state map (shell/panel-state.ts), so a shared id would mean
  * collapsing the picker beside the composer also collapses it beside the map.
- * Same reasoning that kept classic off aeon's `map.palette` — engine-scoped
- * prefix, named for the thing, one id per slot.
+ * Engine-scoped prefix, named for the thing, one id per slot — the convention
+ * both engines now follow.
  */
 function ClassicArtPanels(): React.ReactElement {
   return (

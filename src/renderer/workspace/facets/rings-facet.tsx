@@ -16,7 +16,7 @@ function RingsPanels() {
   const selectedRingPattern = useEditorStore((s) => s.selectedRingPattern);
   return (
     <Panel width={240} scroll>
-      <CollapsibleSection id="map.palette" title="Ring Patterns">
+      <CollapsibleSection id="aeon.ringPatterns" title="Ring Patterns">
         <RingPatternPalette
           selectedIndex={selectedRingPattern}
           onSelect={(index) => useEditorStore.getState().setSelectedRingPattern(index)}
@@ -24,7 +24,7 @@ function RingsPanels() {
       </CollapsibleSection>
       {/* No showObjectSelection — the ring readout is unconditional, objects are
           not. Subscriptions live in the AeonPropertiesPanel leaf. */}
-      <CollapsibleSection id="map.props" title="Properties"><AeonPropertiesPanel /></CollapsibleSection>
+      <CollapsibleSection id="aeon.props" title="Properties"><AeonPropertiesPanel /></CollapsibleSection>
     </Panel>
   );
 }

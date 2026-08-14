@@ -1,9 +1,9 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { FACET_TOOLS, toolsForFacet, toolForFacet, switchFacet } from '../facet-tools';
-import { TOOL_LABELS } from '../tool-meta';
+import { TOOL_LABELS, dockOrder } from '../tool-meta';
 import { TOOL_IDS } from '../../../core/project/adapter';
 import { useWorkspaceStore } from '../workspaceStore';
-import { useEditorStore } from '../../state/editorStore';
+import { useEditorStore, type EditorTool } from '../../state/editorStore';
 import { useProjectStore } from '../../state/projectStore';
 import { useClassicProjectStore } from '../../state/classicProjectStore';
 
@@ -139,5 +139,39 @@ describe('tool labels', () => {
     // (which type-checks only until someone widens the map's type).
     expect(Object.keys(TOOL_LABELS).sort()).toEqual([...TOOL_IDS].sort());
     expect(new Set(Object.values(TOOL_LABELS)).size).toBe(TOOL_IDS.length);
+  });
+});
+
+// The RAIL's order, which is not the facet's tool order. `toolsForFacet` puts
+// the facet DEFAULT first, and the two profiles disagree about where View sits
+// in that list — classic declares layout as `view / stamp-chunk / select`, the
+// shell default for objects is `place-object / select / view`. Rendered in that
+// order, View was the top button on Layout and the bottom button on Objects, so
+// the armed tool moved under the cursor on every facet switch.
+describe('dockOrder', () => {
+  it('is stable across facets whose sets overlap', () => {
+    const layout = dockOrder(['view', 'stamp-chunk', 'select']);
+    const objects = dockOrder(['place-object', 'select', 'view']);
+    // Every tool both rails carry appears in the same relative order on both.
+    const shared = layout.filter((t) => objects.includes(t));
+    expect(shared).toEqual(objects.filter((t) => layout.includes(t)));
+    // And specifically: View is not first on one rail and last on the other.
+    expect(layout.indexOf('view')).toBe(0);
+    expect(objects.indexOf('view')).toBe(0);
+  });
+
+  it('does not change WHICH tools a facet offers', () => {
+    const set: readonly EditorTool[] = ['place-ring', 'select', 'view'];
+    expect([...dockOrder(set)].sort()).toEqual([...set].sort());
+  });
+
+  it('leaves the facet DEFAULT alone — that is toolsForFacet\'s first entry', () => {
+    // The two orders are decoupled on purpose: sorting the buttons must not
+    // change what a facet arms when you switch to it.
+    expect(toolForFacet('objects', 'stamp-chunk')).toBe('place-object');
+  });
+
+  it('orders by the one vocabulary, so an unknown tool cannot reshuffle a rail', () => {
+    expect(dockOrder([...TOOL_IDS])).toEqual([...TOOL_IDS]);
   });
 });

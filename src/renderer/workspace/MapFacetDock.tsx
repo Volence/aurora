@@ -2,7 +2,7 @@ import React from 'react';
 import { ToolButton, Icons } from '../components/ui';
 import { useEditorStore, type EditorTool } from '../state/editorStore';
 import { toolsForFacet } from './facet-tools';
-import { TOOL_LABELS } from './tool-meta';
+import { TOOL_LABELS, dockOrder } from './tool-meta';
 import type { FacetCapability } from '../../core/project/adapter';
 
 // Glyph map — superset of the old MapToolDock TOOLS list (same icons). The
@@ -23,7 +23,7 @@ const TOOL_ICONS: Record<EditorTool, React.FC<{ size?: number }>> = {
 export function MapFacetDock({ facet }: { facet: FacetCapability }) {
   const tool = useEditorStore((s) => s.tool);
   const setTool = useEditorStore((s) => s.setTool);
-  const tools = toolsForFacet(facet);
+  const tools = dockOrder(toolsForFacet(facet));
   return (
     <>
       {tools.map((t) => {

@@ -16,6 +16,7 @@ import { useConfirmStore } from '../../state/confirmStore';
 import { useToastStore } from '../../state/toastStore';
 import { buildSetupRows, applyPathEdits, pendingEditCount, type SetupRow } from './setup-model';
 import { serializeProjectConfig } from '../../../core/project/mapping';
+import { joinPath } from '../../../core/project/join-path';
 import type { EntryStatus } from '../../../core/project/report';
 
 const STATUS_COLOR: Record<EntryStatus, string> = {
@@ -126,7 +127,9 @@ export default function ProjectSetupTab() {
           <div style={styles.infoCard}>
             <div style={styles.infoLine}><span style={styles.infoKey}>engine</span><span style={styles.mono}>s4 (aeon)</span></div>
             <div style={styles.infoLine}><span style={styles.infoKey}>project</span><span style={styles.mono}>{config.name}</span></div>
-            <div style={styles.infoLine}><span style={styles.infoKey}>config</span><span style={styles.mono}>{config.basePath}/project.json</span></div>
+            {/* joinPath, not `${basePath}/…`: aeon's basePath carries a trailing
+                separator, so the literal printed `…/aeon//project.json`. */}
+            <div style={styles.infoLine}><span style={styles.infoKey}>config</span><span style={styles.mono}>{joinPath(config.basePath, 'project.json')}</span></div>
             <div style={styles.infoLine}><span style={styles.infoKey}>zones</span><span style={styles.mono}>{config.zones.length}</span></div>
           </div>
           <div style={styles.note}>

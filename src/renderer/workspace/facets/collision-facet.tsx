@@ -30,11 +30,11 @@ import { mapFacet, type FacetModule } from '../facet-registry';
 function CollisionPanels() {
   return (
     <Panel width={240} scroll>
-      <CollapsibleSection id="map.palette" title="Collision">
+      <CollapsibleSection id="aeon.collision" title="Collision">
         <CollisionPalette variant="map" />
       </CollapsibleSection>
       {/* Subscriptions live in the AeonPropertiesPanel leaf, not this column. */}
-      <CollapsibleSection id="map.props" title="Properties"><AeonPropertiesPanel /></CollapsibleSection>
+      <CollapsibleSection id="aeon.props" title="Properties"><AeonPropertiesPanel /></CollapsibleSection>
     </Panel>
   );
 }
