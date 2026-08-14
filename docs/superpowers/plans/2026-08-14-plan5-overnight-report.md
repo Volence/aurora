@@ -14,14 +14,15 @@ driven by looking at screens rather than by the test suite.
 ## Read this part first: what is proven vs. observed vs. inferred
 
 This distinction matters more than usual here, because **the test suite cannot see React
-or canvas.** There is no jsdom, and `.tsx` test files are not collected at all. All ~1900
+or canvas.** There is no jsdom, and `.tsx` test files are not collected at all. All ~1980
 tests are source greps, pure-function tests, or store tests. Not one renders a component.
 
 - **Proven** — structure and invariants: which module resolves for an `(engine, facet)`
   pair, which facets get the plane control, that no shared component imports a store,
   that `App` mounts one workspace under an engine gate. Backed by tests, most of them
   verified against a planted violation.
-- **Observed** — things actually seen in a screenshot. Two capture rounds, 42 shots.
+- **Observed** — things actually seen in a screenshot. Three capture rounds, 64 shots;
+  the final set of 22 is `shots-final/` with `NOTES.md` beside it.
 - **Inferred** — typechecked, reasoned about, never seen. Until last night this included
   **every "no act loaded" screen**, which is precisely where the worst remaining problems
   turned out to be.
@@ -30,8 +31,9 @@ When this report says something works, it says which of the three it means.
 
 ## What landed
 
-Twelve planned tasks plus three fix rounds. Suite went 1755 → 1899 passing, 0 failed,
-`tsc` clean throughout, production `electron-vite build` verified.
+Twelve planned tasks plus three fix rounds. Suite went 1755 → **1974 passing / 0 failed /
+3 skipped** (205 files) at branch head `d1f0fb7`, `tsc` clean throughout, production
+`electron-vite build` verified.
 
 | | |
 |---|---|
@@ -96,23 +98,52 @@ Plus eleven stale comments — including one that would have led a future agent 
 `classic-surface.ts` that *caused* the Layout/Objects bug, still asserting the thing that
 was wrong.
 
-## Still open when you read this
+## Was open when this was written — round 3 has since closed all of it
 
-A third fix round is running against findings from the second screenshot pass. Highlights:
+> **Amended 2026-08-14 after round 3 and the final visual pass** (22 shots, branch head
+> `d1f0fb7`). The list below was written while the third fix round was still running.
+> Every item on it is now fixed and verified on screen; kept for the record with its
+> verdict attached.
 
-- **The three "no act loaded" screens read like crashes.** Now seen for the first time — a
-  facet stripped to two empty headers with a stale chunk id in the status bar; a `CHUNKS`
-  header over 700px of void with a live FG/BG toggle for nothing; an interactive 23-object
-  library with nowhere to place anything.
-- **Aeon's Art facet opens on no document** — the same bug just fixed for classic, one
-  engine over, while the right rail reports 919 tiles for the loaded zone.
-- Classic's Art **Block** tier opens on the blank block, same class again, and prints no
-  string so no grep guard can catch it.
-- The collision legend leaks onto the Palette facet.
-- FG→BG re-zooms the viewport from 58% to 200%.
-- `RING PATTERNS` still doubled — the heading guard missed it because that panel isn't in
-  the list the guard checks. **A guard that only checks what someone remembered to list**
-  is the failure mode that has bitten this branch three times.
+- ~~**The three "no act loaded" screens read like crashes.**~~ **Fixed.** `facet-chrome.ts`
+  now decides which slots are live from one rule — *a control that cannot act is not
+  drawn* — and with no act every slot but the canvas is suppressed. All three classic
+  facets show canvas-only, no dock, no option bar, no right panel, no status bar, no
+  FG/BG chips, no View menu, with Undo/Redo present and disabled. Layout and Objects are
+  pixel-identical below the app bar; **Art is not** — its empty canvas paints `T.surface`
+  where the map viewport paints `T.void`, an ~8/level lift over the whole canvas. Worth
+  one line to unify.
+- ~~**Aeon's Art facet opens on no document.**~~ **Fixed.** It lands on OJZ `$01`, framed
+  whole rather than at its corner, with `New…` in the doc header as the route back to the
+  launcher. Its `TILESET` thumbnails also stopped rendering blue: mean colour `(70,81,38)`
+  against Layout's `ART` at `(71,89,40)`, so both tile strips now agree on a palette line.
+- ~~**Classic's Art Block tier opens on the blank block.**~~ **Fixed** — opens on `$1`.
+  See the "non-default is not visible" trap in the stage-4 status doc; the first attempt
+  at this fix did not work, for an interesting reason.
+- ~~**The collision legend leaks onto the Palette facet.**~~ **Fixed.** An implicit enable
+  is now implicitly reverted: the legend is on Collision and absent from Palette and
+  Layout both before Collision is visited and after leaving it. An overlay *you* turned on
+  in the View menu is still left alone.
+- ~~**FG→BG re-zooms the viewport from 58% to 200%.**~~ **Fixed.** Zoom is `0.5796875`
+  either side of the switch.
+- ~~**`RING PATTERNS` still doubled.**~~ **Fixed**, and so is the guard: it no longer reads
+  a hand-written `PANELS` array but derives the list by scanning the facet modules for
+  components mounted directly inside a `<CollapsibleSection>` and resolving them through
+  each facet's own imports. That immediately turned up another unlisted panel. **A guard
+  that only checks what someone remembered to list** is the failure mode that has bitten
+  this branch three times, and this is the shape of the answer.
+
+Two further round-3 items, not on the original list: the tool dock's button order is now
+sorted by the one tool vocabulary, so `View` is first on every facet under both engines
+(it used to be top on Layout and bottom on Objects, moving the armed tool under the
+cursor); and aeon's Palette facet gained the `PAL LINE` strip as its bottom bar.
+
+What the final pass found that is still open is in
+`…/scratchpad/shots-final/NOTES.md`. The two worth naming here: **aeon's no-act canvas
+says "Open a project to view sections"** when a project *is* open and only the act is
+missing (classic's equivalent copy is correct), and **classic's `TILES (965)` strip
+renders in two different palettes one tier apart** — green on the Block tier, line-0
+red/blue on the Tile tier — which is the same bug round 3 just fixed for aeon.
 
 ## What I deliberately did not do
 
@@ -130,5 +161,22 @@ A third fix round is running against findings from the second screenshot pass. H
    was dropped. Its one real difference is that you see a recolour against the *map* rather
    than the composer. Keep it and give it something Art can't do, or drop it? The round-3
    agent has been asked to choose and justify; overrule it if you disagree.
+
+   **Round 3 chose "keep and differentiate":** the facet gained `BottomExtra: PaletteViewer`
+   — the `PAL LINE` strip — so picking a line and editing that line's colours are one
+   screen, with the act repainting under both. The reasoning is in
+   `workspace/facets/palette-facet.tsx`'s header.
+
+   **Correction to this report:** it stated elsewhere, and the round-2 screenshot notes
+   stated, that the facet has *no RGB editor*. **That is wrong.** `PaletteEditor`'s R/G/B
+   sliders are **selection-gated** — `sel` starts `null` and only swatch indices 1–15 open
+   them — so the reviewed screenshot simply had no swatch selected. Selecting one shows
+   `Line 2 · Index 5 · $026A` with three channel sliders
+   (`shots-final/aeon-palette-swatch-selected.png`). The real complaint about that column
+   is the ~600px of dead space under a 110px swatch grid, which is step-H shaped.
 2. **Every "empty state" is newly written and barely seen.** They were invisible for the whole
-   project because a cold open always restores an act. Worth a deliberate look.
+   project because a cold open always restores an act — `defaultProjectSession` loads one
+   before any CDP round-trip can land, so no harness could photograph them either. Reaching
+   them at all needed a dev-only `__dbg.resetLevel()`. They turned out to be the worst
+   screens in the app, and round 3 rewrote all of them; they have now had that deliberate
+   look. Treat "a state I cannot reach by clicking" as "a state nobody has ever seen".
