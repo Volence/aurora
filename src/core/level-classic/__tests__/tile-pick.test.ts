@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   isBlankTile, firstEditableNonBlankTile, firstNonBlankBlock, firstEditableChunkId,
+  landingPaletteLine,
 } from '../tile-pick';
 import type { BlockDef, ChunkDef256 } from '../model';
 
@@ -81,6 +82,37 @@ describe('firstNonBlankBlock', () => {
   it('falls back to 0 when every block is blank (or the list is empty)', () => {
     expect(firstNonBlankBlock([blank(), blank()], TILES)).toBe(0);
     expect(firstNonBlankBlock([], TILES)).toBe(0);
+  });
+});
+
+describe('landingPaletteLine', () => {
+  const cell = (tile = 0, extra: Partial<BlockDef['cells'][number]> = {}) =>
+    ({ tile, xf: false, yf: false, pal: 0, pri: false, ...extra });
+  const TILES = pool(16, [5, 9]);
+
+  it('answers the line the Block tier will be drawing its tile strip under', () => {
+    // THE BUG this seeds away: the Block tier shows the strip under the landing
+    // block's TL cell (line 2 here) while the Tile tier showed it under the IDLE
+    // `composerPalLine` of 0 — one tab click, two palettes, same 965 tiles.
+    const blocks = [
+      { cells: [cell(0, { pal: 3 }), cell(), cell(), cell()] },      // blank, skipped
+      { cells: [cell(5, { pal: 2 }), cell(9, { pal: 1 }), cell(), cell()] },
+    ];
+    const landed = firstNonBlankBlock(blocks, TILES);
+    expect(landed).toBe(1);
+    expect(landingPaletteLine(blocks, landed)).toBe(2);
+  });
+
+  it('reads the TOP-LEFT cell, which is the one BlockTab starts selected on', () => {
+    // Not the cell that made the block non-blank: BlockTab's `selCell` starts at
+    // 0, so cell 0 is what the strip is actually keyed on at rest.
+    const blocks = [{ cells: [cell(0, { pal: 0 }), cell(5, { pal: 3 }), cell(), cell()] }];
+    expect(landingPaletteLine(blocks, 0)).toBe(0);
+  });
+
+  it('falls back to 0 for an empty or out-of-range block list', () => {
+    expect(landingPaletteLine([], 0)).toBe(0);
+    expect(landingPaletteLine([{ cells: [cell(0, { pal: 2 }), cell(), cell(), cell()] }], 7)).toBe(0);
   });
 });
 

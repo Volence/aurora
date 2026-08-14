@@ -32,7 +32,7 @@ import { tileLockReason } from '../../core/project/editable-tiles';
 import type { BlockDef, ChunkCell, ChunkDef256 } from '../../core/level-classic/model';
 import { validateLevelDoc, unpackChunkCell, chunkIndexForId } from '../../core/level-classic/model';
 import {
-  firstEditableChunkId, firstEditableNonBlankTile, firstNonBlankBlock,
+  firstEditableChunkId, firstEditableNonBlankTile, firstNonBlankBlock, landingPaletteLine,
 } from '../../core/level-classic/tile-pick';
 import type { S1ObjectEntry } from '../../core/formats/classic/s1-objpos';
 import {
@@ -344,11 +344,20 @@ export const useClassicLevelStore = create<ClassicLevelState>((set, get) => ({
       // would rewrite a choice the user made on Layout (picking air to erase
       // with is a real choice), where an open-time default overrides nothing.
       const range = handle.levels.editableTileRange?.(ref) ?? null;
+      // The palette line goes with them, and for the same reason one tier down:
+      // the Block and Tile tiers draw the SAME tile strip under two different
+      // fields (the landing block's cell pal vs `composerPalLine`), and
+      // `composerPalLine` had no seed at all — so a cold open showed Green Hill's
+      // tileset green on Block and red on Tile, one tab click apart. Seeded from
+      // the block that was just picked, not merged with it; see
+      // core/level-classic/tile-pick.ts:landingPaletteLine.
+      const blockId = firstNonBlankBlock(doc.blocks, doc.tiles);
       set({
         ref, doc, status: 'ready', error: null,
         selectedChunkId: firstEditableChunkId(doc.chunks),
         composerTileIndex: firstEditableNonBlankTile(doc.tiles, range),
-        composerBlockId: firstNonBlankBlock(doc.blocks, doc.tiles),
+        composerBlockId: blockId,
+        composerPalLine: landingPaletteLine(doc.blocks, blockId),
       });
     } catch (e) {
       if (token !== loadToken) return;

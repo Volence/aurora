@@ -22,7 +22,7 @@ import { packChunkCell, unpackChunkCell, type BlockDef } from '../../../core/lev
 import type { S1ObjectEntry } from '../../../core/formats/classic/s1-objpos';
 // Shared with history-routing.test.ts — one fixture, so both suites drive the
 // store through the same doc/handle shape.
-import { TILE_COUNT, REF, makeDoc, openReady } from './helpers/classic-fixture';
+import { TILE_COUNT, REF, makeDoc, openReady, fakeHandle } from './helpers/classic-fixture';
 
 const st = () => useClassicLevelStore.getState();
 // The tool moved to editorStore (one vocabulary, spec §3.6), so the classic
@@ -517,6 +517,32 @@ describe('tool + selectedChunkId UI state', () => {
       expect(st().status).toBe('ready');
       expect(st().selectedChunkId).toBe(1);
     });
+  });
+
+  it('a loaded act seeds the composer palette line from the block it lands on', async () => {
+    // THE BUG: the Art facet draws the same ~965-tile strip on two tiers under
+    // two different fields — the Block tier under the selected cell's `pal`
+    // (data), the Tile tier under `composerPalLine` (the `Line:` chips). Only a
+    // click inside the Block tier ever wrote the second one, so a cold open left
+    // it at its IDLE 0 while the Block tier showed line 2: Green Hill's tileset
+    // green on one tab and unrecognisable red on the next, one click apart.
+    //
+    // Seeded, not merged (the call round 3 made for aeon's pair): a view line
+    // and a paint line are supposed to diverge once touched. Agreeing at rest is
+    // what was missing.
+    const doc = makeDoc();
+    doc.tiles[1 * 32] = 0xa5;               // tile 1 draws → block 1 is the landing block
+    for (const c of doc.blocks[1].cells) c.pal = 2;
+    const handle = fakeHandle();
+    useClassicProjectStore.setState({
+      status: 'open', dir: '/p',
+      handle: { ...handle, levels: { ...handle.levels!, read: async () => doc } },
+    } as never);
+
+    await useClassicLevelStore.getState().openAct(REF);
+
+    expect(st().composerBlockId).toBe(1);
+    expect(st().composerPalLine).toBe(2); // the line the Block tier is showing
   });
 
   it('selectChunkForStamp sets the chunk AND arms the stamp tool from view', () => {

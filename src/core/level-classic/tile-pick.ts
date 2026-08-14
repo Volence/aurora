@@ -59,6 +59,35 @@ export function firstNonBlankBlock(blocks: BlockDef[], tiles: Uint8Array): numbe
 }
 
 /**
+ * The palette line the composer should land on when an act opens: the line the
+ * BLOCK TIER will already be drawing its tile strip under — the landing block's
+ * top-left cell (BlockTab starts with `selCell` 0).
+ *
+ * WHY THIS EXISTS. The Art facet renders the same ~965-tile strip on two tiers
+ * under two different palette-line fields:
+ *   - Block tier: `block.cells[selCell].pal`, DATA — the line the tile will
+ *     actually be drawn with once assigned to that cell, which is the only
+ *     honest preview for a strip whose click rewrites the cell.
+ *   - Tile tier: `classicLevelStore.composerPalLine`, a CHOICE — the `Line:`
+ *     chips, and what the pencil colors with.
+ * `composerPalLine` was only ever written by a click inside the Block tier, so
+ * on a cold open it sat at its IDLE 0 while the Block tier showed line 2, and
+ * Green Hill's tileset was green on one tier and unrecognisable red on the next.
+ *
+ * SEEDED, NOT MERGED — the same call round 3 made for aeon's two fields
+ * (state/aeon-open.ts). A view line and a paint line genuinely mean different
+ * things and are supposed to diverge the moment the user touches either; what
+ * was wrong is that they disagreed BEFORE anyone touched anything.
+ *
+ * Takes the landing block id rather than re-deriving it, so the seed cannot
+ * drift from `firstNonBlankBlock`'s answer. Falls back to 0 for an empty or
+ * out-of-range block list, which is the IDLE value anyway.
+ */
+export function landingPaletteLine(blocks: BlockDef[], blockId: number): number {
+  return blocks[blockId]?.cells[0]?.pal ?? 0;
+}
+
+/**
  * The chunk ENGINE ID the composer should land on when an act opens. Same rule
  * as the two above with one extra constraint that makes it not merely cosmetic:
  * id $00 is AIR, which has no data behind it at all (providers/chunk-grid-
