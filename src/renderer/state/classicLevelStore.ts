@@ -28,6 +28,7 @@
 
 import { create } from 'zustand';
 import type { DirtyDomains, EditableTileRange, LevelDoc, ZoneActRef } from '../../core/project/adapter';
+import { tileLockReason } from '../../core/project/editable-tiles';
 import type { BlockDef, ChunkCell, ChunkDef256 } from '../../core/level-classic/model';
 import { validateLevelDoc, unpackChunkCell, chunkIndexForId } from '../../core/level-classic/model';
 import { firstEditableNonBlankTile, firstNonBlankBlock } from '../../core/level-classic/tile-pick';
@@ -666,15 +667,11 @@ export function classicEditTiles(edits: { tileIndex: number; data: Uint8Array }[
       return err(`tile ${tileIndex} data must be 32 bytes (got ${data?.length})`);
     }
     // Reject un-writable tiles at edit time (the s1-io write contract would else
-    // reject them at save). Only enforced when the range is known.
-    if (range) {
-      if (tileIndex >= range.baseTileCount) {
-        return err(`tile ${tileIndex} is a gap/appended tile — not editable in v1`);
-      }
-      if (range.animRanges.some((r) => tileIndex >= r.start && tileIndex < r.start + r.count)) {
-        return err(`tile ${tileIndex} is an animated-art slot — not editable in v1`);
-      }
-    }
+    // reject them at save). Only enforced when the range is known. Shares ONE
+    // predicate with the composer's 🔒 UI (core/project/editable-tiles) so the
+    // pencil can never look live on a tile this would refuse.
+    const lock = tileLockReason(range, tileIndex);
+    if (lock) return err(`tile ${tileIndex} is not editable: ${lock}`);
   }
   const nextTiles = new Uint8Array(doc.tiles);
   for (const { tileIndex, data } of edits) nextTiles.set(data, tileIndex * 32);

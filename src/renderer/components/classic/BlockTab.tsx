@@ -57,7 +57,15 @@ export default function BlockTab({ doc, usage }: { doc: LevelDoc; usage: UsageIn
     const b = doc.blocks[composerBlockId];
     if (!b) return;
     const def: BlockDef = { cells: b.cells.map((c, i) => (i === selCell ? { ...c, ...patch } : { ...c })) };
-    const res = classicEditBlock(composerBlockId, def);
+    // Nothing may escape this handler — see the note on TileTab's endStroke: the
+    // command's own invariant guards throw, and an uncaught throw out of a React
+    // event handler is what turns a refused edit into a frozen window.
+    let res;
+    try {
+      res = classicEditBlock(composerBlockId, def);
+    } catch (e) {
+      res = { ok: false as const, error: e instanceof Error ? e.message : String(e) };
+    }
     if (!res.ok) useToastStore.getState().addToast(`Block edit failed: ${res.error}`, 'error');
   }, [doc, composerBlockId, selCell]);
 

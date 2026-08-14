@@ -8,7 +8,10 @@ import { decodeGenesisColor } from '../../../core/formats/palette';
 import { cellIndexAt, readTilePixels, packTilePixels, floodFillTile } from './composer-math';
 import { TileThumb } from './composer-thumbs';
 import { COMPOSER_CHECK_A, COMPOSER_CHECK_B, COMPOSER_SWATCH_A, COMPOSER_SWATCH_B } from '../../canvas/canvas-colors';
-import { hex, SharedBanner, useEditableTileRange, tileLockReason, useEscapeCancel, styles } from './composer-shared';
+import {
+  hex, SharedBanner, useEditableTileRange, tileLockReason, useEscapeCancel,
+  useWindowStrokeEnd, styles,
+} from './composer-shared';
 
 // Tile tab — 8x8 pixel editor for the selected tile (16-color row from the act
 // palette; pencil + fill, right-click eyedrops a pixel's color). One
@@ -32,7 +35,12 @@ export default function TileTab({ doc, usage }: { doc: LevelDoc; usage: UsageInd
 
   const [colorIndex, setColorIndex] = useState(1);
   const [tool, setTool] = useState<TileTool>('pencil');
-  const [, force] = useState(0);
+  // The in-progress stroke lives in a REF (mutated per pixel, no re-render per
+  // move), so `strokeVersion` is what tells the paint effect below that the ref
+  // moved. It MUST stay in that effect's dep list: without it `redraw()` bumped a
+  // state nothing depended on, the effect never re-ran, and the pencil drew
+  // nothing at all until the commit replaced `doc`.
+  const [strokeVersion, force] = useState(0);
   const redraw = useCallback(() => force((n) => n + 1), []);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const strokeRef = useRef<Map<number, number> | null>(null); // pixel index → color index
@@ -75,7 +83,7 @@ export default function TileTab({ doc, usage }: { doc: LevelDoc; usage: UsageInd
       ctx.beginPath(); ctx.moveTo(0, i * PX); ctx.lineTo(PX * 8, i * PX); ctx.stroke();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [doc, composerTileIndex, composerPalLine, chunkEpoch, tileCount]);
+  }, [doc, composerTileIndex, composerPalLine, chunkEpoch, tileCount, strokeVersion]);
 
   const pixelAt = useCallback((e: React.MouseEvent): number | null => {
     const canvas = canvasRef.current;
@@ -113,16 +121,31 @@ export default function TileTab({ doc, usage }: { doc: LevelDoc; usage: UsageInd
     redraw();
   }, [pixelAt, tool, colorIndex, redraw]);
 
+  // Idempotent: the canvas's own onMouseUp and the window-level end (below) can
+  // both fire for one release, and the second call finds no stroke in flight.
   const endStroke = useCallback(() => {
     const stroke = strokeRef.current;
+    if (!stroke) return; // nothing in flight — a stray release elsewhere in the app
     strokeRef.current = null;
-    if (!stroke || !stroke.size) { redraw(); return; }
+    if (!stroke.size) { redraw(); return; }
     const px = readTilePixels(doc.tiles, composerTileIndex);
     for (const [i, ci] of stroke) px[i] = ci;
-    const res = classicEditTiles([{ tileIndex: composerTileIndex, data: packTilePixels(px) }]);
+    // NOTHING may escape a pointer handler here. An uncaught throw mid-gesture
+    // leaves React's event dispatch half-unwound and the whole window reads as
+    // frozen, which is a far worse failure than a refused edit — so the command's
+    // own invariant guards (classicLevelStore's assertSingleDomain /
+    // requireClassicHistory both throw) are turned into the same visible toast a
+    // clean refusal gets.
+    let res;
+    try {
+      res = classicEditTiles([{ tileIndex: composerTileIndex, data: packTilePixels(px) }]);
+    } catch (e) {
+      res = { ok: false as const, error: e instanceof Error ? e.message : String(e) };
+    }
     if (!res.ok) useToastStore.getState().addToast(`Tile edit failed: ${res.error}`, 'error');
     redraw();
   }, [doc, composerTileIndex, redraw]);
+  useWindowStrokeEnd(endStroke);
 
   // Right-click eyedrops the pixel's palette index into the pencil (matches the
   // chunk tab's right-click-eyedrop idiom). Works on locked tiles too — reading
@@ -141,7 +164,12 @@ export default function TileTab({ doc, usage }: { doc: LevelDoc; usage: UsageInd
 
   const pasteTile = useCallback(() => {
     if (!tileClipboard || locked) return;
-    const res = classicEditTiles([{ tileIndex: composerTileIndex, data: packTilePixels(tileClipboard) }]);
+    let res;
+    try {
+      res = classicEditTiles([{ tileIndex: composerTileIndex, data: packTilePixels(tileClipboard) }]);
+    } catch (e) {
+      res = { ok: false as const, error: e instanceof Error ? e.message : String(e) };
+    }
     if (!res.ok) useToastStore.getState().addToast(`Paste failed: ${res.error}`, 'error');
   }, [tileClipboard, locked, composerTileIndex]);
 
@@ -178,7 +206,6 @@ export default function TileTab({ doc, usage }: { doc: LevelDoc; usage: UsageInd
           onMouseDown={onDown}
           onMouseMove={onMove}
           onMouseUp={endStroke}
-          onMouseLeave={() => { strokeRef.current = null; redraw(); }}
           onContextMenu={onContext}
           style={{ ...styles.gridCanvas, cursor: locked ? 'not-allowed' : 'crosshair', opacity: locked ? 0.6 : 1 }}
         />

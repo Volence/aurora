@@ -238,6 +238,37 @@ describe('classic:edit-tiles', () => {
     expect(st().dirty.tiles).toBeUndefined();
     expect(artStack().canUndo).toBe(false);
   });
+
+  // The composer's pencil path, at the seam. Both invariant guards added with
+  // the two-document split THROW when they trip (assertSingleDomain on a patch
+  // that names a foreign domain, requireClassicHistory on a stack built for the
+  // other engine), and the Tile tab calls this from a mouse handler — a throw
+  // there escapes React's event dispatch, not just the edit. Pin that an
+  // ordinary editable-tile stroke trips neither: it returns a plain result and
+  // records on the ZONE-ART stack.
+  it('commits an editable tile through both invariant guards without throwing', () => {
+    openReady();
+    const data = new Uint8Array(32).fill(0x5a);
+    let res!: ReturnType<typeof classicEditTiles>;
+    expect(() => { res = classicEditTiles([{ tileIndex: 1, data }]); }).not.toThrow();
+    expect(res).toEqual({ ok: true });
+    // ...on the ART document, not the layout one (the two timelines stay split).
+    expect(artStack().canUndo).toBe(true);
+    expect(layoutStack().canUndo).toBe(false);
+    expect(st().dirty.tiles).toBe(true);
+    expect(st().dirty.fg).toBeUndefined();
+  });
+
+  // A refusal is a RESULT, never an exception: the Tile tab renders it as a
+  // toast and stays live. A throw here would be indistinguishable from the
+  // guards above and would take the window with it.
+  it('refuses a locked tile by returning, not by throwing', () => {
+    openReady();
+    let res!: ReturnType<typeof classicEditTiles>;
+    expect(() => { res = classicEditTiles([{ tileIndex: 2, data: new Uint8Array(32) }]); }).not.toThrow();
+    expect(res.ok).toBe(false);
+    expect(res.ok === false && res.error).toMatch(/animated-art/);
+  });
 });
 
 describe('classic:set-palette', () => {

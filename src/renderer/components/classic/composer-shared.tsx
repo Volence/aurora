@@ -35,14 +35,12 @@ export function useEditableTileRange(): EditableTileRange | null {
   }, [ref, handle]);
 }
 
-export function tileLockReason(range: EditableTileRange | null, tileIndex: number): string | null {
-  if (!range) return null;
-  if (tileIndex >= range.baseTileCount) return 'gap/appended tile — not editable in v1';
-  if (range.animRanges.some((r) => tileIndex >= r.start && tileIndex < r.start + r.count)) {
-    return 'animated-art slot — not editable in v1';
-  }
-  return null;
-}
+// The lock predicate itself lives in core (project/editable-tiles) so the UI and
+// the command that actually refuses the commit cannot drift, and so it is
+// reachable from the node-only test suite — this file is .tsx, which vitest does
+// not collect. Re-exported here because every composer tab imports it from the
+// shared module.
+export { tileLockReason } from '../../../core/project/editable-tiles';
 
 /** An inline shared-edit warning banner with an optional Duplicate action. */
 export function SharedBanner({ text, onDuplicate, dupLabel }: { text: string; onDuplicate?: () => void; dupLabel?: string }) {
@@ -80,6 +78,30 @@ export function useEscapeCancel(strokeRef: React.MutableRefObject<Map<number, nu
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [strokeRef, redraw]);
+}
+
+/**
+ * Finish an in-progress canvas gesture on the window's mouseup — wherever the
+ * button is actually released.
+ *
+ * WHY: the tab editors are small canvases (the Tile tab's is 208px square), so a
+ * pencil drag leaves them constantly. They used to hang the commit off the
+ * canvas's own `onMouseUp` and additionally DISCARD the whole stroke on
+ * `onMouseLeave`, which meant any drag that crossed the edge silently threw the
+ * user's work away — no commit, no message, nothing on the canvas. Ending on the
+ * window instead is what every paint tool does, and it leaves Escape
+ * (useEscapeCancel) as the ONE deliberate cancel.
+ *
+ * `endStroke` must be idempotent — the canvas's own onMouseUp may fire first.
+ */
+export function useWindowStrokeEnd(endStroke: () => void): void {
+  const latest = React.useRef(endStroke);
+  useEffect(() => { latest.current = endStroke; }, [endStroke]);
+  useEffect(() => {
+    const onUp = (): void => latest.current();
+    window.addEventListener('mouseup', onUp);
+    return () => window.removeEventListener('mouseup', onUp);
+  }, []);
 }
 
 /**

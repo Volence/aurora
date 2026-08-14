@@ -1,4 +1,5 @@
 import type { EditableTileRange } from '../project/adapter';
+import { isTileEditable } from '../project/editable-tiles';
 import type { BlockDef } from './model';
 
 // Default composer selections for act open. Tile $000 and block $000 are blank
@@ -15,15 +16,16 @@ export function isBlankTile(tiles: Uint8Array, tileIndex: number): boolean {
 
 /**
  * The tile index the composer should land on when an act opens: the first tile
- * that is neither blank nor locked (lock rules mirror tileLockReason — indices
- * past baseTileCount and animated-art slots are view-only). Falls back to 0
- * when every tile is blank or locked (degenerate pools, fakes).
+ * that is neither blank nor locked. The lock rule is the SHARED one
+ * (project/editable-tiles) rather than a third re-derivation of it: this picks
+ * the tile the pencil lands on, so "pickable" and "editable" must be the same
+ * question. Falls back to 0 when every tile is blank or locked (degenerate
+ * pools, fakes).
  */
 export function firstEditableNonBlankTile(tiles: Uint8Array, range: EditableTileRange | null): number {
   const poolCount = Math.floor(tiles.length / 32);
-  const limit = range ? Math.min(poolCount, range.baseTileCount) : poolCount;
-  for (let t = 0; t < limit; t++) {
-    if (range?.animRanges.some((r) => t >= r.start && t < r.start + r.count)) continue;
+  for (let t = 0; t < poolCount; t++) {
+    if (!isTileEditable(range, t)) continue;
     if (!isBlankTile(tiles, t)) return t;
   }
   return 0;
