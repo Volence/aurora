@@ -849,6 +849,8 @@ cd /home/volence/sonic_hacks/aurora/.claude/worktrees/ux-plan5 && \
 
 `tsc` clean; whole suite 0 failed. **This is the first task with real user-visible change** — it must be smoke-tested (Task 12) before the branch merges.
 
+**Acceptance criterion carried forward from Task 5's review — the undo-binding count.** Task 5's guard (`workspace/__tests__/undo-keys.test.ts`) asserts that `LevelWorkspace` owns a handler and the two canvases do not. It deliberately does **not** assert that classic reaches it, because the only truthful form of that assertion — "App routes a classic open to `LevelWorkspace`" — was false until this task and would have had to be inverted here. **Write it now:** extend the guard to assert `App.tsx` no longer branches to `LegacyWorkspace`, so a future edit cannot leave classic with *zero* undo bindings (deleting `ClassicProjectView`'s handler while the route still points at it). Verify it fails on a planted revert of the ternary.
+
 - [ ] **Step 6: Commit**
 
 ```bash
