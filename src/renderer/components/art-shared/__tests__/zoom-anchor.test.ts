@@ -36,7 +36,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { anchorAt, anchoredScroll, canvasOriginOf, clampScroll, docUnderPointer } from '../zoom-anchor';
+import { anchorAt, anchoredScroll, canvasOriginOf, clampScroll, docUnderPointer, AnchorSlot } from '../zoom-anchor';
 
 /** The pre-fix hook, verbatim: anchor `(scrollLeft + sx) / z`, restore `cx * zoom - sx`. */
 const legacyAnchor = (pointer: number, scroll: number, zoom: number) => (scroll + pointer) / zoom;
@@ -330,7 +330,84 @@ const HOSTS: [string, string][] = [
   ['SpriteMode', readSrc('sprite', 'SpriteMode.tsx')],
 ];
 
+// A STALE ANCHOR IS A JUMP. The anchor is captured on the wheel event and spent
+// by the layout effect that follows the re-render — but two paths used to skip
+// the line that cleared it: a wheel notch the store's clamp refused (no zoom
+// change, so no re-render and no layout effect at all), and the layout effect's
+// own canvas/scroller guard, which sat ABOVE that line. Either one leaves an
+// anchor from an old cursor position to be spent by the next zoom change from any
+// source — the option bar's ZoomControl, which classic now exposes. The slot's
+// consume-on-read is what makes the second unwritable; the wheel handler still
+// owns the first.
+describe('AnchorSlot', () => {
+  const a = { cx: 3.5, cy: 1.25, sx: 120, sy: 60 };
+
+  it('starts empty', () => {
+    const s = new AnchorSlot();
+    expect(s.pending).toBe(false);
+    expect(s.take()).toBeNull();
+  });
+
+  it('hands back exactly what was captured', () => {
+    const s = new AnchorSlot();
+    s.capture(a);
+    expect(s.pending).toBe(true);
+    expect(s.take()).toEqual(a);
+  });
+
+  it('EMPTIES on take — an anchor is spendable exactly once', () => {
+    // The layout-effect bug in one line: `take()` clears before the caller has a
+    // chance to return early on a guard, so a second consumer gets nothing.
+    const s = new AnchorSlot();
+    s.capture(a);
+    expect(s.take()).toEqual(a);
+    expect(s.pending).toBe(false);
+    expect(s.take(), 'the anchor survived being spent').toBeNull();
+  });
+
+  it('can be dropped unspent', () => {
+    // The wheel handler's path when the zoom did not move, or when there is no
+    // canvas to anchor against.
+    const s = new AnchorSlot();
+    s.capture(a);
+    s.clear();
+    expect(s.pending).toBe(false);
+    expect(s.take()).toBeNull();
+  });
+
+  it('keeps only the most recent capture', () => {
+    const s = new AnchorSlot();
+    s.capture(a);
+    s.capture({ ...a, cx: 9 });
+    expect(s.take()!.cx).toBe(9);
+  });
+});
+
 describe('anchored zoom — wiring', () => {
+  it('spends the anchor through the slot rather than a bare ref', () => {
+    // Comment-stripped source: the docblock above discusses every one of these
+    // names at length, so a raw read would pass on prose alone.
+    expect(HOOK, 'the hook is back to a hand-rolled anchor ref').toMatch(/new AnchorSlot\(\)/);
+    expect(HOOK, 'the anchor is read without being consumed').toMatch(/\.take\(\)/);
+    expect(HOOK, 'nothing clears the slot when a zoom is refused').toMatch(/\.clear\(\)/);
+    // And the specific shape of the refused-zoom check: read the store's own value
+    // across setZoom rather than guessing the clamp bounds, which differ per host.
+    expect(HOOK, 'a refused zoom no longer drops its anchor')
+      .toMatch(/const\s+before\s*=\s*getZoom\(\)[\s\S]*setZoom\([\s\S]*getZoom\(\)\s*===\s*before[\s\S]*\.clear\(\)/);
+  });
+
+  it('consumes the anchor BEFORE the guards that can return early', () => {
+    // The order is the assertion. `take()` below `if (!a || !scroller || !canvas)`
+    // would compile and behave identically in the happy path.
+    const effect = /useLayoutEffect\(\(\)\s*=>\s*\{([\s\S]*?)\n\s*\}, \[/.exec(HOOK);
+    expect(effect, 'the post-zoom layout effect is gone — check what replaced it').not.toBeNull();
+    const body = effect![1];
+    expect(body.indexOf('.take()'), 'the layout effect never consumes the slot').toBeGreaterThanOrEqual(0);
+    expect(body.indexOf('return'), 'the early-out guard is gone — re-read this test').toBeGreaterThanOrEqual(0);
+    expect(body.indexOf('.take()'), 'a guard can return before the anchor is consumed')
+      .toBeLessThan(body.indexOf('return'));
+  });
+
   it('measures the canvas, not the scroller\'s content origin', () => {
     expect(HOOK).toMatch(/canvas\.getBoundingClientRect\(\)/);
     expect(HOOK, 'the hook re-derives the anchor instead of using the tested module')
@@ -352,8 +429,10 @@ describe('anchored zoom — wiring', () => {
     // useHandPan drives the same element and takes no canvas; threading the wrong
     // ref into it would break panning without touching a single test above.
     for (const [name, src] of HOSTS) {
-      expect(src, `${name} moved the pan hook off the scroller`).toMatch(/useHandPan\((\w*)\)/);
-      const [, arg] = /useHandPan\((\w*)\)/.exec(src)!;
+      // `[,)]` — the pan hook grew an optional second argument (the keyboard gate,
+      // see pixel-viewport-wiring.test.ts); this assertion is about the FIRST one.
+      expect(src, `${name} moved the pan hook off the scroller`).toMatch(/useHandPan\((\w*)[,)]/);
+      const [, arg] = /useHandPan\((\w*)[,)]/.exec(src)!;
       expect(arg, `${name} pans the canvas instead of the scroller`).not.toBe('canvasRef');
       expect(src).toMatch(new RegExp(`useAnchoredZoom\\(\\s*${arg}\\s*,`));
     }

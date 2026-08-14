@@ -85,3 +85,49 @@ export function clampScroll(desired: number, maxScroll: number): number {
   const max = Math.max(0, maxScroll);
   return Math.min(max, Math.max(0, desired));
 }
+
+/** What one wheel notch captures: the art point under the cursor (`cx`,`cy`) and
+ *  the client-space point it has to end up back under (`sx`,`sy`). */
+export interface ZoomAnchor { cx: number; cy: number; sx: number; sy: number }
+
+/**
+ * The one-shot slot a captured anchor lives in between the wheel event and the
+ * layout effect that spends it.
+ *
+ * WHY A TYPE AND NOT A BARE REF: an anchor is only meaningful for the ONE zoom
+ * change it was captured for, and the hook's two ways of leaving a stale one
+ * behind were both "we did not reach the line that clears it":
+ *
+ *   * the wheel fired but the zoom did not move (already at the store's clamp),
+ *     so nothing re-rendered and the layout effect never ran at all; then the
+ *     NEXT zoom change from any source — the option bar's ZoomControl, a preset —
+ *     spent an anchor captured at a pointer position from minutes ago and the
+ *     view jumped;
+ *   * the layout effect ran but returned early on its canvas/scroller guard,
+ *     which sat ABOVE the assignment that cleared the slot.
+ *
+ * `take()` is therefore a CONSUMING read: it empties the slot before the caller
+ * has a chance to bail, so the second failure cannot be written. The first is
+ * still the wheel handler's job — it knows whether the zoom moved — which is
+ * what `clear()` is for.
+ */
+export class AnchorSlot {
+  private a: ZoomAnchor | null = null;
+
+  capture(a: ZoomAnchor): void { this.a = a; }
+
+  /** Empty the slot without spending it (no canvas to anchor to, or a zoom the
+   *  store refused). */
+  clear(): void { this.a = null; }
+
+  /** Take the anchor AND empty the slot. Reading IS consuming — a second call
+   *  yields null, so an anchor can be applied at most once. */
+  take(): ZoomAnchor | null {
+    const a = this.a;
+    this.a = null;
+    return a;
+  }
+
+  /** For tests/diagnostics: is an anchor waiting to be spent? */
+  get pending(): boolean { return this.a !== null; }
+}

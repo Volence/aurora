@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { tileToBuffer, bufferToTileBytes } from '../classic-tile-buffer';
+import { tileToBuffer, bufferToTileBytes, tileBytesIfChanged } from '../classic-tile-buffer';
+import type { PixelBuffer } from '../pixel-ops';
 
 // This file imports NOTHING from src/renderer — core must be testable in
 // isolation, and a test that reaches across the layer undercuts that even when
@@ -37,5 +38,62 @@ describe('tileToBuffer', () => {
     expect(b.width).toBe(8);
     expect(b.height).toBe(8);
     expect(Array.from(b.data)).toEqual(Array(64).fill(0));
+  });
+});
+
+// The "nothing changed → write nothing" rule, which both classic resolvers ask.
+// It is worth executing rather than trusting because its failure is INVISIBLE in
+// the app: every commit on this path is one `classicEditTiles`, i.e. exactly one
+// undo entry, so a `differs` that answered true too eagerly would fill the undo
+// stack with empty steps that look identical to real ones. It used to live inside
+// classic-tile-gesture, which is why classic-tile-transform reached through the
+// gesture resolver — synthesising a GestureResult and passing `locked: false` to
+// a lock-aware function — purely to borrow it.
+describe('tileBytesIfChanged', () => {
+  const buf = (f: (i: number) => number = () => 0): PixelBuffer =>
+    ({ width: 8, height: 8, data: Uint8Array.from({ length: 64 }, (_, i) => f(i) & 0xf) });
+
+  it('returns null when the buffers are byte-identical', () => {
+    expect(tileBytesIfChanged(buf((i) => i), buf((i) => i))).toBeNull();
+    expect(tileBytesIfChanged(buf(), buf())).toBeNull();
+  });
+
+  it('returns the packed bytes of AFTER when a single pixel differs', () => {
+    const before = buf();
+    const after = buf();
+    after.data[63] = 9;                       // the last pixel: the low nibble of byte 31
+    const bytes = tileBytesIfChanged(before, after);
+    expect(bytes).not.toBeNull();
+    expect(Array.from(bytes!)).toEqual(Array.from(bufferToTileBytes(after)));
+    expect(bytes![31]).toBe(0x09);
+  });
+
+  it('sees a change in either nibble of a shared byte', () => {
+    // Two pixels share a byte. A comparison done on the PACKED bytes with a
+    // nibble-masking slip would miss one of the two halves, and the edit would be
+    // silently dropped as a no-op — so both are asserted, at the same byte.
+    for (const i of [0, 1]) {                 // pixel 0 = high nibble, pixel 1 = low
+      const before = buf();
+      const after = buf();
+      after.data[i] = 1;
+      expect(tileBytesIfChanged(before, after), `pixel ${i}`).not.toBeNull();
+    }
+  });
+
+  it('treats a shape change as a change', () => {
+    const before: PixelBuffer = { width: 8, height: 8, data: new Uint8Array(64) };
+    const after: PixelBuffer = { width: 4, height: 16, data: new Uint8Array(64) };
+    expect(tileBytesIfChanged(before, after)).not.toBeNull();
+  });
+
+  it('knows nothing about locks — that verdict belongs to the callers', () => {
+    // Deliberate: the transform resolver has to distinguish "no-op" (silent) from
+    // "locked" (toasted), and folding the two together here is what forced it to
+    // lie about the lock. Same inputs, same answer, whatever the caller's state.
+    const before = buf();
+    const after = buf();
+    after.data[0] = 5;
+    expect(tileBytesIfChanged(before, after)).not.toBeNull();
+    expect(tileBytesIfChanged(after, after)).toBeNull();
   });
 });

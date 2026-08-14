@@ -34,16 +34,21 @@
 //
 // RULE C — locked refuses the write, and the no-op rule still applies first.
 //   A transform that changes nothing (wrap-shifting a uniform tile, flipping a
-//   symmetric one) must not mint an undo entry even when unlocked — that is
-//   classic-tile-gesture's rule 3, and it is reused here rather than restated. A
-//   locked tile that WOULD have changed gets a refusal message; a locked tile
+//   symmetric one) must not mint an undo entry even when unlocked — the same
+//   rule as classic-tile-gesture's rule 3, and both call the ONE implementation
+//   of it, `tileBytesIfChanged` in classic-tile-buffer.ts. (This module used to
+//   reach it by calling `resolveTileGesture` with a synthesised GestureResult and
+//   `locked: false` — a lock-aware function asked to lie about the lock, two
+//   lines above where this file makes its own lock decision. It no longer
+//   depends on the gesture module at all.)
+//   A locked tile that WOULD have changed gets a refusal message; a locked tile
 //   whose transform was a no-op anyway gets silence, because there is nothing to
 //   explain.
 
 import { createBuffer, flipH, flipV, rotate90, wrapShift } from './pixel-ops';
 import type { PixelBuffer } from './pixel-ops';
 import type { Selection } from './pixel-edit-controller';
-import { resolveTileGesture } from './classic-tile-gesture';
+import { tileBytesIfChanged } from './classic-tile-buffer';
 
 /** The actions the shared option bar's transform grid can arm (ArtToolOptions'
  *  TRANSFORMS table). `artStore.pendingAction` is typed `string | null`, so this
@@ -136,10 +141,12 @@ export function resolveTileTransform(
 
   const after = splice(before, apply(action, extract(before, region)), region);
 
-  // rule C. Asked UNLOCKED on purpose: `resolveTileGesture` folds "locked" and
-  // "nothing changed" into the same null, and those two want different messages.
-  const written = resolveTileGesture(before, { buffer: after }, false);
-  if (!written.bytes) return NOTHING;                    // genuine no-op — no undo entry, no toast
+  // rule C, in the order the two verdicts have to be asked. `tileBytesIfChanged`
+  // is lock-blind by design (classic-tile-buffer), so "nothing changed" is
+  // settled first and stays silent; only a transform that WOULD have written
+  // gets to be refused out loud.
+  const bytes = tileBytesIfChanged(before, after);
+  if (!bytes) return NOTHING;                            // genuine no-op — no undo entry, no toast
   if (locked) return { bytes: null, refusal: 'This tile is view-only — transform refused.' };
-  return { bytes: written.bytes, refusal: null };
+  return { bytes, refusal: null };
 }

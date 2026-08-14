@@ -69,8 +69,15 @@ describe('resolveTileGesture — locked tiles (rule 2)', () => {
     expect(resolveTileGesture(before, c.end(3, 0), true).bytes).toBeNull();
   });
 
-  // The load-bearing case: a select MOVE carries both a marquee and moved pixels.
-  // On a locked tile the marquee must land and only the pixels are refused.
+  // A select MOVE carries both a marquee and moved pixels, and this resolver
+  // answers them separately: the pixels are refused, the marquee is not.
+  //
+  // THAT ANSWER IS RIGHT AND IT IS NOT ENOUGH, which is the case below. A marquee
+  // that MOVED on a tile whose pixels did not is a marquee marking a region its
+  // contents never went to — correct per rule 2 read literally, and wrong on
+  // screen. The fix is upstream of here: the host withholds the selection from
+  // `begin` while locked, so this gesture cannot be produced at all. Kept because
+  // the resolver's contract still has to hold for whatever does reach it.
   it('applies the moved marquee on a locked tile while refusing the moved pixels', () => {
     const before = buf8((x, y) => (x < 2 && y < 2 ? 5 : 0));
     const sel = { x: 0, y: 0, w: 2, h: 2 };
@@ -83,6 +90,37 @@ describe('resolveTileGesture — locked tiles (rule 2)', () => {
     expect(locked.bytes).toBeNull();
     // unlocked, the same gesture is a real write
     expect(resolveTileGesture(before, r, false).bytes).not.toBeNull();
+  });
+
+  // THE MECHANISM TileTab USES TO KEEP `select` READ-ONLY, executed against the
+  // real controller. `PixelViewport`'s `gestureSelection` prop is what feeds
+  // `begin`, and TileTab passes `locked ? null : selection` — the marquee is still
+  // DRAWN, just withheld from the gesture. The controller only takes its move
+  // branch when `begin` receives a non-null selection, so this is the whole fix.
+  it('a selection withheld from begin() turns an inside-drag into a new marquee, not a move', () => {
+    const before = buf8((x, y) => (x < 2 && y < 2 ? 5 : 0));
+    const sel = { x: 0, y: 0, w: 2, h: 2 };
+
+    // What the host does while LOCKED: same pointer path, selection withheld.
+    const c = new PixelEditController(cfg('select'));
+    c.begin(before, 0, 0, null);
+    const r = c.end(4, 4);
+    // The buffer comes back untouched — no pixels were cut out of the snapshot.
+    expect(Array.from(r.buffer.data), 'the withheld gesture still moved pixels')
+      .toEqual(Array.from(before.data));
+    // And the marquee is the one just dragged out, not `sel` relocated.
+    expect(r.selection).toEqual({ x: 0, y: 0, w: 5, h: 5 });
+    const out = resolveTileGesture(before, r, true);
+    expect(out.applySelection).toBe(true);               // rule 2 still holds: selecting works
+    expect(out.bytes).toBeNull();
+
+    // The negative half: hand the SAME selection through and the move branch runs,
+    // which is the behaviour the prop exists to suppress.
+    const c2 = new PixelEditController(cfg('select'));
+    c2.begin(before, 0, 0, sel);
+    const r2 = c2.end(4, 4);
+    expect(Array.from(r2.buffer.data)).not.toEqual(Array.from(before.data));
+    expect(r2.selection).toEqual({ x: 4, y: 4, w: 2, h: 2 });
   });
 });
 

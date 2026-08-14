@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef } from 'react';
-import { anchorAt, anchoredScroll, canvasOriginOf } from './zoom-anchor';
+import { anchorAt, anchoredScroll, canvasOriginOf, AnchorSlot } from './zoom-anchor';
 
 /**
  * Cursor-anchored wheel zoom for a scroll-container pixel canvas: the art pixel
@@ -22,6 +22,16 @@ import { anchorAt, anchoredScroll, canvasOriginOf } from './zoom-anchor';
  * arithmetic and the explanation (that assumption was this hook's bug: up to
  * ~2.4 art px of drift per notch in classic's 240px box).
  *
+ * AN ANCHOR IS SPENT OR DROPPED, NEVER LEFT. It only means anything for the zoom
+ * change it was captured for; carried past that, the next zoom from ANY source
+ * (the option bar's ZoomControl, a preset) snaps the view to a pointer position
+ * the user is no longer at. `AnchorSlot` enforces the "spent" half by making the
+ * read consuming; the wheel handler enforces the "dropped" half by clearing when
+ * the store's clamp refused the change. One residual, small enough to leave: if
+ * the STORE zoom moves while the CAPPED zoom (`zoom-cap`) does not, this hook's
+ * layout effect does not run and the anchor survives to the next capped change.
+ * That needs a canvas already at the 16000px ceiling — no host reaches it today.
+ *
  * @param scrollerRef the overflow:auto container element
  * @param canvasRef   the CANVAS inside it — the element the art is drawn on, not
  *                    its holder, since the holder's padding is part of K
@@ -38,7 +48,12 @@ export function useAnchoredZoom(
   setZoom: (z: number) => void,
   factor = 2,
 ): void {
-  const anchor = useRef<{ cx: number; cy: number; sx: number; sy: number } | null>(null);
+  // A one-shot slot, not a bare ref: the anchor must be spent by the ONE zoom
+  // change it was captured for or dropped, and `AnchorSlot.take()` is what makes
+  // "read it, then bail on a guard" impossible to write. See its docblock for
+  // the two stale-anchor paths this closed.
+  const slotRef = useRef<AnchorSlot | null>(null);
+  if (!slotRef.current) slotRef.current = new AnchorSlot();
   const zoomRef = useRef(zoom);
   zoomRef.current = zoom;
 
@@ -47,6 +62,7 @@ export function useAnchoredZoom(
     if (!scroller) return;
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
+      const slot = slotRef.current!;
       const canvas = canvasRef.current;
       const rect = scroller.getBoundingClientRect();
       const sx = e.clientX - rect.left, sy = e.clientY - rect.top;
@@ -57,15 +73,25 @@ export function useAnchoredZoom(
       // anchoring to a lie.
       if (canvas) {
         const c = canvas.getBoundingClientRect();
-        anchor.current = {
+        slot.capture({
           cx: anchorAt(sx, c.left - rect.left, z),
           cy: anchorAt(sy, c.top - rect.top, z),
           sx, sy,
-        };
+        });
       } else {
-        anchor.current = null;
+        slot.clear();
       }
-      setZoom(getZoom() * (e.deltaY < 0 ? factor : 1 / factor));
+      // A ZOOM THE STORE REFUSED LEAVES NO ANCHOR BEHIND. Wheeling up at the
+      // store's ceiling (or down at its floor) returns the same number, so
+      // nothing re-renders and the layout effect below never runs — the anchor
+      // would sit in the slot until some UNRELATED zoom change spent it (the
+      // option bar's ZoomControl, which classic now exposes) and jumped the view
+      // to a pointer position from another gesture. Comparing the store's own
+      // value across `setZoom` asks the clamp rather than guessing its bounds,
+      // which differ per host (artStore 2..64, spriteStore its own).
+      const before = getZoom();
+      setZoom(before * (e.deltaY < 0 ? factor : 1 / factor));
+      if (getZoom() === before) slot.clear();
     };
     scroller.addEventListener('wheel', onWheel, { passive: false });
     return () => scroller.removeEventListener('wheel', onWheel);
@@ -76,9 +102,14 @@ export function useAnchoredZoom(
   // Once the canvas has resized to the new zoom, scroll so the captured art point
   // is back under the same screen position.
   useLayoutEffect(() => {
-    const a = anchor.current, scroller = scrollerRef.current, canvas = canvasRef.current;
+    // CONSUMING READ, and it happens before the guards on purpose: an anchor
+    // belongs to the zoom change it was captured for, so bailing out below must
+    // still spend it. The canvas-null guard used to sit above the line that
+    // cleared the slot, which left the anchor to be applied at some later,
+    // unrelated zoom.
+    const a = slotRef.current!.take();
+    const scroller = scrollerRef.current, canvas = canvasRef.current;
     if (!a || !scroller || !canvas) return;
-    anchor.current = null;
     // Read the geometry AFTER the resize: `getBoundingClientRect` flushes layout,
     // so the scroll offsets read next are the browser's own re-clamped ones and
     // `canvasEdge + scroll` is the new K′ (holder padding plus whatever centring

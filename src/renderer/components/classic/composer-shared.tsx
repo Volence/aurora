@@ -87,10 +87,14 @@ export function useEscapeKey(handler: () => void): void {
 }
 
 /**
- * Escape cancels an in-progress canvas gesture held as a `strokeRef` Map (the
- * Chunk and Block tabs' hand-rolled paint) — matching the viewport's gesture
- * cancel. The Tile tab's stroke lives inside a PixelEditController instead and
- * cancels through `useEscapeKey` directly.
+ * Escape cancels an in-progress canvas gesture held as a `strokeRef` Map — the
+ * shape the Chunk tab's hand-rolled paint uses.
+ *
+ * ONE CALLER TODAY: ChunkTab, the only tab with a `strokeRef` at all. BlockTab
+ * commits per click rather than per drag, so it has neither a stroke to cancel
+ * nor an Escape binding (`useWindowStrokeEnd`'s docblock below says the same of
+ * the release path). The Tile tab's stroke lives inside a PixelEditController
+ * instead and cancels through `useEscapeKey` directly.
  */
 export function useEscapeCancel(strokeRef: React.MutableRefObject<Map<number, number> | null>, redraw: () => void): void {
   useEscapeKey(useCallback(() => {

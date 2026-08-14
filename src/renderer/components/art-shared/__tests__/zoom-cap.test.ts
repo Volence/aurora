@@ -11,6 +11,8 @@
 // white canvas or clicks landing on the wrong pixel — never an exception.
 
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { cappedZoom, MAX_CANVAS_PX } from '../zoom-cap';
 
 /** The expression this function was extracted from (ComposerCanvas's inline
@@ -68,5 +70,37 @@ describe('cappedZoom', () => {
         }
       }
     }
+  });
+});
+
+// ---- call sites -------------------------------------------------------------
+//
+// `contentPx` is DOCUMENTED as the content's larger axis, and the module exists
+// because getting it wrong renders a BLANK canvas with no error — there is no
+// runtime signal to notice. Aeon's composer used to pass the width alone, so a
+// doc taller than it is wide was capped against the wrong dimension: faithfully
+// carried over from the inline expression, and still the exact failure the module
+// describes. Neither host can be rendered here (.tsx), so the argument is pinned
+// by scan; `chunk-pick.ts`'s `fitComposerZoom` already spells the same
+// `Math.max(widthTiles, heightTiles)` for the same reason.
+
+const readHost = (...p: string[]) => readFileSync(join(__dirname, '..', '..', ...p), 'utf8')
+  .replace(/\/\*[\s\S]*?\*\//g, '')
+  .replace(/(^|[^:])\/\/.*$/gm, '$1');
+
+describe('cappedZoom — what the hosts pass it', () => {
+  it('aeon\'s composer caps against the larger axis, not the width', () => {
+    const src = readHost('art', 'ComposerCanvas.tsx');
+    const call = /cappedZoom\(([^;]*?)\);/.exec(src);
+    expect(call, 'ComposerCanvas no longer caps its zoom at all').not.toBeNull();
+    expect(call![1], 'the composer caps on width alone — a tall doc is under-capped')
+      .toMatch(/Math\.max\(\s*doc\.widthTiles\s*,\s*doc\.heightTiles\s*\)/);
+  });
+
+  it('classic\'s tile host caps against the larger axis too', () => {
+    const src = readHost('classic', 'TileTab.tsx');
+    const call = /cappedZoom\(([^;]*?)\);/.exec(src);
+    expect(call, 'TileTab no longer caps its zoom at all').not.toBeNull();
+    expect(call![1]).toMatch(/Math\.max\(\s*buffer\.width\s*,\s*buffer\.height\s*\)/);
   });
 });

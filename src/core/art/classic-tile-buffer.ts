@@ -90,3 +90,34 @@ export function tileToBuffer(tiles: Uint8Array, tileIndex: number): PixelBuffer 
 export function bufferToTileBytes(buf: PixelBuffer): Uint8Array {
   return packTilePixels(buf.data);
 }
+
+/** True when two buffers differ in shape or in any pixel. */
+function differs(a: PixelBuffer, b: PixelBuffer): boolean {
+  if (a.width !== b.width || a.height !== b.height || a.data.length !== b.data.length) return true;
+  for (let i = 0; i < a.data.length; i++) if (a.data[i] !== b.data[i]) return true;
+  return false;
+}
+
+/**
+ * The 32 bytes for `after`, or NULL when `after` is byte-identical to `before`.
+ *
+ * "Nothing changed → write nothing" is one rule with two callers —
+ * `classic-tile-gesture` (its rule 3) and `classic-tile-transform` (its rule C,
+ * which used to reach through the gesture resolver with a synthesised result and
+ * `locked: false` purely to borrow this pair). Both spellings mean the same
+ * thing, so it lives here, next to the packer it wraps.
+ *
+ * WHY IT MATTERS: every commit on the classic art-edit path is one
+ * `classicEditTiles`, i.e. exactly one undo entry. A result identical to what is
+ * already in the document must not push one — a plain marquee drag returns the
+ * UNCHANGED snapshot as its buffer, so without this every select drag would mint
+ * an empty undo step.
+ *
+ * DELIBERATELY LOCK-BLIND. It answers "did this change anything", never "is this
+ * allowed" — the two verdicts want different messages (a locked no-op is silent;
+ * a locked change is refused out loud), and folding them together here is what
+ * forced the transform resolver to lie about the lock in the first place.
+ */
+export function tileBytesIfChanged(before: PixelBuffer, after: PixelBuffer): Uint8Array | null {
+  return differs(before, after) ? bufferToTileBytes(after) : null;
+}

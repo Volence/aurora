@@ -32,10 +32,13 @@
 //   load-bearing when the marquee arrived: a plain select drag returns the
 //   UNCHANGED snapshot as its buffer, so without this every marquee drag would
 //   mint an empty undo step for the user to press Ctrl+Z through.
+//   The rule itself is `tileBytesIfChanged` in classic-tile-buffer.ts, because
+//   classic-tile-transform.ts needs the identical verdict; it used to get it by
+//   calling THIS function with a synthesised result and a false `locked`.
 
 import type { PixelBuffer } from './pixel-ops';
 import type { GestureResult, Selection } from './pixel-edit-controller';
-import { bufferToTileBytes } from './classic-tile-buffer';
+import { tileBytesIfChanged } from './classic-tile-buffer';
 
 export interface TileGestureOutcome {
   /** The gesture reported a marquee answer — the host must apply `selection`. */
@@ -44,13 +47,6 @@ export interface TileGestureOutcome {
   selection: Selection | null;
   /** The 32 tile bytes to commit, or null when this gesture writes nothing. */
   bytes: Uint8Array | null;
-}
-
-/** True when two buffers differ in shape or in any pixel. */
-function differs(a: PixelBuffer, b: PixelBuffer): boolean {
-  if (a.width !== b.width || a.height !== b.height || a.data.length !== b.data.length) return true;
-  for (let i = 0; i < a.data.length; i++) if (a.data[i] !== b.data[i]) return true;
-  return false;
 }
 
 /**
@@ -65,7 +61,9 @@ export function resolveTileGesture(
 ): TileGestureOutcome {
   const applySelection = result.selection !== undefined;   // rule 1
   const selection = result.selection ?? null;
-  // rules 2 and 3: the marquee answer above survives both of these.
-  if (locked || !differs(before, result.buffer)) return { applySelection, selection, bytes: null };
-  return { applySelection, selection, bytes: bufferToTileBytes(result.buffer) };
+  // rules 2 and 3: the marquee answer above survives both of these. Rule 3 is
+  // `tileBytesIfChanged` (classic-tile-buffer), shared with the transform
+  // resolver so the "nothing changed → no undo entry" rule has one spelling.
+  if (locked) return { applySelection, selection, bytes: null };
+  return { applySelection, selection, bytes: tileBytesIfChanged(before, result.buffer) };
 }

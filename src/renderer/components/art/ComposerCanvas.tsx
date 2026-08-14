@@ -142,7 +142,14 @@ export default function ComposerCanvas() {
   const effectiveZoom = useMemo(() => {
     const doc = open?.doc;
     if (!doc) return zoom;
-    return cappedZoom(zoom, doc.widthTiles * 8 * (repeatPreview ? 3 : 1));
+    // LARGER AXIS, which is what `cappedZoom` documents its argument to be. This
+    // used to pass the width alone, so a doc taller than it is wide was capped
+    // against the wrong dimension and could still produce a canvas past the
+    // 16000px ceiling — which renders BLANK with no error. The change can only
+    // ever LOWER the cap, and only for a doc over ~666 tiles tall (×3 with the
+    // repeat preview); composer docs are chunks, so nothing shipped today gets
+    // near it. Strictly safer, and no reachable behaviour difference.
+    return cappedZoom(zoom, Math.max(doc.widthTiles, doc.heightTiles) * 8 * (repeatPreview ? 3 : 1));
   }, [open, zoom, repeatPreview]);
 
   // ---------- resolved render inputs ----------
@@ -388,7 +395,10 @@ export default function ComposerCanvas() {
   const scrollerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   useAnchoredZoom(scrollerRef, canvasRef, effectiveZoom, () => useArtStore.getState().zoom, (z) => useArtStore.getState().setZoom(z));
-  useHandPan(scrollerRef);
+  // Gated: this canvas is LEVEL-side and stays mounted (display:none) under a
+  // sprite-doc tab, and the pan hook's Space keydown is on `window`. Ungated it
+  // would swallow Space from a focused button in SpriteMode.
+  useHandPan(scrollerRef, { enabled: levelKeysEnabled });
 
   // Tile-space tools (stamp/collision) are tile-space by nature — route them to
   // the host hook whenever selected, regardless of the px/tile tab state.

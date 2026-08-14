@@ -198,7 +198,7 @@ describe('the tile editor zooms and pans', () => {
     // is never mounted is a silent no-op: `scrollerRef.current` is null in the
     // effect, it returns early, and no listener is ever bound.
     expect(TILE_TAB_CODE).toMatch(/useAnchoredZoom\(\s*scrollerRef\s*,/);
-    expect(TILE_TAB_CODE).toMatch(/useHandPan\(\s*scrollerRef\s*\)/);
+    expect(TILE_TAB_CODE).toMatch(/useHandPan\(\s*scrollerRef\s*[,)]/);
     expect(TILE_TAB_CODE, 'scrollerRef is never attached to an element').toMatch(/ref=\{scrollerRef\}/);
   });
 
@@ -209,6 +209,21 @@ describe('the tile editor zooms and pans', () => {
     expect(TILE_TAB_CODE, "the canvas style must keep border: 'none'").toMatch(/border:\s*'none'/);
   });
 
+  // ESCAPE ARMS A FLAG THAT ONLY `onCommit` DISARMS, and `onCommit` needs
+  // PixelViewport's `drawing` ref to survive to a `pointerup`. There is no
+  // `onPointerCancel` on the viewport (the shared fix is deliberately deferred),
+  // so a cancelled pointer leaves the flag armed with no `end()` coming — and the
+  // next COMPLETED stroke is then dropped with no toast at all. Bounding the flag
+  // to one tile does not close that hole; it stops it outliving the tile, which is
+  // the difference between a papercut and losing work on a tile you came back to.
+  it('disarms the Escape-cancel flag when the tile changes', () => {
+    const effect = /useEffect\(\(\) => \{([\s\S]*?)\}, \[composerTileIndex\]\)/.exec(TILE_TAB_CODE);
+    expect(effect, 'the per-tile reset effect is gone — where does the marquee reset now?').not.toBeNull();
+    expect(effect![1], 'the per-tile reset drops the marquee but leaves the cancel flag armed')
+      .toMatch(/cancelledRef\.current\s*=\s*false/);
+    expect(effect![1]).toMatch(/setSelection\(null\)/);
+  });
+
   it('does not repaint the tile strip on zoom', () => {
     // The browse strip is ~1000 thumbnails keyed on two fine clocks. Folding a
     // zoom into that key would redraw all of them on every wheel notch, for a
@@ -216,5 +231,27 @@ describe('the tile editor zooms and pans', () => {
     const key = /const versionKeyFor\s*=[^\n]*\n?/.exec(TILE_TAB_CODE);
     expect(key, 'versionKeyFor is gone — check what the strip is keyed on now').not.toBeNull();
     expect(key![0], 'the tile strip key depends on zoom').not.toMatch(/zoom/i);
+  });
+});
+
+// WHO ACTUALLY HAS AN ESCAPE CANCEL. Two comments this phase introduced said the
+// Chunk AND Block tabs' hand-rolled paint cancels on Escape; BlockTab has neither
+// a `strokeRef` nor an Escape binding — it commits per click — and the same file
+// (composer-shared) got it right two docblocks further down. The comments are
+// fixed; this is what keeps them fixed, since prose cannot be type-checked.
+describe('the composer tabs\' Escape cancel', () => {
+  const readClassic = (f: string) => readFileSync(join(__dirname, '..', '..', 'components', 'classic', f), 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/(^|[^:])\/\/.*$/gm, '$1');
+
+  it('is ChunkTab\'s alone — BlockTab has no stroke to cancel', () => {
+    expect(readClassic('ChunkTab.tsx'), 'ChunkTab lost its Escape cancel').toMatch(/useEscapeCancel\(/);
+    expect(readClassic('BlockTab.tsx'), 'BlockTab grew one — the shared docblocks now understate it')
+      .not.toMatch(/useEscapeCancel\(|strokeRef/);
+  });
+
+  it('is the Tile tab\'s through the controller, not a strokeRef', () => {
+    expect(TILE_TAB_CODE).toMatch(/useEscapeKey\(/);
+    expect(TILE_TAB_CODE, 'the tile tab grew a hand-rolled stroke map').not.toMatch(/strokeRef/);
   });
 });

@@ -249,3 +249,26 @@ describe('isTileTransform', () => {
     for (const a of ['pencil', 'shift', 'rotate-90 ', 'FLIP-H']) expect(isTileTransform(a), a).toBe(false);
   });
 });
+
+// A STRUCTURAL claim, and the only kind of assertion that can hold it: this
+// module used to synthesise a fake `GestureResult` and call `resolveTileGesture`
+// with `locked: false` — a lock-aware function asked to lie about the lock, two
+// lines above where this module makes its own lock decision — purely to borrow a
+// private `differs` + packer pair. That pair is now `tileBytesIfChanged` in
+// classic-tile-buffer, and the dependency is gone. Nothing about the behaviour
+// above would change if it came back, so the shape is what gets pinned.
+describe('classic-tile-transform does not reach through the gesture resolver', () => {
+  it('imports the shared no-op rule, not classic-tile-gesture', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { join } = await import('node:path');
+    const src = readFileSync(join(__dirname, '..', 'classic-tile-transform.ts'), 'utf8')
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/(^|[^:])\/\/.*$/gm, '$1');            // comment-stripped: the docblock discusses both by name
+    expect(src, 'the transform module depends on classic-tile-gesture again')
+      .not.toMatch(/from\s*'\.\/classic-tile-gesture'/);
+    expect(src, 'resolveTileGesture is being called from the transform path')
+      .not.toMatch(/\bresolveTileGesture\b/);
+    expect(src, 'the shared no-op rule is not the one being used')
+      .toMatch(/\btileBytesIfChanged\(/);
+  });
+});

@@ -20,6 +20,7 @@ import { cappedZoom } from '../art-shared/zoom-cap';
 import { TileThumb } from './composer-thumbs';
 import { COMPOSER_CHECK_RGB, COMPOSER_SWATCH_A, COMPOSER_SWATCH_B } from '../../canvas/canvas-colors';
 import { hex, SharedBanner, useEditableTileRange, useEscapeKey, tileLockReason, styles } from './composer-shared';
+import { levelKeysEnabled } from '../../workspace/level-keys';
 
 // Tile tab — 8x8 pixel editor for the selected tile, drawn and edited through the
 // SHARED pixel substrate (PixelViewport + PixelEditController), the same engine
@@ -70,7 +71,20 @@ const TILE_SCROLLER: React.CSSProperties = {
  *  cares about (that is measured from the canvas's own rect). */
 const TILE_HOLDER: React.CSSProperties = { margin: 'auto', padding: 6, lineHeight: 0 };
 
-/** Tools that only READ the tile, so a locked tile may still run them. */
+/**
+ * Tools a LOCKED tile may still hand to the controller.
+ *
+ * `eyedropper` reads a pixel and returns; it cannot write by construction.
+ * `select` is here because a locked tile still takes marquees (classic-tile-
+ * gesture's rule 2) — but ONLY because `gestureSelection` below withholds the
+ * existing marquee from `controller.begin` while locked. With the selection
+ * handed through, a pointerdown inside it takes the controller's MOVE branch,
+ * which relocates pixels and returns a moved marquee; the pixels would be
+ * refused and the marquee would not, leaving it marking a region it never came
+ * from. Withheld, the same drag can only draw a new marquee over the unchanged
+ * snapshot, so the name on this set is true. Do not add a tool here without
+ * checking `pixel-edit-controller.ts` for a write path.
+ */
 const READ_ONLY_TOOLS = new Set(['eyedropper', 'select']);
 
 export default function TileTab({ doc, usage }: { doc: LevelDoc; usage: UsageIndex }) {
@@ -156,19 +170,40 @@ export default function TileTab({ doc, usage }: { doc: LevelDoc; usage: UsageInd
   const scrollerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   useAnchoredZoom(scrollerRef, canvasRef, effectiveZoom, () => useArtStore.getState().zoom, (z) => useArtStore.getState().setZoom(z));
-  useHandPan(scrollerRef);
+  // GATED, unlike the zoom hook above it. The pan hook's Space keydown is on
+  // `window`, and this pane stays MOUNTED (display:none) while a sprite-doc tab is
+  // active (App.tsx:204) — so ungated it would `preventDefault()` Space away from
+  // a focused button in SpriteMode. Same rule, same predicate, as the Escape
+  // binding below (composer-shared's `useEscapeKey` applies it centrally). The
+  // zoom hook needs no gate: its listener is on the scroller element, which a
+  // hidden pane cannot deliver events to.
+  useHandPan(scrollerRef, { enabled: levelKeysEnabled });
 
   const [selection, setSelection] = useState<Selection | null>(null);
-  // A marquee is a region of ONE tile; browsing to another tile leaves it behind.
-  // Deliberately keyed on the tile index only, NOT on `doc` — `doc` is a new object
-  // after every commit, so that would drop the selection on each stroke.
-  useEffect(() => { setSelection(null); }, [composerTileIndex]);
-
   // Set by the Escape handler below and read by onCommit; declared up here so the
   // two sit either side of the ref rather than the callback closing over a
   // binding that appears further down the body.
   const cancelledRef = useRef(false);
   const [, bumpFrame] = useState(0);
+
+  // A marquee is a region of ONE tile; browsing to another tile leaves it behind.
+  // Deliberately keyed on the tile index only, NOT on `doc` — `doc` is a new object
+  // after every commit, so that would drop the selection on each stroke.
+  //
+  // THE CANCEL FLAG IS SCOPED TO ONE TILE, and is disarmed here for the same
+  // reason. It is otherwise cleared only inside `onCommit`, which needs
+  // PixelViewport's `drawing` ref to survive to a `pointerup` — and there is no
+  // `onPointerCancel` on the viewport, so a cancelled pointer (a touch turned into
+  // a scroll, a browser interrupt) leaves `drawing.current === true` and no
+  // `end()` ever arrives. An Escape that armed the flag just before that would
+  // otherwise leave it armed indefinitely, and the next COMPLETED stroke would be
+  // silently discarded with no toast. Bounding it to the tile does not close the
+  // hole — the clean fix is the deferred `onPointerCancel` noted below — but it
+  // does stop a stale flag outliving the tile it was armed on.
+  useEffect(() => {
+    setSelection(null);
+    cancelledRef.current = false;
+  }, [composerTileIndex]);
 
   // THE ONE WRITE PATH. Every edit this tab makes — stroke, paste, transform —
   // goes through here, so every edit is exactly one `classicEditTiles`, i.e. one
@@ -245,15 +280,28 @@ export default function TileTab({ doc, usage }: { doc: LevelDoc; usage: UsageInd
   // a live working buffer for a drag whose commit is then refused, which reads as
   // "the pencil is broken" rather than "this tile is view-only". PixelViewport routes
   // every pointer event to `hostPointer` when one is supplied, so an inert host hook
-  // is how a tile refuses input outright — while eyedropper and marquee select (both
-  // read-only) keep going straight to the controller.
+  // is how a tile refuses input outright — while eyedropper and marquee select (the
+  // READ_ONLY_TOOLS) keep going straight to the controller.
+  //
+  // THE SELECT EXCEPTION IS TWO PARTS, and this is only the first. Letting `select`
+  // past the inert hook is what makes classic-tile-gesture's RULE 2 reachable — a
+  // locked tile still takes marquees, because selecting is reading. But select is
+  // NOT unconditionally read-only: a pointerdown inside an existing marquee is the
+  // controller's move branch, which relocates pixels and returns a moved marquee
+  // (pixel-edit-controller.ts:142/:213). The write is refused downstream by rule 2's
+  // own lock check; the MARQUEE is not, and would land somewhere its pixels never
+  // went. `gestureSelection` below is the second part: while locked, the viewport
+  // draws the marquee but withholds it from `controller.begin`, so the move branch
+  // is never entered and the only thing a drag inside it can do is draw a new
+  // marquee over an unchanged snapshot.
   const inertPointer = useMemo<HostPointer>(() => ({ down() {}, move() {}, up() {} }), []);
   const hostPointer = locked && !READ_ONLY_TOOLS.has(config.tool) ? inertPointer : null;
 
   // ESCAPE CANCELS AN IN-PROGRESS STROKE — the behaviour the hand-rolled editor
   // had through `useEscapeCancel` and that the move to PixelViewport dropped
-  // silently (ChunkTab and BlockTab still have it; the viewport has no keyboard
-  // handling at all).
+  // silently (ChunkTab still has it — it is `useEscapeCancel`'s only caller;
+  // BlockTab commits per click and has neither a strokeRef nor an Escape
+  // binding. The viewport has no keyboard handling at all.)
   //
   // TWO STEPS, because the gesture state is split across two owners. Ending the
   // controller is what kills the stroke: `end()` resets its snapshot, path and
@@ -357,6 +405,7 @@ export default function TileTab({ doc, usage }: { doc: LevelDoc; usage: UsageInd
               zoom={effectiveZoom}
               controller={controllerRef.current}
               selection={selection}
+              gestureSelection={locked ? null : selection}
               layers={{ checkerboard: true, checkerScale: 1, checkerColors: COMPOSER_CHECK_RGB, grids: ['pixel'] }}
               hostPointer={hostPointer}
               onCommit={onCommit}
