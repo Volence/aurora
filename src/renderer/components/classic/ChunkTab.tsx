@@ -231,8 +231,10 @@ export default function ChunkTab({ doc, usage }: { doc: LevelDoc; usage: UsageIn
         <div style={styles.paletteStrip}>
           {doc.blocks.map((_, id) => (
             <BlockThumb
-              key={id} doc={doc} blockId={id} size={34} versionKey={versionKey}
-              selected={id === composerBlockId} usage={usage.blockUsage(id)} onSelect={setComposerBlockId}
+              key={id} blockId={id} size={34} versionKey={versionKey}
+              selected={id === composerBlockId}
+              containers={usage.blockUsage(id).containers} cells={usage.blockUsage(id).cells}
+              onSelect={setComposerBlockId}
             />
           ))}
         </div>

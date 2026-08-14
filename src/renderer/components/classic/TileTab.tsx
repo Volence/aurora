@@ -255,9 +255,9 @@ export default function TileTab({ doc, usage }: { doc: LevelDoc; usage: UsageInd
         <div style={styles.paletteStrip}>
           {Array.from({ length: tileCount }, (_, id) => (
             <TileThumb
-              key={id} doc={doc} tileIndex={id} palLine={composerPalLine} size={26} versionKey={versionKeyFor(id)}
+              key={id} tileIndex={id} palLine={composerPalLine} size={26} versionKey={versionKeyFor(id)}
               selected={id === composerTileIndex} locked={tileLockReason(range, id) !== null}
-              usage={usage.tileUsage(id)}
+              containers={usage.tileUsage(id).containers} cells={usage.tileUsage(id).cells}
               onSelect={setComposerTileIndex}
             />
           ))}

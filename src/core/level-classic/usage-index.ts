@@ -112,15 +112,16 @@ export function buildUsageIndex(doc: LevelDoc): UsageIndex {
     tileToBlocks,
     blockToChunks,
     chunkPlacements,
-    // Usage objects are built ONCE per index and handed out by identity.
+    // Usage objects are built ONCE per index and handed out by identity, so a
+    // caller that queries the same id repeatedly (the composer tabs do, once per
+    // thumbnail per render) allocates nothing after the first hit. The index is
+    // rebuilt whenever the doc changes, so caching here is safe: an entry can
+    // never outlive the content it describes.
     //
-    // These feed `React.memo`'d thumbnails (composer-thumbs' TileThumb /
-    // BlockThumb) as a prop. Returning a fresh `{containers, cells}` per call
-    // made every such prop reference-unequal on every render, so the memo never
-    // held — measured on GHZ act 1, 819 of 965 tiles handed back a fresh object
-    // per call, i.e. 819 thumbnails re-rendered on any unrelated store change.
-    // The index is rebuilt whenever the doc changes, so caching here is safe:
-    // an entry can never outlive the content it describes.
+    // NOTE this identity is NOT what keeps the thumbnails' `React.memo` holding
+    // across an edit — it cannot be, since a commit builds a whole new index. The
+    // thumbnails take `containers`/`cells` as NUMBERS for exactly that reason;
+    // see the prop note in renderer/components/classic/composer-thumbs.tsx.
     tileUsage(tileIndex: number): Usage {
       let u = tileUsageCache.get(tileIndex);
       if (u) return u;
