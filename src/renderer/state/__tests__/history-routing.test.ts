@@ -17,12 +17,12 @@ import {
   classicSetLayoutCells,
 } from '../classicLevelStore';
 import { useClassicProjectStore } from '../classicProjectStore';
-import { focusedHistory } from '../editorStore';
+import { focusedHistory, useEditorStore } from '../editorStore';
 import { useSessionStore } from '../sessionStore';
 import { useSpriteStore, openSpriteDoc } from '../spriteStore';
 import { UNTITLED_SPRITE_TAB_ID } from '../../shell/tabs';
 import { useWorkspaceStore } from '../../workspace/workspaceStore';
-import { focusClassicSurface } from '../../components/classic/classic-surface';
+import { focusClassicSurface, SURFACE_FACETS } from '../../components/classic/classic-surface';
 import { openReady } from './helpers/classic-fixture';
 
 const st = () => useClassicLevelStore.getState();
@@ -175,6 +175,10 @@ describe('focusedHistory', () => {
     registerHistoryFactories();
     useWorkspaceStore.getState().reset();
     useSpriteStore.getState().closeAll();
+    // focusClassicSurface goes through switchFacet, which re-scopes the tool.
+    // editorStore has no reset() and `tool` is a cross-engine singleton, so it is
+    // restored by hand — same as classicLevelStore.test.ts's beforeEach.
+    useEditorStore.setState({ tool: 'view', selection: null, pasting: false } as never);
     openReady();
   });
 
@@ -230,10 +234,16 @@ describe('focusedHistory', () => {
   });
 
   // --- Classic surfaces drive the facet -----------------------------------
-  // The classic view has no facet bar, so nothing used to call setFacet for a
-  // classic tab: facetFor fell back to 'layout' and a Ctrl+Z after an art edit
-  // reverted an unrelated LAYOUT step while leaving the art edit in place. The
-  // classic surfaces now claim the facet as the user works in them.
+  // Classic had no facet bar, so nothing ever recorded a facet for a classic
+  // tab: facetFor fell back to 'layout' and a Ctrl+Z after an art edit reverted
+  // an unrelated LAYOUT step while leaving the art edit in place. The classic
+  // surfaces now claim the facet as the user works in them (classic-surface.ts,
+  // via facet-tools.switchFacet).
+  //
+  // These four exercise the ROUTING consequence — which document Ctrl+Z lands
+  // on. What a claim does to the facet itself, including the cases where it
+  // deliberately does nothing (classic's four facets are served by two
+  // surfaces), belongs to components/classic/__tests__/classic-surface.ts.
 
   it('working in the classic ART surface routes undo to the zone-art document', () => {
     useSessionStore.setState({ activeId: 'level:ghz:1' });
@@ -265,6 +275,28 @@ describe('focusedHistory', () => {
     useSessionStore.setState({ activeId: 'doc:sprite:s1:18' });
     focusClassicSurface('art');
     expect(useWorkspaceStore.getState().record['doc:sprite:s1:18']).toBeUndefined();
+  });
+
+  it('EVERY facet a classic surface serves routes to that surface\'s document', () => {
+    // The two tests above only exercise each surface's PRIMARY facet. A surface
+    // serves a pair (classic has four facets and two canvases), and which
+    // document a facet edits is stated twice — SURFACE_FACETS here and
+    // editorStore's ZONE_ART_FACETS. Drift between them repoints Ctrl+Z at the
+    // wrong document with no other symptom, which is the exact bug this whole
+    // section exists for. Read from the real map so a facet added to a set has
+    // to be answered here.
+    const expected = { map: 'level:ghz:1', art: 'zoneart:ghz' } as const;
+    useSessionStore.setState({ activeId: 'level:ghz:1' });
+    for (const [surface, facets] of Object.entries(SURFACE_FACETS)) {
+      for (const facet of facets) {
+        useWorkspaceStore.getState().setFacet('level:ghz:1', facet);
+        focusClassicSurface(surface as keyof typeof expected);
+        // The claim must not have moved the facet — it already serves this one.
+        expect(useWorkspaceStore.getState().facetFor('level:ghz:1'), facet).toBe(facet);
+        expect(focusedHistory(), `${surface}/${facet}`)
+          .toBe(documentHistoryHub.historyFor(expected[surface as keyof typeof expected]));
+      }
+    }
   });
 
   it('undo with a sprite tab focused reverts THAT sprite document', () => {

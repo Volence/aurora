@@ -6,8 +6,10 @@
 // other document, reverting an edit the user never asked about, and nothing else
 // in the suite would notice.
 //
-// So this is a source-level wiring guard: every file that issues a classic edit
-// command must either claim a surface itself or sit inside one that does.
+// So the FIRST half of this file is a source-level wiring guard: every file that
+// issues a classic edit command must either claim a surface itself or sit inside
+// one that does. The SECOND half tests focusClassicSurface's own behaviour —
+// which facet a claim lands on, and when it deliberately does nothing.
 //
 // SCAN ROOTS: this has now been widened TWICE, each time after a relocation
 // walked a call site out of the scan rather than out of the codebase.
@@ -28,10 +30,16 @@
 // It is deliberately not a filename assertion — the files under these roots move
 // every other task; a root going missing is the failure worth catching.
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import type { ClassicSurface } from '../classic-surface';
+import { focusClassicSurface, SURFACE_FACETS, type ClassicSurface } from '../classic-surface';
+import { useWorkspaceStore } from '../../../workspace/workspaceStore';
+import { toolsForFacet } from '../../../workspace/facet-tools';
+import { useSessionStore } from '../../../state/sessionStore';
+import { useEditorStore } from '../../../state/editorStore';
+import { useProjectStore } from '../../../state/projectStore';
+import { useClassicProjectStore } from '../../../state/classicProjectStore';
 
 /** `src/renderer` — paths below are relative to it, POSIX-separated. */
 const RENDERER = join(__dirname, '..', '..', '..');
@@ -165,5 +173,187 @@ describe('classic surfaces claim their facet', () => {
     // store: the claim rides in on the classic port's `rootProps`, so THAT is
     // what has to keep declaring it.
     expect(code('providers/object-list-classic.ts')).toContain("classicSurfaceProps('map')");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The claim itself. Everything above is source-level wiring; this is behaviour.
+// ---------------------------------------------------------------------------
+// Classic has FOUR facets and TWO surfaces, because each surface is the canvas
+// of a pair (layout+objects share ClassicLevelViewport; art+palette share the
+// composer). A surface claiming ONE facet made the other half of each pair
+// unreachable: the claim fires on every pointer-down, so lighting the Objects
+// pill and then clicking the map wrote `layout` straight back.
+
+const LEVEL_TAB = 'level:ghz:1';
+
+/** The s1 profile's real declaration (core/project/s1/index.ts), as a literal so
+ *  a profile edit has to come through here — the style facet-tools.test.ts uses. */
+const S1_LAYOUT_TOOLS = ['view', 'stamp-chunk', 'select', 'place-object'];
+
+/** No project open ⇒ toolsForFacet falls to the SHELL defaults. `openClassic`
+ *  below is how a test asks for classic's declared sets instead. */
+function closeProjects(): void {
+  useClassicProjectStore.setState({ status: 'closed', capabilities: null } as never);
+  useProjectStore.setState({ project: null, config: null, capabilities: null } as never);
+}
+
+function openClassic(): void {
+  useClassicProjectStore.setState({
+    status: 'open',
+    capabilities: {
+      facets: ['layout', 'art', 'objects', 'palette'],
+      facetTools: { layout: S1_LAYOUT_TOOLS },
+    },
+  } as never);
+}
+
+const facet = (): string => useWorkspaceStore.getState().facetFor(LEVEL_TAB);
+const tool = (): string => useEditorStore.getState().tool;
+
+describe('focusClassicSurface', () => {
+  beforeEach(() => {
+    useWorkspaceStore.getState().reset();
+    useSessionStore.setState({ activeId: LEVEL_TAB } as never);
+    // editorStore has no reset() and `tool` is a cross-engine singleton, so it is
+    // restored by hand — same as classicLevelStore.test.ts's beforeEach.
+    useEditorStore.setState({ tool: 'view', selection: null, pasting: false } as never);
+    closeProjects();
+  });
+  // Both stores get put back, not just the projects: a claim can re-scope the
+  // tool, and `tool` is a cross-engine singleton with no reset() — leaving one
+  // set makes some OTHER suite order-dependent, which is a bad way to find out.
+  afterEach(() => {
+    closeProjects();
+    useEditorStore.setState({ tool: 'view', selection: null, pasting: false } as never);
+  });
+
+  it('claims the surface primary when the facet is on the OTHER surface', () => {
+    useWorkspaceStore.getState().setFacet(LEVEL_TAB, 'art');
+    focusClassicSurface('map');
+    expect(facet()).toBe('layout');
+
+    focusClassicSurface('art');
+    expect(facet()).toBe('art');
+  });
+
+  // The two the 1:1 map got wrong. Without them, Objects and Palette are pills
+  // you can light but not work in.
+  it('leaves OBJECTS alone when the user clicks in the map', () => {
+    useWorkspaceStore.getState().setFacet(LEVEL_TAB, 'objects');
+    focusClassicSurface('map');
+    expect(facet()).toBe('objects');
+  });
+
+  it('leaves PALETTE alone when the user clicks in the composer', () => {
+    useWorkspaceStore.getState().setFacet(LEVEL_TAB, 'palette');
+    focusClassicSurface('art');
+    expect(facet()).toBe('palette');
+  });
+
+  it('from ANY starting facet, a claim lands in one the surface serves', () => {
+    // The closure property, read off the real SURFACE_FACETS: after clicking in
+    // a surface you are always in one of ITS facets — you either already were
+    // (the no-op) or you moved to its primary. Deliberately weaker than the two
+    // cases above, which is why those are spelled out separately: this says
+    // nothing about WHICH of the pair, and a 1:1 map would satisfy it too. What
+    // it catches is a set gaining a facet its surface cannot actually edit.
+    for (const start of ['layout', 'objects', 'art', 'palette'] as const) {
+      for (const [surface, served] of Object.entries(SURFACE_FACETS)) {
+        useWorkspaceStore.getState().setFacet(LEVEL_TAB, start);
+        focusClassicSurface(surface as ClassicSurface);
+        expect(served, `${start} + ${surface}`).toContain(facet());
+      }
+    }
+  });
+
+  it('writes nothing at all when the facet is already served', () => {
+    useWorkspaceStore.getState().setFacet(LEVEL_TAB, 'objects');
+    const before = useWorkspaceStore.getState().record;
+    focusClassicSurface('map');
+    // Object identity, not equality: a redundant setFacet would replace the
+    // record and wake the session-persistence subscription — a localStorage
+    // write on every pointer-down in the level.
+    expect(useWorkspaceStore.getState().record).toBe(before);
+  });
+
+  it('is a no-op when the active tab is not a level tab', () => {
+    // The classic pane stays mounted but hidden while a sprite doc is active; a
+    // hidden surface must never repoint another document's undo.
+    useSessionStore.setState({ activeId: 'doc:sprite:s1:18' } as never);
+    focusClassicSurface('art');
+    expect(useWorkspaceStore.getState().record).toEqual({});
+  });
+});
+
+// switchFacet re-scopes editorStore.tool. That is exactly right on a real
+// surface change and exactly wrong on a redundant one — resetting the tool
+// mid-interaction, on a pointer-down, is the worst possible time. The
+// already-served check above is what prevents it; these pin that down.
+describe('focusClassicSurface and the shared tool', () => {
+  beforeEach(() => {
+    useWorkspaceStore.getState().reset();
+    useSessionStore.setState({ activeId: LEVEL_TAB } as never);
+    useEditorStore.setState({ tool: 'view', selection: null, pasting: false } as never);
+    openClassic();
+  });
+  afterEach(() => {
+    closeProjects();
+    useEditorStore.setState({ tool: 'view', selection: null, pasting: false } as never);
+  });
+
+  it('does not touch the tool when the facet is already served', () => {
+    // `place-object` is the sharp case: it is in classic's DECLARED layout set
+    // but not in the shell default, so a leaked switchFacet('layout') would be
+    // visible either way — kept here, clobbered to 'stamp-chunk' if the profile
+    // declaration were being ignored. Both are wrong; neither may happen.
+    useWorkspaceStore.getState().setFacet(LEVEL_TAB, 'objects');
+    useEditorStore.getState().setTool('place-object');
+    focusClassicSurface('map');
+    expect(facet()).toBe('objects');
+    expect(tool()).toBe('place-object');
+  });
+
+  it('re-scopes the tool to CLASSIC\'s declared set on a real surface change', () => {
+    // Coming back to the map from the composer, `place-object` survives — the s1
+    // manifest declares it for layout even though the shell default omits it.
+    useWorkspaceStore.getState().setFacet(LEVEL_TAB, 'art');
+    useEditorStore.getState().setTool('place-object');
+    focusClassicSurface('map');
+    expect(facet()).toBe('layout');
+    expect(tool()).toBe('place-object');
+  });
+
+  it('never leaves the user holding a tool the dock will not show', () => {
+    // The whole reason this goes through switchFacet rather than setFacet. The
+    // tool is a cross-engine singleton, and the composer facets re-scope nothing
+    // (empty set), so a tool outside classic's vocabulary can be resident when
+    // the user clicks back into the map — `paint-tile` is in the SHELL's layout
+    // default but not in classic's declaration. Landing on layout must clamp it
+    // to the facet default, `view`, because the dock has no button for it: a
+    // resident tool with no button is a mode the user cannot see or leave.
+    expect(S1_LAYOUT_TOOLS).not.toContain('paint-tile');
+    useWorkspaceStore.getState().setFacet(LEVEL_TAB, 'art');
+    useEditorStore.setState({ tool: 'paint-tile' } as never);
+    focusClassicSurface('map');
+    expect(facet()).toBe('layout');
+    expect(tool()).toBe(S1_LAYOUT_TOOLS[0]); // 'view' — the declaration's default
+  });
+
+  it('leaves the tool alone when moving INTO the composer', () => {
+    // `art` has no EditorTool set at all (the composer drives its own tabs), so
+    // toolsForFacet('art') is empty and toolForFacet returns the current tool
+    // untouched. The user gets it back when they return to the map.
+    useWorkspaceStore.getState().setFacet(LEVEL_TAB, 'layout');
+    useEditorStore.getState().setTool('stamp-chunk');
+    focusClassicSurface('art');
+    expect(facet()).toBe('art');
+    expect(tool()).toBe('stamp-chunk');
+  });
+
+  it('the declared layout set is the one the tool dock shows', () => {
+    // The re-scope and the dock must not be able to disagree — both go through
+    // toolsForFacet — so a tool that survives a claim is a tool with a button.
+    expect(toolsForFacet('layout')).toEqual(S1_LAYOUT_TOOLS);
   });
 });
