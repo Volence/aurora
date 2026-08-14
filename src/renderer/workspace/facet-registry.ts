@@ -11,8 +11,15 @@ import React, { type ComponentType } from 'react';
 import { createRegistry, type Registry } from '../../core/shell/registry';
 import type { FacetCapability } from '../../core/project/adapter';
 import MapViewport from '../components/MapViewport';
-import MapStatusBar from '../shell/MapStatusBar';
+import MapStatusBar from '../components/shared/MapStatusBar';
+import { useAeonMapStatusPort } from '../providers/map-status-aeon';
 import { MapFacetDock } from './MapFacetDock';
+
+/** The neutral status bar bound to aeon's port. Classic gets the same bar over
+ *  providers/map-status-classic.ts once it renders through this workspace. */
+function AeonMapStatusBar(): React.ReactElement {
+  return React.createElement(MapStatusBar, { port: useAeonMapStatusPort() });
+}
 
 export interface FacetModule {
   readonly id: FacetCapability;
@@ -48,7 +55,7 @@ export function mapFacet(id: FacetCapability, slots: Pick<FacetModule, 'RightPan
     id,
     Canvas: MapViewport,
     ToolDock: () => React.createElement(MapFacetDock, { facet: id }),
-    StatusBar: MapStatusBar,
+    StatusBar: AeonMapStatusBar,
     mapOverlays: true,
     ...slots,
   };
