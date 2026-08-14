@@ -105,12 +105,13 @@ const COMMAND_SITES: Record<string, ClassicSurface | { inside: string }> = {
   // so this entry moved with it. The widened scan root above is what makes that a
   // rename here rather than a silent loss of coverage.
   'providers/object-inspector-classic.ts': 'map',
-  'components/classic/ClassicPalettePanel.tsx': 'art',
-  // The palette panel's port (stage-4 plan 6). A palette edit belongs to the
-  // ZONE-ART document, so the classicSetPalette call has to keep the art claim
-  // with it — and the shared grid it feeds lives in components/art-shared/, which
-  // has no engine of its own to claim for. Same shape as the object list above:
-  // the claim rides in on the port's `rootProps`.
+  // Was components/classic/ClassicPalettePanel.tsx until stage-4 plan 6 put both
+  // palette panels on the one shared grid: the classicSetPalette call moved INTO
+  // the port, so this entry moved with it. A palette edit belongs to the ZONE-ART
+  // document, so the art claim had to travel with the call — and the grid it
+  // feeds lives in components/art-shared/, which has no engine of its own to
+  // claim for. Same shape as the object list below: the claim rides in on the
+  // port's `rootProps`.
   'providers/palette-classic.ts': 'art',
   'components/classic/ChunkTab.tsx': { inside: 'components/classic/ClassicComposerDock.tsx' },
   'components/classic/BlockTab.tsx': { inside: 'components/classic/ClassicComposerDock.tsx' },
