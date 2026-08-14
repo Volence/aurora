@@ -55,22 +55,23 @@ export type ClassicSurface = 'map' | 'art';
 
 /**
  * The facets each surface SERVES, primary first. Deliberately not a 1:1 map:
- * classic has two surfaces and three facets, because one surface can be the
+ * classic has two surfaces and four facets, because one surface can be the
  * canvas of SEVERAL —
  *
- *   • `map`  → `layout` + `palette`. One ClassicLevelViewport is the canvas of
- *     both (workspace/facets/s1-facets.tsx). They differ in their RIGHT COLUMN
- *     and in their tools: layout is the chunk picker / inspector / object
- *     library over `view / stamp-chunk / select / place-object`; palette is the
- *     CRAM grid over `view` alone, judging a recolour against the whole act.
+ *   • `map`  → `layout` + `objects` + `palette`. One ClassicLevelViewport is the
+ *     canvas of all three (workspace/facets/s1-facets.tsx). They differ in their
+ *     RIGHT COLUMN and in their tools: layout is the chunk picker over
+ *     `view / stamp-chunk / select`; objects is the inspector and the library
+ *     over `place-object / select / view`; palette is the CRAM grid over `view`
+ *     alone, judging a recolour against the whole act.
  *   • `art`  → `art` + `palette`. One ClassicComposerDock is the canvas, with
  *     ClassicPalettePanel a section in its column.
  *
  * So the surface a pointer-down lands in genuinely CANNOT say which of them the
  * user means — it is literally the same component either way. A 1:1 map made the
- * non-primary facet unreachable in practice: light the Palette pill, click
- * anywhere in the map, and the claim writes `layout` straight back and the pill
- * jumps under the pointer.
+ * non-primary facets unreachable in practice: light the Objects or Palette pill,
+ * click anywhere in the map, and the claim writes `layout` straight back and the
+ * pill jumps under the pointer.
  *
  * ---------------------------------------------------------------------------
  * `palette` IS IN BOTH SETS, AND THAT IS NOT A BUG (2026-08-14)
@@ -104,7 +105,7 @@ export type ClassicSurface = 'map' | 'art';
  * Exported so the routing tests can read the real thing rather than a copy.
  */
 export const SURFACE_FACETS: Record<ClassicSurface, readonly FacetCapability[]> = {
-  map: ['layout', 'palette'],
+  map: ['layout', 'objects', 'palette'],
   art: ['art', 'palette'],
 };
 

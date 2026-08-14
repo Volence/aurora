@@ -9,7 +9,7 @@ import { objectsFacet } from './facets/objects-facet';
 import { ringsFacet } from './facets/rings-facet';
 import { collisionFacet } from './facets/collision-facet';
 import { paletteFacet } from './facets/palette-facet';
-import { s1LayoutFacet, s1ArtFacet, s1PaletteFacet } from './facets/s1-facets';
+import { s1LayoutFacet, s1ObjectsFacet, s1PaletteFacet, s1ArtFacet } from './facets/s1-facets';
 
 export function registerAeonFacetModules(): void {
   registerBuiltinFacets();
@@ -19,11 +19,14 @@ export function registerAeonFacetModules(): void {
 }
 
 /**
- * Classic's three modules — exactly the three the s1 profile grants, so every
- * pill classic shows leads somewhere and no facet it serves is missing a pill.
- * The list moves WITH the grant in core/project/s1/index.ts: a module for an
+ * Classic's four modules — exactly the four the s1 profile grants, so every pill
+ * classic shows leads somewhere and no facet it serves is missing a pill. The
+ * list moves WITH the grant in core/project/s1/index.ts: a module for an
  * ungranted facet is unreachable code (FacetBar shows granted ∩ registered), and
  * a grant with no module is a pill that lands on FacetUnavailable.
+ *
+ * Listed in pill order, which is not a requirement (FacetBar sorts on the
+ * descriptor's `order`) but keeps this readable against the grant it mirrors.
  *
  * Registered separately from aeon's rather than merged into one function: the
  * two lists are independent, and a single `registerAllFacetModules` would hide
@@ -32,7 +35,7 @@ export function registerAeonFacetModules(): void {
  */
 export function registerS1FacetModules(): void {
   registerBuiltinFacets();
-  for (const m of [s1LayoutFacet, s1ArtFacet, s1PaletteFacet]) {
+  for (const m of [s1LayoutFacet, s1ObjectsFacet, s1PaletteFacet, s1ArtFacet]) {
     registerFacetModule(['s1'], m);
   }
 }

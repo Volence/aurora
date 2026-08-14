@@ -1,4 +1,4 @@
-// Classic (S1 disasm) facet modules — the three facets the s1 profile grants,
+// Classic (S1 disasm) facet modules — the four facets the s1 profile grants,
 // composed entirely from components that already exist. No new UI was written
 // here: task 4 populated the registry and task 9 flipped classic off the legacy
 // shell onto it, in two commits, so a failure in the registration stayed
@@ -6,26 +6,45 @@
 // renders now.
 //
 // ---------------------------------------------------------------------------
-// THREE FACETS, TWO CANVASES (owner decision, 2026-08-14)
+// FOUR FACETS, TWO CANVASES — AND THE PILL ORDER IS WHY FOUR WORKS
 // ---------------------------------------------------------------------------
-//   Layout   → ClassicLevelViewport + chunks / selected object / object library
-//   Art      → ClassicComposerDock  + chunks / palette grid
+//   Layout   → ClassicLevelViewport + chunks
+//   Objects  → ClassicLevelViewport + selected object / object library
 //   Palette  → ClassicLevelViewport + palette grid
+//   Art      → ClassicComposerDock  + chunks / palette grid
 //
-// **LAYOUT IS THE WHOLE MAP FACET.** It briefly was not: `objects` was split off
-// it, and what was left could select, MOVE and DELETE an object but not ADD one
-// — half a task, not a smaller one. The split's own argument (that Layout was a
-// strict superset of Objects, so the second pill was dead weight) is answered
-// the other way round now: one pill, everything you do TO the map on it.
+// Three of the four share ONE canvas and differ only in their column and their
+// tools; `art` is the one that swaps the canvas outright. core/shell/facets.ts
+// orders the pills so those three are adjacent and `art` is LAST, which is what
+// makes a press inside the group read as what it is — the tools and the panel
+// changing over a scene that does not move.
 //
-// The thing Objects looked like it was for — browse the object library, open one
-// to edit its ART — already has two homes, and neither is a facet: the
-// Explorer's Object Library group and Ctrl+K, both of which open a SPRITE-DOC
-// TAB. Object art is edited in tabs. A facet over the same list would be the
-// third home, which is the duplication this branch has already deleted twice.
+// **THE OBJECTS FACET WAS BRIEFLY MERGED INTO LAYOUT, AND THAT IS REVERTED.**
+// The merge (2026-08-14) argued that Layout with `select` but no `place-object`
+// was half a task: you could pick an object, drag it and delete it, and not add
+// one. That was a true observation with the wrong cure. `art` sat SECOND in the
+// pill row at the time, so stepping Layout → Objects crossed the single facet
+// that replaces the canvas, and the two lenses on one act felt further apart
+// than they are. Move `art` to the end and the distance goes away; the facets
+// were never the problem. Reversed with the owner the same week, having run
+// both.
 //
-// **PALETTE IS BACK, WITH THE MAP AS ITS CANVAS.** The old one was a second name
-// for Art — same composer, same column, same status bar, differing in `id`
+// So Layout is TERRAIN (`view / stamp-chunk / select`, chunk picker) and Objects
+// is PLACEMENT (the shell default `place-object / select / view`, the library
+// and the inspector) — the same division aeon uses. `select` is on both, so an
+// object can be nudged or deleted without leaving terrain work, and the View
+// menu's Objects overlay means you always SEE them.
+//
+// KNOWN CONSEQUENCE, flagged rather than papered over: a selection made on
+// Layout shows in the CANVAS (the viewport draws the highlight) and has no
+// panel readout, because classic has no properties surface at all
+// (providers/properties-classic.ts exists to say so). Aeon's Layout fills that
+// gap with `AeonPropertiesPanel showObjectSelection`; adding a classic stub is a
+// step-H question about what classic's properties surface IS, not something to
+// answer by moving the whole inspector back and recreating the subset.
+//
+// **PALETTE HAS THE MAP AS ITS CANVAS.** An older palette facet was a second
+// name for Art — same composer, same column, same status bar, differing in `id`
 // alone — and it went with its grant. This one differs in the slot that matters:
 // a Genesis palette line is shared by everything drawn with it, so "did that
 // recolour break anything?" is a question only the ACT can answer. That is the
@@ -34,8 +53,8 @@
 // all for a palette-only hack — in the Art column it sits under an 82-chunk
 // wall, which is how it came to be believed not to exist.
 //
-// `collision` and `objects` have no module here on purpose: the s1 profile
-// grants neither (core/project/s1/index.ts, where both absences are argued).
+// `collision` and `rings` have no module here on purpose: the s1 profile grants
+// neither (core/project/s1/index.ts, where both absences are argued).
 //
 // ---------------------------------------------------------------------------
 // WHAT IS STILL OPEN FOR STEP H
@@ -63,6 +82,15 @@
 //     the Palette facet's column — which is right for now (same editor, two
 //     judging surfaces) but is the same question aeon's palette facet has open.
 //     Whether the two hosts should diverge is step H's to answer.
+//  3. **Layout's column is ONE section.** With the object sections back on
+//     Objects, and the chunk grid capped at SECTION_LIST_MAX_HEIGHT (260px), the
+//     Layout column is a 260px picker over a lot of empty 260px-wide column.
+//     That is not a reason to move sections back into it — a column filled to
+//     look busy is how Objects became a subset of Layout the first time — but it
+//     IS the honest state of the screen. The two candidates are both step-H
+//     shaped: classic has no properties surface for the selection Layout's
+//     `select` tool makes, and no layer/plane panel. Recorded rather than
+//     filled.
 
 
 import React from 'react';
@@ -170,45 +198,35 @@ function ClassicComposerCanvas(): React.ReactElement {
 }
 
 /**
- * LAYOUT's right-hand column: the chunk picker, the selected-object inspector
- * and the object library — everything you do TO the map, on the one facet whose
- * canvas IS the map.
+ * LAYOUT's right-hand column: the chunk picker, and nothing else. Layout is
+ * TERRAIN; the object library and the inspector are the Objects facet's
+ * (ClassicObjectsPanels below).
  *
  * ---------------------------------------------------------------------------
- * WHY THE OBJECT SECTIONS ARE BACK (owner decision, 2026-08-14)
+ * THE OBJECT SECTIONS HAVE BEEN HERE AND NOT HERE TWICE. THAT IS THE NOTE.
  * ---------------------------------------------------------------------------
- * They were here, then they were not, and the round trip is worth writing down
- * because both moves were argued from the same file.
+ * They were here, alongside `place-object` on `facetTools.layout`, which made
+ * Objects a strict SUBSET of Layout — nothing you could do there that you could
+ * not do here, so the pill was dead weight. They were REMOVED for that, which
+ * split the facets cleanly and left Layout able to select, move and delete an
+ * object but not add one. They were then put BACK, merging Objects into Layout
+ * on the argument that half a task is not a smaller task. That merge is what
+ * this file reverts.
  *
- * They were REMOVED because Objects was then a strict SUBSET of Layout:
- * `facetTools.layout` still carried `place-object` and this column carried the
- * list and the inspector, so there was no task you could do in Objects that you
- * could not do here, and the pill was dead weight. True, and the fix chosen was
- * to shrink Layout to terrain.
+ * WHY THE SPLIT IS RIGHT AFTER ALL: none of the three moves above touched the
+ * thing that actually made Layout → Objects feel wrong, which was the PILL
+ * ORDER. `art` — the only classic facet that replaces the canvas — sat between
+ * them, so a step between two lenses on one act crossed the single genuine
+ * scene change. `art` is last now (core/shell/facets.ts) and Objects sits
+ * immediately after Layout over an identical canvas: the map does not move, the
+ * column and the rail change, and that reads as what it is.
  *
- * That left a facet with `select` on it — you could pick an object, DRAG it and
- * DELETE it — and no way to add one, and no readout of what you had picked
- * (aeon's Layout pairs `select` with `AeonPropertiesPanel showObjectSelection`;
- * classic has no properties to show at all, which is what
- * providers/properties-classic.ts exists to say). Half a task is not a smaller
- * task. So the merge goes the other way: `place-object` is back in
- * `facetTools.layout`, the inspector is the selection readout Layout was
- * missing, and `objects` is no longer granted (core/project/s1/index.ts).
- *
- * NO `AeonPropertiesPanel showObjectSelection` EQUIVALENT IS ADDED HERE, and
- * that is not an oversight: that prop exists on aeon's Layout precisely because
- * aeon's Objects facet holds the real editor, so Layout gets a read-only stub.
- * Classic's Layout holds the real editor, so a stub beside it would be the same
- * selection printed twice. (Aeon is untouched by this change — it keeps its
- * Objects facet, so its Layout keeps the stub.)
- *
- * THE ORDER IS TERRAIN, THEN SELECTION, THEN LIBRARY. Chunks first because
- * stamping is the facet's default subject; the inspector above the library
- * because it is about the thing you just clicked, and burying it under a
- * 23-row list is how a readout stops being read. Both grids bound their own
- * height (shared/ChunkGrid, shared/ObjectList) so a section below is never
- * behind a wall of thumbnails — the failure that hid the Art column's palette
- * grid so thoroughly it was reported as missing.
+ * NO SELECTION READOUT IS ADDED HERE to compensate. Aeon's Layout passes
+ * `AeonPropertiesPanel showObjectSelection` because aeon HAS a properties
+ * surface; classic has none (providers/properties-classic.ts is the statement of
+ * that), so the honest options are a stub that prints an id or nothing, and
+ * inventing classic's properties surface is step H's. The canvas draws the
+ * selection highlight, so a selection made here is not invisible.
  *
  * Every section mounts a LEAF that resolves its own port, never a port hook in
  * this column — see the wrappers' docblocks and ChunkLibrary.tsx:12-15.
@@ -252,6 +270,25 @@ function ClassicLayoutPanels(): React.ReactElement {
       <CollapsibleSection id="classic.chunks" title="Chunks">
         <ChunkPicker pick="stamp" />
       </CollapsibleSection>
+    </Panel>
+  );
+}
+
+/**
+ * OBJECTS' right-hand column: the inspector and the library, which are this
+ * facet's alone. Together with `place-object` (the shell default set, which
+ * classic does not override) they are what makes Objects a facet rather than a
+ * second name for Layout.
+ *
+ * THE INSPECTOR SITS ABOVE THE LIBRARY because it is about the thing you just
+ * clicked, and burying a readout under a 23-row list is how it stops being read.
+ * The list bounds its own height (shared/ObjectList, SECTION_LIST_MAX_HEIGHT), so
+ * neither section is behind a wall of the other — the failure that hid the Art
+ * column's palette grid so thoroughly it was reported as missing.
+ */
+function ClassicObjectsPanels(): React.ReactElement {
+  return (
+    <Panel width={260} scroll>
       <CollapsibleSection id="classic.object" title="Selected Object">
         <ClassicObjectInspector />
       </CollapsibleSection>
@@ -333,9 +370,11 @@ function ClassicArtPanels(): React.ReactElement {
 // what viewStore.overlays paints on. Canvas and StatusBar are overridden because
 // mapFacet's defaults are aeon-bound; ToolDock is not, because it is neutral.
 //
-// ToolOptions carries classic's contextual hint line, which is keyed on the
-// TOOL rather than on the facet — including the branch that explains why a click
-// did nothing on BG. Layout offers every tool it has a branch for.
+// ToolOptions carries classic's contextual hint line on ALL THREE map facets
+// rather than layout alone: the hint is keyed on the TOOL, not the facet, and
+// every tool any of them offers has a branch in it — including the one that
+// explains why a click did nothing on BG. Withholding it from a facet would hide
+// the hint exactly where that facet's tool is the only thing to explain.
 export const s1LayoutFacet: FacetModule = mapFacet('layout', {
   Canvas: ClassicLevelViewport,
   ToolOptions: ClassicMapToolOptions,
@@ -343,10 +382,25 @@ export const s1LayoutFacet: FacetModule = mapFacet('layout', {
   RightPanel: ClassicLayoutPanels,
 });
 
-// SAME CANVAS AS LAYOUT, SAME STATUS BAR, DIFFERENT SUBJECT — which is what
-// layout and objects used to be, and is why sharing a canvas was never the
-// problem. What made the OLD palette facet a duplicate was sharing EVERY slot
-// with `art`; this one shares none with it.
+// SAME CANVAS AS LAYOUT, SAME STATUS BAR, SAME HINT BAR — the COLUMN and the
+// RAIL are the whole difference, and that is the point rather than a shortfall.
+// Objects declares no facetTools, so it takes the shell default
+// ['place-object', 'select', 'view']; classic implements all three.
+//
+// This module was deleted in the merge (2026-08-14) and is restored: the merge's
+// complaint was about the pill ORDER, not about this facet — see the file
+// header. Sharing a canvas with Layout has never been the problem; sharing every
+// slot is, which is what the old composer-based palette facet did.
+export const s1ObjectsFacet: FacetModule = mapFacet('objects', {
+  Canvas: ClassicLevelViewport,
+  ToolOptions: ClassicMapToolOptions,
+  StatusBar: ClassicMapStatusBar,
+  RightPanel: ClassicObjectsPanels,
+});
+
+// SAME CANVAS AS LAYOUT AND OBJECTS, SAME STATUS BAR, DIFFERENT SUBJECT. What
+// made the OLD palette facet a duplicate was sharing EVERY slot with `art`; this
+// one shares none with it.
 //
 // ToolOptions IS mounted, although aeon's palette facet has no options bar and
 // this facet offers exactly one tool (`palette` is undeclared in the s1

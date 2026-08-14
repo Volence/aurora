@@ -9,7 +9,7 @@ import { useClassicProjectStore } from '../../state/classicProjectStore';
 
 /** The s1 profile's real declaration (core/project/s1/index.ts), as a literal so
  *  a profile edit has to come through here — same style as the adapter tests. */
-const S1_LAYOUT_TOOLS = ['view', 'stamp-chunk', 'select', 'place-object'];
+const S1_LAYOUT_TOOLS = ['view', 'stamp-chunk', 'select'];
 
 function closeProjects() {
   useClassicProjectStore.setState({ status: 'closed', capabilities: null } as never);
@@ -55,14 +55,14 @@ describe('facet tool sets', () => {
 // The profile seam (spec §3.6): a profile declares the tools its facets offer,
 // and that declaration REPLACES the shell default rather than intersecting it.
 //
-// The worked example is classic's layout carrying `place-object`, which the
-// shell default for layout does not have and an intersection would delete. That
-// example has been live, then not, then live again: it was removed when Objects
-// was split off Layout (leaving s1's declaration a strict subset of the default,
-// so nothing real distinguished replace from intersect), and restored when
-// Objects merged back in (2026-08-14). The SYNTHETIC guard below is kept
-// regardless, because the shipping profiles are not a stable place to hang a
-// rule the seam depends on.
+// The worked example used to be classic's layout carrying `place-object`, which
+// an intersection would have deleted. It has come and gone three times now —
+// removed when Objects was split off Layout, restored when Objects merged back
+// in, removed again when that merge was reversed (2026-08-14) — so s1's real
+// declaration is a strict SUBSET of the default again and no longer
+// distinguishes replace from intersect on its own. The SYNTHETIC guard below is
+// what holds the rule, and the churn above is why it is not hung on a shipping
+// profile.
 describe('toolsForFacet — profile declaration over shell default', () => {
   afterEach(closeProjects);
 
@@ -88,18 +88,15 @@ describe('toolsForFacet — profile declaration over shell default', () => {
   });
 
   it("s1's real layout declaration drops the tools classic cannot drive", () => {
-    // One direction the declaration is used for: subtracting marquee /
-    // paint-tile / paint-block, which classic has no implementation of.
+    // The direction the declaration is actually used for today: subtracting
+    // marquee / paint-tile / paint-block, which classic has no implementation of.
     openClassic({ layout: S1_LAYOUT_TOOLS });
     for (const t of ['marquee', 'paint-tile', 'paint-block']) {
       expect(toolsForFacet('layout')).not.toContain(t);
     }
-    // …and the other: ADDING place-object, which the shell default for layout
-    // does not carry. Classic grants no `objects` facet to put it on since the
-    // merge, so if the declaration did not replace the default there would be
-    // nowhere in classic to place an object from at all.
-    expect(FACET_TOOLS.layout).not.toContain('place-object');
-    expect(toolsForFacet('layout')).toContain('place-object');
+    // …and place-object is on OBJECTS, undeclared, straight from the default.
+    expect(toolsForFacet('layout')).not.toContain('place-object');
+    expect(toolsForFacet('objects')).toContain('place-object');
   });
 
   it('a declared profile still gets the default for facets it does NOT name', () => {
@@ -128,10 +125,15 @@ describe('toolsForFacet — profile declaration over shell default', () => {
     // implementation for; the declared default (first entry) takes over.
     expect(toolForFacet('layout', 'marquee')).toBe('view');
     expect(toolForFacet('layout', 'paint-block')).toBe('view');
-    // …and place-object survives, because classic's layout declares it again
-    // since the Objects merge. It is the button beside stamp on the same rail;
-    // clamping it would strand a user mid-placement for switching facet and back.
-    expect(toolForFacet('layout', 'place-object')).toBe('place-object');
+    // …and place-object, which is the OBJECTS facet's, is clamped away on a
+    // switch to layout rather than left resident with no button to show it.
+    // This is the exact stranding the clamp exists for. The assertion has
+    // flipped with the manifest twice; it is spelled out on both facets rather
+    // than folded together so the next flip has to state which way it went.
+    expect(toolForFacet('layout', 'place-object')).toBe('view');
+    // It survives a switch to the facet that DOES offer it (undeclared, so the
+    // shell default ['place-object','select','view']).
+    expect(toolForFacet('objects', 'place-object')).toBe('place-object');
   });
 });
 

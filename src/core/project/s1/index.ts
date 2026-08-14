@@ -42,33 +42,34 @@ const SIDECAR = '.aurora/project.json';
  * assertion, so they could not fail by construction. They read this now, which
  * turns them into cross-checks between the real grant and the facet registry.
  *
- * THREE PILLS: Layout / Art / Palette. What is in the list and what is not, and
- * why, all of it reversible by editing this list (and the renderer's
- * register-facets to match):
+ * FOUR PILLS: Layout / Objects / Palette / Art. The list is written in the order
+ * the bar shows them (core/shell/facets.ts sorts the pills itself; agreeing is
+ * for the reader). What is in it and what is not, and why, all of it reversible
+ * by editing this list (and the renderer's register-facets to match):
  *
- *  - `layout` is THE MAP FACET, terrain and placement together. It absorbed
- *    `objects` (owner decision 2026-08-14) — see facetTools.layout below for the
- *    argument, which is that a facet you can select and MOVE an object in but
- *    not ADD one to is incoherent, and that "browse objects, open one for art
- *    editing" already has two homes that both open a sprite-doc TAB (the
- *    Explorer's Object Library group, and Ctrl+K). Object art is edited through
- *    tabs, not through a facet; a third home would be duplication.
- *  - `art` is the composer — the tile/block/chunk tiers of the zone-art doc.
- *  - `palette` is BACK, in a form that is not a second name for `art`. It was
- *    dropped because both pills rendered the same composer, the same right
- *    column and the same status bar, differing in `id` alone. It returns with
- *    the MAP as its canvas (renderer's workspace/facets/s1-facets.tsx): a
- *    Genesis palette line is shared by everything drawn with it, so "did that
+ *  - `layout` is TERRAIN over the act's map — the chunk picker and the stamp.
+ *  - `objects` is PLACEMENT over the same map: the object library, the inspector
+ *    and `place-object`. It was briefly merged into `layout` (2026-08-14) on the
+ *    argument that a facet you can select and MOVE an object in but not ADD one
+ *    to is half a task. The diagnosis was right and the cure was not: what made
+ *    the split feel wrong was the PILL ORDER, which put `art` — the one facet
+ *    that swaps the canvas — between Layout and Objects, so moving between two
+ *    lenses on the same scene read as a scene change. `art` is last now, and a
+ *    split facet over a canvas that visibly does not move is fine. (Reversed
+ *    with the owner the same week, after seeing both running.)
+ *  - `palette` is the CRAM grid over that same map. It was once dropped for
+ *    being a second name for `art` — both pills rendered the same composer, the
+ *    same right column and the same status bar, differing in `id` alone. It came
+ *    back with the MAP as its canvas (renderer's workspace/facets/s1-facets.tsx):
+ *    a Genesis palette line is shared by everything drawn with it, so "did that
  *    recolour break anything?" is a question only the whole act can answer, and
  *    the composer's 256px chunk cannot. That is exactly why aeon's palette facet
  *    survived the same review. It is also classic's ONLY reachable palette
  *    editor for a palette-only hack: the Art column's grid sits under an
  *    82-chunk wall, which is how it came to be believed not to exist at all.
+ *  - `art` is the composer — the tile/block/chunk tiers of the zone-art doc, and
+ *    the only classic facet whose canvas is not the act. Hence LAST.
  *
- *  - `objects` is ABSENT, and that is the merge above rather than a gap. Aeon
- *    keeps its Objects facet: aeon's layout column is already five sections deep
- *    and its objects facet carries a real properties editor classic has no
- *    equivalent of (providers/properties-classic.ts).
  *  - `collision` is ABSENT. Classic has no collision-editing UI: classicSetColind's
  *    only caller is the agent handler, and classic's sole collision affordance is
  *    a read-only overlay. Granting it would put a Collision pill over an aeon-only
@@ -76,7 +77,7 @@ const SIDECAR = '.aurora/project.json';
  *    classic collision editor lands as its own designed feature.
  *  - `rings` is ABSENT: S1 rings are objects in objpos, not a separate layer.
  */
-export const S1_FACETS = ['layout', 'art', 'palette'] as const satisfies readonly FacetCapability[];
+export const S1_FACETS = ['layout', 'objects', 'palette', 'art'] as const satisfies readonly FacetCapability[];
 
 // ---------------------------------------------------------------------------
 // Profile enumeration — flattens the profile into an ordered list of resolvable
@@ -406,32 +407,43 @@ export const s1Adapter: ProjectAdapter = {
           { id: 'block', label: 'Block', pixelSize: 16, shared: true },
           { id: 'tile', label: 'Tile', pixelSize: 8, shared: true },
         ],
-        // `layout` is declared for two reasons. It SUBTRACTS marquee /
-        // paint-tile / paint-block, which the shell default offers and classic
-        // has no implementation of; and it ADDS `place-object`, which the shell
-        // default for layout does not carry (that is why this declaration is
-        // also the live proof that a profile declaration REPLACES the default
-        // rather than intersecting it — see workspace/facet-tools.ts).
+        // THE CURRENT RULE: layout is TERRAIN plus `select`, and NO
+        // `place-object`. Placement is the Objects facet's, which declares
+        // nothing and so takes the shell default ['place-object','select','view']
+        // — the same division aeon uses. `select` is on both because nudging or
+        // deleting an object should not cost a facet switch, and you can SEE
+        // objects while editing terrain through the View menu's overlay.
         //
-        // THE HISTORY OF THIS ONE LINE, because it has now been wrong in both
-        // directions and each time the comment beside it was the reason:
+        // The declaration exists at all to SUBTRACT marquee / paint-tile /
+        // paint-block, which the shell default for layout offers and classic has
+        // no implementation of.
+        //
+        // WHY THIS LINE CARRIES A HISTORY NOTE. It has been wrong in BOTH
+        // directions, each time because the prose beside it outlived the
+        // decision, and that churn is the useful part:
         //   1. It carried place-object with a comment saying it did so "until
         //      the workspace re-home splits it into per-facet docks". The
         //      re-home landed and the declaration did not move, leaving Objects
         //      a strict SUBSET of Layout — same tools, and the list and the
         //      inspector on both columns — so the Objects pill was dead weight.
-        //   2. It was removed, which split the facets cleanly but left Layout
-        //      able to SELECT, MOVE and DELETE an object while unable to ADD
-        //      one. That is not a smaller task, it is half of one task.
-        // The resolution (owner, 2026-08-14) is the merge: Layout is the map
-        // facet, and everything you do TO the map — terrain and placements —
-        // is on it. `objects` is no longer granted at all.
+        //   2. It was removed, splitting the facets cleanly, and Objects was then
+        //      merged INTO Layout on the grounds that a facet you can select,
+        //      move and delete in but not add from is half a task — which put
+        //      place-object back here.
+        //   3. Reverted (owner, 2026-08-14, after using it): the split was never
+        //      the problem. `art` sat SECOND in the pill row, so Layout → Objects
+        //      crossed the one facet that swaps the canvas and read as a scene
+        //      change. `art` is last now (core/shell/facets.ts) and the split
+        //      stands. The half-a-task complaint is answered by the ORDER of the
+        //      pills, not by collapsing them.
+        // If a fourth revision is ever wanted, note that steps 1–3 all argued
+        // from this file alone; the thing that settled it was running it.
         //
         // Order is dock order and the first entry is the facet DEFAULT, so
         // `view` stays first: switching to Layout must not land you holding a
         // tool that writes.
         facetTools: {
-          layout: ['view', 'stamp-chunk', 'select', 'place-object'],
+          layout: ['view', 'stamp-chunk', 'select'],
         },
       },
       report,

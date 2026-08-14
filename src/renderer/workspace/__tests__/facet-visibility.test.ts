@@ -25,18 +25,22 @@ describe('facet visibility (registered descriptors ∩ granted ∩ has module fo
     const visible = facetsFor([...granted]).filter((f) => moduleFor('aeon', f.id));
     // Grows as facet-module tasks land: Task 10 = ['layout']; Task 11 adds
     // objects/rings/collision/palette; Task 12 adds art — full six, in order.
-    expect(visible.map((f) => f.id)).toEqual(['layout', 'art', 'objects', 'rings', 'collision', 'palette']);
+    // `art` is LAST, not second: five of the six share the map viewport and art
+    // is the one that swaps the canvas, so the bar reads as tool/panel swaps
+    // until the single step where the scene genuinely changes
+    // (core/shell/facets.ts).
+    expect(visible.map((f) => f.id)).toEqual(['layout', 'objects', 'rings', 'collision', 'palette', 'art']);
   });
 
-  it('s1 manifest shows its three facets with a registered module, in order', () => {
+  it('s1 manifest shows its four facets with a registered module, in order', () => {
     registerBuiltinFacets();
     registerS1FacetModules();
     const visible = facetsFor([...S1_GRANT] as FacetCapability[]).filter((f) => moduleFor('s1', f.id));
     // Registry order, not grant order — the pills follow core/shell/facets so
-    // the bar reads the same way under both engines. Here the two orders happen
-    // to agree; `palette` is last in the registry (order 50) and last in the
-    // grant, and Layout leads under both.
-    expect(visible.map((f) => f.id)).toEqual(['layout', 'art', 'palette']);
+    // the bar reads the same way under both engines. The two happen to agree
+    // (the grant is written in pill order for the reader), and classic's bar is
+    // the aeon one minus rings and collision: three map lenses, then Art.
+    expect(visible.map((f) => f.id)).toEqual(['layout', 'objects', 'palette', 'art']);
   });
 
   it('a facet without a registered module renders nothing (no dead chrome)', () => {
@@ -55,23 +59,23 @@ describe('facet visibility (registered descriptors ∩ granted ∩ has module fo
     for (const f of S1_FACETS) expect(moduleFor('s1', f), `s1/${f}`).not.toBeNull();
   });
 
-  it('a session record naming the dropped `objects` facet heals to a served one', () => {
+  it('a session record naming an ungranted facet heals to a served one', () => {
     // What a grant drop has to survive: a workspace record persisted while
     // classic still granted the facet. There is no pill for it now, so the only
     // way in is a restored record — and the answer must be another CLASSIC facet,
     // never null (which is FacetUnavailable) and never aeon's module.
-    //
-    // `objects` is the live case since the merge into Layout (2026-08-14), and
-    // `layout` is a particularly good answer for it: everything the Objects
-    // facet did is on the facet the heal lands on.
     registerBuiltinFacets();
     registerS1FacetModules();
-    expect(resolveFacet('s1', [...S1_GRANT] as FacetCapability[], 'objects')).toBe('layout');
-    // Same for collision, the case this heal was originally built for.
+    // `collision`, the case this heal was originally built for.
     expect(resolveFacet('s1', [...S1_GRANT] as FacetCapability[], 'collision')).toBe('layout');
-    // …and `palette`, which a record could name from EITHER era, is served
-    // again and so must be kept rather than healed away.
-    expect(resolveFacet('s1', [...S1_GRANT] as FacetCapability[], 'palette')).toBe('palette');
+    expect(resolveFacet('s1', [...S1_GRANT] as FacetCapability[], 'rings')).toBe('layout');
+    // The other half of the rule, and the reason the heal is not simply "always
+    // layout": `objects` and `palette` have each spent a day out of the grant
+    // this week, so a stored record could name either from an era when it was
+    // ungranted. Both are served again and must be KEPT, not healed away.
+    for (const f of ['objects', 'palette'] as const) {
+      expect(resolveFacet('s1', [...S1_GRANT] as FacetCapability[], f), f).toBe(f);
+    }
   });
 
   it('a facet granted but module-less FOR THIS ENGINE gets no pill', () => {
@@ -130,7 +134,7 @@ describe("the facet bar's granted list comes from the OPEN engine's manifest", (
     expect(useProjectStore.getState().capabilities).toBeNull();
     // The REAL grant goes in and a LITERAL comes out. Both sides being S1_GRANT
     // is what made this test unable to fail, whatever the manifest said.
-    expect(openCapabilities()?.facets ?? []).toEqual(['layout', 'art', 'palette']);
+    expect(openCapabilities()?.facets ?? []).toEqual(['layout', 'objects', 'palette', 'art']);
   });
 
   it('LevelWorkspace resolves it through that seam, not projectStore', () => {

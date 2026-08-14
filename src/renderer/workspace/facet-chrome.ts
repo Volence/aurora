@@ -58,15 +58,15 @@ const NOTHING: FacetChrome = {
  * LevelWorkspace with its reasoning, which is a list of the FAILURES each
  * omission causes rather than a taxonomy:
  *
- *  - `objects` is load-bearing for AEON, which still has the facet: aeon renders
- *    only Plane B on BG and draws the object overlay solely in the FG branch, so
- *    omitting the chip strands you on a canvas where every object is invisible.
- *    It stays on this list although CLASSIC no longer grants the facet (it
- *    merged into `layout`, 2026-08-14) — the list is keyed on the facet, not on
- *    the engine, and classic's own object gating rode over to `layout` with the
- *    tools: select and place-object act only on FG and fall through to pan on
- *    BG, so a classic Layout with no plane control is one whose object tools
- *    silently do nothing whenever the plane was left on BG.
+ *  - `objects` is load-bearing under BOTH engines, which both grant the facet.
+ *    Classic gates object editing on the plane outright — select and
+ *    place-object only act on FG, and fall through to pan on BG — so an objects
+ *    facet with no plane control is one whose tools silently do nothing whenever
+ *    the plane was left on BG. Aeon does not gate the placement, but renders only
+ *    Plane B on BG and draws the object overlay solely in the FG branch, so the
+ *    same omission strands you on a canvas where every object is invisible.
+ *    (`layout` needs the chip for the same classic reason as well as its own:
+ *    `select` is on both facets, and it too falls through to pan on BG.)
  *  - `rings` is the IDENTICAL aeon bug: the ring overlay draws only in the FG
  *    branch and `place-ring` carries no plane guard, so on BG the facet is a
  *    canvas with no rings and a tool writing invisible ones.

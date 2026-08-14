@@ -102,11 +102,11 @@ describe('registerAeonFacetModules registers every aeon facet', () => {
 describe('registerS1FacetModules registers every facet the s1 profile grants', () => {
   // The s1 profile's real grant (core/project/s1/index.ts), as a literal so a
   // profile edit has to come through here — the house style for these.
-  const S1_GRANT = ['layout', 'art', 'palette'] as const;
+  const S1_GRANT = ['layout', 'objects', 'palette', 'art'] as const;
 
   beforeEach(() => { facetModules.clear(); });
 
-  it('serves all three, and nothing outside the grant', async () => {
+  it('serves all four, and nothing outside the grant', async () => {
     const { registerS1FacetModules } = await import('../register-facets');
     registerS1FacetModules();
     for (const f of S1_GRANT) expect(moduleFor('s1', f), `s1/${f}`).not.toBeNull();
@@ -114,12 +114,10 @@ describe('registerS1FacetModules registers every facet the s1 profile grants', (
     // granted ∩ registered, so it could only ever be reached by a stale session
     // record — and resolveFacet exists to heal exactly that away.
     //
-    // `objects` is in this list as of the merge (2026-08-14): its column moved
-    // into Layout's and its grant went with it, so a module left registered here
-    // would be exactly the dead entry this assertion is for. (`palette` was in
-    // this list, for the opposite reason — it was a module identical to `art`'s
-    // in every slot. It is granted again now, on the map canvas.)
-    for (const f of ['rings', 'collision', 'objects'] as const) {
+    // Both `objects` and `palette` have been on this list at different points
+    // this week and are granted again; what stays on it are the two classic has
+    // no editor for at all.
+    for (const f of ['rings', 'collision'] as const) {
       expect(moduleFor('s1', f), `s1/${f}`).toBeNull();
     }
   });
@@ -154,30 +152,33 @@ describe('registerS1FacetModules registers every facet the s1 profile grants', (
     // facet would be a control that visibly does nothing.
     const { registerS1FacetModules } = await import('../register-facets');
     registerS1FacetModules();
-    expect(moduleFor('s1', 'layout')?.mapOverlays).toBe(true);
-    expect(moduleFor('s1', 'palette')?.mapOverlays).toBe(true);
+    for (const f of ['layout', 'objects', 'palette'] as const) {
+      expect(moduleFor('s1', f)?.mapOverlays, `s1/${f}`).toBe(true);
+    }
     expect(moduleFor('s1', 'art')?.mapOverlays).toBeFalsy();
   });
 
-  it('shares one canvas between the two MAP facets, and serves art from its own', async () => {
-    // Classic has two canvases for three facets. The pair that shares one is
-    // layout+palette (one ClassicLevelViewport); `art` is the other canvas.
+  it('shares one canvas between the three MAP facets, and serves art from its own', async () => {
+    // Classic has two canvases for four facets. Three share one
+    // (ClassicLevelViewport: layout, objects, palette); `art` is the other, and
+    // it is the ONLY facet whose pill changes the scene — which is why
+    // core/shell/facets.ts puts it last.
     //
-    // SHARING A CANVAS HAS NEVER BEEN THE PROBLEM — layout+objects shared this
-    // one and differed by panel. What made the OLD palette facet a duplicate was
-    // sharing every slot with `art`. So the two halves of this assertion say
-    // different things: the map pair share a canvas ON PURPOSE, and the panels
-    // below prove they are not the same screen.
+    // SHARING A CANVAS HAS NEVER BEEN THE PROBLEM. What made the OLD palette
+    // facet a duplicate was sharing every slot with `art`. So the two halves of
+    // this assertion say different things: the map group shares a canvas ON
+    // PURPOSE, and the distinct panels below are what make them three screens.
     const { registerS1FacetModules } = await import('../register-facets');
     registerS1FacetModules();
-    expect(moduleFor('s1', 'layout')?.Canvas).toBe(moduleFor('s1', 'palette')?.Canvas);
-    expect(moduleFor('s1', 'art')?.Canvas).not.toBe(moduleFor('s1', 'layout')?.Canvas);
-    // …and they are NOT the pixel-identical pair the old palette facet was.
-    expect(moduleFor('s1', 'palette')?.RightPanel).not.toBe(moduleFor('s1', 'layout')?.RightPanel);
-    expect(moduleFor('s1', 'palette')?.RightPanel).not.toBe(moduleFor('s1', 'art')?.RightPanel);
+    const mapCanvas = moduleFor('s1', 'layout')?.Canvas;
+    expect(mapCanvas).toBeTypeOf('function');
+    for (const f of ['objects', 'palette'] as const) {
+      expect(moduleFor('s1', f)?.Canvas, `s1/${f}`).toBe(mapCanvas);
+    }
+    expect(moduleFor('s1', 'art')?.Canvas).not.toBe(mapCanvas);
   });
 
-  it('mounts the contextual hint line on BOTH map facets', async () => {
+  it('mounts the contextual hint line on EVERY map facet', async () => {
     // Task 6 filled the slot this test used to assert empty. The hint is keyed
     // on the TOOL, not the facet, and classic's map-status port suppresses the
     // bar's generic hint ENGINE-WIDE on the strength of these mounts
@@ -188,6 +189,7 @@ describe('registerS1FacetModules registers every facet the s1 profile grants', (
     registerS1FacetModules();
     const layout = moduleFor('s1', 'layout')?.ToolOptions;
     expect(layout).toBeDefined();
+    expect(moduleFor('s1', 'objects')?.ToolOptions).toBe(layout);
     expect(moduleFor('s1', 'palette')?.ToolOptions).toBe(layout);
     // Not aeon's: its map facets have no tool-options bar at all, and inheriting
     // classic's hint vocabulary would be a lie about that canvas. Aeon is
@@ -200,14 +202,16 @@ describe('registerS1FacetModules registers every facet the s1 profile grants', (
   });
 
   it('gives every facet its own right panel — the columns are what differ', async () => {
-    // The map pair share a canvas, a hint line and a status bar; the COLUMN is
-    // the whole of the difference between them, so three distinct functions is
-    // the minimum for three facets that are not each other. Identity, not
-    // content, is all a node test can see here — the source assertions below
-    // cover what is actually in each column.
+    // The three map facets share a canvas, a hint line and a status bar; the
+    // COLUMN (and the tool rail) is the whole of the difference between them, so
+    // four distinct functions is the minimum for four facets that are not each
+    // other. This is also the assertion that would catch the old duplicate
+    // palette facet, which shared every slot with `art`. Identity, not content,
+    // is all a node test can see here — the source assertions below cover what
+    // is actually in each column.
     const { registerS1FacetModules } = await import('../register-facets');
     registerS1FacetModules();
-    const panels = (['layout', 'art', 'palette'] as const).map((f) => moduleFor('s1', f)?.RightPanel);
+    const panels = S1_GRANT.map((f) => moduleFor('s1', f)?.RightPanel);
     for (const p of panels) expect(p).toBeTypeOf('function');
     expect(new Set(panels).size).toBe(panels.length);
   });
@@ -234,22 +238,37 @@ function column(name: string): string {
 // point on this branch, and none of them fails anything else: a column is a
 // list of JSX tags, so a section that moves out simply stops rendering.
 describe('the s1 columns hold what their facets are for', () => {
-  it('LAYOUT carries terrain AND placement — chunks, inspector, library', () => {
-    // The merge (2026-08-14). Layout briefly had `select` with no inspector to
-    // read the selection in and no library to place from: you could move and
-    // delete an object but not add one, and nothing told you what you had
-    // picked. All three sections are the facet, so all three are asserted.
+  it('LAYOUT is TERRAIN — the chunk picker, and no object sections', () => {
+    // The object sections have moved in and out of this column twice. They are
+    // OUT: Layout is terrain and Objects is placement, the division aeon uses.
+    // Carrying the list and the inspector here (alongside `place-object` on
+    // facetTools.layout) is what made Objects a strict subset of Layout, and is
+    // what the 2026-08-14 merge briefly re-created before it was reversed.
     const layout = column('ClassicLayoutPanels');
     expect(layout).toMatch(/<ChunkPicker\s+pick="stamp"/);
-    expect(layout).toContain('<ClassicObjectInspector />');
-    expect(layout).toContain('<ClassicObjectList />');
+    expect(layout).not.toContain('ClassicObjectInspector');
+    expect(layout).not.toContain('ClassicObjectList');
   });
 
-  it('LAYOUT does NOT also print the selection read-only beside the inspector', () => {
-    // Aeon's Layout passes `AeonPropertiesPanel showObjectSelection` precisely
-    // because its Objects facet holds the real editor. Classic's Layout holds
-    // the real editor, so the same stub here would be the selection twice.
+  it('LAYOUT has no selection stub either — classic has no properties surface', () => {
+    // Aeon's Layout passes `AeonPropertiesPanel showObjectSelection` as a
+    // read-only readout for the selection its `select` tool makes. Classic has
+    // no properties surface at all (providers/properties-classic.ts is the
+    // statement of that), so there is nothing to mount; inventing one is step
+    // H's. Guarded so a future "Layout looks thin" impulse has to argue with
+    // this line rather than quietly add an aeon panel to a classic column.
     expect(column('ClassicLayoutPanels')).not.toContain('showObjectSelection');
+  });
+
+  it('OBJECTS carries the inspector and the library — placement, not terrain', () => {
+    // The facet's whole content. Deleted in the merge and restored: what made
+    // Layout → Objects feel like a scene change was the pill ORDER (`art` sat
+    // between them), not the split. Asserted against a chunk picker as well, so
+    // this column cannot drift back into being a second Layout.
+    const objects = column('ClassicObjectsPanels');
+    expect(objects).toContain('<ClassicObjectInspector />');
+    expect(objects).toContain('<ClassicObjectList />');
+    expect(objects).not.toContain('ChunkPicker');
   });
 
   it('PALETTE carries the palette grid and nothing of the composer', () => {
@@ -266,11 +285,17 @@ describe('the s1 columns hold what their facets are for', () => {
     expect(art).toContain('<ClassicPalettePanel />');
   });
 
-  it('no OBJECTS column survives the merge', () => {
-    // A column function with no facet to mount it is dead code that reads like
-    // a facet, which is how the last two duplicate screens were re-created.
-    expect(S1_FACETS_SOURCE).not.toContain('ClassicObjectsPanels');
-    expect(S1_FACETS_SOURCE).not.toMatch(/mapFacet\('objects'/);
+  it('no column function is left without a facet to mount it', () => {
+    // A column with no module is dead code that reads like a facet, which is how
+    // duplicate screens keep getting re-created on this branch. Derived rather
+    // than listed: every `function Classic*Panels` in the file must appear as
+    // some module's RightPanel.
+    const declared = [...S1_FACETS_SOURCE.matchAll(/function (Classic\w*Panels)\(/g)]
+      .map((m) => m[1]);
+    expect(declared.length).toBeGreaterThan(0);
+    for (const name of declared) {
+      expect(S1_FACETS_SOURCE, name).toMatch(new RegExp(`RightPanel:\\s*${name},`));
+    }
   });
 });
 

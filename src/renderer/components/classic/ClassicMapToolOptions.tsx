@@ -52,14 +52,20 @@ export default function ClassicMapToolOptions(): React.ReactElement {
               ? 'no object armed — pick one from the Objects panel · Esc cancels'
               : tool === 'select'
                 ? (plane === 'fg'
-                    // The last clause names a control on THIS screen, and has
-                    // been wrong once for naming one that was not. It said
-                    // "switch to Objects to place" for as long as the
-                    // Layout/Objects split existed; the merge (2026-08-14) put
-                    // `place-object` back in facetTools.layout and the object
-                    // library back in this facet's own column, so the panel it
-                    // points at is one pane right of the canvas showing the line.
-                    ? 'click selects · drag moves · drag START to move spawn · Del removes · arm an object below to place'
+                    // THE LAST CLAUSE HAS TO BE TRUE ON EVERY FACET THIS BAR
+                    // MOUNTS ON, which is the constraint it has failed twice.
+                    // `select` is on Layout AND on Objects, and this component
+                    // reads only editorStore — it cannot tell them apart — so a
+                    // clause naming a location is a gamble on which one you are:
+                    //   · "switch to Objects to place" was right on Layout and
+                    //     told an Objects user to go where they already were;
+                    //   · "arm an object below to place" (the 2026-08-14 merge,
+                    //     when the library was in Layout's own column) is right
+                    //     on Objects and points at empty column on Layout.
+                    // Naming the PANEL rather than a direction is true on both,
+                    // and matches the `place-object` branch three lines up,
+                    // which already says "the Objects panel".
+                    ? 'click selects · drag moves · drag START to move spawn · Del removes · arm from the Objects panel to place'
                     : 'objects are FG-only — switch to FG to edit · drag to pan')
                 : 'drag to pan · right-click eyedrops · scroll to zoom'}
       </span>
