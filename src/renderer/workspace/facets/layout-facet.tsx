@@ -8,7 +8,7 @@ import ChunkLibrary from '../../components/ChunkLibrary';
 import MarqueePasteOptions from '../../components/MarqueePasteOptions';
 import ArtBrowser from '../../components/ArtBrowser';
 import PaletteViewer from '../../components/PaletteViewer';
-import PropertiesPanel from '../../components/PropertiesPanel';
+import AeonPropertiesPanel from '../../components/AeonPropertiesPanel';
 import { Panel, CollapsibleSection } from '../../components/ui';
 import { useEditorStore } from '../../state/editorStore';
 import { mapFacet, type FacetModule } from '../facet-registry';
@@ -32,8 +32,10 @@ function LayoutPanels() {
       <CollapsibleSection id="map.art" title="Art"><ArtBrowser /></CollapsibleSection>
       {/* The object readout is on HERE and nowhere else: Layout offers the
           `select` tool, and this panel is the only thing in the facet that shows
-          what you picked. The Objects facet has the real editor instead. */}
-      <CollapsibleSection id="map.props" title="Properties"><PropertiesPanel showObjectSelection /></CollapsibleSection>
+          what you picked. The Objects facet has the real editor instead.
+          The panel's store subscriptions live in the AeonPropertiesPanel leaf,
+          not in this column — see that file. */}
+      <CollapsibleSection id="map.props" title="Properties"><AeonPropertiesPanel showObjectSelection /></CollapsibleSection>
     </Panel>
   );
 }

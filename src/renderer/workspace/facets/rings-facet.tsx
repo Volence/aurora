@@ -5,7 +5,7 @@
 
 import React from 'react';
 import RingPatternPalette from '../../components/RingPatternPalette';
-import PropertiesPanel from '../../components/PropertiesPanel';
+import AeonPropertiesPanel from '../../components/AeonPropertiesPanel';
 import { Panel, CollapsibleSection } from '../../components/ui';
 import { useEditorStore } from '../../state/editorStore';
 import { mapFacet, type FacetModule } from '../facet-registry';
@@ -22,7 +22,9 @@ function RingsPanels() {
           onSelect={(index) => useEditorStore.getState().setSelectedRingPattern(index)}
         />
       </CollapsibleSection>
-      <CollapsibleSection id="map.props" title="Properties"><PropertiesPanel /></CollapsibleSection>
+      {/* No showObjectSelection — the ring readout is unconditional, objects are
+          not. Subscriptions live in the AeonPropertiesPanel leaf. */}
+      <CollapsibleSection id="map.props" title="Properties"><AeonPropertiesPanel /></CollapsibleSection>
     </Panel>
   );
 }

@@ -8,7 +8,7 @@ import ObjectList from '../../components/shared/ObjectList';
 import { useAeonObjectListPort } from '../../providers/object-list-aeon';
 import ObjectInspector from '../../components/shared/ObjectInspector';
 import { useAeonObjectInspectorPort } from '../../providers/object-inspector-aeon';
-import PropertiesPanel from '../../components/PropertiesPanel';
+import AeonPropertiesPanel from '../../components/AeonPropertiesPanel';
 import { Panel, CollapsibleSection } from '../../components/ui';
 import { mapFacet, type FacetModule } from '../facet-registry';
 
@@ -30,7 +30,9 @@ function ObjectsPanels() {
       <CollapsibleSection id="map.object" title="Selected Object">
         <ObjectInspector port={objectInspectorPort} />
       </CollapsibleSection>
-      <CollapsibleSection id="map.props" title="Properties"><PropertiesPanel /></CollapsibleSection>
+      {/* No showObjectSelection: the inspector above IS the selected-object
+          readout. Subscriptions live in the AeonPropertiesPanel leaf. */}
+      <CollapsibleSection id="map.props" title="Properties"><AeonPropertiesPanel /></CollapsibleSection>
     </Panel>
   );
 }

@@ -7,7 +7,7 @@
 
 import React from 'react';
 import CollisionPalette from '../../components/CollisionPalette';
-import PropertiesPanel from '../../components/PropertiesPanel';
+import AeonPropertiesPanel from '../../components/AeonPropertiesPanel';
 import { Panel, CollapsibleSection } from '../../components/ui';
 import { mapFacet, type FacetModule } from '../facet-registry';
 
@@ -17,7 +17,8 @@ function CollisionPanels() {
       <CollapsibleSection id="map.palette" title="Collision">
         <CollisionPalette variant="map" />
       </CollapsibleSection>
-      <CollapsibleSection id="map.props" title="Properties"><PropertiesPanel /></CollapsibleSection>
+      {/* Subscriptions live in the AeonPropertiesPanel leaf, not this column. */}
+      <CollapsibleSection id="map.props" title="Properties"><AeonPropertiesPanel /></CollapsibleSection>
     </Panel>
   );
 }
