@@ -339,7 +339,7 @@ export default function TilesetPanel() {
     return (
       <div style={styles.container}>
         <div style={styles.tabs}>
-          <span style={styles.label}>Tileset</span>
+          <span style={styles.label}>no zone open</span>
         </div>
       </div>
     );
@@ -349,7 +349,7 @@ export default function TilesetPanel() {
     <div style={styles.container}>
       <div style={styles.tabs}>
         <span style={styles.label}>
-          Tiles ({itemCount})
+          {itemCount} tiles
         </span>
         <span ref={hoverLabelRef} style={styles.hoverLabel} />
       </div>
@@ -403,9 +403,11 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex', alignItems: 'center', gap: 0,
     borderBottom: `1px solid ${T.border}`, flexShrink: 0,
   },
+  // A COUNT, not a heading — see ArtBrowser's copy of this note. The section
+  // header above already says TILESET; in heading type this row said TILES (919)
+  // straight under it, which is the "name twice" both engines' panels had.
   label: {
-    padding: '6px 8px', fontSize: 11, fontWeight: 600, color: T.textBase,
-    textTransform: 'uppercase' as const, letterSpacing: 1,
+    padding: '6px 8px', fontSize: 10, color: T.textLo,
   },
   hoverLabel: {
     marginLeft: 'auto', padding: '0 8px',

@@ -138,7 +138,9 @@ export function useClassicChunkGridPort(pick: ClassicChunkPick): ChunkGridPort |
   return React.useMemo((): ChunkGridPort | null => {
     if (!ready || !doc) return null;
     return {
-      heading: `Chunks (${doc.chunks.length})`,
+      // The FILE's chunk count, which is one short of `ids.length` — the id space
+      // has a synthetic air entry in front of it (classicChunkIds).
+      countLabel: `${doc.chunks.length} chunks`,
       ids,
       sourcePx: CLASSIC_CHUNK_PX,
       sizes: [CLASSIC_THUMB],

@@ -40,10 +40,19 @@ export type ChunkGridLayout = 'panel' | 'strip';
  * engines repaint off different clocks).
  */
 export interface ChunkGridPort {
-  /** Header text, e.g. `Chunks (256)`. The count is the engine's own idea of
-   *  how many chunks it has, which is not always `ids.length` — classic's id
-   *  space carries a synthetic air entry the file does not. */
-  readonly heading: string;
+  /**
+   * How many chunks there are, as a phrase: `256 chunks`. A COUNT, not a title.
+   *
+   * It used to be `heading: 'Chunks (256)'`, rendered in heading type at the top
+   * of the grid — directly under the CollapsibleSection header that already said
+   * CHUNKS, so every mount of this panel said its own name twice. The section
+   * header names the panel; this says how much is in it.
+   *
+   * The number is the engine's own idea of how many chunks it has, which is not
+   * always `ids.length` — classic's id space carries a synthetic air entry the
+   * file does not.
+   */
+  readonly countLabel: string;
   /** Every cell, in display order. Engine ids stringified — never parsed back
    *  by the neutral side. */
   readonly ids: readonly string[];

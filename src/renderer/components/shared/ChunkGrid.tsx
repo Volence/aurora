@@ -47,21 +47,36 @@ export default function ChunkGrid({ port }: { port: ChunkGridPort }): React.Reac
 
   const badge = port.statusBadge !== null ? <span style={styles.selBadge}>{port.statusBadge}</span> : null;
   const hint = <span style={styles.hint}>{port.statusHint}</span>;
+  const count = <span style={styles.count}>{port.countLabel}</span>;
 
   return (
     // rootProps first: a port contributes behaviour, not layout, and must not be
     // able to override the grid's own styling.
     <div {...port.rootProps} style={strip ? styles.containerStrip : styles.containerPanel}>
-      <div style={styles.header}>
-        <span style={styles.heading}>{port.heading}</span>
-        {/* A strip is wide enough for one row; a narrow panel wraps the status
-            line under the header controls, which is where each engine already
-            put them. */}
-        {strip && badge}
-        {HeaderExtra && <HeaderExtra />}
-        {strip && hint}
-        {strip && sizeControl}
-      </div>
+      {/* NO TITLE HERE. Every mount of this grid is inside a CollapsibleSection
+          that already names it (Chunks), and rendering `Chunks (82)` in heading
+          type directly under a CHUNKS header made both engines' panels say their
+          name twice. The count moved to the status line below, where it is data
+          beside the selection rather than a second heading.
+
+          The row survives for HeaderExtra — aeon's Import/Clear, classic's loop
+          toggle — and is skipped entirely by a port that supplies none, rather
+          than drawing an empty bordered strip. It sits OUTSIDE the empty-state
+          branch on purpose: with no chunks loaded, Import is the one control
+          that matters.
+
+          A strip is wide enough for one row; a narrow panel wraps the status
+          line under the header controls, which is where each engine already put
+          them. */}
+      {(strip || HeaderExtra) && (
+        <div style={styles.header}>
+          {strip && count}
+          {strip && badge}
+          {HeaderExtra && <HeaderExtra />}
+          {strip && hint}
+          {strip && sizeControl}
+        </div>
+      )}
       {port.ids.length === 0 && port.emptyState ? (
         <div style={styles.empty}>
           <span>{port.emptyState.message}</span>
@@ -71,6 +86,7 @@ export default function ChunkGrid({ port }: { port: ChunkGridPort }): React.Reac
         <>
           {!strip && (
             <div style={styles.toolbar}>
+              {count}
               {badge}
               {hint}
               {sizeControl}
@@ -249,10 +265,10 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex', alignItems: 'center', gap: 6,
     padding: '3px 8px', borderBottom: `1px solid ${T.border}`, flexShrink: 0,
   },
-  heading: {
-    fontSize: 11, fontWeight: 600, color: T.textBase,
-    textTransform: 'uppercase' as const, letterSpacing: 1, flexShrink: 0,
-  },
+  // Deliberately NOT heading type (no uppercase, no letter-spacing, no bold):
+  // this is a count on the status line, and styling it like the old heading is
+  // how it would read as a second section title again.
+  count: { fontSize: 10, color: T.textLo, flexShrink: 0 },
   toolbar: {
     display: 'flex', alignItems: 'center', gap: 6,
     padding: '3px 8px', borderBottom: `1px solid ${T.border}`, flexShrink: 0,

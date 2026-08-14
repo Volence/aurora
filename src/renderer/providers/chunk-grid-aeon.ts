@@ -143,7 +143,7 @@ export function useAeonChunkGridPort(): ChunkGridPort {
     : null;
 
   return React.useMemo((): ChunkGridPort => ({
-    heading: `Chunks (${chunks.length})`,
+    countLabel: `${chunks.length} chunks`,
     ids,
     sourcePx: AEON_CHUNK_PX,
     sizes: AEON_THUMB_SIZES,
