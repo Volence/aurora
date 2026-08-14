@@ -26,7 +26,7 @@ the open project is classic (S1 disassembly) or aeon.
 | `66763cc` | **Aeon sprite binding.** Explorer respects UI bindings; "New Sprite…" breaks the chicken-and-egg. |
 | `5c1d564` | **Plan 2 — facet foundations.** `open-project.ts`, `artTiers`, `facetCanvases`. |
 | `152cff8` | **Plan 3 — slot neutrality.** Shared ObjectList / ObjectInspector / ChunkGrid / rasterizer. |
-| *(plan 4)* | **Steps D + E.** One tool vocabulary; classic's plane/overlays/camera to the stores; per-tab viewport restore for classic. |
+| `3f43bba` | **Steps D + E.** One tool vocabulary; classic's plane/overlays/camera to the stores; per-tab viewport restore for classic. |
 
 Plus `0db582d` (spec §3 amendment) and `3c81e81` (collision docblock fixes,
 §9.2 resolved).
