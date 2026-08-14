@@ -546,6 +546,27 @@ cd /home/volence/sonic_hacks/aurora/.claude/worktrees/ux-plan5 && \
 
 Create `src/renderer/workspace/facets/s1-facets.tsx`. Four modules. **Compose existing components — write no new UI here.**
 
+**Signature note (changed by Task 3's review):** `mapFacet` is `mapFacet(id, slots)` where `slots` is `Pick<FacetModule, 'Canvas' | 'ToolDock' | 'StatusBar' | 'RightPanel' | 'BottomExtra'>`. The earlier plan text proposed a positional third `Canvas` argument; that was a **trap** and was removed. It let an engine override only the Canvas while silently inheriting `StatusBar: AeonMapStatusBar`, whose port reads `projectStore.project` — **null for a classic open** — rendering aeon vocabulary over an empty aeon store beside a classic canvas. That is the bug Task 3 exists to delete, one slot over. **s1 must supply its own `Canvas` and `StatusBar`.**
+
+**`MapFacetDock` is correct for classic as-is — do not build a classic tool dock.** A Task 3 reviewer claimed otherwise, citing `classic-surface.ts`'s docblock that "classic runs its own tool system (`classicLevelStore.tool`)". That claim is **false and was verified false**: `classicLevelStore` has no tool state; its only `setTool` reference is a write *to* `editorStore`. `ClassicLevelViewport.tsx:123-124` reads `useEditorStore.tool`, and `toolsForFacet` already resolves classic's set from the s1 manifest's `facetTools.layout`. Plan 4 merged the two vocabularies deliberately. That stale docblock misled two separate agents on this branch and was corrected in Task 3.
+
+- [ ] **Step 3b: Auto-heal an unserved facet (deferred here from Task 3)**
+
+Task 3 made an unresolvable `(engine, facet)` render `FacetUnavailable` inside the shell rather than as a dead-end screen. This step adds the self-heal, now that a real mismatch exists to test against — s1 grants `collision` with no module until Step 1 drops the grant, and `focusClassicSurface` writes `setFacet` with no served check.
+
+Put the decision in a **pure exported helper**, not the component — it is the only way to test it, since `.tsx` is not collected:
+
+```ts
+// facet-tools.ts
+export function resolveFacet(
+  engine: OpenEngine | null,
+  granted: readonly FacetCapability[],
+  requested: FacetCapability,
+): FacetCapability | null
+```
+
+Returns `requested` when it resolves, else the first granted∩registered facet, else `null`. Redirecting to a **valid facet of the same engine** is not the "silent fallback" the plan forbids — the deleted fallback lied about the *data* (aeon's viewport over an empty store); this changes the *selection*, and it is made non-silent by writing back through `switchFacet(tabId, resolved)` so the active pill matches the screen. **The write cannot happen during render** — put it in a `useEffect` above the early return. `FacetUnavailable` stays as the terminal state, because the served set can legitimately be empty.
+
 | Facet | Canvas | ToolDock | ToolOptions | RightPanel | BottomExtra | StatusBar |
 |---|---|---|---|---|---|---|
 | `layout` | `ClassicLevelViewport` | `MapFacetDock facet="layout"` | — †6 | `ObjectInspector` + `ObjectList` †7 | — | neutral bar + classic port (Task 1) |
