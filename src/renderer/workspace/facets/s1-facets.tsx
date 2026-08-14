@@ -197,10 +197,16 @@ function ClassicComposerCanvas(): React.ReactElement {
  *     exclusive contents of one section. Classic's layout set is
  *     `view / stamp-chunk / select` — no marquee, no paste — so there is nothing
  *     to arbitrate and the gate would be pure subtraction.
- *   - Selecting a chunk ARMS the stamp tool (classicLevelStore.selectChunkForStamp
- *     calls editor.setTool('stamp-chunk') when it is not already active), so the
- *     picker is the way INTO stamping. Gating it on stamping is circular: pick
- *     `select`, and the panel that re-arms stamp is the thing that disappears.
+ *   - Selecting a chunk HERE arms the stamp tool (`pick="stamp"` →
+ *     classicLevelStore.selectChunkForStamp, which calls editor.setTool(
+ *     'stamp-chunk') when it is not already active), so the picker is the way
+ *     INTO stamping. Gating it on stamping is circular: pick `select`, and the
+ *     panel that re-arms stamp is the thing that disappears.
+ *     THE ARM IS THIS MOUNT'S ALONE. It was briefly the port's, unconditionally,
+ *     and the art column inherited it — a screen with no dock and no map quietly
+ *     changing the map's tool, which you only discovered on returning to Layout
+ *     armed to paint. The circularity argument above is what justifies arming,
+ *     and it is an argument about a picker BESIDE A MAP.
  *   - `selectedChunkId` is not stamp state at all: it is also which chunk the
  *     composer's Chunk tab EDITS (components/classic/ChunkTab.tsx). Hiding the
  *     selector for a map tool would hide an art control.
@@ -219,7 +225,7 @@ function ClassicLayoutPanels(): React.ReactElement {
   return (
     <Panel width={260} scroll>
       <CollapsibleSection id="classic.chunks" title="Chunks">
-        <ChunkPicker />
+        <ChunkPicker pick="stamp" />
       </CollapsibleSection>
     </Panel>
   );
@@ -263,6 +269,12 @@ function ClassicObjectsPanels(): React.ReactElement {
  * classic Chunk tab edits whatever `selectedChunkId` points at, so without a
  * selector here the facet has no way to change its own subject).
  *
+ * `pick="edit"`, not the layout column's `pick="stamp"`: the two columns share
+ * the SELECTION and differ in the side-effect. Arming the map's stamp tool from
+ * a facet that has neither a map nor a tool dock is a change you cannot see and
+ * did not ask for, and it persists — the tool is one shared editorStore field,
+ * so the next visit to Layout starts armed to paint terrain.
+ *
  * `classic.artChunks`, not the layout column's `classic.chunks`: section ids key
  * ONE global panel-state map (shell/panel-state.ts), so a shared id would mean
  * collapsing the picker beside the composer also collapses it beside the map.
@@ -273,7 +285,7 @@ function ClassicArtPanels(): React.ReactElement {
   return (
     <Panel width={260} scroll>
       <CollapsibleSection id="classic.artChunks" title="Chunks">
-        <ChunkPicker />
+        <ChunkPicker pick="edit" />
       </CollapsibleSection>
       <CollapsibleSection id="classic.palette" title="Palette">
         <ClassicPalettePanel />

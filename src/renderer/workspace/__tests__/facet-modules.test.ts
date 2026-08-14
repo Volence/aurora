@@ -213,8 +213,24 @@ describe('the s1 columns mount the chunk picker', () => {
     // deleted at task 9 along with the prop itself). In a 260px column the strip
     // caps the wall at 148px and crams the badge, the hint and the loop toggle
     // onto the heading row.
-    expect(source).toContain('<ChunkPicker />');
+    expect(source).toMatch(/<ChunkPicker\s/);
     expect(source).not.toMatch(/<ChunkPicker\s+layout/);
+  });
+
+  it('the ART column selects WITHOUT arming the map\'s stamp tool', () => {
+    // The regression this exists for: both mounts shared one port whose select
+    // called selectChunkForStamp, which calls editor.setTool('stamp-chunk').
+    // On the Art facet — no dock, no map — that looked harmless, but the tool is
+    // one shared editorStore field, so picking a chunk to EDIT left you armed to
+    // PAINT the moment you returned to Layout.
+    //
+    // Read positionally: the layout column is declared before the art column, so
+    // the first mount is the map's and the second the composer's.
+    const picks = [...source.matchAll(/<ChunkPicker\s+pick="(\w+)"/g)].map((m) => m[1]);
+    expect(picks).toEqual(['stamp', 'edit']);
+    // No mount may leave it unsaid: an unset `pick` is the silent-arming shape
+    // this replaced, so ChunkPicker declares it required and every mount states it.
+    expect(source).not.toContain('<ChunkPicker />');
   });
 
   it('files the section under a classic.* content id, not aeon\'s map.palette', () => {
@@ -229,7 +245,7 @@ describe('the s1 columns mount the chunk picker', () => {
     // The picker sits beside the map (its stamp target) and beside the composer
     // (the chunk the Chunk tab edits) — one selection, two jobs, so one mount is
     // a trip to the other facet every time you change subject (task 9, gap 5).
-    const mounts = source.match(/<ChunkPicker \/>/g) ?? [];
+    const mounts = source.match(/<ChunkPicker\s/g) ?? [];
     expect(mounts).toHaveLength(2);
     // Distinctness is the whole point of having two ids: panel-state is ONE
     // global map, so a shared id would make collapsing the picker beside the

@@ -84,6 +84,26 @@ export function rasterizeClassicChunk(doc: LevelDoc, id: string): Uint8ClampedAr
 }
 
 /**
+ * What a click in this picker MEANS, which is not the same question in the two
+ * columns the picker is mounted in (workspace/facets/s1-facets.tsx):
+ *
+ *  - `'stamp'` (the map's column) — select the chunk AND arm the stamp tool.
+ *    Selecting a chunk beside a map expresses intent to paint it, and it is what
+ *    makes the picker the way INTO stamping (see the mount site's argument for
+ *    why the panel is therefore never gated on the stamp tool being active).
+ *  - `'edit'` (the composer's column) — select the chunk and nothing else. The
+ *    Art facet has no map and no tool dock, so arming there changes a tool the
+ *    screen cannot show, and the change PERSISTS: picking a chunk to edit left
+ *    you armed to paint terrain the moment you went back to Layout.
+ *
+ * Both write the same `selectedChunkId` — that one field is genuinely both the
+ * stamp target and the composer's subject (ChunkTab.tsx), and the two columns
+ * agreeing about which chunk is current is the point of mounting it twice. Only
+ * the tool side-effect differs.
+ */
+export type ClassicChunkPick = 'stamp' | 'edit';
+
+/**
  * Null when no act is loaded — the picker renders nothing at all then.
  *
  * `layout` is a constant again, matching aeon's port. It was briefly a parameter
@@ -93,21 +113,24 @@ export function rasterizeClassicChunk(doc: LevelDoc, id: string): Uint8ClampedAr
  * the canvas row. Task 9 deleted that dock, so there is one slot and it is a
  * panel.
  */
-export function useClassicChunkGridPort(): ChunkGridPort | null {
+export function useClassicChunkGridPort(pick: ClassicChunkPick): ChunkGridPort | null {
   const doc = useClassicLevelStore((s) => s.doc);
   const status = useClassicLevelStore((s) => s.status);
   const chunkVersions = useClassicLevelStore((s) => s.chunkVersions);
   const chunkEpoch = useClassicLevelStore((s) => s.chunkEpoch);
   const selectedChunkId = useClassicLevelStore((s) => s.selectedChunkId);
-  // Plain left-click select also ARMS the stamp tool (see the store action's doc
-  // comment); the viewport's right-click eyedrop calls setSelectedChunkId
-  // directly and is untouched by this.
+  // Both select actions are subscribed unconditionally — a hook may not sit
+  // behind a branch — and `pick` chooses between them below. `selectChunkForStamp`
+  // also ARMS the stamp tool (see the store action's doc comment);
+  // `setSelectedChunkId` is the same select without the tool change, which is
+  // also what the viewport's right-click eyedrop calls.
   //
   // That force-arm is why classic's picker is mounted UNCONDITIONALLY rather than
-  // behind aeon's `tool === 'stamp-chunk'` gate — the picker is the way INTO
-  // stamping, so gating it on stamping is circular. The full argument is at the
-  // mount site (workspace/facets/s1-facets.tsx).
+  // behind aeon's `tool === 'stamp-chunk'` gate — beside the map the picker is
+  // the way INTO stamping, so gating it on stamping is circular. The full
+  // argument is at the mount site (workspace/facets/s1-facets.tsx).
   const selectChunkForStamp = useClassicLevelStore((s) => s.selectChunkForStamp);
+  const setSelectedChunkId = useClassicLevelStore((s) => s.setSelectedChunkId);
 
   const ready = status === 'ready' && doc !== null;
   const ids = React.useMemo(() => (doc ? classicChunkIds(doc) : []), [doc]);
@@ -123,7 +146,12 @@ export function useClassicChunkGridPort(): ChunkGridPort | null {
       layout: 'panel',
       selectedId: String(selectedChunkId),
       statusBadge: hexLabel(selectedChunkId),
-      statusHint: 'click to select · right-click viewport to eyedrop',
+      // The eyedrop half of the hint names the VIEWPORT, which the composer
+      // column has no sight of — so the two columns say what their own screen
+      // can do, and neither points at a surface that is not there.
+      statusHint: pick === 'stamp'
+        ? 'click to select · right-click viewport to eyedrop'
+        : 'click to open that chunk in the Chunk tab',
       HeaderExtra: ChunkPickerHeader,
       // `doc` is read at PAINT time through the store rather than closed over:
       // its identity churns on every edit (a layout stamp replaces the doc while
@@ -137,7 +165,10 @@ export function useClassicChunkGridPort(): ChunkGridPort | null {
       label: classicChunkLabel,
       title: classicChunkTitle,
       emptyKind: classicEmptyKind,
-      select: (id) => selectChunkForStamp(Number(id)),
+      select: (id) => (pick === 'stamp' ? selectChunkForStamp : setSelectedChunkId)(Number(id)),
     };
-  }, [ready, doc, ids, selectedChunkId, chunkEpoch, chunkVersions, selectChunkForStamp]);
+  }, [
+    ready, doc, ids, selectedChunkId, chunkEpoch, chunkVersions,
+    pick, selectChunkForStamp, setSelectedChunkId,
+  ]);
 }
