@@ -79,6 +79,22 @@ export const FACET_CAPABILITIES = [
 ] as const;
 export type FacetCapability = (typeof FACET_CAPABILITIES)[number];
 
+/** The ONE editing-tool vocabulary, shared by every engine (spec §3.6).
+ *
+ *  It lives here beside FACET_CAPABILITIES, not in the renderer's editorStore,
+ *  for the same reason the facet vocabulary does: a profile has to be able to
+ *  DECLARE which tools its facets offer (see CapabilityManifest.facetTools),
+ *  and core cannot import the renderer. The renderer's `EditorTool` is an alias
+ *  of this union, so every existing `EditorTool` import keeps working.
+ *
+ *  Runtime list exported so exhaustiveness checks (label maps, icon maps) can
+ *  enumerate the vocabulary without duplicating it. */
+export const TOOL_IDS = [
+  'view', 'select', 'paint-tile', 'paint-block', 'stamp-chunk',
+  'paint-collision', 'eraser', 'place-object', 'place-ring', 'marquee',
+] as const;
+export type ToolId = (typeof TOOL_IDS)[number];
+
 /**
  * One rung of a profile's art hierarchy, outermost first. The breadcrumb in the
  * Art facet has exactly one segment per tier, so this list IS the navigable
@@ -120,6 +136,18 @@ export interface CapabilityManifest {
   /** This profile's art hierarchy, outermost tier first (spec §3.3 as amended
    *  by §3.0.2). Optional: absent means the profile declares no ladder yet. */
   artTiers?: readonly ArtTier[];
+  /**
+   * Which tools this profile's facets offer, for the facets it names. Absent,
+   * or absent for a given facet, means the shell's default set applies
+   * (renderer `FACET_TOOLS`); `toolsForFacet` is the one reader.
+   *
+   * REPLACES the default rather than intersecting it. Spec §3.6 says intersect,
+   * written before contact with the code — but the default `layout` set has no
+   * `place-object`, and that is precisely the tool classic's map needs for an
+   * armed placement, so an intersection would silently delete it. Replacement
+   * also lets a profile ORDER its tools (first entry is the facet default).
+   */
+  facetTools?: Partial<Record<FacetCapability, readonly ToolId[]>>;
 }
 
 /** Sidecar `.aurora/project.json` shape: user path overrides for resolution. */

@@ -15,6 +15,8 @@ import {
   classicAddBlock,
 } from '../classicLevelStore';
 import { useClassicProjectStore } from '../classicProjectStore';
+import { useEditorStore } from '../editorStore';
+import { armedPlacementId } from '../classic-placement';
 import { documentHistoryHub } from '../history-hub';
 import { packChunkCell, unpackChunkCell, type BlockDef } from '../../../core/level-classic/model';
 import type { S1ObjectEntry } from '../../../core/formats/classic/s1-objpos';
@@ -23,6 +25,9 @@ import type { S1ObjectEntry } from '../../../core/formats/classic/s1-objpos';
 import { TILE_COUNT, REF, makeDoc, openReady } from './helpers/classic-fixture';
 
 const st = () => useClassicLevelStore.getState();
+// The tool moved to editorStore (one vocabulary, spec §3.6), so the classic
+// store's tool-adjacent behaviour is asserted against BOTH stores.
+const tool = () => useEditorStore.getState();
 
 // The open act's two undo documents (spec §4.3): layout is act-scoped, art is
 // zone-scoped. `historyFor` get-or-creates, so reading one never records a step.
@@ -33,6 +38,9 @@ beforeEach(() => {
   useClassicProjectStore.getState().reset();
   useClassicLevelStore.getState().reset();
   documentHistoryHub.clearAll();
+  // editorStore has no reset(); the tool is a cross-engine singleton, so put it
+  // back to its initial value rather than letting one case leak into the next.
+  useEditorStore.setState({ tool: 'view', selection: null, pasting: false });
 });
 
 // ---------------------------------------------------------------------------
@@ -457,15 +465,15 @@ describe('command guards + undo/redo triple consistency', () => {
 // Layout-editing UI state (Task 13): tool + selected chunk id.
 // ---------------------------------------------------------------------------
 describe('tool + selectedChunkId UI state', () => {
-  it('defaults to pan tool + chunk 0', () => {
-    expect(st().tool).toBe('pan');
+  it('defaults to chunk 0, with the tool living in editorStore', () => {
     expect(st().selectedChunkId).toBe(0);
+    // The tool is no longer classic's own — one vocabulary, spec §3.6.
+    expect('tool' in st()).toBe(false);
+    expect('setTool' in st()).toBe(false);
   });
 
-  it('setTool / setSelectedChunkId update state', () => {
+  it('setSelectedChunkId updates state', () => {
     openReady();
-    st().setTool('stamp');
-    expect(st().tool).toBe('stamp');
     st().setSelectedChunkId(0x2a);
     expect(st().selectedChunkId).toBe(0x2a);
   });
@@ -490,37 +498,50 @@ describe('tool + selectedChunkId UI state', () => {
 
   it('opening a new act resets the selection but keeps the tool', () => {
     openReady();
-    st().setTool('stamp');
+    tool().setTool('stamp-chunk');
     st().setSelectedChunkId(5);
     void useClassicLevelStore.getState().openAct(REF);
     expect(st().selectedChunkId).toBe(0); // per-act chunk set → reset
-    expect(st().tool).toBe('stamp'); // workflow preference persists
+    expect(tool().tool).toBe('stamp-chunk'); // workflow preference persists
   });
 
-  it('selectChunkForStamp sets the chunk AND arms the stamp tool from pan', () => {
+  it('selectChunkForStamp sets the chunk AND arms the stamp tool from view', () => {
     openReady();
-    expect(st().tool).toBe('pan');
+    tool().setTool('view');
     st().selectChunkForStamp(0x2a);
     expect(st().selectedChunkId).toBe(0x2a);
-    expect(st().tool).toBe('stamp');
+    expect(tool().tool).toBe('stamp-chunk');
   });
 
-  it('selectChunkForStamp switches to stamp from any other tool (e.g. object)', () => {
+  it('selectChunkForStamp switches to stamp from any other tool (e.g. place-object)', () => {
     openReady();
-    st().setTool('object');
+    tool().setTool('place-object');
     st().selectChunkForStamp(3);
     expect(st().selectedChunkId).toBe(3);
-    expect(st().tool).toBe('stamp'); // picking a chunk arms stamp over object too
+    expect(tool().tool).toBe('stamp-chunk'); // a chunk pick arms stamp over placing too
+  });
+
+  it('re-selecting the SAME chunk while already stamping leaves the tool alone', () => {
+    // Not just an optimisation: editorStore.setTool clears the aeon selection
+    // and cancels an in-progress paste, so an unconditional call would make a
+    // no-op re-select destroy unrelated state.
+    openReady();
+    tool().setTool('stamp-chunk');
+    useEditorStore.setState({ selection: { type: 'object', sectionIndex: 0, index: 2 } });
+    st().selectChunkForStamp(4);
+    expect(tool().tool).toBe('stamp-chunk');
+    expect(useEditorStore.getState().selection).not.toBeNull();
   });
 
   it('selectChunkForStamp rejects out-of-byte-range ids (no change to chunk or tool)', () => {
     openReady();
+    tool().setTool('view');
     st().selectChunkForStamp(-1);
     expect(st().selectedChunkId).toBe(0);
-    expect(st().tool).toBe('pan');
+    expect(tool().tool).toBe('view');
     st().selectChunkForStamp(256);
     expect(st().selectedChunkId).toBe(0);
-    expect(st().tool).toBe('pan');
+    expect(tool().tool).toBe('view');
   });
 });
 
@@ -531,12 +552,6 @@ describe('object-tool UI state', () => {
   it('defaults to no selection and no armed object', () => {
     expect(st().selectedObjectIndex).toBeNull();
     expect(st().armedObjectId).toBeNull();
-  });
-
-  it('the object tool is a valid ClassicTool value', () => {
-    openReady();
-    st().setTool('object');
-    expect(st().tool).toBe('object');
   });
 
   it('setSelectedObjectIndex sets/clears the selection', () => {
@@ -576,13 +591,30 @@ describe('object-tool UI state', () => {
 
   it('opening a new act resets selection + arm but keeps the tool', () => {
     openReady();
-    st().setTool('object');
+    tool().setTool('place-object');
     st().setSelectedObjectIndex(0);
     st().setArmedObjectId(0x25);
     void useClassicLevelStore.getState().openAct(REF);
     expect(st().selectedObjectIndex).toBeNull();
     expect(st().armedObjectId).toBeNull();
-    expect(st().tool).toBe('object');
+    expect(tool().tool).toBe('place-object');
+  });
+
+  it('an armed id only counts as a placement while place-object is the tool', () => {
+    // The arm survives a tool switch in the store; armedPlacementId is what
+    // stops that stale id from arming a click under a different tool.
+    openReady();
+    tool().setTool('place-object');
+    st().setArmedObjectId(0x25);
+    expect(armedPlacementId(tool().tool, st().armedObjectId)).toBe(0x25);
+    tool().setTool('select');
+    expect(armedPlacementId(tool().tool, st().armedObjectId)).toBeNull();
+    tool().setTool('stamp-chunk');
+    expect(armedPlacementId(tool().tool, st().armedObjectId)).toBeNull();
+    // …and no arm at all is never a placement, whatever the tool.
+    st().setArmedObjectId(null);
+    tool().setTool('place-object');
+    expect(armedPlacementId(tool().tool, st().armedObjectId)).toBeNull();
   });
 });
 

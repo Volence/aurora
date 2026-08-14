@@ -5,7 +5,23 @@ import { useEditorStore, executeCommand } from '../state/editorStore';
 import { useHistoryVersion } from '../hooks/useHistoryVersion';
 import { T } from './ui';
 
-export default function PropertiesPanel() {
+/**
+ * @param showObjectSelection Render the read-only "Selected Object" block when
+ *   an object is selected. Off by default, and passed only by the LAYOUT facet.
+ *
+ *   The block used to be unconditional; plan 3 deleted it because the Objects
+ *   facet gained a real editor (shared/ObjectInspector), which made a read-only
+ *   copy of the same four values beside an editable form exactly the dead chrome
+ *   panel design forbids. True there — but Layout offers the `select` tool too,
+ *   and there the deleted block was the ONLY thing that displayed what you had
+ *   picked. So it comes back where that gap is, and stays gone where the editor
+ *   already answers the question.
+ *
+ *   A prop rather than a facetFor(activeId) lookup inside the panel: the mount
+ *   site is where the decision is legible, and it keeps this component free of
+ *   yet another store read.
+ */
+export default function PropertiesPanel({ showObjectSelection = false }: { showObjectSelection?: boolean }) {
   const project = useProjectStore((s) => s.project);
   const vpX = useViewStore((s) => s.vpX);
   const vpY = useViewStore((s) => s.vpY);
@@ -32,15 +48,16 @@ export default function PropertiesPanel() {
 
   const section = act.sections[activeSectionIndex];
 
-  // Get selected item details. Objects are deliberately absent: their read-only
-  // block here was superseded by the real editor in the Objects facet
-  // (shared/ObjectInspector + providers/object-inspector-aeon, stage-4 plan 3
-  // task 5), and showing the same four values uneditably beside an editable form
-  // is the dead chrome that panel design forbids. Rings still have no editor, so
-  // their readout stays.
+  // Selected item details. Rings have no editor anywhere, so their readout is
+  // unconditional; objects have one in the Objects facet, so theirs is gated on
+  // the caller (see the docblock above).
   let selectedRing = null;
   if (selection && section && selection.type === 'ring') {
     selectedRing = section.rings[selection.index];
+  }
+  let selectedObject = null;
+  if (showObjectSelection && selection && section && selection.type === 'object') {
+    selectedObject = section.objects[selection.index];
   }
 
   return (
@@ -51,6 +68,16 @@ export default function PropertiesPanel() {
           "PROPERTIES / PROPERTIES". The section header IS this panel's title. */}
       <div style={styles.content}>
         {/* Selection details */}
+        {selectedObject && (
+          <div style={styles.section}>
+            <div style={styles.sectionTitle}>Selected Object</div>
+            <Property label="Section" value={String(activeSectionIndex)} />
+            <Property label="Type" value={selectedObject.typeId} />
+            <Property label="Subtype" value={String(selectedObject.subtype)} />
+            <Property label="Position" value={`${selectedObject.x}, ${selectedObject.y}`} />
+          </div>
+        )}
+
         {selectedRing && (
           <div style={styles.section}>
             <div style={styles.sectionTitle}>Selected Ring</div>

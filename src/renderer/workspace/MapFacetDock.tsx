@@ -1,32 +1,35 @@
 import React from 'react';
 import { ToolButton, Icons } from '../components/ui';
 import { useEditorStore, type EditorTool } from '../state/editorStore';
-import { FACET_TOOLS } from './facet-tools';
+import { toolsForFacet } from './facet-tools';
+import { TOOL_LABELS } from './tool-meta';
 import type { FacetCapability } from '../../core/project/adapter';
 
-// Glyph/label map — superset of the old MapToolDock TOOLS list (same icons).
-const TOOL_META: Record<EditorTool, [string, React.FC<{ size?: number }>]> = {
-  view: ['View', Icons.IconView],
-  select: ['Select', Icons.IconCursor],
-  marquee: ['Marquee', Icons.IconSelect],
-  'paint-tile': ['Paint Tile', Icons.IconPencil],
-  'paint-block': ['Paint Block', Icons.IconRect],
-  'stamp-chunk': ['Stamp Chunk', Icons.IconStamp],
-  'paint-collision': ['Paint Collision', Icons.IconCollision],
-  'place-object': ['Place Object', Icons.IconPlaceObject],
-  'place-ring': ['Place Ring', Icons.IconRing],
-  eraser: ['Eraser', Icons.IconEraser],
+// Glyph map — superset of the old MapToolDock TOOLS list (same icons). The
+// LABELS half moved to tool-meta.ts so classic's chip row can share it; what
+// stays here is the part that needs React.
+const TOOL_ICONS: Record<EditorTool, React.FC<{ size?: number }>> = {
+  view: Icons.IconView,
+  select: Icons.IconCursor,
+  marquee: Icons.IconSelect,
+  'paint-tile': Icons.IconPencil,
+  'paint-block': Icons.IconRect,
+  'stamp-chunk': Icons.IconStamp,
+  'paint-collision': Icons.IconCollision,
+  'place-object': Icons.IconPlaceObject,
+  'place-ring': Icons.IconRing,
+  eraser: Icons.IconEraser,
 };
 
 export function MapFacetDock({ facet }: { facet: FacetCapability }) {
   const tool = useEditorStore((s) => s.tool);
   const setTool = useEditorStore((s) => s.setTool);
-  const tools = FACET_TOOLS[facet] ?? [];
+  const tools = toolsForFacet(facet);
   return (
     <>
       {tools.map((t) => {
-        const [label, Icon] = TOOL_META[t];
-        return <ToolButton key={t} icon={<Icon size={18} />} label={label} active={tool === t} onClick={() => setTool(t)} />;
+        const Icon = TOOL_ICONS[t];
+        return <ToolButton key={t} icon={<Icon size={18} />} label={TOOL_LABELS[t]} active={tool === t} onClick={() => setTool(t)} />;
       })}
     </>
   );

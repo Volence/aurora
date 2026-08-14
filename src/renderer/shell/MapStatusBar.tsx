@@ -1,22 +1,15 @@
 import React from 'react';
 import { StatusBar, T, IconButton, Icons } from '../components/ui';
-import { useEditorStore, type EditorTool } from '../state/editorStore';
+import { useEditorStore } from '../state/editorStore';
+import { TOOL_LABELS, TOOL_HINTS } from '../workspace/tool-meta';
 import { useViewStore } from '../state/viewStore';
 import { useProjectStore, getCurrentZone } from '../state/projectStore';
 import { useBusStore } from '../state/busStore';
 
-const TOOL_INFO: Record<EditorTool, { label: string; hint: string }> = {
-  'view': { label: 'View', hint: 'Click + drag to pan, scroll to zoom' },
-  'select': { label: 'Select', hint: 'Click objects/rings to select, drag to move' },
-  'paint-tile': { label: 'Paint Tile', hint: 'Click to place selected tile, right-click to pick' },
-  'paint-block': { label: 'Paint Block', hint: 'Click to place a 16×16 px block (2×2 tiles)' },
-  'stamp-chunk': { label: 'Stamp Chunk', hint: 'Select a chunk from the library, then click to stamp — Alt: art only' },
-  'paint-collision': { label: 'Paint Collision', hint: 'Click to set collision type on tiles' },
-  'eraser': { label: 'Eraser', hint: 'Click to erase tiles' },
-  'marquee': { label: 'Marquee', hint: 'drag to select · Ctrl+C copy · Ctrl+V paste · S save as chunk · Esc clear' },
-  'place-object': { label: 'Place Object', hint: 'Click to place selected object type' },
-  'place-ring': { label: 'Place Ring', hint: 'Click to place ring pattern' },
-};
+// Labels and hints come from workspace/tool-meta.ts — one vocabulary, named
+// once, so this bar and classic's chip row cannot call the same tool different
+// things. What stays here is the aeon-specific CONTEXT line below, which is
+// where an aeon-only modifier like stamp's Alt belongs.
 
 /** Aether bus indicator — `Aether ◇ <status>`; emerald diamond when connected. */
 function AetherStatus() {
@@ -49,7 +42,7 @@ export default function MapStatusBar() {
 
   const info = pasting
     ? { label: 'Paste', hint: 'Click to paste · Alt: art only · Shift: collision only · Esc to stop' }
-    : TOOL_INFO[tool];
+    : { label: TOOL_LABELS[tool], hint: TOOL_HINTS[tool] };
   const zoomPercent = Math.round(zoom * 100);
 
   const chunkCount = project?.chunkLibrary.length ?? 0;
@@ -57,7 +50,9 @@ export default function MapStatusBar() {
   if (tool === 'stamp-chunk') {
     if (chunkCount === 0) contextInfo = 'No chunks loaded — import chunks first';
     else if (!selectedChunkId) contextInfo = 'Select a chunk from the library panel';
-    else contextInfo = `Chunk: ${selectedChunkId}`;
+    // The Alt modifier is aeon's stamp only, so it rides on this line rather
+    // than in the shared hint (see tool-meta.ts).
+    else contextInfo = `Chunk: ${selectedChunkId} — Alt: art only`;
   }
 
   const left = (

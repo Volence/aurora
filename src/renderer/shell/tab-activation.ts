@@ -37,7 +37,8 @@ import {
 } from '../state/spriteStore';
 import { documentHistoryHub } from '../state/history-hub';
 import {
-  parseLevelTabId, parseSpriteDocTabId, isSpriteDocTabId, zoneArtDocId, UNTITLED_SPRITE_TAB_ID,
+  parseLevelTabId, parseSpriteDocTabId, isSpriteDocTabId, zoneArtDocId, levelDocId,
+  UNTITLED_SPRITE_TAB_ID,
 } from './tabs';
 import { HOME_TAB, type TabDescriptor } from '../../core/shell/session';
 
@@ -284,7 +285,7 @@ async function runSpriteActivation(tabId: string): Promise<boolean> {
   return myGen === activationGen;
 }
 
-function classicOpenAct(zone: string, act: number): boolean {
+function classicOpenAct(zone: string, act: number, opts?: { skipViewSnapshot?: boolean }): boolean {
   const target = useClassicProjectStore.getState().zoneTree
     .find((r) => r.zone === zone && r.act === act);
   if (!target) {
@@ -296,7 +297,24 @@ function classicOpenAct(zone: string, act: number): boolean {
       `${target.label} is unavailable: ${target.reason ?? 'missing files'}`, 'error');
     return false;
   }
+  // Per-tab viewport, same as the aeon branch (spec §10) — possible only since
+  // classic's camera stopped being a component-local ref. Snapshot the OUTGOING
+  // act, then restore the INCOMING one.
+  //
+  // The restore is a plain viewStore write: the classic viewport adopts external
+  // camera writes, so this repositions it without reaching into the component.
+  // Its fit-to-height on load defers to a remembered viewport, which is what
+  // keeps this from being overwritten a moment later when the doc goes ready.
+  const outgoing = useClassicLevelStore.getState().ref;
+  if (!opts?.skipViewSnapshot && outgoing) {
+    const v = useViewStore.getState();
+    useWorkspaceStore.getState().setView(
+      levelDocId(outgoing.zone, String(outgoing.act)),
+      { x: v.vpX, y: v.vpY, zoom: v.zoom });
+  }
   void useClassicLevelStore.getState().openAct(target);
+  const view = useWorkspaceStore.getState().viewFor(levelDocId(zone, String(act)));
+  if (view) useViewStore.getState().setViewport(view.x, view.y, view.zoom);
   return true;
 }
 
@@ -348,7 +366,10 @@ export async function activateLevelTarget(
       return true;
     }
     case 'classic-open':
-      return classicOpenAct(plan.zone, plan.act);
+      // Same skipViewSnapshot reasoning as the aeon branch above: on the BOOT
+      // restore there is no user-viewed outgoing act to snapshot, only the
+      // loader's default, and snapshotting it would clobber the record.
+      return classicOpenAct(plan.zone, plan.act, opts);
     case 'classic-confirm': {
       const loadedLabel = classic.ref?.label ?? 'the current act';
       const answer = await useConfirmStore.getState().ask({
@@ -370,7 +391,7 @@ export async function activateLevelTarget(
       } else if (answer !== 'discard') {
         return false; // 'cancel' (or any unrecognized key, treated as cancel)
       }
-      return classicOpenAct(plan.zone, plan.act);
+      return classicOpenAct(plan.zone, plan.act, opts);
     }
   }
 }

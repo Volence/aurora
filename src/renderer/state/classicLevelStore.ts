@@ -41,6 +41,9 @@ import {
 import { classicLevelTab, zoneArtDocId } from '../shell/tabs';
 import { documentHistoryHub } from './history-hub';
 import { useClassicProjectStore } from './classicProjectStore';
+// One tool vocabulary (spec §3.6): the tool classic paints with lives in
+// editorStore now. Safe direction — editorStore does not import this store.
+import { useEditorStore } from './editorStore';
 
 export type ClassicLevelStatus = 'idle' | 'loading' | 'ready' | 'error';
 
@@ -60,12 +63,11 @@ export type ComposerTab = 'chunk' | 'block' | 'tile';
 
 export type LayoutPlane = 'fg' | 'bg';
 
-/**
- * The active layout-editing tool. `pan` navigates (drag = pan); `stamp` paints
- * the selected chunk (Task 13); `object` selects / moves / places / deletes
- * object placements (Task 14).
- */
-export type ClassicTool = 'pan' | 'stamp' | 'object';
+// The active layout-editing tool used to live here as `ClassicTool`
+// ('pan' | 'stamp' | 'object'). It is now `editorStore.tool`, one vocabulary for
+// both engines (spec §3.6): pan → view, stamp → stamp-chunk, and the
+// dual-purpose `object` split into the two tools it always was — `select` when
+// nothing is armed, `place-object` when something is. See classic-placement.ts.
 
 interface ClassicLevelState {
   /** The act currently selected in the zone tree (even while loading/errored). */
@@ -134,8 +136,8 @@ interface ClassicLevelState {
   /**
    * Layout-editing UI state (Task 13, spec §3 M5). Not doc data and NOT part of
    * an undo snapshot: undo/redo restore the document, never the tool/selection.
+   * The TOOL itself is no longer here — see the note above the state interface.
    */
-  tool: ClassicTool;
   /** The chunk id the stamp tool paints (0..255); also the eyedropper target. */
   selectedChunkId: number;
   /**
@@ -181,7 +183,6 @@ interface ClassicLevelState {
 
   /** Select + load an act. Reads through the open project's handle. */
   openAct: (ref: ZoneActRef) => Promise<void>;
-  setTool: (tool: ClassicTool) => void;
   setSelectedChunkId: (chunkId: number) => void;
   /**
    * The Composer picker's plain left-click select: sets the chunk AND arms the
@@ -227,7 +228,6 @@ const IDLE = {
   paletteEpoch: 0,
   tileEpoch: 0,
   tileVersions: new Map<number, number>(),
-  tool: 'pan' as ClassicTool,
   selectedChunkId: 0,
   stampLoop: false,
   selectedObjectIndex: null as number | null,
@@ -342,17 +342,19 @@ export const useClassicLevelStore = create<ClassicLevelState>((set, get) => ({
     }
   },
 
-  setTool: (tool: ClassicTool) => set({ tool }),
   setSelectedChunkId: (chunkId: number) => {
     if (Number.isInteger(chunkId) && chunkId >= 0 && chunkId <= 0xff) set({ selectedChunkId: chunkId });
   },
   selectChunkForStamp: (chunkId: number) => {
     if (!Number.isInteger(chunkId) || chunkId < 0 || chunkId > 0xff) return;
-    const patch: Partial<ClassicLevelState> = { selectedChunkId: chunkId };
+    set({ selectedChunkId: chunkId });
     // Selecting a chunk expresses intent to stamp it (user feedback, stage-3
     // smoke test) — arm the stamp tool, but only if it isn't already active.
-    if (get().tool !== 'stamp') patch.tool = 'stamp';
-    set(patch);
+    // The guard is not just an optimisation: setTool also clears the aeon
+    // selection and cancels an in-progress paste, so an unconditional call
+    // would make a no-op chunk re-select destroy unrelated state.
+    const editor = useEditorStore.getState();
+    if (editor.tool !== 'stamp-chunk') editor.setTool('stamp-chunk');
   },
   setStampLoop: (loop: boolean) => set({ stampLoop: loop }),
   setSelectedObjectIndex: (index: number | null) => set({ selectedObjectIndex: index }),

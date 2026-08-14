@@ -30,7 +30,10 @@ function LayoutPanels() {
         </CollapsibleSection>
       )}
       <CollapsibleSection id="map.art" title="Art"><ArtBrowser /></CollapsibleSection>
-      <CollapsibleSection id="map.props" title="Properties"><PropertiesPanel /></CollapsibleSection>
+      {/* The object readout is on HERE and nowhere else: Layout offers the
+          `select` tool, and this panel is the only thing in the facet that shows
+          what you picked. The Objects facet has the real editor instead. */}
+      <CollapsibleSection id="map.props" title="Properties"><PropertiesPanel showObjectSelection /></CollapsibleSection>
     </Panel>
   );
 }

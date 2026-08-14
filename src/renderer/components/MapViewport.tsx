@@ -5,7 +5,7 @@ import { useEditorStore, executeCommand, focusedHistory, setCommandInvalidationL
 import { useAeonHistoryVersion } from '../hooks/useHistoryVersion';
 import { useArtStore } from '../state/artStore';
 import { useSessionStore } from '../state/sessionStore';
-import { switchFacet, FACET_TOOLS } from '../workspace/facet-tools';
+import { switchFacet, toolsForFacet } from '../workspace/facet-tools';
 import { useWorkspaceStore } from '../workspace/workspaceStore';
 import { levelKeysEnabled } from '../workspace/level-keys';
 import { useToastStore } from '../state/toastStore';
@@ -655,8 +655,11 @@ export default function MapViewport() {
       // context) => default-allow, so nothing non-facet breaks.
       const setToolScoped = (t: EditorTool) => {
         const facet = useWorkspaceStore.getState().facetFor(useSessionStore.getState().activeId);
-        const allowed = FACET_TOOLS[facet];
-        if (allowed && !allowed.includes(t)) return;
+        const allowed = toolsForFacet(facet);
+        // Empty = the facet declares no EditorTool set at all ('art' runs the
+        // artStore tool system and never mounts MapViewport, plus any future
+        // non-facet context) => default-allow, as before.
+        if (allowed.length > 0 && !allowed.includes(t)) return;
         useEditorStore.getState().setTool(t);
       };
 

@@ -1,6 +1,13 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { T, Chip, OptionBar, Divider } from '../ui';
 import { useClassicLevelStore, classicSetLayoutCells, classicSetObjects, classicSetStart } from '../../state/classicLevelStore';
+import { useEditorStore } from '../../state/editorStore';
+import { useViewStore } from '../../state/viewStore';
+import { useWorkspaceStore } from '../../workspace/workspaceStore';
+import { levelDocId } from '../../shell/tabs';
+import { armedPlacementId } from '../../state/classic-placement';
+import { toolsForFacet } from '../../workspace/facet-tools';
+import { TOOL_LABELS, TOOL_HINTS } from '../../workspace/tool-meta';
 import { useClassicProjectStore } from '../../state/classicProjectStore';
 import { useClassicObjectArtStore, refreshClassicObjectSprites, spriteFor } from '../../state/classicObjectArtStore';
 import { useToastStore } from '../../state/toastStore';
@@ -22,13 +29,6 @@ import {
   LOOP_GLYPH_FILL, LOOP_GLYPH_TEXT,
 } from '../../canvas/canvas-colors';
 
-type Plane = 'fg' | 'bg';
-interface Overlays {
-  collision: boolean;
-  objects: boolean;
-  start: boolean;
-  angles: boolean;
-}
 interface Camera {
   x: number;
   y: number;
@@ -91,14 +91,18 @@ function drawLoopGlyph(ctx: CanvasRenderingContext2D, x0: number, y0: number, in
  * cache is only invalidated when the whole doc changes), with a pan/zoom camera
  * and toggleable collision / object / start overlays.
  *
- * CAMERA MATH is duplicated (not shared) from the map viewport's `useViewStore` +
- * MapViewport render effect (src/renderer/state/viewStore.ts): `cam.x/cam.y` is
- * the world coordinate at the canvas top-left, `zoom` scales world→screen, so the
- * draw transform is `scale(zoom); translate(-cam.x, -cam.y)` and screen→world is
- * `cam.x + screenPx/zoom`. That store is coupled to aeon's overlay set and
- * projectStore, so per the task we keep an isolated local copy rather than
- * refactoring the aeon camera this task. The visible-chunk / layout-index /
- * ring-expansion logic lives in the unit-tested `./viewport-math`.
+ * CAMERA MATH matches the map viewport's (src/renderer/state/viewStore.ts):
+ * `cam.x/cam.y` is the world coordinate at the canvas top-left, `zoom` scales
+ * world→screen, so the draw transform is `scale(zoom); translate(-cam.x,
+ * -cam.y)` and screen→world is `cam.x + screenPx/zoom`. The visible-chunk /
+ * layout-index / ring-expansion logic lives in the unit-tested `./viewport-math`.
+ *
+ * The camera is a REF that publishes to `viewStore` once per painted frame, and
+ * adopts writes that came from elsewhere — not a subscribed selector. Both
+ * halves matter: the store is what makes the camera addressable from outside
+ * (agent goto, per-tab restore), and the ref is what keeps a drag from
+ * re-rendering this component on every mousemove. Reverting the ref to state
+ * rebuilds the redraw storm three perf commits removed; there is a guard test.
  */
 export default function ClassicLevelViewport() {
   const status = useClassicLevelStore((s) => s.status);
@@ -114,11 +118,12 @@ export default function ClassicLevelViewport() {
   // sprites do not, so they read the narrower signals.
   const paletteEpoch = useClassicLevelStore((s) => s.paletteEpoch);
   const tileEpoch = useClassicLevelStore((s) => s.tileEpoch);
-  // Task 13 layout-editing UI state (pan|stamp + the stamp/eyedrop chunk id).
-  const tool = useClassicLevelStore((s) => s.tool);
+  // The tool is engine-neutral now (spec §3.6): classic's pan/stamp/object are
+  // view / stamp-chunk / (select | place-object) in the one vocabulary.
+  const tool = useEditorStore((s) => s.tool);
+  const setTool = useEditorStore((s) => s.setTool);
   const selectedChunkId = useClassicLevelStore((s) => s.selectedChunkId);
   const stampLoop = useClassicLevelStore((s) => s.stampLoop);
-  const setTool = useClassicLevelStore((s) => s.setTool);
   const setSelectedChunkId = useClassicLevelStore((s) => s.setSelectedChunkId);
   const setStampLoop = useClassicLevelStore((s) => s.setStampLoop);
   // Task 14 object-tool UI state (selection index + armed place-mode id).
@@ -126,6 +131,13 @@ export default function ClassicLevelViewport() {
   const armedObjectId = useClassicLevelStore((s) => s.armedObjectId);
   const setSelectedObjectIndex = useClassicLevelStore((s) => s.setSelectedObjectIndex);
   const setArmedObjectId = useClassicLevelStore((s) => s.setArmedObjectId);
+  // The armed id, gated on the place-object tool — switching tools disarms
+  // without any call site having to clear it (classic-placement.ts).
+  const armedId = armedPlacementId(tool, armedObjectId);
+  // The chips this profile's layout facet offers, declared by the s1 manifest
+  // rather than hardcoded here, so the shared dock in the workspace re-home is a
+  // drop-in replacement for the row below.
+  const layoutTools = toolsForFacet('layout');
   // Task B1 object sprites: real art keyed by object id. The published map +
   // version are read by the render pass; `version` bumps on every republish (a
   // sprite finished loading), which re-runs the depless render effect below.
@@ -150,20 +162,60 @@ export default function ClassicLevelViewport() {
   // further redraws before it fires are absorbed (the trailing state bump still
   // reflects the latest ref-based camera/stroke state). Cancelled on unmount.
   const rafRef = useRef<number | null>(null);
+  // The camera values last pushed to viewStore. Two jobs: it keeps the push
+  // below to frames where the camera actually moved, and it is what lets the
+  // adopt-subscription tell OUR OWN echo from a genuine external write.
+  const syncedRef = useRef<Camera>({ x: 0, y: 0, zoom: 1 });
+  // The tab the fit effect last ran for, so it can tell an ACT LOAD from a plane
+  // switch — only the former defers to a remembered viewport.
+  const lastFitTabRef = useRef<string | null>(null);
   const redraw = useCallback(() => {
     if (rafRef.current != null) return;
     rafRef.current = requestAnimationFrame(() => {
       rafRef.current = null;
+      // Publish the camera ONCE PER PAINTED FRAME (spec §3.6 / step D). The ref
+      // stays the hot path — a drag mutates it on every mousemove and this rAF
+      // is what a high-poll mouse's hundreds of events per second collapse
+      // into. Subscribing to vpX/vpY/zoom with a selector instead would
+      // re-render this component per mousemove and rebuild exactly the redraw
+      // storm the perf work removed (see the guard test in __tests__).
+      const cam = camRef.current;
+      const last = syncedRef.current;
+      if (cam.x !== last.x || cam.y !== last.y || cam.zoom !== last.zoom) {
+        syncedRef.current = { ...cam };
+        useViewStore.getState().setViewport(cam.x, cam.y, cam.zoom);
+      }
       forceRedraw((n) => n + 1);
     });
   }, []);
   useEffect(() => () => { if (rafRef.current != null) cancelAnimationFrame(rafRef.current); }, []);
 
-  const [plane, setPlane] = useState<Plane>('fg');
-  const [overlays, setOverlays] = useState<Overlays>({
-    collision: false, objects: true, start: true, angles: false,
-  });
-  const toggle = (k: keyof Overlays) => setOverlays((o) => ({ ...o, [k]: !o[k] }));
+  // Adopt camera writes that did NOT come from this component — the agent
+  // handler's goto, a per-tab viewport restore, any future shared zoom control.
+  // Imperative subscribe, not a selector hook, for the reason above.
+  //
+  // Self-echo is filtered by exact equality against what we just published: the
+  // push writes those three numbers verbatim, and setViewport's clamps match the
+  // bounds the wheel handler already applies, so a value that survived our own
+  // push comes back identical. No epsilon, no in-flight flag, no feedback loop.
+  useEffect(() => useViewStore.subscribe((s) => {
+    const cam = camRef.current;
+    if (s.vpX === cam.x && s.vpY === cam.y && s.zoom === cam.zoom) return;
+    cam.x = s.vpX;
+    cam.y = s.vpY;
+    cam.zoom = s.zoom;
+    syncedRef.current = { ...cam };
+    redraw();
+  }), [redraw]);
+
+  // Plane and overlays are shared state now (spec §3.6), not viewport-local:
+  // unreachable from outside the component is exactly what stopped a shared
+  // plane control and shared overlay toggles from serving both engines. The
+  // plane IS aeon's editingLayer — same 'fg' | 'bg' union, same meaning.
+  const plane = useEditorStore((s) => s.editingLayer);
+  const setPlane = useEditorStore((s) => s.setEditingLayer);
+  const overlays = useViewStore((s) => s.overlays);
+  const toggle = useViewStore((s) => s.toggleOverlay);
 
   // Per-chunk prerender cache (chunkId → {offscreen canvas, version key}). A cached
   // canvas is reused while its content version is unchanged; edits bump the version
@@ -286,12 +338,26 @@ export default function ClassicLevelViewport() {
   // zoom in and then move an object / stamp a chunk / undo.
   useEffect(() => {
     if (status !== 'ready' || !doc) return;
+    // A REMEMBERED viewport beats fit-to-height, but only on an act load — that
+    // is the per-tab restore (tab-activation wrote viewStore just before this
+    // act started loading, and the adopt-subscription has already applied it).
+    // A plane switch still refits, because FG and BG grids differ in height and
+    // the fit is what keeps the whole plane on screen.
+    const tabId = ref ? levelDocId(ref.zone, String(ref.act)) : null;
+    const isActLoad = lastFitTabRef.current !== tabId;
+    lastFitTabRef.current = tabId;
+    if (isActLoad && tabId && useWorkspaceStore.getState().viewFor(tabId)) return;
     const grid = plane === 'bg' ? doc.bg : doc.fg;
     const container = containerRef.current;
     const h = container?.clientHeight ?? 600;
     const levelPxH = grid.height * CHUNK_PX;
     const zoom = Math.max(0.125, Math.min(2, levelPxH > 0 ? h / levelPxH : 1));
     camRef.current = { x: 0, y: 0, zoom };
+    // Publish the fit immediately rather than waiting for the first drag, so the
+    // store never sits holding the PREVIOUS act's camera — which anything
+    // reading it between load and first gesture would otherwise believe.
+    syncedRef.current = { x: 0, y: 0, zoom };
+    useViewStore.getState().setViewport(0, 0, zoom);
     redraw();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status, ref, plane]);
@@ -354,16 +420,16 @@ export default function ClassicLevelViewport() {
     // object placement and the spawn point live on the foreground plane).
     if (plane === 'fg') {
       // Collision overlay (per visible chunk).
-      if (overlays.collision) {
+      if (overlays.showCollision) {
         for (let row = range.startRow; row < range.endRow; row++) {
           for (let col = range.startCol; col < range.endCol; col++) {
             const cell = layoutCellAt(grid, col, row);
             if (cell === undefined) continue;
-            drawCollision(ctx, doc, col, row, cell & 0x7f, overlays.angles);
+            drawCollision(ctx, doc, col, row, cell & 0x7f, overlays.showCollisionAngles);
           }
         }
       }
-      if (overlays.objects) {
+      if (overlays.showObjects) {
         // Selection highlight + live drag preview (Task 14). The selection index
         // can be stale (a delete/undo shrank the list) — treat out-of-range as
         // no selection. During a move the drag ref carries the preview position.
@@ -378,7 +444,7 @@ export default function ClassicLevelViewport() {
         void objectArtVersion;
         drawObjects(ctx, doc, invZoom, objectSprites, ref?.zone ?? '', selIndex, previewPos);
       }
-      if (overlays.start) {
+      if (overlays.showStart) {
         // During a start drag the ref carries the live (clamped) preview position.
         const sdrag = startDragRef.current;
         drawStart(ctx, doc, invZoom, sdrag ? sdrag.preview : null);
@@ -391,7 +457,7 @@ export default function ClassicLevelViewport() {
     // so it can't desync from the actual paint/place target. Never drawn mid-
     // gesture (the refs are only written when none is active) or off-canvas
     // (cleared on mouse-leave).
-    if (tool === 'stamp') {
+    if (tool === 'stamp-chunk') {
       const hc = hoverCellRef.current;
       if (hc) {
         const hx = hc.col * CHUNK_PX;
@@ -409,14 +475,14 @@ export default function ClassicLevelViewport() {
         ctx.strokeRect(hx, hy, CHUNK_PX, CHUNK_PX);
         ctx.restore();
       }
-    } else if (tool === 'object' && plane === 'fg' && armedObjectId != null) {
+    } else if (armedId != null && plane === 'fg') {
       const hw = hoverWorldRef.current;
       if (hw) {
         // Same shape + clamp constants as the click-to-place object in
         // onMouseDown, so the ghost lands exactly where that click would.
         const ghostObj = {
           x: clampInt(hw.x, OBJ_X_MAX), y: clampInt(hw.y, OBJ_Y_MAX),
-          xflip: false, yflip: false, respawn: false, id: armedObjectId, subtype: 0,
+          xflip: false, yflip: false, respawn: false, id: armedId, subtype: 0,
         };
         ctx.save();
         ctx.globalAlpha = 0.6;
@@ -551,7 +617,7 @@ export default function ClassicLevelViewport() {
       return;
     }
     if (e.button !== 0) return; // left drags tools; right-click eyedrops (below)
-    if (tool === 'stamp') {
+    if (tool === 'stamp-chunk') {
       const grid = activeGrid();
       const cell = cellUnderCursor(e);
       if (!grid || !cell) return;
@@ -561,13 +627,14 @@ export default function ClassicLevelViewport() {
       redraw();
       return;
     }
-    // Object tool — only on the FG plane (objects are an FG concept). On BG it
-    // falls through to pan so navigation still works.
-    if (tool === 'object' && plane === 'fg') {
+    // The object tools — only on the FG plane (objects are an FG concept). On BG
+    // both fall through to pan so navigation still works. `place-object` drops a
+    // new one; `select` picks / moves / (via the Delete key) removes.
+    if (plane === 'fg' && (tool === 'place-object' || tool === 'select')) {
       const world = worldUnderCursor(e);
       const d = useClassicLevelStore.getState().doc;
       if (!world || !d) return;
-      const armed = useClassicLevelStore.getState().armedObjectId;
+      const armed = armedPlacementId(tool, useClassicLevelStore.getState().armedObjectId);
       if (armed != null) {
         // Place a new object of the armed id at the click, default subtype 0, no
         // flips, respawn off. One classicSetObjects command; then select it and
@@ -581,11 +648,18 @@ export default function ClassicLevelViewport() {
         ];
         const res = classicSetObjects(next);
         if (!res.ok) { useToastStore.getState().addToast(`Place failed: ${res.error}`, 'error'); return; }
+        // Disarm and fall back to select — the click-to-place idiom, which used
+        // to be "clear the armed id and let the dual-purpose object tool mean
+        // select again" and is now literally that tool switch.
         setArmedObjectId(null);
+        setTool('select');
         setSelectedObjectIndex(next.length - 1);
         redraw();
         return;
       }
+      // Armed but with nothing to drop (place-object with no id) does nothing
+      // rather than falling through to a pan the user did not ask for.
+      if (tool === 'place-object') return;
       // Hit-test with frame bounds where a sprite is loaded (else a constant
       // on-screen anchor tolerance, world radius = px / zoom). The bounds resolver
       // reads the live sprite map; a ring group ($25) is expanded per-ring inside
@@ -609,7 +683,7 @@ export default function ClassicLevelViewport() {
         // visible, so you can only grab what you can see). Objects win ties: an
         // object drawn over the spawn point stays grabbable. Begins a start drag
         // that commits ONE classicSetStart on mouseup (spec §2.3).
-        if (overlays.start && hitTestPoint(world.x, world.y, d.start.x, d.start.y, pickWorld)) {
+        if (overlays.showStart && hitTestPoint(world.x, world.y, d.start.x, d.start.y, pickWorld)) {
           setSelectedObjectIndex(null);
           startDragRef.current = {
             grabDX: d.start.x - world.x, grabDY: d.start.y - world.y,
@@ -631,7 +705,7 @@ export default function ClassicLevelViewport() {
     }
     dragging.current = true;
     lastMouse.current = { x: e.clientX, y: e.clientY };
-  }, [tool, plane, overlays.start, activeGrid, cellUnderCursor, worldUnderCursor, redraw, setArmedObjectId, setSelectedObjectIndex]);
+  }, [tool, plane, overlays.showStart, activeGrid, cellUnderCursor, worldUnderCursor, redraw, setArmedObjectId, setSelectedObjectIndex, setTool]);
 
   const onMouseMove = useCallback((e: React.MouseEvent) => {
     // Hover ghost tracking — BEFORE the drag/stroke dispatch below, and gated on
@@ -641,7 +715,7 @@ export default function ClassicLevelViewport() {
     // click handlers use, so the ghost can't desync from where a click would
     // actually paint/place.
     if (!dragging.current && !startDragRef.current && !objDragRef.current && !strokeRef.current) {
-      if (tool === 'stamp') {
+      if (tool === 'stamp-chunk') {
         const grid = activeGrid();
         const cell = cellUnderCursor(e);
         const inBounds =
@@ -653,7 +727,7 @@ export default function ClassicLevelViewport() {
           hoverCellRef.current = inBounds;
           redraw();
         }
-      } else if (tool === 'object' && plane === 'fg' && armedObjectId != null) {
+      } else if (armedId != null && plane === 'fg') {
         const world = worldUnderCursor(e);
         const prev = hoverWorldRef.current;
         if (world?.x !== prev?.x || world?.y !== prev?.y) {
@@ -710,7 +784,7 @@ export default function ClassicLevelViewport() {
     cam.x = Math.max(0, cam.x - d.x);
     cam.y = Math.max(0, cam.y - d.y);
     redraw();
-  }, [tool, plane, armedObjectId, activeGrid, cellUnderCursor, worldUnderCursor, redraw]);
+  }, [tool, plane, armedId, activeGrid, cellUnderCursor, worldUnderCursor, redraw]);
 
   // Commit an object-move gesture as ONE classicSetObjects (or none, when the
   // gesture was a click without movement, or the net position is unchanged).
@@ -818,7 +892,16 @@ export default function ClassicLevelViewport() {
         if (objDragRef.current) { objDragRef.current = null; redraw(); return; }
         if (startDragRef.current) { startDragRef.current = null; redraw(); return; }
         const s = useClassicLevelStore.getState();
-        if (s.armedObjectId != null) { s.setArmedObjectId(null); redraw(); return; }
+        const editor = useEditorStore.getState();
+        // Cancelling a pending placement drops back to select, the same landing
+        // the place-then-disarm path takes — Esc must not leave the tool armed
+        // with nothing to place.
+        if (armedPlacementId(editor.tool, s.armedObjectId) != null) {
+          s.setArmedObjectId(null);
+          editor.setTool('select');
+          redraw();
+          return;
+        }
         if (s.selectedObjectIndex != null) { s.setSelectedObjectIndex(null); redraw(); return; }
         return;
       }
@@ -866,30 +949,34 @@ export default function ClassicLevelViewport() {
     >
       <OptionBar>
         <span style={{ color: T.textLo }}>Tool</span>
-        <Chip active={tool === 'pan'} onClick={() => setTool('pan')} title="Pan / navigate (drag to pan)">Pan</Chip>
-        <Chip active={tool === 'stamp'} onClick={() => setTool('stamp')} title="Paint the selected chunk onto layout cells (drag)">Stamp</Chip>
-        <Chip active={tool === 'object'} onClick={() => setTool('object')} title="Select / move / place / delete objects (FG plane)">Object</Chip>
+        {layoutTools.map((t) => (
+          <Chip key={t} active={tool === t} onClick={() => setTool(t)} title={TOOL_HINTS[t]}>
+            {TOOL_LABELS[t]}
+          </Chip>
+        ))}
         <Divider />
         <span style={{ color: T.textLo }}>Plane</span>
         <Chip active={plane === 'fg'} onClick={() => setPlane('fg')}>FG</Chip>
         <Chip active={plane === 'bg'} onClick={() => setPlane('bg')}>BG</Chip>
         <Divider />
         <span style={{ color: T.textLo }}>Overlays</span>
-        <Chip active={overlays.collision} onClick={() => toggle('collision')}>Collision</Chip>
-        <Chip active={overlays.angles} onClick={() => toggle('angles')} disabled={!overlays.collision}>Angles</Chip>
-        <Chip active={overlays.objects} onClick={() => toggle('objects')}>Objects</Chip>
-        <Chip active={overlays.start} onClick={() => toggle('start')}>Start</Chip>
+        <Chip active={overlays.showCollision} onClick={() => toggle('showCollision')}>Collision</Chip>
+        <Chip active={overlays.showCollisionAngles} onClick={() => toggle('showCollisionAngles')} disabled={!overlays.showCollision}>Angles</Chip>
+        <Chip active={overlays.showObjects} onClick={() => toggle('showObjects')}>Objects</Chip>
+        <Chip active={overlays.showStart} onClick={() => toggle('showStart')}>Start</Chip>
         <span style={{ flex: 1 }} />
         <span style={{ color: T.textFaint }}>
-          {tool === 'stamp'
+          {tool === 'stamp-chunk'
             ? `stamp $${selectedChunkId.toString(16).toUpperCase().padStart(2, '0')}${stampLoop && selectedChunkId >= 1 && selectedChunkId <= 0x7f ? ' ∞loop' : ''} · drag to paint · right-click eyedrops · scroll to zoom`
-            : tool === 'object'
-              ? (armedObjectId != null
-                  ? `click to place ${s1ObjectName(armedObjectId)} · Esc cancels`
-                  : (plane === 'fg'
+            : armedId != null
+              ? `click to place ${s1ObjectName(armedId)} · Esc cancels`
+              : tool === 'place-object'
+                ? 'no object armed — pick one from the Objects panel · Esc cancels'
+                : tool === 'select'
+                  ? (plane === 'fg'
                       ? 'click selects · drag moves · drag START to move spawn · Del removes · arm to place'
-                      : 'objects are FG-only — switch to FG to edit · drag to pan'))
-              : 'drag to pan · right-click eyedrops · scroll to zoom'}
+                      : 'objects are FG-only — switch to FG to edit · drag to pan')
+                  : 'drag to pan · right-click eyedrops · scroll to zoom'}
         </span>
       </OptionBar>
       <div
@@ -907,8 +994,9 @@ export default function ClassicLevelViewport() {
             onWheel={onWheel}
             style={{
               position: 'absolute', inset: 0,
-              cursor: tool === 'stamp' ? 'crosshair'
-                : tool === 'object' ? (armedObjectId != null ? 'copy' : 'default')
+              cursor: tool === 'stamp-chunk' ? 'crosshair'
+                : armedId != null ? 'copy'
+                : tool === 'select' || tool === 'place-object' ? 'default'
                 : 'grab',
             }}
           />
