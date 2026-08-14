@@ -108,18 +108,34 @@ export default function LevelWorkspace() {
   // serve — and chips that mutate an aeon store from a classic screen with no
   // canvas are exactly the dead chrome this branch is removing.
   //
-  // `objects` IS on this list, and it is load-bearing under BOTH engines — see
-  // the guard in __tests__/facet-visibility.test.ts. Classic gates object
-  // editing on the plane outright (ClassicLevelViewport: select and
-  // place-object only act when the plane is FG; on BG they fall through to
-  // pan), so an objects facet with no plane control is an objects facet whose
-  // tools silently do nothing whenever the plane was left on BG. Aeon does not
-  // gate the placement itself, but it renders only Plane B on BG and draws the
-  // object overlay solely in the FG branch (MapViewport) — so there the same
-  // missing control strands you on a canvas where every object is invisible.
-  // Different failure, same cure.
-  const showPlane = mod != null
-    && (resolved === 'layout' || resolved === 'collision' || resolved === 'objects');
+  // THE LIST IS EVERY FACET WHOSE CANVAS IS THE MAP, and it is a list of the
+  // FAILURES each omission causes, not a taxonomy:
+  //
+  //  - `objects` is load-bearing under BOTH engines — see the guard in
+  //    __tests__/facet-visibility.test.ts. Classic gates object editing on the
+  //    plane outright (ClassicLevelViewport: select and place-object only act
+  //    when the plane is FG; on BG they fall through to pan), so an objects
+  //    facet with no plane control is an objects facet whose tools silently do
+  //    nothing whenever the plane was left on BG. Aeon does not gate the
+  //    placement itself, but it renders only Plane B on BG and draws the object
+  //    overlay solely in the FG branch (MapViewport) — so there the same missing
+  //    control strands you on a canvas where every object is invisible.
+  //  - `rings` is the IDENTICAL aeon bug, and it was simply left off this list
+  //    when objects was added. MapViewport draws the ring overlay only in the FG
+  //    branch and `place-ring` carries no plane guard, so on BG the facet is a
+  //    canvas with no rings on it and a tool that keeps writing invisible ones.
+  //  - `palette` is view-only, so nothing writes invisibly there — but its canvas
+  //    is still the plane-gated map, and with no chip a plane left on BG shows
+  //    Plane B under a palette editor for art you cannot see. It is on the list
+  //    because the chip is LIVE there (it visibly changes the canvas), which is
+  //    the actual rule; a chip is dead chrome only where the canvas ignores it.
+  //
+  // That leaves exactly one served facet off: `art`, whose canvas is a composer
+  // under both engines and reads no plane at all.
+  const showPlane = mod != null && (
+    resolved === 'layout' || resolved === 'collision' || resolved === 'objects'
+    || resolved === 'rings' || resolved === 'palette'
+  );
   const header = (
     <div style={styles.header}>
       <FacetBar tabId={activeId} granted={granted} engine={engine} />

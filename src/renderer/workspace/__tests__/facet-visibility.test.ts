@@ -161,8 +161,15 @@ describe('the header offers the plane control on every facet whose canvas is pla
     return m![1];
   };
 
-  it.each(['layout', 'collision', 'objects'])('%s can switch plane', (facet) => {
+  it.each(['layout', 'collision', 'objects', 'rings', 'palette'])('%s can switch plane', (facet) => {
     expect(showPlaneExpr()).toContain(`'${facet}'`);
+  });
+
+  it('and `art` does NOT — its canvas is a composer that reads no plane', () => {
+    // The other half of the rule. Without it this guard only ever grows, and a
+    // chip over the art facet would write editorStore for a canvas that ignores
+    // it — the dead chrome the list exists to prevent.
+    expect(showPlaneExpr()).not.toContain("'art'");
   });
 
   it('is still gated on the facet being served at all', () => {
