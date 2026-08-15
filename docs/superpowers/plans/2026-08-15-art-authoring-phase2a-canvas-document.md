@@ -987,10 +987,10 @@ export interface DecodedIndexedPng {
   transparentIndex: number | null;
 }
 
-async function inflate(data: Uint8Array): Promise<Uint8Array> {
-  const stream = new Blob([data]).stream().pipeThrough(new DecompressionStream('deflate'));
-  return new Uint8Array(await new Response(stream).arrayBuffer());
-}
+// NOTE (review correction R8): `inflate` does NOT live here. Both directions
+// moved to `src/core/art/zlib-stream.ts` — see the correction for why, and note
+// that the version below does not compile in this toolchain. Import it instead:
+//   import { inflate } from './zlib-stream';
 
 function paeth(a: number, b: number, c: number): number {
   const p = a + b - c;
@@ -2799,6 +2799,12 @@ git commit -m "test(canvas): verify the canvas document in the running app under
 **R2 (IMPORTANT, Task 2) — `constraintProfile` could not accept the input it exists for.** Its documented `none` fallback is justified by "a sidecar can name a profile this build has never heard of", but a sidecar yields a `string` and the parameter type rejected it — which is why the test needed `as never`, and why Task 5's loader had reimplemented the fallback inline with a cast. The parameter is now `string`; the return type stays exact; Task 5 calls it instead of restating the rule.
 
 **R2b (IMPORTANT, follow-on) — the widening in R2 opened a prototype-chain hole, found on re-review.** `??` only fires on null/undefined, and an object-literal `Record` inherits from `Object.prototype`, so once the parameter accepted any string, `constraintProfile('toString')` returned `Function.prototype.toString` *typed as a `ConstraintProfile`* with `.id === undefined` — reachable directly from sidecar JSON, invisible to TypeScript, and surfacing far from its cause. The lookup is now gated on `Object.prototype.hasOwnProperty.call(...)` and tested over `toString`, `constructor`, `__proto__`, `valueOf` and `hasOwnProperty`. Worth remembering the shape: widening a parameter to accept untrusted input moves the problem from the type system to runtime, and an index into a plain object literal is where it lands.
+
+**R8 (IMPORTANT, Task 4) — the deflate/inflate pair moves to its own module, and the plan's `inflate` never compiled.** Task 3 hit a real toolchain mismatch: `@types/node`'s `Uint8Array<ArrayBufferLike>` is not assignable to DOM's `BlobPart`, so `new Blob([raw])` fails `tsc`. The obvious fix — passing `raw.buffer` — is a trap: it discards the view's `byteOffset`/`byteLength`, so a subarray silently compresses its neighbours' bytes. That is dormant in the encoder (its scanline buffer is always freshly allocated at its own size, and `TypedArray.set` respects the source window, which is *why* a public-API test of it passes with the bug present) but live in the decoder, where chunk data genuinely arrives as `png.subarray(start, start + len)`. The correct cast is of the VIEW: `new Blob([data as unknown as BlobPart])`.
+
+Rather than state that twice and leave `inflate` private and unguarded, **Task 4 creates `src/core/art/zlib-stream.ts`** exporting `deflate` and `inflate`, moves the view-safety rationale there, and gives each direction a test that passes a `subarray` with a non-zero `byteOffset` and asserts the window's bytes and not its neighbours'. `indexed-png.ts` imports both. This also retires the "exported only for testability" question Task 3 raised: in the new module both are the public surface. Plant the `.buffer` form in each direction and watch the matching test fail before believing either guard.
+
+**R9 (Task 4) — give chunk parsing one production home.** `chunk()` has no read sibling, so a decoder written straight from the plan inlines its own `while (p < bytes.length)` walker. Add `parseChunks(bytes): { type, data }[]` beside `chunk()` and have `decodeIndexedPng` use it. The hand-rolled walkers in the TEST files stay independent on purpose — a test that shares the parser it is checking proves nothing.
 
 **R7 (IMPORTANT, follow-on) — half of R6 was comment-only.** `pixel-ops.ts`'s comment names the exact dangerous edit ("must not add an `& 15` in here"), but masking all three write sites in `floodFill`, `drawLine` and `drawRect` left the whole `src/core/art` + `src/core/editing` suite green: the controller guard from R6 only exercised the pencil path, which writes through the controller's own `setPx` and never reaches `pixel-ops`. The controller test now drives fill, line, rect and dither with a 0..63 colour, and each was validated by planting the mask and watching the matching test fail.
 
