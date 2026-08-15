@@ -1769,3 +1769,25 @@ paint diverges them on demand, which the two-tier cascade already handles. Fits
 `classicPaintSurface` as one undo entry, lives on the instance, targets the measured dangerous
 tier. **Not now** — it duplicates what Isolate delivers implicitly. Build it only if Task 12 or
 real use shows people hunting for an explicit detach.
+
+### Correction from T5 — the SBZ3 door reservation is empty in practice
+
+**Measured 2026-08-15 against the real disassembly.** GHZ matched the design exactly: 158
+reserved tiles, run 0x3B..0xE4, and without reservations the 5th claim lands on 0x3B.
+
+**LZ act 1 and SBZ act 3 did not.** The design predicted both would cover {0x39F..0x3AD}. Both
+are the EMPTY SET. The door's range is indices 927–941 (`ArtTile_Level+$1F0` plus mapping tile
+`$1AF`/`$1B2`, verified against `_incObj/6B SBZ Stomper and Sliding Door.asm:67`), while the only
+tile file either zone's profile entry names — `artnem/8x8 - LZ.nem` — decodes to **454 tiles**.
+`buildReservedTileSet`'s `[0, poolTileCount)` clamp drops the whole run.
+
+This understates no current risk: `planSurfaceEdit` is bounded by the same `doc.tiles.length`,
+so index 927 is unreachable by any edit Aurora can make today, reserved or not. **What it
+actually reveals is that Aurora's model of LZ's tile pool is incomplete** — the extra art SBZ3
+DMAs over LZ's base at runtime is not in the profile's `tiles` list, nor among its PLC or
+`animatedArt` entries. If a future task widens that model, this reservation becomes load-bearing
+and must be re-verified against the larger pool.
+
+The test is pinned to the measured reality with a comment saying why, not to the prediction.
+Deliberately NOT "fixed" by widening `LZ_TILES` — that needs its own investigation into where
+the ROM actually loads that art from, and it is not this feature's job.
