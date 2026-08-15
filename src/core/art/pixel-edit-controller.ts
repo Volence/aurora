@@ -18,7 +18,7 @@ export interface ToolConfig {
   color: number;            // active palette index — 0..15 for classic art, 0..63 for the origination canvas (see canvas-doc.ts)
   mirror: MirrorMode | null;
   ditherPattern: DitherPattern;
-  ditherSecondary: number;  // 0..15
+  ditherSecondary: number;  // the dither tool's second colour — same range as `color`
   pixelPerfect: boolean;
 }
 export interface Write { x: number; y: number; value: number; }
