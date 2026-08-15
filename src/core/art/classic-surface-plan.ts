@@ -48,6 +48,39 @@ export interface PlanInput {
   isEditableTile: (tileIndex: number) => boolean;
 }
 
+const TILE_BYTES = 32;
+
+function bytesEqualAt(pool: Uint8Array, tileIndex: number, want: Uint8Array): boolean {
+  const base = tileIndex * TILE_BYTES;
+  for (let i = 0; i < TILE_BYTES; i++) if (pool[base + i] !== want[i]) return false;
+  return true;
+}
+
+/** An existing pool tile whose bytes already equal `want`, or null. */
+function findContentMatch(doc: LevelDoc, want: Uint8Array): number | null {
+  const count = Math.floor(doc.tiles.length / TILE_BYTES);
+  for (let t = 0; t < count; t++) if (bytesEqualAt(doc.tiles, t, want)) return t;
+  return null;
+}
+
+/**
+ * A pool slot that is BOTH unreferenced and writable. "Free" is not the same as
+ * "claimable" — tileLockReason marks tiles the save path would refuse, and
+ * claiming one would produce an edit that can never be saved.
+ */
+function findFreeSlot(
+  doc: LevelDoc, index: UsageIndex, isEditableTile: (t: number) => boolean, taken: Set<number>,
+): number | null {
+  const count = Math.floor(doc.tiles.length / TILE_BYTES);
+  for (let t = 1; t < count; t++) {   // 0 is the transparent tile — never claim it
+    if (taken.has(t)) continue;
+    if (index.tileUsage(t).cells !== 0) continue;
+    if (!isEditableTile(t)) continue;
+    return t;
+  }
+  return null;
+}
+
 export function planSurfaceEdit(input: PlanInput): PlanResult {
   const { doc, provenance, index, mode, writes, isEditableTile } = input;
 
@@ -68,6 +101,7 @@ export function planSurfaceEdit(input: PlanInput): PlanResult {
   if (perCell.size === 0) return { ok: true, plan };
 
   const placesAffected = new Set<number>();
+  const claimed = new Set<number>();
 
   for (const [cellIndex, e] of perCell) {
     const c = provenance.cells[cellIndex];
@@ -99,7 +133,38 @@ export function planSurfaceEdit(input: PlanInput): PlanResult {
       continue;
     }
 
-    return { ok: false, reason: 'divergence not implemented yet' }; // Stage B
+    // The tile must diverge if it is linked elsewhere — OR if the block is about
+    // to be cloned (Stage C), since a clone would otherwise share these tiles.
+    const wantBytes = bufferToTileBytes(buf);
+    let targetTile = e.tileIndex;
+
+    const match = findContentMatch(doc, wantBytes);
+    if (match !== null) {
+      targetTile = match;
+    } else {
+      const slot = findFreeSlot(doc, index, isEditableTile, claimed);
+      if (slot === null) {
+        return {
+          ok: false,
+          reason: 'no free editable tile slot to hold the divergent copy — this zone is at its tile limit. Switch to Link mode to edit every place at once.',
+        };
+      }
+      claimed.add(slot);
+      targetTile = slot;
+      plan.tileWrites.push({ tileIndex: slot, data: wantBytes });
+      plan.stats.tilesClaimed++;
+    }
+
+    // Only the TILE POINTER moves. Never write c.xf/c.yf here — those are the
+    // COMPOSED flips (block XOR chunk) and would double-apply the chunk's flip.
+    const srcCell = doc.blocks[c.blockId]?.cells[c.blockCellIndex];
+    plan.blockCellEdits.push({
+      blockId: c.blockId,
+      cellIndex: c.blockCellIndex,
+      cell: { ...srcCell, tile: targetTile },
+    });
+    if (provenance.chunkIndex !== null) placesAffected.add(provenance.chunkIndex);
+    continue;
   }
 
   plan.stats.placesAffected = placesAffected.size;

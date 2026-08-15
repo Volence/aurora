@@ -81,3 +81,98 @@ describe('planSurfaceEdit — the in-place case', () => {
     expect(r.plan.tileWrites).toHaveLength(0);
   });
 });
+
+import { tileToBuffer, bufferToTileBytes } from '../classic-tile-buffer';
+
+describe('planSurfaceEdit — tile divergence', () => {
+  /** Make tile 1 linked by pointing block 1's first cell at it too. */
+  function docWithSharedTile1(): LevelDoc {
+    const doc = makeDoc();
+    doc.blocks[1] = { cells: [cell(1), cell(6), cell(7), cell(8)] };
+    return doc;
+  }
+
+  it('claims a free editable slot when the tile is linked elsewhere', () => {
+    const doc = docWithSharedTile1();
+    const { provenance } = buildChunkSurface(doc, 0);
+    const r = planSurfaceEdit({
+      doc, provenance, index: buildUsageIndex(doc), mode: 'isolate',
+      isEditableTile: allEditable, writes: [{ x: 0, y: 0, value: 9 }],
+    });
+
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.plan.tileWrites.map((w) => w.tileIndex)).not.toContain(1);
+    expect(r.plan.tileWrites).toHaveLength(1);
+    expect(r.plan.stats.tilesClaimed).toBe(1);
+    const claimedTile = r.plan.tileWrites[0].tileIndex;
+    expect(r.plan.blockCellEdits).toHaveLength(1);
+    expect(r.plan.blockCellEdits[0].blockId).toBe(0);
+    expect(r.plan.blockCellEdits[0].cellIndex).toBe(0);
+    expect(r.plan.blockCellEdits[0].cell.tile).toBe(claimedTile);
+  });
+
+  it('reuses an existing tile whose content already matches instead of claiming', () => {
+    const doc = docWithSharedTile1();
+    // Park the exact bytes the edit will produce in tile 12.
+    const want = tileToBuffer(doc.tiles, 1);
+    want.data[0] = 9;
+    doc.tiles.set(bufferToTileBytes(want), 12 * 32);
+
+    const { provenance } = buildChunkSurface(doc, 0);
+    const r = planSurfaceEdit({
+      doc, provenance, index: buildUsageIndex(doc), mode: 'isolate',
+      isEditableTile: allEditable, writes: [{ x: 0, y: 0, value: 9 }],
+    });
+
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.plan.tileWrites).toHaveLength(0);
+    expect(r.plan.stats.tilesClaimed).toBe(0);
+    expect(r.plan.blockCellEdits[0].cell.tile).toBe(12);
+  });
+
+  it('refuses, naming the limit, when no editable slot is free', () => {
+    const doc = docWithSharedTile1();
+    const { provenance } = buildChunkSurface(doc, 0);
+    const r = planSurfaceEdit({
+      doc, provenance, index: buildUsageIndex(doc), mode: 'isolate',
+      isEditableTile: () => false,   // nothing claimable — the Labyrinth case
+      writes: [{ x: 0, y: 0, value: 9 }],
+    });
+
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.reason).toMatch(/no free/i);
+  });
+
+  // REGRESSION. An earlier draft wrote the SurfaceCell's composed xf/yf into the
+  // repointed block cell. Those are block-flip XOR chunk-flip, so storing them
+  // back would double-apply the chunk's flip and paint would render mirrored.
+  it("preserves the block cell's OWN flip when repointing, not the composed flip", () => {
+    const doc = makeDoc();
+    doc.blocks[0] = { cells: [cell(1, true), cell(2), cell(3), cell(4)] };
+    doc.blocks[1] = { cells: [cell(1), cell(6), cell(7), cell(8)] };  // tile 1 linked
+    // Chunk 0 cell 0 uses block 0 and is ITSELF xflipped.
+    doc.chunks[0] = {
+      cells: Array.from({ length: 256 }, (_, i) => chunkCell(i === 0 ? 0 : 1, i === 0)),
+    };
+
+    const { provenance } = buildChunkSurface(doc, 0);
+    // Surface cell 1 draws block cell 0 (the chunk flip swapped it there), whose
+    // OWN xf is true, so the COMPOSED flip is false. These two differing is what
+    // makes the assertion below discriminating.
+    expect(provenance.cells[1].blockCellIndex).toBe(0);
+    expect(provenance.cells[1].xf).toBe(false);
+
+    const r = planSurfaceEdit({
+      doc, provenance, index: buildUsageIndex(doc), mode: 'isolate',
+      isEditableTile: allEditable, writes: [{ x: 8, y: 0, value: 9 }],
+    });
+
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.plan.blockCellEdits).toHaveLength(1);
+    expect(r.plan.blockCellEdits[0].cell.xf).toBe(true);   // OWN flip, not composed
+  });
+});
