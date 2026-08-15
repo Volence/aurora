@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { T, Chip } from '../ui';
+import { T, Chip, Divider } from '../ui';
 import { useClassicLevelStore, classicEditTiles } from '../../state/classicLevelStore';
 import { useArtStore } from '../../state/artStore';
 import { useToastStore } from '../../state/toastStore';
@@ -132,6 +132,20 @@ export default function TileTab({ doc, usage }: { doc: LevelDoc; usage: UsageInd
   // zoom map INSIDE artStore, not a private useState here.
   const zoom = useArtStore((s) => s.zoom);
 
+  // SEAM PREVIEW is the same CROSS-ENGINE SINGLETON as zoom, for the same
+  // reason: `artStore.repeatPreview` is the exact field aeon's ComposerCanvas
+  // already drives its 3x3 tiling preview from (ComposerCanvas.tsx:704), so
+  // toggling it here also arms it for whatever aeon opens next — deliberate,
+  // not an oversight, matching how `zoom` is shared today.
+  //
+  // `CLASSIC_TILE_CAPS.repeatPreview` (ArtToolOptions.tsx) stays FALSE: that cap
+  // gates the shared option bar's OWN "Rpt" button, and turning it on here would
+  // draw a second control for the same field next to the one below. This tab
+  // reads the store directly and draws its toggle as a Chip in the Line: row,
+  // matching that row's neighbours, instead.
+  const repeatPreview = useArtStore((s) => s.repeatPreview);
+  const toggleRepeatPreview = useArtStore((s) => s.toggleRepeatPreview);
+
   const lockReason = tileLockReason(range, composerTileIndex);
   const locked = lockReason !== null;
   const tileCount = Math.floor(doc.tiles.length / 32);
@@ -162,7 +176,14 @@ export default function TileTab({ doc, usage }: { doc: LevelDoc; usage: UsageInd
   // in place. Capping on the LARGER axis covers a future non-square buffer.
   // Whatever value this yields must be the value handed to PixelViewport, since
   // the viewport hit-tests with the zoom it renders at.
-  const effectiveZoom = cappedZoom(zoom, Math.max(buffer.width, buffer.height));
+  // The `* 3` when the seam preview is on matches `cappedZoom`'s own contract
+  // (art-shared/zoom-cap.ts: "including any multiplier the host draws around
+  // it (e.g. the composer's 3x3 repeat preview triples it)") and ComposerCanvas's
+  // identical `(repeatPreview ? 3 : 1)` term. An 8x8 tile never gets near the
+  // 16000px ceiling even at zoom 64 * 3, so this cannot change what renders
+  // today — it keeps the two hosts applying the SAME rule rather than one that
+  // only happens to agree at today's sizes.
+  const effectiveZoom = cappedZoom(zoom, Math.max(buffer.width, buffer.height) * (repeatPreview ? 3 : 1));
 
   // Cursor-anchored wheel zoom + Space/middle-drag pan, the SHARED hooks aeon's
   // composer and the sprite canvas use. Both work by adjusting the scroller's
@@ -420,7 +441,10 @@ export default function TileTab({ doc, usage }: { doc: LevelDoc; usage: UsageInd
               controller={controllerRef.current}
               selection={selection}
               gestureSelection={locked ? null : selection}
-              layers={{ checkerboard: true, checkerScale: 1, checkerColors: COMPOSER_CHECK_RGB, grids: ['pixel'] }}
+              layers={{
+                checkerboard: true, checkerScale: 1, checkerColors: COMPOSER_CHECK_RGB, grids: ['pixel'],
+                repeat: repeatPreview ? { tilesX: 3, tilesY: 3 } : null,
+              }}
               hostPointer={hostPointer}
               onCommit={onCommit}
               onPick={onPick}
@@ -433,6 +457,12 @@ export default function TileTab({ doc, usage }: { doc: LevelDoc; usage: UsageInd
           {[0, 1, 2, 3].map((p) => (
             <Chip key={p} active={composerPalLine === p} onClick={() => setComposerPalLine(p)}>{p}</Chip>
           ))}
+          <Divider />
+          <Chip
+            active={repeatPreview}
+            onClick={toggleRepeatPreview}
+            title="3×3 seamless-tiling preview around the edited tile"
+          >Seam preview</Chip>
         </div>
         {/* Wraps to the COLUMN's width, not the canvas's — the canvas is a zoom
             away from any width at all, and a swatch row that reflowed on a wheel
