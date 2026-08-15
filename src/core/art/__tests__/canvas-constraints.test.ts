@@ -176,16 +176,72 @@ describe('countUniqueTiles', () => {
       .toEqual({ unique: 1, fullCells: 2, pixelsOutsideGrid: 0 });
   });
 
-  it('cost: a full 1024x1024 scan stays under 150ms', () => {
-    const b = buf(1024, 1024, (x, y) => canvasIndex((x >> 8) & 3, (x + y) & 15));
-    const t0 = performance.now();
+  // COST, AS A WORK COUNT RATHER THAN A CLOCK READING.
+  //
+  // This began as `expect(elapsed).toBeLessThan(150)` and measured 71ms on its
+  // own — then failed at 184ms inside the full suite, where 250-odd files run in
+  // parallel. That assertion was reading the machine's load, not this code, so
+  // it was flaky by construction, and a flaky test costs more than the coverage
+  // it pretends to give.
+  //
+  // What actually matters is that the scan stays LINEAR in pixels with a small
+  // constant. The regression it guards against is real and specific: an earlier
+  // draft built a [sx, sy] array per read (four million allocations at max
+  // size), and the obvious "simplification" of the canonicaliser is to
+  // materialise all four orientations per cell instead of walking the tie-break
+  // once. Both blow the constant; neither changes any answer, so no other test
+  // here would notice.
+  //
+  // THE BOUNDS ARE THE MEASURED COSTS, not headroom. The first version of this
+  // allowed 12 reads per pixel — a ceiling derived from the theoretical worst
+  // case — and the plant it exists to catch came in at 6 and passed. A bound
+  // loose enough to be obviously safe is a bound that catches nothing. These are
+  // deterministic (same fixture, same algorithm, same count every run), so they
+  // are pinned one step above what the code actually does.
+  //
+  // Two fixtures, because the tie-break's cost depends entirely on how symmetric
+  // the art is:
+  //   varied    — orientations diverge on the first position, so the tie-break
+  //               is nearly free. This is the normal case and the tight bound.
+  //   symmetric — every orientation stays tied to the last position, which is
+  //               the tie-break's true worst case (a blank or symmetric tile).
+  const countReads = (b: ReturnType<typeof buf>, fn: (p: typeof b) => void) => {
+    let reads = 0;
+    const counted = {
+      width: b.width,
+      height: b.height,
+      data: new Proxy(b.data, {
+        get(t, k) {
+          if (typeof k === 'string' && /^\d+$/.test(k)) reads++;
+          return Reflect.get(t, k);
+        },
+      }),
+    } as unknown as typeof b;
+    fn(counted);
+    return reads / (b.width * b.height);
+  };
+
+  const allThree = (b: ReturnType<typeof buf>) => {
     countUniqueTiles(b, { originX: 0, originY: 0 });
     colorsPerLine(b);
     findCellClashes(b, { originX: 0, originY: 0 }, 4);
-    const ms = performance.now() - t0;
+  };
+
+  it('cost: varied art reads each pixel about three times, not twelve', () => {
+    const perPixel = countReads(buf(128, 128, (x, y) => canvasIndex((x >> 5) & 3, (x + y) & 15)), allThree);
     // eslint-disable-next-line no-console
-    console.log(`[cost] 1024x1024 full constraint scan: ${ms.toFixed(1)}ms`);
-    expect(ms).toBeLessThan(150);
+    console.log(`[cost] varied art, reads per pixel: ${perPixel.toFixed(2)}`);
+    // Materialising all four orientations per cell — the obvious
+    // "simplification" of the canonicaliser, which changes no answer and so
+    // trips no other test here — doubles this to 6.
+    expect(perPixel).toBeLessThanOrEqual(4);
+  });
+
+  it('cost: even a fully symmetric canvas, the tie-break worst case, stays bounded', () => {
+    const perPixel = countReads(buf(128, 128, () => 0), allThree);
+    // eslint-disable-next-line no-console
+    console.log(`[cost] symmetric art, reads per pixel: ${perPixel.toFixed(2)}`);
+    expect(perPixel).toBeLessThanOrEqual(12);
   });
 });
 
