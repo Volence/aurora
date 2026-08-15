@@ -176,3 +176,49 @@ describe('planSurfaceEdit — tile divergence', () => {
     expect(r.plan.blockCellEdits[0].cell.xf).toBe(true);   // OWN flip, not composed
   });
 });
+
+describe('planSurfaceEdit — a stroke that changes nothing commits nothing', () => {
+  it('emits an empty plan in isolate mode', () => {
+    const doc = makeDoc();
+    const { buffer, provenance } = buildChunkSurface(doc, 0);
+    // Repaint surface (0,0) with the value it already displays.
+    const existing = buffer.data[0];
+    const r = planSurfaceEdit({
+      doc, provenance, index: buildUsageIndex(doc), mode: 'isolate',
+      isEditableTile: allEditable, writes: [{ x: 0, y: 0, value: existing }],
+    });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.plan.tileWrites).toHaveLength(0);
+    expect(r.plan.blockCellEdits).toHaveLength(0);
+    expect(r.plan.newBlocks).toHaveLength(0);
+    expect(r.plan.chunkCellEdits).toHaveLength(0);
+  });
+
+  it('emits an empty plan in link mode', () => {
+    const doc = makeDoc();
+    const { buffer, provenance } = buildChunkSurface(doc, 0);
+    const existing = buffer.data[0];
+    const r = planSurfaceEdit({
+      doc, provenance, index: buildUsageIndex(doc), mode: 'link',
+      isEditableTile: allEditable, writes: [{ x: 0, y: 0, value: existing }],
+    });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.plan.tileWrites).toHaveLength(0);
+  });
+
+  it('still commits when a linked tile is repainted to a DIFFERENT value', () => {
+    const doc = makeDoc();
+    doc.blocks[1] = { cells: [cell(1), cell(6), cell(7), cell(8)] };  // tile 1 linked
+    const { buffer, provenance } = buildChunkSurface(doc, 0);
+    const different = (buffer.data[0] + 1) & 0x0f;
+    const r = planSurfaceEdit({
+      doc, provenance, index: buildUsageIndex(doc), mode: 'isolate',
+      isEditableTile: allEditable, writes: [{ x: 0, y: 0, value: different }],
+    });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.plan.blockCellEdits).toHaveLength(1);   // guard is not over-eager
+  });
+});

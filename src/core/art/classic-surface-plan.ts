@@ -16,7 +16,7 @@ import type { LevelDoc, BlockDef, BlockCell, ChunkCell } from '../level-classic/
 import type { UsageIndex } from '../level-classic/usage-index';
 import type { SurfaceProvenance } from './classic-surface-buffer';
 import { surfaceToTile } from './classic-surface-buffer';
-import { tileToBuffer, bufferToTileBytes } from './classic-tile-buffer';
+import { tileToBuffer, tileBytesIfChanged } from './classic-tile-buffer';
 
 export type PaintMode = 'isolate' | 'link';
 
@@ -56,10 +56,22 @@ function bytesEqualAt(pool: Uint8Array, tileIndex: number, want: Uint8Array): bo
   return true;
 }
 
-/** An existing pool tile whose bytes already equal `want`, or null. */
-function findContentMatch(doc: LevelDoc, want: Uint8Array): number | null {
+/**
+ * An existing pool tile whose bytes already equal `want`, or null.
+ *
+ * `excluded` is the set of slots this gesture has already claimed as the NEW
+ * home for some other cell's divergent paint — those slots are about to hold
+ * different bytes than what is on disk right now, so a match against their
+ * STALE content would repoint this cell at someone else's paint instead of its
+ * own. Skipping them is what keeps two cells claiming distinct slots in the
+ * same gesture from cross-contaminating.
+ */
+function findContentMatch(doc: LevelDoc, want: Uint8Array, excluded: Set<number>): number | null {
   const count = Math.floor(doc.tiles.length / TILE_BYTES);
-  for (let t = 0; t < count; t++) if (bytesEqualAt(doc.tiles, t, want)) return t;
+  for (let t = 0; t < count; t++) {
+    if (excluded.has(t)) continue;
+    if (bytesEqualAt(doc.tiles, t, want)) return t;
+  }
   return null;
 }
 
@@ -107,14 +119,20 @@ export function planSurfaceEdit(input: PlanInput): PlanResult {
     const c = provenance.cells[cellIndex];
 
     // 2 · The pixels this tile should end up with, in STORED tile coordinates.
-    const buf = tileToBuffer(doc.tiles, e.tileIndex);
+    // Keep the untouched original around so a no-op stroke can be detected —
+    // rule 3 from classic-tile-gesture.ts: a gesture that changed nothing
+    // commits nothing (no tileWrite, no repoint, no undo entry).
+    const original = tileToBuffer(doc.tiles, e.tileIndex);
+    const buf = { width: original.width, height: original.height, data: original.data.slice() };
     for (const p of e.px) buf.data[p.ty * 8 + p.tx] = p.v & 0x0f;
+    const changedBytes = tileBytesIfChanged(original, buf);
+    if (changedBytes === null) continue; // repainted with the value already there
 
     if (mode === 'link') {
       if (!isEditableTile(e.tileIndex)) {
         return { ok: false, reason: `tile ${e.tileIndex} is not editable` };
       }
-      plan.tileWrites.push({ tileIndex: e.tileIndex, data: bufferToTileBytes(buf) });
+      plan.tileWrites.push({ tileIndex: e.tileIndex, data: changedBytes });
       // Stage-A approximation; Task 7 replaces this with the full reverse lookup.
       for (const ci of index.blockToChunks.get(c.blockId) ?? []) placesAffected.add(ci);
       continue;
@@ -128,17 +146,17 @@ export function planSurfaceEdit(input: PlanInput): PlanResult {
       if (!isEditableTile(e.tileIndex)) {
         return { ok: false, reason: `tile ${e.tileIndex} is not editable` };
       }
-      plan.tileWrites.push({ tileIndex: e.tileIndex, data: bufferToTileBytes(buf) });
+      plan.tileWrites.push({ tileIndex: e.tileIndex, data: changedBytes });
       if (provenance.chunkIndex !== null) placesAffected.add(provenance.chunkIndex);
       continue;
     }
 
     // The tile must diverge if it is linked elsewhere — OR if the block is about
     // to be cloned (Stage C), since a clone would otherwise share these tiles.
-    const wantBytes = bufferToTileBytes(buf);
+    const wantBytes = changedBytes;
     let targetTile = e.tileIndex;
 
-    const match = findContentMatch(doc, wantBytes);
+    const match = findContentMatch(doc, wantBytes, claimed);
     if (match !== null) {
       targetTile = match;
     } else {
