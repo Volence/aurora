@@ -864,6 +864,14 @@ export function classicPaintSurface(plan: SurfaceEditPlan): CommandResult {
 
   // A block or tile change repaints every chunk that reaches it — bump the epoch,
   // naming written tiles so the composer's tile strip repaints only those thumbs.
+  //
+  // Always 'all', even for a lone chunk-cell edit, where classicEditChunkCells
+  // manages the narrower { kind: 'chunk', id }. Two reasons, so nobody "optimises"
+  // this into the narrow path: a paint plan that touches chunks essentially always
+  // touches blocks or tiles too, which needs the epoch anyway (classicEditBlock has
+  // the same precedent); and the narrow effect is keyed by ENGINE chunk id while a
+  // plan addresses chunks by FILE index, so reusing it would need a conversion that
+  // buys nothing here.
   commitArt(newDoc, dirtyPatch, { kind: 'all', tiles: plan.tileWrites.map((w) => w.tileIndex) });
   return { ok: true };
 }
