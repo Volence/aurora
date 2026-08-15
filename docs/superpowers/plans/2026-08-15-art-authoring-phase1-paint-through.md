@@ -10,6 +10,10 @@
 
 **Spec:** `docs/superpowers/specs/2026-08-15-in-app-art-authoring-design.md` §3.
 
+> **⚠ READ `## Audit corrections` AT THE END OF THIS FILE FIRST.** An adversarial audit run
+> after Task 5 found seven defects in Tasks 4–12, two of them severe. That section is
+> **authoritative over the task text above it** wherever they disagree.
+
 ---
 
 ## A note on code in this plan, and why it deviates
@@ -1405,3 +1409,166 @@ The node suite sees no canvas, no React and no event ordering, so nothing above 
 **Type consistency.** `SurfaceCell`, `SurfaceProvenance`, `Surface`, `TileHit`, `PaintMode`, `SurfaceWrite`, `SurfaceEditPlan`, `PlanResult`, `PlanInput` are defined in Tasks 1, 3 and 4 and used unchanged after. `planSurfaceEdit` keeps one signature throughout. `chunksTouchedByTile` changes return type in Task 7 — called out explicitly there, and it has no other caller.
 
 **Placeholder note.** Task 4 deliberately ships a `divergence not implemented yet` branch and a no-op `placesAffected` line, both removed by name in Tasks 5 and 7. These are TDD stepping stones with named removal points, not unfinished plan text.
+
+---
+
+## Audit corrections
+
+**Added 2026-08-15, after an adversarial pre-implementation audit of Tasks 6–12 plus a
+review of the built Tasks 4–5. Authoritative over the task text above.** Seven defects, two
+severe. Five tasks in, every defect found in this plan has been the author's, not an
+implementer's, and every one has the same shape: reasoning slightly too fast about
+reference composition, with a fixture too symmetric to tell right from wrong.
+
+### A1 (SEVERE, Task 6) — the clone memo key is wrong
+
+`cloneOf` is keyed by **block id**. Isolation is per **chunk cell**. Two painted chunk cells
+sharing one block produce one clone and one repoint, so:
+
+- when both map to the same block-cell index, the second `blockCellEdit` **overwrites the
+  first on the same slot** at apply time — the second location's paint appears in the first
+  location, the first location's paint is destroyed, and a written tile is orphaned;
+- when they map to different block-cell indices, the first chunk cell shows *both* edits and
+  the second shows neither.
+
+The existing "clones ONCE" test cannot see this: its writes at x=16 and x=24 are both inside
+chunk cell 1 (cells are 16px wide).
+
+Key the memo by `c.chunkCellIndex` instead. `blockLinked` already guarantees it is non-null.
+Two 8×8 cells of the *same* chunk cell still share one clone, so the existing test stays green
+— keep it, and add:
+
+```ts
+it('repoints EVERY painted chunk cell of a linked block, not just the first', () => {
+  const doc = makeDoc();                       // chunk 0 cells 1..255 all use block 1
+  const { provenance } = buildChunkSurface(doc, 0);
+  const r = planSurfaceEdit({
+    doc, provenance, index: buildUsageIndex(doc), mode: 'isolate',
+    isEditableTile: allEditable,
+    writes: [{ x: 16, y: 0, value: 9 }, { x: 32, y: 0, value: 7 }],  // chunk cells 1 AND 2
+  });
+  expect(r.ok).toBe(true);
+  if (!r.ok) return;
+  expect(r.plan.chunkCellEdits.map((e) => e.cellIndex).sort((a, b) => a - b)).toEqual([1, 2]);
+  const [a, b] = r.plan.chunkCellEdits;
+  expect(a.cell.block).not.toBe(b.cell.block);
+  // No two blockCellEdits may collide on one (block, cell) slot — the buggy memo
+  // produces exactly such a collision, silently last-write-wins at apply.
+  const keys = r.plan.blockCellEdits.map((e) => `${e.blockId}:${e.cellIndex}`);
+  expect(new Set(keys).size).toBe(keys.length);
+});
+```
+
+### A2 (SEVERE, new task) — a claimed "free" tile can be object art
+
+`findFreeSlot` treats a tile as free when `tileUsage(t).cells === 0` and `isEditableTile(t)`.
+Neither sees **objects that draw from the level tile pool via mappings** rather than through
+blocks — GHZ platforms and collapsing ledges, MZ bricks, and the other `artSource: 'levelArt'`
+links. Those tiles are block-unreferenced and not lock-flagged, so the **first Isolate
+divergence in GHZ claims one and overwrites platform art, then saves it.** Silent and
+permanent.
+
+The injected predicate is the right seam — core stays pure. **This needs its own task before
+paint-through is reachable by a user** (see New Task 5c). Do not ship Isolate without it.
+
+Blast radius per zone is UNVERIFIED; the mechanism is code-verified. Task 12's CDP pass in
+GHZ would show it instantly: make one Isolate divergence, then look at a platform.
+
+### A3 (HIGH, Task 7) — Link mode drops paint across cells sharing a tile
+
+Each surface cell builds its own `buf` from the **unmodified** pool and pushes its own
+`tileWrite`. Two cells drawing the same tile — routine in S1 — produce two writes for that
+tile, and Task 8 applies them in order, so the earlier stroke is silently discarded.
+
+In link mode accumulate per **tile**, not per cell: a `Map<number, PixelBuffer>` keyed by tile
+index, lazily seeded from `tileToBuffer`, every cell's pixels applied into the shared buffer,
+one `tileWrite` emitted per entry after the loop.
+
+Test: link mode with writes at `{x:16,y:0,value:9}` and `{x:33,y:0,value:7}` (chunk cells 1
+and 2, both drawing tile 5) → exactly one `tileWrite` for tile 5, with
+`data[0] === (9 << 4) | 7`. Asymmetric values, so an overwrite is visible.
+
+### A4 (HIGH, built code) — a no-op stroke commits
+
+Demonstrated in both branches: repainting a pixel with the value it already holds pushes a
+`tileWrite` of identical bytes, and in the divergence branch `findContentMatch` matches the
+original tile *against itself* and emits a repoint to where the cell already points. Either
+way: a dirty document and an undo entry for nothing.
+
+`src/core/art/classic-tile-gesture.ts` already states **"RULE 3 — a gesture that changed
+nothing commits nothing"**, built on `tileBytesIfChanged`. This resolver breaks a convention
+living one file away.
+
+Fix in `planSurfaceEdit`: hoist `wantBytes` above the mode split and `continue` when
+`bytesEqualAt(doc.tiles, e.tileIndex, wantBytes)` — one check covering all three branches,
+since in every case the question is "would this cell end up showing the bytes it already
+shows".
+
+### A5 (MEDIUM, Task 6) — no block-capacity refusal
+
+Cloning can push the pool past 1024 (the chunk cell's block field is 10 bits). Tile
+exhaustion refuses with an actionable message; block exhaustion currently surfaces only as
+raw `structuralError` text at apply. Atomic, but late and inconsistent — and Task 11 would
+toast it verbatim. Add, in the clone branch:
+
+```ts
+if (nextBlockId() > 0x3ff) {
+  return { ok: false, reason: 'no free block slot to hold the divergent copy — this zone is at its block limit (1024). Switch to Link mode to edit every place at once.' };
+}
+```
+
+### A6 (LOW-MEDIUM, Tasks 5/6) — content match can hit a slot already claimed
+
+`findContentMatch` scans the stale pool and does not exclude slots `claimed` earlier in the
+same gesture. Cell A claims slot 9 and schedules new bytes; if cell B's wanted bytes equal
+slot 9's *old* content, B matches slot 9 and renders A's paint. Also mints duplicates when
+two cells diverge to identical content. Pass `claimed` in and skip its members.
+
+### A7 (LOW, Task 7) — placesAffected is dishonest on a block surface, and mislabelled
+
+On a block surface `provenance.chunkIndex` is null, so Isolate reports 0 even when the block
+sits in N chunks; use `index.blockUsage(blockId).containers` there. And the number counts
+distinct chunk **definitions**, not layout placements — a chunk stamped 40 times counts once.
+The arithmetic is right and no id-spaces are mixed (the set holds file indices throughout),
+but **the UI label must say "chunks", not "places"**. Task 11's copy depends on this.
+
+### A8 (Task 10) — "Make unique" has nothing to call
+
+The clone path exists only inside `planSurfaceEdit` and only fires when there are pixel
+writes; an empty `writes` array short-circuits to an empty plan. Either specify a write-less
+entry point (`planMakeUnique(provenance, cellIndex)` returning the same `SurfaceEditPlan`
+shape, applied through `classicPaintSurface`) or descope the button. **Decide before Task 10
+starts** rather than discovering it mid-task.
+
+### A9 (Task 12) — the CDP assertions would not catch A1
+
+"Painting on a linked block leaves the other chunk unchanged" paints one chunk cell. Add: one
+drag across **two** chunk cells of the same linked block → each shows its own paint, and the
+sibling chunk is unchanged.
+
+### Checked and explicitly cleared
+
+Not skipped — examined and believed correct: Task 6's `nextBlockId` plan/apply agreement
+(ids are computed pre-push and Task 8 pushes before validating, so they line up); the cascade
+surviving Task 6's edit (the built branch fires on `tileLinked || blockLinked` and always
+diverges the tile, so a clone never shares the original's tiles); `srcCell` being read from
+the original block even when the edit targets the clone (byte-identical, order-independent);
+Task 8's single-undo contract, validation atomicity, dirty domains, version effect, and
+file-order `chunkIndex` handling; Task 7's `chunksTouchedByTile` reachability walk; and Task
+11's `diffWrites` → `SurfaceWrite` shape match.
+
+### New Task 5b — fix the built resolver (A4, A6)
+
+Do before Task 6. Hoist `wantBytes`, add the no-op guard, pass `claimed` into
+`findContentMatch`. Tests: a no-op stroke yields an empty plan in all three modes; the A6
+stale-match scenario. Falsify each.
+
+### New Task 5c — make the claimability predicate object-aware (A2)
+
+Do before any UI can reach Isolate. Compose the injected `isEditableTile` so it also excludes
+tiles reachable from this act's `levelArt` object art. `objectArtTiles`
+(`src/core/level-classic/object-sprite.ts`) and the act's object list are the inputs; a
+tile→object reverse index alongside `buildUsageIndex` is the likely shape. Core stays pure —
+the composition happens at the injection site. Test at the seam (a predicate excluding tile 9
+forces `findFreeSlot` to 10) **and** with a real GHZ act, asserting a known object-art tile is
+excluded.
