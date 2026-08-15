@@ -29,6 +29,7 @@
 import { create } from 'zustand';
 import type { DirtyDomains, EditableTileRange, LevelDoc, ZoneActRef } from '../../core/project/adapter';
 import { tileLockReason } from '../../core/project/editable-tiles';
+import type { SurfaceEditPlan } from '../../core/art/classic-surface-plan';
 import type { BlockDef, ChunkCell, ChunkDef256 } from '../../core/level-classic/model';
 import { validateLevelDoc, unpackChunkCell, chunkIndexForId } from '../../core/level-classic/model';
 import {
@@ -790,6 +791,80 @@ export function classicEditTiles(edits: { tileIndex: number; data: Uint8Array }[
   // Naming the written tiles additionally lets the composer's tile strip repaint
   // only those thumbnails (a pencil stroke touches one tile, not the pool).
   commitArt(newDoc, { tiles: true }, { kind: 'all', tiles: edits.map((e) => e.tileIndex) });
+  return { ok: true };
+}
+
+/**
+ * classic:paint-surface — apply one paint gesture across all three art tiers.
+ *
+ * Composite by design: tile pixels, new blocks, block-cell repoints and chunk-cell
+ * repoints land in ONE commitArt, so a stroke that diverges a block is a single
+ * Ctrl+Z. Splitting it would let an undo strand a cloned block with nothing
+ * pointing at it. Validation mirrors classicEditTiles for tile writes — including
+ * the SAME tileLockReason predicate, so a plan can never write a locked tile.
+ */
+export function classicPaintSurface(plan: SurfaceEditPlan): CommandResult {
+  const doc = requireDoc();
+  if (!doc) return err('no classic level is open');
+
+  const poolTiles = Math.floor(doc.tiles.length / 32);
+  const range = editableTileRange();
+  for (const { tileIndex, data } of plan.tileWrites) {
+    if (!isInt(tileIndex) || tileIndex < 0 || tileIndex >= poolTiles) {
+      return err(`tile ${tileIndex} does not exist (0..${poolTiles - 1})`);
+    }
+    if (!(data instanceof Uint8Array) || data.length !== 32) {
+      return err(`tile ${tileIndex} data must be 32 bytes (got ${data?.length})`);
+    }
+    const lock = tileLockReason(range, tileIndex);
+    if (lock) return err(`tile ${tileIndex} is not editable: ${lock}`);
+  }
+
+  const nextTiles = plan.tileWrites.length ? new Uint8Array(doc.tiles) : doc.tiles;
+  for (const { tileIndex, data } of plan.tileWrites) nextTiles.set(data, tileIndex * 32);
+
+  const nextBlocks = (plan.newBlocks.length || plan.blockCellEdits.length)
+    ? doc.blocks.slice() : doc.blocks;
+  for (const b of plan.newBlocks) nextBlocks.push({ cells: b.cells.map((c) => ({ ...c })) });
+  for (const { blockId, cellIndex, cell } of plan.blockCellEdits) {
+    if (!isInt(blockId) || blockId < 0 || blockId >= nextBlocks.length) {
+      return err(`block ${blockId} does not exist (0..${nextBlocks.length - 1})`);
+    }
+    if (!isInt(cellIndex) || cellIndex < 0 || cellIndex > 3) {
+      return err(`block cell index ${cellIndex} out of range 0..3`);
+    }
+    const cells = nextBlocks[blockId].cells.slice();
+    cells[cellIndex] = { ...cell };
+    nextBlocks[blockId] = { cells };
+  }
+
+  const nextChunks = plan.chunkCellEdits.length ? doc.chunks.slice() : doc.chunks;
+  for (const { chunkIndex, cellIndex, cell } of plan.chunkCellEdits) {
+    if (!isInt(chunkIndex) || chunkIndex < 0 || chunkIndex >= nextChunks.length) {
+      return err(`chunk index ${chunkIndex} does not exist (0..${nextChunks.length - 1})`);
+    }
+    if (!isInt(cellIndex) || cellIndex < 0 || cellIndex > 255) {
+      return err(`chunk cell index ${cellIndex} out of range 0..255`);
+    }
+    const cells = nextChunks[chunkIndex].cells.slice();
+    cells[cellIndex] = { ...cell };
+    nextChunks[chunkIndex] = { cells };
+  }
+
+  const newDoc: LevelDoc = { ...doc, tiles: nextTiles, blocks: nextBlocks, chunks: nextChunks };
+  const e = structuralError(newDoc);
+  if (e) return err(e);
+
+  // State the dirty domains TRUTHFULLY — only what actually changed.
+  const dirtyPatch: DirtyDomains = {};
+  if (plan.tileWrites.length) dirtyPatch.tiles = true;
+  if (plan.newBlocks.length || plan.blockCellEdits.length) dirtyPatch.blocks = true;
+  if (plan.chunkCellEdits.length) dirtyPatch.chunks = true;
+  if (Object.keys(dirtyPatch).length === 0) return { ok: true }; // no-op gesture
+
+  // A block or tile change repaints every chunk that reaches it — bump the epoch,
+  // naming written tiles so the composer's tile strip repaints only those thumbs.
+  commitArt(newDoc, dirtyPatch, { kind: 'all', tiles: plan.tileWrites.map((w) => w.tileIndex) });
   return { ok: true };
 }
 

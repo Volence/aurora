@@ -13,6 +13,7 @@ import {
   classicSetStart,
   classicAddChunk,
   classicAddBlock,
+  classicPaintSurface,
 } from '../classicLevelStore';
 import { useClassicProjectStore } from '../classicProjectStore';
 import { useEditorStore } from '../editorStore';
@@ -20,6 +21,7 @@ import { armedPlacementId } from '../classic-placement';
 import { documentHistoryHub } from '../history-hub';
 import { packChunkCell, unpackChunkCell, type BlockDef } from '../../../core/level-classic/model';
 import type { S1ObjectEntry } from '../../../core/formats/classic/s1-objpos';
+import type { SurfaceEditPlan } from '../../../core/art/classic-surface-plan';
 // Shared with history-routing.test.ts — one fixture, so both suites drive the
 // store through the same doc/handle shape.
 import { TILE_COUNT, REF, makeDoc, openReady, fakeHandle } from './helpers/classic-fixture';
@@ -376,6 +378,133 @@ describe('classic:set-objects', () => {
     expect(st().doc).toBe(doc); // no new doc built
     expect(layoutStack().canUndo).toBe(false);
     expect(st().dirty.objects).toBeUndefined();
+  });
+});
+
+describe('classic:paint-surface', () => {
+  // Fixture (makeDoc): 5 tiles (0,1,3 editable; 2 locked/anim, 4 gap/appended),
+  // 2 blocks (block 0 all tile 0, block 1 all tile 1), 2 chunks (all cells
+  // block 0). A plan touching all three tiers: a tile write, a new block
+  // (id 2 = doc.blocks.length), a block-cell repoint targeting that new block,
+  // and a chunk-cell repoint onto it.
+  const blankBlockCell = (tile: number) => ({ tile, xf: false, yf: false, pal: 0, pri: false });
+  const blankChunkCell = (block: number) => ({ block, xf: false, yf: false, solidity: 0 });
+
+  function fullPlan(): SurfaceEditPlan {
+    return {
+      tileWrites: [{ tileIndex: 1, data: new Uint8Array(32).fill(0x7) }],
+      newBlocks: [{ cells: Array.from({ length: 4 }, () => blankBlockCell(1)) }],
+      blockCellEdits: [{ blockId: 2, cellIndex: 0, cell: blankBlockCell(3) }],
+      chunkCellEdits: [{ chunkIndex: 0, cellIndex: 5, cell: blankChunkCell(2) }],
+      stats: { tilesClaimed: 0, blocksCloned: 1, placesAffected: 1 },
+    };
+  }
+
+  const emptyPlan = (): SurfaceEditPlan => ({
+    tileWrites: [], newBlocks: [], blockCellEdits: [], chunkCellEdits: [],
+    stats: { tilesClaimed: 0, blocksCloned: 0, placesAffected: 0 },
+  });
+
+  it('applies a plan touching all three tiers as ONE undo entry, not four', () => {
+    openReady();
+    expect(artStack().canUndo).toBe(false);
+    expect(classicPaintSurface(fullPlan())).toEqual({ ok: true });
+    expect(artStack().canUndo).toBe(true);
+    // One undo entry: a single undo() must exhaust the stack. If the commit had
+    // been split into multiple commitArt calls, 2nd/3rd/4th steps would remain.
+    artStack().undo();
+    expect(artStack().canUndo).toBe(false);
+  });
+
+  it('undo restores all three tiers together (tile bytes, block count, chunk cell)', () => {
+    openReady();
+    const beforeTileByte = st().doc!.tiles[1 * 32];
+    expect(classicPaintSurface(fullPlan())).toEqual({ ok: true });
+
+    // Applied: tile written, new block appended, block cell repointed, chunk
+    // cell repointed onto the new block.
+    expect(st().doc!.tiles[1 * 32]).toBe(0x7);
+    expect(st().doc!.blocks.length).toBe(3);
+    expect(st().doc!.blocks[2].cells[0].tile).toBe(3);
+    expect(st().doc!.chunks[0].cells[5]).toEqual(blankChunkCell(2));
+
+    artStack().undo();
+
+    // A composite that half-undoes is the specific failure this guards.
+    expect(st().doc!.tiles[1 * 32]).toBe(beforeTileByte);
+    expect(st().doc!.blocks.length).toBe(2);
+    expect(st().doc!.chunks[0].cells[5]).toEqual(blankChunkCell(0));
+  });
+
+  it('refuses a plan targeting a locked tile — nothing committed', () => {
+    openReady();
+    const doc = st().doc;
+    const plan: SurfaceEditPlan = {
+      ...emptyPlan(),
+      tileWrites: [{ tileIndex: 2, data: new Uint8Array(32) }], // tile 2: anim overlay, locked
+    };
+    const r = classicPaintSurface(plan);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toMatch(/animated-art|not editable/i);
+    expect(st().doc).toBe(doc); // untouched identity
+    expect(artStack().canUndo).toBe(false);
+  });
+
+  it('an empty plan is a no-op: ok:true, no history entry, no dirty flag', () => {
+    openReady();
+    const doc = st().doc;
+    expect(classicPaintSurface(emptyPlan())).toEqual({ ok: true });
+    expect(st().doc).toBe(doc);
+    expect(st().dirty).toEqual({});
+    expect(artStack().canUndo).toBe(false);
+  });
+
+  it('rejects an out-of-range block id — commits nothing', () => {
+    openReady();
+    const doc = st().doc;
+    const plan: SurfaceEditPlan = {
+      ...emptyPlan(),
+      blockCellEdits: [{ blockId: 99, cellIndex: 0, cell: blankBlockCell(0) }],
+    };
+    expect(classicPaintSurface(plan).ok).toBe(false);
+    expect(st().doc).toBe(doc);
+    expect(artStack().canUndo).toBe(false);
+  });
+
+  it('rejects an out-of-range block cell index (0..3) — commits nothing', () => {
+    openReady();
+    const doc = st().doc;
+    const plan: SurfaceEditPlan = {
+      ...emptyPlan(),
+      blockCellEdits: [{ blockId: 0, cellIndex: 4, cell: blankBlockCell(0) }],
+    };
+    expect(classicPaintSurface(plan).ok).toBe(false);
+    expect(st().doc).toBe(doc);
+    expect(artStack().canUndo).toBe(false);
+  });
+
+  it('rejects an out-of-range chunk index — commits nothing', () => {
+    openReady();
+    const doc = st().doc;
+    const plan: SurfaceEditPlan = {
+      ...emptyPlan(),
+      chunkCellEdits: [{ chunkIndex: 99, cellIndex: 0, cell: blankChunkCell(0) }],
+    };
+    expect(classicPaintSurface(plan).ok).toBe(false);
+    expect(st().doc).toBe(doc);
+    expect(artStack().canUndo).toBe(false);
+  });
+
+  it('rejects an out-of-range chunk cell index (0..255) — commits nothing', () => {
+    openReady();
+    const doc = st().doc;
+    const plan: SurfaceEditPlan = {
+      ...emptyPlan(),
+      chunkCellEdits: [{ chunkIndex: 0, cellIndex: 256, cell: blankChunkCell(0) }],
+    };
+    expect(classicPaintSurface(plan).ok).toBe(false);
+    expect(st().doc).toBe(doc);
+    expect(artStack().canUndo).toBe(false);
   });
 });
 
