@@ -393,7 +393,7 @@ describe('classic:paint-surface', () => {
   function fullPlan(): SurfaceEditPlan {
     return {
       tileWrites: [{ tileIndex: 1, data: new Uint8Array(32).fill(0x7) }],
-      newBlocks: [{ cells: Array.from({ length: 4 }, () => blankBlockCell(1)) }],
+      newBlocks: [{ def: { cells: Array.from({ length: 4 }, () => blankBlockCell(1)) }, sourceBlockId: 1 }],
       blockCellEdits: [{ blockId: 2, cellIndex: 0, cell: blankBlockCell(3) }],
       chunkCellEdits: [{ chunkIndex: 0, cellIndex: 5, cell: blankChunkCell(2) }],
       stats: { tilesClaimed: 0, blocksCloned: 1, placesAffected: 1 },
@@ -448,6 +448,60 @@ describe('classic:paint-surface', () => {
     if (!r.ok) expect(r.error).toMatch(/animated-art|not editable/i);
     expect(st().doc).toBe(doc); // untouched identity
     expect(artStack().canUndo).toBe(false);
+  });
+
+  // --- collision must travel with a cloned block --------------------------
+  //
+  // S1 indexes the block->collision-shape table (colind) BY BLOCK ID, so a
+  // block appended without a colind entry has undefined collision in game. An
+  // Isolate clone is by construction a copy of a block the artist is painting
+  // — usually solid ground — so dropping its collision turns solid ground into
+  // something the player falls through. Aurora's own overlay reads
+  // `colind[block] ?? 0` and so renders the clone as non-solid a second after
+  // showing the original as solid.
+  //
+  // Stock data makes this easy to miss: GHZ ships 439 blocks against a 410-byte
+  // colind, and the engine tolerates that overhang only because those blocks
+  // are never solid.
+  it('a cloned block inherits its source block collision shape', () => {
+    openReady();
+    expect(classicSetColind([{ blockId: 0, value: 7 }, { blockId: 1, value: 9 }]).ok).toBe(true);
+    // fullPlan() clones block 1 (its cells are all tile 1) into new id 2.
+    expect(classicPaintSurface(fullPlan())).toEqual({ ok: true });
+    const colind = st().doc!.collision.colind;
+    expect(colind.length).toBe(st().doc!.blocks.length);
+    expect(colind[2]).toBe(9);
+    // and the source is untouched
+    expect(colind[1]).toBe(9);
+    expect(colind[0]).toBe(7);
+  });
+
+  it('marks colind dirty when a block is appended, so the writer emits it', () => {
+    openReady();
+    expect(classicPaintSurface(fullPlan())).toEqual({ ok: true });
+    expect(st().dirty.colind).toBe(true);
+  });
+
+  it('does NOT touch colind for a plan that appends no block', () => {
+    openReady();
+    const plan: SurfaceEditPlan = {
+      ...emptyPlan(),
+      tileWrites: [{ tileIndex: 1, data: new Uint8Array(32).fill(0x7) }],
+    };
+    const before = st().doc!.collision.colind;
+    expect(classicPaintSurface(plan)).toEqual({ ok: true });
+    expect(st().doc!.collision.colind).toBe(before); // same identity: untouched
+    expect(st().dirty.colind).toBeUndefined();
+  });
+
+  it('undo restores the colind table along with the block', () => {
+    openReady();
+    const before = Array.from(st().doc!.collision.colind);
+    expect(classicPaintSurface(fullPlan())).toEqual({ ok: true });
+    expect(st().doc!.collision.colind.length).toBe(3);
+    artStack().undo();
+    expect(Array.from(st().doc!.collision.colind)).toEqual(before);
+    expect(st().doc!.blocks.length).toBe(2);
   });
 
   it('an empty plan is a no-op: ok:true, no history entry, no dirty flag', () => {
@@ -540,13 +594,17 @@ describe('classic:paint-surface', () => {
     openReady();
     const plan: SurfaceEditPlan = {
       ...emptyPlan(),
-      newBlocks: [{ cells: Array.from({ length: 4 }, () => blankBlockCell(1)) }],
+      newBlocks: [{ def: { cells: Array.from({ length: 4 }, () => blankBlockCell(1)) }, sourceBlockId: 1 }],
       blockCellEdits: [{ blockId: 2, cellIndex: 0, cell: blankBlockCell(1) }],
     };
     expect(classicPaintSurface(plan)).toEqual({ ok: true });
     expect(st().dirty.blocks).toBe(true);
     expect(st().dirty.tiles).toBeUndefined();
     expect(st().dirty.chunks).toBeUndefined();
+    // colind IS dirty here, and that is not an exception to this test's rule:
+    // appending a block extends the block->collision table, so the collision
+    // file genuinely changed and must be written.
+    expect(st().dirty.colind).toBe(true);
   });
 });
 
@@ -945,6 +1003,39 @@ describe('classic:add-block', () => {
     expect(st().doc!.blocks[2].cells.every((c) => c.tile === 0)).toBe(true);
     expect(st().dirty.blocks).toBe(true);
     expect(artStack().canUndo).toBe(true);
+  });
+
+  // Duplicate copies a block the artist is looking at, so the copy has to
+  // behave like it — including underfoot. Without this the Duplicate button
+  // produces a block that looks identical and is not solid.
+  it('inherits the source block collision shape when given a source id', () => {
+    openReady();
+    expect(classicSetColind([{ blockId: 0, value: 7 }, { blockId: 1, value: 9 }]).ok).toBe(true);
+    const src: BlockDef = { cells: st().doc!.blocks[1].cells.map((c) => ({ ...c })) };
+    const res = classicAddBlock(src, { sourceBlockId: 1 });
+    expect(res.ok).toBe(true);
+    const colind = st().doc!.collision.colind;
+    expect(colind.length).toBe(3);
+    expect(colind[2]).toBe(9);
+    expect(st().dirty.colind).toBe(true);
+  });
+
+  // A blank block is not a copy of anything, so it gets shape 0 — the same "no
+  // collision" answer Aurora's overlay already renders for an id past the table.
+  it('gives a brand-new blank block collision shape 0', () => {
+    openReady();
+    expect(classicSetColind([{ blockId: 0, value: 7 }, { blockId: 1, value: 9 }]).ok).toBe(true);
+    expect(classicAddBlock().ok).toBe(true);
+    expect(st().doc!.collision.colind[2]).toBe(0);
+  });
+
+  it('undo restores the colind table when a duplicated block is undone', () => {
+    openReady();
+    const before = Array.from(st().doc!.collision.colind);
+    expect(classicAddBlock({ cells: st().doc!.blocks[1].cells.map((c) => ({ ...c })) },
+      { sourceBlockId: 1 }).ok).toBe(true);
+    artStack().undo();
+    expect(Array.from(st().doc!.collision.colind)).toEqual(before);
   });
 
   it('seeds cells from a def (Duplicate path)', () => {

@@ -26,8 +26,23 @@ export interface SurfaceWrite { x: number; y: number; value: number }
 export interface SurfaceEditPlan {
   /** Tile-pool pixel writes, 32 bytes each. */
   tileWrites: { tileIndex: number; data: Uint8Array }[];
-  /** Blocks appended to the pool; ids are doc.blocks.length + arrayIndex. */
-  newBlocks: BlockDef[];
+  /**
+   * Blocks appended to the pool; ids are doc.blocks.length + arrayIndex.
+   *
+   * `sourceBlockId` is the block this one was CLONED FROM, and it is not
+   * decoration: S1 indexes the block→collision-shape table (`colind`) by block
+   * id, so an appended block with no colind entry has undefined collision in
+   * game. An Isolate clone is by construction a copy of a block the artist is
+   * painting — usually solid ground — so a clone that keeps the pixels and
+   * drops the collision is ground the player falls through. Carrying the source
+   * here is what lets `classicPaintSurface` inherit it.
+   *
+   * It is a required field rather than an optional one so that a future
+   * producer of new blocks (2C mints them from a canvas, with no source block
+   * to copy from) cannot silently default to "no collision" — it has to answer
+   * the question, which is exactly the decision this field exists to force.
+   */
+  newBlocks: { def: BlockDef; sourceBlockId: number }[];
   /** Repoints within an existing or newly-added block. */
   blockCellEdits: { blockId: number; cellIndex: number; cell: BlockCell }[];
   /** Repoints within a chunk. */
@@ -240,7 +255,10 @@ export function planSurfaceEdit(input: PlanInput): PlanResult {
           };
         }
         const srcBlock = doc.blocks[c.blockId];
-        plan.newBlocks.push({ cells: (srcBlock?.cells ?? []).map((bc) => ({ ...bc })) });
+        plan.newBlocks.push({
+          def: { cells: (srcBlock?.cells ?? []).map((bc) => ({ ...bc })) },
+          sourceBlockId: c.blockId,
+        });
         cloned = id;
         cloneOf.set(chunkCellIndex, cloned);
         plan.stats.blocksCloned++;
