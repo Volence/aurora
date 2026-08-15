@@ -15,8 +15,214 @@ import { useClassicLevelStore } from './state/classicLevelStore';
 import { useClassicObjectArtStore } from './state/classicObjectArtStore';
 import { useProjectStore } from './state/projectStore';
 import { useViewStore } from './state/viewStore';
+import { useArtStore } from './state/artStore';
 import { activateLevelTarget } from './shell/tab-activation';
 import { levelDocId } from './shell/tabs';
+import { buildUsageIndex } from '../core/level-classic/usage-index';
+import { buildChunkSurface } from '../core/art/classic-surface-buffer';
+import { tileLockReason } from '../core/project/editable-tiles';
+
+/**
+ * Paint-through (Task 12) read-only query surface. Every function here reads
+ * `doc`/`usage` off the live classic level store and returns plain data — no
+ * mutation, no bypass of the composer's write path (planSurfaceEdit →
+ * classicPaintSurface stays the ONLY way pixels get committed; see ChunkTab's
+ * header). These exist because finding "two chunks that share a block" or "two
+ * ADJACENT cells in one chunk sharing a block" by hand in a real GHZ act is not
+ * practical from outside — the doc has hundreds of blocks/chunks and the CDP
+ * harness cannot import core modules into the page. Selecting the FOUND ids
+ * (setSelectedChunk/setComposerBlock) is setup, exactly like `activate()` is
+ * setup for opening an act — the harness still drives the actual paint strokes,
+ * undo and mode toggles through real pointer/keyboard events on the real UI.
+ */
+interface ClassicProbeApi {
+  /** Pool sizes, for before/after divergence counts. */
+  poolSizes(): { tiles: number; blocks: number; chunks: number } | null;
+  /** { block, xf, yf, solidity } for one chunk cell, by ENGINE chunk id (1-based; 0 = air). */
+  chunkCell(chunkId: number, cellIndex: number): { block: number; xf: boolean; yf: boolean; solidity: number } | null;
+  /** { tile, pal, xf, yf, pri } for one block cell (0=TL,1=TR,2=BL,3=BR). */
+  blockCell(blockId: number, cellIndex: number): { tile: number; pal: number; xf: boolean; yf: boolean; pri: boolean } | null;
+  /** FNV-1a hash of one tile's raw 32 bytes, so undo restoration can be checked without shipping the whole pool. */
+  tileHash(tileIndex: number): number | null;
+  /** The reserved-tile set (object-art-claimed level tiles) for the open act, as a plain array. */
+  reservedTiles(): number[];
+  /**
+   * A block used by >= 2 DISTINCT chunks (blockToChunks), plus one referencing
+   * cell in each of the first two — for the "paint one chunk, the other chunk
+   * must/must not change" checks (3 and 4).
+   */
+  findSharedBlock(): { blockId: number; chunkAId: number; cellA: number; chunkBId: number; cellB: number } | null;
+  /**
+   * A block used by >= 2 distinct chunks AND whose TL tile cell (block.cells[0])
+   * is itself shared by >= 2 distinct blocks, found at an UNFLIPPED chunk cell —
+   * so painting near the cell's local (4,4) is guaranteed to touch a tile that
+   * must clone, inside a block that must clone, inside a chunk cell that must
+   * repoint. For check 2 (undo restores all three tiers together). Skips any
+   * candidate whose tile is in the reserved set.
+   */
+  findJuicyCell(): { chunkId: number; cellIndex: number; blockId: number; tileId: number } | null;
+  /**
+   * Two HORIZONTALLY ADJACENT cells (same row, column N and N+1) in one chunk
+   * that reference the same block — the A1 regression shape (plan doc: two
+   * painted chunk cells sharing one linked block). For check 5.
+   */
+  findAdjacentSharedBlockCells(): { chunkId: number; cellA: number; cellB: number; blockId: number } | null;
+  /**
+   * The EXACT fixture from reserved-tiles-real-act.test.ts's
+   * `sixSharedTileDivergences`, replicated so the CDP harness can force the
+   * same proven six-divergence pass through the REAL UI rather than inventing
+   * its own candidate search: the first six distinct chunk cells (by
+   * chunkCellIndex) of `doc.chunks[chunkFileIndex]` whose current tile is
+   * shared (`tileUsage(t).cells > 1`) and editable, each written with value 9
+   * (a nibble GHZ's real tile data never legitimately holds there — see that
+   * test's docblock). Returns writes in composed-surface art-pixel coordinates
+   * (x, y are each cell's top-left 8x8 corner) and the ENGINE chunk id to
+   * select first. Defaults to chunk file index 0 (engine id 1) — the same
+   * chunk the proven test uses.
+   */
+  sixDivergenceWrites(chunkFileIndex?: number): { chunkId: number; writes: { x: number; y: number; value: number }[] } | null;
+  /** One hash per pool tile, index-aligned — a before/after diff over the WHOLE
+   *  pool without shipping 965 tiles × 32 bytes across the CDP wire. For check 6:
+   *  which tile indices actually changed after a batch of Isolate divergences. */
+  allTileHashes(): number[];
+  /** The first placed object with this engine id (S1ObjectEntry.id), or null. */
+  findObject(id: number): { x: number; y: number; subtype: number } | null;
+  setSelectedChunk(id: number): void;
+  setComposerBlock(id: number): void;
+}
+
+function fnv1a(bytes: Uint8Array, offset: number, length: number): number {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < length; i++) {
+    h ^= bytes[offset + i] ?? 0;
+    h = Math.imul(h, 0x01000193);
+  }
+  return h >>> 0;
+}
+
+function installClassicProbe(): ClassicProbeApi {
+  const state = () => useClassicLevelStore.getState();
+  const usageOf = (doc: NonNullable<ReturnType<typeof state>['doc']>) => buildUsageIndex(doc);
+
+  return {
+    poolSizes: () => {
+      const { doc } = state();
+      if (!doc) return null;
+      return { tiles: Math.floor(doc.tiles.length / 32), blocks: doc.blocks.length, chunks: doc.chunks.length };
+    },
+    chunkCell: (chunkId, cellIndex) => {
+      const { doc } = state();
+      if (!doc) return null;
+      const idx = chunkId - 1; // engine id is 1-based; see model.ts chunkIndexForId
+      const cell = doc.chunks[idx]?.cells[cellIndex];
+      return cell ? { block: cell.block, xf: cell.xf, yf: cell.yf, solidity: cell.solidity } : null;
+    },
+    blockCell: (blockId, cellIndex) => {
+      const { doc } = state();
+      if (!doc) return null;
+      const cell = doc.blocks[blockId]?.cells[cellIndex];
+      return cell ? { tile: cell.tile, pal: cell.pal, xf: cell.xf, yf: cell.yf, pri: cell.pri } : null;
+    },
+    tileHash: (tileIndex) => {
+      const { doc } = state();
+      if (!doc) return null;
+      const offset = tileIndex * 32;
+      if (offset < 0 || offset + 32 > doc.tiles.length) return null;
+      return fnv1a(doc.tiles, offset, 32);
+    },
+    reservedTiles: () => [...(state().reservedTiles ?? [])].sort((a, b) => a - b),
+    findSharedBlock: () => {
+      const { doc } = state();
+      if (!doc) return null;
+      const usage = usageOf(doc);
+      for (const [blockId, chunkIdxs] of usage.blockToChunks) {
+        if (blockId === 0) continue; // block 0 tends to be a blank/filler block — not representative
+        if (chunkIdxs.length < 2) continue;
+        const [ciA, ciB] = chunkIdxs;
+        const cellA = doc.chunks[ciA]?.cells.findIndex((c) => c.block === blockId);
+        const cellB = doc.chunks[ciB]?.cells.findIndex((c) => c.block === blockId);
+        if (cellA === undefined || cellA < 0 || cellB === undefined || cellB < 0) continue;
+        return { blockId, chunkAId: ciA + 1, cellA, chunkBId: ciB + 1, cellB };
+      }
+      return null;
+    },
+    findJuicyCell: () => {
+      const { doc } = state();
+      if (!doc) return null;
+      const usage = usageOf(doc);
+      const reserved = state().reservedTiles;
+      for (let ci = 0; ci < doc.chunks.length; ci++) {
+        const chunk = doc.chunks[ci];
+        for (let cellIndex = 0; cellIndex < chunk.cells.length; cellIndex++) {
+          const cc = chunk.cells[cellIndex];
+          if (cc.xf || cc.yf) continue; // unflipped only — local (4,4) maps straight to block cell 0 (TL)
+          if (cc.block === 0) continue;
+          if (usage.blockUsage(cc.block).containers < 2) continue; // block must be shared to force a clone
+          const tlTile = doc.blocks[cc.block]?.cells[0]?.tile;
+          if (tlTile === undefined || tlTile === 0) continue; // 0 is the transparent filler tile — not representative
+          if (reserved?.has(tlTile)) continue;
+          if ((usage.tileToBlocks.get(tlTile)?.length ?? 0) < 2) continue; // tile must be shared to force its own clone
+          return { chunkId: ci + 1, cellIndex, blockId: cc.block, tileId: tlTile };
+        }
+      }
+      return null;
+    },
+    findAdjacentSharedBlockCells: () => {
+      const { doc } = state();
+      if (!doc) return null;
+      for (let ci = 0; ci < doc.chunks.length; ci++) {
+        const cells = doc.chunks[ci].cells;
+        for (let row = 0; row < 16; row++) {
+          for (let col = 0; col < 15; col++) {
+            const a = row * 16 + col, b = a + 1;
+            if (cells[a].block !== 0 && cells[a].block === cells[b].block) {
+              return { chunkId: ci + 1, cellA: a, cellB: b, blockId: cells[a].block };
+            }
+          }
+        }
+      }
+      return null;
+    },
+    sixDivergenceWrites: (chunkFileIndex = 0) => {
+      const { doc, ref } = state();
+      if (!doc) return null;
+      const handle = useClassicProjectStore.getState().handle;
+      const range = ref && handle?.levels?.editableTileRange ? handle.levels.editableTileRange(ref) : null;
+      const usage = usageOf(doc);
+      const { provenance } = buildChunkSurface(doc, chunkFileIndex);
+      const writes: { x: number; y: number; value: number }[] = [];
+      const seenChunkCells = new Set<number>();
+      for (let i = 0; i < provenance.cells.length && writes.length < 6; i++) {
+        const c = provenance.cells[i];
+        if (c.tileIndex === 0) continue;
+        if (usage.tileUsage(c.tileIndex).cells <= 1) continue;
+        if (tileLockReason(range, c.tileIndex) !== null) continue;
+        if (c.chunkCellIndex === null || seenChunkCells.has(c.chunkCellIndex)) continue;
+        seenChunkCells.add(c.chunkCellIndex);
+        const cx = i % provenance.cellsX;
+        const cy = Math.floor(i / provenance.cellsX);
+        writes.push({ x: cx * 8, y: cy * 8, value: 9 });
+      }
+      return { chunkId: chunkFileIndex + 1, writes };
+    },
+    allTileHashes: () => {
+      const { doc } = state();
+      if (!doc) return [];
+      const n = Math.floor(doc.tiles.length / 32);
+      const out = new Array<number>(n);
+      for (let t = 0; t < n; t++) out[t] = fnv1a(doc.tiles, t * 32, 32);
+      return out;
+    },
+    findObject: (id) => {
+      const { doc } = state();
+      if (!doc) return null;
+      const o = doc.objects.find((e) => e.id === id);
+      return o ? { x: o.x, y: o.y, subtype: o.subtype } : null;
+    },
+    setSelectedChunk: (id) => state().setSelectedChunkId(id),
+    setComposerBlock: (id) => state().setComposerBlockId(id),
+  };
+}
 
 interface DebugApi {
   openDir(dir: string): Promise<string>;
@@ -67,6 +273,18 @@ interface DebugApi {
    * these fields are reported as empty/zero here (kept for shape compatibility).
    */
   perf(): { marks: unknown[]; readCount: number; readTotalMs: number; mtimeCount: number; mtimeTotalMs: number };
+  /** Task 12 (paint-through CDP verification) query surface — see ClassicProbeApi's docblock. */
+  classic: ClassicProbeApi;
+  /**
+   * `artStore.selectedColor` — the cross-engine/cross-tier paint color
+   * singleton (ChunkTab/BlockTab/TileTab all read it; see ChunkTab's header).
+   * ChunkTab/BlockTab in Paint mode mount NO swatch row of their own (only
+   * TileTab does), so a CDP harness testing Chunk/Block paint mode has no DOM
+   * element to click for color selection without first detouring through the
+   * Tile tier. Exposed directly for the same reason `view()`/`setView()` are:
+   * setting which color is armed is setup, not the paint mechanism under test.
+   */
+  setPaintColor(v: number): void;
 }
 
 export function installDebugHooks(): void {
@@ -101,6 +319,8 @@ export function installDebugHooks(): void {
     // "no act" is exactly the value it has no way to express.
     resetAct: () => useProjectStore.setState({ currentActId: null }),
     perf: () => ({ marks: [], readCount: 0, readTotalMs: 0, mtimeCount: 0, mtimeTotalMs: 0 }),
+    classic: installClassicProbe(),
+    setPaintColor: (v) => useArtStore.getState().setSelectedColor(v),
   };
   (window as unknown as { __dbg: DebugApi }).__dbg = dbg;
 }
