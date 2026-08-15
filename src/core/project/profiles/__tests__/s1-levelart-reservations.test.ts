@@ -4,6 +4,9 @@ import {
   buildReservedTileSet,
   type LevelArtReservationRequest,
 } from '../s1-levelart-reservations';
+import { resolveObjectArt } from '../s1-object-art';
+import { ruleObjectIds, resolveEffectiveObjectArt } from '../object-subtype-rules';
+import { s1Profile } from '../s1';
 
 // Synthetic mapping ASM text, in the same `spriteHeader`/`spritePiece` shape
 // `parseAsmMappings` reads (see import/asm-mappings.ts + a real S1 _maps/*.asm
@@ -143,6 +146,65 @@ describe('levelArtReservationRequests — real S1 zone table', () => {
     for (const r of levelArtReservationRequests('ghz', 1)) {
       expect(r.frames).toBeUndefined();
       expect(r.tileBase).toBe(0);
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// T6 — the rule-invariant lock.
+//
+// The whole reservation set (levelArtReservationRequests) is ZONE-STATIC: it
+// takes every frame of a levelArt link's mappings, not just the frames a
+// particular subtype draws, precisely SO THAT subtype does not enter the
+// question (see the module doc's "why zone-static holds"). That is sound only
+// as long as no subtype rule in object-subtype-rules.ts ever swaps a levelArt
+// object's art SOURCE (file vs. levelArt) or its mapAsm/tileIndexOffset out
+// from under the base link — if one ever did, the derived request (built once,
+// from the BASE link) would silently stop matching what actually renders for
+// some subtype, and a real placement's tiles could be corrupted.
+//
+// This test does not read the disasm; it walks every (zone, rule-carrying id,
+// subtype) triple PURELY IN CODE and asserts the invariant holds today, so
+// that adding a subtype rule which breaks it fails loudly here rather than
+// being discovered later as another silent object-art corruption bug.
+// ---------------------------------------------------------------------------
+describe('T6 — every subtype rule keeps the reservation set zone-static', () => {
+  const ZONES = s1Profile.zones.map((z) => z.id);
+
+  it('no rule changes a levelArt object\'s artSource, and every levelArt effective link is one of the zone\'s reservation requests at zero offset', () => {
+    for (const zone of ZONES) {
+      // Union every act's request paths for this zone (only sbz act 3 differs
+      // from sbz act 1/2, via the SBZ3 door supplemental — see
+      // levelArtReservationRequests) so the check holds regardless of which
+      // act a rule-carrying placement happens to sit in.
+      const acts = s1Profile.zones.find((z) => z.id === zone)!.acts.map((a) => a.act);
+      const requestPaths = new Set<string>();
+      for (const act of acts) {
+        for (const r of levelArtReservationRequests(zone, act)) requestPaths.add(r.mapAsm);
+      }
+
+      for (const id of ruleObjectIds(zone)) {
+        const base = resolveObjectArt(id, zone);
+        if (!base) continue; // unlinked rule id — no art to check (hex-box fallback)
+
+        for (let subtype = 0; subtype < 256; subtype++) {
+          const eff = resolveEffectiveObjectArt(id, zone, subtype, base);
+          expect(
+            eff.link.artSource,
+            `id $${id.toString(16)} zone ${zone} subtype ${subtype}: a subtype rule must never change artSource`,
+          ).toBe(base.artSource);
+
+          if (eff.link.artSource !== 'levelArt') continue;
+          expect(
+            eff.link.tileIndexOffset ?? 0,
+            `id $${id.toString(16)} zone ${zone} subtype ${subtype}: a levelArt link must carry zero tileIndexOffset`,
+          ).toBe(0);
+          expect(
+            requestPaths.has(eff.link.mapAsm),
+            `id $${id.toString(16)} zone ${zone} subtype ${subtype}: levelArt mapAsm '${eff.link.mapAsm}' must be a reservation request path for zone '${zone}'`,
+          ).toBe(true);
+        }
+      }
     }
   });
 });
