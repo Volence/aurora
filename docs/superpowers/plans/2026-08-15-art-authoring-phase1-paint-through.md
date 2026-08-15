@@ -1572,3 +1572,146 @@ tile→object reverse index alongside `buildUsageIndex` is the likely shape. Cor
 the composition happens at the injection site. Test at the seam (a predicate excluding tile 9
 forces `findFreeSlot` to 10) **and** with a real GHZ act, asserting a known object-art tile is
 excluded.
+
+---
+
+## Task 5c — object-aware tile claimability, in detail
+
+**Designed 2026-08-15. Supersedes the stub in Audit corrections A2/New Task 5c.** Gates every
+UI task: nothing may reach Isolate before T1–T5 land.
+
+### The rule
+
+Reserve, per open act, every level-pool tile index any level-art-drawn object sprite can read.
+**Reserved tiles stay editable in place** — painting GHZ platform art is a feature, and the
+sprite updates live through `tileEpoch` — so this must NOT be folded into `tileLockReason`. It
+is a third, additive rule: **never claim a reserved slot, and always diverge away from one.**
+
+For `(zone, act)` with pool size `poolTileCount`, the union over reservation requests
+`{mapAsm, tileBase, frames?}` of:
+
+```
+{ tileBase + piece.tile + k
+  | frame ∈ (frames ?? all frames of parseAsmMappings(mapAsm)),
+    piece ∈ frame.pieces,
+    k ∈ [0, piece.widthCells * piece.heightCells) }  ∩  [0, poolTileCount)
+```
+
+The request list is **zone-static** — not placement-, subtype-, or preview-frame-dependent.
+
+- **Derived:** for each `id ∈ linkedObjectIds(zone)` whose `resolveObjectArt(id, zone).artSource`
+  is `'levelArt'`, one request with `tileBase = -(link.tileIndexOffset ?? 0)`. Today: ghz
+  Platforms + Collapsing Ledge; mz Large Grassy Platforms + Bricks; syz Light, Platforms,
+  Floating Blocks and Doors; slz those plus Elevators, Circling Platform, Staircase; lz and sbz
+  none derived.
+- **Supplemental** — engine truth Aurora's table cannot see, found by grepping `ArtTile_Level`
+  across `s1disasm/_incObj`:
+  - **syz**: `_maps/SYZ Boss Blocks.asm`, base 0. Object `$76` is **spawned by boss `$75`**, never
+    in `objpos`, unlinked in Aurora — the concrete proof a placement-derived set is wrong.
+  - **lz (all acts) and sbz act 3**: `_maps/SBZ Stomper and Door.asm`, base `0x1F0`, frame 0.
+    **SBZ3 borrows LZ's tile/block/chunk files**, so editing LZ can corrupt SBZ3's door.
+
+Why zone-static holds: subtype rules only change which *frames* draw — none swaps a levelArt
+link's `mapAsm` or `artSource`. Taking all frames removes subtype from the question entirely,
+and is required anyway because the ROM animates frames Aurora never previews.
+
+### Measured, real s1disasm
+
+GHZ act 1: pool 965, reserved **158** tiles (0x3B..0xE4), **119** of them currently claimable.
+Claimable slots fall **136 → 17**. Other zones: mz 86, syz 120, slz 79, lz/sbz 0 plus the
+15-tile SBZ3 door run at 0x39F..0x3AD.
+
+**The earlier framing was wrong in a way that matters:** the first four claims land on genuinely
+free slots and **the fifth** hits object art — so casual testing looks fine.
+
+### Two questions that were open, now answered
+
+- **The `tileIndexOffset` bug does not infect this.** That drop is in `openDiscoveredSet`, the
+  Sprite-mode path; this builds from `resolveObjectArt` + `objectArtTiles`, which apply the
+  offset correctly. And every offsetted object (`$32`, `$61`) is `artSource: 'file'`, so its
+  tiles are not in the level pool at all. Keep `tileBase` in the request shape anyway, so a
+  future offsetted levelArt link stays correct and SBZ3's `+0x1F0` has somewhere to live.
+- **Cross-act via blocks is impossible; via objects it is real.** `tileToBlocks`/`blockToChunks`
+  come from files shared by every act of a zone, so "unused in act 1, used in act 2" cannot
+  happen through blocks. The real channel is per-act objects reading the shared pool through
+  mappings — hence the SBZ3 entry in **lz's** reservations.
+
+### Where it lives, and why
+
+Computing the set **requires reading the zone's `_maps/*.asm` files** — mappings are the only
+source of which pool indices are read, and Aurora stores paths, not ranges. That decides it:
+core cannot do IO, and putting it in the renderer would strand S1 engine knowledge outside the
+node suite. So it splits along the existing `editableTileRange` seam:
+
+- **Pure core** — request derivation and set computation from *passed-in* mapping texts.
+- **IO in the s1 adapter** — read the ≤6 mapping texts during `levels.read()`, where `fa` is
+  already in scope, cache beside the editable-range bookkeeping, expose as an optional sync
+  `reservedTiles?(ref)` exactly like `editableTileRange`.
+- **Renderer** only threads it into `planSurfaceEdit`'s input.
+
+A missing mappings file contributes nothing (permissive, matching the `editableTileRange` null
+convention).
+
+### Tasks
+
+**T1 — core module** `src/core/project/profiles/s1-levelart-reservations.ts`:
+
+```ts
+export interface LevelArtReservationRequest {
+  mapAsm: string;             // disasm-relative mappings path
+  tileBase: number;           // pool index of mappings tile 0 (engine base − tileIndexOffset)
+  frames?: readonly number[]; // restrict; undefined = all frames
+  ids: readonly number[];     // contributing object ids, for messaging and tests
+}
+export function levelArtReservationRequests(zone: string, act: number): LevelArtReservationRequest[];
+export function buildReservedTileSet(
+  requests: readonly LevelArtReservationRequest[],
+  mapTextByPath: ReadonlyMap<string, string>,
+  poolTileCount: number,
+): { tiles: ReadonlySet<number>; byTile: ReadonlyMap<number, readonly number[]> };
+```
+
+Tests with synthetic mappings text: multi-frame, multi-cell pieces, `tileBase` shift, pool
+clamp, `frames` filter, `byTile` attribution; plus a table test pinning each zone's expected
+request paths and the lz/sbz-act-3 door entry.
+
+**T2 — the plan honours reservations.** Add `reservedTiles?: ReadonlySet<number>` to
+`PlanInput` (default empty). Two changes: `findFreeSlot` skips reserved slots; and
+`tileLinked` becomes `index.tileUsage(e.tileIndex).cells > 1 || reserved.has(e.tileIndex)`, so
+isolate diverges away from a reserved tile rather than repainting the object in place. Link
+mode is deliberately unchanged — edit-everywhere includes the sprite, which is what link means.
+`findContentMatch` may still repoint *to* a reserved tile: byte-identical, corrupts nothing,
+conserves scarce slots. Tests: reserved zero-usage slot skipped; reserved used-once tile
+diverges instead of writing in place; **negative control** — the same fixture without
+`reservedTiles` claims the reserved slot.
+
+**T3 — adapter surface.** Optional `reservedTiles?(ref): ReadonlySet<number> | null` on
+`ClassicLevelAccess` (null = unknown = permissive; semantics are "never claim / always diverge",
+NOT "not editable"). `s1/index.ts` `read()` fetches the mapping texts tolerantly, builds the
+set, stashes it in `readStates`.
+
+**T4 — store threading.** Capture at act read beside `editableTileRange`; pass into
+`planSurfaceEdit`. Merges with the Task 11 wiring if they land together.
+
+**T5 — real-act regression test** — the one that would have caught this. Follow the
+`S1_PRESENT`-skip pattern in `src/core/project/__tests__/editable-tiles.test.ts`. Open GHZ 1;
+assert the reserved set covers the platform run {0x3B..0x4A} and has ≥150 entries; drive
+`planSurfaceEdit` with **six** forced divergences and assert no `tileWrite` index is reserved;
+then the planted violation — the same six with `reservedTiles` omitted claims 0x3B. Also assert
+lz act 1 and sbz act 3 both cover {0x39F..0x3AD}.
+
+**T6 — rule-invariant lock.** For every zone × rule object id × all 256 subtypes,
+`resolveEffectiveObjectArt(...).link.artSource` equals the base link's, and every levelArt
+effective link's `mapAsm` is in that zone's request paths with zero offset. This is what keeps
+the zone-static set sound when someone adds a subtype rule later.
+
+### Consequences to design for
+
+- **Slot scarcity is the next cliff.** 17 claimable slots in GHZ. The refusal message should
+  state remaining capacity, and content-match dedup becomes load-bearing rather than an
+  optimisation.
+- **"0 blocks" currently reads as "unused"** in the composer tile strip, which invites manual
+  repurposing of object art. The `byTile` map gives object ids for a "drawn by GHZ Platform"
+  badge. Separate small task, but it is the same misunderstanding at the UI layer.
+- Verified and recorded so nobody re-audits: MZ `$45` and SBZ `$66` are file-backed, no
+  reservation needed; `$1D` and MZ `$35` need none either.
