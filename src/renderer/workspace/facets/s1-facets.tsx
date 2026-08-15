@@ -417,21 +417,25 @@ function ClassicArtPanels(): React.ReactElement {
 /**
  * The composer's tool-options bar — the SHARED one, on classic's capability set.
  *
- * Gated on the tile tier for the same reason ClassicArtToolDock is (read its
- * header): mirror, dither and pixel-perfect are pixel modifiers, and the Chunk
- * and Block tiers have no pixels. Drawing the row over them would put three live
- * controls above a canvas that ignores all three.
+ * Gated on the ACTIVE TIER'S MODE for the same reason ClassicArtToolDock is
+ * (read its header): mirror, dither and pixel-perfect are pixel modifiers, and a
+ * Chunk/Block tier in its default Assign mode has no pixels for them to modify.
+ * Drawing the row over it would put three live controls above a canvas that
+ * ignores all three; painting a chunk or block surface is exactly when it stops
+ * ignoring them.
  *
  * `before` is deliberately not passed. Aeon fills it with a document header —
  * name, dirty badge, Save — and classic has none of those three: the composer
- * edits the open ACT through `classicEditTiles`, which is a command on the
- * classic undo stack, so there is no per-document dirty flag and no Save button
- * to put there. The act's own save state is the workspace's, and the workspace
- * header already says it.
+ * edits the open ACT through `classicEditTiles`/`classicPaintSurface`, commands
+ * on the classic undo stack, so there is no per-document dirty flag and no Save
+ * button to put there. The act's own save state is the workspace's, and the
+ * workspace header already says it.
  */
 function ClassicArtOptions(): React.ReactElement | null {
   const composerTab = useClassicLevelStore((s) => s.composerTab);
-  if (!isClassicPixelTier(composerTab)) return null;
+  const chunkPaintMode = useClassicLevelStore((s) => s.chunkPaintMode);
+  const blockPaintMode = useClassicLevelStore((s) => s.blockPaintMode);
+  if (!isClassicPixelTier(composerTab, chunkPaintMode, blockPaintMode)) return null;
   return <ArtToolOptions caps={CLASSIC_TILE_CAPS} />;
 }
 

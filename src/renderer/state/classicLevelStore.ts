@@ -29,7 +29,7 @@
 import { create } from 'zustand';
 import type { DirtyDomains, EditableTileRange, LevelDoc, ZoneActRef } from '../../core/project/adapter';
 import { tileLockReason } from '../../core/project/editable-tiles';
-import type { SurfaceEditPlan } from '../../core/art/classic-surface-plan';
+import type { SurfaceEditPlan, PaintMode as SurfaceDivergeMode } from '../../core/art/classic-surface-plan';
 import type { BlockDef, ChunkCell, ChunkDef256 } from '../../core/level-classic/model';
 import { validateLevelDoc, unpackChunkCell, chunkIndexForId } from '../../core/level-classic/model';
 import {
@@ -63,6 +63,15 @@ export type AddResult = { ok: true; id: number } | { ok: false; error: string };
 
 /** Which composer tab is active (shared selection context, Task B3). */
 export type ComposerTab = 'chunk' | 'block' | 'tile';
+
+/**
+ * A composer tab's Assign|Paint mode (Task 11). 'assign' is the tab's original
+ * grid-assignment behaviour; 'paint' composes the tier's surface and mounts the
+ * shared pixel substrate. Named apart from `PaintMode` (classic-surface-plan.ts,
+ * imported here as `SurfaceDivergeMode`) on purpose — that one is Link|Isolate,
+ * an unrelated axis a Paint-mode gesture resolves under, not a tier's mode.
+ */
+export type TierPaintMode = 'assign' | 'paint';
 
 export type LayoutPlane = 'fg' | 'bg';
 
@@ -199,6 +208,38 @@ interface ClassicLevelState {
    */
   tileClipboard: Uint8Array | null;
 
+  /**
+   * Assign | Paint per tier (Task 11, "decided" — paint is an explicit mode, not
+   * an armed tool). The assignment grid stays each tab's default; painting is a
+   * second mode a user switches INTO. Deliberately NOT derived from
+   * `editorStore.tool`: Chunk/Block have no 'assign' member in that union (it
+   * would have to be invented), and that union is shared with the sprite editor
+   * — a level-art-only member would leak a concept into a surface that can never
+   * use it.
+   *
+   * STORE state, not local `useState` inside the tab, for two reasons: (1)
+   * `ClassicComposerDock` unmounts each tab on tab switch
+   * (`{tab === 'chunk' && <ChunkTab/>}`), so local state would forget the choice
+   * every time the user left and came back; (2) `isClassicPixelTier`
+   * (workspace/level-presence.ts) needs THIS SAME value from three call sites
+   * that are not ChunkTab/BlockTab at all — ClassicArtToolDock (the tool rail's
+   * contents) and LevelWorkspace's `usePixelToolsLive` (the rail's 44px
+   * CONTAINER) — so a tab-local toggle could not answer "is this tier live"
+   * from outside the tab.
+   */
+  chunkPaintMode: TierPaintMode;
+  blockPaintMode: TierPaintMode;
+  /**
+   * Link | Isolate for BOTH paint-mode surfaces — a single cross-tier workflow
+   * preference, not per-tier: the same shape as `artStore.zoom` (a CROSS-ENGINE
+   * SINGLETON, see TileTab.tsx), where the cost of one shared field (a choice
+   * made on Chunk carries into Block) is judged worth it over a second toggle
+   * that means the same thing. Isolate default; STICKY — not reset in `openAct`'s
+   * `fresh` object, because it is a workflow preference like `composerTab`, not
+   * per-act document data.
+   */
+  paintDivergeMode: SurfaceDivergeMode;
+
   /** Select + load an act. Reads through the open project's handle. */
   openAct: (ref: ZoneActRef) => Promise<void>;
   setSelectedChunkId: (chunkId: number) => void;
@@ -217,6 +258,9 @@ interface ClassicLevelState {
   setComposerTileIndex: (index: number) => void;
   setComposerPalLine: (line: number) => void;
   setTileClipboard: (px: Uint8Array | null) => void;
+  setChunkPaintMode: (mode: TierPaintMode) => void;
+  setBlockPaintMode: (mode: TierPaintMode) => void;
+  setPaintDivergeMode: (mode: SurfaceDivergeMode) => void;
   /**
    * Clear the given dirty domains for `ref` after a successful save. NOT an
    * undoable edit (it does not touch history).
@@ -255,6 +299,9 @@ const IDLE = {
   composerTileIndex: 0,
   composerPalLine: 0,
   tileClipboard: null as Uint8Array | null,
+  chunkPaintMode: 'assign' as TierPaintMode,
+  blockPaintMode: 'assign' as TierPaintMode,
+  paintDivergeMode: 'isolate' as SurfaceDivergeMode,
 };
 
 // ---------------------------------------------------------------------------
@@ -430,6 +477,9 @@ export const useClassicLevelStore = create<ClassicLevelState>((set, get) => ({
   setTileClipboard: (px: Uint8Array | null) => {
     if (px === null || px.length === 64) set({ tileClipboard: px });
   },
+  setChunkPaintMode: (mode: TierPaintMode) => set({ chunkPaintMode: mode }),
+  setBlockPaintMode: (mode: TierPaintMode) => set({ blockPaintMode: mode }),
+  setPaintDivergeMode: (mode: SurfaceDivergeMode) => set({ paintDivergeMode: mode }),
 
   markDomainsClean: (ref, domains) => {
     const s = get();
