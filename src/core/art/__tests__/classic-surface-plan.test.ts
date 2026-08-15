@@ -222,3 +222,86 @@ describe('planSurfaceEdit — a stroke that changes nothing commits nothing', ()
     expect(r.plan.blockCellEdits).toHaveLength(1);   // guard is not over-eager
   });
 });
+
+describe('planSurfaceEdit — block divergence', () => {
+  it('clones a linked block and repoints only the painted chunk cell', () => {
+    const doc = makeDoc();               // block 1 is used by both chunks
+    const { provenance } = buildChunkSurface(doc, 0);
+    const r = planSurfaceEdit({
+      doc, provenance, index: buildUsageIndex(doc), mode: 'isolate',
+      isEditableTile: allEditable, writes: [{ x: 16, y: 0, value: 9 }],
+    });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.plan.newBlocks).toHaveLength(1);
+    expect(r.plan.stats.blocksCloned).toBe(1);
+    const newId = doc.blocks.length;
+    expect(r.plan.chunkCellEdits).toEqual([
+      { chunkIndex: 0, cellIndex: 1, cell: { block: newId, xf: false, yf: false, solidity: 0 } },
+    ]);
+    expect(r.plan.blockCellEdits.every((b) => b.blockId === newId)).toBe(true);
+  });
+
+  it('clones ONCE when several 8x8 cells of the SAME chunk cell are painted', () => {
+    const doc = makeDoc();
+    const { provenance } = buildChunkSurface(doc, 0);
+    // x=16 and x=24 are both inside chunk cell 1 (cells are 16px wide).
+    const r = planSurfaceEdit({
+      doc, provenance, index: buildUsageIndex(doc), mode: 'isolate',
+      isEditableTile: allEditable,
+      writes: [{ x: 16, y: 0, value: 9 }, { x: 24, y: 0, value: 9 }],
+    });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.plan.newBlocks).toHaveLength(1);
+    expect(r.plan.chunkCellEdits).toHaveLength(1);
+  });
+
+  // REGRESSION for the audit's severe finding.
+  it('repoints EVERY painted chunk cell of a linked block, not just the first', () => {
+    const doc = makeDoc();               // chunk 0 cells 1..255 all use block 1
+    const { provenance } = buildChunkSurface(doc, 0);
+    const r = planSurfaceEdit({
+      doc, provenance, index: buildUsageIndex(doc), mode: 'isolate',
+      isEditableTile: allEditable,
+      writes: [{ x: 16, y: 0, value: 9 }, { x: 32, y: 0, value: 7 }],  // chunk cells 1 AND 2
+    });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.plan.chunkCellEdits.map((e) => e.cellIndex).sort((a, b) => a - b)).toEqual([1, 2]);
+    const [a, b] = r.plan.chunkCellEdits;
+    expect(a.cell.block).not.toBe(b.cell.block);
+    // No two blockCellEdits may collide on one (block, cell) slot — the buggy
+    // memo produces exactly such a collision, silently last-write-wins at apply.
+    const keys = r.plan.blockCellEdits.map((e) => `${e.blockId}:${e.cellIndex}`);
+    expect(new Set(keys).size).toBe(keys.length);
+  });
+
+  it('diverges the tile too when the block is cloned, even if the tile is used once', () => {
+    const doc = makeDoc();
+    const { provenance } = buildChunkSurface(doc, 0);
+    const r = planSurfaceEdit({
+      doc, provenance, index: buildUsageIndex(doc), mode: 'isolate',
+      isEditableTile: allEditable, writes: [{ x: 16, y: 0, value: 9 }],
+    });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    // Tile 5 is used once, but the clone would share it — so it must NOT be mutated.
+    expect(r.plan.tileWrites.map((w) => w.tileIndex)).not.toContain(5);
+    expect(r.plan.stats.tilesClaimed).toBe(1);
+  });
+
+  it('refuses when the block pool is full', () => {
+    const doc = makeDoc();
+    // Pad the pool to the 10-bit ceiling so one more clone cannot fit.
+    while (doc.blocks.length < 0x400) doc.blocks.push({ cells: [cell(0), cell(0), cell(0), cell(0)] });
+    const { provenance } = buildChunkSurface(doc, 0);
+    const r = planSurfaceEdit({
+      doc, provenance, index: buildUsageIndex(doc), mode: 'isolate',
+      isEditableTile: allEditable, writes: [{ x: 16, y: 0, value: 9 }],
+    });
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.reason).toMatch(/block limit/i);
+  });
+});

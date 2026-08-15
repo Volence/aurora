@@ -49,6 +49,9 @@ export interface PlanInput {
 }
 
 const TILE_BYTES = 32;
+// Chunk cell's block field is 10 bits (see model.ts MAX_BLOCK_REF) — a clone
+// that would need id 0x400 or higher can never be encoded, so refuse instead.
+const MAX_BLOCK_REF = 0x3ff;
 
 function bytesEqualAt(pool: Uint8Array, tileIndex: number, want: Uint8Array): boolean {
   const base = tileIndex * TILE_BYTES;
@@ -114,6 +117,11 @@ export function planSurfaceEdit(input: PlanInput): PlanResult {
 
   const placesAffected = new Set<number>();
   const claimed = new Set<number>();
+  // Keyed by CHUNK CELL index, not block id: two painted chunk cells that share
+  // a block each need their OWN clone (each is repointed independently), while
+  // two 8x8 surface cells belonging to the SAME chunk cell must share one clone.
+  const cloneOf = new Map<number, number>();
+  const nextBlockId = () => doc.blocks.length + plan.newBlocks.length;
 
   for (const [cellIndex, e] of perCell) {
     const c = provenance.cells[cellIndex];
@@ -151,8 +159,45 @@ export function planSurfaceEdit(input: PlanInput): PlanResult {
       continue;
     }
 
-    // The tile must diverge if it is linked elsewhere — OR if the block is about
-    // to be cloned (Stage C), since a clone would otherwise share these tiles.
+    // If the BLOCK is linked too, isolate needs its own copy of it — repointing
+    // the shared block's cell in place would repaint every chunk cell that
+    // references it. Key the clone by CHUNK CELL, not by block id: two painted
+    // chunk cells that share a block each need their OWN clone (each gets
+    // repointed independently), while several 8x8 surface cells inside the
+    // SAME chunk cell must share one clone, not one each.
+    let targetBlockId = c.blockId;
+    if (blockLinked) {
+      // Non-null: blockLinked required c.chunkCellIndex !== null, which is only
+      // ever set by buildChunkSurface, which always sets provenance.chunkIndex too.
+      const chunkCellIndex = c.chunkCellIndex as number;
+      const chunkIndex = provenance.chunkIndex as number;
+      let cloned = cloneOf.get(chunkCellIndex);
+      if (cloned === undefined) {
+        const id = nextBlockId();
+        if (id > MAX_BLOCK_REF) {
+          return {
+            ok: false,
+            reason: 'block limit reached — the pool cannot hold a 1025th block (10-bit chunk-cell field). Switch to Link mode to edit every place at once.',
+          };
+        }
+        const srcBlock = doc.blocks[c.blockId];
+        plan.newBlocks.push({ cells: (srcBlock?.cells ?? []).map((bc) => ({ ...bc })) });
+        cloned = id;
+        cloneOf.set(chunkCellIndex, cloned);
+        plan.stats.blocksCloned++;
+
+        const srcChunkCell = doc.chunks[chunkIndex]?.cells[chunkCellIndex];
+        plan.chunkCellEdits.push({
+          chunkIndex,
+          cellIndex: chunkCellIndex,
+          cell: { ...srcChunkCell, block: cloned },
+        });
+      }
+      targetBlockId = cloned;
+    }
+
+    // The tile must diverge if it is linked elsewhere — OR if the block was
+    // just cloned above, since the clone would otherwise still share it.
     const wantBytes = changedBytes;
     let targetTile = e.tileIndex;
 
@@ -175,9 +220,11 @@ export function planSurfaceEdit(input: PlanInput): PlanResult {
 
     // Only the TILE POINTER moves. Never write c.xf/c.yf here — those are the
     // COMPOSED flips (block XOR chunk) and would double-apply the chunk's flip.
+    // The template is always the ORIGINAL block's cell: a fresh clone starts as
+    // an exact copy, so its cell's own flip/pal are identical to the source's.
     const srcCell = doc.blocks[c.blockId]?.cells[c.blockCellIndex];
     plan.blockCellEdits.push({
-      blockId: c.blockId,
+      blockId: targetBlockId,
       cellIndex: c.blockCellIndex,
       cell: { ...srcCell, tile: targetTile },
     });
