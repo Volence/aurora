@@ -41,6 +41,18 @@ describe('restoredTabIsValid', () => {
     expect(restoredTabIsValid(TAB.id, NONE)).toBe(false);
   });
 
+  it('drops a canvas tab whose NAME could never be opened', () => {
+    // parseCanvasDocTabId accepts any suffix, so a hand-edited or corrupt stored
+    // session would otherwise restore a tab that loadCanvasFile refuses on sight
+    // — and because the restore path suppresses the failure report, it would
+    // fail silently at every boot on a tab that looks perfectly ordinary. Keeps
+    // this branch as tight as its sprite sibling.
+    for (const bad of ['doc:canvas:my art', 'doc:canvas:../../etc/passwd', 'doc:canvas:sky.png', 'doc:canvas:_x']) {
+      expect(restoredTabIsValid(bad, CLASSIC), bad).toBe(false);
+    }
+    expect(restoredTabIsValid('doc:canvas:GHZ-cliffs_2', CLASSIC)).toBe(true);
+  });
+
   it('still keeps enumerated tabs and engine-matched sprite tabs, and drops the rest', () => {
     expect(restoredTabIsValid(PROJECT_SETUP_TAB.id, CLASSIC)).toBe(true);
     expect(restoredTabIsValid('doc:sprite:s1:75', CLASSIC)).toBe(true);

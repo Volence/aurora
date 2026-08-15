@@ -26,6 +26,19 @@
 // writer, which treats such a disagreement as evidence another tool rewrote the
 // file).
 //
+// FIFTEEN STEPS MEANS FIFTEEN DIFFERENT COLOURS, and at 3 bits per channel that
+// is a constraint on the anchors, not a free consequence of interpolating. A
+// channel has eight levels, so a ramp whose three channels move in step
+// delivers eight colours and seven duplicate swatches — two identical squares
+// side by side in the palette grid that an artist clicks and cannot tell apart.
+// The anchors below therefore HUE-SHIFT along the ramp (the shadows are tinted
+// away from the highlights) so the channels cross their level boundaries at
+// different steps, which is also what a hand-authored pixel-art ramp does for
+// its own reasons. An earlier set looked reasonable and produced three
+// duplicate adjacent pairs; the test asserts all fifteen are distinct AND that
+// no two neighbours are equal, because "15 distinct" alone would accept a
+// duplicate pair next to a compensating extra shade elsewhere.
+//
 // THE RAMP-PER-LINE SHAPE IS THE POINT, not decoration:
 //
 //   • The default profile is `genesis-level-art`, whose `cellPaletteRule` says
@@ -77,9 +90,9 @@ const LINE_RAMPS: readonly LineRamp[] = [
   // Warm: earth, brick, fire, skin.
   { family: 'warm', shadow: [2, 0, 1], mid: [6, 3, 1], highlight: [7, 7, 4] },
   // Cool: sky, water, shadowed metal.
-  { family: 'cool', shadow: [0, 0, 3], mid: [2, 4, 7], highlight: [6, 7, 7] },
+  { family: 'cool', shadow: [0, 0, 1], mid: [2, 4, 6], highlight: [6, 7, 7] },
   // Foliage: grass, leaves, moss.
-  { family: 'foliage', shadow: [0, 2, 1], mid: [2, 6, 2], highlight: [7, 7, 3] },
+  { family: 'foliage', shadow: [0, 1, 0], mid: [3, 6, 3], highlight: [7, 7, 6] },
 ];
 
 function clamp3(v: number): number {

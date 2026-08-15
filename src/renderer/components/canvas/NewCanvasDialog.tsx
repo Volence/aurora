@@ -20,7 +20,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { T } from '../ui';
 import {
-  createCanvasDocument, validateNewCanvas, type NewCanvasField,
+  createCanvasDocument, validateNewCanvas, NEW_CANVAS_DEFAULTS, type NewCanvasField,
 } from '../../shell/new-canvas';
 import { listCanvasNames } from '../../state/canvas-file';
 import { openProjectDir } from '../../state/open-project';
@@ -30,19 +30,14 @@ import {
   CONSTRAINT_PROFILE_IDS, constraintProfile, type ConstraintProfileId,
 } from '../../../core/art/canvas-profiles';
 
-/** Spec §4.2's default target — the profile most canvases in a Sonic project are
- *  drawn for, and the one whose grids (8/16/256) match the tile/block/chunk
- *  ladder the rest of the app speaks. */
-const DEFAULT_PROFILE: ConstraintProfileId = 'genesis-level-art';
-/** Two chunks square: big enough to draw a real piece of scenery, small enough
- *  that undo snapshots stay cheap (canvas-doc.ts's MAX_SIDE comment). */
-const DEFAULT_SIDE = 128;
-
 export default function NewCanvasDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  // The two values contract 2 names by number live in new-canvas.ts, with the
+  // rest of the rules, and are asserted valid there. As constants in this file
+  // they were the only rules the suite could not reach.
   const [name, setName] = useState('');
-  const [width, setWidth] = useState(DEFAULT_SIDE);
-  const [height, setHeight] = useState(DEFAULT_SIDE);
-  const [profileId, setProfileId] = useState<ConstraintProfileId>(DEFAULT_PROFILE);
+  const [width, setWidth] = useState(NEW_CANVAS_DEFAULTS.width);
+  const [height, setHeight] = useState(NEW_CANVAS_DEFAULTS.height);
+  const [profileId, setProfileId] = useState<ConstraintProfileId>(NEW_CANVAS_DEFAULTS.profileId);
   const [existing, setExisting] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   // Nothing is red until the user has typed or tried: an empty form that opens
@@ -52,7 +47,10 @@ export default function NewCanvasDialog({ open, onClose }: { open: boolean; onCl
 
   useEffect(() => {
     if (!open) return;
-    setName(''); setWidth(DEFAULT_SIDE); setHeight(DEFAULT_SIDE); setProfileId(DEFAULT_PROFILE);
+    setName('');
+    setWidth(NEW_CANVAS_DEFAULTS.width);
+    setHeight(NEW_CANVAS_DEFAULTS.height);
+    setProfileId(NEW_CANVAS_DEFAULTS.profileId);
     setTouched(false); setFailure(null); setBusy(false);
     const dir = openProjectDir();
     if (dir === null) { setExisting([]); return; }

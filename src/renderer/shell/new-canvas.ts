@@ -38,7 +38,9 @@ import {
   defaultCanvasPalette, mostVisiblePaintIndex, paletteHasVisibleColour,
 } from '../../core/art/canvas-default-palette';
 import { canvasNameIsSafe, canvasPngPath, canvasSidecarPath, listCanvasNames } from '../state/canvas-file';
-import { useCanvasStore, openCanvasDoc, closeCanvasDoc } from '../state/canvasStore';
+import {
+  useCanvasStore, openCanvasDoc, closeCanvasDoc, activateCanvasDoc, clearCanvasFocus,
+} from '../state/canvasStore';
 import { saveCanvasDocument } from '../state/canvas-save';
 import { useClassicLevelStore } from '../state/classicLevelStore';
 import { openProjectDir } from '../state/open-project';
@@ -51,6 +53,33 @@ export interface NewCanvasInput {
   height: number;
   profileId: ConstraintProfileId;
 }
+
+/**
+ * What the New Canvas dialog opens on (contract 2's two named values).
+ *
+ * HERE RATHER THAN IN THE DIALOG because they are rules, not presentation, and
+ * the file that displays them is the one file the node suite cannot reach. As
+ * module constants in the .tsx they were referenced by no test at all: an edit
+ * pushing the default side past `CANVAS_MAX_SIDE` — or naming a profile id that
+ * no longer exists — would ship a dialog that opens already-invalid, with the
+ * whole suite green. The test asserts `validateNewCanvas(NEW_CANVAS_DEFAULTS,
+ * [])` is ok, which is the one thing a default has to be.
+ *
+ * 128x128 is two chunks square: big enough for a real piece of scenery, small
+ * enough that undo snapshots stay cheap (canvas-doc.ts's MAX_SIDE comment).
+ * `genesis-level-art` is spec §4.2's default target and the profile whose grids
+ * (8/16/256) match the tile/block/chunk ladder the rest of the app speaks.
+ *
+ * THERE IS NO DEFAULT NAME, and that is why this is a partial input rather than
+ * a whole one: the name field opens empty on purpose (Create starts disabled
+ * until the artist types one), so a default here would be a name nobody chose
+ * landing on disk. The test supplies one and asserts the rest is valid.
+ */
+export const NEW_CANVAS_DEFAULTS: Omit<NewCanvasInput, 'name'> = {
+  width: 128,
+  height: 128,
+  profileId: 'genesis-level-art',
+};
 
 /** Which field a refusal is about, so the dialog can point at it. */
 export type NewCanvasField = 'name' | 'width' | 'height';
@@ -162,6 +191,53 @@ export type CreateCanvasResult =
   | { ok: false; field: NewCanvasField | null; reason: string };
 
 /**
+ * Refuse, LEAVING THE CANVAS FOCUS EXACTLY AS IT WAS FOUND.
+ *
+ * The bug this exists for: `openCanvasDoc` focuses the document it opens (or,
+ * on a name collision, the one already open), and `closeCanvasDoc` clears the
+ * focus when it drops that document. So a create that failed at the write, or
+ * was refused for a name already open, left `activeDocId` pointing at null or
+ * at some other canvas — while the ACTIVE TAB was still whatever canvas the
+ * artist had on screen. `canvasPaneState` compares the two, disagrees, and
+ * renders `CanvasDocUnloaded`: "this canvas could not be loaded" over a document
+ * that is open, intact and possibly mid-stroke. A false data-loss signal, raised
+ * by a dialog the user has not even dismissed yet.
+ *
+ * The invariant, stated once: A CREATE THAT DOES NOT SUCCEED CHANGES NO FOCUS.
+ * It is the same rule tab-activation.ts already states for the load path — "a
+ * failed load that is NOT taking focus must leave the visible document alone" —
+ * and a create rollback is exactly that. Routing EVERY failure return through
+ * here (including the ones that run before any store is touched, where it is a
+ * no-op) means a future early return inherits the rule instead of reopening the
+ * bug.
+ *
+ * WHY NOT THE ROOT FIX — writing the files before touching the store at all,
+ * which would make the rollback unnecessary. It requires `saveCanvasFile` to be
+ * called directly from here, because `saveCanvasDocument` reads its document out
+ * of the store. Task 9's review ruled specifically against a second
+ * `saveCanvasFile` call site: this one would bypass canvas-save.ts's conflict,
+ * partial-write and channel-error messages, each of which carries its own
+ * recovery instruction, and would restate the baseline-folding rule those
+ * failures depend on. Reshaping canvas-save.ts to take a document instead is the
+ * real version of that fix, and it is a change to the save layer at the end of a
+ * fourteen-task branch, immediately before CDP verification. It also would not
+ * remove the second route on its own — the already-open refusal is
+ * `openCanvasDoc`'s focus side effect, which happens before any write in either
+ * design. One mechanism covering both routes is the better trade here; the
+ * store-last ordering is worth revisiting in 2B alongside the tab-activation
+ * split.
+ */
+function refuse(
+  previousFocus: string | null,
+  field: NewCanvasField | null,
+  reason: string,
+): CreateCanvasResult {
+  if (previousFocus === null) clearCanvasFocus();
+  else activateCanvasDoc(previousFocus);
+  return { ok: false, field, reason };
+}
+
+/**
  * Create a canvas: validate, seed the palette, WRITE BOTH FILES, then open the
  * tab and check the document out.
  *
@@ -173,21 +249,28 @@ export type CreateCanvasResult =
  * dialog), and it is what `saveableDirtyCanvasDocIds` and
  * `confirmCloseCanvasDoc` were both written expecting.
  *
- * A FAILED WRITE LEAVES NOTHING BEHIND. The document is closed again and no tab
- * is opened, so a create that could not reach disk cannot leave a tab whose
- * every later save fails for the same reason.
+ * A FAILED WRITE LEAVES NOTHING BEHIND — no document, no undo stack, no tab, and
+ * NO CHANGE OF FOCUS (see `refuse`). The last of those is the easiest to lose
+ * and the loudest when lost: it makes an unrelated canvas tab render "could not
+ * be loaded" over work that is fine.
  *
  * It goes through `saveCanvasDocument` rather than calling `saveCanvasFile`
  * directly — canvas-save.ts's header asks for exactly that, so the mtime
  * baselines, the sidecar-rejected rule and the failure messages have one home.
  */
 export async function createCanvasDocument(input: NewCanvasInput): Promise<CreateCanvasResult> {
+  // Captured BEFORE anything can move it, and restored by every failure path
+  // (see `refuse`). Read once here rather than inside `refuse` for the obvious
+  // reason: by the time a refusal runs, the value has already been overwritten
+  // by the thing being rolled back.
+  const previousFocus = useCanvasStore.getState().activeDocId;
+
   const dir = openProjectDir();
   if (dir === null) {
     // The files land under `<project>/.aurora/canvas/`, so with no project there
     // is no directory to put them in. The command is gated on this too; this is
     // the guard for the race (a project closing while the dialog is open).
-    return { ok: false, field: null, reason: 'No project is open, so there is nowhere to put the canvas.' };
+    return refuse(previousFocus, null, 'No project is open, so there is nowhere to put the canvas.');
   }
 
   // A FRESH listing, not the one the dialog opened with: the dialog can sit on
@@ -197,14 +280,12 @@ export async function createCanvasDocument(input: NewCanvasInput): Promise<Creat
   try {
     existing = (await listCanvasNames(dir)).names;
   } catch (e) {
-    return {
-      ok: false, field: null,
-      reason: `Could not read ${dir}/.aurora/canvas: ${e instanceof Error ? e.message : String(e)}`,
-    };
+    return refuse(previousFocus, null,
+      `Could not read ${dir}/.aurora/canvas: ${e instanceof Error ? e.message : String(e)}`);
   }
 
   const valid = validateNewCanvas(input, existing);
-  if (!valid.ok) return { ok: false, field: valid.field, reason: valid.reason };
+  if (!valid.ok) return refuse(previousFocus, valid.field, valid.reason);
 
   const name = input.name.trim();
   const tab = canvasDocTab(name);
@@ -217,10 +298,11 @@ export async function createCanvasDocument(input: NewCanvasInput): Promise<Creat
   // the exact case that return value was added for.
   if (openCanvasDoc(tab.id, { name, width: input.width, height: input.height, profileId: input.profileId, palette })
       === 'focused') {
-    return {
-      ok: false, field: 'name',
-      reason: `A canvas named "${name}" is already open in a tab. Close it first, or pick another name.`,
-    };
+    // `refuse` also undoes the focus this very call just handed to the colliding
+    // document — a pure validation refusal must not move the artist's view onto
+    // a canvas that isn't even the active tab.
+    return refuse(previousFocus, 'name',
+      `A canvas named "${name}" is already open in a tab. Close it first, or pick another name.`);
   }
 
   useCanvasStore.getState().setSource(tab.id, {
@@ -239,7 +321,10 @@ export async function createCanvasDocument(input: NewCanvasInput): Promise<Creat
     await saveCanvasDocument(tab.id);
   } catch (e) {
     closeCanvasDoc(tab.id); // no document, no undo stack, no tab
-    return { ok: false, field: null, reason: e instanceof Error ? e.message : String(e) };
+    // …and no focus change either: closeCanvasDoc clears activeDocId, which
+    // would otherwise leave whichever canvas tab is actually on screen rendering
+    // "could not be loaded" over live, possibly dirty work.
+    return refuse(previousFocus, null, e instanceof Error ? e.message : String(e));
   }
 
   // Arm the brush on a colour that can actually be SEEN in this canvas's

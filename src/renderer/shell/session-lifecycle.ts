@@ -34,7 +34,8 @@ import { useProjectStore } from '../state/projectStore';
 import { useWorkspaceStore } from '../workspace/workspaceStore';
 import { resetProjectRuntime } from '../state/project-runtime';
 import { loadStoredSession, saveStoredSession, loadStoredWorkspace, defaultProjectSession } from './session-storage';
-import { classicLevelTab, aeonLevelTab, parseSpriteDocTabId, isCanvasDocTabId, PROJECT_SETUP_TAB } from './tabs';
+import { classicLevelTab, aeonLevelTab, parseSpriteDocTabId, parseCanvasDocTabId, PROJECT_SETUP_TAB } from './tabs';
+import { canvasNameIsSafe } from '../state/canvas-file';
 import { activateLevelTarget, activateSpriteDocTarget, activateRestoredCanvasDocTarget } from './tab-activation';
 import type { TabDescriptor } from '../../core/shell/session';
 
@@ -86,7 +87,17 @@ export function restoredTabIsValid(
   // since a level is two clicks away in the Explorer. The deleted-file case is
   // handled by reporting in the PANE rather than in a boot toast (see
   // activateRestoredCanvasDocTarget).
-  if (isCanvasDocTabId(id)) return ctx.classicOpen || ctx.aeonOpen;
+  //
+  // The NAME is checked as well as the shape, which keeps this branch as tight
+  // as its sprite sibling. `parseCanvasDocTabId` accepts any suffix, so a
+  // hand-edited or corrupt stored session could otherwise restore a tab that can
+  // never open — `loadCanvasFile` refuses the name outright — and the restore
+  // path deliberately suppresses that failure, so it would fail SILENTLY, every
+  // boot, on a tab that looks perfectly ordinary. (Not a traversal hole: the
+  // path guard in canvas-file.ts is what stops that, and it still would. This is
+  // about not restoring junk.)
+  const canvas = parseCanvasDocTabId(id);
+  if (canvas) return (ctx.classicOpen || ctx.aeonOpen) && canvasNameIsSafe(canvas.name);
   const sd = parseSpriteDocTabId(id);
   return sd !== null && ((sd.engine === 'aeon' && ctx.aeonOpen) || (sd.engine === 's1' && ctx.classicOpen));
 }
@@ -165,7 +176,7 @@ export function useSessionLifecycle(): void {
     // branches do: the others load on their first focus. That also keeps
     // reportCanvasWarnings' stated ceiling of "3 toasts per load" true — N
     // canvases loaded at once would have made it 3N.
-    else if (isCanvasDocTabId(next.activeId)) void activateRestoredCanvasDocTarget(next.activeId);
+    else if (parseCanvasDocTabId(next.activeId)) void activateRestoredCanvasDocTarget(next.activeId);
     // skipViewSnapshot: this is a restore, not a user switch — the "outgoing" act
     // is the loader default with viewStore at its fresh default, so snapshotting
     // would clobber that act's just-seeded viewport. The restore branch still

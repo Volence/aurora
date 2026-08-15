@@ -105,9 +105,14 @@ export default function Explorer({ onOpenProject, onOpenRecent, onNewCanvas }: E
   // opens the tab only AFTER both files have landed, so a re-list keyed on the
   // tabs cannot race the write. Keying it on the canvas store instead (docs.size
   // changes at create time) would fire while the write was still in flight and
-  // list the project without its newest canvas. The cost is one listDir per tab
-  // open/close, which is cheap and self-correcting; it also picks up canvases
-  // another window or the artist's file manager added.
+  // list the project without its newest canvas.
+  //
+  // NOTHING WATCHES THE DIRECTORY. A canvas added or deleted outside Aurora is
+  // picked up only OPPORTUNISTICALLY — whenever some tab happens to open or
+  // close — so "deleted the PNG in a file manager, alt-tabbed back" leaves a
+  // stale row until then. That degrades correctly rather than silently: clicking
+  // it runs the ordinary load, which fails and lands on CanvasDocUnloaded with
+  // the path and a Retry. A watcher is the real answer if this ever matters.
   const tabs = useSessionStore((s) => s.tabs);
   const [canvases, setCanvases] = useState<CanvasListing>(EMPTY_CANVASES);
   useEffect(() => {

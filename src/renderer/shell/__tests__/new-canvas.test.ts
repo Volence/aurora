@@ -12,22 +12,22 @@
 //     refusal that does not explain itself is one the user cannot act on.
 //   • THE ZONE-PALETTE FLATTENING, line-major. Getting the order wrong does not
 //     throw — it silently transposes the artist's colours.
-//   • R18's VISIBLE DEFAULT. `blankCanvasPalette()` is 64 black words and the
-//     store's default paint index is black in it, so a canvas created outside a
-//     zone used to be an invisible brush on an invisible surface.
+//   • R18's VISIBLE DEFAULT reaching the create path. The palette itself, and
+//     the paint-index rule, are tested beside their module in
+//     src/core/art/__tests__/canvas-default-palette.test.ts.
+//   • THE DIALOG'S DEFAULTS. They are values contract 2 names by number, so they
+//     are constants here rather than in the .tsx, where nothing could reach them.
 
 import { describe, it, expect } from 'vitest';
 import {
-  validateNewCanvas, flattenZonePalette, newCanvasPalette,
+  validateNewCanvas, flattenZonePalette, newCanvasPalette, NEW_CANVAS_DEFAULTS,
 } from '../new-canvas';
-import {
-  defaultCanvasPalette, mostVisiblePaintIndex, paletteHasVisibleColour, paletteLuminance,
-} from '../../../core/art/canvas-default-palette';
+import { paletteHasVisibleColour } from '../../../core/art/canvas-default-palette';
 import {
   CANVAS_COLORS, CANVAS_LINE_LENGTH, CANVAS_MIN_SIDE, CANVAS_MAX_SIDE,
-  blankCanvasPalette, canvasIndex, paletteEntryOf,
+  blankCanvasPalette, canvasIndex,
 } from '../../../core/art/canvas-doc';
-import { encodeGenesisColor, decodeGenesisColor } from '../../../core/formats/palette';
+import { encodeGenesisColor } from '../../../core/formats/palette';
 
 const OK = { name: 'cliffs', width: 128, height: 128, profileId: 'genesis-level-art' as const };
 
@@ -186,92 +186,26 @@ describe('newCanvasPalette', () => {
   });
 });
 
-describe('defaultCanvasPalette (R18\'s visible ramp)', () => {
-  const p = defaultCanvasPalette();
-
-  it('is 64 words with entry 0 of every line left transparent', () => {
-    expect(p).toHaveLength(CANVAS_COLORS);
-    for (let line = 0; line < 4; line++) expect(p[line * CANVAS_LINE_LENGTH]).toBe(0);
+describe('NEW_CANVAS_DEFAULTS', () => {
+  it('is a VALID input — the dialog cannot open already-invalid', () => {
+    // These are the two values contract 2 names by number, and as constants in
+    // NewCanvasDialog.tsx nothing could reach them: an edit pushing the default
+    // side past CANVAS_MAX_SIDE would ship a dialog whose Create button is
+    // disabled the moment it opens, with a red message the user did not cause —
+    // and the whole suite green.
+    expect(validateNewCanvas({ name: 'placeholder', ...NEW_CANVAS_DEFAULTS }, [])).toEqual({ ok: true });
+    // The PROFILE is not part of that check — validateNewCanvas does not judge
+    // it, and `constraintProfile` folds an unknown id to 'none' rather than
+    // failing — so a typo'd default would silently open every new canvas
+    // unconstrained. The literal assertion below is what catches that.
   });
 
-  it('every word is already a CANONICAL CRAM word', () => {
-    // encodeGenesisColor(decodeGenesisColor(w)) === w is what the PNG writer
-    // uses to detect that another tool recoloured the file behind Aurora's
-    // back; a default palette that failed it would report a stale sidecar on
-    // the very first save.
-    for (const w of p) expect(encodeGenesisColor(decodeGenesisColor(w))).toBe(w);
+  it('is the size and profile the contract asks for', () => {
+    expect([NEW_CANVAS_DEFAULTS.width, NEW_CANVAS_DEFAULTS.height]).toEqual([128, 128]);
+    expect(NEW_CANVAS_DEFAULTS.profileId).toBe('genesis-level-art');
   });
 
-  it('gives EVERY line a usable ramp, dark to light', () => {
-    // Not decoration: the dialog defaults to `genesis-level-art`, whose
-    // cellPaletteRule says one 8x8 cell draws from ONE line. A default laid out
-    // as assorted hues per line would make the first thing anyone draws illegal
-    // under the profile the dialog itself chose.
-    for (let line = 0; line < 4; line++) {
-      const lums = [];
-      for (let entry = 1; entry < CANVAS_LINE_LENGTH; entry++) {
-        lums.push(paletteLuminance(p[line * CANVAS_LINE_LENGTH + entry]));
-      }
-      // monotonic (non-decreasing — 3-bit channels cannot give 15 distinct steps)
-      for (let i = 1; i < lums.length; i++) expect(lums[i], `line ${line} entry ${i + 1}`).toBeGreaterThanOrEqual(lums[i - 1]);
-      // and it actually SPANS: a "ramp" of one repeated tone is no better than black
-      expect(lums[lums.length - 1] - lums[0], `line ${line} span`).toBeGreaterThan(100);
-      expect(new Set(p.slice(line * 16 + 1, line * 16 + 16)).size, `line ${line} distinct`).toBeGreaterThanOrEqual(8);
-    }
-  });
-
-  it('the four lines are actually different colours, not four greyscales', () => {
-    const midOf = (line: number) => p[line * CANVAS_LINE_LENGTH + 8];
-    expect(new Set([midOf(0), midOf(1), midOf(2), midOf(3)]).size).toBe(4);
-  });
-});
-
-describe('mostVisiblePaintIndex', () => {
-  it('arms a VISIBLE colour on the default ramp — line 0\'s white', () => {
-    const p = defaultCanvasPalette();
-    const i = mostVisiblePaintIndex(p);
-    expect(paletteLuminance(p[i])).toBeGreaterThan(200);
-    expect(i).toBe(canvasIndex(0, CANVAS_LINE_LENGTH - 1));
-  });
-
-  it('never arms an entry-0 index (that is the ERASER)', () => {
-    // The other half of the same bug: a brush on entry 0 paints transparency,
-    // so the first stroke does nothing visible even with a good palette.
-    const p = blankCanvasPalette();
-    p[0] = 0x0eee;   // a white TRANSPARENT slot — bright, and never drawn
-    p[canvasIndex(1, 3)] = 0x000e;
-    expect(paletteEntryOf(mostVisiblePaintIndex(p))).not.toBe(0);
-    expect(mostVisiblePaintIndex(p)).toBe(canvasIndex(1, 3));
-  });
-
-  it('skips a black entry 1 in a ZONE palette rather than arming it', () => {
-    // Common in practice: a zone's line 0 usually opens on its darkest shades,
-    // so the store's constant default (entry 1) is black there too. A rule
-    // about the palette in hand is what makes the zone path safe as well.
-    const p = blankCanvasPalette();
-    p[canvasIndex(0, 1)] = 0;          // black
-    p[canvasIndex(0, 9)] = 0x0eee;     // white
-    expect(mostVisiblePaintIndex(p)).toBe(canvasIndex(0, 9));
-  });
-
-  it('is total: an all-black palette falls back to the store\'s own default', () => {
-    expect(mostVisiblePaintIndex(blankCanvasPalette())).toBe(canvasIndex(0, 1));
-    expect(mostVisiblePaintIndex([])).toBe(canvasIndex(0, 1));
-  });
-});
-
-describe('paletteHasVisibleColour', () => {
-  it('is false for all-black and for a palette whose ONLY colour is in an entry 0', () => {
-    expect(paletteHasVisibleColour(blankCanvasPalette())).toBe(false);
-    const p = blankCanvasPalette();
-    p[canvasIndex(2, 0)] = 0x0eee;  // canvasIndex folds entry 0 to index 0
-    p[0] = 0x0eee;
-    expect(paletteHasVisibleColour(p)).toBe(false);
-  });
-
-  it('is true as soon as one paintable entry is not black', () => {
-    const p = blankCanvasPalette();
-    p[canvasIndex(3, 15)] = 0x0002;
-    expect(paletteHasVisibleColour(p)).toBe(true);
+  it('carries NO default name, so nothing lands on disk under a name nobody chose', () => {
+    expect('name' in NEW_CANVAS_DEFAULTS).toBe(false);
   });
 });
