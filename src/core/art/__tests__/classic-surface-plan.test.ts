@@ -306,6 +306,69 @@ describe('planSurfaceEdit — block divergence', () => {
   });
 });
 
+describe('planSurfaceEdit — object-reserved tiles', () => {
+  /** Make tile 1 linked by pointing block 1's first cell at it too. */
+  function docWithSharedTile1(): LevelDoc {
+    const doc = makeDoc();
+    doc.blocks[1] = { cells: [cell(1), cell(6), cell(7), cell(8)] };
+    return doc;
+  }
+
+  it('skips a reserved, zero-usage slot and claims the next one instead', () => {
+    const doc = docWithSharedTile1();
+    const { provenance } = buildChunkSurface(doc, 0);
+    // With tile 1 shared, block 1's own tile 5 goes unused (cells=0) and is
+    // findFreeSlot's normal first pick (tiles 6/7/8 stay used once by block
+    // 1; 9..15 were already unused). Reserve 5 so the claim must skip it.
+    const r = planSurfaceEdit({
+      doc, provenance, index: buildUsageIndex(doc), mode: 'isolate',
+      isEditableTile: allEditable, writes: [{ x: 0, y: 0, value: 9 }],
+      reservedTiles: new Set([5]),
+    });
+
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.plan.stats.tilesClaimed).toBe(1);
+    const claimedTile = r.plan.tileWrites[0].tileIndex;
+    expect(claimedTile).not.toBe(5);
+    expect(claimedTile).toBe(9);
+  });
+
+  it('diverges a reserved tile that is used exactly once, rather than writing it in place', () => {
+    const doc = makeDoc();  // tile 1 is used exactly once (block 0's first cell)
+    const { provenance } = buildChunkSurface(doc, 0);
+    const r = planSurfaceEdit({
+      doc, provenance, index: buildUsageIndex(doc), mode: 'isolate',
+      isEditableTile: allEditable, writes: [{ x: 0, y: 0, value: 9 }],
+      reservedTiles: new Set([1]),
+    });
+
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    // Not written in place: tile 1 itself must not appear in tileWrites.
+    expect(r.plan.tileWrites.map((w) => w.tileIndex)).not.toContain(1);
+    expect(r.plan.stats.tilesClaimed).toBe(1);
+    expect(r.plan.blockCellEdits).toHaveLength(1);
+    expect(r.plan.blockCellEdits[0].cell.tile).not.toBe(1);
+  });
+
+  // NEGATIVE CONTROL: the same fixture as the first test above, but with
+  // reservedTiles omitted, DOES claim the "reserved" slot — proving the skip
+  // above is caused by reservedTiles, not some incidental property of slot 5.
+  it('negative control: without reservedTiles, the same fixture claims slot 5', () => {
+    const doc = docWithSharedTile1();
+    const { provenance } = buildChunkSurface(doc, 0);
+    const r = planSurfaceEdit({
+      doc, provenance, index: buildUsageIndex(doc), mode: 'isolate',
+      isEditableTile: allEditable, writes: [{ x: 0, y: 0, value: 9 }],
+    });
+
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.plan.tileWrites[0].tileIndex).toBe(5);
+  });
+});
+
 describe('planSurfaceEdit — link mode', () => {
   it('mutates in place and reports every chunk that will change', () => {
     const doc = makeDoc();              // block 1 lives in chunks 0 and 1

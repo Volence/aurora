@@ -47,6 +47,16 @@ export interface PlanInput {
   writes: SurfaceWrite[];
   /** Shares core/project/editable-tiles' predicate — do NOT restate the rule. */
   isEditableTile: (tileIndex: number) => boolean;
+  /**
+   * Level-pool tiles an object sprite draws through mappings rather than
+   * blocks (see s1-levelart-reservations.ts) — invisible to `index` because
+   * `buildUsageIndex` only walks blocks/chunks. NOT a lock: a reserved tile
+   * stays editable in place (painting object art is a feature). It is a
+   * third, additive rule enforced here: never claim one as a free slot, and
+   * always diverge away from one instead of writing it in place. Defaults to
+   * empty (permissive), matching the `editableTileRange` null convention.
+   */
+  reservedTiles?: ReadonlySet<number>;
 }
 
 const TILE_BYTES = 32;
@@ -80,17 +90,22 @@ function findContentMatch(doc: LevelDoc, want: Uint8Array, excluded: Set<number>
 }
 
 /**
- * A pool slot that is BOTH unreferenced and writable. "Free" is not the same as
- * "claimable" — tileLockReason marks tiles the save path would refuse, and
- * claiming one would produce an edit that can never be saved.
+ * A pool slot that is unreferenced, writable, and not object-reserved.
+ * "Free" is not the same as "claimable" — tileLockReason marks tiles the save
+ * path would refuse, and claiming one would produce an edit that can never be
+ * saved; `reservedTiles` marks tiles an object sprite draws through mappings,
+ * invisible to `index` but never eligible to become someone else's divergent
+ * copy (see PlanInput.reservedTiles).
  */
 function findFreeSlot(
-  doc: LevelDoc, index: UsageIndex, isEditableTile: (t: number) => boolean, taken: Set<number>,
+  doc: LevelDoc, index: UsageIndex, isEditableTile: (t: number) => boolean,
+  reserved: ReadonlySet<number>, taken: Set<number>,
 ): number | null {
   const count = Math.floor(doc.tiles.length / TILE_BYTES);
   for (let t = 1; t < count; t++) {   // 0 is the transparent tile — never claim it
     if (taken.has(t)) continue;
     if (index.tileUsage(t).cells !== 0) continue;
+    if (reserved.has(t)) continue;
     if (!isEditableTile(t)) continue;
     return t;
   }
@@ -119,7 +134,8 @@ function chunksTouchedByTile(index: UsageIndex, tileIndex: number): Set<number> 
 }
 
 export function planSurfaceEdit(input: PlanInput): PlanResult {
-  const { doc, provenance, index, mode, writes, isEditableTile } = input;
+  const { doc, provenance, index, mode, writes, isEditableTile, reservedTiles } = input;
+  const reserved = reservedTiles ?? new Set<number>();
 
   // 1 · Group writes by the surface CELL they land in, in tile coordinates.
   const perCell = new Map<number, { tileIndex: number; px: { tx: number; ty: number; v: number }[] }>();
@@ -178,8 +194,12 @@ export function planSurfaceEdit(input: PlanInput): PlanResult {
     const changedBytes = tileBytesIfChanged(original, buf);
     if (changedBytes === null) continue; // repainted with the value already there
 
-    // 3 · Both questions, independently.
-    const tileLinked = index.tileUsage(e.tileIndex).cells > 1;
+    // 3 · Both questions, independently. `reserved` extends tileLinked (not a
+    // new question) so an object-reserved tile diverges away instead of being
+    // repainted in place — Link mode is deliberately exempt (see PaintMode /
+    // the mode === 'link' branch above): edit-everywhere legitimately includes
+    // the object sprite, which is what link mode means.
+    const tileLinked = index.tileUsage(e.tileIndex).cells > 1 || reserved.has(e.tileIndex);
     const blockLinked = c.chunkCellIndex !== null && index.blockUsage(c.blockId).cells > 1;
 
     if (!tileLinked && !blockLinked) {
@@ -233,11 +253,15 @@ export function planSurfaceEdit(input: PlanInput): PlanResult {
     const wantBytes = changedBytes;
     let targetTile = e.tileIndex;
 
+    // findContentMatch may still repoint TO a reserved tile: byte-identical
+    // content corrupts nothing (the object sprite still reads the same
+    // bytes) and conserves an already-scarce slot, so it is deliberately not
+    // filtered by `reserved` here — only findFreeSlot (a NEW claim) is.
     const match = findContentMatch(doc, wantBytes, claimed);
     if (match !== null) {
       targetTile = match;
     } else {
-      const slot = findFreeSlot(doc, index, isEditableTile, claimed);
+      const slot = findFreeSlot(doc, index, isEditableTile, reserved, claimed);
       if (slot === null) {
         return {
           ok: false,
