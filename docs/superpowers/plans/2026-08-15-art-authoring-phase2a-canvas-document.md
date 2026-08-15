@@ -2776,7 +2776,8 @@ The node suite renders no React and no canvas, so **nothing above is evidence th
 | 6 | Close the tab, reopen the canvas | The pixels and palette come back exactly |
 | 7 | Open a second canvas, edit it, switch back and forth | Each tab keeps its own pixels; each dots independently |
 | 8 | With a canvas tab active, press Ctrl+Z after editing a LEVEL | The level does **not** undo — the keyboard handoff (Task 8) holds in the real app |
-| 9 | Edit a canvas, then switch projects | No stale document survives; no write lands in the old project |
+| 9 | Edit a canvas, then switch projects | A confirm is raised (R16) — proceeding drops the documents, cancelling keeps them; no write lands in the old project |
+| 10 | Force a sidecar rejection (hand-edit the JSON to be invalid), reopen, edit, save | The toast is **legible**: it wraps, stays long enough to read, and the recovery instruction is not clipped. This is the one Task 10 change that could not be falsified in the node suite — there is no DOM there, so the tests assert the CSS is what we intended, not that the message renders readably. Read it on screen at a normal window width. |
 
 - [ ] **Step 3: Reintroduce one original bug and watch the app fail.** The strongest verification available (phase 1's lesson): revert the `levelKeysEnabled` canvas branch, rebuild, confirm row 8 now fails, revert back and confirm it passes again. Record both observations.
 
