@@ -168,3 +168,20 @@ export const COMPOSER_BADGE_TEXT = '#FFFFFF';
 /** Swatch-0 (transparent) checker squares in the color row. */
 export const COMPOSER_SWATCH_A = '#333333';
 export const COMPOSER_SWATCH_B = '#222222';
+
+// --- Constraint clash tint (2B) ---------------------------------------------
+//
+// GrafX2's red-tinted clash cells are the precedent (spec §4.3). A fill alone
+// disappears at zoom 1, where an 8px cell is 8 screen pixels, and swamps the art
+// at zoom 32 — so every clash draws a low-alpha FILL plus a solid 1px OUTLINE:
+// the fill carries at high zoom, the outline carries at low.
+
+/** A cell drawing from more than one palette line. Fixed by REDRAWING. */
+export const CANVAS_CLASH_FILL = 'rgba(255, 64, 64, 0.28)';
+export const CANVAS_CLASH_EDGE = 'rgba(255, 96, 96, 0.9)';
+/** A cell drawing from a line this profile does not have. Fixed by
+ *  RE-ASSIGNING, which is a different repair, so it does not get the same
+ *  colour — an artist who cannot tell the two apart has to inspect every tinted
+ *  cell to find out which fix it wants. */
+export const CANVAS_RANGE_FILL = 'rgba(255, 176, 32, 0.26)';
+export const CANVAS_RANGE_EDGE = 'rgba(255, 196, 64, 0.9)';

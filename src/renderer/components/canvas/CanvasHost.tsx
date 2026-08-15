@@ -8,6 +8,10 @@ import { decodeGenesisColor } from '../../../core/formats/palette';
 import type { Color } from '../../../core/model/s4-types';
 import type { PixelHudHandle } from '../art-shared/PixelHud';
 import { planCanvasGrids, offeredGrids, CANVAS_GRID_STROKE } from './canvas-pane-model';
+import { useCanvasConstraints, planClashOverlay } from './use-canvas-constraints';
+import {
+  CANVAS_CLASH_FILL, CANVAS_CLASH_EDGE, CANVAS_RANGE_FILL, CANVAS_RANGE_EDGE,
+} from '../../canvas/canvas-colors';
 
 /**
  * Canvas host for the shared PixelViewport + PixelEditController — the canvas
@@ -87,6 +91,28 @@ export default function CanvasHost({ docId, hudRef, canvasRef }: {
     }
   }, [doc, grids]);
 
+  // THE CLASH TINT, and it goes through `drawOverlay` rather than
+  // `drawUnderlay`. An underlay draws below the art, which is invisible exactly
+  // where clashes live — in the pixels the artist has drawn. What gets drawn is
+  // decided by `planClashOverlay`, a pure function a test can execute; only the
+  // ctx calls are here.
+  const showClashOverlay = useCanvasStore((s) => s.showClashOverlay);
+  const report = useCanvasConstraints(docId);
+  const clashRects = useMemo(
+    () => planClashOverlay(report?.clashes ?? [], showClashOverlay),
+    [report, showClashOverlay],
+  );
+  const drawClashes = React.useCallback((ctx: CanvasRenderingContext2D, z: number) => {
+    for (const r of clashRects) {
+      const multi = r.kind === 'multi-line';
+      ctx.fillStyle = multi ? CANVAS_CLASH_FILL : CANVAS_RANGE_FILL;
+      ctx.fillRect(r.x * z, r.y * z, r.w * z, r.h * z);
+      ctx.strokeStyle = multi ? CANVAS_CLASH_EDGE : CANVAS_RANGE_EDGE;
+      ctx.lineWidth = 1;
+      ctx.strokeRect(r.x * z + 0.5, r.y * z + 0.5, r.w * z - 1, r.h * z - 1);
+    }
+  }, [clashRects]);
+
   // One persistent controller, reconfigured each render with the current tool
   // state — SpriteCanvasHost's arrangement exactly. `toolConfigFrom`'s
   // tile-space coercion is a no-op here: CanvasTool is exactly the eight pixel
@@ -134,6 +160,7 @@ export default function CanvasHost({ docId, hudRef, canvasRef }: {
         ...(grids.blockPx !== undefined ? { blockPx: grids.blockPx } : {}),
       }}
       drawUnderlay={drawUnderlay}
+      drawOverlay={drawClashes}
       onCommit={onCommit}
       // The eyedropper hands back a 0..63 index, which IS the paint colour —
       // no palette-line bookkeeping, unlike every other surface in the app.

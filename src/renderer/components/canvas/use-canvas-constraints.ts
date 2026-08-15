@@ -16,6 +16,7 @@ import { constraintProfile } from '../../../core/art/canvas-profiles';
 import { cachedConstraints } from '../../state/canvas-constraints-cache';
 import type {
   CanvasConstraintReport, UniqueTileCount, CanvasCellClash, CanvasFrameSize,
+  CellClashKind,
 } from '../../../core/art/canvas-constraints';
 
 /**
@@ -150,4 +151,21 @@ export function frameReadout(frame: CanvasFrameSize | null): string {
  */
 export function clashSignal(clashes: readonly CanvasCellClash[]): boolean {
   return clashes.length > 0;
+}
+
+export interface ClashRect { x: number; y: number; w: number; h: number; kind: CellClashKind }
+
+/**
+ * What the overlay draws, in DOCUMENT pixels — the viewport applies the zoom
+ * and the origin translation, so nothing here knows about either.
+ *
+ * A partial cell keeps its real width and height. Rounding it up to 8x8 would
+ * tint pixels outside the canvas at the offset edge; rounding it away would
+ * hide a real clash in the band a non-zero grid origin creates.
+ */
+export function planClashOverlay(
+  clashes: readonly CanvasCellClash[], show: boolean,
+): ClashRect[] {
+  if (!show) return [];
+  return clashes.map((c) => ({ x: c.x, y: c.y, w: c.w, h: c.h, kind: c.kind }));
 }
