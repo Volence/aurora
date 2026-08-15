@@ -3,7 +3,7 @@ import { tabHasDirtyDot, type DirtySnapshot } from '../dirty-tabs';
 
 const base: DirtySnapshot = {
   classicOpen: false, classicRef: null, classicDirty: false,
-  aeonOpen: false, aeonDirty: false, dirtySpriteDocIds: [],
+  aeonOpen: false, aeonDirty: false, dirtySpriteDocIds: [], dirtyCanvasDocIds: [],
 };
 
 describe('tabHasDirtyDot', () => {

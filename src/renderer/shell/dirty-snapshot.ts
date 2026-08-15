@@ -13,6 +13,7 @@ import { useClassicLevelStore } from '../state/classicLevelStore';
 import { useProjectStore } from '../state/projectStore';
 import { useEditorStore } from '../state/editorStore';
 import { useSpriteStore, dirtySpriteDocIds } from '../state/spriteStore';
+import { useCanvasStore, dirtyCanvasDocIds } from '../state/canvasStore';
 import { useHistoryVersion } from '../hooks/useHistoryVersion';
 import type { DirtySnapshot } from './dirty-tabs';
 
@@ -27,6 +28,7 @@ export function currentDirtySnapshot(): DirtySnapshot {
     aeonOpen: useProjectStore.getState().project !== null,
     aeonDirty: useEditorStore.getState().dirty,
     dirtySpriteDocIds: dirtySpriteDocIds(),
+    dirtyCanvasDocIds: dirtyCanvasDocIds(),
   };
 }
 
@@ -48,5 +50,11 @@ export function useDirtySnapshot(): DirtySnapshot {
   useSpriteStore((s) => s.activeDocId);
   useHistoryVersion();
   useSpriteStore((s) => s.s1ArtSource);
+  // One subscription, not three: canvasStore keeps EVERY document (active or
+  // not) in `docs`, and `unsavedEdits` lives inside those entries, so `docs` is
+  // the only reference that changes when a canvas dirties or is saved (every
+  // mutation rebuilds the Map). The sprite store needs three because it hoists
+  // its checked-out document's fields onto the store root.
+  useCanvasStore((s) => s.docs);
   return currentDirtySnapshot();
 }

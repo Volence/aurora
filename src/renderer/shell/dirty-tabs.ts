@@ -20,10 +20,19 @@ export interface DirtySnapshot {
   /** Sprite-doc tab ids with unsaved edits — checked out or parked
    *  (spriteStore.dirtySpriteDocIds). */
   dirtySpriteDocIds: readonly string[];
+  /** Canvas-doc tab ids with unsaved edits, active or background
+   *  (canvasStore.dirtyCanvasDocIds). Deliberately the UNFILTERED list, not
+   *  `saveableDirtyCanvasDocIds`: a dirty canvas with no file target cannot be
+   *  saved by Ctrl+S but still holds real work, and a tab that stops dotting is
+   *  how that work gets thrown away by a close the user thought was safe. */
+  dirtyCanvasDocIds: readonly string[];
 }
 
 export function tabHasDirtyDot(tabId: string, kind: TabKind, s: DirtySnapshot): boolean {
   if (kind === 'sprite-doc') return s.dirtySpriteDocIds.includes(tabId);
+  // 'art-doc' is the canvas tab's kind (tabs.canvasDocTab); it dots its OWN tab
+  // for the same reason a sprite doc does — it is a distinct document.
+  if (kind === 'art-doc') return s.dirtyCanvasDocIds.includes(tabId);
   if (kind !== 'level') return false;
   const ref = parseLevelTabId(tabId);
   if (!ref) return false;
