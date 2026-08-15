@@ -1,0 +1,275 @@
+# In-app art authoring — design
+
+**Status: approved in brainstorming 2026-08-15. Not yet planned.**
+
+Goal: make Aurora a place where Genesis art is *made*, not only *edited* — so that level art and
+sprite art can both be authored without round-tripping through Aseprite.
+
+Two phases, one product story:
+
+- **Phase 1 — paint-through.** Paint pixels directly on a composed block/chunk surface; strokes
+  resolve down the tile→block→chunk reference ladder without silently damaging other places.
+- **Phase 2 — origination.** A free canvas with a configurable constraint profile, plus a
+  resolve-and-commit step that turns a drawing into pool art.
+
+Phase 1 makes existing art pleasant to edit. Phase 2 makes new art possible. Phase 1 first, because
+its unknowns are nastier and Phase 2's commit step lands on top of it.
+
+---
+
+## 1 · Why, and what the evidence says
+
+Full research: `docs/superpowers/research/2026-08-15-how-a-zone-actually-gets-built.md`. The parts
+that drive this design:
+
+- The reasons artists leave for a dedicated tool are, in order: **seeing seams while drawing**,
+  **editing a tile in context rather than in isolation**, and **tile-instance linking** (edit once,
+  every placement updates). Layers rank fourth.
+- Aurora already has more of this than expected. `PixelViewport` has a `repeat` prop doing a 3×3
+  seamless-tiling preview (wired in aeon's composer, absent in classic). Aeon's `ComposerCanvas`
+  already paints across a chunk-scale `PixelBuffer`. Mirror/symmetry exists. Instance linking is
+  *structurally inherent* — S1 blocks reference tiles by id.
+- **Classic is the half that is behind**: `TileTab` edits one 8×8 tile in isolation.
+- **The variant tier is blocks, not chunks** (measured across six zones): chunks have no
+  near-duplicates at all, while block-level variants are everywhere and usually diverge in
+  flip/palette/collision rather than pixels. So divergence tooling belongs at the block tier.
+- **Nobody prevents a constraint violation.** Every tool that solved the per-cell palette rule
+  (GrafX2, Multipaint, NES Screen Tool) flags visually or auto-corrects; none block input.
+
+### Vocabulary decisions
+
+- Say **limit**, not "budget". Across nine surveyed tools "budget" appears in no primary
+  documentation; GB Studio's phrasing is the field's: *"too many unique 8x8px tiles (204 where limit
+  is 192)"*.
+- Say **linked** / **unique**, not "shared" / "forked", in user-facing copy. "Edit one, all
+  placements update" is a feature in Pyxel Edit and a warning in Aurora today; the words should match
+  the framing we want.
+
+---
+
+## 2 · Scope
+
+**In scope:** painting on composed block/chunk surfaces; block-tier divergence; the seam preview in
+classic; the reframed linkage banner; a constraint-profiled origination canvas; a resolver that
+commits a drawing into the tile/block/chunk pool.
+
+**Out of scope, deliberately:**
+
+- **Layers.** Ranked fourth by the evidence and structurally expensive — `PixelBuffer` is
+  single-plane and layers interact with the commit/undo path. Revisit after Phase 2 ships.
+- **Tile-pool growth** (a real `classicAddTile` writing back grown art files). Phase 1 recycles free
+  pool slots instead. See §3.5 for why this matters and where it bites.
+- **Re-resolve / round-trip link** from a canvas to the art it produced, so re-committing updates
+  rather than duplicates. Useful, fiddly, and must not gate v1.
+- **A standalone art tool.** Considered and deferred: the hard 90% (canvas, constraint model,
+  resolver) is identical either way, a tool boundary would cut the draw → resolve → refine loop in
+  half, and keeping the core pure means promoting it later stays cheap. Recorded because
+  `empyrean/docs/STUDIO_VISION.md` never contemplated a from-scratch art tool at all, even though
+  Seraph is exactly that for music — an asymmetry worth naming.
+
+---
+
+## 3 · Phase 1 — paint-through
+
+### 3.1 The composed surface
+
+New pure core module `src/core/art/classic-surface-buffer.ts`:
+
+```
+buildChunkSurface(doc, chunkIndex) -> { buffer: PixelBuffer, provenance: SurfaceProvenance }
+buildBlockSurface(doc, blockId)    -> { buffer: PixelBuffer, provenance: SurfaceProvenance }
+```
+
+`buffer` is the composed image in palette indices. `provenance` is **per 8×8 cell**, not per pixel —
+cheaper and sufficient — recording for each cell: chunk cell index, block id, block cell index, tile
+index, and the *composed* flips.
+
+**The correctness risk lives here.** A chunk cell's x/y flip mirrors the whole 16×16 block, which
+both reorders which block cell sits where *and* flips the tile within it. Composing that with the
+block cell's own flips is the single fiddliest piece of this design. It is pure, so the node suite
+can cover it properly — and must, including the both-flips case.
+
+Per-cell palette lines come free: `PixelViewport` already supports per-pixel palette lines because
+level art needs them.
+
+### 3.2 Resolving a stroke
+
+`PixelEditController` already produces `diffWrites`. A new pure resolver turns surface writes into a
+document mutation plan: walk provenance backwards, un-flipping coordinates to find the position
+inside the *stored* tile, and group by target tile.
+
+Painted content stays where it was painted only if **the tile is referenced by exactly one block
+cell** *and* **the block is referenced by exactly one chunk cell**. Both checks are independent and
+both are required — forking the block alone does not help, because the copy still points at the same
+shared tile.
+
+- **Block linked elsewhere** → clone it (`classicAddBlock`), repoint this chunk's cell.
+- **Tile linked elsewhere** → try an exact content match in the pool first (reuse it), else claim a
+  free pool slot, then repoint the block cell.
+
+The isolation unit is **the chunk cell painted on**, not the layout placement. A chunk stamped eight
+times in a layout shows the edit eight times; that is what a chunk *is*.
+
+### 3.3 Link vs Isolate
+
+A sticky mode in the tool options, following Aseprite's Manual/Auto rather than prompting per stroke:
+
+- **Isolate** *(default)* — mutate in place when safe, diverge when not. Paint lands where you painted.
+- **Link** — always mutate in place and propagate, with a live "*N places will change*" readout.
+
+Isolate is the default because unwanted propagation is the destructive direction and Link is one
+click away. Link is deliberately offered rather than prevented: it is Pyxel Edit's headline feature.
+
+### 3.4 One command per gesture
+
+A new composite store command applies tile writes, block additions, block-cell repoints and
+chunk-cell repoints as **one** entry, preserving the rule step H established: one gesture, one
+command, one Ctrl+Z. This is the main new architectural surface, and whether it fits the existing
+`CommandResult` shape cleanly is an early unknown — find out first, before building on it.
+
+### 3.5 Limits, surfaced honestly
+
+Measured spare tile slots per zone: ghz 146, mz 126, syz 137, slz 73, sbz 415, **lz 0**. Blocks are
+far roomier (422–828 free of 1024) and `classicAddBlock` already exists; there is no `classicAddTile`
+at all, so Phase 1 can only *recycle* free tile slots, never mint.
+
+Mitigating this: **65% of tiles are used exactly once**, so the common stroke needs no new tile.
+
+The tool options carry a live readout (`blocks 439/1024 · tiles 819/965`), and a stroke that will
+diverge says so before committing. When Isolate cannot isolate because no free tile slot exists —
+Labyrinth, today — it **refuses and offers the Link-mode edit explicitly**. It never silently mutates
+linked content and never silently fails.
+
+### 3.6 Two small pieces that close the loop
+
+- Wire `PixelViewport`'s existing `repeat` prop into classic's `TileTab` behind a toggle, matching
+  aeon's `repeatPreview`. The "essential" feature from the research, nearly free.
+- Reframe `SharedBanner` from hazard to mechanism: *"used in 14 blocks · 31 cells — edits appear in
+  all of them"*, plus a **Make unique** action. Same facts, stated as a tool.
+
+---
+
+## 4 · Phase 2 — the origination canvas
+
+### 4.1 The document
+
+A free-size indexed canvas — no chunk, no tile pool, no fixed dimensions. It is a **new document type
+in the existing tab system**, alongside sprite docs, inheriting guarded activation, dirty tracking,
+undo routing and `SaveCoordinator` without new plumbing.
+
+It differs from a sprite doc in its colour model: pixels index a **64-colour space (4 lines × 16)**
+rather than one 16-colour line.
+
+**Persistence: indexed PNG plus a sidecar JSON** (constraint profile, palette-line assignment, grid
+origin). Deliberately an open format — these files stay openable in Aseprite, and Aseprite output
+stays importable. The origination surface should win by being Genesis-aware, not by trapping files.
+
+### 4.2 Constraint profiles
+
+A profile attached to each document, selected from **presets** — *Genesis level art*, *Genesis
+sprite*, *Genesis unrestricted*, *none* — with individual rules exposed as toggles. Presets, not a
+rule-builder: Multipaint, GrafX2 and GB Studio all ship a fixed menu of target machines, and none
+expose custom rule authoring. Shipping a schema editor would be unusual, not standard.
+
+| Rule | Meaning | Genesis level art | Genesis sprite |
+|---|---|---|---|
+| Colour space | bits per channel | 3 (512 colours) | 3 |
+| Palette | lines × colours, transparent index | 4 × 16, index 0 | 1 × 16, index 0 |
+| Cell palette rule | every 8×8 cell draws from one line | on | on |
+| Tile limit | max unique 8×8 tiles, flip-aware | act's free slots | per sprite |
+| Sprite limits | 4×4 tiles max; 20 sprites & 320 px per scanline; 80 per frame | off | on |
+| Grids | overlay guides | 8 / 16 / 256 | 8 / 16 |
+
+`decodeGenesisColor`/`encodeGenesisColor` already model 3 bits per channel, so the colour space is
+modelled; what is new is *snapping* colour that arrives by paste or import.
+
+### 4.3 How violations surface
+
+Matched to the kind of constraint, following what the surveyed tools actually do:
+
+- **Scalar limits** (colours used per line, unique tiles against the limit) → **live numeric
+  readout**. This is GB Studio's `A: 0/20 T: 0/30` and Pyxel Edit's tile count.
+- **Structural violations** (a cell drawing from two palette lines) → **live highlight overlay** on
+  the offending cells, toggleable. Never a number: no surveyed tool gives a numeric count for this
+  class, and none combines both for one constraint.
+- **Commit** → hard check, refusing with specifics.
+
+**Never prevent.** No tool found blocks the input, and the two that solved this problem properly
+(GrafX2's red-tinted clash cells, Multipaint's silent auto-correct) both keep the artist in flow.
+
+**Escape hatch:** an *unconstrained* toggle suspending live checking, re-scanning when re-enabled.
+Pro Motion NG's tile-sync toggle and Multipaint's "unlimited" mode are the same idea, and it suits an
+origination canvas — draw freely, reconcile deliberately.
+
+**Flip-aware unique-tile counting is novel.** No surveyed tool counts mirrored tiles as one. It is
+the correct count for the Genesis, but there is no proven UX to copy, so expect to iterate on it.
+
+### 4.4 Resolve and commit
+
+Over a grid-aligned region:
+
+1. Palette-line check must pass, or refuse and show the offending cells.
+2. Cut into 8×8 tiles; dedup exactly **and** flip-aware (x, y, xy) — the format has the bits and the
+   shipped data leans on them heavily.
+3. Match against the **existing pool first**, reusing what is already there. This is what SonLVL's
+   importer does, and its author specifically changed it to check *all* existing art rather than only
+   the current batch.
+4. Compose 2×2 tile groups into blocks and dedup; same again for chunks.
+5. Report before applying — *N new tiles, M new blocks, K new chunks*, with pool counts before and
+   after. Over the limit refuses with the numbers; never a silent partial write.
+6. Apply as one command.
+
+**Phase 2 inherits Phase 1's no-mint constraint** (§3.5): with no `classicAddTile`, "new tiles" means
+*claimed free pool slots*, and the commit is bounded by how many exist — zero, in Labyrinth. This is
+the sharpest argument for eventually doing tile-pool growth, because a canvas you can draw on but
+cannot commit is worse than no canvas. Until then the resolver must state the ceiling up front,
+before the user invests in a drawing that cannot land, rather than only at commit.
+
+Then Phase 1 takes over: the region is real chunks, and refinement happens in place.
+
+**Commit targets.** The canvas is general — the *target* is the specialised part. Level art first,
+since the ladder work is Phase 1. Sprite commit (tiles plus mappings, into a sprite doc) is a second
+target behind the same interface, and should not expand Phase 2's first cut.
+
+---
+
+## 5 · Testing
+
+Everything load-bearing here is pure and therefore node-testable, which matters because the suite
+renders no canvas and no React:
+
+- Surface build and **flip composition**, including the both-flips case (§3.1).
+- Plan resolution under Link and Isolate, including the two-tier cascade (§3.2).
+- Limit exhaustion — the Labyrinth path, where Isolate cannot isolate (§3.5).
+- Constraint evaluation: colour-space snapping, per-cell palette-line detection, flip-aware unique
+  tile counting (§4.2–4.3).
+- Resolver dedup against an existing pool, including flip-equivalent matches (§4.4).
+
+Per the standing lesson in `aurora-guards-assert-nothing`: **plant a violation and watch each guard
+fail before believing it passes.** The painting gestures themselves need a CDP harness in the running
+app.
+
+---
+
+## 6 · Risks
+
+1. **Flip composition in provenance** (§3.1) — the most likely source of subtly wrong pixels, and
+   wrong in a way that looks plausible.
+2. **The composite command** (§3.4) — if it does not fit `CommandResult` cleanly, the undo guarantee
+   is at stake. Resolve this before building on it.
+3. **The Labyrinth cliff** (§3.5) — a zone where Isolate simply cannot work. Handled by refusing
+   clearly, but it is a real gap until tile-pool growth exists.
+4. **Novel UX with no precedent** — flip-aware tile counting (§4.3). Expect iteration.
+5. **Scope creep toward "our own Aseprite."** The differentiator is being Genesis-aware, not being a
+   general pixel editor. Layers, brushes and onion skinning stay out until Phase 2 ships and the gap
+   is felt rather than assumed.
+
+---
+
+## 7 · Open decisions
+
+- **Where the paint-through tools live in the UI** — whether painting is a tool-mode on the existing
+  `ChunkTab`/`BlockTab` or a distinct surface. Leaning tool-mode, so there is one place per tier.
+- **What the canvas document is called**, in UI and on disk.
+- **Whether the tile limit for a level-art profile is the act's free slots or the whole pool.** Free
+  slots is honest; the whole pool is what the user will expect to see. Possibly show both.
