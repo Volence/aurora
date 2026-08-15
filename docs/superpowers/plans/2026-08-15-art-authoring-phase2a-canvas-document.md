@@ -2273,7 +2273,16 @@ export async function listCanvasNames(dir: string): Promise<string[]> {
     .filter(canvasNameIsSafe);
 }
 
-export interface LoadedCanvas { doc: CanvasDoc; source: CanvasSource }
+// R12: `warnings` and `sidecarRejected` come straight through from
+// decodeCanvasFiles. A load that could not read the sidecar has to say so, and
+// the SAVE has to know it, because the mtime guard cannot help here — the file
+// did not change on disk, we just could not parse it.
+export interface LoadedCanvas {
+  doc: CanvasDoc;
+  source: CanvasSource;
+  warnings: string[];
+  sidecarRejected: boolean;
+}
 
 export async function loadCanvasFile(dir: string, name: string): Promise<LoadedCanvas> {
   if (!canvasNameIsSafe(name)) throw new Error(`'${name}' is not a valid canvas name`);
@@ -2288,14 +2297,19 @@ export async function loadCanvasFile(dir: string, name: string): Promise<LoadedC
     sidecarJson = new TextDecoder().decode(new Uint8Array(await window.api.readBinaryFile(dir, sidecarPath)));
   } catch { sidecarJson = null; }
 
-  const doc = await decodeCanvasFiles(png, sidecarJson);
+  const loaded = await decodeCanvasFiles(png, sidecarJson);
   const [pngMtimeMs, sidecarMtimeMs] = await Promise.all([
     window.api.fileMtime(dir, pngPath),
     window.api.fileMtime(dir, sidecarPath),
   ]);
   return {
-    doc: { ...doc, name },
+    // The FILE STEM is the canvas's name — the sidecar no longer carries one
+    // (R12), because a field only ever written as a copy of the filename
+    // becomes a lie the moment the pair is renamed.
+    doc: { ...loaded.doc, name },
     source: { dir, pngPath, sidecarPath, pngMtimeMs, sidecarMtimeMs },
+    warnings: loaded.warnings,
+    sidecarRejected: loaded.sidecarRejected,
   };
 }
 
@@ -2312,16 +2326,26 @@ export type SaveCanvasResult =
 export async function saveCanvasFile(
   dir: string, name: string, doc: CanvasDoc,
   expected: { pngMtimeMs: number | null; sidecarMtimeMs: number | null },
+  /** R12: true when the load could not parse the sidecar. The mtime guard does
+   *  NOT cover this — the file never changed on disk — so the batch below
+   *  deliberately omits the sidecar rather than replacing metadata Aurora
+   *  admits it did not understand. Do not destroy what you could not read. */
+  sidecarRejected = false,
 ): Promise<SaveCanvasResult> {
   if (!canvasNameIsSafe(name)) return { ok: false, error: `'${name}' is not a valid canvas name` };
   const { png, sidecar } = await encodeCanvasFiles({ ...doc, name });
   const pngPath = canvasPngPath(name);
   const sidecarPath = canvasSidecarPath(name);
 
-  const result = await window.api.writeGuarded(dir, [
-    { relPath: pngPath, bytes: png, expectedMtimeMs: expected.pngMtimeMs },
-    { relPath: sidecarPath, bytes: new TextEncoder().encode(sidecar), expectedMtimeMs: expected.sidecarMtimeMs },
-  ]);
+  const batch = [{ relPath: pngPath, bytes: png, expectedMtimeMs: expected.pngMtimeMs }];
+  if (!sidecarRejected) {
+    batch.push({
+      relPath: sidecarPath,
+      bytes: new TextEncoder().encode(sidecar),
+      expectedMtimeMs: expected.sidecarMtimeMs,
+    });
+  }
+  const result = await window.api.writeGuarded(dir, batch);
 
   if ('conflicts' in result) {
     return {
@@ -2803,6 +2827,12 @@ git commit -m "test(canvas): verify the canvas document in the running app under
 **R8 (IMPORTANT, Task 4) — the deflate/inflate pair moves to its own module, and the plan's `inflate` never compiled.** Task 3 hit a real toolchain mismatch: `@types/node`'s `Uint8Array<ArrayBufferLike>` is not assignable to DOM's `BlobPart`, so `new Blob([raw])` fails `tsc`. The obvious fix — passing `raw.buffer` — is a trap: it discards the view's `byteOffset`/`byteLength`, so a subarray silently compresses its neighbours' bytes. That is dormant in the encoder (its scanline buffer is always freshly allocated at its own size, and `TypedArray.set` respects the source window, which is *why* a public-API test of it passes with the bug present) but live in the decoder, where chunk data genuinely arrives as `png.subarray(start, start + len)`. The correct cast is of the VIEW: `new Blob([data as unknown as BlobPart])`.
 
 Rather than state that twice and leave `inflate` private and unguarded, **Task 4 creates `src/core/art/zlib-stream.ts`** exporting `deflate` and `inflate`, moves the view-safety rationale there, and gives each direction a test that passes a `subarray` with a non-zero `byteOffset` and asserts the window's bytes and not its neighbours'. `indexed-png.ts` imports both. This also retires the "exported only for testability" question Task 3 raised: in the new module both are the public surface. Plant the `.buffer` form in each direction and watch the matching test fail before believing either guard.
+
+**R12 (IMPORTANT, Tasks 5 and 9) — a load has to be able to report, and a save must not destroy what it could not read.** Task 5's review traced a concrete data-loss chain through Task 9's own sketch. `decodeCanvasFiles` computed careful diagnostics and dropped every one of them; `loadCanvasFile` returned `{ doc, source }` with nowhere to put a warning; `saveCanvasFile` then wrote both files in one guarded batch. The mtime guard does **not** protect the sidecar in this case, because the file did not change on disk — Aurora simply could not read it. So: hand-edit a sidecar and leave a trailing comma, open the canvas (which succeeds, correctly), draw one pixel, save, and the constraint-profile choice is gone with no event ever reported.
+
+`decodeCanvasFiles` now returns `{ doc, warnings, sidecarRejected }`. **Task 9 must carry both through**: surface `warnings` to the caller, and when `sidecarRejected` is true, decline to overwrite the sidecar rather than replacing it with a freshly-generated one. The rule is *do not destroy what you could not read*. Key-passthrough was considered and rejected — it would put a persistence concern inside `CanvasDoc`.
+
+Two related items the same review settled. The sidecar's `name` field is **dropped**: the file stem is the canvas's name, and a field that is only ever written as a copy of the filename becomes an authoritative-looking lie the moment the pair is renamed. And a **stale sidecar is detectable exactly**, with no false positives, because `encodeGenesisColor(decodeGenesisColor(w)) === w` for a canonical word makes PLTE a lossless carrier of a CRAM word — so any disagreement between the snapped PLTE and the sidecar proves another tool rewrote the PNG. That is the Aseprite-recolour case, and it is the single most likely way this design costs a user work: their pixel edits survive and their colour edits are silently reverted.
 
 **R11 (testing lesson, found during Task 4) — a fixture can be too small to discriminate.** The depth × filter cross-product test initially used a 5-pixel-wide fixture. At 1bpp that is `bpr === 1`, and with only one byte per row the Sub filter is *structurally identical* to None — there is no byte to the left. So that cell of the matrix could never fail, whatever the decoder did. It was caught by re-running the `switch(0)` plant against the new test rather than by reading it, and fixed by widening the fixture to 12 pixels (`bpr >= 2` at every depth down to 1bpp). The general form: when a test sweeps a parameter, check that every cell of the sweep is capable of failing — a fixture sized for the common case can silently degenerate at the extremes.
 
