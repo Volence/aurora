@@ -110,6 +110,11 @@ export function buildChunkSurface(doc: LevelDoc, chunkIndex: number): Surface {
   const cellsX = 32, cellsY = 32;
   const cells: SurfaceCell[] = new Array(cellsX * cellsY);
 
+  // Index legend, because four loop variables over two nested grids is easy to
+  // transpose: by/bx range over the chunk's 16x16 grid of BLOCKS; sy/sx range over
+  // the 2x2 grid of TILE cells inside each block. Hence the two different strides —
+  // `by * 16 + bx` indexes the chunk's own cell array, while the surface is
+  // `(by * 2 + sy) * cellsX + (bx * 2 + sx)` because it is twice as wide in cells.
   for (let by = 0; by < 16; by++) {
     for (let bx = 0; bx < 16; bx++) {
       const chunkCellIndex = by * 16 + bx;
