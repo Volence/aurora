@@ -7,8 +7,7 @@ import { toolConfigFrom } from '../../../core/art/tool-config';
 import { decodeGenesisColor } from '../../../core/formats/palette';
 import type { Color } from '../../../core/model/s4-types';
 import type { PixelHudHandle } from '../art-shared/PixelHud';
-import { planCanvasGrids, offeredGrids } from './canvas-pane-model';
-import { PIXEL_GRID_TILE, PIXEL_GRID_BLOCK } from '../../canvas/canvas-colors';
+import { planCanvasGrids, offeredGrids, CANVAS_GRID_STROKE } from './canvas-pane-model';
 
 /**
  * Canvas host for the shared PixelViewport + PixelEditController — the canvas
@@ -74,7 +73,12 @@ export default function CanvasHost({ docId, hudRef, canvasRef }: {
     if (!doc) return;
     const w = doc.pixels.width, h = doc.pixels.height;
     for (const g of grids.underlay) {
-      ctx.strokeStyle = g.weight === 'coarse' ? PIXEL_GRID_BLOCK : PIXEL_GRID_TILE;
+      // The stroke comes from the plan's own table, not from a conditional here.
+      // The version this replaces read `g.weight === 'coarse' ? … : …` and drew
+      // an offset 8px mesh at the 16px grid's brightness — so nudging gridOrigin
+      // by a pixel changed how the mesh LOOKED, and the block grid vanished into
+      // the tile grid in the branch reached by caring about block alignment.
+      ctx.strokeStyle = CANVAS_GRID_STROKE[g.weight];
       ctx.lineWidth = 1;
       ctx.beginPath();
       for (let x = g.offsetX; x <= w; x += g.pitch) { ctx.moveTo(x * z + 0.5, 0); ctx.lineTo(x * z + 0.5, h * z); }
@@ -99,9 +103,19 @@ export default function CanvasHost({ docId, hudRef, canvasRef }: {
   function onCommit(r: GestureResult) {
     const st = useCanvasStore.getState();
     // No no-op check and no normalisation here — setPixels owns both, and one
-    // call is one undo entry. `docId` is read from the current render's props,
-    // so a commit can never land on the document that WAS active when the
-    // gesture began (setPixels throws on the size mismatch that would expose).
+    // call is one undo entry.
+    //
+    // THE RESIDUAL HOLE, named rather than waved at. `docId` is this render's,
+    // while `r.buffer` was seeded from whichever document the gesture BEGAN on.
+    // Two things keep those the same: App keys this pane by docId, so switching
+    // documents remounts rather than re-points it (no controller survives the
+    // switch with a gesture in flight); and a pointer capture means the
+    // pointerup lands here before any click that could change tabs. What is
+    // left is genuinely uncovered: if a future path re-points a LIVE pane at
+    // another document mid-gesture, `setPixels` catches it only when the two
+    // documents differ in SIZE. Two 128x128 canvases — the plan's own default,
+    // so the likely case — would let one document's buffer land in the other,
+    // with an undo entry and a dirty dot that make it look deliberate.
     st.setPixels(docId, r.buffer);
     if (r.selection !== undefined) st.setSelection(docId, r.selection);
   }

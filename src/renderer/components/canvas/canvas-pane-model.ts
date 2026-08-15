@@ -8,6 +8,7 @@
 import type { GridKind } from '../art-shared/PixelViewport';
 import type { CanvasGridOrigin } from '../../../core/art/canvas-doc';
 import { constraintProfile } from '../../../core/art/canvas-profiles';
+import { CANVAS_GRID_CELL, CANVAS_GRID_BLOCK, CANVAS_GRID_CHUNK } from '../../canvas/canvas-colors';
 
 // --- Which document the pane shows -----------------------------------------
 
@@ -56,15 +57,37 @@ export function canvasPaneState(
 
 // --- Which grids get drawn --------------------------------------------------
 
+/**
+ * How heavily one grid draws.
+ *
+ * THESE ARE THE SHARED VIEWPORT'S OWN THREE WEIGHTS, not a scale of this
+ * module's invention, and that is the whole point: the same pitch is drawn by
+ * `PixelViewport`'s layer when the origin is aligned and by the pane's underlay
+ * when it is not, so the two paths have to be pixel-identical apart from
+ * position. A two-tier scale is what made an offset 8px mesh brighter than an
+ * aligned one — a one-pixel origin nudge reading as a functional change — and
+ * made the 8px and 16px grids the same colour in the offset branch, which hides
+ * the block grid exactly when someone offsets the origin because they care about
+ * block alignment.
+ */
+export type CanvasGridWeight = 'cell' | 'block' | 'chunk';
+
+/** The stroke each weight draws with. Here rather than in the pane so the
+ *  mapping is testable — the defect above lived in two lines of JSX consuming a
+ *  correct, exhaustively-tested plan. */
+export const CANVAS_GRID_STROKE: Record<CanvasGridWeight, string> = {
+  cell: CANVAS_GRID_CELL,
+  block: CANVAS_GRID_BLOCK,
+  chunk: CANVAS_GRID_CHUNK,
+};
+
 /** One grid the shared viewport cannot draw itself, handed to `drawUnderlay`. */
 export interface CanvasUnderlayGrid {
   pitch: number;
   /** First line position, in pixels, already folded into 0..pitch-1. */
   offsetX: number;
   offsetY: number;
-  /** Ranks the line weight — the pane maps it to a colour. Coarser pitches read
-   *  as structure and must not disappear under the 8px mesh. */
-  weight: 'fine' | 'coarse';
+  weight: CanvasGridWeight;
 }
 
 export interface CanvasGridPlan {
@@ -116,12 +139,59 @@ export function planCanvasGrids(
     const offsetY = mod(origin.originY, pitch);
     const aligned = offsetX === 0 && offsetY === 0;
     if (aligned && pitch === 8) { plan.layerGrids.push('cell8'); continue; }
-    if (aligned && pitch === 16) { plan.layerGrids.push('block'); plan.blockPx = 16; continue; }
-    plan.underlay.push({ pitch, offsetX, offsetY, weight: pitch >= 64 ? 'coarse' : 'fine' });
+    // `pitch`, not a literal 16: they are provably equal in this branch, and
+    // writing the literal is how the two drift when a profile offers another
+    // block-scale pitch.
+    if (aligned && pitch === 16) { plan.layerGrids.push('block'); plan.blockPx = pitch; continue; }
+    plan.underlay.push({ pitch, offsetX, offsetY, weight: gridWeight(pitch) });
   }
   return plan;
 }
 
+/**
+ * The weight a pitch draws at.
+ *
+ * The two thresholds are the Genesis' own units, not tuning: 8px is one TILE
+ * (the finest mesh, and the one the shared viewport draws at its lightest), 16px
+ * is one BLOCK, and anything coarser is structure — 256px is one chunk. A pitch
+ * between them, if a future profile offers one, is closer in meaning to the
+ * block grid than to the chunk grid, so it rounds down rather than up.
+ */
+function gridWeight(pitch: number): CanvasGridWeight {
+  if (pitch <= 8) return 'cell';
+  if (pitch <= 16) return 'block';
+  return 'chunk';
+}
+
 function mod(v: number, m: number): number {
   return ((v % m) + m) % m;
+}
+
+// --- Fitting the document to the viewport -----------------------------------
+
+/** Zoom bounds, shared with canvasStore.setZoom — which clamps to the same range,
+ *  so a fit that ignored them would be silently corrected and the readout would
+ *  disagree with the fit. */
+const MIN_ZOOM = 1;
+const MAX_ZOOM = 48;
+/** The padding `CanvasMode`'s canvasPad puts around the art, in CSS px. */
+const FIT_PAD = 24;
+
+/**
+ * The integer zoom at which a `docW x docH` document fits a `clientW x clientH`
+ * scroller. Pure so the arithmetic is reachable: the sign of the padding, the
+ * order of the clamp and the zero-size guard are exactly what goes wrong here,
+ * and inside a component closure nothing can test any of them.
+ *
+ * Returns null when the scroller has not been laid out yet (a zero dimension) —
+ * a caller that zoomed anyway would compute a fit against a 0px viewport and
+ * land on MIN_ZOOM, which looks to the user like the document opened at 1x for
+ * no reason.
+ */
+export function fitZoom(
+  clientW: number, clientH: number, docW: number, docH: number,
+): number | null {
+  if (clientW <= 0 || clientH <= 0 || docW <= 0 || docH <= 0) return null;
+  const z = Math.floor(Math.min((clientW - FIT_PAD) / docW, (clientH - FIT_PAD) / docH));
+  return Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, z));
 }

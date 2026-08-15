@@ -14,8 +14,10 @@
 //     otherwise sends the artist's alignment work in the wrong direction.
 
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import {
-  canvasPaneState, planCanvasGrids, offeredGrids,
+  canvasPaneState, planCanvasGrids, offeredGrids, fitZoom, CANVAS_GRID_STROKE,
 } from '../canvas-pane-model';
 
 const CANVAS_TAB = { id: 'doc:canvas:sky', kind: 'art-doc', title: 'Canvas · sky' };
@@ -84,7 +86,11 @@ describe('which grids get drawn', () => {
   it('sends 256 to the underlay — the viewport has no layer for it', () => {
     const plan = planCanvasGrids([8, 16, 256], [256], NO_ORIGIN);
     expect(plan.layerGrids).toEqual([]);
-    expect(plan.underlay).toEqual([{ pitch: 256, offsetX: 0, offsetY: 0, weight: 'coarse' }]);
+    expect(plan.underlay).toEqual([{ pitch: 256, offsetX: 0, offsetY: 0, weight: 'chunk' }]);
+  });
+
+  it('carries the block pitch rather than a literal', () => {
+    expect(planCanvasGrids([16], [16], NO_ORIGIN).blockPx).toBe(16);
   });
 
   it('sends an OFFSET 8 or 16 to the underlay too', () => {
@@ -95,9 +101,21 @@ describe('which grids get drawn', () => {
     const plan = planCanvasGrids([8, 16], [8, 16], { originX: 3, originY: 0 });
     expect(plan.layerGrids).toEqual([]);
     expect(plan.underlay).toEqual([
-      { pitch: 8, offsetX: 3, offsetY: 0, weight: 'fine' },
-      { pitch: 16, offsetX: 3, offsetY: 0, weight: 'fine' },
+      { pitch: 8, offsetX: 3, offsetY: 0, weight: 'cell' },
+      { pitch: 16, offsetX: 3, offsetY: 0, weight: 'block' },
     ]);
+  });
+
+  it('gives each pitch ITS OWN weight, aligned or not', () => {
+    // The defect this replaces: two tiers, so an OFFSET 8px mesh drew at the
+    // 16px grid's brightness. Two consequences, both silent — nudging the origin
+    // by one pixel visibly brightened the mesh (an alignment nudge reading as a
+    // functional change), and 8 and 16 became the same colour, hiding the block
+    // grid in exactly the branch someone reaches by caring about block alignment.
+    const offset = planCanvasGrids([8, 16, 256], [8, 16, 256], { originX: 1, originY: 1 });
+    expect(offset.underlay.map((g) => g.weight)).toEqual(['cell', 'block', 'chunk']);
+    // Three pitches, three distinct strokes.
+    expect(new Set(offset.underlay.map((g) => CANVAS_GRID_STROKE[g.weight])).size).toBe(3);
   });
 
   it('an origin that is a whole multiple of the pitch is still ALIGNED', () => {
@@ -112,7 +130,7 @@ describe('which grids get drawn', () => {
     // JS `%` yields -3 here, and a grid whose first line is at -3 draws its
     // leftmost column off the canvas — the column the artist is aligning to.
     const plan = planCanvasGrids([8], [8], { originX: -3, originY: -20 });
-    expect(plan.underlay).toEqual([{ pitch: 8, offsetX: 5, offsetY: 4, weight: 'fine' }]);
+    expect(plan.underlay).toEqual([{ pitch: 8, offsetX: 5, offsetY: 4, weight: 'cell' }]);
   });
 
   it('orders the grids finest first, so the coarse lines draw on top', () => {
@@ -123,5 +141,76 @@ describe('which grids get drawn', () => {
   it('ignores a nonsense pitch instead of dividing by zero', () => {
     expect(planCanvasGrids([0, 8], [0, 8], NO_ORIGIN))
       .toEqual({ layerGrids: ['cell8'], underlay: [] });
+  });
+});
+
+describe('an offset grid looks identical to an aligned one', () => {
+  // A SOURCE GREP, because the alphas live as literals inside PixelViewport's
+  // draw loop and the suite renders no canvas. It is the only way to hold the
+  // two halves of the hybrid together: the SAME pitch is drawn by the shared
+  // layer when gridOrigin is aligned and by the pane's underlay when it is not,
+  // so any divergence in colour makes a one-pixel origin nudge look like a
+  // functional change. If PixelViewport's alphas move, this fails and points at
+  // the constants that must move with them.
+  const viewport = readFileSync(
+    join(__dirname, '..', '..', 'art-shared', 'PixelViewport.tsx'), 'utf8');
+
+  /** The alpha PixelViewport draws one grid kind at. */
+  function layerAlpha(kind: string): string {
+    const re = new RegExp(`gk === '${kind}'\\)\\s*gridLines\\([^,]+,\\s*([\\d.]+)\\)`);
+    const m = re.exec(viewport);
+    expect(m, `PixelViewport no longer draws '${kind}' via gridLines(pitch, alpha)`).not.toBeNull();
+    return m![1];
+  }
+
+  it('reads the file it claims to (a moved draw loop would pass vacuously)', () => {
+    expect(viewport).toContain('const gridLines = (stepPx: number, alpha: number)');
+  });
+
+  it.each([
+    ['cell8', 'cell' as const],
+    ['block', 'block' as const],
+  ])("the underlay's %s stroke is the shared layer's own", (kind, weight) => {
+    expect(CANVAS_GRID_STROKE[weight]).toBe(`rgba(255,255,255,${layerAlpha(kind)})`);
+  });
+
+  it('the chunk grid is distinct from both — no shared layer draws that pitch', () => {
+    expect(CANVAS_GRID_STROKE.chunk).not.toBe(CANVAS_GRID_STROKE.cell);
+    expect(CANVAS_GRID_STROKE.chunk).not.toBe(CANVAS_GRID_STROKE.block);
+  });
+});
+
+describe('fitZoom', () => {
+  it('picks the largest integer zoom that fits, on the tighter axis', () => {
+    // 424x424 of scroller, 24px of padding => 400 usable; a 100px document fits
+    // at 4x. The height is deliberately the tighter axis in the second case.
+    expect(fitZoom(424, 424, 100, 100)).toBe(4);
+    expect(fitZoom(824, 424, 100, 100)).toBe(4);
+    expect(fitZoom(424, 224, 100, 100)).toBe(2);
+  });
+
+  it('subtracts the padding rather than adding it', () => {
+    // The sign is the classic slip and it is invisible on screen — it just fits
+    // slightly too tight and scrolls. At exactly one pixel short of 5x, the
+    // wrong sign answers 5.
+    expect(fitZoom(523, 523, 100, 100)).toBe(4);
+    expect(fitZoom(524, 524, 100, 100)).toBe(5);
+  });
+
+  it('clamps to the same 1..48 range the store does', () => {
+    // setZoom clamps too, so a fit outside the range would be silently corrected
+    // and the readout would disagree with what was asked for.
+    expect(fitZoom(10_000, 10_000, 8, 8)).toBe(48);
+    expect(fitZoom(64, 64, 1024, 1024)).toBe(1);   // floor(0.039) = 0 without the clamp
+  });
+
+  it('returns null when the scroller has no size yet', () => {
+    // Not 1: a fit computed against a 0px viewport lands on MIN_ZOOM, which
+    // looks to the user like the document opened at 1x for no reason. Layout
+    // has simply not happened yet, and the answer is to leave the zoom alone.
+    expect(fitZoom(0, 400, 32, 32)).toBeNull();
+    expect(fitZoom(400, 0, 32, 32)).toBeNull();
+    expect(fitZoom(400, 400, 0, 32)).toBeNull();   // and a degenerate document
+    expect(fitZoom(400, 400, 32, 0)).toBeNull();
   });
 });

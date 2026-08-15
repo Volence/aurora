@@ -81,6 +81,28 @@ export const MAP_MARQUEE_FILL = 'rgba(148,226,213,0.1)';
 export const PIXEL_GRID = 'rgba(255,255,255,0.08)';     // per-pixel grid (z>=8)
 export const PIXEL_GRID_TILE = 'rgba(255,255,255,0.22)';// 8px tile grid
 export const PIXEL_GRID_BLOCK = 'rgba(249,226,175,0.45)';// 128px block grid (mirrors --warning)
+// ---------- origination canvas grids (components/canvas/canvas-pane-model) ----------
+//
+// THE FIRST TWO MUST MATCH PixelViewport's OWN ALPHAS. The canvas draws the same
+// grid two ways: through the shared `cell8`/`block` layers when the document's
+// gridOrigin is aligned to the pitch, and through CanvasHost's underlay when it
+// is not (the shared layers step from the buffer origin and take no offset). If
+// the two disagree, nudging gridOrigin by one pixel visibly changes the mesh's
+// brightness and the artist reads a functional change into an alignment nudge.
+// components/canvas/__tests__/canvas-pane-model.test.ts greps PixelViewport for
+// the literals and fails when either side moves.
+/** 8px cell mesh — PixelViewport's `cell8` alpha. */
+export const CANVAS_GRID_CELL = 'rgba(255,255,255,0.12)';
+/** 16px block grid — PixelViewport's `block` alpha, and deliberately brighter
+ *  than the cell mesh so the two are still distinguishable when both are drawn
+ *  by the underlay. */
+export const CANVAS_GRID_BLOCK = 'rgba(255,255,255,0.22)';
+/** 256px chunk grid. No shared layer draws this pitch, so there is no alpha to
+ *  match; warm and brighter so it reads as structure over the white mesh — the
+ *  same role PIXEL_GRID_BLOCK plays for the composer's 128px lines, restated
+ *  here rather than borrowed because that constant names a different pitch. */
+export const CANVAS_GRID_CHUNK = 'rgba(249,226,175,0.45)';
+
 /** Selection marquee (mirrors Catppuccin teal accent). */
 export const SELECTION_MARQUEE = '#94e2d5';
 /** Tool preview stroke (mirrors Catppuccin pink). */

@@ -101,6 +101,7 @@ export function DitherConfig({
   onPattern: (p: DitherPattern) => void; onSecondary: (v: number) => void;
   colorCount?: number;
 }) {
+  const wrap = Math.max(1, Math.floor(colorCount));
   return (
     <div style={S.config}>
       {DITHER_PATTERNS.map((p) => (
@@ -116,8 +117,11 @@ export function DitherConfig({
       <Stepper
         title="Secondary dither color (0 = transparent)"
         value={secondary}
-        onPrev={() => onSecondary((secondary + colorCount - 1) % colorCount)}
-        onNext={() => onSecondary((secondary + 1) % colorCount)}
+        // Floored at 1: this is a SHARED component, and `% 0` is NaN — one
+        // caller passing a count it computed from an empty palette would leave
+        // the stepper permanently stuck on NaN for every surface that mounts it.
+        onPrev={() => onSecondary((secondary + wrap - 1) % wrap)}
+        onNext={() => onSecondary((secondary + 1) % wrap)}
       />
     </div>
   );

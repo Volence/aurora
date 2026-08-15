@@ -250,6 +250,12 @@ export default function App() {
               <div style={{ ...styles.tabPane, display: 'flex' }}>
                 {canvasPane.kind === 'ready' ? (
                   <CanvasMode
+                    /* KEYED BY DOCUMENT: switching between two canvas tabs
+                       remounts the pane instead of re-pointing a live one, so no
+                       controller, zoom anchor or in-flight gesture can carry
+                       from one document into another. Lossless — everything the
+                       pane shows lives in canvasStore. */
+                    key={canvasPane.docId}
                     docId={canvasPane.docId}
                     appBar={(
                       <SpriteDocHeader

@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { useCanvasStore, type CanvasTool } from '../../state/canvasStore';
 import { focusedHistory } from '../../state/editorStore';
 import CanvasHost from './CanvasHost';
-import { offeredGrids } from './canvas-pane-model';
+import { offeredGrids, fitZoom } from './canvas-pane-model';
 import { useAnchoredZoom } from '../art-shared/use-anchored-zoom';
 import { useHandPan } from '../art-shared/use-hand-pan';
 import { PixelHud, type PixelHudHandle } from '../art-shared/PixelHud';
@@ -108,13 +108,17 @@ export default function CanvasMode({ docId, appBar }: { docId: string; appBar: R
     }
   }, [tool, docId]);
 
+  // The arithmetic is in `fitZoom` (canvas-pane-model), not here: the padding
+  // sign, the clamp order and the not-yet-laid-out guard are exactly what goes
+  // wrong in a fit, and inside this closure no test could reach any of them.
+  // Null means the scroller has no size yet, which is a reason to leave the zoom
+  // alone rather than to compute one against a 0px viewport.
   function fitToView() {
     const el = canvasWrapRef.current;
     const d = useCanvasStore.getState().docs.get(docId)?.doc;
-    if (!el || !d || el.clientWidth === 0 || el.clientHeight === 0) return; // not laid out yet
-    const pad = 24;
-    const z = Math.floor(Math.min((el.clientWidth - pad) / d.pixels.width, (el.clientHeight - pad) / d.pixels.height));
-    useCanvasStore.getState().setZoom(Math.max(1, Math.min(48, z)));
+    if (!el || !d) return;
+    const z = fitZoom(el.clientWidth, el.clientHeight, d.pixels.width, d.pixels.height);
+    if (z !== null) useCanvasStore.getState().setZoom(z);
   }
   // Auto-fit when the document's dimensions change — which here means a
   // different canvas was focused, since a canvas cannot be resized (yet).

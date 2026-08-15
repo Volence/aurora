@@ -20,7 +20,7 @@
 //                    the fields CanvasSnapshot can restore.
 //   dirty only       setName (persisted, but outside the snapshot — see there).
 //   neither          setSelection, setSource, and all view state (tool, zoom,
-//                    mirror, dither, paint index, grids, clipboard).
+//                    mirror, dither, paint index, grids).
 //
 // A new setter has to answer both questions; nothing but this list will ask it.
 
@@ -28,7 +28,6 @@ import { create } from 'zustand';
 import type { PixelBuffer, MirrorMode, DitherPattern } from '../../core/art/pixel-ops';
 import { createBuffer } from '../../core/art/pixel-ops';
 import type { Selection } from '../../core/art/pixel-edit-controller';
-import type { ClipRegion } from '../../core/art/pixel-clipboard';
 import type { CanvasDoc, CanvasGridOrigin } from '../../core/art/canvas-doc';
 import {
   blankCanvasDoc, normalizeCanvasPixels, cloneCanvasDoc, blankCanvasPalette,
@@ -109,7 +108,6 @@ interface CanvasState {
    * switch. View state, so it neither records nor dirties.
    */
   paintIndex: number;
-  clipboard: ClipRegion | null;
   /** Which of the profile's grid pitches are drawn. Global, though its MEANING
    *  is per-document — it selects from the active profile's pitches, and the
    *  profile belongs to a document. Legitimate only because there is exactly one
@@ -124,7 +122,6 @@ interface CanvasState {
   setDither: (pattern: DitherPattern, secondary: number) => void;
   setPaintIndex: (v: number) => void;
   setVisibleGrids: (g: number[]) => void;
-  setClipboard: (c: ClipRegion | null) => void;
 
   // --- Per-document ---
   setPixels: (docId: string, buffer: PixelBuffer) => void;
@@ -154,7 +151,6 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   // Line 0, entry 1 — the first paintable colour. Starting on 0 would arm the
   // eraser, so the first stroke a new user draws would do nothing visible.
   paintIndex: canvasIndex(0, 1),
-  clipboard: null,
   visibleGrids: [8],
 
   // Does NOT clear the selection, though spriteStore.setTool does. It cannot:
@@ -177,7 +173,6 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   // bug canvas-doc.ts exists to prevent, entering through the palette.
   setPaintIndex: (v) => set({ paintIndex: canvasIndex(paletteLineOf(v), paletteEntryOf(v)) }),
   setVisibleGrids: (visibleGrids) => set({ visibleGrids }),
-  setClipboard: (clipboard) => set({ clipboard }),
 
   /**
    * Replace a document's pixels with a buffer OF THE DOCUMENT'S CURRENT SIZE.
@@ -274,13 +269,22 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
 
   closeAll: () => {
     for (const id of get().docs.keys()) documentHistoryHub.dispose(id);
-    // The clipboard goes with the documents because it IS document data: it
-    // holds raw palette INDICES, and the same numbers name different colours
-    // under another project's palette, so a paste that survived a project switch
-    // would silently recolour itself. The rest of the view state (tool, zoom,
-    // mirror, dither, grids) is genuine user preference and deliberately
-    // survives — it describes how the user works, not what they were working on.
-    set({ docs: new Map(), activeDocId: null, clipboard: null });
+    // The PAINT INDEX goes with the documents because it IS document data: it is
+    // a raw palette index, and the same number names a different colour under
+    // the next project's palette — a brush that survived a project switch would
+    // silently recolour itself, which is precisely the argument that used to be
+    // written here about the clipboard (removed in Task 12: nothing wrote it).
+    // Resetting to the first paintable colour rather than to 0, so the next
+    // canvas does not open with the eraser armed.
+    //
+    // The rest of the view state (tool, zoom, mirror, dither, grids) is genuine
+    // user preference and deliberately survives — it describes how the user
+    // works, not what they were working on. That is the whole test: does the
+    // value mean anything without the document it came from?
+    set({
+      docs: new Map(), activeDocId: null,
+      paintIndex: canvasIndex(0, 1),
+    });
   },
 }));
 

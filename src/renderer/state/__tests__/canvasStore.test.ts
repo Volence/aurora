@@ -352,15 +352,20 @@ describe('focus and lifecycle', () => {
     expect(useCanvasStore.getState().isDirty(A)).toBe(false);
   });
 
-  it('closeAll drops the clipboard but keeps the view preferences', () => {
-    // The clipboard holds palette INDICES, so the same numbers mean different
-    // colours under the next project's palette — a surviving paste silently
-    // recolours itself. Zoom and tool describe how the user works, not what they
-    // were working on, so they stay.
-    useCanvasStore.getState().setClipboard({ w: 1, h: 1, data: new Uint8Array([5]) });
+  it('closeAll drops the paint index but keeps the view preferences', () => {
+    // The paint index is a raw palette INDEX, so the same number names a
+    // different colour under the next project's palette — a brush that survived
+    // a project switch silently recolours itself. (This test replaces the
+    // identical one for the clipboard, which Task 12 removed: nothing ever wrote
+    // that field, so its careful lifetime rule guarded data that could not
+    // exist. The rule was real; it just belonged to this field.)
+    //
+    // Zoom and tool describe how the user works, not what they were working on,
+    // so they stay.
+    useCanvasStore.getState().setPaintIndex(canvasIndex(3, 9));
     useCanvasStore.getState().setZoom(12);
     useCanvasStore.getState().closeAll();
-    expect(useCanvasStore.getState().clipboard).toBeNull();
+    expect(useCanvasStore.getState().paintIndex).toBe(canvasIndex(0, 1));
     expect(useCanvasStore.getState().zoom).toBe(12);
   });
 });
