@@ -1,6 +1,7 @@
 # In-app art authoring — design
 
-**Status: approved in brainstorming 2026-08-15. Not yet planned.**
+**Status: phases 1, 2A and 2B built and merged (2026-08-15). Phase 3 DECLINED — see
+"§0 · Corrections" immediately below, which is AUTHORITATIVE over everything after it.**
 
 Goal: make Aurora a place where Genesis art is *made*, not only *edited* — so that level art and
 sprite art can both be authored without round-tripping through Aseprite.
@@ -14,6 +15,51 @@ Two phases, one product story:
 
 Phase 1 makes existing art pleasant to edit. Phase 2 makes new art possible. Phase 1 first, because
 its unknowns are nastier and Phase 2's commit step lands on top of it.
+
+---
+
+## 0 · Corrections (2026-08-15, post-2B audit)
+
+**This section overrides anything below it that disagrees.** Written after phases 1, 2A and 2B
+shipped and three independent audits measured the claims this spec was resting on. Every number here
+was verified directly against s1disasm, twice by separate implementations where it mattered.
+
+**C1 — "Labyrinth has zero spare tiles" is TRUE BUT NARROWER THAN IT READS, and this document repeats
+it three times (§3.5, §4.4, §6 Risk 3) as though it meant the zone is hopeless.** It does not. LZ has
+zero *claimable slots inside the existing pool*; it has roughly **26 appendable tiles** between the
+end of its art (454 tiles) and the first thing loaded above it (`ArtTile_LZ_Block_1 = $1E0` = 480).
+The flat-pool model cannot express that difference, which is what turned 26 into "impossible".
+
+**C2 — PHASE 3 (tile-pool growth) IS DECLINED.** Measured effective slack, per zone, after accounting
+for animated art and for contexts that share a zone's files: GHZ **2**, LZ 26, MZ 33, SLZ 10, SYZ 14,
+SBZ 7 — about **92 tiles game-wide**. GHZ is 2 rather than 14 because the ending sequence reuses GHZ's
+art files *and its block set*, and `AniArt_Ending_Flower4` writes `$340–$34F`; Aurora already blocks
+that range as an anim overlay, so a growth feature would have had to override a guard that was
+already correct. Growing beyond the slack requires relocating engine art by editing `_Constants.asm`
+equates and PLC lists, which `docs/ROADMAP.md` forbids outright ("Aurora never emits engine assembly
+directly"). The phase therefore has no second rung and is not worth its first.
+
+**C3 — the scarcity is mostly self-inflicted by §4.4's framing.** Commit is specced as *incremental
+slot-claiming*, so the budget is the leftovers. A hacker replacing a zone's theme spends the **whole
+pool** — 454–882 tiles depending on zone — and replace-mode commit is *less* code than the
+incremental allocator, not more. Whatever 2C becomes, it should treat wholesale replacement as the
+primary path and incremental claiming as the fallback.
+
+**C4 — flip-aware dedup of the existing pools returns more than growth ever could, but not where it
+is needed.** Duplicate tiles already present, measured twice independently: GHZ 111, SYZ 52, SLZ 52,
+MZ 50, **LZ 0, SBZ 0**. It belongs inside the commit pipeline (§4.4 steps 2–3), not as a feature
+anyone has to find — and it does not rescue the two starved zones.
+
+**C5 — §4.4 never mentions PALETTE or COLLISION, and both are user-visible on first contact.** A
+canvas seeded from a zone and then recoloured commits art that renders under the act's CRAM, not the
+artist's; and newly composed chunks have no collision, so the player falls through them. Commit must
+state what happens in both cases before it is planned. (The collision half had a shipped defect
+underneath it, fixed 2026-08-15: appended blocks did not extend the block→collision table.)
+
+**C6 — content-matching must be FLIP-AWARE to match 2B.** §4.4 step 2 dedups flip-aware while phase
+1's `findContentMatch` is exact-only. Left as is, a divergence whose bytes are an x-flip of an
+existing pool tile claims a fresh scarce slot instead of repointing with the flip bit set, and 2C's
+claim count can exceed the flip-aware unique count the readout promises is an upper bound.
 
 ---
 
@@ -137,7 +183,10 @@ every chunk that references them.
 
 ### 3.5 Limits, surfaced honestly
 
-Measured spare tile slots per zone: ghz 146, mz 126, syz 137, slz 73, sbz 415, **lz 0**. Blocks are
+Measured spare tile slots per zone: ghz 146, mz 126, syz 137, slz 73, sbz 415, **lz 0**. (These are
+*claimable slots inside the existing pool*. They are not the whole story about room — see C1/C2 in
+§0: every zone also has a small appendable margin above its art, LZ's being 26, and growth into it
+was investigated and declined.) Blocks are
 far roomier (422–828 free of 1024) and `classicAddBlock` already exists; there is no `classicAddTile`
 at all, so Phase 1 can only *recycle* free tile slots, never mint.
 
@@ -234,9 +283,11 @@ Over a grid-aligned region:
 6. Apply as one command.
 
 **Phase 2 inherits Phase 1's no-mint constraint** (§3.5): with no `classicAddTile`, "new tiles" means
-*claimed free pool slots*, and the commit is bounded by how many exist — zero, in Labyrinth. This is
-the sharpest argument for eventually doing tile-pool growth, because a canvas you can draw on but
-cannot commit is worse than no canvas. Until then the resolver must state the ceiling up front,
+*claimed free pool slots*, and the commit is bounded by how many exist — zero, in Labyrinth. This was
+read as the sharpest argument for tile-pool growth, on the grounds that a canvas you can draw on but
+cannot commit is worse than no canvas. **That conclusion did not survive measurement (§0 C2): growth
+is worth ~92 tiles game-wide and 2 in Green Hill.** The real answer is C3 — commit should be able to
+REPLACE a zone's art, where the budget is the whole pool rather than its leftovers. Until then the resolver must state the ceiling up front,
 before the user invests in a drawing that cannot land, rather than only at commit.
 
 Then Phase 1 takes over: the region is real chunks, and refinement happens in place.
@@ -282,6 +333,10 @@ app.
 ---
 
 ## 7 · Open decisions
+
+_(§0's corrections add three that must be answered before 2C is planned: what commit does to the act
+PALETTE when the canvas has drifted from it; what COLLISION newly composed chunks get; and whether
+commit's primary path is wholesale REPLACE or incremental claim. See C3 and C5.)_
 
 - **Where the paint-through tools live in the UI** — whether painting is a tool-mode on the existing
   `ChunkTab`/`BlockTab` or a distinct surface. Leaning tool-mode, so there is one place per tier.
