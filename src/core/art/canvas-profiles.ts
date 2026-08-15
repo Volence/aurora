@@ -1,7 +1,8 @@
 // src/core/art/canvas-profiles.ts
 //
 // Spec §4.2's preset table as DATA. A canvas document names one; the canvas
-// draws the grids it names; plan 2B evaluates the rest and shows violations.
+// draws the grids it names; canvas-constraints.ts evaluates the rest and the
+// canvas pane shows the violations.
 //
 // PRESETS, NOT A RULE BUILDER. Multipaint, GrafX2 and GB Studio all ship a fixed
 // menu of target machines and none of them expose custom rule authoring —
@@ -9,7 +10,7 @@
 // rules are exposed as toggles in the UI; they are still just overrides on top of
 // a preset, which is why this is a table and not a class.
 //
-// Pure data — no evaluation lives here.
+// Pure data — no evaluation lives here. canvas-constraints.ts evaluates it.
 
 export type ConstraintProfileId =
   | 'genesis-level-art' | 'genesis-sprite' | 'genesis-unrestricted' | 'none';
@@ -24,10 +25,15 @@ export interface ConstraintProfile {
   lineLength: number;
   /** Entry index that is the backdrop in every line. */
   transparentIndex: number;
-  /** Every 8x8 cell must draw from ONE palette line. Evaluated in 2B. */
+  /** Every 8x8 cell must draw from ONE palette line. Evaluated by
+   *  `findCellClashes` in canvas-constraints.ts. */
   cellPaletteRule: boolean;
-  /** Sprite-hardware limits: 4x4 tiles max, 20 sprites & 320 px per scanline,
-   *  80 per frame. Evaluated in 2B. */
+  /** Sprite-hardware limits. 2B evaluates ONLY the 4x4-tile frame bound, as a
+   *  readout — see evaluateCanvasConstraints. The per-scanline (20 sprites,
+   *  320px) and per-frame (80) limits are properties of an ASSEMBLED FRAME with
+   *  mappings, which a single indexed image does not have; they belong to sprite
+   *  commit. Owner-confirmed departure from spec §4.2's "evaluated in 2B",
+   *  2026-08-15. */
   spriteLimits: boolean;
   /** Grid overlay pitches, in pixels, coarsest last. */
   grids: number[];

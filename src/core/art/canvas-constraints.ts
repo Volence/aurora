@@ -15,6 +15,7 @@ import {
   CANVAS_LINES, CANVAS_LINE_LENGTH, paletteLineOf, paletteEntryOf, isTransparent,
 } from './canvas-doc';
 import type { CanvasGridOrigin } from './canvas-doc';
+import type { ConstraintProfile } from './canvas-profiles';
 
 /** A Genesis tile is 8x8. The 16 and 256 grids are guides; this one is a rule. */
 export const CELL = 8;
@@ -195,4 +196,69 @@ export function countUniqueTiles(pixels: PixelBuffer, origin: CanvasGridOrigin):
     seen.add(String.fromCharCode(...scratch));
   }
   return { unique: seen.size, fullCells, pixelsOutsideGrid };
+}
+
+export interface CanvasFrameSize {
+  tilesWide: number; tilesHigh: number;
+  /** The sprite hardware's per-frame bound, in tiles on a side. */
+  maxTiles: number;
+  overBound: boolean;
+}
+
+export interface CanvasConstraintReport {
+  /** Empty when the profile's cell rule is off — NOT "unknown". */
+  clashes: CanvasCellClash[];
+  colorsPerLine: number[];
+  /** Paintable entries per line — the readout's denominator. Entry 0 is
+   *  transparency in every line, so it is 15 rather than lineLength. */
+  colorsPerLineMax: number;
+  tiles: UniqueTileCount;
+  /** Null unless the profile carries sprite limits. */
+  frame: CanvasFrameSize | null;
+}
+
+/** The sprite hardware's per-frame bound, in tiles on a side. */
+const SPRITE_MAX_TILES = 4;
+
+/**
+ * THE ONE ENTRY POINT. Profile gating lives here and nowhere else: a pane that
+ * decides for itself whether `cellPaletteRule` applies is a second answer to a
+ * question the profile already answers, and the two will drift.
+ *
+ * Counting is not gated. "How many unique tiles is this drawing" is a fair
+ * question to ask of any canvas, including one whose profile checks nothing —
+ * so `none` still gets its numbers, it just gets no clashes and no bound.
+ *
+ * SPRITE LIMITS, HONESTLY (spec §4.2 departure, owner-confirmed 2026-08-15).
+ * Of the sprite rules, only the 4x4-tile frame bound is knowable from one
+ * indexed image; 20 sprites and 320px per scanline are properties of an
+ * assembled frame with mappings, and belong to sprite commit. So this reports a
+ * size against the bound and evaluates nothing else sprite-shaped. It is a
+ * READOUT rather than a violation because a canvas is a legitimate place to
+ * draw a whole sheet of frames, and a rule that flags every sheet is a rule the
+ * artist switches off — after which it protects nothing.
+ */
+export function evaluateCanvasConstraints(input: {
+  pixels: PixelBuffer; profile: ConstraintProfile; origin: CanvasGridOrigin;
+}): CanvasConstraintReport {
+  const { pixels, profile, origin } = input;
+  // Rounded UP: a drawing 20px wide occupies three tiles, two of them part
+  // empty. Rounding down would report a frame that cannot hold the art.
+  const ceil8 = (n: number) => Math.ceil(n / CELL);
+  const tilesWide = ceil8(pixels.width), tilesHigh = ceil8(pixels.height);
+  return {
+    clashes: profile.cellPaletteRule
+      ? findCellClashes(pixels, origin, profile.paletteLines)
+      : [],
+    colorsPerLine: colorsPerLine(pixels),
+    colorsPerLineMax: profile.lineLength - 1,
+    tiles: countUniqueTiles(pixels, origin),
+    frame: profile.spriteLimits
+      ? {
+        tilesWide, tilesHigh,
+        maxTiles: SPRITE_MAX_TILES,
+        overBound: tilesWide > SPRITE_MAX_TILES || tilesHigh > SPRITE_MAX_TILES,
+      }
+      : null,
+  };
 }

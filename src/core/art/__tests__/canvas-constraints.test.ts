@@ -3,7 +3,9 @@ import { createBuffer } from '../pixel-ops';
 import { canvasIndex } from '../canvas-doc';
 import {
   canvasCells, findCellClashes, colorsPerLine, countUniqueTiles,
+  evaluateCanvasConstraints,
 } from '../canvas-constraints';
+import { constraintProfile } from '../canvas-profiles';
 
 /** A buffer with `fn(x, y)` at every pixel — the fixtures below are all one-liners over it. */
 function buf(w: number, h: number, fn: (x: number, y: number) => number) {
@@ -184,5 +186,58 @@ describe('countUniqueTiles', () => {
     // eslint-disable-next-line no-console
     console.log(`[cost] 1024x1024 full constraint scan: ${ms.toFixed(1)}ms`);
     expect(ms).toBeLessThan(150);
+  });
+});
+
+describe('evaluateCanvasConstraints', () => {
+  const origin = { originX: 0, originY: 0 };
+  const clashing = () => buf(8, 8, (x) => canvasIndex(x === 0 ? 2 : 0, 5));
+
+  it('reports clashes when the profile has the cell rule on', () => {
+    const r = evaluateCanvasConstraints({
+      pixels: clashing(), profile: constraintProfile('genesis-level-art'), origin,
+    });
+    expect(r.clashes).toHaveLength(1);
+  });
+
+  it('reports no clashes when the profile has the cell rule off', () => {
+    const r = evaluateCanvasConstraints({
+      pixels: clashing(), profile: constraintProfile('genesis-unrestricted'), origin,
+    });
+    expect(r.clashes).toEqual([]);
+  });
+
+  // Counting is INFORMATION, not a check — it survives a profile that checks
+  // nothing, because "how many tiles is this" is a fair question to ask of any
+  // drawing.
+  it('still counts tiles and colours under the `none` profile', () => {
+    const r = evaluateCanvasConstraints({
+      pixels: clashing(), profile: constraintProfile('none'), origin,
+    });
+    expect(r.tiles.unique).toBe(1);
+    expect(r.colorsPerLine).toEqual([1, 0, 1, 0]);
+  });
+
+  it('passes the profile line count through to the out-of-range rule', () => {
+    const r = evaluateCanvasConstraints({
+      pixels: buf(8, 8, () => canvasIndex(2, 5)),
+      profile: constraintProfile('genesis-sprite'), origin,
+    });
+    expect(r.clashes[0]).toMatchObject({ kind: 'line-out-of-range' });
+  });
+
+  it('sizes the frame in tiles, flagging past 4x4 only for a sprite profile', () => {
+    const big = buf(48, 16, () => canvasIndex(0, 1));
+    expect(evaluateCanvasConstraints({ pixels: big, profile: constraintProfile('genesis-sprite'), origin }).frame)
+      .toEqual({ tilesWide: 6, tilesHigh: 2, maxTiles: 4, overBound: true });
+    expect(evaluateCanvasConstraints({ pixels: big, profile: constraintProfile('genesis-level-art'), origin }).frame)
+      .toBeNull();
+  });
+
+  it('rounds a ragged canvas UP when sizing the frame — a part-tile still costs a tile', () => {
+    const r = evaluateCanvasConstraints({
+      pixels: buf(20, 8, () => canvasIndex(0, 1)), profile: constraintProfile('genesis-sprite'), origin,
+    });
+    expect(r.frame).toMatchObject({ tilesWide: 3, tilesHigh: 1 });
   });
 });
