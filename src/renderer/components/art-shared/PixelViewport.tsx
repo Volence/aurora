@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { pixelAt } from '../../../core/art/viewport-coords';
 import type { PixelEditController, GestureResult, Selection } from '../../../core/art/pixel-edit-controller';
 import type { PixelBuffer } from '../../../core/art/pixel-ops';
@@ -34,11 +34,33 @@ export interface PixelViewportProps {
   zoom: number;
   controller: PixelEditController;        // pointer input is routed here (pixel tools)
   selection?: Selection | null;           // committed selection (dashed)
+  /**
+   * The selection handed to `controller.begin()`, when it must differ from the
+   * one DRAWN. Defaults to `selection`, so a host that ignores this prop behaves
+   * exactly as before.
+   *
+   * THE ONE CASE IT EXISTS FOR: the select tool is not read-only. A pointerdown
+   * INSIDE an existing marquee takes the controller's move branch
+   * (pixel-edit-controller.ts:142) — it cuts the region out of the snapshot and
+   * `end()` returns both relocated pixels AND a moved marquee. A host that
+   * refuses writes but still permits selecting (classic's locked tiles) would
+   * have the pixels correctly refused while the marquee slid off to mark a region
+   * it never came from. The controller only takes that branch when `begin`
+   * receives a non-null selection, so withholding it here keeps the marquee
+   * visible and re-drawable while making the gesture genuinely read-only.
+   */
+  gestureSelection?: Selection | null;
   layers?: PixelViewportLayers;
   overlays?: ViewportOverlay[];           // host-supplied static overlays (e.g. piece outlines)
   drawUnderlay?: (ctx: CanvasRenderingContext2D, zoom: number) => void; // below selection/preview (e.g. grids), origin-translated
   drawOverlay?: (ctx: CanvasRenderingContext2D, zoom: number) => void; // escape hatch (e.g. collision HUD), origin-translated
   hostPointer?: HostPointer | null;       // when set, pointer routes here instead of the controller (tile-space tools)
+  /** Optional out-param: the host's own handle on the <canvas> element. The
+   *  canvas is what `useAnchoredZoom` measures its anchor against (a padded,
+   *  auto-centred holder is NOT the art origin), and only this component knows
+   *  where the element is — so hosts that pan/zoom pass a ref in and get it back
+   *  populated. Read-only from the host's side: nothing here reads it. */
+  canvasRef?: React.MutableRefObject<HTMLCanvasElement | null>;
   onCommit: (result: GestureResult) => void;
   onPick?: (value: number, pixel: { x: number; y: number }) => void;
   onHover?: (pixel: { x: number; y: number } | null) => void; // pointer position over the editable surface (for paste etc.)
@@ -57,9 +79,21 @@ const SPRITE_CHECKER: [[number, number, number], [number, number, number]] = [[4
  * See docs/specs/2026-06-18-unified-drawing-core-design.md.
  */
 export default function PixelViewport({
-  buffer, palette, paletteLines, lineMap, zoom, controller, selection, layers, overlays, drawUnderlay, drawOverlay, hostPointer, onCommit, onPick, onHover, style,
+  buffer, palette, paletteLines, lineMap, zoom, controller, selection, gestureSelection, layers, overlays, drawUnderlay, drawOverlay, hostPointer, onCommit, onPick, onHover, style, canvasRef: canvasOut,
 }: PixelViewportProps) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  // `undefined` means "the host said nothing", which is not the same answer as an
+  // explicit `null` ("start the gesture with no selection") — so this is not a
+  // `??`. Omit the prop and the gesture sees exactly what is drawn.
+  const gestureSel = gestureSelection !== undefined ? gestureSelection : (selection ?? null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  // One callback ref feeding both the internal ref (hit-testing, drawing) and the
+  // host's optional out-param. STABLE identity — a fresh closure here would make
+  // React detach/reattach the ref (null, then the element) on every render, and
+  // the zoom hook's layout effect would then be racing a momentarily-null canvas.
+  const attachCanvas = useCallback((el: HTMLCanvasElement | null) => {
+    canvasRef.current = el;
+    if (canvasOut) canvasOut.current = el;
+  }, [canvasOut]);
   const drawing = useRef(false);
   const hostDrawing = useRef(false);
   const lastValid = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
@@ -184,7 +218,7 @@ export default function PixelViewport({
       rerender();
       return;
     }
-    const immediate = controller.begin(buffer, p.x, p.y, selection ?? null);
+    const immediate = controller.begin(buffer, p.x, p.y, gestureSel);
     if (immediate) {
       if (immediate.pick !== undefined) onPick?.(immediate.pick, p);
       else onCommit(immediate);
@@ -216,7 +250,7 @@ export default function PixelViewport({
 
   return (
     <canvas
-      ref={canvasRef}
+      ref={attachCanvas}
       width={tilesX * width * zoom}
       height={tilesY * height * zoom}
       onPointerDown={onPointerDown}

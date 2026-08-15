@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useLayoutEffect, useCallback, useMemo, useState } from 'react';
+import React, { useRef, useEffect, useCallback, useMemo, useState } from 'react';
 import { useArtStore } from '../../state/artStore';
 import { useEditorStore, executeCommand } from '../../state/editorStore';
 import { useAeonHistoryVersion } from '../../hooks/useHistoryVersion';
@@ -21,11 +21,13 @@ import type { PixelBuffer } from '../../../core/art/pixel-ops';
 import { tileUsageCounts } from '../../../core/art/usage';
 import type { AnyCommand, SetTilesetTilesCommand } from '../../../core/editing/commands';
 import { PixelEditController } from '../../../core/art/pixel-edit-controller';
-import type { GestureResult, ArtTool as CtlArtTool } from '../../../core/art/pixel-edit-controller';
+import type { GestureResult } from '../../../core/art/pixel-edit-controller';
+import { toolConfigFrom } from '../../../core/art/tool-config';
 import PixelViewport from '../art-shared/PixelViewport';
 import type { HostPointer } from '../art-shared/PixelViewport';
 import { useAnchoredZoom } from '../art-shared/use-anchored-zoom';
 import { useHandPan } from '../art-shared/use-hand-pan';
+import { cappedZoom } from '../art-shared/zoom-cap';
 import { levelKeysEnabled } from '../../workspace/level-keys';
 import { PixelHud, type PixelHudHandle } from '../art-shared/PixelHud';
 import type { Tile, Color } from '../../../core/model/s4-types';
@@ -131,15 +133,23 @@ export default function ComposerCanvas() {
   }
 
   /**
-   * Effective zoom: capped so the composed canvas never exceeds 16000px on its
-   * wider axis. The same value feeds the viewport's render AND its pointer
-   * mapping, so clicks always land on the correct pixel.
+   * Effective zoom: capped by the shared `cappedZoom` so the composed canvas
+   * never exceeds the platform's maximum edge. The same value feeds the
+   * viewport's render AND its pointer mapping, so clicks always land on the
+   * correct pixel. (The rule used to be inline here; classic's tile host applies
+   * the same one, so it now lives in art-shared/zoom-cap and is unit-tested.)
    */
   const effectiveZoom = useMemo(() => {
     const doc = open?.doc;
     if (!doc) return zoom;
-    const docPxWidth = doc.widthTiles * 8;
-    return Math.max(1, Math.min(zoom, Math.floor(16000 / (docPxWidth * (repeatPreview ? 3 : 1)))));
+    // LARGER AXIS, which is what `cappedZoom` documents its argument to be. This
+    // used to pass the width alone, so a doc taller than it is wide was capped
+    // against the wrong dimension and could still produce a canvas past the
+    // 16000px ceiling — which renders BLANK with no error. The change can only
+    // ever LOWER the cap, and only for a doc over ~666 tiles tall (×3 with the
+    // repeat preview); composer docs are chunks, so nothing shipped today gets
+    // near it. Strictly safer, and no reachable behaviour difference.
+    return cappedZoom(zoom, Math.max(doc.widthTiles, doc.heightTiles) * 8 * (repeatPreview ? 3 : 1));
   }, [open, zoom, repeatPreview]);
 
   // ---------- resolved render inputs ----------
@@ -331,11 +341,15 @@ export default function ComposerCanvas() {
   // ---------- shared drawing engine ----------
 
   const controllerRef = useRef<PixelEditController | null>(null);
-  const ctlTool: CtlArtTool = (tool === 'tile-stamp' || tool === 'collision' || tool === 'palette-apply') ? 'pencil' : tool;
-  const config = {
-    tool: ctlTool, color: selectedColor, mirror,
-    ditherPattern, ditherSecondary, pixelPerfect,
-  };
+  // Coercion of the three tile-space tools to 'pencil' now lives in the shared
+  // builder (see its docblock) — this component's inline ternary said exactly the
+  // same thing, and moving it means classic's tile editor gets it for free. No
+  // behaviour change here: whenever `tool` is tile-space, `hostPointer` below is
+  // non-null and PixelViewport routes every pointer event to it, so the
+  // controller never receives a gesture and its tool field goes unread.
+  const config = toolConfigFrom({
+    tool, selectedColor, mirror, ditherPattern, ditherSecondary, pixelPerfect,
+  });
   if (!controllerRef.current) controllerRef.current = new PixelEditController(config);
   controllerRef.current.setConfig(config);
 
@@ -373,10 +387,18 @@ export default function ComposerCanvas() {
     }
   }, []);
 
-  // Cursor-anchored wheel zoom (the doc point under the cursor stays put).
+  // Cursor-anchored wheel zoom (the doc point under the cursor stays put). The
+  // canvas ref is not optional decoration: `styles.holder` pads by 24 and centres
+  // (`margin: auto`) whatever is smaller than the viewport, so the canvas's origin
+  // is 24..(24 + half the slack) into the scrolled content and the anchor has to
+  // be measured off the canvas itself — see use-anchored-zoom's docblock.
   const scrollerRef = useRef<HTMLDivElement>(null);
-  useAnchoredZoom(scrollerRef, effectiveZoom, () => useArtStore.getState().zoom, (z) => useArtStore.getState().setZoom(z));
-  useHandPan(scrollerRef);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  useAnchoredZoom(scrollerRef, canvasRef, effectiveZoom, () => useArtStore.getState().zoom, (z) => useArtStore.getState().setZoom(z));
+  // Gated: this canvas is LEVEL-side and stays mounted (display:none) under a
+  // sprite-doc tab, and the pan hook's Space keydown is on `window`. Ungated it
+  // would swallow Space from a focused button in SpriteMode.
+  useHandPan(scrollerRef, { enabled: levelKeysEnabled });
 
   // Tile-space tools (stamp/collision) are tile-space by nature — route them to
   // the host hook whenever selected, regardless of the px/tile tab state.
@@ -667,6 +689,7 @@ export default function ComposerCanvas() {
       <div ref={scrollerRef} style={styles.scroller}>
       <div style={styles.holder}>
         <PixelViewport
+          canvasRef={canvasRef}
           buffer={buffer}
           palette={paletteLines[0]}
           paletteLines={paletteLines}

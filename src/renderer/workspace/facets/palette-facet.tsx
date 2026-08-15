@@ -33,8 +33,26 @@
 //   through the line stored IN the cell), which is why Layout and this facet are
 //   the only two that mount it.
 //
-// STILL OPEN, and step-H shaped: the dead space under the editor, and whether
-// this facet and Art's palette section should be one component with two hosts.
+// ---------------------------------------------------------------------------
+// ONE OF THE TWO OPEN QUESTIONS IS ANSWERED (H2); THE OTHER IS NOT
+// ---------------------------------------------------------------------------
+// This block used to ask "whether this facet and Art's palette section should be
+// one component with two hosts". They ARE, and deliberately: the swatch grid is
+// components/art-shared/PaletteGrid, reached through a per-engine port
+// (providers/palette-aeon here, providers/palette-classic on the classic side),
+// and `PaletteEditor` is aeon's shell around it — mounted unchanged by this
+// facet and by aeon's Art facet, which differ in the CANVAS beside them and in
+// nothing else. Classic's two mounts are the same arrangement. Four sites, one
+// grid, four section ids. Divergence is not open; it was decided against.
+//
+// STILL OPEN: THE DEAD SPACE UNDER THE EDITOR. `palette.editor` is a single
+// CONTENT section, so PaletteEditor takes its natural height and the rest of a
+// ~700px column is empty. `overflow: auto` is not the fix — panel-scrollers
+// .test.ts forbids an unbounded scroller and is right to — and neither is what
+// classic's composer did in H3.1, because that was a canvas filling its slot and
+// this is a panel column. The honest remedy is a SECOND section with something
+// in it, which is new design. Recorded, and also listed in s1-facets.tsx's open
+// list so the two engines' versions of the question stay in one place.
 
 import React from 'react';
 import PaletteEditor from '../../components/art/PaletteEditor';

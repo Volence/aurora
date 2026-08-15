@@ -1,9 +1,57 @@
-// Pure grid-hit math for the composer dock (Task B3). The three tabs all map a
-// local pixel coordinate inside a fixed-scale canvas to a row-major cell index:
-//   • chunk tab — 16x16 block cells
-//   • block tab — 2x2 tile cells
-//   • tile tab  — 8x8 pixels
+// Pure grid math for the composer dock (Task B3). The two HAND-ROLLED tabs map a
+// local pixel coordinate inside a grid canvas to a row-major cell index, and
+// (since H3.1) size that canvas to the room they are given:
+//   • chunk tab — 16x16 block cells, 20px..48px
+//   • block tab — 2x2 tile cells, 64px..192px
 // Kept pure + unit-tested; the GUI stays a thin caller.
+//
+// THE TILE TAB IS NOT ONE OF THEM ANY MORE. It moved onto the shared pixel
+// substrate in H1.3 (PixelViewport + PixelEditController), which does its own
+// zoom-aware hit-testing in core/art/viewport-coords — so nothing here is on a
+// tile-editing path, and the 4bpp packing helpers that used to live below (the
+// old pencil's `readTilePixels`/`packTilePixels` re-export and its
+// `floodFillTile`) went with it in H1.7. The packing itself is unchanged and
+// lives in core/art/classic-tile-buffer.ts.
+
+/**
+ * The largest WHOLE-PIXEL cell size at which a `cols`x`rows` grid fits inside an
+ * `availW`x`availH` box, clamped to `[min, max]`.
+ *
+ * WHY A CELL SIZE AND NOT A CSS SCALE. The chunk and block canvases are
+ * `imageRendering: pixelated` bitmaps whose backing store is `cell * cols` — the
+ * grid lines, the solidity tint rects and the hit-test (`cellIndexAt` above) are
+ * all in cell units. Stretching the CSS box instead resamples an already-drawn
+ * bitmap at a fractional ratio, which is what the composer was doing before
+ * H3.1: a 320px chunk canvas presented in a 385px box, and a 128px block canvas
+ * in a 340px one, because both are direct children of a `flexDirection: column`
+ * flex container and were being align-stretched to its width. Changing the CELL
+ * keeps one pixel of backing store per pixel on screen.
+ *
+ * WHOLE PIXELS, NOT WHOLE ART PIXELS, and that is a compromise worth naming. A
+ * chunk cell is 16 art px, so the only cell sizes with a whole-number ART scale
+ * are 16/32/48 — i.e. the whole grid may only be 256, 512 or 768 wide, and the
+ * editor column is ~500px, so the choice would be "smaller than it is today" or
+ * "wider than the column". Whole CSS pixels is the achievable rung: the cell
+ * boundaries the user actually interacts with are exact, and the residual is the
+ * uneven art-pixel width the 20px cell already had (20/16 = 1.25).
+ *
+ * `min` is today's size and acts as a floor, so a box too small to measure — or
+ * not yet measured, where `availW`/`availH` are 0 on the first render — yields
+ * the size the tab has always had rather than a degenerate one.
+ */
+export function fitCellSize(
+  availW: number,
+  availH: number,
+  cols: number,
+  rows: number,
+  min: number,
+  max: number,
+): number {
+  if (!(cols > 0) || !(rows > 0) || !(max >= min)) return min;
+  const fit = Math.min(Math.floor(availW / cols), Math.floor(availH / rows));
+  if (!Number.isFinite(fit)) return min;
+  return Math.max(min, Math.min(max, fit));
+}
 
 /**
  * Map a local pixel coordinate (relative to a grid canvas's top-left) to a
@@ -56,16 +104,24 @@ export interface CanvasGeom {
  * `clientX - rect.left`:
  *
  *  1. `getBoundingClientRect()` returns the BORDER box, but drawing coordinates
- *     start at the CONTENT box. The composer canvases carry a 1px border
+ *     start at the CONTENT box. The chunk/block canvases carry a 1px border
  *     (`styles.gridCanvas`), so every hit-test read one CSS pixel further right
  *     and down than the cursor really was — a CONSTANT offset that put the
  *     painted pixel one off whenever the cursor sat within 1px of a cell's
  *     leading edge, and made the last 1px column/row of the canvas dead.
- *  2. CSS content size vs backing-store size. These are 1:1 for the composer
- *     today (the canvases are sized by their width/height attributes with no CSS
- *     width), so this term is the identity — but deriving it rather than
- *     assuming it means a later CSS-sized or DPR-scaled canvas cannot silently
- *     reintroduce a SCALE-dependent version of the same bug.
+ *     (The tile canvas takes the same `styles.gridCanvas` but overrides
+ *     `border: 'none'`, because PixelViewport's own hit-test does NOT make this
+ *     correction — see the note at TileTab's `canvasStyle`.)
+ *  2. CSS content size vs backing-store size. This term was believed to be the
+ *     identity ("the canvases are sized by their width/height attributes with no
+ *     CSS width") and MEASURED NOT TO BE: until H3.1 the chunk canvas drew 320
+ *     backing px into a 385px box and the block canvas 128 into 340, because
+ *     both are direct children of a column flex container and were being
+ *     align-stretched to its width. Deriving the term rather than assuming it is
+ *     the only reason the hit-test stayed correct through that. It is the
+ *     identity again now (the fit box centres rather than stretches — see
+ *     `fitCellSize`), and this correction is what will keep the next accidental
+ *     stretch from also being a mis-click.
  *
  * Degenerate geometry (a zero-size or detached canvas) falls back to scale 1
  * rather than producing NaN/Infinity, which `cellIndexAt` would not reject.
@@ -86,7 +142,7 @@ export function canvasLocalPoint(
 /**
  * `cellIndexAt` for a viewport point: correct the canvas box geometry first, so
  * the cell returned is the one drawn under the cursor. The single hit-test entry
- * point for all three composer tabs.
+ * point for the chunk and block tabs.
  */
 export function canvasCellIndexAt(
   clientX: number,
@@ -100,63 +156,3 @@ export function canvasCellIndexAt(
   return cellIndexAt(x, y, cellPx, cols, rows);
 }
 
-// ---------------------------------------------------------------------------
-// 4bpp tile pixel <-> byte packing (the composer's Tile-tab pencil path)
-// ---------------------------------------------------------------------------
-// A Mega Drive 8x8 tile is 32 bytes: 4 bytes/row, 2 pixels/byte. The HIGH nibble
-// is the LEFT (even-x) pixel, the low nibble the right — cross-checked against
-// the decoder in src/core/formats/tiles.ts (high nybble → col*2, low → col*2+1)
-// and the core renderer. These are the SOLE pencil→bytes path, so the nibble
-// order is pinned by unit tests: a swap would silently corrupt every art edit.
-
-const TILE_BYTES = 32;
-
-/** Read one 8x8 tile's 64 palette indices (row-major) from a tile-pool blob. */
-export function readTilePixels(tiles: Uint8Array, tileIndex: number): Uint8Array {
-  const px = new Uint8Array(64);
-  const base = tileIndex * TILE_BYTES;
-  if (base < 0 || base + TILE_BYTES > tiles.length) return px;
-  for (let i = 0; i < 64; i++) {
-    const byte = tiles[base + (i >> 1)];
-    px[i] = (i & 1) === 0 ? (byte >> 4) & 0xf : byte & 0xf;
-  }
-  return px;
-}
-
-/** Pack 64 palette indices back into one tile's 32 bytes (inverse of readTilePixels). */
-export function packTilePixels(px: Uint8Array): Uint8Array {
-  const out = new Uint8Array(TILE_BYTES);
-  for (let i = 0; i < 64; i++) {
-    const b = i >> 1;
-    if ((i & 1) === 0) out[b] = (out[b] & 0x0f) | ((px[i] & 0xf) << 4);
-    else out[b] = (out[b] & 0xf0) | (px[i] & 0xf);
-  }
-  return out;
-}
-
-/**
- * 4-connected flood fill over an 8x8 tile's 64 palette indices (row-major).
- * Returns pixel index → color — the same Map shape as a pencil stroke, so the
- * Tile tab commits both through the identical endStroke path. Empty when the
- * start is out of range or the region is already the fill color (a no-op fill
- * must not produce an undo step).
- */
-export function floodFillTile(px: Uint8Array, start: number, color: number): Map<number, number> {
-  const out = new Map<number, number>();
-  if (px.length !== 64 || start < 0 || start >= 64) return out;
-  const target = px[start];
-  if (target === (color & 0xf)) return out;
-  const stack = [start];
-  const seen = new Set<number>(stack);
-  while (stack.length) {
-    const i = stack.pop()!;
-    if (px[i] !== target) continue;
-    out.set(i, color & 0xf);
-    const x = i % 8;
-    const nbrs = [x > 0 ? i - 1 : -1, x < 7 ? i + 1 : -1, i - 8, i + 8];
-    for (const n of nbrs) {
-      if (n >= 0 && n < 64 && !seen.has(n)) { seen.add(n); stack.push(n); }
-    }
-  }
-  return out;
-}

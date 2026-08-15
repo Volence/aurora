@@ -1,35 +1,32 @@
 import React from 'react';
 import { T } from '../ui';
-import { encodeGenesisColor, decodeGenesisColor } from '../../../core/formats/palette';
+import { decodeGenesisColor, fmtGenesisWord } from '../../../core/formats/palette';
+import { channelLevel, withChannel } from './palette-grid-model';
 
 // The Genesis palette color-picker CONTROL — three 3-bit R/G/B sliders (0-7 per
-// channel) over a single CRAM word — extracted from PaletteEditor's slider panel
-// so it can be reused decoupled from the aeon art/sprite stores (Task B4). It is
-// pure UI: it holds no state, operates only on a `word` (0000BBB0GGG0RRR0), and
-// reports edits through callbacks so each host wires its own commit/undo path.
+// channel) over a single CRAM word. It is pure UI: it holds no state, operates
+// only on a `word` (0000BBB0GGG0RRR0), and reports edits through callbacks so
+// each host wires its own commit/undo path. BOTH palette panels render it:
+// classic's ClassicPalettePanel and aeon's PaletteEditor (whose inlined second
+// copy — same to3, same word formatter, same channel table, same six styles —
+// this replaced).
 //
 //   • onChange(word) fires per slider tick — a live PREVIEW (no history).
 //   • onCommit(word) fires on release (pointerup / keyup / blur) — the host
 //     records exactly one undo step there.
+//
+// onCommit CAN FIRE MORE THAN ONCE per drag: pointerup commits, and the blur
+// when focus later leaves commits again. Hosts must make the second call a
+// no-op (both do, by clearing their pre-drag snapshot on the first).
 
 const CHANNELS = ['r', 'g', 'b'] as const;
 const CHANNEL_COLORS: Record<string, string> = { r: T.error, g: T.success, b: T.info };
 
-/** 8-bit channel → Genesis 3-bit level (0-7). */
-function to3(v: number): number {
-  return Math.round(Math.min(255, Math.max(0, v)) / 255 * 7);
-}
-
-/** Rebuild a CRAM word from `word` with one channel replaced by a 0-7 level. */
-function withChannel(word: number, channel: 'r' | 'g' | 'b', level3: number): number {
-  const c = decodeGenesisColor(word);
-  const levels = { r: to3(c.r), g: to3(c.g), b: to3(c.b), [channel]: level3 };
-  return encodeGenesisColor({ r: levels.r * 255 / 7, g: levels.g * 255 / 7, b: levels.b * 255 / 7 });
-}
-
-function fmtGenesisWord(word: number): string {
-  return '$' + word.toString(16).toUpperCase().padStart(4, '0');
-}
+// `channelLevel` (8-bit → the Genesis 3-bit level) and `withChannel` (rebuild a
+// CRAM word with one channel replaced) live in palette-grid-model.ts, next to the
+// rest of the word arithmetic and where they can be run by a test. This file used
+// to declare private copies; they are the same two helpers the grid needs, and two
+// copies of a `>> 9 & 7` is how the palette panels drifted the first time.
 
 export default function GenesisColorSliders({
   word, onChange, onCommit, heading,
@@ -40,12 +37,13 @@ export default function GenesisColorSliders({
   heading?: React.ReactNode;
 }) {
   const color = decodeGenesisColor(word);
-  // Commit on release WITHOUT blurring the slider. The aeon PaletteEditor blurs
-  // here so a post-commit Ctrl+Z reaches its keydown handler past an INPUT guard,
-  // but blur() re-enters this same onBlur handler synchronously → onCommit twice,
-  // AND drops focus after one arrow-key press (breaking fine-tuning). We skip it:
-  // the level undo guard (LevelWorkspace) already excludes type:'range', so
-  // a focused slider never blocks undo — no blur needed.
+  // Commit on release WITHOUT blurring the slider. PaletteEditor used to blur
+  // here so a post-commit Ctrl+Z reached its keydown handler past an INPUT guard.
+  // That guard is gone: BOTH surviving level-side undo bindings — LevelWorkspace
+  // (via isTypingTarget) and SpriteMode's own keydown — exempt type:'range', so a
+  // focused slider never blocks undo. And blurring costs: blur() re-enters this
+  // same onBlur handler synchronously → onCommit twice, and it drops focus after
+  // one arrow-key press, so a slider cannot be fine-tuned by keyboard.
   const commit = () => { onCommit(word); };
   return (
     <div style={styles.panel}>
@@ -59,14 +57,14 @@ export default function GenesisColorSliders({
         <div key={ch} style={styles.sliderRow}>
           <span style={{ ...styles.channelLabel, color: CHANNEL_COLORS[ch] }}>{ch.toUpperCase()}</span>
           <input
-            type="range" min={0} max={7} step={1} value={to3(color[ch])}
+            type="range" min={0} max={7} step={1} value={channelLevel(color[ch])}
             onChange={(e) => onChange(withChannel(word, ch, Number(e.target.value)))}
             onPointerUp={commit}
             onKeyUp={commit}
             onBlur={commit}
             style={styles.slider}
           />
-          <span style={styles.channelValue}>{to3(color[ch])}</span>
+          <span style={styles.channelValue}>{channelLevel(color[ch])}</span>
         </div>
       ))}
     </div>

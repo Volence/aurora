@@ -1,32 +1,15 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useState } from 'react';
 import { useProjectStore, getCurrentZone, getActiveLevel, getCurrentAct } from '../../state/projectStore';
 import { executeAmbientCommand } from '../../state/editorStore';
-import { useHistoryVersion } from '../../hooks/useHistoryVersion';
-import { useArtStore } from '../../state/artStore';
 import { useSpriteStore } from '../../state/spriteStore';
-import { encodeGenesisColor, decodeGenesisColor } from '../../../core/formats/palette';
+import { encodeGenesisColor } from '../../../core/formats/palette';
 import { copySwatchInto, copyLineInto } from '../../../core/art/palette-copy';
 import { paletteLineUsageCounts } from '../../../core/art/usage';
 import type { Color } from '../../../core/model/s4-types';
 import { T } from '../ui';
+import PaletteGrid, { type PaletteGridShell, type PaletteSwatchProps } from '../art-shared/PaletteGrid';
+import { useAeonPaletteGridPort } from '../../providers/palette-aeon';
 import PaletteCopyMenu, { type CopyMenuItem } from './PaletteCopyMenu';
-
-/** 8-bit channel → Genesis 3-bit level (0-7). */
-function to3(v: number): number {
-  return Math.round(Math.min(255, Math.max(0, v)) / 255 * 7);
-}
-
-function fmtWord(word: number): string {
-  return '$' + word.toString(16).toUpperCase().padStart(4, '0');
-}
-
-interface SwatchSel {
-  line: number;
-  idx: number;
-}
-
-const CHANNELS = ['r', 'g', 'b'] as const;
-const CHANNEL_COLORS: Record<string, string> = { r: T.error, g: T.success, b: T.info };
 
 /** Source carried by an in-progress swatch/line drag (HTML5 DnD; payload in a
  *  module ref, mirroring SectionGridNav — no dataTransfer). */
@@ -39,233 +22,52 @@ function sameColors(a: Color[], b: Color[]): boolean {
 }
 
 /**
- * Genesis palette editor: 4 rows × 16 swatches over zone.palette. The grid
- * doubles as the painting color picker (artStore.selectedColor/paletteLine).
+ * Aeon's palette editor: the SHARED swatch grid (art-shared/PaletteGrid) plus the
+ * two things that are aeon's alone — drag-and-drop copy grips and the right-click
+ * "Copy to ▸" menu.
  *
- * Render is context-aware (three modes):
- *  1. Art mode — the 4 zone lines; line 0 is sprite-reserved (locked).
- *  2. Sprite + zone palette — the 4 zone lines, but line 0 (the player palette)
- *     is EDITABLE; the paint-selection outline tracks the sprite's bound line
- *     (spriteStore.zoneLine), and clicking a swatch binds that sprite line.
- *  3. Sprite + standalone palette — a single row of the sprite's 16 private
- *     colors; slider edits commit via setStandalonePalette (one undo step/drag).
+ * The grid, the selection, the sliders and the whole preview/commit/teardown path
+ * are no longer here: they are the component classic renders too, driven by
+ * providers/palette-aeon.ts. That port covers all three of this editor's context
+ * modes, because the differences between them are exactly the two things a port
+ * already carries — the policy and the commit path:
  *
- * Index 0 of every line is transparent (locked for editing but clickable as the
- * eraser-equivalent paint color).
+ *  1. Art / Palette facet   — the 4 zone lines; line 0 is sprite-reserved (locked).
+ *  2. Sprite pane, zone     — the same 4 lines with line 0 UNLOCKED, and a click
+ *                             binding the sprite's zoneLine.
+ *  3. Sprite pane, standalone — ONE row of the sprite doc's 16 private colours,
+ *                             committed to the sprite's own undo stack. The port
+ *                             models it as a one-line grid, so nothing here or in
+ *                             the grid special-cases it.
  *
- * The `context` prop selects sprite behavior (mode 2/3 above) — the sprite-doc
- * SpriteMode pane passes `context="sprite"`; the Art and Palette facets pass
- * nothing (zone-line editing, mode 1). Mount invariant: PaletteEditor only
- * renders in the Art/Palette facets and the sprite editor. MapViewport's keydown
- * handler HAS an INPUT-type guard (it skips INPUT/TEXTAREA/contentEditable
- * targets), so a mid-drag Ctrl+Z while a palette slider (an INPUT) has focus is
- * swallowed there — the map-undo path isn't reachable from a focused slider.
+ * WHAT STAYS IS WHAT IS AEON-SHAPED. The copy machinery speaks in aeon `Color`
+ * objects, aeon zone lines and aeon sprite documents; classic has no version of
+ * it, so it does not belong in art-shared/. It reaches the swatches as render
+ * props (PaletteGridShell) instead of moving.
  */
-export default function PaletteEditor({ context }: { context?: 'sprite' }) {
-  // Subscribe to paletteVersion for live-preview repaint during slider drags.
-  // The history clock re-renders swatches after undo/redo restores colors and
-  // after committed commands, for the zone AND the sprite palettes alike — both
-  // documents' stacks report through the same hub.
-  useArtStore((s) => s.paletteVersion);
-  useHistoryVersion();
-  const project = useProjectStore((s) => s.project);
-  const zone = getCurrentZone(useProjectStore.getState());
-  const paintColor = useArtStore((s) => s.selectedColor);
-  const paintLine = useArtStore((s) => s.paletteLine);
-
+export default function PaletteEditor({ context }: { context?: 'sprite' }): React.ReactElement | null {
+  // The port subscribes both repaint clocks (artStore.paletteVersion for the live
+  // preview, the history hub for undo/redo) as well as the project, so this file
+  // re-renders with the grid and needs no subscription of its own beyond the
+  // sprite state its copy menu reads.
+  const port = useAeonPaletteGridPort({ context });
   const spriteMode = useSpriteStore((s) => s.paletteMode);
-  const spriteZoneLine = useSpriteStore((s) => s.zoneLine);
   const standalone = useSpriteStore((s) => s.standalonePalette);
   const inSprite = context === 'sprite';
+  const standaloneSprite = inSprite && spriteMode === 'standalone';
 
-  const [sel, setSel] = useState<SwatchSel | null>(null);
   const [menu, setMenu] = useState<{ x: number; y: number; heading: string; items: CopyMenuItem[] } | null>(null);
   // Highlighted drop target during a drag: `${kind}:${line}:${idx}`.
   const [dropKey, setDropKey] = useState<string | null>(null);
-  // Pre-drag deep copy of the edited line so the committed undo snapshot is
-  // the true pre-drag state (live preview mutates the palette in place).
-  const preDragRef = useRef<{ line: number; colors: Color[] } | null>(null);
-  // Separate pre-drag copy for the standalone path (keyed to no zone line — the
-  // standalone palette is a flat 16-color array on the sprite store, not the
-  // zone). Kept distinct from preDragRef so the two commit paths never collide.
-  const preDragStandaloneRef = useRef<Color[] | null>(null);
 
-  const standaloneSprite = inSprite && spriteMode === 'standalone';
-  // The open swatch selection (sel) is per-context: a standalone sel (line 0,
-  // flat palette) must not leak into the zone/Art render, where line 0 means
-  // the zone's first line. Reset it whenever the render context flips so the
-  // slider panel and edit highlight never target the wrong palette.
-  useEffect(() => { setSel(null); }, [standaloneSprite]);
-
+  const project = useProjectStore((s) => s.project);
+  const zone = getCurrentZone(useProjectStore.getState());
   // Standalone mode reads the sprite's private palette, not the zone — so it
   // renders without a zone. Every other path needs the zone's palette lines.
-  if (!project) return null;
-  if (!standaloneSprite && !zone) return null;
   const lines = zone ? zone.palette.lines : [];
 
-  function handleSwatchClick(line: number, idx: number) {
-    // Art mode: line 0 is sprite-reserved. Sprite mode: line 0 is the editable
-    // player palette, so don't early-return on it.
-    if (line === 0 && !inSprite) return;
-    // Any clickable swatch sets the paint color (index 0 = eraser-equivalent)…
-    useArtStore.getState().setSelectedColor(idx);
-    if (inSprite) {
-      // Bind the SPRITE's zone line (not artStore's paint line) so the canvas
-      // colors against the chosen line; the highlight tracks spriteZoneLine.
-      useSpriteStore.getState().setZoneLine(line);
-    } else {
-      useArtStore.getState().setPaletteLine(line);
-    }
-    // …but only editable swatches (indices 1-15) open the sliders.
-    if (idx > 0) setSel({ line, idx });
-  }
-
-  /** Standalone palette: clicking sets the paint color (index 0 = eraser);
-   *  editable swatches (1-15) open the sliders. No zone line to bind. */
-  function handleStandaloneClick(idx: number) {
-    useArtStore.getState().setSelectedColor(idx);
-    if (idx > 0) setSel({ line: 0, idx });
-  }
-
-  /** Capture the pre-drag standalone copy (pointerdown, or lazily on first change). */
-  function beginStandaloneDrag() {
-    if (preDragStandaloneRef.current) return;
-    preDragStandaloneRef.current = useSpriteStore.getState().standalonePalette.map((c) => ({ ...c }));
-  }
-
-  /**
-   * Live preview for the standalone palette: build the edited array and write it
-   * straight onto the sprite store WITHOUT recording history (setState, not
-   * setStandalonePalette) so a drag is silent per tick. bumpPaletteVersion
-   * repaints the canvas + thumbnails. Index 0 stays transparent.
-   */
-  function previewStandalone(idx: number, channel: 'r' | 'g' | 'b', level3: number) {
-    beginStandaloneDrag();
-    const cur = useSpriteStore.getState().standalonePalette;
-    const prev = cur[idx];
-    const channels = { r: to3(prev.r), g: to3(prev.g), b: to3(prev.b), [channel]: level3 };
-    const next = decodeGenesisColor(encodeGenesisColor({
-      r: channels.r * 255 / 7, g: channels.g * 255 / 7, b: channels.b * 255 / 7,
-    }));
-    const edited = cur.map((c, i) => (i === idx ? next : { ...c }));
-    edited[0] = { ...edited[0], a: 0 }; // index 0 stays transparent
-    useSpriteStore.setState({ standalonePalette: edited });
-    useArtStore.getState().bumpPaletteVersion();
-  }
-
-  /**
-   * Commit a standalone drag: restore the pre-drag array FIRST, then call
-   * setStandalonePalette ONCE so the sprite history records exactly the
-   * pre-drag→edited step (a single undo). Mirrors the zone commitDrag pattern.
-   */
-  function commitStandalone(e?: React.SyntheticEvent) {
-    // Blur the slider so post-commit Ctrl+Z reaches the keydown handler.
-    (e?.currentTarget as HTMLElement | undefined)?.blur?.();
-    const pre = preDragStandaloneRef.current;
-    preDragStandaloneRef.current = null;
-    if (!pre) return;
-    const edited = useSpriteStore.getState().standalonePalette.map((c) => ({ ...c }));
-    edited[0] = { ...edited[0], a: 0 }; // index 0 stays transparent
-
-    const changed = edited.some((c, i) =>
-      encodeGenesisColor(c) !== encodeGenesisColor(pre[i]) || c.a !== pre[i].a);
-    // Restore the pre-drag array before recording, so the undo step transitions
-    // pre-drag → edited and undo restores the true pre-drag colors.
-    useSpriteStore.setState({ standalonePalette: pre.map((c) => ({ ...c })) });
-    if (!changed) return; // click without movement — no history entry
-    useSpriteStore.getState().setStandalonePalette(edited);
-  }
-
-  /** Capture the pre-drag line copy (pointerdown, or lazily on first change). */
-  function beginDrag(line: number) {
-    if (preDragRef.current && preDragRef.current.line === line) return;
-    const z = getCurrentZone(useProjectStore.getState());
-    if (!z) return;
-    preDragRef.current = {
-      line,
-      colors: z.palette.lines[line].colors.map((c) => ({ ...c })),
-    };
-  }
-
-  /**
-   * Live preview: write the quantized color directly into the palette object
-   * and bump docVersion + paletteVersion so the composer canvas (and the
-   * swatch grid) repaint immediately without touching the history clock — keeping
-   * TilesetPanel's tile-thumb cache (keyed on that clock) silent per tick.
-   */
-  function previewChange(line: number, idx: number, channel: 'r' | 'g' | 'b', level3: number) {
-    const z = getCurrentZone(useProjectStore.getState());
-    if (!z) return;
-    beginDrag(line);
-    const cur = z.palette.lines[line].colors[idx];
-    const channels = { r: to3(cur.r), g: to3(cur.g), b: to3(cur.b), [channel]: level3 };
-    const next = decodeGenesisColor(encodeGenesisColor({
-      r: channels.r * 255 / 7, g: channels.g * 255 / 7, b: channels.b * 255 / 7,
-    }));
-    z.palette.lines[line].colors[idx] = next;
-    useArtStore.getState().bumpDoc();
-    useArtStore.getState().bumpPaletteVersion();
-  }
-
-  /**
-   * Commit on slider release (pointerup), keyboard release (keyup — arrow keys
-   * fire onChange but no pointerup), or focus loss (blur). Restore the pre-drag
-   * line FIRST, then run the set-palette-line command — so history's undo
-   * snapshot is the pre-drag state, not the mid-drag preview.
-   *
-   * Blurs the active slider after commit so Ctrl+Z (art-facet.tsx ArtCanvas's
-   * keydown binding) is not blocked by the INPUT early-return guard on the next
-   * undo.
-   *
-   * AMBIENT, not focused: this editor edits ZONE palette lines from inside the
-   * sprite pane too (SpriteMode mounts it with context="sprite", where line 0 is
-   * unlocked and the "Copy to ▸ Zone line N" bridge writes zone CRAM). Focus
-   * there is the sprite DOCUMENT, which owns no command history — routing by
-   * focus threw inside the event handler. executeAmbientCommand records on the
-   * zone-art document the colors actually live in. Same reasoning for
-   * applyZoneSwatchCopy / applyZoneLineCopy below.
-   *
-   * Note: MapViewport's invalidation listener handles set-palette-line →
-   * reloadAllSections for the MAP repaint, but in Art mode it is unmounted —
-   * the composer repaints via the history clock, and the map re-prerenders on
-   * remount (MapViewport's mount effect). Established pattern; see
-   * workspace/facets/art-facet.tsx (ArtCanvas).
-   */
-  function commitDrag(e?: React.SyntheticEvent) {
-    // Blur the slider so post-commit Ctrl+Z reaches art-facet.tsx ArtCanvas's
-    // keydown binding without being swallowed by the INPUT guard.
-    (e?.currentTarget as HTMLElement | undefined)?.blur?.();
-    const pre = preDragRef.current;
-    preDragRef.current = null;
-    if (!pre) return;
-    const state = useProjectStore.getState();
-    const z = getCurrentZone(state);
-    const level = getActiveLevel(state);
-    if (!z || !level) return;
-
-    const edited = z.palette.lines[pre.line].colors.map((c) => ({ ...c }));
-    edited[0] = { ...edited[0], a: 0 }; // index 0 stays transparent
-
-    // Restore the pre-drag line before executing, so apply() transitions
-    // pre-drag → edited and undo restores the true pre-drag colors.
-    z.palette.lines[pre.line].colors = pre.colors.map((c) => ({ ...c }));
-
-    const changed = edited.some((c, i) =>
-      encodeGenesisColor(c) !== encodeGenesisColor(pre.colors[i]) || c.a !== pre.colors[i].a);
-    if (!changed) return; // click without movement — no history entry
-
-    executeAmbientCommand({
-      type: 'set-palette-line',
-      line: pre.line,
-      oldColors: pre.colors,
-      newColors: edited,
-      sectionIndex: -1,
-      description: `art: edit palette line ${pre.line} color ${sel?.idx ?? '?'}`,
-    }, level);
-  }
-
   /** Copy a single color into a zone line index, via the undoable set-palette-line command. */
-  function applyZoneSwatchCopy(line: number, idx: number, src: Color) {
+  function applyZoneSwatchCopy(line: number, idx: number, src: Color): void {
     if (idx <= 0) return;
     const state = useProjectStore.getState();
     const z = getCurrentZone(state);
@@ -280,8 +82,13 @@ export default function PaletteEditor({ context }: { context?: 'sprite' }) {
     }, level);
   }
 
-  /** Copy 16 colors (1-15) into a zone line, via set-palette-line. */
-  function applyZoneLineCopy(line: number, src: Color[]) {
+  /** Copy 16 colors (1-15) into a zone line, via set-palette-line.
+   *
+   *  AMBIENT, not focused, here and above: the "Copy to ▸ Zone line N" bridge
+   *  writes zone CRAM from inside the SPRITE pane, where focus is the sprite
+   *  document — which owns no aeon command history, so routing by focus threw
+   *  inside the event handler. */
+  function applyZoneLineCopy(line: number, src: Color[]): void {
     const state = useProjectStore.getState();
     const z = getCurrentZone(state);
     const level = getActiveLevel(state);
@@ -296,7 +103,7 @@ export default function PaletteEditor({ context }: { context?: 'sprite' }) {
   }
 
   /** Copy a single color into the standalone palette, via setStandalonePalette (sprite undo). */
-  function applyStandaloneSwatchCopy(idx: number, src: Color) {
+  function applyStandaloneSwatchCopy(idx: number, src: Color): void {
     if (idx <= 0) return;
     const cur = useSpriteStore.getState().standalonePalette;
     const edited = copySwatchInto(cur, idx, src);
@@ -305,7 +112,7 @@ export default function PaletteEditor({ context }: { context?: 'sprite' }) {
   }
 
   /** Copy 16 colors into the standalone palette. */
-  function applyStandaloneLineCopy(src: Color[]) {
+  function applyStandaloneLineCopy(src: Color[]): void {
     const cur = useSpriteStore.getState().standalonePalette;
     const edited = copyLineInto(cur, src);
     if (sameColors(edited, cur)) return;
@@ -326,9 +133,9 @@ export default function PaletteEditor({ context }: { context?: 'sprite' }) {
     return act ? paletteLineUsageCounts(act) : new Map<number, number>();
   }
 
-  /** A zone line is off-limits as a copy participant when it's the Art-mode
-   *  sprite-reserved line 0 — mirrors the per-swatch `locked` so the copy bridge
-   *  can't overwrite the player palette outside sprite mode. */
+  /** A zone line is off-limits as a copy participant when it is the Art-mode
+   *  sprite-reserved line 0 — the same rule the port's policy states per swatch,
+   *  so the copy bridge cannot overwrite the player palette outside sprite mode. */
   function zoneLineLocked(line: number): boolean {
     return line === 0 && !inSprite;
   }
@@ -363,39 +170,39 @@ export default function PaletteEditor({ context }: { context?: 'sprite' }) {
     return items;
   }
 
-  function openSwatchMenu(e: React.MouseEvent, srcLine: number, idx: number, src: Color) {
+  function openSwatchMenu(e: React.MouseEvent, srcLine: number, idx: number, src: Color): void {
     e.preventDefault(); // suppress the native menu even on a non-source (idx 0) swatch
     if (idx <= 0) return; // transparent backdrop isn't a copy source
     setMenu({ x: e.clientX, y: e.clientY, heading: 'Copy color to', items: swatchMenuItems(srcLine, idx, src) });
   }
-  function openLineMenu(e: React.MouseEvent, srcLine: number, src: Color[]) {
+  function openLineMenu(e: React.MouseEvent, srcLine: number, src: Color[]): void {
     e.preventDefault();
     setMenu({ x: e.clientX, y: e.clientY, heading: 'Copy line to', items: lineMenuItems(srcLine, src) });
   }
 
-  function onSwatchDragStart(color: Color) { dragPayload = { kind: 'swatch', color }; }
-  function onLineDragStart(colors: Color[]) { dragPayload = { kind: 'line', colors: colors.map((c) => ({ ...c })) }; }
-  function onSwatchDragOver(e: React.DragEvent, key: string, idx: number, locked = false) {
+  function onSwatchDragStart(color: Color): void { dragPayload = { kind: 'swatch', color }; }
+  function onLineDragStart(colors: Color[]): void { dragPayload = { kind: 'line', colors: colors.map((c) => ({ ...c })) }; }
+  function onSwatchDragOver(e: React.DragEvent, key: string, idx: number, locked: boolean): void {
     if (dragPayload?.kind !== 'swatch' || idx <= 0 || locked) return;
     e.preventDefault();
     if (dropKey !== key) setDropKey(key);
   }
-  function onLineDragOver(e: React.DragEvent, key: string, locked = false) {
+  function onLineDragOver(e: React.DragEvent, key: string, locked = false): void {
     if (dragPayload?.kind !== 'line' || locked) return;
     e.preventDefault();
     if (dropKey !== key) setDropKey(key);
   }
-  function endDrag() { dragPayload = null; setDropKey(null); }
+  function endDrag(): void { dragPayload = null; setDropKey(null); }
   /** Drop a swatch onto a target. `destLine` is the zone line, or -1 for standalone.
    *  `locked` (Art-mode line 0) rejects the drop so the player palette is safe. */
-  function onSwatchDrop(destLine: number, idx: number, locked = false) {
+  function onSwatchDrop(destLine: number, idx: number, locked: boolean): void {
     const p = dragPayload;
     endDrag();
     if (p?.kind !== 'swatch' || idx <= 0 || locked) return;
     if (destLine === -1) applyStandaloneSwatchCopy(idx, p.color);
     else applyZoneSwatchCopy(destLine, idx, p.color);
   }
-  function onLineDrop(destLine: number, locked = false) {
+  function onLineDrop(destLine: number, locked = false): void {
     const p = dragPayload;
     endDrag();
     if (p?.kind !== 'line' || locked) return;
@@ -403,192 +210,79 @@ export default function PaletteEditor({ context }: { context?: 'sprite' }) {
     else applyZoneLineCopy(destLine, p.colors);
   }
 
-  const selColor = sel
-    ? (standaloneSprite ? standalone[sel.idx] : lines[sel.line]?.colors[sel.idx])
-    : null;
-  const selWord = selColor ? encodeGenesisColor(selColor) : 0;
+  /** The colours behind row `li` — the sprite's private palette in standalone
+   *  mode, the zone line otherwise. The grid renders CRAM words; the copy paths
+   *  need the `Color` objects they came from. */
+  function rowColors(li: number): Color[] {
+    return standaloneSprite ? standalone : (lines[li]?.colors ?? []);
+  }
+  /** The copy machinery's name for a row: -1 means "the standalone palette". */
+  const srcLine = (li: number): number => (standaloneSprite ? -1 : li);
+  const keyPrefix = standaloneSprite ? 'sa' : 'z';
 
-  return (
-    <div style={styles.root}>
-      <div style={styles.grid}>
-        {standaloneSprite ? (
-          <div style={styles.row}>
-            <div
-              style={styles.grip}
-              title="Drag to copy this palette · right-click to copy to a zone line"
-              draggable
-              onDragStart={() => onLineDragStart(standalone)}
-              onDragOver={(e) => onLineDragOver(e, 'sa-line')}
-              onDrop={() => onLineDrop(-1)}
-              onDragEnd={endDrag}
-              onContextMenu={(e) => openLineMenu(e, -1, standalone)}
-            />
-            {standalone.map((c, ci) => {
-              const transparent = ci === 0;
-              const isEditSel = sel !== null && sel.idx === ci;
-              const isPaintSel = paintColor === ci;
-              const title = transparent
-                ? 'transparent (index 0)'
-                : `sprite palette, index ${ci} — ${fmtWord(encodeGenesisColor(c))}`;
-              return (
-                <div
-                  key={ci}
-                  title={title}
-                  draggable={ci > 0}
-                  onDragStart={() => onSwatchDragStart(c)}
-                  onDragOver={(e) => onSwatchDragOver(e, `sa:0:${ci}`, ci)}
-                  onDrop={() => onSwatchDrop(-1, ci)}
-                  onDragEnd={endDrag}
-                  onContextMenu={(e) => openSwatchMenu(e, -1, ci, c)}
-                  onClick={() => handleStandaloneClick(ci)}
-                  style={{
-                    ...styles.swatch,
-                    ...(transparent
-                      ? styles.checkerboard
-                      : { background: `rgb(${c.r},${c.g},${c.b})` }),
-                    ...(isPaintSel ? styles.paintSel : {}),
-                    ...(isEditSel ? styles.editSel : {}),
-                    ...(dropKey === `sa:0:${ci}` ? styles.dropTarget : {}),
-                  }}
-                />
-              );
-            })}
-          </div>
-        ) : (
-          lines.map((line, li) => {
-            // Line 0 is the editable player palette in Sprite mode; locked
-            // (sprite-reserved) only in Art mode. Gates the grip + every swatch.
-            const rowLocked = li === 0 && !inSprite;
-            return (
-            <div key={li} style={styles.row}>
-              <div
-                style={{ ...styles.grip, ...(rowLocked ? styles.locked : {}), ...(dropKey === `z-line:${li}` ? styles.dropTarget : {}) }}
-                title={rowLocked ? 'sprite-reserved (line 0)' : `Drag to copy line ${li} · right-click to copy elsewhere`}
-                draggable={!rowLocked}
-                onDragStart={() => onLineDragStart(line.colors)}
-                onDragOver={(e) => onLineDragOver(e, `z-line:${li}`, rowLocked)}
-                onDrop={() => onLineDrop(li, rowLocked)}
-                onDragEnd={endDrag}
-                onContextMenu={(e) => { e.preventDefault(); if (!rowLocked) openLineMenu(e, li, line.colors); }}
-              />
-              {line.colors.map((c, ci) => {
-                const locked = rowLocked;
-                const transparent = ci === 0;
-                const isEditSel = sel !== null && sel.line === li && sel.idx === ci;
-                // In Sprite mode the paint-selection outline tracks the sprite's
-                // bound line; in Art mode it tracks artStore.paletteLine.
-                const selLine = inSprite ? spriteZoneLine : paintLine;
-                const isPaintSel = !locked && selLine === li && paintColor === ci;
-                const title = locked
-                  ? 'sprite-reserved (line 0)'
-                  : transparent
-                    ? 'transparent (index 0)'
-                    : `line ${li}, index ${ci} — ${fmtWord(encodeGenesisColor(c))}`;
-                return (
-                  <div
-                    key={ci}
-                    title={title}
-                    draggable={ci > 0 && !locked}
-                    onDragStart={() => onSwatchDragStart(c)}
-                    onDragOver={(e) => onSwatchDragOver(e, `z:${li}:${ci}`, ci, locked)}
-                    onDrop={() => onSwatchDrop(li, ci, locked)}
-                    onDragEnd={endDrag}
-                    onContextMenu={(e) => { if (locked) { e.preventDefault(); return; } openSwatchMenu(e, li, ci, c); }}
-                    onClick={() => handleSwatchClick(li, ci)}
-                    style={{
-                      ...styles.swatch,
-                      ...(transparent
-                        ? styles.checkerboard
-                        : { background: `rgb(${c.r},${c.g},${c.b})` }),
-                      ...(locked ? styles.locked : {}),
-                      ...(isPaintSel ? styles.paintSel : {}),
-                      ...(isEditSel ? styles.editSel : {}),
-                      ...(dropKey === `z:${li}:${ci}` ? styles.dropTarget : {}),
-                    }}
-                  />
-                );
-              })}
-            </div>
-            );
-          })
-        )}
-      </div>
+  /**
+   * Aeon's decoration, handed to the shared grid rather than moved into it: a
+   * drag grip per row, DnD + context-menu props per swatch, and the floating copy
+   * menu. Classic passes no shell at all.
+   */
+  const shell: PaletteGridShell = {
+    renderLineGrip: (li, locked) => (
+      <div
+        key="grip"
+        style={{ ...styles.grip, ...(locked ? styles.locked : {}), ...(dropKey === `${keyPrefix}-line:${li}` ? styles.dropTarget : {}) }}
+        title={locked
+          ? 'sprite-reserved (line 0)'
+          : standaloneSprite
+            ? 'Drag to copy this palette · right-click to copy to a zone line'
+            : `Drag to copy line ${li} · right-click to copy elsewhere`}
+        draggable={!locked}
+        onDragStart={() => onLineDragStart(rowColors(li))}
+        onDragOver={(e) => onLineDragOver(e, `${keyPrefix}-line:${li}`, locked)}
+        onDrop={() => onLineDrop(srcLine(li), locked)}
+        onDragEnd={endDrag}
+        onContextMenu={(e) => { e.preventDefault(); if (!locked) openLineMenu(e, srcLine(li), rowColors(li)); }}
+      />
+    ),
+    swatchProps: (li, ci, state): PaletteSwatchProps => {
+      const color = rowColors(li)[ci];
+      const key = `${keyPrefix}:${li}:${ci}`;
+      return {
+        draggable: ci > 0 && !state.locked,
+        onDragStart: () => { if (color) onSwatchDragStart(color); },
+        onDragOver: (e) => onSwatchDragOver(e, key, ci, state.locked),
+        onDrop: () => onSwatchDrop(srcLine(li), ci, state.locked),
+        onDragEnd: endDrag,
+        onContextMenu: (e) => {
+          if (state.locked || !color) { e.preventDefault(); return; }
+          openSwatchMenu(e, srcLine(li), ci, color);
+        },
+        style: dropKey === key ? styles.dropTarget : undefined,
+      };
+    },
+    overlay: menu ? (
+      <PaletteCopyMenu
+        x={menu.x} y={menu.y} heading={menu.heading} items={menu.items}
+        onClose={() => setMenu(null)}
+      />
+    ) : null,
+  };
 
-      {sel && selColor && (
-        <div style={styles.editPanel}>
-          <div style={styles.editHeader}>
-            <span>
-              {standaloneSprite ? `Sprite · Index ${sel.idx}` : `Line ${sel.line} · Index ${sel.idx}`}
-            </span>
-            <span style={styles.word}>{fmtWord(selWord)}</span>
-          </div>
-          {CHANNELS.map((ch) => (
-            <div key={ch} style={styles.sliderRow}>
-              <span style={{ ...styles.channelLabel, color: CHANNEL_COLORS[ch] }}>
-                {ch.toUpperCase()}
-              </span>
-              <input
-                type="range"
-                min={0}
-                max={7}
-                step={1}
-                value={to3(selColor[ch])}
-                onPointerDown={() => (standaloneSprite ? beginStandaloneDrag() : beginDrag(sel.line))}
-                onChange={(e) => (standaloneSprite
-                  ? previewStandalone(sel.idx, ch, Number(e.target.value))
-                  : previewChange(sel.line, sel.idx, ch, Number(e.target.value)))}
-                onPointerUp={standaloneSprite ? commitStandalone : commitDrag}
-                onKeyUp={standaloneSprite ? commitStandalone : commitDrag}
-                onBlur={standaloneSprite ? commitStandalone : commitDrag}
-                style={styles.slider}
-              />
-              <span style={styles.channelValue}>{to3(selColor[ch])}</span>
-            </div>
-          ))}
-        </div>
-      )}
+  if (!project) return null;
+  if (!standaloneSprite && !zone) return null;
 
-      {menu && (
-        <PaletteCopyMenu
-          x={menu.x} y={menu.y} heading={menu.heading} items={menu.items}
-          onClose={() => setMenu(null)}
-        />
-      )}
-    </div>
-  );
+  // KEYED ON THE MODE. A standalone selection (line 0 of a flat 16-colour
+  // palette) must not leak into the zone render, where line 0 is the zone's first
+  // line — and the remount is also what makes the grid's drain effect run on a
+  // palette-mode flip, which is one of the ways a slider drag gets ended by the
+  // app rather than by the user.
+  return <PaletteGrid key={keyPrefix} port={port} shell={shell} />;
 }
 
 const styles: Record<string, React.CSSProperties> = {
-  root: {
-    padding: 8,
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 8,
-    flexShrink: 0,
-  },
-  grid: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 2,
-  },
-  row: {
-    display: 'flex',
-    gap: 2,
-  },
-  swatch: {
-    width: 20,
-    height: 20,
-    minWidth: 0,
-    flex: '1 1 0',
-    border: `1px solid ${T.border}`,
-    borderRadius: 2,
-    cursor: 'pointer',
-    boxSizing: 'border-box' as const,
-  },
   grip: {
     width: 6,
     alignSelf: 'stretch',
-    minHeight: 20,
+    minHeight: 16,
     borderRadius: 2,
     background: T.borderStrong,
     cursor: 'grab',
@@ -598,59 +292,11 @@ const styles: Record<string, React.CSSProperties> = {
     outline: `2px solid ${T.accent}`,
     outlineOffset: -1,
   },
-  checkerboard: {
-    background: `repeating-conic-gradient(${T.textLo} 0% 25%, ${T.borderStrong} 0% 50%) 0 0 / 8px 8px`,
-  },
   locked: {
     opacity: 0.35,
     cursor: 'not-allowed',
   },
-  paintSel: {
-    outline: `2px solid ${T.accent}`,
-    outlineOffset: -1,
-  },
-  editSel: {
-    border: `2px solid ${T.textHi}`,
-  },
-  editPanel: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 4,
-    padding: 6,
-    background: T.void,
-    border: `1px solid ${T.border}`,
-    borderRadius: 4,
-  },
-  editHeader: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    fontSize: 10,
-    color: T.textBase,
-    marginBottom: 2,
-  },
-  word: {
-    fontFamily: T.fontMono,
-    color: T.warning,
-  },
-  sliderRow: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 6,
-  },
-  channelLabel: {
-    fontSize: 10,
-    fontWeight: 700,
-    width: 10,
-  },
-  slider: {
-    flex: 1,
-    minWidth: 0,
-  },
-  channelValue: {
-    fontSize: 10,
-    fontFamily: T.fontMono,
-    color: T.textHi,
-    width: 10,
-    textAlign: 'right' as const,
-  },
+  // No swatch, grid or slider-panel styles here: the grid is PaletteGrid and the
+  // sliders are GenesisColorSliders, which own theirs. A second copy of them is
+  // what made the two palette panels drift in the first place.
 };

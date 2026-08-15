@@ -1,8 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-  cellIndexAt, canvasLocalPoint, canvasCellIndexAt, type CanvasGeom,
-  readTilePixels, packTilePixels, floodFillTile,
-} from '../composer-math';
+import { cellIndexAt, canvasLocalPoint, canvasCellIndexAt, fitCellSize, type CanvasGeom } from '../composer-math';
 
 describe('cellIndexAt', () => {
   it('maps coords to a row-major index in a 16x16 chunk grid', () => {
@@ -38,15 +35,20 @@ describe('cellIndexAt', () => {
   });
 });
 
-// Regression: the composer canvases carry a 1px border (styles.gridCanvas), and
-// getBoundingClientRect() reports the BORDER box while canvas drawing coords
-// start at the CONTENT box. All three tabs used to hit-test with a bare
+// Regression: the chunk/block canvases carry a 1px border (styles.gridCanvas),
+// and getBoundingClientRect() reports the BORDER box while canvas drawing coords
+// start at the CONTENT box. Every composer tab used to hit-test with a bare
 // `clientX - rect.left`, so every read was one CSS px right/down of the cursor —
 // the tile drawn sat off from the crosshair. These pin the corrected mapping.
 //
-// The Tile tab's real geometry: an 8x8 grid at PX=26 → a 208px backing store,
-// rendered 1:1, inside a 1px border, positioned at viewport (100, 50). So the
-// canvas's drawing-space origin is at client (101, 51).
+// THIS FIXTURE IS SYNTHETIC, not a live tab's geometry. It replays the Tile
+// tab's RETIRED shape — an 8x8 grid at 26px/pixel → a 208px backing store,
+// rendered 1:1, inside a 1px border, positioned at viewport (100, 50), so the
+// drawing-space origin is client (101, 51). That tab now draws through
+// PixelViewport at `artStore.zoom` and never calls this module (H1.3/H1.6); the
+// numbers are kept only because they exercise the mapping at a cell size that
+// divides the canvas evenly, which the live callers (chunk 20px/320, block
+// 64px/128) also do. Nothing here needs updating when a tab's px changes.
 const TILE_GEOM: CanvasGeom = {
   left: 100, top: 50,
   borderLeft: 1, borderTop: 1,
@@ -111,88 +113,61 @@ describe('canvasCellIndexAt (the composer tabs\' hit-test)', () => {
   });
 });
 
-describe('readTilePixels / packTilePixels (4bpp nibble packing)', () => {
-  it('reads the HIGH nibble as the LEFT (even-x) pixel', () => {
-    // One tile, first byte 0x1F → left pixel = 1 (high nibble), right pixel = F.
-    const tiles = new Uint8Array(32);
-    tiles[0] = 0x1f;
-    const px = readTilePixels(tiles, 0);
-    expect(px[0]).toBe(0x1); // even x → high nibble
-    expect(px[1]).toBe(0xf); // odd x  → low nibble
+// ---------------------------------------------------------------------------
+// fitCellSize — the Chunk/Block tiers' answer to "the composer does not fill
+// the canvas it is given" (H3.1). The tabs measure their box with a
+// ResizeObserver and hand the numbers here; everything about WHICH size is
+// chosen is decided in this function, so it is the part that can be executed.
+// ---------------------------------------------------------------------------
+describe('fitCellSize', () => {
+  it('picks the largest whole-pixel cell that fits, on the binding axis', () => {
+    // 16x16 chunk grid: 496px of width is 31px per cell; a taller box does not
+    // make the cell any bigger, because the grid is square.
+    expect(fitCellSize(496, 660, 16, 16, 20, 48)).toBe(31);
+    expect(fitCellSize(660, 496, 16, 16, 20, 48)).toBe(31);
+    // 2x2 block grid: 285px is 142px per cell.
+    expect(fitCellSize(285, 700, 2, 2, 64, 192)).toBe(142);
   });
 
-  it('pins a known byte pattern across a full row', () => {
-    // Row 0 bytes 0x12 0x34 0x56 0x78 → pixels 1 2 3 4 5 6 7 8.
-    const tiles = new Uint8Array(32);
-    tiles.set([0x12, 0x34, 0x56, 0x78], 0);
-    const px = readTilePixels(tiles, 0);
-    expect(Array.from(px.slice(0, 8))).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
+  it('floors at the size the tab shipped with, so a fit can never SHRINK it', () => {
+    // The whole point of the floor: a narrow window must leave the chunk grid
+    // at 320px (cell 20) and hand the overflow to the dock's scrollbar, not
+    // quietly draw a 16x16 grid of 8px cells.
+    expect(fitCellSize(140, 140, 16, 16, 20, 48)).toBe(20);
+    expect(fitCellSize(0, 0, 16, 16, 20, 48)).toBe(20);       // not yet measured
+    expect(fitCellSize(-50, 900, 2, 2, 64, 192)).toBe(64);    // detached box
   });
 
-  it('packTilePixels is the exact inverse of readTilePixels (round-trip)', () => {
-    const tiles = new Uint8Array(64);
-    for (let i = 0; i < 64; i++) tiles[i] = (i * 37) & 0xff; // two tiles of varied bytes
-    for (const t of [0, 1]) {
-      const px = readTilePixels(tiles, t);
-      const bytes = packTilePixels(px);
-      expect(Array.from(bytes)).toEqual(Array.from(tiles.slice(t * 32, t * 32 + 32)));
+  it('caps at the maximum, so a huge window does not draw a 2000px grid', () => {
+    expect(fitCellSize(4000, 4000, 16, 16, 20, 48)).toBe(48);
+    expect(fitCellSize(4000, 4000, 2, 2, 64, 192)).toBe(192);
+  });
+
+  it('returns a whole number for any input, including fractional box sizes', () => {
+    // getBoundingClientRect-derived sizes are fractional in a flex layout, and
+    // a fractional cell is the fractional CSS scale this function exists to
+    // avoid: the canvas is `cell * cols` and must be an integer bitmap.
+    for (const w of [383.5, 496.34, 549.328125, 700.99]) {
+      const cell = fitCellSize(w, 900, 16, 16, 20, 48);
+      expect(Number.isInteger(cell), `cell ${cell} from width ${w}`).toBe(true);
+      expect(cell * 16, `a ${cell}px cell must fit in ${w}px`).toBeLessThanOrEqual(Math.ceil(w));
     }
   });
 
-  it('round-trips an arbitrary pixel array back to itself', () => {
-    const px = new Uint8Array(64);
-    for (let i = 0; i < 64; i++) px[i] = (i * 7) & 0xf;
-    const bytes = packTilePixels(px);
-    const back = readTilePixels(bytes, 0);
-    expect(Array.from(back)).toEqual(Array.from(px));
+  it('never returns a size the grid does not fit in, once above the floor', () => {
+    for (let w = 320; w <= 800; w += 7) {
+      const cell = fitCellSize(w, 10000, 16, 16, 20, 48);
+      expect(cell * 16, `cell ${cell} overflows a ${w}px box`).toBeLessThanOrEqual(Math.max(w, 320));
+    }
   });
 
-  it('returns all-zero pixels for an out-of-range tile index (no throw)', () => {
-    const tiles = new Uint8Array(32);
-    expect(Array.from(readTilePixels(tiles, 5))).toEqual(Array(64).fill(0));
-  });
-});
-
-describe('floodFillTile', () => {
-  const grid = () => new Uint8Array(64); // all color 0
-
-  it('fills the whole tile when it is one region', () => {
-    const fill = floodFillTile(grid(), 0, 5);
-    expect(fill.size).toBe(64);
-    expect([...fill.values()].every((c) => c === 5)).toBe(true);
-  });
-
-  it('stops at a color boundary (fills only the connected region)', () => {
-    const px = grid();
-    for (let y = 0; y < 8; y++) px[y * 8 + 3] = 9; // vertical wall at x=3
-    const fill = floodFillTile(px, 0, 5); // left of the wall
-    expect(fill.size).toBe(24); // 3 columns x 8 rows
-    expect(fill.has(4)).toBe(false); // right of the wall untouched
-    expect(fill.has(3)).toBe(false); // the wall itself untouched
-  });
-
-  it('is 4-connected — diagonals do not leak', () => {
-    // Checkerboard of 0/1: from a 0 pixel, only that single pixel matches
-    // 4-connected (all orthogonal neighbors are 1s).
-    const px = grid();
-    for (let i = 0; i < 64; i++) px[i] = (((i % 8) + ((i / 8) | 0)) & 1) as 0 | 1;
-    const fill = floodFillTile(px, 0, 5);
-    expect(fill.size).toBe(1);
-  });
-
-  it('returns an empty map when the region already has the fill color (no-op, no undo step)', () => {
-    const px = grid();
-    expect(floodFillTile(px, 10, 0).size).toBe(0);
-  });
-
-  it('returns an empty map for out-of-range starts and wrong-size buffers', () => {
-    expect(floodFillTile(grid(), -1, 5).size).toBe(0);
-    expect(floodFillTile(grid(), 64, 5).size).toBe(0);
-    expect(floodFillTile(new Uint8Array(32), 0, 5).size).toBe(0);
-  });
-
-  it('masks the fill color to 4 bits', () => {
-    const fill = floodFillTile(grid(), 0, 0x15);
-    expect(fill.get(0)).toBe(5);
+  it('degenerate grids and an inverted clamp fall back to the floor', () => {
+    expect(fitCellSize(500, 500, 0, 16, 20, 48)).toBe(20);
+    expect(fitCellSize(500, 500, 16, 0, 20, 48)).toBe(20);
+    expect(fitCellSize(500, 500, 16, 16, 48, 20)).toBe(48); // max < min
+    expect(fitCellSize(Number.NaN, 500, 16, 16, 20, 48)).toBe(20);
+    // A non-finite box is a broken measurement, not a very large one — the
+    // floor is the safe answer, and it is the one the max clamp would NOT give.
+    expect(fitCellSize(Infinity, Infinity, 16, 16, 20, 48)).toBe(20);
   });
 });

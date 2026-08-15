@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { T } from '../ui';
 import { useClassicLevelStore } from '../../state/classicLevelStore';
 import { useClassicProjectStore } from '../../state/classicProjectStore';
@@ -62,38 +62,65 @@ export function isTypingTarget(t: HTMLElement): boolean {
 }
 
 /**
- * Register a window Escape handler that cancels an in-progress canvas gesture
- * (a `strokeRef` Map, mutated during the drag) — matching the viewport's gesture
- * cancel. Guarded against text-entry so an Escape in a field isn't hijacked.
+ * Register a window Escape handler for a composer tab, under the two guards
+ * every one of them needs: inert while a sprite-doc tab owns the keyboard (the
+ * classic composer is keep-alive/hidden then — see workspace/level-keys.ts,
+ * finding 1), and inert while a text field has focus, where Escape belongs to
+ * the field.
+ *
+ * The guards are here rather than in each tab because they are what makes an
+ * Escape binding SAFE, and a tab that reimplemented the keydown would be a tab
+ * that could forget one. `handler` decides only whether there is anything to
+ * cancel.
  */
-export function useEscapeCancel(strokeRef: React.MutableRefObject<Map<number, number> | null>, redraw: () => void): void {
+export function useEscapeKey(handler: () => void): void {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      // Inert while a sprite-doc tab owns the keyboard (the classic composer is
-      // keep-alive/hidden then) — see workspace/level-keys.ts (finding 1).
       if (!levelKeysEnabled()) return;
       if (e.key !== 'Escape') return;
       if (isTypingTarget(e.target as HTMLElement)) return;
-      if (strokeRef.current) { strokeRef.current = null; redraw(); }
+      handler();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [strokeRef, redraw]);
+  }, [handler]);
+}
+
+/**
+ * Escape cancels an in-progress canvas gesture held as a `strokeRef` Map — the
+ * shape the Chunk tab's hand-rolled paint uses.
+ *
+ * ONE CALLER TODAY: ChunkTab, the only tab with a `strokeRef` at all. BlockTab
+ * commits per click rather than per drag, so it has neither a stroke to cancel
+ * nor an Escape binding (`useWindowStrokeEnd`'s docblock below says the same of
+ * the release path). The Tile tab's stroke lives inside a PixelEditController
+ * instead and cancels through `useEscapeKey` directly.
+ */
+export function useEscapeCancel(strokeRef: React.MutableRefObject<Map<number, number> | null>, redraw: () => void): void {
+  useEscapeKey(useCallback(() => {
+    if (strokeRef.current) { strokeRef.current = null; redraw(); }
+  }, [strokeRef, redraw]));
 }
 
 /**
  * Finish an in-progress canvas gesture on the window's mouseup — wherever the
  * button is actually released.
  *
- * WHY: the tab editors are small canvases (the Tile tab's is 208px square), so a
- * pencil drag leaves them constantly. They used to hang the commit off the
- * canvas's own `onMouseUp` and additionally DISCARD the whole stroke on
- * `onMouseLeave`, which meant any drag that crossed the edge silently threw the
- * user's work away — no commit, no message, nothing on the canvas. Ending on the
- * window instead is what every paint tool does, and it leaves Escape
- * (useEscapeCancel) as the ONE deliberate cancel.
+ * WHY: the hand-rolled tab editors are small canvases (the Chunk tab's grid is
+ * 320px square), so a paint drag leaves them constantly. They used to hang the
+ * commit off the canvas's own `onMouseUp` and additionally DISCARD the whole
+ * stroke on `onMouseLeave`, which meant any drag that crossed the edge silently
+ * threw the user's work away — no commit, no message, nothing on the canvas.
+ * Ending on the window instead is what every paint tool does, and it leaves
+ * Escape (useEscapeCancel) as the ONE deliberate cancel.
  *
  * `endStroke` must be idempotent — the canvas's own onMouseUp may fire first.
+ *
+ * ONE CALLER TODAY: ChunkTab. BlockTab commits per click rather than per drag
+ * and only borrows the latest-ref idiom (see its note); the Tile tab's release
+ * is PixelViewport's pointer capture, which needs no window listener. Kept
+ * shared because the two hand-rolled tabs remain a pair and either could grow a
+ * drag back.
  */
 export function useWindowStrokeEnd(endStroke: () => void): void {
   const latest = React.useRef(endStroke);
@@ -122,6 +149,41 @@ export function canvasGeom(canvas: HTMLCanvasElement): CanvasGeom {
     cssWidth: canvas.clientWidth, cssHeight: canvas.clientHeight,
     width: canvas.width, height: canvas.height,
   };
+}
+
+/**
+ * The live content-box size of an element, in CSS px, tracked by ResizeObserver.
+ *
+ * WHAT IT IS FOR: the Chunk and Block tiers size their canvas from the room the
+ * layout gives them (`fitCellSize` in composer-math), and the room is only
+ * knowable at layout time. Zero until the first observation — `fitCellSize`
+ * treats that as "unmeasured" and returns its floor, so the first paint is the
+ * size the tab has always had rather than a degenerate one.
+ *
+ * TAKES THE ELEMENT, NOT A REF. The box it measures is mounted conditionally
+ * (ChunkTab draws no canvas for air), and an effect keyed on a ref object never
+ * re-runs when the ref's `current` later becomes non-null — it would bind an
+ * observer to nothing and stay at the floor forever. A callback ref into state
+ * re-runs it. Same reason PixelViewport's `canvasRef` is an out-param.
+ *
+ * NO FEEDBACK LOOP: the observed box is a flex item with `overflow: hidden`, so
+ * the canvas this measurement sizes cannot push it back. The size is compared
+ * before it is stored anyway, so an observation that changes nothing renders
+ * nothing.
+ */
+export function useBoxSize(el: HTMLElement | null): { w: number; h: number } {
+  const [size, setSize] = useState({ w: 0, h: 0 });
+  useEffect(() => {
+    if (!el) return;
+    const read = () => setSize((prev) => (
+      prev.w === el.clientWidth && prev.h === el.clientHeight ? prev : { w: el.clientWidth, h: el.clientHeight }
+    ));
+    const ro = new ResizeObserver(read);
+    ro.observe(el);
+    read();
+    return () => ro.disconnect();
+  }, [el]);
+  return size;
 }
 
 /**
@@ -176,14 +238,104 @@ export const styles: Record<string, React.CSSProperties> = {
   // from the map. As the canvas there is no map to protect, and the cap left a
   // hard edge with empty space below it — so it grows instead, and scrolls
   // inside itself when the open tier needs more room than the slot has.
-  dockContent: { flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'auto' },
-  tabBody: { display: 'flex', gap: 12, padding: 10, alignItems: 'flex-start' },
-  editorCol: { display: 'flex', flexDirection: 'column', gap: 6, flexShrink: 0 },
-  paletteCol: { display: 'flex', flexDirection: 'column', gap: 4, minWidth: 220, maxWidth: 360, flex: 1 },
+  // A COLUMN, so `tabBody` below has a main axis to grow along. As a plain block
+  // box (what this was) a child's `flex` means nothing and the tab body took its
+  // content height no matter what the dock did.
+  dockContent: { flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflowY: 'auto', overflowX: 'auto' },
+
+  // ---------------------------------------------------------------------------
+  // THE TAB BODY FILLS THE SLOT (H3.1). MEASURED, BEFORE: on a 1400x872 window
+  // the dock content box was 751px and the tab body 500px (Chunk), 478 (Block),
+  // 394 (Tile) — 251/273/325px of dead canvas, 33%/36%/45% of the slot. It was
+  // `alignItems: 'flex-start'` in a box that never told it to grow.
+  // ---------------------------------------------------------------------------
+  //
+  // `flex: '1 1 0'` — BASIS ZERO, and that is the load-bearing part. The obvious
+  // shape is `flex: '1 0 auto'` ("at least my content, all of the slot when the
+  // slot is bigger"), and it was tried and MEASURED: the body went to 2387px on
+  // Chunk, 4071 on Block, 3201 on Tile. Basis `auto` is the INTRINSIC height,
+  // and a flex container's intrinsic height counts a `flex-grow` child by its
+  // own max-content size (CSS Flexbox §9.9.1) — so the palette strips below,
+  // which lost their `maxHeight` in the same change, contributed all 1814/2739/
+  // 3510px of unwrapped thumbnails, the body grew to hold them, and the tiers
+  // that had 251px of dead space now had a 3000px scrollbar. Basis 0 takes the
+  // height from the CONTAINER instead, which is the only source that knows how
+  // big the slot is.
+  //
+  // Shrinking below content is then handled where it belongs: the browse strips
+  // scroll their own rows, and the editor's fit box carries a `minHeight` floor
+  // (see `fitBox`), so a window too short for the tier overflows this box and
+  // `dockContent`'s scrollbar — which is what that scroller is for — rather than
+  // crushing the canvas.
+  //
+  // `alignItems: 'stretch'` is the other half — it is what hands the height on
+  // to the columns, which is where it gets spent (see `paletteStrip`).
+  tabBody: { display: 'flex', gap: 12, padding: 10, alignItems: 'stretch', flex: '1 1 0', minHeight: 0 },
+
+  // A SHARE OF THE WIDTH, not its content's width. It was `flexShrink: 0` with
+  // no basis, so it sized to whatever its widest ROW happened to be (385px on
+  // Chunk, 269 on Tile) and left the rest of the body empty — and, worse, it
+  // align-stretched its canvas child to that width, which is how a 320px chunk
+  // bitmap came to be drawn in a 385px box. A definite share is also what makes
+  // the fit box below measurable: a content-sized column measured by its own
+  // content is a circular constraint.
+  //
+  // `2 1 0` against the palettes' `1 1 0`: the editor is the subject and the
+  // strips are the browser. `minWidth` is a floor for the header row's buttons.
+  editorCol: { display: 'flex', flexDirection: 'column', gap: 6, flex: '2 1 0', minWidth: 320, minHeight: 0 },
+  paletteCol: { display: 'flex', flexDirection: 'column', gap: 4, minWidth: 220, maxWidth: 360, flex: '1 1 0', minHeight: 0 },
   paletteHead: { fontSize: 10, color: T.textLo, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 600 },
+
+  // WHERE THE RECOVERED HEIGHT ACTUALLY GOES. `maxHeight: 300` was the browse
+  // strips' own cap; with the body now full-height it was the thing keeping the
+  // dead space — a 300px box of 26px thumbnails scrolling 2553px of tiles in a
+  // 719px column. `flex: 1` + `minHeight: 0` is the same column-bounded shape
+  // the panel columns use (see components/__tests__/panel-scrollers.test.ts):
+  // the ceiling arrives from the column instead of from a number that cannot
+  // know how tall the column is.
   paletteStrip: {
     display: 'flex', flexWrap: 'wrap', alignContent: 'flex-start', gap: 3,
-    maxHeight: 300, overflowY: 'auto', padding: 2, background: T.surface, borderRadius: 3,
+    flex: '1 1 0', minHeight: 0, overflowY: 'auto', padding: 2, background: T.surface, borderRadius: 3,
+  },
+
+  // ---------------------------------------------------------------------------
+  // THE CHUNK/BLOCK FIT BOX — and why those two tiers are NOT stretched.
+  // ---------------------------------------------------------------------------
+  // The Tile tier zooms (artStore.zoom, useAnchoredZoom, useHandPan), so giving
+  // it room is the whole fix: TileTab's viewport box grows and zoom spends it.
+  // The Chunk and Block canvases have no zoom, and they are `imageRendering:
+  // pixelated` bitmaps sized in integer cells — so the size has to come from the
+  // CELL, never from the CSS box.
+  //
+  // WHAT SHIPPED: a fit-to-space that picks the largest WHOLE-PIXEL cell that
+  // fits this box (`fitCellSize`, unit-tested in composer-math), with the
+  // remainder CENTRED. Both halves matter: the fit is what stops the grid being
+  // a 320px card in a 900px slot, and the centring is what absorbs the few px
+  // the integer cell leaves over.
+  //
+  // REJECTED — stretching the box with CSS. It is not hypothetical: it is what
+  // the composer was already doing by accident. The canvases were direct
+  // children of the column-flex `editorCol` and so were align-stretched, so a
+  // 320px chunk bitmap was presented in a 385px box and a 128px block bitmap in
+  // a 340px one. `pixelated` then draws art pixels unevenly 1 or 2 screen px
+  // wide, and `canvasLocalPoint`'s CSS-vs-backing-store scale term — written as
+  // "the identity today" — was silently the only reason clicks still landed.
+  // This box has `alignItems/justifyContent: center`, which is also what stops
+  // that stretch from coming back.
+  //
+  // REJECTED — centring alone (no fit). It moves the dead space rather than
+  // removing it: ~125px above and ~125px below, and a chunk grid still at 20px
+  // cells, which IS the thing being complained about.
+  //
+  // `overflow: hidden` keeps the loop open: a canvas larger than the box cannot
+  // push the box wider, so the measurement that sized it cannot be changed by
+  // it. CALLERS MUST SUPPLY `minHeight` — the floor cell size times the grid, so
+  // that a window too short for the tier overflows the tab body and reaches
+  // `dockContent`'s scrollbar instead of clipping the canvas. It is per-tab, so
+  // it is not baked in here.
+  fitBox: {
+    flex: '1 1 0', minWidth: 0, overflow: 'hidden',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
   },
   gridCanvas: { display: 'block', imageRendering: 'pixelated', background: CANVAS_BLACK, border: `1px solid ${T.border}`, borderRadius: 3 },
   rowWrap: { display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' },

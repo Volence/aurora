@@ -16,7 +16,7 @@ import FacetBar from './FacetBar';
 import { moduleFor, resolveFacet } from './facet-registry';
 import { switchFacet } from './facet-tools';
 import { facetChrome } from './facet-chrome';
-import { useActLoaded } from './level-presence';
+import { useActLoaded, usePixelToolsLive } from './level-presence';
 import { useWorkspaceStore } from './workspaceStore';
 import { useOpenEngine, useOpenCapabilities, type OpenEngine } from '../state/open-project';
 import { useSessionStore } from '../state/sessionStore';
@@ -115,9 +115,17 @@ export default function LevelWorkspace() {
   // from drawing its entire frame around nothing — is facet-chrome.ts, a pure
   // module the node-only suite can actually test. Nothing here re-derives it.
   const actLoaded = useActLoaded(engine);
+  // …and one thing facet-chrome CANNOT own, because it is a pure function of the
+  // module shape: classic's Art facet is three sub-surfaces, and its dock and
+  // options only act on the pixel one. `usePixelToolsLive` is the single
+  // statement of that (level-presence.ts); it answers true for every other
+  // engine/facet pair, so this AND is inert everywhere else. It must be applied
+  // HERE and not left to the components returning null, or EditorShell still
+  // draws the empty 44px rail around nothing.
+  const pixelToolsLive = usePixelToolsLive(engine, mod ? resolved : null);
   const chrome = facetChrome(actLoaded, mod ? resolved : null, {
-    toolDock: mod?.ToolDock != null,
-    toolOptions: mod?.ToolOptions != null,
+    toolDock: mod?.ToolDock != null && pixelToolsLive,
+    toolOptions: mod?.ToolOptions != null && pixelToolsLive,
     rightPanel: mod?.RightPanel != null,
     bottomExtra: mod?.BottomExtra != null,
     statusBar: mod?.StatusBar != null,

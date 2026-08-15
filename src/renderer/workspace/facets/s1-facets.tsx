@@ -72,17 +72,25 @@
 // pre-act canvas (ClassicComposerCanvas's empty state), the missing chunk picker
 // (ClassicArtPanels), and the collapse toggle that could empty the whole facet.
 //
+// TWO OF THE THREE ITEMS THAT USED TO BE HERE ARE CLOSED, and are deleted rather
+// than left to contradict the code — the same rule the paragraph above states:
+//
+//   • "The tab body does not fill the height it is given." CLOSED by H3.1.
+//     Measured on the running app at 1400x872, before: a 751px dock content box
+//     holding a 500px (Chunk) / 478 (Block) / 394 (Tile) tab body — 251/273/325px
+//     of dead canvas. After: 751/751/719, 0px dead on all three. The argument for
+//     each tier, and what was rejected for the two that cannot zoom, is in
+//     components/classic/composer-shared.tsx beside the styles.
+//   • "The palette grid is one component with two hosts … whether the two hosts
+//     should diverge is step H's to answer." CLOSED by H2, and ANSWERED "no":
+//     there is one components/art-shared/PaletteGrid.tsx behind per-engine ports
+//     (providers/palette-classic, providers/palette-aeon), mounted at all four
+//     sites — classic Art, classic Palette, aeon Art, aeon Palette — each keeping
+//     its own section id so the collapse states stay separate.
+//
 // STILL OPEN, and genuinely step-H shaped:
 //
-//  1. **The tab body does not fill the height it is given.** `dockContent` grows
-//     now, but `tabBody` is `alignItems: flex-start`, so the content is
-//     top-anchored under a large empty region. Making the tiers fill their canvas
-//     is the composer redesign proper.
-//  2. **The palette grid is one component with two hosts** — the Art column and
-//     the Palette facet's column — which is right for now (same editor, two
-//     judging surfaces) but is the same question aeon's palette facet has open.
-//     Whether the two hosts should diverge is step H's to answer.
-//  3. **Layout's column is ONE section.** It is now a chunk grid that fills the
+//  1. **Layout's column is ONE section.** It is now a chunk grid that fills the
 //     column (`variant="list"`), which is what CLOSED the half-empty-column
 //     complaint the 260px cap created — but one section is still one section.
 //     That is not a reason to move sections back into it — a column filled to
@@ -91,6 +99,42 @@
 //     shaped: classic has no properties surface for the selection Layout's
 //     `select` tool makes, and no layer/plane panel. Recorded rather than
 //     filled.
+//  2. **Aeon's Palette facet still has dead space under its editor**
+//     (facets/palette-facet.tsx). Its column is a single CONTENT section, so
+//     PaletteEditor takes its natural height and the rest of the column is
+//     empty — and `overflow: auto` is NOT the fix; panel-scrollers.test.ts
+//     forbids it, correctly, because a scroller with no ceiling is the bug that
+//     rule exists for. H3.1 does not transfer either: that was a CANVAS filling
+//     its slot, and this is a panel COLUMN, whose only honest remedy is a second
+//     section — i.e. new design, which is what makes it item 1's twin.
+//  3. **`PixelViewport` has no `onPointerCancel`.** A pointer cancelled by the
+//     system (a touch that becomes a scroll, a browser interrupt) leaves its
+//     `drawing` ref set with no `end()` ever arriving. TileTab documents the one
+//     consequence it can see and mitigates it by scoping its Escape flag to a
+//     single tile; the fix is in the shared substrate and would close it for all
+//     three hosts at once. Deliberately deferred rather than smuggled in under a
+//     classic dock task.
+//  4. **Aeon's composer and the sprite editor have no Escape-cancel for an
+//     in-progress stroke.** Classic has one in two places (composer-shared's
+//     `useEscapeCancel` for the chunk paint, TileTab's `useEscapeKey` for the
+//     controller); the other two hosts lost theirs to the same move onto the
+//     shared substrate and have not noticed. Same change as item 3 — a `cancel()`
+//     on PixelViewport — which is why they are worth doing together.
+//  5. **`artTiers` is tested scaffolding with no production consumer.** Both
+//     adapters declare it (core/project/s1/index.ts, core/project/aeon/index.ts),
+//     `openArtTiers()` (state/open-project.ts) exposes it, and the only callers
+//     of any of it are tests. It was built for a shared art breadcrumb that this
+//     plan's rescoping rejected — classic's tier strip is ClassicComposerDock's
+//     own. Either something uses it or it goes; leaving it is how a reader
+//     concludes the tier ladder is already wired.
+//  6. **Two residuals H3.1 leaves, argued where they live rather than here.**
+//     The Chunk/Block fit is to a whole CSS PIXEL cell, not a whole ART pixel —
+//     the grid boundaries are exact and the art scale is not (composer-math's
+//     `fitCellSize` says why the whole-art-pixel version is unreachable in a
+//     ~500px column). And the tile viewport is now bigger than an 8x8 tile at
+//     every zoom, so the anchored-zoom "hold the pixel under the cursor"
+//     behaviour is only reachable on a short window; while the tile fits, a
+//     wheel notch grows it about the centre, which is what it should do.
 
 
 import React from 'react';
@@ -101,9 +145,12 @@ import ClassicPalettePanel from '../../components/classic/ClassicPalettePanel';
 import ClassicObjectInspector from '../../components/classic/ClassicObjectInspector';
 import ClassicObjectList from '../../components/classic/ClassicObjectList';
 import ChunkPicker from '../../components/classic/ChunkPicker';
+import ClassicArtToolDock from '../../components/classic/ClassicArtToolDock';
+import ArtToolOptions, { CLASSIC_TILE_CAPS } from '../../shell/ArtToolOptions';
 import MapStatusBar from '../../components/shared/MapStatusBar';
 import { useClassicMapStatusPort } from '../../providers/map-status-classic';
 import { useClassicLevelStore } from '../../state/classicLevelStore';
+import { isClassicPixelTier } from '../level-presence';
 import { Panel, CollapsibleSection, StatusBar, T } from '../../components/ui';
 import { mapFacet, type FacetModule } from '../facet-registry';
 
@@ -367,6 +414,27 @@ function ClassicArtPanels(): React.ReactElement {
   );
 }
 
+/**
+ * The composer's tool-options bar — the SHARED one, on classic's capability set.
+ *
+ * Gated on the tile tier for the same reason ClassicArtToolDock is (read its
+ * header): mirror, dither and pixel-perfect are pixel modifiers, and the Chunk
+ * and Block tiers have no pixels. Drawing the row over them would put three live
+ * controls above a canvas that ignores all three.
+ *
+ * `before` is deliberately not passed. Aeon fills it with a document header —
+ * name, dirty badge, Save — and classic has none of those three: the composer
+ * edits the open ACT through `classicEditTiles`, which is a command on the
+ * classic undo stack, so there is no per-document dirty flag and no Save button
+ * to put there. The act's own save state is the workspace's, and the workspace
+ * header already says it.
+ */
+function ClassicArtOptions(): React.ReactElement | null {
+  const composerTab = useClassicLevelStore((s) => s.composerTab);
+  if (!isClassicPixelTier(composerTab)) return null;
+  return <ArtToolOptions caps={CLASSIC_TILE_CAPS} />;
+}
+
 // mapFacet supplies the engine-neutral MapFacetDock (which resolves classic's
 // button set from the s1 manifest's facetTools.layout via toolsForFacet) and
 // `mapOverlays: true` — right for both of these, since ClassicLevelViewport IS
@@ -440,9 +508,20 @@ export const s1PaletteFacet: FacetModule = mapFacet('palette', {
 // it is a control that visibly does nothing, and it drives its own tier tabs
 // rather than editorStore.tool.
 //
-// NO ToolDock ON PURPOSE, and that is now a real absence rather than an empty
-// one: LevelWorkspace passes `undefined` for a missing dock and EditorShell drops
-// the 44px rail instead of drawing a bordered empty column (gap 2).
+// A ToolDock AND ToolOptions, BOTH OF WHICH DRAW ONLY ON THE TILE TIER. There
+// was no dock here at all until the tile editor moved onto the shared pixel
+// substrate (PixelViewport + PixelEditController), which is also what made the
+// absence a bug rather than a choice: TileTab's own Pencil/Fill chips went away
+// in that move and tool selection became `artStore.tool`, whose only writer was
+// aeon's rail — so classic could draw with whatever tool happened to be armed
+// and could not change it. These two slots are what close that.
+//
+// The gate lives in the two components (ClassicArtToolDock, ClassicArtOptions),
+// not here, because a FacetModule slot is a component reference and the tier is
+// live store state. LevelWorkspace still mounts both; they return null off the
+// tile tier, and EditorShell's rail collapses the same way it did when the slot
+// was genuinely absent — see facet-chrome.ts on why an empty bordered column is
+// worse than no column.
 //
 // ONE COMPOSER FACET, and `palette` is not it. There was a `composerFacet(id)`
 // factory here producing an `art` and a `palette` module that differed in `id`
@@ -454,6 +533,8 @@ export const s1PaletteFacet: FacetModule = mapFacet('palette', {
 export const s1ArtFacet: FacetModule = {
   id: 'art',
   Canvas: ClassicComposerCanvas,
+  ToolDock: ClassicArtToolDock,
+  ToolOptions: ClassicArtOptions,
   RightPanel: ClassicArtPanels,
   StatusBar: ClassicComposerStatusBar,
 };

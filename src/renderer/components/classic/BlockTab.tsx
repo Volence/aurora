@@ -7,10 +7,10 @@ import { useToastStore } from '../../state/toastStore';
 import { renderBlock } from '../../../core/level-classic/render';
 import type { LevelDoc, BlockDef } from '../../../core/level-classic/model';
 import type { UsageIndex } from '../../../core/level-classic/usage-index';
-import { canvasCellIndexAt } from './composer-math';
+import { canvasCellIndexAt, fitCellSize } from './composer-math';
 import { TileThumb, BlockThumb } from './composer-thumbs';
 import { COMPOSER_SEL_CELL } from '../../canvas/canvas-colors';
-import { hex, SharedBanner, useEditableTileRange, tileLockReason, drawBufferScaled, canvasGeom, styles } from './composer-shared';
+import { hex, SharedBanner, useEditableTileRange, tileLockReason, drawBufferScaled, canvasGeom, useBoxSize, styles } from './composer-shared';
 
 // Block tab — 4-tile (2x2) composer for the selected block. Two right-hand
 // strips with opposite click semantics: a BROWSE-ONLY block strip (pick which
@@ -18,7 +18,16 @@ import { hex, SharedBanner, useEditableTileRange, tileLockReason, drawBufferScal
 // (clicking ASSIGNS the tile to the selected cell). Flips + palette line +
 // priority per cell; one classicEditBlock per commit.
 
-const BLOCK_CELL = 64; // px per 8x8 tile cell → 128px block preview
+/**
+ * The cell size is FITTED to the room the layout gives the canvas — see
+ * `styles.fitBox` for why a bigger CELL and not a bigger CSS box, and what was
+ * rejected. 64 (a 128px preview) is the constant this tab shipped with and is
+ * now the floor; 192 is a 384px preview, the same on-screen size the Tile tier's
+ * 8x8 canvas reaches at its default zoom of 24, which is as large as four tiles
+ * usefully get.
+ */
+const BLOCK_MIN_CELL = 64;
+const BLOCK_MAX_CELL = 192;
 
 export default function BlockTab({ doc, usage }: { doc: LevelDoc; usage: UsageIndex }) {
   const composerBlockId = useClassicLevelStore((s) => s.composerBlockId);
@@ -29,6 +38,14 @@ export default function BlockTab({ doc, usage }: { doc: LevelDoc; usage: UsageIn
   const range = useEditableTileRange();
   const [selCell, setSelCell] = useState(0); // 0..3 which of the 4 tile cells
   const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  // The canvas is sized to the fit box, which is sized by the layout. A callback
+  // ref into state rather than a `useRef` — see useBoxSize's docblock (the box
+  // is behind the `!block` early return below, so it is not mounted on the
+  // first render of a doc with no block selected).
+  const [fitEl, setFitEl] = useState<HTMLDivElement | null>(null);
+  const fit = useBoxSize(fitEl);
+  const cellPx = fitCellSize(fit.w, fit.h, 2, 2, BLOCK_MIN_CELL, BLOCK_MAX_CELL);
 
   const block = doc.blocks[composerBlockId];
   const tileCount = Math.floor(doc.tiles.length / 32);
@@ -41,17 +58,20 @@ export default function BlockTab({ doc, usage }: { doc: LevelDoc; usage: UsageIn
     const ctx = canvas?.getContext('2d', { willReadFrequently: true });
     if (!canvas || !ctx || !block) return;
     ctx.imageSmoothingEnabled = false;
-    drawBufferScaled(canvas, renderBlock(doc, composerBlockId), 16, 16, BLOCK_CELL * 2, BLOCK_CELL * 2);
+    drawBufferScaled(canvas, renderBlock(doc, composerBlockId), 16, 16, cellPx * 2, cellPx * 2);
     // Grid + selected-cell highlight.
     ctx.strokeStyle = 'rgba(255,255,255,0.15)';
-    ctx.strokeRect(BLOCK_CELL + 0.5, 0, 0, BLOCK_CELL * 2);
-    ctx.beginPath(); ctx.moveTo(BLOCK_CELL, 0); ctx.lineTo(BLOCK_CELL, BLOCK_CELL * 2); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(0, BLOCK_CELL); ctx.lineTo(BLOCK_CELL * 2, BLOCK_CELL); ctx.stroke();
+    ctx.strokeRect(cellPx + 0.5, 0, 0, cellPx * 2);
+    ctx.beginPath(); ctx.moveTo(cellPx, 0); ctx.lineTo(cellPx, cellPx * 2); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0, cellPx); ctx.lineTo(cellPx * 2, cellPx); ctx.stroke();
     ctx.strokeStyle = COMPOSER_SEL_CELL;
     ctx.lineWidth = 2;
-    ctx.strokeRect((selCell % 2) * BLOCK_CELL + 1, ((selCell / 2) | 0) * BLOCK_CELL + 1, BLOCK_CELL - 2, BLOCK_CELL - 2);
+    ctx.strokeRect((selCell % 2) * cellPx + 1, ((selCell / 2) | 0) * cellPx + 1, cellPx - 2, cellPx - 2);
+    // `cellPx` IS A DEPENDENCY — everything above is drawn in cell units, and
+    // React resizing the canvas on a window resize also clears its backing
+    // store, so a redraw has to follow it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [doc, composerBlockId, chunkEpoch, selCell, block]);
+  }, [doc, composerBlockId, chunkEpoch, selCell, block, cellPx]);
 
   const editCell = useCallback((patch: Partial<BlockDef['cells'][number]>) => {
     const b = doc.blocks[composerBlockId];
@@ -85,12 +105,12 @@ export default function BlockTab({ doc, usage }: { doc: LevelDoc; usage: UsageIn
   const onCellClick = useCallback((e: React.MouseEvent) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const idx = canvasCellIndexAt(e.clientX, e.clientY, canvasGeom(canvas), BLOCK_CELL, 2, 2);
+    const idx = canvasCellIndexAt(e.clientX, e.clientY, canvasGeom(canvas), cellPx, 2, 2);
     if (idx === null) return;
     setSelCell(idx);
     const cell = doc.blocks[composerBlockId]?.cells[idx];
     if (cell) { setComposerTileIndex(cell.tile); setComposerPalLine(cell.pal); }
-  }, [doc, composerBlockId, setComposerTileIndex, setComposerPalLine]);
+  }, [doc, composerBlockId, cellPx, setComposerTileIndex, setComposerPalLine]);
 
   const duplicateBlock = () => {
     const b = doc.blocks[composerBlockId];
@@ -130,13 +150,17 @@ export default function BlockTab({ doc, usage }: { doc: LevelDoc; usage: UsageIn
             dupLabel="Duplicate block"
           />
         )}
-        <canvas
-          ref={canvasRef}
-          width={BLOCK_CELL * 2}
-          height={BLOCK_CELL * 2}
-          onClick={onCellClick}
-          style={{ ...styles.gridCanvas, cursor: 'pointer' }}
-        />
+        {/* The fit box is what has the height; the canvas is centred in it at
+            whatever whole-pixel cell size fits. See styles.fitBox. */}
+        <div ref={setFitEl} style={{ ...styles.fitBox, minHeight: BLOCK_MIN_CELL * 2 }}>
+          <canvas
+            ref={canvasRef}
+            width={cellPx * 2}
+            height={cellPx * 2}
+            onClick={onCellClick}
+            style={{ ...styles.gridCanvas, cursor: 'pointer' }}
+          />
+        </div>
         <div style={styles.rowWrap}>
           <span style={styles.dim}>Cell {['TL', 'TR', 'BL', 'BR'][selCell]} · tile {hex(cell.tile)}</span>
           <span style={{ flex: 1 }} />
@@ -163,7 +187,12 @@ export default function BlockTab({ doc, usage }: { doc: LevelDoc; usage: UsageIn
       </div>
       <div style={styles.paletteCol}>
         <div style={styles.paletteHead}>Blocks ({doc.blocks.length}) · click to edit</div>
-        <div style={{ ...styles.paletteStrip, maxHeight: 140 }}>
+        {/* No `maxHeight` override any more. It was 140px so this strip did not
+            crowd the tile strip beside it — but they are SEPARATE COLUMNS, so it
+            never could: all the cap did was leave a 175px column beside a
+            348px one in a 478px body. Each strip now fills its own column
+            (styles.paletteStrip). */}
+        <div style={styles.paletteStrip}>
           {doc.blocks.map((_, id) => (
             <BlockThumb
               key={id} blockId={id} size={34} versionKey={versionKey}

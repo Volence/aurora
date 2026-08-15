@@ -121,9 +121,26 @@ export const OOB_MARKER = '#ff00ff';
 // ---------- classic composer dock (ClassicComposerDock, composer-thumbs) ----------
 /** Selected block-cell highlight outline in the block-tab 2x2 preview. */
 export const COMPOSER_SEL_CELL = '#4FD1C5';
-/** Transparent-pixel checker in the tile-tab editor (light / dark squares). */
-export const COMPOSER_CHECK_A = '#2A2A2A';
-export const COMPOSER_CHECK_B = '#1C1C1C';
+/**
+ * Transparent-pixel checker in the tile-tab editor, as RGB channel triples for
+ * PixelViewport's `checkerColors`: that compositor writes ImageData bytes, so it
+ * takes channels rather than a CSS color string.
+ *
+ * THE ONLY SPELLING OF THESE TWO SQUARES. There used to be a `COMPOSER_CHECK_A`
+ * / `COMPOSER_CHECK_B` pair carrying the same hexes as CSS strings for the
+ * hand-rolled tile painter's `ctx.fillStyle`. That painter is gone (H1.3) and the
+ * pair went with it (H1.7) — deliberately rather than being left "in case":
+ * nothing mechanically tied the two spellings together, so editing one and not
+ * the other would have silently changed the checker on whichever surface still
+ * read the stale one.
+ *
+ * ORDER IS [even cell, odd cell] — PixelViewport paints `(x+y)` EVEN with element
+ * 0, whereas the hand-rolled painter used the light square for the ODD cell. So
+ * the darker square comes first here; swapping them inverts the checker's phase
+ * (harmless to read, but it is a visible change, not a cleanup).
+ */
+export const COMPOSER_CHECK_RGB: [[number, number, number], [number, number, number]] =
+  [[0x1C, 0x1C, 0x1C], [0x2A, 0x2A, 0x2A]];
 /** Usage-count badge text on thumbnails. */
 export const COMPOSER_BADGE_TEXT = '#FFFFFF';
 /** Swatch-0 (transparent) checker squares in the color row. */

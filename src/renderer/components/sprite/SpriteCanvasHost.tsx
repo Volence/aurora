@@ -6,6 +6,7 @@ import PixelViewport from '../art-shared/PixelViewport';
 import type { ViewportOverlay } from '../art-shared/PixelViewport';
 import { PixelEditController, diffWrites } from '../../../core/art/pixel-edit-controller';
 import type { GestureResult } from '../../../core/art/pixel-edit-controller';
+import { toolConfigFrom } from '../../../core/art/tool-config';
 import { resolveDisplayPalette } from '../../../core/art/sprite-palette';
 import type { PixelHudHandle } from '../art-shared/PixelHud';
 import { OVERLAY_OUTLINE } from '../../canvas/canvas-colors';
@@ -19,7 +20,14 @@ export interface OverlayRect { x: number; y: number; w: number; h: number; }
  * commits results via setBuffer/setSelection. Replaces the old standalone SpriteCanvas;
  * all drawing logic + rendering now live in the shared core.
  */
-export default function SpriteCanvasHost({ overlayRects, hudRef }: { overlayRects?: OverlayRect[]; hudRef?: React.RefObject<PixelHudHandle | null> }) {
+export default function SpriteCanvasHost({ overlayRects, hudRef, canvasRef }: {
+  overlayRects?: OverlayRect[];
+  hudRef?: React.RefObject<PixelHudHandle | null>;
+  /** Handed straight to PixelViewport so SpriteMode's `useAnchoredZoom` can
+   *  measure the anchor off the canvas — `styles.canvasPad` puts it 24px into
+   *  the scrolled content, which is 24/zoom art px of anchor error if ignored. */
+  canvasRef?: React.MutableRefObject<HTMLCanvasElement | null>;
+}) {
   const buffer = useSpriteStore((s) => s.frames[s.currentIndex]);
   const zoom = useSpriteStore((s) => s.zoom);
   const tool = useSpriteStore((s) => s.tool);
@@ -39,7 +47,11 @@ export default function SpriteCanvasHost({ overlayRects, hudRef }: { overlayRect
 
   // One persistent controller; reconfigured each render with the current tool state.
   const controllerRef = useRef<PixelEditController | null>(null);
-  const config = { tool, color: selectedColor, mirror, ditherPattern, ditherSecondary, pixelPerfect };
+  // Shared builder — same `selectedColor`->`color` rename this used to spell out
+  // inline. The tile-space coercion inside it is a no-op here: `SpriteTool`
+  // (spriteStore.ts) is exactly the eight pixel tools, so nothing the sprite
+  // store can hold ever hits the fallback.
+  const config = toolConfigFrom({ tool, selectedColor, mirror, ditherPattern, ditherSecondary, pixelPerfect });
   if (!controllerRef.current) controllerRef.current = new PixelEditController(config);
   controllerRef.current.setConfig(config);
 
@@ -55,6 +67,7 @@ export default function SpriteCanvasHost({ overlayRects, hudRef }: { overlayRect
 
   return (
     <PixelViewport
+      canvasRef={canvasRef}
       buffer={buffer}
       palette={palette}
       zoom={zoom}
