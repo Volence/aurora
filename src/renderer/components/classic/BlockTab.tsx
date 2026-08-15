@@ -145,7 +145,7 @@ export default function BlockTab({ doc, usage }: { doc: LevelDoc; usage: UsageIn
         </div>
         {blockUse.cells > 1 && (
           <SharedBanner
-            text={`block ${hex(composerBlockId)} is used in ${blockUse.cells} cells — edits affect all uses`}
+            text={`Linked — used in ${blockUse.containers} chunk${blockUse.containers === 1 ? '' : 's'} · ${blockUse.cells} cell${blockUse.cells === 1 ? '' : 's'}. Edits appear in all of them.`}
             onDuplicate={duplicateBlock}
             dupLabel="Duplicate block"
           />

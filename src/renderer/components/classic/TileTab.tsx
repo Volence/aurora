@@ -411,7 +411,7 @@ export default function TileTab({ doc, usage }: { doc: LevelDoc; usage: UsageInd
           </div>
         )}
         {!locked && tileUse.cells > 1 && (
-          <SharedBanner text={`tile ${hex(composerTileIndex)} is used in ${tileUse.cells} block cells — edits affect all uses`} />
+          <SharedBanner text={`Linked — used in ${tileUse.containers} block${tileUse.containers === 1 ? '' : 's'} · ${tileUse.cells} cell${tileUse.cells === 1 ? '' : 's'}. Edits appear in all of them.`} />
         )}
         {/* SCROLLER + HOLDER, the shape both shared hooks are written against
             (see ComposerCanvas's frame/scroller/holder) — the pan hook adjusts

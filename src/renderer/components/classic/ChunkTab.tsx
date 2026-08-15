@@ -217,7 +217,7 @@ export default function ChunkTab({ doc, usage }: { doc: LevelDoc; usage: UsageIn
           <>
             {placements > 1 && (
               <SharedBanner
-                text={`chunk ${hex(selectedChunkId)} is placed ${placements}× — edits affect every placement`}
+                text={`Linked — placed ${placements}×. Edits appear in every placement.`}
                 onDuplicate={duplicateChunk}
                 dupLabel="Duplicate chunk"
               />
