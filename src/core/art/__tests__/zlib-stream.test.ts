@@ -10,11 +10,10 @@ describe('zlib-stream view semantics', () => {
   // deflate() directly, not through encodeIndexedPng: inside encodeIndexedPng
   // the `raw` scanline buffer handed to deflate() is always freshly allocated
   // at exactly its own size (`new Uint8Array((width + 1) * height)`), so a
-  // `.buffer` bug there would not be observable that way. It matters here
-  // because the decoder's `inflate()` is naturally called with a subarray
-  // straight out of a parsed chunk list (`png.subarray(dataStart, dataStart +
-  // len)`), with real neighbouring bytes on both sides. (Moved here from
-  // indexed-png-encode.test.ts per review correction R8.)
+  // `.buffer` bug there would not be observable that way. (Moved here from
+  // indexed-png-encode.test.ts per review correction R8.) Neither production
+  // call site passes a genuine view today — see zlib-stream.ts's header for
+  // why the guard is still load-bearing rather than aspirational.
   it('deflate compresses exactly a view\'s window, not its backing buffer', async () => {
     const big = new Uint8Array([9, 9, 0, 1, 2, 3, 9, 9]);
     const view = big.subarray(2, 6); // byteOffset 2, the [0,1,2,3] window
@@ -24,9 +23,11 @@ describe('zlib-stream view semantics', () => {
   });
 
   // The same hazard, the other direction: inflate() must decompress exactly a
-  // view's window. This is the LIVE hazard R8 warns about — a decoder's
-  // IDAT chunk data really does arrive as `png.subarray(start, start + len)`,
-  // sitting inside the whole PNG byte buffer with real chunks on both sides.
+  // view's window. Not live today either — decodeIndexedPng inflates
+  // concat(idatParts), which always allocates fresh — but concat's obvious
+  // single-part fast path would put a real subarray straight into this
+  // function's hands, invisibly, the moment someone adds it (see
+  // zlib-stream.ts's header). This guard is what stays true regardless.
   it('inflate decompresses exactly a view\'s window, not its backing buffer', async () => {
     const payload = deflateSync(Buffer.from([4, 5, 6, 7]));
     const big = new Uint8Array(payload.length + 4);

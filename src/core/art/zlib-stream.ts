@@ -6,11 +6,17 @@
 // toolchain: `@types/node`'s `Uint8Array<ArrayBufferLike>` is not assignable
 // to DOM's `BlobPart`, so `new Blob([data])` fails `tsc`.
 //
-// THE VIEW-SAFETY RULE, stated once for BOTH directions. `raw`/`data` is
-// routinely a `.subarray()` of something larger — an encoder's freshly-sized
-// scanline buffer today, but a decoder's chunk data tomorrow, which genuinely
-// arrives as `png.subarray(start, start + len)` with real neighbouring bytes
-// on both sides. The obvious fix for the tsc error, passing `.buffer`, is a
+// THE VIEW-SAFETY RULE, stated once for BOTH directions. `raw`/`data` MUST be
+// treated as a `.subarray()` of something larger, even though — measured —
+// neither production call site actually passes one today: encodeIndexedPng's
+// scanline buffer is always freshly allocated at its own size, and
+// decodeIndexedPng inflates `concat(idatParts)`, which also always allocates
+// fresh. What keeps the guard load-bearing rather than aspirational is
+// `concat`'s obvious single-part fast path (`if (parts.length === 1) return
+// parts[0]`) — the common case is exactly one IDAT chunk, so that
+// "optimization" would put a real subarray straight into inflate()'s hands
+// the moment someone adds it, invisibly, with no call site anywhere needing
+// to change. The obvious fix for the tsc error, passing `.buffer`, is a
 // trap: it discards the view's byteOffset/byteLength and hands Blob the WHOLE
 // backing ArrayBuffer, silently compressing/decompressing a subarray's
 // neighbours along with it:

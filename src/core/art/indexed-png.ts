@@ -50,11 +50,11 @@ function crc32(bytes: Uint8Array): number {
 }
 
 function chunk(type: string, data: Uint8Array): Uint8Array {
-  // Every call site today is a hardcoded 4-char literal (IHDR, PLTE, ...), but
-  // the file is about to gain a second caller (Task 4's inflate-side chunk
-  // walk) where that stops being guaranteed by inspection alone. A typo here
-  // would otherwise write NaN-derived bytes into the type field via
-  // charCodeAt(i) returning undefined, silently, with no error anywhere.
+  // A typo in a call site's type literal (IHDR, PLTE, ...) would otherwise
+  // silently write NaN-derived bytes into the type field via charCodeAt(i)
+  // returning undefined — with no error anywhere else in this file to catch
+  // it. This guard is the only thing standing between that and a chunk whose
+  // type is corrupt bytes nobody notices until a viewer chokes on it.
   if (type.length !== 4) {
     throw new Error(`PNG chunk type must be exactly 4 ASCII characters (got ${JSON.stringify(type)})`);
   }
@@ -88,6 +88,11 @@ function concat(parts: Uint8Array[]): Uint8Array {
  *
  * Stops at IEND or at the end of the buffer, whichever comes first — trailing
  * bytes after IEND (some tools pad) are not an error.
+ *
+ * CRCs are written by chunk() but deliberately NOT verified here: inflate()
+ * already surfaces IDAT corruption when it fails to decompress, and refusing
+ * an otherwise-readable file over a mismatched ancillary-chunk checksum would
+ * only make files unopenable that this reader could safely have shown.
  */
 export function parseChunks(bytes: Uint8Array): { type: string; data: Uint8Array }[] {
   const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
@@ -213,10 +218,23 @@ export async function encodeIndexedPng(img: IndexedImage): Promise<Uint8Array> {
 export interface DecodedIndexedPng {
   width: number;
   height: number;
-  /** One byte per pixel. */
+  /**
+   * One byte per pixel. UNLIKE IndexedImage.indices above — which promises
+   * "each byte < palette.length" because encodeIndexedPng enforces it on the
+   * way out — this is NOT guaranteed to be in range. This decoder refuses
+   * structurally broken files (bad signature, missing/truncated IHDR, wrong
+   * colour type, no usable PLTE, no IDAT) but does not validate that pixel
+   * VALUES stay inside the palette; a hand-edited or foreign-tool file could
+   * still contain an out-of-range index. `canvas-doc.ts`'s
+   * `normalizeCanvasPixels` is the checkpoint that folds the wider domain
+   * back into range on the way into a CanvasDoc — this type does not.
+   */
   indices: Uint8Array;
   palette: Rgb[];
-  /** The first palette entry tRNS marks fully transparent, or null. */
+  /** The first REAL palette entry (index < palette.length) whose tRNS byte is
+   *  0, or null. A tRNS chunk longer than PLTE is spec-invalid; its bytes
+   *  past palette.length are ignored rather than reported as if they named a
+   *  colour that doesn't exist. */
   transparentIndex: number | null;
 }
 
@@ -265,9 +283,11 @@ function unfilterRows(raw: Uint8Array, width: number, height: number, depth: num
   return out;
 }
 
-/** Expand sub-byte samples to one byte per pixel. Depth 8 is already there. */
+/** Expand sub-byte samples to one byte per pixel. At depth 8, bpr === width
+ *  and unfilterRows's output is already a fresh buffer of exactly width *
+ *  height bytes — return it directly rather than copying the whole image. */
 function expandSamples(rows: Uint8Array, width: number, height: number, depth: number): Uint8Array {
-  if (depth === 8) return rows.slice(0, width * height);
+  if (depth === 8) return rows;
   const bpr = Math.ceil((width * depth) / 8);
   const per = 8 / depth;
   const mask = (1 << depth) - 1;
@@ -287,13 +307,27 @@ export async function decodeIndexedPng(bytes: Uint8Array): Promise<DecodedIndexe
     throw new Error('not a PNG file (bad signature)');
   }
 
+  let ihdrSeen = false;
   let width = 0, height = 0, depth = 0, colorType = -1, interlace = 0;
   let palette: Rgb[] | null = null;
-  let transparentIndex: number | null = null;
+  // Deferred rather than resolved inline: the scan below must be clamped to
+  // the palette's REAL length, which isn't known until PLTE (wherever it
+  // falls in the file) has been seen — see the comment at the scan site.
+  let trnsData: Uint8Array | null = null;
   const idatParts: Uint8Array[] = [];
 
   for (const { type, data } of parseChunks(bytes)) {
     if (type === 'IHDR') {
+      // A chunk declaring type IHDR but too little data to hold width/height/
+      // depth/colourType/interlace would otherwise reach the DataView reads
+      // below and throw a raw "Offset is outside the bounds" RangeError —
+      // accurate to V8, meaningless to a user looking at a corrupt file.
+      if (data.length < 13) {
+        throw new Error(
+          `PNG IHDR chunk is truncated or corrupt (needs 13 bytes, got ${data.length}) — the file is likely an incomplete download or a partial write`,
+        );
+      }
+      ihdrSeen = true;
       const dv = new DataView(data.buffer, data.byteOffset, data.byteLength);
       width = dv.getUint32(0);
       height = dv.getUint32(4);
@@ -302,7 +336,7 @@ export async function decodeIndexedPng(bytes: Uint8Array): Promise<DecodedIndexe
       palette = [];
       for (let i = 0; i + 2 < data.length; i += 3) palette.push({ r: data[i], g: data[i + 1], b: data[i + 2] });
     } else if (type === 'tRNS') {
-      for (let i = 0; i < data.length; i++) if (data[i] === 0) { transparentIndex = i; break; }
+      trnsData = data;
     } else if (type === 'IDAT') {
       // Concatenated, not read-first: real encoders split large images, and a
       // decoder that stops at the first IDAT silently truncates the picture.
@@ -310,17 +344,63 @@ export async function decodeIndexedPng(bytes: Uint8Array): Promise<DecodedIndexe
     }
   }
 
+  // A file with no IHDR at all would otherwise fall through to the colour-
+  // type check below with colorType still at its -1 sentinel, reporting
+  // "this PNG is colour type -1, not indexed" — a real value that leaks an
+  // implementation detail and points the user at the wrong fix entirely.
+  if (!ihdrSeen) throw new Error('PNG has no IHDR chunk (not a valid PNG)');
+  // Zero (negative can't happen — IHDR's fields are read with getUint32) is
+  // spec-invalid on its own; the encoder already refuses it on the way out,
+  // so the two directions should agree here too rather than let a decoded
+  // zero-size image quietly exist.
+  if (width <= 0 || height <= 0) {
+    throw new Error(`PNG has invalid dimensions ${width}x${height} — its IHDR chunk looks corrupt`);
+  }
   if (colorType !== 3) {
     throw new Error(
       `this PNG is colour type ${colorType}, not indexed — re-export it as an indexed (paletted) PNG`,
     );
   }
   if (interlace !== 0) throw new Error('interlaced PNGs are not supported — re-export without Adam7 interlacing');
-  if (![1, 2, 4, 8].includes(depth)) throw new Error(`unsupported indexed bit depth ${depth}`);
-  if (!palette) throw new Error('indexed PNG has no PLTE palette chunk');
+  if (![1, 2, 4, 8].includes(depth)) {
+    throw new Error(
+      `unsupported indexed bit depth ${depth} — indexed PNGs must be 1, 2, 4 or 8 bits per pixel; re-export at one of those depths`,
+    );
+  }
+  // `!palette` catches a missing PLTE; `palette.length === 0` catches a PLTE
+  // chunk that is PRESENT but empty — `[]` is truthy, so the first check
+  // alone lets a zero-colour palette through, which then has nothing for any
+  // pixel index to mean. The encoder refuses exactly this on the way out
+  // ("an indexed PNG palette holds 1..256 colours"); the two directions
+  // should not disagree about what a valid palette is.
+  if (!palette || palette.length === 0) {
+    throw new Error('indexed PNG has no PLTE palette chunk — re-export as an indexed (paletted) PNG with a palette');
+  }
   if (idatParts.length === 0) throw new Error('PNG has no image data (no IDAT chunk)');
 
-  const raw = await inflate(concat(idatParts));
+  let transparentIndex: number | null = null;
+  if (trnsData) {
+    // Scanned only across REAL palette entries: a tRNS chunk longer than
+    // PLTE, with its zero-alpha byte past the end, would otherwise produce
+    // an index this very type's JSDoc promises is always "a real palette
+    // entry" — a lie a consumer discovers however far downstream it tries to
+    // look the colour up.
+    const limit = Math.min(trnsData.length, palette.length);
+    for (let i = 0; i < limit; i++) if (trnsData[i] === 0) { transparentIndex = i; break; }
+  }
+
+  let raw: Uint8Array;
+  try {
+    raw = await inflate(concat(idatParts));
+  } catch {
+    // DecompressionStream rejects a broken deflate stream with a bare
+    // TypeError whose .message is the empty string. Left unwrapped, that
+    // reaches a user's error toast (Task 9) as literally nothing — the same
+    // failure shape the transparentIndex validation guard above exists to
+    // prevent on the encode side. A truncated download or a half-written
+    // save is the likeliest real cause, so say that instead of nothing.
+    throw new Error('PNG image data (IDAT) is truncated or corrupt and could not be decompressed');
+  }
   const rows = unfilterRows(raw, width, height, depth);
   return { width, height, indices: expandSamples(rows, width, height, depth), palette, transparentIndex };
 }
