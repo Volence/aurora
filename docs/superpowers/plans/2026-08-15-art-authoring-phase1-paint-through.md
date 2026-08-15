@@ -910,15 +910,35 @@ Then replace the `return { ok: false, reason: 'divergence not implemented yet' }
 
 Declare `const claimed = new Set<number>();` beside `placesAffected`. Block cloning and the repoint bookkeeping arrive in Task 6; for now append, immediately after the block above:
 
+**CORRECTED 2026-08-15, before implementation.** An earlier revision of this step wrote
+`cell: { tile: targetTile, xf: c.xf, yf: c.yf, pal: c.pal, ... }`. That is **wrong**:
+`SurfaceCell.xf` is the *composed* flip (block cell XOR chunk cell), so storing it back into
+the block cell would double-apply the chunk's flip on every later render, and any paint on a
+flipped chunk cell would come out mirrored. Only the tile pointer changes here — the cell's
+orientation is unchanged, because `buf` was built in STORED tile coordinates — so preserve the
+source cell and swap `tile` alone:
+
 ```ts
+    const srcCell = doc.blocks[c.blockId]?.cells[c.blockCellIndex];
     plan.blockCellEdits.push({
-      blockId: c.blockId,
+      blockId: owningBlock,
       cellIndex: c.blockCellIndex,
-      cell: { tile: targetTile, xf: c.xf, yf: c.yf, pal: c.pal, pri: doc.blocks[c.blockId]?.cells[c.blockCellIndex]?.pri ?? false },
+      // Only the tile pointer moves. Never write `c.xf`/`c.yf` here — those are
+      // COMPOSED flips and would double-apply the chunk cell's flip.
+      cell: { ...srcCell, tile: targetTile },
     });
     if (provenance.chunkIndex !== null) placesAffected.add(provenance.chunkIndex);
     continue;
 ```
+
+`c.blockCellIndex` is already the SOURCE cell index (it accounts for the chunk flip's
+reordering), and a clone copies the block's cells in the same order, so the same index is
+correct for both the original and the clone.
+
+**This needs a regression test, added in this task:** paint on a chunk cell that is itself
+flipped, where the tile is linked so divergence is forced, and assert the resulting
+`blockCellEdits[0].cell.xf` equals the ORIGINAL block cell's `xf` — not the composed value.
+Without it, the bug reintroduces silently.
 
 - [ ] **Step 4: Run and verify green**
 
