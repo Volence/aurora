@@ -136,3 +136,24 @@ describe('linkage copy — linked/unique vocabulary, real usage numbers, no shar
     }
   });
 });
+
+// The discovery breadcrumb (Task 11). Both composed tiers that CANNOT isolate a
+// single placement must say where one can: a tile surface and a bare block
+// surface both have no chunk cell to repoint, so Isolate has nothing to isolate
+// there. TileTab's is the load-bearing one — it is where a user first meets
+// linkage — and it was missed on the first pass, so it is pinned here.
+describe('the breadcrumb out of the linkage deadlock', () => {
+  const BREADCRUMB = /To change one place only, paint it on the Chunk tab \(Isolate\)\./;
+
+  it('TileTab points at the Chunk tab', () => {
+    expect(TILE_TAB, 'TileTab has no discovery breadcrumb').toMatch(BREADCRUMB);
+  });
+
+  it('BlockTab points at the Chunk tab', () => {
+    expect(BLOCK_TAB, 'BlockTab has no discovery breadcrumb').toMatch(BREADCRUMB);
+  });
+
+  it('ChunkTab does NOT, since it is where isolating already works', () => {
+    expect(CHUNK_TAB, 'ChunkTab tells the user to go to the tab they are on').not.toMatch(BREADCRUMB);
+  });
+});
