@@ -12,6 +12,8 @@ function handMade(opts: {
   rows: number[][];            // raw (unfiltered) sample values per row
   filters: number[];           // one filter type per row
   palette?: { r: number; g: number; b: number }[];
+  omitPlte?: boolean;          // for the "missing PLTE" refusal case
+  omitIdat?: boolean;          // for the "missing IDAT" refusal case
 }): Uint8Array {
   const { width, height, depth, rows, filters } = opts;
   const palette = opts.palette ?? PAL;
@@ -85,8 +87,9 @@ function handMade(opts: {
 
   const parts = [
     new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
-    mk('IHDR', ihdr), mk('PLTE', plte),
-    mk('IDAT', new Uint8Array(deflateSync(Buffer.from(raw)))),
+    mk('IHDR', ihdr),
+    ...(opts.omitPlte ? [] : [mk('PLTE', plte)]),
+    ...(opts.omitIdat ? [] : [mk('IDAT', new Uint8Array(deflateSync(Buffer.from(raw))))]),
     mk('IEND', new Uint8Array(0)),
   ];
   const total = parts.reduce((n, p) => n + p.length, 0);
@@ -160,6 +163,33 @@ describe('decodeIndexedPng', () => {
   it('refuses an interlaced PNG', async () => {
     const png = handMade({ width: 2, height: 2, depth: 8, interlace: 1, rows: [[0, 1], [1, 0]], filters: [0, 0] });
     await expect(decodeIndexedPng(png)).rejects.toThrow(/interlac/i);
+  });
+
+  // The three refusals below were missing from the plan's Step 1 test list — a
+  // real coverage hole, since error paths in a file reader are exactly where a
+  // wrong message or a branch that never fires gets discovered by a user who
+  // opened their own corrupt or foreign PNG and cannot debug it.
+
+  it('refuses a colour-type-3 PNG with no PLTE chunk, saying so', async () => {
+    // Legal-looking IHDR (indexed, non-interlaced, depth 8) but the palette a
+    // colour-type-3 file is defined against is simply absent.
+    const png = handMade({ width: 1, height: 1, depth: 8, rows: [[0]], filters: [0], omitPlte: true });
+    await expect(decodeIndexedPng(png)).rejects.toThrow(/no PLTE/i);
+  });
+
+  it('refuses a well-formed header with no IDAT chunk, saying so', async () => {
+    // Everything else about the file is fine — IHDR and PLTE both parse — but
+    // there is no pixel data to decode at all.
+    const png = handMade({ width: 1, height: 1, depth: 8, rows: [[0]], filters: [0], omitIdat: true });
+    await expect(decodeIndexedPng(png)).rejects.toThrow(/no image data|IDAT/i);
+  });
+
+  it('refuses an unsupported indexed bit depth, naming it', async () => {
+    // 16 is a legal PNG bit depth for OTHER colour types (grayscale, truecolour)
+    // but not for indexed (colour type 3, max 8 bits per PNG's own table) — the
+    // realistic mistake, not a nonsense value nothing would ever produce.
+    const png = handMade({ width: 1, height: 1, depth: 16, rows: [[0]], filters: [0] });
+    await expect(decodeIndexedPng(png)).rejects.toThrow(/unsupported indexed bit depth 16/i);
   });
 
   it('refuses a file that is not a PNG at all', async () => {
