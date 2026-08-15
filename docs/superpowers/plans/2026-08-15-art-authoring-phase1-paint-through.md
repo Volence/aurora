@@ -231,6 +231,41 @@ git commit -m "feat(art): compose a classic block into an editable pixel surface
 - Modify: `src/core/art/classic-surface-buffer.ts`
 - Modify: `src/core/art/__tests__/classic-surface-buffer.test.ts`
 
+- [ ] **Step 0: Close a hole in Task 1's coverage (amendment, added 2026-08-15 after spec review)**
+
+Task 1's fixture fills tile N with the uniform value N, so **its tests cannot detect whether `blitCell` mirrors anything** — every pixel of a tile is identical, flipped or not. Task 2's tests below assert *provenance* (`xf`/`yf` fields), not blitted pixels, so without this step the blit's flip handling would have no permanent coverage anywhere. Add it before starting Task 2 proper:
+
+```ts
+describe('buildBlockSurface — the blit honours a cell\'s own flips', () => {
+  /** A doc whose tile 1 is blank except for a single pixel at local (0,0). */
+  function docWithCornerPixel(xf: boolean, yf: boolean): LevelDoc {
+    const d = makeDoc([{ cells: [cell(1, xf, yf), cell(0), cell(0), cell(0)] }]);
+    d.tiles.fill(0, 32, 64);   // clear tile 1
+    d.tiles[32] = 0x50;        // pixel (0,0) = 5, pixel (1,0) = 0
+    return d;
+  }
+
+  it('unflipped, the marker stays at (0,0)', () => {
+    const { buffer } = buildBlockSurface(docWithCornerPixel(false, false), 0);
+    expect(buffer.data[0 * 16 + 0]).toBe(5);
+  });
+
+  it('xf moves the marker to the right edge of its cell', () => {
+    const { buffer } = buildBlockSurface(docWithCornerPixel(true, false), 0);
+    expect(buffer.data[0 * 16 + 0]).toBe(0);
+    expect(buffer.data[0 * 16 + 7]).toBe(5);
+  });
+
+  it('yf moves the marker to the bottom edge of its cell', () => {
+    const { buffer } = buildBlockSurface(docWithCornerPixel(false, true), 0);
+    expect(buffer.data[0 * 16 + 0]).toBe(0);
+    expect(buffer.data[7 * 16 + 0]).toBe(5);
+  });
+});
+```
+
+Run it, confirm 3 more tests pass, then **falsify**: delete the `c.xf ? TILE_PX - 1 - px : px` conditional in `blitCell` (use `px` directly) and confirm the xf case fails. Restore from a byte copy. Commit separately as `test(art): pin blitCell's flip handling, which uniform-colour fixtures could not see`.
+
 - [ ] **Step 1: Write the failing tests**
 
 Append to the test file:
