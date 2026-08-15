@@ -29,6 +29,9 @@ import {
   type ResolvedLevelPaths,
   type S1ReadState,
 } from '../../level-classic/s1-io';
+import { levelArtReservationRequests, buildReservedTileSet } from '../profiles/s1-levelart-reservations';
+
+const TILE_BYTES = 32;
 
 const LABEL = 'Sonic 1 Disassembly (GitHub)';
 const SIDECAR = '.aurora/project.json';
@@ -236,6 +239,21 @@ async function dirHasEntries(fa: FileAccess, dir: string): Promise<boolean> {
   }
 }
 
+/**
+ * A mapping ASM file's text, or null when it does not exist / cannot be read.
+ * Tolerant by design, matching `readSidecarState`: a missing reservation
+ * source contributes nothing to `buildReservedTileSet` (permissive), rather
+ * than failing the whole act open.
+ */
+async function readMapTextTolerant(fa: FileAccess, path: string): Promise<string | null> {
+  try {
+    if (!(await fa.exists(path))) return null;
+    return new TextDecoder().decode(await fa.read(path));
+  } catch {
+    return null;
+  }
+}
+
 export const s1Adapter: ProjectAdapter = {
   type: 's1',
 
@@ -336,6 +354,10 @@ export const s1Adapter: ProjectAdapter = {
     // Read-side bookkeeping cached per act so write() can re-pair it with the
     // (edited) doc the store hands back without re-reading from disk.
     const readStates = new Map<string, S1ReadState>();
+    // The reserved-tile set (Task 5c), stashed beside readStates on the same
+    // per-act key. Populated at read() alongside it, exposed synchronously by
+    // reservedTiles() below — same shape as editableTileRange.
+    const reservedTilesStates = new Map<string, ReadonlySet<number>>();
     const refKey = (ref: ZoneActRef): string => `${ref.zone}/${ref.act}`;
 
     const levels: ClassicLevelAccess = {
@@ -347,6 +369,26 @@ export const s1Adapter: ProjectAdapter = {
         const { zone, act } = findAct(ref);
         const state = await readS1Level(act, buildPaths(zone, act), fa);
         readStates.set(refKey(ref), state.read);
+
+        // Task 5c: which pool tiles this act's level-art-drawn object sprites
+        // read, so planSurfaceEdit never claims one as a free slot. The
+        // request list is zone-static (see s1-levelart-reservations.ts); only
+        // the mapping TEXT is per-open IO, so it happens here where `fa` is
+        // already in scope, exactly like the sidecar / profile resolution
+        // above it.
+        const poolTileCount = Math.floor(state.doc.tiles.length / TILE_BYTES);
+        const requests = levelArtReservationRequests(zone, act.act);
+        const mapPaths = [...new Set(requests.map((r) => r.mapAsm))];
+        const mapTextByPath = new Map<string, string>();
+        await Promise.all(
+          mapPaths.map(async (p) => {
+            const text = await readMapTextTolerant(fa, p);
+            if (text !== null) mapTextByPath.set(p, text);
+          }),
+        );
+        const { tiles: reserved } = buildReservedTileSet(requests, mapTextByPath, poolTileCount);
+        reservedTilesStates.set(refKey(ref), reserved);
+
         return state.doc;
       },
       write: async (ref: ZoneActRef, doc: LevelDoc, dirty: DirtyDomains): Promise<WriteResult> => {
@@ -385,6 +427,7 @@ export const s1Adapter: ProjectAdapter = {
         const animRanges = read.animOverlay.map((o) => ({ start: o.start, count: o.count }));
         return { baseTileCount, animRanges };
       },
+      reservedTiles: (ref: ZoneActRef) => reservedTilesStates.get(refKey(ref)) ?? null,
     };
 
     return {

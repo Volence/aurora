@@ -280,6 +280,31 @@ export interface ClassicLevelAccess {
    * falls back to the pool-size bound only.
    */
   editableTileRange?(ref: ZoneActRef): EditableTileRange | null;
+  /**
+   * Level-pool tile indices this act's objects draw through mappings rather
+   * than blocks — a GHZ platform, an MZ brick, the SYZ boss's blocks, and
+   * similar sprites that read `ArtTile_Level` directly (see
+   * `s1-levelart-reservations.ts`). `buildUsageIndex` cannot see these: it only
+   * walks blocks/chunks, so one of these tiles looks like a free slot to
+   * anything that does not also consult this set.
+   *
+   * Returns null when unknown (the act has not been read yet, or a test fake
+   * omits the query) — PERMISSIVE, matching `editableTileRange`'s null
+   * convention, not "nothing is reserved".
+   *
+   * The semantics are load-bearing and easy to get backwards: this is NOT a
+   * lock and must NOT be folded into `tileLockReason` / editableTileRange.
+   * Painting a reserved tile IN PLACE is a legitimate edit — it is how you
+   * repaint a GHZ platform, and the object sprite updates live through
+   * `tileEpoch`. The rule this set exists to support is narrower and additive:
+   * never CLAIM a reserved slot as a free slot for someone else's divergent
+   * copy, and always DIVERGE a shared tile away from a reserved slot instead
+   * of repainting it in place when the edit did not target it directly. See
+   * `PlanInput.reservedTiles` in `classic-surface-plan.ts` for the enforcement.
+   * OPTIONAL — omitted by non-classic adapters (aeon has no such objects) and
+   * simple test fakes.
+   */
+  reservedTiles?(ref: ZoneActRef): ReadonlySet<number> | null;
 }
 
 // ---------------------------------------------------------------------------
