@@ -8,6 +8,12 @@
 
 **Tech Stack:** TypeScript, React, zustand, vitest. No new dependencies.
 
+**STATUS: COMPLETE.** All 11 tasks landed on `feature/canvas-phase2b`. Suite **2805 passed / 3
+skipped** (2738 at the branch point), `tsc --noEmit` and `electron-vite build` clean. CDP evidence:
+`docs/superpowers/plans/2026-08-15-constraints-cdp-report.md` — 30 checks, 30 pass, against real
+s1disasm data, with a planted-bug pass that fails exactly the check it should. **Read
+`## Review corrections` below before treating any task text above as current.**
+
 ---
 
 ## Context an implementer needs before task 1
@@ -1926,3 +1932,30 @@ _(Entries added during implementation. They are AUTHORITATIVE over the task text
 **R7 — import-side colour snapping was already tested in 2A; this plan added two assertions, not the coverage.** Task 10 was written as "verify the door 2A closed". It is closed, and `canvas-file-format.test.ts` *already* had `snaps an off-grid PLTE colour to the nearest Genesis word, verified against hand-computed values`. What was genuinely missing: an assertion that every channel lands **on** the hardware ladder (not merely on a hand-computed pair of values), and that the stored word round-trips so a later save cannot drift it. The plan's own suggested assertion — `channel % 36 === 0` — **was wrong**: the ladder is `round(n × 255/7)` = 0, 36, 73, 109, 146, 182, 219, 255, and 73 is not a multiple of 36. Verified against `decodeGenesisColor` rather than assumed.
 
 **R8 — paste is the one unsnapped door, and it belongs to whichever plan lands paste.** 2A deferred copy/paste entirely (R17), so there is no path today by which unsnapped colour arrives that way, and building a snap for a door that does not exist is speculative. When paste lands, the snap belongs at `normalizeCanvasPixels`' choke point in `canvas-doc.ts` — the same place every other foreign-value path is folded — and **not** in the paste handler, which would make it the second place that decides what a legal pixel is.
+
+
+**R9 — CDP found one real defect, and it was one no unit test could have found.** The tile readout
+printed the internal zone slug: `17 free in ghz 1`, on the same status bar that says "Green Hill Zone
+Act 1" a few inches away. `ZoneActRef.zone` holds a lowercase slug; every unit fixture in
+`canvas-budget.test.ts` happened to pass an already-uppercase zone, so the tests were tidier than the
+data. Fixed at the presentation boundary in `budgetReadout`, with a regression test that feeds it the
+slug the store actually holds. Everything else in tasks 8 and 9 — the overlay, both toggles, profile
+gating, the transparency rule, the grid-origin re-cut, the undo coupling, the no-count rule — was
+correct on first contact with the running app.
+
+**R10 — four harness defects, each of which first presented as an app bug.** Recorded because three
+of the four would have been written up as defects by anyone who trusted the first run: the level pane
+stays mounted at `display:none`, so `querySelector('footer')` read *its* status bar; a canvas file
+left by the previous run made the next run's create refuse as a duplicate, so an entire run proceeded
+against a level tab; the amber tint detector was calibrated against the nominal colour rather than
+the low-alpha composite and could not see amber at all; and two checks asserted things that were
+never true (the unique-tile count need not change when the grid origin moves, and one Ctrl+Z does not
+undo a four-gesture paint). The common shape is the phase-1 lesson one level up — **every check that
+failed had a fixture tidier than reality** — and the specific remedy that closed it is that
+`makeCanvas` now *proves* it produced a focused canvas rather than returning as soon as it has
+clicked Create. A setup step that cannot fail poisons every check after it.
+
+**R11 — phase 2A's harness is now importable, and that is deliberate infrastructure.** Reusing it
+cost one main-module guard and an export list; rewriting its launch discipline, helper bundle, input
+dispatch and dialog driver would have cost a day and started by re-earning trust 2A's own report had
+already paid for with three defects. Future phases should import it too.
