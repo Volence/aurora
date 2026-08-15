@@ -26,6 +26,10 @@ import EditorShell from '../../shell/EditorShell';
 // empty, not as the literal 0 `Number('')` would produce — the exact rule
 // parseCanvasSide already enforces for the New Canvas dialog's size fields.
 import { parseCanvasSide } from '../../shell/new-canvas';
+import {
+  useCanvasConstraints, useCanvasTileBudget, budgetReadout, colorsReadout,
+  frameReadout, clashSignal, BUDGET_TOOLTIP,
+} from './use-canvas-constraints';
 
 /**
  * The origination canvas's editor pane (spec §4.1) — tool dock, options bar,
@@ -208,6 +212,10 @@ function CanvasToolOptions({ docId, onFit }: { docId: string; onFit: () => void 
   const ditherPattern = useCanvasStore((s) => s.ditherPattern);
   const ditherSecondary = useCanvasStore((s) => s.ditherSecondary);
   const visibleGrids = useCanvasStore((s) => s.visibleGrids);
+  const constraintsLive = useCanvasStore((s) => s.constraintsLive);
+  const showClashOverlay = useCanvasStore((s) => s.showClashOverlay);
+  const report = useCanvasConstraints(docId);
+  const hasClashes = report ? clashSignal(report.clashes) : false;
   const st = useCanvasStore.getState;
 
   // The MENU of grid pitches is the profile's; `visibleGrids` is the selection
@@ -240,6 +248,36 @@ function CanvasToolOptions({ docId, onFit }: { docId: string; onFit: () => void 
           </Chip>
         ))}
       </span>
+
+      <Divider />
+
+      {/* The two constraint switches. Separate rather than one three-state
+          control: the numeric readouts are useful with the tint off (checking
+          the tile count while drawing), and the tint is useful without caring
+          about the numbers. */}
+      <Chip
+        active={constraintsLive}
+        title={'Check this canvas against its profile as you draw. Off is the unconstrained '
+          + 'escape hatch — draw freely, reconcile deliberately; re-enabling rescans.'}
+        onClick={() => st().setConstraintsLive(!constraintsLive)}
+      >
+        Constraints
+      </Chip>
+      <Chip
+        active={constraintsLive && showClashOverlay}
+        disabled={!constraintsLive}
+        // The chip carries the warning tone only while the tint is HIDDEN.
+        // With the tint on, the canvas itself is already saying it; with it
+        // off, this is the entire structural signal — and it is still a
+        // signal, not a count (spec §4.3).
+        tone={hasClashes ? 'warning' : undefined}
+        title={hasClashes
+          ? 'Cells drawing from more than one palette line, or from a line this profile does not have.'
+          : 'Tint cells that break the one-line-per-8×8 rule'}
+        onClick={() => st().setShowClashOverlay(!showClashOverlay)}
+      >
+        Clashes
+      </Chip>
 
       <Divider />
 
@@ -402,6 +440,10 @@ function CanvasStatusBar({ docId }: { docId: string }) {
   const doc = useCanvasStore((s) => s.docs.get(docId)?.doc);
   const paintIndex = useCanvasStore((s) => s.paintIndex);
   const zoom = useCanvasStore((s) => s.zoom);
+  // Both hooks run unconditionally — they sit above the `!doc` bail below for
+  // the rules-of-hooks reason, and both are total for a missing document.
+  const report = useCanvasConstraints(docId);
+  const budget = useCanvasTileBudget();
   if (!doc) return <StatusBar />;
 
   const line = paletteLineOf(paintIndex), entry = paletteEntryOf(paintIndex);
@@ -412,6 +454,23 @@ function CanvasStatusBar({ docId }: { docId: string }) {
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 10, color: T.textBase }}>
           <span>{constraintProfile(doc.profileId).label}</span>
           <span>{doc.pixels.width}×{doc.pixels.height}</span>
+          {report ? (
+            <>
+              <span title={BUDGET_TOOLTIP}>{budgetReadout(report.tiles, budget)}</span>
+              <span>
+                {colorsReadout(report.colorsPerLine, report.colorsPerLineMax,
+                  constraintProfile(doc.profileId).paletteLines)}
+              </span>
+              {report.frame && <span>{frameReadout(report.frame)}</span>}
+            </>
+          ) : (
+            // Not "0 clashes" and not a stale number: checking is SUSPENDED, and
+            // a readout that keeps showing its last value while nothing is being
+            // checked is the exact shape of a guard that asserts nothing.
+            <span style={{ color: T.textLo }} title="Constraint checking is off (Constraints chip)">
+              constraints —
+            </span>
+          )}
           {/* Both spellings, because both are true and each is the one some
               other part of the app speaks: the stored index is what a pixel
               holds, the line/entry pair is where the swatch is. */}

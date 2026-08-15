@@ -15,7 +15,7 @@ import { countFreeTileSlots } from '../../../core/art/free-tile-slots';
 import { constraintProfile } from '../../../core/art/canvas-profiles';
 import { cachedConstraints } from '../../state/canvas-constraints-cache';
 import type {
-  CanvasConstraintReport, UniqueTileCount,
+  CanvasConstraintReport, UniqueTileCount, CanvasCellClash, CanvasFrameSize,
 } from '../../../core/art/canvas-constraints';
 
 /**
@@ -115,3 +115,39 @@ export function budgetReadout(tiles: UniqueTileCount, budget: CanvasTileBudget):
 export const BUDGET_TOOLTIP =
   'Unique 8×8 tiles in this canvas, counting flips as one. Committing matches '
   + 'against the pool first, so the slots actually claimed can be fewer than this.';
+
+/**
+ * Colours in use per line, against the 15 an artist can actually spend — entry
+ * 0 is transparency in every line, so a "16" here would promise a colour that
+ * does not exist.
+ *
+ * Lines the profile does not have print as `—` UNLESS something is drawn in
+ * them, in which case the count shows. Hiding it would leave the artist with a
+ * clash tint and no number anywhere that explains where the stray pixels are.
+ */
+export function colorsReadout(perLine: number[], max: number, profileLines = perLine.length): string {
+  const shown = perLine.map((n, i) => (i < profileLines || n > 0 ? String(n) : '—'));
+  while (shown.length > profileLines && shown[shown.length - 1] === '—') shown.pop();
+  return `colours ${shown.join('·')} / ${max} per line`;
+}
+
+/** The sprite frame's size in tiles, naming the hardware bound only when it is
+ *  exceeded — a canvas holding a sheet of frames is legitimate, so this states
+ *  a size rather than nagging about one. */
+export function frameReadout(frame: CanvasFrameSize | null): string {
+  if (!frame) return '';
+  const size = `frame ${frame.tilesWide}×${frame.tilesHigh} tiles`;
+  return frame.overBound ? `${size} (one sprite is ${frame.maxTiles}×${frame.maxTiles} max)` : size;
+}
+
+/**
+ * Whether ANY cell violates the palette-line rule — a boolean, never a count.
+ *
+ * Spec §4.3: structural violations surface as a live highlight and never as a
+ * number, because no surveyed tool gives this class a numeric count and none
+ * combines both for one constraint. The overlay toggle lights off this; the
+ * canvas itself says where.
+ */
+export function clashSignal(clashes: readonly CanvasCellClash[]): boolean {
+  return clashes.length > 0;
+}

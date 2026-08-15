@@ -77,14 +77,23 @@ export function IconButton({ icon, label, onClick, disabled }: {
   );
 }
 
-export function Chip({ children, active, onClick, disabled, title }: {
+export function Chip({ children, active, onClick, disabled, title, tone }: {
   children: React.ReactNode; active?: boolean; onClick?: () => void; disabled?: boolean; title?: string;
+  /** Colours the chip's border and text WITHOUT making it look active. A chip
+   *  that is switched off while reporting a problem — the canvas's Clashes chip
+   *  with the tint hidden — has to say so without claiming the tint is on. A
+   *  named tone rather than a raw `style` prop, because one styling escape
+   *  hatch on a shared primitive becomes every caller's private look. */
+  tone?: 'warning';
 }) {
+  const toned = tone === 'warning' && !active;
   return (
     <span title={title} onClick={disabled ? undefined : onClick} style={{
       display: 'inline-flex', alignItems: 'center', gap: T.s2, padding: `${T.s1} ${T.s3}`,
-      background: active ? T.accent : T.raised, color: active ? T.onAccent : T.textBase,
-      border: `1px solid ${active ? T.accent : T.border}`, borderRadius: T.rMd,
+      background: active ? T.accent : T.raised,
+      color: active ? T.onAccent : toned ? T.warning : T.textBase,
+      border: `1px solid ${active ? T.accent : toned ? T.warning : T.border}`,
+      borderRadius: T.rMd,
       fontSize: 11, cursor: disabled ? 'default' : (onClick ? 'pointer' : 'default'),
       opacity: disabled ? 0.5 : 1, whiteSpace: 'nowrap',
     }}>{children}</span>
