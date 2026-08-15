@@ -65,13 +65,27 @@ function concat(parts: Uint8Array[]): Uint8Array {
   return out;
 }
 
-async function deflate(raw: Uint8Array): Promise<Uint8Array> {
-  // Cast, not copy: @types/node's global Uint8Array is generic over
-  // ArrayBufferLike (to also cover SharedArrayBuffer views), while DOM's
-  // BlobPart wants the concrete ArrayBuffer. `raw` here is always a buffer we
-  // allocated ourselves with `new Uint8Array(n)`, never a SharedArrayBuffer
-  // view, so this narrows a type-checker mismatch, not a real one.
-  const stream = new Blob([raw.buffer as ArrayBuffer]).stream().pipeThrough(new CompressionStream('deflate'));
+// Exported (not just used internally) so the view-safety contract below is
+// unit-testable at its actual hazard site: inside encodeIndexedPng, `raw` is
+// always a buffer allocated fresh at exactly its own size, so a bug here
+// cannot be observed by calling encodeIndexedPng — only by calling deflate
+// directly with a real subarray, which is what its test does, and which is
+// exactly the shape Task 4's inflate(chunkData_subarray) will be called with.
+export async function deflate(raw: Uint8Array): Promise<Uint8Array> {
+  // MUST accept a view, not just a buffer-owning array: `raw` (or, for
+  // inflate, a chunk's data) is routinely a `.subarray()` of something larger.
+  // `raw.buffer` would silently discard byteOffset/byteLength and hand Blob
+  // the WHOLE backing ArrayBuffer, compressing neighbouring bytes that were
+  // never part of this view:
+  //   view = big.subarray(2, 6)
+  //   new Blob([view.buffer])  -> the whole backing store (wrong)
+  //   new Blob([view])         -> just the window (right)
+  // Uint8Array itself is a valid BlobPart at runtime; the `as unknown as
+  // BlobPart` cast below is only working around @types/node's global
+  // Uint8Array being generic over ArrayBufferLike (to also cover
+  // SharedArrayBuffer views) where DOM's BlobPart type wants the narrower
+  // ArrayBufferView<ArrayBuffer> — a type-checker mismatch, not a real one.
+  const stream = new Blob([raw as unknown as BlobPart]).stream().pipeThrough(new CompressionStream('deflate'));
   return new Uint8Array(await new Response(stream).arrayBuffer());
 }
 
@@ -103,7 +117,8 @@ export async function encodeIndexedPng(img: IndexedImage): Promise<Uint8Array> {
   }
 
   // Filter type 0 (None) on every row. Adaptive filtering would shrink the file
-  // and buys nothing here — these are small, and a decoder we also own reads it.
+  // and buys nothing here — these are small, and a decoder we will also own
+  // will read it.
   const raw = new Uint8Array((width + 1) * height);
   for (let y = 0; y < height; y++) {
     raw[y * (width + 1)] = 0;
