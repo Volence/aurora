@@ -16,9 +16,13 @@ import {
 } from './canvas-doc';
 import type { CanvasGridOrigin } from './canvas-doc';
 import type { ConstraintProfile } from './canvas-profiles';
+import { CELL, TILE_ENTRIES, readCellEntries, canonicalTile } from './tile-canon';
 
-/** A Genesis tile is 8x8. The 16 and 256 grids are guides; this one is a rule. */
-export const CELL = 8;
+// The 8x8 rule and the canonical form now live in tile-canon.ts, which 2C's
+// commit dedup also reads — one definition, so the readout's promise that commit
+// can never claim more than it shows is provable rather than hoped for.
+// Re-exported so existing importers of CELL do not have to move.
+export { CELL };
 
 export interface CanvasCell {
   x: number; y: number; w: number; h: number;
@@ -160,40 +164,19 @@ export interface UniqueTileCount {
  * transpose, so a rotated tile is a different tile and folding rotations in here
  * would have 2C emit art that draws wrong.
  *
- * The canonical form is the lexicographically smallest of the four
- * orientations, chosen WITHOUT materialising all four: the loop walks the 64
- * positions once, keeping the set of orientations still tied for smallest, so
- * the common case (an early byte decides it) costs a handful of comparisons.
- * Only the winner is turned into a string, which is what goes in the Set.
+ * Both of those rules — entry-keying and the canonical orientation — live in
+ * tile-canon.ts, which 2C's commit dedup also reads. See its header for why
+ * there is exactly one copy of them.
  */
 export function countUniqueTiles(pixels: PixelBuffer, origin: CanvasGridOrigin): UniqueTileCount {
   const seen = new Set<string>();
   let fullCells = 0, pixelsOutsideGrid = 0;
-  const scratch = new Uint8Array(CELL * CELL);
+  const scratch = new Uint8Array(TILE_ENTRIES);
 
   for (const cell of canvasCells(pixels.width, pixels.height, origin)) {
     if (!cell.full) { pixelsOutsideGrid += cell.w * cell.h; continue; }
     fullCells++;
-
-    // Orientation as two bits — bit 0 flips x, bit 1 flips y — rather than four
-    // closures returning [sx, sy]. This runs up to 64 x 4 times per cell and
-    // 16 384 cells fit in a max-size canvas, so a two-element array per read
-    // would be four million allocations per scan.
-    const at = (o: number, i: number): number => {
-      const cx = i % CELL, cy = (i / CELL) | 0;
-      const sx = (o & 1) ? CELL - 1 - cx : cx;
-      const sy = (o & 2) ? CELL - 1 - cy : cy;
-      return paletteEntryOf(pixels.data[(cell.y + sy) * pixels.width + (cell.x + sx)]);
-    };
-
-    let tied = [0, 1, 2, 3];
-    for (let i = 0; i < CELL * CELL && tied.length > 1; i++) {
-      let min = CANVAS_LINE_LENGTH;
-      for (const o of tied) { const v = at(o, i); if (v < min) min = v; }
-      tied = tied.filter((o) => at(o, i) === min);
-    }
-    for (let i = 0; i < CELL * CELL; i++) scratch[i] = at(tied[0], i);
-    seen.add(String.fromCharCode(...scratch));
+    seen.add(canonicalTile(readCellEntries(pixels, cell.x, cell.y, scratch)).key);
   }
   return { unique: seen.size, fullCells, pixelsOutsideGrid };
 }
