@@ -199,10 +199,15 @@ describe('surfaceToTile', () => {
       }
     }
 
-    // Chunk cell 0 uses block 0 and is itself flipped (both axes), so the
-    // composed flip on those surface cells is the XOR of block-cell flip and
-    // chunk-cell flip. Every other chunk cell uses the plain block 1.
-    d.chunks = [chunkWith(chunkCell(0, true, true))];
+    // Chunk cell 0 uses block 0 and is itself flipped on BOTH axes, so those
+    // surface cells carry the XOR of the block-cell flip and the chunk-cell flip.
+    // Every OTHER cell uses block 1, unflipped — so the sweep covers a
+    // composed-flip region and a plain one. Built inline rather than via
+    // `chunkWith`, whose fill is block 0; using that helper here would leave
+    // block 1 as dead fixture data.
+    d.chunks = [{
+      cells: Array.from({ length: 256 }, (_, i) => (i === 0 ? chunkCell(0, true, true) : chunkCell(1))),
+    }];
     const { buffer, provenance } = buildChunkSurface(d, 0);
 
     // Cache decoded tile buffers per tile index so the check stays fast.
@@ -216,15 +221,24 @@ describe('surfaceToTile', () => {
       return tb;
     }
 
-    for (let y = 0; y < buffer.height; y++) {
+    // Record the FIRST mismatch and assert once, rather than asserting 65536
+    // times: a bare per-pixel `expect` reports "expected 8 to be 1" with no
+    // coordinate, which is useless precisely when it fires.
+    let firstMismatch: string | null = null;
+    for (let y = 0; y < buffer.height && firstMismatch === null; y++) {
       for (let x = 0; x < buffer.width; x++) {
         const hit = surfaceToTile(provenance, x, y);
-        expect(hit).not.toBeNull();
-        const tb = tileBuf(hit!.tileIndex);
-        const expected = tb.data[hit!.ty * 8 + hit!.tx];
+        if (!hit) { firstMismatch = `surfaceToTile returned null at surface (${x},${y})`; break; }
+        const expected = tileBuf(hit.tileIndex).data[hit.ty * 8 + hit.tx];
         const actual = buffer.data[y * buffer.width + x];
-        expect(actual).toBe(expected);
+        if (actual !== expected) {
+          firstMismatch =
+            `surface (${x},${y}) -> tile ${hit.tileIndex} px (${hit.tx},${hit.ty}): ` +
+            `surface has ${actual}, tile has ${expected}`;
+          break;
+        }
       }
     }
+    expect(firstMismatch).toBeNull();
   });
 });
