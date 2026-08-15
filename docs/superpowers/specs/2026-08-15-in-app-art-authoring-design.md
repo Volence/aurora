@@ -124,8 +124,16 @@ click away. Link is deliberately offered rather than prevented: it is Pyxel Edit
 
 A new composite store command applies tile writes, block additions, block-cell repoints and
 chunk-cell repoints as **one** entry, preserving the rule step H established: one gesture, one
-command, one Ctrl+Z. This is the main new architectural surface, and whether it fits the existing
-`CommandResult` shape cleanly is an early unknown — find out first, before building on it.
+command, one Ctrl+Z.
+
+**Verified 2026-08-15 — this fits the existing pattern with no change required.** Every classic
+command already follows: build one immutable `newDoc`, run `structuralError(newDoc)` once, call
+`commitArt(newDoc, dirtyPatch, versionEffect)` once. And `assertSingleDomain` rejects only domains
+belonging to the *other* undo document (the layout split), so a patch of
+`{ tiles, blocks, chunks }` — all members of `ART_DOMAINS` — is legal in a single `commitArt`. One
+commit produces one history record, so the single-undo guarantee is structural, not careful. The
+version effect should be `{ kind: 'all', tiles: [...] }`, since block and tile changes both repaint
+every chunk that references them.
 
 ### 3.5 Limits, surfaced honestly
 
@@ -134,6 +142,12 @@ far roomier (422–828 free of 1024) and `classicAddBlock` already exists; there
 at all, so Phase 1 can only *recycle* free tile slots, never mint.
 
 Mitigating this: **65% of tiles are used exactly once**, so the common stroke needs no new tile.
+
+**Free is not the same as claimable.** `tileLockReason` (`core/project/editable-tiles.ts`) marks
+tiles that cannot be written at all; `classicEditTiles` rejects them at edit time specifically so the
+pencil can never look live on a tile the save path would refuse. A free pool slot is therefore only a
+candidate if it is *also* inside the editable range — Isolate must filter on both, or it will diverge
+into a tile that can never be saved. The same predicate must be used, not a second copy of the rule.
 
 The tool options carry a live readout (`blocks 439/1024 · tiles 819/965`), and a stroke that will
 diverge says so before committing. When Isolate cannot isolate because no free tile slot exists —
@@ -255,8 +269,9 @@ app.
 
 1. **Flip composition in provenance** (§3.1) — the most likely source of subtly wrong pixels, and
    wrong in a way that looks plausible.
-2. **The composite command** (§3.4) — if it does not fit `CommandResult` cleanly, the undo guarantee
-   is at stake. Resolve this before building on it.
+2. ~~**The composite command** (§3.4)~~ — **RETIRED 2026-08-15.** Verified against the store: the
+   existing commit pattern composes, and `assertSingleDomain` permits a multi-domain art patch. No
+   change to `CommandResult` needed.
 3. **The Labyrinth cliff** (§3.5) — a zone where Isolate simply cannot work. Handled by refusing
    clearly, but it is a real gap until tile-pool growth exists.
 4. **Novel UX with no precedent** — flip-aware tile counting (§4.3). Expect iteration.
