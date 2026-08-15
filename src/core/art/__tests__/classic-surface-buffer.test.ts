@@ -48,3 +48,31 @@ describe('buildBlockSurface', () => {
     });
   });
 });
+
+describe('buildBlockSurface — the blit places pixels within a cell correctly', () => {
+  /** A doc whose tile 1 is blank except for value 5 at local (1,0). */
+  function docWithMarker(xf: boolean, yf: boolean): LevelDoc {
+    const d = makeDoc([{ cells: [cell(1, xf, yf), cell(0), cell(0), cell(0)] }]);
+    d.tiles.fill(0, 32, 64);   // clear tile 1
+    d.tiles[32] = 0x05;        // byte 0: pixel (0,0) = 0, pixel (1,0) = 5
+    return d;
+  }
+
+  it('unflipped, the marker stays at (1,0) — and NOT at (0,1)', () => {
+    const { buffer } = buildBlockSurface(docWithMarker(false, false), 0);
+    expect(buffer.data[0 * 16 + 1]).toBe(5);
+    expect(buffer.data[1 * 16 + 0]).toBe(0);   // transposition guard
+  });
+
+  it('xf mirrors it across the cell to (6,0)', () => {
+    const { buffer } = buildBlockSurface(docWithMarker(true, false), 0);
+    expect(buffer.data[0 * 16 + 6]).toBe(5);
+    expect(buffer.data[0 * 16 + 1]).toBe(0);
+  });
+
+  it('yf mirrors it down the cell to (1,7)', () => {
+    const { buffer } = buildBlockSurface(docWithMarker(false, true), 0);
+    expect(buffer.data[7 * 16 + 1]).toBe(5);
+    expect(buffer.data[0 * 16 + 1]).toBe(0);
+  });
+});
