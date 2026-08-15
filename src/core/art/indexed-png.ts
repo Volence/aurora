@@ -4,19 +4,20 @@
 // document is stored in (spec §4.1: "these files stay openable in Aseprite, and
 // Aseprite output stays importable").
 //
-// NO DEPENDENCY, NO NEW IPC. Deflate comes from CompressionStream/
-// DecompressionStream, which exist in Chromium (the renderer) and in Node 18+
-// (the test env). 'deflate' is the zlib-wrapped format, which is exactly what a
-// PNG IDAT holds — no wrapper arithmetic of our own.
+// NO DEPENDENCY, NO NEW IPC. Deflate/inflate live in ./zlib-stream (deliberately
+// split out — see that module's header for why and for the view-safety rule
+// both directions share); 'deflate' is the zlib-wrapped format, which is
+// exactly what a PNG IDAT holds — no wrapper arithmetic of our own.
 //
 // SCOPE, deliberately narrow: colour type 3 (indexed), non-interlaced. Anything
-// else will be refused with a message that says what to do about it, because
-// the alternative — a partial truecolour reader — would be a second image
-// pipeline to keep correct for no gain. Encoding always writes 8-bit; decoding
-// will accept 1/2/4/8 because other tools emit the smaller depths for small
-// palettes.
+// else is refused with a message that says what to do about it, because the
+// alternative — a partial truecolour reader — would be a second image pipeline
+// to keep correct for no gain. Encoding always writes 8-bit; decoding accepts
+// 1/2/4/8 because other tools emit the smaller depths for small palettes.
 //
 // Pure core: async because the compression streams are, but no fs and no DOM.
+
+import { deflate, inflate } from './zlib-stream';
 
 export interface Rgb { r: number; g: number; b: number }
 
@@ -75,28 +76,37 @@ function concat(parts: Uint8Array[]): Uint8Array {
   return out;
 }
 
-// Exported (not just used internally) so the view-safety contract below is
-// unit-testable at its actual hazard site: inside encodeIndexedPng, `raw` is
-// always a buffer allocated fresh at exactly its own size, so a bug here
-// cannot be observed by calling encodeIndexedPng — only by calling deflate
-// directly with a real subarray, which is what its test does, and which is
-// exactly the shape Task 4's inflate(chunkData_subarray) will be called with.
-export async function deflate(raw: Uint8Array): Promise<Uint8Array> {
-  // MUST accept a view, not just a buffer-owning array: `raw` (or, for
-  // inflate, a chunk's data) is routinely a `.subarray()` of something larger.
-  // `raw.buffer` would silently discard byteOffset/byteLength and hand Blob
-  // the WHOLE backing ArrayBuffer, compressing neighbouring bytes that were
-  // never part of this view:
-  //   view = big.subarray(2, 6)
-  //   new Blob([view.buffer])  -> the whole backing store (wrong)
-  //   new Blob([view])         -> just the window (right)
-  // Uint8Array itself is a valid BlobPart at runtime; the `as unknown as
-  // BlobPart` cast below is only working around @types/node's global
-  // Uint8Array being generic over ArrayBufferLike (to also cover
-  // SharedArrayBuffer views) where DOM's BlobPart type wants the narrower
-  // ArrayBufferView<ArrayBuffer> — a type-checker mismatch, not a real one.
-  const stream = new Blob([raw as unknown as BlobPart]).stream().pipeThrough(new CompressionStream('deflate'));
-  return new Uint8Array(await new Response(stream).arrayBuffer());
+/**
+ * Walk a PNG's chunk list starting right after the 8-byte signature:
+ * [{ type, data }] in file order. `chunk()`'s read sibling (review correction
+ * R9) — a decoder written straight from scratch tends to grow its own
+ * `while (p < bytes.length)` copy of this walk, which is exactly the kind of
+ * duplicate that silently drifts from the writer's framing. `decodeIndexedPng`
+ * is the production caller; the hand-rolled walkers in the test files are
+ * deliberately independent of this function (a test that shares the parser it
+ * is checking proves nothing about that parser).
+ *
+ * Stops at IEND or at the end of the buffer, whichever comes first — trailing
+ * bytes after IEND (some tools pad) are not an error.
+ */
+export function parseChunks(bytes: Uint8Array): { type: string; data: Uint8Array }[] {
+  const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const out: { type: string; data: Uint8Array }[] = [];
+  let p = 8;
+  while (p + 8 <= bytes.length) {
+    const len = dv.getUint32(p);
+    if (p + 12 + len > bytes.length) {
+      // A chunk claiming more data than the file has left is corrupt input,
+      // not a bug in this walker — report it as such rather than reading
+      // past the end into whatever memory `subarray` clamps to.
+      throw new Error(`PNG chunk at offset ${p} claims ${len} bytes of data but the file ends first`);
+    }
+    const type = String.fromCharCode(bytes[p + 4], bytes[p + 5], bytes[p + 6], bytes[p + 7]);
+    out.push({ type, data: bytes.subarray(p + 8, p + 8 + len) });
+    if (type === 'IEND') break;
+    p += 12 + len;
+  }
+  return out;
 }
 
 export async function encodeIndexedPng(img: IndexedImage): Promise<Uint8Array> {
@@ -177,8 +187,8 @@ export async function encodeIndexedPng(img: IndexedImage): Promise<Uint8Array> {
   }
 
   // Filter type 0 (None) on every row. Adaptive filtering would shrink the file
-  // and buys nothing here — these are small, and a decoder we will also own
-  // will read it.
+  // and buys nothing here — these are small, and decodeIndexedPng below (which
+  // we also own) reads it either way.
   const raw = new Uint8Array((width + 1) * height);
   for (let y = 0; y < height; y++) {
     raw[y * (width + 1)] = 0;
@@ -195,4 +205,122 @@ export async function encodeIndexedPng(img: IndexedImage): Promise<Uint8Array> {
   }
   parts.push(chunk('IDAT', await deflate(raw)), chunk('IEND', new Uint8Array(0)));
   return concat(parts);
+}
+
+// ---------------------------------------------------------------------------
+// Decode
+
+export interface DecodedIndexedPng {
+  width: number;
+  height: number;
+  /** One byte per pixel. */
+  indices: Uint8Array;
+  palette: Rgb[];
+  /** The first palette entry tRNS marks fully transparent, or null. */
+  transparentIndex: number | null;
+}
+
+function paeth(a: number, b: number, c: number): number {
+  const p = a + b - c;
+  const pa = Math.abs(p - a), pb = Math.abs(p - b), pc = Math.abs(p - c);
+  if (pa <= pb && pa <= pc) return a;
+  return pb <= pc ? b : c;
+}
+
+/**
+ * Undo the per-row filters. `bpp` — the byte distance to the pixel on the left —
+ * is 1 for EVERY indexed depth: below 8 bits the filter still operates on whole
+ * bytes, not on samples. Getting that wrong produces art that is subtly striped
+ * rather than obviously broken.
+ */
+function unfilterRows(raw: Uint8Array, width: number, height: number, depth: number): Uint8Array {
+  const bpr = Math.ceil((width * depth) / 8);
+  if (raw.length < (bpr + 1) * height) {
+    throw new Error(`PNG data is short: expected ${(bpr + 1) * height} bytes, got ${raw.length}`);
+  }
+  const out = new Uint8Array(bpr * height);
+  let pos = 0;
+  for (let y = 0; y < height; y++) {
+    const ft = raw[pos++];
+    const rowStart = y * bpr;
+    const prevStart = (y - 1) * bpr;
+    for (let i = 0; i < bpr; i++) {
+      const x = raw[pos + i];
+      const a = i >= 1 ? out[rowStart + i - 1] : 0;
+      const b = y >= 1 ? out[prevStart + i] : 0;
+      const c = (y >= 1 && i >= 1) ? out[prevStart + i - 1] : 0;
+      let v: number;
+      switch (ft) {
+        case 0: v = x; break;
+        case 1: v = x + a; break;
+        case 2: v = x + b; break;
+        case 3: v = x + ((a + b) >> 1); break;
+        case 4: v = x + paeth(a, b, c); break;
+        default: throw new Error(`unsupported PNG row filter ${ft}`);
+      }
+      out[rowStart + i] = v & 0xff;
+    }
+    pos += bpr;
+  }
+  return out;
+}
+
+/** Expand sub-byte samples to one byte per pixel. Depth 8 is already there. */
+function expandSamples(rows: Uint8Array, width: number, height: number, depth: number): Uint8Array {
+  if (depth === 8) return rows.slice(0, width * height);
+  const bpr = Math.ceil((width * depth) / 8);
+  const per = 8 / depth;
+  const mask = (1 << depth) - 1;
+  const out = new Uint8Array(width * height);
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const byte = rows[y * bpr + ((x / per) | 0)];
+      const shift = 8 - depth * ((x % per) + 1);
+      out[y * width + x] = (byte >> shift) & mask;
+    }
+  }
+  return out;
+}
+
+export async function decodeIndexedPng(bytes: Uint8Array): Promise<DecodedIndexedPng> {
+  if (bytes.length < 8 || !SIGNATURE.every((b, i) => bytes[i] === b)) {
+    throw new Error('not a PNG file (bad signature)');
+  }
+
+  let width = 0, height = 0, depth = 0, colorType = -1, interlace = 0;
+  let palette: Rgb[] | null = null;
+  let transparentIndex: number | null = null;
+  const idatParts: Uint8Array[] = [];
+
+  for (const { type, data } of parseChunks(bytes)) {
+    if (type === 'IHDR') {
+      const dv = new DataView(data.buffer, data.byteOffset, data.byteLength);
+      width = dv.getUint32(0);
+      height = dv.getUint32(4);
+      depth = data[8]; colorType = data[9]; interlace = data[12];
+    } else if (type === 'PLTE') {
+      palette = [];
+      for (let i = 0; i + 2 < data.length; i += 3) palette.push({ r: data[i], g: data[i + 1], b: data[i + 2] });
+    } else if (type === 'tRNS') {
+      for (let i = 0; i < data.length; i++) if (data[i] === 0) { transparentIndex = i; break; }
+    } else if (type === 'IDAT') {
+      // Concatenated, not read-first: real encoders split large images, and a
+      // decoder that stops at the first IDAT silently truncates the picture.
+      idatParts.push(data);
+    }
+  }
+
+  if (colorType !== 3) {
+    throw new Error(
+      `this PNG is colour type ${colorType}, not indexed — re-export it as an indexed (paletted) PNG`,
+    );
+  }
+  if (interlace !== 0) throw new Error('interlaced PNGs are not supported — re-export without Adam7 interlacing');
+  if (![1, 2, 4, 8].includes(depth)) throw new Error(`unsupported indexed bit depth ${depth}`);
+  if (!palette) throw new Error('indexed PNG has no PLTE palette chunk');
+  if (idatParts.length === 0) throw new Error('PNG has no image data (no IDAT chunk)');
+
+  const raw = await inflate(concat(idatParts));
+  const rows = unfilterRows(raw, width, height, depth);
+  return { width, height, indices: expandSamples(rows, width, height, depth), palette, transparentIndex };
 }

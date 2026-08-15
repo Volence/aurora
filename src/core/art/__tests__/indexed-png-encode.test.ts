@@ -1,7 +1,7 @@
 // src/core/art/__tests__/indexed-png-encode.test.ts
 import { describe, it, expect } from 'vitest';
 import { inflateSync, crc32 } from 'node:zlib';
-import { encodeIndexedPng, deflate } from '../indexed-png';
+import { encodeIndexedPng } from '../indexed-png';
 
 const SIG = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
 
@@ -134,23 +134,8 @@ describe('encodeIndexedPng', () => {
     expect(count).toBe(5); // IHDR, PLTE, tRNS, IDAT, IEND — proves the loop actually ran
   });
 
-  // Regression for a hazard the reviewer reproduced against an earlier fix:
-  // deflate() must accept a VIEW (a .subarray()), not silently widen it to its
-  // whole backing buffer via `.buffer`. This has to be tested against deflate()
-  // directly, not through encodeIndexedPng: inside encodeIndexedPng, the `raw`
-  // scanline buffer handed to deflate() is always freshly allocated at exactly
-  // its own size (`new Uint8Array((width + 1) * height)`), so passing a
-  // subarray as encodeIndexedPng's `indices` argument gets defensively copied
-  // by `raw.set(...)` long before deflate() ever sees it — a `.buffer` bug
-  // there would NOT be observable that way. It matters here because Task 4's
-  // inflate() will naturally be called with a subarray straight out of a
-  // parsed chunk list (`png.subarray(dataStart, dataStart + len)`), with real
-  // neighbouring bytes on both sides.
-  it('deflate compresses exactly a view\'s window, not its backing buffer', async () => {
-    const big = new Uint8Array([9, 9, 0, 1, 2, 3, 9, 9]);
-    const view = big.subarray(2, 6); // byteOffset 2, the [0,1,2,3] window
-    const compressed = await deflate(view);
-    const inflated = Array.from(new Uint8Array(inflateSync(Buffer.from(compressed))));
-    expect(inflated).toEqual([0, 1, 2, 3]); // not [9, 9, 0, 1, 2, 3, 9, 9]
-  });
+  // The deflate() view-safety guard (a hazard the reviewer reproduced against
+  // an earlier fix) now lives in zlib-stream.test.ts, next to deflate()/
+  // inflate() themselves (review correction R8) — moved there rather than
+  // duplicated here.
 });
