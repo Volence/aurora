@@ -1,7 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { createBuffer } from '../pixel-ops';
 import { canvasIndex } from '../canvas-doc';
-import { canvasCells, findCellClashes } from '../canvas-constraints';
+import {
+  canvasCells, findCellClashes, colorsPerLine, countUniqueTiles,
+} from '../canvas-constraints';
 
 /** A buffer with `fn(x, y)` at every pixel — the fixtures below are all one-liners over it. */
 function buf(w: number, h: number, fn: (x: number, y: number) => number) {
@@ -92,5 +94,95 @@ describe('findCellClashes', () => {
     const b = buf(8, 8, (x) => canvasIndex(x === 0 ? 3 : 2, 5));
     expect(findCellClashes(b, { originX: 0, originY: 0 }, 1)[0])
       .toMatchObject({ kind: 'multi-line', lines: [2, 3] });
+  });
+});
+
+describe('colorsPerLine', () => {
+  it('counts distinct non-transparent entries in each line', () => {
+    const b = buf(8, 8, (x, y) => {
+      if (y === 0) return canvasIndex(0, 1 + (x % 3)); // line 0: entries 1,2,3
+      if (y === 1) return canvasIndex(2, 9);           // line 2: entry 9
+      return 0;                                        // transparent
+    });
+    expect(colorsPerLine(b)).toEqual([3, 0, 1, 0]);
+  });
+
+  it('never counts entry 0 — it is transparency, not a colour choice', () => {
+    expect(colorsPerLine(buf(8, 8, () => 0))).toEqual([0, 0, 0, 0]);
+  });
+
+  it('counts a colour once however many pixels use it', () => {
+    expect(colorsPerLine(buf(8, 8, () => canvasIndex(1, 4)))).toEqual([0, 1, 0, 0]);
+  });
+});
+
+describe('countUniqueTiles', () => {
+  const origin = { originX: 0, originY: 0 };
+
+  it('counts identical cells once', () => {
+    const b = buf(16, 8, (x, y) => canvasIndex(0, 1 + (y % 2)));
+    expect(countUniqueTiles(b, origin)).toMatchObject({ unique: 1, fullCells: 2 });
+  });
+
+  // THE ONE THIS FUNCTION EXISTS FOR. Left cell and right cell are mirror
+  // images; the VDP draws both from one tile with the H-flip bit set.
+  it('counts an x-mirrored pair as one tile', () => {
+    const b = buf(16, 8, (x, y) => {
+      const lx = x < 8 ? x : 15 - x;             // right half mirrors the left
+      return canvasIndex(0, lx < 2 ? 1 + (y % 3) : 0);
+    });
+    expect(countUniqueTiles(b, origin).unique).toBe(1);
+  });
+
+  it('counts a y-mirrored pair as one tile', () => {
+    const b = buf(8, 16, (x, y) => {
+      const ly = y < 8 ? y : 15 - y;
+      return canvasIndex(0, ly < 2 ? 1 + (x % 3) : 0);
+    });
+    expect(countUniqueTiles(b, origin).unique).toBe(1);
+  });
+
+  it('counts an xy-mirrored pair as one tile', () => {
+    const src = (x: number, y: number) => canvasIndex(0, (x < 3 && y < 2) ? 1 + x : 0);
+    const b = buf(16, 8, (x, y) => (x < 8 ? src(x, y) : src(7 - (x - 8), 7 - y)));
+    expect(countUniqueTiles(b, origin).unique).toBe(1);
+  });
+
+  // A TRANSPOSE IS NOT A FLIP. The VDP has H and V bits and no diagonal; if
+  // this passes as 1, the canonicaliser folded in a rotation the hardware
+  // cannot perform, and 2C would emit tiles that draw wrong.
+  it('does NOT count a transposed pair as one tile', () => {
+    const src = (x: number, y: number) => canvasIndex(0, (x < 3 && y === 0) ? 1 + x : 0);
+    const b = buf(16, 8, (x, y) => (x < 8 ? src(x, y) : src(y, x - 8)));
+    expect(countUniqueTiles(b, origin).unique).toBe(2);
+  });
+
+  // The line lives in the block/sprite attribute, not in the tile.
+  it('counts two cells drawn in different lines as ONE tile', () => {
+    const b = buf(16, 8, (x, y) => canvasIndex(x < 8 ? 0 : 3, y < 2 ? 5 : 0));
+    expect(countUniqueTiles(b, origin).unique).toBe(1);
+  });
+
+  it('excludes partial cells and reports their pixels instead', () => {
+    const b = buf(12, 8, () => canvasIndex(0, 1));
+    expect(countUniqueTiles(b, { originX: 0, originY: 0 }))
+      .toEqual({ unique: 1, fullCells: 1, pixelsOutsideGrid: 4 * 8 });
+  });
+
+  it('counts the blank tile like any other', () => {
+    expect(countUniqueTiles(buf(16, 8, () => 0), origin))
+      .toEqual({ unique: 1, fullCells: 2, pixelsOutsideGrid: 0 });
+  });
+
+  it('cost: a full 1024x1024 scan stays under 150ms', () => {
+    const b = buf(1024, 1024, (x, y) => canvasIndex((x >> 8) & 3, (x + y) & 15));
+    const t0 = performance.now();
+    countUniqueTiles(b, { originX: 0, originY: 0 });
+    colorsPerLine(b);
+    findCellClashes(b, { originX: 0, originY: 0 }, 4);
+    const ms = performance.now() - t0;
+    // eslint-disable-next-line no-console
+    console.log(`[cost] 1024x1024 full constraint scan: ${ms.toFixed(1)}ms`);
+    expect(ms).toBeLessThan(150);
   });
 });
