@@ -223,6 +223,26 @@ describe('createCanvasDocument', () => {
     expect(paneOverActiveTab()).toEqual({ kind: 'ready', docId: beta });
   });
 
+  it('a FAILED WRITE leaves the artist\'s armed COLOUR alone too', async () => {
+    // `openCanvasDoc` arms the brush from the new document's palette (the R18
+    // rule, in the store so both doors share it), so a create that is then
+    // rolled back would leave the colour derived from a palette no longer in
+    // the store — a silently recoloured brush on the canvas actually on screen.
+    // The same invariant as the focus restore, and it needs its own assertion:
+    // deleting the restore left every other test in this file green.
+    await createCanvasDocument({ ...INPUT, name: 'alpha' });
+    const chosen = canvasIndex(1, 4);
+    useCanvasStore.getState().setPaintIndex(chosen);
+
+    writeReply = () => ({ conflicts: [canvasPngPath('beta')] });
+    try {
+      expect((await createCanvasDocument({ ...INPUT, name: 'beta' })).ok).toBe(false);
+    } finally {
+      writeReply = okWrite;
+    }
+    expect(useCanvasStore.getState().paintIndex).toBe(chosen);
+  });
+
   it('a refusal BEFORE any store is touched still leaves the focus alone', async () => {
     // The no-op case, asserted so the uniform routing through `refuse` is not
     // mistaken for an over-reaction that could itself clobber something.

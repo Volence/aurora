@@ -65,8 +65,12 @@ export default function CanvasMode({ docId, appBar }: { docId: string; appBar: R
   //
   // The hidden level editors' handlers are registered alongside this one (their
   // pane stays mounted at display:none), and they are inert while a canvas tab
-  // is active because they all gate on levelKeysEnabled() — otherwise one Ctrl+Z
-  // would undo both a canvas stroke and a level edit.
+  // is active because they all gate on levelKeysEnabled(). NOT because they
+  // would undo a level edit — they call the same `focusedHistory()` this does,
+  // which on a canvas tab resolves to THIS document — but because a second
+  // caller of the same stack makes one Ctrl+Z consume two entries, so two
+  // strokes disappear per press. (Measured under CDP in Task 14; the older
+  // comments here and in level-keys.ts named a mechanism that cannot occur.)
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;

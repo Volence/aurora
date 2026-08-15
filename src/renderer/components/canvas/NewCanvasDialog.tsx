@@ -3,9 +3,32 @@
 //
 // EVERY RULE IT ENFORCES LIVES IN shell/new-canvas.ts, not here. The node suite
 // renders no React, so a rule written inside this component is a rule no test
-// can reach; this file collects values, renders the refusal `validateNewCanvas`
-// hands back, and calls the flow. The one thing it decides for itself is WHEN to
-// show a refusal (see `touched` below), which is a presentation question.
+// can reach; this file collects values, renders the refusal
+// `newCanvasFieldErrors` hands back, and calls the flow. What it decides for
+// itself is presentation: WHEN to show a refusal (see `touched`) and WHICH one
+// when more than one field is wrong (see `shown`).
+//
+// THREE THINGS THE FIRST VERSION GOT WRONG, all found the first time it was
+// rendered (Task 14, under CDP) and all invisible to a node suite:
+//
+//   • No focus trap — Tab walked out of the modal into the app behind it. The
+//     arithmetic now lives in ui/focus-trap.ts, where it can be tested.
+//   • An emptied number field showed a literal `0`, because `Number('')` is 0.
+//     The sizes are held as TEXT and parsed with `parseCanvasSide`, so an empty
+//     field looks empty and reads as NaN — refused with the bounds message,
+//     which is the true statement about it.
+//   • Enter did not submit from the number fields, because only the name input
+//     had a handler. The controls are a real <form> now, so Enter submits from
+//     any of them, once, natively.
+//
+// THE BACKDROP NO LONGER DISMISSES. It used to answer like ConfirmDialog's,
+// which is right there — that dialog holds nothing but a question. This one
+// holds typed input, and a click a few pixels outside it threw the name and
+// sizes away silently. Esc and Cancel are both explicit and both discoverable
+// (one is a visible button, the other is the universal modal reflex), so the
+// cost of dropping the third way out is one extra click in the "opened it by
+// accident" case. A confirm-on-backdrop was the other option and is too much
+// ceremony for a form that costs seconds to refill.
 //
 // The refusal is shown INLINE and the Create button is disabled with it on
 // screen, rather than the button silently doing nothing: a name that fails
@@ -17,10 +40,12 @@
 // not the guard — `createCanvasDocument` re-lists at create time and the
 // guarded write refuses an existing file outright (see new-canvas.ts's header).
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { T } from '../ui';
+import { FOCUSABLE_SELECTOR, nextTrapIndex } from '../ui/focus-trap';
 import {
-  createCanvasDocument, validateNewCanvas, NEW_CANVAS_DEFAULTS, type NewCanvasField,
+  createCanvasDocument, newCanvasFieldErrors, parseCanvasSide, NEW_CANVAS_DEFAULTS,
+  type NewCanvasField,
 } from '../../shell/new-canvas';
 import { listCanvasNames } from '../../state/canvas-file';
 import { openProjectDir } from '../../state/open-project';
@@ -35,23 +60,31 @@ export default function NewCanvasDialog({ open, onClose }: { open: boolean; onCl
   // rest of the rules, and are asserted valid there. As constants in this file
   // they were the only rules the suite could not reach.
   const [name, setName] = useState('');
-  const [width, setWidth] = useState(NEW_CANVAS_DEFAULTS.width);
-  const [height, setHeight] = useState(NEW_CANVAS_DEFAULTS.height);
+  // TEXT, not numbers: `Number('')` is 0, so a cleared field used to show a
+  // literal 0 the user never typed. See parseCanvasSide.
+  const [widthText, setWidthText] = useState(String(NEW_CANVAS_DEFAULTS.width));
+  const [heightText, setHeightText] = useState(String(NEW_CANVAS_DEFAULTS.height));
   const [profileId, setProfileId] = useState<ConstraintProfileId>(NEW_CANVAS_DEFAULTS.profileId);
   const [existing, setExisting] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   // Nothing is red until the user has typed or tried: an empty form that opens
   // already complaining reads as an error the user caused.
   const [touched, setTouched] = useState(false);
+  // WHICH field the user last edited, so the message on screen describes what
+  // they just did. Without it the display followed the create-time priority
+  // (name first), and clearing the width field showed a complaint about the
+  // name — a message that does not match what is on screen or what just changed.
+  const [lastField, setLastField] = useState<NewCanvasField | null>(null);
   const [failure, setFailure] = useState<{ field: NewCanvasField | null; reason: string } | null>(null);
+  const panelRef = useRef<HTMLFormElement>(null);
 
   useEffect(() => {
     if (!open) return;
     setName('');
-    setWidth(NEW_CANVAS_DEFAULTS.width);
-    setHeight(NEW_CANVAS_DEFAULTS.height);
+    setWidthText(String(NEW_CANVAS_DEFAULTS.width));
+    setHeightText(String(NEW_CANVAS_DEFAULTS.height));
     setProfileId(NEW_CANVAS_DEFAULTS.profileId);
-    setTouched(false); setFailure(null); setBusy(false);
+    setTouched(false); setFailure(null); setBusy(false); setLastField(null);
     const dir = openProjectDir();
     if (dir === null) { setExisting([]); return; }
     let live = true;
@@ -64,18 +97,30 @@ export default function NewCanvasDialog({ open, onClose }: { open: boolean; onCl
     return () => { live = false; };
   }, [open]);
 
-  const validation = validateNewCanvas({ name, width, height, profileId }, existing);
-  // The create flow's own refusal (a stale listing, a write that failed) outranks
-  // the live check — it is the newer fact about the same question.
-  const shown = failure ?? (touched && !validation.ok ? { field: validation.field, reason: validation.reason } : null);
+  const width = parseCanvasSide(widthText);
+  const height = parseCanvasSide(heightText);
+  const errors = newCanvasFieldErrors({ name, width, height, profileId }, existing);
+  const valid = Object.keys(errors).length === 0;
+
+  // WHICH refusal is on screen, in priority order:
+  //   1. the create flow's own (a stale listing, a failed write) — the newest
+  //      fact about the same question;
+  //   2. the field the user last touched, so the message matches what they just
+  //      did — this is the fix for "cleared the width, was told about the name";
+  //   3. otherwise the first bad field in reading order.
+  const liveField = (lastField && errors[lastField] ? lastField : null)
+    ?? (['name', 'width', 'height'] as NewCanvasField[]).find((f) => errors[f]) ?? null;
+  const shown = failure
+    ?? (touched && liveField ? { field: liveField, reason: errors[liveField]! } : null);
 
   const submit = useCallback(async () => {
     setTouched(true);
     setFailure(null);
-    const v = validateNewCanvas({ name, width, height, profileId }, existing);
-    if (!v.ok) return;
+    const w = parseCanvasSide(widthText);
+    const h = parseCanvasSide(heightText);
+    if (Object.keys(newCanvasFieldErrors({ name, width: w, height: h, profileId }, existing)).length > 0) return;
     setBusy(true);
-    const result = await createCanvasDocument({ name: name.trim(), width, height, profileId });
+    const result = await createCanvasDocument({ name: name.trim(), width: w, height: h, profileId });
     setBusy(false);
     if (!result.ok) {
       setFailure({ field: result.field, reason: result.reason });
@@ -86,7 +131,7 @@ export default function NewCanvasDialog({ open, onClose }: { open: boolean; onCl
       return;
     }
     onClose();
-  }, [name, width, height, profileId, existing, onClose]);
+  }, [name, widthText, heightText, profileId, existing, onClose]);
 
   useEffect(() => {
     if (!open) return;
@@ -99,14 +144,45 @@ export default function NewCanvasDialog({ open, onClose }: { open: boolean; onCl
 
   if (!open) return null;
 
+  // EVERY bad field is marked, not only the one being explained: with one
+  // message and three fields, marking just the explained one leaves the others
+  // looking fine until the user fixes this one and is refused again.
   const fieldStyle = (field: NewCanvasField): React.CSSProperties => ({
     ...styles.input,
-    ...(shown?.field === field ? styles.inputBad : {}),
+    ...(touched && (errors[field] || failure?.field === field) ? styles.inputBad : {}),
   });
 
+  const edited = (field: NewCanvasField) => { setTouched(true); setLastField(field); setFailure(null); };
+
+  /**
+   * Tab must not leave the modal. The element list is read LIVE on each press
+   * because it changes as you type — Create is disabled while the form is
+   * invalid, and a disabled button is not focusable, so a list captured on open
+   * would send focus to an element the browser refuses and drop it on <body>,
+   * outside the dialog.
+   */
+  const trapTab = (e: React.KeyboardEvent) => {
+    if (e.key !== 'Tab' || !panelRef.current) return;
+    const items = Array.from(panelRef.current.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR));
+    const next = nextTrapIndex(items.length, items.indexOf(document.activeElement as HTMLElement), e.shiftKey);
+    if (next === null) return;
+    e.preventDefault();
+    items[next].focus();
+  };
+
   return (
-    <div style={styles.backdrop} onMouseDown={onClose}>
-      <div style={styles.panel} onMouseDown={(e) => e.stopPropagation()} role="dialog" aria-label="New Canvas">
+    <div style={styles.backdrop}>
+      {/* A <form>, so Enter submits from ANY control — the number fields used to
+          swallow it because only the name input had a key handler. onSubmit
+          preventDefault keeps Electron from attempting a navigation. */}
+      <form
+        ref={panelRef}
+        style={styles.panel}
+        role="dialog"
+        aria-label="New Canvas"
+        onKeyDown={trapTab}
+        onSubmit={(e) => { e.preventDefault(); void submit(); }}
+      >
         <div style={styles.title}>New Canvas</div>
         <div style={styles.hint}>
           A free-size drawing surface with its own 64 colours, saved under
@@ -120,8 +196,7 @@ export default function NewCanvasDialog({ open, onClose }: { open: boolean; onCl
             value={name}
             spellCheck={false}
             placeholder="green-hill-cliffs"
-            onChange={(e) => { setName(e.target.value); setTouched(true); setFailure(null); }}
-            onKeyDown={(e) => { if (e.key === 'Enter') void submit(); }}
+            onChange={(e) => { setName(e.target.value); edited('name'); }}
             style={fieldStyle('name')}
           />
         </label>
@@ -130,14 +205,14 @@ export default function NewCanvasDialog({ open, onClose }: { open: boolean; onCl
           <span style={styles.label}>Size</span>
           <span style={styles.sizeRow}>
             <input
-              type="number" value={width} min={CANVAS_MIN_SIDE} max={CANVAS_MAX_SIDE}
-              onChange={(e) => { setWidth(Number(e.target.value)); setTouched(true); setFailure(null); }}
+              type="number" value={widthText} min={CANVAS_MIN_SIDE} max={CANVAS_MAX_SIDE}
+              onChange={(e) => { setWidthText(e.target.value); edited('width'); }}
               style={{ ...fieldStyle('width'), width: 72 }}
             />
             <span style={styles.times}>×</span>
             <input
-              type="number" value={height} min={CANVAS_MIN_SIDE} max={CANVAS_MAX_SIDE}
-              onChange={(e) => { setHeight(Number(e.target.value)); setTouched(true); setFailure(null); }}
+              type="number" value={heightText} min={CANVAS_MIN_SIDE} max={CANVAS_MAX_SIDE}
+              onChange={(e) => { setHeightText(e.target.value); edited('height'); }}
               style={{ ...fieldStyle('height'), width: 72 }}
             />
             <span style={styles.times}>px</span>
@@ -164,16 +239,17 @@ export default function NewCanvasDialog({ open, onClose }: { open: boolean; onCl
         {shown && <div style={styles.error}>{shown.reason}</div>}
 
         <div style={styles.buttons}>
-          <button onClick={onClose} style={styles.button}>Cancel</button>
+          {/* type="button" or it submits the form too. */}
+          <button type="button" onClick={onClose} style={styles.button}>Cancel</button>
           <button
-            onClick={() => { void submit(); }}
-            disabled={busy || !validation.ok}
-            style={{ ...styles.button, ...styles.primary, ...(busy || !validation.ok ? styles.buttonOff : {}) }}
+            type="submit"
+            disabled={busy || !valid}
+            style={{ ...styles.button, ...styles.primary, ...(busy || !valid ? styles.buttonOff : {}) }}
           >
             {busy ? 'Creating…' : 'Create'}
           </button>
         </div>
-      </div>
+      </form>
     </div>
   );
 }

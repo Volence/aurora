@@ -33,6 +33,7 @@ import {
   blankCanvasDoc, normalizeCanvasPixels, cloneCanvasDoc, blankCanvasPalette,
   canvasIndex, paletteLineOf, paletteEntryOf,
 } from '../../core/art/canvas-doc';
+import { mostVisiblePaintIndex } from '../../core/art/canvas-default-palette';
 import type { ConstraintProfileId } from '../../core/art/canvas-profiles';
 import type { CanvasSnapshot } from '../../core/editing/canvas-history';
 import { CanvasDocHistory } from '../../core/editing/canvas-history';
@@ -101,6 +102,10 @@ interface CanvasState {
    * surface whose palette has sixteen entries — magenta on screen (PixelViewport
    * draws an out-of-range index magenta) and an illegal nibble in the tile it
    * writes. The two ranges are different alphabets and need different variables.
+   *
+   * IT IS ARMED FOR YOU when a document is installed — see
+   * `armVisiblePaintIndex`, which both `openCanvasDoc` and `loadCanvasDoc` call.
+   * The default below is only what holds before any canvas has been opened.
    *
    * It lives on the STORE rather than in the pane's own React state because
    * CanvasMode is not keep-alive (App mounts it only while a canvas tab is
@@ -340,6 +345,33 @@ function recordEdit(docId: string): void {
 // --- Document lifecycle ----------------------------------------------------
 
 /**
+ * Arm the brush on a colour that can be SEEN in this document's palette.
+ *
+ * ONE RULE, BOTH DOORS. A canvas document enters this store in exactly two
+ * ways — `openCanvasDoc` (created) and `loadCanvasDoc` (read from disk) — and
+ * R18's fix originally went into the CREATE flow only. So a canvas created
+ * outside a zone opened with white armed, and the same canvas REOPENED next
+ * session opened with `canvasIndex(0, 1)` armed, which in a zone-seeded palette
+ * is usually black: the stroke commits, the dirty dot appears, and nothing
+ * visible happens. That is R18's exact defect one door over, and the CDP run
+ * caught it. Putting the rule here rather than at the two call sites is what
+ * stops the doors drifting apart again.
+ *
+ * NOT ON PLAIN FOCUS (`activateCanvasDoc`), which would overwrite the artist's
+ * chosen colour on every tab switch. This fires only when a document's palette
+ * first becomes known to the store — the same moment the store already treats
+ * as "this is new" by clearing the undo stack.
+ *
+ * The store's own `closeAll` comment is the general argument: a paint index is a
+ * raw palette index, and the same number names a different colour under a
+ * different palette, so carrying one across a palette boundary silently
+ * recolours the brush.
+ */
+function armVisiblePaintIndex(palette: readonly number[]): void {
+  useCanvasStore.getState().setPaintIndex(mostVisiblePaintIndex(palette));
+}
+
+/**
  * Open a blank document and focus it, or focus the one already open under this
  * id. The return value says WHICH: Task 13 writes a canvas's file pair up front,
  * so a name that collides with an already-open canvas would otherwise focus the
@@ -362,6 +394,7 @@ export function openCanvasDoc(docId: string, input: {
   // buffer of the old size, which writeCanvasSnapshot installs without checking.
   canvasHistory(docId).clear();
   useCanvasStore.setState({ docs, activeDocId: docId });
+  armVisiblePaintIndex(docs.get(docId)!.doc.palette);
   return 'created';
 }
 
@@ -383,6 +416,9 @@ export function loadCanvasDoc(docId: string, doc: CanvasDoc, source: CanvasSourc
   docs.set(docId, { doc, selection: null, unsavedEdits: false, source });
   canvasHistory(docId).clear();  // a loaded canvas starts with empty history
   useCanvasStore.setState({ docs, activeDocId: docId });
+  // The door R18's original fix missed: a REOPENED zone-seeded canvas armed
+  // entry 1, which is black in most zone palettes.
+  armVisiblePaintIndex(doc.palette);
 }
 
 /**

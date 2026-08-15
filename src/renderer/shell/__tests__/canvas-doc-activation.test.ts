@@ -54,9 +54,13 @@ function sourceFor(name: string, over: Partial<CanvasSource> = {}): CanvasSource
 
 /** What a successful loader hands back. `mark` paints one identifying pixel so a
  *  document's provenance is visible in its buffer. */
-function loadedCanvas(name: string, opts: { mark?: number; warnings?: string[] } = {}): LoadedCanvas {
+function loadedCanvas(
+  name: string,
+  opts: { mark?: number; warnings?: string[]; palette?: number[] } = {},
+): LoadedCanvas {
   const doc = blankCanvasDoc({ name, width: 8, height: 8, profileId: 'none' });
   if (opts.mark !== undefined) doc.pixels.data[0] = opts.mark;
+  if (opts.palette) doc.palette = opts.palette;
   return { doc, source: sourceFor(name), warnings: opts.warnings ?? [], sidecarRejected: false };
 }
 
@@ -203,6 +207,24 @@ describe('activateCanvasDocTarget', () => {
 
     expect(useCanvasStore.getState().isOpen(TAB.id)).toBe(false);
     expect(useCanvasStore.getState().activeDocId).toBe(OTHER.id);
+  });
+});
+
+describe('reopening a canvas arms a visible brush (R18, the load door)', () => {
+  it('arms the palette\'s brightest entry, not the black default', () => {
+    // End to end down the REOPEN path — activation, then loadCanvasDoc, then the
+    // store's arming rule. The CDP run found this door open: a zone-seeded
+    // canvas reopened with index 1 armed, which is black in GHZ's palette, so
+    // every stroke committed invisibly.
+    const palette = new Array<number>(64).fill(0);
+    palette[canvasIndex(0, 1)] = 0;        // black, as a zone's line 0 usually is
+    palette[canvasIndex(2, 6)] = 0x0eee;   // white
+    useCanvasStore.getState().setPaintIndex(canvasIndex(0, 1));
+
+    return activateCanvasDocTarget(TAB.id, async (n) => loadedCanvas(n, { palette })).then((ok) => {
+      expect(ok).toBe(true);
+      expect(useCanvasStore.getState().paintIndex).toBe(canvasIndex(2, 6));
+    });
   });
 });
 

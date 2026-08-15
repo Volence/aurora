@@ -227,8 +227,10 @@ export default function App() {
                 the art facet, the classic view/composer) are still registered
                 alongside SpriteMode's. Those level-side handlers are gated by
                 levelKeysEnabled() (workspace/level-keys.ts) — inert whenever a
-                sprite-doc tab is active — so one Ctrl+Z can't fire both sprite and
-                the hidden level undo (finding 1). */}
+                sprite-doc tab is active — so one Ctrl+Z consumes one undo entry
+                rather than two. (It was never "sprite undo AND level undo": both
+                handlers resolve focusedHistory(), which on a sprite tab IS the
+                sprite's stack. See level-keys.ts for the corrected mechanism.) */}
             {activeTab?.kind === 'sprite-doc' && (
               <div style={{ ...styles.tabPane, display: 'flex' }}>
                 {/* SpriteMode renders whatever document is CHECKED OUT, so it may

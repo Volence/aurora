@@ -523,9 +523,12 @@ export default function MapViewport() {
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       // The level pane is keep-alive (display:none) under an active sprite-doc
-      // tab, so this window handler stays registered. Bail while sprite mode
-      // owns the keyboard so one Ctrl+Z can't fire BOTH sprite undo and this
-      // hidden level undo (finding 1). See workspace/level-keys.ts.
+      // or canvas-doc tab, so this window handler stays registered. Bail while
+      // that editor owns the keyboard: the shortcuts BELOW are this pane's own
+      // (map clipboard, tool letters), and firing them from a tab whose pane is
+      // hidden acts on a document the user cannot see. Undo is not among them —
+      // it was hoisted to LevelWorkspace — so the "one Ctrl+Z fires both" story
+      // this comment used to tell was wrong twice over. See level-keys.ts.
       if (!levelKeysEnabled()) return;
 
       // Typing into an input/textarea/contentEditable (e.g. the CommandPalette

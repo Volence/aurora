@@ -4,9 +4,16 @@ import { useSessionStore } from '../../state/sessionStore';
 import { aeonLevelTab, spriteDocTab, untitledSpriteTab } from '../../shell/tabs';
 
 // levelKeysEnabled() gates the (keep-alive, hidden) level editors' window keydown
-// handlers: inert whenever a sprite-doc tab is active, so SpriteMode alone owns
-// the keyboard (finding 1 — the double-undo merge blocker). Home stays enabled
-// (master's pre-existing Home-tab keep-alive semantics, deliberately unchanged).
+// handlers: inert whenever a sprite-doc or canvas-doc tab is active, so that
+// editor alone owns the keyboard (finding 1 — the double-undo merge blocker).
+// Home stays enabled (master's pre-existing Home-tab keep-alive semantics,
+// deliberately unchanged).
+//
+// WHAT THIS FILE PROVES, AND WHAT IT DOES NOT. Everything here is about the
+// PREDICATE. That the predicate matters — that a live level handler would
+// consume a second undo entry off the focused editor's own stack — is pinned in
+// undo-double-consume.test.ts, because the CDP run showed this file could pass
+// unchanged while nothing downstream depended on it.
 
 describe('levelKeysEnabled', () => {
   beforeEach(() => {
@@ -40,7 +47,8 @@ describe('levelKeysEnabled', () => {
   it('is disabled while the UNTITLED sprite tab is active', () => {
     // "New Sprite…" mounts SpriteMode exactly like an engine-bound sprite tab,
     // so the hidden level handlers must be just as inert — otherwise one Ctrl+Z
-    // drives both the sprite stack and a hidden level document's.
+    // is seen by two handlers that both drive THIS sprite's stack, and two edits
+    // vanish per press.
     const untitled = untitledSpriteTab();
     useSessionStore.getState().open(untitled);
     expect(useSessionStore.getState().activeId).toBe(untitled.id);

@@ -263,6 +263,63 @@ describe('the paint index (Task 12)', () => {
   });
 });
 
+describe('arming the brush on the document\'s own palette (R18, BOTH doors)', () => {
+  /** A zone-shaped palette: line 0 opens on black, as most zone palettes do,
+   *  with the readable colours further along. */
+  function zonePalette(): number[] {
+    const p = new Array<number>(64).fill(0);
+    p[canvasIndex(0, 1)] = 0;         // black — what the store's DEFAULT index names
+    p[canvasIndex(0, 9)] = 0x0eee;    // white
+    p[canvasIndex(1, 4)] = 0x0080;    // a mid green
+    return p;
+  }
+
+  it('a LOADED canvas arms a visible colour, not the default black entry 1', () => {
+    // THE BUG THE CDP RUN FOUND. R18's fix went into the create flow only, so a
+    // canvas created in a zone opened with white armed and the SAME canvas
+    // reopened next session armed entry 1 — black in a zone palette. The stroke
+    // commits and the dot appears; nothing visible happens.
+    const doc = blankCanvasDoc({ name: 'alpha', width: 8, height: 8, profileId: 'genesis-level-art' });
+    doc.palette = zonePalette();
+    loadCanvasDoc(A, doc, SOURCE);
+    expect(useCanvasStore.getState().paintIndex).toBe(canvasIndex(0, 9));
+  });
+
+  it('a CREATED canvas arms from the palette it was seeded with', () => {
+    openCanvasDoc(A, {
+      name: 'alpha', width: 8, height: 8, profileId: 'genesis-level-art', palette: zonePalette(),
+    });
+    expect(useCanvasStore.getState().paintIndex).toBe(canvasIndex(0, 9));
+  });
+
+  it('does NOT re-arm on a plain focus change — the artist keeps their colour', () => {
+    // Arming belongs to INSTALLING a document, not to looking at one: firing it
+    // from activateCanvasDoc would reset the chosen colour on every tab switch.
+    // The two palettes differ so the assertion can tell "left alone" from
+    // "re-armed from whichever document just took focus".
+    const doc = blankCanvasDoc({ name: 'alpha', width: 8, height: 8, profileId: 'none' });
+    doc.palette = zonePalette();                    // brightest at line 0 entry 9
+    loadCanvasDoc(A, doc, SOURCE);
+    expect(useCanvasStore.getState().paintIndex).toBe(canvasIndex(0, 9));
+
+    const other = new Array<number>(64).fill(0);
+    other[canvasIndex(2, 3)] = 0x0eee;              // brightest at line 2 entry 3
+    openCanvasDoc(B, { name: 'beta', width: 8, height: 8, profileId: 'none', palette: other });
+    expect(useCanvasStore.getState().paintIndex).toBe(canvasIndex(2, 3));
+
+    // Back and forth between two OPEN documents changes nothing.
+    activateCanvasDoc(A);
+    expect(useCanvasStore.getState().paintIndex).toBe(canvasIndex(2, 3));
+    activateCanvasDoc(B);
+    expect(useCanvasStore.getState().paintIndex).toBe(canvasIndex(2, 3));
+  });
+
+  it('is total: an all-black palette leaves the store\'s own default armed', () => {
+    openCanvasDoc(A, { name: 'alpha', width: 8, height: 8, profileId: 'none' });
+    expect(useCanvasStore.getState().paintIndex).toBe(canvasIndex(0, 1));
+  });
+});
+
 describe('one gesture, one undo entry', () => {
   it('a whole stroke committed in one setPixels takes exactly one Ctrl+Z', () => {
     // Task 12's contract 3, which falls out of committing THROUGH the store: the

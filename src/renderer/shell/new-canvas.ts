@@ -34,9 +34,7 @@
 
 import type { ConstraintProfileId } from '../../core/art/canvas-profiles';
 import { CANVAS_COLORS, CANVAS_LINE_LENGTH, CANVAS_MIN_SIDE, CANVAS_MAX_SIDE } from '../../core/art/canvas-doc';
-import {
-  defaultCanvasPalette, mostVisiblePaintIndex, paletteHasVisibleColour,
-} from '../../core/art/canvas-default-palette';
+import { defaultCanvasPalette, paletteHasVisibleColour } from '../../core/art/canvas-default-palette';
 import { canvasNameIsSafe, canvasPngPath, canvasSidecarPath, listCanvasNames } from '../state/canvas-file';
 import {
   useCanvasStore, openCanvasDoc, closeCanvasDoc, activateCanvasDoc, clearCanvasFocus,
@@ -88,6 +86,74 @@ export type NewCanvasValidation =
   | { ok: true }
   | { ok: false; field: NewCanvasField; reason: string };
 
+/** Every field that is wrong, with its reason. `{}` means the input is valid. */
+export type NewCanvasFieldErrors = Partial<Record<NewCanvasField, string>>;
+
+/** Refusal priority — also the reading order of the form. */
+const FIELD_ORDER: NewCanvasField[] = ['name', 'width', 'height'];
+
+/**
+ * What a width/height FIELD holds, as a number.
+ *
+ * An EMPTY field is `NaN`, not 0, and that is the whole point. `Number('')` is
+ * 0, so a dialog that stored its sizes as numbers turned a cleared field into a
+ * literal `0` on screen — a value the user did not type, shown back to them as
+ * though they had. NaN is refused by `validateNewCanvas` with the bounds
+ * message, which is the true statement about an empty field ("must be a whole
+ * number between 8 and 1024"), and it lets the input render the raw text so an
+ * emptied field simply looks empty.
+ */
+export function parseCanvasSide(text: string): number {
+  return text.trim() === '' ? Number.NaN : Number(text);
+}
+
+/**
+ * EVERY field's error at once — what the dialog needs, because it marks each bad
+ * field and shows the message for the one the user last touched.
+ *
+ * `validateNewCanvas` (below) is this plus "first in FIELD_ORDER wins", which is
+ * what the CREATE path needs: one refusal, and the name checked before the size
+ * so a collision is never masked by a typo'd number. Two shapes, one set of
+ * rules — the earlier split showed a name error while the user was editing the
+ * width, because the create-time priority was also driving the display.
+ */
+export function newCanvasFieldErrors(
+  input: NewCanvasInput,
+  existing: readonly string[],
+): NewCanvasFieldErrors {
+  const errors: NewCanvasFieldErrors = {};
+  const name = input.name.trim();
+  if (name === '') {
+    errors.name = 'Give the canvas a name.';
+  } else if (!canvasNameIsSafe(name)) {
+    // The rule spelled out rather than named: it is also a FILE STEM and a tab
+    // id, which is why it is stricter than a filename would have to be.
+    errors.name =
+      'A canvas name must start with a letter or digit and use only letters, digits, '
+      + '- and _ (no spaces, dots or slashes), up to 64 characters. It is the name of '
+      + 'the file on disk.';
+  } else {
+    const clash = existing.find((e) => e.toLowerCase() === name.toLowerCase());
+    if (clash !== undefined) {
+      // Names the file, because "already exists" without the path invites the
+      // user to assume Aurora means some other kind of already.
+      errors.name =
+        `A canvas named "${clash}" already exists (${canvasPngPath(clash)}). `
+        + 'Creating over it would replace that art with a blank canvas — pick another name, '
+        + 'or open the existing one from the Explorer.';
+    }
+  }
+
+  const sideOk = (v: number): boolean =>
+    Number.isFinite(v) && Math.floor(v) === v && v >= CANVAS_MIN_SIDE && v <= CANVAS_MAX_SIDE;
+  const bounds = (label: string): string =>
+    `${label} must be a whole number between ${CANVAS_MIN_SIDE} and ${CANVAS_MAX_SIDE} pixels.`;
+  if (!sideOk(input.width)) errors.width = bounds('Width');
+  if (!sideOk(input.height)) errors.height = bounds('Height');
+
+  return errors;
+}
+
 /**
  * Whether this canvas may be created, and if not, WHY — the reason is the whole
  * value of the function. "Invalid name" with no explanation, on a rule as
@@ -97,43 +163,12 @@ export type NewCanvasValidation =
  * `existing` is the project's current canvas names (`listCanvasNames().names`).
  */
 export function validateNewCanvas(input: NewCanvasInput, existing: readonly string[]): NewCanvasValidation {
-  const name = input.name.trim();
-  if (name === '') return { ok: false, field: 'name', reason: 'Give the canvas a name.' };
-  if (!canvasNameIsSafe(name)) {
-    return {
-      ok: false,
-      field: 'name',
-      // The rule spelled out rather than named: it is also a FILE STEM and a tab
-      // id, which is why it is stricter than a filename would have to be.
-      reason:
-        'A canvas name must start with a letter or digit and use only letters, digits, '
-        + '- and _ (no spaces, dots or slashes), up to 64 characters. It is the name of '
-        + 'the file on disk.',
-    };
+  const errors = newCanvasFieldErrors(input, existing);
+  for (const field of FIELD_ORDER) {
+    const reason = errors[field];
+    if (reason !== undefined) return { ok: false, field, reason };
   }
-  const clash = existing.find((e) => e.toLowerCase() === name.toLowerCase());
-  if (clash !== undefined) {
-    return {
-      ok: false,
-      field: 'name',
-      // Names the file, because "already exists" without the path invites the
-      // user to assume Aurora means some other kind of already.
-      reason:
-        `A canvas named "${clash}" already exists (${canvasPngPath(clash)}). `
-        + 'Creating over it would replace that art with a blank canvas — pick another name, '
-        + 'or open the existing one from the Explorer.',
-    };
-  }
-  const side = (v: number, field: 'width' | 'height'): NewCanvasValidation | null =>
-    Number.isFinite(v) && Math.floor(v) === v && v >= CANVAS_MIN_SIDE && v <= CANVAS_MAX_SIDE
-      ? null
-      : {
-          ok: false,
-          field,
-          reason: `${field === 'width' ? 'Width' : 'Height'} must be a whole number `
-            + `between ${CANVAS_MIN_SIDE} and ${CANVAS_MAX_SIDE} pixels.`,
-        };
-  return side(input.width, 'width') ?? side(input.height, 'height') ?? { ok: true };
+  return { ok: true };
 }
 
 /**
@@ -228,12 +263,18 @@ export type CreateCanvasResult =
  * split.
  */
 function refuse(
-  previousFocus: string | null,
+  previous: { focus: string | null; paintIndex: number },
   field: NewCanvasField | null,
   reason: string,
 ): CreateCanvasResult {
-  if (previousFocus === null) clearCanvasFocus();
-  else activateCanvasDoc(previousFocus);
+  if (previous.focus === null) clearCanvasFocus();
+  else activateCanvasDoc(previous.focus);
+  // The PAINT INDEX is restored for the same reason and by the same rule.
+  // `openCanvasDoc` arms the brush from the new document's palette, so a create
+  // that is then rolled back would leave the artist's colour derived from a
+  // palette no longer in the store — i.e. a silently recoloured brush on the
+  // canvas they are actually looking at.
+  useCanvasStore.getState().setPaintIndex(previous.paintIndex);
   return { ok: false, field, reason };
 }
 
@@ -263,14 +304,17 @@ export async function createCanvasDocument(input: NewCanvasInput): Promise<Creat
   // (see `refuse`). Read once here rather than inside `refuse` for the obvious
   // reason: by the time a refusal runs, the value has already been overwritten
   // by the thing being rolled back.
-  const previousFocus = useCanvasStore.getState().activeDocId;
+  const previous = {
+    focus: useCanvasStore.getState().activeDocId,
+    paintIndex: useCanvasStore.getState().paintIndex,
+  };
 
   const dir = openProjectDir();
   if (dir === null) {
     // The files land under `<project>/.aurora/canvas/`, so with no project there
     // is no directory to put them in. The command is gated on this too; this is
     // the guard for the race (a project closing while the dialog is open).
-    return refuse(previousFocus, null, 'No project is open, so there is nowhere to put the canvas.');
+    return refuse(previous, null, 'No project is open, so there is nowhere to put the canvas.');
   }
 
   // A FRESH listing, not the one the dialog opened with: the dialog can sit on
@@ -280,12 +324,12 @@ export async function createCanvasDocument(input: NewCanvasInput): Promise<Creat
   try {
     existing = (await listCanvasNames(dir)).names;
   } catch (e) {
-    return refuse(previousFocus, null,
+    return refuse(previous, null,
       `Could not read ${dir}/.aurora/canvas: ${e instanceof Error ? e.message : String(e)}`);
   }
 
   const valid = validateNewCanvas(input, existing);
-  if (!valid.ok) return refuse(previousFocus, valid.field, valid.reason);
+  if (!valid.ok) return refuse(previous, valid.field, valid.reason);
 
   const name = input.name.trim();
   const tab = canvasDocTab(name);
@@ -301,7 +345,7 @@ export async function createCanvasDocument(input: NewCanvasInput): Promise<Creat
     // `refuse` also undoes the focus this very call just handed to the colliding
     // document — a pure validation refusal must not move the artist's view onto
     // a canvas that isn't even the active tab.
-    return refuse(previousFocus, 'name',
+    return refuse(previous, 'name',
       `A canvas named "${name}" is already open in a tab. Close it first, or pick another name.`);
   }
 
@@ -324,13 +368,14 @@ export async function createCanvasDocument(input: NewCanvasInput): Promise<Creat
     // …and no focus change either: closeCanvasDoc clears activeDocId, which
     // would otherwise leave whichever canvas tab is actually on screen rendering
     // "could not be loaded" over live, possibly dirty work.
-    return refuse(previousFocus, null, e instanceof Error ? e.message : String(e));
+    return refuse(previous, null, e instanceof Error ? e.message : String(e));
   }
 
-  // Arm the brush on a colour that can actually be SEEN in this canvas's
-  // palette (R18). Set after the write and before the tab opens, so the pane's
-  // first frame already shows it in the status bar.
-  useCanvasStore.getState().setPaintIndex(mostVisiblePaintIndex(palette));
+  // The brush was armed on a visible colour by `openCanvasDoc` above — the rule
+  // lives in the store (armVisiblePaintIndex) so that CREATING and REOPENING a
+  // canvas cannot drift apart, which is exactly what happened when this flow
+  // owned its own copy: a new canvas armed white, and the same canvas reopened
+  // next session armed black.
 
   // Through the ordinary tab route, so the create path shares the activation
   // glue with every other way a canvas tab is focused. The document is already

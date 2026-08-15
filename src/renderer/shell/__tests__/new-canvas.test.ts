@@ -21,6 +21,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   validateNewCanvas, flattenZonePalette, newCanvasPalette, NEW_CANVAS_DEFAULTS,
+  newCanvasFieldErrors, parseCanvasSide,
 } from '../new-canvas';
 import { paletteHasVisibleColour } from '../../../core/art/canvas-default-palette';
 import {
@@ -207,5 +208,51 @@ describe('NEW_CANVAS_DEFAULTS', () => {
 
   it('carries NO default name, so nothing lands on disk under a name nobody chose', () => {
     expect('name' in NEW_CANVAS_DEFAULTS).toBe(false);
+  });
+});
+
+describe('parseCanvasSide — an empty field is not zero', () => {
+  it('reads an empty or blank field as NaN', () => {
+    // `Number('')` is 0, so holding the sizes as numbers turned a cleared field
+    // into a literal 0 on screen — a value the user never typed, shown back to
+    // them as though they had. NaN keeps the field's text empty and is refused
+    // with the bounds message, which is the true statement about it.
+    expect(parseCanvasSide('')).toBeNaN();
+    expect(parseCanvasSide('   ')).toBeNaN();
+    expect(validateNewCanvas({ ...OK, width: parseCanvasSide('') }, []).ok).toBe(false);
+  });
+
+  it('reads a typed number, and does not silently repair a bad one', () => {
+    expect(parseCanvasSide('128')).toBe(128);
+    expect(parseCanvasSide(' 64 ')).toBe(64);
+    expect(parseCanvasSide('12.5')).toBe(12.5);   // refused, not rounded
+    expect(parseCanvasSide('abc')).toBeNaN();
+    expect(parseCanvasSide('0')).toBe(0);          // refused by the bounds, not by this
+  });
+});
+
+describe('newCanvasFieldErrors — every field at once', () => {
+  it('reports the name AND the size together', () => {
+    // The dialog marks every bad field and explains the one the user last
+    // touched. With only a first-wins answer, clearing the width field showed a
+    // complaint about the name — a message describing neither what is on screen
+    // nor what just changed.
+    const errors = newCanvasFieldErrors({ ...OK, name: 'sky tiles', width: Number.NaN }, []);
+    expect(Object.keys(errors).sort()).toEqual(['name', 'width']);
+    expect(errors.width).toContain('Width');
+    expect(errors.name).toContain('canvas name');
+  });
+
+  it('is empty for a valid input', () => {
+    expect(newCanvasFieldErrors(OK, [])).toEqual({});
+  });
+
+  it('and validateNewCanvas is that, first-in-order — name before size', () => {
+    // The CREATE path still wants exactly one refusal, with the collision never
+    // masked by a typo'd number. Both shapes, one set of rules.
+    const v = validateNewCanvas({ ...OK, name: 'cliffs', width: 0 }, ['cliffs']);
+    expect(v.ok ? null : v.field).toBe('name');
+    expect(validateNewCanvas({ ...OK, width: 0, height: 0 }, []).ok).toBe(false);
+    expect(validateNewCanvas({ ...OK, width: 0, height: 0 }, [])).toMatchObject({ field: 'width' });
   });
 });

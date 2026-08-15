@@ -55,8 +55,11 @@ describe('canvas undo routing', () => {
 describe('keyboard handoff', () => {
   it('level key handlers are inert while a canvas tab is active', () => {
     // Same rule sprite docs already have: the level editors stay MOUNTED behind
-    // the canvas pane, so without this one Ctrl+Z fires both the canvas undo and
-    // the hidden level undo.
+    // the canvas pane, so without this a single Ctrl+Z reaches TWO handlers that
+    // both resolve focusedHistory() — the canvas's own stack — and consumes two
+    // undo entries. (Not "canvas undo plus level undo": focusedDocId returns the
+    // canvas tab's document, so the level pool is never reachable. Corrected
+    // after Task 14 measured it; see workspace/level-keys.ts.)
     useSessionStore.setState({ tabs: [HOME_TAB, TAB], activeId: TAB.id });
     expect(levelKeysEnabled()).toBe(false);
   });
