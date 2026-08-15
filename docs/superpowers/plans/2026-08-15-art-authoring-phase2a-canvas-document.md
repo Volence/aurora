@@ -88,6 +88,8 @@ Named so a reviewer does not read them as gaps:
 
 ### Task 1: The canvas document and its pixel encoding
 
+> **Superseded in part by R1, R3 and the renames — see `## Review corrections` at the foot of this plan.** The code block below is the version that shipped in `e434050` and is kept as history; `normalizeTransparent` is now `normalizeCanvasPixels` and covers the whole illegal domain, `CanvasDoc.grid` is now `gridOrigin`, and `blankCanvasDoc` clamps a ceiling as well as a floor. Do not copy this block verbatim.
+
 **Files:**
 - Create: `src/core/art/canvas-doc.ts`
 - Test: `src/core/art/__tests__/canvas-doc.test.ts`
@@ -1260,8 +1262,7 @@ Expected: FAIL — module not found.
 
 import type { CanvasDoc } from './canvas-doc';
 import { CANVAS_COLORS, CANVAS_TRANSPARENT, blankCanvasPalette, normalizeCanvasPixels } from './canvas-doc';
-import type { ConstraintProfileId } from './canvas-profiles';
-import { CONSTRAINT_PROFILES } from './canvas-profiles';
+import { CONSTRAINT_PROFILES, constraintProfile } from './canvas-profiles';
 import { decodeIndexedPng, encodeIndexedPng, type Rgb } from './indexed-png';
 import { decodeGenesisColor, encodeGenesisColor } from '../formats/palette';
 
@@ -2796,6 +2797,10 @@ git commit -m "test(canvas): verify the canvas document in the running app under
 **R1 (IMPORTANT, Task 1) — the choke point only covered half the illegal domain.** `normalizeTransparent` collapsed the entry-0 aliases (16/32/48) but let any value above 63 through untouched, so 200 and 8 rendered identically and stored differently — the exact "two spellings of one colour" bug the module header argues must never exist, entering by another door. Task 5's decoder feeds raw PNG indices straight into it, so the hole was on the real path. **Renamed `normalizeCanvasPixels`** (the old name under-describes a function that owns the whole domain) and every pixel now routes through `canvasIndex(paletteLineOf(v), paletteEntryOf(v))`, which already masks both fields — making `canvasIndex`'s "the ONE constructor" claim literally true and removing the asymmetry where the constructor masked and the normaliser did not. A value above 63 is corrupt input; the file-format layer refuses over-large palettes before this point, so it should never arrive in practice.
 
 **R2 (IMPORTANT, Task 2) — `constraintProfile` could not accept the input it exists for.** Its documented `none` fallback is justified by "a sidecar can name a profile this build has never heard of", but a sidecar yields a `string` and the parameter type rejected it — which is why the test needed `as never`, and why Task 5's loader had reimplemented the fallback inline with a cast. The parameter is now `string`; the return type stays exact; Task 5 calls it instead of restating the rule.
+
+**R2b (IMPORTANT, follow-on) — the widening in R2 opened a prototype-chain hole, found on re-review.** `??` only fires on null/undefined, and an object-literal `Record` inherits from `Object.prototype`, so once the parameter accepted any string, `constraintProfile('toString')` returned `Function.prototype.toString` *typed as a `ConstraintProfile`* with `.id === undefined` — reachable directly from sidecar JSON, invisible to TypeScript, and surfacing far from its cause. The lookup is now gated on `Object.prototype.hasOwnProperty.call(...)` and tested over `toString`, `constructor`, `__proto__`, `valueOf` and `hasOwnProperty`. Worth remembering the shape: widening a parameter to accept untrusted input moves the problem from the type system to runtime, and an index into a plain object literal is where it lands.
+
+**R7 (IMPORTANT, follow-on) — half of R6 was comment-only.** `pixel-ops.ts`'s comment names the exact dangerous edit ("must not add an `& 15` in here"), but masking all three write sites in `floodFill`, `drawLine` and `drawRect` left the whole `src/core/art` + `src/core/editing` suite green: the controller guard from R6 only exercised the pencil path, which writes through the controller's own `setPx` and never reaches `pixel-ops`. The controller test now drives fill, line, rect and dither with a 0..63 colour, and each was validated by planting the mask and watching the matching test fail.
 
 **R3 (IMPORTANT, Task 1) — no size ceiling.** `blankCanvasDoc` clamped the floor only. `cloneCanvasDoc` copies the whole buffer per undo entry and `CanvasDocHistory` keeps 40, so an unbounded "free-size" canvas is an unbounded history. `MAX_SIDE = 1024` (~1 MB per snapshot, ~40 MB of history); the ceiling is set by snapshot cost, not by anything about the art.
 
