@@ -4,8 +4,8 @@
 // close confirm without checking it out first.
 //
 // The snapshot is the whole editable state: pixels, the 64-word palette, the
-// marquee and the constraint profile. Name and grid origin are document
-// IDENTITY, not edits, and sit outside. Profile is an EDIT and sits inside —
+// marquee, the constraint profile and the grid origin. Only the name is
+// document IDENTITY and sits outside. Profile is an EDIT and sits inside —
 // same split SpriteSnapshot makes for paletteMode (spriteStore.setPaletteMode
 // calls recordEdit; profileId is the canvas's analogue, both answering "what
 // colour/constraint model is this document under"). Leaving profileId out
@@ -13,11 +13,20 @@
 // a later Ctrl+Z would silently revert the previous paint stroke instead while
 // leaving the new (wrong) profile in place — the worst of both, since 2B's
 // clash overlay depends on which profile is active.
+//
+// gridOrigin is inside for the SAME reason, not merely by analogy: it decides
+// where the profile's tile grid starts, so it decides which pixels share a tile
+// and therefore which palette-line clashes exist. It is a deliberate
+// document-level choice with visible consequences, it is persisted in the
+// sidecar, and two numbers cost nothing to clone. Leaving it out would have
+// made it dirty-but-un-undoable — the exact shape R13 rejected for the field
+// sitting next to it.
 
 import type { PixelBuffer } from '../art/pixel-ops';
 import { clonePixelBuffer } from '../art/pixel-ops';
 import type { Selection } from '../art/pixel-edit-controller';
 import type { ConstraintProfileId } from '../art/canvas-profiles';
+import type { CanvasGridOrigin } from '../art/canvas-doc';
 import { SnapshotHistory } from './snapshot-history';
 
 /** A full snapshot of one canvas document for undo/redo. */
@@ -26,6 +35,7 @@ export interface CanvasSnapshot {
   palette: number[];
   selection: Selection | null;
   profileId: ConstraintProfileId;
+  gridOrigin: CanvasGridOrigin;
 }
 
 /** Entries kept per stack. Canvas pixels are dense buffers cloned in full per
@@ -42,6 +52,10 @@ export function cloneCanvasSnapshot(s: CanvasSnapshot): CanvasSnapshot {
     palette: s.palette.slice(),
     selection: s.selection ? { ...s.selection } : null,
     profileId: s.profileId,
+    // Copied, not aliased: a snapshot that shares the document's origin object
+    // would be rewritten by the next nudge, and undo would restore the value it
+    // was supposed to revert (the R4/R5 `palette: d.palette` bug, one field over).
+    gridOrigin: { ...s.gridOrigin },
   };
 }
 

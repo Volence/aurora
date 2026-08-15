@@ -1,11 +1,11 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
-  useCanvasStore, openCanvasDoc, activateCanvasDoc, closeCanvasDoc,
+  useCanvasStore, openCanvasDoc, loadCanvasDoc, activateCanvasDoc, closeCanvasDoc,
   canvasDocState, dirtyCanvasDocIds, saveableDirtyCanvasDocIds,
   readCanvasSnapshot, writeCanvasSnapshot,
 } from '../canvasStore';
 import { documentHistoryHub } from '../history-hub';
-import { canvasIndex } from '../../../core/art/canvas-doc';
+import { canvasIndex, blankCanvasDoc } from '../../../core/art/canvas-doc';
 import { createBuffer } from '../../../core/art/pixel-ops';
 
 const A = 'doc:canvas:alpha';
@@ -130,7 +130,7 @@ describe('canvasStore documents', () => {
     openCanvasDoc(A, { name: 'alpha', width: 8, height: 8, profileId: 'none' });
     openCanvasDoc(B, { name: 'beta', width: 8, height: 8, profileId: 'none' });
     closeCanvasDoc(B);
-    expect(useCanvasStore.getState().activeDocId).toBe('');
+    expect(useCanvasStore.getState().activeDocId).toBeNull();
     expect(canvasDocState(A)).not.toBeNull();   // A is still open, just not focused
   });
 
@@ -164,14 +164,29 @@ describe('canvasStore documents', () => {
     expect(saveableDirtyCanvasDocIds()).toEqual([A]);
   });
 
-  it('read/writeCanvasSnapshot reach a document by id, active or not', () => {
+  it('writeCanvasSnapshot installs an INDEPENDENT buffer into the named document', () => {
+    // Built independently rather than by mutating the live buffer: reading a
+    // snapshot hands back the document's own pixels, so the mutate-then-write
+    // version passes with writeCanvasSnapshot gutted to a no-op.
     openCanvasDoc(A, { name: 'alpha', width: 8, height: 8, profileId: 'none' });
     openCanvasDoc(B, { name: 'beta', width: 8, height: 8, profileId: 'none' });
-    const snap = readCanvasSnapshot(A);
-    snap.pixels.data[0] = canvasIndex(3, 9);
-    writeCanvasSnapshot(A, snap);
+    const before = readCanvasSnapshot(A);
+    const pixels = createBuffer(8, 8);
+    pixels.data[0] = canvasIndex(3, 9);
+    writeCanvasSnapshot(A, { ...before, pixels, palette: before.palette.slice() });
     expect(canvasDocState(A)!.pixels.data[0]).toBe(canvasIndex(3, 9));
+    expect(canvasDocState(A)!.pixels).toBe(pixels);   // the write installed it
     expect(canvasDocState(B)!.pixels.data[0]).toBe(0);
+  });
+
+  it('readCanvasSnapshot hands back the LIVE pixel buffer, by design', () => {
+    // Pinning an aliasing contract on purpose, not accidentally: the history
+    // deep-clones on record and on write, so nothing it keeps is reachable from
+    // here — and copying instead would clone a megabyte on every record, the
+    // cost this design exists to avoid. A consumer wanting a document should
+    // call canvasDocState.
+    openCanvasDoc(A, { name: 'alpha', width: 8, height: 8, profileId: 'none' });
+    expect(readCanvasSnapshot(A).pixels).toBe(canvasDocState(A)!.pixels);
   });
 
   it('a snapshot carries the profile through both directions', () => {
@@ -180,5 +195,117 @@ describe('canvasStore documents', () => {
     expect(snap.profileId).toBe('genesis-level-art');
     writeCanvasSnapshot(A, { ...snap, profileId: 'genesis-sprite' });
     expect(canvasDocState(A)!.profileId).toBe('genesis-sprite');
+  });
+
+  it('a snapshot carries the grid origin through both directions', () => {
+    openCanvasDoc(A, { name: 'alpha', width: 8, height: 8, profileId: 'none' });
+    const snap = readCanvasSnapshot(A);
+    expect(snap.gridOrigin).toEqual({ originX: 0, originY: 0 });
+    writeCanvasSnapshot(A, { ...snap, gridOrigin: { originX: 3, originY: 5 } });
+    expect(canvasDocState(A)!.gridOrigin).toEqual({ originX: 3, originY: 5 });
+  });
+});
+
+describe('setPixels refuses a size mismatch', () => {
+  it('throws rather than silently resizing the document', () => {
+    // The bug: a paint handler whose dep array misses docId, captured while an
+    // 8x8 document was active and firing after the user switched to a 16x16 one.
+    // Silently resizing destroys B's art behind an undo entry and a dirty dot
+    // that make it look deliberate; silently no-op'ing hides the edit instead.
+    openCanvasDoc(A, { name: 'alpha', width: 16, height: 16, profileId: 'none' });
+    const wrongSize = createBuffer(8, 8);
+    expect(() => useCanvasStore.getState().setPixels(A, wrongSize)).toThrow(/16x16/);
+    expect(canvasDocState(A)!.pixels.width).toBe(16);      // art intact
+    expect(useCanvasStore.getState().isDirty(A)).toBe(false);
+    expect(documentHistoryHub.historyFor(A).canUndo).toBe(false);  // no undo entry either
+  });
+
+  it('says nothing about a document that is not open', () => {
+    // Not-open is a legitimate race (the tab closed mid-stroke), not a
+    // programmer error — it stays a no-op, and must not throw on the way past.
+    expect(() => useCanvasStore.getState().setPixels('doc:canvas:gone', createBuffer(8, 8))).not.toThrow();
+  });
+});
+
+describe('grid origin', () => {
+  it('records, so a nudge is undoable rather than merely dirtying', () => {
+    openCanvasDoc(A, { name: 'alpha', width: 8, height: 8, profileId: 'none' });
+    useCanvasStore.getState().setGridOrigin(A, { originX: 4, originY: 2 });
+    expect(canvasDocState(A)!.gridOrigin).toEqual({ originX: 4, originY: 2 });
+    expect(useCanvasStore.getState().isDirty(A)).toBe(true);
+
+    documentHistoryHub.historyFor(A).undo();
+    expect(canvasDocState(A)!.gridOrigin).toEqual({ originX: 0, originY: 0 });
+  });
+
+  it('copies the caller’s origin object', () => {
+    openCanvasDoc(A, { name: 'alpha', width: 8, height: 8, profileId: 'none' });
+    const origin = { originX: 4, originY: 2 };
+    useCanvasStore.getState().setGridOrigin(A, origin);
+    origin.originX = 99;
+    expect(canvasDocState(A)!.gridOrigin.originX).toBe(4);
+  });
+});
+
+describe('focus and lifecycle', () => {
+  it('activating a document that is not open focuses NOTHING', () => {
+    // Not a silent return: that would leave focus on the PREVIOUS canvas, and a
+    // restored tab activates before its file has been read — pane showing
+    // document X under tab Y.
+    openCanvasDoc(A, { name: 'alpha', width: 8, height: 8, profileId: 'none' });
+    expect(useCanvasStore.getState().activeDocId).toBe(A);
+    activateCanvasDoc('doc:canvas:never-opened');
+    expect(useCanvasStore.getState().activeDocId).toBeNull();
+  });
+
+  it('reports whether it created a document or focused an existing one', () => {
+    expect(openCanvasDoc(A, { name: 'alpha', width: 8, height: 8, profileId: 'none' })).toBe('created');
+    expect(openCanvasDoc(A, { name: 'alpha', width: 8, height: 8, profileId: 'none' })).toBe('focused');
+  });
+
+  it('reopening a closed id does not inherit the old incarnation’s undo stack', () => {
+    // historyFor creates on demand, so merely READING the stack after a close
+    // leaves one alive. Without the clear in openCanvasDoc, this undo writes an
+    // 8x8 snapshot into a 16x16 document.
+    openCanvasDoc(A, { name: 'alpha', width: 8, height: 8, profileId: 'none' });
+    const buf = createBuffer(8, 8);
+    buf.data[0] = canvasIndex(1, 1);
+    useCanvasStore.getState().setPixels(A, buf);
+    closeCanvasDoc(A);
+    documentHistoryHub.historyFor(A);   // a consumer merely looks at the stack
+
+    openCanvasDoc(A, { name: 'alpha', width: 16, height: 16, profileId: 'none' });
+    expect(documentHistoryHub.historyFor(A).canUndo).toBe(false);
+    expect(canvasDocState(A)!.pixels.width).toBe(16);
+  });
+
+  it('loadCanvasDoc refuses to discard unsaved edits', () => {
+    openCanvasDoc(A, { name: 'alpha', width: 8, height: 8, profileId: 'none' });
+    const buf = createBuffer(8, 8);
+    buf.data[0] = canvasIndex(1, 1);
+    useCanvasStore.getState().setPixels(A, buf);
+    const fresh = blankCanvasDoc({ name: 'alpha', width: 8, height: 8, profileId: 'none' });
+    expect(() => loadCanvasDoc(A, fresh, null)).toThrow(/unsaved edits/);
+    expect(canvasDocState(A)!.pixels.data[0]).toBe(canvasIndex(1, 1));
+  });
+
+  it('loadCanvasDoc replaces a CLEAN open document', () => {
+    openCanvasDoc(A, { name: 'alpha', width: 8, height: 8, profileId: 'none' });
+    const fresh = blankCanvasDoc({ name: 'alpha', width: 16, height: 16, profileId: 'none' });
+    loadCanvasDoc(A, fresh, null);
+    expect(canvasDocState(A)!.pixels.width).toBe(16);
+    expect(useCanvasStore.getState().isDirty(A)).toBe(false);
+  });
+
+  it('closeAll drops the clipboard but keeps the view preferences', () => {
+    // The clipboard holds palette INDICES, so the same numbers mean different
+    // colours under the next project's palette — a surviving paste silently
+    // recolours itself. Zoom and tool describe how the user works, not what they
+    // were working on, so they stay.
+    useCanvasStore.getState().setClipboard({ w: 1, h: 1, data: new Uint8Array([5]) });
+    useCanvasStore.getState().setZoom(12);
+    useCanvasStore.getState().closeAll();
+    expect(useCanvasStore.getState().clipboard).toBeNull();
+    expect(useCanvasStore.getState().zoom).toBe(12);
   });
 });

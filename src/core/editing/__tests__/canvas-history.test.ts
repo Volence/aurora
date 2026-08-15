@@ -6,7 +6,13 @@ import { createBuffer } from '../../art/pixel-ops';
 function snapshot(fill: number): CanvasSnapshot {
   const pixels = createBuffer(4, 4);
   pixels.data.fill(fill);
-  return { pixels, palette: new Array(64).fill(fill), selection: null, profileId: 'genesis-unrestricted' };
+  return {
+    pixels,
+    palette: new Array(64).fill(fill),
+    selection: null,
+    profileId: 'genesis-unrestricted',
+    gridOrigin: { originX: fill, originY: fill },
+  };
 }
 
 describe('CanvasDocHistory', () => {
@@ -54,6 +60,19 @@ describe('CanvasDocHistory', () => {
     live = { ...snapshot(2), profileId: 'none' };
     h.undo();
     expect(live.profileId).toBe('genesis-sprite');
+  });
+
+  it('restores the grid origin, and does not alias the live one', () => {
+    // Guards Task 7's setGridOrigin. The aliasing half is the R4/R5 bug in a
+    // new field: record the live object rather than a copy and a later nudge
+    // rewrites the snapshot, so undo restores the value it should have reverted.
+    let live = snapshot(1);
+    const h = new CanvasDocHistory(() => live, (s) => { live = s; });
+    h.record(live);
+    live.gridOrigin.originX = 99;   // the live object moves on after the record
+    live = { ...snapshot(2), gridOrigin: { originX: 4, originY: 4 } };
+    h.undo();
+    expect(live.gridOrigin).toEqual({ originX: 1, originY: 1 });
   });
 
   it('caps the undo stack at CANVAS_MAX_DEPTH, dropping the oldest entry', () => {

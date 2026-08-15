@@ -88,11 +88,16 @@ export function normalizeCanvasPixels(buf: PixelBuffer): PixelBuffer {
 /** 64 CRAM words, all black — the sprite editor's blankStandalonePalette (which
  *  returns Color[] with alpha, not CRAM words — same idea, different
  *  representation) at canvas scale. A canvas created inside an open zone is
- *  seeded from that zone's palette instead (canvasStore.newCanvas); this is
- *  the fallback. */
+ *  seeded from that zone's palette instead (the New Canvas flow passes it to
+ *  canvasStore.openCanvasDoc); this is the fallback. */
 export function blankCanvasPalette(): number[] {
   return new Array(CANVAS_COLORS).fill(0);
 }
+
+/** Where the profile's grids start. Named rather than left inline because the
+ *  same shape is a CanvasDoc field, a CanvasSnapshot field and a store setter's
+ *  parameter — three spellings of one thing is three places to drift. */
+export interface CanvasGridOrigin { originX: number; originY: number }
 
 /**
  * ONE canvas document. Everything here belongs to a particular canvas. Tool/view
@@ -111,7 +116,7 @@ export interface CanvasDoc {
   profileId: ConstraintProfileId;
   /** Where the profile's grids start, so guides can align to the art rather
    *  than to the canvas corner. */
-  gridOrigin: { originX: number; originY: number };
+  gridOrigin: CanvasGridOrigin;
 }
 
 const MIN_SIDE = 8;
