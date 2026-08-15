@@ -42,7 +42,7 @@ import {
   dirtySpriteDocIds, spriteDocState, DEFAULT_FRAME_SIZE,
 } from '../state/spriteStore';
 import {
-  useCanvasStore, loadCanvasDoc, activateCanvasDoc, closeCanvasDoc,
+  useCanvasStore, loadCanvasDoc, activateCanvasDoc, clearCanvasFocus, closeCanvasDoc,
 } from '../state/canvasStore';
 import { loadCanvasFile, type LoadedCanvas } from '../state/canvas-file';
 import { saveCanvasDocument } from '../state/canvas-save';
@@ -370,8 +370,16 @@ function defaultCanvasLoader(name: string): Promise<LoadedCanvas> {
  * ONE TOAST PER WARNING, not one joined paragraph: they are independent
  * diagnoses with independent fixes, and a reader who acts on the first sentence
  * of a wall of text never sees the second. Each is prefixed with the canvas name
- * because a load can be triggered by session restore, when the user is not
- * looking at the tab that produced it.
+ * because a load can be triggered by something other than a click, when the user
+ * is not looking at the tab that produced it.
+ *
+ * THE CEILING IS 3 AT ONCE, and it holds only while loads are one-at-a-time.
+ * Four sites push warnings (three in canvas-file-format, one in canvas-file) but
+ * two pairs are mutually exclusive — a stale-palette disagreement requires a
+ * sidecar that PARSED, and canvas-file's read failure excludes format's parse
+ * failure — so one load can produce at most three. If Task 13 (or a restore that
+ * stops pruning canvas tabs) ever loads N canvases at once, that becomes 3N on
+ * screen together and this should batch per load instead.
  *
  * TYPE 'error' although none of these is fatal — the type picks the DWELL, and
  * only the error dwell (10s, vs 2.2s) is long enough to read a multi-sentence
@@ -398,6 +406,12 @@ export async function activateCanvasDocTarget(
   tabId: string,
   loader: CanvasLoader = defaultCanvasLoader,
 ): Promise<boolean> {
+  // Bumped BEFORE the plan, so even the synchronous 'activate' branch supersedes
+  // whatever was in flight — including an open classic dirty-switch confirm,
+  // which will then answer false and skip its openAct. That is deliberate (the
+  // user moved to another tab, so the switch they were being asked about is
+  // stale) and it is what runSpriteActivation has always done; noted because it
+  // widens what can cancel a level switch, and nothing tests that interaction.
   const myGen = ++activationGen;
   const plan = planCanvasDocActivation({
     tabId,
@@ -443,20 +457,22 @@ export async function activateCanvasDocTarget(
 }
 
 /**
- * The canvas half of a focus change, run for EVERY tab (R14): a canvas tab loads
- * or checks out its document, and any OTHER tab clears the canvas focus.
+ * The canvas half of a focus change, run for EVERY tab kind (R14): a canvas tab
+ * loads or checks out its document, and any OTHER tab clears the canvas focus.
  *
  * The clear is not decoration. Canvas documents stay open in the background, so
  * without it `activeDocId` still names the last canvas while a level tab is
  * active — and the moment a canvas tab is focused again, the pane's first frame
- * renders that stale document. `activateCanvasDoc` is TOTAL (an id that is not
- * an open canvas focuses NOTHING), so handing it the incoming tab's own id says
- * exactly "focus whatever canvas this tab is, if any" with no second store
- * action to keep in sync.
+ * renders that stale document.
+ *
+ * BOTH CALL SITES MATTER, and the second one is the easy one to lose: this runs
+ * from requestOpenTab AND from the neighbour promotion in requestCloseTab, which
+ * is the focus change `session.closeTab` performs after a close. Deleting the
+ * promotion call left the whole suite green until the test named for it existed.
  */
 async function focusCanvasForTab(tab: TabDescriptor): Promise<boolean> {
   if (tab.kind === 'art-doc') return activateCanvasDocTarget(tab.id);
-  activateCanvasDoc(tab.id);
+  clearCanvasFocus();
   return true;
 }
 
@@ -656,10 +672,26 @@ export async function activateLevelTarget(
   }
 }
 
-/** Open (or focus) a tab, running the level/sprite-doc/canvas activation guard
- *  first. The canvas step runs for EVERY tab kind — see focusCanvasForTab: a tab
- *  that is not a canvas has to CLEAR the canvas focus, and this is the one
- *  function every focus change goes through. */
+/**
+ * Open (or focus) a tab, running the level/sprite-doc/canvas activation guard
+ * first. The canvas step runs for EVERY tab kind — see focusCanvasForTab: a tab
+ * that is not a canvas has to CLEAR the canvas focus.
+ *
+ * This is every focus change FROM THE TAB STRIP (plus ⌘K and Ctrl+1..9, which
+ * route through requestFocusTabId/requestFocusIndex). It is NOT every focus
+ * change in the app: two paths deliberately call `useSessionStore.open`/
+ * `replace` directly and are not covered here —
+ *
+ *   • useActTabSync (session-lifecycle.ts) opens the tab for an act the STORES
+ *     switched to, which is how the MCP/agent surface, __dbg.openAct and
+ *     aeon-open move the user. An agent-driven act switch therefore focuses a
+ *     level tab WITHOUT clearing the canvas focus.
+ *   • The restore effect calls replace(next) and hand-dispatches activation for
+ *     sprite and level ids only.
+ *
+ * Both are bounded today (nothing renders a canvas pane yet), but Task 12 must
+ * not read this function as a funnel it can rely on.
+ */
 export async function requestOpenTab(tab: TabDescriptor): Promise<void> {
   if (tab.kind === 'level' && !(await activateLevelTarget(tab.id))) return;
   if (tab.kind === 'sprite-doc' && !(await activateSpriteDocTarget(tab.id))) return;

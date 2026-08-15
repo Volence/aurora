@@ -22,7 +22,7 @@ import {
 } from '../tab-activation';
 import { canvasDocTab } from '../tabs';
 import {
-  useCanvasStore, openCanvasDoc, canvasDocState, type CanvasSource,
+  useCanvasStore, openCanvasDoc, activateCanvasDoc, canvasDocState, type CanvasSource,
 } from '../../state/canvasStore';
 import { canvasPngPath, canvasSidecarPath, type LoadedCanvas } from '../../state/canvas-file';
 import { useConfirmStore, type ConfirmRequest } from '../../state/confirmStore';
@@ -365,6 +365,29 @@ describe('closing a canvas tab', () => {
 
     expect(useCanvasStore.getState().isOpen(TAB.id)).toBe(false);
     expect(useCanvasStore.getState().activeDocId).toBe(OTHER.id); // focus never moved
+  });
+
+  it('hands the canvas focus to the PROMOTED neighbour', async () => {
+    // R14(b): activation fires on every focus change, including the one
+    // session.closeTab performs after a close. Deleting the promotion call in
+    // requestCloseTab left the whole suite green — the other close tests promote
+    // HOME (whose clear is indistinguishable from closeCanvasDoc's own null-out)
+    // or close an INACTIVE tab (which early-returns before promoting).
+    //
+    // It also pins the ORDER: the promotion focus lands before session.close, so
+    // closeCanvasDoc(TAB) then sees activeDocId !== its own id and leaves the
+    // promotion alone. Reversed, the tab strip would show OTHER with no canvas
+    // focused at all.
+    useSessionStore.setState({ tabs: [HOME_TAB, TAB, OTHER], activeId: TAB.id });
+    openCanvasDoc(TAB.id, { name: 'sky', width: 8, height: 8, profileId: 'none' });
+    openCanvasDoc(OTHER.id, { name: 'rock', width: 8, height: 8, profileId: 'none' });
+    activateCanvasDoc(TAB.id);   // the closing tab is the focused one
+
+    await requestCloseTab(TAB.id);
+
+    expect(useSessionStore.getState().activeId).toBe(OTHER.id);
+    expect(useCanvasStore.getState().activeDocId).toBe(OTHER.id);
+    expect(useCanvasStore.getState().isOpen(OTHER.id)).toBe(true);
   });
 
   it('a tab whose file never loaded is still closable', async () => {

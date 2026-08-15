@@ -355,17 +355,45 @@ export function loadCanvasDoc(docId: string, doc: CanvasDoc, source: CanvasSourc
  * Focus a document — or, when it is not open, focus NOTHING.
  *
  * Total on purpose. Returning silently for an unknown id would leave
- * `activeDocId` on the PREVIOUSLY focused canvas, and Task 11 activates on tab
- * focus with a tab id that survives a session restart: a restored canvas tab
- * exists before its file has been read, so the pane would render document X
- * under tab Y. That is precisely the stale-focus bug closeCanvasDoc refuses to
- * create, arriving through the other door. An empty pane reads as "not loaded";
- * someone else's art does not.
+ * `activeDocId` on the PREVIOUSLY focused canvas — the pane rendering document X
+ * under tab Y, precisely the stale-focus bug closeCanvasDoc refuses to create,
+ * arriving through the other door. An empty pane reads as "not loaded"; someone
+ * else's art does not.
+ *
+ * WHAT MAKES THAT LOAD-BEARING TODAY is the tab-activation glue: focusing any
+ * NON-canvas tab clears the canvas focus by calling this with that tab's own id
+ * (see focusCanvasForTab / clearCanvasFocus), so "focus nothing" is spelled as
+ * "focus an id no document has". Every level- and sprite-tab focus takes that
+ * path.
+ *
+ * An earlier draft of this comment justified totality with session restore
+ * instead — a restored canvas tab existing before its file has been read. That
+ * is the right SHAPE but is not reachable yet: session-lifecycle's `isValid`
+ * prunes canvas tabs on restore (it accepts project-setup, enumerated level tabs
+ * and sprite-doc ids only), so no canvas tab survives a restart to reach here.
+ * Whether they should is a Task 13 decision — a canvas whose PNG was deleted
+ * between sessions would otherwise error-toast at every boot.
  */
 export function activateCanvasDoc(docId: string): void {
   const open = useCanvasStore.getState().docs.has(docId);
   useCanvasStore.setState({ activeDocId: open ? docId : null });
 }
+
+/**
+ * Focus NO canvas — the state the pane reads as "no canvas is showing".
+ *
+ * Delegates to `activateCanvasDoc`, whose totality is the whole mechanism; this
+ * exists so the CALL SITE says what it means. Written out, the clear is
+ * `activateCanvasDoc(someLevelTabId)`, which reads as a mistake until you find
+ * the comment explaining that an id no document has focuses nothing.
+ */
+export function clearCanvasFocus(): void {
+  activateCanvasDoc(NO_CANVAS_DOC_ID);
+}
+
+// An id no document can be opened under: `openCanvasDoc`/`loadCanvasDoc` are
+// keyed by TAB id, and every tab id is non-empty.
+const NO_CANVAS_DOC_ID = '';
 
 /**
  * Drop a document and its undo stack.
