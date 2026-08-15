@@ -24,6 +24,7 @@
 
 import { spawn, execSync } from 'node:child_process';
 import * as http from 'node:http';
+import { pathToFileURL } from 'node:url';
 import { writeFileSync, mkdirSync, existsSync, readFileSync, rmSync, cpSync } from 'node:fs';
 
 const PORT = Number(process.env.PORT ?? 9364);
@@ -652,7 +653,16 @@ async function fillDialog(c, { name, width, height, profile }) {
   return c.json('window.__c.dlgSnapshot()');
 }
 
-export { session, openProjectAndAct, openNewCanvasDialog, fillDialog };
+// Exported so a LATER harness can reuse this machinery rather than rewriting
+// it. That matters here specifically: the phase-2A report records three harness
+// defects that each produced a convincing FALSE result before being caught, so
+// a fresh reimplementation starts by re-earning trust this code already has.
+export {
+  session, openProjectAndAct, openNewCanvasDialog, fillDialog,
+  INSTALL, sleep, mouse, key, enter, escape, ctrlK, typeText, clickEl,
+  drawArt, clickArt, focusTab, closeTab, shot, drain,
+  ROOT, S1DIR, CANVAS_DIR, SHOTS,
+};
 
 // ===========================================================================
 // SECOND PASS (PASS=2) — the fixes made against the first report
@@ -2098,5 +2108,10 @@ async function sessionD(c, shared) {
 }
 
 // ---------------------------------------------------------------------------
-const entry = process.env.PASS === '2' ? secondPass : main;
-entry().catch((e) => { console.error('HARNESS ERROR:', e); process.exitCode = 2; });
+// RUN ONLY WHEN INVOKED DIRECTLY. Importing this file for its helpers (see the
+// export above) must not launch Electron and drive fourteen rows as a side
+// effect of the import.
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  const entry = process.env.PASS === '2' ? secondPass : main;
+  entry().catch((e) => { console.error('HARNESS ERROR:', e); process.exitCode = 2; });
+}

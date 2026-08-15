@@ -7,7 +7,7 @@ import {
 } from '../canvas-file-format';
 import { blankCanvasDoc, canvasIndex, CANVAS_COLORS, CANVAS_MAX_SIDE } from '../canvas-doc';
 import { encodeIndexedPng, parseChunks } from '../indexed-png';
-import { encodeGenesisColor } from '../../formats/palette';
+import { encodeGenesisColor, decodeGenesisColor } from '../../formats/palette';
 
 function docWithArt() {
   const doc = blankCanvasDoc({ name: 'Ramp', width: 16, height: 8, profileId: 'genesis-level-art' });
@@ -486,5 +486,48 @@ describe('canvas file format', () => {
     }));
     expect(r.ok).toBe(true);
     if (r.ok) expect(r.sidecar.gridOrigin).toEqual({ originX: 0, originY: 5 });
+  });
+});
+
+// Spec §4.3 lists colour-space snapping on paste and import as 2B work. IMPORT
+// is already closed — the PLTE recovery path below runs every entry through
+// encodeGenesisColor — so this pins existing behaviour rather than driving new
+// behaviour, and it was written by planting the bug and watching it fail before
+// being believed. PASTE is the door still open, and 2A deferred paste itself
+// (R17); the snap belongs at normalizeCanvasPixels' choke point when it lands,
+// not bolted onto a paste handler.
+describe('colour-space snapping on import (spec §4.3)', () => {
+  // The Genesis' eight levels per channel: Math.round(n * 255 / 7) for n in
+  // 0..7. Written out rather than computed from decodeGenesisColor, which would
+  // test that function against itself. These are hardware.
+  const LADDER = [0, 36, 73, 109, 146, 182, 219, 255];
+
+  it('snaps an arbitrary 24-bit PLTE colour into the Genesis 512', async () => {
+    // No channel of 0x7B / 0xC5 / 0x39 is on the ladder. This is what a plain
+    // Aseprite export hands us.
+    const png = await encodeIndexedPng({
+      width: 8, height: 8, indices: new Uint8Array(64),
+      palette: [{ r: 0, g: 0, b: 0 }, { r: 0x7b, g: 0xc5, b: 0x39 }],
+      transparentIndex: 0,
+    });
+    const { doc } = await decodeCanvasFiles(png, null);
+
+    const back = decodeGenesisColor(doc.palette[1]);
+    expect(LADDER).toContain(back.r);
+    expect(LADDER).toContain(back.g);
+    expect(LADDER).toContain(back.b);
+    // The NEAREST level on each channel, not a truncation and not black.
+    expect({ r: back.r, g: back.g, b: back.b }).toEqual({ r: 109, g: 182, b: 73 });
+  });
+
+  it('round-trips the snapped word, so a save cannot drift it further', async () => {
+    const png = await encodeIndexedPng({
+      width: 8, height: 8, indices: new Uint8Array(64),
+      palette: [{ r: 0, g: 0, b: 0 }, { r: 0x7b, g: 0xc5, b: 0x39 }],
+      transparentIndex: 0,
+    });
+    const { doc } = await decodeCanvasFiles(png, null);
+    const w = doc.palette[1];
+    expect(encodeGenesisColor(decodeGenesisColor(w))).toBe(w);
   });
 });

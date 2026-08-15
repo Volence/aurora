@@ -10,6 +10,7 @@ import type { LevelDoc, BlockDef } from '../../../core/level-classic/model';
 import type { UsageIndex } from '../../../core/level-classic/usage-index';
 import { decodeGenesisColor } from '../../../core/formats/palette';
 import { isTileEditable } from '../../../core/project/editable-tiles';
+import { countFreeTileSlots } from '../../../core/art/free-tile-slots';
 import { PixelEditController, diffWrites } from '../../../core/art/pixel-edit-controller';
 import type { GestureResult, Selection } from '../../../core/art/pixel-edit-controller';
 import { toolConfigFrom } from '../../../core/art/tool-config';
@@ -181,19 +182,12 @@ export default function BlockTab({ doc, usage }: { doc: LevelDoc; usage: UsageIn
   }, [composerBlockId]);
 
   const poolTileCount = Math.floor(doc.tiles.length / 32);
-  // APPROXIMATE, for display only — see ChunkTab's identical readout and its
-  // note on why this may drift slightly but `planSurfaceEdit` stays the sole
-  // authority over what an edit is actually allowed to do.
-  const freeTileSlots = useMemo(() => {
-    let n = 0;
-    for (let t = 1; t < poolTileCount; t++) { // 0 is the transparent tile — never counted free
-      if (usage.tileUsage(t).cells !== 0) continue;
-      if (reservedTiles?.has(t)) continue;
-      if (!isTileEditable(range, t)) continue;
-      n++;
-    }
-    return n;
-  }, [poolTileCount, usage, reservedTiles, range]);
+  // APPROXIMATE, for display only — countFreeTileSlots' header carries the whole
+  // reason that is acceptable and what stays authoritative (`planSurfaceEdit`).
+  const freeTileSlots = useMemo(() => countFreeTileSlots({
+    poolTileCount, usage, reserved: reservedTiles ?? null,
+    isEditable: (t) => isTileEditable(range, t),
+  }), [poolTileCount, usage, reservedTiles, range]);
   const limitsReadout =
     `blocks ${doc.blocks.length}/${MAX_BLOCK_REF + 1} · tiles ${poolTileCount - freeTileSlots}/${poolTileCount}`;
 

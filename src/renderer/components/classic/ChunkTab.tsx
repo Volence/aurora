@@ -10,6 +10,7 @@ import { chunkIndexForId, packChunkCell, type LevelDoc } from '../../../core/lev
 import type { UsageIndex } from '../../../core/level-classic/usage-index';
 import { decodeGenesisColor } from '../../../core/formats/palette';
 import { isTileEditable } from '../../../core/project/editable-tiles';
+import { countFreeTileSlots } from '../../../core/art/free-tile-slots';
 import { PixelEditController, diffWrites } from '../../../core/art/pixel-edit-controller';
 import type { GestureResult, Selection } from '../../../core/art/pixel-edit-controller';
 import { toolConfigFrom } from '../../../core/art/tool-config';
@@ -211,23 +212,12 @@ export default function ChunkTab({ doc, usage }: { doc: LevelDoc; usage: UsageIn
   }, [selectedChunkId]);
 
   const poolTileCount = Math.floor(doc.tiles.length / 32);
-  // The limits readout is APPROXIMATE, for display only. It mirrors
-  // `findFreeSlot`'s three conditions (classic-surface-plan.ts: unreferenced,
-  // not object-reserved, editable) without importing it — that function is a
-  // private implementation detail of the planner, not an exported predicate —
-  // so this can only ever be off by the handful of slots a single in-flight
-  // gesture claims, never wrong about what an edit is ALLOWED to do:
-  // `planSurfaceEdit` remains the sole authority for that, every time.
-  const freeTileSlots = useMemo(() => {
-    let n = 0;
-    for (let t = 1; t < poolTileCount; t++) { // 0 is the transparent tile — never counted free
-      if (usage.tileUsage(t).cells !== 0) continue;
-      if (reservedTiles?.has(t)) continue;
-      if (!isTileEditable(range, t)) continue;
-      n++;
-    }
-    return n;
-  }, [poolTileCount, usage, reservedTiles, range]);
+  // APPROXIMATE, for display only — countFreeTileSlots' header carries the whole
+  // reason that is acceptable and what stays authoritative (`planSurfaceEdit`).
+  const freeTileSlots = useMemo(() => countFreeTileSlots({
+    poolTileCount, usage, reserved: reservedTiles ?? null,
+    isEditable: (t) => isTileEditable(range, t),
+  }), [poolTileCount, usage, reservedTiles, range]);
   const limitsReadout =
     `blocks ${doc.blocks.length}/${MAX_BLOCK_REF + 1} · tiles ${poolTileCount - freeTileSlots}/${poolTileCount}`;
 
