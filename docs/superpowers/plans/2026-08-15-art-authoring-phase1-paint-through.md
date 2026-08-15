@@ -1715,3 +1715,57 @@ the zone-static set sound when someone adds a subtype rule later.
   badge. Separate small task, but it is the same misunderstanding at the UI layer.
 - Verified and recorded so nobody re-audits: MZ `$45` and SBZ `$66` are file-backed, no
   reservation needed; `$1D` and MZ `$35` need none either.
+
+---
+
+## A8 resolved — "Make unique" is descoped
+
+**Decided 2026-08-15.** Do not build `planMakeUnique`. Task 10 becomes copy and styling only.
+
+Three reasons, the second of which is the one that settles it:
+
+1. **The banner has no instance to detach.** Every composer tab selects a resource by ID — the
+   shared source itself. `BlockTab` shows "used in 31 chunk cells" but holds no selected chunk
+   cell; `TileTab` holds no selected block cell. A Make-unique click there cannot know which of
+   the 31 uses to repoint. The only thing it could mean from a source editor is "copy to a new
+   id and select the copy" — which already exists on the Block and Chunk banners, correctly
+   named **Duplicate**.
+2. **A write-less divergence is unstable in a content-deduplicating pool.** `findContentMatch`
+   repoints to any byte-identical tile before claiming a slot. A write-less copy is byte-
+   identical by definition, so it would have to BYPASS dedup — and then any later Isolate stroke
+   whose result matches those bytes content-matches onto the user's "unique" copy, silently
+   re-linking the thing they spent a scarce slot to detach. Uniqueness of identical bytes is not
+   a stable property here; the gesture cannot deliver what its name promises.
+3. **It spends a scarce or nonexistent resource for zero visible change.** LZ is 454/454 — the
+   button could never work there. GHZ has 17 claimable slots after reservations. Meanwhile
+   63–65% of tiles are used once, so most edits never diverge, and Isolate handles the rest at
+   the moment it actually matters, with dedup working *for* the user.
+
+### Task 10, revised
+
+Copy, per spec §1 vocabulary (linked/unique, never shared/forked):
+
+- **TileTab:** `Linked — used in 14 blocks · 31 cells. Edits appear in all of them.` No button.
+  Once Task 11 lands, append the discovery breadcrumb: `To change one place only, paint it on
+  the Chunk tab (Isolate).`
+- **BlockTab:** `Linked — used in 12 chunks · 31 cells. Edits appear in all of them.` Keep
+  **Duplicate** — it is a copy, not a detach, and the label should keep saying so.
+- **ChunkTab:** `Linked — placed 40×. Edits appear in every placement.` Keep **Duplicate chunk**.
+
+Styling: drop the ⚠ glyph and amber hazard tint; neutral status strip. The spec's "same facts,
+stated as a tool" needs the visual reframe, not just new words. **The red locked-tile banner in
+TileTab is a genuine refusal and keeps its hazard styling.**
+
+No new commands, no `planSurfaceEdit` change, no undo implications. Keep the guard test (the
+banner renders the numbers it is given), planted first.
+
+### The follow-up this leaves open
+
+**Instance-anchored block detach**, if demand ever appears: right-click a cell in ChunkTab's
+assignment grid → "Make block unique in this cell". Clones the block (plentiful slots),
+repoints that one chunk cell, claims **zero tiles** — the clone shares tiles and later Isolate
+paint diverges them on demand, which the two-tier cascade already handles. Fits
+`SurfaceEditPlan` as `newBlocks` + `chunkCellEdits` with no `tileWrites`, commits through
+`classicPaintSurface` as one undo entry, lives on the instance, targets the measured dangerous
+tier. **Not now** — it duplicates what Isolate delivers implicitly. Build it only if Task 12 or
+real use shows people hunting for an explicit detach.
