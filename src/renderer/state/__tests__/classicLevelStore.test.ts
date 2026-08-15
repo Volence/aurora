@@ -633,6 +633,49 @@ describe('command guards + undo/redo triple consistency', () => {
 });
 
 // ---------------------------------------------------------------------------
+// T4: reservedTiles, captured at act read beside editableTileRange. Not a
+// command — a value `planSurfaceEdit`'s renderer call site (ChunkTab/BlockTab's
+// paint mode) reads to keep Isolate from claiming a tile a level-art-drawn
+// object sprite draws from (GHZ platforms, MZ bricks, …).
+// ---------------------------------------------------------------------------
+describe('reservedTiles (T4)', () => {
+  it("captures the adapter's reserved-tile set at act read", async () => {
+    const handle = fakeHandle();
+    useClassicProjectStore.setState({
+      status: 'open', dir: '/p',
+      handle: { ...handle, levels: { ...handle.levels, reservedTiles: () => new Set([2, 3]) } },
+    } as never);
+    await useClassicLevelStore.getState().openAct(REF);
+    expect(st().reservedTiles).toEqual(new Set([2, 3]));
+  });
+
+  it('is null when the adapter omits reservedTiles — permissive, matching editableTileRange', async () => {
+    useClassicProjectStore.setState({ status: 'open', dir: '/p', handle: fakeHandle() } as never);
+    await useClassicLevelStore.getState().openAct(REF);
+    expect(st().reservedTiles).toBeNull();
+  });
+
+  it('resets to null the instant a fresh act load starts, not left over from the previous act', async () => {
+    const reservedHandle = fakeHandle();
+    useClassicProjectStore.setState({
+      status: 'open', dir: '/p',
+      handle: { ...reservedHandle, levels: { ...reservedHandle.levels, reservedTiles: () => new Set([9]) } },
+    } as never);
+    await useClassicLevelStore.getState().openAct(REF);
+    expect(st().reservedTiles).toEqual(new Set([9]));
+
+    // Swap to a handle with no reservedTiles query at all, then start a fresh
+    // load. `fresh` resets the field SYNCHRONOUSLY, before the read below lands
+    // — so it must already read null right after the call, not after an await.
+    useClassicProjectStore.setState({ status: 'open', dir: '/p', handle: fakeHandle() } as never);
+    const pending = useClassicLevelStore.getState().openAct(REF);
+    expect(st().reservedTiles).toBeNull();
+    await pending;
+    expect(st().reservedTiles).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Layout-editing UI state (Task 13): tool + selected chunk id.
 // ---------------------------------------------------------------------------
 describe('tool + selectedChunkId UI state', () => {

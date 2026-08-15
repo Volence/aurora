@@ -81,6 +81,23 @@ interface ClassicLevelState {
   /** Human-readable failure reason when status === 'error'. */
   error: string | null;
 
+  /**
+   * Level-pool tiles this act's objects draw through mappings rather than
+   * blocks (GHZ platforms, MZ bricks, …) — see `ClassicLevelAccess.reservedTiles`'s
+   * docblock for the full rule. Captured HERE, at act read, the same moment and
+   * the same way `editableTileRange` is (openAct below) — not recomputed lazily
+   * per render — because `planSurfaceEdit`'s call site (ChunkTab/BlockTab's paint
+   * mode) needs one stable value for the whole open act, not a fresh adapter call
+   * on every keystroke. Null when unknown (no handle, adapter omits the query, or
+   * the act has not finished loading) — PERMISSIVE, matching `editableTileRange`'s
+   * null convention: `planSurfaceEdit` treats an absent set as "nothing reserved",
+   * never as "refuse everything".
+   *
+   * NOT a lock and must never be folded into `dirty`/`tileLockReason` — painting
+   * a reserved tile in place is a legitimate edit (see the adapter docblock).
+   */
+  reservedTiles: ReadonlySet<number> | null;
+
   /** Per-domain unsaved-change flags (adapter DirtyDomains shape). */
   dirty: DirtyDomains;
   /**
@@ -222,6 +239,7 @@ const IDLE = {
   doc: null,
   status: 'idle' as ClassicLevelStatus,
   error: null,
+  reservedTiles: null as ReadonlySet<number> | null,
   dirty: {} as DirtyDomains,
   chunkVersions: new Map<number, number>(),
   chunkEpoch: 0,
@@ -288,6 +306,9 @@ export const useClassicLevelStore = create<ClassicLevelState>((set, get) => ({
     disposeStacksFor(get().ref);
     disposeStacksFor(ref);
     const fresh = {
+      // Unknown until the read below succeeds — a stale set from the PRIOR act
+      // would misdescribe this one (different zone, different object list).
+      reservedTiles: null as ReadonlySet<number> | null,
       dirty: {} as DirtyDomains,
       chunkVersions: new Map<number, number>(),
       chunkEpoch: nextVersion(),
@@ -345,6 +366,13 @@ export const useClassicLevelStore = create<ClassicLevelState>((set, get) => ({
       // would rewrite a choice the user made on Layout (picking air to erase
       // with is a real choice), where an open-time default overrides nothing.
       const range = handle.levels.editableTileRange?.(ref) ?? null;
+      // T4: the tiles this act's object sprites draw from the level pool
+      // through mappings, not blocks — captured HERE, beside the range above,
+      // so `planSurfaceEdit`'s call site (ChunkTab/BlockTab's paint mode) reads
+      // one stable value for the act rather than re-querying the adapter per
+      // gesture. See the `reservedTiles` field's docblock for why this is not a
+      // lock and must never be merged into `range`/`tileLockReason`.
+      const reserved = handle.levels.reservedTiles?.(ref) ?? null;
       // The palette line goes with them, and for the same reason one tier down:
       // the Block and Tile tiers draw the SAME tile strip under two different
       // fields (the landing block's cell pal vs `composerPalLine`), and
@@ -355,6 +383,7 @@ export const useClassicLevelStore = create<ClassicLevelState>((set, get) => ({
       const blockId = firstNonBlankBlock(doc.blocks, doc.tiles);
       set({
         ref, doc, status: 'ready', error: null,
+        reservedTiles: reserved,
         selectedChunkId: firstEditableChunkId(doc.chunks),
         composerTileIndex: firstEditableNonBlankTile(doc.tiles, range),
         composerBlockId: blockId,
