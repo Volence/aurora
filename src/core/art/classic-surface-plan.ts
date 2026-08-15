@@ -14,7 +14,8 @@
 
 import type { LevelDoc, BlockDef, BlockCell, ChunkCell } from '../level-classic/model';
 import type { UsageIndex } from '../level-classic/usage-index';
-import type { SurfaceProvenance } from './classic-surface-buffer';
+import type { PixelBuffer } from './pixel-ops';
+import type { SurfaceCell, SurfaceProvenance } from './classic-surface-buffer';
 import { surfaceToTile } from './classic-surface-buffer';
 import { tileToBuffer, tileBytesIfChanged } from './classic-tile-buffer';
 
@@ -96,6 +97,27 @@ function findFreeSlot(
   return null;
 }
 
+/**
+ * The chunks (FILE indices) an isolate-mode edit at `c` reaches. A chunk
+ * surface isolates to the chunk being edited — that is the whole point of
+ * isolate mode. A BLOCK surface has no chunk cell to repoint (chunkCellIndex
+ * is always null there), so editing it directly reaches every chunk that
+ * currently uses the block — there is no narrower place for the edit to land.
+ */
+function addPlaces(set: Set<number>, index: UsageIndex, p: SurfaceProvenance, c: SurfaceCell): void {
+  if (p.chunkIndex !== null) set.add(p.chunkIndex);
+  else for (const ci of index.blockToChunks.get(c.blockId) ?? []) set.add(ci);
+}
+
+/** The chunks (FILE indices) reached by a link-mode write to one pool tile. */
+function chunksTouchedByTile(index: UsageIndex, tileIndex: number): Set<number> {
+  const out = new Set<number>();
+  for (const blockId of index.tileToBlocks.get(tileIndex) ?? []) {
+    for (const ci of index.blockToChunks.get(blockId) ?? []) out.add(ci);
+  }
+  return out;
+}
+
 export function planSurfaceEdit(input: PlanInput): PlanResult {
   const { doc, provenance, index, mode, writes, isEditableTile } = input;
 
@@ -122,31 +144,41 @@ export function planSurfaceEdit(input: PlanInput): PlanResult {
   // two 8x8 surface cells belonging to the SAME chunk cell must share one clone.
   const cloneOf = new Map<number, number>();
   const nextBlockId = () => doc.blocks.length + plan.newBlocks.length;
+  // Link mode accumulates per TILE, not per surface cell: two cells drawing the
+  // same tile (routine once art is shared) must merge into ONE tileWrite, or
+  // the store applies them in order and the earlier stroke is silently lost.
+  const linkBufs = new Map<number, PixelBuffer>();
 
   for (const [cellIndex, e] of perCell) {
     const c = provenance.cells[cellIndex];
 
-    // 2 · The pixels this tile should end up with, in STORED tile coordinates.
-    // Keep the untouched original around so a no-op stroke can be detected —
-    // rule 3 from classic-tile-gesture.ts: a gesture that changed nothing
-    // commits nothing (no tileWrite, no repoint, no undo entry).
+    if (mode === 'link') {
+      if (!isEditableTile(e.tileIndex)) {
+        return { ok: false, reason: `tile ${e.tileIndex} is not editable` };
+      }
+      let buf = linkBufs.get(e.tileIndex);
+      if (!buf) {
+        const src = tileToBuffer(doc.tiles, e.tileIndex);
+        buf = { width: src.width, height: src.height, data: src.data.slice() };
+        linkBufs.set(e.tileIndex, buf);
+      }
+      for (const p of e.px) buf.data[p.ty * 8 + p.tx] = p.v & 0x0f;
+      // Nothing emitted here — resolved once per tile after the loop, so a
+      // second cell's pixels land in the SAME buffer instead of a second write.
+      continue;
+    }
+
+    // 2 · Isolate. The pixels this tile should end up with, in STORED tile
+    // coordinates. Keep the untouched original around so a no-op stroke can be
+    // detected — rule 3 from classic-tile-gesture.ts: a gesture that changed
+    // nothing commits nothing (no tileWrite, no repoint, no undo entry).
     const original = tileToBuffer(doc.tiles, e.tileIndex);
     const buf = { width: original.width, height: original.height, data: original.data.slice() };
     for (const p of e.px) buf.data[p.ty * 8 + p.tx] = p.v & 0x0f;
     const changedBytes = tileBytesIfChanged(original, buf);
     if (changedBytes === null) continue; // repainted with the value already there
 
-    if (mode === 'link') {
-      if (!isEditableTile(e.tileIndex)) {
-        return { ok: false, reason: `tile ${e.tileIndex} is not editable` };
-      }
-      plan.tileWrites.push({ tileIndex: e.tileIndex, data: changedBytes });
-      // Stage-A approximation; Task 7 replaces this with the full reverse lookup.
-      for (const ci of index.blockToChunks.get(c.blockId) ?? []) placesAffected.add(ci);
-      continue;
-    }
-
-    // 3 · Isolate. Both questions, independently.
+    // 3 · Both questions, independently.
     const tileLinked = index.tileUsage(e.tileIndex).cells > 1;
     const blockLinked = c.chunkCellIndex !== null && index.blockUsage(c.blockId).cells > 1;
 
@@ -155,7 +187,7 @@ export function planSurfaceEdit(input: PlanInput): PlanResult {
         return { ok: false, reason: `tile ${e.tileIndex} is not editable` };
       }
       plan.tileWrites.push({ tileIndex: e.tileIndex, data: changedBytes });
-      if (provenance.chunkIndex !== null) placesAffected.add(provenance.chunkIndex);
+      addPlaces(placesAffected, index, provenance, c);
       continue;
     }
 
@@ -228,8 +260,20 @@ export function planSurfaceEdit(input: PlanInput): PlanResult {
       cellIndex: c.blockCellIndex,
       cell: { ...srcCell, tile: targetTile },
     });
-    if (provenance.chunkIndex !== null) placesAffected.add(provenance.chunkIndex);
+    addPlaces(placesAffected, index, provenance, c);
     continue;
+  }
+
+  // 4 · Resolve link mode's accumulated per-tile buffers, one write per tile —
+  // AFTER every cell has contributed its pixels, so two cells drawing the same
+  // tile merge instead of racing. Same no-op rule as isolate: skip a tile whose
+  // accumulated buffer ended up byte-identical to what is already stored.
+  for (const [tileIndex, buf] of linkBufs) {
+    const original = tileToBuffer(doc.tiles, tileIndex);
+    const changedBytes = tileBytesIfChanged(original, buf);
+    if (changedBytes === null) continue;
+    plan.tileWrites.push({ tileIndex, data: changedBytes });
+    for (const ci of chunksTouchedByTile(index, tileIndex)) placesAffected.add(ci);
   }
 
   plan.stats.placesAffected = placesAffected.size;

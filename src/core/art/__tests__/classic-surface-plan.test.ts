@@ -305,3 +305,52 @@ describe('planSurfaceEdit — block divergence', () => {
     expect(r.reason).toMatch(/block limit/i);
   });
 });
+
+describe('planSurfaceEdit — link mode', () => {
+  it('mutates in place and reports every chunk that will change', () => {
+    const doc = makeDoc();              // block 1 lives in chunks 0 and 1
+    const { provenance } = buildChunkSurface(doc, 0);
+    const r = planSurfaceEdit({
+      doc, provenance, index: buildUsageIndex(doc), mode: 'link',
+      isEditableTile: allEditable, writes: [{ x: 16, y: 0, value: 9 }],
+    });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.plan.tileWrites.map((w) => w.tileIndex)).toEqual([5]);
+    expect(r.plan.newBlocks).toHaveLength(0);
+    expect(r.plan.chunkCellEdits).toHaveLength(0);
+    expect(r.plan.stats.placesAffected).toBe(2);
+  });
+
+  it('isolate reports only the chunk being edited', () => {
+    const doc = makeDoc();
+    const { provenance } = buildChunkSurface(doc, 0);
+    const r = planSurfaceEdit({
+      doc, provenance, index: buildUsageIndex(doc), mode: 'isolate',
+      isEditableTile: allEditable, writes: [{ x: 16, y: 0, value: 9 }],
+    });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.plan.stats.placesAffected).toBe(1);
+  });
+
+  // REGRESSION for the audit's link-mode finding.
+  it('merges two cells drawing the SAME tile into one write, losing neither pixel', () => {
+    const doc = makeDoc();
+    const { provenance } = buildChunkSurface(doc, 0);
+    // Chunk cells 1 and 2 both use block 1, whose cell 0 is tile 5. Surface x=16
+    // and x=32 are pixel (0,0) of each — the SAME stored tile pixel — so use
+    // x=33 for the second, a different stored pixel, to prove both survive.
+    const r = planSurfaceEdit({
+      doc, provenance, index: buildUsageIndex(doc), mode: 'link',
+      isEditableTile: allEditable,
+      writes: [{ x: 16, y: 0, value: 9 }, { x: 33, y: 0, value: 7 }],
+    });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    const forTile5 = r.plan.tileWrites.filter((w) => w.tileIndex === 5);
+    expect(forTile5).toHaveLength(1);
+    // 4bpp byte 0 holds pixels (0,0) and (1,0) as high and low nibble.
+    expect(forTile5[0].data[0]).toBe((9 << 4) | 7);
+  });
+});
