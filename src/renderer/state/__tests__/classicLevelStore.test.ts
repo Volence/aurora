@@ -506,6 +506,48 @@ describe('classic:paint-surface', () => {
     expect(st().doc).toBe(doc);
     expect(artStack().canUndo).toBe(false);
   });
+
+  // Dirty domains drive save routing (s1-io.ts keeps a zero-edit save
+  // byte-identical), so a spuriously-marked tier isn't cosmetic — it would
+  // make a tile-only stroke rewrite an unchanged map16/map256 file. These pin
+  // that the patch names ONLY the tier(s) the plan actually touched.
+  it('a tile-only plan leaves blocks and chunks dirty unset', () => {
+    openReady();
+    const plan: SurfaceEditPlan = {
+      ...emptyPlan(),
+      tileWrites: [{ tileIndex: 1, data: new Uint8Array(32).fill(0x7) }],
+    };
+    expect(classicPaintSurface(plan)).toEqual({ ok: true });
+    expect(st().dirty.tiles).toBe(true);
+    expect(st().dirty.blocks).toBeUndefined();
+    expect(st().dirty.chunks).toBeUndefined();
+  });
+
+  it('a chunk-cell-only plan leaves tiles and blocks dirty unset', () => {
+    openReady();
+    const plan: SurfaceEditPlan = {
+      ...emptyPlan(),
+      // Repoints chunk 0 cell 5 at the existing block 1 — no tile or block edit.
+      chunkCellEdits: [{ chunkIndex: 0, cellIndex: 5, cell: blankChunkCell(1) }],
+    };
+    expect(classicPaintSurface(plan)).toEqual({ ok: true });
+    expect(st().dirty.chunks).toBe(true);
+    expect(st().dirty.tiles).toBeUndefined();
+    expect(st().dirty.blocks).toBeUndefined();
+  });
+
+  it('a block-only plan (new block + block-cell repoint, no tile writes) leaves tiles and chunks dirty unset', () => {
+    openReady();
+    const plan: SurfaceEditPlan = {
+      ...emptyPlan(),
+      newBlocks: [{ cells: Array.from({ length: 4 }, () => blankBlockCell(1)) }],
+      blockCellEdits: [{ blockId: 2, cellIndex: 0, cell: blankBlockCell(1) }],
+    };
+    expect(classicPaintSurface(plan)).toEqual({ ok: true });
+    expect(st().dirty.blocks).toBe(true);
+    expect(st().dirty.tiles).toBeUndefined();
+    expect(st().dirty.chunks).toBeUndefined();
+  });
 });
 
 // ---------------------------------------------------------------------------
