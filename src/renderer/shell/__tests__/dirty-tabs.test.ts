@@ -29,6 +29,23 @@ describe('tabHasDirtyDot', () => {
     expect(tabHasDirtyDot('level:ghz:1', 'level', s)).toBe(false);
   });
 
+  // Lives here as well as in canvas-save-routing.test.ts on purpose: the RULE is
+  // in this file, so this is the test file the next person editing
+  // tabHasDirtyDot runs. Covering the branch only from a state/ test meant
+  // deleting it left this file entirely green — a green they would believe.
+  it("art-doc (canvas): a tab dots exactly when its own document has unsaved edits", () => {
+    const s = { ...base, dirtyCanvasDocIds: ['doc:canvas:sky'] };
+    expect(tabHasDirtyDot('doc:canvas:sky', 'art-doc', s)).toBe(true);
+    expect(tabHasDirtyDot('doc:canvas:rock', 'art-doc', s)).toBe(false);
+    expect(tabHasDirtyDot('doc:canvas:sky', 'art-doc', base)).toBe(false);
+    // The two doc kinds must not cross-dot: a dirty canvas leaves a sprite tab
+    // alone and vice versa (both branches read a list, and swapping which list
+    // each reads is a one-character edit).
+    expect(tabHasDirtyDot('doc:canvas:sky', 'sprite-doc', s)).toBe(false);
+    expect(tabHasDirtyDot('doc:sprite:s1:13', 'art-doc', { ...base, dirtySpriteDocIds: ['doc:sprite:s1:13'] }))
+      .toBe(false);
+  });
+
   it('sprite-doc: a tab dots exactly when its own document has unsaved edits', () => {
     const s = { ...base, dirtySpriteDocIds: ['doc:sprite:s1:13'] };
     expect(tabHasDirtyDot('doc:sprite:s1:13', 'sprite-doc', s)).toBe(true);

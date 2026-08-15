@@ -28,10 +28,18 @@ import { useToastStore } from './toastStore';
 /**
  * Write a canvas document back to the pair it was loaded from.
  *
- * Throws on failure (the coordinator's contract). Resolves silently when the
- * document is not open or has no destination: `saveableDirtyCanvasDocIds`
- * already filters those out, so reaching here means the document closed
- * mid-save, which is not an error the user can act on.
+ * Throws on failure (the coordinator's contract).
+ *
+ * Resolves silently for a document that is not open OR has no `CanvasSource`.
+ * On the SAVER's path that means the document closed mid-save (the saver reads
+ * `saveableDirtyCanvasDocIds`, which already requires a source), which is not
+ * an error the user can act on. It is NOT a statement that this function only
+ * works for already-saved documents: a first write goes through here too —
+ * `setSource` with `pngMtimeMs`/`sidecarMtimeMs` of `null` (the guarded-write
+ * spelling of "this file did not exist when we read it"), then call this. Task
+ * 13's New Canvas flow should take that path rather than adding a second
+ * `saveCanvasFile` call site, which is exactly what splitting this module out
+ * was meant to prevent.
  *
  * `api` exists as a test seam only — the same one `saveCanvasFile` already
  * offers, threaded through so a routing test can drive the REAL save path
@@ -53,7 +61,14 @@ export async function saveCanvasDocument(docId: string, api?: GuardedWriteApi): 
   );
 
   if (!res.ok) {
-    if (res.kind === 'partial' && res.partial) {
+    // Branch on `kind` ALONE, never on the optional payload. `SaveCanvasResult`
+    // is one object type with a `kind` union rather than a discriminated union
+    // of separate members, so `partial` is optional on every failure and the
+    // compiler cannot prove it is present here. Testing `kind === 'partial' &&
+    // res.partial` reads fine and silently routes a payload-less partial into
+    // the catch-all at the bottom, reporting a batch that half-landed as if
+    // nothing had been sent.
+    if (res.kind === 'partial') {
       const p = res.partial;
       // SOME files landed. Fold their fresh mtimes into the source even though
       // the save failed overall, or the next attempt conflicts on a file AURORA
@@ -61,20 +76,21 @@ export async function saveCanvasDocument(docId: string, api?: GuardedWriteApi): 
       // reopening the canvas. `setSource`, not `markSaved`: the document is
       // still dirty (the failed file's content is not on disk) and must keep
       // its dot so a retry is possible.
-      refreshBaselines(docId, p.pngMtimeMs, p.sidecarMtimeMs);
+      if (p) refreshBaselines(docId, p.pngMtimeMs, p.sidecarMtimeMs);
       throw new Error(
-        `write failed at ${p.failed.path} (${p.failed.message}); ` +
-        `${p.unwritten.length + 1} file(s) of this canvas did not land. ` +
-        'The canvas is still marked unsaved — fix the error and save again.',
+        `${res.error} — ${p ? p.unwritten.length + 1 : 'some'} file(s) of this canvas did not land. ` +
+        'The canvas is still marked unsaved; fix the error and save again.',
       );
     }
     if (res.kind === 'conflict') {
       // Main wrote NOTHING, so no baseline moves. Reopening is the only
       // recovery Aurora offers in 2A (there is no merge UI), and saying so is
-      // the difference between a dead end and an instruction.
+      // the difference between a dead end and an instruction. Built ON TOP of
+      // `res.error` rather than restating it: canvas-file.ts already names the
+      // files and says nothing was written, and a second hand-written copy of
+      // that sentence is one that drifts.
       throw new Error(
-        `${(res.conflicts ?? []).join(', ')} changed on disk since this canvas was opened, ` +
-        'so nothing was written. Reopen the canvas to pick up the external change ' +
+        `${res.error}. Reopen the canvas to pick up the external change ` +
         '(your unsaved edits in this tab will be lost).',
       );
     }

@@ -93,13 +93,26 @@ afterEach(() => {
 describe('canvas save routing', () => {
   it('the canvas saver owns canvas tabs and nothing else', () => {
     expect(saveCoordinator.activeSaver(TAB.id)?.id).toBe('canvas-doc');
-    // The neighbours it sits between in registration order. `owns` is
-    // first-match-wins, so a scope that over-claims silently steals another
-    // saver's Ctrl+S rather than erroring.
-    expect(saveCoordinator.activeSaver('doc:sprite:s1:42')?.id).not.toBe('canvas-doc');
     expect(saveCoordinator.activeSaver('level:ghz:1')?.id).not.toBe('canvas-doc');
     expect(saveCoordinator.activeSaver('home')).toBeNull();
     expect(saveCoordinator.activeSaver('tool:project-setup')).toBeNull();
+    // NOT asserted here: that a sprite tab is not owned by canvas-doc. That
+    // assertion cannot fail — `activeSaver` is first-match-wins and sprite-art
+    // registers AHEAD of canvas-doc, so widening canvas's `owns` to `() => true`
+    // leaves it green (verified by planting exactly that). A test that cannot
+    // fail is not covering the sprite case; the registration ORDER is the fact
+    // the safety actually rests on, so it gets its own test below.
+  });
+
+  it('registers behind sprite-art and ahead of both project savers', () => {
+    // saveAll walks the savers in registration order and pushes each to `saved`
+    // or `skipped`, so with nothing dirty `skipped` IS the registration order.
+    // This is what makes the sprite/canvas split safe (first-match-wins gives
+    // sprite tabs to sprite-art) and what keeps pixel edits from being stranded
+    // behind a level-save error.
+    return saveAllDirty().then((r) => {
+      expect(r.skipped).toEqual(['sprite-art', 'canvas-doc', 'classic-level', 'aeon-project']);
+    });
   });
 
   it('Ctrl+S on a canvas tab writes THAT canvas only', async () => {

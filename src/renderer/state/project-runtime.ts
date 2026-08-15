@@ -118,10 +118,16 @@ export function ensureSaversRegistered(): void {
     // all three of these read, so the saver can never disagree with itself
     // about which documents are savable.
     isDirty: () => saveableDirtyCanvasDocIds().length > 0,
-    // Re-read the list on each iteration? No — the set is captured once and
-    // each id saved in turn, which matches saveAllSpriteArt. A save that throws
-    // aborts the rest, and the coordinator reports the failure; the untouched
-    // documents keep their dirty dots.
+    // The set is captured once and each id saved in turn, byte-for-byte the
+    // shape of saveAllSpriteArt — a throw aborts the rest, the coordinator
+    // reports the failure, and the untouched documents keep their dirty dots.
+    // Worth knowing that canvas failures are MORE independent than sprite ones:
+    // each canvas is its own file pair, so a conflict on sky.png blocks
+    // rock.png for no reason, and the aggregate carries only the first failure's
+    // message. Continuing past a failure is the better behaviour on the merits;
+    // it is not done here because the two savers must change together — a Save
+    // All where one surface stops on the first error and its neighbour does not
+    // is a worse thing to reason about than either policy applied consistently.
     save: async () => { for (const id of saveableDirtyCanvasDocIds()) await canvasDocImpl(id); },
     // Ctrl+S in a canvas tab writes THAT canvas and no other. A dirty canvas
     // with no destination is not savable work, so Save stays inert for it
