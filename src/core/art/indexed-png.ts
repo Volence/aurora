@@ -1,6 +1,6 @@
 // src/core/art/indexed-png.ts
 //
-// 8-bit indexed PNG in, 1/2/4/8-bit indexed PNG out — the open format a canvas
+// 1/2/4/8-bit indexed PNG in, 8-bit indexed PNG out — the open format a canvas
 // document is stored in (spec §4.1: "these files stay openable in Aseprite, and
 // Aseprite output stays importable").
 //
@@ -10,10 +10,11 @@
 // PNG IDAT holds — no wrapper arithmetic of our own.
 //
 // SCOPE, deliberately narrow: colour type 3 (indexed), non-interlaced. Anything
-// else is refused with a message that says what to do about it, because the
-// alternative — a partial truecolour reader — would be a second image pipeline
-// to keep correct for no gain. Encoding always writes 8-bit; decoding accepts
-// 1/2/4/8 because other tools emit the smaller depths for small palettes.
+// else will be refused with a message that says what to do about it, because
+// the alternative — a partial truecolour reader — would be a second image
+// pipeline to keep correct for no gain. Encoding always writes 8-bit; decoding
+// will accept 1/2/4/8 because other tools emit the smaller depths for small
+// palettes.
 //
 // Pure core: async because the compression streams are, but no fs and no DOM.
 
@@ -31,22 +32,31 @@ export interface IndexedImage {
 
 const SIGNATURE = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 
-let crcTable: Uint32Array | null = null;
-function crc32(bytes: Uint8Array): number {
-  if (!crcTable) {
-    crcTable = new Uint32Array(256);
-    for (let n = 0; n < 256; n++) {
-      let c = n;
-      for (let k = 0; k < 8; k++) c = (c & 1) ? (0xedb88320 ^ (c >>> 1)) : (c >>> 1);
-      crcTable[n] = c >>> 0;
-    }
+const CRC_TABLE: Uint32Array = (() => {
+  const table = new Uint32Array(256);
+  for (let n = 0; n < 256; n++) {
+    let c = n;
+    for (let k = 0; k < 8; k++) c = (c & 1) ? (0xedb88320 ^ (c >>> 1)) : (c >>> 1);
+    table[n] = c >>> 0;
   }
+  return table;
+})();
+
+function crc32(bytes: Uint8Array): number {
   let c = 0xffffffff;
-  for (let i = 0; i < bytes.length; i++) c = crcTable[(c ^ bytes[i]) & 0xff] ^ (c >>> 8);
+  for (let i = 0; i < bytes.length; i++) c = CRC_TABLE[(c ^ bytes[i]) & 0xff] ^ (c >>> 8);
   return (c ^ 0xffffffff) >>> 0;
 }
 
 function chunk(type: string, data: Uint8Array): Uint8Array {
+  // Every call site today is a hardcoded 4-char literal (IHDR, PLTE, ...), but
+  // the file is about to gain a second caller (Task 4's inflate-side chunk
+  // walk) where that stops being guaranteed by inspection alone. A typo here
+  // would otherwise write NaN-derived bytes into the type field via
+  // charCodeAt(i) returning undefined, silently, with no error anywhere.
+  if (type.length !== 4) {
+    throw new Error(`PNG chunk type must be exactly 4 ASCII characters (got ${JSON.stringify(type)})`);
+  }
   const out = new Uint8Array(12 + data.length);
   const dv = new DataView(out.buffer);
   dv.setUint32(0, data.length);
@@ -91,12 +101,59 @@ export async function deflate(raw: Uint8Array): Promise<Uint8Array> {
 
 export async function encodeIndexedPng(img: IndexedImage): Promise<Uint8Array> {
   const { width, height, indices, palette } = img;
-  if (width <= 0 || height <= 0) throw new Error(`PNG size must be positive (got ${width}x${height})`);
+  // Number.isInteger folded in here (not a separate check) so a non-integer or
+  // NaN size is reported as the size problem it is, rather than tripping the
+  // indices-count guard below with a message about the wrong thing: width 2.5
+  // used to produce "2.5x1 needs 2.5 indices (got 2)".
+  if (!Number.isInteger(width) || !Number.isInteger(height) || width <= 0 || height <= 0) {
+    throw new Error(`PNG size must be positive integers (got ${width}x${height})`);
+  }
   if (indices.length !== width * height) {
     throw new Error(`${width}x${height} needs ${width * height} indices (got ${indices.length})`);
   }
   if (palette.length === 0 || palette.length > 256) {
     throw new Error(`an indexed PNG palette holds 1..256 colours (got ${palette.length})`);
+  }
+  // Every component is a PNG PLTE byte: 0..255, no fractional part. Silently
+  // masking with `& 0xff` (the previous behaviour) turns 300 into 44 and
+  // 255.9 into 255 with no error anywhere — colour corruption a decoder would
+  // just render, wrongly, forever.
+  for (let i = 0; i < palette.length; i++) {
+    const c = palette[i];
+    if (!Number.isInteger(c.r) || c.r < 0 || c.r > 255) {
+      throw new Error(`palette[${i}].r must be an integer 0..255 (got ${c.r})`);
+    }
+    if (!Number.isInteger(c.g) || c.g < 0 || c.g > 255) {
+      throw new Error(`palette[${i}].g must be an integer 0..255 (got ${c.g})`);
+    }
+    if (!Number.isInteger(c.b) || c.b < 0 || c.b > 255) {
+      throw new Error(`palette[${i}].b must be an integer 0..255 (got ${c.b})`);
+    }
+  }
+  // A transparentIndex outside the palette produces a spec-invalid file three
+  // different ways depending on how far outside: too large writes a tRNS
+  // chunk with more entries than PLTE has (PNG §11.3.2.1, a MUST-level
+  // violation); -1 writes a zero-length tRNS; anything more negative throws a
+  // raw V8 RangeError out of `new Uint8Array(t + 1)` with a message nowhere
+  // near this codebase's voice. One guard replaces all three failure shapes.
+  const t = img.transparentIndex;
+  if (t !== null && t !== undefined) {
+    if (!Number.isInteger(t) || t < 0 || t >= palette.length) {
+      throw new Error(`transparentIndex must be a palette index 0..${palette.length - 1} (got ${t})`);
+    }
+  }
+  // The JSDoc on IndexedImage.indices promises "each byte < palette.length";
+  // this is what actually enforces that promise. Without it, index 250 against
+  // a 3-colour palette encodes into a valid-looking file whose out-of-range
+  // pixels are then undefined behaviour that varies by decoder — exactly the
+  // hostile-input posture canvas-doc.ts takes on its own pixel domain (see
+  // normalizeCanvasPixels there). An O(n) scan is free at these sizes.
+  for (let i = 0; i < indices.length; i++) {
+    if (indices[i] >= palette.length) {
+      throw new Error(
+        `indices[${i}] = ${indices[i]} is out of range for a ${palette.length}-colour palette (0..${palette.length - 1})`,
+      );
+    }
   }
 
   const ihdr = new Uint8Array(13);
@@ -109,11 +166,14 @@ export async function encodeIndexedPng(img: IndexedImage): Promise<Uint8Array> {
   ihdr[11] = 0;  // filter method: adaptive
   ihdr[12] = 0;  // interlace: none
 
+  // No `& 0xff` masking here: the validation above already guarantees every
+  // component is an integer 0..255, so a mask at this point could only ever
+  // hide a bug in that guard rather than legitimately do anything.
   const plte = new Uint8Array(palette.length * 3);
   for (let i = 0; i < palette.length; i++) {
-    plte[i * 3] = palette[i].r & 0xff;
-    plte[i * 3 + 1] = palette[i].g & 0xff;
-    plte[i * 3 + 2] = palette[i].b & 0xff;
+    plte[i * 3] = palette[i].r;
+    plte[i * 3 + 1] = palette[i].g;
+    plte[i * 3 + 2] = palette[i].b;
   }
 
   // Filter type 0 (None) on every row. Adaptive filtering would shrink the file
@@ -126,7 +186,6 @@ export async function encodeIndexedPng(img: IndexedImage): Promise<Uint8Array> {
   }
 
   const parts = [SIGNATURE, chunk('IHDR', ihdr), chunk('PLTE', plte)];
-  const t = img.transparentIndex;
   if (t !== null && t !== undefined) {
     // tRNS is a prefix: entries past the array are opaque, so one byte marks
     // index 0 and says nothing about the other 63.

@@ -69,6 +69,48 @@ describe('encodeIndexedPng', () => {
     })).rejects.toThrow(/257/);
   });
 
+  // I1: an out-of-range transparentIndex used to produce spec-invalid output
+  // three different ways depending on how far out of range — a tRNS chunk
+  // with more entries than PLTE (too large), a zero-length tRNS (-1), or a
+  // raw V8 RangeError with none of this codebase's voice (more negative than
+  // -1). One guard, three cases, all now a clean rejection.
+  it('rejects an out-of-range transparentIndex instead of emitting a spec-invalid file', async () => {
+    const base = { width: 1, height: 1, indices: new Uint8Array([0]), palette: PAL }; // PAL has 3 entries: 0..2
+    await expect(encodeIndexedPng({ ...base, transparentIndex: 200 })).rejects.toThrow(/0\.\.2/);
+    await expect(encodeIndexedPng({ ...base, transparentIndex: -1 })).rejects.toThrow(/0\.\.2/);
+    await expect(encodeIndexedPng({ ...base, transparentIndex: -5 })).rejects.toThrow(/0\.\.2/);
+  });
+
+  // I2: the JSDoc on IndexedImage.indices promises "each byte < palette.length"
+  // but nothing enforced it — index 250 against a 3-colour palette encoded
+  // silently into a valid-looking file whose out-of-range pixels are then
+  // decoder-defined behaviour.
+  it('rejects an index that is out of range for the palette', async () => {
+    await expect(encodeIndexedPng({ width: 1, height: 1, indices: new Uint8Array([250]), palette: PAL }))
+      .rejects.toThrow(/250.*0\.\.2/);
+  });
+
+  // M1: non-integer/NaN dimensions used to be caught by the indices-count
+  // guard with a message about the wrong thing ("2.5x1 needs 2.5 indices
+  // (got 2)"). Number.isInteger is folded into the size check so the message
+  // names the actual problem.
+  it('rejects non-integer or NaN dimensions with a message about size, not index count', async () => {
+    await expect(encodeIndexedPng({ width: 2.5, height: 1, indices: new Uint8Array([0, 0]), palette: PAL }))
+      .rejects.toThrow(/positive integers/);
+    await expect(encodeIndexedPng({ width: NaN, height: 1, indices: new Uint8Array([0]), palette: PAL }))
+      .rejects.toThrow(/positive integers/);
+  });
+
+  // M2: palette components used to be masked with `& 0xff`, so {r:300, g:-1,
+  // b:255.9} wrote [44, 255, 255] with no error — silent colour corruption in
+  // the one module whose entire justification is producing spec-valid files.
+  it('rejects out-of-range or non-integer palette components instead of masking them', async () => {
+    await expect(encodeIndexedPng({
+      width: 1, height: 1, indices: new Uint8Array([0]),
+      palette: [{ r: 300, g: -1, b: 255.9 }],
+    })).rejects.toThrow(/palette\[0\]\.r/);
+  });
+
   // Not part of the given spec, but the failure a real viewer reports and a
   // round-trip against our own decoder would never catch: a corrupt chunk. Each
   // chunk's trailing 4 bytes must be the CRC-32 of its TYPE+DATA (not its
