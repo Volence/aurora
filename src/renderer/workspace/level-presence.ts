@@ -17,7 +17,7 @@
 // workspace. Both stores are read UNCONDITIONALLY — the engine branch is on the
 // values, not on the hook calls, because hooks may not sit behind a condition.
 
-import { useClassicLevelStore, type ComposerTab } from '../state/classicLevelStore';
+import { useClassicLevelStore, type ComposerTab, type TierPaintMode } from '../state/classicLevelStore';
 import { useProjectStore, getCurrentAct } from '../state/projectStore';
 import type { OpenEngine } from '../state/open-project';
 import type { FacetCapability } from '../../core/project/adapter';
@@ -31,28 +31,36 @@ export function useActLoaded(engine: OpenEngine | null): boolean {
 }
 
 /**
- * Is a classic composer tier a PIXEL surface — one the art tool dock and the art
- * tool options can act on?
+ * Is a classic composer tier a PIXEL surface RIGHT NOW — one the art tool dock
+ * and the art tool options can act on?
  *
- * Classic's Art facet is three sub-surfaces behind one pill: Chunk assigns
- * blocks, Block assigns tiles, and only Tile has pixels (it is the one mounting
- * PixelViewport + PixelEditController). So the pixel chrome is gated one level
- * DEEPER than facet granularity — the same "a control that cannot act is not
- * drawn" rule facet-chrome.ts states, applied to the one facet with more than
- * one canvas under it.
+ * REVERSED, DELIBERATELY, from an earlier recorded decision (Task 11,
+ * "decided" — see the plan doc's final section). It used to read "Chunk assigns
+ * blocks, Block assigns tiles, and only Tile has pixels" and be gated on the
+ * TAB alone. Paint-through changes that: Chunk and Block can now compose their
+ * tier into a pixel surface too, so the true gate is not the tab but the tab's
+ * own Assign|Paint TOGGLE — Tile has no such toggle (it is unconditionally a
+ * pixel surface), while Chunk/Block are pixel surfaces only while their own
+ * mode says 'paint'. The assignment grid stays each tab's default specifically
+ * so "a pencil/fill/eyedropper column beside the chunk grid" — the dead chrome
+ * the old rule was written to prevent — still cannot happen while assigning;
+ * it can now happen while painting, which is the point.
  *
- * THE ONE STATEMENT OF THAT, because the answer is needed in two places that
- * would otherwise drift: the components themselves (ClassicArtToolDock and
- * s1-facets' ClassicArtOptions return null off the tile tier, so each is correct
- * standing alone) and `usePixelToolsLive` below, which is what stops EditorShell
- * from drawing the CONTAINER. A component returning null is not enough on its
- * own: LevelWorkspace hands EditorShell an ELEMENT, `p.toolDock != null` is true
- * for an element that renders nothing, and the 44px bordered rail is drawn empty
- * down the left of the screen — the exact failure EditorShell's `toolDock`
- * docblock exists to describe.
+ * THE ONE STATEMENT OF THAT, because the answer is needed in three places that
+ * would otherwise drift: ClassicArtToolDock (the tool rail's contents),
+ * s1-facets' ClassicArtOptions (the mirror/dither/pixel-perfect row), and
+ * `usePixelToolsLive` below, which is what stops EditorShell from drawing the
+ * rail's 44px CONTAINER. A component returning null is not enough on its own:
+ * LevelWorkspace hands EditorShell an ELEMENT, `p.toolDock != null` is true for
+ * an element that renders nothing, and the bordered rail is drawn empty down
+ * the left of the screen — the exact failure EditorShell's `toolDock` docblock
+ * exists to describe.
  */
-export function isClassicPixelTier(tab: ComposerTab): boolean {
-  return tab === 'tile';
+export function isClassicPixelTier(tab: ComposerTab, chunkMode: TierPaintMode, blockMode: TierPaintMode): boolean {
+  if (tab === 'tile') return true;
+  if (tab === 'chunk') return chunkMode === 'paint';
+  if (tab === 'block') return blockMode === 'paint';
+  return false;
 }
 
 /**
@@ -67,6 +75,8 @@ export function isClassicPixelTier(tab: ComposerTab): boolean {
  */
 export function usePixelToolsLive(engine: OpenEngine | null, facet: FacetCapability | null): boolean {
   const classicTier = useClassicLevelStore((s) => s.composerTab);
-  if (engine === 's1' && facet === 'art') return isClassicPixelTier(classicTier);
+  const chunkMode = useClassicLevelStore((s) => s.chunkPaintMode);
+  const blockMode = useClassicLevelStore((s) => s.blockPaintMode);
+  if (engine === 's1' && facet === 'art') return isClassicPixelTier(classicTier, chunkMode, blockMode);
   return true;
 }

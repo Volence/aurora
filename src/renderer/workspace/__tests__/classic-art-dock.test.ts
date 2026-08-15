@@ -48,14 +48,27 @@ const TILE_SPACE_TOOLS = ['tile-stamp', 'collision', 'palette-apply'];
 const literal = (name: string) => new RegExp(`(['"\`])${name}\\1`);
 
 describe('the pixel tier predicate', () => {
-  // The real decision, actually executed. Classic's Art facet is three
-  // sub-surfaces — Chunk assigns blocks, Block assigns tiles, Tile has pixels —
-  // and only the last one mounts PixelViewport, so only the last one has
-  // anything the eight pixel tools can touch.
-  it('is true for the tile tier only', () => {
-    expect(isClassicPixelTier('tile')).toBe(true);
-    expect(isClassicPixelTier('chunk')).toBe(false);
-    expect(isClassicPixelTier('block')).toBe(false);
+  // The real decision, actually executed. Task 11 ("decided") reversed the
+  // earlier one: Chunk and Block CAN be pixel surfaces now, but only while
+  // their own Assign|Paint toggle says 'paint' — Tile has no such toggle and is
+  // unconditionally a pixel surface, as it always was.
+  it('the tile tier is always a pixel surface, regardless of either tier mode', () => {
+    expect(isClassicPixelTier('tile', 'assign', 'assign')).toBe(true);
+    expect(isClassicPixelTier('tile', 'paint', 'paint')).toBe(true);
+  });
+
+  it('the chunk tier is a pixel surface only in its OWN paint mode', () => {
+    expect(isClassicPixelTier('chunk', 'assign', 'assign')).toBe(false);
+    expect(isClassicPixelTier('chunk', 'paint', 'assign')).toBe(true);
+    // The block tier's mode must not leak into the chunk tier's answer.
+    expect(isClassicPixelTier('chunk', 'assign', 'paint')).toBe(false);
+  });
+
+  it('the block tier is a pixel surface only in its OWN paint mode', () => {
+    expect(isClassicPixelTier('block', 'assign', 'assign')).toBe(false);
+    expect(isClassicPixelTier('block', 'assign', 'paint')).toBe(true);
+    // The chunk tier's mode must not leak into the block tier's answer.
+    expect(isClassicPixelTier('block', 'paint', 'assign')).toBe(false);
   });
 });
 

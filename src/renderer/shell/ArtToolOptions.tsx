@@ -98,8 +98,12 @@ function PaletteLinePicker() {
  * false; H1.6 made the canvas render at `artStore.zoom` (with the shared
  * cursor-anchored wheel zoom and hand-pan), and the same one field turned true.
  *
- * `brushSpace` and `repeatPreview` are simply aeon-only (ComposerCanvas is the
- * sole reader of both), and `paletteLine` belongs to the `palette-apply` tool,
+ * `brushSpace` is aeon-only (ComposerCanvas is its sole reader). `repeatPreview`
+ * is the CAP that gates THIS BAR'S OWN "Rpt" button, which stays aeon-only too —
+ * classic's TileTab reads the underlying `artStore.repeatPreview` field
+ * directly and draws its own seam-preview toggle beside the tile's palette-line
+ * Chips instead, so turning this cap on would put two controls on one field.
+ * `paletteLine` belongs to the `palette-apply` tool,
  * which is tile-space and not in CLASSIC_TILE_TOOLS — its picker also reads
  * `projectStore`, null under a classic open, so it would render four empty
  * swatch strips.

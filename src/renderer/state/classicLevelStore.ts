@@ -29,6 +29,7 @@
 import { create } from 'zustand';
 import type { DirtyDomains, EditableTileRange, LevelDoc, ZoneActRef } from '../../core/project/adapter';
 import { tileLockReason } from '../../core/project/editable-tiles';
+import type { SurfaceEditPlan, PaintMode as SurfaceDivergeMode } from '../../core/art/classic-surface-plan';
 import type { BlockDef, ChunkCell, ChunkDef256 } from '../../core/level-classic/model';
 import { validateLevelDoc, unpackChunkCell, chunkIndexForId } from '../../core/level-classic/model';
 import {
@@ -63,6 +64,15 @@ export type AddResult = { ok: true; id: number } | { ok: false; error: string };
 /** Which composer tab is active (shared selection context, Task B3). */
 export type ComposerTab = 'chunk' | 'block' | 'tile';
 
+/**
+ * A composer tab's Assign|Paint mode (Task 11). 'assign' is the tab's original
+ * grid-assignment behaviour; 'paint' composes the tier's surface and mounts the
+ * shared pixel substrate. Named apart from `PaintMode` (classic-surface-plan.ts,
+ * imported here as `SurfaceDivergeMode`) on purpose — that one is Link|Isolate,
+ * an unrelated axis a Paint-mode gesture resolves under, not a tier's mode.
+ */
+export type TierPaintMode = 'assign' | 'paint';
+
 export type LayoutPlane = 'fg' | 'bg';
 
 // The active layout-editing tool used to live here as `ClassicTool`
@@ -79,6 +89,23 @@ interface ClassicLevelState {
   status: ClassicLevelStatus;
   /** Human-readable failure reason when status === 'error'. */
   error: string | null;
+
+  /**
+   * Level-pool tiles this act's objects draw through mappings rather than
+   * blocks (GHZ platforms, MZ bricks, …) — see `ClassicLevelAccess.reservedTiles`'s
+   * docblock for the full rule. Captured HERE, at act read, the same moment and
+   * the same way `editableTileRange` is (openAct below) — not recomputed lazily
+   * per render — because `planSurfaceEdit`'s call site (ChunkTab/BlockTab's paint
+   * mode) needs one stable value for the whole open act, not a fresh adapter call
+   * on every keystroke. Null when unknown (no handle, adapter omits the query, or
+   * the act has not finished loading) — PERMISSIVE, matching `editableTileRange`'s
+   * null convention: `planSurfaceEdit` treats an absent set as "nothing reserved",
+   * never as "refuse everything".
+   *
+   * NOT a lock and must never be folded into `dirty`/`tileLockReason` — painting
+   * a reserved tile in place is a legitimate edit (see the adapter docblock).
+   */
+  reservedTiles: ReadonlySet<number> | null;
 
   /** Per-domain unsaved-change flags (adapter DirtyDomains shape). */
   dirty: DirtyDomains;
@@ -181,6 +208,38 @@ interface ClassicLevelState {
    */
   tileClipboard: Uint8Array | null;
 
+  /**
+   * Assign | Paint per tier (Task 11, "decided" — paint is an explicit mode, not
+   * an armed tool). The assignment grid stays each tab's default; painting is a
+   * second mode a user switches INTO. Deliberately NOT derived from
+   * `editorStore.tool`: Chunk/Block have no 'assign' member in that union (it
+   * would have to be invented), and that union is shared with the sprite editor
+   * — a level-art-only member would leak a concept into a surface that can never
+   * use it.
+   *
+   * STORE state, not local `useState` inside the tab, for two reasons: (1)
+   * `ClassicComposerDock` unmounts each tab on tab switch
+   * (`{tab === 'chunk' && <ChunkTab/>}`), so local state would forget the choice
+   * every time the user left and came back; (2) `isClassicPixelTier`
+   * (workspace/level-presence.ts) needs THIS SAME value from three call sites
+   * that are not ChunkTab/BlockTab at all — ClassicArtToolDock (the tool rail's
+   * contents) and LevelWorkspace's `usePixelToolsLive` (the rail's 44px
+   * CONTAINER) — so a tab-local toggle could not answer "is this tier live"
+   * from outside the tab.
+   */
+  chunkPaintMode: TierPaintMode;
+  blockPaintMode: TierPaintMode;
+  /**
+   * Link | Isolate for BOTH paint-mode surfaces — a single cross-tier workflow
+   * preference, not per-tier: the same shape as `artStore.zoom` (a CROSS-ENGINE
+   * SINGLETON, see TileTab.tsx), where the cost of one shared field (a choice
+   * made on Chunk carries into Block) is judged worth it over a second toggle
+   * that means the same thing. Isolate default; STICKY — not reset in `openAct`'s
+   * `fresh` object, because it is a workflow preference like `composerTab`, not
+   * per-act document data.
+   */
+  paintDivergeMode: SurfaceDivergeMode;
+
   /** Select + load an act. Reads through the open project's handle. */
   openAct: (ref: ZoneActRef) => Promise<void>;
   setSelectedChunkId: (chunkId: number) => void;
@@ -199,6 +258,9 @@ interface ClassicLevelState {
   setComposerTileIndex: (index: number) => void;
   setComposerPalLine: (line: number) => void;
   setTileClipboard: (px: Uint8Array | null) => void;
+  setChunkPaintMode: (mode: TierPaintMode) => void;
+  setBlockPaintMode: (mode: TierPaintMode) => void;
+  setPaintDivergeMode: (mode: SurfaceDivergeMode) => void;
   /**
    * Clear the given dirty domains for `ref` after a successful save. NOT an
    * undoable edit (it does not touch history).
@@ -221,6 +283,7 @@ const IDLE = {
   doc: null,
   status: 'idle' as ClassicLevelStatus,
   error: null,
+  reservedTiles: null as ReadonlySet<number> | null,
   dirty: {} as DirtyDomains,
   chunkVersions: new Map<number, number>(),
   chunkEpoch: 0,
@@ -236,6 +299,9 @@ const IDLE = {
   composerTileIndex: 0,
   composerPalLine: 0,
   tileClipboard: null as Uint8Array | null,
+  chunkPaintMode: 'assign' as TierPaintMode,
+  blockPaintMode: 'assign' as TierPaintMode,
+  paintDivergeMode: 'isolate' as SurfaceDivergeMode,
 };
 
 // ---------------------------------------------------------------------------
@@ -287,6 +353,9 @@ export const useClassicLevelStore = create<ClassicLevelState>((set, get) => ({
     disposeStacksFor(get().ref);
     disposeStacksFor(ref);
     const fresh = {
+      // Unknown until the read below succeeds — a stale set from the PRIOR act
+      // would misdescribe this one (different zone, different object list).
+      reservedTiles: null as ReadonlySet<number> | null,
       dirty: {} as DirtyDomains,
       chunkVersions: new Map<number, number>(),
       chunkEpoch: nextVersion(),
@@ -344,6 +413,13 @@ export const useClassicLevelStore = create<ClassicLevelState>((set, get) => ({
       // would rewrite a choice the user made on Layout (picking air to erase
       // with is a real choice), where an open-time default overrides nothing.
       const range = handle.levels.editableTileRange?.(ref) ?? null;
+      // T4: the tiles this act's object sprites draw from the level pool
+      // through mappings, not blocks — captured HERE, beside the range above,
+      // so `planSurfaceEdit`'s call site (ChunkTab/BlockTab's paint mode) reads
+      // one stable value for the act rather than re-querying the adapter per
+      // gesture. See the `reservedTiles` field's docblock for why this is not a
+      // lock and must never be merged into `range`/`tileLockReason`.
+      const reserved = handle.levels.reservedTiles?.(ref) ?? null;
       // The palette line goes with them, and for the same reason one tier down:
       // the Block and Tile tiers draw the SAME tile strip under two different
       // fields (the landing block's cell pal vs `composerPalLine`), and
@@ -354,6 +430,7 @@ export const useClassicLevelStore = create<ClassicLevelState>((set, get) => ({
       const blockId = firstNonBlankBlock(doc.blocks, doc.tiles);
       set({
         ref, doc, status: 'ready', error: null,
+        reservedTiles: reserved,
         selectedChunkId: firstEditableChunkId(doc.chunks),
         composerTileIndex: firstEditableNonBlankTile(doc.tiles, range),
         composerBlockId: blockId,
@@ -400,6 +477,9 @@ export const useClassicLevelStore = create<ClassicLevelState>((set, get) => ({
   setTileClipboard: (px: Uint8Array | null) => {
     if (px === null || px.length === 64) set({ tileClipboard: px });
   },
+  setChunkPaintMode: (mode: TierPaintMode) => set({ chunkPaintMode: mode }),
+  setBlockPaintMode: (mode: TierPaintMode) => set({ blockPaintMode: mode }),
+  setPaintDivergeMode: (mode: SurfaceDivergeMode) => set({ paintDivergeMode: mode }),
 
   markDomainsClean: (ref, domains) => {
     const s = get();
@@ -790,6 +870,88 @@ export function classicEditTiles(edits: { tileIndex: number; data: Uint8Array }[
   // Naming the written tiles additionally lets the composer's tile strip repaint
   // only those thumbnails (a pencil stroke touches one tile, not the pool).
   commitArt(newDoc, { tiles: true }, { kind: 'all', tiles: edits.map((e) => e.tileIndex) });
+  return { ok: true };
+}
+
+/**
+ * classic:paint-surface — apply one paint gesture across all three art tiers.
+ *
+ * Composite by design: tile pixels, new blocks, block-cell repoints and chunk-cell
+ * repoints land in ONE commitArt, so a stroke that diverges a block is a single
+ * Ctrl+Z. Splitting it would let an undo strand a cloned block with nothing
+ * pointing at it. Validation mirrors classicEditTiles for tile writes — including
+ * the SAME tileLockReason predicate, so a plan can never write a locked tile.
+ */
+export function classicPaintSurface(plan: SurfaceEditPlan): CommandResult {
+  const doc = requireDoc();
+  if (!doc) return err('no classic level is open');
+
+  const poolTiles = Math.floor(doc.tiles.length / 32);
+  const range = editableTileRange();
+  for (const { tileIndex, data } of plan.tileWrites) {
+    if (!isInt(tileIndex) || tileIndex < 0 || tileIndex >= poolTiles) {
+      return err(`tile ${tileIndex} does not exist (0..${poolTiles - 1})`);
+    }
+    if (!(data instanceof Uint8Array) || data.length !== 32) {
+      return err(`tile ${tileIndex} data must be 32 bytes (got ${data?.length})`);
+    }
+    const lock = tileLockReason(range, tileIndex);
+    if (lock) return err(`tile ${tileIndex} is not editable: ${lock}`);
+  }
+
+  const nextTiles = plan.tileWrites.length ? new Uint8Array(doc.tiles) : doc.tiles;
+  for (const { tileIndex, data } of plan.tileWrites) nextTiles.set(data, tileIndex * 32);
+
+  const nextBlocks = (plan.newBlocks.length || plan.blockCellEdits.length)
+    ? doc.blocks.slice() : doc.blocks;
+  for (const b of plan.newBlocks) nextBlocks.push({ cells: b.cells.map((c) => ({ ...c })) });
+  for (const { blockId, cellIndex, cell } of plan.blockCellEdits) {
+    if (!isInt(blockId) || blockId < 0 || blockId >= nextBlocks.length) {
+      return err(`block ${blockId} does not exist (0..${nextBlocks.length - 1})`);
+    }
+    if (!isInt(cellIndex) || cellIndex < 0 || cellIndex > 3) {
+      return err(`block cell index ${cellIndex} out of range 0..3`);
+    }
+    const cells = nextBlocks[blockId].cells.slice();
+    cells[cellIndex] = { ...cell };
+    nextBlocks[blockId] = { cells };
+  }
+
+  const nextChunks = plan.chunkCellEdits.length ? doc.chunks.slice() : doc.chunks;
+  for (const { chunkIndex, cellIndex, cell } of plan.chunkCellEdits) {
+    if (!isInt(chunkIndex) || chunkIndex < 0 || chunkIndex >= nextChunks.length) {
+      return err(`chunk index ${chunkIndex} does not exist (0..${nextChunks.length - 1})`);
+    }
+    if (!isInt(cellIndex) || cellIndex < 0 || cellIndex > 255) {
+      return err(`chunk cell index ${cellIndex} out of range 0..255`);
+    }
+    const cells = nextChunks[chunkIndex].cells.slice();
+    cells[cellIndex] = { ...cell };
+    nextChunks[chunkIndex] = { cells };
+  }
+
+  const newDoc: LevelDoc = { ...doc, tiles: nextTiles, blocks: nextBlocks, chunks: nextChunks };
+  const e = structuralError(newDoc);
+  if (e) return err(e);
+
+  // State the dirty domains TRUTHFULLY — only what actually changed.
+  const dirtyPatch: DirtyDomains = {};
+  if (plan.tileWrites.length) dirtyPatch.tiles = true;
+  if (plan.newBlocks.length || plan.blockCellEdits.length) dirtyPatch.blocks = true;
+  if (plan.chunkCellEdits.length) dirtyPatch.chunks = true;
+  if (Object.keys(dirtyPatch).length === 0) return { ok: true }; // no-op gesture
+
+  // A block or tile change repaints every chunk that reaches it — bump the epoch,
+  // naming written tiles so the composer's tile strip repaints only those thumbs.
+  //
+  // Always 'all', even for a lone chunk-cell edit, where classicEditChunkCells
+  // manages the narrower { kind: 'chunk', id }. Two reasons, so nobody "optimises"
+  // this into the narrow path: a paint plan that touches chunks essentially always
+  // touches blocks or tiles too, which needs the epoch anyway (classicEditBlock has
+  // the same precedent); and the narrow effect is keyed by ENGINE chunk id while a
+  // plan addresses chunks by FILE index, so reusing it would need a conversion that
+  // buys nothing here.
+  commitArt(newDoc, dirtyPatch, { kind: 'all', tiles: plan.tileWrites.map((w) => w.tileIndex) });
   return { ok: true };
 }
 

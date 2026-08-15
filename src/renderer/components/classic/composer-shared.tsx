@@ -43,11 +43,31 @@ export function useEditableTileRange(): EditableTileRange | null {
 // shared module.
 export { tileLockReason } from '../../../core/project/editable-tiles';
 
-/** An inline shared-edit warning banner with an optional Duplicate action. */
+/**
+ * An inline status strip stating a tile/block/chunk's linkage — that editing it
+ * edits every place it is used — with an optional Duplicate action.
+ *
+ * DELIBERATELY NEUTRAL, not a warning. A662e99's `⚠` glyph and amber hazard
+ * tint framed the shared-art reference ladder as a defect to route around; per
+ * plan A8 (docs/superpowers/plans/2026-08-15-art-authoring-phase1-paint-through.md,
+ * "A8 resolved") the SAME MECHANISM — edit once, every placement updates — is
+ * the headline feature of a tileset-based pixel editor, so the banner now
+ * states it as one: `styles.banner` carries neutral chrome tokens (the same
+ * `T.overlay`/`T.border` the composer's other secondary controls use), and this
+ * component draws no glyph of its own. `text` still carries the copy, so this
+ * is styling-and-copy only — no prop shape change, no new command.
+ *
+ * NOT THE LOCKED-TILE BANNER. TileTab's red "🔒 tile … is locked" banner is a
+ * genuine refusal (the tile cannot be edited at all here, not just edited
+ * everywhere) and is a SEPARATE inline `<div>` in TileTab.tsx that spreads
+ * `styles.banner` and then overrides its background/borderColor back to a
+ * hazard red — it does not call this component, so restyling `SharedBanner`
+ * cannot neutralise it. See TileTab.tsx's locked-tile block.
+ */
 export function SharedBanner({ text, onDuplicate, dupLabel }: { text: string; onDuplicate?: () => void; dupLabel?: string }) {
   return (
     <div style={styles.banner}>
-      <span style={{ flex: 1 }}>⚠ {text}</span>
+      <span style={{ flex: 1 }}>{text}</span>
       {onDuplicate && (
         <button onClick={onDuplicate} style={styles.dupBtn}>{dupLabel ?? 'Duplicate'}</button>
       )}
@@ -344,9 +364,16 @@ export const styles: Record<string, React.CSSProperties> = {
   dim: { fontSize: 10, color: T.textLo },
   hintRow: { fontSize: 9, color: T.textFaint },
   notice: { fontSize: 11, color: T.textLo, padding: '12px 4px', maxWidth: 320, lineHeight: 1.5 },
+  // NEUTRAL STATUS CHROME, not a warning — same tokens as `smallBtn`/`dupBtn`'s
+  // own resting chrome (`T.overlay`/`T.border`), because the linkage this
+  // banner states (edit one, every placement updates) is a mechanism, not a
+  // hazard. Task 10 dropped the `⚠` glyph and the amber `rgba(255,170,60,…)`
+  // hazard tint this used to carry; TileTab's LOCKED-tile banner is a real
+  // refusal and still overrides these two fields back to red on its own
+  // (see SharedBanner's docblock) — it does not go through this component.
   banner: {
     display: 'flex', alignItems: 'center', gap: 8, fontSize: 10, color: T.textBase,
-    background: 'rgba(255,170,60,0.12)', borderWidth: 1, borderStyle: 'solid', borderColor: 'rgba(255,170,60,0.4)',
+    background: T.overlay, borderWidth: 1, borderStyle: 'solid', borderColor: T.border,
     borderRadius: 3, padding: '4px 8px', maxWidth: 340,
   },
   dupBtn: {

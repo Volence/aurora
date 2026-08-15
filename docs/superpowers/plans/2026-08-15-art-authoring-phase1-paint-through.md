@@ -1572,3 +1572,282 @@ tile→object reverse index alongside `buildUsageIndex` is the likely shape. Cor
 the composition happens at the injection site. Test at the seam (a predicate excluding tile 9
 forces `findFreeSlot` to 10) **and** with a real GHZ act, asserting a known object-art tile is
 excluded.
+
+---
+
+## Task 5c — object-aware tile claimability, in detail
+
+**Designed 2026-08-15. Supersedes the stub in Audit corrections A2/New Task 5c.** Gates every
+UI task: nothing may reach Isolate before T1–T5 land.
+
+### The rule
+
+Reserve, per open act, every level-pool tile index any level-art-drawn object sprite can read.
+**Reserved tiles stay editable in place** — painting GHZ platform art is a feature, and the
+sprite updates live through `tileEpoch` — so this must NOT be folded into `tileLockReason`. It
+is a third, additive rule: **never claim a reserved slot, and always diverge away from one.**
+
+For `(zone, act)` with pool size `poolTileCount`, the union over reservation requests
+`{mapAsm, tileBase, frames?}` of:
+
+```
+{ tileBase + piece.tile + k
+  | frame ∈ (frames ?? all frames of parseAsmMappings(mapAsm)),
+    piece ∈ frame.pieces,
+    k ∈ [0, piece.widthCells * piece.heightCells) }  ∩  [0, poolTileCount)
+```
+
+The request list is **zone-static** — not placement-, subtype-, or preview-frame-dependent.
+
+- **Derived:** for each `id ∈ linkedObjectIds(zone)` whose `resolveObjectArt(id, zone).artSource`
+  is `'levelArt'`, one request with `tileBase = -(link.tileIndexOffset ?? 0)`. Today: ghz
+  Platforms + Collapsing Ledge; mz Large Grassy Platforms + Bricks; syz Light, Platforms,
+  Floating Blocks and Doors; slz those plus Elevators, Circling Platform, Staircase; lz and sbz
+  none derived.
+- **Supplemental** — engine truth Aurora's table cannot see, found by grepping `ArtTile_Level`
+  across `s1disasm/_incObj`:
+  - **syz**: `_maps/SYZ Boss Blocks.asm`, base 0. Object `$76` is **spawned by boss `$75`**, never
+    in `objpos`, unlinked in Aurora — the concrete proof a placement-derived set is wrong.
+  - **lz (all acts) and sbz act 3**: `_maps/SBZ Stomper and Door.asm`, base `0x1F0`, frame 0.
+    **SBZ3 borrows LZ's tile/block/chunk files**, so editing LZ can corrupt SBZ3's door.
+
+Why zone-static holds: subtype rules only change which *frames* draw — none swaps a levelArt
+link's `mapAsm` or `artSource`. Taking all frames removes subtype from the question entirely,
+and is required anyway because the ROM animates frames Aurora never previews.
+
+### Measured, real s1disasm
+
+GHZ act 1: pool 965, reserved **158** tiles (0x3B..0xE4), **119** of them currently claimable.
+Claimable slots fall **136 → 17**. Other zones: mz 86, syz 120, slz 79, lz/sbz 0 plus the
+15-tile SBZ3 door run at 0x39F..0x3AD.
+
+**The earlier framing was wrong in a way that matters:** the first four claims land on genuinely
+free slots and **the fifth** hits object art — so casual testing looks fine.
+
+### Two questions that were open, now answered
+
+- **The `tileIndexOffset` bug does not infect this.** That drop is in `openDiscoveredSet`, the
+  Sprite-mode path; this builds from `resolveObjectArt` + `objectArtTiles`, which apply the
+  offset correctly. And every offsetted object (`$32`, `$61`) is `artSource: 'file'`, so its
+  tiles are not in the level pool at all. Keep `tileBase` in the request shape anyway, so a
+  future offsetted levelArt link stays correct and SBZ3's `+0x1F0` has somewhere to live.
+- **Cross-act via blocks is impossible; via objects it is real.** `tileToBlocks`/`blockToChunks`
+  come from files shared by every act of a zone, so "unused in act 1, used in act 2" cannot
+  happen through blocks. The real channel is per-act objects reading the shared pool through
+  mappings — hence the SBZ3 entry in **lz's** reservations.
+
+### Where it lives, and why
+
+Computing the set **requires reading the zone's `_maps/*.asm` files** — mappings are the only
+source of which pool indices are read, and Aurora stores paths, not ranges. That decides it:
+core cannot do IO, and putting it in the renderer would strand S1 engine knowledge outside the
+node suite. So it splits along the existing `editableTileRange` seam:
+
+- **Pure core** — request derivation and set computation from *passed-in* mapping texts.
+- **IO in the s1 adapter** — read the ≤6 mapping texts during `levels.read()`, where `fa` is
+  already in scope, cache beside the editable-range bookkeeping, expose as an optional sync
+  `reservedTiles?(ref)` exactly like `editableTileRange`.
+- **Renderer** only threads it into `planSurfaceEdit`'s input.
+
+A missing mappings file contributes nothing (permissive, matching the `editableTileRange` null
+convention).
+
+### Tasks
+
+**T1 — core module** `src/core/project/profiles/s1-levelart-reservations.ts`:
+
+```ts
+export interface LevelArtReservationRequest {
+  mapAsm: string;             // disasm-relative mappings path
+  tileBase: number;           // pool index of mappings tile 0 (engine base − tileIndexOffset)
+  frames?: readonly number[]; // restrict; undefined = all frames
+  ids: readonly number[];     // contributing object ids, for messaging and tests
+}
+export function levelArtReservationRequests(zone: string, act: number): LevelArtReservationRequest[];
+export function buildReservedTileSet(
+  requests: readonly LevelArtReservationRequest[],
+  mapTextByPath: ReadonlyMap<string, string>,
+  poolTileCount: number,
+): { tiles: ReadonlySet<number>; byTile: ReadonlyMap<number, readonly number[]> };
+```
+
+Tests with synthetic mappings text: multi-frame, multi-cell pieces, `tileBase` shift, pool
+clamp, `frames` filter, `byTile` attribution; plus a table test pinning each zone's expected
+request paths and the lz/sbz-act-3 door entry.
+
+**T2 — the plan honours reservations.** Add `reservedTiles?: ReadonlySet<number>` to
+`PlanInput` (default empty). Two changes: `findFreeSlot` skips reserved slots; and
+`tileLinked` becomes `index.tileUsage(e.tileIndex).cells > 1 || reserved.has(e.tileIndex)`, so
+isolate diverges away from a reserved tile rather than repainting the object in place. Link
+mode is deliberately unchanged — edit-everywhere includes the sprite, which is what link means.
+`findContentMatch` may still repoint *to* a reserved tile: byte-identical, corrupts nothing,
+conserves scarce slots. Tests: reserved zero-usage slot skipped; reserved used-once tile
+diverges instead of writing in place; **negative control** — the same fixture without
+`reservedTiles` claims the reserved slot.
+
+**T3 — adapter surface.** Optional `reservedTiles?(ref): ReadonlySet<number> | null` on
+`ClassicLevelAccess` (null = unknown = permissive; semantics are "never claim / always diverge",
+NOT "not editable"). `s1/index.ts` `read()` fetches the mapping texts tolerantly, builds the
+set, stashes it in `readStates`.
+
+**T4 — store threading.** Capture at act read beside `editableTileRange`; pass into
+`planSurfaceEdit`. Merges with the Task 11 wiring if they land together.
+
+**T5 — real-act regression test** — the one that would have caught this. Follow the
+`S1_PRESENT`-skip pattern in `src/core/project/__tests__/editable-tiles.test.ts`. Open GHZ 1;
+assert the reserved set covers the platform run {0x3B..0x4A} and has ≥150 entries; drive
+`planSurfaceEdit` with **six** forced divergences and assert no `tileWrite` index is reserved;
+then the planted violation — the same six with `reservedTiles` omitted claims 0x3B. Also assert
+lz act 1 and sbz act 3 both cover {0x39F..0x3AD}.
+
+**T6 — rule-invariant lock.** For every zone × rule object id × all 256 subtypes,
+`resolveEffectiveObjectArt(...).link.artSource` equals the base link's, and every levelArt
+effective link's `mapAsm` is in that zone's request paths with zero offset. This is what keeps
+the zone-static set sound when someone adds a subtype rule later.
+
+### Consequences to design for
+
+- **Slot scarcity is the next cliff.** 17 claimable slots in GHZ. The refusal message should
+  state remaining capacity, and content-match dedup becomes load-bearing rather than an
+  optimisation.
+- **"0 blocks" currently reads as "unused"** in the composer tile strip, which invites manual
+  repurposing of object art. The `byTile` map gives object ids for a "drawn by GHZ Platform"
+  badge. Separate small task, but it is the same misunderstanding at the UI layer.
+- Verified and recorded so nobody re-audits: MZ `$45` and SBZ `$66` are file-backed, no
+  reservation needed; `$1D` and MZ `$35` need none either.
+
+---
+
+## A8 resolved — "Make unique" is descoped
+
+**Decided 2026-08-15.** Do not build `planMakeUnique`. Task 10 becomes copy and styling only.
+
+Three reasons, the second of which is the one that settles it:
+
+1. **The banner has no instance to detach.** Every composer tab selects a resource by ID — the
+   shared source itself. `BlockTab` shows "used in 31 chunk cells" but holds no selected chunk
+   cell; `TileTab` holds no selected block cell. A Make-unique click there cannot know which of
+   the 31 uses to repoint. The only thing it could mean from a source editor is "copy to a new
+   id and select the copy" — which already exists on the Block and Chunk banners, correctly
+   named **Duplicate**.
+2. **A write-less divergence is unstable in a content-deduplicating pool.** `findContentMatch`
+   repoints to any byte-identical tile before claiming a slot. A write-less copy is byte-
+   identical by definition, so it would have to BYPASS dedup — and then any later Isolate stroke
+   whose result matches those bytes content-matches onto the user's "unique" copy, silently
+   re-linking the thing they spent a scarce slot to detach. Uniqueness of identical bytes is not
+   a stable property here; the gesture cannot deliver what its name promises.
+3. **It spends a scarce or nonexistent resource for zero visible change.** LZ is 454/454 — the
+   button could never work there. GHZ has 17 claimable slots after reservations. Meanwhile
+   63–65% of tiles are used once, so most edits never diverge, and Isolate handles the rest at
+   the moment it actually matters, with dedup working *for* the user.
+
+### Task 10, revised
+
+Copy, per spec §1 vocabulary (linked/unique, never shared/forked):
+
+- **TileTab:** `Linked — used in 14 blocks · 31 cells. Edits appear in all of them.` No button.
+  Once Task 11 lands, append the discovery breadcrumb: `To change one place only, paint it on
+  the Chunk tab (Isolate).`
+- **BlockTab:** `Linked — used in 12 chunks · 31 cells. Edits appear in all of them.` Keep
+  **Duplicate** — it is a copy, not a detach, and the label should keep saying so.
+- **ChunkTab:** `Linked — placed 40×. Edits appear in every placement.` Keep **Duplicate chunk**.
+
+Styling: drop the ⚠ glyph and amber hazard tint; neutral status strip. The spec's "same facts,
+stated as a tool" needs the visual reframe, not just new words. **The red locked-tile banner in
+TileTab is a genuine refusal and keeps its hazard styling.**
+
+No new commands, no `planSurfaceEdit` change, no undo implications. Keep the guard test (the
+banner renders the numbers it is given), planted first.
+
+### The follow-up this leaves open
+
+**Instance-anchored block detach**, if demand ever appears: right-click a cell in ChunkTab's
+assignment grid → "Make block unique in this cell". Clones the block (plentiful slots),
+repoints that one chunk cell, claims **zero tiles** — the clone shares tiles and later Isolate
+paint diverges them on demand, which the two-tier cascade already handles. Fits
+`SurfaceEditPlan` as `newBlocks` + `chunkCellEdits` with no `tileWrites`, commits through
+`classicPaintSurface` as one undo entry, lives on the instance, targets the measured dangerous
+tier. **Not now** — it duplicates what Isolate delivers implicitly. Build it only if Task 12 or
+real use shows people hunting for an explicit detach.
+
+### Correction from T5 — the SBZ3 door reservation is empty in practice
+
+**Measured 2026-08-15 against the real disassembly.** GHZ matched the design exactly: 158
+reserved tiles, run 0x3B..0xE4, and without reservations the 5th claim lands on 0x3B.
+
+**LZ act 1 and SBZ act 3 did not.** The design predicted both would cover {0x39F..0x3AD}. Both
+are the EMPTY SET. The door's range is indices 927–941 (`ArtTile_Level+$1F0` plus mapping tile
+`$1AF`/`$1B2`, verified against `_incObj/6B SBZ Stomper and Sliding Door.asm:67`), while the only
+tile file either zone's profile entry names — `artnem/8x8 - LZ.nem` — decodes to **454 tiles**.
+`buildReservedTileSet`'s `[0, poolTileCount)` clamp drops the whole run.
+
+This understates no current risk: `planSurfaceEdit` is bounded by the same `doc.tiles.length`,
+so index 927 is unreachable by any edit Aurora can make today, reserved or not. **What it
+actually reveals is that Aurora's model of LZ's tile pool is incomplete** — the extra art SBZ3
+DMAs over LZ's base at runtime is not in the profile's `tiles` list, nor among its PLC or
+`animatedArt` entries. If a future task widens that model, this reservation becomes load-bearing
+and must be re-verified against the larger pool.
+
+The test is pinned to the measured reality with a comment saying why, not to the prediction.
+Deliberately NOT "fixed" by widening `LZ_TILES` — that needs its own investigation into where
+the ROM actually loads that art from, and it is not this feature's job.
+
+---
+
+## Task 11, decided — paint is an explicit per-tier mode, not an armed tool
+
+**Settled 2026-08-15 before implementation, after reading `ClassicArtToolDock.tsx`.**
+
+Step H established, deliberately and in writing, that **only the Tile tier is a pixel surface**:
+Chunk and Block "paint with a block/tile brush chosen in their own inline controls and never read
+`artStore.tool` at all", and the tool rail is gated on the tier because "a pencil/fill/eyedropper
+column beside the chunk grid is exactly the dead chrome that rule exists to prevent".
+
+Paint-through reverses that premise. That is intended — but it is a reversal of a recorded
+decision, not an oversight to code around, and three things move together with it.
+
+### The decision
+
+**The assignment grid stays the default. Painting is an explicit per-tier toggle.**
+
+Rejected: deriving the mode from the armed `artStore.tool`. Chunk and Block have no "assign"
+member in that union, so it would need inventing, and `artStore.tool` is shared with the SPRITE
+editor — a level-art-only member would leak a concept into a surface that can never use it. The
+existing assignment behaviour is also the primary use of both tabs and must not become a mode
+someone has to escape from.
+
+So each of ChunkTab and BlockTab gains an **Assign | Paint** toggle in its own controls row,
+defaulting to Assign. In Paint the tab composes its surface and mounts `PixelViewport` +
+`PixelEditController`; in Assign it behaves exactly as today.
+
+### What moves with it
+
+1. **`isClassicPixelTier` (`level-presence.ts`) must take the mode into account**, not just the
+   tab. It gates BOTH the tool rail's contents and `LevelWorkspace`'s 44px rail CONTAINER —
+   returning null from the dock empties the column but does not remove it. One predicate, two
+   gates; keep it that way.
+2. **The rail appears only when Paint is on**, which keeps "a control that cannot act is not
+   drawn" true rather than abandoning it. Eight armed tools beside an assignment grid is the
+   dead chrome step H was avoiding, and that reasoning still holds in Assign mode.
+3. **`ClassicArtToolDock`'s comment block is now wrong** and must be rewritten, not left. It is a
+   careful explanation of why only one tier is a pixel surface, and someone will trust it. Say
+   instead: three tiers can be pixel surfaces, gated on the tier's MODE.
+4. `CLASSIC_TILE_TOOLS` is now the pixel-tool set for three tiers rather than one. Renaming is
+   optional; leaving the name while widening the meaning is not.
+
+### The rest of Task 11's contract
+
+- In Paint mode, compose via `buildChunkSurface` / `buildBlockSurface`, render through
+  `PixelViewport`, drive the existing `PixelEditController` exactly as `TileTab` does after H1.
+- On gesture end: `diffWrites` → `planSurfaceEdit` → `classicPaintSurface`. **Never call
+  `classicEditTiles` directly from the composed path** — that would bypass divergence entirely.
+- Thread the adapter's `reservedTiles` for the open act into `planSurfaceEdit`'s input (this is
+  T4). Capture it beside `editableTileRange`. **Without this, Isolate can overwrite object art**
+  — the whole point of task 5c.
+- Add the **Link | Isolate** control and a limits readout: `blocks 439/1024 · tiles 819/965`.
+  Say **limit**, never budget. On `{ ok: false }`, toast `reason` verbatim — those messages were
+  written to be actionable and name the Link-mode escape.
+- Add TileTab's deferred discovery breadcrumb to its linkage banner: `To change one place only,
+  paint it on the Chunk tab (Isolate).`
+- Guard test: the composed path reaches `planSurfaceEdit` before `classicPaintSurface`, and
+  never `classicEditTiles`. Plant the violation first.

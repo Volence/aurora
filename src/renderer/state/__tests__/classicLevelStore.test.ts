@@ -13,6 +13,7 @@ import {
   classicSetStart,
   classicAddChunk,
   classicAddBlock,
+  classicPaintSurface,
 } from '../classicLevelStore';
 import { useClassicProjectStore } from '../classicProjectStore';
 import { useEditorStore } from '../editorStore';
@@ -20,6 +21,7 @@ import { armedPlacementId } from '../classic-placement';
 import { documentHistoryHub } from '../history-hub';
 import { packChunkCell, unpackChunkCell, type BlockDef } from '../../../core/level-classic/model';
 import type { S1ObjectEntry } from '../../../core/formats/classic/s1-objpos';
+import type { SurfaceEditPlan } from '../../../core/art/classic-surface-plan';
 // Shared with history-routing.test.ts — one fixture, so both suites drive the
 // store through the same doc/handle shape.
 import { TILE_COUNT, REF, makeDoc, openReady, fakeHandle } from './helpers/classic-fixture';
@@ -379,6 +381,175 @@ describe('classic:set-objects', () => {
   });
 });
 
+describe('classic:paint-surface', () => {
+  // Fixture (makeDoc): 5 tiles (0,1,3 editable; 2 locked/anim, 4 gap/appended),
+  // 2 blocks (block 0 all tile 0, block 1 all tile 1), 2 chunks (all cells
+  // block 0). A plan touching all three tiers: a tile write, a new block
+  // (id 2 = doc.blocks.length), a block-cell repoint targeting that new block,
+  // and a chunk-cell repoint onto it.
+  const blankBlockCell = (tile: number) => ({ tile, xf: false, yf: false, pal: 0, pri: false });
+  const blankChunkCell = (block: number) => ({ block, xf: false, yf: false, solidity: 0 });
+
+  function fullPlan(): SurfaceEditPlan {
+    return {
+      tileWrites: [{ tileIndex: 1, data: new Uint8Array(32).fill(0x7) }],
+      newBlocks: [{ cells: Array.from({ length: 4 }, () => blankBlockCell(1)) }],
+      blockCellEdits: [{ blockId: 2, cellIndex: 0, cell: blankBlockCell(3) }],
+      chunkCellEdits: [{ chunkIndex: 0, cellIndex: 5, cell: blankChunkCell(2) }],
+      stats: { tilesClaimed: 0, blocksCloned: 1, placesAffected: 1 },
+    };
+  }
+
+  const emptyPlan = (): SurfaceEditPlan => ({
+    tileWrites: [], newBlocks: [], blockCellEdits: [], chunkCellEdits: [],
+    stats: { tilesClaimed: 0, blocksCloned: 0, placesAffected: 0 },
+  });
+
+  it('applies a plan touching all three tiers as ONE undo entry, not four', () => {
+    openReady();
+    expect(artStack().canUndo).toBe(false);
+    expect(classicPaintSurface(fullPlan())).toEqual({ ok: true });
+    expect(artStack().canUndo).toBe(true);
+    // One undo entry: a single undo() must exhaust the stack. If the commit had
+    // been split into multiple commitArt calls, 2nd/3rd/4th steps would remain.
+    artStack().undo();
+    expect(artStack().canUndo).toBe(false);
+  });
+
+  it('undo restores all three tiers together (tile bytes, block count, chunk cell)', () => {
+    openReady();
+    const beforeTileByte = st().doc!.tiles[1 * 32];
+    expect(classicPaintSurface(fullPlan())).toEqual({ ok: true });
+
+    // Applied: tile written, new block appended, block cell repointed, chunk
+    // cell repointed onto the new block.
+    expect(st().doc!.tiles[1 * 32]).toBe(0x7);
+    expect(st().doc!.blocks.length).toBe(3);
+    expect(st().doc!.blocks[2].cells[0].tile).toBe(3);
+    expect(st().doc!.chunks[0].cells[5]).toEqual(blankChunkCell(2));
+
+    artStack().undo();
+
+    // A composite that half-undoes is the specific failure this guards.
+    expect(st().doc!.tiles[1 * 32]).toBe(beforeTileByte);
+    expect(st().doc!.blocks.length).toBe(2);
+    expect(st().doc!.chunks[0].cells[5]).toEqual(blankChunkCell(0));
+  });
+
+  it('refuses a plan targeting a locked tile — nothing committed', () => {
+    openReady();
+    const doc = st().doc;
+    const plan: SurfaceEditPlan = {
+      ...emptyPlan(),
+      tileWrites: [{ tileIndex: 2, data: new Uint8Array(32) }], // tile 2: anim overlay, locked
+    };
+    const r = classicPaintSurface(plan);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toMatch(/animated-art|not editable/i);
+    expect(st().doc).toBe(doc); // untouched identity
+    expect(artStack().canUndo).toBe(false);
+  });
+
+  it('an empty plan is a no-op: ok:true, no history entry, no dirty flag', () => {
+    openReady();
+    const doc = st().doc;
+    expect(classicPaintSurface(emptyPlan())).toEqual({ ok: true });
+    expect(st().doc).toBe(doc);
+    expect(st().dirty).toEqual({});
+    expect(artStack().canUndo).toBe(false);
+  });
+
+  it('rejects an out-of-range block id — commits nothing', () => {
+    openReady();
+    const doc = st().doc;
+    const plan: SurfaceEditPlan = {
+      ...emptyPlan(),
+      blockCellEdits: [{ blockId: 99, cellIndex: 0, cell: blankBlockCell(0) }],
+    };
+    expect(classicPaintSurface(plan).ok).toBe(false);
+    expect(st().doc).toBe(doc);
+    expect(artStack().canUndo).toBe(false);
+  });
+
+  it('rejects an out-of-range block cell index (0..3) — commits nothing', () => {
+    openReady();
+    const doc = st().doc;
+    const plan: SurfaceEditPlan = {
+      ...emptyPlan(),
+      blockCellEdits: [{ blockId: 0, cellIndex: 4, cell: blankBlockCell(0) }],
+    };
+    expect(classicPaintSurface(plan).ok).toBe(false);
+    expect(st().doc).toBe(doc);
+    expect(artStack().canUndo).toBe(false);
+  });
+
+  it('rejects an out-of-range chunk index — commits nothing', () => {
+    openReady();
+    const doc = st().doc;
+    const plan: SurfaceEditPlan = {
+      ...emptyPlan(),
+      chunkCellEdits: [{ chunkIndex: 99, cellIndex: 0, cell: blankChunkCell(0) }],
+    };
+    expect(classicPaintSurface(plan).ok).toBe(false);
+    expect(st().doc).toBe(doc);
+    expect(artStack().canUndo).toBe(false);
+  });
+
+  it('rejects an out-of-range chunk cell index (0..255) — commits nothing', () => {
+    openReady();
+    const doc = st().doc;
+    const plan: SurfaceEditPlan = {
+      ...emptyPlan(),
+      chunkCellEdits: [{ chunkIndex: 0, cellIndex: 256, cell: blankChunkCell(0) }],
+    };
+    expect(classicPaintSurface(plan).ok).toBe(false);
+    expect(st().doc).toBe(doc);
+    expect(artStack().canUndo).toBe(false);
+  });
+
+  // Dirty domains drive save routing (s1-io.ts keeps a zero-edit save
+  // byte-identical), so a spuriously-marked tier isn't cosmetic — it would
+  // make a tile-only stroke rewrite an unchanged map16/map256 file. These pin
+  // that the patch names ONLY the tier(s) the plan actually touched.
+  it('a tile-only plan leaves blocks and chunks dirty unset', () => {
+    openReady();
+    const plan: SurfaceEditPlan = {
+      ...emptyPlan(),
+      tileWrites: [{ tileIndex: 1, data: new Uint8Array(32).fill(0x7) }],
+    };
+    expect(classicPaintSurface(plan)).toEqual({ ok: true });
+    expect(st().dirty.tiles).toBe(true);
+    expect(st().dirty.blocks).toBeUndefined();
+    expect(st().dirty.chunks).toBeUndefined();
+  });
+
+  it('a chunk-cell-only plan leaves tiles and blocks dirty unset', () => {
+    openReady();
+    const plan: SurfaceEditPlan = {
+      ...emptyPlan(),
+      // Repoints chunk 0 cell 5 at the existing block 1 — no tile or block edit.
+      chunkCellEdits: [{ chunkIndex: 0, cellIndex: 5, cell: blankChunkCell(1) }],
+    };
+    expect(classicPaintSurface(plan)).toEqual({ ok: true });
+    expect(st().dirty.chunks).toBe(true);
+    expect(st().dirty.tiles).toBeUndefined();
+    expect(st().dirty.blocks).toBeUndefined();
+  });
+
+  it('a block-only plan (new block + block-cell repoint, no tile writes) leaves tiles and chunks dirty unset', () => {
+    openReady();
+    const plan: SurfaceEditPlan = {
+      ...emptyPlan(),
+      newBlocks: [{ cells: Array.from({ length: 4 }, () => blankBlockCell(1)) }],
+      blockCellEdits: [{ blockId: 2, cellIndex: 0, cell: blankBlockCell(1) }],
+    };
+    expect(classicPaintSurface(plan)).toEqual({ ok: true });
+    expect(st().dirty.blocks).toBe(true);
+    expect(st().dirty.tiles).toBeUndefined();
+    expect(st().dirty.chunks).toBeUndefined();
+  });
+});
+
 // ---------------------------------------------------------------------------
 // Cross-cutting: no-level guard, triple consistency, shared timeline.
 // ---------------------------------------------------------------------------
@@ -458,6 +629,49 @@ describe('command guards + undo/redo triple consistency', () => {
     void useClassicLevelStore.getState().openAct(REF);
     expect(layoutStack().canUndo).toBe(false);
     expect(artStack().canUndo).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// T4: reservedTiles, captured at act read beside editableTileRange. Not a
+// command — a value `planSurfaceEdit`'s renderer call site (ChunkTab/BlockTab's
+// paint mode) reads to keep Isolate from claiming a tile a level-art-drawn
+// object sprite draws from (GHZ platforms, MZ bricks, …).
+// ---------------------------------------------------------------------------
+describe('reservedTiles (T4)', () => {
+  it("captures the adapter's reserved-tile set at act read", async () => {
+    const handle = fakeHandle();
+    useClassicProjectStore.setState({
+      status: 'open', dir: '/p',
+      handle: { ...handle, levels: { ...handle.levels, reservedTiles: () => new Set([2, 3]) } },
+    } as never);
+    await useClassicLevelStore.getState().openAct(REF);
+    expect(st().reservedTiles).toEqual(new Set([2, 3]));
+  });
+
+  it('is null when the adapter omits reservedTiles — permissive, matching editableTileRange', async () => {
+    useClassicProjectStore.setState({ status: 'open', dir: '/p', handle: fakeHandle() } as never);
+    await useClassicLevelStore.getState().openAct(REF);
+    expect(st().reservedTiles).toBeNull();
+  });
+
+  it('resets to null the instant a fresh act load starts, not left over from the previous act', async () => {
+    const reservedHandle = fakeHandle();
+    useClassicProjectStore.setState({
+      status: 'open', dir: '/p',
+      handle: { ...reservedHandle, levels: { ...reservedHandle.levels, reservedTiles: () => new Set([9]) } },
+    } as never);
+    await useClassicLevelStore.getState().openAct(REF);
+    expect(st().reservedTiles).toEqual(new Set([9]));
+
+    // Swap to a handle with no reservedTiles query at all, then start a fresh
+    // load. `fresh` resets the field SYNCHRONOUSLY, before the read below lands
+    // — so it must already read null right after the call, not after an await.
+    useClassicProjectStore.setState({ status: 'open', dir: '/p', handle: fakeHandle() } as never);
+    const pending = useClassicLevelStore.getState().openAct(REF);
+    expect(st().reservedTiles).toBeNull();
+    await pending;
+    expect(st().reservedTiles).toBeNull();
   });
 });
 
