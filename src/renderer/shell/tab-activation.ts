@@ -412,6 +412,40 @@ export async function activateCanvasDocTarget(
 }
 
 /**
+ * The SESSION-RESTORE entry point (R17(1)), and the only caller that asks for a
+ * load failure to be silent.
+ *
+ * Restoring canvas tabs is the decision Task 13 owns, and this function is the
+ * half of it that keeps the decision affordable. A canvas tab id names a file,
+ * so a canvas whose PNG was deleted or renamed between sessions produces a
+ * failed load at EVERY boot, forever. Reported the ordinary way that is a
+ * 10-second error toast on every single launch, about a file the user may have
+ * deleted deliberately — the definition of an alarm nobody can turn off, and the
+ * exact cost R17(1) flagged as the reason not to restore at all.
+ *
+ * So the restore is silent about the failure and the PANE carries the report
+ * instead: `canvasPaneState` renders `CanvasDocUnloaded`, which names the file,
+ * explains what happened, and offers Retry. That is strictly better than a
+ * toast for this case — it is scoped to the tab it is about, it is there when
+ * the user looks at that tab rather than 10 seconds after boot, and it does not
+ * follow them into a level they opened instead. It is also what Task 12's
+ * R17(2) decision built and, until now, nothing reached.
+ *
+ * A restore-time load that SUCCEEDS still reports its warnings normally: those
+ * are facts about a file that opened fine, and the reader is about to draw on
+ * it.
+ */
+export async function activateRestoredCanvasDocTarget(
+  tabId: string,
+  /** The same test seam `activateCanvasDocTarget` offers, for the same reason:
+   *  "does this path stay silent?" is only answerable if the failure can be
+   *  provoked without a filesystem. */
+  loader: CanvasLoader = defaultCanvasLoader,
+): Promise<void> {
+  await runCanvasActivation(tabId, loader, { reportLoadFailure: false });
+}
+
+/**
  * WHY THE INTERNAL FORM DISTINGUISHES TWO FAILURES (Task 12's R17(2) decision).
  *
  * The boolean above conflates them, and its one consumer needs them apart:
@@ -429,6 +463,11 @@ type CanvasActivation = 'focused' | 'failed' | 'superseded';
 async function runCanvasActivation(
   tabId: string,
   loader: CanvasLoader,
+  /** `reportLoadFailure: false` is session restore's — see
+   *  activateRestoredCanvasDocTarget. Everything else must leave it on: a
+   *  failure the user's own click provoked, unreported, is a click that does
+   *  nothing. */
+  opts: { reportLoadFailure?: boolean } = {},
 ): Promise<CanvasActivation> {
   // Bumped BEFORE the plan, so even the synchronous 'activate' branch supersedes
   // whatever was in flight — including an open classic dirty-switch confirm,
@@ -453,9 +492,11 @@ async function runCanvasActivation(
   } catch (e) {
     // The store was never touched, so there is nothing to roll back — the whole
     // point of loading before installing. Only the report is left to do.
-    useToastStore.getState().addToast(
-      `Could not open the canvas "${plan.name}": ${e instanceof Error ? e.message : String(e)}`,
-      'error');
+    if (opts.reportLoadFailure !== false) {
+      useToastStore.getState().addToast(
+        `Could not open the canvas "${plan.name}": ${e instanceof Error ? e.message : String(e)}`,
+        'error');
+    }
     return 'failed';
   }
 
@@ -711,10 +752,14 @@ export async function activateLevelTarget(
  *     aeon-open move the user. An agent-driven act switch therefore focuses a
  *     level tab WITHOUT clearing the canvas focus.
  *   • The restore effect calls replace(next) and hand-dispatches activation for
- *     sprite and level ids only.
+ *     the ACTIVE tab only — a level, sprite or canvas id (session-lifecycle.ts).
+ *     A restored canvas tab therefore reaches activateRestoredCanvasDocTarget
+ *     rather than this function, which is why the silent-failure option lives
+ *     there and not here.
  *
- * Both are bounded today (nothing renders a canvas pane yet), but Task 12 must
- * not read this function as a funnel it can rely on.
+ * Neither is a hole today — the agent path only ever focuses level tabs, and the
+ * restore path clears nothing because nothing is open yet — but this function is
+ * not a funnel anything may rely on.
  */
 export async function requestOpenTab(tab: TabDescriptor): Promise<void> {
   if (tab.kind === 'level' && !(await activateLevelTarget(tab.id))) return;

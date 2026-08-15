@@ -85,11 +85,19 @@ export function normalizeCanvasPixels(buf: PixelBuffer): PixelBuffer {
   return { width: buf.width, height: buf.height, data };
 }
 
-/** 64 CRAM words, all black — the sprite editor's blankStandalonePalette (which
- *  returns Color[] with alpha, not CRAM words — same idea, different
- *  representation) at canvas scale. A canvas created inside an open zone is
- *  seeded from that zone's palette instead (the New Canvas flow passes it to
- *  canvasStore.openCanvasDoc); this is the fallback. */
+/**
+ * 64 CRAM words, all black — the sprite editor's blankStandalonePalette (which
+ * returns Color[] with alpha, not CRAM words — same idea, different
+ * representation) at canvas scale.
+ *
+ * NOT what a NEW canvas gets (R18). Its two real jobs are padding a short PLTE
+ * on load, where "surplus entries are black" is Task 5's deliberate decision,
+ * and standing in for a document that is not open (canvasStore's
+ * EMPTY_SNAPSHOT). Creating a canvas seeds from the open zone, or from
+ * `defaultCanvasPalette()` in canvas-default-palette.ts when there is none —
+ * because 64 black words plus a paint index of `canvasIndex(0, 1)` is an
+ * invisible brush on an invisible surface.
+ */
 export function blankCanvasPalette(): number[] {
   return new Array(CANVAS_COLORS).fill(0);
 }
@@ -119,20 +127,26 @@ export interface CanvasDoc {
   gridOrigin: CanvasGridOrigin;
 }
 
-const MIN_SIDE = 8;
+// EXPORTED because `blankCanvasDoc` clamps SILENTLY: a create dialog that asked
+// for 4x4 would get an 8x8 document with no complaint, which is a size the user
+// did not choose appearing under a name they did. The New Canvas flow validates
+// against these and refuses with the numbers instead (shell/new-canvas.ts), and
+// it must read the same two constants the clamp uses — a restated `1024` in the
+// dialog is a limit that drifts the day this one moves.
+export const CANVAS_MIN_SIDE = 8;
 // Snapshot cost, not anything about the art, sets this ceiling: the canvas's
 // undo history (CanvasDocHistory, a later task — not built yet) keeps 40
 // whole-buffer snapshots. 1024x1024 is ~1 MB per snapshot and ~40 MB of
 // history — already a lot to hold across 40 undo steps; there is no reason for
 // a single free-size canvas to need to go further than that.
-const MAX_SIDE = 1024;
+export const CANVAS_MAX_SIDE = 1024;
 
 export function blankCanvasDoc(input: {
   name: string; width: number; height: number;
   profileId: ConstraintProfileId; palette?: number[];
 }): CanvasDoc {
-  const width = Math.min(MAX_SIDE, Math.max(MIN_SIDE, input.width | 0));
-  const height = Math.min(MAX_SIDE, Math.max(MIN_SIDE, input.height | 0));
+  const width = Math.min(CANVAS_MAX_SIDE, Math.max(CANVAS_MIN_SIDE, input.width | 0));
+  const height = Math.min(CANVAS_MAX_SIDE, Math.max(CANVAS_MIN_SIDE, input.height | 0));
   const palette = input.palette && input.palette.length === CANVAS_COLORS
     ? input.palette.slice()
     : blankCanvasPalette();

@@ -34,8 +34,8 @@ import { useProjectStore } from '../state/projectStore';
 import { useWorkspaceStore } from '../workspace/workspaceStore';
 import { resetProjectRuntime } from '../state/project-runtime';
 import { loadStoredSession, saveStoredSession, loadStoredWorkspace, defaultProjectSession } from './session-storage';
-import { classicLevelTab, aeonLevelTab, parseSpriteDocTabId, PROJECT_SETUP_TAB } from './tabs';
-import { activateLevelTarget, activateSpriteDocTarget } from './tab-activation';
+import { classicLevelTab, aeonLevelTab, parseSpriteDocTabId, isCanvasDocTabId, PROJECT_SETUP_TAB } from './tabs';
+import { activateLevelTarget, activateSpriteDocTarget, activateRestoredCanvasDocTarget } from './tab-activation';
 import type { TabDescriptor } from '../../core/shell/session';
 
 function projectLevelTabs(): TabDescriptor[] {
@@ -55,6 +55,40 @@ function firstOpenableLevelTab(): TabDescriptor | null {
     return ref ? classicLevelTab(ref) : null;
   }
   return projectLevelTabs()[0] ?? null;
+}
+
+/**
+ * Which restored tabs survive `pruneSession` — EXPORTED so the rule can be
+ * tested, because the effect it lives in cannot be (the node suite renders no
+ * React), and because deleting any one of its branches leaves a suite that only
+ * notices the next time someone restarts the app with that kind of tab open.
+ *
+ * `enumerated` is the set of ids the open project can list outright (the
+ * project-setup tab and every level tab). The two doc kinds are predicates
+ * instead because neither is enumerable from the project model: an aeon sprite
+ * is a named library entry, an s1 sprite is a per-object checkout, and a canvas
+ * is a file the user may have created seconds ago.
+ */
+export function restoredTabIsValid(
+  id: string,
+  ctx: { enumerated: ReadonlySet<string>; classicOpen: boolean; aeonOpen: boolean },
+): boolean {
+  if (ctx.enumerated.has(id)) return true;
+  // CANVAS TABS SURVIVE A RESTART (R17(1), decided in Task 13). Gated on ANY
+  // project being open, because unlike a sprite a canvas has no engine: the same
+  // canvas is equally valid in a classic or an aeon project, and all it needs is
+  // a project root to resolve `.aurora/canvas/<name>.png` against.
+  //
+  // WHY RESTORE THEM AT ALL, given that a deleted PNG then fails to load at
+  // every boot: the failure REPORT was the problem, not the restore. A canvas is
+  // a document the artist was working in, and dropping its tab on every restart
+  // is an editor forgetting your open files — worse here than for a level tab,
+  // since a level is two clicks away in the Explorer. The deleted-file case is
+  // handled by reporting in the PANE rather than in a boot toast (see
+  // activateRestoredCanvasDocTarget).
+  if (isCanvasDocTabId(id)) return ctx.classicOpen || ctx.aeonOpen;
+  const sd = parseSpriteDocTabId(id);
+  return sd !== null && ((sd.engine === 'aeon' && ctx.aeonOpen) || (sd.engine === 's1' && ctx.classicOpen));
 }
 
 export function useSessionLifecycle(): void {
@@ -102,17 +136,12 @@ export function useSessionLifecycle(): void {
       PROJECT_SETUP_TAB.id,
       ...projectLevelTabs().map((t) => t.id),
     ]);
-    // Sprite-doc tabs aren't enumerable (aeon sprites are named library entries;
-    // s1 checkouts are per-object), so accept them by predicate: a sprite-doc id
-    // survives the prune when its engine matches the open project kind. Content
-    // is NOT loaded here — activation runs only when the tab is focused (below).
-    const classicOpen = classicDir !== null;
-    const aeonOpen = aeonBase !== null;
-    const isValid = (t: TabDescriptor): boolean => {
-      if (validIds.has(t.id)) return true;
-      const sd = parseSpriteDocTabId(t.id);
-      return sd !== null && ((sd.engine === 'aeon' && aeonOpen) || (sd.engine === 's1' && classicOpen));
-    };
+    // Sprite-doc and canvas-doc tabs aren't enumerable, so they are accepted by
+    // predicate — the rule, and its reasoning, live in `restoredTabIsValid`
+    // above. Content is NOT loaded here: activation runs only for the tab that
+    // ends up focused (below).
+    const ctx = { enumerated: validIds, classicOpen: classicDir !== null, aeonOpen: aeonBase !== null };
+    const isValid = (t: TabDescriptor): boolean => restoredTabIsValid(t.id, ctx);
     // Read BOTH stored payloads BEFORE mutating any store below. replace() and
     // seed() fire the persist subscriptions SYNCHRONOUSLY (zustand), and persist
     // serializes whatever the stores CURRENTLY hold — a not-yet-seeded (empty)
@@ -132,6 +161,11 @@ export function useSessionLifecycle(): void {
     // viewport, so the seed must land first or the restore sees an empty record.
     useWorkspaceStore.getState().seed(storedWorkspace);
     if (parseSpriteDocTabId(next.activeId)) void activateSpriteDocTarget(next.activeId);
+    // Only the ACTIVE tab's canvas is read, exactly as the sprite and level
+    // branches do: the others load on their first focus. That also keeps
+    // reportCanvasWarnings' stated ceiling of "3 toasts per load" true — N
+    // canvases loaded at once would have made it 3N.
+    else if (isCanvasDocTabId(next.activeId)) void activateRestoredCanvasDocTarget(next.activeId);
     // skipViewSnapshot: this is a restore, not a user switch — the "outgoing" act
     // is the loader default with viewStore at its fresh default, so snapshotting
     // would clobber that act's just-seeded viewport. The restore branch still

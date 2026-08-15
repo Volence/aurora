@@ -5,7 +5,8 @@ import { buildCommands, type CommandSnapshot, type CommandActions } from '../com
 function actions(): CommandActions {
   return {
     openProjectDialog: vi.fn(), save: vi.fn(), saveAll: vi.fn(), toggleExplorer: vi.fn(),
-    openTab: vi.fn(), editObjectArt: vi.fn(), newSprite: vi.fn(), openRecent: vi.fn(),
+    openTab: vi.fn(), editObjectArt: vi.fn(), newSprite: vi.fn(), newCanvas: vi.fn(),
+    openRecent: vi.fn(),
   };
 }
 
@@ -127,6 +128,26 @@ describe('buildCommands', () => {
       .some((c) => c.id === 'new-sprite')).toBe(false);
     expect(buildCommands(emptySnapshot, actions())
       .some((c) => c.id === 'new-sprite')).toBe(false);
+  });
+
+  it('offers "New Canvas…" in EITHER engine — a canvas has no engine', () => {
+    // The difference from New Sprite above, and the one thing about this command
+    // that is easy to get wrong by copying it: an origination canvas is a
+    // free-size indexed image, not an object's art. Gating it on aeon would hide
+    // it from the classic projects it was designed for.
+    for (const engine of ['s1', 'aeon'] as const) {
+      const a = actions();
+      const c = buildCommands({ ...emptySnapshot, engine }, a).find((x) => x.id === 'new-canvas')!;
+      expect(c.label).toBe('New Canvas…');
+      c.run();
+      expect(a.newCanvas).toHaveBeenCalled();
+    }
+  });
+
+  it('does NOT offer "New Canvas…" with no project open', () => {
+    // Its files land under `<project>/.aurora/canvas/`; with no project there is
+    // no directory to write them to, so the dialog could only fail.
+    expect(buildCommands(emptySnapshot, actions()).some((c) => c.id === 'new-canvas')).toBe(false);
   });
 
   it('offers recents only when no project is open', () => {

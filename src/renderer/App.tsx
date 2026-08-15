@@ -10,6 +10,7 @@ import SpriteDocUnloaded from './components/sprite/SpriteDocUnloaded';
 import SpriteDocHeader from './shell/SpriteDocHeader';
 import CanvasMode from './components/canvas/CanvasMode';
 import CanvasDocUnloaded from './components/canvas/CanvasDocUnloaded';
+import NewCanvasDialog from './components/canvas/NewCanvasDialog';
 import { canvasPaneState } from './components/canvas/canvas-pane-model';
 import HomeTab from './components/home/HomeTab';
 import ProjectSetupTab from './components/setup/ProjectSetupTab';
@@ -69,6 +70,11 @@ export default function App() {
 
   const activeTab = tabs.find((t) => t.id === activeId);
   const canvasPane = canvasPaneState(activeTab, canvasDocId);
+  // The New Canvas dialog has ONE mount (below), like ConfirmDialog: both ⌘K and
+  // the Explorer's row raise it, and two live copies would be two forms racing
+  // to create the same file. Plain state rather than another store — App already
+  // hands Explorer its other entry points as props.
+  const [newCanvasOpen, setNewCanvasOpen] = useState(false);
 
   // -- runtime wiring ------------------------------------------------------
   useEffect(() => {
@@ -153,6 +159,7 @@ export default function App() {
         openTab: (tab) => void requestOpenTab(tab),
         editObjectArt: (id) => { void editObjectArt(id); },
         newSprite: () => void requestOpenTab(untitledSpriteTab()),
+        newCanvas: () => setNewCanvasOpen(true),
         openRecent: (path) => void openProjectByPath(path),
       },
     );
@@ -177,7 +184,11 @@ export default function App() {
       )}
 
       <div style={styles.body}>
-        <Explorer onOpenProject={openProject} onOpenRecent={openProjectByPath} />
+        <Explorer
+          onOpenProject={openProject}
+          onOpenRecent={openProjectByPath}
+          onNewCanvas={() => setNewCanvasOpen(true)}
+        />
         <div style={styles.main}>
           <TabStrip />
           <div style={styles.content}>
@@ -276,6 +287,7 @@ export default function App() {
       <ToastContainer />
       <CommandPalette commands={commands} />
       <ConfirmDialog />
+      <NewCanvasDialog open={newCanvasOpen} onClose={() => setNewCanvasOpen(false)} />
     </div>
   );
 }

@@ -35,6 +35,8 @@ export interface CommandActions {
   editObjectArt: (id: number) => void;
   /** Open an empty, untitled sprite document (aeon). */
   newSprite: () => void;
+  /** Open the New Canvas dialog (any engine — see the command below). */
+  newCanvas: () => void;
   openRecent: (path: string) => void;
 }
 
@@ -56,6 +58,17 @@ export function buildCommands(s: CommandSnapshot, a: CommandActions): Command[] 
   // (Classic has its own entry — "Edit art" per object — and no library sprites.)
   if (s.engine === 'aeon') {
     cmds.push({ id: 'new-sprite', label: 'New Sprite…', hint: 'sprite', run: a.newSprite });
+  }
+
+  // ANY engine, unlike New Sprite above: an origination canvas has no engine at
+  // all — it is a free-size indexed image, not an object's art — so gating it on
+  // aeon would hide it from the classic projects it was designed for (drawing
+  // new level art for a zone you have open is the motivating case). What it DOES
+  // need is a project: its file pair lands under that project's `.aurora/canvas`,
+  // and with none open there is no directory to write to. `engine !== null` is
+  // this app's one definition of "a project is open" (state/open-project.ts).
+  if (s.engine !== null) {
+    cmds.push({ id: 'new-canvas', label: 'New Canvas…', hint: 'canvas', run: a.newCanvas });
   }
 
   for (const tab of s.tabs) {

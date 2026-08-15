@@ -400,13 +400,13 @@ export function loadCanvasDoc(docId: string, doc: CanvasDoc, source: CanvasSourc
  * "focus an id no document has". Every level- and sprite-tab focus takes that
  * path.
  *
- * An earlier draft of this comment justified totality with session restore
- * instead — a restored canvas tab existing before its file has been read. That
- * is the right SHAPE but is not reachable yet: session-lifecycle's `isValid`
- * prunes canvas tabs on restore (it accepts project-setup, enumerated level tabs
- * and sprite-doc ids only), so no canvas tab survives a restart to reach here.
- * Whether they should is a Task 13 decision — a canvas whose PNG was deleted
- * between sessions would otherwise error-toast at every boot.
+ * SESSION RESTORE reaches this too, as of Task 13: `isValid` now keeps
+ * `doc:canvas:` tabs and the restore effect activates the active one, so a tab
+ * genuinely exists here before its file has been read. (That was written as the
+ * justification for totality long before it was true — the clear-the-focus case
+ * above is what has always made it load-bearing.) A restored canvas whose file
+ * cannot be read lands on the `false` branch and focuses nothing, which is what
+ * the pane renders as "could not be loaded".
  */
 export function activateCanvasDoc(docId: string): void {
   const open = useCanvasStore.getState().docs.has(docId);
