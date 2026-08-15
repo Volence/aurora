@@ -17,6 +17,7 @@ import {
   readArtSnapshot, readLayoutSnapshot, writeArtSnapshot, writeLayoutSnapshot,
 } from './classicLevelStore';
 import { readSpriteSnapshot, writeSpriteSnapshot } from './spriteStore';
+import { makeCanvasHistory } from './canvasStore';
 import { useProjectStore, getActiveLevel } from './projectStore';
 import { notifyCommandApplied } from './editorStore';
 
@@ -72,4 +73,9 @@ export function registerHistoryFactories(): void {
       () => readSpriteSnapshot(docId),
       (snapshot) => writeSpriteSnapshot(docId, snapshot),
     ));
+
+  // One stack per canvas document. Like the sprite factory this needs no engine
+  // dispatch — a canvas is engine-agnostic by construction (it is not yet
+  // committed into anyone's pool).
+  documentHistoryHub.registerFactory('doc:canvas:', (docId) => makeCanvasHistory(docId));
 }

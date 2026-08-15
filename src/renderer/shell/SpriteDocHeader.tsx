@@ -22,7 +22,19 @@ import { tabHasDirtyDot } from './dirty-tabs';
 import { canSaveActive } from '../state/project-runtime';
 import { Chip } from '../components/ui';
 
-export default function SpriteDocHeader({ onSave }: { onSave: () => Promise<void> | void }) {
+export default function SpriteDocHeader({ onSave, noDestinationHint }: {
+  onSave: () => Promise<void> | void;
+  /**
+   * The Save tooltip for a dirty document with nowhere to write. Defaults to the
+   * sprite answer (Export) because this header was built for the sprite pane;
+   * the canvas pane mounts the same header — everything on it is derived from
+   * the ACTIVE TAB (focusedHistory, canSaveActive), not from spriteStore, so it
+   * is already document-kind agnostic — and its escape hatch is a different one.
+   * Passing the wrong recovery instruction is worse than passing none: it is the
+   * only explanation the user gets for a disabled button.
+   */
+  noDestinationHint?: string;
+}) {
   // ONE undo/redo pair, for whichever document has focus — which under this
   // header is the sprite doc, but the derivation is focusedHistory()'s and not
   // this component's, exactly as on the level header. The hub clock
@@ -62,7 +74,7 @@ export default function SpriteDocHeader({ onSave }: { onSave: () => Promise<void
         disabled={!canSave && !saveFlash}
         title={
           canSave ? 'Save this document (Ctrl+S) — Save All is Ctrl+Shift+S'
-            : activeDirty ? 'This document has no save-back file — export it from the sprite editor'
+            : activeDirty ? (noDestinationHint ?? 'This document has no save-back file — export it from the sprite editor')
               : 'Nothing to save in this document'
         }
         onClick={async () => {

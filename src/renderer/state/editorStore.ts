@@ -11,7 +11,7 @@ import { documentHistoryHub } from './history-hub';
 import { useProjectStore } from './projectStore';
 import { useSessionStore } from './sessionStore';
 import { useWorkspaceStore } from '../workspace/workspaceStore';
-import { levelDocId, parseLevelTabId, isSpriteDocTabId, zoneArtDocId } from '../shell/tabs';
+import { levelDocId, parseLevelTabId, isSpriteDocTabId, isCanvasDocTabId, zoneArtDocId } from '../shell/tabs';
 
 /**
  * The editing tool, for BOTH engines (spec §3.6 — one tool vocabulary). Classic
@@ -211,6 +211,10 @@ export function focusedDocId(): string | null {
   // toolbar's undo would read as "nothing undoable" while SpriteMode's own
   // Ctrl+Z happily undid on that document's stack.
   if (isSpriteDocTabId(activeId)) return activeId;
+
+  // A canvas-doc tab IS its document, exactly like a sprite-doc tab — no facet
+  // refinement applies.
+  if (isCanvasDocTabId(activeId)) return activeId;
 
   const level = parseLevelTabId(activeId);
   if (!level) return null;

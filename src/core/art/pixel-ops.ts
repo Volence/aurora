@@ -1,22 +1,33 @@
-// Pure pixel-buffer operations for the art composer. Buffers hold 4bpp
-// palette indices (0-15); all ops return new buffers, never mutate input.
+// Pure pixel-buffer operations for the art composer. A PixelBuffer's value
+// range is set by its OWNER, not by this module: 4bpp classic art (tiles,
+// blocks, sprites) uses 0..15, while the origination canvas (canvas-doc.ts)
+// packs the whole 4-line palette space into 0..63. These are geometry/gesture
+// ops, not an encoding, so nothing here masks or validates a value — a future
+// "tighten this to 4bpp" change must not add an `& 15` in here, or it will
+// silently flatten every origination-canvas pixel to palette line 0. All ops
+// return new buffers, never mutate input.
 
 export interface PixelBuffer {
   width: number;
   height: number;
-  data: Uint8Array; // row-major, values 0-15
+  data: Uint8Array; // row-major; value range is the owner's — 0..15 for classic art, 0..63 for the canvas
 }
 
 export function createBuffer(width: number, height: number): PixelBuffer {
   return { width, height, data: new Uint8Array(width * height) };
 }
 
-function clone(buf: PixelBuffer): PixelBuffer {
+/** Deep copy of a buffer — the one spelling of `{ width, height, data: new
+ *  Uint8Array(data) }` shared by every caller that needs a buffer clone
+ *  (canvas-doc.ts's document clone, canvas-history.ts's undo snapshot, and the
+ *  ops below). sprite-history.ts predates this helper and keeps its own
+ *  inline copy — unrelated code, left alone here. */
+export function clonePixelBuffer(buf: PixelBuffer): PixelBuffer {
   return { width: buf.width, height: buf.height, data: new Uint8Array(buf.data) };
 }
 
 export function floodFill(buf: PixelBuffer, x: number, y: number, value: number): PixelBuffer {
-  const out = clone(buf);
+  const out = clonePixelBuffer(buf);
   // Bounds guard: a seed at x === width would otherwise wrap (row-major
   // indexing) into the first pixel of the next row and fill from there.
   if (x < 0 || x >= buf.width || y < 0 || y >= buf.height) return out;
@@ -40,7 +51,7 @@ export function floodFill(buf: PixelBuffer, x: number, y: number, value: number)
 export function drawLine(
   buf: PixelBuffer, x0: number, y0: number, x1: number, y1: number, value: number,
 ): PixelBuffer {
-  const out = clone(buf);
+  const out = clonePixelBuffer(buf);
   let dx = Math.abs(x1 - x0), dy = -Math.abs(y1 - y0);
   const sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1;
   let err = dx + dy, cx = x0, cy = y0;
@@ -60,7 +71,7 @@ export function drawRect(
   buf: PixelBuffer, x: number, y: number, w: number, h: number,
   value: number, filled: boolean,
 ): PixelBuffer {
-  const out = clone(buf);
+  const out = clonePixelBuffer(buf);
   for (let ry = y; ry < y + h; ry++) {
     for (let rx = x; rx < x + w; rx++) {
       if (rx < 0 || rx >= out.width || ry < 0 || ry >= out.height) continue;

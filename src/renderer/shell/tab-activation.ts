@@ -1,5 +1,5 @@
-// EVERY tab open/focus flows through requestOpenTab/requestFocusTabId, so TWO
-// dirty-switch guard systems live here and cannot be bypassed:
+// EVERY tab open/focus flows through requestOpenTab/requestFocusTabId, so the
+// three activation systems below live here and cannot be bypassed:
 //
 //   1. Classic LEVEL activation (planLevelActivation + activateLevelTarget):
 //      classicLevelStore.openAct resets doc + dirty + undo history, so switching
@@ -14,6 +14,14 @@
 //      where the confirm now lives (confirmCloseSpriteDoc — Save / Discard /
 //      Cancel).
 //
+//   3. CANVAS-DOC activation (planCanvasDocActivation + activateCanvasDocTarget):
+//      same multi-document shape as (2), with the difference that a canvas tab
+//      id is STABLE ACROSS SESSIONS — it names a file — so the first focus is
+//      usually a disk read. Closing confirms through confirmCloseCanvasDoc,
+//      which is what puts something behind the unsaved dot on a canvas tab.
+//      A read that FAILS blocks the tab from being created, but never blocks an
+//      existing tab from being focused — see requestOpenTab (R17(2)).
+//
 // Each planner is the pure, tested decision; the exported request*/activate*
 // functions are the glue.
 //
@@ -25,7 +33,7 @@ import { useSessionStore } from '../state/sessionStore';
 import { useClassicProjectStore } from '../state/classicProjectStore';
 import { useClassicLevelStore } from '../state/classicLevelStore';
 import { useProjectStore } from '../state/projectStore';
-import { openEngine } from '../state/open-project';
+import { openEngine, openProjectDir } from '../state/open-project';
 import { useViewStore } from '../state/viewStore';
 import { useWorkspaceStore } from '../workspace/workspaceStore';
 import { useConfirmStore } from '../state/confirmStore';
@@ -35,9 +43,15 @@ import {
   useSpriteStore, openSpriteDoc, activateSpriteDoc, closeSpriteDoc,
   dirtySpriteDocIds, spriteDocState, DEFAULT_FRAME_SIZE,
 } from '../state/spriteStore';
+import {
+  useCanvasStore, loadCanvasDoc, activateCanvasDoc, clearCanvasFocus, closeCanvasDoc,
+} from '../state/canvasStore';
+import { loadCanvasFile, type LoadedCanvas } from '../state/canvas-file';
+import { saveCanvasDocument } from '../state/canvas-save';
 import { documentHistoryHub } from '../state/history-hub';
 import {
   parseLevelTabId, parseSpriteDocTabId, isSpriteDocTabId, zoneArtDocId, levelDocId,
+  parseCanvasDocTabId, isCanvasDocTabId,
   UNTITLED_SPRITE_TAB_ID,
 } from './tabs';
 import { HOME_TAB, type TabDescriptor } from '../../core/shell/session';
@@ -285,6 +299,306 @@ async function runSpriteActivation(tabId: string): Promise<boolean> {
   return myGen === activationGen;
 }
 
+// --- Canvas-doc activation -------------------------------------------------
+//
+// A canvas-doc tab owns a document in canvasStore plus an undo stack on the hub,
+// both keyed by the tab id — the same multi-document shape sprite docs have. Two
+// things differ, and both come from the tab id naming a FILE:
+//
+//   • The first focus is a DISK READ, not a checkout of something already in
+//     memory. So the order is LOAD THEN ACTIVATE, never the reverse: nothing is
+//     written into the store until the bytes are in hand (R14). Opening an empty
+//     document first and filling it in afterwards — the shape the sprite path
+//     uses, because its loaders write into whatever is checked out — would leave
+//     a failed load holding a blank document under the missing file's name,
+//     which is indistinguishable from data loss.
+//
+//   • A canvas tab id SURVIVES A RESTART, so session restore reaches a tab whose
+//     document has not been read yet. That is why activateCanvasDoc is total
+//     (canvasStore) and why activation must fire on EVERY focus change, clearing
+//     the canvas focus when the incoming tab is not a canvas — otherwise the
+//     pane keeps rendering the last canvas under someone else's tab.
+//
+// The pane (Task 12) derives its document from the ACTIVE TAB ID and treats
+// `activeDocId` as a mirror to validate against; nothing here asks it to trust
+// `activeDocId` alone.
+
+export type CanvasDocPlan =
+  | { kind: 'none' }
+  | { kind: 'activate' }
+  | { kind: 'load'; name: string };
+
+/**
+ * What focusing a canvas tab has to do. Pure — no store reads, so the decision
+ * is testable without a loaded document (its two inputs are the tab id and the
+ * one fact only the store knows).
+ *
+ * No confirm among the cases, for the sprite reason: focusing parks nothing and
+ * discards nothing. An already-open document is FOCUSED rather than re-read —
+ * re-reading would throw away exactly the unsaved edits multi-document exists to
+ * keep, and `loadCanvasDoc` refuses it outright.
+ */
+export function planCanvasDocActivation(input: { tabId: string; isOpen: boolean }): CanvasDocPlan {
+  const ref = parseCanvasDocTabId(input.tabId);
+  if (!ref) return { kind: 'none' };
+  if (input.isOpen) return { kind: 'activate' };
+  return { kind: 'load', name: ref.name };
+}
+
+/** Reads one canvas's file pair by NAME. Injectable so the activation flow is
+ *  testable without window.api — the seam is a parameter rather than a module
+ *  global because there is exactly one call site. */
+export type CanvasLoader = (name: string) => Promise<LoadedCanvas>;
+
+function defaultCanvasLoader(name: string): Promise<LoadedCanvas> {
+  const dir = openProjectDir();
+  // A canvas lives under the project root; with no project open there is no
+  // root to resolve `.aurora/canvas/<name>.png` against. Rejecting (rather than
+  // reading from some default) routes it through the same "leave nothing
+  // behind" path as any other failed load.
+  if (dir === null) return Promise.reject(new Error('no project is open'));
+  return loadCanvasFile(dir, name);
+}
+
+/**
+ * R16: the load-time warnings, on screen.
+ *
+ * `decodeCanvasFiles` diagnoses a sidecar it could not parse, a PNG another tool
+ * recoloured behind Aurora's back, a short PLTE, a tRNS index a canvas cannot
+ * honour — and every one of those is a fact about the artist's file that only
+ * this moment can report. Dropped here, their first notice would be a save-time
+ * toast much later, after they have drawn on top of it.
+ *
+ * ONE TOAST PER WARNING, not one joined paragraph: they are independent
+ * diagnoses with independent fixes, and a reader who acts on the first sentence
+ * of a wall of text never sees the second. Each is prefixed with the canvas name
+ * because a load can be triggered by something other than a click, when the user
+ * is not looking at the tab that produced it.
+ *
+ * THE CEILING IS 3 AT ONCE, and it holds only while loads are one-at-a-time.
+ * Four sites push warnings (three in canvas-file-format, one in canvas-file) but
+ * two pairs are mutually exclusive — a stale-palette disagreement requires a
+ * sidecar that PARSED, and canvas-file's read failure excludes format's parse
+ * failure — so one load can produce at most three. If Task 13 (or a restore that
+ * stops pruning canvas tabs) ever loads N canvases at once, that becomes 3N on
+ * screen together and this should batch per load instead.
+ *
+ * TYPE 'error' although none of these is fatal — the type picks the DWELL, and
+ * only the error dwell (10s, vs 2.2s) is long enough to read a multi-sentence
+ * message that ends in an instruction. canvas-save.ts makes the same call for
+ * the same reason on its `ok: true, sidecarWritten: false` toast.
+ */
+function reportCanvasWarnings(name: string, warnings: readonly string[]): void {
+  for (const w of warnings) {
+    useToastStore.getState().addToast(`Canvas "${name}": ${w}`, 'error');
+  }
+}
+
+/**
+ * Focus a canvas tab's document, reading it from disk on the first focus.
+ * Resolves true when the tab may take focus (false = the load failed or was
+ * superseded).
+ *
+ * A FAILED LOAD LEAVES NOTHING BEHIND — no document, no undo stack, no focus
+ * change. There is deliberately no openCanvasDoc fallback: a blank document
+ * under the missing file's name reads as "your art is gone", and the next save
+ * would write that blank over the file that failed to read.
+ */
+export async function activateCanvasDocTarget(
+  tabId: string,
+  loader: CanvasLoader = defaultCanvasLoader,
+): Promise<boolean> {
+  return (await runCanvasActivation(tabId, loader)) === 'focused';
+}
+
+/**
+ * The SESSION-RESTORE entry point (R17(1)), and the only caller that asks for a
+ * load failure to be silent.
+ *
+ * Restoring canvas tabs is the decision Task 13 owns, and this function is the
+ * half of it that keeps the decision affordable. A canvas tab id names a file,
+ * so a canvas whose PNG was deleted or renamed between sessions produces a
+ * failed load at EVERY boot, forever. Reported the ordinary way that is a
+ * 10-second error toast on every single launch, about a file the user may have
+ * deleted deliberately — the definition of an alarm nobody can turn off, and the
+ * exact cost R17(1) flagged as the reason not to restore at all.
+ *
+ * So the restore is silent about the failure and the PANE carries the report
+ * instead: `canvasPaneState` renders `CanvasDocUnloaded`, which names the file,
+ * explains what happened, and offers Retry. That is strictly better than a
+ * toast for this case — it is scoped to the tab it is about, it is there when
+ * the user looks at that tab rather than 10 seconds after boot, and it does not
+ * follow them into a level they opened instead. It is also what Task 12's
+ * R17(2) decision built and, until now, nothing reached.
+ *
+ * A restore-time load that SUCCEEDS still reports its warnings normally: those
+ * are facts about a file that opened fine, and the reader is about to draw on
+ * it.
+ */
+export async function activateRestoredCanvasDocTarget(
+  tabId: string,
+  /** The same test seam `activateCanvasDocTarget` offers, for the same reason:
+   *  "does this path stay silent?" is only answerable if the failure can be
+   *  provoked without a filesystem. */
+  loader: CanvasLoader = defaultCanvasLoader,
+): Promise<void> {
+  await runCanvasActivation(tabId, loader, { reportLoadFailure: false });
+}
+
+/**
+ * WHY THE INTERNAL FORM DISTINGUISHES TWO FAILURES (Task 12's R17(2) decision).
+ *
+ * The boolean above conflates them, and its one consumer needs them apart:
+ *
+ *   'failed'     — the file could not be read. PERMANENT, and it says nothing
+ *                  about which tab the user wants to be looking at.
+ *   'superseded' — the read finished after the user moved on. It says exactly
+ *                  that, and a tab that takes focus on it steals it back.
+ *
+ * requestOpenTab treats them differently (see there); requestCloseTab discards
+ * both. The public boolean is unchanged so nothing else has to care.
+ */
+type CanvasActivation = 'focused' | 'failed' | 'superseded';
+
+async function runCanvasActivation(
+  tabId: string,
+  loader: CanvasLoader,
+  /** `reportLoadFailure: false` is session restore's — see
+   *  activateRestoredCanvasDocTarget. Everything else must leave it on: a
+   *  failure the user's own click provoked, unreported, is a click that does
+   *  nothing. */
+  opts: { reportLoadFailure?: boolean } = {},
+): Promise<CanvasActivation> {
+  // Bumped BEFORE the plan, so even the synchronous 'activate' branch supersedes
+  // whatever was in flight — including an open classic dirty-switch confirm,
+  // which will then answer false and skip its openAct. That is deliberate (the
+  // user moved to another tab, so the switch they were being asked about is
+  // stale) and it is what runSpriteActivation has always done; noted because it
+  // widens what can cancel a level switch, and nothing tests that interaction.
+  const myGen = ++activationGen;
+  const plan = planCanvasDocActivation({
+    tabId,
+    isOpen: useCanvasStore.getState().isOpen(tabId),
+  });
+  if (plan.kind === 'none') return 'focused';
+  if (plan.kind === 'activate') {
+    activateCanvasDoc(tabId); // synchronous, nothing to supersede
+    return 'focused';
+  }
+
+  let loaded: LoadedCanvas;
+  try {
+    loaded = await loader(plan.name);
+  } catch (e) {
+    // The store was never touched, so there is nothing to roll back — the whole
+    // point of loading before installing. Only the report is left to do.
+    if (opts.reportLoadFailure !== false) {
+      useToastStore.getState().addToast(
+        `Could not open the canvas "${plan.name}": ${e instanceof Error ? e.message : String(e)}`,
+        'error');
+    }
+    return 'failed';
+  }
+
+  // SUPERSEDED while the read was in flight: the user has moved on. Discard the
+  // bytes rather than install them — installing focuses the document
+  // (loadCanvasDoc is the first-load path and always focuses), which would point
+  // the pane at this canvas while another tab is active. The cost is one
+  // re-read on the next focus; the alternative is a second "restore the focus
+  // someone else set" path, which is the stale-pane bug wearing a repair kit.
+  if (myGen !== activationGen) return 'superseded';
+
+  // A document that dirtied while this read was in flight WINS. loadCanvasDoc
+  // throws rather than overwrite unsaved edits (a stale read replacing live
+  // work), and it is right to: focus what is already open instead.
+  if (useCanvasStore.getState().isDirty(tabId)) {
+    activateCanvasDoc(tabId);
+    return 'focused';
+  }
+
+  loadCanvasDoc(tabId, loaded.doc, loaded.source);
+  reportCanvasWarnings(plan.name, loaded.warnings);
+  return 'focused';
+}
+
+/**
+ * The canvas half of a focus change, run for EVERY tab kind (R14): a canvas tab
+ * loads or checks out its document, and any OTHER tab clears the canvas focus.
+ *
+ * The clear is not decoration. Canvas documents stay open in the background, so
+ * without it `activeDocId` still names the last canvas while a level tab is
+ * active — and the moment a canvas tab is focused again, the pane's first frame
+ * renders that stale document.
+ *
+ * BOTH CALL SITES MATTER, and the second one is the easy one to lose: this runs
+ * from requestOpenTab AND from the neighbour promotion in requestCloseTab, which
+ * is the focus change `session.closeTab` performs after a close. Deleting the
+ * promotion call left the whole suite green until the test named for it existed.
+ */
+async function focusCanvasForTab(tab: TabDescriptor): Promise<CanvasActivation> {
+  if (tab.kind === 'art-doc') return runCanvasActivation(tab.id, defaultCanvasLoader);
+  clearCanvasFocus();
+  return 'focused';
+}
+
+/**
+ * Ask what to do about a canvas document that is about to be CLOSED with unsaved
+ * edits — the only canvas path that destroys work, since focusing parks. Resolves
+ * true when the close may proceed. Same Save / Discard / Cancel vocabulary as
+ * confirmCloseSpriteDoc, deliberately: one dialog language for closing a
+ * document, whatever kind it is.
+ *
+ * Save is offered only when the document HAS a destination (`CanvasSource`).
+ * Without one there is nothing to write — `saveCanvasDocument` resolves silently
+ * for a source-less document — so the button would be a promise the dialog
+ * cannot keep. (Task 13 gives every new canvas its file up front, which is what
+ * makes that the rare case rather than the normal one.)
+ */
+export async function confirmCloseCanvasDoc(docId: string): Promise<boolean> {
+  const store = useCanvasStore.getState();
+  if (!store.isDirty(docId)) return true; // clean, or not open at all: nothing to lose
+  const canSave = store.sourceOf(docId) !== null;
+
+  const answer = await useConfirmStore.getState().ask({
+    title: 'Unsaved canvas edits',
+    body: canSave
+      ? 'Closing this canvas tab discards its unsaved pixels and undo history.'
+      : 'Closing this canvas tab discards its unsaved pixels and undo history. '
+        + 'This canvas has no file yet, so there is nowhere to save it.',
+    buttons: [
+      ...(canSave ? [{ key: 'save', label: 'Save & close', tone: 'primary' as const }] : []),
+      { key: 'discard', label: 'Discard & close', tone: 'danger' as const },
+      { key: 'cancel', label: 'Cancel' },
+    ],
+  });
+
+  if (answer === 'save') {
+    // saveCanvasDocument THROWS to report failure (the SaveCoordinator contract
+    // it was written for) and does NOT toast — its header says the entry points
+    // above it do that. This is a third entry point, so the message, which
+    // carries the whole recovery instruction, has to be surfaced here or the
+    // Save button just looks dead. That is where this diverges from
+    // confirmCloseSpriteDoc, whose savers toast and never reject.
+    try {
+      await saveCanvasDocument(docId);
+    } catch (e) {
+      useToastStore.getState().addToast(
+        `Close cancelled — ${e instanceof Error ? e.message : String(e)}`, 'error');
+      return false;
+    }
+    // Re-read the flag rather than trusting "it did not throw" (the sprite path's
+    // rule, and the project-open guard's): still dirty ⇒ nothing was written, and
+    // closing would destroy the work Save was meant to protect.
+    if (useCanvasStore.getState().isDirty(docId)) {
+      useToastStore.getState().addToast(
+        'Close cancelled — the canvas could not be saved.', 'error');
+      return false;
+    }
+    return true;
+  }
+  return answer === 'discard';
+}
+
 function classicOpenAct(zone: string, act: number, opts?: { skipViewSnapshot?: boolean }): boolean {
   const target = useClassicProjectStore.getState().zoneTree
     .find((r) => r.zone === zone && r.act === act);
@@ -423,10 +737,68 @@ export async function activateLevelTarget(
   }
 }
 
-/** Open (or focus) a tab, running the level/sprite-doc activation guard first. */
+/**
+ * Open (or focus) a tab, running the level/sprite-doc/canvas activation guard
+ * first. The canvas step runs for EVERY tab kind — see focusCanvasForTab: a tab
+ * that is not a canvas has to CLEAR the canvas focus.
+ *
+ * This is every focus change FROM THE TAB STRIP (plus ⌘K and Ctrl+1..9, which
+ * route through requestFocusTabId/requestFocusIndex). It is NOT every focus
+ * change in the app: two paths deliberately call `useSessionStore.open`/
+ * `replace` directly and are not covered here —
+ *
+ *   • useActTabSync (session-lifecycle.ts) opens the tab for an act the STORES
+ *     switched to, which is how the MCP/agent surface, __dbg.openAct and
+ *     aeon-open move the user. An agent-driven act switch therefore focuses a
+ *     level tab WITHOUT clearing the canvas focus.
+ *   • The restore effect calls replace(next) and hand-dispatches activation for
+ *     the ACTIVE tab only — a level, sprite or canvas id (session-lifecycle.ts).
+ *     A restored canvas tab therefore reaches activateRestoredCanvasDocTarget
+ *     rather than this function, which is why the silent-failure option lives
+ *     there and not here.
+ *
+ * Neither is a hole today — the agent path only ever focuses level tabs, and the
+ * restore path clears nothing because nothing is open yet — but this function is
+ * not a funnel anything may rely on.
+ */
 export async function requestOpenTab(tab: TabDescriptor): Promise<void> {
   if (tab.kind === 'level' && !(await activateLevelTarget(tab.id))) return;
   if (tab.kind === 'sprite-doc' && !(await activateSpriteDocTarget(tab.id))) return;
+  const canvas = await focusCanvasForTab(tab);
+  // A SUPERSEDED read always stops here: the user has moved to another tab
+  // while this one's file was being read, and opening now would drag the focus
+  // back to a tab they left.
+  if (canvas === 'superseded') return;
+  // A FAILED read stops here only when this tab is NOT already in the strip.
+  //
+  // R17(2), decided in Task 12. The two situations are genuinely different:
+  //
+  //   • The tab does not exist yet (an Explorer click, ⌘K, the create flow).
+  //     Refusing to open it is right — the toast carries the decoder's own
+  //     message, and a dead tab is debris the user then has to clean up.
+  //
+  //   • The tab is already open (its file was deleted, moved or made
+  //     unreadable since; or a restore reopened it — Task 13). Refusing FOCUS
+  //     makes a tab the user can see, cannot select, and gets a fresh toast
+  //     from on every click: the strip appears frozen on that tab. The pane
+  //     renders an honest "could not be loaded" card instead
+  //     (canvasPaneState → CanvasDocUnloaded), with Retry and the file path.
+  //
+  // This is the rule requestCloseTab already states for the sprite path in
+  // another form: a document that will not load is a reason not to CREATE or
+  // to REDRAW a tab, never a reason to make an existing one unusable.
+  if (canvas === 'failed') {
+    if (!useSessionStore.getState().tabs.some((t) => t.id === tab.id)) return;
+    // The tab is about to be focused with no document behind it, so no canvas
+    // is showing — say so. Without this the mirror keeps naming whichever canvas
+    // was focused before, which is the stale-mirror state R14 spent a whole
+    // section on; the pane already refuses to draw it (it compares against the
+    // TAB), but leaving the two disagreeing is how the next consumer inherits
+    // the bug. The clear lives here rather than in the activation itself because
+    // there it would also fire for a failed load that is NOT taking focus, and
+    // that one must leave the visible document alone.
+    clearCanvasFocus();
+  }
   useSessionStore.getState().open(tab);
 }
 
@@ -483,13 +855,18 @@ async function confirmCloseSpriteDoc(docId: string): Promise<boolean> {
 
 /**
  * Drop the undo stacks a closed tab leaves unreachable (Task 11). A sprite doc's
- * stack goes with its document (closeSpriteDoc). A level tab disposes only its
- * OWN layout document: the zone-art document is shared by every act tab of that
- * zone, so it survives until the last of them closes — otherwise closing act 1
- * would silently throw away undo for art edits still visible in act 2.
+ * stack goes with its document (closeSpriteDoc), and a canvas doc's likewise
+ * (closeCanvasDoc). A level tab disposes only its OWN layout document: the
+ * zone-art document is shared by every act tab of that zone, so it survives
+ * until the last of them closes — otherwise closing act 1 would silently throw
+ * away undo for art edits still visible in act 2.
  */
 function disposeStacksForClosedTab(id: string): void {
   if (isSpriteDocTabId(id)) { closeSpriteDoc(id); return; }
+  // Runs AFTER the close confirm in requestCloseTab, so by here the user has
+  // either saved or chosen to discard. closeCanvasDoc disposes the stack itself
+  // — including for a tab whose document never loaded.
+  if (isCanvasDocTabId(id)) { closeCanvasDoc(id); return; }
   const level = parseLevelTabId(id);
   if (!level) return;
   documentHistoryHub.dispose(id);
@@ -530,6 +907,10 @@ export async function requestCloseTab(id: string): Promise<void> {
   // it has unsaved edits. Runs BEFORE neighbor-promotion so a promoted level tab
   // isn't blocked by a now-stale sprite prompt.
   if (isSpriteDocTabId(id) && !(await confirmCloseSpriteDoc(id))) return;
+  // Same for a canvas tab, and for the same reason: the document dies with the
+  // tab (disposeStacksForClosedTab below), so this is what the unsaved dot on a
+  // canvas tab means. Without it the dot is a warning with nothing behind it.
+  if (isCanvasDocTabId(id) && !(await confirmCloseCanvasDoc(id))) return;
 
   const session = useSessionStore.getState();
   if (session.activeId !== id) {
@@ -546,6 +927,12 @@ export async function requestCloseTab(id: string): Promise<void> {
   // someone else's document) but its result is discarded — see the asymmetry
   // note above.
   if (promoted && promoted.kind === 'sprite-doc') await activateSpriteDocTarget(promoted.id);
+  // The canvas side of that same promotion, and it runs for EVERY promoted kind:
+  // this is a focus change (session.close moves the active tab), so a promoted
+  // canvas tab must check its document out and a promoted LEVEL tab must clear
+  // the canvas focus. Result discarded for the sprite reason — a neighbour whose
+  // file will not load is no argument for keeping the tab the user is closing.
+  if (promoted) await focusCanvasForTab(promoted);
   useSessionStore.getState().close(id);
   // AFTER the session close: disposeStacksForClosedTab reads the surviving tabs
   // to decide whether the zone-art document still has an owner.

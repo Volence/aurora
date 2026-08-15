@@ -26,12 +26,12 @@ describe('project runtime', () => {
     __resetRuntimeSaversForTest();
   });
 
-  it('registers exactly the three savers, idempotently', () => {
+  it('registers exactly the four savers, idempotently', () => {
     ensureSaversRegistered();
     ensureSaversRegistered();
     return saveAllDirty().then((r) => {
       expect([...r.saved, ...r.skipped, ...r.failed.map((f) => f.id)].sort())
-        .toEqual(['aeon-project', 'classic-level', 'sprite-art']);
+        .toEqual(['aeon-project', 'canvas-doc', 'classic-level', 'sprite-art']);
     });
   });
 

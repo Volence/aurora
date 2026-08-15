@@ -2,13 +2,18 @@
 // SaveCoordinator behind Ctrl+S / Ctrl+Shift+S. The ONE DocumentHistoryHub now lives in
 // history-hub.ts (import-free, to break the editorStore→project-runtime cycle)
 // and is re-exported below; this module still owns resetProjectRuntime's
-// clearAll on project switch. The three savers reproduce the
+// clearAll on project switch. The savers reproduce the
 // retired save router's semantics — fire-when-context-open, not
 // fire-when-strictly-dirty — so save behavior cannot regress in this stage:
 //   • sprite-art: for every open sprite document whose art is checked out
 //     (s1ArtSource set) AND has unsaved edits — writing back an untouched checkout
 //     would be a pointless identical-bytes write + mtime churn. Registered FIRST
 //     so pixel edits are never lost behind a level-save error.
+//   • canvas-doc: for every open canvas document that has BOTH unsaved edits and
+//     a file target (saveableDirtyCanvasDocIds). Registered second, beside
+//     sprite-art and ahead of the project savers, for that same reason — these
+//     are hand-drawn pixels, and a level-save error must not be able to strand
+//     them.
 //   • classic-level: whenever a classic project is open (its own writer skips
 //     clean domains internally).
 //   • aeon-project: whenever an aeon project is resident AND no classic project
@@ -25,6 +30,7 @@
 // stage deliberately deleted the scattered per-target save routing; don't bring
 // it back). The mapping:
 //   • sprite-doc tab   → that ONE sprite document (saveSpriteDocArt(tabId))
+//   • canvas-doc tab   → that ONE canvas document (saveCanvasDocument(tabId))
 //   • classic level tab → the classic project save
 //   • aeon level tab    → the aeon project save
 //   • Home / tool tabs  → nothing owns them: no-op
@@ -36,11 +42,13 @@ import { documentHistoryHub } from './history-hub';
 import { openEngine } from './open-project';
 import { useSessionStore } from './sessionStore';
 import { useSpriteStore, saveableDirtySpriteDocIds } from './spriteStore';
+import { useCanvasStore, saveableDirtyCanvasDocIds } from './canvasStore';
 import { useToastStore } from './toastStore';
 import { saveClassicProject } from './classic-save';
 import { saveAllSpriteArt, saveSpriteDocArt } from '../components/sprite/export-sprite';
+import { saveCanvasDocument } from './canvas-save';
 import { saveAeonProject } from './aeon-save';
-import { parseLevelTabId, parseSpriteDocTabId } from '../shell/tabs';
+import { parseLevelTabId, parseSpriteDocTabId, parseCanvasDocTabId } from '../shell/tabs';
 import { tabHasDirtyDot } from '../shell/dirty-tabs';
 import { currentDirtySnapshot } from '../shell/dirty-snapshot';
 
@@ -54,20 +62,26 @@ type SaveFn = () => Promise<unknown> | unknown;
 type SaveDocFn = (docId: string) => Promise<unknown> | unknown;
 let spriteArtImpl: SaveFn = saveAllSpriteArt;
 let spriteDocImpl: SaveDocFn = saveSpriteDocArt;
+let canvasDocImpl: SaveDocFn = saveCanvasDocument;
 let classicImpl: SaveFn = saveClassicProject;
 let aeonImpl: SaveFn = saveAeonProject;
 
 export function __setRuntimeSaversForTest(
-  over: { spriteArt?: SaveFn; spriteDoc?: SaveDocFn; classic?: SaveFn; aeon?: SaveFn },
+  over: {
+    spriteArt?: SaveFn; spriteDoc?: SaveDocFn; canvasDoc?: SaveDocFn;
+    classic?: SaveFn; aeon?: SaveFn;
+  },
 ): void {
   if (over.spriteArt) spriteArtImpl = over.spriteArt;
   if (over.spriteDoc) spriteDocImpl = over.spriteDoc;
+  if (over.canvasDoc) canvasDocImpl = over.canvasDoc;
   if (over.classic) classicImpl = over.classic;
   if (over.aeon) aeonImpl = over.aeon;
 }
 export function __resetRuntimeSaversForTest(): void {
   spriteArtImpl = saveAllSpriteArt;
   spriteDocImpl = saveSpriteDocArt;
+  canvasDocImpl = saveCanvasDocument;
   classicImpl = saveClassicProject;
   aeonImpl = saveAeonProject;
 }
@@ -94,6 +108,34 @@ export function ensureSaversRegistered(): void {
       owns: (tabId) => parseSpriteDocTabId(tabId) !== null,
       isDirty: (tabId) => saveableDirtySpriteDocIds().includes(tabId),
       save: async (tabId) => { await spriteDocImpl(tabId); },
+    },
+  });
+  saveCoordinator.register({
+    id: 'canvas-doc',
+    // Only documents with a file target AND unsaved edits: a canvas that has
+    // never been named has no destination, and a clean one is a pointless
+    // identical-bytes write. `saveableDirtyCanvasDocIds` is the ONE predicate
+    // all three of these read, so the saver can never disagree with itself
+    // about which documents are savable.
+    isDirty: () => saveableDirtyCanvasDocIds().length > 0,
+    // The set is captured once and each id saved in turn, byte-for-byte the
+    // shape of saveAllSpriteArt — a throw aborts the rest, the coordinator
+    // reports the failure, and the untouched documents keep their dirty dots.
+    // Worth knowing that canvas failures are MORE independent than sprite ones:
+    // each canvas is its own file pair, so a conflict on sky.png blocks
+    // rock.png for no reason, and the aggregate carries only the first failure's
+    // message. Continuing past a failure is the better behaviour on the merits;
+    // it is not done here because the two savers must change together — a Save
+    // All where one surface stops on the first error and its neighbour does not
+    // is a worse thing to reason about than either policy applied consistently.
+    save: async () => { for (const id of saveableDirtyCanvasDocIds()) await canvasDocImpl(id); },
+    // Ctrl+S in a canvas tab writes THAT canvas and no other. A dirty canvas
+    // with no destination is not savable work, so Save stays inert for it
+    // rather than failing — same rule the sprite scope above applies.
+    scope: {
+      owns: (tabId) => parseCanvasDocTabId(tabId) !== null,
+      isDirty: (tabId) => saveableDirtyCanvasDocIds().includes(tabId),
+      save: async (tabId) => { await canvasDocImpl(tabId); },
     },
   });
   saveCoordinator.register({
@@ -169,13 +211,17 @@ export function canSaveActive(tabId: string | null = activeTabId()): boolean {
 
 /**
  * Project switch/close: drop all per-document histories AND every open sprite
- * document. The sprite documents have to go with them — a document that outlived
- * its project keeps an s1ArtSource pointing at the OLD project's file by absolute
- * path, so a later Ctrl+S would write across projects. Safe to blank the editor
- * here (the concern that deferred this in Task 7): session restore runs right
- * after and re-activates the restored sprite tab, which loads its document again.
+ * and canvas document. The sprite documents have to go with them — a document
+ * that outlived its project keeps an s1ArtSource pointing at the OLD project's
+ * file by absolute path, so a later Ctrl+S would write across projects. A canvas
+ * document is the same hazard through the same door: its `CanvasSource.dir` is
+ * the old project root, and Task 11's activation reloads a canvas tab from the
+ * new project anyway. Safe to blank the editor here (the concern that deferred
+ * this in Task 7): session restore runs right after and re-activates the
+ * restored tab, which loads its document again.
  */
 export function resetProjectRuntime(): void {
   documentHistoryHub.clearAll();
   useSpriteStore.getState().closeAll();
+  useCanvasStore.getState().closeAll();
 }

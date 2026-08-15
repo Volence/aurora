@@ -24,6 +24,25 @@ export function openEngine(): OpenEngine | null {
   return null;
 }
 
+/**
+ * The open project's ROOT DIRECTORY — the base every per-project relative path
+ * resolves under (guarded writes, readBinaryFile, listDir). Null when no project
+ * is open.
+ *
+ * Lives here for the reason in the header: four call sites deriving "which
+ * engine is open" independently is how two of them came to disagree, and
+ * "where is it on disk" is the same question with the same two answers
+ * (classicProjectStore.dir / projectStore.config.basePath). session-lifecycle
+ * derives the same pair for its storage key; a per-feature copy is what this
+ * module exists to prevent.
+ */
+export function openProjectDir(): string | null {
+  const engine = openEngine();
+  if (engine === 's1') return useClassicProjectStore.getState().dir;
+  if (engine === 'aeon') return useProjectStore.getState().config?.basePath ?? null;
+  return null;
+}
+
 /** The open project's capability manifest, or null when none is open. */
 export function openCapabilities(): CapabilityManifest | null {
   const engine = openEngine();

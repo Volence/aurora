@@ -8,6 +8,10 @@ import LevelWorkspace from './workspace/LevelWorkspace';
 import SpriteMode from './components/sprite/SpriteMode';
 import SpriteDocUnloaded from './components/sprite/SpriteDocUnloaded';
 import SpriteDocHeader from './shell/SpriteDocHeader';
+import CanvasMode from './components/canvas/CanvasMode';
+import CanvasDocUnloaded from './components/canvas/CanvasDocUnloaded';
+import NewCanvasDialog from './components/canvas/NewCanvasDialog';
+import { canvasPaneState } from './components/canvas/canvas-pane-model';
 import HomeTab from './components/home/HomeTab';
 import ProjectSetupTab from './components/setup/ProjectSetupTab';
 import { T } from './components/ui';
@@ -18,6 +22,7 @@ import { useOpenEngine } from './state/open-project';
 import { useClassicLevelStore } from './state/classicLevelStore';
 import { useSessionStore } from './state/sessionStore';
 import { useSpriteStore } from './state/spriteStore';
+import { useCanvasStore } from './state/canvasStore';
 import { useShellStore } from './state/shellStore';
 import { ensureSaversRegistered, saveAllDirty, saveActive } from './state/project-runtime';
 import { registerHistoryFactories } from './state/history-factories';
@@ -57,9 +62,19 @@ export default function App() {
   // Which sprite document the editor currently holds — the sprite pane below
   // mounts only when it is the active tab's own (see the comment there).
   const spriteDocId = useSpriteStore((s) => s.activeDocId);
+  // The canvas store's focused document. Read here ONLY as the mirror
+  // `canvasPaneState` validates the active tab against (R14c) — the pane's
+  // document id comes from the TAB, never from this.
+  const canvasDocId = useCanvasStore((s) => s.activeDocId);
   const toggleExplorer = useShellStore((s) => s.toggleExplorer);
 
   const activeTab = tabs.find((t) => t.id === activeId);
+  const canvasPane = canvasPaneState(activeTab, canvasDocId);
+  // The New Canvas dialog has ONE mount (below), like ConfirmDialog: both ⌘K and
+  // the Explorer's row raise it, and two live copies would be two forms racing
+  // to create the same file. Plain state rather than another store — App already
+  // hands Explorer its other entry points as props.
+  const [newCanvasOpen, setNewCanvasOpen] = useState(false);
 
   // -- runtime wiring ------------------------------------------------------
   useEffect(() => {
@@ -144,6 +159,7 @@ export default function App() {
         openTab: (tab) => void requestOpenTab(tab),
         editObjectArt: (id) => { void editObjectArt(id); },
         newSprite: () => void requestOpenTab(untitledSpriteTab()),
+        newCanvas: () => setNewCanvasOpen(true),
         openRecent: (path) => void openProjectByPath(path),
       },
     );
@@ -168,7 +184,11 @@ export default function App() {
       )}
 
       <div style={styles.body}>
-        <Explorer onOpenProject={openProject} onOpenRecent={openProjectByPath} />
+        <Explorer
+          onOpenProject={openProject}
+          onOpenRecent={openProjectByPath}
+          onNewCanvas={() => setNewCanvasOpen(true)}
+        />
         <div style={styles.main}>
           <TabStrip />
           <div style={styles.content}>
@@ -178,8 +198,9 @@ export default function App() {
                 at the active tab's target (shell/tab-activation.ts), not one
                 instance per tab. Sprite-doc tabs are EXCLUDED here — SpriteMode has
                 exactly one mounting point (see below), mounted only while a
-                sprite-doc tab is active. */}
-            {tabs.filter((t) => t.kind !== 'level' && t.kind !== 'sprite-doc').map((tab) => (
+                sprite-doc tab is active. Canvas ('art-doc') tabs are excluded for
+                the same reason — CanvasMode is a singleton too. */}
+            {tabs.filter((t) => t.kind !== 'level' && t.kind !== 'sprite-doc' && t.kind !== 'art-doc').map((tab) => (
               <div key={tab.id} style={{ ...styles.tabPane, display: tab.id === activeId ? 'flex' : 'none' }}>
                 {tab.kind === 'home' ? (
                   <HomeTab onOpenProject={openProject} onOpenRecent={openProjectByPath} />
@@ -206,8 +227,10 @@ export default function App() {
                 the art facet, the classic view/composer) are still registered
                 alongside SpriteMode's. Those level-side handlers are gated by
                 levelKeysEnabled() (workspace/level-keys.ts) — inert whenever a
-                sprite-doc tab is active — so one Ctrl+Z can't fire both sprite and
-                the hidden level undo (finding 1). */}
+                sprite-doc tab is active — so one Ctrl+Z consumes one undo entry
+                rather than two. (It was never "sprite undo AND level undo": both
+                handlers resolve focusedHistory(), which on a sprite tab IS the
+                sprite's stack. See level-keys.ts for the corrected mechanism.) */}
             {activeTab?.kind === 'sprite-doc' && (
               <div style={{ ...styles.tabPane, display: 'flex' }}>
                 {/* SpriteMode renders whatever document is CHECKED OUT, so it may
@@ -225,6 +248,40 @@ export default function App() {
                 )}
               </div>
             )}
+            {/* CanvasMode's ONE mounting point — same rule as SpriteMode's above,
+                for the same reason: two live instances would double-register the
+                pane's window keydown handler and fire undo twice per Ctrl+Z. The
+                documents live in the module-level canvasStore, so the remount a
+                tab switch causes is lossless.
+
+                WHICH DOCUMENT comes from the TAB (canvasPaneState), with the
+                store's activeDocId only as the mirror it is validated against
+                (R14c). A canvas tab whose file could not be read renders the
+                inert pane instead — a blank canvas under a real canvas's name
+                reads as "your art is gone". */}
+            {canvasPane.kind !== 'hidden' && (
+              <div style={{ ...styles.tabPane, display: 'flex' }}>
+                {canvasPane.kind === 'ready' ? (
+                  <CanvasMode
+                    /* KEYED BY DOCUMENT: switching between two canvas tabs
+                       remounts the pane instead of re-pointing a live one, so no
+                       controller, zoom anchor or in-flight gesture can carry
+                       from one document into another. Lossless — everything the
+                       pane shows lives in canvasStore. */
+                    key={canvasPane.docId}
+                    docId={canvasPane.docId}
+                    appBar={(
+                      <SpriteDocHeader
+                        onSave={() => { void saveActive(); }}
+                        noDestinationHint="This canvas has no file yet, so there is nowhere to save it."
+                      />
+                    )}
+                  />
+                ) : (
+                  <CanvasDocUnloaded tabId={canvasPane.tabId} title={canvasPane.title} />
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -232,6 +289,7 @@ export default function App() {
       <ToastContainer />
       <CommandPalette commands={commands} />
       <ConfirmDialog />
+      <NewCanvasDialog open={newCanvasOpen} onClose={() => setNewCanvasOpen(false)} />
     </div>
   );
 }

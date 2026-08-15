@@ -75,6 +75,24 @@ export function isSpriteDocTabId(id: string): boolean {
   return id === UNTITLED_SPRITE_TAB_ID || parseSpriteDocTabId(id) !== null;
 }
 
+// Canvas-doc tab ids — 'doc:canvas:<name>' — host the origination canvas
+// (spec §4.1). <name> is the canvas's file stem under .aurora/canvas/, which is
+// what makes the tab id stable across sessions: session restore reopens the tab
+// and the activation glue loads that file. Kind is 'art-doc', the entry
+// TAB_KINDS has always listed and nothing has claimed.
+export function canvasDocTab(name: string): TabDescriptor {
+  return { id: `doc:canvas:${name}`, kind: 'art-doc', title: `Canvas · ${name}` };
+}
+
+export function parseCanvasDocTabId(id: string): { name: string } | null {
+  const m = /^doc:canvas:(.+)$/.exec(id);
+  return m ? { name: m[1] } : null;
+}
+
+export function isCanvasDocTabId(id: string): boolean {
+  return parseCanvasDocTabId(id) !== null;
+}
+
 // Zone-art doc ids — 'zoneart:<zone>'. Unlike the others this is NOT a tab id:
 // zone art (chunks, blocks, tiles, palettes) is edited from act-scoped tabs but
 // is zone-scoped data, so it owns its own undo document (spec §4.2). One zone's

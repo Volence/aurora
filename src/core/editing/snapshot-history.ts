@@ -16,6 +16,14 @@ import type { UndoStack } from './undo-stack';
 export const DEFAULT_MAX_DEPTH = 200;
 
 export abstract class SnapshotHistory<S> implements UndoStack {
+  // INVARIANT (emergent, not enforced): undoStack.length + redoStack.length
+  // <= maxDepth, always. `record` pushes one to undoStack (capped) and clears
+  // redoStack; `undo`/`redo` each move exactly one entry across, so the sum
+  // never grows past whatever record last capped it to. Nothing here asserts
+  // this — any future path that pushes to redoStack without popping undoStack
+  // breaks it silently. It is why residency at maxDepth N is ~N snapshots, not
+  // ~2N: worth stating explicitly now that canvas-history.ts's snapshots are
+  // ~1 MB each and the difference is a bounded 40 MB vs. unbounded growth.
   private undoStack: S[] = [];
   private redoStack: S[] = [];
   private listeners: Array<() => void> = [];

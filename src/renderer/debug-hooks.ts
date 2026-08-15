@@ -16,6 +16,9 @@ import { useClassicObjectArtStore } from './state/classicObjectArtStore';
 import { useProjectStore } from './state/projectStore';
 import { useViewStore } from './state/viewStore';
 import { useArtStore } from './state/artStore';
+import { useCanvasStore } from './state/canvasStore';
+import { useToastStore } from './state/toastStore';
+import { confirmProjectOpen } from './shell/project-open-guard';
 import { activateLevelTarget } from './shell/tab-activation';
 import { levelDocId } from './shell/tabs';
 import { buildUsageIndex } from '../core/level-classic/usage-index';
@@ -224,6 +227,131 @@ function installClassicProbe(): ClassicProbeApi {
   };
 }
 
+/**
+ * Task 14 (origination-canvas CDP verification) read-only query surface.
+ *
+ * STRICTLY READ-ONLY FOR 13 OF ITS 14 MEMBERS, and that is load-bearing: the
+ * canvas rows are checked by driving the REAL UI (the New Canvas dialog's own
+ * fields, real pointer strokes on the real PixelViewport, real Ctrl+Z/Ctrl+S,
+ * real Explorer rows), and these answer "what does the store now hold" so an
+ * on-screen observation can be corroborated at the byte level. There is
+ * deliberately no `createCanvas`, `setPixels` or `save` here — verifying a
+ * mechanism by calling something other than the mechanism is the failure
+ * phase 1's report warns about.
+ *
+ * THE ONE EXCEPTION IS `projectOpenGuard()`. It calls the real
+ * `confirmProjectOpen`, and every exit of that function which returns `true`
+ * also calls `endDocumentSession()` — closing every open sprite and canvas
+ * document (and, on the discard path, marking the editor clean too). So a
+ * `true` return from this hook is not a read: it is proof that whatever the
+ * harness had open a moment ago is now gone. The hook is legitimate (see its
+ * own comment — a headless harness has no other way to reach this code path at
+ * all), but a caller must not lean on the paragraph above to assume calling it
+ * leaves state untouched. It also does not reproduce `openPath`'s full
+ * behaviour: the follow-on `openDirectory` is deliberately skipped, so a `true`
+ * result leaves the app in a state the real open flow never actually produces
+ * on its own — documents gone, but no new project opened in their place.
+ */
+interface CanvasProbeApi {
+  /** Every open canvas document id (the tab ids they are keyed by). */
+  docIds(): string[];
+  /** The store's focused document — the mirror `canvasPaneState` validates the
+   *  active tab against. */
+  activeDocId(): string | null;
+  /** Everything about one document that a check might want to assert on. */
+  state(docId: string): {
+    name: string; width: number; height: number; profileId: string;
+    gridOrigin: { originX: number; originY: number };
+    dirty: boolean;
+    source: { pngPath: string; sidecarPath: string; sidecarRejected: boolean } | null;
+  } | null;
+  /** FNV-1a over the document's whole index buffer — "are these the same pixels". */
+  pixelsHash(docId: string): number | null;
+  /** How many pixels are not index 0, i.e. how much has been drawn. */
+  drawnPixels(docId: string): number | null;
+  /** The document's own 64 CRAM words. */
+  paletteWords(docId: string): number[] | null;
+  /** One pixel's stored index. */
+  pixelAt(docId: string, x: number, y: number): number | null;
+  /** The armed paint index (0..63) and which grids are switched on. */
+  paintIndex(): number;
+  visibleGrids(): number[];
+  /** Live toast messages — a cross-check on what is read off the screen. */
+  toasts(): { message: string; type: string; exiting: boolean }[];
+  /**
+   * The project-open guard, called EXACTLY as `useProject`'s `openPath` calls
+   * it — same function, same store state, and the real `ConfirmDialog` appears
+   * on screen for the harness to read and click.
+   *
+   * IT EXISTS BECAUSE THE ONLY UI ROUTE IS A NATIVE DIALOG. `openPath` is
+   * reachable from two places: "Open Project…", which begins with
+   * `window.api.selectDirectory()` (an OS folder picker CDP cannot drive), and
+   * the "Open recent" commands, which `buildCommands` only emits while
+   * `engine === null` — i.e. never while a project is open, which is the only
+   * state in which a dirty canvas can exist. So the guard's own call is the
+   * furthest out a headless harness can start; what is skipped is the folder
+   * picker, not any part of the guard.
+   *
+   * The subsequent `openDirectory` is deliberately NOT performed: this reports
+   * the guard's answer and leaves the project where it is, so the harness can
+   * exercise Cancel and Discard without tearing down the session it is midway
+   * through.
+   */
+  projectOpenGuard(): Promise<boolean>;
+}
+
+function installCanvasProbe(): CanvasProbeApi {
+  const entry = (docId: string) => useCanvasStore.getState().docs.get(docId) ?? null;
+  return {
+    docIds: () => [...useCanvasStore.getState().docs.keys()],
+    activeDocId: () => useCanvasStore.getState().activeDocId,
+    state: (docId) => {
+      const e = entry(docId);
+      if (!e) return null;
+      return {
+        name: e.doc.name,
+        width: e.doc.pixels.width,
+        height: e.doc.pixels.height,
+        profileId: e.doc.profileId,
+        gridOrigin: { originX: e.doc.gridOrigin.originX, originY: e.doc.gridOrigin.originY },
+        dirty: e.unsavedEdits,
+        source: e.source
+          ? { pngPath: e.source.pngPath, sidecarPath: e.source.sidecarPath, sidecarRejected: e.source.sidecarRejected }
+          : null,
+      };
+    },
+    pixelsHash: (docId) => {
+      const e = entry(docId);
+      if (!e) return null;
+      return fnv1a(e.doc.pixels.data, 0, e.doc.pixels.data.length);
+    },
+    drawnPixels: (docId) => {
+      const e = entry(docId);
+      if (!e) return null;
+      let n = 0;
+      for (const v of e.doc.pixels.data) if (v !== 0) n++;
+      return n;
+    },
+    paletteWords: (docId) => {
+      const e = entry(docId);
+      return e ? [...e.doc.palette] : null;
+    },
+    pixelAt: (docId, x, y) => {
+      const e = entry(docId);
+      if (!e) return null;
+      const { width, height, data } = e.doc.pixels;
+      if (x < 0 || y < 0 || x >= width || y >= height) return null;
+      return data[y * width + x] ?? null;
+    },
+    paintIndex: () => useCanvasStore.getState().paintIndex,
+    visibleGrids: () => [...useCanvasStore.getState().visibleGrids],
+    toasts: () => useToastStore.getState().toasts.map(
+      (t) => ({ message: t.message, type: t.type, exiting: t.exiting }),
+    ),
+    projectOpenGuard: () => confirmProjectOpen(),
+  };
+}
+
 interface DebugApi {
   openDir(dir: string): Promise<string>;
   projStatus(): { status: string; zones: number };
@@ -275,6 +403,8 @@ interface DebugApi {
   perf(): { marks: unknown[]; readCount: number; readTotalMs: number; mtimeCount: number; mtimeTotalMs: number };
   /** Task 12 (paint-through CDP verification) query surface — see ClassicProbeApi's docblock. */
   classic: ClassicProbeApi;
+  /** Task 14 (origination canvas) read-only query surface — see CanvasProbeApi. */
+  canvas: CanvasProbeApi;
   /**
    * `artStore.selectedColor` — the cross-engine/cross-tier paint color
    * singleton (ChunkTab/BlockTab/TileTab all read it; see ChunkTab's header).
@@ -320,6 +450,7 @@ export function installDebugHooks(): void {
     resetAct: () => useProjectStore.setState({ currentActId: null }),
     perf: () => ({ marks: [], readCount: 0, readTotalMs: 0, mtimeCount: 0, mtimeTotalMs: 0 }),
     classic: installClassicProbe(),
+    canvas: installCanvasProbe(),
     setPaintColor: (v) => useArtStore.getState().setSelectedColor(v),
   };
   (window as unknown as { __dbg: DebugApi }).__dbg = dbg;

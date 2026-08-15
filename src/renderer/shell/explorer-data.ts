@@ -2,8 +2,14 @@
 // plain inputs so the group shapes are unit-testable; the Explorer component
 // supplies store data and routes item-id prefixes to actions. Only groups
 // with live data sources render (spec §3, no dead chrome): aeon's Object
-// Library (Task 15) is live; Level Art / Palettes / UI & Screens are still
-// pending.
+// Library (Task 15) and Canvases are live; Level Art / Palettes / UI & Screens
+// are still pending.
+//
+// The Canvases group is the ONE exception to "no dead chrome", and deliberately:
+// it renders with only its New Canvas… row in a project that has none, because
+// it is the only place the origination canvas is discoverable and a group that
+// appears once you already have one is a feature nobody finds. Every other group
+// here lists something that exists independently of Aurora.
 
 import type { ZoneActRef } from '../../core/project/adapter';
 import type { RecentProject } from '../../shared/ipc-types';
@@ -30,10 +36,48 @@ const TOOLS_GROUP: ExplorerGroupModel = Object.freeze({
   ]),
 });
 
+/** The Explorer row that opens the New Canvas dialog. Its own item id (not a tab
+ *  id) for the same reason NEW_SPRITE_ITEM_ID has one — the `doc:canvas:` branch
+ *  must not swallow it. */
+export const NEW_CANVAS_ITEM_ID = 'new-canvas';
+
+/**
+ * The Canvases group, identical for both engines because a canvas has no engine
+ * (see the ⌘K entry's comment). Present even when empty: it is the only place
+ * the origination canvas is discoverable, and a group that appears only once you
+ * already have one is a feature nobody finds.
+ *
+ * `skipped` files are LISTED AS DISABLED ROWS rather than dropped. `.aurora/canvas`
+ * is a directory users are expected to hand-populate (dropping an Aseprite
+ * export in is a supported way to get art into Aurora), and a file that vanishes
+ * from a listing with no explanation is indistinguishable from data loss —
+ * `listCanvasNames` computes `skipped` for exactly this and says so in its own
+ * doc comment. The row says what to do: the name, not the file, is the problem.
+ */
+export function canvasExplorerGroup(listing: { names: string[]; skipped: string[] }): ExplorerGroupModel {
+  return {
+    id: 'canvases',
+    label: 'Canvases',
+    items: [
+      { id: NEW_CANVAS_ITEM_ID, label: 'New Canvas…', hint: 'new' },
+      ...listing.names.map((n) => ({ id: `doc:canvas:${n}`, label: n })),
+      ...listing.skipped.map((f) => ({
+        id: `canvas-skipped:${f}`,
+        label: f,
+        disabled: true,
+        reason:
+          'Aurora cannot open this file because of its NAME (letters, digits, - and _ only, '
+          + 'starting with a letter or digit). Rename it and it will appear as a canvas.',
+      })),
+    ],
+  };
+}
+
 export function classicExplorerGroups(
   zoneTree: ZoneActRef[],
   objects: ClassicObjectRow[],
   levelDocReady: boolean,
+  canvases: { names: string[]; skipped: string[] },
 ): ExplorerGroupModel[] {
   return [
     {
@@ -59,6 +103,7 @@ export function classicExplorerGroups(
               },
         ),
     },
+    canvasExplorerGroup(canvases),
     TOOLS_GROUP,
   ];
 }
@@ -92,6 +137,7 @@ export function resolveObjectSprite(
 export function aeonExplorerGroups(
   zones: { id: string; name: string; acts: { id: string }[] }[],
   objects: AeonObjectRow[],
+  canvases: { names: string[]; skipped: string[] },
 ): ExplorerGroupModel[] {
   const groups: ExplorerGroupModel[] = [
     {
@@ -121,6 +167,7 @@ export function aeonExplorerGroups(
       ],
     });
   }
+  groups.push(canvasExplorerGroup(canvases));
   groups.push(TOOLS_GROUP);
   return groups;
 }
