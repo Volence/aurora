@@ -79,7 +79,19 @@ export const CONSTRAINT_PROFILE_IDS: ConstraintProfileId[] = [
  * Aurora yields a string, not a member of this build's union, and the right
  * answer is to open the art unconstrained, not to refuse to open it because the
  * name doesn't type-check.
+ *
+ * The lookup is `hasOwnProperty`-gated rather than a bare index + `??`: an
+ * untrusted string can name an inherited `Object.prototype` member —
+ * `'toString'`, `'constructor'`, `'__proto__'`, `'valueOf'`,
+ * `'hasOwnProperty'` itself — which is a real, non-nullish property of the
+ * `CONSTRAINT_PROFILES` object without being a table entry. `??` does not
+ * catch that: it only fires on null/undefined, and `CONSTRAINT_PROFILES.toString`
+ * is a function, not undefined. Left unguarded, that function comes back typed
+ * as `ConstraintProfile` and the corruption surfaces wherever the caller next
+ * reads `.cellPaletteRule` or `.grids`, far from this function.
  */
 export function constraintProfile(id: string): ConstraintProfile {
-  return CONSTRAINT_PROFILES[id as ConstraintProfileId] ?? CONSTRAINT_PROFILES.none;
+  return Object.prototype.hasOwnProperty.call(CONSTRAINT_PROFILES, id)
+    ? CONSTRAINT_PROFILES[id as ConstraintProfileId]
+    : CONSTRAINT_PROFILES.none;
 }

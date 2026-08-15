@@ -24,4 +24,59 @@ describe('PixelEditController — colour values above the 4bpp range', () => {
     const r = c.end(1, 1);
     expect(r.buffer.data[1 * 4 + 1]).toBe(47);
   });
+
+  // Pencil paints through the controller's OWN setPx and never reaches
+  // pixel-ops at all, so the case above cannot guard pixel-ops.ts's write
+  // sites. Fill/line/rect call floodFill/drawLine/drawRect directly, and
+  // dither's value carrier (ditherValue) also lives in pixel-ops.ts — these
+  // four are what actually back the "must not add an `& 15` in here" comment
+  // on PixelBuffer.
+
+  it('a fill gesture with a canvas-range colour reaches floodFill untouched', () => {
+    const cfg: ToolConfig = {
+      tool: 'fill', color: 47, mirror: null,
+      ditherPattern: 'checker', ditherSecondary: 0, pixelPerfect: false,
+    };
+    const c = new PixelEditController(cfg);
+    const r = c.begin(buf(4, 4), 0, 0, null); // fill is instantaneous: begin returns the result
+    expect(r).not.toBeNull();
+    expect(r!.buffer.data[0]).toBe(47);
+  });
+
+  it('a line gesture with a canvas-range colour reaches drawLine untouched', () => {
+    const cfg: ToolConfig = {
+      tool: 'line', color: 47, mirror: null,
+      ditherPattern: 'checker', ditherSecondary: 0, pixelPerfect: false,
+    };
+    const c = new PixelEditController(cfg);
+    c.begin(buf(4, 4), 0, 0, null);
+    const r = c.end(3, 0);
+    for (let x = 0; x <= 3; x++) expect(r.buffer.data[x]).toBe(47);
+  });
+
+  it('a rect gesture with a canvas-range colour reaches drawRect untouched', () => {
+    const cfg: ToolConfig = {
+      tool: 'rect', color: 47, mirror: null,
+      ditherPattern: 'checker', ditherSecondary: 0, pixelPerfect: false,
+    };
+    const c = new PixelEditController(cfg);
+    c.begin(buf(4, 4), 0, 0, null);
+    const r = c.end(2, 2);
+    for (let y = 0; y <= 2; y++) for (let x = 0; x <= 2; x++) expect(r.buffer.data[y * 4 + x]).toBe(47);
+  });
+
+  it('a dither stroke carries both canvas-range colours through ditherValue untouched', () => {
+    // Also backs the ditherSecondary comment: that field has the same
+    // documented-but-unguarded status color had before this suite existed.
+    const cfg: ToolConfig = {
+      tool: 'dither', color: 47, mirror: null,
+      ditherPattern: 'checker', ditherSecondary: 33, pixelPerfect: false,
+    };
+    const c = new PixelEditController(cfg);
+    c.begin(buf(4, 4), 0, 0, null); // (0+0)%2===0 -> primary colour
+    c.move(1, 0);                  // (1+0)%2!==0 -> secondary colour
+    const r = c.end(1, 0);
+    expect(r.buffer.data[0]).toBe(47);
+    expect(r.buffer.data[1]).toBe(33);
+  });
 });

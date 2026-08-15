@@ -50,8 +50,9 @@ describe('canvas pixel encoding', () => {
   });
 
   it('normalizeCanvasPixels returns the SAME buffer when nothing needed fixing', () => {
-    // Identity matters: the store compares by reference to decide whether an
-    // edit happened at all.
+    // Pins the allocation-avoidance path: an already-canonical buffer (the
+    // common case — most strokes never touch a foreign spelling) must not pay
+    // for a copy just to discover that.
     const buf = createBuffer(4, 1);
     buf.data.set([0, 1, 17, 63]);
     expect(normalizeCanvasPixels(buf)).toBe(buf);

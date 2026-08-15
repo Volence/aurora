@@ -55,6 +55,17 @@ describe('constraint profiles', () => {
     expect(constraintProfile('made-up').id).toBe('none');
   });
 
+  it('a prototype-chain key never leaks an inherited value typed as a profile', () => {
+    // `CONSTRAINT_PROFILES[id]` on an untrusted string is reachable through
+    // Object.prototype — 'toString', 'constructor', '__proto__' etc name real
+    // properties that are neither undefined nor in the table, so a bare `??`
+    // fallback does not catch them. This is on the real path: Task 5 calls
+    // constraintProfile(sidecar?.profile ?? 'none') on arbitrary JSON.
+    for (const id of ['toString', 'constructor', '__proto__', 'valueOf', 'hasOwnProperty']) {
+      expect(constraintProfile(id).id).toBe('none');
+    }
+  });
+
   it('every profile is a member of the table it claims to be in', () => {
     for (const id of CONSTRAINT_PROFILE_IDS) expect(CONSTRAINT_PROFILES[id].id).toBe(id);
   });

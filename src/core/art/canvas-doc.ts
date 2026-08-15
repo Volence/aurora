@@ -64,22 +64,24 @@ export function canvasIndex(line: number, entry: number): number {
  * domain in one pass: foreign transparent spellings (16/32/48 -> 0) and any
  * value above 63 (corrupt input, e.g. a raw PNG index) are the same bug through
  * two different doors, so they get the same fix. Returns the SAME buffer when
- * nothing needed fixing — callers compare by reference to decide whether
- * anything actually changed — and never mutates the input, which the store
- * relies on for undo.
+ * nothing needed fixing, to skip the copy on the common clean path — most
+ * strokes are already canonical, and paying for an allocation on every one of
+ * them just to re-check that would be wasted work — and never mutates the
+ * input, which the store relies on for undo.
  */
 export function normalizeCanvasPixels(buf: PixelBuffer): PixelBuffer {
+  // One definition of "canonical", used by both passes below, so the scan and
+  // the rewrite can never quietly disagree about what they are checking for.
+  const canonical = (v: number): number => canvasIndex(paletteLineOf(v), paletteEntryOf(v));
+
   let dirty = false;
   for (let i = 0; i < buf.data.length; i++) {
-    const v = buf.data[i];
-    if (canvasIndex(paletteLineOf(v), paletteEntryOf(v)) !== v) { dirty = true; break; }
+    if (canonical(buf.data[i]) !== buf.data[i]) { dirty = true; break; }
   }
   if (!dirty) return buf;
+
   const data = new Uint8Array(buf.data.length);
-  for (let i = 0; i < data.length; i++) {
-    const v = buf.data[i];
-    data[i] = canvasIndex(paletteLineOf(v), paletteEntryOf(v));
-  }
+  for (let i = 0; i < data.length; i++) data[i] = canonical(buf.data[i]);
   return { width: buf.width, height: buf.height, data };
 }
 
@@ -113,11 +115,11 @@ export interface CanvasDoc {
 }
 
 const MIN_SIDE = 8;
-// Snapshot cost, not anything about the art, sets this ceiling: cloneCanvasDoc
-// copies the whole pixel buffer per undo entry, and the canvas history keeps 40
-// of them. 1024x1024 is ~1 MB per snapshot and ~40 MB of history — already a lot
-// to hold across 40 undo steps; there is no reason for a single free-size canvas
-// to need to go further than that.
+// Snapshot cost, not anything about the art, sets this ceiling: the canvas's
+// undo history (CanvasDocHistory, a later task — not built yet) keeps 40
+// whole-buffer snapshots. 1024x1024 is ~1 MB per snapshot and ~40 MB of
+// history — already a lot to hold across 40 undo steps; there is no reason for
+// a single free-size canvas to need to go further than that.
 const MAX_SIDE = 1024;
 
 export function blankCanvasDoc(input: {
