@@ -211,6 +211,27 @@ const INSTALL = String.raw`
   H.dirtyTabLabels = () => [...document.querySelectorAll('span[title^="Unsaved changes"]')]
     .map((d) => (d.parentElement ? (d.parentElement.title || d.parentElement.textContent.trim()) : '?'));
 
+  // --- second pass: dialog focus + field readouts -------------------------
+  /** Every control the trap should cycle through, in DOM order, with which one
+   *  holds focus. Read live, exactly as the trap itself reads it. */
+  H.dlgFocusables = () => {
+    const d = H.dlg(); if (!d) return null;
+    const sel = 'input:not([disabled]), select:not([disabled]), textarea:not([disabled]), button:not([disabled]), [href]';
+    const items = [...d.querySelectorAll(sel)];
+    const a = document.activeElement;
+    return {
+      count: items.length,
+      names: items.map((e) => (e.tagName === 'BUTTON' ? 'BUTTON:' + e.textContent.trim()
+        : e.tagName === 'SELECT' ? 'SELECT' : 'INPUT:' + (e.type || 'text'))),
+      focusIndex: items.indexOf(a),
+      activeInDialog: d.contains(a),
+      activeTag: a ? a.tagName : null,
+    };
+  };
+  /** Is the dialog a real <form>? Enter-submits-natively depends on it. */
+  H.dlgIsForm = () => { const d = H.dlg(); return d ? d.tagName : null; };
+  H.dlgButtonTypes = () => H.dlgButtons().map((b) => b.type);
+
   // --- status bar ---------------------------------------------------------
   H.statusText = () => { const f = document.querySelector('footer'); return f ? f.textContent : null; };
 
@@ -339,7 +360,23 @@ const ctrlZ = (c) => key(c, 'z', 'KeyZ', 90, 2);
 const ctrlS = (c) => key(c, 's', 'KeyS', 83, 2);
 const ctrlK = (c) => key(c, 'k', 'KeyK', 75, 2);
 const escape = (c) => key(c, 'Escape', 'Escape', 27, 0);
-const enter = (c) => key(c, 'Enter', 'Enter', 13, 0);
+/**
+ * Enter, WITH ITS CHARACTER EVENT.
+ *
+ * `Input.dispatchKeyEvent` with a bare `keyDown` produces no keypress/char
+ * event, and Blink's IMPLICIT FORM SUBMISSION runs off the char event, not the
+ * keydown — so a bare Enter reaches an explicit `onKeyDown` handler (which is
+ * why this worked against the old dialog) but silently does nothing to a real
+ * <form>. The first run of pass 2 reported "Enter still does not submit"
+ * because of this, not because of the app; sending `text` is what makes the
+ * keypress happen.
+ */
+async function enter(c) {
+  const base = { key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, nativeVirtualKeyCode: 13 };
+  await c.send('Input.dispatchKeyEvent', { type: 'keyDown', text: '\r', unmodifiedText: '\r', ...base });
+  await c.send('Input.dispatchKeyEvent', { type: 'char', text: '\r', unmodifiedText: '\r', ...base });
+  await c.send('Input.dispatchKeyEvent', { type: 'keyUp', ...base });
+}
 const tab = (c) => key(c, 'Tab', 'Tab', 9, 0);
 
 async function typeText(c, text) { await c.send('Input.insertText', { text }); await sleep(60); }
@@ -557,17 +594,33 @@ async function openProjectAndAct(c, { clearStorage = true, act = true } = {}) {
   return c.evalExpr('JSON.stringify(window.__dbg.levelState())');
 }
 
-/** Open the New Canvas dialog through ⌘K, the way the plan's row 11 asks. */
-async function openNewCanvasDialog(c) {
-  await ctrlK(c);
-  await sleep(500);
-  await c.evalExpr(INSTALL);
-  await typeText(c, 'New Canvas');
-  await sleep(400);
-  await enter(c);
-  await sleep(600);
-  await c.evalExpr(INSTALL);
-  return c.evalExpr('window.__c.dlgOpen()');
+/** Open the New Canvas dialog through ⌘K, the way the plan's row 11 asks.
+ *
+ *  RETRIES, because it is driven by three separate events (Ctrl+K, typed text,
+ *  Enter) and a dropped one leaves the caller filling in a dialog that is not
+ *  there — which surfaces far away as "the form is null" rather than as "the
+ *  palette did not open". */
+async function openNewCanvasDialog(c, attempts = 3) {
+  for (let i = 0; i < attempts; i++) {
+    if (await c.evalExpr('window.__c.dlgOpen()')) return true;
+    await escape(c);
+    await sleep(300);
+    await ctrlK(c);
+    await sleep(600);
+    await c.evalExpr(INSTALL);
+    const hasInput = await c.evalExpr('window.__c.paletteInput() !== null');
+    if (hasInput) {
+      await typeText(c, 'New Canvas');
+      await sleep(450);
+      await enter(c);
+      await sleep(700);
+    }
+    await c.evalExpr(INSTALL);
+    if (await c.evalExpr('window.__c.dlgOpen()')) return true;
+    note('dialog', `⌘K attempt ${i + 1} did not open the New Canvas dialog`,
+      `command palette input present=${hasInput}`);
+  }
+  return false;
 }
 
 /** Fill the dialog's fields with real typed input and a real select change. */
@@ -600,6 +653,342 @@ async function fillDialog(c, { name, width, height, profile }) {
 }
 
 export { session, openProjectAndAct, openNewCanvasDialog, fillDialog };
+
+// ===========================================================================
+// SECOND PASS (PASS=2) — the fixes made against the first report
+// ===========================================================================
+//
+// Six fixes landed in b9225d9 against the first session's written findings,
+// four of them with nobody watching the screen. This pass puts eyes back on
+// them. It is a SEPARATE run rather than more rows in session A: the arming
+// checks need canvases whose palettes differ, which means opening and closing
+// an act mid-run, and folding that into the fourteen-row flow would make both
+// harder to read.
+
+async function sessionE(c, shared) {
+  const lvl = await openProjectAndAct(c);
+  note('s2', 'GHZ act 1 ready', lvl);
+
+  // ---- 15: the reopen door arms a VISIBLE brush -------------------------
+  if (run('15')) await row15(c, shared);
+  // ---- 16: a plain tab switch must NOT re-arm ---------------------------
+  if (run('16')) await row16(c, shared);
+  // ---- 17: the dialog, on screen ----------------------------------------
+  if (run('17')) await row17(c, shared);
+
+  // Leave a canvas tab focused for session F's restart.
+  await focusTab(c, 'Canvas · arm-a', 2000);
+  await drain(c);
+  await ctrlS(c); await sleep(1500);
+  await c.evalExpr(INSTALL);
+  shared.armAHash = await c.evalExpr('window.__dbg.canvas.pixelsHash("doc:canvas:arm-a")');
+  note('s2-exit', 'handing arm-a to the restart', `hash ${shared.armAHash}`);
+}
+
+/** THE ONE THAT MATTERS MOST: a zone-seeded canvas reopened from disk. */
+async function row15(c, shared) {
+  const opened = await openNewCanvasDialog(c);
+  if (!opened) { check('15', 'a canvas can be created', false, 'the dialog did not open'); return; }
+  await fillDialog(c, { name: 'arm-a', width: 64, height: 64, profile: 'genesis-level-art' });
+  await clickEl(c, 'window.__c.dlgCreate()');
+  await sleep(1800);
+  await c.evalExpr(INSTALL);
+  const id = 'doc:canvas:arm-a';
+
+  const words = await c.json(`window.__dbg.canvas.paletteWords(${JSON.stringify(id)})`);
+  // THE PRECONDITION. This check is only meaningful in a palette where the old
+  // default (canvasIndex(0,1) === 1) really is invisible — which is what made
+  // the original defect invisible too. GHZ's word 1 is 0x0000.
+  check('15pre', 'the zone palette makes the OLD default (index 1) black — the precondition for this row',
+    words !== null && words[1] === 0,
+    `palette word 1 = 0x${((words ?? [])[1] ?? 0).toString(16)} (0 = black); word 0 = 0x${((words ?? [])[0] ?? 0).toString(16)}`);
+
+  const createdIdx = await c.evalExpr('window.__dbg.canvas.paintIndex()');
+  check('15a', 'CREATE arms a visible colour',
+    createdIdx !== 1 && words[createdIdx] !== 0,
+    `armed index ${createdIdx}, word 0x${(words[createdIdx] ?? 0).toString(16)}`);
+
+  // Draw + save so there is something to reopen.
+  await c.evalExpr('window.__c.clickTool("Pencil")'); await sleep(250);
+  await drawArt(c, 8, 8, 40, 40, 64, 8);
+  await ctrlS(c); await sleep(1500);
+  await c.evalExpr(INSTALL);
+  const savedHash = await c.evalExpr(`window.__dbg.canvas.pixelsHash(${JSON.stringify(id)})`);
+
+  // ---- close the tab, then REOPEN it: the door R18's fix had missed ----
+  await closeTab(c, 'Canvas · arm-a');
+  const gone = await c.json('window.__dbg.canvas.docIds()');
+  const reopened = await openFromExplorer(c, 'arm-a');
+  const idx = await c.evalExpr('window.__dbg.canvas.paintIndex()');
+  const w2 = await c.json(`window.__dbg.canvas.paletteWords(${JSON.stringify(id)})`);
+  const status = await c.evalExpr('window.__c.statusText()');
+  await shot(c, 's2-01-reopened-armed');
+  // NOT DISCRIMINATING ON ITS OWN, and the plant proved it: within one session
+  // `paintIndex` is still whatever the CREATE armed, so this passes with the
+  // loadCanvasDoc door removed. Kept because it is the user-visible statement,
+  // and paired with 15b2 and 15d, which are the checks that can actually fail.
+  check('15b', 'REOPENING from disk (same session) shows a visible colour armed',
+    reopened.ok === true && !gone.includes(id) && idx !== 1 && w2 !== null && w2[idx] !== 0,
+    `the document was closed first (${JSON.stringify(gone)}); after the reopen the armed index is ${idx}, `
+    + `word 0x${((w2 ?? [])[idx] ?? 0).toString(16)}; status bar: ${JSON.stringify(status)}`);
+  neg('15b', 'the reopened canvas armed the black index 1', idx === 1 || (w2 && w2[idx] === 0),
+    `index ${idx}, word 0x${((w2 ?? [])[idx] ?? 0).toString(16)}`);
+
+  // ---- and the point of all of it: the stroke is VISIBLE ----------------
+  await c.evalExpr('window.__c.clickTool("Pencil")'); await sleep(250);
+  const before = await c.evalExpr('window.__c.pixelAt(50, 12, 64)');
+  await drawArt(c, 45, 12, 58, 12, 64, 5);
+  const after = await c.evalExpr('window.__c.pixelAt(50, 12, 64)');
+  const drawn = await c.evalExpr(`window.__dbg.canvas.drawnPixels(${JSON.stringify(id)})`);
+  await shot(c, 's2-02-reopened-stroke-visible');
+  check('15c', 'a stroke drawn on the REOPENED canvas is visible on screen',
+    before !== after && after !== '0,0,0,255' && after !== '0,0,0,0',
+    `the pixel at art (50,12) went ${before} → ${after}; ${drawn} pixels are now non-zero`);
+  neg('15c', 'the stroke on the reopened canvas is invisible (black on black)',
+    after === '0,0,0,255' || after === before,
+    `${before} → ${after}`);
+  await drain(c);
+  await ctrlS(c); await sleep(1200);
+  await c.evalExpr(INSTALL);
+  shared.savedHash = savedHash;
+
+  // ---- 15b2: the reopen door with the paint index ACTUALLY RESET --------
+  //
+  // The discriminating in-session version. `closeAll` — which the project-open
+  // guard's Discard runs — puts `paintIndex` back to its default (canvasIndex(0,1)),
+  // the store's own stated behaviour, because a raw palette index names a
+  // different colour under a different palette. Reopening arm-a after that is the
+  // only in-session path where `loadCanvasDoc`'s arming is the thing under test.
+  await c.evalExpr('window.__dbg.__g3 = window.__dbg.canvas.projectOpenGuard(); 1');
+  await sleep(900);
+  await c.evalExpr(INSTALL);
+  const hadConfirm = await c.json('window.__c.confirmInfo()');
+  if (hadConfirm) {
+    await clickEl(c, `(() => [...window.__c.confirm().querySelectorAll('button')].find((b) => b.textContent.trim() === 'Discard & open'))()`);
+  } else {
+    await c.evalExpr('window.__dbg.__g3'); // clean: the guard proceeded without asking
+  }
+  await sleep(1200);
+  await c.evalExpr(INSTALL);
+  const resetIdx = await c.evalExpr('window.__dbg.canvas.paintIndex()');
+  const clearedDocs = await c.json('window.__dbg.canvas.docIds()');
+  const back = await openFromExplorer(c, 'arm-a');
+  const idx2 = await c.evalExpr('window.__dbg.canvas.paintIndex()');
+  const w3 = await c.json(`window.__dbg.canvas.paletteWords(${JSON.stringify(id)})`);
+  await shot(c, 's2-01b-reopen-after-reset');
+  check('15b2', 'with the paint index reset, reopening from disk RE-ARMS a visible colour',
+    resetIdx === 1 && clearedDocs.length === 0 && back.ok === true
+      && idx2 !== 1 && w3 !== null && w3[idx2] !== 0,
+    `after closeAll the armed index is ${resetIdx} (the default) and no documents are open `
+    + `(${JSON.stringify(clearedDocs)}); reopening arm-a armed index ${idx2}, `
+    + `word 0x${((w3 ?? [])[idx2] ?? 0).toString(16)}`);
+  neg('15b2', 'the reopen left the default black index 1 armed', idx2 === 1,
+    `armed ${idx2} after the reopen`);
+
+  // Draw once more so the visible claim is on screen in this state too.
+  await c.evalExpr('window.__c.clickTool("Pencil")'); await sleep(250);
+  const b2 = await c.evalExpr('window.__c.pixelAt(50, 20, 64)');
+  await drawArt(c, 45, 20, 58, 20, 64, 5);
+  const a2 = await c.evalExpr('window.__c.pixelAt(50, 20, 64)');
+  check('15b3', 'and the stroke drawn in that state is visible',
+    b2 !== a2 && a2 !== '0,0,0,255',
+    `the pixel at art (50,20) went ${b2} → ${a2}`);
+  await drain(c);
+  await ctrlS(c); await sleep(1200);
+  await c.evalExpr(INSTALL);
+}
+
+/** THE DELIBERATE NON-DOOR: focus must not re-arm. */
+async function row16(c, shared) {
+  // A second canvas whose palette DIFFERS — created with no zone open, so it
+  // gets the default ramp rather than Green Hill's.
+  await c.evalExpr('window.__dbg.resetLevel()');
+  await sleep(900);
+  await c.evalExpr(INSTALL);
+  const opened = await openNewCanvasDialog(c);
+  if (!opened) { check('16', 'a second canvas can be created', false, 'the dialog did not open'); return; }
+  await fillDialog(c, { name: 'arm-b', width: 64, height: 64 });
+  await clickEl(c, 'window.__c.dlgCreate()');
+  await sleep(1800);
+  await c.evalExpr(INSTALL);
+  await c.evalExpr('window.__dbg.activate("ghz", 1)');
+  await sleep(4000);
+  await c.evalExpr(INSTALL);
+
+  const pa = await c.json('window.__dbg.canvas.paletteWords("doc:canvas:arm-a")');
+  const pb = await c.json('window.__dbg.canvas.paletteWords("doc:canvas:arm-b")');
+  const differ = JSON.stringify(pa) !== JSON.stringify(pb);
+  note('16', 'the two palettes', `identical=${!differ}; arm-a[1]=0x${(pa[1]||0).toString(16)}, arm-b[1]=0x${(pb[1]||0).toString(16)}`);
+
+  // Pick a specific colour on arm-a by clicking its swatch, then bounce.
+  await focusTab(c, 'Canvas · arm-a', 1800);
+  const picked = await c.evalExpr('window.__c.clickSwatch(40)');
+  await sleep(400);
+  const armed0 = await c.evalExpr('window.__dbg.canvas.paintIndex()');
+  const toB = await focusTab(c, 'Canvas · arm-b', 1800);
+  const armedOnB = await c.evalExpr('window.__dbg.canvas.paintIndex()');
+  const backToA = await focusTab(c, 'Canvas · arm-a', 1800);
+  const armed1 = await c.evalExpr('window.__dbg.canvas.paintIndex()');
+  await shot(c, 's2-03-tab-switch-keeps-colour');
+  check('16', 'a plain tab switch does NOT re-arm — the colour the artist picked survives',
+    differ === true && picked === true && armed0 === 40 && armedOnB === 40 && armed1 === 40,
+    `palettes differ=${differ}; picked swatch 40 → armed ${armed0}; after switching to arm-b it is ${armedOnB}; `
+    + `after switching back it is ${armed1}${toB && backToA ? '' : ' (A TAB SWITCH FAILED)'}`);
+  neg('16', 'the switch re-armed the brush', armedOnB !== 40 || armed1 !== 40,
+    `40 → ${armedOnB} → ${armed1}`);
+}
+
+/** The dialog, on screen, after the four blind fixes. */
+async function row17(c, shared) {
+  const opened = await openNewCanvasDialog(c);
+  if (!opened) { check('17', 'the dialog opens', false, 'it did not'); return; }
+  const form = await c.evalExpr('window.__c.dlgIsForm()');
+  const btypes = await c.json('window.__c.dlgButtonTypes()');
+  const f0 = await c.json('window.__c.dlgFocusables()');
+  note('17', 'dialog shape', `root element is <${String(form).toLowerCase()}>; button types ${JSON.stringify(btypes)}; `
+    + `focusables ${JSON.stringify(f0.names)}`);
+  check('17a', 'the controls are a real <form> and Cancel is type="button"',
+    form === 'FORM' && btypes.includes('button') && btypes.includes('submit'),
+    `<${String(form).toLowerCase()}>, button types ${JSON.stringify(btypes)}`);
+
+  // ---- Tab cycles, wraps, and never escapes -----------------------------
+  const walk = [];
+  for (let i = 0; i < f0.count + 2; i++) {
+    await tab(c); await sleep(120);
+    walk.push(await c.json('window.__c.dlgFocusables()'));
+  }
+  const escaped = walk.some((w) => w && w.activeInDialog === false);
+  const wrapped = walk.length > f0.count && walk[f0.count - 1] && walk[f0.count - 1].focusIndex === 0;
+  await shot(c, 's2-04-focus-trap');
+  check('17b', 'Tab cycles inside the dialog and WRAPS — it never leaves',
+    escaped === false && wrapped === true,
+    `${f0.count} focusables; ${walk.length} Tab presses landed on indices `
+    + `[${walk.map((w) => (w ? w.focusIndex : '?')).join(', ')}], all inside the dialog=${!escaped}; `
+    + `press ${f0.count} returned to index 0=${wrapped}`);
+  neg('17b', 'Tab escaped the dialog', escaped, `activeInDialog across the walk: ${walk.map((w) => w && w.activeInDialog).join(',')}`);
+
+  // ---- Shift+Tab from the first control wraps to the last ---------------
+  await c.evalExpr(`(() => { const d = window.__c.dlg();
+    d.querySelectorAll('input')[0].focus(); return 1; })()`);
+  await sleep(150);
+  await c.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9, nativeVirtualKeyCode: 9, modifiers: 8 });
+  await c.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9, nativeVirtualKeyCode: 9, modifiers: 8 });
+  await sleep(250);
+  const back = await c.json('window.__c.dlgFocusables()');
+  check('17c', 'Shift+Tab from the first control wraps to the LAST, still inside',
+    back.focusIndex === back.count - 1 && back.activeInDialog === true,
+    `landed on index ${back.focusIndex} of ${back.count} (${back.names[back.focusIndex] ?? '?'}), inside=${back.activeInDialog}`);
+
+  // ---- RECOVERY: focus dropped outside the controls, then Tab ----------
+  // A -1 index is what a maintain-only trap cannot handle. Reached the way a
+  // user reaches it: click the dialog's own title text, which is a div and
+  // therefore not focusable, so activeElement leaves the control set.
+  await clickEl(c, `[...window.__c.dlg().querySelectorAll('div')].find((e) => e.textContent.trim() === 'New Canvas')`);
+  await sleep(250);
+  const lost = await c.json('window.__c.dlgFocusables()');
+  await tab(c); await sleep(250);
+  const found = await c.json('window.__c.dlgFocusables()');
+  await shot(c, 's2-05-focus-recovery');
+  note('17d', 'recovery attempt', `after clicking the title, focusIndex=${lost.focusIndex} (activeTag ${lost.activeTag}, `
+    + `inDialog=${lost.activeInDialog}); after one Tab, focusIndex=${found.focusIndex} (inDialog=${found.activeInDialog})`);
+  check('17d', 'focus that has left the controls is RECOVERED by Tab, not lost',
+    found.activeInDialog === true && found.focusIndex >= 0,
+    `focus went to ${lost.activeTag} (index ${lost.focusIndex}); one Tab put it back at index ${found.focusIndex} `
+    + `(${found.names[found.focusIndex] ?? '?'})`);
+
+  // ---- an emptied width renders BLANK, and the message names the WIDTH --
+  await fillDialog(c, { name: 'goodname' });
+  await clickEl(c, 'window.__c.dlgNums()[0]');
+  await key(c, 'a', 'KeyA', 65, 2);
+  await key(c, 'Backspace', 'Backspace', 8, 0);
+  await sleep(400);
+  const emptied = await c.json('window.__c.dlgSnapshot()');
+  await shot(c, 's2-06-emptied-width');
+  check('17e', 'an emptied width field renders BLANK, not a literal 0',
+    emptied.nums[0] === '',
+    `the field reads ${JSON.stringify(emptied.nums[0])}`);
+  neg('17e', 'the emptied width still shows 0', emptied.nums[0] === '0', `value ${JSON.stringify(emptied.nums[0])}`);
+  check('17f', 'the message on screen is about the WIDTH, not the name',
+    emptied.error !== null && /Width must be/.test(emptied.error.text) && !/canvas name/i.test(emptied.error.text)
+      && emptied.createDisabled === true,
+    emptied.error ? `"${emptied.error.text}" — Create disabled=${emptied.createDisabled}, `
+      + `rendered opacity ${emptied.createOpacity} (it must LOOK disabled too, not just be it)`
+      : 'NO MESSAGE SHOWN');
+
+  // ---- Enter submits from a number field, exactly once ------------------
+  await fillDialog(c, { name: 'entersubmit', width: 64, height: 64 });
+  const before = await c.json('window.__dbg.canvas.docIds()');
+  await clickEl(c, 'window.__c.dlgNums()[1]');
+  await enter(c);
+  await sleep(2200);
+  await c.evalExpr(INSTALL);
+  const after = await c.json('window.__dbg.canvas.docIds()');
+  const stillOpen = await c.evalExpr('window.__c.dlgOpen()');
+  const tabsNow = await c.json('window.__c.tabLabels()');
+  const dupes = tabsNow.filter((t) => t === 'Canvas · entersubmit').length;
+  await shot(c, 's2-07-enter-submits');
+  check('17g', 'Enter from a NUMBER field submits the form — once',
+    stillOpen === false && after.includes('doc:canvas:entersubmit')
+      && after.length === before.length + 1 && dupes === 1,
+    `dialog open=${stillOpen}; documents ${before.length} → ${after.length} (${JSON.stringify(after)}); `
+    + `tabs titled "Canvas · entersubmit" on screen: ${dupes}`);
+
+  // ---- the backdrop no longer discards ----------------------------------
+  await openNewCanvasDialog(c);
+  await fillDialog(c, { name: 'keepme', width: 96, height: 96 });
+  const filled = await c.json('window.__c.dlgSnapshot()');
+  await mouse(c, 'mousePressed', 40, 40);
+  await sleep(60);
+  await mouse(c, 'mouseReleased', 40, 40, { buttons: 0 });
+  await sleep(700);
+  await c.evalExpr(INSTALL);
+  const survived = await c.json('window.__c.dlgSnapshot()');
+  await shot(c, 's2-08-backdrop-no-longer-discards');
+  check('17h', 'a backdrop click no longer discards a filled-in form',
+    survived !== null && survived.name === filled.name && survived.nums[0] === filled.nums[0],
+    `before the click ${JSON.stringify({ name: filled.name, nums: filled.nums })}; after it `
+    + `${survived ? JSON.stringify({ name: survived.name, nums: survived.nums }) : 'THE DIALOG CLOSED'}`);
+  neg('17h', 'the backdrop click closed the dialog', survived === null, `dialog present afterwards=${survived !== null}`);
+  await escape(c);
+  await sleep(400);
+  await c.evalExpr(INSTALL);
+}
+
+/** The original defect's exact scenario: reopen NEXT SESSION and draw. */
+async function sessionF(c, shared) {
+  if (!run('15')) return;
+  const restored = await waitRestored(c);
+  note('15d', 'restore settled', JSON.stringify({ waited: restored.waitedMs, tabs: restored.tabs }));
+  const focused = await focusTab(c, 'Canvas · arm-a', 2500);
+  const idx = await c.evalExpr('window.__dbg.canvas.paintIndex()');
+  const words = await c.json('window.__dbg.canvas.paletteWords("doc:canvas:arm-a")');
+  await c.evalExpr('window.__c.clickTool("Pencil")'); await sleep(300);
+  const before = await c.evalExpr('window.__c.pixelAt(50, 58, 64)');
+  await drawArt(c, 45, 58, 58, 58, 64, 5);
+  const after = await c.evalExpr('window.__c.pixelAt(50, 58, 64)');
+  await shot(c, 's2-09-next-session-stroke');
+  check('15d', 'reopened in a NEW SESSION, the brush is visible and the stroke shows — the original defect',
+    focused === true && idx !== 1 && words !== null && words[idx] !== 0 && before !== after
+      && after !== '0,0,0,255',
+    `armed index ${idx}, word 0x${((words ?? [])[idx] ?? 0).toString(16)}; `
+    + `the pixel at art (50,58) went ${before} → ${after}`);
+  neg('15d', 'the next-session stroke is invisible', after === before || after === '0,0,0,255',
+    `${before} → ${after}`);
+}
+
+async function secondPass() {
+  if (existsSync(CANVAS_DIR)) rmSync(CANVAS_DIR, { recursive: true, force: true });
+  const shared = {};
+  await session('E — the six fixes, on screen', (c) => sessionE(c, shared));
+  await session('F — reopened in a NEW SESSION (the original defect)', (c) => sessionF(c, shared));
+  writeFileSync(`${SHOTS}/results-pass2.json`, JSON.stringify(results, null, 2));
+  console.log('\n================ SUMMARY (pass 2) ================');
+  console.log(`checks: ${results.filter((r) => !r.negative && r.ok !== null).length}, fails: ${fails.length}`);
+  if (fails.length) console.log('FAILED:\n  ' + fails.join('\n  '));
+  if (negFails.length) console.log('!!! NEGATIVE CONTROLS THAT DID NOT FAIL (harness is blind):\n  ' + negFails.join('\n  '));
+  else console.log('all negative controls correctly reported FAIL');
+  if (fails.length || negFails.length) process.exitCode = 1;
+}
 
 // ===========================================================================
 // The run
@@ -809,22 +1198,33 @@ async function row11(c) {
   check('11k', 'Escape closes the dialog', escClosed === false, `dlgOpen()=${escClosed}`);
 
   // --- backdrop click on a FILLED form -------------------------------------
+  // BEHAVIOUR CHANGED IN b9225d9. The first run of this row recorded that a
+  // backdrop click discarded a filled-in form with no confirmation; the fix
+  // removed backdrop dismissal entirely. The row now asserts the CURRENT rule,
+  // and pass 2's 17h is the dedicated check with the full before/after form.
   await openNewCanvasDialog(c);
   await fillDialog(c, { name: 'backdroptest', width: 200, height: 200 });
   const before = await c.json('window.__c.dlgSnapshot()');
+  if (before === null) { check('11l', 'a backdrop click does NOT discard a filled-in form', false,
+    'the dialog was not open, so this row could not run'); return; }
   await mouse(c, 'mousePressed', 40, 40);
   await sleep(60);
   await mouse(c, 'mouseReleased', 40, 40, { buttons: 0 });
+  await sleep(500);
+  await c.evalExpr(INSTALL);
+  const after = await c.json('window.__c.dlgSnapshot()');
+  check('11l', 'a backdrop click does NOT discard a filled-in form',
+    after !== null && after.name === before.name && after.nums[0] === before.nums[0],
+    `form was ${JSON.stringify({ name: before.name, nums: before.nums })}; after the backdrop click `
+    + `${after ? JSON.stringify({ name: after.name, nums: after.nums }) : 'THE DIALOG CLOSED'}`);
+  neg('11l', 'the backdrop click closed the dialog', after === null, `dialog still present=${after !== null}`);
+
+  // Escape is the explicit way out, and it must still give a fresh form next time.
+  await escape(c);
   await sleep(400);
-  const bdClosed = await c.evalExpr('window.__c.dlgOpen()');
-  note('11l', 'clicking the backdrop with a FILLED form',
-    `form was ${JSON.stringify({ name: before.name, nums: before.nums })}; dialog open afterwards=${bdClosed}`);
-  check('11l', 'a backdrop click discards a filled form WITHOUT asking (recorded, not judged)',
-    bdClosed === false, `dialog closed=${bdClosed === false} — no confirm was raised`);
-  // and the form is not remembered
   await openNewCanvasDialog(c);
   const reopened = await c.json('window.__c.dlgSnapshot()');
-  check('11m', 'reopening after a discard gives a fresh form',
+  check('11m', 'Escape then reopening gives a fresh form',
     reopened.name === '' && reopened.nums[0] === '128',
     `name=${JSON.stringify(reopened.name)} nums=${JSON.stringify(reopened.nums)}`);
   await escape(c);
@@ -1698,4 +2098,5 @@ async function sessionD(c, shared) {
 }
 
 // ---------------------------------------------------------------------------
-main().catch((e) => { console.error('HARNESS ERROR:', e); process.exitCode = 2; });
+const entry = process.env.PASS === '2' ? secondPass : main;
+entry().catch((e) => { console.error('HARNESS ERROR:', e); process.exitCode = 2; });

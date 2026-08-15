@@ -1,5 +1,16 @@
 # Task 14 — the origination canvas, verified in the running app
 
+> **This report is a history, not a snapshot.** Session 1 (below) is what was observed at
+> `c5d39a5`, when the feature had never been on screen. Session 2 (at the end) is what was
+> observed at `b9225d9`, after the six fixes those findings prompted. Session 1's text is left
+> exactly as written — the three dialog failures it records are real history, and they are
+> fixed now.
+>
+> **Where the branch stands after session 2: 52/52 in session 1's suite and 16/16 in session
+> 2's, every negative control correct, and five falsification cycles across the two sessions.**
+
+## Session 1 — 2026-08-15, at `c5d39a5`
+
 **Status: DONE_WITH_CONCERNS.** All 14 rows of the plan's Task 14 table were driven in the
 running Electron app against the real `s1disasm` project (GHZ act 1), over CDP, with real
 pointer strokes, real keystrokes, real tab clicks and real pixel readback. **52 checks, 49
@@ -542,6 +553,167 @@ handlers route through `focusedHistory()`, so the real symptom is a **double can
 one keypress, two strokes gone. An assertion about the level's state cannot see it. Row 8b in
 the harness is the check that can.
 
+---
+
+# Session 2 — 2026-08-15, at `b9225d9`
+
+**Status: DONE.** Six fixes landed against session 1's written findings, **four of them
+without anyone looking at the screen**. This pass put eyes back on all six.
+
+**Session 2's own suite: 16 checks, 16 pass.** Session 1's suite, re-run against the fixed
+tree: **52 checks, 52 pass** — the three dialog failures it recorded are gone. Every negative
+control in both reported FAIL. **Two more original bugs were planted, rebuilt, watched to
+fail, and reverted**, both aimed at the arming fix, which has two doors and a deliberate
+non-door.
+
+Run it with `PASS=2 node scratchpad/canvas-cdp-harness.mjs` (`ONLY=15,16` etc. still applies).
+Two sessions: **E** for the fixes on screen, **F** for a genuine restart, because the original
+defect only shows itself in a fresh process.
+
+### 15 — the brush on a reopened canvas *(the one that mattered most)*
+
+**PASS**, across four checks, and one of them only exists because a plant proved the obvious
+version of the check was worthless.
+
+**The precondition first (15pre).** This row is only meaningful in a palette where the old
+default really is invisible. Created `arm-a` 64×64 in GHZ and read its words back: **word 1 is
+`0x0000`** — black. That is what made the original defect silent.
+
+- **15a — create arms a visible colour:** armed index **6**, word `0x0EEE` (white).
+- **15b — same-session close and reopen:** closed the tab with its own `×` (documents `[]`
+  confirmed), reopened from the Explorer, armed index **6**, word `0x0EEE`.
+  **This check is not discriminating and the plant proved it** — see the falsification below.
+  It is kept because it is the user-visible statement, but it passes whether the fix is there
+  or not, because within one session `paintIndex` still holds whatever the *create* armed.
+- **15b2 — the discriminating in-session version:** ran the project-open guard and clicked
+  **Discard & open**, whose `closeAll` puts `paintIndex` back to its default. Confirmed: armed
+  index **1**, no documents open. Then reopened `arm-a` from the Explorer — armed index **6**,
+  word `0x0EEE`. This is the only in-session path where `loadCanvasDoc`'s arming is the thing
+  under test.
+- **15b3 — and it is visible:** a stroke in that state took the pixel at art (50,20) from
+  `42,42,58,255` to `255,255,255,255`.
+- **15c:** a stroke on the same-session reopened canvas is visible, `42,42,58` →
+  `255,255,255`, 47 non-zero pixels.
+- **15d — the original defect's exact scenario:** app killed, relaunched, project opened, the
+  restored `Canvas · arm-a` tab clicked. Armed index **6**, word `0x0EEE`, and the stroke at
+  art (50,58) went `42,42,58,255` → `255,255,255,255`. **Visible.**
+
+Shots `s2-01-reopened-armed.png`, `s2-01b-reopen-after-reset.png`,
+`s2-02-reopened-stroke-visible.png`, `s2-09-next-session-stroke.png`.
+
+### 16 — a plain tab switch must NOT re-arm
+
+**PASS**, and this is the regression the store-level fix could have introduced.
+
+Built two canvases whose palettes genuinely differ (`arm-a` seeded from Green Hill, `arm-b`
+created with the act reset so it gets the default ramp; the harness asserts they differ before
+asserting anything else). On `arm-a`, clicked the swatch that arms canvas index **40**.
+
+| step | armed index |
+|---|---|
+| after clicking the swatch on `arm-a` | 40 |
+| after switching to `arm-b` | **40** |
+| after switching back to `arm-a` | **40** |
+
+The artist's colour survives both crossings. Shot `s2-03-tab-switch-keeps-colour.png`.
+
+### 17 — the dialog, on screen
+
+**PASS**, eight checks. All three of session 1's failures are fixed, and the two changes it
+did not ask for behave as described.
+
+- **17a — shape:** the root element is a real `<form>`; button types are
+  `["button", "submit"]`, so Cancel does not submit.
+- **17b — Tab cycles and wraps, and never escapes.** Five focusables while the form is invalid
+  (`INPUT:text, INPUT:number, INPUT:number, SELECT, BUTTON:Cancel` — Create is disabled and
+  correctly out of the cycle). Seven presses landed on indices **1, 2, 3, 4, 0, 1, 2**: it
+  wraps at the fifth and **`activeInDialog` was true on every single press.**
+- **17c — Shift+Tab from the first control wraps to the last:** index **4 of 5**
+  (`BUTTON:Cancel`), still inside.
+- **17d — RECOVERY, the case a maintain-only trap fails.** Reached the way a user reaches it:
+  clicked the dialog's own title, which is a `div` and therefore not focusable, so
+  `document.activeElement` became **`BODY`** and the trap's index went to **-1** — focus
+  genuinely outside the control set. One Tab put it back at **index 0** (`INPUT:text`), inside
+  the dialog. The `-1` branch is not decorative; it is reachable by an ordinary click, and it
+  works.
+- **17e — an emptied width renders BLANK:** the field reads `""`, not `"0"`.
+- **17f — and the message names the WIDTH:** *"Width must be a whole number between 8 and 1024
+  pixels."* — no mention of the name. Create is `disabled=true` **and renders at opacity 0.5**,
+  so it looks disabled as well as being disabled. (I misread the screenshot as a
+  full-strength button and checked rather than reporting it; it is correctly dimmed.) The red
+  border is on the width field, not the name. Shot `s2-06-emptied-width.png`.
+- **17g — Enter submits from a number field, once:** dialog closed, documents `2 → 3`, and
+  **exactly one** tab titled `Canvas · entersubmit` on screen. See the harness note below —
+  this one initially reported a failure that was mine.
+- **17h — the backdrop no longer discards:** with `keepme / 96 × 96` typed, a click at (40,40)
+  left the form exactly as it was. Shot `s2-08-backdrop-no-longer-discards.png`.
+
+### The falsification cycles (session 2)
+
+**Plant A — remove the `loadCanvasDoc` door** (`armVisiblePaintIndex(doc.palette)` deleted from
+`loadCanvasDoc`). Rebuilt, ran `PASS=2 ONLY=15`.
+
+- **15d FAILED**, exactly as the original bug: reopened in a new session the brush armed the
+  black index and the stroke came back `42,42,58,255 → 0,0,0,255` — **invisible**.
+- **15b PASSED anyway.** That is the finding that produced 15b2: a same-session close/reopen
+  cannot see this bug, because `paintIndex` is still whatever the create armed. Wrote 15b2/15b3
+  *while the plant was still in place*, watched them **FAIL**, then reverted.
+- **Reverted:** 15b2, 15b3 and 15d all **PASS** (armed index 6, word `0x0EEE`, strokes visible).
+
+**Plant B — move arming onto the non-door** (`armVisiblePaintIndex` added to
+`activateCanvasDoc`, i.e. every plain tab focus). Rebuilt, ran `PASS=2 ONLY=15,16`.
+
+- **16 FAILED**, and the numbers say precisely what the artist would experience: picked colour
+  **40**, switched to `arm-b` and it became **15**, switched back to `arm-a` and it became
+  **6**. The chosen colour destroyed on every tab switch.
+- **Reverted:** 16 **PASSES**, `40 → 40 → 40`.
+
+After both cycles `git status` shows no source modification, `npx tsc --noEmit` is clean and
+`npm test` reports **2726 passed / 3 skipped**.
+
+### Two harness defects found in session 2
+
+Both were caught by a result that looked like a product failure, and both would have been
+reported as one:
+
+1. **"Enter still does not submit" (17g) was my key dispatch.** `Input.dispatchKeyEvent` with a
+   bare `keyDown` produces no keypress/char event, and Blink's **implicit form submission runs
+   off the char event**. A bare Enter reaches an explicit `onKeyDown` handler — which is why it
+   worked against the *old* dialog, whose name input had one — and does nothing to a real
+   `<form>`. Sending `text: '\r'` plus a `char` event fixed it and 17g passes. **Without that
+   check I would have reported the Enter fix as broken.**
+2. **⌘K occasionally drops one of its three events** (Ctrl+K, typed text, Enter), leaving the
+   caller filling in a dialog that is not there — which surfaced far away as "the form is
+   null". `openNewCanvasDialog` now retries up to three times and says so; the log shows it
+   taking a second attempt twice in a full run.
+
+Session 1's suite was also updated where the fixes deliberately changed behaviour: **row 11l
+now asserts that a backdrop click does *not* discard the form** (it asserted the opposite,
+which was the finding), and 11m checks Escape-then-reopen instead. 11e/11i/11j needed no
+change — they simply pass now.
+
+### What is still unverified after session 2
+
+- **Focus recovery from outside the panel entirely.** 17d recovers from `BODY` after a click
+  *inside* the dialog. If focus somehow lands on a control *behind* the modal, the keydown
+  never reaches the form's handler and the trap cannot fire — the backdrop makes that hard to
+  reach by mouse, and nothing in this run reached it, but it is not proven impossible.
+- **`ConfirmDialog` has no trap.** `focus-trap.ts` names it as the obvious second caller and it
+  is still uncovered; not in scope here, but it is the same gap one dialog over.
+- **The arming rule under an aeon project.** Both doors were driven under classic only.
+- Everything listed in session 1's "What I could NOT verify" still stands unchanged.
+
+### Anything still wrong?
+
+**No defect found in session 2.** All six fixes do on screen what they were written to do, and
+the two that could plausibly have regressed something (arming on load, arming *not* on focus)
+were each falsified by a plant that made the app fail in the predicted way.
+
+The one thing I would flag as a judgement call rather than a bug: **15b is a check that cannot
+fail**, and it is still in the suite. It is labelled as such in the harness and here, and
+15b2/15d carry the weight — but a reader skimming green output would take it for evidence, and
+it is not.
+
 ## Housekeeping
 
 The harness creates `<project>/.aurora/canvas/` and wipes it at the start of every run, so a
@@ -556,4 +728,17 @@ and has been removed again; re-running the harness recreates it.
 - `scratchpad/canvas-cdp-harness.mjs` — the harness.
 - `scratchpad/storage-flush-probe.mjs` — the localStorage-durability control.
 - `docs/superpowers/plans/2026-08-15-canvas-cdp-report.md` — this report.
-- `scratchpad/shots-canvas/` — 32 screenshots and `results.json`.
+- `scratchpad/shots-canvas/` — screenshots plus `results.json` (session 1) and
+  `results-pass2.json` (session 2). Untracked, matching the phase-1 convention: harnesses are
+  committed, their output is not.
+
+## How to re-run the whole thing
+
+```bash
+VITE_AURORA_DEBUG=1 npx electron-vite build
+node scratchpad/canvas-cdp-harness.mjs          # session 1's 14 rows  (52 checks, ~14 min)
+PASS=2 node scratchpad/canvas-cdp-harness.mjs   # session 2's 3 rows   (16 checks, ~7 min)
+```
+
+`ONLY=…` restricts which numbered rows run inside each pass, which is what the falsification
+cycles used. Both passes are green against `b9225d9`.
