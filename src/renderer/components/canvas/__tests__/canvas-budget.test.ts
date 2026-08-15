@@ -32,6 +32,16 @@ describe('budgetReadout', () => {
     })).toBe('tiles 37 unique · 17 free in GHZ 1 · pool 239/256');
   });
 
+  // The store holds the project's internal slug, lowercase. CDP caught the
+  // readout printing it raw — "free in ghz 1" on the same status bar as "Green
+  // Hill Zone Act 1". Every fixture above hands it an already-uppercase zone,
+  // which is why no unit test noticed.
+  it('uppercases the zone slug the store actually holds', () => {
+    expect(budgetReadout(tiles, {
+      act: { zone: 'ghz', act: 1 }, freeSlots: 17, poolUsed: 239, poolTotal: 256,
+    })).toBe('tiles 37 unique · 17 free in GHZ 1 · pool 239/256');
+  });
+
   // The unaligned band is reported, never folded into the tile count — a
   // rounded number here is budget the artist does not have.
   it('reports pixels the grid cannot turn into tiles', () => {

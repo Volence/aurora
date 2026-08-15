@@ -106,7 +106,13 @@ export function shapeTileBudget(input: {
 export function budgetReadout(tiles: UniqueTileCount, budget: CanvasTileBudget): string {
   const parts = [`tiles ${tiles.unique} unique`];
   if (budget.act) {
-    parts.push(`${budget.freeSlots} free in ${budget.act.zone} ${budget.act.act}`);
+    // UPPERCASED. `ZoneActRef.zone` is the project's internal slug — 'ghz',
+    // 'lz' — and the readout was printing it raw, so a status bar that says
+    // "Green Hill Zone Act 1" three inches to its left also said "free in ghz
+    // 1". Found under CDP, not in a unit test, because only the running app
+    // puts the two spellings on one line. Presentation only: nothing downstream
+    // reads this string.
+    parts.push(`${budget.freeSlots} free in ${budget.act.zone.toUpperCase()} ${budget.act.act}`);
     parts.push(`pool ${budget.poolUsed}/${budget.poolTotal}`);
   }
   if (tiles.pixelsOutsideGrid > 0) parts.push(`${tiles.pixelsOutsideGrid}px outside the grid`);
