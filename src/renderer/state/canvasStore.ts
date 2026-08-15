@@ -26,7 +26,10 @@
 //                    a name-only setter left lying around is exactly the shape
 //                    a future caller reaches for and gets half-right.
 //   neither          setSelection, setSource, and all view state (tool, zoom,
-//                    mirror, dither, paint index, grids).
+//                    mirror, dither, paint index, grids, and the two constraint
+//                    switches). Note the line above it: setProfile RECORDS,
+//                    because the profile decides which violations exist; the
+//                    constraint switches decide only whether you are shown them.
 //
 // A new setter has to answer both questions; nothing but this list will ask it.
 
@@ -125,6 +128,21 @@ interface CanvasState {
    *  canvas editor: if a second pane ever shows a second document, this and the
    *  rest of the view block move into OpenCanvas. */
   visibleGrids: number[];
+  /**
+   * The *unconstrained* escape hatch (spec §4.3): false suspends live checking
+   * entirely — no scan, no readouts, no overlay — and re-enabling rescans.
+   *
+   * VIEW STATE, not a document field, and deliberately not persisted: a document
+   * that permanently checks nothing already has a spelling, the `none` profile.
+   * Two ways to say one thing is two things to keep in agreement. It also
+   * neither records undo nor dirties, for the same reason `visibleGrids` does
+   * not — it changes what you are shown, not what the file holds.
+   */
+  constraintsLive: boolean;
+  /** Whether clash cells are tinted. Independent of `constraintsLive` — the
+   *  numeric readouts are useful with the tint off, so they are separate
+   *  switches rather than one three-state control. */
+  showClashOverlay: boolean;
 
   setTool: (t: CanvasTool) => void;
   setZoom: (z: number) => void;
@@ -133,6 +151,8 @@ interface CanvasState {
   setDither: (pattern: DitherPattern, secondary: number) => void;
   setPaintIndex: (v: number) => void;
   setVisibleGrids: (g: number[]) => void;
+  setConstraintsLive: (v: boolean) => void;
+  setShowClashOverlay: (v: boolean) => void;
 
   // --- Per-document ---
   setPixels: (docId: string, buffer: PixelBuffer) => void;
@@ -162,6 +182,8 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   // eraser, so the first stroke a new user draws would do nothing visible.
   paintIndex: canvasIndex(0, 1),
   visibleGrids: [8],
+  constraintsLive: true,
+  showClashOverlay: true,
 
   // Does NOT clear the selection, though spriteStore.setTool does. It cannot:
   // there, tool and selection are both per-document; here the tool is global and
@@ -183,6 +205,11 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   // bug canvas-doc.ts exists to prevent, entering through the palette.
   setPaintIndex: (v) => set({ paintIndex: canvasIndex(paletteLineOf(v), paletteEntryOf(v)) }),
   setVisibleGrids: (visibleGrids) => set({ visibleGrids }),
+  // No recordEdit and no unsavedEdits: both are view state (see their
+  // declarations). setProfile records because the profile decides which
+  // violations EXIST; these two decide only whether you are being shown them.
+  setConstraintsLive: (constraintsLive) => set({ constraintsLive }),
+  setShowClashOverlay: (showClashOverlay) => set({ showClashOverlay }),
 
   /**
    * Replace a document's pixels with a buffer OF THE DOCUMENT'S CURRENT SIZE.

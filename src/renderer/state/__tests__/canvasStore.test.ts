@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import {
   useCanvasStore, openCanvasDoc, loadCanvasDoc, activateCanvasDoc, closeCanvasDoc,
   canvasDocState, dirtyCanvasDocIds, saveableDirtyCanvasDocIds,
-  readCanvasSnapshot, writeCanvasSnapshot,
+  readCanvasSnapshot, writeCanvasSnapshot, canvasHistory,
 } from '../canvasStore';
 import { documentHistoryHub } from '../history-hub';
 import { canvasIndex, blankCanvasDoc } from '../../../core/art/canvas-doc';
@@ -500,5 +500,38 @@ describe('focus and lifecycle', () => {
     useCanvasStore.getState().closeAll();
     expect(useCanvasStore.getState().paintIndex).toBe(canvasIndex(0, 1));
     expect(useCanvasStore.getState().zoom).toBe(12);
+  });
+});
+
+describe('constraint view flags', () => {
+  beforeEach(() => {
+    useCanvasStore.getState().setConstraintsLive(true);
+    useCanvasStore.getState().setShowClashOverlay(true);
+  });
+
+  it('default to live checking with the overlay on', () => {
+    const s = useCanvasStore.getState();
+    expect(s.constraintsLive).toBe(true);
+    expect(s.showClashOverlay).toBe(true);
+  });
+
+  it('toggle independently', () => {
+    useCanvasStore.getState().setConstraintsLive(false);
+    expect(useCanvasStore.getState().showClashOverlay).toBe(true);
+    useCanvasStore.getState().setShowClashOverlay(false);
+    expect(useCanvasStore.getState().constraintsLive).toBe(false);
+  });
+
+  // They are VIEW state: no undo entry, no dirty dot. A document that checks
+  // nothing permanently is the `none` profile, not this flag — and a flag that
+  // dirtied the document would put an unsaved dot on a canvas nobody edited.
+  it('do not dirty a document or record undo', () => {
+    openCanvasDoc(A, { name: 'alpha', width: 16, height: 16, profileId: 'genesis-level-art' });
+    const before = canvasHistory(A).canUndo;
+    useCanvasStore.getState().setConstraintsLive(false);
+    useCanvasStore.getState().setShowClashOverlay(false);
+    expect(useCanvasStore.getState().isDirty(A)).toBe(false);
+    expect(canvasHistory(A).canUndo).toBe(before);
+    closeCanvasDoc(A);
   });
 });
