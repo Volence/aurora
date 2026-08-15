@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { buildBlockSurface, buildChunkSurface } from '../classic-surface-buffer';
+import { buildBlockSurface, buildChunkSurface, surfaceToTile } from '../classic-surface-buffer';
+import { tileToBuffer } from '../classic-tile-buffer';
 import type { LevelDoc, BlockDef, ChunkDef256, ChunkCell } from '../../level-classic/model';
 
 /** Minimal doc: tile N is filled entirely with palette value N. */
@@ -145,5 +146,85 @@ describe('buildChunkSurface — flip composition', () => {
     // The old TL (tile 1, xf true) lands right, and its flip CANCELS.
     expect(provenance.cells[1].tileIndex).toBe(1);
     expect(provenance.cells[1].xf).toBe(false);
+  });
+});
+
+describe('surfaceToTile', () => {
+  it('maps an unflipped cell straight through', () => {
+    const d = makeDoc([{ cells: [cell(1), cell(2), cell(3), cell(4)] }]);
+    const { provenance } = buildBlockSurface(d, 0);
+    expect(surfaceToTile(provenance, 3, 5)).toEqual({ cellIndex: 0, tileIndex: 1, tx: 3, ty: 5 });
+  });
+
+  it('un-flips x for a mirrored cell', () => {
+    const d = makeDoc([{ cells: [cell(1, true), cell(2), cell(3), cell(4)] }]);
+    const { provenance } = buildBlockSurface(d, 0);
+    // surface x=3 in a mirrored tile reads stored x = 7-3 = 4
+    expect(surfaceToTile(provenance, 3, 5)).toEqual({ cellIndex: 0, tileIndex: 1, tx: 4, ty: 5 });
+  });
+
+  it('returns null outside the surface', () => {
+    const d = makeDoc([{ cells: [cell(1), cell(2), cell(3), cell(4)] }]);
+    const { provenance } = buildBlockSurface(d, 0);
+    expect(surfaceToTile(provenance, 16, 0)).toBeNull();
+    expect(surfaceToTile(provenance, -1, 0)).toBeNull();
+  });
+
+  it('is the exact inverse of the composer for every pixel', () => {
+    // Every tile gets a VARIED pattern (not a uniform fill) so that mixing up
+    // flips or coordinates would actually change a comparison instead of
+    // trivially matching a constant value.
+    const tileCount = 8;
+    const d = makeDoc(
+      [
+        // Block 0: mix of flips, including one cell with both.
+        {
+          cells: [
+            cell(1, false, false),
+            cell(2, true, false),
+            cell(3, false, true),
+            cell(4, true, true),
+          ],
+        },
+        // Block 1: plain, used as the chunk's fill block.
+        { cells: [cell(5), cell(6), cell(7), cell(1)] },
+      ],
+      tileCount,
+    );
+    // Overwrite the uniform per-tile fill from makeDoc with a varied pattern
+    // per byte so every pixel within a tile is distinguishable too.
+    for (let t = 1; t < tileCount; t++) {
+      for (let i = 0; i < 32; i++) {
+        d.tiles[t * 32 + i] = (t * 7 + i) % 256;
+      }
+    }
+
+    // Chunk cell 0 uses block 0 and is itself flipped (both axes), so the
+    // composed flip on those surface cells is the XOR of block-cell flip and
+    // chunk-cell flip. Every other chunk cell uses the plain block 1.
+    d.chunks = [chunkWith(chunkCell(0, true, true))];
+    const { buffer, provenance } = buildChunkSurface(d, 0);
+
+    // Cache decoded tile buffers per tile index so the check stays fast.
+    const tileBufCache = new Map<number, ReturnType<typeof tileToBuffer>>();
+    function tileBuf(tileIndex: number) {
+      let tb = tileBufCache.get(tileIndex);
+      if (!tb) {
+        tb = tileToBuffer(d.tiles, tileIndex);
+        tileBufCache.set(tileIndex, tb);
+      }
+      return tb;
+    }
+
+    for (let y = 0; y < buffer.height; y++) {
+      for (let x = 0; x < buffer.width; x++) {
+        const hit = surfaceToTile(provenance, x, y);
+        expect(hit).not.toBeNull();
+        const tb = tileBuf(hit!.tileIndex);
+        const expected = tb.data[hit!.ty * 8 + hit!.tx];
+        const actual = buffer.data[y * buffer.width + x];
+        expect(actual).toBe(expected);
+      }
+    }
   });
 });

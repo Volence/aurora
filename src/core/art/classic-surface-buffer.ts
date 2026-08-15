@@ -154,3 +154,33 @@ export function buildChunkSurfaceById(doc: LevelDoc, chunkId: number): Surface |
   const idx = chunkIndexForId(doc, chunkId);
   return idx === null ? null : buildChunkSurface(doc, idx);
 }
+
+export interface TileHit {
+  /** Index into provenance.cells. */
+  cellIndex: number;
+  tileIndex: number;
+  /** Coordinates within the STORED tile (flips undone), 0..7. */
+  tx: number;
+  ty: number;
+}
+
+/**
+ * Resolve a surface pixel to the stored tile pixel it is drawn from.
+ *
+ * This is the EXACT inverse of `blitCell` above, and lives beside it so the two
+ * can be read against each other — an inverse that drifts from its forward map is
+ * the kind of bug that produces plausible-looking wrong pixels.
+ */
+export function surfaceToTile(p: SurfaceProvenance, x: number, y: number): TileHit | null {
+  if (x < 0 || y < 0 || x >= p.cellsX * TILE_PX || y >= p.cellsY * TILE_PX) return null;
+  const cellIndex = (y >> 3) * p.cellsX + (x >> 3);
+  const c = p.cells[cellIndex];
+  if (!c) return null;
+  const px = x & 7, py = y & 7;
+  return {
+    cellIndex,
+    tileIndex: c.tileIndex,
+    tx: c.xf ? TILE_PX - 1 - px : px,
+    ty: c.yf ? TILE_PX - 1 - py : py,
+  };
+}
