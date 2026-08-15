@@ -33,9 +33,9 @@ The standing product bar is that the canvas should be good enough that artists *
 Aseprite to make the art in the first place**. The PNG path exists for work that already happened
 elsewhere, not as an admission that origination belongs elsewhere.
 
-`src/renderer/components/ChunkSheetImporter.tsx` is a gutted S4-era stub, mounted nowhere, whose
-TODO claims the tile→block→chunk hierarchy "no longer exists" (true for aeon, false for classic).
-2C supersedes it; delete it as part of this work.
+`src/renderer/components/ChunkSheetImporter.tsx` was a gutted S4-era stub, mounted nowhere, whose
+TODO claimed the tile→block→chunk hierarchy "no longer exists" (true for aeon, false for classic).
+2C supersedes it. Deleted in `e432a87`.
 
 ---
 
@@ -59,8 +59,12 @@ names the drifted entries, and offers two resolutions:
 
 - **Use the act's colours** — re-index the art onto the act palette. Exact matches only; refuses if
   a canvas colour has no equivalent, rather than picking a nearest.
-- **Adopt into the zone palette** — write lines 1–3, stating plainly that every act of the zone
-  changes.
+- **Adopt into the zone palette** — write lines 1–3, stating plainly which acts change.
+
+  **That reach is computed from the act's own palette components, never hardcoded.** "Every act of
+  the zone changes" is false for SBZ, whose acts carry per-act palette files — `SBZ Act 2.bin`,
+  `SBZ Act 3.bin` (`profiles/s1.ts:473, 493`). The dialog must read `paletteSources` and name the
+  files it would write, so the sentence is true in every zone rather than in most of them.
 
 **Line 0 drift always refuses.** `profiles/s1.ts:132–140`: every zone composes as
 `palette/Sonic.bin[0..16) → entries 0..16` plus `palette/<Zone>.bin[0..48) → entries 16..64`. Line 0
@@ -81,6 +85,7 @@ VERIFIED against `s1disasm/_incObj/sub FindNearestTile & FindFloor & FindWall.as
 ```
 move.w  (a1),d0          ; chunk cell word
 andi.w  #$7FF,d0         ; block number
+beq.s   .isblank         ; BLOCK 0 IS BLANK — short-circuits BEFORE the solidity test
 btst    d5,d4            ; is the block solid?      <- chunk cell solidity bits
 movea.l (v_collindex).w,a2
 move.b  (a2,d0.w),d0     ; collision heightmap id   <- colind INDEXED BY BLOCK NUMBER
@@ -89,7 +94,7 @@ btst    #$B,d4           ; x-flip -> mirror heightmap, negate angle
 btst    #$C,d4           ; y-flip -> flip angle
 ```
 
-Three consequences, none of them optional:
+Four consequences, none of them optional:
 
 1. **colind is one byte per block id.** Two blocks needing different collision *are* two different
    blocks. So inherited collision is **part of block identity during dedup**: two occurrences that
@@ -100,9 +105,39 @@ Three consequences, none of them optional:
    all solidity 0 is fall-through regardless of colind. So a new chunk cell **inherits the displaced
    cell's solidity plane** as well as its block's colind. Both, or the feature ships the defect D3
    exists to prevent.
-3. **Flip-merged blocks get correct collision for free.** The engine mirrors the heightmap and
-   negates the angle from the chunk cell's own flip bits, so mirrored art gets mirrored collision
-   automatically. Flip-aware block dedup is therefore safe, not a wrinkle to dodge.
+3. **Orientation is part of block identity too — flip-merging is NOT free.** The engine orients the
+   heightmap by the **chunk cell's** flip bits. The displaced cell collided as
+   `orient(colind_old, flip_old)`; the new cell collides as `orient(colind_inherited, flip_new)`,
+   where `flip_new` comes from the resolver's canonicalisation and knows nothing about `flip_old`.
+   Two cells whose old art was mirror-imaged but whose colind id was the *same* (a symmetric shape —
+   real data does this) pass the D3.1 identity test and merge, after which one of them collides
+   against a mirrored heightmap. Even a lone occurrence breaks if canonicalisation flips it relative
+   to the cell it displaced.
+
+   So the dedup identity tuple is **(canonical cells, inherited colind, relative orientation
+   `flip_new XOR flip_old`)** — three elements, not two. Merge only where that relative orientation
+   is consistent across occurrences, or where the inherited colind is 0 (nothing to orient). The
+   resolver should additionally *prefer* the displaced cell's orientation when choosing an
+   occurrence's flips, so the common case merges rather than splits.
+
+   An earlier draft of this spec claimed flip-merged blocks got correct collision for free. That is
+   true for art drawn from scratch and false under positional inheritance, which is the only mode
+   2C has.
+
+4. **Block 0 and tile 0 are floors, not resources.** `beq.s .isblank` fires on block number 0
+   *before* the solidity test, so block 0 is engine-blank unconditionally and can never carry
+   collision. Tile 0 is the transparent tile. **Neither is ever reclaimable or allocatable**, and
+   this must be stated as its own rule in 2C rather than inherited: the tile-0 protection phase 1
+   relies on is `findFreeSlot` starting at `t=1` (`classic-surface-plan.ts:127`), a private function
+   2C does not call — 2C's allocator is new code drawing from a reclaimed list phase 1 never had.
+
+   A full replace (D1) makes every block's chunk references a subset of the replaced set, so without
+   this rule tile 0 and block 0 are *always* reclaimed on the path most likely to be used. Allocating
+   over tile 0 repaints every blank cell in the zone; reassigning block 0 fills every blank chunk
+   cell with art the engine will never make solid.
+
+   The mirror of the all-transparent-cell rule applies at the block tier too: an all-transparent
+   block maps to **block 0**, never allocated.
 
 Appended chunks have nothing to inherit: colind 0 and solidity 0, **reported as a count**, never
 silent.
@@ -121,9 +156,48 @@ Its `excluded` contract (documented at `classic-surface-plan.ts:88–97`) is loa
 survive the move: a slot already claimed this gesture holds stale on-disk bytes, so matching against
 it would repoint one cell at another's paint.
 
+**One exclusion set is not enough — there are three states, and the matcher's contract must name
+all of them.** Availability threads through matching *and* allocation as one structure:
+
+| State | May be matched against | May be allocated |
+|---|---|---|
+| free / reclaimed, untouched | yes — its bytes are what is on disk | yes |
+| matched and reused this gesture | yes — its bytes are unchanged | **no** |
+| allocated new bytes this gesture | **no** — its bytes are stale | no |
+
+The middle row is the one a single `excluded` set loses. Without it: tile A content-matches
+reclaimed slot 5 and repoints to it, then the allocator hands slot 5 to tile B and overwrites it —
+A's blocks now render B's paint. On a re-theme this is close to certain, because reclaimed slots
+hold the old zone art, imported art matches many of them, and the allocator draws from the same
+list.
+
+**This is also a latent defect in shipped phase 1**, found by this review rather than in the field:
+`classic-surface-plan.ts:285–288` takes a `findContentMatch` hit without adding it to `claimed`, so
+a free slot whose stale bytes matched one cell can be handed to another cell by `findFreeSlot` in
+the same gesture and overwritten. Reachable, because free pool slots hold leftover art rather than
+zeros. Fixing it is part of the extraction; it needs its own regression test with a planted
+collision, and that test must fail against today's code before the fix lands.
+
 §0 C6 feared 2C's claim count could exceed 2B's readout. It cannot, provided **within-canvas dedup
 is flip-aware** — pool matching only ever reduces the count further. The readout stays an upper
 bound.
+
+### D2b — the commit's reach crosses acts, and the report must say so
+
+Art files are shared, so a commit is never scoped to the act the artist has open. Three reaches,
+all verified in `profiles/s1.ts`:
+
+- **Sibling acts** share the zone's tiles, blocks, chunks and colind files. Replacing a chunk
+  changes every act of the zone that uses it.
+- **SBZ Act 3 borrows LZ's tiles, blocks, chunks and colind** (`profiles/s1.ts:485–488`) while
+  keeping its own palette (`:493`). So art committed while editing LZ also appears in SBZ3 — under
+  a different palette the artist never saw. "Use the act's colours" is honest about LZ and silent
+  about SBZ3; the report must name it.
+- **The ending reuses GHZ's art *and its block set*** (predecessor spec §0 C2).
+
+Reclaim itself is safe across all three, because `blockToChunks` walks the shared chunk file rather
+than one act's view of it. The exposure is entirely in what the artist is told. The report names
+every context a commit reaches, computed from the profile, not from the open act.
 
 ### D5 — commit's minimum unit is a whole chunk
 
@@ -140,6 +214,14 @@ pixel buffer per edit". The cap belongs to the **document**, not the decoder.
 So the import path calls `decodeIndexedPng` (`indexed-png.ts:332`) directly, maps its palette into
 canvas index space against the act palette, and feeds the resolver. No `CanvasDoc`, no undo history,
 no 1024px cap. That is the whole reason a layout-sized sheet can be imported at all.
+
+**Mapping a PNG colour to a palette LINE is constraint satisfaction, not a lookup.** Real act
+palettes repeat colours across lines — black and white especially — so a per-colour first-match
+assignment picks a line per *colour* when the rule is one line per *8×8 cell*. On a legitimate sheet
+that manufactures clashes the artist cannot fix, because nothing they drew is wrong. Assignment is
+therefore solved **per cell**: for each 8×8 cell, choose a line that can express all of its colours;
+a cell with no such line is a genuine clash and refuses through the same gate as the canvas path
+(§4 step 2). SonLVL solves this per tile; so do we.
 
 ---
 
@@ -181,18 +263,31 @@ so").
 
 ### `core/art/classic-commit-plan.ts` — the binding
 
-In: `doc: LevelDoc`, `UsageIndex`, the resolution, the target chunk ids, the chosen palette
-resolution, and injected `isEditableTile` / `reservedTiles` (same injection pattern as `PlanInput`,
-`classic-surface-plan.ts:57–75`).
+In: `doc: LevelDoc`, `UsageIndex`, **`pixels: PixelBuffer` and `gridOrigin`**, the target chunk file
+indices, the chosen palette resolution, and injected `isEditableTile` / `reservedTiles` (same
+injection pattern as `PlanInput`, `classic-surface-plan.ts:57–75`).
+
+**The planner takes pixels and calls `canvas-resolve` itself** — it does not take a finished
+resolution. Three of its own steps need pixels (the palette scan, the clash gate, the cut), and
+"use the act's colours" re-indexes pixels and therefore must re-resolve. A caller that ran resolve
+first would have to run the palette and clash steps too, which would make "every refusal lives in
+the planner" false.
 
 Out — `CanvasCommitPlan`:
 
 - `tileWrites: { tileIndex, data }[]`
 - `blockWrites: { blockId, def, colind }[]` — **overwrites as well as appends**, which
   `SurfaceEditPlan.newBlocks` cannot express, so this is a new type rather than a reuse
-- `chunkWrites: { chunkIndex, def }[]` and `chunkAppends: ChunkDef256[]`
+- `chunkWrites: { chunkFileIndex, def }[]` and `chunkAppends: ChunkDef256[]`
 - `paletteWrites: { line, colors }[] | null`
 - `report` (§6)
+
+**Every chunk id in every type names its space.** The `UsageIndex` carries both: `blockToChunks` is
+FILE order, `chunkPlacements` is ENGINE id (`usage-index.ts:39, 41`), and engine id = file index + 1
+(`classicLevelStore.ts:1057–1059`). So fields are `chunkFileIndex` or `chunkEngineId`, never
+`chunkIndex`, with **one** conversion point. A missed conversion in reclaim would intersect the
+wrong file index against `blockToChunks` and free an *adjacent* chunk's tiles and blocks — the
+corrupts-art-nobody-was-editing failure this feature must not have.
 
 **Every refusal lives here**, as a discriminated union rather than phase 1's bare `reason` string —
 the palette refusal must carry the drifted entries and both resolutions so the dialog can offer them
@@ -223,29 +318,66 @@ bookkeeping: the claimed-slot set must thread through matching and allocation as
 2. **Clash gate** — by *calling* `findCellClashes` (`canvas-constraints.ts:86`), never restating it.
    Refuses with the offending cells.
 3. **Reclaim** — from the `UsageIndex`, the tiles and blocks referenced only by the chunks being
-   replaced. **Filtered by the same predicates as allocation**: reclaimed tiles must pass
-   `isEditableTile` and must not be in `reservedTiles`. Two concrete failure modes this prevents:
-   GHZ chunks reference animated-art overlay slots (`profiles/s1.ts:150–158`) which
-   `tileLockReason` would refuse at apply time, killing the whole plan *after* the artist committed;
-   and `reservedTiles` are invisible to the usage index by construction
-   (`classic-surface-plan.ts:65–74`), so a tile drawn by an object sprite plus a replaced chunk
-   would be reclaimed and overwritten, corrupting the sprite.
+   replaced. Four rules, all load-bearing:
+
+   - **Never tile 0, never block 0** (D3.4).
+   - **Filtered by the same predicates as allocation**: reclaimed tiles must pass `isEditableTile`
+     and must not be in `reservedTiles`. Two concrete failure modes this prevents: GHZ chunks
+     reference animated-art overlay slots (`profiles/s1.ts:150–158`) which `tileLockReason` would
+     refuse at apply time, killing the whole plan *after* the artist committed; and `reservedTiles`
+     are invisible to the usage index by construction (`classic-surface-plan.ts:65–74`), so a tile
+     drawn by an object sprite plus a replaced chunk would be reclaimed and overwritten, corrupting
+     the sprite.
+   - **Refuse to reclaim at all when either predicate is UNKNOWN.** `tileLockReason(null, …)`
+     permits everything (`editable-tiles.ts:35`) and `buildReservedTileSet` contributes nothing when
+     the mapping assembly failed to load (`s1-levelart-reservations.ts:96–110`); `PlanInput`
+     documents the empty set as deliberately permissive. Phase 1 tolerates that because one gesture
+     risks a handful of tiles. A full-zone reclaim under unknown predicates exposes the whole pool
+     at once. 2C refuses rather than inheriting the permissive default — this is the one place the
+     two phases deliberately differ, and the reason is scale.
+   - **Chunk ids are FILE indices here**, because `blockToChunks` is (§3).
 4. **Cut and canonicalise** — via `tile-canon`. All-transparent cells map to **tile 0**, never
    allocated (`findFreeSlot` starts at `t=1`, `classic-surface-plan.ts:127`); this is the difference
    between a mostly-empty canvas costing nothing and costing dozens of slots.
 5. **Dedup within the drawing**, flip-aware (D4).
-6. **Match against the pool**, flip-aware, `excluded` carrying every slot already claimed this
-   gesture. Reclaimed slots still hold their old bytes: matching them is legitimate reuse, but once
-   allocated to new bytes they must enter `excluded`.
+6. **Match against the pool**, flip-aware, against the three-state availability structure (D4) —
+   not a single exclusion set. Reclaimed slots still hold their old bytes, so matching them is
+   legitimate reuse; a matched slot then becomes ineligible for allocation, and an allocated slot
+   ineligible for both.
+
+   **Animated-art overlay slots are excluded from matching.** The doc pool contains blitted
+   animation frames (`s1-io.ts:245–267`); a match that repoints level art at one of them produces
+   art that animates in game. Latent in phase 1, near-certain at import scale.
 7. **Allocate** the remainder from reclaimed-then-free slots. Short → refuse with the numbers.
-8. **Compose blocks**, dedup with **inherited colind as part of identity** (D3).
-9. **Assign block ids** — reclaimed ids first, then append. Inherit colind positionally.
+8. **Compose blocks**, dedup on the **three-element identity** of D3.1 and D3.3 — canonical cells,
+   inherited colind, relative orientation. Then **match against existing pool blocks**, on that same
+   identity: an identical-looking pool block carrying a different colind is not a reuse candidate,
+   by D3's own logic. Without pool-block matching an additive re-import duplicates every block and
+   reaches the 1024 ceiling twice as fast; reclaimed block ids pending overwrite are excluded from
+   matching for the same reason their tile counterparts are.
+9. **Assign block ids** — reclaimed ids first, then append. Inherit colind positionally. Reclaimed
+   ids left unwritten keep stale definitions pointing at reallocated tiles: harmless in game, but
+   garbage in BlockTab, so zero them and say how many in the report.
 10. **Compose chunks** — write to target ids, or append. Inherit solidity positionally (D3).
 11. **Report** (§6), then **apply as one command**.
 
 **Ordering note:** "use the act's colours" (D2) remaps entries and therefore changes tile bytes, so
 it must run *before* step 4. The planner takes the palette resolution as an **input parameter** and
 re-runs; it never patches a finished plan.
+
+**The remap is line-preserving, or the clash gate runs again.** An exact colour match may live in a
+different palette line, so a remap that crosses lines can manufacture a multi-line cell *after*
+step 2 already passed. Constrain the remap to within-line matches; where that is impossible, re-run
+step 2 on the remapped pixels rather than trusting the earlier pass.
+
+**There is an engine-hardcoded chunk alias no index can see.** When an object's
+`sprite_looping_bit` is set — behind a loop — `FindNearestTile` substitutes engine chunk `$51` for
+engine chunk `$28` when resolving collision
+(`sub FindNearestTile & FindFloor & FindWall.asm:67–74`). The constants are hardcoded and the swap
+is gated on the render bit, not on the zone, so it is a GHZ mechanism by data rather than by
+condition. Consequence: replacing engine chunk `$51` silently changes what `$28` collides against
+while leaving `$28` looking untouched. Nothing in `LevelDoc` records the relationship. A one-line
+warning when the target range includes `$51` is the whole mitigation.
 
 **The priority bit has no author.** `BlockCell.pri` exists (`model.ts:56`); the canvas has no
 priority plane. Committed cells get `pri = 0`. Correct for most level art, wrong for
@@ -267,6 +399,8 @@ that stops with "no" is the thing that sends someone back to another tool.
 | Block pool exceeded | needed vs `MAX_BLOCKS_TOTAL` | widen the range, or accept merged collision |
 | Chunk append exceeded | needed vs 127 | replace existing chunks instead of appending |
 | Range/canvas mismatch | ids named vs chunks supplied | adjust either |
+| Predicates unknown | which one failed to load | reopen the project so the editable range and object reservations resolve; commit additively (no reclaim) meanwhile |
+| PNG cell has no viable line | the offending cells | recolour those cells — no line can express them |
 
 ---
 
@@ -274,7 +408,13 @@ that stops with "no" is the thing that sends someone back to another tool.
 
 VERIFIED against the code, not inferred:
 
-- **Tiles** — per-zone pool, 454–882. Free slots via `countFreeTileSlots` (`free-tile-slots.ts`).
+- **Tiles** — two different numbers, and this spec previously used one word for both. **Base art**
+  (the decompressed source files) is 454–882 tiles: LZ 454, SYZ 882, GHZ 461+369 = 830. The
+  **document pool** is larger, because `s1-io.ts:243–267` extends it to cover animated-art overlays
+  and the gaps before them: GHZ 965, SBZ 1120. The readout's denominator, and the allocator's
+  ceiling, is the **document pool** — `poolTileCount`, `Math.floor(doc.tiles.length / 32)`. Name the
+  two separately in code (`baseTileCount` vs `poolTileCount`); free slots come from
+  `countFreeTileSlots` (`free-tile-slots.ts`) either way.
 - **Blocks** — `MAX_BLOCKS_TOTAL = 0x400` = 1024 (`classicLevelStore.ts:1063`).
 - **Chunks** — `MAX_ADDRESSABLE_CHUNKS = 0x7f` = **127**, not 256. The layout byte's bit 7 is S1's
   loop flag, so engine ids $80+ are unstampable (`classicLevelStore.ts:1055–1061`). `model.ts:194`'s
@@ -304,8 +444,19 @@ plant applied to the file** — a silent no-op plant is indistinguishable from a
 
 - `tile-canon`: orientation choice, including the both-flips case. Planting a wrong orientation must
   fail **both** the 2B count suite and the 2C dedup suite.
-- `findPoolMatch`: `allowFlips` both ways; the `excluded` stale-bytes contract; phase 1's existing
-  suite green **untouched**.
+- `findPoolMatch`: `allowFlips` both ways; the three-state availability contract in **both**
+  directions — allocate-then-match and match-then-allocate; phase 1's existing suite green
+  **untouched**.
+- **The phase-1 latent defect (D4)**: a regression test where one cell content-matches a free slot
+  and a second cell would be allocated the same slot. It must **fail against today's code** before
+  the fix lands — a test that passes on the unfixed code is testing nothing.
+- Floors: tile 0 and block 0 are never reclaimed and never allocated, exercised on the **full
+  replace** path where every chunk is named, since that is the path that reclaims them.
+- Collision orientation (D3.3): two occurrences with mirror-image art and the *same* colind must
+  **not** merge; one occurrence whose canonical orientation differs from the cell it displaces keeps
+  the displaced cell's orientation.
+- Id spaces: a reclaim computed from engine ids rather than file indices must fail loudly — plant
+  the off-by-one and assert it frees the neighbour's art.
 - Reclaim: an animated-art overlay slot is never reclaimed; a `reservedTiles` tile is never
   reclaimed. Both planted against **real s1disasm GHZ data**, not a synthetic fixture — the dominant
   defect class all session was fixtures tidier than reality.
