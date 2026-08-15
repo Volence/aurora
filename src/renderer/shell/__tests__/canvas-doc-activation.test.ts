@@ -245,6 +245,44 @@ describe('canvas focus follows the tab strip', () => {
     expect(toastMessages().join('\n')).toContain('sky');
   });
 
+  it('a canvas tab ALREADY IN THE STRIP still takes focus when its file will not load', async () => {
+    // R17(2), decided in Task 12. Before this, requestOpenTab gated session.open
+    // on the load for every case, so a tab whose file was deleted mid-session
+    // (or restored by a later Task 13) could be seen, could not be selected, and
+    // re-toasted on every click — the strip looked frozen on that tab. The pane
+    // renders CanvasDocUnloaded instead, which is honest and closable.
+    //
+    // Drives the DEFAULT loader with no project open, so the load fails for a
+    // real reason.
+    useSessionStore.setState({ tabs: [HOME_TAB, TAB], activeId: HOME_TAB.id });
+
+    await requestOpenTab(TAB);
+
+    expect(useSessionStore.getState().activeId).toBe(TAB.id);
+    expect(useSessionStore.getState().tabs.map((t) => t.id)).toEqual([HOME_TAB.id, TAB.id]);
+    expect(toastMessages().join('\n')).toContain('sky');      // still says why
+    // And no half-open document behind it: the pane's "is this tab loaded?"
+    // test (activeDocId === tab.id) reads false, so it draws the inert card.
+    expect(useCanvasStore.getState().isOpen(TAB.id)).toBe(false);
+    expect(useCanvasStore.getState().activeDocId).toBeNull();
+  });
+
+  it('a failed load clears the canvas focus rather than leaving the last one named', async () => {
+    // The mirror must not keep naming a background canvas while a DIFFERENT
+    // canvas tab is the active one — the pane refuses to draw that (it compares
+    // against the tab), but a mirror left disagreeing is how the next consumer
+    // inherits the bug.
+    useSessionStore.setState({ tabs: [HOME_TAB, TAB, OTHER], activeId: OTHER.id });
+    await activateCanvasDocTarget(OTHER.id, async (n) => loadedCanvas(n));
+    expect(useCanvasStore.getState().activeDocId).toBe(OTHER.id);
+
+    await requestOpenTab(TAB);   // default loader, no project → fails
+
+    expect(useSessionStore.getState().activeId).toBe(TAB.id);
+    expect(useCanvasStore.getState().activeDocId).toBeNull();
+    expect(useCanvasStore.getState().isOpen(OTHER.id)).toBe(true); // parked, not closed
+  });
+
   it('focusing a NON-canvas tab clears the canvas focus', async () => {
     // Without this the last canvas stays "active" behind a level tab, and the
     // pane's first frame on the next canvas focus renders the stale document.

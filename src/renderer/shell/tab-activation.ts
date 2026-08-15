@@ -19,6 +19,8 @@
 //      id is STABLE ACROSS SESSIONS — it names a file — so the first focus is
 //      usually a disk read. Closing confirms through confirmCloseCanvasDoc,
 //      which is what puts something behind the unsaved dot on a canvas tab.
+//      A read that FAILS blocks the tab from being created, but never blocks an
+//      existing tab from being focused — see requestOpenTab (R17(2)).
 //
 // Each planner is the pure, tested decision; the exported request*/activate*
 // functions are the glue.
@@ -406,6 +408,28 @@ export async function activateCanvasDocTarget(
   tabId: string,
   loader: CanvasLoader = defaultCanvasLoader,
 ): Promise<boolean> {
+  return (await runCanvasActivation(tabId, loader)) === 'focused';
+}
+
+/**
+ * WHY THE INTERNAL FORM DISTINGUISHES TWO FAILURES (Task 12's R17(2) decision).
+ *
+ * The boolean above conflates them, and its one consumer needs them apart:
+ *
+ *   'failed'     — the file could not be read. PERMANENT, and it says nothing
+ *                  about which tab the user wants to be looking at.
+ *   'superseded' — the read finished after the user moved on. It says exactly
+ *                  that, and a tab that takes focus on it steals it back.
+ *
+ * requestOpenTab treats them differently (see there); requestCloseTab discards
+ * both. The public boolean is unchanged so nothing else has to care.
+ */
+type CanvasActivation = 'focused' | 'failed' | 'superseded';
+
+async function runCanvasActivation(
+  tabId: string,
+  loader: CanvasLoader,
+): Promise<CanvasActivation> {
   // Bumped BEFORE the plan, so even the synchronous 'activate' branch supersedes
   // whatever was in flight — including an open classic dirty-switch confirm,
   // which will then answer false and skip its openAct. That is deliberate (the
@@ -417,10 +441,10 @@ export async function activateCanvasDocTarget(
     tabId,
     isOpen: useCanvasStore.getState().isOpen(tabId),
   });
-  if (plan.kind === 'none') return true;
+  if (plan.kind === 'none') return 'focused';
   if (plan.kind === 'activate') {
     activateCanvasDoc(tabId); // synchronous, nothing to supersede
-    return true;
+    return 'focused';
   }
 
   let loaded: LoadedCanvas;
@@ -432,7 +456,7 @@ export async function activateCanvasDocTarget(
     useToastStore.getState().addToast(
       `Could not open the canvas "${plan.name}": ${e instanceof Error ? e.message : String(e)}`,
       'error');
-    return false;
+    return 'failed';
   }
 
   // SUPERSEDED while the read was in flight: the user has moved on. Discard the
@@ -441,19 +465,19 @@ export async function activateCanvasDocTarget(
   // the pane at this canvas while another tab is active. The cost is one
   // re-read on the next focus; the alternative is a second "restore the focus
   // someone else set" path, which is the stale-pane bug wearing a repair kit.
-  if (myGen !== activationGen) return false;
+  if (myGen !== activationGen) return 'superseded';
 
   // A document that dirtied while this read was in flight WINS. loadCanvasDoc
   // throws rather than overwrite unsaved edits (a stale read replacing live
   // work), and it is right to: focus what is already open instead.
   if (useCanvasStore.getState().isDirty(tabId)) {
     activateCanvasDoc(tabId);
-    return true;
+    return 'focused';
   }
 
   loadCanvasDoc(tabId, loaded.doc, loaded.source);
   reportCanvasWarnings(plan.name, loaded.warnings);
-  return true;
+  return 'focused';
 }
 
 /**
@@ -470,10 +494,10 @@ export async function activateCanvasDocTarget(
  * is the focus change `session.closeTab` performs after a close. Deleting the
  * promotion call left the whole suite green until the test named for it existed.
  */
-async function focusCanvasForTab(tab: TabDescriptor): Promise<boolean> {
-  if (tab.kind === 'art-doc') return activateCanvasDocTarget(tab.id);
+async function focusCanvasForTab(tab: TabDescriptor): Promise<CanvasActivation> {
+  if (tab.kind === 'art-doc') return runCanvasActivation(tab.id, defaultCanvasLoader);
   clearCanvasFocus();
-  return true;
+  return 'focused';
 }
 
 /**
@@ -695,7 +719,41 @@ export async function activateLevelTarget(
 export async function requestOpenTab(tab: TabDescriptor): Promise<void> {
   if (tab.kind === 'level' && !(await activateLevelTarget(tab.id))) return;
   if (tab.kind === 'sprite-doc' && !(await activateSpriteDocTarget(tab.id))) return;
-  if (!(await focusCanvasForTab(tab))) return;
+  const canvas = await focusCanvasForTab(tab);
+  // A SUPERSEDED read always stops here: the user has moved to another tab
+  // while this one's file was being read, and opening now would drag the focus
+  // back to a tab they left.
+  if (canvas === 'superseded') return;
+  // A FAILED read stops here only when this tab is NOT already in the strip.
+  //
+  // R17(2), decided in Task 12. The two situations are genuinely different:
+  //
+  //   • The tab does not exist yet (an Explorer click, ⌘K, the create flow).
+  //     Refusing to open it is right — the toast carries the decoder's own
+  //     message, and a dead tab is debris the user then has to clean up.
+  //
+  //   • The tab is already open (its file was deleted, moved or made
+  //     unreadable since; or a restore reopened it — Task 13). Refusing FOCUS
+  //     makes a tab the user can see, cannot select, and gets a fresh toast
+  //     from on every click: the strip appears frozen on that tab. The pane
+  //     renders an honest "could not be loaded" card instead
+  //     (canvasPaneState → CanvasDocUnloaded), with Retry and the file path.
+  //
+  // This is the rule requestCloseTab already states for the sprite path in
+  // another form: a document that will not load is a reason not to CREATE or
+  // to REDRAW a tab, never a reason to make an existing one unusable.
+  if (canvas === 'failed') {
+    if (!useSessionStore.getState().tabs.some((t) => t.id === tab.id)) return;
+    // The tab is about to be focused with no document behind it, so no canvas
+    // is showing — say so. Without this the mirror keeps naming whichever canvas
+    // was focused before, which is the stale-mirror state R14 spent a whole
+    // section on; the pane already refuses to draw it (it compares against the
+    // TAB), but leaving the two disagreeing is how the next consumer inherits
+    // the bug. The clear lives here rather than in the activation itself because
+    // there it would also fire for a failed load that is NOT taking focus, and
+    // that one must leave the visible document alone.
+    clearCanvasFocus();
+  }
   useSessionStore.getState().open(tab);
 }
 

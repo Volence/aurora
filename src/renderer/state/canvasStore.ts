@@ -20,7 +20,7 @@
 //                    the fields CanvasSnapshot can restore.
 //   dirty only       setName (persisted, but outside the snapshot — see there).
 //   neither          setSelection, setSource, and all view state (tool, zoom,
-//                    mirror, dither, grids, clipboard).
+//                    mirror, dither, paint index, grids, clipboard).
 //
 // A new setter has to answer both questions; nothing but this list will ask it.
 
@@ -32,6 +32,7 @@ import type { ClipRegion } from '../../core/art/pixel-clipboard';
 import type { CanvasDoc, CanvasGridOrigin } from '../../core/art/canvas-doc';
 import {
   blankCanvasDoc, normalizeCanvasPixels, cloneCanvasDoc, blankCanvasPalette,
+  canvasIndex, paletteLineOf, paletteEntryOf,
 } from '../../core/art/canvas-doc';
 import type { ConstraintProfileId } from '../../core/art/canvas-profiles';
 import type { CanvasSnapshot } from '../../core/editing/canvas-history';
@@ -90,6 +91,24 @@ interface CanvasState {
   pixelPerfect: boolean;
   ditherPattern: DitherPattern;
   ditherSecondary: number;
+  /**
+   * The paint index, 0..63 — the colour the next stroke writes (Task 12).
+   *
+   * IT CANNOT BE artStore.selectedColor, which is what every other pixel surface
+   * in the app uses. That field is documented 0-15 and is a CROSS-ENGINE
+   * SINGLETON: the classic tile/block/chunk editors and aeon's composer all
+   * paint with it into real 4bpp tile data. A canvas index is 0..63, so binding
+   * a line-2 swatch here and then opening a tile tab would arm colour 37 on a
+   * surface whose palette has sixteen entries — magenta on screen (PixelViewport
+   * draws an out-of-range index magenta) and an illegal nibble in the tile it
+   * writes. The two ranges are different alphabets and need different variables.
+   *
+   * It lives on the STORE rather than in the pane's own React state because
+   * CanvasMode is not keep-alive (App mounts it only while a canvas tab is
+   * active), so component state would reset the artist's colour on every tab
+   * switch. View state, so it neither records nor dirties.
+   */
+  paintIndex: number;
   clipboard: ClipRegion | null;
   /** Which of the profile's grid pitches are drawn. Global, though its MEANING
    *  is per-document — it selects from the active profile's pitches, and the
@@ -103,6 +122,7 @@ interface CanvasState {
   setMirror: (m: MirrorMode | null) => void;
   setPixelPerfect: (v: boolean) => void;
   setDither: (pattern: DitherPattern, secondary: number) => void;
+  setPaintIndex: (v: number) => void;
   setVisibleGrids: (g: number[]) => void;
   setClipboard: (c: ClipRegion | null) => void;
 
@@ -131,6 +151,9 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   pixelPerfect: true,
   ditherPattern: 'checker',
   ditherSecondary: 0,
+  // Line 0, entry 1 — the first paintable colour. Starting on 0 would arm the
+  // eraser, so the first stroke a new user draws would do nothing visible.
+  paintIndex: canvasIndex(0, 1),
   clipboard: null,
   visibleGrids: [8],
 
@@ -146,6 +169,13 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   setMirror: (mirror) => set({ mirror }),
   setPixelPerfect: (pixelPerfect) => set({ pixelPerfect }),
   setDither: (ditherPattern, ditherSecondary) => set({ ditherPattern, ditherSecondary }),
+  // Through canvasIndex, the ONE constructor: it masks both fields and folds
+  // every entry-0 alias to 0, so an eyedropper reading a corrupt pixel — or a
+  // future caller doing its own `(line << 4) | entry` — cannot arm a brush that
+  // paints a value the document's own normaliser would rewrite. A brush holding
+  // 16 would look like the eraser and store as one, which is the two-spellings
+  // bug canvas-doc.ts exists to prevent, entering through the palette.
+  setPaintIndex: (v) => set({ paintIndex: canvasIndex(paletteLineOf(v), paletteEntryOf(v)) }),
   setVisibleGrids: (visibleGrids) => set({ visibleGrids }),
   setClipboard: (clipboard) => set({ clipboard }),
 

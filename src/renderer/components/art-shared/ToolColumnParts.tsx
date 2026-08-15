@@ -85,12 +85,21 @@ export function Stepper({
   );
 }
 
-/** Dither pattern picker + secondary-color stepper (0 = transparent). */
+/**
+ * Dither pattern picker + secondary-color stepper (0 = transparent).
+ *
+ * `colorCount` is the size of the index space the stepper wraps in — 16 for
+ * every tile/sprite surface (one palette line) and 64 for the origination
+ * canvas, whose indices span all four lines. Defaulting to 16 keeps every
+ * existing caller byte-identical; hard-coding it would have silently pinned the
+ * canvas's second dither colour to line 0.
+ */
 export function DitherConfig({
-  pattern, secondary, onPattern, onSecondary,
+  pattern, secondary, onPattern, onSecondary, colorCount = 16,
 }: {
   pattern: DitherPattern; secondary: number;
   onPattern: (p: DitherPattern) => void; onSecondary: (v: number) => void;
+  colorCount?: number;
 }) {
   return (
     <div style={S.config}>
@@ -107,8 +116,8 @@ export function DitherConfig({
       <Stepper
         title="Secondary dither color (0 = transparent)"
         value={secondary}
-        onPrev={() => onSecondary((secondary + 15) % 16)}
-        onNext={() => onSecondary((secondary + 1) % 16)}
+        onPrev={() => onSecondary((secondary + colorCount - 1) % colorCount)}
+        onNext={() => onSecondary((secondary + 1) % colorCount)}
       />
     </div>
   );

@@ -228,6 +228,60 @@ describe('setPixels refuses a size mismatch', () => {
   });
 });
 
+describe('the paint index (Task 12)', () => {
+  it('starts on a paintable colour, not the eraser', () => {
+    // Index 0 is transparent, so a canvas that opened with it armed would answer
+    // the first stroke a new user draws with nothing visible.
+    expect(useCanvasStore.getState().paintIndex).toBe(canvasIndex(0, 1));
+  });
+
+  it('folds every spelling of transparency to the one index', () => {
+    // Through canvasIndex, the ONE constructor. A brush holding 16 looks like
+    // the eraser, paints as the eraser, and stores as a value the document's own
+    // normaliser rewrites — two spellings of one colour, entering through the
+    // palette rather than through a file.
+    for (const v of [0, 16, 32, 48]) {
+      useCanvasStore.getState().setPaintIndex(v);
+      expect(useCanvasStore.getState().paintIndex).toBe(0);
+    }
+  });
+
+  it('masks a value outside 0..63 instead of arming it', () => {
+    // An eyedropper on a corrupt pixel is the realistic source. 200 would paint
+    // a value no palette entry names and no PNG round-trip preserves.
+    useCanvasStore.getState().setPaintIndex(200);
+    expect(useCanvasStore.getState().paintIndex).toBe(canvasIndex(0, 8));
+    useCanvasStore.getState().setPaintIndex(63);
+    expect(useCanvasStore.getState().paintIndex).toBe(63);
+  });
+
+  it('neither records nor dirties — it is view state', () => {
+    openCanvasDoc(A, { name: 'alpha', width: 8, height: 8, profileId: 'none' });
+    useCanvasStore.getState().setPaintIndex(canvasIndex(2, 3));
+    expect(useCanvasStore.getState().isDirty(A)).toBe(false);
+    expect(documentHistoryHub.historyFor(A).canUndo).toBe(false);
+  });
+});
+
+describe('one gesture, one undo entry', () => {
+  it('a whole stroke committed in one setPixels takes exactly one Ctrl+Z', () => {
+    // Task 12's contract 3, which falls out of committing THROUGH the store: the
+    // pane hands over the gesture's finished buffer once, and setPixels records
+    // once. A pane that wrote per-pixel (or that called setPixels again on the
+    // trailing pointerup) would leave the artist pressing Ctrl+Z once per pixel.
+    openCanvasDoc(A, { name: 'alpha', width: 8, height: 8, profileId: 'none' });
+    const stroke = createBuffer(8, 8);
+    for (let x = 0; x < 8; x++) stroke.data[x] = canvasIndex(1, 4);   // one 8px stroke
+    useCanvasStore.getState().setPixels(A, stroke);
+
+    const history = documentHistoryHub.historyFor(A);
+    expect(history.canUndo).toBe(true);
+    history.undo();
+    expect(Array.from(canvasDocState(A)!.pixels.data.subarray(0, 8)).every((v) => v === 0)).toBe(true);
+    expect(history.canUndo).toBe(false);   // the WHOLE stroke was one entry
+  });
+});
+
 describe('grid origin', () => {
   it('records, so a nudge is undoable rather than merely dirtying', () => {
     openCanvasDoc(A, { name: 'alpha', width: 8, height: 8, profileId: 'none' });

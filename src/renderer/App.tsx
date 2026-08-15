@@ -8,6 +8,9 @@ import LevelWorkspace from './workspace/LevelWorkspace';
 import SpriteMode from './components/sprite/SpriteMode';
 import SpriteDocUnloaded from './components/sprite/SpriteDocUnloaded';
 import SpriteDocHeader from './shell/SpriteDocHeader';
+import CanvasMode from './components/canvas/CanvasMode';
+import CanvasDocUnloaded from './components/canvas/CanvasDocUnloaded';
+import { canvasPaneState } from './components/canvas/canvas-pane-model';
 import HomeTab from './components/home/HomeTab';
 import ProjectSetupTab from './components/setup/ProjectSetupTab';
 import { T } from './components/ui';
@@ -18,6 +21,7 @@ import { useOpenEngine } from './state/open-project';
 import { useClassicLevelStore } from './state/classicLevelStore';
 import { useSessionStore } from './state/sessionStore';
 import { useSpriteStore } from './state/spriteStore';
+import { useCanvasStore } from './state/canvasStore';
 import { useShellStore } from './state/shellStore';
 import { ensureSaversRegistered, saveAllDirty, saveActive } from './state/project-runtime';
 import { registerHistoryFactories } from './state/history-factories';
@@ -57,9 +61,14 @@ export default function App() {
   // Which sprite document the editor currently holds — the sprite pane below
   // mounts only when it is the active tab's own (see the comment there).
   const spriteDocId = useSpriteStore((s) => s.activeDocId);
+  // The canvas store's focused document. Read here ONLY as the mirror
+  // `canvasPaneState` validates the active tab against (R14c) — the pane's
+  // document id comes from the TAB, never from this.
+  const canvasDocId = useCanvasStore((s) => s.activeDocId);
   const toggleExplorer = useShellStore((s) => s.toggleExplorer);
 
   const activeTab = tabs.find((t) => t.id === activeId);
+  const canvasPane = canvasPaneState(activeTab, canvasDocId);
 
   // -- runtime wiring ------------------------------------------------------
   useEffect(() => {
@@ -178,8 +187,9 @@ export default function App() {
                 at the active tab's target (shell/tab-activation.ts), not one
                 instance per tab. Sprite-doc tabs are EXCLUDED here — SpriteMode has
                 exactly one mounting point (see below), mounted only while a
-                sprite-doc tab is active. */}
-            {tabs.filter((t) => t.kind !== 'level' && t.kind !== 'sprite-doc').map((tab) => (
+                sprite-doc tab is active. Canvas ('art-doc') tabs are excluded for
+                the same reason — CanvasMode is a singleton too. */}
+            {tabs.filter((t) => t.kind !== 'level' && t.kind !== 'sprite-doc' && t.kind !== 'art-doc').map((tab) => (
               <div key={tab.id} style={{ ...styles.tabPane, display: tab.id === activeId ? 'flex' : 'none' }}>
                 {tab.kind === 'home' ? (
                   <HomeTab onOpenProject={openProject} onOpenRecent={openProjectByPath} />
@@ -222,6 +232,34 @@ export default function App() {
                   <SpriteMode appBar={<SpriteDocHeader onSave={() => { void saveActive(); }} />} />
                 ) : (
                   <SpriteDocUnloaded tabId={activeTab.id} title={activeTab.title} />
+                )}
+              </div>
+            )}
+            {/* CanvasMode's ONE mounting point — same rule as SpriteMode's above,
+                for the same reason: two live instances would double-register the
+                pane's window keydown handler and fire undo twice per Ctrl+Z. The
+                documents live in the module-level canvasStore, so the remount a
+                tab switch causes is lossless.
+
+                WHICH DOCUMENT comes from the TAB (canvasPaneState), with the
+                store's activeDocId only as the mirror it is validated against
+                (R14c). A canvas tab whose file could not be read renders the
+                inert pane instead — a blank canvas under a real canvas's name
+                reads as "your art is gone". */}
+            {canvasPane.kind !== 'hidden' && (
+              <div style={{ ...styles.tabPane, display: 'flex' }}>
+                {canvasPane.kind === 'ready' ? (
+                  <CanvasMode
+                    docId={canvasPane.docId}
+                    appBar={(
+                      <SpriteDocHeader
+                        onSave={() => { void saveActive(); }}
+                        noDestinationHint="This canvas has no file yet, so there is nowhere to save it."
+                      />
+                    )}
+                  />
+                ) : (
+                  <CanvasDocUnloaded tabId={canvasPane.tabId} title={canvasPane.title} />
                 )}
               </div>
             )}
