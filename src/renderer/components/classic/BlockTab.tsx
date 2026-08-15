@@ -312,7 +312,10 @@ export default function BlockTab({ doc, usage }: { doc: LevelDoc; usage: UsageIn
   const duplicateBlock = () => {
     const b = doc.blocks[composerBlockId];
     if (!b) return;
-    const res = classicAddBlock({ cells: b.cells.map((c) => ({ ...c })) });
+    // The source id, so the copy inherits its collision shape — a duplicate
+    // that looks identical and is not solid is worse than no duplicate.
+    const res = classicAddBlock({ cells: b.cells.map((c) => ({ ...c })) },
+      { sourceBlockId: composerBlockId });
     if (res.ok) { useClassicLevelStore.getState().setComposerBlockId(res.id); useToastStore.getState().addToast(`Duplicated to block ${hex(res.id)}`, 'info'); }
     else useToastStore.getState().addToast(res.error, 'error');
   };

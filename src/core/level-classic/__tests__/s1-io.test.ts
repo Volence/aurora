@@ -379,6 +379,17 @@ describe('s1-io (e) synthetic round-trip with a mutation', () => {
     expect(doc.blocks[0].cells[0].tile).not.toBe(42);
     doc.blocks[0].cells[0] = { ...doc.blocks[0].cells[0], tile: 42 };
 
+    // AND append a block with a collision entry, the shape classicPaintSurface
+    // and classicAddBlock now produce. The synthetic fixture has 2 blocks and a
+    // 2-byte colind; growing to 3 blocks must carry a 3-byte table to disk. If
+    // the writer emitted the ORIGINAL length the third block would read past the
+    // end of the collision file in game — the defect this pins.
+    doc.blocks.push({ cells: doc.blocks[1].cells.map((c) => ({ ...c })) });
+    const grown = new Uint8Array(3);
+    grown.set(doc.collision.colind);
+    grown[2] = doc.collision.colind[1]; // inherit block 1's shape, as a clone does
+    doc.collision = { ...doc.collision, colind: grown };
+
     const result = writeS1Level(state, ALL_DIRTY);
     expect(result.errors).toEqual([]);
 
@@ -390,6 +401,11 @@ describe('s1-io (e) synthetic round-trip with a mutation', () => {
 
     // Mutation present.
     expect(doc2.blocks[0].cells[0].tile).toBe(42);
+
+    // The grown collision table survived the round trip at its new length.
+    expect(doc2.blocks.length).toBe(3);
+    expect(doc2.collision.colind.length).toBe(3);
+    expect(Array.from(doc2.collision.colind)).toEqual(Array.from(grown));
 
     // Untouched domains identical.
     expect(doc2.chunks[0].cells).toEqual(chunk0);

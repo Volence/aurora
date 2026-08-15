@@ -904,7 +904,32 @@ export function classicPaintSurface(plan: SurfaceEditPlan): CommandResult {
 
   const nextBlocks = (plan.newBlocks.length || plan.blockCellEdits.length)
     ? doc.blocks.slice() : doc.blocks;
-  for (const b of plan.newBlocks) nextBlocks.push({ cells: b.cells.map((c) => ({ ...c })) });
+  for (const b of plan.newBlocks) nextBlocks.push({ cells: b.def.cells.map((c) => ({ ...c })) });
+
+  // COLLISION TRAVELS WITH THE CLONE. `colind` is indexed by block id, so an
+  // appended block with no entry has undefined collision in game — and an
+  // Isolate clone is a copy of a block the artist is painting, usually solid
+  // ground. Dropping it turns solid ground into something the player falls
+  // through: invisible here (the overlay reads `colind[block] ?? 0`), wrong on
+  // hardware. See SurfaceEditPlan.newBlocks for why the source id is carried.
+  //
+  // THE TABLE MAY START SHORTER THAN THE BLOCK LIST and that is normal, not
+  // corruption: GHZ ships 439 blocks against a 410-byte colind. Growing it to
+  // cover a new id necessarily defines the entries in between, which this fills
+  // with 0 — the same "no collision" answer Aurora's overlay already renders
+  // for them, so the game is brought into line with what the editor shows
+  // rather than left reading whatever bytes follow the file.
+  const nextColind = plan.newBlocks.length
+    ? (() => {
+      const src = doc.collision.colind;
+      const out = new Uint8Array(Math.max(nextBlocks.length, src.length));
+      out.set(src);
+      plan.newBlocks.forEach((b, i) => {
+        out[doc.blocks.length + i] = src[b.sourceBlockId] ?? 0;
+      });
+      return out;
+    })()
+    : doc.collision.colind;
   for (const { blockId, cellIndex, cell } of plan.blockCellEdits) {
     if (!isInt(blockId) || blockId < 0 || blockId >= nextBlocks.length) {
       return err(`block ${blockId} does not exist (0..${nextBlocks.length - 1})`);
@@ -930,7 +955,10 @@ export function classicPaintSurface(plan: SurfaceEditPlan): CommandResult {
     nextChunks[chunkIndex] = { cells };
   }
 
-  const newDoc: LevelDoc = { ...doc, tiles: nextTiles, blocks: nextBlocks, chunks: nextChunks };
+  const newDoc: LevelDoc = {
+    ...doc, tiles: nextTiles, blocks: nextBlocks, chunks: nextChunks,
+    collision: { ...doc.collision, colind: nextColind },
+  };
   const e = structuralError(newDoc);
   if (e) return err(e);
 
@@ -938,6 +966,10 @@ export function classicPaintSurface(plan: SurfaceEditPlan): CommandResult {
   const dirtyPatch: DirtyDomains = {};
   if (plan.tileWrites.length) dirtyPatch.tiles = true;
   if (plan.newBlocks.length || plan.blockCellEdits.length) dirtyPatch.blocks = true;
+  // An appended block extends colind (above), so the collision file must be
+  // rewritten too — the writer emits it only when this domain is dirty, and a
+  // grown table nobody flags is a table that never reaches disk.
+  if (plan.newBlocks.length) dirtyPatch.colind = true;
   if (plan.chunkCellEdits.length) dirtyPatch.chunks = true;
   if (Object.keys(dirtyPatch).length === 0) return { ok: true }; // no-op gesture
 
@@ -1071,7 +1103,17 @@ export function classicAddChunk(cells?: { index: number; word: number }[]): AddR
  * seeds it (Duplicate passes the source block's def; New-blank passes nothing →
  * four tile-0 cells). Returns the new block id (file index; blocks are 0-based).
  */
-export function classicAddBlock(def?: BlockDef): AddResult {
+export function classicAddBlock(
+  def?: BlockDef,
+  /** `sourceBlockId` is the block this one is a COPY of — Duplicate passes the
+   *  block being shown. It is what the new block inherits its collision shape
+   *  from: `colind` is indexed by block id, so a copy without an entry looks
+   *  identical and is not solid. Omitted (New-blank) means shape 0, which is
+   *  the "no collision" answer Aurora's overlay already renders for an id past
+   *  the end of the table. See classicPaintSurface for the same rule on the
+   *  Isolate-clone path, and SurfaceEditPlan.newBlocks for why it matters. */
+  opts?: { sourceBlockId?: number },
+): AddResult {
   const doc = requireDoc();
   if (!doc) return err('no classic level is open');
   if (doc.blocks.length >= MAX_BLOCKS_TOTAL) {
@@ -1085,12 +1127,25 @@ export function classicAddBlock(def?: BlockDef): AddResult {
     cells = Array.from({ length: 4 }, () => ({ tile: 0, xf: false, yf: false, pal: 0, pri: false }));
   }
   const nextBlocks = [...doc.blocks, { cells }];
-  const newDoc: LevelDoc = { ...doc, blocks: nextBlocks };
+  // Grow colind to cover the new id, inheriting the source's shape (or 0 for a
+  // blank). The table can legitimately START shorter than the block list —
+  // GHZ ships 439 blocks against a 410-byte colind — so the entries in between
+  // are filled with 0 rather than left undefined.
+  const srcColind = doc.collision.colind;
+  const nextColind = new Uint8Array(Math.max(nextBlocks.length, srcColind.length));
+  nextColind.set(srcColind);
+  nextColind[nextBlocks.length - 1] = opts?.sourceBlockId !== undefined
+    ? (srcColind[opts.sourceBlockId] ?? 0)
+    : 0;
+  const newDoc: LevelDoc = {
+    ...doc, blocks: nextBlocks,
+    collision: { ...doc.collision, colind: nextColind },
+  };
   const e = structuralError(newDoc);
   if (e) return err(e);
   // A brand-new block is referenced by no chunk yet → no chunk art changes; the
   // block palette re-reads on the new doc identity. No version bump needed.
-  commitArt(newDoc, { blocks: true }, { kind: 'none' });
+  commitArt(newDoc, { blocks: true, colind: true }, { kind: 'none' });
   return { ok: true, id: nextBlocks.length - 1 };
 }
 

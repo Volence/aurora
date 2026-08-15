@@ -130,55 +130,132 @@ export function nemesisExtractRuns(input: Uint8Array): NemRun[] {
 
 const SYM = (value: number, length: number) => value * 8 + (length - 1); // 0..127
 
-/** Huffman code lengths for the given symbols (by frequency). Returns symbol→bitLength. */
-function huffmanLengths(freq: number[], symbols: number[]): Map<number, number> {
+/**
+ * Code lengths for the given symbols, OPTIMAL SUBJECT TO A MAXIMUM LENGTH
+ * (package-merge, Larmore & Hirschberg).
+ *
+ * Nemesis codes are at most 8 bits. The obvious approach — build an unbounded
+ * Huffman tree and, when something exceeds 8 bits, drop the rarest symbol and
+ * retry — is what this replaces, and it was expensive in a way that is easy to
+ * miss: a dropped symbol is not merely coded worse, it is written INLINE at
+ * 6 (escape) + 3 (run length) + 4 (nibble) = 13 bits, against 4 bits for the
+ * raw nibble it stands for. On varied art enough symbols got dropped that the
+ * "compressed" stream was larger than the uncompressed tiles.
+ *
+ * Package-merge instead finds the best assignment that already respects the
+ * limit, so nothing has to be dropped: with at most 128 symbols and 8-bit
+ * codes the codespace (256) is never the binding constraint.
+ *
+ * The algorithm, briefly: build L levels of "packages". At each level, take the
+ * original symbols plus the pairwise merges of the previous level, sorted by
+ * weight. After L levels, the cheapest 2n-2 items are the optimal solution, and
+ * a symbol's code length is the number of those items that contain it.
+ */
+function huffmanLengths(freq: number[], symbols: number[], maxLen = 8): Map<number, number> {
   const lengths = new Map<number, number>();
   if (symbols.length === 0) return lengths;
   if (symbols.length === 1) { lengths.set(symbols[0], 1); return lengths; }
-  for (const s of symbols) lengths.set(s, 0);
-  let nodes = symbols.map((s) => ({ freq: freq[s], leaves: [s] }));
-  while (nodes.length > 1) {
-    nodes.sort((a, b) => a.freq - b.freq);
-    const a = nodes.shift()!;
-    const b = nodes.shift()!;
-    for (const s of a.leaves) lengths.set(s, lengths.get(s)! + 1);
-    for (const s of b.leaves) lengths.set(s, lengths.get(s)! + 1);
-    nodes.push({ freq: a.freq + b.freq, leaves: [...a.leaves, ...b.leaves] });
+
+  const n = symbols.length;
+  const sorted = symbols.map((s) => ({ w: freq[s], syms: [s] })).sort((a, b) => a.w - b.w);
+  let level: { w: number; syms: number[] }[] = [];
+  for (let d = 0; d < maxLen; d++) {
+    const packaged: { w: number; syms: number[] }[] = [];
+    for (let i = 0; i + 1 < level.length; i += 2) {
+      packaged.push({ w: level[i].w + level[i + 1].w, syms: [...level[i].syms, ...level[i + 1].syms] });
+    }
+    level = [...sorted.map((s) => ({ w: s.w, syms: s.syms })), ...packaged]
+      .sort((a, b) => a.w - b.w);
   }
+  for (const s of symbols) lengths.set(s, 0);
+  for (const item of level.slice(0, 2 * n - 2)) {
+    for (const sym of item.syms) lengths.set(sym, lengths.get(sym)! + 1);
+  }
+  // A symbol the solution never touched would have length 0, which is not a
+  // code. It cannot happen for 2n-2 items over n symbols, but a 0 here would
+  // silently produce a zero-bit code, so it is folded to 1 rather than trusted.
+  for (const s of symbols) if (lengths.get(s)! < 1) lengths.set(s, 1);
   return lengths;
 }
 
 interface NemCode { bits: number; code: number; }
 
-/** Build canonical codes ≤8 bits, dropping rarest symbols (→ inline) until they fit and
- *  no code collides with the reserved 0x3F inline escape. */
+/**
+ * The inline escape's share of the codespace.
+ *
+ * Measuring every code in 8-bit units, the whole codespace is 256. The escape
+ * is the 6-bit code `111111`, which owns the four units 0xFC..0xFF — and so does
+ * every longer code whose top six bits are `111111`, which is the same region.
+ * Reserving those four units up front is what lets canonical assignment run
+ * straight through without ever colliding with the escape.
+ */
+const ESCAPE_UNITS = 4;
+const CODESPACE_UNITS = 256;
+
+/**
+ * Build canonical codes ≤8 bits for every present symbol.
+ *
+ * THIS NO LONGER DROPS SYMBOLS. The previous version assigned codes first and
+ * rejected the whole assignment whenever one collided with the escape branch,
+ * whereupon the caller dropped the rarest symbol to inline and retried — over
+ * and over. Since canonical codes ascend, an all-ones code at a short length is
+ * common, so this fired constantly and inlined most of the alphabet at 13 bits
+ * per run against 4 bits for a raw nibble. That, not the Huffman itself, is why
+ * re-encoded art came out larger than uncompressed.
+ *
+ * Reserving the escape's four units BEFORE assigning means the top of the
+ * codespace is simply never reached, so no collision is possible and every
+ * symbol keeps a code.
+ */
 function buildCodes(freq: number[], present: number[]): Map<number, NemCode> {
-  let coded = present.slice();
-  for (;;) {
-    const lengths = huffmanLengths(freq, coded);
-    const ok = assignCanonical(lengths);
-    if (ok) return ok;
-    if (coded.length <= 1) return new Map(); // give up → all inline
-    coded.sort((a, b) => freq[a] - freq[b]);
-    coded.shift(); // drop the rarest, inline it, retry
-  }
+  if (present.length === 0) return new Map();
+  const lengths = huffmanLengths(freq, present);
+  if (!fitCodespace(lengths, freq)) return new Map(); // pathological → all inline
+  return assignCanonical(lengths);
 }
 
-/** Assign canonical codes; returns null if it can't fit ≤8 bits without overflow. */
-function assignCanonical(lengths: Map<number, number>): Map<number, NemCode> | null {
+/**
+ * Lengthen codes until they fit the codespace left over after the escape.
+ *
+ * Package-merge produces a complete code, whose Kraft sum is the full 256 units
+ * — four too many once the escape is reserved. Freeing them costs one bit on
+ * the least frequent symbol (halving its share), repeated until it fits, which
+ * is the cheapest place to take it from.
+ */
+function fitCodespace(lengths: Map<number, number>, freq: number[]): boolean {
+  const kraft = () => [...lengths.values()]
+    .reduce((n, l) => n + (1 << (8 - l)), 0);
+  const limit = CODESPACE_UNITS - ESCAPE_UNITS;
+  // Bounded rather than `while (true)`: each step strictly reduces the Kraft
+  // sum or exits, but a guard makes "cannot fit" a return value instead of a
+  // hang if that reasoning is ever wrong.
+  for (let guard = 0; kraft() > limit && guard < 4096; guard++) {
+    let victim = -1;
+    for (const [s, l] of lengths) {
+      if (l >= 8) continue;
+      if (victim < 0 || freq[s] < freq[victim]) victim = s;
+    }
+    if (victim < 0) return false; // everything is already 8 bits and it still does not fit
+    lengths.set(victim, lengths.get(victim)! + 1);
+  }
+  return kraft() <= limit;
+}
+
+/**
+ * Assign canonical codes, shortest first, ascending.
+ *
+ * No escape handling here by design: `fitCodespace` has already guaranteed the
+ * assignment stops short of the reserved region at the top, so the two special
+ * cases this used to carry — and the rejection path they drove — are gone.
+ */
+function assignCanonical(lengths: Map<number, number>): Map<number, NemCode> {
   const syms = [...lengths.keys()].sort((a, b) => (lengths.get(a)! - lengths.get(b)!) || (a - b));
-  if (syms.some((s) => lengths.get(s)! > 8)) return null;
   const out = new Map<number, NemCode>();
   let code = 0;
   let prevLen = 0;
   for (const s of syms) {
     const len = lengths.get(s)!;
     code <<= (len - prevLen);
-    // The whole "111111" branch is reserved for the inline escape, so no code may be a
-    // prefix of it (all-ones, len≤6) nor have it as a prefix (top-6-bits = 0x3F, len>6).
-    if (len <= 6 && code === (1 << len) - 1) return null;        // all-ones prefix → drop a symbol & retry
-    if (len > 6 && (code >> (len - 6)) === 0x3f) code = 0x40 << (len - 6); // jump past the block
-    if (code >= (1 << len)) return null; // overflowed codespace → caller drops a symbol
     out.set(s, { bits: len, code });
     code++;
     prevLen = len;
@@ -186,8 +263,62 @@ function assignCanonical(lengths: Map<number, number>): Map<number, NemCode> | n
   return out;
 }
 
-/** Compress raw 4bpp tile bytes (length must be a multiple of 32) into a Nemesis stream. */
+/**
+ * Row-wise XOR delta, the transform behind Nemesis' XOR mode.
+ *
+ * A Nemesis row is 8 pixels = 4 bytes, and the decoder reconstructs it as
+ * `row_i = stream_i ^ row_{i-1}` (see `outputNybble`). So to ENCODE in XOR mode
+ * the stream must carry `row_i ^ row_{i-1}`, which for vertically coherent art
+ * — nearly all tile art — is mostly zero and collapses into long runs.
+ *
+ * THE CHAIN RUNS ACROSS TILES, not per tile: the decoder never resets `prevRow`
+ * at a tile boundary, so neither does this. Resetting here would decode as
+ * garbage from the second tile onward.
+ */
+function xorDelta(input: Uint8Array): Uint8Array {
+  const out = new Uint8Array(input.length);
+  let prev = 0;
+  for (let i = 0; i + 4 <= input.length; i += 4) {
+    const row = ((input[i] << 24) | (input[i + 1] << 16) | (input[i + 2] << 8) | input[i + 3]) >>> 0;
+    const d = (row ^ prev) >>> 0;
+    out[i] = (d >>> 24) & 0xff;
+    out[i + 1] = (d >>> 16) & 0xff;
+    out[i + 2] = (d >>> 8) & 0xff;
+    out[i + 3] = d & 0xff;
+    prev = row;
+  }
+  return out;
+}
+
+/**
+ * Compress raw 4bpp tile bytes (length must be a multiple of 32) into a Nemesis
+ * stream.
+ *
+ * BOTH MODES ARE TRIED AND THE SMALLER WINS. Plain mode alone made every
+ * re-encode of stock art ~2.5x larger than the original (measured: +100,851
+ * bytes across Sonic 1's seven zone files) and, for varied art, larger than
+ * storing it uncompressed — once the (nibble, run-length) alphabet outgrows
+ * 8-bit codes, `buildCodes` starts inlining the rarest symbols at 13 bits each
+ * against 4 bits raw. All seven stock files are XOR mode for exactly this
+ * reason. Trying both is what makes this strictly better than what it replaced
+ * rather than better on average.
+ */
 export function nemesisCompress(input: Uint8Array): Uint8Array {
+  const plain = encodeNemesis(input, false);
+  const xor = encodeNemesis(xorDelta(input), true);
+  return xor.length < plain.length ? xor : plain;
+}
+
+/** The plain-mode encoding, exposed so a test can pin the "never larger than
+ *  plain" guarantee against the real alternative rather than a remembered one. */
+export function nemesisCompressPlainForTest(input: Uint8Array): Uint8Array {
+  return encodeNemesis(input, false);
+}
+
+/** One encoding pass. `stream` is already in the form the decoder's nibble
+ *  pipeline consumes — raw bytes for plain mode, the XOR delta for XOR mode. */
+function encodeNemesis(stream: Uint8Array, xorMode: boolean): Uint8Array {
+  const input = stream;
   if (input.length % 32 !== 0) throw new NemesisError('Nemesis input length must be a multiple of 32');
   const tileCount = input.length / 32;
 
@@ -198,7 +329,8 @@ export function nemesisCompress(input: Uint8Array): Uint8Array {
   const codes = buildCodes(freq, present);
 
   const out: number[] = [];
-  out.push((tileCount >> 8) & 0x7f, tileCount & 0xff); // header, plain mode (bit15 = 0)
+  // Header: bit 15 = XOR mode, bits 14-0 = tile count.
+  out.push(((tileCount >> 8) & 0x7f) | (xorMode ? 0x80 : 0), tileCount & 0xff);
 
   // Code table: grouped by nibble value, ascending; each = 0x80|nibble marker (once),
   // then (runLen-1)<<4 | codeBits, then the code byte (left-aligned in 8 bits).
