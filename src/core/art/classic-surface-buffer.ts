@@ -93,3 +93,59 @@ export function buildBlockSurface(doc: LevelDoc, blockId: number): Surface {
   }
   return composeFrom(doc, cells, 2, 2, null);
 }
+
+/**
+ * Compose one 256x256 chunk into a 32x32-cell surface.
+ *
+ * `chunkIndex` is a FILE-ORDER index into `doc.chunks`, not an engine id — use
+ * `chunkIndexForId` to convert a layout byte first.
+ *
+ * The flip rule, stated once: a chunk cell's xflip mirrors the whole 16x16 block.
+ * That means (a) the left and right sub-tiles trade places, and (b) each tile is
+ * itself mirrored. (a) is the `srcSx` lookup; (b) is the XOR into `xf`. Doing only
+ * one of the two is the classic way to get this wrong, and it looks almost right.
+ */
+export function buildChunkSurface(doc: LevelDoc, chunkIndex: number): Surface {
+  const chunk = doc.chunks[chunkIndex];
+  const cellsX = 32, cellsY = 32;
+  const cells: SurfaceCell[] = new Array(cellsX * cellsY);
+
+  for (let by = 0; by < 16; by++) {
+    for (let bx = 0; bx < 16; bx++) {
+      const chunkCellIndex = by * 16 + bx;
+      const cc = chunk?.cells[chunkCellIndex];
+      const blockId = cc?.block ?? 0;
+      const cxf = cc?.xf ?? false;
+      const cyf = cc?.yf ?? false;
+      const block = doc.blocks[blockId];
+
+      for (let sy = 0; sy < 2; sy++) {
+        for (let sx = 0; sx < 2; sx++) {
+          // (a) the chunk flip reorders which block cell sits at this sub-position
+          const srcSx = cxf ? 1 - sx : sx;
+          const srcSy = cyf ? 1 - sy : sy;
+          const blockCellIndex = srcSy * 2 + srcSx;
+          const bc = block?.cells[blockCellIndex];
+
+          cells[(by * 2 + sy) * cellsX + (bx * 2 + sx)] = {
+            chunkCellIndex,
+            blockId,
+            blockCellIndex,
+            tileIndex: bc?.tile ?? 0,
+            // (b) ...and mirrors the tile within it
+            xf: (bc?.xf ?? false) !== cxf,
+            yf: (bc?.yf ?? false) !== cyf,
+            pal: bc?.pal ?? 0,
+          };
+        }
+      }
+    }
+  }
+  return composeFrom(doc, cells, cellsX, cellsY, chunkIndex);
+}
+
+/** Convenience: compose by ENGINE chunk id (layout byte), returning null for air. */
+export function buildChunkSurfaceById(doc: LevelDoc, chunkId: number): Surface | null {
+  const idx = chunkIndexForId(doc, chunkId);
+  return idx === null ? null : buildChunkSurface(doc, idx);
+}
