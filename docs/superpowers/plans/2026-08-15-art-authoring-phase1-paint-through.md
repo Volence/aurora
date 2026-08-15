@@ -443,6 +443,8 @@ git commit -m "feat(art): compose a chunk surface, composing chunk and block fli
 
 The inverse of the blit. Small, but every write depends on it.
 
+**File placement, decided 2026-08-15 after Task 2's code review.** The review asked whether this belongs in a sibling `classic-surface-resolve.ts` instead of growing the buffer module. It stays in `classic-surface-buffer.ts`, deliberately: `surfaceToTile` must **exactly invert** `blitCell`, and the cheapest way to keep an inverse honest is to have it sit next to the thing it inverts, where any reviewer can check the two against each other. Splitting a forward and inverse map across files is how they drift. The resolver proper — which is a different job, not a mirror of this one — gets its own file in Task 4.
+
 **Files:**
 - Modify: `src/core/art/classic-surface-buffer.ts`
 - Modify: `src/core/art/__tests__/classic-surface-buffer.test.ts`
