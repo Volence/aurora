@@ -96,6 +96,13 @@ function findContentMatch(doc: LevelDoc, want: Uint8Array, excluded: Set<number>
  * saved; `reservedTiles` marks tiles an object sprite draws through mappings,
  * invisible to `index` but never eligible to become someone else's divergent
  * copy (see PlanInput.reservedTiles).
+ *
+ * TWO UI COPIES OF THESE CONDITIONS EXIST. ChunkTab and BlockTab re-derive them
+ * to show a "tiles N/M" limit readout, because this function is not exported and
+ * the readout must not depend on running a plan. They are display-only and this
+ * function stays the authority — but if you change the conditions here, change
+ * them there too, or the readout will quietly disagree with what an edit can
+ * actually do. Search for `freeTileSlots`.
  */
 function findFreeSlot(
   doc: LevelDoc, index: UsageIndex, isEditableTile: (t: number) => boolean,

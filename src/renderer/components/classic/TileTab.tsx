@@ -410,8 +410,17 @@ export default function TileTab({ doc, usage }: { doc: LevelDoc; usage: UsageInd
             🔒 tile {hex(composerTileIndex)} is locked: {lockReason}
           </div>
         )}
+        {/* The breadcrumb matters MOST here. The Tile tier is where a user first
+            meets linkage — they pick a tile, paint it, and it changes elsewhere —
+            and it is the one composed tier that cannot resolve the problem on its
+            own: a tile surface has no chunk cell to repoint, so Isolate has
+            nothing to isolate. Pointing at the Chunk tab is the only way out, and
+            saying so where the deadlock is discovered is the whole point.
+            BlockTab carries the same sentence for its own reason (a bare block
+            surface has no chunk cell either); the two answer different questions
+            and both are wanted. */}
         {!locked && tileUse.cells > 1 && (
-          <SharedBanner text={`Linked — used in ${tileUse.containers} block${tileUse.containers === 1 ? '' : 's'} · ${tileUse.cells} cell${tileUse.cells === 1 ? '' : 's'}. Edits appear in all of them.`} />
+          <SharedBanner text={`Linked — used in ${tileUse.containers} block${tileUse.containers === 1 ? '' : 's'} · ${tileUse.cells} cell${tileUse.cells === 1 ? '' : 's'}. Edits appear in all of them. To change one place only, paint it on the Chunk tab (Isolate).`} />
         )}
         {/* SCROLLER + HOLDER, the shape both shared hooks are written against
             (see ComposerCanvas's frame/scroller/holder) — the pan hook adjusts
