@@ -17,6 +17,7 @@ const SOURCE = {
   sidecarPath: '.aurora/canvas/alpha.canvas.json',
   pngMtimeMs: 1,
   sidecarMtimeMs: 1,
+  sidecarRejected: false,
 };
 
 beforeEach(() => { useCanvasStore.getState().closeAll(); });

@@ -48,6 +48,14 @@ export interface CanvasSource {
   /** Guarded-write conflict baselines; null when the file did not exist. */
   pngMtimeMs: number | null;
   sidecarMtimeMs: number | null;
+  /** R12: true when the sidecar at `sidecarPath` exists but could not be read
+   *  or parsed the last time this document was loaded. Carried on the source
+   *  (not just returned by the one `loadCanvasFile` call that discovered it)
+   *  because a save can happen long after the load, and `saveCanvasFile` must
+   *  keep declining to overwrite that sidecar for the life of this document —
+   *  a flag returned only once, with nowhere to live, is a flag that gets
+   *  dropped the moment something other than the loader reads it. */
+  sidecarRejected: boolean;
 }
 
 export type CanvasTool =
