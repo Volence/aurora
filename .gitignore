@@ -4,3 +4,7 @@ out/
 
 # Superpowers brainstorm visual-companion mockups (local, ephemeral)
 .superpowers/
+
+# CDP harness screenshots — evidence for a run, not artefacts to keep.
+# Every prior harness cleaned these up; this rule makes that automatic.
+scratchpad/shots*/
