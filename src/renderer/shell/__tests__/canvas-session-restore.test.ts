@@ -82,7 +82,6 @@ describe('activateRestoredCanvasDocTarget', () => {
         pngMtimeMs: 1, sidecarMtimeMs: 1, sidecarRejected: false,
       },
       warnings: ['its palette disagrees with its sidecar'],
-      sidecarRejected: false,
     };
     return activateRestoredCanvasDocTarget(TAB.id, async () => loaded).then(() => {
       expect(canvasDocState(TAB.id)?.pixels.data[0]).toBe(5);

@@ -18,7 +18,13 @@
 //
 //   record + dirty   setPixels, setPalette, setProfile, setGridOrigin — exactly
 //                    the fields CanvasSnapshot can restore.
-//   dirty only       setName (persisted, but outside the snapshot — see there).
+//   dirty only       none, today. `setName` used to fill this slot and was
+//                    deleted as dead code (no production caller ever wired a
+//                    rename flow to it — see CanvasMode.tsx's "NO NAME FIELD"
+//                    comment) rather than left as a loaded gun: a real rename
+//                    has to move the file pair too, which is a 2B feature, and
+//                    a name-only setter left lying around is exactly the shape
+//                    a future caller reaches for and gets half-right.
 //   neither          setSelection, setSource, and all view state (tool, zoom,
 //                    mirror, dither, paint index, grids).
 //
@@ -30,7 +36,7 @@ import { createBuffer } from '../../core/art/pixel-ops';
 import type { Selection } from '../../core/art/pixel-edit-controller';
 import type { CanvasDoc, CanvasGridOrigin } from '../../core/art/canvas-doc';
 import {
-  blankCanvasDoc, normalizeCanvasPixels, cloneCanvasDoc, blankCanvasPalette,
+  blankCanvasDoc, normalizeCanvasPixels, blankCanvasPalette,
   canvasIndex, paletteLineOf, paletteEntryOf,
 } from '../../core/art/canvas-doc';
 import { mostVisiblePaintIndex } from '../../core/art/canvas-default-palette';
@@ -132,7 +138,6 @@ interface CanvasState {
   setPixels: (docId: string, buffer: PixelBuffer) => void;
   setSelection: (docId: string, sel: Selection | null) => void;
   setPalette: (docId: string, palette: number[]) => void;
-  setName: (docId: string, name: string) => void;
   setProfile: (docId: string, profileId: ConstraintProfileId) => void;
   setGridOrigin: (docId: string, origin: CanvasGridOrigin) => void;
   setSource: (docId: string, source: CanvasSource | null) => void;
@@ -228,16 +233,6 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     patch(docId, (e) => ({ ...e, doc: { ...e.doc, palette: palette.slice() }, unsavedEdits: true }));
   },
 
-  // Dirties WITHOUT recording — the one setter that does, and the one thing here
-  // R13 would otherwise object to. The name is document identity: it is the file
-  // stem the pair is written under (canvas-file.ts), so undoing it would desync
-  // the document from its own filename rather than restore anything. That is why
-  // `name` is the only editable field CanvasSnapshot leaves out; the reasoning
-  // lives in canvas-history.ts's header and is restated here because this is
-  // where someone would notice the asymmetry. Note it also diverges from
-  // spriteStore.setName, which does not dirty at all — a canvas's name is
-  // persisted data, a sprite's is an export-time label.
-  setName: (docId, name) => patch(docId, (e) => ({ ...e, doc: { ...e.doc, name }, unsavedEdits: true })),
   // R13: profile is an EDIT, not identity — it records. Without recordEdit
   // here, switching profile dirties the document but cannot be undone, and
   // Ctrl+Z afterwards silently reverts the previous paint stroke instead while
@@ -251,8 +246,29 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   // profile's tile grid starts, so it decides which pixels share a tile and
   // which palette-line clashes 2B will report. A deliberate choice with visible
   // consequences — and persisted — so it is undoable, not merely dirtying.
+  //
+  // THE NO-OP GUARD, which R13 was right to skip discussing and wrong to leave
+  // out: R13's point was that the origin IS an edit and therefore MUST record,
+  // and that is still true — the bug here was never "it records", it was that
+  // it recorded even when nothing changed, which setPixels (samePixels) and
+  // commitCanvasSwatch (its 'unchanged' path) both already guard against. The
+  // field USED TO BE a plain NumberField whose onChange fired per keystroke, so
+  // without this guard: typing "12" pushed TWO full CanvasSnapshots (pixels
+  // included, ~1 MB each at CANVAS_MAX_SIDE) for one field edit, and clearing
+  // the field committed a literal 0 the user never typed AND recorded it — the
+  // same defect a CDP row found in NewCanvasDialog, entering here through a
+  // second door. At a 40-deep undo stack, three keystrokes silently evicted
+  // three real pixel edits. CanvasMode.tsx's grid-origin field (GridOriginField)
+  // was ALSO moved to commit-on-blur rather than per-keystroke, so a single
+  // field edit costs at most one entry regardless; this guard is the second,
+  // independent line of defence — it is what makes re-committing an unchanged
+  // value, or a value equal to what is already there, free even if some future
+  // caller goes back to firing on every keystroke.
   setGridOrigin: (docId, origin) => {
-    if (!get().docs.has(docId)) return;
+    const entry = get().docs.get(docId);
+    if (!entry) return;
+    const cur = entry.doc.gridOrigin;
+    if (cur.originX === origin.originX && cur.originY === origin.originY) return;
     recordEdit(docId);
     patch(docId, (e) => ({ ...e, doc: { ...e.doc, gridOrigin: { ...origin } }, unsavedEdits: true }));
   },
@@ -590,5 +606,3 @@ export function makeCanvasHistory(docId: string): CanvasDocHistory {
     (snapshot) => writeCanvasSnapshot(docId, snapshot),
   );
 }
-
-export { cloneCanvasDoc };

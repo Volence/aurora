@@ -135,7 +135,7 @@ export interface CanvasDoc {
 // dialog is a limit that drifts the day this one moves.
 export const CANVAS_MIN_SIDE = 8;
 // Snapshot cost, not anything about the art, sets this ceiling: the canvas's
-// undo history (CanvasDocHistory, a later task — not built yet) keeps 40
+// undo history (CanvasDocHistory, core/editing/canvas-history.ts) keeps 40
 // whole-buffer snapshots. 1024x1024 is ~1 MB per snapshot and ~40 MB of
 // history — already a lot to hold across 40 undo steps; there is no reason for
 // a single free-size canvas to need to go further than that.

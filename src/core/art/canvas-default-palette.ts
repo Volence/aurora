@@ -165,8 +165,21 @@ export function paletteHasVisibleColour(palette: readonly number[]): boolean {
 }
 
 /**
- * The brightest paintable entry of a palette — the index a NEWLY CREATED canvas
- * arms its brush with.
+ * The brightest paintable entry of a palette — the index the store arms the
+ * brush with whenever a canvas's palette FIRST BECOMES KNOWN to it, whether
+ * that canvas was just CREATED or just LOADED from disk.
+ *
+ * BOTH DOORS, NOT JUST CREATE. R18's original fix called this only from the
+ * create path; the CDP run then caught the same invisible-brush bug one door
+ * over, on REOPEN — a canvas created outside a zone armed white as intended,
+ * but the same canvas reopened next session armed `canvasIndex(0, 1)` instead,
+ * which in a zone-seeded palette is usually black. R20's fix moved the call
+ * into `canvasStore.armVisiblePaintIndex`, which `openCanvasDoc` AND
+ * `loadCanvasDoc` both call — this function itself doesn't know or care which
+ * door it was reached through, and that is now the point: a rule stated once
+ * here and invoked from two call sites in the store is what stops the doors
+ * drifting apart again. See canvasStore.ts's `armVisiblePaintIndex` for the
+ * live wiring.
  *
  * "Brightest" rather than "entry 1" is the whole fix, and it is deliberately a
  * rule about the palette in hand rather than a constant: it lands on white in

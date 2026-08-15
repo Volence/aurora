@@ -70,7 +70,7 @@
 
 import type { CanvasDoc } from './canvas-doc';
 import {
-  CANVAS_COLORS, CANVAS_LINES, CANVAS_LINE_LENGTH, CANVAS_TRANSPARENT,
+  CANVAS_COLORS, CANVAS_LINES, CANVAS_LINE_LENGTH, CANVAS_MAX_SIDE, CANVAS_TRANSPARENT,
   blankCanvasPalette, normalizeCanvasPixels,
 } from './canvas-doc';
 import { constraintProfile } from './canvas-profiles';
@@ -228,6 +228,31 @@ export interface CanvasLoad {
 
 export async function decodeCanvasFiles(png: Uint8Array, sidecarJson: string | null): Promise<CanvasLoad> {
   const img = await decodeIndexedPng(png);
+
+  // R3's ceiling, enforced on the door the feature actually advertises. Every
+  // OTHER way onto a canvas document goes through `blankCanvasDoc` (clamps) or
+  // `new-canvas.ts`'s validation (refuses with the numbers) — this decode path
+  // is the one R3 named and never reached: `.aurora/canvas` is a directory
+  // users are EXPECTED to hand-populate (canvas-file.ts's own comment —
+  // dropping an Aseprite export in is a supported way to get art into Aurora),
+  // and an Aseprite export is routinely bigger than 1024px. Without this, a
+  // 2048x2048 import gives ~4 MB undo snapshots x 40 ~= 160 MB of history —
+  // exactly the cost R3 exists to bound, reached through the front door.
+  //
+  // REFUSE, not clamp. A canvas opened this way is the artist's own file, and
+  // `blankCanvasDoc`'s silent clamp is fine for a NEW, empty document (nothing
+  // is lost — there is nothing there yet); silently shrinking someone's actual
+  // art on open would throw pixels away with no undo to recover them from and
+  // no signal beyond the dimensions on screen looking smaller than the file on
+  // disk. Declining to open, with the numbers, is the same call this module
+  // already makes for an over-large palette two lines below.
+  if (img.width > CANVAS_MAX_SIDE || img.height > CANVAS_MAX_SIDE) {
+    throw new Error(
+      `this PNG is ${img.width}x${img.height}px; a canvas holds at most ${CANVAS_MAX_SIDE}x${CANVAS_MAX_SIDE} ` +
+      `pixels (the undo history clones the whole pixel buffer per edit) — resize it before opening`,
+    );
+  }
+
   // This is the ceiling: a canvas holds 64 colours, full stop. Refused with the
   // count and the ceiling rather than quantized, because silently discarding
   // colours the artist chose is a worse failure than refusing to open the file

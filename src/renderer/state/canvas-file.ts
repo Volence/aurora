@@ -101,17 +101,19 @@ export async function listCanvasNames(dir: string): Promise<CanvasListing> {
   return { names, skipped };
 }
 
-// R12: `warnings` and `sidecarRejected` come straight through from
-// decodeCanvasFiles, plus a second source below (a sidecar that could not even
-// be READ, as opposed to one that read but did not parse). A load that could
-// not read the sidecar has to say so, and the SAVE has to know it, because the
-// mtime guard cannot help here — the file did not change on disk, we just
-// could not read or parse it.
+// R12: `warnings` comes straight through from decodeCanvasFiles, plus a second
+// source below (a sidecar that could not even be READ, as opposed to one that
+// read but did not parse). A load that could not read the sidecar has to say
+// so, and the SAVE has to know it, because the mtime guard cannot help here —
+// the file did not change on disk, we just could not read or parse it. That
+// last fact lives on `source.sidecarRejected` (CanvasSource carries it because
+// it must outlive this one load call, for the life of the document — see its
+// own doc comment); there is no second copy at the top level here, so there is
+// nothing for the two to disagree about.
 export interface LoadedCanvas {
   doc: CanvasDoc;
   source: CanvasSource;
   warnings: string[];
-  sidecarRejected: boolean;
 }
 
 export async function loadCanvasFile(dir: string, name: string): Promise<LoadedCanvas> {
@@ -160,7 +162,6 @@ export async function loadCanvasFile(dir: string, name: string): Promise<LoadedC
     doc: { ...loaded.doc, name },
     source: { dir, pngPath, sidecarPath, pngMtimeMs, sidecarMtimeMs, sidecarRejected },
     warnings,
-    sidecarRejected,
   };
 }
 
@@ -229,9 +230,20 @@ function mtimeAfterWrite(
 
 /**
  * Write both files as ONE guarded batch. One batch because the conflict check is
- * per batch: a PNG that landed while its sidecar was refused would leave art
- * whose metadata describes the previous version — and the sidecar is where the
- * palette lives, so that is a silently recoloured picture.
+ * per batch: a PNG that landed while its sidecar failed to write — a conflict,
+ * or an fs error partway through — would leave art whose metadata describes the
+ * previous version, and the sidecar is where the palette lives, so that is a
+ * silently recoloured picture.
+ *
+ * That guarantee is about WRITE FAILURES. It is deliberately NOT what happens
+ * for `sidecarRejected` below, twenty lines down: when the sidecar could not be
+ * READ on load, this function drops it from the batch on purpose (R12) and
+ * writes only the PNG — the exact "PNG lands, sidecar doesn't" shape the
+ * paragraph above exists to prevent, reached through a door that paragraph
+ * isn't talking about. It is the right call anyway (overwriting metadata Aurora
+ * never understood is worse than leaving it stale, per this module's header),
+ * just not covered by the single-batch atomicity argument — a chosen exception,
+ * not a gap in it.
  */
 export async function saveCanvasFile(
   dir: string, name: string, doc: CanvasDoc,

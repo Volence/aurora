@@ -61,7 +61,7 @@ function loadedCanvas(
   const doc = blankCanvasDoc({ name, width: 8, height: 8, profileId: 'none' });
   if (opts.mark !== undefined) doc.pixels.data[0] = opts.mark;
   if (opts.palette) doc.palette = opts.palette;
-  return { doc, source: sourceFor(name), warnings: opts.warnings ?? [], sidecarRejected: false };
+  return { doc, source: sourceFor(name), warnings: opts.warnings ?? [] };
 }
 
 /** Answer the next confirm dialog with `answer`, and record what it was asked.

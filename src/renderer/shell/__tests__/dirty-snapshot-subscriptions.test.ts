@@ -29,8 +29,11 @@
 // on any undo-stack change, so leaving it live would let a pixel edit (which
 // records) satisfy these assertions with the document subscriptions deleted —
 // the test would pass for the wrong reason. The mutations below are also chosen
-// to dirty WITHOUT recording (`setName`, `setUnsavedEdits`), so the document
-// stores are the only candidates twice over.
+// to dirty WITHOUT recording (`setUnsavedEdits`, and — for the canvas case,
+// since canvasStore has no setter left that dirties without recording; `setName`
+// used to be that setter and was deleted as dead code — a direct `setState`
+// poke of `unsavedEdits`), so the document stores are the only candidates
+// twice over.
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
@@ -110,6 +113,22 @@ beforeEach(() => {
   useSpriteStore.getState().setUnsavedEdits(false);
 });
 
+/** Flip a canvas document's `unsavedEdits` WITHOUT recording an undo entry —
+ *  exactly what the deleted `setName` used to give this test file for free.
+ *  Pokes the map directly rather than through a public setter because there is
+ *  no longer a public setter with this shape (canvasStore's header now says so
+ *  explicitly): this test only needs SOMETHING on `docs` to change, not any
+ *  particular real edit. */
+function dirtyCanvasNoRecord(docId: string): void {
+  useCanvasStore.setState((s) => {
+    const e = s.docs.get(docId);
+    if (!e) return s;
+    const docs = new Map(s.docs);
+    docs.set(docId, { ...e, unsavedEdits: true });
+    return { docs };
+  });
+}
+
 describe('useDirtySnapshot subscriptions', () => {
   it('subscribes to something at all (proves the mock is really engaged)', () => {
     // Guards the test itself: if the store mocks ever stopped applying, `reads`
@@ -121,13 +140,13 @@ describe('useDirtySnapshot subscriptions', () => {
     openCanvasDoc(CANVAS, { name: 'sky', width: 8, height: 8, profileId: 'none' });
     const reads = subscribedReads();
     expect(wouldRepaint(reads, () => {
-      useCanvasStore.getState().setName(CANVAS, 'renamed'); // dirties, does NOT record
+      dirtyCanvasNoRecord(CANVAS); // dirties, does NOT record
     })).toBe(true);
   });
 
   it('a canvas going CLEAN again repaints it (the dot has to come off, too)', () => {
     openCanvasDoc(CANVAS, { name: 'sky', width: 8, height: 8, profileId: 'none' });
-    useCanvasStore.getState().setName(CANVAS, 'renamed');
+    dirtyCanvasNoRecord(CANVAS);
     const reads = subscribedReads();
     expect(wouldRepaint(reads, () => {
       useCanvasStore.getState().markSaved(CANVAS, { pngMtimeMs: 1, sidecarMtimeMs: 1 });

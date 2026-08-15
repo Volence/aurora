@@ -210,7 +210,6 @@ describe('save and load', () => {
     const loaded = await loadCanvasFile(DIR, 'foreign');
     expect(loaded.doc.profileId).toBe('none');
     expect(loaded.source.sidecarMtimeMs).toBeNull();
-    expect(loaded.sidecarRejected).toBe(false);
     expect(loaded.source.sidecarRejected).toBe(false);
     expect(loaded.warnings).toEqual([]);
   });
@@ -226,7 +225,6 @@ describe('save and load', () => {
     files.set('.aurora/canvas/sky.canvas.json', new TextEncoder().encode('{ "version": 1, "palette": [1,2,], }'));
 
     const loaded = await loadCanvasFile(DIR, 'sky');
-    expect(loaded.sidecarRejected).toBe(true);
     expect(loaded.source.sidecarRejected).toBe(true);
     expect(loaded.warnings.length).toBeGreaterThan(0);
     // Refusing to open art because its metadata rotted would lose the
@@ -253,7 +251,7 @@ describe('save and load', () => {
       });
 
     const loaded = await loadCanvasFile(DIR, 'sky');
-    expect(loaded.sidecarRejected).toBe(true);
+    expect(loaded.source.sidecarRejected).toBe(true);
     expect(loaded.warnings.some((w) => /could not be read/.test(w))).toBe(true);
   });
 

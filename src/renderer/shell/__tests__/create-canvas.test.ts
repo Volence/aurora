@@ -150,11 +150,22 @@ describe('createCanvasDocument', () => {
     // is what openCanvasDoc's 'focused' return value exists to prevent.
     await createCanvasDocument(INPUT);
     listing = [];                       // pretend the file vanished
-    useCanvasStore.getState().setName(TAB.id, 'cliffs');  // dirty it, so a silent reuse would be visible
+    // Dirty it directly (there is no store setter left that dirties without
+    // recording — `setName` used to be that setter and was deleted as dead
+    // code, no production caller), so a silent reuse would be visible: if the
+    // refusal below wrongly reset or replaced this document, the dirty flag
+    // would go with it.
+    useCanvasStore.setState((s) => {
+      const e = s.docs.get(TAB.id)!;
+      const docs = new Map(s.docs);
+      docs.set(TAB.id, { ...e, unsavedEdits: true });
+      return { docs };
+    });
     const r = await createCanvasDocument(INPUT);
     expect(r.ok).toBe(false);
     expect(r.ok ? '' : r.reason).toContain('already open');
     expect(useCanvasStore.getState().isOpen(TAB.id)).toBe(true);   // untouched
+    expect(useCanvasStore.getState().isDirty(TAB.id)).toBe(true);  // still dirty: not silently reset
   });
 
   it('a conflict on the write leaves NO document and NO tab', async () => {

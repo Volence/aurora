@@ -7,6 +7,7 @@ import {
 import { documentHistoryHub } from '../history-hub';
 import { canvasIndex, blankCanvasDoc } from '../../../core/art/canvas-doc';
 import { createBuffer } from '../../../core/art/pixel-ops';
+import { CANVAS_MAX_DEPTH } from '../../../core/editing/canvas-history';
 
 const A = 'doc:canvas:alpha';
 const B = 'doc:canvas:beta';
@@ -356,6 +357,81 @@ describe('grid origin', () => {
     useCanvasStore.getState().setGridOrigin(A, origin);
     origin.originX = 99;
     expect(canvasDocState(A)!.gridOrigin.originX).toBe(4);
+  });
+
+  it('a no-op setGridOrigin (same value the document already holds) neither dirties nor records', () => {
+    // The two cases the missing guard used to fail: an emptied field parsed
+    // back to the value already there, and re-typing an unchanged value.
+    openCanvasDoc(A, { name: 'alpha', width: 8, height: 8, profileId: 'none' });
+    useCanvasStore.getState().setGridOrigin(A, { originX: 0, originY: 0 }); // already (0,0)
+    expect(useCanvasStore.getState().isDirty(A)).toBe(false);
+    expect(documentHistoryHub.historyFor(A).canUndo).toBe(false);
+
+    useCanvasStore.getState().setGridOrigin(A, { originX: 4, originY: 2 }); // a real change
+    expect(documentHistoryHub.historyFor(A).canUndo).toBe(true);
+    useCanvasStore.getState().setGridOrigin(A, { originX: 4, originY: 2 }); // re-commit, unchanged
+    documentHistoryHub.historyFor(A).undo();
+    // Exactly ONE undo reaches (0,0). A second recorded entry from the
+    // re-committed identical value would leave the origin at (4,2) here,
+    // still one undo away from the start.
+    expect(canvasDocState(A)!.gridOrigin).toEqual({ originX: 0, originY: 0 });
+    expect(documentHistoryHub.historyFor(A).canUndo).toBe(false);
+  });
+
+  it('PINS THE EVICTION: one committed origin edit costs exactly one undo slot, so real pixel edits at capacity all survive', () => {
+    // What a per-keystroke field (typing "12" -> two calls to setGridOrigin,
+    // one per digit) would have cost: TWO entries for one field edit. A test
+    // that only checked "one entry per committed change" would still pass a
+    // per-keystroke implementation that happened to coalesce — so this test
+    // fills the stack to exactly ONE BELOW capacity with real, distinct pixel
+    // edits, commits the origin exactly ONCE (what the fixed field's
+    // commit-on-blur does for a whole "type 12, tab away" gesture), and then
+    // undoes all the way back. If the origin edit had cost more than one slot,
+    // the very FIRST pixel edit — the oldest entry in the stack — would have
+    // been shifted off the bottom and be unreachable here.
+    openCanvasDoc(A, { name: 'alpha', width: 8, height: 8, profileId: 'none' });
+    const before = Array.from(canvasDocState(A)!.pixels.data); // all-transparent baseline
+
+    const pixelEdits = CANVAS_MAX_DEPTH - 1; // leave exactly one slot for the origin commit
+    for (let i = 0; i < pixelEdits; i++) {
+      const buf = createBuffer(8, 8);
+      buf.data.set(canvasDocState(A)!.pixels.data);
+      buf.data[i % 64] = canvasIndex(1, (i % 15) + 1); // distinct, non-transparent, non-no-op
+      useCanvasStore.getState().setPixels(A, buf);
+    }
+
+    useCanvasStore.getState().setGridOrigin(A, { originX: 12, originY: 0 }); // ONE commit, not one per digit
+
+    const history = documentHistoryHub.historyFor(A);
+    for (let i = 0; i < pixelEdits + 1; i++) history.undo();
+    expect(Array.from(canvasDocState(A)!.pixels.data)).toEqual(before); // the first edit is reachable
+    expect(history.canUndo).toBe(false); // capacity held everything; nothing was evicted
+  });
+
+  it('CONTRAST: two DIFFERENT origin commits at capacity DO evict the earliest real edit', () => {
+    // The equality guard cannot save this case — both values genuinely differ
+    // from what came before, exactly as two keystrokes of a per-keystroke field
+    // would. This is the failure mode GridOriginField's commit-on-blur exists
+    // to prevent (CanvasMode.tsx), demonstrated at the store boundary the field
+    // ultimately calls into.
+    openCanvasDoc(A, { name: 'alpha', width: 8, height: 8, profileId: 'none' });
+    const before = Array.from(canvasDocState(A)!.pixels.data);
+
+    const pixelEdits = CANVAS_MAX_DEPTH - 1;
+    for (let i = 0; i < pixelEdits; i++) {
+      const buf = createBuffer(8, 8);
+      buf.data.set(canvasDocState(A)!.pixels.data);
+      buf.data[i % 64] = canvasIndex(1, (i % 15) + 1);
+      useCanvasStore.getState().setPixels(A, buf);
+    }
+
+    useCanvasStore.getState().setGridOrigin(A, { originX: 1, originY: 0 });  // "1"
+    useCanvasStore.getState().setGridOrigin(A, { originX: 12, originY: 0 }); // "12"
+
+    const history = documentHistoryHub.historyFor(A);
+    for (let i = 0; i < pixelEdits + 2; i++) history.undo();
+    expect(Array.from(canvasDocState(A)!.pixels.data)).not.toEqual(before); // the first edit is GONE
+    expect(history.canUndo).toBe(false); // the stack is exhausted, not merely short of reaching it
   });
 });
 

@@ -333,6 +333,37 @@ describe('decodeIndexedPng', () => {
     await expect(decodeIndexedPng(png)).rejects.toThrow(/dimensions|width|height/i);
   });
 
+  // MAX_PNG_DIMENSION: IHDR width/height are getUint32, so a small, perfectly
+  // valid (highly compressible) IDAT can legitimately claim to decompress to a
+  // gigabytes-large image — the ceiling has to be checked against the DECLARED
+  // dimensions before `inflate` is ever called, or the memory is already spent
+  // by the time anything downstream could object.
+  it('refuses IHDR dimensions past the decoder ceiling BEFORE ever calling inflate', async () => {
+    // A small, structurally normal PNG, then patched to (a) declare a width
+    // way past the ceiling and (b) hold a CORRUPTED IDAT. If the ceiling were
+    // checked AFTER inflate (or not checked at all), decoding would instead
+    // fail with "truncated or corrupt" — the corrupted IDAT's real failure —
+    // which is exactly what proves the dimension check runs first: this test
+    // only ever sees the dimension message.
+    const png = handMade({ width: 4, height: 1, depth: 8, rows: [[0, 1, 2, 3]], filters: [0] });
+    const dv = new DataView(png.buffer, png.byteOffset, png.byteLength);
+    dv.setUint32(16, 100_000); // width; see the offset note two tests up
+    const bad = corruptIdat(png);
+    await expect(decodeIndexedPng(bad)).rejects.toThrow(/100000x1 exceed/);
+  });
+
+  it('does NOT refuse a PNG at exactly the dimension ceiling', async () => {
+    // Off-by-one guard on the other side: a real, if unusually thin, image at
+    // the ceiling must still open. One row keeps the fixture cheap to build —
+    // width is what is under test, not the total pixel count.
+    const width = 16384; // MAX_PNG_DIMENSION, restated: not exported (codec-internal)
+    const png = await encodeIndexedPng({
+      width, height: 1, indices: new Uint8Array(width), palette: [{ r: 0, g: 0, b: 0 }],
+    });
+    const got = await decodeIndexedPng(png);
+    expect(got.width).toBe(width);
+  });
+
   it('clamps the tRNS scan to real palette entries', async () => {
     // A tRNS chunk longer than PLTE, with its zero-alpha byte past the
     // palette's end, is spec-invalid but not something a hostile or buggy

@@ -19,6 +19,33 @@
 
 import { deflate, inflate } from './zlib-stream';
 
+/**
+ * A decoding-cost ceiling, independent of anything upstream. IHDR's width and
+ * height are read with `getUint32` (see `decodeIndexedPng`), so a hostile or
+ * merely careless file can declare a canvas up to ~4.29 billion pixels on a
+ * side — and does not even need a "bomb" to make that expensive: a SOLID FILL
+ * at those dimensions is exactly the kind of input deflate compresses best, so
+ * a tiny IDAT can be a perfectly valid, non-corrupt encoding of a gigabytes-
+ * large image. `inflate()` has to materialise the whole decompressed buffer
+ * before anything downstream (the "PNG data is short" length check in
+ * `unfilterRows`, the row/sample buffers in `expandSamples`) gets a chance to
+ * object — so the only place a bound can actually stop the allocation is
+ * BEFORE `inflate` runs, checked against IHDR's declared dimensions alone.
+ *
+ * DELIBERATELY NOT `CANVAS_MAX_SIDE` (canvas-doc.ts). This module is a general
+ * indexed-PNG codec with no canvas-shaped opinions anywhere else in it, and
+ * canvas-file-format.ts already enforces the canvas ceiling on top of this one
+ * — the two bounds answer different questions (this one: "is decoding this
+ * file safe to attempt at all"; that one: "does a canvas store pixels this
+ * wide") and importing a canvas constant into a codec module would make this
+ * file's safety limit quietly track an unrelated product decision.
+ *
+ * 16384 per side is generous for any real PNG (a 16384x16384 8-bit image is
+ * 256 MiB raw, already an enormous single image) while still refusing the
+ * genuinely unbounded case outright.
+ */
+const MAX_PNG_DIMENSION = 16384;
+
 export interface Rgb { r: number; g: number; b: number }
 
 export interface IndexedImage {
@@ -355,6 +382,13 @@ export async function decodeIndexedPng(bytes: Uint8Array): Promise<DecodedIndexe
   // zero-size image quietly exist.
   if (width <= 0 || height <= 0) {
     throw new Error(`PNG has invalid dimensions ${width}x${height} — its IHDR chunk looks corrupt`);
+  }
+  // Checked BEFORE inflate — see MAX_PNG_DIMENSION's own comment for why that
+  // ordering is the whole point, not a style choice.
+  if (width > MAX_PNG_DIMENSION || height > MAX_PNG_DIMENSION) {
+    throw new Error(
+      `PNG dimensions ${width}x${height} exceed this decoder's ${MAX_PNG_DIMENSION}x${MAX_PNG_DIMENSION} limit`,
+    );
   }
   if (colorType !== 3) {
     throw new Error(

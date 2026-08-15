@@ -230,13 +230,27 @@ function installClassicProbe(): ClassicProbeApi {
 /**
  * Task 14 (origination-canvas CDP verification) read-only query surface.
  *
- * STRICTLY READ-ONLY, and that is load-bearing: the canvas rows are checked by
- * driving the REAL UI (the New Canvas dialog's own fields, real pointer strokes
- * on the real PixelViewport, real Ctrl+Z/Ctrl+S, real Explorer rows), and these
- * only answer "what does the store now hold" so an on-screen observation can be
- * corroborated at the byte level. There is deliberately no `createCanvas`,
- * `setPixels` or `save` here — verifying a mechanism by calling something other
- * than the mechanism is the failure phase 1's report warns about.
+ * STRICTLY READ-ONLY FOR 13 OF ITS 14 MEMBERS, and that is load-bearing: the
+ * canvas rows are checked by driving the REAL UI (the New Canvas dialog's own
+ * fields, real pointer strokes on the real PixelViewport, real Ctrl+Z/Ctrl+S,
+ * real Explorer rows), and these answer "what does the store now hold" so an
+ * on-screen observation can be corroborated at the byte level. There is
+ * deliberately no `createCanvas`, `setPixels` or `save` here — verifying a
+ * mechanism by calling something other than the mechanism is the failure
+ * phase 1's report warns about.
+ *
+ * THE ONE EXCEPTION IS `projectOpenGuard()`. It calls the real
+ * `confirmProjectOpen`, and every exit of that function which returns `true`
+ * also calls `endDocumentSession()` — closing every open sprite and canvas
+ * document (and, on the discard path, marking the editor clean too). So a
+ * `true` return from this hook is not a read: it is proof that whatever the
+ * harness had open a moment ago is now gone. The hook is legitimate (see its
+ * own comment — a headless harness has no other way to reach this code path at
+ * all), but a caller must not lean on the paragraph above to assume calling it
+ * leaves state untouched. It also does not reproduce `openPath`'s full
+ * behaviour: the follow-on `openDirectory` is deliberately skipped, so a `true`
+ * result leaves the app in a state the real open flow never actually produces
+ * on its own — documents gone, but no new project opened in their place.
  */
 interface CanvasProbeApi {
   /** Every open canvas document id (the tab ids they are keyed by). */

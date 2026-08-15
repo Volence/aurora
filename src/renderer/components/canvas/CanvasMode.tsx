@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useCanvasStore, type CanvasTool } from '../../state/canvasStore';
 import { focusedHistory } from '../../state/editorStore';
 import CanvasHost from './CanvasHost';
@@ -18,10 +18,14 @@ import {
   CONSTRAINT_PROFILE_IDS, constraintProfile, type ConstraintProfileId,
 } from '../../../core/art/canvas-profiles';
 import {
-  Panel, CollapsibleSection, OptionBar, Chip, Divider, NumberField, StatusBar,
+  Panel, CollapsibleSection, OptionBar, Chip, Divider, StatusBar,
   ToolButton, Icons, T,
 } from '../ui';
 import EditorShell from '../../shell/EditorShell';
+// Reused rather than reimplemented: an empty grid-origin field must read as
+// empty, not as the literal 0 `Number('')` would produce — the exact rule
+// parseCanvasSide already enforces for the New Canvas dialog's size fields.
+import { parseCanvasSide } from '../../shell/new-canvas';
 
 /**
  * The origination canvas's editor pane (spec §4.1) — tool dock, options bar,
@@ -275,9 +279,11 @@ function CanvasToolOptions({ docId, onFit }: { docId: string; onFit: () => void 
  * profile, and where the profile's grids start.
  *
  * NO NAME FIELD, deliberately. A canvas's name is its file stem and its tab id
- * (canvas-file.ts, tabs.ts) — `setName` changes neither the file nor the tab, so
- * an editable name here would show one name while saving under another. Renaming
- * belongs with the create/copy flow that owns the filename.
+ * (canvas-file.ts, tabs.ts), and canvasStore has no setter that can change it at
+ * all — an editable name here would show one name while saving under another.
+ * Renaming belongs with the create/copy flow that owns the filename, and needs
+ * to move the file pair too; that is a 2B feature, not a text field bolted on
+ * here.
  */
 function CanvasDocSection({ docId }: { docId: string }) {
   const doc = useCanvasStore((s) => s.docs.get(docId)?.doc);
@@ -307,17 +313,80 @@ function CanvasDocSection({ docId }: { docId: string }) {
       <div style={styles.row} title="Where the grids start, so guides can align to the art rather than to the canvas corner.">
         <span style={styles.dim}>Grid origin</span>
         <span style={{ display: 'inline-flex', gap: 4 }}>
-          <NumberField
-            value={doc.gridOrigin.originX} width={44} title="grid origin X (px)"
-            onChange={(v) => useCanvasStore.getState().setGridOrigin(docId, { ...doc.gridOrigin, originX: v | 0 })}
-          />
-          <NumberField
-            value={doc.gridOrigin.originY} width={44} title="grid origin Y (px)"
-            onChange={(v) => useCanvasStore.getState().setGridOrigin(docId, { ...doc.gridOrigin, originY: v | 0 })}
-          />
+          <GridOriginField docId={docId} axis="originX" value={doc.gridOrigin.originX} title="grid origin X (px)" />
+          <GridOriginField docId={docId} axis="originY" value={doc.gridOrigin.originY} title="grid origin Y (px)" />
         </span>
       </div>
     </div>
+  );
+}
+
+/**
+ * One grid-origin axis. Holds its own TEXT and commits on blur or Enter,
+ * rather than on every keystroke — that used to be a plain `NumberField` bound
+ * straight to `doc.gridOrigin`, whose `onChange` fires `Number(e.target.value)`
+ * per keystroke.
+ *
+ * WHY THIS MATTERS HERE SPECIFICALLY. `setGridOrigin` records an undo entry per
+ * call (R13: the origin is an edit, not a view setting), and a CanvasSnapshot
+ * clones the whole pixel buffer — ~1 MB at CANVAS_MAX_SIDE. Against a 40-deep
+ * undo stack, typing a three-digit origin one keystroke at a time used to push
+ * three full snapshots and silently evict three real pixel edits from the
+ * artist's history — the field cost more undo budget than the strokes it was
+ * meant to merely align. Committing once per gesture instead of once per
+ * keystroke is what keeps that cost at one entry (`setGridOrigin` also gained
+ * its own no-op guard, so even a re-committed identical value is free — see its
+ * comment in canvasStore.ts — but that guard cannot help two DIFFERENT
+ * keystroke values, which is why this half of the fix has to live here).
+ *
+ * `parseCanvasSide` — reused from new-canvas.ts rather than reimplemented — is
+ * what keeps an emptied field from committing a literal 0 the user never typed:
+ * an empty or non-numeric string parses to NaN, which this field treats as "not
+ * ready to commit" and reverts to the last real value instead of writing
+ * through.
+ *
+ * The local text resyncs from the document's value whenever that value changes
+ * from OUTSIDE this field — switching to a different canvas, or an undo/redo
+ * landing on this axis — tracked via `committed`, the last value THIS field
+ * itself pushed to the store. Comparing the incoming prop against that (rather
+ * than against the text box's current contents) means a store change that
+ * merely confirms what this field just committed does not stomp on text the
+ * user has since started retyping.
+ */
+function GridOriginField({ docId, axis, value, title }: {
+  docId: string; axis: 'originX' | 'originY'; value: number; title: string;
+}) {
+  const [text, setText] = useState(String(value));
+  const committed = useRef(value);
+
+  useEffect(() => {
+    if (value !== committed.current) {
+      committed.current = value;
+      setText(String(value));
+    }
+  }, [value]);
+
+  const commit = () => {
+    const parsed = parseCanvasSide(text);
+    if (!Number.isFinite(parsed)) { setText(String(committed.current)); return; } // empty/junk: revert, don't write 0
+    const n = parsed | 0;
+    const origin = useCanvasStore.getState().docs.get(docId)?.doc.gridOrigin;
+    if (!origin) return; // the document closed while this field was focused
+    committed.current = n;
+    useCanvasStore.getState().setGridOrigin(docId, { ...origin, [axis]: n });
+    setText(String(n));
+  };
+
+  return (
+    <input
+      type="number"
+      title={title}
+      value={text}
+      onChange={(e) => setText(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+      style={styles.numberInput}
+    />
   );
 }
 
@@ -366,6 +435,12 @@ const styles: Record<string, React.CSSProperties> = {
   dim: { fontSize: 11, color: T.textLo },
   select: {
     flex: 1, background: T.raised, color: T.textHi, border: `1px solid ${T.borderStrong}`,
+    borderRadius: 4, fontSize: 12, padding: '4px 6px',
+  },
+  // Same look NumberField gave the grid-origin fields before GridOriginField
+  // replaced it with a locally-held, commit-on-blur input (see its comment).
+  numberInput: {
+    width: 44, background: T.raised, color: T.textHi, border: `1px solid ${T.borderStrong}`,
     borderRadius: 4, fontSize: 12, padding: '4px 6px',
   },
 };

@@ -5,7 +5,7 @@ import {
   encodeCanvasFiles, decodeCanvasFiles, parseCanvasSidecar,
   CANVAS_SIDECAR_VERSION, CANVAS_PLACEHOLDER_NAME,
 } from '../canvas-file-format';
-import { blankCanvasDoc, canvasIndex, CANVAS_COLORS } from '../canvas-doc';
+import { blankCanvasDoc, canvasIndex, CANVAS_COLORS, CANVAS_MAX_SIDE } from '../canvas-doc';
 import { encodeIndexedPng, parseChunks } from '../indexed-png';
 import { encodeGenesisColor } from '../../formats/palette';
 
@@ -93,6 +93,43 @@ describe('canvas file format', () => {
       palette: Array.from({ length: 137 }, (_, i) => ({ r: i, g: 0, b: 0 })),
     });
     await expect(decodeCanvasFiles(png, null)).rejects.toThrow(/137.*64.*4 lines x 16/s);
+  });
+
+  // R3's ceiling, reached through the decode door instead of blankCanvasDoc's
+  // clamp or new-canvas.ts's refusal — the door the Explorer's own comment
+  // names as a SUPPORTED way in (dropping an Aseprite export into
+  // .aurora/canvas). Before this fix, decodeCanvasFiles built the pixel buffer
+  // straight from the PNG's own dimensions with no ceiling at all.
+  it('REFUSES a PNG wider than CANVAS_MAX_SIDE, and says the actual dimensions and the ceiling', async () => {
+    const width = CANVAS_MAX_SIDE + 1;
+    const png = await encodeIndexedPng({
+      width, height: 1, indices: new Uint8Array(width), // all index 0
+      palette: [{ r: 0, g: 0, b: 0 }],
+    });
+    await expect(decodeCanvasFiles(png, null))
+      .rejects.toThrow(new RegExp(`${width}x1.*${CANVAS_MAX_SIDE}x${CANVAS_MAX_SIDE}`));
+  });
+
+  it('REFUSES a PNG taller than CANVAS_MAX_SIDE the same way', async () => {
+    const height = CANVAS_MAX_SIDE + 1;
+    const png = await encodeIndexedPng({
+      width: 1, height, indices: new Uint8Array(height),
+      palette: [{ r: 0, g: 0, b: 0 }],
+    });
+    await expect(decodeCanvasFiles(png, null))
+      .rejects.toThrow(new RegExp(`1x${height}.*${CANVAS_MAX_SIDE}x${CANVAS_MAX_SIDE}`));
+  });
+
+  it('does NOT refuse a PNG exactly AT the ceiling on one side', async () => {
+    // Off-by-one guard: CANVAS_MAX_SIDE itself must still open. A thin strip
+    // keeps the fixture (and the test) fast — width is what is under test.
+    const width = CANVAS_MAX_SIDE;
+    const png = await encodeIndexedPng({
+      width, height: 1, indices: new Uint8Array(width),
+      palette: [{ r: 0, g: 0, b: 0 }],
+    });
+    const back = await decodeCanvasFiles(png, null);
+    expect(back.doc.pixels.width).toBe(width);
   });
 
   it('a sidecar naming an unknown profile still opens, unconstrained', async () => {
