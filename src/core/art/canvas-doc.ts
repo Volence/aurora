@@ -30,7 +30,7 @@
 // Pure core — no store, no fs, no React.
 
 import type { PixelBuffer } from './pixel-ops';
-import { createBuffer } from './pixel-ops';
+import { createBuffer, clonePixelBuffer } from './pixel-ops';
 import type { ConstraintProfileId } from './canvas-profiles';
 
 /** Palette lines in the Genesis colour space. Hardware. */
@@ -140,11 +140,11 @@ export function blankCanvasDoc(input: {
   };
 }
 
-/** Deep copy — the undo snapshot and the store's document clone both need one. */
+/** Deep copy — the store's document clone needs one. */
 export function cloneCanvasDoc(d: CanvasDoc): CanvasDoc {
   return {
     name: d.name,
-    pixels: { width: d.pixels.width, height: d.pixels.height, data: new Uint8Array(d.pixels.data) },
+    pixels: clonePixelBuffer(d.pixels),
     palette: d.palette.slice(),
     profileId: d.profileId,
     gridOrigin: { ...d.gridOrigin },

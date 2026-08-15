@@ -6,7 +6,7 @@ import { createBuffer } from '../../art/pixel-ops';
 function snapshot(fill: number): CanvasSnapshot {
   const pixels = createBuffer(4, 4);
   pixels.data.fill(fill);
-  return { pixels, palette: new Array(64).fill(fill), selection: null };
+  return { pixels, palette: new Array(64).fill(fill), selection: null, profileId: 'genesis-unrestricted' };
 }
 
 describe('CanvasDocHistory', () => {
@@ -42,6 +42,18 @@ describe('CanvasDocHistory', () => {
     live = snapshot(2);
     h.undo();
     expect(live.selection).toEqual({ x: 1, y: 1, w: 2, h: 2 });
+  });
+
+  it('restores the profile alongside the pixels', () => {
+    // Guards Task 7's setProfile: a profile switch must be undoable, not just
+    // a dirty-flag flip, or Ctrl+Z after one silently reverts the previous
+    // paint stroke while leaving the (wrong) new profile in place.
+    let live: CanvasSnapshot = { ...snapshot(1), profileId: 'genesis-sprite' };
+    const h = new CanvasDocHistory(() => live, (s) => { live = s; });
+    h.record(live);
+    live = { ...snapshot(2), profileId: 'none' };
+    h.undo();
+    expect(live.profileId).toBe('genesis-sprite');
   });
 
   it('caps the undo stack at CANVAS_MAX_DEPTH, dropping the oldest entry', () => {
