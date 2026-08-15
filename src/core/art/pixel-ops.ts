@@ -1,10 +1,16 @@
-// Pure pixel-buffer operations for the art composer. Buffers hold 4bpp
-// palette indices (0-15); all ops return new buffers, never mutate input.
+// Pure pixel-buffer operations for the art composer. A PixelBuffer's value
+// range is set by its OWNER, not by this module: 4bpp classic art (tiles,
+// blocks, sprites) uses 0..15, while the origination canvas (canvas-doc.ts)
+// packs the whole 4-line palette space into 0..63. These are geometry/gesture
+// ops, not an encoding, so nothing here masks or validates a value — a future
+// "tighten this to 4bpp" change must not add an `& 15` in here, or it will
+// silently flatten every origination-canvas pixel to palette line 0. All ops
+// return new buffers, never mutate input.
 
 export interface PixelBuffer {
   width: number;
   height: number;
-  data: Uint8Array; // row-major, values 0-15
+  data: Uint8Array; // row-major; value range is the owner's — 0..15 for classic art, 0..63 for the canvas
 }
 
 export function createBuffer(width: number, height: number): PixelBuffer {

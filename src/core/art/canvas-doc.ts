@@ -9,16 +9,23 @@
 //     line  = v >> 4   (0..3)   which palette line it draws from
 //     entry = v & 15   (0..15)  the colour within that line
 //
-// `entry === 0` is the BACKDROP in every line — hardware, not a convention (see
-// TRANSPARENT_INDEX in components/art-shared/palette-grid-model.ts) — so 0, 16,
-// 32 and 48 would all be the same transparent pixel. A document that holds four
-// spellings of one colour breaks every downstream comparison in a way that looks
-// plausible: `diffWrites` reports edits that changed nothing, a per-cell palette-
-// line scan (2B) sees a clash between two lines where the artist drew only
-// transparency, and tile dedup (2C) misses byte-identical tiles. So the document
-// holds ONE spelling — 0 — and `normalizeTransparent` is the choke point every
-// path that can introduce a foreign value must pass through: a decoded PNG, a
-// paste, a fill seeded from a picked value.
+// `entry === 0` is TRANSPARENT in every line for plane and sprite pixels —
+// hardware, not a convention (see TRANSPARENT_INDEX in
+// src/renderer/components/art-shared/palette-grid-model.ts). The backdrop
+// colour proper is a separately selected CRAM entry (VDP register 7); what
+// matters for this module is only that entry 0 never draws, in any of the four
+// lines — so 0, 16, 32 and 48 would all be the same transparent pixel, and any
+// value above 63 is simply corrupt (the encoding is 6 bits wide, full stop). A
+// document that holds two spellings of one colour breaks every downstream
+// comparison in a way that looks plausible: `diffWrites` reports edits that
+// changed nothing, a per-cell palette-line scan (2B) sees a clash between two
+// lines where the artist drew only transparency, and tile dedup (2C) misses
+// byte-identical tiles. So the document holds ONE spelling per colour, and
+// `normalizeCanvasPixels` is the choke point every path that can introduce a
+// foreign value must pass through: a decoded PNG, a paste, a fill seeded from a
+// picked value. An out-of-range value should never arrive in practice — the
+// file-format layer refuses an over-large palette before this point — but it is
+// folded into the space rather than trusted, same as any other hostile input.
 //
 // Pure core — no store, no fs, no React.
 
@@ -41,8 +48,9 @@ export function paletteLineOf(v: number): number { return (v >> 4) & (CANVAS_LIN
 export function paletteEntryOf(v: number): number { return v & (CANVAS_LINE_LENGTH - 1); }
 export function isTransparent(v: number): boolean { return paletteEntryOf(v) === 0; }
 
-/** The stored index for a (line, entry) pair — the ONE constructor. Entry 0
- *  collapses to CANVAS_TRANSPARENT whatever line it came from. */
+/** The stored index for a (line, entry) pair — the ONE constructor. Masks both
+ *  fields, so it is also the fold for anything outside the 6-bit domain, and
+ *  entry 0 collapses to CANVAS_TRANSPARENT whatever line it came from. */
 export function canvasIndex(line: number, entry: number): number {
   const e = entry & (CANVAS_LINE_LENGTH - 1);
   if (e === 0) return CANVAS_TRANSPARENT;
@@ -50,24 +58,36 @@ export function canvasIndex(line: number, entry: number): number {
 }
 
 /**
- * Rewrite foreign spellings of transparency (16/32/48) to 0. Returns the SAME
- * buffer when nothing needed fixing — callers compare by reference to decide
- * whether anything actually changed.
+ * Rewrite every pixel to its canonical spelling by routing it back through
+ * `canvasIndex` — the ONE constructor (see its doc comment) — rather than
+ * special-casing the transparent spellings alone. That closes the whole 6-bit
+ * domain in one pass: foreign transparent spellings (16/32/48 -> 0) and any
+ * value above 63 (corrupt input, e.g. a raw PNG index) are the same bug through
+ * two different doors, so they get the same fix. Returns the SAME buffer when
+ * nothing needed fixing — callers compare by reference to decide whether
+ * anything actually changed — and never mutates the input, which the store
+ * relies on for undo.
  */
-export function normalizeTransparent(buf: PixelBuffer): PixelBuffer {
+export function normalizeCanvasPixels(buf: PixelBuffer): PixelBuffer {
   let dirty = false;
   for (let i = 0; i < buf.data.length; i++) {
-    if (buf.data[i] !== 0 && isTransparent(buf.data[i])) { dirty = true; break; }
+    const v = buf.data[i];
+    if (canvasIndex(paletteLineOf(v), paletteEntryOf(v)) !== v) { dirty = true; break; }
   }
   if (!dirty) return buf;
-  const data = new Uint8Array(buf.data);
-  for (let i = 0; i < data.length; i++) if (isTransparent(data[i])) data[i] = CANVAS_TRANSPARENT;
+  const data = new Uint8Array(buf.data.length);
+  for (let i = 0; i < data.length; i++) {
+    const v = buf.data[i];
+    data[i] = canvasIndex(paletteLineOf(v), paletteEntryOf(v));
+  }
   return { width: buf.width, height: buf.height, data };
 }
 
-/** 64 CRAM words, all black — the sprite editor's blankStandalonePalette at
- *  canvas scale. A canvas created inside an open zone is seeded from that zone's
- *  palette instead (canvasStore.newCanvas); this is the fallback. */
+/** 64 CRAM words, all black — the sprite editor's blankStandalonePalette (which
+ *  returns Color[] with alpha, not CRAM words — same idea, different
+ *  representation) at canvas scale. A canvas created inside an open zone is
+ *  seeded from that zone's palette instead (canvasStore.newCanvas); this is
+ *  the fallback. */
 export function blankCanvasPalette(): number[] {
   return new Array(CANVAS_COLORS).fill(0);
 }
@@ -81,22 +101,31 @@ export interface CanvasDoc {
   name: string;
   /** Indices 0..63, normalized (see the header). */
   pixels: PixelBuffer;
-  /** 64 CRAM words, line-major: palette[line * 16 + entry]. */
+  /** 64 CRAM words, line-major: palette[line * 16 + entry]. A third shape
+   *  alongside the sprite editor's Color[] (r/g/b/a) and LevelDoc's
+   *  Uint16Array[] (palettes) — flat number[] because that is what the
+   *  canvas's JSON sidecar stores a palette as. */
   palette: number[];
   profileId: ConstraintProfileId;
   /** Where the profile's grids start, so guides can align to the art rather
    *  than to the canvas corner. */
-  grid: { originX: number; originY: number };
+  gridOrigin: { originX: number; originY: number };
 }
 
 const MIN_SIDE = 8;
+// Snapshot cost, not anything about the art, sets this ceiling: cloneCanvasDoc
+// copies the whole pixel buffer per undo entry, and the canvas history keeps 40
+// of them. 1024x1024 is ~1 MB per snapshot and ~40 MB of history — already a lot
+// to hold across 40 undo steps; there is no reason for a single free-size canvas
+// to need to go further than that.
+const MAX_SIDE = 1024;
 
 export function blankCanvasDoc(input: {
   name: string; width: number; height: number;
   profileId: ConstraintProfileId; palette?: number[];
 }): CanvasDoc {
-  const width = Math.max(MIN_SIDE, input.width | 0);
-  const height = Math.max(MIN_SIDE, input.height | 0);
+  const width = Math.min(MAX_SIDE, Math.max(MIN_SIDE, input.width | 0));
+  const height = Math.min(MAX_SIDE, Math.max(MIN_SIDE, input.height | 0));
   const palette = input.palette && input.palette.length === CANVAS_COLORS
     ? input.palette.slice()
     : blankCanvasPalette();
@@ -105,7 +134,7 @@ export function blankCanvasDoc(input: {
     pixels: createBuffer(width, height),
     palette,
     profileId: input.profileId,
-    grid: { originX: 0, originY: 0 },
+    gridOrigin: { originX: 0, originY: 0 },
   };
 }
 
@@ -116,6 +145,6 @@ export function cloneCanvasDoc(d: CanvasDoc): CanvasDoc {
     pixels: { width: d.pixels.width, height: d.pixels.height, data: new Uint8Array(d.pixels.data) },
     palette: d.palette.slice(),
     profileId: d.profileId,
-    grid: { ...d.grid },
+    gridOrigin: { ...d.gridOrigin },
   };
 }

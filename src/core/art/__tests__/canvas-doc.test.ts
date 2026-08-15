@@ -3,7 +3,7 @@ import { describe, it, expect } from 'vitest';
 import {
   CANVAS_LINES, CANVAS_LINE_LENGTH, CANVAS_COLORS,
   canvasIndex, paletteLineOf, paletteEntryOf, isTransparent,
-  normalizeTransparent, blankCanvasPalette, blankCanvasDoc,
+  normalizeCanvasPixels, blankCanvasPalette, blankCanvasDoc, cloneCanvasDoc,
 } from '../canvas-doc';
 import { createBuffer } from '../pixel-ops';
 
@@ -28,19 +28,33 @@ describe('canvas pixel encoding', () => {
     expect(isTransparent(1)).toBe(false);
   });
 
-  it('normalizeTransparent rewrites foreign spellings and nothing else', () => {
+  it('normalizeCanvasPixels rewrites foreign spellings and nothing else', () => {
     const buf = createBuffer(4, 1);
     buf.data.set([0, 16, 48, 17]);
-    const out = normalizeTransparent(buf);
+    const out = normalizeCanvasPixels(buf);
     expect(Array.from(out.data)).toEqual([0, 0, 0, 17]);
+    // The input itself is untouched — the store holds the previous buffer for
+    // undo, so an in-place rewrite here would corrupt it.
+    expect(Array.from(buf.data)).toEqual([0, 16, 48, 17]);
   });
 
-  it('normalizeTransparent returns the SAME buffer when nothing needed fixing', () => {
+  it('normalizeCanvasPixels folds a value outside the 6-bit domain', () => {
+    // The encoding is 6 bits (2 line bits x 4 entry bits). 200 and 8 render
+    // identically once masked but would store as different values if this
+    // held open — the same "two spellings of one colour" bug the header
+    // describes, entering through a different door (e.g. a raw PNG index).
+    const buf = createBuffer(2, 1);
+    buf.data.set([200, 8]);
+    const out = normalizeCanvasPixels(buf);
+    expect(Array.from(out.data)).toEqual([8, 8]);
+  });
+
+  it('normalizeCanvasPixels returns the SAME buffer when nothing needed fixing', () => {
     // Identity matters: the store compares by reference to decide whether an
     // edit happened at all.
     const buf = createBuffer(4, 1);
     buf.data.set([0, 1, 17, 63]);
-    expect(normalizeTransparent(buf)).toBe(buf);
+    expect(normalizeCanvasPixels(buf)).toBe(buf);
   });
 
   it('a blank palette is 64 words and a blank doc is all-transparent', () => {
@@ -53,12 +67,40 @@ describe('canvas pixel encoding', () => {
     expect(doc.pixels.height).toBe(16);
     expect(doc.pixels.data.every((v) => v === 0)).toBe(true);
     expect(doc.palette).toHaveLength(64);
-    expect(doc.grid).toEqual({ originX: 0, originY: 0 });
+    expect(doc.gridOrigin).toEqual({ originX: 0, originY: 0 });
   });
 
   it('a blank doc clamps a nonsense size instead of producing a 0-pixel buffer', () => {
     const doc = blankCanvasDoc({ name: 'T', width: 0, height: -5, profileId: 'none' });
-    expect(doc.pixels.width).toBeGreaterThanOrEqual(8);
-    expect(doc.pixels.height).toBeGreaterThanOrEqual(8);
+    expect(doc.pixels.width).toBe(8);
+    expect(doc.pixels.height).toBe(8);
+  });
+
+  it('a blank doc clamps an oversize request too — snapshot cost, not the art, sets the ceiling', () => {
+    const doc = blankCanvasDoc({ name: 'T', width: 5000, height: 5000, profileId: 'none' });
+    expect(doc.pixels.width).toBe(1024);
+    expect(doc.pixels.height).toBe(1024);
+  });
+
+  it('does not alias the caller-supplied palette array', () => {
+    const palette = blankCanvasPalette();
+    const doc = blankCanvasDoc({ name: 'T', width: 8, height: 8, profileId: 'none', palette });
+    palette[0] = 999;
+    expect(doc.palette[0]).toBe(0);
+  });
+});
+
+describe('cloneCanvasDoc', () => {
+  it('is a deep copy: mutating every mutable field of the original leaves the clone unchanged', () => {
+    const original = blankCanvasDoc({ name: 'T', width: 8, height: 8, profileId: 'none' });
+    const clone = cloneCanvasDoc(original);
+
+    original.pixels.data[0] = 42;
+    original.palette[0] = 42;
+    original.gridOrigin.originX = 42;
+
+    expect(clone.pixels.data[0]).toBe(0);
+    expect(clone.palette[0]).toBe(0);
+    expect(clone.gridOrigin.originX).toBe(0);
   });
 });

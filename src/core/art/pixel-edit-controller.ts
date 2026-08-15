@@ -15,7 +15,7 @@ export type ArtTool = 'pencil' | 'eraser' | 'fill' | 'eyedropper' | 'line' | 're
 export interface Selection { x: number; y: number; w: number; h: number; }
 export interface ToolConfig {
   tool: ArtTool;
-  color: number;            // active palette index 0..15
+  color: number;            // active palette index — 0..15 for classic art, 0..63 for the origination canvas (see canvas-doc.ts)
   mirror: MirrorMode | null;
   ditherPattern: DitherPattern;
   ditherSecondary: number;  // 0..15

@@ -11,6 +11,12 @@ describe('constraint profiles', () => {
     ]);
   });
 
+  it('the table and the menu name exactly the same profiles', () => {
+    // The union type forces a table entry to exist but not a menu entry — a
+    // new profile could land in CONSTRAINT_PROFILES and stay invisible.
+    expect(Object.keys(CONSTRAINT_PROFILES).sort()).toEqual([...CONSTRAINT_PROFILE_IDS].sort());
+  });
+
   it('genesis-level-art matches spec §4.2', () => {
     const p = constraintProfile('genesis-level-art');
     expect(p.colorBitsPerChannel).toBe(3);
@@ -46,7 +52,7 @@ describe('constraint profiles', () => {
   it('an unknown id falls back to none rather than throwing', () => {
     // A sidecar from a future Aurora can name a profile this build has never
     // heard of. Opening the art still has to work.
-    expect(constraintProfile('made-up' as never).id).toBe('none');
+    expect(constraintProfile('made-up').id).toBe('none');
   });
 
   it('every profile is a member of the table it claims to be in', () => {

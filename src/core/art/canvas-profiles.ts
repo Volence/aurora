@@ -74,11 +74,12 @@ export const CONSTRAINT_PROFILE_IDS: ConstraintProfileId[] = [
 ];
 
 /**
- * The profile for an id, falling back to `none` for anything unrecognised. A
- * sidecar written by a future Aurora can name a profile this build has never
- * heard of, and the right answer is to open the art unconstrained, not to refuse
- * to open it.
+ * The profile for an id, falling back to `none` for anything unrecognised. Takes
+ * a plain `string`, not `ConstraintProfileId` — a sidecar written by a future
+ * Aurora yields a string, not a member of this build's union, and the right
+ * answer is to open the art unconstrained, not to refuse to open it because the
+ * name doesn't type-check.
  */
-export function constraintProfile(id: ConstraintProfileId): ConstraintProfile {
-  return CONSTRAINT_PROFILES[id] ?? CONSTRAINT_PROFILES.none;
+export function constraintProfile(id: string): ConstraintProfile {
+  return CONSTRAINT_PROFILES[id as ConstraintProfileId] ?? CONSTRAINT_PROFILES.none;
 }

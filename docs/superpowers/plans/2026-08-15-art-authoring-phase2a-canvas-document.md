@@ -1199,7 +1199,7 @@ describe('canvas file format', () => {
     const { png } = await encodeCanvasFiles(doc);
     const sidecar = JSON.stringify({
       version: CANVAS_SIDECAR_VERSION, name: 'Ramp', profile: 'genesis-2027',
-      palette: doc.palette, grid: { originX: 0, originY: 0 },
+      palette: doc.palette, gridOrigin: { originX: 0, originY: 0 },
     });
     const back = await decodeCanvasFiles(png, sidecar);
     expect(back.profileId).toBe('none');
@@ -1209,7 +1209,7 @@ describe('canvas file format', () => {
   it('parseCanvasSidecar rejects a future version and malformed JSON', () => {
     const bad = parseCanvasSidecar('{ not json');
     expect(bad.ok).toBe(false);
-    const future = parseCanvasSidecar(JSON.stringify({ version: 99, name: 'x', profile: 'none', palette: [], grid: {} }));
+    const future = parseCanvasSidecar(JSON.stringify({ version: 99, name: 'x', profile: 'none', palette: [], gridOrigin: {} }));
     expect(future.ok).toBe(false);
     if (!future.ok) expect(future.error).toMatch(/99/);
   });
@@ -1217,7 +1217,7 @@ describe('canvas file format', () => {
   it('parseCanvasSidecar rejects a palette that is the wrong length', () => {
     const r = parseCanvasSidecar(JSON.stringify({
       version: CANVAS_SIDECAR_VERSION, name: 'x', profile: 'none',
-      palette: [1, 2, 3], grid: { originX: 0, originY: 0 },
+      palette: [1, 2, 3], gridOrigin: { originX: 0, originY: 0 },
     }));
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.error).toMatch(/64/);
@@ -1259,7 +1259,7 @@ Expected: FAIL — module not found.
 // Pure core — no fs. Path layout lives in renderer/state/canvas-file.ts.
 
 import type { CanvasDoc } from './canvas-doc';
-import { CANVAS_COLORS, CANVAS_TRANSPARENT, blankCanvasPalette, normalizeTransparent } from './canvas-doc';
+import { CANVAS_COLORS, CANVAS_TRANSPARENT, blankCanvasPalette, normalizeCanvasPixels } from './canvas-doc';
 import type { ConstraintProfileId } from './canvas-profiles';
 import { CONSTRAINT_PROFILES } from './canvas-profiles';
 import { decodeIndexedPng, encodeIndexedPng, type Rgb } from './indexed-png';
@@ -1272,7 +1272,7 @@ export interface CanvasSidecar {
   name: string;
   profile: string;              // a ConstraintProfileId, or an id this build doesn't know
   palette: number[];            // 64 CRAM words
-  grid: { originX: number; originY: number };
+  gridOrigin: { originX: number; originY: number };
 }
 
 export type SidecarParse =
@@ -1295,7 +1295,7 @@ export function parseCanvasSidecar(json: string): SidecarParse {
   if (!Array.isArray(o.palette) || o.palette.length !== CANVAS_COLORS) {
     return { ok: false, error: `sidecar palette must hold ${CANVAS_COLORS} CRAM words (got ${Array.isArray(o.palette) ? o.palette.length : 'none'})` };
   }
-  const grid = (o.grid ?? {}) as Record<string, unknown>;
+  const grid = (o.gridOrigin ?? {}) as Record<string, unknown>;
   return {
     ok: true,
     sidecar: {
@@ -1303,7 +1303,7 @@ export function parseCanvasSidecar(json: string): SidecarParse {
       name: typeof o.name === 'string' ? o.name : 'Canvas',
       profile: typeof o.profile === 'string' ? o.profile : 'none',
       palette: (o.palette as unknown[]).map((w) => Number(w) & 0xffff),
-      grid: {
+      gridOrigin: {
         originX: Number(grid.originX) || 0,
         originY: Number(grid.originY) || 0,
       },
@@ -1331,7 +1331,7 @@ export async function encodeCanvasFiles(doc: CanvasDoc): Promise<{ png: Uint8Arr
     name: doc.name,
     profile: doc.profileId,
     palette: doc.palette.slice(),
-    grid: { ...doc.grid },
+    gridOrigin: { ...doc.gridOrigin },
   };
   // Trailing newline + 2-space indent: these land in a git tree next to the art
   // they describe, so they should diff like source, not like a blob.
@@ -1353,6 +1353,8 @@ export async function decodeCanvasFiles(png: Uint8Array, sidecarJson: string | n
   // still openable, and refusing to open art because its metadata rotted would
   // lose the artist's work for the sake of the annotation about it.
   const sidecar = parsed && parsed.ok ? parsed.sidecar : null;
+  // NOTE (review correction 2): `constraintProfile` takes a plain string and
+  // falls back to `none` itself, so do NOT restate that rule here with a cast.
 
   let palette: number[];
   if (sidecar) {
@@ -1364,12 +1366,9 @@ export async function decodeCanvasFiles(png: Uint8Array, sidecarJson: string | n
     img.palette.forEach((c, i) => { palette[i] = encodeGenesisColor({ r: c.r, g: c.g, b: c.b, a: 255 }); });
   }
 
-  const profileId: ConstraintProfileId =
-    sidecar && sidecar.profile in CONSTRAINT_PROFILES
-      ? (sidecar.profile as ConstraintProfileId)
-      : 'none';
+  const profileId = constraintProfile(sidecar?.profile ?? 'none').id;
 
-  const pixels = normalizeTransparent({
+  const pixels = normalizeCanvasPixels({
     width: img.width, height: img.height, data: new Uint8Array(img.indices),
   });
 
@@ -1378,7 +1377,7 @@ export async function decodeCanvasFiles(png: Uint8Array, sidecarJson: string | n
     pixels,
     palette,
     profileId,
-    grid: sidecar?.grid ?? { originX: 0, originY: 0 },
+    gridOrigin: sidecar?.gridOrigin ?? { originX: 0, originY: 0 },
   };
 }
 ```
@@ -1671,7 +1670,7 @@ import type { Selection } from '../../core/art/pixel-edit-controller';
 import { diffWrites } from '../../core/art/pixel-edit-controller';
 import type { ClipRegion } from '../../core/art/pixel-clipboard';
 import type { CanvasDoc } from '../../core/art/canvas-doc';
-import { blankCanvasDoc, normalizeTransparent, cloneCanvasDoc } from '../../core/art/canvas-doc';
+import { blankCanvasDoc, normalizeCanvasPixels, cloneCanvasDoc } from '../../core/art/canvas-doc';
 import type { ConstraintProfileId } from '../../core/art/canvas-profiles';
 import type { CanvasSnapshot } from '../../core/editing/canvas-history';
 import { CanvasDocHistory } from '../../core/editing/canvas-history';
@@ -1761,7 +1760,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   setPixels: (docId, buffer) => {
     const entry = get().docs.get(docId);
     if (!entry) return;
-    const next = normalizeTransparent(buffer);
+    const next = normalizeCanvasPixels(buffer);
     // A gesture that changed nothing commits nothing: no undo entry, no dirty dot.
     if (next.width === entry.doc.pixels.width && next.height === entry.doc.pixels.height
         && diffWrites(entry.doc.pixels, next).length === 0) return;
@@ -2674,7 +2673,7 @@ git commit -m "feat(canvas): focus and close a canvas tab without losing work"
 **Contract this task must meet:**
 
 1. **`CanvasHost` renders the document through the SHARED `PixelViewport` and `PixelEditController`.** No second drawing engine. Pass the document's 64 palette words decoded to `Color[]` as the `palette` prop — the viewport takes `(Color | undefined)[]` with no length assumption, and a canvas index IS a palette index, so no `lineMap` is involved. Build the config with `toolConfigFrom` exactly as `SpriteCanvasHost` does.
-2. **Commit through the store, not into the buffer.** `onCommit` calls `useCanvasStore.getState().setPixels(docId, r.buffer)` and `setSelection`. The store's no-op check and `normalizeTransparent` are the only places those rules live.
+2. **Commit through the store, not into the buffer.** `onCommit` calls `useCanvasStore.getState().setPixels(docId, r.buffer)` and `setSelection`. The store's no-op check and `normalizeCanvasPixels` are the only places those rules live.
 3. **One gesture, one undo entry** — this falls out of (2): `setPixels` records exactly one snapshot per call.
 4. **Grids come from the profile.** `constraintProfile(doc.profileId).grids` drives which pitches are offered; the store's `visibleGrids` says which are drawn. Map 8 → `'cell8'`, 16 → `'block'` via `layers.blockPx`, 256 → a `drawUnderlay` line, matching how the classic composer already draws its coarse grid.
 5. **The palette is the canvas's own 64 colours**, edited through the shared `PaletteGrid` behind a new `PaletteGridPort` in `providers/palette-canvas.ts`. Its `lines` are the doc's words in 4 rows of 16; clicking a swatch binds `canvasIndex(line, idx)` as the paint colour; index 0 uses the `'paint'` transparent behaviour (it is the eraser here, exactly as in aeon); a slider commit calls `setPalette`. A canvas with fewer profile lines (`genesis-sprite`) still shows four rows — the profile is checked in 2B, never prevented here (spec §4.3: **never prevent**).
@@ -2787,5 +2786,25 @@ git commit -m "test(canvas): verify the canvas document in the running app under
 **Placeholder scan:** no TBDs. Tasks 12 and 13 are marked ILLUSTRATIVE and carry a numbered contract plus the exact files to read instead of invented component code — the same convention phase 1's Tasks 9–11 used successfully, and the honest option given the node suite cannot test React.
 
 **Type consistency:** `ConstraintProfileId` (Task 2) is the type used by `CanvasDoc.profileId` (Task 1), `CanvasSidecar.profile` is a bare `string` because a sidecar may name an unknown profile (Task 5 tests that path). `CanvasSource` is defined once in `canvasStore.ts` and imported by `canvas-file.ts`. `readCanvasSnapshot`/`writeCanvasSnapshot` (Task 7) match `CanvasDocHistory`'s constructor (Task 6). `saveableDirtyCanvasDocIds` is the one predicate both the saver's `isDirty` and its `scope.isDirty` read (Task 10).
+
+---
+
+## Review corrections
+
+**These are AUTHORITATIVE over the task text above them.** Tasks 1 and 2 shipped first (`e434050`), were reviewed, and the review found real defects in the plan's own code. The task text above is left as written so the history reads honestly; where it disagrees with this section, this section wins. Forward references in Tasks 5, 7 and 12 have already been updated in place.
+
+**R1 (IMPORTANT, Task 1) — the choke point only covered half the illegal domain.** `normalizeTransparent` collapsed the entry-0 aliases (16/32/48) but let any value above 63 through untouched, so 200 and 8 rendered identically and stored differently — the exact "two spellings of one colour" bug the module header argues must never exist, entering by another door. Task 5's decoder feeds raw PNG indices straight into it, so the hole was on the real path. **Renamed `normalizeCanvasPixels`** (the old name under-describes a function that owns the whole domain) and every pixel now routes through `canvasIndex(paletteLineOf(v), paletteEntryOf(v))`, which already masks both fields — making `canvasIndex`'s "the ONE constructor" claim literally true and removing the asymmetry where the constructor masked and the normaliser did not. A value above 63 is corrupt input; the file-format layer refuses over-large palettes before this point, so it should never arrive in practice.
+
+**R2 (IMPORTANT, Task 2) — `constraintProfile` could not accept the input it exists for.** Its documented `none` fallback is justified by "a sidecar can name a profile this build has never heard of", but a sidecar yields a `string` and the parameter type rejected it — which is why the test needed `as never`, and why Task 5's loader had reimplemented the fallback inline with a cast. The parameter is now `string`; the return type stays exact; Task 5 calls it instead of restating the rule.
+
+**R3 (IMPORTANT, Task 1) — no size ceiling.** `blankCanvasDoc` clamped the floor only. `cloneCanvasDoc` copies the whole buffer per undo entry and `CanvasDocHistory` keeps 40, so an unbounded "free-size" canvas is an unbounded history. `MAX_SIDE = 1024` (~1 MB per snapshot, ~40 MB of history); the ceiling is set by snapshot cost, not by anything about the art.
+
+**R4/R5 (IMPORTANT, Task 1) — two regressions the suite would have reported green.** `cloneCanvasDoc` had no test at all despite being what undo depends on (a regression to `palette: d.palette` would produce an undo that mutates the snapshot it restores), and the normaliser's test could not tell a copy from an in-place mutation of the caller's buffer. Both now tested.
+
+**R6 (IMPORTANT, cross-module) — `PixelBuffer`'s own documentation contradicts the canvas.** `pixel-ops.ts` says values are 0-15 and `pixel-edit-controller.ts` says `color` is 0..15; `CanvasDoc.pixels` is that type carrying 0..63. Nothing masks today, so the canvas works by accident of stale docs — someone tightening `pixel-ops` in good faith could add `v & 15` and flatten every canvas pixel to line 0. Both comments now say the range is set by the owner, and a controller test pushes a 0..63 colour through a stroke so the comment is backed by a guard.
+
+**Renames to carry forward:** `normalizeTransparent` → `normalizeCanvasPixels`; `CanvasDoc.grid` → `CanvasDoc.gridOrigin` (it sat beside `ConstraintProfile.grids`, which holds pitches, so `doc.grid` read as the wrong thing) — and the sidecar JSON key changes with it, which is free because nothing has shipped.
+
+---
 
 **Contracts verified against the tree while writing this plan** (do not re-derive them, but do re-check if the code has moved): `SnapshotHistory`'s constructor is `(read, write, maxDepth?)` with a protected abstract `clone`, and `canUndo`/`canRedo` are **getters, not methods**; `PixelViewport.palette` is `(Color | undefined)[]` with no length assumption, so a 64-entry palette is legal; `PixelEditController` never masks a colour to 0..15, so a 0..63 paint index passes through unchanged; `TAB_KINDS` already contains `'art-doc'` with no user; `writeGuarded`, `readBinaryFile`, `fileMtime` and `listDir` already exist on `window.api`, so this plan adds **no IPC channel**; `CompressionStream`/`DecompressionStream` are present in node v24.15.0 and in Chromium.
