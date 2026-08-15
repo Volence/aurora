@@ -1791,3 +1791,63 @@ and must be re-verified against the larger pool.
 The test is pinned to the measured reality with a comment saying why, not to the prediction.
 Deliberately NOT "fixed" by widening `LZ_TILES` — that needs its own investigation into where
 the ROM actually loads that art from, and it is not this feature's job.
+
+---
+
+## Task 11, decided — paint is an explicit per-tier mode, not an armed tool
+
+**Settled 2026-08-15 before implementation, after reading `ClassicArtToolDock.tsx`.**
+
+Step H established, deliberately and in writing, that **only the Tile tier is a pixel surface**:
+Chunk and Block "paint with a block/tile brush chosen in their own inline controls and never read
+`artStore.tool` at all", and the tool rail is gated on the tier because "a pencil/fill/eyedropper
+column beside the chunk grid is exactly the dead chrome that rule exists to prevent".
+
+Paint-through reverses that premise. That is intended — but it is a reversal of a recorded
+decision, not an oversight to code around, and three things move together with it.
+
+### The decision
+
+**The assignment grid stays the default. Painting is an explicit per-tier toggle.**
+
+Rejected: deriving the mode from the armed `artStore.tool`. Chunk and Block have no "assign"
+member in that union, so it would need inventing, and `artStore.tool` is shared with the SPRITE
+editor — a level-art-only member would leak a concept into a surface that can never use it. The
+existing assignment behaviour is also the primary use of both tabs and must not become a mode
+someone has to escape from.
+
+So each of ChunkTab and BlockTab gains an **Assign | Paint** toggle in its own controls row,
+defaulting to Assign. In Paint the tab composes its surface and mounts `PixelViewport` +
+`PixelEditController`; in Assign it behaves exactly as today.
+
+### What moves with it
+
+1. **`isClassicPixelTier` (`level-presence.ts`) must take the mode into account**, not just the
+   tab. It gates BOTH the tool rail's contents and `LevelWorkspace`'s 44px rail CONTAINER —
+   returning null from the dock empties the column but does not remove it. One predicate, two
+   gates; keep it that way.
+2. **The rail appears only when Paint is on**, which keeps "a control that cannot act is not
+   drawn" true rather than abandoning it. Eight armed tools beside an assignment grid is the
+   dead chrome step H was avoiding, and that reasoning still holds in Assign mode.
+3. **`ClassicArtToolDock`'s comment block is now wrong** and must be rewritten, not left. It is a
+   careful explanation of why only one tier is a pixel surface, and someone will trust it. Say
+   instead: three tiers can be pixel surfaces, gated on the tier's MODE.
+4. `CLASSIC_TILE_TOOLS` is now the pixel-tool set for three tiers rather than one. Renaming is
+   optional; leaving the name while widening the meaning is not.
+
+### The rest of Task 11's contract
+
+- In Paint mode, compose via `buildChunkSurface` / `buildBlockSurface`, render through
+  `PixelViewport`, drive the existing `PixelEditController` exactly as `TileTab` does after H1.
+- On gesture end: `diffWrites` → `planSurfaceEdit` → `classicPaintSurface`. **Never call
+  `classicEditTiles` directly from the composed path** — that would bypass divergence entirely.
+- Thread the adapter's `reservedTiles` for the open act into `planSurfaceEdit`'s input (this is
+  T4). Capture it beside `editableTileRange`. **Without this, Isolate can overwrite object art**
+  — the whole point of task 5c.
+- Add the **Link | Isolate** control and a limits readout: `blocks 439/1024 · tiles 819/965`.
+  Say **limit**, never budget. On `{ ok: false }`, toast `reason` verbatim — those messages were
+  written to be actionable and name the Link-mode escape.
+- Add TileTab's deferred discovery breadcrumb to its linkage banner: `To change one place only,
+  paint it on the Chunk tab (Isolate).`
+- Guard test: the composed path reaches `planSurfaceEdit` before `classicPaintSurface`, and
+  never `classicEditTiles`. Plant the violation first.
