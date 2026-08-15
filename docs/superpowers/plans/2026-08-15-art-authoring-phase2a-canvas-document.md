@@ -1779,7 +1779,15 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   },
 
   setName: (docId, name) => patch(set, get, docId, (e) => ({ ...e, doc: { ...e.doc, name }, unsavedEdits: true })),
-  setProfile: (docId, profileId) => patch(set, get, docId, (e) => ({ ...e, doc: { ...e.doc, profileId }, unsavedEdits: true })),
+  // R13: profile is an EDIT, not identity — it records. Without recordEdit
+  // here, switching profile dirties the document but cannot be undone, and
+  // Ctrl+Z afterwards silently reverts the previous paint stroke instead while
+  // leaving the new profile in place.
+  setProfile: (docId, profileId) => {
+    if (!get().docs.has(docId)) return;
+    recordEdit(docId);
+    patch(set, get, docId, (e) => ({ ...e, doc: { ...e.doc, profileId }, unsavedEdits: true }));
+  },
   setSource: (docId, source) => patch(set, get, docId, (e) => ({ ...e, source })),
 
   markSaved: (docId, mtimes) => patch(set, get, docId, (e) => ({
@@ -2827,6 +2835,12 @@ git commit -m "test(canvas): verify the canvas document in the running app under
 **R8 (IMPORTANT, Task 4) — the deflate/inflate pair moves to its own module, and the plan's `inflate` never compiled.** Task 3 hit a real toolchain mismatch: `@types/node`'s `Uint8Array<ArrayBufferLike>` is not assignable to DOM's `BlobPart`, so `new Blob([raw])` fails `tsc`. The obvious fix — passing `raw.buffer` — is a trap: it discards the view's `byteOffset`/`byteLength`, so a subarray silently compresses its neighbours' bytes. That is dormant in the encoder (its scanline buffer is always freshly allocated at its own size, and `TypedArray.set` respects the source window, which is *why* a public-API test of it passes with the bug present) but live in the decoder, where chunk data genuinely arrives as `png.subarray(start, start + len)`. The correct cast is of the VIEW: `new Blob([data as unknown as BlobPart])`.
 
 Rather than state that twice and leave `inflate` private and unguarded, **Task 4 creates `src/core/art/zlib-stream.ts`** exporting `deflate` and `inflate`, moves the view-safety rationale there, and gives each direction a test that passes a `subarray` with a non-zero `byteOffset` and asserts the window's bytes and not its neighbours'. `indexed-png.ts` imports both. This also retires the "exported only for testability" question Task 3 raised: in the new module both are the public surface. Plant the `.buffer` form in each direction and watch the matching test fail before believing either guard.
+
+**R13 (IMPORTANT, Tasks 6 and 7) — the constraint profile is an edit, not identity.** Task 6's plan text put `profileId` outside `CanvasSnapshot` and justified it as "matching SpriteSnapshot's split". That justification is false: `SpriteSnapshot` carries `paletteMode` and `zoneLine`, and `spriteStore.setPaletteMode` records. `paletteMode` is the sprite analogue of `profileId` — both answer "what colour and constraint model is this document under" — so putting it outside was a *divergence* dressed up as a match.
+
+The consequence was live in Task 7's own text: `setProfile` set `unsavedEdits: true` without recording, so switching profile would dirty the document, be un-undoable, and make the next Ctrl+Z silently revert the previous *paint stroke* while leaving the new profile in place. Worst of both — it looks undoable because the dot appeared, and it isn't. It gets sharper in 2B, where the profile decides which violations are reported. `profileId` is now inside the snapshot (one string, no clone cost) and `setProfile` records. Name and grid origin stay outside as genuine identity.
+
+**Also settled here:** `SnapshotHistory`'s memory bound is tighter than Task 6's comment first claimed. `undoStack.length + redoStack.length` is invariant at ≤ `maxDepth` — `record` pushes one and clears redo, `undo`/`redo` each move one across and conserve the sum — so 40 entries is ~40 MB at `MAX_SIDE`, not ~80. The invariant is **emergent, not enforced**: nothing asserts it, and any future path that pushes to `redoStack` without popping `undoStack` breaks it silently. Canvas is the first snapshot type whose entries are megabytes, which is what makes that worth a comment in `snapshot-history.ts`.
 
 **R12 (IMPORTANT, Tasks 5 and 9) — a load has to be able to report, and a save must not destroy what it could not read.** Task 5's review traced a concrete data-loss chain through Task 9's own sketch. `decodeCanvasFiles` computed careful diagnostics and dropped every one of them; `loadCanvasFile` returned `{ doc, source }` with nowhere to put a warning; `saveCanvasFile` then wrote both files in one guarded batch. The mtime guard does **not** protect the sidecar in this case, because the file did not change on disk — Aurora simply could not read it. So: hand-edit a sidecar and leave a trailing comma, open the canvas (which succeeds, correctly), draw one pixel, save, and the constraint-profile choice is gone with no event ever reported.
 
