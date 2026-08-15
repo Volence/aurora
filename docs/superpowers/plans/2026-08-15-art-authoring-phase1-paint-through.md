@@ -235,36 +235,39 @@ git commit -m "feat(art): compose a classic block into an editable pixel surface
 
 Task 1's fixture fills tile N with the uniform value N, so **its tests cannot detect whether `blitCell` mirrors anything** — every pixel of a tile is identical, flipped or not. Task 2's tests below assert *provenance* (`xf`/`yf` fields), not blitted pixels, so without this step the blit's flip handling would have no permanent coverage anywhere. Add it before starting Task 2 proper:
 
+The marker pixel sits at local **(1,0)**, deliberately NOT (0,0): a marker on the diagonal is symmetric under transposition, so an `sx`/`sy` swap would still read back correctly and the test would pass while the blit was wrong. (1,0) is asymmetric and catches the wider class the code-quality review named — transposition and off-by-one inside the cell, not only flips.
+
 ```ts
-describe('buildBlockSurface — the blit honours a cell\'s own flips', () => {
-  /** A doc whose tile 1 is blank except for a single pixel at local (0,0). */
-  function docWithCornerPixel(xf: boolean, yf: boolean): LevelDoc {
+describe('buildBlockSurface — the blit places pixels within a cell correctly', () => {
+  /** A doc whose tile 1 is blank except for value 5 at local (1,0). */
+  function docWithMarker(xf: boolean, yf: boolean): LevelDoc {
     const d = makeDoc([{ cells: [cell(1, xf, yf), cell(0), cell(0), cell(0)] }]);
     d.tiles.fill(0, 32, 64);   // clear tile 1
-    d.tiles[32] = 0x50;        // pixel (0,0) = 5, pixel (1,0) = 0
+    d.tiles[32] = 0x05;        // byte 0: pixel (0,0) = 0, pixel (1,0) = 5
     return d;
   }
 
-  it('unflipped, the marker stays at (0,0)', () => {
-    const { buffer } = buildBlockSurface(docWithCornerPixel(false, false), 0);
-    expect(buffer.data[0 * 16 + 0]).toBe(5);
+  it('unflipped, the marker stays at (1,0) — and NOT at (0,1)', () => {
+    const { buffer } = buildBlockSurface(docWithMarker(false, false), 0);
+    expect(buffer.data[0 * 16 + 1]).toBe(5);
+    expect(buffer.data[1 * 16 + 0]).toBe(0);   // transposition guard
   });
 
-  it('xf moves the marker to the right edge of its cell', () => {
-    const { buffer } = buildBlockSurface(docWithCornerPixel(true, false), 0);
-    expect(buffer.data[0 * 16 + 0]).toBe(0);
-    expect(buffer.data[0 * 16 + 7]).toBe(5);
+  it('xf mirrors it across the cell to (6,0)', () => {
+    const { buffer } = buildBlockSurface(docWithMarker(true, false), 0);
+    expect(buffer.data[0 * 16 + 6]).toBe(5);
+    expect(buffer.data[0 * 16 + 1]).toBe(0);
   });
 
-  it('yf moves the marker to the bottom edge of its cell', () => {
-    const { buffer } = buildBlockSurface(docWithCornerPixel(false, true), 0);
-    expect(buffer.data[0 * 16 + 0]).toBe(0);
-    expect(buffer.data[7 * 16 + 0]).toBe(5);
+  it('yf mirrors it down the cell to (1,7)', () => {
+    const { buffer } = buildBlockSurface(docWithMarker(false, true), 0);
+    expect(buffer.data[7 * 16 + 1]).toBe(5);
+    expect(buffer.data[0 * 16 + 1]).toBe(0);
   });
 });
 ```
 
-Run it, confirm 3 more tests pass, then **falsify**: delete the `c.xf ? TILE_PX - 1 - px : px` conditional in `blitCell` (use `px` directly) and confirm the xf case fails. Restore from a byte copy. Commit separately as `test(art): pin blitCell's flip handling, which uniform-colour fixtures could not see`.
+Run it, confirm 3 more tests pass, then **falsify twice**: (a) delete the `c.xf ? TILE_PX - 1 - px : px` conditional in `blitCell` (use `px` directly) — the xf case MUST fail; (b) swap the source lookup to `tile.data[sx * TILE_PX + sy]` — the unflipped transposition guard MUST fail. Restore from a byte copy after each. Commit separately as `test(art): pin blitCell's pixel placement, which uniform-colour fixtures could not see`.
 
 - [ ] **Step 1: Write the failing tests**
 
