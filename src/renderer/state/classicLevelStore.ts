@@ -31,7 +31,10 @@ import type { DirtyDomains, EditableTileRange, LevelDoc, ZoneActRef } from '../.
 import { tileLockReason } from '../../core/project/editable-tiles';
 import type { SurfaceEditPlan, PaintMode as SurfaceDivergeMode } from '../../core/art/classic-surface-plan';
 import type { BlockDef, ChunkCell, ChunkDef256 } from '../../core/level-classic/model';
-import { validateLevelDoc, unpackChunkCell, chunkIndexForId } from '../../core/level-classic/model';
+import type { CanvasCommitPlan } from '../../core/art/classic-commit-plan';
+import {
+  validateLevelDoc, unpackChunkCell, chunkIndexForId, MAX_ADDRESSABLE_CHUNKS,
+} from '../../core/level-classic/model';
 import {
   firstEditableChunkId, firstEditableNonBlankTile, firstNonBlankBlock, landingPaletteLine,
 } from '../../core/level-classic/tile-pick';
@@ -987,6 +990,120 @@ export function classicPaintSurface(plan: SurfaceEditPlan): CommandResult {
   return { ok: true };
 }
 
+/**
+ * classic:commit-canvas — apply a resolved canvas commit across all five art
+ * domains as ONE command.
+ *
+ * Composite for the same reason `classicPaintSurface` is: tiles, blocks, their
+ * collision, chunks and (when the artist adopted it) the palette land in one
+ * `commitArt`, so a commit is a single Ctrl+Z. Splitting it would let an undo
+ * strand appended blocks with nothing pointing at them, or leave art recoloured
+ * by a palette the tiles no longer match.
+ *
+ * All five domains are members of ART_DOMAINS, so `assertSingleDomain` permits
+ * the patch — the same property §3.4 verified for phase 1.
+ *
+ * The PLAN is the authority on what is legal; this re-validates only what it
+ * must, using the SAME predicates rather than a second copy of the rules.
+ */
+export function classicCommitCanvas(plan: CanvasCommitPlan): CommandResult {
+  const doc = requireDoc();
+  if (!doc) return err('no classic level is open');
+
+  const poolTiles = Math.floor(doc.tiles.length / 32);
+  const range = editableTileRange();
+  for (const { tileIndex, data } of plan.tileWrites) {
+    if (!isInt(tileIndex) || tileIndex < 1 || tileIndex >= poolTiles) {
+      // Tile 0 is the transparent tile — a plan that wrote it would repaint
+      // every blank cell in the zone, so it is rejected here as well as being
+      // unreachable in the planner.
+      return err(`tile ${tileIndex} cannot be written (1..${poolTiles - 1})`);
+    }
+    if (!(data instanceof Uint8Array) || data.length !== 32) {
+      return err(`tile ${tileIndex} data must be 32 bytes (got ${data?.length})`);
+    }
+    const lock = tileLockReason(range, tileIndex);
+    if (lock) return err(`tile ${tileIndex} is not editable: ${lock}`);
+  }
+
+  const nextTiles = plan.tileWrites.length ? new Uint8Array(doc.tiles) : doc.tiles;
+  for (const { tileIndex, data } of plan.tileWrites) nextTiles.set(data, tileIndex * 32);
+
+  // Blocks: the plan addresses them by id and may OVERWRITE a reclaimed id or
+  // APPEND a new one, so grow to fit rather than assuming a push.
+  const maxBlockId = plan.blockWrites.reduce((m, w) => Math.max(m, w.blockId), doc.blocks.length - 1);
+  if (maxBlockId >= MAX_BLOCKS_TOTAL) {
+    return err(`block ${maxBlockId} exceeds the ${MAX_BLOCKS_TOTAL}-block ceiling (10-bit chunk-cell field)`);
+  }
+  const nextBlocks = plan.blockWrites.length ? doc.blocks.slice() : doc.blocks;
+  while (nextBlocks.length <= maxBlockId) {
+    nextBlocks.push({ cells: [0, 1, 2, 3].map(() => ({ tile: 0, xf: false, yf: false, pal: 0, pri: false })) });
+  }
+  for (const { blockId, def } of plan.blockWrites) {
+    if (blockId < 1) return err('block 0 is engine-blank and cannot be written');
+    nextBlocks[blockId] = { cells: def.cells.map((c) => ({ ...c })) };
+  }
+
+  // Collision travels with the block, as it does for an Isolate clone — but
+  // here the value is inherited positionally from the cell being displaced
+  // rather than from a source block. See the plan's D3.
+  const nextColind = plan.blockWrites.length
+    ? (() => {
+      const out = new Uint8Array(Math.max(nextBlocks.length, doc.collision.colind.length));
+      out.set(doc.collision.colind);
+      for (const { blockId, colind } of plan.blockWrites) out[blockId] = colind;
+      return out;
+    })()
+    : doc.collision.colind;
+
+  const nextChunks = (plan.chunkWrites.length || plan.chunkAppends.length)
+    ? doc.chunks.slice() : doc.chunks;
+  for (const { chunkFileIndex, def } of plan.chunkWrites) {
+    if (!isInt(chunkFileIndex) || chunkFileIndex < 0 || chunkFileIndex >= nextChunks.length) {
+      return err(`chunk index ${chunkFileIndex} does not exist (0..${nextChunks.length - 1})`);
+    }
+    nextChunks[chunkFileIndex] = { cells: def.cells.map((c) => ({ ...c })) };
+  }
+  for (const def of plan.chunkAppends) nextChunks.push({ cells: def.cells.map((c) => ({ ...c })) });
+  if (nextChunks.length > MAX_ADDRESSABLE_CHUNKS) {
+    return err(
+      `chunk capacity reached: ${MAX_ADDRESSABLE_CHUNKS} chunks max — engine ids 1..$7F, `
+      + 'the layout loop bit (bit 7) makes $80+ unaddressable',
+    );
+  }
+
+  const nextPalettes = plan.paletteWrites?.length ? doc.palettes.slice() : doc.palettes;
+  for (const { line, colors } of plan.paletteWrites ?? []) {
+    if (!isInt(line) || line < 1 || line > 3) {
+      // Line 0 is Sonic's, shared game-wide. The planner refuses drift there;
+      // this is the second door, because the save path writes Sonic.bin happily.
+      return err(`palette line ${line} cannot be written by a commit (1..3 only — line 0 is Sonic's)`);
+    }
+    if (!(colors instanceof Uint16Array) || colors.length !== 16) {
+      return err(`palette line ${line} must have 16 colors (got ${colors?.length})`);
+    }
+    nextPalettes[line] = new Uint16Array(colors);
+  }
+
+  const newDoc: LevelDoc = {
+    ...doc,
+    tiles: nextTiles, blocks: nextBlocks, chunks: nextChunks, palettes: nextPalettes,
+    collision: { ...doc.collision, colind: nextColind },
+  };
+  const e = structuralError(newDoc);
+  if (e) return err(e);
+
+  const dirtyPatch: DirtyDomains = {};
+  if (plan.tileWrites.length) dirtyPatch.tiles = true;
+  if (plan.blockWrites.length) { dirtyPatch.blocks = true; dirtyPatch.colind = true; }
+  if (plan.chunkWrites.length || plan.chunkAppends.length) dirtyPatch.chunks = true;
+  if (plan.paletteWrites?.length) dirtyPatch.palette = true;
+  if (Object.keys(dirtyPatch).length === 0) return { ok: true }; // nothing to do
+
+  commitArt(newDoc, dirtyPatch, { kind: 'all', tiles: plan.tileWrites.map((w) => w.tileIndex) });
+  return { ok: true };
+}
+
 /** classic:set-palette — write one 16-color palette line. */
 export function classicSetPalette(line: number, colors: Uint16Array): CommandResult {
   const doc = requireDoc();
@@ -1058,7 +1175,6 @@ export function classicSetObjects(objects: S1ObjectEntry[]): CommandResult {
 //     only engine ids 1..$7F are stampable. doc.chunks is file-order (0-based);
 //     engine id = index + 1, so at most 127 chunks can be addressed.
 //   • Chunk cells reference blocks with a 10-bit field → at most $400 = 1024 blocks.
-const MAX_ADDRESSABLE_CHUNKS = 0x7f; // 127 (engine ids 1..$7F)
 const MAX_BLOCKS_TOTAL = 0x400; // 1024 (10-bit block ref)
 
 /**

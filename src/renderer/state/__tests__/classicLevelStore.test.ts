@@ -14,6 +14,7 @@ import {
   classicAddChunk,
   classicAddBlock,
   classicPaintSurface,
+  classicCommitCanvas,
 } from '../classicLevelStore';
 import { useClassicProjectStore } from '../classicProjectStore';
 import { useEditorStore } from '../editorStore';
@@ -22,6 +23,7 @@ import { documentHistoryHub } from '../history-hub';
 import { packChunkCell, unpackChunkCell, type BlockDef } from '../../../core/level-classic/model';
 import type { S1ObjectEntry } from '../../../core/formats/classic/s1-objpos';
 import type { SurfaceEditPlan } from '../../../core/art/classic-surface-plan';
+import type { CanvasCommitPlan } from '../../../core/art/classic-commit-plan';
 // Shared with history-routing.test.ts — one fixture, so both suites drive the
 // store through the same doc/handle shape.
 import { TILE_COUNT, REF, makeDoc, openReady, fakeHandle } from './helpers/classic-fixture';
@@ -1164,5 +1166,89 @@ describe('fine content clocks (paletteEpoch / tileEpoch / tileVersions)', () => 
     expect(st().paletteEpoch).toBeGreaterThan(pal1);
     expect(st().tileEpoch).toBeGreaterThan(tile1);
     expect(st().tileVersions.size).toBe(0);
+  });
+});
+
+describe('classicCommitCanvas', () => {
+  /** A commit touching all five art domains, so the composite is exercised. */
+  const fullCommit = (): CanvasCommitPlan => ({
+    tileWrites: [{ tileIndex: 1, data: new Uint8Array(32).fill(0x5a) }],
+    blockWrites: [{
+      blockId: 2, // appended (the fixture ships 2 blocks: ids 0 and 1)
+      def: { cells: [0, 1, 2, 3].map(() => ({ tile: 1, xf: false, yf: false, pal: 1, pri: false })) },
+      colind: 6,
+    }],
+    chunkWrites: [{
+      chunkFileIndex: 0,
+      def: { cells: Array.from({ length: 256 }, () => ({ block: 2, xf: false, yf: false, solidity: 2 })) },
+    }],
+    chunkAppends: [],
+    paletteWrites: [{ line: 2, colors: new Uint16Array(16).fill(0x0e0e) }],
+    report: {
+      tilesNew: 1, tilesReused: 0, tilesReclaimed: 0,
+      blocksNew: 1, blocksReused: 0, blocksReclaimed: 0,
+      chunksReplaced: 1, chunksAppended: 0,
+      blocksInheritedCollision: 1, blocksWithoutCollision: 0,
+      cellsInheritedSolidity: 256, cellsWithoutSolidity: 0,
+      poolBefore: { tiles: TILE_COUNT, blocks: 2, chunks: 1 },
+      poolAfter: { tiles: TILE_COUNT, blocks: 3, chunks: 1 },
+      warnings: [],
+    },
+  });
+
+  it('applies tiles, blocks, collision, chunks and palette in ONE undo entry', () => {
+    openReady();
+    expect(artStack().canUndo).toBe(false);
+    expect(classicCommitCanvas(fullCommit())).toEqual({ ok: true });
+
+    expect(st().doc!.tiles[1 * 32]).toBe(0x5a);
+    expect(st().doc!.blocks.length).toBe(3);
+    expect(st().doc!.collision.colind[2]).toBe(6);
+    expect(st().doc!.chunks[0].cells[0].solidity).toBe(2);
+    expect(st().doc!.palettes[2][0]).toBe(0x0e0e);
+
+    // One entry: a single undo must exhaust the stack, or the commit was split.
+    expect(artStack().canUndo).toBe(true);
+    artStack().undo();
+    expect(artStack().canUndo).toBe(false);
+  });
+
+  it('undo restores every domain together, including the palette', () => {
+    openReady();
+    const beforeTile = st().doc!.tiles[1 * 32];
+    const beforePal = st().doc!.palettes[2][0];
+    expect(classicCommitCanvas(fullCommit())).toEqual({ ok: true });
+    artStack().undo();
+    expect(st().doc!.tiles[1 * 32]).toBe(beforeTile);
+    expect(st().doc!.blocks.length).toBe(2);
+    expect(st().doc!.palettes[2][0]).toBe(beforePal);
+  });
+
+  it('refuses to write tile 0 — it would repaint every blank cell in the zone', () => {
+    openReady();
+    const p = fullCommit();
+    p.tileWrites = [{ tileIndex: 0, data: new Uint8Array(32) }];
+    expect(classicCommitCanvas(p).ok).toBe(false);
+  });
+
+  it('refuses to write block 0 — it is engine-blank', () => {
+    openReady();
+    const p = fullCommit();
+    p.blockWrites = [{ ...p.blockWrites[0], blockId: 0 }];
+    expect(classicCommitCanvas(p).ok).toBe(false);
+  });
+
+  it("refuses to write palette line 0 — it is Sonic's, shared game-wide", () => {
+    openReady();
+    const p = fullCommit();
+    p.paletteWrites = [{ line: 0, colors: new Uint16Array(16) }];
+    expect(classicCommitCanvas(p).ok).toBe(false);
+  });
+
+  it('marks colind dirty whenever blocks are written, so the file reaches disk', () => {
+    openReady();
+    expect(classicCommitCanvas(fullCommit())).toEqual({ ok: true });
+    expect(st().dirty.colind).toBe(true);
+    expect(st().dirty.palette).toBe(true);
   });
 });

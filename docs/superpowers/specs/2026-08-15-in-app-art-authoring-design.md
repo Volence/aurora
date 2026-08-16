@@ -3,6 +3,10 @@
 **Status: phases 1, 2A and 2B built and merged (2026-08-15). Phase 3 DECLINED — see
 "§0 · Corrections" immediately below, which is AUTHORITATIVE over everything after it.**
 
+**§4.4 (resolve and commit) is SUPERSEDED by
+`2026-08-15-phase-2c-resolve-and-commit-design.md`**, which answers the questions §0 raised and
+adds a PNG import path alongside the canvas. Read that instead for anything about commit.
+
 Goal: make Aurora a place where Genesis art is *made*, not only *edited* — so that level art and
 sprite art can both be authored without round-tripping through Aseprite.
 

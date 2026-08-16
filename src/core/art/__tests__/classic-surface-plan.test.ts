@@ -417,3 +417,50 @@ describe('planSurfaceEdit — link mode', () => {
     expect(forTile5[0].data[0]).toBe((9 << 4) | 7);
   });
 });
+
+describe('planSurfaceEdit — slot double-booking (regression)', () => {
+  /**
+   * A shipped defect, found while extracting the pool matcher for 2C.
+   *
+   * Two surface cells that both reference tile 5 through the shared block 1, in
+   * DIFFERENT chunk cells, so each diverges independently. The first one's
+   * painted result is planted into free slot 9 beforehand, so it finds a content
+   * match and repoints there without allocating. The second finds no match and
+   * asks for a free slot — and slot 9 is the lowest free one.
+   *
+   * Before the fix, a content match was taken without being recorded, so
+   * findFreeSlot handed slot 9 to the second cell too: it wrote ITS bytes there
+   * and the first cell's block was left pointing at them. Two cells painting
+   * different colours, one tile, one of them silently wrong.
+   */
+  it('never allocates a slot another cell in the same gesture matched', () => {
+    const doc = makeDoc();
+
+    // Tiles 9..15 are unreferenced (makeDoc only uses 1..8), so 9 is the lowest
+    // free slot — the one findFreeSlot will hand out.
+    const painted = new Uint8Array(doc.tiles.subarray(5 * 32, 6 * 32));
+    painted[0] = (9 << 4) | (painted[0] & 0x0f); // pixel (0,0) := 9
+    doc.tiles.set(painted, 9 * 32);
+
+    const { provenance } = buildChunkSurface(doc, 0);
+    const r = planSurfaceEdit({
+      doc, provenance, index: buildUsageIndex(doc), mode: 'isolate',
+      isEditableTile: allEditable,
+      // (16,0) and (0,16) are both block 1's cell 0 — tile 5 — in different
+      // chunk cells, so both must diverge. They paint DIFFERENT values.
+      writes: [{ x: 16, y: 0, value: 9 }, { x: 0, y: 16, value: 10 }],
+    });
+
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+
+    const targets = r.plan.blockCellEdits.map((e) => e.cell.tile);
+    expect(targets).toHaveLength(2);
+    // Different painted content must never land on one tile.
+    expect(new Set(targets).size).toBe(2);
+
+    // And the matched slot must not have been written by the other cell.
+    const written = new Set(r.plan.tileWrites.map((w) => w.tileIndex));
+    expect(written.has(9)).toBe(false);
+  });
+});

@@ -18,6 +18,10 @@ import type { PixelBuffer } from './pixel-ops';
 import type { SurfaceCell, SurfaceProvenance } from './classic-surface-buffer';
 import { surfaceToTile } from './classic-surface-buffer';
 import { tileToBuffer, tileBytesIfChanged } from './classic-tile-buffer';
+import {
+  findPoolMatch, emptyAvailability, unavailableForAllocation, TILE_BYTES,
+} from './tile-pool-match';
+import type { PoolAvailability } from './tile-pool-match';
 
 export type PaintMode = 'isolate' | 'link';
 
@@ -74,35 +78,9 @@ export interface PlanInput {
   reservedTiles?: ReadonlySet<number>;
 }
 
-const TILE_BYTES = 32;
 // Chunk cell's block field is 10 bits (see model.ts MAX_BLOCK_REF) — a clone
 // that would need id 0x400 or higher can never be encoded, so refuse instead.
 const MAX_BLOCK_REF = 0x3ff;
-
-function bytesEqualAt(pool: Uint8Array, tileIndex: number, want: Uint8Array): boolean {
-  const base = tileIndex * TILE_BYTES;
-  for (let i = 0; i < TILE_BYTES; i++) if (pool[base + i] !== want[i]) return false;
-  return true;
-}
-
-/**
- * An existing pool tile whose bytes already equal `want`, or null.
- *
- * `excluded` is the set of slots this gesture has already claimed as the NEW
- * home for some other cell's divergent paint — those slots are about to hold
- * different bytes than what is on disk right now, so a match against their
- * STALE content would repoint this cell at someone else's paint instead of its
- * own. Skipping them is what keeps two cells claiming distinct slots in the
- * same gesture from cross-contaminating.
- */
-function findContentMatch(doc: LevelDoc, want: Uint8Array, excluded: Set<number>): number | null {
-  const count = Math.floor(doc.tiles.length / TILE_BYTES);
-  for (let t = 0; t < count; t++) {
-    if (excluded.has(t)) continue;
-    if (bytesEqualAt(doc.tiles, t, want)) return t;
-  }
-  return null;
-}
 
 /**
  * A pool slot that is unreferenced, writable, and not object-reserved.
@@ -176,7 +154,10 @@ export function planSurfaceEdit(input: PlanInput): PlanResult {
   if (perCell.size === 0) return { ok: true, plan };
 
   const placesAffected = new Set<number>();
-  const claimed = new Set<number>();
+  // Three states, not one set — see tile-pool-match.ts's header. A slot this
+  // gesture MATCHED keeps its on-disk bytes and stays matchable for another
+  // cell, but must never be handed out as free; a slot it ALLOCATED is neither.
+  const avail: PoolAvailability = emptyAvailability();
   // Keyed by CHUNK CELL index, not block id: two painted chunk cells that share
   // a block each need their OWN clone (each is repointed independently), while
   // two 8x8 surface cells belonging to the SAME chunk cell must share one clone.
@@ -278,22 +259,26 @@ export function planSurfaceEdit(input: PlanInput): PlanResult {
     const wantBytes = changedBytes;
     let targetTile = e.tileIndex;
 
-    // findContentMatch may still repoint TO a reserved tile: byte-identical
+    // findPoolMatch may still repoint TO a reserved tile: byte-identical
     // content corrupts nothing (the object sprite still reads the same
     // bytes) and conserves an already-scarce slot, so it is deliberately not
     // filtered by `reserved` here — only findFreeSlot (a NEW claim) is.
-    const match = findContentMatch(doc, wantBytes, claimed);
+    const match = findPoolMatch(doc.tiles, wantBytes, avail, { allowFlips: false });
     if (match !== null) {
-      targetTile = match;
+      // Reused as-is. RECORDED, so the allocator below cannot hand this same
+      // slot to a later cell and overwrite the bytes this one now points at —
+      // the defect this used to have when the match was taken silently.
+      avail.matched.add(match.tileIndex);
+      targetTile = match.tileIndex;
     } else {
-      const slot = findFreeSlot(doc, index, isEditableTile, reserved, claimed);
+      const slot = findFreeSlot(doc, index, isEditableTile, reserved, unavailableForAllocation(avail));
       if (slot === null) {
         return {
           ok: false,
           reason: 'no free editable tile slot to hold the divergent copy — this zone is at its tile limit. Switch to Link mode to edit every place at once.',
         };
       }
-      claimed.add(slot);
+      avail.allocated.add(slot);
       targetTile = slot;
       plan.tileWrites.push({ tileIndex: slot, data: wantBytes });
       plan.stats.tilesClaimed++;
