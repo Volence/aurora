@@ -1,7 +1,6 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import express from 'express';
-import type { Request, Response, NextFunction } from 'express';
 import { app as electronApp } from 'electron';
 import type { BrowserWindow } from 'electron';
 import { createServer } from 'http';
@@ -12,6 +11,7 @@ import { requestAgent } from './agent-bridge';
 import type { AgentRequest } from '../shared/agent-protocol';
 import { EDITOR_METHODS } from './editor-methods';
 import { handleRequest, addSubscriber, removeSubscriber } from './aether/adapter';
+import { loopbackOnly } from './loopback-guard';
 
 const DEFAULT_PORT = 38473;
 
@@ -50,6 +50,28 @@ function buildServer(getWindow: () => BrowserWindow | null): McpServer {
 let httpServer: Server | null = null;
 let discoveryPaths: string[] = [];
 
+/**
+ * The port actually bound. Read at REQUEST time rather than captured, because
+ * the transport's allow-lists are built per request and the port is only known
+ * after `listen` resolves — a snapshot taken while wiring the routes would be
+ * zero, which allows nothing and would 403 every legitimate call.
+ */
+let boundPort = 0;
+
+const LOOPBACK_NAMES = ['127.0.0.1', 'localhost', '[::1]'];
+
+/** Host header values this server answers to. */
+function allowedHosts(): string[] {
+  return LOOPBACK_NAMES.flatMap((h) => [`${h}:${boundPort}`, h]);
+}
+
+/** Origins allowed to reach it from a browser context. */
+function allowedOrigins(): string[] {
+  return LOOPBACK_NAMES.flatMap((h) => [
+    `http://${h}:${boundPort}`, `https://${h}:${boundPort}`, `http://${h}`, `https://${h}`,
+  ]);
+}
+
 // Aurora's discovery file moved from ~/.sonic-level-editor/ to ~/.aurora/ with the
 // rename. We write BOTH during the transition window so existing bus/MCP clients
 // pointing at the legacy path keep finding us; remove the legacy write once every
@@ -57,15 +79,41 @@ let discoveryPaths: string[] = [];
 const DISCOVERY_DIR = '.aurora';
 const LEGACY_DISCOVERY_DIR = '.sonic-level-editor';
 
-export async function startMcpServer(getWindow: () => BrowserWindow | null): Promise<void> {
+/**
+ * Every route this process serves, wired onto a fresh express app.
+ *
+ * Exported so the node suite can plant a rebound request against the REAL
+ * routing table. Testing the middleware alone would not have caught the finding
+ * this exists for: the guard was correct, and `/mcp` simply did not have it.
+ */
+export function buildMcpApp(getWindow: () => BrowserWindow | null): express.Express {
   const exp = express();
   exp.use(express.json({ limit: '16mb' }));
 
-  // Stateless Streamable HTTP: fresh server+transport per POST (SDK-documented pattern)
-  exp.post('/mcp', async (req, res) => {
+  // ---- EVERY route below wears `loopbackOnly` ----
+  //
+  // `/mcp` used to run bare while `/aether` wore the guard, under a comment
+  // claiming the surface is "never remotely exposed". Both dispatch the SAME
+  // EDITOR_METHODS registry — open_project, edit_chunk, save_project, and
+  // save_project asks nobody — so the unguarded route was a way to rewrite the
+  // user's disassembly from a rebound web page. See loopback-guard.ts for why
+  // the 127.0.0.1 bind is not by itself an answer to that.
+  //
+  // Stateless Streamable HTTP: fresh server+transport per POST (SDK-documented
+  // pattern). BOTH defences, not either: the middleware is Aurora's own rule
+  // stated once for every route, and the transport's own protection defaults to
+  // FALSE, so leaving it unset opted out of the SDK's. (The SDK marks these
+  // options deprecated in favour of exactly the middleware above — which is why
+  // the middleware is the primary and these are the backstop, not the reverse.)
+  exp.post('/mcp', loopbackOnly, async (req, res) => {
     try {
       const server = buildServer(getWindow);
-      const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
+      const transport = new StreamableHTTPServerTransport({
+        sessionIdGenerator: undefined,
+        enableDnsRebindingProtection: true,
+        allowedHosts: allowedHosts(),
+        allowedOrigins: allowedOrigins(),
+      });
       res.on('close', () => { void transport.close(); void server.close(); });
       await server.connect(transport);
       await transport.handleRequest(req, res, req.body);
@@ -74,21 +122,12 @@ export async function startMcpServer(getWindow: () => BrowserWindow | null): Pro
       if (!res.headersSent) res.status(500).json({ error: 'internal error' });
     }
   });
-  exp.get('/mcp', (_req, res) => { res.status(405).end(); });
-  exp.delete('/mcp', (_req, res) => { res.status(405).end(); });
+  exp.get('/mcp', loopbackOnly, (_req, res) => { res.status(405).end(); });
+  exp.delete('/mcp', loopbackOnly, (_req, res) => { res.status(405).end(); });
 
   // ---- Aether adapter: the editor/* surface over the Aether envelope ----
   // JSON-RPC 2.0 (POST) + server-push events (SSE). Trusted local-developer
   // API: loopback bind + Origin/Host check, never remotely exposed (protocol D8).
-  const loopbackOnly = (req: Request, res: Response, next: NextFunction) => {
-    const loopback = /^(127\.0\.0\.1|localhost|\[::1\]|::1)(:\d+)?$/i;
-    const host = req.headers.host ?? '';
-    const origin = req.headers.origin;
-    const hostOk = loopback.test(host);
-    const originOk = !origin || loopback.test(origin.replace(/^https?:\/\//, ''));
-    if (!hostOk || !originOk) { res.status(403).json({ error: 'loopback only (protocol D8)' }); return; }
-    next();
-  };
   const aetherForward = (payload: AgentRequest) => {
     const win = getWindow();
     if (!win) throw new Error('editor not ready (no window)');
@@ -112,6 +151,12 @@ export async function startMcpServer(getWindow: () => BrowserWindow | null): Pro
     req.on('close', () => removeSubscriber(res));
   });
 
+  return exp;
+}
+
+export async function startMcpServer(getWindow: () => BrowserWindow | null): Promise<void> {
+  const exp = buildMcpApp(getWindow);
+
   const listen = (port: number) => new Promise<number>((resolve, reject) => {
     const srv = createServer(exp);
     srv.once('error', reject);
@@ -128,6 +173,7 @@ export async function startMcpServer(getWindow: () => BrowserWindow | null): Pro
   } catch {
     port = await listen(0); // fallback to an ephemeral port
   }
+  boundPort = port; // the allow-lists above are built from this, per request
 
   const home = electronApp.getPath('home');
   const base = `http://127.0.0.1:${port}`;
