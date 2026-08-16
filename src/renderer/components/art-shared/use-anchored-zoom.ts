@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef } from 'react';
+import { useAttachedEffect } from './use-attached-effect';
 import { anchorAt, anchoredScroll, canvasOriginOf, AnchorSlot } from './zoom-anchor';
 
 /**
@@ -57,9 +58,11 @@ export function useAnchoredZoom(
   const zoomRef = useRef(zoom);
   zoomRef.current = zoom;
 
-  useEffect(() => {
-    const scroller = scrollerRef.current;
-    if (!scroller) return;
+  // ATTACHED, NOT MOUNT-ONCE. The scrolled element can appear later than this
+  // hook's first run — classic's Chunk/Block tabs mount theirs only in Paint
+  // mode and open in Assign — and a `useEffect(..., [])` that returned early on
+  // a null ref never ran again, leaving wheel zoom dead in the mode that has it.
+  useAttachedEffect(scrollerRef, (scroller) => {
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
       const slot = slotRef.current!;
@@ -95,9 +98,7 @@ export function useAnchoredZoom(
     };
     scroller.addEventListener('wheel', onWheel, { passive: false });
     return () => scroller.removeEventListener('wheel', onWheel);
-    // scrollerRef/canvasRef/getZoom/setZoom are stable (refs / store getState); factor is constant.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  });
 
   // Once the canvas has resized to the new zoom, scroll so the captured art point
   // is back under the same screen position.

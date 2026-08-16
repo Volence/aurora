@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { useAttachedEffect } from './use-attached-effect';
 
 export interface HandPanOptions {
   /**
@@ -46,10 +47,10 @@ export function useHandPan(
   const enabledRef = useRef(opts.enabled);
   enabledRef.current = opts.enabled;
 
-  useEffect(() => {
-    const scroller = scrollerRef.current;
-    if (!scroller) return;
-
+  // ATTACHED, NOT MOUNT-ONCE — same reason as use-anchored-zoom: a host may
+  // mount its scrolled element later than this hook's first run, and an empty
+  // dependency array left drag-pan permanently dead when it did.
+  useAttachedEffect(scrollerRef, (scroller) => {
     const inTextField = (t: EventTarget | null) => {
       const el = t as HTMLElement | null;
       return !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable);
@@ -110,7 +111,5 @@ export function useHandPan(
       scroller.removeEventListener('pointermove', onPointerMove);
       scroller.removeEventListener('pointerup', onPointerUp);
     };
-    // scrollerRef is stable.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  });
 }
