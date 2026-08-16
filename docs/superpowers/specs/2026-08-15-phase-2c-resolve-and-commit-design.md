@@ -1,6 +1,8 @@
 # Phase 2C — resolve and commit
 
-**Status: designed 2026-08-15, unbuilt.** Supersedes §4.4 of
+**Status: BUILT 2026-08-16.** Core (`canvas-resolve`, `classic-commit-plan`, `classicCommitCanvas`),
+the canvas commit panel (CDP-verified 7/7) and the PNG import path (CDP-verified 4/4, plus a
+real-GHZ-palette check) are all on `master`. Originally designed 2026-08-15. Supersedes §4.4 of
 `2026-08-15-in-app-art-authoring-design.md` (the "origination canvas" spec), whose §0 · Corrections
 called for exactly this respec. Where the two disagree, this document wins.
 
