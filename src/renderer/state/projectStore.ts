@@ -135,6 +135,7 @@ export function getActiveLevel(state: ProjectState): S4Level | null {
     tileset: zone.tileset,
     palette: zone.palette,
     chunkLibrary: state.project?.chunkLibrary,
+    bgLibrary: state.project?.bgLibrary,
     act,
   };
 }

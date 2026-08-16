@@ -104,6 +104,18 @@ export interface Section {
   collisionEditB?: Uint16Array | null;
   objects: ObjectPlacement[];
   rings: RingPlacement[];
+  /**
+   * Suffixes of this section's files that EXIST on disk but Aurora could not
+   * read or parse — `'objects.json'`, `'rings.json'`, `'tiles.bin'`.
+   *
+   * Absent and unreadable are not the same fact, and the loader used to
+   * conflate them: a truncated hand-edit or a merge-conflict marker in
+   * objects.json opened the project with zero objects in that section, said
+   * nothing, and the next save wrote `[]` over every placement. The in-memory
+   * value for such a file is a PLACEHOLDER, not the user's data, so the save
+   * plan omits it — Aurora does not overwrite what it never understood.
+   */
+  unreadable?: string[];
   tiles: Tile[] | null;
   paletteRef: string | null;
   parallaxRef: string | null;

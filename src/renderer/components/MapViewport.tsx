@@ -89,6 +89,22 @@ export default function MapViewport() {
   // ghost preview. `alt` latches the live Alt key (propagate to matching blocks).
   const previewHoverRef = useRef<{ sectionIndex: number; cellCol: number; cellRow: number; alt: boolean } | null>(null);
   const isDragging = useRef(false);
+  /** The BG paint gesture in flight: which background, and the first-seen old
+   *  value per tile. Committed as ONE command on release — see endBgStroke. */
+  const bgStroke = useRef<{ bgRef: string | null; entries: Map<number, { oldNt: number; newNt: number }> } | null>(null);
+  /**
+   * The FG tile / collision paint gesture in flight — same rule as bgStroke.
+   *
+   * A DRAG IS ONE EDIT. Each cell used to execute its own command, so a 60-cell
+   * drag put 60 entries on a 200-deep stack and a few drags evicted the whole
+   * session's history — while Ctrl+Z undid the stroke one cell at a time.
+   * Classic coalesces its equivalent correctly; this is that.
+   */
+  const paintStroke = useRef<
+    | { kind: 'tiles'; sectionIndex: number; entries: Map<number, { oldNt: number; newNt: number }> }
+    | { kind: 'collision'; sectionIndex: number; plane: 'a' | 'b'; blocks: number; entries: Map<number, { oldColl: number; newColl: number }> }
+    | null
+  >(null);
   // Screen pos at mousedown — used to tell a View-mode click (select the section
   // under the cursor) from a pan-drag.
   const downPos = useRef<{ x: number; y: number } | null>(null);
@@ -404,6 +420,10 @@ export default function MapViewport() {
           // A structural grid change (add/remove/resize/move/paste) re-indexes
           // the whole grid — full rebuild.
           reloadAllSections();
+          break;
+        case 'set-bg-tiles':
+          // Per-tile: repaint just those, the same way the live stroke does.
+          sectionRenderer.markBgDirty(cmd.entries.map((e) => e.index));
           break;
         case 'set-bg':
           // The BG entry's canvas and TileRenderer are built from the
@@ -750,9 +770,8 @@ export default function MapViewport() {
     // (held by reference, so markBgDirty repaints from it). When the active
     // section displays a library BG, this edits that library entry in place
     // (additive store state, like chunk edits in Art mode).
-    const resolved = resolveActiveBg(
-      act, state.project?.bgLibrary ?? [], useEditorStore.getState().activeSectionIndex,
-    );
+    const activeSection = useEditorStore.getState().activeSectionIndex;
+    const resolved = resolveActiveBg(act, state.project?.bgLibrary ?? [], activeSection);
     if (!resolved) return;
 
     const tile = worldToBgTile(worldX, worldY);
@@ -760,12 +779,115 @@ export default function MapViewport() {
 
     const { selectedTileIndex, selectedPaletteLine } = useEditorStore.getState();
     const newNt = (selectedTileIndex & 0x7FF) | ((selectedPaletteLine & 0x3) << 13);
-    if (resolved.layout[tile.tileIndex] !== newNt) {
-      resolved.layout[tile.tileIndex] = newNt;
-      sectionRenderer.markBgDirty([tile.tileIndex]);
-      useEditorStore.getState().markDirty();
-      useEditorStore.getState().bumpLiveEdit();
+    if (resolved.layout[tile.tileIndex] === newNt) return;
+
+    // The stroke paints LIVE and records as it goes; the whole gesture becomes
+    // ONE command when the button is released (endBgStroke). Painting through
+    // per-tile commands instead would put 60 entries on a 200-deep stack for one
+    // drag; painting through none — which is what this used to do — left the
+    // mutation outside history entirely, so the next Ctrl+Z reverted whatever
+    // act-scoped command happened to precede the strokes.
+    const bgRef = act.sections[activeSection]?.bgLayoutRef ?? null;
+    if (!bgStroke.current || bgStroke.current.bgRef !== bgRef) {
+      endBgStroke();
+      bgStroke.current = { bgRef, entries: new Map() };
     }
+    // FIRST value wins: a stroke crossing its own path must undo to what was
+    // there before the gesture, not to what the gesture itself put down.
+    if (!bgStroke.current.entries.has(tile.tileIndex)) {
+      bgStroke.current.entries.set(tile.tileIndex, { oldNt: resolved.layout[tile.tileIndex], newNt });
+    } else {
+      bgStroke.current.entries.get(tile.tileIndex)!.newNt = newNt;
+    }
+
+    resolved.layout[tile.tileIndex] = newNt;
+    sectionRenderer.markBgDirty([tile.tileIndex]);
+    useEditorStore.getState().markDirty();
+    useEditorStore.getState().bumpLiveEdit();
+  }
+
+  /**
+   * Record one cell of a paint gesture and apply it live.
+   *
+   * FIRST value wins per index: a stroke crossing its own path must undo to
+   * what was there before the gesture, not to what the gesture put down.
+   * A change of section or plane flushes the stroke and starts a new one —
+   * one command per contiguous run, never one spanning two sections.
+   */
+  function recordPaint(
+    kind: 'tiles' | 'collision', sectionIndex: number, plane: 'a' | 'b',
+    changes: Array<{ index: number; oldValue: number; newValue: number }>,
+  ): void {
+    const cur = paintStroke.current;
+    const sameRun = cur && cur.kind === kind && cur.sectionIndex === sectionIndex
+      && (cur.kind !== 'collision' || cur.plane === plane);
+    if (!sameRun) {
+      endPaintStroke();
+      paintStroke.current = kind === 'tiles'
+        ? { kind, sectionIndex, entries: new Map() }
+        : { kind, sectionIndex, plane, blocks: 0, entries: new Map() };
+    }
+    const stroke = paintStroke.current!;
+    if (stroke.kind === 'collision') stroke.blocks++;
+    for (const c of changes) {
+      const seen = stroke.entries.get(c.index) as { oldNt?: number; oldColl?: number; newNt?: number; newColl?: number } | undefined;
+      if (seen) {
+        if (stroke.kind === 'tiles') seen.newNt = c.newValue; else seen.newColl = c.newValue;
+      } else if (stroke.kind === 'tiles') {
+        stroke.entries.set(c.index, { oldNt: c.oldValue, newNt: c.newValue });
+      } else {
+        stroke.entries.set(c.index, { oldColl: c.oldValue, newColl: c.newValue });
+      }
+    }
+    // No command yet, so nothing bumps the history clock — the overlay and the
+    // dirty dot need saying explicitly.
+    useEditorStore.getState().markDirty();
+    useEditorStore.getState().bumpLiveEdit();
+  }
+
+  /** Commit the FG tile / collision stroke as one undo step. Idempotent. */
+  function endPaintStroke(): void {
+    const stroke = paintStroke.current;
+    paintStroke.current = null;
+    if (!stroke || stroke.entries.size === 0) return;
+    const level = getActiveLevel();
+    if (!level) return;
+    if (stroke.kind === 'tiles') {
+      executeCommand({
+        type: 'set-tiles',
+        description: `Paint ${stroke.entries.size} tile${stroke.entries.size === 1 ? '' : 's'}`,
+        sectionIndex: stroke.sectionIndex,
+        entries: [...stroke.entries].map(([index, e]) => ({ index, ...e })),
+      }, level);
+    } else {
+      executeCommand({
+        type: 'set-collision-edit',
+        plane: stroke.plane,
+        description: `Paint collision ${stroke.plane.toUpperCase()} (${stroke.blocks} block${stroke.blocks === 1 ? '' : 's'})`,
+        sectionIndex: stroke.sectionIndex,
+        entries: [...stroke.entries].map(([index, e]) => ({ index, ...e })),
+      }, level);
+    }
+  }
+
+  /** Commit the BG stroke as one undo step. Idempotent — the release can arrive
+   *  from the container's own mouseup AND from the window listener. */
+  function endBgStroke(): void {
+    const stroke = bgStroke.current;
+    bgStroke.current = null;
+    if (!stroke || stroke.entries.size === 0) return;
+    const level = getActiveLevel();
+    if (!level) return;
+    executeCommand({
+      type: 'set-bg-tiles',
+      description: `Paint ${stroke.entries.size} background tile${stroke.entries.size === 1 ? '' : 's'}`,
+      // The BG plane is act-wide, not per-section; the field is required by
+      // EditCommand and the active section is the honest answer to "where was
+      // the artist" for the description.
+      sectionIndex: useEditorStore.getState().activeSectionIndex,
+      bgRef: stroke.bgRef,
+      entries: [...stroke.entries].map(([index, e]) => ({ index, oldNt: e.oldNt, newNt: e.newNt })),
+    }, level);
   }
 
   function getActiveLevel(): S4Level | null {
@@ -814,9 +936,6 @@ export default function MapViewport() {
       cellCol, cellRow, brush, propagate,
       nametable: section.tileGrid.nametable, width: SECTION_TILES_WIDE, cellsW, cellsH,
     });
-    const label = brush > 1 ? `${brush}×${brush} area`
-      : propagate ? `${targets.length} matching blocks` : 'this block';
-
     const entries: Array<{ index: number; oldColl: number; newColl: number }> = [];
     for (const t of targets) {
       for (const index of cellTileIndices(t.cellCol, t.cellRow, SECTION_TILES_WIDE)) {
@@ -825,15 +944,12 @@ export default function MapViewport() {
       }
     }
     if (entries.length === 0) return;
-    const level = getActiveLevel();
-    if (!level) return;
-    executeCommand({
-      type: 'set-collision-edit',
-      plane,
-      description: `Paint collision ${plane.toUpperCase()} (${label})`,
-      sectionIndex: info.sectionIndex,
-      entries,
-    }, level);
+    // Live, and recorded: a collision drag is one edit, not one per cell. (The
+    // per-cell "this block"/"N matching blocks" wording went with it — the
+    // command now names how many blocks the whole gesture covered.)
+    for (const e of entries) ce[e.index] = e.newColl;
+    recordPaint('collision', info.sectionIndex, plane,
+      entries.map((e) => ({ index: e.index, oldValue: e.oldColl, newValue: e.newColl })));
     useEditorStore.getState().setActiveSectionIndex(info.sectionIndex);
   }
 
@@ -962,12 +1078,11 @@ export default function MapViewport() {
       const oldNt = section.tileGrid.nametable[info.tileIndex];
       const newNt = (selectedTileIndex & 0x7FF) | ((selectedPaletteLine & 0x3) << 13);
       if (oldNt !== newNt) {
-        executeCommand({
-          type: 'set-tiles',
-          description: `Paint tile at (${info.col}, ${info.row})`,
-          sectionIndex: info.sectionIndex,
-          entries: [{ index: info.tileIndex, oldNt, newNt }],
-        }, level);
+        // The gesture starts here and commits on release — one command whether
+        // it turns out to be a click or a sixty-cell drag.
+        section.tileGrid.nametable[info.tileIndex] = newNt;
+        recordPaint('tiles', info.sectionIndex, 'a',
+          [{ index: info.tileIndex, oldValue: oldNt, newValue: newNt }]);
         sectionRenderer.markDirty(info.sectionIndex, [info.tileIndex]);
       }
       useEditorStore.getState().setActiveSectionIndex(info.sectionIndex);
@@ -1214,12 +1329,10 @@ export default function MapViewport() {
         const oldNt = section.tileGrid.nametable[info.tileIndex];
         const newNt = (selectedTileIndex & 0x7FF) | ((selectedPaletteLine & 0x3) << 13);
         if (oldNt !== newNt) {
-          executeCommand({
-            type: 'set-tiles',
-            description: `Paint tile at (${info.col}, ${info.row})`,
-            sectionIndex: info.sectionIndex,
-            entries: [{ index: info.tileIndex, oldNt, newNt }],
-          }, level);
+          // Live, and recorded: the whole drag becomes one command on release.
+          section.tileGrid.nametable[info.tileIndex] = newNt;
+          recordPaint('tiles', info.sectionIndex, 'a',
+            [{ index: info.tileIndex, oldValue: oldNt, newValue: newNt }]);
           sectionRenderer.markDirty(info.sectionIndex, [info.tileIndex]);
         }
       } else {
@@ -1335,29 +1448,27 @@ export default function MapViewport() {
     }
   }, [pan, drawCollisionPreview]);
 
-  const handleMouseUp = useCallback((e: React.MouseEvent) => {
+  /**
+   * End whatever gesture is in flight, wherever the button was released.
+   *
+   * A drag that leaves the viewport used to be DISCARDED: `onMouseLeave` nulled
+   * `dragTarget`, there was no window listener and no pointer capture, so
+   * releasing outside left the object drawn at its new position with no
+   * command, no dirty flag, an empty undo stack and a Ctrl+S that did nothing —
+   * the placement was gone at the next load, and closing prompted nothing. The
+   * classic composer fixed the identical bug with a window mouseup
+   * (composer-shared.tsx documents it); this is the same move, and it makes
+   * mouseleave a pause rather than a cancel.
+   *
+   * Idempotent: the container's own onMouseUp fires first when the release
+   * happens inside, and this must be harmless a second time.
+   */
+  const finishGesture = useCallback(() => {
+    endBgStroke();
+    endPaintStroke();
     isPaintDragging.current = false;
-    // A click with no drag already committed a 2x2-tile marquee at mousedown —
-    // mouseup just ends the drag; the final marquee (set live on mousemove)
-    // stays in the store.
     isMarqueeDragging.current = false;
     marqueeDragStart.current = null;
-
-    // View tool: a click (pointer barely moved) selects the section under the
-    // cursor — a pan-drag does not.
-    if (useEditorStore.getState().tool === 'view' && downPos.current) {
-      const dx = e.clientX - downPos.current.x;
-      const dy = e.clientY - downPos.current.y;
-      if (dx * dx + dy * dy < 25) { // moved < 5px → treat as a click
-        const world = screenToWorld(e.clientX, e.clientY);
-        const secIdx = sectionRenderer.sectionAtWorld(world.x, world.y);
-        const act = getCurrentAct(useProjectStore.getState());
-        if (secIdx >= 0 && act && act.sections[secIdx]) {
-          useEditorStore.getState().setActiveSectionIndex(secIdx);
-        }
-      }
-    }
-    downPos.current = null;
 
     if (dragTarget.current && isDragging.current) {
       const target = dragTarget.current;
@@ -1401,6 +1512,44 @@ export default function MapViewport() {
     }
     isDragging.current = false;
   }, []);
+
+  // Wherever the button comes up, the gesture ends there — including outside
+  // this component entirely.
+  useEffect(() => {
+    const onUp = (): void => finishGesture();
+    window.addEventListener('mouseup', onUp);
+    return () => window.removeEventListener('mouseup', onUp);
+  }, [finishGesture]);
+
+  const handleMouseUp = useCallback((e: React.MouseEvent) => {
+    isPaintDragging.current = false;
+    // A click with no drag already committed a 2x2-tile marquee at mousedown —
+    // mouseup just ends the drag; the final marquee (set live on mousemove)
+    // stays in the store.
+    isMarqueeDragging.current = false;
+    marqueeDragStart.current = null;
+
+    // View tool: a click (pointer barely moved) selects the section under the
+    // cursor — a pan-drag does not.
+    if (useEditorStore.getState().tool === 'view' && downPos.current) {
+      const dx = e.clientX - downPos.current.x;
+      const dy = e.clientY - downPos.current.y;
+      if (dx * dx + dy * dy < 25) { // moved < 5px → treat as a click
+        const world = screenToWorld(e.clientX, e.clientY);
+        const secIdx = sectionRenderer.sectionAtWorld(world.x, world.y);
+        const act = getCurrentAct(useProjectStore.getState());
+        if (secIdx >= 0 && act && act.sections[secIdx]) {
+          useEditorStore.getState().setActiveSectionIndex(secIdx);
+        }
+      }
+    }
+    downPos.current = null;
+
+    // The commit itself lives in finishGesture, which the window listener also
+    // calls — one body, so a release inside and a release outside can never
+    // commit different things.
+    finishGesture();
+  }, [finishGesture]);
 
   const handleWheel = useCallback((e: React.WheelEvent) => {
     e.preventDefault();
@@ -1529,11 +1678,12 @@ export default function MapViewport() {
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
       onMouseLeave={() => {
-        isPaintDragging.current = false;
-        isMarqueeDragging.current = false;
-        marqueeDragStart.current = null;
-        if (dragTarget.current) dragTarget.current = null;
-        isDragging.current = false;
+        // A PAUSE, NOT A CANCEL. This used to null `dragTarget` and clear
+        // `isDragging`, which threw away an object/ring move the moment the
+        // cursor crossed the edge — and painting stopped mid-stroke with the
+        // gesture's command never committed. The gesture now survives until the
+        // button comes up (finishGesture, on the window), so leaving and coming
+        // back is continuous and releasing outside still commits.
         if (hoverBarRef.current) hoverBarRef.current.style.display = 'none';
         if (previewHoverRef.current) { previewHoverRef.current = null; drawCollisionPreview(); }
         if (pasteHoverRef.current) { pasteHoverRef.current = null; drawCollisionPreview(); }

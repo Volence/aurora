@@ -142,6 +142,42 @@ export async function loadAeonProject(fa: FileAccess, dir: string): Promise<Aeon
   return { config, project, collisionProfiles, notices, legacyAtlasMerged };
 }
 
+/**
+ * Decide which kind of failure a section-file read was, and record it.
+ *
+ * ABSENT AND UNREADABLE ARE NOT THE SAME FACT. One bare catch conflated them:
+ * ENOENT, EACCES and a JSON SyntaxError all yielded an empty in-memory value
+ * with no notice anywhere — so a truncated hand-edit or a merge-conflict marker
+ * in objects.json opened the project with zero objects in that section, and the
+ * next save wrote `[]` over every placement, permanently.
+ *
+ * Absence is normal and silent (a section with no objects has no file). Any
+ * other failure marks the file not-understood, which `buildAeonSavePlan` reads
+ * and omits — the rule save.ts already states one guard down: "a load-time
+ * parse failure must not lead to destroying data".
+ *
+ * Existence is asked of the file adapter rather than sniffed out of the error
+ * message, because the message is whatever the host's fs layer chose to say.
+ */
+async function markUnreadable(
+  fa: FileAccess,
+  section: Section,
+  path: string,
+  suffix: string,
+  error: unknown,
+  notices: string[],
+): Promise<void> {
+  let present = false;
+  try { present = await fa.exists(path); } catch { present = false; }
+  if (!present) return; // simply not there — the ordinary case
+
+  (section.unreadable ??= []).push(suffix);
+  notices.push(
+    `${path} exists but could not be read (${error instanceof Error ? error.message : String(error)}). ` +
+    'Aurora is showing empty data for it and will NOT overwrite the file — fix it by hand and reopen.',
+  );
+}
+
 async function loadFullProject(
   fa: FileAccess,
   config: LoadedS4Config,
@@ -197,8 +233,12 @@ async function loadFullProject(
             const ntRaw = await fa.read(`${prefix}.tiles.bin`);
             section.tileGrid.nametable = parseNametable(ntRaw, SECTION_TILES_WIDE, SECTION_TILES_HIGH);
             loaded = true;
-          } catch {
-            // No editor nametable — try strip source
+          } catch (e) {
+            // No editor nametable — try strip source. But a nametable that is
+            // THERE and unreadable is not that: reseeding from the baked strips
+            // silently replaces the artist's layout, and the next save writes
+            // the reseed over it.
+            await markUnreadable(fa, section, `${prefix}.tiles.bin`, 'tiles.bin', e, notices);
           }
 
           // The engine's real per-cell collision attr indices come from the baked
@@ -259,8 +299,9 @@ async function loadFullProject(
             const objRaw = await fa.read(`${prefix}.objects.json`);
             const objText = new TextDecoder().decode(objRaw);
             section.objects = JSON.parse(objText) as ObjectPlacement[];
-          } catch {
+          } catch (e) {
             section.objects = [];
+            await markUnreadable(fa, section, `${prefix}.objects.json`, 'objects.json', e, notices);
           }
 
           // Load rings
@@ -268,8 +309,9 @@ async function loadFullProject(
             const ringRaw = await fa.read(`${prefix}.rings.json`);
             const ringText = new TextDecoder().decode(ringRaw);
             section.rings = JSON.parse(ringText) as RingPlacement[];
-          } catch {
+          } catch (e) {
             section.rings = [];
+            await markUnreadable(fa, section, `${prefix}.rings.json`, 'rings.json', e, notices);
           }
 
           // Load meta sidecar (bgLayoutRef/paletteRef) — optional, only

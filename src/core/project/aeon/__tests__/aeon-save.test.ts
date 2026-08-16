@@ -105,6 +105,29 @@ describe('buildAeonSavePlan', () => {
     expect(plan.files.some((f) => f.bytes.length === 0)).toBe(false);
   });
 
+  /**
+   * R7, the other half. A file the load could not read holds a PLACEHOLDER in
+   * memory, not the user's data. Writing it back is how a truncated hand-edit
+   * or a merge-conflict marker in objects.json becomes a permanent loss of
+   * every placement in the section — the plan must leave that file alone.
+   */
+  it('omits a file the load could not understand, and still writes the rest', async () => {
+    const files = fixtureFiles();
+    files.set('data/ojz/act1/section_0.objects.json',
+      new TextEncoder().encode('[{"id":"o1",<<<<<<< HEAD'));
+    const fa = memFa(files);
+    const r = await loadAeonProject(fa, '/proj');
+    expect(r.project.zones[0].acts[0].sections[0]!.unreadable).toContain('objects.json');
+
+    const plan = await buildAeonSavePlan(fa, r.config, r.project, 'ojz', 'act1',
+      { legacyAtlasMerged: false });
+    const paths = plan.files.map((f) => f.path);
+    expect(paths).not.toContain('data/ojz/act1/section_0.objects.json');
+    // The section's other files are unaffected — this is one file, not a veto.
+    expect(paths).toContain('data/ojz/act1/section_0.tiles.bin');
+    expect(paths).toContain('data/ojz/act1/section_0.rings.json');
+  });
+
   it('reports export failure as a non-fatal note instead of throwing', async () => {
     const fa = memFa(fixtureFiles());
     const r = await loadAeonProject(fa, '/proj');

@@ -86,6 +86,46 @@ describe('loadAeonProject', () => {
     expect(r.project.zones[0].acts[0].sections[0]).toBeNull();
   });
 
+  /**
+   * R7. Absent and unreadable are not the same fact. The bare catch conflated
+   * ENOENT, EACCES and a JSON SyntaxError: all three yielded `objects = []`
+   * with no notice, so a truncated hand-edit or a merge-conflict marker opened
+   * the project with zero objects in that section — and the next save wrote
+   * `[]` over every placement.
+   */
+  it('flags a present-but-unparseable objects.json instead of loading it as empty', async () => {
+    const files = fixtureFiles();
+    files.set('data/ojz/act1/section_0.objects.json',
+      new TextEncoder().encode('[{"id":"o1",<<<<<<< HEAD'));
+    const r = await loadAeonProject(memFa(files), '/proj');
+    const section = r.project.zones[0].acts[0].sections[0]!;
+    expect(section.objects).toEqual([]);                    // nothing to show
+    expect(section.unreadable).toContain('objects.json');   // but not "nothing there"
+    expect(r.notices.join(' ')).toMatch(/objects\.json exists but could not be read/);
+  });
+
+  it('says nothing about a section file that is simply absent', async () => {
+    // The ordinary case: a section with no objects has no objects file.
+    const files = fixtureFiles();
+    files.delete('data/ojz/act1/section_0.objects.json');
+    const r = await loadAeonProject(memFa(files), '/proj');
+    const section = r.project.zones[0].acts[0].sections[0]!;
+    expect(section.objects).toEqual([]);
+    expect(section.unreadable).toBeUndefined();
+    expect(r.notices).toEqual([]);
+  });
+
+  it('flags an unreadable .tiles.bin rather than silently reseeding from strips', async () => {
+    const files = fixtureFiles();
+    files.set('data/ojz/act1/section_0.tiles.bin', new Uint8Array([1, 2, 3])); // wrong length
+    const r = await loadAeonProject(memFa(files), '/proj');
+    const section = r.project.zones[0].acts[0].sections[0];
+    // No strips in this fixture, so the section is dropped — but the notice is
+    // the point: the file is there and Aurora did not understand it.
+    expect(r.notices.join(' ')).toMatch(/tiles\.bin exists but could not be read/);
+    if (section) expect(section.unreadable).toContain('tiles.bin');
+  });
+
   it('rejects a non-s4 project.json with the loader error (validation is NOT weakened)', async () => {
     const files = fixtureFiles();
     files.set('project.json', new TextEncoder().encode(JSON.stringify({ ...PROJECT_JSON, engine: 'nope' })));

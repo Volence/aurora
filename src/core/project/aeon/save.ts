@@ -65,9 +65,18 @@ export async function buildAeonSavePlan(
 
     const prefix = `${dataPath}section_${i}`;
 
+    // A file the LOAD could not read holds a placeholder in memory, not the
+    // user's data — writing it back is how a truncated hand-edit or a
+    // merge-conflict marker turns into a permanent loss of every placement in
+    // the section. Same rule as the legacy-atlas guard below: a load-time parse
+    // failure must not lead to destroying data.
+    const understood = (suffix: string): boolean => !section.unreadable?.includes(suffix);
+
     // Write nametable (.tiles.bin)
-    const ntData = serializeNametable(section.tileGrid.nametable);
-    files.push({ path: `${prefix}.tiles.bin`, bytes: ntData });
+    if (understood('tiles.bin')) {
+      const ntData = serializeNametable(section.tileGrid.nametable);
+      files.push({ path: `${prefix}.tiles.bin`, bytes: ntData });
+    }
 
     // Write editable collision attr plane (.collattr.bin) — the authored
     // collision. (Legacy .coll.bin is no longer written; stray files from
@@ -82,14 +91,18 @@ export async function buildAeonSavePlan(
     }
 
     // Write objects (.objects.json)
-    const objectsJson = JSON.stringify(section.objects, null, 2);
-    const objectsBytes = new TextEncoder().encode(objectsJson);
-    files.push({ path: `${prefix}.objects.json`, bytes: objectsBytes });
+    if (understood('objects.json')) {
+      const objectsJson = JSON.stringify(section.objects, null, 2);
+      const objectsBytes = new TextEncoder().encode(objectsJson);
+      files.push({ path: `${prefix}.objects.json`, bytes: objectsBytes });
+    }
 
     // Write rings (.rings.json)
-    const ringsJson = JSON.stringify(section.rings, null, 2);
-    const ringsBytes = new TextEncoder().encode(ringsJson);
-    files.push({ path: `${prefix}.rings.json`, bytes: ringsBytes });
+    if (understood('rings.json')) {
+      const ringsJson = JSON.stringify(section.rings, null, 2);
+      const ringsBytes = new TextEncoder().encode(ringsJson);
+      files.push({ path: `${prefix}.rings.json`, bytes: ringsBytes });
+    }
 
     // Write meta sidecar (.meta.json) — scalar refs (bgLayoutRef,
     // paletteRef). Written only when at least one ref is non-null; when
