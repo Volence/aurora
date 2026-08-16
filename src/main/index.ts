@@ -77,6 +77,19 @@ function createWindow(): BrowserWindow {
  * answer does not arrive, the close proceeds: a renderer too wedged to reply is
  * also too wedged to save, and an app that cannot be quit is worse than one
  * that quits.
+ *
+ * WHAT THIS DOES NOT COVER, measured rather than assumed. A renderer calling
+ * `window.close()` does NOT raise this event at all: Electron routes that
+ * through `webContents.close()`, which consults `beforeunload` and destroys the
+ * window without the BrowserWindow ever being asked. Verified under CDP — with
+ * a trace written from inside this handler to a file (main's stdout is lost
+ * when the process exits with it), the handler never ran for that path, while
+ * the window went. Nothing in Aurora calls `window.close()`, so the exposure is
+ * a script in the renderer deciding to; the paths a USER has — the title bar,
+ * the default menu's `close` role on Ctrl+W, and app quit — all close the
+ * window from the browser process and do raise this. If Aurora ever grows a
+ * "close window" button of its own, it must ask through here rather than
+ * calling `window.close()`, or it will walk straight past this guard.
  */
 const CLOSE_ANSWER_TIMEOUT_MS = 15_000;
 
