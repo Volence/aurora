@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useCanvasStore, type CanvasTool } from '../../state/canvasStore';
+import { isTypingTarget } from '../../shell/typing-target';
 import { focusedHistory } from '../../state/editorStore';
 import CanvasHost from './CanvasHost';
 import CanvasCommitSection from './CanvasCommitSection';
@@ -82,12 +83,7 @@ export default function CanvasMode({ docId, appBar }: { docId: string; appBar: R
   // comments here and in level-keys.ts named a mechanism that cannot occur.)
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement;
-      const isTextEntry = target.isContentEditable
-        || target.tagName === 'TEXTAREA'
-        || (target.tagName === 'INPUT'
-          && !['range', 'checkbox', 'button', 'radio'].includes((target as HTMLInputElement).type));
-      if (isTextEntry) return;
+      if (isTypingTarget(e.target)) return;
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) {
         focusedHistory()?.undo();
         e.preventDefault();

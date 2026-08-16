@@ -19,11 +19,17 @@ export const hex = (n: number) => `$${n.toString(16).toUpperCase()}`;
 // Solidity vocabulary — verified against SonLVLAPI's Solidity enum
 //   /home/volence/sonic_hacks/programs/SonLVL/SonLVLAPI/DataTypes.cs:400
 //   0 NotSolid, 1 TopSolid, 2 LRBSolid, 3 AllSolid.
+//
+// `full` IS THE TOOLTIP, so it says what the value DOES rather than what
+// SonLVL's C# enum member is called. "TopSolid" is a name from another tool's
+// source; "Solid from above only — you can jump up through it" is the thing the
+// artist is choosing. The enum spellings stay in the comment above, where they
+// belong: they are provenance for whoever checks the mapping, not UI copy.
 export const SOLIDITY = [
-  { v: 0, label: 'None', full: 'NotSolid', tint: null as string | null },
-  { v: 1, label: 'Top', full: 'TopSolid', tint: 'rgba(80,160,255,0.30)' },
-  { v: 2, label: 'LRB', full: 'LRBSolid', tint: 'rgba(255,170,60,0.30)' },
-  { v: 3, label: 'All', full: 'AllSolid', tint: 'rgba(255,70,70,0.32)' },
+  { v: 0, label: 'None', full: 'Not solid — the player passes straight through', tint: null as string | null },
+  { v: 1, label: 'Top', full: 'Solid from above only — you can jump up through it', tint: 'rgba(80,160,255,0.30)' },
+  { v: 2, label: 'LRB', full: 'Solid from the sides and below, but not from above', tint: 'rgba(255,170,60,0.30)' },
+  { v: 3, label: 'All', full: 'Solid from every direction', tint: 'rgba(255,70,70,0.32)' },
 ];
 
 /** The writable tile span for the open act, or null (unknown / fakes). */
@@ -75,11 +81,11 @@ export function SharedBanner({ text, onDuplicate, dupLabel }: { text: string; on
   );
 }
 
-/** Whether a keyboard event targets a text-entry field (Escape belongs to it). */
-export function isTypingTarget(t: HTMLElement): boolean {
-  return t.isContentEditable || t.tagName === 'TEXTAREA'
-    || (t.tagName === 'INPUT' && !['range', 'checkbox', 'button', 'radio'].includes((t as HTMLInputElement).type));
-}
+/** Whether a keyboard event targets a text-entry field (Escape belongs to it).
+ *  Re-exported, not restated: shell/typing-target.ts owns the rule now, because
+ *  five other surfaces had each grown their own slightly different copy. */
+export { isTypingTarget } from '../../shell/typing-target';
+import { isTypingTarget } from '../../shell/typing-target';
 
 /**
  * Register a window Escape handler for a composer tab, under the two guards

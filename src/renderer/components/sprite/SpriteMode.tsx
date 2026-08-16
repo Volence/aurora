@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useProjectStore } from '../../state/projectStore';
+import { isTypingTarget } from '../../shell/typing-target';
 import { useClassicProjectStore } from '../../state/classicProjectStore';
 import S1ObjectSection from './S1ObjectSection';
 import { useArtStore } from '../../state/artStore';
@@ -90,12 +91,7 @@ export default function SpriteMode({ appBar }: { appBar: React.ReactNode }) {
   // after a slider/checkbox commit.
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement;
-      const isTextEntry = target.isContentEditable
-        || target.tagName === 'TEXTAREA'
-        || (target.tagName === 'INPUT'
-          && !['range', 'checkbox', 'button', 'radio'].includes((target as HTMLInputElement).type));
-      if (isTextEntry) return;
+      if (isTypingTarget(e.target)) return;
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) {
         focusedHistory()?.undo();
         e.preventDefault();

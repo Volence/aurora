@@ -1,5 +1,6 @@
 import React, { useRef, useEffect, useCallback, useState } from 'react';
 import { useViewStore } from '../state/viewStore';
+import { isTypingTarget } from '../shell/typing-target';
 import { useProjectStore, getCurrentAct, getCurrentZone, getActiveLevel as getStoreActiveLevel } from '../state/projectStore';
 import { useEditorStore, executeCommand, setCommandInvalidationListener, RING_PATTERNS, type EditorTool } from '../state/editorStore';
 import { useAeonHistoryVersion } from '../hooks/useHistoryVersion';
@@ -555,7 +556,10 @@ export default function MapViewport() {
       // search box) must not fire map shortcuts — 'm' switching to the marquee
       // tool mid-keystroke was the reported symptom.
       const target = e.target as HTMLElement | null;
-      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
+      // The shared rule, not a fourth copy: this one used to miss the input-TYPE
+      // filter, so a focused range slider counted as typing and swallowed every
+      // map key while it had focus.
+      if (isTypingTarget(target)) {
         return;
       }
 
