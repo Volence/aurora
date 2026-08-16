@@ -33,9 +33,12 @@ import { canvasIndex, paletteLineOf, paletteEntryOf, isTransparent, CANVAS_LINE_
 import type { ResolveRegion, ResolvedBlock } from './canvas-resolve';
 import { resolveCanvasRegion, mirrorBlock, CHUNK_PX } from './canvas-resolve';
 import {
-  findPoolMatch, emptyAvailability, unavailableForAllocation, packTileEntries, TILE_BYTES,
+  findPoolMatch, emptyAvailability, unavailableForAllocation, packTileEntries,
+  poolTileEntries, TILE_BYTES,
 } from './tile-pool-match';
 import type { PoolAvailability } from './tile-pool-match';
+import { CELL, TILE_ENTRIES } from './tile-canon';
+import { sameGenesisColor, GENESIS_WORD_MASK } from '../formats/palette';
 
 const MAX_BLOCKS_TOTAL = 0x400; // 10-bit chunk-cell block field
 const PALETTE_LINES = 4;
@@ -68,12 +71,22 @@ export interface CommitPlanInput {
   editableRangeKnown: boolean;
   /** Animated-art overlay slots: never matched against, never reclaimed. */
   animTiles: ReadonlySet<number>;
+  /**
+   * The canvas's own cell-grid origin, if it has one. Commit cuts on the
+   * region's grid and never on this — see canvas-resolve's header for why there
+   * is only ever one answer to "where does this cell start". It is taken here
+   * solely so an origin that disagrees can be REFUSED rather than silently cut
+   * somewhere the artist was never shown. Absent means aligned.
+   */
+  gridOrigin?: { originX: number; originY: number };
 }
 
 export type CommitRefusal =
   | { kind: 'region-misaligned'; detail: string }
   | { kind: 'region-out-of-bounds'; detail: string }
   | { kind: 'target-count'; expected: number; got: number }
+  | { kind: 'target-invalid'; detail: string }
+  | { kind: 'grid-origin'; originX: number; originY: number }
   | { kind: 'cell-clash'; cells: CanvasCellClash[] }
   | { kind: 'palette-drift'; entries: number[]; touchesLine0: boolean }
   | { kind: 'palette-unmappable'; entries: number[] }
@@ -85,6 +98,8 @@ export type CommitRefusal =
 export interface CommitReport {
   tilesNew: number; tilesReused: number; tilesReclaimed: number;
   blocksNew: number; blocksReused: number; blocksReclaimed: number;
+  /** Reclaimed ids nothing took, blanked so their tiles stop reading as used. */
+  blocksZeroed: number;
   chunksReplaced: number; chunksAppended: number;
   /** D3: how many minted blocks carried collision over, and how many could not. */
   blocksInheritedCollision: number; blocksWithoutCollision: number;
@@ -143,15 +158,21 @@ function usedPaletteEntries(pixels: PixelBuffer, region: ResolveRegion): Set<num
  */
 function remapToActColours(
   pixels: PixelBuffer, region: ResolveRegion, canvasPal: number[], docPal: number[],
+  drifted: ReadonlySet<number>,
 ): { pixels: PixelBuffer } | { unmappable: number[] } {
   const map = new Map<number, number>();
   const unmappable: number[] = [];
   for (const flat of usedPaletteEntries(pixels, region)) {
+    // ONLY the entries that drifted. An entry already holding the act's colour
+    // is already right, and "the lowest slot with this colour" would move it to
+    // a duplicate slot — different tile bytes for identical art, which stops the
+    // drawing matching the pool tiles it came from and mints copies of them.
+    if (!drifted.has(flat)) continue;
     const line = Math.floor(flat / CANVAS_LINE_LENGTH);
     const want = canvasPal[flat];
     let found = -1;
     for (let e = 1; e < CANVAS_LINE_LENGTH; e++) {
-      if (docPal[line * CANVAS_LINE_LENGTH + e] === want) { found = e; break; }
+      if (sameGenesisColor(docPal[line * CANVAS_LINE_LENGTH + e], want)) { found = e; break; }
     }
     if (found < 0) { unmappable.push(flat); continue; }
     map.set(canvasIndex(line, flat % CANVAS_LINE_LENGTH), canvasIndex(line, found));
@@ -203,6 +224,51 @@ function computeReclaim(input: CommitPlanInput, replaced: Set<number>): {
   return { tiles, blocks };
 }
 
+// --- block identity --------------------------------------------------------
+
+/**
+ * WHAT A BLOCK DRAWS, as a string — deliberately not how it is spelled.
+ *
+ * The pool holds mirror-duplicate tiles, and the tile matcher spells each drawn
+ * cell with whichever copy it meets first. That is almost never the copy the
+ * existing block used, so comparing tile ids and flip bits answers "same
+ * spelling", not "same block" — and on real GHZ blocks the two disagree
+ * essentially always. The consequence is not cosmetic: a re-commit of art
+ * nobody touched mints duplicate blocks and burns pool slots that then have to
+ * be reclaimed from somewhere.
+ *
+ * Priority is NOT part of identity, matching the scan this replaces: the canvas
+ * has no priority plane (spec §4), so every drawn cell would spell pri=false
+ * and a pool block carrying priority would never match again.
+ */
+function blockRenderKeyFn(pool: Uint8Array): (def: BlockDef) => string {
+  const poolTiles = Math.floor(pool.length / TILE_BYTES);
+  const cache = new Map<number, string>();
+
+  const cellKey = (tile: number, xf: boolean, yf: boolean): string => {
+    // A reference past the pool draws nothing knowable; give it an identity of
+    // its own rather than letting it read as blank and match real art.
+    if (tile < 0 || tile >= poolTiles) return `#oob${tile}`;
+    const ck = tile * 4 + (xf ? 1 : 0) + (yf ? 2 : 0);
+    let s = cache.get(ck);
+    if (s === undefined) {
+      const ent = poolTileEntries(pool, tile);
+      const out = new Uint8Array(TILE_ENTRIES);
+      for (let i = 0; i < TILE_ENTRIES; i++) {
+        const cx = i % CELL, cy = (i / CELL) | 0;
+        const sx = xf ? CELL - 1 - cx : cx, sy = yf ? CELL - 1 - cy : cy;
+        out[i] = ent[sy * CELL + sx];
+      }
+      s = String.fromCharCode(...out);
+      cache.set(ck, s);
+    }
+    return s;
+  };
+
+  return (def: BlockDef): string =>
+    def.cells.map((c) => `${cellKey(c.tile, c.xf, c.yf)}:${c.pal}`).join('|');
+}
+
 // --- the planner -----------------------------------------------------------
 
 export function planCanvasCommit(input: CommitPlanInput): CommitPlanResult {
@@ -219,9 +285,41 @@ export function planCanvasCommit(input: CommitPlanInput): CommitPlanResult {
     || region.y + region.chunksHigh * CHUNK_PX > input.pixels.height) {
     return { ok: false, refusal: { kind: 'region-out-of-bounds', detail: `region does not fit in a ${input.pixels.width}x${input.pixels.height} canvas` } };
   }
+  // The clash gate and the cut below both work on the region's 8px grid. The
+  // readout the artist has been watching works on the CANVAS's grid, so when
+  // that one is offset the two disagree about where every cell begins: the
+  // overlay can read clean while this refuses, or worse, read clean while the
+  // cut lands mid-cell and one of the two lines in it is dropped. Neither is
+  // something to discover after committing.
+  const grid = input.gridOrigin ?? { originX: 0, originY: 0 };
+  if (grid.originX % CELL !== 0 || grid.originY % CELL !== 0) {
+    return { ok: false, refusal: { kind: 'grid-origin', originX: grid.originX, originY: grid.originY } };
+  }
+
   const cellCount = region.chunksWide * region.chunksHigh;
   if (targets.length !== cellCount) {
     return { ok: false, refusal: { kind: 'target-count', expected: cellCount, got: targets.length } };
+  }
+  // One chunk, one target. Two region cells aimed at the same chunk file index
+  // produce two writes to one slot: the second silently wins, the report counts
+  // both, and the reclaim was computed as though one chunk's worth of art were
+  // being freed when it was two.
+  const aimedAt = new Set<number>();
+  for (const t of targets) {
+    if (t.chunkFileIndex === null) continue;
+    if (t.chunkFileIndex < 0 || t.chunkFileIndex >= doc.chunks.length) {
+      return {
+        ok: false,
+        refusal: { kind: 'target-invalid', detail: `chunk ${t.chunkFileIndex} is not in this act (it has ${doc.chunks.length})` },
+      };
+    }
+    if (aimedAt.has(t.chunkFileIndex)) {
+      return {
+        ok: false,
+        refusal: { kind: 'target-invalid', detail: `two cells of the region both replace chunk $${(t.chunkFileIndex + 1).toString(16).toUpperCase().padStart(2, '0')}` },
+      };
+    }
+    aimedAt.add(t.chunkFileIndex);
   }
 
   // 2 · Clash gate — by CALLING the 2B rule, never restating it.
@@ -233,9 +331,14 @@ export function planCanvasCommit(input: CommitPlanInput): CommitPlanResult {
 
   // 3 · Palette gate.
   const docPal = flattenDocPalette(doc);
+  // Compared on the bits the hardware displays, not the raw word: a palette
+  // read out of a disasm can carry junk in the dead bits, and calling that
+  // drift would turn a commit that changes no colour at all into a zone-wide
+  // palette rewrite.
   const drifted = [...usedPaletteEntries(input.pixels, region)]
-    .filter((flat) => input.canvasPalette[flat] !== docPal[flat])
+    .filter((flat) => !sameGenesisColor(input.canvasPalette[flat], docPal[flat]))
     .sort((a, b) => a - b);
+  const driftedSet = new Set(drifted);
   const touchesLine0 = drifted.some((flat) => flat < CANVAS_LINE_LENGTH);
   let pixels = input.pixels;
   let paletteWrites: { line: number; colors: Uint16Array }[] | null = null;
@@ -247,18 +350,26 @@ export function planCanvasCommit(input: CommitPlanInput): CommitPlanResult {
       return { ok: false, refusal: { kind: 'palette-drift', entries: drifted, touchesLine0 } };
     }
     if (input.paletteResolution === 'use-act-colours') {
-      const r = remapToActColours(input.pixels, region, input.canvasPalette, docPal);
+      const r = remapToActColours(input.pixels, region, input.canvasPalette, docPal, driftedSet);
       if ('unmappable' in r) {
         return { ok: false, refusal: { kind: 'palette-unmappable', entries: r.unmappable } };
       }
       pixels = r.pixels;
     } else {
+      // ADOPT ONLY WHAT DRIFTED. Drift is measured over the entries this art
+      // actually draws with; every other entry is the act's business, and a
+      // canvas carries a full 64-word palette whether or not the artist ever
+      // looked at it. Writing whole lines back would recolour existing zone art
+      // — in every act sharing the palette file — from slots this drawing never
+      // touched.
       paletteWrites = [];
       for (let l = 1; l < PALETTE_LINES; l++) {
-        paletteWrites.push({
-          line: l,
-          colors: new Uint16Array(input.canvasPalette.slice(l * CANVAS_LINE_LENGTH, (l + 1) * CANVAS_LINE_LENGTH)),
-        });
+        const base = l * CANVAS_LINE_LENGTH;
+        const line = [...driftedSet].filter((flat) => flat >= base && flat < base + CANVAS_LINE_LENGTH);
+        if (!line.length) continue;
+        const colors = new Uint16Array(docPal.slice(base, base + CANVAS_LINE_LENGTH));
+        for (const flat of line) colors[flat - base] = input.canvasPalette[flat] & GENESIS_WORD_MASK;
+        paletteWrites.push({ line: l, colors });
       }
       warnings.push('the zone palette changed: every act composed from the same palette file is affected');
     }
@@ -281,6 +392,13 @@ export function planCanvasCommit(input: CommitPlanInput): CommitPlanResult {
 
   // 6 · Map tiles to pool slots.
   const avail: PoolAvailability = emptyAvailability();
+  // An animated-art overlay slot is neither matchable nor allocatable: the
+  // engine repaints it every few frames, so binding art to it would make the
+  // drawing flicker. `allocated` is exactly that pair of properties, so saying
+  // it here — once, up front — is the whole rule. Testing it at the match site
+  // instead threw the match away rather than looking past it, which mints a
+  // duplicate of a tile the pool already holds.
+  for (const t of animTiles) avail.allocated.add(t);
   const tileWrites: { tileIndex: number; data: Uint8Array }[] = [];
   const poolTiles = Math.floor(doc.tiles.length / TILE_BYTES);
   const reclaimPool = [...reclaim.tiles];
@@ -302,13 +420,31 @@ export function planCanvasCommit(input: CommitPlanInput): CommitPlanResult {
     return null;
   };
 
+  /**
+   * Pool slots that were free BEFORE this gesture — reclaim is reported apart.
+   *
+   * Counted from the pool rather than from what is left when allocation fails,
+   * because at that moment the live count is zero by construction: the refusal
+   * would be reporting the tautology instead of the number that tells the
+   * artist how much room the act actually has.
+   */
+  const countFreeSlots = (): number => {
+    let n = 0;
+    for (let t = 1; t < poolTiles; t++) {
+      if (index.tileUsage(t).cells !== 0) continue;
+      if (reserved.has(t) || animTiles.has(t) || !isEditableTile(t)) continue;
+      n++;
+    }
+    return n;
+  };
+
   /** Pool tile + the flips a referencing cell must carry, per resolved tile. */
   const tileBinding: { tileIndex: number; xf: boolean; yf: boolean }[] = [];
   for (const t of res.tiles) {
     if (t.blank) { tileBinding.push({ tileIndex: 0, xf: false, yf: false }); continue; }
     const want = packTileEntries(t.entries);
     const m = findPoolMatch(doc.tiles, want, avail, { allowFlips: true });
-    if (m !== null && !animTiles.has(m.tileIndex)) {
+    if (m !== null) {
       avail.matched.add(m.tileIndex);
       tileBinding.push({ tileIndex: m.tileIndex, xf: m.xf, yf: m.yf });
       tilesReused++;
@@ -324,7 +460,7 @@ export function planCanvasCommit(input: CommitPlanInput): CommitPlanResult {
           needed,
           available: tileWrites.length + tilesReused,
           reclaimed: reclaim.tiles.length,
-          free: 0,
+          free: countFreeSlots(),
         },
       };
     }
@@ -340,7 +476,32 @@ export function planCanvasCommit(input: CommitPlanInput): CommitPlanResult {
   const blockWrites: { blockId: number; def: BlockDef; colind: number }[] = [];
   const blockIdOf = new Map<string, number>();
   const reclaimBlocks = [...reclaim.blocks];
+  // THE SAME THREE STATES AS THE TILE TIER, and for the same reason —
+  // tile-pool-match.ts's header states the rule once. A reclaimed block id is a
+  // legal match target (its bytes are still the ones on disk, and a kept 16x16
+  // matching it is the conservation reclaim exists to enable) right up until the
+  // allocator hands it out; after that the id is spent. Collapsing the two
+  // states lets one plan both reuse and rewrite the same id, which corrupts the
+  // kept cell's art AND — silently — its inherited collision.
+  const blockAvail: PoolAvailability = emptyAvailability();
   let reclaimBlockCursor = 0;
+
+  // Pool blocks by what they draw and the collision they carry, lowest id
+  // first — the same order the linear scan this replaces would have found them.
+  const blockRenderKey = blockRenderKeyFn(doc.tiles);
+  const repainted = new Set(tileWrites.map((w) => w.tileIndex));
+  const poolByRender = new Map<string, number[]>();
+  for (let b = 1; b < doc.blocks.length; b++) {
+    if (doc.blocks[b].cells.length !== 4) continue;
+    // Its render key is read from the pool as it stands NOW, so a block whose
+    // tiles step 6 just handed to new art does not draw that any more. Without
+    // this, a kept 16x16 bound to a duplicate tile can match a block whose own
+    // tile is about to be repainted underneath it.
+    if (doc.blocks[b].cells.some((c) => repainted.has(c.tile))) continue;
+    const k = `${blockRenderKey(doc.blocks[b])}#${doc.collision.colind[b] ?? 0}`;
+    const at = poolByRender.get(k);
+    if (at) at.push(b); else poolByRender.set(k, [b]);
+  }
   let nextAppendId = doc.blocks.length;
   let blocksReused = 0;
   let blocksInheritedCollision = 0, blocksWithoutCollision = 0;
@@ -364,28 +525,30 @@ export function planCanvasCommit(input: CommitPlanInput): CommitPlanResult {
   const internBlock = (shape: ResolvedBlock, colind: number): number | null => {
     if (shape.blank) return 0; // engine-blank, and never allocated
     const def = toDef(shape);
-    const key = `${def.cells.map((c) => `${c.tile}:${c.xf ? 1 : 0}${c.yf ? 1 : 0}:${c.pal}`).join('|')}#${colind}`;
+    // Identity is what the block draws plus the collision it carries — an
+    // identical-looking block with a different shape is not a reuse candidate.
+    const key = `${blockRenderKey(def)}#${colind}`;
     const seen = blockIdOf.get(key);
     if (seen !== undefined) return seen;
 
-    // Reuse an existing pool block only when its collision matches too — an
-    // identical-looking block with a different shape is not a reuse candidate.
-    for (let b = 1; b < doc.blocks.length; b++) {
-      if ((doc.collision.colind[b] ?? 0) !== colind) continue;
-      const cells = doc.blocks[b].cells;
-      if (cells.length !== 4) continue;
-      let same = true;
-      for (let i = 0; i < 4; i++) {
-        const a = cells[i], d = def.cells[i];
-        if (a.tile !== d.tile || a.xf !== d.xf || a.yf !== d.yf || a.pal !== d.pal) { same = false; break; }
-      }
-      if (same) { blockIdOf.set(key, b); blocksReused++; return b; }
+    for (const b of poolByRender.get(key) ?? []) {
+      // Already given new bytes by this gesture: doc.blocks[b] is what WAS
+      // there, so matching against it would repoint this cell at another cell's
+      // art.
+      if (blockAvail.allocated.has(b)) continue;
+      blockAvail.matched.add(b);
+      blockIdOf.set(key, b); blocksReused++; return b;
     }
 
-    let id: number;
-    if (reclaimBlockCursor < reclaimBlocks.length) id = reclaimBlocks[reclaimBlockCursor++];
-    else { id = nextAppendId; nextAppendId++; }
+    const spent = unavailableForAllocation(blockAvail);
+    let id = -1;
+    while (reclaimBlockCursor < reclaimBlocks.length) {
+      const b = reclaimBlocks[reclaimBlockCursor++];
+      if (!spent.has(b)) { id = b; break; }
+    }
+    if (id < 0) { id = nextAppendId; nextAppendId++; }
     if (id >= MAX_BLOCKS_TOTAL) return null;
+    blockAvail.allocated.add(id);
     blockIdOf.set(key, id);
     blockWrites.push({ blockId: id, def, colind });
     if (colind !== 0) blocksInheritedCollision++; else blocksWithoutCollision++;
@@ -427,6 +590,24 @@ export function planCanvasCommit(input: CommitPlanInput): CommitPlanResult {
     else chunkWrites.push({ chunkFileIndex: target.chunkFileIndex, def: { cells } });
   }
 
+  // 9 · Blank the reclaimed blocks nothing took. Every chunk that referred to
+  // them has just been rewritten, so they are unreachable — but a stale def
+  // still points at pool tiles, and the usage index counts those references, so
+  // the tiles they strand can never be reclaimed by any later gesture. Blanking
+  // is what makes the reclaim actually give the pool back.
+  const blocksNew = blockWrites.length;
+  const spentBlocks = unavailableForAllocation(blockAvail);
+  let blocksZeroed = 0;
+  for (const b of reclaim.blocks) {
+    if (spentBlocks.has(b)) continue;
+    blockWrites.push({
+      blockId: b,
+      def: { cells: Array.from({ length: 4 }, () => ({ tile: 0, xf: false, yf: false, pal: 0, pri: false })) },
+      colind: 0,
+    });
+    blocksZeroed++;
+  }
+
   if (doc.chunks.length + appendCount > MAX_ADDRESSABLE_CHUNKS) {
     return {
       ok: false,
@@ -455,9 +636,10 @@ export function planCanvasCommit(input: CommitPlanInput): CommitPlanResult {
         tilesNew: tileWrites.length,
         tilesReused,
         tilesReclaimed: reclaim.tiles.length,
-        blocksNew: blockWrites.length,
+        blocksNew,
         blocksReused,
         blocksReclaimed: reclaim.blocks.length,
+        blocksZeroed,
         chunksReplaced: chunkWrites.length,
         chunksAppended: chunkAppends.length,
         blocksInheritedCollision,

@@ -26,6 +26,26 @@ export function encodeGenesisColor(color: { r: number; g: number; b: number }): 
   return (to3(color.b) << 9) | (to3(color.g) << 5) | (to3(color.r) << 1);
 }
 
+/**
+ * The Genesis CRAM word's meaningfully-live bits: 0BGR0, one nibble per
+ * channel, low bit of each nibble always 0 — exactly the bits
+ * decode/encodeGenesisColor read and write.
+ */
+export const GENESIS_WORD_MASK = 0x0eee;
+
+/**
+ * A CRAM word reduced to the bits the hardware displays.
+ *
+ * Two words that differ only outside the mask are THE SAME COLOUR, and every
+ * "did this change?" test has to say so: a palette read out of a disasm can
+ * carry junk in the dead bits, and comparing raw words there reports drift for
+ * a palette that draws identically — which turns a no-op commit into a
+ * whole-zone palette rewrite.
+ */
+export function sameGenesisColor(a: number, b: number): boolean {
+  return (a & GENESIS_WORD_MASK) === (b & GENESIS_WORD_MASK);
+}
+
 /** Render a CRAM word the way the editor shows it: `$0EEE`. */
 export function fmtGenesisWord(word: number): string {
   return '$' + word.toString(16).toUpperCase().padStart(4, '0');

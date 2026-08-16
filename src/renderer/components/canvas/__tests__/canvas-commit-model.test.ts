@@ -43,7 +43,7 @@ describe('targetOptions', () => {
 
 const report = (over: Partial<CommitReport> = {}): CommitReport => ({
   tilesNew: 4, tilesReused: 2, tilesReclaimed: 0,
-  blocksNew: 3, blocksReused: 1, blocksReclaimed: 0,
+  blocksNew: 3, blocksReused: 1, blocksReclaimed: 0, blocksZeroed: 0,
   chunksReplaced: 0, chunksAppended: 1,
   blocksInheritedCollision: 0, blocksWithoutCollision: 0,
   cellsInheritedSolidity: 0, cellsWithoutSolidity: 0,

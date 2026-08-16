@@ -25,10 +25,12 @@ import {
  * so this plans on every render and shows the outcome — counts or refusal —
  * before anything is committed to. Spec §4 step 5: never a silent partial write.
  */
-export default function CommitPlanView({ pixels, palette, onApplied }: {
+export default function CommitPlanView({ pixels, palette, gridOrigin, onApplied }: {
   pixels: PixelBuffer;
   /** 64 CRAM words, line-major — the palette these pixels index. */
   palette: number[];
+  /** The source's own cell grid, when it has one. An imported sheet does not. */
+  gridOrigin?: { originX: number; originY: number };
   onApplied?: () => void;
 }) {
   const levelDoc = useClassicLevelStore((s) => s.doc);
@@ -63,8 +65,9 @@ export default function CommitPlanView({ pixels, palette, onApplied }: {
       canvasPalette: palette,
       targets: effectiveTargets,
       paletteResolution: resolution,
+      gridOrigin,
     });
-  }, [levelDoc, cap, reservedTiles, range, pixels, palette, effectiveTargets, resolution]);
+  }, [levelDoc, cap, reservedTiles, range, pixels, palette, effectiveTargets, resolution, gridOrigin]);
 
   if (!levelDoc || !ref) {
     return <div style={styles.note}>Open a level act to commit into.</div>;
