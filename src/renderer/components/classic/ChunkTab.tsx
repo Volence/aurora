@@ -342,7 +342,17 @@ export default function ChunkTab({ doc, usage }: { doc: LevelDoc; usage: UsageIn
     // canvas React had already resized (which also CLEARS it: assigning
     // width/height resets the backing store).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [doc, selectedChunkId, chunkIndex, chunkEpoch, chunkVersions, composerBlockId, brushXf, brushYf, showSolidity, strokeVersion, cellPx, sizePx]);
+    //
+    // `chunkPaintMode` IS A DEPENDENCY even though nothing above reads it. The
+    // Assign and Paint branches mount different element types, so React DESTROYS
+    // and recreates this <canvas> on every toggle — and a fresh canvas has a
+    // transparent backing store over `styles.gridCanvas`'s CANVAS_BLACK
+    // background (canvas-colors.ts), so it reads as a solid black square.
+    // Without this dep, Assign -> Paint -> Assign left a canvas nobody ever
+    // painted: entirely black, no grid, no tint. It self-healed on the next dep
+    // change (clicking a cell, picking a chunk, toggling Show), which is why it
+    // looked intermittent and was reported from a screenshot rather than caught.
+  }, [doc, selectedChunkId, chunkIndex, chunkEpoch, chunkVersions, composerBlockId, brushXf, brushYf, showSolidity, strokeVersion, cellPx, sizePx, chunkPaintMode]);
 
   const cellAt = useCallback((e: React.MouseEvent): number | null => {
     const canvas = canvasRef.current;

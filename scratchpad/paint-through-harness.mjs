@@ -28,7 +28,10 @@ import * as http from 'node:http';
 import { writeFileSync, mkdirSync } from 'node:fs';
 
 const PORT = Number(process.env.PORT ?? 9362);
-const ROOT = '/home/volence/sonic_hacks/aurora/.claude/worktrees/ux-plan6';
+// Repointed 2026-08-16: this was hardcoded to .claude/worktrees/ux-plan6, a
+// worktree that no longer exists, so the harness could not run at all. Derived
+// from this file's own location instead, which survives the next move.
+const ROOT = new URL('..', import.meta.url).pathname.replace(/\/$/, '');
 const ELECTRON = '/home/volence/sonic_hacks/aurora/node_modules/.bin/electron';
 const S1DIR = '/home/volence/sonic_hacks/s1disasm';
 const SHOTS = `${ROOT}/scratchpad/shots-paint`;
@@ -304,7 +307,7 @@ async function main() {
   child.stderr.on('data', (d) => { if (process.env.VERBOSE) process.stderr.write(`[err] ${d}`); });
   const killGroup = () => {
     try { process.kill(-child.pid, 'SIGKILL'); } catch { /* gone */ }
-    try { execSync(`pkill -f 'ux-plan6/dist/main/index.mjs' 2>/dev/null; true`, { shell: '/bin/bash' }); } catch { /* */ }
+    try { execSync(`pkill -f '${ROOT}/dist/main/index.mjs' 2>/dev/null; true`, { shell: '/bin/bash' }); } catch { /* */ }
   };
 
   let c;

@@ -268,7 +268,10 @@ export default function BlockTab({ doc, usage }: { doc: LevelDoc; usage: UsageIn
     // React resizing the canvas on a window resize also clears its backing
     // store, so a redraw has to follow it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [doc, composerBlockId, chunkEpoch, selCell, block, cellPx]);
+    // `blockPaintMode` IS A DEPENDENCY for the same reason ChunkTab's is: the
+    // Assign/Paint branches mount different element types, so a toggle recreates
+    // this <canvas> and nothing would repaint it. Same bug, same tab shape.
+  }, [doc, composerBlockId, chunkEpoch, selCell, block, cellPx, blockPaintMode]);
 
   const editCell = useCallback((patch: Partial<BlockDef['cells'][number]>) => {
     const b = doc.blocks[composerBlockId];
