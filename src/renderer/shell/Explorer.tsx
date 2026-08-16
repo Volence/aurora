@@ -18,7 +18,7 @@ import { useOpenEngine } from '../state/open-project';
 import { filterExplorer, type ExplorerGroupModel, type ExplorerItemModel } from '../../core/shell/explorer';
 import {
   classicExplorerGroups, aeonExplorerGroups, noProjectExplorerGroups, resolveObjectSprite,
-  NEW_SPRITE_ITEM_ID, NEW_CANVAS_ITEM_ID, type ClassicObjectRow, type AeonObjectRow,
+  NEW_SPRITE_ITEM_ID, NEW_CANVAS_ITEM_ID, IMPORT_SHEET_ITEM_ID, type ClassicObjectRow, type AeonObjectRow,
 } from './explorer-data';
 import { requestOpenTab } from './tab-activation';
 import { classicLevelTab, aeonLevelTab, parseLevelTabId, spriteDocTab, parseSpriteDocTabId, parseCanvasDocTabId, canvasDocTab, untitledSpriteTab, PROJECT_SETUP_TAB } from './tabs';
@@ -52,6 +52,7 @@ export interface ExplorerProps {
   onOpenRecent: (path: string) => void;
   /** Opens the New Canvas dialog, which App owns (one mount, like ConfirmDialog). */
   onNewCanvas: () => void;
+  onImportSheet: () => void;
 }
 
 /** One explorer tree row. Local hover state (the way `Tab` does) — never a CSS file. */
@@ -76,7 +77,7 @@ function ExplorerItem({ item, onActivate }: { item: ExplorerItemModel; onActivat
   );
 }
 
-export default function Explorer({ onOpenProject, onOpenRecent, onNewCanvas }: ExplorerProps) {
+export default function Explorer({ onOpenProject, onOpenRecent, onNewCanvas, onImportSheet }: ExplorerProps) {
   const collapsed = useShellStore((s) => s.explorerCollapsed);
   const toggle = useShellStore((s) => s.toggleExplorer);
   const [query, setQuery] = useState('');
@@ -171,6 +172,8 @@ export default function Explorer({ onOpenProject, onOpenRecent, onNewCanvas }: E
       if (p) void requestOpenTab(spriteDocTab(p.engine, p.ref, item.label));
     } else if (item.id === NEW_CANVAS_ITEM_ID) {
       onNewCanvas();
+    } else if (item.id === IMPORT_SHEET_ITEM_ID) {
+      onImportSheet();
     } else if (item.id.startsWith('doc:canvas:')) {
       // Rebuilt through canvasDocTab rather than reusing the item id as a
       // descriptor: the tab needs a kind and a title, and the ONE place that

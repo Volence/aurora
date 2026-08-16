@@ -116,6 +116,13 @@ await session('art-mode repro', async (c) => {
     note('B', 'zoom at rest', await c.evalExpr('window.__p2.zoomLabel()'));
     note('B', 'canvas at rest', await c.evalExpr('JSON.stringify(window.__p2.canvasInfo())'));
     note('B', 'ink at rest', await c.evalExpr('JSON.stringify(window.__p2.inkFraction())'));
+    // ---- zoom IN from the floor, one notch at a time ----
+    for (let i = 0; i < 5; i++) {
+      await wheel(c, rect.x, rect.y, -240, false);
+      await c.evalExpr(PROBE);
+      note('C', 'zoom in notch ' + (i + 1), await c.evalExpr('window.__p2.zoomLabel()'));
+    }
+    note('C', 'canvas after zoom in', await c.evalExpr('JSON.stringify(window.__p2.canvasInfo())'));
   }
   await shot(c, 'repro-paint-after-wheel');
   await drain(c);

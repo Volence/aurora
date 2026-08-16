@@ -191,6 +191,7 @@ export default function App() {
           onOpenProject={openProject}
           onOpenRecent={openProjectByPath}
           onNewCanvas={() => setNewCanvasOpen(true)}
+          onImportSheet={() => setImportSheetOpen(true)}
         />
         <div style={styles.main}>
           <TabStrip />

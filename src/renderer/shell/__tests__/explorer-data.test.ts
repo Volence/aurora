@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   classicExplorerGroups, aeonExplorerGroups, noProjectExplorerGroups,
-  resolveObjectSprite, canvasExplorerGroup, NEW_SPRITE_ITEM_ID, NEW_CANVAS_ITEM_ID,
+  resolveObjectSprite, canvasExplorerGroup, NEW_SPRITE_ITEM_ID, NEW_CANVAS_ITEM_ID, IMPORT_SHEET_ITEM_ID,
 } from '../explorer-data';
 
 /** A project with no canvases — the shape listCanvasNames returns. */
@@ -196,5 +196,23 @@ describe('noProjectExplorerGroups', () => {
 
   it('no recents → no groups (the empty state lives in the component)', () => {
     expect(noProjectExplorerGroups([])).toEqual([]);
+  });
+});
+
+describe('canvasExplorerGroup — the import entry', () => {
+  it('offers Import Art Sheet beside New Canvas for a classic project', () => {
+    const g = canvasExplorerGroup({ names: [], skipped: [] }, { classic: true });
+    expect(g.items.map((i) => i.id)).toEqual([NEW_CANVAS_ITEM_ID, IMPORT_SHEET_ITEM_ID]);
+  });
+
+  it('omits it for aeon — the tile/block/chunk ladder it commits into is classic', () => {
+    const g = canvasExplorerGroup({ names: [], skipped: [] });
+    expect(g.items.some((i) => i.id === IMPORT_SHEET_ITEM_ID)).toBe(false);
+  });
+
+  it('keeps both entry points ABOVE the canvas listing, so they are always visible', () => {
+    // A "New…" row that sorts below fifty canvases is a row nobody scrolls to.
+    const g = canvasExplorerGroup({ names: ['a', 'b'], skipped: [] }, { classic: true });
+    expect(g.items.slice(0, 2).map((i) => i.id)).toEqual([NEW_CANVAS_ITEM_ID, IMPORT_SHEET_ITEM_ID]);
   });
 });

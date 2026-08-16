@@ -40,6 +40,9 @@ const TOOLS_GROUP: ExplorerGroupModel = Object.freeze({
  *  id) for the same reason NEW_SPRITE_ITEM_ID has one — the `doc:canvas:` branch
  *  must not swallow it. */
 export const NEW_CANVAS_ITEM_ID = 'new-canvas';
+/** Import a foreign PNG sheet into the open act. Classic only — the
+ *  tile/block/chunk ladder it commits into is a classic notion. */
+export const IMPORT_SHEET_ITEM_ID = 'import-sheet';
 
 /**
  * The Canvases group, identical for both engines because a canvas has no engine
@@ -54,12 +57,20 @@ export const NEW_CANVAS_ITEM_ID = 'new-canvas';
  * `listCanvasNames` computes `skipped` for exactly this and says so in its own
  * doc comment. The row says what to do: the name, not the file, is the problem.
  */
-export function canvasExplorerGroup(listing: { names: string[]; skipped: string[] }): ExplorerGroupModel {
+export function canvasExplorerGroup(
+  listing: { names: string[]; skipped: string[] },
+  opts: { classic?: boolean } = {},
+): ExplorerGroupModel {
   return {
     id: 'canvases',
     label: 'Canvases',
     items: [
       { id: NEW_CANVAS_ITEM_ID, label: 'New Canvas…', hint: 'new' },
+      // Sits beside New Canvas because it is the OTHER way art gets in, and the
+      // command palette was its only home — a feature reachable solely by a
+      // keystroke nobody has been told about is a feature nobody finds. Classic
+      // only, matching the ⌘K entry's gate.
+      ...(opts.classic ? [{ id: IMPORT_SHEET_ITEM_ID, label: 'Import Art Sheet…', hint: 'import' }] : []),
       ...listing.names.map((n) => ({ id: `doc:canvas:${n}`, label: n })),
       ...listing.skipped.map((f) => ({
         id: `canvas-skipped:${f}`,
@@ -103,7 +114,7 @@ export function classicExplorerGroups(
               },
         ),
     },
-    canvasExplorerGroup(canvases),
+    canvasExplorerGroup(canvases, { classic: true }),
     TOOLS_GROUP,
   ];
 }
