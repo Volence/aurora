@@ -163,6 +163,22 @@ export const CLASSIC_TILE_CAPS: ArtOptionCaps = {
 };
 
 /**
+ * Classic's Chunk and Block tiers in Paint mode — the same bar WITHOUT the
+ * transform grid.
+ *
+ * `pendingAction` has exactly one consumer, TileTab, and only TileTab clears it
+ * (in a `finally`, for the hazard its own comment names). Handing the grid to
+ * hosts that cannot consume it drew three live buttons that did nothing — and
+ * worse than nothing: the click left an action parked in the store, and the next
+ * time the Tile tab MOUNTED its effect fired on the leftover and committed a
+ * real, dirty-marking transform against a tile the artist never chose. A
+ * capability is a claim about the host; these hosts make no such claim.
+ */
+export const CLASSIC_SURFACE_CAPS: ArtOptionCaps = {
+  ...CLASSIC_TILE_CAPS, transforms: false,
+};
+
+/**
  * Art-mode tool-options bar. Holds the tool MODIFIERS relocated out of the old
  * ToolColumn — brush-space tabs, per-tool config (dither, pixel-perfect),
  * mirror, repeat preview, transforms, and zoom. Each control keeps its exact

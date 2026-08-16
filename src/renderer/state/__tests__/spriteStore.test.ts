@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { useSpriteStore } from '../spriteStore';
+import { useSpriteStore, activeSpriteHistory } from '../spriteStore';
 import { createBuffer } from '../../../core/art/pixel-ops';
 
 // unsavedEdits is the honest sprite-dirtiness signal (Fix A): TRUE only when the
@@ -62,8 +62,8 @@ describe('spriteStore unsavedEdits lifecycle', () => {
   });
 
   // Timeline edits mutate persisted data (exportSprite writes steps to
-  // <name>_anims.asm) so they must dirty the doc — even though they sit outside
-  // the snapshot history and so leave no undo entry.
+  // <name>_anims.asm) so they must dirty the doc — and, since U2 put `steps`
+  // into the snapshot, they record an undo entry too.
   it('addStep sets it true (timeline is persisted data)', () => {
     useSpriteStore.getState().addStep(0);
     expect(useSpriteStore.getState().unsavedEdits).toBe(true);
@@ -84,5 +84,49 @@ describe('spriteStore unsavedEdits lifecycle', () => {
   it('setPlaybackMode does NOT set it (preview-only; not persisted in export)', () => {
     useSpriteStore.getState().setPlaybackMode('pingpong');
     expect(useSpriteStore.getState().unsavedEdits).toBe(false);
+  });
+});
+
+/**
+ * U2 (UNDO-A6). Animation steps are INDICES into `frames`. Deleting a frame
+ * drops the steps that referenced it and shifts every higher reference down —
+ * and `steps` was not a snapshot field, so undoing restored the frames without
+ * them. Every later step was left off by one, pointing at the wrong picture:
+ * silently, and wrong on export.
+ */
+describe('undoing a frame delete restores the animation', () => {
+  const frames = () => [createBuffer(8, 8), createBuffer(8, 8), createBuffer(8, 8)];
+
+  beforeEach(() => {
+    useSpriteStore.getState().loadSprite(frames(), [
+      { frameIndex: 0, duration: 4 },
+      { frameIndex: 1, duration: 5 },
+      { frameIndex: 2, duration: 6 },
+    ], 4, 4);
+  });
+
+  it('brings the steps back with the frames, not re-indexed', () => {
+    useSpriteStore.getState().selectFrame(1);
+    useSpriteStore.getState().deleteFrame();
+    // The delete itself is right: step 1 goes, step 2 shifts down to 1.
+    expect(useSpriteStore.getState().steps).toEqual([
+      { frameIndex: 0, duration: 4 },
+      { frameIndex: 1, duration: 6 },
+    ]);
+
+    activeSpriteHistory().undo();
+    expect(useSpriteStore.getState().frames).toHaveLength(3);
+    expect(useSpriteStore.getState().steps).toEqual([
+      { frameIndex: 0, duration: 4 },
+      { frameIndex: 1, duration: 5 },
+      { frameIndex: 2, duration: 6 },
+    ]);
+  });
+
+  it('a timeline edit is undoable now that steps are snapshotted', () => {
+    useSpriteStore.getState().setStepDuration(0, 30);
+    expect(useSpriteStore.getState().steps[0].duration).toBe(30);
+    activeSpriteHistory().undo();
+    expect(useSpriteStore.getState().steps[0].duration).toBe(4);
   });
 });

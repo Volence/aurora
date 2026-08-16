@@ -5,6 +5,7 @@ import type { GuardedWriteFile } from '../shared/ipc-types';
 import { readBinaryFile, readManyFiles, listProjectFiles, pathExists, listDir, fileMtime } from './file-io';
 import { performGuardedWrite } from './guarded-write';
 import { getRecentProjects, addRecentProject, removeRecentProject } from './recent-projects';
+import { isRelPathSafe } from '../shared/rel-path';
 
 export function registerIpcHandlers(): void {
   // Env-guarded paint instrumentation sink (AURORA_PERF=1). The renderer only
@@ -79,6 +80,17 @@ export function registerIpcHandlers(): void {
   });
 
   ipcMain.handle(IPC_CHANNELS.WRITE_BINARY_FILE, async (_event, basePath: string, relativePath: string, data: ArrayBuffer) => {
+    // THE ONE WRITE CHANNEL THAT HAD NO GUARD, while file-io.ts and
+    // guarded-write.ts have carried one since they were written. `resolve`
+    // happily walks out of the project on a `..` segment or an absolute path,
+    // and the sprite exporter feeds this a FREE-TYPED name as a path segment —
+    // so a sprite called `../../.ssh/authorized_keys` was a write outside the
+    // project the user opened. Refuse rather than throw: the renderer treats
+    // `false` as a failed write and reports it.
+    if (!isRelPathSafe(relativePath)) {
+      console.error(`[ipc] refused write to unsafe path: '${relativePath}'`);
+      return false;
+    }
     const { resolve, dirname } = await import('path');
     const { writeFileSync, renameSync, mkdirSync } = await import('fs');
     const fullPath = resolve(basePath, relativePath);

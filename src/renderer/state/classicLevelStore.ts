@@ -970,6 +970,15 @@ export function classicPaintSurface(plan: SurfaceEditPlan): CommandResult {
   // with 0 — the same "no collision" answer Aurora's overlay already renders
   // for them, so the game is brought into line with what the editor shows
   // rather than left reading whatever bytes follow the file.
+  //
+  // KNOWN OPEN QUESTION (CLASSIC-A4, seat evidence, unverified): "whatever bytes
+  // follow the file" is not nothing — the ROM resolves the overhang from the
+  // adjacent zone's table, so those blocks may have REAL collision in game that
+  // Aurora both draws as air and overwrites with zeros here. Reading it would
+  // need cross-file reach Aurora does not have, so the behaviour is left as
+  // argued above rather than changed on an unverified claim. What HAS been
+  // closed is the other direction: s1-io refuses to write a colind SHORTER than
+  // the one it read, which would move the overhang boundary silently.
   const nextColind = plan.newBlocks.length
     ? (() => {
       const src = doc.collision.colind;

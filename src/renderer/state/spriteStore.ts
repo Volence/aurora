@@ -281,6 +281,7 @@ function recordEdit(s: SpriteState): void {
  *  redo, so passing live refs is safe. */
 const snap = (s: SpriteDoc): SpriteSnapshot => ({
   frames: s.frames,
+  steps: s.steps,
   currentIndex: s.currentIndex,
   selection: s.selection,
   paletteMode: s.paletteMode,
@@ -555,18 +556,28 @@ export const useSpriteStore = create<SpriteState>((set, get) => ({
 
   playbackMode: 'forward',
   // Timeline edits mutate persisted data (exportSprite writes steps to
-  // <name>_anims.asm), so they dirty the doc — but steps live OUTSIDE the snapshot
-  // history (snap() omits them), so they set unsavedEdits DIRECTLY rather than via
-  // recordEdit (recording would push a snapshot that can't restore steps, a
-  // misleading undo entry). Pre-existing history gap; noted for Stage 4.
+  // <name>_anims.asm), so they dirty the doc — and they are UNDOABLE, now that
+  // `steps` is part of the snapshot. It was not: steps are indices into
+  // `frames`, so deleting a frame re-indexed them and an undo restored the
+  // frames without them, leaving every later step off by one. Putting them in
+  // fixed that AND closed the gap these three setters were noted under —
+  // recording used to push a snapshot that could not restore what they changed.
   // playbackMode is preview-only (export hardcodes control:{kind:'loop'}), so it
-  // does NOT dirty.
-  addStep: (frameIndex) => set((s) => ({ steps: [...s.steps, { frameIndex, duration: DEFAULT_STEP_DURATION }], unsavedEdits: true })),
-  removeStep: (i) => set((s) => ({ steps: s.steps.filter((_, idx) => idx !== i), unsavedEdits: true })),
-  setStepDuration: (i, duration) => set((s) => ({
-    steps: s.steps.map((st, idx) => (idx === i ? { ...st, duration: Math.min(0x7f, Math.max(1, Math.round(duration) || 1)) } : st)),
-    unsavedEdits: true,
-  })),
+  // does NOT dirty and does not record.
+  addStep: (frameIndex) => {
+    recordEdit(get());
+    set((s) => ({ steps: [...s.steps, { frameIndex, duration: DEFAULT_STEP_DURATION }] }));
+  },
+  removeStep: (i) => {
+    recordEdit(get());
+    set((s) => ({ steps: s.steps.filter((_, idx) => idx !== i) }));
+  },
+  setStepDuration: (i, duration) => {
+    recordEdit(get());
+    set((s) => ({
+      steps: s.steps.map((st, idx) => (idx === i ? { ...st, duration: Math.min(0x7f, Math.max(1, Math.round(duration) || 1)) } : st)),
+    }));
+  },
   setPlaybackMode: (playbackMode) => set({ playbackMode }),
   setSteps: (steps) => set({ steps, unsavedEdits: true }),
 

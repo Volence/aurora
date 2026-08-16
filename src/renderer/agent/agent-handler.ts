@@ -751,7 +751,31 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
 
     case 'classic-save-project': {
       requireClassicProject();
-      return saveClassicProject();
+      const result = await saveClassicProject();
+      // A FAILED SAVE IS NOT A RESULT. `saveClassicProject` reports outcomes as
+      // a variant rather than throwing — that is its contract with the UI,
+      // which toasts them — but returning the variant verbatim here made a
+      // conflict, a partial write or a self-check failure arrive at the agent
+      // as an ordinary successful tool result. The agent then proceeds as if
+      // the level were on disk. The transport's only "this failed" channel is a
+      // throw, so the failing variants take it.
+      switch (result.kind) {
+        case 'saved':
+        case 'nothing':
+          return result;
+        case 'conflict':
+          throw new Error(
+            `Save aborted — ${result.conflicts.length} file(s) changed on disk since the act was read ` +
+            `(${result.conflicts.slice(0, 3).join(', ')}). Reopen the act to pick up the external changes.`,
+          );
+        case 'partial':
+          throw new Error(
+            `Save incomplete — the write failed at ${result.failed.path} (${result.failed.message}); ` +
+            `${result.unwritten.length} further file(s) did not land. The act is still marked unsaved.`,
+          );
+        case 'error':
+          throw new Error('Save failed — see the editor notice for the reason. Nothing was written.');
+      }
     }
 
     default: {

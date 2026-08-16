@@ -678,6 +678,16 @@ export default function MapViewport() {
         useEditorStore.getState().setTool(t);
       };
 
+      // A MODIFIED KEY IS SOMEBODY ELSE'S CHORD, all of them, not the three
+      // that happened to be noticed. Two window keydown listeners fire for one
+      // event, so Ctrl+B toggled the Explorer AND armed paint-block — the next
+      // map click wrote nametable entries the user never asked for — while
+      // Ctrl+K opened the command palette AND armed stamp-chunk. The browser
+      // zoom chords (Ctrl+±/0) reached the map's zoom the same way. Escape
+      // carries no modifier of its own and stays below; the arrows are the
+      // map's own pan and are equally not Ctrl-chords.
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+
       const step = 64;
       switch (e.key) {
         case 'ArrowLeft': pan(step, 0); e.preventDefault(); break;
@@ -687,15 +697,13 @@ export default function MapViewport() {
         case '=': case '+': setZoom(zoom * 1.5); e.preventDefault(); break;
         case '-': setZoom(zoom / 1.5); e.preventDefault(); break;
         case '0': setZoom(1); e.preventDefault(); break;
-        // Ctrl+V is claimed by paste above (returns before reaching this
-        // switch) — guard here too so a stray Ctrl+V can't switch tools.
-        case 'v': if (!e.ctrlKey) setToolScoped('view'); break;
-        case 's': if (!e.ctrlKey) setToolScoped('select'); break;
+        case 'v': setToolScoped('view'); break;
+        case 's': setToolScoped('select'); break;
         case 'o': setToolScoped('place-object'); break;
         case 'r': setToolScoped('place-ring'); break;
         case 't': setToolScoped('paint-tile'); break;
         case 'b': setToolScoped('paint-block'); break;
-        case 'c': if (!e.ctrlKey) setToolScoped('paint-collision'); break;
+        case 'c': setToolScoped('paint-collision'); break;
         case 'k': setToolScoped('stamp-chunk'); break;
         case 'm': setToolScoped('marquee'); break;
         case 'Escape': {

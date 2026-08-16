@@ -245,12 +245,34 @@ async function dirHasEntries(fa: FileAccess, dir: string): Promise<boolean> {
  * source contributes nothing to `buildReservedTileSet` (permissive), rather
  * than failing the whole act open.
  */
-async function readMapTextTolerant(fa: FileAccess, path: string): Promise<string | null> {
+/**
+ * A mappings .asm, or WHY there isn't one.
+ *
+ * ABSENT AND UNREADABLE ARE NOT THE SAME ANSWER, and folding both to null was
+ * how a reservation set could come back non-null but INCOMPLETE. `reservedTiles`
+ * has a documented "not known" spelling — null — that the surface planner and
+ * the commit planner both refuse under; an empty-but-present set defeats it, and
+ * the allocator then hands out tiles an object sprite is still drawing through.
+ * An absent file is a request that simply does not apply; an unreadable one
+ * means the set cannot be computed at all.
+ */
+type MapTextRead =
+  | { kind: 'text'; text: string }
+  | { kind: 'absent' }
+  | { kind: 'unreadable' };
+
+async function readMapText(fa: FileAccess, path: string): Promise<MapTextRead> {
+  let present: boolean;
   try {
-    if (!(await fa.exists(path))) return null;
-    return new TextDecoder().decode(await fa.read(path));
+    present = await fa.exists(path);
   } catch {
-    return null;
+    return { kind: 'unreadable' };
+  }
+  if (!present) return { kind: 'absent' };
+  try {
+    return { kind: 'text', text: new TextDecoder().decode(await fa.read(path)) };
+  } catch {
+    return { kind: 'unreadable' };
   }
 }
 
@@ -380,14 +402,26 @@ export const s1Adapter: ProjectAdapter = {
         const requests = levelArtReservationRequests(zone, act.act);
         const mapPaths = [...new Set(requests.map((r) => r.mapAsm))];
         const mapTextByPath = new Map<string, string>();
+        let reservationsKnown = true;
         await Promise.all(
           mapPaths.map(async (p) => {
-            const text = await readMapTextTolerant(fa, p);
-            if (text !== null) mapTextByPath.set(p, text);
+            const r = await readMapText(fa, p);
+            if (r.kind === 'text') mapTextByPath.set(p, r.text);
+            // A file that is THERE and could not be read leaves the set
+            // incomplete, and an incomplete set is indistinguishable from a
+            // complete one at the allocator. See readMapText.
+            else if (r.kind === 'unreadable') reservationsKnown = false;
           }),
         );
-        const { tiles: reserved } = buildReservedTileSet(requests, mapTextByPath, poolTileCount);
-        reservedTilesStates.set(refKey(ref), reserved);
+        if (reservationsKnown) {
+          const { tiles: reserved } = buildReservedTileSet(requests, mapTextByPath, poolTileCount);
+          reservedTilesStates.set(refKey(ref), reserved);
+        } else {
+          // NULL is the documented "not known", and both planners already refuse
+          // the dangerous operations under it. Say it rather than reporting a
+          // set that is quietly missing entries.
+          reservedTilesStates.delete(refKey(ref));
+        }
 
         return state.doc;
       },

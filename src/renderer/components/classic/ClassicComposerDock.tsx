@@ -78,7 +78,18 @@ export default function ClassicComposerDock() {
   // a 256x256 chunk at 6144px. `composerTab` already names the tier that is on
   // screen, so mirroring it here beats a second source of truth in each tab.
   const setArtTier = useArtStore((s) => s.setArtTier);
-  useEffect(() => { setArtTier(tab); }, [tab, setArtTier]);
+  const clearAction = useArtStore((s) => s.clearAction);
+  useEffect(() => {
+    setArtTier(tab);
+    // AND DROP ANY PENDING TRANSFORM. `pendingAction` is a one-shot request with
+    // exactly one consumer (TileTab, which clears it in a `finally`), so an
+    // action left parked by any other host would fire the next time the Tile tab
+    // mounted — committing a real transform against a tile the artist never
+    // chose. The tiers that cannot consume it no longer OFFER it
+    // (CLASSIC_SURFACE_CAPS), and this is the belt to that braces: crossing a
+    // tier boundary discards the request rather than carrying it.
+    clearAction();
+  }, [tab, setArtTier, clearAction]);
 
   // Usage index — rebuilt on every doc change (the doc is small). Recomputes on
   // the identity churn a command produces, so counts stay exact after edits AND

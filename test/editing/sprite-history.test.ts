@@ -4,7 +4,7 @@ import { createBuffer } from '../../src/core/art/pixel-ops';
 
 function snap(fill: number): SpriteSnapshot {
   const b = createBuffer(4, 4); b.data.fill(fill);
-  return { frames: [b], currentIndex: 0, selection: null, paletteMode: 'zone', zoneLine: 1, standalonePalette: [] };
+  return { frames: [b], steps: [], currentIndex: 0, selection: null, paletteMode: 'zone', zoneLine: 1, standalonePalette: [] };
 }
 
 /** A history bound to one mutable cell, standing in for a sprite document in the
@@ -73,9 +73,9 @@ describe('SpriteDocHistory', () => {
     expect(cell.live).toBeDefined();
   });
   it('round-trips palette state (mode/line/standalone) through undo', () => {
-    const a: SpriteSnapshot = { frames: [createBuffer(4, 4)], currentIndex: 0, selection: null,
+    const a: SpriteSnapshot = { frames: [createBuffer(4, 4)], steps: [], currentIndex: 0, selection: null,
       paletteMode: 'zone', zoneLine: 2, standalonePalette: [] };
-    const b: SpriteSnapshot = { frames: [createBuffer(4, 4)], currentIndex: 0, selection: null,
+    const b: SpriteSnapshot = { frames: [createBuffer(4, 4)], steps: [], currentIndex: 0, selection: null,
       paletteMode: 'standalone', zoneLine: 2, standalonePalette: [{ r: 9, g: 0, b: 0, a: 255 }] };
     const { h, cell } = bound(a);
     h.record(a);
