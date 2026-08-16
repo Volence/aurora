@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useCanvasStore, type CanvasTool } from '../../state/canvasStore';
 import { focusedHistory } from '../../state/editorStore';
 import CanvasHost from './CanvasHost';
+import CanvasCommitSection from './CanvasCommitSection';
 import { offeredGrids, fitZoom } from './canvas-pane-model';
 import { useAnchoredZoom } from '../art-shared/use-anchored-zoom';
 import { useHandPan } from '../art-shared/use-hand-pan';
@@ -151,6 +152,9 @@ export default function CanvasMode({ docId, appBar }: { docId: string; appBar: R
           </CollapsibleSection>
           <CollapsibleSection id="canvas.palette" title="Palette">
             <CanvasPalette docId={docId} />
+          </CollapsibleSection>
+          <CollapsibleSection id="canvas.commit" title="Commit to level">
+            <CanvasCommitSection docId={docId} />
           </CollapsibleSection>
         </Panel>
       }

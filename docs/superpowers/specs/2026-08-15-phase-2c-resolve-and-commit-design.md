@@ -424,6 +424,19 @@ VERIFIED against the code, not inferred:
   re-theme from the canvas is therefore several commits, each naming its own range, each computed
   fresh against the live document. The PNG path has no such cap (D6).
 
+**GHZ act 1 has 17 claimable tiles, not the 146 the art-authoring spec's §3.5 records.** Measured
+live in the running app (CDP, 2026-08-15): the budget readout says
+`tiles 9 unique · 17 free in GHZ 1 · pool 948/965`, and `reservedTiles` is **158**. §3.5's per-zone
+figures ("ghz 146, mz 126, syz 137, slz 73, sbz 415, lz 0") are *unreferenced pool slots* and do not
+subtract the tiles object sprites draw through mappings — which `countFreeTileSlots`,
+`findFreeSlot` and this planner all do. 146 − 17 = 129 of GHZ's 158 reserved tiles were being
+counted as free.
+
+This is the same class of error as the Labyrinth claim §0 C1 corrected: a number measured by a model
+simpler than the code that consumes it. Treat §3.5's table as an upper bound only. It also means
+commit is much tighter than the predecessor spec implies — a 256×256 drawing of three casual strokes
+needed 29 tiles and was correctly refused, which is the scarcity D1's reclaim exists to answer.
+
 2B already ships the ceiling readout: `budgetReadout` prints
 `tiles N unique · M free in GHZ 1 · pool 819/965`, and its comment
 (`use-canvas-constraints.ts:100–105`) deliberately refuses to compare the two numbers because

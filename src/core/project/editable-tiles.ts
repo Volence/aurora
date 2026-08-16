@@ -44,3 +44,26 @@ export function tileLockReason(
 export function isTileEditable(range: EditableTileRange | null, tileIndex: number): boolean {
   return tileLockReason(range, tileIndex) === null;
 }
+
+/**
+ * The animated-art overlay slots as a set, expanded from `animRanges`.
+ *
+ * `isTileEditable` already refuses to WRITE these, so this is not a second copy
+ * of that rule — it answers a different question that only 2C's commit asks:
+ * may new art be REPOINTED at this slot? Matching a pool tile writes nothing, so
+ * the editable predicate never fires, and level art bound to an overlay slot
+ * would animate in game. Derived from the same `animRanges` rather than from a
+ * separate table, so the two can never disagree about which slots those are.
+ *
+ * An unknown range yields the empty set, matching the permissive null
+ * convention — the caller decides whether unknown is safe (2C refuses to
+ * reclaim under it; see the commit planner).
+ */
+export function animatedTileSet(range: EditableTileRange | null): Set<number> {
+  const out = new Set<number>();
+  if (!range) return out;
+  for (const r of range.animRanges) {
+    for (let t = r.start; t < r.start + r.count; t++) out.add(t);
+  }
+  return out;
+}
