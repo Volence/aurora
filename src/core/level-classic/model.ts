@@ -192,6 +192,20 @@ export function unpackChunkCell(w: number): ChunkCell {
 
 const MAX_BLOCKS = 0x400; // block ids are 10-bit → at most 1024 entries
 const MAX_CHUNKS = 256; // chunk ids are one byte → at most 256 entries
+
+/**
+ * How many chunks can actually be STAMPED, which is not the same as how many the
+ * file can hold (MAX_CHUNKS above, a validation limit).
+ *
+ * The layout byte's bit 7 is S1's loop flag, so only engine ids 1..$7F address a
+ * chunk. `doc.chunks` is file-order and 0-based, engine id = index + 1, so the
+ * addressable count is 127.
+ *
+ * EXPORTED because two callers need it and a restated 0x7f is a limit that
+ * drifts: `classicAddChunk` enforces it for the grow command and the MCP path,
+ * and 2C's commit planner refuses an append past it.
+ */
+export const MAX_ADDRESSABLE_CHUNKS = 0x7f;
 const MAX_BLOCK_REF = 0x3ff; // chunk cell block field width
 const MAX_LAYOUT_W = 64; // INI levelwidthmax; applies to fg and bg (all real bg fit)
 const MAX_LAYOUT_H = 8; // INI levelheightmax

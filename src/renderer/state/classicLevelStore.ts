@@ -31,7 +31,9 @@ import type { DirtyDomains, EditableTileRange, LevelDoc, ZoneActRef } from '../.
 import { tileLockReason } from '../../core/project/editable-tiles';
 import type { SurfaceEditPlan, PaintMode as SurfaceDivergeMode } from '../../core/art/classic-surface-plan';
 import type { BlockDef, ChunkCell, ChunkDef256 } from '../../core/level-classic/model';
-import { validateLevelDoc, unpackChunkCell, chunkIndexForId } from '../../core/level-classic/model';
+import {
+  validateLevelDoc, unpackChunkCell, chunkIndexForId, MAX_ADDRESSABLE_CHUNKS,
+} from '../../core/level-classic/model';
 import {
   firstEditableChunkId, firstEditableNonBlankTile, firstNonBlankBlock, landingPaletteLine,
 } from '../../core/level-classic/tile-pick';
@@ -1058,7 +1060,6 @@ export function classicSetObjects(objects: S1ObjectEntry[]): CommandResult {
 //     only engine ids 1..$7F are stampable. doc.chunks is file-order (0-based);
 //     engine id = index + 1, so at most 127 chunks can be addressed.
 //   • Chunk cells reference blocks with a 10-bit field → at most $400 = 1024 blocks.
-const MAX_ADDRESSABLE_CHUNKS = 0x7f; // 127 (engine ids 1..$7F)
 const MAX_BLOCKS_TOTAL = 0x400; // 1024 (10-bit block ref)
 
 /**

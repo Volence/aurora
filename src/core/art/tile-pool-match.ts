@@ -82,6 +82,21 @@ export function poolTileEntries(pool: Uint8Array, tileIndex: number, out?: Uint8
 }
 
 /**
+ * The inverse of `poolTileEntries`: 64 entries into a 32-byte 4bpp tile.
+ *
+ * Kept beside its inverse deliberately — the nibble order is the one rule both
+ * share, and a pack that disagreed with the unpack would round-trip wrong in a
+ * way that still renders as art.
+ */
+export function packTileEntries(entries: Uint8Array, out?: Uint8Array): Uint8Array {
+  const dst = out ?? new Uint8Array(TILE_BYTES);
+  for (let i = 0; i < TILE_BYTES; i++) {
+    dst[i] = ((entries[i * 2] & 0x0f) << 4) | (entries[i * 2 + 1] & 0x0f);
+  }
+  return dst;
+}
+
+/**
  * A pool tile whose content equals `want`, or null.
  *
  * With `allowFlips`, "equals" means "equals under one of the four VDP
