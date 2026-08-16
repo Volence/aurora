@@ -10,10 +10,14 @@ import { useConfirmStore } from '../../state/confirmStore';
 import { useToastStore } from '../../state/toastStore';
 import { openCanvasDoc, useCanvasStore, type CanvasSource } from '../../state/canvasStore';
 import { resetProjectRuntime } from '../../state/project-runtime';
+import { useArtStore } from '../../state/artStore';
+import { createDoc } from '../../../core/art/composer-buffer';
 import { createBuffer } from '../../../core/art/pixel-ops';
 import { canvasIndex } from '../../../core/art/canvas-doc';
 
-const CLEAN = { classicDirty: false, aeonDirty: false, spriteDirty: false, canvasDirty: false };
+const CLEAN = {
+  classicDirty: false, aeonDirty: false, spriteDirty: false, canvasDirty: false, artDirty: false,
+};
 
 describe('planProjectOpen', () => {
   it('proceeds when nothing is dirty', () => {
@@ -24,6 +28,7 @@ describe('planProjectOpen', () => {
     ['aeon project edits', { ...CLEAN, aeonDirty: true }],
     ['a dirty sprite (unsaved edits)', { ...CLEAN, spriteDirty: true }],
     ['a dirty canvas (unsaved pixels)', { ...CLEAN, canvasDirty: true }],
+    ['an unsaved aeon composer document', { ...CLEAN, artDirty: true }],
   ] as const)('asks before opening over %s', (_label, snap) => {
     expect(planProjectOpen(snap)).toEqual({ kind: 'confirm' });
   });
@@ -144,6 +149,60 @@ describe('confirmProjectOpen', () => {
     expect(toasts.length).toBe(toastCountBefore + 1);
     expect(toasts[toasts.length - 1]).toMatchObject({ type: 'error' });
     expect(toasts[toasts.length - 1].message).toMatch(/unsaved changes remain/i);
+  });
+});
+
+/**
+ * R3. The aeon composer document (New Tile / Block / Chunk) keeps its strokes
+ * in artStore alone — ComposerCanvas calls markOpenDirty() and records no
+ * command, so editorStore.dirty stays false. It was in no dirty predicate and
+ * in none of the three teardowns, so opening another project replaced it
+ * outright with no dialog at all: the exact failure this module exists to
+ * prevent, through the one store that was never joined to it.
+ */
+describe('confirmProjectOpen over an unsaved aeon composer document', () => {
+  function dirtyComposer(): void {
+    useArtStore.getState().openDocument({
+      doc: createDoc(2, 2), liveTileIndex: null, chunkId: null, name: 'New Chunk', dirty: false,
+    });
+    useArtStore.getState().markOpenDirty(); // what a stroke does
+  }
+
+  beforeEach(() => { useArtStore.getState().closeDocument(); });
+  afterEach(() => { useArtStore.getState().closeDocument(); });
+
+  it('asks instead of proceeding, with no other store dirty', async () => {
+    dirtyComposer();
+    const p = confirmProjectOpen();
+    expect(useConfirmStore.getState().request).not.toBeNull();
+    useConfirmStore.getState().answer('cancel');
+    await expect(p).resolves.toBe(false);
+    expect(useArtStore.getState().open?.dirty).toBe(true); // cancel keeps the work
+  });
+
+  it("'discard' drops the document", async () => {
+    dirtyComposer();
+    const p = confirmProjectOpen();
+    useConfirmStore.getState().answer('discard');
+    await expect(p).resolves.toBe(true);
+    expect(useArtStore.getState().open).toBeNull();
+  });
+
+  it('the CLEAN path still ends the composer session', async () => {
+    // Its ComposerDoc is built from the OLD project's tiles, so a survivor
+    // writes the previous project's art into the new one's atlas.
+    useArtStore.getState().openDocument({
+      doc: createDoc(2, 2), liveTileIndex: 4, chunkId: null, name: 'Tile $04', dirty: false,
+    });
+    await expect(confirmProjectOpen()).resolves.toBe(true);
+    expect(useConfirmStore.getState().request).toBeNull();
+    expect(useArtStore.getState().open).toBeNull();
+  });
+
+  it('resetProjectRuntime closes it too', () => {
+    dirtyComposer();
+    resetProjectRuntime();
+    expect(useArtStore.getState().open).toBeNull();
   });
 });
 

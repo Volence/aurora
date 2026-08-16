@@ -1,8 +1,9 @@
-import { app, BrowserWindow } from 'electron';
+import { app, BrowserWindow, ipcMain } from 'electron';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { registerIpcHandlers } from './ipc-handlers';
 import { startMcpServer, stopMcpServer } from './mcp-server';
+import { IPC_CHANNELS } from '../shared/ipc-types';
 
 // The main bundle is ESM (.mjs), where __dirname doesn't exist.
 const moduleDir = dirname(fileURLToPath(import.meta.url));
@@ -53,9 +54,62 @@ function createWindow(): BrowserWindow {
     win.loadFile(join(moduleDir, '../renderer/index.html'));
   }
 
+  installCloseGuard(win);
   win.on('closed', () => { if (mainWindow === win) mainWindow = null; });
   mainWindow = win;
   return win;
+}
+
+/**
+ * ASK BEFORE THE WINDOW TAKES THE WORK WITH IT.
+ *
+ * Every other exit door in Aurora prompts — closing a tab, switching acts,
+ * opening a project, applying Setup — which trains the habit precisely where it
+ * was missing. And no application menu is set, so Electron's default menu
+ * supplies the `close` role on Ctrl+W: the reflexive close-this-tab chord
+ * destroyed the window and every unsaved document in it.
+ *
+ * Main cannot answer "is anything unsaved" — only the renderer can — so it
+ * suspends the close and asks. The renderer runs the same dirty snapshot and
+ * the same save/discard/cancel dialog the tab-close path uses.
+ *
+ * A RENDERER THAT NEVER ANSWERS MUST NOT MAKE THE WINDOW UNCLOSABLE. If the
+ * answer does not arrive, the close proceeds: a renderer too wedged to reply is
+ * also too wedged to save, and an app that cannot be quit is worse than one
+ * that quits.
+ */
+const CLOSE_ANSWER_TIMEOUT_MS = 15_000;
+
+function installCloseGuard(win: BrowserWindow): void {
+  let closing = false;   // the answer said yes; let this close through
+  let pending = false;   // a question is out; don't ask twice
+
+  win.on('close', (e) => {
+    if (closing) return;
+    e.preventDefault();
+    if (pending) return;
+    pending = true;
+
+    const finish = (mayClose: boolean): void => {
+      if (!pending) return;
+      pending = false;
+      clearTimeout(timer);
+      ipcMain.removeListener(IPC_CHANNELS.CLOSE_RESPONSE, onAnswer);
+      if (mayClose && !win.isDestroyed()) { closing = true; win.close(); }
+    };
+    const onAnswer = (event: Electron.IpcMainEvent, mayClose: unknown): void => {
+      if (event.sender !== win.webContents) return; // another window's answer
+      finish(mayClose === true);
+    };
+    const timer = setTimeout(() => {
+      console.warn('[close] renderer did not answer; closing anyway');
+      finish(true);
+    }, CLOSE_ANSWER_TIMEOUT_MS);
+
+    ipcMain.on(IPC_CHANNELS.CLOSE_RESPONSE, onAnswer);
+    if (win.webContents.isDestroyed()) { finish(true); return; }
+    win.webContents.send(IPC_CHANNELS.CLOSE_REQUEST);
+  });
 }
 
 app.whenReady().then(() => {

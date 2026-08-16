@@ -78,6 +78,17 @@ export interface OpenCanvas {
   selection: Selection | null;
   unsavedEdits: boolean;
   source: CanvasSource | null;
+  /**
+   * Bumped by every change to the document's CONTENT, undo included.
+   *
+   * A save encodes the document, awaits the guarded write, and then clears
+   * `unsavedEdits`. A stroke landing while that write is in flight is not in
+   * the bytes on disk, so clearing the flag afterwards loses it in silence — no
+   * dot, no close prompt, and the next Ctrl+S has nothing to save. `markSaved`
+   * takes the counter the saver read before its await and declines to clear
+   * when it has moved.
+   */
+  editGen: number;
 }
 
 interface CanvasState {
@@ -161,7 +172,11 @@ interface CanvasState {
   setProfile: (docId: string, profileId: ConstraintProfileId) => void;
   setGridOrigin: (docId: string, origin: CanvasGridOrigin) => void;
   setSource: (docId: string, source: CanvasSource | null) => void;
-  markSaved: (docId: string, mtimes: { pngMtimeMs: number | null; sidecarMtimeMs: number | null }) => void;
+  markSaved: (
+    docId: string,
+    mtimes: { pngMtimeMs: number | null; sidecarMtimeMs: number | null },
+    atGen?: number,
+  ) => boolean;
   sourceOf: (docId: string) => CanvasSource | null;
   isOpen: (docId: string) => boolean;
   isDirty: (docId: string) => boolean;
@@ -249,7 +264,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     // A gesture that changed nothing commits nothing: no undo entry, no dirty dot.
     if (samePixels(cur, next)) return;
     recordEdit(docId);
-    patch(docId, (e) => ({ ...e, doc: { ...e.doc, pixels: next }, unsavedEdits: true }));
+    patch(docId, (e) => ({ ...e, doc: { ...e.doc, pixels: next }, unsavedEdits: true, editGen: e.editGen + 1 }));
   },
 
   setSelection: (docId, selection) => patch(docId, (e) => ({ ...e, selection })),
@@ -257,7 +272,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   setPalette: (docId, palette) => {
     if (!get().docs.has(docId)) return;
     recordEdit(docId);
-    patch(docId, (e) => ({ ...e, doc: { ...e.doc, palette: palette.slice() }, unsavedEdits: true }));
+    patch(docId, (e) => ({ ...e, doc: { ...e.doc, palette: palette.slice() }, unsavedEdits: true, editGen: e.editGen + 1 }));
   },
 
   // R13: profile is an EDIT, not identity — it records. Without recordEdit
@@ -267,7 +282,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   setProfile: (docId, profileId) => {
     if (!get().docs.has(docId)) return;
     recordEdit(docId);
-    patch(docId, (e) => ({ ...e, doc: { ...e.doc, profileId }, unsavedEdits: true }));
+    patch(docId, (e) => ({ ...e, doc: { ...e.doc, profileId }, unsavedEdits: true, editGen: e.editGen + 1 }));
   },
   // Records for the same reason setProfile does: the origin decides where the
   // profile's tile grid starts, so it decides which pixels share a tile and
@@ -297,7 +312,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     const cur = entry.doc.gridOrigin;
     if (cur.originX === origin.originX && cur.originY === origin.originY) return;
     recordEdit(docId);
-    patch(docId, (e) => ({ ...e, doc: { ...e.doc, gridOrigin: { ...origin } }, unsavedEdits: true }));
+    patch(docId, (e) => ({ ...e, doc: { ...e.doc, gridOrigin: { ...origin } }, unsavedEdits: true, editGen: e.editGen + 1 }));
   },
   setSource: (docId, source) => patch(docId, (e) => ({ ...e, source })),
 
@@ -305,11 +320,21 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   // have landed FIRST: with no source there is nothing to refresh, and the
   // mtimes are dropped on the floor (the save path sets the source when it
   // learns the destination, then marks saved).
-  markSaved: (docId, mtimes) => patch(docId, (e) => ({
-    ...e,
-    unsavedEdits: false,
-    source: e.source ? { ...e.source, ...mtimes } : e.source,
-  })),
+  // `atGen` is the document's `editGen` as the saver read it, before the write.
+  // A counter that has moved since means the artist edited during the write,
+  // those pixels are not on disk, and the flag must stay. Returns whether it
+  // cleared, so the caller can say which happened.
+  markSaved: (docId, mtimes, atGen) => {
+    const e = get().docs.get(docId);
+    if (!e) return false;
+    const stale = atGen !== undefined && e.editGen !== atGen;
+    patch(docId, (cur) => ({
+      ...cur,
+      unsavedEdits: stale ? cur.unsavedEdits : false,
+      source: cur.source ? { ...cur.source, ...mtimes } : cur.source,
+    }));
+    return !stale;
+  },
 
   sourceOf: (docId) => get().docs.get(docId)?.source ?? null,
   isOpen: (docId) => get().docs.has(docId),
@@ -428,7 +453,7 @@ export function openCanvasDoc(docId: string, input: {
   const s = useCanvasStore.getState();
   if (s.docs.has(docId)) { activateCanvasDoc(docId); return 'focused'; }
   const docs = new Map(s.docs);
-  docs.set(docId, { doc: blankCanvasDoc(input), selection: null, unsavedEdits: false, source: null });
+  docs.set(docId, { doc: blankCanvasDoc(input), selection: null, unsavedEdits: false, source: null, editGen: 0 });
   // A new document starts with EMPTY history even though this id is new to
   // `docs`. The hub creates stacks on demand, so any consumer that so much as
   // READ canvasHistory(id) after this id was last closed left a live stack
@@ -456,7 +481,7 @@ export function loadCanvasDoc(docId: string, doc: CanvasDoc, source: CanvasSourc
     throw new Error(`loadCanvasDoc(${docId}): document is already open with unsaved edits`);
   }
   const docs = new Map(s.docs);
-  docs.set(docId, { doc, selection: null, unsavedEdits: false, source });
+  docs.set(docId, { doc, selection: null, unsavedEdits: false, source, editGen: 0 });
   canvasHistory(docId).clear();  // a loaded canvas starts with empty history
   useCanvasStore.setState({ docs, activeDocId: docId });
   // The door R18's original fix missed: a REOPENED zone-seeded canvas armed
@@ -622,6 +647,9 @@ export function writeCanvasSnapshot(docId: string, snapshot: CanvasSnapshot): vo
       gridOrigin: { ...snapshot.gridOrigin },
     },
     selection: snapshot.selection,
+    // Undo/redo changes the content like any other edit, so a save in flight
+    // over the pre-undo bytes no longer describes what is resident.
+    editGen: e.editGen + 1,
   });
   useCanvasStore.setState({ docs });
 }

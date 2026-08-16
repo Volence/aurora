@@ -49,6 +49,10 @@ export async function saveCanvasDocument(docId: string, api?: GuardedWriteApi): 
   const doc = canvasDocState(docId);
   const source = useCanvasStore.getState().sourceOf(docId);
   if (!doc || !source) return; // nothing to write; not an error
+  // The counter describing THESE bytes. Read beside the document, before the
+  // encode and the write, so `markSaved` can tell whether the pixels that
+  // landed are still the pixels the artist has.
+  const atGen = useCanvasStore.getState().docs.get(docId)?.editGen;
 
   const res = await saveCanvasFile(
     source.dir, doc.name, doc,
@@ -102,9 +106,19 @@ export async function saveCanvasDocument(docId: string, api?: GuardedWriteApi): 
     throw new Error(res.error); // invalid-name: nothing was sent to disk
   }
 
-  useCanvasStore.getState().markSaved(docId, {
+  const cleared = useCanvasStore.getState().markSaved(docId, {
     pngMtimeMs: res.pngMtimeMs, sidecarMtimeMs: res.sidecarMtimeMs,
-  });
+  }, atGen);
+
+  // The write succeeded, but the artist kept painting while it was in flight,
+  // so what is on disk is already behind what is on screen. Saying nothing here
+  // is the silent case: the dot would have cleared over unsaved pixels.
+  if (!cleared) {
+    useToastStore.getState().addToast(
+      `Saved "${doc.name}", but edits made during the save are still unsaved — save again`,
+      'info',
+    );
+  }
 
   // `ok && !sidecarWritten` happens for exactly one reason: `sidecarRejected`
   // made `saveCanvasFile` leave the sidecar out of the batch (a successful

@@ -622,7 +622,30 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
       const s = requireClassicProject();
       const ref = s.zoneTree.find(r => r.zone === req.zone && r.act === req.act);
       if (!ref) throw new Error(`level ${req.zone}/${req.act} not found in this project`);
-      await useClassicLevelStore.getState().openAct(ref);
+
+      // A READ MUST NOT DESTROY WORK. `openAct` re-reads from disk, drops both
+      // undo stacks and clears every dirty flag — so calling it unconditionally
+      // made the natural agent sequence (edit, then read back to check) revert
+      // the agent's own edits and report the pristine disk state as success.
+      // The two doors this tool sits beside already have the policy: the tab
+      // strip's planLevelActivation no-ops on the loaded act and confirms
+      // before discarding, and classic-open-project above fails closed. This is
+      // the same rule with the confirm turned into a refusal, because an
+      // agent-driven read has no UI to confirm through.
+      const loaded = useClassicLevelStore.getState();
+      // A failed or never-finished load of the same act is still worth
+      // retrying: there is no doc, so there is nothing to lose.
+      const sameAct = loaded.ref?.zone === ref.zone && loaded.ref?.act === ref.act
+        && loaded.status === 'ready' && !!loaded.doc;
+      if (!sameAct) {
+        if (Object.values(loaded.dirty).some(Boolean)) {
+          throw new Error(
+            `Unsaved changes in ${loaded.ref?.label ?? 'the loaded act'}. Reading ${req.zone}/${req.act} ` +
+            'reloads from disk and would discard them — save first (classic-save-level), then retry.',
+          );
+        }
+        await useClassicLevelStore.getState().openAct(ref);
+      }
       const ls = useClassicLevelStore.getState();
       if (ls.status !== 'ready' || !ls.doc) throw new Error(ls.error ?? `level ${req.zone}/${req.act} failed to load`);
       const doc = ls.doc;

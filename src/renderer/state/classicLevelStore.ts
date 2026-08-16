@@ -76,6 +76,22 @@ export type ComposerTab = 'chunk' | 'block' | 'tile';
  */
 export type TierPaintMode = 'assign' | 'paint';
 
+/**
+ * An edit counter per dirty domain. See `domainGen` on the store.
+ *
+ * A counter, not a timestamp: two edits inside one millisecond are two edits,
+ * and the only question ever asked of it is "is this the same value I read
+ * before the await".
+ */
+export type DomainGen = Partial<Record<keyof DirtyDomains, number>>;
+
+/** The counters for `domains`, each moved on. */
+function bumpDomainGen(prev: DomainGen, domains: readonly (keyof DirtyDomains)[]): DomainGen {
+  const next = { ...prev };
+  for (const d of domains) next[d] = (next[d] ?? 0) + 1;
+  return next;
+}
+
 export type LayoutPlane = 'fg' | 'bg';
 
 // The active layout-editing tool used to live here as `ClassicTool`
@@ -112,6 +128,18 @@ interface ClassicLevelState {
 
   /** Per-domain unsaved-change flags (adapter DirtyDomains shape). */
   dirty: DirtyDomains;
+  /**
+   * A counter per domain, bumped every time that domain's CONTENT changes.
+   *
+   * The dirty flags alone cannot answer the question a save has to ask. A save
+   * snapshots the doc, awaits real IPC, and then clears what it wrote — but an
+   * edit committed while the write was in flight is not in the bytes that
+   * landed, so clearing its flag loses it silently: no tab dot, no close
+   * prompt, and the next Ctrl+S answers "nothing to save". Comparing these
+   * counters across the await is what tells the saver which domains are still
+   * the ones it wrote.
+   */
+  domainGen: DomainGen;
   /**
    * Per-chunk content version. The viewport caches offscreen chunk canvases keyed
    * by chunkId; keying additionally on this version lets a single-chunk edit
@@ -277,7 +305,15 @@ interface ClassicLevelState {
    * divergence — the dirty indicator simply reads these flags, which is an
    * accepted v1 limitation (a true doc-vs-disk hash comparison is out of scope).
    */
-  markDomainsClean: (ref: ZoneActRef, domains: (keyof DirtyDomains)[]) => void;
+  /**
+   * `atGen` is the `domainGen` the saver read BEFORE its write. A domain whose
+   * counter has moved since was edited mid-save, is not in the bytes that
+   * landed, and is left dirty. Returns the domains it withheld, so the caller
+   * can say so rather than reporting a clean save.
+   */
+  markDomainsClean: (
+    ref: ZoneActRef, domains: (keyof DirtyDomains)[], atGen?: DomainGen,
+  ) => (keyof DirtyDomains)[];
   reset: () => void;
 }
 
@@ -288,6 +324,7 @@ const IDLE = {
   error: null,
   reservedTiles: null as ReadonlySet<number> | null,
   dirty: {} as DirtyDomains,
+  domainGen: {} as DomainGen,
   chunkVersions: new Map<number, number>(),
   chunkEpoch: 0,
   paletteEpoch: 0,
@@ -360,6 +397,7 @@ export const useClassicLevelStore = create<ClassicLevelState>((set, get) => ({
       // would misdescribe this one (different zone, different object list).
       reservedTiles: null as ReadonlySet<number> | null,
       dirty: {} as DirtyDomains,
+      domainGen: {} as DomainGen,
       chunkVersions: new Map<number, number>(),
       chunkEpoch: nextVersion(),
       // Fresh finer clocks too: a new act has a new palette and a new tile pool,
@@ -484,13 +522,18 @@ export const useClassicLevelStore = create<ClassicLevelState>((set, get) => ({
   setBlockPaintMode: (mode: TierPaintMode) => set({ blockPaintMode: mode }),
   setPaintDivergeMode: (mode: SurfaceDivergeMode) => set({ paintDivergeMode: mode }),
 
-  markDomainsClean: (ref, domains) => {
+  markDomainsClean: (ref, domains, atGen) => {
     const s = get();
     // Only touch the currently-open act (the saver clears exactly what it wrote).
-    if (!s.ref || s.ref.zone !== ref.zone || s.ref.act !== ref.act) return;
+    if (!s.ref || s.ref.zone !== ref.zone || s.ref.act !== ref.act) return domains;
     const dirty = { ...s.dirty };
-    for (const d of domains) delete dirty[d];
+    const withheld: (keyof DirtyDomains)[] = [];
+    for (const d of domains) {
+      if (atGen && (s.domainGen[d] ?? 0) !== (atGen[d] ?? 0)) { withheld.push(d); continue; }
+      delete dirty[d];
+    }
     set({ dirty });
+    return withheld;
   },
 
   reset: () => {
@@ -519,6 +562,9 @@ export function writeLayoutSnapshot(snap: ClassicLayoutSnapshot): void {
   useClassicLevelStore.setState((s) => ({
     doc: { ...s.doc!, fg: snap.fg, bg: snap.bg, objects: snap.objects, start: snap.start },
     dirty: restoreDomainDirty(s.dirty, snap.dirty, LAYOUT_DOMAINS),
+    // An undo/redo is a content change like any other — the whole scope moves,
+    // so a save in flight over any of it no longer wrote what is now resident.
+    domainGen: bumpDomainGen(s.domainGen, LAYOUT_DOMAINS),
   }));
 }
 
@@ -541,6 +587,7 @@ export function writeArtSnapshot(snap: ClassicArtSnapshot): void {
       collision: { ...s.doc!.collision, colind: snap.colind },
     },
     dirty: restoreDomainDirty(s.dirty, snap.dirty, ART_DOMAINS),
+    domainGen: bumpDomainGen(s.domainGen, ART_DOMAINS),  // see writeLayoutSnapshot
     chunkVersions: snap.chunkVersions,
     chunkEpoch: snap.chunkEpoch,
     // The finer clocks are NOT snapshotted: an art undo/redo can revert tiles,
@@ -678,6 +725,7 @@ function applyCommit(newDoc: LevelDoc, dirtyPatch: DirtyDomains, ve: VersionEffe
   useClassicLevelStore.setState({
     doc: newDoc,
     dirty: { ...s.dirty, ...dirtyPatch },
+    domainGen: bumpDomainGen(s.domainGen, Object.keys(dirtyPatch) as (keyof DirtyDomains)[]),
     chunkVersions,
     chunkEpoch,
     paletteEpoch,

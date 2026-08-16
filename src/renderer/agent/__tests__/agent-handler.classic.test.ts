@@ -207,6 +207,53 @@ describe('classic-get-level', () => {
     await expect(handleAgentRequest({ kind: 'classic-get-level', zone: 'zzz', act: 9 })).rejects.toThrow(/not found/);
   });
 
+  /**
+   * R2. Reading the act that is already loaded must not re-read it from disk:
+   * `openAct` drops both undo stacks and clears every dirty flag, so the
+   * natural agent sequence — edit, then read back to check — reverted the
+   * agent's own edits and reported the pristine disk state as success.
+   */
+  it('reads the LIVE doc for the act already open, keeping edits and undo', async () => {
+    openReady();
+    await handleAgentRequest({
+      kind: 'classic-set-layout-region', plane: 'fg', x: 0, y: 0, chunkIds: [[2]],
+    });
+    expect(lvl().dirty.fg).toBe(true);
+
+    const res = await handleAgentRequest({ kind: 'classic-get-level', zone: 'ghz', act: 1 }) as {
+      layout: { fg: number[][] };
+    };
+    expect(res.layout.fg[0][0]).toBe(2);   // the edit, not the disk
+    expect(lvl().dirty.fg).toBe(true);
+    expect(layoutStack().canUndo).toBe(true);
+  });
+
+  /**
+   * The other half: a DIFFERENT act while work is unsaved. The UI door confirms
+   * (save / discard / cancel); an agent has no UI to confirm through, so this
+   * fails closed exactly as classic-open-project does.
+   */
+  it('refuses to read a different act while the loaded one is dirty', async () => {
+    const OTHER: ZoneActRef = { zone: 'ghz', act: 2, label: 'Green Hill 2', available: true };
+    openReady();
+    useClassicProjectStore.setState({ zoneTree: [REF, OTHER] } as never);
+    await handleAgentRequest({
+      kind: 'classic-set-layout-region', plane: 'fg', x: 0, y: 0, chunkIds: [[2]],
+    });
+    await expect(handleAgentRequest({ kind: 'classic-get-level', zone: 'ghz', act: 2 }))
+      .rejects.toThrow(/Unsaved changes/);
+    expect(lvl().ref?.act).toBe(1);
+    expect(lvl().dirty.fg).toBe(true);
+  });
+
+  it('opens a different act freely when nothing is unsaved', async () => {
+    const OTHER: ZoneActRef = { zone: 'ghz', act: 2, label: 'Green Hill 2', available: true };
+    openReady();
+    useClassicProjectStore.setState({ zoneTree: [REF, OTHER] } as never);
+    await handleAgentRequest({ kind: 'classic-get-level', zone: 'ghz', act: 2 });
+    expect(lvl().ref?.act).toBe(2);
+  });
+
   it('errors when no project is open', async () => {
     await expect(handleAgentRequest({ kind: 'classic-get-level', zone: 'ghz', act: 1 })).rejects.toThrow(/no classic project is open/);
   });

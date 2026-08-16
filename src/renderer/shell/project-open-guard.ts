@@ -23,6 +23,8 @@ import { anySpriteDocDirty, closeAllSpriteDocs } from './tab-activation';
 // NARROWER set Save All can actually write, and the gap between the two is why
 // the post-save message below has a second sentence.
 import { useCanvasStore, dirtyCanvasDocIds, saveableDirtyCanvasDocIds } from '../state/canvasStore';
+// The aeon composer's document. A leaf store (core types only), so no cycle.
+import { useArtStore } from '../state/artStore';
 
 export interface OpenDirtySnapshot {
   classicDirty: boolean;  // any classicLevelStore dirty domain
@@ -41,12 +43,19 @@ export interface OpenDirtySnapshot {
   // sprites — the open-guard being narrower than what the tab strip dots —
   // arriving through a store that did not exist when that was written.
   canvasDirty: boolean;
+  // useArtStore.getState().open?.dirty — the aeon composer document (New Tile /
+  // Block / Chunk). Its strokes live in artStore alone: ComposerCanvas calls
+  // markOpenDirty() and no command, so editorStore.dirty stays FALSE and every
+  // other field of this snapshot reads clean while a whole unsaved drawing is
+  // resident. Same divergence the sprite and canvas fields closed, arriving
+  // through the one document store that was never joined to the perimeter.
+  artDirty: boolean;
 }
 
 export type ProjectOpenPlan = { kind: 'proceed' } | { kind: 'confirm' };
 
 export function planProjectOpen(s: OpenDirtySnapshot): ProjectOpenPlan {
-  return s.classicDirty || s.aeonDirty || s.spriteDirty || s.canvasDirty
+  return s.classicDirty || s.aeonDirty || s.spriteDirty || s.canvasDirty || s.artDirty
     ? { kind: 'confirm' }
     : { kind: 'proceed' };
 }
@@ -58,6 +67,7 @@ export function currentOpenDirtySnapshot(): OpenDirtySnapshot {
     aeonDirty: useEditorStore.getState().dirty,
     spriteDirty: anySpriteDocDirty(),
     canvasDirty: dirtyCanvasDocIds().length > 0,
+    artDirty: useArtStore.getState().open?.dirty === true,
   };
 }
 
@@ -78,6 +88,11 @@ export function __resetOpenGuardSaveForTest(): void { saveImpl = saveAllDirty; }
  * was added to resetProjectRuntime's teardown but to none of these three, so a
  * dirty canvas died with no dialog. The next document type is added here once.
  *
+ * The aeon composer document (artStore.open) was the standing counter-example:
+ * this docblock promised the rule while that store was in none of the three
+ * teardowns and in none of the dirty predicates, so aeon-open.ts:86 replaced an
+ * unsaved drawing outright with no confirm at all.
+ *
  * Why tear down at all on the CLEAN path, where nothing is dirty: a surviving
  * document points into the OLD project by absolute path (a sprite checkout's
  * basePath, a CanvasSource.dir), so a later Ctrl+S in the NEW project would
@@ -88,6 +103,7 @@ export function __resetOpenGuardSaveForTest(): void { saveImpl = saveAllDirty; }
 function endDocumentSession(): void {
   closeAllSpriteDocs();
   useCanvasStore.getState().closeAll();
+  useArtStore.getState().closeDocument();
 }
 
 /**
