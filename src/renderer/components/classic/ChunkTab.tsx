@@ -3,7 +3,7 @@ import { Chip, Divider, T } from '../ui';
 import {
   useClassicLevelStore, classicEditChunkCells, classicAddChunk, classicPaintSurface,
 } from '../../state/classicLevelStore';
-import { useArtStore } from '../../state/artStore';
+import { useArtStore, selectArtZoom } from '../../state/artStore';
 import { useToastStore } from '../../state/toastStore';
 import { renderChunk, renderBlock } from '../../../core/level-classic/render';
 import { chunkIndexForId, packChunkCell, type LevelDoc } from '../../../core/level-classic/model';
@@ -178,7 +178,7 @@ export default function ChunkTab({ doc, usage }: { doc: LevelDoc; usage: UsageIn
   const paintDitherSecondary = useArtStore((s) => s.ditherSecondary);
   const paintPixelPerfect = useArtStore((s) => s.pixelPerfect);
   // ZOOM IS THE ART STORE'S TOO — the same cross-engine singleton TileTab uses.
-  const paintZoom = useArtStore((s) => s.zoom);
+  const paintZoom = useArtStore(selectArtZoom);
 
   const paintConfig = toolConfigFrom({
     tool: paintTool, selectedColor: paintColor, mirror: paintMirror,
@@ -197,7 +197,7 @@ export default function ChunkTab({ doc, usage }: { doc: LevelDoc; usage: UsageIn
   const paintCanvasRef = useRef<HTMLCanvasElement | null>(null);
   useAnchoredZoom(
     paintScrollerRef, paintCanvasRef, paintEffectiveZoom,
-    () => useArtStore.getState().zoom, (z) => useArtStore.getState().setZoom(z),
+    () => selectArtZoom(useArtStore.getState()), (z) => useArtStore.getState().setZoom(z),
   );
   useHandPan(paintScrollerRef, { enabled: levelKeysEnabled });
 

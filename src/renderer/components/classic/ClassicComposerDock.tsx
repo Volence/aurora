@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo } from 'react';
 import { T } from '../ui';
 import { useClassicLevelStore, type ComposerTab } from '../../state/classicLevelStore';
+import { useArtStore } from '../../state/artStore';
 import { buildUsageIndex } from '../../../core/level-classic/usage-index';
 import ChunkTab from './ChunkTab';
 import BlockTab from './BlockTab';
@@ -71,6 +72,13 @@ export default function ClassicComposerDock() {
   const doc = useClassicLevelStore((s) => s.doc);
   const tab = useClassicLevelStore((s) => s.composerTab);
   const setTab = useClassicLevelStore((s) => s.setComposerTab);
+
+  // THE ONE WRITER of the art zoom's tier, for classic. Each tier keeps its own
+  // zoom (artStore.ART_TIER_DEFAULT_ZOOM): 24x suits an 8x8 tile and would open
+  // a 256x256 chunk at 6144px. `composerTab` already names the tier that is on
+  // screen, so mirroring it here beats a second source of truth in each tab.
+  const setArtTier = useArtStore((s) => s.setArtTier);
+  useEffect(() => { setArtTier(tab); }, [tab, setArtTier]);
 
   // Usage index — rebuilt on every doc change (the doc is small). Recomputes on
   // the identity churn a command produces, so counts stay exact after edits AND

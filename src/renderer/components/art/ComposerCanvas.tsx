@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useCallback, useMemo, useState } from 'react';
-import { useArtStore } from '../../state/artStore';
+import { useArtStore, selectArtZoom } from '../../state/artStore';
 import { useEditorStore, executeCommand } from '../../state/editorStore';
 import { useAeonHistoryVersion } from '../../hooks/useHistoryVersion';
 import {
@@ -73,7 +73,12 @@ function tilesEqual(a: Uint8Array, b: Uint8Array): boolean {
 export default function ComposerCanvas() {
   const open = useArtStore((s) => s.open);
   const docVersion = useArtStore((s) => s.docVersion);
-  const zoom = useArtStore((s) => s.zoom);
+  const zoom = useArtStore(selectArtZoom);
+  // Claim the zoom tier. Aeon's composer and classic's three tiers share one
+  // store, so without this it would render at whatever tier classic last set —
+  // and the tiers exist precisely because their content sizes are nothing alike.
+  const setArtTier = useArtStore((s) => s.setArtTier);
+  useEffect(() => { setArtTier('composer'); }, [setArtTier]);
   const repeatPreview = useArtStore((s) => s.repeatPreview);
   const pendingAction = useArtStore((s) => s.pendingAction);
   const tool = useArtStore((s) => s.tool);
@@ -394,7 +399,7 @@ export default function ComposerCanvas() {
   // be measured off the canvas itself — see use-anchored-zoom's docblock.
   const scrollerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  useAnchoredZoom(scrollerRef, canvasRef, effectiveZoom, () => useArtStore.getState().zoom, (z) => useArtStore.getState().setZoom(z));
+  useAnchoredZoom(scrollerRef, canvasRef, effectiveZoom, () => selectArtZoom(useArtStore.getState()), (z) => useArtStore.getState().setZoom(z));
   // Gated: this canvas is LEVEL-side and stays mounted (display:none) under a
   // sprite-doc tab, and the pan hook's Space keydown is on `window`. Ungated it
   // would swallow Space from a focused button in SpriteMode.

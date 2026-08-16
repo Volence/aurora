@@ -174,8 +174,11 @@ describe('the tile editor zooms and pans', () => {
   it('renders at the store zoom, not a constant', () => {
     // The subscription: without it the canvas would not even re-render when the
     // option bar's +/- moved the number.
-    expect(TILE_TAB_CODE, 'TileTab does not subscribe to artStore.zoom')
-      .toMatch(/useArtStore\(\(s\)\s*=>\s*s\.zoom\)/);
+    // `selectArtZoom` since zoom went PER TIER — one shared number opened a
+    // 256x256 chunk at 24x. The assertion is unchanged in intent: TileTab must
+    // subscribe to the store's zoom rather than draw at a constant.
+    expect(TILE_TAB_CODE, 'TileTab does not subscribe to the art zoom')
+      .toMatch(/useArtStore\(selectArtZoom\)/);
     // And the zoom prop actually handed to the viewport. A number here — the old
     // `zoom={PX}` shape — is the whole regression: it compiles, it draws, and the
     // readout silently stops meaning anything.

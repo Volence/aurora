@@ -1,5 +1,5 @@
 import React from 'react';
-import { useArtStore } from '../state/artStore';
+import { useArtStore, selectArtZoom } from '../state/artStore';
 import { useProjectStore, getCurrentZone } from '../state/projectStore';
 import { useHistoryVersion } from '../hooks/useHistoryVersion';
 import { OptionBar, Chip, Divider, T } from '../components/ui';
@@ -184,7 +184,7 @@ export default function ArtToolOptions({ before, caps = FULL_CAPS }: { before?: 
   const setMirror = useArtStore((s) => s.setMirror);
   const repeatPreview = useArtStore((s) => s.repeatPreview);
   const toggleRepeatPreview = useArtStore((s) => s.toggleRepeatPreview);
-  const zoom = useArtStore((s) => s.zoom);
+  const zoom = useArtStore(selectArtZoom);
   const setZoom = useArtStore((s) => s.setZoom);
   const open = useArtStore((s) => s.open);
   const requestAction = useArtStore((s) => s.requestAction);

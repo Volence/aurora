@@ -1,11 +1,11 @@
 import React from 'react';
 import { StatusBar, T } from '../components/ui';
-import { useArtStore } from '../state/artStore';
+import { useArtStore, selectArtZoom } from '../state/artStore';
 
 /** Art-mode status bar: open document name on the left, zoom factor on the right. */
 export default function ArtStatusBar() {
   const open = useArtStore((s) => s.open);
-  const zoom = useArtStore((s) => s.zoom);
+  const zoom = useArtStore(selectArtZoom);
 
   const left = (
     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }}>

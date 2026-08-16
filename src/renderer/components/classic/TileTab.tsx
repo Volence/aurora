@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { T, Chip, Divider } from '../ui';
 import { useClassicLevelStore, classicEditTiles } from '../../state/classicLevelStore';
-import { useArtStore } from '../../state/artStore';
+import { useArtStore, selectArtZoom } from '../../state/artStore';
 import { useToastStore } from '../../state/toastStore';
 import type { LevelDoc } from '../../../core/level-classic/model';
 import type { UsageIndex } from '../../../core/level-classic/usage-index';
@@ -130,7 +130,7 @@ export default function TileTab({ doc, usage }: { doc: LevelDoc; usage: UsageInd
   // 64 leaves aeon's next chunk at 64 as well. Judged worth it over a second zoom
   // state the shared control cannot see; if that changes, the fix is a per-tier
   // zoom map INSIDE artStore, not a private useState here.
-  const zoom = useArtStore((s) => s.zoom);
+  const zoom = useArtStore(selectArtZoom);
 
   // SEAM PREVIEW is the same CROSS-ENGINE SINGLETON as zoom, for the same
   // reason: `artStore.repeatPreview` is the exact field aeon's ComposerCanvas
@@ -199,7 +199,7 @@ export default function TileTab({ doc, usage }: { doc: LevelDoc; usage: UsageInd
   // point by K/zoom and drifts by up to ~2.4 art px per notch here.
   const scrollerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  useAnchoredZoom(scrollerRef, canvasRef, effectiveZoom, () => useArtStore.getState().zoom, (z) => useArtStore.getState().setZoom(z));
+  useAnchoredZoom(scrollerRef, canvasRef, effectiveZoom, () => selectArtZoom(useArtStore.getState()), (z) => useArtStore.getState().setZoom(z));
   // GATED, unlike the zoom hook above it. The pan hook's Space keydown is on
   // `window`, and this pane stays MOUNTED (display:none) while a sprite-doc tab is
   // active (App.tsx:204) — so ungated it would `preventDefault()` Space away from

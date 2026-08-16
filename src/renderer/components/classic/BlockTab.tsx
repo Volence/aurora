@@ -3,7 +3,7 @@ import { Chip, Divider, T } from '../ui';
 import {
   useClassicLevelStore, classicEditBlock, classicAddBlock, classicPaintSurface,
 } from '../../state/classicLevelStore';
-import { useArtStore } from '../../state/artStore';
+import { useArtStore, selectArtZoom } from '../../state/artStore';
 import { useToastStore } from '../../state/toastStore';
 import { renderBlock } from '../../../core/level-classic/render';
 import type { LevelDoc, BlockDef } from '../../../core/level-classic/model';
@@ -152,7 +152,7 @@ export default function BlockTab({ doc, usage }: { doc: LevelDoc; usage: UsageIn
   const paintDither = useArtStore((s) => s.ditherPattern);
   const paintDitherSecondary = useArtStore((s) => s.ditherSecondary);
   const paintPixelPerfect = useArtStore((s) => s.pixelPerfect);
-  const paintZoom = useArtStore((s) => s.zoom);
+  const paintZoom = useArtStore(selectArtZoom);
 
   const paintConfig = toolConfigFrom({
     tool: paintTool, selectedColor: paintColor, mirror: paintMirror,
@@ -167,7 +167,7 @@ export default function BlockTab({ doc, usage }: { doc: LevelDoc; usage: UsageIn
   const paintCanvasRef = useRef<HTMLCanvasElement | null>(null);
   useAnchoredZoom(
     paintScrollerRef, paintCanvasRef, paintEffectiveZoom,
-    () => useArtStore.getState().zoom, (z) => useArtStore.getState().setZoom(z),
+    () => selectArtZoom(useArtStore.getState()), (z) => useArtStore.getState().setZoom(z),
   );
   useHandPan(paintScrollerRef, { enabled: levelKeysEnabled });
 
