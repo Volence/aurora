@@ -1,0 +1,145 @@
+{
+ "seat": "ART",
+ "model": "fable",
+ "coverage": "Did not get to: running the app under CDP (commit panel gesture, ImportSheetDialog end-to-end, adopt/use-act-colours dialog flows — all judged from source only); indexed-png.ts decode internals (multi-entry tRNS / non-indexed handling), canvas-file-format.ts, zlib-stream.ts; the sprite modules (sprite-decompose/render/palette, export-sprite beyond the known finding), composer-buffer/composer-collision, pixel-edit-controller, rasterize.ts internals (only its doc contract read), atlas-migration, usage.ts, chunk-pick, camera/viewport-coords, palette-copy/drag, free-tile-slots.ts internals; classicPaintSurface and the wider store/undo machinery beyond classicCommitCanvas; LZ/SBZ3 shared-file reach behaviour was verified only in the profile, not exercised; plan-vs-apply staleness race (plan computed on one doc, applied after another command) noted but not exercised; the repo's own vitest suite was not run (repo pinned read-only — my two executed probes bundled repo source into scratchpad instead). Real-data cross-checks were GHZ act 1 only (3 chunks); other zones checked only for palette duplicates. Bash output became flaky near the end (echo/grep output intermittently swallowed); all load-bearing claims were verified before or via the Read tool/executed scripts.\"",
+ "verified_clean": [
+  "Tile-0/block-0 floors (spec D3.4): computeReclaim starts at b=1/t=1 (classic-commit-plan.ts:187,196), blank cells map to tile 0/block 0 without allocation (:308, :365), freeSlot scans from t=1 (:296); store re-guards both (classicLevelStore.ts:1016-1021, 1043) — and the full-replace path is exercised by tests (classic-commit-plan.test.ts:158-196).",
+  "Tile-tier three-state availability is correct: findPoolMatch skips only `allocated`, matched slots stay matchable (tile-pool-match.ts:116-127), freeSlot excludes matched+allocated via unavailableForAllocation (classic-commit-plan.ts:290-292); the phase-1 double-booking fix is in place (classic-surface-plan.ts:266-283) with a genuine planted-collision regression (classic-surface-plan.test.ts:421-466).",
+  "tile-canon: canonical form is lexicographic min over identity/x/y/xy only — no transpose (tile-canon.ts:79-95), ties prefer identity, keyed on entries not canvas indices; the XOR flip composition in findPoolMatch (tile-pool-match.ts:130-138) is mathematically sound for commuting axis flips, and empirically: matching found every non-anim tile of three real GHZ chunks (tilesNew=0 for chunks $1C and $27, executed round-trip against /home/volence/sonic_hacks/s1disasm).",
+  "D3 positional inheritance is enforced end to end: chunk cells keep the displaced cell's xf/yf/solidity and its block's colind (classic-commit-plan.ts:405-423), blocks are pre-mirrored via the involution mirrorBlock (canvas-resolve.ts:180-197), colind is part of block identity (:367), and GHZ chunk $1C round-trips 256/256 cells identical including solidity and flips against the real disasm.",
+  "D5 (whole-chunk minimum) enforced: region must be 256-aligned and target-counted (classic-commit-plan.ts:214-225), the panel derives whole chunks and reports the remainder rather than including it (canvas-commit-model.ts:33-41, CommitPlanView.tsx:105-111).",
+  "D6 (PNG never becomes a canvas doc) enforced: import-sheet.ts:59-92 goes decodeIndexedPng -> importPngAgainstPalette -> pixels for the planner, no CanvasDoc, no CANVAS_MAX_SIDE; per-cell palette-line assignment is real constraint satisfaction over line intersections, not per-colour first-match (png-import.ts:118-163), with homeless colours judged over used indices only.",
+  "Chunk id spaces are consistent: targets, reclaim, blockToChunks all FILE-indexed; engine ids appear only in labels (canvas-commit-model.ts:62) and the $51 alias warning, whose GHZ_LOOP_ALIAS_FILE_INDEX 0x50 = engine $51 conversion is correct (classic-commit-plan.ts:442-445).",
+  "Ceilings: MAX_ADDRESSABLE_CHUNKS = 0x7f defined once (model.ts:208) and enforced in both planner (classic-commit-plan.ts:430) and store (classicLevelStore.ts:1068); MAX_BLOCKS_TOTAL 1024 enforced in both (:388/417 and :1034-1037).",
+  "Line-0 palette protection is double-doored: planner refuses line-0 drift unconditionally (classic-commit-plan.ts:246-247) and the store command independently rejects any paletteWrite for line 0 (classicLevelStore.ts:1076-1081); adoption only ever emits lines 1-3 (:257).",
+  "classicCommitCanvas is one commitArt across all five ART_DOMAINS with tileLockReason re-validation per tile write and one structuralError pass (classicLevelStore.ts:1009-1104) — one undo record as specced.",
+  "canvas-doc pixel-space normalization: canvasIndex is the single constructor folding entry-0 spellings and out-of-range values (canvas-doc.ts:54-58), normalizeCanvasPixels routes everything through it (:72-86).",
+  "Predicates-unknown refusal fires only when something is actually replaced, allowing additive commits under unknown predicates (classic-commit-plan.ts:269-277) — matches the spec's deliberate phase-1/2C difference, and reservedTiles/animTiles/isEditableTile filter both reclaim and allocation identically (:200, :299)."
+ ],
+ "findings": [
+  {
+   "id": "A1",
+   "title": "Block tier lacks the three-state availability: matched reclaimed block ids are overwritten by the same plan",
+   "severity": "critical",
+   "confidence": "certain",
+   "file": "src/core/art/classic-commit-plan.ts",
+   "line": 373,
+   "claim": "internBlock's pool-reuse scan matches block ids the same plan reclaims and later hands out from the reclaim queue (and ids already given new defs this gesture), so a replaced chunk's unchanged cells end up pointing at a block id the plan overwrites with different art and colind.",
+   "evidence": "classic-commit-plan.ts:373-382 scans doc.blocks with no exclusion of reclaim.blocks or blockWrites; :386 allocates from the same reclaimBlocks queue. Spec §4 step 8 explicitly requires 'reclaimed block ids pending overwrite are excluded from matching' — not implemented. EXECUTED REPRO (scratchpad/repro-block-availability.cjs, bundled from repo source at 2b38e0b): replace chunk 0 keeping the first 16x16 block identical to old block 1 and drawing new art in the second; output: cell0 (old art) -> block 1 AND blockWrite id 1 carries the NEW art's def — 255 of 256 chunk cells render the wrong 16x16, with colind 9 attached to art it never described. Store applies blockWrites verbatim (classicLevelStore.ts:1042-1045) and the corrupt chunk/blocks are saved into the user's s1disasm. This is the exact partial-edit-then-commit-replace main path; the tile tier has PoolAvailability for precisely this class (tile-pool-match.ts:33-48) and the existing regression (classic-surface-plan.test.ts:421) pins only the tile site, not the class.",
+   "fix": "Mirror PoolAvailability at the block tier: skip ids in a pendingReclaim set and ids already in blockWrites inside the doc.blocks match scan (classic-commit-plan.ts:373), and remove any pool-matched id from the reclaim allocation queue. Add a block-tier regression with a planted match+allocate collision that fails against today's code.",
+   "verdict": {
+    "reasoning": "I tried to refute A1 and could not — the path holds end to end, and I reproduced it by executing the real planner.\n\nCODE PATH (src/core/art/classic-commit-plan.ts @ 2b38e0b):\n- Tile tier is protected by the three-state PoolAvailability: a match does `avail.matched.add(m.tileIndex)` (:312) and `freeSlot()` skips `unavailableForAllocation(avail)` (:291-302), so a reclaimed tile that gets matched can never also be allocated.\n- Block tier has no equivalent. `internBlock`'s pool scan at :373-383 walks every `doc.blocks[b]` with only a colind/cell-equality test — no exclusion of `reclaim.blocks` and no exclusion of ids already pushed into `blockWrites`. Allocation at :386 then hands out `reclaimBlocks[reclaimBlockCursor++]` unconditionally. Nothing records a matched id anywhere the allocator reads (`blockIdOf` is keyed by def+colind and never consulted by the allocator). So the same id can be both \"reused\" for one cell and rewritten with different art/colind for another in one plan.\n\nEXECUTED REPRO (bundled the actual repo sources with esbuild, ran under node; files in /tmp/claude-1000/-home-volence-sonic-hacks-aurora/375dbea4-.../scratchpad/entry.ts and entry.cjs — nothing in the repo was modified):\nDoc: 64-tile pool, tile 1 = flat entry 5; block 1 = 4x{tile 1, pal 1} with colind 9; chunk 0 = 256 cells of block 1 (so block 1 and tile 1 are exclusive to chunk 0); chunk 1 uses block 2. Gesture: target chunk 0, canvas painted so the top-left 16x16 keeps the old art (canvasIndex(1,5)) and the rest is new art (canvasIndex(1,6)).\nOutput:\n  report: blocksReused:1, blocksNew:1, blocksReclaimed:1, no warnings\n  tileWrites [2]            <- tile tier correctly refused to reallocate matched tile 1\n  blockWrites [{id:1, tiles:[2,2,2,2], colind:9}]\n  chunk cell 0 -> block 1, and block 1 is overwritten by this same plan (verified: written.has(cells[0].block) === true)\nSo the 16x16 the artist deliberately kept is bound to block id 1 while block id 1 is simultaneously given the new art's def. The kept art is destroyed with no refusal and no warning.\n\nREACHABILITY: live main path, not synthetic. planFromSnapshot (src/renderer/components/canvas/canvas-commit-model.ts:208-210) feeds planCanvasCommit; targets with a non-null chunkFileIndex come straight from the UI chunk picker (CommitPlanView.tsx:84,117), and several refusal messages actively push the artist toward \"Replace existing chunks\". classicCommitCanvas applies blockWrites verbatim (src/renderer/state/classicLevelStore.ts:1042-1045) and colind verbatim (:1050-1057); structuralError sees nothing wrong because the doc is structurally valid, just wrong. The state that triggers it is ordinary: replace a chunk you partially edited, where the chunk owns blocks used nowhere else (exactly what reclaim collects) — every unchanged 16x16 matches its own pool block, and the first reclaimed id handed to a newly drawn block is the lowest of those same exclusive ids.\n\nSPEC: docs/superpowers/specs/2026-08-15-phase-2c-resolve-and-commit-design.md:358 states the requirement verbatim (\"reclaimed block ids pending overwrite are excluded from matching for the same reason their tile counterparts are\"); neither that exclusion nor the tile-tier alternative (matched => not allocatable) exists in the code. The existing regression at classic-surface-plan.test.ts:421 pins only the tile-tier instance of this identical class.\n\nI found no guard that breaks the chain: the reclaim filter (computeReclaim :180-204) restricts reclaim to blocks exclusive to replaced chunks — which is precisely the set most likely to be matched by unchanged cells, so it aggravates rather than prevents the collision.",
+    "verdict": "CONFIRMED",
+    "severity_correction": "Severity critical stands, with one correction to the claim's damage description. The art half is loud-ish (the just-committed chunk renders wrong immediately, and undo exists), which on its own would read as \"high\". What makes it critical is the collision half, which is genuinely silent: the overwritten id's colind comes from whichever displaced cell allocated it, so when the replaced chunk's old cells carry different colinds (e.g. old cell 0 -> block with colind 9, old cell 1 -> block with colind 4), the reused cell's collision shape silently changes under unchanged-looking art, and it is written into doc.collision.colind and saved to the user's s1disasm with no warning in the report. Also note the blast radius is narrower than the finding implies: corruption is confined to the chunks being replaced in that gesture (reclaimed ids are exclusive to them), not the wider level, and the \"255 of 256 cells wrong\" figure is repro-specific — in my run the single kept cell was the one destroyed."
+   }
+  },
+  {
+   "id": "A2",
+   "title": "Pool-block reuse matches def spelling, not identity — real GHZ data shows a 100% miss rate for rendered-identical blocks",
+   "severity": "medium",
+   "confidence": "certain",
+   "file": "src/core/art/classic-commit-plan.ts",
+   "line": 377,
+   "claim": "The pool-block match compares raw tile/xf/yf/pal spelling against doc.blocks, so stock data's flip spellings (symmetric tiles stored with xf=1, etc.) defeat reuse and re-committing untouched art mints duplicate blocks.",
+   "evidence": "Measured against real /home/volence/sonic_hacks/s1disasm GHZ act 1 (scratchpad/ghz-roundtrip.cjs + ghz-diagnose.cjs): re-committing chunk $27's own rendered pixels yields tilesNew=0 yet blocksNew=16, and ALL 16 render byte-identically to an existing pool block with the same colind; chunk $0f: 32/32. Spec §4 step 8's stated purpose for pool-block matching is that 'an additive re-import duplicates every block and reaches the 1024 ceiling twice as fast' — the matching exists but misses whenever the pool's spelling differs from the resolver's canonical spelling, which measured as every missed block on stock data. Additive/partial PNG re-import (the documented community workflow) bloats the 1024-block pool at ~16-32 duplicates per chunk; the report's blocksNew/blocksReused numbers are wrong in the same proportion. Merging is collision-safe here because block-internal tile flips do not affect colind orientation (heightmap is oriented by chunk-cell flips, per the spec's own D3 trace).",
+   "fix": "Compare on rendered identity: canonicalise each pool block's 4 cells (canonical tile key + composed orientation + pal) and match against the resolved block's canonical form with equal colind, instead of raw def equality at classic-commit-plan.ts:373-382.",
+   "verdict": null
+  },
+  {
+   "id": "A3",
+   "title": "Two targets naming the same chunk silently drop one region cell's art and the report lies",
+   "severity": "medium",
+   "confidence": "certain",
+   "file": "src/core/art/classic-commit-plan.ts",
+   "line": 269,
+   "claim": "Nothing refuses duplicate chunkFileIndex targets: the planner emits two chunkWrites for one index, the store applies them last-write-wins, and the report counts both as replaced.",
+   "evidence": "Planner validates only target COUNT (classic-commit-plan.ts:223-225); `replaced` is a Set so reclaim treats duplicates as one chunk (:269-270) while the write loop emits one chunkWrite per region cell (:426-427); store applies sequentially so the later def overwrites the earlier (classicLevelStore.ts:1061-1066); report says chunksReplaced=2 (:461). UI permits it — each row is an independent Select over all chunks (CommitPlanView.tsx:113-127). A 2x1 commit with both rows set to 'Replace chunk $10' silently discards the left chunk's art while reporting success. Spec §5's 'Range/canvas mismatch' refusal row is only partially implemented (length check only).",
+   "fix": "Refuse duplicate non-null chunkFileIndex values in step 1 of planCanvasCommit with a named refusal, and/or disable already-chosen options in CommitPlanView.",
+   "verdict": null
+  },
+  {
+   "id": "A4",
+   "title": "'Use the act's colours' remaps NON-drifted entries to the lowest duplicate colour slot, defeating pool reuse",
+   "severity": "medium",
+   "confidence": "certain",
+   "file": "src/core/art/classic-commit-plan.ts",
+   "line": 153,
+   "claim": "remapToActColours builds its map over ALL used entries and picks the FIRST same-colour entry in the line, so an entry that never drifted is rewritten to a lower duplicate index; tile bytes then diverge from the pool's spelling and identical art stops matching.",
+   "evidence": "classic-commit-plan.ts:149-157: `for (const flat of usedPaletteEntries(...))` with `for (let e = 1; ...) if (docPal[...] === want) { found = e; break; }` — no preference for found === flat%16 when docPal[flat] already equals want. Real palettes have intra-line duplicates (measured in /home/volence/sonic_hacks/s1disasm/palette: Spring Yard line 2 white $EEE at entries 6 and 13; Star Light line 2 black $000 at 4,5,12,15; SBZ Act 2 line 2, SBZ Act 3 line 1). Art correctly drawn with entry 13 white on SYZ, committed with one genuinely drifted entry elsewhere, gets ALL its white pixels rewritten to entry 6 — same rendered colour, different tile bytes — so findPoolMatch misses every existing pool tile spelled with entry 13, inflating tilesNew and triggering spurious tiles-exhausted refusals on the scarce tier.",
+   "fix": "In remapToActColours, when docPal[flat] === want, map the entry to itself; only search for an alternative when the entry actually drifted.",
+   "verdict": null
+  },
+  {
+   "id": "A5",
+   "title": "Reclaimed-but-unwritten slots are never zeroed; orphaned blocks permanently strand tiles and block ids",
+   "severity": "medium",
+   "confidence": "certain",
+   "file": "src/core/art/classic-commit-plan.ts",
+   "line": 189,
+   "claim": "Spec §4 step 9 ('reclaimed ids left unwritten ... zero them and say how many in the report') is unimplemented, and the leak is worse than the spec's 'garbage in BlockTab': orphaned blocks keep their tile references alive so neither the blocks nor their tiles are ever free or reclaimable again.",
+   "evidence": "No zeroing exists anywhere in planCanvasCommit or classicCommitCanvas for reclaim.blocks/reclaim.tiles entries beyond the cursors. After a replace that needs fewer blocks than it reclaimed, the leftover block ids keep old defs with zero chunk references. Next commit: computeReclaim skips them (`if (chunks.length === 0) continue`, classic-commit-plan.ts:189-190), freeSlot's tile scan requires `index.tileUsage(t).cells !== 0` to be false, but buildUsageIndex counts tile references from ALL blocks including orphans (usage-index.ts:73-81) — so tiles referenced only by orphaned blocks are never free, never reclaimable, and the block ids themselves are only reachable by append-past-them. Repeated shrink-replaces monotonically strand the scarce tier.",
+   "fix": "After allocation, emit blockWrites zeroing leftover reclaimed block ids (def -> 4x tile 0, colind 0) and count them in the report, per spec step 9; consider zero-length tileWrites optional since blank-def blocks release the tiles.",
+   "verdict": null
+  },
+  {
+   "id": "A6",
+   "title": "Commit ignores the canvas gridOrigin the 2B readout honours — the two describe different 8px cells",
+   "severity": "medium",
+   "confidence": "certain",
+   "file": "src/renderer/components/canvas/canvas-commit-model.ts",
+   "line": 214,
+   "claim": "planFromSnapshot pins the region at (0,0) and the planner's clash gate hardcodes origin {0,0}, while the 2B constraint readout/overlay computes cells at doc.gridOrigin (mod-8 phase) — with a non-multiple-of-8 origin, the overlay shows clean while commit refuses cell-clash at boundaries the artist cannot see, and the unique-tile readout no longer upper-bounds the commit's claim (the promise tile-canon exists to keep).",
+   "evidence": "canvas-commit-model.ts:214 `region: { x: 0, y: 0, ... }`; classic-commit-plan.ts:228 `findCellClashes(input.pixels, { originX: 0, originY: 0 }, ...)`; the readout passes the doc's origin (use-canvas-constraints.ts:40) and canvasCells phases the grid by origin mod 8 (canvas-constraints.ts:39-56); the origin is user-settable to arbitrary integers per axis (CanvasMode.tsx:418 setGridOrigin). tile-canon.ts:1-22 and spec §3 stake the 2B/2C shared-definition guarantee on the two sides counting the same cells; they count the same PIXELS but different CELLS whenever originX/Y % 8 != 0. No corruption (the planner re-gates), but refusals become unactionable and the readout promise breaks.",
+   "fix": "Either resolve/plan relative to gridOrigin's 8px phase, or clamp/snap gridOrigin to multiples of 8 for chunk-profile canvases, or have CommitPlanView surface the mismatch when origin phase is non-zero.",
+   "verdict": null
+  },
+  {
+   "id": "A7",
+   "title": "Anim-slot exclusion is post-hoc on findPoolMatch's first hit; a later identical non-anim tile is never tried",
+   "severity": "low",
+   "confidence": "certain",
+   "file": "src/core/art/classic-commit-plan.ts",
+   "line": 311,
+   "claim": "The planner discards the whole match when the first canonical hit is an animated-overlay slot instead of continuing the scan, allocating a duplicate even when a legitimate non-anim duplicate exists; and phase 1's matcher still matches anim slots at all.",
+   "evidence": "classic-commit-plan.ts:310-315: `if (m !== null && !animTiles.has(m.tileIndex))` — findPoolMatch (tile-pool-match.ts:108) has no excluded-set parameter, so an anim first-hit falls through to freeSlot. Measured on GHZ chunk $0f: all 30 anim-first matches had no non-anim duplicate, so GHZ impact is nil today, but the miss is structural. Phase 1 (classic-surface-plan.ts:262-271) passes no anim exclusion either and its comment only defends reserved-tile matches; a match onto a blitted animation frame repoints level art at a slot that cycles in game — the spec itself calls this 'latent in phase 1'.",
+   "fix": "Add an excluded/skip predicate to findPoolMatch (or continue scanning past excluded hits) and pass animTiles from both call sites.",
+   "verdict": null
+  },
+  {
+   "id": "A8",
+   "title": "CRAM words compared raw — the spec's single masking helper does not exist",
+   "severity": "low",
+   "confidence": "certain",
+   "file": "src/core/art/classic-commit-plan.ts",
+   "line": 237,
+   "claim": "The drift gate, the remap, and the PNG importer all compare palette words with raw ===, so a stray bit outside $0EEE in a hand-edited palette file causes spurious palette-drift or colour-not-in-act refusals.",
+   "evidence": "classic-commit-plan.ts:237 and :154 compare input.canvasPalette/docPal raw; png-import.ts:96 compares actPalette words against encodeGenesisColor output (which is always in-mask, palette.ts:24-27); s1-io.ts:321 fills doc.palettes with unmasked beWord reads (:182-184). Spec §4 step 1: 'Compare CRAM words through ONE masking helper on both sides'. Measured: all stock s1disasm palette/*.bin words are within $0EEE (scan came back empty), so this only bites edited disasms — and it fails safe (refusal, not silent wrongness).",
+   "fix": "Add one cramWord(w) { return w & 0x0EEE } helper in core/formats/palette.ts and route both sides of every comparison (drift gate, remap, png-import) through it.",
+   "verdict": null
+  },
+  {
+   "id": "A9",
+   "title": "tiles-exhausted refusal reports free:0 hardcoded and 'available' = tiles already placed",
+   "severity": "low",
+   "confidence": "certain",
+   "file": "src/core/art/classic-commit-plan.ts",
+   "line": 326,
+   "claim": "The one refusal whose job is the numbers carries wrong numbers: `available` is the count of tiles bound so far this plan (not slots available) and `free` is a literal 0, so the dialog renders a misleading sentence.",
+   "evidence": "classic-commit-plan.ts:317-329: `available: tileWrites.length + tilesReused, ... free: 0`. canvas-commit-model.ts:163 renders 'needs N tiles and only M are available (R reclaimed)'. A commit needing 40 tiles that placed 12 before exhausting reads 'needs 40 and only 12 are available' — 12 is neither the free count nor the capacity. Spec §5 requires 'needed, available, reclaimed, free'. countFreeTileSlots exists (free-tile-slots.ts) and is not consulted.",
+   "fix": "Compute free via the same predicate loop freeSlot uses (or countFreeTileSlots with the reserved/anim/editable filters) at refusal time and report available = reclaimed-usable + free.",
+   "verdict": null
+  },
+  {
+   "id": "A10",
+   "title": "Palette adoption writes whole lines 1-3 while drift names only USED entries — unnamed entries recolour existing zone art silently",
+   "severity": "medium",
+   "confidence": "certain",
+   "file": "src/core/art/classic-commit-plan.ts",
+   "line": 256,
+   "claim": "Drift detection filters to entries the committed art uses, but 'adopt into the zone palette' writes all 48 words of lines 1-3 from the canvas palette — a canvas entry the artist edited but never painted with is written into the zone unnamed, recolouring other level art in every act, violating D2's 'never changes colour silently' in the direction the dialog never mentions.",
+   "evidence": "usedPaletteEntries filter at classic-commit-plan.ts:236-238 vs wholesale `input.canvasPalette.slice(l*16,(l+1)*16)` writes at :256-262; the refusal's entry list (the only thing the dialog names, canvas-commit-model.ts:145-147) is the used-drift list. Also the D2b/D2 report reach requirements are absent: the single warning string at :263 is generic — no paletteSources-computed file naming (SBZ's per-act palette files, spec D2 explicitly), no SBZ3-borrows-LZ naming, no LZ/SBZ3 underwater-palette note. Reproduce: seed a canvas from GHZ, edit line 1 entry 9 to magenta, never paint with it, paint with one drifted colour elsewhere, adopt — entry 9 goes magenta in GHZ 1/2/3 with no mention anywhere.",
+   "fix": "Either write only the drifted USED entries (word-level paletteWrites) or extend the drift scan/dialog to name every entry that differs, used or not; add the profile-computed reach lines (paletteSources file names, SBZ3/LZ share, underwater note) to report.warnings per D2/D2b.",
+   "verdict": null
+  }
+ ]
+}

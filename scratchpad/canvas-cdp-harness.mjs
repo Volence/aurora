@@ -158,13 +158,13 @@ const INSTALL = String.raw`
     return h >>> 0;
   };
 
-  // --- chips (Chip = span[title], opacity 0.5 when disabled) --------------
-  H.chip = (label) => [...document.querySelectorAll('span[title]')].find(
+  // --- chips (Chip = [title]; a BUTTON when interactive, a span when a readout) --------------
+  H.chip = (label) => [...document.querySelectorAll('[title]')].find(
     (e) => e.children.length === 0 && e.textContent.trim() === label && vis(e));
   H.chipEnabled = (label) => { const e = H.chip(label); return e ? getComputedStyle(e).opacity === '1' : null; };
   H.clickChip = (label) => { const e = H.chip(label); if (!e) return false; e.click(); return true; };
   /** A grid chip in the options bar: title '<n>px guides…'. */
-  H.gridChip = (n) => [...document.querySelectorAll('span[title]')].find(
+  H.gridChip = (n) => [...document.querySelectorAll('[title]')].find(
     (e) => e.title.startsWith(n + 'px guides'));
   H.gridChipActive = (n) => {
     const e = H.gridChip(n); if (!e) return null;
@@ -1626,7 +1626,7 @@ async function row8(c, shared) {
     return { bar: !!bar }; })()`);
   await sleep(900);
   await c.evalExpr(INSTALL);
-  const chip = await c.evalExpr(`(() => { const e = [...document.querySelectorAll('span[title]')]
+  const chip = await c.evalExpr(`(() => { const e = [...document.querySelectorAll('[title]')]
     .find((x) => x.title === 'Paint pixels across the composed chunk'); if (!e) return false; e.click(); return true; })()`);
   await sleep(900);
   await c.evalExpr('window.__dbg.setPaintColor(9)');

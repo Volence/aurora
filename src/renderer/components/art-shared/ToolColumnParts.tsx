@@ -175,11 +175,11 @@ export const S: Record<string, React.CSSProperties> = {
   stepper: { display: 'flex', alignItems: 'center', gap: 2, width: 40, justifyContent: 'space-between' },
   stepButton: {
     width: 12, height: 16, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-    background: T.border, color: T.textBase, border: `1px solid ${T.borderStrong}`, borderRadius: 3,
+    background: T.border, color: T.textBase, border: `1px solid ${T.borderStrong}`, borderRadius: T.rMd,
     cursor: 'pointer', fontSize: 7, lineHeight: 1,
   },
-  value: { fontSize: 10, color: T.textHi, fontFamily: 'monospace' },
+  value: { fontSize: 10, color: T.textHi, fontFamily: T.fontMono },
   divider: { width: '80%', height: 1, background: T.border, margin: '4px 0', flexShrink: 0 },
   zoomGroup: { display: 'inline-flex', alignItems: 'center', gap: 4 },
-  zoomLabel: { fontSize: 10, color: T.textLo, fontFamily: 'monospace' },
+  zoomLabel: { fontSize: 10, color: T.textLo, fontFamily: T.fontMono },
 };

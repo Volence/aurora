@@ -1,0 +1,151 @@
+{
+ "seat": "ERR",
+ "model": "opus",
+ "coverage": "\"NOT COVERED — stated honestly.\\n\\n(1) No runtime verification. This is a pure static trace of the pinned tree; I did not launch the app, drive it under CDP, or run the vitest suite, so I did not confirm any of these paths fires in practice nor check which have tests. Per the seat memory ('guards assert nothing'), A3 and A4 in particular deserve a planted-violation check before being treated as settled.\\n\\n(2) I read every catch/`.catch(`/`void `/toast site on the save, export, import, load, IPC and main-process paths, plus all 23 silent catches. I did NOT read full context for the UI-local catches in: MapViewport.tsx, ComposerCanvas.tsx, PixelViewport.tsx:242/245 and use-hand-pan.ts:86/99 (pointer-capture calls — skimmed only), shellStore.ts:9/22 and panel-state.ts:8/11 (localStorage — skimmed), core/art/indexed-png.ts:429, core/art/canvas-file-format.ts:122, core/project/mapping.ts:58, core/shell/session-persistence.ts:53/78, renderer/object-previews.ts:86, renderer/providers/object-list-aeon.ts:70-71, debug-hooks.\\n\\n(3) art-facet.tsx handleSave: I read only its first ~40 lines (through the sliceForSave guard at :84-89); the rest of that save path, and TilesetPanel's handleAddToTileset tail past :300, were not audited.\\n\\n(4) Not evaluated in depth, flagged for a follow-up seat: parseNametable (core/formats/s4-nametable.ts:1-9) silently zero-fills past the end of a SHORT .tiles.bin instead of throwing, and buildAeonSavePlan then writes the zero-padded full-size file back. Same family as finding A2 but I did not trace a concrete trigger, so it is not filed.\\n\\n(5) The aeon write loop (aeon-save.ts:27-30) is a non-atomic multi-file sequence with a documented ordering claim (save.ts:6-9). I confirmed the legacy-atlas truncation sits AFTER the tileset writes, so the worst ordering hazard is closed, but I did not enumerate the other partial-write end states (e.g. tilesets written, project.json retarget not) — that is a real gap worth its own pass.\\n\\n(6) Out of scope / untouched: test files, the s1disasm data repo beyond confirming two mapping paths exist, and anything outside aurora/src.\"",
+ "verified_clean": [
+  "Classic save path is honest end to end: saveClassicWriteResult (src/renderer/state/classic-save.ts:50-91) never rejects and encodes channel-error/conflict/partial/error as variants; saveClassicProject:199-244 refreshes mtimes for what landed, clears ONLY domains whose files all landed (domainsToClear:145-159), toasts each failure with a recovery instruction, and returns before the success toast at :243.",
+  "Canvas save path: canvas-file.ts:282-319 folds mtimes correctly for unwritten/never-queued files (mtimeAfterWrite:221-229) and returns a typed partial; canvas-save.ts:63-103 branches on `kind` ALONE (documented trap), refreshes baselines on partial via setSource not markSaved, and throws with full recovery text. The ok-but-sidecar-skipped case is toasted at :115-123 rather than silently clearing.",
+  "Guarded write in main (src/main/guarded-write.ts:56-105): rel-path guard throws before any write, the conflict check is genuinely all-or-nothing before the first write, each file is tmp+rename, and a mid-batch fs error returns {written,newMtimes,failed,unwritten} rather than rejecting. The one `.catch(() => {})` at :97 is orphan-tmp cleanup only.",
+  "Close/discard confirms re-read the dirty flag instead of trusting 'it did not throw': confirmCloseSpriteDoc (tab-activation/sprite.ts:248-252) and confirmCloseCanvasDoc (tab-activation/canvas.ts:298-312) both abort with a toast when the document is still dirty after Save.",
+  "Project-open guard (src/renderer/shell/project-open-guard.ts:145-162) re-snapshots after 'Save & open' and aborts with a message rather than destroying edits; openBlockedMessage:107-114 additionally names the unsavable-canvas case so the user is not looped with no exit.",
+  "activateLevelTarget's 'Save & switch' (tab-activation/level.ts:187-192) gates openAct on isSaveSuccess(), and isSaveSuccess (:36-38) correctly accepts only 'saved'/'nothing' — a conflict or partial cannot fall through into the openAct that would discard the edits.",
+  "createCanvasDocument (src/renderer/shell/new-canvas.ts:302-384) writes both files BEFORE opening the tab, and every failure return goes through refuse() (:265-279) which restores both the previous canvas focus and the paint index.",
+  "The classic level loader does not substitute defaults for unreadable files: readS1Level's readBytes (src/core/level-classic/s1-io.ts:225-233) throws when a prefetched entry has bytes === null, openAct catches into status:'error' (classicLevelStore.ts:446-449), and the error is rendered (s1-facets.tsx:228-238, ClassicLevelViewport.tsx:120).",
+  "Write self-checks are real and their failures are surfaced: emitCompressed/emitVerified push to `errors` (s1-io.ts:398-417) and saveClassicWriteResult refuses to send anything to disk when errors.length > 0 (classic-save.ts:57); encodeS1ArtWriteBack does the same for sprite art (s1-art-write.ts:108-127).",
+  "The three classic art-editing handlers explicitly convert command throws into toasts so nothing escapes a pointer handler: TileTab.tsx:248-256, BlockTab.tsx:213-219 and :283-289, ChunkTab.tsx:246-252 and :388-401.",
+  "Toasts are actually reachable: ToastContainer is mounted unconditionally at App root (App.tsx:293), outside every tab/engine conditional, and error toasts get a 10s dwell plus click-to-dismiss (toastStore.ts:26-28).",
+  "IPC error semantics survive the preload boundary: ENOENT is returned as a marker (ipc-handlers.ts:19-27) and rethrown as a real ENOENT Error by unwrapBinaryRead (shared/ipc-types.ts:104-107) via preload/index.ts:10 — which is what loadCanvasFile's /ENOENT/ discrimination (canvas-file.ts:136-141) depends on.",
+  "The agent bridge cannot leave a caller hanging: requestAgent has a 30s timeout, a window-closed listener and pre-checks for destroyed/loading webContents (src/main/agent-bridge.ts:8-60), and the renderer handler always responds on both branches (agent-handler.ts:49-57).",
+  "The Aether adapter converts a forwarded throw into a JSON-RPC error rather than swallowing it (src/main/aether/adapter.ts:73-78); the only swallow is the SSE write in broadcast (:97), which correctly drops the dead subscriber.",
+  "Counts for the sweep: 120 catch sites in non-test src/. 23 of them are silent (13 one-line empty/comment-only, 10 multi-line comment-only) and 7 more return a bare fallback constant; all but the ones filed above sit in optional-file probes, localStorage access or pointer-capture calls where the swallow is documented and correct."
+ ],
+ "findings": [
+  {
+   "id": "A1",
+   "title": "Aeon save toasts \"Project saved\" after the export step silently failed (console.warn only)",
+   "severity": "high",
+   "file": "src/renderer/state/aeon-save.ts",
+   "line": 31,
+   "claim": "When exportAct() throws, buildAeonSavePlan swallows it into a string field and aeon-save.ts reports it only with console.warn, then calls markClean() and toasts 'Project saved' — the user is told the save succeeded while every export artifact was silently omitted from the write.",
+   "evidence": "src/core/project/aeon/save.ts:219-247 wraps the whole export block in try/catch and assigns `exportError = ...` instead of pushing the export files; the plan is still returned as an ordinary plan (save.ts:249). src/renderer/state/aeon-save.ts:27-30 writes plan.files, then :31 `if (plan.exportError) console.warn('[save] Export step failed (non-fatal):', ...)`, :32 markClean(), :34 addToast('Project saved','success'). Failure scenario: the artist edits an act; exportAct throws on any of its inputs; the toast says 'Project saved', the dirty dot clears, and the engine build then assembles the PREVIOUS save's export/act_descriptor.asm, entity_data.asm, vram_bases.asm and section_N.{tiles,art}.bin. The only trace is a renderer devtools warning. Every other failure in this file goes through addToast('Save failed','error') at :39 — the export half is the one exception.",
+   "confidence": "certain",
+   "fix": "Surface exportError as a toast ('Project data saved, but the engine export failed: <msg> — the files under export/ are stale') instead of console.warn, and either withhold markClean() or state the caveat, since on-disk state is now half-current.",
+   "verdict": {
+    "reasoning": "I could not break the claim at any link; every cited line is verbatim and the path traces end-to-end.\n\n1. Renderer glue (src/renderer/state/aeon-save.ts:27-35) is exactly as quoted: it writes `plan.files`, then line 31 `if (plan.exportError) console.warn('[save] Export step failed (non-fatal):', plan.exportError);`, then line 32 `markClean()`, line 34 `addToast('Project saved','success')`, line 35 `return { kind: 'saved' }`. There is no toast, no error state, no return-variant difference on the export-failure path. Every other failure routes to the catch at :36-40 with `addToast('Save failed','error')` — the export half is the sole exception, as claimed.\n\n2. Core plan builder (src/core/project/aeon/save.ts:220-249) wraps the entire export block in try/catch; the catch at :245-246 assigns `exportError = ...` and the function returns an ordinary plan at :249. The header comment at :12-14 confirms this is a deliberate port of the old console.warn behavior into a data field, with the renderer owning the warn — i.e. the design intends exactly the silent path.\n\n3. Consumer search: `grep -rn exportError src/` returns exactly one non-test consumer — aeon-save.ts:31 (console.warn). Nothing else reads it. No stale-export banner, no \"Export\" command in the Aeon UI (grep over src/renderer/components finds Export surfaces only under sprite/ and classic/), so save is the only place the Aeon export runs and the only place its failure could be reported.\n\n4. Live wiring confirmed: src/renderer/state/project-runtime.ts:50/67/86 sets `aeonImpl = saveAeonProject`, so this is the real Aeon save path, not dead code. `markClean` really clears the dirty flag: editorStore.ts:299 `markClean: () => set({ dirty: false })`.\n\n5. Reachability is proven by the repo's own test, not by my speculation: src/core/project/aeon/__tests__/aeon-save.test.ts:118-158 drives the REAL export path (explicitly \"no mocks\") into a VRAM overflow and asserts `plan.exportError` matches /VRAM overflow/, that pre-export writes survive (section_0.tiles.bin, project.json present), and that NO export outputs are in files[]. I ran it: 5/5 pass at this SHA. That test is a direct machine-checked reproduction of the half-written on-disk state the finding describes.\n\nConcrete trigger (ordinary authoring mistakes, not contrived): an artist places a 33rd unique object type in one section (src/core/export/entity-data.ts:15 `throw new Error('Section N has X unique object types (max 32)')`), or drags an object past x=$7FF (entity-data.ts:12), or grows a section's tile union past the 1024 FG pool limit (src/core/export/vram-coloring.ts:45) — then presses Ctrl+S. The toast reads \"Project saved\", the dirty dot clears, the authored data is written, and export/act_descriptor.asm, entity_data.asm, vram_bases.asm and every section_N.{tiles,art}.bin remain at the previous save's contents. The message naming which object or which section overflowed — the only thing that would let the artist fix it — exists only in a renderer devtools warning the artist will never open.\n\nSeverity check: \"high\" is correct and not theatrical. It is NOT critical: the artist's authored work is fully written and uncorrupted; only derived export artifacts are stale. It IS high rather than medium: the export half of save is a main-path feature that silently no-ops while reporting success, and the downstream engine build consumes the stale export/ files, producing a ROM that does not match the editor — wrong output on the main path, with the diagnostic suppressed. The suggested fix (surface exportError as a toast, and either withhold markClean or state the caveat) is the right shape.",
+    "verdict": "CONFIRMED"
+   }
+  },
+  {
+   "id": "A2",
+   "title": "A section's objects.json/rings.json that exists but fails to parse loads as [] and the next save writes [] over it",
+   "severity": "high",
+   "file": "src/core/project/aeon/load.ts",
+   "line": 262,
+   "claim": "The aeon loader cannot tell 'file absent' from 'file present but unreadable/unparseable': both land in the same bare catch and set section.objects = [] / section.rings = [], and buildAeonSavePlan then unconditionally writes those empty arrays back, permanently destroying every object and ring placement in that section.",
+   "evidence": "load.ts:258-264 `try { const objRaw = await fa.read(prefix+'.objects.json'); ... JSON.parse(objText) } catch { section.objects = []; }` and :267-273 the identical shape for rings. fa.read is createIpcFileAccess.read (src/renderer/state/classic-file-access.ts:48-53), which throws ENOENT for a genuine miss but also propagates permission/EIO errors — and JSON.parse throws SyntaxError for a corrupt file — all three reach the same catch. The save side is unconditional: src/core/project/aeon/save.ts:83-91 pushes `${prefix}.objects.json` (and :87-91 rings) for every non-null section, with no 'did this load' gate. Failure scenario: a user hand-edits or a tool truncates section_3.objects.json; the project opens with zero visible objects in that section and NO error anywhere (no toast, no console line, no notice — contrast the chunk-library path, which at least warns); the next Ctrl+S writes `[]` over the file. Compare canvas-file.ts:136-141, which solves exactly this by testing /ENOENT/ on the message before treating a read failure as 'absent'.",
+   "confidence": "certain",
+   "fix": "Distinguish ENOENT from other failures the way loadCanvasFile does: on a non-ENOENT read error or a JSON.parse failure, record a load notice/warning AND mark the section as 'objects not understood' so buildAeonSavePlan omits that file from the write (do not destroy what you could not read). The same treatment is needed for the .tiles.bin branch at load.ts:196-202, whose failure silently reseeds the nametable from the baked strips and then saves that over the user's edited layout.",
+   "verdict": {
+    "reasoning": "Traced end-to-end and then executed the real modules; could not refute. (1) load.ts:258-273 has bare catches setting section.objects/rings = [] with no ENOENT discrimination, no notice, no console line. (2) All three failure causes reach it: fa.read throws ENOENT for a miss, main/ipc-handlers.ts:17-27 rethrows any non-ENOENT fs error (only ENOENT becomes the resolve-marker), and JSON.parse throws SyntaxError on a corrupt file. (3) save.ts:84-92 pushes both files unconditionally for every non-null section, with no load gate; aeon-save.ts:27-30 writes every entry via window.api.writeBinaryFile, whose main handler (ipc-handlers.ts:81-93) does tmp-write + renameSync full replace with no mtime guard. (4) The path is live: useProject.ts:27 -> aeon-open.ts:22 -> aeonAdapter.open -> index.ts:115 loadAeonProject. Empirical run with the real loadAeonProject/buildAeonSavePlan and an in-memory FileAccess matching the IPC throw semantics: with section_0.objects.json truncated to '[{\"id\":\"o1\",\"typeId\":\"ring-mon', the section loads objects: [] with notices: [] and the save plan writes '[]' back to data/ojz/act1/section_0.objects.json; same for an EACCES-style read failure on both objects.json and rings.json. Concrete trigger: a section_N.objects.json containing git merge-conflict markers or a truncated hand-edit — project opens with zero objects in that section, no warning anywhere, next save overwrites the file with []. Notably the same save function already applies exactly this class of guard elsewhere (fa.exists probe for the meta sidecar at save.ts:105; opts.legacyAtlasMerged gate at save.ts:212, whose comment says a load-time parse failure must not lead to destroying data), which corroborates the finding. Partly verified only: the secondary .tiles.bin claim in the fix note — code reading of load.ts:196-202/223-224 plus save.ts:69-70 shows a silent read failure reseeds the nametable from the baked strips and saves that over the user's layout, but that variant requires actConfig.stripPath and I did not execute it.",
+    "verdict": "CONFIRMED",
+    "severity_correction": "None — high is appropriate. It is silent destruction of user work (which argues for critical), but the trigger requires a file that is already corrupt/unreadable, so the first loss precedes Aurora, and aeon project data normally lives in the engine git repo, leaving history-level recovery. Not theatrical; keep at high."
+   }
+  },
+  {
+   "id": "A3",
+   "title": "An unreadable mappings .asm silently empties the object tile-reservation set, and the 'predicates-unknown' refusal cannot see it",
+   "severity": "medium",
+   "file": "src/core/project/profiles/s1-levelart-reservations.ts",
+   "line": 110,
+   "claim": "readMapTextTolerant swallows every read failure into null, buildReservedTileSet skips those requests with `continue`, and the resulting set is non-null-but-empty — so classic-commit-plan's `reservedTiles === null` refusal never fires and the tile allocator will hand out pool tiles that object sprites draw from, overwriting object art in the disasm with no warning.",
+   "evidence": "src/core/project/s1/index.ts:248-255 readMapTextTolerant returns null on any exists/read failure; :383-390 collects only the texts that came back and calls buildReservedTileSet, storing the result unconditionally, so reservedTiles() (:430) returns an empty Set rather than null. s1-levelart-reservations.ts:109-110 `const text = mapTextByPath.get(req.mapAsm); if (text === undefined) continue;` — a missing text contributes zero reserved tiles and is not counted or reported. The guard that exists for this is src/core/art/classic-commit-plan.ts:272-276, which only pushes 'object tile reservations' into `unknown` when `input.reservedTiles === null` — i.e. it fires when the act was never read, never when the mapping files failed to read. classic-commit-plan.ts:299 (`if (reserved.has(t) ...) continue;` inside freeSlot) and classic-surface-plan.ts:138 are the consumers that then treat those tiles as free. Failure scenario: a disasm fork with a different _maps/ layout (Aurora resolves e.g. '_maps/SYZ Boss Blocks.asm' by hardcoded path — verified present in the canonical /home/volence/sonic_hacks/s1disasm, so this bites forks/renames) — a canvas commit or paint then allocates the SYZ boss-block tiles as free slots and rewrites them.",
+   "confidence": "certain",
+   "fix": "Have buildReservedTileSet report which requested mapAsm paths were missing, and make s1/index.ts store null (or a 'partial' marker) for the act when any request's text failed to load, so classic-commit-plan's predicates-unknown refusal actually covers this case.",
+   "verdict": null
+  },
+  {
+   "id": "A4",
+   "title": "CommitPlanView.apply is the one classic-command call site with no try/catch, so a throw makes Apply silently do nothing",
+   "severity": "medium",
+   "file": "src/renderer/components/canvas/CommitPlanView.tsx",
+   "line": 88,
+   "claim": "Every other classic-command invocation from a React handler explicitly wraps the call ('nothing may escape this handler'), but the canvas/import-sheet Apply button calls classicCommitCanvas bare — a throw from its history-invariant guards escapes the onClick, produces no message, and leaves the user clicking a dead button.",
+   "evidence": "CommitPlanView.tsx:88-95 `const apply = () => { if (!plan) return; const r = classicCommitCanvas(plan); setApplied(r.ok ? ... : ...); }` with no try. classicCommitCanvas (src/renderer/state/classicLevelStore.ts:1009-1104) returns err() for its own validation but ends at :1103 in `commitArt(...)`, which calls assertSingleDomain (:635, throws — see :582-594) and requireClassicHistory (:638, throws — see :607-618 'document holds a X, not a ClassicArtHistory'). The three sibling call sites all guard explicitly against exactly this and say so: TileTab.tsx:248-256, BlockTab.tsx:213-219 and :283-289, ChunkTab.tsx:246-252 and :394-400. Failure scenario: the zone-art history document is rebuilt for the wrong engine (an aeon project resident behind a classic act, the hub state the requireClassicHistory message names) — Apply throws, React's event dispatch unwinds, the dialog shows neither 'Committed' nor 'Refused', and the import silently does nothing.",
+   "confidence": "probable",
+   "fix": "Wrap the classicCommitCanvas call in the same try/catch the three tab call sites use, folding the throw into `{ ok: false, error: message }` so it lands in the existing `Refused: ...` line.",
+   "verdict": null
+  },
+  {
+   "id": "A5",
+   "title": "exportSprite writes five files sequentially with no rollback; a mid-sequence failure leaves a mismatched sprite directory",
+   "severity": "medium",
+   "file": "src/renderer/components/sprite/export-sprite.ts",
+   "line": 95,
+   "claim": "The five artifact writes plus the index upsert are independent awaits inside one try; a failure after the first write leaves new art.bin/mappings.bin next to the PREVIOUS export's sprite.json and dplc.bin, and the toast says only 'Export failed', never that the directory is now half-updated.",
+   "evidence": "export-sprite.ts:95-105 — writeBinaryFile for mappings.bin, art.bin, (dplc.bin), <name>_anims.asm, sprite.json, then the index.json upsert at :102-105; the single catch at :111-113 emits `Export failed: <msg>`. No guarded/batched write is used here (contrast classic-save.ts:73 and canvas-file.ts:284, which both go through window.api.writeGuarded and report `partial` with the list of files that did and did not land). Failure scenario: disk full / permission change after art.bin lands. The manifest on disk still describes the old frame count and old dplc flag, so loadSpriteByName (:566-594) reconstructs frames with reconstructWithAdapter against a mismatched manifest and silently produces the wrong sprite — and index.json still lists the old frameCount/tileCount. The user was told 'Export failed', which reads as 'nothing happened'.",
+   "confidence": "certain",
+   "fix": "Route the export batch through window.api.writeGuarded (one batch, the same partial/conflict reporting the classic and canvas save paths already have), or at minimum name the files that did land in the failure toast.",
+   "verdict": null
+  },
+  {
+   "id": "A6",
+   "title": "classic-save-project returns a FAILED save as a successful MCP tool result",
+   "severity": "medium",
+   "file": "src/renderer/agent/agent-handler.ts",
+   "line": 731,
+   "claim": "The agent/MCP save tool returns saveClassicProject()'s outcome variant as the tool's success payload, so a conflict, partial write or self-check failure is delivered as ok:true with no isError flag — an agent that checks call success proceeds as if the level was written.",
+   "evidence": "agent-handler.ts:729-732 `case 'classic-save-project': requireClassicProject(); return saveClassicProject();`. saveClassicProject (src/renderer/state/classic-save.ts:181-245) deliberately never throws: it returns { kind: 'conflict' | 'partial' | 'error' | 'nothing' | 'saved' } and reports the failure via a renderer TOAST (:220-238) that no agent can see. The bridge marks anything that does not throw as ok:true (agent-handler.ts:50-56), and src/main/mcp-server.ts:37-43 wraps the value with textResult() — no isError, no error path. Failure scenario: an agent runs classic_save_project after edits; another process touched the layout file, so kind='conflict' and NOTHING was written; the tool call succeeds, the JSON body carries the conflict list, and an agent that gates on call success (or on a short summary) reports the save as done and moves on to the next edit against a doc whose files never landed.",
+   "confidence": "certain",
+   "fix": "In the 'classic-save-project' case, throw with the variant's message for every kind other than 'saved'/'nothing' (or have the MCP wrapper set isError from a kind field), so the failure is a tool error rather than a successful payload.",
+   "verdict": null
+  },
+  {
+   "id": "A7",
+   "title": "Every PNG decode failure in the sheet importer is relabelled as 'needs an INDEXED PNG'",
+   "severity": "low",
+   "file": "src/renderer/state/import-sheet.ts",
+   "line": 67,
+   "claim": "The catch appends '— the importer needs an INDEXED (paletted) PNG' to every decodeIndexedPng error, including truncated IDAT, interlacing and bad-signature errors, so the UI misdiagnoses the file and sends the user to re-export as indexed when it already is.",
+   "evidence": "import-sheet.ts:63-68 `catch (e) { return { ok: false, error: `${(e as Error).message} — the importer needs an INDEXED (paletted) PNG` }; }`. decodeIndexedPng throws a wide range of already-actionable messages: 'PNG image data (IDAT) is truncated or corrupt and could not be decompressed' (src/core/art/indexed-png.ts:436), 'interlaced PNGs are not supported — re-export without Adam7 interlacing' (:398), 'not a PNG file (bad signature)' (:334), 'PNG has no IHDR chunk' (:378). Only :411 ('indexed PNG has no PLTE palette chunk') actually means what the suffix claims. Failure scenario: an artist drops an interlaced indexed PNG; the dialog reads 'interlaced PNGs are not supported ... — the importer needs an INDEXED (paletted) PNG', and they go re-export it as indexed (again) instead of disabling interlacing.",
+   "confidence": "certain",
+   "fix": "Only append the indexed-PNG hint for the colour-type/PLTE errors (decodeIndexedPng already distinguishes them); pass every other message through unchanged.",
+   "verdict": null
+  },
+  {
+   "id": "A8",
+   "title": "ImportSheetDialog.pick has try/finally with no catch — a rejection clears 'Reading…' and shows nothing",
+   "severity": "low",
+   "file": "src/renderer/components/canvas/ImportSheetDialog.tsx",
+   "line": 28,
+   "claim": "pick() awaits loadSheetForAct inside try/finally with no catch, so any rejection (the file dialog channel failing, or a throw out of importPngAgainstPalette/flattenActPalette, which sit outside import-sheet's own try) becomes an unhandled promise rejection and the dialog resets to its idle state with no error line.",
+   "evidence": "ImportSheetDialog.tsx:26-37 `try { const r = await loadSheetForAct(levelDoc); ... } finally { setBusy(false); }` — `error` state (:31-32) is only ever set from the returned variant, never from a throw. In import-sheet.ts only the decode is guarded (:63-68); window.api.selectFile (:60), flattenActPalette (:70) and importPngAgainstPalette (:71) are all outside any try, and loadSheetForAct is declared to return an outcome variant rather than reject, so no caller guards it. Failure scenario: an OOM RangeError on a very large sheet inside importPngAgainstPalette — the Chip flips back from 'Reading…' to 'Choose a PNG…' and nothing else happens, which is the 'a click that does nothing' shape the codebase elsewhere calls out explicitly (tab-activation/canvas.ts:178-181).",
+   "confidence": "probable",
+   "fix": "Add a catch that setError()s the message, matching the ok:false branch.",
+   "verdict": null
+  },
+  {
+   "id": "A9",
+   "title": "A corrupt recent-projects.json is silently reset to empty and then overwritten",
+   "severity": "low",
+   "file": "src/main/recent-projects.ts",
+   "line": 19,
+   "claim": "getRecentProjects swallows a JSON.parse failure into [], and the very next addRecentProject writes that [] plus one entry back over the file, discarding the user's whole recents list with no notice.",
+   "evidence": "recent-projects.ts:16-21 `try { return JSON.parse(readFileSync(storePath,'utf-8')); } catch { return []; }`; :24-37 addRecentProject calls getRecentProjects(), unshifts, and writeFileSync's the result unconditionally. Failure scenario: the file is truncated by a crash mid-write (this path uses a plain writeFileSync, unlike the tmp+rename in ipc-handlers.ts:81-94); the next project open rewrites it with a single entry and the Home/Explorer recents list is permanently one row long. Same 'do not destroy what you could not read' rule that canvas-file.ts:251-256 enforces for sidecars.",
+   "confidence": "certain",
+   "fix": "On a parse failure, keep the file (rename it aside or refuse to write) rather than silently rebuilding from empty; and use the tmp+rename write the binary-file handler already uses.",
+   "verdict": null
+  },
+  {
+   "id": "A10",
+   "title": "requestCloseTab is fire-and-forget from the tab strip; a rejecting close confirm silently leaves the tab open",
+   "severity": "low",
+   "file": "src/renderer/shell/TabStrip.tsx",
+   "line": 36,
+   "claim": "The close button calls `void requestCloseTab(tab.id)`, and requestCloseTab awaits confirmCloseSpriteDoc/confirmCloseCanvasDoc without guarding them — a rejection (notably the dynamic import of export-sprite failing inside confirmCloseSpriteDoc) becomes an unhandled rejection and the close silently does nothing.",
+   "evidence": "TabStrip.tsx:36 `onMouseDown={(e) => { e.stopPropagation(); if (e.button === 0) void requestCloseTab(tab.id); }}`. dispatch.ts:151 `if (isSpriteDocTabId(id) && !(await confirmCloseSpriteDoc(id))) return;` — no try. sprite.ts:242 `const { saveSpriteDocArt } = await spriteModule();` is a dynamic import() (sprite.ts:116-120, deliberately dynamic to break an import cycle), and :243 awaits saveSpriteDocArt. Failure scenario: a chunk-load failure in a packaged build during 'Save & close' — the confirm dialog resolves, the promise rejects, and the tab neither closes nor reports anything. Every other outcome of this flow is reported (the two 'Close cancelled' toasts at sprite.ts:249 and canvas.ts:301/309).",
+   "confidence": "speculative",
+   "fix": "Wrap the two confirm calls in dispatch.ts in try/catch that toasts and aborts the close, so the button can never be silently inert.",
+   "verdict": null
+  }
+ ]
+}

@@ -1,8 +1,10 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useClassicLevelStore } from '../../state/classicLevelStore';
 import { loadSheetForAct, type LoadedSheet } from '../../state/import-sheet';
 import CommitPlanView from './CommitPlanView';
-import { Chip, T } from '../ui';
+import { Chip, T, Z } from '../ui';
+import { FOCUSABLE_SELECTOR, nextTrapIndex } from '../ui/focus-trap';
+import { useModalPresence } from '../../state/modalStore';
 
 /**
  * Import an art sheet made elsewhere and commit it into the open act.
@@ -22,6 +24,32 @@ export default function ImportSheetDialog({ onClose }: { onClose: () => void }) 
   const [sheet, setSheet] = useState<LoadedSheet | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  // THE ONE MODAL THAT WAS NOT ONE. This dialog had no Escape, no role, no
+  // focus trap, and a backdrop click that threw away a loaded sheet and its
+  // whole commit plan without asking — while its sibling New Canvas dialog had
+  // all four. Same shape as that one now, for the same reason: a modal the
+  // keyboard cannot reach or leave is a trap, and the two dialogs sitting side
+  // by side should not behave differently.
+  useModalPresence('import-sheet', true);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { e.stopPropagation(); onClose(); }
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [onClose]);
+
+  const trapTab = (e: React.KeyboardEvent) => {
+    if (e.key !== 'Tab' || !panelRef.current) return;
+    const items = Array.from(panelRef.current.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR));
+    const next = nextTrapIndex(items.length, items.indexOf(document.activeElement as HTMLElement), e.shiftKey);
+    if (next === null) return;
+    e.preventDefault();
+    items[next].focus();
+  };
 
   const pick = async () => {
     if (!levelDoc) return;
@@ -38,8 +66,19 @@ export default function ImportSheetDialog({ onClose }: { onClose: () => void }) 
   };
 
   return (
-    <div style={styles.overlay} onClick={onClose}>
-      <div style={styles.dialog} onClick={(e) => e.stopPropagation()}>
+    // NO BACKDROP DISMISS. A stray click outside used to discard a loaded sheet
+    // and the commit plan built from it — minutes of work, no confirmation, no
+    // undo. The × and Escape are the two deliberate ways out, and both are
+    // right there.
+    <div style={styles.overlay}>
+      <div
+        ref={panelRef}
+        style={styles.dialog}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Import art sheet"
+        onKeyDown={trapTab}
+      >
         <div style={styles.header}>
           <span style={styles.title}>Import art sheet</span>
           <button onClick={onClose} style={styles.closeBtn} title="Close">×</button>
@@ -89,7 +128,7 @@ export default function ImportSheetDialog({ onClose }: { onClose: () => void }) 
 const styles: Record<string, React.CSSProperties> = {
   overlay: {
     position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)',
-    display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+    display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: Z.modal,
   },
   dialog: {
     background: T.surface, border: `1px solid ${T.borderStrong}`, borderRadius: 8,

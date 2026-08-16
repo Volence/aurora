@@ -1742,7 +1742,7 @@ const styles: Record<string, React.CSSProperties> = {
     position: 'absolute', bottom: 0, left: 0, right: 0,
     padding: '4px 12px', background: 'rgba(17, 17, 27, 0.9)',
     borderTop: `1px solid ${T.border}`,
-    fontSize: 11, fontFamily: 'monospace', color: T.textBase,
+    fontSize: 11, fontFamily: T.fontMono, color: T.textBase,
     gap: 6, alignItems: 'center',
     pointerEvents: 'none',
   },

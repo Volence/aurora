@@ -106,7 +106,7 @@ export const BlockThumb = React.memo(function BlockThumb({
 function cellStyle(size: number): React.CSSProperties {
   return {
     position: 'relative', padding: 0, width: size, height: size, flexShrink: 0,
-    background: T.overlay, borderWidth: 1, borderStyle: 'solid', borderColor: T.border, borderRadius: 3,
+    background: T.overlay, borderWidth: 1, borderStyle: 'solid', borderColor: T.border, borderRadius: T.rMd,
     cursor: 'pointer', overflow: 'hidden',
   };
 }

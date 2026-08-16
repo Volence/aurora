@@ -35,6 +35,7 @@
 import type { ConstraintProfileId } from '../../core/art/canvas-profiles';
 import { CANVAS_COLORS, CANVAS_LINE_LENGTH, CANVAS_MIN_SIDE, CANVAS_MAX_SIDE } from '../../core/art/canvas-doc';
 import { defaultCanvasPalette, paletteHasVisibleColour } from '../../core/art/canvas-default-palette';
+import { CHUNK_PX } from '../../core/art/canvas-resolve';
 import { canvasNameIsSafe, canvasPngPath, canvasSidecarPath, listCanvasNames } from '../state/canvas-file';
 import {
   useCanvasStore, openCanvasDoc, closeCanvasDoc, activateCanvasDoc, clearCanvasFocus,
@@ -63,8 +64,13 @@ export interface NewCanvasInput {
  * whole suite green. The test asserts `validateNewCanvas(NEW_CANVAS_DEFAULTS,
  * [])` is ok, which is the one thing a default has to be.
  *
- * 128x128 is two chunks square: big enough for a real piece of scenery, small
- * enough that undo snapshots stay cheap (canvas-doc.ts's MAX_SIDE comment).
+ * 256x256 is ONE CHUNK — the smallest size a commit can actually take. The
+ * default used to be 128x128, described here as "two chunks square", which is
+ * wrong twice over: a chunk is 256px, so that is a QUARTER of one, and
+ * `canvasChunkCapacity` floors to zero for it. A new canvas therefore opened at
+ * a size the commit panel could only answer "there is nothing to commit yet"
+ * for — the one thing a default must not be. Undo snapshots grow 4x with it
+ * (64KB a step), which is well inside what canvas-doc's MAX_SIDE budgets.
  * `genesis-level-art` is spec §4.2's default target and the profile whose grids
  * (8/16/256) match the tile/block/chunk ladder the rest of the app speaks.
  *
@@ -74,10 +80,26 @@ export interface NewCanvasInput {
  * landing on disk. The test supplies one and asserts the rest is valid.
  */
 export const NEW_CANVAS_DEFAULTS: Omit<NewCanvasInput, 'name'> = {
-  width: 128,
-  height: 128,
+  width: 256,
+  height: 256,
   profileId: 'genesis-level-art',
 };
+
+/**
+ * Why a size cannot be committed into a level, or null when it can.
+ *
+ * NOT a refusal — a canvas smaller than a chunk is a perfectly good place to
+ * draw something you will paste, import or grow later. It is a thing the dialog
+ * has to SAY, because the consequence only shows up much later, in a commit
+ * panel that reports "nothing to commit yet" without explaining that the size
+ * chosen at creation is the reason.
+ */
+export function commitReachNote(width: number, height: number): string | null {
+  if (!Number.isFinite(width) || !Number.isFinite(height)) return null;
+  if (width >= CHUNK_PX && height >= CHUNK_PX) return null;
+  return `Smaller than one ${CHUNK_PX}x${CHUNK_PX} chunk, so this cannot be committed into a level `
+    + 'as it stands — commit works on whole chunks. Fine for art you will paste or import from.';
+}
 
 /** Which field a refusal is about, so the dialog can point at it. */
 export type NewCanvasField = 'name' | 'width' | 'height';

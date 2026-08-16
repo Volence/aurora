@@ -88,14 +88,13 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: 'pointer', padding: '3px 5px', borderRadius: 4,
     border: '2px solid transparent',
     background: 'transparent',
-    outline: 'none',
   },
   lineSelected: {
     border: `2px solid ${T.accent}`,
     background: 'rgba(137, 180, 250, 0.15)',
   },
   lineLabel: {
-    fontSize: 10, color: T.textLo, marginRight: 4, fontFamily: 'monospace',
+    fontSize: 10, color: T.textLo, marginRight: 4, fontFamily: T.fontMono,
   },
   lineLabelSelected: {
     color: T.accent, fontWeight: 700,

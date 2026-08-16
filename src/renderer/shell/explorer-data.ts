@@ -65,12 +65,12 @@ export function canvasExplorerGroup(
     id: 'canvases',
     label: 'Canvases',
     items: [
-      { id: NEW_CANVAS_ITEM_ID, label: 'New Canvas…', hint: 'new' },
+      { id: NEW_CANVAS_ITEM_ID, label: 'New Canvas…', hint: 'new', action: true },
       // Sits beside New Canvas because it is the OTHER way art gets in, and the
       // command palette was its only home — a feature reachable solely by a
       // keystroke nobody has been told about is a feature nobody finds. Classic
       // only, matching the ⌘K entry's gate.
-      ...(opts.classic ? [{ id: IMPORT_SHEET_ITEM_ID, label: 'Import Art Sheet…', hint: 'import' }] : []),
+      ...(opts.classic ? [{ id: IMPORT_SHEET_ITEM_ID, label: 'Import Art Sheet…', hint: 'import', action: true }] : []),
       ...listing.names.map((n) => ({ id: `doc:canvas:${n}`, label: n })),
       ...listing.skipped.map((f) => ({
         id: `canvas-skipped:${f}`,
@@ -169,7 +169,7 @@ export function aeonExplorerGroups(
         // unreachable — nothing opens a sprite-doc tab without a binding, and
         // Export (which creates the sprite the binding would point at) lives
         // inside that editor. This row breaks that circle.
-        { id: NEW_SPRITE_ITEM_ID, label: 'New Sprite…', hint: 'new' },
+        { id: NEW_SPRITE_ITEM_ID, label: 'New Sprite…', hint: 'new', action: true },
         ...objects.map((o) =>
           o.sprite
             ? { id: `doc:sprite:aeon:${o.sprite}`, label: o.name }

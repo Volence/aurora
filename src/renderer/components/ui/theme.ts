@@ -14,3 +14,27 @@ export const T = {
   // emerald accent on void surface — for primary buttons/active states
   onAccent: 'var(--void)',
 } as const;
+
+/**
+ * THE STACKING ORDER, stated once.
+ *
+ * Not in theme.css because that file is generated from the Empyrean tokens and
+ * these are Aurora's own layering, but named here for the same reason the
+ * spacing scale is: the app had five hand-picked z-indexes and two of them
+ * collided. A context menu and a modal both sat at 1000, so which one won was
+ * whichever React rendered later, and the New Canvas dialog outranked the
+ * import dialog for no reason anyone chose.
+ *
+ * Read top to bottom as what covers what:
+ *
+ *   menu      a dropdown anchored to its trigger, inside the page
+ *   floating  a context menu / picker that escapes its container
+ *   modal     a dialog that owns the screen until it is answered
+ *   toast     always visible, even over a dialog — it reports what happened
+ */
+export const Z = {
+  menu: 100,
+  floating: 1000,
+  modal: 1100,
+  toast: 1300,
+} as const;

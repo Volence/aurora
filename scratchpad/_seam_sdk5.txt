@@ -1,0 +1,20 @@
+files mentioning rebinding opts:
+/home/volence/sonic_hacks/aurora/node_modules/@modelcontextprotocol/sdk/dist/esm/server/express.js
+/home/volence/sonic_hacks/aurora/node_modules/@modelcontextprotocol/sdk/dist/esm/server/sse.js
+/home/volence/sonic_hacks/aurora/node_modules/@modelcontextprotocol/sdk/dist/esm/server/webStandardStreamableHttp.js
+
+server/express.js:23: * const app = createMcpExpressApp({ host: '0.0.0.0', allowedHosts: ['myapp.local', 'localhost'] });
+server/express.js:27: const { host = '127.0.0.1', allowedHosts } = options;
+server/express.js:30: // If allowedHosts is explicitly provided, use that for validation
+server/express.js:31: if (allowedHosts) {
+server/express.js:32: app.use(hostHeaderValidation(allowedHosts));
+server/express.js:44: 'Consider using the allowedHosts option to restrict allowed hosts, ' +
+server/sse.js:22: this._options = options || { enableDnsRebindingProtection: false };
+server/sse.js:30: if (!this._options.enableDnsRebindingProtection) {
+server/sse.js:33: // Validate Host header if allowedHosts is configured
+server/sse.js:34: if (this._options.allowedHosts && this._options.allowedHosts.length > 0) {
+server/sse.js:36: if (!hostHeader || !this._options.allowedHosts.includes(hostHeader)) {
+server/sse.js:37: return `Invalid Host header: ${hostHeader}`;
+server/sse.js:40: // Validate Origin header if allowedOrigins is configured
+server/sse.js:41: if (this._options.allowedOrigins && this._options.allowedOrigins.length > 0) {
+server/sse.js:43: if (originHeader && !this._options.allowedOrigins.includes(originHeader)) {

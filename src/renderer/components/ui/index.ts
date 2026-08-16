@@ -1,5 +1,5 @@
 // src/renderer/components/ui/index.ts
-export { T } from './theme';
+export { T, Z } from './theme';
 export * from './primitives';
 export * from './fields';
 export { CollapsibleSection, type SectionVariant } from './CollapsibleSection';

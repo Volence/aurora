@@ -41,10 +41,11 @@
 // guarded write refuses an existing file outright (see new-canvas.ts's header).
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { T } from '../ui';
+import { T, Z } from '../ui';
 import { FOCUSABLE_SELECTOR, nextTrapIndex } from '../ui/focus-trap';
+import { useModalPresence } from '../../state/modalStore';
 import {
-  createCanvasDocument, newCanvasFieldErrors, parseCanvasSide, NEW_CANVAS_DEFAULTS,
+  createCanvasDocument, newCanvasFieldErrors, parseCanvasSide, NEW_CANVAS_DEFAULTS, commitReachNote,
   type NewCanvasField,
 } from '../../shell/new-canvas';
 import { listCanvasNames } from '../../state/canvas-file';
@@ -78,6 +79,8 @@ export default function NewCanvasDialog({ open, onClose }: { open: boolean; onCl
   const [failure, setFailure] = useState<{ field: NewCanvasField | null; reason: string } | null>(null);
   const panelRef = useRef<HTMLFormElement>(null);
 
+  useModalPresence('new-canvas', open);
+
   useEffect(() => {
     if (!open) return;
     setName('');
@@ -97,6 +100,7 @@ export default function NewCanvasDialog({ open, onClose }: { open: boolean; onCl
     return () => { live = false; };
   }, [open]);
 
+  const reachNote = commitReachNote(parseCanvasSide(widthText) ?? NaN, parseCanvasSide(heightText) ?? NaN);
   const width = parseCanvasSide(widthText);
   const height = parseCanvasSide(heightText);
   const errors = newCanvasFieldErrors({ name, width, height, profileId }, existing);
@@ -218,6 +222,12 @@ export default function NewCanvasDialog({ open, onClose }: { open: boolean; onCl
             <span style={styles.times}>px</span>
           </span>
         </div>
+        {/* UX-A1: the consequence of a sub-chunk size shows up much later, in a
+            commit panel that says "nothing to commit yet" without connecting it
+            to the number typed here. Said at the moment of the choice instead,
+            and as information rather than a refusal — a small canvas is a fine
+            place to draw something you will paste. */}
+        {reachNote && <div style={styles.hint}>{reachNote}</div>}
 
         <label style={styles.row}>
           <span style={styles.label}>Profile</span>
@@ -257,7 +267,7 @@ export default function NewCanvasDialog({ open, onClose }: { open: boolean; onCl
 const styles: Record<string, React.CSSProperties> = {
   backdrop: {
     position: 'fixed', inset: 0, background: 'rgba(10,12,18,0.6)', backdropFilter: 'blur(2px)',
-    display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100,
+    display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: Z.modal,
   },
   panel: {
     width: 460, maxWidth: '90vw', background: T.surface, border: `1px solid ${T.borderStrong}`,
@@ -274,7 +284,7 @@ const styles: Record<string, React.CSSProperties> = {
   input: {
     flex: 1, minWidth: 0, background: T.raised, color: T.textHi,
     border: `1px solid ${T.borderStrong}`, borderRadius: T.rMd,
-    fontSize: 12, fontFamily: T.fontUi, padding: '5px 8px', outline: 'none',
+    fontSize: 12, fontFamily: T.fontUi, padding: '5px 8px',
   },
   inputBad: { borderColor: T.error },
   error: {

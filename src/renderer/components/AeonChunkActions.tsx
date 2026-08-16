@@ -40,6 +40,6 @@ const styles: Record<string, React.CSSProperties> = {
   wrap: { display: 'flex', gap: 4, marginLeft: 'auto', flexShrink: 0 },
   btn: {
     padding: '2px 8px', background: T.border, color: T.textHi,
-    border: `1px solid ${T.borderStrong}`, borderRadius: 3, cursor: 'pointer', fontSize: 10,
+    border: `1px solid ${T.borderStrong}`, borderRadius: T.rMd, cursor: 'pointer', fontSize: 10,
   },
 };

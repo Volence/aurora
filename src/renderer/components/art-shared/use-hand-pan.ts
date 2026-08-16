@@ -51,16 +51,29 @@ export function useHandPan(
   // mount its scrolled element later than this hook's first run, and an empty
   // dependency array left drag-pan permanently dead when it did.
   useAttachedEffect(scrollerRef, (scroller) => {
-    const inTextField = (t: EventTarget | null) => {
+    /**
+     * Does the focused element own Space itself?
+     *
+     * This listener is on the WINDOW, so it fires wherever focus happens to be
+     * — and it used to preventDefault Space for everything except text fields.
+     * Space is also how a keyboard user presses a focused BUTTON, so while any
+     * pixel surface was mounted, Space-to-press was dead across the whole app:
+     * every toolbar button, every chip, every dialog's Save. The hand-pan is a
+     * gesture on a canvas; a focused control outranks it.
+     */
+    const ownsSpace = (t: EventTarget | null) => {
       const el = t as HTMLElement | null;
-      return !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable);
+      if (!el || !el.tagName) return false;
+      if (el.isContentEditable) return true;
+      if (['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON', 'A', 'SUMMARY', 'OPTION'].includes(el.tagName)) return true;
+      return el.getAttribute('role') === 'button' || el.getAttribute('role') === 'checkbox';
     };
 
     const onKeyDown = (e: KeyboardEvent) => {
       const gate = enabledRef.current;
       if (gate && !gate()) return;   // another surface owns the keyboard — do not even preventDefault
-      if (e.code !== 'Space' || inTextField(e.target)) return;
-      e.preventDefault(); // stop Space from scrolling the page / activating a focused button
+      if (e.code !== 'Space' || ownsSpace(e.target)) return;
+      e.preventDefault(); // stop Space from scrolling the page
       if (!spaceDown.current) {
         spaceDown.current = true;
         if (!panning.current) scroller.style.cursor = 'grab';

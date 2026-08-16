@@ -1,0 +1,20 @@
+build.sh:54: # built against a UNIQUIFIED act art pool (ojz_strip_gen --stress-uniquify N,
+
+--- act_descriptor bg lines (editor export) ---
+13: dc.l    ojz_act1_BG_Layout      ; act_bg_layout
+14: dc.l    ojz_act1_BG_Tiles       ; act_bg_tiles
+17: ; NOTE: non-zero sec_bg_layout entries reference editor BG-library
+18: ; binaries (data/editor/ojz_bg_{id}.bin). The build pipeline must
+19: ; BINCLUDE each referenced binary at its ojz_BG_{id} label.
+30: dc.l    ojz_BG_deep_forest_v16_trunks_over_wall_1781232789593  ; sec_bg_layout
+52: dc.l    0  ; sec_bg_layout
+74: dc.l    0  ; sec_bg_layout
+96: dc.l    0  ; sec_bg_layout
+118: dc.l    0  ; sec_bg_layout
+140: dc.l    0  ; sec_bg_layout
+162: dc.l    0  ; sec_bg_layout
+184: dc.l    0  ; sec_bg_layout
+206: dc.l    0  ; sec_bg_layout
+
+--- generated dir ---
+act_pool_page0.bin act_pool_page0.zx0 act_pool_page1.bin act_pool_page1.zx0 act_pool_page2.bin act_pool_page2.zx0 act_pool_page3.bin act_pool_page3.zx0 act_pool_page4.bin act_pool_page4.zx0 act_pool_page5.bin act_pool_page5.zx0 act_pool_page6.bin act_pool_page6.zx0 act_pool_page7.bin act_pool_page7.zx0 act_pool_page8.bin act_pool_page8.zx0 act_pool_page9.bin act_pool_page9.zx0 bg_anim.emp bg_anim_banks.bin bg_tiles.bin entity_data.emp ojz_act_pool.emp ojz_act_pool_manifest.emp ojz_act_pool_manifest.json ojz_palette.bin sec0_blocks.bin sec0_local_map.bin sec0_strips_a.bin sec0_strips_source.bin sec0_tiles.bin sec0_tiles.zx0 sec1_blocks.bin sec1_local_map.bin sec1_strips_a.bin sec1_strips_source.bin sec1_tiles.bin sec1_tiles.zx0 sec2_blocks.bin sec2_local_map.bin sec2_strips_a.bin sec2_strips_source.bin sec2_tiles.bin sec2_tiles.zx0 sec3_blocks.bin sec3_local_map.bin sec3_strips_a.bin sec3_strips_source.bin sec3_tiles.bin sec3_tiles.zx0 sec4_blocks.bin sec4_local_map.bin sec4_strips_a.bin sec4_strips_source.bin sec4_tiles.bin sec4_tiles.zx0 sec5_blocks.bin sec5_local_map.bin sec5_strips_a.bin sec5_strips_source.bin sec5_tiles.bin sec5_tiles.zx0 sec6_blocks.bin sec6_local_map.bin sec6_strips_a.bin sec6_strips_source.bin sec6_tiles.bin sec6_tiles.zx0 sec7_blocks.bin sec7_local_map.bin sec7_strips_a.bin sec7_strips_source.bin sec7_tiles.bin sec7_tiles.zx0 sec8_blocks.bin sec8_local_map.bin sec8_strips_a.bin sec8_strips_source.bin sec8_tiles.bin sec8_tiles.zx0 sec_block_blobs.emp sec_block_dicts.emp sec_local_maps.emp zone_bg.bin

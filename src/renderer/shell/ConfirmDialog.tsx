@@ -1,11 +1,15 @@
 import React, { useEffect } from 'react';
-import { T } from '../components/ui';
+import { T, Z } from '../components/ui';
 import { useConfirmStore } from '../state/confirmStore';
+import { useModalPresence } from '../state/modalStore';
 
 /** Modal for confirmStore requests. Esc / backdrop click answer 'cancel'. */
 export default function ConfirmDialog() {
   const request = useConfirmStore((s) => s.request);
   const answer = useConfirmStore((s) => s.answer);
+  // Declares itself to the modal registry while it is on screen, so anything
+  // that must behave differently under a modal (the command palette) can ask.
+  useModalPresence('confirm', request !== null);
 
   useEffect(() => {
     if (!request) return;
@@ -46,7 +50,7 @@ export default function ConfirmDialog() {
 const styles: Record<string, React.CSSProperties> = {
   backdrop: {
     position: 'fixed', inset: 0, background: 'rgba(10,12,18,0.6)', backdropFilter: 'blur(2px)',
-    display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100,
+    display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: Z.modal,
   },
   panel: {
     width: 420, maxWidth: '90vw', background: T.surface, border: `1px solid ${T.borderStrong}`,

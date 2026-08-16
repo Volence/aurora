@@ -1,0 +1,4 @@
+/home/volence/sonic_hacks/aurora/node_modules/@modelcontextprotocol/sdk/dist/cjs/client/streamableHttp.js
+/home/volence/sonic_hacks/aurora/node_modules/@modelcontextprotocol/sdk/dist/cjs/server/streamableHttp.js
+/home/volence/sonic_hacks/aurora/node_modules/@modelcontextprotocol/sdk/dist/esm/client/streamableHttp.js
+/home/volence/sonic_hacks/aurora/node_modules/@modelcontextprotocol/sdk/dist/esm/server/streamableHttp.js
