@@ -25,7 +25,7 @@
 
 import type { PixelBuffer } from './pixel-ops';
 import type { DecodedIndexedPng } from './indexed-png';
-import { encodeGenesisColor } from '../formats/palette';
+import { encodeGenesisColor, decodeGenesisColor } from '../formats/palette';
 import { canvasIndex, CANVAS_LINES, CANVAS_LINE_LENGTH } from './canvas-doc';
 import { CELL } from './tile-canon';
 
@@ -75,11 +75,21 @@ export function importPngAgainstPalette(
   for (let i = 0; i < palette.length; i++) {
     const word = encodeGenesisColor(palette[i]);
     snappedWords.push(word);
-    // A colour is "snapped" when the 3-bit round trip moved it — worth counting
-    // because it is the difference between the artist's colour and the one the
-    // hardware can hold, and they should be told rather than surprised.
-    const rt = encodeGenesisColor(genesisRgb(word));
-    if (rt !== word || !isExactGenesis(palette[i])) snappedColours++;
+    // A colour is "snapped" when the 3-bit quantisation MOVED it — worth
+    // counting, because it is the difference between the artist's colour and
+    // the one the hardware can hold, and they should be told rather than
+    // surprised.
+    //
+    // Measured by round-tripping through the SAME pair of functions the rest of
+    // the app uses, and comparing the RGB that comes back. An earlier version
+    // asked "is this value on the 3-bit grid" arithmetically and compared
+    // floats — `5 * 255 / 7` is 182.142…, never equal to the 182 that
+    // `decodeGenesisColor` produces — so it reported every exact Genesis colour
+    // as snapped. Real GHZ art is entirely exact Genesis colours, so the count
+    // it showed was the palette size.
+    const back = decodeGenesisColor(word);
+    const c = palette[i];
+    if (back.r !== c.r || back.g !== c.g || back.b !== c.b) snappedColours++;
     const found: Candidate[] = [];
     for (let line = 0; line < CANVAS_LINES; line++) {
       for (let entry = 1; entry < CANVAS_LINE_LENGTH; entry++) {
@@ -180,21 +190,4 @@ export function importPngAgainstPalette(
       snappedColours,
     },
   };
-}
-
-/** The RGB a CRAM word renders as — the inverse of encodeGenesisColor's 3-bit
- *  quantisation, used only to detect whether a colour moved. */
-function genesisRgb(word: number): { r: number; g: number; b: number } {
-  const to8 = (v: number) => Math.round(v * 255 / 7);
-  return {
-    r: to8((word >> 1) & 0x7),
-    g: to8((word >> 5) & 0x7),
-    b: to8((word >> 9) & 0x7),
-  };
-}
-
-/** Whether a colour already sits exactly on the Genesis 3-bit grid. */
-function isExactGenesis(c: { r: number; g: number; b: number }): boolean {
-  const on = (v: number) => Math.round(v * 7 / 255) * 255 / 7 === v;
-  return on(c.r) && on(c.g) && on(c.b);
 }

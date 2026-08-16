@@ -11,6 +11,7 @@ import SpriteDocHeader from './shell/SpriteDocHeader';
 import CanvasMode from './components/canvas/CanvasMode';
 import CanvasDocUnloaded from './components/canvas/CanvasDocUnloaded';
 import NewCanvasDialog from './components/canvas/NewCanvasDialog';
+import ImportSheetDialog from './components/canvas/ImportSheetDialog';
 import { canvasPaneState } from './components/canvas/canvas-pane-model';
 import HomeTab from './components/home/HomeTab';
 import ProjectSetupTab from './components/setup/ProjectSetupTab';
@@ -75,6 +76,7 @@ export default function App() {
   // to create the same file. Plain state rather than another store — App already
   // hands Explorer its other entry points as props.
   const [newCanvasOpen, setNewCanvasOpen] = useState(false);
+  const [importSheetOpen, setImportSheetOpen] = useState(false);
 
   // -- runtime wiring ------------------------------------------------------
   useEffect(() => {
@@ -160,6 +162,7 @@ export default function App() {
         editObjectArt: (id) => { void editObjectArt(id); },
         newSprite: () => void requestOpenTab(untitledSpriteTab()),
         newCanvas: () => setNewCanvasOpen(true),
+        importSheet: () => setImportSheetOpen(true),
         openRecent: (path) => void openProjectByPath(path),
       },
     );
@@ -290,6 +293,7 @@ export default function App() {
       <CommandPalette commands={commands} />
       <ConfirmDialog />
       <NewCanvasDialog open={newCanvasOpen} onClose={() => setNewCanvasOpen(false)} />
+      {importSheetOpen && <ImportSheetDialog onClose={() => setImportSheetOpen(false)} />}
     </div>
   );
 }

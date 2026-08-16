@@ -204,3 +204,19 @@ describe('importPngAgainstPalette — the rules that had no test', () => {
     expect(r.result.usedLines).toEqual([1]);
   });
 });
+
+describe('importPngAgainstPalette — the snapped count', () => {
+  it('counts NOTHING when every colour is already an exact Genesis colour', () => {
+    // Real level art is entirely exact Genesis colours. An arithmetic
+    // "is this on the 3-bit grid" check compares floats (5 * 255 / 7 is
+    // 182.142…, never the 182 decodeGenesisColor returns) and reports every one
+    // of them as snapped — so the number the artist sees would be the palette
+    // size. Found against the real GHZ palette, not a fixture.
+    const grey = { r: 182, g: 182, b: 182 }; // exactly 3-bit level 5
+    const pal = actPalette([{ line: 1, entry: 1, rgb: grey }]);
+    const r = importPngAgainstPalette(png(8, 8, [grey], () => 0), pal);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.result.snappedColours).toBe(0);
+  });
+});

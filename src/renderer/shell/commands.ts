@@ -37,6 +37,8 @@ export interface CommandActions {
   newSprite: () => void;
   /** Open the New Canvas dialog (any engine — see the command below). */
   newCanvas: () => void;
+  /** Open the Import Art Sheet dialog (classic only — it commits into an act). */
+  importSheet: () => void;
   openRecent: (path: string) => void;
 }
 
@@ -69,6 +71,15 @@ export function buildCommands(s: CommandSnapshot, a: CommandActions): Command[] 
   // this app's one definition of "a project is open" (state/open-project.ts).
   if (s.engine !== null) {
     cmds.push({ id: 'new-canvas', label: 'New Canvas…', hint: 'canvas', run: a.newCanvas });
+  }
+
+  // CLASSIC ONLY, unlike New Canvas above: importing a sheet commits it into an
+  // act's tile/block/chunk pools, which is a classic notion — aeon's art model
+  // has no such ladder. Gated on the engine rather than on an act being open, so
+  // the command is discoverable before you have picked a level; the dialog says
+  // "open a level act first" rather than the command silently not existing.
+  if (s.engine === 's1') {
+    cmds.push({ id: 'import-sheet', label: 'Import Art Sheet…', hint: 'art', run: a.importSheet });
   }
 
   for (const tab of s.tabs) {

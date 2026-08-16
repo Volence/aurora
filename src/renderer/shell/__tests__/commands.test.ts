@@ -6,7 +6,7 @@ function actions(): CommandActions {
   return {
     openProjectDialog: vi.fn(), save: vi.fn(), saveAll: vi.fn(), toggleExplorer: vi.fn(),
     openTab: vi.fn(), editObjectArt: vi.fn(), newSprite: vi.fn(), newCanvas: vi.fn(),
-    openRecent: vi.fn(),
+    importSheet: vi.fn(), openRecent: vi.fn(),
   };
 }
 
@@ -158,5 +158,22 @@ describe('buildCommands', () => {
     expect(buildCommands(withRecents, actions()).some((c) => c.id === 'recent:/p')).toBe(true);
     expect(buildCommands({ ...withRecents, engine: 's1' as const }, actions())
       .some((c) => c.id === 'recent:/p')).toBe(false);
+  });
+});
+
+describe('Import Art Sheet', () => {
+  it('is offered for a classic project', () => {
+    const cmds = buildCommands({ ...emptySnapshot, engine: 's1' }, actions());
+    expect(cmds.some((c) => c.id === 'import-sheet')).toBe(true);
+  });
+
+  it('is NOT offered for aeon — the tile/block/chunk ladder it commits into is classic', () => {
+    const cmds = buildCommands({ ...emptySnapshot, engine: 'aeon' }, actions());
+    expect(cmds.some((c) => c.id === 'import-sheet')).toBe(false);
+  });
+
+  it('is NOT offered with no project open', () => {
+    const cmds = buildCommands(emptySnapshot, actions());
+    expect(cmds.some((c) => c.id === 'import-sheet')).toBe(false);
   });
 });
