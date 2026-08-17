@@ -73,10 +73,11 @@ const SIDECAR = '.aurora/project.json';
  *  - `art` is the composer — the tile/block/chunk tiers of the zone-art doc, and
  *    the only classic facet whose canvas is not the act. Hence LAST.
  *
- *  - `collision` is the READ side of the collision editor (spec stage 3a): the
- *    lookup that decides whether the player stands on a cell, shown where the
- *    hole is. It does not write yet — solidity stays in ChunkTab's Assign mode,
- *    and the shape picker is stage 3b. Granted 2026-08-17.
+ *  - `collision` is the collision editor: the lookup that decides whether the
+ *    player stands on a cell, shown where the hole is. Granted read-only
+ *    2026-08-17 (spec stage 3a); stage 3b (same day) made it write — a shape
+ *    picker over `paint-collision` — while solidity itself stays ChunkTab's
+ *    Assign mode.
  *  - `rings` is ABSENT: S1 rings are objects in objpos, not a separate layer.
  */
 export const S1_FACETS = ['layout', 'objects', 'collision', 'palette', 'art'] as const satisfies readonly FacetCapability[];

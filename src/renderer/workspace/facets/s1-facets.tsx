@@ -11,7 +11,7 @@
 // ---------------------------------------------------------------------------
 //   Layout     → ClassicLevelViewport + chunks
 //   Objects    → ClassicLevelViewport + selected object / object library
-//   Collision  → ClassicLevelViewport + solidity readout (read-only)
+//   Collision  → ClassicLevelViewport + solidity readout + shape picker
 //   Palette    → ClassicLevelViewport + palette grid
 //   Art        → ClassicComposerDock  + chunks / palette grid
 //

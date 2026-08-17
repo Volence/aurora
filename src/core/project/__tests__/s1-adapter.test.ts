@@ -91,8 +91,9 @@ describe('s1Adapter.open resolution', () => {
       // the only classic facet that swaps the canvas, and the four before it
       // are lenses over one map. `objects` merged into `layout` for a day and
       // was reversed once the reorder made the split read correctly.
-      // `collision` is the READ side of the collision editor (spec stage 3a),
-      // granted 2026-08-17. `rings` stays out — S1 rings are objects in objpos,
+      // `collision` was granted read-only 2026-08-17 (spec stage 3a) and made
+      // writable the same day (stage 3b, the shape picker over
+      // paint-collision). `rings` stays out — S1 rings are objects in objpos,
       // not a separate layer. Argued at the grant itself (core/project/s1/index.ts).
       facets: ['layout', 'objects', 'collision', 'palette', 'art'],
       artTiers: [
