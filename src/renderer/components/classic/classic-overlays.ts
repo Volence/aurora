@@ -10,6 +10,7 @@
 
 import { chunkIndexForId, type LevelDoc } from '../../../core/level-classic/model';
 import { columnSolidRun } from '../../../core/collision/collision-render';
+import { angleNeedle } from './collision-needle';
 import { objectFrameRect } from '../../../core/level-classic/object-sprite';
 import { objectArtKey } from '../../../core/project/profiles/object-subtype-rules';
 import { s1ObjectIsInvisible, s1ObjectName } from '../../../core/project/profiles/s1-objects';
@@ -81,14 +82,17 @@ export function drawCollision(
       ctx.fillRect(cx + c, cy + ry, 1, run.h);
     }
     if (showAngles) {
-      const ang = angles[shapeIndex] ?? 0;
-      const a = (ang / 256) * Math.PI * 2;
+      // Direction and flips both come from collision-needle.ts, which is
+      // anchored on the engine's own convention and unit-tested; this block
+      // used to inline a mirrored formula and ignore cell.xf/yf entirely,
+      // while the height rendering above honoured them.
+      const { dx, dy } = angleNeedle(angles[shapeIndex] ?? 0, cell.xf, cell.yf);
       const mx = cx + 8, my = cy + 8, len = 6;
       ctx.strokeStyle = COLLISION_ANGLE_TICK;
       ctx.lineWidth = 1 / ctx.getTransform().a;
       ctx.beginPath();
-      ctx.moveTo(mx - Math.cos(a) * len, my + Math.sin(a) * len);
-      ctx.lineTo(mx + Math.cos(a) * len, my - Math.sin(a) * len);
+      ctx.moveTo(mx - dx * len, my - dy * len);
+      ctx.lineTo(mx + dx * len, my + dy * len);
       ctx.stroke();
     }
   }
