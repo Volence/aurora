@@ -423,12 +423,25 @@ describe('classic object tools', () => {
 describe('classic-set-colind', () => {
   it('sets collision-shape indices', async () => {
     openReady();
-    expect(await handleAgentRequest({ kind: 'classic-set-colind', entries: [{ blockId: 0, value: 7 }, { blockId: 1, value: 200 }] })).toEqual({ entries: 2 });
-    expect(Array.from(lvl().doc!.collision.colind)).toEqual([7, 200]);
+    // Block 1, not block 0: block 0 is the blank block and is refused outright
+    // now (the engine short-circuits before reading its collision), so using it
+    // as filler here would test the refusal instead of the write.
+    expect(await handleAgentRequest({ kind: 'classic-set-colind', entries: [{ blockId: 1, value: 200 }] })).toEqual({ entries: 1 });
+    expect(Array.from(lvl().doc!.collision.colind)).toEqual([0, 200]);
   });
   it('rejects a value > 255', async () => {
     openReady();
-    await expect(handleAgentRequest({ kind: 'classic-set-colind', entries: [{ blockId: 0, value: 256 }] })).rejects.toThrow(/out of range/);
+    // Block 1 for the same reason — with block 0 the id refusal fires first and
+    // this stops being a test of the VALUE range at all.
+    await expect(handleAgentRequest({ kind: 'classic-set-colind', entries: [{ blockId: 1, value: 256 }] })).rejects.toThrow(/out of range/);
+  });
+  it('refuses block 0 on the agent path too, with the reason', async () => {
+    // The agent surface must refuse exactly what the UI will. set_colind is the
+    // one collision tool that already existed, so it is also the one place a
+    // model could quietly write a shape the console can never read.
+    openReady();
+    await expect(handleAgentRequest({ kind: 'classic-set-colind', entries: [{ blockId: 0, value: 7 }] }))
+      .rejects.toThrow(/blank block/);
   });
   it('errors when no level is open', async () => {
     await expect(handleAgentRequest({ kind: 'classic-set-colind', entries: [] })).rejects.toThrow(/no classic level is open/);

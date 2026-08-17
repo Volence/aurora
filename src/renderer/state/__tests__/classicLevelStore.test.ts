@@ -325,8 +325,11 @@ describe('classic:set-colind', () => {
   it('sets shape indices, marks colind dirty, bumps NO version', () => {
     openReady();
     const epoch0 = st().chunkEpoch;
-    expect(classicSetColind([{ blockId: 0, value: 7 }, { blockId: 1, value: 200 }]).ok).toBe(true);
-    expect(Array.from(st().doc!.collision.colind)).toEqual([7, 200]);
+    // Block 0 is refused (see the 'classicSetColind refusals' suite below), so
+    // this exercises the set/dirty/undo mechanics on the one settable block
+    // the fixture has.
+    expect(classicSetColind([{ blockId: 1, value: 200 }]).ok).toBe(true);
+    expect(Array.from(st().doc!.collision.colind)).toEqual([0, 200]);
     expect(st().dirty.colind).toBe(true);
     expect(st().chunkEpoch).toBe(epoch0);
     artStack().undo();
@@ -335,7 +338,7 @@ describe('classic:set-colind', () => {
 
   it('rejects value > 255 and out-of-range block (atomic)', () => {
     openReady();
-    expect(classicSetColind([{ blockId: 0, value: 256 }]).ok).toBe(false);
+    expect(classicSetColind([{ blockId: 1, value: 256 }]).ok).toBe(false);
     expect(classicSetColind([{ blockId: 9, value: 0 }]).ok).toBe(false);
     expect(st().dirty.colind).toBeUndefined();
   });
@@ -343,10 +346,33 @@ describe('classic:set-colind', () => {
   it('an all-unchanged entry set is a no-op: ok:true but no undo step', () => {
     openReady(); // colind is [0, 0] in the fixture
     const doc = st().doc;
-    expect(classicSetColind([{ blockId: 0, value: 0 }, { blockId: 1, value: 0 }])).toEqual({ ok: true });
+    expect(classicSetColind([{ blockId: 1, value: 0 }])).toEqual({ ok: true });
     expect(st().doc).toBe(doc);
     expect(artStack().canUndo).toBe(false);
     expect(st().dirty.colind).toBeUndefined();
+  });
+});
+
+describe('classicSetColind refusals', () => {
+  beforeEach(() => { openReady(); });
+
+  it('refuses block 0 and says the engine cannot read it', () => {
+    const r = classicSetColind([{ blockId: 0, value: 3 }]);
+    expect(r.ok).toBe(false);
+    expect((r as { error: string }).error).toMatch(/block 0/);
+    expect((r as { error: string }).error).toMatch(/short-circuit|never/i);
+  });
+
+  it('refuses a block past the colind table and names the overhang', () => {
+    // The fixture's colind is 2 bytes for 2 blocks; block 2 is past the end.
+    const r = classicSetColind([{ blockId: 2, value: 3 }]);
+    expect(r.ok).toBe(false);
+    expect((r as { error: string }).error).toMatch(/overhang|adjacent zone/i);
+  });
+
+  it('still accepts an in-range block', () => {
+    expect(classicSetColind([{ blockId: 1, value: 3 }])).toEqual({ ok: true });
+    expect(useClassicLevelStore.getState().doc!.collision.colind[1]).toBe(3);
   });
 });
 
@@ -467,7 +493,10 @@ describe('classic:paint-surface', () => {
   // are never solid.
   it('a cloned block inherits its source block collision shape', () => {
     openReady();
-    expect(classicSetColind([{ blockId: 0, value: 7 }, { blockId: 1, value: 9 }]).ok).toBe(true);
+    // Block 0 can't be set (see 'classicSetColind refusals') — its colind
+    // entry stays at the fixture's default 0, which is fine for this test:
+    // the point is that cloning block 1 doesn't disturb unrelated entries.
+    expect(classicSetColind([{ blockId: 1, value: 9 }]).ok).toBe(true);
     // fullPlan() clones block 1 (its cells are all tile 1) into new id 2.
     expect(classicPaintSurface(fullPlan())).toEqual({ ok: true });
     const colind = st().doc!.collision.colind;
@@ -475,7 +504,7 @@ describe('classic:paint-surface', () => {
     expect(colind[2]).toBe(9);
     // and the source is untouched
     expect(colind[1]).toBe(9);
-    expect(colind[0]).toBe(7);
+    expect(colind[0]).toBe(0);
   });
 
   it('marks colind dirty when a block is appended, so the writer emits it', () => {
@@ -607,6 +636,49 @@ describe('classic:paint-surface', () => {
     // appending a block extends the block->collision table, so the collision
     // file genuinely changed and must be written.
     expect(st().dirty.colind).toBe(true);
+  });
+});
+
+describe('classicPaintSurface colind override', () => {
+  // Same helpers the file's existing classicPaintSurface tests use; redeclared
+  // here because they are scoped to that describe block.
+  const blankBlockCell = (tile: number) => ({ tile, xf: false, yf: false, pal: 0, pri: false });
+  const clonePlan = (colind?: number): SurfaceEditPlan => ({
+    tileWrites: [],
+    newBlocks: [{
+      def: { cells: Array.from({ length: 4 }, () => blankBlockCell(1)) },
+      sourceBlockId: 1,
+      ...(colind === undefined ? {} : { colind }),
+    }],
+    blockCellEdits: [],
+    chunkCellEdits: [],
+    stats: { tilesClaimed: 0, blocksCloned: 1, placesAffected: 1 },
+  });
+
+  beforeEach(() => { openReady(); });
+
+  it('gives a cloned block the OVERRIDE shape, not the source shape', () => {
+    // Isolate-for-collision: same pixels, deliberately different collision.
+    // Without the override this is inexpressible in one command.
+    useClassicLevelStore.getState().doc!.collision.colind[1] = 7;
+    expect(classicPaintSurface(clonePlan(9))).toEqual({ ok: true });
+    const doc = useClassicLevelStore.getState().doc!;
+    expect(doc.collision.colind[doc.blocks.length - 1]).toBe(9);
+  });
+
+  it('still inherits the source shape when no override is given', () => {
+    // The existing contract, locked so the override cannot quietly become
+    // mandatory: an art-side Isolate clone must keep its collision.
+    useClassicLevelStore.getState().doc!.collision.colind[1] = 7;
+    expect(classicPaintSurface(clonePlan())).toEqual({ ok: true });
+    const doc = useClassicLevelStore.getState().doc!;
+    expect(doc.collision.colind[doc.blocks.length - 1]).toBe(7);
+  });
+
+  it('refuses an out-of-range override rather than truncating it', () => {
+    const r = classicPaintSurface(clonePlan(300));
+    expect(r.ok).toBe(false);
+    expect((r as { error: string }).error).toMatch(/0\.\.255/);
   });
 });
 
@@ -1012,7 +1084,7 @@ describe('classic:add-block', () => {
   // produces a block that looks identical and is not solid.
   it('inherits the source block collision shape when given a source id', () => {
     openReady();
-    expect(classicSetColind([{ blockId: 0, value: 7 }, { blockId: 1, value: 9 }]).ok).toBe(true);
+    expect(classicSetColind([{ blockId: 1, value: 9 }]).ok).toBe(true);
     const src: BlockDef = { cells: st().doc!.blocks[1].cells.map((c) => ({ ...c })) };
     const res = classicAddBlock(src, { sourceBlockId: 1 });
     expect(res.ok).toBe(true);
@@ -1026,7 +1098,7 @@ describe('classic:add-block', () => {
   // collision" answer Aurora's overlay already renders for an id past the table.
   it('gives a brand-new blank block collision shape 0', () => {
     openReady();
-    expect(classicSetColind([{ blockId: 0, value: 7 }, { blockId: 1, value: 9 }]).ok).toBe(true);
+    expect(classicSetColind([{ blockId: 1, value: 9 }]).ok).toBe(true);
     expect(classicAddBlock().ok).toBe(true);
     expect(st().doc!.collision.colind[2]).toBe(0);
   });

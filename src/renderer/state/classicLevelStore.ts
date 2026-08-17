@@ -979,13 +979,18 @@ export function classicPaintSurface(plan: SurfaceEditPlan): CommandResult {
   // argued above rather than changed on an unverified claim. What HAS been
   // closed is the other direction: s1-io refuses to write a colind SHORTER than
   // the one it read, which would move the overhang boundary silently.
+  for (const b of plan.newBlocks) {
+    if (b.colind !== undefined && (!isInt(b.colind) || b.colind < 0 || b.colind > 255)) {
+      return err(`colind override ${b.colind} out of range 0..255`);
+    }
+  }
   const nextColind = plan.newBlocks.length
     ? (() => {
       const src = doc.collision.colind;
       const out = new Uint8Array(Math.max(nextBlocks.length, src.length));
       out.set(src);
       plan.newBlocks.forEach((b, i) => {
-        out[doc.blocks.length + i] = src[b.sourceBlockId] ?? 0;
+        out[doc.blocks.length + i] = b.colind ?? src[b.sourceBlockId] ?? 0;
       });
       return out;
     })()
@@ -1191,8 +1196,28 @@ export function classicSetColind(entries: { blockId: number; value: number }[]):
   if (!doc) return err('no classic level is open');
   const colind = doc.collision.colind;
   for (const { blockId, value } of entries) {
-    if (!isInt(blockId) || blockId < 0 || blockId >= colind.length) {
-      return err(`colind block ${blockId} out of range 0..${colind.length - 1}`);
+    // Block 0 is the blank block. FindFloor does `andi.w #$7FF,d0 / beq.s
+    // .isblank` before it reads either solidity or colind, so a shape stored
+    // here can never apply in game — writing it would be an edit the editor
+    // shows and the console ignores.
+    if (blockId === 0) {
+      return err('block 0 is the blank block — the engine short-circuits before reading its collision, so a shape here can never apply');
+    }
+    // 1, not 0, is the low bound now: block 0 is refused above with its own
+    // reason, so quoting 0..N-1 here would name a range whose first value this
+    // very function rejects.
+    if (!isInt(blockId) || blockId < 0) {
+      return err(`colind block ${blockId} out of range 1..${colind.length - 1}`);
+    }
+    // THE OVERHANG. A zone can ship more blocks than its colind has bytes —
+    // GHZ is 439 against 410 — and in ROM the tail resolves into the ADJACENT
+    // zone's table, so these blocks may have real collision that Aurora cannot
+    // see and draws as air. Growing the table here would write zeros over that,
+    // silently changing every other overhang block's in-game collision.
+    // Refused rather than guessed; reading the true values needs cross-file
+    // reach Aurora does not have. See classicPaintSurface for the same fact.
+    if (blockId >= colind.length) {
+      return err(`block ${blockId} is past the end of this zone's collision table (${colind.length} entries) — the overhang resolves into the adjacent zone's table in ROM, so Aurora cannot set it without silently changing other blocks`);
     }
     if (!isInt(value) || value < 0 || value > 255) {
       return err(`colind value ${value} out of range 0..255`);
