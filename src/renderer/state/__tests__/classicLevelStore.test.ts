@@ -934,6 +934,40 @@ describe('tool + selectedChunkId UI state', () => {
 // ---------------------------------------------------------------------------
 // Object-tool UI state (Task 14): selection index + armed place-mode id.
 // ---------------------------------------------------------------------------
+describe('collision probe point', () => {
+  beforeEach(() => { openReady(); });
+
+  it('records and clears the probed point', () => {
+    expect(useClassicLevelStore.getState().collisionProbe).toBeNull();
+    useClassicLevelStore.getState().setCollisionProbe({ x: 40, y: 72 });
+    expect(useClassicLevelStore.getState().collisionProbe).toEqual({ x: 40, y: 72 });
+    useClassicLevelStore.getState().setCollisionProbe(null);
+    expect(useClassicLevelStore.getState().collisionProbe).toBeNull();
+  });
+
+  it('drops the probe when the act changes', () => {
+    // A point is meaningless against a different act's layout, and a stale one
+    // would have the panel confidently describing a cell the user is not
+    // looking at — worse than showing nothing.
+    useClassicLevelStore.getState().setCollisionProbe({ x: 40, y: 72 });
+    useClassicLevelStore.getState().reset();
+    expect(useClassicLevelStore.getState().collisionProbe).toBeNull();
+  });
+
+  it('the REAL per-act lever: opening a new act clears the probe too', () => {
+    // reset() above is the full store teardown (project close/switch) — it
+    // happens to clear the probe because collisionProbe sits in IDLE, same as
+    // selectedChunkId. But the lever that actually fires on an ordinary
+    // act-to-act switch WITHIN an open project is openAct's `fresh` object
+    // (see "opening a new act resets the selection" above for the same
+    // pattern on selectedChunkId), so exercise that path directly too.
+    st().setCollisionProbe({ x: 40, y: 72 });
+    void useClassicLevelStore.getState().openAct(REF);
+    // Synchronous phase, before the read resolves — `fresh` has already landed.
+    expect(st().collisionProbe).toBeNull();
+  });
+});
+
 describe('object-tool UI state', () => {
   it('defaults to no selection and no armed object', () => {
     expect(st().selectedObjectIndex).toBeNull();
