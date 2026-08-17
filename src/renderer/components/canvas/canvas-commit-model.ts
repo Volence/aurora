@@ -128,6 +128,18 @@ export function refusalView(r: CommitRefusal): RefusalView {
         resolution: 'Name one target per chunk in the region.',
         offers: [],
       };
+    case 'grid-origin':
+      return {
+        message: `This canvas's cell grid is offset to (${r.originX}, ${r.originY}), so the guides and the unique-tile readout describe different 8×8 cells than a commit would cut.`,
+        resolution: 'Set the grid origin back to a multiple of 8 — commit always cuts from the canvas corner.',
+        offers: [],
+      };
+    case 'target-invalid':
+      return {
+        message: `This commit cannot be aimed where it is pointed: ${r.detail}.`,
+        resolution: 'Give each chunk of the region its own target.',
+        offers: [],
+      };
     case 'cell-clash':
       return {
         message: `${r.cells.length} cell${r.cells.length === 1 ? '' : 's'} draw from more than one palette line, which no block can express.`,
@@ -160,7 +172,8 @@ export function refusalView(r: CommitRefusal): RefusalView {
       };
     case 'tiles-exhausted':
       return {
-        message: `This drawing needs ${r.needed} tiles and only ${r.available} are available (${r.reclaimed} reclaimed from the chunks being replaced).`,
+        message: `This drawing needs ${r.needed} tiles and only ${r.available} are available `
+          + `(${r.free} free in the act's pool, ${r.reclaimed} reclaimed from the chunks being replaced).`,
         resolution: 'Replace more chunks — their art is reclaimed — or simplify the drawing.',
         offers: [],
       };
@@ -196,6 +209,9 @@ export interface CommitSnapshot {
   canvasPalette: number[];
   targets: CommitTarget[];
   paletteResolution: PaletteResolution;
+  /** The source canvas's cell-grid origin; absent for pixels that have no grid
+   *  of their own (an imported sheet). See CommitPlanInput.gridOrigin. */
+  gridOrigin?: { originX: number; originY: number };
 }
 
 /**
@@ -215,6 +231,7 @@ export function planFromSnapshot(snap: CommitSnapshot): CommitPlanResult {
     canvasPalette: snap.canvasPalette,
     targets: snap.targets,
     paletteResolution: snap.paletteResolution,
+    gridOrigin: snap.gridOrigin,
     // ONE predicate, shared with the composer's lock badge and the store's
     // commands — never a second copy of the rule.
     isEditableTile: (t) => isTileEditable(snap.range, t),

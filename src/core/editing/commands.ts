@@ -1,10 +1,11 @@
-import type { ObjectPlacement, RingPlacement, Section, Tileset, Palette, Color, Tile, ChunkDef, Act } from '../model/s4-types';
+import type { ObjectPlacement, RingPlacement, Section, Tileset, Palette, Color, Tile, ChunkDef, Act, BgLibraryEntry } from '../model/s4-types';
 
 export interface S4Level {
   sections: (Section | null)[];
   tileset?: Tileset;          // zone-level; present when zone commands are used
   palette?: Palette;
   chunkLibrary?: ChunkDef[];  // zone-level; present when set-chunk commands are used
+  bgLibrary?: BgLibraryEntry[]; // project-level; present when set-bg-tiles is used
   act?: Act;                  // current act; present when set-bg commands are used
 }
 
@@ -139,6 +140,27 @@ export interface SetBgCommand extends EditCommand {
   newTiles: Tile[] | null;
 }
 
+/**
+ * Per-tile edits to the RESOLVED background plane — the drag path's command.
+ *
+ * `set-bg` above is a whole-plane swap, and nothing on the painting path ever
+ * built one: BG strokes wrote the resolved nametable directly, marking the
+ * project dirty with no command at all. The data saved (to
+ * `<zone>_<act>_bg.bin`), so the mutation was durable — but the next Ctrl+Z
+ * popped whatever act-scoped command happened to precede the strokes and
+ * silently reverted THAT instead.
+ *
+ * `bgRef` names which background was painted, because the viewport resolves it
+ * per section: a library entry id, or null for the act's own bgLayout. Undo has
+ * to reach the same array the stroke did, and the active section may have moved
+ * on by then.
+ */
+export interface SetBgTilesCommand extends EditCommand {
+  type: 'set-bg-tiles';
+  bgRef: string | null;
+  entries: Array<{ index: number; oldNt: number; newNt: number }>;
+}
+
 export interface SetSectionBgCommand extends EditCommand {
   type: 'set-section-bg';
   // Assign which background (Plane B) the section displays: null = the act
@@ -189,5 +211,6 @@ export type AnyCommand =
   | SetTilesetTilesCommand
   | SetChunkCommand
   | SetBgCommand
+  | SetBgTilesCommand
   | SetSectionBgCommand
   | SetSectionsCommand;

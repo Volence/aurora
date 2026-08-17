@@ -33,6 +33,13 @@ export const IPC_CHANNELS = {
   // real paint numbers off the user's machine without a CDP session. Fire-and-
   // forget (send, not invoke) — never on a hot path, no-op when perf is off.
   PERF_LOG: 'perf:log',
+  // The window-close handshake. Main intercepts `close`, asks the renderer
+  // (which is the only side that knows what is unsaved), and closes only on a
+  // true answer. Two one-way channels rather than an invoke, because the
+  // question travels main → renderer and `ipcMain.handle` only goes the other
+  // way.
+  CLOSE_REQUEST: 'app:close-request',
+  CLOSE_RESPONSE: 'app:close-response',
 } as const;
 
 export type IpcChannels = typeof IPC_CHANNELS;

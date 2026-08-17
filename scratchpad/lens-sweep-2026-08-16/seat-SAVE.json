@@ -1,0 +1,136 @@
+{
+ "seat": "SAVE",
+ "model": "fable",
+ "coverage": "Did not run the app, tests, or any CDP session — this is a static trace only (per brief the tree is read-only). Not audited: aeon load/save round-trip at the format level (serializeNametable/serializeCollAttr/serializeBgTiles vs their readers — only the write orchestration was reviewed); the aeon export step (exportAct) contents; core/art/canvas-file-format encode/decode internals (relied on the module's own tests existing, not verified byte-level); session-lifecycle.ts / session-persistence restore internals beyond confirming it is localStorage-based and prunes invalid tabs; history-hub/undo snapshot mechanics beyond the dirty-restore interaction; the agent-bridge/mcp-server write surface beyond confirming save_project routes through the guarded path and mcp-server.ts:148 writeFileSync (appears to be a scratch/screenshot path, not audited); chunk-library-import and import-sheet beyond confirming they only read; open-project.ts / classicProjectStore open-flow error paths; and Windows-specific rename semantics (rename over an existing file is not atomic on Windows — the comments claim POSIX only; the user's platform is Linux so I did not chase it). The saveFile dialog path (ipc-handlers.ts:110-122, non-atomic writeFileSync to a user-chosen path) was noted but not reported — export-to-chosen-file is outside the disasm and the user picked the destination.",
+ "verified_clean": [
+  "Guarded classic write is genuinely guarded, not decorative: the exact rejected input is 'on-disk mtimeMs differs from the read-time baseline' (or file appeared/vanished) — save-guard.ts:71-78 decision table, enforced pre-write across the whole batch at guarded-write.ts:66-78; conflict → main writes NOTHING and the renderer names the files (classic-save.ts:251-258).",
+  "The mtime baseline is armed in production, not just in tests: readMany returns per-file mtimes (src/main/file-io.ts:19-35), s1-io captures them for every path a write could touch (s1-io.ts:346-364, keyed off sourceRefs which covers all written paths), and the IPC FileAccess plumbs them (classic-file-access.ts:59-78).",
+  "Per-file write atomicity holds on the classic/canvas path: sibling .tmp + same-dir rename, orphan cleanup, structured partial result with failed/unwritten (guarded-write.ts:84-107); classic-save maps every outcome to a variant and never rejects (classic-save.ts:50-91).",
+  "Every classic domain writer is self-check-gated against the REAL decoder before bytes are emitted — tiles/blocks/chunks (emitCompressed decode==raw, s1-io.ts:398-417), fg/bg/objpos/startpos/colind (emitVerified, s1-io.ts:424-437,513-569), palette recompose check (s1-io.ts:574-602) — so a broken encoder routes to errors and saveClassicWriteResult blocks the write (classic-save.ts:57), never corrupting the disasm.",
+  "Dirty-domain clearing after save is conservative w.r.t. FILES: a domain clears only when every one of its resolved files landed (domainsToClear, classic-save.ts:145-159), and partial saves refresh baselines for landed files so retries don't self-conflict (classic-save.ts:211-226; canvas-file.ts:205-229 mtimeAfterWrite).",
+  "Canvas sidecar corruption handling is exemplary: an unreadable/unparseable sidecar is never overwritten (R12, canvas-file.ts:248-280), the resulting 'clean dot but settings unpersisted' lie is surfaced by toast every save (canvas-save.ts:109-123), and sidecarRejected deliberately survives successful saves until a real re-read (canvas-save.ts:125-134).",
+  "Sprite in-place art save handles the mid-save-edit race correctly — re-reads the doc after the await and clears unsavedEdits only when frames still match what was written, else toasts 'save again' (export-sprite.ts:230-235, 283-290) — and refuses frame-count changes rather than writing pixels into wrong tiles (export-sprite.ts:246-252).",
+  "Objpos round-trip: writer sorts by X only when the list actually changed, preserving byte-identity for untouched files including GHZ3's real out-of-order entry (s1-io.ts:523-547); encode grows the file safely when objects are added (s1-objpos.ts:70-75).",
+  ".aurora/project.json parsing preserves unknown top-level fields through a round-trip (looseObject + spread, mapping.ts:20-27,66) and degrades per-entry with reported issues, never all-or-nothing (mapping.ts:52-107).",
+  "MCP/agent save entry routes through the same guarded classic save, not a side door (editor-methods.ts:155-156 → saveClassicProject).",
+  "project.json / bindings sidecar writes via the write-binary channel are tmp+rename atomic (ipc-handlers.ts:86-93), so a crash cannot brick the sidecar mid-write.",
+  "No second writer targets classic level files: level bytes go only through saveClassicProject's guarded batch; sprite save-back targets object .nem files with its own mtime baseline, and if the two ever did share a file the mtime guard degrades to a spurious conflict, not corruption."
+ ],
+ "findings": [
+  {
+   "id": "A1",
+   "title": "No unsaved-work guard on window close / app quit",
+   "severity": "high",
+   "file": "src/main/index.ts",
+   "line": 56,
+   "claim": "Closing the Aurora window (X button / Ctrl+W / SIGTERM-initiated quit) discards all dirty classic/canvas/sprite/aeon work with no prompt, while every other exit door in the app prompts.",
+   "evidence": "src/main/index.ts:32-79 — BrowserWindow has no 'close' interception and app has no before-quit dirty check; grep for 'beforeunload' across src/ returns zero renderer handlers. Contrast: tab close prompts (src/renderer/shell/tab-activation/dispatch.ts:149-155), act switch prompts (src/renderer/shell/tab-activation/level.ts:179), project open prompts (src/renderer/shell/project-open-guard.ts), Project Setup Apply prompts (src/renderer/components/setup/ProjectSetupTab.tsx:161-183). Failure scenario: user paints tiles (dirty.tiles=true, confirmed set at classicLevelStore.ts:678-686), clicks the window X — window closes immediately, edits gone, no dialog. The app trains users to expect a prompt at every other destructive transition, so the one unguarded door is exactly where the loss will happen.",
+   "confidence": "certain",
+   "fix": "Intercept 'close' on the BrowserWindow in src/main/index.ts, ask the renderer (IPC round-trip to the same dirty-snapshot the tab-close path uses, src/renderer/shell/dirty-snapshot.ts) and show the save/discard/cancel confirm before allowing destroy.",
+   "verdict": {
+    "verdict": "CONFIRMED",
+    "reasoning": "I attempted to refute and could not; every candidate escape hatch is absent in the tree.\n\n1. Main process: read /home/volence/sonic_hacks/aurora/src/main/index.ts in full (79 lines). Line 56 is `win.on('closed', ...)` — the past-tense, non-cancellable event fired AFTER destruction. There is no `win.on('close')`, no `app.on('before-quit')`, and no `event.preventDefault()` in the file. `app.on('will-quit')` (line 73) only calls `stopMcpServer()`; `window-all-closed` (75-79) calls `app.quit()` unconditionally off-darwin.\n\n2. No renderer backstop: `grep -rn \"beforeunload|before-quit|onbeforeunload|will-prevent-unload|window-close|closeWindow|confirm-close\" src/` returns zero hits. A `beforeunload` handler is the only way the renderer could veto a close without main-process cooperation, and it does not exist. `grep -rni \"quit|close|unload|destroy\" src/main src/preload` surfaces only the three lines above plus unrelated agent-bridge/mcp-server cleanup.\n\n3. No autosave to soften the loss: `grep` for `setInterval|autosave|autoSave|debounce.*save|periodic` over src/renderer/state/*.ts and src/renderer/shell/*.ts returns nothing. src/renderer/shell/session-lifecycle.ts:127-138 persists only `{tabs, activeId}` and the workspace record (facet + viewport) to localStorage — tab identity, never document content. So a relaunch restores which tabs were open and restores them from disk, i.e. it restores exactly the pre-edit bytes.\n\n4. Dirty state is genuinely in-memory: classicLevelStore.ts:678-681 (`applyCommit`) sets `dirty: {...s.dirty, ...dirtyPatch}` next to the new `doc` in the zustand store with no disk write. canvasStore.ts:252/260/270/300 set `unsavedEdits: true` on in-memory doc entries.\n\n5. The stated contrast is accurate: src/renderer/shell/tab-activation/dispatch.ts:148-155 (confirmCloseSpriteDoc / confirmCloseCanvasDoc), tab-activation/level.ts:174-186 (three-button \"Unsaved changes in <act>\" confirm), and project-open-guard.ts confirmProjectOpen (full ask→save→re-snapshot guard, whose header comment explicitly calls the prior unguarded version \"silent data loss\") all prompt.\n\nAdditional evidence the seat missed that strengthens rather than weakens the finding: `grep -rn \"Menu|setApplicationMenu\" src/main` returns zero, so Electron's DEFAULT application menu is active and supplies the `close` role bound to Ctrl+W; and Ctrl+W is not claimed by the renderer either (no 'w' key case in App.tsx's keydown handler at 100-121, none in shell/commands.ts). In a tab-centric editor, the reflexive \"close tab\" chord therefore destroys the whole window and every dirty document.\n\nEnd-to-end triggering state: classic project open, one tile painted (commitArt sets dirty.tiles=true, doc held only in zustand), then titlebar X or Ctrl+W. Nothing intercepts 'close', the window is destroyed, window-all-closed quits the app, and the edits plus undo history are gone with no dialog.\n\nSeverity check: the seat said high. Under the given rubric (\"critical = silent loss of user work\") this arguably qualifies as critical rather than high; it is certainly not theatrical and does not warrant a downgrade. I am not issuing a formal correction because the X-button path is a deliberate, unambiguous user action, which is the one factor arguing for high over critical — but the Ctrl+W path is not intent-aligned at all."
+   }
+  },
+  {
+   "id": "A2",
+   "title": "Dirty flags cleared unconditionally after async save — edits landing mid-save are silently marked clean (class: 3 of 4 save paths)",
+   "severity": "high",
+   "file": "src/renderer/state/classic-save.ts",
+   "line": 205,
+   "claim": "Classic, canvas, and aeon saves all clear dirty state captured before the write without checking whether the document changed during the IPC/write await, so an edit committed mid-save is left un-flagged while its bytes are not on disk; the sprite path already fixes this exact race, proving the class.",
+   "evidence": "Classic: saveClassicProject snapshots doc+dirty in collectDirtyLevels (classic-save.ts:106-112), then awaits api.writeGuarded (real IPC, classic-save.ts:73) — pointer/keyboard macrotasks interleave there, and any classic command commits via applyCommit which sets dirty (classicLevelStore.ts:678-686); on return, markDomainsClean deletes the domain unconditionally (classicLevelStore.ts:487-494 — no doc-identity or edit-generation check). Canvas: saveCanvasDocument reads doc at canvas-save.ts:49-50, awaits encodeCanvasFiles + writeGuarded, then markSaved sets unsavedEdits:false unconditionally (canvasStore.ts:308-312). Aeon: aeon-save.ts:32 calls markClean() after the write loop with no comparison. The codebase KNOWS this race: the sprite save re-reads the doc after the await and clears the flag only when framesEqual(after.frames, frames) (export-sprite.ts:230-235, 283-290) — the other three paths never got the fix. Consequence chain: dirty flag false while doc≠disk → next Ctrl+S returns 'nothing' (collectDirtyLevels, classic-save.ts:109-110; canvas saveableDirtyCanvasDocIds), and every close/switch prompt keys off these same flags (dirty-snapshot.ts, project-open-guard.ts, confirmCloseCanvasDoc) → the mid-save edit is silently lost on close. Failure scenario: user is painting; a stroke's pointer-up commits while Ctrl+S's guarded write is in flight; save resolves, clears dirty.tiles; user closes — stroke gone, no prompt, no toast.",
+   "confidence": "certain",
+   "fix": "Port the sprite pattern: after the write resolves, compare the live doc's domain against the snapshot that was encoded (or use a per-domain edit-generation counter captured before write) and clear only unchanged domains; canvas should compare pixels/doc revision before markSaved; aeon should gate markClean the same way. Toast 'edits made during the save are still unsaved' as export-sprite.ts:288 does.",
+   "verdict": {
+    "reasoning": "Traced all three cited paths end-to-end. Classic: collectDirtyLevels (classic-save.ts:106-112) snapshots doc+dirty synchronously; saveClassicProject awaits levels.write (197) and api.writeGuarded (73, real ipcRenderer.invoke); a mid-flight edit goes through applyCommit (classicLevelStore.ts:678-686) which installs a NEW doc object and re-sets dirty; on resolve, line 205 calls markDomainsClean, which (classicLevelStore.ts:487-494) checks ONLY ref zone/act identity and then unconditionally `delete dirty[d]` — no doc-identity or generation check. Canvas: saveCanvasDocument reads canvasDocState before the await (canvas-save.ts:49-50) and calls markSaved after (canvasStore.ts:308-312, unsavedEdits:false unconditional); tellingly the same file DOES re-read live state for the source baseline (refreshBaselines, canvas-save.ts:137-145) so the mid-save mutation hazard was recognized for mtimes but not for the dirty flag. Aeon: aeon-save.ts:32 markClean() -> editorStore.ts:299 set({dirty:false}), unconditional; setLoading(true) is not an input block (no component consumes projectStore.loading). Consequence chain verified: currentDirtySnapshot (dirty-snapshot.ts:20-33) derives classicDirty from Object.values(classic.dirty).some(Boolean) and aeonDirty from useEditorStore.dirty — the exact flags just cleared, so no tab dot and no close prompt; the next Ctrl+S returns {kind:'nothing'} at classic-save.ts:109-110 with no toast. The sprite path really does implement the fix the others lack (export-sprite.ts:271-290: re-read via spriteDocState after the await, framesEqual gate, 'edits made during the save are still unsaved' toast), confirming the class. Refutation attempts that failed: no save-in-flight lock exists anywhere (grep isSaving/savePending/saveInFlight -> zero hits), no blocking overlay during save, no coordinator serialization of edits, and domainsToClear is conservative about file paths only, not about time. One narrowing the seat did not state (does not break the finding): loss requires the mid-save edit to touch a domain already present in the pre-write dirty snapshot — a new domain is not cleared — which is the common painting-while-saving case. Concrete trigger: classic act open with dirty.tiles; Ctrl+S; a pointer-up commits a tile stroke while writeGuarded is in flight; save resolves 'saved', domainsToClear returns ['tiles'], markDomainsClean deletes it, toast says 'Saved 1 level(s)'; the stroke is not on disk, has no dirty dot, and closing discards it with no prompt.",
+    "verdict": "CONFIRMED",
+    "severity_correction": "None — 'high' is correct and arguably conservative. By the rubric this is silent loss of user work (critical territory: bytes not on disk, flag false, no dot, no close prompt, no toast on the follow-up no-op save), tempered only by the narrow race window and the requirement that the mid-save edit hit a domain already in the pre-write dirty snapshot. Keep at high; do not downgrade."
+   }
+  },
+  {
+   "id": "A3",
+   "title": "Aeon save path has no mtime guard, no rel-path guard, and unreported partial batches",
+   "severity": "medium",
+   "file": "src/renderer/state/aeon-save.ts",
+   "line": 27,
+   "claim": "saveAeonProject writes every plan file through the unguarded writeBinaryFile channel: an externally-edited aeon file is silently clobbered (no conflict check), and a throw mid-loop leaves an undisclosed half-written multi-file act (e.g. section_0.tiles.bin new, its objects.json old).",
+   "evidence": "aeon-save.ts:27-30 loops plan.files over window.api.writeBinaryFile; the handler (ipc-handlers.ts:81-94) does tmp+rename per file but never stats an expected mtime and never checks isRelPathSafe — compare the classic channel, which stats every target and refuses on mismatch (guarded-write.ts:66-78). Failure scenario 1 (clobber): user hand-edits games/demo section objects.json in a text editor while Aurora is open, then hits Ctrl+S in Aurora — the external edit is overwritten with no warning (the exact defect Task 10 built save-guard.ts to prevent for classic). Failure scenario 2 (partial): fs error at file N → catch at aeon-save.ts:36-41 toasts 'Save failed' but files 1..N-1 are committed and nothing reports which; the multi-file consistency ordering comment in core/project/aeon/save.ts:6-9 acknowledges partial failure exists but nothing surfaces it. Dirty state is at least preserved (markClean unreached).",
+   "confidence": "certain",
+   "fix": "Route buildAeonSavePlan's files through performGuardedWrite (it already takes a batch with expectedMtimeMs; aeon load would need to capture read-time mtimes like s1-io.ts:353-364 does), or minimally add the mtime baseline + partial-result reporting to the aeon path.",
+   "verdict": null
+  },
+  {
+   "id": "A4",
+   "title": "WRITE_BINARY_FILE IPC has no rel-path guard; reachable with a free-typed sprite name",
+   "severity": "medium",
+   "file": "src/main/ipc-handlers.ts",
+   "line": 81,
+   "claim": "The write-binary channel resolves basePath+relativePath with no isRelPathSafe check, so a relativePath containing ../ (or an absolute path) writes anywhere on disk — and exportSprite feeds it a raw user-typed sprite name as a path segment.",
+   "evidence": "ipc-handlers.ts:81-94 — no isRelPathSafe (contrast guarded-write.ts:59-63 which throws, and even read-side pathExists/listDir/fileMtime guard in file-io.ts:45-84; only READ_BINARY_FILE is deliberately unguarded, documented at classic-file-access.ts:14-21 — no such doc exists for the write channel). Reachable input: SpriteMode.tsx:219 is a free-text name input, SpriteMode.tsx:146 passes it to exportSprite(spriteName), export-sprite.ts:93-99 builds `${spritesDir()}/${name}/mappings.bin` and writes 5 files — sanitizeName exists (export-sprite.ts:151-154) but exportSprite never calls it on the export path. Typing '../../../home/user/x' as the sprite name mkdir-recursives and writes files outside the project, silently overwriting any same-named target (the tmp+rename even makes the clobber atomic). Verified no caller needs absolute writes: aeon-save (project-relative plan paths), object-previews.ts:35, ProjectSetupTab.tsx:191, export-sprite — all relative, so adding the guard breaks nothing.",
+   "confidence": "certain",
+   "fix": "Add `if (!isRelPathSafe(relativePath)) throw` at the top of the WRITE_BINARY_FILE handler (ipc-handlers.ts:82), and apply sanitizeName to the export path's `name` in export-sprite.ts:93.",
+   "verdict": null
+  },
+  {
+   "id": "A5",
+   "title": "Project Setup 'Apply' rewrites a sidecar Aurora failed to read, from an empty config",
+   "severity": "low",
+   "file": "src/core/project/s1/index.ts",
+   "line": 212,
+   "claim": "When .aurora/project.json existed but could not be read at open (fs error path), readSidecarState degrades to config {} — and a later Apply in Project Setup serializes that empty config over the file, destroying contents Aurora never saw; the canvas layer treats this exact case as must-not-overwrite (R12) but the project sidecar does not.",
+   "evidence": "s1/index.ts:212-220 catch → { config: {} } with only an 'unreadable — ignoring it' issue; ProjectSetupTab.tsx:186-191 apply() serializes sidecar.config (the empty one) + edits and writes .aurora/project.json unconditionally. Contrast the stated policy for the canvas sidecar: 'Do not destroy what you could not read' (canvas-file.ts:251-256, enforced by dropping the file from the batch). Failure scenario: transient permission error at open, user later tweaks one path override and hits Apply → all other overrides plus any unknown fields written by a newer Aurora are erased. Mitigation already present: when the file READS but has bad entries, unknown fields survive (mapping.ts:20-27, 66) — only the could-not-read path loses data, which bounds this to low.",
+   "confidence": "probable",
+   "fix": "Track a sidecarUnreadable flag in SidecarState (s1/index.ts:217) and have ProjectSetupTab either block Apply or require explicit confirmation when set, mirroring the canvas sidecarRejected rule.",
+   "verdict": null
+  },
+  {
+   "id": "A6",
+   "title": "Rapid double Ctrl+S can produce a false 'changed on disk — reload project' conflict",
+   "severity": "low",
+   "file": "src/core/editing/save-coordinator.ts",
+   "line": 98,
+   "claim": "SaveCoordinator has no reentrancy guard, so two overlapping saveClassicProject runs can both build payloads from the same pre-write mtime baseline; if the second's main-side stat lands after the first's rename, the second reports a conflict against Aurora's own write and the toast tells the user to reload the project (losing undo history).",
+   "evidence": "save-coordinator.ts:40-113 — no in-flight flag; saveActive/saveAll can be re-entered from a second keypress. Both runs read the same read.fileMtimes baseline (s1/index.ts:394-417) before either updateMtimes lands; performGuardedWrite's stat (guarded-write.ts:67-78) in run 2 then sees run 1's fresh mtime ≠ expected → conflicts, and notifyConflict (classic-save.ts:251-258) instructs 'Reload project to pick up external changes' for a change Aurora itself made. No data corruption (per-file rename atomicity holds and bytes are near-identical), just a scary false instruction.",
+   "confidence": "probable",
+   "fix": "Add an in-flight promise latch to SaveCoordinator (return/join the running saveAll/saveActive) or per-saver, as the cheapest fix at the one seam all save entry points share.",
+   "verdict": null
+  },
+  {
+   "id": "A7",
+   "title": "recent-projects.json written non-atomically",
+   "severity": "low",
+   "file": "src/main/recent-projects.ts",
+   "line": 36,
+   "claim": "addRecentProject/removeRecentProject use bare writeFileSync with no tmp+rename, so a crash mid-write corrupts the file; the reader self-heals to [] so the blast radius is only losing the recents list.",
+   "evidence": "recent-projects.ts:36,43 direct writeFileSync (contrast the tmp+rename pattern the same process uses at ipc-handlers.ts:90-92 with an explicit comment about why); getRecentProjects catches parse errors and returns [] (recent-projects.ts:16-21), so corruption degrades to an empty list rather than a crash.",
+   "confidence": "certain",
+   "fix": "Reuse the tmp+rename pattern for the userData JSON write.",
+   "verdict": null
+  },
+  {
+   "id": "A8",
+   "title": "Save→undo leaves dirty flags clean while doc differs from disk (documented, accepted)",
+   "severity": "low",
+   "file": "src/renderer/state/classicLevelStore.ts",
+   "line": 267,
+   "claim": "After edit→save→undo, the restored snapshot's dirty={} leaves the doc diverged from disk with a clean indicator, so Ctrl+S no-ops and close prompts stay silent — the code itself documents this as an accepted v1 limitation, recorded here so the overseer knows it is deliberate, not missed.",
+   "evidence": "classicLevelStore.ts:267-279 documents the exact mechanism ('the dirty flags are NOT a doc≠disk oracle after a save+undo'); restoreDomainDirty replays the recorded snapshot flags (classicLevelStore.ts:518-523, 536-557). Failure scenario: save, Ctrl+Z, close — the undone (pre-edit) state the user is looking at is not on disk and no prompt fires. Same class as A2 but a different, self-documented door.",
+   "confidence": "certain",
+   "fix": "None required if the wontfix stands; if A2 gets an edit-generation counter, the same counter would fix this door for free (compare generation at save vs now instead of replaying snapshot dirty).",
+   "verdict": null
+  },
+  {
+   "id": "A9",
+   "title": "Atomic-rename claim excludes durability: no fsync before rename",
+   "severity": "low",
+   "file": "src/main/guarded-write.ts",
+   "line": 92,
+   "claim": "guarded-write's header says a crash mid-write 'can never leave a half-written target', which is true for process crashes but not power loss: writeFile+rename without fsync of the tmp file (and its directory) can leave a zero-length or stale target on some filesystem configurations.",
+   "evidence": "guarded-write.ts:90-93 (writeFile then rename, no fsync/fdatasync anywhere in the file); same in the WRITE_BINARY_FILE handler (ipc-handlers.ts:90-92). ext4's auto_da_alloc rename heuristic usually saves this on the user's platform, which is why this is low and speculative rather than a live defect — but the class of file being protected is an irreplaceable disasm source, where the belt-and-braces fsync is cheap.",
+   "confidence": "speculative",
+   "fix": "open/write/fsync/close the tmp file before rename (and optionally fsync the parent dir) in performGuardedWrite and the write-binary handler.",
+   "verdict": null
+  }
+ ]
+}

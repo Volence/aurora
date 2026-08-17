@@ -6,6 +6,19 @@ import { SnapshotHistory } from './snapshot-history';
 /** A full snapshot of one sprite document for undo/redo. */
 export interface SpriteSnapshot {
   frames: PixelBuffer[];
+  /**
+   * The animation's steps — INDICES INTO `frames`, which is why they are here.
+   *
+   * Deleting a frame drops the steps that referenced it and shifts every higher
+   * reference down. Restoring the frames without the steps therefore left every
+   * later step off by one, pointing at the wrong picture — silently, and wrong
+   * on export. The frames-are-expensive argument that kept the rest of the
+   * document out of this snapshot does not apply: a step is two numbers.
+   *
+   * Structural rather than the renderer's `AnimStepUI`: core cannot import from
+   * the renderer, and the two shapes are the same two fields.
+   */
+  steps: { frameIndex: number; duration: number }[];
   currentIndex: number;
   selection: { x: number; y: number; w: number; h: number } | null;
   paletteMode: SpritePaletteMode;
@@ -19,6 +32,7 @@ function cloneBuf(b: PixelBuffer): PixelBuffer {
 export function cloneSpriteSnapshot(s: SpriteSnapshot): SpriteSnapshot {
   return {
     frames: s.frames.map(cloneBuf),
+    steps: s.steps.map((st) => ({ ...st })),
     currentIndex: s.currentIndex,
     selection: s.selection ? { ...s.selection } : null,
     paletteMode: s.paletteMode,

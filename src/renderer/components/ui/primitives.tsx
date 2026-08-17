@@ -87,16 +87,41 @@ export function Chip({ children, active, onClick, disabled, title, tone }: {
   tone?: 'warning';
 }) {
   const toned = tone === 'warning' && !active;
+  // ONE LOOK, TWO ELEMENTS, decided by whether the chip DOES anything.
+  //
+  // Every chip used to be a `<span onClick>`, which made every interactive chip
+  // in the app mouse-only: no tab stop, no Enter, no Space, and nothing for a
+  // screen reader to announce as pressable. Chips are not decoration here —
+  // Undo/Redo, the grid toggles, the constraint switches and the palette-line
+  // picker are all chips.
+  //
+  // A real `<button>` rather than role/tabIndex/onKeyDown by hand: the button
+  // brings the tab stop, both activation keys, the disabled semantics AND the
+  // :focus-visible ring with it, and none of those can then drift apart. The
+  // non-interactive chips (readouts like "tiles: 12 new") stay spans, because a
+  // button that does nothing is a worse lie than a span that does nothing.
+  const style: React.CSSProperties = {
+    display: 'inline-flex', alignItems: 'center', gap: T.s2, padding: `${T.s1} ${T.s3}`,
+    background: active ? T.accent : T.raised,
+    color: active ? T.onAccent : toned ? T.warning : T.textBase,
+    border: `1px solid ${active ? T.accent : toned ? T.warning : T.border}`,
+    borderRadius: T.rMd,
+    fontSize: 11, cursor: disabled ? 'default' : (onClick ? 'pointer' : 'default'),
+    opacity: disabled ? 0.5 : 1, whiteSpace: 'nowrap',
+  };
+  if (!onClick) return <span title={title} style={style}>{children}</span>;
   return (
-    <span title={title} onClick={disabled ? undefined : onClick} style={{
-      display: 'inline-flex', alignItems: 'center', gap: T.s2, padding: `${T.s1} ${T.s3}`,
-      background: active ? T.accent : T.raised,
-      color: active ? T.onAccent : toned ? T.warning : T.textBase,
-      border: `1px solid ${active ? T.accent : toned ? T.warning : T.border}`,
-      borderRadius: T.rMd,
-      fontSize: 11, cursor: disabled ? 'default' : (onClick ? 'pointer' : 'default'),
-      opacity: disabled ? 0.5 : 1, whiteSpace: 'nowrap',
-    }}>{children}</span>
+    <button
+      type="button"
+      title={title}
+      disabled={disabled}
+      aria-pressed={active === undefined ? undefined : active}
+      onClick={disabled ? undefined : onClick}
+      // The UA's own button styling is the only thing the span never had to
+      // undo: font and line-height are inherited so a chip in a 13px bar is
+      // still 11px, and `margin: 0` keeps the option bars' gaps exact.
+      style={{ ...style, font: 'inherit', fontSize: 11, lineHeight: 1, margin: 0, textAlign: 'left' }}
+    >{children}</button>
   );
 }
 

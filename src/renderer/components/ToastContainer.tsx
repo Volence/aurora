@@ -1,6 +1,6 @@
 import React from 'react';
 import { useToastStore, type ToastType } from '../state/toastStore';
-import { T } from './ui';
+import { T, Z } from './ui';
 
 // Backgrounds map to the nearest semantic surface token (T.raised) — the
 // Empyrean palette has no per-status tinted backgrounds; the colored border
@@ -53,7 +53,7 @@ const styles: Record<string, React.CSSProperties> = {
     // short toast shrink-wrapped to its own text as before, so this changes
     // nothing about the common case.
     maxWidth: 'min(560px, 90vw)', alignItems: 'center',
-    display: 'flex', flexDirection: 'column', gap: 6, zIndex: 1000,
+    display: 'flex', flexDirection: 'column', gap: 6, zIndex: Z.toast,
     // The STRIP stays click-through so it can never swallow a click aimed at the
     // editor underneath; only the toast rectangle itself takes pointer events
     // (see `toast` below). That is the narrowest surface that still allows

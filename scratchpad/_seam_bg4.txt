@@ -1,0 +1,103 @@
+src/core/config/s4-config.ts:8: bgLayout: string;
+src/core/config/s4-config.ts:9: bgTiles: string;
+src/core/editing/__tests__/bound-edit-history.test.ts:11: collisionEdit: null, collisionEditB: null, bgLayoutRef: null,
+src/core/editing/commands.ts:145: // default (act.bgLayout/bgTiles), otherwise an S4Project.bgLibrary entry
+src/core/editing/history.ts:83: level.act.bgLayout = cmd.newLayout ? new Uint16Array(cmd.newLayout) : null;
+src/core/editing/history.ts:84: level.act.bgTiles = cmd.newTiles
+src/core/editing/history.ts:107: section.bgLayoutRef = cmd.newRef;
+src/core/editing/history.ts:204: level.act.bgLayout = cmd.oldLayout ? new Uint16Array(cmd.oldLayout) : null;
+src/core/editing/history.ts:205: level.act.bgTiles = cmd.oldTiles
+src/core/editing/history.ts:228: section.bgLayoutRef = cmd.oldRef;
+src/core/editing/section-ops.ts:30: bgLayoutRef: sec.bgLayoutRef,
+src/core/export/act-descriptor.ts:46: if (sections.some(s => s !== null && s.bgLayoutRef !== null)) {
+src/core/export/act-descriptor.ts:73: lines.push(`    dc.l    ${section.bgLayoutRef !== null ? `${zonePrefix}_BG_${asmLabelFragment(section.bgLayoutRef)}` : '0'}  ; sec_bg_layout`);
+src/core/formats/bg-library.ts:5: // (Section.bgLayoutRef: null = act default, else a library entry id). It is
+src/core/formats/section-meta.ts:6: // background assignment (bgLayoutRef: null = act default, else an
+src/core/formats/section-meta.ts:12: bgLayoutRef: string | null;
+src/core/formats/section-meta.ts:21: if (meta.bgLayoutRef === null && meta.paletteRef === null) return null;
+src/core/formats/section-meta.ts:22: return JSON.stringify({ bgLayoutRef: meta.bgLayoutRef, paletteRef: meta.paletteRef }, null, 2);
+src/core/formats/section-meta.ts:29: bgLayoutRef: typeof raw?.bgLayoutRef === 'string' ? raw.bgLayoutRef : null,
+src/core/level-classic/__tests__/s1-io.test.ts:81: bg: resolveVariant(act.bgLayout),
+src/core/level-classic/__tests__/s1-io.test.ts:339: bgLayout: { path: 'levels/syn_bg.bin' },
+src/core/model/s4-types.ts:110: bgLayoutRef: string | null;
+src/core/model/s4-types.ts:125: bgLayoutRef: null,
+src/core/model/s4-types.ts:213: bgLayout: Uint16Array | null;
+src/core/model/s4-types.ts:214: bgTiles: Tile[] | null;
+src/core/model/s4-types.ts:228: * id via Section.bgLayoutRef (null = the act default act.bgLayout/bgTiles,
+src/core/project/aeon/__tests__/aeon-adapter.test.ts:52: bgLayout: '', bgTiles: '', parallax: null,
+src/core/project/aeon/__tests__/aeon-load.test.ts:38: bgLayout: '', bgTiles: '', parallax: null,
+src/core/project/aeon/__tests__/aeon-save.test.ts:41: bgLayout: '', bgTiles: '', parallax: null,
+src/core/project/aeon/load.ts:275: // Load meta sidecar (bgLayoutRef/paletteRef) — optional, only
+src/core/project/aeon/load.ts:280: section.bgLayoutRef = meta.bgLayoutRef;
+src/core/project/aeon/load.ts:294: let bgLayout: Uint16Array | null = null;
+src/core/project/aeon/load.ts:295: let bgTiles: Tile[] | null = null;
+src/core/project/aeon/load.ts:297: if (actConfig.bgLayout) {
+src/core/project/aeon/load.ts:298: const bgRaw = await fa.read(actConfig.bgLayout);
+src/core/project/aeon/load.ts:304: bgLayout = normalizeBgLayout(parseNametable(bgRaw, BG_WIDTH, bgHeight), BG_TILE_BASE_SLOT);
+src/core/project/aeon/load.ts:306: if (actConfig.bgTiles) {
+src/core/project/aeon/load.ts:310: const bgTileRaw = await fa.read(actConfig.bgTiles);
+src/core/project/aeon/load.ts:311: bgTiles = parseBgTiles(bgTileRaw);
+src/core/project/aeon/load.ts:323: bgLayout,
+src/core/project/aeon/load.ts:324: bgTiles,
+src/core/project/aeon/save.ts:94: // Write meta sidecar (.meta.json) — scalar refs (bgLayoutRef,
+src/core/project/aeon/save.ts:100: const metaJson = serializeSectionMeta({ bgLayoutRef: section.bgLayoutRef, paletteRef: section.paletteRef });
+src/core/project/aeon/save.ts:106: const clearedBytes = new TextEncoder().encode(JSON.stringify({ bgLayoutRef: null, paletteRef: null }, null, 2));
+src/core/project/aeon/save.ts:149: // mirroring the tileset retarget above: the configured bgLayout/bgTiles
+src/core/project/aeon/save.ts:152: if (act.bgLayout && act.bgTiles) {
+src/core/project/aeon/save.ts:160: const bgLayoutBytes = serializeNametable(act.bgLayout);
+src/core/project/aeon/save.ts:161: files.push({ path: editorBgLayoutPath, bytes: bgLayoutBytes });
+src/core/project/aeon/save.ts:162: const bgTileBytes = serializeBgTiles(act.bgTiles);
+src/core/project/aeon/save.ts:167: if (rawAct && (rawAct.bgLayout !== editorBgLayoutPath || rawAct.bgTiles !== editorBgTilesPath)) {
+src/core/project/aeon/save.ts:168: rawAct.bgLayout = editorBgLayoutPath;
+src/core/project/aeon/save.ts:169: rawAct.bgTiles = editorBgTilesPath;
+src/core/project/profiles/s1.ts:87: bgLayout: VariantPath;
+src/core/project/profiles/s1.ts:213: bgLayout: v('levels/ghzbg.bin'),
+src/core/project/profiles/s1.ts:227: bgLayout: v('levels/ghzbg.bin'),
+src/core/project/profiles/s1.ts:241: bgLayout: v('levels/ghzbg.bin'),
+src/core/project/profiles/s1.ts:261: bgLayout: v('levels/mz1bg.bin'),
+src/core/project/profiles/s1.ts:275: bgLayout: v('levels/mz2bg.bin'),
+src/core/project/profiles/s1.ts:289: bgLayout: v('levels/mz3bg.bin'),
+src/core/project/profiles/s1.ts:309: bgLayout: v('levels/syzbg (REV01).bin', 'levels/syzbg (REV00).bin'),
+src/core/project/profiles/s1.ts:323: bgLayout: v('levels/syzbg (REV01).bin', 'levels/syzbg (REV00).bin'),
+src/core/project/profiles/s1.ts:337: bgLayout: v('levels/syzbg (REV01).bin', 'levels/syzbg (REV00).bin'),
+src/core/project/profiles/s1.ts:357: bgLayout: v('levels/lzbg.bin'),
+src/core/project/profiles/s1.ts:372: bgLayout: v('levels/lzbg.bin'),
+src/core/project/profiles/s1.ts:387: bgLayout: v('levels/lzbg.bin'),
+src/core/project/profiles/s1.ts:408: bgLayout: v('levels/slzbg.bin'),
+src/core/project/profiles/s1.ts:422: bgLayout: v('levels/slzbg.bin'),
+src/core/project/profiles/s1.ts:436: bgLayout: v('levels/slzbg.bin'),
+src/core/project/profiles/s1.ts:456: bgLayout: v('levels/sbz1bg.bin'),
+src/core/project/profiles/s1.ts:470: bgLayout: v('levels/sbz2bg.bin'),
+src/core/project/profiles/s1.ts:490: bgLayout: v('levels/lzbg.bin'),
+src/core/project/s1/index.ts:130: out.push({ key: p('bgLayout'), zone: zone.id, act: act.act, variant: act.bgLayout, gating: true });
+src/core/project/s1/index.ts:342: bg: p('bgLayout'),
+src/renderer/agent/agent-handler.ts:448: layout: ctx.act.bgLayout ? Array.from(ctx.act.bgLayout) : null,
+src/renderer/agent/agent-handler.ts:449: tiles: ctx.act.bgTiles ? ctx.act.bgTiles.map(t => Array.from(t.pixels)) : null,
+src/renderer/agent/agent-handler.ts:494: oldLayout: ctx.act.bgLayout ? new Uint16Array(ctx.act.bgLayout) : null,
+src/renderer/agent/agent-handler.ts:496: oldTiles: ctx.act.bgTiles ? ctx.act.bgTiles.map(t => ({ pixels: new Uint8Array(t.pixels) })) : null,
+src/renderer/agent/agent-handler.ts:515: if (section.bgLayoutRef === req.bgId) {
+src/renderer/agent/agent-handler.ts:524: oldRef: section.bgLayoutRef,
+src/renderer/agent/agent-handler.ts:534: actDefault: ctx.act.bgLayout && ctx.act.bgTiles
+src/renderer/agent/agent-handler.ts:535: ? { width: BG_WIDTH, height: Math.floor(ctx.act.bgLayout.length / BG_WIDTH), tiles: ctx.act.bgTiles.length }
+src/renderer/agent/agent-handler.ts:538: sections: ctx.act.sections.map((s, i) => s ? { index: i, bgId: s.bgLayoutRef } : null),
+src/renderer/components/MapViewport.tsx:57: * ACTIVE section: its bgLayoutRef names a BG-library entry, null (or a
+src/renderer/components/MapViewport.tsx:66: const ref = act.sections[activeSectionIndex]?.bgLayoutRef ?? null;
+src/renderer/components/MapViewport.tsx:71: if (act.bgLayout && act.bgTiles) return { layout: act.bgLayout, tiles: act.bgTiles };
+src/renderer/components/MapViewport.tsx:278: // section (bgLayoutRef -> library entry, else act default). Lighter than
+src/renderer/components/MapViewport.tsx:381: // bgLayoutRef may point at a different library entry (or the act default).
+src/renderer/components/SectionGridNav.tsx:156: // (bgLayoutRef != null); tooltip names it.
+src/renderer/components/SectionGridNav.tsx:157: const bgName = sec?.bgLayoutRef
+src/renderer/components/SectionGridNav.tsx:158: ? project?.bgLibrary.find(b => b.id === sec.bgLayoutRef)?.name ?? sec.bgLayoutRef
+src/renderer/providers/__tests__/properties-aeon.test.ts:20: section: { objects: [], rings: [], bgLayoutRef: null },
+src/renderer/providers/__tests__/properties-aeon.test.ts:71: section: { objects: [obj(), obj()], rings: [{ x: 0, y: 0 }], bgLayoutRef: null },
+src/renderer/providers/__tests__/properties-aeon.test.ts:110: const i = input({ bgLibrary: LIB, section: { objects: [], rings: [], bgLayoutRef: 'bg-sky' } });
+src/renderer/providers/__tests__/properties-aeon.test.ts:116: // empty option is `bgLayoutRef: null`, and only it may issue the command.
+src/renderer/providers/__tests__/properties-aeon.test.ts:162: section: { objects: [], rings: [{ x: 16, y: 32 }], bgLayoutRef: null },
+src/renderer/providers/__tests__/properties-aeon.test.ts:173: const sec = { objects: [obj(), obj({ typeId: 'ring-monitor', subtype: 3, x: 8, y: 9 })], rings: [], bgLayoutRef: null };
+src/renderer/providers/__tests__/properties-aeon.test.ts:188: const stale = { objects: [], rings: [], bgLayoutRef: null };
+src/renderer/providers/__tests__/properties-aeon.test.ts:219: section: { objects: [], rings: [{ x: 0, y: 0 }], bgLayoutRef: null },
+src/renderer/providers/properties-aeon.ts:28: * and a rename of `bgLayoutRef` or `gridWidth` breaks the build here instead of
+src/renderer/providers/properties-aeon.ts:37: readonly section: Pick<Section, 'objects' | 'rings' | 'bgLayoutRef'> | null;
+src/renderer/providers/properties-aeon.ts:161: value: input.section.bgLayoutRef ?? '',
+src/renderer/providers/properties-aeon.ts:247: const command = aeonBackgroundCommand(index, section.bgLayoutRef, value);
+src/renderer/state/projectStore.ts:127: * is included for the same reason (set-bg swaps act.bgLayout/bgTiles).

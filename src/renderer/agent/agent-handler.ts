@@ -622,7 +622,30 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
       const s = requireClassicProject();
       const ref = s.zoneTree.find(r => r.zone === req.zone && r.act === req.act);
       if (!ref) throw new Error(`level ${req.zone}/${req.act} not found in this project`);
-      await useClassicLevelStore.getState().openAct(ref);
+
+      // A READ MUST NOT DESTROY WORK. `openAct` re-reads from disk, drops both
+      // undo stacks and clears every dirty flag — so calling it unconditionally
+      // made the natural agent sequence (edit, then read back to check) revert
+      // the agent's own edits and report the pristine disk state as success.
+      // The two doors this tool sits beside already have the policy: the tab
+      // strip's planLevelActivation no-ops on the loaded act and confirms
+      // before discarding, and classic-open-project above fails closed. This is
+      // the same rule with the confirm turned into a refusal, because an
+      // agent-driven read has no UI to confirm through.
+      const loaded = useClassicLevelStore.getState();
+      // A failed or never-finished load of the same act is still worth
+      // retrying: there is no doc, so there is nothing to lose.
+      const sameAct = loaded.ref?.zone === ref.zone && loaded.ref?.act === ref.act
+        && loaded.status === 'ready' && !!loaded.doc;
+      if (!sameAct) {
+        if (Object.values(loaded.dirty).some(Boolean)) {
+          throw new Error(
+            `Unsaved changes in ${loaded.ref?.label ?? 'the loaded act'}. Reading ${req.zone}/${req.act} ` +
+            'reloads from disk and would discard them — save first (classic-save-level), then retry.',
+          );
+        }
+        await useClassicLevelStore.getState().openAct(ref);
+      }
       const ls = useClassicLevelStore.getState();
       if (ls.status !== 'ready' || !ls.doc) throw new Error(ls.error ?? `level ${req.zone}/${req.act} failed to load`);
       const doc = ls.doc;
@@ -728,7 +751,31 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
 
     case 'classic-save-project': {
       requireClassicProject();
-      return saveClassicProject();
+      const result = await saveClassicProject();
+      // A FAILED SAVE IS NOT A RESULT. `saveClassicProject` reports outcomes as
+      // a variant rather than throwing — that is its contract with the UI,
+      // which toasts them — but returning the variant verbatim here made a
+      // conflict, a partial write or a self-check failure arrive at the agent
+      // as an ordinary successful tool result. The agent then proceeds as if
+      // the level were on disk. The transport's only "this failed" channel is a
+      // throw, so the failing variants take it.
+      switch (result.kind) {
+        case 'saved':
+        case 'nothing':
+          return result;
+        case 'conflict':
+          throw new Error(
+            `Save aborted — ${result.conflicts.length} file(s) changed on disk since the act was read ` +
+            `(${result.conflicts.slice(0, 3).join(', ')}). Reopen the act to pick up the external changes.`,
+          );
+        case 'partial':
+          throw new Error(
+            `Save incomplete — the write failed at ${result.failed.path} (${result.failed.message}); ` +
+            `${result.unwritten.length} further file(s) did not land. The act is still marked unsaved.`,
+          );
+        case 'error':
+          throw new Error('Save failed — see the editor notice for the reason. Nothing was written.');
+      }
     }
 
     default: {

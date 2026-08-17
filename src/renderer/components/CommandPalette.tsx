@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { T } from './ui';
+import { T, Z } from './ui';
+import { modalIsOpen } from '../state/modalStore';
 
 export interface Command {
   id: string;
@@ -23,6 +24,15 @@ export default function CommandPalette({ commands }: { commands: Command[] }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K')) {
+        // A DIALOG IS WAITING FOR AN ANSWER — the palette does not open over it.
+        //
+        // It used to open UNDERNEATH: the palette sat at z-1000 and the dialogs
+        // at 1100, so Ctrl+K during a confirm swallowed the chord, focused an
+        // invisible search field, and typing went nowhere anybody could see.
+        // Raising it above would have been the other bug: a modal that can be
+        // walked around is not modal, and the commands behind it include Open
+        // Project, which is exactly what the confirm is asking about.
+        if (!open && modalIsOpen()) return;
         e.preventDefault();
         setOpen((v) => !v);
       } else if (e.key === 'Escape' && open) {
@@ -84,7 +94,7 @@ export default function CommandPalette({ commands }: { commands: Command[] }) {
 const styles: Record<string, React.CSSProperties> = {
   backdrop: {
     position: 'fixed', inset: 0, background: 'rgba(10,12,18,0.6)', backdropFilter: 'blur(2px)',
-    display: 'flex', justifyContent: 'center', alignItems: 'flex-start', paddingTop: '12vh', zIndex: 1000,
+    display: 'flex', justifyContent: 'center', alignItems: 'flex-start', paddingTop: '12vh', zIndex: Z.modal,
   },
   panel: {
     width: 540, maxWidth: '90vw', background: T.surface,
@@ -93,7 +103,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   input: {
     width: '100%', padding: '12px 16px', fontSize: 15, color: T.textHi,
-    background: 'transparent', border: 'none', borderBottom: `1px solid ${T.border}`, outline: 'none',
+    background: 'transparent', border: 'none', borderBottom: `1px solid ${T.border}`,
     fontFamily: T.fontUi,
   },
   list: { maxHeight: 360, overflowY: 'auto', padding: 4 },

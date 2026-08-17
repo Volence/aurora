@@ -88,6 +88,24 @@ interface EditorState {
   selection: Selection | null;
   dirty: boolean;
   /**
+   * WHICH acts have unsaved edits, keyed `${zoneId}/${actId}`, with an edit
+   * counter as the value.
+   *
+   * One project-wide `dirty` boolean could not survive a second act. Every
+   * command in every act set it; the save resolved exactly ONE act and looped
+   * its sections; `markClean()` then cleared everything. Edit act 1, switch to
+   * act 2, Ctrl+S → act 2's files written, dirty false, no dot on any tab, the
+   * project switch proceeds without a confirm, act 1's edits gone. Multi-act is
+   * a designed configuration (shell/tabs.ts, session-lifecycle emits a tab per
+   * act), so this had to be fixed before anyone authored the second act rather
+   * than after.
+   *
+   * The counter is the other half: a save awaits real IPC, so an edit landing
+   * mid-write is not in the bytes that reached disk and its act must stay
+   * dirty. `markActsClean` compares.
+   */
+  dirtyActs: Record<string, number>;
+  /**
    * Repaint clock for level mutations that DON'T go through a command and so
    * never reach an undo stack: an object/ring drag in progress, a direct BG tile
    * write. History-driven repaint is not here — it comes from the hub, via
@@ -169,7 +187,14 @@ interface EditorState {
   setPasteLayers: (layers: PasteLayers) => void;
   setPasting: (pasting: boolean) => void;
   markDirty: () => void;
+  /** Everything clean — a discard, or a project going away. */
   markClean: () => void;
+  /**
+   * Clean exactly the acts a save WROTE, and only where the act has not been
+   * edited since: `atGen` is the `dirtyActs` snapshot the saver read before its
+   * write. Returns the keys it withheld.
+   */
+  markActsClean: (keys: string[], atGen: Record<string, number>) => string[];
   bumpLiveEdit: () => void;
   bumpChunkLibraryVersion: () => void;
   /** Advance the given chunks' revisions. A no-op for an empty list. */
@@ -236,10 +261,11 @@ export function focusedHistory(): UndoStack | null {
   return docId ? documentHistoryHub.historyFor(docId) : null;
 }
 
-export const useEditorStore = create<EditorState>((set) => ({
+export const useEditorStore = create<EditorState>((set, get) => ({
   tool: 'view',
   selection: null,
   dirty: false,
+  dirtyActs: {},
   liveEditVersion: 0,
   chunkLibraryVersion: 0,
   chunkVersions: new Map<string, number>(),
@@ -295,8 +321,24 @@ export const useEditorStore = create<EditorState>((set) => ({
   setMapClipboard: (mapClipboard) => set({ mapClipboard }),
   setPasteLayers: (pasteLayers) => set({ pasteLayers }),
   setPasting: (pasting) => set({ pasting }),
-  markDirty: () => set({ dirty: true }),
-  markClean: () => set({ dirty: false }),
+  markDirty: () => set((s) => {
+    const p = useProjectStore.getState();
+    if (!p.currentZoneId || !p.currentActId) return { dirty: true };
+    const key = `${p.currentZoneId}/${p.currentActId}`;
+    return { dirty: true, dirtyActs: { ...s.dirtyActs, [key]: (s.dirtyActs[key] ?? 0) + 1 } };
+  }),
+  markClean: () => set({ dirty: false, dirtyActs: {} }),
+  markActsClean: (keys, atGen) => {
+    const s = get();
+    const next = { ...s.dirtyActs };
+    const withheld: string[] = [];
+    for (const k of keys) {
+      if ((next[k] ?? 0) !== (atGen[k] ?? 0)) { withheld.push(k); continue; }
+      delete next[k];
+    }
+    set({ dirtyActs: next, dirty: Object.keys(next).length > 0 });
+    return withheld;
+  },
   bumpLiveEdit: () => set((s) => ({ liveEditVersion: s.liveEditVersion + 1 })),
   bumpChunkLibraryVersion: () => set((s) => ({ chunkLibraryVersion: s.chunkLibraryVersion + 1 })),
   bumpChunkVersions: (ids) => set((s) => {

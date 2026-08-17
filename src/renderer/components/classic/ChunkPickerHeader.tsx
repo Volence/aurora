@@ -36,7 +36,7 @@ export default function ChunkPickerHeader(): React.ReactElement | null {
 const styles: Record<string, React.CSSProperties> = {
   loopBtn: {
     fontSize: 10, fontWeight: 600, color: T.textLo, background: T.overlay,
-    borderWidth: 1, borderStyle: 'solid', borderColor: T.border, borderRadius: 3, padding: '0 6px',
+    borderWidth: 1, borderStyle: 'solid', borderColor: T.border, borderRadius: T.rMd, padding: '0 6px',
     lineHeight: '16px', cursor: 'pointer', flexShrink: 0,
   },
   loopBtnOn: { color: T.onAccent, background: T.warning, borderColor: T.warning },

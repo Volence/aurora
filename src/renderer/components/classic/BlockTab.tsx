@@ -71,7 +71,7 @@ const MAX_BLOCK_REF = 0x3ff;
 const PAINT_VIEW_PX = 240;
 const PAINT_SCROLLER: React.CSSProperties = {
   minWidth: PAINT_VIEW_PX, minHeight: PAINT_VIEW_PX, flex: '1 1 0', overflow: 'auto',
-  display: 'flex', background: T.void, borderRadius: 3,
+  display: 'flex', background: T.void, borderRadius: T.rMd,
 };
 const PAINT_HOLDER: React.CSSProperties = { margin: 'auto', padding: 6, lineHeight: 0 };
 

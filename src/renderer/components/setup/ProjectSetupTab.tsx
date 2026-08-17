@@ -308,7 +308,7 @@ const styles: Record<string, React.CSSProperties> = {
   key: { fontFamily: T.fontMono, fontSize: 11, color: T.textBase, width: 220, flexShrink: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const },
   pathInput: {
     flex: 1, minWidth: 0, padding: '2px 8px', background: T.surface,
-    border: `1px solid ${T.border}`, borderRadius: T.rSm, outline: 'none',
+    border: `1px solid ${T.border}`, borderRadius: T.rSm,
     color: T.textHi, fontSize: 11, fontFamily: T.fontMono,
   },
   footer: {

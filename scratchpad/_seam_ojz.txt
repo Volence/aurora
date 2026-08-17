@@ -1,0 +1,8 @@
+123: # POOL_TILE_CEILING / BG_* are imported from the generated registry mirror —
+126: from vram_map import GAME as _VRAM_MAP_GAME, POOL_TILE_CEILING, BG_TILE_BASE_SLOT, BG_TILE_CAPACITY
+131: PAGE_TABLE_MAX = 256                  # residency page-table ceiling (replaces POOL_TILE_CEILING as the hard cap)
+1776:     # identity-residency guard (OJZ_ACT_POOL_TILES <= POOL_TILE_CEILING) is retired.
+1955:         f"(ceiling {POOL_TILE_CEILING})\n"
+
+=== override ===
+layout len 4096, tiles 448, keys layout,tiles

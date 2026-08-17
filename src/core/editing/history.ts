@@ -50,6 +50,20 @@ export class EditHistory {
   }
 }
 
+/**
+ * The nametable a `set-bg-tiles` command edits: a library entry's, or the act's
+ * own default plane.
+ *
+ * Resolved from the command's OWN `bgRef` rather than from whichever section is
+ * active now — an undo can land long after the artist moved to a section that
+ * displays a different background, and reaching the wrong array would revert
+ * tiles nobody painted while leaving the painted ones in place.
+ */
+function resolveBgLayout(level: S4Level, bgRef: string | null): Uint16Array | null {
+  if (bgRef !== null) return level.bgLibrary?.find((b) => b.id === bgRef)?.layout ?? null;
+  return level.act?.bgLayout ?? null;
+}
+
 function applyCommand(cmd: AnyCommand, level: S4Level): void {
   if (cmd.type === 'batch') {
     for (const c of cmd.commands) applyCommand(c, level);
@@ -84,6 +98,11 @@ function applyCommand(cmd: AnyCommand, level: S4Level): void {
     level.act.bgTiles = cmd.newTiles
       ? cmd.newTiles.map(t => ({ pixels: new Uint8Array(t.pixels) }))
       : null;
+    return;
+  }
+  if (cmd.type === 'set-bg-tiles') {
+    const layout = resolveBgLayout(level, cmd.bgRef);
+    if (layout) for (const e of cmd.entries) layout[e.index] = e.newNt;
     return;
   }
   if (cmd.type === 'set-sections') {
@@ -205,6 +224,11 @@ function undoCommand(cmd: AnyCommand, level: S4Level): void {
     level.act.bgTiles = cmd.oldTiles
       ? cmd.oldTiles.map(t => ({ pixels: new Uint8Array(t.pixels) }))
       : null;
+    return;
+  }
+  if (cmd.type === 'set-bg-tiles') {
+    const layout = resolveBgLayout(level, cmd.bgRef);
+    if (layout) for (const e of cmd.entries) layout[e.index] = e.oldNt;
     return;
   }
   if (cmd.type === 'set-sections') {

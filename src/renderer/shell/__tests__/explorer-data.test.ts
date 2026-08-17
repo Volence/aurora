@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { countableItems } from '../../../core/shell/explorer';
 import {
   classicExplorerGroups, aeonExplorerGroups, noProjectExplorerGroups,
   resolveObjectSprite, canvasExplorerGroup, NEW_SPRITE_ITEM_ID, NEW_CANVAS_ITEM_ID, IMPORT_SHEET_ITEM_ID,
@@ -83,7 +84,7 @@ describe('aeonExplorerGroups', () => {
     const lib = groups.find((g) => g.id === 'objects')!;
     expect(lib.label).toBe('Object Library');
     expect(lib.items).toEqual([
-      { id: NEW_SPRITE_ITEM_ID, label: 'New Sprite…', hint: 'new' },
+      { id: NEW_SPRITE_ITEM_ID, label: 'New Sprite…', hint: 'new', action: true },
       { id: 'doc:sprite:aeon:motobug', label: 'Moto Bug' },
       { id: 'doc:sprite:aeon:spring', label: 'Spring', disabled: true, reason: 'no sprite bound' },
     ]);
@@ -99,7 +100,7 @@ describe('aeonExplorerGroups', () => {
       [{ id: 'spring', name: 'Spring', sprite: undefined }],
       NO_CANVASES,
     ).find((g) => g.id === 'objects')!;
-    expect(lib.items[0]).toEqual({ id: NEW_SPRITE_ITEM_ID, label: 'New Sprite…', hint: 'new' });
+    expect(lib.items[0]).toEqual({ id: NEW_SPRITE_ITEM_ID, label: 'New Sprite…', hint: 'new', action: true });
     expect(lib.items[0].disabled).toBeUndefined();
     // Not a tab id: the Explorer routes 'doc:sprite:' items into a sprite-doc
     // tab open, and this row must not be swallowed by that branch.
@@ -112,7 +113,7 @@ describe('canvasExplorerGroup', () => {
     const g = canvasExplorerGroup({ names: ['cliffs', 'sky'], skipped: [] });
     expect(g.label).toBe('Canvases');
     expect(g.items).toEqual([
-      { id: NEW_CANVAS_ITEM_ID, label: 'New Canvas…', hint: 'new' },
+      { id: NEW_CANVAS_ITEM_ID, label: 'New Canvas…', hint: 'new', action: true },
       { id: 'doc:canvas:cliffs', label: 'cliffs' },
       { id: 'doc:canvas:sky', label: 'sky' },
     ]);
@@ -123,7 +124,7 @@ describe('canvasExplorerGroup', () => {
     // origination canvas has exactly one entry point (⌘K) and a user who has
     // never made one has no reason to look for it there.
     const g = canvasExplorerGroup({ names: [], skipped: [] });
-    expect(g.items).toEqual([{ id: NEW_CANVAS_ITEM_ID, label: 'New Canvas…', hint: 'new' }]);
+    expect(g.items).toEqual([{ id: NEW_CANVAS_ITEM_ID, label: 'New Canvas…', hint: 'new', action: true }]);
     // Would be swallowed by the Explorer's 'doc:canvas:' branch otherwise.
     expect(NEW_CANVAS_ITEM_ID.startsWith('doc:canvas:')).toBe(false);
   });
@@ -214,5 +215,27 @@ describe('canvasExplorerGroup — the import entry', () => {
     // A "New…" row that sorts below fifty canvases is a row nobody scrolls to.
     const g = canvasExplorerGroup({ names: ['a', 'b'], skipped: [] }, { classic: true });
     expect(g.items.slice(0, 2).map((i) => i.id)).toEqual([NEW_CANVAS_ITEM_ID, IMPORT_SHEET_ITEM_ID]);
+  });
+});
+
+/**
+ * UX-A4. Group headers counted every row, so the two verbs at the top of the
+ * Canvases group counted as canvases: a project with ONE canvas read
+ * "CANVASES 3". The count is about the things, not the verbs.
+ */
+describe('group counts report things, not actions', () => {
+  it('does not count New Canvas… or Import Art Sheet…', () => {
+    const g = canvasExplorerGroup({ names: ['sky'], skipped: [] }, { classic: true });
+    expect(g.items).toHaveLength(3);      // both verbs plus the one canvas
+    expect(countableItems(g)).toBe(1);
+  });
+
+  it('counts a badly-named file — it IS a canvas, just an unopenable one', () => {
+    const g = canvasExplorerGroup({ names: ['sky'], skipped: ['9 bad name.png'] });
+    expect(countableItems(g)).toBe(2);
+  });
+
+  it('reads zero for an empty group rather than counting its own verb', () => {
+    expect(countableItems(canvasExplorerGroup({ names: [], skipped: [] }))).toBe(0);
   });
 });

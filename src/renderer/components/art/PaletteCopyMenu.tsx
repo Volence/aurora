@@ -1,6 +1,6 @@
 // src/renderer/components/art/PaletteCopyMenu.tsx
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { T } from '../ui';
+import { T, Z } from '../ui';
 
 export interface CopyMenuItem {
   label: string;
@@ -73,7 +73,7 @@ export default function PaletteCopyMenu({
 const styles: Record<string, React.CSSProperties> = {
   menu: {
     position: 'fixed',
-    zIndex: 1000,
+    zIndex: Z.floating,
     minWidth: 160,
     background: T.raised,
     border: `1px solid ${T.borderStrong}`,

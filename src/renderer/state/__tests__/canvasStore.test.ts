@@ -155,6 +155,56 @@ describe('canvasStore documents', () => {
     expect(useCanvasStore.getState().sourceOf(A)?.pngMtimeMs).toBe(5);
   });
 
+  /**
+   * R4. A save encodes the document, awaits the guarded write, then clears the
+   * flag. A stroke that lands during the write is not in the bytes on disk, so
+   * clearing it loses the work in silence — no dot, no close prompt, and the
+   * next Ctrl+S has nothing to save. The counter the saver read before its
+   * await is what tells the two apart.
+   */
+  it('markSaved leaves a document dirty when it was edited during the write', () => {
+    openCanvasDoc(A, { name: 'alpha', width: 8, height: 8, profileId: 'none' });
+    useCanvasStore.getState().setSource(A, SOURCE);
+    const first = createBuffer(8, 8);
+    first.data[0] = canvasIndex(1, 1);
+    useCanvasStore.getState().setPixels(A, first);
+
+    const atGen = useCanvasStore.getState().docs.get(A)!.editGen; // what the saver sends
+
+    const during = createBuffer(8, 8);
+    during.data[1] = canvasIndex(1, 2);
+    useCanvasStore.getState().setPixels(A, during);              // painted mid-write
+
+    const cleared = useCanvasStore.getState().markSaved(A, { pngMtimeMs: 5, sidecarMtimeMs: 6 }, atGen);
+    expect(cleared).toBe(false);
+    expect(useCanvasStore.getState().isDirty(A)).toBe(true);
+    // The mtimes still move: those files DID land, and a stale baseline would
+    // make the retry conflict on a file Aurora itself just wrote.
+    expect(useCanvasStore.getState().sourceOf(A)?.pngMtimeMs).toBe(5);
+  });
+
+  it('markSaved clears when nothing moved during the write', () => {
+    openCanvasDoc(A, { name: 'alpha', width: 8, height: 8, profileId: 'none' });
+    useCanvasStore.getState().setSource(A, SOURCE);
+    const buf = createBuffer(8, 8);
+    buf.data[0] = canvasIndex(1, 1);
+    useCanvasStore.getState().setPixels(A, buf);
+    const atGen = useCanvasStore.getState().docs.get(A)!.editGen;
+    expect(useCanvasStore.getState().markSaved(A, { pngMtimeMs: 5, sidecarMtimeMs: 6 }, atGen)).toBe(true);
+    expect(useCanvasStore.getState().isDirty(A)).toBe(false);
+  });
+
+  it('an undo during the write counts as an edit', () => {
+    openCanvasDoc(A, { name: 'alpha', width: 8, height: 8, profileId: 'none' });
+    useCanvasStore.getState().setSource(A, SOURCE);
+    const buf = createBuffer(8, 8);
+    buf.data[0] = canvasIndex(1, 1);
+    useCanvasStore.getState().setPixels(A, buf);
+    const atGen = useCanvasStore.getState().docs.get(A)!.editGen;
+    canvasHistory(A).undo();
+    expect(useCanvasStore.getState().markSaved(A, { pngMtimeMs: 5, sidecarMtimeMs: 6 }, atGen)).toBe(false);
+  });
+
   it('a dirty document with no destination is not saveable work', () => {
     openCanvasDoc(A, { name: 'alpha', width: 8, height: 8, profileId: 'none' });
     const buf = createBuffer(8, 8);

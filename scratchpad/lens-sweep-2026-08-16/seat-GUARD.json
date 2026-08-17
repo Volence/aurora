@@ -1,0 +1,123 @@
+{
+ "seat": "GUARD",
+ "model": "fable",
+ "coverage": "Did NOT plant in: the aeon backend (aeon-save/aeon-load/aeon-adapter), the s1 adapter/profile resolution layer, layout/objpos/startpos/colind codecs (only their self-check gate), chunk-invalidation and selection-to-chunk (editing), agent-handler, palette drag/copy/apply, sprite decompose/render, session persistence, explorer/tab-activation, canvas-budget, or any compression codec internals — plants were 18 targeted mutations on the brief's named guard areas, not suite-wide mutation testing, so per-file kill-rate numbers exist only for the 12 files I ran. Static sweep is regex-based (approximate it-block splitting; helper-delegated assertions initially flagged then manually cleared for the 3 biggest hits — smaller flagged files were not all hand-read). The renderer/shell commands.test.ts mock-only spot-check was cut short: my Bash cwd broke late in the session (worktree files intact — Read and git -C still worked; final `git status --porcelain` is empty, all plants reverted). The A8 flake was reproduced once, not root-caused. Vacuity RATE headline: classic assert-nothing vacuity is ~0% of ~2138 blocks — but 7/18 (39%) of load-bearing guards I attacked have no test that notices their removal, and ~19% of test files (32/171) guard .tsx behavior by source-text scan only.",
+ "verified_clean": [
+  "save-guard decision table (src/core/project/__tests__/save-guard.test.ts): plants CAUGHT — 'edited externally' inverted at save-guard.ts:77 → 4 failures; 'appeared externally' neutered at :74 → 1 failure; all five documented rows genuinely pinned, and planGuardedWrite is really wired into main (guarded-write.ts:77)",
+  "Collision carry D3 (classic-commit-plan.ts:411,413): plants CAUGHT — forcing colind=0 → 2 failures; forcing solidity=0 → 1 failure (classic-commit-plan.test.ts)",
+  "Slot double-booking regression (classic-surface-plan.ts:106): plant CAUGHT — removing the `taken` check → 1 failure in the dedicated 'slot double-booking (regression)' describe at classic-surface-plan.test.ts:421",
+  "canvas-resolve flip canonicalization (canvas-resolve.ts:120): plant CAUGHT — dropping canon.xf/yf propagation → 1 failure (canvas-resolve.test.ts)",
+  "Zoom-per-tier (artStore.ts:90 selectArtZoom): plant CAUGHT — hardwiring the 'tile' tier → 4 failures in art-zoom-tier.test.ts",
+  "PNG import validation (png-import.ts:146 cell-needs-two-lines): plant CAUGHT — swallowing the unexpressible cell → 1 failure; png-import.test.ts also covers colour-not-in-act, snapping semantics, entry-0 rule",
+  "Locked-tile PREDICATE (editable-tiles.ts:37 animRanges): plant CAUGHT — 2 failures across editable-tiles.test.ts / reserved-tiles-real-act.test.ts (the predicate is solid; only its planner WIRING is unpinned — finding A2/A3)",
+  "Canvas sidecar version gate (canvas-file-format.ts:127): plant CAUGHT — disabling the version check → 3 failures (canvas-file-format.test.ts)",
+  "free-tile-slots readout parity (free-tile-slots.ts:31): plant CAUGHT — dropping the reserved exclusion → 1 failure",
+  "Commit-plan refusal tests use `expect(r.ok).toBe(false)` BEFORE the `if (!r.ok)` narrow (classic-commit-plan.test.ts:81-104) — read directly; NOT the historically-dominant assert-nothing pattern; chunks-exhausted has an expect.fail else-arm (:337-339)",
+  "Static sweep of all 171 files / ~2138 it-blocks: true zero-assertion tests ≈ 0 — 11 regex flags all resolved to false positives (goldens/enigma delegate to expect-bearing helpers kosRoundTrips/nemRoundTrips/roundTrips; compose-bench.test.ts is an explicitly documented opt-in print-only bench); zero toBeDefined/toBeTruthy-only tests in the whole suite",
+  "Mock-assertion flags (12 blocks) are legitimate interaction tests, not mocks of the unit under test — e.g. classicObjectArtStore.test.ts counts injected-builder calls to pin cache invalidation (:144-188); save-art-refusal.test.ts asserts toast + untouched source around a real saveSpriteArt call",
+  "The 'legacy' re-implementations in zoom-cap.test.ts:21 and zoom-anchor.test.ts:42-43 are extraction-parity / negative oracles (zoom-anchor asserts the shipped formula DIFFERS from the buggy legacy), not production-logic-compared-to-itself",
+  "PLANT SCOREBOARD: 18 planted violations, 11 caught / 7 missed (39% miss). The misses concentrate in exactly two places: the new 2C commit planner's refusal wiring (A1-A4) and the byte-mismatch arms of both save self-checks (A5)."
+ ],
+ "findings": [
+  {
+   "id": "A1",
+   "title": "Commit-plan block reuse ignoring collision mismatch is untested",
+   "severity": "high",
+   "file": "src/core/art/classic-commit-plan.ts",
+   "line": 374,
+   "claim": "The guard that forbids reusing a visually-identical pool block whose colind differs (classic-commit-plan.ts:371-374) is pinned by no test — deleting the colind check leaves all 24 classic-commit-plan tests green.",
+   "evidence": "PLANT: removed `if ((doc.collision.colind[b] ?? 0) !== colind) continue;` at classic-commit-plan.ts:374 → `npx vitest run src/core/art/__tests__/classic-commit-plan.test.ts` = 24/24 pass. planCanvasCommit is imported by exactly one test file (grep). Failure scenario: a 2C canvas commit whose region overlaps a look-alike block (same 4 tiles/flips/pals, different colind — decorative vs solid variants) reuses the wrong block id; chunk cells save cleanly and the disasm silently gets wrong collision, with no downstream defense — writeS1Level round-trips it fine. Measured S1 fact: one block can reach 55 chunks, so the blast radius is large.",
+   "confidence": "certain",
+   "fix": "Add a test: doc with two blocks identical in cells but colind 0 vs N; commit art matching that shape needing colind N (via displaced cell); assert the plan reuses ONLY the colind-matching block / mints a new block rather than reusing the colind-0 one.",
+   "verdict": {
+    "verdict": "CONFIRMED",
+    "reasoning": "I attempted to refute and could not; the coverage gap is real and I reproduced it end to end.\n\nWHAT THE GUARD DOES. classic-commit-plan.ts:373-383, inside internBlock, scans doc.blocks ascending for a pool block whose 4 cells match the drawn def; line 374 skips any candidate whose doc.collision.colind[b] differs from the colind inherited from the displaced chunk cell (computed at line 413). This is a DIFFERENT mechanism from the intern-key dedup at line 367 (`...#${colind}`), which only separates blocks minted within this same commit. Line 374 is the only thing protecting reuse of a PRE-EXISTING pool block.\n\nMUTATION SURVIVAL — VERIFIED EMPIRICALLY (repo untouched). I copied src/ + vitest.config.ts to scratchpad with node_modules symlinked, deleted line 374 there, and ran tests: baseline classic-commit-plan.test.ts = 24/24 pass; mutant = 24/24 pass. I then ran the ENTIRE suite against the mutant: 170 files passed / 1 skipped, 2293 tests passed / 1 skipped — byte-identical to baseline. So the guard is unpinned not just by the cited file but by the whole 2294-test suite. `git status --short -- src` afterwards: clean.\n\nONE SEAT DETAIL IS WRONG, BUT IT CUTS AGAINST THE SEAT. The evidence says \"planCanvasCommit is imported by exactly one test file\". False: it is imported by src/renderer/state/classicLevelStore.ts, src/renderer/components/canvas/canvas-commit-model.ts and CommitPlanView.tsx, and indirectly exercised by classicLevelStore.test.ts and canvas-commit-model.test.ts. Those suites still pass with the guard deleted, so the conclusion (zero coverage) survives the misstatement.\n\nWHY THE EXISTING \"LOOKS IDENTICAL BUT DIFFERENT COLLISION\" TEST (test file :300) MISSES IT. That test paints canvasIndex(1,5), which resolves to a brand-new solid tile at pal:1, while pool blocks 1 and 3 hold tiles 1-4 at pal:0. The pool scan at :373 therefore never finds a visual match, so the assertion (two colind values in blockWrites) is satisfied purely by the intern key at :367. Deleting :374 leaves it green — which I confirmed.\n\nBEHAVIORAL PROOF OF THE DEFECT THE GUARD PREVENTS. Concrete triggering state: doc with tile 5 = 0x55 (solid entry 5); block 1 = 4x{tile:5,pal:1} with colind 0; block 3 = identical cells with colind 7; chunk 0 = 256 cells of block 3. Commit a solid canvasIndex(1,5) canvas over target {chunkFileIndex: 0}. With the guard: chunkWrites[0] cells all reference block 3 (colind 7 preserved), blocksReused=1. Without the guard: cells all reference block 1 (colind 0) — the chunk silently loses its collision. Both runs return ok:true with no warning, so nothing downstream flags it.\n\nTHE SHAPE IS REAL IN S1, NOT HYPOTHETICAL. Using Aurora's own enigmaDecompress on /home/volence/sonic_hacks/s1disasm/map16/*.eni cross-referenced with decodeS1ColInd over collide/*.bin, groups of byte-identical blocks carrying DIFFERENT colind: GHZ 5 groups, MZ 1 group (LZ, SLZ, SYZ, SBZ 0). Example GHZ: blocks 1 and 393 share cells 4054,4854,4854,4054 with colind 255 vs 251; blocks 325/396 (255 vs 252); 326/397 (255 vs 252); 329/395 (255 vs 253). Because the scan runs ascending from b=1, block 1 is the first hit for its shape, so the unguarded path would pick exactly the wrong variant.\n\nThe proposed fix is correct, with one addition: the fixture must make the pool block visually REACHABLE (a solid pool tile plus a matching pal line), which is exactly where the existing :300 test falls short.",
+    "severity_correction": "Downgrade high -> medium. The rubric's \"high\" is wrong output or a broken main-path feature, but HEAD emits correct plans: the guard at :374 is present, correct, and I verified it selects the colind-matching block. Nothing is currently wrong for a user. This is a mutation-survival/regression-risk finding: an unpinned invariant whose removal WOULD be high (silently wrong collision on a block that can reach up to 55 chunks), but the defect is latent, not live. Medium is the honest rating for \"correct code, zero test pinning it\"."
+   }
+  },
+  {
+   "id": "A2",
+   "title": "planSurfaceEdit locked-tile refusals untested in both paint modes",
+   "severity": "medium",
+   "file": "src/core/art/classic-surface-plan.ts",
+   "line": 175,
+   "claim": "Both 'tile N is not editable' refusals in planSurfaceEdit (link mode :175-177, isolate mode :209-211) can be deleted without failing any test — the Paint path's lock enforcement wiring is unpinned.",
+   "evidence": "PLANTS: removed the link-mode refusal (lines 175-177) → 22/22 pass; separately removed the isolate-mode refusal (lines 209-211) → 22/22 pass (classic-surface-plan.test.ts, the only consumer). The predicate itself (tileLockReason) IS tested (editable-tiles.test.ts caught my anim-range plant with 2 failures), but nothing proves the planner calls it. Failure scenario: regression drops the call → pencil paints an anim-overlay or appended tile, producing an edit the save path later errors on ('animated art slots are not editable in v1'), i.e. work the artist cannot save. Save-path defense means no silent corruption, hence medium not high.",
+   "confidence": "certain",
+   "fix": "Two tests in classic-surface-plan.test.ts: writes landing on a tile whose isEditableTile returns false, once in link mode and once in isolate mode with tileLinked/blockLinked false; assert { ok: false, reason: /not editable/ }.",
+   "verdict": null
+  },
+  {
+   "id": "A3",
+   "title": "Commit-plan freeSlot allocation filter (reserved/anim/locked) untested",
+   "severity": "medium",
+   "file": "src/core/art/classic-commit-plan.ts",
+   "line": 299,
+   "claim": "Deleting the `reserved.has(t) || animTiles.has(t) || !isEditableTile(t)` filter from the commit planner's freeSlot (classic-commit-plan.ts:299) leaves all 24 tests green — nothing proves a canvas commit refuses to allocate into object-reserved, animated, or non-editable tile slots.",
+   "evidence": "PLANT: rewrote the freeSlot loop body to `return t` unconditionally after the usage check → classic-commit-plan.test.ts 24/24 pass. Failure scenario: a commit allocates new art into an anim-overlay slot → art bound there animates in game; or into an appended/gap tile → save errors after the fact. Contrast: the surface-plan twin of this filter IS partially pinned — my double-booking plant (removed `taken.has(t)` at classic-surface-plan.ts:106) was CAUGHT by the 'slot double-booking (regression)' describe at classic-surface-plan.test.ts:421.",
+   "confidence": "certain",
+   "fix": "Test in classic-commit-plan.test.ts: doc with the only zero-usage slots covered by animTiles/reservedTiles/locked predicate; commit new art; assert refusal is tiles-exhausted rather than an allocation into those slots (and assert no tileWrite targets them when other free slots exist).",
+   "verdict": null
+  },
+  {
+   "id": "A4",
+   "title": "blocks-exhausted and tiles-exhausted refusals have no core-level test",
+   "severity": "medium",
+   "file": "src/core/art/classic-commit-plan.ts",
+   "line": 388,
+   "claim": "Removing the MAX_BLOCKS_TOTAL ceiling (`if (id >= MAX_BLOCKS_TOTAL) return null;` at :388) leaves all tests green; the 'blocks-exhausted' and 'tiles-exhausted' refusal kinds are exercised nowhere against the real planner.",
+   "evidence": "PLANT: deleted the ceiling check → 24/24 pass. grep across all tests: 'blocks-exhausted'/'tiles-exhausted' appear only in canvas-commit-model.test.ts:101-121, which formats UI messages from HAND-BUILT refusal objects (a mock of the planner's output, not the planner). chunks-exhausted, by contrast, is genuinely pinned (classic-commit-plan.test.ts:337 with expect.fail else-arm — I verified the pattern). Failure scenario: block id 0x400+ flows into the 10-bit chunk-cell field on save and is truncated/corrupted. Rare in practice (needs >1024 blocks), hence medium.",
+   "confidence": "certain",
+   "fix": "Two tests: a doc at MAX_BLOCKS_TOTAL blocks committing one new block shape → expect blocks-exhausted; a doc with zero free/reclaimable tile slots committing new art → expect tiles-exhausted with the reported counts.",
+   "verdict": null
+  },
+  {
+   "id": "A5",
+   "title": "Both save self-check gates: byte-mismatch arm is dead code to the suite",
+   "severity": "medium",
+   "file": "src/core/level-classic/s1-io.ts",
+   "line": 408,
+   "claim": "The re-decode-and-compare halves of the two write-path self-checks (s1-io.ts emitCompressed :408 and s1-art-write.ts encodeS1ArtWriteBack :121) can be disabled (`if (false && ...)`) with every test still green — only the decoder-THROWS arm is ever exercised, though both modules' headers claim tests prove the gate fires.",
+   "evidence": "PLANT (s1-io): `if (!bytesEqual(dec, raw))` → `if (false as boolean && ...)` → s1-io.test.ts + classic-save.test.ts 34/34 pass. PLANT (s1-art-write): same disable at :121 → 8/8 pass. Cause: the injected broken encoders produce UNDECODABLE output (s1-io.test.ts:263 `brokenNemesis = () => new Uint8Array([0,0,0,0])`; s1-art-write.test.ts:104 truncates the stream), so nemesisDecompress throws and the catch arm (:412/:124) returns the same refusal. Failure scenario the untested arm exists for: a compressor bug that emits a VALID stream decoding to different bytes — precisely the silent-corruption case — would pass the gate and write wrong art into the disasm.",
+   "confidence": "certain",
+   "fix": "In each gate test, additionally inject a compressor that returns the real compression of MUTATED input (e.g. nemesisCompress of raw with one byte flipped) — decodes cleanly to wrong bytes — and assert the self-check refusal fires.",
+   "verdict": null
+  },
+  {
+   "id": "A6",
+   "title": "performGuardedWrite (main-process fs half of guarded save) has zero tests",
+   "severity": "medium",
+   "file": "src/main/guarded-write.ts",
+   "line": 54,
+   "claim": "The fs-effecting half of the guarded save — unsafe-relPath throw, tmp+rename atomic write, orphan-tmp cleanup, and the partial-batch {written,newMtimes,failed,unwritten} contract — is exercised by no test, despite the header (:4-5) saying it was extracted 'so the whole cycle is unit-testable headlessly'.",
+   "evidence": "grep 'performGuardedWrite' across all *.test.* files: zero hits; its only caller is ipc-handlers.ts:53. src/main contains no test files at all (find). Renderer-side tests (classic-save.test.ts etc.) stub the write bridge with vi.fn handles. The pure decision table IS solid — my two save-guard plants were caught (4 and 1 failures) — but the code that turns a plan into disk writes, including the partial-batch reporting the renderer's error UI depends on, runs for the first time in production. Failure scenario: a regression in the partial-batch path (e.g. failed file omitted from `failed`) silently misreports which disasm files landed after a mid-batch fs error.",
+   "confidence": "certain",
+   "fix": "Add src/main/__tests__/guarded-write.test.ts using a tmpdir: happy path returns newMtimes matching fs.stat; conflict path writes nothing; an EACCES-forced failure mid-batch yields correct written/failed/unwritten and no leftover .tmp; '../escape' relPath throws before any stat.",
+   "verdict": null
+  },
+  {
+   "id": "A7",
+   "title": "32 test files pin .tsx behavior by regex over source text",
+   "severity": "low",
+   "file": "src/renderer/workspace/__tests__/classic-art-dock.test.ts",
+   "line": 152,
+   "claim": "32 of 171 test files assert by readFileSync-ing .tsx source and matching text (e.g. classic-art-dock.test.ts:152 pins a literal `finally { ...clearAction(); }` shape; facet-modules 8 such blocks, facet-visibility 6, palette-grid-wiring 6, map-status-model 5) — these pass whenever the text survives, even if the behavior around it breaks.",
+   "evidence": "Static sweep (scratchpad/sweep.mjs) + `grep -rln readFileSync ... | xargs grep -l .tsx` = 32 files. The pattern is honest and self-documented (zoom-cap.test.ts header: 'pinned by source scan... must be checked by hand in the app') and is a structural consequence of the node-only suite (matches the known runtime-only-bugs constraint). Example vacuity: classic-art-dock.test.ts:143 `toMatch(/s\\.pendingAction/)` passes if TileTab reads pendingAction into a dead variable. Not per-file negligence — a suite-architecture ceiling; these tests are worth keeping but must not be counted as behavioral coverage.",
+   "confidence": "certain",
+   "fix": "No per-file fix; the honest ledger is: treat source-scan blocks as tripwires, and route new .tsx-behavior guarantees through extracted pure modules (the codebase already does this well — zoom-cap, free-tile-slots, palette-grid-model are all extractions with real tests) or through the CDP-driven checks used elsewhere.",
+   "verdict": null
+  },
+  {
+   "id": "A8",
+   "title": "Baseline suite is flaky: 2 facet-mount tests failed once, green on rerun",
+   "severity": "low",
+   "file": "src/renderer/workspace/__tests__/facet-modules.test.ts",
+   "line": 118,
+   "claim": "At the pinned commit the first full `npx vitest run` failed 2 tests ('s1ArtFacet mounts the pixel chrome › declares both a ToolDock and a ToolOptions' via dynamic import of s1-facets, plus one sibling) and passed 2914/2914 on two immediate re-runs — a nondeterministic failure mode that trains people to re-run red suites.",
+   "evidence": "Run 1: 'Test Files 2 failed | 263 passed, Tests 2 failed | 2912 passed'; runs 2 and 3 (same tree, no changes): all green (scratchpad/baseline.txt). The failing block dynamically imports '../facets/s1-facets' inside the test; symptom is consistent with a module-graph/timing race under parallel workers. I did not root-cause it.",
+   "confidence": "probable",
+   "fix": "Reproduce under `--sequence.shuffle` / repeated runs to bisect the import race; consider hoisting the dynamic import or isolating the facet-module tests into their own pool.",
+   "verdict": null
+  }
+ ]
+}

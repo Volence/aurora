@@ -658,3 +658,67 @@ describe('s1-io tile-write rejection paths', () => {
     expect(state2.doc.tiles[0]).toBe(expected);
   });
 });
+
+describe('s1-io save gates that no re-decode could catch', () => {
+  /**
+   * U5 (CLASSIC-A5). S1 stores "this object is already gone" as a bit keyed by
+   * the entry's POSITION in the objpos table, so X-sorting a list whose
+   * remembered entries are not already in X order swaps which object each saved
+   * bit refers to. FIVE real acts are not strictly X-ascending, so the sort is a
+   * genuine reorder in those files — reached by editing anything at all in the
+   * act, not by touching the remembered objects.
+   */
+  it('refuses to write an objpos sort that would swap two remember slots', async () => {
+    const { fa, act, paths } = buildSynthetic();
+    const state = await readS1Level(act, paths, fa);
+    // Two remembered objects, out of X order on disk, plus an unrelated edit so
+    // the list counts as changed and the sort runs.
+    state.doc.objects = [
+      { x: 0x200, y: 0x10, xflip: false, yflip: false, respawn: true, id: 1, subtype: 0 },
+      { x: 0x100, y: 0x20, xflip: false, yflip: false, respawn: true, id: 2, subtype: 0 },
+    ];
+    const result = writeS1Level(state, { objects: true });
+    expect(result.errors.some((e) => /remember flag/.test(e.message))).toBe(true);
+    expect(result.files.some((f) => f.path === paths.objpos)).toBe(false);
+  });
+
+  it('writes an edited list whose remembered entries keep their order', async () => {
+    const { fa, act, paths } = buildSynthetic();
+    const state = await readS1Level(act, paths, fa);
+    state.doc.objects = [
+      { x: 0x100, y: 0x10, xflip: false, yflip: false, respawn: true, id: 1, subtype: 0 },
+      { x: 0x180, y: 0x20, xflip: false, yflip: false, respawn: false, id: 2, subtype: 0 },
+      { x: 0x200, y: 0x30, xflip: false, yflip: false, respawn: true, id: 3, subtype: 0 },
+    ];
+    const result = writeS1Level(state, { objects: true });
+    expect(result.errors).toEqual([]);
+    expect(result.files.some((f) => f.path === paths.objpos)).toBe(true);
+  });
+
+  /**
+   * The colind gate. Its encode/decode are both `slice()`, so the re-decode
+   * comparison it used to make was `bytesEqual(x.slice().slice(), x)` — true for
+   * every input. What can actually go wrong is the LENGTH: the table
+   * legitimately starts shorter than the block list and the ROM resolves the
+   * overhang from what follows the file, so shortening it silently changes the
+   * collision of every block past the new end.
+   */
+  it('refuses to shrink the collision table', async () => {
+    const { fa, act, paths } = buildSynthetic();
+    const state = await readS1Level(act, paths, fa);
+    expect(state.doc.collision.colind.length).toBe(2);
+    state.doc.collision = { ...state.doc.collision, colind: new Uint8Array([9]) };
+    const result = writeS1Level(state, { colind: true });
+    expect(result.errors.some((e) => /shrink/.test(e.message))).toBe(true);
+    expect(result.files.some((f) => f.path === paths.colind)).toBe(false);
+  });
+
+  it('still writes a table that grew', async () => {
+    const { fa, act, paths } = buildSynthetic();
+    const state = await readS1Level(act, paths, fa);
+    state.doc.collision = { ...state.doc.collision, colind: new Uint8Array([0, 1, 5]) };
+    const result = writeS1Level(state, { colind: true });
+    expect(result.errors).toEqual([]);
+    expect(result.files.find((f) => f.path === paths.colind)!.bytes.length).toBe(3);
+  });
+});

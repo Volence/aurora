@@ -12,6 +12,20 @@ export interface ExplorerItemModel {
   disabled?: boolean;
   /** Tooltip when disabled (e.g. an act's missing-files reason). */
   reason?: string;
+  /**
+   * This row DOES something rather than naming something — "New Canvas…",
+   * "Import Art Sheet…", "New Sprite…".
+   *
+   * The group headers count their items, and counting these made the number a
+   * lie: a project with one canvas read "CANVASES 3", because the two verbs at
+   * the top of the group counted as canvases. `countableItems` is the rule.
+   */
+  action?: boolean;
+}
+
+/** The rows a group's count should report: the things, not the verbs. */
+export function countableItems(group: ExplorerGroupModel): number {
+  return group.items.reduce((n, i) => n + (i.action ? 0 : 1), 0);
 }
 
 export interface ExplorerGroupModel {

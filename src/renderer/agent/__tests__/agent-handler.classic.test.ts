@@ -207,6 +207,53 @@ describe('classic-get-level', () => {
     await expect(handleAgentRequest({ kind: 'classic-get-level', zone: 'zzz', act: 9 })).rejects.toThrow(/not found/);
   });
 
+  /**
+   * R2. Reading the act that is already loaded must not re-read it from disk:
+   * `openAct` drops both undo stacks and clears every dirty flag, so the
+   * natural agent sequence — edit, then read back to check — reverted the
+   * agent's own edits and reported the pristine disk state as success.
+   */
+  it('reads the LIVE doc for the act already open, keeping edits and undo', async () => {
+    openReady();
+    await handleAgentRequest({
+      kind: 'classic-set-layout-region', plane: 'fg', x: 0, y: 0, chunkIds: [[2]],
+    });
+    expect(lvl().dirty.fg).toBe(true);
+
+    const res = await handleAgentRequest({ kind: 'classic-get-level', zone: 'ghz', act: 1 }) as {
+      layout: { fg: number[][] };
+    };
+    expect(res.layout.fg[0][0]).toBe(2);   // the edit, not the disk
+    expect(lvl().dirty.fg).toBe(true);
+    expect(layoutStack().canUndo).toBe(true);
+  });
+
+  /**
+   * The other half: a DIFFERENT act while work is unsaved. The UI door confirms
+   * (save / discard / cancel); an agent has no UI to confirm through, so this
+   * fails closed exactly as classic-open-project does.
+   */
+  it('refuses to read a different act while the loaded one is dirty', async () => {
+    const OTHER: ZoneActRef = { zone: 'ghz', act: 2, label: 'Green Hill 2', available: true };
+    openReady();
+    useClassicProjectStore.setState({ zoneTree: [REF, OTHER] } as never);
+    await handleAgentRequest({
+      kind: 'classic-set-layout-region', plane: 'fg', x: 0, y: 0, chunkIds: [[2]],
+    });
+    await expect(handleAgentRequest({ kind: 'classic-get-level', zone: 'ghz', act: 2 }))
+      .rejects.toThrow(/Unsaved changes/);
+    expect(lvl().ref?.act).toBe(1);
+    expect(lvl().dirty.fg).toBe(true);
+  });
+
+  it('opens a different act freely when nothing is unsaved', async () => {
+    const OTHER: ZoneActRef = { zone: 'ghz', act: 2, label: 'Green Hill 2', available: true };
+    openReady();
+    useClassicProjectStore.setState({ zoneTree: [REF, OTHER] } as never);
+    await handleAgentRequest({ kind: 'classic-get-level', zone: 'ghz', act: 2 });
+    expect(lvl().ref?.act).toBe(2);
+  });
+
   it('errors when no project is open', async () => {
     await expect(handleAgentRequest({ kind: 'classic-get-level', zone: 'ghz', act: 1 })).rejects.toThrow(/no classic project is open/);
   });
@@ -473,5 +520,51 @@ describe('classic-save-project', () => {
 
   it('errors when no project is open', async () => {
     await expect(handleAgentRequest({ kind: 'classic-save-project' })).rejects.toThrow(/no classic project is open/);
+  });
+
+  /**
+   * U4 (ERR-A6). The saver reports outcomes as a variant rather than throwing —
+   * its contract with the UI, which toasts them. Returning that variant
+   * verbatim delivered a conflict / partial write / self-check failure to the
+   * agent as an ordinary SUCCESSFUL tool result, and the agent then proceeded
+   * as if the level were on disk. A throw is the transport's only failure
+   * channel, so the failing variants take it.
+   */
+  it.each([
+    ['a conflict', { conflicts: ['map16/b.eni'] }, /changed on disk/],
+    ['a partial write', { failed: { path: 'map16/b.eni', message: 'EIO' }, unwritten: [] }, /Save incomplete/],
+  ])('reports %s as a tool ERROR, not a result', async (_label, extra, match) => {
+    (globalThis as unknown as { window: unknown }).window = {
+      api: {
+        writeGuarded: async () => ('conflicts' in extra
+          ? { conflicts: extra.conflicts }
+          : { written: [], newMtimes: {}, failed: extra.failed, unwritten: [] }),
+      },
+    };
+    const handle: ProjectHandle = {
+      type: 's1',
+      capabilities: fakeHandle().capabilities,
+      report: REPORT,
+      levels: {
+        list: () => [REF],
+        read: async () => makeDoc(),
+        write: async (): Promise<WriteResult> => ({
+          written: ['startpos/s.bin'], skipped: [], errors: [],
+          files: [{ path: 'startpos/s.bin', bytes: new Uint8Array([1]) }],
+          fileMtimes: {},
+        }),
+      },
+    };
+    useClassicProjectStore.setState({
+      status: 'open', dir: '/p', label: 'Sonic 1', type: 's1',
+      capabilities: handle.capabilities, report: REPORT,
+      zoneTree: [REF], handle, error: null,
+    } as never);
+    useClassicLevelStore.setState({
+      ref: REF, doc: makeDoc(), status: 'ready', error: null,
+      dirty: { start: true }, chunkVersions: new Map(), chunkEpoch: 1,
+    });
+
+    await expect(handleAgentRequest({ kind: 'classic-save-project' })).rejects.toThrow(match);
   });
 });

@@ -178,4 +178,33 @@ describe('object-aware tile claimability, real s1disasm', () => {
       expect(sbzReserved.size).toBe(0);
     },
   );
+  /**
+   * U7 (ERR-A3). A mappings .asm that is THERE and unreadable used to be folded
+   * into the same answer as one that is absent: the request was skipped and the
+   * set came back NON-NULL BUT INCOMPLETE. `reservedTiles` has a documented
+   * "not known" spelling — null — that both planners refuse under, and a
+   * quietly-short set defeats it: the allocator then hands out tiles an object
+   * sprite is still drawing through.
+   */
+  it.skipIf(!S1_PRESENT)(
+    'a present-but-unreadable mappings .asm reports NOT KNOWN, not an empty reservation',
+    async () => {
+      const real = realFs(S1DIR);
+      let refusedOne = false;
+      const fa: FileAccess = {
+        ...real,
+        async read(rel) {
+          // Exactly the class of failure a permissions bit or a locked file
+          // produces: exists() says yes, read() throws.
+          if (rel.endsWith('.asm') && rel.startsWith('_maps/')) { refusedOne = true; throw new Error('EACCES'); }
+          return real.read(rel);
+        },
+      };
+      const handle = await s1Adapter.open(fa);
+      const ghz1 = handle.levels!.list().find((r) => r.zone === 'ghz' && r.act === 1)!;
+      await handle.levels!.read(ghz1);
+      expect(refusedOne, 'the fixture never hit a mappings file — the act reserves nothing').toBe(true);
+      expect(handle.levels!.reservedTiles!(ghz1)).toBeNull();
+    },
+  );
 });

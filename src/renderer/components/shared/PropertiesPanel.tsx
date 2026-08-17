@@ -91,7 +91,7 @@ const styles: Record<string, React.CSSProperties> = {
     color: T.textBase,
   },
   propValue: {
-    color: T.textHi, fontFamily: 'monospace', fontSize: 11,
+    color: T.textHi, fontFamily: T.fontMono, fontSize: 11,
   },
   select: {
     maxWidth: 120, fontSize: 11,

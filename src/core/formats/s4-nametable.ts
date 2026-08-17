@@ -1,5 +1,17 @@
+/**
+ * A nametable of exactly `width * height` big-endian words.
+ *
+ * SHORT INPUT IS AN ERROR, not zero-fill. Reading past the end yielded
+ * `undefined << 8` = 0, so a truncated section_N.tiles.bin loaded as a mostly
+ * BLANK section that looked deliberate — and the next save wrote that blank
+ * over the artist's layout. The two callers that pass a derived height floor it
+ * from the data length, so they can never trip this.
+ */
 export function parseNametable(data: Uint8Array, width: number, height: number): Uint16Array {
   const count = width * height;
+  if (data.length < count * 2) {
+    throw new Error(`nametable is ${data.length} bytes; ${width}x${height} needs ${count * 2}`);
+  }
   const nt = new Uint16Array(count);
   for (let i = 0; i < count; i++) {
     const offset = i * 2;

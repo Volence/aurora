@@ -38,6 +38,10 @@ const CLASSIC = code('components/classic/ClassicPalettePanel.tsx');
 const WORKSPACE = code('workspace/LevelWorkspace.tsx');
 const SPRITE_MODE = code('components/sprite/SpriteMode.tsx');
 const COMPOSER_SHARED = code('components/classic/composer-shared.tsx');
+// The rule itself moved here (VIS2): six surfaces each held a slightly
+// different copy of "is the user typing", and the map viewport's was the one
+// missing the input-TYPE filter this test exists to protect.
+const TYPING_TARGET = code('shell/typing-target.ts');
 
 const HOSTS = [['aeon PaletteEditor', EDITOR], ['ClassicPalettePanel', CLASSIC]] as const;
 
@@ -177,9 +181,12 @@ describe('the shared slider control, still the only one', () => {
     // fix would be to restore the exemption, NOT to re-add blur().
     expect(WORKSPACE, 'LevelWorkspace stopped routing its guard through isTypingTarget')
       .toMatch(/isTypingTarget\(/);
-    expect(COMPOSER_SHARED, "isTypingTarget no longer exempts range — a focused palette slider now blocks undo")
+    expect(TYPING_TARGET, "isTypingTarget no longer exempts range — a focused palette slider now blocks undo")
       .toMatch(/'range'/);
-    expect(SPRITE_MODE, "SpriteMode's undo keydown no longer exempts range").toMatch(/'range'/);
+    expect(COMPOSER_SHARED, 'composer-shared stopped sharing the one rule')
+      .toMatch(/from '\.\.\/\.\.\/shell\/typing-target'/);
+    expect(SPRITE_MODE, "SpriteMode's undo keydown stopped routing through isTypingTarget")
+      .toMatch(/isTypingTarget\(/);
     // …and there are still exactly these two window-level level undo bindings, so
     // "both" is the whole set.
     for (const [name, src] of [['LevelWorkspace', WORKSPACE], ['SpriteMode', SPRITE_MODE]] as const) {

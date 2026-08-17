@@ -336,4 +336,43 @@ describe('saveClassicProject clears dirty flags on success', () => {
     expect(out).toEqual({ kind: 'saved', count: 1 });
     expect(useClassicLevelStore.getState().dirty).toEqual({});
   });
+
+  /**
+   * R4. The save snapshots the doc, awaits real IPC, and then clears what it
+   * wrote. An edit committed while that write was in flight is not in the bytes
+   * that landed — so clearing its flag loses it in silence: no tab dot, no
+   * close prompt, and the next Ctrl+S answers "nothing to save".
+   *
+   * The sprite path has re-read after its await since it was written; this is
+   * that discipline at the classic door, via the per-domain edit counters.
+   */
+  it('leaves a domain dirty when an edit lands DURING the write', async () => {
+    const doc = docWithRefs();
+    useClassicLevelStore.setState({
+      ref: REF, doc, status: 'ready', dirty: { blocks: true, start: true }, domainGen: {},
+    });
+    const writeResult: WriteResult = {
+      written: [], skipped: [], errors: [],
+      files: [
+        { path: 'map16/b.eni', bytes: new Uint8Array([1]) },
+        { path: 'startpos/s.bin', bytes: new Uint8Array([2]) },
+      ],
+      fileMtimes: {},
+    };
+    openStoreWithHandle(handleWith(async () => writeResult, vi.fn()));
+    // The artist paints a block while the guarded write is in flight.
+    const api = fakeApi(() => {
+      const s = useClassicLevelStore.getState();
+      useClassicLevelStore.setState({
+        dirty: { ...s.dirty, blocks: true },
+        domainGen: { ...s.domainGen, blocks: (s.domainGen.blocks ?? 0) + 1 },
+      });
+      return okResult(['map16/b.eni', 'startpos/s.bin'], {});
+    });
+
+    const out = await saveClassicProject(api);
+    expect(out).toEqual({ kind: 'saved', count: 1 });
+    // `start` landed and was not touched again; `blocks` is the newer edit.
+    expect(useClassicLevelStore.getState().dirty).toEqual({ blocks: true });
+  });
 });

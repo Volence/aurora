@@ -1,0 +1,20 @@
+4: Reads data/editor_bg_override.json ({"layout": [2048 words, blob-local
+7: conventions (VRAM-absolute indices at BG_TILE_BASE_SLOT, 2-byte BE
+18: # BG_TILE_BASE_SLOT / BG_TILE_CAPACITY are imported from the generated registry
+24: from vram_map import GAME as _VRAM_MAP_GAME, BG_TILE_BASE_SLOT, BG_TILE_CAPACITY
+25: assert _VRAM_MAP_GAME == 'sonic4', (
+48:         assert len(anims) <= 4, 'engine supports at most BGANIM_MAX_BANDS=4 bands'
+58:             assert (1 << col_shift) == col_bytes, 'column bytes must be a power of 2'
+59:             assert pattern_px == cols * 8, 'pattern width must equal cols*8'
+61:             assert slot_base == slot_cursor, 'bands must pack contiguously from slot 0'
+65:                 assert len(bank) == n
+95:             assert len(b['bank_offsets']) == 8, \
+130:     if len(layout) == 2048:
+131:         layout = layout + [0]*2048          # legacy 32-row layout: pad to 64 rows
+132:     assert len(layout) == 4096, f'layout must be 64x32 or 64x64 words, got {len(layout)}'
+133:     assert len(tiles) <= BG_TILE_CAPACITY, f'{len(tiles)} tiles exceeds BG capacity {BG_TILE_CAPACITY}'
+148:                 word = (word & ~0x7FF) | ((idx + BG_TILE_BASE_SLOT) & 0x7FF)
+163:     # Tiles are 32 bytes each, so this holds by construction; assert it anyway so
+165:     assert len(blob) % 4 == 0, f'BG tile blob must be 4-byte granular for move.l, got {len(blob)}'
+177:         assert len(words) == 16, f'palette must be 16 CRAM words, got {len(words)}'
+182:         assert file_line >= 0, 'BG palette maps to CRAM line >=1'

@@ -1,0 +1,17 @@
+bytes=6534
+has "headers": true
+has "origin": false
+has "host": false
+has DnsRebinding: false
+
+ctor snippet:
+constructor(options = {}) {
+        // Store auth and parsedBody per request for passing through to handleRequest
+        this._requestContext = new WeakMap();
+        this._webStandardTransport = new WebStandardStreamableHTTPServerTransport(options);
+        // Create a request listener that wraps the web standard transport
+        // getRequestListener converts Node.js HTTP to Web Standard and properly handles SSE streaming
+        // overrideGlobalObjects: false prevents Hono from overwriting global Response, which would
+        // break frameworks like Next.js whose response classes extend the native Response
+        this._requestListener = getRequestListener(async (webRequest) => {
+    

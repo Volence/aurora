@@ -1,5 +1,6 @@
 import React, { useRef, useEffect, useCallback, useMemo, useState } from 'react';
 import { useArtStore, selectArtZoom } from '../../state/artStore';
+import { isTypingTarget } from '../../shell/typing-target';
 import { useEditorStore, executeCommand } from '../../state/editorStore';
 import { useAeonHistoryVersion } from '../../hooks/useHistoryVersion';
 import {
@@ -573,7 +574,7 @@ export default function ComposerCanvas() {
       // Keep-alive under a sprite-doc tab: bail so the composer's clipboard keys
       // (Ctrl+C/X/V) don't double-fire alongside SpriteMode's (finding 1).
       if (!levelKeysEnabled()) return;
-      if ((e.target as HTMLElement).tagName === 'INPUT') return;
+      if (isTypingTarget(e.target)) return;  // was INPUT-only: a textarea lost its Escape
 
       // X/Y: toggle pending flips for the tile-stamp brush (guard !e.repeat so
       // holding the key doesn't strobe the flip).

@@ -1,0 +1,200 @@
+{
+ "seat": "VIS",
+ "model": "opus",
+ "coverage": "SHELL FAILURE MID-SWEEP — state this plainly: the Bash tool died with EDQUOT (disk quota exhausted on the machine) roughly halfway through, after the theme/colour/spacing/font-size measurements but BEFORE I could grep for `outline`, `tabIndex`, `aria-`, `role=`, `.focus()` and `autoFocus` across the tree. Everything I report about focus rings, focus traps, tabIndex and ARIA was established by READING individual files, not by an exhaustive scan. Treat those counts as lower bounds: there may be more `outline: 'none'` sites, and there may be a tabIndex or aria attribute somewhere I did not open. The theme measurements (25 hex literals; 103 rgb/rgba; 65 T.sN vs 333 literal spacing values; 227 fontSize literals across 13 values; 0 consumers of the type-scale tokens) were all captured while the shell worked and are exhaustive over src/renderer excluding __tests__.\\n\\nNOT REACHED AT ALL — files I never opened, so their theme/density/keyboard behaviour is unaudited: BlockTab.tsx, ClassicComposerDock, PaletteEditor.tsx, TilesetPanel.tsx (read only its two TILE_* call sites), ArtBrowser.tsx (same), ChunkGrid.tsx, SectionGridNav.tsx, CollisionPalette.tsx, CollisionLegend.tsx (one line only), Explorer.tsx (three lines only), HomeTab.tsx, ProjectSetupTab.tsx, TabStrip, FacetBar, ViewMenu, ui/Menu.tsx, ui/CollapsibleSection.tsx, ui/icons, ToastContainer.tsx, Timeline.tsx, FrameGrid.tsx, PaletteCopyMenu.tsx (which registers its own window keydown at :29 — I never read what it binds or how it guards), and the whole workspace/facets/art-facet.tsx + aeon provider panel set.\\n\\nNOT DONE BY DESIGN OR BY CONSTRAINT: (a) no runtime verification — read-only seat, no screenshots, no CDP; every interaction claim is traced through source and the layering claim in VIS5 rests on z-index values rather than an observed render. (b) I did not diff hover/active/disabled state treatments beyond index.html:14-24's global filter rules — there may be per-component hover styles that fight them. (c) I did not audit the sprite facet's panel density against the level facets. (d) I did not read the s1 profile manifest to confirm whether its facetTools declaration would change VIS14's picture once classic gains hotkeys. (e) I did not check whether any test asserts shortcut non-collision — I looked for one and found none, but the search was not exhaustive (shell died). (f) Contrast ratios of the token ramp were not computed. (g) scripts/gen-theme.mjs's upstream tokens.json was not available to me (it lives in a sibling repo that is not present), so I verified theme.css against itself and could not check whether the checked-in output is stale relative to the contract.",
+ "verified_clean": [
+  "Colour-token discipline is genuinely strong: only 25 hex literals exist in all of src/renderer (excluding __tests__) and all 25 are inside src/renderer/canvas/canvas-colors.ts, the module that declares itself the canvas colour registry (canvas-colors.ts:1-11). No component hardcodes a surface, text or border colour — every panel style object reads T.* (composer-shared.tsx:250-388, ui/primitives.tsx:31-127, MapViewport.tsx:1575-1604). The 60 non-canvas rgb()/rgba() uses are overwhelmingly legitimate dynamic palette colours (`rgb(${c.r},${c.g},${c.b})` at PaletteViewer.tsx:70, PixelHud.tsx:30, FrameGrid.tsx:20, Timeline.tsx:25, palette-grid-model.ts:221, ArtToolOptions.tsx:31) or shadow/scrim alphas.",
+  "Cross-facet layout consistency is structurally enforced rather than conventional: LevelWorkspace.tsx:126-133 computes dock/options/right-panel/bottom/status presence once via facetChrome (a pure, node-testable module) and LevelWorkspace.tsx:172-187 composes every facet of both engines through one EditorShell. A facet cannot grow its own chrome shape by accident, and the 'no act loaded' suppression is one decision, not five.",
+  "The four classic art tiers really do share their substrate rather than re-implementing panels: TileTab.tsx:15-22 and ChunkTab.tsx:19-29 both import PixelViewport, use-anchored-zoom, use-hand-pan, zoom-cap and composer-shared's shared `styles` object; the density/flex rules (tabBody, editorCol, paletteCol, paletteStrip, fitBox at composer-shared.tsx:293-359) are defined once with measured justifications and consumed by all three tiers.",
+  "Keep-alive keyboard exclusivity is correct and its reasoning has been corrected against a real measurement: level-keys.ts:27-36 gates every level-side window handler on the active tab id, and App.tsx:238 / App.tsx:266 mount SpriteMode and CanvasMode single-instance (not keep-alive) precisely so the undo handler cannot double-register. I traced all three undo registrations (LevelWorkspace.tsx:95-110, SpriteMode.tsx:91-125, CanvasMode.tsx:83-104) — they cannot fire concurrently, so no double-consume path exists.",
+  "The canvas grid alphas have a real cross-file guard with a stated failure mode: canvas-colors.ts:84-99 pins CANVAS_GRID_CELL/CANVAS_GRID_BLOCK to PixelViewport's own alphas and names the test (components/canvas/__tests__/canvas-pane-model.test.ts) that greps PixelViewport for the literals. The exact input that breaks it is stated in the comment (nudging gridOrigin off-pitch changes which code path draws the mesh), which is the standard this codebase usually fails to meet.",
+  "NewCanvasDialog's focus trap is real, not decorative: the index arithmetic is extracted to ui/focus-trap.ts (nextTrapIndex) so a node suite can reach it, and NewCanvasDialog.tsx:164-171 re-queries the focusable list on every Tab press specifically because the Create button is disabled while the form is invalid and a stale list would drop focus onto <body>. That is a correctly-identified failure input.",
+  "ui/primitives.tsx:55-78 gets button accessibility right where it uses real buttons — ToolButton and IconButton both carry `title` AND `aria-label`, and IconButton propagates `disabled` so index.html:16's disabled styling applies.",
+  "MapViewport's tool hotkeys are correctly scoped to the active facet's declared tool set (MapViewport.tsx:646-658 via toolsForFacet), and facet-tools.ts:49-51 is the single reader of CapabilityManifest.facetTools, so the dock, the keyboard and the facet-switch re-scope cannot disagree about which tools exist. The default-allow branch for the 'art' facet is explicitly reasoned (facet-tools.ts:25)."
+ ],
+ "findings": [
+  {
+   "id": "VIS1",
+   "title": "Ctrl+B and Ctrl+K silently arm a destructive map tool alongside their real action",
+   "severity": "high",
+   "file": "src/renderer/components/MapViewport.tsx",
+   "line": 677,
+   "claim": "MapViewport's tool-letter switch does not guard `o r t b k m` against the Ctrl/Cmd modifier, so the app-level Ctrl+B (toggle Explorer) and Ctrl+K (command palette) each ALSO change the active editor tool on an aeon level tab.",
+   "evidence": "Two window keydown listeners fire for the same event and neither stops propagation. App.tsx:113 `else if ((e.key === 'b' || e.key === 'B') && !e.shiftKey && !e.altKey) { e.preventDefault(); toggleExplorer(); }` — preventDefault only. MapViewport.tsx:662 switches on `e.key` with no modifier test reaching it (the early return at :532 is `levelKeysEnabled()`, at :538 the typing guard; neither looks at ctrlKey), and MapViewport.tsx:677 `case 'b': setToolScoped('paint-block'); break;` — unguarded, unlike :672/:673/:678 which explicitly carry `if (!e.ctrlKey)`. facet-tools.ts:20 lists `paint-block` and `stamp-chunk` in the `layout` facet set, so setToolScoped passes. Ctrl+K is the same shape: CommandPalette.tsx:25 toggles the palette, MapViewport.tsx:679 `case 'k': setToolScoped('stamp-chunk')`. FAILURE: on an aeon level tab, layout facet, user presses Ctrl+B to hide the Explorer; the Explorer hides AND the tool becomes paint-block; their next left-click on the map paints a block into the section instead of selecting. Same for Ctrl+K then dismissing the palette with a click on the map — the click lands with stamp-chunk armed. The author knew this class existed: :670-671 comments about exactly this for Ctrl+V.",
+   "fix": "Guard every tool case the same way the v/s/c cases already are: hoist one `if (e.ctrlKey || e.metaKey || e.altKey) return;` immediately before `const step = 64;` at MapViewport.tsx:661 (Ctrl+C, Ctrl+V and Delete all return above it, and no arrow/zoom key wants a modifier), and delete the now-redundant per-case `if (!e.ctrlKey)` on :672/:673/:678.",
+   "confidence": "certain",
+   "verdict": {
+    "reasoning": "Traced end-to-end at SHA 2b38e0b; could not refute. (1) MapViewport.tsx:702 and App.tsx:120 both register bare window keydown listeners and neither stops propagation — App.tsx:113 calls preventDefault() + toggleExplorer() only. (2) The only gates before the tool switch are MapViewport.tsx:532 levelKeysEnabled() (false only for sprite-doc/canvas-doc tab ids, per workspace/level-keys.ts) and :538's INPUT/TEXTAREA/contentEditable check — on Ctrl+B the target is body; on Ctrl+K the palette input does not exist yet (CommandPalette.tsx:36 focuses it in a later requestAnimationFrame). (3) Every conditional return between :532 and the switch requires either a non-ctrl key or non-empty state: :554 Ctrl+C needs a marquee, :576 Ctrl+V needs a clipboard, :592 'is explicitly !e.ctrlKey, :615 is Delete/Backspace. Ctrl+B/Ctrl+K reach switch(e.key) at :662. (4) :677 case 'b' and :679 case 'k' carry no modifier test, unlike :672/:673/:678. (5) setToolScoped at :651 consults toolsForFacet; facet-tools.ts:21 layout = ['stamp-chunk','select','view','marquee','paint-tile','paint-block'], so both pass and setTool runs. (6) facet-registry.ts:169 Canvas: MapViewport — mounted on every aeon map facet, handler live. (7) The armed tool mutates on the next left-click: MapViewport.tsx:979 builds a set-tiles command and calls executeCommand at :1008. Trigger: aeon level tab, layout facet, tool=select, focus on body, press Ctrl+B — Explorer toggles AND tool becomes paint-block; next left-click writes up to 4 nametable entries. Two evidence corrections that do not break the finding: the Ctrl+K story is off by one click (CommandPalette.tsx:85-88 backdrop is fixed/inset:0/zIndex 1000 with onMouseDown close, so the dismiss-click is absorbed; the FOLLOWING click stamps, and stamp-chunk no-ops at :1026 with no chunk selected), and 'silently' is overstated (MapFacetDock renders the active tool, MapViewport.tsx:1500 switches the cursor to 'cell', and the edit is an undoable executeCommand). One case the seat missed strengthens the fix: :667-669 '=', '+', '-', '0' are also unguarded, so Ctrl+plus/minus/0 browser zoom also changes the map zoom.",
+    "verdict": "CONFIRMED"
+   }
+  },
+  {
+   "id": "VIS2",
+   "title": "Six different \"is the user typing?\" predicates across eight window keydown registrations; two have none",
+   "severity": "medium",
+   "file": "src/renderer/components/MapViewport.tsx",
+   "line": 538,
+   "claim": "Every editor shortcut is a window-level listener with a hand-rolled text-entry guard, and the six copies have diverged — MapViewport's and ComposerCanvas's both miss `<select>`, so native select typeahead fires editor shortcuts.",
+   "evidence": "The predicates, all doing the same job: (1) composer-shared.tsx:79-82 `isTypingTarget` = contentEditable | TEXTAREA | INPUT-not-in-[range,checkbox,button,radio], used at LevelWorkspace.tsx:97, ClassicLevelViewport.tsx:963 and :982, composer-shared.tsx:101; (2) CanvasMode.tsx:85-89 an inline character-for-character copy of it; (3) SpriteMode.tsx:93-97 a third inline copy; (4) MapViewport.tsx:538 INPUT|TEXTAREA|contentEditable — no type exemptions, no SELECT; (5) ComposerCanvas.tsx:576 `(e.target as HTMLElement).tagName === 'INPUT'` — no TEXTAREA, no contentEditable, and it blocks range/checkbox that (1) deliberately exempts; (6) use-hand-pan.ts:56 INPUT|TEXTAREA|SELECT|contentEditable — the ONLY one that excludes SELECT, which proves the omission elsewhere is an oversight rather than a decision. App.tsx:104-117 and CommandPalette.tsx:24-31 have no guard at all. FAILURE: on an aeon level tab (layout facet) open the New Canvas dialog, focus its Profile `<select>` (NewCanvasDialog.tsx:224-232) and use native typeahead by pressing `s`, `b` or `m` — MapViewport.tsx:538 lets the event through because a SELECT is neither INPUT nor TEXTAREA, and :673/:677/:680 switch the map tool behind the open modal. Same key in ComposerCanvas: `x`/`y` at :580-587 toggle the tile-stamp flips. Root cause: no canvas surface is focusable — PixelViewport.tsx:252-260 renders `<canvas>` with no tabIndex/role/aria-label — so there is no focused-surface scope to hang shortcuts on and every binding must be global.",
+   "fix": "Export `isTypingTarget` from a renderer-neutral module (it is already pure; composer-shared.tsx:79 is the canonical body), add `|| t.tagName === 'SELECT'` to it, and replace all five other spellings with an import — including adding it to App.tsx:104 and CommandPalette.tsx:24. A test that greps for a second `tagName === 'INPUT'` in src/renderer keeps it from re-forking.",
+   "confidence": "certain",
+   "verdict": null
+  },
+  {
+   "id": "VIS3",
+   "title": "The shared `Chip` primitive is a <span> with onClick — every action built from it is mouse-only",
+   "severity": "medium",
+   "file": "src/renderer/components/ui/primitives.tsx",
+   "line": 91,
+   "claim": "`Chip` renders `<span title onClick>` with no tabIndex, no role and no key handler, so chips cannot be reached by Tab or activated by Enter/Space anywhere in the app — including primary actions with no alternative control.",
+   "evidence": "primitives.tsx:80-101: the element is `<span ... onClick={disabled ? undefined : onClick}>` — no `tabIndex`, no `role=\"button\"`, no `onKeyDown`, no `aria-disabled`. Contrast the file's own ToolButton (:59) and IconButton (:71), which are real `<button>`s carrying `title` AND `aria-label`. Chips carry real actions: ImportSheetDialog.tsx:58 makes the dialog's ONLY action (\"Choose a PNG…\") a Chip, so the import flow has no keyboard entry point at all; LevelWorkspace.tsx:139 (FG/BG plane switch), :154/:155 (Undo/Redo) and ArtToolOptions.tsx:205-206 (px/tile brush space) are likewise unreachable. FAILURE: open Import Art Sheet and Tab — focus skips the Chip entirely and lands on the × close button, so a keyboard-only user cannot start an import.",
+   "fix": "Make Chip a `<button type=\"button\">` in primitives.tsx:90-99 with `disabled={disabled}` and the existing style object (add `font: inherit`, `appearance: none` to keep the look). That fixes all call sites at once and inherits index.html:14-17's hover/active feedback, which chips currently do not get either.",
+   "confidence": "certain",
+   "verdict": null
+  },
+  {
+   "id": "VIS4",
+   "title": "Three modals, three different dismissal/focus contracts",
+   "severity": "medium",
+   "file": "src/renderer/components/canvas/ImportSheetDialog.tsx",
+   "line": 41,
+   "claim": "ImportSheetDialog has no Escape handler, no focus trap and no initial focus, while it dismisses on backdrop click — the exact combination NewCanvasDialog deliberately rejected, and the only modal in the app where Esc does nothing.",
+   "evidence": "ImportSheetDialog.tsx:40-42 `<div style={styles.overlay} onClick={onClose}>` — backdrop dismiss, and the file contains no `keydown` registration at all (the whole component is :19-87). ConfirmDialog.tsx:10-17 registers Escape on window with capture and stopPropagation, and dismisses on backdrop (:22), but has no Tab trap and never focuses a button, so Enter after it opens does nothing. NewCanvasDialog.tsx:136-143 registers the same capture-phase Escape, adds a real Tab trap (:164-171, arithmetic in the testable ui/focus-trap.ts) and `autoFocus` (:195), and its header at :24-31 explicitly documents dropping backdrop dismiss because the dialog holds typed input. ImportSheetDialog holds a loaded sheet plus a CommitPlanView (:74-78) — more state than ConfirmDialog, less protection than either. FAILURE: load a PNG in Import Art Sheet, click a few pixels outside the panel to reach for the scrollbar — the dialog closes and the loaded sheet is discarded; pressing Esc instead does nothing at all, so the user's modal reflex fails on this one dialog.",
+   "fix": "In ImportSheetDialog: drop the backdrop `onClick` at :41 (match NewCanvasDialog's reasoning — it holds work), and add the same capture-phase Escape effect as ConfirmDialog.tsx:10-17. Separately give ConfirmDialog an initial focus on the primary button so Enter answers it.",
+   "confidence": "certain",
+   "verdict": null
+  },
+  {
+   "id": "VIS5",
+   "title": "Ctrl+K opens the command palette BEHIND an open modal and steals focus to an invisible input",
+   "severity": "medium",
+   "file": "src/renderer/components/CommandPalette.tsx",
+   "line": 25,
+   "claim": "CommandPalette's Ctrl+K listener is ungated by modal state and its backdrop sits at z-index 1000 while ConfirmDialog and NewCanvasDialog sit at 1100, so pressing Ctrl+K while either is open renders the palette underneath them and focuses its hidden search field.",
+   "evidence": "All four overlays are siblings under App.tsx:293-297 in DOM order ToastContainer, CommandPalette, ConfirmDialog, NewCanvasDialog, ImportSheetDialog. z-index: CommandPalette.tsx:87 `zIndex: 1000`; ConfirmDialog.tsx:49 `zIndex: 1100`; NewCanvasDialog.tsx:260 `zIndex: 1100`; ImportSheetDialog.tsx:92 `zIndex: 1000`. CommandPalette.tsx:23-34 registers Ctrl/Cmd+K on window with no check for an open dialog, and :37 `requestAnimationFrame(() => inputRef.current?.focus())` moves focus into the hidden panel. Escape does not recover it: NewCanvasDialog.tsx:141 and ConfirmDialog.tsx:15 register `keydown` with capture:true on window and call `stopPropagation()`, so CommandPalette's bubble-phase window listener (:32, capture false) never sees the Escape and the palette stays open. FAILURE: open New Canvas, press Ctrl+K — keystrokes now go to a search box the user cannot see, and Esc closes the New Canvas dialog only, revealing a palette they did not know was open.",
+   "fix": "Give CommandPalette.tsx:24 an early `if (useConfirmStore.getState().request) return;` plus the same test for the New Canvas/Import Sheet open flags (lift them into a tiny `modalOpen()` predicate next to level-keys.ts, so all three modals declare through one place), and raise the palette to 1050 so it can never render under a peer that did not gate it.",
+   "confidence": "probable",
+   "verdict": null
+  },
+  {
+   "id": "VIS6",
+   "title": "Focus rings are suppressed and never replaced; no focus token exists at all",
+   "severity": "medium",
+   "file": "src/renderer/components/canvas/NewCanvasDialog.tsx",
+   "line": 277,
+   "claim": "Interactive controls set `outline: 'none'` with no substitute, and neither index.html nor theme.css defines any :focus/:focus-visible rule or a --focus-ring token, so the one surface with a deliberate Tab trap cycles focus invisibly.",
+   "evidence": "NewCanvasDialog.tsx:277 `styles.input` ends `outline: 'none'` and is applied to the Name field (:200), both size fields (:210/:216) and the Profile select (:227) — the exact four controls the Tab trap at :164-171 cycles between. CommandPalette.tsx:96 does the same on its search input; PaletteViewer.tsx:91 does it on a real `<button>`. index.html:8-35 is the only global stylesheet and defines hover (:14, :20, :24) and active (:15) feedback but nothing for focus; theme.css:4-67 is the complete token set and contains no focus/ring token. Inconsistently, ObjectInspector.tsx:199-203 `hexInput` does NOT suppress the outline, so the app has some controls with a browser ring and some with none. FAILURE: open New Canvas, press Tab three times — focus is trapped correctly but nothing on screen changes, so the user cannot tell which of Name/width/height/Profile/Cancel/Create will receive the next keystroke or Enter.",
+   "fix": "Add `--focus-ring: #34D399` (accent) to the token emission in scripts/gen-theme.mjs, and one global rule in index.html: `:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }`. Then delete the three `outline: 'none'` declarations rather than keeping them — with :focus-visible the ring only appears for keyboard focus, which is the reason they were suppressed.",
+   "confidence": "certain",
+   "verdict": null
+  },
+  {
+   "id": "VIS7",
+   "title": "The generated type scale has zero consumers; 227 hardcoded font sizes span 13 values against a 7-step contract",
+   "severity": "medium",
+   "file": "src/renderer/styles/theme.css",
+   "line": 33,
+   "claim": "gen-theme.mjs emits --text-*-size/--text-*-line and --weight-* from the Empyrean contract, and nothing in the renderer reads them except one `body` fallback — the app's actual typography is 227 inline numeric fontSize values, most of them below the scale's floor.",
+   "evidence": "theme.css:33-49 emits 7 size/line pairs and 3 weights (gen-theme.mjs:51-55). Measured over src/renderer excluding __tests__: `--text-xs-size` 0 consumers, `--text-sm-size` 0, `--text-md-size` 0, `--text-lg-size` 0, `--text-xl-size` 0, `--text-2xl-size` 0, `--weight-regular/medium/semibold` 0 each; `--text-base-size` has exactly one, index.html:11's body rule. ui/theme.ts:4-16 — the typed bridge every component imports — exposes spacing (s1..s8), radius (rSm..rPill) and fonts but deliberately omits the type scale, so there is no way to reach it from an inline style. Counter-measurement: 227 `fontSize: <number>` literals in src/renderer across 13 distinct values — 7(×1), 8(×4), 9(×12), 10(×58), 11(×73), 12(×50), 13(×18), 14(×3), 15(×1), 16(×3), 18(×2), 20(×1), 36(×1) — against a token scale of 11/12/13/14/16/20/24. 131 of 227 are 10px or 11px, i.e. at or below the contract's smallest step, and 9px/8px/7px (17 sites, e.g. composer-shared.tsx:256 `dockHint` and :365 `hintRow`, ArtToolOptions.tsx:71, ToolColumnParts.tsx:179) are two steps off-scale. Spacing is healthier but split: 65 `T.s1..s8` uses vs 333 literal padding/gap/margin numbers.",
+   "fix": "Add `xs: 'var(--text-xs-size)' … x2l:` (and `wReg/wMed/wSemi`) to ui/theme.ts:4-16 so the scale is reachable, then normalise: 7/8/9 → xs (11px), 10 → xs, 15 → lg, 18 → xl. Do NOT keep 9px — it is the one size that is genuinely illegible at the density these panels run at, and it appears only on hint text nobody is meant to squint at.",
+   "confidence": "certain",
+   "verdict": null
+  },
+  {
+   "id": "VIS8",
+   "title": "canvas-colors.ts comments claim token mirroring that is false; the tile browser draws selection and hover in two different greens",
+   "severity": "low",
+   "file": "src/renderer/canvas/canvas-colors.ts",
+   "line": 120,
+   "claim": "Several canvas constants are stale Catppuccin values whose comments assert they mirror an Empyrean token they do not match, and the visible consequence is that TilesetPanel/ArtBrowser outline the SELECTED tile in one green and the HOVERED tile in a different green.",
+   "evidence": "canvas-colors.ts:120 `TILE_SELECTED = '#a6e3a1'  // selected brush tile outline (mirrors --success)` — theme.css:26 says `--success: #34D399`. :121 `TILE_HOVER = '#34D399' // (mirrors --accent)` — that one is true. Both are consumed in the same widget: TilesetPanel.tsx:127 `ctx.strokeStyle = TILE_SELECTED` and :194 `ctx.strokeStyle = TILE_HOVER`; ArtBrowser.tsx:100 and :154 identically. Same false-mirror pattern at :111 `OVERLAY_OUTLINE = '#f9e2af' // (mirrors --warning / T.warning)` and :117 `HUD_COLL_NONZERO = '#f9e2af' // (mirrors --warning)` and :83 `PIXEL_GRID_BLOCK = 'rgba(249,226,175,0.45)' // (mirrors --warning)` against theme.css:27 `--warning: #FBBF24` (251,191,36). Separately, the file's header claim at :6-7 (\"the ONLY module … allowed to hold raw hex — it is exempt from the no-raw-hex guardrail\") describes a guardrail that does not exist: package.json has no lint script and no eslint config file, and no test in src greps for hex literals. The discipline itself is real (25 hex literals in all of src/renderer, all 25 in this file) but nothing enforces it. FAILURE: hover a tile adjacent to the selected one in the Tileset panel — #a6e3a1 and #34D399 are ~20° apart in hue at similar lightness, so the two 1px outlines read as the same state.",
+   "fix": "Set TILE_SELECTED to `#34D399` (accent — selection is the persistent state and should carry the brand colour) and TILE_HOVER to `#E8EAF2` (--text-hi — hover is transient and should be neutral). Correct the three false `mirrors --warning` comments to say \"Catppuccin yellow, not a token\" or retint them to #FBBF24; do not leave a comment naming a token it does not equal.",
+   "confidence": "certain",
+   "verdict": null
+  },
+  {
+   "id": "VIS9",
+   "title": "Selected palette line wears an emerald ring over a Catppuccin-blue wash",
+   "severity": "low",
+   "file": "src/renderer/components/PaletteViewer.tsx",
+   "line": 95,
+   "claim": "The palette-line selected state combines `T.accent` (emerald) for the border with a hardcoded blue tint for the background — two accent hues on one element.",
+   "evidence": "PaletteViewer.tsx:93-96 `lineSelected: { border: \\`2px solid ${T.accent}\\`, background: 'rgba(137, 180, 250, 0.15)' }`. rgb(137,180,250) is #89B4FA, Catppuccin Blue; theme.css:18 `--accent: #34D399`. The same stale blue survives at canvas-colors.ts:73 `ACTIVE_SECTION_BORDER = 'rgba(137, 180, 250, 0.6)'`. The same file also suppresses the focus ring on these buttons (:91 `outline: 'none'`) and uses raw `fontFamily: 'monospace'` (:98) instead of T.fontMono.",
+   "fix": "Replace the wash with `background: T.raised` at PaletteViewer.tsx:95 — one accent per state, and the emerald ring already carries selection unambiguously. Tinting the wash emerald instead would double the same signal and make the swatches inside read green.",
+   "confidence": "certain",
+   "verdict": null
+  },
+  {
+   "id": "VIS10",
+   "title": "Floating HUD chrome is on two different near-blacks",
+   "severity": "low",
+   "file": "src/renderer/components/MapViewport.tsx",
+   "line": 1585,
+   "claim": "The map hover bar and the composer collision HUD sit on rgba(17,17,27,…) (#11111B) while every other floating overlay uses rgba(10,12,18,…) — the value of --void.",
+   "evidence": "MapViewport.tsx:1585 `hoverBar: { … background: 'rgba(17, 17, 27, 0.9)' }` and canvas-colors.ts:114-115 `HUD_CHIP_BG = 'rgba(17,17,27,0.85)'` / `HUD_CELL_BG = 'rgba(17,17,27,0.65)'`. The rest of the app's translucent chrome uses the token value from theme.css:6 `--void: #0A0C12`: PixelHud.tsx:43 `rgba(10,12,18,0.82)`, CollisionLegend.tsx:51 `rgba(10,12,18,0.82)`, and all three modal backdrops (ConfirmDialog.tsx:48, NewCanvasDialog.tsx:259, CommandPalette.tsx:86) `rgba(10,12,18,0.6)`. #11111B is Catppuccin Crust, a leftover palette. FAILURE: with both the map hover bar and the collision legend on screen (MapViewport.tsx:1583 and CollisionLegend.tsx:51 are simultaneous overlays on the collision facet) the two bars are visibly different blacks against the same canvas.",
+   "fix": "Change MapViewport.tsx:1585 to `rgba(10,12,18,0.9)` and canvas-colors.ts:114-115 to `rgba(10,12,18,0.85)` / `rgba(10,12,18,0.65)`. Standardise on the token value, not on the more common literal, so a future gen-theme change has one place to reach.",
+   "confidence": "certain",
+   "verdict": null
+  },
+  {
+   "id": "VIS11",
+   "title": "`ToolButton` and `Divider` each exist twice with divergent APIs and opposite visuals",
+   "severity": "low",
+   "file": "src/renderer/components/art-shared/ToolColumnParts.tsx",
+   "line": 155,
+   "claim": "Two components named `Divider` render perpendicular rules, and two named `ToolButton` take incompatible props and differ in size and accessibility — swapping an import silently changes the layout.",
+   "evidence": "`Divider`: ui/primitives.tsx:103 returns `<span style={{ width: 1, height: 16, background: T.borderStrong }} />` (VERTICAL, for OptionBar rows); ToolColumnParts.tsx:155-157 returns `<div style={S.divider} />` where :182 is `{ width: '80%', height: 1, background: T.border, margin: '4px 0' }` (HORIZONTAL, for tool rails). `ToolButton`: ui/primitives.tsx:55-65 takes `{icon, label, active, onClick}`, is 28×28, transparent-until-active, and carries `aria-label={label}`; ToolColumnParts.tsx:21-38 takes `{glyph, title, active, disabled, small, onClick}`, is 40×28 (S.toolButton :161-165), filled `T.border`, and carries NO aria-label. ArtToolOptions.tsx:5 imports `Divider` from '../components/ui' and :7 imports `ToolButton` from ToolColumnParts — both names live in one file's scope, resolved only by import path. Also ToolColumnParts.tsx:166 `toolActive: { background: T.accent, color: T.surface }` while every other on-accent surface uses `T.onAccent` (= var(--void)): primitives.tsx:61, :94, composer-shared.tsx:255, :380, NewCanvasDialog.tsx:289.",
+   "fix": "Rename the ToolColumnParts pair to `GlyphButton` and `RailDivider` (they are the rail-specific variants; the ui/ ones are the general primitives), add `aria-label={title}` to GlyphButton, and change ToolColumnParts.tsx:166 to `color: T.onAccent`.",
+   "confidence": "certain",
+   "verdict": null
+  },
+  {
+   "id": "VIS12",
+   "title": "Four readouts render in the OS default mono instead of the token font",
+   "severity": "low",
+   "file": "src/renderer/components/art-shared/ToolColumnParts.tsx",
+   "line": 181,
+   "claim": "`fontFamily: 'monospace'` is written raw in several numeric readouts, so they render in the browser default mono while every other mono readout uses JetBrains Mono via T.fontMono.",
+   "evidence": "Raw: ToolColumnParts.tsx:181 `value: { … fontFamily: 'monospace' }` (the dither-secondary stepper) and :184 `zoomLabel: { … fontFamily: 'monospace' }` (the zoom readout in the shared option bar); PaletteViewer.tsx:98; MapViewport.tsx:1587 (the map hover bar). Token: theme.css:32 `--font-mono: \"JetBrains Mono\", ui-monospace, …` reached via ui/theme.ts:10 `fontMono`, used at primitives.tsx:122 (StatusBar), Explorer.tsx:302/:312, ObjectInspector.tsx:177/:202, composer-shared.tsx:362/:363, composer-thumbs.tsx:117. FAILURE: the zoom readout (ToolColumnParts.tsx:149, rendered in the same OptionBar as the rest of the art controls) and the StatusBar directly below it show digits in two different typefaces.",
+   "fix": "Replace all four with `T.fontMono` (ToolColumnParts already imports T at :3).",
+   "confidence": "certain",
+   "verdict": null
+  },
+  {
+   "id": "VIS13",
+   "title": "The classic composer uses a 3px radius that is not on the token scale",
+   "severity": "low",
+   "file": "src/renderer/components/classic/composer-shared.tsx",
+   "line": 253,
+   "claim": "Six shared composer styles hardcode `borderRadius: 3`, a value the emitted radius scale does not contain, so the classic art tiers are visibly rounder-by-one than the rest of the app.",
+   "evidence": "theme.css:62-66 emits sm=2, md=4, lg=6, xl=8, pill=999 — no 3. composer-shared.tsx:253 (tabBtn), :318 (paletteStrip), :360 (gridCanvas), :377 (banner), :381 (dupBtn), :385 (smallBtn) all use `borderRadius: 3`; composer-thumbs.tsx:117 uses `borderTopLeftRadius: 3`. Everything outside the composer uses the token: primitives.tsx:63/:74/:96, NewCanvasDialog.tsx:276/:287, ConfirmDialog.tsx:60, CommandPalette.tsx:102. Additional off-scale spellings of ON-scale values: ArtToolOptions.tsx:67 `borderRadius: 4` and :73 `borderRadius: 2`, ToolColumnParts.tsx:163/:172 `borderRadius: 4` and :178 `borderRadius: 3`, ImportSheetDialog.tsx:95 `borderRadius: 8`, MapViewport.tsx:1595 `6` and :1601 `4`, App.tsx:317 `4`.",
+   "fix": "Change every `borderRadius: 3` to `T.rMd` (4px) rather than adding a 3px step to the contract — 4px is what the surrounding chrome already uses, and Aurora does not own the token file. Replace the literal 2/4/6/8 spellings with T.rSm/T.rMd/T.rLg/T.rXl in the same pass.",
+   "confidence": "certain",
+   "verdict": null
+  },
+  {
+   "id": "VIS14",
+   "title": "Tool hotkeys exist on aeon's level canvas and on no other surface in the app",
+   "severity": "medium",
+   "file": "src/renderer/components/classic/ClassicLevelViewport.tsx",
+   "line": 955,
+   "claim": "Nine single-letter tool hotkeys are bound on aeon's MapViewport; the classic level canvas binds none, and none of the five pixel-art surfaces binds a single tool letter — so the same named facet has a different keyboard depending on which engine is open.",
+   "evidence": "aeon: MapViewport.tsx:672-680 binds v/s/o/r/t/b/c/k/m to view/select/place-object/place-ring/paint-tile/paint-block/paint-collision/stamp-chunk/marquee, plus arrows, +/-/0 at :663-669. classic: ClassicLevelViewport.tsx:955-996 is the file's only window keydown and handles exactly Escape (:960) and Delete/Backspace (:980) — no letters, no arrow pan, no zoom keys, despite s1-facets.tsx:32 giving classic's Layout facet `view / stamp-chunk / select` and Objects `place-object / select / view`, all of which have aeon hotkeys. Art surfaces: TileTab.tsx, BlockTab.tsx and ChunkTab.tsx register no keydown of their own (they take only composer-shared.tsx:96's `useEscapeKey`); ComposerCanvas.tsx:571-679 binds only x/y flips and Ctrl+C/X/V; CanvasMode.tsx:84-104 binds only undo/redo; SpriteMode.tsx:91-125 only undo/redo and clipboard. So the pencil/eraser/fill tools that every comparable pixel editor puts on B/E/G have no key anywhere. FAILURE: a user who learns `s`/`k` on an aeon act opens an S1 act, presses `k` over the layout canvas and nothing happens — same facet name, same chunk-stamp tool in the dock (facet-tools.ts:50 resolves it), no key.",
+   "fix": "Move the letter map out of MapViewport into a table keyed by EditorTool next to FACET_TOOLS in facet-tools.ts, and have both ClassicLevelViewport and MapViewport dispatch through `toolsForFacet(facet)` — the scoping logic at MapViewport.tsx:646-658 already does exactly this and is engine-agnostic. Do this AFTER VIS1's modifier guard, or classic inherits the Ctrl+B collision too.",
+   "confidence": "certain",
+   "verdict": null
+  },
+  {
+   "id": "VIS15",
+   "title": "Space cannot activate any focused button while a pixel surface is mounted",
+   "severity": "low",
+   "file": "src/renderer/components/art-shared/use-hand-pan.ts",
+   "line": 63,
+   "claim": "The hand-pan hook calls preventDefault on every Space keydown that is not in a text field, which suppresses Space-activation of focused buttons app-wide, not just over the canvas.",
+   "evidence": "use-hand-pan.ts:59-68: the listener is on `window` (:102), the only exclusions are the caller's `enabled()` gate (:61) and `inTextField` (:54-57, which covers INPUT/TEXTAREA/SELECT/contentEditable but not BUTTON), and :63 `e.preventDefault(); // stop Space from scrolling the page / activating a focused button` — the suppression is intentional but its scope is the whole window, not the scroller. Hosts: TileTab.tsx:18, ChunkTab.tsx:21, ComposerCanvas, SpriteMode.tsx:81, CanvasMode.tsx:68. FAILURE: on the classic Art facet with the Tile tier open, Tab to the Duplicate button (composer-shared.tsx:72) and press Space — nothing happens; Enter still works, so the control appears half-broken rather than deliberately keyed.",
+   "fix": "Move the arming logic's preventDefault behind a check that the event target is not a natively Space-activated control: `if (el.tagName === 'BUTTON' || el.getAttribute('role') === 'button') return;` alongside the inTextField test at :62. Panning still arms from the canvas and from body-level focus, which is where a Space-drag actually starts.",
+   "confidence": "probable",
+   "verdict": null
+  }
+ ]
+}

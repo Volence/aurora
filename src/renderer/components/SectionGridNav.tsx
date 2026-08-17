@@ -6,7 +6,7 @@ import { useProjectStore, getCurrentAct, getActiveLevel } from '../state/project
 import { SECTION_PIXEL_SIZE, MAX_ACT_SECTIONS } from '../../core/model/s4-types';
 import type { Section } from '../../core/model/s4-types';
 import * as ops from '../../core/editing/section-ops';
-import { T } from './ui';
+import { T, Z } from './ui';
 
 // Module-level clipboard: a deep-cloned section survives re-renders and lets
 // the user paste into any slot (even after switching the active section).
@@ -275,12 +275,12 @@ const styles: Record<string, React.CSSProperties> = {
   addBtn: {
     marginTop: 6, width: '100%', padding: '4px 0', fontSize: 11, flexShrink: 0,
     background: T.overlay, color: T.textBase, border: `1px solid ${T.border}`,
-    borderRadius: 3, cursor: 'pointer',
+    borderRadius: T.rMd, cursor: 'pointer',
   },
   addBtnDisabled: { opacity: 0.5, cursor: 'default' },
   empty: { padding: 8, color: T.textLo, fontSize: 11 },
   menu: {
-    position: 'fixed', zIndex: 1000, minWidth: 110,
+    position: 'fixed', zIndex: Z.floating, minWidth: 110,
     background: T.surface, border: `1px solid ${T.borderStrong}`, borderRadius: 4,
     padding: 3, display: 'flex', flexDirection: 'column', gap: 1,
     boxShadow: '0 8px 24px rgba(0,0,0,0.4)',

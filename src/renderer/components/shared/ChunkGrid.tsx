@@ -280,7 +280,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   selBadge: {
     fontSize: 10, fontWeight: 600, color: T.onAccent, background: T.accent,
-    padding: '0 6px', borderRadius: 3, lineHeight: '16px', fontFamily: T.fontMono,
+    padding: '0 6px', borderRadius: T.rMd, lineHeight: '16px', fontFamily: T.fontMono,
     maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
   },
   // Takes the slack between the badge and the size control, so the size buttons
@@ -292,7 +292,7 @@ const styles: Record<string, React.CSSProperties> = {
   sizeCtl: { display: 'flex', gap: 2, flexShrink: 0 },
   sizeBtn: {
     padding: '0 6px', background: T.overlay, color: T.textBase,
-    borderWidth: 1, borderStyle: 'solid', borderColor: T.border, borderRadius: 3, cursor: 'pointer', fontSize: 10, lineHeight: '16px',
+    borderWidth: 1, borderStyle: 'solid', borderColor: T.border, borderRadius: T.rMd, cursor: 'pointer', fontSize: 10, lineHeight: '16px',
   },
   sizeBtnSel: { background: T.accent, color: T.onAccent, borderColor: T.accent },
   // The scrollable wall: native overflow gives a real scrollbar, flex-wrap lays
@@ -323,7 +323,7 @@ const styles: Record<string, React.CSSProperties> = {
   emptyHint: { fontSize: 9, color: T.borderStrong },
   cell: {
     position: 'relative', padding: 0, flexShrink: 0, backgroundColor: T.overlay,
-    borderWidth: 1, borderStyle: 'solid', borderColor: T.border, borderRadius: 3, cursor: 'pointer', overflow: 'hidden',
+    borderWidth: 1, borderStyle: 'solid', borderColor: T.border, borderRadius: T.rMd, cursor: 'pointer', overflow: 'hidden',
   },
   cellSel: { outline: `2px solid ${T.accent}`, outlineOffset: -1, borderColor: T.accent },
   // Blank/eraser chunks: a faint diagonal hatch behind the canvas so an empty

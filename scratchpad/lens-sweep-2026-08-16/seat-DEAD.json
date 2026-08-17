@@ -1,0 +1,126 @@
+{
+ "seat": "DEAD",
+ "model": "opus",
+ "coverage": "SIGNIFICANT GAP — the shell died partway through. Around the two-thirds mark every Bash call began returning exit 1 with no output; the cause is disk-quota exhaustion (a Write to the scratchpad returned EDQUOT), and clearing ~/.npm/_cacache and ~/.npm/_npx did not restore it. No Grep/Glob tool is exposed in this seat, so from that point I could only use Read. Everything reported above was verified BEFORE the shell died or via Read afterwards; nothing is asserted on unverified grounds.\n\nNOT COVERED, in priority order for a follow-up seat:\n(1) The props/flags-at-default sweep — I got as far as loading ArtToolOptions.tsx's `caps` contract (ArtOptionCaps at :129, FULL_CAPS :145, CLASSIC_TILE_CAPS :161, default at :179) but could not enumerate its call sites, so I do not know whether any host actually omits `caps`, nor did I check `showObjectSelection` on AeonPropertiesPanel or any other optional boolean prop. Treat this entire category as unexamined, not clean.\n(2) The 78 'unused exported type' hits from knip — I verified none of them individually. Type-only exports are the highest-false-positive category, so they are deliberately absent from my findings rather than cleared.\n(3) The TODO/FIXME age audit — not started. I never ran the comment-vs-blame comparison anywhere in the tree.\n(4) Stale inline-style debt beyond the theme.css var() diff — I measured fontSize/fontWeight but did not sweep colors, spacing, or the `const styles` objects that docs/plans/2026-06-19-polish-feel-foundation-plan-a-look.md:41 lists as pending migration (~23 components named there).\n(5) Deleted-workspace archaeology is only partial: I identified the two deletion commits (7569be4 for LegacyWorkspace/ClassicProjectView/ZoneActTree, 0c42129 for Toolbar) and caught the IconUndo/IconRedo orphans (A7), but never diffed what those deleted files imported against what survives. There are likely more orphans of that era than I found.\n(6) I did not resolve `Divider` (ToolColumnParts.tsx:155) or `sectionRenderer` (MapViewport.tsx:42). Both had high raw grep counts I could not disambiguate from same-named locals before the shell failed — status unknown, not clean.\n(7) knip ran with no config, so its entry-point assumptions are its defaults. My independent reachability walk agreed with it on the file list, which is why I trust that list; I did not cross-check its export analysis beyond the symbols enumerated above.\n\nRepo state: my one write into the repo tree was running scripts/gen-theme.mjs, which regenerated theme.css identically. `git status --short` was re-checked afterwards and the tree is clean apart from three pre-existing untracked scratchpad/*.mjs files that are not mine. Nothing was deleted; all findings are a proposed deletion LIST only.",
+ "verified_clean": [
+  "scripts/gen-theme.mjs is NOT stale: I ran it and it resolved its token source through /home/volence/sonic_hacks/megaforge (a symlink to empyrean) to empyrean/design/tokens.json and regenerated src/renderer/styles/theme.css with zero diff — `git status --short` stayed clean afterwards, so the checked-in output is current. The `npm run gen:theme` script entry is live.",
+  "src/renderer/providers/properties-classic.ts is dead-by-design, NOT an oversight — do not put it on a deletion list. It has zero importers (confirmed by grep and by the reachability walk) and returns an empty `PropertiesPort` (properties-classic.ts:36 `const NO_PROPERTIES: PropertiesPort = { sections: [] }`), but properties-classic.ts:3-31 is an itemised, per-field audit of what the deleted ClassicProjectView showed and where each fact now lives, and three separate call sites cite it as the reason they mount nothing: workspace/facets/s1-facets.tsx:41 and :273, and workspace/__tests__/facet-modules.test.ts:256. It is documentation with a type signature.",
+  "src/renderer/components/art-shared/ToolColumnParts.tsx is live despite six knip hits against it — the classic deletion-by-single-file-view trap. It has three importers (shell/ArtToolOptions.tsx:8, shell/SpriteToolOptions.tsx:7, components/canvas/CanvasMode.tsx:14). Of its flagged exports, only ToolButtonGrid (:41) is truly unused; MIRROR_CYCLE (:11) is used at :139, DITHER_PATTERNS (:14) at :107, and Stepper (:74) at :117 — all internal, so they are over-exports, not dead code.",
+  "src/core/import/tile-dedup.ts must be kept: `flipTile` (tile-dedup.ts:6) has three live importers (core/export/tile-dedup.ts:3, core/agent/budget.ts:3, core/art/composer-buffer.ts:4). Only the `TileDeduplicator` class at :26 is dead. Likewise src/core/level-classic/object-sprite.ts (13 of 14 exports live, e.g. renderObjectFrame :62, composeObjectFrames :136) and src/renderer/components/ui/icons.tsx are live files with one or two dead members each.",
+  "scripts/render-classic-act.mjs and scripts/verify-s1-roundtrip.mjs are deliberate standalone verification harnesses, not stale build steps: both are self-documented as such (render-classic-act.mjs:7-8 'This is a verification harness (Task 11), NOT app/core code'; verify-s1-roundtrip.mjs:2 'the M5 acceptance gate'), both are invoked by hand per their own usage lines, and both bundle the TS core with esbuild rather than importing it. Absence from package.json scripts is correct for these. verify-s1-roundtrip.mjs:9-13 also documents that it copies s1disasm to a scratchpad and never touches the real tree.",
+  "The `screenToWorld` single-symbol re-export at src/renderer/components/classic/viewport-math.ts:145 is genuinely load-bearing and correctly justified by its comment at :141 — ClassicLevelViewport.tsx:21 imports it through that barrel and uses it at :668, :856 and :1008, and it has direct test coverage at components/classic/__tests__/viewport-math.test.ts:142-168. It is the one live thread holding core/art/camera.ts (A3) alive.",
+  "Twenty more knip 'unused export' hits are over-exports with a real internal caller, not dead code — each verified by whole-src grep showing definition plus at least one same-file use: cellPixels (composer-buffer.ts:101, used :112/:130/:202), PALETTE_LUT_BYTES (rasterize.ts:70, used :76/:77), kosinskiDecompressFrom (kosinski.ts:12, used :4/:185), cloneCanvasSnapshot (canvas-history.ts:49, used :67), cloneSpriteSnapshot (sprite-history.ts:19, used :49), DEFAULT_MAX_DEPTH (snapshot-history.ts:16, used :34), nemesisExtractRuns (nemesis.ts:114, used :325), flattenActPalette (import-sheet.ts:34, used :70), FULL_CAPS (ArtToolOptions.tsx:145, the default at :179), loadObjectBindings (object-previews.ts:65, used :76), notifyConflict (classic-save.ts:251, used :228), projectConfigSchema (mapping.ts:20, used :29), entrySchema (editor-methods.ts:11, used :68/:82), RING_OBJ_ID (classic-overlays.ts:26, used :172), AEON_THUMB_SIZES (chunk-grid-aeon.ts:31, used :142/:143), CLASSIC_THUMB (chunk-grid-classic.ts:38, used :146/:147), commandDocId (editorStore.ts:435, used :461), isZoneScopedCommand (editorStore.ts:423, used :425/:438), EnigmaError (enigma.ts:1, thrown :24/:28/:124), PREVIEW (ObjectPreview.tsx:7, used :39-:61), THUMB (ObjectThumb.tsx:6, used :44-:70). Reporting any of these as deletable would be a false positive.",
+  "The three source entry points are all real and reachable: src/renderer/index.tsx (which imports './styles/theme.css' at :1), src/main/index.ts, and src/preload/index.ts — the last confirmed as the configured preload entry at electron.vite.config.ts:19. No orphaned entry point.",
+  "knip's 'unused file' report for scratchpad/*.mjs (26 entries) is noise, not a finding — those are per-investigation CDP harnesses, untracked or deliberately kept, and are not part of the shipped tree."
+ ],
+ "findings": [
+  {
+   "id": "A1",
+   "title": "toolStore.ts is a zero-importer duplicate of artStore's tool-modifier slice",
+   "severity": "medium",
+   "file": "src/renderer/state/toolStore.ts",
+   "line": 14,
+   "claim": "`useToolStore` is a complete zustand store (mirror / ditherPattern / ditherSecondary / pixelPerfect plus setMirror/setDither/setPixelPerfect) with ZERO importers anywhere in src/, and every field and setter name is duplicated verbatim by the live `useArtStore`.",
+   "evidence": "src/renderer/state/toolStore.ts:14 defines `useToolStore`. Grep for `useToolStore` across all of src/ returns exactly one hit — the definition line itself (toolStore.ts:14); no component, facet, test or shell module subscribes. Independently confirmed by a module-reachability walk from the three real entries (src/renderer/index.tsx, src/main/index.ts, src/preload/index.ts): toolStore.ts is in the unreached set. Meanwhile src/renderer/state/artStore.ts:29-32 declares `ditherPattern`, `ditherSecondary`, `mirror`, `pixelPerfect` and artStore.ts:56-58 declares `setDither`, `setMirror`, `setPixelPerfect` — identical names, and artStore IS what ArtToolOptions.tsx:183-186 subscribes to. Failure scenario: a future task adds a mirror toggle, autocompletes `useToolStore.setMirror` (the name reads more specific than artStore), and ships a control that flips a store no renderer reads — the toggle moves a number nothing on screen answers to, with no type error and no test failure. This is the exact trap ArtToolOptions.tsx:155-159 documents having already been fallen into once with zoom.",
+   "fix": "Delete src/renderer/state/toolStore.ts. If the split is wanted later, it must be a slice OF artStore, not a second store.",
+   "confidence": "certain",
+   "verdict": null
+  },
+  {
+   "id": "A2",
+   "title": "Aether advertises an `editor/ready` event it can never emit — `broadcast` has no callers",
+   "severity": "medium",
+   "file": "src/main/aether/adapter.ts",
+   "line": 94,
+   "claim": "The SSE event channel is fully built and wired for subscribers, but `broadcast()` is never called from anywhere, so the `events: ['editor/ready']` capability returned by the `initialize` handshake is a promise the server cannot keep.",
+   "evidence": "src/main/aether/adapter.ts:94 `export function broadcast(method, params)` — grep for `broadcast` across src/ returns only this definition line; no call site in src/main, src/renderer or src/core. The other two channel functions ARE wired: src/main/mcp-server.ts:14 imports `addSubscriber, removeSubscriber`, calls addSubscriber at mcp-server.ts:110 and removeSubscriber at mcp-server.ts:112. So a client can open the SSE stream and will hold it open forever receiving nothing. adapter.ts:28 `export const EVENTS = ['editor/ready'] as const` is returned to the client at adapter.ts:36 inside `capabilities()`, which adapter.ts:59 returns as the `initialize` result. Failure scenario: an Aether client (per the suite protocol) reads `capabilities.events`, sees `editor/ready`, subscribes to the SSE endpoint and waits for the editor to signal readiness before issuing editor/* calls — it blocks indefinitely, because nothing in Aurora ever writes that frame. `EVENTS` also has no importer outside the same file, so nothing else can emit it either.",
+   "fix": "Either emit `broadcast('editor/ready')` at the point the renderer finishes opening a project, or remove `EVENTS` from the advertised capabilities and delete `broadcast`. Advertising an event with no emitter is the worse of the two.",
+   "confidence": "certain",
+   "verdict": null
+  },
+  {
+   "id": "A3",
+   "title": "src/core/art/camera.ts: 8 of its 10 exports are dead; the migration its header promises never happened",
+   "severity": "low",
+   "file": "src/core/art/camera.ts",
+   "line": 1,
+   "claim": "Only `screenToWorld` is consumed; `clampZoom`, `worldToScreen`, `pan`, `zoomAtPoint`, `fit`, `zoomToSelection`, `clampPan` and `ZoomBounds` have zero consumers, and the module header's stated purpose (the Map viewport migrating onto this camera) was never carried out.",
+   "evidence": "The ONLY import of this module anywhere in src/ is src/renderer/components/classic/viewport-math.ts:145 `export { screenToWorld } from '../../../core/art/camera';` — a single-symbol re-export. Grep across src/ for the other names: `clampZoom` 0 hits outside camera.ts, `worldToScreen` 0, `zoomAtPoint` 0, `zoomToSelection` 0, `clampPan` 0 (knip independently flagged clampPan at camera.ts:35). `fit` only matches unrelated locals (BlockTab.tsx:98 `const fit = useBoxSize(fitEl)`, fitCellSize) — never the camera export, which is not imported. The header at camera.ts:1-4 asserts it 'Mirrors the anchored-zoom math viewStore.setZoom already uses, so the Map's navigation is preserved when it migrates onto this' — MapViewport.tsx:706 instead defines its OWN local `function screenToWorld(clientX, clientY)`, and ClassicLevelViewport.tsx:21 pulls the shared one via viewport-math, so the Map never migrated. This is a comment asserting a plan, not a fact.",
+   "fix": "Move `screenToWorld` (and the `Camera` interface) into components/classic/viewport-math.ts where its one consumer lives, and delete camera.ts. Do not keep the module 'for the migration' — the migration is three direction-changes old.",
+   "confidence": "certain",
+   "verdict": null
+  },
+  {
+   "id": "A4",
+   "title": "src/core/formats/sprite-mappings.ts is a stale duplicate of the live sprite-mapping parser",
+   "severity": "medium",
+   "file": "src/core/formats/sprite-mappings.ts",
+   "line": 36,
+   "claim": "This 175-line S2 sprite-mapping parser (`parseSpriteMappings`, `SpriteMappings`, `SpritePiece`) has zero importers; the live parser of the same name is src/core/import/sprite-mappings-import.ts, and every real consumer imports THAT one.",
+   "evidence": "src/core/formats/sprite-mappings.ts:36 defines `export function parseSpriteMappings`. Its two real callers both import from elsewhere: src/core/import/sprite-import.ts:1 `import { parseSpriteMappings } from './sprite-mappings-import'` (used at sprite-import.ts:97 and :141), and src/core/formats/games/s4.ts:3 `import { parseSpriteMappings } from '../../import/sprite-mappings-import'` (wired as `readMappings` at s4.ts:16). Nothing imports `formats/sprite-mappings` — confirmed by grep over src/ and by the reachability walk, which places it in the unreached set. Failure scenario: two files export a function with the identical name and an overlapping-but-not-identical format contract; a fix applied to the wrong one (the shorter, more obviously-named path) is silently a no-op, and the reviewer sees a correct-looking diff. That is a live foot-gun on the sprite path, not just size.",
+   "fix": "Delete src/core/formats/sprite-mappings.ts. There must be exactly one `parseSpriteMappings`.",
+   "confidence": "certain",
+   "verdict": null
+  },
+  {
+   "id": "A5",
+   "title": "src/core/formats/object-names.ts is an S2-era object-name table superseded by the S1 profile",
+   "severity": "low",
+   "file": "src/core/formats/object-names.ts",
+   "line": 5,
+   "claim": "`OBJECT_NAMES` (134 lines of Sonic 2 object IDs) and its lookup helper have zero importers; the live name table for the classic backend is `S1_OBJECT_NAMES` in src/core/project/profiles/s1-objects.ts.",
+   "evidence": "src/core/formats/object-names.ts:5 `export const OBJECT_NAMES` and its fallback helper at object-names.ts:133 are referenced only from within that same file. The live table is src/core/project/profiles/s1-objects.ts:17 `export const S1_OBJECT_NAMES`, consumed at s1-objects.ts:133/143/146 and covered by src/core/project/profiles/__tests__/s1-objects.test.ts. Reachability walk lists object-names.ts as unreached. The header at object-names.ts:2-3 says it was built from 'the Obj_Index table in object_index.asm and S2 disassembly' — the wrong game for the classic backend, which opens s1disasm. Failure scenario: someone extends object labelling and edits the S2 table, producing zero visible change and a plausible-looking commit.",
+   "fix": "Delete src/core/formats/object-names.ts.",
+   "confidence": "certain",
+   "verdict": null
+  },
+  {
+   "id": "A6",
+   "title": "Four more source files have zero importers and are unreachable from every entry point",
+   "severity": "low",
+   "file": "src/renderer/components/SectionList.tsx",
+   "line": 6,
+   "claim": "SectionList.tsx, core/formats/object-defs.ts, core/formats/s4-objects.ts, core/formats/s4-rings.ts and core/import/color-quantize.ts are all unreachable from src/renderer/index.tsx, src/main/index.ts and src/preload/index.ts, and none is imported by any test.",
+   "evidence": "A module-reachability walk (resolving every static and dynamic relative import transitively from the three real entry points, resolving .ts/.tsx/index) reaches 349 of 534 source modules; excluding __tests__, the unreached, non-test set is exactly: core/formats/object-defs.ts, core/formats/object-names.ts, core/formats/s4-objects.ts, core/formats/s4-rings.ts, core/formats/sprite-mappings.ts, core/import/color-quantize.ts, renderer/components/SectionList.tsx, renderer/providers/properties-classic.ts, renderer/state/toolStore.ts. Cross-checked per-file with a text grep over all of src/: SectionList — 0 code references (only a passing mention in a comment at src/renderer/workspace/facets/collision-facet.tsx:15 and two 2026-06 plan docs); object-defs (`parseObjectDefsIni`, object-defs.ts:17) — 0; color-quantize (`quantizeTile`, color-quantize.ts:35) — 0; s4-objects (`packObject`) and s4-rings (`serializeRingList`/`parseRingList`) — 0 outside their own files. SectionList.tsx:6-7 self-declares 'Legacy SectionList - replaced by SectionGridNav in the main layout. Kept for compatibility' — nothing depends on that compatibility. Note s4-rings.ts:2 `serializeRingList` is a ring SERIALIZER: keeping a dead second writer for a format the live path also writes is the same duplicate-writer hazard as A4.",
+   "fix": "Deletion list: src/renderer/components/SectionList.tsx, src/core/formats/object-defs.ts, src/core/formats/s4-objects.ts, src/core/formats/s4-rings.ts, src/core/import/color-quantize.ts. Verify s4-objects/s4-rings are not part of an intended aeon save path first (they are aeon-format shaped) — if they are, that path is currently missing and is a separate bug.",
+   "confidence": "certain",
+   "verdict": null
+  },
+  {
+   "id": "A7",
+   "title": "Seven exported symbols in otherwise-live files have zero callers",
+   "severity": "low",
+   "file": "src/core/art/classic-surface-buffer.ts",
+   "line": 153,
+   "claim": "These exports are dead while their host modules are live, so file-level tools and the reachability walk both miss them: buildChunkSurfaceById, decodeObjectArt, TileDeduplicator, ToolButtonGrid, resetClassicObjectArt, IconUndo, IconRedo.",
+   "evidence": "Each verified by a whole-src grep returning exactly one hit — the definition line — with no internal self-use either: src/core/art/classic-surface-buffer.ts:153 `buildChunkSurfaceById`; src/core/level-classic/object-sprite.ts:33 `decodeObjectArt` (the other 13 exports of that module are live, e.g. renderObjectFrame at :62); src/core/import/tile-dedup.ts:26 `class TileDeduplicator` (the file's other export, `flipTile` at tile-dedup.ts:6, has 3 live importers: core/export/tile-dedup.ts:3, core/agent/budget.ts:3, core/art/composer-buffer.ts:4 — so the FILE must stay, only the class goes); src/renderer/components/art-shared/ToolColumnParts.tsx:41 `ToolButtonGrid` (the file is live — imported by shell/ArtToolOptions.tsx:8, shell/SpriteToolOptions.tsx:7, components/canvas/CanvasMode.tsx:14 — but this one export is unused, including internally); src/renderer/state/classicObjectArtStore.ts:315 `resetClassicObjectArt`; src/renderer/components/ui/icons.tsx:34 `IconUndo` and :35 `IconRedo`. The IconUndo/IconRedo pair is the interesting one: undo/redo icons with no mount is the fingerprint of the deleted Toolbar (removed in 0c42129 'the legacy Toolbar is deleted') — the icons outlived their only consumer. `resetClassicObjectArt` is likewise a test/teardown-shaped helper that no test calls, so the classic object-art cache has no exercised reset path.",
+   "fix": "Delete the seven symbols (not their host files, except as covered elsewhere). Before deleting resetClassicObjectArt, check whether classicObjectArtStore actually needs a reset on project close — if it does, this is a missing call, not dead code.",
+   "confidence": "certain",
+   "verdict": null
+  },
+  {
+   "id": "A8",
+   "title": "The design system's entire typography scale is generated but never consumed",
+   "severity": "low",
+   "file": "src/renderer/styles/theme.css",
+   "line": 1,
+   "claim": "25 of the 55 CSS custom properties emitted by scripts/gen-theme.mjs are never referenced by any `var()` in src/renderer, including all 12 type-scale tokens and all 3 weight tokens — while 227 inline `fontSize` sites hardcode 13 distinct pixel values.",
+   "evidence": "Set-diff of every `var(--x)` occurrence in src/renderer against every `--x:` definition in src/renderer/styles/theme.css yields these unreferenced tokens: --text-{xs,sm,base,md,lg,xl,2xl}-{size,line} (14), --weight-{regular,medium,semibold} (3), --space-0, --space-9, and --accent-{aurora,aether,crucible,empyrean,oracle,seraph} (6). They are not consumed indirectly either: src/renderer/components/ui/theme.ts:4-16 is the ONLY typed bridge to these variables and its `T` map exposes surfaces, the text ramp, one accent, fonts, --space-1..8 and the radii — it deliberately omits every type-scale, weight and sibling-accent token. Against that, src/renderer carries 227 `fontSize` occurrences with hardcoded values (73x 11, 58x 10, 50x 12, 18x 13, 12x 9, 4x 8, 3x 16, 3x 14, 2x 18, and one each of 7/15/20/36) and 50 hardcoded `fontWeight` values (40x 600, 5x 700, 4x 500). The generator itself is NOT dead — I ran `node scripts/gen-theme.mjs` and it regenerated theme.css byte-identically (git status stayed clean), resolving tokens via the megaforge->empyrean symlink. So the pipeline works; the tokens simply have no consumer. Fifteen of the 25 (the scale + weights) are Aurora's own type system going unused; the six sibling-tool accents are a legitimate contract dump and should not be counted as debt.",
+   "fix": "Either extend `T` in components/ui/theme.ts with the scale (fsXs..fs2xl, wRegular/wMedium/wSemibold) and migrate the 227 sites, or drop the scale from gen-theme.mjs's output. Shipping a type scale that 227 call sites ignore is the more expensive of the two states.",
+   "confidence": "certain",
+   "verdict": null
+  },
+  {
+   "id": "A9",
+   "title": "core/model/types.ts is a compat barrel whose value re-exports are all dead",
+   "severity": "low",
+   "file": "src/core/model/types.ts",
+   "line": 19,
+   "claim": "The barrel re-exports 16 runtime symbols and 15 types from s4-types, but its five importers consume only Tile, Color, Palette, PaletteLine and TileRef — every value re-export (createSection, createSectionTileGrid, createChunkDef, packNametableWord, unpackNametableWord, SECTION_TILES_*, BLOCK_*, BLOCKS_PER_SECTION, SF_*) reaches nobody through this path.",
+   "evidence": "src/core/model/types.ts:19-35 re-exports the value block; :2-18 re-exports the type block. All five importers of 'model/types' take only the primitives: src/renderer/canvas/TileRenderer.ts:1 (Tile, PaletteLine, Color), src/core/formats/palette.ts:1 (Color, Palette, PaletteLine), src/core/import/color-quantize.ts:1 (Palette, Color — itself dead per A6), src/core/formats/tiles.ts:1 (Tile), src/core/import/tile-dedup.ts:1 (Tile, TileRef). The live consumers of the re-exported values go straight to the source instead: src/renderer/agent/agent-handler.ts:7 imports `packNametableWord, unpackNametableWord, createChunkDef` from s4-types, and createChunkDef is defined at s4-types.ts:156. The legacy `Block`/`BlockRef`/`Chunk` interfaces declared locally at types.ts:46/50/58 are imported by nobody. Low severity, but it is a second name for the model surface, and A4/A6 show what two names for one thing cost here.",
+   "fix": "Reduce types.ts to the five primitives its importers actually use plus TileRef, drop the value re-export block and the unused legacy interfaces — or repoint the five importers at s4-types and delete the barrel.",
+   "confidence": "certain",
+   "verdict": null
+  }
+ ]
+}

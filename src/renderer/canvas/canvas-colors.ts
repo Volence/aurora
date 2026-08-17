@@ -117,8 +117,21 @@ export const HUD_COLL_ZERO = '#6E7589';                 // collision 0 text (mir
 export const HUD_COLL_NONZERO = '#f9e2af';              // collision >0 text (mirrors --warning)
 
 // ---------- tile/chunk browser grids (TilesetPanel, ArtBrowser, ChunkLibrary) ----------
-export const TILE_SELECTED = '#a6e3a1';                 // selected brush tile outline (mirrors --success)
-export const TILE_HOVER = '#34D399';                    // hovered tile outline (mirrors --accent)
+/**
+ * ONE GREEN, TWO STRENGTHS.
+ *
+ * These were two different greens — a Catppuccin `#a6e3a1` for the selection
+ * and the emerald accent for the hover — sitting a few pixels apart in the same
+ * grid, which reads as two unrelated states rather than one at two strengths.
+ * The comment claiming the first mirrored `--success` was also stale: the token
+ * IS the accent (`--success: #34D399`), so nothing was mirroring anything.
+ *
+ * Selection is the accent at full strength; hover is the same hue at reduced
+ * alpha, which is what "you could pick this" should look like next to "this one
+ * is picked".
+ */
+export const TILE_SELECTED = '#34D399';                 // selected brush tile outline (mirrors --accent)
+export const TILE_HOVER = 'rgba(52,211,153,0.55)';      // hovered tile — the same green, softer
 export const CHUNK_LABEL_BG = 'rgba(0,0,0,0.6)';        // chunk index label backdrop
 export const CHUNK_LABEL_TEXT = '#E8EAF2';              // chunk index label (mirrors --text-hi)
 export const CHUNK_AIR_CHECK_A = '#2A2F3A';             // air ($00) picker checker — light square

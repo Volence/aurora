@@ -147,11 +147,11 @@ const INSTALL = String.raw`
     return on ? on.textContent.trim() : null;
   };
 
-  // Chip (span[title]) helpers — Assign/Paint and Isolate/Link are both Chips,
+  // Chip ([title]; a button when it does something, a span when it reports) helpers — Assign/Paint and Isolate/Link are both Chips,
   // matched by their exact title (unambiguous: only one tab is mounted at a
   // time — ClassicComposerDock renders each tab as a hard conditional on
   // composerTab, never all three at once).
-  H.chipEl = (title) => [...document.querySelectorAll('span[title]')].find((e) => e.title === title);
+  H.chipEl = (title) => [...document.querySelectorAll('[title]')].find((e) => e.title === title);
   H.clickChip = (title) => { const e = H.chipEl(title); if (!e) return false; e.click(); return true; };
   // Active chips render background === border color (T.accent for both);
   // inactive chips render background T.raised / border T.border, which differ.

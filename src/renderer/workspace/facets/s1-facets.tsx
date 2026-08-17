@@ -146,7 +146,7 @@ import ClassicObjectInspector from '../../components/classic/ClassicObjectInspec
 import ClassicObjectList from '../../components/classic/ClassicObjectList';
 import ChunkPicker from '../../components/classic/ChunkPicker';
 import ClassicArtToolDock from '../../components/classic/ClassicArtToolDock';
-import ArtToolOptions, { CLASSIC_TILE_CAPS } from '../../shell/ArtToolOptions';
+import ArtToolOptions, { CLASSIC_TILE_CAPS, CLASSIC_SURFACE_CAPS } from '../../shell/ArtToolOptions';
 import MapStatusBar from '../../components/shared/MapStatusBar';
 import { useClassicMapStatusPort } from '../../providers/map-status-classic';
 import { useClassicLevelStore } from '../../state/classicLevelStore';
@@ -436,7 +436,11 @@ function ClassicArtOptions(): React.ReactElement | null {
   const chunkPaintMode = useClassicLevelStore((s) => s.chunkPaintMode);
   const blockPaintMode = useClassicLevelStore((s) => s.blockPaintMode);
   if (!isClassicPixelTier(composerTab, chunkPaintMode, blockPaintMode)) return null;
-  return <ArtToolOptions caps={CLASSIC_TILE_CAPS} />;
+  // Per TIER, not one set for all three: only the Tile tab consumes
+  // `pendingAction`, so the Chunk and Block surfaces get the bar without the
+  // transform grid rather than three buttons that park an action for the next
+  // TileTab mount to fire against a tile nobody chose.
+  return <ArtToolOptions caps={composerTab === 'tile' ? CLASSIC_TILE_CAPS : CLASSIC_SURFACE_CAPS} />;
 }
 
 // mapFacet supplies the engine-neutral MapFacetDock (which resolves classic's

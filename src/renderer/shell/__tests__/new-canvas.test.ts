@@ -20,7 +20,7 @@
 
 import { describe, it, expect } from 'vitest';
 import {
-  validateNewCanvas, flattenZonePalette, newCanvasPalette, NEW_CANVAS_DEFAULTS,
+  validateNewCanvas, flattenZonePalette, newCanvasPalette, NEW_CANVAS_DEFAULTS, commitReachNote,
   newCanvasFieldErrors, parseCanvasSide,
 } from '../new-canvas';
 import { paletteHasVisibleColour } from '../../../core/art/canvas-default-palette';
@@ -201,9 +201,25 @@ describe('NEW_CANVAS_DEFAULTS', () => {
     // unconstrained. The literal assertion below is what catches that.
   });
 
-  it('is the size and profile the contract asks for', () => {
-    expect([NEW_CANVAS_DEFAULTS.width, NEW_CANVAS_DEFAULTS.height]).toEqual([128, 128]);
+  /**
+   * UX-A1. The default used to be 128x128 — a QUARTER of a chunk, described in
+   * the source as "two chunks square" — so every new canvas opened at a size
+   * `canvasChunkCapacity` floors to zero and the commit panel could only answer
+   * "there is nothing to commit yet". A default has to be a size the app can
+   * actually do the main thing with.
+   */
+  it('opens at a size that CAN be committed — one whole chunk', () => {
+    expect([NEW_CANVAS_DEFAULTS.width, NEW_CANVAS_DEFAULTS.height]).toEqual([256, 256]);
     expect(NEW_CANVAS_DEFAULTS.profileId).toBe('genesis-level-art');
+    expect(commitReachNote(NEW_CANVAS_DEFAULTS.width, NEW_CANVAS_DEFAULTS.height)).toBeNull();
+  });
+
+  it('says so for a size a commit could never take', () => {
+    // Not a refusal — a sub-chunk canvas is a fine place to draw something you
+    // will paste. It just has to be SAID, at the moment the size is chosen.
+    expect(commitReachNote(128, 128)).toMatch(/cannot be committed/);
+    expect(commitReachNote(256, 128)).toMatch(/cannot be committed/);
+    expect(commitReachNote(512, 256)).toBeNull();
   });
 
   it('carries NO default name, so nothing lands on disk under a name nobody chose', () => {

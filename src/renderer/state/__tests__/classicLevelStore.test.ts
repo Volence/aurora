@@ -1186,7 +1186,7 @@ describe('classicCommitCanvas', () => {
     paletteWrites: [{ line: 2, colors: new Uint16Array(16).fill(0x0e0e) }],
     report: {
       tilesNew: 1, tilesReused: 0, tilesReclaimed: 0,
-      blocksNew: 1, blocksReused: 0, blocksReclaimed: 0,
+      blocksNew: 1, blocksReused: 0, blocksReclaimed: 0, blocksZeroed: 0,
       chunksReplaced: 1, chunksAppended: 0,
       blocksInheritedCollision: 1, blocksWithoutCollision: 0,
       cellsInheritedSolidity: 256, cellsWithoutSolidity: 0,

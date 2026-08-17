@@ -66,7 +66,7 @@ const styles: Record<string, React.CSSProperties> = {
     background: T.border, outline: `1px solid ${T.accent}`,
   },
   index: {
-    color: T.accent, fontFamily: 'monospace', fontSize: 12,
+    color: T.accent, fontFamily: T.fontMono, fontSize: 12,
   },
   name: {
     flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const,

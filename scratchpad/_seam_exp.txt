@@ -1,0 +1,9 @@
+/home/volence/sonic_hacks/aurora/src/core/export/index.ts:22:export function exportAct(
+/home/volence/sonic_hacks/aurora/src/core/project/aeon/save.ts:27:import { exportAct } from '../../export/index';
+/home/volence/sonic_hacks/aurora/src/core/project/aeon/save.ts:222:    const result = exportAct(
+/home/volence/sonic_hacks/aurora/test/export/pipeline.test.ts:2:import { exportAct, type ExportResult } from '../../src/core/export/index';
+/home/volence/sonic_hacks/aurora/test/export/pipeline.test.ts:41:    const result = exportAct('OJZ', act, tileset, objectLibrary);
+/home/volence/sonic_hacks/aurora/test/export/pipeline.test.ts:54:    const result = exportAct('OJZ', act, tileset, objectLibrary);
+/home/volence/sonic_hacks/aurora/test/export/tile-dedup.test.ts:116:describe('exportAct group blobs', () => {
+/home/volence/sonic_hacks/aurora/test/export/tile-dedup.test.ts:118:    const { exportAct } = await import('../../src/core/export/index');
+/home/volence/sonic_hacks/aurora/test/export/tile-dedup.test.ts:125:    const result = exportAct('TST', {

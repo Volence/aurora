@@ -15,7 +15,7 @@ import { useClassicProjectStore } from '../state/classicProjectStore';
 import { useClassicLevelStore } from '../state/classicLevelStore';
 import { useProjectStore } from '../state/projectStore';
 import { useOpenEngine } from '../state/open-project';
-import { filterExplorer, type ExplorerGroupModel, type ExplorerItemModel } from '../../core/shell/explorer';
+import { filterExplorer, type ExplorerGroupModel, type ExplorerItemModel, countableItems } from '../../core/shell/explorer';
 import {
   classicExplorerGroups, aeonExplorerGroups, noProjectExplorerGroups, resolveObjectSprite,
   NEW_SPRITE_ITEM_ID, NEW_CANVAS_ITEM_ID, IMPORT_SHEET_ITEM_ID, type ClassicObjectRow, type AeonObjectRow,
@@ -198,7 +198,7 @@ export default function Explorer({ onOpenProject, onOpenRecent, onNewCanvas, onI
           return (
             <button
               key={g.id}
-              title={`${g.label} (${g.items.length})`}
+              title={`${g.label} (${countableItems(g)})`}
               onClick={toggle}
               style={styles.railButton}
             >
@@ -249,7 +249,7 @@ export default function Explorer({ onOpenProject, onOpenRecent, onNewCanvas, onI
             title={g.label}
             defaultCollapsed
             collapsedOverride={query.trim() !== '' ? false : undefined}
-            right={<span style={styles.count}>{g.items.length}</span>}
+            right={<span style={styles.count}>{countableItems(g)}</span>}
           >
             <div style={styles.items}>
               {g.items.map((item) => (
@@ -295,7 +295,7 @@ const styles: Record<string, React.CSSProperties> = {
     color: T.textLo, flexShrink: 0,
   },
   filter: {
-    flex: 1, minWidth: 0, background: 'transparent', border: 'none', outline: 'none',
+    flex: 1, minWidth: 0, background: 'transparent', border: 'none',
     color: T.textHi, fontSize: 12, fontFamily: T.fontUi,
   },
   treeScroll: { flex: 1, overflowY: 'auto' },

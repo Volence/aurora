@@ -43,6 +43,7 @@ import { openEngine } from './open-project';
 import { useSessionStore } from './sessionStore';
 import { useSpriteStore, saveableDirtySpriteDocIds } from './spriteStore';
 import { useCanvasStore, saveableDirtyCanvasDocIds } from './canvasStore';
+import { useArtStore } from './artStore';
 import { useToastStore } from './toastStore';
 import { saveClassicProject } from './classic-save';
 import { saveAllSpriteArt, saveSpriteDocArt } from '../components/sprite/export-sprite';
@@ -224,4 +225,8 @@ export function resetProjectRuntime(): void {
   documentHistoryHub.clearAll();
   useSpriteStore.getState().closeAll();
   useCanvasStore.getState().closeAll();
+  // The aeon composer document goes with them, for the same reason and one
+  // stronger: its ComposerDoc is built from the OLD project's tile/chunk data,
+  // so a survivor writes the previous project's art into the new one's atlas.
+  useArtStore.getState().closeDocument();
 }

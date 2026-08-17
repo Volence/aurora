@@ -1,0 +1,140 @@
+1: // Shared engine struct definitions — Act (the 40-byte act descriptor), Sec
+2: // (the 66-byte section descriptor), DMAEntry (the 14-byte DMA-queue entry),
+3: // parallax_config (the 28-byte parallax ROM config header), and VdpShadow (the
+4: // 19-byte RAM mirror of VDP registers $00-$12).
+5: // All are TYPE-ONLY: this module emits ZERO bytes. It gives every consumer
+6: // (act_descriptor.emp, section.emp, tile_cache.emp, entity_window.emp,
+7: // dma_queue.emp) ONE typed home for field access —
+8: // `Sec.sec_bg_layout(a0)`, `DMAEntry.SizeH(a1)`, `offsetof(Act, grid_w)` —
+9: // instead of per-file offset-const mirrors.
+10: //
+11: // This module is the SOLE AUTHOR of these layouts. The residual AS reads the
+12: // field offsets + total sizes it needs (`ram.asm`'s `ds` slot sizes,
+13: // `act_descriptor.asm`'s `Sec`/`Act` access) through the struct-offset harvest:
+14: // the build harvests each struct's `<Struct>_<field>` / `<Struct>_len` and
+15: // injects them as guarded AS defines, the struct-offset sibling of the constants
+16: // flip. Field names are VERBATIM the AS spelling (the `sec_`/`act_` stutter
+17: // included) for cross-seam greppability.
+18: //
+19: // BOUNDARY: this module carries LAYOUT and layout-adjacent struct knowledge
+20: // (offsets, sizes, blessed sub-field views like the grid-dim low bytes) — NOT
+21: // consumer-specific usage detail. A derived view read by multiple consumers
+22: // belongs here with the layout; a one-consumer computed offset stays file-local.
+23: module engine.structs
+24: 
+25: // -----------------------------------------------
+26: // Act Descriptor (§4) — 40 bytes ($28), ROM table (sizeof is the truth; no _len const)
+27: // -----------------------------------------------
+28: pub struct Act {
+29:     sec_grid_ptr:        *u8,           // $00 — section definition array
+30:     grid_w:              u16,           // $04 — sections wide
+31:     grid_h:              u16,           // $06 — sections tall
+32:     start_local_x:       u16,           // $08 — player start X within section
+33:     start_local_y:       u16,           // $0A — player start Y within section
+34:     start_sec_x:         u8,            // $0C — starting section X index
+35:     start_sec_y:         u8,            // $0D — starting section Y index
+36:     act_bg_layout:       *u8,           // $0E — zone-wide Plane B layout (T1 default)
+37:     act_bg_tiles:        *u8,           // $12 — zone-wide Plane B tile blob
+38:     act_parallax_config: *u8,           // $16 — default parallax config
+39:     act_art_pool_table:  *u8,           // $1A — manifest v2 table: [PageManifest; act_art_pool_pages] (generated)
+40:     act_art_pool_pages:  u16,           // $1E — pool page count (generated)
+41:     edge_mode:           u8,            // $20 — vertical edge behavior (EDGE_*)
+42:     pad_21:              u8 = 0,        // $21 — reserved byte pad (anonymous in structs.asm)
+43:     act_sec_local_maps:  *u8,           // $22 — [*u8; grid_w*grid_h] per-section local->global tables (P2b, generated)
+44:     act_art_budget:      u16,           // $26 — per-act steady-state art-streaming byte budget (B&R
+45:                                         //       pattern, P2c Task 9): PageIn_Process's once-per-physical-
+46:                                         //       frame Frame_Counter tick reloads
+47:                                         //       Art_Budget_Remaining from it; page_in charges
+48:                                         //       each landing's DMA bytes and defers when exhausted.
+49:                                         //       Steady-state governor (init bulk-load runs <=1 page/frame,
+50:                                         //       under the budget, so it never throttles the display-off load).
+51: }
+52: 
+53: // -----------------------------------------------
+54: // Page manifest entry (Art-streaming P2b, manifest v2) — 8 bytes.
+55: // Act.act_art_pool_table points at [PageManifest; act_art_pool_pages].
+56: // PageIn_Process strides this table by sizeof(PageManifest) and dispatches on
+57: // pm_form (ART_PAGE_FORM_*); pm_flags carries ART_PAGE_FLAG_PINNED (residency).
+58: // -----------------------------------------------
+59: pub struct PageManifest {
+60:     pm_source:           *u8,           // $00 — page blob ptr (ZX0 wrapper, or raw payload)
+61:     pm_tiles:            u16,           // $04 — decompressed tile count (landing DMA length = *32)
+62:     pm_form:             u8,            // $06 — ART_PAGE_FORM_ZX0 / ART_PAGE_FORM_RAW
+63:     pm_flags:            u8,            // $07 — ART_PAGE_FLAG_PINNED bit0
+64: }
+65: 
+66: // Low-byte views of the word grid dims — safe: grid_w, grid_h ≤
+67: // MAX_ACT_SECTIONS (48) < 256, guarded by the act constructor.
+68: // (`.field + N` does not compose in disp arithmetic — row 1068.) A blessed
+69: // sub-field view read by all three consumers (section/tile_cache/entity_window)
+70: // is layout-adjacent struct knowledge, so it lives WITH the layout — not
+71: // consumer-specific detail (rule-1 amendment).
+72: pub const Act_grid_w_lo = offsetof(Act, grid_w) + 1
+73: pub const Act_grid_h_lo = offsetof(Act, grid_h) + 1
+74: 
+75: // -----------------------------------------------
+76: // Page-in request (§9.7) — 4 bytes, one FIFO slot (engine.page_in).
+77: // The dispatcher's request queue holds these; page_id indexes the act's
+78: // page-address table, pr_flags carries the PGRQ_DEMAND priority bit.
+79: // -----------------------------------------------
+80: pub struct PageInReq {
+81:     pr_page_id:          u16,           // $00 — pool page index (into act_art_pool_table)
+82:     pr_flags:            u8,            // $02 — PGRQ_DEMAND bit0 (demand vs prefetch)
+83:     pr_pad:              u8 = 0,        // $03 — reserved
+84: }
+85: 
+86: // -----------------------------------------------
+87: // Page frame (§5) — one 64-tile VRAM art slot in the residency cache
+88: // (engine.page_cache). Page_Frames[i] describes frame i; frame*64 is its base
+89: // tile index in the FG art window. pf_next threads the FREE list (the only
+90: // list left); eviction order is the pf_stamp age (F-1 stamp eviction)
+91: // AND the free list (a frame is in at most one list); PAGE_NOT_RESIDENT($FF)
+92: // terminates a link. 8 bytes — sizeof is compiler truth (no manual _len).
+93: // -----------------------------------------------
+94: pub struct PageFrame {
+95:     pf_page:             u16,           // $00 — resident page id, or $FFFF when free/unassigned
+96:     pf_refcount:         u16,           // $02 — cache nametable words referencing this frame
+97:     pf_stamp:            u16,           // $04 — Frame_Counter when the frame became evictable (F-1
+98:                                         //       stamp eviction: victim = max unsigned age among
+99:                                         //       PF_EVICTABLE frames; wrap at 65536 frames merely
+100:                                         //       mis-ages a candidate, never breaks safety)
+101:     pf_next:             u8,            // $06 — FREE-list forward link only (frame idx / $FF);
+102:                                         //       eviction order is the stamp, not a list
+103:     pf_flags:            u8,            // $07 — PF_PINNED / PF_EVICTABLE bits
+104: }
+105: 
+106: // -----------------------------------------------
+107: // Section Definition (§4) — 66 bytes ($42), ROM table
+108: // All fields: 0 = keep current / no change
+109: // -----------------------------------------------
+110: pub struct Sec {
+111:     sec_block_index:     *u8,           // $00 — 256-entry block index table
+112:     sec_objects:         *u8,           // $04 — objentry list (dc.w -1 terminated)
+113:     sec_rings:           *u8,           // $08 — X-sorted ring entries
+114:     sec_plc:             *u8 = 0,       // $0C — S4LZ art PLC list
+115:     sec_pal:             *u8,           // $10 — 128-byte palette
+116:     sec_parallax_config: *u8 = 0,       // $14 — 0 = inherit the act default
+117:     sec_raster_table:    *u8 = 0,       // $18 — raster command table
+118:     sec_bg_layout:       *u8 = 0,       // $1C — NULL = use Act_act_bg_layout
+119:     sec_type_table:      *u8,           // $20 — dc.b count,pad; dc.l ObjDef×N
+120:     sec_pal_cycle:       *u8 = 0,       // $24 — palette cycling script
+121:     sec_sound_bank:      *u8 = 0,       // $28 — DAC sample bank
+122:     sec_block_dict:      *u8,           // $2C — raw dict region (LZ pre-seed)
+123:     sec_anim_blocks:     *u8 = 0,       // $30 — animated tile script
+124:     sec_effects:         *u8 = 0,       // $34 — EffectsPreset* (0 = use the legacy fields)
+125:     sec_flags:           u16 = 0,       // $38 — SF_* bitmask
+126:     sec_music:           u16 = 0,       // $3A — music track (0 = keep current)
+127:     sec_pcfg_pad_3C:     u8 = 0,        // $3C — reserved
+128:     sec_camera_lookahead: u8 = 0,       // $3D — lookahead px (0 = zone default)
+129:     sec_pcfg_pad_3E:     u8 = 0,        // $3E — reserved
+130:     sec_pcfg_pad_3F:     u8 = 0,        // $3F — reserved
+131:     sec_block_dict_len:  u16,           // $40 — dict bytes (768×K, K≤3)
+132: }
+133: 
+134: // -----------------------------------------------
+135: // DMA Queue Entry (§1.2) — 14 bytes, RAM queue slots
+136: // VDP reg numbers at even offsets, data at odd offsets — movep's
+137: // alternate-byte writes interleave value bytes between the pre-filled
+138: // register markers, so one movep.l lands a whole field family.
+139: // -----------------------------------------------
+140: pub struct DMAEntry {

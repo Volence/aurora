@@ -40,7 +40,7 @@ await session('2C import', async (c) => {
   check('3', 'it states what kind of file it needs', /indexed PNG/.test(String(body)), String(body).slice(0,90));
 
   const chip = await c.evalExpr(`(() => {
-    const e = [...document.querySelectorAll('span[title]')].find(x => x.textContent.trim() === 'Choose a PNG…');
+    const e = [...document.querySelectorAll('[title]')].find(x => x.textContent.trim() === 'Choose a PNG…');
     return e ? 'present' : 'missing';
   })()`);
   check('4', 'it offers a file chooser', chip === 'present', String(chip));

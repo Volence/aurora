@@ -1,6 +1,6 @@
 // src/renderer/components/ui/Menu.tsx
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { T } from './theme';
+import { T, Z } from './theme';
 
 const EDGE_MARGIN = 8; // keep the dropdown this far from the viewport edges
 
@@ -38,7 +38,7 @@ export function Menu({ label, children, align = 'left' }: {
       }}>{label}</button>
       {open && (
         <div ref={panelRef} style={{
-          position: 'absolute', top: '100%', [align]: 0, marginTop: T.s2, zIndex: 100,
+          position: 'absolute', top: '100%', [align]: 0, marginTop: T.s2, zIndex: Z.menu,
           transform: shiftX ? `translateX(${shiftX}px)` : undefined,
           minWidth: 200, padding: T.s2, background: T.overlay, border: `1px solid ${T.borderStrong}`,
           borderRadius: T.rLg, boxShadow: '0 8px 24px rgba(0,0,0,0.4)',

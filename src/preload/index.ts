@@ -54,6 +54,21 @@ const api = {
   // `perfLog` posts one summary line per act load to the main-process terminal.
   perfEnabled: process.env.AURORA_PERF === '1',
   perfLog: (line: string): void => { ipcRenderer.send(IPC_CHANNELS.PERF_LOG, line); },
+
+  /**
+   * Answer main's "may I close?" — the window-close guard.
+   *
+   * The renderer is the only side that knows whether anything is unsaved, so
+   * main asks and waits. `respond(false)` keeps the window open; `true` lets it
+   * go. Registered once at startup (shell/close-guard.ts).
+   */
+  onCloseRequest: (callback: (respond: (mayClose: boolean) => void) => void): void => {
+    ipcRenderer.on(IPC_CHANNELS.CLOSE_REQUEST, () => {
+      callback((mayClose: boolean) => {
+        ipcRenderer.send(IPC_CHANNELS.CLOSE_RESPONSE, mayClose);
+      });
+    });
+  },
 };
 
 contextBridge.exposeInMainWorld('api', api);

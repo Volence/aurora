@@ -26,6 +26,7 @@ const SHARED_DOCK = read('..', 'shell', 'ArtToolDock.tsx');
 const S1_FACETS = read('facets', 's1-facets.tsx');
 const WORKSPACE = read('LevelWorkspace.tsx');
 const TILE_TAB = read('..', 'components', 'classic', 'TileTab.tsx');
+const COMPOSER_DOCK = read('..', 'components', 'classic', 'ClassicComposerDock.tsx');
 
 /**
  * TileTab with comments stripped. The zoom guards below ask whether the file
@@ -126,7 +127,24 @@ describe('s1ArtFacet mounts the pixel chrome', () => {
     expect(S1_FACETS).toMatch(/if\s*\(\s*!isClassicPixelTier\([^)]*\)\s*\)\s*return\s+null/);
     // Classic's capability set, not aeon's full bar: `brushSpace`,
     // `repeatPreview` and `paletteLine` are controls TileTab does not read.
-    expect(S1_FACETS).toMatch(/caps=\{CLASSIC_TILE_CAPS\}/);
+    // And PER TIER — see the transform-grid test below.
+    expect(S1_FACETS).toMatch(/caps=\{composerTab === 'tile' \? CLASSIC_TILE_CAPS : CLASSIC_SURFACE_CAPS\}/);
+  });
+
+  /**
+   * R12. The transform grid was handed to all three classic pixel tiers, and
+   * `pendingAction` has exactly one consumer. Clicking Rotate-90 on Chunk-Paint
+   * did nothing visible, parked the action, and the next TileTab MOUNT fired its
+   * effect on the leftover — committing a real, dirty-marking transform against
+   * a tile the artist never chose.
+   */
+  it('offers the transform grid only to the tier that consumes it', async () => {
+    const { CLASSIC_TILE_CAPS, CLASSIC_SURFACE_CAPS } = await import('../../shell/ArtToolOptions');
+    expect(CLASSIC_TILE_CAPS.transforms).not.toBe(false);
+    expect(CLASSIC_SURFACE_CAPS.transforms, 'chunk/block paint would park an action').toBe(false);
+    // Belt to that braces: crossing a tier boundary discards any request.
+    expect(COMPOSER_DOCK, 'the dock carries a pending action across tiers')
+      .toMatch(/setArtTier\(tab\);[\s\S]{0,900}?clearAction\(\);/);
   });
 
   // THE CROSS-ENGINE SLOT. `artStore.pendingAction` is one string every art host

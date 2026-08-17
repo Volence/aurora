@@ -172,7 +172,7 @@ async function main() {
     // ---- 3: committing actually changes the document -----------------------
     if (run('3')) {
       const before = JSON.parse(await c.evalExpr('JSON.stringify(window.__dbg.classic.poolSizes())'));
-      const clicked = await c.evalExpr('(() => { const e=[...document.querySelectorAll("span[title]")].find(x=>/^Commit \\d+ chunk/.test(x.textContent.trim())); if(!e) return "no-chip"; e.click(); return e.textContent.trim(); })()');
+      const clicked = await c.evalExpr('(() => { const e=[...document.querySelectorAll("[title]")].find(x=>/^Commit \\d+ chunk/.test(x.textContent.trim())); if(!e) return "no-chip"; e.click(); return e.textContent.trim(); })()');
       await sleep(1200);
       const after = JSON.parse(await c.evalExpr('JSON.stringify(window.__dbg.classic.poolSizes())'));
       note('3', 'commit chip', clicked);

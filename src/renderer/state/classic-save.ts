@@ -11,7 +11,7 @@
 import type { GuardedWriteFile, GuardedWriteResult } from '../../shared/ipc-types';
 import type { WriteResult, ProjectHandle, ZoneActRef, DirtyDomains, LevelDoc } from '../../core/project/adapter';
 import { useClassicProjectStore } from './classicProjectStore';
-import { useClassicLevelStore } from './classicLevelStore';
+import { useClassicLevelStore, type DomainGen } from './classicLevelStore';
 import { useToastStore } from './toastStore';
 
 /** The narrow guarded-write capability the save pipe needs (window.api by default). */
@@ -95,6 +95,10 @@ export interface DirtyLevel {
   ref: ZoneActRef;
   doc: LevelDoc;
   dirty: DirtyDomains;
+  /** The store's per-domain edit counters AT COLLECTION — i.e. describing the
+   *  `doc` above, which is what gets written. Anything that moves before the
+   *  write lands is an edit these bytes do not contain. */
+  gen?: DomainGen;
 }
 
 /**
@@ -108,7 +112,7 @@ export function collectDirtyLevels(_handle: ProjectHandle): DirtyLevel[] {
   if (s.status !== 'ready' || !s.doc || !s.ref) return [];
   const hasDirty = Object.values(s.dirty).some(Boolean);
   if (!hasDirty) return [];
-  return [{ ref: s.ref, doc: s.doc, dirty: { ...s.dirty } }];
+  return [{ ref: s.ref, doc: s.doc, dirty: { ...s.dirty }, gen: { ...s.domainGen } }];
 }
 
 /**
@@ -158,6 +162,23 @@ export function domainsToClear(
   return out;
 }
 
+/**
+ * Say so when a save wrote a domain the artist has since edited again.
+ *
+ * The alternative — clearing the flag anyway — is the silent case: the edit is
+ * not on disk, the tab dot is gone, closing prompts nothing, and the next
+ * Ctrl+S answers "nothing to save". The sprite path has said this since it was
+ * written ("edits made during the save are still unsaved"); this is that
+ * sentence, at the other three doors.
+ */
+function notifyMidSaveEdits(withheld: (keyof DirtyDomains)[]): void {
+  if (withheld.length === 0) return;
+  useToastStore.getState().addToast(
+    `Saved, but edits made during the save are still unsaved (${withheld.join(', ')}) — save again`,
+    'info',
+  );
+}
+
 export type SaveClassicProjectResult =
   | { kind: 'nothing' }
   | { kind: 'saved'; count: number }
@@ -201,11 +222,15 @@ export async function saveClassicProject(
         // Refresh the cached read-time mtimes so the next save expects the new
         // on-disk values (no re-read needed).
         levels.updateMtimes?.(dl.ref, outcome.newMtimes);
-        // Clear the dirty flags for the domains whose files all landed.
-        useClassicLevelStore.getState().markDomainsClean(
+        // Clear the dirty flags for the domains whose files all landed — except
+        // any the artist edited while the write was in flight. Those edits are
+        // not in the bytes on disk, and clearing them would lose the work with
+        // no dot, no prompt and a "nothing to save" on the next Ctrl+S.
+        notifyMidSaveEdits(useClassicLevelStore.getState().markDomainsClean(
           dl.ref,
           domainsToClear(dl.doc, dl.dirty, outcome.written),
-        );
+          dl.gen,
+        ));
         saved++;
         break;
       case 'partial':
@@ -213,10 +238,11 @@ export async function saveClassicProject(
         // doesn't spuriously conflict on the already-written ones. Clear only the
         // domains whose files ALL landed; the rest stay dirty for the retry.
         levels.updateMtimes?.(dl.ref, outcome.newMtimes);
-        useClassicLevelStore.getState().markDomainsClean(
+        notifyMidSaveEdits(useClassicLevelStore.getState().markDomainsClean(
           dl.ref,
           domainsToClear(dl.doc, dl.dirty, outcome.written),
-        );
+          dl.gen,
+        ));
         useToastStore.getState().addToast(
           `Save incomplete — write failed at ${outcome.failed.path}; ` +
             `${outcome.written.length} file(s) saved, ${outcome.unwritten.length + 1} not. ` +

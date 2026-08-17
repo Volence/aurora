@@ -13,5 +13,5 @@ import CommitPlanView from './CommitPlanView';
 export default function CanvasCommitSection({ docId }: { docId: string }) {
   const doc = useCanvasStore((s) => s.docs.get(docId)?.doc);
   if (!doc) return null;
-  return <CommitPlanView pixels={doc.pixels} palette={doc.palette} />;
+  return <CommitPlanView pixels={doc.pixels} palette={doc.palette} gridOrigin={doc.gridOrigin} />;
 }

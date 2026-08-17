@@ -133,6 +133,16 @@ export interface S1ReadState {
   animOverlay: AnimOverlay[];
   objposOriginalLength: number;
   /**
+   * The colind table's length on disk.
+   *
+   * It legitimately starts SHORTER than the block list — GHZ ships 439 blocks
+   * against a 410-byte table — and the ROM resolves the overhang from whatever
+   * follows the file. So the length is data, and a save that shortened the
+   * table would silently change the collision of every block past the new end.
+   * The writer's gate reads this; see the colind branch.
+   */
+  colindOriginalLength: number;
+  /**
    * The object list exactly as decoded from disk, in on-disk order. Used by the
    * writer to keep a zero-edit save byte-identical even for the rare real file
    * whose entries are not strictly X-ascending (e.g. GHZ act 3 carries one 64px
@@ -370,6 +380,7 @@ export async function readS1Level(
       originalDisplayTiles: tiles.slice(),
       animOverlay,
       objposOriginalLength: objposBytes.length,
+      colindOriginalLength: colind.length,
       objposOriginal: objects.map((o) => ({ ...o })),
       paletteOriginals,
       paths,
@@ -533,17 +544,40 @@ export function writeS1Level(
   // zero-edit round-trip. So we sort ONLY when the object list has actually
   // changed from disk; an untouched list is emitted in its exact original order.
   // The self-check compares the re-decode against whichever list we emit.
+  //
+  // AND THE REMEMBER FLAG IS AN INDEX. S1 stores "this object is already gone"
+  // as a bit keyed by the entry's POSITION IN THIS TABLE, so re-ordering two
+  // remembered objects relative to each other swaps which one every saved bit
+  // refers to. That is not hypothetical: FIVE real acts are not strictly
+  // X-ascending (the note above named one), so the sort is a genuine reorder in
+  // those files — reachable by editing anything at all in the act, not by
+  // touching the remembered objects. Refuse rather than write it: this is the
+  // one thing at this seam that no re-decode would ever notice.
   if (dirty.objects) {
-    const emit = objectsEqual(doc.objects, read.objposOriginal)
+    const unchanged = objectsEqual(doc.objects, read.objposOriginal);
+    const emit = unchanged
       ? read.objposOriginal
       : [...doc.objects].sort((a, b) => a.x - b.x);
-    emitVerified(
-      read.paths.objpos,
-      encodeS1Objpos(emit, read.objposOriginalLength),
-      decodeS1Objpos,
-      (b) => objectsEqual(b, emit),
-      'objpos',
-    );
+    const rememberOrder = (list: readonly S1ObjectEntry[]): string =>
+      list.filter((o) => o.respawn).map((o) => `${o.id}:${o.subtype}:${o.x}:${o.y}`).join('|');
+    if (!unchanged && rememberOrder(doc.objects) !== rememberOrder(emit)) {
+      // Routed to `errors` like every other failed gate: that file is not
+      // written, the rest of the save still is, and the caller reports it.
+      errors.push({
+        path: read.paths.objpos,
+        message: 'refused: writing this list X-sorted would reorder objects that carry the '
+          + 'remember flag, which swaps the respawn slot each of them owns. Move them so their '
+          + 'X order matches their table order, or clear the flag.',
+      });
+    } else {
+      emitVerified(
+        read.paths.objpos,
+        encodeS1Objpos(emit, read.objposOriginalLength),
+        decodeS1Objpos,
+        (b) => objectsEqual(b, emit),
+        'objpos',
+      );
+    }
   }
 
   // --- start ---------------------------------------------------------------
@@ -558,14 +592,29 @@ export function writeS1Level(
   }
 
   // --- colind --------------------------------------------------------------
+  // THIS DOMAIN HAS NO CODEC, and the gate used to pretend otherwise: encode and
+  // decode are both `slice()`, so `bytesEqual(decode(encode(x)), x)` reads as a
+  // self-check and is `bytesEqual(x.slice().slice(), x)` — true for every input,
+  // including a corrupt one. Like the palette gate below, the honest thing is to
+  // say what IS being guarded.
+  //
+  // What can actually go wrong here is the LENGTH. The table legitimately starts
+  // shorter than the block list (GHZ ships 439 blocks against a 410-byte colind)
+  // and the ROM resolves the overhang from whatever follows the file, so the
+  // length is data: a save that shortened the table would silently change the
+  // collision of every block past the new end, and no re-decode would notice.
+  // That is the check worth having, so that is the check.
   if (dirty.colind) {
-    emitVerified(
-      read.paths.colind,
-      encodeS1ColInd(doc.collision.colind),
-      decodeS1ColInd,
-      (b) => bytesEqual(b, doc.collision.colind),
-      'colind',
-    );
+    const enc = encodeS1ColInd(doc.collision.colind);
+    if (enc.length < read.colindOriginalLength) {
+      errors.push({
+        path: read.paths.colind,
+        message: `refused: colind would shrink from ${read.colindOriginalLength} to ${enc.length} bytes, `
+          + 'changing the collision of every block past the new end',
+      });
+    } else {
+      emitVerified(read.paths.colind, enc, decodeS1ColInd, (b) => bytesEqual(b, doc.collision.colind), 'colind');
+    }
   }
 
   // --- palette: decompose into each component file, then recompose to verify.

@@ -1,5 +1,18 @@
 const SLIDING_WINDOW_SIZE = 0x2000;
 
+export class KosinskiError extends Error {
+  constructor(message: string) { super(message); this.name = 'KosinskiError'; }
+}
+
+/**
+ * The most a single stream may decompress to before this gives up.
+ *
+ * 16 MB is far past anything a Mega Drive asset can be (the whole address space
+ * is 4 MB of ROM) and far short of what it takes to abort the process — which
+ * is the failure this bound exists to prevent, not a size policy.
+ */
+const MAX_OUTPUT_BYTES = 16 * 1024 * 1024;
+
 export function kosinskiDecompress(input: Uint8Array): Uint8Array {
   return kosinskiDecompressFrom(input, 0).output;
 }
@@ -8,6 +21,15 @@ export function kosinskiDecompress(input: Uint8Array): Uint8Array {
  * Decompress one Kosinski stream starting at `startOffset`, returning the output
  * plus `endOffset` (the input index just past the stream's terminator). The
  * endOffset is needed by the Moduled variant to align to the next module.
+ *
+ * MALFORMED INPUT THROWS. It used to read zeros past the end of the input and
+ * loop until V8 aborted the process — an abort no try/catch can intercept, so
+ * one bad file took the whole editor and every unsaved document with it. And
+ * "bad file" is not exotic: a git-lfs pointer, a placeholder, or a truncated
+ * copy all reach here, because availability checks are existence-only. Nemesis
+ * has thrown at EOF since it was written; this is the same rule, plus a ceiling
+ * for the streams whose descriptor bits keep routing away from the terminator
+ * while still reading real bytes.
  */
 export function kosinskiDecompressFrom(input: Uint8Array, startOffset = 0): { output: Uint8Array; endOffset: number } {
   const output: number[] = [];
@@ -18,11 +40,20 @@ export function kosinskiDecompressFrom(input: Uint8Array, startOffset = 0): { ou
   let bitsRemaining = 0;
 
   function readByte(): number {
-    if (readPos >= input.length) return 0;
+    if (readPos >= input.length) {
+      throw new KosinskiError(
+        `Unexpected end of Kosinski data at ${readPos} (input is ${input.length} bytes)`,
+      );
+    }
     return input[readPos++];
   }
 
   function writeByte(byte: number): void {
+    if (output.length >= MAX_OUTPUT_BYTES) {
+      throw new KosinskiError(
+        `Kosinski stream exceeded ${MAX_OUTPUT_BYTES} bytes without terminating — the data is not Kosinski`,
+      );
+    }
     output.push(byte & 0xFF);
     window[writePos % SLIDING_WINDOW_SIZE] = byte & 0xFF;
     writePos++;
@@ -74,7 +105,17 @@ export function kosinskiDecompressFrom(input: Uint8Array, startOffset = 0): { ou
       }
 
       for (let i = 0; i < count; i++) {
-        writeByte(window[(writePos - distance) % SLIDING_WINDOW_SIZE]);
+        // A match reaching back before anything written is not a match. JS's %
+        // keeps the sign, so this used to index the window with a negative
+        // number, read `undefined`, and write a silent zero — corruption that
+        // decodes without complaint and only shows up as a wrong pixel.
+        const from = writePos - distance;
+        if (from < 0) {
+          throw new KosinskiError(
+            `Kosinski match reaches ${-from} bytes before the start of the output`,
+          );
+        }
+        writeByte(window[from % SLIDING_WINDOW_SIZE]);
       }
     }
   }

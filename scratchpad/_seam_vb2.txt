@@ -1,0 +1,239 @@
+/docs/BUGS.md:362: `games/sonic4/data/levels/ojz/act1/act_descriptor.emp:176`) and section 2
+/docs/BUGS.md:410: (`act_descriptor.emp:198`), and no `Pal_Cycle_None` exists yet. **Parcel C must move the flag set
+/docs/DEFERRED_WORK.md:626: caught why it cannot stay: DEBUG-gating made `entity_data` 48 bytes longer in
+/docs/DEFERRED_WORK.md:632: `data/editor/ojz/act1/section_0.objects.json` so they land in BOTH shapes, run
+/docs/DEFERRED_WORK.md:991: > `data/editor/ojz/act1/export/act_descriptor.asm` is gone and there is no stale descriptor left
+/docs/DEFERRED_WORK.md:1005: **Status:** `data/editor/ojz/act1/export/act_descriptor.asm` is git-tracked but NOT in the build include graph (`main.asm:198` includes only `data/lev
+/docs/DEFERRED_WORK.md:1411: > `games/sonic4/data/editor/ojz/act1/section_N.collattr.bin` / `.collattrb.bin` — 16-bit
+/docs/DEFERRED_WORK.md:1432: > real two-path loop is placed in level data (`OJZ_Sec1_Objects`, `entity_data.emp:41`, type 1
+/docs/DEFERRED_WORK.md:1447: >    `games/sonic4/data/generated/ojz/act1/entity_data.emp:41`
+/docs/DEFERRED_WORK.md:2279: **When ready:** before the next editor level export; engine-side spec is all on master (structs.asm Sec fields, act_descriptor.asm as reference).
+/docs/DEFERRED_WORK.md:2281: `tools/ojz_entity_gen.py` generates entity_data.asm from the editor JSONs (X-sort,
+/docs/EFFECTS_AUTHORING.md:213: **4. Point a section at it.** In `games/sonic4/data/levels/ojz/act1/act_descriptor.emp`, the `ojz_sec`
+/docs/EFFECTS_AUTHORING.md:215: exactly as section 1 already does for `OJZ_TestRaster` (`act_descriptor.emp:176`):
+/docs/ENGINE_ARCHITECTURE.md:2479: **Build tool embeds collision in blocks — fresh-start, editor-authoritative (current, since the 2026-07-02 editor-collision-authoring design):** Level
+/docs/LEVEL_EDITOR_SPEC.md:5: The editor-facing pipeline output is **`.emp` data modules** (typed `data` records against the structs in `engine/structs.emp`) plus **binary files** 
+/docs/LEVEL_EDITOR_SPEC.md:536: act_descriptor.emp           ← Act descriptor + section table (EDITOR WRITES THIS)
+/docs/LEVEL_EDITOR_SPEC.md:539: editor/ojz/                      ← Editor-native sources (committed)
+/docs/LEVEL_EDITOR_SPEC.md:546: entity_data.emp              ← Ring lists, object lists, type tables (ojz_entity_gen.py)
+/docs/LEVEL_EDITOR_SPEC.md:609: 1. **`act_descriptor.emp`** — Complete act descriptor with:
+/docs/LEVEL_EDITOR_SPEC.md:614: 2. **`entity_data.emp`** — Per-section:
+/docs/benchmarks/knuckles-c4/GATE-EVIDENCE.md:70: suite caught the real problem: a DEBUG-only ENTITY makes `entity_data` 48 bytes longer
+/docs/research/2026-06-23-phase3-audit-findings.md:135: | `OEF_XFLIP` | constants.asm:508 | Defined as a constant (OEF_XFLIP = 13) but marked as unused (*) in s4.lst; no actual references in code or generat
+/docs/research/2026-06-23-phase3-audit-findings.md:136: | `OEF_YFLIP` | constants.asm:507 | Defined as a constant (OEF_YFLIP = 14) but marked as unused (*) in s4.lst; no actual references in code or generat
+/docs/research/2026-06-23-phase3-audit-findings.md:168: - `SF_HAS_WATER` @ /home/volence/sonic_hacks/aeon/constants.asm:425 — Member of section flags bitmask enum (SF_* set); sec_flags struct field is initi
+/docs/research/2026-06-23-phase3-audit-findings.md:169: - `SF_NO_Y_WRAP` @ /home/volence/sonic_hacks/aeon/constants.asm:427 — Member of section flags bitmask enum (SF_* set); sec_flags struct field is initi
+/docs/research/visual-techniques-backlog.md:136: `games/sonic4/data/levels/ojz/act1/act_descriptor.emp:198`.
+/docs/reviews/2026-07-16-emp-port-optimization-review.md:590: CAM_MAX_Y_STEP build guard, computed pads, dead constants, act_descriptor
+/docs/reviews/2026-07-16-emp-port-optimization-review.md:655: - **structs/constants twins:** drift-guard coverage verified 100%; `act_descriptor.emp`
+/docs/reviews/2026-07-16-emp-port-optimization-review.md:965: home exists. *Would have caught:* act_descriptor's duplicate SECTION_SIZE_SHIFT,
+/docs/reviews/2026-07-16-emp-port-optimization-review.md:2373: act_descriptor's ensure. Struct layout quality moot on 68000 (d16 displacement flat).
+/docs/reviews/2026-07-16-emp-port-optimization-review.md:2377: 3rd consumer — but `act_descriptor.emp:21` still carries its own local mirror + duplicate
+/docs/reviews/2026-07-16-emp-port-optimization-review.md:2383: ### act_descriptor.emp
+/docs/superpowers/2026-08-12-next-session-handoff.md:198: Gating it made `entity_data` 48 bytes longer in the debug shape, and the harness
+/docs/superpowers/2026-08-12-next-session-handoff.md:206: constraint:** put the records in `data/editor/ojz/act1/section_0.objects.json` so
+/docs/superpowers/2026-08-13-effects-p2-handoff.md:120: | `act_descriptor_{,debug_}region_matches_reference` | unresolved `OJZ_TestGradient` + `OJZ_ShimmerCycle` data symbols | teach the port test's scope a
+/docs/superpowers/2026-08-14-vsram-planeb-handoff.md:89: - Fixture bindings live in `games/sonic4/data/levels/ojz/act1/act_descriptor.emp`
+/docs/superpowers/notes/2026-08-05-objtest-gate-ab.md:11: PLAIN level content** (OJZ act1 entity_data places ObjDef_Solid in Sec0/1/2 and
+/docs/superpowers/notes/2026-08-07-lane-b-packet.md:18: `sprites.emp:151,236`, `constants.emp:440-441`, `act_descriptor.emp:74` —
+/docs/superpowers/notes/2026-08-07-lane-b-packet.md:30: | 3 | `act_descriptor.emp:74` `MAX_ACT_SECTIONS * 66` | **Yes** — `sizeof(Sec)` moves whenever a section field is added, and the guard would then boun
+/docs/superpowers/notes/2026-08-07-lane-b-packet.md:152: * The stated rationale for the `act_descriptor` change was wrong. "A field added
+/docs/superpowers/notes/2026-08-09-art-streaming-p2c-t11-orphan-audit-ab.md:35: - **`act_descriptor.emp` guard relaxation** (plan Task 5 §2e completion): the stale
+/docs/superpowers/notes/2026-08-13-ojz-act-pool-shape-invariance-ruling.md:40: including level data: `act_descriptor` +6, `sec_block_blobs` -12, `sec_local_maps` -14,
+/docs/superpowers/notes/2026-08-13-ojz-act-pool-shape-invariance-ruling.md:42: - `act_descriptor` is this region's **immediate neighbour**, uses the identical
+/docs/superpowers/plans/2026-04-25-level-world-phase1.md:21: - `data/levels/ojz/act1/act_descriptor.asm` — OJZ Act 1 level/act/section descriptor tables
+/docs/superpowers/plans/2026-04-25-level-world-phase1.md:893: ; (see act_descriptor.asm for full layout)
+/docs/superpowers/plans/2026-04-25-level-world-phase1.md:1216: Expected: assembles cleanly. Note: Act_* field names from `act_descriptor.asm` (Task 6) are referenced — if they cause undefined-symbol errors now, ad
+/docs/superpowers/plans/2026-04-25-level-world-phase1.md:1415: - Create: `data/levels/ojz/act1/act_descriptor.asm`
+/docs/superpowers/plans/2026-04-25-level-world-phase1.md:1424: - [ ] **Step 2: Create `data/levels/ojz/act1/act_descriptor.asm`**
+/docs/superpowers/plans/2026-04-25-level-world-phase1.md:1633: include "data/levels/ojz/act1/act_descriptor.asm"
+/docs/superpowers/plans/2026-04-25-level-world-phase1.md:1851: - ✓ Data directory with JSON sidecar structure (Task 6 act_descriptor)
+/docs/superpowers/plans/2026-04-26-art-pipeline-phase2-A1-tile-dedupe.md:28: - `data/levels/ojz/act1/act_descriptor.asm` — `OJZ_Tiles` label now references the S4LZ blob and exposes `OJZ_TILES_VRAM` constant
+/docs/superpowers/plans/2026-04-26-art-pipeline-phase2-A1-tile-dedupe.md:1119: - Modify: `data/levels/ojz/act1/act_descriptor.asm`
+/docs/superpowers/plans/2026-04-26-art-pipeline-phase2-A1-tile-dedupe.md:1146: In `data/levels/ojz/act1/act_descriptor.asm`, after the `cam_max_y` line in `OJZ_Act1_Descriptor`, add:
+/docs/superpowers/plans/2026-04-26-art-pipeline-phase2-A1-tile-dedupe.md:1195: git add structs.asm data/levels/ojz/act1/act_descriptor.asm engine/level/load_art.asm main.asm
+/docs/superpowers/plans/2026-04-26-art-pipeline-phase2-A1-tile-dedupe.md:1256: In `data/levels/ojz/act1/act_descriptor.asm`, remove the line:
+/docs/superpowers/plans/2026-04-26-art-pipeline-phase2-A2-multi-region.md:29: - `data/levels/ojz/act1/act_descriptor.asm` — populate region-2 pointer; add `OJZ_Tiles_R2_S4LZ` BINCLUDE (or zero if no spill)
+/docs/superpowers/plans/2026-04-26-art-pipeline-phase2-A2-multi-region.md:798: ;   Safe because OJZ act_descriptor's cam_max_y=128 caps the visible
+/docs/superpowers/plans/2026-04-26-art-pipeline-phase2-A2-multi-region.md:830: - Modify: `data/levels/ojz/act1/act_descriptor.asm`
+/docs/superpowers/plans/2026-04-26-art-pipeline-phase2-A2-multi-region.md:886: In `data/levels/ojz/act1/act_descriptor.asm`, find:
+/docs/superpowers/plans/2026-04-26-art-pipeline-phase2-A2-multi-region.md:930: git add structs.asm data/levels/ojz/act1/act_descriptor.asm
+/docs/superpowers/plans/2026-04-26-art-pipeline-phase2-A3-graph-coloring.md:30: - `data/levels/ojz/act1/act_descriptor.asm` — populate per-section `tile_art_s4lz`/`tile_art_vram` for all 16 sections; remove obsolete act-wide `tile
+/docs/superpowers/plans/2026-04-26-art-pipeline-phase2-A3-graph-coloring.md:1199: - Modify: `data/levels/ojz/act1/act_descriptor.asm`
+/docs/superpowers/plans/2026-04-26-art-pipeline-phase2-A3-graph-coloring.md:1233: - [ ] **Step 3: Update `data/levels/ojz/act1/act_descriptor.asm` for per-section fields**
+/docs/superpowers/plans/2026-04-26-art-pipeline-phase2-A3-graph-coloring.md:1237: First, include the auto-generated VRAM bases file. At the top of `data/levels/ojz/act1/act_descriptor.asm` (just below the existing comment), insert:
+/docs/superpowers/plans/2026-04-26-art-pipeline-phase2-A3-graph-coloring.md:1388: git add tools/ojz_strip_gen.py structs.asm data/levels/ojz/act1/act_descriptor.asm
+/docs/superpowers/plans/2026-04-26-art-pipeline-phase2-A4-deferrable-streaming.md:34: - `data/levels/ojz/act1/act_descriptor.asm` — no changes
+/docs/superpowers/plans/2026-04-26-art-pipeline-phase2-A4-deferrable-streaming.md:225: ;   Safe because OJZ act_descriptor's cam_max_y=128 caps the visible
+/docs/superpowers/plans/2026-04-26-art-pipeline-phase2-A5-per-section-background.md:25: - `data/levels/ojz/act1/act_descriptor.asm` — emit `act_bg_layout` + per-section `sec_bg_layout` (NULL on shipped OJZ = T1)
+/docs/superpowers/plans/2026-04-26-art-pipeline-phase2-A5-per-section-background.md:115: Expected: only references are the struct definition, the placeholder emission in `ojz_strip_gen.py`, the BINCLUDE lines in `act_descriptor.asm`, and a
+/docs/superpowers/plans/2026-04-26-art-pipeline-phase2-A5-per-section-background.md:157: Expected: PASS (no struct-size errors). Build will fail later because `act_descriptor.asm` still references `OJZ_SecN_Strips_B` and the new `act_bg_la
+/docs/superpowers/plans/2026-04-26-art-pipeline-phase2-A5-per-section-background.md:313: - Modify: `data/levels/ojz/act1/act_descriptor.asm`
+/docs/superpowers/plans/2026-04-26-art-pipeline-phase2-A5-per-section-background.md:317: Append to `data/levels/ojz/act1/act_descriptor.asm` (after the existing per-section tile blobs):
+/docs/superpowers/plans/2026-04-26-art-pipeline-phase2-A5-per-section-background.md:352: data/levels/ojz/act1/act_descriptor.asm
+/docs/superpowers/plans/2026-04-26-art-pipeline-phase2-A5-per-section-background.md:361: data/levels/ojz/act1/act_descriptor.asm
+/docs/superpowers/plans/2026-04-26-art-pipeline-phase2-A5-per-section-background.md:382: git add data/levels/ojz/act1/act_descriptor.asm tools/ojz_strip_gen.py
+/docs/superpowers/plans/2026-04-26-art-pipeline-phase2-A5-per-section-background.md:531: - Modify: `data/levels/ojz/act1/act_descriptor.asm` — wire `act_bg_tiles` to new `OJZ_BG_Tiles` BINCLUDE
+/docs/superpowers/plans/2026-04-26-art-pipeline-phase2-A5-per-section-background.md:620: `act_descriptor.asm`:
+/docs/superpowers/plans/2026-04-26-art-pipeline-phase2-A5-per-section-background.md:637: git add tools/ojz_strip_gen.py tools/test_bg_emit.py constants.asm structs.asm engine/level/bg.asm data/levels/ojz/act1/act_descriptor.asm
+/docs/superpowers/plans/2026-04-26-art-pipeline-phase2-A5-per-section-background.md:823: Copy the entire content of `data/levels/ojz/act1/act_descriptor.asm` to `data/levels/ojz/act1/bg_fixture_t2.asm`. Then edit the new file:
+/docs/superpowers/plans/2026-04-26-art-pipeline-phase2-A5-per-section-background.md:901: Find the master include list (likely in `S4.asm`). After the `include "data/levels/ojz/act1/act_descriptor.asm"` line, add:
+/docs/superpowers/plans/2026-04-29-camera-entity-window.md:63: - Modify: `data/levels/ojz/act1/entity_data.asm`
+/docs/superpowers/plans/2026-04-29-camera-entity-window.md:70: Review how sonic_hack's ring layout format works. Check sonic_hack `level/rings/` format. Review our current entity_data.asm pattern-encoded format (R
+/docs/superpowers/plans/2026-04-29-camera-entity-window.md:76: For the current OJZ test data, the authoring definitions are in `entity_data.asm`. Since these are currently assembled inline (not read by the build t
+/docs/superpowers/plans/2026-04-29-camera-entity-window.md:127: - [ ] **Step 4: Rewrite entity_data.asm ring lists as flat X-sorted**
+/docs/superpowers/plans/2026-04-29-camera-entity-window.md:170: Also update the entity_data.asm header comment to describe the new flat format.
+/docs/superpowers/plans/2026-04-29-camera-entity-window.md:200: git add tools/ojz_strip_gen.py data/levels/ojz/act1/entity_data.asm constants.asm
+/docs/superpowers/plans/2026-04-29-section-49-entities.md:29: | `data/levels/ojz/act1/act_descriptor.asm` | Modify | Wire Sec0/Sec1 ring/object data pointers |
+/docs/superpowers/plans/2026-04-29-section-49-entities.md:30: | `data/levels/ojz/act1/entity_data.asm` | Create | Test ring patterns + object placements + type tables for Sec0/Sec1 |
+/docs/superpowers/plans/2026-04-29-section-49-entities.md:964: - Create: `data/levels/ojz/act1/entity_data.asm`
+/docs/superpowers/plans/2026-04-29-section-49-entities.md:965: - Modify: `data/levels/ojz/act1/act_descriptor.asm` (wire pointers)
+/docs/superpowers/plans/2026-04-29-section-49-entities.md:966: - Modify: `main.asm` (add include for entity_data)
+/docs/superpowers/plans/2026-04-29-section-49-entities.md:977: - [ ] **Step 2: Create entity_data.asm with test fixtures**
+/docs/superpowers/plans/2026-04-29-section-49-entities.md:1048: - [ ] **Step 3: Wire pointers in act_descriptor.asm**
+/docs/superpowers/plans/2026-04-29-section-49-entities.md:1076: Add the entity_data.asm include in the data section (after `test_objects.asm`):
+/docs/superpowers/plans/2026-04-29-section-49-entities.md:1079: include "data/levels/ojz/act1/entity_data.asm"
+/docs/superpowers/plans/2026-04-29-section-49-entities.md:1090: git add data/levels/ojz/act1/entity_data.asm data/levels/ojz/act1/act_descriptor.asm main.asm
+/docs/superpowers/plans/2026-04-29-section-49-entities.md:1228: git add engine/level/section.asm structs.asm data/levels/ojz/act1/entity_data.asm
+/docs/superpowers/plans/2026-04-30-world-space-strip-cache.md:40: | `data/levels/ojz/act1/act_descriptor.asm` | Switch to compressed strip BINCLUDEs, add checkpoint + collision map data |
+/docs/superpowers/plans/2026-04-30-world-space-strip-cache.md:357: - Modify: `data/levels/ojz/act1/act_descriptor.asm`
+/docs/superpowers/plans/2026-04-30-world-space-strip-cache.md:405: - [ ] **Step 3: Update act_descriptor.asm data includes**
+/docs/superpowers/plans/2026-04-30-world-space-strip-cache.md:441: After verifying the compressed data is generated correctly, remove the raw `secN_strips_a.bin` BINCLUDE blocks from act_descriptor.asm. The raw files 
+/docs/superpowers/plans/2026-04-30-world-space-strip-cache.md:462: git add tools/ojz_strip_gen.py build.sh data/levels/ojz/act1/act_descriptor.asm
+/docs/superpowers/plans/2026-04-30-world-space-strip-cache.md:466: 64 strips. act_descriptor switched to compressed BINCLUDEs.
+/docs/superpowers/plans/2026-04-30-world-space-strip-cache.md:1478: - Modify: `data/levels/ojz/act1/act_descriptor.asm`
+/docs/superpowers/plans/2026-04-30-world-space-strip-cache.md:1563: - [ ] **Step 3: Add collision map BINCLUDEs to act_descriptor.asm**
+/docs/superpowers/plans/2026-04-30-world-space-strip-cache.md:1663: git add tools/ojz_strip_gen.py data/levels/ojz/act1/act_descriptor.asm \
+/docs/superpowers/plans/2026-04-30-world-space-strip-cache.md:1668: S4LZ compressed, BINCLUDEd in act_descriptor.
+/docs/superpowers/plans/2026-05-01-2d-section-grid.md:26: | `data/levels/ojz/act1/act_descriptor.asm` | Modify | Point sections to block index tables instead of strip streams |
+/docs/superpowers/plans/2026-05-01-2d-section-grid.md:1760: - Modify: `data/levels/ojz/act1/act_descriptor.asm`
+/docs/superpowers/plans/2026-05-01-2d-section-grid.md:1807: git add data/levels/ojz/act1/act_descriptor.asm
+/docs/superpowers/plans/2026-06-10-objects-formats-v2.md:405: **Research first:** the S.C.E.-Extended commit `8a8cd4f` (flags-in-ID-word; already analyzed), and `data/editor/ojz/act1/export/entity_data.asm` + wha
+/docs/superpowers/plans/2026-06-10-objects-formats-v2.md:410: - Modify: `data/levels/ojz/act1/entity_data.asm` (+ the editor exporter + `data/editor/.../export/entity_data.asm`)
+/docs/superpowers/plans/2026-06-10-objects-formats-v2.md:460: - [ ] **Step 3:** Migrate `data/levels/ojz/act1/entity_data.asm` (4 sections with objects, 1-2 entries each) to `dc.w x, y, (type<<OEF_TYPE_SHIFT)|sub
+/docs/superpowers/plans/2026-06-10-objects-formats-v2.md:473: - Modify: `data/levels/ojz/act1/act_descriptor.asm` (build assert), exporter (list caps)
+/docs/superpowers/plans/2026-06-10-objects-formats-v2.md:542: - [ ] **Step 0 (from T5 reviews):** `objentry`/`objend` data macros in macros.asm — monotonic-X assert (SET-variable), x/y range asserts (0-$7FF; bit 
+/docs/superpowers/plans/2026-06-10-vertical-streaming-budget.md:56: **Branch:** `vertical-streaming` off master. The 5 uncommitted user files (editor rings JSONs + export entity_data.asm) must NEVER be staged — use exp
+/docs/superpowers/plans/2026-06-11-compression-two-tier.md:65: **Files:** engine/s4lz_stream.asm (delete), tools/ojz_strip_gen.py (strip emission removal), data/levels/ojz/act1/act_descriptor.asm (strip BINCLUDEs)
+/docs/superpowers/plans/2026-06-11-vertical-entity-window.md:42: - Test data lives in `data/levels/ojz/act1/entity_data.asm`; Sec3-8 (rows 1-2) are empty stubs at lines 104-144. Sections are 2048×2048; OJZ act1 grid
+/docs/superpowers/plans/2026-06-11-vertical-entity-window.md:429: - Modify: `data/levels/ojz/act1/entity_data.asm` (Sec3/Sec4 stubs, lines 104-117)
+/docs/superpowers/plans/2026-06-11-vertical-entity-window.md:486: git add data/levels/ojz/act1/entity_data.asm
+/docs/superpowers/plans/2026-06-11-visibility-window-preview-entities.md:21: - Test fixtures + editor pipeline: entity data generates from `data/editor/ojz/act1/section_N.{rings,objects}.json` via `tools/ojz_entity_gen.py` (run
+/docs/superpowers/plans/2026-06-11-visibility-window-preview-entities.md:22: - **Concurrent-session caution still applies:** `build.sh`, `data/levels/ojz/act1/act_descriptor.asm`, `project.json`, parallax/bg files are dirty fro
+/docs/superpowers/plans/2026-06-11-visibility-window-preview-entities.md:400: - Modify: `data/editor/ojz/act1/section_2.rings.json`, `section_5.rings.json`, `section_5.objects.json` (+ library if needed)
+/docs/superpowers/plans/2026-06-11-visibility-window-preview-entities.md:413: git add data/editor/ojz/act1/section_2.rings.json data/editor/ojz/act1/section_5.rings.json data/editor/ojz/act1/section_5.objects.json
+/docs/superpowers/plans/2026-06-22-act-art-streaming-phase1.md:30: - `data/levels/ojz/act1/act_descriptor.asm` + `structs.asm` — Act struct gains `act_art_pool` (ptr) + `act_art_pool_pages` (count); Sec struct's `sec_
+/docs/superpowers/plans/2026-06-22-act-art-streaming-phase1.md:39: > ⚠️ `tools/ojz_strip_gen.py` and `data/editor/ojz` are watched by an auto-commit daemon that commits to the CURRENT branch (~60 s). We edit `ojz_stri
+/docs/superpowers/plans/2026-06-22-act-art-streaming-phase1.md:346: **Files:** Modify `structs.asm` (Act + Sec), `data/levels/ojz/act1/act_descriptor.asm`.
+/docs/superpowers/plans/2026-06-22-act-art-streaming-phase1.md:354: In `data/levels/ojz/act1/act_descriptor.asm`: include `data/generated/ojz/act1/ojz_act_pool_manifest.asm` and `ojz_act_pool.asm`; set `act_art_pool` t
+/docs/superpowers/plans/2026-06-22-act-art-streaming-phase1.md:364: git add structs.asm data/levels/ojz/act1/act_descriptor.asm
+/docs/superpowers/plans/2026-06-22-continuous-scroll-phase1.md:27: - `constants.asm`, `ram.asm`, `data/levels/ojz/act1/act_descriptor.asm` — delete leapfrog constants/RAM; slim cam-bound fields.
+/docs/superpowers/plans/2026-06-22-continuous-scroll-phase1.md:269: **Files:** `engine/level/section.asm`, `ram.asm`, `constants.asm`, `data/levels/ojz/act1/act_descriptor.asm`
+/docs/superpowers/plans/2026-06-22-continuous-scroll-phase1.md:274: - [ ] **Step 4: Slim the act descriptor.** In `act_descriptor.asm`, the engine-space `cam_min/max_x` fields are now unused (camera clamps live-compute
+/docs/superpowers/plans/2026-06-22-continuous-scroll-phase1.md:278: git add engine/level/section.asm ram.asm constants.asm data/levels/ojz/act1/act_descriptor.asm
+/docs/superpowers/plans/2026-06-22-continuous-scroll-phase2.md:19: - `data/levels/ojz/act1/act_descriptor.asm` + `structs.asm` — delete `cam_min_y/cam_max_y`; add `edge_mode` field.
+/docs/superpowers/plans/2026-06-22-continuous-scroll-phase2.md:38: **Files:** Modify `engine/level/camera.asm` (the `.clamp_y` block), `data/levels/ojz/act1/act_descriptor.asm`, `structs.asm`.
+/docs/superpowers/plans/2026-06-22-continuous-scroll-phase2.md:44: - [ ] **Step 3: Delete the descriptor Y-bound fields.** Remove `cam_min_y` + `cam_max_y` from the `Act` struct (`structs.asm`) and the two `dc.w` line
+/docs/superpowers/plans/2026-06-22-continuous-scroll-phase2.md:52: **Files:** `constants.asm`, `structs.asm`, `data/levels/ojz/act1/act_descriptor.asm`, `engine/level/camera.asm` (or `engine/player/player_common.asm` 
+/docs/superpowers/plans/2026-06-22-continuous-scroll-phase2.md:55: - [ ] **Step 2: Add the `edge_mode` field** to the `Act` struct (`structs.asm`, a `ds.b 1` — reuse a reserved/pad byte or extend; update `Act_len` ass
+/docs/superpowers/plans/2026-06-23-engine-phase3-cleanup.md:21: - **Do NOT touch** the user's unrelated uncommitted work: `data/sprites/`, `tools/forest_bg_gen.py`, `data/editor_bg_override.json`, `data/editor/ojz/
+/docs/superpowers/plans/2026-06-23-engine-phase3-cleanup.md:55: Run: `git status --porcelain | grep -vE 'data/sprites|forest_bg_gen|editor_bg_override|data/editor/ojz|reference_captures|s3k_art_style_demo'` → expec
+/docs/superpowers/plans/2026-06-23-engine-phase3-cleanup.md:537: Run: `git status --porcelain | grep -vE 'data/sprites|forest_bg_gen|editor_bg_override|data/editor/ojz|reference_captures|s3k_art_style_demo'`
+/docs/superpowers/plans/2026-06-28-aeon-engine-game-restructure.md:480: - [ ] **Step 4: Post-merge coordination note (user-side):** the autocommit daemon's watch path must move to `games/sonic4/data/editor/ojz`; Oracle is 
+/docs/superpowers/plans/2026-06-28-aeon-engine-game-restructure.md:487: - The user's uncommitted WIP (daemon-watched `data/editor/ojz`, `data/sprites/`, research docs, `forest_bg_gen.py`) moves under `games/sonic4/data/` w
+/docs/superpowers/plans/2026-07-02-art-streaming-phase2.md:16: - **`tools/ojz_strip_gen.py` and `games/sonic4/data/editor/ojz/` are daemon-watched (auto-committed as the user ~60s after edit). ASK THE USER before 
+/docs/superpowers/plans/2026-07-02-art-streaming-phase2.md:309: - Modify: `structs.asm` (Act struct), `games/sonic4/data/levels/ojz/act1/act_descriptor.asm`, `engine/level/page_in.asm`, `ram.asm`, `engine/system/vb
+/docs/superpowers/plans/2026-07-02-art-streaming-phase2.md:311: - [ ] **Step 1: Research.** Read the Act struct (`structs.asm` — `Act_len = $22` per DEFERRED_WORK) and the descriptor consumer in level init; note th
+/docs/superpowers/plans/2026-07-02-editor-collision-authoring.md:9: **Standing rules:** research step first — Aurora file anchors below are from the 2026-07-02 audit and WILL drift. Test runner: `npm test` (vitest) in 
+/docs/superpowers/plans/2026-07-02-engine-game-split.md:15: **Standing rules:** research step first (anchors as of the 2026-07-02 coupling map WILL drift); build `SOUND_DRIVER_ENABLED=1 DEBUG=1 ./build.sh` AND 
+/docs/superpowers/plans/2026-07-02-floating-origin.md:27: - [ ] **Step 1: Research.** Read `engine/parallax_macros.inc:31-43` (factor encodings — which shift(s) each `FACTOR_*` implies) and `games/sonic4/data
+/docs/superpowers/plans/2026-07-02-floating-origin.md:138: - Modify: the level game-state loop (`games/sonic4/ojz_scroll_test.asm:149-261` and/or the real level state — research which drives OJZ today), `engin
+/docs/superpowers/plans/2026-07-02-floating-origin.md:197: - Create: `games/sonic4/data/levels/ojz/act1_wide/act_descriptor.asm` (fixture — hand-written, NOT under the daemon-watched editor tree)
+/docs/superpowers/plans/2026-07-02-floating-origin.md:200: - [ ] **Step 1: Research.** Read the Act descriptor + section grid format (`act_descriptor.asm` + `Section` struct docs) — confirm grid entries are se
+/docs/superpowers/plans/2026-07-02-object-behaviors.md:98: - Modify: `games/sonic4/data/objdefs/test_objects.asm` (add three, DELETE ObjDef_Enemy), delete `games/sonic4/objects/test_enemy.asm`, `games/sonic4/d
+/docs/superpowers/plans/2026-07-02-raster-parallax-authoring.md:91: - [ ] **Step 1: Research.** `engine/parallax_macros.inc` full semantics (factor encodings: 24-bit packed shift-add, `FACTOR_*` constants; `deform_tabl
+/docs/superpowers/plans/2026-07-02-raster-parallax-authoring.md:100: - Modify: `build.sh`, `structs.asm` (`sec_raster_script`/`act_raster_script` fields), `games/sonic4/data/levels/ojz/act1/act_descriptor.asm` (wire scr
+/docs/superpowers/plans/2026-07-02-screens-hud.md:11: **Tech Stack:** 68000 (AS), Python 3 generators + pytest, oracle MCP (foreground only — never from subagents), Aurora = Electron/React/TS/Zod/Zustand.
+/docs/superpowers/plans/2026-07-03-sfx-fidelity-stage-a.md:19: - **Do not touch** `tools/ojz_strip_gen.py` or `games/sonic4/data/editor/ojz/**` (daemon-watched).
+/docs/superpowers/plans/2026-07-07-engine-game-split-execution.md:78: - `tools/ojz_strip_gen.py` and `games/sonic4/data/editor/ojz/**` are daemon-watched —
+/docs/superpowers/plans/2026-08-02-bug005-sprites-player-parcel.md:434: //     now lives HERE only, still guarded by act_descriptor's <= $8000 ensure.
+/docs/superpowers/plans/2026-08-06-art-streaming-phase2-reanchor-addendum.md:47: | 9 | Act struct + `act_descriptor.asm` + `Act_len = $22` | `engine/structs.emp:28` + `games/sonic4/data/levels/ojz/act1/act_descriptor.emp` (:77 `pub
+/docs/superpowers/plans/2026-08-08-art-streaming-phase2-v2.md:44: - `tools/ojz_strip_gen.py` and `games/sonic4/data/editor/ojz/` are auto-committed by the daemon ~60s after edit. **⚠ ASK THE USER before starting Task
+/docs/superpowers/plans/2026-08-08-art-streaming-phase2-v2.md:297: - **R1 — raw election is NOT in `build.sh`.** `build.sh` never compresses pages; it only builds the salvador binary + verifies the committed tree + ru
+/docs/superpowers/plans/2026-08-08-art-streaming-phase2-v2.md:372: - Modify: `engine/structs.emp` (Act struct :28), `games/sonic4/data/levels/ojz/act1/act_descriptor.emp` (`OJZ_Act1_Descriptor` typed literal :81), `en
+/docs/superpowers/plans/2026-08-08-art-streaming-phase2-v2.md:375: - [ ] **Step 1: Research.** Read the Act struct (`engine/structs.emp:28` — existing `act_art_pool_table` :39, `act_art_pool_pages` :40; `sizeof` is co
+/docs/superpowers/plans/2026-08-08-art-streaming-phase2-v2.md:443: - **Anchors re-verified against master `824b69f`** (drift fixed inline): load_art `Art_Decompress` :46→:50, `Level_LoadArt` :103→:108, `QueueDMA_Criti
+/docs/superpowers/plans/2026-08-08-character-dispatch-v2.md:47: - The auto-commit daemon watches `tools/ojz_strip_gen.py` and `games/sonic4/data/editor/ojz/`. **No task in this plan edits either.** The new converte
+/docs/superpowers/plans/2026-08-08-character-dispatch-v2.md:320: - **Standing-rules markers:** ⚠ controller on every oracle step; parcel ritual on every byte-emitting change; verify-branch-before-commit throughout; 
+/docs/superpowers/plans/2026-08-09-floating-origin-v2.md:35: - The auto-commit daemon watches `tools/ojz_strip_gen.py` and `games/sonic4/data/editor/ojz/`. **No task here edits either** (the F3 fixture is a hand
+/docs/superpowers/plans/2026-08-09-floating-origin-v2.md:53: - **Section grid helpers** `engine/level/section.emp` — `Section_FlatIDXY` :102 (`(d2: u8, d3: GridY, a2: *Act) out(d0: SectionId)` — **`SectionId = u
+/docs/superpowers/plans/2026-08-09-floating-origin-v2.md:206: - Modify: `games/sonic4/test/ojz_scroll_test.emp` (trigger at :249-251; diagnostic derive :288/:291), `engine/level/camera.emp` (base-aware clamp :102
+/docs/superpowers/plans/2026-08-09-floating-origin-v2.md:209: - [ ] **Step 1: Research.** Re-map the frame order (Task 1). Confirm the eight derive→lookup clusters and that each adds `+World_Section_Base_axis` (i
+/docs/superpowers/plans/2026-08-09-floating-origin-v2.md:245: - [ ] **Step 4: Base-aware camera clamp.** The clamp template `clamp_camera_axis_reg` (camera.emp:102-118) compares the fine camera against `Camera_X_
+/docs/superpowers/plans/2026-08-09-floating-origin-v2.md:262: > **SPEC-STALE #1 — the widening is HALF DONE; F2 is now narrow AND decoupled.** Spec §7 frames "`section_id` byte→word" as widening carriers AND the 
+/docs/superpowers/plans/2026-08-09-floating-origin-v2.md:283: - Create: `games/sonic4/data/levels/ojz/act1_wide/act_descriptor.emp` (fixture — hand-written, NOT under the daemon-watched editor tree) + its head-la
+/docs/superpowers/plans/2026-08-09-floating-origin-v2.md:286: - [ ] **Step 1: Research.** Read the Act descriptor + `Sec` grid format (`act_descriptor.emp` + the `Sec` struct). Confirm grid entries are section PO
+/docs/superpowers/plans/2026-08-09-floating-origin-v2.md:306: - **Standing-rules markers:** ⚠ controller on every oracle step; parcel ritual on every byte-emitting change; verify-branch-before-commit throughout; 
+/docs/superpowers/plans/2026-08-11-dust-effect.md:33: 3. **An auto-commit daemon** watches `ojz_strip_gen.py` and `data/editor/ojz` and commits to the *current* branch about every 60 s. Never `--amend` on
+/docs/superpowers/plans/2026-08-11-effects-p1-raster-core.md:465: - Modify: `games/sonic4/data/levels/ojz/act1/act_descriptor.emp` (:125-151 — `ojz_sec` constructor + section array)
+/docs/superpowers/plans/2026-08-11-effects-p1-raster-core.md:492: - [ ] **Step 2: Wire two sections in `act_descriptor.emp`** — the `ojz_sec` comptime constructor (:125-149) currently hardcodes `sec_parallax_config: 
+/docs/superpowers/plans/2026-08-11-effects-p1-raster-core.md:501: git add games/sonic4/data/effects/test_effects.emp games/sonic4/data/levels/ojz/act1/act_descriptor.emp games/sonic4/map.toml
+/docs/superpowers/plans/2026-08-12-effects-p2-palette-engine.md:55: Fix any conflicts in `hblank.emp` / `buffers.emp` / `parallax.emp` / `configs.emp` / `act_descriptor.emp`.
+/docs/superpowers/plans/2026-08-14-blanket-register-restore.md:335: Both hit on every byte-moving parcel: `repin_pins::generated_pins_match_the_hand_typed_baseline` needs its ledger rows re-booked with an explanation o
+/docs/superpowers/plans/2026-08-14-effects-p3-parcel-c1.md:385: `games/sonic4/data/levels/ojz/act1/act_descriptor.emp`: add `OJZ_TestComposed` to the `use` list on line 20, and add `raster: OJZ_TestComposed,` to th
+/docs/superpowers/plans/2026-08-14-effects-p3-parcel-c1.md:395: git add games/sonic4/data/parallax/configs.emp games/sonic4/data/levels/ojz/act1/act_descriptor.emp
+/docs/superpowers/plans/2026-08-14-effects-p3-parcel-c2.md:55: Also verified: `sec_collision_s4lz` has exactly **three** references tree-wide — the definition, one `sec_collision_s4lz: default,` at `act_descriptor
+/docs/superpowers/plans/2026-08-14-effects-p3-parcel-c2.md:57: **Known stale-comment site:** `games/sonic4/data/editor/ojz/act1/export/act_descriptor.asm` (untracked, auto-commit-daemon territory) emits `dc.l 0  ;
+/docs/superpowers/plans/2026-08-14-effects-p3-parcel-c2.md:114: | `games/sonic4/data/levels/ojz/act1/act_descriptor.emp` | nine sections converted to `effects:` | 12 |
+/docs/superpowers/plans/2026-08-14-effects-p3-parcel-c2.md:205: Bind it as `cycle:` on OJZ section 3 in `act_descriptor.emp`, build `DEBUG=1 ./build.sh`, boot, walk into section 3, then read `Pal_Active`:
+/docs/superpowers/plans/2026-08-14-effects-p3-parcel-c2.md:259: - Modify: `games/sonic4/data/levels/ojz/act1/act_descriptor.emp:152`
+/docs/superpowers/plans/2026-08-14-effects-p3-parcel-c2.md:266: Expected: exactly three hits (definition, `act_descriptor.emp` default, `test_support.rs`). **If there are more, STOP and report** — a new consumer ap
+/docs/superpowers/plans/2026-08-14-effects-p3-parcel-c2.md:278: `act_descriptor.emp:152`: `sec_collision_s4lz:   default,` becomes `sec_effects:          default,`
+/docs/superpowers/plans/2026-08-14-effects-p3-parcel-c2.md:318: git add engine/structs.emp games/sonic4/data/levels/ojz/act1/act_descriptor.emp
+/docs/superpowers/plans/2026-08-14-effects-p3-parcel-c2.md:703: - Modify: `games/sonic4/data/levels/ojz/act1/act_descriptor.emp`
+/docs/superpowers/specs/2026-04-29-camera-driven-entity-loading-design.md:199: | `entity_data.asm` | data/levels/ojz/act1/ | Flat X-sorted ring lists |
+/docs/superpowers/specs/2026-04-29-camera-driven-entity-loading-design.md:200: | `act_descriptor.asm` | data/levels/ojz/act1/ | Type table pointers stay in section defs (read from ROM directly at spawn time) |
+/docs/superpowers/specs/2026-06-23-engine-phase3-cleanup-design.md:50: `data/editor_bg_override.json`, editor `data/editor/ojz/...` changes,
+/docs/superpowers/specs/2026-06-28-aeon-engine-game-restructure-design.md:162: - **Autocommit daemon** watches `data/editor/ojz` → its watch path moves to
+/docs/superpowers/specs/2026-06-28-aeon-engine-game-restructure-design.md:163: `games/sonic4/data/editor/ojz`. `tools/ojz_strip_gen.py` is daemon-watched — coordinate, don't
+/docs/superpowers/specs/2026-07-02-editor-collision-authoring-design.md:87: `games/sonic4/data/editor/ojz/**`) are not edited by this design (Aurora WRITES
+/docs/superpowers/specs/2026-07-12-comfyui-art-pipeline-design.md:50: | BG source format | `games/sonic4/data/editor/ojz_act1_bg_tiles.bin` (raw tiles) consumed by `ojz_strip_gen.py` |
+/docs/superpowers/specs/2026-08-13-effects-p3-design.md:324: and a third guard at `act_descriptor.emp:87`. A new 4-byte field would trip all three, change
+/docs/superpowers/specs/2026-08-13-effects-p3-design.md:724: Also: `games/sonic4/data/editor/ojz/act1/export/act_descriptor.asm` (untracked, another
+/docs/superpowers/specs/2026-08-15-effects-p3-parcel-p-design.md:502: (`act_descriptor_port.rs:146-150`) — routine repin. EFX-6's `act_sec_field_equs()` is **not**
+/engine/level/camera.emp:115: // today by act_descriptor's (GRID_* << SECTION_SIZE_SHIFT) <= $8000 ensures
+/engine/level/section.emp:31: // its owner (games/.../act_descriptor.emp, beside the other mega-act grid
+/engine/structs.emp:6: // (act_descriptor.emp, section.emp, tile_cache.emp, entity_window.emp,
+/engine/structs.emp:13: // `act_descriptor.asm`'s `Sec`/`Act` access) through the struct-offset harvest:
+/engine/system/constants.emp:207: // Section / level geometry, shared by entity_window + act_descriptor + section.
+/games/sonic4/player/player_common.emp:1325: // $FFFF px — grid dim > 31 sections; guarded by act_descriptor's <= $8000
+/project.json:8: "tileset": "games/sonic4/data/editor/ojz_tiles.bin",
+/project.json:15: "dataPath": "games/sonic4/data/editor/ojz/act1/",
+/project.json:18: "bgLayout": "games/sonic4/data/editor/ojz_act1_bg.bin",
+/project.json:19: "bgTiles": "games/sonic4/data/editor/ojz_act1_bg_tiles.bin",
+/project.json:32: "chunkLibrary": "games/sonic4/data/editor/ojz/chunks.json"
+/tools/ojz_block_gen.py:369: # consumed by act_descriptor.emp (the Sec.sec_block_dict_len field).
+/tools/ojz_block_gen.py:375: f.write("// Consumed at comptime by act_descriptor.emp; emits ZERO ROM bytes.\n")
+/tools/ojz_block_gen.py:381: # (Parcel K3 run B); consumed by act_descriptor.emp. Identical blobs are
+/tools/ojz_block_gen.py:389: f.write("// by act_descriptor.emp; natively placed at the sec_block_blobs section.\n")
+/tools/ojz_entity_gen.py:2: """OJZ entity data generator — editor JSONs → engine entity_data.asm.
+/tools/ojz_entity_gen.py:10: python3 tools/ojz_entity_gen.py generate  # generate entity_data.asm
+/tools/ojz_entity_gen.py:20: Output: data/generated/ojz/act1/entity_data.asm
+/tools/ojz_entity_gen.py:76: OUTPUT_PATH = os.path.join(REPO_ROOT, "games", "sonic4", "data", "generated", "ojz", "act1", "entity_data.emp")
+/tools/ojz_entity_gen.py:274: # WHY IT CANNOT STAY: DEBUG-gating it made `entity_data` 48 bytes longer in the
+/tools/ojz_entity_gen.py:282: # (data/editor/ojz/act1/section_0.objects.json) so they land in BOTH shapes, run
+/tools/ojz_entity_gen.py:291: (Parcel K3 run A: the entity_data `.emp` native section)."""
+/tools/ojz_entity_gen.py:325: """Generate entity_data.asm from the editor JSONs. Exits nonzero on errors."""
+/tools/ojz_entity_gen.py:359: lines.append("// edit data/editor/ojz/act1/section_N.{rings,objects}.json and")
+/tools/ojz_entity_gen.py:364: lines.append("// natively placed at the entity_data section. An object entry is the packed")
+/tools/ojz_entity_gen.py:380: lines.append("module games.sonic4.ojz_entity_data_act1 in entity_data")
+/tools/ojz_strip_gen.py:771: the index TileCache_DecompressBlock computes). Consumed by act_descriptor.emp
+/tools/ojz_strip_gen.py:793: f.write("// the sec_local_maps section; consumed by act_descriptor.emp.\n")
+/tools/ojz_strip_gen.py:1590: "ojz_strip_gen: editor section data absent (need editor/ojz/act1/"
+/tools/ojz_strip_gen.py:1591: "section_0.tiles.bin + editor/ojz/chunks_tiles.bin). Refusing the "
+/tools/ojz_strip_gen.py:1774: # page_id*64), so there is no per-act VRAM fit to guard. act_descriptor.emp
+/tools/ojz_strip_gen.py:1902: # consumed by act_descriptor.emp (its act_art_pool_pages field + the
+/tools/ojz_strip_gen.py:1910: f.write("// comptime by act_descriptor.emp; emits ZERO ROM bytes.\n")
+/tools/regenerate-level.sh:129: # entry {source, tiles, form, flags}. act_descriptor.emp consumes
+/tools/regenerate-level.sh:138: echo "// consumed by act_descriptor.emp (OJZ_Act_Pool_PageTable). Page blobs are"
+/tools/seed-worktree.sh:33: games/sonic4/data/generated/ojz/act1/entity_data.asm \

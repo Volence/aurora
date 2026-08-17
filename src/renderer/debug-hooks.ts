@@ -13,7 +13,9 @@
 import { useClassicProjectStore } from './state/classicProjectStore';
 import { useClassicLevelStore } from './state/classicLevelStore';
 import { useClassicObjectArtStore } from './state/classicObjectArtStore';
-import { useProjectStore } from './state/projectStore';
+import { useProjectStore, getCurrentAct } from './state/projectStore';
+import { useEditorStore, focusedHistory } from './state/editorStore';
+import { openAeonProject } from './state/aeon-open';
 import { useViewStore } from './state/viewStore';
 import { useArtStore } from './state/artStore';
 import { useCanvasStore } from './state/canvasStore';
@@ -252,6 +254,42 @@ function installClassicProbe(): ClassicProbeApi {
  * result leaves the app in a state the real open flow never actually produces
  * on its own — documents gone, but no new project opened in their place.
  */
+/**
+ * The AEON read-only query surface, and the door that opens an aeon project.
+ *
+ * IT EXISTS BECAUSE THE HARNESSES HAD NO WAY IN. The 2026-08-16 sweep's standing
+ * gap was "the aeon backend had ZERO runtime rows" — not because nobody wanted
+ * them, but because `openDir` above is classic's door and aeon's only UI route
+ * is the native folder picker CDP cannot drive. Every finding against the aeon
+ * viewport (drag commit, BG history, drag coalescing, the tool-letter chords)
+ * was therefore static-trace only. This is the door; the rest is read-only, on
+ * the same rule the classic probe states: opening an act is SETUP, and every
+ * gesture under test still goes through real pointer and keyboard events.
+ */
+interface AeonProbeApi {
+  /** aeon's counterpart to `openDir`, via the same loader `useProject` uses. */
+  open(dir: string): Promise<void>;
+  state(): {
+    open: boolean; zone: string | null; act: string | null; sections: number;
+    tool: string; dirty: boolean; dirtyActs: string[];
+  };
+  /** Can the focused document's stack undo? Drives the "one gesture, one step" count. */
+  canUndo(): boolean;
+  /** One placement's live position — the drag rows read this before and after. */
+  objectAt(sectionIndex: number, index: number): { x: number; y: number; typeId: string } | null;
+  /** One section nametable entry — the FG paint rows. */
+  ntAt(sectionIndex: number, index: number): number | null;
+  /** One RESOLVED background nametable entry — the BG paint rows. */
+  bgAt(index: number): number | null;
+  /** Which section the last gesture claimed. */
+  activeSection(): number;
+  /** Live toast messages, same as the canvas probe's. */
+  toasts(): { message: string; type: string }[];
+  /** SETUP, like the classic probe's setSelectedChunk: which plane the next
+   *  stroke paints. The stroke itself is still a real drag on the real canvas. */
+  setLayer(layer: 'fg' | 'bg'): void;
+}
+
 interface CanvasProbeApi {
   /** Every open canvas document id (the tab ids they are keyed by). */
   docIds(): string[];
@@ -298,6 +336,51 @@ interface CanvasProbeApi {
    * through.
    */
   projectOpenGuard(): Promise<boolean>;
+}
+
+function installAeonProbe(): AeonProbeApi {
+  const act = () => getCurrentAct(useProjectStore.getState());
+  const section = (i: number) => act()?.sections[i] ?? null;
+  return {
+    open: (dir) => openAeonProject(dir).then(() => undefined),
+    state: () => {
+      const p = useProjectStore.getState();
+      const e = useEditorStore.getState();
+      return {
+        open: p.project !== null,
+        zone: p.currentZoneId, act: p.currentActId,
+        sections: act()?.sections.filter(Boolean).length ?? 0,
+        tool: e.tool, dirty: e.dirty, dirtyActs: Object.keys(e.dirtyActs),
+      };
+    },
+    canUndo: () => focusedHistory()?.canUndo ?? false,
+    objectAt: (sectionIndex, index) => {
+      const o = section(sectionIndex)?.objects[index];
+      return o ? { x: o.x, y: o.y, typeId: o.typeId } : null;
+    },
+    ntAt: (sectionIndex, index) => section(sectionIndex)?.tileGrid.nametable[index] ?? null,
+    // Mirrors MapViewport's own resolveActiveBg, INCLUDING its requirement that
+    // an act default have both a layout and tiles — a probe that answered from
+    // `bgLayout` alone would report a plane the paint path refuses to touch, and
+    // a harness would read that as "the stroke did nothing" rather than "there
+    // is nothing here to stroke".
+    bgAt: (index) => {
+      const a = act();
+      if (!a) return null;
+      const ref = a.sections[useEditorStore.getState().activeSectionIndex]?.bgLayoutRef ?? null;
+      if (ref !== null) {
+        const entry = useProjectStore.getState().project?.bgLibrary.find((b) => b.id === ref);
+        if (entry) return entry.layout[index] ?? null;
+      }
+      if (!a.bgLayout || !a.bgTiles) return null;
+      return a.bgLayout[index] ?? null;
+    },
+    /** Which section the last gesture claimed — a paint lands wherever the
+     *  cursor was, and the grid is 3x3 here. */
+    activeSection: () => useEditorStore.getState().activeSectionIndex,
+    toasts: () => useToastStore.getState().toasts.map((t) => ({ message: t.message, type: t.type })),
+    setLayer: (layer) => useEditorStore.getState().setEditingLayer(layer),
+  };
 }
 
 function installCanvasProbe(): CanvasProbeApi {
@@ -403,6 +486,8 @@ interface DebugApi {
   perf(): { marks: unknown[]; readCount: number; readTotalMs: number; mtimeCount: number; mtimeTotalMs: number };
   /** Task 12 (paint-through CDP verification) query surface — see ClassicProbeApi's docblock. */
   classic: ClassicProbeApi;
+  /** The aeon read-only query surface + its open door — see AeonProbeApi. */
+  aeon: AeonProbeApi;
   /** Task 14 (origination canvas) read-only query surface — see CanvasProbeApi. */
   canvas: CanvasProbeApi;
   /**
@@ -449,6 +534,7 @@ export function installDebugHooks(): void {
     // "no act" is exactly the value it has no way to express.
     resetAct: () => useProjectStore.setState({ currentActId: null }),
     perf: () => ({ marks: [], readCount: 0, readTotalMs: 0, mtimeCount: 0, mtimeTotalMs: 0 }),
+    aeon: installAeonProbe(),
     classic: installClassicProbe(),
     canvas: installCanvasProbe(),
     setPaintColor: (v) => useArtStore.getState().setSelectedColor(v),
