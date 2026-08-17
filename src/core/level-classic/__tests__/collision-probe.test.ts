@@ -68,6 +68,34 @@ describe('probeCollision', () => {
     expect(p.blockCells).toBe(2);
   });
 
+  it('flags a loop-region cell without changing which chunk it reads', () => {
+    // Bit 7 alone changes nothing: `.specialtile` masks to 7 bits and, unless
+    // the PLAYER's loop bit is set, branches straight to .treatasnormal.
+    const d = doc();
+    d.fg.cells[0] = 0x81;                       // chunk 1, loop-flagged
+    const p = probeCollision(d, 0, 0)!;
+    expect(p.chunkId).toBe(1);
+    expect(p.looping).toBe(true);
+    expect(p.loopAmbiguous).toBe(false);        // only $28 is substituted
+  });
+
+  it('marks the $28 loop alias as unanswerable from level data', () => {
+    // FindNearestTile swaps chunk $28 for $51 — but ONLY while the player is
+    // behind the loop, which is runtime object state no editor can see. Two
+    // possible answers, so the probe reports the ambiguity instead of picking.
+    const d = doc();
+    d.fg.cells[0] = 0x80 | 0x28;
+    const p = probeCollision(d, 0, 0)!;
+    expect(p.chunkId).toBe(0x28);
+    expect(p.loopAmbiguous).toBe(true);
+  });
+
+  it('does not flag $28 when the cell is not in a loop region', () => {
+    const d = doc();
+    d.fg.cells[0] = 0x28;                       // no bit 7
+    expect(probeCollision(d, 0, 0)!.loopAmbiguous).toBe(false);
+  });
+
   it('reports the block-0 short-circuit even when solidity would allow it', () => {
     // Cell 16 (x=0,y=16) is block 0 AND solidity 0 — the ONE probe point where
     // the order of the two short-circuits is observable. See the plant step.

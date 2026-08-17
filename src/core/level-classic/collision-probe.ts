@@ -26,7 +26,34 @@ export interface CollisionProbe {
   chunkPlacements: number;
   /** How many chunk-DEFINITION cells, across every chunk, name this block. */
   blockCells: number;
+  /**
+   * The layout byte had bit 7 set — this cell is inside a looping region.
+   *
+   * On its own this changes nothing: `.specialtile` masks the id to 7 bits and,
+   * unless the PLAYER's `sprite_looping_bit` is set, branches straight to
+   * `.treatasnormal`. It is reported because it is the precondition for the one
+   * case below.
+   */
+  looping: boolean;
+  /**
+   * This probe cannot be answered from level data alone.
+   *
+   * True only for a loop-flagged cell naming chunk **$28**, where FindNearestTile
+   * substitutes chunk **$51** — but only while the player is behind the loop
+   * (`btst #sprite_looping_bit,obRender(a0)`, lines 69-74 of
+   * `_incObj/sub FindNearestTile & FindFloor & FindWall.asm`). Which of the two
+   * chunks the engine reads therefore depends on RUNTIME OBJECT STATE that an
+   * editor cannot see, so everything below — block, shape, solidity — is the
+   * $28 answer and may not be the one the console uses.
+   *
+   * Reported rather than resolved, because picking either chunk would be a
+   * confident answer to a question with two of them.
+   */
+  loopAmbiguous: boolean;
 }
+
+/** The one chunk id FindNearestTile substitutes behind a loop, and its target. */
+export const LOOP_ALIAS = { from: 0x28, to: 0x51 } as const;
 
 /**
  * Probe the FG plane at a level pixel. Returns null outside the layout.
@@ -49,7 +76,12 @@ export function probeCollision(doc: LevelDoc, x: number, y: number): CollisionPr
   if (col >= doc.fg.width || row >= doc.fg.height) return null;
 
   const raw = doc.fg.cells[row * doc.fg.width + col] ?? 0;
-  const chunkId = raw & 0x7f;              // strip S1's bit-7 loop flag
+  // Bit 7 marks a looping region. Masking it off is what `.specialtile` itself
+  // does first, and for every chunk but one that is the whole story — the
+  // substitution below is the exception, and it is not resolvable from here.
+  const chunkId = raw & 0x7f;
+  const looping = (raw & 0x80) !== 0;
+  const loopAmbiguous = looping && chunkId === LOOP_ALIAS.from;
   const cellIndex = (Math.floor((y % 256) / 16) * 16) + Math.floor((x % 256) / 16);
 
   let chunkPlacements = 0;
@@ -60,6 +92,7 @@ export function probeCollision(doc: LevelDoc, x: number, y: number): CollisionPr
     return {
       chunkId, chunkIndex: null, cellIndex, blockId: 0, shapeIndex: 0, solidity: 0,
       collides: false, reason: 'air', chunkPlacements, blockCells: 0,
+      looping, loopAmbiguous,
     };
   }
 
@@ -76,5 +109,6 @@ export function probeCollision(doc: LevelDoc, x: number, y: number): CollisionPr
   return {
     chunkId, chunkIndex, cellIndex, blockId, shapeIndex, solidity,
     collides: reason === null, reason, chunkPlacements, blockCells,
+    looping, loopAmbiguous,
   };
 }
