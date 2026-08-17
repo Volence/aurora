@@ -80,7 +80,7 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: T.rMd,
     boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
     padding: 4,
-    fontSize: 11,
+    fontSize: T.tXs,
   },
   heading: {
     padding: `${T.s1} ${T.s2}`,

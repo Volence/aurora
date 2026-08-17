@@ -489,7 +489,7 @@ export default function ChunkTab({ doc, usage }: { doc: LevelDoc; usage: UsageIn
               </div>
             </div>
             <div style={styles.rowWrap}>
-              <span style={styles.dim}>Diverge:</span>
+              <span style={styles.dim} title="What a painted pixel does to the OTHER places this art is used">Edits:</span>
               <Chip
                 active={paintDivergeMode === 'isolate'}
                 onClick={() => setPaintDivergeMode('isolate')}

@@ -26,7 +26,7 @@ export default function ViewMenu() {
   return (
     <Menu label={<><Icons.IconView size={14} /> View <Icons.IconChevron size={12} /></>}>
       {keys.map((key) => (
-        <label key={key} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: `${T.s1} ${T.s2}`, fontSize: 12, color: T.textBase, cursor: 'pointer' }}>
+        <label key={key} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: `${T.s1} ${T.s2}`, fontSize: T.tSm, color: T.textBase, cursor: 'pointer' }}>
           <input type="checkbox" checked={overlays[key]} onChange={() => toggle(key)} />
           {pretty(key)}
         </label>

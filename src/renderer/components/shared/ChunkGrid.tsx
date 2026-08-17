@@ -279,7 +279,7 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '3px 8px', borderBottom: `1px solid ${T.border}`, flexShrink: 0,
   },
   selBadge: {
-    fontSize: 10, fontWeight: 600, color: T.onAccent, background: T.accent,
+    fontSize: 10, fontWeight: T.wSemibold, color: T.onAccent, background: T.accent,
     padding: '0 6px', borderRadius: T.rMd, lineHeight: '16px', fontFamily: T.fontMono,
     maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
   },
@@ -318,7 +318,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   empty: {
     padding: '12px 8px', display: 'flex', flexDirection: 'column',
-    alignItems: 'center', gap: 4, color: T.textLo, fontSize: 11, textAlign: 'center' as const,
+    alignItems: 'center', gap: 4, color: T.textLo, fontSize: T.tXs, textAlign: 'center' as const,
   },
   emptyHint: { fontSize: 9, color: T.borderStrong },
   cell: {

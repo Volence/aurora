@@ -138,14 +138,14 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
     padding: '10px 14px', borderBottom: `1px solid ${T.border}`,
   },
-  title: { fontSize: 14, fontWeight: 600, color: T.textHi },
+  title: { fontSize: T.tMd, fontWeight: T.wSemibold, color: T.textHi },
   closeBtn: {
     background: 'transparent', border: 'none', color: T.textLo,
     cursor: 'pointer', fontSize: 18, lineHeight: 1, padding: '0 4px',
   },
   body: { padding: '12px 14px', overflow: 'auto', display: 'flex', flexDirection: 'column', gap: 8 },
-  note: { fontSize: 11, color: T.textLo, lineHeight: 1.5 },
-  meta: { fontSize: 11, color: T.textBase, lineHeight: 1.5 },
-  error: { fontSize: 11, color: T.error, lineHeight: 1.5 },
+  note: { fontSize: T.tXs, color: T.textLo, lineHeight: 1.5 },
+  meta: { fontSize: T.tXs, color: T.textBase, lineHeight: 1.5 },
+  error: { fontSize: T.tXs, color: T.error, lineHeight: 1.5 },
   actions: { display: 'flex' },
 };

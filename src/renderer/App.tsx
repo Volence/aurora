@@ -312,10 +312,10 @@ const styles: Record<string, React.CSSProperties> = {
   tabPane: { flex: 1, minWidth: 0, overflow: 'hidden' },
   error: {
     padding: '6px 12px', background: T.error, color: T.void,
-    fontSize: 13, display: 'flex', alignItems: 'center', gap: 8,
+    fontSize: T.tBase, display: 'flex', alignItems: 'center', gap: 8,
   },
   dismissButton: {
     padding: '2px 8px', background: 'rgba(0,0,0,0.2)', border: 'none',
-    color: T.void, borderRadius: 4, cursor: 'pointer', fontSize: 12,
+    color: T.void, borderRadius: 4, cursor: 'pointer', fontSize: T.tSm,
   },
 };

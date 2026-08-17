@@ -342,9 +342,9 @@ const styles: Record<string, React.CSSProperties> = {
     gap: 8,
   },
   docName: {
-    fontSize: 12,
+    fontSize: T.tSm,
     color: T.textHi,
-    fontWeight: 500,
+    fontWeight: T.wMedium,
   },
   sharedWarning: {
     fontSize: 10,
@@ -357,7 +357,7 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '0 4px',
     borderRadius: 3,
     lineHeight: '14px',
-    fontWeight: 600,
+    fontWeight: T.wSemibold,
   },
   saveButton: {
     padding: '2px 10px',
@@ -368,8 +368,8 @@ const styles: Record<string, React.CSSProperties> = {
     borderColor: T.success,
     borderRadius: 4,
     cursor: 'pointer',
-    fontSize: 11,
-    fontWeight: 600,
+    fontSize: T.tXs,
+    fontWeight: T.wSemibold,
   },
   newDocButton: {
     padding: '2px 10px',
@@ -378,7 +378,7 @@ const styles: Record<string, React.CSSProperties> = {
     border: `1px solid ${T.borderStrong}`,
     borderRadius: 4,
     cursor: 'pointer',
-    fontSize: 11,
+    fontSize: T.tXs,
   },
   saveDisabled: {
     background: T.raised,
@@ -398,7 +398,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   launcherTitle: {
     fontSize: 18,
-    fontWeight: 600,
+    fontWeight: T.wSemibold,
     color: T.textHi,
     marginBottom: 8,
   },
@@ -409,7 +409,7 @@ const styles: Record<string, React.CSSProperties> = {
     border: `1px solid ${T.borderStrong}`,
     borderRadius: 6,
     cursor: 'pointer',
-    fontSize: 13,
+    fontSize: T.tBase,
     display: 'flex',
     alignItems: 'center',
     gap: 8,
@@ -417,7 +417,7 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: 'center',
   },
   preset: {
-    fontSize: 11,
+    fontSize: T.tXs,
     color: T.accent,
   },
   newChunkRow: {
@@ -429,7 +429,7 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     gap: 4,
-    fontSize: 12,
+    fontSize: T.tSm,
     color: T.textBase,
   },
   dimInput: {
@@ -439,6 +439,6 @@ const styles: Record<string, React.CSSProperties> = {
     color: T.textHi,
     border: `1px solid ${T.borderStrong}`,
     borderRadius: 4,
-    fontSize: 12,
+    fontSize: T.tSm,
   },
 };

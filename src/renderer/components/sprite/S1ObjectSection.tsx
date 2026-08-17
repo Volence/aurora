@@ -78,6 +78,6 @@ const styles: Record<string, React.CSSProperties> = {
   thumbWrap: { width: 28, height: 28, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' },
   hex: { fontFamily: T.fontMono, fontSize: 10, color: T.textLo, width: 30, flexShrink: 0 },
   onCur: { color: T.onAccent },
-  name: { fontSize: 11, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  name: { fontSize: T.tXs, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   hint: { fontSize: 9, color: T.textFaint, padding: '0 8px 6px' },
 };

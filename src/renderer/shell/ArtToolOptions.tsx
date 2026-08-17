@@ -4,7 +4,7 @@ import { useProjectStore, getCurrentZone } from '../state/projectStore';
 import { useHistoryVersion } from '../hooks/useHistoryVersion';
 import { OptionBar, Chip, Divider, T } from '../components/ui';
 import {
-  ToolButton, TransformGrid, DitherConfig, MirrorButton, ZoomControl,
+  GlyphButton, TransformGrid, DitherConfig, MirrorButton, ZoomControl,
 } from '../components/art-shared/ToolColumnParts';
 import type { Color } from '../../core/model/s4-types';
 
@@ -243,12 +243,12 @@ export default function ArtToolOptions({ before, caps = FULL_CAPS }: { before?: 
       {/* Mirror cycle + repeat preview */}
       <MirrorButton mirror={mirror} onChange={setMirror} />
       {caps.repeatPreview && (
-        <ToolButton glyph="Rpt" small active={repeatPreview} title="Toggle 3×3 repeat preview" onClick={toggleRepeatPreview} />
+        <GlyphButton glyph="Rpt" small active={repeatPreview} title="Toggle 3×3 repeat preview" onClick={toggleRepeatPreview} />
       )}
 
       {/* Pixel-perfect mode (pencil / line only) */}
       {(tool === 'pencil' || tool === 'line') && (
-        <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: T.textLo }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: T.tXs, color: T.textLo }}>
           <input type="checkbox" checked={pixelPerfect} onChange={(e) => setPixelPerfect(e.target.checked)} />
           Pixel-perfect
         </label>

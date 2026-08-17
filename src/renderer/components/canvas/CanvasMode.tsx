@@ -5,13 +5,14 @@ import { focusedHistory } from '../../state/editorStore';
 import CanvasHost from './CanvasHost';
 import CanvasCommitSection from './CanvasCommitSection';
 import { offeredGrids, fitZoom } from './canvas-pane-model';
+import { TOOL_KEYS, toolForKey } from './canvas-tool-keys';
 import { useAnchoredZoom } from '../art-shared/use-anchored-zoom';
 import { useHandPan } from '../art-shared/use-hand-pan';
 import { PixelHud, type PixelHudHandle } from '../art-shared/PixelHud';
 import PaletteGrid from '../art-shared/PaletteGrid';
 import { useCanvasPaletteGridPort } from '../../providers/palette-canvas';
 import {
-  ToolButton as ModifierButton, DitherConfig, MirrorButton, ZoomControl,
+  GlyphButton, DitherConfig, MirrorButton, ZoomControl,
 } from '../art-shared/ToolColumnParts';
 import {
   CANVAS_COLORS, canvasIndex, paletteEntryOf, paletteLineOf,
@@ -91,6 +92,15 @@ export default function CanvasMode({ docId, appBar }: { docId: string; appBar: R
       }
       if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key.toLowerCase() === 'z' && e.shiftKey))) {
         focusedHistory()?.redo();
+        e.preventDefault();
+        return;
+      }
+      // Tool keys LAST, and only for an unmodified letter: the undo/redo arms
+      // above own their combinations, and `toolForKey` refuses anything carrying
+      // a modifier, so Ctrl+E can never arm the eraser on its way through.
+      const tool = toolForKey(e);
+      if (tool) {
+        useCanvasStore.getState().setTool(tool);
         e.preventDefault();
       }
     };
@@ -192,7 +202,10 @@ function CanvasToolDock() {
         <ToolButton
           key={t}
           icon={<Icon size={18} />}
-          label={label}
+          // The shortcut is printed from the same table the handler reads, so a
+          // rebinding cannot leave the tooltip teaching the old key. A shortcut
+          // nobody can discover is not a shortcut.
+          label={`${label} — ${TOOL_KEYS[t].toUpperCase()}`}
           active={tool === t}
           onClick={() => useCanvasStore.getState().setTool(t)}
         />
@@ -283,7 +296,7 @@ function CanvasToolOptions({ docId, onFit }: { docId: string; onFit: () => void 
 
       {/* Pencil/line/rect honour pixel-perfect; the toggle shows for those. */}
       {(tool === 'pencil' || tool === 'line' || tool === 'rect') && (
-        <ModifierButton
+        <GlyphButton
           glyph="PP" small active={pixelPerfect}
           title="Pixel-perfect strokes (no doubled corner pixels)"
           onClick={() => st().setPixelPerfect(!pixelPerfect)}
@@ -449,7 +462,7 @@ function CanvasStatusBar({ docId }: { docId: string }) {
   const line = paletteLineOf(paintIndex), entry = paletteEntryOf(paintIndex);
   return (
     <StatusBar
-      left={<span style={{ color: T.accent, fontWeight: 600 }}>{doc.name}</span>}
+      left={<span style={{ color: T.accent, fontWeight: T.wSemibold }}>{doc.name}</span>}
       right={
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 10, color: T.textBase }}>
           <span>{constraintProfile(doc.profileId).label}</span>
@@ -489,17 +502,17 @@ const styles: Record<string, React.CSSProperties> = {
   canvasWrap: { position: 'absolute', inset: 0, overflow: 'auto', background: T.void },
   canvasPad: { display: 'inline-block', padding: 24 },
   section: { padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 6 },
-  stat: { display: 'flex', justifyContent: 'space-between', fontSize: 13, color: T.textHi },
+  stat: { display: 'flex', justifyContent: 'space-between', fontSize: T.tBase, color: T.textHi },
   row: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 },
-  dim: { fontSize: 11, color: T.textLo },
+  dim: { fontSize: T.tXs, color: T.textLo },
   select: {
     flex: 1, background: T.raised, color: T.textHi, border: `1px solid ${T.borderStrong}`,
-    borderRadius: 4, fontSize: 12, padding: '4px 6px',
+    borderRadius: 4, fontSize: T.tSm, padding: '4px 6px',
   },
   // Same look NumberField gave the grid-origin fields before GridOriginField
   // replaced it with a locally-held, commit-on-blur input (see its comment).
   numberInput: {
     width: 44, background: T.raised, color: T.textHi, border: `1px solid ${T.borderStrong}`,
-    borderRadius: 4, fontSize: 12, padding: '4px 6px',
+    borderRadius: 4, fontSize: T.tSm, padding: '4px 6px',
   },
 };

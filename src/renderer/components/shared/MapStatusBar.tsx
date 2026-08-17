@@ -20,7 +20,7 @@ export default function MapStatusBar({ port }: { port: MapStatusPort }): React.R
 
   const left = (
     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }}>
-      <span style={{ color: T.accent, fontWeight: 600 }}>{info.label}</span>
+      <span style={{ color: T.accent, fontWeight: T.wSemibold }}>{info.label}</span>
       <span style={{ color: T.textBase }}>{port.layer.toUpperCase()}</span>
       <span style={{ color: T.textLo }}>{port.zoneName}</span>
       <span style={{ color: port.scopeTone === 'error' ? T.error : T.textLo }}>{port.scopeInfo}</span>

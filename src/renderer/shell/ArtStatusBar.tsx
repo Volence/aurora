@@ -22,7 +22,7 @@ export default function ArtStatusBar() {
     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }}>
       {open ? (
         <>
-          <span style={{ color: T.accent, fontWeight: 600 }}>{open.name}</span>
+          <span style={{ color: T.accent, fontWeight: T.wSemibold }}>{open.name}</span>
           {open.dirty && <span style={{ color: T.warning }}>unsaved</span>}
         </>
       ) : (

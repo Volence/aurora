@@ -56,13 +56,13 @@ const styles: Record<string, React.CSSProperties> = {
     width: 420, maxWidth: '90vw', background: T.surface, border: `1px solid ${T.borderStrong}`,
     borderRadius: T.rXl, boxShadow: '0 16px 48px rgba(0,0,0,0.5)', padding: 16,
   },
-  title: { fontSize: 13, fontWeight: 600, color: T.textHi },
-  body: { fontSize: 12, color: T.textBase, marginTop: 8, whiteSpace: 'pre-line' },
+  title: { fontSize: T.tBase, fontWeight: T.wSemibold, color: T.textHi },
+  body: { fontSize: T.tSm, color: T.textBase, marginTop: 8, whiteSpace: 'pre-line' },
   buttons: { display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 16 },
   button: {
-    padding: '4px 12px', fontSize: 12, background: T.raised, color: T.textBase,
+    padding: '4px 12px', fontSize: T.tSm, background: T.raised, color: T.textBase,
     borderWidth: 1, borderStyle: 'solid', borderColor: T.border, borderRadius: T.rMd, cursor: 'pointer',
   },
-  primary: { background: T.accent, borderColor: T.accent, color: T.onAccent, fontWeight: 600 },
+  primary: { background: T.accent, borderColor: T.accent, color: T.onAccent, fontWeight: T.wSemibold },
   danger: { color: T.warning, borderColor: T.warning },
 };

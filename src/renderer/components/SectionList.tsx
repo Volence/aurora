@@ -49,7 +49,7 @@ const styles: Record<string, React.CSSProperties> = {
     flexShrink: 0,
   },
   header: {
-    padding: '8px 12px', fontSize: 12, fontWeight: 600, color: T.textBase,
+    padding: '8px 12px', fontSize: T.tSm, fontWeight: T.wSemibold, color: T.textBase,
     borderBottom: `1px solid ${T.border}`, textTransform: 'uppercase' as const,
     letterSpacing: 1,
   },
@@ -59,19 +59,19 @@ const styles: Record<string, React.CSSProperties> = {
   item: {
     display: 'flex', alignItems: 'center', gap: 8, width: '100%',
     padding: '6px 8px', background: 'transparent', border: 'none',
-    color: T.textHi, cursor: 'pointer', borderRadius: 4, fontSize: 13,
+    color: T.textHi, cursor: 'pointer', borderRadius: 4, fontSize: T.tBase,
     textAlign: 'left' as const,
   },
   active: {
     background: T.border, outline: `1px solid ${T.accent}`,
   },
   index: {
-    color: T.accent, fontFamily: T.fontMono, fontSize: 12,
+    color: T.accent, fontFamily: T.fontMono, fontSize: T.tSm,
   },
   name: {
     flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const,
   },
   empty: {
-    padding: 12, color: T.textLo, fontSize: 12,
+    padding: 12, color: T.textLo, fontSize: T.tSm,
   },
 };

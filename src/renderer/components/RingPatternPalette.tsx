@@ -96,6 +96,6 @@ const styles: Record<string, React.CSSProperties> = {
     background: T.accent, color: T.surface, borderColor: T.accent,
   },
   label: {
-    fontSize: 12,
+    fontSize: T.tSm,
   },
 };

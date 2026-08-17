@@ -77,7 +77,7 @@ const styles: Record<string, React.CSSProperties> = {
     flexShrink: 0, overflow: 'auto',
   },
   label: {
-    fontSize: 11, fontWeight: 600, color: T.textLo, textTransform: 'uppercase' as const,
+    fontSize: T.tXs, fontWeight: T.wSemibold, color: T.textLo, textTransform: 'uppercase' as const,
     letterSpacing: 1, flexShrink: 0,
   },
   lines: {

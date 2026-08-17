@@ -110,9 +110,9 @@ const styles: Record<string, React.CSSProperties> = {
   row: {
     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
     padding: '7px 12px', borderRadius: T.rMd, cursor: 'pointer',
-    color: T.textBase, fontSize: 13,
+    color: T.textBase, fontSize: T.tBase,
   },
   rowActive: { background: T.raised, color: T.textHi, boxShadow: `inset 2px 0 0 ${T.accent}` },
-  hint: { fontSize: 11, color: T.textLo, fontFamily: T.fontMono },
-  empty: { padding: '12px', color: T.textLo, fontSize: 13, textAlign: 'center' },
+  hint: { fontSize: T.tXs, color: T.textLo, fontFamily: T.fontMono },
+  empty: { padding: '12px', color: T.textLo, fontSize: T.tBase, textAlign: 'center' },
 };
