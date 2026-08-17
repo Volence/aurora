@@ -87,27 +87,34 @@ describe('s1Adapter.open resolution', () => {
       sprites: true,
       objects: 'objpos',
       build: false,
-      // Four pills, in the order the bar shows them: `art` is LAST because it is
-      // the only classic facet that swaps the canvas, and the three before it
+      // Five pills, in the order the bar shows them: `art` is LAST because it is
+      // the only classic facet that swaps the canvas, and the four before it
       // are lenses over one map. `objects` merged into `layout` for a day and
       // was reversed once the reorder made the split read correctly.
-      // `collision` and `rings` stay out. Every one of those is argued at the
-      // grant itself (core/project/s1/index.ts).
-      facets: ['layout', 'objects', 'palette', 'art'],
+      // `collision` is the READ side of the collision editor (spec stage 3a),
+      // granted 2026-08-17. `rings` stays out — S1 rings are objects in objpos,
+      // not a separate layer. Argued at the grant itself (core/project/s1/index.ts).
+      facets: ['layout', 'objects', 'collision', 'palette', 'art'],
       artTiers: [
         { id: 'chunk', label: 'Chunk', pixelSize: 256, shared: true },
         { id: 'block', label: 'Block', pixelSize: 16, shared: true },
         { id: 'tile', label: 'Tile', pixelSize: 8, shared: true },
       ],
-      // Only `layout` is declared, and only to REMOVE the shell default's
-      // marquee / paint-tile / paint-block, none of which classic implements.
-      // No place-object: that is the Objects facet's, which keeps the shell
+      // `layout` is declared to REMOVE the shell default's marquee /
+      // paint-tile / paint-block, none of which classic implements. No
+      // place-object: that is the Objects facet's, which keeps the shell
       // default (['place-object','select','view']). Carrying it on layout too
       // made Objects a strict subset of Layout, and is what the 2026-08-14 merge
       // briefly re-created. See CapabilityManifest.facetTools — declaring
       // REPLACES.
+      //
+      // `collision` is declared as `['view']` — NOT omitted. The shell default
+      // for collision is `['paint-collision', 'view']` and the first entry is
+      // the facet default (facet-tools.ts), so omitting the entry would land
+      // the user on a write tool this read-only facet does not implement.
       facetTools: {
         layout: ['view', 'stamp-chunk', 'select'],
+        collision: ['view'],
       },
     });
     expect(handle.report.total).toBe(ENTRIES.length);

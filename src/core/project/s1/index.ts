@@ -73,14 +73,13 @@ const SIDECAR = '.aurora/project.json';
  *  - `art` is the composer — the tile/block/chunk tiers of the zone-art doc, and
  *    the only classic facet whose canvas is not the act. Hence LAST.
  *
- *  - `collision` is ABSENT. Classic has no collision-editing UI: classicSetColind's
- *    only caller is the agent handler, and classic's sole collision affordance is
- *    a read-only overlay. Granting it would put a Collision pill over an aeon-only
- *    CollisionPalette (spec §3.0.3). Owner decision 2026-08-13; restore when the
- *    classic collision editor lands as its own designed feature.
+ *  - `collision` is the READ side of the collision editor (spec stage 3a): the
+ *    lookup that decides whether the player stands on a cell, shown where the
+ *    hole is. It does not write yet — solidity stays in ChunkTab's Assign mode,
+ *    and the shape picker is stage 3b. Granted 2026-08-17.
  *  - `rings` is ABSENT: S1 rings are objects in objpos, not a separate layer.
  */
-export const S1_FACETS = ['layout', 'objects', 'palette', 'art'] as const satisfies readonly FacetCapability[];
+export const S1_FACETS = ['layout', 'objects', 'collision', 'palette', 'art'] as const satisfies readonly FacetCapability[];
 
 // ---------------------------------------------------------------------------
 // Profile enumeration — flattens the profile into an ordered list of resolvable
@@ -521,6 +520,14 @@ export const s1Adapter: ProjectAdapter = {
         // tool that writes.
         facetTools: {
           layout: ['view', 'stamp-chunk', 'select'],
+          // DECLARED, not defaulted. The shell default for collision is
+          // `['paint-collision', 'view']` (renderer/workspace/facet-tools.ts:23)
+          // and its FIRST ENTRY IS THE FACET DEFAULT (same file, line 3) — so
+          // leaving this out lands the user on paint-collision, renders a
+          // "Paint Collision" button in the dock, prints a hint promising a
+          // write, and the viewport has no branch for that tool so the click
+          // falls through to pan. This facet reads; `view` is the truth.
+          collision: ['view'],
         },
       },
       report,
