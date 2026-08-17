@@ -299,7 +299,7 @@ const styles: Record<string, React.CSSProperties> = {
     color: T.textHi, fontSize: T.tSm, fontFamily: T.fontUi,
   },
   treeScroll: { flex: 1, overflowY: 'auto' },
-  count: { fontSize: 10, color: T.textFaint, fontFamily: T.fontMono },
+  count: { fontSize: T.t2xs, color: T.textFaint, fontFamily: T.fontMono },
   items: { display: 'flex', flexDirection: 'column', padding: '2px 4px 6px' },
   item: {
     display: 'flex', alignItems: 'center', gap: 8, padding: '3px 8px', width: '100%',
@@ -309,7 +309,7 @@ const styles: Record<string, React.CSSProperties> = {
   itemHover: { background: T.raised },
   itemDisabled: { color: T.textFaint, cursor: 'default' },
   itemLabel: { flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const },
-  itemHint: { fontSize: 10, color: T.textFaint, fontFamily: T.fontMono, flexShrink: 0 },
+  itemHint: { fontSize: T.t2xs, color: T.textFaint, fontFamily: T.fontMono, flexShrink: 0 },
   empty: { padding: 16, textAlign: 'center' as const, color: T.textLo, fontSize: T.tSm },
   openButton: {
     padding: '6px 14px', background: T.accent, color: T.onAccent, fontWeight: T.wSemibold,

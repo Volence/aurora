@@ -242,7 +242,7 @@ const styles: Record<string, React.CSSProperties> = {
   // type this row read as a second, disagreeing title stacked under the first —
   // the same doubling ChunkGrid's countLabel fixed.
   label: {
-    padding: '6px 12px', fontSize: 10, color: T.textLo,
+    padding: '6px 12px', fontSize: T.t2xs, color: T.textLo,
   },
   hoverLabel: {
     marginLeft: 'auto', padding: '0 12px',

@@ -280,7 +280,7 @@ export default function CollisionPalette({ variant = 'map' }: { variant?: 'map' 
 }
 
 const styles: Record<string, React.CSSProperties> = {
-  hint: { fontSize: 10, color: T.textLo, padding: `0 ${T.s2} ${T.s2}` },
+  hint: { fontSize: T.t2xs, color: T.textLo, padding: `0 ${T.s2} ${T.s2}` },
   note: { fontSize: T.tXs, color: T.textLo, padding: T.s2 },
   tabs: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 4, padding: `0 ${T.s2} ${T.s2}` },
   preview: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, padding: `0 ${T.s2} ${T.s2}` },
@@ -289,7 +289,7 @@ const styles: Record<string, React.CSSProperties> = {
     border: `1px solid ${T.border}`, borderRadius: T.rSm,
     display: 'flex', alignItems: 'center', justifyContent: 'center',
   },
-  previewText: { fontSize: 10, color: T.textBase, fontFamily: T.fontMono, textAlign: 'center' },
+  previewText: { fontSize: T.t2xs, color: T.textBase, fontFamily: T.fontMono, textAlign: 'center' },
   grid: { display: 'flex', flexWrap: 'wrap', gap: 4, padding: `0 ${T.s2} ${T.s2}` },
   cellWrap: {
     width: PX + 6, padding: 2, background: T.overlay,
@@ -305,8 +305,8 @@ const styles: Record<string, React.CSSProperties> = {
 
   degLabel: { fontSize: 8, lineHeight: '8px', color: T.textLo },
   planes: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 4, padding: `${T.s2} ${T.s2} 0` },
-  planeLabel: { fontSize: 10, color: T.textLo, marginRight: 2, minWidth: 38, flexShrink: 0 },
+  planeLabel: { fontSize: T.t2xs, color: T.textLo, marginRight: 2, minWidth: 38, flexShrink: 0 },
   planeBtn: { padding: `2px ${T.s2}`, background: T.overlay, color: T.textBase, borderWidth: 1, borderStyle: 'solid', borderColor: T.border, borderRadius: T.rSm, cursor: 'pointer', fontSize: T.tXs, minWidth: 26, textAlign: 'center' },
   planeSel: { background: T.accent, color: T.onAccent, borderColor: T.accent },
-  subtleBtn: { padding: `2px ${T.s2}`, background: 'transparent', color: T.textLo, border: `1px solid ${T.border}`, borderRadius: T.rSm, cursor: 'pointer', fontSize: 10 },
+  subtleBtn: { padding: `2px ${T.s2}`, background: 'transparent', color: T.textLo, border: `1px solid ${T.border}`, borderRadius: T.rSm, cursor: 'pointer', fontSize: T.t2xs },
 };

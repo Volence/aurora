@@ -85,7 +85,7 @@ const styles: Record<string, React.CSSProperties> = {
   heading: {
     padding: `${T.s1} ${T.s2}`,
     color: T.textLo,
-    fontSize: 10,
+    fontSize: T.t2xs,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },

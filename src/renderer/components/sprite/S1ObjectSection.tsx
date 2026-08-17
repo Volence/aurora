@@ -76,8 +76,8 @@ const styles: Record<string, React.CSSProperties> = {
   rowCurrent: { background: T.accent, borderColor: T.accent, color: T.onAccent },
   busy: { opacity: 0.6, cursor: 'default' },
   thumbWrap: { width: 28, height: 28, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' },
-  hex: { fontFamily: T.fontMono, fontSize: 10, color: T.textLo, width: 30, flexShrink: 0 },
+  hex: { fontFamily: T.fontMono, fontSize: T.t2xs, color: T.textLo, width: 30, flexShrink: 0 },
   onCur: { color: T.onAccent },
   name: { fontSize: T.tXs, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
-  hint: { fontSize: 9, color: T.textFaint, padding: '0 8px 6px' },
+  hint: { fontSize: T.t2xs, color: T.textFaint, padding: '0 8px 6px' },
 };

@@ -248,7 +248,7 @@ const styles: Record<string, React.CSSProperties> = {
   // section means this takes only what it needs and the rest goes to Chunks.
   grid: { display: 'grid', gap: 2, flex: '1 1 auto', minHeight: 0, overflowY: 'auto' },
   cell: {
-    padding: '4px 0', textAlign: 'center', fontSize: 10,
+    padding: '4px 0', textAlign: 'center', fontSize: T.t2xs,
     background: T.border, border: `1px solid ${T.borderStrong}`, borderRadius: 2,
     color: T.textHi, cursor: 'pointer', position: 'relative',
   },
@@ -262,7 +262,7 @@ const styles: Record<string, React.CSSProperties> = {
   dropTarget: { outline: `2px solid ${T.accent}`, outlineOffset: -1 },
   gridControls: {
     display: 'flex', alignItems: 'center', gap: 3, marginTop: 6,
-    fontSize: 10, color: T.textLo, flexShrink: 0,
+    fontSize: T.t2xs, color: T.textLo, flexShrink: 0,
   },
   ctrlLabel: { marginLeft: 4 },
   ctrlVal: { minWidth: 12, textAlign: 'center', color: T.textBase },

@@ -273,26 +273,26 @@ const styles: Record<string, React.CSSProperties> = {
   // Deliberately NOT heading type (no uppercase, no letter-spacing, no bold):
   // this is a count on the status line, and styling it like the old heading is
   // how it would read as a second section title again.
-  count: { fontSize: 10, color: T.textLo, flexShrink: 0 },
+  count: { fontSize: T.t2xs, color: T.textLo, flexShrink: 0 },
   toolbar: {
     display: 'flex', alignItems: 'center', gap: 6,
     padding: '3px 8px', borderBottom: `1px solid ${T.border}`, flexShrink: 0,
   },
   selBadge: {
-    fontSize: 10, fontWeight: T.wSemibold, color: T.onAccent, background: T.accent,
+    fontSize: T.t2xs, fontWeight: T.wSemibold, color: T.onAccent, background: T.accent,
     padding: '0 6px', borderRadius: T.rMd, lineHeight: '16px', fontFamily: T.fontMono,
     maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
   },
   // Takes the slack between the badge and the size control, so the size buttons
   // sit flush right without a second auto margin fighting for the same space.
   hint: {
-    fontSize: 9, color: T.textFaint, flex: 1, minWidth: 0, textAlign: 'right' as const,
+    fontSize: T.t2xs, color: T.textFaint, flex: 1, minWidth: 0, textAlign: 'right' as const,
     overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
   },
   sizeCtl: { display: 'flex', gap: 2, flexShrink: 0 },
   sizeBtn: {
     padding: '0 6px', background: T.overlay, color: T.textBase,
-    borderWidth: 1, borderStyle: 'solid', borderColor: T.border, borderRadius: T.rMd, cursor: 'pointer', fontSize: 10, lineHeight: '16px',
+    borderWidth: 1, borderStyle: 'solid', borderColor: T.border, borderRadius: T.rMd, cursor: 'pointer', fontSize: T.t2xs, lineHeight: '16px',
   },
   sizeBtnSel: { background: T.accent, color: T.onAccent, borderColor: T.accent },
   // The scrollable wall: native overflow gives a real scrollbar, flex-wrap lays
@@ -320,7 +320,7 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '12px 8px', display: 'flex', flexDirection: 'column',
     alignItems: 'center', gap: 4, color: T.textLo, fontSize: T.tXs, textAlign: 'center' as const,
   },
-  emptyHint: { fontSize: 9, color: T.borderStrong },
+  emptyHint: { fontSize: T.t2xs, color: T.borderStrong },
   cell: {
     position: 'relative', padding: 0, flexShrink: 0, backgroundColor: T.overlay,
     borderWidth: 1, borderStyle: 'solid', borderColor: T.border, borderRadius: T.rMd, cursor: 'pointer', overflow: 'hidden',
@@ -340,6 +340,6 @@ const styles: Record<string, React.CSSProperties> = {
   cellLabel: {
     position: 'absolute', left: 0, bottom: 0, right: 0,
     background: CHUNK_LABEL_BG, color: CHUNK_LABEL_TEXT,
-    fontSize: 9, fontFamily: T.fontMono, lineHeight: '12px', padding: '0 2px',
+    fontSize: T.t2xs, fontFamily: T.fontMono, lineHeight: '12px', padding: '0 2px',
   },
 };

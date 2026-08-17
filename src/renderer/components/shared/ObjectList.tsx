@@ -182,7 +182,7 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center', justifyContent: 'center',
   },
   badge: {
-    fontFamily: T.fontMono, fontSize: 10, color: T.textLo, minWidth: 30, maxWidth: 72,
+    fontFamily: T.fontMono, fontSize: T.t2xs, color: T.textLo, minWidth: 30, maxWidth: 72,
     flexShrink: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
   },
   badgeSelected: { color: T.onAccent },

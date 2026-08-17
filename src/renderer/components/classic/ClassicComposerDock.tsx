@@ -52,10 +52,10 @@ function SelectionTrail() {
   );
 }
 
-const trailStyle: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 4, fontFamily: T.fontMono, fontSize: 10 };
+const trailStyle: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 4, fontFamily: T.fontMono, fontSize: T.t2xs };
 const trailBtn: React.CSSProperties = {
   background: 'transparent', border: 'none', color: T.textLo, cursor: 'pointer',
-  fontFamily: T.fontMono, fontSize: 10, padding: '1px 2px',
+  fontFamily: T.fontMono, fontSize: T.t2xs, padding: '1px 2px',
 };
 
 /**

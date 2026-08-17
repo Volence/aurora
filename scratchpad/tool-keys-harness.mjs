@@ -276,6 +276,22 @@ async function main() {
       finalTool === 'select', `tool is ${finalTool}`);
   } finally {
     if (c) {
+      // CLOSE THE TAB, not just the files. Deleting the document on disk while
+      // its tab is still in the stored session leaves the NEXT launch parked on
+      // the inert "this canvas could not be loaded" pane — the app behaving
+      // correctly about a mess this harness made. (That cost a later run three
+      // restarts before the cause was obvious.) Nothing here is dirty, so the
+      // close is silent.
+      try {
+        await c.evalExpr(`(() => {
+          const tab = [...document.querySelectorAll('*')].find((e) => /Canvas · toolkeys/.test(e.textContent || '')
+            && e.querySelector && e.querySelector('[aria-label*="Close"], [title*="Close"]'));
+          const x = tab && tab.querySelector('[aria-label*="Close"], [title*="Close"]');
+          if (x) { x.click(); return true; }
+          return false;
+        })()`);
+        await sleep(600);
+      } catch { /* the window may already be going away */ }
       try { await c.send('Runtime.evaluate', { expression: 'window.close()' }); } catch { /* target dies mid-call */ }
       await sleep(3000);
       try { c.close(); } catch { /* */ }

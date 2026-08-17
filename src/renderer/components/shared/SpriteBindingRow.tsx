@@ -35,7 +35,7 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '8px 12px', borderTop: `1px solid ${T.border}`, display: 'flex',
     flexDirection: 'column', gap: 4,
   },
-  label: { fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.5, color: T.textLo },
+  label: { fontSize: T.t2xs, textTransform: 'uppercase', letterSpacing: 0.5, color: T.textLo },
   select: {
     padding: '4px 6px', background: T.border, color: T.textHi,
     border: `1px solid ${T.borderStrong}`, borderRadius: 4, fontSize: T.tSm,

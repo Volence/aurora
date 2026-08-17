@@ -68,7 +68,7 @@ function PaletteLinePicker() {
               cursor: 'pointer',
             }}
           >
-            <span style={{ fontSize: 9, lineHeight: 1, color: active ? T.onAccent : T.textLo }}>{li}</span>
+            <span style={{ fontSize: T.t2xs, lineHeight: 1, color: active ? T.onAccent : T.textLo }}>{li}</span>
             <span style={{
               width: 32, height: 8, borderRadius: 2,
               background: lineGradient(lines[li]?.colors ?? []),

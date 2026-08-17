@@ -147,8 +147,8 @@ const styles: Record<string, React.CSSProperties> = {
   stepCell: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, padding: 3, background: T.void, borderWidth: 1, borderStyle: 'solid', borderColor: T.borderStrong, borderRadius: 4 },
   stepLive: { borderColor: T.success, boxShadow: `0 0 0 1px ${T.success}` },
   stepMeta: { display: 'flex', alignItems: 'center', gap: 2 },
-  stepLabel: { fontSize: 10, color: T.textBase },
-  dur: { width: 34, background: T.raised, color: T.textHi, border: `1px solid ${T.borderStrong}`, borderRadius: T.rMd, fontSize: 10, padding: '1px 2px' },
+  stepLabel: { fontSize: T.t2xs, color: T.textBase },
+  dur: { width: 34, background: T.raised, color: T.textHi, border: `1px solid ${T.borderStrong}`, borderRadius: T.rMd, fontSize: T.t2xs, padding: '1px 2px' },
   del: { background: 'none', border: 'none', color: T.error, cursor: 'pointer', fontSize: T.tBase, lineHeight: 1, padding: 0 },
   addStep: { alignSelf: 'center', padding: '4px 10px', background: T.raised, color: T.textHi, border: `1px dashed ${T.borderStrong}`, borderRadius: 4, cursor: 'pointer', fontSize: T.tSm, whiteSpace: 'nowrap' },
 };

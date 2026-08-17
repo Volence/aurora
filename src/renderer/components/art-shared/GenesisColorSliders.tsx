@@ -73,10 +73,10 @@ export default function GenesisColorSliders({
 
 const styles: Record<string, React.CSSProperties> = {
   panel: { display: 'flex', flexDirection: 'column', gap: 4, padding: 6, background: T.void, border: `1px solid ${T.border}`, borderRadius: 4 },
-  header: { display: 'flex', justifyContent: 'space-between', fontSize: 10, color: T.textBase, marginBottom: 2 },
+  header: { display: 'flex', justifyContent: 'space-between', fontSize: T.t2xs, color: T.textBase, marginBottom: 2 },
   word: { fontFamily: T.fontMono, color: T.warning },
   sliderRow: { display: 'flex', alignItems: 'center', gap: 6 },
-  channelLabel: { fontSize: 10, fontWeight: 700, width: 10 },
+  channelLabel: { fontSize: T.t2xs, fontWeight: T.wSemibold, width: 10 },
   slider: { flex: 1, minWidth: 0 },
-  channelValue: { fontSize: 10, fontFamily: T.fontMono, color: T.textHi, width: 10, textAlign: 'right' },
+  channelValue: { fontSize: T.t2xs, fontFamily: T.fontMono, color: T.textHi, width: 10, textAlign: 'right' },
 };

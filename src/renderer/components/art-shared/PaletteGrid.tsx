@@ -180,7 +180,7 @@ const styles: Record<string, React.CSSProperties> = {
   grid: { display: 'flex', flexDirection: 'column', gap: 2 },
   row: { display: 'flex', gap: 2, alignItems: 'stretch' },
   lineLabel: {
-    fontSize: 10, color: T.textLo, width: 10, fontFamily: T.fontMono,
+    fontSize: T.t2xs, color: T.textLo, width: 10, fontFamily: T.fontMono,
     flexShrink: 0, alignSelf: 'center',
   },
   // `flex: 1 1 0` over a fixed width: the four columns this renders in are
@@ -196,6 +196,6 @@ const styles: Record<string, React.CSSProperties> = {
   locked: { opacity: 0.35, cursor: 'not-allowed' },
   paintSel: { outline: `2px solid ${T.accent}`, outlineOffset: -1 },
   editSel: { borderWidth: 2, borderColor: T.textHi },
-  note: { fontSize: 10, color: T.textLo, padding: '4px 2px' },
-  hint: { fontSize: 9, color: T.textFaint },
+  note: { fontSize: T.t2xs, color: T.textLo, padding: '4px 2px' },
+  hint: { fontSize: T.t2xs, color: T.textFaint },
 };
