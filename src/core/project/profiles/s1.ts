@@ -79,7 +79,10 @@ export interface LevelAct {
   blocks: VariantPath;
   /** map256 chunk (256x256) definitions — Kosinski-compressed. */
   chunks: VariantPath;
-  /** collide/{ZONE}.bin — per-chunk collision-block index. */
+  /**
+   * per-BLOCK collision-shape indices, shared by all three acts of the zone
+   * (one collide/{ZONE}.bin) — block id → shape index, not chunk → anything.
+   */
   colind: VariantPath;
   /** Foreground chunk layout (uncompressed). Per act. */
   fgLayout: VariantPath;
