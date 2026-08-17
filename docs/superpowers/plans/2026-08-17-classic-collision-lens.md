@@ -387,7 +387,7 @@ export const s1CollisionFacet: FacetModule = mapFacet('collision', {
 });
 ```
 
-Import `ClassicCollisionPanel` from the component Task 6 creates. **Until Task 4 exists, stub it in this file** as a component returning a single `<div>Collision</div>` so the registration can be verified on its own; Task 6 replaces the stub with the real import.
+Import `ClassicCollisionPanel` from the component Task 6 creates. **Until Task 6 exists, stub it in this file** as a component returning a single `<div>Collision</div>` so the registration can be verified on its own; Task 6 replaces the stub with the real import.
 
 Then in `src/renderer/workspace/register-facets.ts:38`, add it to the loop:
 
@@ -419,10 +419,11 @@ git commit -m "feat(classic): grant the Collision facet
 The read side of the collision editor. Same shared map canvas as the other
 three classic map facets; the right-hand column is the difference.
 
-No facetTools entry, so it lands on \`view\`: this facet cannot write yet,
-and arriving on it holding a tool that can would misrepresent it. The
-2026-08-13 note explaining why the facet was withheld is replaced with
-what it now is, rather than deleted."
+The tool set is DECLARED as \`['view']\` rather than left to the shell
+default, which is \`['paint-collision','view']\` — and the first entry is
+the facet default, so defaulting would have landed the user on a write
+tool this facet does not implement. The 2026-08-13 note explaining why the
+facet was withheld is replaced with what it now is, rather than deleted."
 ```
 
 ---
