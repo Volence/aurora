@@ -269,6 +269,17 @@ describe('focusClassicSurface', () => {
     expect(facet()).toBe('palette');
   });
 
+  it('leaves COLLISION alone when the user clicks in the map', () => {
+    // A pointer-down on the map calls focusClassicSurface('map'), which switches
+    // any facet outside the served set to the surface primary — `layout`. The
+    // Collision facet's whole interaction IS clicking a cell, so being absent
+    // here means every probe click ejects the user from the facet doing the
+    // probing.
+    useWorkspaceStore.getState().setFacet(LEVEL_TAB, 'collision');
+    focusClassicSurface('map');
+    expect(facet()).toBe('collision');
+  });
+
   it('from ANY starting facet, a claim lands in one the surface serves', () => {
     // The closure property, read off the real SURFACE_FACETS: after clicking in
     // a surface you are always in one of ITS facets — you either already were
