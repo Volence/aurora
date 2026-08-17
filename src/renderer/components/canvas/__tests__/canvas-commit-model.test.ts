@@ -74,6 +74,19 @@ describe('reportLines', () => {
     const lines = reportLines(report({ cellsWithoutSolidity: 256 }));
     expect(lines.join('\n')).toMatch(/solidity: 256 cells have none/);
   });
+
+  it('describes what will happen, not what is missing, once the collision toggle is on', () => {
+    const lines = reportLines(
+      report({ blocksWithoutCollision: 3, blocksInheritedCollision: 1, cellsWithoutSolidity: 256 }),
+      { blocks: 3, cells: 200 },
+    );
+    const text = lines.join('\n');
+    expect(text).toMatch(/3 will get flat \(\$FF\)/);
+    expect(text).not.toMatch(/have none/);
+    // 200, not 256: withCollision skips block-0 cells within an appended
+    // chunk, so the applied count can be lower than cellsWithoutSolidity.
+    expect(text).toMatch(/200 cells will become solid/);
+  });
 });
 
 describe('refusalView', () => {

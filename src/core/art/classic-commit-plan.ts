@@ -112,7 +112,15 @@ export interface CommitReport {
 
 export interface CanvasCommitPlan {
   tileWrites: { tileIndex: number; data: Uint8Array }[];
-  blockWrites: { blockId: number; def: BlockDef; colind: number }[];
+  /**
+   * `blanked` marks a RECLAIMED id nothing took, written back as four blank
+   * cells so its stale def stops holding pool tiles hostage — not a block the
+   * commit is minting. Flagged rather than left to be inferred from array
+   * order (blanked entries are pushed after the minted ones) or from a
+   * blank-looking def, because both are silent to read and a consumer that
+   * guesses wrong either skips a real block or acts on a dead one.
+   */
+  blockWrites: { blockId: number; def: BlockDef; colind: number; blanked?: true }[];
   chunkWrites: { chunkFileIndex: number; def: ChunkDef256 }[];
   chunkAppends: ChunkDef256[];
   paletteWrites: { line: number; colors: Uint16Array }[] | null;
@@ -473,7 +481,7 @@ export function planCanvasCommit(input: CommitPlanInput): CommitPlanResult {
   // orientation relative to the displaced cell, because the engine reads colind
   // per block id and orients the heightmap by the chunk cell's flips: merging
   // two occurrences that differ in either would silently change collision.
-  const blockWrites: { blockId: number; def: BlockDef; colind: number }[] = [];
+  const blockWrites: { blockId: number; def: BlockDef; colind: number; blanked?: true }[] = [];
   const blockIdOf = new Map<string, number>();
   const reclaimBlocks = [...reclaim.blocks];
   // THE SAME THREE STATES AS THE TILE TIER, and for the same reason —
@@ -604,6 +612,7 @@ export function planCanvasCommit(input: CommitPlanInput): CommitPlanResult {
       blockId: b,
       def: { cells: Array.from({ length: 4 }, () => ({ tile: 0, xf: false, yf: false, pal: 0, pri: false })) },
       colind: 0,
+      blanked: true,
     });
     blocksZeroed++;
   }

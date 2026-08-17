@@ -64,8 +64,17 @@ export function targetOptions(chunkCount: number): { value: number | null; label
   return rows;
 }
 
-/** Human-readable lines for a successful plan's report, in display order. */
-export function reportLines(r: CommitReport): string[] {
+/**
+ * Human-readable lines for a successful plan's report, in display order.
+ *
+ * `applied` is `withCollision(plan).applied` — pass it when the "Give new art
+ * collision" toggle is on, so the preview describes the plan that will
+ * actually be applied rather than the one the planner produced before the
+ * toggle. Its `cells` count is the more precise one: `r.cellsWithoutSolidity`
+ * counts every appended cell with no predecessor, block 0 (blank) included,
+ * while `applied.cells` counts only the ones that actually gain solidity.
+ */
+export function reportLines(r: CommitReport, applied?: { blocks: number; cells: number }): string[] {
   const lines = [
     `tiles: ${r.tilesNew} new · ${r.tilesReused} reused · ${r.tilesReclaimed} reclaimed`,
     `blocks: ${r.blocksNew} new · ${r.blocksReused} reused · ${r.blocksReclaimed} reclaimed`,
@@ -76,12 +85,16 @@ export function reportLines(r: CommitReport): string[] {
   // Collision is stated whenever any of it is missing, because "the player falls
   // through this" is the one outcome that must never be discovered in game.
   if (r.blocksWithoutCollision > 0) {
-    lines.push(`collision: ${r.blocksInheritedCollision} inherited · ${r.blocksWithoutCollision} have none`);
+    lines.push(applied
+      ? `collision: ${r.blocksInheritedCollision} inherited · ${applied.blocks} will get flat ($FF)`
+      : `collision: ${r.blocksInheritedCollision} inherited · ${r.blocksWithoutCollision} have none`);
   } else if (r.blocksInheritedCollision > 0) {
     lines.push(`collision: all ${r.blocksInheritedCollision} inherited`);
   }
   if (r.cellsWithoutSolidity > 0) {
-    lines.push(`solidity: ${r.cellsWithoutSolidity} cells have none (appended chunks)`);
+    lines.push(applied
+      ? `solidity: ${applied.cells} cell${applied.cells === 1 ? '' : 's'} will become solid (appended chunks)`
+      : `solidity: ${r.cellsWithoutSolidity} cells have none (appended chunks)`);
   }
   return lines;
 }

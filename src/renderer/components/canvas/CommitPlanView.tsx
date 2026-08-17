@@ -4,6 +4,7 @@ import { useEditableTileRange } from '../classic/composer-shared';
 import { Chip, Select, Divider, T } from '../ui';
 import type { PixelBuffer } from '../../../core/art/pixel-ops';
 import type { CommitTarget, PaletteResolution, CanvasCommitPlan } from '../../../core/art/classic-commit-plan';
+import { withCollision } from '../../../core/art/commit-collision';
 import {
   canvasChunkCapacity, defaultTargets, targetOptions, reportLines, refusalView,
   planFromSnapshot, type RefusalView,
@@ -41,6 +42,11 @@ export default function CommitPlanView({ pixels, palette, gridOrigin, onApplied 
   const [targets, setTargets] = useState<CommitTarget[] | null>(null);
   const [resolution, setResolution] = useState<PaletteResolution>('none');
   const [applied, setApplied] = useState<string | null>(null);
+  // Off by default — a commit is already a big operation over someone's level,
+  // and silently assigning collision to art nobody has looked at is a decision
+  // the artist did not make. The report already says the art has none; this
+  // makes acting on it one click, not zero.
+  const [giveCollision, setGiveCollision] = useState(false);
 
   const cap = useMemo(
     () => canvasChunkCapacity(pixels.width, pixels.height),
@@ -82,6 +88,12 @@ export default function CommitPlanView({ pixels, palette, gridOrigin, onApplied 
 
   const view: RefusalView | null = result && !result.ok ? refusalView(result.refusal) : null;
   const plan: CanvasCommitPlan | null = result && result.ok ? result.plan : null;
+  // The toggle folds into the SAME plan and the SAME undo step — never a
+  // second edit chasing the commit. When off, this is just `plan`.
+  const collisionPlan = plan && giveCollision && levelDoc
+    ? withCollision(plan, levelDoc.collision.colind.length)
+    : null;
+  const effectivePlan = collisionPlan ?? plan;
 
   const setTarget = (i: number, value: number | null) => {
     setTargets(effectiveTargets.map((t, j) => (j === i ? { chunkFileIndex: value } : t)));
@@ -89,8 +101,8 @@ export default function CommitPlanView({ pixels, palette, gridOrigin, onApplied 
   };
 
   const apply = () => {
-    if (!plan) return;
-    const r = classicCommitCanvas(plan);
+    if (!effectivePlan) return;
+    const r = classicCommitCanvas(effectivePlan);
     setApplied(r.ok
       ? `Committed to ${ref.zone.toUpperCase()} ${ref.act}.`
       : `Refused: ${'error' in r ? r.error : 'unknown'}`);
@@ -160,8 +172,14 @@ export default function CommitPlanView({ pixels, palette, gridOrigin, onApplied 
 
       {plan && (
         <>
-          <div style={styles.report}>
-            {reportLines(plan.report).map((l) => <div key={l}>{l}</div>)}
+          <div style={styles.reportRow}>
+            <div style={styles.report}>
+              {reportLines(plan.report, collisionPlan?.applied).map((l) => <div key={l}>{l}</div>)}
+            </div>
+            <Chip onClick={() => setGiveCollision((v) => !v)} active={giveCollision}
+                  title="Give new art solid, flat collision — the artist refines it in the Collision facet afterward">
+              Give new art collision
+            </Chip>
           </div>
           {plan.report.warnings.map((w) => <div key={w} style={styles.warning}>{w}</div>)}
           {resolution !== 'none' && (
@@ -192,6 +210,7 @@ const styles: Record<string, React.CSSProperties> = {
   note: { fontSize: T.tXs, color: T.textLo, lineHeight: 1.4 },
   row: { display: 'flex', alignItems: 'center', gap: 6 },
   rowLabel: { fontSize: T.tXs, color: T.textLo, minWidth: 52 },
+  reportRow: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 6 },
   report: { fontSize: T.tXs, color: T.textBase, lineHeight: 1.5, fontVariantNumeric: 'tabular-nums' },
   warning: { fontSize: T.tXs, color: T.warning, lineHeight: 1.4 },
   refusal: { display: 'flex', flexDirection: 'column', gap: 4 },
