@@ -91,8 +91,9 @@ describe('s1Adapter.open resolution', () => {
       // the only classic facet that swaps the canvas, and the four before it
       // are lenses over one map. `objects` merged into `layout` for a day and
       // was reversed once the reorder made the split read correctly.
-      // `collision` is the READ side of the collision editor (spec stage 3a),
-      // granted 2026-08-17. `rings` stays out — S1 rings are objects in objpos,
+      // `collision` was granted read-only 2026-08-17 (spec stage 3a) and made
+      // writable the same day (stage 3b, the shape picker over
+      // paint-collision). `rings` stays out — S1 rings are objects in objpos,
       // not a separate layer. Argued at the grant itself (core/project/s1/index.ts).
       facets: ['layout', 'objects', 'collision', 'palette', 'art'],
       artTiers: [
@@ -108,13 +109,15 @@ describe('s1Adapter.open resolution', () => {
       // briefly re-created. See CapabilityManifest.facetTools — declaring
       // REPLACES.
       //
-      // `collision` is declared as `['view']` — NOT omitted. The shell default
-      // for collision is `['paint-collision', 'view']` and the first entry is
-      // the facet default (facet-tools.ts), so omitting the entry would land
-      // the user on a write tool this read-only facet does not implement.
+      // `collision` is declared as `['view', 'paint-collision']` — same order
+      // as the shell default, restated rather than omitted so this test still
+      // pins the facet's actual tool set. Stage 3b (2026-08-17) made the facet
+      // write; `view` stays first because the first entry is the facet default
+      // (facet-tools.ts), so arriving on Collision still hands you the
+      // read-only probe, not an armed write tool.
       facetTools: {
         layout: ['view', 'stamp-chunk', 'select'],
-        collision: ['view'],
+        collision: ['view', 'paint-collision'],
       },
     });
     expect(handle.report.total).toBe(ENTRIES.length);

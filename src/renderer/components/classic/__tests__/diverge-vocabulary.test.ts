@@ -19,6 +19,12 @@
 // The STORE still says `paintDivergeMode` / `SurfaceDivergeMode`, deliberately:
 // UX-A6 is about the words on screen, and those identifiers are documented at
 // length in classicLevelStore. This file guards the screen.
+//
+// Collision's own field is `collisionDiverge` / `setCollisionDiverge` (stage
+// 3b) — a different field from the art tiers' `paintDivergeMode`, deliberately
+// (classicLevelStore.ts's docblock on `collisionDiverge` says why), but the
+// same kind of identifier: a store name, not screen text. Carved out below for
+// the same reason `paintDivergeMode` is.
 
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -34,6 +40,12 @@ const code = (p: string): string => readFileSync(join(R, p), 'utf8')
 const SURFACES: Array<[string, string]> = [
   ['BlockTab', code('components/classic/BlockTab.tsx')],
   ['ChunkTab', code('components/classic/ChunkTab.tsx')],
+  // Collision's OWN Link/Isolate field (collisionDiverge, stage 3b) is a
+  // different mode from the art tiers' paintDivergeMode (see
+  // classicLevelStore.ts's docblock on collisionDiverge for why they are not
+  // shared), but it is the SAME CONCEPT — fork vs. propagate — so it gets the
+  // same one word, mechanically enforced here rather than by imitation.
+  ['ClassicCollisionPanel', code('components/classic/ClassicCollisionPanel.tsx')],
 ];
 
 describe.each(SURFACES)('%s composer vocabulary', (name, src) => {
@@ -42,8 +54,12 @@ describe.each(SURFACES)('%s composer vocabulary', (name, src) => {
   });
 
   it('shows no "Diverge" anywhere the artist can read it', () => {
-    // Screen text only — `paintDivergeMode` is the store field and stays.
-    const rendered = src.replace(/\bpaint(?:Diverge|)Mode\b|\bsetPaintDivergeMode\b|\bSurfaceDivergeMode\b/g, '');
+    // Screen text only — `paintDivergeMode` / `collisionDiverge` are store
+    // fields and stay.
+    const rendered = src.replace(
+      /\bpaint(?:Diverge|)Mode\b|\bsetPaintDivergeMode\b|\bSurfaceDivergeMode\b|\bcollisionDiverge\b|\bsetCollisionDiverge\b/g,
+      '',
+    );
     expect(rendered, `${name}: "Diverge" is still rendered`).not.toMatch(/Diverge/);
   });
 

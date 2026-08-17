@@ -968,6 +968,40 @@ describe('collision probe point', () => {
   });
 });
 
+describe('collision shape + diverge mode', () => {
+  beforeEach(() => { openReady(); });
+
+  it('defaults to no armed shape and Link — the non-destructive path spec §4.5 requires', () => {
+    // Isolate spends a block id and can grow the colind table (classic-write.ts's
+    // overhang refusal — GHZ/SBZ refuse it outright). Link only ever rewrites one
+    // existing table entry. Defaulting to Isolate would make the more destructive
+    // operation the one a user reaches with zero clicks; spec §4.5 forbids that,
+    // so Link is the default here even though the art tiers default the other way.
+    expect(st().collisionShape).toBeNull();
+    expect(st().collisionDiverge).toBe('link');
+  });
+
+  it('setCollisionShape and setCollisionDiverge set independently and survive a probe change', () => {
+    st().setCollisionShape(7);
+    st().setCollisionDiverge('isolate');
+    st().setCollisionProbe({ x: 40, y: 72 });
+    expect(st().collisionShape).toBe(7);
+    expect(st().collisionDiverge).toBe('isolate');
+    expect(st().collisionProbe).toEqual({ x: 40, y: 72 });
+  });
+
+  it('opening a new act clears the armed shape but leaves the diverge mode alone', () => {
+    // An armed shape names an index into the act you armed it in; Link/Isolate is
+    // a standing preference, like a tool choice — the same asymmetry openAct's
+    // `fresh` already applies to selectedChunkId (per-act) vs the tool (kept).
+    st().setCollisionShape(7);
+    st().setCollisionDiverge('isolate');
+    void useClassicLevelStore.getState().openAct(REF);
+    expect(st().collisionShape).toBeNull();
+    expect(st().collisionDiverge).toBe('isolate');
+  });
+});
+
 describe('object-tool UI state', () => {
   it('defaults to no selection and no armed object', () => {
     expect(st().selectedObjectIndex).toBeNull();

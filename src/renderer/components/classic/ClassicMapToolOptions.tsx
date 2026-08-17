@@ -35,6 +35,14 @@ export default function ClassicMapToolOptions(): React.ReactElement {
   const selectedChunkId = useClassicLevelStore((s) => s.selectedChunkId);
   const stampLoop = useClassicLevelStore((s) => s.stampLoop);
   const armedObjectId = useClassicLevelStore((s) => s.armedObjectId);
+  // Collision facet (Task 5): the shape armed by the picker, and the Link |
+  // Isolate mode it will be written under. Read here rather than trusting
+  // the shared tool-meta hint (tool-meta.ts:46, "Click to set the collision
+  // type on tiles") — that sentence is aeon's model, a TYPE assigned per
+  // TILE. Classic assigns a SHAPE to a BLOCK, so the wording belongs in this
+  // branch chain, where classic already overrides per-tool copy.
+  const collisionShape = useClassicLevelStore((s) => s.collisionShape);
+  const collisionDiverge = useClassicLevelStore((s) => s.collisionDiverge);
   // Through the derivation, never the raw field: the armed id is a payload that
   // a tool switch leaves behind, so reading it raw would keep announcing a
   // placement the map has already stopped offering (state/classic-placement.ts).
@@ -46,7 +54,11 @@ export default function ClassicMapToolOptions(): React.ReactElement {
       <span style={{ color: T.textFaint }}>
         {tool === 'stamp-chunk'
           ? `stamp $${selectedChunkId.toString(16).toUpperCase().padStart(2, '0')}${stampLoop && selectedChunkId >= 1 && selectedChunkId <= 0x7f ? ' ∞loop' : ''} · drag to paint · right-click eyedrops · scroll to zoom`
-          : armedId != null
+          : tool === 'paint-collision'
+            ? (collisionShape != null
+                ? `click to write shape ${collisionShape} (${collisionDiverge === 'link' ? 'Link' : 'Isolate'}) to the block under the cursor`
+                : 'no shape armed — pick one in the Collision panel')
+            : armedId != null
             ? `click to place ${s1ObjectName(armedId)} · Esc cancels`
             : tool === 'place-object'
               ? 'no object armed — pick one from the Objects panel · Esc cancels'

@@ -203,12 +203,13 @@ interface ClassicLevelState {
   /**
    * The level-pixel point last clicked on the Collision facet, or null.
    *
-   * The Collision facet is read-only — `view` stays armed, so a left-drag pans
-   * and a right-click still eyedrops a chunk into `selectedChunkId`. Neither of
-   * those tells the (future) Collision panel WHERE the user clicked, and there
-   * was no existing channel for a non-writing tool to report a point at all.
-   * This is that channel: set from the viewport's left-click path only while
-   * the collision facet is active, read by the panel to call `probeCollision`.
+   * `view` is the Collision facet's DEFAULT tool, so a left-drag pans and a
+   * right-click still eyedrops a chunk into `selectedChunkId`. Neither tells
+   * the Collision panel WHERE the user clicked, and there was no channel for a
+   * tool that writes nothing to report a point at all. This is that channel:
+   * set from the viewport's left-click path whenever the collision facet is
+   * active — including under `view`, so the readout can be consulted BEFORE
+   * deciding to write — and read by the panel to call `probeCollision`.
    *
    * LEVEL PIXELS, not layout cells and not client/screen coordinates —
    * `probeCollision(doc, x, y)` takes level pixels, so storing anything else
@@ -220,6 +221,20 @@ interface ClassicLevelState {
    * at — worse than showing nothing.
    */
   collisionProbe: { x: number; y: number } | null;
+  /** The shape the picker last armed, applied by a swatch click and by the
+   *  paint-collision tool. Null until the user picks one. */
+  collisionShape: number | null;
+  /**
+   * Link | Isolate for COLLISION writes, defaulting to Link.
+   *
+   * Deliberately NOT the art tiers' `paintDivergeMode`, though the concept is
+   * the same: that field initialises to 'isolate' and is sticky across
+   * surfaces, so sharing it would (a) default this facet to the block-spending,
+   * table-growing path against spec §4.5, and (b) mean setting Link here
+   * silently re-arms Link in the art composer, where the next stroke propagates
+   * pixels to every use of a shared tile.
+   */
+  collisionDiverge: 'link' | 'isolate';
   /**
    * Whether the stamp tool writes S1's bit-7 loop flag alongside the chunk id
    * (Task B4). Only meaningful for an armed engine id 1..$7F — air ($00) never
@@ -296,6 +311,10 @@ interface ClassicLevelState {
   setSelectedChunkId: (chunkId: number) => void;
   /** Record (or clear, with null) the Collision facet's last-clicked point. */
   setCollisionProbe: (point: { x: number; y: number } | null) => void;
+  /** Arm (or clear, with null) the shape a swatch click or paint-collision applies. */
+  setCollisionShape: (shape: number | null) => void;
+  /** Switch the Collision facet's write mode between Link and Isolate. */
+  setCollisionDiverge: (mode: 'link' | 'isolate') => void;
   /**
    * The Composer picker's plain left-click select: sets the chunk AND arms the
    * stamp tool (unless it's already active). Distinct from setSelectedChunkId
@@ -354,6 +373,11 @@ const IDLE = {
   tileVersions: new Map<number, number>(),
   selectedChunkId: 0,
   collisionProbe: null as { x: number; y: number } | null,
+  collisionShape: null as number | null,
+  // Link, not Isolate: the non-destructive path (spec §4.5) — see the field's
+  // docblock in the state interface for why this is not shared with
+  // paintDivergeMode, which defaults the other way.
+  collisionDiverge: 'link' as 'link' | 'isolate',
   stampLoop: false,
   selectedObjectIndex: null as number | null,
   armedObjectId: null as number | null,
@@ -438,6 +462,12 @@ export const useClassicLevelStore = create<ClassicLevelState>((set, get) => ({
       // freshly-loaded act would have the Collision panel confidently
       // describing a cell the user is no longer looking at.
       collisionProbe: null as { x: number; y: number } | null,
+      // An armed shape names an index into THIS act's shape table (and belongs
+      // to the block the user was looking at) — cleared per act, same reason as
+      // collisionProbe just above. collisionDiverge is deliberately NOT reset
+      // here: Link/Isolate is a standing preference, like a tool choice, not
+      // per-act document data (compare paintDivergeMode, also absent from `fresh`).
+      collisionShape: null as number | null,
       stampLoop: false,
       // Object selection + place-arm are per-act too (indices/ids into this act's
       // object list), so a fresh act clears them.
@@ -514,6 +544,8 @@ export const useClassicLevelStore = create<ClassicLevelState>((set, get) => ({
     if (Number.isInteger(chunkId) && chunkId >= 0 && chunkId <= 0xff) set({ selectedChunkId: chunkId });
   },
   setCollisionProbe: (point: { x: number; y: number } | null) => set({ collisionProbe: point }),
+  setCollisionShape: (shape: number | null) => set({ collisionShape: shape }),
+  setCollisionDiverge: (mode: 'link' | 'isolate') => set({ collisionDiverge: mode }),
   selectChunkForStamp: (chunkId: number) => {
     if (!Number.isInteger(chunkId) || chunkId < 0 || chunkId > 0xff) return;
     set({ selectedChunkId: chunkId });

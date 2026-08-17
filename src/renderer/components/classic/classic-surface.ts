@@ -64,8 +64,9 @@ export type ClassicSurface = 'map' | 'art';
  *     layout is the chunk picker over `view / stamp-chunk / select`; objects is
  *     the inspector and the library over `place-object / select / view`; palette
  *     is the CRAM grid over `view` alone, judging a recolour against the whole
- *     act; collision is the read-only cell explainer over `view` alone, judging
- *     a clicked cell against the zone's colind.
+ *     act; collision is the cell explainer over `view / paint-collision`,
+ *     judging a clicked cell against the zone's colind and, from stage 3b,
+ *     writing a picked shape to it.
  *   • `art`  → `art` + `palette`. One ClassicComposerDock is the canvas, with
  *     ClassicPalettePanel a section in its column.
  *

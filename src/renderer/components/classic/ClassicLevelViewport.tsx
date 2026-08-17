@@ -15,6 +15,7 @@ import { objectArtKey } from '../../../core/project/profiles/object-subtype-rule
 import { objectSpriteEpoch } from '../../../core/level-classic/object-sprite-clock';
 import { useToastStore } from '../../state/toastStore';
 import { renderChunk } from '../../../core/level-classic/render';
+import { applyCollisionShape } from '../../state/collision-dispatch';
 import type { LevelDoc } from '../../../core/level-classic/model';
 import { s1ObjectIsInvisible } from '../../../core/project/profiles/s1-objects';
 import {
@@ -140,8 +141,9 @@ export default function ClassicLevelViewport() {
   // here would only re-render the canvas host for a toggle it cannot show.
   const setSelectedChunkId = useClassicLevelStore((s) => s.setSelectedChunkId);
   const setStampLoop = useClassicLevelStore((s) => s.setStampLoop);
-  // Collision facet's click channel (Task 5) — a read-only point report, not a
-  // write. See collisionProbe's docblock on the store for why it exists.
+  // Collision facet's click channel — where the user clicked, which the panel
+  // turns into a probe. Separate from the WRITE below: the point is reported on
+  // every click, the write only when paint-collision is armed.
   const setCollisionProbe = useClassicLevelStore((s) => s.setCollisionProbe);
   // Task 14 object-tool UI state (selection index + armed place-mode id).
   const selectedObjectIndex = useClassicLevelStore((s) => s.selectedObjectIndex);
@@ -694,9 +696,10 @@ export default function ClassicLevelViewport() {
       return;
     }
     if (e.button !== 0) return; // left drags tools; right-click eyedrops (below)
-    // Collision facet click channel (Task 5): the facet is read-only (`view`
-    // stays armed there), so a left-drag pans and there was no other route by
-    // which the user could tell a future panel WHERE they clicked. Read via
+    // Collision facet click channel: `view` is the facet DEFAULT, so a plain
+    // left-drag still pans and there was no other route by which the user could
+    // tell the panel WHERE they clicked. The panel reads this on every click;
+    // the write below happens only with paint-collision armed. Read via
     // getState() rather than the closured `ref`/`tool` above, since neither is
     // in this callback's dependency list.
     const activeRef = useClassicLevelStore.getState().ref;
@@ -708,7 +711,25 @@ export default function ClassicLevelViewport() {
         // takes level pixels directly, so this is the point to capture, not
         // a cell.
         const world = worldUnderCursor(e);
-        if (world) setCollisionProbe({ x: world.x, y: world.y });
+        if (world) {
+          // PROBE ON EVERY CLICK, whatever the armed tool — a readout that only
+          // works while holding paint-collision could not be consulted before
+          // deciding whether to write, which is backwards for a tool whose
+          // whole job is to inform that decision.
+          setCollisionProbe({ x: world.x, y: world.y });
+          // The write is gated on BOTH paint-collision being armed AND a shape
+          // having been picked (Task 6's picker arms one). Routed through the
+          // one dispatch helper (renderer/state/collision-dispatch.ts) — never
+          // classicSetColind / classicPaintSurface directly — so the Link/
+          // Isolate decision exists in exactly one place.
+          if (tool === 'paint-collision') {
+            const shape = useClassicLevelStore.getState().collisionShape;
+            if (shape != null) {
+              const res = applyCollisionShape(shape);
+              if (!res.ok) useToastStore.getState().addToast(res.why, 'error');
+            }
+          }
+        }
         // Deliberately NOT a return: the map still pans on this facet, so the
         // gesture must fall through to the pan-arm at the bottom of this
         // handler exactly like it would on any other read-only tool state.

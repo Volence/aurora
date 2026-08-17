@@ -1,10 +1,14 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useClassicLevelStore } from '../../state/classicLevelStore';
 import { probeCollision, LOOP_ALIAS, type CollisionProbe } from '../../../core/level-classic/collision-probe';
+import { collisionShapeChoices, type CollisionShapeChoice } from '../../../core/level-classic/collision-choices';
+import { heightSparkline } from '../../../core/collision/collision-render';
+import { applyCollisionShape } from '../../state/collision-dispatch';
 import { claimCollisionOverlay } from '../collision-overlay-scope';
 import { classicCollisionOverlayPort } from '../../providers/collision-overlay-classic';
 import { SOLIDITY, hex } from './composer-shared';
-import { T } from '../ui';
+import { T, Chip } from '../ui';
+import type { LevelDoc } from '../../../core/level-classic/model';
 
 /**
  * COLLISION's right-hand column, over the pure `probeCollision`.
@@ -26,8 +30,27 @@ import { T } from '../ui';
  *    summed across all three acts — a number this panel cannot compute either,
  *    for the same one-act reason. So it says "chunk cells", never bare "cells".
  *
- * READ-ONLY, on purpose, in this stage: solidity is edited on the Chunk tab
- * (ChunkTab.tsx), not here — see the footer note.
+ * WRITES, from stage 3b on — but only the SHAPE. "This block" ends in a shape
+ * picker: click a swatch to assign that shape to the block under the probed
+ * cell, either zone-wide (Link, one `colind` entry) or for this cell alone
+ * (Isolate, clones the block). Solidity is still edited on the Chunk tab
+ * (ChunkTab.tsx) — see the footer note, which used to say the whole facet was
+ * read-only and now says exactly this split.
+ *
+ * EVERY WRITE GOES THROUGH `applyCollisionShape` (renderer/state/collision-
+ * dispatch.ts) — the panel does not build a `SurfaceEditPlan` or call
+ * `classicSetColind` / `classicPaintSurface` itself, matching the viewport's
+ * `paint-collision` tool (ClassicLevelViewport.tsx), which arms the same
+ * store field (`collisionShape`) and calls the same helper. Two gestures
+ * (click a swatch, or arm the tool and click the map), one write path.
+ *
+ * REFUSALS SHOW HERE, next to the swatch that triggered them — not a toast
+ * that scrolls away — because two of them are the load-bearing kind: an
+ * Isolate that would extend this zone's `colind` table past its blocks
+ * (GHZ, SBZ) is refused outright, and the refusal names the exact entry count
+ * and the alternative (Link, accepting the change reaches every use of the
+ * block). See `planCollisionWrite` (core/level-classic/collision-write.ts)
+ * for where that text is built; this panel only displays it.
  *
  * SHADING: mounting this facet claims the map's collision overlay through
  * `claimCollisionOverlay` (collision-overlay-scope.ts) via a classic port
@@ -81,11 +104,11 @@ export default function ClassicCollisionPanel(): React.ReactElement {
       ) : (
         <>
           <CellSection probe={probe} />
-          <BlockSection probe={probe} />
+          <BlockSection probe={probe} doc={doc!} />
         </>
       )}
       <div style={styles.footer}>
-        Read-only for now — solidity is edited on the Chunk tab.
+        The shape is editable here — solidity is still edited on the Chunk tab.
         <br />
         Shading is a floor heightmap only: the Rotated array is enumerated but
         never loaded, so a hack whose Rotated data has drifted from Regular
@@ -119,7 +142,7 @@ function CellSection({ probe }: { probe: CollisionProbe }): React.ReactElement {
   );
 }
 
-function BlockSection({ probe }: { probe: CollisionProbe }): React.ReactElement {
+function BlockSection({ probe, doc }: { probe: CollisionProbe; doc: LevelDoc }): React.ReactElement {
   if (probe.reason === 'air') {
     return (
       <div style={styles.section}>
@@ -134,7 +157,97 @@ function BlockSection({ probe }: { probe: CollisionProbe }): React.ReactElement 
       <Row label="Block" value={hex(probe.blockId)} />
       <Row label="Shape" value={String(probe.shapeIndex)} />
       <Row label="Named by" value={`${probe.blockCells} chunk cells`} />
+      <ShapePicker doc={doc} probe={probe} />
     </div>
+  );
+}
+
+/**
+ * The shape grid: this zone's used shapes first and marked (`collisionShapeChoices`),
+ * the block's CURRENT shape highlighted. A swatch click both ARMS the shape
+ * (`setCollisionShape`, so the `paint-collision` map tool picks up the same
+ * choice on its next click) and WRITES it to the probed block right away
+ * (`applyCollisionShape`) — the plan's "two gestures, one piece of state".
+ *
+ * THUMBNAIL CHOICE: `heightSparkline`, not `columnSolidRun`. A zone's used-shape
+ * count runs to 109 (SLZ) and the full table to roughly 247 distinct patterns —
+ * a grid that size wants a cheap monospace text row per swatch, not a drawn
+ * 16x16 canvas per swatch (a quarter-thousand offscreen canvases for one
+ * picker). `columnSolidRun` earns its keep where there is exactly one shape to
+ * draw large (a future single-shape detail view); a grid of many wants the
+ * text-cheap row.
+ *
+ * REFUSALS render inline, right below the Link/Isolate chips — not a toast —
+ * because the two that matter (an Isolate that would extend this zone's
+ * `colind` table past its blocks) carry numbers and an alternative the user
+ * needs to read while still looking at the picker, not chase across the
+ * screen. `planCollisionWrite` builds that text; this only displays it.
+ */
+function ShapePicker({ doc, probe }: { doc: LevelDoc; probe: CollisionProbe }): React.ReactElement {
+  const collisionDiverge = useClassicLevelStore((s) => s.collisionDiverge);
+  const setCollisionDiverge = useClassicLevelStore((s) => s.setCollisionDiverge);
+  const setCollisionShape = useClassicLevelStore((s) => s.setCollisionShape);
+  const [refusal, setRefusal] = useState<string | null>(null);
+
+  const choices = useMemo(() => collisionShapeChoices(doc), [doc]);
+
+  // A refusal belongs to the cell it happened on — probing a different cell
+  // clears it rather than leaving a stale warning glued to a new block.
+  useEffect(() => { setRefusal(null); }, [probe.chunkIndex, probe.cellIndex]);
+
+  const pick = (index: number) => {
+    setCollisionShape(index);
+    const result = applyCollisionShape(index);
+    setRefusal(result.ok ? null : result.why);
+  };
+
+  return (
+    <div style={styles.picker}>
+      <div style={styles.rowWrap}>
+        <span style={styles.dim} title="What a picked shape does to the OTHER cells that share this block">Edits:</span>
+        <Chip
+          active={collisionDiverge === 'link'}
+          onClick={() => setCollisionDiverge('link')}
+          title="The new shape applies everywhere this block is used, zone-wide"
+        >Link</Chip>
+        <Chip
+          active={collisionDiverge === 'isolate'}
+          onClick={() => setCollisionDiverge('isolate')}
+          title="The new shape applies to this cell only — the block is cloned"
+        >Isolate</Chip>
+      </div>
+      {refusal && <div style={styles.refusal}>{refusal}</div>}
+      <div style={styles.grid}>
+        {choices.map((c) => (
+          <ShapeSwatch key={c.index} choice={c} current={c.index === probe.shapeIndex} onClick={() => pick(c.index)} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ShapeSwatch({ choice, current, onClick }: {
+  choice: CollisionShapeChoice; current: boolean; onClick: () => void;
+}): React.ReactElement {
+  return (
+    <button
+      onClick={onClick}
+      title={
+        `shape ${choice.index}` +
+        (choice.usedInZone
+          ? ` — used by ${choice.blocks} block${choice.blocks === 1 ? '' : 's'} in this zone`
+          : ' — not used in this zone yet')
+      }
+      style={{
+        ...styles.swatch,
+        background: current ? T.accent : choice.usedInZone ? T.raised : T.void,
+        color: current ? T.onAccent : T.textBase,
+        borderColor: current ? T.accent : T.border,
+      }}
+    >
+      <span style={styles.swatchIndex}>{choice.index}</span>
+      <span style={styles.swatchLine}>{heightSparkline(choice.heights)}</span>
+    </button>
   );
 }
 
@@ -176,6 +289,23 @@ const styles: Record<string, React.CSSProperties> = {
   reason: { color: T.warning, fontSize: T.tXs, marginTop: 2 },
   warn: { color: T.warning, fontSize: T.tXs, marginTop: 4, lineHeight: 1.4 },
   dim: { color: T.textLo, fontSize: T.tSm },
+  picker: { display: 'flex', flexDirection: 'column', gap: T.s2, marginTop: T.s2 },
+  rowWrap: { display: 'flex', alignItems: 'center', gap: T.s2, flexWrap: 'wrap' },
+  refusal: {
+    color: T.warning, fontSize: T.tXs, lineHeight: 1.4, background: T.raised,
+    border: `1px solid ${T.warning}`, borderRadius: T.rMd, padding: T.s2,
+  },
+  grid: {
+    display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(52px, 1fr))',
+    gap: T.s1, maxHeight: 220, overflowY: 'auto', paddingRight: 2,
+  },
+  swatch: {
+    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1,
+    padding: `${T.s1} 2px`, borderRadius: T.rSm, borderWidth: 1, borderStyle: 'solid',
+    cursor: 'pointer', fontFamily: T.fontMono,
+  },
+  swatchIndex: { fontSize: T.t2xs },
+  swatchLine: { fontSize: T.tXs, lineHeight: 1 },
   footer: {
     color: T.textFaint, fontSize: T.t2xs, lineHeight: 1.4, borderTop: `1px solid ${T.border}`,
     paddingTop: T.s2, marginTop: T.s2,
