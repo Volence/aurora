@@ -15,6 +15,7 @@ import { objectArtKey } from '../../../core/project/profiles/object-subtype-rule
 import { objectSpriteEpoch } from '../../../core/level-classic/object-sprite-clock';
 import { useToastStore } from '../../state/toastStore';
 import { renderChunk } from '../../../core/level-classic/render';
+import { applyCollisionShape } from '../../state/collision-dispatch';
 import type { LevelDoc } from '../../../core/level-classic/model';
 import { s1ObjectIsInvisible } from '../../../core/project/profiles/s1-objects';
 import {
@@ -708,7 +709,25 @@ export default function ClassicLevelViewport() {
         // takes level pixels directly, so this is the point to capture, not
         // a cell.
         const world = worldUnderCursor(e);
-        if (world) setCollisionProbe({ x: world.x, y: world.y });
+        if (world) {
+          // PROBE ON EVERY CLICK, whatever the armed tool — a readout that only
+          // works while holding paint-collision could not be consulted before
+          // deciding whether to write, which is backwards for a tool whose
+          // whole job is to inform that decision.
+          setCollisionProbe({ x: world.x, y: world.y });
+          // The write is gated on BOTH paint-collision being armed AND a shape
+          // having been picked (Task 6's picker arms one). Routed through the
+          // one dispatch helper (renderer/state/collision-dispatch.ts) — never
+          // classicSetColind / classicPaintSurface directly — so the Link/
+          // Isolate decision exists in exactly one place.
+          if (tool === 'paint-collision') {
+            const shape = useClassicLevelStore.getState().collisionShape;
+            if (shape != null) {
+              const res = applyCollisionShape(shape);
+              if (!res.ok) useToastStore.getState().addToast(res.why, 'error');
+            }
+          }
+        }
         // Deliberately NOT a return: the map still pans on this facet, so the
         // gesture must fall through to the pan-arm at the bottom of this
         // handler exactly like it would on any other read-only tool state.

@@ -108,13 +108,15 @@ describe('s1Adapter.open resolution', () => {
       // briefly re-created. See CapabilityManifest.facetTools — declaring
       // REPLACES.
       //
-      // `collision` is declared as `['view']` — NOT omitted. The shell default
-      // for collision is `['paint-collision', 'view']` and the first entry is
-      // the facet default (facet-tools.ts), so omitting the entry would land
-      // the user on a write tool this read-only facet does not implement.
+      // `collision` is declared as `['view', 'paint-collision']` — same order
+      // as the shell default, restated rather than omitted so this test still
+      // pins the facet's actual tool set. Stage 3b (2026-08-17) made the facet
+      // write; `view` stays first because the first entry is the facet default
+      // (facet-tools.ts), so arriving on Collision still hands you the
+      // read-only probe, not an armed write tool.
       facetTools: {
         layout: ['view', 'stamp-chunk', 'select'],
-        collision: ['view'],
+        collision: ['view', 'paint-collision'],
       },
     });
     expect(handle.report.total).toBe(ENTRIES.length);

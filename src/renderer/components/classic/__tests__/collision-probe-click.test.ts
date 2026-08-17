@@ -42,4 +42,13 @@ describe('collision facet click channel', () => {
     // assertion above would pass for the wrong reason (nothing to match).
     expect(code()).toContain('setCollisionProbe');
   });
+
+  it('probes on every click but writes only when paint-collision is armed', () => {
+    const VIEWPORT = code();
+    expect(VIEWPORT).toMatch(/setCollisionProbe/);
+    expect(VIEWPORT, 'the write must be gated on the tool').toMatch(/paint-collision/);
+    expect(VIEWPORT, 'the write goes through the dispatch helper, not the store directly')
+      .toMatch(/applyCollisionShape/);
+    expect(VIEWPORT).not.toMatch(/classicSetColind\(|classicPaintSurface\(/);
+  });
 });

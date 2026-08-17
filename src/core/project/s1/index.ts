@@ -520,14 +520,13 @@ export const s1Adapter: ProjectAdapter = {
         // tool that writes.
         facetTools: {
           layout: ['view', 'stamp-chunk', 'select'],
-          // DECLARED, not defaulted. The shell default for collision is
-          // `['paint-collision', 'view']` (renderer/workspace/facet-tools.ts:23)
-          // and its FIRST ENTRY IS THE FACET DEFAULT (same file, line 3) — so
-          // leaving this out lands the user on paint-collision, renders a
-          // "Paint Collision" button in the dock, prints a hint promising a
-          // write, and the viewport has no branch for that tool so the click
-          // falls through to pan. This facet reads; `view` is the truth.
-          collision: ['view'],
+          // DECLARED, not defaulted. Stage 3b (2026-08-17) makes the facet
+          // write, but `view` MUST stay first — the first entry is the facet
+          // default (renderer/workspace/facet-tools.ts:3) — so arriving on
+          // Collision still hands you the read-only probe, not a loaded write
+          // tool. The user arms `paint-collision` deliberately (the chip row,
+          // or the tool dock) once they have picked a shape in the panel.
+          collision: ['view', 'paint-collision'],
         },
       },
       report,
