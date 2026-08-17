@@ -37,6 +37,15 @@ import { T } from '../ui';
  * a collision overlay on (View menu), this mount declines ownership and
  * leaves it exactly as found, on the way in and the way out.
  *
+ * THE COLOUR KEY IS `CollisionLegend`, mounted in `ClassicLevelViewport`
+ * itself (beside the canvas), not duplicated here. It turned out NOT to be
+ * aeon-only despite being aeon's alone to mount before this facet: it reads
+ * only `viewStore.overlays` and the same `COLLISION_FILL_*` / `COLLISION_
+ * ANGLE_TICK` constants `classic-overlays.ts#drawCollision` already paints
+ * classic's own shading with, so classic needed no adapter — just the mount
+ * aeon already had. Reinventing an inline key here would have been a second,
+ * driftable copy of a key that already matches the shading exactly.
+ *
  * `collision.rotated` is enumerated in the S1 format but never loaded
  * (`s1-io.ts:371-372`), so every shape this panel or the map can show is a
  * floor HEIGHTMAP only. That is the whole story for stock data — Rotated never

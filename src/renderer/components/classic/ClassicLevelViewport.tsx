@@ -23,6 +23,7 @@ import {
   type ObjectHitBounds, type StampCell,
 } from './viewport-math';
 import { drawCollision, drawObjects, drawStart, GHOST_MARKER_BOUNDS } from './classic-overlays';
+import CollisionLegend from '../CollisionLegend';
 import { isTypingTarget } from './composer-shared';
 import { classicSurfaceProps } from './classic-surface';
 import { levelKeysEnabled } from '../../workspace/level-keys';
@@ -1056,22 +1057,31 @@ export default function ClassicLevelViewport() {
         style={{ flex: 1, position: 'relative', overflow: 'hidden', minHeight: 0, background: T.void }}
       >
         {status === 'ready' && doc ? (
-          <canvas
-            ref={canvasRef}
-            onMouseDown={onMouseDown}
-            onMouseMove={onMouseMove}
-            onMouseUp={onMouseUp}
-            onMouseLeave={onMouseLeave}
-            onContextMenu={onContextMenu}
-            onWheel={onWheel}
-            style={{
-              position: 'absolute', inset: 0,
-              cursor: tool === 'stamp-chunk' ? 'crosshair'
-                : armedId != null ? 'copy'
-                : tool === 'select' || tool === 'place-object' ? 'default'
-                : 'grab',
-            }}
-          />
+          <>
+            <canvas
+              ref={canvasRef}
+              onMouseDown={onMouseDown}
+              onMouseMove={onMouseMove}
+              onMouseUp={onMouseUp}
+              onMouseLeave={onMouseLeave}
+              onContextMenu={onContextMenu}
+              onWheel={onWheel}
+              style={{
+                position: 'absolute', inset: 0,
+                cursor: tool === 'stamp-chunk' ? 'crosshair'
+                  : armedId != null ? 'copy'
+                  : tool === 'select' || tool === 'place-object' ? 'default'
+                  : 'grab',
+              }}
+            />
+            {/* Engine-neutral: reads only viewStore.overlays and the shared
+                canvas-colors constants drawCollision (classic-overlays.ts)
+                already paints with, so it needs no classic-specific port.
+                Self-gated on showCollision/showCollisionPathB, so mounting it
+                unconditionally here (same as aeon's MapViewport) costs nothing
+                on the four map facets that never turn shading on. */}
+            <CollisionLegend />
+          </>
         ) : (
           <div style={{
             position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
