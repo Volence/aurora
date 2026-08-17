@@ -25,8 +25,30 @@ describe('ClassicCollisionPanel', () => {
     expect(src).toMatch(/This block/);
   });
 
-  it('states that it cannot write yet, and where solidity is edited', () => {
+  it('routes every write through the dispatch helper', () => {
+    expect(src).toMatch(/applyCollisionShape/);
+    expect(src, 'the panel must not build a plan or call a store command itself')
+      .not.toMatch(/newBlocks:|classicSetColind\(|classicPaintSurface\(/);
+  });
+
+  it('no longer claims to be read-only, and still says where solidity lives', () => {
+    expect(src).not.toMatch(/Read-only/i);
     expect(src).toMatch(/Chunk tab/);
+  });
+
+  it('shows a refusal where the picker is', () => {
+    expect(src).toMatch(/refus|why/i);
+  });
+
+  it('uses the composer vocabulary for the mode, not a second one', () => {
+    expect(src).toMatch(/Edits:/);
+    // Screen text only — `collisionDiverge` / `setCollisionDiverge` are the
+    // store field (classicLevelStore.ts, Task 3) and stay; see
+    // diverge-vocabulary.test.ts, which carves the same identifiers out for
+    // the identical reason. Not renaming the field to satisfy a bare regex —
+    // that field is already landed and documented at length on the store.
+    const rendered = src.replace(/\bcollisionDiverge\b|\bsetCollisionDiverge\b/g, '');
+    expect(rendered).not.toMatch(/Diverge/);
   });
 
   it('claims the collision overlay through the shared scope helper', () => {
