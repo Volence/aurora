@@ -17,8 +17,16 @@ export const DITHER_PATTERNS: Array<{ id: DitherPattern; label: string; title: s
   { id: 'sparse75', label: '75', title: 'Sparse 75%' },
 ];
 
-/** A single tool/transform button (glyph, optional active/disabled/small text). */
-export function ToolButton({
+/**
+ * A single tool/transform button (glyph, optional active/disabled/small text).
+ *
+ * NOT `ToolButton`, which is the 28×28 icon button in `components/ui` that the
+ * tool DOCKS use. Both were called ToolButton until CanvasMode — which mounts a
+ * dock and an option bar — had to import one of them under an alias to say which
+ * it meant. Named for what it draws: a glyph, in a bordered box, in an option
+ * bar. Guarded by art-shared/__tests__/tool-column-parts.test.ts.
+ */
+export function GlyphButton({
   glyph, title, active, disabled, small, onClick,
 }: {
   glyph: React.ReactNode; title: string;
@@ -48,7 +56,7 @@ export function ToolButtonGrid<T extends string>({
   return (
     <>
       {items.map((t) => (
-        <ToolButton key={t.id} glyph={t.glyph} title={t.label} active={activeId === t.id} onClick={() => onSelect(t.id)} />
+        <GlyphButton key={t.id} glyph={t.glyph} title={t.label} active={activeId === t.id} onClick={() => onSelect(t.id)} />
       ))}
     </>
   );
@@ -64,7 +72,7 @@ export function TransformGrid<T extends string>({
   return (
     <>
       {items.map((t) => (
-        <ToolButton key={t.action} glyph={t.glyph} title={t.label} disabled={t.disabled} onClick={() => onAction(t.action)} />
+        <GlyphButton key={t.action} glyph={t.glyph} title={t.label} disabled={t.disabled} onClick={() => onAction(t.action)} />
       ))}
     </>
   );
@@ -131,7 +139,7 @@ export function DitherConfig({
 export function MirrorButton({ mirror, onChange }: { mirror: MirrorMode | null; onChange: (m: MirrorMode | null) => void }) {
   const key = mirror ?? 'off';
   return (
-    <ToolButton
+    <GlyphButton
       glyph={MIRROR_LABEL[key]}
       title={`Mirror mode: ${key} (cycle off/H/V/both)`}
       active={!!mirror}
@@ -141,35 +149,38 @@ export function MirrorButton({ mirror, onChange }: { mirror: MirrorMode | null; 
   );
 }
 
-/** Zoom in/out buttons with a current-zoom label. Callers own the step math. */
+/**
+ * Zoom out/in buttons with a current-zoom label. Callers own the step math.
+ *
+ * ZOOM-OUT IS THE LEFT CONTROL, because the level surfaces' MapStatusBar reads
+ * `− 100% +` and this one read `+ 4× −`. Two zoom clusters one screen apart,
+ * running opposite directions (UX-A5). The value grows rightwards here, as it
+ * does there and in every editor the artist arrives from.
+ */
 export function ZoomControl({ zoom, onZoomIn, onZoomOut }: { zoom: number; onZoomIn: () => void; onZoomOut: () => void }) {
   return (
     <span style={S.zoomGroup}>
-      <ToolButton glyph="+" title="Zoom in" onClick={onZoomIn} />
+      <GlyphButton glyph="−" title="Zoom out" onClick={onZoomOut} />
       <span style={S.zoomLabel}>{zoom}×</span>
-      <ToolButton glyph="−" title="Zoom out" onClick={onZoomOut} />
+      <GlyphButton glyph="+" title="Zoom in" onClick={onZoomIn} />
     </span>
   );
-}
-
-export function Divider() {
-  return <div style={S.divider} />;
 }
 
 /** Shared styles for the tool-column parts (each column keeps its own `column`). */
 export const S: Record<string, React.CSSProperties> = {
   toolButton: {
     width: 40, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center',
-    background: T.border, color: T.textHi, borderWidth: 1, borderStyle: 'solid', borderColor: T.borderStrong, borderRadius: 4,
-    cursor: 'pointer', fontSize: 14, lineHeight: 1, flexShrink: 0,
+    background: T.border, color: T.textHi, borderWidth: 1, borderStyle: 'solid', borderColor: T.borderStrong, borderRadius: T.rMd,
+    cursor: 'pointer', fontSize: T.tMd, lineHeight: 1, flexShrink: 0,
   },
   toolActive: { background: T.accent, color: T.surface, borderColor: T.accent },
-  smallText: { fontSize: 10, fontWeight: 600 },
+  smallText: { fontSize: 10, fontWeight: T.wSemibold },
   disabled: { opacity: 0.35, cursor: 'default' },
   config: { display: 'inline-flex', alignItems: 'center', gap: 2 },
   ditherButton: {
     width: 40, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center',
-    background: T.border, color: T.textHi, borderWidth: 1, borderStyle: 'solid', borderColor: T.borderStrong, borderRadius: 4,
+    background: T.border, color: T.textHi, borderWidth: 1, borderStyle: 'solid', borderColor: T.borderStrong, borderRadius: T.rMd,
     cursor: 'pointer', fontSize: 10, lineHeight: 1, flexShrink: 0,
   },
   stepper: { display: 'flex', alignItems: 'center', gap: 2, width: 40, justifyContent: 'space-between' },
@@ -179,7 +190,6 @@ export const S: Record<string, React.CSSProperties> = {
     cursor: 'pointer', fontSize: 7, lineHeight: 1,
   },
   value: { fontSize: 10, color: T.textHi, fontFamily: T.fontMono },
-  divider: { width: '80%', height: 1, background: T.border, margin: '4px 0', flexShrink: 0 },
   zoomGroup: { display: 'inline-flex', alignItems: 'center', gap: 4 },
   zoomLabel: { fontSize: 10, color: T.textLo, fontFamily: T.fontMono },
 };

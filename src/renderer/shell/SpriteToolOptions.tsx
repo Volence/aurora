@@ -3,7 +3,7 @@ import { useSpriteStore } from '../state/spriteStore';
 import type { SpriteTool, SpriteTransform } from '../state/spriteStore';
 import { OptionBar, Chip, Divider, NumberField, T } from '../components/ui';
 import {
-  ToolButton, TransformGrid, DitherConfig, MirrorButton, ZoomControl,
+  GlyphButton, TransformGrid, DitherConfig, MirrorButton, ZoomControl,
 } from '../components/art-shared/ToolColumnParts';
 
 const SIZE_PRESETS = [16, 24, 32, 48, 64];
@@ -68,7 +68,7 @@ export default function SpriteToolOptions({
 
       <Divider />
 
-      <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: T.textLo, cursor: 'pointer' }}>
+      <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: T.tXs, color: T.textLo, cursor: 'pointer' }}>
         <input type="checkbox" checked={showPieces}
           onChange={(e) => st().setShowPieces(e.target.checked)} />
         Show pieces
@@ -79,7 +79,7 @@ export default function SpriteToolOptions({
       {/* Tool modifiers (gated by current tool, same as the old column) */}
       {/* Pencil/line/rect honor pixel-perfect; show the toggle for those. */}
       {(tool === 'pencil' || tool === 'line' || tool === 'rect') && (
-        <ToolButton
+        <GlyphButton
           glyph="PP" small active={pixelPerfect}
           title="Pixel-perfect strokes (no doubled corner pixels)"
           onClick={() => st().setPixelPerfect(!pixelPerfect)}
