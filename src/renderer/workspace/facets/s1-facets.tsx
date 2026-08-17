@@ -150,6 +150,7 @@ import ClassicObjectInspector from '../../components/classic/ClassicObjectInspec
 import ClassicObjectList from '../../components/classic/ClassicObjectList';
 import ChunkPicker from '../../components/classic/ChunkPicker';
 import ClassicArtToolDock from '../../components/classic/ClassicArtToolDock';
+import ClassicCollisionPanel from '../../components/classic/ClassicCollisionPanel';
 import ArtToolOptions, { CLASSIC_TILE_CAPS, CLASSIC_SURFACE_CAPS } from '../../shell/ArtToolOptions';
 import MapStatusBar from '../../components/shared/MapStatusBar';
 import { useClassicMapStatusPort } from '../../providers/map-status-classic';
@@ -377,17 +378,10 @@ function ClassicPalettePanels(): React.ReactElement {
 /**
  * COLLISION's right-hand column: one readout, split by the tier each half
  * belongs to. Nothing here writes — see ClassicCollisionPanel's own docblock
- * for why the two halves are labelled rather than merged.
- *
- * STUBBED for now (task 2 of the collision-lens plan): ClassicCollisionPanel
- * is a later task's component. This registers the facet — the pill, the
- * canvas, the tool set — so those can be verified on their own; the stub is
- * swapped for the real read-only lookup panel without touching this wrapper.
+ * (components/classic/ClassicCollisionPanel.tsx) for why the two halves are
+ * labelled rather than merged, and for the overlay claim the panel makes on
+ * mount.
  */
-function ClassicCollisionPanel(): React.ReactElement {
-  return <div style={{ color: T.textLo }}>Collision</div>;
-}
-
 function ClassicCollisionPanels(): React.ReactElement {
   return (
     <Panel width={260} scroll>
