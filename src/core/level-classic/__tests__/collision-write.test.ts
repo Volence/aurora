@@ -126,3 +126,34 @@ describe('planCollisionWrite', () => {
     expect((r as { warnings: string[] }).warnings.join(' ')).toMatch(/\$51|loop/i);
   });
 });
+
+describe('planCollisionWrite no-op', () => {
+  const doc2 = () => {
+    const cells = Array.from({ length: 256 }, () => ({ block: 0, xf: false, yf: false, solidity: 0 }));
+    cells[5] = { block: 3, xf: true, yf: false, solidity: 3 };
+    const blockDef = () => ({ cells: Array.from({ length: 4 }, () => ({ tile: 0, xf: false, yf: false, pal: 0, pri: false })) });
+    const colind = new Uint8Array(64);
+    colind[3] = 9;                                   // block 3 already uses shape 9
+    return {
+      chunks: [{ cells }], blocks: [blockDef(), blockDef(), blockDef(), blockDef()],
+      collision: { colind, shapes: { heights: [], angles: new Uint8Array() } },
+    } as unknown as LevelDoc;
+  };
+
+  it('link to the shape already held writes nothing', () => {
+    expect(planCollisionWrite(doc2(), probe(), 9, 'link')).toEqual({ kind: 'noop' });
+  });
+
+  it('ISOLATE to the shape already held does not clone a block', () => {
+    // The expensive half. Without this, clicking the swatch the panel already
+    // highlights as current appends a block and grows the colind table to give
+    // the clone collision identical to the block it copied — spending the exact
+    // capacity this file's ceiling and table-growth refusals protect.
+    expect(planCollisionWrite(doc2(), probe(), 9, 'isolate')).toEqual({ kind: 'noop' });
+  });
+
+  it('still writes when the shape actually differs', () => {
+    expect(planCollisionWrite(doc2(), probe(), 10, 'link').kind).toBe('link');
+    expect(planCollisionWrite(doc2(), probe(), 10, 'isolate').kind).toBe('isolate');
+  });
+});

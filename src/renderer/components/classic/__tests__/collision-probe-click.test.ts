@@ -5,10 +5,10 @@
 // this is a source scan rather than a behavioural test — see
 // classic-camera.test.ts for the same pattern on a different invariant.
 //
-// The Collision facet is read-only: `view` stays armed, so a left-drag pans
-// and a right-click still eyedrops a chunk. There was no channel for the
-// viewport to tell a (future) panel WHERE the user clicked — this guard
-// protects both halves of that fix: the call exists, AND it does not consume
+// `view` is the Collision facet's DEFAULT tool, so a left-drag pans and a
+// right-click still eyedrops a chunk. There was no channel for the viewport to
+// tell the panel WHERE the user clicked — this guard protects both halves of
+// that fix: the call exists, AND it does not consume
 // the mousedown (a `return` right after it would make the collision facet the
 // one place on the map that cannot be panned).
 

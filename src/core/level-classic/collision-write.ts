@@ -25,6 +25,8 @@ export type CollisionWriteMode = 'link' | 'isolate';
 export type CollisionWritePlan =
   | { kind: 'link'; entries: { blockId: number; value: number }[]; warnings: string[] }
   | { kind: 'isolate'; plan: SurfaceEditPlan; newBlockId: number; warnings: string[] }
+  /** The block already carries this shape — nothing to write, and nothing to undo. */
+  | { kind: 'noop' }
   | { kind: 'refused'; why: string };
 
 // Chunk cells reference blocks with a 10-bit field → at most 1024 blocks
@@ -74,6 +76,17 @@ export function planCollisionWrite(
   }
 
   const colind = doc.collision.colind;
+
+  // ALREADY THIS SHAPE → nothing to do, in EITHER mode.
+  //
+  // `classicSetColind` has this guard (classicLevelStore.ts:1286) so a link
+  // that changes nothing records no undo step. Isolate had no equivalent, and
+  // its cost is far higher than a wasted undo entry: re-picking the swatch the
+  // panel already highlights as current would clone a block and grow the colind
+  // table to give the clone collision identical to the block it copied. That
+  // spends exactly the capacity this file's ceiling and table-growth refusals
+  // exist to protect — LZ has four spare entries — for no change at all.
+  if ((colind[blockId] ?? 0) === shapeIndex) return { kind: 'noop' };
 
   if (mode === 'link') {
     // THE OVERHANG. A block id past the end of the colind table resolves

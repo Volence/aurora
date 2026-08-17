@@ -38,6 +38,11 @@ export function applyCollisionShape(shape: number): ApplyCollisionShapeResult {
   }
 
   const plan = planCollisionWrite(s.doc, probe, shape, s.collisionDiverge);
+  // Nothing to write: the block already carries this shape. Reported as
+  // success because from the user's side the shape IS what they asked for —
+  // and silently doing nothing beats spending a block id and an undo entry to
+  // arrive at the state we were already in.
+  if (plan.kind === 'noop') return { ok: true };
   if (plan.kind === 'refused') {
     return { ok: false, why: plan.why };
   }

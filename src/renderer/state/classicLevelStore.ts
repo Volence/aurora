@@ -203,12 +203,13 @@ interface ClassicLevelState {
   /**
    * The level-pixel point last clicked on the Collision facet, or null.
    *
-   * The Collision facet is read-only — `view` stays armed, so a left-drag pans
-   * and a right-click still eyedrops a chunk into `selectedChunkId`. Neither of
-   * those tells the (future) Collision panel WHERE the user clicked, and there
-   * was no existing channel for a non-writing tool to report a point at all.
-   * This is that channel: set from the viewport's left-click path only while
-   * the collision facet is active, read by the panel to call `probeCollision`.
+   * `view` is the Collision facet's DEFAULT tool, so a left-drag pans and a
+   * right-click still eyedrops a chunk into `selectedChunkId`. Neither tells
+   * the Collision panel WHERE the user clicked, and there was no channel for a
+   * tool that writes nothing to report a point at all. This is that channel:
+   * set from the viewport's left-click path whenever the collision facet is
+   * active — including under `view`, so the readout can be consulted BEFORE
+   * deciding to write — and read by the panel to call `probeCollision`.
    *
    * LEVEL PIXELS, not layout cells and not client/screen coordinates —
    * `probeCollision(doc, x, y)` takes level pixels, so storing anything else
