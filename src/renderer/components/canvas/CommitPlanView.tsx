@@ -90,7 +90,9 @@ export default function CommitPlanView({ pixels, palette, gridOrigin, onApplied 
   const plan: CanvasCommitPlan | null = result && result.ok ? result.plan : null;
   // The toggle folds into the SAME plan and the SAME undo step — never a
   // second edit chasing the commit. When off, this is just `plan`.
-  const collisionPlan = plan && giveCollision ? withCollision(plan) : null;
+  const collisionPlan = plan && giveCollision && levelDoc
+    ? withCollision(plan, levelDoc.collision.colind.length)
+    : null;
   const effectivePlan = collisionPlan ?? plan;
 
   const setTarget = (i: number, value: number | null) => {

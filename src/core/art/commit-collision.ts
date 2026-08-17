@@ -46,7 +46,14 @@ export const FLAT_SHAPE = 0xff;
 /** Solidity plane value for "solid from every direction" (see ChunkCell.solidity). */
 const SOLID_ALL = 3;
 
-export interface CommitCollisionApplied { blocks: number; cells: number }
+export interface CommitCollisionApplied {
+  blocks: number;
+  cells: number;
+  /** Collisionless blocks NOT given a shape because their id is past the end of
+   *  this zone's collision table — see withCollision's docblock. Counted so the
+   *  preview can decline to claim them. */
+  skippedOverhang: number;
+}
 
 export type CommitPlanWithCollision = CanvasCommitPlan & { applied: CommitCollisionApplied };
 
@@ -55,10 +62,26 @@ export type CommitPlanWithCollision = CanvasCommitPlan & { applied: CommitCollis
  * every appended-chunk cell naming a non-zero block gets solidity `All`.
  * Replaced chunks (chunkWrites) are left exactly as planned — see header.
  */
-export function withCollision(plan: CanvasCommitPlan): CommitPlanWithCollision {
+/**
+ * @param colindLength  `doc.collision.colind.length`. Block ids at or past it
+ *   are THE OVERHANG: a zone can ship more blocks than its collision table has
+ *   entries (GHZ: 439 against 410), and in ROM those ids resolve into the
+ *   ADJACENT zone's table. `classicSetColind` refuses to write them for exactly
+ *   that reason; this is the first path that could stamp a DELIBERATE non-zero
+ *   value into one, because `computeReclaim` walks `1..blocks.length` and can
+ *   hand a fresh drawing a freed overhang id. Skipped rather than written, and
+ *   counted separately so the preview does not claim them.
+ *
+ *   This does NOT address the pre-existing zero-fill on save (U6 / CLASSIC-A4)
+ *   — that is a wider defect with its own campaign, and widening this guard to
+ *   cover it would change behaviour the commit path has always had.
+ */
+export function withCollision(plan: CanvasCommitPlan, colindLength: number): CommitPlanWithCollision {
   let blocks = 0;
+  let skippedOverhang = 0;
   const blockWrites = plan.blockWrites.map((w) => {
     if (w.colind !== 0 || w.blanked) return w;
+    if (w.blockId >= colindLength) { skippedOverhang++; return w; }
     blocks++;
     return { ...w, colind: FLAT_SHAPE };
   });
@@ -76,6 +99,6 @@ export function withCollision(plan: CanvasCommitPlan): CommitPlanWithCollision {
     ...plan,
     blockWrites,
     chunkAppends,
-    applied: { blocks, cells: cellsChanged },
+    applied: { blocks, cells: cellsChanged, skippedOverhang },
   };
 }

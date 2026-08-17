@@ -35,7 +35,7 @@ const plan = (over: Partial<CanvasCommitPlan> = {}): CanvasCommitPlan => ({
 
 describe('withCollision', () => {
   it('gives every collisionless new block the FLAT shape', () => {
-    const out = withCollision(plan());
+    const out = withCollision(plan(), 4096);
     expect(out.blockWrites.map((b) => b.colind)).toEqual([FLAT_SHAPE, 7, FLAT_SHAPE]);
   });
 
@@ -45,12 +45,12 @@ describe('withCollision', () => {
   });
 
   it('leaves inherited collision alone', () => {
-    const out = withCollision(plan());
+    const out = withCollision(plan(), 4096);
     expect(out.blockWrites.find((b) => b.blockId === 11)!.colind).toBe(7);
   });
 
   it('makes appended chunks solid, but only where a block is named', () => {
-    const out = withCollision(plan());
+    const out = withCollision(plan(), 4096);
     const c = out.chunkAppends[0].cells;
     expect(c[0].solidity).toBe(3);      // block 9 → solid from every direction
     expect(c[1].solidity).toBe(0);      // block 0 is blank; the engine skips it
@@ -61,20 +61,20 @@ describe('withCollision', () => {
     // A replaced chunk has a predecessor for all 256 cells, so its solidity was
     // inherited rather than missing. Overwriting it would silently make an
     // existing jump-through platform solid.
-    const out = withCollision(plan());
+    const out = withCollision(plan(), 4096);
     expect(out.chunkWrites[0].def.cells[0].solidity).toBe(0);
   });
 
   it('does not mutate the plan it was given', () => {
     const p = plan();
-    withCollision(p);
+    withCollision(p, 4096);
     expect(p.blockWrites[0].colind).toBe(0);
     expect(p.chunkAppends[0].cells[0].solidity).toBe(0);
   });
 
   it('reports what it changed, so the view can say so before committing', () => {
-    const out = withCollision(plan());
-    expect(out.applied).toEqual({ blocks: 2, cells: 1 });
+    const out = withCollision(plan(), 4096);
+    expect(out.applied).toEqual({ blocks: 2, cells: 1, skippedOverhang: 0 });
   });
 });
 
@@ -92,9 +92,25 @@ describe('withCollision and reclaimed blanks', () => {
         { ...block(99, 0), blanked: true as const },
       ],
     });
-    const out = withCollision(p);
+    const out = withCollision(p, 4096);
     expect(out.blockWrites.find((b) => b.blockId === 10)!.colind).toBe(FLAT_SHAPE);
     expect(out.blockWrites.find((b) => b.blockId === 99)!.colind).toBe(0);
     expect(out.applied.blocks).toBe(1);
+  });
+});
+
+describe('withCollision and the colind overhang', () => {
+  it('does not stamp a shape into a block past the collision table', () => {
+    // A zone can ship more blocks than its table has entries (GHZ: 439 vs 410),
+    // and those ids resolve into the ADJACENT zone's table in ROM.
+    // classicSetColind refuses to write them; the reclaim cursor can hand a
+    // fresh drawing one, so this is the first path that could stamp a
+    // deliberate value there. Skipped, and not counted as applied.
+    const p = plan({ blockWrites: [block(5, 0), block(412, 0)] });
+    const out = withCollision(p, 410);
+    expect(out.blockWrites.find((b) => b.blockId === 5)!.colind).toBe(FLAT_SHAPE);
+    expect(out.blockWrites.find((b) => b.blockId === 412)!.colind).toBe(0);
+    expect(out.applied.blocks).toBe(1);
+    expect(out.applied.skippedOverhang).toBe(1);
   });
 });
