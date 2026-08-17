@@ -54,10 +54,16 @@ describe('angleNeedle', () => {
     expect(flipped.dy).toBeCloseTo(plain.dy, 6);
   });
 
-  it('applies X then Y when both are set', () => {
-    // Order is the engine's: negate for xflip, THEN -a-$80 for yflip. Stated as
-    // a test because "both flips" is the case a reader would otherwise have to
-    // re-derive from the disassembly.
+  it('pins the both-flips value against a direct re-derivation', () => {
+    // NOT an order test, though it is the obvious thing to read it as. The two
+    // orders are provably identical here: xflip-then-yflip is -(-a)-$80 = a-$80,
+    // yflip-then-xflip is -(-a-$80) = a+$80, and -$80 = +$80 (mod 256). Swapping
+    // the two `if` blocks in the implementation would pass this and every other
+    // test in the file, because tests 4 and 5 each set only ONE flip.
+    //
+    // What it does buy: the combined case computed by the helper matches the
+    // combined case worked out by hand, so a reader does not have to re-derive
+    // it from the disassembly to trust it.
     const both = angleNeedle(0x20, true, true);
     const stepwise = angleNeedle((-((-0x20) & 0xff) - 0x80) & 0xff, false, false);
     expect(both.dx).toBeCloseTo(stepwise.dx, 6);
