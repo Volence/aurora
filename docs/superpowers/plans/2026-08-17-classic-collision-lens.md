@@ -622,7 +622,11 @@ The panel reads `classicLevelStore.collisionProbe` (Task 5) and runs it through 
 
 This is the plan's own "Diverge:" lesson (`17783ae`) applied to its numbers rather than only to its headings.
 
-**Two caveats from spec §5 belong here**, because this is the first map-first collision surface: GHZ's `$28`/`$51` loop alias means the engine substitutes chunk `$51` behind loops, so a probe on `$28` is showing half the loop's truth (the probe strips bit 7 and says nothing about it); and `collision.rotated` is enumerated but never loaded (`s1-io.ts:371-372`), so the shading is a floor heightmap only — correct for stock, misleading on a hack with a desynced Rotated array.
+**Two caveats from spec §5 belong here**, because this is the first map-first collision surface.
+
+The first is now DRIVEN BY THE PROBE rather than printed as static prose: `probeCollision` returns `looping` (the layout byte had bit 7) and `loopAmbiguous` (a loop-flagged cell naming chunk `$28`, which `FindNearestTile` swaps for `$51` — but only while the player's `sprite_looping_bit` is set, which is runtime state no editor can see). When `loopAmbiguous` is true the panel must say the reading is one of two possible answers and name `$51` as the other; the fields exist precisely so the panel does not have to re-derive that.
+
+The second stays prose: `collision.rotated` is enumerated but never loaded (`s1-io.ts:371-372`), so the shading is a floor heightmap only — correct for stock, misleading on a hack with a desynced Rotated array.
 
 Keep the two headings. The tier a value belongs to must be stated, not inferred — the same lesson that removed the "Diverge:" label in `17783ae`.
 
@@ -680,6 +684,15 @@ describe('ClassicCollisionPanel', () => {
 
   it('names all three non-collision reasons', () => {
     for (const r of ['air', 'block0', 'solidity']) expect(src).toContain(`'${r}'`);
+  });
+
+  it('surfaces the loop ambiguity the probe reports', () => {
+    // $28 behind a loop may be read as $51, decided by runtime player state.
+    // The probe reports the ambiguity rather than resolving it; a panel that
+    // ignored the field would show one of two answers as if it were the only
+    // one — which is the specific thing spec §5 warned a map-first collision
+    // surface would do.
+    expect(src).toMatch(/loopAmbiguous/);
   });
 });
 ```
