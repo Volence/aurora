@@ -45,8 +45,13 @@ export interface SurfaceEditPlan {
    * producer of new blocks (2C mints them from a canvas, with no source block
    * to copy from) cannot silently default to "no collision" — it has to answer
    * the question, which is exactly the decision this field exists to force.
+   *
+   * `colind`, when present, OVERRIDES that inheritance. It exists for
+   * Isolate-for-collision: same pixels, deliberately different collision. It is
+   * optional because the art-side Isolate must keep inheriting — a clone that
+   * silently lost its shape is ground the player falls through.
    */
-  newBlocks: { def: BlockDef; sourceBlockId: number }[];
+  newBlocks: { def: BlockDef; sourceBlockId: number; colind?: number }[];
   /** Repoints within an existing or newly-added block. */
   blockCellEdits: { blockId: number; cellIndex: number; cell: BlockCell }[];
   /** Repoints within a chunk. */

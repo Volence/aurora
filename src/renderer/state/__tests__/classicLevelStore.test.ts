@@ -610,6 +610,49 @@ describe('classic:paint-surface', () => {
   });
 });
 
+describe('classicPaintSurface colind override', () => {
+  // Same helpers the file's existing classicPaintSurface tests use; redeclared
+  // here because they are scoped to that describe block.
+  const blankBlockCell = (tile: number) => ({ tile, xf: false, yf: false, pal: 0, pri: false });
+  const clonePlan = (colind?: number): SurfaceEditPlan => ({
+    tileWrites: [],
+    newBlocks: [{
+      def: { cells: Array.from({ length: 4 }, () => blankBlockCell(1)) },
+      sourceBlockId: 1,
+      ...(colind === undefined ? {} : { colind }),
+    }],
+    blockCellEdits: [],
+    chunkCellEdits: [],
+    stats: { tilesClaimed: 0, blocksCloned: 1, placesAffected: 1 },
+  });
+
+  beforeEach(() => { openReady(); });
+
+  it('gives a cloned block the OVERRIDE shape, not the source shape', () => {
+    // Isolate-for-collision: same pixels, deliberately different collision.
+    // Without the override this is inexpressible in one command.
+    useClassicLevelStore.getState().doc!.collision.colind[1] = 7;
+    expect(classicPaintSurface(clonePlan(9))).toEqual({ ok: true });
+    const doc = useClassicLevelStore.getState().doc!;
+    expect(doc.collision.colind[doc.blocks.length - 1]).toBe(9);
+  });
+
+  it('still inherits the source shape when no override is given', () => {
+    // The existing contract, locked so the override cannot quietly become
+    // mandatory: an art-side Isolate clone must keep its collision.
+    useClassicLevelStore.getState().doc!.collision.colind[1] = 7;
+    expect(classicPaintSurface(clonePlan())).toEqual({ ok: true });
+    const doc = useClassicLevelStore.getState().doc!;
+    expect(doc.collision.colind[doc.blocks.length - 1]).toBe(7);
+  });
+
+  it('refuses an out-of-range override rather than truncating it', () => {
+    const r = classicPaintSurface(clonePlan(300));
+    expect(r.ok).toBe(false);
+    expect((r as { error: string }).error).toMatch(/0\.\.255/);
+  });
+});
+
 // ---------------------------------------------------------------------------
 // Cross-cutting: no-level guard, triple consistency, shared timeline.
 // ---------------------------------------------------------------------------

@@ -979,13 +979,18 @@ export function classicPaintSurface(plan: SurfaceEditPlan): CommandResult {
   // argued above rather than changed on an unverified claim. What HAS been
   // closed is the other direction: s1-io refuses to write a colind SHORTER than
   // the one it read, which would move the overhang boundary silently.
+  for (const b of plan.newBlocks) {
+    if (b.colind !== undefined && (!isInt(b.colind) || b.colind < 0 || b.colind > 255)) {
+      return err(`colind override ${b.colind} out of range 0..255`);
+    }
+  }
   const nextColind = plan.newBlocks.length
     ? (() => {
       const src = doc.collision.colind;
       const out = new Uint8Array(Math.max(nextBlocks.length, src.length));
       out.set(src);
       plan.newBlocks.forEach((b, i) => {
-        out[doc.blocks.length + i] = src[b.sourceBlockId] ?? 0;
+        out[doc.blocks.length + i] = b.colind ?? src[b.sourceBlockId] ?? 0;
       });
       return out;
     })()
