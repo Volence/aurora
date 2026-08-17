@@ -1203,8 +1203,11 @@ export function classicSetColind(entries: { blockId: number; value: number }[]):
     if (blockId === 0) {
       return err('block 0 is the blank block — the engine short-circuits before reading its collision, so a shape here can never apply');
     }
+    // 1, not 0, is the low bound now: block 0 is refused above with its own
+    // reason, so quoting 0..N-1 here would name a range whose first value this
+    // very function rejects.
     if (!isInt(blockId) || blockId < 0) {
-      return err(`colind block ${blockId} out of range 0..${colind.length - 1}`);
+      return err(`colind block ${blockId} out of range 1..${colind.length - 1}`);
     }
     // THE OVERHANG. A zone can ship more blocks than its colind has bytes —
     // GHZ is 439 against 410 — and in ROM the tail resolves into the ADJACENT
