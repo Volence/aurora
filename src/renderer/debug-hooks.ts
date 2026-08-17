@@ -314,6 +314,10 @@ interface CanvasProbeApi {
   /** The armed paint index (0..63) and which grids are switched on. */
   paintIndex(): number;
   visibleGrids(): number[];
+  /** The armed tool. Read-only, and the only way a harness can see whether a
+   *  real keypress reached the tool keys (UX-A3) — the dock's active state is a
+   *  background colour, which is a far weaker thing to assert on. */
+  tool(): string;
   /** Live toast messages — a cross-check on what is read off the screen. */
   toasts(): { message: string; type: string; exiting: boolean }[];
   /**
@@ -428,6 +432,7 @@ function installCanvasProbe(): CanvasProbeApi {
     },
     paintIndex: () => useCanvasStore.getState().paintIndex,
     visibleGrids: () => [...useCanvasStore.getState().visibleGrids],
+    tool: () => useCanvasStore.getState().tool,
     toasts: () => useToastStore.getState().toasts.map(
       (t) => ({ message: t.message, type: t.type, exiting: t.exiting }),
     ),
