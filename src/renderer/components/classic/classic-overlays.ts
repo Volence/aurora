@@ -64,7 +64,10 @@ export function drawCollision(
   const angles = d.collision.shapes.angles;
   for (let i = 0; i < 256; i++) {
     const cell = chunk.cells[i];
-    if (!cell || cell.solidity === 0) continue;
+    // Block 0 first, because that is the order the engine tests in: FindFloor
+    // does `andi.w #$7FF,d0 / beq.s .isblank` BEFORE `btst d5,d4`. Without
+    // this, a non-zero colind[0] draws collision the game will never apply.
+    if (!cell || cell.block === 0 || cell.solidity === 0) continue;
     const shapeIndex = d.collision.colind[cell.block] ?? 0;
     if (shapeIndex === 0) continue; // shape 0 = empty (no collision)
     const cols = heights[shapeIndex];
@@ -101,7 +104,10 @@ export function drawCollision(
   ctx.lineWidth = 1 / ctx.getTransform().a;
   for (let i = 0; i < 256; i++) {
     const cell = chunk.cells[i];
-    if (!cell || cell.solidity === 0) continue;
+    // Block 0 first, because that is the order the engine tests in: FindFloor
+    // does `andi.w #$7FF,d0 / beq.s .isblank` BEFORE `btst d5,d4`. Without
+    // this, a non-zero colind[0] draws collision the game will never apply.
+    if (!cell || cell.block === 0 || cell.solidity === 0) continue;
     const shapeIndex = d.collision.colind[cell.block] ?? 0;
     if (shapeIndex === 0) continue;
     const cols = heights[shapeIndex];

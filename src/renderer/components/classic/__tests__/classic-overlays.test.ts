@@ -136,3 +136,29 @@ describe('drawCollision angle needle', () => {
     expect(dy).toBeGreaterThan(0); // X-flipped $E0 descends
   });
 });
+
+describe('drawCollision block 0', () => {
+  it('draws nothing for block 0, which the engine never consults', () => {
+    // The engine short-circuits on block 0 (`andi.w #$7FF,d0 / beq.s .isblank`)
+    // BEFORE the solidity test and before colind. The overlay skipped shape 0
+    // and solidity 0 but not block 0, so a non-zero colind[0] would paint
+    // phantom collision the game does not have.
+    const cells = Array.from({ length: 256 }, () => ({ block: 0, xf: false, yf: false, solidity: 0 }));
+    cells[0] = { block: 0, xf: false, yf: false, solidity: 3 };
+    const doc = {
+      chunks: [{ cells }],
+      blocks: [{ cells: [] }],
+      collision: {
+        colind: new Uint8Array([1]),                      // colind[0] non-zero
+        shapes: { heights: [new Int8Array(16), new Int8Array(16).fill(8)], angles: new Uint8Array([0, 0]) },
+      },
+    } as unknown as LevelDoc;
+
+    const { ctx, pts } = needleCtx();
+    let fills = 0;
+    (ctx as unknown as { fillRect: () => void }).fillRect = () => { fills++; };
+    drawCollision(ctx, doc, 0, 0, 1, true);
+    expect(fills).toBe(0);
+    expect(pts.length).toBe(0);
+  });
+});
