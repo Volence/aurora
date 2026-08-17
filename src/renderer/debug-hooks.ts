@@ -49,6 +49,10 @@ interface ClassicProbeApi {
   blockCell(blockId: number, cellIndex: number): { tile: number; pal: number; xf: boolean; yf: boolean; pri: boolean } | null;
   /** FNV-1a hash of one tile's raw 32 bytes, so undo restoration can be checked without shipping the whole pool. */
   tileHash(tileIndex: number): number | null;
+  /** One block's collision-shape index. Read-only, and the only way a harness
+   *  can see whether a commit gave its new art collision — the shape is not on
+   *  screen anywhere until the block is stamped and probed on the map. */
+  colindOf(blockId: number): number | null;
   /** The reserved-tile set (object-art-claimed level tiles) for the open act, as a plain array. */
   reservedTiles(): number[];
   /**
@@ -114,6 +118,12 @@ function installClassicProbe(): ClassicProbeApi {
       const { doc } = state();
       if (!doc) return null;
       return { tiles: Math.floor(doc.tiles.length / 32), blocks: doc.blocks.length, chunks: doc.chunks.length };
+    },
+    colindOf: (blockId) => {
+      const { doc } = state();
+      if (!doc) return null;
+      if (!Number.isInteger(blockId) || blockId < 0 || blockId >= doc.blocks.length) return null;
+      return doc.collision.colind[blockId] ?? 0;
     },
     chunkCell: (chunkId, cellIndex) => {
       const { doc } = state();
