@@ -185,7 +185,7 @@ function ClassicComposerStatusBar(): React.ReactElement {
   const doc = useClassicLevelStore((s) => s.doc);
   const left = (
     <span style={{ color: T.textBase }}>
-      <span style={{ color: T.accent, fontWeight: 600 }}>S1</span>
+      <span style={{ color: T.accent, fontWeight: T.wSemibold }}>S1</span>
       {ref ? ` · ${ref.label}` : ''}
     </span>
   );
@@ -560,6 +560,6 @@ const styles: Record<string, React.CSSProperties> = {
   // the wrapper would be a second decision about a surface that is not empty.
   empty: {
     flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
-    fontSize: 13, textAlign: 'center', padding: 24, background: T.void,
+    fontSize: T.tBase, textAlign: 'center', padding: 24, background: T.void,
   },
 };

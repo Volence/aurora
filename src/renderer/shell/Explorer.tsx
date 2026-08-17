@@ -282,7 +282,7 @@ const styles: Record<string, React.CSSProperties> = {
     borderBottom: `1px solid ${T.border}`, flexShrink: 0,
   },
   projectName: {
-    flex: 1, minWidth: 0, fontSize: 12, fontWeight: 600, color: T.textHi,
+    flex: 1, minWidth: 0, fontSize: T.tSm, fontWeight: T.wSemibold, color: T.textHi,
     overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const,
   },
   headerButton: {
@@ -296,7 +296,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   filter: {
     flex: 1, minWidth: 0, background: 'transparent', border: 'none',
-    color: T.textHi, fontSize: 12, fontFamily: T.fontUi,
+    color: T.textHi, fontSize: T.tSm, fontFamily: T.fontUi,
   },
   treeScroll: { flex: 1, overflowY: 'auto' },
   count: { fontSize: 10, color: T.textFaint, fontFamily: T.fontMono },
@@ -304,15 +304,15 @@ const styles: Record<string, React.CSSProperties> = {
   item: {
     display: 'flex', alignItems: 'center', gap: 8, padding: '3px 8px', width: '100%',
     background: 'transparent', border: 'none', borderRadius: T.rMd, cursor: 'pointer',
-    color: T.textBase, fontSize: 12, textAlign: 'left' as const,
+    color: T.textBase, fontSize: T.tSm, textAlign: 'left' as const,
   },
   itemHover: { background: T.raised },
   itemDisabled: { color: T.textFaint, cursor: 'default' },
   itemLabel: { flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const },
   itemHint: { fontSize: 10, color: T.textFaint, fontFamily: T.fontMono, flexShrink: 0 },
-  empty: { padding: 16, textAlign: 'center' as const, color: T.textLo, fontSize: 12 },
+  empty: { padding: 16, textAlign: 'center' as const, color: T.textLo, fontSize: T.tSm },
   openButton: {
-    padding: '6px 14px', background: T.accent, color: T.onAccent, fontWeight: 600,
-    border: 'none', borderRadius: T.rMd, cursor: 'pointer', fontSize: 12,
+    padding: '6px 14px', background: T.accent, color: T.onAccent, fontWeight: T.wSemibold,
+    border: 'none', borderRadius: T.rMd, cursor: 'pointer', fontSize: T.tSm,
   },
 };

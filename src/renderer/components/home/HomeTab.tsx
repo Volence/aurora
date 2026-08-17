@@ -163,14 +163,14 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex', flexDirection: 'column', gap: 12,
   },
   hero: { display: 'flex', alignItems: 'center', gap: 14, marginBottom: 12 },
-  heroTitle: { fontSize: 20, fontWeight: 600, color: T.textHi, letterSpacing: '0.02em' },
-  heroSub: { fontSize: 12, color: T.textLo, marginTop: 2 },
+  heroTitle: { fontSize: T.tXl, fontWeight: T.wSemibold, color: T.textHi, letterSpacing: '0.02em' },
+  heroSub: { fontSize: T.tSm, color: T.textLo, marginTop: 2 },
   primaryButton: {
     alignSelf: 'flex-start', padding: '8px 18px', background: T.accent, color: T.onAccent,
-    fontWeight: 600, fontSize: 13, border: 'none', borderRadius: T.rMd, cursor: 'pointer',
+    fontWeight: T.wSemibold, fontSize: T.tBase, border: 'none', borderRadius: T.rMd, cursor: 'pointer',
   },
   sectionTitle: {
-    marginTop: 20, fontSize: 10, fontWeight: 600, color: T.textLo,
+    marginTop: 20, fontSize: 10, fontWeight: T.wSemibold, color: T.textLo,
     textTransform: 'uppercase' as const, letterSpacing: 1,
   },
   recentList: { display: 'flex', flexDirection: 'column', gap: 2 },
@@ -187,7 +187,7 @@ const styles: Record<string, React.CSSProperties> = {
     border: `1px solid ${T.border}`, borderRadius: T.rLg,
     cursor: 'pointer', textAlign: 'left' as const,
   },
-  recentName: { fontSize: 13, color: T.textHi, fontWeight: 500 },
+  recentName: { fontSize: T.tBase, color: T.textHi, fontWeight: T.wMedium },
   recentPath: {
     fontSize: 10, color: T.textFaint, fontFamily: T.fontMono,
     overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const, maxWidth: '100%',
@@ -206,6 +206,6 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: 'pointer', color: T.textBase, textAlign: 'left' as const,
   },
   cardDisabled: { opacity: 0.45, cursor: 'default' },
-  cardLabel: { flex: 1, minWidth: 0, fontSize: 12, fontWeight: 500, color: T.textHi },
+  cardLabel: { flex: 1, minWidth: 0, fontSize: T.tSm, fontWeight: T.wMedium, color: T.textHi },
   cardBadge: { fontSize: 10, color: T.textLo, fontFamily: T.fontMono, flexShrink: 0 },
 };

@@ -46,7 +46,7 @@ export default function FacetBar(
 
 const styles: Record<string, React.CSSProperties> = {
   bar: { display: 'inline-flex', gap: 2, padding: 2, background: T.raised, borderRadius: 7 },
-  pill: { padding: '3px 12px', fontSize: 11, border: 'none', borderRadius: 5,
+  pill: { padding: '3px 12px', fontSize: T.tXs, border: 'none', borderRadius: 5,
     background: 'transparent', color: T.textBase, cursor: 'pointer' },
-  pillActive: { background: T.surface, color: T.textHi, fontWeight: 600 },
+  pillActive: { background: T.surface, color: T.textHi, fontWeight: T.wSemibold },
 };

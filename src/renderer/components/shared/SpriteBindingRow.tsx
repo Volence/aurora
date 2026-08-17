@@ -38,6 +38,6 @@ const styles: Record<string, React.CSSProperties> = {
   label: { fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.5, color: T.textLo },
   select: {
     padding: '4px 6px', background: T.border, color: T.textHi,
-    border: `1px solid ${T.borderStrong}`, borderRadius: 4, fontSize: 12,
+    border: `1px solid ${T.borderStrong}`, borderRadius: 4, fontSize: T.tSm,
   },
 };

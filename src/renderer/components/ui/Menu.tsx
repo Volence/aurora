@@ -34,7 +34,7 @@ export function Menu({ label, children, align = 'left' }: {
       <button onClick={() => setOpen((o) => !o)} style={{
         display: 'flex', alignItems: 'center', gap: T.s2, padding: `${T.s2} ${T.s3}`,
         background: open ? T.raised : T.overlay, color: T.textBase,
-        border: `1px solid ${T.border}`, borderRadius: T.rMd, cursor: 'pointer', fontSize: 11,
+        border: `1px solid ${T.border}`, borderRadius: T.rMd, cursor: 'pointer', fontSize: T.tXs,
       }}>{label}</button>
       {open && (
         <div ref={panelRef} style={{

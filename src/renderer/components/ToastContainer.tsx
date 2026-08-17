@@ -63,7 +63,7 @@ const styles: Record<string, React.CSSProperties> = {
     pointerEvents: 'none',
   },
   toast: {
-    padding: '6px 16px', borderRadius: 6, fontSize: 12, fontWeight: 500,
+    padding: '6px 16px', borderRadius: 6, fontSize: T.tSm, fontWeight: T.wMedium,
     color: T.textHi, borderWidth: 1, borderStyle: 'solid',
     // No `whiteSpace: nowrap` — that is what made a long message unreadable.
     // `overflowWrap: anywhere` because the messages that get long are the ones

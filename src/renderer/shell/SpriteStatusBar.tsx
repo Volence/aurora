@@ -12,7 +12,7 @@ export default function SpriteStatusBar({ pieces, tiles }: { pieces: number; til
   const zoom = useSpriteStore((s) => s.zoom);
 
   const left = (
-    <span style={{ color: T.accent, fontWeight: 600 }}>{name || 'NewSprite'}</span>
+    <span style={{ color: T.accent, fontWeight: T.wSemibold }}>{name || 'NewSprite'}</span>
   );
 
   const right = (

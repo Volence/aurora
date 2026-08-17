@@ -1052,7 +1052,7 @@ export default function ClassicLevelViewport() {
         ) : (
           <div style={{
             position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-            color: status === 'error' ? T.error : T.textLo, fontSize: 13, textAlign: 'center', padding: 24,
+            color: status === 'error' ? T.error : T.textLo, fontSize: T.tBase, textAlign: 'center', padding: 24,
           }}>
             {status === 'loading' && `Loading ${ref?.label ?? 'level'}…`}
             {status === 'error' && <span style={{ whiteSpace: 'pre-line' }}>{error ?? 'Failed to load level'}</span>}

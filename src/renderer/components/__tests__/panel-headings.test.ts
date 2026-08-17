@@ -58,7 +58,10 @@ const PANELS = derivePanels();
 function headingTypeStyles(source: string): string[] {
   const flat = source.replace(/\$\{[^{}]*\}/g, 'X');
   return (flat.match(/\{[^{}]*\}/g) ?? []).filter(
-    (block) => /fontWeight:\s*600/.test(block) && /textTransform:\s*['"`]?uppercase/.test(block),
+    // Both spellings of semibold. `T.wSemibold` is the token bridge the VIS7
+    // pass moved these sites onto; the raw 600 stays matched so a style object
+    // that reverts to the number is still caught as heading type.
+    (block) => /fontWeight:\s*(?:600|T\.wSemibold)/.test(block) && /textTransform:\s*['"`]?uppercase/.test(block),
   );
 }
 

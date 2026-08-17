@@ -80,21 +80,21 @@ const styles: Record<string, React.CSSProperties> = {
     marginBottom: 12,
   },
   sectionTitle: {
-    fontSize: 11, fontWeight: 600, color: T.accent, marginBottom: 4,
+    fontSize: T.tXs, fontWeight: T.wSemibold, color: T.accent, marginBottom: 4,
     textTransform: 'uppercase' as const, letterSpacing: 0.5,
   },
   property: {
     display: 'flex', justifyContent: 'space-between', padding: '2px 0',
-    fontSize: 12,
+    fontSize: T.tSm,
   },
   propLabel: {
     color: T.textBase,
   },
   propValue: {
-    color: T.textHi, fontFamily: T.fontMono, fontSize: 11,
+    color: T.textHi, fontFamily: T.fontMono, fontSize: T.tXs,
   },
   select: {
-    maxWidth: 120, fontSize: 11,
+    maxWidth: 120, fontSize: T.tXs,
     background: T.border, color: T.textHi,
     border: `1px solid ${T.borderStrong}`, borderRadius: 2,
   },

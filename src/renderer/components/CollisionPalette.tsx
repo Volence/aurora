@@ -281,7 +281,7 @@ export default function CollisionPalette({ variant = 'map' }: { variant?: 'map' 
 
 const styles: Record<string, React.CSSProperties> = {
   hint: { fontSize: 10, color: T.textLo, padding: `0 ${T.s2} ${T.s2}` },
-  note: { fontSize: 11, color: T.textLo, padding: T.s2 },
+  note: { fontSize: T.tXs, color: T.textLo, padding: T.s2 },
   tabs: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 4, padding: `0 ${T.s2} ${T.s2}` },
   preview: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, padding: `0 ${T.s2} ${T.s2}` },
   previewBox: {
@@ -298,7 +298,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   sel: { outline: `2px solid ${T.accent}`, outlineOffset: -1 },
   eraseCell: {
-    width: PX, height: PX, color: T.textLo, fontSize: 14,
+    width: PX, height: PX, color: T.textLo, fontSize: T.tMd,
     display: 'flex', alignItems: 'center', justifyContent: 'center',
   },
   erase: { color: T.textLo, fontSize: 36 }, // big-preview empty (air) state
@@ -306,7 +306,7 @@ const styles: Record<string, React.CSSProperties> = {
   degLabel: { fontSize: 8, lineHeight: '8px', color: T.textLo },
   planes: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 4, padding: `${T.s2} ${T.s2} 0` },
   planeLabel: { fontSize: 10, color: T.textLo, marginRight: 2, minWidth: 38, flexShrink: 0 },
-  planeBtn: { padding: `2px ${T.s2}`, background: T.overlay, color: T.textBase, borderWidth: 1, borderStyle: 'solid', borderColor: T.border, borderRadius: T.rSm, cursor: 'pointer', fontSize: 11, minWidth: 26, textAlign: 'center' },
+  planeBtn: { padding: `2px ${T.s2}`, background: T.overlay, color: T.textBase, borderWidth: 1, borderStyle: 'solid', borderColor: T.border, borderRadius: T.rSm, cursor: 'pointer', fontSize: T.tXs, minWidth: 26, textAlign: 'center' },
   planeSel: { background: T.accent, color: T.onAccent, borderColor: T.accent },
   subtleBtn: { padding: `2px ${T.s2}`, background: 'transparent', color: T.textLo, border: `1px solid ${T.border}`, borderRadius: T.rSm, cursor: 'pointer', fontSize: 10 },
 };

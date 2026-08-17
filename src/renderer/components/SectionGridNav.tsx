@@ -239,7 +239,7 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex', flexDirection: 'column', flex: '1 1 auto', minHeight: 0,
     padding: 8, borderBottom: `1px solid ${T.border}`,
   },
-  header: { fontSize: 11, color: T.textLo, marginBottom: 4, flexShrink: 0 },
+  header: { fontSize: T.tXs, color: T.textLo, marginBottom: 4, flexShrink: 0 },
   // Scrolls inside its section like every other data-driven grid in a panel
   // column: an act may hold MAX_ACT_SECTIONS = 48 slots, and at a grid width of
   // 2 that is 24 rows — enough to push Chunks, Art and Properties below it out
@@ -269,16 +269,16 @@ const styles: Record<string, React.CSSProperties> = {
   sBtn: {
     width: 16, height: 16, lineHeight: '14px', padding: 0, textAlign: 'center',
     background: T.overlay, color: T.textBase, border: `1px solid ${T.border}`,
-    borderRadius: 2, cursor: 'pointer', fontSize: 11,
+    borderRadius: 2, cursor: 'pointer', fontSize: T.tXs,
   },
   sBtnDisabled: { opacity: 0.4, cursor: 'default' },
   addBtn: {
-    marginTop: 6, width: '100%', padding: '4px 0', fontSize: 11, flexShrink: 0,
+    marginTop: 6, width: '100%', padding: '4px 0', fontSize: T.tXs, flexShrink: 0,
     background: T.overlay, color: T.textBase, border: `1px solid ${T.border}`,
     borderRadius: T.rMd, cursor: 'pointer',
   },
   addBtnDisabled: { opacity: 0.5, cursor: 'default' },
-  empty: { padding: 8, color: T.textLo, fontSize: 11 },
+  empty: { padding: 8, color: T.textLo, fontSize: T.tXs },
   menu: {
     position: 'fixed', zIndex: Z.floating, minWidth: 110,
     background: T.surface, border: `1px solid ${T.borderStrong}`, borderRadius: 4,
@@ -286,7 +286,7 @@ const styles: Record<string, React.CSSProperties> = {
     boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
   },
   menuItem: {
-    textAlign: 'left', padding: '4px 8px', fontSize: 11,
+    textAlign: 'left', padding: '4px 8px', fontSize: T.tXs,
     background: 'transparent', color: T.textBase, border: 'none',
     borderRadius: 2, cursor: 'pointer',
   },

@@ -148,7 +148,7 @@ const styles: Record<string, React.CSSProperties> = {
   filter: {
     width: '100%', boxSizing: 'border-box', padding: '4px 8px',
     background: T.border, color: T.textHi,
-    border: `1px solid ${T.borderStrong}`, borderRadius: T.rMd, fontSize: 12,
+    border: `1px solid ${T.borderStrong}`, borderRadius: T.rMd, fontSize: T.tSm,
   },
   // The rows scroll INSIDE the section rather than growing it: 23 classic rows
   // (3084px, measured) would otherwise push the sections under them off the
@@ -165,7 +165,7 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex', flexDirection: 'column', padding: 4, gap: 2,
     flex: '1 1 auto', minHeight: 0, overflowY: 'auto',
   },
-  empty: { padding: 12, color: T.textLo, fontSize: 12 },
+  empty: { padding: 12, color: T.textLo, fontSize: T.tSm },
   row: {
     display: 'flex', alignItems: 'center', gap: 4, width: '100%',
     padding: '2px 4px', background: 'transparent', borderWidth: 1, borderStyle: 'solid', borderColor: 'transparent',
@@ -186,11 +186,11 @@ const styles: Record<string, React.CSSProperties> = {
     flexShrink: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
   },
   badgeSelected: { color: T.onAccent },
-  label: { fontSize: 11, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  label: { fontSize: T.tXs, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   secondary: {
     flexShrink: 0, padding: '2px 6px', background: 'transparent',
     borderWidth: 1, borderStyle: 'solid', borderColor: T.border, borderRadius: T.rMd, cursor: 'pointer',
-    color: T.textLo, fontSize: 12, lineHeight: 1,
+    color: T.textLo, fontSize: T.tSm, lineHeight: 1,
   },
   secondarySelected: { color: T.onAccent, borderColor: T.onAccent },
 };

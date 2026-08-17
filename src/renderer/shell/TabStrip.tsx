@@ -71,7 +71,7 @@ const styles: Record<string, React.CSSProperties> = {
   tab: {
     display: 'flex', alignItems: 'center', gap: 6, padding: '0 10px 0 12px',
     maxWidth: 180, minWidth: 0, cursor: 'pointer', userSelect: 'none' as const,
-    color: T.textLo, fontSize: 12, borderRight: `1px solid ${T.border}`,
+    color: T.textLo, fontSize: T.tSm, borderRight: `1px solid ${T.border}`,
     boxShadow: 'inset 0 2px 0 transparent',
   },
   tabHover: { background: T.raised, color: T.textBase },

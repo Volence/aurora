@@ -47,13 +47,13 @@ const styles: Record<string, React.CSSProperties> = {
     maxWidth: 460, display: 'flex', flexDirection: 'column', gap: T.s3,
     textAlign: 'center', alignItems: 'center',
   },
-  title: { fontSize: 16, fontWeight: 600, color: T.textHi, fontFamily: T.fontUi },
-  body: { fontSize: 13, lineHeight: 1.5, color: T.textLo, fontFamily: T.fontUi },
+  title: { fontSize: T.tLg, fontWeight: T.wSemibold, color: T.textHi, fontFamily: T.fontUi },
+  body: { fontSize: T.tBase, lineHeight: 1.5, color: T.textLo, fontFamily: T.fontUi },
   code: { fontFamily: T.fontMono, color: T.textBase },
   button: {
     padding: '6px 14px', background: T.raised, border: `1px solid ${T.border}`,
     color: T.textBase, borderRadius: T.rMd, cursor: 'pointer',
-    fontSize: 13, fontFamily: T.fontUi,
+    fontSize: T.tBase, fontFamily: T.fontUi,
   },
-  hint: { fontSize: 12, color: T.textFaint, fontFamily: T.fontUi },
+  hint: { fontSize: T.tSm, color: T.textFaint, fontFamily: T.fontUi },
 };

@@ -1746,7 +1746,7 @@ const styles: Record<string, React.CSSProperties> = {
     position: 'absolute', bottom: 0, left: 0, right: 0,
     padding: '4px 12px', background: 'rgba(17, 17, 27, 0.9)',
     borderTop: `1px solid ${T.border}`,
-    fontSize: 11, fontFamily: T.fontMono, color: T.textBase,
+    fontSize: T.tXs, fontFamily: T.fontMono, color: T.textBase,
     gap: 6, alignItems: 'center',
     pointerEvents: 'none',
   },
@@ -1761,6 +1761,6 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '6px 10px', textAlign: 'left' as const,
     background: 'transparent', color: T.textHi,
     border: 'none', borderRadius: 4,
-    cursor: 'pointer', fontSize: 12,
+    cursor: 'pointer', fontSize: T.tSm,
   },
 };

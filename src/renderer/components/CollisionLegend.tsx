@@ -49,7 +49,7 @@ const styles: Record<string, React.CSSProperties> = {
     position: 'absolute', top: 8, left: 8, zIndex: 6, pointerEvents: 'none',
     display: 'flex', flexDirection: 'column', gap: 3, padding: '6px 8px',
     background: 'rgba(10,12,18,0.82)', border: `1px solid ${T.border}`, borderRadius: T.rMd,
-    fontFamily: T.fontUi, fontSize: 11, color: T.textBase,
+    fontFamily: T.fontUi, fontSize: T.tXs, color: T.textBase,
   },
   title: { color: T.textLo, fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2 },
   row: { display: 'flex', alignItems: 'center', gap: 7 },

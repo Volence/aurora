@@ -246,7 +246,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   hoverLabel: {
     marginLeft: 'auto', padding: '0 12px',
-    fontSize: 11, fontFamily: T.fontMono, color: T.accent,
+    fontSize: T.tXs, fontFamily: T.fontMono, color: T.accent,
   },
   canvasWrap: {
     flex: 1, position: 'relative', overflow: 'hidden',

@@ -44,7 +44,7 @@ export function PanelHeader({ children, right }: { children: React.ReactNode; ri
   return (
     <div style={{
       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-      padding: `${T.s2} ${T.s4}`, fontSize: 10, fontWeight: 600, color: T.textLo,
+      padding: `${T.s2} ${T.s4}`, fontSize: 10, fontWeight: T.wSemibold, color: T.textLo,
       textTransform: 'uppercase', letterSpacing: 1, borderBottom: `1px solid ${T.border}`,
     }}>
       <span>{children}</span>{right}
@@ -72,7 +72,7 @@ export function IconButton({ icon, label, onClick, disabled }: {
       display: 'flex', alignItems: 'center', justifyContent: 'center', gap: T.s2,
       padding: `${T.s2} ${T.s3}`, background: T.overlay, color: T.textBase,
       border: `1px solid ${T.border}`, borderRadius: T.rMd, cursor: disabled ? 'default' : 'pointer',
-      opacity: disabled ? 0.5 : 1, fontSize: 11,
+      opacity: disabled ? 0.5 : 1, fontSize: T.tXs,
     }}>{icon}</button>
   );
 }
@@ -106,7 +106,7 @@ export function Chip({ children, active, onClick, disabled, title, tone }: {
     color: active ? T.onAccent : toned ? T.warning : T.textBase,
     border: `1px solid ${active ? T.accent : toned ? T.warning : T.border}`,
     borderRadius: T.rMd,
-    fontSize: 11, cursor: disabled ? 'default' : (onClick ? 'pointer' : 'default'),
+    fontSize: T.tXs, cursor: disabled ? 'default' : (onClick ? 'pointer' : 'default'),
     opacity: disabled ? 0.5 : 1, whiteSpace: 'nowrap',
   };
   if (!onClick) return <span title={title} style={style}>{children}</span>;
@@ -120,7 +120,7 @@ export function Chip({ children, active, onClick, disabled, title, tone }: {
       // The UA's own button styling is the only thing the span never had to
       // undo: font and line-height are inherited so a chip in a 13px bar is
       // still 11px, and `margin: 0` keeps the option bars' gaps exact.
-      style={{ ...style, font: 'inherit', fontSize: 11, lineHeight: 1, margin: 0, textAlign: 'left' }}
+      style={{ ...style, font: 'inherit', fontSize: T.tXs, lineHeight: 1, margin: 0, textAlign: 'left' }}
     >{children}</button>
   );
 }
@@ -134,7 +134,7 @@ export function OptionBar({ children }: { children: React.ReactNode }) {
     <div style={{
       display: 'flex', alignItems: 'center', gap: T.s4, height: 32, padding: `0 ${T.s4}`,
       background: T.surface, borderBottom: `1px solid ${T.border}`, color: T.textLo,
-      fontSize: 11, flexShrink: 0,
+      fontSize: T.tXs, flexShrink: 0,
     }}>{children}</div>
   );
 }
@@ -144,7 +144,7 @@ export function StatusBar({ left, right }: { left?: React.ReactNode; right?: Rea
     <footer style={{
       display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 24,
       padding: `0 ${T.s4}`, background: T.void, borderTop: `1px solid ${T.border}`,
-      color: T.textLo, fontFamily: T.fontMono, fontSize: 11, flexShrink: 0,
+      color: T.textLo, fontFamily: T.fontMono, fontSize: T.tXs, flexShrink: 0,
     }}>
       <span>{left}</span><span>{right}</span>
     </footer>

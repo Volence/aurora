@@ -173,32 +173,32 @@ const styles: Record<string, React.CSSProperties> = {
     background: T.raised, border: `1px solid ${T.border}`, borderRadius: T.rMd,
   },
   title: {
-    display: 'flex', alignItems: 'center', fontSize: 11, fontWeight: 600,
+    display: 'flex', alignItems: 'center', fontSize: T.tXs, fontWeight: T.wSemibold,
     color: T.textBase, fontFamily: T.fontMono,
   },
   deselect: {
     marginLeft: 'auto', background: 'transparent', border: 'none', color: T.textLo,
-    cursor: 'pointer', fontSize: 12, lineHeight: 1, padding: 2,
+    cursor: 'pointer', fontSize: T.tSm, lineHeight: 1, padding: 2,
   },
   field: { display: 'flex', alignItems: 'center', gap: 8 },
-  label: { fontSize: 11, color: T.textLo, width: 56, flexShrink: 0 },
-  check: { display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: T.textBase, cursor: 'pointer' },
-  hint: { padding: 10, fontSize: 11, color: T.textLo, lineHeight: 1.5 },
+  label: { fontSize: T.tXs, color: T.textLo, width: 56, flexShrink: 0 },
+  check: { display: 'flex', alignItems: 'center', gap: 6, fontSize: T.tXs, color: T.textBase, cursor: 'pointer' },
+  hint: { padding: 10, fontSize: T.tXs, color: T.textLo, lineHeight: 1.5 },
   // Inline rather than a corner toast: the failure is about the field the user
   // just left, and it is the same message on both engines because the ports
   // normalise to one result shape.
   error: {
-    fontSize: 11, color: T.error, lineHeight: 1.4,
+    fontSize: T.tXs, color: T.error, lineHeight: 1.4,
     padding: '4px 6px', background: T.raised, borderRadius: T.rMd,
   },
   action: {
     marginTop: 4, padding: '5px 8px', background: T.raised, color: T.textHi,
     border: `1px solid ${T.borderStrong}`, borderRadius: T.rMd, cursor: 'pointer',
-    fontSize: 11, fontWeight: 600,
+    fontSize: T.tXs, fontWeight: T.wSemibold,
   },
   hexInput: {
     background: T.raised, color: T.textHi, border: `1px solid ${T.border}`,
-    borderRadius: T.rMd, fontSize: 12, padding: `${T.s2} ${T.s3}`,
+    borderRadius: T.rMd, fontSize: T.tSm, padding: `${T.s2} ${T.s3}`,
     width: 44, fontFamily: T.fontMono, textTransform: 'uppercase',
   },
 };

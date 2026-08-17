@@ -4,7 +4,7 @@ import { T } from './theme';
 
 const base: React.CSSProperties = {
   background: T.raised, color: T.textHi, border: `1px solid ${T.border}`,
-  borderRadius: T.rMd, fontSize: 12, padding: `${T.s2} ${T.s3}`,
+  borderRadius: T.rMd, fontSize: T.tSm, padding: `${T.s2} ${T.s3}`,
 };
 
 export function Select({ value, onChange, children, title, style }: {

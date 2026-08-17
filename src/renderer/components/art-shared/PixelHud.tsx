@@ -41,7 +41,7 @@ export const PixelHud = forwardRef<PixelHudHandle>(function PixelHud(_props, ref
       position: 'absolute', left: 6, bottom: 6, zIndex: 5, pointerEvents: 'none',
       display: 'flex', alignItems: 'center', gap: 8, padding: '1px 8px',
       background: 'rgba(10,12,18,0.82)', border: `1px solid ${T.border}`, borderRadius: T.rMd,
-      fontFamily: T.fontMono, fontSize: 11, color: T.textBase,
+      fontFamily: T.fontMono, fontSize: T.tXs, color: T.textBase,
     }}>
       <span ref={posRef}>—</span>
       <span ref={zoomRef} style={{ color: T.textLo }} />

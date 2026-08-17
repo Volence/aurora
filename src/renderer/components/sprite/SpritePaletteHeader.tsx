@@ -13,7 +13,7 @@ const btn: React.CSSProperties = {
   border: `1px solid ${T.border}`,
   borderRadius: T.rMd,
   cursor: 'pointer',
-  fontSize: 11,
+  fontSize: T.tXs,
   whiteSpace: 'nowrap',
 };
 
@@ -22,7 +22,7 @@ const selectStyle: React.CSSProperties = {
   color: T.textHi,
   border: `1px solid ${T.border}`,
   borderRadius: T.rMd,
-  fontSize: 11,
+  fontSize: T.tXs,
   padding: `0 ${T.s1}`,
 };
 
@@ -54,7 +54,7 @@ export default function SpritePaletteHeader() {
       alignItems: 'center',
       gap: T.s2,
       padding: `${T.s2} ${T.s4}`,
-      fontSize: 11,
+      fontSize: T.tXs,
       color: T.textBase,
       borderBottom: `1px solid ${T.border}`,
       flexWrap: 'wrap',

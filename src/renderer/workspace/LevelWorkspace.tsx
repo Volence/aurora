@@ -217,6 +217,6 @@ const styles: Record<string, React.CSSProperties> = {
   // without it this is a non-growing item and justifyContent centres nothing.
   unavailable: {
     flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
-    height: '100%', color: T.textLo, fontSize: 12,
+    height: '100%', color: T.textLo, fontSize: T.tSm,
   },
 };
