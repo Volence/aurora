@@ -18,11 +18,22 @@ export const T = {
   // here sets a px line-height (the inline `lineHeight: 1` sites are ratios), and
   // bridging them would just move the unconsumed-token problem up a layer.
   //
-  // NOT EVERY SIZE THE APP DRAWS HAS A STEP. The contract's floor is xs/11px
-  // ("dense labels, table cells, register dumps") and Aurora's single most common
-  // chrome size is 10px, 55 sites of it, with 9px and 8px below that. Those stay
-  // raw numbers on purpose: tokens.json is the SUITE's contract, shared with
-  // Seraph, so a step below xs is a suite decision and not Aurora's to forge.
+  // THE FLOOR MOVED. The contract used to stop at xs/11px while Aurora's single
+  // most common chrome size was 10px — 55 sites of it, plus a dozen 9px hints —
+  // so the app's densest tier had no name at all. `2xs` is now a step in
+  // tokens.json (purely additive: every consumer's generator iterates the scale,
+  // so Seraph and Oracle gained a property and nothing of theirs moved).
+  //
+  // The 9px hints were FOLDED INTO IT rather than given a step of their own. The
+  // app did not need a 10px label tier and a 9px hint tier one pixel apart — the
+  // two were already distinguished by colour (textLo vs textFaint), which is the
+  // hierarchy that actually reads at this size. One micro tier, colour carries
+  // the rank.
+  //
+  // What is still raw, deliberately: the 8px and 7px numerals stamped ON artwork
+  // — frame numbers, thumbnail corner tags, the ◀▶ stepper arrows. Those are
+  // glyphs over pixels, not text in chrome, and they are sized to the art.
+  t2xs: 'var(--text-2xs-size)',     // 10px — micro-chrome: readouts, tags, captions, hints
   tXs: 'var(--text-xs-size)',       // 11px — dense labels, chips, readouts
   tSm: 'var(--text-sm-size)',       // 12px — secondary UI text
   tBase: 'var(--text-base-size)',   // 13px — default UI text

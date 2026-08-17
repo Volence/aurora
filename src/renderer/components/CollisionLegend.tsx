@@ -51,6 +51,6 @@ const styles: Record<string, React.CSSProperties> = {
     background: 'rgba(10,12,18,0.82)', border: `1px solid ${T.border}`, borderRadius: T.rMd,
     fontFamily: T.fontUi, fontSize: T.tXs, color: T.textBase,
   },
-  title: { color: T.textLo, fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2 },
+  title: { color: T.textLo, fontSize: T.t2xs, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2 },
   row: { display: 'flex', alignItems: 'center', gap: 7 },
 };

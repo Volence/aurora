@@ -175,13 +175,13 @@ export const S: Record<string, React.CSSProperties> = {
     cursor: 'pointer', fontSize: T.tMd, lineHeight: 1, flexShrink: 0,
   },
   toolActive: { background: T.accent, color: T.surface, borderColor: T.accent },
-  smallText: { fontSize: 10, fontWeight: T.wSemibold },
+  smallText: { fontSize: T.t2xs, fontWeight: T.wSemibold },
   disabled: { opacity: 0.35, cursor: 'default' },
   config: { display: 'inline-flex', alignItems: 'center', gap: 2 },
   ditherButton: {
     width: 40, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center',
     background: T.border, color: T.textHi, borderWidth: 1, borderStyle: 'solid', borderColor: T.borderStrong, borderRadius: T.rMd,
-    cursor: 'pointer', fontSize: 10, lineHeight: 1, flexShrink: 0,
+    cursor: 'pointer', fontSize: T.t2xs, lineHeight: 1, flexShrink: 0,
   },
   stepper: { display: 'flex', alignItems: 'center', gap: 2, width: 40, justifyContent: 'space-between' },
   stepButton: {
@@ -189,7 +189,7 @@ export const S: Record<string, React.CSSProperties> = {
     background: T.border, color: T.textBase, border: `1px solid ${T.borderStrong}`, borderRadius: T.rMd,
     cursor: 'pointer', fontSize: 7, lineHeight: 1,
   },
-  value: { fontSize: 10, color: T.textHi, fontFamily: T.fontMono },
+  value: { fontSize: T.t2xs, color: T.textHi, fontFamily: T.fontMono },
   zoomGroup: { display: 'inline-flex', alignItems: 'center', gap: 4 },
-  zoomLabel: { fontSize: 10, color: T.textLo, fontFamily: T.fontMono },
+  zoomLabel: { fontSize: T.t2xs, color: T.textLo, fontFamily: T.fontMono },
 };

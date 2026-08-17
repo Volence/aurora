@@ -74,7 +74,7 @@ const styles: Record<string, React.CSSProperties> = {
     flex: '1 1 auto', minHeight: 0, overflow: 'hidden',
   },
   count: {
-    padding: '6px 8px', fontSize: 10, color: T.textLo,
+    padding: '6px 8px', fontSize: T.t2xs, color: T.textLo,
     borderBottom: `1px solid ${T.border}`, flexShrink: 0,
   },
   // Scrolls inside the section instead of growing it. `flex: 1` alone was a

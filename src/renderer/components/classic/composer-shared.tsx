@@ -259,7 +259,7 @@ export const styles: Record<string, React.CSSProperties> = {
     padding: '2px 12px', fontSize: T.tXs, cursor: 'pointer', borderRadius: 3,
   },
   tabBtnActive: { background: T.accent, color: T.onAccent, borderColor: T.accent, fontWeight: T.wSemibold },
-  dockHint: { fontSize: 9, color: T.textFaint },
+  dockHint: { fontSize: T.t2xs, color: T.textFaint },
   // `maxHeight: 380` was the strip's cap on how much of the window it could take
   // from the map. As the canvas there is no map to protect, and the cap left a
   // hard edge with empty space below it — so it grows instead, and scrolls
@@ -310,7 +310,7 @@ export const styles: Record<string, React.CSSProperties> = {
   // strips are the browser. `minWidth` is a floor for the header row's buttons.
   editorCol: { display: 'flex', flexDirection: 'column', gap: 6, flex: '2 1 0', minWidth: 320, minHeight: 0 },
   paletteCol: { display: 'flex', flexDirection: 'column', gap: 4, minWidth: 220, maxWidth: 360, flex: '1 1 0', minHeight: 0 },
-  paletteHead: { fontSize: 10, color: T.textLo, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: T.wSemibold },
+  paletteHead: { fontSize: T.t2xs, color: T.textLo, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: T.wSemibold },
 
   // WHERE THE RECOVERED HEIGHT ACTUALLY GOES. `maxHeight: 300` was the browse
   // strips' own cap; with the body now full-height it was the thing keeping the
@@ -366,9 +366,9 @@ export const styles: Record<string, React.CSSProperties> = {
   gridCanvas: { display: 'block', imageRendering: 'pixelated', background: CANVAS_BLACK, border: `1px solid ${T.border}`, borderRadius: 3 },
   rowWrap: { display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
   title: { fontSize: T.tSm, fontWeight: T.wSemibold, color: T.textHi, fontFamily: T.fontMono },
-  count: { fontSize: 10, color: T.textLo, fontFamily: T.fontMono },
-  dim: { fontSize: 10, color: T.textLo },
-  hintRow: { fontSize: 9, color: T.textFaint },
+  count: { fontSize: T.t2xs, color: T.textLo, fontFamily: T.fontMono },
+  dim: { fontSize: T.t2xs, color: T.textLo },
+  hintRow: { fontSize: T.t2xs, color: T.textFaint },
   notice: { fontSize: T.tXs, color: T.textLo, padding: '12px 4px', maxWidth: 320, lineHeight: 1.5 },
   // NEUTRAL STATUS CHROME, not a warning — same tokens as `smallBtn`/`dupBtn`'s
   // own resting chrome (`T.overlay`/`T.border`), because the linkage this
@@ -378,17 +378,17 @@ export const styles: Record<string, React.CSSProperties> = {
   // refusal and still overrides these two fields back to red on its own
   // (see SharedBanner's docblock) — it does not go through this component.
   banner: {
-    display: 'flex', alignItems: 'center', gap: 8, fontSize: 10, color: T.textBase,
+    display: 'flex', alignItems: 'center', gap: 8, fontSize: T.t2xs, color: T.textBase,
     background: T.overlay, borderWidth: 1, borderStyle: 'solid', borderColor: T.border,
     borderRadius: 3, padding: '4px 8px', maxWidth: 340,
   },
   dupBtn: {
     background: T.accent, color: T.onAccent, border: 'none', borderRadius: 3,
-    padding: '2px 8px', fontSize: 10, fontWeight: T.wSemibold, cursor: 'pointer', flexShrink: 0,
+    padding: '2px 8px', fontSize: T.t2xs, fontWeight: T.wSemibold, cursor: 'pointer', flexShrink: 0,
   },
   smallBtn: {
     background: T.overlay, color: T.textBase, border: `1px solid ${T.border}`, borderRadius: 3,
-    padding: '2px 8px', fontSize: 10, cursor: 'pointer',
+    padding: '2px 8px', fontSize: T.t2xs, cursor: 'pointer',
   },
   swatchRow: { display: 'flex', gap: 3, flexWrap: 'wrap' },
 };

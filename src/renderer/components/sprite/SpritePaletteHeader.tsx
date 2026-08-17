@@ -28,7 +28,7 @@ const selectStyle: React.CSSProperties = {
 
 const note: React.CSSProperties = {
   color: T.warning,
-  fontSize: 10,
+  fontSize: T.t2xs,
   whiteSpace: 'nowrap',
 };
 

@@ -94,10 +94,10 @@ const styles: Record<string, React.CSSProperties> = {
     background: 'rgba(137, 180, 250, 0.15)',
   },
   lineLabel: {
-    fontSize: 10, color: T.textLo, marginRight: 4, fontFamily: T.fontMono,
+    fontSize: T.t2xs, color: T.textLo, marginRight: 4, fontFamily: T.fontMono,
   },
   lineLabelSelected: {
-    color: T.accent, fontWeight: 700,
+    color: T.accent, fontWeight: T.wSemibold,
   },
   swatch: {
     width: 14, height: 14, borderRadius: 2, flexShrink: 0,

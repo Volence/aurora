@@ -407,11 +407,11 @@ const styles: Record<string, React.CSSProperties> = {
   // header above already says TILESET; in heading type this row said TILES (919)
   // straight under it, which is the "name twice" both engines' panels had.
   label: {
-    padding: '6px 8px', fontSize: 10, color: T.textLo,
+    padding: '6px 8px', fontSize: T.t2xs, color: T.textLo,
   },
   hoverLabel: {
     marginLeft: 'auto', padding: '0 8px',
-    fontSize: 10, fontFamily: T.fontMono, color: T.accent,
+    fontSize: T.t2xs, fontFamily: T.fontMono, color: T.accent,
     whiteSpace: 'nowrap' as const, overflow: 'hidden', textOverflow: 'ellipsis',
   },
   headerActions: {
@@ -421,13 +421,13 @@ const styles: Record<string, React.CSSProperties> = {
     background: T.void,
   },
   liveInfo: {
-    fontSize: 10, fontFamily: T.fontMono, color: T.warning,
+    fontSize: T.t2xs, fontFamily: T.fontMono, color: T.warning,
   },
   actionButton: {
     padding: '2px 8px',
     background: T.border, color: T.textHi,
     border: `1px solid ${T.borderStrong}`, borderRadius: 4,
-    cursor: 'pointer', fontSize: 10,
+    cursor: 'pointer', fontSize: T.t2xs,
   },
   canvasWrap: {
     flex: 1, position: 'relative', overflow: 'hidden',

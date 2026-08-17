@@ -170,7 +170,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: T.wSemibold, fontSize: T.tBase, border: 'none', borderRadius: T.rMd, cursor: 'pointer',
   },
   sectionTitle: {
-    marginTop: 20, fontSize: 10, fontWeight: T.wSemibold, color: T.textLo,
+    marginTop: 20, fontSize: T.t2xs, fontWeight: T.wSemibold, color: T.textLo,
     textTransform: 'uppercase' as const, letterSpacing: 1,
   },
   recentList: { display: 'flex', flexDirection: 'column', gap: 2 },
@@ -189,13 +189,13 @@ const styles: Record<string, React.CSSProperties> = {
   },
   recentName: { fontSize: T.tBase, color: T.textHi, fontWeight: T.wMedium },
   recentPath: {
-    fontSize: 10, color: T.textFaint, fontFamily: T.fontMono,
+    fontSize: T.t2xs, color: T.textFaint, fontFamily: T.fontMono,
     overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const, maxWidth: '100%',
   },
   projectHeader: { display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' as const },
   chip: {
     padding: '1px 8px', background: T.raised, border: `1px solid ${T.borderStrong}`,
-    borderRadius: T.rPill, fontSize: 10, fontWeight: 700, color: T.accent, fontFamily: T.fontMono,
+    borderRadius: T.rPill, fontSize: T.t2xs, fontWeight: T.wSemibold, color: T.accent, fontFamily: T.fontMono,
   },
   cards: {
     display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 8,
@@ -207,5 +207,5 @@ const styles: Record<string, React.CSSProperties> = {
   },
   cardDisabled: { opacity: 0.45, cursor: 'default' },
   cardLabel: { flex: 1, minWidth: 0, fontSize: T.tSm, fontWeight: T.wMedium, color: T.textHi },
-  cardBadge: { fontSize: 10, color: T.textLo, fontFamily: T.fontMono, flexShrink: 0 },
+  cardBadge: { fontSize: T.t2xs, color: T.textLo, fontFamily: T.fontMono, flexShrink: 0 },
 };

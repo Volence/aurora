@@ -44,7 +44,7 @@ export function PanelHeader({ children, right }: { children: React.ReactNode; ri
   return (
     <div style={{
       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-      padding: `${T.s2} ${T.s4}`, fontSize: 10, fontWeight: T.wSemibold, color: T.textLo,
+      padding: `${T.s2} ${T.s4}`, fontSize: T.t2xs, fontWeight: T.wSemibold, color: T.textLo,
       textTransform: 'uppercase', letterSpacing: 1, borderBottom: `1px solid ${T.border}`,
     }}>
       <span>{children}</span>{right}

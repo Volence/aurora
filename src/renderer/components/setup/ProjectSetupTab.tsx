@@ -251,7 +251,7 @@ export default function ProjectSetupTab() {
               title={g.id.toUpperCase()}
               defaultCollapsed={g.resolved === g.total}
               right={
-                <span style={{ color: g.resolved === g.total ? T.success : T.warning, fontSize: 10 }}>
+                <span style={{ color: g.resolved === g.total ? T.success : T.warning, fontSize: T.t2xs }}>
                   {g.resolved}/{g.total}
                 </span>
               }
@@ -289,7 +289,7 @@ const styles: Record<string, React.CSSProperties> = {
     background: T.void, border: `1px solid ${T.border}`, borderRadius: T.rLg,
   },
   infoLine: { display: 'flex', gap: 12, fontSize: T.tSm },
-  infoKey: { width: 90, flexShrink: 0, color: T.textLo, fontSize: 10, textTransform: 'uppercase' as const, letterSpacing: 1, paddingTop: 1 },
+  infoKey: { width: 90, flexShrink: 0, color: T.textLo, fontSize: T.t2xs, textTransform: 'uppercase' as const, letterSpacing: 1, paddingTop: 1 },
   mono: { fontFamily: T.fontMono, fontSize: T.tXs, color: T.textBase, overflowWrap: 'anywhere' as const },
   note: { fontSize: T.tSm, color: T.textLo },
   issueCard: {
@@ -300,7 +300,7 @@ const styles: Record<string, React.CSSProperties> = {
   issueLine: { fontSize: T.tXs, color: T.textBase, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' as const },
   removeButton: {
     padding: '0 6px', background: 'transparent', border: `1px solid ${T.border}`,
-    borderRadius: T.rSm, color: T.textLo, cursor: 'pointer', fontSize: 10,
+    borderRadius: T.rSm, color: T.textLo, cursor: 'pointer', fontSize: T.t2xs,
   },
   rows: { display: 'flex', flexDirection: 'column', gap: 2, padding: '4px 0 8px' },
   row: { display: 'flex', alignItems: 'center', gap: 8, padding: '1px 8px' },

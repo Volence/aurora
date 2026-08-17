@@ -347,11 +347,11 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: T.wMedium,
   },
   sharedWarning: {
-    fontSize: 10,
+    fontSize: T.t2xs,
     color: T.warning,
   },
   dirtyBadge: {
-    fontSize: 9,
+    fontSize: T.t2xs,
     color: T.onAccent,
     background: T.warning,
     padding: '0 4px',

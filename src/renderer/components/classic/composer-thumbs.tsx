@@ -117,5 +117,5 @@ const countBadge: React.CSSProperties = {
   background: 'rgba(0,0,0,0.65)', color: COMPOSER_BADGE_TEXT, fontFamily: T.fontMono, borderTopLeftRadius: 3,
 };
 const lockBadge: React.CSSProperties = {
-  position: 'absolute', left: 1, top: 0, fontSize: 9, lineHeight: '11px',
+  position: 'absolute', left: 1, top: 0, fontSize: T.t2xs, lineHeight: '11px',
 };
