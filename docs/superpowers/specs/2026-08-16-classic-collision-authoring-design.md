@@ -167,7 +167,7 @@ and it is available only as this one bulk action on freshly created chunks — n
 
 ## 5. Hazards to surface, not swallow
 
-- **The colind overhang (CLASSIC-A4, `classicLevelStore.ts:967-981`).** GHZ ships **439 blocks
+- **The colind overhang (CLASSIC-A4, `classicLevelStore.ts:988-1015`).** GHZ ships **439 blocks
   against a 410-byte colind**; in ROM the overhang resolves into the adjacent zone's table, so
   blocks ≥410 may have real in-game collision that Aurora shows as air. Assigning a shape to such a
   block force-grows the table with zeros, **silently changing every other overhang block's in-game
