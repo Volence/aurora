@@ -1196,8 +1196,25 @@ export function classicSetColind(entries: { blockId: number; value: number }[]):
   if (!doc) return err('no classic level is open');
   const colind = doc.collision.colind;
   for (const { blockId, value } of entries) {
-    if (!isInt(blockId) || blockId < 0 || blockId >= colind.length) {
+    // Block 0 is the blank block. FindFloor does `andi.w #$7FF,d0 / beq.s
+    // .isblank` before it reads either solidity or colind, so a shape stored
+    // here can never apply in game — writing it would be an edit the editor
+    // shows and the console ignores.
+    if (blockId === 0) {
+      return err('block 0 is the blank block — the engine short-circuits before reading its collision, so a shape here can never apply');
+    }
+    if (!isInt(blockId) || blockId < 0) {
       return err(`colind block ${blockId} out of range 0..${colind.length - 1}`);
+    }
+    // THE OVERHANG. A zone can ship more blocks than its colind has bytes —
+    // GHZ is 439 against 410 — and in ROM the tail resolves into the ADJACENT
+    // zone's table, so these blocks may have real collision that Aurora cannot
+    // see and draws as air. Growing the table here would write zeros over that,
+    // silently changing every other overhang block's in-game collision.
+    // Refused rather than guessed; reading the true values needs cross-file
+    // reach Aurora does not have. See classicPaintSurface for the same fact.
+    if (blockId >= colind.length) {
+      return err(`block ${blockId} is past the end of this zone's collision table (${colind.length} entries) — the overhang resolves into the adjacent zone's table in ROM, so Aurora cannot set it without silently changing other blocks`);
     }
     if (!isInt(value) || value < 0 || value > 255) {
       return err(`colind value ${value} out of range 0..255`);
