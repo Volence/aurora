@@ -10,9 +10,15 @@
 // the toggle is off.
 //
 // WHAT GETS TOUCHED, and why nothing else does:
-//   - blockWrites with colind === 0 are exactly the newly-minted blocks that
-//     inherited no collision (classic-commit-plan.ts's D3 step already tells
-//     them apart from reused/inherited blocks — see blocksWithoutCollision).
+//   - blockWrites with colind === 0 AND no `blanked` flag are the newly-minted
+//     blocks that inherited no collision. The flag matters: blockWrites also
+//     carries RECLAIMED ids nothing took, written back as blank cells so their
+//     stale defs stop holding pool tiles — those also have colind 0, are not
+//     counted in blocksWithoutCollision, and are referenced by no live chunk
+//     cell. Including them would make the toggle's preview count read higher
+//     than the "N have none" line directly above it, and would hand flat
+//     collision to a blank block that is invisible if anything ever points at
+//     it again.
 //   - chunkAppends cells are exactly the ones with no predecessor: the planner
 //     sets `old?.solidity ?? 0` from `src?.cells[ci] ?? null`, and `src` is
 //     null only when the region cell targeted no chunk file (an append). A
@@ -52,7 +58,7 @@ export type CommitPlanWithCollision = CanvasCommitPlan & { applied: CommitCollis
 export function withCollision(plan: CanvasCommitPlan): CommitPlanWithCollision {
   let blocks = 0;
   const blockWrites = plan.blockWrites.map((w) => {
-    if (w.colind !== 0) return w;
+    if (w.colind !== 0 || w.blanked) return w;
     blocks++;
     return { ...w, colind: FLAT_SHAPE };
   });

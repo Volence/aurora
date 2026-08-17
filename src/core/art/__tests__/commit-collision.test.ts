@@ -77,3 +77,24 @@ describe('withCollision', () => {
     expect(out.applied).toEqual({ blocks: 2, cells: 1 });
   });
 });
+
+describe('withCollision and reclaimed blanks', () => {
+  it('does not give collision to a blanked reclaimed id', () => {
+    // blockWrites carries two different things. Minted blocks that inherited
+    // nothing have colind 0 — those are the point. But RECLAIMED ids nothing
+    // took are also pushed, blanked, with colind 0, so their stale defs stop
+    // holding pool tiles. They are referenced by no live chunk cell and are NOT
+    // counted in blocksWithoutCollision, so treating them as minted would make
+    // the toggle's preview read higher than the "N have none" line above it.
+    const p = plan({
+      blockWrites: [
+        block(10, 0),
+        { ...block(99, 0), blanked: true as const },
+      ],
+    });
+    const out = withCollision(p);
+    expect(out.blockWrites.find((b) => b.blockId === 10)!.colind).toBe(FLAT_SHAPE);
+    expect(out.blockWrites.find((b) => b.blockId === 99)!.colind).toBe(0);
+    expect(out.applied.blocks).toBe(1);
+  });
+});

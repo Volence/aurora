@@ -369,6 +369,15 @@ describe('planCanvasCommit — reclaim', () => {
     const zeroed = r.plan.blockWrites.filter((w) => w.def.cells.every((c) => c.tile === 0));
     expect(zeroed).toHaveLength(1);
     expect(zeroed[0].colind).toBe(0);
+    // FLAGGED, not merely blank-looking. A blanked reclaim and a freshly minted
+    // block both carry colind 0, and consumers have to tell them apart —
+    // commit-collision's toggle must not hand flat collision to a dead id, and
+    // must not count it in what it reports. Inferring from "the def looks
+    // blank" or from push order is silent to read and wrong the moment either
+    // changes, so the planner says so outright.
+    expect(zeroed[0].blanked).toBe(true);
+    const minted = r.plan.blockWrites.filter((w) => !w.blanked);
+    expect(minted).toHaveLength(r.plan.report.blocksNew);
     // And it is not the id the drawing was bound to.
     const bound = new Set(r.plan.chunkWrites[0].def.cells.map((c) => c.block));
     expect(bound.has(zeroed[0].blockId)).toBe(false);
