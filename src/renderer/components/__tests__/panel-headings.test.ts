@@ -93,13 +93,19 @@ describe('a panel inside a CollapsibleSection does not title itself', () => {
    * SECTION / ART / VIEWPORT) under one `Properties` section header. It never
    * repeats that header, so it is not the bug this file exists for.
    *
+   * ClassicCollisionPanel is the same shape: "This cell" and "This block" are
+   * two labelled TIERS under one `Collision` section header (never "Collision"
+   * itself) — the plan that wrote it required both labels precisely because a
+   * merged, unlabelled readout is how a solidity number gets misread as the
+   * on-map count or the reverse (see the panel's own docblock).
+   *
    * AN ALLOWLIST IS SAFE HERE IN A WAY THE OLD `PANELS` LIST WAS NOT, and the
    * asymmetry is the whole reason the derivation above was worth writing: an
    * entry MISSING from a list of things to check is a silent pass — which is how
    * RING PATTERNS shipped doubled. An entry missing from an allowlist is a
    * FAILING test. Both lists are hand-maintained; only one of them fails safe.
    */
-  const SUBHEADING_PANELS = ['shared/PropertiesPanel.tsx'];
+  const SUBHEADING_PANELS = ['shared/PropertiesPanel.tsx', 'classic/ClassicCollisionPanel.tsx'];
 
   it.each(PANELS)('%s renders no heading-type text of its own', (file) => {
     const name = panelName(file);

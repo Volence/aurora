@@ -201,6 +201,26 @@ interface ClassicLevelState {
   /** The chunk id the stamp tool paints (0..255); also the eyedropper target. */
   selectedChunkId: number;
   /**
+   * The level-pixel point last clicked on the Collision facet, or null.
+   *
+   * The Collision facet is read-only — `view` stays armed, so a left-drag pans
+   * and a right-click still eyedrops a chunk into `selectedChunkId`. Neither of
+   * those tells the (future) Collision panel WHERE the user clicked, and there
+   * was no existing channel for a non-writing tool to report a point at all.
+   * This is that channel: set from the viewport's left-click path only while
+   * the collision facet is active, read by the panel to call `probeCollision`.
+   *
+   * LEVEL PIXELS, not layout cells and not client/screen coordinates —
+   * `probeCollision(doc, x, y)` takes level pixels, so storing anything else
+   * here would need a silent unit conversion at every read site.
+   *
+   * UI state, not doc data: not part of an undo snapshot, and cleared on every
+   * act change (openAct's `fresh`) because a point that survived would have the
+   * panel confidently describing a cell in an act the user is no longer looking
+   * at — worse than showing nothing.
+   */
+  collisionProbe: { x: number; y: number } | null;
+  /**
    * Whether the stamp tool writes S1's bit-7 loop flag alongside the chunk id
    * (Task B4). Only meaningful for an armed engine id 1..$7F — air ($00) never
    * loops. UI state (not doc data); the eyedropper syncs it from the picked cell.
@@ -274,6 +294,8 @@ interface ClassicLevelState {
   /** Select + load an act. Reads through the open project's handle. */
   openAct: (ref: ZoneActRef) => Promise<void>;
   setSelectedChunkId: (chunkId: number) => void;
+  /** Record (or clear, with null) the Collision facet's last-clicked point. */
+  setCollisionProbe: (point: { x: number; y: number } | null) => void;
   /**
    * The Composer picker's plain left-click select: sets the chunk AND arms the
    * stamp tool (unless it's already active). Distinct from setSelectedChunkId
@@ -331,6 +353,7 @@ const IDLE = {
   tileEpoch: 0,
   tileVersions: new Map<number, number>(),
   selectedChunkId: 0,
+  collisionProbe: null as { x: number; y: number } | null,
   stampLoop: false,
   selectedObjectIndex: null as number | null,
   armedObjectId: null as number | null,
@@ -411,6 +434,10 @@ export const useClassicLevelStore = create<ClassicLevelState>((set, get) => ({
       // paths, where there is no pool to pick from; a successful read replaces it
       // with firstEditableChunkId(doc.chunks).
       selectedChunkId: 0,
+      // A probed point names a cell in THIS act's layout; carrying it into a
+      // freshly-loaded act would have the Collision panel confidently
+      // describing a cell the user is no longer looking at.
+      collisionProbe: null as { x: number; y: number } | null,
       stampLoop: false,
       // Object selection + place-arm are per-act too (indices/ids into this act's
       // object list), so a fresh act clears them.
@@ -486,6 +513,7 @@ export const useClassicLevelStore = create<ClassicLevelState>((set, get) => ({
   setSelectedChunkId: (chunkId: number) => {
     if (Number.isInteger(chunkId) && chunkId >= 0 && chunkId <= 0xff) set({ selectedChunkId: chunkId });
   },
+  setCollisionProbe: (point: { x: number; y: number } | null) => set({ collisionProbe: point }),
   selectChunkForStamp: (chunkId: number) => {
     if (!Number.isInteger(chunkId) || chunkId < 0 || chunkId > 0xff) return;
     set({ selectedChunkId: chunkId });

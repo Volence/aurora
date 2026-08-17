@@ -55,15 +55,17 @@ export type ClassicSurface = 'map' | 'art';
 
 /**
  * The facets each surface SERVES, primary first. Deliberately not a 1:1 map:
- * classic has two surfaces and four facets, because one surface can be the
+ * classic has two surfaces and five facets, because one surface can be the
  * canvas of SEVERAL —
  *
- *   • `map`  → `layout` + `objects` + `palette`. One ClassicLevelViewport is the
- *     canvas of all three (workspace/facets/s1-facets.tsx). They differ in their
- *     RIGHT COLUMN and in their tools: layout is the chunk picker over
- *     `view / stamp-chunk / select`; objects is the inspector and the library
- *     over `place-object / select / view`; palette is the CRAM grid over `view`
- *     alone, judging a recolour against the whole act.
+ *   • `map`  → `layout` + `objects` + `palette` + `collision`. One
+ *     ClassicLevelViewport is the canvas of all four (workspace/facets/
+ *     s1-facets.tsx). They differ in their RIGHT COLUMN and in their tools:
+ *     layout is the chunk picker over `view / stamp-chunk / select`; objects is
+ *     the inspector and the library over `place-object / select / view`; palette
+ *     is the CRAM grid over `view` alone, judging a recolour against the whole
+ *     act; collision is the read-only cell explainer over `view` alone, judging
+ *     a clicked cell against the zone's colind.
  *   • `art`  → `art` + `palette`. One ClassicComposerDock is the canvas, with
  *     ClassicPalettePanel a section in its column.
  *
@@ -105,7 +107,7 @@ export type ClassicSurface = 'map' | 'art';
  * Exported so the routing tests can read the real thing rather than a copy.
  */
 export const SURFACE_FACETS: Record<ClassicSurface, readonly FacetCapability[]> = {
-  map: ['layout', 'objects', 'palette'],
+  map: ['layout', 'objects', 'palette', 'collision'],
   art: ['art', 'palette'],
 };
 

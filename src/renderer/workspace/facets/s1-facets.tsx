@@ -1,21 +1,23 @@
-// Classic (S1 disasm) facet modules — the four facets the s1 profile grants,
-// composed entirely from components that already exist. No new UI was written
-// here: task 4 populated the registry and task 9 flipped classic off the legacy
-// shell onto it, in two commits, so a failure in the registration stayed
-// isolated from a failure in the switch-on. This IS what a classic level tab
-// renders now.
+// Classic (S1 disasm) facet modules — the five facets the s1 profile grants,
+// composed entirely from components that already exist (task 2 of the
+// collision-lens plan added `collision`, read-only, to the four that shipped
+// before it). No new UI was written for the first four: task 4 populated the
+// registry and task 9 flipped classic off the legacy shell onto it, in two
+// commits, so a failure in the registration stayed isolated from a failure in
+// the switch-on. This IS what a classic level tab renders now.
 //
 // ---------------------------------------------------------------------------
-// FOUR FACETS, TWO CANVASES — AND THE PILL ORDER IS WHY FOUR WORKS
+// FIVE FACETS, TWO CANVASES — AND THE PILL ORDER IS WHY IT WORKS
 // ---------------------------------------------------------------------------
-//   Layout   → ClassicLevelViewport + chunks
-//   Objects  → ClassicLevelViewport + selected object / object library
-//   Palette  → ClassicLevelViewport + palette grid
-//   Art      → ClassicComposerDock  + chunks / palette grid
+//   Layout     → ClassicLevelViewport + chunks
+//   Objects    → ClassicLevelViewport + selected object / object library
+//   Collision  → ClassicLevelViewport + solidity readout (read-only)
+//   Palette    → ClassicLevelViewport + palette grid
+//   Art        → ClassicComposerDock  + chunks / palette grid
 //
-// Three of the four share ONE canvas and differ only in their column and their
+// Four of the five share ONE canvas and differ only in their column and their
 // tools; `art` is the one that swaps the canvas outright. core/shell/facets.ts
-// orders the pills so those three are adjacent and `art` is LAST, which is what
+// orders the pills so those four are adjacent and `art` is LAST, which is what
 // makes a press inside the group read as what it is — the tools and the panel
 // changing over a scene that does not move.
 //
@@ -53,8 +55,10 @@
 // all for a palette-only hack — in the Art column it sits under an 82-chunk
 // wall, which is how it came to be believed not to exist.
 //
-// `collision` and `rings` have no module here on purpose: the s1 profile grants
-// neither (core/project/s1/index.ts, where both absences are argued).
+// `collision` DOES have a module here now (ClassicCollisionPanels, below) — see
+// its own docblock for what it is and is not. `rings` still has no module on
+// purpose: the s1 profile does not grant it (core/project/s1/index.ts, where
+// the absence is argued — S1 rings are objects in objpos, not a separate layer).
 //
 // ---------------------------------------------------------------------------
 // WHAT IS STILL OPEN FOR STEP H
@@ -146,6 +150,7 @@ import ClassicObjectInspector from '../../components/classic/ClassicObjectInspec
 import ClassicObjectList from '../../components/classic/ClassicObjectList';
 import ChunkPicker from '../../components/classic/ChunkPicker';
 import ClassicArtToolDock from '../../components/classic/ClassicArtToolDock';
+import ClassicCollisionPanel from '../../components/classic/ClassicCollisionPanel';
 import ArtToolOptions, { CLASSIC_TILE_CAPS, CLASSIC_SURFACE_CAPS } from '../../shell/ArtToolOptions';
 import MapStatusBar from '../../components/shared/MapStatusBar';
 import { useClassicMapStatusPort } from '../../providers/map-status-classic';
@@ -371,6 +376,23 @@ function ClassicPalettePanels(): React.ReactElement {
 }
 
 /**
+ * COLLISION's right-hand column: one readout, split by the tier each half
+ * belongs to. Nothing here writes — see ClassicCollisionPanel's own docblock
+ * (components/classic/ClassicCollisionPanel.tsx) for why the two halves are
+ * labelled rather than merged, and for the overlay claim the panel makes on
+ * mount.
+ */
+function ClassicCollisionPanels(): React.ReactElement {
+  return (
+    <Panel width={260} scroll>
+      <CollapsibleSection id="classic.collision" title="Collision">
+        <ClassicCollisionPanel />
+      </CollapsibleSection>
+    </Panel>
+  );
+}
+
+/**
  * The right-hand column for both art facets.
  *
  * THE CHUNK PICKER IS HERE TOO (gap 5, closed at task 9). `selectedChunkId` is
@@ -508,6 +530,19 @@ export const s1PaletteFacet: FacetModule = mapFacet('palette', {
   ToolOptions: ClassicMapToolOptions,
   StatusBar: ClassicMapStatusBar,
   RightPanel: ClassicPalettePanels,
+});
+
+// SAME CANVAS, SAME STATUS BAR, SAME HINT BAR as Layout/Objects/Palette — the
+// COLUMN is the difference, which is the established shape for classic's map
+// facets. The tool set is DECLARED (see s1/index.ts facetTools) rather than
+// left to the shell default, because that default is ['paint-collision','view']
+// and its first entry is the facet default — so omitting it would land the user
+// on a write tool this facet does not implement.
+export const s1CollisionFacet: FacetModule = mapFacet('collision', {
+  Canvas: ClassicLevelViewport,
+  ToolOptions: ClassicMapToolOptions,
+  StatusBar: ClassicMapStatusBar,
+  RightPanel: ClassicCollisionPanels,
 });
 
 // Written out rather than built with mapFacet: this is NOT a map-canvas facet.

@@ -202,6 +202,16 @@ describe('focusedHistory', () => {
     expect(focusedHistory()).toBe(documentHistoryHub.historyFor('zoneart:ghz'));
   });
 
+  it('returns the ZONE-ART doc stack for the collision facet too', () => {
+    // colind is an ART_DOMAIN, so a collision edit lands on the ZONE-ART stack.
+    // If the facet were missing from ZONE_ART_FACETS, this would resolve to the
+    // act's layout document instead — Ctrl+Z on the map would reach a stack the
+    // edit was never recorded on.
+    useSessionStore.setState({ activeId: 'level:ghz:1' });
+    useWorkspaceStore.getState().setFacet('level:ghz:1', 'collision');
+    expect(focusedHistory()).toBe(documentHistoryHub.historyFor('zoneart:ghz'));
+  });
+
   it('returns the SPRITE doc stack when a sprite tab is active', () => {
     useSessionStore.setState({ activeId: 'doc:sprite:s1:18' });
     expect(focusedHistory()).toBe(documentHistoryHub.historyFor('doc:sprite:s1:18'));

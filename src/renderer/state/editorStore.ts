@@ -206,6 +206,9 @@ interface EditorState {
 /**
  * Facets whose edits belong to the ZONE-ART document rather than the act's
  * layout: art and palette are zone-scoped data edited from an act tab.
+ * Collision joins them for the same reason — colind is zone-scoped like the
+ * art it hangs off, shared by all three acts of the zone through one
+ * `collide/{ZONE}.bin`, not owned by any single act's layout.
  *
  * THE SOLE STATEMENT OF WHICH DOCUMENT A FACET EDITS, and keyed on the FACET
  * because that is the unambiguous thing. Classic's SURFACE_FACETS used to be a
@@ -217,7 +220,7 @@ interface EditorState {
  *
  * Exported for that test, so it reads the real set rather than a copy of it.
  */
-export const ZONE_ART_FACETS = new Set<string>(['art', 'palette']);
+export const ZONE_ART_FACETS = new Set<string>(['art', 'palette', 'collision']);
 
 /**
  * The document the user is currently editing: the active tab, refined by the

@@ -108,11 +108,11 @@ describe('classicScopeTone', () => {
 describe('the bar defers because classic\'s map facets speak for themselves', () => {
   it('EVERY s1 map module mounts a ToolOptions hint line', async () => {
     // Derived from the registry rather than named one by one: the flag is a
-    // claim about the whole set, and the set has changed three times in a week
-    // — layout+objects, then layout+palette, now all three. The palette module
-    // was written WITHOUT this bar until this test failed, which is the hole the
-    // flag creates, exactly as described above, on a facet whose only tool would
-    // then go unexplained.
+    // claim about the whole set, and the set has changed four times in as many
+    // weeks — layout+objects, then layout+palette, then all three, now all four
+    // with collision. The palette module was written WITHOUT this bar until this
+    // test failed, which is the hole the flag creates, exactly as described
+    // above, on a facet whose only tool would then go unexplained.
     const [{ registerS1FacetModules }, { moduleFor, facetModules }, { S1_FACETS }] =
       await Promise.all([
         import('../../workspace/register-facets'),
@@ -124,7 +124,7 @@ describe('the bar defers because classic\'s map facets speak for themselves', ()
     const mapFacets = S1_FACETS.filter((f) => moduleFor('s1', f)?.mapOverlays === true);
     // The composer is not a map facet and has no such bar; if this ever empties,
     // the loop below would pass by testing nothing.
-    expect(mapFacets).toEqual(['layout', 'objects', 'palette']);
+    expect(mapFacets).toEqual(['layout', 'objects', 'collision', 'palette']);
     for (const f of mapFacets) {
       expect(moduleFor('s1', f)?.ToolOptions, `s1/${f}`).toBeTypeOf('function');
     }

@@ -23,6 +23,7 @@ import {
   type ObjectHitBounds, type StampCell,
 } from './viewport-math';
 import { drawCollision, drawObjects, drawStart, GHOST_MARKER_BOUNDS } from './classic-overlays';
+import CollisionLegend from '../CollisionLegend';
 import { isTypingTarget } from './composer-shared';
 import { classicSurfaceProps } from './classic-surface';
 import { levelKeysEnabled } from '../../workspace/level-keys';
@@ -139,6 +140,9 @@ export default function ClassicLevelViewport() {
   // here would only re-render the canvas host for a toggle it cannot show.
   const setSelectedChunkId = useClassicLevelStore((s) => s.setSelectedChunkId);
   const setStampLoop = useClassicLevelStore((s) => s.setStampLoop);
+  // Collision facet's click channel (Task 5) — a read-only point report, not a
+  // write. See collisionProbe's docblock on the store for why it exists.
+  const setCollisionProbe = useClassicLevelStore((s) => s.setCollisionProbe);
   // Task 14 object-tool UI state (selection index + armed place-mode id).
   const selectedObjectIndex = useClassicLevelStore((s) => s.selectedObjectIndex);
   const armedObjectId = useClassicLevelStore((s) => s.armedObjectId);
@@ -690,6 +694,26 @@ export default function ClassicLevelViewport() {
       return;
     }
     if (e.button !== 0) return; // left drags tools; right-click eyedrops (below)
+    // Collision facet click channel (Task 5): the facet is read-only (`view`
+    // stays armed there), so a left-drag pans and there was no other route by
+    // which the user could tell a future panel WHERE they clicked. Read via
+    // getState() rather than the closured `ref`/`tool` above, since neither is
+    // in this callback's dependency list.
+    const activeRef = useClassicLevelStore.getState().ref;
+    if (activeRef) {
+      const tabId = levelDocId(activeRef.zone, String(activeRef.act));
+      if (useWorkspaceStore.getState().facetFor(tabId) === 'collision') {
+        // worldUnderCursor already yields LEVEL PIXELS — the same conversion
+        // cellUnderCursor further quantizes to a layout cell. probeCollision
+        // takes level pixels directly, so this is the point to capture, not
+        // a cell.
+        const world = worldUnderCursor(e);
+        if (world) setCollisionProbe({ x: world.x, y: world.y });
+        // Deliberately NOT a return: the map still pans on this facet, so the
+        // gesture must fall through to the pan-arm at the bottom of this
+        // handler exactly like it would on any other read-only tool state.
+      }
+    }
     if (tool === 'stamp-chunk') {
       const grid = activeGrid();
       const cell = cellUnderCursor(e);
@@ -778,7 +802,7 @@ export default function ClassicLevelViewport() {
     }
     dragging.current = true;
     lastMouse.current = { x: e.clientX, y: e.clientY };
-  }, [tool, plane, overlays.showStart, activeGrid, cellUnderCursor, worldUnderCursor, redraw, setArmedObjectId, setSelectedObjectIndex, setTool]);
+  }, [tool, plane, overlays.showStart, activeGrid, cellUnderCursor, worldUnderCursor, redraw, setArmedObjectId, setSelectedObjectIndex, setTool, setCollisionProbe]);
 
   const onMouseMove = useCallback((e: React.MouseEvent) => {
     // Hover ghost tracking — BEFORE the drag/stroke dispatch below, and gated on
@@ -1033,22 +1057,31 @@ export default function ClassicLevelViewport() {
         style={{ flex: 1, position: 'relative', overflow: 'hidden', minHeight: 0, background: T.void }}
       >
         {status === 'ready' && doc ? (
-          <canvas
-            ref={canvasRef}
-            onMouseDown={onMouseDown}
-            onMouseMove={onMouseMove}
-            onMouseUp={onMouseUp}
-            onMouseLeave={onMouseLeave}
-            onContextMenu={onContextMenu}
-            onWheel={onWheel}
-            style={{
-              position: 'absolute', inset: 0,
-              cursor: tool === 'stamp-chunk' ? 'crosshair'
-                : armedId != null ? 'copy'
-                : tool === 'select' || tool === 'place-object' ? 'default'
-                : 'grab',
-            }}
-          />
+          <>
+            <canvas
+              ref={canvasRef}
+              onMouseDown={onMouseDown}
+              onMouseMove={onMouseMove}
+              onMouseUp={onMouseUp}
+              onMouseLeave={onMouseLeave}
+              onContextMenu={onContextMenu}
+              onWheel={onWheel}
+              style={{
+                position: 'absolute', inset: 0,
+                cursor: tool === 'stamp-chunk' ? 'crosshair'
+                  : armedId != null ? 'copy'
+                  : tool === 'select' || tool === 'place-object' ? 'default'
+                  : 'grab',
+              }}
+            />
+            {/* Engine-neutral: reads only viewStore.overlays and the shared
+                canvas-colors constants drawCollision (classic-overlays.ts)
+                already paints with, so it needs no classic-specific port.
+                Self-gated on showCollision/showCollisionPathB, so mounting it
+                unconditionally here (same as aeon's MapViewport) costs nothing
+                on the four map facets that never turn shading on. */}
+            <CollisionLegend />
+          </>
         ) : (
           <div style={{
             position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',

@@ -102,11 +102,11 @@ describe('registerAeonFacetModules registers every aeon facet', () => {
 describe('registerS1FacetModules registers every facet the s1 profile grants', () => {
   // The s1 profile's real grant (core/project/s1/index.ts), as a literal so a
   // profile edit has to come through here — the house style for these.
-  const S1_GRANT = ['layout', 'objects', 'palette', 'art'] as const;
+  const S1_GRANT = ['layout', 'objects', 'collision', 'palette', 'art'] as const;
 
   beforeEach(() => { facetModules.clear(); });
 
-  it('serves all four, and nothing outside the grant', async () => {
+  it('serves all five, and nothing outside the grant', async () => {
     const { registerS1FacetModules } = await import('../register-facets');
     registerS1FacetModules();
     for (const f of S1_GRANT) expect(moduleFor('s1', f), `s1/${f}`).not.toBeNull();
@@ -114,10 +114,11 @@ describe('registerS1FacetModules registers every facet the s1 profile grants', (
     // granted ∩ registered, so it could only ever be reached by a stale session
     // record — and resolveFacet exists to heal exactly that away.
     //
-    // Both `objects` and `palette` have been on this list at different points
-    // this week and are granted again; what stays on it are the two classic has
-    // no editor for at all.
-    for (const f of ['rings', 'collision'] as const) {
+    // `objects`, `palette` and now `collision` have each been on this list at
+    // different points and are granted again; what stays off it is `rings` —
+    // classic has no editor for it at all (S1 rings are objects in objpos, not
+    // a separate layer).
+    for (const f of ['rings'] as const) {
       expect(moduleFor('s1', f), `s1/${f}`).toBeNull();
     }
   });
