@@ -444,6 +444,15 @@ async function main() {
               `same x throughout — READ ROW 11 BEFORE CONCLUDING ANYTHING FROM THIS`
             : `neither: resting ${[...restingYs].join(',')} deltas ${[...deltas].join(',')}`);
 
+      // RESOLVED ENGINE-SIDE (aeon b3169c26), recorded so nobody re-opens it:
+      // the placement is VERBATIM, and the -11 is DESTINATION-DEPENDENT — an
+      // engine raw probe at this same x got delta 0 for a request in clear air
+      // and -11 for one intersecting terrain. Prime suspect is a one-shot
+      // terrain resolve inside the ack window that runs once and then never
+      // ticks again in this state. So all six of the sweep's points sat in
+      // terrain. Aurora still does NOT compensate: doing so would break the
+      // clear-air case, which is the common one.
+      //
       // ---- Row 11: is the player's PHYSICS even running in this state?
       //
       // Row 10's conclusion only means something if the player is being
