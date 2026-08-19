@@ -759,8 +759,14 @@ In `src/shared/agent-protocol.ts`, after the `classic-save-project` member (line
   | { kind: 'classic-commit-canvas'; name: string; targets?: { chunkFileIndex: number | null }[];
       paletteResolution?: 'none' | 'use-act-colours' | 'adopt-into-zone';
       collision?: boolean; dryRun?: boolean }
+  // NO `paletteResolution` on the import: an imported sheet is mapped against
+  // the act's own palette by `sheetFromBytes` (its `flattenActPalette` is
+  // byte-identical to the planner's `flattenDocPalette`), so its palette can
+  // never drift, so the option is only ever read on a branch this tool cannot
+  // reach. A knob that provably cannot turn is worse than no knob — doubly so
+  // here, where the colour refusal's advice mentions widening the palette and
+  // this would look like the lever for it.
   | { kind: 'classic-import-art-sheet'; path: string; targets?: { chunkFileIndex: number | null }[];
-      paletteResolution?: 'none' | 'use-act-colours' | 'adopt-into-zone';
       collision?: boolean; dryRun?: boolean };
 ```
 
@@ -775,26 +781,30 @@ In `src/main/editor-methods.ts`, above the closing `];` of `EDITOR_METHODS`, add
   // protocol error — see the design's §4.
   { name: 'commit_canvas', kind: 'classic-commit-canvas', result: 'json',
     params: {
-      name: z.string().describe('canvas name under .aurora/canvas (no path, no extension)'),
+      name: z.string().regex(CANVAS_NAME_PATTERN, 'a canvas name is 1-64 chars of letters, digits, - and _, starting with a letter or digit (no path, no extension)')
+        .describe('canvas name under .aurora/canvas (no path, no extension)'),
       targets: z.array(z.object({
-        chunkFileIndex: z.number().int().min(0).nullable().describe('chunk to replace, or null to append'),
+        chunkFileIndex: z.number().int().min(0).nullable().describe('0-based FILE index of the chunk to replace (engine id minus one), or null to append'),
       })).optional().describe('one per whole 256x256 chunk of the canvas, row-major; omit to append them all'),
-      paletteResolution: z.enum(['none', 'use-act-colours', 'adopt-into-zone']).optional(),
+      paletteResolution: z.enum(['none', 'use-act-colours', 'adopt-into-zone']).optional()
+        .describe('what to do when the canvas draws with colours the act does not have (default "none" = refuse and report them). "use-act-colours" re-indexes the art onto the nearest act colours, changing no palette; "adopt-into-zone" writes the drifted colours into the ZONE palette, which every act sharing that palette file displays. Line 0 (Sonic\'s) is never written by either.'),
       collision: z.boolean().optional().describe('give the new art flat ($FF) collision in the same undo step'),
       dryRun: z.boolean().optional().describe('plan and report without applying'),
     },
     description: 'Commit a saved canvas into the open act: cut to tiles/blocks/chunks, dedupe, reclaim, write. One undo step. Reply carries the full commit report plus the 1-based ENGINE ids of any appended chunks (pass those to set_layout_region). A refusal returns ok:false with a message, a resolution, and which paletteResolution values would unblock it.' },
+  // NO `paletteResolution` HERE. The sheet is mapped onto the act's own palette
+  // before it is planned, so it cannot drift, so the option could never change
+  // an outcome — see the kind's own comment in shared/agent-protocol.ts.
   { name: 'import_art_sheet', kind: 'classic-import-art-sheet', result: 'json',
     params: {
-      path: z.string().describe('absolute path to an INDEXED (paletted) PNG'),
+      path: z.string().min(1).describe('absolute path to an INDEXED (paletted) PNG'),
       targets: z.array(z.object({
-        chunkFileIndex: z.number().int().min(0).nullable().describe('chunk to replace, or null to append'),
+        chunkFileIndex: z.number().int().min(0).nullable().describe('0-based FILE index of the chunk to replace (engine id minus one), or null to append'),
       })).optional().describe('one per whole 256x256 chunk of the sheet, row-major; omit to append them all'),
-      paletteResolution: z.enum(['none', 'use-act-colours', 'adopt-into-zone']).optional(),
       collision: z.boolean().optional().describe('give the new art flat ($FF) collision in the same undo step'),
       dryRun: z.boolean().optional().describe('plan and report without applying'),
     },
-    description: 'Import an indexed PNG made elsewhere, mapped onto the open act\'s palette, and commit it. No size cap (unlike a canvas). Same reply and refusal shape as commit_canvas, plus two import-only refusals: a colour the act does not have, and an 8x8 cell mixing colours from two palette lines.' },
+    description: 'Import an indexed PNG made elsewhere, mapped onto the open act\'s palette, and commit it. No size cap (unlike a canvas). The reply is commit_canvas\'s; the refusals are a NARROWER set plus two import-only ones. Narrower: the sheet is mapped onto the act\'s palette before planning, so palette-drift, palette-unmappable and cell-clash cannot arise (and there is no paletteResolution to pass). Import-only: a colour the act does not have, and an 8x8 cell mixing colours from two palette lines — for that one, adding the missing colour to the zone palette only helps if it goes on the LINE the cell already uses.' },
 ```
 
 - [ ] **Step 3: Verify types**
@@ -876,18 +886,38 @@ In `src/renderer/agent/agent-handler.ts`, alongside the other `classic-*` cases,
       // be an unused local and a second copy of the guard.
       const dir = useClassicProjectStore.getState().dir;
       if (!dir) throw new Error('no project directory is open');
-      // Name safety is loadCanvasFile's own guard (canvas-file.ts:120) and it
-      // throws — which is right: a bad name is a fault, not a refusal.
+      // Name safety is loadCanvasFile's own guard (canvas-file.ts:39/120) and it
+      // THROWS — right for a fault, but a throw is -32603 INTERNAL at the Aether
+      // adapter, so the tool schema states the same pattern (shared/canvas-name.ts)
+      // and rejects a bad name as INVALID_PARAMS before this case ever runs.
       const loaded = await loadCanvasFile(dir, req.name);
-      return commitPixels({
-        pixels: loaded.doc.pixels,
-        canvasPalette: loaded.doc.palette,
-        gridOrigin: loaded.doc.gridOrigin,
-        targets: req.targets,
-        paletteResolution: req.paletteResolution,
-        collision: req.collision,
-        dryRun: req.dryRun,
-      });
+      // `collision` STAYS A BOOLEAN here, and that is the whole conversion story
+      // at this layer: `commitPixels` takes a flag (art-commit.ts:130) and turns
+      // it into `{ colindLength }` off the doc it has already read for the
+      // snapshot (art-commit.ts:136). Task 4's review (fb92c99) moved that store
+      // read UP out of `replyFromPlanResult` — which used to do it itself behind
+      // a `?? 0` — and pushed the typed REQUIREMENT down in its place, so the
+      // layer that actually stamps collision cannot be called without the table
+      // length. A `?? 0` there meant every block id was past the table: every
+      // new block skipped while its cells were still stamped solid, which is the
+      // fall-through-the-floor case. Nothing about that lives here; forwarding
+      // the flag is all this case has to get right.
+      const { kind: _k, name: _n, ...opts } = req;
+      return {
+        ...commitPixels({
+          pixels: loaded.doc.pixels,
+          canvasPalette: loaded.doc.palette,
+          gridOrigin: loaded.doc.gridOrigin,
+          // Rest-spread, not six named forwards: `commitPixels`' input is
+          // all-optional, so a seventh option added to the kind and forgotten
+          // here would be a silent no-op with no type error.
+          ...opts,
+        }),
+        // NEVER DROPPED. These carry "the sidecar could not be read — the canvas
+        // is unconstrained until this is fixed", which is precisely the kind of
+        // thing a caller committing art unattended has to hear.
+        warnings: loaded.warnings,
+      };
     }
 
     case 'classic-import-art-sheet': {
@@ -895,20 +925,29 @@ In `src/renderer/agent/agent-handler.ts`, alongside the other `classic-*` cases,
       const bytes = new Uint8Array(await window.api.readBinaryFile(req.path, ''));
       const res = await sheetFromBytes(doc, bytes);
       if (!res.ok) {
-        // An import refusal, like a commit refusal, is an ANSWER. Same shape, so
-        // a caller handles both with one branch.
-        return { ok: false, refusal: res.refusal, message: explainSheetRefusal(res.refusal),
-                 resolution: 'Recolour the sheet, or widen the act palette, then import again.',
-                 offers: [] };
+        // An import refusal, like a commit refusal, is an ANSWER — and in the
+        // same shape, so a caller handles both with one branch. The shape is
+        // DERIVED from `ArtCommitReply`'s refusal arm (see SheetRefusalReply)
+        // rather than promised in a comment, and both sentences come from core,
+        // where the dialog reads the identical pair.
+        const reply: SheetRefusalReply = {
+          ok: false,
+          refusal: res.refusal,
+          message: explainSheetRefusal(res.refusal),
+          resolution: sheetRefusalResolution(res.refusal),
+          // No palette resolution can unblock these: this sheet was mapped onto
+          // the act's own palette, so there is nothing for the commit planner's
+          // palette offers to act on.
+          offers: [],
+        };
+        return reply;
       }
       // An imported sheet has no grid of its own — see CommitPlanInput.gridOrigin.
+      const { kind: _k, path: _p, ...opts } = req;
       return commitPixels({
         pixels: res.sheet.pixels,
         canvasPalette: res.sheet.palette,
-        targets: req.targets,
-        paletteResolution: req.paletteResolution,
-        collision: req.collision,
-        dryRun: req.dryRun,
+        ...opts,
       });
     }
 ```
@@ -917,14 +956,32 @@ Add the imports at the top of the file:
 
 ```ts
 import { commitPixels } from './art-commit';
+import type { ArtCommitReply } from './art-commit';
 import { loadCanvasFile } from '../state/canvas-file';
-import { sheetFromBytes, explainSheetRefusal } from '../../core/art/sheet-import';
+import { sheetFromBytes, explainSheetRefusal, sheetRefusalResolution } from '../../core/art/sheet-import';
+import type { PngImportRefusal } from '../../core/art/png-import';
 ```
+
+…and the derived refusal-reply type beside the other handler-local helpers, so
+"the same shape as a commit refusal" is checked rather than promised:
+
+```ts
+type SheetRefusalReply =
+  Omit<Extract<ArtCommitReply, { ok: false }>, 'refusal'> & { refusal: PngImportRefusal };
+```
+
+`sheetRefusalResolution` is core's per-kind remedy (added beside
+`explainSheetRefusal`, and read by the Import dialog too). It must not be
+written out again here: one remedy for both kinds sends a `cell-needs-two-lines`
+caller round a loop, because widening the palette fixes that refusal only when
+the colour lands on the LINE the cell already uses.
 
 - [ ] **Step 4: Run the tests and typecheck**
 
 Run: `npx vitest run src/renderer/agent/__tests__/agent-handler.art.test.ts && npx tsc --noEmit`
-Expected: PASS, 3 tests; tsc clean.
+Expected: PASS; tsc clean. (Assert the message AND the resolution per refusal
+kind — `resolution.length > 0` passes for any string, including a second copy
+written for the agent, which is the drift this design forbids.)
 
 - [ ] **Step 5: Commit**
 
