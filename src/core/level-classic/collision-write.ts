@@ -36,7 +36,7 @@ export type CollisionWritePlan =
  * the 1024-block ceiling — are deliberately NOT here: they are properties of
  * the whole call, and a partial application of them would depend on scan order.
  */
-export type CollisionSkipReason = 'outside-layout' | 'air' | 'block0' | 'overhang';
+export type CollisionSkipReason = 'outside-layout' | 'air' | 'block0' | 'no-such-block' | 'overhang';
 
 export type CollisionCellOutcome =
   | { kind: 'write'; blockId: number; chunkIndex: number; cellIndex: number; cell: ChunkCell }
@@ -52,41 +52,31 @@ export type CollisionCellOutcome =
 const MAX_BLOCKS_TOTAL = 0x400; // 1024
 
 /**
- * Would an Isolate clone fit in this document at all?
- *
- * Isolate appends ONE block at `doc.blocks.length` and `classicPaintSurface`
- * then grows colind to cover it — which necessarily defines every entry in
- * between, and any of those past the table's current end resolve into the
- * ADJACENT ZONE's table in ROM. So a clone "fits" only when the table already
- * covers the id, and when the 10-bit block field still has room.
- */
-function isolateFits(doc: LevelDoc, clones: number): boolean {
-  const next = doc.blocks.length + clones;
-  return next <= doc.collision.colind.length && next <= MAX_BLOCKS_TOTAL;
-}
-
-/**
- * THE ESCAPE SENTENCE, COMPUTED RATHER THAN ASSERTED.
+ * THE ESCAPE SENTENCE FOR A LINK OVERHANG — a dead end, and PROVABLY so.
  *
  * Both refusals used to end by recommending the OTHER mode unconditionally, and
- * on the documents where they fire that advice is usually a dead end: Link's
- * overhang refusal needs `blockId >= colind.length`, which on any document whose
- * chunk cells reference blocks that exist means `doc.blocks.length >
- * colind.length`, which is exactly what makes Isolate refuse too. GHZ (439
- * blocks / 410 entries) and SBZ (602/600) are the two stock zones where this is
- * real.
+ * on an overhang that advice is a dead end. The proof, which used to be computed
+ * per-document and is now asserted:
  *
- * It is COMPUTED and not asserted because the implication has a hole:
- * `validateLevelDoc` bounds a chunk cell's block ref by the 10-bit field
- * (model.ts, `inRange(..., c.block, 0, MAX_BLOCK_REF)`), NOT by
- * `doc.blocks.length` — so a dangling ref is representable and would break the
- * proof. Asking the document is robust either way and costs one boolean.
+ *   an 'overhang' skip implies `blockId >= colind.length` AND — because
+ *   `no-such-block` is classified FIRST — `blockId < doc.blocks.length`.
+ *   Therefore `doc.blocks.length > colind.length`, therefore a clone appended at
+ *   `doc.blocks.length` lands past the end of the table and Isolate refuses too.
  *
- * This matters more for an agent than for a person: a human sees the second
- * refusal and stops, while an autonomous caller acts on the sentence.
+ * The hole that used to force the computation was the DANGLING ref —
+ * `validateLevelDoc` bounds a chunk cell's block by the 10-bit field (model.ts,
+ * `inRange(..., c.block, 0, MAX_BLOCK_REF)`), not by `doc.blocks.length`. That
+ * is now its own refusal, taken before the overhang is ever considered, so the
+ * implication has no hole left. IF THE CLASSIFIER'S ORDER CHANGES, REVISIT THIS:
+ * a `no-such-block` cell reaching the overhang arm would make "Use Isolate"
+ * right again — except that Isolate on it crashes, which is why it is refused.
+ *
+ * GHZ (439 blocks / 410 entries) and SBZ (602/600) are the two stock zones where
+ * the overhang is real. This matters more for an agent than for a person: a
+ * human sees the second refusal and stops, while an autonomous caller acts on
+ * the sentence.
  */
 function escapeFromLinkOverhang(doc: LevelDoc): string {
-  if (isolateFits(doc, 1)) return 'Use Isolate, or edit a block within the table.';
   return `Isolate cannot escape it either — this zone ships ${doc.blocks.length} blocks against ${doc.collision.colind.length} entries, so a clone would grow the table over the same overhang. Edit a block within the table, or restamp this cell to a block that is.`;
 }
 
@@ -121,6 +111,25 @@ export function classifyCollisionCell(
   // Block 0 is the blank block. FindFloor short-circuits before it ever reads
   // solidity or colind, so a shape stored here can never apply in game.
   if (blockId === 0) return { kind: 'skip', reason: 'block0' };
+
+  // A DANGLING REF, and it must be tested HERE — after block 0, BEFORE the
+  // no-op. `validateLevelDoc` bounds a chunk cell's block by the 10-bit field
+  // (model.ts, `inRange(..., c.block, 0, MAX_BLOCK_REF)`) and NOT by
+  // `doc.blocks.length`, so a cell naming a block the document does not have is
+  // representable inside a document that validates.
+  //
+  // WHY BEFORE THE NO-OP: the no-op test reads `colind[blockId] ?? 0`, so a
+  // dangling ref past the end of the table answers 0 for a shape it does not
+  // have — asked for shape 0 it would return `noop`, reporting SUCCESS on
+  // garbage. For an autonomous caller that is worse than the crash below.
+  //
+  // WHY AT ALL: Isolate means "clone the block, keep its pixels, change its
+  // shape", and there is no block to clone. The plan emitted `def:
+  // doc.blocks[blockId]` = undefined into SurfaceEditPlan.newBlocks and
+  // `classicPaintSurface`'s `b.def.cells.map` (classicLevelStore.ts:1025) threw
+  // — a -32603 INTERNAL at the agent surface. Link is no better: it would spend
+  // a colind entry on a block that does not exist.
+  if (blockId >= doc.blocks.length) return { kind: 'skip', reason: 'no-such-block' };
 
   // ALREADY THIS SHAPE → nothing to do, in EITHER mode.
   //
@@ -161,6 +170,8 @@ export function skipRefusal(doc: LevelDoc, reason: CollisionSkipReason, blockId:
       return 'no chunk is stamped here — this cell is air';
     case 'block0':
       return 'block 0 is the blank block — the engine short-circuits before reading its collision, so a shape here can never apply';
+    case 'no-such-block':
+      return `this cell names block ${blockId}, but this act has only ${doc.blocks.length} blocks — the reference is dangling. Restamp the cell to a block that exists.`;
     case 'overhang':
       return `block ${blockId} is past the end of this zone's collision table (${doc.collision.colind.length} entries) — the overhang resolves into the adjacent zone's table in ROM, so Aurora cannot set it without silently changing other blocks. ${escapeFromLinkOverhang(doc)}`;
   }
@@ -401,6 +412,7 @@ function skipPhrase(reason: CollisionSkipReason): string {
     case 'outside-layout': return 'outside the layout';
     case 'air': return 'air — no chunk is stamped there';
     case 'block0': return 'the blank block 0, whose collision the engine never reads';
+    case 'no-such-block': return 'blocks this act does not have — dangling references';
     case 'overhang': return 'blocks past the end of this zone\'s collision table';
   }
 }
@@ -441,11 +453,17 @@ function dominantSkipWhy(skipped: { reason: CollisionSkipReason; count: number }
  * (collision-write.test.ts's "refuses an isolate at the block ceiling" is the
  * standing note of that).
  *
- * The two checks below are `isolateFits(doc, needed)` SPLIT IN TWO, because
- * each half needs its own refusal kind and its own numbers. Keep them in step
- * with it: `isolateFits` is what the single-cell escape sentence asks, and if
- * these ever disagree with it the panel would recommend a mode this planner
- * refuses — the exact defect an earlier task removed.
+ * THE TWO CHECKS BELOW ARE ONE QUESTION SPLIT IN TWO — "do `needed` clones fit
+ * in this document at all?", which is `doc.blocks.length + needed` against BOTH
+ * `colind.length` and the 10-bit ceiling. They are written out separately
+ * because each half needs its own refusal kind and its own numbers, and they
+ * must stay in step with each other: an Isolate that clears one and not the
+ * other is not a legal plan.
+ *
+ * The single-cell path (`planCollisionWrite`) asks the same question inline for
+ * `needed = 1`, and the two must keep agreeing — if they ever diverge, the panel
+ * would recommend a mode this planner refuses, the exact defect an earlier task
+ * removed.
  */
 function planIsolateRect(
   doc: LevelDoc,
