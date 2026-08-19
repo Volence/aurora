@@ -57,7 +57,12 @@ interface AetherState {
 
 /** Coalescing state, deliberately outside the store: it is not UI. */
 let inFlight = false;
-let queued: { line: number; words: number[] } | null = null;
+/**
+ * PER LINE. A single queued slot silently dropped every line but the last,
+ * which broke the case where one change touches several lines at once — an
+ * undo restoring a whole palette, or the initial push on connect.
+ */
+let queued = new Map<number, number[]>();
 let lastPushAt = 0;
 let timer: ReturnType<typeof setTimeout> | null = null;
 
@@ -100,20 +105,24 @@ export const useAetherStore = create<AetherState>((set, get) => ({
     // the badge from flickering on every line-0 tick.
     if (st.status !== 'connected' || !st.palette || line === 0) return;
 
-    queued = { line, words: [...words] };
+    queued.set(line, [...words]);
     if (inFlight || timer) return;
 
     const fire = async () => {
       timer = null;
-      const next = queued;
-      queued = null;
-      if (!next) return;
+      const batch = [...queued.entries()];
+      queued = new Map();
+      if (!batch.length) return;
       inFlight = true;
       lastPushAt = Date.now();
       set({ pushing: true });
       try {
-        const r = await window.api.aetherPushPalette(next.line, next.words);
-        set({ pushError: r.pushed ? undefined : r.error });
+        let err: string | undefined;
+        for (const [l, w] of batch) {
+          const r = await window.api.aetherPushPalette(l, w);
+          if (!r.pushed && !err) err = r.error;
+        }
+        set({ pushError: err });
       } catch (e) {
         set({ pushError: e instanceof Error ? e.message : String(e) });
       } finally {
@@ -121,7 +130,7 @@ export const useAetherStore = create<AetherState>((set, get) => ({
         set({ pushing: false });
         // Whatever arrived during the flight goes out on the next tick, so the
         // last colour the artist chose always lands even if they stop moving.
-        if (queued && !timer) timer = setTimeout(fire, MIN_PUSH_INTERVAL_MS);
+        if (queued.size && !timer) timer = setTimeout(fire, MIN_PUSH_INTERVAL_MS);
       }
     };
 

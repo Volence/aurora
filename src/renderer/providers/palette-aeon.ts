@@ -39,6 +39,7 @@ import { executeAmbientCommand } from '../state/editorStore';
 import { useHistoryVersion } from '../hooks/useHistoryVersion';
 import { useArtStore } from '../state/artStore';
 import { useAetherStore } from '../state/aetherStore';
+import { PAL_BASE_FIRST_LINE as PUSHABLE_FIRST_LINE, PAL_BASE_LAST_LINE as PUSHABLE_LAST_LINE } from '../../core/aether/palette-push';
 import { useSpriteStore, patchSpriteDoc } from '../state/spriteStore';
 import { encodeGenesisColor, decodeGenesisColor, fmtGenesisWord } from '../../core/formats/palette';
 import { resolvePaletteDragEnd } from '../../core/art/palette-drag';
@@ -343,32 +344,56 @@ export function useAeonPaletteGridPort(opts?: { context?: 'sprite' }): PaletteGr
    * exactly the ones on screen. The store coalesces, so calling this on every
    * slider tick is safe; see its MIN_PUSH_INTERVAL comment for why it must.
    */
-  const pushLive = React.useCallback((line: number): void => {
-    const z = getCurrentZone(useProjectStore.getState());
-    const colors = z?.palette.lines[line]?.colors;
-    if (!colors) return;
-    useAetherStore.getState().pushPaletteLine(line, colors.map(encodeGenesisColor));
-  }, []);
-
   const preview = React.useCallback((line: number, idx: number, word: number): void => {
     if (standaloneMode) previewStandalone(idx, word);
-    else { previewZone(line, idx, word); pushLive(line); }
-  }, [standaloneMode, previewStandalone, previewZone, pushLive]);
+    else previewZone(line, idx, word);
+  }, [standaloneMode, previewStandalone, previewZone]);
 
   // The released word is ignored: the preview already wrote it into the document
   // the ender reads, and the ender is what decides commit vs revert.
   const commit = React.useCallback((): void => {
     if (standaloneMode) endStandaloneDrag();
-    else {
-      endZoneDrag();
-      // Push again on release. The ender can REVERT (a drag that ended back
-      // where it started, or on another document), and the last previewed push
-      // would then have left the game showing a colour the editor no longer
-      // holds. Pushing the post-ender line puts them back in agreement either
-      // way.
-      pushLive(paintSel.line);
+    else endZoneDrag();
+  }, [standaloneMode, endStandaloneDrag, endZoneDrag]);
+
+  /**
+   * LIVE PUSH, DRIVEN BY THE PALETTE'S CONTENT rather than by the edit gesture.
+   *
+   * This used to hang off `preview` and `commit`, which meant UNDO changed the
+   * editor and left the running game showing the colour you had just undone —
+   * found by the owner within minutes of trying it. Undo goes through the
+   * history system, not through the port's edit path, and so does redo, and so
+   * does an agent edit.
+   *
+   * Watching `lines` catches all of them, because every one of those paths ends
+   * by bumping the version this memo depends on. Only lines whose WORDS
+   * actually changed are pushed, so a drag on line 2 does not re-send lines 1
+   * and 3, and a no-op re-render sends nothing at all.
+   *
+   * Zone only: a standalone sprite palette is a private working palette, not
+   * CRAM state, and pushing it would recolour the game from something it never
+   * had.
+   */
+  const lastPushedRef = React.useRef(new Map<number, string>());
+  const aetherReady = useAetherStore((s) => s.status === 'connected' && s.palette);
+  React.useEffect(() => {
+    if (standaloneMode || !aetherReady) {
+      // Forget what was pushed, so reconnecting re-sends the current palette
+      // rather than assuming the game still holds it. A reload_rom or a restart
+      // puts ROM colours back.
+      lastPushedRef.current.clear();
+      return;
     }
-  }, [standaloneMode, endStandaloneDrag, endZoneDrag, pushLive, paintSel.line]);
+    const push = useAetherStore.getState().pushPaletteLine;
+    for (let line = PUSHABLE_FIRST_LINE; line <= PUSHABLE_LAST_LINE; line++) {
+      const words = lines[line];
+      if (!words) continue;
+      const key = words.join(',');
+      if (lastPushedRef.current.get(line) === key) continue;
+      lastPushedRef.current.set(line, key);
+      push(line, [...words]);
+    }
+  }, [lines, standaloneMode, aetherReady]);
 
   const scope = standaloneMode ? `sprite:${activeDocId}` : `zone:${zoneId ?? ''}`;
 

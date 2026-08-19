@@ -94,15 +94,37 @@ export async function warpTo(
     return Number.parseInt(r.bytes.replace(/^0x/i, ''), 16);
   };
 
+  // `write_memory` IS require_paused, mailbox or not. Frame-top consumption
+  // makes the warp itself tear-free, but the write that requests it still has
+  // to happen on a stopped machine — the first version of this skipped the
+  // pause on that reasoning and every warp failed with
+  // "needs the machine paused; call emulator/pause first".
+  const pauseResult = await client.call('emulator/pause') as { wasRunning?: boolean };
+  const wasRunning = pauseResult?.wasRunning !== false;
+  let resumed = false;
+
   try {
-    // Frame-top consumption makes this tear-free by construction, so unlike the
-    // palette push there is no pause window here and the game never stutters.
     await client.call('emulator/write_memory', { addr: hex(addrX), bytes: word(x) });
     await client.call('emulator/write_memory', { addr: hex(addrY), bytes: word(y) });
     await client.call('emulator/write_memory', { addr: hex(addrFlag), bytes: '0x01' });
 
+    // AND THE MACHINE HAS TO RUN TO CONSUME IT. The engine takes the request at
+    // frame top, so polling a paused machine waits forever — the second failure
+    // this sequence produced was "did not acknowledge within 120 polls", from
+    // polling a machine that could not advance.
+    //
+    // `read_memory` is a pure read with no pause gate, so the flag can be
+    // watched while the game runs.
+    if (wasRunning) {
+      await client.call('emulator/resume');
+      resumed = true;
+    }
+
     let polls = 0;
     for (; polls < maxPolls; polls++) {
+      // Paused by someone else: step it ourselves rather than resuming, so a
+      // deliberately stopped machine stays stopped.
+      if (!wasRunning) await client.call('emulator/run_frames', { frames: 1 });
       const r = await client.call('emulator/read_memory', { addr: hex(addrFlag), len: 1 }) as { bytes: string };
       if (Number.parseInt(r.bytes.replace(/^0x/i, ''), 16) === 0) break;
     }
@@ -120,5 +142,11 @@ export async function warpTo(
     };
   } catch (e) {
     return { warped: false, error: e instanceof Error ? e.message : String(e) };
+  } finally {
+    // Put the machine back the way it was found. A warp that quietly leaves the
+    // game stopped looks like the warp hung.
+    if (wasRunning && !resumed) {
+      try { await client.call('emulator/resume'); } catch { /* already reported */ }
+    }
   }
 }

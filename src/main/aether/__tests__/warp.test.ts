@@ -8,6 +8,8 @@ function fakeClient(opts: {
   /** What the engine publishes back as the clamped destination. */
   clampTo?: { x: number; y: number };
   connected?: boolean;
+  /** Whether the machine was running when the warp arrived. */
+  wasRunning?: boolean;
 } = {}) {
   const symbols = opts.symbols ?? { Warp_Req_X: 0xffe502, Warp_Req_Y: 0xffe504, Warp_Req_Flag: 0xffe506 };
   const calls: Array<{ method: string; params: Record<string, unknown> }> = [];
@@ -15,6 +17,7 @@ function fakeClient(opts: {
   let polls = 0;
   let written = { x: 0, y: 0 };
   const ackAfter = opts.ackAfter ?? 1;
+  const wasRunning = opts.wasRunning ?? true;
   return {
     calls,
     status: opts.connected === false ? 'disconnected' : 'connected',
@@ -26,6 +29,7 @@ function fakeClient(opts: {
     },
     call: async (method: string, params: Record<string, unknown>) => {
       calls.push({ method, params });
+      if (method === 'emulator/pause') return { wasRunning };
       if (method === 'emulator/write_memory') {
         const addr = Number.parseInt(String(params.addr), 16);
         const bytes = String(params.bytes).replace(/^0x/, '');
@@ -140,5 +144,48 @@ describe('warpTo', () => {
 
   it('names the three symbols it needs', () => {
     expect(WARP_SYMBOLS).toEqual(['Warp_Req_X', 'Warp_Req_Y', 'Warp_Req_Flag']);
+  });
+});
+
+describe('warpTo and the machine it borrows', () => {
+  /**
+   * BOTH OF THESE WERE FOUND IN REAL USE, in sequence, by pressing F7.
+   *
+   * First: `write_memory` is require_paused whatever it is writing. The mailbox
+   * being frame-top-consumed makes the WARP tear-free; it does not exempt the
+   * REQUEST from the pause gate. Every warp failed with "needs the machine
+   * paused; call emulator/pause first".
+   *
+   * Then, after pausing: "the engine did not acknowledge within 120 polls" —
+   * because the engine takes the request at frame top, and a paused machine has
+   * no frame tops. The fix has to both pause for the write AND let the machine
+   * run to consume it.
+   */
+  it('pauses to write, then resumes so the engine can consume the request', async () => {
+    const c = fakeClient({ wasRunning: true });
+    const r = await warpTo(c as never, 100, 200);
+    expect(r.warped).toBe(true);
+    const order = c.calls.map((x) => x.method);
+    expect(order[0]).toBe('emulator/pause');
+    const lastWrite = order.lastIndexOf('emulator/write_memory');
+    const resume = order.indexOf('emulator/resume');
+    expect(resume).toBeGreaterThan(lastWrite);
+  });
+
+  it('leaves a machine that was already paused paused, stepping it instead', async () => {
+    // Someone stopped the machine on purpose — a debugger, or the person. A
+    // warp must not start it running underneath them.
+    const c = fakeClient({ wasRunning: false, ackAfter: 3 });
+    const r = await warpTo(c as never, 100, 200);
+    expect(r.warped).toBe(true);
+    const methods = c.calls.map((x) => x.method);
+    expect(methods).not.toContain('emulator/resume');
+    expect(methods.filter((m) => m === 'emulator/run_frames').length).toBeGreaterThan(0);
+  });
+
+  it('resumes even when the warp fails partway', async () => {
+    const c = fakeClient({ wasRunning: true, ackAfter: Number.MAX_SAFE_INTEGER });
+    await warpTo(c as never, 10, 10, { maxPolls: 3 });
+    expect(c.calls.map((x) => x.method)).toContain('emulator/resume');
   });
 });
