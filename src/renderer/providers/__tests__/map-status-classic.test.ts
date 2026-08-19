@@ -128,7 +128,15 @@ describe('the bar defers because classic\'s map facets speak for themselves', ()
     for (const f of mapFacets) {
       expect(moduleFor('s1', f)?.ToolOptions, `s1/${f}`).toBeTypeOf('function');
     }
-  });
+  // AN EXPLICIT TIMEOUT, because this test dynamic-imports the real facet
+  // registry — which transitively loads every s1 map surface and the React
+  // components under them. Measured at ~520ms standalone (10x inside the 5s
+  // default), but it was seen to time out once in five FULL-suite runs, where
+  // ~300 files contend for transform workers and this one pays for the whole
+  // module graph at once. Raised rather than chased: the ceiling can only ever
+  // mask SLOWNESS here, never a wrong answer — every assertion above is a
+  // synchronous check on an already-resolved registry.
+  }, 20_000);
 
   it('…and the port therefore suppresses the generic hint', () => {
     // Source-level: the port is a hook, and the suite has no renderer. Comments
