@@ -1031,6 +1031,30 @@ The node suite cannot see React or the real IPC, and this surface crosses that l
 **Files:**
 - Create: `scratchpad/art-agent-harness.mjs`
 
+### THREE ENVIRONMENT HAZARDS, measured before writing anything
+
+**1. `ROOT` is hardcoded to the MAIN CHECKOUT.** `scratchpad/canvas-cdp-harness.mjs:31` is
+`const ROOT = '/home/volence/sonic_hacks/aurora'`, and `session()` launches
+`${ROOT}/node_modules/.bin/electron` against the app built at `${ROOT}`. Importing `session`
+unchanged from a worktree therefore drives **the main checkout's build — code without any of
+this plan's changes — and reports a confident PASS.** Earlier worktree runs hit this and
+patched ROOT (see `probe-click-paint.mjs:9`, `composer-fill-harness.mjs:26`, both pointing at
+`.claude/worktrees/ux-plan6`). Override ROOT to the worktree, and **prove you did**: assert at
+startup that the running app serves a build containing something only this branch has (e.g.
+`editor/commit_canvas` in `initialize`'s method list — row 1 already does this, so make row 1
+FAIL LOUDLY rather than skip if the method is absent).
+
+**2. It drives the REAL `/home/volence/sonic_hacks/s1disasm`.** `S1DIR` (`:33`) is the user's
+actual disassembly, and the harness writes canvases into `${S1DIR}/.aurora/canvas`. A commit
+mutates the in-memory level document only — **do NOT call `save_project` / `editor/save_project`
+anywhere in this harness**, or the pools get written to the user's disassembly for real. Clean
+up every canvas the run creates (`commit-collision-harness.mjs:38-44` is the pattern: prefix the
+names and `rmSync` them, because a leftover canvas makes the next create refuse as a duplicate —
+that produced ten false failures once).
+
+**3. `xvfb-run` is required and present** (`/usr/bin/xvfb-run`). `npm run build` in the worktree
+is verified working, and `node_modules/.bin/electron` resolves. Build before running.
+
 - [ ] **Step 1: Read the existing harness for the connection boilerplate**
 
 Run: `sed -n '1,60p' scratchpad/commit-collision-harness.mjs`
