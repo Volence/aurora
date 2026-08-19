@@ -4,10 +4,14 @@ import { T, Z } from './ui';
 
 // Backgrounds map to the nearest semantic surface token (T.raised) — the
 // Empyrean palette has no per-status tinted backgrounds; the colored border
-// carries the success/info/error distinction.
+// carries the success/info/warning/error distinction.
 const TYPE_COLORS: Record<ToastType, { bg: string; border: string }> = {
   success: { bg: T.raised, border: T.success },
   info: { bg: T.raised, border: T.info },
+  // `T.warning`, not `T.error`: the collision panel's persistent loop warning
+  // already uses that token for exactly this hazard, and painting a warning red
+  // would say something failed when the write in fact landed.
+  warning: { bg: T.raised, border: T.warning },
   error: { bg: T.raised, border: T.error },
 };
 
