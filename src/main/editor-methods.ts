@@ -4,6 +4,11 @@ import type { AgentRequest } from '../shared/agent-protocol';
 // as a schema so a bad canvas name is INVALID_PARAMS at the protocol edge
 // rather than the renderer's throw, which reaches a client as INTERNAL.
 import { CANVAS_NAME_PATTERN } from '../shared/canvas-name';
+// The flat/fully-solid colind value, named in set_block_collision's `shape`
+// description. Imported rather than restated so the tool cannot advertise a
+// value the collision writer no longer uses. Type-only-import module, so this
+// pulls no runtime code into the main process.
+import { FLAT_SHAPE } from '../core/art/commit-collision';
 // Pure-TS format facts (model.ts imports only two `import type`s, so nothing
 // runtime-heavy follows it into the main process). The collision tool's schema
 // bounds are DERIVED from them rather than restated.
@@ -162,11 +167,20 @@ export const EDITOR_METHODS: EditorMethod[] = [
   // full-width sweep has to be ONE call to be one undo step.
   { name: 'set_block_collision', kind: 'classic-set-block-collision', result: 'json',
     params: {
-      x: z.number().int().min(0).max(MAX_FG_CELLS_W - 1).describe('left FG cell column (16px units)'),
-      y: z.number().int().min(0).max(MAX_FG_CELLS_H - 1).describe('top FG cell row (16px units)'),
-      w: z.number().int().min(1).max(MAX_FG_CELLS_W),
-      h: z.number().int().min(1).max(MAX_FG_CELLS_H),
-      shape: z.number().int().min(0).max(255).describe('collision-shape index (a colind value); 0 = no collision'),
+      // THE UNIT IS SPELLED OUT WITH ITS CONVERSION, because the classic surface
+      // speaks three of them: set_layout_region takes CHUNKS, place_object and
+      // set_start take PIXELS, and this takes 16px CELLS. An agent that just read
+      // a pixel coordinate off an object has no other way to know to divide.
+      x: z.number().int().min(0).max(MAX_FG_CELLS_W - 1).describe('left FG cell column, in 16px cell units (level pixel x / 16)'),
+      y: z.number().int().min(0).max(MAX_FG_CELLS_H - 1).describe('top FG cell row, in 16px cell units (level pixel y / 16)'),
+      w: z.number().int().min(1).max(MAX_FG_CELLS_W).describe('width in cells, extending right from x (inclusive)'),
+      h: z.number().int().min(1).max(MAX_FG_CELLS_H).describe('height in cells, extending down from y (inclusive)'),
+      // NAMING $FF MATTERS: there is no tool that lists the zone's collision
+      // shapes, so without it an agent asked to "make this ledge solid" has
+      // nothing to pick from. FLAT_SHAPE is imported rather than written as 255
+      // so the two cannot drift.
+      shape: z.number().int().min(0).max(255)
+        .describe(`collision-shape index (a colind value): 0 = no collision, ${FLAT_SHAPE} ($FF) = flat/fully solid. Other values index this zone's collision array and vary per zone.`),
       mode: z.enum(['link', 'isolate']).optional()
         .describe('"link" (default) writes the shape onto the block itself, changing every use of it ZONE-wide; "isolate" clones the block first so only these cells change — at the cost of one collision-table entry per distinct block, which some zones have none of'),
       dryRun: z.boolean().optional().describe('plan and report without applying'),
