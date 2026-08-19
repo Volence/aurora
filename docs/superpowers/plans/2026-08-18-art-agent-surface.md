@@ -1352,4 +1352,14 @@ completion without those four numbers.
   `TileTab`, `BlockTab` and `CommitPlanView`, and a reactivity regression there is
   invisible to the node suite. Out of scope for this plan; needs its own change
   with UI verification.
+- **RECOMMENDED, repo-wide, NOT done here: `npm test` does not typecheck.** `package.json`'s
+  scripts are `test: "vitest run"` with no `typecheck` entry, and vitest does not typecheck. So
+  every compile-time guarantee this plan leans on is enforced only when somebody remembers to run
+  `tsc` by hand: the `CommitRefusal` mapped-type exhaustiveness (task 4), `agent-handler.ts`'s
+  `const exhaustive: never` switch sentinel, the `EditorMethod.kind` union, and the derived
+  `SheetRefusalReply` / `CanvasCommitReply` aliases. Task 7's runtime case-label check exists as a
+  backstop *because* of this gap, and says so at its header.
+  Adding `"typecheck": "tsc --noEmit"` is purely additive; making `test` run it first is the change
+  with teeth. Not done here because `test` is shared with other sessions working in this repo and
+  changing what `npm test` means is theirs to approve, not a side effect of an art-surface plan.
 - **A refusal is never a throw.** If you find yourself writing `throw` for something the caller could fix by changing an argument, it belongs in the refusal shape instead.
