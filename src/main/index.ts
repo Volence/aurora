@@ -2,6 +2,7 @@ import { app, BrowserWindow, ipcMain } from 'electron';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { registerIpcHandlers } from './ipc-handlers';
+import { registerAetherBridge } from './aether/bridge';
 import { startMcpServer, stopMcpServer } from './mcp-server';
 import { IPC_CHANNELS } from '../shared/ipc-types';
 
@@ -55,6 +56,7 @@ function createWindow(): BrowserWindow {
   }
 
   installCloseGuard(win);
+  registerAetherBridge(win);
   win.on('closed', () => { if (mainWindow === win) mainWindow = null; });
   mainWindow = win;
   return win;

@@ -38,6 +38,7 @@ import { useProjectStore, getCurrentZone, getActiveLevel } from '../state/projec
 import { executeAmbientCommand } from '../state/editorStore';
 import { useHistoryVersion } from '../hooks/useHistoryVersion';
 import { useArtStore } from '../state/artStore';
+import { useAetherStore } from '../state/aetherStore';
 import { useSpriteStore, patchSpriteDoc } from '../state/spriteStore';
 import { encodeGenesisColor, decodeGenesisColor, fmtGenesisWord } from '../../core/formats/palette';
 import { resolvePaletteDragEnd } from '../../core/art/palette-drag';
@@ -331,17 +332,43 @@ export function useAeonPaletteGridPort(opts?: { context?: 'sprite' }): PaletteGr
     : { line: inSprite ? spriteZoneLine : paintLine, idx: paintColor }),
   [standaloneMode, inSprite, spriteZoneLine, paintLine, paintColor]);
 
+  /**
+   * Push the zone line to a running game, if one is connected.
+   *
+   * ZONE ONLY. A standalone sprite palette is not CRAM state — it is a private
+   * working palette for a sprite document — so pushing it would recolour the
+   * game from something the game never had.
+   *
+   * Read AFTER the preview has mutated the document, so the pushed words are
+   * exactly the ones on screen. The store coalesces, so calling this on every
+   * slider tick is safe; see its MIN_PUSH_INTERVAL comment for why it must.
+   */
+  const pushLive = React.useCallback((line: number): void => {
+    const z = getCurrentZone(useProjectStore.getState());
+    const colors = z?.palette.lines[line]?.colors;
+    if (!colors) return;
+    useAetherStore.getState().pushPaletteLine(line, colors.map(encodeGenesisColor));
+  }, []);
+
   const preview = React.useCallback((line: number, idx: number, word: number): void => {
     if (standaloneMode) previewStandalone(idx, word);
-    else previewZone(line, idx, word);
-  }, [standaloneMode, previewStandalone, previewZone]);
+    else { previewZone(line, idx, word); pushLive(line); }
+  }, [standaloneMode, previewStandalone, previewZone, pushLive]);
 
   // The released word is ignored: the preview already wrote it into the document
   // the ender reads, and the ender is what decides commit vs revert.
   const commit = React.useCallback((): void => {
     if (standaloneMode) endStandaloneDrag();
-    else endZoneDrag();
-  }, [standaloneMode, endStandaloneDrag, endZoneDrag]);
+    else {
+      endZoneDrag();
+      // Push again on release. The ender can REVERT (a drag that ended back
+      // where it started, or on another document), and the last previewed push
+      // would then have left the game showing a colour the editor no longer
+      // holds. Pushing the post-ender line puts them back in agreement either
+      // way.
+      pushLive(paintSel.line);
+    }
+  }, [standaloneMode, endStandaloneDrag, endZoneDrag, pushLive, paintSel.line]);
 
   const scope = standaloneMode ? `sprite:${activeDocId}` : `zone:${zoneId ?? ''}`;
 

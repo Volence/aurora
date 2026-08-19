@@ -16,6 +16,7 @@ import { useClassicObjectArtStore } from './state/classicObjectArtStore';
 import { useProjectStore, getCurrentAct } from './state/projectStore';
 import { useEditorStore, focusedHistory } from './state/editorStore';
 import { openAeonProject } from './state/aeon-open';
+import { useAetherStore } from './state/aetherStore';
 import { useViewStore } from './state/viewStore';
 import { useArtStore } from './state/artStore';
 import { useCanvasStore } from './state/canvasStore';
@@ -515,10 +516,38 @@ interface DebugApi {
    * setting which color is armed is setup, not the paint mechanism under test.
    */
   setPaintColor(v: number): void;
+  /**
+   * The OUTBOUND Aether link (the playtest loop).
+   *
+   * Exposed for the same reason `aeon.open` is: connecting is a click on a
+   * status-bar badge and pushing is a slider drag, and a harness proving the
+   * IPC -> main -> socket path should not have to first drive the whole UI to
+   * reach it. The UI paths are exercised separately by clicking the badge and
+   * moving a real slider; this is the deterministic seam underneath them.
+   */
+  aether: {
+    connect(): Promise<void>;
+    disconnect(): Promise<void>;
+    state(): { status: string; palette: boolean; serverName?: string; error?: string; pushError?: string };
+    /** Push a line of CRAM words, exactly as the palette port does. */
+    push(line: number, words: number[]): void;
+  };
 }
 
 export function installDebugHooks(): void {
   const dbg: DebugApi = {
+    aether: {
+      connect: () => useAetherStore.getState().connect(),
+      disconnect: () => useAetherStore.getState().disconnect(),
+      state: () => {
+        const s = useAetherStore.getState();
+        return {
+          status: s.status, palette: s.palette,
+          serverName: s.serverName, error: s.error, pushError: s.pushError,
+        };
+      },
+      push: (line, words) => useAetherStore.getState().pushPaletteLine(line, words),
+    },
     openDir: (dir) => useClassicProjectStore.getState().openDirectory(dir),
     projStatus: () => {
       const s = useClassicProjectStore.getState();

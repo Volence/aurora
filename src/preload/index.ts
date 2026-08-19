@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import { IPC_CHANNELS, unwrapBinaryRead } from '../shared/ipc-types';
-import type { RecentProject, GuardedWriteFile, GuardedWriteResult, ReadManyEntry } from '../shared/ipc-types';
+import type { RecentProject, GuardedWriteFile, GuardedWriteResult, ReadManyEntry, AetherStatusPayload } from '../shared/ipc-types';
 import { AGENT_REQUEST_CHANNEL, AGENT_RESPONSE_CHANNEL } from '../shared/agent-protocol';
 import type { AgentRequestEnvelope, AgentResponseEnvelope } from '../shared/agent-protocol';
 
@@ -68,6 +68,18 @@ const api = {
         ipcRenderer.send(IPC_CHANNELS.CLOSE_RESPONSE, mayClose);
       });
     });
+  },
+
+  // --- the outbound Aether link (playtest loop) --------------------------
+  // Connect is explicit and user-driven; nothing here fires on launch.
+  aetherConnect: (): Promise<AetherStatusPayload> =>
+    ipcRenderer.invoke(IPC_CHANNELS.AETHER_CONNECT),
+  aetherDisconnect: (): Promise<AetherStatusPayload> =>
+    ipcRenderer.invoke(IPC_CHANNELS.AETHER_DISCONNECT),
+  aetherPushPalette: (line: number, words: number[]): Promise<{ pushed: boolean; error?: string }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.AETHER_PUSH_PALETTE, line, words),
+  onAetherStatus: (callback: (s: AetherStatusPayload) => void): void => {
+    ipcRenderer.on(IPC_CHANNELS.AETHER_STATUS, (_e, s: AetherStatusPayload) => callback(s));
   },
 };
 

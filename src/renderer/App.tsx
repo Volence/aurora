@@ -38,6 +38,7 @@ import { resolveObjectArt } from '../core/project/profiles/s1-object-art';
 import { editObjectArt } from './components/sprite/export-sprite';
 import { registerAgentHandler } from './agent/agent-handler';
 import { installCloseGuard } from './shell/close-guard';
+import { installAetherStatusListener } from './state/aetherStore';
 import { refreshObjectPreviews } from './object-previews';
 import type { RecentProject } from '../shared/ipc-types';
 import type { ObjectDef } from '../core/model/s4-types';
@@ -83,6 +84,7 @@ export default function App() {
   useEffect(() => {
     registerAgentHandler();
     installCloseGuard();          // main asks before the window takes unsaved work with it
+    installAetherStatusListener(); // the outbound link's state arrives as a push, not a poll
     ensureSaversRegistered();
     registerHistoryFactories();   // must precede any edit: the hub builds no stack without it
     registerAeonFacetModules();

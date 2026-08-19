@@ -2,10 +2,16 @@ import { create } from 'zustand';
 
 /**
  * Aether bus connection status, surfaced in the status bar as
- * `Aether ◇ <status>` (Empyrean chrome convention). Aurora is not yet a bus
- * *client* — the Aether adapter + Oracle client land in a later workstream;
- * until then this reports `offline`. When the client connects it calls
- * `setBusStatus('connected')` and the indicator turns emerald.
+ * `Aether ◇ <status>` (Empyrean chrome convention).
+ *
+ * This was a placeholder reporting `offline` until Aurora became a bus CLIENT.
+ * It now is: `aetherStore.apply` drives this from the real outbound link's
+ * status pushes, and `peer` carries the server that answered the handshake
+ * (oracle-next). The badge turns emerald when that link is up.
+ *
+ * Kept as its own store rather than folded into `aetherStore` because the
+ * status bar is engine-neutral and must not import the client's surface — the
+ * same rule that moved the indicator out of MapStatusBar in the first place.
  */
 export type BusStatus = 'offline' | 'connecting' | 'connected';
 

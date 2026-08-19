@@ -104,3 +104,20 @@ describe('planPalettePush', () => {
     expect(planPalettePush(1, line).symbols).toEqual(['Pal_Base', 'Pal_Base_Dirty']);
   });
 });
+
+describe('planPalettePushWords', () => {
+  it('pushes the editor\'s CRAM words without a decode/re-quantize round trip', async () => {
+    const { planPalettePushWords } = await import('../palette-push');
+    const words = Array.from({ length: 16 }, (_, i) => (i * 0x111) & 0x0eee);
+    const plan = planPalettePushWords(1, words);
+    const bytes = plan.writes[0].bytes;
+    expect(bytes.length).toBe(32);
+    // Big-endian, entry 3 -> 0x0333 & 0x0EEE = 0x0222
+    expect((bytes[6] << 8) | bytes[7]).toBe(words[3]);
+  });
+
+  it('refuses line 0 like the colour path does', async () => {
+    const { planPalettePushWords } = await import('../palette-push');
+    expect(() => planPalettePushWords(0, new Array(16).fill(0))).toThrow(/line 0/i);
+  });
+});
