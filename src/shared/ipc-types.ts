@@ -50,7 +50,17 @@ export const IPC_CHANNELS = {
   AETHER_DISCONNECT: 'aether:disconnect',
   AETHER_STATUS: 'aether:status',
   AETHER_PUSH_PALETTE: 'aether:push-palette',
+  AETHER_WARP: 'aether:warp',
 } as const;
+
+export interface AetherWarpResult {
+  warped: boolean;
+  gate?: string;
+  error?: string;
+  /** Where the ENGINE says the player landed, after its own clamping. */
+  landed?: { x: number; y: number };
+  clamped?: boolean;
+}
 
 /** What the renderer knows about the outbound link. */
 export interface AetherStatusPayload {
