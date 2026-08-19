@@ -2,6 +2,7 @@ import React, { useRef, useEffect, useCallback, useState } from 'react';
 import { useViewStore } from '../state/viewStore';
 import { isTypingTarget } from '../shell/typing-target';
 import { useProjectStore, getCurrentAct, getCurrentZone, getActiveLevel as getStoreActiveLevel } from '../state/projectStore';
+import { rasterizeAeonChunk } from '../providers/chunk-grid-aeon';
 import { useEditorStore, executeCommand, setCommandInvalidationListener, RING_PATTERNS, type EditorTool } from '../state/editorStore';
 import { useAeonHistoryVersion } from '../hooks/useHistoryVersion';
 import { useArtStore } from '../state/artStore';
@@ -127,6 +128,16 @@ export default function MapViewport() {
   // render state (like previewHoverRef) — nothing outside MapViewport needs
   // the exact hovered cell, only whether pasting is active (store).
   const pasteHoverRef = useRef<{ sectionIndex: number; baseCol: number; baseRow: number } | null>(null);
+  /**
+   * Where a stamp would land, in the same shape as the paste ghost.
+   *
+   * Aeon had no stamp preview at all: you picked a chunk out of a wall of
+   * seventy thumbnails and clicked blind, learning where it went only by
+   * undoing. Classic has had one; this closes the gap the owner reported.
+   */
+  const stampHoverRef = useRef<{ sectionIndex: number; baseCol: number; baseRow: number; chunkId: string } | null>(null);
+  /** Rasterised chunk art for the ghost, cached so a mousemove is not a re-render. */
+  const stampGhostRef = useRef<{ key: string; canvas: HTMLCanvasElement } | null>(null);
   const lastMouse = useRef({ x: 0, y: 0 });
   const dragTarget = useRef<{
     type: 'object' | 'ring';
@@ -196,6 +207,64 @@ export default function MapViewport() {
       ctx.strokeRect(mx, my, mw, mh);
       ctx.setLineDash([]);
       ctx.restore();
+    }
+
+    // Stamp ghost: the CHUNK'S ACTUAL ART, translucent, at the snapped origin,
+    // plus a footprint outline.
+    //
+    // Deliberately unlike the paste ghost below, which is footprint-only by an
+    // earlier decision. Different question: a paste's contents are what you
+    // just copied and still remember, whereas a stamp's contents are one of
+    // seventy library thumbnails you picked a moment ago — so "which chunk"
+    // matters as much as "where", and only the art answers it.
+    {
+      const stampHover = stampHoverRef.current;
+      if (stampHover && useEditorStore.getState().tool === 'stamp-chunk') {
+        const liveProject = useProjectStore.getState().project;
+        const chunk = liveProject?.chunkLibrary.find((c) => c.id === stampHover.chunkId);
+        const zone = getCurrentZone(useProjectStore.getState());
+        if (chunk && zone) {
+          // Keyed on liveEditVersion so editing the chunk's art re-rasterises the
+          // ghost rather than showing a stale picture of it.
+          const key = `${chunk.id}:${useEditorStore.getState().liveEditVersion}:${zone.id}`;
+          if (stampGhostRef.current?.key !== key) {
+            const rgba = rasterizeAeonChunk(chunk, zone.tileset.tiles, zone.palette);
+            if (rgba) {
+              const px = chunk.widthTiles * 8, py = chunk.heightTiles * 8;
+              const off = document.createElement('canvas');
+              off.width = px; off.height = py;
+              const octx = off.getContext('2d');
+              if (octx) {
+                // createImageData + set, matching TilesetPanel: the rasterizer
+                // hands back a Uint8ClampedArray, and the ImageData constructor
+                // wants its own buffer type.
+                const img = octx.createImageData(px, py);
+                img.data.set(rgba);
+                octx.putImageData(img, 0, 0);
+                stampGhostRef.current = { key, canvas: off };
+              }
+            }
+          }
+          const sOffset = sectionRenderer.sectionWorldOffset(stampHover.sectionIndex);
+          const { vpX: svpX, vpY: svpY, zoom: sZoom } = useViewStore.getState();
+          const sx = sOffset.x + stampHover.baseCol * 8, sy = sOffset.y + stampHover.baseRow * 8;
+          const sw = chunk.widthTiles * 8, sh = chunk.heightTiles * 8;
+          ctx.save();
+          ctx.imageSmoothingEnabled = false;
+          ctx.scale(sZoom, sZoom);
+          ctx.translate(-svpX, -svpY);
+          const ghost = stampGhostRef.current;
+          if (ghost && ghost.key === key) {
+            ctx.globalAlpha = 0.55;      // clearly a preview, still readable as art
+            ctx.drawImage(ghost.canvas, sx, sy, sw, sh);
+            ctx.globalAlpha = 1;
+          }
+          ctx.strokeStyle = SELECTION_MARQUEE;
+          ctx.lineWidth = 2 / sZoom;
+          ctx.strokeRect(sx, sy, sw, sh);
+          ctx.restore();
+        }
+      }
     }
 
     // Paste ghost: the clipboard footprint as a translucent fill + outline at
@@ -1329,6 +1398,32 @@ export default function MapViewport() {
         drawCollisionPreview();
       }
       return;
+    }
+
+    // Stamp ghost: track where the chunk would land, snapped to its own size.
+    if (tool === 'stamp-chunk') {
+      const { selectedChunkId } = useEditorStore.getState();
+      const chunk = useProjectStore.getState().project?.chunkLibrary.find((c) => c.id === selectedChunkId);
+      const world = screenToWorld(e.clientX, e.clientY);
+      const info = chunk ? worldToSectionTile(world.x, world.y) : null;
+      if (chunk && info) {
+        // The same snap the stamp itself uses — a preview that lands somewhere
+        // other than the stamp is worse than no preview.
+        const baseCol = Math.floor(info.col / chunk.widthTiles) * chunk.widthTiles;
+        const baseRow = Math.floor(info.row / chunk.heightTiles) * chunk.heightTiles;
+        const prev = stampHoverRef.current;
+        if (!prev || prev.sectionIndex !== info.sectionIndex || prev.baseCol !== baseCol
+            || prev.baseRow !== baseRow || prev.chunkId !== chunk.id) {
+          stampHoverRef.current = { sectionIndex: info.sectionIndex, baseCol, baseRow, chunkId: chunk.id };
+          drawCollisionPreview();
+        }
+      } else if (stampHoverRef.current) {
+        stampHoverRef.current = null;
+        drawCollisionPreview();
+      }
+    } else if (stampHoverRef.current) {
+      stampHoverRef.current = null;
+      drawCollisionPreview();
     }
 
     // Marquee dragging — always resolved against the drag-START section's
