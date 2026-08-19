@@ -28,7 +28,13 @@ stage 4's expectation is what is wrong.
 
 ---
 
-## 1. `docs/ROADMAP.md` is stale, and this phase made it worse — DO THIS FIRST
+## 1. ~~`docs/ROADMAP.md` is stale~~ — **DONE 2026-08-19 (`f0ff53f`)**
+
+> Closed the same day this packet was written. `ROADMAP.md` gained a **§2.6** recording the
+> August line (UX stages 1–4, art authoring 1/2A/2B/2C, classic collision + the agent
+> surface, the lens sweep) and a rewritten **§5**, whose **§5.1 is the open list in order**.
+> §2/§3/§5's older claims are banner-marked as superseded by §2.6. The rest of this section
+> is kept as the record of why.
 
 Its last delivered entry is **§2.5, dated 2026-08-09**. Unrecorded since: the UX stages, the whole
 art-authoring line (1–2C), the art agent surface, and all five merges above.
@@ -75,15 +81,26 @@ runs, exactly as the two collision harnesses do.
 
 ### 3a. Retire the dead export path — **but the DIR item as written would break a live tool**
 
+> **Correction, re-measured the same day (now written into ROADMAP §4.2, which is the
+> authoritative version): the "ZERO importers" line below is WRONG.**
+> `src/core/project/aeon/save.ts:27` imports `exportAct` from the barrel and calls it at
+> `:271` — the aeon save's export step. What that step emits
+> (`data/export/{act_descriptor,entity_data,vram_bases}.asm`, `section_N.{tiles,art}.bin`)
+> is consumed by nothing: aeon has no `data/export/` directory and no reference to one.
+> So it is dead *output* behind a *live* call, and the order is (1) delete the export step
+> from `buildAeonSavePlan`, (2) then the barrel + `act-descriptor.ts` + `entity-data.ts`
+> are genuinely dead, (3) keep `vram-coloring.ts`. The conclusion below survives; the
+> reasoning under it does not.
+
 DIR item 6 ordered `vram-coloring.ts`, `act-descriptor.ts`, `entity-data.ts` retired (originally
 ordered 2026-07-03). **Measured 2026-08-19, and the instruction is partly wrong:**
 
 ```
-src/core/export/index.ts        → ZERO importers. The whole export barrel is unreachable.
-  ├ act-descriptor.ts           → imported only by that barrel.          DEAD, safe to retire.
-  ├ entity-data.ts              → that barrel + its own test.            DEAD, safe to retire.
+src/core/export/index.ts        → imported by core/project/aeon/save.ts (exportAct).
+  ├ act-descriptor.ts           → imported only by that barrel.          DEAD once the step goes.
+  ├ entity-data.ts              → that barrel + its own test.            DEAD once the step goes.
   └ vram-coloring.ts            → that barrel, AND src/core/agent/budget.ts
-                                   (computeVramColoring, FG_TILE_LIMIT)
+                                   (computeVramColoring, FG_TILE_LIMIT)   → KEEP
 ```
 
 `core/agent/budget.ts` is **live** — `agent-handler.ts` imports `computeActBudget` from it for the
