@@ -23,6 +23,7 @@ import type { LevelDoc } from '../../../core/level-classic/model';
 import type { ProjectHandle, ZoneActRef, WriteResult } from '../../../core/project/adapter';
 import type { ResolutionReport } from '../../../core/project/report';
 import type { CommitRefusal } from '../../../core/art/classic-commit-plan';
+import { explainSheetRefusal, sheetRefusalResolution } from '../../../core/art/sheet-import';
 
 // ---------------------------------------------------------------------------
 // Fixtures — mirroring agent-handler.classic.test.ts.
@@ -106,6 +107,18 @@ function openReady(doc = makeDoc()): void {
 
 const BLACK = { r: 0, g: 0, b: 0 };
 const RED = { r: 0xee, g: 0, b: 0 };
+const GREEN = { r: 0, g: 0xee, b: 0 };
+const RED_WORD = 0x000e;
+const GREEN_WORD = 0x00e0;
+
+/** The fixture act, but holding red on line 0 and green on line 1 — two colours
+ *  that exist, in lines the hardware cannot combine inside one 8x8 cell. */
+function docWithSplitColours(): LevelDoc {
+  const doc = makeDoc();
+  doc.palettes[0][1] = RED_WORD;
+  doc.palettes[1][1] = GREEN_WORD;
+  return doc;
+}
 
 /** An all-black indexed PNG of the given size. */
 function blackPng(width: number, height: number): Uint8Array {
@@ -202,6 +215,23 @@ describe('classic-commit-canvas', () => {
     expect(useClassicLevelStore.getState().doc!.chunks).toHaveLength(2);
   });
 
+  // A FIELD NAMED `warnings` MUST NOT BE DROPPED. `loadCanvasFile` reports, among
+  // others, "the sidecar could not be read … the canvas is unconstrained until
+  // this is fixed" — the one thing an unattended caller most needs told, since
+  // the commit proceeds anyway.
+  it('carries loadCanvasFile\'s warnings into the reply', async () => {
+    openReady();
+    // A 1-colour PLTE: the decoder warns that the other 63 canvas slots default
+    // to black. Any warning does — the assertion is that they SURVIVE.
+    stubFiles(canvasFile('blob', blackPng(256, 256)));
+    const res = await handleAgentRequest({ kind: 'classic-commit-canvas', name: 'blob', dryRun: true }) as {
+      ok: boolean; warnings: string[];
+    };
+    expect(res.ok).toBe(true);
+    expect(res.warnings.length).toBeGreaterThan(0);
+    expect(res.warnings.join(' ')).toMatch(/palette has only 1 colours/);
+  });
+
   it('applies by default, growing the act\'s chunk pool', async () => {
     openReady();
     stubFiles(canvasFile('blob', blackPng(256, 256)));
@@ -249,8 +279,43 @@ describe('classic-import-art-sheet', () => {
     };
     expect(res.ok).toBe(false);
     expect(res.refusal.kind).toBe('colour-not-in-act');
+    // BOTH SENTENCES, BY IDENTITY WITH CORE. `resolution.length > 0` passes for
+    // any string at all, including one written a second time for the agent —
+    // which is exactly what sheet-import.ts's header forbids, because the
+    // artist's copy and the agent's copy drift the first time either is
+    // reworded. Comparing against core's own output is what makes that
+    // impossible rather than merely discouraged.
+    expect(res.message).toBe(explainSheetRefusal({ kind: 'colour-not-in-act', colours: [RED_WORD] }));
     expect(res.message).toMatch(/colours the act does not have/);
-    expect(res.resolution.length).toBeGreaterThan(0);
+    expect(res.resolution).toBe(sheetRefusalResolution({ kind: 'colour-not-in-act', colours: [RED_WORD] }));
+    expect(res.resolution).toMatch(/Recolour it to the act's palette/);
+    expect(res.offers).toEqual([]);
+  });
+
+  // THE OTHER HALF OF WHAT THE REGISTRY ADVERTISES. `import_art_sheet`'s
+  // description names two import-only refusals; this is the second, and until
+  // now it had never made the trip to this surface at all — only png-import's
+  // and sheet-import's own suites ever raised it.
+  it('returns an 8x8 cell that needs two palette lines as ok:false, with the same-line advice', async () => {
+    openReady(docWithSplitColours());
+    // One cell, one pixel of line-1 green among line-0 red: both colours exist,
+    // no single line holds both.
+    const indices = new Uint8Array(64).fill(1);
+    indices[0] = 2;
+    stubFiles({ [SHEET_PATH]: encodeIndexedPngForTest({
+      width: 8, height: 8, palette: [BLACK, RED, GREEN], indices,
+    }) });
+    const res = await handleAgentRequest({ kind: 'classic-import-art-sheet', path: SHEET_PATH }) as {
+      ok: boolean; refusal: { kind: string }; message: string; resolution: string; offers: string[];
+    };
+    expect(res.ok).toBe(false);
+    expect(res.refusal.kind).toBe('cell-needs-two-lines');
+    expect(res.message).toMatch(/no single palette line holds/);
+    // Not the OTHER kind's remedy, and it carries the clause that stops the
+    // retry loop: widening the palette works only on the cell's own line.
+    expect(res.resolution).toMatch(/^Redraw those cells/);
+    expect(res.resolution).toMatch(/LINE the cell's other colours already use/);
+    expect(res.resolution).not.toBe(sheetRefusalResolution({ kind: 'colour-not-in-act', colours: [RED_WORD] }));
     expect(res.offers).toEqual([]);
   });
 

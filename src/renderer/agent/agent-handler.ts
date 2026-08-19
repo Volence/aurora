@@ -28,7 +28,9 @@ import {
 import { saveClassicProject } from '../state/classic-save';
 import { commitPixels } from './art-commit';
 import { loadCanvasFile } from '../state/canvas-file';
-import { sheetFromBytes, explainSheetRefusal } from '../../core/art/sheet-import';
+import { sheetFromBytes, explainSheetRefusal, sheetRefusalResolution } from '../../core/art/sheet-import';
+import type { PngImportRefusal } from '../../core/art/png-import';
+import type { ArtCommitReply } from './art-commit';
 import type { LevelDoc, LayoutGrid } from '../../core/level-classic/model';
 import { planProjectOpen, currentOpenDirtySnapshot } from '../shell/project-open-guard';
 import { useSessionStore } from '../state/sessionStore';
@@ -112,6 +114,20 @@ function requireClassicProject() {
 }
 
 /** The currently-open, ready classic level document, or throw. */
+/**
+ * An IMPORT refusal, in the commit refusal's shape.
+ *
+ * Derived from `ArtCommitReply`'s own `ok:false` arm rather than written out
+ * again, so "same shape" is a fact the compiler checks: drop `offers`, misspell
+ * `resolution`, or let the commit reply grow a field, and this stops compiling.
+ * It cannot simply BE that arm — the refusal it carries is a `PngImportRefusal`
+ * (two kinds about colour, raised before planning starts), not a
+ * `CommitRefusal`, and widening the commit arm to accept either would let a
+ * commit reply claim a refusal a commit can never raise.
+ */
+type SheetRefusalReply =
+  Omit<Extract<ArtCommitReply, { ok: false }>, 'refusal'> & { refusal: PngImportRefusal };
+
 function requireClassicDoc(): LevelDoc {
   const s = useClassicLevelStore.getState();
   if (s.status !== 'ready' || !s.doc) throw new Error('no classic level is open');
@@ -791,24 +807,38 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
       // be an unused local and a second copy of the guard.
       const dir = useClassicProjectStore.getState().dir;
       if (!dir) throw new Error('no project directory is open');
-      // Name safety is loadCanvasFile's own guard (canvas-file.ts:120) and it
-      // throws — which is right: a bad name is a fault, not a refusal.
+      // Name safety is loadCanvasFile's own guard (canvas-file.ts:39/120) and it
+      // THROWS — right for a fault, but a throw is -32603 INTERNAL at the Aether
+      // adapter, so the tool schema states the same pattern (shared/canvas-name.ts)
+      // and rejects a bad name as INVALID_PARAMS before this case ever runs.
       const loaded = await loadCanvasFile(dir, req.name);
-      return commitPixels({
-        pixels: loaded.doc.pixels,
-        canvasPalette: loaded.doc.palette,
-        gridOrigin: loaded.doc.gridOrigin,
-        targets: req.targets,
-        paletteResolution: req.paletteResolution,
-        // A BOOLEAN is what `commitPixels` takes, and passing one on is right:
-        // it turns the flag into `{ colindLength }` off the doc it has already
-        // read (art-commit.ts:130). Task 4's review moved that conversion one
-        // level down, to `replyFromPlanResult`, so that asking for collision
-        // without the zone's table length is unrepresentable AT the layer that
-        // stamps it — the layer this one never touches.
-        collision: req.collision,
-        dryRun: req.dryRun,
-      });
+      // `collision` STAYS A BOOLEAN here, and that is the whole conversion story
+      // at this layer: `commitPixels` takes a flag (art-commit.ts:130) and turns
+      // it into `{ colindLength }` off the doc it has already read for the
+      // snapshot (art-commit.ts:136). Task 4's review (fb92c99) moved that store
+      // read UP out of `replyFromPlanResult` — which used to do it itself behind
+      // a `?? 0` — and pushed the typed REQUIREMENT down in its place, so the
+      // layer that actually stamps collision cannot be called without the table
+      // length. A `?? 0` there meant every block id was past the table: every
+      // new block skipped while its cells were still stamped solid, which is the
+      // fall-through-the-floor case. Nothing about that lives here; forwarding
+      // the flag is all this case has to get right.
+      const { kind: _k, name: _n, ...opts } = req;
+      return {
+        ...commitPixels({
+          pixels: loaded.doc.pixels,
+          canvasPalette: loaded.doc.palette,
+          gridOrigin: loaded.doc.gridOrigin,
+          // Rest-spread, not six named forwards: `commitPixels`' input is
+          // all-optional, so a seventh option added to the kind and forgotten
+          // here would be a silent no-op with no type error.
+          ...opts,
+        }),
+        // NEVER DROPPED. These carry "the sidecar could not be read — the canvas
+        // is unconstrained until this is fixed", which is precisely the kind of
+        // thing a caller committing art unattended has to hear.
+        warnings: loaded.warnings,
+      };
     }
 
     case 'classic-import-art-sheet': {
@@ -816,20 +846,29 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
       const bytes = new Uint8Array(await window.api.readBinaryFile(req.path, ''));
       const res = await sheetFromBytes(doc, bytes);
       if (!res.ok) {
-        // An import refusal, like a commit refusal, is an ANSWER. Same shape, so
-        // a caller handles both with one branch.
-        return { ok: false, refusal: res.refusal, message: explainSheetRefusal(res.refusal),
-                 resolution: 'Recolour the sheet, or widen the act palette, then import again.',
-                 offers: [] };
+        // An import refusal, like a commit refusal, is an ANSWER — and in the
+        // same shape, so a caller handles both with one branch. The shape is
+        // DERIVED from `ArtCommitReply`'s refusal arm (see SheetRefusalReply)
+        // rather than promised in a comment, and both sentences come from core,
+        // where the dialog reads the identical pair.
+        const reply: SheetRefusalReply = {
+          ok: false,
+          refusal: res.refusal,
+          message: explainSheetRefusal(res.refusal),
+          resolution: sheetRefusalResolution(res.refusal),
+          // No palette resolution can unblock these: this sheet was mapped onto
+          // the act's own palette, so there is nothing for the commit planner's
+          // palette offers to act on.
+          offers: [],
+        };
+        return reply;
       }
       // An imported sheet has no grid of its own — see CommitPlanInput.gridOrigin.
+      const { kind: _k, path: _p, ...opts } = req;
       return commitPixels({
         pixels: res.sheet.pixels,
         canvasPalette: res.sheet.palette,
-        targets: req.targets,
-        paletteResolution: req.paletteResolution,
-        collision: req.collision,
-        dryRun: req.dryRun,
+        ...opts,
       });
     }
 
