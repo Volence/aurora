@@ -27,7 +27,11 @@ import type { CollisionRectReport } from '../../../../core/level-classic/collisi
  */
 function report(over: Partial<CollisionRectReport> = {}): CollisionRectReport {
   return {
-    mode: 'link', applied: 3, noop: 0, skipped: [], blocks: 1, warnings: [], ...over,
+    mode: 'link', applied: 3, noop: 0, skipped: [], blocks: 1, warnings: [],
+    // Present because the report REQUIRES them, and defaulted to the clean-write
+    // answer like everything else here — nothing skipped, so nothing elided.
+    skippedCells: [], skippedCellsTruncated: false,
+    ...over,
   };
 }
 

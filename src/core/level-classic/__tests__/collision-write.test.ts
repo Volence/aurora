@@ -12,7 +12,7 @@
 // creating one (isolate) would define entries whose real values are unknown.
 
 import { describe, it, expect } from 'vitest';
-import { classifyCollisionCell, planCollisionCells, planCollisionRect, planCollisionWrite } from '../collision-write';
+import { classifyCollisionCell, planCollisionCells, planCollisionRect, planCollisionWrite, SKIPPED_CELLS_CAP } from '../collision-write';
 import { LOOP_ALIAS, type CollisionProbe } from '../collision-probe';
 import type { LevelDoc } from '../model';
 import type { SurfaceEditPlan } from '../../art/classic-surface-plan';
@@ -783,5 +783,131 @@ describe('planCollisionRect — isolate refusal, containment', () => {
     expect(refusalOf(r).kind).toBe('isolate-grows-table');
     expect(resolutionOf(r)).toMatch(/accepting it changes every use of these blocks zone-wide/);
     expect(refusalOf(r).linkEquivalent).toEqual([3]);        // block 2 escapes, block 3 does not
+  });
+});
+
+// WHICH CELLS WERE SKIPPED, not just how many.
+//
+// `skipped` is a per-reason tally, and a tally is the wrong tier for the one
+// axis the caller controls. A caller that asked for a 4-cell slope and got
+// `applied: 2, skipped: [{ block0, 2 }]` cannot tell whether the two blank
+// cells were the two it expected to be air or the two it most cared about —
+// only a cell-by-cell probe answers that, which is the round-trip the reply
+// exists to save. `applied` and `blocks` stay aggregates because they are
+// about BLOCKS; this list is about CELLS.
+describe('planCollisionCells — skippedCells', () => {
+  const rect = (x: number, y: number, w: number, h: number) => ({ x, y, w, h });
+  const withCells = (assign: [number, number][]) => {
+    const d = doc();
+    for (const [cellIndex, block] of assign) {
+      d.chunks[0].cells[cellIndex] = { block, xf: false, yf: false, solidity: 3 };
+    }
+    return d;
+  };
+
+  it('names each skipped cell with the CALLER\'S coordinates and the reason it was tallied under', () => {
+    // The rectangle sits at x=16..18, which is the SECOND placement of chunk 1
+    // (fg is [1, 1]) — so definition cells 0/1/2 are reached through FG cells
+    // 16/17/18. The list must report what the caller asked for, not the
+    // chunk-definition cell index it resolved to; a caller correcting a
+    // coordinate mistake can only act on its own coordinate space.
+    //   (16,0) → cell 0 → block 1  → write
+    //   (17,0) → cell 1 → block 0  → skip, block0
+    //   (18,0) → cell 2 → block 9  → skip, no-such-block (doc() ships 4 blocks)
+    const d = withCells([[0, 1], [2, 9]]);
+    const r = planCollisionRect(d, rect(16, 0, 3, 1), 7, 'link');
+    expect(r.kind).toBe('link');
+    expect(r.report.applied).toBe(1);
+    expect(r.report.skippedCells).toEqual([
+      { x: 17, y: 0, reason: 'block0' },
+      { x: 18, y: 0, reason: 'no-such-block' },
+    ]);
+    // Every listed reason is one the tally accounts for, with the same totals.
+    expect(r.report.skipped).toEqual([
+      { reason: 'block0', count: 1 },
+      { reason: 'no-such-block', count: 1 },
+    ]);
+    expect(r.report.skippedCellsTruncated).toBe(false);
+  });
+
+  it('CAPS the list while the per-reason counts stay the true total', () => {
+    // THE TEST THAT PROVES THE TWO ARE NOT THE SAME NUMBER. doc() is a 32x16
+    // act whose only non-blank definition cell is 5, reached at FG (5,0) and
+    // (21,0). A 32x4 rectangle scans 128 cells: 2 write, 126 skip as block 0.
+    // 126 against a cap of 32 — no reader can mistake one for the other.
+    const d = doc();
+    const r = planCollisionRect(d, rect(0, 0, 32, 4), 7, 'link');
+    expect(r.kind).toBe('link');
+    expect(r.report.applied).toBe(2);
+
+    const total = r.report.skipped.reduce((n, s) => n + s.count, 0);
+    expect(total, 'the counts are the authoritative total').toBe(126);
+    expect(r.report.skipped).toEqual([{ reason: 'block0', count: 126 }]);
+    expect(r.report.skippedCells).toHaveLength(SKIPPED_CELLS_CAP);
+    expect(r.report.skippedCells!.length, 'the list length is NOT the total').not.toBe(total);
+    expect(r.report.skippedCellsTruncated).toBe(true);
+  });
+
+  it('is FIRST-N IN SCAN ORDER — not sampled, not grouped by reason, not deduped', () => {
+    // Deterministic and identical across a retry of the same call: a sampled or
+    // set-ordered list would make two identical calls disagree, which is worse
+    // than no list at all.
+    //   (0,0) → cell 0  → block 1 → write        <- the scan's FIRST cell is not a skip
+    //   (1,0) → cell 1  → block 1 → write
+    //   (2,0) → cell 2  → block 0 → skip block0  <- so THIS is the list's head
+    //   (3,0) → cell 3  → block 9 → skip no-such-block
+    //   (0..3,1) → cells 16..19 → block 0 → skip block0 x4
+    // The two reasons INTERLEAVE, so a collection keyed by reason — a Map or a
+    // Set per reason — cannot reproduce this order, and one that deduped by
+    // reason could not reproduce five separate block0 entries.
+    const d = withCells([[0, 1], [1, 1], [3, 9]]);
+    const cells = [
+      { x: 0, y: 0 }, { x: 1, y: 0 }, { x: 2, y: 0 }, { x: 3, y: 0 },
+      { x: 0, y: 1 }, { x: 1, y: 1 }, { x: 2, y: 1 }, { x: 3, y: 1 },
+    ];
+    const r = planCollisionCells(d, cells, 7, 'link');
+    expect(r.kind).toBe('link');
+    expect(r.report.skippedCells).toEqual([
+      { x: 2, y: 0, reason: 'block0' },
+      { x: 3, y: 0, reason: 'no-such-block' },
+      { x: 0, y: 1, reason: 'block0' },
+      { x: 1, y: 1, reason: 'block0' },
+      { x: 2, y: 1, reason: 'block0' },
+      { x: 3, y: 1, reason: 'block0' },
+    ]);
+    expect(r.report.skippedCells![0], 'the head is the first cell the SCAN reached that skipped')
+      .toEqual({ x: 2, y: 0, reason: 'block0' });
+    expect(r.report.skipped).toEqual([
+      { reason: 'block0', count: 5 },
+      { reason: 'no-such-block', count: 1 },
+    ]);
+    expect(r.report.skippedCellsTruncated).toBe(false);
+
+    // A retry of the same call returns the same list, entry for entry.
+    const again = planCollisionCells(d, cells, 7, 'link');
+    expect(again.report.skippedCells).toEqual(r.report.skippedCells);
+  });
+
+  it('lists cells the SCANNER rejected too, in the same order as the classifier\'s', () => {
+    // THE OTHER BUMP SITE. 'outside-layout' is manufactured by the scanner when
+    // `locateCell` returns null — the classifier never returns it, and for such
+    // a cell there is no CellAddress at all, so the caller's own coordinate is
+    // the ONLY thing that could be reported. The act is 32 cells wide.
+    //   (30,0) → cell 14 → block 1 → write
+    //   (31,0) → cell 15 → block 0 → skip block0
+    //   (32,0), (33,0) → past the edge → skip outside-layout
+    const d = withCells([[14, 1]]);
+    const r = planCollisionRect(d, rect(30, 0, 4, 1), 7, 'link');
+    expect(r.kind).toBe('link');
+    expect(r.report.applied).toBe(1);
+    expect(r.report.skippedCells).toEqual([
+      { x: 31, y: 0, reason: 'block0' },
+      { x: 32, y: 0, reason: 'outside-layout' },
+      { x: 33, y: 0, reason: 'outside-layout' },
+    ]);
+    expect(r.report.skipped).toEqual([
+      { reason: 'block0', count: 1 },
+      { reason: 'outside-layout', count: 2 },
+    ]);
   });
 });

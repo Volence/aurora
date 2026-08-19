@@ -84,6 +84,12 @@ export type ApplyCollisionRectResult =
 function noLevelResult(mode: CollisionWriteMode): ApplyCollisionRectResult {
   const report: CollisionRectReport = {
     mode, applied: 0, noop: 0, skipped: [], blocks: 0, warnings: [],
+    // Stated rather than left off: `skippedCells`/`skippedCellsTruncated` are
+    // REQUIRED on the report so a future report-builder cannot silently omit
+    // them and leave a caller reading `undefined` as "nothing was skipped".
+    // Nothing was scanned here, so an empty list and an untruncated flag are
+    // both literally true.
+    skippedCells: [], skippedCellsTruncated: false,
   };
   return {
     ok: false,
