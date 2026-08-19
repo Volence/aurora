@@ -4,12 +4,29 @@
 // reply exists (without them the agent has minted chunks it cannot name in a
 // follow-up set_layout_region).
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { appendedEngineIds, replyFromPlanResult } from '../art-commit';
 import type {
   CommitPlanResult, CommitRefusal, CommitReport,
 } from '../../../core/art/classic-commit-plan';
+import type { CommandResult } from '../../state/classicLevelStore';
 import type { BlockDef, ChunkDef256 } from '../../../core/level-classic/model';
+
+// THE ONE CALL THIS FILE MAKES INTO THE STORE, and the only reason it is mocked:
+// `replyFromPlanResult(..., {apply:true})` hands the plan to
+// `classicCommitCanvas`, and the case worth asserting is the one the real
+// command cannot be made to produce on demand — it disagreeing with the planner.
+// Everything else here still runs with `apply:false` and touches none of this.
+const stub = vi.hoisted(() => ({ result: { ok: true } as CommandResult }));
+vi.mock('../../state/classicLevelStore', () => ({
+  classicCommitCanvas: () => stub.result,
+  // Unused by `replyFromPlanResult`, but named in art-commit.ts's import list,
+  // so the mock must carry them or the module fails to bind.
+  useClassicLevelStore: { getState: () => ({ status: 'idle', doc: null }) },
+  editableTileRange: () => null,
+}));
+
+beforeEach(() => { stub.result = { ok: true }; });
 
 describe('appendedEngineIds', () => {
   // classicLevelStore.ts:1361 — newEngineId = nextChunks.length, i.e. file index + 1.
@@ -192,5 +209,52 @@ describe('replyFromPlanResult · collision', () => {
     if (!reply.ok) return;
     expect(reply.appendedChunkIds).toEqual([41]);
     expect(reply.applied).toBe(false);
+  });
+});
+
+// THE COMPONENT-DISAGREEMENT FAULT. `classicCommitCanvas` re-validates the plan
+// it is handed, using the same predicates — so a rejection there does not mean
+// the art was wrong (the planner already said it was legal), it means the two
+// halves have DRIFTED. That is not an answer a caller can retry from with
+// different options, so it is the one thing on this path that throws rather than
+// returning `{ok:false}`.
+//
+// Without this, a drifted pair returns ok:true with a report describing writes
+// that never landed — the caller is told its art committed when nothing did.
+describe('replyFromPlanResult · apply', () => {
+  const emptyReport = (): CommitReport => ({
+    tilesNew: 0, tilesReused: 0, tilesReclaimed: 0,
+    blocksNew: 0, blocksReused: 0, blocksReclaimed: 0, blocksZeroed: 0,
+    chunksReplaced: 1, chunksAppended: 0,
+    blocksInheritedCollision: 0, blocksWithoutCollision: 0,
+    cellsInheritedSolidity: 0, cellsWithoutSolidity: 0,
+    poolBefore: { tiles: 1, blocks: 1, chunks: 2 },
+    poolAfter: { tiles: 1, blocks: 1, chunks: 2 },
+    warnings: [],
+  });
+
+  const plan = (): CommitPlanResult => ({
+    ok: true,
+    plan: {
+      tileWrites: [], blockWrites: [],
+      chunkWrites: [{ chunkFileIndex: 0, def: { cells: [] } as unknown as ChunkDef256 }],
+      chunkAppends: [], paletteWrites: null, report: emptyReport(),
+    },
+  });
+
+  it('throws when the command rejects a plan the planner passed', () => {
+    stub.result = { ok: false, error: 'chunk 0 is outside the 2-chunk pool' };
+    expect(() => replyFromPlanResult(plan(), { apply: true }))
+      .toThrow(/commit rejected after planning: chunk 0 is outside the 2-chunk pool/);
+  });
+
+  // The other side of the same seam: an ACCEPTED plan must not throw, and must
+  // say it applied. Without this the test above would still pass if the throw
+  // were unconditional.
+  it('returns applied:true when the command accepts', () => {
+    const reply = replyFromPlanResult(plan(), { apply: true });
+    expect(reply.ok).toBe(true);
+    if (!reply.ok) return;
+    expect(reply.applied).toBe(true);
   });
 });
