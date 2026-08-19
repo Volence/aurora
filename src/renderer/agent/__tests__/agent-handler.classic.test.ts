@@ -1,4 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { handleAgentRequest } from '../agent-handler';
 import {
   useClassicProjectStore,
@@ -12,6 +14,7 @@ import { documentHistoryHub } from '../../state/history-hub';
 import { useEditorStore } from '../../state/editorStore';
 import type { ClassicBridge } from '../../state/classic-bridge';
 import type { LevelDoc } from '../../../core/level-classic/model';
+import { locateCell } from '../../../core/level-classic/collision-probe';
 import type { ProjectHandle, ZoneActRef, WriteResult } from '../../../core/project/adapter';
 import type { ResolutionReport } from '../../../core/project/report';
 import type { S1ObjectEntry } from '../../../core/formats/classic/s1-objpos';
@@ -445,6 +448,151 @@ describe('classic-set-colind', () => {
   });
   it('errors when no level is open', async () => {
     await expect(handleAgentRequest({ kind: 'classic-set-colind', entries: [] })).rejects.toThrow(/no classic level is open/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// set_block_collision — the rectangle collision tool on the agent surface.
+//
+// THE RULE THIS SUITE TURNS ON: a refusal is a RESULT, not an error. The Aether
+// adapter maps a thrown error to JSON-RPC -32603 INTERNAL, i.e. "Aurora broke".
+// "your rectangle was entirely over air" is an ANSWER, so it comes back inside
+// a successful result as ok:false. The one genuine fault is "no level open".
+// ---------------------------------------------------------------------------
+
+/**
+ * makeDoc's fg is 2x2 CHUNKS, cells [0, 1, 0, 1] — layout column 1 holds engine
+ * chunk id 1 -> doc.chunks[0]. In 16px CELL units that is cx 16..31, with
+ * cellIndex = (cy % 16) * 16 + (cx % 16). So cell (16,0) is definition cell 0.
+ */
+function collisionDoc(): LevelDoc {
+  const base = makeDoc();
+  const chunks = base.chunks.map((c) => ({ cells: c.cells.map((cc) => ({ ...cc })) }));
+  chunks[0].cells[0] = { block: 1, xf: false, yf: false, solidity: 3 };
+  chunks[0].cells[1] = { block: 2, xf: false, yf: false, solidity: 3 };
+  return {
+    ...base,
+    // makeDoc ships 2 blocks; block 2 has to exist for the second cell, and it
+    // is CLONED from an existing block so its tile refs stay inside the pool.
+    blocks: [...base.blocks, { cells: base.blocks[1].cells.map((c) => ({ ...c })) }],
+    chunks,
+    collision: { ...base.collision, colind: new Uint8Array(8) },
+  };
+}
+
+/** The shape the block under FG cell (cx, cy) currently carries. */
+const shapeAt = (cx: number, cy: number) => {
+  const d = lvl().doc!;
+  const at = locateCell(d, cx, cy)!;
+  return d.collision.colind[d.chunks[at.chunkIndex!].cells[at.cellIndex].block];
+};
+
+describe('classic-set-block-collision', () => {
+  it('THROWS when no level is open — that is a fault, not a refusal', async () => {
+    await expect(handleAgentRequest({
+      kind: 'classic-set-block-collision', x: 16, y: 0, w: 1, h: 1, shape: 7,
+    })).rejects.toThrow(/no classic level is open/);
+  });
+
+  it('applies a rectangle and reports cells, blocks and mode', async () => {
+    openReady(collisionDoc());
+    const res = await handleAgentRequest({
+      kind: 'classic-set-block-collision', x: 16, y: 0, w: 2, h: 1, shape: 7,
+    }) as { ok: boolean; applied: number; blocks: number; mode: string; dryRun: boolean };
+    expect(res.ok).toBe(true);
+    expect(res.mode).toBe('link');          // the default
+    expect(res.applied).toBe(2);
+    expect(res.blocks).toBe(2);
+    expect(res.dryRun).toBe(false);
+    expect(shapeAt(16, 0)).toBe(7);
+  });
+
+  it('counts the blank-block cells it stepped over instead of refusing', async () => {
+    // Cells (18,0) and (19,0) are still block 0. A rectangle over a slope
+    // legitimately contains air and blank blocks; refusing would make the tool
+    // unusable.
+    openReady(collisionDoc());
+    const res = await handleAgentRequest({
+      kind: 'classic-set-block-collision', x: 16, y: 0, w: 4, h: 1, shape: 7,
+    }) as { ok: boolean; applied: number; skipped: { reason: string; count: number }[] };
+    expect(res.ok).toBe(true);
+    expect(res.applied).toBe(2);
+    expect(res.skipped).toEqual([{ reason: 'block0', count: 2 }]);
+  });
+
+  it('returns a REFUSAL as ok:false inside a successful result, never a throw', async () => {
+    // Layout column 0 is chunk id 0 — air. The caller can fix this by changing
+    // an argument, so it is an ANSWER; a throw would reach the client as -32603
+    // INTERNAL, claiming Aurora broke.
+    openReady(collisionDoc());
+    const res = await handleAgentRequest({
+      kind: 'classic-set-block-collision', x: 0, y: 0, w: 2, h: 2, shape: 7,
+    }) as { ok: boolean; refusal: { kind: string }; message: string; resolution: string; offers: unknown[] };
+    expect(res.ok).toBe(false);
+    expect(res.refusal.kind).toBe('nothing-applicable');
+    expect(res.message).toMatch(/air/i);
+    expect(res.resolution).toMatch(/cell units/i);
+    expect(res.offers).toEqual([]);
+  });
+
+  it('dryRun plans without mutating the document', async () => {
+    openReady(collisionDoc());
+    const res = await handleAgentRequest({
+      kind: 'classic-set-block-collision', x: 16, y: 0, w: 2, h: 1, shape: 7, dryRun: true,
+    }) as { ok: boolean; applied: number; dryRun: boolean };
+    expect(res.ok).toBe(true);
+    expect(res.applied).toBe(2);
+    expect(res.dryRun).toBe(true);
+    expect(shapeAt(16, 0)).toBe(0);
+  });
+
+  it('is idempotent — a repeat is ok:true with noop, not a refusal', async () => {
+    openReady(collisionDoc());
+    const req = { kind: 'classic-set-block-collision' as const, x: 16, y: 0, w: 2, h: 1, shape: 7 };
+    await handleAgentRequest(req);
+    const res = await handleAgentRequest(req) as { ok: boolean; applied: number; noop: number };
+    expect(res.ok).toBe(true);
+    expect(res.applied).toBe(0);
+    expect(res.noop).toBe(2);
+  });
+
+  it('honours an explicit isolate mode', async () => {
+    openReady(collisionDoc());
+    const before = lvl().doc!.blocks.length;
+    const res = await handleAgentRequest({
+      kind: 'classic-set-block-collision', x: 16, y: 0, w: 2, h: 1, shape: 7, mode: 'isolate',
+    }) as { ok: boolean; mode: string; isolate: { blocksCloned: number } };
+    expect(res.ok).toBe(true);
+    expect(res.mode).toBe('isolate');
+    expect(res.isolate.blocksCloned).toBe(2);
+    expect(lvl().doc!.blocks.length).toBe(before + 2);
+  });
+});
+
+describe('agent-handler collision write route', () => {
+  it('routes through the dispatch helper, never a store command or the planner', () => {
+    // The SAME guard the panel and the viewport wear
+    // (collision-panel.test.ts, collision-probe-click.test.ts). The agent is a
+    // third caller and would drift the Link/Isolate decision the same way.
+    //
+    // COMMENTS ARE STRIPPED FIRST: the case body explains in prose why it does
+    // not plan for itself, and an unstripped scan would either match the
+    // forbidden names in that prose or let a comment satisfy the positive
+    // assertion after the real call had been deleted.
+    const src = readFileSync(join(__dirname, '..', 'agent-handler.ts'), 'utf8')
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/(^|[^:])\/\/.*$/gm, '$1');
+    const start = src.indexOf("case 'classic-set-block-collision'");
+    expect(start, 'no such case in agent-handler.ts — this guard is blind').toBeGreaterThan(-1);
+    const rest = src.slice(start);
+    const end = rest.indexOf('\n    case ');
+    const body = end === -1 ? rest : rest.slice(0, end);
+    // The PAREN is load-bearing: a bare /applyCollisionShapeRect/ still matches
+    // a suffixed rename such as applyCollisionShapeRectXX(, which would leave
+    // this assertion green while nothing was dispatched. Matched as a CALL.
+    expect(body).toMatch(/applyCollisionShapeRect\(/);
+    expect(body, 'the handler must not build a plan or call a store command itself')
+      .not.toMatch(/newBlocks:|classicSetColind\(|classicPaintSurface\(|planCollisionRect\(/);
   });
 });
 

@@ -26,6 +26,7 @@ import {
   type CommandResult,
 } from '../state/classicLevelStore';
 import { saveClassicProject } from '../state/classic-save';
+import { applyCollisionShapeRect } from '../state/collision-dispatch';
 import { commitPixels } from './art-commit';
 import { loadCanvasFile } from '../state/canvas-file';
 import { sheetFromBytes, explainSheetRefusal, sheetRefusalResolution } from '../../core/art/sheet-import';
@@ -766,6 +767,37 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
       requireClassicDoc();
       assertCommand(classicSetColind(req.entries));
       return { entries: req.entries.length };
+    }
+
+    case 'classic-set-block-collision': {
+      // THE ONE FAULT ON THIS TOOL. Everything else a caller could fix by
+      // changing an argument comes back as a refusal inside a SUCCESSFUL
+      // result — a throw is -32603 INTERNAL at the Aether adapter, which tells
+      // the client Aurora broke. See art-commit.ts for the worked example.
+      requireClassicDoc();
+
+      // ONE call, deliberately. `dryRun` is the dispatch function's option
+      // (collision-dispatch.ts) rather than a planner call made here: planning
+      // in the handler would need the rectangle planner, which this case's own
+      // source guard forbids, and the guard is right — a second planning site
+      // is a second place for the Link/Isolate decision to drift.
+      const res = applyCollisionShapeRect(
+        { x: req.x, y: req.y, w: req.w, h: req.h },
+        req.shape,
+        req.mode ?? 'link',
+        { dryRun: req.dryRun },
+      );
+
+      const dryRun = req.dryRun === true;
+      return res.ok
+        ? { ok: true, ...res.report, dryRun }
+        // `offers` is [] and stays [] — unlike the art line's palette
+        // resolutions, no parameter VALUE can unblock these refusals. The
+        // actionable half is `resolution`, which is computed against THIS
+        // document, so it never recommends a mode this document also refuses.
+        // Shaped like `import_art_sheet`'s refusal reply so a caller handles
+        // every Aurora refusal with one branch.
+        : { ok: false, refusal: res.refusal, message: res.why, resolution: res.resolution, offers: [], dryRun };
     }
 
     case 'classic-set-palette': {
