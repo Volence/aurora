@@ -66,8 +66,14 @@ export type AgentRequest =
   | { kind: 'classic-commit-canvas'; name: string; targets?: { chunkFileIndex: number | null }[];
       paletteResolution?: 'none' | 'use-act-colours' | 'adopt-into-zone';
       collision?: boolean; dryRun?: boolean }
+  // NO `paletteResolution` on the import: an imported sheet is mapped against
+  // the act's own palette by `sheetFromBytes` (its `flattenActPalette` is
+  // byte-identical to the planner's `flattenDocPalette`), so its palette can
+  // never drift, so the option is only ever read on a branch this tool cannot
+  // reach. A knob that provably cannot turn is worse than no knob — doubly so
+  // here, where the colour refusal's advice mentions widening the palette and
+  // this would look like the lever for it.
   | { kind: 'classic-import-art-sheet'; path: string; targets?: { chunkFileIndex: number | null }[];
-      paletteResolution?: 'none' | 'use-act-colours' | 'adopt-into-zone';
       collision?: boolean; dryRun?: boolean };
 
 export interface AgentRequestEnvelope {
