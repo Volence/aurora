@@ -313,16 +313,30 @@ act-descriptor,entity-data}.ts` target the retired one (see PLAN_AUDIT §1). Dir
   > | `act-descriptor.ts`, `entity-data.ts` | Reached only through that barrel. |
   > | `vram-coloring.ts` | Reached through that barrel **and** by `src/core/agent/budget.ts:4` (`computeVramColoring`, `FG_TILE_LIMIT`), which `agent-handler.ts` uses for the **live** `check_budget` tool. Deleting it wholesale **breaks `check_budget`**. |
   >
-  > What the export step emits — `data/export/{act_descriptor,entity_data,vram_bases}.asm`
-  > and `section_N.{tiles,art}.bin` — is consumed by **nothing**: aeon has no
-  > `data/export/` directory and no reference to one, and the build's real
-  > `act_descriptor.emp` is generator/hand-authored under `games/*/data/levels/`.
+  > What the export step emits — `{dataPath}export/{act_descriptor,entity_data,vram_bases}.asm`
+  > and `section_N.{tiles,art}.bin` — is consumed by **nothing**. The directory *does*
+  > exist and is populated (`aeon/games/sonic4/data/editor/ojz/act1/export/`, 30 files,
+  > last written 2026-08-12) — an earlier revision of this note wrongly said it did not —
+  > but nothing in aeon reads it: the build's `act_descriptor.emp` is authored under
+  > `games/*/data/levels/`, and `tools/ojz_entity_gen.py` builds its own
+  > `data/generated/ojz/act1/entity_data.emp` from the editor JSONs. Same filename,
+  > different producer.
   >
   > So the order is: (1) delete the export step from `buildAeonSavePlan` — which also kills
   > sweep finding **R8**'s misleading "Project saved" after a failed export; (2) then
   > `export/index.ts`, `act-descriptor.ts`, `entity-data.ts` are genuinely dead — delete
   > them; (3) **keep** `vram-coloring.ts`, or move the two symbols `budget.ts` needs
   > somewhere honest and retire only the ASM generators.
+
+  > **DONE 2026-08-19.** Executed exactly as ordered above. `buildAeonSavePlan` no longer
+  > emits anything under `export/` and `AeonSavePlan.exportError` is gone with the R8 toast
+  > branch it fed; `export/index.ts`, `act-descriptor.ts`, `entity-data.ts` and four test
+  > files are deleted; `vram-coloring.ts` kept, trimmed to the two symbols `budget.ts` uses
+  > (`assignVramBases`, `generateVramBasesAsm`, `VramBaseAssignment` deleted). Two guards
+  > replace the deleted export tests and were both proven red against a planted
+  > `export/act_descriptor.asm` push. Suite 291 files / 3271 passed / 3 skipped, tsc clean.
+  > **Left alone deliberately:** the 30 stale files already on disk in the aeon tree —
+  > deleting another repo's data is not this change's business.
 - **Whole-level tile view stays** (the editor's flat-tile model is unaffected); what
   changes is bookkeeping: the VRAM budget readout should count **act-pool pages**
   (612 distinct tiles ⇒ 3 pages of 256) against the 1472-tile FG pool + 448-tile BG
@@ -484,7 +498,7 @@ what is actually being built. **P2 — the playtest loop — is next.**
 | # | Work | Size | Source |
 |---|---|---|---|
 | 1 | **The playtest loop (= P2, §4.8)** — Aether outbound client, then A1 palette→CRAM, A3 Build & Run, A2 play-from-cursor. Classic-first, then the aeon client. | M | sweep §7.2, `SUITE_PLAN_AUDIT_2026-07-01.md` §3.1 |
-| 2 | Retire the dead export path — **corrected scope, read §4.2 before starting** | S | sweep §7.6 |
+| 2 | ~~Retire the dead export path~~ — **DONE 2026-08-19**, see §4.2 | S | sweep §7.6 |
 | 3 | `docs/ART_SUITE.md` teaches a deleted UI — `:73` still says *"Click the **Art** button in the Toolbar (next to **Map**)"*, and that Toolbar was deleted in stage 4. Rewrite against facets/paint-through, or delete the file. | XS | sweep §7.5 |
 | 4 | Annotate the 2C spec header — §D2b cross-act reach reporting is not built (§2.6 B). | XS | sweep §7.3 |
 | 5 | Write three already-settled decisions into the art spec, so a cold session doesn't redesign shipped behaviour: paint lives as a **tool-mode per tier**; canvas docs are **named sidecars under `.aurora/canvas`**; the budget readout shows unique/free/pool **without comparing** (deliberate). | XS | sweep §7.4 |
@@ -502,7 +516,7 @@ don't re-find it), and the sweep's three REFUTED findings (§6 of the review).
 | Phase | Work | Gate/dependency | Status |
 |---|---|---|---|
 | **P0** | Doc hygiene: apply PLAN_AUDIT (status banners, naming pass, README); annotate vision-doc entries superseded by design-week specs | none | **PARTLY DONE** — this revision closes the ROADMAP half; §5.1 items 3–5 are the rest |
-| **P1** | Design #6 collision-in-chunks + retirements; in-viewport object/ring placement; section/act properties inspector; act/zone wizard; export realignment (retire vram-coloring path, budget → act-pool math) | none | **PARTLY DONE, and re-cut.** Classic collision authoring shipped (§2.6 C) — but that is *classic*, not aeon design #6; classic object place/move/delete shipped (§2.5). Still open: **aeon** design #6, the section/act properties inspector, the act/zone wizard, and the export realignment (§5.1 item 2) |
+| **P1** | Design #6 collision-in-chunks + retirements; in-viewport object/ring placement; section/act properties inspector; act/zone wizard; export realignment (retire vram-coloring path, budget → act-pool math) | none | **PARTLY DONE, and re-cut.** Classic collision authoring shipped (§2.6 C) — but that is *classic*, not aeon design #6; classic object place/move/delete shipped (§2.5); the export **retirement** is done (§4.2, 2026-08-19). Still open: **aeon** design #6, the section/act properties inspector, the act/zone wizard, and the budget readout's act-pool math (the retirement removed the old path; it did not build the new count) |
 | **P2** | Aether outbound client + A1 palette→CRAM + A3 Build & Run + A2 warp | Oracle running (exists) | **NEXT** |
 | **P3** | Sprite export spine (decompose → mappings → DPLC) + animation authoring timeline w/ event tags + object-art previews in map | none | open. Note object-art previews already exist for **classic** (§2.5 v1.1 B1) |
 | **P4** | Screen mode (design #7 Aurora half) | aeon #7 tasks 1–4 (interpreter + `screens_gen.py`) | open, engine-gated |

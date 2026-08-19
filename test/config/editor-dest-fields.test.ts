@@ -140,11 +140,11 @@ const BASELINE_PLAN: [string, number][] = [
   ['games/sonic4/data/editor/ojz_act1_bg.bin', 256],
   ['games/sonic4/data/editor/ojz_act1_bg_tiles.bin', 66],
   ['project.json', 993],
-  ['games/sonic4/data/editor/ojz/act1/export/act_descriptor.asm', 1817],
-  ['games/sonic4/data/editor/ojz/act1/export/entity_data.asm', 315],
-  ['games/sonic4/data/editor/ojz/act1/export/vram_bases.asm', 34],
-  ['games/sonic4/data/editor/ojz/act1/export/section_0.tiles.bin', 131072],
-  ['games/sonic4/data/editor/ojz/act1/export/section_0.art.bin', 64],
+  // The capture also ended with five `export/` writes — act_descriptor.asm,
+  // entity_data.asm, vram_bases.asm and section_0.{tiles,art}.bin. The export
+  // step was retired 2026-08-19 (ROADMAP §4.2); a save is editor files only
+  // now, and the tail of this baseline went with it. Everything above is
+  // unchanged from the original capture.
 ];
 
 /** The project.json text that same capture produced, verbatim. */
@@ -227,7 +227,6 @@ describe('editor destinations absent — Aurora owns the path (unchanged behavio
     const p = await plan(fixtureFiles());
     expect(p.files.map(f => [f.path, f.bytes.length])).toEqual(BASELINE_PLAN);
     expect(p.configChanged).toBe(true);
-    expect(p.exportError).toBeNull();
   });
 
   it('emits the captured project.json byte-for-byte', async () => {
