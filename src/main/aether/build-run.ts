@@ -38,6 +38,8 @@ export interface BuildRunResult {
   reloadError?: string;
   /** True when the emulator was reloaded; false when no link was connected. */
   reloaded: boolean;
+  /** Which ROM was actually reloaded — the running one, not the configured guess. */
+  romPath?: string;
   /** Required env vars that were absent — the usual cause of an instant exit 1. */
   missingEnv: string[];
   plan: BuildPlan;
@@ -108,9 +110,28 @@ export function runBuild(opts: BuildRunOptions): Promise<BuildRunResult> {
           return;
         }
         try {
-          await opts.client.call('emulator/reload_rom', { path: join(plan.cwd, plan.romPath) });
-          await opts.client.loadSymbols(join(plan.cwd, plan.symbolsPath));
-          resolve({ ...base, ok: true, reloaded: true });
+          // RELOAD WHAT IS ACTUALLY LOADED, not what the config guesses.
+          //
+          // The plan's default is `s4.bin`, but the emulator may well be
+          // running `s4.debug.bin` — which is exactly the case that matters,
+          // since the warp mailbox is DEBUG-only. Reloading the configured
+          // default there would swap the debug ROM for the release one and
+          // silently remove the symbols a feature depends on, with a cheerful
+          // "Build succeeded" toast on top.
+          //
+          // `emulator/status` reports `romPath`, so the running machine is
+          // asked rather than assumed. The listing is derived from it, which
+          // keeps `s4.bin`/`s4.lst` and `s4.debug.bin`/`s4.debug.lst` paired
+          // without a second config field to get out of step.
+          const status = await opts.client.call('emulator/status') as { romPath?: string };
+          const romPath = status?.romPath ?? join(plan.cwd, plan.romPath);
+          const symbolsPath = romPath.endsWith('.bin')
+            ? `${romPath.slice(0, -4)}.lst`
+            : join(plan.cwd, plan.symbolsPath);
+
+          await opts.client.call('emulator/reload_rom', { path: romPath });
+          await opts.client.loadSymbols(symbolsPath);
+          resolve({ ...base, ok: true, reloaded: true, romPath });
         } catch (e) {
           // The build succeeded; only the handoff failed. Saying so is the
           // difference between "your build is broken" and "the emulator did not

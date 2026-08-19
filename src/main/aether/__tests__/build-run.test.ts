@@ -18,7 +18,7 @@ function scriptDir(body: string, name = 'build.sh'): string {
   return dir;
 }
 
-function fakeClient(opts: { failOn?: string } = {}) {
+function fakeClient(opts: { failOn?: string; romPath?: string } = {}) {
   const calls: string[] = [];
   return {
     calls,
@@ -33,6 +33,7 @@ function fakeClient(opts: { failOn?: string } = {}) {
     call: async (method: string, params?: Record<string, unknown>) => {
       calls.push(`${method}:${params?.path ?? ''}`);
       if (opts.failOn === method) throw new Error('reload refused');
+      if (method === 'emulator/status') return { romPath: opts.romPath ?? '/engine/s4.bin' };
       return {};
     },
   };
@@ -80,8 +81,13 @@ describe('runBuild', () => {
     try {
       const r = await runBuild({ basePath: dir, client: client as never, env: {} });
       expect(r.reloaded).toBe(true);
-      expect(client.calls[0]).toMatch(/^emulator\/reload_rom:/);
-      expect(client.calls[1]).toMatch(/^load_symbols:/);
+      // Relative order, not absolute position: the runner also asks
+      // `emulator/status` first to learn which ROM is actually loaded, and this
+      // test is about reload-before-symbols, not about being call zero.
+      const reload = client.calls.findIndex((c) => c.startsWith('emulator/reload_rom:'));
+      const symbols = client.calls.findIndex((c) => c.startsWith('load_symbols:'));
+      expect(reload).toBeGreaterThanOrEqual(0);
+      expect(symbols).toBeGreaterThan(reload);
     } finally { rmSync(dir, { recursive: true, force: true }); }
   });
 
@@ -144,6 +150,37 @@ describe('runBuild', () => {
     try {
       await runBuild({ basePath: dir, client: null, env: {}, onOutput: (s) => seen.push(s) });
       expect(seen.join('')).toContain('one');
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+});
+
+describe('runBuild and which ROM is actually running', () => {
+  /**
+   * The plan's default is s4.bin, but the emulator may be running
+   * s4.debug.bin — which is the case that matters, because the warp mailbox is
+   * DEBUG-only. Reloading the configured default there swaps the debug ROM for
+   * the release one and silently removes the symbols a shipped feature depends
+   * on, under a cheerful "Build succeeded" toast.
+   *
+   * Found by the owner's emulator running the debug ROM while this reloaded a
+   * hardcoded s4.bin.
+   */
+  it('reloads the ROM the emulator reports, not the configured default', async () => {
+    const dir = scriptDir('exit 0');
+    const client = fakeClient({ romPath: '/engine/s4.debug.bin' });
+    try {
+      const r = await runBuild({ basePath: dir, client: client as never, env: {} });
+      expect(r.romPath).toBe('/engine/s4.debug.bin');
+      expect(client.calls).toContain('emulator/reload_rom:/engine/s4.debug.bin');
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it('derives the listing from that ROM so the pair cannot drift', async () => {
+    const dir = scriptDir('exit 0');
+    const client = fakeClient({ romPath: '/engine/s4.debug.bin' });
+    try {
+      await runBuild({ basePath: dir, client: client as never, env: {} });
+      expect(client.calls).toContain('load_symbols:/engine/s4.debug.lst');
     } finally { rmSync(dir, { recursive: true, force: true }); }
   });
 });

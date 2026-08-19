@@ -5,10 +5,14 @@ import { useAetherStore } from '../state/aetherStore';
 /**
  * The build output panel.
  *
- * IT OPENS ITSELF ONLY ON FAILURE. A successful build should get out of the
- * way — the artist wants the game, not a wall of assembler output — so success
- * is a toast and this stays shut. A failure is the one moment the output is the
- * most important thing on screen.
+ * IT OPENS WHEN A BUILD STARTS AND CLOSES ITSELF ON SUCCESS. The first version
+ * opened only on failure, which meant pressing Build & Run produced no visible
+ * change for however long the build took — indistinguishable from a dead
+ * keybinding, and reported as exactly that. Success still gets out of the way;
+ * it just does so at the END rather than by never appearing.
+ *
+ * A failure is the one moment the output is the most important thing on screen,
+ * so it stays.
  *
  * The spec calls this "the single place 'the generator rejected my document'
  * appears, so make it good": the collision, screens, parallax and behaviour

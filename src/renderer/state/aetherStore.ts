@@ -155,7 +155,16 @@ export const useAetherStore = create<AetherState>((set, get) => ({
 
   build: async (basePath, raw) => {
     if (get().buildState === 'building') return;      // one build at a time
-    set({ buildState: 'building', buildOutput: [], buildSummary: null, buildMissingEnv: [] });
+    // OPEN THE PANEL IMMEDIATELY. A build takes seconds to minutes, and the
+    // first version showed nothing at all until it finished — which is
+    // indistinguishable from a keybinding that does not work. The owner pressed
+    // Ctrl+Shift+B, saw nothing, and reported it as dead; it had in fact built
+    // the ROM. Success closes the panel again, so this costs nothing once the
+    // build lands.
+    set({
+      buildState: 'building', buildOutput: [], buildSummary: null,
+      buildMissingEnv: [], buildPanelOpen: true,
+    });
     try {
       const r = await window.api.aetherBuild(basePath, raw);
       const summary = r.ok
@@ -170,8 +179,8 @@ export const useAetherStore = create<AetherState>((set, get) => ({
         buildOutput: r.output,
         buildSummary: summary,
         buildMissingEnv: r.missingEnv,
-        // OPEN ONLY ON FAILURE. A successful build should get out of the way;
-        // the artist wants the game, not a wall of assembler output.
+        // Stays open on failure, closes itself on success — the artist wants
+        // the game back, not a wall of assembler output.
         buildPanelOpen: !r.ok,
       });
     } catch (e) {
