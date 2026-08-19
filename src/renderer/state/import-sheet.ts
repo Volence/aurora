@@ -10,9 +10,11 @@
 // importer takes a layout-sized image; so does this one. The pixels go straight
 // to the commit planner.
 //
-// The interesting half — deciding which palette LINE each 8x8 cell draws from —
-// is in core/art/png-import.ts, where the suite can execute it. This file is the
-// plumbing: a file dialog, a read, and the act's palette.
+// Everything past picking the file delegates to core/art/sheet-import.ts — the
+// decode, the palette mapping, and the refusal wording all live there, where
+// the agent surface can reach them too. This file is the dialog's plumbing: a
+// file picker, a read, and turning that module's result into something a
+// dialog can render.
 
 import { sheetFromBytes, explainSheetRefusal, flattenActPalette } from '../../core/art/sheet-import';
 import type { ImportedSheet } from '../../core/art/sheet-import';
@@ -43,7 +45,11 @@ export async function loadSheetForAct(doc: LevelDoc): Promise<LoadSheetOutcome> 
   try {
     res = await sheetFromBytes(doc, await readAbsolute(path));
   } catch (e) {
-    // A dialog reports; it does not throw at its caller.
+    // Covers a failed READ (moved file, permission denied) as well as a failed
+    // DECODE — readAbsolute and sheetFromBytes both throw into here. The
+    // "needs an INDEXED PNG" wording lives inside sheetFromBytes, scoped to the
+    // decode alone, so a read failure surfaces its own message rather than
+    // being mislabelled as an encoding problem it never got far enough to see.
     return { ok: false, error: (e as Error).message };
   }
   if (!res.ok) return { ok: false, error: explainSheetRefusal(res.refusal) };

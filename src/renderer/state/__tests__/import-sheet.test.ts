@@ -4,6 +4,12 @@
 // core/art/__tests__/sheet-import.test.ts — this asserts the SPLIT: that the
 // wrapper reports cancellation, and that a refusal arrives as the artist's
 // sentence rather than as a bare kind.
+//
+// A read failure and a decode failure both land in loadSheetForAct's one catch,
+// but they must not carry the same wording: the "needs an INDEXED PNG" suffix
+// is scoped inside sheetFromBytes, around the decode alone, so a read failure
+// (moved file, permission denied) reports its own message instead of being
+// mislabelled as an encoding problem it never got far enough to see.
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { loadSheetForAct } from '../import-sheet';
@@ -36,5 +42,17 @@ describe('loadSheetForAct', () => {
     const res = await loadSheetForAct(doc);
     expect(res).toMatchObject({ ok: false });
     if ('error' in res) expect(res.error).toMatch(/INDEXED/);
+  });
+
+  it('surfaces a read failure with its own message, not the decode wording', async () => {
+    const api = fakeApi();
+    api.selectFile.mockResolvedValue('/tmp/x.png');
+    api.readBinaryFile.mockRejectedValue(new Error('EACCES: permission denied'));
+    const res = await loadSheetForAct(doc);
+    expect(res).toMatchObject({ ok: false });
+    if ('error' in res) {
+      expect(res.error).toBe('EACCES: permission denied');
+      expect(res.error).not.toMatch(/INDEXED/);
+    }
   });
 });
