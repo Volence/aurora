@@ -1,3 +1,19 @@
+// Editor-destination fields (`editorTilesetPath`, `editorBgLayout`,
+// `editorBgTiles`).
+//
+// INVARIANT: for each of the three art blobs Aurora persists on save, the
+// project file names BOTH where the bytes go and where a reader finds them,
+// and those two are the same file. Exactly one party fixes that file:
+//
+//   • field ABSENT  → Aurora owns it. It writes to `<dataRoot>editor/<derived>`
+//     and rewrites the pointer (`tileset` / `bgLayout` / `bgTiles`) to match.
+//   • field PRESENT → the repo owns it. Aurora writes the bytes to the declared
+//     editor path and never touches the pointer, so a repo-managed pointer
+//     (e.g. one a bake regenerates) survives every save.
+//
+// Either way bytes and pointer stay consistent by construction; what changes is
+// who decides. See buildAeonSavePlan.
+
 export interface S4ActConfig {
   id: string;
   gridWidth: number;
@@ -7,6 +23,10 @@ export interface S4ActConfig {
   stripPrefix?: string;
   bgLayout: string;
   bgTiles: string;
+  /** Repo-declared destination for the act's BG layout bytes (see above). */
+  editorBgLayout?: string;
+  /** Repo-declared destination for the act's BG tile blob (see above). */
+  editorBgTiles?: string;
   parallax: string | null;
   startPosition: { secX: number; secY: number; localX: number; localY: number };
 }
@@ -16,6 +36,8 @@ export interface S4ZoneConfig {
   name: string;
   tileset: string;
   palette: string;
+  /** Repo-declared destination for the zone's tileset bytes (see above). */
+  editorTilesetPath?: string;
   acts: S4ActConfig[];
 }
 
@@ -44,9 +66,22 @@ export interface LoadedS4Config {
    * objects as `raw.zones`, so mutations through either are visible to both.
    */
   raw: S4ProjectConfig;
+  /**
+   * Whether the project.json TEXT this config was parsed from ended with a
+   * newline. A save re-stringifies `raw`, which cannot know that, so the fact
+   * is carried here and the newline reproduced — otherwise every pointer
+   * rewrite also silently strips the file's last byte, and the diff a reviewer
+   * sees is "\ No newline at end of file" on top of the real change.
+   * Absent (programmatic configs, no source text) means "no trailing newline".
+   */
+  rawTrailingNewline?: boolean;
 }
 
-export function loadS4Config(json: S4ProjectConfig, basePath: string): LoadedS4Config {
+export function loadS4Config(
+  json: S4ProjectConfig,
+  basePath: string,
+  opts: { rawTrailingNewline?: boolean } = {},
+): LoadedS4Config {
   if (!json.name) throw new Error('Project config missing "name"');
   if (json.engine !== 's4') throw new Error(`Expected engine "s4", got "${json.engine}"`);
   if (!json.zones || !Array.isArray(json.zones)) throw new Error('Project config missing "zones" array');
@@ -70,6 +105,7 @@ export function loadS4Config(json: S4ProjectConfig, basePath: string): LoadedS4C
     objectLibraryPath: json.objectLibrary || '',
     chunkLibraryPath: json.chunkLibrary || '',
     raw: json,
+    rawTrailingNewline: opts.rawTrailingNewline ?? false,
   };
 }
 
