@@ -15,12 +15,19 @@ import { objectArtKey } from '../../../core/project/profiles/object-subtype-rule
 import { objectSpriteEpoch } from '../../../core/level-classic/object-sprite-clock';
 import { useToastStore } from '../../state/toastStore';
 import { renderChunk } from '../../../core/level-classic/render';
-import { applyCollisionShape } from '../../state/collision-dispatch';
+import { applyCollisionShapeCells, applyCollisionShapeRect } from '../../state/collision-dispatch';
 import type { LevelDoc } from '../../../core/level-classic/model';
+// TYPE-ONLY (erased at runtime): the gesture's cells and the report it hands to
+// the toast are the planner's own types, so a change to what a cell IS breaks
+// here at compile time rather than silently at the dispatch call.
+import type {
+  CollisionCell, CollisionRectReport, CollisionSkipReason,
+} from '../../../core/level-classic/collision-write';
 import { s1ObjectIsInvisible } from '../../../core/project/profiles/s1-objects';
 import {
   CHUNK_PX, visibleChunkRange, layoutCellAt, screenToWorld, clampInt, fitCamera,
   worldToLayoutCell, addStampCell, stampAccumToCells, hitTestObjectFrames, hitTestPoint,
+  worldToCollisionCell, rectFromCorners, COLLISION_CELL_PX,
   type ObjectHitBounds, type StampCell,
 } from './viewport-math';
 import { drawCollision, drawObjects, drawStart, GHOST_MARKER_BOUNDS } from './classic-overlays';
@@ -31,6 +38,7 @@ import { levelKeysEnabled } from '../../workspace/level-keys';
 import {
   CANVAS_VOID,
   STAMP_PREVIEW_FILL, STAMP_PREVIEW_STROKE,
+  COLLISION_PREVIEW_FILL, COLLISION_PREVIEW_PRIMARY,
   LOOP_GLYPH_FILL, LOOP_GLYPH_TEXT,
 } from '../../canvas/canvas-colors';
 
@@ -88,6 +96,53 @@ function drawLoopGlyph(ctx: CanvasRenderingContext2D, x0: number, y0: number, in
   ctx.fillText('∞', cx, cy + 0.5 * invZoom);
   ctx.textAlign = 'start';
   ctx.textBaseline = 'alphabetic';
+}
+
+/**
+ * A skip reason in words a painter can read, carrying its count.
+ *
+ * The raw reason strings are INTERNAL VOCABULARY — `block0` in particular is not
+ * a phrase to show a person, and `overhang` names a ROM-layout fact, not
+ * anything the user did. Deliberately shorter than the planner's own
+ * `skipPhrase` (collision-write.ts), which writes the full explanatory sentence
+ * for a refusal; this is a tally line, so it counts rather than explains.
+ * `air` stays uncountable ("3 air") — "3 airs" is not English.
+ */
+function collisionSkipWords(reason: CollisionSkipReason, count: number): string {
+  const s = count === 1 ? '' : 's';
+  switch (reason) {
+    case 'air': return `${count} air`;
+    case 'block0': return `${count} blank block${s}`;
+    case 'no-such-block': return `${count} missing block${s}`;
+    case 'overhang': return `${count} past the collision table`;
+    case 'outside-layout': return `${count} outside the level`;
+  }
+}
+
+/**
+ * Surface a PARTIAL collision write, and only a partial one.
+ *
+ * A partial write is the one outcome a painter will misread: cells silently
+ * stepped over (a stroke that crossed air, or a rectangle whose corner clipped
+ * blank blocks) look exactly like the tool not working. So a stroke with skips
+ * says what it did and what it stepped over.
+ *
+ * SILENT OTHERWISE, in both directions. A clean write needs no announcement —
+ * the canvas already shows it — and a pure no-op (repainting a shape that was
+ * already there) is nagging someone for making no mistake. Refusals never reach
+ * here at all: `applyCollisionShapeCells/Rect` return `ok: false` for those and
+ * the caller toasts `why` as an error.
+ */
+function reportCollisionGesture(report: CollisionRectReport): void {
+  if (report.skipped.length === 0) return;
+  const parts: string[] = [];
+  if (report.applied > 0) parts.push(`painted ${report.applied} cell${report.applied === 1 ? '' : 's'}`);
+  // `applied === 0` with skips is reachable only alongside no-ops: the planner
+  // refuses a selection where nothing applied AND nothing already matched, so
+  // this branch is what keeps the line from reading "painted 0 cells".
+  if (report.noop > 0) parts.push(`${report.noop} already had it`);
+  parts.push(`skipped ${report.skipped.map((s) => collisionSkipWords(s.reason, s.count)).join(', ')}`);
+  useToastStore.getState().addToast(parts.join(' · '), 'info');
 }
 
 /**
@@ -586,6 +641,45 @@ export default function ClassicLevelViewport() {
       }
     }
 
+    // Collision-gesture preview: what the in-progress drag would write, drawn
+    // from the ref so it repaints whenever the stroke calls redraw(). Nothing
+    // draws when not painting.
+    //
+    // COLLISION_CELL_PX, NOT CHUNK_PX — the two gestures quantise the same mouse
+    // position to different grids (16px collision cells inside a 256px layout
+    // cell), so borrowing the stamp preview's unit here would draw the whole
+    // thing 16x too big.
+    //
+    // The colours are the map viewport's own collision-paint ghost constants
+    // rather than the stamp preview's blue: blue is also what drawCollision
+    // paints walls/ceilings with, and a blue preview over a blue overlay is the
+    // one pair this canvas cannot afford to confuse.
+    const cstroke = collisionStrokeRef.current;
+    if (cstroke) {
+      ctx.save();
+      if (cstroke.mode === 'free') {
+        // Filled cells: the freehand set has no outline worth tracing, and a
+        // per-cell stroke at 16px reads as noise rather than as a shape.
+        ctx.fillStyle = COLLISION_PREVIEW_FILL;
+        for (const c of cstroke.cells.values()) {
+          ctx.fillRect(c.x * COLLISION_CELL_PX, c.y * COLLISION_CELL_PX, COLLISION_CELL_PX, COLLISION_CELL_PX);
+        }
+      } else {
+        // The marquee: an OUTLINE, so the collision overlay under it stays
+        // readable while the user sizes the box against it. Same inclusive rect
+        // the commit will hand the planner, so the preview cannot promise a
+        // different box than the one that gets written.
+        const r = rectFromCorners(cstroke.anchor, cstroke.current);
+        ctx.strokeStyle = COLLISION_PREVIEW_PRIMARY;
+        ctx.lineWidth = 1.5 * invZoom;
+        ctx.strokeRect(
+          r.x * COLLISION_CELL_PX, r.y * COLLISION_CELL_PX,
+          r.w * COLLISION_CELL_PX, r.h * COLLISION_CELL_PX,
+        );
+      }
+      ctx.restore();
+    }
+
     // Paint timing record (AURORA_PERF): accumulate this full compose into the
     // current act-load window. First real paint stamps first-paint latency.
     if (PERF) {
@@ -639,6 +733,26 @@ export default function ClassicLevelViewport() {
   // committed on mouseUp. A ref (not state): mutated during the drag, drawn from
   // the render effect, and reset without a partial command on cancel.
   const strokeRef = useRef<Map<number, StampCell> | null>(null);
+  // The active COLLISION paint gesture (null when not painting). Mirrors
+  // strokeRef exactly: a ref, not state, so a drag mutates it without a render
+  // per cell; deduped so wiggling over a cell counts once; committed as ONE
+  // store command on mouseup, discarded on cancel.
+  //
+  // KEYED BY `${x},${y}`, NOT a linear index — unlike the stamp stroke above,
+  // which can key by `row*gridW+col` because it already holds the layout grid's
+  // width. A collision cell's stride is the act's width in 16px units, and
+  // getting that wrong silently drops cells from the stroke. The planner
+  // (planCollisionCells) dedupes its own input by the same coordinate string;
+  // matching it means the two counts can't disagree.
+  //
+  // `mode` is fixed at mousedown from the Shift key and is NOT re-read during
+  // the drag — a marquee that changed shape because a modifier was released
+  // mid-gesture would be unpredictable, and its anchor meaningless.
+  const collisionStrokeRef = useRef<
+    | { mode: 'free'; cells: Map<string, CollisionCell> }
+    | { mode: 'rect'; anchor: CollisionCell; current: CollisionCell }
+    | null
+  >(null);
   // The active object-move gesture (null when not dragging an object). Like the
   // stamp stroke it's a ref: mutated during the drag, drawn from the render
   // effect, committed as ONE classicSetObjects on mouseup, discarded on cancel.
@@ -722,11 +836,29 @@ export default function ClassicLevelViewport() {
           // one dispatch helper (renderer/state/collision-dispatch.ts) — never
           // classicSetColind / classicPaintSurface directly — so the Link/
           // Isolate decision exists in exactly one place.
+          //
+          // NOTHING IS WRITTEN HERE ANY MORE: this only ARMS the gesture, and
+          // the commit lands in one store command on mouseup. A drag that wrote
+          // per-cell on the way past would spend forty undo entries crossing
+          // forty cells. A plain click with no movement is the degenerate case
+          // — a one-cell stroke — so single-click painting still behaves as it
+          // did, it just becomes undoable as the one thing it is.
           if (tool === 'paint-collision') {
             const shape = useClassicLevelStore.getState().collisionShape;
             if (shape != null) {
-              const res = applyCollisionShape(shape);
-              if (!res.ok) useToastStore.getState().addToast(res.why, 'error');
+              const cell = worldToCollisionCell(world.x, world.y);
+              // Shift is read ONCE, here. See collisionStrokeRef's declaration:
+              // re-reading it per move would let a released key redefine the
+              // gesture mid-drag.
+              collisionStrokeRef.current = e.shiftKey
+                ? { mode: 'rect', anchor: cell, current: cell }
+                : { mode: 'free', cells: new Map([[`${cell.x},${cell.y}`, cell]]) };
+              redraw();
+              // PAINT, DON'T PAN. This return is the one behavioural change to
+              // the pan-arm below, and it is gated on the tool being armed AND
+              // a shape being picked — so a user who has not armed the tool
+              // still pans on this facet exactly as before.
+              return;
             }
           }
         }
@@ -832,7 +964,8 @@ export default function ClassicLevelViewport() {
     // during one). Uses the SAME cellUnderCursor/worldUnderCursor helpers the
     // click handlers use, so the ghost can't desync from where a click would
     // actually paint/place.
-    if (!dragging.current && !startDragRef.current && !objDragRef.current && !strokeRef.current) {
+    if (!dragging.current && !startDragRef.current && !objDragRef.current && !strokeRef.current
+        && !collisionStrokeRef.current) {
       if (tool === 'stamp-chunk') {
         const grid = activeGrid();
         const cell = cellUnderCursor(e);
@@ -857,6 +990,29 @@ export default function ClassicLevelViewport() {
         hoverWorldRef.current = null;
         redraw();
       }
+    }
+    // The collision stroke owns the move first: it is the only gesture that can
+    // be active on the collision facet, and taking it before the drag branches
+    // keeps its own preview the only thing this move updates.
+    const cstroke = collisionStrokeRef.current;
+    if (cstroke) {
+      const world = worldUnderCursor(e);
+      if (world) {
+        const cell = worldToCollisionCell(world.x, world.y);
+        // Redraw only when the CELL actually changed — the same discipline the
+        // hover refs use above, so a jittering cursor inside one 16px cell does
+        // not redraw-storm. (rAF would coalesce it anyway; not asking is cheaper.)
+        if (cstroke.mode === 'free') {
+          const k = `${cell.x},${cell.y}`;
+          if (!cstroke.cells.has(k)) { cstroke.cells.set(k, cell); redraw(); }
+        } else if (cell.x !== cstroke.current.x || cell.y !== cstroke.current.y) {
+          // The ANCHOR never moves: only the far corner follows the cursor, so
+          // dragging back past the start inverts the box rather than dragging it.
+          cstroke.current = cell;
+          redraw();
+        }
+      }
+      return;
     }
     const sdrag = startDragRef.current;
     if (sdrag) {
@@ -953,19 +1109,54 @@ export default function ClassicLevelViewport() {
     redraw();
   }, [plane, redraw]);
 
+  // Commit the collision paint gesture as ONE undoable command — the freehand
+  // stroke through `applyCollisionShapeCells`, the Shift marquee through
+  // `applyCollisionShapeRect`. Both refuse identically and both spend one undo
+  // entry, because they are the same write with a different selection.
+  const endCollisionStroke = useCallback(() => {
+    const cstroke = collisionStrokeRef.current;
+    // Cleared FIRST, so an early return below can never leave a gesture armed
+    // after the button is up.
+    collisionStrokeRef.current = null;
+    if (!cstroke) { redraw(); return; }
+    // Re-read at COMMIT time rather than trusting the shape captured at
+    // mousedown: the picker is a live panel, and the shape the user is looking
+    // at when they let go is the one they meant. A shape cleared mid-drag
+    // writes nothing at all rather than writing a stale one.
+    const shape = useClassicLevelStore.getState().collisionShape;
+    if (shape != null) {
+      // collisionDiverge is read HERE, from the store: this is the HUMAN path
+      // and that field is the panel's own Link/Isolate toggle. (The agent path
+      // deliberately does the opposite and takes its mode as an argument, so an
+      // agent is never steered by whatever a person last clicked — see
+      // collision-dispatch.ts.)
+      const mode = useClassicLevelStore.getState().collisionDiverge;
+      const res = cstroke.mode === 'free'
+        ? applyCollisionShapeCells([...cstroke.cells.values()], shape, mode)
+        : applyCollisionShapeRect(rectFromCorners(cstroke.anchor, cstroke.current), shape, mode);
+      if (!res.ok) useToastStore.getState().addToast(res.why, 'error');
+      else reportCollisionGesture(res.report);
+    }
+    redraw();
+  }, [redraw]);
+
   // Mouse-up ends whichever gesture is active. Mouse-leave CANCELS a stamp stroke
   // cleanly (no partial command) but also ends a pan.
   const onMouseUp = useCallback(() => {
+    if (collisionStrokeRef.current) { endCollisionStroke(); return; }
     if (startDragRef.current) { endStartDrag(); return; }
     if (objDragRef.current) { endObjectDrag(); return; }
     if (strokeRef.current) { endStroke(); return; }
     dragging.current = false;
-  }, [endStroke, endObjectDrag, endStartDrag]);
+  }, [endStroke, endObjectDrag, endStartDrag, endCollisionStroke]);
   const onMouseLeave = useCallback(() => {
-    // Abandon an in-progress stamp / object move / start move without committing
-    // (mouseleave cancels cleanly). A pan just ends. Also clears the hover ghost —
-    // there's no cursor position off-canvas for it to preview.
+    // Abandon an in-progress stamp / collision paint / object move / start move
+    // without committing (mouseleave cancels cleanly). A pan just ends. Also
+    // clears the hover ghost — there's no cursor position off-canvas for it to
+    // preview. A collision stroke abandoned by leaving the canvas WRITES
+    // NOTHING: the command only ever runs from endCollisionStroke.
     strokeRef.current = null;
+    collisionStrokeRef.current = null;
     objDragRef.current = null;
     startDragRef.current = null;
     hoverCellRef.current = null;
@@ -1007,6 +1198,9 @@ export default function ClassicLevelViewport() {
         // mid-edit. Guarded like the Delete keys.
         if (isTypingTarget(e.target as HTMLElement)) return;
         if (strokeRef.current) { strokeRef.current = null; redraw(); return; }
+        // Escape discards the collision gesture with no command dispatched — the
+        // half-painted preview vanishes and the document is untouched.
+        if (collisionStrokeRef.current) { collisionStrokeRef.current = null; redraw(); return; }
         if (objDragRef.current) { objDragRef.current = null; redraw(); return; }
         if (startDragRef.current) { startDragRef.current = null; redraw(); return; }
         const s = useClassicLevelStore.getState();
