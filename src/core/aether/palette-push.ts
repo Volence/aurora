@@ -62,9 +62,25 @@ export function encodePaletteLine(colors: readonly Color[]): Uint8Array {
   if (colors.length !== ENTRIES_PER_LINE) {
     throw new Error(`a palette line is ${ENTRIES_PER_LINE} entries, got ${colors.length}`);
   }
+  return encodePaletteWords(colors.map(encodeGenesisColor));
+}
+
+/**
+ * Encode 16 CRAM words directly.
+ *
+ * This is the path the editor actually uses: its palette lines are ALREADY
+ * CRAM words, and routing them through `Color` would decode to 8-bit channels
+ * and re-quantize back to 3-bit — a lossless round trip in theory, and one more
+ * place for a rounding rule to disagree with the one that wrote the document.
+ * Push the words the artist is looking at.
+ */
+export function encodePaletteWords(words: readonly number[]): Uint8Array {
+  if (words.length !== ENTRIES_PER_LINE) {
+    throw new Error(`a palette line is ${ENTRIES_PER_LINE} entries, got ${words.length}`);
+  }
   const bytes = new Uint8Array(ENTRIES_PER_LINE * 2);
   for (let i = 0; i < ENTRIES_PER_LINE; i++) {
-    const word = encodeGenesisColor(colors[i]);
+    const word = words[i] & 0xffff;
     bytes[i * 2] = (word >> 8) & 0xff;
     bytes[i * 2 + 1] = word & 0xff;
   }
@@ -96,10 +112,19 @@ export interface PalettePushPlan {
  * as "the feature does nothing".
  */
 export function planPalettePush(line: number, colors: readonly Color[]): PalettePushPlan {
+  return planPalettePushBytes(line, encodePaletteLine(colors));
+}
+
+/** As `planPalettePush`, from CRAM words the editor already holds. */
+export function planPalettePushWords(line: number, words: readonly number[]): PalettePushPlan {
+  return planPalettePushBytes(line, encodePaletteWords(words));
+}
+
+function planPalettePushBytes(line: number, payload: Uint8Array): PalettePushPlan {
   const offset = palBaseOffset(line, 0);
   return {
     writes: [
-      { symbol: PAL_BASE_SYMBOL, offset, bytes: encodePaletteLine(colors) },
+      { symbol: PAL_BASE_SYMBOL, offset, bytes: payload },
       { symbol: PAL_BASE_DIRTY_SYMBOL, offset: 0, bytes: Uint8Array.of(1) },
     ],
     symbols: [PAL_BASE_SYMBOL, PAL_BASE_DIRTY_SYMBOL],

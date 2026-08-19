@@ -40,7 +40,29 @@ export const IPC_CHANNELS = {
   // way.
   CLOSE_REQUEST: 'app:close-request',
   CLOSE_RESPONSE: 'app:close-response',
+  // The OUTBOUND Aether link (the playtest loop). The client itself lives in
+  // main — it owns a unix socket, which the renderer has no business holding —
+  // and the renderer drives it over these. STATUS is a main→renderer push, the
+  // same shape as CLOSE_REQUEST and for the same reason: the connection changes
+  // state on its own (the emulator can exit), so the renderer cannot be the one
+  // asking.
+  AETHER_CONNECT: 'aether:connect',
+  AETHER_DISCONNECT: 'aether:disconnect',
+  AETHER_STATUS: 'aether:status',
+  AETHER_PUSH_PALETTE: 'aether:push-palette',
 } as const;
+
+/** What the renderer knows about the outbound link. */
+export interface AetherStatusPayload {
+  status: 'disconnected' | 'connecting' | 'connected';
+  serverName?: string;
+  serverVersion?: string;
+  socketPath?: string;
+  /** Set when the last connect attempt failed — shown, not swallowed. */
+  error?: string;
+  /** True when both Pal_Base symbols resolved, i.e. live palette can push. */
+  palette?: boolean;
+}
 
 export type IpcChannels = typeof IPC_CHANNELS;
 
