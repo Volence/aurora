@@ -412,7 +412,7 @@ export interface CollisionRectReport {
    * diverge, so a caller reading the type alone is told, rather than having to
    * infer it from `length === SKIPPED_CELLS_CAP`.
    */
-  skippedCells?: CollisionSkippedCell[];
+  skippedCells: CollisionSkippedCell[];
   /**
    * TRUE when more cells were skipped than `skippedCells` could hold — i.e.
    * exactly when `skippedCells.length` is NOT the number of skipped cells.
@@ -423,7 +423,7 @@ export interface CollisionRectReport {
    * guards against is a caller reading `skippedCells.length` as a total, and a
    * caller doing that is by definition not consulting the cap.
    */
-  skippedCellsTruncated?: boolean;
+  skippedCellsTruncated: boolean;
   /** DISTINCT blocks written. */
   blocks: number;
   /**
