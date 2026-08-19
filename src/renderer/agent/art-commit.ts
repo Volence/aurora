@@ -86,7 +86,7 @@ export function replyFromPlanResult(
 
   // The report's OWN pre-commit chunk count. The STORE is the authority at apply
   // time — `classicCommitCanvas` pushes onto `doc.chunks.slice()`
-  // (classicLevelStore.ts:1194) — so if the two ever disagreed this would be the
+  // (classicLevelStore.ts:1196) — so if the two ever disagreed this would be the
   // wrong answer. They cannot disagree here because planning and applying happen
   // in one synchronous call, and taking it from the plan is what keeps this
   // function store-free, which is what makes the ok-path testable in node.
