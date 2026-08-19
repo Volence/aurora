@@ -209,8 +209,10 @@ Aseprite to make the art in the first place.*
   artist while they draw. Canvas documents are named sidecar files under `.aurora/canvas`.
 - **Phase 2C — resolve and commit.** `canvas-resolve` (pure geometry) → `classic-commit-plan`
   → `classicCommitCanvas` (one store command), with a **PNG import path** at any size feeding
-  the same resolver. Canvas commits cap at 16 chunks (it is an undo-tracked document).
-  CDP-verified 7/7 (commit panel) and 4/4 (import).
+  the same resolver. A canvas commit therefore covers at most **16 chunks** — that is a
+  derivation, not a literal in source (`CANVAS_MAX_SIDE` 1024px ÷ `CHUNK_PX` 256 = 4, so
+  4×4); an agent auditing this went looking for a `16` and reasonably could not find one.
+  The PNG path has no such cap. CDP-verified 7/7 (commit panel) and 4/4 (import).
 - **Phase 3 (tile-pool growth) was measured and DECLINED** — see §0 of the phase-1/2 spec.
   Measured across all six S1 zones: **blocks** are both the dangerous tier and the variant
   tier; chunks have no near-duplicates at all; GHZ has 2 spare tiles.
