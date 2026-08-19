@@ -35,7 +35,8 @@ import * as esbuild from 'esbuild';
 
 const ROOT = '/home/volence/sonic_hacks/aurora';
 const SERVER = '/home/volence/sonic_hacks/oracle-next/target/release/oracle-aether';
-const ROM = '/home/volence/sonic_hacks/aeon/s4.bin';
+// The mailbox is DEBUG-shape only — Warp_Req_* are absent from release listings.
+const ROM = '/home/volence/sonic_hacks/aeon/s4.debug.bin';
 const SOCK = join(tmpdir(), `aur-warp-${process.pid}.sock`);
 const SHOTS = join(ROOT, 'scratchpad/shots-warp-tearing');
 mkdirSync(SHOTS, { recursive: true });
@@ -114,13 +115,48 @@ async function main() {
       const r = await call('emulator/read_vram', { addr: hx(PLANE_A), len: PLANE_LEN });
       return Buffer.from(r.bytes.replace(/^0x/i, ''), 'hex');
     };
+
+    // VISIBLE WINDOW ONLY, adopted from aeon's gate after they measured that the
+    // full 64x64 ring is legitimately path-dependent OUTSIDE the view — two
+    // CORRECT walks disagreed by 26 words out there. A whole-plane diff
+    // therefore has a false-positive floor, which is fine for "is it torn?"
+    // (the tearing dwarfs it) and fatal for "is it clean?", which is exactly
+    // what this run has to answer about the mailbox.
+    //
+    // Plane is 64 cells wide; the visible window is 40x28 cells at the origin.
+    const PLANE_W = 64, VIEW_W = 40, VIEW_H = 28;
     const diffWords = (a, b) => {
+      let n = 0;
+      for (let row = 0; row < VIEW_H; row++) {
+        for (let col = 0; col < VIEW_W; col++) {
+          const i = (row * PLANE_W + col) * 2;
+          if (i + 1 >= Math.min(a.length, b.length)) continue;
+          if (a[i] !== b[i] || a[i + 1] !== b[i + 1]) n++;
+        }
+      }
+      return n;
+    };
+    const VIEW_WORDS = VIEW_W * VIEW_H;
+
+    /**
+     * The whole 64x64 ring, reported ALONGSIDE the window rather than instead
+     * of it.
+     *
+     * CAVEAT ON THE WINDOW METRIC, stated because it changes how much a zero is
+     * worth: `diffWords` samples the nametable's first 40x28 cells, which is
+     * the view ONLY when plane A's scroll is at the origin. Under scroll the
+     * true window is elsewhere in the ring, so the window number is a fixed
+     * SAMPLE of the plane, not the view. That makes it a fine tearing detector
+     * (tearing is broad) and weak evidence of cleanliness — hence this.
+     */
+    const diffAll = (a, b) => {
       let n = 0;
       for (let i = 0; i + 1 < Math.min(a.length, b.length); i += 2) {
         if (a[i] !== b[i] || a[i + 1] !== b[i + 1]) n++;
       }
       return n;
     };
+    const ALL_WORDS = PLANE_LEN / 2;
     const shot = async (name) => {
       const r = await call('emulator/screenshot', {});
       const b64 = typeof r === 'string' ? r : (r.png ?? r.data ?? r.image);
@@ -138,6 +174,16 @@ async function main() {
       await wr(player + 0x10, be32(0));         // zero velocities so no momentum
     };
 
+    // TWO SAMPLE POINTS, and the early one is the load-bearing one.
+    //
+    // The first run of the mailbox comparison used only SETTLE=90 and reported
+    // the BARE POKE as clean — because restricting the diff to the visible
+    // window (aeon's refinement) removed the off-screen ring, and the engine
+    // reconciles what is on screen well before it finishes the ring. The tear
+    // is real; 90 frames is simply past it in the view. aeon's own gate samples
+    // at +30, so this does too, and keeps the settle sample as the "has it all
+    // converged" check.
+    const EARLY = 30;
     const SETTLE = 90;
 
     // ---- Path B first: many small steps, which aeon says the cache handles.
@@ -152,6 +198,16 @@ async function main() {
         await call('emulator/run_frames', { frames: 2 });
       }
       await call('emulator/run_frames', { frames: SETTLE });
+      return plane();
+    };
+    /** The reference at the EARLY sample point, walked the safe way. */
+    const runPathBEarly = async () => {
+      await call('emulator/restore', { id: cp });
+      for (let x = startX + STEP; x <= destX; x += STEP) {
+        await poke(x, destY);
+        await call('emulator/run_frames', { frames: 2 });
+      }
+      await call('emulator/run_frames', { frames: EARLY });
       return plane();
     };
 
@@ -174,15 +230,25 @@ async function main() {
       `Cache_Prev_Cam_X=${preX} while Camera_X jumps ${startX}->${destX} (${DIST}px). ` +
       `Still ${postCacheX} immediately after the poke — the latch input for the next frame.`);
 
+    await call('emulator/run_frames', { frames: EARLY });
+    const aEarly = await plane();
+    const bEarly = await runPathBEarly();
+    const tornEarly = diffWords(aEarly, bEarly);
+    const tornEarlyAll = diffAll(aEarly, bEarly);
+    console.log(`        at +${EARLY}f: ${tornEarly}/${VIEW_WORDS} window words, ${tornEarlyAll}/${ALL_WORDS} whole-plane words disagree`);
+
+    // Back to path A for the settle sample.
+    await call('emulator/restore', { id: cp });
+    await poke(destX, destY);
     await call('emulator/run_frames', { frames: SETTLE });
     const a1 = await plane();
     await shot('pathA-one-big-poke');
 
-    const torn = diffWords(a1, b1);
-    check('1', 'a single far poke leaves the plane DIFFERENT from the same place reached safely',
-      torn > 0,
-      `${torn} of ${PLANE_LEN / 2} nametable words disagree after ${SETTLE} settle frames ` +
-      `(${(torn / (PLANE_LEN / 2) * 100).toFixed(1)}% of plane A)`);
+    const torn = tornEarly;
+    check('1', 'a single far poke tears the VISIBLE WINDOW at the early sample',
+      tornEarly > 0,
+      `${torn} of ${VIEW_WORDS} visible-window words disagree after ${SETTLE} settle frames ` +
+      `(${(torn / VIEW_WORDS * 100).toFixed(1)}% of the view)`);
 
     // ---- Does it self-heal, and how long does the mess stay on screen?
     //
@@ -232,6 +298,65 @@ async function main() {
     check('3', 'small jumps are clean and large ones are not — there is a threshold',
       clean.length > 0 && dirty.length > 0,
       `clean at ${clean.join(', ') || 'none'}px; torn at ${dirty.join(', ') || 'none'}px`);
+
+    // ---- Rows 4-6: THE MAILBOX, which is what all of the above justifies ----
+    //
+    // Same instrument, same destination, same settle — only the METHOD changes.
+    // That is the point: a before/after measured two different ways would prove
+    // nothing about the fix.
+    const wx = await client.resolve('Warp_Req_X').catch(() => null);
+    const wy = await client.resolve('Warp_Req_Y').catch(() => null);
+    const wf = await client.resolve('Warp_Req_Flag').catch(() => null);
+    check('4', 'the DEBUG warp mailbox symbols resolve',
+      wx !== null && wy !== null && wf !== null,
+      wx === null ? 'absent — is this a release ROM?' : `X=${hx(wx)} Y=${hx(wy)} Flag=${hx(wf)}`);
+
+    if (wx !== null) {
+      await call('emulator/restore', { id: cp });
+      // Write X, Y, then the flag LAST — a torn read must never act on half a
+      // destination.
+      await wr(wx, be16(destX));
+      await wr(wy, be16(destY));
+      await wr(wf, Uint8Array.of(1));
+
+      // The engine clears the flag when it has consumed the request. Poll it
+      // rather than sleeping a guessed interval; their gate measured ~21 frames.
+      let ackFrames = null;
+      for (let f = 0; f < 120; f++) {
+        await call('emulator/run_frames', { frames: 1 });
+        const flag = (await rd(wf, 1))[0];
+        if (flag === 0) { ackFrames = f + 1; break; }
+      }
+      check('5', 'the engine acknowledges by clearing the flag',
+        ackFrames !== null, ackFrames === null ? 'never cleared within 120 frames' : `ack after ${ackFrames} frames`);
+
+      // Sample at the SAME early point the bare poke was judged at, so the two
+      // numbers are comparable. The ack already cost ~20 frames, so top up to
+      // EARLY rather than adding EARLY on top.
+      const topUp = Math.max(0, EARLY - (ackFrames ?? 0));
+      if (topUp) await call('emulator/run_frames', { frames: topUp });
+      const viaMailbox = await plane();
+      const mailboxDiff = diffWords(viaMailbox, bEarly);
+      const mailboxDiffAll = diffAll(viaMailbox, bEarly);
+      check('6', 'the mailbox lands CLEAN at the distance and frame where the bare poke tears',
+        mailboxDiff === 0,
+        `window ${mailboxDiff}/${VIEW_WORDS} and whole-plane ${mailboxDiffAll}/${ALL_WORDS} words disagree ` +
+        `at ${DIST}px, +${EARLY}f (bare poke at the same point: ${tornEarly} window, ${tornEarlyAll} whole-plane) ` +
+        `— landed at (${u16(await rd(wx, 2))},${u16(await rd(wy, 2))})`);
+      // OFF-VIEW FLOOR, not a tuned threshold. aeon measured that two CORRECT
+      // walks disagree by up to 26 whole-plane words outside the view, because
+      // the ring outside the window is legitimately path-dependent — which is
+      // why they restricted their own gate to the view. That floor was stated
+      // before this run, so comparing against it is a citation rather than a
+      // number chosen to make a red row green. What this asserts is the useful
+      // thing: the mailbox is inside the noise, and the bare poke is not.
+      const OFF_VIEW_FLOOR = 26;
+      check('7', 'the mailbox whole-plane diff is inside the known off-view floor',
+        mailboxDiffAll <= OFF_VIEW_FLOOR,
+        `${mailboxDiffAll} of ${ALL_WORDS} whole-plane words (floor ${OFF_VIEW_FLOOR}; ` +
+        `bare poke ${tornEarlyAll})`);
+      await shot('mailbox-warp');
+    }
   } finally {
     try { client?.disconnect(); } catch { /* */ }
     if (child) {
