@@ -529,24 +529,31 @@ describe('replyFromPlanResult', () => {
     expect(reply.offers).toEqual(['use-act-colours', 'adopt-into-zone']);
   });
 
-  // The planner's own suite proves each refusal is RAISED (classic-commit-plan
-  // .test.ts covers target-invalid and chunks-exhausted; png-import.test.ts covers
-  // cell-needs-two-lines). What is unproven at this tier is that each one SURVIVES
-  // the trip to the agent — that none throws, and none arrives without a sentence.
-  const ALL_REFUSALS: CommitRefusal[] = [
-    { kind: 'region-misaligned', detail: 'x' },
-    { kind: 'region-out-of-bounds', detail: 'x' },
-    { kind: 'target-count', expected: 2, got: 1 },
-    { kind: 'target-invalid', detail: 'x' },
-    { kind: 'grid-origin', originX: 3, originY: 3 },
-    { kind: 'cell-clash', cells: [] },
-    { kind: 'palette-drift', entries: [1], touchesLine0: false },
-    { kind: 'palette-unmappable', entries: [1] },
-    { kind: 'predicates-unknown', which: ['reservedTiles'] },
-    { kind: 'tiles-exhausted', needed: 2, available: 1, reclaimed: 0, free: 1 },
-    { kind: 'blocks-exhausted', needed: 1025, ceiling: 1024 },
-    { kind: 'chunks-exhausted', needed: 128, ceiling: 127 },
-  ];
+  // The planner's own suite proves refusals are RAISED (core/art/__tests__/
+  // classic-commit-plan.test.ts covers region-misaligned, region-out-of-bounds,
+  // target-count and cell-clash). What is unproven at that tier is that every
+  // member of the union SURVIVES the trip to the agent — that none throws, and
+  // none arrives without a sentence.
+  //
+  // The samples are a mapped type over CommitRefusal['kind'], so coverage is
+  // enforced by the COMPILER, not by this list being kept in step by hand: a new
+  // member of the union makes this object a type error until it is sampled here,
+  // and a sample whose fields drift from its variant is a type error too.
+  const SAMPLES: { [K in CommitRefusal['kind']]: Extract<CommitRefusal, { kind: K }> } = {
+    'region-misaligned': { kind: 'region-misaligned', detail: 'x' },
+    'region-out-of-bounds': { kind: 'region-out-of-bounds', detail: 'x' },
+    'target-count': { kind: 'target-count', expected: 2, got: 1 },
+    'target-invalid': { kind: 'target-invalid', detail: 'x' },
+    'grid-origin': { kind: 'grid-origin', originX: 3, originY: 3 },
+    'cell-clash': { kind: 'cell-clash', cells: [] },
+    'palette-drift': { kind: 'palette-drift', entries: [1], touchesLine0: false },
+    'palette-unmappable': { kind: 'palette-unmappable', entries: [1] },
+    'predicates-unknown': { kind: 'predicates-unknown', which: ['reservedTiles'] },
+    'tiles-exhausted': { kind: 'tiles-exhausted', needed: 2, available: 1, reclaimed: 0, free: 1 },
+    'blocks-exhausted': { kind: 'blocks-exhausted', needed: 1025, ceiling: 1024 },
+    'chunks-exhausted': { kind: 'chunks-exhausted', needed: 128, ceiling: 127 },
+  };
+  const ALL_REFUSALS: CommitRefusal[] = Object.values(SAMPLES);
 
   it.each(ALL_REFUSALS.map((r) => [r.kind, r] as const))(
     'turns a %s refusal into a result with a message, never a throw',
@@ -1185,6 +1192,7 @@ completion without those four numbers.
 
 ## Notes for the implementer
 
+- **`classicLevelStore.ts:1354` drifts.** Task 3 adds 7 lines above it, so the `newEngineId = nextChunks.length` annotation moves to **1361**. Cite it from source at the time you write, not from this plan.
 - **Do not widen `CommandResult`.** The appended engine ids are derived (Task 4), by design — see spec §4.1.
 - **Do not modify `CommitPlanView.tsx`.** See spec §3.2; an earlier draft called for it and was wrong.
 - **`paint_collision` is aeon's.** The classic collision tool is `set_block_collision` and is Plan B, a separate plan. Do not add it here.
