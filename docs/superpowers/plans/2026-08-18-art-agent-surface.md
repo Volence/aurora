@@ -473,6 +473,29 @@ The agent handler is not a component, so it cannot use the hook twin."
 
 The one place that builds a snapshot, plans, applies, and shapes the reply. Both tools call it; neither duplicates it.
 
+> **THE CODE BELOW IS SUPERSEDED. Read `src/renderer/agent/art-commit.ts` instead.**
+> Code review found three errors in this draft and they are fixed in the shipped
+> module (`fb92c99`), not here:
+>
+> 1. **Two throws that should have been refusals.** The draft throws for a
+>    wrong-length `targets` and for pixels holding no whole chunk. Both are
+>    caller-fixable, and a throw becomes `-32603 INTERNAL` at the adapter — "Aurora
+>    is broken" — for "you passed 3 targets for a 4-chunk canvas". Worse, my
+>    rationale for keeping them was false: `planCanvasCommit` **already** refuses
+>    the first as `target-count` (`classic-commit-plan.ts:308-310`) with a better
+>    sentence, and the second lands in `region-out-of-bounds`. No wider type was
+>    ever needed. The guard is deleted; the zero-chunk case returns a refusal.
+> 2. **`withCollision`'s `applied` was discarded**, so a `collision: true` reply
+>    described the plan *before* the toggle, and `skippedOverhang` — the count of
+>    blocks that genuinely still lack collision — was dropped. It now surfaces as
+>    `collision` on the ok-branch. (Not named `applied`: that field already exists
+>    as a boolean meaning "written to the doc".)
+> 3. **`collision` is an object, not a flag.** The draft's
+>    `doc?.collision.colind.length ?? 0` silently produced a plan whose cells are
+>    stamped solid while every block is skipped as overhang — the two-tier model's
+>    fall-through-the-floor case. `collision?: { colindLength: number }` makes
+>    asking for collision without the table length **unrepresentable**.
+
 **Files:**
 - Create: `src/renderer/agent/art-commit.ts`
 - Test: `src/renderer/agent/__tests__/art-commit.test.ts`
@@ -1197,4 +1220,13 @@ completion without those four numbers.
 - **Do not modify `CommitPlanView.tsx`.** See spec §3.2; an earlier draft called for it and was wrong.
 - **`paint_collision` is aeon's.** The classic collision tool is `set_block_collision` and is Plan B, a separate plan. Do not add it here.
 - **The remaining §5.3 refusals are already covered at the planner tier** — `target-invalid` and `chunks-exhausted` in `classic-commit-plan.test.ts`, `cell-needs-two-lines` in `png-import.test.ts`. Task 4 asserts they SURVIVE the trip to the agent reply rather than re-proving they are raised.
+- **DEFERRED (not done, deliberately): collapse `useEditableTileRange`.** Now that
+  `editableTileRange` is exported (Task 3), the hook at `composer-shared.tsx:36`
+  restates the same two null conditions and could become
+  `useMemo(() => editableTileRange(), [ref, handle])`. This codebase refuses that
+  duplication elsewhere ("never a second copy of the rule",
+  `canvas-commit-model.ts:222`), so it is worth doing — but the hook feeds
+  `TileTab`, `BlockTab` and `CommitPlanView`, and a reactivity regression there is
+  invisible to the node suite. Out of scope for this plan; needs its own change
+  with UI verification.
 - **A refusal is never a throw.** If you find yourself writing `throw` for something the caller could fix by changing an argument, it belongs in the refusal shape instead.
