@@ -312,33 +312,166 @@ async function drag(c, points, { modifiers = 0, settle = 450, step = 70 } = {}) 
   await sleep(settle);
 }
 
+// ---------------------------------------------------------------------------
+// ARMING A SHAPE THROUGH THE PANEL'S OWN PICKER
+// ---------------------------------------------------------------------------
+//
+// This is the fiddliest click in the harness and the first run failed on it
+// (`click landed on the swatch=false`, shape armed=null), so it is worth
+// stating what makes it hard. The picker is a `maxHeight: 220, overflowY: auto`
+// grid of ~247 swatches inside a panel column that is ITSELF scrollable, and
+// the shapes a zone does not use are all BELOW the ones it does — so every
+// swatch this harness wants is off the bottom of the grid to begin with.
+//
+// THREE THINGS THE FIRST ATTEMPT GOT WRONG:
+//
+//  1. `scrollIntoView({ block: 'nearest' })` scrolls the MINIMUM, which parks
+//     the swatch against an EDGE of the grid — and if that edge is off the
+//     bottom of the window (the grid box straddles it whenever the panel column
+//     is scrolled a certain way), the point hit-tests to nothing at all.
+//     `block: 'center'` centres it in EVERY scrollable ancestor, and the
+//     scroller's own `scrollTop` is then pinned by rect maths so the swatch sits
+//     near the TOP of the grid, the part most certain to be on screen.
+//     (`offsetTop` would be wrong here: it is measured from the nearest
+//     POSITIONED ancestor, which a `display: grid` box is not.)
+//  2. Measuring in the SAME evaluation that scrolls. Split across two round
+//     trips with a sleep between, so layout has certainly settled before the
+//     rect that decides the click coordinate is read.
+//  3. Believing the click because the hit test passed. The hit test only says
+//     the pointer is over the swatch; it cannot say the handler ran. So the
+//     real confirmation is the PANEL ITSELF: a swatch click writes its shape to
+//     the probed block, so the "Shape" row must afterwards READ BACK the index
+//     that was clicked. That is end-to-end evidence, and it is what `armShape`
+//     returns `ok` on.
+//
+// The hit test is NOT relaxed — a point that lands on something else is still
+// refused, and every refusal is reported with the rect, the scroller's state,
+// the viewport size and what `elementFromPoint` actually returned, so a second
+// failure is diagnosable rather than mysterious.
+
+/** The "Shape" row of the panel's `This block` section — what the probed block
+ *  carries right now, read off the screen. `Row` renders `<div><span>label</span>
+ *  <span>value</span></div>`, so this is the label/value pair, not a text scrape. */
+const panelShape = (c) => c.evalExpr(`(() => {
+  const row = [...document.querySelectorAll('div')].find((d) => d.children.length === 2
+    && d.children[0].textContent.trim() === 'Shape');
+  if (!row) return null;
+  const n = Number(row.children[1].textContent.trim());
+  return Number.isFinite(n) ? n : null;
+})()`);
+
 /**
- * Click an element with REAL mouse events after scrolling it into view, and
- * report what was actually under the pointer.
+ * The swatches worth trying, in grid order.
  *
- * The shape picker is a `maxHeight: 220, overflowY: auto` grid of ~247
- * swatches, so most of them have a bounding rect OUTSIDE the scroller's visible
- * box. Clicking those coordinates presses whatever is painted there instead —
- * silently, with a plausible-looking result. `hit` is the guard: the row only
- * believes the click if the element under the point is the swatch itself.
+ * UNUSED SHAPES FIRST (`unusedOnly`), because a shape this zone does not use
+ * cannot already be on any candidate block: every cell a row paints is then a
+ * genuine write with no no-ops to blur the counts. A used shape is a sound
+ * fallback rather than a compromise — every expectation in every row is derived
+ * from a dry run that pins `applied`/`noop`/`blocks` exactly, so a shape some
+ * OTHER block already carries changes nothing but which candidates qualify.
+ *
+ * `avoid` drops the shape the probed block ALREADY carries: clicking that one
+ * is a no-op, the panel's Shape row would read back the clicked index without
+ * anything having happened, and the confirmation below would pass on a click
+ * that never landed.
  */
-async function clickInto(c, expr) {
-  const r = await c.json(`(() => {
-    const e = ${expr};
-    if (!e) return null;
-    e.scrollIntoView({ block: 'nearest', inline: 'nearest' });
-    const b = e.getBoundingClientRect();
-    const x = Math.round(b.left + b.width / 2), y = Math.round(b.top + b.height / 2);
+const swatchList = (unusedOnly, avoid) =>
+  `[...document.querySelectorAll('button[title]')].filter((b) => /^shape \\d+ /.test(b.title)`
+  + ` && b.getBoundingClientRect().width > 0`
+  + (unusedOnly ? ` && /not used in this zone yet$/.test(b.title)` : '')
+  + ` && Number(/^shape (\\d+)/.exec(b.title)[1]) !== ${avoid})`;
+
+/** Scroll swatch `i` into a clickable position and stash it for the next call. */
+const prepSwatch = (c, listExpr, i) => c.json(`(() => {
+  const list = ${listExpr};
+  const el = list[${i}];
+  if (!el) return null;
+  window.__gsw = el;
+  el.scrollIntoView({ block: 'center', inline: 'nearest' });
+  let s = el.parentElement;
+  while (s && !(s.scrollHeight > s.clientHeight + 1 && /auto|scroll/.test(getComputedStyle(s).overflowY))) {
+    s = s.parentElement;
+  }
+  let scroller = null;
+  if (s) {
+    const gr = s.getBoundingClientRect(), er = el.getBoundingClientRect();
+    s.scrollTop += (er.top - gr.top) - 6;
+    scroller = { top: Math.round(gr.top), bottom: Math.round(gr.bottom),
+                 clientH: s.clientHeight, scrollTop: Math.round(s.scrollTop), scrollH: s.scrollHeight };
+  }
+  return { count: list.length, title: el.title, scroller };
+})()`);
+
+/** Where to press for the stashed swatch — or why there is nowhere to press. */
+const aimSwatch = (c) => c.json(`(() => {
+  const el = window.__gsw;
+  if (!el) return null;
+  const b = el.getBoundingClientRect();
+  const rect = { left: Math.round(b.left), top: Math.round(b.top),
+                 w: Math.round(b.width), h: Math.round(b.height) };
+  const vp = { w: window.innerWidth, h: window.innerHeight };
+  const desc = (e) => e ? { tag: e.tagName, title: e.title || null,
+                            text: (e.textContent || '').trim().slice(0, 32) } : null;
+  // The centre first, then points nearer each edge: a swatch is only 52px wide
+  // and its centre can sit under a scrollbar or a 1px clip while the rest of it
+  // is perfectly clickable. Every one of these still has to hit the swatch (or
+  // one of its own spans) — the test is not weakened, only tried more than once.
+  for (const [fx, fy] of [[0.5, 0.5], [0.5, 0.3], [0.5, 0.7], [0.25, 0.5], [0.75, 0.5]]) {
+    const x = Math.round(b.left + b.width * fx), y = Math.round(b.top + b.height * fy);
+    if (x < 1 || y < 1 || x > vp.w - 1 || y > vp.h - 1) continue;
     const hit = document.elementFromPoint(x, y);
-    return { x, y, inside: e === hit || e.contains(hit), title: e.title || null };
-  })()`);
-  if (!r) return { ok: false, why: 'element not found' };
-  if (!r.inside) return { ok: false, why: `something else is on top at (${r.x},${r.y})`, ...r };
-  await mouse(c, 'mousePressed', r.x, r.y);
-  await sleep(40);
-  await mouse(c, 'mouseReleased', r.x, r.y, { buttons: 0 });
-  await sleep(400);
-  return { ok: true, ...r };
+    if (hit && (hit === el || el.contains(hit))) return { ok: true, x, y, rect, vp, hit: desc(hit) };
+  }
+  const cx = Math.round(b.left + b.width / 2), cy = Math.round(b.top + b.height / 2);
+  return { ok: false, x: cx, y: cy, rect, vp, hit: desc(document.elementFromPoint(cx, cy)) };
+})()`);
+
+/**
+ * Arm a collision shape by clicking a real swatch, and PROVE it took.
+ *
+ * Tries the unused shapes first and falls back to used ones, at most `perGroup`
+ * of each. Every attempt is recorded — the click point, the rect, the scroller,
+ * and what was under the pointer — so a total failure comes back as a
+ * diagnosis rather than a shrug.
+ */
+async function armShape(c, avoid, perGroup = 6) {
+  const tried = [];
+  for (const unusedOnly of [true, false]) {
+    const listExpr = swatchList(unusedOnly, avoid ?? -1);
+    const n = await c.evalExpr(`${listExpr}.length`);
+    for (let i = 0; i < Math.min(n, perGroup); i++) {
+      const prep = await prepSwatch(c, listExpr, i);
+      if (!prep) break;
+      const idx = Number(/^shape (\d+)/.exec(prep.title)[1]);
+      // The picker regroups used/unused after every write, so the list is
+      // re-evaluated each attempt and the shape on screen is re-read each time
+      // rather than trusted from the top of the loop.
+      const was = await panelShape(c);
+      if (was === idx) {
+        tried.push({ unusedOnly, i, title: prep.title, why: 'the block already carries it — a click here proves nothing' });
+        continue;
+      }
+      await sleep(300);                       // let the scroll settle before the rect that decides the point
+      const aim = await aimSwatch(c);
+      if (!aim || !aim.ok) {
+        tried.push({ unusedOnly, i, title: prep.title, why: 'no point on the swatch is hittable',
+                     aim, scroller: prep.scroller });
+        continue;
+      }
+      await mouse(c, 'mousePressed', aim.x, aim.y);
+      await sleep(40);
+      await mouse(c, 'mouseReleased', aim.x, aim.y, { buttons: 0 });
+      await sleep(600);
+      const now = await panelShape(c);
+      if (now === idx) {
+        return { ok: true, shape: idx, title: prep.title, unusedOnly, attempt: tried.length + 1, aim, tried };
+      }
+      tried.push({ unusedOnly, i, title: prep.title,
+                   why: `clicked at (${aim.x},${aim.y}) but the panel's Shape row went ${was} -> ${now}, not ${idx}`,
+                   aim });
+    }
+  }
+  return { ok: false, tried };
 }
 
 // ---------------------------------------------------------------------------
@@ -407,11 +540,17 @@ const findTargets = (c, fg, limit) => c.json(`(() => {
       for (let i = 0; i < 256; i++) { const cc = P.chunkCell(chunkId, i); B[i] = cc ? cc.block : -1; }
       const ok = (b) => b > 0 && b < blockCount;  // 0 = blank block, >= count = dangling
       const at = (cc, cr) => B[cr * 16 + cc];
-      let tookBox = false, tookMix = false;       // at most one of each per chunk
+      let tookBox = false, tookMix = false, tookProbe = false;   // at most one of each per chunk
       for (let cr = 0; cr < 16; cr++) {
         for (let cc = 0; cc < 16; cc++) {
           const gx = col * 16 + cc, gy = row * 16 + cr;
-          if (probes.length < 4 && ok(at(cc, cr))) probes.push({ x: gx, y: gy, block: at(cc, cr) });
+          // Probe candidates, one per chunk: the caller confirms each with a 1x1
+          // dry run, and a whole chunk's blocks can overhang the colind table
+          // together — four candidates from one chunk would be one candidate.
+          if (!tookProbe && probes.length < 12 && ok(at(cc, cr))) {
+            tookProbe = true;
+            probes.push({ x: gx, y: gy, chunkId, block: at(cc, cr) });
+          }
           // ---- the mixed run: 3 across, >=1 writable, >=1 blank block ----
           if (cc <= 13 && !tookMix && mixed.length < ${limit}) {
             const t = [at(cc, cr), at(cc + 1, cr), at(cc + 2, cr)];
@@ -509,17 +648,34 @@ const main = async () => {
     console.log(`[setup] candidates: ${cand.boxes.length} 3x3 boxes, ${cand.mixed.length} mixed runs`);
 
     // THE SHAPE. Picked through the panel's own swatch — the control that arms
-    // the map tool (ShapePicker's `pick` calls setCollisionShape) — and
-    // deliberately one the zone does NOT already use, because that makes every
-    // candidate cell a genuine write: no block anywhere carries it, so there
-    // are no no-ops to blur the counts and no cell that was "already right".
+    // the map tool (ShapePicker's `pick` calls setCollisionShape) — preferring
+    // one the zone does NOT already use, because then no block anywhere carries
+    // it and every candidate cell is a genuine write. `armShape` falls back to
+    // a used shape if none of the unused swatches can be reached, which is
+    // sound: the dry runs below pin `applied`/`noop`/`blocks` exactly, so a
+    // shape some other block happens to carry changes which candidates qualify
+    // and nothing else. See armShape's docblock for why this click is fussy.
     //
     // The picker only renders over a probed cell, so a real click on the map
     // comes first. That click paints nothing: `collisionShape` is still null at
     // this point, so the mousedown probes and falls through exactly as it does
     // with the tool unarmed.
-    const probeCell = cand.probes[0];
-    if (!probeCell) { console.error('no non-blank FG cell in this act — nothing to probe'); return; }
+    //
+    // THE PROBED CELL IS CONFIRMED FIRST. Its block has to be one a link write
+    // can actually take: a block past the end of the colind table skips as
+    // 'overhang', the panel shows a refusal instead of a new shape, and the
+    // read-back below would fail against a picker that worked perfectly. A 1x1
+    // dry run answers exactly that — `ok` with the cell either applied or a
+    // no-op means it is not skipped. (The shape used to ask is irrelevant and
+    // nothing is written; $ff is just a byte.)
+    let probeCell = null;
+    for (const p of cand.probes) {
+      const dry = await rpc(PORT, 'editor/set_block_collision',
+        { x: p.x, y: p.y, w: 1, h: 1, shape: 0xff, dryRun: true });
+      const r = dry.body.result;
+      if (r?.ok === true && (r.applied === 1 || r.noop === 1)) { probeCell = p; break; }
+    }
+    if (!probeCell) { console.error('no FG cell in this act takes a link write — nothing to probe'); return; }
     const probeFrame = await framePoints(c, [probeCell]);
     if (probeFrame.ok) {
       const p = probeFrame.pt(probeCell);
@@ -534,15 +690,19 @@ const main = async () => {
     const probed = await c.evalExpr(
       `document.body.textContent.includes('This cell') && document.body.textContent.includes('This block')`);
     const opening = await colindSnapshot(c);
-    const picked = await clickInto(c,
-      `[...document.querySelectorAll('button[title]')].find((b) => /^shape \\d+ — not used in this zone yet/.test(b.title))`);
-    const SHAPE = picked.ok ? Number(/^shape (\d+)/.exec(picked.title)[1]) : null;
+    const shapeBefore = await panelShape(c);
+    const picked = await armShape(c, shapeBefore);
+    const SHAPE = picked.ok ? picked.shape : null;
     // The swatch click both ARMS the shape and WRITES it to the probed block
-    // (the panel's "two gestures, one piece of state"). Undo that write so
-    // every row below starts from the act as it was opened; the ARMED shape
-    // survives the undo, which is exactly what is wanted.
+    // (the panel's "two gestures, one piece of state"). Undo that write — and
+    // any write a mis-landed earlier attempt left behind — so every row below
+    // starts from the act as it was opened. The ARMED shape survives the undo,
+    // which is exactly what is wanted.
     const drainedSetup = await drainUndo(c);
     const afterSetup = await colindSnapshot(c);
+    if (!picked.ok || picked.tried.length > 0) {
+      console.log(`[setup] shape picker attempts: ${JSON.stringify(picked.tried, null, 1)}`);
+    }
 
     // --- 1: this build, this act, this facet, this tool, this shape -------
     check(1, 'the build under test is this branch, GHZ 1 is open on the Collision facet, and the gesture is armed',
@@ -552,8 +712,10 @@ const main = async () => {
       `bundle: ${markers.files} renderer chunk(s), '${BUILD_MARKER}' present=${markers.build}; `
       + `act ${JSON.stringify(where)}; Collision pill lit=${facetLit}, panel mounted=${panelUp}, `
       + `map click probed a cell=${probed}; `
-      + `Paint Collision armed=${armed}; shape armed=${SHAPE} via ${JSON.stringify(picked.title)} `
-      + `(probe click framed=${probeFrame.ok}, click landed on the swatch=${picked.ok}); `
+      + `Paint Collision armed=${armed}; shape armed=${SHAPE} via ${JSON.stringify(picked.title ?? null)} `
+      + `(probe click framed=${probeFrame.ok}; the probed block read shape ${shapeBefore} before the pick and `
+      + `${SHAPE} after, which is what says the swatch click reached the handler; `
+      + `${picked.tried.length} earlier swatch attempt(s), ${picked.unusedOnly === false ? 'a USED' : 'an unused'} shape); `
       + `setup write undone in ${drainedSetup} step(s), `
       + `table back to the opening state=${diffColind(opening, afterSetup).length === 0}`);
     note(`Task 5's panel hint ('${HINT_MARKER}') in the bundle: ${markers.hint}`,
