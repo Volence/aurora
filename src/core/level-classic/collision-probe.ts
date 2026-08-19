@@ -56,6 +56,51 @@ export interface CollisionProbe {
 export const LOOP_ALIAS = { from: 0x28, to: 0x51 } as const;
 
 /**
+ * Where a point lands in the FG plane, and nothing more.
+ *
+ * The cheap half of `probeCollision`: O(1), because it computes NO sharing
+ * counts. Those two scans (`chunkPlacements` over the layout, `blockCells` over
+ * every chunk cell) are what make a probe expensive, and a rectangle write does
+ * not need them per cell.
+ *
+ * Takes CELL coordinates (16px units) because that is the unit the collision
+ * facet and `set_block_collision` speak. `probeCollision` converts pixels and
+ * delegates, so the addressing — the loop-bit mask, the chunk lookup, the
+ * row-major cell index — exists exactly once.
+ */
+export interface CellAddress {
+  /** 1-based engine chunk id, loop bit already masked off; 0 = air. */
+  chunkId: number;
+  /** Index into doc.chunks, or null for air. */
+  chunkIndex: number | null;
+  /** 0..255 within the chunk, row-major. */
+  cellIndex: number;
+  looping: boolean;
+  loopAmbiguous: boolean;
+}
+
+/** Address one FG cell (16px units). Null outside the layout. */
+export function locateCell(doc: LevelDoc, cx: number, cy: number): CellAddress | null {
+  if (cx < 0 || cy < 0) return null;
+  const col = Math.floor(cx / 16);
+  const row = Math.floor(cy / 16);
+  if (col >= doc.fg.width || row >= doc.fg.height) return null;
+
+  const raw = doc.fg.cells[row * doc.fg.width + col] ?? 0;
+  // Bit 7 marks a looping region. Masking it off is what `.specialtile` itself
+  // does first; the one substitution it does not cover is `loopAmbiguous`.
+  const chunkId = raw & 0x7f;
+  const looping = (raw & 0x80) !== 0;
+  return {
+    chunkId,
+    chunkIndex: chunkIndexForId(doc, chunkId),
+    cellIndex: (cy % 16) * 16 + (cx % 16),
+    looping,
+    loopAmbiguous: looping && chunkId === LOOP_ALIAS.from,
+  };
+}
+
+/**
  * Probe the FG plane at a level pixel. Returns null outside the layout.
  *
  * FG ONLY, deliberately: the engine reads collision from `v_lvllayout_fg` and
@@ -70,24 +115,13 @@ export const LOOP_ALIAS = { from: 0x28, to: 0x51 } as const;
  * blast radius they describe.
  */
 export function probeCollision(doc: LevelDoc, x: number, y: number): CollisionProbe | null {
-  if (x < 0 || y < 0) return null;
-  const col = Math.floor(x / 256);
-  const row = Math.floor(y / 256);
-  if (col >= doc.fg.width || row >= doc.fg.height) return null;
-
-  const raw = doc.fg.cells[row * doc.fg.width + col] ?? 0;
-  // Bit 7 marks a looping region. Masking it off is what `.specialtile` itself
-  // does first, and for every chunk but one that is the whole story — the
-  // substitution below is the exception, and it is not resolvable from here.
-  const chunkId = raw & 0x7f;
-  const looping = (raw & 0x80) !== 0;
-  const loopAmbiguous = looping && chunkId === LOOP_ALIAS.from;
-  const cellIndex = (Math.floor((y % 256) / 16) * 16) + Math.floor((x % 256) / 16);
+  const at = locateCell(doc, Math.floor(x / 16), Math.floor(y / 16));
+  if (!at) return null;
+  const { chunkId, chunkIndex, cellIndex, looping, loopAmbiguous } = at;
 
   let chunkPlacements = 0;
   for (const c of doc.fg.cells) if ((c & 0x7f) === chunkId) chunkPlacements++;
 
-  const chunkIndex = chunkIndexForId(doc, chunkId);
   if (chunkIndex === null) {
     return {
       chunkId, chunkIndex: null, cellIndex, blockId: 0, shapeIndex: 0, solidity: 0,
