@@ -634,6 +634,12 @@ Model it on `scratchpad/collision-agent-harness.mjs` (same session helpers, same
 | 7 | A drag that leaves the canvas mid-gesture writes nothing | The cancel path. |
 | 8 | A drag over air/blank cells reports the skips (toast or panel) and still writes the rest | Partial application, visible to a human. |
 
+**THE SHIFT TRAP — read this before writing a single row.** `canvas-cdp-harness.mjs`'s exported `mouse(c, type, x, y, opts)` helper forwards only `type`, `x`, `y`, `button` and `buttons` to `Input.dispatchMouseEvent`. **It silently drops `modifiers`.** A Shift-drag row written against it dispatches WITHOUT Shift, performs a freehand paint, and then reports PASS for the rectangle — a false pass of exactly the kind this series keeps finding.
+
+Fix it at the source: extend `mouse()` to forward `modifiers: opts.modifiers ?? 0`. That is purely additive (every existing caller omits it and gets 0) and it fixes the trap for every future harness rather than only this one. CDP's bitmask is **Alt=1, Ctrl=2, Meta=4, Shift=8**.
+
+Then PROVE the modifier actually arrives, because a dropped modifier is invisible: row 4 must assert something only a rectangle can produce — a cell **inside the box that the cursor never entered**. If Shift never reached the page, that cell is unpainted and the row fails. Do not settle for asserting "some cells were painted".
+
 **Discover coordinates at runtime** — read the level and find real solid cells, exactly as the agent harness does. Do not hardcode.
 
 - [ ] **Step 1: Write it. Step 2: `node --check`. Step 3: commit.**
