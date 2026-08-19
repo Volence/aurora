@@ -1940,6 +1940,17 @@ Verify the branch at commit time — parallel sessions share this tree and HEAD 
 
 ---
 
+## Decided NOT to fix: `shapeIndex` is unvalidated in core
+
+Found during Task 5b. `planCollisionRect` never bounds `shapeIndex`, while `classicSetColind` bounds a colind value to 0..255. So a core-level caller passing `shape: 300` plans cleanly and is then rejected by the store, arriving as the `store-disagreement` refusal whose resolution says "This is an Aurora bug" — wrong words for a caller-fixable mistake.
+
+**Left as is, on purpose**, for two reasons:
+
+1. **The agent surface is already bounded at the right layer.** `set_block_collision`'s zod schema declares `shape: z.number().int().min(0).max(255)`, so an out-of-range shape is `-32602 INVALID_PARAMS` at the protocol edge and never reaches core. That is the same layering the art line chose for canvas names, and `editor-methods.ts` says so: a bad argument is INVALID_PARAMS at the edge "rather than the renderer's throw, which reaches a client as INTERNAL". The panel's other caller picks shapes from a swatch list and cannot produce 300 either.
+2. **It is currently the only honest reach to the `store-disagreement` branch.** Task 5b's test for that branch drives a real store with `shape: 300` and asserts the document comes back reference-identical. Adding a core-level bound would delete the one test that proves the planner/store disagreement path behaves — trading a real guard for a refusal nobody can trigger.
+
+If a future caller reaches core directly with unbounded input, add the bound AND find that branch another honest reach (a doc whose colind the planner accepts and the store does not) before deleting the existing test.
+
 ## Notes for the implementer
 
 - **Trust source over this plan.** Line numbers drift; five claims in the previous plan of this series were wrong.
