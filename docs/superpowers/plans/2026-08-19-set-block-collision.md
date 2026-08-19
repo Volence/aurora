@@ -1951,6 +1951,44 @@ Found during Task 5b. `planCollisionRect` never bounds `shapeIndex`, while `clas
 
 If a future caller reaches core directly with unbounded input, add the bound AND find that branch another honest reach (a doc whose colind the planner accepts and the store does not) before deleting the existing test.
 
+## Runtime results (2026-08-19, controller foreground run)
+
+`scratchpad/collision-agent-harness.mjs`, driving the built worktree app under xvfb against the real `/home/volence/sonic_hacks/s1disasm`, over `POST /aether`:
+
+```
+8/8
+```
+
+The setup line is worth keeping, because it is the design's central fact measured on real data rather than asserted from a fixture:
+
+```
+Green Hill Zone Act 1: fg 48x5 chunks, 439 blocks, 82 chunks
+row 7 refusal {"kind":"isolate-grows-table","needed":2,"spare":0,"colindLength":410,"blocks":439}
+```
+
+GHZ ships **439 blocks against a 410-entry collision table**, so Isolate is refused for every cell of the zone and the resolution correctly says `Use Link, ...` — D4 and D6, confirmed against ROM data.
+
+### The harness is not vacuous — three defects planted, each rebuilt and re-run
+
+| Plant | Result |
+|---|---|
+| `applyCollisionShapeRect`'s link branch → per-entry `classicSetColind` loop | **row 4 FAILS** (5/8; rows 7–8 fall as collateral, because row 4 leaves the document dirty and they assert it unchanged) |
+| the handler's refusal branch → `throw new Error(res.why)` | **rows 5 and 7 FAIL** (6/8). The success path still works perfectly; every refusal just tells the client Aurora broke. That is the whole reason row 5 exists. |
+| `planIsolateRect`'s `isolate-grows-table` resolution ternary inverted | **row 7 FAILS ALONE** (7/8), printing `"Link cannot set every block in this rectangle either…"` — the refusal KIND is still correct and only the advice is wrong, which nothing else in the suite can see |
+
+**A false start worth recording.** The first attempt at the row-4 plant edited the FIRST `classicSetColind(plan.entries)` in the file, which is inside the single-cell `applyCollisionShape` — where `entries` always holds exactly one element, so the "loop" was behaviourally identical and everything stayed green. The plant has to go in `applyCollisionShapeRect`. A planted defect that does not change behaviour proves nothing about the guard, and this one looked convincing for a full build-and-run cycle.
+
+### Pre-existing failure, re-confirmed as NOT ours
+
+`node scratchpad/commit-collision-harness.mjs` → **5/6, row 4**, exactly as before this branch:
+
+```
+FAIL  4  with the toggle ON every new block gets the flat shape
+        shapes=[0,0]
+```
+
+The two appended blocks land at ids 439/440, past GHZ's 410-entry table, so `withCollision` correctly skips them while the row still expects `$FF`. Row 4's expectation is what is wrong. Stage 4's, not this plan's.
+
 ## Notes for the implementer
 
 - **Trust source over this plan.** Line numbers drift; five claims in the previous plan of this series were wrong.
