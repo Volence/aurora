@@ -222,6 +222,15 @@ function ShapePicker({ doc, probe }: { doc: LevelDoc; probe: CollisionProbe }): 
           <ShapeSwatch key={c.index} choice={c} current={c.index === probe.shapeIndex} onClick={() => pick(c.index)} />
         ))}
       </div>
+      {/* The gesture hint, HERE and not in the footer, because this grid is
+          what arms the shape the map tool paints — the moment the user is
+          about to go and drag is the moment they are looking at a swatch.
+          Shift is the ONLY modifier this viewport reads, and an undocumented
+          modifier is one nobody finds. */}
+      <div style={styles.hint}>
+        With Paint Collision armed: drag the map to paint cells · Shift-drag
+        paints the whole rectangle.
+      </div>
     </div>
   );
 }
@@ -289,6 +298,7 @@ const styles: Record<string, React.CSSProperties> = {
   reason: { color: T.warning, fontSize: T.tXs, marginTop: 2 },
   warn: { color: T.warning, fontSize: T.tXs, marginTop: 4, lineHeight: 1.4 },
   dim: { color: T.textLo, fontSize: T.tSm },
+  hint: { color: T.textLo, fontSize: T.tXs, lineHeight: 1.4 },
   picker: { display: 'flex', flexDirection: 'column', gap: T.s2, marginTop: T.s2 },
   rowWrap: { display: 'flex', alignItems: 'center', gap: T.s2, flexWrap: 'wrap' },
   refusal: {
