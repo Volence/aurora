@@ -175,7 +175,7 @@ export const EDITOR_METHODS: EditorMethod[] = [
       collision: z.boolean().optional().describe('give the new art flat ($FF) collision in the same undo step'),
       dryRun: z.boolean().optional().describe('plan and report without applying'),
     },
-    description: 'Commit a saved canvas into the open act: cut to tiles/blocks/chunks, dedupe, reclaim, write. One undo step. Reply carries the full commit report plus the 1-based ENGINE ids of any appended chunks (pass those to set_layout_region). A refusal returns ok:false with a message, a resolution, and which paletteResolution values would unblock it.' },
+    description: 'Commit a saved canvas into the open act: cut to tiles/blocks/chunks, dedupe, reclaim, write. One undo step. Reply carries the full commit report plus the 1-based ENGINE ids of any appended chunks (pass those to set_layout_region). A refusal returns ok:false with a message, a resolution, and which paletteResolution values would unblock it. Also returns "warnings" from loading the canvas — an unreadable sidecar means the canvas was treated as unconstrained, which is worth reading before trusting the result.' },
   // NO `paletteResolution` HERE. The sheet is mapped onto the act's own palette
   // before it is planned, so it cannot drift, so the option could never change
   // an outcome — see the kind's own comment in shared/agent-protocol.ts.

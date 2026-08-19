@@ -113,7 +113,6 @@ function requireClassicProject() {
   return s;
 }
 
-/** The currently-open, ready classic level document, or throw. */
 /**
  * An IMPORT refusal, in the commit refusal's shape.
  *
@@ -128,6 +127,19 @@ function requireClassicProject() {
 type SheetRefusalReply =
   Omit<Extract<ArtCommitReply, { ok: false }>, 'refusal'> & { refusal: PngImportRefusal };
 
+/**
+ * A canvas commit's reply: whatever `commitPixels` returned, plus the load's
+ * warnings.
+ *
+ * Annotated rather than inferred so the extra field is checked. `warnings` is
+ * spread-LAST on purpose: were `ArtCommitReply` ever to grow a `warnings` of its
+ * own, an inferred object would silently keep whichever came last and nobody
+ * would notice the canvas's were gone. Naming the type here means that day is a
+ * compile error instead.
+ */
+type CanvasCommitReply = ArtCommitReply & { warnings: string[] };
+
+/** The currently-open, ready classic level document, or throw. */
 function requireClassicDoc(): LevelDoc {
   const s = useClassicLevelStore.getState();
   if (s.status !== 'ready' || !s.doc) throw new Error('no classic level is open');
@@ -807,7 +819,7 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
       // be an unused local and a second copy of the guard.
       const dir = useClassicProjectStore.getState().dir;
       if (!dir) throw new Error('no project directory is open');
-      // Name safety is loadCanvasFile's own guard (canvas-file.ts:39/120) and it
+      // Name safety is loadCanvasFile's own guard (canvas-file.ts:42/123) and it
       // THROWS — right for a fault, but a throw is -32603 INTERNAL at the Aether
       // adapter, so the tool schema states the same pattern (shared/canvas-name.ts)
       // and rejects a bad name as INVALID_PARAMS before this case ever runs.
@@ -824,14 +836,16 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
       // fall-through-the-floor case. Nothing about that lives here; forwarding
       // the flag is all this case has to get right.
       const { kind: _k, name: _n, ...opts } = req;
-      return {
+      const reply: CanvasCommitReply = {
         ...commitPixels({
           pixels: loaded.doc.pixels,
           canvasPalette: loaded.doc.palette,
           gridOrigin: loaded.doc.gridOrigin,
           // Rest-spread, not six named forwards: `commitPixels`' input is
           // all-optional, so a seventh option added to the kind and forgotten
-          // here would be a silent no-op with no type error.
+          // here would be a silent no-op with no type error. Note the converse
+          // is NOT covered: TS does not excess-property-check spreads, so an
+          // option forwarded to nothing is also silent.
           ...opts,
         }),
         // NEVER DROPPED. These carry "the sidecar could not be read — the canvas
@@ -839,6 +853,7 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
         // thing a caller committing art unattended has to hear.
         warnings: loaded.warnings,
       };
+      return reply;
     }
 
     case 'classic-import-art-sheet': {

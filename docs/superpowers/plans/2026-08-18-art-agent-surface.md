@@ -20,6 +20,12 @@
 - `src/renderer/agent/art-commit.ts` — the shared agent-side commit helper: snapshot → plan → apply → reply shape (report, engine ids, refusal view).
 - `src/renderer/agent/__tests__/art-commit.test.ts`
 - `src/main/__tests__/registry-conformance.test.ts` — asserts the MCP/Aether/handler triple never drifts.
+- `src/shared/canvas-name.ts` — `CANVAS_NAME_PATTERN`, the ONE canvas-name rule. Shared like
+  `rel-path.ts`: the renderer enforces it as a guard that throws, main states it as a zod schema so a
+  bad name is `-32602 INVALID_PARAMS` at the edge instead of `-32603 INTERNAL` from a throw. Importing
+  `canvas-file.ts` into main instead would drag its `canvas-file-format` → `indexed-png` → `zlib-stream`
+  chain into the main bundle for one regex.
+- `src/shared/__tests__/canvas-name.test.ts`
 - `scratchpad/art-agent-harness.mjs` — CDP runtime proof.
 
 **Modify:**
@@ -28,12 +34,26 @@
 - `src/shared/agent-protocol.ts` — two new `AgentRequest` kinds.
 - `src/main/editor-methods.ts` — two new registry entries.
 - `src/renderer/agent/agent-handler.ts` — two new cases.
+- `src/renderer/state/canvas-file.ts` — `canvasNameIsSafe` delegates to the shared pattern.
 
 **Not modified:** `src/renderer/components/canvas/CommitPlanView.tsx`. See spec §3.2 — it already shares `planFromSnapshot` and needs its hooks for reactivity.
 
 ---
 
 ## Task 1: Pure sheet import (core)
+
+> **PARTLY SUPERSEDED. Read `src/core/art/sheet-import.ts` for the shipped shape.**
+> The draft below welds the ADVICE onto `explainSheetRefusal`'s message ("Recolour it
+> to the act's palette, or add those colours to the zone palette first"). Review of
+> tasks 5-6 split that: `explainSheetRefusal` now states only what is WRONG, and a new
+> `sheetRefusalResolution(refusal)` beside it states what to DO — per kind, mirroring
+> `refusalView`'s message/resolution/offers split so an import refusal and a commit
+> refusal are the same shape rather than nearly so.
+>
+> Why it matters, and why it must not be re-welded: the one-size string told a caller
+> hitting `cell-needs-two-lines` to "widen the act palette", which loops — adding the
+> colour to a line the cell does not already use leaves the refusal unchanged. The
+> remedy that always works is redrawing the cell to one line.
 
 Moves decode + palette-map + the artist-facing refusal text out of the renderer, so both the dialog and the agent use one copy.
 
@@ -313,6 +333,12 @@ and a second copy written for the agent drifts the first reword."
 ---
 
 ## Task 2: Rewire the dialog onto the core module
+
+> **PARTLY SUPERSEDED.** The draft's `loadSheetForAct` returns
+> `explainSheetRefusal(res.refusal)` alone. The shipped version joins BOTH halves —
+> message + `sheetRefusalResolution(...)` — so the artist reads exactly what the agent
+> reads. That equality is the point (spec §4); a dialog showing only half the answer is
+> the drift `sheet-import.ts`'s header forbids.
 
 `loadSheetForAct` keeps its signature and behaviour; only its internals change. Existing callers (`ImportSheetDialog.tsx`) are untouched.
 
