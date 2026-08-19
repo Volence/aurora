@@ -1577,11 +1577,34 @@ Expected: FAIL on "has a handler case for every method kind" — the handler cas
 
 That failure is the guard working. Do not silence it; Task 8 closes it.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 5: Document the tool in `docs/MCP.md`**
+
+`docs/MCP.md` documents the whole agent tool surface, and its classic table already lists `set_colind`, `set_level_palette`, `add_block` and the rest. A tool that is in the registry but not in that table is discoverable only by reading source.
+
+Add a row to the classic table, immediately after `set_colind`:
+
+```markdown
+| `set_block_collision`\* | `{ x, y, w, h, shape, mode?, dryRun? }` | Sets the collision SHAPE on the block under every cell of a rectangle, in 16px FG cell units. Does NOT set solidity — that rides the chunk cell (`edit_chunk`). `mode` is `link` (default; changes the block everywhere it is used, ZONE-wide) or `isolate` (clones the block first, at the cost of one collision-table entry per distinct block — GHZ and SBZ have none spare). Partial by design: cells that are air, blank block 0, outside the layout, or (link) past the end of the zone's collision table are skipped and counted. Refuses only when nothing applied and nothing already matched, or when isolate needs more table entries than the zone has. |
+```
+
+**Also backfill the two tools Plan A left out of this file.** `commit_canvas` and `import_art_sheet` shipped in the registry on 2026-08-18 and were never added here — verify with `grep -n "commit_canvas\|import_art_sheet" docs/MCP.md` returning nothing before you write them. That is a pre-existing gap, not this plan's, but leaving the table wrong while editing it is worse than fixing it; call it out in the commit message so the backfill is not mistaken for this plan's own work. Take the descriptions from their `EDITOR_METHODS` entries.
+
+Re-check after editing:
 
 ```bash
-git add src/core/level-classic/model.ts src/shared/agent-protocol.ts src/main/editor-methods.ts
-git commit -m "feat(agent): the set_block_collision kind and registry entry"
+grep -c "^| \`" docs/MCP.md
+grep -n "set_block_collision\|commit_canvas\|import_art_sheet" docs/MCP.md
+```
+Expected: all three named, each exactly once.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add src/core/level-classic/model.ts src/shared/agent-protocol.ts src/main/editor-methods.ts docs/MCP.md
+git commit -m "feat(agent): the set_block_collision kind and registry entry
+
+Also backfills commit_canvas and import_art_sheet into docs/MCP.md, which
+the 2026-08-18 art surface added to the registry but not to the doc."
 git show --stat
 ```
 
