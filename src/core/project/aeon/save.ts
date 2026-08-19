@@ -240,15 +240,28 @@ export async function buildAeonSavePlan(
   //      on load (swallowed in the catch block), the migration was skipped
   //      and we must NOT truncate — doing so would permanently destroy
   //      tile art that was never merged into the zone tileset.
-  //   2. aliasesLiveTileset check — skip if that path is still some zone's
-  //      CURRENT raw-config tileset (i.e. the retarget above didn't move
-  //      it). In the OJZ project the configured tileset literally aliases
-  //      chunks_tiles.bin; truncating the live tileset file would destroy
-  //      zone art.
+  //   2. aliasesLiveTileset check — skip if that path holds live zone art.
+  //      In the OJZ project the configured tileset literally aliases
+  //      chunks_tiles.bin; zeroing the live tileset file destroys zone art.
+  //
+  //      INVARIANT: a path holds live zone art if, for any zone, it is either
+  //      the pointer a reader follows (`tileset`, as project.json will be
+  //      written out — the retarget above may just have moved it) or the
+  //      destination this plan writes the zone's tile bytes to. Under the
+  //      editor-destination rule those are the same path in each case, but
+  //      which field names it differs: Aurora-owned zones have it in the
+  //      (rewritten) `tileset`, repo-owned zones in `editorTilesetPath` with
+  //      `tileset` left pointing wherever the repo put it. Both must count, so
+  //      the guard reads both fields and never only the one that happens to be
+  //      authoritative today.
   if (config.chunkLibraryPath && opts.legacyAtlasMerged) {
     const atlasTruncatePath = legacyAtlasPath(config.chunkLibraryPath);
-    const aliasesLiveTileset = config.raw.zones.some(rz => rz.tileset === atlasTruncatePath);
-    if (!aliasesLiveTileset) {
+    const liveTilesetPaths = new Set<string>();
+    for (const rz of config.raw.zones) {
+      liveTilesetPaths.add(rz.tileset);
+      if (rz.editorTilesetPath) liveTilesetPaths.add(rz.editorTilesetPath);
+    }
+    if (!liveTilesetPaths.has(atlasTruncatePath)) {
       files.push({ path: atlasTruncatePath, bytes: new Uint8Array(0) });
     }
   }
