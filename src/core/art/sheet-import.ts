@@ -16,7 +16,7 @@ import { decodeIndexedPng } from './indexed-png';
 import { importPngAgainstPalette } from './png-import';
 import type { PngImport, PngImportRefusal } from './png-import';
 import { fmtGenesisWord } from '../formats/palette';
-import { CANVAS_LINE_LENGTH } from './canvas-doc';
+import { flattenDocPalette } from './classic-commit-plan';
 import type { LevelDoc } from '../level-classic/model';
 
 export interface ImportedSheet extends PngImport {
@@ -30,14 +30,18 @@ export type SheetImportResult =
   | { ok: true; sheet: ImportedSheet }
   | { ok: false; refusal: PngImportRefusal };
 
-/** The act's 64 CRAM words, line-major. */
-export function flattenActPalette(doc: LevelDoc): number[] {
-  const out: number[] = [];
-  for (let l = 0; l < 4; l++) {
-    for (let e = 0; e < CANVAS_LINE_LENGTH; e++) out.push(doc.palettes[l]?.[e] ?? 0);
-  }
-  return out;
-}
+/**
+ * The act's 64 CRAM words, line-major.
+ *
+ * THE PLANNER'S OWN FLATTENER, under this module's name — not a copy of it. The
+ * two were identical six-line loops until the branch that added `import_art_sheet`
+ * turned that coincidence into an invariant: the agent tool has no
+ * `paletteResolution` parameter precisely BECAUSE a sheet mapped against this
+ * cannot drift from what `planCanvasCommit` compares it to. If the two ever
+ * differed, that tool would get a `palette-drift` refusal it has no argument to
+ * resolve. Aliasing rather than duplicating is what makes that unreachable.
+ */
+export { flattenDocPalette as flattenActPalette };
 
 /**
  * Decode PNG bytes and map them onto `doc`'s palette.
@@ -54,7 +58,7 @@ export async function sheetFromBytes(doc: LevelDoc, bytes: Uint8Array): Promise<
   } catch (e) {
     throw new Error(`${(e as Error).message} — the importer needs an INDEXED (paletted) PNG`);
   }
-  const palette = flattenActPalette(doc);
+  const palette = flattenDocPalette(doc);
   const mapped = importPngAgainstPalette(png, palette);
   if (!mapped.ok) return { ok: false, refusal: mapped.refusal };
   return { ok: true, sheet: { ...mapped.result, palette } };

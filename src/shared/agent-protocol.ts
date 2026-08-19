@@ -67,10 +67,11 @@ export type AgentRequest =
       paletteResolution?: 'none' | 'use-act-colours' | 'adopt-into-zone';
       collision?: boolean; dryRun?: boolean }
   // NO `paletteResolution` on the import: an imported sheet is mapped against
-  // the act's own palette by `sheetFromBytes` (its `flattenActPalette` is
-  // byte-identical to the planner's `flattenDocPalette`), so its palette can
-  // never drift, so the option is only ever read on a branch this tool cannot
-  // reach. A knob that provably cannot turn is worse than no knob — doubly so
+  // the act's own palette by `sheetFromBytes`, using the planner's OWN
+  // `flattenDocPalette` (sheet-import.ts re-exports it as `flattenActPalette`
+  // rather than keeping a second copy), so its palette cannot drift from what
+  // the planner compares it to, so the option is only ever read on a branch this
+  // tool cannot reach. A knob that provably cannot turn is worse than no knob — doubly so
   // here, where the colour refusal's advice mentions widening the palette and
   // this would look like the lever for it.
   | { kind: 'classic-import-art-sheet'; path: string; targets?: { chunkFileIndex: number | null }[];

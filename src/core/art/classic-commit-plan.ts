@@ -133,8 +133,16 @@ export type CommitPlanResult =
 
 // --- palette ---------------------------------------------------------------
 
-/** The act's 64 CRAM words, line-major — the same shape as a canvas palette. */
-function flattenDocPalette(doc: LevelDoc): number[] {
+/**
+ * The act's 64 CRAM words, line-major — the same shape as a canvas palette.
+ *
+ * EXPORTED because sheet-import.ts needs the identical bytes: an imported sheet
+ * is mapped against this, so the palette gate below can never fire on it, which
+ * is why `import_art_sheet` carries no `paletteResolution`
+ * (shared/agent-protocol.ts). That argument rests on the two flatteners
+ * agreeing, so there is only one of them.
+ */
+export function flattenDocPalette(doc: LevelDoc): number[] {
   const out: number[] = [];
   for (let l = 0; l < PALETTE_LINES; l++) {
     for (let e = 0; e < CANVAS_LINE_LENGTH; e++) out.push(doc.palettes[l]?.[e] ?? 0);
