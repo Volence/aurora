@@ -12,9 +12,10 @@
 // creating one (isolate) would define entries whose real values are unknown.
 
 import { describe, it, expect } from 'vitest';
-import { planCollisionWrite } from '../collision-write';
-import type { CollisionProbe } from '../collision-probe';
+import { classifyCollisionCell, planCollisionRect, planCollisionWrite } from '../collision-write';
+import { LOOP_ALIAS, type CollisionProbe } from '../collision-probe';
 import type { LevelDoc } from '../model';
+import type { SurfaceEditPlan } from '../../art/classic-surface-plan';
 
 const probe = (over: Partial<CollisionProbe> = {}): CollisionProbe => ({
   chunkId: 1, chunkIndex: 0, cellIndex: 5, blockId: 3, shapeIndex: 2, solidity: 3,
@@ -30,6 +31,12 @@ function doc(): LevelDoc {
     chunks: [{ cells }],
     blocks: [blockDef(), blockDef(), blockDef(), blockDef()],
     collision: { colind: new Uint8Array(64), shapes: { heights: [], angles: new Uint8Array() } },
+    // Two layout columns, both stamping engine chunk id 1 → chunks[0]. So the
+    // act is 32 cells wide x 16 tall, cellIndex = (cy % 16) * 16 + (cx % 16),
+    // and cells (0,0) and (16,0) are the SAME chunk-definition cell reached
+    // through two placements. planCollisionWrite never reads this; the
+    // rectangle planner addresses cells itself and cannot run without it.
+    fg: { width: 2, height: 1, cells: new Uint8Array([1, 1]) },
   } as unknown as LevelDoc;
 }
 
@@ -125,6 +132,83 @@ describe('planCollisionWrite', () => {
     expect(r.kind).toBe('link');
     expect((r as { warnings: string[] }).warnings.join(' ')).toMatch(/\$51|loop/i);
   });
+
+  it('does not send a LINK overhang refusal to Isolate when Isolate would also refuse', () => {
+    // The GHZ/SBZ shape: more blocks than the table has entries. Link refuses
+    // the overhang block; Isolate would have to grow the table over the same
+    // overhang, so it refuses too. Telling the caller to "Use Isolate" is a
+    // dead end presented as an escape — and an AGENT will act on it.
+    const d = doc();
+    d.collision.colind = new Uint8Array(2);          // 4 blocks, 2 entries
+    const r = planCollisionWrite(d, probe(), 7, 'link');
+    expect(r.kind).toBe('refused');
+    const why = (r as { why: string }).why;
+    expect(why).toMatch(/past the end/i);
+    expect(why, 'recommends a mode that this same document refuses').not.toMatch(/Use Isolate/i);
+    expect(why).toMatch(/restamp|within the table/i);
+  });
+
+  it('refuses a DANGLING block ref rather than recommending a mode for it', () => {
+    // This document used to be the one place `escapeFromLinkOverhang`'s "Use
+    // Isolate" branch fired: a block ref PAST the table but with the table still
+    // longer than the block list. That state is only reachable through a
+    // DANGLING ref — validateLevelDoc bounds a chunk cell's block by the 10-bit
+    // field (model.ts, MAX_BLOCK_REF), not by doc.blocks.length — and a dangling
+    // ref is now refused in its own right, BEFORE the overhang is ever
+    // considered. Isolate on it would emit `def: undefined` into
+    // SurfaceEditPlan.newBlocks and crash classicPaintSurface's
+    // `b.def.cells.map`, so recommending Isolate was never an escape at all.
+    //
+    // This test is what keeps `escapeFromLinkOverhang`'s collapse honest: if the
+    // classifier's order ever changes, this refusal changes with it.
+    const d = doc();                                 // 4 blocks
+    d.collision.colind = new Uint8Array(8);          // 8 entries — longer than the block list
+    d.chunks[0].cells[5] = { ...d.chunks[0].cells[5], block: 9 };  // no block 9 exists
+    const r = planCollisionWrite(d, probe(), 7, 'link');
+    expect(r.kind).toBe('refused');
+    const why = (r as { why: string }).why;
+    expect(why).toMatch(/dangling/i);
+    expect(why).toMatch(/block 9/);
+    expect(why).toMatch(/only 4 blocks/);
+    expect(why, 'recommends a mode that would crash on a block that does not exist').not.toMatch(/Use Isolate/i);
+  });
+
+  it('refuses a DANGLING block ref in isolate mode too — there is nothing to clone', () => {
+    // Isolate means "clone the block, keep its pixels, change its shape". With
+    // no block to clone the operation is meaningless, and the plan it used to
+    // build carried `def: undefined` straight into classicPaintSurface.
+    const d = doc();
+    d.collision.colind = new Uint8Array(8);
+    d.chunks[0].cells[5] = { ...d.chunks[0].cells[5], block: 9 };
+    const r = planCollisionWrite(d, probe(), 7, 'isolate');
+    expect(r.kind).toBe('refused');
+    expect((r as { why: string }).why).toMatch(/dangling/i);
+  });
+
+  it('does not send an ISOLATE growth refusal to Link for a block Link cannot set', () => {
+    // The mirrored defect. For an OVERHANG block both modes refuse, so "Use
+    // Link, accepting it changes every use of block N" is false.
+    // doc()'s probed cell already holds block 3; a 2-entry table puts it past
+    // the end, and the clone at id 4 would grow that table by 3.
+    const d = doc();
+    d.collision.colind = new Uint8Array(2);
+    const r = planCollisionWrite(d, probe(), 7, 'isolate');
+    expect(r.kind).toBe('refused');
+    const why = (r as { why: string }).why;
+    expect(why).toMatch(/adjacent|next zone/i);
+    expect(why, 'recommends Link for a block Link refuses').not.toMatch(/Use Link/i);
+  });
+
+  it('still offers Link when the block IS within the table', () => {
+    // Table exactly as long as the block list: the clone at id 4 still grows it
+    // (by 1), so isolate refuses — but block 3 is inside it, so Link genuinely
+    // is the escape here.
+    const d = doc();
+    d.collision.colind = new Uint8Array(4);
+    const r = planCollisionWrite(d, probe(), 7, 'isolate');
+    expect(r.kind).toBe('refused');
+    expect((r as { why: string }).why).toMatch(/Use Link/i);
+  });
 });
 
 describe('planCollisionWrite no-op', () => {
@@ -155,5 +239,335 @@ describe('planCollisionWrite no-op', () => {
   it('still writes when the shape actually differs', () => {
     expect(planCollisionWrite(doc2(), probe(), 10, 'link').kind).toBe('link');
     expect(planCollisionWrite(doc2(), probe(), 10, 'isolate').kind).toBe('isolate');
+  });
+});
+
+// THE PER-CELL DECISION, on its own. Both the single-cell panel path and the
+// rectangle tool go through this, so it names each outcome without deciding
+// what the write is — and without any of the AGGREGATE limits, which are
+// properties of a whole call and not of a cell.
+describe('classifyCollisionCell', () => {
+  const at = (chunkIndex: number | null, cellIndex: number) =>
+    ({ chunkId: 1, chunkIndex, cellIndex, looping: false, loopAmbiguous: false });
+
+  it('skips air — no chunk is stamped at this cell', () => {
+    const d = doc();
+    expect(classifyCollisionCell(d, at(null, 0), 7, 'link').kind).toBe('skip');
+    expect((classifyCollisionCell(d, at(null, 0), 7, 'link') as { reason: string }).reason).toBe('air');
+  });
+
+  it('skips block 0 — the blank block the engine short-circuits before', () => {
+    const d = doc();
+    d.chunks[0].cells[1] = { ...d.chunks[0].cells[1], block: 0 };
+    expect((classifyCollisionCell(d, at(0, 1), 7, 'link') as { reason: string }).reason).toBe('block0');
+  });
+
+  it('is a no-op when the block already carries the shape, in EITHER mode', () => {
+    const d = doc();
+    d.chunks[0].cells[2] = { ...d.chunks[0].cells[2], block: 1 };
+    d.collision.colind = new Uint8Array([0, 7, 0, 0]);
+    expect(classifyCollisionCell(d, at(0, 2), 7, 'link').kind).toBe('noop');
+    expect(classifyCollisionCell(d, at(0, 2), 7, 'isolate').kind).toBe('noop');
+  });
+
+  it('skips a cell naming a block the document does not have, in EITHER mode', () => {
+    // validateLevelDoc bounds a chunk cell's block by the 10-bit field only
+    // (model.ts, MAX_BLOCK_REF) — NOT by doc.blocks.length — so a dangling ref
+    // is representable inside a document that validates. Isolate on one emits
+    // `def: doc.blocks[id]` = undefined into SurfaceEditPlan.newBlocks and
+    // classicPaintSurface's `b.def.cells.map` throws.
+    const d = doc();                                          // 4 blocks
+    d.chunks[0].cells[2] = { ...d.chunks[0].cells[2], block: 9 };
+    expect((classifyCollisionCell(d, at(0, 2), 7, 'link') as { reason: string }).reason).toBe('no-such-block');
+    expect((classifyCollisionCell(d, at(0, 2), 7, 'isolate') as { reason: string }).reason).toBe('no-such-block');
+  });
+
+  it('tests the dangling ref BEFORE the no-op — a dangling ref must never report success', () => {
+    // THE ORDER, PINNED. The no-op test reads `colind[blockId] ?? 0`, so a
+    // dangling ref past the end of the table answers 0 for a shape it does not
+    // have. Asked for shape 0 it would return `noop` — reporting SUCCESS on
+    // garbage, which for an autonomous caller is worse than the crash the
+    // refusal replaces.
+    const d = doc();                                          // 4 blocks
+    d.collision.colind = new Uint8Array(8);                   // no entry 9 either
+    d.chunks[0].cells[2] = { ...d.chunks[0].cells[2], block: 9 };
+    expect(d.collision.colind[9]).toBeUndefined();            // the trap: `?? 0` answers 0
+    const r = classifyCollisionCell(d, at(0, 2), 0, 'link');
+    expect(r.kind, 'a dangling ref reported success').toBe('skip');
+    expect((r as { reason: string }).reason).toBe('no-such-block');
+  });
+
+  it('skips the overhang in LINK mode only — isolate’s limit is aggregate', () => {
+    const d = doc();
+    d.chunks[0].cells[2] = { ...d.chunks[0].cells[2], block: 1 };
+    d.collision.colind = new Uint8Array(1);
+    expect((classifyCollisionCell(d, at(0, 2), 7, 'link') as { reason: string }).reason).toBe('overhang');
+    // Isolate does not have a per-cell overhang skip — its limit is aggregate.
+    expect(classifyCollisionCell(d, at(0, 2), 7, 'isolate').kind).toBe('write');
+  });
+
+  it('carries the block and the cell back out in the ordinary case', () => {
+    const d = doc();
+    d.chunks[0].cells[2] = { ...d.chunks[0].cells[2], block: 1 };
+    d.collision.colind = new Uint8Array([0, 3, 0, 0]);
+    const w = classifyCollisionCell(d, at(0, 2), 7, 'link');
+    expect(w).toMatchObject({ kind: 'write', blockId: 1, chunkIndex: 0, cellIndex: 2 });
+    expect((w as { cell: unknown }).cell).toBe(d.chunks[0].cells[2]);
+  });
+});
+
+// A RECTANGLE IS ONE WRITE, not a loop over planCollisionWrite: one undo step
+// means one store command. Partial by design in ONE direction — per-cell skips
+// (air, block 0, a link overhang, past the layout edge) are expected inside any
+// real rectangle, because a slope's bounding box contains air.
+describe('planCollisionRect — link', () => {
+  const rect = (x: number, y: number, w: number, h: number) => ({ x, y, w, h });
+  /** doc() with the named chunk-definition cells pointed at real blocks. */
+  const withCells = (assign: [number, number][]) => {
+    const d = doc();
+    for (const [cellIndex, block] of assign) {
+      d.chunks[0].cells[cellIndex] = { block, xf: false, yf: false, solidity: 3 };
+    }
+    return d;
+  };
+
+  it('collapses cells sharing a block into ONE colind entry', () => {
+    const d = withCells([[0, 1], [1, 1], [16, 1], [17, 1]]);
+    const r = planCollisionRect(d, rect(0, 0, 2, 2), 7, 'link');
+    expect(r.kind).toBe('link');
+    expect((r as { entries: unknown[] }).entries).toEqual([{ blockId: 1, value: 7 }]);
+    expect(r.report.applied).toBe(4);   // four CELLS
+    expect(r.report.blocks).toBe(1);    // one BLOCK
+  });
+
+  it('applies the writable cells and reports the skipped ones by reason', () => {
+    // cell 0 → block 1 (writes), cell 1 → block 0 (skip), cell 16 → block 2
+    // (writes), cell 17 → block 3 which ALREADY holds 7 (noop).
+    const d = withCells([[0, 1], [1, 0], [16, 2], [17, 3]]);
+    d.collision.colind[3] = 7;
+    const r = planCollisionRect(d, rect(0, 0, 2, 2), 7, 'link');
+    expect(r.kind).toBe('link');
+    expect(r.report.applied).toBe(2);
+    expect(r.report.noop).toBe(1);
+    expect(r.report.skipped).toEqual([{ reason: 'block0', count: 1 }]);
+  });
+
+  it('skips cells outside the layout instead of clamping or refusing', () => {
+    // The act is 32 cells wide; ask for 36.
+    const d = withCells([[0, 1]]);
+    const r = planCollisionRect(d, rect(0, 0, 36, 1), 7, 'link');
+    expect(r.kind).toBe('link');
+    expect(r.report.skipped.find((s) => s.reason === 'outside-layout')!.count).toBe(4);
+  });
+
+  it('is SUCCESS with no command when every cell already carries the shape', () => {
+    // Idempotence. An agent retrying after a timeout must not get a refusal.
+    const d = withCells([[0, 1]]);
+    d.collision.colind[1] = 7;
+    const r = planCollisionRect(d, rect(0, 0, 1, 1), 7, 'link');
+    expect(r.kind).toBe('nothing');
+    expect(r.report.applied).toBe(0);
+    expect(r.report.noop).toBe(1);
+  });
+
+  it('REFUSES when nothing was applied and nothing already matched', () => {
+    // doc()'s cells are all block 0 except cell 5; the 2x2 at the origin misses it.
+    const d = doc();
+    const r = planCollisionRect(d, rect(0, 0, 2, 2), 7, 'link');
+    expect(r.kind).toBe('refused');
+    expect((r as { refusal: { kind: string } }).refusal.kind).toBe('nothing-applicable');
+    expect((r as { why: string }).why).toMatch(/blank block 0/i);
+  });
+
+  it('refuses a zero-area rectangle instead of throwing on an empty skip list', () => {
+    // NOT in the plan. `dominantSkipWhy` reduces the skip array without a seed,
+    // so a w=0 / h=0 rectangle — no cells scanned, no skips recorded, and still
+    // nothing applied — took the refusal branch and crashed on an empty reduce.
+    // An agent passing w:0 must get a sentence, not a TypeError.
+    const d = withCells([[0, 1]]);
+    const r = planCollisionRect(d, rect(0, 0, 0, 4), 7, 'link');
+    expect(r.kind).toBe('refused');
+    expect((r as { refusal: { kind: string } }).refusal.kind).toBe('nothing-applicable');
+    expect((r as { why: string }).why).toMatch(/no cells/i);
+    expect(r.report.skipped).toEqual([]);
+  });
+
+  it('skips a LINK overhang block and still applies the rest', () => {
+    // Block 3 is past a 2-entry table; block 1 is not.
+    const d = withCells([[0, 1], [1, 3]]);
+    d.collision.colind = new Uint8Array(2);
+    const r = planCollisionRect(d, rect(0, 0, 2, 1), 7, 'link');
+    expect(r.kind).toBe('link');
+    expect(r.report.applied).toBe(1);
+    expect(r.report.skipped).toEqual([{ reason: 'overhang', count: 1 }]);
+  });
+
+  it('counts a dangling block ref as a skip and still applies the rest', () => {
+    // The rectangle contract for the same refusal: a skip, counted and stepped
+    // over, not a refusal of the whole call. doc() ships 4 blocks, so block 9
+    // does not exist.
+    const d = withCells([[0, 1], [1, 9]]);
+    const r = planCollisionRect(d, rect(0, 0, 2, 1), 7, 'link');
+    expect(r.kind).toBe('link');
+    expect(r.report.applied).toBe(1);
+    expect(r.report.skipped).toEqual([{ reason: 'no-such-block', count: 1 }]);
+  });
+
+  it('has a summary phrase for a rectangle that is entirely dangling refs', () => {
+    // `skipPhrase` is a separate switch from `skipRefusal`, and a missing arm
+    // there is a compile error rather than a wrong sentence — this pins the
+    // wording that reaches an agent through `dominantSkipWhy`.
+    const d = withCells([[0, 9]]);
+    const r = planCollisionRect(d, rect(0, 0, 1, 1), 7, 'link');
+    expect(r.kind).toBe('refused');
+    expect((r as { why: string }).why).toMatch(/dangling/i);
+    // No specific block id in the summary — a rectangle has no single block to name.
+    expect((r as { why: string }).why).not.toMatch(/block 9/);
+  });
+
+  it('counts loop-ambiguous cells in ONE warning rather than one per cell', () => {
+    // Needs the act to actually own engine chunk id $28, so build the pool out
+    // to it. LOOP_ALIAS.from is $28 and chunkIndexForId is id - 1.
+    const d = doc();
+    const blank = () => ({ cells: Array.from({ length: 256 }, () => ({ block: 0, xf: false, yf: false, solidity: 0 })) });
+    d.chunks = Array.from({ length: LOOP_ALIAS.from }, blank);
+    d.chunks[LOOP_ALIAS.from - 1].cells[0] = { block: 1, xf: false, yf: false, solidity: 3 };
+    d.chunks[LOOP_ALIAS.from - 1].cells[1] = { block: 1, xf: false, yf: false, solidity: 3 };
+    d.fg = { width: 1, height: 1, cells: new Uint8Array([0x80 | LOOP_ALIAS.from]) };
+    const r = planCollisionRect(d, rect(0, 0, 2, 1), 7, 'link');
+    expect(r.report.warnings.length).toBe(1);
+    expect(r.report.warnings[0]).toMatch(/\$51/);
+    expect(r.report.warnings[0]).toMatch(/^2 cells/);
+  });
+
+  it('reports the LINK blast radius in chunk-definition cells', () => {
+    // Link changes the block ZONE-wide. The rectangle is not the blast radius,
+    // and an agent reading only `applied` would think it was.
+    const d = withCells([[0, 1], [200, 1]]);   // cell 200 is outside the rect
+    const r = planCollisionRect(d, rect(0, 0, 1, 1), 7, 'link');
+    expect(r.report.applied).toBe(1);
+    expect(r.report.blockCellsAffected).toBe(2);
+  });
+});
+
+describe('planCollisionRect — isolate', () => {
+  const rect = (x: number, y: number, w: number, h: number) => ({ x, y, w, h });
+
+  it('mints ONE clone per distinct block, not one per cell', () => {
+    // The dedupe that `planSurfaceEdit` deliberately does NOT do (it keys clones
+    // by chunk cell, because each cell's PIXELS differ). Here every cell gets
+    // the same SHAPE, so one clone serves them all.
+    const d = doc();
+    for (const i of [0, 1, 16, 17]) d.chunks[0].cells[i] = { block: 1, xf: false, yf: false, solidity: 3 };
+    const r = planCollisionRect(d, rect(0, 0, 2, 2), 7, 'isolate');
+    expect(r.kind).toBe('isolate');
+    const plan = (r as { plan: SurfaceEditPlan }).plan;
+    expect(plan.newBlocks.length).toBe(1);
+    expect(plan.newBlocks[0].colind).toBe(7);
+    expect(plan.newBlocks[0].sourceBlockId).toBe(1);
+    expect(plan.chunkCellEdits.length).toBe(4);
+    const cloneId = d.blocks.length;
+    expect(new Set(plan.chunkCellEdits.map((e) => e.cell.block))).toEqual(new Set([cloneId]));
+    expect(r.report.isolate).toEqual({ blocksCloned: 1, chunkCellsRepointed: 4, chunksTouched: 1 });
+  });
+
+  it('gives each distinct block its own clone id, in order', () => {
+    const d = doc();
+    d.chunks[0].cells[0] = { block: 1, xf: false, yf: false, solidity: 3 };
+    d.chunks[0].cells[1] = { block: 2, xf: false, yf: false, solidity: 3 };
+    const r = planCollisionRect(d, rect(0, 0, 2, 1), 7, 'isolate');
+    const plan = (r as { plan: SurfaceEditPlan }).plan;
+    expect(plan.newBlocks.map((b) => b.sourceBlockId)).toEqual([1, 2]);
+    expect(plan.chunkCellEdits.map((e) => e.cell.block)).toEqual([d.blocks.length, d.blocks.length + 1]);
+  });
+
+  it("carries each cell's OWN flips and solidity onto the repoint", () => {
+    // Re-derived from the doc, never from a cached probe, and never shared
+    // between cells: two cells can use one block with different solidity.
+    const d = doc();
+    d.chunks[0].cells[0] = { block: 1, xf: true, yf: false, solidity: 1 };
+    d.chunks[0].cells[1] = { block: 1, xf: false, yf: true, solidity: 3 };
+    const r = planCollisionRect(d, rect(0, 0, 2, 1), 7, 'isolate');
+    const edits = (r as { plan: SurfaceEditPlan }).plan.chunkCellEdits;
+    expect(edits[0].cell).toMatchObject({ xf: true, yf: false, solidity: 1 });
+    expect(edits[1].cell).toMatchObject({ xf: false, yf: true, solidity: 3 });
+  });
+
+  it('de-duplicates chunk-cell edits when the rectangle spans two placements of one chunk', () => {
+    // Cell (0,0) and cell (16,0) are BOTH chunk-definition cell 0 of chunk 1,
+    // because fg is [1, 1].
+    const d = doc();
+    d.chunks[0].cells[0] = { block: 1, xf: false, yf: false, solidity: 3 };
+    // PLAN DISCREPANCY: the plan's fixture left doc()'s cell 5 (block 3) in
+    // place, but a 17-wide rectangle passes over cx=5 — so it would have
+    // written THREE cells across TWO definition cells, not the 2/1 the
+    // assertions below state. Cleared, because the point of the test is the
+    // (0,0)/(16,0) pair collapsing to one definition cell, not block 3.
+    d.chunks[0].cells[5] = { block: 0, xf: false, yf: false, solidity: 0 };
+    const r = planCollisionRect(d, { x: 0, y: 0, w: 17, h: 1 }, 7, 'isolate');
+    const edits = (r as { plan: SurfaceEditPlan }).plan.chunkCellEdits;
+    const keys = edits.map((e) => `${e.chunkIndex}:${e.cellIndex}`);
+    expect(new Set(keys).size, 'duplicate chunk-cell edits').toBe(keys.length);
+    expect(keys).toContain('0:0');
+    // Two CELLS were applied, but they are one DEFINITION cell — the two units
+    // must not collapse into each other.
+    expect(r.report.applied).toBe(2);
+    expect(r.report.isolate!.chunkCellsRepointed).toBe(1);
+  });
+
+  it('REFUSES the whole call when the clones would grow the colind table', () => {
+    const d = doc();
+    d.collision.colind = new Uint8Array(d.blocks.length);   // zero spare
+    d.chunks[0].cells[0] = { block: 1, xf: false, yf: false, solidity: 3 };
+    const r = planCollisionRect(d, rect(0, 0, 1, 1), 7, 'isolate');
+    expect(r.kind).toBe('refused');
+    const ref = (r as { refusal: { kind: string; needed: number; spare: number } }).refusal;
+    expect(ref.kind).toBe('isolate-grows-table');
+    expect(ref.needed).toBe(1);
+    expect(ref.spare).toBe(0);
+    expect((r as { why: string }).why).toMatch(/adjacent|next zone/i);
+  });
+
+  it('names how many clones the rectangle needs against how many fit', () => {
+    const d = doc();
+    d.collision.colind = new Uint8Array(d.blocks.length + 1);   // exactly one spare
+    d.chunks[0].cells[0] = { block: 1, xf: false, yf: false, solidity: 3 };
+    d.chunks[0].cells[1] = { block: 2, xf: false, yf: false, solidity: 3 };
+    d.chunks[0].cells[16] = { block: 3, xf: false, yf: false, solidity: 3 };
+    const r = planCollisionRect(d, rect(0, 0, 2, 2), 7, 'isolate');
+    expect(r.kind).toBe('refused');
+    const ref = (r as { refusal: { needed: number; spare: number } }).refusal;
+    expect(ref.needed).toBe(3);
+    expect(ref.spare).toBe(1);
+    expect((r as { resolution: string }).resolution).toMatch(/link|smaller/i);
+  });
+
+  it('REFUSES at the 1024-block ceiling, which classicPaintSurface does not check', () => {
+    const d = doc();
+    d.blocks = Array.from({ length: 1024 }, () => d.blocks[0]);
+    d.collision.colind = new Uint8Array(2048);
+    d.chunks[0].cells[0] = { block: 1, xf: false, yf: false, solidity: 3 };
+    const r = planCollisionRect(d, rect(0, 0, 1, 1), 7, 'isolate');
+    expect(r.kind).toBe('refused');
+    expect((r as { refusal: { kind: string } }).refusal.kind).toBe('block-ceiling');
+  });
+
+  it('is still SUCCESS-with-no-command when an isolate rectangle is entirely no-op', () => {
+    // The success predicate sits BEFORE the mode split, so a rectangle needing
+    // no clones never consults the clone budget — even in a zone with none spare.
+    const d = doc();
+    d.collision.colind = new Uint8Array(d.blocks.length);   // zero spare
+    d.chunks[0].cells[0] = { block: 1, xf: false, yf: false, solidity: 3 };
+    d.collision.colind[1] = 7;
+    const r = planCollisionRect(d, rect(0, 0, 1, 1), 7, 'isolate');
+    expect(r.kind).toBe('nothing');
+    expect(r.report.noop).toBe(1);
+  });
+
+  it('reports no blockCellsAffected for isolate — that number is link-only', () => {
+    const d = doc();
+    d.chunks[0].cells[0] = { block: 1, xf: false, yf: false, solidity: 3 };
+    const r = planCollisionRect(d, rect(0, 0, 1, 1), 7, 'isolate');
+    expect(r.report.blockCellsAffected).toBeUndefined();
   });
 });

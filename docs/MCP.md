@@ -100,9 +100,19 @@ commands do, so an agent never loops single-cell calls.
 | `move_object`\* | `{ index, x, y }` | Moves the object at `index`. |
 | `delete_object`\* | `{ index }` | Deletes the object at `index`. |
 | `set_colind`\* | `{ entries: [{blockId, value}] }` | Sets block→collision-shape indices. |
+| `set_block_collision`\* | `{ x, y, w, h, shape, mode?, dryRun? }` | Sets the collision SHAPE on the block under every cell of a rectangle, in 16px FG cell units. Does NOT set solidity — that rides the chunk cell (`edit_chunk`). `mode` is `link` (default; changes the block everywhere it is used, ZONE-wide) or `isolate` (clones the block first, at the cost of one collision-table entry per distinct block — GHZ and SBZ have none spare). Partial by design: cells that are air, blank block 0, a dangling block reference, outside the layout, or (link) past the end of the zone's collision table are skipped and counted. Refuses only when nothing applied and nothing already matched, or when isolate needs more table entries than the zone has. |
 | `set_level_palette`\* | `{ line, colors: [16] }` | Writes one classic-level palette line (0-3) as 16 Genesis CRAM words (`0000BBB0GGG0RRR0`; index 0 transparent). Bumps the palette epoch so chunk art + object sprites refresh. Named `set_level_palette` (not `set_palette`) because the aeon `set_palette` already owns that name in the shared tool registry and the classic surface allows line 0. |
 | `set_start`\* | `{ x, y }` | Moves the player spawn point to `(x,y)` (both 16-bit; the startpos file has no terminator sentinel). |
 | `save_project` | `{}` | Saves every dirty act through the guarded (mtime-checked) write channel. Structured outcome: `saved` / `conflict` / `partial` / `error` / `nothing`. |
+| `commit_canvas`\* | `{ name, targets?, paletteResolution?, collision?, dryRun? }` | Commits a saved canvas (under `.aurora/canvas`) into the open act: cut to tiles/blocks/chunks, dedupe, reclaim, write. Reply carries the full commit report plus the 1-based ENGINE ids of any appended chunks (pass those to `set_layout_region`). `paletteResolution` says what to do when the canvas draws with colours the act does not have — default `none` refuses and reports them, `use-act-colours` re-indexes onto the nearest act colours, `adopt-into-zone` writes them into the ZONE palette (every act sharing that palette file displays them); line 0 is never written by either. A refusal returns `ok:false` with a message, a resolution, and which `paletteResolution` values would unblock it. Also returns `warnings` from loading the canvas — an unreadable sidecar means the canvas was treated as unconstrained. |
+| `import_art_sheet`\* | `{ path, targets?, collision?, dryRun? }` | Same commit from an INDEXED (paletted) PNG made elsewhere, mapped onto the open act's palette first. No size cap (unlike a canvas). Reply is `commit_canvas`'s; the refusals are a NARROWER set (no palette-drift, palette-unmappable or cell-clash, and so no `paletteResolution` to pass) plus two import-only ones: a colour the act does not have, and an 8×8 cell mixing colours from two palette lines — for that one, adding the missing colour to the zone palette only helps if it goes on the LINE the cell already uses. |
+
+`commit_canvas`, `import_art_sheet` and `set_block_collision` return a refusal
+in the RESULT as `ok:false` with a human-facing sentence and a `resolution`, not
+as a protocol error — a refusal is a decision the caller can act on, not a
+malformed call. Thrown faults stay for genuine breakage (no act open, canvas not
+found, unreadable file), because the transport maps a throw to `-32603 INTERNAL`,
+which claims the server broke.
 
 \* One classic undo step each. Editing tools require a classic project AND an
 open act (`get_classic_level` first); they error cleanly otherwise. A command's

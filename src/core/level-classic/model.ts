@@ -207,8 +207,16 @@ const MAX_CHUNKS = 256; // chunk ids are one byte → at most 256 entries
  */
 export const MAX_ADDRESSABLE_CHUNKS = 0x7f;
 const MAX_BLOCK_REF = 0x3ff; // chunk cell block field width
-const MAX_LAYOUT_W = 64; // INI levelwidthmax; applies to fg and bg (all real bg fit)
-const MAX_LAYOUT_H = 8; // INI levelheightmax
+export const MAX_LAYOUT_W = 64; // INI levelwidthmax; applies to fg and bg (all real bg fit)
+export const MAX_LAYOUT_H = 8; // INI levelheightmax
+/**
+ * The layout maxima in 16px CELLS rather than chunks — the unit the collision
+ * facet and `set_block_collision` speak. Exported so the tool's schema bounds
+ * are DERIVED from the format fact instead of being two more magic numbers that
+ * drift from it.
+ */
+export const MAX_FG_CELLS_W = MAX_LAYOUT_W * 16;   // 1024
+export const MAX_FG_CELLS_H = MAX_LAYOUT_H * 16;   // 128
 const PALETTE_LINES = 4;
 const PALETTE_LINE_LEN = 16;
 const MAX_OBJ_ID = 0x7f;

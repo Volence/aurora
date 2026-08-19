@@ -8,7 +8,7 @@
 // thing to someone hunting a hole in their level.
 
 import { describe, it, expect } from 'vitest';
-import { probeCollision } from '../collision-probe';
+import { probeCollision, locateCell, LOOP_ALIAS } from '../collision-probe';
 import type { LevelDoc } from '../model';
 
 /** A 2x2-chunk act: layout row 0 = [chunk 1, air], row 1 = [air, air]. */
@@ -100,5 +100,71 @@ describe('probeCollision', () => {
     // Cell 16 (x=0,y=16) is block 0 AND solidity 0 — the ONE probe point where
     // the order of the two short-circuits is observable. See the plant step.
     expect(probeCollision(doc(), 0, 16)).toMatchObject({ reason: 'block0' });
+  });
+});
+
+describe('locateCell', () => {
+  it('addresses a cell in 16px units and masks the loop bit', () => {
+    const d = doc();
+    // Cell (1,2) of a chunk is chunk-definition cell index 2*16 + 1 = 33.
+    const at = locateCell(d, 1, 2);
+    expect(at).not.toBeNull();
+    expect(at!.cellIndex).toBe(33);
+  });
+
+  it('returns null outside the layout, and for negative coordinates', () => {
+    const d = doc();
+    expect(locateCell(d, -1, 0)).toBeNull();
+    expect(locateCell(d, 0, -1)).toBeNull();
+    expect(locateCell(d, d.fg.width * 16, 0)).toBeNull();
+    expect(locateCell(d, 0, d.fg.height * 16)).toBeNull();
+  });
+
+  it('reports air as chunkIndex null rather than throwing', () => {
+    const d = doc();
+    d.fg.cells[0] = 0; // layout byte 0 = air
+    const at = locateCell(d, 0, 0);
+    expect(at!.chunkId).toBe(0);
+    expect(at!.chunkIndex).toBeNull();
+  });
+
+  it('is what probeCollision addresses through — every addressing field, for every layout byte', () => {
+    // The guard against a SECOND copy of the addressing math. If probeCollision
+    // stops delegating, these two drift silently and the rectangle tool writes
+    // to different cells than the panel does.
+    //
+    // Run over three layout bytes, not one: a plain chunk, the SAME chunk with
+    // the loop bit set, and the $28 the engine substitutes behind a loop. The
+    // last two are the only states in which `looping` and `loopAmbiguous` are
+    // true at all, so a guard that skipped them would compare those two fields
+    // only in their boring value and could not see a drift in either.
+    for (const layoutByte of [1, 0x80 | 1, 0x80 | LOOP_ALIAS.from]) {
+      const d = doc();
+      d.fg.cells[0] = layoutByte;
+      for (const [px, py] of [[0, 0], [17, 33], [255, 255], [256, 16]] as const) {
+        const where = `byte $${layoutByte.toString(16)} at ${px},${py}`;
+        const p = probeCollision(d, px, py);
+        const at = locateCell(d, Math.floor(px / 16), Math.floor(py / 16));
+        expect(at!.cellIndex, `cellIndex, ${where}`).toBe(p!.cellIndex);
+        expect(at!.chunkId, `chunkId, ${where}`).toBe(p!.chunkId);
+        expect(at!.chunkIndex, `chunkIndex, ${where}`).toBe(p!.chunkIndex);
+        expect(at!.looping, `looping, ${where}`).toBe(p!.looping);
+        expect(at!.loopAmbiguous, `loopAmbiguous, ${where}`).toBe(p!.loopAmbiguous);
+      }
+    }
+  });
+
+  it('reports the loop bit and the $28 ambiguity it gates', () => {
+    // Not a drift check — the values themselves, so the guard above is comparing
+    // against something known rather than two copies of the same mistake.
+    const d = doc();
+    d.fg.cells[0] = 0x80 | 1;
+    expect(locateCell(d, 0, 0)).toMatchObject({ chunkId: 1, looping: true, loopAmbiguous: false });
+
+    d.fg.cells[0] = 0x80 | LOOP_ALIAS.from;
+    expect(locateCell(d, 0, 0)).toMatchObject({ chunkId: LOOP_ALIAS.from, looping: true, loopAmbiguous: true });
+
+    d.fg.cells[0] = LOOP_ALIAS.from;   // $28 WITHOUT the loop bit is unambiguous
+    expect(locateCell(d, 0, 0)).toMatchObject({ looping: false, loopAmbiguous: false });
   });
 });
