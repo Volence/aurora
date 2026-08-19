@@ -66,6 +66,13 @@ describe('ClassicCollisionPanel', () => {
     for (const r of ['air', 'block0', 'solidity']) expect(src).toContain(`'${r}'`);
   });
 
+  it('tells the user the drag gestures exist', () => {
+    // Shift is the only modifier this viewport uses, and a modifier nobody
+    // documents is a feature nobody finds.
+    expect(src).toMatch(/drag/i);
+    expect(src).toMatch(/Shift/);
+  });
+
   it('surfaces the loop ambiguity the probe reports', () => {
     expect(src).toMatch(/loopAmbiguous/);
   });

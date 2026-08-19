@@ -10,7 +10,7 @@
 // this function could produce.
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { applyCollisionShape, applyCollisionShapeRect } from '../collision-dispatch';
+import { applyCollisionShape, applyCollisionShapeRect, applyCollisionShapeCells } from '../collision-dispatch';
 import { useClassicLevelStore, zoneArtDocIdForCurrentZone } from '../classicLevelStore';
 import { useClassicProjectStore } from '../classicProjectStore';
 import { documentHistoryHub } from '../history-hub';
@@ -255,6 +255,59 @@ describe('applyCollisionShapeRect', () => {
 
     expect(r.ok).toBe(true);
     expect((r as { report: { applied: number } }).report.applied).toBe(2);
+    expect(st().doc!.collision.colind[1]).toBe(0);
+    expect(artStack().canUndo).toBe(false);
+  });
+});
+
+// THE FREEHAND SIBLING.
+//
+// Same join again, but the cell set is arbitrary rather than a box — the shape a
+// drag gesture produces. It shares `applyCollisionShapeRect`'s whole tail (the
+// no-level guard, the refusal pass-through, the nothing/dryRun short-circuits and
+// the command dispatch); these tests exist to pin the BEHAVIOUR of that shared
+// tail from the cell-set entry point, so a future copy-paste of it is caught.
+describe('applyCollisionShapeCells', () => {
+  it('writes a freehand cell set as ONE undo step', () => {
+    openReady(rectDoc());
+    // Cells (16,0) and (17,0) are chunk-definition cells 0 and 1 → blocks 1 and 2
+    // (see RECT_ORIGIN's note above).
+    const r = applyCollisionShapeCells([{ x: 16, y: 0 }, { x: 17, y: 0 }], 7, 'link');
+
+    expect(r.ok).toBe(true);
+    expect(st().doc!.collision.colind[1]).toBe(7);
+    expect(st().doc!.collision.colind[2]).toBe(7);
+
+    // One undo takes BOTH back — a per-cell loop would restore only the last.
+    artStack().undo();
+    expect(st().doc!.collision.colind[1]).toBe(0);
+    expect(st().doc!.collision.colind[2]).toBe(0);
+  });
+
+  it('refuses an empty cell set rather than throwing', () => {
+    // A stroke that never touched a cell. `planCollisionCells` lands on the same
+    // empty refusal a degenerate rectangle does.
+    openReady(rectDoc());
+    const r = applyCollisionShapeCells([], 7, 'link');
+    expect(r.ok).toBe(false);
+    expect((r as { refusal: { kind: string } }).refusal.kind).toBe('nothing-applicable');
+  });
+
+  it('refuses rather than throwing when no level is open', () => {
+    const r = applyCollisionShapeCells([{ x: 16, y: 0 }], 7, 'link');
+    expect(r.ok).toBe(false);
+    expect((r as { refusal: { kind: string } }).refusal.kind).toBe('no-level');
+    expect((r as { why: string }).why).toMatch(/no classic level is open/);
+    // The fabricated report describes a scan that never happened.
+    expect((r as { report: { mode: string; applied: number } }).report)
+      .toMatchObject({ mode: 'link', applied: 0 });
+  });
+
+  it('dryRun plans without writing', () => {
+    openReady(rectDoc());
+    const r = applyCollisionShapeCells([{ x: 16, y: 0 }], 7, 'link', { dryRun: true });
+    expect(r.ok).toBe(true);
+    expect((r as { report: { applied: number } }).report.applied).toBe(1);
     expect(st().doc!.collision.colind[1]).toBe(0);
     expect(artStack().canUndo).toBe(false);
   });

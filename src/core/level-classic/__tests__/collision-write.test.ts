@@ -12,7 +12,7 @@
 // creating one (isolate) would define entries whose real values are unknown.
 
 import { describe, it, expect } from 'vitest';
-import { classifyCollisionCell, planCollisionRect, planCollisionWrite } from '../collision-write';
+import { classifyCollisionCell, planCollisionCells, planCollisionRect, planCollisionWrite } from '../collision-write';
 import { LOOP_ALIAS, type CollisionProbe } from '../collision-probe';
 import type { LevelDoc } from '../model';
 import type { SurfaceEditPlan } from '../../art/classic-surface-plan';
@@ -569,5 +569,76 @@ describe('planCollisionRect — isolate', () => {
     d.chunks[0].cells[0] = { block: 1, xf: false, yf: false, solidity: 3 };
     const r = planCollisionRect(d, rect(0, 0, 1, 1), 7, 'isolate');
     expect(r.report.blockCellsAffected).toBeUndefined();
+  });
+});
+
+// THE GENERAL FORM. A freehand drag produces an arbitrary SET of cells, not a
+// rectangle — taking its bounding box would write cells the user never touched,
+// and on a Link write that is a zone-wide collision change nobody asked for.
+// The rectangle is this with the box expanded, which is what keeps ONE copy of
+// the Link/Isolate decision.
+describe('planCollisionCells', () => {
+  const withCells = (assign: [number, number][]) => {
+    const d = doc();
+    for (const [cellIndex, block] of assign) {
+      d.chunks[0].cells[cellIndex] = { block, xf: false, yf: false, solidity: 3 };
+    }
+    return d;
+  };
+
+  it('plans an arbitrary set of cells, not just a rectangle', () => {
+    // A diagonal — the shape a slope actually has, and the reason this exists.
+    // cellIndex = (cy % 16) * 16 + (cx % 16): (0,0)→0, (1,1)→17, (2,2)→34.
+    const d = withCells([[0, 1], [17, 2], [34, 3]]);
+    const r = planCollisionCells(d, [{ x: 0, y: 0 }, { x: 1, y: 1 }, { x: 2, y: 2 }], 7, 'link');
+    expect(r.kind).toBe('link');
+    expect(r.report.applied).toBe(3);
+    expect(r.report.blocks).toBe(3);
+  });
+
+  it('DEDUPES repeated cells — a freehand drag revisits them constantly', () => {
+    // The planner must not depend on its caller having deduped: it is pure core
+    // with a second, agent-shaped caller. Without this, `applied` counts a cell
+    // once per visit and every reported number is fiction.
+    const d = withCells([[0, 1]]);
+    const r = planCollisionCells(d, [{ x: 0, y: 0 }, { x: 0, y: 0 }, { x: 0, y: 0 }], 7, 'link');
+    expect(r.kind).toBe('link');
+    expect(r.report.applied).toBe(1);
+    expect((r as { entries: unknown[] }).entries).toEqual([{ blockId: 1, value: 7 }]);
+  });
+
+  it('dedupes before counting skips too', () => {
+    const d = doc();   // every cell of the 2x2 origin is block 0
+    const r = planCollisionCells(d, [{ x: 0, y: 0 }, { x: 0, y: 0 }], 7, 'link');
+    expect(r.kind).toBe('refused');
+    expect((r as { refusal: { skipped: { count: number }[] } }).refusal.skipped)
+      .toEqual([{ reason: 'block0', count: 1 }]);
+  });
+
+  it('is what planCollisionRect is built on — same answer for the same cells', () => {
+    // The guard against a SECOND copy of the decision. If the rect stops
+    // delegating, the human gesture and the agent tool drift apart silently.
+    const d = withCells([[0, 1], [1, 2], [16, 3], [17, 1]]);
+    const viaRect = planCollisionRect(d, { x: 0, y: 0, w: 2, h: 2 }, 7, 'link');
+    const viaCells = planCollisionCells(
+      d, [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 0, y: 1 }, { x: 1, y: 1 }], 7, 'link',
+    );
+    expect(viaCells).toEqual(viaRect);
+  });
+
+  it('refuses an empty cell list without throwing', () => {
+    // The freehand equivalent of the zero-area rectangle that crashed the
+    // previous plan: an empty list means an empty `skipped`, and an unseeded
+    // reduce over it throws.
+    const r = planCollisionCells(doc(), [], 7, 'link');
+    expect(r.kind).toBe('refused');
+    expect((r as { why: string }).why).toMatch(/no cells/i);
+  });
+
+  it('isolate over a cell list clones once per distinct block', () => {
+    const d = withCells([[0, 1], [17, 1], [34, 2]]);
+    const r = planCollisionCells(d, [{ x: 0, y: 0 }, { x: 1, y: 1 }, { x: 2, y: 2 }], 7, 'isolate');
+    expect(r.kind).toBe('isolate');
+    expect((r as { plan: SurfaceEditPlan }).plan.newBlocks.length).toBe(2);
   });
 });

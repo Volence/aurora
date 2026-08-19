@@ -6,6 +6,9 @@ import {
   ringGroupPositions,
   screenToWorld,
   worldToLayoutCell,
+  worldToCollisionCell,
+  rectFromCorners,
+  COLLISION_CELL_PX,
   addStampCell,
   stampAccumToCells,
   hitTestObjectFrames,
@@ -412,5 +415,52 @@ describe('fitCamera', () => {
     // canvasH/zoom, not canvasH: at 2x only half the canvas height of world is
     // on screen, so more of a short plane is legitimately scrollable.
     expect(fitCamera(CANVAS, BG_H, { x: 0, y: 9999, zoom: 2 }).y).toBe(BG_H - CANVAS / 2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// worldToCollisionCell / rectFromCorners — the COLLISION facet's units.
+//
+// The layout facet stamps 256px chunks; the collision facet writes 16px cells.
+// Both gestures start from the same mouse event, so the two quantisers have to
+// agree about where the boundaries are or the map paints one place and
+// highlights another.
+// ---------------------------------------------------------------------------
+describe('worldToCollisionCell', () => {
+  it('quantises level pixels to 16px cells', () => {
+    expect(COLLISION_CELL_PX).toBe(16);
+    expect(worldToCollisionCell(0, 0)).toEqual({ x: 0, y: 0 });
+    expect(worldToCollisionCell(15, 15)).toEqual({ x: 0, y: 0 });
+    expect(worldToCollisionCell(16, 32)).toEqual({ x: 1, y: 2 });
+  });
+
+  it('agrees with worldToLayoutCell about which chunk a point is in', () => {
+    // A collision cell is 16px and a layout cell is a 256px CHUNK, so
+    // CHUNK_PX/COLLISION_CELL_PX collision cells span one layout cell. If these
+    // two ever disagree the map would paint one chunk and highlight another.
+    const per = CHUNK_PX / COLLISION_CELL_PX;
+    for (const [x, y] of [[0, 0], [255, 255], [256, 0], [1000, 300]] as const) {
+      const cc = worldToCollisionCell(x, y);
+      const lc = worldToLayoutCell(x, y);
+      expect(Math.floor(cc.x / per), `col at ${x},${y}`).toBe(lc.col);
+      expect(Math.floor(cc.y / per), `row at ${x},${y}`).toBe(lc.row);
+    }
+  });
+});
+
+describe('rectFromCorners', () => {
+  it('normalises a drag in any direction into the same inclusive box', () => {
+    // A marquee dragged up-and-left must paint the SAME cells as one dragged
+    // down-and-right. This is the case a naive implementation gets wrong, and
+    // it is invisible until someone drags the other way.
+    const want = { x: 2, y: 3, w: 3, h: 2 };
+    expect(rectFromCorners({ x: 2, y: 3 }, { x: 4, y: 4 })).toEqual(want);
+    expect(rectFromCorners({ x: 4, y: 4 }, { x: 2, y: 3 })).toEqual(want);
+    expect(rectFromCorners({ x: 2, y: 4 }, { x: 4, y: 3 })).toEqual(want);
+    expect(rectFromCorners({ x: 4, y: 3 }, { x: 2, y: 4 })).toEqual(want);
+  });
+
+  it('a single cell is a 1x1 box, INCLUSIVE of both corners', () => {
+    expect(rectFromCorners({ x: 5, y: 5 }, { x: 5, y: 5 })).toEqual({ x: 5, y: 5, w: 1, h: 1 });
   });
 });

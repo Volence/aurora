@@ -6,6 +6,12 @@
 // DOM or canvas. The component is a thin drawing shell over these functions.
 
 import type { LayoutGrid } from '../../../core/level-classic/model';
+// TYPE-ONLY, so no core module is pulled into this render-hot file at runtime —
+// the import is erased. Reusing the planner's own types rather than restating
+// {x,y,w,h} inline is the point: these two functions exist to feed
+// applyCollisionShapeCells/Rect, so a change to what a cell or a rect IS has to
+// break here at compile time rather than silently at the call site.
+import type { CollisionCell, CollisionRect } from '../../../core/level-classic/collision-write';
 import type { S1ObjectEntry } from '../../../core/formats/classic/s1-objpos';
 import { objectFrameRect, pointInRect } from '../../../core/level-classic/object-sprite';
 
@@ -147,6 +153,36 @@ export { screenToWorld } from '../../../core/art/camera';
 /** The layout cell (column, row) that contains a world-pixel coordinate. */
 export function worldToLayoutCell(worldX: number, worldY: number): { col: number; row: number } {
   return { col: Math.floor(worldX / CHUNK_PX), row: Math.floor(worldY / CHUNK_PX) };
+}
+
+/** One 16px collision cell, in level pixels. `CHUNK_PX` above is the 256px
+ *  layout cell; 16 of these span one of those. */
+export const COLLISION_CELL_PX = 16;
+
+/**
+ * The 16px COLLISION cell containing a level pixel — the unit the collision
+ * facet and `set_block_collision` speak.
+ *
+ * The sibling of `worldToLayoutCell`, and deliberately NOT the same cell: the
+ * layout gesture stamps a 256px chunk while the collision gesture writes the
+ * chunk-definition cell inside it, so the two quantise the same mouse position
+ * to different grids.
+ */
+export function worldToCollisionCell(worldX: number, worldY: number): CollisionCell {
+  return { x: Math.floor(worldX / COLLISION_CELL_PX), y: Math.floor(worldY / COLLISION_CELL_PX) };
+}
+
+/**
+ * The inclusive box between two cells, whichever way the drag went.
+ *
+ * INCLUSIVE is what a marquee means: dragging from a cell to itself selects
+ * that one cell, not none. Normalising both axes is what makes an up-and-left
+ * drag paint the same box as a down-and-right one.
+ */
+export function rectFromCorners(a: CollisionCell, b: CollisionCell): CollisionRect {
+  const x = Math.min(a.x, b.x);
+  const y = Math.min(a.y, b.y);
+  return { x, y, w: Math.abs(a.x - b.x) + 1, h: Math.abs(a.y - b.y) + 1 };
 }
 
 /** One accumulated stamp cell (grid column/row). */

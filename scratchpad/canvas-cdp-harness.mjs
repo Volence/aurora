@@ -353,10 +353,24 @@ const INSTALL = String.raw`
 })()`;
 
 // ---------------------------------------------------------------------------
+/**
+ * One mouse event, through the real input pipeline.
+ *
+ * `modifiers` IS FORWARDED, and it was not always. This helper used to pass
+ * only type/x/y/button/buttons and silently drop everything else, which made a
+ * modifier-drag harness impossible to write correctly and — far worse — easy to
+ * write INcorrectly: a Shift-drag row built on it dispatches without Shift, the
+ * app takes its unmodified branch, and the row reports PASS for a gesture that
+ * never happened. Additive, so every existing caller omits it and gets 0.
+ *
+ * CDP's bitmask: Alt=1, Ctrl=2, Meta=4, Shift=8 (the same encoding
+ * `Input.dispatchKeyEvent` takes, which is why `key()` below already had it).
+ */
 async function mouse(c, type, x, y, opts = {}) {
   await c.send('Input.dispatchMouseEvent', {
     type, x, y, button: opts.button ?? 'left',
     buttons: opts.buttons ?? (type === 'mouseReleased' ? 0 : 1), clickCount: 1,
+    modifiers: opts.modifiers ?? 0,
   });
 }
 async function key(c, k, code, vk, modifiers = 0) {

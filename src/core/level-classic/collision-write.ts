@@ -326,24 +326,36 @@ export type CollisionRectPlan =
   | { kind: 'nothing'; report: CollisionRectReport }
   | { kind: 'refused'; refusal: CollisionRectRefusal; why: string; resolution: string; report: CollisionRectReport };
 
+/** One FG cell, in 16px units. */
+export interface CollisionCell { x: number; y: number }
+
 /**
- * Plan ONE write of `shapeIndex` across every cell of `rect`, in `mode`.
+ * Plan ONE write of `shapeIndex` across an arbitrary SET of FG cells.
  *
- * WHY THIS IS A RECTANGLE AND NOT A LOOP OVER `planCollisionWrite`: a rectangle
- * must be one undo step, and one undo step means one store command. Isolate in
+ * The general form. `planCollisionRect` is this with the rectangle expanded —
+ * a rectangle is just the cell set a marquee produces, and keeping one planner
+ * is what stops the human gesture and the agent tool from drifting apart.
+ *
+ * WHY THIS IS ONE CALL AND NOT A LOOP OVER `planCollisionWrite`: a stroke must
+ * be one undo step, and one undo step means one store command. Isolate in
  * particular cannot be looped — every call would compute the same
  * `doc.blocks.length` for its clone id and they would collide.
  *
+ * DEDUPES ITS INPUT. A rectangle scan visits each cell once, but a freehand
+ * drag revisits them constantly — a wiggling cursor crosses the same cell
+ * dozens of times. The viewport dedupes its own stroke as well, but this
+ * function must not depend on that: it is pure core with a second caller.
+ *
  * PARTIAL BY DESIGN, in one direction only. Per-cell skips (air, block 0, a
  * link-mode overhang block, cells past the layout edge) are expected inside any
- * real rectangle — a slope's bounding box contains air — so they are counted and
+ * real selection — a slope's bounding box contains air — so they are counted and
  * stepped over. The AGGREGATE limits are not: which cells would land under a
  * half-satisfied clone budget is a function of scan order, so those refuse the
  * whole call.
  */
-export function planCollisionRect(
+export function planCollisionCells(
   doc: LevelDoc,
-  rect: CollisionRect,
+  cells: readonly CollisionCell[],
   shapeIndex: number,
   mode: CollisionWriteMode,
 ): CollisionRectPlan {
@@ -353,19 +365,24 @@ export function planCollisionRect(
   let noop = 0;
   let ambiguous = 0;
 
-  for (let dy = 0; dy < rect.h; dy++) {
-    for (let dx = 0; dx < rect.w; dx++) {
-      const at = locateCell(doc, rect.x + dx, rect.y + dy);
-      // `classifyCollisionCell` never returns 'outside-layout': a CellAddress
-      // already implies the cell is inside, because locateCell returns null
-      // outside. The reason is MANUFACTURED here, before the classifier runs.
-      if (!at) { bump('outside-layout'); continue; }
-      const outcome = classifyCollisionCell(doc, at, shapeIndex, mode);
-      if (outcome.kind === 'skip') { bump(outcome.reason); continue; }
-      if (outcome.kind === 'noop') { noop++; continue; }
-      if (at.loopAmbiguous) ambiguous++;
-      writes.push(outcome);
-    }
+  // Deduped by cell coordinate, insertion-ordered, so counts are honest and the
+  // scan order stays deterministic (first-seen).
+  const seenCells = new Set<string>();
+  for (const c of cells) {
+    const key = `${c.x},${c.y}`;
+    if (seenCells.has(key)) continue;
+    seenCells.add(key);
+
+    const at = locateCell(doc, c.x, c.y);
+    // `classifyCollisionCell` never returns 'outside-layout': a CellAddress
+    // already implies the cell is inside, because locateCell returns null
+    // outside. The reason is MANUFACTURED here, before the classifier runs.
+    if (!at) { bump('outside-layout'); continue; }
+    const outcome = classifyCollisionCell(doc, at, shapeIndex, mode);
+    if (outcome.kind === 'skip') { bump(outcome.reason); continue; }
+    if (outcome.kind === 'noop') { noop++; continue; }
+    if (at.loopAmbiguous) ambiguous++;
+    writes.push(outcome);
   }
 
   const skipped = [...skips].map(([reason, count]) => ({ reason, count }));
@@ -418,6 +435,30 @@ export function planCollisionRect(
 }
 
 /**
+ * Plan a RECTANGLE of FG cells — `planCollisionCells` with the box expanded.
+ *
+ * Kept as its own entry point because it is the agent tool's contract
+ * (`set_block_collision` takes x/y/w/h) and because a rectangle can be stated
+ * in four numbers where its cell list cannot.
+ *
+ * A degenerate rectangle (`w` or `h` of 0) expands to an EMPTY list and lands on
+ * the same empty refusal the freehand path gets — which is why
+ * `dominantSkipWhy`'s empty sentence must be true of both.
+ */
+export function planCollisionRect(
+  doc: LevelDoc,
+  rect: CollisionRect,
+  shapeIndex: number,
+  mode: CollisionWriteMode,
+): CollisionRectPlan {
+  const cells: CollisionCell[] = [];
+  for (let dy = 0; dy < rect.h; dy++) {
+    for (let dx = 0; dx < rect.w; dx++) cells.push({ x: rect.x + dx, y: rect.y + dy });
+  }
+  return planCollisionCells(doc, cells, shapeIndex, mode);
+}
+
+/**
  * A short phrase per skip reason, for counting rather than for explaining.
  *
  * DELIBERATELY NOT `skipRefusal`. That function writes the single-cell
@@ -442,14 +483,17 @@ function skipPhrase(reason: CollisionSkipReason): string {
  * distinguishable. Ties break by the array's own order, which is first-seen in
  * row-major scan — deterministic, and the tie is cosmetic.
  *
- * The empty case is not decoration. A zero-width or zero-height rectangle scans
- * no cells at all, so it applies nothing, matches nothing and skips nothing —
- * it reaches this function with an empty array, and an unseeded reduce over one
- * throws. An agent that passes `w: 0` must get a sentence back, not a TypeError.
+ * The empty case is not decoration, and it now has TWO ways in. A zero-width or
+ * zero-height rectangle expands to no cells at all, and a freehand stroke can
+ * hand over an empty list — either way nothing is applied, nothing matches and
+ * nothing is skipped, so this function is reached with an empty array and an
+ * unseeded reduce over one throws. An agent that passes `w: 0` must get a
+ * sentence back, not a TypeError. The sentence is worded for BOTH callers: it
+ * must not claim a width or a height, because a cell list has neither.
  */
 function dominantSkipWhy(skipped: { reason: CollisionSkipReason; count: number }[]): string {
   if (skipped.length === 0) {
-    return 'this rectangle covers no cells — its width or height is zero';
+    return 'no cells were given to write to — a rectangle with a zero width or height covers none';
   }
   const total = skipped.reduce((n, s) => n + s.count, 0);
   const top = skipped.reduce((a, b) => (b.count > a.count ? b : a));
