@@ -1,8 +1,19 @@
 # Phase 2C — resolve and commit
 
-**Status: BUILT 2026-08-16.** Core (`canvas-resolve`, `classic-commit-plan`, `classicCommitCanvas`),
-the canvas commit panel (CDP-verified 7/7) and the PNG import path (CDP-verified 4/4, plus a
-real-GHZ-palette check) are all on `master`. Originally designed 2026-08-15. Supersedes §4.4 of
+**Status: BUILT 2026-08-16 — EXCEPT §D2b.** Core (`canvas-resolve`, `classic-commit-plan`,
+`classicCommitCanvas`), the canvas commit panel (CDP-verified 7/7) and the PNG import path
+(CDP-verified 4/4, plus a real-GHZ-palette check) are all on `master`.
+
+> **§D2b — cross-act reach reporting — is NOT built.** Re-measured 2026-08-19: `CommitReport`
+> has a `warnings: string[]`, but only two things ever push into it
+> (`classic-commit-plan.ts:390` the shared-palette-file warning, and `:642` the engine-chunk-$51
+> loop warning). None of D2b's three reaches is reported — no sibling-act enumeration, no
+> "SBZ Act 3 borrows LZ's art under a palette you never saw", no underwater-palette warning. The
+> commit still *does* the right thing (reclaim is safe across all three, as D2b says); what is
+> missing is entirely what the artist is TOLD. Flagged by the 2026-08-16 lens sweep §7.3 and
+> annotated here rather than letting BUILT quietly mean "except D2b".
+
+Originally designed 2026-08-15. Supersedes §4.4 of
 `2026-08-15-in-app-art-authoring-design.md` (the "origination canvas" spec), whose §0 · Corrections
 called for exactly this respec. Where the two disagree, this document wins.
 

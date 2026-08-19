@@ -336,14 +336,27 @@ app.
 
 ---
 
-## 7 · Open decisions
+## 7 · Settled decisions
 
-_(§0's corrections add three that must be answered before 2C is planned: what commit does to the act
-PALETTE when the canvas has drifted from it; what COLLISION newly composed chunks get; and whether
-commit's primary path is wholesale REPLACE or incremental claim. See C3 and C5.)_
+**All three are CLOSED — settled by the code that shipped, and written down here 2026-08-19 (the
+2026-08-16 lens sweep §7.4 asked for exactly this) so that a cold session reading a list of "open"
+questions does not redesign shipped behaviour.** Each was re-verified against source on that date;
+the citation is where to look if you want to change one.
 
-- **Where the paint-through tools live in the UI** — whether painting is a tool-mode on the existing
-  `ChunkTab`/`BlockTab` or a distinct surface. Leaning tool-mode, so there is one place per tier.
-- **What the canvas document is called**, in UI and on disk.
-- **Whether the tile limit for a level-art profile is the act's free slots or the whole pool.** Free
-  slots is honest; the whole pool is what the user will expect to see. Possibly show both.
+_(§0's corrections added three more that had to be answered before 2C was planned: what commit does
+to the act PALETTE when the canvas has drifted from it; what COLLISION newly composed chunks get;
+and whether commit's primary path is wholesale REPLACE or incremental claim. See C3 and C5 — and
+`2026-08-15-phase-2c-resolve-and-commit-design.md`, which answers them.)_
+
+- **Where the paint-through tools live in the UI** — SETTLED: **a tool-mode per tier**, as this
+  spec was leaning. `ChunkTab.tsx:441` and `BlockTab.tsx:347` each carry a Paint chip that flips
+  `chunkPaintMode` / `blockPaintMode`, and the pixel surface mounts only in that mode. One place
+  per tier; no distinct surface.
+- **What the canvas document is called**, in UI and on disk — SETTLED: **named sidecar files under
+  `.aurora/canvas`**. `renderer/state/canvas-file.ts:36` (`CANVAS_DIR = '.aurora/canvas'`) writes
+  `<project>/.aurora/canvas/<name>.png` beside `<name>.canvas.json`.
+- **Whether the tile limit for a level-art profile is the act's free slots or the whole pool** —
+  SETTLED: **show unique / free / pool and do NOT compare them.** `use-canvas-constraints.ts`
+  carries `freeSlots`, `poolUsed` and `poolTotal` side by side; the not-comparing is deliberate and
+  is asserted by `components/canvas/__tests__/canvas-budget.test.ts` ("It states two numbers and
+  does NOT compare them"). Committing is where the match against the pool actually happens.
