@@ -792,6 +792,10 @@ describe('planCollisionRect — link', () => {
 
 Add `LOOP_ALIAS` to the file's import from `../collision-probe`.
 
+> **On `skipRefusal`'s `outside-layout` arm.** Task 3 added it for switch exhaustiveness over `CollisionSkipReason`, and NO caller renders it — the rectangle's summary sentence uses `skipPhrase` (below) instead, because a rectangle has no single block to name and `skipRefusal`'s overhang arm needs one. Leave the arm in place; removing it breaks the exhaustive switch. Note that it reads `doc.fg.width/height`, which is the other reason Step 1's fixture change is required.
+
+> **The scanner MANUFACTURES `outside-layout`.** `classifyCollisionCell` never returns it — a `CellAddress` already implies the cell is inside the layout, because `locateCell` returns `null` outside. So the rectangle loop produces that reason itself when `locateCell` comes back null, before the classifier is consulted.
+
 - [ ] **Step 3: Run to verify it fails**
 
 ```bash
