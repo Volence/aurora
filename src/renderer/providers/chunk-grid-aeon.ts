@@ -144,7 +144,9 @@ export function useAeonChunkGridPort(): ChunkGridPort {
     layout: 'panel',
     selectedId: selectedChunkId,
     statusBadge: selectedName,
-    statusHint: selectedName ? 'Click map to stamp · dbl-click to edit' : 'Click a chunk to select',
+    // `double-click` spelled out, not `dbl-click`: the abbreviation existed to
+    // chase a slot that no longer squeezes it (ChunkGrid's `hintLine`).
+    statusHint: selectedName ? 'Click map to stamp · double-click to edit' : 'Click a chunk to select',
     emptyState: {
       message: 'No chunks loaded',
       hint: 'Import 128x128 + 16x16 + art from S2/S3K/hack',
