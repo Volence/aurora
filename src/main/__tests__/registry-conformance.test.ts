@@ -118,4 +118,32 @@ describe('registry conformance', () => {
       }
     }
   });
+
+  it('never names a param `kind` — it would hijack its own dispatch', () => {
+    // BOTH consumers spread the params AFTER the discriminant:
+    //   adapter.ts:73   forward({ kind: m.kind, ...parsed.data } as AgentRequest)
+    //   mcp-server.ts:38 forward({ kind: m.kind, ...args }       as AgentRequest)
+    // so a param called `kind` overwrites the routing key and sends the request
+    // to some other handler entirely. The `as AgentRequest` on both lines is
+    // what makes this invisible: unlike the kind->case mapping, there is NO
+    // compiler backstop here at all.
+    //
+    // A caller cannot reach this — zod strips undeclared keys, so `parsed.data`
+    // only ever holds what the entry itself declared. That is exactly why it
+    // belongs here rather than in a runtime guard: the mistake is made by
+    // whoever WRITES a registry entry, and it would ship green.
+    for (const m of EDITOR_METHODS) {
+      expect(Object.keys(m.params), `${m.name} declares a param named 'kind'`).not.toContain('kind');
+    }
+  });
+
+  it('advertises the registry and nothing else', () => {
+    // The other direction of the advertisement check. That one proves every
+    // entry is reachable; this proves nothing UNREACHABLE is advertised. A
+    // hand-added string in `capabilities().methods` is discoverable, dispatches
+    // to METHOD_NOT_FOUND, and is otherwise completely silent — which matters
+    // because the spec's own claim is that discovery IS the protocol.
+    const expected = ['editor/ping', ...EDITOR_METHODS.map((m) => `editor/${m.name}`)];
+    expect(new Set(capabilities().methods)).toEqual(new Set(expected));
+  });
 });
