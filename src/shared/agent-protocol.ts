@@ -55,6 +55,14 @@ export type AgentRequest =
   | { kind: 'classic-move-object'; index: number; x: number; y: number }
   | { kind: 'classic-delete-object'; index: number }
   | { kind: 'classic-set-colind'; entries: { blockId: number; value: number }[] }
+  // Classic's collision-authoring tool, in the FACET's coordinates — a rectangle
+  // of 16px FG CELLS. It sets the SHAPE on the BLOCK under each cell and never
+  // touches solidity, which rides the chunk cell and stays `classic-edit-chunk`.
+  //
+  // NOT `paint-collision`: that kind is aeon's and means something else (a
+  // collision-plane cell word including solidity, on a per-section plane).
+  | { kind: 'classic-set-block-collision'; x: number; y: number; w: number; h: number;
+      shape: number; mode?: 'link' | 'isolate'; dryRun?: boolean }
   | { kind: 'classic-set-palette'; line: number; colors: number[] }
   | { kind: 'classic-set-start'; x: number; y: number }
   | { kind: 'classic-save-project' }

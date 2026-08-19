@@ -4,6 +4,10 @@ import type { AgentRequest } from '../shared/agent-protocol';
 // as a schema so a bad canvas name is INVALID_PARAMS at the protocol edge
 // rather than the renderer's throw, which reaches a client as INTERNAL.
 import { CANVAS_NAME_PATTERN } from '../shared/canvas-name';
+// Pure-TS format facts (model.ts imports only two `import type`s, so nothing
+// runtime-heavy follows it into the main process). The collision tool's schema
+// bounds are DERIVED from them rather than restated.
+import { MAX_FG_CELLS_W, MAX_FG_CELLS_H } from '../core/level-classic/model';
 
 /**
  * The editor's capability surface, defined once and consumed by BOTH the MCP
@@ -146,6 +150,28 @@ export const EDITOR_METHODS: EditorMethod[] = [
   { name: 'set_colind', kind: 'classic-set-colind', result: 'json',
     params: { entries: z.array(z.object({ blockId: z.number().int().min(0), value: z.number().int().min(0).max(255) })).describe('block id → collision-shape index edits') },
     description: 'Set block→collision-shape indices (batched). One undo step.' },
+  // NAMED `set_block_collision`, NOT `paint_collision` — aeon already owns that
+  // name in this flat registry with different semantics (a collision-plane cell
+  // word including solidity, versus a shape index on the zone-wide BLOCK tier),
+  // and registry names must be globally unique. Same collision, same resolution
+  // as `set_level_palette` below.
+  //
+  // The bounds are DERIVED from the format (model.ts's MAX_LAYOUT_W/H, in cells)
+  // rather than copied from aeon's `paint_collision`, whose 127/128 encode
+  // aeon's fixed section size. A classic act is up to 1024 cells wide, and a
+  // full-width sweep has to be ONE call to be one undo step.
+  { name: 'set_block_collision', kind: 'classic-set-block-collision', result: 'json',
+    params: {
+      x: z.number().int().min(0).max(MAX_FG_CELLS_W - 1).describe('left FG cell column (16px units)'),
+      y: z.number().int().min(0).max(MAX_FG_CELLS_H - 1).describe('top FG cell row (16px units)'),
+      w: z.number().int().min(1).max(MAX_FG_CELLS_W),
+      h: z.number().int().min(1).max(MAX_FG_CELLS_H),
+      shape: z.number().int().min(0).max(255).describe('collision-shape index (a colind value); 0 = no collision'),
+      mode: z.enum(['link', 'isolate']).optional()
+        .describe('"link" (default) writes the shape onto the block itself, changing every use of it ZONE-wide; "isolate" clones the block first so only these cells change — at the cost of one collision-table entry per distinct block, which some zones have none of'),
+      dryRun: z.boolean().optional().describe('plan and report without applying'),
+    },
+    description: 'Set the collision SHAPE on the block under every cell of a rectangle, in 16px FG cell units. One undo step. Does NOT set solidity — that rides the chunk cell (edit_chunk). Partial by design: cells that are air, blank block 0, a dangling block reference, outside the layout, or (link) past the end of the zone\'s collision table are skipped and counted in the reply, and the rest still applies. A refusal returns ok:false with a message and a resolution — the whole call is refused only when nothing applied and nothing already matched, or when isolate would need more collision-table entries than the zone has spare.' },
   // NOTE: named `set_level_palette` (not `set_palette`) — the aeon `set_palette`
   // tool already owns that name in this flat registry, and MCP tool names must be
   // globally unique. The classic surface allows palette line 0 (a real level line,
