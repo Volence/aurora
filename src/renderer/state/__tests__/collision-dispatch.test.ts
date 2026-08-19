@@ -145,10 +145,46 @@ function rectDoc(colindLength = 8): LevelDoc {
 const artStack = () => documentHistoryHub.historyFor(zoneArtDocIdForCurrentZone()!);
 
 describe('applyCollisionShapeRect', () => {
-  it('refuses rather than throwing when no level is open', () => {
+  it('refuses rather than throwing when no level is open, under its OWN kind', () => {
+    // NOT 'nothing-applicable'. That kind's declared meaning is "cells were
+    // scanned and none could take a shape" — here nothing was scanned at all,
+    // because there was no document to scan. A human reads `why` and is fine; an
+    // agent branching on `refusal.kind` gets a wrong answer, which is exactly
+    // what a discriminated union invites.
     const r = applyCollisionShapeRect({ x: 0, y: 0, w: 1, h: 1 }, 7, 'link');
     expect(r.ok).toBe(false);
+    expect((r as { refusal: { kind: string } }).refusal.kind).toBe('no-level');
     expect((r as { why: string }).why).toMatch(/no classic level is open/);
+  });
+
+  it('reports a planner/store disagreement under its OWN kind, not as nothing-applicable', () => {
+    // The other kind that was lying. Here cells WERE applicable — the planner
+    // produced a link plan for two of them — and the store rejected the write.
+    // The `skipped` array a 'nothing-applicable' refusal carries has nothing to
+    // do with that failure.
+    //
+    // REACHED WITHOUT MOCKING, through a real gap: the planner does not bound
+    // `shapeIndex` at all, while classicSetColind bounds a colind value to
+    // 0..255 (classicLevelStore.ts:1289). So shape 300 plans clean and the store
+    // refuses it — which is precisely what this branch means by "the planner and
+    // the store command disagree". (That the planner should bound the shape
+    // itself is a separate, real defect; this test does not depend on which way
+    // it is eventually fixed, only that the disagreement is reported honestly.)
+    openReady(rectDoc());
+    const docBefore = st().doc;
+
+    const r = applyCollisionShapeRect({ ...RECT_ORIGIN, w: 2, h: 1 }, 300, 'link');
+
+    expect(r.ok).toBe(false);
+    const refusal = (r as { refusal: { kind: string; error?: string } }).refusal;
+    expect(refusal.kind).toBe('store-disagreement');
+    expect(refusal.error).toMatch(/out of range 0\.\.255/);
+    expect((r as { why: string }).why).toBe(refusal.error);
+    expect((r as { resolution: string }).resolution).toMatch(/Aurora bug/i);
+    // The report still describes the rectangle the planner actually scanned.
+    expect((r as { report: { applied: number } }).report.applied).toBe(2);
+    // A rejected command wrote nothing — reference-identical.
+    expect(st().doc).toBe(docBefore);
   });
 
   it('writes a whole rectangle as ONE undo step', () => {

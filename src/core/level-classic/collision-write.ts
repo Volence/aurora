@@ -295,10 +295,29 @@ export interface CollisionRectReport {
   warnings: string[];
 }
 
+/**
+ * WHY A CALL WROTE NOTHING, as a discriminant an agent can branch on.
+ *
+ * Each kind means ONE thing and carries the numbers that thing is about.
+ * 'nothing-applicable' in particular means "cells were scanned and none could
+ * take a shape" — it is NOT the bucket for every failure, which is why the two
+ * kinds below it that the dispatcher owns exist separately: a call with no
+ * document scanned no cells, and a call the store rejected had applicable cells
+ * whose `skipped` counts say nothing about the rejection. A human reads `why`
+ * and is fine either way; an agent branching on `kind` is not.
+ */
 export type CollisionRectRefusal =
   | { kind: 'nothing-applicable'; skipped: { reason: CollisionSkipReason; count: number }[] }
   | { kind: 'isolate-grows-table'; needed: number; spare: number; colindLength: number; blocks: number }
-  | { kind: 'block-ceiling'; needed: number; spare: number };
+  | { kind: 'block-ceiling'; needed: number; spare: number }
+  /** No act is open — nothing was scanned. Raised by the dispatcher, not here. */
+  | { kind: 'no-level' }
+  /**
+   * The planner said the write was legal and the store command refused it. An
+   * Aurora bug rather than a fact about the document, and raised by the
+   * dispatcher — the only place that can see both answers.
+   */
+  | { kind: 'store-disagreement'; error: string };
 
 export type CollisionRectPlan =
   | { kind: 'link'; entries: { blockId: number; value: number }[]; report: CollisionRectReport }

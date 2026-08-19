@@ -106,7 +106,9 @@ export function applyCollisionShapeRect(
     };
     return {
       ok: false,
-      refusal: { kind: 'nothing-applicable', skipped: [] },
+      // NOT 'nothing-applicable': that kind means "cells were scanned and none
+      // could take a shape", and here no cell was scanned at all.
+      refusal: { kind: 'no-level' },
       why: 'no classic level is open',
       resolution: 'Open an act first (get_classic_level).',
       report,
@@ -128,10 +130,14 @@ export function applyCollisionShapeRect(
 
   // A rejection HERE is a genuine fault: the planner is the authority on what is
   // legal, so the command re-validating and disagreeing means the two drifted.
+  //
+  // It gets its OWN kind, and carried 'nothing-applicable' before: cells WERE
+  // applicable here — the planner built a command out of them — and the
+  // `skipped` counts that kind carries have nothing to do with the rejection.
   if (!result.ok) {
     return {
       ok: false,
-      refusal: { kind: 'nothing-applicable', skipped: plan.report.skipped },
+      refusal: { kind: 'store-disagreement', error: result.error },
       why: result.error,
       resolution: 'This is an Aurora bug — the planner and the store command disagree.',
       report: plan.report,
