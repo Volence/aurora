@@ -12,7 +12,7 @@
 // creating one (isolate) would define entries whose real values are unknown.
 
 import { describe, it, expect } from 'vitest';
-import { planCollisionWrite } from '../collision-write';
+import { classifyCollisionCell, planCollisionWrite } from '../collision-write';
 import type { CollisionProbe } from '../collision-probe';
 import type { LevelDoc } from '../model';
 
@@ -213,5 +213,52 @@ describe('planCollisionWrite no-op', () => {
   it('still writes when the shape actually differs', () => {
     expect(planCollisionWrite(doc2(), probe(), 10, 'link').kind).toBe('link');
     expect(planCollisionWrite(doc2(), probe(), 10, 'isolate').kind).toBe('isolate');
+  });
+});
+
+// THE PER-CELL DECISION, on its own. Both the single-cell panel path and the
+// rectangle tool go through this, so it names each outcome without deciding
+// what the write is — and without any of the AGGREGATE limits, which are
+// properties of a whole call and not of a cell.
+describe('classifyCollisionCell', () => {
+  const at = (chunkIndex: number | null, cellIndex: number) =>
+    ({ chunkId: 1, chunkIndex, cellIndex, looping: false, loopAmbiguous: false });
+
+  it('skips air — no chunk is stamped at this cell', () => {
+    const d = doc();
+    expect(classifyCollisionCell(d, at(null, 0), 7, 'link').kind).toBe('skip');
+    expect((classifyCollisionCell(d, at(null, 0), 7, 'link') as { reason: string }).reason).toBe('air');
+  });
+
+  it('skips block 0 — the blank block the engine short-circuits before', () => {
+    const d = doc();
+    d.chunks[0].cells[1] = { ...d.chunks[0].cells[1], block: 0 };
+    expect((classifyCollisionCell(d, at(0, 1), 7, 'link') as { reason: string }).reason).toBe('block0');
+  });
+
+  it('is a no-op when the block already carries the shape, in EITHER mode', () => {
+    const d = doc();
+    d.chunks[0].cells[2] = { ...d.chunks[0].cells[2], block: 1 };
+    d.collision.colind = new Uint8Array([0, 7, 0, 0]);
+    expect(classifyCollisionCell(d, at(0, 2), 7, 'link').kind).toBe('noop');
+    expect(classifyCollisionCell(d, at(0, 2), 7, 'isolate').kind).toBe('noop');
+  });
+
+  it('skips the overhang in LINK mode only — isolate’s limit is aggregate', () => {
+    const d = doc();
+    d.chunks[0].cells[2] = { ...d.chunks[0].cells[2], block: 1 };
+    d.collision.colind = new Uint8Array(1);
+    expect((classifyCollisionCell(d, at(0, 2), 7, 'link') as { reason: string }).reason).toBe('overhang');
+    // Isolate does not have a per-cell overhang skip — its limit is aggregate.
+    expect(classifyCollisionCell(d, at(0, 2), 7, 'isolate').kind).toBe('write');
+  });
+
+  it('carries the block and the cell back out in the ordinary case', () => {
+    const d = doc();
+    d.chunks[0].cells[2] = { ...d.chunks[0].cells[2], block: 1 };
+    d.collision.colind = new Uint8Array([0, 3, 0, 0]);
+    const w = classifyCollisionCell(d, at(0, 2), 7, 'link');
+    expect(w).toMatchObject({ kind: 'write', blockId: 1, chunkIndex: 0, cellIndex: 2 });
+    expect((w as { cell: unknown }).cell).toBe(d.chunks[0].cells[2]);
   });
 });

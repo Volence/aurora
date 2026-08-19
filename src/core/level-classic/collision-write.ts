@@ -16,8 +16,8 @@
 // module only decides WHAT to hand them, and refuses what neither of them
 // should be asked to do.
 
-import type { CollisionProbe } from './collision-probe';
-import type { LevelDoc } from './model';
+import type { CellAddress, CollisionProbe } from './collision-probe';
+import type { ChunkCell, LevelDoc } from './model';
 import type { SurfaceEditPlan } from '../art/classic-surface-plan';
 
 export type CollisionWriteMode = 'link' | 'isolate';
@@ -28,6 +28,21 @@ export type CollisionWritePlan =
   /** The block already carries this shape — nothing to write, and nothing to undo. */
   | { kind: 'noop' }
   | { kind: 'refused'; why: string };
+
+/**
+ * Why one cell of a write is not written. Every one of these is CELL-LOCAL,
+ * deterministic and stable across re-invocation, which is what makes them safe
+ * to skip past rather than refuse on. The aggregate limits — colind growth and
+ * the 1024-block ceiling — are deliberately NOT here: they are properties of
+ * the whole call, and a partial application of them would depend on scan order.
+ */
+export type CollisionSkipReason = 'outside-layout' | 'air' | 'block0' | 'overhang';
+
+export type CollisionCellOutcome =
+  | { kind: 'write'; blockId: number; chunkIndex: number; cellIndex: number; cell: ChunkCell }
+  /** The block already carries this shape. Success, not a skip. */
+  | { kind: 'noop' }
+  | { kind: 'skip'; reason: CollisionSkipReason };
 
 // Chunk cells reference blocks with a 10-bit field → at most 1024 blocks
 // (model.ts's MAX_BLOCKS / classicLevelStore.ts's MAX_BLOCKS_TOTAL — restated
@@ -83,6 +98,75 @@ function escapeFromIsolateGrowth(doc: LevelDoc, blockId: number): string {
 }
 
 /**
+ * THE PER-CELL DECISION, in one place, for both the single-cell panel path and
+ * the rectangle tool. Everything except the aggregate capacity limits.
+ *
+ * Re-derives the block from `doc` rather than trusting any cached address — a
+ * probe survives undo, so it can name a block the cell no longer references.
+ *
+ * The ORDER mirrors the engine's own short-circuit order: block 0 is tested
+ * before solidity and before colind is ever read.
+ */
+export function classifyCollisionCell(
+  doc: LevelDoc,
+  at: CellAddress,
+  shapeIndex: number,
+  mode: CollisionWriteMode,
+): CollisionCellOutcome {
+  if (at.chunkIndex === null) return { kind: 'skip', reason: 'air' };
+
+  const cell = doc.chunks[at.chunkIndex]?.cells[at.cellIndex];
+  const blockId = cell?.block ?? 0;
+
+  // Block 0 is the blank block. FindFloor short-circuits before it ever reads
+  // solidity or colind, so a shape stored here can never apply in game.
+  if (blockId === 0) return { kind: 'skip', reason: 'block0' };
+
+  // ALREADY THIS SHAPE → nothing to do, in EITHER mode.
+  //
+  // `classicSetColind` has this guard (classicLevelStore.ts:1286) so a link
+  // that changes nothing records no undo step. Isolate had no equivalent, and
+  // its cost is far higher than a wasted undo entry: re-picking the swatch the
+  // panel already highlights as current would clone a block and spend a colind
+  // entry to arrive at collision identical to the block it copied — exactly the
+  // capacity this file's ceiling and table-growth refusals exist to protect.
+  if ((doc.collision.colind[blockId] ?? 0) === shapeIndex) return { kind: 'noop' };
+
+  // THE OVERHANG, link mode only. A block id past the end of the colind table
+  // resolves into the ADJACENT ZONE's table in ROM, so writing it would
+  // silently redefine another zone's collision. Isolate has no per-cell
+  // equivalent: it never writes the existing id, and its own limit is aggregate.
+  if (mode === 'link' && blockId >= doc.collision.colind.length) {
+    return { kind: 'skip', reason: 'overhang' };
+  }
+
+  return { kind: 'write', blockId, chunkIndex: at.chunkIndex, cellIndex: at.cellIndex, cell: cell! };
+}
+
+/** The block a cell references right now, or 0. Used only for refusal wording. */
+function blockIdAt(doc: LevelDoc, at: CellAddress): number {
+  return (at.chunkIndex === null ? 0 : doc.chunks[at.chunkIndex]?.cells[at.cellIndex]?.block) ?? 0;
+}
+
+/**
+ * The one sentence for each skip reason, shared by the panel (which shows it as
+ * a refusal) and the agent tool (which shows it as the dominant reason when a
+ * whole rectangle skipped). Written once so the two cannot drift.
+ */
+export function skipRefusal(doc: LevelDoc, reason: CollisionSkipReason, blockId: number): string {
+  switch (reason) {
+    case 'outside-layout':
+      return `this cell is outside the act's layout (${doc.fg.width * 16} x ${doc.fg.height * 16} cells)`;
+    case 'air':
+      return 'no chunk is stamped here — this cell is air';
+    case 'block0':
+      return 'block 0 is the blank block — the engine short-circuits before reading its collision, so a shape here can never apply';
+    case 'overhang':
+      return `block ${blockId} is past the end of this zone's collision table (${doc.collision.colind.length} entries) — the overhang resolves into the adjacent zone's table in ROM, so Aurora cannot set it without silently changing other blocks. ${escapeFromLinkOverhang(doc)}`;
+  }
+}
+
+/**
  * Decide how to write shape `shapeIndex` to the block under the cell `probe`
  * named, in `mode`. Re-derives the block from `doc` at `probe.chunkIndex` /
  * `probe.cellIndex` rather than trusting `probe.blockId` — a probe survives
@@ -94,22 +178,31 @@ export function planCollisionWrite(
   shapeIndex: number,
   mode: CollisionWriteMode,
 ): CollisionWritePlan {
-  if (probe.chunkIndex === null) {
-    return { kind: 'refused', why: 'no chunk is stamped here — this cell is air' };
-  }
+  const at: CellAddress = {
+    chunkId: probe.chunkId,
+    chunkIndex: probe.chunkIndex,
+    cellIndex: probe.cellIndex,
+    looping: probe.looping,
+    loopAmbiguous: probe.loopAmbiguous,
+  };
+  const outcome = classifyCollisionCell(doc, at, shapeIndex, mode);
 
-  const chunk = doc.chunks[probe.chunkIndex];
-  const cell = chunk?.cells[probe.cellIndex];
-  const blockId = cell?.block ?? 0;
-
-  // Block 0 is the blank block. FindFloor short-circuits before it ever reads
-  // solidity or colind, so a shape stored here can never apply in game.
-  if (blockId === 0) {
-    return {
-      kind: 'refused',
-      why: 'block 0 is the blank block — the engine short-circuits before reading its collision, so a shape here can never apply',
-    };
+  // A SKIP IS A REFUSAL ON THIS PATH, and that asymmetry is deliberate. This is
+  // the answer to a CLICK: the person aimed at one cell, and "nothing happened"
+  // with no sentence is the worst possible reply. The rectangle path turns the
+  // same outcomes into counts instead, because a rectangle over a slope
+  // legitimately contains air. Same classifier, two contracts.
+  if (outcome.kind === 'skip') {
+    return { kind: 'refused', why: skipRefusal(doc, outcome.reason, blockIdAt(doc, at)) };
   }
+  if (outcome.kind === 'noop') return { kind: 'noop' };
+
+  // The classifier carries the ADDRESS back out as well as the block, and this
+  // path uses its copy rather than the probe's: `probe.chunkIndex` is
+  // `number | null` and it is `classifyCollisionCell` that resolved the null,
+  // so taking it from the outcome is both narrower and the single source.
+  const { blockId, cell, chunkIndex, cellIndex } = outcome;
+  const colind = doc.collision.colind;
 
   const warnings: string[] = [];
   // $28 behind a loop may be read as $51 while the player's sprite_looping_bit
@@ -121,33 +214,7 @@ export function planCollisionWrite(
     );
   }
 
-  const colind = doc.collision.colind;
-
-  // ALREADY THIS SHAPE → nothing to do, in EITHER mode.
-  //
-  // `classicSetColind` has this guard (classicLevelStore.ts:1286) so a link
-  // that changes nothing records no undo step. Isolate had no equivalent, and
-  // its cost is far higher than a wasted undo entry: re-picking the swatch the
-  // panel already highlights as current would clone a block and grow the colind
-  // table to give the clone collision identical to the block it copied. That
-  // spends exactly the capacity this file's ceiling and table-growth refusals
-  // exist to protect — LZ has four spare entries — for no change at all.
-  if ((colind[blockId] ?? 0) === shapeIndex) return { kind: 'noop' };
-
-  if (mode === 'link') {
-    // THE OVERHANG. A block id past the end of the colind table resolves
-    // into the ADJACENT ZONE's table in ROM — its real value is unknowable
-    // from this zone's files, so writing it would silently redefine another
-    // zone's collision. classicSetColind refuses the same ids; refused here
-    // too so the panel has one refusal path to render instead of two.
-    if (blockId >= colind.length) {
-      return {
-        kind: 'refused',
-        why: `block ${blockId} is past the end of this zone's collision table (${colind.length} entries) — the overhang resolves into the adjacent zone's table in ROM, so Aurora cannot set it without silently changing other blocks. ${escapeFromLinkOverhang(doc)}`,
-      };
-    }
-    return { kind: 'link', entries: [{ blockId, value: shapeIndex }], warnings };
-  }
+  if (mode === 'link') return { kind: 'link', entries: [{ blockId, value: shapeIndex }], warnings };
 
   // mode === 'isolate'
   const newBlockId = doc.blocks.length;
@@ -178,9 +245,9 @@ export function planCollisionWrite(
     blockCellEdits: [],
     chunkCellEdits: [
       {
-        chunkIndex: probe.chunkIndex,
-        cellIndex: probe.cellIndex,
-        cell: { block: newBlockId, xf: cell!.xf, yf: cell!.yf, solidity: cell!.solidity },
+        chunkIndex,
+        cellIndex,
+        cell: { block: newBlockId, xf: cell.xf, yf: cell.yf, solidity: cell.solidity },
       },
     ],
     stats: { tilesClaimed: 0, blocksCloned: 1, placesAffected: 1 },
