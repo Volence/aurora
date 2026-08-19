@@ -49,12 +49,26 @@
 // the teardown drains the stack and compares the whole collision table against
 // the snapshot taken at the start of the run.
 //
+// ROW 9 IS THE ONE EXCEPTION, and it is worth stating plainly: it STAMPS A
+// LAYOUT CELL (to author the loop-flagged chunk $28 that no stock layout
+// contains) and therefore mutates something the collision-table comparison
+// above cannot see. It restores that byte by value in a `finally` and re-reads
+// it to prove the restore, and the restore is part of the row's pass predicate
+// — so a row 9 that leaves the layout dirty is a row 9 that FAILS. The stamp
+// and its inverse land on the LAYOUT undo stack, which the Undo chip does not
+// reach from the Collision facet (see drainUndo), which is exactly why the
+// restore is a stamp and not a click.
+//
 // ---------------------------------------------------------------------------
 // WHAT THE WIRE IS USED FOR (and what it is NOT)
 // ---------------------------------------------------------------------------
-// The Aether HTTP binding is used for exactly two SETUP jobs: reading the FG
-// layout (`editor/get_classic_level`) and DRY-RUNNING a candidate rectangle
-// (`editor/set_block_collision` with `dryRun: true`, which mutates nothing).
+// The Aether HTTP binding is used for SETUP only: reading the FG layout
+// (`editor/get_classic_level`), DRY-RUNNING a candidate rectangle
+// (`editor/set_block_collision` with `dryRun: true`, which mutates nothing),
+// and — row 9 alone — stamping and then restoring one layout byte
+// (`editor/set_layout_region`), because the condition that row tests does not
+// occur in any stock layout and has to be authored before it can be painted
+// across.
 // The second is not optional: `__dbg.classic.colindOf` cannot see the colind
 // table's LENGTH, so a block past its end still looks like a fine candidate
 // here and would skip as 'overhang' at write time — a row failing for a reason
@@ -82,10 +96,16 @@ import { join } from 'node:path';
 
 /** CDP's Shift bit. Alt=1, Ctrl=2, Meta=4, Shift=8. */
 const SHIFT = 8;
+/** S1's loop flag — bit 7 of a raw FG layout byte — and the chunk id the engine
+ *  swaps out behind a loop. `LOOP_ALIAS.from` in core/level-classic/
+ *  collision-probe.ts, and `$28` is the RAW byte: FindNearestTile masks with
+ *  #$7F, adds 1 and compares #$29. Row 9 authors both halves. */
+const LOOP_BIT = 0x80;
+const LOOP_CHUNK = 0x28;
 /** Branch-only string literal — see PROVENANCE. */
 const BUILD_MARKER = 'already had it';
 /** Task 5's panel hint. A NOTE, not an abort: a build made before that commit
- *  is still a perfectly good build of the GESTURE, which is what the 8 rows
+ *  is still a perfectly good build of the GESTURE, which is what the 9 rows
  *  test. If this is missing, rebuild to see the hint on screen. */
 const HINT_MARKER = 'Shift-drag paints';
 
@@ -159,6 +179,36 @@ const colindSnapshot = (c) => c.json(`(() => {
   const out = new Array(sizes.blocks);
   for (let i = 0; i < sizes.blocks; i++) out[i] = P.colindOf(i);
   return out;
+})()`);
+
+/**
+ * Two horizontally ADJACENT paintable cells inside one chunk's definition.
+ *
+ * Row 9's subject. The filter is deliberately the same one `findTargets` uses
+ * (`block > 0 && block < blockCount`): a non-blank, in-pool block is exactly
+ * what `classifyCollisionCell` will take, and the one thing neither can see
+ * from here — a block past the END of the colind table — is settled by a dry
+ * run at the call site, as everywhere else in this file.
+ *
+ * Returns the pool's chunk count too, so the caller can say "this act does not
+ * have chunk $28" rather than reporting an empty list as if the chunk were
+ * simply featureless.
+ */
+const chunkPairs = (c, chunkId, limit = 24) => c.json(`(() => {
+  const P = window.__dbg.classic;
+  const sizes = P.poolSizes();
+  if (!sizes) return null;
+  const out = [];
+  const ok = (cell) => cell && cell.block > 0 && cell.block < sizes.blocks;
+  if (${chunkId} >= 1 && ${chunkId} <= sizes.chunks) {
+    for (let cr = 0; cr < 16 && out.length < ${limit}; cr++) {
+      for (let cc = 0; cc < 15 && out.length < ${limit}; cc++) {
+        const a = P.chunkCell(${chunkId}, cr * 16 + cc), b = P.chunkCell(${chunkId}, cr * 16 + cc + 1);
+        if (ok(a) && ok(b)) out.push({ cc, cr, blocks: [a.block, b.block] });
+      }
+    }
+  }
+  return { chunks: sizes.chunks, pairs: out };
 })()`);
 
 /** Which block ids differ between two snapshots, and how. */
@@ -719,7 +769,7 @@ const main = async () => {
       + `setup write undone in ${drainedSetup} step(s), `
       + `table back to the opening state=${diffColind(opening, afterSetup).length === 0}`);
     note(`Task 5's panel hint ('${HINT_MARKER}') in the bundle: ${markers.hint}`,
-      markers.hint ? 'the hint commit is in this build' : 'REBUILD to see the Task 5 hint — the 8 rows below do not depend on it');
+      markers.hint ? 'the hint commit is in this build' : 'REBUILD to see the Task 5 hint — the 9 rows below do not depend on it');
     if (!(markers.build && facetLit && armed && SHAPE !== null)) {
       console.error('\nABORT: the app is not in the state the gesture needs. Every later row would be a lie.');
       return;
@@ -1004,6 +1054,170 @@ const main = async () => {
         + `(must contain no skip line, or the report is not telling the user anything)`);
     }
 
+    // --- 9: a drag across a LOOP-FLAGGED chunk $28 WARNS, and still writes --
+    //
+    // AUTHORED, NOT FOUND — and the authoring is the finding. A census of every
+    // stock layout in the disassembly turns up eighteen loop-flagged cells in
+    // total (GHZ 1-3 one each, all on chunk 53/$35; SLZ 1-3 the other fifteen,
+    // on 42/$2A and 52/$34) and NOT ONE of them names chunk $28. `loopAmbiguous`
+    // needs the loop bit AND that id, so it is false everywhere in the shipped
+    // game and no drag over stock data can ever raise the warning.
+    //
+    // THE CONSTANT IS RIGHT, NOT THE DATA. `_incObj/sub FindNearestTile...asm`
+    // does `andi #$7F` / `addq #1` / `cmpi #$29` — i.e. the RAW byte $28 — and
+    // the chunk it substitutes lands on index $50 under the shared `subq #1`,
+    // which is engine id $51. LOOP_ALIAS (collision-probe.ts) matches both.
+    //
+    // So the only way to cover the warning at runtime is to STAMP the condition
+    // and paint across it. That is also why `findTargets` skips loop-flagged
+    // cells outright: rows 2-8 want a toast list with no warning in it, and this
+    // row wants a toast list with nothing else.
+    //
+    // THE LAYOUT IS RESTORED BY VALUE, IN A `finally`, AND RE-READ TO PROVE IT.
+    // This is the only row in the file that mutates a LAYOUT, and the stamp
+    // lands on the layout undo stack — which the Undo chip cannot reach from the
+    // Collision facet (see drainUndo), so the restore has to be the opposite
+    // stamp rather than a click. Nothing here calls save_project; the
+    // disassembly on disk is untouched either way.
+    const pairInfo = await chunkPairs(c, LOOP_CHUNK);
+    // The placement to overwrite: any non-air cell that is not already looping.
+    // The box's own placement is skipped so nothing this row stamps can ever be
+    // confused for something rows 2-8 did.
+    const boxPlacement = { col: Math.floor(box.x / 16), row: Math.floor(box.y / 16) };
+    let stampAt = null;
+    for (let r = 0; r < level.layout.fg.length && !stampAt; r++) {
+      for (let col = 0; col < level.layout.fg[r].length; col++) {
+        const raw = level.layout.fg[r][col];
+        if (raw === 0 || (raw & LOOP_BIT) !== 0) continue;
+        if (col === boxPlacement.col && r === boxPlacement.row) continue;
+        stampAt = { col, row: r, was: raw };
+        break;
+      }
+    }
+
+    if (!pairInfo || pairInfo.chunks < LOOP_CHUNK || pairInfo.pairs.length === 0 || !stampAt) {
+      check(9, 'a drag across a loop-flagged chunk $28 raises a WARNING toast — and still writes the cells', false,
+        !pairInfo ? 'no classic doc behind __dbg.classic'
+          : pairInfo.chunks < LOOP_CHUNK
+            ? `this act's pool has ${pairInfo.chunks} chunks, so engine id $${LOOP_CHUNK.toString(16)} `
+              + `(${LOOP_CHUNK}) does not exist here — the loop alias cannot be authored in this act, `
+              + 'and forcing it would be testing a chunk the engine could never draw'
+            : pairInfo.pairs.length === 0
+              ? `chunk $${LOOP_CHUNK.toString(16)}'s definition has no two adjacent cells on a non-blank, `
+                + 'in-pool block — there is nothing inside it a drag could paint'
+              : 'every FG layout cell is air or already loop-flagged — nowhere to stamp');
+    } else {
+      const layoutByte = async () => {
+        const l = await levelOf();
+        return l?.layout?.fg?.[stampAt.row]?.[stampAt.col] ?? null;
+      };
+      // `set_layout_region` takes RAW layout bytes 0..255, so the loop bit rides
+      // along in band (classicSetLayoutCells validates the MASKED id against the
+      // pool and accepts the full byte — see its comment).
+      const stamp = (byte) => rpc(PORT, 'editor/set_layout_region',
+        { plane: 'fg', x: stampAt.col, y: stampAt.row, chunkIds: [[byte]] });
+      const LOOP_BYTE = LOOP_BIT | LOOP_CHUNK;
+
+      let stamped = null, pair = null, dryWarn = [];
+      let frame9 = { ok: false, why: 'not reached' }, armed9 = null;
+      let diff9 = [], toasts9 = [], drained9 = 0;
+      let restored9 = null, backTo = null;
+      try {
+        await stamp(LOOP_BYTE);
+        await sleep(600);
+        stamped = await layoutByte();
+
+        // THE PAIR, confirmed the way every subject in this file is: a dry run
+        // over the exact two cells. `applied === 2` with no skips because the
+        // row asserts an EXACT block set afterwards, and `warnings >= 1` because
+        // that is the independent evidence the stamp really did author the
+        // condition — the agent path carries `warnings` verbatim, and it is the
+        // HUMAN path (a toast) that is under test here. If the dry run does not
+        // warn, the setup failed and the toast assertion below would be
+        // measuring the wrong thing.
+        for (const p of pairInfo.pairs) {
+          const x = stampAt.col * 16 + p.cc, y = stampAt.row * 16 + p.cr;
+          const dry = await rpc(PORT, 'editor/set_block_collision',
+            { x, y, w: 2, h: 1, shape: SHAPE, dryRun: true });
+          const r = dry.body.result;
+          if (r?.ok === true && r.applied === 2 && r.noop === 0 && (r.skipped?.length ?? 0) === 0
+              && (r.warnings?.length ?? 0) >= 1) {
+            pair = { ...p, x, y };
+            dryWarn = r.warnings;
+            break;
+          }
+        }
+
+        if (pair) {
+          // Re-armed and re-READ, like row 7's: rows 6-8 leave the tool armed,
+          // but an empty diff from a disarmed tool would fail this row with a
+          // story about the warning that was really a story about the dock.
+          await clickEl(c, TOOL_BTN('Paint Collision'));
+          await sleep(400);
+          armed9 = await toolArmed(c, 'Paint Collision');
+          const cells9 = [{ x: pair.x, y: pair.y }, { x: pair.x + 1, y: pair.y }];
+          frame9 = await framePoints(c, cells9);
+          drained9 = await drainUndo(c);
+          const before9 = await colindSnapshot(c);
+          const toastsBefore9 = await toastsNow(c);
+          if (frame9.ok) await drag(c, cells9.map(frame9.pt), { settle: 150 });
+          // Longer than the other rows': a warning dwells 8s (toastStore's
+          // dwellMs), so there is no hurry — but the SKIP line it must not be
+          // accompanied by only dwells 2.2s, and the "no skip line" clause is
+          // worthless if the window closes before one could have appeared.
+          toasts9 = await collectToasts(c, 2600, toastsBefore9);
+          diff9 = diffColind(before9, await colindSnapshot(c));
+        }
+      } finally {
+        // BOTH mutations backed out, in the order they were made: the paint
+        // through the app's own Undo chip (the zone-art stack), the layout byte
+        // by the opposite stamp. In a `finally` so an assertion or a CDP failure
+        // anywhere above still puts the byte back.
+        await drainUndo(c);
+        await stamp(stampAt.was);
+        await sleep(500);
+        backTo = await layoutByte();
+        restored9 = backTo === stampAt.was;
+      }
+
+      const warns9 = toasts9.filter((t) => t.type === 'warning');
+      const changed9 = diff9.map((d) => d.blockId).sort((a, b) => a - b);
+      const want9 = pair ? [...new Set(pair.blocks)].sort((a, b) => a - b) : [];
+      check(9, 'a drag across a loop-flagged chunk $28 raises a WARNING toast — and still writes the cells',
+        pair !== null && stamped === LOOP_BYTE && frame9.ok && armed9 === true
+          // ONE warning for the gesture, not one per cell: the planner counts
+          // the ambiguous cells into a single sentence, and a rectangle across a
+          // loop must not return hundreds of identical toasts.
+          && warns9.length === 1
+          && /\$51/.test(warns9[0].message) && /\$28/.test(warns9[0].message)
+          && /2 cells/.test(warns9[0].message)
+          // NOT A REFUSAL. The cells are written; the caveat is that the console
+          // may read a different chunk. Both halves are asserted, because a
+          // warning that came with an empty diff would be a refusal wearing a
+          // warning's clothes.
+          && JSON.stringify(changed9) === JSON.stringify(want9)
+          && diff9.every((d) => d.to === SHAPE)
+          // A clean write: nothing was skipped, so no tally line. This is the
+          // combination the human path used to drop entirely.
+          && toasts9.every((t) => !/skipped/i.test(t.message))
+          && restored9 === true,
+        `stamped $${LOOP_BYTE.toString(16)} (loop | $${LOOP_CHUNK.toString(16)}) over layout cell `
+        + `(${stampAt.col},${stampAt.row}), which was $${stampAt.was.toString(16)}; read back `
+        + `$${stamped === null ? '??' : stamped.toString(16)}; `
+        + `chunk $${LOOP_CHUNK.toString(16)} has ${pairInfo.pairs.length} adjacent paintable pair(s) `
+        + `in a pool of ${pairInfo.chunks} chunks; `
+        + (pair
+          ? `painted cells (${pair.x},${pair.y})-(${pair.x + 1},${pair.y}) over blocks `
+            + `${JSON.stringify(pair.blocks)}; dry run warned ${JSON.stringify(dryWarn)}; `
+            + `framing ${frame9.ok ? 'ok' : frame9.why}; Paint Collision armed=${armed9}; `
+            + `${drained9} stray undo step(s) drained first; `
+            + `diff ${JSON.stringify(diff9)} (wanted exactly ${JSON.stringify(want9)} -> ${SHAPE}); `
+            + `toasts ${JSON.stringify(toasts9)} — ${warns9.length} of type 'warning'`
+          : 'NO PAIR: none of the pairs dry-ran to applied=2, no skips and a warning '
+            + '(a block past the end of the colind table would do that, and so would a stamp that did not take)')
+        + `; layout byte restored to $${backTo === null ? '??' : backTo.toString(16)}=${restored9}`);
+    }
+
     // LEAVE THE DOCUMENT AS WE FOUND IT. Every writing row above undoes its own
     // write; this drains whatever is left and states, in one number, whether
     // the act is byte-for-byte as it opened. Note there is no save_project call
@@ -1101,3 +1315,36 @@ main().catch((e) => { console.error(e); process.exit(1); });
 //            same branch. The camera then never moves on this facet, row 6
 //            fails on its camera clause alone, nothing is written, and rows 7
 //            and 8 stay green (both re-arm the tool first). Expect 7/8.
+//
+// --- ROW 9 (a drag across a loop-flagged $28 warns) ------------------------
+//   FILE     src/renderer/components/classic/collision-gesture-report.ts
+//   FUNCTION reportCollisionGesture
+//   CHANGE   Put the warning emission back BELOW the clean-write early return,
+//            which is exactly where the human path used to drop it:
+//                export function reportCollisionGesture(report) {
+//                  if (report.skipped.length === 0) return;
+//                  for (const w of report.warnings) addToast(w, 'warning');
+//                  ...
+//   EXPECT   Row 9 FAILS on its warning clauses: the gesture writes both cells
+//            (`diff9` is still exactly the pair's blocks) and skips nothing, so
+//            the function returns before it ever reads `warnings` and `warns9`
+//            is empty. The row's "and it still writes" half stays true, which is
+//            the point — the defect is invisible in the document and visible
+//            only in what the painter was told.
+//   COLLATERAL None. Rows 2-8 never author a loop-flagged cell (`findTargets`
+//            skips bit 7 outright), so no other row has a warning to lose, and
+//            row 8's skip line is on the far side of the return and unaffected.
+//            Expect 8/9.
+//   NARROWER  ALTERNATIVE: leave the position alone and emit the warnings as
+//            'info' instead of 'warning'. Row 9 then fails on `warns9.length
+//            === 1` alone — the sentence is on screen, in the wrong voice, at
+//            the wrong dwell (2.2s instead of 8s, i.e. too short to read the
+//            one message that has to be acted on). Rows 2-8 stay green. Also
+//            8/9. Note that row 8's predicates are SUBSTRING-based (`/skipped/i`)
+//            and would not notice either plant, which is why row 9 asserts the
+//            toast TYPE explicitly rather than leaning on the toast list.
+//   VACUITY   If the act ever loses chunk $28 from its pool, row 9 reports that
+//            as a FAIL with the chunk count rather than passing quietly — see
+//            its guard branch. A row that skips itself is a row that proves
+//            nothing, and this one covers the only runtime evidence the loop
+//            warning has.

@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-export type ToastType = 'success' | 'info' | 'error';
+export type ToastType = 'success' | 'info' | 'error' | 'warning';
 
 export interface Toast {
   id: number;
@@ -23,9 +23,20 @@ const EXIT_MS = 400; // must outlast ToastContainer's 0.3s toast-out animation
  * is not enough time to read one, and an unread error is the same as no error
  * at all. Click-to-dismiss (ToastContainer) is the other half of this: the
  * longer dwell is only tolerable because the user can end it early.
+ *
+ * A WARNING sits between the two, for the same reason from the other side. Like
+ * an error it carries a sentence that has to be ACTED on — "these cells are
+ * behind a loop, the engine may read a different chunk" is not an
+ * acknowledgement, and 2.2s is not enough time to read it, so a warning on the
+ * short dwell is a warning nobody saw. But nothing FAILED: the write landed, and
+ * holding a successful gesture's aside on screen for the full ten seconds of a
+ * file conflict overstates it and trains the user to swat toasts. Same bargain
+ * as the error: the longer dwell is only tolerable because a click ends it.
  */
-function dwellMs(type: ToastType): number {
-  return type === 'error' ? 10000 : 2200;
+export function dwellMs(type: ToastType): number {
+  if (type === 'error') return 10000;
+  if (type === 'warning') return 8000;
+  return 2200;
 }
 
 interface ToastState {

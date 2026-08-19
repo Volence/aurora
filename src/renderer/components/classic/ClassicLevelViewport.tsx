@@ -20,9 +20,8 @@ import type { LevelDoc } from '../../../core/level-classic/model';
 // TYPE-ONLY (erased at runtime): the gesture's cells and the report it hands to
 // the toast are the planner's own types, so a change to what a cell IS breaks
 // here at compile time rather than silently at the dispatch call.
-import type {
-  CollisionCell, CollisionRectReport, CollisionSkipReason,
-} from '../../../core/level-classic/collision-write';
+import type { CollisionCell } from '../../../core/level-classic/collision-write';
+import { reportCollisionGesture } from './collision-gesture-report';
 import { s1ObjectIsInvisible } from '../../../core/project/profiles/s1-objects';
 import {
   CHUNK_PX, visibleChunkRange, layoutCellAt, screenToWorld, clampInt, fitCamera,
@@ -96,53 +95,6 @@ function drawLoopGlyph(ctx: CanvasRenderingContext2D, x0: number, y0: number, in
   ctx.fillText('∞', cx, cy + 0.5 * invZoom);
   ctx.textAlign = 'start';
   ctx.textBaseline = 'alphabetic';
-}
-
-/**
- * A skip reason in words a painter can read, carrying its count.
- *
- * The raw reason strings are INTERNAL VOCABULARY — `block0` in particular is not
- * a phrase to show a person, and `overhang` names a ROM-layout fact, not
- * anything the user did. Deliberately shorter than the planner's own
- * `skipPhrase` (collision-write.ts), which writes the full explanatory sentence
- * for a refusal; this is a tally line, so it counts rather than explains.
- * `air` stays uncountable ("3 air") — "3 airs" is not English.
- */
-function collisionSkipWords(reason: CollisionSkipReason, count: number): string {
-  const s = count === 1 ? '' : 's';
-  switch (reason) {
-    case 'air': return `${count} air`;
-    case 'block0': return `${count} blank block${s}`;
-    case 'no-such-block': return `${count} missing block${s}`;
-    case 'overhang': return `${count} past the collision table`;
-    case 'outside-layout': return `${count} outside the level`;
-  }
-}
-
-/**
- * Surface a PARTIAL collision write, and only a partial one.
- *
- * A partial write is the one outcome a painter will misread: cells silently
- * stepped over (a stroke that crossed air, or a rectangle whose corner clipped
- * blank blocks) look exactly like the tool not working. So a stroke with skips
- * says what it did and what it stepped over.
- *
- * SILENT OTHERWISE, in both directions. A clean write needs no announcement —
- * the canvas already shows it — and a pure no-op (repainting a shape that was
- * already there) is nagging someone for making no mistake. Refusals never reach
- * here at all: `applyCollisionShapeCells/Rect` return `ok: false` for those and
- * the caller toasts `why` as an error.
- */
-function reportCollisionGesture(report: CollisionRectReport): void {
-  if (report.skipped.length === 0) return;
-  const parts: string[] = [];
-  if (report.applied > 0) parts.push(`painted ${report.applied} cell${report.applied === 1 ? '' : 's'}`);
-  // `applied === 0` with skips is reachable only alongside no-ops: the planner
-  // refuses a selection where nothing applied AND nothing already matched, so
-  // this branch is what keeps the line from reading "painted 0 cells".
-  if (report.noop > 0) parts.push(`${report.noop} already had it`);
-  parts.push(`skipped ${report.skipped.map((s) => collisionSkipWords(s.reason, s.count)).join(', ')}`);
-  useToastStore.getState().addToast(parts.join(' · '), 'info');
 }
 
 /**
