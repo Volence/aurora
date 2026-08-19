@@ -16,7 +16,9 @@
 // file picker, a read, and turning that module's result into something a
 // dialog can render.
 
-import { sheetFromBytes, explainSheetRefusal, flattenActPalette } from '../../core/art/sheet-import';
+import {
+  sheetFromBytes, explainSheetRefusal, sheetRefusalResolution, flattenActPalette,
+} from '../../core/art/sheet-import';
 import type { ImportedSheet } from '../../core/art/sheet-import';
 import type { LevelDoc } from '../../core/level-classic/model';
 
@@ -52,6 +54,14 @@ export async function loadSheetForAct(doc: LevelDoc): Promise<LoadSheetOutcome> 
     // being mislabelled as an encoding problem it never got far enough to see.
     return { ok: false, error: (e as Error).message };
   }
-  if (!res.ok) return { ok: false, error: explainSheetRefusal(res.refusal) };
+  // BOTH HALVES, joined. The dialog renders one string, but a refusal that says
+  // only what is wrong leaves the artist to guess the fix — and the agent
+  // surface returns `message` and `resolution` as separate fields off these
+  // same two functions, so joining here is what keeps the human and the agent
+  // reading the identical sentences (spec §4) instead of the artist reading
+  // strictly less.
+  if (!res.ok) {
+    return { ok: false, error: `${explainSheetRefusal(res.refusal)} ${sheetRefusalResolution(res.refusal)}` };
+  }
   return { ok: true, sheet: { ...res.sheet, path } };
 }

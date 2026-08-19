@@ -13,7 +13,10 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { loadSheetForAct } from '../import-sheet';
+import { explainSheetRefusal, sheetRefusalResolution } from '../../../core/art/sheet-import';
+import { encodeIndexedPngForTest } from '../../../core/art/__tests__/helpers/indexed-png-fixture';
 import type { LevelDoc } from '../../../core/level-classic/model';
+import type { PngImportRefusal } from '../../../core/art/png-import';
 
 const doc = { palettes: [0, 1, 2, 3].map(() => new Uint16Array(16)) } as unknown as LevelDoc;
 
@@ -42,6 +45,30 @@ describe('loadSheetForAct', () => {
     const res = await loadSheetForAct(doc);
     expect(res).toMatchObject({ ok: false });
     if ('error' in res) expect(res.error).toMatch(/INDEXED/);
+  });
+
+  // THE ARTIST READS WHAT THE AGENT READS (spec §4). The agent surface returns
+  // `message` and `resolution` as two fields off the same two core functions;
+  // the dialog renders one string, so it joins them. A dialog showing only the
+  // message would leave the human with strictly less than the agent gets, out
+  // of the same refusal.
+  it('surfaces a refusal as the message AND its remedy, both from core', async () => {
+    const api = fakeApi();
+    api.selectFile.mockResolvedValue('/tmp/x.png');
+    // An indexed PNG whose one drawn colour is not in the (all-black) act.
+    api.readBinaryFile.mockResolvedValue(encodeIndexedPngForTest({
+      width: 8, height: 8,
+      palette: [{ r: 0, g: 0, b: 0 }, { r: 0xee, g: 0, b: 0 }],
+      indices: new Uint8Array(64).fill(1),
+    }).buffer);
+    const res = await loadSheetForAct(doc);
+    expect(res).toMatchObject({ ok: false });
+    if (!('error' in res)) return;
+    // The exact pair core would produce for this refusal, joined by one space —
+    // not a loose substring match, so a dialog that quietly dropped either half
+    // (or reworded one in place) fails here.
+    const refusal: PngImportRefusal = { kind: 'colour-not-in-act', colours: [0x000e] };
+    expect(res.error).toBe(`${explainSheetRefusal(refusal)} ${sheetRefusalResolution(refusal)}`);
   });
 
   it('surfaces a read failure with its own message, not the decode wording', async () => {

@@ -5,9 +5,12 @@
 // none of it had a test.
 
 import { describe, it, expect } from 'vitest';
-import { flattenActPalette, sheetFromBytes, explainSheetRefusal } from '../sheet-import';
+import {
+  flattenActPalette, sheetFromBytes, explainSheetRefusal, sheetRefusalResolution,
+} from '../sheet-import';
 import { encodeIndexedPngForTest } from './helpers/indexed-png-fixture';
 import type { LevelDoc } from '../../level-classic/model';
+import type { PngImportRefusal } from '../png-import';
 
 /** A LevelDoc carrying only what sheet import reads: four palette lines. */
 function docWithPalette(words: number[]): LevelDoc {
@@ -62,6 +65,11 @@ describe('sheetFromBytes', () => {
     if (res.ok) return;
     expect(res.refusal.kind).toBe('colour-not-in-act');
     expect(explainSheetRefusal(res.refusal)).toMatch(/colours the act does not have/);
+    // The MESSAGE says what is wrong; the REMEDY is its own function, the way
+    // refusalView splits the commit refusals. Neither restates the other.
+    expect(explainSheetRefusal(res.refusal)).not.toMatch(/Recolour/);
+    expect(sheetRefusalResolution(res.refusal)).toMatch(/Recolour it to the act's palette/);
+    expect(sheetRefusalResolution(res.refusal)).toMatch(/zone palette/);
   });
 
   it('refuses an 8x8 cell that mixes colours from two palette lines', async () => {
@@ -82,6 +90,23 @@ describe('sheetFromBytes', () => {
     if (res.ok) return;
     expect(res.refusal.kind).toBe('cell-needs-two-lines');
     expect(explainSheetRefusal(res.refusal)).toMatch(/one line/);
+  });
+
+  // THE REMEDIES ARE NOT INTERCHANGEABLE, and the difference is the whole point
+  // of splitting them per kind. Widening the palette DOES fix a two-line cell —
+  // but only if the colour lands on the line the cell's other colours already
+  // use. Advice that says "add the colour to the palette" without that clause
+  // sends the caller round a loop: add it to whichever line has a free slot,
+  // re-import, get the identical refusal.
+  it('answers a two-line cell with redrawing first, and names the same-line constraint', () => {
+    const cellRefusal: PngImportRefusal = { kind: 'cell-needs-two-lines', cells: [{ x: 0, y: 0 }] };
+    const r = sheetRefusalResolution(cellRefusal);
+    expect(r).toMatch(/^Redraw those cells/);
+    expect(r).toMatch(/only helps/);
+    expect(r).toMatch(/LINE the cell's other colours already use/);
+    // And it is NOT the other kind's sentence.
+    const colourRefusal: PngImportRefusal = { kind: 'colour-not-in-act', colours: [1] };
+    expect(r).not.toBe(sheetRefusalResolution(colourRefusal));
   });
 
   it('throws, rather than refusing, on bytes that are not a PNG', async () => {

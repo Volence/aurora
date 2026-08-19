@@ -60,17 +60,46 @@ export async function sheetFromBytes(doc: LevelDoc, bytes: Uint8Array): Promise<
   return { ok: true, sheet: { ...mapped.result, palette } };
 }
 
-/** The refusal, in the artist's terms. One copy, read by the dialog and the agent. */
+/**
+ * The refusal, in the artist's terms: WHAT IS WRONG, not what to do about it.
+ *
+ * Split the way `refusalView` splits the commit refusals
+ * (canvas-commit-model.ts:124) — message here, remedy in
+ * `sheetRefusalResolution` below — so the two halves can be shown separately
+ * (the agent returns them as separate fields) without either being restated.
+ * One copy of each, read by the dialog and the agent alike.
+ */
 export function explainSheetRefusal(refusal: PngImportRefusal): string {
   if (refusal.kind === 'colour-not-in-act') {
     const all = refusal.colours ?? [];
     const list = all.slice(0, 8).map(fmtGenesisWord).join(', ');
     const more = all.length - 8;
-    return `This sheet uses colours the act does not have: ${list}${more > 0 ? `, and ${more} more` : ''}. `
-      + 'Recolour it to the act\'s palette, or add those colours to the zone palette first.';
+    return `This sheet uses colours the act does not have: ${list}${more > 0 ? `, and ${more} more` : ''}.`;
   }
   const cells = refusal.cells ?? [];
   const where = cells.slice(0, 4).map((c) => `(${c.x},${c.y})`).join(' ');
   return `${cells.length} cell${cells.length === 1 ? '' : 's'} mix colours that no single palette line holds — `
     + `${where}${cells.length > 4 ? ' and more' : ''}. Each 8×8 cell must draw from one line.`;
+}
+
+/**
+ * What to do about it. The remedy half of the pair above, per kind.
+ *
+ * WHY IT IS PER-KIND, AND WHY IT LEADS WITH REDRAWING. One remedy for both
+ * kinds sends a `cell-needs-two-lines` caller down a loop: widening the palette
+ * DOES fix that refusal, but only if the missing colour lands on the LINE the
+ * cell's other colours already use — add it to whichever line happens to have a
+ * free slot, re-import, and the identical refusal comes back. So the sentence
+ * leads with the move that always works (the same answer the canvas side gives
+ * for the identical hardware condition — `refusalView`'s `cell-clash`) and
+ * states the constraint on the other one rather than implying it is free.
+ */
+export function sheetRefusalResolution(refusal: PngImportRefusal): string {
+  if (refusal.kind === 'colour-not-in-act') {
+    return 'Recolour it to the act\'s palette, or add those colours to the zone palette first '
+      + '(the zone palette is shared by every act in the zone).';
+  }
+  return 'Redraw those cells so each 8×8 draws from a single line. Widening the palette only helps '
+    + 'if the missing colour is added to the LINE the cell\'s other colours already use — putting it '
+    + 'on any other line leaves this refusal unchanged.';
 }
