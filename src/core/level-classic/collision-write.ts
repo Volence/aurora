@@ -356,13 +356,74 @@ export function planCollisionWrite(
 
 export interface CollisionRect { x: number; y: number; w: number; h: number }
 
+/** One skipped cell, in the CALLER'S 16px FG coordinates. */
+export interface CollisionSkippedCell {
+  x: number;
+  y: number;
+  reason: CollisionSkipReason;
+}
+
+/**
+ * How many skipped cells `CollisionRectReport.skippedCells` will name before it
+ * stops. THE LIST IS BOUNDED AND THE COUNTS ARE NOT — a 1024x128 selection over
+ * mostly-air skips six figures of cells, and returning that many objects would
+ * dwarf the rest of the reply for a caller that wanted a hint, not a dump.
+ *
+ * 32 because a classic chunk is 16x16 FG cells: a chunk-wide selection gets its
+ * first TWO full rows, which is the smallest window that distinguishes a
+ * horizontal coordinate error (the same columns skip on both rows) from a
+ * vertical one (a whole row skips and the next does not). One row could not.
+ */
+export const SKIPPED_CELLS_CAP = 32;
+
 export interface CollisionRectReport {
   mode: CollisionWriteMode;
   /** CELLS whose block did not carry the shape and now will. */
   applied: number;
   /** CELLS whose block already carried it. Success, not a skip. */
   noop: number;
+  /**
+   * THE AUTHORITATIVE TOTALS, per reason. `skippedCells` below is a bounded
+   * prefix of the same population and its length is NOT this — read the counts,
+   * always, for "how many".
+   */
   skipped: { reason: CollisionSkipReason; count: number }[];
+  /**
+   * WHICH cells were skipped — the FIRST `SKIPPED_CELLS_CAP` of them, in scan
+   * order, in the coordinates the CALLER passed.
+   *
+   * WHY THIS EXISTS AT ALL, when `skipped` already counts them: a caller that
+   * asked for a 4-cell slope and got `applied: 2, skipped: [{ block0, 2 }]`
+   * cannot tell whether the two blank cells were the two it expected to be air
+   * (fine, carry on) or the two it most cared about (its coordinates are off by
+   * two). Counts are the right tier for `applied` and `blocks`, which are about
+   * BLOCKS; skips are about CELLS, and collapsing cells to a count throws away
+   * the one axis the caller controls. Without this the only way to find out is
+   * to probe cell by cell — exactly the round-trip this reply exists to save.
+   *
+   * FIRST-N IN SCAN ORDER, NOT SAMPLED. Two identical calls must return
+   * identical lists; a sampled or set-ordered list would make a retry disagree
+   * with the call it retried, which is worse than no list. Entries are NOT
+   * grouped by reason and NOT deduped by reason — the interleaving IS the
+   * information, because it is what maps a reason onto a position.
+   *
+   * ITS LENGTH IS NOT A COUNT OF ANYTHING the caller wants. `skipped` holds the
+   * totals; this stops at the cap. `skippedCellsTruncated` says when the two
+   * diverge, so a caller reading the type alone is told, rather than having to
+   * infer it from `length === SKIPPED_CELLS_CAP`.
+   */
+  skippedCells?: CollisionSkippedCell[];
+  /**
+   * TRUE when more cells were skipped than `skippedCells` could hold — i.e.
+   * exactly when `skippedCells.length` is NOT the number of skipped cells.
+   *
+   * Derived from the `skipped` totals rather than from a second counter, so the
+   * flag cannot drift from the numbers it is a statement about. It is carried
+   * as its own field rather than left implicit because the failure mode it
+   * guards against is a caller reading `skippedCells.length` as a total, and a
+   * caller doing that is by definition not consulting the cap.
+   */
+  skippedCellsTruncated?: boolean;
   /** DISTINCT blocks written. */
   blocks: number;
   /**
@@ -458,7 +519,18 @@ export function planCollisionCells(
   mode: CollisionWriteMode,
 ): CollisionRectPlan {
   const skips = new Map<CollisionSkipReason, number>();
-  const bump = (r: CollisionSkipReason) => skips.set(r, (skips.get(r) ?? 0) + 1);
+  // A FLAT ARRAY, appended to in scan order — deliberately not a Map or a Set
+  // keyed by reason. Those would either lose the interleaving (which is the
+  // only thing that maps a reason onto a POSITION) or dedupe cells that differ
+  // only in coordinate, and either way two identical calls could disagree.
+  const skippedCells: CollisionSkippedCell[] = [];
+  // The counts are unconditional; only the LIST stops at the cap. Capping both
+  // would make the totals stop being authoritative, which is the whole reason
+  // the two fields are separate.
+  const bump = (r: CollisionSkipReason, x: number, y: number) => {
+    skips.set(r, (skips.get(r) ?? 0) + 1);
+    if (skippedCells.length < SKIPPED_CELLS_CAP) skippedCells.push({ x, y, reason: r });
+  };
   const writes: { blockId: number; chunkIndex: number; cellIndex: number; cell: ChunkCell }[] = [];
   let noop = 0;
   let ambiguous = 0;
@@ -475,9 +547,14 @@ export function planCollisionCells(
     // `classifyCollisionCell` never returns 'outside-layout': a CellAddress
     // already implies the cell is inside, because locateCell returns null
     // outside. The reason is MANUFACTURED here, before the classifier runs.
-    if (!at) { bump('outside-layout'); continue; }
+    // The CALLER'S coordinates, both here and below. For an outside-layout cell
+    // there is no CellAddress to report instead, and for an inside one the
+    // chunk-definition cell is the wrong answer anyway: two FG cells reach the
+    // same definition cell through two placements, and only the caller's own
+    // coordinate is something the caller can act on.
+    if (!at) { bump('outside-layout', c.x, c.y); continue; }
     const outcome = classifyCollisionCell(doc, at, shapeIndex, mode);
-    if (outcome.kind === 'skip') { bump(outcome.reason); continue; }
+    if (outcome.kind === 'skip') { bump(outcome.reason, c.x, c.y); continue; }
     if (outcome.kind === 'noop') { noop++; continue; }
     if (at.loopAmbiguous) ambiguous++;
     writes.push(outcome);
@@ -495,7 +572,12 @@ export function planCollisionCells(
 
   const distinct = [...new Set(writes.map((w) => w.blockId))];
   const base: CollisionRectReport = {
-    mode, applied: writes.length, noop, skipped, blocks: distinct.length, warnings,
+    mode, applied: writes.length, noop, skipped, blocks: distinct.length,
+    skippedCells,
+    // Derived from the AUTHORITATIVE counts, not from a parallel tally, so the
+    // flag and the numbers it describes cannot drift.
+    skippedCellsTruncated: skipped.reduce((n, s) => n + s.count, 0) > skippedCells.length,
+    warnings,
   };
 
   // THE SUCCESS PREDICATE, stated once. Nothing written AND nothing already
