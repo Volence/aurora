@@ -31,13 +31,16 @@ import type { CanvasDoc } from '../../core/art/canvas-doc';
 import { encodeCanvasFiles, decodeCanvasFiles } from '../../core/art/canvas-file-format';
 import type { CanvasSource } from './canvasStore';
 import type { GuardedWriteFile, GuardedWriteResult } from '../../shared/ipc-types';
+import { CANVAS_NAME_PATTERN } from '../../shared/canvas-name';
 
 export const CANVAS_DIR = '.aurora/canvas';
 
-const SAFE_NAME = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
-
+// The pattern itself lives in src/shared/canvas-name.ts: the `commit_canvas`
+// tool schema (main process) must state the same rule this guard enforces, so
+// that a bad name is INVALID_PARAMS at the protocol edge rather than the
+// INTERNAL error this throw becomes.
 export function canvasNameIsSafe(name: string): boolean {
-  return SAFE_NAME.test(name);
+  return CANVAS_NAME_PATTERN.test(name);
 }
 
 export function canvasPngPath(name: string): string { return `${CANVAS_DIR}/${name}.png`; }

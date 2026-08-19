@@ -1,5 +1,9 @@
 import { z } from 'zod';
 import type { AgentRequest } from '../shared/agent-protocol';
+// The SAME pattern `loadCanvasFile`'s guard tests (canvas-file.ts). Stated here
+// as a schema so a bad canvas name is INVALID_PARAMS at the protocol edge
+// rather than the renderer's throw, which reaches a client as INTERNAL.
+import { CANVAS_NAME_PATTERN } from '../shared/canvas-name';
 
 /**
  * The editor's capability surface, defined once and consumed by BOTH the MCP
@@ -154,4 +158,35 @@ export const EDITOR_METHODS: EditorMethod[] = [
     description: 'Move the player spawn point to (x,y). Both are 16-bit (the startpos file has no terminator sentinel). One classic undo step.' },
   { name: 'save_project', kind: 'classic-save-project', result: 'json', params: {},
     description: 'Save every dirty act of the open classic project through the guarded (mtime-checked) write channel. Returns a structured outcome: saved / conflict / partial / error / nothing.' },
+
+  // --- the art line (spec 2026-08-18) ---
+  // Both are the same commit with different pixel sources. A REFUSAL comes back
+  // in the result as `ok:false` with the artist-facing sentence, not as a
+  // protocol error — see the design's §4.
+  { name: 'commit_canvas', kind: 'classic-commit-canvas', result: 'json',
+    params: {
+      name: z.string().regex(CANVAS_NAME_PATTERN, 'a canvas name is 1-64 chars of letters, digits, - and _, starting with a letter or digit (no path, no extension)')
+        .describe('canvas name under .aurora/canvas (no path, no extension)'),
+      targets: z.array(z.object({
+        chunkFileIndex: z.number().int().min(0).nullable().describe('0-based FILE index of the chunk to replace (engine id minus one), or null to append'),
+      })).optional().describe('one per whole 256x256 chunk of the canvas, row-major; omit to append them all'),
+      paletteResolution: z.enum(['none', 'use-act-colours', 'adopt-into-zone']).optional()
+        .describe('what to do when the canvas draws with colours the act does not have (default "none" = refuse and report them). "use-act-colours" re-indexes the art onto the nearest act colours, changing no palette; "adopt-into-zone" writes the drifted colours into the ZONE palette, which every act sharing that palette file displays. Line 0 (Sonic\'s) is never written by either.'),
+      collision: z.boolean().optional().describe('give the new art flat ($FF) collision in the same undo step'),
+      dryRun: z.boolean().optional().describe('plan and report without applying'),
+    },
+    description: 'Commit a saved canvas into the open act: cut to tiles/blocks/chunks, dedupe, reclaim, write. One undo step. Reply carries the full commit report plus the 1-based ENGINE ids of any appended chunks (pass those to set_layout_region). A refusal returns ok:false with a message, a resolution, and which paletteResolution values would unblock it. Also returns "warnings" from loading the canvas — an unreadable sidecar means the canvas was treated as unconstrained, which is worth reading before trusting the result.' },
+  // NO `paletteResolution` HERE. The sheet is mapped onto the act's own palette
+  // before it is planned, so it cannot drift, so the option could never change
+  // an outcome — see the kind's own comment in shared/agent-protocol.ts.
+  { name: 'import_art_sheet', kind: 'classic-import-art-sheet', result: 'json',
+    params: {
+      path: z.string().min(1).describe('absolute path to an INDEXED (paletted) PNG'),
+      targets: z.array(z.object({
+        chunkFileIndex: z.number().int().min(0).nullable().describe('0-based FILE index of the chunk to replace (engine id minus one), or null to append'),
+      })).optional().describe('one per whole 256x256 chunk of the sheet, row-major; omit to append them all'),
+      collision: z.boolean().optional().describe('give the new art flat ($FF) collision in the same undo step'),
+      dryRun: z.boolean().optional().describe('plan and report without applying'),
+    },
+    description: 'Import an indexed PNG made elsewhere, mapped onto the open act\'s palette, and commit it. No size cap (unlike a canvas). The reply is commit_canvas\'s; the refusals are a NARROWER set plus two import-only ones. Narrower: the sheet is mapped onto the act\'s palette before planning, so palette-drift, palette-unmappable and cell-clash cannot arise (and there is no paletteResolution to pass). Import-only: a colour the act does not have, and an 8x8 cell mixing colours from two palette lines — for that one, adding the missing colour to the zone palette only helps if it goes on the LINE the cell already uses.' },
 ];

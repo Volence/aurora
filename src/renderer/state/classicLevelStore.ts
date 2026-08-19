@@ -838,8 +838,15 @@ function objectListsEqual(a: readonly S1ObjectEntry[], b: readonly S1ObjectEntry
   return a.length === b.length && a.every((o, i) => objectEntryEqual(o, b[i]));
 }
 
-/** The writable tile span for the open act, or null when unknown (fakes/no handle). */
-function editableTileRange(): EditableTileRange | null {
+/**
+ * The writable tile span for the open act, or null (unknown / fakes).
+ *
+ * EXPORTED for the agent surface. `useEditableTileRange`
+ * (components/classic/composer-shared.tsx:36) is the React-reactive twin of this
+ * and is what components use; the agent handler is not a component, and
+ * `classicCommitCanvas` below already calls this one.
+ */
+export function editableTileRange(): EditableTileRange | null {
   const { ref } = useClassicLevelStore.getState();
   const levels = useClassicProjectStore.getState().handle?.levels;
   if (!ref || !levels?.editableTileRange) return null;

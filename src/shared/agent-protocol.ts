@@ -57,7 +57,25 @@ export type AgentRequest =
   | { kind: 'classic-set-colind'; entries: { blockId: number; value: number }[] }
   | { kind: 'classic-set-palette'; line: number; colors: number[] }
   | { kind: 'classic-set-start'; x: number; y: number }
-  | { kind: 'classic-save-project' };
+  | { kind: 'classic-save-project' }
+  // ---- The art line (spec 2026-08-18) ----
+  // Two pixel sources, one commit. `collision` stays a BOOLEAN on the wire: an
+  // agent should not have to know the zone's colind table length to ask for
+  // flat collision — the handler sources that from the open act (see
+  // commitPixels, which turns the flag into { colindLength }).
+  | { kind: 'classic-commit-canvas'; name: string; targets?: { chunkFileIndex: number | null }[];
+      paletteResolution?: 'none' | 'use-act-colours' | 'adopt-into-zone';
+      collision?: boolean; dryRun?: boolean }
+  // NO `paletteResolution` on the import: an imported sheet is mapped against
+  // the act's own palette by `sheetFromBytes`, using the planner's OWN
+  // `flattenDocPalette` (sheet-import.ts re-exports it as `flattenActPalette`
+  // rather than keeping a second copy), so its palette cannot drift from what
+  // the planner compares it to, so the option is only ever read on a branch this
+  // tool cannot reach. A knob that provably cannot turn is worse than no knob — doubly so
+  // here, where the colour refusal's advice mentions widening the palette and
+  // this would look like the lever for it.
+  | { kind: 'classic-import-art-sheet'; path: string; targets?: { chunkFileIndex: number | null }[];
+      collision?: boolean; dryRun?: boolean };
 
 export interface AgentRequestEnvelope {
   id: number;
