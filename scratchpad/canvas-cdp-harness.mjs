@@ -24,11 +24,18 @@
 
 import { spawn, execSync } from 'node:child_process';
 import * as http from 'node:http';
-import { pathToFileURL } from 'node:url';
+import { pathToFileURL, fileURLToPath } from 'node:url';
 import { writeFileSync, mkdirSync, existsSync, readFileSync, rmSync, cpSync } from 'node:fs';
 
 const PORT = Number(process.env.PORT ?? 9364);
-const ROOT = '/home/volence/sonic_hacks/aurora';
+// SELF-LOCATING, not hardcoded. This file used to name the main checkout
+// absolutely, which meant importing `session` from a WORKTREE launched the main
+// checkout's build — a harness that reports a confident PASS for code the branch
+// does not contain. Two earlier worktrees hand-patched this line
+// (probe-click-paint.mjs, composer-fill-harness.mjs still carry their copies);
+// deriving it from this file's own location fixes it for every future one.
+// Resolves identically to the old literal when run from the main checkout.
+const ROOT = fileURLToPath(new URL('..', import.meta.url)).replace(/\/$/, '');
 const ELECTRON = `${ROOT}/node_modules/.bin/electron`;
 const S1DIR = '/home/volence/sonic_hacks/s1disasm';
 const CANVAS_DIR = `${S1DIR}/.aurora/canvas`;
