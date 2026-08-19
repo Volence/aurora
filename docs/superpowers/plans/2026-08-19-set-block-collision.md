@@ -78,6 +78,24 @@ The mirrored defect is in Isolate's own refusal: *"Use Link, accepting it change
 
 **Fixed in this plan, not booked**, for three reasons: the messages are provably wrong rather than merely stale (they were never true); the single-refusal-path architecture means the fix is one string per branch and repairs the human Collision panel and the agent tool at the same time — that is the "one place" design doing its job, not collateral damage; and this tool ships those messages to an agent that will *act* on them. A message instructing a guaranteed-refused retry is worse for an autonomous caller than for a human, who at least sees the second refusal and stops.
 
+### D6 — A dangling block ref is refused, and that makes D4's escape a constant
+
+**Found during Task 5, decided 2026-08-19.** `validateLevelDoc` bounds a chunk cell's `block` by the 10-bit field (`model.ts`, `inRange(..., c.block, 0, MAX_BLOCK_REF)`), **not** by `doc.blocks.length` — so a cell naming a block the document does not have is representable in a "valid" doc. On such a cell the Isolate path emits `def: doc.blocks[blockId]` = `undefined` into `newBlocks`, and `classicPaintSurface` does `b.def.cells.map(...)` (`classicLevelStore.ts:1025`) → **TypeError** → `-32603 INTERNAL` at the agent surface. Not a regression — the single-cell path has carried the same line since it shipped — but the rectangle path is what wires it to an agent.
+
+**Decided: refuse it in `classifyCollisionCell`, as a new `no-such-block` skip reason.** Both paths inherit it, because `planCollisionWrite` was rebuilt on the classifier: the panel gets a refusal sentence, the rectangle gets a counted skip.
+
+**The ordering is load-bearing: air → block0 → `no-such-block` → noop → overhang.** It must precede the NO-OP test, not merely follow block-0. The no-op test reads `(colind[blockId] ?? 0) === shapeIndex`, so a dangling ref past the table asked for shape 0 currently returns `noop` — reporting SUCCESS on garbage, which for an autonomous caller is worse than the crash it replaces.
+
+**Rejected: guarding only the Isolate path.** It needs two guards, and it leaves Link writing a colind entry for a phantom block whenever `blocks.length <= blockId < colind.length` — a shape change for a block the document does not have, invisible in the editor. That is the same "writing bytes whose meaning you cannot see" this file's overhang refusals exist to prevent.
+
+**Consequence, and it is the point.** A dangling ref was the ONLY thing that made `isolateFits` non-constant inside `escapeFromLinkOverhang` — which is exactly what D4's comment says. Refuse it first and an `overhang` skip implies `blockId < doc.blocks.length` and `blockId >= colind.length`, hence `doc.blocks.length > colind.length`, hence `isolateFits(doc, 1)` is **false**. So:
+
+- `escapeFromLinkOverhang` collapses to the unconditional dead-end sentence, carrying the proof as a comment ("overhang implies blocks > colind, because no-such-block is refused first — if the classifier's order changes, revisit"). Keeping the dead branch would leave a false comment guarding code no document can reach, and therefore no test can pin.
+- `isolateFits` then has no caller (Task 5's `planIsolateRect` uses the split form for its numbers) and is deleted; `planIsolateRect`'s comment tying its two checks back to it is rewritten to stand on its own.
+- The test `still offers Isolate as the escape when Isolate would actually fit` does not merely become redundant — **its document now takes the `no-such-block` refusal before it ever reaches overhang**, so it must change either way. It is rewritten to pin the new refusal, and that rewritten test is what protects the simplification from a future reordering.
+
+**In this change, not a follow-up**, because the tool being added is what exposes the crash to an agent, and because the escape computation and its test are this same series' work — deferring would churn the same lines twice.
+
 ### D5 — Cells outside the layout are skipped; the schema bounds come from the format, not from aeon
 
 - **Out-of-layout cells skip** with reason `outside-layout`; the whole call refuses only when nothing at all was inside, which D3's predicate already covers. A rectangle hugging a level's right edge is a legitimate gesture, exactly like one containing air. **Do not silently clamp** — clamping hides the coordinate mistake the skip count exposes.
