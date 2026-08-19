@@ -40,7 +40,7 @@ commit_canvas {name}      --+
                             +--> CommitSnapshot --> planFromSnapshot --> classicCommitCanvas
 import_art_sheet {path}   --+          ^               (pure, existing)     (existing command)
                                        |
-                         commitContextFromStores()
+                          the store reads (§3.2)
                       doc . reservedTiles . range . animTiles
 ```
 
@@ -115,17 +115,33 @@ The agent calls `sheetFromBytes`; the dialog calls both. The two refusal message
 at `:73-89` — already written in the artist's terms — move into
 `sheetFromBytes`, so the agent receives the same text the human does.
 
-### 3.2 Extract `commitContextFromStores()`
+### 3.2 Export the non-hook `editableTileRange()`
 
-`CommitPlanView.tsx:39-69` reads `levelDoc`, `reservedTiles` and `range` from the
-stores and turns them into the level half of a `CommitSnapshot`. The agent
-handler needs the identical four reads.
+*This section is narrower than an earlier draft claimed, and the correction
+matters: it would otherwise licence a pointless rewrite of a working panel.*
 
-This must be extracted rather than repeated, because `range === null ->
-editableRangeKnown: false` is load-bearing: the planner refuses to RECLAIM under
-an unknown editable span while still allowing an additive commit
-(`classic-commit-plan.ts:66-73`). A second copy of that rule in the agent handler
-is exactly the drift this codebase has been avoiding elsewhere.
+The draft said `CommitPlanView.tsx:39-69` had to be refactored so the agent could
+share it. It does not. The `editableRangeKnown` rule the extraction was meant to
+protect does not live in the panel — it lives inside `planFromSnapshot`
+(`canvas-commit-model.ts:246-255`, deriving `isEditableTile`, `editableRangeKnown`
+and `animTiles` from `range`). The panel merely passes `range` in. An agent
+handler that also passes `range` in is therefore **not** a second copy of the
+rule, and `CommitSnapshot` is already the shared shape.
+
+What the agent handler actually needs is a *non-hook* way to read the same three
+store values, because `useEditableTileRange` (`composer-shared.tsx:36`) is a React
+hook and the handler is not a component. That function already exists:
+`editableTileRange()` at `classicLevelStore.ts:842`, used by
+`classicCommitCanvas` itself — it is simply not exported.
+
+So the whole of §3.2 is:
+
+- export `editableTileRange` from `classicLevelStore.ts`
+- read `doc` and `reservedTiles` via `useClassicLevelStore.getState()` in the
+  agent's commit helper
+
+`CommitPlanView.tsx` is **not modified**. It keeps its hooks, because it needs
+the reactivity and is already correct.
 
 ## 4. Error handling: refusals are results, not errors
 
