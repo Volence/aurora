@@ -46,7 +46,6 @@ export async function saveAeonProject(): Promise<AeonSaveResult> {
   try {
     s.setLoading(true);
     const fa = createIpcFileAccess(config.basePath);
-    const exportErrors: string[] = [];
     const written: string[] = [];
 
     for (const key of targets) {
@@ -58,7 +57,6 @@ export async function saveAeonProject(): Promise<AeonSaveResult> {
         await window.api.writeBinaryFile(config.basePath, f.path,
           f.bytes.buffer.slice(f.bytes.byteOffset, f.bytes.byteOffset + f.bytes.byteLength) as ArrayBuffer);
       }
-      if (plan.exportError) exportErrors.push(`${key}: ${plan.exportError}`);
       written.push(key);
     }
 
@@ -68,22 +66,10 @@ export async function saveAeonProject(): Promise<AeonSaveResult> {
     const withheld = useEditorStore.getState().markActsClean(written, atGen);
     s.setLoading(false);
 
-    // THE EXPORT STEP IS PART OF THE SAVE, so its failure is part of the
-    // answer. Its only consumer used to be a console.warn while the toast said
-    // "Project saved" — leaving export/act_descriptor.asm, entity_data.asm,
-    // vram_bases.asm and the section binaries at the PREVIOUS save's contents,
-    // which the engine build then consumes. Ordinary authoring mistakes reach
-    // it (a 33rd unique object type, x past $7FF, a tile union past the pool),
-    // and the diagnostic that would let the artist fix it existed only in
-    // devtools.
-    if (exportErrors.length) {
-      console.warn('[save] Export step failed:', exportErrors.join('; '));
-      useToastStore.getState().addToast(
-        `Saved the level data, but the engine export failed — the files under export/ are STALE ` +
-        `and a build will use the previous save's. ${exportErrors[0]}`,
-        'error',
-      );
-    } else if (withheld.length) {
+    // The export step, and with it the R8 branch that reported its failure, was
+    // retired 2026-08-19 (ROADMAP §4.2). A save now writes editor files only,
+    // so there is no second half that can fail quietly behind "Project saved".
+    if (withheld.length) {
       useToastStore.getState().addToast(
         'Project saved, but edits made during the save are still unsaved — save again',
         'info',

@@ -81,8 +81,13 @@ runs, exactly as the two collision harnesses do.
 
 ### 3a. Retire the dead export path — **but the DIR item as written would break a live tool**
 
-> **Correction, re-measured the same day (now written into ROADMAP §4.2, which is the
-> authoritative version): the "ZERO importers" line below is WRONG.**
+> **DONE 2026-08-19** — executed on branch `chore/retire-export-path`; ROADMAP §4.2 carries
+> the authoritative record. Two corrections were needed on the way, both recorded there:
+> the "ZERO importers" line below is WRONG, and the `data/export/` directory *does* exist
+> (`aeon/games/sonic4/data/editor/ojz/act1/export/`, 30 files) — it is simply read by
+> nothing. The stale files were left on disk deliberately.
+>
+> **The measurement error below, kept as the record:**
 > `src/core/project/aeon/save.ts:27` imports `exportAct` from the barrel and calls it at
 > `:271` — the aeon save's export step. What that step emits
 > (`data/export/{act_descriptor,entity_data,vram_bases}.asm`, `section_N.{tiles,art}.bin`)

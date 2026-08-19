@@ -128,55 +128,30 @@ describe('buildAeonSavePlan', () => {
     expect(paths).toContain('data/ojz/act1/section_0.rings.json');
   });
 
-  it('reports export failure as a non-fatal note instead of throwing', async () => {
+  // The export step was retired 2026-08-19 (ROADMAP §4.2): it emitted
+  // `{dataPath}export/` outputs — act_descriptor.asm, entity_data.asm,
+  // vram_bases.asm, section_N.{tiles,art}.bin — that nothing in aeon reads.
+  // The two tests this replaces asserted the failure REPORTING of that step
+  // (exportError null on success, "VRAM overflow" on a >1024-tile union).
+  //
+  // This guards the retirement in the direction that can regress: a save plan
+  // that starts emitting engine assembly again. The path prefix is derived from
+  // the act's own dataPath rather than pinned, so moving the act moves the guard.
+  it('writes editor files only — no engine assembly, nothing under export/', async () => {
     const fa = memFa(fixtureFiles());
     const r = await loadAeonProject(fa, '/proj');
-    // An act id that exists is required for the plan; the export step runs on real
-    // data here and should succeed, so exportError is null in the healthy case.
     const plan = await buildAeonSavePlan(fa, r.config, r.project, 'ojz', 'act1',
       { legacyAtlasMerged: false });
-    expect(plan.exportError).toBeNull();
-  });
-
-  it('captures a genuine export throw (VRAM overflow) as exportError, keeps pre-export writes, drops export outputs', async () => {
-    const fa = memFa(fixtureFiles());
-    const r = await loadAeonProject(fa, '/proj');
-
-    // Drive the REAL export path into its throw (no mocks): overflow the FG tile
-    // pool (assignVramBases limit = 1024). Give the zone a tileset of >1024
-    // distinct tiles and point the single color-0 section at all of them, so its
-    // union exceeds the limit and assignVramBases throws "VRAM overflow" — before
-    // any section binaries are produced.
-    const N = 1100;
-    const tiles: Tile[] = [{ pixels: new Uint8Array(64) }]; // slot 0 stays blank
-    for (let n = 1; n <= N; n++) {
-      const px = new Uint8Array(64);
-      // Anchor at pixel 0 so only the identity orientation carries a nonzero
-      // there → every T_n is flip-distinct → distinct canonical hashes (no dedup).
-      px[0] = 1;
-      px[1] = (n >> 8) & 0xF;
-      px[2] = (n >> 4) & 0xF;
-      px[3] = n & 0xF;
-      tiles.push({ pixels: px });
-    }
-    r.project.zones[0].tileset.tiles = tiles;
-    const section = r.project.zones[0].acts[0].sections[0]!;
-    const nt = new Uint16Array(SECTION_TILES_WIDE * SECTION_TILES_HIGH);
-    for (let n = 1; n <= N; n++) nt[n - 1] = n; // reference each distinct tile once
-    section.tileGrid.nametable = nt;
-
-    const plan = await buildAeonSavePlan(fa, r.config, r.project, 'ojz', 'act1',
-      { legacyAtlasMerged: false });
-
-    // 1. Resolves rather than rejecting; 2. exportError is a non-null string.
-    expect(typeof plan.exportError).toBe('string');
-    expect(plan.exportError).toMatch(/VRAM overflow/);
-    // 3. Everything written BEFORE the export step survives...
     const paths = plan.files.map((f) => f.path);
+
+    // Anti-vacuous: a plan that wrote nothing would pass every assertion below.
     expect(paths).toContain('data/ojz/act1/section_0.tiles.bin');
     expect(paths).toContain('project.json');
-    // ...and no export outputs leaked in (the throw is before the first push).
-    expect(paths.some((p) => p.endsWith('act_descriptor.asm'))).toBe(false);
-    expect(paths.some((p) => p.endsWith('.art.bin'))).toBe(false);
+
+    const dataPath = r.config.zones.find((z) => z.id === 'ojz')!
+      .acts.find((a) => a.id === 'act1')!.dataPath;
+    expect(paths.filter((p) => p.startsWith(`${dataPath}export/`))).toEqual([]);
+    expect(paths.filter((p) => p.endsWith('.asm'))).toEqual([]);
+    expect(paths.filter((p) => p.endsWith('.art.bin'))).toEqual([]);
   });
 });

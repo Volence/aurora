@@ -112,30 +112,3 @@ describe('flip-aware dedup', () => {
     // the differing hFlip compensation above.
   });
 });
-
-describe('exportAct group blobs', () => {
-  it('same-color sections share an identical tileArt blob with blank slot 0', async () => {
-    const { exportAct } = await import('../../src/core/export/index');
-    const { createSection } = await import('../../src/core/model/s4-types');
-    const tiles: Tile[] = [tile(0), tile(3), tile(6)];
-    const secA = createSection(0, 'A');
-    secA.tileGrid.nametable[0] = packNametableWord(1, 0, false, false, false);
-    const secB = createSection(2, 'B'); // grid (2,0) in 3x1 -> same color as (0,0)
-    secB.tileGrid.nametable[0] = packNametableWord(2, 0, false, false, false);
-    const result = exportAct('TST', {
-      id: 'act1', gridWidth: 3, gridHeight: 1,
-      sections: [secA, null, secB],
-      startPosition: { secX: 0, secY: 0, localX: 0, localY: 0 },
-      bgLayout: null, bgTiles: null, parallaxRef: null,
-    }, { tiles }, []);
-    const [binA, binB] = result.sectionBinaries;
-    expect(binA.tileArt).toEqual(binB.tileArt);
-    // slot 0 blank (first 32 bytes zero), then the two used tiles
-    expect(binA.tileArt.length).toBe(3 * 32);
-    expect(Array.from(binA.tileArt.slice(0, 32)).every(b => b === 0)).toBe(true);
-    // nametable words remapped to slots 1 and 2 (blank occupies 0)
-    expect(result.vramBasesAsm).toContain('TST_SEC0_VRAM = 0 * 32');
-    expect(result.vramBasesAsm).toContain('TST_SEC1_VRAM = 0 * 32');   // inactive
-    expect(result.vramBasesAsm).toContain('TST_SEC2_VRAM = 0 * 32');   // same color as sec0
-  });
-});

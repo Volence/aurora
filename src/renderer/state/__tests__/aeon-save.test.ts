@@ -144,15 +144,15 @@ describe('saveAeonProject', () => {
   });
 
   /**
-   * R8. `exportError` had exactly one consumer — a console.warn — while the
-   * toast said "Project saved" and export/act_descriptor.asm, entity_data.asm,
-   * vram_bases.asm and the section binaries stayed at the PREVIOUS save's
-   * contents, which the engine build then consumes. Ordinary authoring
-   * mistakes trigger it, and the diagnostic lived only in devtools.
+   * R8's toast is GONE, with the step it reported on: the export half of the
+   * save was retired 2026-08-19 (ROADMAP §4.2), so "Project saved" can no
+   * longer be hiding a silent second failure. What R8 actually protected — that
+   * the toast never claims more than the save did — is now structural, and this
+   * asserts the structure: the data that used to blow the export step up
+   * (>1024 flip-distinct tiles in one section) is now just data, and the save
+   * succeeds and says so.
    */
-  it('says so when the engine export step failed', async () => {
-    // Drive the real export into its VRAM-overflow throw: >1024 flip-distinct
-    // tiles referenced from one section.
+  it('saves a tileset that used to overflow the retired export step', async () => {
     const project = useProjectStore.getState().project!;
     const tiles: Tile[] = [{ pixels: new Uint8Array(64) }];
     for (let n = 1; n <= 1100; n++) {
@@ -165,11 +165,11 @@ describe('saveAeonProject', () => {
     for (let n = 1; n <= 1100; n++) nt[n - 1] = n;
     project.zones[0].acts[0].sections[0]!.tileGrid.nametable = nt;
 
-    await saveAeonProject();
-
+    expect((await saveAeonProject()).kind).toBe('saved');
     const last = useToastStore.getState().toasts.at(-1)!;
-    expect(last.type).toBe('error');
-    expect(last.message).toMatch(/export/i);
-    expect(last.message).toMatch(/STALE/);
+    expect(last.type).toBe('success');
+    expect(last.message).toMatch(/Project saved/);
+    // Nothing under export/ was written — the guard in the direction that regresses.
+    expect(written.filter((p) => p.includes('export/'))).toEqual([]);
   });
 });

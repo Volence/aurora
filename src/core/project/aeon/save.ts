@@ -5,13 +5,22 @@
 //
 // Ordering parity: files[] preserves the original write order exactly
 // (sections → chunk library → tilesets → act BG → BG library → project.json →
-// legacy-atlas truncation → export outputs) so a partial failure mid-plan
-// leaves the same on-disk shape as a partial failure did before the port.
+// legacy-atlas truncation) so a partial failure mid-plan leaves the same
+// on-disk shape as a partial failure did before the port.
 //
-// Delta parity note: the original's export-failure path did a
-// `console.warn('[save] Export step failed (non-fatal):', ...)`. In core we
-// stay side-effect-free: the failure surfaces as `exportError` (a string) and
-// the renderer glue owns the warn.
+// THE EXPORT STEP IS GONE (2026-08-19, ROADMAP §4.2 / §5.1 item 2). It used to
+// call `exportAct` and append `{dataPath}export/` outputs — act_descriptor.asm,
+// entity_data.asm, vram_bases.asm, section_N.{tiles,art}.bin — targeting the
+// engine pipeline that the act-pool model retired. Nothing in aeon reads that
+// directory: the build's `act_descriptor.emp` is authored under
+// `games/*/data/levels/`, and `tools/ojz_entity_gen.py` builds its own
+// `data/generated/ojz/act1/entity_data.emp` from the editor JSONs this plan
+// writes — same filename, different producer. The editor files ARE the
+// interface; the Python generators own baking.
+//
+// The stale outputs of the last export (2026-08-12) are still on disk at
+// `games/sonic4/data/editor/ojz/act1/export/`. They are left alone
+// deliberately — deleting another repo's data is not this change's business.
 
 import type { FileAccess } from '../adapter';
 import { legacyAtlasPath } from './load';
@@ -24,7 +33,6 @@ import { bgLibIndexPath, bgLibLayoutPath, bgLibTilesPath, serializeBgLibraryInde
 import { serializeSectionMeta } from '../../formats/section-meta';
 import { serializeNametable } from '../../formats/s4-nametable';
 import { serializeCollAttr } from '../../formats/s4-collattr';
-import { exportAct } from '../../export/index';
 import { serializeTiles } from '../../export/tile-dedup';
 import type { S4Project } from '../../model/s4-types';
 
@@ -33,8 +41,6 @@ export interface AeonSavePlan {
   files: { path: string; bytes: Uint8Array }[];
   /** True when project.json was retargeted (it is then also present in files). */
   configChanged: boolean;
-  /** Non-fatal export-step failure (parity with the old console.warn path). */
-  exportError: string | null;
 }
 
 export async function buildAeonSavePlan(
@@ -46,7 +52,6 @@ export async function buildAeonSavePlan(
   opts: { legacyAtlasMerged: boolean },
 ): Promise<AeonSavePlan> {
   const files: { path: string; bytes: Uint8Array }[] = [];
-  let exportError: string | null = null;
 
   const zone = project.zones.find(z => z.id === zoneId);
   const act = zone?.acts.find(a => a.id === actId);
@@ -266,34 +271,5 @@ export async function buildAeonSavePlan(
     }
   }
 
-  // Export assembly + binaries
-  try {
-    const result = exportAct(
-      zone.id,
-      act,
-      zone.tileset,
-      project.objectLibrary,
-    );
-
-    // Write export outputs
-    const exportPath = `${dataPath}export/`;
-
-    const actAsmBytes = new TextEncoder().encode(result.actDescriptorAsm);
-    files.push({ path: `${exportPath}act_descriptor.asm`, bytes: actAsmBytes });
-
-    const entityBytes = new TextEncoder().encode(result.entityDataAsm);
-    files.push({ path: `${exportPath}entity_data.asm`, bytes: entityBytes });
-
-    const vramBytes = new TextEncoder().encode(result.vramBasesAsm);
-    files.push({ path: `${exportPath}vram_bases.asm`, bytes: vramBytes });
-
-    for (const secBin of result.sectionBinaries) {
-      files.push({ path: `${exportPath}section_${secBin.index}.tiles.bin`, bytes: secBin.nametable });
-      files.push({ path: `${exportPath}section_${secBin.index}.art.bin`, bytes: secBin.tileArt });
-    }
-  } catch (exportErr) {
-    exportError = exportErr instanceof Error ? exportErr.message : String(exportErr);
-  }
-
-  return { files, configChanged, exportError };
+  return { files, configChanged };
 }
