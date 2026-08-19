@@ -1031,6 +1031,22 @@ The node suite cannot see React or the real IPC, and this surface crosses that l
 **Files:**
 - Create: `scratchpad/art-agent-harness.mjs`
 
+### WHAT THE NODE SUITE STILL CANNOT REACH (carried from tasks 5-6)
+
+Tasks 5-6 shipped 12 handler tests, but they call `handleAgentRequest` directly. Three things
+only a live run can confirm, and row 1 and a new row must cover them:
+
+1. **That the two tools are actually advertised.** Nothing below the transport proves
+   `commit_canvas` / `import_art_sheet` reach the Aether `initialize` method list or register as
+   MCP tools. This is also the build-provenance check (hazard 1) — make it fail loudly.
+2. **A canvas WITH a sidecar.** Every canvas in the node suite is sidecar-less, so `gridOrigin`
+   is always `{0,0}` and the `grid-origin` refusal has never executed. Commit a canvas whose
+   sidecar carries a non-zero origin and confirm it REFUSES rather than cutting somewhere the
+   artist was never shown.
+3. **`collision: true` end-to-end.** The unit tests drive `withCollision` through
+   `replyFromPlanResult`; no test has run it against a real zone's colind table. Assert the reply's
+   `collision.skippedOverhang` against the real table length for the zone under test.
+
 ### THREE ENVIRONMENT HAZARDS, measured before writing anything
 
 **1. `ROOT` is hardcoded to the MAIN CHECKOUT.** `scratchpad/canvas-cdp-harness.mjs:31` is
