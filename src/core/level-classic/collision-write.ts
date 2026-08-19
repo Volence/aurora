@@ -16,7 +16,7 @@
 // module only decides WHAT to hand them, and refuses what neither of them
 // should be asked to do.
 
-import type { CellAddress, CollisionProbe } from './collision-probe';
+import { LOOP_ALIAS, locateCell, type CellAddress, type CollisionProbe } from './collision-probe';
 import type { ChunkCell, LevelDoc } from './model';
 import type { SurfaceEditPlan } from '../art/classic-surface-plan';
 
@@ -254,4 +254,184 @@ export function planCollisionWrite(
   };
 
   return { kind: 'isolate', plan, newBlockId, warnings };
+}
+
+// ---------------------------------------------------------------------------
+// The RECTANGLE path
+// ---------------------------------------------------------------------------
+
+export interface CollisionRect { x: number; y: number; w: number; h: number }
+
+export interface CollisionRectReport {
+  mode: CollisionWriteMode;
+  /** CELLS whose block did not carry the shape and now will. */
+  applied: number;
+  /** CELLS whose block already carried it. Success, not a skip. */
+  noop: number;
+  skipped: { reason: CollisionSkipReason; count: number }[];
+  /** DISTINCT blocks written. */
+  blocks: number;
+  /**
+   * LINK only. Chunk-DEFINITION cells naming a written block — NOT map
+   * positions, and not the rectangle. A link changes the block everywhere it is
+   * used, zone-wide, and this is the closest honest number the editor can give
+   * cheaply. It still UNDERSTATES the real reach, which is each of these
+   * multiplied by its chunk's placements across all three acts.
+   */
+  blockCellsAffected?: number;
+  /** ISOLATE only. */
+  isolate?: { blocksCloned: number; chunkCellsRepointed: number; chunksTouched: number };
+  warnings: string[];
+}
+
+export type CollisionRectRefusal =
+  | { kind: 'nothing-applicable'; skipped: { reason: CollisionSkipReason; count: number }[] }
+  | { kind: 'isolate-grows-table'; needed: number; spare: number; colindLength: number; blocks: number }
+  | { kind: 'block-ceiling'; needed: number; spare: number };
+
+export type CollisionRectPlan =
+  | { kind: 'link'; entries: { blockId: number; value: number }[]; report: CollisionRectReport }
+  | { kind: 'isolate'; plan: SurfaceEditPlan; report: CollisionRectReport }
+  /** Everything already carried the shape. Success, and NO command to dispatch. */
+  | { kind: 'nothing'; report: CollisionRectReport }
+  | { kind: 'refused'; refusal: CollisionRectRefusal; why: string; resolution: string; report: CollisionRectReport };
+
+/**
+ * Plan ONE write of `shapeIndex` across every cell of `rect`, in `mode`.
+ *
+ * WHY THIS IS A RECTANGLE AND NOT A LOOP OVER `planCollisionWrite`: a rectangle
+ * must be one undo step, and one undo step means one store command. Isolate in
+ * particular cannot be looped — every call would compute the same
+ * `doc.blocks.length` for its clone id and they would collide.
+ *
+ * PARTIAL BY DESIGN, in one direction only. Per-cell skips (air, block 0, a
+ * link-mode overhang block, cells past the layout edge) are expected inside any
+ * real rectangle — a slope's bounding box contains air — so they are counted and
+ * stepped over. The AGGREGATE limits are not: which cells would land under a
+ * half-satisfied clone budget is a function of scan order, so those refuse the
+ * whole call.
+ */
+export function planCollisionRect(
+  doc: LevelDoc,
+  rect: CollisionRect,
+  shapeIndex: number,
+  mode: CollisionWriteMode,
+): CollisionRectPlan {
+  const skips = new Map<CollisionSkipReason, number>();
+  const bump = (r: CollisionSkipReason) => skips.set(r, (skips.get(r) ?? 0) + 1);
+  const writes: { blockId: number; chunkIndex: number; cellIndex: number; cell: ChunkCell }[] = [];
+  let noop = 0;
+  let ambiguous = 0;
+
+  for (let dy = 0; dy < rect.h; dy++) {
+    for (let dx = 0; dx < rect.w; dx++) {
+      const at = locateCell(doc, rect.x + dx, rect.y + dy);
+      // `classifyCollisionCell` never returns 'outside-layout': a CellAddress
+      // already implies the cell is inside, because locateCell returns null
+      // outside. The reason is MANUFACTURED here, before the classifier runs.
+      if (!at) { bump('outside-layout'); continue; }
+      const outcome = classifyCollisionCell(doc, at, shapeIndex, mode);
+      if (outcome.kind === 'skip') { bump(outcome.reason); continue; }
+      if (outcome.kind === 'noop') { noop++; continue; }
+      if (at.loopAmbiguous) ambiguous++;
+      writes.push(outcome);
+    }
+  }
+
+  const skipped = [...skips].map(([reason, count]) => ({ reason, count }));
+  const warnings: string[] = [];
+  // ONE warning carrying a count, not one per cell: a rectangle across a loop
+  // would otherwise return hundreds of identical sentences.
+  if (ambiguous > 0) {
+    warnings.push(
+      `${ambiguous} cell${ambiguous === 1 ? ' is' : 's are'} behind a loop: the engine may read chunk $${LOOP_ALIAS.to.toString(16)} instead of $${LOOP_ALIAS.from.toString(16)} while the player is looping, so those writes may not be the ones that apply`,
+    );
+  }
+
+  const distinct = [...new Set(writes.map((w) => w.blockId))];
+  const base: CollisionRectReport = {
+    mode, applied: writes.length, noop, skipped, blocks: distinct.length, warnings,
+  };
+
+  // THE SUCCESS PREDICATE, stated once. Nothing written AND nothing already
+  // right is a refusal — almost always a coordinate mistake. Nothing written
+  // but something already right is SUCCESS: the world matches the request, and
+  // an agent retrying after a timeout must not be told it failed.
+  if (writes.length === 0 && noop === 0) {
+    return {
+      kind: 'refused',
+      refusal: { kind: 'nothing-applicable', skipped },
+      why: dominantSkipWhy(skipped),
+      resolution: 'Check the rectangle\'s coordinates: they are in 16px FG CELL units, not pixels and not chunks.',
+      report: base,
+    };
+  }
+  if (writes.length === 0) return { kind: 'nothing', report: base };
+
+  if (mode === 'link') {
+    // ONE scan of every chunk definition, not one per written cell: the counts
+    // are per BLOCK, so the whole distinct set is answered in a single pass.
+    let blockCellsAffected = 0;
+    const written = new Set(distinct);
+    for (const c of doc.chunks) for (const cc of c.cells) if (written.has(cc.block)) blockCellsAffected++;
+    return {
+      kind: 'link',
+      // DEDUPED. Two cells sharing a block are ONE colind entry, and emitting
+      // the entry twice would make the store's undo step and the report's
+      // `blocks` count disagree about how many blocks the rectangle touched.
+      entries: distinct.map((blockId) => ({ blockId, value: shapeIndex })),
+      report: { ...base, blockCellsAffected },
+    };
+  }
+
+  return planIsolateRect(doc, writes, distinct, shapeIndex, base); // Task 5
+}
+
+/**
+ * A short phrase per skip reason, for counting rather than for explaining.
+ *
+ * DELIBERATELY NOT `skipRefusal`. That function writes the single-cell
+ * refusal, and two of its sentences are about a SPECIFIC block ("block 412 is
+ * past the end of..."). A rectangle's summary has no single block to name, and
+ * passing a placeholder id would print a confident sentence about block 0 —
+ * which is a different refusal entirely.
+ */
+function skipPhrase(reason: CollisionSkipReason): string {
+  switch (reason) {
+    case 'outside-layout': return 'outside the layout';
+    case 'air': return 'air — no chunk is stamped there';
+    case 'block0': return 'the blank block 0, whose collision the engine never reads';
+    case 'overhang': return 'blocks past the end of this zone\'s collision table';
+  }
+}
+
+/**
+ * The sentence for a rectangle that wrote nothing: the reason that accounted for
+ * the most cells, so "you aimed at air" and "you aimed at blank blocks" are
+ * distinguishable. Ties break by the array's own order, which is first-seen in
+ * row-major scan — deterministic, and the tie is cosmetic.
+ *
+ * The empty case is not decoration. A zero-width or zero-height rectangle scans
+ * no cells at all, so it applies nothing, matches nothing and skips nothing —
+ * it reaches this function with an empty array, and an unseeded reduce over one
+ * throws. An agent that passes `w: 0` must get a sentence back, not a TypeError.
+ */
+function dominantSkipWhy(skipped: { reason: CollisionSkipReason; count: number }[]): string {
+  if (skipped.length === 0) {
+    return 'this rectangle covers no cells — its width or height is zero';
+  }
+  const total = skipped.reduce((n, s) => n + s.count, 0);
+  const top = skipped.reduce((a, b) => (b.count > a.count ? b : a));
+  return `no cell in this rectangle could take a shape — ${top.count} of ${total} ${top.count === 1 ? 'is' : 'are'} ${skipPhrase(top.reason)}`;
+}
+
+/** Task 5 owns this. Declared here only so the link path type-checks. */
+function planIsolateRect(
+  doc: LevelDoc,
+  writes: { blockId: number; chunkIndex: number; cellIndex: number; cell: ChunkCell }[],
+  distinct: number[],
+  shapeIndex: number,
+  base: CollisionRectReport,
+): CollisionRectPlan {
+  throw new Error('planIsolateRect: implemented in task 5');
 }

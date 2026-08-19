@@ -12,8 +12,8 @@
 // creating one (isolate) would define entries whose real values are unknown.
 
 import { describe, it, expect } from 'vitest';
-import { classifyCollisionCell, planCollisionWrite } from '../collision-write';
-import type { CollisionProbe } from '../collision-probe';
+import { classifyCollisionCell, planCollisionRect, planCollisionWrite } from '../collision-write';
+import { LOOP_ALIAS, type CollisionProbe } from '../collision-probe';
 import type { LevelDoc } from '../model';
 
 const probe = (over: Partial<CollisionProbe> = {}): CollisionProbe => ({
@@ -30,6 +30,12 @@ function doc(): LevelDoc {
     chunks: [{ cells }],
     blocks: [blockDef(), blockDef(), blockDef(), blockDef()],
     collision: { colind: new Uint8Array(64), shapes: { heights: [], angles: new Uint8Array() } },
+    // Two layout columns, both stamping engine chunk id 1 → chunks[0]. So the
+    // act is 32 cells wide x 16 tall, cellIndex = (cy % 16) * 16 + (cx % 16),
+    // and cells (0,0) and (16,0) are the SAME chunk-definition cell reached
+    // through two placements. planCollisionWrite never reads this; the
+    // rectangle planner addresses cells itself and cannot run without it.
+    fg: { width: 2, height: 1, cells: new Uint8Array([1, 1]) },
   } as unknown as LevelDoc;
 }
 
@@ -260,5 +266,116 @@ describe('classifyCollisionCell', () => {
     const w = classifyCollisionCell(d, at(0, 2), 7, 'link');
     expect(w).toMatchObject({ kind: 'write', blockId: 1, chunkIndex: 0, cellIndex: 2 });
     expect((w as { cell: unknown }).cell).toBe(d.chunks[0].cells[2]);
+  });
+});
+
+// A RECTANGLE IS ONE WRITE, not a loop over planCollisionWrite: one undo step
+// means one store command. Partial by design in ONE direction — per-cell skips
+// (air, block 0, a link overhang, past the layout edge) are expected inside any
+// real rectangle, because a slope's bounding box contains air.
+describe('planCollisionRect — link', () => {
+  const rect = (x: number, y: number, w: number, h: number) => ({ x, y, w, h });
+  /** doc() with the named chunk-definition cells pointed at real blocks. */
+  const withCells = (assign: [number, number][]) => {
+    const d = doc();
+    for (const [cellIndex, block] of assign) {
+      d.chunks[0].cells[cellIndex] = { block, xf: false, yf: false, solidity: 3 };
+    }
+    return d;
+  };
+
+  it('collapses cells sharing a block into ONE colind entry', () => {
+    const d = withCells([[0, 1], [1, 1], [16, 1], [17, 1]]);
+    const r = planCollisionRect(d, rect(0, 0, 2, 2), 7, 'link');
+    expect(r.kind).toBe('link');
+    expect((r as { entries: unknown[] }).entries).toEqual([{ blockId: 1, value: 7 }]);
+    expect(r.report.applied).toBe(4);   // four CELLS
+    expect(r.report.blocks).toBe(1);    // one BLOCK
+  });
+
+  it('applies the writable cells and reports the skipped ones by reason', () => {
+    // cell 0 → block 1 (writes), cell 1 → block 0 (skip), cell 16 → block 2
+    // (writes), cell 17 → block 3 which ALREADY holds 7 (noop).
+    const d = withCells([[0, 1], [1, 0], [16, 2], [17, 3]]);
+    d.collision.colind[3] = 7;
+    const r = planCollisionRect(d, rect(0, 0, 2, 2), 7, 'link');
+    expect(r.kind).toBe('link');
+    expect(r.report.applied).toBe(2);
+    expect(r.report.noop).toBe(1);
+    expect(r.report.skipped).toEqual([{ reason: 'block0', count: 1 }]);
+  });
+
+  it('skips cells outside the layout instead of clamping or refusing', () => {
+    // The act is 32 cells wide; ask for 36.
+    const d = withCells([[0, 1]]);
+    const r = planCollisionRect(d, rect(0, 0, 36, 1), 7, 'link');
+    expect(r.kind).toBe('link');
+    expect(r.report.skipped.find((s) => s.reason === 'outside-layout')!.count).toBe(4);
+  });
+
+  it('is SUCCESS with no command when every cell already carries the shape', () => {
+    // Idempotence. An agent retrying after a timeout must not get a refusal.
+    const d = withCells([[0, 1]]);
+    d.collision.colind[1] = 7;
+    const r = planCollisionRect(d, rect(0, 0, 1, 1), 7, 'link');
+    expect(r.kind).toBe('nothing');
+    expect(r.report.applied).toBe(0);
+    expect(r.report.noop).toBe(1);
+  });
+
+  it('REFUSES when nothing was applied and nothing already matched', () => {
+    // doc()'s cells are all block 0 except cell 5; the 2x2 at the origin misses it.
+    const d = doc();
+    const r = planCollisionRect(d, rect(0, 0, 2, 2), 7, 'link');
+    expect(r.kind).toBe('refused');
+    expect((r as { refusal: { kind: string } }).refusal.kind).toBe('nothing-applicable');
+    expect((r as { why: string }).why).toMatch(/blank block 0/i);
+  });
+
+  it('refuses a zero-area rectangle instead of throwing on an empty skip list', () => {
+    // NOT in the plan. `dominantSkipWhy` reduces the skip array without a seed,
+    // so a w=0 / h=0 rectangle — no cells scanned, no skips recorded, and still
+    // nothing applied — took the refusal branch and crashed on an empty reduce.
+    // An agent passing w:0 must get a sentence, not a TypeError.
+    const d = withCells([[0, 1]]);
+    const r = planCollisionRect(d, rect(0, 0, 0, 4), 7, 'link');
+    expect(r.kind).toBe('refused');
+    expect((r as { refusal: { kind: string } }).refusal.kind).toBe('nothing-applicable');
+    expect((r as { why: string }).why).toMatch(/no cells/i);
+    expect(r.report.skipped).toEqual([]);
+  });
+
+  it('skips a LINK overhang block and still applies the rest', () => {
+    // Block 3 is past a 2-entry table; block 1 is not.
+    const d = withCells([[0, 1], [1, 3]]);
+    d.collision.colind = new Uint8Array(2);
+    const r = planCollisionRect(d, rect(0, 0, 2, 1), 7, 'link');
+    expect(r.kind).toBe('link');
+    expect(r.report.applied).toBe(1);
+    expect(r.report.skipped).toEqual([{ reason: 'overhang', count: 1 }]);
+  });
+
+  it('counts loop-ambiguous cells in ONE warning rather than one per cell', () => {
+    // Needs the act to actually own engine chunk id $28, so build the pool out
+    // to it. LOOP_ALIAS.from is $28 and chunkIndexForId is id - 1.
+    const d = doc();
+    const blank = () => ({ cells: Array.from({ length: 256 }, () => ({ block: 0, xf: false, yf: false, solidity: 0 })) });
+    d.chunks = Array.from({ length: LOOP_ALIAS.from }, blank);
+    d.chunks[LOOP_ALIAS.from - 1].cells[0] = { block: 1, xf: false, yf: false, solidity: 3 };
+    d.chunks[LOOP_ALIAS.from - 1].cells[1] = { block: 1, xf: false, yf: false, solidity: 3 };
+    d.fg = { width: 1, height: 1, cells: new Uint8Array([0x80 | LOOP_ALIAS.from]) };
+    const r = planCollisionRect(d, rect(0, 0, 2, 1), 7, 'link');
+    expect(r.report.warnings.length).toBe(1);
+    expect(r.report.warnings[0]).toMatch(/\$51/);
+    expect(r.report.warnings[0]).toMatch(/^2 cells/);
+  });
+
+  it('reports the LINK blast radius in chunk-definition cells', () => {
+    // Link changes the block ZONE-wide. The rectangle is not the blast radius,
+    // and an agent reading only `applied` would think it was.
+    const d = withCells([[0, 1], [200, 1]]);   // cell 200 is outside the rect
+    const r = planCollisionRect(d, rect(0, 0, 1, 1), 7, 'link');
+    expect(r.report.applied).toBe(1);
+    expect(r.report.blockCellsAffected).toBe(2);
   });
 });
