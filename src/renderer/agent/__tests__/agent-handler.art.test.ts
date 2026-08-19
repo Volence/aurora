@@ -99,6 +99,24 @@ function openReady(doc = makeDoc()): void {
   });
 }
 
+/**
+ * `openReady`, plus the two predicates REPLACING a chunk needs.
+ *
+ * Replacing reclaims, and the planner refuses to reclaim under unknown
+ * predicates with `predicates-unknown` (classic-commit-plan.ts:393) — an
+ * additive commit never asks, which is why the rest of this file's fixtures do
+ * without them. Kept separate rather than folded into `openReady` for exactly
+ * that reason: handing every test an editable range would silently narrow which
+ * tile slots the APPEND tests are allowed to allocate.
+ */
+function openReadyForReplace(doc: LevelDoc): void {
+  openReady(doc);
+  const handle = fakeHandle();
+  handle.levels!.editableTileRange = () => ({ baseTileCount: TILE_COUNT, animRanges: [] });
+  useClassicProjectStore.setState({ handle } as never);
+  useClassicLevelStore.setState({ reservedTiles: new Set<number>() });
+}
+
 // ---------------------------------------------------------------------------
 // PNG fixtures. The act's four palette lines are all-zero words (= black), so a
 // sheet whose PLTE is one black entry maps cleanly onto it and nothing here
@@ -120,10 +138,27 @@ function docWithSplitColours(): LevelDoc {
   return doc;
 }
 
+/** The fixture act, but holding red at line 0 entry 1 — one colour the act has,
+ *  so a sheet or canvas painted entirely in it commits without a palette
+ *  refusal AND lands non-transparent art (entry 0 never draws). */
+function docWithRed(): LevelDoc {
+  const doc = makeDoc();
+  doc.palettes[0][1] = RED_WORD;
+  return doc;
+}
+
 /** An all-black indexed PNG of the given size. */
 function blackPng(width: number, height: number): Uint8Array {
   return encodeIndexedPngForTest({
     width, height, palette: [BLACK], indices: new Uint8Array(width * height),
+  });
+}
+
+/** An indexed PNG painted entirely in palette entry 1 — the one entry
+ *  `docWithRed` gives the act, and unlike entry 0 it DRAWS. */
+function redPng(width: number, height: number): Uint8Array {
+  return encodeIndexedPngForTest({
+    width, height, palette: [BLACK, RED], indices: new Uint8Array(width * height).fill(1),
   });
 }
 
@@ -242,6 +277,48 @@ describe('classic-commit-canvas', () => {
     expect(res.applied).toBe(true);
     expect(res.appendedChunkIds).toEqual([3]);
     expect(useClassicLevelStore.getState().doc!.chunks).toHaveLength(3);
+  });
+
+  // THE REPLACE PATH, AND THE ID BASIS IT TURNS ON. Every other test on this
+  // surface appends; `targets` had only ever been seen here with a wrong LENGTH
+  // (target-count, below) or an out-of-range index (target-invalid, in the CDP
+  // harness). Neither ever named a real chunk — and naming one is the single
+  // branch where getting the basis wrong OVERWRITES THE ARTIST'S EXISTING ART
+  // instead of failing, silently, with an ok:true reply.
+  //
+  // The registry calls `chunkFileIndex` a "0-based FILE index (engine id minus
+  // one)". So index 0 must hit the FIRST chunk. Asserting chunk 1 is untouched
+  // is the half that catches the off-by-one: an engine-id reading of 0 or 1
+  // moves the write by exactly one chunk, and "chunk 0 changed" alone would
+  // still pass if BOTH were rewritten.
+  it('replaces the chunk at a 0-based file index, leaving the pool the same size', async () => {
+    openReadyForReplace(docWithRed());
+    stubFiles(canvasFile('blob', redPng(256, 256)));
+    const before = useClassicLevelStore.getState().doc!.chunks.map((c) => c.cells.map((x) => x.block));
+
+    const res = await handleAgentRequest({
+      kind: 'classic-commit-canvas', name: 'blob', targets: [{ chunkFileIndex: 0 }],
+    }) as {
+      ok: boolean;
+      report: { chunksReplaced: number; chunksAppended: number };
+      appendedChunkIds: number[];
+    };
+
+    expect(res.ok).toBe(true);
+    expect(res.report.chunksReplaced).toBe(1);
+    expect(res.report.chunksAppended).toBe(0);
+    // Replaced chunks KEEP their ids, so none is announced — this list names
+    // only chunks the caller could not otherwise refer to.
+    expect(res.appendedChunkIds).toEqual([]);
+
+    const after = useClassicLevelStore.getState().doc!.chunks;
+    expect(after).toHaveLength(2); // the pool did not grow
+    const nowBlocks = after.map((c) => c.cells.map((x) => x.block));
+    expect(nowBlocks[0]).not.toEqual(before[0]);
+    // The art actually landed: red is not transparent, so every cell of the
+    // replaced chunk names a real (non-blank) block.
+    expect(nowBlocks[0].every((b) => b !== 0)).toBe(true);
+    expect(nowBlocks[1]).toEqual(before[1]);
   });
 });
 
