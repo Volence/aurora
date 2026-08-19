@@ -151,11 +151,14 @@ export function useClassicChunkGridPort(pick: ClassicChunkPick): ChunkGridPort |
       // The eyedrop half of the hint names the VIEWPORT, which the composer
       // column has no sight of — so the two columns say what their own screen
       // can do, and neither points at a surface that is not there.
+      //
+      // Sentence case, matching aeon's provider and both engines' empty-state
+      // hints — classic's lowercase was the outlier, unified 2026-08-19.
       statusHint: pick === 'stamp'
-        ? 'click to select · right-click viewport to eyedrop'
+        ? 'Click to select · right-click viewport to eyedrop'
         // Not "opens" it: the click changes the SUBJECT the Chunk tab is
         // already showing, and does not switch tabs from Block or Tile.
-        : 'click to pick the chunk the Chunk tab edits',
+        : 'Click to pick the chunk the Chunk tab edits',
       HeaderExtra: ChunkPickerHeader,
       // `doc` is read at PAINT time through the store rather than closed over:
       // its identity churns on every edit (a layout stamp replaces the doc while

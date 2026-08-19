@@ -46,7 +46,10 @@ export default function ChunkGrid({ port }: { port: ChunkGridPort }): React.Reac
   ) : null;
 
   const badge = port.statusBadge !== null ? <span style={styles.selBadge}>{port.statusBadge}</span> : null;
-  const hint = <span style={styles.hint}>{port.statusHint}</span>;
+  // Two hints, because the two layouts have genuinely different room. See the
+  // `hint` / `hintLine` style comments: the strip shares one row, the panel
+  // gives the hint its own.
+  const hint = <span style={strip ? styles.hint : styles.hintLine}>{port.statusHint}</span>;
   const count = <span style={styles.count}>{port.countLabel}</span>;
 
   return (
@@ -274,8 +277,10 @@ const styles: Record<string, React.CSSProperties> = {
   // this is a count on the status line, and styling it like the old heading is
   // how it would read as a second section title again.
   count: { fontSize: T.t2xs, color: T.textLo, flexShrink: 0 },
+  // WRAPS ON PURPOSE. The hint carries `flexBasis: 100%` (see `hintLine`), so
+  // it always takes the second line and row 1 is count · badge · size control.
   toolbar: {
-    display: 'flex', alignItems: 'center', gap: 6,
+    display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' as const,
     padding: '3px 8px', borderBottom: `1px solid ${T.border}`, flexShrink: 0,
   },
   selBadge: {
@@ -283,13 +288,33 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '0 6px', borderRadius: T.rMd, lineHeight: '16px', fontFamily: T.fontMono,
     maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
   },
-  // Takes the slack between the badge and the size control, so the size buttons
-  // sit flush right without a second auto margin fighting for the same space.
+  // STRIP ONLY. Takes the slack between the badge and the size control, so the
+  // size buttons sit flush right without a second auto margin fighting for the
+  // same space. A strip is wide enough for one row.
   hint: {
     fontSize: T.t2xs, color: T.textFaint, flex: 1, minWidth: 0, textAlign: 'right' as const,
     overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
   },
-  sizeCtl: { display: 'flex', gap: 2, flexShrink: 0 },
+  // PANEL ONLY — the hint gets its own line.
+  //
+  // It used to share the toolbar row, taking whatever was left after the count,
+  // the badge and the size buttons. In a 260px column that leftover is ~157px
+  // for a sentence wanting ~213px, so classic's hint ellipsized mid-sentence —
+  // and aeon is worse than classic, not better: its badge is a chunk NAME
+  // (`maxWidth: 120`) and it renders the S/M/L control, so a long name can
+  // squeeze the leftover to nearly zero. No honest sentence fits a slot another
+  // element can collapse, which is why this is a layout fix and not shorter copy.
+  //
+  // Left-aligned, sharing the count's left edge: as a right-aligned orphan on
+  // its own line it reads as mislaid rather than as a caption. The ellipsis
+  // guard stays as a never-expected backstop.
+  hintLine: {
+    fontSize: T.t2xs, color: T.textFaint, flexBasis: '100%', minWidth: 0,
+    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+  },
+  // `marginLeft: auto` keeps the size buttons flush right on row 1 now that the
+  // panel hint no longer supplies the slack that used to push them there.
+  sizeCtl: { display: 'flex', gap: 2, flexShrink: 0, marginLeft: 'auto' as const },
   sizeBtn: {
     padding: '0 6px', background: T.overlay, color: T.textBase,
     borderWidth: 1, borderStyle: 'solid', borderColor: T.border, borderRadius: T.rMd, cursor: 'pointer', fontSize: T.t2xs, lineHeight: '16px',
