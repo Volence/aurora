@@ -1989,6 +1989,15 @@ FAIL  4  with the toggle ON every new block gets the flat shape
 
 The two appended blocks land at ids 439/440, past GHZ's 410-entry table, so `withCollision` correctly skips them while the row still expects `$FF`. Row 4's expectation is what is wrong. Stage 4's, not this plan's.
 
+## Booked follow-ups
+
+Discovered during this plan, deliberately not done:
+
+1. **No human rectangle gesture.** `set_block_collision` gives the AGENT a rectangle; the Collision panel is still one cell per click. The facet-side rectangle is §4.5's other half and was never in this plan's scope.
+2. **Isolate could fall back to Link when a block is fully contained.** Rect Isolate always clones, even for a block whose every use lies inside the rectangle, where Link would be outcome-identical and free — and free matters, because GHZ and SBZ have no spare collision-table entries at all. Not done: predictability and parity with the shipped single-cell case won.
+3. **Bounded `skippedCells` in the reply.** The reply gives skip counts by reason but no coordinates, so a caller that asked for a 4-cell slope and got `applied: 2, skipped: [{block0, 2}]` cannot tell whether the blank cells were the ones it expected or the ones it cared about. Proposal: a bounded `skippedCells` array (first ~16 as `{x, y, reason}`) with the counts staying authoritative. Needs a `CollisionRectReport` change.
+4. **`skipRefusal`'s `outside-layout` arm is unreachable.** It exists for switch exhaustiveness; the rectangle's summary uses `skipPhrase` instead, because a rectangle has no single block to name and the overhang sentence needs one. Harmless, but it will look like dead code to the next reader — the code says so in place.
+
 ## Notes for the implementer
 
 - **Trust source over this plan.** Line numbers drift; five claims in the previous plan of this series were wrong.
