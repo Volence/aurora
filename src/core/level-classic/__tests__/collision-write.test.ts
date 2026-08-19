@@ -209,6 +209,51 @@ describe('planCollisionWrite', () => {
     expect(r.kind).toBe('refused');
     expect((r as { why: string }).why).toMatch(/Use Link/i);
   });
+
+  it('GUARANTEES Link when the clicked cell is the block\'s ONLY naming definition cell', () => {
+    // doc() names block 3 from exactly one chunk-definition cell (chunks[0]
+    // cell 5), and that is the cell the probe points at. So the clone Isolate
+    // would mint would be referenced by that same one cell — Link reaches
+    // nothing Isolate would have spared. A 4-entry table against 4 blocks still
+    // refuses the clone, so the escape sentence is the whole answer here.
+    const d = doc();
+    d.collision.colind = new Uint8Array(4);
+    const r = planCollisionWrite(d, probe(), 7, 'isolate');
+    expect(r.kind).toBe('refused');
+    const why = (r as { why: string }).why;
+    expect(why).toMatch(/Use Link/);
+    expect(why, 'hedges when it can guarantee').not.toMatch(/accepting it changes every use/);
+    expect(why).toMatch(/no chunk-definition cell outside this one names block 3/);
+  });
+
+  it('keeps HEDGING when one more definition cell names the same block', () => {
+    // The pair. Identical to the test above except for ONE extra naming cell,
+    // which the click does not cover — so Link would change collision the user
+    // did not point at, and the sentence must go back to saying so.
+    const d = doc();
+    d.collision.colind = new Uint8Array(4);
+    d.chunks[0].cells[6] = { block: 3, xf: false, yf: false, solidity: 3 };
+    const r = planCollisionWrite(d, probe(), 7, 'isolate');
+    expect(r.kind).toBe('refused');
+    expect((r as { why: string }).why).toMatch(/accepting it changes every use of block 3/);
+  });
+
+  it('counts a naming cell in a chunk the LAYOUT NEVER STAMPS as uncontained', () => {
+    // TRAP 1. chunks[1] is engine chunk id 2 and fg is [1, 1] — nothing stamps
+    // it, so no click anywhere in the act can reach its cells. A Link still
+    // rewrites their collision, latently, surfacing the day that chunk is
+    // stamped. Containment is a property of the chunk DEFINITIONS, not of the
+    // layout, and a scan that walked only placed chunks would call this
+    // contained and promise a guarantee it cannot keep.
+    const d = doc();
+    d.collision.colind = new Uint8Array(4);
+    const cells = Array.from({ length: 256 }, () => ({ block: 0, xf: false, yf: false, solidity: 0 }));
+    cells[0] = { block: 3, xf: false, yf: false, solidity: 3 };
+    (d.chunks as unknown[]).push({ cells });
+    const r = planCollisionWrite(d, probe(), 7, 'isolate');
+    expect(r.kind).toBe('refused');
+    expect((r as { why: string }).why).toMatch(/accepting it changes every use of block 3/);
+  });
 });
 
 describe('planCollisionWrite no-op', () => {
@@ -640,5 +685,103 @@ describe('planCollisionCells', () => {
     const r = planCollisionCells(d, [{ x: 0, y: 0 }, { x: 1, y: 1 }, { x: 2, y: 2 }], 7, 'isolate');
     expect(r.kind).toBe('isolate');
     expect((r as { plan: SurfaceEditPlan }).plan.newBlocks.length).toBe(2);
+  });
+});
+
+// WHEN LINK IS PROVABLY ENOUGH. Isolate refuses in GHZ and SBZ for every cell,
+// and the escape it offers used to be a hedge in every case: "Use Link,
+// accepting it changes every use of block N". When every chunk-definition cell
+// naming N is inside the selection, that hedge is describing a cost that does
+// not exist — Link reaches nothing Isolate would have spared.
+//
+// The refusal is unchanged. Only the sentence, and the machine-readable set
+// beside it, are.
+describe('planCollisionRect — isolate refusal, containment', () => {
+  const rect = (x: number, y: number, w: number, h: number) => ({ x, y, w, h });
+  const resolutionOf = (r: ReturnType<typeof planCollisionRect>) => (r as { resolution: string }).resolution;
+  const refusalOf = (r: ReturnType<typeof planCollisionRect>) =>
+    (r as { refusal: { kind: string; linkEquivalent?: number[] } }).refusal;
+
+  /**
+   * doc() with a colind table exactly as long as the block list: zero spare, so
+   * ANY isolate refuses with `isolate-grows-table` while every block id (0..3)
+   * is still inside the table. That is the state the guarantee is about.
+   */
+  const zeroSpare = () => {
+    const d = doc();
+    d.collision.colind = new Uint8Array(d.blocks.length);   // 4 entries, 4 blocks
+    return d;
+  };
+
+  it('GUARANTEES Link when every definition cell naming the blocks is selected', () => {
+    // doc() names block 3 from chunks[0] cell 5 and nowhere else, and cell 5 is
+    // FG cell (5,0). A 1x1 rectangle there covers the block's whole use.
+    const d = zeroSpare();
+    const r = planCollisionRect(d, rect(5, 0, 1, 1), 7, 'isolate');
+    expect(r.kind).toBe('refused');
+    expect(refusalOf(r).kind).toBe('isolate-grows-table');
+    const res = resolutionOf(r);
+    expect(res).toMatch(/^Use Link/);
+    expect(res, 'hedges when it can guarantee').not.toMatch(/accepting it changes every use/);
+    expect(res).toMatch(/every chunk-definition cell naming this block is inside this selection/);
+    expect(refusalOf(r).linkEquivalent).toEqual([3]);
+  });
+
+  it('HEDGES when one further definition cell naming the block is left outside', () => {
+    // THE PAIR. Identical to the test above except cell 6 also names block 3,
+    // and the same 1x1 rectangle does not cover it.
+    const d = zeroSpare();
+    d.chunks[0].cells[6] = { block: 3, xf: false, yf: false, solidity: 3 };
+    const r = planCollisionRect(d, rect(5, 0, 1, 1), 7, 'isolate');
+    expect(r.kind).toBe('refused');
+    expect(resolutionOf(r)).toMatch(/accepting it changes every use of these blocks zone-wide/);
+    expect(refusalOf(r).linkEquivalent).toEqual([]);
+  });
+
+  it('counts a naming cell in a chunk the LAYOUT NEVER STAMPS as uncontained', () => {
+    // TRAP 1, on the rectangle path. chunks[1] is engine chunk id 2; fg is
+    // [1, 1], so no rectangle in this act can ever reach it — yet a Link would
+    // rewrite the collision of the cell inside it. Containment must be computed
+    // from doc.chunks, never from the layout.
+    const d = zeroSpare();
+    const cells = Array.from({ length: 256 }, () => ({ block: 0, xf: false, yf: false, solidity: 0 }));
+    cells[0] = { block: 3, xf: false, yf: false, solidity: 3 };
+    (d.chunks as unknown[]).push({ cells });
+    const r = planCollisionRect(d, rect(5, 0, 1, 1), 7, 'isolate');
+    expect(r.kind).toBe('refused');
+    expect(resolutionOf(r), 'promised a guarantee for a cell no selection can reach')
+      .toMatch(/accepting it changes every use of these blocks zone-wide/);
+    expect(refusalOf(r).linkEquivalent).toEqual([]);
+  });
+
+  it('never guarantees Link for an OVERHANG block, however contained it is', () => {
+    // TRAP 2. The classifier's overhang skip is link-mode only, so an isolate
+    // refusal's block set CAN hold blocks past the end of the table — blocks
+    // Link cannot set either. Block 3 here is named by exactly one definition
+    // cell and the rectangle covers it, so it is fully contained; it is still
+    // outside a 3-entry table, and promising Link for it would recreate the
+    // "recommends a mode this same document refuses" defect.
+    const d = doc();
+    d.collision.colind = new Uint8Array(3);                 // block 3 is the overhang
+    const r = planCollisionRect(d, rect(5, 0, 1, 1), 7, 'isolate');
+    expect(r.kind).toBe('refused');
+    const res = resolutionOf(r);
+    expect(res).toMatch(/Link cannot set every block/);
+    expect(res, 'recommends Link for a block Link refuses').not.toMatch(/^Use Link/);
+    expect(refusalOf(r).linkEquivalent).toEqual([]);
+  });
+
+  it('hedges for a MIXED selection — one block contained, one not', () => {
+    // The guarantee is all-or-nothing on purpose: it is one sentence about the
+    // whole call, and "some of these are free" is not something a caller can
+    // act on without knowing which. `linkEquivalent` carries the which.
+    const d = zeroSpare();
+    d.chunks[0].cells[4] = { block: 2, xf: false, yf: false, solidity: 3 };
+    d.chunks[0].cells[6] = { block: 2, xf: false, yf: false, solidity: 3 };  // outside the rect
+    const r = planCollisionRect(d, rect(4, 0, 2, 1), 7, 'isolate');          // cells 4 and 5
+    expect(r.kind).toBe('refused');
+    expect(refusalOf(r).kind).toBe('isolate-grows-table');
+    expect(resolutionOf(r)).toMatch(/accepting it changes every use of these blocks zone-wide/);
+    expect(refusalOf(r).linkEquivalent).toEqual([3]);        // block 2 escapes, block 3 does not
   });
 });

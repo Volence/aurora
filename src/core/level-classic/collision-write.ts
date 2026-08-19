@@ -80,11 +80,90 @@ function escapeFromLinkOverhang(doc: LevelDoc): string {
   return `Isolate cannot escape it either — this zone ships ${doc.blocks.length} blocks against ${doc.collision.colind.length} entries, so a clone would grow the table over the same overhang. Edit a block within the table, or restamp this cell to a block that is.`;
 }
 
-function escapeFromIsolateGrowth(doc: LevelDoc, blockId: number): string {
-  if (blockId < doc.collision.colind.length) {
-    return `Use Link, accepting it changes every use of block ${blockId}.`;
+/**
+ * WHICH OF THESE BLOCKS DOES LINK REACH NOTHING EXTRA FOR — one scan of every
+ * chunk DEFINITION, answering the whole write set at once.
+ *
+ * A block is FULLY CONTAINED when every chunk-definition cell naming it is one
+ * of the cells this call already resolved to. For such a block, Link and
+ * Isolate produce the same collision everywhere in the act: Isolate would
+ * repoint exactly these cells at a clone carrying the new shape, and there is no
+ * other cell left holding the old one. That is what turns the escape sentence
+ * from a hedge into a guarantee.
+ *
+ * TWO TRAPS, both of which this function exists to avoid, and neither of which
+ * is visible from the call site:
+ *
+ *  1. IT SCANS DEFINITIONS, NOT THE LAYOUT. A chunk definition can exist with no
+ *     placement in the FG plane at all. Its cells are unreachable by any
+ *     selection a person or an agent could make — but a Link write still changes
+ *     their collision, latently, surfacing the day that chunk is stamped. Walking
+ *     only the chunks the layout references would call such a block contained and
+ *     promise a guarantee that is false. (`blockCellsAffected` in
+ *     `planCollisionCells` counts the same population for the same reason.)
+ *
+ *  2. IT SAYS NOTHING ABOUT THE COLIND TABLE. `classifyCollisionCell` skips
+ *     overhang blocks in LINK mode only, so an ISOLATE write set can contain
+ *     blocks past the end of the table — blocks Link cannot set either. Callers
+ *     must AND this answer with `blockId < colind.length` before recommending
+ *     Link, or the refusal recommends a mode the same document also refuses.
+ *
+ * Covering a definition cell through any ONE placement covers all of them, since
+ * both modes write the definition tier and not the layout.
+ *
+ * Returns the contained ids in `candidates` order, so a caller's reported set
+ * lines up with its `distinct` array.
+ */
+function fullyContainedBlocks(
+  doc: LevelDoc,
+  candidates: readonly number[],
+  covered: readonly { chunkIndex: number; cellIndex: number }[],
+): number[] {
+  const wanted = new Set(candidates);
+  const inSelection = new Set(covered.map((c) => `${c.chunkIndex}:${c.cellIndex}`));
+
+  // Blocks with at least one naming definition cell the selection does not
+  // cover. Collected as the complement because the scan sees the counterexample,
+  // not the proof.
+  const escaped = new Set<number>();
+  for (let ci = 0; ci < doc.chunks.length; ci++) {
+    const cells = doc.chunks[ci].cells;
+    for (let k = 0; k < cells.length; k++) {
+      const b = cells[k].block;
+      if (!wanted.has(b) || escaped.has(b)) continue;
+      if (!inSelection.has(`${ci}:${k}`)) escaped.add(b);
+    }
   }
-  return `Link cannot set block ${blockId} either — it is past the end of the table. Edit a block within the table, or restamp this cell to a block that is.`;
+  return candidates.filter((b) => !escaped.has(b));
+}
+
+/**
+ * THE ESCAPE SENTENCE FOR AN ISOLATE THAT WOULD GROW THE TABLE — three answers,
+ * and only one of them is a hedge.
+ *
+ * `contained` is `fullyContainedBlocks` for this one cell, which is the
+ * degenerate case: the selection is a single definition cell, so containment
+ * means "no chunk definition anywhere names this block except the cell that was
+ * clicked". The caller computes it because THIS function has no notion of a
+ * selection and must not invent one — a `doc`-only containment test would have
+ * to assume the selection, and assuming it is what makes a guarantee false.
+ *
+ * WHY THE GUARANTEE IS TRUE when both conditions hold: Isolate would clone the
+ * block, repoint this cell at the clone and give the clone the shape. Link gives
+ * the shape to the block itself. No other chunk cell names that block, so no
+ * collision anywhere in the act differs between the two. (The one residue is
+ * that Link also changes what the block would contribute if it were stamped
+ * SOMEWHERE NEW later — which is a statement about a document that does not
+ * exist yet, not about the collision this call is being asked to change.)
+ */
+function escapeFromIsolateGrowth(doc: LevelDoc, blockId: number, contained: boolean): string {
+  if (blockId >= doc.collision.colind.length) {
+    return `Link cannot set block ${blockId} either — it is past the end of the table. Edit a block within the table, or restamp this cell to a block that is.`;
+  }
+  if (contained) {
+    return `Use Link: no chunk-definition cell outside this one names block ${blockId}, so Link changes exactly what Isolate would have changed here — and costs no table entry.`;
+  }
+  return `Use Link, accepting it changes every use of block ${blockId}.`;
 }
 
 /**
@@ -244,9 +323,13 @@ export function planCollisionWrite(
   // rather than guessed.
   const extendsTableBy = newBlockId + 1 - colind.length;
   if (extendsTableBy > 0) {
+    // The selection here is ONE definition cell — the one the classifier
+    // resolved — so the general containment scan is asked the degenerate
+    // question, with the same answer the rectangle path gets.
+    const contained = fullyContainedBlocks(doc, [blockId], [{ chunkIndex, cellIndex }]).length === 1;
     return {
       kind: 'refused',
-      why: `isolating this block would grow this zone's collision table by ${extendsTableBy} entr${extendsTableBy === 1 ? 'y' : 'ies'} (${colind.length} → ${newBlockId + 1}) — those entries resolve into the adjacent zone's table in ROM, so Aurora cannot define them. ${escapeFromIsolateGrowth(doc, blockId)}`,
+      why: `isolating this block would grow this zone's collision table by ${extendsTableBy} entr${extendsTableBy === 1 ? 'y' : 'ies'} (${colind.length} → ${newBlockId + 1}) — those entries resolve into the adjacent zone's table in ROM, so Aurora cannot define them. ${escapeFromIsolateGrowth(doc, blockId, contained)}`,
     };
   }
 
@@ -308,7 +391,22 @@ export interface CollisionRectReport {
  */
 export type CollisionRectRefusal =
   | { kind: 'nothing-applicable'; skipped: { reason: CollisionSkipReason; count: number }[] }
-  | { kind: 'isolate-grows-table'; needed: number; spare: number; colindLength: number; blocks: number }
+  | {
+      kind: 'isolate-grows-table'; needed: number; spare: number; colindLength: number; blocks: number;
+      /**
+       * The blocks in this selection for which LINK IS EXACTLY EQUIVALENT to the
+       * refused Isolate: every chunk-definition cell naming them is inside the
+       * selection (so Link reaches nothing Isolate would have spared) AND they
+       * are inside the colind table (so Link can set them at all). Both halves
+       * are required — see `fullyContainedBlocks`.
+       *
+       * Carried as data, not only as prose, because the caller acting on this
+       * refusal is often an agent: `resolution` says WHETHER, this says WHICH,
+       * and re-deriving it needs a scan of every chunk definition that the
+       * agent surface cannot cheaply run. Empty when the answer is "none".
+       */
+      linkEquivalent: number[];
+    }
   | { kind: 'block-ceiling'; needed: number; spare: number }
   /** No act is open — nothing was scanned. Raised by the dispatcher, not here. */
   | { kind: 'no-level' }
@@ -564,16 +662,35 @@ function planIsolateRect(
   const tableSpare = colind.length - doc.blocks.length;
   if (needed > tableSpare) {
     const grow = doc.blocks.length + needed - colind.length;
+
+    // THREE ANSWERS, not two. The table check comes first and is unchanged: if
+    // ANY written block is past the end of the table, Link cannot set it either
+    // and recommending Link would be the dead end an earlier task removed.
+    //
+    // Otherwise Link is available — and the question is whether it costs
+    // anything. `linkEquivalent` is the subset for which it does not; when that
+    // is the WHOLE selection the sentence stops hedging, because there is no
+    // collateral left to warn about. All-or-nothing on purpose: one sentence
+    // covers the whole call, and "some of these are free" is not actionable
+    // without knowing which — which is what the payload field is for.
+    const allInTable = distinct.every((b) => b < colind.length);
+    const linkEquivalent = allInTable
+      ? fullyContainedBlocks(doc, distinct, writes)
+      : [];
+    const guaranteed = allInTable && linkEquivalent.length === distinct.length;
+
     return {
       kind: 'refused',
       refusal: {
         kind: 'isolate-grows-table', needed, spare: Math.max(0, tableSpare),
-        colindLength: colind.length, blocks: doc.blocks.length,
+        colindLength: colind.length, blocks: doc.blocks.length, linkEquivalent,
       },
       why: `isolating this rectangle needs ${needed} new block${needed === 1 ? '' : 's'} and this zone's collision table has room for ${Math.max(0, tableSpare)} — it would grow by ${grow} entr${grow === 1 ? 'y' : 'ies'} (${colind.length} → ${doc.blocks.length + needed}), and those entries resolve into the adjacent zone's table in ROM, so Aurora cannot define them.`,
-      resolution: distinct.every((b) => b < colind.length)
-        ? 'Use Link, accepting it changes every use of these blocks zone-wide, or paint a smaller rectangle.'
-        : 'Link cannot set every block in this rectangle either — some are past the end of the table. Paint over blocks that are within it.',
+      resolution: !allInTable
+        ? 'Link cannot set every block in this rectangle either — some are past the end of the table. Paint over blocks that are within it.'
+        : guaranteed
+          ? `Use Link: every chunk-definition cell naming ${needed === 1 ? 'this block' : 'these blocks'} is inside this selection, so Link changes exactly what Isolate would have changed — and costs no table entry.`
+          : 'Use Link, accepting it changes every use of these blocks zone-wide, or paint a smaller rectangle.',
       report: base,
     };
   }
