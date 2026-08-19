@@ -38,6 +38,8 @@ interface AetherState {
   disconnect: () => Promise<void>;
   /** Coalescing live push. Safe to call on every slider tick. */
   pushPaletteLine: (line: number, words: number[]) => void;
+  /** Warp the running game. Returns a human-facing sentence, or null if gated. */
+  warp: (x: number, y: number) => Promise<string | null>;
 }
 
 /** Coalescing state, deliberately outside the store: it is not UI. */
@@ -112,6 +114,21 @@ export const useAetherStore = create<AetherState>((set, get) => ({
 
     const wait = Math.max(0, MIN_PUSH_INTERVAL_MS - (Date.now() - lastPushAt));
     timer = setTimeout(fire, wait);
+  },
+
+  warp: async (x, y) => {
+    if (get().status !== 'connected') return null;
+    const r = await window.api.aetherWarp(x, y);
+    if (!r.warped) {
+      // A release ROM simply does not carry the mailbox — say that rather than
+      // reporting a failure the user cannot act on.
+      if (r.gate === 'no-symbols') return 'Warp needs a DEBUG build — this ROM has no warp mailbox';
+      return `Warp failed: ${r.error ?? 'unknown'}`;
+    }
+    // The engine clamps and publishes where it actually put the player, so the
+    // message reports the LANDING rather than the request.
+    const at = r.landed ? ` to (${r.landed.x}, ${r.landed.y})` : '';
+    return r.clamped ? `Warped${at} — clamped to the act bounds` : `Warped${at}`;
   },
 }));
 

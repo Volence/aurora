@@ -10,6 +10,8 @@ import { switchFacet, toolsForFacet } from '../workspace/facet-tools';
 import { useWorkspaceStore } from '../workspace/workspaceStore';
 import { levelKeysEnabled } from '../workspace/level-keys';
 import { useToastStore } from '../state/toastStore';
+import { useAetherStore } from '../state/aetherStore';
+import { warpTargetFor } from '../../core/aether/warp-math';
 import { openDocumentGuarded } from './art/open-document';
 import { docFromTile, docFromSectionRegion } from '../../core/art/composer-buffer';
 import { seedDocCollisionFromSection } from '../../core/art/composer-collision';
@@ -634,6 +636,32 @@ export default function MapViewport() {
           e.preventDefault();
           return;
         }
+      }
+
+      // F7 — play from cursor (DSVEdit's convention). Warps the RUNNING game to
+      // wherever the mouse is on the map.
+      //
+      // The cursor position comes from `lastMouse` rather than from a hovered
+      // cell, because a warp is to a POINT, not to a tile: rounding to the tile
+      // grid would put the player up to 7px from where they were told to appear,
+      // and the whole feature is "put me exactly there".
+      if (e.key === 'F7') {
+        e.preventDefault();
+        const world = screenToWorld(lastMouse.current.x, lastMouse.current.y);
+        // Read the act FRESH from the store rather than the closure. This
+        // handler is installed by an effect keyed on [pan, setZoom, zoom], so a
+        // captured `act` goes stale the moment the user switches act without
+        // touching the camera — and a stale act means clamping the warp to the
+        // wrong bounds. The Delete branch below reads its selection the same
+        // way for the same reason.
+        const liveAct = getCurrentAct(useProjectStore.getState());
+        const target = warpTargetFor(world.x, world.y, {
+          gridWidth: liveAct?.gridWidth ?? 0, gridHeight: liveAct?.gridHeight ?? 0,
+        });
+        void useAetherStore.getState().warp(target.x, target.y).then((msg) => {
+          if (msg) useToastStore.getState().addToast(msg, msg.startsWith('Warped') ? 'success' : 'info');
+        });
+        return;
       }
 
       if ((e.key === 'Delete' || e.key === 'Backspace') && level) {

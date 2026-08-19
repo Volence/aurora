@@ -13,10 +13,11 @@
 
 import net from 'node:net';
 import { ipcMain, type BrowserWindow } from 'electron';
-import { IPC_CHANNELS, type AetherStatusPayload } from '../../shared/ipc-types';
+import { IPC_CHANNELS, type AetherStatusPayload, type AetherWarpResult } from '../../shared/ipc-types';
 import { AetherClient } from './client';
 import { resolveSocketPath } from './socket-path';
 import { pushPaletteWords } from './push-palette';
+import { warpTo } from './warp';
 import { PAL_BASE_SYMBOL, PAL_BASE_DIRTY_SYMBOL } from '../../core/aether/palette-push';
 
 let client: AetherClient | null = null;
@@ -102,6 +103,15 @@ export function registerAetherBridge(browserWindow: BrowserWindow): void {
     publish();
     return statusPayload();
   });
+
+  ipcMain.handle(
+    IPC_CHANNELS.AETHER_WARP,
+    async (_e, x: number, y: number): Promise<AetherWarpResult> => {
+      if (!client) return { warped: false, error: 'not connected' };
+      const r = await warpTo(client, x, y);
+      return { warped: r.warped, gate: r.gate, error: r.error, landed: r.landed, clamped: r.clamped };
+    },
+  );
 
   ipcMain.handle(
     IPC_CHANNELS.AETHER_PUSH_PALETTE,

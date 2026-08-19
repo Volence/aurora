@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import { IPC_CHANNELS, unwrapBinaryRead } from '../shared/ipc-types';
-import type { RecentProject, GuardedWriteFile, GuardedWriteResult, ReadManyEntry, AetherStatusPayload } from '../shared/ipc-types';
+import type { RecentProject, GuardedWriteFile, GuardedWriteResult, ReadManyEntry, AetherStatusPayload, AetherWarpResult } from '../shared/ipc-types';
 import { AGENT_REQUEST_CHANNEL, AGENT_RESPONSE_CHANNEL } from '../shared/agent-protocol';
 import type { AgentRequestEnvelope, AgentResponseEnvelope } from '../shared/agent-protocol';
 
@@ -78,6 +78,8 @@ const api = {
     ipcRenderer.invoke(IPC_CHANNELS.AETHER_DISCONNECT),
   aetherPushPalette: (line: number, words: number[]): Promise<{ pushed: boolean; error?: string }> =>
     ipcRenderer.invoke(IPC_CHANNELS.AETHER_PUSH_PALETTE, line, words),
+  aetherWarp: (x: number, y: number): Promise<AetherWarpResult> =>
+    ipcRenderer.invoke(IPC_CHANNELS.AETHER_WARP, x, y),
   onAetherStatus: (callback: (s: AetherStatusPayload) => void): void => {
     ipcRenderer.on(IPC_CHANNELS.AETHER_STATUS, (_e, s: AetherStatusPayload) => callback(s));
   },

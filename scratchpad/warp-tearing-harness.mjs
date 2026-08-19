@@ -351,6 +351,62 @@ async function main() {
       // number chosen to make a red row green. What this asserts is the useful
       // thing: the mailbox is inside the noise, and the bare poke is not.
       const OFF_VIEW_FLOOR = 26;
+      // ---- Row 8: do the EDITOR's world pixels mean the same thing as the
+      // ENGINE's? Aurora's warp-math assumes they do (an aeon act is flat world
+      // coordinates end to end, and the editor lays sections out on the same
+      // grid at the same scale). Assumed correspondences between two codebases
+      // are exactly what has bitten this work repeatedly, so it is measured:
+      // ask for a known world point and see where the PLAYER ends up.
+      const playerAddr = await client.resolve('Player_1');
+      const warpAndRead = async (ax, ay) => {
+        await call('emulator/restore', { id: cp });
+        await wr(wx, be16(ax));
+        await wr(wy, be16(ay));
+        await wr(wf, Uint8Array.of(1));
+        for (let f = 0; f < 120; f++) {
+          await call('emulator/run_frames', { frames: 1 });
+          if ((await rd(wf, 1))[0] === 0) break;
+        }
+        // SETTLE BEFORE READING. The player arrives airborne, so reading at the
+        // ack (~20 frames) catches them mid-fall — and two warps read at the
+        // same elapsed time have both fallen the same distance, which preserves
+        // their difference and imitates a constant offset exactly. The first
+        // run of this row fell for that: it reported a fixed -11 that was
+        // really two unfinished falls.
+        await call('emulator/run_frames', { frames: 240 });
+        return {
+          x: (await rd(playerAddr + 0x02, 4)).readUInt32BE(0) >>> 16,   // SST x, 16.16
+          y: (await rd(playerAddr + 0x06, 4)).readUInt32BE(0) >>> 16,   // SST y
+        };
+      };
+
+      const askX = 1536;
+      const low = await warpAndRead(askX, 320);
+      check('8', 'X is the editor world coordinate, exactly — the spaces correspond',
+        low.x === askX, `asked x=${askX}, player x=${low.x}`);
+
+      // Y needs characterising rather than a tolerance. aeon says the player
+      // "arrives airborne with zeroed velocities and falls to the ground", so
+      // two different asked-Y values at the same X should converge to the SAME
+      // ground if it is a fall, and stay a CONSTANT offset apart if it is a
+      // placement convention Aurora would have to compensate for.
+      const high = await warpAndRead(askX, 120);
+      // What matters to the client is not the offset's VALUE but whether it is
+      // PREDICTABLE. A fall-to-ground would make Y terrain-dependent and
+      // uncorrectable; a constant offset is a convention Aurora can compensate
+      // for (or deliberately not, once aeon says which point it means).
+      const dLow = low.y - 320, dHigh = high.y - 120;
+      const constant = dLow === dHigh;
+      check('9', 'Y differs from the request by a CONSTANT, not by terrain',
+        constant,
+        `asked 320 -> ${low.y} (${dLow}); asked 120 -> ${high.y} (${dHigh}). ` +
+        (constant
+          ? `A stable ${dLow}px convention — Player_1.y is not the point the warp takes. ` +
+            `Measured after 240 settle frames, so it is not an unfinished fall. Aurora does NOT ` +
+            `compensate: the engine's read-back reports the request, and which point it means ` +
+            `(feet vs origin) is aeon's to define.`
+          : 'Terrain-dependent — Y cannot be predicted client-side.'));
+
       check('7', 'the mailbox whole-plane diff is inside the known off-view floor',
         mailboxDiffAll <= OFF_VIEW_FLOOR,
         `${mailboxDiffAll} of ${ALL_WORDS} whole-plane words (floor ${OFF_VIEW_FLOOR}; ` +
