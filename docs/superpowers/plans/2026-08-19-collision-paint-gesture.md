@@ -662,6 +662,50 @@ Then PROVE the modifier actually arrives, because a dropped modifier is invisibl
 
 ---
 
+## Runtime results (2026-08-19, controller foreground run)
+
+`scratchpad/collision-gesture-harness.mjs` against the built worktree app under xvfb, driving the real `/home/volence/sonic_hacks/s1disasm` with synthetic mouse events: **8/8**.
+
+The setup line shows it discovered its own targets rather than being handed them:
+
+```
+box at cell (380,7) in chunk 56: blocks [15,3,360,16,19,19,17,35,35]
+freehand path [[380,7],[381,7],[382,7],[382,8],[382,9]] over blocks [15,3,360,19,35];
+  WITNESS cell (380,8) is block 16, which appears nowhere on the path
+```
+
+**The witness cell is what makes rows 2 and 4 mean anything.** It sits inside the bounding box but is never under the cursor, and its block appears on no cell the cursor touches:
+
+- Row 2 (freehand): `block 16: 255 -> 255` — *a rectangle would have taken it*
+- Row 4 (Shift): `block 16: 255 -> 1` — *unchanged here means Shift never reached the page*
+
+One cell, distinguishing both branches in both directions. Without it, a straight-line drag paints identical cells either way and neither row could tell freehand from marquee.
+
+### Three defects planted, each rebuilt and re-run
+
+| Plant | Result |
+|---|---|
+| `dispatchCollisionPlan`'s link branch → per-entry `classicSetColind` loop | **row 3 FAILS** (5/8; rows 4–5 collateral, the dirty document). The node suite caught it too (2 failed). |
+| `rectFromCorners` → no normalisation (`w: b.x - a.x + 1` from the raw corners) | **row 5 FAILS ALONE** (7/8). Row 4 still passes, because a down-and-right drag works fine un-normalised — this bug only ever appears when someone drags the other way. |
+| `onMouseDown`'s `tool === 'paint-collision'` condition → `true` | **row 6 FAILS ALONE** (7/8). Painting while unarmed, i.e. the map stops panning on this facet. |
+
+**A false start, again worth recording.** The first attempt at the row-3 plant would have gone into `applyCollisionShape` — the SINGLE-CELL path, where `entries` always holds one element and the "loop" is behaviourally identical. That is the same trap that wasted a full build-and-run cycle on the previous plan. `grep` for the call site and check WHICH function you are in; there are two.
+
+### Regression gates on the restored tree
+
+- `npm test` — **3268 passed, 3 skipped, 293 files**
+- `npx tsc --noEmit` — clean
+- `scratchpad/collision-agent-harness.mjs` — **8/8**. Task 1 rewrote the planner the shipped `set_block_collision` tool runs on, so this is the gate that says the agent surface did not move.
+- `scratchpad/commit-collision-harness.mjs` — **5/6, row 4**, exactly as before. Stage 4's, not ours.
+
+### Harness setup, and why row 1 aborted on the first run
+
+The first foreground run stopped at row 1: `shape armed=null`, `click landed on the swatch=false`. The picker's grid is `maxHeight:220, overflow:auto` and every unused shape sits below every used one, so `scrollIntoView({block:'nearest'})` parked the target against the grid's bottom edge — off-window, where `elementFromPoint` returns null.
+
+**The abort was the harness working.** Seven rows would otherwise have run against an unarmed tool, painted nothing, changed nothing, and reported that no unintended writes occurred.
+
+The fix is worth carrying forward: arming is now confirmed by **reading the shape back out of the panel** (the probed block's shape must change from 0 to the clicked index), not by a hit test. A hit test only says the pointer was over the element; it never says the handler ran.
+
 ## Notes for the implementer
 
 - **Trust source over this plan.** Seven defects were found in the previous plan this way.
