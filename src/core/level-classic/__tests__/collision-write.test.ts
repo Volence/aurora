@@ -125,6 +125,64 @@ describe('planCollisionWrite', () => {
     expect(r.kind).toBe('link');
     expect((r as { warnings: string[] }).warnings.join(' ')).toMatch(/\$51|loop/i);
   });
+
+  it('does not send a LINK overhang refusal to Isolate when Isolate would also refuse', () => {
+    // The GHZ/SBZ shape: more blocks than the table has entries. Link refuses
+    // the overhang block; Isolate would have to grow the table over the same
+    // overhang, so it refuses too. Telling the caller to "Use Isolate" is a
+    // dead end presented as an escape — and an AGENT will act on it.
+    const d = doc();
+    d.collision.colind = new Uint8Array(2);          // 4 blocks, 2 entries
+    const r = planCollisionWrite(d, probe(), 7, 'link');
+    expect(r.kind).toBe('refused');
+    const why = (r as { why: string }).why;
+    expect(why).toMatch(/past the end/i);
+    expect(why, 'recommends a mode that this same document refuses').not.toMatch(/Use Isolate/i);
+    expect(why).toMatch(/restamp|within the table/i);
+  });
+
+  it('still offers Isolate as the escape when Isolate would actually fit', () => {
+    // The other side of the same branch, so the fix is a COMPUTATION and not a
+    // blanket deletion.
+    //
+    // Reaching this state needs a block ref PAST the table but with the table
+    // still longer than the block list — i.e. a DANGLING ref, which is exactly
+    // the hole in the "both refusals are the same condition" proof:
+    // validateLevelDoc bounds a chunk cell's block by the 10-bit field, not by
+    // doc.blocks.length. Unreachable on stock data, representable in the model,
+    // and the reason the escape is computed instead of asserted.
+    const d = doc();                                 // 4 blocks
+    d.collision.colind = new Uint8Array(8);          // 8 entries — a clone fits
+    d.chunks[0].cells[5] = { ...d.chunks[0].cells[5], block: 9 };  // 9 >= 8
+    const r = planCollisionWrite(d, probe(), 7, 'link');
+    expect(r.kind).toBe('refused');
+    expect((r as { why: string }).why).toMatch(/Use Isolate/i);
+  });
+
+  it('does not send an ISOLATE growth refusal to Link for a block Link cannot set', () => {
+    // The mirrored defect. For an OVERHANG block both modes refuse, so "Use
+    // Link, accepting it changes every use of block N" is false.
+    // doc()'s probed cell already holds block 3; a 2-entry table puts it past
+    // the end, and the clone at id 4 would grow that table by 3.
+    const d = doc();
+    d.collision.colind = new Uint8Array(2);
+    const r = planCollisionWrite(d, probe(), 7, 'isolate');
+    expect(r.kind).toBe('refused');
+    const why = (r as { why: string }).why;
+    expect(why).toMatch(/adjacent|next zone/i);
+    expect(why, 'recommends Link for a block Link refuses').not.toMatch(/Use Link/i);
+  });
+
+  it('still offers Link when the block IS within the table', () => {
+    // Table exactly as long as the block list: the clone at id 4 still grows it
+    // (by 1), so isolate refuses — but block 3 is inside it, so Link genuinely
+    // is the escape here.
+    const d = doc();
+    d.collision.colind = new Uint8Array(4);
+    const r = planCollisionWrite(d, probe(), 7, 'isolate');
+    expect(r.kind).toBe('refused');
+    expect((r as { why: string }).why).toMatch(/Use Link/i);
+  });
 });
 
 describe('planCollisionWrite no-op', () => {

@@ -37,6 +37,52 @@ export type CollisionWritePlan =
 const MAX_BLOCKS_TOTAL = 0x400; // 1024
 
 /**
+ * Would an Isolate clone fit in this document at all?
+ *
+ * Isolate appends ONE block at `doc.blocks.length` and `classicPaintSurface`
+ * then grows colind to cover it — which necessarily defines every entry in
+ * between, and any of those past the table's current end resolve into the
+ * ADJACENT ZONE's table in ROM. So a clone "fits" only when the table already
+ * covers the id, and when the 10-bit block field still has room.
+ */
+function isolateFits(doc: LevelDoc, clones: number): boolean {
+  const next = doc.blocks.length + clones;
+  return next <= doc.collision.colind.length && next <= MAX_BLOCKS_TOTAL;
+}
+
+/**
+ * THE ESCAPE SENTENCE, COMPUTED RATHER THAN ASSERTED.
+ *
+ * Both refusals used to end by recommending the OTHER mode unconditionally, and
+ * on the documents where they fire that advice is usually a dead end: Link's
+ * overhang refusal needs `blockId >= colind.length`, which on any document whose
+ * chunk cells reference blocks that exist means `doc.blocks.length >
+ * colind.length`, which is exactly what makes Isolate refuse too. GHZ (439
+ * blocks / 410 entries) and SBZ (602/600) are the two stock zones where this is
+ * real.
+ *
+ * It is COMPUTED and not asserted because the implication has a hole:
+ * `validateLevelDoc` bounds a chunk cell's block ref by the 10-bit field
+ * (model.ts, `inRange(..., c.block, 0, MAX_BLOCK_REF)`), NOT by
+ * `doc.blocks.length` — so a dangling ref is representable and would break the
+ * proof. Asking the document is robust either way and costs one boolean.
+ *
+ * This matters more for an agent than for a person: a human sees the second
+ * refusal and stops, while an autonomous caller acts on the sentence.
+ */
+function escapeFromLinkOverhang(doc: LevelDoc): string {
+  if (isolateFits(doc, 1)) return 'Use Isolate, or edit a block within the table.';
+  return `Isolate cannot escape it either — this zone ships ${doc.blocks.length} blocks against ${doc.collision.colind.length} entries, so a clone would grow the table over the same overhang. Edit a block within the table, or restamp this cell to a block that is.`;
+}
+
+function escapeFromIsolateGrowth(doc: LevelDoc, blockId: number): string {
+  if (blockId < doc.collision.colind.length) {
+    return `Use Link, accepting it changes every use of block ${blockId}.`;
+  }
+  return `Link cannot set block ${blockId} either — it is past the end of the table. Edit a block within the table, or restamp this cell to a block that is.`;
+}
+
+/**
  * Decide how to write shape `shapeIndex` to the block under the cell `probe`
  * named, in `mode`. Re-derives the block from `doc` at `probe.chunkIndex` /
  * `probe.cellIndex` rather than trusting `probe.blockId` — a probe survives
@@ -97,7 +143,7 @@ export function planCollisionWrite(
     if (blockId >= colind.length) {
       return {
         kind: 'refused',
-        why: `block ${blockId} is past the end of this zone's collision table (${colind.length} entries) — the overhang resolves into the adjacent zone's table in ROM, so Aurora cannot set it without silently changing other blocks. Use Isolate, or edit a block within the table.`,
+        why: `block ${blockId} is past the end of this zone's collision table (${colind.length} entries) — the overhang resolves into the adjacent zone's table in ROM, so Aurora cannot set it without silently changing other blocks. ${escapeFromLinkOverhang(doc)}`,
       };
     }
     return { kind: 'link', entries: [{ blockId, value: shapeIndex }], warnings };
@@ -122,7 +168,7 @@ export function planCollisionWrite(
   if (extendsTableBy > 0) {
     return {
       kind: 'refused',
-      why: `isolating this block would grow this zone's collision table by ${extendsTableBy} entr${extendsTableBy === 1 ? 'y' : 'ies'} (${colind.length} → ${newBlockId + 1}) — those entries resolve into the adjacent zone's table in ROM, so Aurora cannot define them. Use Link, accepting it changes every use of block ${blockId}.`,
+      why: `isolating this block would grow this zone's collision table by ${extendsTableBy} entr${extendsTableBy === 1 ? 'y' : 'ies'} (${colind.length} → ${newBlockId + 1}) — those entries resolve into the adjacent zone's table in ROM, so Aurora cannot define them. ${escapeFromIsolateGrowth(doc, blockId)}`,
     };
   }
 
