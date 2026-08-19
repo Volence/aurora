@@ -31,6 +31,8 @@ export interface CommandActions {
   /** Ctrl+Shift+S — every dirty surface. */
   saveAll: () => void;
   toggleExplorer: () => void;
+  /** Ctrl+Shift+B — save, build, and reload the running emulator. */
+  buildAndRun: () => void;
   openTab: (tab: TabDescriptor) => void;
   editObjectArt: (id: number) => void;
   /** Open an empty, untitled sprite document (aeon). */
@@ -50,6 +52,7 @@ export function buildCommands(s: CommandSnapshot, a: CommandActions): Command[] 
     { id: 'save', label: 'Save', hint: 'Ctrl+S', run: a.save },
     { id: 'save-all', label: 'Save All', hint: 'Ctrl+Shift+S', run: a.saveAll },
     { id: 'toggle-explorer', label: 'Toggle Explorer', hint: 'Ctrl+B', run: a.toggleExplorer },
+    { id: 'build-and-run', label: 'Build & Run', hint: 'Ctrl+Shift+B', run: a.buildAndRun },
     { id: 'open-setup', label: 'Project Setup', hint: 'tool', run: () => a.openTab(PROJECT_SETUP_TAB) },
   ];
 

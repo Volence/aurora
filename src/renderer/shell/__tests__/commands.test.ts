@@ -5,6 +5,7 @@ import { buildCommands, type CommandSnapshot, type CommandActions } from '../com
 function actions(): CommandActions {
   return {
     openProjectDialog: vi.fn(), save: vi.fn(), saveAll: vi.fn(), toggleExplorer: vi.fn(),
+    buildAndRun: vi.fn(),
     openTab: vi.fn(), editObjectArt: vi.fn(), newSprite: vi.fn(), newCanvas: vi.fn(),
     importSheet: vi.fn(), openRecent: vi.fn(),
   };

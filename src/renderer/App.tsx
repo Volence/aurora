@@ -1,5 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import ToastContainer from './components/ToastContainer';
+import BuildPanel from './components/BuildPanel';
+import { useToastStore } from './state/toastStore';
+import { useAetherStore, installAetherStatusListener } from './state/aetherStore';
 import CommandPalette from './components/CommandPalette';
 import TabStrip from './shell/TabStrip';
 import Explorer from './shell/Explorer';
@@ -38,7 +41,6 @@ import { resolveObjectArt } from '../core/project/profiles/s1-object-art';
 import { editObjectArt } from './components/sprite/export-sprite';
 import { registerAgentHandler } from './agent/agent-handler';
 import { installCloseGuard } from './shell/close-guard';
-import { installAetherStatusListener } from './state/aetherStore';
 import { refreshObjectPreviews } from './object-previews';
 import type { RecentProject } from '../shared/ipc-types';
 import type { ObjectDef } from '../core/model/s4-types';
@@ -101,8 +103,35 @@ export default function App() {
   // until a level happened to be open.
   useEffect(() => { if (project) refreshObjectPreviews().catch(() => {}); }, [project, currentZoneId]);
 
+  /**
+   * Build & Run: save first, then hand the project to the build.
+   *
+   * SAVE BEFORE BUILDING, always. The build reads editor files off disk, so
+   * building without saving assembles the previous state and hands back a ROM
+   * that does not contain the change being tested — the single most confusing
+   * outcome this feature could produce.
+   *
+   * Aeon only for now: the command and artifact paths come from project.json,
+   * and a classic disassembly has neither. Rather than spawn something
+   * plausible in a directory that never asked for it, the command says so.
+   */
+  const startBuild = React.useCallback(async () => {
+    const cfg = useProjectStore.getState().config;
+    if (!cfg) {
+      useToastStore.getState().addToast(
+        'Build & Run needs an aeon project — a classic disassembly builds with its own toolchain', 'info');
+      return;
+    }
+    await saveAllDirty();
+    await useAetherStore.getState().build(cfg.basePath, cfg.raw as unknown as Record<string, unknown>);
+    const st = useAetherStore.getState();
+    if (st.buildSummary) {
+      useToastStore.getState().addToast(st.buildSummary, st.buildState === 'failed' ? 'error' : 'success');
+    }
+  }, []);
+
   // -- global keys: Ctrl+S save current doc, Ctrl+Shift+S save all,
-  //    Ctrl+B explorer, Ctrl+1..9 tab jump ---------------------------------
+  //    Ctrl+B explorer, Ctrl+Shift+B build & run, Ctrl+1..9 tab jump --------
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (!(e.ctrlKey || e.metaKey)) return;
@@ -115,6 +144,14 @@ export default function App() {
         void (e.shiftKey ? saveAllDirty() : saveActive());
       }
       else if ((e.key === 'b' || e.key === 'B') && !e.shiftKey && !e.altKey) { e.preventDefault(); toggleExplorer(); }
+      // Ctrl+SHIFT+B for Build & Run. The 2026-07-03 spec asked for Ctrl+B, but
+      // stage 2 gave that to the Explorer and stealing a shipped binding to
+      // honour an older document is the wrong way round. Ctrl+Shift+B is what
+      // VS Code binds "Run Build Task" to, so the muscle memory is right anyway.
+      else if ((e.key === 'b' || e.key === 'B') && e.shiftKey && !e.altKey) {
+        e.preventDefault();
+        void startBuild();
+      }
       else if (e.key >= '1' && e.key <= '9' && !e.shiftKey && !e.altKey) {
         e.preventDefault();
         void requestFocusIndex(Number(e.key));
@@ -122,7 +159,7 @@ export default function App() {
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [toggleExplorer]);
+  }, [toggleExplorer, startBuild]);
 
   // -- window title: Aurora — <project> — <tab> ----------------------------
   useEffect(() => {
@@ -162,6 +199,7 @@ export default function App() {
         save: () => void saveActive(),
         saveAll: () => void saveAllDirty(),
         toggleExplorer,
+      buildAndRun: () => { void startBuild(); },
         openTab: (tab) => void requestOpenTab(tab),
         editObjectArt: (id) => { void editObjectArt(id); },
         newSprite: () => void requestOpenTab(untitledSpriteTab()),
@@ -294,6 +332,7 @@ export default function App() {
         </div>
       </div>
 
+      <BuildPanel />
       <ToastContainer />
       <CommandPalette commands={commands} />
       <ConfirmDialog />
