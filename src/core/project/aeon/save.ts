@@ -137,34 +137,47 @@ export async function buildAeonSavePlan(
     files.push({ path: config.chunkLibraryPath, bytes: chunksBytes });
   }
 
-  // Persist each zone's tileset to an editor-owned path. The configured
-  // tileset may point into the engine's regenerated data/generated tree
-  // (or even alias the legacy chunks_tiles.bin), so we always write to
-  // <dataRoot>editor/ and retarget project.json to it. Without this, MCP
-  // write_tiles and imported/merged art vanish on reload. The root is
-  // derived from the project layout (projectDataRoot) so post-split engine
-  // repos get games/<game>/data/editor/, never a repo-root data/ dir.
+  // Persist each zone's tileset to an editor-owned path.
+  //
+  // INVARIANT (see the editor-destination note in config/s4-config.ts): the
+  // bytes and the pointer that names them are the same file, and exactly one
+  // party fixes it.
+  //   • `editorTilesetPath` declared → the REPO owns the destination. Write
+  //     there and leave `tileset` alone, so a pointer the repo maintains (a
+  //     bake regenerates zones[0].tileset) is not clobbered on every save.
+  //   • absent → AURORA owns it: write to <dataRoot>editor/ and retarget
+  //     `tileset` to match. The configured tileset may point into the engine's
+  //     regenerated data/generated tree (or even alias the legacy
+  //     chunks_tiles.bin); without the retarget, MCP write_tiles and
+  //     imported/merged art vanish on reload.
+  // The root is derived from the project layout (projectDataRoot) so post-split
+  // engine repos get games/<game>/data/editor/, never a repo-root data/ dir.
   const dataRoot = projectDataRoot(config.raw);
   let configChanged = false;
   for (const projZone of project.zones) {
-    const editorTilesetPath = `${dataRoot}editor/${projZone.id}_tiles.bin`;
-    const tileBytes = serializeTiles(projZone.tileset.tiles);
-    files.push({ path: editorTilesetPath, bytes: tileBytes });
-
     const rawZone = config.raw.zones.find(rz => rz.id === projZone.id);
-    if (rawZone && rawZone.tileset !== editorTilesetPath) {
-      rawZone.tileset = editorTilesetPath;
+    const tilesetDest = rawZone?.editorTilesetPath || `${dataRoot}editor/${projZone.id}_tiles.bin`;
+    const tileBytes = serializeTiles(projZone.tileset.tiles);
+    files.push({ path: tilesetDest, bytes: tileBytes });
+
+    if (rawZone && !rawZone.editorTilesetPath && rawZone.tileset !== tilesetDest) {
+      rawZone.tileset = tilesetDest;
       configChanged = true;
     }
   }
 
   // Persist the current act's background (Plane B) to editor-owned paths,
-  // mirroring the tileset retarget above: the configured bgLayout/bgTiles
-  // may point into the engine's regenerated data/generated tree, so edits
-  // (set-bg commands, BG-layer painting) would vanish on reload otherwise.
+  // mirroring the tileset rule above, per field: a declared `editorBgLayout` /
+  // `editorBgTiles` is the repo's destination and suppresses that pointer's
+  // rewrite; absent, Aurora derives the path and retargets. Without the
+  // retarget in the Aurora-owned case, edits (set-bg commands, BG-layer
+  // painting) vanish on reload, because the configured bgLayout/bgTiles may
+  // point into the engine's regenerated data/generated tree.
   if (act.bgLayout && act.bgTiles) {
-    const editorBgLayoutPath = `${dataRoot}editor/${zone.id}_${act.id}_bg.bin`;
-    const editorBgTilesPath = `${dataRoot}editor/${zone.id}_${act.id}_bg_tiles.bin`;
+    const rawAct = config.raw.zones.find(rz => rz.id === zone.id)
+      ?.acts.find(ra => ra.id === act.id);
+    const editorBgLayoutPath = rawAct?.editorBgLayout || `${dataRoot}editor/${zone.id}_${act.id}_bg.bin`;
+    const editorBgTilesPath = rawAct?.editorBgTiles || `${dataRoot}editor/${zone.id}_${act.id}_bg_tiles.bin`;
     // Editor-owned BG files stay in the LOCAL index convention (in-memory
     // arrays serialized verbatim) — the engine build pipeline regenerates
     // its own VRAM-absolute files. On reload, normalizeBgLayout detects
@@ -175,12 +188,15 @@ export async function buildAeonSavePlan(
     const bgTileBytes = serializeBgTiles(act.bgTiles);
     files.push({ path: editorBgTilesPath, bytes: bgTileBytes });
 
-    const rawAct = config.raw.zones.find(rz => rz.id === zone.id)
-      ?.acts.find(ra => ra.id === act.id);
-    if (rawAct && (rawAct.bgLayout !== editorBgLayoutPath || rawAct.bgTiles !== editorBgTilesPath)) {
-      rawAct.bgLayout = editorBgLayoutPath;
-      rawAct.bgTiles = editorBgTilesPath;
-      configChanged = true;
+    if (rawAct) {
+      if (!rawAct.editorBgLayout && rawAct.bgLayout !== editorBgLayoutPath) {
+        rawAct.bgLayout = editorBgLayoutPath;
+        configChanged = true;
+      }
+      if (!rawAct.editorBgTiles && rawAct.bgTiles !== editorBgTilesPath) {
+        rawAct.bgTiles = editorBgTilesPath;
+        configChanged = true;
+      }
     }
   }
 
@@ -202,7 +218,14 @@ export async function buildAeonSavePlan(
   }
 
   if (configChanged) {
-    const projectJsonBytes = new TextEncoder().encode(JSON.stringify(config.raw, null, 2));
+    // A pointer rewrite should read as a pointer rewrite in review, nothing
+    // else: 2-space indent (what the committed project.json already uses, so
+    // every untouched line re-serializes byte-identically) plus the source
+    // file's own trailing-newline state, carried across the parse by the
+    // loader. Re-stringifying without it silently strips the last byte and
+    // adds a spurious "\ No newline at end of file" to every such diff.
+    const trailer = config.rawTrailingNewline ? '\n' : '';
+    const projectJsonBytes = new TextEncoder().encode(JSON.stringify(config.raw, null, 2) + trailer);
     files.push({ path: 'project.json', bytes: projectJsonBytes });
   }
 
