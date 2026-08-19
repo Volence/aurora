@@ -1336,6 +1336,32 @@ completion without those four numbers.
 
 ---
 
+## Pre-existing failure found during task 9 (NOT this plan's)
+
+`scratchpad/commit-collision-harness.mjs` — stage 4's own runtime proof — now reports **5/6**.
+Row 4, "with the toggle ON every new block gets the flat shape", gets `shapes=[0,0]` instead of
+`$FF`.
+
+**It is not a regression from this plan.** Proven by A/B rather than argued: a throwaway worktree
+at `bd7700b` (master's code, none of this plan's changes, the *same* harness file) fails row 4
+identically, 5/6. Both runs used the same s1disasm and the same `.aurora` state.
+
+**The mechanism is the GHZ overhang**, measured live by task 8 row 9: the act ships **439 blocks
+against a 410-entry colind table**, so a newly minted block's id is past the end of the table and
+`withCollision` declines to give it a shape — reporting `{blocks: 0, cells: 256,
+skippedOverhang: 1}`. That is the documented hazard behaving CORRECTLY: force-growing the table
+would silently change every other overhang block's in-game collision. Row 5 confirms the preview
+tells the truth about it ("0 will get flat ($FF)").
+
+So row 4's expectation is what is wrong, not the code: it asserts every new block gets `$FF`
+without accounting for the zone whose ids cannot carry a shape. Stage 4's note that it verified
+6/6 was presumably taken on an act or pool state where the new ids still fell inside the table.
+
+**Booked, not fixed here** — it is stage 4's harness and its own expectation to correct, and
+changing another phase's runtime proof from inside this one would muddy exactly the A/B that
+just established whose failure it is. The fix is to assert `$FF` only for blocks whose id is
+below `colind.length`, and to assert `skippedOverhang` for the rest.
+
 ## Notes for the implementer
 
 - **`classicLevelStore.ts:1354` drifts.** Task 3 adds 7 lines above it, so the `newEngineId = nextChunks.length` annotation moves to **1361**. Cite it from source at the time you write, not from this plan.
