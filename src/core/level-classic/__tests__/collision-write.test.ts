@@ -15,6 +15,7 @@ import { describe, it, expect } from 'vitest';
 import { classifyCollisionCell, planCollisionRect, planCollisionWrite } from '../collision-write';
 import { LOOP_ALIAS, type CollisionProbe } from '../collision-probe';
 import type { LevelDoc } from '../model';
+import type { SurfaceEditPlan } from '../../art/classic-surface-plan';
 
 const probe = (over: Partial<CollisionProbe> = {}): CollisionProbe => ({
   chunkId: 1, chunkIndex: 0, cellIndex: 5, blockId: 3, shapeIndex: 2, solidity: 3,
@@ -377,5 +378,127 @@ describe('planCollisionRect — link', () => {
     const r = planCollisionRect(d, rect(0, 0, 1, 1), 7, 'link');
     expect(r.report.applied).toBe(1);
     expect(r.report.blockCellsAffected).toBe(2);
+  });
+});
+
+describe('planCollisionRect — isolate', () => {
+  const rect = (x: number, y: number, w: number, h: number) => ({ x, y, w, h });
+
+  it('mints ONE clone per distinct block, not one per cell', () => {
+    // The dedupe that `planSurfaceEdit` deliberately does NOT do (it keys clones
+    // by chunk cell, because each cell's PIXELS differ). Here every cell gets
+    // the same SHAPE, so one clone serves them all.
+    const d = doc();
+    for (const i of [0, 1, 16, 17]) d.chunks[0].cells[i] = { block: 1, xf: false, yf: false, solidity: 3 };
+    const r = planCollisionRect(d, rect(0, 0, 2, 2), 7, 'isolate');
+    expect(r.kind).toBe('isolate');
+    const plan = (r as { plan: SurfaceEditPlan }).plan;
+    expect(plan.newBlocks.length).toBe(1);
+    expect(plan.newBlocks[0].colind).toBe(7);
+    expect(plan.newBlocks[0].sourceBlockId).toBe(1);
+    expect(plan.chunkCellEdits.length).toBe(4);
+    const cloneId = d.blocks.length;
+    expect(new Set(plan.chunkCellEdits.map((e) => e.cell.block))).toEqual(new Set([cloneId]));
+    expect(r.report.isolate).toEqual({ blocksCloned: 1, chunkCellsRepointed: 4, chunksTouched: 1 });
+  });
+
+  it('gives each distinct block its own clone id, in order', () => {
+    const d = doc();
+    d.chunks[0].cells[0] = { block: 1, xf: false, yf: false, solidity: 3 };
+    d.chunks[0].cells[1] = { block: 2, xf: false, yf: false, solidity: 3 };
+    const r = planCollisionRect(d, rect(0, 0, 2, 1), 7, 'isolate');
+    const plan = (r as { plan: SurfaceEditPlan }).plan;
+    expect(plan.newBlocks.map((b) => b.sourceBlockId)).toEqual([1, 2]);
+    expect(plan.chunkCellEdits.map((e) => e.cell.block)).toEqual([d.blocks.length, d.blocks.length + 1]);
+  });
+
+  it("carries each cell's OWN flips and solidity onto the repoint", () => {
+    // Re-derived from the doc, never from a cached probe, and never shared
+    // between cells: two cells can use one block with different solidity.
+    const d = doc();
+    d.chunks[0].cells[0] = { block: 1, xf: true, yf: false, solidity: 1 };
+    d.chunks[0].cells[1] = { block: 1, xf: false, yf: true, solidity: 3 };
+    const r = planCollisionRect(d, rect(0, 0, 2, 1), 7, 'isolate');
+    const edits = (r as { plan: SurfaceEditPlan }).plan.chunkCellEdits;
+    expect(edits[0].cell).toMatchObject({ xf: true, yf: false, solidity: 1 });
+    expect(edits[1].cell).toMatchObject({ xf: false, yf: true, solidity: 3 });
+  });
+
+  it('de-duplicates chunk-cell edits when the rectangle spans two placements of one chunk', () => {
+    // Cell (0,0) and cell (16,0) are BOTH chunk-definition cell 0 of chunk 1,
+    // because fg is [1, 1].
+    const d = doc();
+    d.chunks[0].cells[0] = { block: 1, xf: false, yf: false, solidity: 3 };
+    // PLAN DISCREPANCY: the plan's fixture left doc()'s cell 5 (block 3) in
+    // place, but a 17-wide rectangle passes over cx=5 — so it would have
+    // written THREE cells across TWO definition cells, not the 2/1 the
+    // assertions below state. Cleared, because the point of the test is the
+    // (0,0)/(16,0) pair collapsing to one definition cell, not block 3.
+    d.chunks[0].cells[5] = { block: 0, xf: false, yf: false, solidity: 0 };
+    const r = planCollisionRect(d, { x: 0, y: 0, w: 17, h: 1 }, 7, 'isolate');
+    const edits = (r as { plan: SurfaceEditPlan }).plan.chunkCellEdits;
+    const keys = edits.map((e) => `${e.chunkIndex}:${e.cellIndex}`);
+    expect(new Set(keys).size, 'duplicate chunk-cell edits').toBe(keys.length);
+    expect(keys).toContain('0:0');
+    // Two CELLS were applied, but they are one DEFINITION cell — the two units
+    // must not collapse into each other.
+    expect(r.report.applied).toBe(2);
+    expect(r.report.isolate!.chunkCellsRepointed).toBe(1);
+  });
+
+  it('REFUSES the whole call when the clones would grow the colind table', () => {
+    const d = doc();
+    d.collision.colind = new Uint8Array(d.blocks.length);   // zero spare
+    d.chunks[0].cells[0] = { block: 1, xf: false, yf: false, solidity: 3 };
+    const r = planCollisionRect(d, rect(0, 0, 1, 1), 7, 'isolate');
+    expect(r.kind).toBe('refused');
+    const ref = (r as { refusal: { kind: string; needed: number; spare: number } }).refusal;
+    expect(ref.kind).toBe('isolate-grows-table');
+    expect(ref.needed).toBe(1);
+    expect(ref.spare).toBe(0);
+    expect((r as { why: string }).why).toMatch(/adjacent|next zone/i);
+  });
+
+  it('names how many clones the rectangle needs against how many fit', () => {
+    const d = doc();
+    d.collision.colind = new Uint8Array(d.blocks.length + 1);   // exactly one spare
+    d.chunks[0].cells[0] = { block: 1, xf: false, yf: false, solidity: 3 };
+    d.chunks[0].cells[1] = { block: 2, xf: false, yf: false, solidity: 3 };
+    d.chunks[0].cells[16] = { block: 3, xf: false, yf: false, solidity: 3 };
+    const r = planCollisionRect(d, rect(0, 0, 2, 2), 7, 'isolate');
+    expect(r.kind).toBe('refused');
+    const ref = (r as { refusal: { needed: number; spare: number } }).refusal;
+    expect(ref.needed).toBe(3);
+    expect(ref.spare).toBe(1);
+    expect((r as { resolution: string }).resolution).toMatch(/link|smaller/i);
+  });
+
+  it('REFUSES at the 1024-block ceiling, which classicPaintSurface does not check', () => {
+    const d = doc();
+    d.blocks = Array.from({ length: 1024 }, () => d.blocks[0]);
+    d.collision.colind = new Uint8Array(2048);
+    d.chunks[0].cells[0] = { block: 1, xf: false, yf: false, solidity: 3 };
+    const r = planCollisionRect(d, rect(0, 0, 1, 1), 7, 'isolate');
+    expect(r.kind).toBe('refused');
+    expect((r as { refusal: { kind: string } }).refusal.kind).toBe('block-ceiling');
+  });
+
+  it('is still SUCCESS-with-no-command when an isolate rectangle is entirely no-op', () => {
+    // The success predicate sits BEFORE the mode split, so a rectangle needing
+    // no clones never consults the clone budget — even in a zone with none spare.
+    const d = doc();
+    d.collision.colind = new Uint8Array(d.blocks.length);   // zero spare
+    d.chunks[0].cells[0] = { block: 1, xf: false, yf: false, solidity: 3 };
+    d.collision.colind[1] = 7;
+    const r = planCollisionRect(d, rect(0, 0, 1, 1), 7, 'isolate');
+    expect(r.kind).toBe('nothing');
+    expect(r.report.noop).toBe(1);
+  });
+
+  it('reports no blockCellsAffected for isolate — that number is link-only', () => {
+    const d = doc();
+    d.chunks[0].cells[0] = { block: 1, xf: false, yf: false, solidity: 3 };
+    const r = planCollisionRect(d, rect(0, 0, 1, 1), 7, 'isolate');
+    expect(r.report.blockCellsAffected).toBeUndefined();
   });
 });

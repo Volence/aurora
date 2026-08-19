@@ -425,7 +425,28 @@ function dominantSkipWhy(skipped: { reason: CollisionSkipReason; count: number }
   return `no cell in this rectangle could take a shape — ${top.count} of ${total} ${top.count === 1 ? 'is' : 'are'} ${skipPhrase(top.reason)}`;
 }
 
-/** Task 5 owns this. Declared here only so the link path type-checks. */
+/**
+ * ONE CLONE PER DISTINCT BLOCK, and that is only correct because every cell of
+ * the rectangle receives the SAME shape.
+ *
+ * `planSurfaceEdit` keys its clones by CHUNK CELL for the opposite reason
+ * (classic-surface-plan.ts: "two painted chunk cells that share a block each
+ * need their OWN clone") — there the per-cell pixels differ, so sharing a clone
+ * would lose paint. Here they cannot differ. IF THIS TOOL EVER TAKES A SHAPE PER
+ * CELL, this dedupe becomes wrong and must move to a per-cell key.
+ *
+ * The aggregate limits live here rather than in the store because
+ * `classicPaintSurface` checks NEITHER: it grows colind silently with
+ * `Math.max(nextBlocks.length, src.length)` and has no ceiling check at all
+ * (collision-write.test.ts's "refuses an isolate at the block ceiling" is the
+ * standing note of that).
+ *
+ * The two checks below are `isolateFits(doc, needed)` SPLIT IN TWO, because
+ * each half needs its own refusal kind and its own numbers. Keep them in step
+ * with it: `isolateFits` is what the single-cell escape sentence asks, and if
+ * these ever disagree with it the panel would recommend a mode this planner
+ * refuses — the exact defect an earlier task removed.
+ */
 function planIsolateRect(
   doc: LevelDoc,
   writes: { blockId: number; chunkIndex: number; cellIndex: number; cell: ChunkCell }[],
@@ -433,5 +454,92 @@ function planIsolateRect(
   shapeIndex: number,
   base: CollisionRectReport,
 ): CollisionRectPlan {
-  throw new Error('planIsolateRect: implemented in task 5');
+  const colind = doc.collision.colind;
+  const needed = distinct.length;
+
+  // THE CEILING FIRST, and the order matters when BOTH would fire. The 10-bit
+  // block field is absolute — no zone, no table and no smaller rectangle can
+  // make a 1025th block encodable — while the table-growth refusal is a
+  // property of this zone's data. Naming the hard wall first is the honest
+  // answer, and its resolution ("Link, or a smaller rectangle") stays true in
+  // the both-fail case, whereas the growth refusal's resolution would offer
+  // Link as if the ceiling were not also in the way.
+  const ceilingSpare = MAX_BLOCKS_TOTAL - doc.blocks.length;
+  if (needed > ceilingSpare) {
+    return {
+      kind: 'refused',
+      refusal: { kind: 'block-ceiling', needed, spare: Math.max(0, ceilingSpare) },
+      why: `this rectangle needs ${needed} new block${needed === 1 ? '' : 's'} and only ${Math.max(0, ceilingSpare)} fit: ${MAX_BLOCKS_TOTAL} blocks max (chunk cells reference blocks with a 10-bit field)`,
+      resolution: 'Use Link, accepting it changes every use of these blocks, or paint a smaller rectangle.',
+      report: base,
+    };
+  }
+
+  // Isolate appends blocks at doc.blocks.length.. and classicPaintSurface then
+  // grows colind to cover them, which — per its own comment — "necessarily
+  // defines the entries in between" as zeros. Any of those past the table's
+  // current end resolve into the ADJACENT ZONE's table in ROM, so growing over
+  // them is refused rather than guessed.
+  const tableSpare = colind.length - doc.blocks.length;
+  if (needed > tableSpare) {
+    const grow = doc.blocks.length + needed - colind.length;
+    return {
+      kind: 'refused',
+      refusal: {
+        kind: 'isolate-grows-table', needed, spare: Math.max(0, tableSpare),
+        colindLength: colind.length, blocks: doc.blocks.length,
+      },
+      why: `isolating this rectangle needs ${needed} new block${needed === 1 ? '' : 's'} and this zone's collision table has room for ${Math.max(0, tableSpare)} — it would grow by ${grow} entr${grow === 1 ? 'y' : 'ies'} (${colind.length} → ${doc.blocks.length + needed}), and those entries resolve into the adjacent zone's table in ROM, so Aurora cannot define them.`,
+      resolution: distinct.every((b) => b < colind.length)
+        ? 'Use Link, accepting it changes every use of these blocks zone-wide, or paint a smaller rectangle.'
+        : 'Link cannot set every block in this rectangle either — some are past the end of the table. Paint over blocks that are within it.',
+      report: base,
+    };
+  }
+
+  const cloneFor = new Map<number, number>();
+  distinct.forEach((blockId, i) => cloneFor.set(blockId, doc.blocks.length + i));
+
+  // De-duped by (chunkIndex, cellIndex): a rectangle spanning two placements of
+  // the same chunk resolves to the same DEFINITION cell twice. Harmless in the
+  // store (same value, last wins) but it would inflate every reported count.
+  const seen = new Set<string>();
+  const chunkCellEdits: SurfaceEditPlan['chunkCellEdits'] = [];
+  const chunks = new Set<number>();
+  for (const w of writes) {
+    const key = `${w.chunkIndex}:${w.cellIndex}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    chunks.add(w.chunkIndex);
+    chunkCellEdits.push({
+      chunkIndex: w.chunkIndex,
+      cellIndex: w.cellIndex,
+      // Flips and solidity come from THIS cell, re-read from the doc — two cells
+      // can share a block and differ in both.
+      cell: { block: cloneFor.get(w.blockId)!, xf: w.cell.xf, yf: w.cell.yf, solidity: w.cell.solidity },
+    });
+  }
+
+  const plan: SurfaceEditPlan = {
+    tileWrites: [],
+    // The id of newBlocks[i] is doc.blocks.length + i by SurfaceEditPlan's own
+    // contract, which is exactly what `cloneFor` assigned above — the two are
+    // built from the SAME `distinct` array in the same order, so they cannot
+    // drift apart without one of these two lines changing.
+    newBlocks: distinct.map((blockId) => ({
+      def: doc.blocks[blockId], sourceBlockId: blockId, colind: shapeIndex,
+    })),
+    blockCellEdits: [],
+    chunkCellEdits,
+    stats: { tilesClaimed: 0, blocksCloned: needed, placesAffected: chunkCellEdits.length },
+  };
+
+  return {
+    kind: 'isolate',
+    plan,
+    report: {
+      ...base,
+      isolate: { blocksCloned: needed, chunkCellsRepointed: chunkCellEdits.length, chunksTouched: chunks.size },
+    },
+  };
 }
