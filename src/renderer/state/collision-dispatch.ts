@@ -16,7 +16,10 @@ import { probeCollision } from '../../core/level-classic/collision-probe';
 import {
   planCollisionWrite,
   planCollisionRect,
+  planCollisionCells,
+  type CollisionCell,
   type CollisionRect,
+  type CollisionRectPlan,
   type CollisionRectReport,
   type CollisionRectRefusal,
   type CollisionWriteMode,
@@ -69,53 +72,42 @@ export type ApplyCollisionRectResult =
   | { ok: false; refusal: CollisionRectRefusal; why: string; resolution: string; report: CollisionRectReport };
 
 /**
- * Apply `shape` across a rectangle of FG cells as ONE undo step.
+ * The fabricated result for "there is nothing open to write to".
  *
- * The rectangle sibling of `applyCollisionShape`, and the tool's only write
- * route — the same reason that function exists: the panel must not assemble a
- * plan or call a store command, or the Link/Isolate decision would live in two
- * places and drift.
+ * The counts are all zero because NOTHING WAS SCANNED — there was no document
+ * to scan. It is the same shape a refused plan carries so callers have one
+ * report field to read, not an estimate of a selection we looked at.
  *
- * `mode` is an ARGUMENT and is never read from `collisionDiverge`. That field is
- * the human's panel toggle; an agent's call must not be steered by whatever a
- * person last clicked. Only `applyCollisionShape` reads it.
- *
- * Refusals are handed back unchanged — no store write happens on a refused
- * plan, so there is nothing to undo.
- *
- * `dryRun` lives HERE rather than in the agent handler so the handler has
- * exactly one call to make. If the handler planned for itself it would have to
- * import the planner, which is precisely what its source guard forbids — and
- * the guard is right: a second planning call site is a second place for the
- * Link/Isolate decision to drift. It also means a dry run's numbers ARE the
- * real ones, not a second estimate.
+ * SHARED so the two entry points cannot disagree about what a no-level refusal
+ * looks like — an agent branching on `refusal.kind` would be the one to notice.
  */
-export function applyCollisionShapeRect(
-  rect: CollisionRect,
-  shape: number,
-  mode: CollisionWriteMode,
-  opts: { dryRun?: boolean } = {},
-): ApplyCollisionRectResult {
-  const s = useClassicLevelStore.getState();
-  if (s.status !== 'ready' || !s.doc) {
-    // The counts are all zero because NOTHING WAS SCANNED — there was no
-    // document to scan. It is the same shape a refused plan carries so callers
-    // have one report field to read, not an estimate of a rectangle we looked at.
-    const report: CollisionRectReport = {
-      mode, applied: 0, noop: 0, skipped: [], blocks: 0, warnings: [],
-    };
-    return {
-      ok: false,
-      // NOT 'nothing-applicable': that kind means "cells were scanned and none
-      // could take a shape", and here no cell was scanned at all.
-      refusal: { kind: 'no-level' },
-      why: 'no classic level is open',
-      resolution: 'Open an act first (get_classic_level).',
-      report,
-    };
-  }
+function noLevelResult(mode: CollisionWriteMode): ApplyCollisionRectResult {
+  const report: CollisionRectReport = {
+    mode, applied: 0, noop: 0, skipped: [], blocks: 0, warnings: [],
+  };
+  return {
+    ok: false,
+    // NOT 'nothing-applicable': that kind means "cells were scanned and none
+    // could take a shape", and here no cell was scanned at all.
+    refusal: { kind: 'no-level' },
+    why: 'no classic level is open',
+    resolution: 'Open an act first (get_classic_level).',
+    report,
+  };
+}
 
-  const plan = planCollisionRect(s.doc, rect, shape, mode);
+/**
+ * The half both multi-cell entry points share: dispatch a planned write, or
+ * hand back why not. Everything except WHICH planner produced the plan.
+ *
+ * A second copy of this tail would be a second place for the refusal shapes,
+ * the no-op short-circuit and the dryRun skip to drift — the exact failure this
+ * module exists to prevent.
+ */
+function dispatchCollisionPlan(
+  plan: CollisionRectPlan,
+  opts: { dryRun?: boolean },
+): ApplyCollisionRectResult {
   if (plan.kind === 'refused') {
     return { ok: false, refusal: plan.refusal, why: plan.why, resolution: plan.resolution, report: plan.report };
   }
@@ -144,4 +136,61 @@ export function applyCollisionShapeRect(
     };
   }
   return { ok: true, report: plan.report };
+}
+
+/**
+ * Apply `shape` across a rectangle of FG cells as ONE undo step.
+ *
+ * The rectangle sibling of `applyCollisionShape`, and the tool's only write
+ * route — the same reason that function exists: the panel must not assemble a
+ * plan or call a store command, or the Link/Isolate decision would live in two
+ * places and drift.
+ *
+ * `mode` is an ARGUMENT and is never read from `collisionDiverge`. That field is
+ * the human's panel toggle; an agent's call must not be steered by whatever a
+ * person last clicked. Only `applyCollisionShape` reads it.
+ *
+ * Refusals are handed back unchanged — no store write happens on a refused
+ * plan, so there is nothing to undo.
+ *
+ * `dryRun` lives HERE rather than in the agent handler so the handler has
+ * exactly one call to make. If the handler planned for itself it would have to
+ * import the planner, which is precisely what its source guard forbids — and
+ * the guard is right: a second planning call site is a second place for the
+ * Link/Isolate decision to drift. It also means a dry run's numbers ARE the
+ * real ones, not a second estimate.
+ */
+export function applyCollisionShapeRect(
+  rect: CollisionRect,
+  shape: number,
+  mode: CollisionWriteMode,
+  opts: { dryRun?: boolean } = {},
+): ApplyCollisionRectResult {
+  const s = useClassicLevelStore.getState();
+  if (s.status !== 'ready' || !s.doc) return noLevelResult(mode);
+  return dispatchCollisionPlan(planCollisionRect(s.doc, rect, shape, mode), opts);
+}
+
+/**
+ * Apply `shape` to an arbitrary SET of FG cells as ONE undo step — the freehand
+ * gesture's route. `applyCollisionShapeRect` is the marquee's and the agent's.
+ *
+ * Identical to it in every respect but the planner call, deliberately: a stroke
+ * and a rectangle must refuse the same way, spend the same one undo entry, and
+ * report the same numbers, because they are the same write with a different
+ * selection. `planCollisionCells` dedupes the cell list itself, so a wiggling
+ * cursor handing the same cell in a hundred times still costs one write.
+ *
+ * `mode` is an ARGUMENT here too — the caller passes the panel's toggle if it
+ * wants it; this function never reads `collisionDiverge` on its behalf.
+ */
+export function applyCollisionShapeCells(
+  cells: readonly CollisionCell[],
+  shape: number,
+  mode: CollisionWriteMode,
+  opts: { dryRun?: boolean } = {},
+): ApplyCollisionRectResult {
+  const s = useClassicLevelStore.getState();
+  if (s.status !== 'ready' || !s.doc) return noLevelResult(mode);
+  return dispatchCollisionPlan(planCollisionCells(s.doc, cells, shape, mode), opts);
 }
