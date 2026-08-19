@@ -154,4 +154,31 @@ export const EDITOR_METHODS: EditorMethod[] = [
     description: 'Move the player spawn point to (x,y). Both are 16-bit (the startpos file has no terminator sentinel). One classic undo step.' },
   { name: 'save_project', kind: 'classic-save-project', result: 'json', params: {},
     description: 'Save every dirty act of the open classic project through the guarded (mtime-checked) write channel. Returns a structured outcome: saved / conflict / partial / error / nothing.' },
+
+  // --- the art line (spec 2026-08-18) ---
+  // Both are the same commit with different pixel sources. A REFUSAL comes back
+  // in the result as `ok:false` with the artist-facing sentence, not as a
+  // protocol error — see the design's §4.
+  { name: 'commit_canvas', kind: 'classic-commit-canvas', result: 'json',
+    params: {
+      name: z.string().describe('canvas name under .aurora/canvas (no path, no extension)'),
+      targets: z.array(z.object({
+        chunkFileIndex: z.number().int().min(0).nullable().describe('chunk to replace, or null to append'),
+      })).optional().describe('one per whole 256x256 chunk of the canvas, row-major; omit to append them all'),
+      paletteResolution: z.enum(['none', 'use-act-colours', 'adopt-into-zone']).optional(),
+      collision: z.boolean().optional().describe('give the new art flat ($FF) collision in the same undo step'),
+      dryRun: z.boolean().optional().describe('plan and report without applying'),
+    },
+    description: 'Commit a saved canvas into the open act: cut to tiles/blocks/chunks, dedupe, reclaim, write. One undo step. Reply carries the full commit report plus the 1-based ENGINE ids of any appended chunks (pass those to set_layout_region). A refusal returns ok:false with a message, a resolution, and which paletteResolution values would unblock it.' },
+  { name: 'import_art_sheet', kind: 'classic-import-art-sheet', result: 'json',
+    params: {
+      path: z.string().describe('absolute path to an INDEXED (paletted) PNG'),
+      targets: z.array(z.object({
+        chunkFileIndex: z.number().int().min(0).nullable().describe('chunk to replace, or null to append'),
+      })).optional().describe('one per whole 256x256 chunk of the sheet, row-major; omit to append them all'),
+      paletteResolution: z.enum(['none', 'use-act-colours', 'adopt-into-zone']).optional(),
+      collision: z.boolean().optional().describe('give the new art flat ($FF) collision in the same undo step'),
+      dryRun: z.boolean().optional().describe('plan and report without applying'),
+    },
+    description: 'Import an indexed PNG made elsewhere, mapped onto the open act\'s palette, and commit it. No size cap (unlike a canvas). Same reply and refusal shape as commit_canvas, plus two import-only refusals: a colour the act does not have, and an 8x8 cell mixing colours from two palette lines.' },
 ];

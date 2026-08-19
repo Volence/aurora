@@ -57,7 +57,18 @@ export type AgentRequest =
   | { kind: 'classic-set-colind'; entries: { blockId: number; value: number }[] }
   | { kind: 'classic-set-palette'; line: number; colors: number[] }
   | { kind: 'classic-set-start'; x: number; y: number }
-  | { kind: 'classic-save-project' };
+  | { kind: 'classic-save-project' }
+  // ---- The art line (spec 2026-08-18) ----
+  // Two pixel sources, one commit. `collision` stays a BOOLEAN on the wire: an
+  // agent should not have to know the zone's colind table length to ask for
+  // flat collision — the handler sources that from the open act (see
+  // commitPixels, which turns the flag into { colindLength }).
+  | { kind: 'classic-commit-canvas'; name: string; targets?: { chunkFileIndex: number | null }[];
+      paletteResolution?: 'none' | 'use-act-colours' | 'adopt-into-zone';
+      collision?: boolean; dryRun?: boolean }
+  | { kind: 'classic-import-art-sheet'; path: string; targets?: { chunkFileIndex: number | null }[];
+      paletteResolution?: 'none' | 'use-act-colours' | 'adopt-into-zone';
+      collision?: boolean; dryRun?: boolean };
 
 export interface AgentRequestEnvelope {
   id: number;
