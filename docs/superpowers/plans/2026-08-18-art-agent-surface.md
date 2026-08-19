@@ -362,7 +362,11 @@ describe('loadSheetForAct', () => {
 - [ ] **Step 2: Run the test to verify it fails**
 
 Run: `npx vitest run src/renderer/state/__tests__/import-sheet.test.ts`
-Expected: FAIL — the second test throws instead of returning `{ ok: false }`, because today's `loadSheetForAct` only catches around `decodeIndexedPng` and the new core function re-throws.
+Expected: **both tests PASS against the pre-rewrite code.** This step has no red state, and that is correct rather than a problem — Task 2 is a pure refactor.
+
+*An earlier draft of this plan predicted a failure here, reasoning that `loadSheetForAct` "only catches around `decodeIndexedPng`" so the new core throw would escape. That was wrong: the pre-rewrite code already wrapped the decode in its own `try/catch` returning the identical `— the importer needs an INDEXED (paletted) PNG` message. Verified at `c50adfa:src/renderer/state/import-sheet.ts:63-69`.*
+
+So these are **characterisation tests**: they pin the wrapper's catch in place across the move, and they would fail if the rewrite let the core throw escape. Write them first anyway — a refactor's tests are worth more before the refactor than after — but do not manufacture a red state, and do not treat green-first as a reason to skip them.
 
 - [ ] **Step 3: Rewrite `import-sheet.ts` to delegate**
 
