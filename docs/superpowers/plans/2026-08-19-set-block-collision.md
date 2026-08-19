@@ -271,12 +271,18 @@ Expected: PASS, including the pre-existing probe tests — they are the real reg
 
 - [ ] **Step 5: Prove the delegation guard is not vacuous**
 
-Temporarily break the delegation: in `locateCell`, change `cellIndex` to `(cy % 16) * 16 + (cx % 16) + 1`.
+**Plant it in `probeCollision`, NOT in `locateCell`.** Breaking `locateCell` breaks BOTH sides identically, so the two still agree and the guard stays green — it is the pre-existing probe tests that fail. The defect this guard names is *`probeCollision` keeping its own second copy*, so that is what must be planted:
+
+```ts
+  // in probeCollision, instead of destructuring `at`:
+  const { chunkId, chunkIndex, cellIndex, loopAmbiguous } = at;
+  const looping = false;   // PLANTED
+```
 
 ```bash
 npx vitest run src/core/level-classic/__tests__/collision-probe.test.ts
 ```
-Expected: FAIL on "is what probeCollision addresses through". **Restore the line**, re-run, expect PASS.
+Expected: FAIL with the guard's own labelled message (`looping, byte $81 at 0,0: expected true to be false`). **Restore**, re-run, expect PASS.
 
 This step is not optional. Three guards in the previous plan of this series asserted nothing and were caught only by planting the defect they name.
 
