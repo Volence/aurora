@@ -13,7 +13,14 @@
 
 import { useClassicLevelStore, classicSetColind, classicPaintSurface } from './classicLevelStore';
 import { probeCollision } from '../../core/level-classic/collision-probe';
-import { planCollisionWrite } from '../../core/level-classic/collision-write';
+import {
+  planCollisionWrite,
+  planCollisionRect,
+  type CollisionRect,
+  type CollisionRectReport,
+  type CollisionRectRefusal,
+  type CollisionWriteMode,
+} from '../../core/level-classic/collision-write';
 
 export type ApplyCollisionShapeResult = { ok: true } | { ok: false; why: string };
 
@@ -55,4 +62,80 @@ export function applyCollisionShape(shape: number): ApplyCollisionShapeResult {
     return { ok: false, why: result.error };
   }
   return { ok: true };
+}
+
+export type ApplyCollisionRectResult =
+  | { ok: true; report: CollisionRectReport }
+  | { ok: false; refusal: CollisionRectRefusal; why: string; resolution: string; report: CollisionRectReport };
+
+/**
+ * Apply `shape` across a rectangle of FG cells as ONE undo step.
+ *
+ * The rectangle sibling of `applyCollisionShape`, and the tool's only write
+ * route — the same reason that function exists: the panel must not assemble a
+ * plan or call a store command, or the Link/Isolate decision would live in two
+ * places and drift.
+ *
+ * `mode` is an ARGUMENT and is never read from `collisionDiverge`. That field is
+ * the human's panel toggle; an agent's call must not be steered by whatever a
+ * person last clicked. Only `applyCollisionShape` reads it.
+ *
+ * Refusals are handed back unchanged — no store write happens on a refused
+ * plan, so there is nothing to undo.
+ *
+ * `dryRun` lives HERE rather than in the agent handler so the handler has
+ * exactly one call to make. If the handler planned for itself it would have to
+ * import the planner, which is precisely what its source guard forbids — and
+ * the guard is right: a second planning call site is a second place for the
+ * Link/Isolate decision to drift. It also means a dry run's numbers ARE the
+ * real ones, not a second estimate.
+ */
+export function applyCollisionShapeRect(
+  rect: CollisionRect,
+  shape: number,
+  mode: CollisionWriteMode,
+  opts: { dryRun?: boolean } = {},
+): ApplyCollisionRectResult {
+  const s = useClassicLevelStore.getState();
+  if (s.status !== 'ready' || !s.doc) {
+    // The counts are all zero because NOTHING WAS SCANNED — there was no
+    // document to scan. It is the same shape a refused plan carries so callers
+    // have one report field to read, not an estimate of a rectangle we looked at.
+    const report: CollisionRectReport = {
+      mode, applied: 0, noop: 0, skipped: [], blocks: 0, warnings: [],
+    };
+    return {
+      ok: false,
+      refusal: { kind: 'nothing-applicable', skipped: [] },
+      why: 'no classic level is open',
+      resolution: 'Open an act first (get_classic_level).',
+      report,
+    };
+  }
+
+  const plan = planCollisionRect(s.doc, rect, shape, mode);
+  if (plan.kind === 'refused') {
+    return { ok: false, refusal: plan.refusal, why: plan.why, resolution: plan.resolution, report: plan.report };
+  }
+  // Every cell already carried the shape: success, and deliberately NO command,
+  // so no undo entry is spent arriving at the state we were already in.
+  if (plan.kind === 'nothing') return { ok: true, report: plan.report };
+  if (opts.dryRun) return { ok: true, report: plan.report };
+
+  const result = plan.kind === 'link'
+    ? classicSetColind(plan.entries)
+    : classicPaintSurface(plan.plan);
+
+  // A rejection HERE is a genuine fault: the planner is the authority on what is
+  // legal, so the command re-validating and disagreeing means the two drifted.
+  if (!result.ok) {
+    return {
+      ok: false,
+      refusal: { kind: 'nothing-applicable', skipped: plan.report.skipped },
+      why: result.error,
+      resolution: 'This is an Aurora bug — the planner and the store command disagree.',
+      report: plan.report,
+    };
+  }
+  return { ok: true, report: plan.report };
 }

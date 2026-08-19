@@ -10,8 +10,8 @@
 // this function could produce.
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { applyCollisionShape } from '../collision-dispatch';
-import { useClassicLevelStore } from '../classicLevelStore';
+import { applyCollisionShape, applyCollisionShapeRect } from '../collision-dispatch';
+import { useClassicLevelStore, zoneArtDocIdForCurrentZone } from '../classicLevelStore';
 import { useClassicProjectStore } from '../classicProjectStore';
 import { documentHistoryHub } from '../history-hub';
 import { openReady, makeDoc } from './helpers/classic-fixture';
@@ -107,5 +107,119 @@ describe('applyCollisionShape', () => {
     const r = applyCollisionShape(5);
     expect(r.ok).toBe(false);
     expect((r as { why: string }).why).toMatch(/no classic level|open/i);
+  });
+});
+
+// THE RECTANGLE SIBLING.
+//
+// Same join, one command for the whole rectangle. There is no undo-DEPTH
+// accessor anywhere in this repo (UndoStack exposes canUndo/canRedo/undo/redo/
+// clear and nothing else), so "one undo step" is asserted the way the repo
+// already asserts it (see agent-handler.classic.test.ts): change TWO things,
+// undo ONCE, require BOTH back. A per-entry loop would leave the first behind.
+
+// makeDoc's fg is 2x2 CHUNKS with cells [0, 1, 0, 1], so layout column 1 holds
+// engine chunk id 1 → doc.chunks[0]. In 16px CELL units that chunk occupies
+// cx 16..31, and cellIndex = (cy % 16) * 16 + (cx % 16). So cell (16,0) is
+// chunk-definition cell 0 and cell (17,0) is cell 1.
+const RECT_ORIGIN = { x: 16, y: 0 };
+
+/** makeDoc() with TWO distinct in-table blocks under the first two cells. */
+function rectDoc(colindLength = 8): LevelDoc {
+  const base = makeDoc();
+  const chunks = base.chunks.map((c) => ({ cells: c.cells.map((cc) => ({ ...cc })) }));
+  chunks[0].cells[0] = { block: 1, xf: true, yf: false, solidity: 3 };
+  chunks[0].cells[1] = { block: 2, xf: false, yf: true, solidity: 1 };
+  return {
+    ...base,
+    // makeDoc ships 2 blocks; block 2 has to exist for the second cell. Cloned
+    // from blocks[1] so its tile refs stay inside the fixture's 5-tile pool —
+    // structuralError bounds a block cell's tile by the pool, so a fabricated
+    // def would be rejected by the very command under test.
+    blocks: [...base.blocks, { cells: base.blocks[1].cells.map((c) => ({ ...c })) }],
+    chunks,
+    collision: { ...base.collision, colind: new Uint8Array(colindLength) },
+  };
+}
+
+const artStack = () => documentHistoryHub.historyFor(zoneArtDocIdForCurrentZone()!);
+
+describe('applyCollisionShapeRect', () => {
+  it('refuses rather than throwing when no level is open', () => {
+    const r = applyCollisionShapeRect({ x: 0, y: 0, w: 1, h: 1 }, 7, 'link');
+    expect(r.ok).toBe(false);
+    expect((r as { why: string }).why).toMatch(/no classic level is open/);
+  });
+
+  it('writes a whole rectangle as ONE undo step', () => {
+    openReady(rectDoc());
+    const r = applyCollisionShapeRect({ ...RECT_ORIGIN, w: 2, h: 1 }, 7, 'link');
+
+    expect(r.ok).toBe(true);
+    expect((r as { report: { applied: number; blocks: number } }).report)
+      .toMatchObject({ applied: 2, blocks: 2 });
+    expect(st().doc!.collision.colind[1]).toBe(7);
+    expect(st().doc!.collision.colind[2]).toBe(7);
+
+    // THE ASSERTION THIS TASK EXISTS FOR. One undo must take BOTH back. If the
+    // dispatch looped per entry, this would restore only the last one.
+    artStack().undo();
+    expect(st().doc!.collision.colind[1]).toBe(0);
+    expect(st().doc!.collision.colind[2]).toBe(0);
+  });
+
+  it('records NO undo step when every cell already carries the shape', () => {
+    const d = rectDoc();
+    d.collision.colind[1] = 7;
+    d.collision.colind[2] = 7;
+    openReady(d);
+
+    const r = applyCollisionShapeRect({ ...RECT_ORIGIN, w: 2, h: 1 }, 7, 'link');
+    expect(r.ok).toBe(true);
+    expect((r as { report: { applied: number; noop: number } }).report)
+      .toMatchObject({ applied: 0, noop: 2 });
+    expect(artStack().canUndo, 'a no-op spent an undo entry').toBe(false);
+  });
+
+  it('takes its mode from the ARGUMENT, never from collisionDiverge', () => {
+    openReady(rectDoc());
+    st().setCollisionDiverge('isolate');
+
+    const r = applyCollisionShapeRect({ ...RECT_ORIGIN, w: 1, h: 1 }, 7, 'link');
+    expect((r as { report: { mode: string } }).report.mode).toBe('link');
+    // A link changed the colind entry and appended NO block; an isolate would
+    // have done the opposite.
+    expect(st().doc!.collision.colind[1]).toBe(7);
+    expect(st().doc!.blocks.length).toBe(3);
+  });
+
+  it('isolate clones once per distinct block and repoints both cells, in one step', () => {
+    openReady(rectDoc());
+    const before = st().doc!.blocks.length; // 3
+
+    const r = applyCollisionShapeRect({ ...RECT_ORIGIN, w: 2, h: 1 }, 7, 'isolate');
+
+    expect(r.ok).toBe(true);
+    expect(st().doc!.blocks.length).toBe(before + 2);
+    expect(st().doc!.chunks[0].cells[0].block).toBe(before);
+    expect(st().doc!.chunks[0].cells[1].block).toBe(before + 1);
+    // Each cell kept its OWN flips and solidity.
+    expect(st().doc!.chunks[0].cells[0]).toMatchObject({ xf: true, yf: false, solidity: 3 });
+    expect(st().doc!.chunks[0].cells[1]).toMatchObject({ xf: false, yf: true, solidity: 1 });
+
+    artStack().undo();
+    expect(st().doc!.blocks.length).toBe(before);
+    expect(st().doc!.chunks[0].cells[0].block).toBe(1);
+    expect(st().doc!.chunks[0].cells[1].block).toBe(2);
+  });
+
+  it('dryRun reports the same numbers and writes nothing', () => {
+    openReady(rectDoc());
+    const r = applyCollisionShapeRect({ ...RECT_ORIGIN, w: 2, h: 1 }, 7, 'link', { dryRun: true });
+
+    expect(r.ok).toBe(true);
+    expect((r as { report: { applied: number } }).report.applied).toBe(2);
+    expect(st().doc!.collision.colind[1]).toBe(0);
+    expect(artStack().canUndo).toBe(false);
   });
 });
