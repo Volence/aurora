@@ -40,6 +40,19 @@ interface AetherState {
   pushPaletteLine: (line: number, words: number[]) => void;
   /** Warp the running game. Returns a human-facing sentence, or null if gated. */
   warp: (x: number, y: number) => Promise<string | null>;
+
+  // -- Build & Run ---------------------------------------------------------
+  buildState: 'idle' | 'building' | 'ok' | 'failed';
+  /** Streamed output of the build in flight, plus the summarised result after. */
+  buildOutput: string[];
+  /** The panel only opens itself on failure; a success is a toast. */
+  buildPanelOpen: boolean;
+  buildSummary: string | null;
+  /** Required env vars the build is missing — the usual cause of an instant exit 1. */
+  buildMissingEnv: string[];
+  setBuildPanelOpen: (open: boolean) => void;
+  appendBuildOutput: (chunk: string) => void;
+  build: (basePath: string, raw?: Record<string, unknown>) => Promise<void>;
 }
 
 /** Coalescing state, deliberately outside the store: it is not UI. */
@@ -116,6 +129,51 @@ export const useAetherStore = create<AetherState>((set, get) => ({
     timer = setTimeout(fire, wait);
   },
 
+  buildState: 'idle',
+  buildOutput: [],
+  buildPanelOpen: false,
+  buildSummary: null,
+  buildMissingEnv: [],
+
+  setBuildPanelOpen: (open) => set({ buildPanelOpen: open }),
+
+  appendBuildOutput: (chunk) => set((s) => ({
+    // Cap while streaming. A full aeon build emits thousands of lines and the
+    // panel is a diagnostic, not a log file; the RESULT replaces this with the
+    // summarised set (errors kept preferentially) the moment the build ends.
+    buildOutput: [...s.buildOutput, ...chunk.split('\n').filter((l) => l.length > 0)].slice(-500),
+  })),
+
+  build: async (basePath, raw) => {
+    if (get().buildState === 'building') return;      // one build at a time
+    set({ buildState: 'building', buildOutput: [], buildSummary: null, buildMissingEnv: [] });
+    try {
+      const r = await window.api.aetherBuild(basePath, raw);
+      const summary = r.ok
+        ? (r.reloaded
+            ? 'Build succeeded — emulator reloaded'
+            : r.reloadError
+              ? `Build succeeded, but the emulator did not reload: ${r.reloadError}`
+              : 'Build succeeded (no emulator connected)')
+        : `Build failed${r.exitCode === null ? '' : ` (exit ${r.exitCode})`}`;
+      set({
+        buildState: r.ok ? 'ok' : 'failed',
+        buildOutput: r.output,
+        buildSummary: summary,
+        buildMissingEnv: r.missingEnv,
+        // OPEN ONLY ON FAILURE. A successful build should get out of the way;
+        // the artist wants the game, not a wall of assembler output.
+        buildPanelOpen: !r.ok,
+      });
+    } catch (e) {
+      set({
+        buildState: 'failed',
+        buildSummary: `Build could not start: ${e instanceof Error ? e.message : String(e)}`,
+        buildPanelOpen: true,
+      });
+    }
+  },
+
   warp: async (x, y) => {
     if (get().status !== 'connected') return null;
     const r = await window.api.aetherWarp(x, y);
@@ -135,4 +193,5 @@ export const useAetherStore = create<AetherState>((set, get) => ({
 /** Subscribe to main's status pushes. Call once, at app start. */
 export function installAetherStatusListener(): void {
   window.api.onAetherStatus((s) => useAetherStore.getState().apply(s));
+  window.api.onAetherBuildOutput((chunk) => useAetherStore.getState().appendBuildOutput(chunk));
 }

@@ -219,3 +219,51 @@ describe('AetherClient symbol resolution', () => {
     expect(await p).toBe(0xFF8D24);
   });
 });
+
+describe('AetherClient status notification', () => {
+  /**
+   * FOUND IN REAL USE, not by reasoning: the owner closed the emulator window
+   * and Aurora's status bar kept saying "connected · oracle-next". The client
+   * tore down correctly — it just had no way to tell anyone, and the UI only
+   * ever heard about state it had asked for.
+   */
+  it('announces a disconnect nobody asked for', async () => {
+    const { sock, client } = await connected();
+    const seen: string[] = [];
+    client.onStatusChange((s) => seen.push(s));
+    sock.destroy();                       // the emulator went away
+    expect(seen).toEqual(['disconnected']);
+  });
+
+  it('announces reaching connected', async () => {
+    const sock = new MockSocket();
+    const client = new AetherClient({ connect: () => sock, socketPath: '/tmp/test.sock' });
+    const seen: string[] = [];
+    client.onStatusChange((s) => seen.push(s));
+    const p = client.connect();
+    sock.open();
+    await vi.waitFor(() => expect(sock.sent().some((m) => m.method === 'initialize')).toBe(true));
+    sock.reply({ jsonrpc: '2.0', id: sock.sent()[0].id, result: INIT_RESULT });
+    await p;
+    expect(seen).toEqual(['connected']);
+  });
+
+  it('does not announce a second disconnect for an already-dead client', async () => {
+    const { sock, client } = await connected();
+    const seen: string[] = [];
+    client.onStatusChange((s) => seen.push(s));
+    sock.destroy();
+    sock.destroy();
+    client.disconnect();
+    expect(seen).toEqual(['disconnected']);
+  });
+
+  it('unsubscribes cleanly', async () => {
+    const { sock, client } = await connected();
+    const seen: string[] = [];
+    const off = client.onStatusChange((s) => seen.push(s));
+    off();
+    sock.destroy();
+    expect(seen).toEqual([]);
+  });
+});

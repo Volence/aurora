@@ -13,11 +13,12 @@
 
 import net from 'node:net';
 import { ipcMain, type BrowserWindow } from 'electron';
-import { IPC_CHANNELS, type AetherStatusPayload, type AetherWarpResult } from '../../shared/ipc-types';
+import { IPC_CHANNELS, type AetherStatusPayload, type AetherWarpResult, type AetherBuildResult } from '../../shared/ipc-types';
 import { AetherClient } from './client';
 import { resolveSocketPath } from './socket-path';
 import { pushPaletteWords } from './push-palette';
 import { warpTo } from './warp';
+import { runBuild } from './build-run';
 import { PAL_BASE_SYMBOL, PAL_BASE_DIRTY_SYMBOL } from '../../core/aether/palette-push';
 
 let client: AetherClient | null = null;
@@ -81,6 +82,16 @@ export function registerAetherBridge(browserWindow: BrowserWindow): void {
     });
     client = c;
     c.onEvent(() => publish());       // stopped/resumed/romReloaded all move the badge
+    // The link can die with nobody asking — the emulator window closes, the
+    // process is killed. Without this the UI keeps showing the last state it
+    // was told about, which is "connected" forever.
+    c.onStatusChange((status) => {
+      if (status === 'disconnected') {
+        paletteAvailable = false;
+        if (client === c) client = null;
+      }
+      publish();
+    });
     publish();
 
     try {
@@ -103,6 +114,23 @@ export function registerAetherBridge(browserWindow: BrowserWindow): void {
     publish();
     return statusPayload();
   });
+
+  ipcMain.handle(
+    IPC_CHANNELS.AETHER_BUILD,
+    async (_e, basePath: string, raw: Record<string, unknown> | undefined): Promise<AetherBuildResult> => {
+      // The build runs whether or not an emulator is connected — an artist
+      // without one still wants to know their level assembles.
+      const r = await runBuild({
+        basePath, raw, client,
+        onOutput: (chunk) => win?.webContents.send(IPC_CHANNELS.AETHER_BUILD_OUTPUT, chunk),
+      });
+      return {
+        ok: r.ok, exitCode: r.exitCode, output: r.output, reloaded: r.reloaded,
+        reloadError: r.reloadError, missingEnv: r.missingEnv,
+        command: [r.plan.command, ...r.plan.args].join(' '),
+      };
+    },
+  );
 
   ipcMain.handle(
     IPC_CHANNELS.AETHER_WARP,

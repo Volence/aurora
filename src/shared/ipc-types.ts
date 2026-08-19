@@ -51,7 +51,20 @@ export const IPC_CHANNELS = {
   AETHER_STATUS: 'aether:status',
   AETHER_PUSH_PALETTE: 'aether:push-palette',
   AETHER_WARP: 'aether:warp',
+  AETHER_BUILD: 'aether:build',
+  /** Main→renderer stream of build output, so the panel fills as it runs. */
+  AETHER_BUILD_OUTPUT: 'aether:build-output',
 } as const;
+
+export interface AetherBuildResult {
+  ok: boolean;
+  exitCode: number | null;
+  output: string[];
+  reloaded: boolean;
+  reloadError?: string;
+  missingEnv: string[];
+  command: string;
+}
 
 export interface AetherWarpResult {
   warped: boolean;

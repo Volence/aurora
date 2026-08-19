@@ -50,6 +50,7 @@ export class AetherClient {
   private nextId = 1;
   private readonly pending = new Map<number, { resolve: (v: unknown) => void; reject: (e: unknown) => void }>();
   private readonly eventSubs = new Set<(method: string, params: unknown) => void>();
+  private readonly statusSubs = new Set<(status: AetherStatus) => void>();
 
   /**
    * Symbol → address, valid for ONE ROM image. Symbols provably move between
@@ -100,6 +101,7 @@ export class AetherClient {
       // you get a healthy connection that silently never receives an event.
       this.notify('initialized');
       this.status = 'connected';
+      this.emitStatus();
     } catch (e) {
       this.teardown(e instanceof Error ? e : new Error(String(e)));
       throw e;
@@ -114,6 +116,7 @@ export class AetherClient {
   private onClose(): void { this.teardown(new Error('Aether socket disconnected')); }
 
   private teardown(reason: Error): void {
+    const was = this.status;
     this.status = 'disconnected';
     this.sock = null;
     this.buf = '';
@@ -124,6 +127,22 @@ export class AetherClient {
     // awaited them, which in a UI is a spinner that never stops.
     for (const { reject } of this.pending.values()) reject(reason);
     this.pending.clear();
+    // TELL SOMEBODY. The link can die without anyone having asked it anything —
+    // the emulator window is closed, the process is killed — and a client that
+    // only reports its state when called leaves the UI showing "connected" for
+    // a socket that is gone. Found in real use: closing the emulator left the
+    // badge emerald.
+    if (was !== 'disconnected') this.emitStatus();
+  }
+
+  private emitStatus(): void {
+    for (const fn of this.statusSubs) fn(this.status);
+  }
+
+  /** Subscribe to connection-state changes, including ones nobody asked for. */
+  onStatusChange(fn: (status: AetherStatus) => void): () => void {
+    this.statusSubs.add(fn);
+    return () => this.statusSubs.delete(fn);
   }
 
   // -- wire -----------------------------------------------------------------
