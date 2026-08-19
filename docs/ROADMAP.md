@@ -10,7 +10,12 @@ Update this doc as phases complete — mark DONE in place, log discoveries under
 # Aurora — Art-Suite Roadmap
 
 *The plan of record for making Aurora the best-in-class visual authoring tool for the
-Aeon engine. Last full revision: 2026-07-03.*
+Aeon engine. Last full revision: 2026-07-03; **re-sequenced 2026-08-19** (§2.6 + §5).*
+
+> **Read §2.6 before §2, §3 or §5.** Two lines of work were delivered out of this plan's
+> sequence — §2.5 (disasm-as-project, 2026-08-09) and §2.6 (the August line, 2026-08-12 →
+> 08-19) — and where they disagree with the older sections, **they win**. §5.1 is the
+> short list of what is open right now.
 
 ## 1. Mission
 
@@ -35,6 +40,9 @@ Two structural rules frame everything below:
   (§4.8) — named by the 2026-07-01 suite audit as the whole suite's keystone gap.
 
 ## 2. Ground truth (2026-07-03)
+
+> Dated, and partly overtaken — §2.5 and §2.6 are the current picture. Kept because the
+> engine-contract half below is still the contract.
 
 **Shipped and solid** (verified against src + git):
 - **Map mode** — 256×256-tile sections, sparse act grids, tile/block/chunk stamping,
@@ -143,6 +151,113 @@ branch; plan `plans/2026-08-09-classic-v1.1-batch.md`):
   authorable (the chunk picker's Loop toggle stamps S1's bit-7 flag; the viewport
   draws a corner glyph; the eyedropper preserves the flag) (B4).
 
+## 2.6 Delivered out of sequence — the August line (2026-08-12 → 2026-08-19)
+
+**Status: SHIPPED — all on `master` and pushed** (`ae5d6a2` … `8efda9d`, ~540 commits).
+Recorded 2026-08-19. Where this section disagrees with §2, §3 or §5, **this section wins**;
+every row was re-checked against source on that date.
+
+Health at `8efda9d`: 296 test files, **3291 passed / 3 skipped**, `tsc --noEmit` clean.
+
+Like §2.5 this was *steered*, not taken from §5's order, and for the same reason: the
+motivating spine is the **classic (S1 disassembly) editor**, the one engine where a whole
+level can be authored end-to-end today. Three lines landed, each on its own spec, plus a
+full-surface review.
+
+### A. UX overhaul — one shell, facet parity (spec stages 1–4)
+
+Specs: `specs/2026-08-12-aurora-ux-overhaul-design.md` (§12 is the staging) and
+`specs/2026-08-13-ux-overhaul-stage4-design.md` (**read its §2 and §3.0 first** — seven
+claims from earlier documents were investigated and found wrong; four changed the design).
+Merges `ae5d6a2` → `2f1db2b`, `a662e99`.
+
+- **Stages 1–3** — document/session model (tabs, per-document undo, project-wide save),
+  facet/tool/panel registries, tab strip + explorer + Home + Project Setup, and aeon's
+  Map/Art/Sprite modes re-homed as facets of one `LevelWorkspace`.
+- **Stage 4** — classic re-homed into that same workspace, and the exit criterion met:
+  **both engines render through one `LevelWorkspace`**, through one `(engine, facetId)`
+  module registry. `LegacyWorkspace`, `ClassicProjectView`, `ZoneActTree` and the old
+  `Toolbar` are **deleted**. Undo is unified on `DocumentHistoryHub` (per-document stacks;
+  undo-bus, sprite-undo, edit-seq and classic-history all gone). Step H converged the art
+  tiers three ways instead of the spec's one shared Art facet — only one of classic's three
+  tiers is a pixel surface — so classic's Tile tier now runs on aeon's
+  `PixelEditController`/`PixelViewport`, one `art-shared/PaletteGrid.tsx` serves all four
+  palette sites, and `s1ArtFacet`/`artFacet` stay separate modules.
+- **Classic facets today** (`src/core/project/s1/index.ts`):
+  `layout · objects · collision · palette · art`. Rings are absent by design (S1 rings are
+  objpos objects, not a layer).
+- **Not built from that spec:** stage 5's **typed cross-tab/cross-window clipboard** and the
+  **Converter tab** (clipboards are still per-store; no converter module in-tree), and stage
+  6's polish pass beyond what the lens sweep (D below) fixed. PNG import — stage 5's other
+  half — shipped through line B instead.
+
+### B. In-app art authoring — originate, constrain, commit (phases 1, 2A, 2B, 2C)
+
+Specs: `specs/2026-08-15-in-app-art-authoring-design.md` (its **§0 · Corrections** is
+authoritative over everything after it) and
+`specs/2026-08-15-phase-2c-resolve-and-commit-design.md` (supersedes §4.4).
+Merges `4427c2f`, `42ff186`, `d5f44d6`, `9a77e5b`, `697d409`.
+
+The bar this line was built to: *Aurora must be good enough that artists don't leave for
+Aseprite to make the art in the first place.*
+
+- **Phase 1 — paint-through.** Paint pixels on a composed block/chunk surface; the stroke
+  resolves down the tile→block→chunk reference ladder without silently damaging the other
+  places sharing that tile.
+- **Phase 2A/2B — the origination canvas.** A free canvas with a configurable constraint
+  profile; clashes, colours-per-line and the flip-aware tile count stay live in front of the
+  artist while they draw. Canvas documents are named sidecar files under `.aurora/canvas`.
+- **Phase 2C — resolve and commit.** `canvas-resolve` (pure geometry) → `classic-commit-plan`
+  → `classicCommitCanvas` (one store command), with a **PNG import path** at any size feeding
+  the same resolver. Canvas commits cap at 16 chunks (it is an undo-tracked document).
+  CDP-verified 7/7 (commit panel) and 4/4 (import).
+- **Phase 3 (tile-pool growth) was measured and DECLINED** — see §0 of the phase-1/2 spec.
+  Measured across all six S1 zones: **blocks** are both the dangerous tier and the variant
+  tier; chunks have no near-duplicates at all; GHZ has 2 spare tiles.
+- **Doc debt:** the 2C header says BUILT, but **§D2b cross-act reach reporting is not built**
+  (SBZ palette sources, LZ/SBZ3 shared-file reach, the underwater-palette warning). Annotate
+  the header rather than letting BUILT mean "except §D2b".
+
+### C. Classic collision authoring + the agent surface (spec stages 1–5)
+
+Spec: `specs/2026-08-16-classic-collision-authoring-design.md`. Merges `81a51fc`, `e981908`,
+`a39afce`, `13734af`, `3217fab`, `9f734f4`, `4df618f`, `a814b09`, `eb138e2`, `92a7a00`,
+`8efda9d`. **Complete and closed** — nothing it booked is outstanding; the packet is
+`docs/reviews/2026-08-19-handoff-after-collision.md`.
+
+Before it, `classicSetColind` was reachable **only** from the agent handler: the agent could
+assign collision and a person could not. Now:
+
+- A **Collision facet** for classic, over the real engine lookup verified against
+  `s1disasm/_incObj/sub FindNearestTile & FindFloor & FindWall.asm`: chunk-cell solidity
+  gates the block-id `colind`, and block 0 short-circuits both. Granted read-only at stage
+  3a, write at stage 3b (a shape picker over `paint-collision`); solidity itself stays
+  ChunkTab's Assign mode.
+- **Committed art gets collision** (stage 4) — closing 2C's own out-of-scope note that a
+  committed drawing landed at colind 0 / solidity 0, i.e. the player fell through new art.
+- **Human gestures** — drag to paint, Shift-drag for a rectangle — and refusals that
+  *guarantee* instead of hedging: link-equivalence carries `linkEquivalent`, a drag crossing
+  a loop-flagged cell says so, and a partial paint names **which** cells were skipped.
+- **Agent parity restored** (stage 5, two plans): `commit_canvas` + `import_art_sheet` (the
+  whole art line had shipped UI-only) and `set_block_collision`. Each is one `EDITOR_METHODS`
+  entry, so it lights up on **both** MCP and Aether at once; that registry now carries **36
+  tools**. Spec `specs/2026-08-18-art-agent-surface-design.md` §1 corrects the "MCP parity"
+  framing: it is registry work, with no MCP-specific and no Aether-specific half.
+
+**Runtime proof lives outside vitest** — a node-only suite cannot see React or canvas.
+`scratchpad/collision-agent-harness.mjs` (**8/8**) and
+`scratchpad/collision-gesture-harness.mjs` (**9/9**) drive the real app under CDP; both must
+stay green, and each carries planted-defect notes in its footer. Known pre-existing and *not*
+from this line: `scratchpad/commit-collision-harness.mjs` reports 5/6 — stage 4's row-4
+*expectation* is what is wrong.
+
+### D. The 2026-08-16 lens sweep
+
+`docs/reviews/2026-08-16-aurora-lens-sweep.md`, a full-surface review. Its R1–R14 defect
+campaign landed (`de7fb4e`, `780d311`), the micro type tier `2xs: 10px/14px` landed
+(`3a129f5`), and three findings were REFUTED and recorded so they are not re-found. Its §7
+*direction* items are the open list in §5.1.
+
 ## 3. The domain map
 
 Where each art domain stands and where it goes. ★ = new capability, ☆ = upgrade.
@@ -150,15 +265,15 @@ Where each art domain stands and where it goes. ★ = new capability, ☆ = upgr
 | Domain | Today | Target | Contract | Phase |
 |---|---|---|---|---|
 | Level layout (map) | Mature | ☆ in-viewport object/ring placement + section/act properties | `specs/2026-07-03-entity-placement-properties-design.md` | P1 |
-| Level art (tiles/chunks) | Mature | ☆ export realignment to act-pool pipeline; VRAM budget v2 | §4.2 | P1/P6 |
-| Collision | Mature (map paint) | ☆ chunk-carried collision (design #6) | aeon spec #6 | P1 |
+| Level art (tiles/chunks) | Mature; **authoring shipped** — paint-through, origination canvas, resolve-and-commit (§2.6 B) | ☆ export realignment to act-pool pipeline; VRAM budget v2 | §4.2 | P1/P6 |
+| Collision | Mature (aeon map paint); **classic authoring shipped** — Collision facet, gestures, committed art gets collision (§2.6 C) | ☆ chunk-carried collision (design #6, **aeon**) | aeon spec #6 | P1 |
 | Sprite art | Mature (draw/read) | ☆ finish the S4 export spine (decompose→mappings→DPLC→anim) | `plans/2026-06-17-sprite-*.md` | P3 |
 | Animation | Playback only | ★ authoring timeline + event tags | `specs/2026-07-03-animation-authoring-design.md` | P3 |
 | Screens/menus/HUD | Nothing | ★ Screen mode (design #7) | aeon spec #7 | P4 |
 | Parallax/raster | Config path in project.json only | ★ Raster mode + live preview (design #8) | aeon spec #8 | P5 |
 | Object behaviors | Static JSON placement | ★ properties panel + behavior picker (design #9) | aeon spec #9 | P6 |
-| Playtest loop | None | ★ Aether client: palette→CRAM, build→reload, play-from-cursor | `specs/2026-07-03-aether-client-playtest-design.md` | P2 |
-| Import pipeline | None | ★ PNG/sheet import with Genesis quantization | `specs/2026-07-03-png-import-design.md` | P7 |
+| Playtest loop | None | ★ Aether client: palette→CRAM, build→reload, play-from-cursor | `specs/2026-07-03-aether-client-playtest-design.md` | **P2 — next** |
+| Import pipeline | **PNG import shipped for classic** on 2C's resolver (§2.6 B) | ★ sprite-frame targets, sheet slicing, auto-palette suggestion | `specs/2026-07-03-png-import-design.md` + `specs/2026-08-15-phase-2c-resolve-and-commit-design.md` | P7 |
 | Multi-game levels | Sprites only; **S1 read+write in place shipped** (§2.5) | ★ level adapters (S1/S2/S3K ⇄ each other ⇄ aeon, both directions) | `specs/2026-07-03-multi-game-level-interop-design.md` | P8 (Phase A unblocked now; **Phase A/D substrate landed by §2.5**) |
 
 ### 4.1 Level layout — close the last authoring gaps
@@ -185,10 +300,29 @@ inspector), which is why it's Phase 1.
 
 The engine moved to the act-pool model; Aurora's `core/export/{vram-coloring,
 act-descriptor,entity-data}.ts` target the retired one (see PLAN_AUDIT §1). Direction:
-- **Retire, don't extend.** Aurora's save path (editor files) is the real interface;
-  the Python generators own baking. Delete `vram-coloring.ts` + `vram_bases.asm`
-  emission; keep `exportAct()` only if something still consumes it (audit first —
-  design #9 already retires `entity-data.ts`).
+- **Retire, don't extend.** Aurora's save path (editor files) is the real interface; the
+  Python generators own baking.
+
+  > **Corrected scope, measured 2026-08-19 — the 2026-07-03 order and the 2026-08-19
+  > handoff packet are BOTH wrong about this, in opposite directions. Re-measure before
+  > you cut.** What is actually in-tree:
+  >
+  > | Module | Reality |
+  > |---|---|
+  > | `core/export/index.ts` | **Not dead.** `src/core/project/aeon/save.ts:27` imports `exportAct` and calls it at `:271` — the aeon save's export step. (The handoff packet says "ZERO importers"; that is wrong.) |
+  > | `act-descriptor.ts`, `entity-data.ts` | Reached only through that barrel. |
+  > | `vram-coloring.ts` | Reached through that barrel **and** by `src/core/agent/budget.ts:4` (`computeVramColoring`, `FG_TILE_LIMIT`), which `agent-handler.ts` uses for the **live** `check_budget` tool. Deleting it wholesale **breaks `check_budget`**. |
+  >
+  > What the export step emits — `data/export/{act_descriptor,entity_data,vram_bases}.asm`
+  > and `section_N.{tiles,art}.bin` — is consumed by **nothing**: aeon has no
+  > `data/export/` directory and no reference to one, and the build's real
+  > `act_descriptor.emp` is generator/hand-authored under `games/*/data/levels/`.
+  >
+  > So the order is: (1) delete the export step from `buildAeonSavePlan` — which also kills
+  > sweep finding **R8**'s misleading "Project saved" after a failed export; (2) then
+  > `export/index.ts`, `act-descriptor.ts`, `entity-data.ts` are genuinely dead — delete
+  > them; (3) **keep** `vram-coloring.ts`, or move the two symbols `budget.ts` needs
+  > somewhere honest and retire only the ASM generators.
 - **Whole-level tile view stays** (the editor's flat-tile model is unaffected); what
   changes is bookkeeping: the VRAM budget readout should count **act-pool pages**
   (612 distinct tiles ⇒ 3 pages of 256) against the 1472-tile FG pool + 448-tile BG
@@ -341,37 +475,78 @@ if it's the motivating feature.
 
 ## 5. Recommended sequencing
 
-Aurora-side phases; engine dependencies noted. P0–P3 are unblocked **today**.
+Two things invalidated the original table: §2.5 and §2.6 delivered ~700 commits it never
+recorded, and the steering moved to the **classic spine**. Re-sequenced 2026-08-19 around
+what is actually being built. **P2 — the playtest loop — is next.**
 
-| Phase | Work | Gate/dependency | Size |
+### 5.1 Open now, in order
+
+| # | Work | Size | Source |
 |---|---|---|---|
-| **P0** | Doc hygiene: apply PLAN_AUDIT (status banners, naming pass, README); annotate vision-doc entries superseded by design-week specs | none | XS |
-| **P1** | Design #6 collision-in-chunks + retirements; in-viewport object/ring placement; section/act properties inspector; act/zone wizard; export realignment (retire vram-coloring path, budget → act-pool math) | none | M |
-| **P2** | Aether outbound client + A1 palette→CRAM + A3 Build & Run + A2 warp | Oracle running (exists) | M |
-| **P3** | Sprite export spine (decompose → mappings → DPLC) + animation authoring timeline w/ event tags + object-art previews in map | none | L |
-| **P4** | Screen mode (design #7 Aurora half) | aeon #7 tasks 1–4 (interpreter + `screens_gen.py`) | M |
-| **P5** | Raster mode + live preview (design #8 Aurora half) | aeon #8 tasks 1–4; P2's client | M–L |
-| **P6** | Behaviors properties panel (design #9 Aurora half) + entity-exporter retirement; VRAM budget visualizer v2 | aeon #9 tasks 1–4 | M |
-| **P7** | Import pipeline (PNG/sheet quantization) + craft backlog pulls | none | M |
-| **P8** | Multi-game level adapters (own design cycle) — *Phase A/D substrate (neutral LevelDoc + S1 classic codecs + adapter layer) already delivered by §2.5; remaining work is cross-game adapters + world assembly* | none hard | XL |
-| **§2.5** | ✅ **DONE** — Disassembly-as-Project: engine-agnostic `ProjectAdapter` + S1 in-place editing (levels/objects/sprite-art) + guarded save + 12 MCP tools + aeon detection unified. Pulled P8 Phase A/D forward; shares P1's placement vocabulary. Aeon adapter is a marker (real loader deferred); Art-mode composer classic wiring deferred. | delivered 2026-08-09 | L (done) |
+| 1 | **The playtest loop (= P2, §4.8)** — Aether outbound client, then A1 palette→CRAM, A3 Build & Run, A2 play-from-cursor. Classic-first, then the aeon client. | M | sweep §7.2, `SUITE_PLAN_AUDIT_2026-07-01.md` §3.1 |
+| 2 | Retire the dead export path — **corrected scope, read §4.2 before starting** | S | sweep §7.6 |
+| 3 | `docs/ART_SUITE.md` teaches a deleted UI — `:73` still says *"Click the **Art** button in the Toolbar (next to **Map**)"*, and that Toolbar was deleted in stage 4. Rewrite against facets/paint-through, or delete the file. | XS | sweep §7.5 |
+| 4 | Annotate the 2C spec header — §D2b cross-act reach reporting is not built (§2.6 B). | XS | sweep §7.3 |
+| 5 | Write three already-settled decisions into the art spec, so a cold session doesn't redesign shipped behaviour: paint lives as a **tool-mode per tier**; canvas docs are **named sidecars under `.aurora/canvas`**; the budget readout shows unique/free/pool **without comparing** (deliberate). | XS | sweep §7.4 |
+| 6 | `ChunkGrid`'s status hint needs 213px in a 157px slot. **The copy is too long for the slot, not the font too large** — it ellipsized 35px of its own sentence before the 2xs tier and 56px after. `scratchpad/micro-type-harness.mjs` measures it. Pre-existing. | XS | handoff §4 |
 
-Rationale: P1 pays down the drift while executing the one design-week item with zero
-engine gating; P2 lands the suite's keystone (and #8's plumbing) while the engine
-sessions execute their halves of #7/#8/#9; P3 is pure-Aurora work that can interleave
-anytime; P4–P6 track engine landings in their planned order (#7 → #8 → #9 mirrors the
-engine's own soft-dependency order). If engine work stalls, P3/P7 keep Aurora moving.
+⚠ **Item 1 is the first phase that needs the emulator.** Background agents must never call
+`mcp__oracle__*` — they deadlock. Runtime work goes in a CDP / foreground harness the
+controller runs, exactly as the two collision harnesses do.
 
-Watch items from the engine side: `section_id` byte→word (floating origin) — check
-Aurora's section keying when it lands; engine/game split (#5) — `project.json` may
-gain a game-manifest pointer; per-act ROM budget gate (#1) — surface its numbers in
-the budget UI when the manifest exists.
+Deliberately **not** open: sweep finding U6 (argued at the site, left unchanged on purpose —
+don't re-find it), and the sweep's three REFUTED findings (§6 of the review).
+
+### 5.2 The phase table
+
+| Phase | Work | Gate/dependency | Status |
+|---|---|---|---|
+| **P0** | Doc hygiene: apply PLAN_AUDIT (status banners, naming pass, README); annotate vision-doc entries superseded by design-week specs | none | **PARTLY DONE** — this revision closes the ROADMAP half; §5.1 items 3–5 are the rest |
+| **P1** | Design #6 collision-in-chunks + retirements; in-viewport object/ring placement; section/act properties inspector; act/zone wizard; export realignment (retire vram-coloring path, budget → act-pool math) | none | **PARTLY DONE, and re-cut.** Classic collision authoring shipped (§2.6 C) — but that is *classic*, not aeon design #6; classic object place/move/delete shipped (§2.5). Still open: **aeon** design #6, the section/act properties inspector, the act/zone wizard, and the export realignment (§5.1 item 2) |
+| **P2** | Aether outbound client + A1 palette→CRAM + A3 Build & Run + A2 warp | Oracle running (exists) | **NEXT** |
+| **P3** | Sprite export spine (decompose → mappings → DPLC) + animation authoring timeline w/ event tags + object-art previews in map | none | open. Note object-art previews already exist for **classic** (§2.5 v1.1 B1) |
+| **P4** | Screen mode (design #7 Aurora half) | aeon #7 tasks 1–4 (interpreter + `screens_gen.py`) | open, engine-gated |
+| **P5** | Raster mode + live preview (design #8 Aurora half) | aeon #8 tasks 1–4; P2's client | open, engine-gated |
+| **P6** | Behaviors properties panel (design #9 Aurora half) + entity-exporter retirement; VRAM budget visualizer v2 | aeon #9 tasks 1–4 | open, engine-gated |
+| **P7** | Import pipeline (PNG/sheet quantization) + craft backlog pulls | none | **PARTLY DONE** — the PNG import path shipped on 2C's resolver for classic (§2.6 B). Remaining: sprite-frame targets, sheet slicing (grid / auto-bounds), auto-palette suggestion (median-cut to 15 + transparent) |
+| **P8** | Multi-game level adapters (own design cycle) | none hard | substrate delivered by §2.5; remaining work is the cross-game adapters + world assembly (§4.10) |
+| **UX 5–6** | The UX overhaul's own leftovers: typed cross-tab/cross-window clipboard, Converter tab, and the stage-6 polish pass | none | open (§2.6 A) |
+| **§2.5** | ✅ **DONE** — Disassembly-as-Project: engine-agnostic `ProjectAdapter` + S1 in-place editing + guarded save + 12 MCP tools + aeon detection unified. Aeon adapter is still a routing marker (real loader deferred). | delivered 2026-08-09 | done |
+| **§2.6** | ✅ **DONE** — the August line: UX overhaul stages 1–4, art authoring 1/2A/2B/2C, classic collision authoring + the agent surface, the lens-sweep defect campaign. | delivered 2026-08-12 → 08-19 | done |
+
+Rationale: P2 is the suite's keystone gap — Aurora already *serves* Aether and the outbound
+half is what the 2026-07-01 suite audit named — and it builds exactly the plumbing design
+#8's live preview needs, which is why it still precedes P5. The classic spine has overtaken
+P1's aeon half, so P1's remainder should be re-cut against what facet parity already gave for
+free rather than executed as written. P3 and P7 stay pure-Aurora work that can interleave any
+time engine work stalls.
+
+Watch items from the engine side: `section_id` byte→word (floating origin) — check Aurora's
+section keying when it lands; engine/game split (#5) — `project.json` may gain a
+game-manifest pointer (the split happened on 2026-07-07: `games/demo` now boots on the
+agnostic engine); per-act ROM budget gate (#1) — surface its numbers in the budget UI when
+the manifest exists.
 
 ## 6. Acceptance bar (per phase)
 
 A phase is done when: tsc + vitest green with new coverage for every format codec;
-every new mutation is one undo step and has an MCP tool; formats are Zod-validated
+every new mutation is one undo step and has an agent tool; formats are Zod-validated
 with build-gate parity (what the generator rejects, Aurora flags at edit time); the
 feature is GUI-verified by the user (Electron; no headless); relevant docs updated
 (this file's phase table + MCP.md tool list); and — for generator-coupled work — a
 golden test proving Aurora's writer and the Python reader agree byte-for-byte.
+
+Two amendments from the August line (§2.6), both learned the hard way:
+
+- **"an MCP tool" is the wrong phrasing** — one `EDITOR_METHODS` entry in
+  `src/main/editor-methods.ts` serves **both** MCP and Aether, so the parity obligation is
+  *registry* work: schema entry + `AgentRequest` kind (`src/shared/agent-protocol.ts`) +
+  a case in `src/renderer/agent/agent-handler.ts`. There is no MCP-specific half.
+- **vitest cannot see React or canvas.** Anything whose behaviour is a rendered surface, a
+  mouse gesture or a live store round-trip needs a CDP harness driving the real app
+  (`scratchpad/*-harness.mjs` — the collision pair are the reference), run in the
+  foreground by the controller. Background agents must never call `mcp__oracle__*`; they
+  deadlock. And **plant a violation before believing any guard**: a guard that asserts
+  nothing is the dominant defect class here, and a defect planted in the wrong function —
+  there are usually two near-identical dispatch lines — passes a full build-and-run cycle
+  looking convincing.
