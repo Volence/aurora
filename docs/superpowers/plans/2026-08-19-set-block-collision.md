@@ -1126,6 +1126,12 @@ Expected: FAIL — `planIsolateRect: implemented in task 5`.
  * `Math.max(nextBlocks.length, src.length)` and has no ceiling check at all
  * (collision-write.test.ts's "refuses an isolate at the block ceiling" is the
  * standing note of that).
+ *
+ * The two checks below are `isolateFits(doc, needed)` SPLIT IN TWO, because
+ * each half needs its own refusal kind and its own numbers. Keep them in step
+ * with it: `isolateFits` is what the single-cell escape sentence asks, and if
+ * these ever disagree with it the panel would recommend a mode this planner
+ * refuses — the exact defect Task 2 removed.
  */
 function planIsolateRect(
   doc: LevelDoc,
