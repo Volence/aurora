@@ -97,10 +97,12 @@ top-left, with any remainder reported rather than silently included or dropped
 letting the agent cut somewhere a human could not, which would also make
 `gridOrigin` refusals unreproducible in the UI.
 
-## 3. Two targeted refactors
+## 3. Two small changes to existing code
 
-Both remove a UI dependency from a rule. Neither is unrelated cleanup: without
-them the agent handler would carry a second copy of a load-bearing rule.
+Both exist for the same reason: a rule the agent needs is currently locked behind
+a UI affordance — a file dialog in one case, a React hook in the other. Neither is
+unrelated cleanup, and §3.2 in particular is deliberately smaller than it first
+looks.
 
 ### 3.1 Split the dialog out of `loadSheetForAct`
 
