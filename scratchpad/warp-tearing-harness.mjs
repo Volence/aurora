@@ -407,6 +407,71 @@ async function main() {
             `(feet vs origin) is aeon's to define.`
           : 'Terrain-dependent — Y cannot be predicted client-side.'));
 
+      // ---- Row 10: terrain snap, or a constant shift? aeon's discriminator.
+      //
+      // If the engine grounds the player, every request in clear air above the
+      // SAME x must settle to the SAME resting y (surface - radius), ignoring
+      // the requested height. If instead resting y tracks the request, then
+      // something is applying a constant shift and the terrain-snap account is
+      // falsified.
+      //
+      // Note all of these share one x, so they share one terrain column — which
+      // is what makes the sweep discriminating rather than a survey of spots.
+      const sweep = [];
+      for (const ay of [64, 128, 192, 256, 320, 384]) {
+        const r = await warpAndRead(askX, ay);
+        sweep.push({ ask: ay, rest: r.y, delta: r.y - ay });
+      }
+      for (const s of sweep) {
+        console.log(`        ask y=${String(s.ask).padStart(3)} -> rest ${String(s.rest).padStart(3)} (delta ${s.delta})`);
+      }
+      const restingYs = new Set(sweep.map((s) => s.rest));
+      const deltas = new Set(sweep.map((s) => s.delta));
+      const snapped = restingYs.size === 1;
+      const shifted = deltas.size === 1;
+      // NOTE THE WORDING. This row reports WHAT the sweep shows; it deliberately
+      // does not conclude anything about the engine's intent, because row 11
+      // below establishes whether the player is being simulated at all — and if
+      // it is not, "no terrain snap" is trivially true and means nothing.
+      // An earlier version of this row announced terrain snap FALSIFIED on this
+      // evidence alone. It was not entitled to.
+      check('10', 'the sweep resolves to one regime, whatever that regime means',
+        snapped || shifted,
+        snapped
+          ? `all six settle at y=${[...restingYs][0]} regardless of the request (consistent with terrain snap)`
+          : shifted
+            ? `resting y tracks the request at a constant ${[...deltas][0]}px across all six, ` +
+              `same x throughout — READ ROW 11 BEFORE CONCLUDING ANYTHING FROM THIS`
+            : `neither: resting ${[...restingYs].join(',')} deltas ${[...deltas].join(',')}`);
+
+      // ---- Row 11: is the player's PHYSICS even running in this state?
+      //
+      // Row 10's conclusion only means something if the player is being
+      // simulated. If gameplay is not advancing, "no terrain snap" is trivially
+      // true and says nothing about the engine's intent — so trace y frame by
+      // frame after a warp into clear air instead of assuming.
+      await call('emulator/restore', { id: cp });
+      await wr(wx, be16(askX));
+      await wr(wy, be16(64));
+      await wr(wf, Uint8Array.of(1));
+      for (let f = 0; f < 120; f++) {
+        await call('emulator/run_frames', { frames: 1 });
+        if ((await rd(wf, 1))[0] === 0) break;
+      }
+      const trace = [];
+      for (const step of [0, 1, 4, 15, 40, 120, 240]) {
+        if (step) await call('emulator/run_frames', { frames: step - (trace.at(-1)?.f ?? 0) });
+        trace.push({ f: step, y: (await rd(playerAddr + 0x06, 4)).readUInt32BE(0) >>> 16 });
+      }
+      console.log(`        y after ack: ${trace.map((s) => `+${s.f}f=${s.y}`).join('  ')}`);
+      const moved = new Set(trace.map((s) => s.y)).size > 1;
+      check('11', 'the player is actually being simulated (y moves after the warp)',
+        moved,
+        moved
+          ? 'y changes over time, so row 10 compares real physics outcomes'
+          : 'y NEVER changes — the player is not being simulated here, so row 10 cannot ' +
+            'distinguish terrain snap from a shift and its conclusion must not be trusted');
+
       check('7', 'the mailbox whole-plane diff is inside the known off-view floor',
         mailboxDiffAll <= OFF_VIEW_FLOOR,
         `${mailboxDiffAll} of ${ALL_WORDS} whole-plane words (floor ${OFF_VIEW_FLOOR}; ` +
