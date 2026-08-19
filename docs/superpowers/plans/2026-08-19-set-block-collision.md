@@ -326,13 +326,17 @@ Append to `collision-write.test.ts`, inside the existing `describe('planCollisio
 
   it('still offers Isolate as the escape when Isolate would actually fit', () => {
     // The other side of the same branch, so the fix is a COMPUTATION and not a
-    // blanket deletion. Table longer than the block list: a clone fits.
-    const d = doc();
-    d.collision.colind = new Uint8Array(64);
-    // Force the link-overhang branch on a doc where isolate has room, which
-    // needs a block ref past the table but inside the block list.
-    d.blocks = Array.from({ length: 80 }, () => d.blocks[0]);
-    d.chunks[0].cells[0] = { ...d.chunks[0].cells[0], block: 70 };
+    // blanket deletion.
+    //
+    // Reaching this state needs a block ref PAST the table but with the table
+    // still longer than the block list — i.e. a DANGLING ref, which is exactly
+    // the hole in the "both refusals are the same condition" proof:
+    // validateLevelDoc bounds a chunk cell's block by the 10-bit field, not by
+    // doc.blocks.length. Unreachable on stock data, representable in the model,
+    // and the reason the escape is computed instead of asserted.
+    const d = doc();                                 // 4 blocks
+    d.collision.colind = new Uint8Array(8);          // 8 entries — a clone fits
+    d.chunks[0].cells[5] = { ...d.chunks[0].cells[5], block: 9 };  // 9 >= 8
     const r = planCollisionWrite(d, probe(), 7, 'link');
     expect(r.kind).toBe('refused');
     expect((r as { why: string }).why).toMatch(/Use Isolate/i);
@@ -341,9 +345,10 @@ Append to `collision-write.test.ts`, inside the existing `describe('planCollisio
   it('does not send an ISOLATE growth refusal to Link for a block Link cannot set', () => {
     // The mirrored defect. For an OVERHANG block both modes refuse, so "Use
     // Link, accepting it changes every use of block N" is false.
+    // doc()'s probed cell already holds block 3; a 2-entry table puts it past
+    // the end, and the clone at id 4 would grow that table by 3.
     const d = doc();
     d.collision.colind = new Uint8Array(2);
-    d.chunks[0].cells[0] = { ...d.chunks[0].cells[0], block: 3 }; // 3 >= 2 = overhang
     const r = planCollisionWrite(d, probe(), 7, 'isolate');
     expect(r.kind).toBe('refused');
     const why = (r as { why: string }).why;
@@ -352,15 +357,18 @@ Append to `collision-write.test.ts`, inside the existing `describe('planCollisio
   });
 
   it('still offers Link when the block IS within the table', () => {
+    // Table exactly as long as the block list: the clone at id 4 still grows it
+    // (by 1), so isolate refuses — but block 3 is inside it, so Link genuinely
+    // is the escape here.
     const d = doc();
-    d.collision.colind = new Uint8Array(2);          // block 1 is within it
+    d.collision.colind = new Uint8Array(4);
     const r = planCollisionWrite(d, probe(), 7, 'isolate');
     expect(r.kind).toBe('refused');
     expect((r as { why: string }).why).toMatch(/Use Link/i);
   });
 ```
 
-> Read `doc()` and `probe()` before writing: the third and fourth tests assume the fixture's probed cell resolves to chunk 0 / cell 0 and that `d.blocks` has at least one entry. If the fixture differs, adjust the indices to match it rather than reshaping the fixture — other tests depend on it.
+> **Read `doc()` and `probe()` before writing, and re-derive every number above.** These tests depend on the fixture shipping 4 blocks and on `probe()` naming `chunkIndex 0 / cellIndex 5`, whose block is 3. If the fixture differs, recompute the table lengths so each test still lands on the branch its name describes — and say in your report which numbers you changed and why. Do NOT reshape the fixture; other tests depend on it.
 
 - [ ] **Step 2: Run to verify they fail**
 
