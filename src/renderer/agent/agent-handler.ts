@@ -26,6 +26,9 @@ import {
   type CommandResult,
 } from '../state/classicLevelStore';
 import { saveClassicProject } from '../state/classic-save';
+import { commitPixels } from './art-commit';
+import { loadCanvasFile } from '../state/canvas-file';
+import { sheetFromBytes, explainSheetRefusal } from '../../core/art/sheet-import';
 import type { LevelDoc, LayoutGrid } from '../../core/level-classic/model';
 import { planProjectOpen, currentOpenDirtySnapshot } from '../shell/project-open-guard';
 import { useSessionStore } from '../state/sessionStore';
@@ -776,6 +779,58 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
         case 'error':
           throw new Error('Save failed — see the editor notice for the reason. Nothing was written.');
       }
+    }
+
+    // ---- The art line (spec 2026-08-18) ----
+    // One commit, two pixel sources. Everything below the surface —
+    // snapshot, plan, collision, apply, reply — is `commitPixels`.
+
+    case 'classic-commit-canvas': {
+      // No `requireClassicDoc()` here: `commitPixels` reads the doc itself via
+      // commitContextFromStores and throws the same message. A second read would
+      // be an unused local and a second copy of the guard.
+      const dir = useClassicProjectStore.getState().dir;
+      if (!dir) throw new Error('no project directory is open');
+      // Name safety is loadCanvasFile's own guard (canvas-file.ts:120) and it
+      // throws — which is right: a bad name is a fault, not a refusal.
+      const loaded = await loadCanvasFile(dir, req.name);
+      return commitPixels({
+        pixels: loaded.doc.pixels,
+        canvasPalette: loaded.doc.palette,
+        gridOrigin: loaded.doc.gridOrigin,
+        targets: req.targets,
+        paletteResolution: req.paletteResolution,
+        // A BOOLEAN is what `commitPixels` takes, and passing one on is right:
+        // it turns the flag into `{ colindLength }` off the doc it has already
+        // read (art-commit.ts:130). Task 4's review moved that conversion one
+        // level down, to `replyFromPlanResult`, so that asking for collision
+        // without the zone's table length is unrepresentable AT the layer that
+        // stamps it — the layer this one never touches.
+        collision: req.collision,
+        dryRun: req.dryRun,
+      });
+    }
+
+    case 'classic-import-art-sheet': {
+      const doc = requireClassicDoc();
+      const bytes = new Uint8Array(await window.api.readBinaryFile(req.path, ''));
+      const res = await sheetFromBytes(doc, bytes);
+      if (!res.ok) {
+        // An import refusal, like a commit refusal, is an ANSWER. Same shape, so
+        // a caller handles both with one branch.
+        return { ok: false, refusal: res.refusal, message: explainSheetRefusal(res.refusal),
+                 resolution: 'Recolour the sheet, or widen the act palette, then import again.',
+                 offers: [] };
+      }
+      // An imported sheet has no grid of its own — see CommitPlanInput.gridOrigin.
+      return commitPixels({
+        pixels: res.sheet.pixels,
+        canvasPalette: res.sheet.palette,
+        targets: req.targets,
+        paletteResolution: req.paletteResolution,
+        collision: req.collision,
+        dryRun: req.dryRun,
+      });
     }
 
     default: {
