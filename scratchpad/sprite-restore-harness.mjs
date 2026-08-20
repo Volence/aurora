@@ -237,21 +237,46 @@ async function main() {
       `activeDocId=${sp7.activeDocId} refusalShown=${refusal7}`);
     await shot(c, '4-legacy-refusal');
 
-    // --- Row 8: Try again succeeds once the data is loadable ---------------
-    await c.evalExpr('window.__dbg.openAct("ghz", 1)');
-    await until(async () => (await c.json('window.__dbg.levelState()')).status === 'ready');
-    const clicked = await c.evalExpr(`(() => {
+    // --- Row 8: the refusal GUARANTEES, and the come-back succeeds ---------
+    // Two halves of the honest contract. (a) While the data is genuinely
+    // unloadable (no zone from any source), "Try again" changes nothing — the
+    // refusal is a guarantee, not a hedge. (b) Open a level and come back — the
+    // owner's dance. Coming back is a tab-strip click, which runs the SAME
+    // requestFocusTabId path the pane's button calls (the pane exists so there
+    // is exactly one loading code path), and it must now succeed.
+    const clickedWhileUnloadable = await c.evalExpr(`(() => {
       const b = [...document.querySelectorAll('button')].find((e) => /Try again/.test(e.textContent || ''));
       if (!b) return 'no-button'; b.click(); return 'clicked';
+    })()`);
+    await sleep(1200);
+    const sp8a = await c.json('window.__dbg.spriteState()');
+    const stillRefused = await c.evalExpr(`document.body.innerText.includes(${JSON.stringify(REFUSAL)})`);
+    check('8a', '"Try again" while genuinely unloadable changes nothing — the refusal guarantees',
+      clickedWhileUnloadable === 'clicked' && sp8a.activeDocId !== MOTOBUG_TAB && stillRefused === true,
+      `clicked=${clickedWhileUnloadable} activeDocId=${sp8a.activeDocId} refusalShown=${stillRefused}`);
+
+    await c.evalExpr('window.__dbg.openAct("ghz", 1)');
+    await until(async () => (await c.json('window.__dbg.levelState()')).status === 'ready');
+    // The act load focused the LEVEL tab (useActTabSync); come back via the
+    // sprite tab in the strip — requestFocusTabId, the button's own path.
+    const cameBack = await c.evalExpr(`(() => {
+      const t = [...document.querySelectorAll('*')].filter((e) =>
+        e.textContent?.trim() === 'Moto Bug' && e.closest && !e.querySelector('*'));
+      for (const e of t) {
+        const target = e.closest('[role="tab"]') ?? e;
+        target.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0 }));
+        return 'clicked';
+      }
+      return 'no-tab';
     })()`);
     const retried = await until(async () => {
       const s = await c.json('window.__dbg.spriteState()');
       return s.activeDocId === MOTOBUG_TAB && s.frames > 0;
     });
     const sp8 = await c.json('window.__dbg.spriteState()');
-    check('8', '"Try again" loads the sprite once a level made the zone data loadable',
-      clicked === 'clicked' && retried && sp8.frames > 0,
-      `clicked=${clicked} activeDocId=${sp8.activeDocId} frames=${sp8.frames}`);
+    check('8b', 'coming back to the tab (the requestFocusTabId path "Try again" shares) loads it',
+      cameBack === 'clicked' && retried && sp8.frames > 0,
+      `cameBack=${cameBack} activeDocId=${sp8.activeDocId} frames=${sp8.frames}`);
     await shot(c, '5-try-again');
   } finally {
     // Put the owner's real session back before tearing the app down.
