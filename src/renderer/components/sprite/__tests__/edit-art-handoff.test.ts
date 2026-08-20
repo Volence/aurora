@@ -17,7 +17,9 @@ import {
   __setSpriteSetOpenerForTest,
   __resetSpriteSetOpenerForTest,
   __setAnimScriptReaderForTest,
+  syncedTimelineAnims,
 } from '../export-sprite';
+import { resolveObjectAnims } from '../../../../core/project/profiles/s1-object-anims';
 import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import type { DiscoveredSpriteSet } from '../../../../core/import/sprite-discovery';
@@ -230,6 +232,70 @@ describe('editObjectArtCheckout — animation auto-load', () => {
     expect(reads).toEqual([]); // no script was even read
     expect(useSpriteStore.getState().characterAnims).toEqual([]);
     expect(useSpriteStore.getState().steps).toEqual([]);
+  });
+
+  (treePresent ? it : it.skip)('Ring: the synced spin LEADS the picker, then the scripted sparkle', async () => {
+    __setSpriteSetOpenerForTest(stubOpener([], 9)); // Map_Ring (REV01) has 9 frames (4 spin + 4 sparkle + blank)
+    __setAnimScriptReaderForTest(realReader);
+
+    const ok = await editObjectArtCheckout(0x25); // Ring
+
+    expect(ok).toBe(true);
+    const s = useSpriteStore.getState();
+    // Spin is the SynchroAnimate channel-1 cycle (transcribed data, no file
+    // read): frames 0-3 ascending at 8 game frames per step, labeled synced.
+    // The scripted collect-sparkle follows from _anim/Rings.asm.
+    expect(s.characterAnims.map((a) => `${a.name}${a.synced ? '!' : ''}`)).toEqual(['spin!', 'sparkle']);
+    // duration 7 = the true 8-frame period minus 1: AnimStepUI stores the
+    // engine's raw byte and the timeline holds (duration + 1) ticks.
+    expect(s.characterAnims[0].steps).toEqual([0, 1, 2, 3].map((f) => (
+      { frameIndex: f, duration: 7, xFlip: false, yFlip: false })));
+    // Hand-transcribed from _anim/Rings.asm: dc.b 5 / 4,5,6,7 / afRoutine.
+    expect(s.characterAnims[1].steps).toEqual([4, 5, 6, 7].map((f) => (
+      { frameIndex: f, duration: 5, xFlip: false, yFlip: false })));
+    // The at-rest look (spin) is what pre-loads into the playable timeline.
+    expect(s.steps).toEqual(s.characterAnims[0].steps);
+    expect(s.unsavedEdits).toBe(false);
+  });
+
+  it('a sync-only object (Giant Ring) gets its synced entry with NO script read', async () => {
+    __setSpriteSetOpenerForTest(stubOpener([]));
+    const reads: string[] = [];
+    __setAnimScriptReaderForTest(async (_base, rel) => { reads.push(rel); return ''; });
+
+    const ok = await editObjectArtCheckout(0x4b); // Giant Ring — sync channel 1, no _anim script
+
+    expect(ok).toBe(true);
+    expect(reads).toEqual([]); // pure table data — no file was read
+    const s = useSpriteStore.getState();
+    expect(s.characterAnims).toHaveLength(1);
+    expect(s.characterAnims[0]).toMatchObject({ name: 'spin', synced: true });
+    // duration 7 = the true 8-frame period minus 1: AnimStepUI stores the
+    // engine's raw byte and the timeline holds (duration + 1) ticks.
+    expect(s.characterAnims[0].steps).toEqual([0, 1, 2, 3].map((f) => (
+      { frameIndex: f, duration: 7, xFlip: false, yFlip: false })));
+    expect(s.steps).toEqual(s.characterAnims[0].steps);
+  });
+
+  it('the approximate accumulator channel carries its disclosure note', () => {
+    // Obj37 (scattered rings) is not art-linked, so its row rides the SAME
+    // conversion the checkout uses — tested on the exported helper directly.
+    const rows = syncedTimelineAnims(resolveObjectAnims(0x37)?.sync, 9);
+    expect(rows).toHaveLength(1);
+    const spin = rows[0];
+    expect(spin.synced).toBe(true);
+    // 4 = the measured AVERAGE of the decelerating accumulator (derivation in
+    // profiles/__tests__/s1-sync-anims.test.ts) — and the caveat must ride
+    // along where the UI can disclose it, never be silently dropped.
+    expect(spin.steps.every((st) => st.duration === 3)).toBe(true); // 3+1 ticks = the 4-frame average
+    expect(spin.note).toMatch(/decelerat/i);
+  });
+
+  it('sync frames past the loaded frame count clamp, same as scripted anims', () => {
+    // A 3-frame doc cannot show frame 3 of the ring spin — the step drops
+    // instead of pointing at a nonexistent frame (toTimelineAnims rule).
+    const rows = syncedTimelineAnims(resolveObjectAnims(0x25)?.sync, 3);
+    expect(rows[0].steps.map((st) => st.frameIndex)).toEqual([0, 1, 2]);
   });
 
   it('a failed script read keeps the art open usable with an empty timeline', async () => {

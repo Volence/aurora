@@ -16,9 +16,16 @@
 //   3  the loaded steps PLAY: select "walk" (3 steps) in the real picker, click
 //      the real Play button — it flips to pause, every step has a nonzero
 //      duration, and the live-step highlight visits ≥2 distinct cells
-//   4  ANTI-VACUOUS control: an art-linked object with NO anim script (GHZ
-//      Bridge $11) opens with an EMPTY timeline and NO anim picker — the
-//      empty-but-honest state, proving row 2 didn't pass by accident
+//   4  ANTI-VACUOUS control: an art-linked object with NO anim script AND no
+//      SynchroAnimate channel (GHZ Bridge $11) opens with an EMPTY timeline
+//      and NO anim picker — the empty-but-honest state, proving rows 2 and 5
+//      didn't pass by accident
+//   5  SYNCED animations (S1 sync Parcel): Ring ($25) offers BOTH the
+//      transcribed SynchroAnimate spin (frames 0-3 at the true 8-frame period,
+//      labeled synced in the picker) AND the scripted sparkle — the spin
+//      pre-loads as the at-rest look
+//   6  the synced spin PLAYS through the real UI: Play engages, and the live
+//      step highlight cycles ≥3 of the 4 spin cells at the 8-tick hold
 //
 // A STALE dist/ MAKES EVERY ROW VACUOUS (guard copied from
 // classic-playtest-harness.mjs, which once passed 19/19 against a planted
@@ -226,9 +233,66 @@ async function main() {
       return !sels.some((s) => [...s.options].some((o) => /\\(\\d+f\\)$/.test(o.text)));
     })()`);
     await shot(c, 'bridge-empty');
-    check('4', 'GHZ Bridge (no anim script): empty timeline, no anim picker — empty-but-honest, so row 2 was earned',
+    check('4', 'GHZ Bridge (no anim script, no sync channel): empty timeline, no picker, no synced entry — rows 2 and 5 were earned',
       opened2 === true && st2.activeDocId === 'doc:sprite:s1:17' && st2.anims.length === 0 && st2.steps.length === 0 && pickerGone === true,
       `opened=${opened2} doc=${st2.activeDocId} anims=${st2.anims.length} steps=${st2.steps.length} pickerGone=${pickerGone}`);
+
+    // --- Row 5: Ring — synced spin AND scripted sparkle ---------------------
+    // Expectations hand-derived, never from the code under test:
+    //   spin: SynchroAnimate Sync2 (s1disasm sonic.asm:3147-3152) steps every
+    //     8 frames (`#8-1` reset) through frames 0-3 (`andi #3`), consumed by
+    //     Ring_Animate (_incObj/25, 37 Rings.asm:134). AnimStepUI stores the
+    //     raw byte, timeline holds duration+1 → duration 7 plays the true 8.
+    //   sparkle: _anim/Rings.asm — dc.b 5 / 4,5,6,7 / afRoutine.
+    //   Ring art (REV00 map, 8 frames) → doc:sprite:s1:37 with 8 frames.
+    const opened3 = await c.evalExpr('window.__dbg.editObjectArt(0x25)');
+    await sleep(1200);
+    const st3 = await c.json('window.__dbg.spriteState()');
+    await shot(c, 'ring-doc');
+    const spinOk = st3.anims.length === 2
+      && st3.anims[0].name === 'spin' && st3.anims[0].synced === true
+      && st3.anims[0].steps.length === 4
+      && st3.anims[0].steps.every((s, i) => s.frameIndex === i && s.duration === 7 && !s.xFlip && !s.yFlip)
+      && st3.anims[1].name === 'sparkle' && !st3.anims[1].synced
+      && st3.anims[1].steps.every((s, i) => s.frameIndex === i + 4 && s.duration === 5);
+    const spinPreloaded = st3.steps.length === 4 && st3.steps.every((s, i) => s.frameIndex === i && s.duration === 7);
+    // The picker must SAY it's synced — the real option label, not store state.
+    const pickerLabels = await c.evalExpr(`(() => {
+      const sels = [...document.querySelectorAll('select')];
+      const sel = sels.find((s) => [...s.options].some((o) => /\\(\\d+f/.test(o.text)));
+      return sel ? [...sel.options].map((o) => o.text.trim()).join(' | ') : 'no picker';
+    })()`);
+    check('5', 'Ring: picker offers synced spin (labeled) AND scripted sparkle; spin pre-loads',
+      opened3 === true && st3.activeDocId === 'doc:sprite:s1:37' && st3.frames === 8 && spinOk && spinPreloaded
+      && pickerLabels === 'spin (4f, synced) | sparkle (4f)',
+      `opened=${opened3} doc=${st3.activeDocId} frames=${st3.frames} anims=${st3.anims.map((a) => `${a.name}(${a.steps.length}${a.synced ? ',sync' : ''})`).join(',')} labels="${pickerLabels}" steps0=${JSON.stringify(st3.steps[0] ?? null)}`);
+
+    // --- Row 6: the spin PLAYS through the real UI --------------------------
+    // Spin is already the loaded timeline (row 5) — just press Play and watch
+    // the live-step highlight: 8 ticks ≈ 0.133s/step, so ~1.6s of sampling at
+    // 100ms must catch ≥3 distinct cells of the 4.
+    const playClicked2 = await c.evalExpr(`(() => {
+      const btn = [...document.querySelectorAll('button')].find((b) => b.textContent.includes('Play'));
+      if (!btn) return 'no play button';
+      btn.click(); return 'ok';
+    })()`);
+    const seen2 = new Set();
+    for (let i = 0; i < 16; i++) {
+      const live = await c.evalExpr(`(() => {
+        const add = [...document.querySelectorAll('button')].find((b) => /^\\+ Frame \\d+$/.test(b.textContent.trim()));
+        if (!add) return -2;
+        const cells = [...add.parentElement.children].filter((el) => el.tagName === 'DIV');
+        return cells.findIndex((el) => el.style.boxShadow);
+      })()`);
+      if (live >= 0) seen2.add(live);
+      await sleep(100);
+    }
+    const paused2 = await c.evalExpr(
+      `[...document.querySelectorAll('button')].some((b) => b.textContent.includes('Pause'))`);
+    await shot(c, 'ring-spinning');
+    check('6', 'the synced spin plays: Play engages and the live step cycles the real spin frames',
+      playClicked2 === 'ok' && paused2 === true && seen2.size >= 3 && [...seen2].every((i) => i >= 0 && i <= 3),
+      `play=${playClicked2} paused=${paused2} liveCells=${[...seen2].sort().join(',')}`);
   } finally {
     try { c?.close(); } catch { /* closing */ }
     if (app?.pid) { try { process.kill(-app.pid, 'SIGKILL'); } catch { /* gone */ } }

@@ -1,7 +1,7 @@
 import { useProjectStore, getCurrentZone } from '../../state/projectStore';
 import { useArtStore } from '../../state/artStore';
 import { useSpriteStore, spriteDocState, patchSpriteDoc, saveableDirtySpriteDocIds } from '../../state/spriteStore';
-import type { AnimStepUI } from '../../state/spriteStore';
+import type { AnimStepUI, CharacterAnimUI } from '../../state/spriteStore';
 import type { PixelBuffer } from '../../../core/art/pixel-ops';
 import { useToastStore } from '../../state/toastStore';
 import { buildSpriteExport, buildDPLCData } from '../../../core/export/sprite-export';
@@ -28,6 +28,7 @@ import { useClassicProjectStore } from '../../state/classicProjectStore';
 import { useClassicLevelStore } from '../../state/classicLevelStore';
 import { resolveObjectArt } from '../../../core/project/profiles/s1-object-art';
 import { resolveObjectAnims } from '../../../core/project/profiles/s1-object-anims';
+import type { SyncAnimEntry } from '../../../core/project/profiles/s1-object-anims';
 import { parseS1DisasmAnimScript } from '../../../core/import/anim-import';
 import { s1ObjectName, s1ObjectHex } from '../../../core/project/profiles/s1-objects';
 import type { Color } from '../../../core/model/s4-types';
@@ -381,6 +382,30 @@ function toTimelineAnims(parsed: ParsedAnim[], frameCount: number) {
 }
 
 /**
+ * Convert transcribed SynchroAnimate rows (profiles/s1-object-anims) into
+ * timeline entries. These are a read-only VIEW of the engine's global sync
+ * counters — constant-rate channels play exactly; the channel-3 accumulator
+ * plays its measured average, with the honest caveat riding along in `note`
+ * (surfaced as the picker tooltip). Frames past the loaded frame count drop,
+ * same as toTimelineAnims.
+ */
+export function syncedTimelineAnims(sync: readonly SyncAnimEntry[] | undefined, frameCount: number): CharacterAnimUI[] {
+  return (sync ?? []).map((s) => ({
+    name: s.name,
+    synced: true,
+    note: s.note,
+    // AnimStepUI.duration follows the engine's RAW-byte convention: the
+    // timeline holds each step (duration + 1) ticks (Timeline.tsx playback,
+    // matching `_anim` scripts whose byte N holds N+1 frames). framesPerStep
+    // is the TRUE period (SynchroAnimate resets its timer to `#N-1` for an
+    // N-frame hold), so the step stores N-1 and plays exactly N.
+    steps: s.frames
+      .filter((f) => f < frameCount)
+      .map((f) => ({ frameIndex: f, duration: s.framesPerStep - 1, xFlip: false, yFlip: false })),
+  })).filter((a) => a.steps.length > 0);
+}
+
+/**
  * Load an animation script (.asm) for the CURRENT sprite — classic Sonic ($FF/$FE)
  * or S4-engine (AF_*) form, auto-detected. Populates the animation picker and loads
  * the first animation into the timeline. Frame indices past the loaded frame count
@@ -550,18 +575,28 @@ export async function editObjectArtCheckout(id: number): Promise<boolean> {
   // A read/parse failure keeps the art open usable — anims are optional.
   const animLink = resolveObjectAnims(id);
   if (animLink) {
-    try {
-      const { anims, problems } = parseS1DisasmAnimScript(await readAnimImpl(dir, animLink.animAsm));
-      const timeline = toTimelineAnims(anims, useSpriteStore.getState().frames.length);
+    const animFrameCount = useSpriteStore.getState().frames.length;
+    // Synced (SynchroAnimate) entries come straight from the transcription
+    // table — no file read, and they LEAD the picker: the sync cycle is what
+    // the object shows at rest in-level (Ring's spin), while the `_anim`
+    // script is event-driven (Ring's collect sparkle).
+    const timeline = syncedTimelineAnims(animLink.sync, animFrameCount);
+    if (animLink.animAsm) {
+      try {
+        const { anims, problems } = parseS1DisasmAnimScript(await readAnimImpl(dir, animLink.animAsm));
+        timeline.push(...toTimelineAnims(anims, animFrameCount));
+        if (problems.length) {
+          useToastStore.getState().addToast(
+            `Animation script ${animLink.animAsm}: ${problems.length} entr${problems.length === 1 ? 'y' : 'ies'} not understood (loaded the rest)`, 'info');
+        }
+      } catch { /* anim script optional — synced entries (if any) still load */ }
+    }
+    if (timeline.length) {
       useSpriteStore.getState().setCharacterAnims(timeline);
-      if (timeline[0]) useSpriteStore.getState().setSteps(timeline[0].steps);
+      useSpriteStore.getState().setSteps(timeline[0].steps);
       // A fresh load-from-disk is not unsaved work (setSteps dirties).
       useSpriteStore.getState().setUnsavedEdits(false);
-      if (problems.length) {
-        useToastStore.getState().addToast(
-          `Animation script ${animLink.animAsm}: ${problems.length} entr${problems.length === 1 ? 'y' : 'ies'} not understood (loaded the rest)`, 'info');
-      }
-    } catch { /* anim script optional — timeline stays empty rather than failing the art open */ }
+    }
   }
   return true;
 }
