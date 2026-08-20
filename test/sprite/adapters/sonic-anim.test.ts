@@ -4,6 +4,10 @@ import { parseSonicAnimScript, parseAnyAnimScript } from '../../../src/core/impo
 
 const txt = (n: string) => readFileSync(new URL(`../../fixtures/mappings/src/${n}`, import.meta.url), 'utf8');
 
+// ParsedAnim.frames carries per-frame flips since the S1 anim work; this raw
+// classic dialect emits none, so every frame is {index, xFlip:false, yFlip:false}.
+const fr = (index: number) => ({ index, xFlip: false, yFlip: false });
+
 describe('parseSonicAnimScript — classic S2 animation format (raw $FF/$FE bytes)', () => {
   const anims = parseSonicAnimScript(txt('pitcherplant_anim.asm'));
 
@@ -12,15 +16,15 @@ describe('parseSonicAnimScript — classic S2 animation format (raw $FF/$FE byte
   });
 
   it('Plant_Idle: dc.b $0F, 00, $FF → speed 15, frame 0, loop', () => {
-    expect(anims[0]).toEqual({ name: 'Plant_Idle', duration: 15, frames: [0], control: { kind: 'loop' } });
+    expect(anims[0]).toEqual({ name: 'Plant_Idle', duration: 15, frames: [fr(0)], control: { kind: 'loop' } });
   });
 
   it('Poison_Bullet: dc.b $03, $05, $FF → frame 5, loop', () => {
-    expect(anims[1]).toMatchObject({ duration: 3, frames: [5], control: { kind: 'loop' } });
+    expect(anims[1]).toMatchObject({ duration: 3, frames: [fr(5)], control: { kind: 'loop' } });
   });
 
   it('Plant_Shooting: dc.b $09, 1,2,3,4,1, $FE,1 → frames + back 1', () => {
-    expect(anims[2]).toEqual({ name: 'Plant_Shooting', duration: 9, frames: [1, 2, 3, 4, 1], control: { kind: 'back', count: 1 } });
+    expect(anims[2]).toEqual({ name: 'Plant_Shooting', duration: 9, frames: [1, 2, 3, 4, 1].map(fr), control: { kind: 'back', count: 1 } });
   });
 });
 
@@ -33,11 +37,11 @@ describe('parseSonicAnimScript — real skdisasm Anim file with a LEADING table 
   });
 
   it('byte_3E1DE: dc.b 7, 0, $FF → duration 7, frame 0, loop', () => {
-    expect(anims[0]).toEqual({ name: 'byte_3E1DE', duration: 7, frames: [0], control: { kind: 'loop' } });
+    expect(anims[0]).toEqual({ name: 'byte_3E1DE', duration: 7, frames: [fr(0)], control: { kind: 'loop' } });
   });
 
   it('byte_3E1E1: multi-line dc.b, frames until $FC routine', () => {
-    expect(anims[1].frames).toEqual([1, 1, 1, 1, 1, 3, 0, 3, 0, 3, 0, 3, 0, 3, 0, 2, 0, 2, 0, 2, 0, 2, 0]);
+    expect(anims[1].frames).toEqual([1, 1, 1, 1, 1, 3, 0, 3, 0, 3, 0, 3, 0, 3, 0, 2, 0, 2, 0, 2, 0, 2, 0].map(fr));
     expect(anims[1].control).toEqual({ kind: 'routine' });
   });
 
