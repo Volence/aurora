@@ -165,3 +165,17 @@ Concretely:
 - **Parser coverage**: only 5 of 49 files were probed against the current parser (all failed identically); the proposed grammar was checked by eye against 4 transcribed files + the constants, not yet against all 49.
 - **The `lea` sweep**: 3 of 90 binding sites verified by reading; the `S1_OBJECT_ANIMS` transcription task must sweep all of them (some `lea` sites bind zone-shared scripts, some objects select among several tables by routine).
 - **REV00/REV01 divergence** in `_anim/` files: not checked (the profile's `VariantPath` machinery exists if any file turns out to be revision-split).
+
+
+## Runtime verification of the sync channels — 2026-08-20, overseer foreground run
+
+Sampled `v_ani0_time..v_ani3_frame` (8 bytes at `$FFFEC0`) in the live GHZ demo
+(gamemode $08) at frames 4300/4308/4316/4324 on headless oracle-aether (37 methods):
+
+- **ch1: steps exactly every 8 frames, ascending** — f 0→1→2→3 at 8-frame intervals,
+  time resetting to 7 (#8−1). CONFIRMED.
+- **ch0: steps exactly every 12 frames, descending mod 8** — f 0→7→6, time resetting
+  to $0B (#12−1). CONFIRMED.
+- **ch2**: same 8-frame period as ch1. CONFIRMED. **ch3**: 0000 throughout (no ring
+  loss active), consistent with the accumulator model. Its in-loss sequence (TAG 2)
+  and the level-start phase (TAG 3) remain unverified — TAG 2 needs an induced hit.
