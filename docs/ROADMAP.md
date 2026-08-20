@@ -266,7 +266,12 @@ campaign landed (`de7fb4e`, `780d311`), the micro type tier `2xs: 10px/14px` lan
 2026-07-01 suite audit named as the whole suite's keystone gap. Aeon-first, not
 classic-first as the lens sweep recommended — that advice predated the switch to
 `oracle-next`, and aeon's path was measurably working while classic's had two
-unverified links (see §4.8's corrections block).
+unverified links — measured 2026-08-19 in
+`docs/reviews/2026-08-19-classic-playtest-links.md`: they were **symbols** (oracle's
+listing parser hard-refuses an AS `.lst`; gates everything, since Aurora resolves only
+by symbol) and **play-from-cursor** (S1 has no warp mailbox and no facility to co-opt).
+Build and live palette were false worries — 600 ms native build, palette strictly
+simpler than aeon's.
 
 Health: 3383 passed / 3 skipped, `tsc` clean.
 
