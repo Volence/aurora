@@ -29,6 +29,23 @@ export default function BuildPanel(): React.ReactElement | null {
   const setOpen = useAetherStore((s) => s.setBuildPanelOpen);
   const bodyRef = React.useRef<HTMLDivElement>(null);
 
+  /**
+   * Elapsed seconds while building.
+   *
+   * A real aeon build is ~30s, and build.sh's output is block-buffered when
+   * stdout is a pipe rather than a terminal — so the panel can sit with the
+   * word "Building…" and nothing else for half a minute, which reads as frozen.
+   * A ticking counter is the cheapest possible proof of life, and it also tells
+   * the owner what the build actually costs rather than leaving them to guess.
+   */
+  const [elapsed, setElapsed] = React.useState(0);
+  React.useEffect(() => {
+    if (state !== 'building') { setElapsed(0); return; }
+    const started = performance.now();
+    const id = setInterval(() => setElapsed(Math.floor((performance.now() - started) / 1000)), 250);
+    return () => clearInterval(id);
+  }, [state]);
+
   // Follow the tail while a build runs; stop fighting the user once it ends, so
   // they can read the failure without being yanked to the bottom.
   React.useEffect(() => {
@@ -48,7 +65,7 @@ export default function BuildPanel(): React.ReactElement | null {
       <div style={styles.header}>
         <span style={{ ...styles.dot, background: state === 'failed' ? T.error : state === 'building' ? T.textLo : T.accent }} />
         <span style={styles.title}>
-          {state === 'building' ? 'Building…' : summary ?? 'Build'}
+          {state === 'building' ? `Building… ${elapsed}s` : summary ?? 'Build'}
         </span>
         {missingEnv.length > 0 && (
           // The most common instant failure, and the one whose real cause is

@@ -18,7 +18,7 @@ function scriptDir(body: string, name = 'build.sh'): string {
   return dir;
 }
 
-function fakeClient(opts: { failOn?: string; romPath?: string } = {}) {
+function fakeClient(opts: { failOn?: string; romPath?: string; wasRunning?: boolean } = {}) {
   const calls: string[] = [];
   return {
     calls,
@@ -34,6 +34,7 @@ function fakeClient(opts: { failOn?: string; romPath?: string } = {}) {
       calls.push(`${method}:${params?.path ?? ''}`);
       if (opts.failOn === method) throw new Error('reload refused');
       if (method === 'emulator/status') return { romPath: opts.romPath ?? '/engine/s4.bin' };
+      if (method === 'emulator/pause') return { wasRunning: opts.wasRunning ?? true };
       return {};
     },
   };
@@ -242,6 +243,50 @@ describe('runBuild and the build flavour', () => {
       });
       expect(r.debugBuild).toBe(false);
       expect(r.output.join('\n')).toContain('DEBUG=[0]');
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+});
+
+describe('runBuild and the reload pause gate', () => {
+  /**
+   * `emulator/reload_rom` is require_paused (engine.rs:2202), the same gate as
+   * write_memory — and it was missed here exactly as it was missed in the warp.
+   * Unpaused, the reload fails, the build succeeds, and the game keeps running
+   * the OLD ROM under a "Build succeeded" toast, so the edit appears to have
+   * done nothing. Reported by the owner as "it took 30 seconds and nothing
+   * changed", with the error in a toast.
+   */
+  it('pauses before reloading and resumes afterwards', async () => {
+    const dir = scriptDir('exit 0');
+    const client = fakeClient({ wasRunning: true });
+    try {
+      await runBuild({ basePath: dir, client: client as never, env: {} });
+      const order = client.calls.map((c) => c.split(':')[0]);
+      const pause = order.indexOf('emulator/pause');
+      const reload = order.indexOf('emulator/reload_rom');
+      expect(pause).toBeGreaterThanOrEqual(0);
+      expect(reload).toBeGreaterThan(pause);
+      expect(order.indexOf('emulator/resume')).toBeGreaterThan(reload);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it('leaves a machine that was already paused paused', async () => {
+    const dir = scriptDir('exit 0');
+    const client = fakeClient({ wasRunning: false });
+    try {
+      await runBuild({ basePath: dir, client: client as never, env: {} });
+      expect(client.calls.map((c) => c.split(':')[0])).not.toContain('emulator/resume');
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it('resumes even when the reload itself fails', async () => {
+    const dir = scriptDir('exit 0');
+    const client = fakeClient({ wasRunning: true, failOn: 'emulator/reload_rom' });
+    try {
+      const r = await runBuild({ basePath: dir, client: client as never, env: {} });
+      expect(r.ok).toBe(true);
+      expect(r.reloaded).toBe(false);
+      expect(client.calls.map((c) => c.split(':')[0])).toContain('emulator/resume');
     } finally { rmSync(dir, { recursive: true, force: true }); }
   });
 });

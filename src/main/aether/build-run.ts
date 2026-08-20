@@ -170,8 +170,23 @@ export async function runBuild(opts: BuildRunOptions): Promise<BuildRunResult> {
             ? `${romPath.slice(0, -4)}.lst`
             : join(plan.cwd, plan.symbolsPath);
 
-          await opts.client.call('emulator/reload_rom', { path: romPath });
-          await opts.client.loadSymbols(symbolsPath);
+          // `reload_rom` is require_paused (engine.rs:2202) — the same gate as
+          // write_memory, and it was missed here exactly as it was missed in the
+          // warp. Unpaused it fails with "needs the machine paused", the BUILD
+          // still succeeds, and the game keeps running the OLD ROM under a
+          // "Build succeeded" toast, so the edit appears to have done nothing.
+          const pauseResult = await opts.client.call('emulator/pause') as { wasRunning?: boolean };
+          const wasRunning = pauseResult?.wasRunning !== false;
+          try {
+            await opts.client.call('emulator/reload_rom', { path: romPath });
+            await opts.client.loadSymbols(symbolsPath);
+          } finally {
+            // A reload RESETS the machine, so resuming lets the fresh ROM boot
+            // rather than leaving a frozen first frame that looks hung.
+            if (wasRunning) {
+              try { await opts.client.call('emulator/resume'); } catch { /* reported below */ }
+            }
+          }
           resolve({ ...base, ok: true, reloaded: true, romPath });
         } catch (e) {
           // The build succeeded; only the handoff failed. Saying so is the
