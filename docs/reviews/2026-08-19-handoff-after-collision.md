@@ -21,10 +21,20 @@ Verify before acting: the repo moves.
 Design of record: `docs/superpowers/plans/2026-08-19-set-block-collision.md` (its head carries
 **six decisions** §4.5 never settled) and `docs/superpowers/plans/2026-08-19-collision-paint-gesture.md`.
 
-Runtime proof, both must stay green: `scratchpad/collision-agent-harness.mjs` (**8/8**) and
-`scratchpad/collision-gesture-harness.mjs` (**9/9**). Each has planted-defect notes in its footer.
-Known pre-existing and **not** ours: `scratchpad/commit-collision-harness.mjs` reports 5/6, row 4 —
-stage 4's expectation is what is wrong.
+Runtime proof, all three must stay green: `scratchpad/collision-agent-harness.mjs` (**8/8**),
+`scratchpad/collision-gesture-harness.mjs` (**9/9**) and
+`scratchpad/commit-collision-harness.mjs` (**7/7**). Each has planted-defect notes in its footer.
+
+> **Resolved (`c005f57`).** This line used to record `commit-collision-harness.mjs` at 5/6 with
+> "stage 4's expectation is what is wrong". It was the expectation — verified, not assumed. Row 4
+> asserted that the "Give new art collision" toggle stamps `$FF` into **every** new block;
+> `withCollision` deliberately skips ids past the end of the zone's colind table (spec §5 /
+> CLASSIC-A4 — in ROM they resolve into the *adjacent* zone's table), and GHZ ships 439 blocks
+> against a 410-entry `collide/GHZ.bin`, so **every** id a commit can append there is in that
+> overhang. Row 4 demanded exactly the write the design refuses, and the app's own preview said so
+> on screen ("collision: 0 inherited · 0 will get flat ($FF)") while the row contradicted it. The
+> harness now runs **two acts** — GHZ for the refusal and the solidity half, SLZ (414 blocks
+> against a 500-entry table) for the shape half — and is 7/7. No app change was needed.
 
 ---
 
