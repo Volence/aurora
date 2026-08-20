@@ -53,7 +53,37 @@ export async function saveAeonProject(): Promise<AeonSaveResult> {
       if (!ref) continue;
       const plan = await buildAeonSavePlan(fa, config, project, ref.zoneId, ref.actId,
         { legacyAtlasMerged: s.legacyAtlasMerged });
-      for (const f of plan.files) {
+      // WRITE ONLY WHAT CHANGED.
+      //
+      // The plan regenerates every file for the act whether or not you touched
+      // it, so a blind write bumps the mtime of ~40 files — over a megabyte —
+      // to change one chunk. That is slow, but the expensive part is what it
+      // does DOWNSTREAM: aeon's build decides whether to re-bake the level tree
+      // by comparing editor-source mtimes against generated ones, so rewriting
+      // an untouched file marks the whole tree stale forever. Every build then
+      // paid a 7s re-bake it did not need — measured, and named in aeon's own
+      // build banner ("newest editor source: ojz_bg_..._tiles.bin").
+      //
+      // One batched read, compare, write the differences. A read that fails
+      // (missing file, first save) simply has no old bytes and is written.
+      // Degrades to writing everything if the batch read is unavailable or
+      // throws: skipping an unchanged write is an optimisation, and a save must
+      // never fail because an optimisation could not run.
+      let existing: Array<{ bytes: Uint8Array | null }> = [];
+      try {
+        existing = await window.api.readManyFiles?.(
+          config.basePath, plan.files.map((f) => f.path),
+        ) ?? [];
+      } catch { existing = []; }
+      const same = (a: Uint8Array, b: Uint8Array | null): boolean => {
+        if (!b || a.length !== b.length) return false;
+        for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+        return true;
+      };
+      for (let i = 0; i < plan.files.length; i++) {
+        const f = plan.files[i];
+        const old = existing[i]?.bytes ?? null;
+        if (same(f.bytes, old)) continue;
         await window.api.writeBinaryFile(config.basePath, f.path,
           f.bytes.buffer.slice(f.bytes.byteOffset, f.bytes.byteOffset + f.bytes.byteLength) as ArrayBuffer);
       }

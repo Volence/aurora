@@ -131,6 +131,14 @@ export default function App() {
     await useAetherStore.getState().build(
       cfg.basePath, cfg.raw as unknown as Record<string, unknown>, saveMs,
     );
+    // Also emit the phase split to the LAUNCH TERMINAL via the existing perf
+    // channel. The toast is for the person; this is so the split can be read
+    // off a log without asking them to transcribe four numbers off a toast that
+    // fades — which is exactly the friction that stops timings being collected.
+    const bt = useAetherStore.getState();
+    window.api.perfLog?.(
+      `[build] save ${Math.round(saveMs)}ms · ${bt.buildSummary ?? ''}`,
+    );
     const st = useAetherStore.getState();
     if (st.buildSummary) {
       useToastStore.getState().addToast(st.buildSummary, st.buildState === 'failed' ? 'error' : 'success');

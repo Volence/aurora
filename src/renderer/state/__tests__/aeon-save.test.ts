@@ -66,6 +66,15 @@ function installWindowApi(files: Map<string, Uint8Array>, written: string[]) {
       },
       listDir: async () => [],
       fileMtime: async () => null,
+      // The save skips writes whose bytes already match on disk (so an
+      // untouched file's mtime does not mark aeon's level tree stale and force
+      // a 7s re-bake on every build). The mock therefore has to answer reads
+      // from the same map the writes land in.
+      readManyFiles: async (_dir: string, rels: string[]) =>
+        rels.map((rel) => {
+          const b = files.get(rel);
+          return { relPath: rel, bytes: b ?? null, mtimeMs: b ? 1 : null };
+        }),
       writeBinaryFile: async (_dir: string, rel: string, data: ArrayBuffer) => {
         files.set(rel, new Uint8Array(data));
         written.push(rel);
@@ -114,8 +123,9 @@ describe('saveAeonProject', () => {
 
     expect((await saveAeonProject()).kind).toBe('saved');
 
-    expect(written).toContain('data/ojz/act1/section_0.tiles.bin');
-    expect(written).toContain('data/ojz/act2/section_0.tiles.bin');
+    // BOTH acts are cleared, which is what "written" means here. The file list
+    // is no longer the proxy for it: the save skips files whose bytes already
+    // match on disk, and this fixture's do. See the skip tests below.
     expect(useEditorStore.getState().dirty).toBe(false);
     expect(useEditorStore.getState().dirtyActs).toEqual({});
   });
@@ -139,8 +149,34 @@ describe('saveAeonProject', () => {
 
   it('saves the current act even when nothing was recorded as dirty', async () => {
     expect((await saveAeonProject()).kind).toBe('saved');
-    expect(written).toContain('data/ojz/act1/section_0.tiles.bin');
     expect(useToastStore.getState().toasts.at(-1)!.message).toMatch(/Project saved/);
+  });
+
+  /**
+   * The plan regenerates EVERY file for an act whether or not it was touched,
+   * so a blind write bumps ~40 mtimes to change one chunk. The cost is not the
+   * IO: aeon's build decides whether to re-bake the level tree by comparing
+   * editor-source mtimes against generated ones, so rewriting an untouched file
+   * marks the tree stale forever and every build pays a 7s re-bake it does not
+   * need. Caught in aeon's own build banner, naming a BG tiles file nobody had
+   * edited.
+   */
+  it('does not rewrite a file whose bytes already match on disk', async () => {
+    await saveAeonProject();          // first save populates the fixture
+    written.length = 0;
+    expect((await saveAeonProject()).kind).toBe('saved');
+    expect(written).toEqual([]);      // nothing changed, so nothing is touched
+  });
+
+  it('DOES write a file whose bytes changed', async () => {
+    await saveAeonProject();
+    written.length = 0;
+    // Move one tile in section 0 — the smallest edit that must still reach disk.
+    const project = useProjectStore.getState().project!;
+    project.zones[0].acts[0].sections[0]!.tileGrid.nametable[0] ^= 0x1;
+    dirtyAct('ojz', 'act1');
+    expect((await saveAeonProject()).kind).toBe('saved');
+    expect(written).toContain('data/ojz/act1/section_0.tiles.bin');
   });
 
   /**
