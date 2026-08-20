@@ -12,6 +12,7 @@
 import type {
   CommitRefusal, CommitReport, CommitTarget, CommitPlanResult, PaletteResolution,
 } from '../../../core/art/classic-commit-plan';
+import type { CommitCollisionApplied } from '../../../core/art/commit-collision';
 import { planCanvasCommit } from '../../../core/art/classic-commit-plan';
 import { CHUNK_PX } from '../../../core/art/canvas-resolve';
 import type { LevelDoc } from '../../../core/level-classic/model';
@@ -73,8 +74,15 @@ export function targetOptions(chunkCount: number): { value: number | null; label
  * toggle. Its `cells` count is the more precise one: `r.cellsWithoutSolidity`
  * counts every appended cell with no predecessor, block 0 (blank) included,
  * while `applied.cells` counts only the ones that actually gain solidity.
+ *
+ * The parameter is the WHOLE `CommitCollisionApplied`, not a `{blocks, cells}`
+ * projection, for the same reason collision-dispatch requires `skippedCells`
+ * on every report: a projection let this preview drop `skippedOverhang` on the
+ * floor, and in GHZ (439 blocks over a 410-entry table) the toggle's preview
+ * read "0 will get flat ($FF)" with no statement that every block was skipped
+ * or why (spec §5 / CLASSIC-A4 demands the refusal be loud).
  */
-export function reportLines(r: CommitReport, applied?: { blocks: number; cells: number }): string[] {
+export function reportLines(r: CommitReport, applied?: CommitCollisionApplied): string[] {
   const lines = [
     `tiles: ${r.tilesNew} new · ${r.tilesReused} reused · ${r.tilesReclaimed} reclaimed`,
     `blocks: ${r.blocksNew} new · ${r.blocksReused} reused · ${r.blocksReclaimed} reclaimed`,
@@ -90,6 +98,21 @@ export function reportLines(r: CommitReport, applied?: { blocks: number; cells: 
       : `collision: ${r.blocksInheritedCollision} inherited · ${r.blocksWithoutCollision} have none`);
   } else if (r.blocksInheritedCollision > 0) {
     lines.push(`collision: all ${r.blocksInheritedCollision} inherited`);
+  }
+  // The refusal the "will get flat" count is silent about: blocks whose id is
+  // past the end of the zone's collision table keep no shape (spec §5 /
+  // CLASSIC-A4 — withCollision refuses them), and a refusal the artist cannot
+  // see is a quiet one. Stated with the count AND the reason, in the same
+  // guaranteeing voice as the collision facet's refusals; absent entirely when
+  // nothing was skipped, so the common case gains no noise.
+  if (applied && applied.skippedOverhang > 0) {
+    const n = applied.skippedOverhang;
+    lines.push(
+      `skipped: ${n} block${n === 1 ? ' keeps' : 's keep'} no shape — `
+      + `${n === 1 ? 'its id is' : 'their ids are'} past the end of this zone's collision table; `
+      + `in ROM those entries resolve into the adjacent zone's table, `
+      + `so stamping one changes other blocks' in-game collision`,
+    );
   }
   if (r.cellsWithoutSolidity > 0) {
     lines.push(applied

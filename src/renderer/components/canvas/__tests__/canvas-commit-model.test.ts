@@ -1,8 +1,12 @@
 import { describe, it, expect } from 'vitest';
+import * as fs from 'fs';
 import {
   canvasChunkCapacity, defaultTargets, targetOptions, reportLines, refusalView,
 } from '../canvas-commit-model';
 import type { CommitReport, CommitRefusal } from '../../../../core/art/classic-commit-plan';
+import { withCollision } from '../../../../core/art/commit-collision';
+import type { CanvasCommitPlan } from '../../../../core/art/classic-commit-plan';
+import { enigmaDecompress } from '../../../../core/formats/classic/enigma';
 
 describe('canvasChunkCapacity', () => {
   it('counts whole chunks only, and reports the remainder rather than rounding', () => {
@@ -78,7 +82,7 @@ describe('reportLines', () => {
   it('describes what will happen, not what is missing, once the collision toggle is on', () => {
     const lines = reportLines(
       report({ blocksWithoutCollision: 3, blocksInheritedCollision: 1, cellsWithoutSolidity: 256 }),
-      { blocks: 3, cells: 200 },
+      { blocks: 3, cells: 200, skippedOverhang: 0 },
     );
     const text = lines.join('\n');
     expect(text).toMatch(/3 will get flat \(\$FF\)/);
@@ -86,6 +90,98 @@ describe('reportLines', () => {
     // 200, not 256: withCollision skips block-0 cells within an appended
     // chunk, so the applied count can be lower than cellsWithoutSolidity.
     expect(text).toMatch(/200 cells will become solid/);
+  });
+});
+
+// --- the colind overhang in the preview -------------------------------------
+//
+// withCollision REFUSES to stamp a shape into a block whose id is past the end
+// of the zone's collision table (spec §5 / CLASSIC-A4: in ROM those ids resolve
+// into the ADJACENT zone's table, so stamping one silently changes other
+// blocks' in-game collision — "must refuse or warn loudly, not proceed
+// quietly"). The refusal is counted as `applied.skippedOverhang`; these tests
+// pin that the PREVIEW states it — count and reason — and says nothing at all
+// when nothing was skipped.
+//
+// Counts are DERIVED, never quoted: the synthetic cases pass a plan through the
+// real `withCollision` and read `applied` back, and the GHZ case derives both
+// of its numbers from the s1disasm files themselves.
+
+const mintedBlock = (blockId: number) => ({
+  blockId, colind: 0,
+  def: { cells: Array.from({ length: 4 }, () => ({ tile: 0, xf: false, yf: false, pal: 0, pri: false })) },
+});
+const overhangPlan = (blockIds: number[]): CanvasCommitPlan => ({
+  tileWrites: [],
+  blockWrites: blockIds.map(mintedBlock),
+  chunkWrites: [],
+  chunkAppends: [],
+  paletteWrites: null,
+  report: {} as CanvasCommitPlan['report'],
+}) as CanvasCommitPlan;
+
+describe('reportLines and the colind overhang', () => {
+  it('adds no line — and no claim of any kind — when nothing was skipped', () => {
+    // Every id inside the table: withCollision skips nothing, and the preview
+    // must not gain a reassuring "0 skipped" row in the common case.
+    const applied = withCollision(overhangPlan([1, 2, 3]), 400).applied;
+    expect(applied.skippedOverhang).toBe(0);
+    const text = reportLines(report({ blocksWithoutCollision: 3 }), applied).join('\n');
+    expect(text).not.toMatch(/skip/i);
+    expect(text).not.toMatch(/overhang/i);
+  });
+
+  it('states the skip — count and the overhang reason — when blocks were refused', () => {
+    // Two ids past a 400-entry table, one inside. The expected count is read
+    // back from the transform that owns the rule, not asserted as a literal.
+    const applied = withCollision(overhangPlan([5, 400, 401]), 400).applied;
+    expect(applied.skippedOverhang).toBe([400, 401].length);
+    const lines = reportLines(report({ blocksWithoutCollision: 3 }), applied);
+    const line = lines.find((l) => l.startsWith('skipped:'));
+    expect(line).toBe(
+      'skipped: 2 blocks keep no shape — their ids are past the end of this zone\'s '
+      + 'collision table; in ROM those entries resolve into the adjacent zone\'s table, '
+      + 'so stamping one changes other blocks\' in-game collision',
+    );
+  });
+
+  it('keeps its grammar when exactly one block was refused', () => {
+    const applied = withCollision(overhangPlan([5, 400]), 400).applied;
+    expect(applied.skippedOverhang).toBe(1);
+    const line = reportLines(report({ blocksWithoutCollision: 2 }), applied)
+      .find((l) => l.startsWith('skipped:'));
+    expect(line).toMatch(/^skipped: 1 block keeps no shape — its id is past the end/);
+  });
+});
+
+// GHZ against the real files. Both numbers are derived on the spot: the table
+// length is the byte length of collide/GHZ.bin (decodeS1ColInd is `b.slice()`
+// over a one-byte-per-entry file, src/core/formats/classic/s1-colind.ts), and
+// the block count is the Enigma-decoded map16/GHZ.eni at 8 bytes per block
+// (s1-io.ts's own stride). Gated like the compression goldens: the fixture
+// tree is absent on CI.
+const S1DIR = '/home/volence/sonic_hacks/s1disasm';
+describe.skipIf(!fs.existsSync(S1DIR))('reportLines over GHZ, the zone whose commits all overhang', () => {
+  it('states GHZ\'s whole overhang when a commit mints every id past the table', () => {
+    const colindLength = fs.statSync(`${S1DIR}/collide/GHZ.bin`).size;
+    const blockCount = Math.floor(
+      enigmaDecompress(new Uint8Array(fs.readFileSync(`${S1DIR}/map16/GHZ.eni`))).length / 8,
+    );
+    const overhang = blockCount - colindLength;
+    // GHZ really does ship more blocks than table entries — the premise of the
+    // whole hazard, asserted rather than assumed.
+    expect(overhang).toBeGreaterThan(0);
+
+    const ids = Array.from({ length: overhang }, (_, i) => colindLength + i);
+    const applied = withCollision(overhangPlan(ids), colindLength).applied;
+    expect(applied.skippedOverhang).toBe(overhang);
+
+    const lines = reportLines(report({ blocksWithoutCollision: overhang }), applied);
+    const line = lines.find((l) => l.startsWith('skipped:'));
+    expect(line).toBeDefined();
+    expect(line).toMatch(new RegExp(`^skipped: ${overhang} blocks keep no shape`));
+    expect(line).toMatch(/past the end of this zone's collision table/);
+    expect(line).toMatch(/adjacent zone's table/);
   });
 });
 

@@ -26,10 +26,13 @@
 //
 //   GHZ IS ENTIRELY IN THAT OVERHANG: 439 blocks against a 410-entry
 //   collide/GHZ.bin. Every id a commit can append there is past the end, so the
-//   shape half is a NO-OP in GHZ *by design* — the toggle's own preview says so
-//   ("0 will get flat ($FF)"). Session A proves that refusal. Session B re-runs
-//   the same commit in SLZ (414 blocks against a 500-entry table) where the
-//   design permits the write, and proves $FF actually lands.
+//   shape half is a NO-OP in GHZ *by design* — and the toggle's preview must
+//   say BOTH halves of that: "0 will get flat ($FF)" AND that the rest were
+//   skipped, with the reason (the preview used to state only the first, which
+//   left the refusal quiet — the gap row 8 now guards). Session A proves that
+//   refusal. Session B re-runs the same commit in SLZ (414 blocks against a
+//   500-entry table) where the design permits the write, and proves $FF
+//   actually lands.
 //
 //   THIS IS WHAT THE HARNESS USED TO GET WRONG. Its row 4 asserted "with the
 //   toggle ON every new block gets the flat shape" and ran only in GHZ, so it
@@ -278,6 +281,26 @@ async function main() {
         && !/will get flat/.test(lineOf(on.offLines, 'collision:') || ''),
       `off=${JSON.stringify(on.offLines)}\n        on= ${JSON.stringify(on.onLines)}\n        `
       + `blocks stamped=${on.becameFlat.length} · cells stamped=${on.solidity.art.length}`);
+
+    // --- C: the refusal is LOUD — the ON preview states the skip, count and
+    // reason (spec §5 / CLASSIC-A4: "must refuse or warn loudly, not proceed
+    // quietly"). The expected count is DERIVED from the same screen: in GHZ the
+    // toggle stamps 0 blocks (row 5), so the skip count is exactly the OFF
+    // preview's "N have none". Anti-vacuous on purpose: N must parse and be
+    // nonzero, and the line itself must be FOUND before any regex runs — an
+    // absent line is a null here, never a lax match. The OFF preview must NOT
+    // carry the line: nothing is being skipped when nothing is being stamped.
+    const haveNone = /(\d+) have none/.exec(lineOf(on.offLines, 'collision:') || '');
+    const skipLine = lineOf(on.onLines, 'skipped:');
+    check('8', 'and the ON preview states the skip — the count and the overhang reason, not just "0 will get flat"',
+      !!haveNone && Number(haveNone[1]) > 0
+        && skipLine !== null
+        && new RegExp(`^skipped: ${haveNone[1]} blocks? keeps? no shape`).test(skipLine)
+        && /past the end of this zone's collision table/.test(skipLine)
+        && /adjacent zone's table/.test(skipLine)
+        && lineOf(on.offLines, 'skipped:') === null,
+      `have-none=${haveNone && haveNone[1]} · skipped line=${JSON.stringify(skipLine)}\n        `
+      + `off carries a skipped line=${lineOf(on.offLines, 'skipped:') !== null}`);
     await shot(c, 'stage4-on');
   });
 
@@ -372,6 +395,29 @@ main().catch((e) => { console.error(e); process.exit(1); });
 //            Row 4 FAILED on its off-baseline clause ("OFF: 8 art cells [3]") —
 //            which is why that clause is inside row 4 rather than assumed.
 //            Row 6 FAILED: the ON preview no longer differs from the OFF one.
+//
+// --- PLANT D (row 8 — the refusal is STATED, count and reason) -------------
+//   FILE     src/renderer/components/canvas/canvas-commit-model.ts, `reportLines`
+//   CHANGE   the `applied.skippedOverhang > 0` branch removed — i.e. exactly
+//            the shipped omission row 8 was added against (open since the
+//            7/7 redesign, closed 2026-08-20): `reportLines` took a
+//            `{blocks, cells}` projection of `applied`, so the refusal
+//            happened, the agent reply carried the count, and the artist's
+//            preview said only "0 will get flat ($FF)" — a quiet refusal where
+//            CLASSIC-A4 demands a loud one.
+//   RESULT   7/8. Row 8 FAILED:
+//              "have-none=2 · skipped line=null
+//               off carries a skipped line=false"
+//            Rows 1–7 all still PASSED — correctly: the refusal itself (row 5)
+//            and the stamped-count agreement (row 6) are untouched; the LINE is
+//            the only thing row 8 owns. Restored, rebuilt: 8/8, the ON preview
+//            carrying
+//              "skipped: 2 blocks keep no shape — their ids are past the end
+//               of this zone's collision table; in ROM those entries resolve
+//               into the adjacent zone's table, so stamping one changes other
+//               blocks' in-game collision"
+//            and row 7's SLZ dump showing NO skipped line where nothing was
+//            skipped — the zero case stays noise-free.
 //
 // NOT PLANTED: row 1 (a commit grows the block pool). It is the pre-existing
 // setup row; every other row reads the range it reports, so a commit that did

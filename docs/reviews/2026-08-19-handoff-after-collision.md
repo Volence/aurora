@@ -23,7 +23,7 @@ Design of record: `docs/superpowers/plans/2026-08-19-set-block-collision.md` (it
 
 Runtime proof, all three must stay green: `scratchpad/collision-agent-harness.mjs` (**8/8**),
 `scratchpad/collision-gesture-harness.mjs` (**9/9**) and
-`scratchpad/commit-collision-harness.mjs` (**7/7**). Each has planted-defect notes in its footer.
+`scratchpad/commit-collision-harness.mjs` (**8/8**). Each has planted-defect notes in its footer.
 
 > **Resolved (`c005f57`).** This line used to record `commit-collision-harness.mjs` at 5/6 with
 > "stage 4's expectation is what is wrong". It was the expectation — verified, not assumed. Row 4
@@ -35,6 +35,18 @@ Runtime proof, all three must stay green: `scratchpad/collision-agent-harness.mj
 > on screen ("collision: 0 inherited · 0 will get flat ($FF)") while the row contradicted it. The
 > harness now runs **two acts** — GHZ for the refusal and the solidity half, SLZ (414 blocks
 > against a 500-entry table) for the shape half — and is 7/7. No app change was needed.
+
+> **Follow-up closed (2026-08-20, `fix/report-skipped-overhang`).** "The app's own preview said so"
+> above was only half true, and that half was the open gap this note used to record: the preview
+> said "0 will get flat ($FF)" but never that blocks WERE skipped or why — `reportLines` took a
+> `{blocks, cells}` projection of `withCollision`'s `applied` and dropped `skippedOverhang` on the
+> floor, so the refusal was quiet where CLASSIC-A4 demands loud (the agent reply always carried the
+> count; the artist saw nothing). The preview now states it — *"skipped: N blocks keep no shape —
+> their ids are past the end of this zone's collision table; in ROM those entries resolve into the
+> adjacent zone's table, so stamping one changes other blocks' in-game collision"* — absent
+> entirely when nothing was skipped. Guarded by harness row 8 (planted red first, PLANT D in the
+> footer) and node tests deriving GHZ's counts from `collide/GHZ.bin` / `map16/GHZ.eni`; the
+> harness is **8/8**. The refusal behaviour and the agent-reply shape are unchanged.
 
 ---
 
