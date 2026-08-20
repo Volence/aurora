@@ -93,8 +93,14 @@ export interface AetherStatusPayload {
   socketPath?: string;
   /** Set when the last connect attempt failed — shown, not swallowed. */
   error?: string;
-  /** True when both Pal_Base symbols resolved, i.e. live palette can push. */
+  /** True when a palette symbol family resolved, i.e. live palette can push. */
   palette?: boolean;
+  /**
+   * WHICH family the running ROM's listing carries: aeon's Pal_Base pair or
+   * classic's v_palette_line_1..4. The UI gates per open project on this, so a
+   * classic panel does not light up green against an aeon ROM (or vice versa).
+   */
+  paletteKind?: 'aeon' | 'classic';
 }
 
 export type IpcChannels = typeof IPC_CHANNELS;
