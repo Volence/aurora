@@ -29,6 +29,7 @@ import { useSpriteStore } from './state/spriteStore';
 import { useCanvasStore } from './state/canvasStore';
 import { useShellStore } from './state/shellStore';
 import { ensureSaversRegistered, saveAllDirty, saveActive } from './state/project-runtime';
+import { startBuildAndRunWithToasts } from './state/build-and-run';
 import { registerHistoryFactories } from './state/history-factories';
 import { registerAeonFacetModules, registerS1FacetModules } from './workspace/register-facets';
 import { useSessionLifecycle, useActTabSync } from './shell/session-lifecycle';
@@ -104,45 +105,14 @@ export default function App() {
   useEffect(() => { if (project) refreshObjectPreviews().catch(() => {}); }, [project, currentZoneId]);
 
   /**
-   * Build & Run: save first, then hand the project to the build.
-   *
-   * SAVE BEFORE BUILDING, always. The build reads editor files off disk, so
-   * building without saving assembles the previous state and hands back a ROM
-   * that does not contain the change being tested — the single most confusing
-   * outcome this feature could produce.
-   *
-   * Aeon only for now: the command and artifact paths come from project.json,
-   * and a classic disassembly has neither. Rather than spawn something
-   * plausible in a directory that never asked for it, the command says so.
+   * Build & Run: save first, then hand the OPEN project — aeon or classic — to
+   * the build. The routing, the save-before-build rule and the toasts all live
+   * in state/build-and-run.ts, ONE dispatch site shared with the agent surface
+   * (`build_and_run`) and the debug hooks, so a person and an agent pressing
+   * the same button can never diverge.
    */
   const startBuild = React.useCallback(async () => {
-    const cfg = useProjectStore.getState().config;
-    if (!cfg) {
-      useToastStore.getState().addToast(
-        'Build & Run needs an aeon project — a classic disassembly builds with its own toolchain', 'info');
-      return;
-    }
-    // Timed separately: the save writes every dirty editor file and is a real
-    // candidate for the loop's wall time, but it is the renderer's half and the
-    // main process cannot see it.
-    const tSave = performance.now();
-    await saveAllDirty();
-    const saveMs = performance.now() - tSave;
-    await useAetherStore.getState().build(
-      cfg.basePath, cfg.raw as unknown as Record<string, unknown>, saveMs,
-    );
-    // Also emit the phase split to the LAUNCH TERMINAL via the existing perf
-    // channel. The toast is for the person; this is so the split can be read
-    // off a log without asking them to transcribe four numbers off a toast that
-    // fades — which is exactly the friction that stops timings being collected.
-    const bt = useAetherStore.getState();
-    window.api.perfLog?.(
-      `[build] save ${Math.round(saveMs)}ms · ${bt.buildSummary ?? ''}`,
-    );
-    const st = useAetherStore.getState();
-    if (st.buildSummary) {
-      useToastStore.getState().addToast(st.buildSummary, st.buildState === 'failed' ? 'error' : 'success');
-    }
+    await startBuildAndRunWithToasts();
   }, []);
 
   // -- global keys: Ctrl+S save current doc, Ctrl+Shift+S save all,

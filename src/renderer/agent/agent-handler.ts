@@ -930,8 +930,11 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
       return {
         status: s.status,
         server: s.serverName ?? null,
-        // Both Pal_Base symbols resolved — i.e. a palette push can actually land.
+        // A palette symbol family resolved — i.e. a push can actually land…
         palettePushAvailable: s.palette,
+        // …and WHICH family the running ROM carries ('aeon' | 'classic'). A
+        // push only lands when this matches the open project's engine.
+        paletteKind: s.paletteKind ?? null,
         building: s.buildState === 'building',
         lastBuild: s.buildSummary ?? null,
         error: s.error ?? null,
@@ -948,17 +951,41 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
     }
 
     case 'aether-push-palette': {
-      const ctx = requireProject();
-      const colors = ctx.zone.palette.lines[req.line]?.colors;
-      if (!colors) throw new Error(`palette line ${req.line} does not exist in this zone`);
       const s = useAetherStore.getState();
       if (s.status !== 'connected') {
         return { pushed: false, reason: 'not connected to an emulator' };
       }
-      if (!s.palette) {
-        return { pushed: false, reason: 'this ROM has no Pal_Base symbols — live palette is unavailable' };
+      // PROJECT-AWARE, one entry for both engines (the registry rule): the
+      // open project decides where the words come from and which symbol
+      // family they land in.
+      const classicOpen = useClassicProjectStore.getState().status === 'open';
+      let words: number[];
+      if (classicOpen) {
+        const doc = useClassicLevelStore.getState().doc;
+        const line = doc?.palettes?.[req.line];
+        if (!line) throw new Error(`palette line ${req.line} does not exist in the open act`);
+        words = Array.from(line);
+      } else {
+        const ctx = requireProject();
+        const colors = ctx.zone.palette.lines[req.line]?.colors;
+        if (!colors) throw new Error(`palette line ${req.line} does not exist in this zone`);
+        // aeon's line 0 is the character palette; the engine owns it. The
+        // store refuses it silently, so the refusal is said HERE, in words.
+        if (req.line === 0) {
+          return { pushed: false, reason: 'line 0 is the character palette on aeon — the engine owns it' };
+        }
+        words = colors.map(encodeGenesisColor);
       }
-      s.pushPaletteLine(req.line, colors.map(encodeGenesisColor));
+      const kind = classicOpen ? 'classic' as const : 'aeon' as const;
+      if (!s.palette || s.paletteKind !== kind) {
+        return {
+          pushed: false,
+          reason: s.palette
+            ? `the running ROM carries ${s.paletteKind} palette symbols, not ${kind} — wrong emulator for this project`
+            : 'this ROM has no live-palette symbols — live palette is unavailable',
+        };
+      }
+      s.pushPaletteLine(req.line, words, kind);
       // The store COALESCES pushes, so this reports that the push was accepted,
       // not that bytes have landed. Saying "pushed: true" would be a lie about
       // an operation that is still queued.
@@ -966,20 +993,26 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
     }
 
     case 'aether-warp': {
-      const msg = await useAetherStore.getState().warp(req.x, req.y);
+      const classicOpen = useClassicProjectStore.getState().status === 'open';
+      const msg = await useAetherStore.getState().warp(req.x, req.y, classicOpen ? 'classic' : 'aeon');
       if (msg === null) return { warped: false, reason: 'not connected to an emulator' };
       return { warped: msg.startsWith('Warped'), detail: msg };
     }
 
     case 'aether-build-run': {
-      const cfg = useProjectStore.getState().config;
-      if (!cfg) throw new Error('build_and_run needs an aeon project open');
-      await saveAllDirty();
-      const s = useAetherStore.getState();
-      await s.build(cfg.basePath, cfg.raw as unknown as Record<string, unknown>);
+      // ONE routing site with the UI (state/build-and-run.ts): the open
+      // project — classic or aeon — decides the toolchain, and the save
+      // always precedes the build on both routes.
+      const { startBuildAndRun } = await import('../state/build-and-run');
+      const routed = await startBuildAndRun();
+      if (routed.route === 'none') throw new Error('build_and_run needs a project open — aeon or a classic disassembly');
+      if (!routed.ran) {
+        return { ok: false, summary: 'the pre-build save failed, so the build was refused — it would have assembled the previous state' };
+      }
       const after = useAetherStore.getState();
       return {
         ok: after.buildState === 'ok',
+        project: routed.route,
         summary: after.buildSummary,
         // The output is the point on failure — an agent that only learns "it
         // failed" cannot fix the document that caused it.
