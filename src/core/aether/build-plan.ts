@@ -16,6 +16,15 @@
  * which are missing, so the failure can be explained rather than merely shown.
  */
 
+/**
+ * Which engine family the project is, because the two build worlds genuinely
+ * differ: aeon's `./build.sh` is sigil-driven (hard env requirements, a FAST
+ * iteration shape, a DEBUG flavour), while a classic disassembly's `lua
+ * build.lua` is a plain assembler run — no required env, no flavours, one
+ * artifact. Defaulting to 'aeon' keeps every existing caller byte-identical.
+ */
+export type BuildProjectType = 'aeon' | 'classic';
+
 export interface BuildPlanInput {
   /** Absolute path to the engine repo root (where project.json lives). */
   basePath: string;
@@ -23,6 +32,8 @@ export interface BuildPlanInput {
   raw?: Record<string, unknown>;
   /** The environment the app is running under. */
   env: Record<string, string | undefined>;
+  /** Engine family; decides required env, FAST default and the artifact defaults. */
+  projectType?: BuildProjectType;
   /**
    * Does a path exist, relative to basePath? Injected so the plan stays pure —
    * the default pre-build command is only used when the script is actually
@@ -45,6 +56,17 @@ export interface BuildPlan {
   romPath: string;
   /** Listing to hand `emulator/load_symbols`, relative to `cwd`. */
   symbolsPath: string;
+  /**
+   * True when `symbolsPath` was DECLARED by the project rather than defaulted.
+   * The runner needs the distinction: for an undeclared path it derives the
+   * listing from the running ROM's stem (`s4.debug.bin` → `s4.debug.lst`,
+   * which keeps aeon's flavours paired) — but AS names its listing after the
+   * SOURCE file, not the ROM (`s1built.bin`'s listing is `sonic.lst`), so a
+   * declared path must never be second-guessed by that derivation.
+   */
+  symbolsDeclared: boolean;
+  /** Echo of the input, so downstream steps gate flavour/restore per family. */
+  projectType: BuildProjectType;
   /**
    * Variables this build is known to require that are ABSENT from the merged
    * environment. Not fatal here — the build is still attempted, because only
@@ -105,14 +127,30 @@ export const DEFAULT_SYMBOLS = 's4.lst';
  */
 export const AEON_REQUIRED_ENV = ['SIGIL_BUILD', 'SIGIL_EMIT'] as const;
 
+/**
+ * A classic disassembly's build (measured against s1disasm, 2026-08-19 report):
+ * `lua build.lua` in the project dir, native asl/p2bin, ~600ms warm, and it
+ * needs NO environment — spawning it with aeon's requirements attached would
+ * report two "missing variables" it never reads, and forcing `FAST`/`DEBUG`
+ * into its env would make the result claim a flavour the build has no concept
+ * of. These defaults are belt-and-braces under the sidecar-declared values the
+ * classic open path writes; the sidecar wins when present.
+ */
+export const CLASSIC_BUILD_COMMAND = 'lua build.lua';
+export const CLASSIC_ROM = 's1built.bin';
+/** AS names the listing after the SOURCE (`sonic.asm`), not the ROM. */
+export const CLASSIC_SYMBOLS = 'sonic.lst';
+
 const str = (v: unknown): string | null => (typeof v === 'string' && v.length > 0 ? v : null);
 
 export function buildPlanFor(input: BuildPlanInput): BuildPlan {
   const raw = input.raw ?? {};
+  const projectType: BuildProjectType = input.projectType ?? 'aeon';
+  const classic = projectType === 'classic';
 
-  // A project may override the command; the default is the convention every
-  // engine repo here follows.
-  const commandLine = str(raw.buildCommand) ?? DEFAULT_BUILD_COMMAND;
+  // A project may override the command; the default is the convention the
+  // engine family follows.
+  const commandLine = str(raw.buildCommand) ?? (classic ? CLASSIC_BUILD_COMMAND : DEFAULT_BUILD_COMMAND);
   // Split on whitespace so `buildCommand` can carry flags ("./build.sh demo")
   // without the caller having to model args separately.
   const [command, ...args] = commandLine.split(/\s+/);
@@ -127,10 +165,17 @@ export function buildPlanFor(input: BuildPlanInput): BuildPlan {
   }
 
   const merged = { ...input.env, ...envOverrides };
-  const missingEnv = AEON_REQUIRED_ENV.filter((k) => !str(merged[k]));
+  // Only aeon's build has hard env requirements — sigil IS its assembler.
+  // Classic's `lua build.lua` reads nothing from the environment, so nothing
+  // can be "missing" and reporting SIGIL_* against it would be a false alarm.
+  const requiredEnv = classic ? [] : AEON_REQUIRED_ENV;
+  const missingEnv = requiredEnv.filter((k) => !str(merged[k]));
 
-  // FAST is the default for Build & Run; a project can opt out.
-  const fast = raw.buildFast !== false;
+  // FAST is the default for aeon's Build & Run; a project can opt out. Classic
+  // has no FAST shape at all — `build.lua` takes no such switch — and `fast`
+  // drives a "not a ship artifact" claim downstream that would be FALSE for a
+  // classic build, so it is never set there, whatever `buildFast` says.
+  const fast = classic ? false : raw.buildFast !== false;
   if (fast) envOverrides[FAST_ENV] = '1';
 
   // An explicit empty string turns the step OFF; absent means "use the default
@@ -139,14 +184,19 @@ export function buildPlanFor(input: BuildPlanInput): BuildPlan {
   // FAST re-bakes stale editor data ITSELF, so planning our own step on top
   // would run the generators twice — and ours has no staleness detection, so it
   // would run them every time. Under FAST there is no pre-build step at all.
+  //
+  // The DEFAULT pre-build is aeon's donor re-bake and means nothing to a
+  // classic tree (a classic save writes the assembler's own inputs in place),
+  // so classic only gets a pre-build the project explicitly declares.
   const declaredPre = raw.prebuildCommand;
   const preLine = fast
     ? ''
     : typeof declaredPre === 'string'
       ? declaredPre
-      : (input.exists?.(DEFAULT_PREBUILD_COMMAND) ? DEFAULT_PREBUILD_COMMAND : '');
+      : (!classic && input.exists?.(DEFAULT_PREBUILD_COMMAND) ? DEFAULT_PREBUILD_COMMAND : '');
   const [preCmd, ...preArgs] = preLine.split(/\s+/).filter(Boolean);
 
+  const declaredSymbols = str(raw.symbolsPath);
   return {
     command,
     args,
@@ -154,8 +204,10 @@ export function buildPlanFor(input: BuildPlanInput): BuildPlan {
     prebuild: preCmd ? { command: preCmd, args: preArgs } : null,
     cwd: input.basePath,
     envOverrides,
-    romPath: str(raw.romPath) ?? DEFAULT_ROM,
-    symbolsPath: str(raw.symbolsPath) ?? DEFAULT_SYMBOLS,
+    romPath: str(raw.romPath) ?? (classic ? CLASSIC_ROM : DEFAULT_ROM),
+    symbolsPath: declaredSymbols ?? (classic ? CLASSIC_SYMBOLS : DEFAULT_SYMBOLS),
+    symbolsDeclared: declaredSymbols !== null,
+    projectType,
     missingEnv,
   };
 }
