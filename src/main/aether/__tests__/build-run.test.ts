@@ -209,21 +209,39 @@ describe('runBuild and the build flavour', () => {
     } finally { rmSync(dir, { recursive: true, force: true }); }
   });
 
-  it('does not force DEBUG when the emulator is on the release ROM', async () => {
+  it('drops to release when the emulator is on the release ROM', async () => {
+    // Correctness beats preference: building debug here would leave the reload
+    // pointing at a file the build never touched.
     const dir = scriptDir('echo "DEBUG=[$DEBUG]"; exit 0');
     const client = fakeClient({ romPath: '/engine/s4.bin' });
     try {
       const r = await runBuild({ basePath: dir, client: client as never, env: {} });
       expect(r.debugBuild).toBe(false);
-      expect(r.output.join('\n')).toContain('DEBUG=[]');
+      expect(r.output.join('\n')).toContain('DEBUG=[0]');
     } finally { rmSync(dir, { recursive: true, force: true }); }
   });
 
-  it('builds the configured flavour when nothing is connected', async () => {
+  it('defaults to DEBUG when nothing is connected', async () => {
+    // Someone driving a build from the editor is developing; shipping a release
+    // ROM is a deliberate act, not what a keypress gives you.
     const dir = scriptDir('echo "DEBUG=[$DEBUG]"; exit 0');
     try {
       const r = await runBuild({ basePath: dir, client: null, env: {} });
-      expect(r.output.join('\n')).toContain('DEBUG=[]');
+      expect(r.debugBuild).toBe(true);
+      expect(r.output.join('\n')).toContain('DEBUG=[1]');
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it('lets project.json state the flavour explicitly, beating both', async () => {
+    const dir = scriptDir('echo "DEBUG=[$DEBUG]"; exit 0');
+    const client = fakeClient({ romPath: '/engine/s4.debug.bin' });
+    try {
+      const r = await runBuild({
+        basePath: dir, client: client as never, env: {},
+        raw: { buildEnv: { DEBUG: '0' } },
+      });
+      expect(r.debugBuild).toBe(false);
+      expect(r.output.join('\n')).toContain('DEBUG=[0]');
     } finally { rmSync(dir, { recursive: true, force: true }); }
   });
 });

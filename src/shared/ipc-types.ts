@@ -64,6 +64,8 @@ export interface AetherBuildResult {
   reloadError?: string;
   missingEnv: string[];
   command: string;
+  /** Whether the DEBUG flavour was built — decides which ROM file was written. */
+  debugBuild?: boolean;
 }
 
 export interface AetherWarpResult {

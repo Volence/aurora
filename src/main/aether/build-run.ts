@@ -74,14 +74,32 @@ export async function runBuild(opts: BuildRunOptions): Promise<BuildRunResult> {
       runningRom = status?.romPath ?? null;
     } catch { /* not fatal: fall back to the configured flavour */ }
   }
-  const wantsDebug = runningRom?.endsWith('.debug.bin') ?? false;
-
   const plan = buildPlanFor({
     basePath: opts.basePath,
     raw: opts.raw,
     env: opts.env ?? process.env,
   });
-  if (wantsDebug) plan.envOverrides.DEBUG = '1';
+
+  // DEBUG IS THE DEFAULT (owner's call, 2026-08-19). Someone driving a build
+  // from the editor is developing, and the debug ROM is the one carrying the
+  // equipment — asserts, the warp mailbox, boot autoplay. Shipping a release
+  // ROM is a deliberate act, not the thing you get by pressing a key while
+  // editing a level.
+  //
+  // The RUNNING ROM overrides it, and only in one direction: if the emulator is
+  // on `s4.bin`, building debug would leave the reload pointing at a file the
+  // build never touched — the exact defect this whole path just had. Correctness
+  // beats preference there, and the result says which flavour ran.
+  //
+  // An explicit `buildEnv.DEBUG` in project.json beats both: stated config
+  // outranks anything inferred. A UI toggle is the natural next step.
+  const explicitDebug = plan.envOverrides.DEBUG;
+  const wantsDebug = explicitDebug !== undefined
+    ? explicitDebug === '1'
+    : runningRom !== null
+      ? runningRom.endsWith('.debug.bin')
+      : true;
+  plan.envOverrides.DEBUG = wantsDebug ? '1' : '0';
 
   return new Promise<BuildRunResult>((resolve) => {
     let output = '';
@@ -109,7 +127,7 @@ export async function runBuild(opts: BuildRunOptions): Promise<BuildRunResult> {
       output += `\n${plan.command}: ${e.message}\n`;
       resolve({
         ok: false, exitCode: null, output: summariseBuildOutput(output),
-        reloaded: false, missingEnv: plan.missingEnv, plan,
+        reloaded: false, missingEnv: plan.missingEnv, plan, debugBuild: wantsDebug,
       });
     });
 
@@ -118,6 +136,9 @@ export async function runBuild(opts: BuildRunOptions): Promise<BuildRunResult> {
         const base = {
           exitCode: code, output: summariseBuildOutput(output),
           missingEnv: plan.missingEnv, plan,
+          // A fact about the BUILD, so it is reported whether or not anything
+          // was reloaded afterwards.
+          debugBuild: wantsDebug,
         };
         if (code !== 0) {
           // A FAILED BUILD MUST NOT RELOAD. The ROM on disk is the previous
@@ -151,7 +172,7 @@ export async function runBuild(opts: BuildRunOptions): Promise<BuildRunResult> {
 
           await opts.client.call('emulator/reload_rom', { path: romPath });
           await opts.client.loadSymbols(symbolsPath);
-          resolve({ ...base, ok: true, reloaded: true, romPath, debugBuild: wantsDebug });
+          resolve({ ...base, ok: true, reloaded: true, romPath });
         } catch (e) {
           // The build succeeded; only the handoff failed. Saying so is the
           // difference between "your build is broken" and "the emulator did not

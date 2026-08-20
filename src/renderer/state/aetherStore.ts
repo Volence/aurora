@@ -167,12 +167,16 @@ export const useAetherStore = create<AetherState>((set, get) => ({
     });
     try {
       const r = await window.api.aetherBuild(basePath, raw);
+      // Name the FLAVOUR. Release-vs-debug decides which ROM file the build
+      // wrote, and getting it wrong is silent: the game reloads and looks
+      // untouched. Saying which one ran turns that into something readable.
+      const flavour = r.debugBuild ? 'debug' : 'release';
       const summary = r.ok
         ? (r.reloaded
-            ? 'Build succeeded — emulator reloaded'
+            ? `Build succeeded (${flavour}) — emulator reloaded`
             : r.reloadError
-              ? `Build succeeded, but the emulator did not reload: ${r.reloadError}`
-              : 'Build succeeded (no emulator connected)')
+              ? `Build succeeded (${flavour}), but the emulator did not reload: ${r.reloadError}`
+              : `Build succeeded (${flavour}) — no emulator connected`)
         : `Build failed${r.exitCode === null ? '' : ` (exit ${r.exitCode})`}`;
       set({
         buildState: r.ok ? 'ok' : 'failed',
