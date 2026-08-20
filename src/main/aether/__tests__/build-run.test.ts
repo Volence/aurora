@@ -60,7 +60,10 @@ describe('runBuild', () => {
       expect(r.output.join('\n')).toContain('collision gate rejected');
       // THE POINT: the ROM on disk is the previous build's, so reloading would
       // put the artist in a game that silently lacks the change they made.
-      expect(client.calls).toEqual([]);
+      // (A `status` call is expected — it happens BEFORE the build, to pick the
+      // release/DEBUG flavour that matches the running ROM.)
+      expect(client.calls.filter((c) => c.startsWith('emulator/reload_rom'))).toEqual([]);
+      expect(client.calls.filter((c) => c.startsWith('load_symbols'))).toEqual([]);
       expect(r.reloaded).toBe(false);
     } finally { rmSync(dir, { recursive: true, force: true }); }
   });
@@ -181,6 +184,46 @@ describe('runBuild and which ROM is actually running', () => {
     try {
       await runBuild({ basePath: dir, client: client as never, env: {} });
       expect(client.calls).toContain('load_symbols:/engine/s4.debug.lst');
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+});
+
+describe('runBuild and the build flavour', () => {
+  /**
+   * `./build.sh` emits s4.bin; `DEBUG=1 ./build.sh` emits s4.debug.bin
+   * (build.sh:37 suffixes the artifact). The emulator is often on the DEBUG ROM
+   * because that is the one carrying the warp mailbox — so building release and
+   * then reloading the debug ROM reloads a file the build never touched, the
+   * game comes back byte-identical, and the edit appears to have done nothing.
+   *
+   * Found by the owner changing a chunk, pressing Build & Run, and watching
+   * the game not change.
+   */
+  it('builds DEBUG when the emulator is running a .debug.bin', async () => {
+    const dir = scriptDir('echo "DEBUG=$DEBUG"; exit 0');
+    const client = fakeClient({ romPath: '/engine/s4.debug.bin' });
+    try {
+      const r = await runBuild({ basePath: dir, client: client as never, env: {} });
+      expect(r.debugBuild).toBe(true);
+      expect(r.output.join('\n')).toContain('DEBUG=1');
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it('does not force DEBUG when the emulator is on the release ROM', async () => {
+    const dir = scriptDir('echo "DEBUG=[$DEBUG]"; exit 0');
+    const client = fakeClient({ romPath: '/engine/s4.bin' });
+    try {
+      const r = await runBuild({ basePath: dir, client: client as never, env: {} });
+      expect(r.debugBuild).toBe(false);
+      expect(r.output.join('\n')).toContain('DEBUG=[]');
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it('builds the configured flavour when nothing is connected', async () => {
+    const dir = scriptDir('echo "DEBUG=[$DEBUG]"; exit 0');
+    try {
+      const r = await runBuild({ basePath: dir, client: null, env: {} });
+      expect(r.output.join('\n')).toContain('DEBUG=[]');
     } finally { rmSync(dir, { recursive: true, force: true }); }
   });
 });

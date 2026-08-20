@@ -40,6 +40,8 @@ export interface BuildRunResult {
   reloaded: boolean;
   /** Which ROM was actually reloaded — the running one, not the configured guess. */
   romPath?: string;
+  /** True when the build was run in DEBUG flavour to match the running ROM. */
+  debugBuild?: boolean;
   /** Required env vars that were absent — the usual cause of an instant exit 1. */
   missingEnv: string[];
   plan: BuildPlan;
@@ -55,12 +57,31 @@ export interface BuildRunOptions {
   signal?: AbortSignal;
 }
 
-export function runBuild(opts: BuildRunOptions): Promise<BuildRunResult> {
+export async function runBuild(opts: BuildRunOptions): Promise<BuildRunResult> {
+  // WHICH ROM IS RUNNING DECIDES WHICH BUILD TO RUN — asked before spawning,
+  // not after.
+  //
+  // `./build.sh` emits `s4.bin`; `DEBUG=1 ./build.sh` emits `s4.debug.bin`
+  // (build.sh:37 suffixes the artifact name). The emulator is frequently on the
+  // debug ROM, because that is the one carrying the warp mailbox. Building the
+  // release flavour and then reloading the debug ROM reloads a file the build
+  // never touched — so the game comes back byte-identical and the edit appears
+  // to have done nothing, which is exactly what the owner saw.
+  let runningRom: string | null = null;
+  if (opts.client && opts.client.status === 'connected') {
+    try {
+      const status = await opts.client.call('emulator/status') as { romPath?: string };
+      runningRom = status?.romPath ?? null;
+    } catch { /* not fatal: fall back to the configured flavour */ }
+  }
+  const wantsDebug = runningRom?.endsWith('.debug.bin') ?? false;
+
   const plan = buildPlanFor({
     basePath: opts.basePath,
     raw: opts.raw,
     env: opts.env ?? process.env,
   });
+  if (wantsDebug) plan.envOverrides.DEBUG = '1';
 
   return new Promise<BuildRunResult>((resolve) => {
     let output = '';
@@ -123,15 +144,14 @@ export function runBuild(opts: BuildRunOptions): Promise<BuildRunResult> {
           // asked rather than assumed. The listing is derived from it, which
           // keeps `s4.bin`/`s4.lst` and `s4.debug.bin`/`s4.debug.lst` paired
           // without a second config field to get out of step.
-          const status = await opts.client.call('emulator/status') as { romPath?: string };
-          const romPath = status?.romPath ?? join(plan.cwd, plan.romPath);
+          const romPath = runningRom ?? join(plan.cwd, plan.romPath);
           const symbolsPath = romPath.endsWith('.bin')
             ? `${romPath.slice(0, -4)}.lst`
             : join(plan.cwd, plan.symbolsPath);
 
           await opts.client.call('emulator/reload_rom', { path: romPath });
           await opts.client.loadSymbols(symbolsPath);
-          resolve({ ...base, ok: true, reloaded: true, romPath });
+          resolve({ ...base, ok: true, reloaded: true, romPath, debugBuild: wantsDebug });
         } catch (e) {
           // The build succeeded; only the handoff failed. Saying so is the
           // difference between "your build is broken" and "the emulator did not
