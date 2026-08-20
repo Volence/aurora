@@ -11,8 +11,13 @@ import { CHECKER_A, CHECKER_B, OOB_MARKER } from '../../canvas/canvas-colors';
 
 const MODES: PlaybackMode[] = ['forward', 'reverse', 'pingpong'];
 
-/** Renders a frame buffer at an integer scale using the active palette line. */
-function BufferView({ buffer, colors, scale }: { buffer: PixelBuffer; colors: Color[]; scale: number }) {
+/** Renders a frame buffer at an integer scale using the active palette line.
+ *  `xFlip`/`yFlip` mirror the DRAW (per-step S1 animation flips, e.g. Crabmeat's
+ *  `2|aniXFlip` walk frames) — the checker stays unflipped, matching hardware
+ *  where flipping is a sprite attribute, not a background one. */
+function BufferView({ buffer, colors, scale, xFlip, yFlip }: {
+  buffer: PixelBuffer; colors: Color[]; scale: number; xFlip?: boolean; yFlip?: boolean;
+}) {
   const ref = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
     const ctx = ref.current?.getContext('2d');
@@ -20,13 +25,15 @@ function BufferView({ buffer, colors, scale }: { buffer: PixelBuffer; colors: Co
     const { width, height, data } = buffer;
     for (let y = 0; y < height; y++) {
       for (let x = 0; x < width; x++) {
-        const idx = data[y * width + x];
+        const sx = xFlip ? width - 1 - x : x;
+        const sy = yFlip ? height - 1 - y : y;
+        const idx = data[sy * width + sx];
         if (idx === 0) { ctx.fillStyle = (x + y) % 2 === 0 ? CHECKER_A : CHECKER_B; }
         else { const c = colors[idx]; ctx.fillStyle = c ? `rgb(${c.r},${c.g},${c.b})` : OOB_MARKER; }
         ctx.fillRect(x, y, 1, 1);
       }
     }
-  }, [buffer, colors]);
+  }, [buffer, colors, xFlip, yFlip]);
   return (
     <canvas ref={ref} width={buffer.width} height={buffer.height}
       style={{ width: buffer.width * scale, height: buffer.height * scale, imageRendering: 'pixelated' }} />
@@ -85,15 +92,15 @@ export default function Timeline() {
 
   const order = buildPlayOrder(steps.length, playbackMode);
   const liveStepIdx = order.length ? order[posRef.current % order.length] : -1;
-  const previewFrameIdx = playing && liveStepIdx >= 0
-    ? steps[liveStepIdx].frameIndex
-    : (steps[0]?.frameIndex ?? currentIndex);
+  const previewStep = playing && liveStepIdx >= 0 ? steps[liveStepIdx] : steps[0];
+  const previewFrameIdx = previewStep?.frameIndex ?? currentIndex;
   const previewBuffer = frames[previewFrameIdx] ?? frames[0];
 
   return (
     <div style={styles.root}>
       <div style={styles.preview}>
-        <BufferView buffer={previewBuffer} colors={colors} scale={3} />
+        <BufferView buffer={previewBuffer} colors={colors} scale={3}
+          xFlip={previewStep?.xFlip} yFlip={previewStep?.yFlip} />
         <div style={styles.controls}>
           <button style={styles.playBtn} onClick={() => setPlaying((p) => !p)} disabled={steps.length === 0}>
             {playing ? '❚❚ Pause' : '▶ Play'}
@@ -118,9 +125,11 @@ export default function Timeline() {
         {steps.length === 0 && <div style={styles.hint}>No steps. Add the current frame to start an animation →</div>}
         {steps.map((st, i) => (
           <div key={i} style={{ ...styles.stepCell, ...(playing && i === liveStepIdx ? styles.stepLive : {}) }}>
-            <BufferView buffer={frames[st.frameIndex] ?? frames[0]} colors={colors} scale={1} />
+            <BufferView buffer={frames[st.frameIndex] ?? frames[0]} colors={colors} scale={1}
+              xFlip={st.xFlip} yFlip={st.yFlip} />
             <div style={styles.stepMeta}>
-              <span style={styles.stepLabel}>f{st.frameIndex}</span>
+              <span style={styles.stepLabel} title={st.xFlip || st.yFlip ? 'animation flip flags' : undefined}>
+                f{st.frameIndex}{st.xFlip ? '↔' : ''}{st.yFlip ? '↕' : ''}</span>
               <input type="number" min={1} max={127} value={st.duration} style={styles.dur}
                 onChange={(e) => useSpriteStore.getState().setStepDuration(i, Number(e.target.value))}
                 title="hold (1/60s)" />

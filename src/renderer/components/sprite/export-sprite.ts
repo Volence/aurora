@@ -27,6 +27,8 @@ import { spriteDocTab } from '../../shell/tabs';
 import { useClassicProjectStore } from '../../state/classicProjectStore';
 import { useClassicLevelStore } from '../../state/classicLevelStore';
 import { resolveObjectArt } from '../../../core/project/profiles/s1-object-art';
+import { resolveObjectAnims } from '../../../core/project/profiles/s1-object-anims';
+import { parseS1DisasmAnimScript } from '../../../core/import/anim-import';
 import { s1ObjectName, s1ObjectHex } from '../../../core/project/profiles/s1-objects';
 import type { Color } from '../../../core/model/s4-types';
 import type { ParsedAnim } from '../../../core/import/anim-import';
@@ -362,13 +364,19 @@ export async function openSprite(sourceFormat: SpriteFormatId = 's2', artCompres
   }
 }
 
-/** Convert parsed animations into editor timeline animations for the current frames. */
+/** Convert parsed animations into editor timeline animations for the current frames.
+ *  Per-frame flips (S1 `2|aniXFlip` bytes) ride along on the step. */
 function toTimelineAnims(parsed: ParsedAnim[], frameCount: number) {
   return parsed.map((a) => ({
     name: a.name,
     steps: a.frames
-      .filter((f) => f < frameCount)
-      .map((f) => ({ frameIndex: f, duration: a.duration === 'dynamic' ? DYNAMIC_PREVIEW_HOLD : Math.max(1, a.duration) })),
+      .filter((f) => f.index < frameCount)
+      .map((f) => ({
+        frameIndex: f.index,
+        duration: a.duration === 'dynamic' ? DYNAMIC_PREVIEW_HOLD : Math.max(1, a.duration),
+        xFlip: f.xFlip,
+        yFlip: f.yFlip,
+      })),
   })).filter((a) => a.steps.length > 0);
 }
 
@@ -476,6 +484,14 @@ let openSetImpl: SpriteSetOpener = openDiscoveredSet;
 export function __setSpriteSetOpenerForTest(fn: SpriteSetOpener): void { openSetImpl = fn; }
 export function __resetSpriteSetOpenerForTest(): void { openSetImpl = openDiscoveredSet; }
 
+// Same seam for the animation-script read (node tests have no window.api; they
+// substitute a reader that returns real _anim text straight from fs).
+type AnimScriptReader = (baseDir: string, relPath: string) => Promise<string>;
+const readAnimScript: AnimScriptReader = async (baseDir, relPath) =>
+  new TextDecoder().decode(new Uint8Array(await window.api.readBinaryFile(baseDir, relPath)));
+let readAnimImpl: AnimScriptReader = readAnimScript;
+export function __setAnimScriptReaderForTest(fn: AnimScriptReader | null): void { readAnimImpl = fn ?? readAnimScript; }
+
 /**
  * Load a classic object's art + mappings into the CHECKED-OUT sprite document
  * (Task B2 / Task 14). The object id resolves to an `ObjectArtLink` (profiles/
@@ -523,6 +539,29 @@ export async function editObjectArtCheckout(id: number): Promise<boolean> {
       return i === 0 ? { ...c, a: 0 } : c; // index 0 is transparent (sprite convention)
     });
     useSpriteStore.setState({ paletteMode: 'standalone', standalonePalette: colors });
+  }
+
+  // AUTO-LOAD the object's S1 animation script (S1 anim Parcel 1): the
+  // transcribed link table (profiles/s1-object-anims) names the `_anim/*.asm`
+  // file; parse the s1disasm dialect and populate the SHIPPED timeline +
+  // animation picker, exactly as loadSpriteAnimations would from a manual pick.
+  // An unlinked object (static art, or a named exclusion like Sonic/Caterkiller)
+  // stays empty-but-honest: loadSprite already cleared characterAnims/steps.
+  // A read/parse failure keeps the art open usable — anims are optional.
+  const animLink = resolveObjectAnims(id);
+  if (animLink) {
+    try {
+      const { anims, problems } = parseS1DisasmAnimScript(await readAnimImpl(dir, animLink.animAsm));
+      const timeline = toTimelineAnims(anims, useSpriteStore.getState().frames.length);
+      useSpriteStore.getState().setCharacterAnims(timeline);
+      if (timeline[0]) useSpriteStore.getState().setSteps(timeline[0].steps);
+      // A fresh load-from-disk is not unsaved work (setSteps dirties).
+      useSpriteStore.getState().setUnsavedEdits(false);
+      if (problems.length) {
+        useToastStore.getState().addToast(
+          `Animation script ${animLink.animAsm}: ${problems.length} entr${problems.length === 1 ? 'y' : 'ies'} not understood (loaded the rest)`, 'info');
+      }
+    } catch { /* anim script optional — timeline stays empty rather than failing the art open */ }
   }
   return true;
 }
@@ -632,12 +671,7 @@ export async function loadEngineCharacter(name: string): Promise<void> {
     try {
       const asm = new TextDecoder().decode(new Uint8Array(await window.api.readBinaryFile(base, `data/animations/${name}_anims.asm`)));
       const parsed = parseCharacterAnims(asm);
-      const charAnims = parsed.map((a) => ({
-        name: a.name,
-        steps: a.frames
-          .filter((f) => f < frames.length)
-          .map((f) => ({ frameIndex: f, duration: a.duration === 'dynamic' ? DYNAMIC_PREVIEW_HOLD : Math.max(1, a.duration) })),
-      })).filter((a) => a.steps.length > 0);
+      const charAnims = toTimelineAnims(parsed, frames.length);
       useSpriteStore.getState().setCharacterAnims(charAnims);
       if (charAnims[0]) useSpriteStore.getState().setSteps(charAnims[0].steps); // auto-load the first
       animCount = charAnims.length;

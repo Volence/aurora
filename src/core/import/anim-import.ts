@@ -15,13 +15,26 @@ export type ParsedControl =
   | { kind: 'change'; animId: number }
   | { kind: 'routine' }
   | { kind: 'delete' }
+  | { kind: 'reset' } // S1 afReset $FB: restart script + clear 2nd routine
+  | { kind: 'secondRoutine' } // S1 af2ndRoutine $FA: ob2ndRout += 2
   | null;
+
+/**
+ * One frame reference in an animation script. `index` is the mapping-frame
+ * index; `xFlip`/`yFlip` are the classic per-frame flip flags (S1 frame bytes
+ * carry bits 0–4 = frame, $20 = aniXFlip, $40 = aniYFlip — `_Constants.asm`
+ * 312-313, applied by `Anim_SetFrameAndFlipFlags` via `andi.b #$1F` + rol/eor
+ * into obRender). Dialects without per-frame flips emit false/false.
+ */
+export interface AnimFrame { index: number; xFlip: boolean; yFlip: boolean; }
+
+const frame = (index: number, xFlip = false, yFlip = false): AnimFrame => ({ index, xFlip, yFlip });
 
 export interface ParsedAnim {
   name: string;
   /** Per-animation hold, or 'dynamic' for DUR_DYNAMIC (speed-scaled in-game). */
   duration: number | 'dynamic';
-  frames: number[]; // mapping-frame indices
+  frames: AnimFrame[]; // mapping-frame references (index + flips)
   control: ParsedControl;
 }
 
@@ -75,12 +88,12 @@ export function parseCharacterAnims(text: string): ParsedAnim[] {
     if (tokens.length === 0) continue;
 
     const duration: number | 'dynamic' = tokens[0] === 'DUR_DYNAMIC' ? 'dynamic' : (parseNum(tokens[0]) ?? 0);
-    const frames: number[] = [];
+    const frames: AnimFrame[] = [];
     let control: ParsedControl = null;
     for (let i = 1; i < tokens.length; i++) {
       const t = tokens[i];
       const n = parseNum(t);
-      if (n !== null) { frames.push(n); continue; }
+      if (n !== null) { frames.push(frame(n)); continue; }
       if (!CONTROLS.has(t)) continue; // skip event/unknown tokens (best-effort)
       if (t === 'AF_END') control = { kind: 'loop' };
       else if (t === 'AF_BACK') control = { kind: 'back', count: parseNum(tokens[i + 1] ?? '0') ?? 0 };
@@ -140,11 +153,11 @@ export function parseSonicAnimScript(text: string): ParsedAnim[] {
     const bytes = blocks.get(label);
     if (!bytes || bytes.length === 0) continue;
     const duration = bytes[0];
-    const frames: number[] = [];
+    const frames: AnimFrame[] = [];
     let control: ParsedControl = null;
     for (let i = 1; i < bytes.length; i++) {
       const b = bytes[i];
-      if (b < 0xfa) { frames.push(b); continue; }
+      if (b < 0xfa) { frames.push(frame(b)); continue; }
       if (b === 0xff) control = { kind: 'loop' };
       else if (b === 0xfe) control = { kind: 'back', count: bytes[i + 1] ?? 0 };
       else if (b === 0xfd) control = { kind: 'change', animId: bytes[i + 1] ?? 0 };
@@ -157,9 +170,152 @@ export function parseSonicAnimScript(text: string): ParsedAnim[] {
   return anims;
 }
 
-/** Load either animation-script dialect: classic ($FF/$FE) or S4-engine (AF_*). */
+// --- s1disasm dialect -------------------------------------------------------
+//
+// Grammar transcribed from the real `_anim/*.asm` files (48 non-Sonic files;
+// `_anim/Sonic.asm` is a DIFFERENT language — `sonani` macro table, fr_* frame
+// equates, negative duration mode markers, code-driven walk/run rotation — and
+// is deliberately NOT handled here; see docs/reviews/2026-08-20-s1-animation-audit.md §1.4):
+//
+//   Ani_Hog:    dc.w .hog-Ani_Hog       ; word offset table — one entry per anim,
+//               dc.w .fly1-Ani_Hog      ;   dot-LOCAL script labels, no spaces
+//   .hog:       dc.b 9                  ; first byte: hold duration
+//               dc.b 0, 0, 2|aniXFlip   ; frame bytes: bits 0-4 index, $20/$40 flips
+//               dc.b afEnd              ; symbolic control terminator
+//               even
+//
+// Control codes are ALWAYS symbolic in source; their values come from
+// `_Constants.asm:305-310` ($FF afEnd … $FA af2ndRoutine) and $20/$40 flips
+// from `_Constants.asm:312-313` — hardcoded here, verified against the tree.
+// Flip expressions are exactly `N`, `$N`, `N|aniXFlip`, `N|aniYFlip`,
+// `N|aniXFlip|aniYFlip` (the only forms in the 48 files) — no general
+// expression evaluator.
+
+const S1_CONTROLS: Record<string, number> = {
+  afEnd: 0xff, // restart script (loop)
+  afBack: 0xfe, // + count arg: step back N script bytes
+  afChange: 0xfd, // + anim-id arg
+  afRoutine: 0xfc, // obRoutine += 2
+  afReset: 0xfb, // restart + clear ob2ndRout
+  af2ndRoutine: 0xfa, // ob2ndRout += 2
+};
+const S1_FLIPS: Record<string, number> = { aniXFlip: 0x20, aniYFlip: 0x40 };
+
+/** Evaluate one s1disasm dc.b token to a byte, or null if it isn't this dialect. */
+function parseS1Token(tok: string): number | null {
+  const direct = parseNum(tok);
+  if (direct !== null) return direct & 0xff;
+  if (tok in S1_CONTROLS) return S1_CONTROLS[tok];
+  // N|aniXFlip[|aniYFlip] — numeric head, flip-name tail, any order of flips.
+  const parts = tok.split('|').map((s) => s.trim());
+  if (parts.length < 2) return null;
+  const head = parseNum(parts[0]);
+  if (head === null) return null;
+  let b = head;
+  for (const p of parts.slice(1)) {
+    if (!(p in S1_FLIPS)) return null;
+    b |= S1_FLIPS[p];
+  }
+  return b & 0xff;
+}
+
+export interface S1AnimParseResult {
+  anims: ParsedAnim[];
+  /**
+   * Anything the grammar could not account for, named. NEVER silently dropped:
+   * the shipped bug this parser replaces was symbolic bytes (afEnd, 2|aniXFlip)
+   * parsing to null and vanishing, which truncated or emptied every script.
+   * Callers that care about fidelity (the sweep test) assert this is empty.
+   */
+  problems: string[];
+}
+
+/**
+ * Parse an s1disasm `_anim/*.asm` animation script file. Returns every
+ * animation in offset-table order (anim id = array index, duplicates kept —
+ * the engine indexes the table, so two entries to one script are two anims).
+ */
+export function parseS1DisasmAnimScript(text: string): S1AnimParseResult {
+  const problems: string[] = [];
+  const clean = text.split(/\r?\n/).map((l) => l.replace(/;.*$/, '').trim());
+
+  // Offset table: collect every `dc.w <label>-<base>` operand. The table label
+  // shares its line with the first entry (`Ani_Hog:\tdc.w .hog-Ani_Hog`), and
+  // dc.w appears nowhere else in these files. Labels may be dot-local.
+  const LABEL = /^([A-Za-z_.][A-Za-z0-9_.]*):\s*(.*)$/;
+  let base = '';
+  const order: string[] = [];
+  for (const raw of clean) {
+    const lm = raw.match(LABEL);
+    const body = lm ? lm[2] : raw;
+    const wm = body.match(/^dc\.w\s+(.*)$/);
+    if (!wm) continue;
+    for (const tok of wm[1].split(',').map((s) => s.trim()).filter(Boolean)) {
+      const em = tok.match(/^([A-Za-z_.][A-Za-z0-9_.]*)\s*-\s*([A-Za-z_][A-Za-z0-9_]*)$/);
+      if (!em) { problems.push(`offset-table entry not <label>-<base>: "${tok}"`); continue; }
+      if (!base) base = em[2];
+      else if (em[2] !== base) problems.push(`offset entry "${tok}" subtracts ${em[2]}, table base is ${base}`);
+      order.push(em[1]);
+    }
+  }
+  if (order.length === 0) { problems.push('no dc.w offset table found'); return { anims: [], problems }; }
+
+  // Script blocks: label → evaluated byte list. `even` ends nothing (blocks are
+  // delimited by the next label); unknown tokens are recorded, never dropped.
+  const blocks = new Map<string, number[]>();
+  let cur: number[] | null = null;
+  let curLabel = '';
+  for (const raw of clean) {
+    if (raw === '' || raw === 'even') continue;
+    const lm = raw.match(LABEL);
+    let body = raw;
+    if (lm) { curLabel = lm[1]; cur = []; blocks.set(curLabel, cur); body = lm[2]; }
+    const bm = body.match(/^dc\.b\s+(.*)$/);
+    if (!bm || !cur) continue;
+    for (const tok of bm[1].split(',').map((s) => s.trim()).filter(Boolean)) {
+      const b = parseS1Token(tok);
+      if (b === null) { problems.push(`${curLabel}: unrecognized dc.b token "${tok}"`); continue; }
+      cur.push(b);
+    }
+  }
+
+  const anims: ParsedAnim[] = [];
+  for (const label of order) {
+    const bytes = blocks.get(label);
+    if (!bytes || bytes.length === 0) { problems.push(`offset table names "${label}" but no script block found`); continue; }
+    const duration = bytes[0];
+    if (duration >= 0x80) problems.push(`${label}: duration byte $${duration.toString(16)} is negative (Sonic-dialect mode marker?)`);
+    const frames: AnimFrame[] = [];
+    let control: ParsedControl = null;
+    for (let i = 1; i < bytes.length; i++) {
+      const b = bytes[i];
+      if (b < 0x80) { // frame byte: bits 0-4 index, $20/$40 flips (Anim_SetFrameAndFlipFlags)
+        frames.push(frame(b & 0x1f, (b & 0x20) !== 0, (b & 0x40) !== 0));
+        continue;
+      }
+      if (b === 0xff) control = { kind: 'loop' };
+      else if (b === 0xfe) control = { kind: 'back', count: bytes[i + 1] ?? 0 };
+      else if (b === 0xfd) control = { kind: 'change', animId: bytes[i + 1] ?? 0 };
+      else if (b === 0xfc) control = { kind: 'routine' };
+      else if (b === 0xfb) control = { kind: 'reset' };
+      else if (b === 0xfa) control = { kind: 'secondRoutine' };
+      else { // $80–$F9: engine-silent no-op (falls through to Anim_End rts) — surface it
+        problems.push(`${label}: byte $${b.toString(16)} in frame position is an engine no-op`);
+        continue;
+      }
+      break; // control terminates the script
+    }
+    anims.push({ name: label.replace(/^\./, ''), duration, frames, control });
+  }
+  return { anims, problems };
+}
+
+/** Load any animation-script dialect: classic ($FF/$FE raw bytes), s1disasm
+ *  (dot-local labels + symbolic af-constant / aniXFlip tokens), or S4 (AF_*). */
 export function parseAnyAnimScript(text: string): ParsedAnim[] {
   const classic = parseSonicAnimScript(text);
   if (classic.length) return classic;
+  const s1 = parseS1DisasmAnimScript(text);
+  if (s1.anims.length) return s1.anims;
   return parseCharacterAnims(text);
 }

@@ -20,6 +20,7 @@ import { useAetherStore } from './state/aetherStore';
 import { useViewStore } from './state/viewStore';
 import { useArtStore } from './state/artStore';
 import { useCanvasStore } from './state/canvasStore';
+import { useSpriteStore } from './state/spriteStore';
 import { useToastStore } from './state/toastStore';
 import { confirmProjectOpen } from './shell/project-open-guard';
 import { activateLevelTarget } from './shell/tab-activation';
@@ -540,6 +541,24 @@ interface DebugApi {
     /** Warp, worded per project kind — the classic F7 path's seam. */
     warp(x: number, y: number, kind?: 'aeon' | 'classic'): Promise<string | null>;
   };
+  /**
+   * The classic "Edit art…" action, exactly as the object UI runs it (tab
+   * activation owns the document lifecycle). Resolves true when the object's
+   * sprite-doc ended up checked out.
+   */
+  editObjectArt(id: number): Promise<boolean>;
+  /**
+   * The checked-out sprite document's timeline state, read from the store (not
+   * from any loader's return value): the anim picker's contents with full
+   * per-step data, and the steps currently loaded in the playable timeline.
+   */
+  spriteState(): {
+    activeDocId: string | null;
+    frames: number;
+    anims: { name: string; steps: { frameIndex: number; duration: number; xFlip?: boolean; yFlip?: boolean }[] }[];
+    steps: { frameIndex: number; duration: number; xFlip?: boolean; yFlip?: boolean }[];
+    unsavedEdits: boolean;
+  };
 }
 
 export function installDebugHooks(): void {
@@ -596,6 +615,20 @@ export function installDebugHooks(): void {
     classic: installClassicProbe(),
     canvas: installCanvasProbe(),
     setPaintColor: (v) => useArtStore.getState().setSelectedColor(v),
+    editObjectArt: async (id) => {
+      const { editObjectArt } = await import('./components/sprite/export-sprite');
+      return editObjectArt(id);
+    },
+    spriteState: () => {
+      const s = useSpriteStore.getState();
+      return {
+        activeDocId: s.activeDocId,
+        frames: s.frames.length,
+        anims: s.characterAnims.map((a) => ({ name: a.name, steps: a.steps.map((st) => ({ ...st })) })),
+        steps: s.steps.map((st) => ({ ...st })),
+        unsavedEdits: s.unsavedEdits,
+      };
+    },
   };
   (window as unknown as { __dbg: DebugApi }).__dbg = dbg;
 }

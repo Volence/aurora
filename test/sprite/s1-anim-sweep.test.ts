@@ -1,0 +1,180 @@
+import { describe, it, expect } from 'vitest';
+import { readFileSync, readdirSync, existsSync } from 'fs';
+import { join } from 'path';
+import { parseS1DisasmAnimScript } from '../../src/core/import/anim-import';
+import type { AnimFrame } from '../../src/core/import/anim-import';
+import { S1_OBJECT_ANIMS } from '../../src/core/project/profiles/s1-object-anims';
+
+// Sweep of parseS1DisasmAnimScript over ALL 48 non-Sonic s1disasm _anim files
+// (the real read-only tree, not fixtures). `_anim/Sonic.asm` is EXCLUDED by
+// design: it is a different language (sonani macro table, fr_* equates,
+// negative duration mode markers, code-driven walk/run rotation) — see
+// docs/reviews/2026-08-20-s1-animation-audit.md §1.4.
+//
+// ANTI-VACUOUS: this suite FAILS (never skips) if the tree is missing or any
+// file parses to zero animations — "zero animations parsed" was precisely the
+// shipped bug (both pre-existing parsers returned [] on every real file), so a
+// sweep that tolerates it proves nothing.
+
+const ANIM_DIR = '/home/volence/sonic_hacks/s1disasm/_anim';
+
+/**
+ * INDEPENDENT expected-animation-count: count the file's own `dc.w` offset-table
+ * operands by direct text scan (comment-strip + count `X-Y` operands). This
+ * deliberately shares no code with the parser under test — an expectation the
+ * parser produced would assert nothing.
+ */
+function offsetTableEntryCount(text: string): number {
+  let count = 0;
+  for (let line of text.split(/\r?\n/)) {
+    line = line.replace(/;.*$/, '');
+    const m = line.match(/dc\.w\s+(.*)$/);
+    if (!m) continue;
+    for (const tok of m[1].split(',').map((s) => s.trim()).filter(Boolean)) {
+      if (tok.includes('-')) count++;
+    }
+  }
+  return count;
+}
+
+const files = existsSync(ANIM_DIR)
+  ? readdirSync(ANIM_DIR).filter((f) => f.endsWith('.asm') && f !== 'Sonic.asm').sort()
+  : [];
+
+describe('s1disasm _anim sweep (all 48 non-Sonic files)', () => {
+  it('the real tree is present with exactly 48 non-Sonic scripts', () => {
+    // Loud failure, not a skip: without the tree the sweep is vacuous.
+    expect(existsSync(ANIM_DIR), `${ANIM_DIR} missing — sweep cannot run`).toBe(true);
+    expect(files).toHaveLength(48);
+  });
+
+  it.each(files)('%s parses fully, count matching its own offset table', (f) => {
+    const text = readFileSync(join(ANIM_DIR, f), 'utf8');
+    const expected = offsetTableEntryCount(text);
+    expect(expected, `${f}: no dc.w offset entries found by the independent scan`).toBeGreaterThanOrEqual(1);
+
+    const { anims, problems } = parseS1DisasmAnimScript(text);
+    expect(problems, `${f}: parser reported problems`).toEqual([]);
+    expect(anims.length, `${f}: anim count != its own dc.w table length`).toBe(expected);
+    expect(anims.length, `${f}: zero animations parsed — the shipped bug`).toBeGreaterThanOrEqual(1);
+
+    for (const a of anims) {
+      // Every real script terminates in a control byte (afEnd overwhelmingly;
+      // afBack/afChange/afRoutine/af2ndRoutine elsewhere). A null control means
+      // a symbolic byte was swallowed — the exact silent-drop failure mode.
+      expect(a.control, `${f}/${a.name}: no control terminator — symbolic byte swallowed?`).not.toBeNull();
+      // Frame bytes decode to bits 0-4 (< $20) + flips; durations are positive holds.
+      expect(a.duration, `${f}/${a.name}: duration`).toBeGreaterThanOrEqual(0);
+      expect(a.duration, `${f}/${a.name}: negative duration is Sonic-dialect only`).toBeLessThan(0x80);
+      for (const fr of a.frames) {
+        expect(fr.index, `${f}/${a.name}: frame index out of the 5-bit range`).toBeLessThan(0x20);
+        expect(fr.index).toBeGreaterThanOrEqual(0);
+      }
+    }
+  });
+});
+
+// --- Byte-accurate exemplars -------------------------------------------------
+// Expectations below are TRANSCRIBED BY HAND from the named file (derivation in
+// the comments), never from parser output.
+
+const fr = (index: number, xFlip = false, yFlip = false): AnimFrame => ({ index, xFlip, yFlip });
+const parseFile = (name: string) => parseS1DisasmAnimScript(readFileSync(join(ANIM_DIR, name), 'utf8'));
+
+describe('exemplar: Ball Hog.asm (single-anim, single-entry table)', () => {
+  it('matches a hand transcription', () => {
+    const { anims, problems } = parseFile('Ball Hog.asm');
+    expect(problems).toEqual([]);
+    // Ani_Hog: dc.w .hog-Ani_Hog — one entry. .hog: dc.b 9 (duration), then
+    // three lines of "0, 0, 2, 2, 3, 2", then "0, 0, 1", then afEnd.
+    expect(anims).toEqual([{
+      name: 'hog',
+      duration: 9,
+      frames: [0, 0, 2, 2, 3, 2, 0, 0, 2, 2, 3, 2, 0, 0, 2, 2, 3, 2, 0, 0, 1].map((n) => fr(n)),
+      control: { kind: 'loop' },
+    }]);
+  });
+});
+
+describe('exemplar: Buzz Bomber.asm (three-anim table, all afEnd)', () => {
+  it('matches a hand transcription', () => {
+    const { anims, problems } = parseFile('Buzz Bomber.asm');
+    expect(problems).toEqual([]);
+    // Ani_Buzz table order: .fly1, .fly2, .fires. Each: dc.b 1 / two frames / afEnd.
+    expect(anims).toEqual([
+      { name: 'fly1', duration: 1, frames: [fr(0), fr(1)], control: { kind: 'loop' } },
+      { name: 'fly2', duration: 1, frames: [fr(2), fr(3)], control: { kind: 'loop' } },
+      { name: 'fires', duration: 1, frames: [fr(4), fr(5)], control: { kind: 'loop' } },
+    ]);
+  });
+});
+
+describe('exemplar: Monitor.asm (10-anim table, afBack with argument)', () => {
+  it('matches a hand transcription', () => {
+    const { anims, problems } = parseFile('Monitor.asm');
+    expect(problems).toEqual([]);
+    expect(anims.map((a) => a.name)).toEqual([
+      'static', 'eggman', 'sonic', 'shoes', 'shield', 'invincible', 'rings', 's', 'goggles', 'breaking',
+    ]);
+    // .static: dc.b 1 / 0,1,2 / afEnd
+    expect(anims[0]).toEqual({ name: 'static', duration: 1, frames: [fr(0), fr(1), fr(2)], control: { kind: 'loop' } });
+    // .goggles: dc.b 1 / 0,$A,$A,1,$A,$A,2,$A,$A / afEnd — $hex frame bytes
+    expect(anims[8]).toEqual({
+      name: 'goggles', duration: 1,
+      frames: [0, 0xa, 0xa, 1, 0xa, 0xa, 2, 0xa, 0xa].map((n) => fr(n)),
+      control: { kind: 'loop' },
+    });
+    // .breaking: dc.b 2 / 0,1,2 / $B / afBack,1 — the audit's afBack round-trip:
+    // $B is a FRAME byte (11 < $20), then the control afBack with count 1.
+    expect(anims[9]).toEqual({
+      name: 'breaking', duration: 2,
+      frames: [fr(0), fr(1), fr(2), fr(0xb)],
+      control: { kind: 'back', count: 1 },
+    });
+  });
+});
+
+describe('exemplar: Crabmeat.asm (flip-expression frames)', () => {
+  it('matches a hand transcription, flips preserved', () => {
+    const { anims, problems } = parseFile('Crabmeat.asm');
+    expect(problems).toEqual([]);
+    expect(anims.map((a) => a.name)).toEqual([
+      'stand', 'standslope', 'standsloperev', 'walk', 'walkslope', 'walksloperev', 'firing', 'ball',
+    ]);
+    // .standsloperev: dc.b 15 / 2|aniXFlip / afEnd — frame INDEX 2, xFlip set.
+    // (The old parser read this byte as 34 and dropped it — the shipped misparse.)
+    expect(anims[2]).toEqual({
+      name: 'standsloperev', duration: 15, frames: [fr(2, true)], control: { kind: 'loop' },
+    });
+    // .walk: dc.b 15 / 1, 1|aniXFlip, 0 / afEnd
+    expect(anims[3]).toEqual({
+      name: 'walk', duration: 15, frames: [fr(1), fr(1, true), fr(0)], control: { kind: 'loop' },
+    });
+    // .walksloperev: dc.b 15 / 1, 3|aniXFlip, 2|aniXFlip / afEnd
+    expect(anims[5]).toEqual({
+      name: 'walksloperev', duration: 15, frames: [fr(1), fr(3, true), fr(2, true)], control: { kind: 'loop' },
+    });
+  });
+});
+
+// --- S1_OBJECT_ANIMS transcription integrity ---------------------------------
+
+describe('S1_OBJECT_ANIMS links resolve against the real tree', () => {
+  const entries = Object.entries(S1_OBJECT_ANIMS);
+
+  it('has a meaningful number of links (badniks + interactives + bosses)', () => {
+    expect(entries.length).toBeGreaterThanOrEqual(45);
+  });
+
+  it.each(entries)('id %s → its animAsm exists and parses to ≥1 animation', (id, link) => {
+    const path = join('/home/volence/sonic_hacks/s1disasm', link.animAsm);
+    expect(existsSync(path), `${link.animAsm} missing on disk`).toBe(true);
+    const { anims, problems } = parseS1DisasmAnimScript(readFileSync(path, 'utf8'));
+    expect(problems, `${link.animAsm}: parse problems`).toEqual([]);
+    expect(anims.length, `${link.animAsm}: zero animations`).toBeGreaterThanOrEqual(1);
+  });
+
+  it('never links _anim/Sonic.asm (different dialect, excluded by design)', () => {
+    for (const [, link] of entries) expect(link.animAsm).not.toBe('_anim/Sonic.asm');
+  });
+});
