@@ -389,7 +389,7 @@ function toTimelineAnims(parsed: ParsedAnim[], frameCount: number) {
  * (surfaced as the picker tooltip). Frames past the loaded frame count drop,
  * same as toTimelineAnims.
  */
-function syncedTimelineAnims(sync: readonly SyncAnimEntry[] | undefined, frameCount: number): CharacterAnimUI[] {
+export function syncedTimelineAnims(sync: readonly SyncAnimEntry[] | undefined, frameCount: number): CharacterAnimUI[] {
   return (sync ?? []).map((s) => ({
     name: s.name,
     synced: true,
