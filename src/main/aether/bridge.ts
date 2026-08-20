@@ -131,6 +131,7 @@ export function registerAetherBridge(browserWindow: BrowserWindow): void {
         debugBuild: r.debugBuild,
         restoredTo: r.restoredTo,
         fast: r.fast,
+        timings: r.timings,
       };
     },
   );

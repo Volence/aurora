@@ -122,8 +122,15 @@ export default function App() {
         'Build & Run needs an aeon project — a classic disassembly builds with its own toolchain', 'info');
       return;
     }
+    // Timed separately: the save writes every dirty editor file and is a real
+    // candidate for the loop's wall time, but it is the renderer's half and the
+    // main process cannot see it.
+    const tSave = performance.now();
     await saveAllDirty();
-    await useAetherStore.getState().build(cfg.basePath, cfg.raw as unknown as Record<string, unknown>);
+    const saveMs = performance.now() - tSave;
+    await useAetherStore.getState().build(
+      cfg.basePath, cfg.raw as unknown as Record<string, unknown>, saveMs,
+    );
     const st = useAetherStore.getState();
     if (st.buildSummary) {
       useToastStore.getState().addToast(st.buildSummary, st.buildState === 'failed' ? 'error' : 'success');

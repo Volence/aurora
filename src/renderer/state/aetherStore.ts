@@ -52,7 +52,7 @@ interface AetherState {
   buildMissingEnv: string[];
   setBuildPanelOpen: (open: boolean) => void;
   appendBuildOutput: (chunk: string) => void;
-  build: (basePath: string, raw?: Record<string, unknown>) => Promise<void>;
+  build: (basePath: string, raw?: Record<string, unknown>, saveMs?: number) => Promise<void>;
 }
 
 /** Coalescing state, deliberately outside the store: it is not UI. */
@@ -153,7 +153,7 @@ export const useAetherStore = create<AetherState>((set, get) => ({
     buildOutput: [...s.buildOutput, ...chunk.split('\n').filter((l) => l.length > 0)].slice(-500),
   })),
 
-  build: async (basePath, raw) => {
+  build: async (basePath, raw, saveMs) => {
     if (get().buildState === 'building') return;      // one build at a time
     // OPEN THE PANEL IMMEDIATELY. A build takes seconds to minutes, and the
     // first version showed nothing at all until it finished — which is
@@ -175,9 +175,21 @@ export const useAetherStore = create<AetherState>((set, get) => ({
       // could hand to a player — aeon's own banner says as much and this is the
       // client half of saying it.
       const flavour = `${r.debugBuild ? 'debug' : 'release'}${r.fast ? ', fast' : ''}`;
+      // ATTRIBUTED, not totalled. The loop measured ~10s wall against a 1.3s
+      // build, and a single number cannot tell you which of save / build /
+      // reload / restore to go after.
+      const t = r.timings;
+      const timing = t
+        ? ` · ${[
+            saveMs !== undefined ? `save ${(saveMs / 1000).toFixed(1)}s` : null,
+            `build ${(t.build / 1000).toFixed(1)}s`,
+            t.reload ? `reload ${(t.reload / 1000).toFixed(1)}s` : null,
+            t.restore ? `restore ${(t.restore / 1000).toFixed(1)}s` : null,
+          ].filter(Boolean).join(' · ')}`
+        : '';
       const summary = r.ok
         ? (r.reloaded
-            ? `Build succeeded (${flavour}) — emulator reloaded${r.restoredTo ? `, back at (${r.restoredTo.x}, ${r.restoredTo.y})` : ''}`
+            ? `Build succeeded (${flavour}) — emulator reloaded${r.restoredTo ? `, back at (${r.restoredTo.x}, ${r.restoredTo.y})` : ''}${timing}`
             : r.reloadError
               ? `Build succeeded (${flavour}), but the emulator did not reload: ${r.reloadError}`
               : `Build succeeded (${flavour}) — no emulator connected`)

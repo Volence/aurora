@@ -48,6 +48,14 @@ export interface BuildRunResult {
   restoredTo?: { x: number; y: number };
   /** FAST shape — deliberately NOT a ship artifact. */
   fast?: boolean;
+  /**
+   * Milliseconds per phase.
+   *
+   * Added because the loop measured ~10s wall against a 1.3s build: the
+   * interesting number was never the build, and "somewhere in the other 8.7
+   * seconds" is not something you can act on.
+   */
+  timings?: { build: number; reload: number; restore: number };
   /** Required env vars that were absent — the usual cause of an instant exit 1. */
   missingEnv: string[];
   plan: BuildPlan;
@@ -152,6 +160,7 @@ export async function runBuild(opts: BuildRunOptions): Promise<BuildRunResult> {
     }
   }
 
+  const tBuildStart = Date.now();
   return new Promise<BuildRunResult>((resolve) => {
     const child = spawn(plan.command, plan.args, {
       cwd: plan.cwd,
@@ -183,12 +192,15 @@ export async function runBuild(opts: BuildRunOptions): Promise<BuildRunResult> {
 
     child.on('close', (code) => {
       void (async () => {
+        const buildMs = Date.now() - tBuildStart;
+        let reloadMs = 0, restoreMs = 0;
         const base = {
           exitCode: code, output: summariseBuildOutput(output),
           missingEnv: plan.missingEnv, plan,
           // Facts about the BUILD, so they are reported whether or not anything
           // was reloaded afterwards.
           debugBuild: wantsDebug, fast: plan.fast,
+          timings: { build: buildMs, reload: 0, restore: 0 },
         };
         if (code !== 0) {
           // A FAILED BUILD MUST NOT RELOAD. The ROM on disk is the previous
@@ -246,6 +258,7 @@ export async function runBuild(opts: BuildRunOptions): Promise<BuildRunResult> {
             } catch { /* no symbols, no restore — not worth failing the build over */ }
           }
 
+          const tReload = Date.now();
           const pauseResult = await opts.client.call('emulator/pause') as { wasRunning?: boolean };
           const wasRunning = pauseResult?.wasRunning !== false;
           try {
@@ -266,6 +279,8 @@ export async function runBuild(opts: BuildRunOptions): Promise<BuildRunResult> {
           // attempt that lands is the moment gameplay began; no polling of some
           // separate "am I in a level yet" flag, and nothing to keep in sync
           // with the engine's own state machine.
+          reloadMs = Date.now() - tReload;
+          const tRestore = Date.now();
           let restored = false;
           if (restoreTo) {
             for (let attempt = 0; attempt < 12 && !restored; attempt++) {
@@ -273,7 +288,12 @@ export async function runBuild(opts: BuildRunOptions): Promise<BuildRunResult> {
               restored = r.warped;
             }
           }
-          resolve({ ...base, ok: true, reloaded: true, romPath, restoredTo: restored ? restoreTo! : undefined });
+          restoreMs = Date.now() - tRestore;
+          resolve({
+            ...base, ok: true, reloaded: true, romPath,
+            restoredTo: restored ? restoreTo! : undefined,
+            timings: { build: buildMs, reload: reloadMs, restore: restoreMs },
+          });
         } catch (e) {
           // The build succeeded; only the handoff failed. Saying so is the
           // difference between "your build is broken" and "the emulator did not

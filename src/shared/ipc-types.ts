@@ -70,6 +70,8 @@ export interface AetherBuildResult {
   restoredTo?: { x: number; y: number };
   /** FAST shape — verification lanes skipped, NOT a ship artifact. */
   fast?: boolean;
+  /** Milliseconds per phase, so a slow loop can be attributed rather than guessed at. */
+  timings?: { build: number; reload: number; restore: number };
 }
 
 export interface AetherWarpResult {
