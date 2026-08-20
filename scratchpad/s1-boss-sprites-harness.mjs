@@ -25,6 +25,20 @@
 //      REFUSE the level-free open — editObjectArt resolves false and the
 //      checked-out doc stays $82's. Proves rows 2/3 passed because the
 //      zone-free classification does work, not because anything opens.
+//   5  Boss Wrecking Ball ($48) shows the BALL (owner finding 2026-08-20): the
+//      doc is doc:sprite:s1:72 with exactly 4 frames (HAND-DERIVED from
+//      _maps/GHZ Ball.asm's mappingsTable: .shiny, .check1, .check2, .check3 —
+//      the giant ball Obj48 swings, Map_GBall @ Nem_Ball "artnem/GHZ Giant
+//      Ball.nem", _incObj/3D,48:479-480), on a 48x48 canvas (piece union
+//      -$18..$18 both axes), and EVERY frame draws a substantial ball:
+//      >=800 nonzero pixels of the 2304 (a 24px-radius disc is ~1810).
+//      An empty canvas (coverage 0) FAILS — anti-vacuous by construction.
+//   6  Eggman's exhaust tail frames are NONBLANK: $3D's doc frames 11/12
+//      (.escapeflame1/2 — tiles $12A+ = Nem_Exhaust "artnem/Boss - Exhaust
+//      Flame.nem" at ArtTile_Eggman+$12A, _Constants.asm:584) each draw
+//      >=100 nonzero pixels; frame 8 (.flame1, tile $2D inside Nem_Eggman)
+//      stays nonblank; and frame 10 (.blank, ZERO spritePiece rows in the
+//      source) is EXACTLY 0 — the control that proves coverage can fail.
 //
 // A STALE dist/ MAKES EVERY ROW VACUOUS — same guard as s1-anim-harness.mjs:
 // refuse to run when any source file is newer than the built main bundle.
@@ -206,6 +220,29 @@ async function main() {
     check('4', 'Crabmeat ($1F, zone-scoped) refuses the level-free open — the checked-out doc stays $82\'s',
       opened3 === false && st3.activeDocId === 'doc:sprite:s1:130' && st3.frames === 11,
       `opened=${opened3} doc=${st3.activeDocId} frames=${st3.frames}`);
+
+    // --- Row 5: Wrecking Ball ($48) shows the BALL ---------------------------
+    const opened4 = await c.evalExpr('window.__dbg.editObjectArt(0x48)');
+    await sleep(1500);
+    const st4 = await c.json('window.__dbg.spriteState()');
+    await shot(c, 'wrecking-ball-doc');
+    const ballCov = st4.frameCoverage ?? [];
+    const ballAllSolid = ballCov.length === 4 && ballCov.every((n) => n >= 800);
+    check('5', 'Wrecking Ball ($48) opens as the GIANT BALL: doc:sprite:s1:72, 4 Map_GBall frames on a 48x48 canvas, every frame >=800 nonzero px',
+      opened4 === true && st4.activeDocId === 'doc:sprite:s1:72' && st4.frames === 4
+      && st4.frameW === 48 && st4.frameH === 48 && ballAllSolid,
+      `opened=${opened4} doc=${st4.activeDocId} frames=${st4.frames} canvas=${st4.frameW}x${st4.frameH} coverage=${JSON.stringify(ballCov)}`);
+
+    // --- Row 6: Eggman's exhaust tail frames are NONBLANK --------------------
+    const opened5 = await c.evalExpr('window.__dbg.editObjectArt(0x3d)');
+    await sleep(1500);
+    const st5 = await c.json('window.__dbg.spriteState()');
+    await shot(c, 'eggman-flame-frames');
+    const cov = st5.frameCoverage ?? [];
+    check('6', 'Eggman ($3D) tail frames draw: .escapeflame1/2 (11/12) >=100 px each, .flame1 (8) nonblank, .blank (10) EXACTLY 0',
+      opened5 === true && st5.activeDocId === 'doc:sprite:s1:61' && st5.frames === 13
+      && (cov[11] ?? 0) >= 100 && (cov[12] ?? 0) >= 100 && (cov[8] ?? 0) >= 50 && cov[10] === 0,
+      `opened=${opened5} doc=${st5.activeDocId} frames=${st5.frames} cov[8]=${cov[8]} cov[10]=${cov[10]} cov[11]=${cov[11]} cov[12]=${cov[12]}`);
   } finally {
     try { c?.close(); } catch { /* closing */ }
     if (app?.pid) { try { process.kill(-app.pid, 'SIGKILL'); } catch { /* gone */ } }
