@@ -109,3 +109,35 @@ export function readProjectConfig(bytes: Uint8Array | null): SidecarState {
 export function serializeProjectConfig(cfg: ProjectConfig): Uint8Array {
   return new TextEncoder().encode(JSON.stringify(cfg, null, 2) + '\n');
 }
+
+/**
+ * The build fields Aurora writes into a CLASSIC project's sidecar at open, so
+ * Build & Run has a declared channel rather than hardcoded knowledge, and so
+ * the person who owns the disassembly can see and edit what will be spawned.
+ * Values transcribed from s1disasm's own build (build.lua:27,30 names the
+ * artifact `s1built`; AS's `-L` writes the listing beside the SOURCE, so it is
+ * `sonic.lst`); the sidecar schema round-trips these as unknown top-level keys.
+ */
+export const CLASSIC_BUILD_SIDECAR: Readonly<Record<string, string>> = {
+  buildCommand: 'lua build.lua',
+  romPath: 's1built.bin',
+  symbolsPath: 'sonic.lst',
+};
+
+/**
+ * Fill in any of the three build fields the sidecar does not already carry.
+ * NEVER overwrites: a project that declared its own values (a different
+ * disassembly layout, a wrapper script) keeps them — the seed exists to make
+ * the default visible, not to enforce it. `changed` says whether a write-back
+ * is needed at all, so an already-seeded project costs no disk write on open.
+ */
+export function seedClassicBuildConfig(cfg: ProjectConfig): { config: ProjectConfig; changed: boolean } {
+  const out: Record<string, unknown> = { ...cfg };
+  let changed = false;
+  for (const [k, v] of Object.entries(CLASSIC_BUILD_SIDECAR)) {
+    if (typeof out[k] === 'string' && (out[k] as string).length > 0) continue;
+    out[k] = v;
+    changed = true;
+  }
+  return { config: out as ProjectConfig, changed };
+}

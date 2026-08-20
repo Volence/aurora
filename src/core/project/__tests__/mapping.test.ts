@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { readProjectConfig, serializeProjectConfig, type ProjectConfig } from '../mapping';
+import { readProjectConfig, serializeProjectConfig, seedClassicBuildConfig, type ProjectConfig } from '../mapping';
 
 const enc = (s: string) => new TextEncoder().encode(s);
 
@@ -81,5 +81,54 @@ describe('project mapping config', () => {
     const text = new TextDecoder().decode(serializeProjectConfig(cfg));
     expect(text.endsWith('\n')).toBe(true);
     expect(text).toContain('  "base": "aeon"');
+  });
+});
+
+describe('seedClassicBuildConfig', () => {
+  it('fills the three build fields into an empty config, and says it changed', () => {
+    const { config, changed } = seedClassicBuildConfig({});
+    expect(changed).toBe(true);
+    // Values transcribed from s1disasm's build (build.lua:27,30; AS -L names
+    // the listing after the source), same derivation as CLASSIC_BUILD_SIDECAR.
+    expect(config).toMatchObject({
+      buildCommand: 'lua build.lua',
+      romPath: 's1built.bin',
+      symbolsPath: 'sonic.lst',
+    });
+  });
+
+  it('never overwrites a declared value — the seed makes the default visible, not enforced', () => {
+    const declared = { buildCommand: './wrapper.sh', base: 's1-github' };
+    const { config, changed } = seedClassicBuildConfig(declared);
+    expect((config as Record<string, unknown>).buildCommand).toBe('./wrapper.sh');
+    // The other two were absent, so they are filled and the config changed.
+    expect(changed).toBe(true);
+    expect((config as Record<string, unknown>).romPath).toBe('s1built.bin');
+  });
+
+  it('reports no change for an already-seeded config, so open costs no disk write', () => {
+    const { config: once } = seedClassicBuildConfig({});
+    const { changed } = seedClassicBuildConfig(once);
+    expect(changed).toBe(false);
+  });
+
+  it('round-trips through serialize + read with the seeded keys intact', () => {
+    // The whole design leans on the sidecar preserving unknown top-level keys;
+    // prove the three build fields survive an actual write-read cycle rather
+    // than asserting the schema comment.
+    const { config } = seedClassicBuildConfig({ base: 's1-github' });
+    const back = readProjectConfig(serializeProjectConfig(config));
+    expect(back.issues).toEqual([]);
+    expect(back.config).toMatchObject({
+      base: 's1-github',
+      buildCommand: 'lua build.lua',
+      romPath: 's1built.bin',
+      symbolsPath: 'sonic.lst',
+    });
+  });
+
+  it('treats an empty-string declaration as absent rather than spawning an empty command', () => {
+    const { config } = seedClassicBuildConfig({ buildCommand: '' } as never);
+    expect((config as Record<string, unknown>).buildCommand).toBe('lua build.lua');
   });
 });

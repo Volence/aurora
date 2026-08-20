@@ -26,6 +26,7 @@ import type {
   SidecarState,
 } from '../../core/project/adapter';
 import type { ResolutionReport } from '../../core/project/report';
+import { seedClassicBuildConfig, serializeProjectConfig } from '../../core/project/mapping';
 import { ipcClassicBridge, type ClassicBridge } from './classic-bridge';
 // classicLevelStore.ts imports useClassicProjectStore back from this module —
 // an intentional lazy (function-body-only) circular reference: both stores
@@ -103,6 +104,23 @@ export const useClassicProjectStore = create<ClassicProjectState>((set) => ({
       const res = await bridge.open(dir);
       if (res.kind === 'opened') {
         const h = res.handle;
+        // SEED THE BUILD FIELDS into the sidecar, once, so Build & Run runs a
+        // channel the owner can see and edit (`.aurora/project.json` —
+        // buildCommand/romPath/symbolsPath). Fill-only: declared values are
+        // never overwritten, and an already-seeded project writes nothing. A
+        // failed write is non-fatal — the build planner carries the same
+        // values as defaults — but the seeded config still feeds this session
+        // so the plan and the file cannot disagree.
+        let sidecar = h.sidecar ?? null;
+        if (sidecar && bridge.writeSidecar) {
+          const seeded = seedClassicBuildConfig(sidecar.config);
+          if (seeded.changed) {
+            sidecar = { ...sidecar, config: seeded.config };
+            try {
+              await bridge.writeSidecar(dir, serializeProjectConfig(seeded.config));
+            } catch { /* planner defaults cover it; the setup tab shows the sidecar state */ }
+          }
+        }
         set({
           status: 'open',
           dir,
@@ -112,7 +130,7 @@ export const useClassicProjectStore = create<ClassicProjectState>((set) => ({
           report: h.report,
           zoneTree: h.levels ? h.levels.list() : [],
           handle: h,
-          sidecar: h.sidecar ?? null,
+          sidecar,
           error: null,
         });
         return 'opened';

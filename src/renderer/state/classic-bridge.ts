@@ -48,10 +48,19 @@ export type ClassicOpenResult =
 
 export interface ClassicBridge {
   open(dir: string): Promise<ClassicOpenResult>;
+  /**
+   * Persist the sidecar (`.aurora/project.json`). Optional so test fakes that
+   * only exercise open/detect need not implement it; the store treats its
+   * absence as "cannot write" and skips the seed silently.
+   */
+  writeSidecar?(dir: string, bytes: Uint8Array): Promise<void>;
 }
 
 /** The real bridge: FileAccess over IPC → core openProject in the renderer. */
 export const ipcClassicBridge: ClassicBridge = {
+  async writeSidecar(dir: string, bytes: Uint8Array): Promise<void> {
+    await window.api.writeBinaryFile(dir, '.aurora/project.json', bytes.buffer as ArrayBuffer);
+  },
   async open(dir: string): Promise<ClassicOpenResult> {
     ensureAdaptersRegistered();
     const fa = createIpcFileAccess(dir);
