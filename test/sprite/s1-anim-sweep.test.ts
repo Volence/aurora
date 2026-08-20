@@ -3,6 +3,7 @@ import { readFileSync, readdirSync, existsSync } from 'fs';
 import { join } from 'path';
 import { parseS1DisasmAnimScript } from '../../src/core/import/anim-import';
 import type { AnimFrame } from '../../src/core/import/anim-import';
+import { S1_OBJECT_ANIMS } from '../../src/core/project/profiles/s1-object-anims';
 
 // Sweep of parseS1DisasmAnimScript over ALL 48 non-Sonic s1disasm _anim files
 // (the real read-only tree, not fixtures). `_anim/Sonic.asm` is EXCLUDED by
@@ -153,5 +154,27 @@ describe('exemplar: Crabmeat.asm (flip-expression frames)', () => {
     expect(anims[5]).toEqual({
       name: 'walksloperev', duration: 15, frames: [fr(1), fr(3, true), fr(2, true)], control: { kind: 'loop' },
     });
+  });
+});
+
+// --- S1_OBJECT_ANIMS transcription integrity ---------------------------------
+
+describe('S1_OBJECT_ANIMS links resolve against the real tree', () => {
+  const entries = Object.entries(S1_OBJECT_ANIMS);
+
+  it('has a meaningful number of links (badniks + interactives + bosses)', () => {
+    expect(entries.length).toBeGreaterThanOrEqual(45);
+  });
+
+  it.each(entries)('id %s → its animAsm exists and parses to ≥1 animation', (id, link) => {
+    const path = join('/home/volence/sonic_hacks/s1disasm', link.animAsm);
+    expect(existsSync(path), `${link.animAsm} missing on disk`).toBe(true);
+    const { anims, problems } = parseS1DisasmAnimScript(readFileSync(path, 'utf8'));
+    expect(problems, `${link.animAsm}: parse problems`).toEqual([]);
+    expect(anims.length, `${link.animAsm}: zero animations`).toBeGreaterThanOrEqual(1);
+  });
+
+  it('never links _anim/Sonic.asm (different dialect, excluded by design)', () => {
+    for (const [, link] of entries) expect(link.animAsm).not.toBe('_anim/Sonic.asm');
   });
 });
