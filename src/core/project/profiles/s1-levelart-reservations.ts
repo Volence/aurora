@@ -30,11 +30,12 @@
 //   • Supplemental — engine truth the id → art table cannot see (found by
 //     grepping `ArtTile_Level` across s1disasm/_incObj), verified directly
 //     against the disasm source for this module:
-//       - syz: `_maps/SYZ Boss Blocks.asm`, base 0, all frames. Object $76
-//         (id_BossBlock) is spawned by boss $75
-//         (_incObj/"75, 76 Boss - SYZ Main and Blocks.asm") and never placed
-//         in objpos — unlinked in s1-object-art.ts, so the derived pass can
-//         never find it.
+//       - (RETIRED by the boss-sprites sweep) syz `_maps/SYZ Boss Blocks.asm`:
+//         object $76 (id_BossBlock, spawned by boss $75, _incObj/"75, 76 Boss -
+//         SYZ Main and Blocks.asm":753-754) used to need a supplemental entry
+//         because it was unlinked; it is now a syz `lvl()` row in
+//         s1-object-art.ts, so the DERIVED pass finds it (base 0, all frames —
+//         identical tiles to the old supplemental).
 //       - lz (every act) and sbz act 3 only: `_maps/SBZ Stomper and
 //         Door.asm`, base 0x1F0, frame 0 only. Object $6B
 //         (_incObj/"6B SBZ Stomper and Sliding Door.asm") draws
@@ -57,10 +58,6 @@ export interface LevelArtReservationRequest {
   /** Contributing object ids, for messaging and tests. */
   ids: readonly number[];
 }
-
-const SYZ_BOSS_BLOCKS: LevelArtReservationRequest = {
-  mapAsm: '_maps/SYZ Boss Blocks.asm', tileBase: 0, ids: [0x76],
-};
 
 const SBZ_STOMPER_AND_DOOR: LevelArtReservationRequest = {
   mapAsm: '_maps/SBZ Stomper and Door.asm', tileBase: 0x1f0, frames: [0], ids: [0x6b],
@@ -85,7 +82,6 @@ export function levelArtReservationRequests(zone: string, act: number): LevelArt
     });
   }
 
-  if (zone === 'syz') out.push(SYZ_BOSS_BLOCKS);
   if (zone === 'lz' || (zone === 'sbz' && act === 3)) out.push(SBZ_STOMPER_AND_DOOR);
 
   return out;

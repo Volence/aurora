@@ -147,6 +147,46 @@ const BOMB = nem('artnem/Enemy Bomb.nem', '_maps/Bomb Enemy.asm', 0, 0);
 // composes anchor (frame 2) + chain links (frame 1) + platform (frame 0).
 const SWINGING_PLATFORM = nem('artnem/GHZ Swinging Platform.nem', '_maps/Swinging Platforms (GHZ).asm', 0, 2);
 
+// --- Bosses (transcribed from the disasm SOURCE — SonLVL has no boss objdefs) --
+//
+// SonLVL's INIs define NO section for any boss id, so every row below is
+// transcribed from `_incObj` obMap/obGfx writes plus the PLC that loads the art
+// (the same treatment as the MZ $31/$4C and SBZ $6B/$6F rows above). The zone
+// bosses all draw Eggman's shared base art: `Nem_Eggman: binclude "artnem/Boss -
+// Main.nem"` (sonic.asm:4793), queued by `PLC_Boss` (_inc/Pattern Load
+// Cues.asm:285) — ONE shared binclude, not zone-stored, so those ids live in the
+// BASE map and classify zone-free (level-free open), exactly like Ring.
+//
+// MULTI-SOURCE HONESTY: several bosses composite MORE than one art file at
+// runtime; the checkout model supports one `artFile` per row, so each row is the
+// object's OWN slot's primary source and the composite parts are named here:
+//   • Eggman ($3D/$73/$75/$77/$7A): the ship + face sub-slots draw Map_Eggman
+//     frames 0-7 from Nem_Eggman; the exhaust-flame sub-slot's frames 8/11/12
+//     index tile $12A+ — past Nem_Eggman's pool and into Nem_Exhaust
+//     (ArtTile_Eggman_Exhaust equ ArtTile_Eggman+$12A, _Constants.asm:584; PLC_Boss
+//     line 290) — so the flame frames render blank/garbage from the single .nem.
+//   • Wrecking Ball ($48): chain links are a spawned sub-slot on Map_Swing_GHZ /
+//     ArtTile_GHZ_MZ_Swing and the ball itself on Map_GBall / Nem_Ball
+//     (artnem/GHZ Giant Ball.nem via PLC_GHZ2:126) — both beyond the one-file row.
+//   • SLZ Spikeball ($7B): the explosion shrapnel (routine $A) swaps to
+//     Map_BSBall, whose tiles $27/$28 read the Nem_Bomb underlay PLC_Boss loads
+//     UNDER the spikeball art (:288 "gets overwritten" — only the first $12 tiles
+//     are) — a VRAM-layering trick a single-file checkout cannot reproduce.
+//   • SBZ2 Eggman ($82): the spawned switch sub-slot draws Map_But from
+//     Nem_LzSwitch at ArtTile_Eggman_Button-4 (PLC_EggmanSBZ2:434).
+//   • FZ Eggman ($85): SIX slots — exposed Eggman (Map_SEgg/Nem_Sbz2Eggman, the
+//     object's own slot, transcribed below), cockpit cylinder (Map_EggCyl/
+//     Nem_FzBoss), legs (Map_FZLegs, _maps/FZ Eggmobile Legs.asm, from
+//     Nem_FzEggman at ArtTile_FZ_Eggman_Fleeing, PLC_FZBoss:441), and ship+flame
+//     (Map_Eggman/Nem_Eggman).
+//   • FZ Plasma ($86): the launcher is the object's own slot (below); the balls
+//     it spawns (routine 8) draw Map_Plasma at ArtTile_FZ_Boss|Tile_Pal2 → same
+//     Nem_FzBoss file, palette line 1.
+//
+// The shared Eggman ship row (frame 0 = .ship; obGfx = ArtTile_Eggman, no
+// Tile_Pal bits → palette line 0):
+const EGGMAN = nem('artnem/Boss - Main.nem', '_maps/Eggman.asm', 0, 0);
+
 /**
  * The base linkage (from `obj.ini` + the XML / C# defs it references). These
  * apply in EVERY zone unless a per-zone override below redefines the id.
@@ -161,6 +201,50 @@ export const S1_OBJECT_ART_BASE: Readonly<Record<number, ObjectArtLink>> = {
   0x4b: unc('artunc/Giant Ring.unc', '_maps/Giant Ring.asm', 0, 1), // Giant ring (uncompressed, pal 1)
   0x79: nem('artnem/Lamppost.nem', '_maps/Lamppost.asm', 0, 0), // Lamppost
   0x7d: nem('artnem/Hidden Bonuses.nem', '_maps/Hidden Bonuses.asm', 3, 0), // Point bonus (img100 = frame 3)
+
+  // --- Bosses (see the boss provenance block above the EGGMAN const) --------
+  // Zone bosses on Eggman's shared ship art. obMap/obGfx citations, all
+  // `move.l #Map_Eggman,obMap` + `move.w #ArtTile_Eggman,obGfx` (line 0):
+  0x3d: EGGMAN, // GHZ boss — _incObj/3D, 48 Boss - GHZ Main and Wrecking Ball.asm:44-45
+  0x73: EGGMAN, // MZ boss — _incObj/73, 74 Boss - MZ Main and Fire.asm:59-60
+  0x75: EGGMAN, // SYZ boss — _incObj/75, 76 Boss - SYZ Main and Blocks.asm:61-62
+  0x77: EGGMAN, // LZ boss — _incObj/77 Boss - LZ Main.asm:58-59
+  0x7a: EGGMAN, // SLZ boss — _incObj/7A, 7B Boss - SLZ Main and Spike Balls.asm:64-65
+  // Wrecking Ball ($48): own slot = Map_BossItems frame 0 (.chainanchor1) at
+  // ArtTile_Eggman_Weapons, no pal bits → line 0 (_incObj/3D, 48 …:443-444);
+  // art = Nem_Weapons "artnem/Boss - Weapons.nem" (sonic.asm:4795) queued at
+  // that tile by PLC_Boss (:286). Chain + giant ball are multi-source (above).
+  0x48: nem('artnem/Boss - Weapons.nem', '_maps/Boss Items.asm', 0, 0),
+  // SLZ Spikeball ($7B): own slot = Map_SSawBall, obFrame set to 1 (.silver) at
+  // ArtTile_Eggman_Spikeball, no pal bits → line 0 (_incObj/7A, 7B …:534-537);
+  // art = Nem_SlzSpike "artnem/SLZ Little Spikeball.nem" (sonic.asm:4578) queued
+  // there by PLC_Boss (:289, over the Nem_Bomb underlay :288). Shrapnel is
+  // multi-source (above).
+  0x7b: nem('artnem/SLZ Little Spikeball.nem', '_maps/Seesaw Ball.asm', 1, 0),
+  // SBZ2 Eggman cutscene ($82): Map_SEgg + ArtTile_Eggman, no pal bits → line 0
+  // (_incObj/82, 83 SBZ Eggman Cutscene and Crumbling Floor.asm:45-46); art =
+  // Nem_Sbz2Eggman "artnem/Boss - Eggman in SBZ2 & FZ.nem" (sonic.asm:4799),
+  // queued AT ArtTile_Eggman by PLC_EggmanSBZ2 (:433).
+  0x82: nem('artnem/Boss - Eggman in SBZ2 & FZ.nem', '_maps/Eggman - Scrap Brain 2.asm', 0, 0),
+  // Crumbling floor ($83): Map_FFloor + ArtTile_Eggman_Trap_Floor|Tile_Pal3 →
+  // line 2 (_incObj/82, 83 …:237-238); art = Nem_SbzBlock "artnem/SBZ Vanishing
+  // Block.nem" (sonic.asm:4624) queued at that tile by PLC_EggmanSBZ2 (:432).
+  0x83: nem('artnem/SBZ Vanishing Block.nem', "_maps/SBZ Eggman's Crumbling Floor.asm", 0, 2),
+  // FZ cylinder ($84): Map_EggCyl + ArtTile_FZ_Boss, no pal bits → line 0
+  // (_incObj/85,84,86 Boss - FZ Main, Cylinders, and Plasma Balls.asm:770-771);
+  // art = Nem_FzBoss "artnem/Boss - Final Zone.nem" (sonic.asm:4801) queued at
+  // ArtTile_FZ_Boss by PLC_FZBoss (:442).
+  0x84: nem('artnem/Boss - Final Zone.nem', "_maps/FZ Eggman's Cylinders.asm", 0, 0),
+  // FZ Eggman ($85): the object's OWN slot is BossFinal_ObjData row 1 —
+  // Map_SEgg at ArtTile_FZ_Eggman_No_Vehicle, no pal bits → line 0 (_incObj/
+  // 85,84,86 …:39-40 with the table-driven init at :89-93); art = Nem_Sbz2Eggman
+  // queued AT that tile by PLC_FZBoss (:444). The other five slots are the
+  // multi-source composite named above.
+  0x85: nem('artnem/Boss - Eggman in SBZ2 & FZ.nem', '_maps/Eggman - Scrap Brain 2.asm', 0, 0),
+  // FZ plasma launcher ($86): routine 0 = Map_PLaunch + ArtTile_FZ_Boss, no pal
+  // bits → line 0 (_incObj/85,84,86 …:993-994); same Nem_FzBoss file as $84
+  // (Map_PLaunch's .red starts at tile $6E inside it). Balls are multi-source.
+  0x86: nem('artnem/Boss - Final Zone.nem', '_maps/Plasma Ball Launcher.asm', 0, 0),
 };
 
 /**
@@ -232,6 +316,12 @@ export const S1_OBJECT_ART_ZONE: Readonly<Record<string, Readonly<Record<number,
     0x53: nem('artnem/MZ Green Pushable Block.nem', '_maps/Collapsing Floors.asm', 0, 2), // Collapsing floor
     0x55: nem('artnem/Enemy Basaran.nem', '_maps/Basaran.asm', 0, 1), // Basaran
     0x78: CATERKILLER,
+    // Boss fire ($74): Map_Fire + ArtTile_MZ_Fireball, no pal bits → line 0
+    // (_incObj/73, 74 Boss - MZ Main and Fire.asm:546-547). ZONE-scoped, not
+    // zone-free: its art Nem_MzFire "artnem/Fireballs.nem" (sonic.asm:4564) is
+    // queued by the MZ zone cue PLC_MZ (_inc/Pattern Load Cues.asm:173), not by
+    // the shared PLC_Boss list the Eggman rows ride.
+    0x74: nem('artnem/Fireballs.nem', '_maps/Fireballs.asm', 0, 0),
   },
   syz: {
     0x12: lvl('_maps/Light.asm', 1, 0), // Siren Light (objSYZ.ini art=LevelArt frame=1 pal=0)
@@ -246,6 +336,13 @@ export const S1_OBJECT_ART_ZONE: Readonly<Record<string, Readonly<Record<number,
     0x57: nem('artnem/SYZ Small Spikeball.nem', '_maps/Spiked Ball and Chain (SYZ).asm', 0, 0), // Spikeball chain
     0x58: nem('artnem/SYZ Large Spikeball.nem', '_maps/Big Spiked Ball.asm', 0, 0), // Big spiked ball
     0x78: CATERKILLER,
+    // Boss block ($76): Map_BossBlock + ArtTile_Level|Tile_Pal3 → LevelArt,
+    // palette line 2 (_incObj/75, 76 Boss - SYZ Main and Blocks.asm:753-754).
+    // ZONE-scoped by construction: LevelArt draws the ACT's own tile pool, so a
+    // level-free open is impossible. Linking it here lets the DERIVED pass of
+    // s1-levelart-reservations find it (the SYZ_BOSS_BLOCKS supplemental was
+    // retired in the same change).
+    0x76: lvl('_maps/SYZ Boss Blocks.asm', 0, 2),
   },
   lz: LZ_LINKS,
   slz: {

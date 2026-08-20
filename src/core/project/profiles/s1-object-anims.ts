@@ -23,6 +23,22 @@
 //   • Everything else placeable simply has no animation script (static
 //     platforms, blocks, spikes, switches, bridges, …): the engine never calls
 //     AnimateSprite for them, so an empty timeline is the honest state.
+//   • Boss-family ids with NO AnimateSprite call anywhere in their routines —
+//     verified by sweeping each owning `_incObj` file's `lea (Ani_*)` sites and
+//     attributing them to the routine tables that bind them:
+//       $48 Wrecking Ball (the Ani_Eggman sites at "3D, 48 Boss - GHZ Main and
+//         Wrecking Ball.asm":70/:406 are inside $3D's BGHZ_* routines; BossBall
+//         at :420+ drives obFrame directly),
+//       $76 SYZ Boss Block ("75, 76 …":78/:644 are $75's; BossBlock at :727+
+//         has none),
+//       $7B SLZ Boss Spikeball ("7A, 7B …":109/:476 are $7A's; BossSpikeball at
+//         :512+ has none),
+//       $83 SBZ2 Crumbling Floor ("82, 83 …":76 Ani_SEgg is $82's; FalseFloor
+//         at :204+ has none),
+//       $84 FZ Cylinder ("85,84,86 …": EggmanCylinder :737-:965 binds nothing —
+//         the nearby Ani_PLaunch site at :1038 sits inside $86's
+//         BossPlasma_Generator routine, see the $86 row; a previous revision of
+//         this table mis-attributed that site to $84).
 //
 // ZONE SCOPING: none. Unlike art (where SonLVL's per-zone INIs redefine what an
 // id LOOKS like), the anim script is bound to the object's CODE, and S1 has one
@@ -195,9 +211,16 @@ export const S1_OBJECT_ANIMS: Readonly<Record<number, ObjectAnimLink>> = {
   0x7a: anim('_anim/Eggman.asm'), // 2 lea Ani_Eggman ← _incObj/7A, 7B Boss - SLZ Main and Spike Balls.asm
   0x80: anim('_anim/Continue Screen Sonic.asm'), // include + lea Ani_CSon ← _incObj/80, 81 Continue Screen Elements and Sonic.asm
   0x82: anim('_anim/Eggman - Scrap Brain 2 & Final.asm'), // include + lea Ani_SEgg ← _incObj/82, 83 SBZ Eggman Cutscene and Crumbling Floor.asm
-  0x84: anim('_anim/Plasma Ball Launcher.asm'), // lea Ani_PLaunch ← _incObj/85,84,86 Boss - FZ….asm:1038
+  // $84 (FZ Cylinder) is a named EXCLUSION — see the header. The Ani_PLaunch
+  // binding a previous revision recorded here belongs to $86.
   0x85: anim('_anim/FZ Eggman in Ship.asm'), // include + lea Ani_FZEgg ← same FZ boss file ($85 is the ship; it also binds Ani_SEgg for the exposed Eggman)
-  0x86: anim('_anim/Plasma Balls.asm'), // include + lea Ani_Plasma ← same FZ boss file
+  // $86 binds TWO scripts for its two forms: Ani_PLaunch (:1038, inside
+  // BossPlasma_Generator — the launcher, Map_PLaunch, the form the art row
+  // links) and Ani_Plasma (:1123, inside BossPlasma_Balls — the spawned balls
+  // on Map_Plasma, a mapping set the single-link art row cannot show). One
+  // animAsm per id: the LAUNCHER script matches the linked art, so it wins;
+  // the balls' script is the recorded remainder of the composite.
+  0x86: anim('_anim/Plasma Ball Launcher.asm'), // lea Ani_PLaunch ← _incObj/85,84,86 Boss - FZ….asm:1038 (launcher form)
   0x87: anim('_anim/Ending Sequence Sonic.asm'), // include + lea Ani_ESon ← _incObj/87, 88, 89 Ending Sequence Sonic, Emeralds, Logo.asm
   0x8b: anim('_anim/Try Again & End Eggman.asm'), // include + lea Ani_EEgg ← _incObj/8B, 8C Try Again, End Eggman, End Emeralds.asm
 };

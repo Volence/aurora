@@ -84,8 +84,10 @@ describe('buildReservedTileSet', () => {
 
 describe('levelArtReservationRequests — real S1 zone table', () => {
   // Pinned against s1-object-art.ts (verified by reading the real table, not
-  // transcribed blind): every `lvl(...)` link in each zone's map, plus the two
-  // supplemental engine-truth entries the id->art table cannot express.
+  // transcribed blind): every `lvl(...)` link in each zone's map, plus the ONE
+  // remaining supplemental engine-truth entry the id->art table cannot express
+  // (the SBZ3 door; the old SYZ boss-blocks supplemental became a derived
+  // `lvl()` row when the boss sweep linked $76).
   const cases: { zone: string; act: number; paths: string[] }[] = [
     { zone: 'ghz', act: 1, paths: ['_maps/Platforms (GHZ).asm', '_maps/Collapsing Ledge.asm'] },
     { zone: 'mz', act: 1, paths: ['_maps/MZ Large Grassy Platforms.asm', '_maps/MZ Bricks.asm'] },
