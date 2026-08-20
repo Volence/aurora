@@ -27,7 +27,9 @@ import { spawn } from 'node:child_process';
 import { join } from 'node:path';
 import { existsSync } from 'node:fs';
 import type { AetherClient } from './client';
-import { buildPlanFor, summariseBuildOutput, type BuildPlan } from '../../core/aether/build-plan';
+import {
+  buildPlanFor, summariseBuildOutput, type BuildPlan, type BuildProjectType,
+} from '../../core/aether/build-plan';
 import { warpTo } from './warp';
 import { bootRestoreTo } from './boot-restore';
 
@@ -80,6 +82,16 @@ export interface BuildRunResult {
 export interface BuildRunOptions {
   basePath: string;
   raw?: Record<string, unknown>;
+  /**
+   * Engine family of the OPEN PROJECT (default 'aeon'). Classic differs in
+   * three ways, each measured against s1disasm rather than assumed: no DEBUG
+   * flavour exists (build.lua takes no switch, there is no s1built.debug.bin),
+   * the listing is named after the source (`sonic.lst`) so it must never be
+   * derived from the ROM stem, and there is no position restore — S1 has no
+   * boot override and no warp mailbox, so v1 is an honest clean boot
+   * (`restoredVia` absent), not a poke at a running machine.
+   */
+  projectType?: BuildProjectType;
   env?: Record<string, string | undefined>;
   /** Null when nothing is connected — the build still runs and simply doesn't reload. */
   client: AetherClient | null;
@@ -132,9 +144,11 @@ export async function runBuild(opts: BuildRunOptions): Promise<BuildRunResult> {
   const plan = buildPlanFor({
     basePath: opts.basePath,
     raw: opts.raw,
+    projectType: opts.projectType,
     env: opts.env ?? process.env,
     exists: (rel) => existsSync(join(opts.basePath, rel)),
   });
+  const classic = plan.projectType === 'classic';
 
   // DEBUG IS THE DEFAULT (owner's call, 2026-08-19). Someone driving a build
   // from the editor is developing, and the debug ROM is the one carrying the
@@ -149,13 +163,20 @@ export async function runBuild(opts: BuildRunOptions): Promise<BuildRunResult> {
   //
   // An explicit `buildEnv.DEBUG` in project.json beats both: stated config
   // outranks anything inferred. A UI toggle is the natural next step.
-  const explicitDebug = plan.envOverrides.DEBUG;
-  const wantsDebug = explicitDebug !== undefined
-    ? explicitDebug === '1'
-    : runningRom !== null
-      ? runningRom.endsWith('.debug.bin')
-      : true;
-  plan.envOverrides.DEBUG = wantsDebug ? '1' : '0';
+  //
+  // AEON ONLY. Classic has no flavour at all — `build.lua` takes no switch and
+  // emits one artifact — so forcing DEBUG into its env would be noise and
+  // reporting `debugBuild` would claim a distinction that does not exist there.
+  let wantsDebug: boolean | undefined;
+  if (!classic) {
+    const explicitDebug = plan.envOverrides.DEBUG;
+    wantsDebug = explicitDebug !== undefined
+      ? explicitDebug === '1'
+      : runningRom !== null
+        ? runningRom.endsWith('.debug.bin')
+        : true;
+    plan.envOverrides.DEBUG = wantsDebug ? '1' : '0';
+  }
 
   let output = '';
 
@@ -243,10 +264,18 @@ export async function runBuild(opts: BuildRunOptions): Promise<BuildRunResult> {
           // asked rather than assumed. The listing is derived from it, which
           // keeps `s4.bin`/`s4.lst` and `s4.debug.bin`/`s4.debug.lst` paired
           // without a second config field to get out of step.
+          // …EXCEPT when the project DECLARED a listing path, or is classic.
+          // The stem swap encodes an aeon convention (s4.debug.bin pairs with
+          // s4.debug.lst); AS names its listing after the SOURCE file, so
+          // s1built.bin's listing is sonic.lst and the derivation would hand
+          // load_symbols a file that does not exist. Stated config outranks
+          // anything inferred.
           const romPath = runningRom ?? join(plan.cwd, plan.romPath);
-          const symbolsPath = romPath.endsWith('.bin')
-            ? `${romPath.slice(0, -4)}.lst`
-            : join(plan.cwd, plan.symbolsPath);
+          const symbolsPath = (plan.symbolsDeclared || classic)
+            ? join(plan.cwd, plan.symbolsPath)
+            : romPath.endsWith('.bin')
+              ? `${romPath.slice(0, -4)}.lst`
+              : join(plan.cwd, plan.symbolsPath);
 
           // `reload_rom` is require_paused (engine.rs:2202) — the same gate as
           // write_memory, and it was missed here exactly as it was missed in the
@@ -259,8 +288,15 @@ export async function runBuild(opts: BuildRunOptions): Promise<BuildRunResult> {
           // your place in the level every time — you rebuild to check one chunk
           // and land back at the act start. Read now, restore after boot, and
           // the whole thing reads as a refresh rather than a restart.
+          //
+          // CLASSIC: NO RESTORE, BY DESIGN. S1 has no boot-position override
+          // and no warp mailbox, so the only way to "restore" would be poking
+          // v_player on a running machine — which is link 4's unmeasured
+          // spike, not this parcel. The reload boots clean and the result
+          // reports it honestly: `restoredVia` absent, exactly the shape a
+          // release aeon ROM (no mailbox symbols) already produces.
           let restoreTo: { x: number; y: number } | null = null;
-          if (opts.restorePosition !== false) {
+          if (!classic && opts.restorePosition !== false) {
             try {
               const player = await opts.client.resolve('Player_1');
               const rd = async (addr: number): Promise<number> => {
