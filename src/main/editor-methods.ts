@@ -219,6 +219,52 @@ export const EDITOR_METHODS: EditorMethod[] = [
   // NO `paletteResolution` HERE. The sheet is mapped onto the act's own palette
   // before it is planned, so it cannot drift, so the option could never change
   // an outcome — see the kind's own comment in shared/agent-protocol.ts.
+  // ---- The playtest loop (§4.8). Same code paths as the UI drives ----------
+  //
+  // The art line shipped UI-only and had to be retrofitted; this phase does not
+  // repeat that. One EDITOR_METHODS entry lights a capability up on BOTH MCP and
+  // Aether, so agent parity is a property of adding it here, not a second task.
+  { name: 'aether_status', kind: 'aether-status', result: 'json', params: {},
+    description: 'Is Aurora connected to a running emulator, and what can it do there? '
+      + 'Reports connection state, the server, whether live palette is available (both '
+      + 'Pal_Base symbols resolved) and the last push error. Read this before assuming a '
+      + 'push or warp will land.' },
+
+  { name: 'aether_connect', kind: 'aether-connect', result: 'json',
+    params: {
+      connect: z.boolean().optional()
+        .describe('true (default) connects, false disconnects'),
+    },
+    description: 'Connect Aurora to the running emulator over the Aether bus, or disconnect. '
+      + 'Connecting is always explicit — Aurora never opens the socket on its own.' },
+
+  { name: 'push_palette', kind: 'aether-push-palette', result: 'json',
+    params: {
+      // LINE 0 IS REFUSED AND THE RANGE SAYS SO. Pal_Base covers lines 1-3; line
+      // 0 is the character palette and the engine never writes it, so an agent
+      // that guessed 0 would get a refusal with no way to know why from the
+      // schema alone.
+      line: z.number().int().min(1).max(3)
+        .describe('palette line 1-3 (line 0 is the character palette; the engine owns it)'),
+    },
+    description: 'Push a zone palette line to the RUNNING game, so it recolours without a '
+      + 'rebuild. Writes the editor\'s current colours for that line — edit the palette '
+      + 'first, then push. Not persisted: a rebuild or a section crossing restores ROM colours.' },
+
+  { name: 'warp', kind: 'aether-warp', result: 'json',
+    params: {
+      x: z.number().int().min(0).describe('destination x in act-world PIXELS'),
+      y: z.number().int().min(0).describe('destination y in act-world PIXELS'),
+    },
+    description: 'Warp the running game to a point in the act (play-from-cursor). '
+      + 'Reports where the player LANDED — the engine clamps to act bounds and the answer '
+      + 'may differ from the request. Needs a DEBUG build; a release ROM has no warp mailbox.' },
+
+  { name: 'build_and_run', kind: 'aether-build-run', result: 'json', params: {},
+    description: 'Save, re-bake the level data, build the ROM, reload the emulator and put the '
+      + 'player back where they were. The one call that makes an edit real. Reports the '
+      + 'build output on failure and does NOT reload a failed build.' },
+
   { name: 'import_art_sheet', kind: 'classic-import-art-sheet', result: 'json',
     params: {
       path: z.string().min(1).describe('absolute path to an INDEXED (paletted) PNG'),

@@ -1,4 +1,6 @@
 import { useProjectStore, getCurrentZone, getCurrentAct, getActiveLevel } from '../state/projectStore';
+import { useAetherStore } from '../state/aetherStore';
+import { saveAllDirty } from '../state/project-runtime';
 import { useEditorStore, executeAmbientCommand } from '../state/editorStore';
 import { useViewStore } from '../state/viewStore';
 import type { S4Level, SetTilesCommand } from '../../core/editing/commands';
@@ -917,6 +919,73 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
         canvasPalette: res.sheet.palette,
         ...opts,
       });
+    }
+
+    // ---- The playtest loop. These drive the SAME store actions the UI does,
+    // deliberately: an agent and a person pressing the key must not be able to
+    // diverge, and the store is where the gating, throttling and pause handling
+    // already live.
+    case 'aether-status': {
+      const s = useAetherStore.getState();
+      return {
+        status: s.status,
+        server: s.serverName ?? null,
+        // Both Pal_Base symbols resolved — i.e. a palette push can actually land.
+        palettePushAvailable: s.palette,
+        building: s.buildState === 'building',
+        lastBuild: s.buildSummary ?? null,
+        error: s.error ?? null,
+        lastPushError: s.pushError ?? null,
+      };
+    }
+
+    case 'aether-connect': {
+      const s = useAetherStore.getState();
+      if (req.connect === false) { await s.disconnect(); }
+      else { await s.connect(); }
+      const now = useAetherStore.getState();
+      return { status: now.status, server: now.serverName ?? null, error: now.error ?? null };
+    }
+
+    case 'aether-push-palette': {
+      const ctx = requireProject();
+      const colors = ctx.zone.palette.lines[req.line]?.colors;
+      if (!colors) throw new Error(`palette line ${req.line} does not exist in this zone`);
+      const s = useAetherStore.getState();
+      if (s.status !== 'connected') {
+        return { pushed: false, reason: 'not connected to an emulator' };
+      }
+      if (!s.palette) {
+        return { pushed: false, reason: 'this ROM has no Pal_Base symbols — live palette is unavailable' };
+      }
+      s.pushPaletteLine(req.line, colors.map(encodeGenesisColor));
+      // The store COALESCES pushes, so this reports that the push was accepted,
+      // not that bytes have landed. Saying "pushed: true" would be a lie about
+      // an operation that is still queued.
+      return { pushed: true, line: req.line, note: 'queued; the store coalesces pushes at ~10Hz' };
+    }
+
+    case 'aether-warp': {
+      const msg = await useAetherStore.getState().warp(req.x, req.y);
+      if (msg === null) return { warped: false, reason: 'not connected to an emulator' };
+      return { warped: msg.startsWith('Warped'), detail: msg };
+    }
+
+    case 'aether-build-run': {
+      const cfg = useProjectStore.getState().config;
+      if (!cfg) throw new Error('build_and_run needs an aeon project open');
+      await saveAllDirty();
+      const s = useAetherStore.getState();
+      await s.build(cfg.basePath, cfg.raw as unknown as Record<string, unknown>);
+      const after = useAetherStore.getState();
+      return {
+        ok: after.buildState === 'ok',
+        summary: after.buildSummary,
+        // The output is the point on failure — an agent that only learns "it
+        // failed" cannot fix the document that caused it.
+        output: after.buildState === 'failed' ? after.buildOutput : undefined,
+        missingEnv: after.buildMissingEnv.length ? after.buildMissingEnv : undefined,
+      };
     }
 
     default: {

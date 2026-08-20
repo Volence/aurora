@@ -107,6 +107,21 @@ commands do, so an agent never loops single-cell calls.
 | `commit_canvas`\* | `{ name, targets?, paletteResolution?, collision?, dryRun? }` | Commits a saved canvas (under `.aurora/canvas`) into the open act: cut to tiles/blocks/chunks, dedupe, reclaim, write. Reply carries the full commit report plus the 1-based ENGINE ids of any appended chunks (pass those to `set_layout_region`). `paletteResolution` says what to do when the canvas draws with colours the act does not have — default `none` refuses and reports them, `use-act-colours` re-indexes onto the nearest act colours, `adopt-into-zone` writes them into the ZONE palette (every act sharing that palette file displays them); line 0 is never written by either. A refusal returns `ok:false` with a message, a resolution, and which `paletteResolution` values would unblock it. Also returns `warnings` from loading the canvas — an unreadable sidecar means the canvas was treated as unconstrained. |
 | `import_art_sheet`\* | `{ path, targets?, collision?, dryRun? }` | Same commit from an INDEXED (paletted) PNG made elsewhere, mapped onto the open act's palette first. No size cap (unlike a canvas). Reply is `commit_canvas`'s; the refusals are a NARROWER set (no palette-drift, palette-unmappable or cell-clash, and so no `paletteResolution` to pass) plus two import-only ones: a colour the act does not have, and an 8×8 cell mixing colours from two palette lines — for that one, adding the missing colour to the zone palette only helps if it goes on the LINE the cell already uses. |
 
+## The playtest loop (aeon)
+
+These drive a RUNNING emulator over the Aether bus, through the same store
+actions the UI drives — an agent and a person pressing the key cannot diverge.
+All five no-op gracefully when nothing is connected; none of them connects on
+its own.
+
+| Tool | Params | Notes |
+|---|---|---|
+| `aether_status` | `{}` | Connection state, the server, whether live palette can land (both `Pal_Base` symbols resolved), build state, last errors. **Read this before assuming a push or warp will do anything.** |
+| `aether_connect` | `{ connect? }` | Connect (default) or disconnect. Connecting is always explicit — Aurora never opens the socket by itself. |
+| `push_palette` | `{ line }` | Pushes the editor's current colours for zone palette **line 1–3** to the running game, which recolours without a rebuild. Line 0 is the character palette and the engine owns it, so the schema excludes it. Reports `pushed: true` when the push is ACCEPTED — the store coalesces at ~10Hz, so bytes may still be queued. Not persisted: a rebuild or a section crossing restores ROM colours. |
+| `warp` | `{ x, y }` | Play-from-cursor, in act-world PIXELS. Reports where the player **landed** — the engine clamps to act bounds, so the answer can differ from the request. Needs a DEBUG build; a release ROM has no warp mailbox and the tool says so. |
+| `build_and_run` | `{}` | Save → re-bake level data → build → reload the emulator → put the player back where they were. The one call that makes an edit real. A FAILED build does not reload (the ROM on disk is the previous one) and returns its error output, because an agent that only learns "it failed" cannot fix the document that caused it. |
+
 `commit_canvas`, `import_art_sheet` and `set_block_collision` return a refusal
 in the RESULT as `ok:false` with a human-facing sentence and a `resolution`, not
 as a protocol error — a refusal is a decision the caller can act on, not a

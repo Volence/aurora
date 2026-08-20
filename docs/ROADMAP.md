@@ -260,6 +260,46 @@ campaign landed (`de7fb4e`, `780d311`), the micro type tier `2xs: 10px/14px` lan
 (`3a129f5`), and three findings were REFUTED and recorded so they are not re-found. Its §7
 *direction* items are the open list in §5.1.
 
+## 2.7 P2 delivered — the playtest loop (2026-08-19)
+
+**Status: SHIPPED.** Aurora is now Aether's first outbound client, which the
+2026-07-01 suite audit named as the whole suite's keystone gap. Aeon-first, not
+classic-first as the lens sweep recommended — that advice predated the switch to
+`oracle-next`, and aeon's path was measurably working while classic's had two
+unverified links (see §4.8's corrections block).
+
+Health: 3383 passed / 3 skipped, `tsc` clean.
+
+- **Client** (`src/main/aether/client.ts`) — unix socket, NDJSON JSON-RPC,
+  four-step socket-path resolution, symbol resolution with a cache dropped on
+  `romReloaded`. **The handshake is two messages**: `initialize` advertising
+  `events: true`, then an `initialized` notification. Subscription happens on the
+  second; a client sending only the first gets a healthy connection that silently
+  never receives an event.
+- **Live palette** — writes `Pal_Base` (96 bytes, **lines 1–3 only**) then sets
+  `Pal_Base_Dirty`, payload-then-flag. NOT a `write_cram`: both engines rebuild
+  CRAM from a RAM source every frame, so a CRAM write is a one-frame flash. Proven
+  end to end by a harness driving the real app, with an independent observer client
+  reading `Palette_Buffer` out of the machine.
+- **Play-from-cursor** (F7) — through aeon's `Warp_Req_*` mailbox rather than a
+  camera poke. Measured: a bare poke leaves 19/1120 visible-window nametable words
+  wrong at +30f; the mailbox leaves 0. DEBUG-shape only, so a release ROM greys it
+  out.
+- **Build & Run** (Ctrl+Shift+B — Ctrl+B was already the Explorer) — save →
+  `FAST=1 ./build.sh` → reload the ROM the emulator is actually running → restore
+  the player's position. The panel opens on start and closes on success; errors are
+  pulled to the top of its output.
+- **Agent surface** — five `EDITOR_METHODS` entries, so all of it is live on MCP
+  and Aether at once. The art line had to be retrofitted for this; this phase did
+  not repeat that.
+
+**Loop cost, attributed** (the interesting number was never the build): re-bake
+7–12s · build 1.3s · position restore 1.5s · reload 64ms · save ~0. Aeon has an
+incremental content-addressed re-bake in flight targeting <2s. Aurora's own
+contribution to the wall was a save that rewrote every file whether it had changed
+or not, which bumped ~40 mtimes and marked aeon's level tree stale on **every**
+build — fixed by comparing before writing.
+
 ## 3. The domain map
 
 Where each art domain stands and where it goes. ★ = new capability, ☆ = upgrade.
@@ -499,7 +539,7 @@ what is actually being built. **P2 — the playtest loop — is next.**
 
 | # | Work | Size | Source |
 |---|---|---|---|
-| 1 | **The playtest loop (= P2, §4.8)** — Aether outbound client, then A1 palette→CRAM, A3 Build & Run, A2 play-from-cursor. Classic-first, then the aeon client. | M | sweep §7.2, `SUITE_PLAN_AUDIT_2026-07-01.md` §3.1 |
+| 1 | ~~The playtest loop (= P2, §4.8)~~ — **DELIVERED 2026-08-19, aeon-first.** Client core, live palette, play-from-cursor and Build & Run all ship, with the agent surface (`aether_status`, `aether_connect`, `push_palette`, `warp`, `build_and_run`). See §2.7. | M | sweep §7.2, `SUITE_PLAN_AUDIT_2026-07-01.md` §3.1 |
 | 2 | ~~Retire the dead export path~~ — **DONE 2026-08-19**, see §4.2 | S | sweep §7.6 |
 | 3 | ~~`docs/ART_SUITE.md` teaches a deleted UI~~ — **DONE 2026-08-19**, rewritten, not deleted. Measured section by section first: the mechanics core (presets, brush spaces, tools, flip keys, edit-in-place, save/dedup flows, palette editor, atlas note) was still true against source and is kept; the Toolbar navigation, the "separate classic surface" section and the shared-stack undo claim were false and are replaced with the facet-pill shell, the five classic facets, and per-document undo; paint-through, the origination canvas, resolve-and-commit and the 36-tool agent registry are now covered with spec pointers. | XS | sweep §7.5 |
 | 4 | ~~Annotate the 2C spec header~~ — **DONE 2026-08-19.** Re-measured first: `CommitReport.warnings` is fed by exactly two pushes (shared-palette file, engine chunk $51), so none of D2b's three reaches is reported. Header now reads "BUILT — EXCEPT §D2b". | XS | sweep §7.3 |
@@ -519,7 +559,7 @@ don't re-find it), and the sweep's three REFUTED findings (§6 of the review).
 |---|---|---|---|
 | **P0** | Doc hygiene: apply PLAN_AUDIT (status banners, naming pass, README); annotate vision-doc entries superseded by design-week specs | none | **PARTLY DONE** — this revision closes the ROADMAP half; §5.1 items 3–5 are the rest |
 | **P1** | Design #6 collision-in-chunks + retirements; in-viewport object/ring placement; section/act properties inspector; act/zone wizard; export realignment (retire vram-coloring path, budget → act-pool math) | none | **PARTLY DONE, and re-cut.** Classic collision authoring shipped (§2.6 C) — but that is *classic*, not aeon design #6; classic object place/move/delete shipped (§2.5); the export **retirement** is done (§4.2, 2026-08-19). Still open: **aeon** design #6, the section/act properties inspector, the act/zone wizard, and the budget readout's act-pool math (the retirement removed the old path; it did not build the new count) |
-| **P2** | Aether outbound client + A1 palette→CRAM + A3 Build & Run + A2 warp | Oracle running (exists) | **NEXT** |
+| **P2** | Aether outbound client + A1 palette→CRAM + A3 Build & Run + A2 warp | Oracle running (exists) | ✅ **DONE 2026-08-19** — see §2.7 |
 | **P3** | Sprite export spine (decompose → mappings → DPLC) + animation authoring timeline w/ event tags + object-art previews in map | none | open. Note object-art previews already exist for **classic** (§2.5 v1.1 B1) |
 | **P4** | Screen mode (design #7 Aurora half) | aeon #7 tasks 1–4 (interpreter + `screens_gen.py`) | open, engine-gated |
 | **P5** | Raster mode + live preview (design #8 Aurora half) | aeon #8 tasks 1–4; P2's client | open, engine-gated |

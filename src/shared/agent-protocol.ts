@@ -71,6 +71,12 @@ export type AgentRequest =
   // agent should not have to know the zone's colind table length to ask for
   // flat collision — the handler sources that from the open act (see
   // commitPixels, which turns the flag into { colindLength }).
+  // ---- The playtest loop (§4.8) --------------------------------------------
+  | { kind: 'aether-status' }
+  | { kind: 'aether-connect'; connect?: boolean }
+  | { kind: 'aether-push-palette'; line: number }
+  | { kind: 'aether-warp'; x: number; y: number }
+  | { kind: 'aether-build-run' }
   | { kind: 'classic-commit-canvas'; name: string; targets?: { chunkFileIndex: number | null }[];
       paletteResolution?: 'none' | 'use-act-colours' | 'adopt-into-zone';
       collision?: boolean; dryRun?: boolean }
