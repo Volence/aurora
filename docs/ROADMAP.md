@@ -372,7 +372,7 @@ Where each art domain stands and where it goes. ★ = new capability, ☆ = upgr
 | Level art (tiles/chunks) | Mature; **authoring shipped** — paint-through, origination canvas, resolve-and-commit (§2.6 B) | ☆ export realignment to act-pool pipeline; VRAM budget v2 | §4.2 | P1/P6 |
 | Collision | Mature (aeon map paint); **classic authoring shipped** — Collision facet, gestures, committed art gets collision (§2.6 C) | ☆ chunk-carried collision (design #6, **aeon**) | aeon spec #6 | P1 |
 | Sprite art | Mature (draw/read) | ☆ finish the S4 export spine (decompose→mappings→DPLC→anim) | `plans/2026-06-17-sprite-*.md` | P3 |
-| Animation | Playback only | ★ authoring timeline + event tags | `specs/2026-07-03-animation-authoring-design.md` | P3 |
+| Animation | Playback only; **S1 `_anim` scripts auto-load** into the timeline on object art checkout, flips included (Parcel 1, 2026-08-20 — `docs/reviews/2026-08-20-s1-animation-audit.md`) | ★ authoring timeline + event tags | `specs/2026-07-03-animation-authoring-design.md` | P3 |
 | Screens/menus/HUD | Nothing | ★ Screen mode (design #7) | aeon spec #7 | P4 |
 | Parallax/raster | Config path in project.json only | ★ Raster mode + live preview (design #8) | aeon spec #8 | P5 |
 | Object behaviors | Static JSON placement | ★ properties panel + behavior picker (design #9) | aeon spec #9 | P6 |

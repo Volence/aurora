@@ -1,5 +1,15 @@
 # S1 animation audit — measurement report (2026-08-20)
 
+> **Parcel 1 delivered 2026-08-20** (branch `feat/s1-anim-loader`): `parseS1DisasmAnimScript`
+> (dialect of §1.2, nothing silently dropped — a named `problems[]` instead), the per-frame
+> flip channel (`AnimFrame {index,xFlip,yFlip}` through `AnimStepUI` to the timeline blit),
+> the transcribed `S1_OBJECT_ANIMS` table (54 ids; named exclusions: Sonic $01 per §1.4,
+> Caterkiller $78 — `Ani_Cat` is inline in `_incObj/78`, not an `_anim` file), and auto-load
+> via `editObjectArtCheckout` into the shipped timeline. Sweep-tested against all 48
+> non-Sonic `_anim` files with offset-table-derived expectations (48/48, zero problems);
+> CDP harness `scratchpad/s1-anim-harness.mjs` 4/4 (Crabmeat plays with flips; Bridge is
+> empty-but-honest). §1.4's Sonic rotation TAG and the §5 UNVERIFIED items stand.
+
 **Question:** Aurora opens `s1disasm` as a project but does not recognize animations. What exists on both sides, and what is the smallest parcel that ships S1 animation support?
 
 **Method:** read-only transcription from `/home/volence/sonic_hacks/s1disasm` (format + interpreter), grep/read inventory of Aurora `src/core` + `src/renderer`, and one empirical probe: Aurora's existing animation parsers run under vitest against five real `_anim/*.asm` files (probe deleted after the run, output transcribed in §2.3).
