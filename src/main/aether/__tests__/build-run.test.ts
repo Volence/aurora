@@ -400,3 +400,212 @@ describe('runBuild and the FAST shape', () => {
     } finally { rmSync(dir, { recursive: true, force: true }); }
   });
 });
+
+describe('runBuild and the position restore (boot override + warp fallback)', () => {
+  /**
+   * A model of the engine's contract rather than an accept-anything recorder
+   * (the sequencing details have their own suite in boot-restore.test.ts —
+   * this one is about how runBuild WIRES the restore into the reload):
+   *
+   *  - run_to the init simulates the boot, which ZEROES work RAM — so a
+   *    runBuild that regressed to writing before/without run_to fails here.
+   *  - the init consumes Boot_At_* single-shot: clamp to the fixture bounds,
+   *    publish the CLAMPED pair back, clear the flag as the ack.
+   *  - the warp mailbox is consumed while the game RUNS (modelled as: time
+   *    passes on any read of a running machine), same clamp/publish/ack.
+   *  - write_memory / run_to / run_frames are require_paused, as on the real
+   *    server (oracle-aether engine.rs:1401/1290/1263).
+   */
+  const RSYM: Record<string, number> = {
+    Player_1: 0xffb000,
+    Boot_At_X: 0xffe508, Boot_At_Y: 0xffe50a, Boot_At_Flag: 0xffe50c,
+    Warp_Req_X: 0xffe502, Warp_Req_Y: 0xffe504, Warp_Req_Flag: 0xffe506,
+    GameState_OJZScroll_Init: 0xa1724,
+  };
+  const R_BOUND_X = 0x0900, R_BOUND_Y = 0x0700;
+  const rHex = (n: number) => '0x' + (n >>> 0).toString(16).toUpperCase();
+
+  function restoreFake(opts: {
+    /** Player pixel position seeded into RAM before the build (16.16 fixed). */
+    playerAt: { x: number; y: number };
+    /** Which symbols this ROM carries (default: all of RSYM). */
+    symbols?: Record<string, number>;
+    running?: boolean;
+  }) {
+    const symbols = opts.symbols ?? RSYM;
+    const ram = new Map<number, number>();
+    const log: string[] = [];
+    let running = opts.running ?? true;
+    let booted = false, initConsumed = false;
+
+    const rd = (a: number) => ram.get(a) ?? 0;
+    const wrWord = (a: number, v: number) => { ram.set(a, (v >> 8) & 0xff); ram.set(a + 1, v & 0xff); };
+    const rdWord = (a: number) => (rd(a) << 8) | rd(a + 1);
+    // Seed the player's 16.16 position: high word = whole pixels. The .8000
+    // subpixel is there so a restore of the LOW word would be caught.
+    const seed = (off: number, px: number) => { wrWord(symbols.Player_1 + off, px); wrWord(symbols.Player_1 + off + 2, 0x8000); };
+    seed(0x02, opts.playerAt.x);
+    seed(0x06, opts.playerAt.y);
+
+    const consume = (xs: string, ys: string, fs: string, once: boolean) => {
+      if (once && initConsumed) return;
+      if (once) initConsumed = true;
+      if (rd(symbols[fs]) !== 0) {
+        wrWord(symbols[xs], Math.min(rdWord(symbols[xs]), R_BOUND_X));
+        wrWord(symbols[ys], Math.min(rdWord(symbols[ys]), R_BOUND_Y));
+        ram.set(symbols[fs], 0);
+      }
+    };
+    const tick = () => {
+      if (booted) consume('Boot_At_X', 'Boot_At_Y', 'Boot_At_Flag', true);
+      if (symbols.Warp_Req_Flag !== undefined) consume('Warp_Req_X', 'Warp_Req_Y', 'Warp_Req_Flag', false);
+    };
+
+    const client = {
+      log,
+      status: 'connected' as const,
+      resolve: async (name: string): Promise<number> => {
+        const a = symbols[name];
+        if (a === undefined) throw new Error(`symbol ${name} did not resolve`);
+        return a;
+      },
+      loadSymbols: async (path: string) => { log.push(`load_symbols:${path}`); return {}; },
+      call: async (method: string, params?: Record<string, unknown>): Promise<unknown> => {
+        log.push(`${method}:${params?.symbol ?? params?.addr ?? params?.path ?? ''}`);
+        const requirePaused = () => {
+          if (running) throw new Error(`${method} needs the machine paused; call emulator/pause first`);
+        };
+        switch (method) {
+          case 'emulator/status': return { romPath: '/engine/s4.debug.bin' };
+          case 'emulator/pause': { const was = running; running = false; return { wasRunning: was }; }
+          case 'emulator/resume': running = true; tick(); return {};
+          case 'emulator/reload_rom': requirePaused(); return {};
+          case 'emulator/run_to': requirePaused(); ram.clear(); booted = true; return { reached: true };
+          case 'emulator/run_frames': requirePaused(); tick(); return {};
+          case 'emulator/write_memory': {
+            requirePaused();
+            const addr = Number(params!.addr);
+            const h = String(params!.bytes).replace(/^0x/i, '');
+            for (let i = 0; i < h.length / 2; i++) ram.set(addr + i, Number.parseInt(h.slice(i * 2, i * 2 + 2), 16));
+            return {};
+          }
+          case 'emulator/read_memory': {
+            if (running) tick(); // time passes on a running machine
+            const addr = Number(params!.addr), len = Number(params!.len ?? 1);
+            let h = '';
+            for (let i = 0; i < len; i++) h += rd(addr + i).toString(16).padStart(2, '0');
+            return { bytes: '0x' + h };
+          }
+          default: return {};
+        }
+      },
+    };
+    return { client, log, isRunning: () => running };
+  }
+
+  it('restores via the boot override, inside the pre-resume window', async () => {
+    const dir = scriptDir('exit 0');
+    const at = { x: 0x0234, y: 0x0567 }; // within the fixture bounds
+    const f = restoreFake({ playerAt: at });
+    try {
+      const r = await runBuild({ basePath: dir, client: f.client as never, env: {} });
+      expect(r.reloaded).toBe(true);
+      expect(r.restoredVia).toBe('boot-override');
+      // In bounds, so the engine publishes back exactly the saved pixels.
+      expect(r.restoredTo).toEqual(at);
+
+      // THE WINDOW: pause -> reload -> symbols -> run_to -> X -> Y -> flag
+      // LAST -> resume. Derived from the fixture's own address table.
+      const i = (needle: string) => f.log.findIndex((c) => c.startsWith(needle));
+      const order = [
+        i('emulator/pause'),
+        i('emulator/reload_rom:'),
+        i('load_symbols:'),
+        i('emulator/run_to:'),
+        i(`emulator/write_memory:${rHex(RSYM.Boot_At_X)}`),
+        i(`emulator/write_memory:${rHex(RSYM.Boot_At_Y)}`),
+        i(`emulator/write_memory:${rHex(RSYM.Boot_At_Flag)}`),
+        i('emulator/resume'),
+      ];
+      for (const idx of order) expect(idx).toBeGreaterThanOrEqual(0);
+      expect([...order].sort((a, b) => a - b)).toEqual(order);
+      // Exactly one resume: the restore's own continue. A second one would be
+      // runBuild resuming a machine its restore already resumed.
+      expect(f.log.filter((c) => c.startsWith('emulator/resume')).length).toBe(1);
+      // And no warp fallback ran.
+      expect(i(`emulator/write_memory:${rHex(RSYM.Warp_Req_Flag)}`)).toBe(-1);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it('surfaces where the engine says the player LANDED, not what was asked', async () => {
+    const dir = scriptDir('exit 0');
+    // Saved position beyond the fixture bounds -> the engine clamps and
+    // publishes back; the expectation is computed with the same Math.min.
+    const at = { x: R_BOUND_X + 0x100, y: R_BOUND_Y + 0x80 };
+    const f = restoreFake({ playerAt: at });
+    try {
+      const r = await runBuild({ basePath: dir, client: f.client as never, env: {} });
+      expect(r.restoredVia).toBe('boot-override');
+      expect(r.restoredTo).toEqual({ x: Math.min(at.x, R_BOUND_X), y: Math.min(at.y, R_BOUND_Y) });
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it('falls back to the warp mailbox on a DEBUG ROM that predates the override', async () => {
+    const dir = scriptDir('exit 0');
+    const at = { x: 0x0234, y: 0x0567 };
+    const noBoot = Object.fromEntries(Object.entries(RSYM)
+      .filter(([k]) => !k.startsWith('Boot_At_')));
+    const f = restoreFake({ playerAt: at, symbols: noBoot });
+    try {
+      const r = await runBuild({ basePath: dir, client: f.client as never, env: {} });
+      expect(r.reloaded).toBe(true);
+      expect(r.restoredVia).toBe('warp');
+      expect(r.restoredTo).toEqual(at); // warpTo's landed — published back by the engine
+      // The boot path gated off BEFORE advancing the machine: no run_to.
+      expect(f.log.some((c) => c.startsWith('emulator/run_to'))).toBe(false);
+      // And runBuild resumed the machine itself (the fallback needs a booting
+      // game, and the restore never got as far as resuming).
+      expect(f.log.some((c) => c.startsWith('emulator/resume'))).toBe(true);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it('restores nothing, and still succeeds, when NEITHER mailbox exists (release ROM)', async () => {
+    const dir = scriptDir('exit 0');
+    const f = restoreFake({
+      playerAt: { x: 0x0100, y: 0x0100 },
+      symbols: { Player_1: RSYM.Player_1 }, // position readable; no mailboxes
+    });
+    try {
+      const r = await runBuild({ basePath: dir, client: f.client as never, env: {} });
+      expect(r.ok).toBe(true);
+      expect(r.reloaded).toBe(true);
+      expect(r.restoredTo).toBeUndefined();
+      expect(r.restoredVia).toBeUndefined();
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it('leaves a machine somebody else stopped STOPPED, and still restores', async () => {
+    const dir = scriptDir('exit 0');
+    const at = { x: 0x0234, y: 0x0567 };
+    const f = restoreFake({ playerAt: at, running: false });
+    try {
+      const r = await runBuild({ basePath: dir, client: f.client as never, env: {} });
+      expect(r.restoredVia).toBe('boot-override');
+      expect(r.restoredTo).toEqual(at);
+      expect(f.log.some((c) => c.startsWith('emulator/resume'))).toBe(false);
+      expect(f.isRunning()).toBe(false);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it('honours restorePosition: false by never touching either mailbox', async () => {
+    const dir = scriptDir('exit 0');
+    const f = restoreFake({ playerAt: { x: 0x0100, y: 0x0100 } });
+    try {
+      const r = await runBuild({ basePath: dir, client: f.client as never, env: {}, restorePosition: false });
+      expect(r.reloaded).toBe(true);
+      expect(r.restoredTo).toBeUndefined();
+      expect(f.log.some((c) => c.startsWith('emulator/run_to'))).toBe(false);
+      expect(f.log.some((c) => c.startsWith('emulator/write_memory'))).toBe(false);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+});
