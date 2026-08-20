@@ -16,7 +16,10 @@ import {
   editObjectArtCheckout,
   __setSpriteSetOpenerForTest,
   __resetSpriteSetOpenerForTest,
+  __setAnimScriptReaderForTest,
 } from '../export-sprite';
+import { readFileSync, existsSync } from 'fs';
+import { join } from 'path';
 import type { DiscoveredSpriteSet } from '../../../../core/import/sprite-discovery';
 import type { CompressionKind } from '../../../../core/compress';
 import { useClassicProjectStore } from '../../../state/classicProjectStore';
@@ -67,6 +70,7 @@ afterEach(() => {
   __setSpriteModuleForTest(null);
   useSpriteStore.getState().closeAll();
   __resetSpriteSetOpenerForTest();
+  __setAnimScriptReaderForTest(null);
   useConfirmStore.setState({ ask: realAsk }); // undo any stubbed confirm
   vi.restoreAllMocks();
 });
@@ -181,6 +185,61 @@ describe('editObjectArtCheckout', () => {
     expect(ok).toBe(false);
     expect(calls).toHaveLength(0);
     expect(getLoadedSpriteDocId()).toBeNull();
+  });
+});
+
+// S1 anim Parcel 1 — the checkout auto-loads the object's `_anim` script into
+// the timeline/picker. The reader seam feeds REAL s1disasm text from fs (the
+// tree is read-only), so these are integration-grade without window.api.
+describe('editObjectArtCheckout — animation auto-load', () => {
+  const S1DIR = '/home/volence/sonic_hacks/s1disasm';
+  const realReader = async (_base: string, rel: string) => readFileSync(join(S1DIR, rel), 'utf8');
+  const treePresent = existsSync(join(S1DIR, '_anim'));
+
+  (treePresent ? it : it.skip)('Crabmeat: loads all 8 anims with flips into the picker + timeline', async () => {
+    __setSpriteSetOpenerForTest(stubOpener([], 7)); // Crabmeat art has 7 frames (0..6)
+    const reads: string[] = [];
+    __setAnimScriptReaderForTest(async (base, rel) => { reads.push(`${base}|${rel}`); return realReader(base, rel); });
+
+    const ok = await editObjectArtCheckout(0x1f); // Crabmeat (ghz)
+
+    expect(ok).toBe(true);
+    expect(reads).toEqual([`${DIR}|_anim/Crabmeat.asm`]);
+    const s = useSpriteStore.getState();
+    // Table order hand-transcribed from _anim/Crabmeat.asm's dc.w rows.
+    expect(s.characterAnims.map((a) => a.name)).toEqual([
+      'stand', 'standslope', 'standsloperev', 'walk', 'walkslope', 'walksloperev', 'firing', 'ball',
+    ]);
+    // .standsloperev is `dc.b 15 / 2|aniXFlip / afEnd` — frame INDEX 2, xFlip
+    // (the old parsers read that byte as 34 and dropped it).
+    expect(s.characterAnims[2].steps).toEqual([{ frameIndex: 2, duration: 15, xFlip: true, yFlip: false }]);
+    // The first animation is pre-loaded into the playable timeline.
+    expect(s.steps).toEqual([{ frameIndex: 0, duration: 15, xFlip: false, yFlip: false }]);
+    // A fresh load-from-disk is not unsaved work.
+    expect(s.unsavedEdits).toBe(false);
+  });
+
+  it('an art-linked object with NO anim script stays empty-but-honest', async () => {
+    __setSpriteSetOpenerForTest(stubOpener([]));
+    const reads: string[] = [];
+    __setAnimScriptReaderForTest(async (base, rel) => { reads.push(rel); return ''; });
+
+    const ok = await editObjectArtCheckout(0x11); // GHZ Bridge — art link, no anim link
+
+    expect(ok).toBe(true);
+    expect(reads).toEqual([]); // no script was even read
+    expect(useSpriteStore.getState().characterAnims).toEqual([]);
+    expect(useSpriteStore.getState().steps).toEqual([]);
+  });
+
+  it('a failed script read keeps the art open usable with an empty timeline', async () => {
+    __setSpriteSetOpenerForTest(stubOpener([]));
+    __setAnimScriptReaderForTest(async () => { throw new Error('ENOENT'); });
+
+    const ok = await editObjectArtCheckout(0x1f);
+
+    expect(ok).toBe(true);
+    expect(useSpriteStore.getState().characterAnims).toEqual([]);
   });
 });
 
