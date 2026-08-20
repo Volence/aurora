@@ -16,8 +16,12 @@
 //  - **The resolution summary** ("N/M files resolved"), which is a project-level
 //    fact rather than a map-level one. Its home is the Project Setup tab's info
 //    card (setup/ProjectSetupTab.tsx), which prints the same roll-up above the
-//    editable path rows — not the `right` slot, which is reserved for
-//    engine-only trailing content and is empty for classic (no Aether bus).
+//    editable path rows — not the `right` slot, which carries the Aether badge
+//    (below).
+//
+// The `right` slot carries the same Aether bus indicator as aeon's port since
+// the classic playtest loop landed: Build & Run and the live palette push both
+// run against classic now, and the badge is where connecting happens.
 
 import React from 'react';
 import type { MapStatusPort } from '../components/shared/map-status-model';
@@ -26,6 +30,10 @@ import { useEditorStore } from '../state/editorStore';
 import { useViewStore } from '../state/viewStore';
 import { useClassicLevelStore, type ClassicLevelStatus } from '../state/classicLevelStore';
 import type { ZoneActRef } from '../../core/project/adapter';
+import AetherStatus from '../components/AetherStatus';
+
+/** Same hoisted element as the aeon port: no props, never varies. */
+const AETHER = React.createElement(AetherStatus);
 
 /**
  * The four fields the scope line reads, and no more. Narrower than `LevelDoc` on
@@ -116,7 +124,8 @@ export function useClassicMapStatusPort(): MapStatusPort {
     ownHintLine: true,
     zoom,
     onZoom: setZoom,
-    // No Aether bus for classic.
-    right: undefined,
+    // The Aether bus badge — connect/disconnect for Build & Run and the live
+    // palette push, which both serve classic since the playtest-loop parcel.
+    right: AETHER,
   }), [tool, pasting, editingLayer, ref, scopeInfo, scopeTone, zoom, setZoom]);
 }

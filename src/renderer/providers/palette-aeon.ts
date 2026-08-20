@@ -375,7 +375,9 @@ export function useAeonPaletteGridPort(opts?: { context?: 'sprite' }): PaletteGr
    * had.
    */
   const lastPushedRef = React.useRef(new Map<number, string>());
-  const aetherReady = useAetherStore((s) => s.status === 'connected' && s.palette);
+  // Kind-gated: `palette` alone would light up against a CLASSIC ROM, whose
+  // listing resolves v_palette_line_N but has no Pal_Base to write.
+  const aetherReady = useAetherStore((s) => s.status === 'connected' && s.paletteKind === 'aeon');
   React.useEffect(() => {
     if (standaloneMode || !aetherReady) {
       // Forget what was pushed, so reconnecting re-sends the current palette
