@@ -394,9 +394,14 @@ export function syncedTimelineAnims(sync: readonly SyncAnimEntry[] | undefined, 
     name: s.name,
     synced: true,
     note: s.note,
+    // AnimStepUI.duration follows the engine's RAW-byte convention: the
+    // timeline holds each step (duration + 1) ticks (Timeline.tsx playback,
+    // matching `_anim` scripts whose byte N holds N+1 frames). framesPerStep
+    // is the TRUE period (SynchroAnimate resets its timer to `#N-1` for an
+    // N-frame hold), so the step stores N-1 and plays exactly N.
     steps: s.frames
       .filter((f) => f < frameCount)
-      .map((f) => ({ frameIndex: f, duration: s.framesPerStep, xFlip: false, yFlip: false })),
+      .map((f) => ({ frameIndex: f, duration: s.framesPerStep - 1, xFlip: false, yFlip: false })),
   })).filter((a) => a.steps.length > 0);
 }
 

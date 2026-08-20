@@ -167,6 +167,14 @@ describe('S1_OBJECT_ANIMS links resolve against the real tree', () => {
   });
 
   it.each(entries)('id %s → its animAsm exists and parses to ≥1 animation', (id, link) => {
+    if (!link.animAsm) {
+      // Sync-only rows (Spiked Pole Helix $17, Giant Ring $4B) have no script:
+      // their animation is a transcribed SynchroAnimate channel, covered by
+      // src/core/project/profiles/__tests__/s1-sync-anims.test.ts. A row must
+      // never be EMPTY though — no script and no sync would be a dead link.
+      expect(link.sync?.length, `id ${id}: neither animAsm nor sync`).toBeGreaterThanOrEqual(1);
+      return;
+    }
     const path = join('/home/volence/sonic_hacks/s1disasm', link.animAsm);
     expect(existsSync(path), `${link.animAsm} missing on disk`).toBe(true);
     const { anims, problems } = parseS1DisasmAnimScript(readFileSync(path, 'utf8'));

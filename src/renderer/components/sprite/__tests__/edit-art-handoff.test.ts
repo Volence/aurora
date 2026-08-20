@@ -246,8 +246,10 @@ describe('editObjectArtCheckout — animation auto-load', () => {
     // read): frames 0-3 ascending at 8 game frames per step, labeled synced.
     // The scripted collect-sparkle follows from _anim/Rings.asm.
     expect(s.characterAnims.map((a) => `${a.name}${a.synced ? '!' : ''}`)).toEqual(['spin!', 'sparkle']);
+    // duration 7 = the true 8-frame period minus 1: AnimStepUI stores the
+    // engine's raw byte and the timeline holds (duration + 1) ticks.
     expect(s.characterAnims[0].steps).toEqual([0, 1, 2, 3].map((f) => (
-      { frameIndex: f, duration: 8, xFlip: false, yFlip: false })));
+      { frameIndex: f, duration: 7, xFlip: false, yFlip: false })));
     // Hand-transcribed from _anim/Rings.asm: dc.b 5 / 4,5,6,7 / afRoutine.
     expect(s.characterAnims[1].steps).toEqual([4, 5, 6, 7].map((f) => (
       { frameIndex: f, duration: 5, xFlip: false, yFlip: false })));
@@ -268,8 +270,10 @@ describe('editObjectArtCheckout — animation auto-load', () => {
     const s = useSpriteStore.getState();
     expect(s.characterAnims).toHaveLength(1);
     expect(s.characterAnims[0]).toMatchObject({ name: 'spin', synced: true });
+    // duration 7 = the true 8-frame period minus 1: AnimStepUI stores the
+    // engine's raw byte and the timeline holds (duration + 1) ticks.
     expect(s.characterAnims[0].steps).toEqual([0, 1, 2, 3].map((f) => (
-      { frameIndex: f, duration: 8, xFlip: false, yFlip: false })));
+      { frameIndex: f, duration: 7, xFlip: false, yFlip: false })));
     expect(s.steps).toEqual(s.characterAnims[0].steps);
   });
 
@@ -283,7 +287,7 @@ describe('editObjectArtCheckout — animation auto-load', () => {
     // 4 = the measured AVERAGE of the decelerating accumulator (derivation in
     // profiles/__tests__/s1-sync-anims.test.ts) — and the caveat must ride
     // along where the UI can disclose it, never be silently dropped.
-    expect(spin.steps.every((st) => st.duration === 4)).toBe(true);
+    expect(spin.steps.every((st) => st.duration === 3)).toBe(true); // 3+1 ticks = the 4-frame average
     expect(spin.note).toMatch(/decelerat/i);
   });
 
