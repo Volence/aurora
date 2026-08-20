@@ -609,3 +609,106 @@ describe('runBuild and the position restore (boot override + warp fallback)', ()
     } finally { rmSync(dir, { recursive: true, force: true }); }
   });
 });
+
+describe('runBuild on a classic (S1) project', () => {
+  /**
+   * A real `lua` spawn against a throwaway build.lua, same policy as the rest
+   * of this file: the things under test are which command gets spawned, which
+   * env it does NOT get, which listing path the emulator is handed, and that
+   * no restore is attempted — and a mocked child_process would test the mock.
+   */
+  function classicDir(luaBody: string): string {
+    const dir = mkdtempSync(join(tmpdir(), 'aurora-classic-build-'));
+    writeFileSync(join(dir, 'build.lua'), luaBody);
+    return dir;
+  }
+
+  /** fakeClient plus a record of which symbols were resolved. */
+  function recordingClient(opts: { romPath?: string } = {}) {
+    const c = fakeClient(opts);
+    const resolves: string[] = [];
+    return {
+      ...c,
+      resolves,
+      resolve: async (name: string) => { resolves.push(name); return 0; },
+    };
+  }
+
+  it('spawns lua build.lua in the project dir, with neither DEBUG nor FAST in its env', async () => {
+    // The lua script REPORTS what env it actually received; asserting on the
+    // plan alone would not catch build-run re-adding the aeon overrides after
+    // planning (which is exactly what it does for aeon).
+    const dir = classicDir(
+      'print("DEBUG=" .. tostring(os.getenv("DEBUG")))\n'
+      + 'print("FAST=" .. tostring(os.getenv("FAST")))\n');
+    try {
+      const r = await runBuild({ basePath: dir, projectType: 'classic', client: null, env: {} });
+      expect(r.ok).toBe(true);
+      expect(r.output).toContain('DEBUG=nil');
+      expect(r.output).toContain('FAST=nil');
+      // No flavour exists on classic, so the result must not claim one either way.
+      expect(r.debugBuild).toBeUndefined();
+      expect(r.fast).toBe(false);
+      expect(r.missingEnv).toEqual([]);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it('hands load_symbols the SOURCE-named listing, never a ROM-stem derivation', async () => {
+    // The emulator reports it is running s1built.bin; the stem swap would hand
+    // over "s1built.lst", a file AS never writes. The listing is sonic.lst,
+    // named after sonic.asm (s1disasm common.lua:773, `-L`).
+    const dir = classicDir('print("ok")');
+    const client = recordingClient({ romPath: join(dir, 's1built.bin') });
+    try {
+      const r = await runBuild({ basePath: dir, projectType: 'classic', client: client as never, env: {} });
+      expect(r.reloaded).toBe(true);
+      const sym = client.calls.find((c) => c.startsWith('load_symbols:'));
+      expect(sym).toBe(`load_symbols:${join(dir, 'sonic.lst')}`);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it('attempts NO position restore — S1 has no boot override and no mailbox', async () => {
+    const dir = classicDir('print("ok")');
+    const client = recordingClient({ romPath: join(dir, 's1built.bin') });
+    try {
+      const r = await runBuild({ basePath: dir, projectType: 'classic', client: client as never, env: {} });
+      expect(r.ok).toBe(true);
+      // Not a single symbol resolve: no Player_1 read before the reload, no
+      // Warp_Req_*/Boot_At_* after it. `restoredVia` absent is the honest
+      // report, the same shape a release aeon ROM produces.
+      expect(client.resolves).toEqual([]);
+      expect(r.restoredVia).toBeUndefined();
+      expect(r.restoredTo).toBeUndefined();
+      // The reload envelope itself is unchanged: pause -> reload -> resume.
+      const order = client.calls;
+      expect(order.find((c) => c.startsWith('emulator/reload_rom:'))).toBeTruthy();
+      expect(order.filter((c) => c.startsWith('emulator/write_memory'))).toEqual([]);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it('a DECLARED symbolsPath beats the ROM-stem derivation on aeon too', async () => {
+    // Same rule, other family: stated config outranks anything inferred.
+    const dir = scriptDir('exit 0');
+    const client = fakeClient({ romPath: '/engine/s4.debug.bin' });
+    try {
+      await runBuild({
+        basePath: dir, client: client as never, env: {},
+        raw: { symbolsPath: 'custom/name.lst' }, restorePosition: false,
+      });
+      const sym = client.calls.find((c) => c.startsWith('load_symbols:'));
+      expect(sym).toBe(`load_symbols:${join(dir, 'custom/name.lst')}`);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it('still derives from the running ROM stem when aeon declares nothing', async () => {
+    // The behaviour the derivation exists FOR: s4.debug.bin pairs with
+    // s4.debug.lst without a second config field to get out of step.
+    const dir = scriptDir('exit 0');
+    const client = fakeClient({ romPath: '/engine/s4.debug.bin' });
+    try {
+      await runBuild({ basePath: dir, client: client as never, env: {}, restorePosition: false });
+      const sym = client.calls.find((c) => c.startsWith('load_symbols:'));
+      expect(sym).toBe('load_symbols:/engine/s4.debug.lst');
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+});

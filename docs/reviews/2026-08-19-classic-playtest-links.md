@@ -521,7 +521,12 @@ two expression changes in one function of a repo Aurora must not build, so it is
 than a project, and the payoff is disproportionate — it unblocks three of the four links at
 once. Raise it first; the Aurora-side work is worth starting in parallel only because item 7
 is small, and it should be gated behind a real `load_symbols` success before anyone calls
-the parcel done.
+the parcel done. **[CONDITION MET 2026-08-20:** the §9 acceptance run observed the real
+`load_symbols` success on the rebuilt frontend, and the parcel's own harness
+(`scratchpad/classic-playtest-harness.mjs`, row 1) re-proves it against the rebuilt
+headless `oracle-aether` (35 methods) on every run — the parcel shipped on
+`feat/classic-playtest-loop` with links 1+3 delivered and link 4 gated off by symbol
+detection, per this section's split.**]**
 
 Link 4 does not belong in the same phase. It is the only item requiring new 68000 code in a
 repo Aurora does not own, its central question (when it is safe to call

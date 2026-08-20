@@ -19,12 +19,16 @@ import { resolveSocketPath } from './socket-path';
 import { pushPaletteWords } from './push-palette';
 import { warpTo } from './warp';
 import { runBuild } from './build-run';
-import { PAL_BASE_SYMBOL, PAL_BASE_DIRTY_SYMBOL } from '../../core/aether/palette-push';
+import {
+  PAL_BASE_SYMBOL, PAL_BASE_DIRTY_SYMBOL, classicPaletteSymbol, CLASSIC_LINES,
+  type PalettePushKind,
+} from '../../core/aether/palette-push';
+import type { BuildProjectType } from '../../core/aether/build-plan';
 
 let client: AetherClient | null = null;
 let win: BrowserWindow | null = null;
 let lastError: string | undefined;
-let paletteAvailable = false;
+let paletteKind: PalettePushKind | null = null;
 
 function publish(): void {
   const payload: AetherStatusPayload = {
@@ -32,23 +36,33 @@ function publish(): void {
     serverName: client?.server.name,
     serverVersion: client?.server.version,
     error: lastError,
-    palette: paletteAvailable,
+    palette: paletteKind !== null,
+    paletteKind: paletteKind ?? undefined,
   };
   win?.webContents.send(IPC_CHANNELS.AETHER_STATUS, payload);
 }
 
 /**
- * Probe the two symbols live palette needs, once per connection, so the UI can
- * grey the control out instead of discovering the gap mid-drag. A release ROM
- * carries them today; a stripped one would not, and neither would an engine
- * that renamed them.
+ * Probe the symbols live palette needs, once per connection, so the UI can
+ * grey the control out instead of discovering the gap mid-drag — and report
+ * WHICH family's symbols the running ROM carries, so a classic project's UI
+ * does not light up green against an aeon ROM (or vice versa). The loaded
+ * listing decides: aeon's `Pal_Base`/`Pal_Base_Dirty` pair, or classic's four
+ * `v_palette_line_N`. A stripped ROM, or one whose engine renamed them,
+ * resolves neither and the feature stays grey.
  */
-async function probePalette(c: AetherClient): Promise<boolean> {
+async function probePalette(c: AetherClient): Promise<PalettePushKind | null> {
   try {
     await c.resolve(PAL_BASE_SYMBOL);
     await c.resolve(PAL_BASE_DIRTY_SYMBOL);
-    return true;
-  } catch { return false; }
+    return 'aeon';
+  } catch { /* not an aeon listing — try classic */ }
+  try {
+    for (let line = 0; line < CLASSIC_LINES; line++) {
+      await c.resolve(classicPaletteSymbol(line));
+    }
+    return 'classic';
+  } catch { return null; }
 }
 
 /**
@@ -87,7 +101,7 @@ export function registerAetherBridge(browserWindow: BrowserWindow): void {
     // was told about, which is "connected" forever.
     c.onStatusChange((status) => {
       if (status === 'disconnected') {
-        paletteAvailable = false;
+        paletteKind = null;
         if (client === c) client = null;
       }
       publish();
@@ -96,10 +110,10 @@ export function registerAetherBridge(browserWindow: BrowserWindow): void {
 
     try {
       await c.connect();
-      paletteAvailable = await probePalette(c);
+      paletteKind = await probePalette(c);
     } catch (e) {
       lastError = e instanceof Error ? e.message : String(e);
-      paletteAvailable = false;
+      paletteKind = null;
       client = null;
     }
     publish();
@@ -109,7 +123,7 @@ export function registerAetherBridge(browserWindow: BrowserWindow): void {
   ipcMain.handle(IPC_CHANNELS.AETHER_DISCONNECT, async (): Promise<AetherStatusPayload> => {
     client?.disconnect();
     client = null;
-    paletteAvailable = false;
+    paletteKind = null;
     lastError = undefined;
     publish();
     return statusPayload();
@@ -117,11 +131,14 @@ export function registerAetherBridge(browserWindow: BrowserWindow): void {
 
   ipcMain.handle(
     IPC_CHANNELS.AETHER_BUILD,
-    async (_e, basePath: string, raw: Record<string, unknown> | undefined): Promise<AetherBuildResult> => {
+    async (
+      _e, basePath: string, raw: Record<string, unknown> | undefined,
+      projectType?: BuildProjectType,
+    ): Promise<AetherBuildResult> => {
       // The build runs whether or not an emulator is connected — an artist
       // without one still wants to know their level assembles.
       const r = await runBuild({
-        basePath, raw, client,
+        basePath, raw, projectType, client,
         onOutput: (chunk) => win?.webContents.send(IPC_CHANNELS.AETHER_BUILD_OUTPUT, chunk),
       });
       return {
@@ -148,11 +165,14 @@ export function registerAetherBridge(browserWindow: BrowserWindow): void {
 
   ipcMain.handle(
     IPC_CHANNELS.AETHER_PUSH_PALETTE,
-    async (_e, line: number, words: number[]): Promise<{ pushed: boolean; error?: string }> => {
+    async (
+      _e, line: number, words: number[], kind?: PalettePushKind,
+    ): Promise<{ pushed: boolean; error?: string }> => {
       if (!client) return { pushed: false, error: 'not connected' };
       // The renderer hands CRAM words; they go to the wire as-is rather than
-      // round-tripping through 8-bit colour and back.
-      const r = await pushPaletteWords(client, line, words);
+      // round-tripping through 8-bit colour and back. `kind` is the OPEN
+      // PROJECT's family; a mismatched ROM gates on symbol resolution inside.
+      const r = await pushPaletteWords(client, line, words, kind);
       return { pushed: r.pushed, error: r.error };
     },
   );
@@ -165,7 +185,8 @@ function statusPayload(socketPath?: string): AetherStatusPayload {
     serverVersion: client?.server.version,
     socketPath,
     error: lastError,
-    palette: paletteAvailable,
+    palette: paletteKind !== null,
+    paletteKind: paletteKind ?? undefined,
   };
 }
 
@@ -175,5 +196,5 @@ export function resetAetherBridge(): void {
   client = null;
   win = null;
   lastError = undefined;
-  paletteAvailable = false;
+  paletteKind = null;
 }

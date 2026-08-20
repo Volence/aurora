@@ -226,9 +226,10 @@ export const EDITOR_METHODS: EditorMethod[] = [
   // Aether, so agent parity is a property of adding it here, not a second task.
   { name: 'aether_status', kind: 'aether-status', result: 'json', params: {},
     description: 'Is Aurora connected to a running emulator, and what can it do there? '
-      + 'Reports connection state, the server, whether live palette is available (both '
-      + 'Pal_Base symbols resolved) and the last push error. Read this before assuming a '
-      + 'push or warp will land.' },
+      + 'Reports connection state, the server, whether live palette is available and for WHICH '
+      + 'engine family (`paletteKind`: aeon\'s Pal_Base pair or classic\'s v_palette_line_1..4 '
+      + 'resolved — a push only lands when it matches the open project), and the last push '
+      + 'error. Read this before assuming a push or warp will land.' },
 
   { name: 'aether_connect', kind: 'aether-connect', result: 'json',
     params: {
@@ -240,16 +241,18 @@ export const EDITOR_METHODS: EditorMethod[] = [
 
   { name: 'push_palette', kind: 'aether-push-palette', result: 'json',
     params: {
-      // LINE 0 IS REFUSED AND THE RANGE SAYS SO. Pal_Base covers lines 1-3; line
-      // 0 is the character palette and the engine never writes it, so an agent
-      // that guessed 0 would get a refusal with no way to know why from the
-      // schema alone.
-      line: z.number().int().min(1).max(3)
-        .describe('palette line 1-3 (line 0 is the character palette; the engine owns it)'),
+      // THE RANGE IS THE UNION OF BOTH ENGINES (one entry serves both, per the
+      // registry rule). On aeon, line 0 is the character palette the engine
+      // owns and a push to it is refused with a reason; on classic (S1), line
+      // 0 is an ordinary act line and pushes like any other.
+      line: z.number().int().min(0).max(3)
+        .describe('palette line 0-3 (on aeon, line 0 is the character palette and is refused; classic pushes all four)'),
     },
-    description: 'Push a zone palette line to the RUNNING game, so it recolours without a '
-      + 'rebuild. Writes the editor\'s current colours for that line — edit the palette '
-      + 'first, then push. Not persisted: a rebuild or a section crossing restores ROM colours.' },
+    description: 'Push a palette line of the OPEN PROJECT to the RUNNING game, so it recolours '
+      + 'without a rebuild. Writes the editor\'s current colours for that line — edit the palette '
+      + 'first, then push. Persistence differs by engine: on aeon a rebuild or a section crossing '
+      + 'restores ROM colours; on classic (S1) the push PERSISTS until the next level transition '
+      + 'or fade (only the zone\'s few palette-cycled entries keep repainting themselves).' },
 
   { name: 'warp', kind: 'aether-warp', result: 'json',
     params: {
@@ -258,14 +261,18 @@ export const EDITOR_METHODS: EditorMethod[] = [
     },
     description: 'Warp the running game to a point in the act (play-from-cursor). '
       + 'Reports where the player LANDED — the engine clamps to act bounds and the answer '
-      + 'may differ from the request. Needs a DEBUG build; a release ROM has no warp mailbox.' },
+      + 'may differ from the request. Aeon-only, and needs a DEBUG build: a release aeon ROM '
+      + 'has no warp mailbox, and classic (S1) has none in any flavour — both gate off on '
+      + 'symbol detection with the reason in `detail`.' },
 
   { name: 'build_and_run', kind: 'aether-build-run', result: 'json', params: {},
-    description: 'Save, re-bake the level data, build the ROM, reload the emulator and put the '
-      + 'player back where they were — via the engine\'s boot-position override, so the first '
-      + 'painted frame is already the destination (falls back to the warp mailbox on a DEBUG ROM '
-      + 'that predates it; `restoredVia` says which ran, `restoredTo` is where the engine says the '
-      + 'player LANDED after clamping). The one call that makes an edit real. Reports the '
+    description: 'Save, build the OPEN project (aeon: re-bake + ./build.sh; classic: lua '
+      + 'build.lua), reload the emulator, and on aeon put the player back where they were — via '
+      + 'the engine\'s boot-position override, so the first painted frame is already the '
+      + 'destination (falls back to the warp mailbox on a DEBUG ROM that predates it; '
+      + '`restoredVia` says which ran, `restoredTo` is where the engine says the player LANDED '
+      + 'after clamping). Classic reloads to a clean boot — S1 has no restore mechanism, and '
+      + '`restoredVia` is honestly absent. The one call that makes an edit real. Reports the '
       + 'build output on failure and does NOT reload a failed build.' },
 
   { name: 'import_art_sheet', kind: 'classic-import-art-sheet', result: 'json',

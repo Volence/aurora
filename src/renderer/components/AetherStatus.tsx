@@ -6,11 +6,12 @@ import { useAetherStore } from '../state/aetherStore';
 /**
  * Aether bus indicator — `Aether ◇ <status>`; emerald diamond when connected.
  *
- * Aeon-only: the Aether bus is the aeon engine's link to Oracle/Seraph, and
- * classic has no bus at all. It lived inside the old shell/MapStatusBar; when
- * that bar became neutral (it may not import a store) the indicator moved here
- * so `providers/map-status-aeon.ts` can hand it to the bar through the `right`
- * slot while staying JSX-free like its sibling providers.
+ * Both engines mount it now: the outbound link serves classic's Build & Run
+ * and live palette push as well as aeon's (the classic playtest-loop parcel),
+ * so both map-status ports hand it to the neutral bar through the `right`
+ * slot. It lived inside the old shell/MapStatusBar; when that bar became
+ * neutral (it may not import a store) the indicator moved here so the
+ * JSX-free provider files can hoist a single element.
  */
 export default function AetherStatus(): React.ReactElement {
   const status = useBusStore((s) => s.status);

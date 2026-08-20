@@ -76,12 +76,16 @@ const api = {
     ipcRenderer.invoke(IPC_CHANNELS.AETHER_CONNECT),
   aetherDisconnect: (): Promise<AetherStatusPayload> =>
     ipcRenderer.invoke(IPC_CHANNELS.AETHER_DISCONNECT),
-  aetherPushPalette: (line: number, words: number[]): Promise<{ pushed: boolean; error?: string }> =>
-    ipcRenderer.invoke(IPC_CHANNELS.AETHER_PUSH_PALETTE, line, words),
+  aetherPushPalette: (
+    line: number, words: number[], kind?: 'aeon' | 'classic',
+  ): Promise<{ pushed: boolean; error?: string }> =>
+    ipcRenderer.invoke(IPC_CHANNELS.AETHER_PUSH_PALETTE, line, words, kind),
   aetherWarp: (x: number, y: number): Promise<AetherWarpResult> =>
     ipcRenderer.invoke(IPC_CHANNELS.AETHER_WARP, x, y),
-  aetherBuild: (basePath: string, raw?: Record<string, unknown>): Promise<AetherBuildResult> =>
-    ipcRenderer.invoke(IPC_CHANNELS.AETHER_BUILD, basePath, raw),
+  aetherBuild: (
+    basePath: string, raw?: Record<string, unknown>, projectType?: 'aeon' | 'classic',
+  ): Promise<AetherBuildResult> =>
+    ipcRenderer.invoke(IPC_CHANNELS.AETHER_BUILD, basePath, raw, projectType),
   onAetherBuildOutput: (callback: (chunk: string) => void): void => {
     ipcRenderer.on(IPC_CHANNELS.AETHER_BUILD_OUTPUT, (_e, chunk: string) => callback(chunk));
   },

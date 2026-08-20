@@ -26,8 +26,14 @@ interface AetherState {
   serverName?: string;
   serverVersion?: string;
   error?: string;
-  /** Both Pal_Base symbols resolved — live palette can actually push. */
+  /** A palette symbol family resolved — live palette can actually push. */
   palette: boolean;
+  /**
+   * WHICH family the running ROM's listing carries ('aeon': the Pal_Base
+   * pair; 'classic': v_palette_line_1..4). Pushes gate on it matching the open
+   * project, so a classic panel never writes aeon symbols or vice versa.
+   */
+  paletteKind?: 'aeon' | 'classic';
   /** True while a push is in flight, for the badge's activity dot. */
   pushing: boolean;
   /** Last push failure, shown once rather than logged into the void. */
@@ -37,9 +43,15 @@ interface AetherState {
   connect: () => Promise<void>;
   disconnect: () => Promise<void>;
   /** Coalescing live push. Safe to call on every slider tick. */
-  pushPaletteLine: (line: number, words: number[]) => void;
-  /** Warp the running game. Returns a human-facing sentence, or null if gated. */
-  warp: (x: number, y: number) => Promise<string | null>;
+  pushPaletteLine: (line: number, words: number[], kind?: 'aeon' | 'classic') => void;
+  /**
+   * Warp the running game. Returns a human-facing sentence, or null if gated
+   * on connection. `kind` only words the symbol-gate sentence: the GATE itself
+   * is symbol detection either way (Warp_Req_* absent → refused), but "needs a
+   * DEBUG build" is actionable on aeon and false on classic, where no build
+   * flavour carries a mailbox at all.
+   */
+  warp: (x: number, y: number, kind?: 'aeon' | 'classic') => Promise<string | null>;
 
   // -- Build & Run ---------------------------------------------------------
   buildState: 'idle' | 'building' | 'ok' | 'failed';
@@ -52,7 +64,10 @@ interface AetherState {
   buildMissingEnv: string[];
   setBuildPanelOpen: (open: boolean) => void;
   appendBuildOutput: (chunk: string) => void;
-  build: (basePath: string, raw?: Record<string, unknown>, saveMs?: number) => Promise<void>;
+  build: (
+    basePath: string, raw?: Record<string, unknown>, saveMs?: number,
+    projectType?: 'aeon' | 'classic',
+  ) => Promise<void>;
 }
 
 /** Coalescing state, deliberately outside the store: it is not UI. */
@@ -61,8 +76,12 @@ let inFlight = false;
  * PER LINE. A single queued slot silently dropped every line but the last,
  * which broke the case where one change touches several lines at once — an
  * undo restoring a whole palette, or the initial push on connect.
+ *
+ * The kind rides with the words: only one project is open at a time, but a
+ * queued push must land against the family it was made for even if the open
+ * project changes mid-throttle.
  */
-let queued = new Map<number, number[]>();
+let queued = new Map<number, { words: number[]; kind: 'aeon' | 'classic' }>();
 let lastPushAt = 0;
 let timer: ReturnType<typeof setTimeout> | null = null;
 
@@ -78,6 +97,7 @@ export const useAetherStore = create<AetherState>((set, get) => ({
       serverVersion: s.serverVersion,
       error: s.error,
       palette: s.palette ?? false,
+      paletteKind: s.paletteKind,
     });
     // Drive the status-bar badge, which predates this client and was written
     // waiting for it ("when the client connects it calls setBusStatus").
@@ -98,14 +118,18 @@ export const useAetherStore = create<AetherState>((set, get) => ({
     get().apply(s);
   },
 
-  pushPaletteLine: (line, words) => {
+  pushPaletteLine: (line, words, kind = 'aeon') => {
     const st = get();
-    // Line 0 is the character palette and Pal_Base does not include it; the
-    // main side refuses it too, but not bothering the wire is cheaper and keeps
-    // the badge from flickering on every line-0 tick.
-    if (st.status !== 'connected' || !st.palette || line === 0) return;
+    // The push must match the ROM's symbol family: a classic project's lines
+    // mean nothing to an aeon listing and vice versa, so a mismatch stays off
+    // the wire entirely (the main side would gate NoSymbols anyway; not
+    // flickering the badge on every tick is the point of gating here too).
+    if (st.status !== 'connected' || !st.palette || st.paletteKind !== kind) return;
+    // Line 0 is aeon's character palette and Pal_Base does not include it.
+    // Classic's line 0 is an ordinary act line and pushes like any other.
+    if (kind === 'aeon' && line === 0) return;
 
-    queued.set(line, [...words]);
+    queued.set(line, { words: [...words], kind });
     if (inFlight || timer) return;
 
     const fire = async () => {
@@ -118,8 +142,8 @@ export const useAetherStore = create<AetherState>((set, get) => ({
       set({ pushing: true });
       try {
         let err: string | undefined;
-        for (const [l, w] of batch) {
-          const r = await window.api.aetherPushPalette(l, w);
+        for (const [l, q] of batch) {
+          const r = await window.api.aetherPushPalette(l, q.words, q.kind);
           if (!r.pushed && !err) err = r.error;
         }
         set({ pushError: err });
@@ -153,7 +177,7 @@ export const useAetherStore = create<AetherState>((set, get) => ({
     buildOutput: [...s.buildOutput, ...chunk.split('\n').filter((l) => l.length > 0)].slice(-500),
   })),
 
-  build: async (basePath, raw, saveMs) => {
+  build: async (basePath, raw, saveMs, projectType) => {
     if (get().buildState === 'building') return;      // one build at a time
     // OPEN THE PANEL IMMEDIATELY. A build takes seconds to minutes, and the
     // first version showed nothing at all until it finished — which is
@@ -166,7 +190,7 @@ export const useAetherStore = create<AetherState>((set, get) => ({
       buildMissingEnv: [], buildPanelOpen: true,
     });
     try {
-      const r = await window.api.aetherBuild(basePath, raw);
+      const r = await window.api.aetherBuild(basePath, raw, projectType);
       // Name the FLAVOUR. Release-vs-debug decides which ROM file the build
       // wrote, and getting it wrong is silent: the game reloads and looks
       // untouched. Saying which one ran turns that into something readable.
@@ -174,7 +198,13 @@ export const useAetherStore = create<AetherState>((set, get) => ({
       // verification lanes, so a FAST ROM must never be mistaken for one you
       // could hand to a player — aeon's own banner says as much and this is the
       // client half of saying it.
-      const flavour = `${r.debugBuild ? 'debug' : 'release'}${r.fast ? ', fast' : ''}`;
+      //
+      // CLASSIC HAS NO FLAVOURS: build.lua emits one artifact, debugBuild is
+      // undefined, and calling it "release" or "fast" would claim a
+      // distinction that does not exist there.
+      const flavour = projectType === 'classic'
+        ? 'classic'
+        : `${r.debugBuild ? 'debug' : 'release'}${r.fast ? ', fast' : ''}`;
       // ATTRIBUTED, not totalled. The loop measured ~10s wall against a 1.3s
       // build, and a single number cannot tell you which of save / build /
       // reload / restore to go after.
@@ -212,13 +242,20 @@ export const useAetherStore = create<AetherState>((set, get) => ({
     }
   },
 
-  warp: async (x, y) => {
+  warp: async (x, y, kind = 'aeon') => {
     if (get().status !== 'connected') return null;
     const r = await window.api.aetherWarp(x, y);
     if (!r.warped) {
-      // A release ROM simply does not carry the mailbox — say that rather than
-      // reporting a failure the user cannot act on.
-      if (r.gate === 'no-symbols') return 'Warp needs a DEBUG build — this ROM has no warp mailbox';
+      // A ROM without the mailbox simply does not carry the symbols — say
+      // that rather than reporting a failure the user cannot act on. On aeon
+      // the fix is actionable (build DEBUG); on classic there is no flavour to
+      // build — S1 has no warp mailbox at all — so the sentence must not send
+      // anyone hunting for one.
+      if (r.gate === 'no-symbols') {
+        return kind === 'classic'
+          ? 'Play-from-cursor is not available on classic — S1 has no warp mailbox (aeon-only for now)'
+          : 'Warp needs a DEBUG build — this ROM has no warp mailbox';
+      }
       return `Warp failed: ${r.error ?? 'unknown'}`;
     }
     // The engine clamps and publishes where it actually put the player, so the

@@ -87,6 +87,51 @@ export function encodePaletteWords(words: readonly number[]): Uint8Array {
   return bytes;
 }
 
+// ---------------------------------------------------------------------------
+// Classic (S1) geometry — SIMPLER than aeon's, not a port of it.
+//
+// S1's VBlank DMAs the whole `v_palette` buffer (all four lines, $80 bytes) to
+// CRAM UNCONDITIONALLY every frame (`writeCRAM v_palette,0` — sonic.asm:740 and
+// five siblings, one per game-mode VBlank flavour). There is NO dirty flag and
+// none is needed: a bare RAM write shows on the next frame with no ordering
+// hazard. aeon's payload-then-flag discipline is aeon-specific and is
+// deliberately NOT ported here — inventing a flag write against a symbol that
+// does not exist would gate the whole feature off.
+//
+// THE LINE MAPPING IS 1-INDEXED, and it is derived, not assumed:
+//   - Aurora's own S1 profile composes every zone's editor palette as
+//     `palette/Sonic.bin[0..16) → editor line 0` then
+//     `palette/<zone>.bin[0..48) → editor lines 1-3`
+//     (src/core/project/profiles/s1.ts — SONIC_LINE0 destOffset 0, zone
+//     component destOffset 16 length 48).
+//   - The engine loads those same two files at `v_palette_line_1` (palid_Sonic)
+//     and `v_palette_line_2` (palid_GHZ et al) — s1disasm/_inc/Palette
+//     Index.asm:18-27; each line is $20 bytes (_Variables.asm:318-321).
+// So editor line N lives at `v_palette_line_(N+1)`. The 2026-08-20 acceptance
+// run proved the off-by-one is not hypothetical: a `v_palette_line_2` write did
+// NOT recolour the GHZ ground an artist would call "line 2".
+//
+// ALL FOUR LINES ARE PUSHABLE. Classic's line 0 is an ordinary act palette line
+// (the classic editor edits it; there is no engine invariant protecting it),
+// unlike aeon where line 0 is excluded by contract. Two engine behaviours a
+// caller should expect: `PaletteCycle` repaints its few cycling entries (GHZ:
+// line 3's colours 8-11, i.e. `v_palette_line_3+$10`) every 6 frames — push
+// anyway and let the artist see it; and a push PERSISTS until the next level
+// transition/fade, because `PalLoad` only runs at level load.
+// ---------------------------------------------------------------------------
+
+export const CLASSIC_LINES = 4;
+
+/** The RAM symbol for one editor palette line (0-3) on a classic (S1) ROM. */
+export function classicPaletteSymbol(line: number): string {
+  if (!Number.isInteger(line) || line < 0 || line >= CLASSIC_LINES) {
+    throw new Error(`palette line ${line} is out of range; classic has lines 0-3`);
+  }
+  // Editor line N ↔ v_palette_line_(N+1): S1 numbers its lines 1-4 over CRAM
+  // lines 0-3. See the derivation in the block comment above.
+  return `v_palette_line_${line + 1}`;
+}
+
 export interface PaletteWrite {
   symbol: string;
   /** Byte displacement from the symbol. Resolved and ADDED client-side: a
@@ -129,4 +174,34 @@ function planPalettePushBytes(line: number, payload: Uint8Array): PalettePushPla
     ],
     symbols: [PAL_BASE_SYMBOL, PAL_BASE_DIRTY_SYMBOL],
   };
+}
+
+/**
+ * Plan the writes for one CLASSIC (S1) palette line, from CRAM words.
+ *
+ * One write, no flag: S1's VBlank re-DMAs the whole buffer unconditionally
+ * every frame (see the geometry block above), so payload-then-flag would be a
+ * write into a symbol that does not exist. Offset 0 because each line has its
+ * OWN symbol — the mapping lives in `classicPaletteSymbol`, not in arithmetic
+ * against a shared base.
+ */
+export function planClassicPalettePushWords(line: number, words: readonly number[]): PalettePushPlan {
+  const symbol = classicPaletteSymbol(line);
+  return {
+    writes: [{ symbol, offset: 0, bytes: encodePaletteWords(words) }],
+    symbols: [symbol],
+  };
+}
+
+export type PalettePushKind = 'aeon' | 'classic';
+
+/** One planner, dispatched per engine family; the geometry differs per kind. */
+export function planPalettePushWordsFor(
+  kind: PalettePushKind,
+  line: number,
+  words: readonly number[],
+): PalettePushPlan {
+  return kind === 'classic'
+    ? planClassicPalettePushWords(line, words)
+    : planPalettePushWords(line, words);
 }

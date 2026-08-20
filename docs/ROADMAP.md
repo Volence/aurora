@@ -323,6 +323,45 @@ contribution to the wall was a save that rewrote every file whether it had chang
 or not, which bumped ~40 mtimes and marked aeon's level tree stale on **every**
 build — fixed by comparing before writing.
 
+### 2.7b The classic half — links 1 and 3 (2026-08-20)
+
+**Status: SHIPPED** for s1disasm projects, per the split the measurement report
+recommended (`2026-08-19-classic-playtest-links.md` §7). The gate that report
+named — oracle-next's parser refusing AS listings — opened with oracle's
+`a380830` drop; the report's §9 foreground acceptance and this parcel's own
+harness both confirm `sonic.lst` loads (accepted unverified, 35-method server).
+
+- **Build & Run** routes through the OPEN project (`state/build-and-run.ts`,
+  ONE dispatch site for UI + agent + debug hooks): classic saves via
+  `saveClassicProject` then runs `lua build.lua` in the disasm root. No env
+  requirements, no FAST/DEBUG flavour (the plan never claims one), listing is
+  the source-named `sonic.lst` — never a ROM-stem derivation. The three build
+  fields are seeded fill-only into `.aurora/project.json` at open. **Measured
+  end-to-end wall: ~650 ms** (save ~0 · build 0.6s · reload ~0) — the fastest
+  Build & Run in the suite, as the report predicted.
+- **Live palette** — classic is SIMPLER than aeon and is not a port: S1's
+  VBlank DMAs all four `v_palette_line_N` lines to CRAM unconditionally every
+  frame, so a push is ONE 32-byte write, no dirty flag (none exists; none was
+  invented). The mapping is 1-indexed — editor line N ↔ `v_palette_line_(N+1)`
+  — derived from Aurora's own S1 profile against `Palette Index.asm`, and the
+  harness plants the off-by-one to prove the observer catches it. All four
+  lines push (classic line 0 is an ordinary act line). A push PERSISTS until
+  the next level transition/fade; only `PaletteCycle`'s few entries repaint.
+  The connection probe reports **which family** the ROM carries
+  (`paletteKind`), so neither engine's panel lights up against the other's ROM.
+- **Play-from-cursor stays gated OFF** — link 4, not shipped and not faked: S1
+  has no warp mailbox in any flavour, so F7 gates on symbol detection exactly
+  as a release aeon ROM does, with a classic-worded reason. Position restore
+  after Build & Run is likewise absent by design (`restoredVia` omitted): the
+  only alternative is poking `v_player` on a running machine, which is link
+  4's unmeasured spike. Both wait on the s1disasm-side mailbox decision the
+  report assigned across the fence (§6 items 8–9).
+
+Proof: `scratchpad/classic-playtest-harness.mjs`, 19/19 — real app under CDP on
+the real s1disasm, independent observer client, anti-vacuous controls (stale-
+dist refusal, pre-push sentinel absence, untouched-line checks), and the tree
+restored byte-identically (git status equal) at the end.
+
 ## 3. The domain map
 
 Where each art domain stands and where it goes. ★ = new capability, ☆ = upgrade.

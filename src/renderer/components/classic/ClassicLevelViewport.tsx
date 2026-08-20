@@ -14,6 +14,7 @@ import {
 import { objectArtKey } from '../../../core/project/profiles/object-subtype-rules';
 import { objectSpriteEpoch } from '../../../core/level-classic/object-sprite-clock';
 import { useToastStore } from '../../state/toastStore';
+import { useAetherStore } from '../../state/aetherStore';
 import { renderChunk } from '../../../core/level-classic/render';
 import { applyCollisionShapeCells, applyCollisionShapeRect } from '../../state/collision-dispatch';
 import type { LevelDoc } from '../../../core/level-classic/model';
@@ -1180,6 +1181,32 @@ export default function ClassicLevelViewport() {
         if (res.ok) s.setSelectedObjectIndex(null);
         else useToastStore.getState().addToast(`Delete failed: ${res.error}`, 'error');
         redraw();
+        return;
+      }
+      // F7 — play from cursor, the same key aeon's MapViewport binds
+      // (DSVEdit's convention). On classic this GATES today, and the gate is
+      // symbol detection against the running ROM — Warp_Req_* does not
+      // resolve, the exact path a release aeon ROM takes — because S1 has no
+      // warp mailbox in ANY build flavour (that is link 4, an s1disasm-side
+      // engine change out of this parcel's scope). The toast says so rather
+      // than sending anyone hunting for a DEBUG build that would not help.
+      if (e.key === 'F7') {
+        e.preventDefault();
+        const canvas = canvasRef.current;
+        const s = useClassicLevelStore.getState();
+        if (!canvas || !s.doc) return;
+        const rect = canvas.getBoundingClientRect();
+        const w = screenToWorld(
+          camRef.current, lastMouse.current.x - rect.left, lastMouse.current.y - rect.top);
+        // Clamp to the act's pixel bounds, mirroring aeon's warpTargetFor: a
+        // warp is to a POINT, and the engine-side clamp should never be handed
+        // a coordinate the editor already knows is outside the level.
+        const x = clampInt(w.x, s.doc.fg.width * CHUNK_PX - 1);
+        const y = clampInt(w.y, s.doc.fg.height * CHUNK_PX - 1);
+        void useAetherStore.getState().warp(x, y, 'classic').then((msg) => {
+          if (msg) useToastStore.getState().addToast(msg, msg.startsWith('Warped') ? 'success' : 'info');
+        });
+        return;
       }
     };
     window.addEventListener('keydown', onKey);

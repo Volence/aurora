@@ -528,9 +528,17 @@ interface DebugApi {
   aether: {
     connect(): Promise<void>;
     disconnect(): Promise<void>;
-    state(): { status: string; palette: boolean; serverName?: string; error?: string; pushError?: string };
+    state(): {
+      status: string; palette: boolean; paletteKind?: string;
+      serverName?: string; error?: string; pushError?: string;
+      buildState: string; buildSummary: string | null;
+    };
     /** Push a line of CRAM words, exactly as the palette port does. */
-    push(line: number, words: number[]): void;
+    push(line: number, words: number[], kind?: 'aeon' | 'classic'): void;
+    /** Build & Run through the SAME routing the UI and agent use. */
+    build(): Promise<{ route: string; ran: boolean }>;
+    /** Warp, worded per project kind — the classic F7 path's seam. */
+    warp(x: number, y: number, kind?: 'aeon' | 'classic'): Promise<string | null>;
   };
 }
 
@@ -542,11 +550,17 @@ export function installDebugHooks(): void {
       state: () => {
         const s = useAetherStore.getState();
         return {
-          status: s.status, palette: s.palette,
+          status: s.status, palette: s.palette, paletteKind: s.paletteKind,
           serverName: s.serverName, error: s.error, pushError: s.pushError,
+          buildState: s.buildState, buildSummary: s.buildSummary,
         };
       },
-      push: (line, words) => useAetherStore.getState().pushPaletteLine(line, words),
+      push: (line, words, kind) => useAetherStore.getState().pushPaletteLine(line, words, kind),
+      build: async () => {
+        const { startBuildAndRun } = await import('./state/build-and-run');
+        return startBuildAndRun();
+      },
+      warp: (x, y, kind) => useAetherStore.getState().warp(x, y, kind),
     },
     openDir: (dir) => useClassicProjectStore.getState().openDirectory(dir),
     projStatus: () => {

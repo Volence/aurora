@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { pushPaletteLine, PaletteGateReason } from '../push-palette';
+import { pushPaletteLine, pushPaletteWords, PaletteGateReason } from '../push-palette';
 
 /** A client stand-in recording the wire calls in order. */
 function fakeClient(opts: { symbols?: Record<string, number>; methods?: string[]; connected?: boolean; wasRunning?: boolean } = {}) {
@@ -122,5 +122,74 @@ describe('pushPaletteLine and a machine somebody else paused', () => {
     const c = fakeClient({ wasRunning: true });
     await pushPaletteLine(c as never, 1, line());
     expect(c.calls.map((x) => x.method)).toContain('emulator/resume');
+  });
+});
+
+describe('pushPaletteWords on a classic (S1) project', () => {
+  // Addresses in this fixture are arbitrary fake values (the real ones come
+  // from the listing at runtime; nothing here may hardcode $FFFB20-shaped
+  // knowledge). What IS pinned: which SYMBOL a given editor line resolves,
+  // the single-write shape, and the pause/resume envelope.
+  const s1Symbols = {
+    v_palette_line_1: 0x110000,
+    v_palette_line_2: 0x220000,
+    v_palette_line_3: 0x330000,
+    v_palette_line_4: 0x440000,
+  };
+  const words = Array.from({ length: 16 }, () => 0x0eee);
+
+  it('writes ONE 32-byte payload to the mapped v_palette_line_(N+1), no flag', async () => {
+    const c = fakeClient({ symbols: s1Symbols });
+    const r = await pushPaletteWords(c as never, 2, words, 'classic');
+    expect(r.pushed).toBe(true);
+    const writes = c.calls.filter((x) => x.method === 'emulator/write_memory');
+    expect(writes).toHaveLength(1);                       // no dirty flag exists on S1
+    // Editor line 2 -> v_palette_line_3 (1-indexed engine lines; derivation in
+    // core/aether/__tests__/palette-push.test.ts), at the symbol's own address.
+    expect(writes[0].params.addr).toBe('0x330000');
+    // 16 words -> 32 bytes -> '0x' + 64 hex chars.
+    expect((writes[0].params.bytes as string).length).toBe(2 + 64);
+  });
+
+  it('pushes line 0 — an ordinary act line on classic', async () => {
+    const c = fakeClient({ symbols: s1Symbols });
+    const r = await pushPaletteWords(c as never, 0, words, 'classic');
+    expect(r.pushed).toBe(true);
+    const writes = c.calls.filter((x) => x.method === 'emulator/write_memory');
+    expect(writes[0].params.addr).toBe('0x110000');
+  });
+
+  it('keeps the pause/resume envelope — write_memory is require_paused', async () => {
+    const c = fakeClient({ symbols: s1Symbols });
+    await pushPaletteWords(c as never, 1, words, 'classic');
+    const order = c.calls.map((x) => x.method);
+    expect(order[0]).toBe('emulator/pause');
+    expect(order.at(-1)).toBe('emulator/resume');
+  });
+
+  it('gates NoSymbols against an aeon ROM — resolution IS the family detection', async () => {
+    // A classic push while the running ROM only serves aeon symbols must grey
+    // out, never write: the aeon listing has no v_palette_line_2.
+    const c = fakeClient();                                // aeon default symbols
+    const r = await pushPaletteWords(c as never, 1, words, 'classic');
+    expect(r.pushed).toBe(false);
+    expect(r.gate).toBe(PaletteGateReason.NoSymbols);
+    expect(r.error).toMatch(/v_palette_line_2/);
+    expect(c.calls.filter((x) => x.method === 'emulator/write_memory')).toHaveLength(0);
+  });
+
+  it('still refuses an out-of-range line before touching the wire', async () => {
+    const c = fakeClient({ symbols: s1Symbols });
+    const r = await pushPaletteWords(c as never, 4, words, 'classic');
+    expect(r.pushed).toBe(false);
+    expect(c.calls).toHaveLength(0);
+  });
+
+  it('defaults to the aeon geometry when no kind is given — existing callers unchanged', async () => {
+    const c = fakeClient();
+    const r = await pushPaletteWords(c as never, 1, words);
+    expect(r.pushed).toBe(true);
+    const writes = c.calls.filter((x) => x.method === 'emulator/write_memory');
+    expect(writes).toHaveLength(2);                        // payload then flag
   });
 });

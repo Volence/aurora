@@ -130,3 +130,76 @@ describe('buildPlanFor and the FAST shape', () => {
     expect(p.envOverrides.FAST).toBeUndefined();
   });
 });
+
+describe('buildPlanFor for a classic project', () => {
+  // Every expectation below is transcribed from s1disasm's own build, not from
+  // a design doc: the entry point is `lua build.lua` (build.lua is a shebanged
+  // Lua script; build.bat is a Windows shim over the same file); the artifact
+  // is `s1built.bin` (build.lua:27 `build_rom_and_handle_failure("sonic",
+  // "s1built", …)`, :30 `fix_header("s1built.bin")`); and the listing is
+  // `sonic.lst` because AS's `-L` (common.lua:773) names the listing after the
+  // SOURCE file (`sonic.asm`), never after the ROM.
+  const classic = { ...base, projectType: 'classic' as const };
+
+  it('defaults to the classic toolchain, not aeon.s', () => {
+    const p = buildPlanFor(classic);
+    expect(p.command).toBe('lua');
+    expect(p.args).toEqual(['build.lua']);
+    expect(p.romPath).toBe('s1built.bin');
+    expect(p.symbolsPath).toBe('sonic.lst');
+    expect(p.projectType).toBe('classic');
+  });
+
+  it('requires NO environment — lua build.lua reads none', () => {
+    // The aeon plan under the same empty env names both SIGIL_* variables as
+    // missing (asserted above); the classic plan must name neither, because
+    // build.lua invokes its bundled native asl/p2bin directly (common.lua
+    // picks the platform binary) and never consults SIGIL_BUILD/SIGIL_EMIT.
+    const p = buildPlanFor(classic);
+    expect(p.missingEnv).toEqual([]);
+  });
+
+  it('never claims the FAST shape — build.lua has no such switch', () => {
+    // `fast` drives a "not a ship artifact" caveat downstream; for classic that
+    // claim would be false, so even an explicit buildFast:true must not set it.
+    for (const raw of [undefined, { buildFast: true }, { buildFast: false }]) {
+      const p = buildPlanFor({ ...classic, raw });
+      expect(p.fast).toBe(false);
+      expect(p.envOverrides.FAST).toBeUndefined();
+    }
+  });
+
+  it('plans no phantom pre-build — a classic save writes the assembler inputs in place', () => {
+    // aeon's default pre-build (tools/regenerate-level.sh) exists only in the
+    // aeon tree; `exists` returning true for it must not summon it here.
+    const p = buildPlanFor({ ...classic, exists: () => true });
+    expect(p.prebuild).toBeNull();
+  });
+
+  it('still honours a declared pre-build, declared command and declared paths', () => {
+    const p = buildPlanFor({
+      ...classic,
+      raw: {
+        buildCommand: 'lua build.lua', prebuildCommand: './gen.sh',
+        romPath: 's1built.bin', symbolsPath: 'sonic.lst',
+      },
+    });
+    expect(p.command).toBe('lua');
+    expect(p.prebuild).toEqual({ command: './gen.sh', args: [] });
+    expect(p.symbolsDeclared).toBe(true);
+  });
+
+  it('marks an undeclared symbolsPath so the runner knows the default is a guess', () => {
+    expect(buildPlanFor(classic).symbolsDeclared).toBe(false);
+    expect(buildPlanFor(base).symbolsDeclared).toBe(false);
+    expect(buildPlanFor({ ...base, raw: { symbolsPath: 's4.lst' } }).symbolsDeclared).toBe(true);
+  });
+
+  it('leaves the aeon plan byte-identical when projectType is absent', () => {
+    const p = buildPlanFor(base);
+    expect(p.projectType).toBe('aeon');
+    expect(p.command).toBe(DEFAULT_BUILD_COMMAND);
+    expect(p.missingEnv).toEqual([...AEON_REQUIRED_ENV]);
+    expect(p.fast).toBe(true);
+  });
+});
