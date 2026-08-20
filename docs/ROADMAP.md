@@ -247,11 +247,19 @@ assign collision and a person could not. Now:
   framing: it is registry work, with no MCP-specific and no Aether-specific half.
 
 **Runtime proof lives outside vitest** — a node-only suite cannot see React or canvas.
-`scratchpad/collision-agent-harness.mjs` (**8/8**) and
-`scratchpad/collision-gesture-harness.mjs` (**9/9**) drive the real app under CDP; both must
-stay green, and each carries planted-defect notes in its footer. Known pre-existing and *not*
-from this line: `scratchpad/commit-collision-harness.mjs` reports 5/6 — stage 4's row-4
-*expectation* is what is wrong.
+`scratchpad/collision-agent-harness.mjs` (**8/8**),
+`scratchpad/collision-gesture-harness.mjs` (**9/9**) and
+`scratchpad/commit-collision-harness.mjs` (**7/7**) drive the real app under CDP; all three
+must stay green, and each carries planted-defect notes in its footer.
+
+The commit harness used to report 5/6, recorded here as "stage 4's row-4 *expectation* is what
+is wrong". **Confirmed and closed in `c005f57`**, and the reason is worth keeping: row 4 wanted
+the toggle to stamp `$FF` into *every* new block, but `withCollision` skips block ids past the
+end of the zone's colind table (spec §5 / CLASSIC-A4 — in ROM they read the *adjacent* zone's
+table). GHZ ships **439 blocks against a 410-entry** `collide/GHZ.bin`, so in GHZ that skip
+covers every id a commit can append and the shape half of the toggle is a designed no-op — which
+the preview stated on screen all along. The harness now runs GHZ *and* SLZ (414 blocks against a
+500-entry table, where the write is permitted) and proves both halves. No app change was needed.
 
 ### D. The 2026-08-16 lens sweep
 
