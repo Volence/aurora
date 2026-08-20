@@ -1201,8 +1201,8 @@ export default function ClassicLevelViewport() {
         // Clamp to the act's pixel bounds, mirroring aeon's warpTargetFor: a
         // warp is to a POINT, and the engine-side clamp should never be handed
         // a coordinate the editor already knows is outside the level.
-        const x = clampInt(Math.round(w.x), 0, s.doc.fg.width * CHUNK_PX - 1);
-        const y = clampInt(Math.round(w.y), 0, s.doc.fg.height * CHUNK_PX - 1);
+        const x = clampInt(w.x, s.doc.fg.width * CHUNK_PX - 1);
+        const y = clampInt(w.y, s.doc.fg.height * CHUNK_PX - 1);
         void useAetherStore.getState().warp(x, y, 'classic').then((msg) => {
           if (msg) useToastStore.getState().addToast(msg, msg.startsWith('Warped') ? 'success' : 'info');
         });
