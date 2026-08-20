@@ -249,7 +249,7 @@ assign collision and a person could not. Now:
 **Runtime proof lives outside vitest** — a node-only suite cannot see React or canvas.
 `scratchpad/collision-agent-harness.mjs` (**8/8**),
 `scratchpad/collision-gesture-harness.mjs` (**9/9**) and
-`scratchpad/commit-collision-harness.mjs` (**7/7**) drive the real app under CDP; all three
+`scratchpad/commit-collision-harness.mjs` (**8/8**) drive the real app under CDP; all three
 must stay green, and each carries planted-defect notes in its footer.
 
 The commit harness used to report 5/6, recorded here as "stage 4's row-4 *expectation* is what
@@ -259,7 +259,11 @@ end of the zone's colind table (spec §5 / CLASSIC-A4 — in ROM they read the *
 table). GHZ ships **439 blocks against a 410-entry** `collide/GHZ.bin`, so in GHZ that skip
 covers every id a commit can append and the shape half of the toggle is a designed no-op — which
 the preview stated on screen all along. The harness now runs GHZ *and* SLZ (414 blocks against a
-500-entry table, where the write is permitted) and proves both halves. No app change was needed.
+500-entry table, where the write is permitted) and proves both halves. No app change was needed
+for row 4 itself — but the preview's statement was half-silent: it said "0 will get flat ($FF)"
+without saying blocks were skipped or why (`reportLines` dropped `skippedOverhang`). Closed
+2026-08-20 (`fix/report-skipped-overhang`): the preview now carries the count and the overhang
+reason, guarded by harness row 8 (planted red first) — hence 8/8.
 
 ### D. The 2026-08-16 lens sweep
 
