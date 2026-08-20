@@ -130,6 +130,7 @@ export function registerAetherBridge(browserWindow: BrowserWindow): void {
         command: [r.plan.command, ...r.plan.args].join(' '),
         debugBuild: r.debugBuild,
         restoredTo: r.restoredTo,
+        fast: r.fast,
       };
     },
   );

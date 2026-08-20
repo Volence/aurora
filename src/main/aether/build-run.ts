@@ -46,6 +46,8 @@ export interface BuildRunResult {
   debugBuild?: boolean;
   /** Where the player was put back, when the position survived the reload. */
   restoredTo?: { x: number; y: number };
+  /** FAST shape — deliberately NOT a ship artifact. */
+  fast?: boolean;
   /** Required env vars that were absent — the usual cause of an instant exit 1. */
   missingEnv: string[];
   plan: BuildPlan;
@@ -184,9 +186,9 @@ export async function runBuild(opts: BuildRunOptions): Promise<BuildRunResult> {
         const base = {
           exitCode: code, output: summariseBuildOutput(output),
           missingEnv: plan.missingEnv, plan,
-          // A fact about the BUILD, so it is reported whether or not anything
+          // Facts about the BUILD, so they are reported whether or not anything
           // was reloaded afterwards.
-          debugBuild: wantsDebug,
+          debugBuild: wantsDebug, fast: plan.fast,
         };
         if (code !== 0) {
           // A FAILED BUILD MUST NOT RELOAD. The ROM on disk is the previous

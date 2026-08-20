@@ -170,7 +170,11 @@ export const useAetherStore = create<AetherState>((set, get) => ({
       // Name the FLAVOUR. Release-vs-debug decides which ROM file the build
       // wrote, and getting it wrong is silent: the game reloads and looks
       // untouched. Saying which one ran turns that into something readable.
-      const flavour = r.debugBuild ? 'debug' : 'release';
+      // FAST is named in every summary, never silently. It skips the
+      // verification lanes, so a FAST ROM must never be mistaken for one you
+      // could hand to a player — aeon's own banner says as much and this is the
+      // client half of saying it.
+      const flavour = `${r.debugBuild ? 'debug' : 'release'}${r.fast ? ', fast' : ''}`;
       const summary = r.ok
         ? (r.reloaded
             ? `Build succeeded (${flavour}) — emulator reloaded${r.restoredTo ? `, back at (${r.restoredTo.x}, ${r.restoredTo.y})` : ''}`

@@ -68,6 +68,8 @@ export interface AetherBuildResult {
   debugBuild?: boolean;
   /** Where the player was put back after the reload, if the position survived. */
   restoredTo?: { x: number; y: number };
+  /** FAST shape — verification lanes skipped, NOT a ship artifact. */
+  fast?: boolean;
 }
 
 export interface AetherWarpResult {

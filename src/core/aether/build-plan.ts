@@ -34,6 +34,8 @@ export interface BuildPlanInput {
 export interface BuildPlan {
   command: string;
   args: string[];
+  /** FAST shape — skips the verification lanes, NOT a ship artifact. */
+  fast: boolean;
   /** Ran before the build. Null when the project declares none and none exists. */
   prebuild: { command: string; args: string[] } | null;
   cwd: string;
@@ -53,6 +55,27 @@ export interface BuildPlan {
 }
 
 export const DEFAULT_BUILD_COMMAND = './build.sh';
+
+/**
+ * The iteration-loop build shape (aeon `3c2e24fb`).
+ *
+ * `FAST=1 ./build.sh` skips the two verification lanes and re-bakes stale
+ * editor data itself. Measured by aeon: the lanes were **92% of the wall**
+ * (expect-fail 22.7s + pytest 12.4s) against an assemble of 1.15s, so FAST
+ * comes in at ~1.3s, or ~2.0s when it has to re-bake. Output is byte-identical
+ * to the canonical build on all four shapes.
+ *
+ * Build & Run defaults to it because this IS the iteration loop — the thing the
+ * artist presses between two looks at the same chunk. A shipping build is a
+ * deliberate act and should still pay for every lane; `buildFast: false` in
+ * project.json turns it off.
+ *
+ * FAST owns staleness detection, which is why it also retires Aurora's own
+ * pre-build step: a timestamp heuristic here would rot the first time aeon's
+ * dependency graph changed, and aeon is the side that knows what invalidates
+ * what.
+ */
+export const FAST_ENV = 'FAST';
 
 /**
  * The level re-bake, which `build.sh` deliberately does NOT run.
@@ -106,17 +129,28 @@ export function buildPlanFor(input: BuildPlanInput): BuildPlan {
   const merged = { ...input.env, ...envOverrides };
   const missingEnv = AEON_REQUIRED_ENV.filter((k) => !str(merged[k]));
 
+  // FAST is the default for Build & Run; a project can opt out.
+  const fast = raw.buildFast !== false;
+  if (fast) envOverrides[FAST_ENV] = '1';
+
   // An explicit empty string turns the step OFF; absent means "use the default
   // if the script is there". Both are things a project might reasonably want.
+  //
+  // FAST re-bakes stale editor data ITSELF, so planning our own step on top
+  // would run the generators twice — and ours has no staleness detection, so it
+  // would run them every time. Under FAST there is no pre-build step at all.
   const declaredPre = raw.prebuildCommand;
-  const preLine = typeof declaredPre === 'string'
-    ? declaredPre
-    : (input.exists?.(DEFAULT_PREBUILD_COMMAND) ? DEFAULT_PREBUILD_COMMAND : '');
+  const preLine = fast
+    ? ''
+    : typeof declaredPre === 'string'
+      ? declaredPre
+      : (input.exists?.(DEFAULT_PREBUILD_COMMAND) ? DEFAULT_PREBUILD_COMMAND : '');
   const [preCmd, ...preArgs] = preLine.split(/\s+/).filter(Boolean);
 
   return {
     command,
     args,
+    fast,
     prebuild: preCmd ? { command: preCmd, args: preArgs } : null,
     cwd: input.basePath,
     envOverrides,

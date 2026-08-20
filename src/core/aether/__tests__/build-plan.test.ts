@@ -57,7 +57,9 @@ describe('buildPlanFor environment', () => {
       ...base,
       raw: { buildEnv: { SIGIL_BUILD: '/s/sigil', SIGIL_EMIT: '/s/emit' } },
     });
-    expect(p.envOverrides).toEqual({ SIGIL_BUILD: '/s/sigil', SIGIL_EMIT: '/s/emit' });
+    // toMatchObject, not toEqual: the plan also carries FAST=1 by default, which
+    // this test is not about.
+    expect(p.envOverrides).toMatchObject({ SIGIL_BUILD: '/s/sigil', SIGIL_EMIT: '/s/emit' });
     expect(p.missingEnv).toEqual([]);
   });
 
@@ -72,7 +74,8 @@ describe('buildPlanFor environment', () => {
 
   it('ignores non-string buildEnv entries instead of passing junk to spawn', () => {
     const p = buildPlanFor({ ...base, raw: { buildEnv: { SIGIL_BUILD: 42, SIGIL_EMIT: '/e' } } });
-    expect(p.envOverrides).toEqual({ SIGIL_EMIT: '/e' });
+    expect(p.envOverrides).toMatchObject({ SIGIL_EMIT: '/e' });
+    expect(p.envOverrides.SIGIL_BUILD).toBeUndefined();
     expect(p.missingEnv).toEqual(['SIGIL_BUILD']);
   });
 });
@@ -108,5 +111,22 @@ describe('summariseBuildOutput', () => {
     const lines = ['ERROR: first', ...Array.from({ length: 300 }, (_, i) => `ok ${i}`), 'ERROR: last'];
     const out = summariseBuildOutput(lines.join('\n'), 10);
     expect(out.indexOf('ERROR: first')).toBeLessThan(out.indexOf('ERROR: last'));
+  });
+});
+
+describe('buildPlanFor and the FAST shape', () => {
+  it('defaults to FAST — this is the iteration loop', () => {
+    const p = buildPlanFor(base);
+    expect(p.fast).toBe(true);
+    expect(p.envOverrides.FAST).toBe('1');
+    // FAST re-bakes stale editor data itself, so planning our own step would
+    // run the generators twice, and ours would run them unconditionally.
+    expect(p.prebuild).toBeNull();
+  });
+
+  it('lets a project opt out for a shipping build', () => {
+    const p = buildPlanFor({ ...base, raw: { buildFast: false } });
+    expect(p.fast).toBe(false);
+    expect(p.envOverrides.FAST).toBeUndefined();
   });
 });

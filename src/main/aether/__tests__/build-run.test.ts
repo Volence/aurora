@@ -308,7 +308,9 @@ describe('runBuild and the level re-bake', () => {
     try {
       const r = await runBuild({
         basePath: dir, client: null, env: {},
-        raw: { prebuildCommand: './regen.sh' },
+        // Canonical shape: FAST owns staleness itself, so our own step only
+        // exists on the path that opts out of it.
+        raw: { buildFast: false, prebuildCommand: './regen.sh' },
       });
       const out = r.output.join('\n');
       expect(out).toContain('REBAKE');
@@ -326,7 +328,7 @@ describe('runBuild and the level re-bake', () => {
     try {
       const r = await runBuild({
         basePath: dir, client: null, env: {},
-        raw: { prebuildCommand: './regen.sh' },
+        raw: { buildFast: false, prebuildCommand: './regen.sh' },
       });
       expect(r.ok).toBe(false);
       expect(r.exitCode).toBe(3);
@@ -339,7 +341,7 @@ describe('runBuild and the level re-bake', () => {
     const dir = scriptDir('echo BUILD; exit 0');
     try {
       const r = await runBuild({
-        basePath: dir, client: null, env: {}, raw: { prebuildCommand: '' },
+        basePath: dir, client: null, env: {}, raw: { buildFast: false, prebuildCommand: '' },
       });
       expect(r.ok).toBe(true);
       expect(r.output.join('\n')).toContain('BUILD');
@@ -349,9 +351,52 @@ describe('runBuild and the level re-bake', () => {
   it('plans no step at all when the default script is absent', async () => {
     const dir = scriptDir('echo BUILD; exit 0');
     try {
-      const r = await runBuild({ basePath: dir, client: null, env: {} });
+      const r = await runBuild({ basePath: dir, client: null, env: {}, raw: { buildFast: false } });
       expect(r.plan.prebuild).toBeNull();
       expect(r.ok).toBe(true);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+});
+
+describe('runBuild and the FAST shape', () => {
+  /**
+   * aeon measured the two verification lanes at 92% of the wall (expect-fail
+   * 22.7s + pytest 12.4s) against a 1.15s assemble, and shipped
+   * `FAST=1 ./build.sh` for the iteration loop — byte-identical output, ~1.3s,
+   * and it re-bakes stale editor data itself.
+   *
+   * That last part is why Aurora's own pre-build step must NOT also run: ours
+   * has no staleness detection, so it would re-bake every single time on top of
+   * a build that already handles it.
+   */
+  it('passes FAST=1 and plans no pre-build step of its own', async () => {
+    const dir = scriptDir('echo "FAST=[$FAST]"; exit 0');
+    writeFileSync(join(dir, 'regen.sh'), '#!/bin/sh\necho REBAKE\n');
+    chmodSync(join(dir, 'regen.sh'), 0o755);
+    try {
+      const r = await runBuild({
+        basePath: dir, client: null, env: {},
+        raw: { prebuildCommand: './regen.sh' },
+      });
+      expect(r.fast).toBe(true);
+      expect(r.plan.prebuild).toBeNull();
+      expect(r.output.join('\n')).toContain('FAST=[1]');
+      expect(r.output.join('\n')).not.toContain('REBAKE');
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it('runs the canonical shape, and our own re-bake, when a project opts out', async () => {
+    const dir = scriptDir('echo "FAST=[$FAST]"; exit 0');
+    writeFileSync(join(dir, 'regen.sh'), '#!/bin/sh\necho REBAKE\n');
+    chmodSync(join(dir, 'regen.sh'), 0o755);
+    try {
+      const r = await runBuild({
+        basePath: dir, client: null, env: {},
+        raw: { buildFast: false, prebuildCommand: './regen.sh' },
+      });
+      expect(r.fast).toBe(false);
+      expect(r.output.join('\n')).toContain('FAST=[]');
+      expect(r.output.join('\n')).toContain('REBAKE');
     } finally { rmSync(dir, { recursive: true, force: true }); }
   });
 });
