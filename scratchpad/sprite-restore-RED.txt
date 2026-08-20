@@ -1,0 +1,20 @@
+PASS  [1] the app opened s1disasm and the default session landed GHZ act 1 ready
+        open=opened
+PASS  [2] editObjectArt($40 Moto Bug) checked the sprite doc out with frames + anims
+        activeDocId=doc:sprite:s1:64 frames=7 anims=3
+FAIL  [3] the stored session persists the sprite tab as active AND its zone/act key (s1Zone ghz/1)
+        activeId=doc:sprite:s1:64 s1Zone=null
+PASS  [4] after relaunch+openDir NO act is loaded (session restores tabs, not level data)
+        level={"status":"idle","zone":null,"act":null}
+FAIL  [5] the RESTORED Moto Bug tab is checked out and editable — no refusal, no level touched
+        activeDocId=doc:sprite:untitled frames=1 anims=0 refusalShown=true level={"status":"idle","zone":null,"act":null}
+PASS  [5b] no hidden level tab was created by the restore (tab set unchanged)
+        tabs before=3 after=3
+FAIL  [6] Ring ($25, shared artnem/Rings.nem via PLC_Main) opens LEVEL-FREE with no act loaded
+        opened=false activeDocId=doc:sprite:untitled frames=1 level={"status":"idle","zone":null,"act":null}
+PASS  [7] CONTROL: zone-stored Moto Bug with NO persisted zone and no level still refuses honestly
+        activeDocId=doc:sprite:untitled refusalShown=true
+FAIL  [8] "Try again" loads the sprite once a level made the zone data loadable
+        clicked=no-button activeDocId=doc:sprite:untitled frames=1
+
+5/9 rows passed — FAILING: 3, 5, 6, 8
