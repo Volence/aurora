@@ -72,6 +72,29 @@ describe('session persistence', () => {
     expect(restoreWorkspace(json)).toEqual({ ok: { facet: 'layout' } });
   });
 
+  it('round-trips a sprite tab\'s S1ZoneKey — the identity a restored checkout re-runs from', () => {
+    const s = openTab(initialSession(), { id: 'doc:sprite:s1:64', kind: 'sprite-doc', title: 'Moto Bug' });
+    const ws = { 'doc:sprite:s1:64': { s1Zone: { zone: 'ghz', act: 1 } } } as const;
+    const json = serializeSession(s, ws);
+    expect(restoreWorkspace(json)).toEqual(ws);
+  });
+
+  it('an s1Zone-only entry is KEPT (it must survive without facet/view beside it)…', () => {
+    // …and a corrupt one drops alone, exactly like a bad facet/view: a
+    // zone-scoped sprite tab with a mangled key falls back to the deferral
+    // pane, never to a checkout against garbage.
+    const json = JSON.stringify({
+      tabs: [], activeId: 'home',
+      workspace: {
+        ok: { s1Zone: { zone: 'slz', act: 2 } },
+        emptyZone: { s1Zone: { zone: '', act: 1 } },
+        fractionalAct: { s1Zone: { zone: 'ghz', act: 1.5 } },
+        extraField: { s1Zone: { zone: 'ghz', act: 1, extra: true } },
+      },
+    });
+    expect(restoreWorkspace(json)).toEqual({ ok: { s1Zone: { zone: 'slz', act: 2 } } });
+  });
+
   it('restoreWorkspace on a legacy payload (no workspace key) is empty, and legacy sessions still restore', () => {
     const legacy = JSON.stringify({ tabs: [], activeId: 'home' });
     expect(restoreWorkspace(legacy)).toEqual({});

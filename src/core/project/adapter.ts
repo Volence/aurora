@@ -265,6 +265,18 @@ export interface EditableTileRange {
 export interface ClassicLevelAccess {
   list(): ZoneActRef[];
   read(ref: ZoneActRef): Promise<LevelDoc>;
+  /**
+   * Palette-only read: the act's four composed 16-word CRAM lines, exactly as
+   * `read()` would produce in `LevelDoc.palettes`, without touching the other
+   * ~18 files of a full level read. For consumers that need zone COLORS but no
+   * level — the S1 object-art checkout re-running from a restored session, where
+   * no act is loaded and loading one just to seed a sprite palette would drag a
+   * whole LevelDoc (and a level tab's worth of state) behind a sprite tab.
+   * OPTIONAL — omitted by non-classic adapters and simple test fakes; callers
+   * must treat its absence (or a rejection) as "no palette available", not as
+   * an error in the thing they were actually loading.
+   */
+  readPalettes?(ref: ZoneActRef): Promise<Uint16Array[]>;
   write(ref: ZoneActRef, doc: LevelDoc, dirty: DirtyDomains): Promise<WriteResult>;
   /**
    * Refresh the cached read-time mtimes for an act after a successful guarded

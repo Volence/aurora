@@ -26,6 +26,7 @@ import { readProjectConfig, type SidecarState } from '../mapping';
 import {
   readS1Level,
   writeS1Level,
+  composeS1Palettes,
   type ResolvedLevelPaths,
   type S1ReadState,
 } from '../../level-classic/s1-io';
@@ -424,6 +425,21 @@ export const s1Adapter: ProjectAdapter = {
         }
 
         return state.doc;
+      },
+      // Palette-only read (see ClassicLevelAccess.readPalettes): the act's four
+      // composed CRAM lines from just its palette component files. Deliberately
+      // does NOT require the act to be `available` — availability gates the
+      // GATING level files (layout, tiles, …), and a palette consumer that
+      // cannot have those is exactly who calls this.
+      readPalettes: async (ref: ZoneActRef): Promise<Uint16Array[]> => {
+        const { zone, act } = findAct(ref);
+        const paths = act.palette.map((_, i) => {
+          const key = `${zone}.act${act.act}.palette.${i}`;
+          const path = pathByKey.get(key);
+          if (path === undefined) throw new Error(`entry '${key}' did not resolve`);
+          return path;
+        });
+        return composeS1Palettes(act.palette, await Promise.all(paths.map((p) => fa.read(p))));
       },
       write: async (ref: ZoneActRef, doc: LevelDoc, dirty: DirtyDomains): Promise<WriteResult> => {
         const read = readStates.get(refKey(ref));

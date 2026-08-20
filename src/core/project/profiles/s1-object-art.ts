@@ -324,6 +324,27 @@ export function resolveObjectArt(id: number, zone?: string): ObjectArtLink | und
   return S1_OBJECT_ART_BASE[id];
 }
 
+/**
+ * TRUE when an object's art link is the SAME in every zone — a base-map entry
+ * no per-zone map redefines — so resolving it needs no zone at all. This is the
+ * measured "Ring is not really stored per zone" distinction: Ring ($25) is one
+ * shared file, `artnem/Rings.nem` (a single binclude, s1disasm sonic.asm:4682)
+ * queued by `PLC_Main` (_inc/Pattern Load Cues.asm:77), the cue list every
+ * level loads — where Moto Bug's `Nem_Motobug` is queued only by `PLC_GHZ`
+ * (line 116) and its link exists only under the `ghz` zone map here. Zone-free
+ * ids may open with NO act loaded (session restore, a level-free "Edit art…");
+ * the override check keeps the answer honest if a zone map ever claims one of
+ * these ids (e.g. a future per-zone $53-style redefinition), instead of
+ * silently serving the base file in a zone that draws different art.
+ */
+export function objectArtIsZoneFree(id: number): boolean {
+  if (!S1_OBJECT_ART_BASE[id]) return false;
+  for (const zoneMap of Object.values(S1_OBJECT_ART_ZONE)) {
+    if (zoneMap[id] !== undefined) return false;
+  }
+  return true;
+}
+
 /** Every id linked in the given zone (zone overrides ∪ base), ascending. */
 export function linkedObjectIds(zone?: string): number[] {
   const ids = new Set<number>(Object.keys(S1_OBJECT_ART_BASE).map(Number));

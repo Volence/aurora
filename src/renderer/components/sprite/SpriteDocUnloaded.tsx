@@ -4,10 +4,12 @@
 // tab's art actually loads (tab-activation.ts). Two states leave a legitimate,
 // still-open tab with nothing loaded:
 //
-//   DEFERRED — an s1 object-art tab restored before any classic act is open.
-//     s1 art resolves against the open act's ZONE, so the checkout genuinely
-//     cannot run yet. Session restore hits this on every boot that restores an
-//     s1 sprite tab as the active tab, so it is normal, not a failure.
+//   DEFERRED — an s1 object-art tab restored before any classic act is open,
+//     WITHOUT a persisted zone key to self-serve from (a legacy session) and
+//     with zone-scoped art. s1 art resolves against a ZONE, so this checkout
+//     genuinely cannot run yet. Tabs saved since the S1ZoneKey work carry their
+//     zone in the workspace record and restore straight into their document, so
+//     this pane is now the legacy/edge path, not every boot's landing.
 //
 //   FAILED — the checkout ran and could not read the art.
 //
@@ -24,11 +26,22 @@ import React from 'react';
 import { T } from '../ui';
 import { requestFocusTabId } from '../../shell/tab-activation';
 import { useClassicLevelStore } from '../../state/classicLevelStore';
+import { useWorkspaceStore } from '../../workspace/workspaceStore';
+import { parseSpriteDocTabId } from '../../shell/tabs';
+import { objectArtIsZoneFree } from '../../../core/project/profiles/s1-object-art';
 
 export default function SpriteDocUnloaded({ tabId, title }: { tabId: string; title: string }) {
   const actLoaded = useClassicLevelStore((s) => s.ref !== null);
-  const isS1 = tabId.startsWith('doc:sprite:s1:');
-  const waitingForAct = isS1 && !actLoaded;
+  // Selected as the record VALUE (not the s1ZoneFor getter — see the store's
+  // usage note): a persisted zone key means the checkout could run without an
+  // act, so an unloaded tab here means it RAN and failed — the DEFERRED copy
+  // would promise that opening a level fixes it, which is a promise the failed
+  // case can't keep. Same for zone-free art (Ring): no act was ever needed.
+  const persistedZone = useWorkspaceStore((s) => s.record[tabId]?.s1Zone ?? null);
+  const parsed = parseSpriteDocTabId(tabId);
+  const isS1 = parsed?.engine === 's1';
+  const selfServes = isS1 && (persistedZone !== null || objectArtIsZoneFree(Number(parsed?.ref)));
+  const waitingForAct = isS1 && !actLoaded && !selfServes;
 
   return (
     <div style={styles.wrap}>

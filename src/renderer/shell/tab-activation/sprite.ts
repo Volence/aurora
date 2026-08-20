@@ -13,6 +13,9 @@
 // records against), so there is no second copy to drift out of sync.
 
 import { useClassicLevelStore } from '../../state/classicLevelStore';
+import { useClassicProjectStore } from '../../state/classicProjectStore';
+import { useWorkspaceStore } from '../../workspace/workspaceStore';
+import { objectArtIsZoneFree } from '../../../core/project/profiles/s1-object-art';
 import { useConfirmStore } from '../../state/confirmStore';
 import { useToastStore } from '../../state/toastStore';
 import {
@@ -74,21 +77,27 @@ export type SpriteDocPlan =
  * without ever reaching a loader.
  *
  * DEFERRED is the fifth case, and it is about boot order. An s1 tab's ref is a
- * bare object id: editObjectArtCheckout resolves its art against the OPEN act's
- * ZONE, so with no act loaded there is nothing to resolve against and the
- * checkout can only fail. Session restore hits this every time it reopens an s1
- * sprite tab as the active tab — the level tabs are restored alongside it but
- * nothing has LOADED one yet — so it is the expected order of events, not an
- * error. Deferring means: touch no document, run no loader (hence toast
- * nothing), and let the next focus, after the user opens an act, do the real
- * checkout. Only a FIRST load defers; an already-open document needs nothing
- * from the act, so it still checks out (that is why this sits below `isOpen`).
+ * bare object id: editObjectArtCheckout resolves its art against a ZONE, and
+ * with no act loaded the OPEN act can't supply one. Session restore hits this
+ * every time it reopens an s1 sprite tab as the active tab — the level tabs are
+ * restored alongside it but nothing has LOADED one yet. It is no longer the
+ * common restore outcome, though: `canResolveWithoutAct` is true when the tab
+ * can supply its own zone context — a persisted S1ZoneKey (the workspace record
+ * remembers which zone/act the checkout ran against), or a zone-free id whose
+ * art is one shared file (objectArtIsZoneFree — Ring, monitors, …) — and then
+ * the checkout runs normally with no act. Deferring remains for the genuinely
+ * unresolvable leftover (a legacy session with no zone key restoring a
+ * zone-scoped object): touch no document, run no loader (hence toast nothing),
+ * and let the next focus, after the user opens an act, do the real checkout.
+ * Only a FIRST load defers; an already-open document needs nothing from the
+ * act, so it still checks out (that is why this sits below `isOpen`).
  */
 export function planSpriteDocActivation(input: {
   tabId: string;
   activeDocId: string;
   isOpen: boolean;
   classicActLoaded: boolean;
+  canResolveWithoutAct?: boolean;
 }): SpriteDocPlan {
   if (input.tabId === UNTITLED_SPRITE_TAB_ID) {
     return input.activeDocId === input.tabId ? { kind: 'none' } : { kind: 'untitled' };
@@ -97,8 +106,26 @@ export function planSpriteDocActivation(input: {
   if (!ref) return { kind: 'none' };
   if (input.activeDocId === input.tabId) return { kind: 'none' };
   if (input.isOpen) return { kind: 'checkout' };
-  if (ref.engine === 's1' && !input.classicActLoaded) return { kind: 'deferred' };
+  if (ref.engine === 's1' && !input.classicActLoaded && !input.canResolveWithoutAct) {
+    return { kind: 'deferred' };
+  }
   return { kind: 'open', engine: ref.engine, ref: ref.ref };
+}
+
+/**
+ * Can an s1 sprite tab's checkout run with NO act loaded? True when the tab
+ * carries its own persisted zone/act key, or the object's art is zone-free
+ * (one shared file — resolves from the base map with no zone). Gated on the
+ * classic project being open: the checkout needs the project dir either way,
+ * and an s1 tab only survives restore while one is open (restoredTabIsValid).
+ * Exported for tests; the activation runner is the real caller.
+ */
+export function spriteTabCanResolveWithoutAct(tabId: string): boolean {
+  const ref = parseSpriteDocTabId(tabId);
+  if (!ref || ref.engine !== 's1') return false;
+  if (useClassicProjectStore.getState().status !== 'open') return false;
+  return useWorkspaceStore.getState().s1ZoneFor(tabId) !== null
+    || objectArtIsZoneFree(Number(ref.ref));
 }
 
 // IMPORT CYCLE: export-sprite statically imports the shell's tab-activation
@@ -150,6 +177,7 @@ async function runSpriteActivation(tabId: string): Promise<boolean> {
     activeDocId: store.activeDocId,
     isOpen: store.isOpen(tabId),
     classicActLoaded: useClassicLevelStore.getState().ref !== null,
+    canResolveWithoutAct: spriteTabCanResolveWithoutAct(tabId),
   });
   if (plan.kind === 'none') return true;
   if (plan.kind === 'deferred') {
@@ -179,6 +207,13 @@ async function runSpriteActivation(tabId: string): Promise<boolean> {
   const previousDocId = store.activeDocId;
   openSpriteDoc(tabId, { width: DEFAULT_FRAME_SIZE, height: DEFAULT_FRAME_SIZE });
 
+  // An s1 checkout's zone context: the tab's own persisted key when it has one
+  // (session restore; also lets a tab keep ITS zone when a different zone's act
+  // is the one open), else the open act — captured HERE so a successful load can
+  // record exactly what it resolved against.
+  const persistedZone = plan.engine === 's1' ? useWorkspaceStore.getState().s1ZoneFor(tabId) : null;
+  const openRef = useClassicLevelStore.getState().ref;
+
   const { loadSpriteByName, editObjectArtCheckout } = await spriteModule();
   let loaded = false;
   try {
@@ -188,7 +223,7 @@ async function runSpriteActivation(tabId: string): Promise<boolean> {
     // placeholder document instead of taking the rollback below.
     loaded = plan.engine === 'aeon'
       ? await loadSpriteByName(plan.ref)
-      : await editObjectArtCheckout(Number(plan.ref));
+      : await editObjectArtCheckout(Number(plan.ref), persistedZone);
   } catch {
     loaded = false; // loadSpriteByName rejected — stay put
   }
@@ -199,6 +234,15 @@ async function runSpriteActivation(tabId: string): Promise<boolean> {
     closeSpriteDoc(tabId);
     if (useSpriteStore.getState().activeDocId !== previousDocId) activateSpriteDoc(previousDocId);
     return false;
+  }
+  // A successful s1 checkout records the zone/act it resolved against as the
+  // tab's persisted identity (S1ZoneKey, rides in the workspace record) — the
+  // key session restore's `canResolveWithoutAct` reads, which is what lets this
+  // tab come back editable next boot with no act loaded. Zone-free ids opened
+  // with no act record nothing: their identity IS "no zone needed".
+  if (plan.engine === 's1') {
+    const used = persistedZone ?? (openRef ? { zone: openRef.zone, act: openRef.act } : null);
+    if (used) useWorkspaceStore.getState().setS1Zone(tabId, used);
   }
   // Superseded by a LEVEL activation while the load was in flight: the document
   // itself is fine (it is this tab's own), but the user has moved on, so the tab

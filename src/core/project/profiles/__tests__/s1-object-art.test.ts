@@ -192,3 +192,43 @@ describe('red-box sweep closeout (post-B6)', () => {
     expect(resolveObjectArt(0x66, 'sbz')).toBeUndefined();
   });
 });
+
+// --- zone-free classification (the "Ring is not stored per zone" measurement) --
+//
+// The distinction is measured against the disasm, not assumed: a zone-free id's
+// art is ONE shared file. Ring's Nem_Ring is a single binclude (sonic.asm:4682)
+// queued by PLC_Main (_inc/Pattern Load Cues.asm:77), the cue list every level
+// loads; Moto Bug's Nem_Motobug is queued only by PLC_GHZ (line 116). The
+// classifier answers from the transcribed maps: in base AND overridden nowhere.
+
+import { objectArtIsZoneFree } from '../s1-object-art';
+
+describe('objectArtIsZoneFree', () => {
+  it('Ring ($25), Monitor ($26) and Signpost ($0d) are zone-free: base-linked, never overridden', () => {
+    expect(objectArtIsZoneFree(0x25)).toBe(true);
+    expect(objectArtIsZoneFree(0x26)).toBe(true);
+    expect(objectArtIsZoneFree(0x0d)).toBe(true);
+  });
+
+  it('zone-scoped ids are NOT zone-free — Moto Bug ($40, ghz-only) and the per-zone $1c/$53', () => {
+    expect(objectArtIsZoneFree(0x40)).toBe(false);
+    expect(objectArtIsZoneFree(0x1c)).toBe(false); // GHZ Bridge stump vs SLZ Fireball Thrower
+    expect(objectArtIsZoneFree(0x53)).toBe(false); // different art in MZ/SLZ/SBZ
+  });
+
+  it('unlinked ids are not zone-free (there is nothing to open)', () => {
+    expect(objectArtIsZoneFree(0x02)).toBe(false);
+    expect(objectArtIsZoneFree(0x71)).toBe(false); // Invisible Block — deliberately unlinked
+  });
+
+  it('agrees with resolveObjectArt across every zone: a zone-free id resolves IDENTICALLY everywhere', () => {
+    const zones = Object.keys(S1_OBJECT_ART_ZONE);
+    for (const id of Object.keys(S1_OBJECT_ART_BASE).map(Number)) {
+      if (!objectArtIsZoneFree(id)) continue;
+      const base = resolveObjectArt(id, undefined);
+      for (const z of zones) {
+        expect(resolveObjectArt(id, z), `id $${id.toString(16)} in ${z}`).toBe(base);
+      }
+    }
+  });
+});

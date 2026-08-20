@@ -178,15 +178,57 @@ describe('editObjectArtCheckout', () => {
     expect(getLoadedSpriteDocId()).toBeNull();
   });
 
-  it('is a no-op when no classic level is open (no zone)', async () => {
+  it('with no level open, a ZONE-SCOPED id is a no-op (nothing to resolve against)', async () => {
+    // $40 Moto Bug is linked only under the ghz zone map (its Nem_Motobug art is
+    // queued only by PLC_GHZ in the disasm) — with no zone from any source the
+    // per-zone link is unresolvable, so the checkout refuses before the opener.
+    useClassicLevelStore.setState({ ref: null, doc: null });
+    const calls: OpenCall[] = [];
+    __setSpriteSetOpenerForTest(stubOpener(calls));
+
+    const ok = await editObjectArtCheckout(0x40);
+    expect(ok).toBe(false);
+    expect(calls).toHaveLength(0);
+    expect(getLoadedSpriteDocId()).toBeNull();
+  });
+
+  it('with no level open, a ZONE-FREE id opens level-free (shared art needs no zone)', async () => {
+    // $0d Signpost sits in the base map and no zone map redefines it — same
+    // class as Ring ($25, artnem/Rings.nem via PLC_Main): one shared file, so
+    // requiring a level was ceremony, not a data dependency.
     useClassicLevelStore.setState({ ref: null, doc: null });
     const calls: OpenCall[] = [];
     __setSpriteSetOpenerForTest(stubOpener(calls));
 
     const ok = await editObjectArtCheckout(0x0d);
-    expect(ok).toBe(false);
-    expect(calls).toHaveLength(0);
-    expect(getLoadedSpriteDocId()).toBeNull();
+    expect(ok).toBe(true);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].set).toMatchObject({ mappings: '_maps/Signpost.asm', art: 'artnem/Signpost.nem' });
+  });
+
+  it('a persisted zone key resolves the checkout with NO level open (session restore)', async () => {
+    // The restored-tab path: no act loaded, but the tab carries its own
+    // S1ZoneKey. $1c resolves differently per zone (GHZ Bridge stump vs SLZ
+    // Fireball Thrower), so the key must pick the art — slz here, with no ref.
+    useClassicLevelStore.setState({ ref: null, doc: null });
+    const calls: OpenCall[] = [];
+    __setSpriteSetOpenerForTest(stubOpener(calls));
+
+    const ok = await editObjectArtCheckout(0x1c, { zone: 'slz', act: 1 });
+    expect(ok).toBe(true);
+    expect(calls[0].set).toMatchObject({ mappings: '_maps/Scenery.asm', art: 'artnem/SLZ Cannon.nem' });
+  });
+
+  it('the persisted zone key WINS over a different open act (tab identity sticks)', async () => {
+    // The tab was created as "GHZ bridge stump"; restoring it while an SLZ act
+    // happens to be open must not silently re-resolve it as SLZ's $1c.
+    setZone('slz');
+    const calls: OpenCall[] = [];
+    __setSpriteSetOpenerForTest(stubOpener(calls));
+
+    const ok = await editObjectArtCheckout(0x1c, { zone: 'ghz', act: 1 });
+    expect(ok).toBe(true);
+    expect(calls[0].set).toMatchObject({ mappings: '_maps/Bridge.asm', art: 'artnem/GHZ Bridge.nem' });
   });
 });
 
