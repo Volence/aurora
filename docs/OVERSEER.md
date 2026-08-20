@@ -91,6 +91,11 @@ trusting, the repos move.
   Aurora runs no re-bake of its own. The canonical build fails loud on stale editor data.
   Build the flavour matching the RUNNING ROM (`emulator/status.romPath`), or the reload
   targets a file the build never touched.
+- **Boot zeroes all 64KB of work RAM.** A write to a reset-paused machine is gone
+  before level init reads it, and the boot proceeds with authored values SILENTLY —
+  the client looks finished having done nothing. Anything init must consume is written
+  at `reload_rom → run_to <init symbol> → write, flag last → continue`, where the
+  machine is stopped at the init's entry and nothing is painted yet.
 - **`emulator/reset` is off-limits on the hosted build** until aeon's F-HOSTED-RESET-SRM
   closes — it bypasses the player's `.srm` flush. `reload_rom` is unaffected.
 - **`.lst` listings carry a third `EQU` section**; oracle-next's parser handles it.
