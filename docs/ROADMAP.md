@@ -312,7 +312,13 @@ Health: 3383 passed / 3 skipped, `tsc` clean.
 
 **Loop cost, attributed** (the interesting number was never the build): re-bake
 7–12s · build 1.3s · position restore 1.5s · reload 64ms · save ~0. Aeon has an
-incremental content-addressed re-bake in flight targeting <2s. Aurora's own
+incremental content-addressed re-bake in flight targeting <2s. **Updated 2026-08-20:**
+aeon's re-bake landed at 0.99s, and position restore moved to the engine's boot-position
+override (aeon `a2a24eb9`, ARCH §4.12b; consumed here in `src/main/aether/boot-restore.ts`)
+— measured 643ms vs the warp-retry loop's 1442ms, and the first painted frame IS the
+destination (the draw-then-jump is deleted, not shortened). The warp loop survives only
+as a fallback for pre-override DEBUG ROMs; `restoredTo` now reports the engine-published
+clamped pair on both paths. Aurora's own
 contribution to the wall was a save that rewrote every file whether it had changed
 or not, which bumped ~40 mtimes and marked aeon's level tree stale on **every**
 build — fixed by comparing before writing.

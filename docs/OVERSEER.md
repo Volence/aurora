@@ -91,6 +91,19 @@ trusting, the repos move.
   Aurora runs no re-bake of its own. The canonical build fails loud on stale editor data.
   Build the flavour matching the RUNNING ROM (`emulator/status.romPath`), or the reload
   targets a file the build never touched.
+- **Boot-position override** (DEBUG shape only, aeon `a2a24eb9`, ARCH §4.12b):
+  `Boot_At_X`/`Boot_At_Y` (u16 world px) + `Boot_At_Flag`, same clamp/publish-back/
+  cleared-flag-ack contract as the warp mailbox, consumed by Build & Run's restore
+  (`src/main/aether/boot-restore.ts`) at the run_to-the-init window below. **The
+  cleared flag can be FORGED**: a write that lands before the boot clear is zeroed
+  along with the flag, which reads exactly like an ack — any check of this sequence
+  must verify position via an independent read, never the flag alone. The warp-retry
+  fallback (pre-override DEBUG ROMs) inherits this hazard on paused machines and is
+  unguarded; it vanishes as ROMs carry `Boot_At_*`.
+- **Fresh headless oracle-aether is paused at frame 0** — reads before any resume see
+  reset-RAM garbage; and after `reload_rom`, RAM holds the OLD session's values until
+  the boot clear runs, so level-up polls must gate on `frameToken`, not on plausible
+  values.
 - **Boot zeroes all 64KB of work RAM.** A write to a reset-paused machine is gone
   before level init reads it, and the boot proceeds with authored values SILENTLY —
   the client looks finished having done nothing. Anything init must consume is written
