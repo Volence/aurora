@@ -9,8 +9,8 @@
 
 import type { AetherClient } from './client';
 import {
-  planPalettePush, planPalettePushWords, PAL_BASE_SYMBOL, PAL_BASE_DIRTY_SYMBOL,
-  type PalettePushPlan,
+  planPalettePush, planPalettePushWordsFor,
+  type PalettePushPlan, type PalettePushKind,
 } from '../../core/aether/palette-push';
 import type { Color } from '../../core/model/types';
 
@@ -31,16 +31,26 @@ export interface PalettePushResult {
 const hex = (n: number) => '0x' + (n >>> 0).toString(16).toUpperCase();
 const hexBytes = (b: Uint8Array) => '0x' + Buffer.from(b).toString('hex');
 
-/** Push a line held as editor CRAM words — the path the UI actually uses. */
+/**
+ * Push a line held as editor CRAM words — the path the UI actually uses.
+ *
+ * `kind` selects the geometry: aeon writes `Pal_Base` (lines 1-3) then raises
+ * the dirty flag; classic writes the line's own `v_palette_line_N` symbol
+ * (lines 0-3, no flag — S1's VBlank re-DMAs unconditionally). The kind is the
+ * OPEN PROJECT's, not a probe of the ROM: if the running ROM is the other
+ * family, its listing simply lacks the symbols and the push gates NoSymbols —
+ * resolution IS the detection (contract D7; nothing here hardcodes addresses).
+ */
 export function pushPaletteWords(
   client: AetherClient,
   line: number,
   words: readonly number[],
+  kind: PalettePushKind = 'aeon',
 ): Promise<PalettePushResult> {
-  return pushPlanned(client, line, () => planPalettePushWords(line, words));
+  return pushPlanned(client, line, () => planPalettePushWordsFor(kind, line, words));
 }
 
-/** Push a line held as `Color`s. */
+/** Push a line held as `Color`s. (aeon-only caller today) */
 export function pushPaletteLine(
   client: AetherClient,
   line: number,
@@ -74,13 +84,13 @@ async function pushPlanned(
     };
   }
 
-  // Both symbols or nothing. A ROM built without them — or a future engine that
-  // renames one — greys the feature out; it never writes into a guessed
-  // address, which is the whole point of contract D7.
-  let base: number, dirty: number;
+  // EVERY symbol the plan names, or nothing. A ROM built without them — the
+  // other engine family, a stripped build, a future rename — greys the feature
+  // out; it never writes into a guessed address, which is the whole point of
+  // contract D7.
+  const addrs = new Map<string, number>();
   try {
-    base = await client.resolve(PAL_BASE_SYMBOL);
-    dirty = await client.resolve(PAL_BASE_DIRTY_SYMBOL);
+    for (const s of plan.symbols) addrs.set(s, await client.resolve(s));
   } catch (e) {
     return {
       pushed: false,
@@ -89,8 +99,7 @@ async function pushPlanned(
     };
   }
 
-  const addrOf = (symbol: string, offset: number) =>
-    hex((symbol === PAL_BASE_SYMBOL ? base : dirty) + offset);
+  const addrOf = (symbol: string, offset: number) => hex((addrs.get(symbol) ?? 0) + offset);
 
   // `write_memory` is require_paused. The machine must go back to WHATEVER IT
   // WAS DOING afterwards, including when a write throws.
