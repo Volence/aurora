@@ -95,7 +95,18 @@ export interface SpriteDoc {
   exportDplc: boolean;         // export as DPLC (streamed art) vs flat resident art
   format: SpriteFormatId;      // game format to interpret on open / write on export
   /** Named animations loaded from a character's script (empty for new/editor sprites). */
-  characterAnims: { name: string; steps: AnimStepUI[] }[];
+  characterAnims: CharacterAnimUI[];
+}
+
+/** One picker entry. `synced` marks a transcribed SynchroAnimate cycle (a global
+ *  engine counter shared by all instances — read-only data, not an `_anim`
+ *  script); `note` is its honest caveat (approximate rate, phase offset),
+ *  surfaced as the picker option's tooltip. */
+export interface CharacterAnimUI {
+  name: string;
+  steps: AnimStepUI[];
+  synced?: boolean;
+  note?: string;
 }
 
 /**
@@ -175,7 +186,7 @@ interface SpriteState extends SpriteDoc {
   setPlaybackMode: (m: PlaybackMode) => void;
   setSteps: (steps: AnimStepUI[]) => void;
 
-  setCharacterAnims: (anims: { name: string; steps: AnimStepUI[] }[]) => void;
+  setCharacterAnims: (anims: CharacterAnimUI[]) => void;
 
   // Load (replace the whole working sprite)
   loadSprite: (frames: PixelBuffer[], steps: AnimStepUI[], originX: number, originY: number) => void;

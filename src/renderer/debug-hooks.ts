@@ -555,7 +555,7 @@ interface DebugApi {
   spriteState(): {
     activeDocId: string | null;
     frames: number;
-    anims: { name: string; steps: { frameIndex: number; duration: number; xFlip?: boolean; yFlip?: boolean }[] }[];
+    anims: { name: string; synced?: boolean; note?: string; steps: { frameIndex: number; duration: number; xFlip?: boolean; yFlip?: boolean }[] }[];
     steps: { frameIndex: number; duration: number; xFlip?: boolean; yFlip?: boolean }[];
     unsavedEdits: boolean;
   };
@@ -624,7 +624,7 @@ export function installDebugHooks(): void {
       return {
         activeDocId: s.activeDocId,
         frames: s.frames.length,
-        anims: s.characterAnims.map((a) => ({ name: a.name, steps: a.steps.map((st) => ({ ...st })) })),
+        anims: s.characterAnims.map((a) => ({ name: a.name, synced: a.synced, note: a.note, steps: a.steps.map((st) => ({ ...st })) })),
         steps: s.steps.map((st) => ({ ...st })),
         unsavedEdits: s.unsavedEdits,
       };

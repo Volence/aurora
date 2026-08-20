@@ -29,9 +29,59 @@
 // global object index — the same id runs the same code (and thus the same
 // script) in every zone it appears in.
 
-/** One object's animation-script link: the disasm-relative `_anim/*.asm` file. */
+// ---------------------------------------------------------------------------
+// SYNCHRONIZED (SynchroAnimate) animations. Rings do NOT spin via an `_anim`
+// script: `SynchroAnimate` (s1disasm sonic.asm:3136, called once per frame from
+// the level main loops at sonic.asm:3034/:3679/:3717) advances four GLOBAL
+// counter pairs (v_aniN_time / v_aniN_frame, _Variables.asm:410-418), and each
+// consuming object copies the shared frame counter straight into obFrame — so
+// every instance animates in phase. Transcribed here as read-only DATA; Aurora
+// never authors sync state (that is engine code).
+//
+// The four channels (every citation = s1disasm sonic.asm unless noted):
+//   0  Sync1 :3139-3144  timer reset `#12-1` → steps every 12 frames;
+//      `subq` + `andi #7` → DESCENDING cycle through 8 frames.
+//      Consumer: Obj17 GHZ Spiked Pole Helix.
+//   1  Sync2 :3147-3152  timer reset `#8-1` → steps every 8 frames;
+//      `addq` + `andi #3` → ascending cycle through 4 frames.
+//      Consumers: Obj25 Ring, Obj4B Giant Ring.
+//   2  Sync3 :3155-3162  every 8 frames, frames 0-5 — "Used for nothing"
+//      (its own header comment): NO level-mode consumer, so no row below.
+//   3  Sync4 :3165-3176  ACCUMULATOR, not a fixed rate — active only while
+//      the ring-loss timer runs; see the Obj37 row for the derivation.
+//      Consumer: Obj37 scattered (bouncing) rings.
+//
+// Special Stage reuses the same RAM with its OWN updater and rates
+// (_inc/Special Stage Loading & Drawing.asm:165-220) — SS is a different
+// runtime context and is out of scope for the level-object timeline.
+
+/**
+ * One synchronized animation, transcribed from SynchroAnimate + its consumer.
+ * `frames` is the mapping-frame order AS DISPLAYED over time (channel 0 counts
+ * down, so its list descends); `framesPerStep` is 1/60s game frames per step —
+ * the exact reset constant for channels 0-2, the measured AVERAGE for the
+ * channel-3 accumulator (flagged `approximate`, with the honest story in
+ * `note`). The UI shows these read-only alongside scripted anims.
+ */
+export interface SyncAnimEntry {
+  name: string;
+  /** SynchroAnimate channel index (v_ani<channel>_frame). */
+  channel: 0 | 1 | 2 | 3;
+  /** Mapping frames in display order (one full cycle). */
+  frames: readonly number[];
+  /** Game frames (1/60s) per animation step; average when `approximate`. */
+  framesPerStep: number;
+  /** True when the real engine rate is NOT constant and this is an average. */
+  approximate?: true;
+  /** Honest caveat the UI can disclose (accumulator shape, phase offsets…). */
+  note?: string;
+}
+
+/** One object's animation linkage: an `_anim/*.asm` script (disasm-relative),
+ *  synchronized entries, or both. At least one is always present. */
 export interface ObjectAnimLink {
-  animAsm: string;
+  animAsm?: string;
+  sync?: readonly SyncAnimEntry[];
 }
 
 const anim = (animAsm: string): ObjectAnimLink => ({ animAsm });
@@ -44,6 +94,19 @@ const anim = (animAsm: string): ObjectAnimLink => ({ animAsm });
 export const S1_OBJECT_ANIMS: Readonly<Record<number, ObjectAnimLink>> = {
   // --- Placeable objects / badniks -----------------------------------------
   0x08: anim('_anim/Water Splash.asm'), // lea Ani_Splash ← _incObj/08 LZ Water Splash.asm
+  0x17: { // GHZ Spiked Pole Helix — sync-only (no _anim script)
+    sync: [{
+      name: 'rotate',
+      channel: 0, // Sync1: sonic.asm:3139-3144 — reset `#12-1`, `subq`, `andi #7`
+      // v_ani0_frame counts DOWN mod 8, so display order descends. Frames 0-7 =
+      // Map_Hel .up/.up45/.up90/.down45/.down/.down45bg/<invisible>/.up45bg
+      // (_maps/Spiked Pole Helix.asm:4-12).
+      frames: [0, 7, 6, 5, 4, 3, 2, 1],
+      framesPerStep: 12, // exact: the `move.b #12-1,(v_ani0_time).w` reset, sonic.asm:3141
+      note: 'Each spike instance adds its own base offset: obFrame = (v_ani0_frame + helix_frame) & 7 '
+        + '(_incObj/17 GHZ Spiked Pole Helix.asm:107-111). Shown here at offset 0; other spikes are phase-shifted copies.',
+    }],
+  },
   0x0a: anim('_anim/Drowning Countdown.asm'), // include + 3 lea ← _incObj/0A LZ Drowning Countdown.asm
   0x0c: anim('_anim/Flapping Door.asm'), // include + lea Ani_Flap ← _incObj/0C LZ Flapping Door.asm
   0x0d: anim('_anim/Signpost.asm'), // include + lea Ani_Sign ← _incObj/0D Signpost.asm
@@ -53,14 +116,41 @@ export const S1_OBJECT_ANIMS: Readonly<Record<number, ObjectAnimLink>> = {
   0x1f: anim('_anim/Crabmeat.asm'), // include + 2 lea Ani_Crab ← _incObj/1F Badnik - Crabmeat.asm
   0x22: anim('_anim/Buzz Bomber.asm'), // include ← _incObj/22, 23…; lea Ani_Buzz is the $22 body
   0x23: anim('_anim/Buzz Bomber Missile.asm'), // include ← _incObj/22, 23…; 4 lea Ani_Missile are the $23 missile
-  0x25: anim('_anim/Rings.asm'), // included from sonic.asm:4120; lea Ani_Ring ← _incObj/25, 37 Rings.asm
+  0x25: { // Ring: the SPIN is synced (Sync2); the _anim script is only the collect-sparkle
+    animAsm: '_anim/Rings.asm', // included from sonic.asm:4120; lea Ani_Ring ← _incObj/25, 37 Rings.asm
+    sync: [{
+      name: 'spin',
+      channel: 1, // Sync2: sonic.asm:3147-3152 — reset `#8-1`, `addq`, `andi #3`
+      // Ring_Animate copies v_ani1_frame → obFrame (_incObj/25, 37 Rings.asm:134).
+      // Frames 0-3 = Map_Ring .front/.angle1/.edge/.angle2 (_maps/Rings (REV01).asm:4-13).
+      frames: [0, 1, 2, 3],
+      framesPerStep: 8, // exact: the `move.b #8-1,(v_ani1_time).w` reset, sonic.asm:3149
+    }],
+  },
   0x26: anim('_anim/Monitor.asm'), // include + lea Ani_Monitor ← _incObj/26, 2E Monitors and Power-Ups.asm
   0x2a: anim('_anim/SBZ Small Door.asm'), // include + lea Ani_ADoor ← _incObj/2A SBZ Small Door.asm
   0x2b: anim('_anim/Chopper.asm'), // include + lea Ani_Chop ← _incObj/2B Badnik - Chopper.asm
   0x2c: anim('_anim/Jaws.asm'), // include + lea Ani_Jaws ← _incObj/2C Badnik - Jaws.asm
   0x2d: anim('_anim/Burrobot.asm'), // include + lea Ani_Burro ← _incObj/2D Badnik - Burrobot.asm
   0x35: anim('_anim/Burning Grass.asm'), // include + lea Ani_GFire ← _incObj/2F, 35 MZ Large Grassy Platforms and Burning Grass.asm ($2F platform is static)
-  0x37: anim('_anim/Rings.asm'), // scattered rings — same _incObj/25, 37 Rings.asm code binds Ani_Ring
+  0x37: { // Scattered rings — same file binds Ani_Ring; the bounce-spin is the Sync4 accumulator
+    animAsm: '_anim/Rings.asm', // scattered rings — same _incObj/25, 37 Rings.asm code binds Ani_Ring
+    sync: [{
+      name: 'spin (scattering)',
+      channel: 3, // Sync4: sonic.asm:3165-3176 — accumulator, NOT a fixed-rate timer
+      // RLoss_Bounce copies v_ani3_frame → obFrame (_incObj/25, 37 Rings.asm:315).
+      frames: [0, 1, 2, 3],
+      // AVERAGE, derived: while the loss timer T runs (seeded 255,
+      // _incObj/25, 37 Rings.asm:270), each frame does buf += T; T -= 1, and the
+      // displayed frame is (buf >> 9) & 3 (`rol.w #7` + `andi #3`,
+      // sonic.asm:3170-3173). Total buf = 255·256/2 = 32640 → 32640/512 = 63.75
+      // frame steps over 255 game frames → 4.0 game frames per step on average.
+      framesPerStep: 4,
+      approximate: true,
+      note: 'Accumulator channel: spins fast right after the hit (~2 frames/step while the timer is high) '
+        + 'and decelerates as the loss timer runs out. The timeline plays the measured 4-frame average.',
+    }],
+  },
   0x38: anim('_anim/Shield and Invincibility.asm'), // included from sonic.asm:4250; 2 lea Ani_Shield ← _incObj/38 Shield and Invincibility.asm
   0x3e: anim('_anim/Prison Capsule.asm'), // include + lea Ani_Pri ← _incObj/3E Prison Capsule.asm
   0x40: anim('_anim/Moto Bug.asm'), // include + 2 lea Ani_Moto ← _incObj/40 Badnik - Moto Bug.asm
@@ -69,6 +159,17 @@ export const S1_OBJECT_ANIMS: Readonly<Record<number, ObjectAnimLink>> = {
   0x43: anim('_anim/Roller.asm'), // include + lea Ani_Roll ← _incObj/43 Badnik - Roller.asm
   0x47: anim('_anim/Bumper.asm'), // include + lea Ani_Bump ← _incObj/47 SYZ Bumper.asm
   0x4a: anim('_anim/Special Stage Entry (Unused).asm'), // included from sonic.asm:4252; lea Ani_Vanish ← _incObj/4A Unused - Special Stage Entry.asm
+  0x4b: { // Giant Ring — sync-only: shares the ring channel (no _anim script)
+    sync: [{
+      name: 'spin',
+      channel: 1, // Sync2: sonic.asm:3147-3152 — same channel as Obj25
+      // GRing_Animate copies v_ani1_frame → obFrame (_incObj/4B, 7C Giant Ring
+      // and Flash.asm:43). Frames 0-3 = Map_GRing .gring_front/.gring_angled1/
+      // .gring_side/.gring_angled2 (_maps/Giant Ring.asm:4-8).
+      frames: [0, 1, 2, 3],
+      framesPerStep: 8, // exact: sonic.asm:3149 reset — in phase with every small ring
+    }],
+  },
   0x4c: anim('_anim/Lava Geyser.asm'), // included from sonic.asm:4205; 2 lea Ani_Geyser ← _incObj/4C, 4D MZ Lava Geyser and Maker.asm
   0x4e: anim('_anim/Wall of Lava.asm'), // included from sonic.asm:4206; lea Ani_LWall ← _incObj/4E MZ Wall of Lava.asm
   0x50: anim('_anim/Yadrin.asm'), // include + lea Ani_Yad ← _incObj/50 Badnik - Yadrin.asm

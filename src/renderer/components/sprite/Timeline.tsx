@@ -116,7 +116,14 @@ export default function Timeline() {
         {characterAnims.length > 0 && (
           <select style={styles.select} defaultValue="0"
             onChange={(e) => { const a = characterAnims[Number(e.target.value)]; if (a) useSpriteStore.getState().setSteps(a.steps); }}>
-            {characterAnims.map((a, i) => <option key={a.name} value={i}>{a.name} ({a.steps.length}f)</option>)}
+            {characterAnims.map((a, i) => (
+              // Synced entries are transcribed SynchroAnimate cycles (global
+              // engine counters), labeled so, with their honest caveat (e.g.
+              // the accumulator channel's average rate) as the tooltip.
+              <option key={a.name} value={i} title={a.note}>
+                {a.name} ({a.steps.length}f{a.synced ? ', synced' : ''})
+              </option>
+            ))}
           </select>
         )}
       </div>
