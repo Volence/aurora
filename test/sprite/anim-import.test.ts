@@ -2,6 +2,10 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync, existsSync } from 'fs';
 import { parseCharacterAnims } from '../../src/core/import/anim-import';
 
+// ParsedAnim.frames carries per-frame flip flags since the S1 anim work; these
+// dialects have none, so every frame is {index, xFlip:false, yFlip:false}.
+const fr = (index: number) => ({ index, xFlip: false, yFlip: false });
+
 const SAMPLE = `
 ; comment
 Ani_Sonic:
@@ -25,8 +29,8 @@ describe('parseCharacterAnims', () => {
   it('parses names, durations (incl. DUR_DYNAMIC), hex+dec frames, and control', () => {
     const anims = parseCharacterAnims(SAMPLE);
     expect(anims.map((a) => a.name)).toEqual(['Walk', 'Wait']);
-    expect(anims[0]).toMatchObject({ name: 'Walk', duration: 'dynamic', frames: [7, 8, 1, 2, 3, 4, 5, 6], control: { kind: 'loop' } });
-    expect(anims[1]).toMatchObject({ name: 'Wait', duration: 7, frames: [0xba, 0xba, 0xbb], control: { kind: 'back', count: 5 } });
+    expect(anims[0]).toMatchObject({ name: 'Walk', duration: 'dynamic', frames: [7, 8, 1, 2, 3, 4, 5, 6].map(fr), control: { kind: 'loop' } });
+    expect(anims[1]).toMatchObject({ name: 'Wait', duration: 7, frames: [0xba, 0xba, 0xbb].map(fr), control: { kind: 'back', count: 5 } });
   });
 
   it('returns [] when there is no table', () => {
@@ -44,9 +48,9 @@ const FILE = '/home/volence/sonic_hacks/s4_engine/data/animations/sonic_anims.as
       'Walk', 'Run', 'Roll', 'Spindash', 'Push', 'Wait', 'Balance', 'LookUp', 'Duck', 'Skid', 'GetUp',
     ]);
     const walk = anims.find((a) => a.name === 'Walk')!;
-    expect(walk.frames).toEqual([7, 8, 1, 2, 3, 4, 5, 6]);
+    expect(walk.frames).toEqual([7, 8, 1, 2, 3, 4, 5, 6].map(fr));
     expect(walk.control).toEqual({ kind: 'loop' });
     // every frame index is a valid mapping frame (< 0xF7) and within Sonic's 224 frames
-    for (const a of anims) for (const f of a.frames) { expect(f).toBeLessThan(224); expect(f).toBeGreaterThanOrEqual(0); }
+    for (const a of anims) for (const f of a.frames) { expect(f.index).toBeLessThan(224); expect(f.index).toBeGreaterThanOrEqual(0); }
   });
 });

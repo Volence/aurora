@@ -362,13 +362,19 @@ export async function openSprite(sourceFormat: SpriteFormatId = 's2', artCompres
   }
 }
 
-/** Convert parsed animations into editor timeline animations for the current frames. */
+/** Convert parsed animations into editor timeline animations for the current frames.
+ *  Per-frame flips (S1 `2|aniXFlip` bytes) ride along on the step. */
 function toTimelineAnims(parsed: ParsedAnim[], frameCount: number) {
   return parsed.map((a) => ({
     name: a.name,
     steps: a.frames
-      .filter((f) => f < frameCount)
-      .map((f) => ({ frameIndex: f, duration: a.duration === 'dynamic' ? DYNAMIC_PREVIEW_HOLD : Math.max(1, a.duration) })),
+      .filter((f) => f.index < frameCount)
+      .map((f) => ({
+        frameIndex: f.index,
+        duration: a.duration === 'dynamic' ? DYNAMIC_PREVIEW_HOLD : Math.max(1, a.duration),
+        xFlip: f.xFlip,
+        yFlip: f.yFlip,
+      })),
   })).filter((a) => a.steps.length > 0);
 }
 
@@ -632,12 +638,7 @@ export async function loadEngineCharacter(name: string): Promise<void> {
     try {
       const asm = new TextDecoder().decode(new Uint8Array(await window.api.readBinaryFile(base, `data/animations/${name}_anims.asm`)));
       const parsed = parseCharacterAnims(asm);
-      const charAnims = parsed.map((a) => ({
-        name: a.name,
-        steps: a.frames
-          .filter((f) => f < frames.length)
-          .map((f) => ({ frameIndex: f, duration: a.duration === 'dynamic' ? DYNAMIC_PREVIEW_HOLD : Math.max(1, a.duration) })),
-      })).filter((a) => a.steps.length > 0);
+      const charAnims = toTimelineAnims(parsed, frames.length);
       useSpriteStore.getState().setCharacterAnims(charAnims);
       if (charAnims[0]) useSpriteStore.getState().setSteps(charAnims[0].steps); // auto-load the first
       animCount = charAnims.length;

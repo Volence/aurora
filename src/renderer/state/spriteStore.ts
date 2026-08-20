@@ -45,10 +45,14 @@ export interface S1ArtSource {
   frameCount: number;
 }
 
-/** One animation step: a reference to a frame + how long it holds (in 1/60s ticks). */
+/** One animation step: a reference to a frame + how long it holds (in 1/60s ticks).
+ *  `xFlip`/`yFlip` are the classic per-frame animation flip flags (S1 frame bytes
+ *  $20/$40, xor'd onto the object's facing in-engine); absent = unflipped. */
 export interface AnimStepUI {
   frameIndex: number;
   duration: number; // 1/60s ticks
+  xFlip?: boolean;
+  yFlip?: boolean;
 }
 
 /**
