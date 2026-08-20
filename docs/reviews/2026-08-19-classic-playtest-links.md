@@ -146,6 +146,20 @@ purely Aurora pressing the button.
 
 ## 2. Symbols — the gate
 
+> **CORRECTION (2026-08-19, same day, after oracle's review — authoritative over the
+> binding claim below):** "`EndOfRom` … so the binding then works for free" is **wrong**.
+> Verified against the artifacts: `sonic.asm:184` is `RomEndLoc: dc.l EndOfRom-1`, so
+> `EndOfRom` lands at **exactly** ROM length — `sonic.lst` says `86978` and `s1built.bin`
+> is exactly 551,288 = $86978 bytes. One-past-the-end means the $DEB2 appendix probe
+> either reads out-of-range (unpadded, the case here) or reads padding; both refuse, and
+> the accepted-unverified fallback did not apply because the symbol IS present. Oracle
+> ruled the same day: **EndOfRom == ROM length exactly is treated as a no-appendix
+> marker → accepted UNVERIFIED** (one-past-the-end cannot be a mismatched in-range
+> listing, so the wrong-listing guard stays intact). The parser fix itself is booked and
+> implementing on oracle's side, bundled with the CRAM handlers; the |-split finding
+> corroborated their independent recon, and the 48-bit sign-extended RAM finding was new
+> to them. Nothing else in this section changes.
+
 ### The build does emit a listing
 
 `common.lua:772` passes `-L` to AS:
