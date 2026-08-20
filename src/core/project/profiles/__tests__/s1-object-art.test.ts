@@ -27,9 +27,12 @@ describe('s1-object-art linkage table', () => {
   it('every entry has a plausible, disasm-relative shape', () => {
     for (const { where, id, link } of allLinks()) {
       const tag = `${where}:$${id.toString(16)}`;
-      // Object ids are 7-bit.
+      // Object ids live in the disasm object index (obID is a byte; the index
+      // runs to $8C — _inc/Object Pointers.asm:156). Placeable objpos ids stop
+      // at $7F, but the FZ/SBZ2 boss actors $82-$86 are linked for their
+      // sprite docs.
       expect(id, tag).toBeGreaterThanOrEqual(0);
-      expect(id, tag).toBeLessThanOrEqual(0x7f);
+      expect(id, tag).toBeLessThanOrEqual(0x8c);
       // artSource is always one of the two known kinds (B6).
       expect(['file', 'levelArt'], tag).toContain(link.artSource);
       if (link.artSource === 'levelArt') {
@@ -193,6 +196,106 @@ describe('red-box sweep closeout (post-B6)', () => {
   });
 });
 
+// --- boss-family rows (transcribed from the disasm source; no SonLVL objdefs) --
+
+import { parseAsmMappings } from '../../../import/asm-mappings';
+
+/** Every boss-family link: [tag, zone-or-undefined, id]. */
+const BOSS_ROWS: readonly [string, string | undefined, number][] = [
+  ['GHZ boss', undefined, 0x3d],
+  ['Wrecking Ball', undefined, 0x48],
+  ['MZ boss', undefined, 0x73],
+  ['Boss Fire', 'mz', 0x74],
+  ['SYZ boss', undefined, 0x75],
+  ['Boss Block', 'syz', 0x76],
+  ['LZ boss', undefined, 0x77],
+  ['SLZ boss', undefined, 0x7a],
+  ['Boss Spikeball', undefined, 0x7b],
+  ['SBZ2 Eggman', undefined, 0x82],
+  ['Crumbling Floor', undefined, 0x83],
+  ['FZ Cylinder', undefined, 0x84],
+  ['FZ Eggman', undefined, 0x85],
+  ['FZ Plasma Launcher', undefined, 0x86],
+];
+
+describe('boss-family art rows', () => {
+  it('the five zone bosses share ONE Eggman ship link (Nem_Eggman via PLC_Boss, Map_Eggman frame 0, line 0)', () => {
+    const ghz = resolveObjectArt(0x3d);
+    expect(ghz?.artFile).toBe('artnem/Boss - Main.nem');
+    expect(ghz?.mapAsm).toBe('_maps/Eggman.asm');
+    expect(ghz?.frame).toBe(0); // .ship
+    expect(ghz?.pal).toBe(0); // ArtTile_Eggman carries no Tile_Pal bits
+    for (const id of [0x73, 0x75, 0x77, 0x7a]) {
+      expect(resolveObjectArt(id), `$${id.toString(16)}`).toBe(ghz); // the SAME link object
+    }
+  });
+
+  it('the boss sub-objects and FZ/SBZ2 actors carry their cited art/maps/palette', () => {
+    // $48: Map_BossItems @ ArtTile_Eggman_Weapons (line 0), Nem_Weapons.
+    expect(resolveObjectArt(0x48)?.artFile).toBe('artnem/Boss - Weapons.nem');
+    expect(resolveObjectArt(0x48)?.mapAsm).toBe('_maps/Boss Items.asm');
+    expect(resolveObjectArt(0x48)?.pal).toBe(0);
+    // $7B: Map_SSawBall frame 1 (.silver — `move.b #1,obFrame`, _incObj 7A,7B:536).
+    expect(resolveObjectArt(0x7b)?.artFile).toBe('artnem/SLZ Little Spikeball.nem');
+    expect(resolveObjectArt(0x7b)?.mapAsm).toBe('_maps/Seesaw Ball.asm');
+    expect(resolveObjectArt(0x7b)?.frame).toBe(1);
+    // $82/$85 both draw Nem_Sbz2Eggman through Map_SEgg (PLC_EggmanSBZ2:433 /
+    // PLC_FZBoss:444 load the same binclude at different tiles).
+    for (const id of [0x82, 0x85]) {
+      expect(resolveObjectArt(id)?.artFile, `$${id.toString(16)}`).toBe('artnem/Boss - Eggman in SBZ2 & FZ.nem');
+      expect(resolveObjectArt(id)?.mapAsm, `$${id.toString(16)}`).toBe('_maps/Eggman - Scrap Brain 2.asm');
+    }
+    // $83: ArtTile_Eggman_Trap_Floor|Tile_Pal3 → palette line 2.
+    expect(resolveObjectArt(0x83)?.artFile).toBe('artnem/SBZ Vanishing Block.nem');
+    expect(resolveObjectArt(0x83)?.pal).toBe(2);
+    // $84/$86: both on Nem_FzBoss (ArtTile_FZ_Boss, line 0), different maps.
+    expect(resolveObjectArt(0x84)?.artFile).toBe('artnem/Boss - Final Zone.nem');
+    expect(resolveObjectArt(0x84)?.mapAsm).toBe("_maps/FZ Eggman's Cylinders.asm");
+    expect(resolveObjectArt(0x86)?.artFile).toBe('artnem/Boss - Final Zone.nem');
+    expect(resolveObjectArt(0x86)?.mapAsm).toBe('_maps/Plasma Ball Launcher.asm');
+    // $74 (mz): Map_Fire @ ArtTile_MZ_Fireball (line 0), Nem_MzFire.
+    expect(resolveObjectArt(0x74, 'mz')?.artFile).toBe('artnem/Fireballs.nem');
+    expect(resolveObjectArt(0x74, 'mz')?.mapAsm).toBe('_maps/Fireballs.asm');
+    expect(resolveObjectArt(0x74)).toBeUndefined(); // zone-scoped: no base entry
+    // $76 (syz): LevelArt @ ArtTile_Level|Tile_Pal3 → line 2.
+    expect(resolveObjectArt(0x76, 'syz')?.artSource).toBe('levelArt');
+    expect(resolveObjectArt(0x76, 'syz')?.pal).toBe(2);
+    expect(resolveObjectArt(0x76)).toBeUndefined();
+  });
+
+  describe.skipIf(!fs.existsSync(S1DIR))('against real s1disasm', () => {
+    it('every boss mapAsm parses and the linked default frame exists', () => {
+      for (const [tag, zone, id] of BOSS_ROWS) {
+        const link = resolveObjectArt(id, zone)!;
+        expect(link, tag).toBeDefined();
+        const text = fs.readFileSync(path.join(S1DIR, link.mapAsm), 'utf8');
+        const frames = parseAsmMappings(text);
+        expect(frames.length, `${tag} (${link.mapAsm})`).toBeGreaterThan(0);
+        expect(link.frame, `${tag} default frame in range`).toBeLessThan(frames.length);
+        // The default frame must actually draw something (not a blank frame).
+        expect(frames[link.frame].pieces.length, `${tag} frame ${link.frame} has pieces`).toBeGreaterThan(0);
+      }
+    });
+
+    it('frame counts match the hand-derived transcriptions (Eggman ship + Boss Items)', () => {
+      // HAND-DERIVED from the mappingsTable headers, never from the parser:
+      //   _maps/Eggman.asm — 13 mappingsTableEntry rows: .ship, .facenormal1,
+      //     .facenormal2, .facelaugh1, .facelaugh2, .facehit, .facepanic,
+      //     .facedefeat, .flame1, .flame2, .blank, .escapeflame1, .escapeflame2.
+      const eggman = parseAsmMappings(fs.readFileSync(path.join(S1DIR, '_maps/Eggman.asm'), 'utf8'));
+      expect(eggman.length).toBe(13);
+      //   _maps/Boss Items.asm — 8 rows: .chainanchor1, .chainanchor2, .cross,
+      //     .widepipe, .pipe, .spike, .legmask, .legs.
+      const items = parseAsmMappings(fs.readFileSync(path.join(S1DIR, '_maps/Boss Items.asm'), 'utf8'));
+      expect(items.length).toBe(8);
+      // $48's default (.chainanchor1) is the single 2x2 piece at tile 0 of
+      // Nem_Weapons — the one spritePiece row under that label.
+      expect(items[0].pieces.length).toBe(1);
+      expect(items[0].pieces[0].tile).toBe(0);
+    });
+  });
+});
+
 // --- zone-free classification (the "Ring is not stored per zone" measurement) --
 //
 // The distinction is measured against the disasm, not assumed: a zone-free id's
@@ -219,6 +322,20 @@ describe('objectArtIsZoneFree', () => {
   it('unlinked ids are not zone-free (there is nothing to open)', () => {
     expect(objectArtIsZoneFree(0x02)).toBe(false);
     expect(objectArtIsZoneFree(0x71)).toBe(false); // Invisible Block — deliberately unlinked
+  });
+
+  it('every zone-boss id is zone-free (shared PLC_Boss/PLC_EggmanSBZ2/PLC_FZBoss bincludes, base-linked, never overridden)', () => {
+    // Art provenance per id is cited on the rows themselves; the shared lists:
+    // PLC_Boss (_inc/Pattern Load Cues.asm:285-290) for $3D/$48/$73/$75/$77/
+    // $7A/$7B, PLC_EggmanSBZ2 (:432-434) for $82/$83, PLC_FZBoss (:441-445)
+    // for $84/$85/$86 — none of them zone art cues.
+    for (const id of [0x3d, 0x48, 0x73, 0x75, 0x77, 0x7a, 0x7b, 0x82, 0x83, 0x84, 0x85, 0x86]) {
+      expect(objectArtIsZoneFree(id), `$${id.toString(16)}`).toBe(true);
+    }
+    // The two zone-scoped boss parts are NOT: $74's Nem_MzFire rides PLC_MZ
+    // (:173) and $76 is LevelArt (the act's own tile pool).
+    expect(objectArtIsZoneFree(0x74)).toBe(false);
+    expect(objectArtIsZoneFree(0x76)).toBe(false);
   });
 
   it('agrees with resolveObjectArt across every zone: a zone-free id resolves IDENTICALLY everywhere', () => {

@@ -4,11 +4,16 @@ import { S1_OBJECT_LIST, s1ObjectHex } from '../../../core/project/profiles/s1-o
 import { resolveObjectArt } from '../../../core/project/profiles/s1-object-art';
 
 describe('classicObjectRows', () => {
-  it('emits one row per named S1 object, in S1_OBJECT_LIST order', () => {
+  it('emits one row per named PLACEABLE S1 object (id ≤ $7F), in S1_OBJECT_LIST order', () => {
+    // The objpos id byte's bit 7 is the remember-state flag, so the FZ/SBZ2
+    // boss actors ($82-$86, named only for their sprite docs) must NOT be
+    // offered for placement.
+    const placeable = S1_OBJECT_LIST.filter((o) => o.id <= 0x7f);
+    expect(placeable.length).toBeLessThan(S1_OBJECT_LIST.length); // $82+ exist and are excluded
     const rows = classicObjectRows('');
-    expect(rows).toHaveLength(S1_OBJECT_LIST.length);
-    expect(rows.map((r) => r.key)).toEqual(S1_OBJECT_LIST.map((o) => String(o.id)));
-    expect(rows.map((r) => r.label)).toEqual(S1_OBJECT_LIST.map((o) => o.name));
+    expect(rows).toHaveLength(placeable.length);
+    expect(rows.map((r) => r.key)).toEqual(placeable.map((o) => String(o.id)));
+    expect(rows.map((r) => r.label)).toEqual(placeable.map((o) => o.name));
   });
 
   it('badges rows with the $XX hex, so the filter finds an id', () => {
