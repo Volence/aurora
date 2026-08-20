@@ -23,11 +23,19 @@ export interface BuildPlanInput {
   raw?: Record<string, unknown>;
   /** The environment the app is running under. */
   env: Record<string, string | undefined>;
+  /**
+   * Does a path exist, relative to basePath? Injected so the plan stays pure —
+   * the default pre-build command is only used when the script is actually
+   * there, and a project without it must not have a phantom step planned.
+   */
+  exists?: (relativePath: string) => boolean;
 }
 
 export interface BuildPlan {
   command: string;
   args: string[];
+  /** Ran before the build. Null when the project declares none and none exists. */
+  prebuild: { command: string; args: string[] } | null;
   cwd: string;
   /** Extra environment the project asked for, merged over the inherited env. */
   envOverrides: Record<string, string>;
@@ -45,6 +53,24 @@ export interface BuildPlan {
 }
 
 export const DEFAULT_BUILD_COMMAND = './build.sh';
+
+/**
+ * The level re-bake, which `build.sh` deliberately does NOT run.
+ *
+ * aeon's own words (`tools/regenerate-level.sh`): *"MANUAL re-bake of the OJZ
+ * generated level tree + collision tables. These outputs are COMMITTED
+ * artifacts the build consumes directly … the build never runs these
+ * generators, because they read TWO out-of-repo donor projects at paths that
+ * only exist on an authoring machine. Run this by hand when the editor data
+ * changes."*
+ *
+ * Which means a save-then-build produces a ROM containing the PREVIOUS level
+ * data, every time, silently and successfully. Aurora is an authoring machine
+ * by definition — the donor projects are right there — so it runs the re-bake
+ * as part of Build & Run rather than leaving a hand step between "I edited a
+ * chunk" and "the game has my chunk".
+ */
+export const DEFAULT_PREBUILD_COMMAND = 'tools/regenerate-level.sh';
 export const DEFAULT_ROM = 's4.bin';
 export const DEFAULT_SYMBOLS = 's4.lst';
 
@@ -80,9 +106,18 @@ export function buildPlanFor(input: BuildPlanInput): BuildPlan {
   const merged = { ...input.env, ...envOverrides };
   const missingEnv = AEON_REQUIRED_ENV.filter((k) => !str(merged[k]));
 
+  // An explicit empty string turns the step OFF; absent means "use the default
+  // if the script is there". Both are things a project might reasonably want.
+  const declaredPre = raw.prebuildCommand;
+  const preLine = typeof declaredPre === 'string'
+    ? declaredPre
+    : (input.exists?.(DEFAULT_PREBUILD_COMMAND) ? DEFAULT_PREBUILD_COMMAND : '');
+  const [preCmd, ...preArgs] = preLine.split(/\s+/).filter(Boolean);
+
   return {
     command,
     args,
+    prebuild: preCmd ? { command: preCmd, args: preArgs } : null,
     cwd: input.basePath,
     envOverrides,
     romPath: str(raw.romPath) ?? DEFAULT_ROM,

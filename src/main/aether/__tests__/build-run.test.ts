@@ -290,3 +290,68 @@ describe('runBuild and the reload pause gate', () => {
     } finally { rmSync(dir, { recursive: true, force: true }); }
   });
 });
+
+describe('runBuild and the level re-bake', () => {
+  /**
+   * build.sh NEVER runs the level generators — its own tools/regenerate-level.sh
+   * says so: "MANUAL re-bake … the build never runs these generators … run this
+   * by hand when the editor data changes". So save-then-build assembles the
+   * PREVIOUS level data, successfully and silently, every time.
+   *
+   * Found by the owner stamping a chunk, building, reloading, and seeing the old
+   * layout — three times, across three different fixes to the wrong layer.
+   */
+  it('runs the re-bake before the build when the script exists', async () => {
+    const dir = scriptDir('echo BUILD; exit 0');
+    writeFileSync(join(dir, 'regen.sh'), '#!/bin/sh\necho REBAKE\n');
+    chmodSync(join(dir, 'regen.sh'), 0o755);
+    try {
+      const r = await runBuild({
+        basePath: dir, client: null, env: {},
+        raw: { prebuildCommand: './regen.sh' },
+      });
+      const out = r.output.join('\n');
+      expect(out).toContain('REBAKE');
+      expect(out).toContain('BUILD');
+      expect(out.indexOf('REBAKE')).toBeLessThan(out.indexOf('BUILD'));
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it('does NOT build when the re-bake fails', async () => {
+    // Building on a failed re-bake produces a ROM with the old level data and a
+    // green result — the worst of both.
+    const dir = scriptDir('echo BUILD; exit 0');
+    writeFileSync(join(dir, 'regen.sh'), '#!/bin/sh\necho "ERROR: donor missing" >&2\nexit 3\n');
+    chmodSync(join(dir, 'regen.sh'), 0o755);
+    try {
+      const r = await runBuild({
+        basePath: dir, client: null, env: {},
+        raw: { prebuildCommand: './regen.sh' },
+      });
+      expect(r.ok).toBe(false);
+      expect(r.exitCode).toBe(3);
+      expect(r.output.join('\n')).not.toContain('BUILD');
+      expect(r.output.join('\n')).toMatch(/NOT re-baked/);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it('skips the step when the project turns it off with an empty string', async () => {
+    const dir = scriptDir('echo BUILD; exit 0');
+    try {
+      const r = await runBuild({
+        basePath: dir, client: null, env: {}, raw: { prebuildCommand: '' },
+      });
+      expect(r.ok).toBe(true);
+      expect(r.output.join('\n')).toContain('BUILD');
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it('plans no step at all when the default script is absent', async () => {
+    const dir = scriptDir('echo BUILD; exit 0');
+    try {
+      const r = await runBuild({ basePath: dir, client: null, env: {} });
+      expect(r.plan.prebuild).toBeNull();
+      expect(r.ok).toBe(true);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+});

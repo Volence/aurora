@@ -25,8 +25,10 @@
 
 import { spawn } from 'node:child_process';
 import { join } from 'node:path';
+import { existsSync } from 'node:fs';
 import type { AetherClient } from './client';
 import { buildPlanFor, summariseBuildOutput, type BuildPlan } from '../../core/aether/build-plan';
+import { warpTo } from './warp';
 
 export interface BuildRunResult {
   ok: boolean;
@@ -42,6 +44,8 @@ export interface BuildRunResult {
   romPath?: string;
   /** True when the build was run in DEBUG flavour to match the running ROM. */
   debugBuild?: boolean;
+  /** Where the player was put back, when the position survived the reload. */
+  restoredTo?: { x: number; y: number };
   /** Required env vars that were absent — the usual cause of an instant exit 1. */
   missingEnv: string[];
   plan: BuildPlan;
@@ -55,6 +59,31 @@ export interface BuildRunOptions {
   client: AetherClient | null;
   onOutput?: (chunk: string) => void;
   signal?: AbortSignal;
+  /** Restore the player's position after the reload (default true). */
+  restorePosition?: boolean;
+}
+
+/** Spawn one command to completion, streaming its output. */
+function runOne(
+  command: string,
+  args: string[],
+  plan: BuildPlan,
+  opts: BuildRunOptions,
+  onChunk: (s: string) => void,
+): Promise<{ code: number | null }> {
+  return new Promise((resolve) => {
+    const child = spawn(command, args, {
+      cwd: plan.cwd,
+      env: { ...(opts.env ?? process.env), ...plan.envOverrides } as NodeJS.ProcessEnv,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      signal: opts.signal,
+    });
+    const collect = (c: Buffer): void => onChunk(c.toString('utf8'));
+    child.stdout?.on('data', collect);
+    child.stderr?.on('data', collect);
+    child.on('error', (e) => { onChunk(`\n${command}: ${e.message}\n`); resolve({ code: null }); });
+    child.on('close', (code) => resolve({ code }));
+  });
 }
 
 export async function runBuild(opts: BuildRunOptions): Promise<BuildRunResult> {
@@ -78,6 +107,7 @@ export async function runBuild(opts: BuildRunOptions): Promise<BuildRunResult> {
     basePath: opts.basePath,
     raw: opts.raw,
     env: opts.env ?? process.env,
+    exists: (rel) => existsSync(join(opts.basePath, rel)),
   });
 
   // DEBUG IS THE DEFAULT (owner's call, 2026-08-19). Someone driving a build
@@ -101,8 +131,26 @@ export async function runBuild(opts: BuildRunOptions): Promise<BuildRunResult> {
       : true;
   plan.envOverrides.DEBUG = wantsDebug ? '1' : '0';
 
+  let output = '';
+
+  // THE LEVEL RE-BAKE, FIRST. `build.sh` never runs the generators (it says so
+  // itself), so without this a save-then-build assembles the PREVIOUS level
+  // data — successfully, silently, every time. Measured at ~8s against aeon.
+  if (plan.prebuild) {
+    const pre = await runOne(
+      plan.prebuild.command, plan.prebuild.args, plan, opts,
+      (s) => { output += s; opts.onOutput?.(s); },
+    );
+    if (pre.code !== 0) {
+      output += `\n${plan.prebuild.command} failed — the level data was NOT re-baked, so a build here would assemble the previous one.\n`;
+      return {
+        ok: false, exitCode: pre.code, output: summariseBuildOutput(output),
+        reloaded: false, missingEnv: plan.missingEnv, plan, debugBuild: wantsDebug,
+      };
+    }
+  }
+
   return new Promise<BuildRunResult>((resolve) => {
-    let output = '';
     const child = spawn(plan.command, plan.args, {
       cwd: plan.cwd,
       env: { ...(opts.env ?? process.env), ...plan.envOverrides } as NodeJS.ProcessEnv,
@@ -175,6 +223,27 @@ export async function runBuild(opts: BuildRunOptions): Promise<BuildRunResult> {
           // warp. Unpaused it fails with "needs the machine paused", the BUILD
           // still succeeds, and the game keeps running the OLD ROM under a
           // "Build succeeded" toast, so the edit appears to have done nothing.
+          // REMEMBER WHERE THE PLAYER WAS, before the reload wipes it.
+          //
+          // A reload resets the machine, so without this Build & Run costs you
+          // your place in the level every time — you rebuild to check one chunk
+          // and land back at the act start. Read now, restore after boot, and
+          // the whole thing reads as a refresh rather than a restart.
+          let restoreTo: { x: number; y: number } | null = null;
+          if (opts.restorePosition !== false) {
+            try {
+              const player = await opts.client.resolve('Player_1');
+              const rd = async (addr: number): Promise<number> => {
+                const r = await opts.client!.call('emulator/read_memory', {
+                  addr: '0x' + (addr >>> 0).toString(16).toUpperCase(), len: 4,
+                }) as { bytes: string };
+                // SST position is 16.16 fixed; the whole pixel is the high word.
+                return Number.parseInt(r.bytes.replace(/^0x/i, ''), 16) >>> 16;
+              };
+              restoreTo = { x: await rd(player + 0x02), y: await rd(player + 0x06) };
+            } catch { /* no symbols, no restore — not worth failing the build over */ }
+          }
+
           const pauseResult = await opts.client.call('emulator/pause') as { wasRunning?: boolean };
           const wasRunning = pauseResult?.wasRunning !== false;
           try {
@@ -187,7 +256,22 @@ export async function runBuild(opts: BuildRunOptions): Promise<BuildRunResult> {
               try { await opts.client.call('emulator/resume'); } catch { /* reported below */ }
             }
           }
-          resolve({ ...base, ok: true, reloaded: true, romPath });
+          // PUT THE PLAYER BACK, once the game is actually playing.
+          //
+          // The mailbox is consumed by the LEVEL game state, so a warp attempted
+          // on the boot/title screen simply never acks — which makes the ack the
+          // signal we need. Retry with a short budget each time and the first
+          // attempt that lands is the moment gameplay began; no polling of some
+          // separate "am I in a level yet" flag, and nothing to keep in sync
+          // with the engine's own state machine.
+          let restored = false;
+          if (restoreTo) {
+            for (let attempt = 0; attempt < 12 && !restored; attempt++) {
+              const r = await warpTo(opts.client, restoreTo.x, restoreTo.y, { maxPolls: 40 });
+              restored = r.warped;
+            }
+          }
+          resolve({ ...base, ok: true, reloaded: true, romPath, restoredTo: restored ? restoreTo! : undefined });
         } catch (e) {
           // The build succeeded; only the handoff failed. Saying so is the
           // difference between "your build is broken" and "the emulator did not

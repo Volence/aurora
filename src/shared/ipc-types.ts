@@ -66,6 +66,8 @@ export interface AetherBuildResult {
   command: string;
   /** Whether the DEBUG flavour was built — decides which ROM file was written. */
   debugBuild?: boolean;
+  /** Where the player was put back after the reload, if the position survived. */
+  restoredTo?: { x: number; y: number };
 }
 
 export interface AetherWarpResult {

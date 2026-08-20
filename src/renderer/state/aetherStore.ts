@@ -173,7 +173,7 @@ export const useAetherStore = create<AetherState>((set, get) => ({
       const flavour = r.debugBuild ? 'debug' : 'release';
       const summary = r.ok
         ? (r.reloaded
-            ? `Build succeeded (${flavour}) — emulator reloaded`
+            ? `Build succeeded (${flavour}) — emulator reloaded${r.restoredTo ? `, back at (${r.restoredTo.x}, ${r.restoredTo.y})` : ''}`
             : r.reloadError
               ? `Build succeeded (${flavour}), but the emulator did not reload: ${r.reloadError}`
               : `Build succeeded (${flavour}) — no emulator connected`)

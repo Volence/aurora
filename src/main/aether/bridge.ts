@@ -129,6 +129,7 @@ export function registerAetherBridge(browserWindow: BrowserWindow): void {
         reloadError: r.reloadError, missingEnv: r.missingEnv,
         command: [r.plan.command, ...r.plan.args].join(' '),
         debugBuild: r.debugBuild,
+        restoredTo: r.restoredTo,
       };
     },
   );
