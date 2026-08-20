@@ -25,7 +25,10 @@ import { ObjectThumb } from '../components/classic/ObjectThumb';
  * zone override shows a thumbnail the base table would not.
  */
 export function classicObjectRows(zone: string): ObjectRow[] {
-  return S1_OBJECT_LIST.map(({ id, name }) => ({
+  // Placement rows stop at $7F: the objpos id byte's bit 7 is the remember-state
+  // flag, so ids past 0x7F (the FZ/SBZ2 boss actors $82-$86, named for their
+  // sprite docs) are not placeable and must not be offered here.
+  return S1_OBJECT_LIST.filter(({ id }) => id <= 0x7f).map(({ id, name }) => ({
     key: String(id),
     badge: s1ObjectHex(id),
     label: name,

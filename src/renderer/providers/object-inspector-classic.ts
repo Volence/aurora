@@ -49,7 +49,9 @@ export function classicObjectSchema(currentId: number): readonly ObjectField[] {
   // The S1 object word masks the id to 7 bits, so an id outside that could never
   // round-trip through the file — clamp before offering it as an option.
   const id = Math.max(0, Math.min(CLASSIC_OBJECT_LIMITS.id, Math.round(currentId)));
-  const ids = S1_OBJECT_LIST.map((e) => e.id);
+  // Same 7-bit truth for the offered options: names past $7F (the FZ/SBZ2 boss
+  // actors, named for their sprite docs) could never round-trip through objpos.
+  const ids = S1_OBJECT_LIST.filter((e) => e.id <= CLASSIC_OBJECT_LIMITS.id).map((e) => e.id);
   const options = (ids.includes(id) ? ids : [...ids, id].sort((a, b) => a - b))
     .map((id) => ({ value: String(id), label: `${s1ObjectHex(id)} — ${s1ObjectName(id)}` }));
   return [

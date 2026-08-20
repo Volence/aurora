@@ -12,8 +12,15 @@
 // This is a display convenience only — it does NOT gate editing. The object tool
 // can place/select any 7-bit id (0x00–0x7F); ids absent from this table simply
 // render as their `$XX` hex (see `s1ObjectName`).
+//
+// The BOSS-family names are the one exception to the SonLVL provenance (SonLVL
+// defines no boss objdef at all): they are transcribed from the disasm's
+// `_inc/Object Pointers.asm` labels and the `_incObj` file headers. That also
+// widens the id domain past 0x7F — the engine's object index runs to $8C, and
+// the FZ/SBZ2 boss actors ($82-$86) are named so their sprite docs (opened via
+// the s1-object-art.ts boss rows) carry real titles.
 
-/** id (0x00–0x7F) → human-readable object name. */
+/** id (0x00–0x8C, the disasm object-index range) → human-readable object name. */
 export const S1_OBJECT_NAMES: Readonly<Record<number, string>> = {
   0x0b: 'Pole',
   0x0c: 'Flapping Door',
@@ -45,6 +52,11 @@ export const S1_OBJECT_NAMES: Readonly<Record<number, string>> = {
   0x36: 'Spikes',
   0x3b: 'Purple Rock',
   0x3c: 'Breakable Wall',
+  // Boss-family ids: SonLVL's INIs define NO section for any boss, so these
+  // names are transcribed from the disasm itself — `_inc/Object Pointers.asm`
+  // labels + the `_incObj` file headers ("Object 3D - Eggman (GHZ)", …). Same
+  // NOT-IN-SonLVL treatment as the s1-object-art.ts boss rows.
+  0x3d: 'Eggman (GHZ Boss)',
   0x3e: 'Egg Prison',
   0x40: 'Moto Bug',
   0x41: 'Spring',
@@ -54,6 +66,7 @@ export const S1_OBJECT_NAMES: Readonly<Record<number, string>> = {
   0x45: 'Sideways Stomper',
   0x46: 'Brick',
   0x47: 'Bumper',
+  0x48: 'Boss Wrecking Ball', // id_BossBall — "wrecking ball on a chain that Eggman swings (GHZ)"
   0x49: 'Waterfall Sound Effect',
   0x4b: 'Giant Ring',
   0x4c: 'Lava Geyser Maker',
@@ -93,9 +106,26 @@ export const S1_OBJECT_NAMES: Readonly<Record<number, string>> = {
   0x70: 'Girder Block',
   0x71: 'Invisible Block',
   0x72: 'Teleporter',
+  // Boss-family ids (see the $3D note): from _inc/Object Pointers.asm + the
+  // _incObj headers.
+  0x73: 'Eggman (MZ Boss)',
+  0x74: 'Boss Fire', // id_BossFire — the fireballs the MZ boss drops
+  0x75: 'Eggman (SYZ Boss)',
+  0x76: 'Boss Block', // id_BossBlock — blocks Eggman picks up (SYZ)
+  0x77: 'Eggman (LZ Boss)',
   0x78: 'Caterkiller',
   0x79: 'Lamppost',
+  0x7a: 'Eggman (SLZ Boss)',
+  0x7b: 'Boss Spikeball', // id_BossSpikeball — spiked balls the SLZ boss drops
   0x7d: 'Hidden Point Bonus',
+  // $80+ ids are outside the placeable 7-bit objpos range Aurora's object tool
+  // edits, but they name the sprite docs the boss art rows open (the checkout
+  // path resolves names through s1ObjectName).
+  0x82: 'Eggman (SBZ2 Cutscene)',
+  0x83: 'Crumbling Floor (SBZ2)', // id_FalseFloor
+  0x84: 'FZ Boss Cylinder', // id_EggmanCylinder
+  0x85: 'Eggman (FZ Boss)', // id_BossFinal
+  0x86: 'FZ Plasma Launcher', // id_BossPlasma — launcher + energy balls
 };
 
 /**
