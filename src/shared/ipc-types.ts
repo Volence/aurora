@@ -66,8 +66,10 @@ export interface AetherBuildResult {
   command: string;
   /** Whether the DEBUG flavour was built — decides which ROM file was written. */
   debugBuild?: boolean;
-  /** Where the player was put back after the reload, if the position survived. */
+  /** Where the player actually LANDED after the reload (engine-clamped), if the position survived. */
   restoredTo?: { x: number; y: number };
+  /** How: `boot-override` (first painted frame is the destination) or the `warp` fallback. */
+  restoredVia?: 'boot-override' | 'warp';
   /** FAST shape — verification lanes skipped, NOT a ship artifact. */
   fast?: boolean;
   /** Milliseconds per phase, so a slow loop can be attributed rather than guessed at. */

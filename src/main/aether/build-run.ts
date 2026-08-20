@@ -29,6 +29,7 @@ import { existsSync } from 'node:fs';
 import type { AetherClient } from './client';
 import { buildPlanFor, summariseBuildOutput, type BuildPlan } from '../../core/aether/build-plan';
 import { warpTo } from './warp';
+import { bootRestoreTo } from './boot-restore';
 
 export interface BuildRunResult {
   ok: boolean;
@@ -44,8 +45,18 @@ export interface BuildRunResult {
   romPath?: string;
   /** True when the build was run in DEBUG flavour to match the running ROM. */
   debugBuild?: boolean;
-  /** Where the player was put back, when the position survived the reload. */
+  /**
+   * Where the player actually LANDED — the engine-published pair, after its
+   * own clamping to the act bounds. Never the pre-reload ask.
+   */
   restoredTo?: { x: number; y: number };
+  /**
+   * Which mechanism put the player back. `boot-override` is the norm on a
+   * current DEBUG ROM: the position is consumed at level init, so the FIRST
+   * painted frame is the destination. `warp` is the fallback for a DEBUG ROM
+   * older than the override (visible draw-then-jump, ~20-frame ack).
+   */
+  restoredVia?: 'boot-override' | 'warp';
   /** FAST shape — deliberately NOT a ship artifact. */
   fast?: boolean;
   /**
@@ -54,6 +65,11 @@ export interface BuildRunResult {
    * Added because the loop measured ~10s wall against a 1.3s build: the
    * interesting number was never the build, and "somewhere in the other 8.7
    * seconds" is not something you can act on.
+   *
+   * `restore` is whatever mechanism `restoredVia` names actually spent:
+   * for the boot override that is run_to-the-init + the three writes + the
+   * ack; for the warp fallback it is the old retry-until-gameplay loop. It is
+   * NOT a warp-poll figure dressed up as the new mechanism, or vice versa.
    */
   timings?: { build: number; reload: number; restore: number };
   /** Required env vars that were absent — the usual cause of an instant exit 1. */
@@ -261,37 +277,70 @@ export async function runBuild(opts: BuildRunOptions): Promise<BuildRunResult> {
           const tReload = Date.now();
           const pauseResult = await opts.client.call('emulator/pause') as { wasRunning?: boolean };
           const wasRunning = pauseResult?.wasRunning !== false;
+          let landed: { x: number; y: number } | undefined;
+          let restoredVia: 'boot-override' | 'warp' | undefined;
+          let tRestore = 0;
+          // Set once the restore has resumed the machine itself; the finally
+          // must then NOT resume again (and must never resume a machine that
+          // somebody else deliberately stopped — wasRunning is the courtesy).
+          let resumedByRestore = false;
           try {
             await opts.client.call('emulator/reload_rom', { path: romPath });
             await opts.client.loadSymbols(symbolsPath);
+            reloadMs = Date.now() - tReload;
+
+            // PUT THE PLAYER BACK — AT BOOT, inside the pre-display window.
+            //
+            // The engine's boot-position override (ENGINE_ARCHITECTURE.md
+            // §4.12b) is consumed by the level init itself, so the first
+            // painted frame IS the destination — no draw-then-jump, and none
+            // of the old shape's "retry the warp until gameplay begins" loop.
+            // The window is the one subtle part: boot zeroes ALL work RAM, so
+            // the writes only survive AFTER `run_to` the init's entry — which
+            // is why this runs here, before any resume, while the machine is
+            // still paused from the reload. `bootRestoreTo` owns the sequence
+            // (run_to -> X, Y, flag LAST -> continue) and the ack.
+            if (restoreTo) {
+              tRestore = Date.now();
+              const boot = await bootRestoreTo(opts.client, restoreTo.x, restoreTo.y, { wasRunning });
+              resumedByRestore = boot.resumed;
+              if (boot.restored) {
+                landed = boot.landed;
+                restoredVia = 'boot-override';
+              }
+              restoreMs = Date.now() - tRestore;
+            }
           } finally {
             // A reload RESETS the machine, so resuming lets the fresh ROM boot
-            // rather than leaving a frozen first frame that looks hung.
-            if (wasRunning) {
+            // rather than leaving a frozen first frame that looks hung. When
+            // the boot restore already resumed (its `continue` step), a second
+            // resume here would be redundant at best.
+            if (wasRunning && !resumedByRestore) {
               try { await opts.client.call('emulator/resume'); } catch { /* reported below */ }
             }
           }
-          // PUT THE PLAYER BACK, once the game is actually playing.
-          //
-          // The mailbox is consumed by the LEVEL game state, so a warp attempted
-          // on the boot/title screen simply never acks — which makes the ack the
-          // signal we need. Retry with a short budget each time and the first
-          // attempt that lands is the moment gameplay began; no polling of some
-          // separate "am I in a level yet" flag, and nothing to keep in sync
-          // with the engine's own state machine.
-          reloadMs = Date.now() - tReload;
-          const tRestore = Date.now();
-          let restored = false;
-          if (restoreTo) {
-            for (let attempt = 0; attempt < 12 && !restored; attempt++) {
+          // FALLBACK: the warp mailbox, for a DEBUG ROM that predates the
+          // boot override (it has Warp_Req_* but no Boot_At_*), or when the
+          // boot path could not complete. Old shape, kept verbatim: the warp
+          // is consumed by the LEVEL game state, so an attempt made during
+          // boot simply never acks — retry with a short budget each time and
+          // the first attempt that lands is the moment gameplay began. A ROM
+          // with neither mailbox (release) gates out inside warpTo, and the
+          // build result simply reports no restore.
+          if (restoreTo && !landed) {
+            for (let attempt = 0; attempt < 12 && !landed; attempt++) {
               const r = await warpTo(opts.client, restoreTo.x, restoreTo.y, { maxPolls: 40 });
-              restored = r.warped;
+              if (r.warped) {
+                landed = r.landed ?? restoreTo;
+                restoredVia = 'warp';
+              }
             }
+            restoreMs = Date.now() - tRestore;
           }
-          restoreMs = Date.now() - tRestore;
           resolve({
             ...base, ok: true, reloaded: true, romPath,
-            restoredTo: restored ? restoreTo! : undefined,
+            restoredTo: landed,
+            restoredVia,
             timings: { build: buildMs, reload: reloadMs, restore: restoreMs },
           });
         } catch (e) {

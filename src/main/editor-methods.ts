@@ -262,7 +262,10 @@ export const EDITOR_METHODS: EditorMethod[] = [
 
   { name: 'build_and_run', kind: 'aether-build-run', result: 'json', params: {},
     description: 'Save, re-bake the level data, build the ROM, reload the emulator and put the '
-      + 'player back where they were. The one call that makes an edit real. Reports the '
+      + 'player back where they were — via the engine\'s boot-position override, so the first '
+      + 'painted frame is already the destination (falls back to the warp mailbox on a DEBUG ROM '
+      + 'that predates it; `restoredVia` says which ran, `restoredTo` is where the engine says the '
+      + 'player LANDED after clamping). The one call that makes an edit real. Reports the '
       + 'build output on failure and does NOT reload a failed build.' },
 
   { name: 'import_art_sheet', kind: 'classic-import-art-sheet', result: 'json',
