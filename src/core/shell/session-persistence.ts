@@ -24,17 +24,30 @@ const persistedSessionSchema = z.looseObject({
   activeId: z.string(),
 });
 
+/** The zone/act an S1 sprite-doc checkout resolved against — the tab's OWN
+ *  copy of its per-zone identity. An s1 sprite tab id names only the object
+ *  (`doc:sprite:s1:<id>`); the art it opened resolved against whichever act was
+ *  loaded at the time, and without that key a session-restored tab could only
+ *  wait for the user to open a level again (the "stored per zone … come back
+ *  here" dance). Persisting it lets the restore re-run the same checkout. */
+export interface S1ZoneKey {
+  zone: string;
+  act: number;
+}
+
 /** Per-tab UI state persisted ALONGSIDE the session — deliberately not on
  *  TabDescriptor, so tab identity and the session reducers stay pure. */
 export interface PersistedTabWorkspace {
   facet?: FacetCapability;
   view?: { x: number; y: number; zoom: number };
+  s1Zone?: S1ZoneKey;
 }
 export type WorkspaceRecord = Record<string, PersistedTabWorkspace>;
 
 const persistedWorkspaceSchema = z.strictObject({
   facet: z.enum(FACET_CAPABILITIES).optional(),
   view: z.strictObject({ x: z.number(), y: z.number(), zoom: z.number() }).optional(),
+  s1Zone: z.strictObject({ zone: z.string().min(1), act: z.number().int() }).optional(),
 });
 
 export function serializeSession(state: SessionState, workspace?: WorkspaceRecord): string {
@@ -81,7 +94,7 @@ export function restoreWorkspace(json: string): WorkspaceRecord {
   const out: WorkspaceRecord = {};
   for (const [id, entry] of Object.entries(ws as Record<string, unknown>)) {
     const res = persistedWorkspaceSchema.safeParse(entry);
-    if (res.success && (res.data.facet !== undefined || res.data.view !== undefined)) out[id] = res.data;
+    if (res.success && (res.data.facet !== undefined || res.data.view !== undefined || res.data.s1Zone !== undefined)) out[id] = res.data;
   }
   return out;
 }

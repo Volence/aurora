@@ -335,3 +335,43 @@ describe('s1Adapter golden (real s1disasm)', () => {
     ).toEqual([]);
   });
 });
+
+// ---------------------------------------------------------------------------
+// readPalettes — the palette-only read (sprite checkout on session restore)
+// ---------------------------------------------------------------------------
+
+describe('s1Adapter levels.readPalettes', () => {
+  it('composes the act palette components without touching any level file', async () => {
+    // Real bytes only for the two GHZ palette components; every other entry
+    // stays fullFake() text, which would make a full read() blow up — so a
+    // passing test also proves readPalettes read ONLY the palette files.
+    // Expectations derive from the transcribed components (profiles/s1.ts):
+    // Sonic.bin[0..16)→entries[0..16), Green Hill Zone.bin[0..48)→[16..64).
+    const word = (n: number) => [n >> 8, n & 0xff];
+    const sonic = new Uint8Array(Array.from({ length: 16 }, (_, i) => word(0x0a00 + i)).flat());
+    const ghz = new Uint8Array(Array.from({ length: 48 }, (_, i) => word(0x0b00 + i)).flat());
+    const handle = await s1Adapter.open(memFs(fullFake({
+      'palette/Sonic.bin': sonic,
+      'palette/Green Hill Zone.bin': ghz,
+    } as never)));
+
+    const ref = handle.levels!.list().find((r) => r.zone === 'ghz' && r.act === 1)!;
+    const palettes = await handle.levels!.readPalettes!(ref);
+
+    expect(palettes).toHaveLength(4);
+    expect([...palettes[0]]).toEqual(Array.from({ length: 16 }, (_, i) => 0x0a00 + i));
+    expect([...palettes[1]]).toEqual(Array.from({ length: 16 }, (_, i) => 0x0b00 + i));
+    expect([...palettes[2]]).toEqual(Array.from({ length: 16 }, (_, i) => 0x0b10 + i));
+    expect([...palettes[3]]).toEqual(Array.from({ length: 16 }, (_, i) => 0x0b20 + i));
+  });
+
+  it.skipIf(!S1_PRESENT)('golden: equals the full read()\'s LevelDoc.palettes on real s1disasm (GHZ 1)', async () => {
+    const handle = await s1Adapter.open(realFs(S1DIR));
+    const ref = handle.levels!.list().find((r) => r.zone === 'ghz' && r.act === 1)!;
+    const doc = await handle.levels!.read(ref);
+    const palettes = await handle.levels!.readPalettes!(ref);
+    expect(palettes.map((l) => [...l])).toEqual(doc.palettes.map((l) => [...l]));
+    // Anti-vacuous: line 1 (Ring's declared line) is a real, non-blank palette.
+    expect(palettes[1].some((w) => w !== 0)).toBe(true);
+  });
+});

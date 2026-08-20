@@ -8,10 +8,13 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import {
   planSpriteDocActivation,
+  spriteTabCanResolveWithoutAct,
   activateSpriteDocTarget,
   requestCloseTab,
   __setSpriteModuleForTest,
 } from '../tab-activation';
+import { useClassicProjectStore } from '../../state/classicProjectStore';
+import { useWorkspaceStore } from '../../workspace/workspaceStore';
 import { untitledSpriteTab, UNTITLED_SPRITE_TAB_ID } from '../tabs';
 import { useConfirmStore } from '../../state/confirmStore';
 import { useClassicLevelStore } from '../../state/classicLevelStore';
@@ -459,5 +462,149 @@ describe('an s1 sprite tab activated with no classic act loaded', () => {
 
     expect(useSessionStore.getState().tabs.map((t) => t.id)).toEqual([HOME.id, OTHER_S1_TAB]);
     expect(useConfirmStore.getState().request).toBeNull(); // nothing to lose, nothing asked
+  });
+});
+
+// --- Session-restored s1 tabs self-serve their zone context ----------------
+//
+// The owner bug: reopen the app with an s1 sprite tab active and it landed on
+// the "stored per zone … open one of the level tabs" pane until a level tab was
+// clicked. The tab now persists the zone/act its checkout resolved against
+// (S1ZoneKey in the workspace record), and activation threads that key into
+// editObjectArtCheckout — so a restored tab loads with NO act open. Zone-free
+// ids (objectArtIsZoneFree — Ring $25, Signpost $0d: one shared art file, no
+// per-zone override) never needed a zone, so they self-serve even without a
+// persisted key. The deferral remains only for a zone-scoped id with no key
+// (a legacy session) — the pane's copy is honest there.
+
+const ZONAL_TAB = 'doc:sprite:s1:28';   // 28 = $1C — GHZ Bridge stump / SLZ Fireball Thrower
+const ZONE_FREE_TAB = 'doc:sprite:s1:37'; // 37 = $25 Ring — shared artnem/Rings.nem
+
+describe('spriteTabCanResolveWithoutAct', () => {
+  beforeEach(() => {
+    useWorkspaceStore.getState().reset();
+    useClassicProjectStore.setState({ status: 'open' });
+  });
+  afterEach(() => {
+    useWorkspaceStore.getState().reset();
+    useClassicProjectStore.setState({ status: 'closed' });
+  });
+
+  it('true for a tab with a persisted zone key (zone-scoped id)', () => {
+    useWorkspaceStore.getState().setS1Zone(ZONAL_TAB, { zone: 'slz', act: 1 });
+    expect(spriteTabCanResolveWithoutAct(ZONAL_TAB)).toBe(true);
+  });
+
+  it('false for a zone-scoped id with no key — the legacy-session deferral survives', () => {
+    expect(spriteTabCanResolveWithoutAct(ZONAL_TAB)).toBe(false);
+  });
+
+  it('true for a zone-free id even with no key (Ring: one shared art file)', () => {
+    expect(spriteTabCanResolveWithoutAct(ZONE_FREE_TAB)).toBe(true);
+  });
+
+  it('false whenever the classic project is closed — the checkout needs the dir', () => {
+    useClassicProjectStore.setState({ status: 'closed' });
+    useWorkspaceStore.getState().setS1Zone(ZONAL_TAB, { zone: 'slz', act: 1 });
+    expect(spriteTabCanResolveWithoutAct(ZONAL_TAB)).toBe(false);
+    expect(spriteTabCanResolveWithoutAct(ZONE_FREE_TAB)).toBe(false);
+  });
+
+  it('false for aeon tabs and non-sprite ids — this is an s1-only question', () => {
+    expect(spriteTabCanResolveWithoutAct(AEON_TAB)).toBe(false);
+    expect(spriteTabCanResolveWithoutAct('level:ghz:1')).toBe(false);
+  });
+});
+
+describe('planSpriteDocActivation with canResolveWithoutAct', () => {
+  it('opens instead of deferring when the tab can self-serve', () => {
+    expect(planSpriteDocActivation({
+      tabId: ZONAL_TAB, activeDocId: UNTITLED_SPRITE_DOC_ID,
+      isOpen: false, classicActLoaded: false, canResolveWithoutAct: true,
+    })).toEqual({ kind: 'open', engine: 's1', ref: '28' });
+  });
+
+  it('still defers when it cannot (and when the flag is absent — old callers)', () => {
+    expect(planSpriteDocActivation({
+      tabId: ZONAL_TAB, activeDocId: UNTITLED_SPRITE_DOC_ID,
+      isOpen: false, classicActLoaded: false, canResolveWithoutAct: false,
+    })).toEqual({ kind: 'deferred' });
+    expect(planSpriteDocActivation({
+      tabId: ZONAL_TAB, activeDocId: UNTITLED_SPRITE_DOC_ID,
+      isOpen: false, classicActLoaded: false,
+    })).toEqual({ kind: 'deferred' });
+  });
+});
+
+describe('restored-tab activation (no act loaded, classic project open)', () => {
+  /** Stub that captures the zone key the runner threads into the s1 checkout. */
+  function stubS1Capture(keys: (unknown)[]) {
+    __setSpriteModuleForTest({
+      loadSpriteByName: async () => true,
+      editObjectArtCheckout: async (_id: number, zoneKey?: unknown) => {
+        keys.push(zoneKey ?? null);
+        useSpriteStore.getState().loadSprite([frameFilledWith(3)], [], 4, 4);
+        return true;
+      },
+    });
+  }
+
+  beforeEach(() => {
+    useWorkspaceStore.getState().reset();
+    useClassicProjectStore.setState({ status: 'open' });
+    useClassicLevelStore.setState({ ref: null });
+  });
+  afterEach(() => {
+    useWorkspaceStore.getState().reset();
+    useClassicProjectStore.setState({ status: 'closed' });
+  });
+
+  it('threads the persisted zone key into the checkout and loads the document', async () => {
+    const keys: unknown[] = [];
+    stubS1Capture(keys);
+    useWorkspaceStore.getState().setS1Zone(ZONAL_TAB, { zone: 'slz', act: 1 });
+
+    expect(await activateSpriteDocTarget(ZONAL_TAB)).toBe(true);
+
+    expect(keys).toEqual([{ zone: 'slz', act: 1 }]);
+    expect(useSpriteStore.getState().activeDocId).toBe(ZONAL_TAB);
+  });
+
+  it('opens a zone-free tab level-free with NO key, and records none', async () => {
+    const keys: unknown[] = [];
+    stubS1Capture(keys);
+
+    expect(await activateSpriteDocTarget(ZONE_FREE_TAB)).toBe(true);
+
+    expect(keys).toEqual([null]);
+    expect(useSpriteStore.getState().activeDocId).toBe(ZONE_FREE_TAB);
+    // "No zone needed" IS the identity — recording a zone here would pin Ring
+    // to whatever act happened to serve its representative palette.
+    expect(useWorkspaceStore.getState().s1ZoneFor(ZONE_FREE_TAB)).toBeNull();
+  });
+
+  it('a successful act-derived checkout RECORDS the zone key (what restore reads)', async () => {
+    const keys: unknown[] = [];
+    stubS1Capture(keys);
+    useClassicLevelStore.setState({ ref: LOADED_ACT });
+
+    expect(await activateSpriteDocTarget(ZONAL_TAB)).toBe(true);
+
+    expect(keys).toEqual([null]); // act-derived: the checkout used the open ref itself
+    expect(useWorkspaceStore.getState().s1ZoneFor(ZONAL_TAB)).toEqual({ zone: 'ghz', act: 1 });
+  });
+
+  it('a FAILED checkout records nothing and rolls the tab back', async () => {
+    __setSpriteModuleForTest({
+      loadSpriteByName: async () => true,
+      editObjectArtCheckout: async () => false,
+    });
+    useWorkspaceStore.getState().setS1Zone(ZONAL_TAB, { zone: 'slz', act: 1 });
+    const before = useWorkspaceStore.getState().s1ZoneFor(ZONAL_TAB);
+
+    expect(await activateSpriteDocTarget(ZONAL_TAB)).toBe(false);
+
+    expect(useSpriteStore.getState().isOpen(ZONAL_TAB)).toBe(false);
+    expect(useWorkspaceStore.getState().s1ZoneFor(ZONAL_TAB)).toEqual(before);
   });
 });

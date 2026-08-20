@@ -26,7 +26,8 @@ import { requestOpenTab } from '../../shell/tab-activation';
 import { spriteDocTab } from '../../shell/tabs';
 import { useClassicProjectStore } from '../../state/classicProjectStore';
 import { useClassicLevelStore } from '../../state/classicLevelStore';
-import { resolveObjectArt } from '../../../core/project/profiles/s1-object-art';
+import { resolveObjectArt, objectArtIsZoneFree } from '../../../core/project/profiles/s1-object-art';
+import type { S1ZoneKey } from '../../../core/shell/session-persistence';
 import { resolveObjectAnims } from '../../../core/project/profiles/s1-object-anims';
 import { parseS1DisasmAnimScript } from '../../../core/import/anim-import';
 import { s1ObjectName, s1ObjectHex } from '../../../core/project/profiles/s1-objects';
@@ -495,12 +496,21 @@ export function __setAnimScriptReaderForTest(fn: AnimScriptReader | null): void 
 /**
  * Load a classic object's art + mappings into the CHECKED-OUT sprite document
  * (Task B2 / Task 14). The object id resolves to an `ObjectArtLink` (profiles/
- * s1-object-art.ts) against the OPEN classic level's zone (derived from the
- * classic level store's `ref` — no longer a caller argument); the link's
- * disasm-relative `artFile`/`mapAsm` are opened through `openDiscoveredSet`, so
- * the S1 Nemesis guarded save-back (captureS1ArtSource) is captured EXACTLY as a
- * manual pick's. Returns false (a no-op) for an unlinked id, no open project, or
- * no open level — the calling buttons only render for linked ids, so those are
+ * s1-object-art.ts) against a ZONE that comes from, in order:
+ *
+ *   1. `zoneKey` — the tab's own persisted zone/act identity (S1ZoneKey), which
+ *      is what lets a session-RESTORED sprite tab re-run its checkout with no
+ *      act loaded (the activation glue passes it; see tab-activation/sprite.ts);
+ *   2. the OPEN classic level's `ref` (the original, act-derived behavior);
+ *   3. no zone at all — allowed ONLY for zone-free ids (objectArtIsZoneFree:
+ *      one shared art file, e.g. Ring's artnem/Rings.nem), which resolve from
+ *      the base map and therefore support a genuinely level-free open.
+ *
+ * The link's disasm-relative `artFile`/`mapAsm` are opened through
+ * `openDiscoveredSet`, so the S1 Nemesis guarded save-back (captureS1ArtSource)
+ * is captured EXACTLY as a manual pick's. Returns false (a no-op) for an
+ * unlinked id, no open project, or a zonal id with no zone from any of the
+ * three sources — the calling buttons only render for linked ids, so those are
  * guards. A failed open leaves the user where they were with an error toast.
  *
  * This does NOT open a tab and does NOT open a document of its own — it loads
@@ -515,11 +525,51 @@ export function __setAnimScriptReaderForTest(fn: AnimScriptReader | null): void 
  * setStandalonePalette) because loadSprite just cleared history and this must not
  * record an undo step — mirroring loadEngineCharacter's direct zone-bind setState.
  */
-export async function editObjectArtCheckout(id: number): Promise<boolean> {
-  const zone = useClassicLevelStore.getState().ref?.zone;
-  if (!zone) { useToastStore.getState().addToast('Open a classic level before editing object art', 'error'); return false; }
+/**
+ * The 16 CRAM words a checkout seeds its standalone palette from. The OPEN
+ * act's LIVE `doc.palettes` win whenever they describe the target zone —
+ * unsaved palette edits must color the checkout, exactly as before. With no
+ * matching act loaded (session restore; a zone-free level-free open), the
+ * adapter's palette-only read serves the same composed lines from disk: the
+ * target act when it exists, else the target zone's first available act, else
+ * — no target zone at all — the project's first available act as a
+ * representative palette (zone-free art like Ring draws from a line every
+ * zone's palette carries). `undefined` = no palette source reachable; the
+ * caller skips seeding rather than failing the art open — colors are the one
+ * soft part of a checkout, the pixels and save-back target are not.
+ */
+async function checkoutPaletteLine(pal: number, target: S1ZoneKey | null): Promise<Uint16Array | undefined> {
+  const lvl = useClassicLevelStore.getState();
+  if (lvl.doc && lvl.ref && (!target || lvl.ref.zone === target.zone)) {
+    return lvl.doc.palettes[pal] ?? lvl.doc.palettes[0];
+  }
+  const proj = useClassicProjectStore.getState();
+  const readPalettes = proj.handle?.levels?.readPalettes;
+  if (!readPalettes) return undefined;
+  const tree = proj.zoneTree;
+  const ref = target
+    ? tree.find((r) => r.zone === target.zone && r.act === target.act)
+      ?? tree.find((r) => r.zone === target.zone && r.available)
+    : tree.find((r) => r.available);
+  if (!ref) return undefined;
+  try {
+    const palettes = await readPalettes(ref);
+    return palettes[pal] ?? palettes[0];
+  } catch {
+    return undefined; // palette seeding is optional — the art still opens
+  }
+}
+
+export async function editObjectArtCheckout(id: number, zoneKey?: S1ZoneKey | null): Promise<boolean> {
+  const openRef = useClassicLevelStore.getState().ref;
+  const target: S1ZoneKey | null =
+    zoneKey ?? (openRef ? { zone: openRef.zone, act: openRef.act } : null);
+  if (!target && !objectArtIsZoneFree(id)) {
+    useToastStore.getState().addToast('Open a classic level before editing object art', 'error');
+    return false;
+  }
   const dir = useClassicProjectStore.getState().dir;
-  const link = resolveObjectArt(id, zone);
+  const link = resolveObjectArt(id, target?.zone);
   if (!dir || !link) return false;
 
   const name = sanitizeName(s1ObjectName(id) || s1ObjectHex(id));
@@ -531,8 +581,7 @@ export async function editObjectArtCheckout(id: number): Promise<boolean> {
 
   useSpriteStore.getState().selectFrame(link.frame);
 
-  const doc = useClassicLevelStore.getState().doc;
-  const words = doc?.palettes[link.pal] ?? doc?.palettes[0];
+  const words = await checkoutPaletteLine(link.pal, target);
   if (words) {
     const colors: Color[] = Array.from({ length: 16 }, (_, i) => {
       const c = decodeGenesisColor(words[i] ?? 0);

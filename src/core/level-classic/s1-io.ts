@@ -199,6 +199,22 @@ function bytesEqual(a: Uint8Array, b: Uint8Array): boolean {
   return true;
 }
 
+/**
+ * Compose an act's palette components into the four 16-word CRAM lines
+ * (`LevelDoc.palettes` order). Pure byte-placement — each component copies
+ * `length` big-endian words from `files[i]` at `srcOffset` into a flat 64-word
+ * space at `destOffset`. Shared by the full level read AND the adapter's
+ * palette-only `readPalettes` (the sprite checkout's session-restore path), so
+ * the two can never compose differently.
+ */
+export function composeS1Palettes(components: readonly PaletteComponent[], files: readonly Uint8Array[]): Uint16Array[] {
+  const flat = new Uint16Array(64);
+  components.forEach((c, i) => {
+    for (let w = 0; w < c.length; w++) flat[c.destOffset + w] = beWord(files[i], (c.srcOffset + w) * 2);
+  });
+  return [0, 1, 2, 3].map((l) => flat.slice(l * 16, l * 16 + 16));
+}
+
 // ---------------------------------------------------------------------------
 // read
 // ---------------------------------------------------------------------------
@@ -320,17 +336,14 @@ export async function readS1Level(
   sourceRefs['collision.angleMap'] = paths.collisionAngleMap;
 
   // --- palette: compose components into a 64-word CRAM space ---------------
-  const flat = new Uint16Array(64);
   const paletteOriginals: S1ReadState['paletteOriginals'] = [];
   for (let i = 0; i < act.palette.length; i++) {
     const c = act.palette[i];
     const p = paths.palette[i];
-    const bytes = await readBytes(p);
-    paletteOriginals.push({ component: c, path: p, bytes });
-    for (let w = 0; w < c.length; w++) flat[c.destOffset + w] = beWord(bytes, (c.srcOffset + w) * 2);
+    paletteOriginals.push({ component: c, path: p, bytes: await readBytes(p) });
     sourceRefs[`palette.${i}`] = p;
   }
-  const palettes = [0, 1, 2, 3].map((l) => flat.slice(l * 16, l * 16 + 16));
+  const palettes = composeS1Palettes(act.palette, paletteOriginals.map((o) => o.bytes));
 
   // --- objects / start -----------------------------------------------------
   const objposBytes = await readBytes(paths.objpos);

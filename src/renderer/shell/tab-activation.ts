@@ -58,6 +58,7 @@ export {
 export {
   type SpriteDocPlan,
   planSpriteDocActivation,
+  spriteTabCanResolveWithoutAct,
   activateSpriteDocTarget,
   getLoadedSpriteDocId,
   anySpriteDocDirty,

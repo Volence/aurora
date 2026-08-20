@@ -12,7 +12,7 @@
 
 import { create } from 'zustand';
 import type { FacetCapability } from '../../core/project/adapter';
-import type { WorkspaceRecord } from '../../core/shell/session-persistence';
+import type { WorkspaceRecord, S1ZoneKey } from '../../core/shell/session-persistence';
 
 export interface TabView { x: number; y: number; zoom: number }
 
@@ -20,8 +20,12 @@ interface WorkspaceState {
   record: WorkspaceRecord;
   facetFor: (tabId: string) => FacetCapability;
   viewFor: (tabId: string) => TabView | null;
+  /** The zone/act an s1 sprite-doc tab's checkout resolved against (persisted
+   *  tab identity — see S1ZoneKey), or null when never checked out / legacy. */
+  s1ZoneFor: (tabId: string) => S1ZoneKey | null;
   setFacet: (tabId: string, facet: FacetCapability) => void;
   setView: (tabId: string, view: TabView) => void;
+  setS1Zone: (tabId: string, s1Zone: S1ZoneKey) => void;
   /** Session restore: replace the whole record. */
   seed: (record: WorkspaceRecord) => void;
   reset: () => void;
@@ -31,10 +35,13 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   record: {},
   facetFor: (tabId) => get().record[tabId]?.facet ?? 'layout',
   viewFor: (tabId) => get().record[tabId]?.view ?? null,
+  s1ZoneFor: (tabId) => get().record[tabId]?.s1Zone ?? null,
   setFacet: (tabId, facet) =>
     set((s) => ({ record: { ...s.record, [tabId]: { ...s.record[tabId], facet } } })),
   setView: (tabId, view) =>
     set((s) => ({ record: { ...s.record, [tabId]: { ...s.record[tabId], view } } })),
+  setS1Zone: (tabId, s1Zone) =>
+    set((s) => ({ record: { ...s.record, [tabId]: { ...s.record[tabId], s1Zone } } })),
   seed: (record) => set({ record }),
   reset: () => set({ record: {} }),
 }));
