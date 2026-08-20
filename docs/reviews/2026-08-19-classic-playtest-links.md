@@ -557,3 +557,33 @@ real mailbox as a separate, later ask once s1disasm's owner has ruled on the tim
   prediction, and it should be confirmed by that session rather than assumed.
 - **s1disasm was not modified.** The only writes were the build's own gitignored artifacts;
   `git status --short` there is unchanged.
+
+
+---
+
+## 9. Foreground acceptance run — 2026-08-20, after oracle's drop (`a380830`)
+
+Run by the overseer against the rebuilt `oracle-frontend` (35 methods, up from 32) on
+`s1built.bin`, live GHZ demo:
+
+- **(a) `load_symbols` on the raw `sonic.lst`: ACCEPTED** — `binding: indeterminate`,
+  accepted unverified, **12,405 symbols** (declared 12,410; delta unexplained, flagged to
+  oracle). Before the drop this exact call was a hard `RpcError`.
+- **`v_player` (type `-`, equ-defined) resolves forward**: `0x00FFD000`, exact,
+  `rawAddr 0xFFFFD000` — the 48-bit spelling parsed and bus-masked. `v_palette_line_2` →
+  `0x00FFFB20`, symmetric. §2's fourth-blocker fear is closed by oracle's forward-only
+  ruling.
+- **(c) the palette write recolors the running game**: pause → `write_memory` by symbol →
+  2–3 frames → the write propagates to CRAM. Decisive frame: all-red `v_palette_line_1`
+  turned Sonic, the HUD and the lives icon solid red within 2 frames. The RAM readback
+  after 3 frames was verbatim — the game does not fight the write. One mapping nuance for
+  the parcel: `v_palette_line_N` is 1-indexed onto CRAM line N−1, and the GHZ *ground* did
+  not visibly turn red on a line-2 write — which on-screen elements sit on which line needs
+  the profile's palette map, not an assumption from the `palid_GHZ` load target.
+- **(b) and (d) remain unmeasured** — they belong to link 4, which is out of this phase.
+- Environment note for the parcel: the MCP/socket resolution found a **stale
+  `$XDG_RUNTIME_DIR/oracle.sock`** from a dead instance first and refused; clear it or set
+  `ORACLE_SOCKET` explicitly. The headless `oracle-aether` binary predates the drop
+  (rebuild asked of oracle); the frontend is the fresh one.
+
+**Verdict: the gate is open.** Links 1+3 are dispatchable.
