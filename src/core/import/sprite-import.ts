@@ -113,6 +113,44 @@ export function reconstructFromFrames(
   return renderFrames(frames, tiles, dplc);
 }
 
+/** One art file placed into a composite tile pool at a fixed tile offset. */
+export interface ArtPoolSlice {
+  bytes: Uint8Array;
+  compression: CompressionKind;
+  /** Tile index in the pool where this file's tile 0 lands (VRAM-relative offset). */
+  tileBase: number;
+}
+
+/**
+ * Compose N art files into ONE tile pool at their VRAM-relative tile offsets —
+ * what the engine's PLC does in VRAM when a single obGfx base spans several nem
+ * files (e.g. Nem_Eggman at ArtTile_Eggman + Nem_Exhaust at +$12A). Gaps
+ * between slices become blank tiles (mappings written against the real VRAM
+ * layout never reference them). Slices must be in ascending, non-overlapping
+ * order — an overlap means a transcribed tileBase is wrong, so refuse loudly
+ * rather than silently letting one file's tiles shadow another's.
+ */
+export function composeTilePool(slices: ArtPoolSlice[]): Tile[] {
+  const pool: Tile[] = [];
+  for (const s of slices) {
+    if (s.tileBase < pool.length) {
+      throw new Error(`composeTilePool: slice at tileBase ${s.tileBase} overlaps the previous slice (pool already ${pool.length} tiles)`);
+    }
+    while (pool.length < s.tileBase) pool.push({ pixels: new Uint8Array(64) });
+    pool.push(...parseTiles(compressionFor(s.compression).decompress(s.bytes)));
+  }
+  return pool;
+}
+
+/** Reconstruct from logical frames + an already-composed tile pool. */
+export function reconstructFromTilePool(
+  frames: SpriteFrame[],
+  tiles: Tile[],
+  dplc?: number[][],
+): ReconstructedSprite {
+  return renderFrames(frames, tiles, dplc);
+}
+
 /**
  * Format-agnostic reconstruct: decompress the art per the adapter's compression,
  * parse mappings (and DPLC, if streamed) through the adapter, then render. This is

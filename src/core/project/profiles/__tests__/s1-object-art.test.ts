@@ -231,10 +231,13 @@ describe('boss-family art rows', () => {
   });
 
   it('the boss sub-objects and FZ/SBZ2 actors carry their cited art/maps/palette', () => {
-    // $48: Map_BossItems @ ArtTile_Eggman_Weapons (line 0), Nem_Weapons.
-    expect(resolveObjectArt(0x48)?.artFile).toBe('artnem/Boss - Weapons.nem');
-    expect(resolveObjectArt(0x48)?.mapAsm).toBe('_maps/Boss Items.asm');
-    expect(resolveObjectArt(0x48)?.pal).toBe(0);
+    // $48 leads with the BALL: Map_GBall @ ArtTile_GHZ_Giant_Ball|Tile_Pal3
+    // (_incObj/3D, 48 …:479-480) → Nem_Ball, palette line 2 (Tile_Pal3 equ
+    // 2<<13, _Constants.asm:438). Frame 0 = .shiny (in-game alternates 0/1).
+    expect(resolveObjectArt(0x48)?.artFile).toBe('artnem/GHZ Giant Ball.nem');
+    expect(resolveObjectArt(0x48)?.mapAsm).toBe('_maps/GHZ Ball.asm');
+    expect(resolveObjectArt(0x48)?.frame).toBe(0);
+    expect(resolveObjectArt(0x48)?.pal).toBe(2);
     // $7B: Map_SSawBall frame 1 (.silver — `move.b #1,obFrame`, _incObj 7A,7B:536).
     expect(resolveObjectArt(0x7b)?.artFile).toBe('artnem/SLZ Little Spikeball.nem');
     expect(resolveObjectArt(0x7b)?.mapAsm).toBe('_maps/Seesaw Ball.asm');
@@ -285,13 +288,20 @@ describe('boss-family art rows', () => {
       const eggman = parseAsmMappings(fs.readFileSync(path.join(S1DIR, '_maps/Eggman.asm'), 'utf8'));
       expect(eggman.length).toBe(13);
       //   _maps/Boss Items.asm — 8 rows: .chainanchor1, .chainanchor2, .cross,
-      //     .widepipe, .pipe, .spike, .legmask, .legs.
+      //     .widepipe, .pipe, .spike, .legmask, .legs. (The chain anchor Obj48
+      //     draws in its own slot — no longer any doc's lead frame.)
       const items = parseAsmMappings(fs.readFileSync(path.join(S1DIR, '_maps/Boss Items.asm'), 'utf8'));
       expect(items.length).toBe(8);
-      // $48's default (.chainanchor1) is the single 2x2 piece at tile 0 of
-      // Nem_Weapons — the one spritePiece row under that label.
+      // .chainanchor1 is the single 2x2 piece at tile 0 of Nem_Weapons.
       expect(items[0].pieces.length).toBe(1);
       expect(items[0].pieces[0].tile).toBe(0);
+      //   _maps/GHZ Ball.asm ($48's doc) — 4 rows: .shiny, .check1, .check2,
+      //     .check3. HAND-DERIVED piece counts: .shiny = 6 (two 2x1 shine
+      //     pieces at tile $24 + four 3x3 quadrants of tile 0, h/v-flipped),
+      //     .check1/2/3 = 4 quadrants each.
+      const ball = parseAsmMappings(fs.readFileSync(path.join(S1DIR, '_maps/GHZ Ball.asm'), 'utf8'));
+      expect(ball.length).toBe(4);
+      expect(ball.map((f) => f.pieces.length)).toEqual([6, 4, 4, 4]);
     });
   });
 });
@@ -326,9 +336,11 @@ describe('objectArtIsZoneFree', () => {
 
   it('every zone-boss id is zone-free (shared PLC_Boss/PLC_EggmanSBZ2/PLC_FZBoss bincludes, base-linked, never overridden)', () => {
     // Art provenance per id is cited on the rows themselves; the shared lists:
-    // PLC_Boss (_inc/Pattern Load Cues.asm:285-290) for $3D/$48/$73/$75/$77/
+    // PLC_Boss (_inc/Pattern Load Cues.asm:285-290) for $3D/$73/$75/$77/
     // $7A/$7B, PLC_EggmanSBZ2 (:432-434) for $82/$83, PLC_FZBoss (:441-445)
-    // for $84/$85/$86 — none of them zone art cues.
+    // for $84/$85/$86. $48's Nem_Ball rides PLC_GHZ2 (:126) but is ONE
+    // standalone binclude (sonic.asm:4502) — the classifier measures "one
+    // shared art file, never overridden per zone", which still holds.
     for (const id of [0x3d, 0x48, 0x73, 0x75, 0x77, 0x7a, 0x7b, 0x82, 0x83, 0x84, 0x85, 0x86]) {
       expect(objectArtIsZoneFree(id), `$${id.toString(16)}`).toBe(true);
     }

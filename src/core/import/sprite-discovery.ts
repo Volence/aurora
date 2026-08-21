@@ -16,6 +16,13 @@ export interface DiscoveredSpriteSet {
   mappings: string;
   dplc?: string;
   art?: string;
+  /**
+   * Additional art files composited into the tile pool at their VRAM-relative
+   * tile offsets (see ObjectArtExtraSource / composeTilePool). Discovery never
+   * sets this — it comes from the transcribed object-art rows (e.g. Eggman's
+   * Nem_Exhaust at tileBase $12A), where each offset is cited.
+   */
+  extraSources?: { art: string; compression: 'nemesis' | 'uncompressed'; tileBase: number }[];
 }
 
 const norm = (p: string) => p.replace(/\\/g, '/');

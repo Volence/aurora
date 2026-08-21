@@ -8,7 +8,7 @@ import { buildSpriteExport, buildDPLCData } from '../../../core/export/sprite-ex
 import type { SpriteManifest } from '../../../core/export/sprite-export';
 import { assembleSprite } from '../../../core/art/sprite-decompose';
 import { writeAsmMappings, writeAsmDPLC } from '../../../core/export/sprite-asm-export';
-import { reconstructDPLCSprite, reconstructWithAdapter, reconstructFromFrames } from '../../../core/import/sprite-import';
+import { reconstructDPLCSprite, reconstructWithAdapter, reconstructFromFrames, reconstructFromTilePool, composeTilePool } from '../../../core/import/sprite-import';
 import { getAdapter } from '../../../core/formats/games';
 import { parseTiles } from '../../../core/formats/tiles';
 import { compressionFor } from '../../../core/compress';
@@ -482,7 +482,29 @@ export async function openDiscoveredSet(baseDir: string, set: DiscoveredSpriteSe
       ? dplcFromFile(set.dplc, new Uint8Array(await window.api.readBinaryFile(baseDir, set.dplc)), adapter)
       : undefined;
 
-    const recon = reconstructFromFrames(frames, artBytes, artCompression, dplc);
+    // Composite tile pool (sources rows): the primary art is always tile 0;
+    // each extra source lands at its transcribed VRAM-relative tileBase (e.g.
+    // Eggman's Nem_Exhaust at $12A — see ObjectArtExtraSource). A failed extra
+    // read degrades to the primary pool with an info toast: the primary frames
+    // still open and only the frames indexing the missing slice stay blank
+    // (exactly the pre-sources behavior).
+    let recon;
+    if (set.extraSources?.length) {
+      const slices = [{ bytes: artBytes, compression: artCompression, tileBase: 0 }];
+      for (const ex of set.extraSources) {
+        try {
+          slices.push({
+            bytes: new Uint8Array(await window.api.readBinaryFile(baseDir, ex.art)),
+            compression: ex.compression, tileBase: ex.tileBase,
+          });
+        } catch {
+          toast(`Composite art source ${ex.art} unavailable — its frames will render blank`, 'info');
+        }
+      }
+      recon = reconstructFromTilePool(frames, composeTilePool(slices), dplc);
+    } else {
+      recon = reconstructFromFrames(frames, artBytes, artCompression, dplc);
+    }
     const frameBufs = recon.frames.map((data) => ({ width: recon.width, height: recon.height, data }));
     const name = sanitizeName(set.name);
     useSpriteStore.getState().loadSprite(frameBufs, [], recon.originX, recon.originY);
@@ -599,7 +621,16 @@ export async function editObjectArtCheckout(id: number, zoneKey?: S1ZoneKey | nu
 
   const name = sanitizeName(s1ObjectName(id) || s1ObjectHex(id));
   const comp: CompressionKind = link.compression === 'uncompressed' ? 'uncompressed' : 'nemesis';
-  const set: DiscoveredSpriteSet = { name, game: 's1', mappings: link.mapAsm, art: link.artFile };
+  const set: DiscoveredSpriteSet = {
+    name, game: 's1', mappings: link.mapAsm, art: link.artFile,
+    // Composite rows (link.sources) ride into the open as extra pool slices at
+    // their transcribed VRAM-relative tile offsets (see ObjectArtExtraSource).
+    extraSources: link.sources?.map((s) => ({
+      art: s.artFile,
+      compression: s.compression === 'uncompressed' ? 'uncompressed' as const : 'nemesis' as const,
+      tileBase: s.tileBase,
+    })),
+  };
 
   const opened = await openSetImpl(dir, set, comp);
   if (!opened) return false; // open failed (a toast already fired) — stay in the level view

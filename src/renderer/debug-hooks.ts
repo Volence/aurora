@@ -558,6 +558,14 @@ interface DebugApi {
     anims: { name: string; synced?: boolean; note?: string; steps: { frameIndex: number; duration: number; xFlip?: boolean; yFlip?: boolean }[] }[];
     steps: { frameIndex: number; duration: number; xFlip?: boolean; yFlip?: boolean }[];
     unsavedEdits: boolean;
+    /** Shared frame canvas size (every frame is the same buffer size). */
+    frameW: number;
+    frameH: number;
+    /**
+     * Per-frame count of NONZERO pixel indices — the harness's anti-vacuous
+     * "does this frame actually draw anything" readout (0 = blank canvas).
+     */
+    frameCoverage: number[];
   };
 }
 
@@ -627,6 +635,13 @@ export function installDebugHooks(): void {
         anims: s.characterAnims.map((a) => ({ name: a.name, synced: a.synced, note: a.note, steps: a.steps.map((st) => ({ ...st })) })),
         steps: s.steps.map((st) => ({ ...st })),
         unsavedEdits: s.unsavedEdits,
+        frameW: s.frames[0]?.width ?? 0,
+        frameH: s.frames[0]?.height ?? 0,
+        frameCoverage: s.frames.map((f) => {
+          let n = 0;
+          for (let i = 0; i < f.data.length; i++) if (f.data[i] !== 0) n++;
+          return n;
+        }),
       };
     },
   };

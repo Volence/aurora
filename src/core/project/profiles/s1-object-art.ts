@@ -97,6 +97,24 @@ export type ObjectArtSource = 'file' | 'levelArt';
  * absent = the mappings index the pool directly (every LevelArt def, and plain
  * `.nem` files).
  */
+/**
+ * One ADDITIONAL art file composited into a doc's tile space (beyond the row's
+ * `artFile`, which is always the pool's tile 0). `tileBase` is the tile index
+ * where this file's tile 0 lands — the VRAM-RELATIVE offset between the two
+ * PLC load addresses, transcribed (and cited on the row) from the disasm's
+ * ArtTile constants. This mirrors what the engine does in VRAM: one obGfx
+ * base, N nem files loaded at fixed offsets from it, mappings whose tile
+ * indices span the whole space. Gaps between slices are blank tiles (no
+ * mapping references them). Save-back stays PRIMARY-only: s1ArtSource captures
+ * `artFile`'s tiles alone, and the write-back's per-piece guard skips pieces
+ * whose tiles fall outside that pool — secondary pixels render, never write.
+ */
+export interface ObjectArtExtraSource {
+  artFile: string;
+  compression: ObjectArtCompression;
+  tileBase: number;
+}
+
 export interface ObjectArtLink {
   artFile: string;
   mapAsm: string;
@@ -105,6 +123,8 @@ export interface ObjectArtLink {
   compression: ObjectArtCompression;
   artSource: ObjectArtSource;
   tileIndexOffset?: number;
+  /** Additional art files at their VRAM-relative tile offsets (see ObjectArtExtraSource). */
+  sources?: ObjectArtExtraSource[];
 }
 
 const nem = (
@@ -161,13 +181,17 @@ const SWINGING_PLATFORM = nem('artnem/GHZ Swinging Platform.nem', '_maps/Swingin
 // runtime; the checkout model supports one `artFile` per row, so each row is the
 // object's OWN slot's primary source and the composite parts are named here:
 //   • Eggman ($3D/$73/$75/$77/$7A): the ship + face sub-slots draw Map_Eggman
-//     frames 0-7 from Nem_Eggman; the exhaust-flame sub-slot's frames 8/11/12
-//     index tile $12A+ — past Nem_Eggman's pool and into Nem_Exhaust
-//     (ArtTile_Eggman_Exhaust equ ArtTile_Eggman+$12A, _Constants.asm:584; PLC_Boss
-//     line 290) — so the flame frames render blank/garbage from the single .nem.
-//   • Wrecking Ball ($48): chain links are a spawned sub-slot on Map_Swing_GHZ /
-//     ArtTile_GHZ_MZ_Swing and the ball itself on Map_GBall / Nem_Ball
-//     (artnem/GHZ Giant Ball.nem via PLC_GHZ2:126) — both beyond the one-file row.
+//     frames 0-7 from Nem_Eggman; the escape-flame frames 11/12 index tile
+//     $12A+ — past Nem_Eggman's pool and into Nem_Exhaust — CLOSED by the
+//     row's `sources` slice (citations on the EGGMAN const below): one maps
+//     file whose tile indices span N nem files at VRAM-relative offsets is
+//     exactly what `sources` composites. (Contrast $48: its parts are
+//     different maps FILES, which `sources` cannot merge.)
+//   • Wrecking Ball ($48): three maps FILES at runtime — the ball (Map_GBall /
+//     Nem_Ball, the row below: the recognizable sprite leads the doc), chain
+//     links (Map_Swing_GHZ frame 1 / ArtTile_GHZ_MZ_Swing — $15's file pair),
+//     and the chain anchor (Map_BossItems .chainanchor1 / Nem_Weapons) — the
+//     anchor is the part beyond the one-file row now.
 //   • SLZ Spikeball ($7B): the explosion shrapnel (routine $A) swaps to
 //     Map_BSBall, whose tiles $27/$28 read the Nem_Bomb underlay PLC_Boss loads
 //     UNDER the spikeball art (:288 "gets overwritten" — only the first $12 tiles
@@ -184,8 +208,20 @@ const SWINGING_PLATFORM = nem('artnem/GHZ Swinging Platform.nem', '_maps/Swingin
 //     Nem_FzBoss file, palette line 1.
 //
 // The shared Eggman ship row (frame 0 = .ship; obGfx = ArtTile_Eggman, no
-// Tile_Pal bits → palette line 0):
-const EGGMAN = nem('artnem/Boss - Main.nem', '_maps/Eggman.asm', 0, 0);
+// Tile_Pal bits → palette line 0). `sources` composites Nem_Exhaust into the
+// tile space at $12A — the VRAM-relative offset the escapeflame frames were
+// written against: ArtTile_Eggman equ $400 / ArtTile_Eggman_Exhaust equ
+// ArtTile_Eggman+$12A (_Constants.asm:579/584), PLC_Boss loads Nem_Eggman at
+// ArtTile_Eggman and Nem_Exhaust "artnem/Boss - Exhaust Flame.nem"
+// (sonic.asm:4805) at ArtTile_Eggman_Exhaust (_inc/Pattern Load Cues.asm:
+// 286/290; PLC_FZBoss repeats the pair at :445). Map_Eggman's .escapeflame1/2
+// index tiles $12A-$13A — past Nem_Eggman's $6C tiles and exactly onto
+// Nem_Exhaust's $11 (Nemesis headers) — so without this slice the tail frames
+// rendered blank (owner-recorded limitation, now closed).
+const EGGMAN: ObjectArtLink = {
+  ...nem('artnem/Boss - Main.nem', '_maps/Eggman.asm', 0, 0),
+  sources: [{ artFile: 'artnem/Boss - Exhaust Flame.nem', compression: 'nemesis', tileBase: 0x12A }],
+};
 
 /**
  * The base linkage (from `obj.ini` + the XML / C# defs it references). These
@@ -210,11 +246,24 @@ export const S1_OBJECT_ART_BASE: Readonly<Record<number, ObjectArtLink>> = {
   0x75: EGGMAN, // SYZ boss — _incObj/75, 76 Boss - SYZ Main and Blocks.asm:61-62
   0x77: EGGMAN, // LZ boss — _incObj/77 Boss - LZ Main.asm:58-59
   0x7a: EGGMAN, // SLZ boss — _incObj/7A, 7B Boss - SLZ Main and Spike Balls.asm:64-65
-  // Wrecking Ball ($48): own slot = Map_BossItems frame 0 (.chainanchor1) at
-  // ArtTile_Eggman_Weapons, no pal bits → line 0 (_incObj/3D, 48 …:443-444);
-  // art = Nem_Weapons "artnem/Boss - Weapons.nem" (sonic.asm:4795) queued at
-  // that tile by PLC_Boss (:286). Chain + giant ball are multi-source (above).
-  0x48: nem('artnem/Boss - Weapons.nem', '_maps/Boss Items.asm', 0, 0),
+  // Wrecking Ball ($48): the doc LEADS with the BALL — the sprite the owner
+  // (and the player) knows as "the wrecking ball" (owner finding 2026-08-20:
+  // the old row led with the anchor's Map_BossItems and showed chain/debris
+  // with no ball). Obj48's final spawned slot draws Map_GBall at
+  // ArtTile_GHZ_Giant_Ball|Tile_Pal3 with obFrame=1 (_incObj/3D, 48 …:479-481;
+  // frames 0/1 then alternate via `bchg #0,obFrame` in GBall_UpdateBase, so
+  // frame 0 `.shiny` — the ball with its shine — leads the doc). Maps =
+  // Map_GBall "_maps/GHZ Ball.asm" (sonic.asm:4094; 4 frames .shiny/.check1/
+  // .check2/.check3); art = Nem_Ball "artnem/GHZ Giant Ball.nem" (sonic.asm:
+  // 4502) queued at ArtTile_GHZ_Giant_Ball = $3AA by PLC_GHZ2 (_inc/Pattern
+  // Load Cues.asm:126; _Constants.asm:460) — a standalone binclude, so the
+  // level-free open stays honest. Tile_Pal3 equ 2<<13 (_Constants.asm:438) →
+  // palette LINE 2. The other two pairs Obj48 draws are different maps FILES
+  // (multi-source note above): chain links = Map_Swing_GHZ frame 1 (:459-461,
+  // reachable via $15's doc — same file pair as SWINGING_PLATFORM); chain
+  // anchor = Map_BossItems frame 0 @ ArtTile_Eggman_Weapons (:443-444,
+  // Nem_Weapons via PLC_Boss:286) — no doc doorway anymore; cut reported.
+  0x48: nem('artnem/GHZ Giant Ball.nem', '_maps/GHZ Ball.asm', 0, 2),
   // SLZ Spikeball ($7B): own slot = Map_SSawBall, obFrame set to 1 (.silver) at
   // ArtTile_Eggman_Spikeball, no pal bits → line 0 (_incObj/7A, 7B …:534-537);
   // art = Nem_SlzSpike "artnem/SLZ Little Spikeball.nem" (sonic.asm:4578) queued
