@@ -215,11 +215,21 @@ async function main() {
     await c.ready;
     await c.send('Runtime.enable');
     await c.send('Page.enable').catch(() => {});
+    // A mid-load page destroys eval contexts ("Promise was collected"), so
+    // every startup eval retries until the context holds still.
+    const evalRetry = async (expr, tries = 40) => {
+      for (let i = 0; ; i++) {
+        try { return await c.evalExpr(expr); } catch (e) {
+          if (i >= tries) throw e;
+          await sleep(500);
+        }
+      }
+    };
     for (let i = 0; i < 60; i++) {
       if (await c.evalExpr('typeof window.__dbg === "object"').catch(() => false)) break;
       await sleep(300);
     }
-    await c.evalExpr('localStorage.clear()');
+    await evalRetry('localStorage.clear()');
     await c.send('Page.reload');
     await sleep(4000);
     for (let i = 0; i < 60; i++) {
@@ -227,7 +237,7 @@ async function main() {
       await sleep(300);
     }
 
-    await c.evalExpr(`window.__dbg.openDir(${JSON.stringify(S1DIR)})`);
+    await evalRetry(`window.__dbg.openDir(${JSON.stringify(S1DIR)})`);
     let lvl = null;
     for (let i = 0; i < 50; i++) {
       lvl = await c.json('window.__dbg.levelState()');
@@ -245,6 +255,10 @@ async function main() {
 
     const wfOff = await samplePx(c, WF.x, WF.y);
     const ctrlOff = await samplePx(c, CTRL.x, CTRL.y);
+    // Trap-1 sentinel (audit §2.3): the DOC's waterfall slot tile, hashed
+    // before and after the play session. Any playback that leaked into doc.tiles
+    // would move this hash and poison the save path.
+    const docHashBefore = await c.evalExpr('window.__dbg.classic.tileHash(0x378)');
     check('2', 'the control cell reads its probe-measured color before play',
       eq(ctrlOff.slice(0, 3), CTRL_COLOR), `ctrl=${px(ctrlOff)} expected rgb ${px(CTRL_COLOR)}`);
     await shot(c, 'ghz-play-off');
@@ -285,6 +299,10 @@ async function main() {
     check('9', 'toggle off: waterfall cell is static and identical to the never-played render',
       offAgain === false && eq(wfAfter, wfOff) && eq(ctrlAfter, ctrlOff),
       `after=${px(wfAfter)} never-played=${px(wfOff)}`);
+    const docHashAfter = await c.evalExpr('window.__dbg.classic.tileHash(0x378)');
+    check('9b', 'doc.tiles was NEVER touched by playback (waterfall slot hash unchanged)',
+      JSON.stringify(docHashBefore) === JSON.stringify(docHashAfter),
+      `before=${JSON.stringify(docHashBefore)} after=${JSON.stringify(docHashAfter)}`);
     await c.evalExpr(UNFREEZE);
 
     // --- SBZ act 1 (BG plane): the smoke's long blank phases ----------------
