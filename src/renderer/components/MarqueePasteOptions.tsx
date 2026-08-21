@@ -36,6 +36,12 @@ export default function MarqueePasteOptions() {
     const name = nameInput.trim() || `Selection ${m.w >> 1}×${m.h >> 1}`;
     const def = selectionToChunk(section, m.col, m.row, m.w, m.h, name);
     useProjectStore.getState().addChunks([def]);
+    // Select the chunk you just made: the obvious next act is stamping it, and
+    // without this the user saves into a wall of 70+ thumbnails and has to
+    // find their own selection by eye before the stamp tool does anything
+    // (owner report, 2026-08-19 — this was the path that ended in the ghost
+    // crash). With it, K -> click stamps the saved selection immediately.
+    useEditorStore.getState().setSelectedChunkId(def.id);
     useEditorStore.getState().markDirty();
     useToastStore.getState().addToast(
       `Added "${name}" to chunk library — Save project to keep`, 'success');

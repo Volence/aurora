@@ -253,10 +253,14 @@ async function main() {
     const after = await c.json('window.__dbg.aeon.chunkIds()');
     const newId = after.find((id) => !before.includes(id));
     const info = newId ? await c.json(`window.__dbg.aeon.chunkInfo(${JSON.stringify(newId)})`) : null;
-    check('3', 'Save as chunk adds the selection to the library, dims = marquee dims, and it carries actual art',
+    // Saving also ARMS the saved chunk as the stamp source — the user's next
+    // act is stamping it, not finding it again in a 70+ thumbnail wall.
+    const autoSel = await c.evalExpr('window.__dbg.aeon.selectedChunk()');
+    check('3', 'Save as chunk adds the selection to the library (dims = marquee dims, real art) and selects it as the stamp source',
       saveClicked === 'clicked' && !!newId && !!info
-      && info.widthTiles === m.w && info.heightTiles === m.h && info.nonzeroTiles > 0,
-      `save=${saveClicked} new=${newId} info=${JSON.stringify(info)}`);
+      && info.widthTiles === m.w && info.heightTiles === m.h && info.nonzeroTiles > 0
+      && autoSel === newId,
+      `save=${saveClicked} new=${newId} autoSelected=${autoSel === newId} info=${JSON.stringify(info)}`);
     if (!newId || !info) throw new Error('no saved chunk — nothing below can run');
 
     // --- Row 4: select it in the REAL grid; arm the stamp ------------------
