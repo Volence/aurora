@@ -33,6 +33,19 @@ export const COLLISION_UNKNOWN = 'rgba(255,0,255,0.5)';           // out-of-rang
 export const COLLISION_FALLBACK = 'rgba(120,160,220,0.35)';       // flat fill when no tables
 export const COLLISION_DIFF = 'rgba(255,120,40,0.95)';            // outline: A/B planes differ here
 
+// ---------- priority lens (classic-overlays drawPriority) ----------
+// Marks the EXCEPTION only: high-priority 8x8 tiles (pattern-word bit 15 —
+// render above sprites); low-priority tiles stay untouched art. Violet is the
+// one hue the collision lens family doesn't use (green/amber/blue fills, white
+// line, red ticks), so both lenses stay readable stacked. Same 0.42 fill alpha
+// the collision fills proved legible over both light and dark zone art.
+/** Translucent veil over each high-priority tile. */
+export const PRIORITY_FILL = 'rgba(200, 90, 255, 0.42)';
+/** Crisp stroke on high↔low boundaries — the shape read, like the collision
+ *  overlay's white surface line (pale enough to register on dark art, violet
+ *  enough to survive light art). */
+export const PRIORITY_EDGE = 'rgba(245, 215, 255, 0.9)';
+
 // ---------- collision shape palette (CollisionPalette previews / thumbnails) ----------
 /** Neutral teal silhouette fill for a drawn collision shape. */
 export const COLLISION_SHAPE_FILL = 'rgba(70,200,150,0.9)';      // shape body — teal

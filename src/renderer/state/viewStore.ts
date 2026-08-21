@@ -14,6 +14,9 @@ export interface OverlayOptions {
   /** The player-start marker. Classic-only so far — aeon has no spawn point in
    *  its level model — which is what OVERLAY_KEYS_BY_ENGINE below is for. */
   showStart: boolean;
+  /** The per-8x8-tile VDP priority lens (classic-only): marks tiles whose
+   *  pattern word carries bit 15 — they render ABOVE sprites in game. */
+  showPriority: boolean;
 }
 
 /**
@@ -31,7 +34,7 @@ export interface OverlayOptions {
  * overlay bar lands and classic's OptionBar stops declaring its own.
  */
 export const OVERLAY_KEYS_BY_ENGINE: Record<OpenEngine, readonly (keyof OverlayOptions)[]> = {
-  s1: ['showObjects', 'showStart', 'showCollision', 'showCollisionAngles'],
+  s1: ['showObjects', 'showStart', 'showCollision', 'showCollisionAngles', 'showPriority'],
   aeon: [
     'showObjects', 'showRings', 'showTileGrid', 'showBlockGrid', 'showChunkGrid',
     'showCollision', 'showCollisionAngles', 'showCollisionPathB', 'showBgPlane',
@@ -72,6 +75,8 @@ export const useViewStore = create<ViewState>((set) => ({
     // On by default, matching the local default classic's viewport carried
     // before the overlays became shared state.
     showStart: true,
+    // A lens, not ambient chrome: off until asked for, like the collision lens.
+    showPriority: false,
   },
 
   pan: (dx, dy) => set((state) => ({
