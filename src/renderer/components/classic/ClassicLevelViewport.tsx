@@ -23,7 +23,8 @@ import type { LevelDoc } from '../../../core/level-classic/model';
 // here at compile time rather than silently at the dispatch call.
 import type { CollisionCell } from '../../../core/level-classic/collision-write';
 import { reportCollisionGesture } from './collision-gesture-report';
-import { s1ObjectIsInvisible } from '../../../core/project/profiles/s1-objects';
+import { s1ObjectIsInvisible, s1ObjectName } from '../../../core/project/profiles/s1-objects';
+import { s1PlacementWarning } from '../../../core/project/profiles/s1-object-presentation';
 import {
   CHUNK_PX, visibleChunkRange, layoutCellAt, screenToWorld, clampInt, fitCamera,
   worldToLayoutCell, addStampCell, stampAccumToCells, hitTestObjectFrames, hitTestPoint,
@@ -851,6 +852,14 @@ export default function ClassicLevelViewport() {
         ];
         const res = classicSetObjects(next);
         if (!res.ok) { useToastStore.getState().addToast(`Place failed: ${res.error}`, 'error'); return; }
+        // The placement is ALLOWED for any id the objpos format encodes — but
+        // an id whose art this zone's Pattern Load Cues never queue draws
+        // garbage in-game, and the canvas cannot show that. Same register as
+        // the collision loop warning: a successful write plus one honest
+        // warning toast saying what won't load and where. Null (silent) for
+        // available ids and invisible triggers.
+        const zoneWarn = s1PlacementWarning(armed, useClassicLevelStore.getState().ref?.zone ?? '', s1ObjectName(armed));
+        if (zoneWarn !== null) useToastStore.getState().addToast(zoneWarn, 'warning');
         // Disarm and fall back to select — the click-to-place idiom, which used
         // to be "clear the armed id and let the dual-purpose object tool mean
         // select again" and is now literally that tool switch.

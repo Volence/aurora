@@ -13,17 +13,12 @@
 
 import type { ZoneActRef } from '../../core/project/adapter';
 import type { RecentProject } from '../../shared/ipc-types';
-import type { ExplorerGroupModel } from '../../core/shell/explorer';
+import type { ExplorerGroupModel, ExplorerItemModel } from '../../core/shell/explorer';
+import {
+  s1ArtRowGroups, groupIdsHex, s1UnavailableRowNote,
+} from '../../core/project/profiles/s1-object-presentation';
+import { S1_OBJECT_LIST, s1ObjectHex } from '../../core/project/profiles/s1-objects';
 import { PROJECT_SETUP_TAB } from './tabs';
-
-export interface ClassicObjectRow {
-  id: number;
-  name: string;
-  hex: string;
-  /** Has resolvable sprite art (only linked objects are listed — Stage 2's
-   *  library is the art-editable catalog; the full definition view is Stage 4). */
-  linked: boolean;
-}
 
 // Frozen: this singleton is spread into every classic/aeon groups() result, so
 // an accidental mutation through one caller (e.g. a future in-place sort/push)
@@ -84,9 +79,53 @@ export function canvasExplorerGroup(
   };
 }
 
+/**
+ * The classic Object Library's rows: EVERY named object, in two blocks.
+ *
+ * FIRST the objects whose art this zone actually loads — `s1ArtRowGroups(zone)`,
+ * the resolveObjectArt hits (zone map ∪ zone-free base map), deduped by link
+ * identity so the five shared-link Eggman ids read as one "Eggman (Boss)" row
+ * whose hint carries the covered ids. Then a heading divider, then THE REST of
+ * the registry: rows this zone's Pattern Load Cues never feed (or that no
+ * table links at all), listed disabled with the honest per-row note from
+ * `s1UnavailableRowNote` — visible because the catalog is the whole game's,
+ * not the open act's, but not clickable because there is no art doc to open
+ * here. The split is derived from the same table `resolveObjectArt` reads;
+ * nothing is hardcoded.
+ */
+export function classicObjectLibraryItems(
+  zone: string | null,
+  levelDocReady: boolean,
+): ExplorerItemModel[] {
+  const groups = s1ArtRowGroups(zone ?? undefined);
+  const linkedIds = new Set(groups.flatMap((g) => g.ids));
+  const available: ExplorerItemModel[] = groups.map((g) => {
+    const hint = g.ids.length > 1 ? groupIdsHex(g) : s1ObjectHex(g.id);
+    return levelDocReady
+      ? { id: `obj:${g.id}`, label: g.label, hint }
+      : {
+          id: `obj:${g.id}`, label: g.label, hint,
+          disabled: true, reason: 'Open a level first (art preview needs its palette)',
+        };
+  });
+  const rest: ExplorerItemModel[] = S1_OBJECT_LIST
+    .filter((o) => !linkedIds.has(o.id))
+    .map((o) => ({
+      id: `obj:${o.id}`, label: o.name, hint: s1ObjectHex(o.id),
+      disabled: true, reason: s1UnavailableRowNote(o.id, zone),
+    }));
+  if (rest.length === 0) return available;
+  const heading: ExplorerItemModel = {
+    id: 'objlib:unavailable',
+    label: zone !== null ? `Not loaded in ${zone.toUpperCase()}` : 'Needs an open act',
+    heading: true,
+  };
+  return [...available, heading, ...rest];
+}
+
 export function classicExplorerGroups(
   zoneTree: ZoneActRef[],
-  objects: ClassicObjectRow[],
+  zone: string | null,
   levelDocReady: boolean,
   canvases: { names: string[]; skipped: string[] },
 ): ExplorerGroupModel[] {
@@ -103,16 +142,7 @@ export function classicExplorerGroups(
     {
       id: 'objects',
       label: 'Object Library',
-      items: objects
-        .filter((o) => o.linked)
-        .map((o) =>
-          levelDocReady
-            ? { id: `obj:${o.id}`, label: o.name, hint: o.hex }
-            : {
-                id: `obj:${o.id}`, label: o.name, hint: o.hex,
-                disabled: true, reason: 'Open a level first (art preview needs its palette)',
-              },
-        ),
+      items: classicObjectLibraryItems(zone, levelDocReady),
     },
     canvasExplorerGroup(canvases, { classic: true }),
     TOOLS_GROUP,

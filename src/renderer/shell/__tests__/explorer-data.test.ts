@@ -1,9 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import { countableItems } from '../../../core/shell/explorer';
 import {
-  classicExplorerGroups, aeonExplorerGroups, noProjectExplorerGroups,
+  classicExplorerGroups, classicObjectLibraryItems, aeonExplorerGroups, noProjectExplorerGroups,
   resolveObjectSprite, canvasExplorerGroup, NEW_SPRITE_ITEM_ID, NEW_CANVAS_ITEM_ID, IMPORT_SHEET_ITEM_ID,
 } from '../explorer-data';
+import { S1_OBJECT_LIST } from '../../../core/project/profiles/s1-objects';
+import { resolveObjectArt } from '../../../core/project/profiles/s1-object-art';
 
 /** A project with no canvases — the shape listCanvasNames returns. */
 const NO_CANVASES = { names: [], skipped: [] };
@@ -13,39 +15,84 @@ describe('classicExplorerGroups', () => {
     { zone: 'ghz', act: 1, label: 'Green Hill Act 1', available: true },
     { zone: 'lz', act: 2, label: 'Labyrinth Act 2', available: false, reason: 'missing 2 required file(s): x, y' },
   ];
-  const objects = [
-    { id: 0x4b, name: 'Buzz Bomber', hex: '$4B', linked: true },
-    { id: 0x40, name: 'Moto Bug', hex: '$40', linked: false },
-  ];
 
   it('builds Levels / Object Library / Tools', () => {
-    const groups = classicExplorerGroups(zoneTree, objects, true, NO_CANVASES);
+    const groups = classicExplorerGroups(zoneTree, 'ghz', true, NO_CANVASES);
     expect(groups.map((g) => g.id)).toEqual(['levels', 'objects', 'canvases', 'tools']);
   });
 
   it('level items carry tab ids; unavailable acts disable with the reason', () => {
-    const levels = classicExplorerGroups(zoneTree, objects, true, NO_CANVASES)[0];
+    const levels = classicExplorerGroups(zoneTree, 'ghz', true, NO_CANVASES)[0];
     expect(levels.items[0]).toEqual({ id: 'level:ghz:1', label: 'Green Hill Act 1' });
     expect(levels.items[1]).toMatchObject({
       id: 'level:lz:2', disabled: true, reason: expect.stringContaining('missing'),
     });
   });
 
-  it('object library lists only art-linked objects, hint = hex id', () => {
-    const objectsGroup = classicExplorerGroups(zoneTree, objects, true, NO_CANVASES)[1];
-    expect(objectsGroup.items).toEqual([
-      { id: 'obj:75', label: 'Buzz Bomber', hint: '$4B' },
-    ]);
-  });
-
-  it('object rows disable with a reason until a level doc is loaded (art edit needs its palette)', () => {
-    const objectsGroup = classicExplorerGroups(zoneTree, objects, false, NO_CANVASES)[1];
-    expect(objectsGroup.items[0]).toMatchObject({ disabled: true, reason: expect.any(String) });
-  });
-
   it('tools group contains Project Setup', () => {
-    const tools = classicExplorerGroups(zoneTree, objects, true, NO_CANVASES)[3];
+    const tools = classicExplorerGroups(zoneTree, 'ghz', true, NO_CANVASES)[3];
     expect(tools.items).toEqual([{ id: 'tool:project-setup', label: 'Project Setup' }]);
+  });
+});
+
+describe('classicObjectLibraryItems', () => {
+  // Real-table expectations, hand-derived (see s1-object-presentation.test.ts
+  // for the table citations): GHZ links 35 ids; the five shared-link Eggman
+  // ids dedup to one row, so the available block is 31 rows.
+  const items = classicObjectLibraryItems('ghz', true);
+  const headingIdx = items.findIndex((i) => i.heading === true);
+
+  it('lists EVERY named object: available block, one heading divider, then the rest', () => {
+    expect(headingIdx).toBeGreaterThan(0);
+    expect(items.filter((i) => i.heading)).toHaveLength(1);
+    const available = items.slice(0, headingIdx);
+    const rest = items.slice(headingIdx + 1);
+    expect(available).toHaveLength(31);
+    // Every named id appears exactly once across the two blocks (merged rows
+    // carry their extra ids in the hint, not as rows).
+    const linked = S1_OBJECT_LIST.filter((o) => resolveObjectArt(o.id, 'ghz') !== undefined);
+    expect(available.length + 4).toBe(linked.length); // Eggman merge swallowed 4 rows
+    expect(rest).toHaveLength(S1_OBJECT_LIST.length - linked.length);
+    for (const r of rest) expect(r.disabled).toBe(true);
+  });
+
+  it('the heading names the zone', () => {
+    expect(items[headingIdx].label).toBe('Not loaded in GHZ');
+  });
+
+  it('the merged Eggman row carries the covered ids as its hint', () => {
+    const egg = items.slice(0, headingIdx).filter((i) => i.label.includes('Eggman'));
+    expect(egg.map((i) => i.label)).toContain('Eggman (Boss)');
+    const merged = egg.find((i) => i.label === 'Eggman (Boss)')!;
+    expect(merged.id).toBe('obj:61'); // canonical $3D
+    expect(merged.hint).toBe('$3D · $73 · $75 · $77 · $7A');
+  });
+
+  it('unavailable rows carry the honest per-row note (PLC-derived, cited)', () => {
+    const jaws = items.find((i) => i.label === 'Jaws')!;
+    expect(jaws.disabled).toBe(true);
+    expect(jaws.reason).toContain('Not loaded in GHZ');
+    expect(jaws.reason).toContain('LZ, SBZ');
+    const teleporter = items.find((i) => i.label === 'Teleporter')!;
+    expect(teleporter.reason).toContain('Invisible trigger');
+  });
+
+  it('available rows disable with the palette reason until a level doc is loaded', () => {
+    const cold = classicObjectLibraryItems('ghz', false);
+    const idx = cold.findIndex((i) => i.heading === true);
+    for (const i of cold.slice(0, idx)) {
+      expect(i).toMatchObject({ disabled: true, reason: expect.stringContaining('Open a level first') });
+    }
+  });
+
+  it('no zone open: zone-free rows are the available set; the heading does not blame a zone', () => {
+    const free = classicObjectLibraryItems(null, false);
+    const idx = free.findIndex((i) => i.heading === true);
+    expect(free[idx].label).toBe('Needs an open act');
+    // The available block is exactly the base-map (zone-free) groups.
+    expect(idx).toBeGreaterThan(0);
+    expect(free.slice(0, idx).some((i) => i.label === 'Ring')).toBe(true);
+    expect(free.slice(0, idx).some((i) => i.label === 'Moto Bug')).toBe(false);
   });
 });
 

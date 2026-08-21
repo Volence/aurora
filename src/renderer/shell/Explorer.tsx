@@ -18,15 +18,13 @@ import { useOpenEngine } from '../state/open-project';
 import { filterExplorer, type ExplorerGroupModel, type ExplorerItemModel, countableItems } from '../../core/shell/explorer';
 import {
   classicExplorerGroups, aeonExplorerGroups, noProjectExplorerGroups, resolveObjectSprite,
-  NEW_SPRITE_ITEM_ID, NEW_CANVAS_ITEM_ID, IMPORT_SHEET_ITEM_ID, type ClassicObjectRow, type AeonObjectRow,
+  NEW_SPRITE_ITEM_ID, NEW_CANVAS_ITEM_ID, IMPORT_SHEET_ITEM_ID, type AeonObjectRow,
 } from './explorer-data';
 import { requestOpenTab } from './tab-activation';
 import { classicLevelTab, aeonLevelTab, parseLevelTabId, spriteDocTab, parseSpriteDocTabId, parseCanvasDocTabId, canvasDocTab, untitledSpriteTab, PROJECT_SETUP_TAB } from './tabs';
 import { listCanvasNames, type CanvasListing } from '../state/canvas-file';
 import { openProjectDir } from '../state/open-project';
 import { useSessionStore } from '../state/sessionStore';
-import { S1_OBJECT_LIST, s1ObjectHex } from '../../core/project/profiles/s1-objects';
-import { resolveObjectArt } from '../../core/project/profiles/s1-object-art';
 import { editObjectArt } from '../components/sprite/export-sprite';
 import type { RecentProject } from '../../shared/ipc-types';
 import type { ObjectDef } from '../../core/model/s4-types';
@@ -58,6 +56,11 @@ export interface ExplorerProps {
 /** One explorer tree row. Local hover state (the way `Tab` does) — never a CSS file. */
 function ExplorerItem({ item, onActivate }: { item: ExplorerItemModel; onActivate: (item: ExplorerItemModel) => void }) {
   const [hover, setHover] = useState(false);
+  if (item.heading) {
+    // A divider labelling the rows after it (ExplorerItemModel.heading) — a
+    // plain div, not a button: nothing to activate, nothing to focus.
+    return <div data-explorer-heading style={styles.itemHeading}>{item.label}</div>;
+  }
   return (
     <button
       onClick={() => onActivate(item)}
@@ -128,13 +131,9 @@ export default function Explorer({ onOpenProject, onOpenRecent, onNewCanvas, onI
 
   const groups: ExplorerGroupModel[] = useMemo(() => {
     if (classicOpen) {
-      // The object list keys art off the LOADED zone; before a doc is ready we
-      // pass zone '' so linked-ness still computes for zone-independent art.
-      const objects: ClassicObjectRow[] = S1_OBJECT_LIST.map(({ id, name }) => ({
-        id, name, hex: s1ObjectHex(id),
-        linked: resolveObjectArt(id, classicZone ?? '') !== undefined,
-      }));
-      return classicExplorerGroups(zoneTree, objects, docReady, canvases);
+      // The library keys availability off the LOADED zone (null before a doc
+      // is ready — zone-free art still lists as available level-free).
+      return classicExplorerGroups(zoneTree, classicZone, docReady, canvases);
     }
     if (config) {
       const objects: AeonObjectRow[] = objectLibrary.map((o) => ({
@@ -309,7 +308,18 @@ const styles: Record<string, React.CSSProperties> = {
   itemHover: { background: T.raised },
   itemDisabled: { color: T.textFaint, cursor: 'default' },
   itemLabel: { flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const },
-  itemHint: { fontSize: T.t2xs, color: T.textFaint, fontFamily: T.fontMono, flexShrink: 0 },
+  itemHint: {
+    fontSize: T.t2xs, color: T.textFaint, fontFamily: T.fontMono,
+    // Ellipsize the HINT, not the label: a long hint (the merged Eggman row's
+    // covered-id list, a recent project's path) must not eat the row's name.
+    // The row tooltip still carries the full hint.
+    maxWidth: '50%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const,
+  },
+  itemHeading: {
+    padding: '8px 10px 2px 18px', fontSize: T.t2xs, color: T.textFaint,
+    textTransform: 'uppercase' as const, letterSpacing: 0.5,
+    borderTop: `1px solid ${T.border}`, marginTop: 4,
+  },
   empty: { padding: 16, textAlign: 'center' as const, color: T.textLo, fontSize: T.tSm },
   openButton: {
     padding: '6px 14px', background: T.accent, color: T.onAccent, fontWeight: T.wSemibold,

@@ -21,11 +21,20 @@ export interface ExplorerItemModel {
    * the top of the group counted as canvases. `countableItems` is the rule.
    */
   action?: boolean;
+  /**
+   * A DIVIDER inside a group — a label over the rows after it, not a row
+   * itself (classic's Object Library uses one between the objects this zone's
+   * cues load and the rest). Never activatable, never counted, and dropped
+   * while a filter is active: the filtered view interleaves survivors from
+   * both sides, so a stranded divider would mislabel whatever happens to
+   * follow it.
+   */
+  heading?: boolean;
 }
 
-/** The rows a group's count should report: the things, not the verbs. */
+/** The rows a group's count should report: the things — not the verbs, not the dividers. */
 export function countableItems(group: ExplorerGroupModel): number {
-  return group.items.reduce((n, i) => n + (i.action ? 0 : 1), 0);
+  return group.items.reduce((n, i) => n + (i.action || i.heading ? 0 : 1), 0);
 }
 
 export interface ExplorerGroupModel {
@@ -42,7 +51,9 @@ export function filterExplorer(groups: ExplorerGroupModel[], query: string): Exp
   const out: ExplorerGroupModel[] = [];
   for (const g of groups) {
     const items = g.items.filter(
-      (i) => i.label.toLowerCase().includes(q) || i.hint?.toLowerCase().includes(q),
+      // Headings drop out under a filter (see ExplorerItemModel.heading) —
+      // matching one by its own label would show a divider with no rows.
+      (i) => !i.heading && (i.label.toLowerCase().includes(q) || i.hint?.toLowerCase().includes(q)),
     );
     if (items.length > 0) out.push({ ...g, items });
   }
