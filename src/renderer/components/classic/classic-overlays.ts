@@ -18,6 +18,7 @@ import { s1ObjectIsInvisible, s1ObjectName } from '../../../core/project/profile
 import type { ObjectSprite } from '../../state/classicObjectArtStore';
 import { CHUNK_PX, ringGroupPositions } from './viewport-math';
 import {
+  CANVAS_VOID,
   COLLISION_FILL_ALL, COLLISION_FILL_TOP, COLLISION_FILL_SIDES, COLLISION_FILL_NONE,
   COLLISION_SURFACE_LINE, COLLISION_ANGLE_TICK,
   OBJECT_BOX_FILL, OBJECT_BOX_STROKE, OBJECT_LABEL, RING_FILL, RING_STROKE, START_MARKER,
@@ -337,4 +338,37 @@ export function drawStart(
   ctx.font = `${9 * invZoom}px monospace`;
   ctx.textAlign = 'left';
   ctx.fillText('START', x + r + 6, y - r);
+}
+
+/**
+ * Animated-art play overlay for one visible chunk (audit §2.2's cost verdict:
+ * an overlay blit over just the animated cells, never chunk-cache
+ * invalidation — the MZ magma redraws every 2 frames across 28 chunks, which
+ * rules out re-rasterizing chunk canvases per tick).
+ *
+ * `cells` comes from animatedCellsForChunk (derived on the chunk's version
+ * key); `getPlacementCanvas` returns the 16x16 canvas of that block placement
+ * composed from the CURRENT animation-frame tiles (viewport-cached per
+ * distinct block+flip per tick). Each cell is first filled with the canvas
+ * void so a color-0 (transparent) pixel in the current frame shows the void
+ * exactly as the base pass composes it — NOT the stale frame-0 art underneath
+ * (SBZ's blank smoke state is entirely transparent; without the fill the
+ * overlay could never blank anything).
+ */
+export function drawAnimatedArt(
+  ctx: CanvasRenderingContext2D,
+  col: number,
+  row: number,
+  cells: readonly { cell: number; block: number; xf: boolean; yf: boolean }[],
+  getPlacementCanvas: (block: number, xf: boolean, yf: boolean) => HTMLCanvasElement,
+): void {
+  const baseX = col * CHUNK_PX;
+  const baseY = row * CHUNK_PX;
+  ctx.fillStyle = CANVAS_VOID;
+  for (const c of cells) {
+    const x = baseX + (c.cell % 16) * 16;
+    const y = baseY + ((c.cell / 16) | 0) * 16;
+    ctx.fillRect(x, y, 16, 16);
+    ctx.drawImage(getPlacementCanvas(c.block, c.xf, c.yf), x, y);
+  }
 }

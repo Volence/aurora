@@ -8,6 +8,7 @@ const LABELS: Record<string, string> = {
   showCollision: 'Collision (path A)', showCollisionPathB: 'Collision (path B)',
   showCollisionAngles: 'Collision angles', showStart: 'Player start',
   showPriority: 'Priority (above sprites)',
+  playAnimatedArt: 'Play animated art',
 };
 function pretty(key: string) {
   return LABELS[key] ?? key.replace('show', '').replace(/([A-Z])/g, ' $1').trim();
