@@ -314,3 +314,13 @@ streamer, and the ending cutscene routine.
   (`s1.ts:261`).
 - Oscillator period: node simulation of `OscillateNumDo` semantics (UNVERIFIED against
   live emulator; flagged in §1.2).
+
+
+## Oscillator TAG closed — 2026-08-21, overseer foreground run
+
+Sampled the byte at `v_oscillate+$A` ($FFFE68 — the symbol map attributes the address to
+`v_timingvariables+8`; the engine deliberately indexes past the 2-byte bitfield) in the
+live GHZ demo: f4400 $16 → f4445 $03 → f4490 $01 → f4580 $2A → f4670 $3E → f4760 $16.
+Triangle sweep within 0..$3F; frames 4400 and 4760 — exactly 360 apart — read identically.
+**The simulation (0..$3F sweep, 360-frame period) is CONFIRMED live.** Parcel B may rely
+on it. (Oscillators are global — verified in GHZ without reaching MZ.)
