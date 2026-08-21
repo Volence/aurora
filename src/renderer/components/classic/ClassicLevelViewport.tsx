@@ -15,7 +15,7 @@ import { objectArtKey } from '../../../core/project/profiles/object-subtype-rule
 import { objectSpriteEpoch } from '../../../core/level-classic/object-sprite-clock';
 import { useToastStore } from '../../state/toastStore';
 import { useAetherStore } from '../../state/aetherStore';
-import { renderChunk } from '../../../core/level-classic/render';
+import { renderBlockPlacement, renderChunk } from '../../../core/level-classic/render';
 import { applyCollisionShapeCells, applyCollisionShapeRect } from '../../state/collision-dispatch';
 import type { LevelDoc } from '../../../core/level-classic/model';
 // TYPE-ONLY (erased at runtime): the gesture's cells and the report it hands to
@@ -31,7 +31,12 @@ import {
   worldToCollisionCell, rectFromCorners, COLLISION_CELL_PX,
   type ObjectHitBounds, type StampCell,
 } from './viewport-math';
-import { drawCollision, drawObjects, drawPriority, drawStart, GHOST_MARKER_BOUNDS } from './classic-overlays';
+import { drawAnimatedArt, drawCollision, drawObjects, drawPriority, drawStart, GHOST_MARKER_BOUNDS } from './classic-overlays';
+import {
+  animStateKey, animTilePatchesAt, animatedCellsForChunk, animatedTilesForZone,
+  familiesForZone, type AnimatedCell,
+} from '../../../core/level-classic/s1-anim-art';
+import { createIpcFileAccess } from '../../state/classic-file-access';
 import CollisionLegend from '../CollisionLegend';
 import { isTypingTarget } from './composer-shared';
 import { classicSurfaceProps } from './classic-surface';
@@ -264,6 +269,96 @@ export default function ClassicLevelViewport() {
     chunkCache.current = new Map();
   }, [ref]);
 
+  // ---- animated-art playback (audit Parcel B, §2.2) ------------------------
+  // Overlay-only playback of the S1 AniArt_* families: a wall-clock game-frame
+  // counter drives the pure core clock (s1-anim-art.ts), and the draw pass
+  // blits the current-frame block placements over just the animated cells.
+  // NEVER through doc.tiles (§2.3 — the save path hard-errors on changed anim
+  // bytes and playback through the doc would poison undo/recompose baselines)
+  // and NEVER via chunk-cache invalidation (§2.2 — the MZ magma is a 30 Hz
+  // redraw across 28 chunks the naive way).
+  const zone = ref?.zone ?? null;
+  const playAnim =
+    overlays.playAnimatedArt && zone !== null && familiesForZone(zone).length > 0;
+  // The zone's family sources (artunc/*.unc bytes), loaded once per zone when
+  // playback is first switched on. A family whose file is missing simply stays
+  // static (the clock skips absent sources).
+  const animSourcesRef = useRef<{ zone: string; map: Map<string, Uint8Array> } | null>(null);
+  const animFrameRef = useRef(0); // game frame (60/s) since play switched on
+  const animKeyRef = useRef('');
+  // Scratch tile pool: doc.tiles copied once per doc identity, animated slots
+  // re-patched in place per clock state. The DOC's pool is never written.
+  const animScratchRef = useRef<{ base: Uint8Array; scratch: Uint8Array; patchedKey: string } | null>(null);
+  // Per-chunk animated-cell lists, derived on the same version key as the art
+  // cache (chunk-cell edits move/flip placements; block edits change which
+  // blocks are animated via the coarse epoch).
+  const animCellsRef = useRef<Map<number, { key: string; cells: AnimatedCell[] }>>(new Map());
+  useEffect(() => {
+    animCellsRef.current = new Map();
+    animScratchRef.current = null;
+  }, [ref]);
+  // Per-tick placement canvases: one per distinct (block, xf, yf) at the
+  // current clock state — the audit's blast-radius measurement says a zone has
+  // ≤14 animated blocks, so this rebuilds a handful of 16x16 canvases per art
+  // step, not per painted frame.
+  const animPlacementRef = useRef<{ key: string; map: Map<string, HTMLCanvasElement> }>({ key: '', map: new Map() });
+  // Honest cost meter for the overlay pass (read by the CDP harness/report):
+  // total ms spent in the animated-art section of the draw pass.
+  const animPerfRef = useRef<{ draws: number; sumMs: number; maxMs: number }>({ draws: 0, sumMs: 0, maxMs: 0 });
+
+  useEffect(() => {
+    if (!playAnim || !projectDir || !zone) return;
+    if (animSourcesRef.current?.zone === zone) return;
+    let cancelled = false;
+    const fa = createIpcFileAccess(projectDir);
+    const files = [...new Set(familiesForZone(zone).map((f) => f.file))];
+    void (async () => {
+      const map = new Map<string, Uint8Array>();
+      if (fa.readMany) {
+        const got = await fa.readMany(files);
+        for (const [p, e] of got) if (e.bytes) map.set(p, e.bytes);
+      } else {
+        for (const f of files) {
+          try { map.set(f, await fa.read(f)); } catch { /* missing → family stays static */ }
+        }
+      }
+      if (!cancelled) {
+        animSourcesRef.current = { zone, map };
+        redraw();
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [playAnim, projectDir, zone, redraw]);
+
+  useEffect(() => {
+    if (!playAnim || !zone) return;
+    // Playback starts at game-frame 0 (level init) every time it is switched
+    // on — deterministic, and exactly the state the static view shows for SBZ
+    // (blank smoke) and GHZ frame-0 families.
+    const t0 = performance.now();
+    let handle = 0;
+    const tick = () => {
+      const t = Math.floor(((performance.now() - t0) * 60) / 1000);
+      animFrameRef.current = t;
+      const key = animStateKey(zone, t);
+      if (key !== animKeyRef.current) {
+        animKeyRef.current = key;
+        redraw(); // repaint only when some family actually stepped
+      }
+      handle = requestAnimationFrame(tick);
+    };
+    handle = requestAnimationFrame(tick);
+    return () => {
+      cancelAnimationFrame(handle);
+      // Toggle-off restores the exact static view with NO explicit redraw:
+      // flipping the overlay key re-renders the component, the depless render
+      // effect repaints, and the draw pass simply skips the overlay (chunk
+      // canvases and doc were never touched).
+      animFrameRef.current = 0;
+      animKeyRef.current = '';
+    };
+  }, [playAnim, zone, redraw]);
+
   // ---- paint instrumentation (AURORA_PERF=1) -------------------------------
   // The current act load's paint accumulator (null when perf is off). Written by
   // the render effect (draw count + timings) and the ready-transition effect
@@ -491,6 +586,84 @@ export default function ClassicLevelViewport() {
         // (world units × invZoom) so it reads at any zoom.
         if (cell & 0x80) drawLoopGlyph(ctx, col * CHUNK_PX, row * CHUNK_PX, invZoom);
       }
+    }
+
+    // Animated-art play overlay: blit the current-frame block placements over
+    // just the visible animated cells (audit §2.2 — never chunk-cache
+    // invalidation). Drawn on whichever plane is displayed — the waterfall/
+    // torch/smoke families live largely on BG — and BEFORE the lenses, which
+    // must stay legible on top of moving art.
+    if (playAnim && zone && animSourcesRef.current?.zone === zone) {
+      const animT0 = performance.now();
+      const sources = animSourcesRef.current.map;
+      const t = animFrameRef.current;
+      const stateKey = animStateKey(zone, t);
+      // Scratch pool for this doc, patched to the current clock state.
+      let s = animScratchRef.current;
+      if (!s || s.base !== doc.tiles) {
+        s = { base: doc.tiles, scratch: doc.tiles.slice(), patchedKey: '' };
+        animScratchRef.current = s;
+      }
+      if (s.patchedKey !== stateKey) {
+        for (const patch of animTilePatchesAt(zone, t, sources)) {
+          const off = patch.start * 32;
+          if (off + patch.bytes.length <= s.scratch.length) s.scratch.set(patch.bytes, off);
+        }
+        s.patchedKey = stateKey;
+      }
+      const facade: LevelDoc = { ...doc, tiles: s.scratch };
+      // Placement canvases for this clock state (chunkEpoch folds in block/
+      // tile/palette edits; stateKey folds in the animation frames).
+      const placementKey = `${chunkEpoch}:${stateKey}`;
+      const pc = animPlacementRef.current;
+      if (pc.key !== placementKey) {
+        pc.key = placementKey;
+        pc.map.clear();
+      }
+      const getPlacementCanvas = (block: number, xf: boolean, yf: boolean): HTMLCanvasElement => {
+        const k = `${block}:${xf ? 1 : 0}${yf ? 1 : 0}`;
+        let c = pc.map.get(k);
+        if (!c) {
+          c = document.createElement('canvas');
+          c.width = 16;
+          c.height = 16;
+          const cctx = c.getContext('2d', { willReadFrequently: true });
+          if (cctx) {
+            const img = cctx.createImageData(16, 16);
+            img.data.set(renderBlockPlacement(facade, block, xf, yf));
+            cctx.putImageData(img, 0, 0);
+          }
+          pc.map.set(k, c);
+        }
+        return c;
+      };
+      const animTiles = animatedTilesForZone(zone);
+      for (let row = range.startRow; row < range.endRow; row++) {
+        for (let col = range.startCol; col < range.endCol; col++) {
+          const cell = layoutCellAt(grid, col, row);
+          if (cell === undefined) continue;
+          const chunkId = cell & 0x7f;
+          const verKey = `${chunkEpoch}:${chunkVersions.get(chunkId) ?? 0}`;
+          let entry = animCellsRef.current.get(chunkId);
+          if (!entry || entry.key !== verKey) {
+            entry = { key: verKey, cells: animatedCellsForChunk(doc, chunkId, animTiles) };
+            animCellsRef.current.set(chunkId, entry);
+          }
+          if (entry.cells.length === 0) continue;
+          drawAnimatedArt(ctx, col, row, entry.cells, getPlacementCanvas);
+          // The loop glyph sits at the chunk's top-left; re-assert it over an
+          // animated cell 0 so playback never hides the loop flag.
+          if (cell & 0x80 && entry.cells[0]?.cell === 0) {
+            drawLoopGlyph(ctx, col * CHUNK_PX, row * CHUNK_PX, invZoom);
+          }
+        }
+      }
+      const animMs = performance.now() - animT0;
+      const acc = animPerfRef.current;
+      acc.draws++;
+      acc.sumMs += animMs;
+      acc.maxMs = Math.max(acc.maxMs, animMs);
+      (window as unknown as Record<string, unknown>).__auroraAnimArtPerf = acc;
     }
 
     // Priority lens (per visible chunk, per 8x8 tile). NOT inside the fg gate

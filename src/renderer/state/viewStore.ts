@@ -17,6 +17,10 @@ export interface OverlayOptions {
   /** The per-8x8-tile VDP priority lens (classic-only): marks tiles whose
    *  pattern word carries bit 15 — they render ABOVE sprites in game. */
   showPriority: boolean;
+  /** Play the S1 animated level art (classic-only): GHZ waterfall/flowers, MZ
+   *  lava/magma/torch, SBZ smoke animate at their real AnimateLevelGfx rates.
+   *  Overlay-only playback — never touches doc.tiles (audit §2.3). */
+  playAnimatedArt: boolean;
 }
 
 /**
@@ -34,7 +38,7 @@ export interface OverlayOptions {
  * overlay bar lands and classic's OptionBar stops declaring its own.
  */
 export const OVERLAY_KEYS_BY_ENGINE: Record<OpenEngine, readonly (keyof OverlayOptions)[]> = {
-  s1: ['showObjects', 'showStart', 'showCollision', 'showCollisionAngles', 'showPriority'],
+  s1: ['showObjects', 'showStart', 'showCollision', 'showCollisionAngles', 'showPriority', 'playAnimatedArt'],
   aeon: [
     'showObjects', 'showRings', 'showTileGrid', 'showBlockGrid', 'showChunkGrid',
     'showCollision', 'showCollisionAngles', 'showCollisionPathB', 'showBgPlane',
@@ -77,6 +81,8 @@ export const useViewStore = create<ViewState>((set) => ({
     showStart: true,
     // A lens, not ambient chrome: off until asked for, like the collision lens.
     showPriority: false,
+    // Playback is asked for, never ambient: OFF by default like the lenses.
+    playAnimatedArt: false,
   },
 
   pan: (dx, dy) => set((state) => ({

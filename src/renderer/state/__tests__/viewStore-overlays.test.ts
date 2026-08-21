@@ -71,18 +71,25 @@ describe('OVERLAY_KEYS_BY_ENGINE', () => {
     }
   });
 
-  it('lists exactly the five overlays classic\'s viewport draws', () => {
+  it('lists exactly the six overlays classic\'s viewport draws', () => {
     // The four originally shared with classic's chip row, plus the priority
-    // lens (per-8x8-tile VDP bit-15 overlay, feat/s1-priority-lens). Classic-
-    // only: aeon's tile words are a different engine's format and its viewport
-    // has no drawPriority, so listing it there would be a dead toggle.
+    // lens (per-8x8-tile VDP bit-15 overlay, feat/s1-priority-lens) and the
+    // animated-art play toggle (feat/s1-animated-art-playback). Classic-only:
+    // aeon's tile words are a different engine's format and its viewport has
+    // no drawPriority/drawAnimatedArt, so listing them there would be dead
+    // toggles.
     expect([...OVERLAY_KEYS_BY_ENGINE.s1].sort()).toEqual(
-      ['showCollision', 'showCollisionAngles', 'showObjects', 'showPriority', 'showStart'],
+      ['playAnimatedArt', 'showCollision', 'showCollisionAngles', 'showObjects', 'showPriority', 'showStart'],
     );
     expect(OVERLAY_KEYS_BY_ENGINE.aeon).not.toContain('showPriority');
+    expect(OVERLAY_KEYS_BY_ENGINE.aeon).not.toContain('playAnimatedArt');
   });
 
   it('keeps the priority lens OFF by default, like the collision lens', () => {
     expect(defaults().showPriority).toBe(false);
+  });
+
+  it('keeps animated-art playback OFF by default (asked for, never ambient)', () => {
+    expect(defaults().playAnimatedArt).toBe(false);
   });
 });
