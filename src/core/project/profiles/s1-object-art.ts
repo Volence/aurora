@@ -97,6 +97,24 @@ export type ObjectArtSource = 'file' | 'levelArt';
  * absent = the mappings index the pool directly (every LevelArt def, and plain
  * `.nem` files).
  */
+/**
+ * One ADDITIONAL art file composited into a doc's tile space (beyond the row's
+ * `artFile`, which is always the pool's tile 0). `tileBase` is the tile index
+ * where this file's tile 0 lands — the VRAM-RELATIVE offset between the two
+ * PLC load addresses, transcribed (and cited on the row) from the disasm's
+ * ArtTile constants. This mirrors what the engine does in VRAM: one obGfx
+ * base, N nem files loaded at fixed offsets from it, mappings whose tile
+ * indices span the whole space. Gaps between slices are blank tiles (no
+ * mapping references them). Save-back stays PRIMARY-only: s1ArtSource captures
+ * `artFile`'s tiles alone, and the write-back's per-piece guard skips pieces
+ * whose tiles fall outside that pool — secondary pixels render, never write.
+ */
+export interface ObjectArtExtraSource {
+  artFile: string;
+  compression: ObjectArtCompression;
+  tileBase: number;
+}
+
 export interface ObjectArtLink {
   artFile: string;
   mapAsm: string;
@@ -105,6 +123,8 @@ export interface ObjectArtLink {
   compression: ObjectArtCompression;
   artSource: ObjectArtSource;
   tileIndexOffset?: number;
+  /** Additional art files at their VRAM-relative tile offsets (see ObjectArtExtraSource). */
+  sources?: ObjectArtExtraSource[];
 }
 
 const nem = (
@@ -161,10 +181,12 @@ const SWINGING_PLATFORM = nem('artnem/GHZ Swinging Platform.nem', '_maps/Swingin
 // runtime; the checkout model supports one `artFile` per row, so each row is the
 // object's OWN slot's primary source and the composite parts are named here:
 //   • Eggman ($3D/$73/$75/$77/$7A): the ship + face sub-slots draw Map_Eggman
-//     frames 0-7 from Nem_Eggman; the exhaust-flame sub-slot's frames 8/11/12
-//     index tile $12A+ — past Nem_Eggman's pool and into Nem_Exhaust
-//     (ArtTile_Eggman_Exhaust equ ArtTile_Eggman+$12A, _Constants.asm:584; PLC_Boss
-//     line 290) — so the flame frames render blank/garbage from the single .nem.
+//     frames 0-7 from Nem_Eggman; the escape-flame frames 11/12 index tile
+//     $12A+ — past Nem_Eggman's pool and into Nem_Exhaust — CLOSED by the
+//     row's `sources` slice (citations on the EGGMAN const below): one maps
+//     file whose tile indices span N nem files at VRAM-relative offsets is
+//     exactly what `sources` composites. (Contrast $48: its parts are
+//     different maps FILES, which `sources` cannot merge.)
 //   • Wrecking Ball ($48): three maps FILES at runtime — the ball (Map_GBall /
 //     Nem_Ball, the row below: the recognizable sprite leads the doc), chain
 //     links (Map_Swing_GHZ frame 1 / ArtTile_GHZ_MZ_Swing — $15's file pair),
@@ -186,8 +208,20 @@ const SWINGING_PLATFORM = nem('artnem/GHZ Swinging Platform.nem', '_maps/Swingin
 //     Nem_FzBoss file, palette line 1.
 //
 // The shared Eggman ship row (frame 0 = .ship; obGfx = ArtTile_Eggman, no
-// Tile_Pal bits → palette line 0):
-const EGGMAN = nem('artnem/Boss - Main.nem', '_maps/Eggman.asm', 0, 0);
+// Tile_Pal bits → palette line 0). `sources` composites Nem_Exhaust into the
+// tile space at $12A — the VRAM-relative offset the escapeflame frames were
+// written against: ArtTile_Eggman equ $400 / ArtTile_Eggman_Exhaust equ
+// ArtTile_Eggman+$12A (_Constants.asm:579/584), PLC_Boss loads Nem_Eggman at
+// ArtTile_Eggman and Nem_Exhaust "artnem/Boss - Exhaust Flame.nem"
+// (sonic.asm:4805) at ArtTile_Eggman_Exhaust (_inc/Pattern Load Cues.asm:
+// 286/290; PLC_FZBoss repeats the pair at :445). Map_Eggman's .escapeflame1/2
+// index tiles $12A-$13A — past Nem_Eggman's $6C tiles and exactly onto
+// Nem_Exhaust's $11 (Nemesis headers) — so without this slice the tail frames
+// rendered blank (owner-recorded limitation, now closed).
+const EGGMAN: ObjectArtLink = {
+  ...nem('artnem/Boss - Main.nem', '_maps/Eggman.asm', 0, 0),
+  sources: [{ artFile: 'artnem/Boss - Exhaust Flame.nem', compression: 'nemesis', tileBase: 0x12A }],
+};
 
 /**
  * The base linkage (from `obj.ini` + the XML / C# defs it references). These
