@@ -13,6 +13,7 @@ import { useProjectStore } from '../../state/projectStore';
 import { requestOpenTab } from '../../shell/tab-activation';
 import { classicLevelTab, aeonLevelTab, PROJECT_SETUP_TAB } from '../../shell/tabs';
 import type { RecentProject } from '../../../shared/ipc-types';
+import { normalizeProjectPath } from '../../../shared/project-path';
 
 export interface HomeTabProps {
   onOpenProject: () => void;
@@ -88,7 +89,12 @@ export default function HomeTab({ onOpenProject, onOpenRecent }: HomeTabProps) {
     ? { resolved: report.resolved, total: report.total, issues: sidecar?.issues.length ?? 0 }
     : null;
   // Recents minus the project already open — switching "to" it would be a no-op.
-  const otherRecents = recents.filter((r) => r.path !== currentPath);
+  // Compared under normalizeProjectPath: the stored side is normalized by the
+  // recents store, but currentPath is whatever spelling the project was opened
+  // with (an agent can pass `proj/`), and a raw compare would then show the
+  // open project as an "other" recent.
+  const currentNorm = currentPath !== null ? normalizeProjectPath(currentPath) : null;
+  const otherRecents = recents.filter((r) => normalizeProjectPath(r.path) !== currentNorm);
 
   return (
     <div style={styles.scroll}>
