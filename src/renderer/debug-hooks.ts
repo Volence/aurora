@@ -566,7 +566,22 @@ interface DebugApi {
      * "does this frame actually draw anything" readout (0 = blank canvas).
      */
     frameCoverage: number[];
+    /**
+     * Per-frame FNV-1a (32-bit, 8 hex digits) over the frame's index bytes —
+     * lets a harness assert WHICH pixels a frame holds (e.g. the spring's
+     * sideways frames drawing Nem_VSpring), not merely that some exist. The
+     * unit domain (s1-open-refusal.test.ts) computes the same hash over the
+     * same openDiscoveredSet output, so a constant measured there is
+     * comparable here.
+     */
+    frameHashes: string[];
   };
+}
+
+/** The file's fnv1a as 8 hex digits — the frameHashes encoding. Mirrored in
+ *  s1-open-refusal.test.ts — keep the two implementations equivalent. */
+function frameHash(d: Uint8Array): string {
+  return fnv1a(d, 0, d.length).toString(16).padStart(8, '0');
 }
 
 export function installDebugHooks(): void {
@@ -642,6 +657,7 @@ export function installDebugHooks(): void {
           for (let i = 0; i < f.data.length; i++) if (f.data[i] !== 0) n++;
           return n;
         }),
+        frameHashes: s.frames.map((f) => frameHash(f.data)),
       };
     },
   };

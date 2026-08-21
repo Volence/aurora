@@ -136,6 +136,22 @@ describe.skipIf(!fs.existsSync(S1DIR))('openDiscoveredSet — Spring per-frame a
     // -$10+16=0.. — shows vertical tile 1*4+2 = 6.
     expect(at(0 + 3, 0 + 3)).toBe(vtiles[6].pixels[3 * 8 + 3]);
 
+    // CROSS-DOMAIN IDENTITY for the CDP harness (s1-sonic-sprite-harness.mjs):
+    // FNV-1a of the frame's index bytes, mirrored in __dbg.spriteState().
+    // These constants are MEASURED from this very render path over the real
+    // files (scratchpad spring-hash probe) — the hand-derived pixel asserts
+    // above are what prove them CORRECT; the constants only carry identity
+    // into the harness, where frame 4 must hash 358b89d8 (vertical pool) and
+    // must NOT hash 01af9749 (the old horizontal-pool render).
+    const fnv1a = (d: Uint8Array) => {
+      let h = 0x811c9dc5;
+      for (let i = 0; i < d.length; i++) { h ^= d[i]; h = Math.imul(h, 0x01000193) >>> 0; }
+      return h.toString(16).padStart(8, '0');
+    };
+    expect(fnv1a(s.frames[4].data)).toBe('358b89d8');
+    expect(fnv1a(oldFrames[4])).toBe('01af9749');
+    expect(fnv1a(s.frames[1].data)).toBe('7e380bb1'); // upright frame: same either way
+
     // Save-back: a frame-swap doc has NO single honest write target.
     expect(s.s1ArtSource).toBeNull();
     expect(s.saveBackRefusal).toContain("Spring can't save back in place");
