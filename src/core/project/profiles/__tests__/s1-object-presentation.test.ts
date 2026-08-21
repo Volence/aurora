@@ -186,12 +186,19 @@ describe('s1UnavailableRowNote', () => {
   });
 });
 
-describe('placement rows keep the >$7F exclusion (boss-parcel filter)', () => {
+describe('placement rows are untouched by the display-side dedup', () => {
   it('classicObjectRows offers no id past $7F — objpos bit 7 is the remember-state flag', () => {
     const rows = classicObjectRows('ghz');
     expect(rows.length).toBeGreaterThan(0);
     for (const r of rows) expect(Number(r.key)).toBeLessThanOrEqual(0x7f);
     // Anti-vacuous: the ids exist in the registry, so the filter did real work.
     expect(S1_OBJECT_LIST.some((o) => o.id > 0x7f)).toBe(true);
+  });
+
+  it('every per-zone boss id keeps its OWN placement row — the merge is display-only', () => {
+    // $3D places the GHZ boss and $73 the MZ boss; collapsing them in a
+    // placement surface would remove the ability to place four of the five.
+    const keys = new Set(classicObjectRows('ghz').map((r) => Number(r.key)));
+    for (const id of [0x3d, 0x73, 0x75, 0x77, 0x7a]) expect(keys.has(id)).toBe(true);
   });
 });
