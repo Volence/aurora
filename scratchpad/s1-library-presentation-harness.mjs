@@ -21,9 +21,10 @@
 //      in LZ/SBZ only) in the Objects facet and clicking the map PLACES it
 //      (objpos allows any id <= $7F) AND fires the honest warning toast
 //      naming the object and the zone
-//   6  ANTI-VACUOUS: placing an AVAILABLE id (Crabmeat $1F) stays silent —
-//      row 5 passed because of the classification, not because every
-//      placement now nags
+//   6  ANTI-VACUOUS: placing an AVAILABLE id (Egg Prison $3E — zone-free, and
+//      absent from GHZ1's objpos so before/after findObject proves THIS
+//      placement) stays silent — row 5 passed because of the classification,
+//      not because every placement now nags
 //
 // A STALE dist/ MAKES EVERY ROW VACUOUS — same guard as the sibling: refuse
 // to run when any source file is newer than the built main bundle.

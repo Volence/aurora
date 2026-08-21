@@ -308,7 +308,13 @@ const styles: Record<string, React.CSSProperties> = {
   itemHover: { background: T.raised },
   itemDisabled: { color: T.textFaint, cursor: 'default' },
   itemLabel: { flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const },
-  itemHint: { fontSize: T.t2xs, color: T.textFaint, fontFamily: T.fontMono, flexShrink: 0 },
+  itemHint: {
+    fontSize: T.t2xs, color: T.textFaint, fontFamily: T.fontMono,
+    // Ellipsize the HINT, not the label: a long hint (the merged Eggman row's
+    // covered-id list, a recent project's path) must not eat the row's name.
+    // The row tooltip still carries the full hint.
+    maxWidth: '50%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const,
+  },
   itemHeading: {
     padding: '8px 10px 2px 18px', fontSize: T.t2xs, color: T.textFaint,
     textTransform: 'uppercase' as const, letterSpacing: 0.5,
