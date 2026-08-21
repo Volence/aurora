@@ -279,9 +279,10 @@ export const S1_OBJECT_ART_BASE: Readonly<Record<number, ObjectArtLink>> = {
   // line (_inc/Palette Index.asm:19,51; _Variables.asm:317-321). Zone-free by
   // construction: one binclude streamed per frame to ArtTile_Sonic = $780
   // (_Constants.asm:571, sonic.asm:832-835) in EVERY zone — no zone map may
-  // claim $01. Frame 0 = the standing frame. All facts probe-verified in
-  // docs/reviews/2026-08-20-s1-nonlevel-art-audit.md §1/§4.
-  0x01: dplc('artunc/Sonic.unc', '_maps/Sonic.asm', '_maps/Sonic - Dynamic Gfx Script.asm', 0, 0),
+  // claim $01. Default frame 1 = MS_Stand, the standing frame (frame 0 is
+  // MS_Null/SonPLC_Null — the empty null frame, a blank doc lead). All facts
+  // probe-verified in docs/reviews/2026-08-20-s1-nonlevel-art-audit.md §1/§4.
+  0x01: dplc('artunc/Sonic.unc', '_maps/Sonic.asm', '_maps/Sonic - Dynamic Gfx Script.asm', 1, 0),
   0x0d: nem('artnem/Signpost.nem', '_maps/Signpost.asm', 0, 0), // Signpost
   0x25: nem('artnem/Rings.nem', '_maps/Rings (REV00).asm', 0, 1), // Ring (Ring.cs: startpal 1)
   0x26: nem('artnem/Monitors.nem', '_maps/Monitor.asm', 0, 0), // Monitor (Monitor.xml Image="img")

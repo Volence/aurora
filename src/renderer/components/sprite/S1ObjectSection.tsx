@@ -7,7 +7,8 @@ import {
   s1ArtRowGroups, groupIdsHex, type S1ArtRowGroup,
 } from '../../../core/project/profiles/s1-object-presentation';
 import { s1ObjectHex } from '../../../core/project/profiles/s1-objects';
-import { editObjectArt } from './export-sprite';
+import { editObjectArt, editNamedArtDoc } from './export-sprite';
+import { S1_NAMED_ART_DOCS } from '../../../core/project/profiles/s1-object-art';
 import { ObjectThumb } from '../classic/ObjectThumb';
 
 /**
@@ -97,6 +98,27 @@ export default function S1ObjectSection({ busy, onBusy }: { busy: boolean; onBus
       {shared.length > 0 && (
         <CollapsibleSection id="sprite.s1-shared-objects" title="Shared objects">
           {rowList(shared)}
+          {/* Named art docs (S1_NAMED_ART_DOCS): maps files with no object id
+              of their own — Boss Items' chain anchor/debris. Zone-free like
+              the rows above; no thumb (the thumb cache is object-id keyed). */}
+          <div style={styles.list}>
+            {Object.entries(S1_NAMED_ART_DOCS).map(([key, d]) => {
+              const current = openRelPath !== null && d.link.artFile.split('/').pop() === openRelPath;
+              return (
+                <button
+                  key={key}
+                  onClick={() => { if (!busy) { onBusy(true); void editNamedArtDoc(key).finally(() => onBusy(false)); } }}
+                  disabled={busy}
+                  title={current ? `${d.name} — currently open` : `Open ${d.name}'s art + mappings`}
+                  style={{ ...styles.row, ...(current ? styles.rowCurrent : {}), ...(busy ? styles.busy : {}) }}
+                >
+                  <span style={styles.thumbWrap} />
+                  <span style={{ ...styles.hex, ...(current ? styles.onCur : {}) }}>maps</span>
+                  <span style={styles.text}><span style={styles.name}>{d.name}</span></span>
+                </button>
+              );
+            })}
+          </div>
           <div style={styles.hint}>art every zone loads — not {zone.toUpperCase()}-specific</div>
         </CollapsibleSection>
       )}
