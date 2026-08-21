@@ -37,8 +37,7 @@ import { requestOpenTab, requestFocusIndex } from './shell/tab-activation';
 import { buildCommands } from './shell/commands';
 import { classicLevelTab, aeonLevelTab, untitledSpriteTab, PROJECT_SETUP_TAB } from './shell/tabs';
 import { resolveObjectSprite } from './shell/explorer-data';
-import { S1_OBJECT_LIST, s1ObjectHex } from '../core/project/profiles/s1-objects';
-import { resolveObjectArt } from '../core/project/profiles/s1-object-art';
+import { s1ArtRowGroups, groupIdsHex } from '../core/project/profiles/s1-object-presentation';
 import { editObjectArt } from './components/sprite/export-sprite';
 import { registerAgentHandler } from './agent/agent-handler';
 import { installCloseGuard } from './shell/close-guard';
@@ -170,9 +169,11 @@ export default function App() {
         ? config.zones.flatMap((z) => z.acts.map((a) => aeonLevelTab(z.id, z.name, a.id)))
         : [];
     const objects = classicOpen && docReady && classicZone
-      ? S1_OBJECT_LIST
-          .filter(({ id }) => resolveObjectArt(id, classicZone) !== undefined)
-          .map(({ id, name }) => ({ id, name, hex: s1ObjectHex(id) }))
+      // Deduped by link identity (the five shared-link Eggman ids are ONE
+      // "Eggman (Boss)" entry); the hint carries every covered hex id so a
+      // search for "$73" still finds the merged entry.
+      ? s1ArtRowGroups(classicZone)
+          .map((g) => ({ id: g.id, name: g.label, hex: groupIdsHex(g) }))
       : [];
     const aeonSprites = objectLibrary
       .map((o) => ({ name: o.name, sprite: resolveObjectSprite(o, objectBindings) }))

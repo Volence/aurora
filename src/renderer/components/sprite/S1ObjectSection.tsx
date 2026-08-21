@@ -3,19 +3,34 @@ import { T, CollapsibleSection } from '../ui';
 import { useClassicLevelStore } from '../../state/classicLevelStore';
 import { useClassicProjectStore } from '../../state/classicProjectStore';
 import { useSpriteStore } from '../../state/spriteStore';
-import { S1_OBJECT_LIST, s1ObjectHex } from '../../../core/project/profiles/s1-objects';
-import { resolveObjectArt } from '../../../core/project/profiles/s1-object-art';
+import {
+  s1ArtRowGroups, groupIdsHex, type S1ArtRowGroup,
+} from '../../../core/project/profiles/s1-object-presentation';
+import { s1ObjectHex } from '../../../core/project/profiles/s1-objects';
 import { editObjectArt } from './export-sprite';
 import { ObjectThumb } from '../classic/ObjectThumb';
 
 /**
  * The disasm's own object list, INSIDE Sprite mode (classic sessions only) — so
  * hopping between S1 objects never requires a round trip through the level
- * view's Object Library. Rows are the zone-linked objects (same registry the
- * edit-art handoff uses); clicking one opens its art + mappings in place. The
- * row whose art file is currently open is highlighted. Switching discards
- * unsaved pixel edits — editObjectArt guards that with the shared sprite discard
- * confirm (re-clicking the open row stays a no-op), so no ad hoc prompt here.
+ * view's Object Library. Rows come from s1ArtRowGroups (the same registry the
+ * edit-art handoff uses), which does two presentation jobs here:
+ *
+ *  • TWO SECTIONS, not one. Zone-free rows — the Ring, monitors, the bosses:
+ *    art whose link no zone map redefines, loaded for every level — sit under
+ *    their own "Shared objects" header instead of being filed under the open
+ *    zone's ("GHZ objects" listing five Eggmen was the reported confusion).
+ *    Only genuinely zone-scoped rows keep the zone's header.
+ *  • LINK-IDENTITY DEDUP. Ids sharing one link object (the five zone bosses on
+ *    the single EGGMAN const) collapse to one row labeled by the derived
+ *    merged name ("Eggman (Boss)"), with the covered ids in the subtitle and
+ *    tooltip. Clicking opens the canonical (lowest) id's doc — which is the
+ *    identical art+maps set for every covered id.
+ *
+ * Clicking one opens its art + mappings in place. The row whose art file is
+ * currently open is highlighted. Switching discards unsaved pixel edits —
+ * editObjectArt guards that with the shared sprite discard confirm
+ * (re-clicking the open row stays a no-op), so no ad hoc prompt here.
  */
 export default function S1ObjectSection({ busy, onBusy }: { busy: boolean; onBusy: (b: boolean) => void }) {
   const ref = useClassicLevelStore((s) => s.ref);
@@ -26,10 +41,10 @@ export default function S1ObjectSection({ busy, onBusy }: { busy: boolean; onBus
   const zone = ref?.zone ?? '';
   if (!zone) return null;
 
-  const linked = S1_OBJECT_LIST
-    .map((o) => ({ ...o, link: resolveObjectArt(o.id, zone) }))
-    .filter((o) => o.link !== undefined);
-  if (!linked.length) return null;
+  const groups = s1ArtRowGroups(zone);
+  if (!groups.length) return null;
+  const zonal = groups.filter((g) => !g.zoneFree);
+  const shared = groups.filter((g) => g.zoneFree);
 
   const pick = async (id: number) => {
     if (busy) return;
@@ -39,30 +54,53 @@ export default function S1ObjectSection({ busy, onBusy }: { busy: boolean; onBus
     try { await editObjectArt(id); } finally { onBusy(false); }
   };
 
+  const rowList = (rows: S1ArtRowGroup[]) => (
+    <div style={styles.list}>
+      {rows.map((g) => {
+        const current = openRelPath !== null && g.link.artFile.split('/').pop() === openRelPath;
+        const covered = g.ids.length > 1 ? groupIdsHex(g) : null;
+        const title = current
+          ? `${g.label} — currently open`
+          : `Open ${g.label}'s art + mappings${covered !== null ? ` (one art set shared by ${covered})` : ''}`;
+        return (
+          <button
+            key={g.id}
+            onClick={() => void pick(g.id)}
+            disabled={busy}
+            title={title}
+            style={{ ...styles.row, ...(current ? styles.rowCurrent : {}), ...(busy ? styles.busy : {}) }}
+          >
+            <span style={styles.thumbWrap}>
+              <ObjectThumb id={g.id} zone={zone} paletteEpoch={paletteEpoch} tileEpoch={tileEpoch} dir={dir} />
+            </span>
+            <span style={{ ...styles.hex, ...(current ? styles.onCur : {}) }}>{s1ObjectHex(g.id)}</span>
+            <span style={styles.text}>
+              <span style={styles.name}>{g.label}</span>
+              {covered !== null && (
+                <span style={{ ...styles.covered, ...(current ? styles.onCur : {}) }}>{covered}</span>
+              )}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+
   return (
-    <CollapsibleSection id="sprite.s1-objects" title={`${zone.toUpperCase()} objects`}>
-      <div style={styles.list}>
-        {linked.map(({ id, name, link }) => {
-          const current = openRelPath !== null && link!.artFile.split('/').pop() === openRelPath;
-          return (
-            <button
-              key={id}
-              onClick={() => void pick(id)}
-              disabled={busy}
-              title={current ? `${name} — currently open` : `Open ${name}'s art + mappings`}
-              style={{ ...styles.row, ...(current ? styles.rowCurrent : {}), ...(busy ? styles.busy : {}) }}
-            >
-              <span style={styles.thumbWrap}>
-                <ObjectThumb id={id} zone={zone} paletteEpoch={paletteEpoch} tileEpoch={tileEpoch} dir={dir} />
-              </span>
-              <span style={{ ...styles.hex, ...(current ? styles.onCur : {}) }}>{s1ObjectHex(id)}</span>
-              <span style={styles.name}>{name}</span>
-            </button>
-          );
-        })}
-      </div>
-      <div style={styles.hint}>art shared between objects edits together (same .nem)</div>
-    </CollapsibleSection>
+    <>
+      {zonal.length > 0 && (
+        <CollapsibleSection id="sprite.s1-objects" title={`${zone.toUpperCase()} objects`}>
+          {rowList(zonal)}
+          <div style={styles.hint}>art shared between objects edits together (same .nem)</div>
+        </CollapsibleSection>
+      )}
+      {shared.length > 0 && (
+        <CollapsibleSection id="sprite.s1-shared-objects" title="Shared objects">
+          {rowList(shared)}
+          <div style={styles.hint}>art every zone loads — not {zone.toUpperCase()}-specific</div>
+        </CollapsibleSection>
+      )}
+    </>
   );
 }
 
@@ -78,6 +116,9 @@ const styles: Record<string, React.CSSProperties> = {
   thumbWrap: { width: 28, height: 28, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' },
   hex: { fontFamily: T.fontMono, fontSize: T.t2xs, color: T.textLo, width: 30, flexShrink: 0 },
   onCur: { color: T.onAccent },
+  text: { display: 'flex', flexDirection: 'column', minWidth: 0 },
   name: { fontSize: T.tXs, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  /** The merged row's covered-ids subtitle ("$3D · $73 · …"). */
+  covered: { fontFamily: T.fontMono, fontSize: T.t2xs, color: T.textFaint, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   hint: { fontSize: T.t2xs, color: T.textFaint, padding: '0 8px 6px' },
 };
