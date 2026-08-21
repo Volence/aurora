@@ -28,7 +28,7 @@ import { requestFocusTabId } from '../../shell/tab-activation';
 import { useClassicLevelStore } from '../../state/classicLevelStore';
 import { useWorkspaceStore } from '../../workspace/workspaceStore';
 import { parseSpriteDocTabId } from '../../shell/tabs';
-import { objectArtIsZoneFree } from '../../../core/project/profiles/s1-object-art';
+import { objectArtIsZoneFree, resolveNamedArtDoc } from '../../../core/project/profiles/s1-object-art';
 
 export default function SpriteDocUnloaded({ tabId, title }: { tabId: string; title: string }) {
   const actLoaded = useClassicLevelStore((s) => s.ref !== null);
@@ -40,7 +40,8 @@ export default function SpriteDocUnloaded({ tabId, title }: { tabId: string; tit
   const persistedZone = useWorkspaceStore((s) => s.record[tabId]?.s1Zone ?? null);
   const parsed = parseSpriteDocTabId(tabId);
   const isS1 = parsed?.engine === 's1';
-  const selfServes = isS1 && (persistedZone !== null || objectArtIsZoneFree(Number(parsed?.ref)));
+  const selfServes = isS1 && (persistedZone !== null || objectArtIsZoneFree(Number(parsed?.ref))
+    || (parsed !== null && resolveNamedArtDoc(parsed.ref) !== undefined)); // named docs are zone-free
   const waitingForAct = isS1 && !actLoaded && !selfServes;
 
   return (

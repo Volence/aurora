@@ -103,7 +103,7 @@ function stubLoaders(opts: { aeonOk?: boolean; aeonThrows?: boolean; s1Ok?: bool
       useSpriteStore.getState().loadSprite([frameFilledWith(1)], [], 4, 4);
       return true;
     },
-    editObjectArtCheckout: async (id: number) => {
+    editObjectArtCheckout: async (id: number | string) => {
       calls.push(`s1:${id}`);
       if (opts.s1Ok === false) return false;
       useSpriteStore.getState().loadSprite([frameFilledWith(2)], [], 4, 4);
@@ -541,7 +541,7 @@ describe('restored-tab activation (no act loaded, classic project open)', () => 
   function stubS1Capture(keys: (unknown)[]) {
     __setSpriteModuleForTest({
       loadSpriteByName: async () => true,
-      editObjectArtCheckout: async (_id: number, zoneKey?: unknown) => {
+      editObjectArtCheckout: async (_id: number | string, zoneKey?: unknown) => {
         keys.push(zoneKey ?? null);
         useSpriteStore.getState().loadSprite([frameFilledWith(3)], [], 4, 4);
         return true;

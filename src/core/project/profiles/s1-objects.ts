@@ -22,6 +22,11 @@
 
 /** id (0x00–0x8C, the disasm object-index range) → human-readable object name. */
 export const S1_OBJECT_NAMES: Readonly<Record<number, string>> = {
+  // $01 is the player object (SonLVL's [Sonic] start entry — a spawn marker,
+  // not a normal placement). Named so his sprite doc (the $01 DPLC art row in
+  // s1-object-art.ts) carries a real title and a library row; the object tool
+  // never gated on this table.
+  0x01: 'Sonic',
   0x0b: 'Pole',
   0x0c: 'Flapping Door',
   0x0d: 'Signpost',
