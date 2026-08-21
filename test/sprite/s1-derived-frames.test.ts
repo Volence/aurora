@@ -214,12 +214,16 @@ describe('spring $41 art pairing (the actual source of the "scrambled" look)', (
     expect(base.artFile).toBe('artnem/Spring Horizontal.nem');
     // Subtype $10 = horizontal (Direction bits 4-5 = 1): the engine sets
     // obFrame=3 AND obGfx=ArtTile_Spring_Vertical — one maps file, two art
-    // files split BY FRAME RANGE. The in-level preview honors that; the doc
-    // (one art file for all six frames) cannot, which is why frames 3-5 look
-    // scrambled there. Recorded limitation, same multi-source class as the
-    // boss rows' provenance block in s1-object-art.ts.
+    // files split BY FRAME RANGE. The in-level preview honors that via the
+    // subtype rule; the DOC now honors it too via the row's frameSources
+    // slice (formerly the recorded "scrambled frames 3-5" limitation — see
+    // s1-open-refusal.test.ts for the hand-derived doc-render assertions).
     const eff = resolveEffectiveObjectArt(0x41, 'ghz', 0x10, base);
     expect(eff.link.artFile).toBe('artnem/Spring Vertical.nem');
     expect(eff.link.frame).toBe(3);
+    // The doc-side transcription of the same engine fact:
+    expect(base.frameSources).toEqual([
+      { firstFrame: 3, lastFrame: 5, artFile: 'artnem/Spring Vertical.nem', compression: 'nemesis' },
+    ]);
   });
 });

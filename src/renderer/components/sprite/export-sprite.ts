@@ -8,7 +8,7 @@ import { buildSpriteExport, buildDPLCData } from '../../../core/export/sprite-ex
 import type { SpriteManifest } from '../../../core/export/sprite-export';
 import { assembleSprite } from '../../../core/art/sprite-decompose';
 import { writeAsmMappings, writeAsmDPLC } from '../../../core/export/sprite-asm-export';
-import { reconstructDPLCSprite, reconstructWithAdapter, reconstructFromFrames, reconstructFromTilePool, composeTilePool } from '../../../core/import/sprite-import';
+import { reconstructDPLCSprite, reconstructWithAdapter, reconstructFromFrames, reconstructFromTilePool, reconstructFromFramePools, composeTilePool } from '../../../core/import/sprite-import';
 import { getAdapter } from '../../../core/formats/games';
 import { parseTiles } from '../../../core/formats/tiles';
 import { compressionFor } from '../../../core/compress';
@@ -26,7 +26,7 @@ import { requestOpenTab } from '../../shell/tab-activation';
 import { spriteDocTab } from '../../shell/tabs';
 import { useClassicProjectStore } from '../../state/classicProjectStore';
 import { useClassicLevelStore } from '../../state/classicLevelStore';
-import { resolveObjectArt, objectArtIsZoneFree } from '../../../core/project/profiles/s1-object-art';
+import { resolveObjectArt, objectArtIsZoneFree, resolveNamedArtDoc } from '../../../core/project/profiles/s1-object-art';
 import type { S1ZoneKey } from '../../../core/shell/session-persistence';
 import { resolveObjectAnims } from '../../../core/project/profiles/s1-object-anims';
 import type { SyncAnimEntry } from '../../../core/project/profiles/s1-object-anims';
@@ -176,10 +176,22 @@ const baseOf = (p: string) => p.replace(/\\/g, '/').split('/').filter(Boolean).p
 
 /**
  * Capture the in-place ART save-back target after an S1 object sprite opens
- * (Task 15). Only S1, non-DPLC, Nemesis art gets a target — the write-back
- * re-encodes with Nemesis and keeps the read-only mappings, so any other shape
- * (DPLC, non-Nemesis, other games) is left with no source (edit/export only).
- * `loadSprite` already cleared any prior source, so a skip here leaves it null.
+ * (Task 15). Only S1, non-DPLC, Nemesis art WITHOUT per-frame art swaps gets a
+ * target — the write-back re-encodes with Nemesis and keeps the read-only
+ * mappings, so any other shape (DPLC, non-Nemesis, frame-swapped, other games)
+ * is left with no source (edit/export only). When the shape is one of the
+ * S1-specific refusals, the WHY is recorded on the document (saveBackRefusal)
+ * so a save attempt refuses with the honest, specific reason instead of the
+ * generic "no S1 art source" line:
+ *   • DPLC (Sonic): every frame's mapping indices resolve through a per-frame
+ *     source-tile list into ONE shared art pool — frames share source tiles,
+ *     so an in-place write of one frame's pixels would rewrite other frames.
+ *   • frame swaps (Spring): frames 3-5 render from a different art file than
+ *     the primary save target, so a single-file write would corrupt one side.
+ *   • non-Nemesis (Giant Ring, Sonic again): the S1 writer is Nemesis-only by
+ *     design (s1-art-write.ts header).
+ * `loadSprite` already cleared any prior source AND refusal, so an early return
+ * here leaves them null/set exactly as decided.
  * Non-fatal: a decode/stat failure just means no in-place save, not a broken open.
  */
 async function captureS1ArtSource(
@@ -192,8 +204,31 @@ async function captureS1ArtSource(
   hasDplc: boolean,
   basePath: string,
   relPath: string,
+  hasFrameSwaps = false,
 ): Promise<void> {
-  if (game !== 's1' || hasDplc || artCompression !== 'nemesis') return;
+  if (game !== 's1') return;
+  const store = useSpriteStore.getState();
+  const name = store.name;
+  if (hasDplc) {
+    store.setSaveBackRefusal(
+      `${name} can't save back in place: its frames stream through a shared DPLC tile pool — `
+      + `every frame's mapping indices resolve into one art file whose source tiles many frames share, `
+      + `so writing one frame's pixels would silently rewrite other frames. Editing and Export still work.`);
+    return;
+  }
+  if (hasFrameSwaps) {
+    store.setSaveBackRefusal(
+      `${name} can't save back in place: some of its frames draw from a different art file than the `
+      + `primary save target (the object swaps its art base per frame), so a single-file write would `
+      + `corrupt one of the two files. Editing and Export still work.`);
+    return;
+  }
+  if (artCompression !== 'nemesis') {
+    store.setSaveBackRefusal(
+      `${name} can't save back in place: its art file is not Nemesis-compressed, and the in-place S1 `
+      + `writer re-encodes Nemesis only. Editing and Export still work.`);
+    return;
+  }
   try {
     const originalTiles = parseTiles(compressionFor('nemesis').decompress(artBytes));
     const expectedMtimeMs = await window.api.fileMtime(basePath, relPath);
@@ -244,7 +279,12 @@ export async function saveSpriteArt(docId?: string): Promise<void> {
   const doc = spriteDocState(targetId);
   if (!doc) return; // not open — nothing to save, and nothing to say about it
   const src = doc.s1ArtSource;
-  if (!src) { toast('This sprite has no S1 art source to save back to', 'error'); return; }
+  if (!src) {
+    // Prefer the open path's recorded refusal (WHY this document cannot write
+    // in place — DPLC pool, per-frame art swap, non-Nemesis) over the generic.
+    toast(doc.saveBackRefusal ?? 'This sprite has no S1 art source to save back to', 'error');
+    return;
+  }
 
   const frames = doc.frames;
   // Frames pair to mappings BY INDEX; a changed frame count means add/delete/
@@ -489,9 +529,9 @@ export async function openDiscoveredSet(baseDir: string, set: DiscoveredSpriteSe
     // still open and only the frames indexing the missing slice stay blank
     // (exactly the pre-sources behavior).
     let recon;
-    if (set.extraSources?.length) {
+    if (set.extraSources?.length || set.frameSources?.length) {
       const slices = [{ bytes: artBytes, compression: artCompression, tileBase: 0 }];
-      for (const ex of set.extraSources) {
+      for (const ex of set.extraSources ?? []) {
         try {
           slices.push({
             bytes: new Uint8Array(await window.api.readBinaryFile(baseDir, ex.art)),
@@ -501,7 +541,33 @@ export async function openDiscoveredSet(baseDir: string, set: DiscoveredSpriteSe
           toast(`Composite art source ${ex.art} unavailable — its frames will render blank`, 'info');
         }
       }
-      recon = reconstructFromTilePool(frames, composeTilePool(slices), dplc);
+      const basePool = composeTilePool(slices);
+      if (set.frameSources?.length) {
+        // Per-frame REPLACEMENT pools (frameSources rows): the named frame
+        // ranges index their own file's tiles from 0 — the engine's per-frame
+        // obGfx swap (Spring's sideways frames on ArtTile_Spring_Vertical). A
+        // failed read degrades that range to the primary pool with an info
+        // toast: exactly the pre-frameSources render, nothing worse.
+        const overrides: { first: number; last: number; tiles: ReturnType<typeof parseTiles> }[] = [];
+        for (const fs of set.frameSources) {
+          try {
+            const bytes = new Uint8Array(await window.api.readBinaryFile(baseDir, fs.art));
+            overrides.push({
+              first: fs.firstFrame, last: fs.lastFrame,
+              tiles: parseTiles(compressionFor(fs.compression).decompress(bytes)),
+            });
+          } catch {
+            toast(`Frame art source ${fs.art} unavailable — frames ${fs.firstFrame}–${fs.lastFrame} will render from the primary art`, 'info');
+          }
+        }
+        recon = reconstructFromFramePools(
+          frames,
+          (i) => overrides.find((r) => i >= r.first && i <= r.last)?.tiles ?? basePool,
+          dplc,
+        );
+      } else {
+        recon = reconstructFromTilePool(frames, basePool, dplc);
+      }
     } else {
       recon = reconstructFromFrames(frames, artBytes, artCompression, dplc);
     }
@@ -511,7 +577,7 @@ export async function openDiscoveredSet(baseDir: string, set: DiscoveredSpriteSe
     useSpriteStore.getState().setName(name);
     useSpriteStore.getState().setExportDplc(!!dplc);
     useSpriteStore.getState().setFormat(set.game);
-    await captureS1ArtSource(set.game, artCompression, artBytes, frames, recon.originX, recon.originY, !!dplc, artBase, artRel);
+    await captureS1ArtSource(set.game, artCompression, artBytes, frames, recon.originX, recon.originY, !!dplc, artBase, artRel, !!set.frameSources?.length);
     toast(`Opened "${set.name}" (${set.game.toUpperCase()}): ${frameBufs.length} frames${dplc ? ' (DPLC)' : ''}`, 'success');
     return true;
   } catch (e) {
@@ -607,28 +673,45 @@ async function checkoutPaletteLine(pal: number, target: S1ZoneKey | null): Promi
   }
 }
 
-export async function editObjectArtCheckout(id: number, zoneKey?: S1ZoneKey | null): Promise<boolean> {
+export async function editObjectArtCheckout(id: number | string, zoneKey?: S1ZoneKey | null): Promise<boolean> {
+  // A non-numeric string ref names a NAMED art doc (S1_NAMED_ART_DOCS — maps
+  // files with no object id of their own, e.g. Map_BossItems). Named docs are
+  // zone-free by construction (their art is a shared PLC_Boss-class binclude)
+  // and have no anim script. Numeric refs — number or the tab ref's string
+  // form — stay the object-id path.
+  const named = typeof id === 'string' ? resolveNamedArtDoc(id) : undefined;
+  const numId = typeof id === 'number' ? id : Number(id);
   const openRef = useClassicLevelStore.getState().ref;
   const target: S1ZoneKey | null =
     zoneKey ?? (openRef ? { zone: openRef.zone, act: openRef.act } : null);
-  if (!target && !objectArtIsZoneFree(id)) {
+  if (!target && !named && !objectArtIsZoneFree(numId)) {
     useToastStore.getState().addToast('Open a classic level before editing object art', 'error');
     return false;
   }
   const dir = useClassicProjectStore.getState().dir;
-  const link = resolveObjectArt(id, target?.zone);
+  const link = named?.link ?? resolveObjectArt(numId, target?.zone);
   if (!dir || !link) return false;
 
-  const name = sanitizeName(s1ObjectName(id) || s1ObjectHex(id));
+  const name = sanitizeName(named?.name ?? (s1ObjectName(numId) || s1ObjectHex(numId)));
   const comp: CompressionKind = link.compression === 'uncompressed' ? 'uncompressed' : 'nemesis';
   const set: DiscoveredSpriteSet = {
     name, game: 's1', mappings: link.mapAsm, art: link.artFile,
+    // DPLC rows (link.dplcAsm — Sonic) carry the dynamic-gfx script into the
+    // open, where dplcFromFile parses it and renderFrames resolves each
+    // frame's FRAME-LOCAL tile indices through it.
+    dplc: link.dplcAsm,
     // Composite rows (link.sources) ride into the open as extra pool slices at
     // their transcribed VRAM-relative tile offsets (see ObjectArtExtraSource).
     extraSources: link.sources?.map((s) => ({
       art: s.artFile,
       compression: s.compression === 'uncompressed' ? 'uncompressed' as const : 'nemesis' as const,
       tileBase: s.tileBase,
+    })),
+    // Frame-swap rows (link.frameSources) name per-frame-range replacement
+    // pools (see ObjectArtFrameSource — Spring's sideways frames 3-5).
+    frameSources: link.frameSources?.map((s) => ({
+      firstFrame: s.firstFrame, lastFrame: s.lastFrame, art: s.artFile,
+      compression: s.compression === 'uncompressed' ? 'uncompressed' as const : 'nemesis' as const,
     })),
   };
 
@@ -653,7 +736,7 @@ export async function editObjectArtCheckout(id: number, zoneKey?: S1ZoneKey | nu
   // An unlinked object (static art, or a named exclusion like Sonic/Caterkiller)
   // stays empty-but-honest: loadSprite already cleared characterAnims/steps.
   // A read/parse failure keeps the art open usable — anims are optional.
-  const animLink = resolveObjectAnims(id);
+  const animLink = named ? undefined : resolveObjectAnims(numId);
   if (animLink) {
     const animFrameCount = useSpriteStore.getState().frames.length;
     // Synced (SynchroAnimate) entries come straight from the transcription
@@ -695,6 +778,21 @@ export async function editObjectArt(id: number): Promise<boolean> {
   const tabId = 'doc:sprite:s1:' + id;
   const name = s1ObjectName(id); // named object, or its $XX hex fallback
   await requestOpenTab(spriteDocTab('s1', String(id), name));
+  return useSpriteStore.getState().activeDocId === tabId;
+}
+
+/**
+ * "Edit art…" for a NAMED art doc (S1_NAMED_ART_DOCS — e.g. Map_BossItems,
+ * whose only engine consumers are sub-slots of objects with other docs). Same
+ * shape as editObjectArt: the tab ref is the named key, sprite-doc activation
+ * runs editObjectArtCheckout with it, and the named branch there resolves the
+ * link + title from the table.
+ */
+export async function editNamedArtDoc(key: string): Promise<boolean> {
+  const doc = resolveNamedArtDoc(key);
+  if (!doc) return false;
+  const tabId = 'doc:sprite:s1:' + key;
+  await requestOpenTab(spriteDocTab('s1', key, doc.name));
   return useSpriteStore.getState().activeDocId === tabId;
 }
 

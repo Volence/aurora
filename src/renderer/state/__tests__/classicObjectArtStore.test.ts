@@ -9,6 +9,8 @@ import {
 import type { LevelDoc } from '../../../core/level-classic/model';
 
 // Minimal doc: refresh only reads doc.objects[].id (the builder is faked).
+// Ids here must stay UNLINKED in s1-object-art ($02/$03 — $01 is Sonic's DPLC
+// row now), or refresh's prefetch reaches the Electron-only readMany bridge.
 function fakeDoc(ids: number[]): LevelDoc {
   return { objects: ids.map((id) => ({ id })) } as unknown as LevelDoc;
 }
@@ -63,7 +65,7 @@ describe('refreshClassicObjectSprites — lifecycle guards', () => {
       return d.promise;
     });
 
-    const doc = fakeDoc([1]);
+    const doc = fakeDoc([2]);
     const pA = refreshClassicObjectSprites('dir', doc, 'ghz', clk(1)); // gen 1
     const pB = refreshClassicObjectSprites('dir', doc, 'ghz', clk(2)); // gen 2
     expect(builds).toHaveLength(2); // one build per (epoch) key
@@ -71,20 +73,20 @@ describe('refreshClassicObjectSprites — lifecycle guards', () => {
     // Newer refresh (B) resolves first and publishes.
     builds[1].resolve(fakeSprite(2));
     await pB;
-    expect(useClassicObjectArtStore.getState().sprites.get('1')?.width).toBe(2);
+    expect(useClassicObjectArtStore.getState().sprites.get('2')?.width).toBe(2);
     const versionAfterB = useClassicObjectArtStore.getState().version;
 
     // Older refresh (A) resolves last — its publish must be DROPPED.
     builds[0].resolve(fakeSprite(1));
     await pA;
-    expect(useClassicObjectArtStore.getState().sprites.get('1')?.width).toBe(2); // unchanged
+    expect(useClassicObjectArtStore.getState().sprites.get('2')?.width).toBe(2); // unchanged
     expect(useClassicObjectArtStore.getState().version).toBe(versionAfterB); // no extra publish
   });
 
   it('evicts + closes prior-epoch bitmaps after a new-epoch refresh publishes', async () => {
     const close = vi.fn();
     __setObjectSpriteBuilderForTest(async () => fakeSprite(1, close));
-    const doc = fakeDoc([1]);
+    const doc = fakeDoc([2]);
     await refreshClassicObjectSprites('dir', doc, 'ghz', clk(1));
     expect(close).not.toHaveBeenCalled();
     await refreshClassicObjectSprites('dir', doc, 'ghz', clk(2));
@@ -95,9 +97,9 @@ describe('refreshClassicObjectSprites — lifecycle guards', () => {
   it('wipes + closes the cache on a project-dir change', async () => {
     const close = vi.fn();
     __setObjectSpriteBuilderForTest(async () => fakeSprite(1, close));
-    await refreshClassicObjectSprites('dirA', fakeDoc([1]), 'ghz', clk(1));
+    await refreshClassicObjectSprites('dirA', fakeDoc([2]), 'ghz', clk(1));
     expect(close).not.toHaveBeenCalled();
-    await refreshClassicObjectSprites('dirB', fakeDoc([1]), 'ghz', clk(1));
+    await refreshClassicObjectSprites('dirB', fakeDoc([2]), 'ghz', clk(1));
     // dirB's refresh cleared the dirA-built bitmap before rebuilding.
     expect(close).toHaveBeenCalledTimes(1);
   });
@@ -108,7 +110,7 @@ describe('refreshClassicObjectSprites — lifecycle guards', () => {
     // publish (and bump) exactly once.
     __setObjectSpriteBuilderForTest(async (id) => fakeSprite(id));
     const before = useClassicObjectArtStore.getState().version;
-    await refreshClassicObjectSprites('dir', fakeDoc([1, 2, 3, 4, 5, 6, 7, 8]), 'ghz', clk(1));
+    await refreshClassicObjectSprites('dir', fakeDoc([2, 3, 4, 5, 6, 7, 8, 9]), 'ghz', clk(1));
     expect(useClassicObjectArtStore.getState().version).toBe(before + 1);
     expect(useClassicObjectArtStore.getState().sprites.size).toBe(8);
   });
@@ -193,11 +195,11 @@ describe('refreshClassicObjectSprites — lifecycle guards', () => {
   });
 
   it('publishes only linked (non-null) sprites, skipping misses', async () => {
-    __setObjectSpriteBuilderForTest(async (id) => (id === 1 ? fakeSprite(3) : null));
-    await refreshClassicObjectSprites('dir', fakeDoc([1, 2]), 'ghz', clk(1));
+    __setObjectSpriteBuilderForTest(async (id) => (id === 2 ? fakeSprite(3) : null));
+    await refreshClassicObjectSprites('dir', fakeDoc([2, 3]), 'ghz', clk(1));
     const map = useClassicObjectArtStore.getState().sprites;
-    expect(map.get('1')?.width).toBe(3);
-    expect(map.has('2')).toBe(false); // null miss not published
+    expect(map.get('2')?.width).toBe(3);
+    expect(map.has('3')).toBe(false); // null miss not published
   });
 
   it('keys subtype-rule objects by subtype, static objects by bare id', async () => {

@@ -82,11 +82,17 @@ function frameBounds(frames: SpriteFrame[]): { width: number; height: number; or
  * that frame's source-tile list (streaming-art sprites); otherwise the art pool
  * is fully resident and indexed directly.
  */
-function renderFrames(frames: SpriteFrame[], art: Tile[], dplc?: number[][]): ReconstructedSprite {
+function renderFrames(
+  frames: SpriteFrame[],
+  art: Tile[],
+  dplc?: number[][],
+  poolForFrame?: (frameIndex: number) => Tile[],
+): ReconstructedSprite {
   const blank: Tile = { pixels: new Uint8Array(64) };
   const { width, height, originX, originY } = frameBounds(frames);
   const out = frames.map((f, i) => {
-    const tiles = dplc ? (dplc[i] ?? []).map((src) => art[src] ?? blank) : art;
+    const pool = poolForFrame ? poolForFrame(i) : art;
+    const tiles = dplc ? (dplc[i] ?? []).map((src) => pool[src] ?? blank) : pool;
     return renderFrameToIndices(f, tiles, width, height, originX, originY);
   });
   if (out.length === 0) out.push(new Uint8Array(width * height));
@@ -149,6 +155,22 @@ export function reconstructFromTilePool(
   dplc?: number[][],
 ): ReconstructedSprite {
   return renderFrames(frames, tiles, dplc);
+}
+
+/**
+ * Reconstruct with a PER-FRAME tile pool: `poolForFrame(i)` names the pool
+ * frame `i`'s tile indices resolve against. This is the per-frame obGfx swap
+ * (ObjectArtFrameSource — Spring's sideways frames on ArtTile_Spring_Vertical):
+ * each frame indexes its own pool from tile 0, unlike composeTilePool's single
+ * shared VRAM-offset space. The shared canvas still spans ALL frames' bounds,
+ * so override frames stay origin-aligned with primary ones.
+ */
+export function reconstructFromFramePools(
+  frames: SpriteFrame[],
+  poolForFrame: (frameIndex: number) => Tile[],
+  dplc?: number[][],
+): ReconstructedSprite {
+  return renderFrames(frames, [], dplc, poolForFrame);
 }
 
 /**

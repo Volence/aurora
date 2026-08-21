@@ -77,6 +77,13 @@ export interface SpriteDoc {
   steps: AnimStepUI[];
   /** In-place art save-back target (S1 objects only); null when there is none. */
   s1ArtSource: S1ArtSource | null;
+  /** WHY this document has no in-place save-back target, when the open path
+   *  could name a specific reason (DPLC shared tile pool, per-frame art swap,
+   *  non-Nemesis art). Shown by saveSpriteArt instead of the generic "no S1
+   *  art source" line. Null when a target exists OR the reason is generic
+   *  (new/editor/other-game sprites). Set alongside s1ArtSource by
+   *  captureS1ArtSource; cleared by loadSprite/newSprite like the target. */
+  saveBackRefusal: string | null;
   /** TRUE only when this document has edits not yet persisted — the single
    *  signal for the tab dot, the sprite-switch discard guard, and the
    *  project-open guard. Distinct from `s1ArtSource`: a checkout target is merely
@@ -149,6 +156,7 @@ interface SpriteState extends SpriteDoc {
   setExportDplc: (v: boolean) => void;
   setFormat: (f: SpriteFormatId) => void;
   setS1ArtSource: (src: S1ArtSource | null) => void;
+  setSaveBackRefusal: (reason: string | null) => void;
   setUnsavedEdits: (v: boolean) => void;
 
   /** The checked-out document's frames (the plan's `activeFrames()` selector). */
@@ -243,6 +251,7 @@ function blankDoc(w: number, h: number): SpriteDoc {
     standalonePalette: blankStandalonePalette(),
     steps: [],
     s1ArtSource: null,
+    saveBackRefusal: null,
     unsavedEdits: false,
     name: 'NewSprite',
     originX: Math.floor(width / 2),
@@ -266,6 +275,7 @@ function parkedDoc(s: SpriteState): SpriteDoc {
     standalonePalette: s.standalonePalette,
     steps: s.steps,
     s1ArtSource: s.s1ArtSource,
+    saveBackRefusal: s.saveBackRefusal,
     unsavedEdits: s.unsavedEdits,
     name: s.name,
     originX: s.originX,
@@ -467,6 +477,7 @@ export const useSpriteStore = create<SpriteState>((set, get) => ({
   setExportDplc: (exportDplc) => set({ exportDplc }),
   setFormat: (format) => set({ format }),
   setS1ArtSource: (s1ArtSource) => set({ s1ArtSource }),
+  setSaveBackRefusal: (saveBackRefusal) => set({ saveBackRefusal }),
   setUnsavedEdits: (unsavedEdits) => set({ unsavedEdits }),
   setTool: (tool) => set((s) => ({ tool, selection: tool === 'select' ? s.selection : null })),
   setZoom: (zoom) => set({ zoom: Math.min(48, Math.max(1, Math.round(zoom))) }),
@@ -617,6 +628,7 @@ export const useSpriteStore = create<SpriteState>((set, get) => ({
       originY,
       characterAnims: [],
       s1ArtSource: null,
+      saveBackRefusal: null,
       unsavedEdits: false,
         });
   },

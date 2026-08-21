@@ -18,6 +18,7 @@ import {
   s1ArtRowGroups, groupIdsHex, s1UnavailableRowNote,
 } from '../../core/project/profiles/s1-object-presentation';
 import { S1_OBJECT_LIST, s1ObjectHex } from '../../core/project/profiles/s1-objects';
+import { S1_NAMED_ART_DOCS } from '../../core/project/profiles/s1-object-art';
 import { PROJECT_SETUP_TAB } from './tabs';
 
 // Frozen: this singleton is spread into every classic/aeon groups() result, so
@@ -101,26 +102,38 @@ export function classicObjectLibraryItems(
   const linkedIds = new Set(groups.flatMap((g) => g.ids));
   const available: ExplorerItemModel[] = groups.map((g) => {
     const hint = g.ids.length > 1 ? groupIdsHex(g) : s1ObjectHex(g.id);
-    return levelDocReady
+    // ZONE-FREE rows (objectArtIsZoneFree — Ring, the bosses, Sonic: one
+    // shared art file no zone map redefines) open genuinely level-free: the
+    // checkout resolves their link from the base map and seeds the palette
+    // from disk (checkoutPaletteLine's zone-free fallback). Only zone-scoped
+    // rows still need an open act for their zone context.
+    return levelDocReady || g.zoneFree
       ? { id: `obj:${g.id}`, label: g.label, hint }
       : {
           id: `obj:${g.id}`, label: g.label, hint,
           disabled: true, reason: 'Open a level first (art preview needs its palette)',
         };
   });
+  // NAMED art docs (S1_NAMED_ART_DOCS — maps files with no object id of their
+  // own, e.g. Map_BossItems): listed after the object rows, opened through the
+  // existing `doc:sprite:` Explorer branch. Zone-free by construction, so
+  // never gated on an open level.
+  const namedDocs: ExplorerItemModel[] = Object.entries(S1_NAMED_ART_DOCS).map(([key, d]) => ({
+    id: `doc:sprite:s1:${key}`, label: d.name, hint: 'maps',
+  }));
   const rest: ExplorerItemModel[] = S1_OBJECT_LIST
     .filter((o) => !linkedIds.has(o.id))
     .map((o) => ({
       id: `obj:${o.id}`, label: o.name, hint: s1ObjectHex(o.id),
       disabled: true, reason: s1UnavailableRowNote(o.id, zone),
     }));
-  if (rest.length === 0) return available;
+  if (rest.length === 0) return [...available, ...namedDocs];
   const heading: ExplorerItemModel = {
     id: 'objlib:unavailable',
     label: zone !== null ? `Not loaded in ${zone.toUpperCase()}` : 'Needs an open act',
     heading: true,
   };
-  return [...available, heading, ...rest];
+  return [...available, ...namedDocs, heading, ...rest];
 }
 
 export function classicExplorerGroups(

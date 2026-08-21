@@ -74,6 +74,24 @@ describe('s1ArtRowGroups — link-identity dedup', () => {
     expect(ghz.find((g) => g.id === 0x85)!.ids).toEqual([0x85]);
   });
 
+  it('ANTI-VACUOUS: Sonic ($01) is his own row — shares a link with nobody, merges with nobody', () => {
+    // The $01 DPLC row (Parcel A) is a fresh link object: if the grouping ever
+    // merged him into another row (or another id into his), his doc — the only
+    // DPLC doc — would open the wrong art set. The Eggman assertions above
+    // prove the merge machinery DOES merge where declared, so this is not
+    // vacuously true.
+    const sonic = ghz.find((g) => g.ids.includes(0x01));
+    expect(sonic).toBeDefined();
+    expect(sonic!.ids).toEqual([0x01]);
+    expect(sonic!.label).toBe('Sonic');
+    expect(sonic!.zoneFree).toBe(true); // one shared file, no zone map claims $01
+    expect(sonic!.link.dplcAsm).toBe('_maps/Sonic - Dynamic Gfx Script.asm');
+    // No OTHER group's link is Sonic's link object.
+    for (const g of ghz) {
+      if (g !== sonic) expect(g.link).not.toBe(sonic!.link);
+    }
+  });
+
   it('covers every linked id exactly once (dedup loses nothing, invents nothing)', () => {
     const linked = S1_OBJECT_LIST.filter((o) => resolveObjectArt(o.id, 'ghz') !== undefined)
       .map((o) => o.id);

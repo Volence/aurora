@@ -23,6 +23,14 @@ export interface DiscoveredSpriteSet {
    * Nem_Exhaust at tileBase $12A), where each offset is cited.
    */
   extraSources?: { art: string; compression: 'nemesis' | 'uncompressed'; tileBase: number }[];
+  /**
+   * Per-frame-range REPLACEMENT art pools (see ObjectArtFrameSource): frames
+   * `firstFrame..lastFrame` inclusive draw from `art` instead of the primary
+   * art file (the engine's per-frame obGfx swap, e.g. Spring's sideways frames
+   * 3-5 on ArtTile_Spring_Vertical). Discovery never sets this — it comes from
+   * the transcribed object-art rows, where each range is cited.
+   */
+  frameSources?: { firstFrame: number; lastFrame: number; art: string; compression: 'nemesis' | 'uncompressed' }[];
 }
 
 const norm = (p: string) => p.replace(/\\/g, '/');

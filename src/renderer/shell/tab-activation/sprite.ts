@@ -15,7 +15,7 @@
 import { useClassicLevelStore } from '../../state/classicLevelStore';
 import { useClassicProjectStore } from '../../state/classicProjectStore';
 import { useWorkspaceStore } from '../../workspace/workspaceStore';
-import { objectArtIsZoneFree } from '../../../core/project/profiles/s1-object-art';
+import { objectArtIsZoneFree, resolveNamedArtDoc } from '../../../core/project/profiles/s1-object-art';
 import { useConfirmStore } from '../../state/confirmStore';
 import { useToastStore } from '../../state/toastStore';
 import {
@@ -125,7 +125,10 @@ export function spriteTabCanResolveWithoutAct(tabId: string): boolean {
   if (!ref || ref.engine !== 's1') return false;
   if (useClassicProjectStore.getState().status !== 'open') return false;
   return useWorkspaceStore.getState().s1ZoneFor(tabId) !== null
-    || objectArtIsZoneFree(Number(ref.ref));
+    || objectArtIsZoneFree(Number(ref.ref))
+    // Named art docs (non-numeric refs, e.g. `bossitems`) are zone-free by
+    // construction — shared bincludes with no per-zone variant.
+    || resolveNamedArtDoc(ref.ref) !== undefined;
 }
 
 // IMPORT CYCLE: export-sprite statically imports the shell's tab-activation
@@ -221,9 +224,12 @@ async function runSpriteActivation(tabId: string): Promise<boolean> {
     // returned boolean — not "it didn't throw" — is what decides whether this tab
     // has a document. Assuming success here opened the tab onto the blank 32×32
     // placeholder document instead of taking the rollback below.
+    // s1 refs pass through as strings: editObjectArtCheckout Number()s the
+    // numeric object-id refs itself and routes non-numeric refs to the named
+    // art docs (S1_NAMED_ART_DOCS, e.g. `bossitems`).
     loaded = plan.engine === 'aeon'
       ? await loadSpriteByName(plan.ref)
-      : await editObjectArtCheckout(Number(plan.ref), persistedZone);
+      : await editObjectArtCheckout(plan.ref, persistedZone);
   } catch {
     loaded = false; // loadSpriteByName rejected — stay put
   }

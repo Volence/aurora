@@ -53,8 +53,10 @@
 //   • Ending Animals ($28): the ending act is not a placeable zone in this profile
 //     (zones are ghz/mz/syz/lz/slz/sbz), so there is nowhere to scope it.
 // Orbinaut's XML default is a spikeball+body composite; we preview its recognizable
-// body frame (frame 0) alone. The [Sonic] start entry uses a DPLC frame, not a flat
-// mapping — excluded (it is the spawn marker, not a placeable id).
+// body frame (frame 0) alone. Sonic ($01) — long excluded here because the [Sonic]
+// start entry uses a DPLC frame, not a flat mapping — is now LINKED via `dplc()`
+// (Parcel A of docs/reviews/2026-08-20-s1-nonlevel-art-audit.md): the shipped
+// parseAsmDPLC/renderFrames pipeline was probe-proven to render all 88 frames.
 //
 // ZONE SCOPING: SonLVL merges a base `obj.ini` with a per-zone `objXXX.ini` that
 // can REDEFINE an id (e.g. $1C is GHZ's "Bridge stump" but SLZ's "Fireball
@@ -115,6 +117,24 @@ export interface ObjectArtExtraSource {
   tileBase: number;
 }
 
+/**
+ * A per-frame-range REPLACEMENT art pool: mapping frames `firstFrame..lastFrame`
+ * (inclusive) draw their tiles from `artFile` INSTEAD of the row's primary art.
+ * This transcribes an engine pattern `sources` cannot: the object code swaps
+ * `obGfx` to a DIFFERENT ArtTile base for certain frames (Spring: `_incObj/41
+ * Springs.asm:54-58` sets obFrame 3 + ArtTile_Spring_Vertical for sideways
+ * springs), so those frames' tile indices are relative to the OTHER file's tile
+ * 0 — not offsets into a shared composite pool. Save-back is refused for rows
+ * carrying these (frames from two files, one save target — a single-file write
+ * would corrupt one of them); see captureS1ArtSource.
+ */
+export interface ObjectArtFrameSource {
+  firstFrame: number;
+  lastFrame: number;
+  artFile: string;
+  compression: ObjectArtCompression;
+}
+
 export interface ObjectArtLink {
   artFile: string;
   mapAsm: string;
@@ -123,8 +143,19 @@ export interface ObjectArtLink {
   compression: ObjectArtCompression;
   artSource: ObjectArtSource;
   tileIndexOffset?: number;
+  /**
+   * DPLC (dynamic pattern load cue) script, for streamed-art objects: the
+   * `.asm` whose per-frame `dplcEntry tiles,offset` lists resolve each frame's
+   * FRAME-LOCAL mapping tile indices into the shared art pool. Sonic ($01) is
+   * S1's only such object. Rows carrying this open edit/export-only — see
+   * captureS1ArtSource (frames share source tiles in the pool, so an in-place
+   * write of one frame would rewrite others).
+   */
+  dplcAsm?: string;
   /** Additional art files at their VRAM-relative tile offsets (see ObjectArtExtraSource). */
   sources?: ObjectArtExtraSource[];
+  /** Per-frame-range replacement art pools (see ObjectArtFrameSource). */
+  frameSources?: ObjectArtFrameSource[];
 }
 
 const nem = (
@@ -134,6 +165,17 @@ const nem = (
 const unc = (
   artFile: string, mapAsm: string, frame: number, pal: number,
 ): ObjectArtLink => ({ artFile, mapAsm, frame, pal, compression: 'uncompressed', artSource: 'file' });
+
+/**
+ * A DPLC (streamed-art) link: uncompressed art pool + mappings whose tile
+ * indices are FRAME-LOCAL, resolved through `dplcAsm`'s per-frame source-tile
+ * lists (Ver-1 `dplcHeader`/`dplcEntry` macros — s1disasm/_maps/_MapMacros.asm:
+ * 62-81). Sonic is the only S1 case (audit §1: SonicMappingsVer/SonicDplcVer = 1,
+ * sonic.asm:68-69).
+ */
+const dplc = (
+  artFile: string, mapAsm: string, dplcAsm: string, frame: number, pal: number,
+): ObjectArtLink => ({ artFile, mapAsm, dplcAsm, frame, pal, compression: 'uncompressed', artSource: 'file' });
 
 /**
  * A LevelArt-backed link: tiles come from `LevelDoc.tiles` (the act's own pool), not
@@ -228,12 +270,39 @@ const EGGMAN: ObjectArtLink = {
  * apply in EVERY zone unless a per-zone override below redefines the id.
  */
 export const S1_OBJECT_ART_BASE: Readonly<Record<number, ObjectArtLink>> = {
+  // Sonic ($01) — the player object, S1's ONLY DPLC (streamed-art) sprite.
+  // Art = Art_Sonic "artunc/Sonic.unc" (sonic.asm:4412; 41,248 B = 1,289 tiles,
+  // uncompressed); maps = Map_Sonic "_maps/Sonic.asm" (88 frames, all plain
+  // spritePiece literals); DPLC = SonicDynPLC "_maps/Sonic - Dynamic Gfx
+  // Script.asm" (sonic.asm:4410; 88 entries, 1:1 with mapping frames, offsets
+  // in TILES). Palette LINE 0: Pal_Sonic → v_palette_line_1, the FIRST CRAM
+  // line (_inc/Palette Index.asm:19,51; _Variables.asm:317-321). Zone-free by
+  // construction: one binclude streamed per frame to ArtTile_Sonic = $780
+  // (_Constants.asm:571, sonic.asm:832-835) in EVERY zone — no zone map may
+  // claim $01. Default frame 1 = MS_Stand, the standing frame (frame 0 is
+  // MS_Null/SonPLC_Null — the empty null frame, a blank doc lead). All facts
+  // probe-verified in docs/reviews/2026-08-20-s1-nonlevel-art-audit.md §1/§4.
+  0x01: dplc('artunc/Sonic.unc', '_maps/Sonic.asm', '_maps/Sonic - Dynamic Gfx Script.asm', 1, 0),
   0x0d: nem('artnem/Signpost.nem', '_maps/Signpost.asm', 0, 0), // Signpost
   0x25: nem('artnem/Rings.nem', '_maps/Rings (REV00).asm', 0, 1), // Ring (Ring.cs: startpal 1)
   0x26: nem('artnem/Monitors.nem', '_maps/Monitor.asm', 0, 0), // Monitor (Monitor.xml Image="img")
   0x36: nem('artnem/Spikes.nem', '_maps/Spikes.asm', 0, 0), // Spikes (Spikes.xml Image="img1")
   0x3e: nem('artnem/Prison Capsule.nem', '_maps/Prison Capsule.asm', 0, 0), // Egg Prison (capsule)
-  0x41: nem('artnem/Spring Horizontal.nem', '_maps/Springs.asm', 0, 0), // Spring (redvert)
+  // Spring ($41): Map_Spring has 6 frames — 0-2 upright (drawn at
+  // ArtTile_Spring_Horizontal → Nem_HSpring "artnem/Spring Horizontal.nem"),
+  // 3-5 sideways (.spg_Left/LeftFlat/LeftExt). The object code SWAPS the art
+  // base for sideways springs: `_incObj/41 Springs.asm:54-58` sets obFrame 3 +
+  // `move.w #ArtTile_Spring_Vertical,obGfx` (→ Nem_VSpring "artnem/Spring
+  // Vertical.nem"; ArtTile_Spring_Horizontal equ $523 / ArtTile_Spring_Vertical
+  // equ $533, _Constants.asm:554-555), so frames 3-5's tile indices are
+  // relative to Nem_VSpring's tile 0 — a per-frame pool replacement, not a
+  // composite offset (`sources` can't express it). Without the frameSources
+  // slice, frames 3-5 rendered from the horizontal-spring tiles (owner
+  // screenshot, render-bugs parcel).
+  0x41: {
+    ...nem('artnem/Spring Horizontal.nem', '_maps/Springs.asm', 0, 0), // Spring (redvert)
+    frameSources: [{ firstFrame: 3, lastFrame: 5, artFile: 'artnem/Spring Vertical.nem', compression: 'nemesis' }],
+  },
   0x4b: unc('artunc/Giant Ring.unc', '_maps/Giant Ring.asm', 0, 1), // Giant ring (uncompressed, pal 1)
   0x79: nem('artnem/Lamppost.nem', '_maps/Lamppost.asm', 0, 0), // Lamppost
   0x7d: nem('artnem/Hidden Bonuses.nem', '_maps/Hidden Bonuses.asm', 3, 0), // Point bonus (img100 = frame 3)
@@ -498,4 +567,48 @@ export function linkedObjectIds(zone?: string): number[] {
     for (const k of Object.keys(S1_OBJECT_ART_ZONE[zone])) ids.add(Number(k));
   }
   return [...ids].sort((a, b) => a - b);
+}
+
+// --- Named art docs (maps files with no object id of their own) --------------
+
+/** A named sprite doc: a maps+art pair whose only engine consumers are
+ *  SUB-SLOTS of objects whose own docs lead with different maps files. */
+export interface S1NamedArtDoc {
+  /** Doc title (there is no S1_OBJECT_NAMES entry to resolve). */
+  name: string;
+  link: ObjectArtLink;
+}
+
+/**
+ * Keyed by the sprite-doc tab ref (`doc:sprite:s1:<key>`). Keys are lowercase
+ * identifiers, deliberately DISJOINT from numeric object-id refs — a named key
+ * never parses as a number, so `Number(ref)` sites fall through to NaN and the
+ * named lookup is unambiguous.
+ *
+ * bossitems — Map_BossItems "_maps/Boss Items.asm" (sonic.asm:4293): the boss
+ * fights' chain anchor / debris frames (.chainanchor1/2, .cross, .widepipe,
+ * .pipe, .spike, .legmask, .legs). Art = Nem_Weapons "artnem/Boss -
+ * Weapons.nem" (sonic.asm:4795), queued by PLC_Boss (_inc/Pattern Load
+ * Cues.asm:286) at ArtTile_Eggman_Weapons equ $46C (_Constants.asm:580) — a
+ * shared binclude every boss loads, i.e. zone-free like the EGGMAN rows. No
+ * object id draws it as its PRIMARY slot: its consumers are sub-slot routines
+ * of $48 (GBall_Main, "_incObj/3D, 48 Boss - GHZ Main and Wrecking Ball.asm":
+ * 443-444 — the chain anchor, obGfx with no pal bits → LINE 0), $73's tube
+ * (BossMarble_TubeMain :510-512), $75's spike (BossSpringYard_SpikeMain
+ * :661-663) and $7A's pipe (:501). It HAD a doc while $48's row led with the
+ * anchor; when $48 restructured to lead with the ball (owner finding
+ * 2026-08-20), these maps lost their only doorway — this named row is the
+ * replacement home. Frame 0 = .chainanchor1, the GHZ anchor the old doc led
+ * with; pal 0 per GBall's obGfx.
+ */
+export const S1_NAMED_ART_DOCS: Readonly<Record<string, S1NamedArtDoc>> = {
+  bossitems: {
+    name: 'Boss Items',
+    link: nem('artnem/Boss - Weapons.nem', '_maps/Boss Items.asm', 0, 0),
+  },
+};
+
+/** The named doc for a tab ref key, or undefined for object-id refs. */
+export function resolveNamedArtDoc(key: string): S1NamedArtDoc | undefined {
+  return S1_NAMED_ART_DOCS[key];
 }
