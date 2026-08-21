@@ -152,6 +152,17 @@ export interface ObjectArtLink {
    * write of one frame would rewrite others).
    */
   dplcAsm?: string;
+  /**
+   * Palette FILE for families whose colors never come from a level's CRAM: a
+   * disasm-relative `palette/*.bin` binclude from `_inc/Palette Index.asm`
+   * (Pal_Title, Pal_Continue, Pal_Ending, Pal_SSResult, …). When present,
+   * `pal` indexes the LINE (0..3) within THIS file — 32 bytes = 16 big-endian
+   * CRAM words per line — instead of a level palette line. Absent = the
+   * original behavior: `pal` picks a line of the open/act palette
+   * (checkoutPaletteLine). Non-level modes (title, continue, ending, SS
+   * results, credits) are the only users.
+   */
+  palFile?: string;
   /** Additional art files at their VRAM-relative tile offsets (see ObjectArtExtraSource). */
   sources?: ObjectArtExtraSource[];
   /** Per-frame-range replacement art pools (see ObjectArtFrameSource). */
@@ -605,6 +616,179 @@ export const S1_NAMED_ART_DOCS: Readonly<Record<string, S1NamedArtDoc>> = {
   bossitems: {
     name: 'Boss Items',
     link: nem('artnem/Boss - Weapons.nem', '_maps/Boss Items.asm', 0, 0),
+  },
+
+  // --- Non-level art families (audit 2026-08-20 §2/§5 Parcel B) --------------
+  //
+  // Every row below is TRANSCRIBED from the disasm source: the object's obMap/
+  // obGfx writes name the maps file + palette line, the binclude site names the
+  // art file, and the mode's PalLoad names the palette FILE (palFile — see
+  // ObjectArtLink). These have real `_incObj` ids ($38, $0E/$0F, $34, $39,
+  // $80/$81, $87-$8A, $7F) but live HERE, not in S1_OBJECT_ART_BASE, because
+  // the id route composes worse: `pal` on an object row means a LEVEL CRAM
+  // line, several ids fan out over multiple maps files ($87-$8A → five), and
+  // none is placeable (no objdef, no level palette, no thumbs). A named row is
+  // one family = one doc, which is the granularity these open at.
+
+  // Obj $38 (_incObj/38 Shield and Invincibility.asm:22-33): Map_Shield for
+  // both powerups; obGfx ArtTile_Shield for the shield frames and
+  // ArtTile_Invincibility for the stars — a per-frame obGfx swap, so the stars
+  // frames (4-7, table order in _maps/Shield and Invincibility.asm) index
+  // Nem_Stars from tile 0 (frameSources, the Spring pattern). Frame 0 is the
+  // table's deliberate invisible entry (`.shield1+$B`); frame 1 is the first
+  // real shield frame. obGfx carries no pal bits → level palette line 0.
+  shield: {
+    name: 'Shield & Invincibility',
+    link: {
+      ...nem('artnem/Shield.nem', '_maps/Shield and Invincibility.asm', 1, 0),
+      frameSources: [
+        { firstFrame: 4, lastFrame: 7, artFile: 'artnem/Invincibility Stars.nem', compression: 'nemesis' },
+      ],
+    },
+  },
+
+  // Obj $21 (_incObj/21 HUD.asm:20-21): Map_HUD at ArtTile_HUD ($6CA), line 0,
+  // hi-priority pieces. The lives-counter pieces (tiles $10A/$10E) sit at
+  // ArtTile_Lives_Counter $7D4 = ArtTile_HUD+$10A, where PLC_Main loads
+  // Nem_Lives (_inc/Pattern Load Cues.asm:76) — an extra slice, engine-exact.
+  // The score/time/rings DIGIT cells (tiles $18..$35) are raw-blitted from
+  // artunc/HUD Numbers.unc at runtime (_inc/HUD Update.asm) and stay blank in
+  // this static doc — the raw-grid families are the audit's Parcel C.
+  hudlabels: {
+    name: 'HUD',
+    link: {
+      ...nem('artnem/HUD.nem', '_maps/HUD.asm', 0, 0),
+      sources: [{ artFile: 'artnem/HUD - Life Counter Icon.nem', compression: 'nemesis', tileBase: 0x10a }],
+    },
+  },
+
+  // Obj $0E (_incObj/0E,0F:27-28): Map_TSon at ArtTile_Title_Sonic|Tile_Pal2 →
+  // LINE 1 of Pal_Title (palette/Title Screen.bin, loaded by GM_Title
+  // sonic.asm:2017). Frame 6 = the finger-wag pose the title settles on.
+  titlesonic: {
+    name: 'Title Screen Sonic',
+    link: {
+      ...nem('artnem/Title Screen Sonic.nem', '_maps/Title Screen Sonic.asm', 6, 1),
+      palFile: 'palette/Title Screen.bin',
+    },
+  },
+
+  // Obj $0F (_incObj/0E,0F:92-103): Map_PSB at ArtTile_Title_Foreground (the
+  // PSB letters live INSIDE the foreground emblem's tiles, $F0..$FD), line 0 of
+  // Pal_Title. Frame 3 ("TM") swaps obGfx to ArtTile_Title_Trademark|Tile_Pal2
+  // — transcribed as a frameSources slice so it composes from Nem_TitleTM;
+  // its engine palette is LINE 1, which a single-line doc cannot also show —
+  // the known static-doc simplification (same class as per-piece pal bits).
+  // Frame 0 is the table's invisible hack entry; frame 2 a blank sprite mask.
+  titlepsb: {
+    name: 'Press Start / TM',
+    link: {
+      ...nem('artnem/Title Screen Foreground.nem', '_maps/Press Start and TM.asm', 1, 0),
+      palFile: 'palette/Title Screen.bin',
+      frameSources: [
+        { firstFrame: 3, lastFrame: 3, artFile: 'artnem/Title Screen TM.nem', compression: 'nemesis' },
+      ],
+    },
+  },
+
+  // Obj $34 (_incObj/34 Title Cards.asm:69-70): Map_Card at
+  // ArtTile_Title_Card|Tile_Prio, LEVEL palette line 0 (cards draw over the
+  // level). _maps/Title Cards.asm is the disasm's ONE multi-table file —
+  // Map_Card + (Map_Over include, skipped by the call-site parser) + Map_Got +
+  // Map_SSR, sharing cross-referenced blocks — so this doc's frames are the
+  // concatenation: 0-11 = Map_Card exactly (GHZ..FZ, ZONE, acts, oval), then
+  // Got's and SSR's frames at shifted indices (probe-verified, 30 frames).
+  // Got/SSR frames also reference the HUD labels resident at ArtTile_HUD $6CA
+  // = ArtTile_Title_Card+$14A — composed as an extra slice, engine-exact.
+  titlecards: {
+    name: 'Title Cards',
+    link: {
+      ...nem('artnem/Title Cards.nem', '_maps/Title Cards.asm', 0, 0),
+      sources: [{ artFile: 'artnem/HUD.nem', compression: 'nemesis', tileBase: 0x14a }],
+    },
+  },
+
+  // Obj $39 (_incObj/39 Game Over.asm:31-32): Map_Over at
+  // ArtTile_Game_Over|Tile_Prio, level palette line 0. The standalone file
+  // (also textually included into Title Cards.asm — this row points at the
+  // most specific file, so frame indices match the engine table).
+  gameover: {
+    name: 'Game Over',
+    link: nem('artnem/Game Over.nem', '_maps/Game Over.asm', 0, 0),
+  },
+
+  // Objs $80/$81 (_incObj/80,81:20-21,77-80): Map_ContScr at
+  // ArtTile_Continue_Sonic $500 (line 0 of Pal_Continue, loaded at
+  // sonic.asm:3476 from palette/Special Stage Continue Bonus.bin). The
+  // continue screen's VRAM also holds Nem_TitleCard at ArtTile_Title_Card
+  // $580 = +$80 (sonic.asm:3462-3464 — the "CONTINUE" letters come from the
+  // title-card letter pool), composed as an extra slice. The mini-Sonic
+  // frames (5-7) swap obGfx to ArtTile_Mini_Sonic and index Nem_MiniSonic
+  // ("Continue Screen Stuff.nem", loaded at $551) from tile 0 → frameSources.
+  continue: {
+    name: 'Continue Screen',
+    link: {
+      ...nem('artnem/Continue Screen Sonic.nem', '_maps/Continue Screen.asm', 0, 0),
+      palFile: 'palette/Special Stage Continue Bonus.bin',
+      sources: [{ artFile: 'artnem/Title Cards.nem', compression: 'nemesis', tileBase: 0x80 }],
+      frameSources: [
+        { firstFrame: 5, lastFrame: 7, artFile: 'artnem/Continue Screen Stuff.nem', compression: 'nemesis' },
+      ],
+    },
+  },
+
+  // Objs $87-$89 (_incObj/87,88,89:44-45,178-179,259-260) + $8B
+  // (_incObj/8B,8C:25-26) + $8A (_incObj/8A:20-21): the ending/credits modes.
+  // All obGfx writes carry no pal bits → line 0 of the mode's palette:
+  // Pal_Ending (sonic.asm:3745/4001) for the ending rows, and — measured, not
+  // assumed — palid_Sonic (palette/Sonic.bin, sonic.asm:3848-3849) for the
+  // credits font.
+  endingsonic: {
+    name: 'Ending Sonic',
+    link: {
+      ...nem('artnem/Ending - Sonic.nem', '_maps/Ending Sequence Sonic.asm', 0, 0),
+      palFile: 'palette/Ending.bin',
+    },
+  },
+  endingemeralds: {
+    name: 'Ending Emeralds',
+    link: {
+      ...nem('artnem/Ending - Emeralds.nem', '_maps/Ending Sequence Emeralds.asm', 0, 0),
+      palFile: 'palette/Ending.bin',
+    },
+  },
+  endingsth: {
+    name: 'Ending StH Logo',
+    link: {
+      ...nem('artnem/Ending - StH Logo.nem', '_maps/Ending Sequence STH.asm', 0, 0),
+      palFile: 'palette/Ending.bin',
+    },
+  },
+  tryagain: {
+    name: 'Try Again',
+    link: {
+      ...nem('artnem/Ending - Try Again.nem', '_maps/Try Again & End Eggman.asm', 0, 0),
+      palFile: 'palette/Ending.bin',
+    },
+  },
+  credits: {
+    name: 'Credits Font',
+    link: {
+      ...nem('artnem/Ending - Credits.nem', '_maps/Credits.asm', 0, 0),
+      palFile: 'palette/Sonic.bin',
+    },
+  },
+
+  // Obj $7F (_incObj/7E,7F:276-277): Map_SSRC at
+  // ArtTile_SS_Results_Emeralds|Tile_Prio → line 0 of Pal_SSResult
+  // (palette/Special Stage Results.bin, sonic.asm:3382). The results TEXT
+  // (Map_SSR, obj $7E) lives inside the titlecards row's merged tables.
+  ssresults: {
+    name: 'SS Result Emeralds',
+    link: {
+      ...nem('artnem/Special Result Emeralds.nem', '_maps/SS Result Chaos Emeralds.asm', 0, 0),
+      palFile: 'palette/Special Stage Results.bin',
+    },
   },
 };
 

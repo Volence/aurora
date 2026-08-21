@@ -673,6 +673,42 @@ async function checkoutPaletteLine(pal: number, target: S1ZoneKey | null): Promi
   }
 }
 
+// Non-level palette FILES (link.palFile — Pal_Title/Pal_Continue/Pal_Ending/
+// Pal_SSResult class rows): the mode's `palette/*.bin` binclude read from disk.
+// Reader seam mirrors readAnimScript — node tests have no window.api and
+// substitute an fs reader serving the real s1disasm bytes.
+type PalFileReader = (baseDir: string, relPath: string) => Promise<Uint8Array>;
+const readPalFile: PalFileReader = async (baseDir, relPath) =>
+  new Uint8Array(await window.api.readBinaryFile(baseDir, relPath));
+let readPalImpl: PalFileReader = readPalFile;
+export function __setPalFileReaderForTest(fn: PalFileReader | null): void { readPalImpl = fn ?? readPalFile; }
+
+/**
+ * The 16 CRAM words of line `line` (0..3) of a palette FILE — 32 bytes of
+ * big-endian words per line, the `_inc/Palette Index.asm` binclude layout.
+ * `undefined` = not seedable (missing/short file); the caller skips seeding —
+ * same soft-palette contract as checkoutPaletteLine — but a row that NAMES a
+ * palette file expects it to be there, so failure is toasted, never silent.
+ */
+async function paletteLineFromFile(baseDir: string, relPath: string, line: number): Promise<Uint16Array | undefined> {
+  const toast = useToastStore.getState().addToast;
+  let bytes: Uint8Array;
+  try {
+    bytes = await readPalImpl(baseDir, relPath);
+  } catch {
+    toast(`Palette ${relPath} unreadable — colors not seeded`, 'info');
+    return undefined;
+  }
+  const start = line * 32;
+  if (bytes.length < start + 32) {
+    toast(`Palette ${relPath} is ${bytes.length} bytes — it has no line ${line}; colors not seeded`, 'info');
+    return undefined;
+  }
+  const words = new Uint16Array(16);
+  for (let i = 0; i < 16; i++) words[i] = (bytes[start + i * 2] << 8) | bytes[start + i * 2 + 1];
+  return words;
+}
+
 export async function editObjectArtCheckout(id: number | string, zoneKey?: S1ZoneKey | null): Promise<boolean> {
   // A non-numeric string ref names a NAMED art doc (S1_NAMED_ART_DOCS — maps
   // files with no object id of their own, e.g. Map_BossItems). Named docs are
@@ -720,7 +756,13 @@ export async function editObjectArtCheckout(id: number | string, zoneKey?: S1Zon
 
   useSpriteStore.getState().selectFrame(link.frame);
 
-  const words = await checkoutPaletteLine(link.pal, target);
+  // Colors: a palFile row (title/continue/ending/SS-results class) seeds from
+  // its own mode's palette binclude — these families never appear over a level
+  // palette, so checkoutPaletteLine's act-derived lines would be WRONG colors,
+  // not merely missing ones. Everything else keeps the level-palette path.
+  const words = link.palFile
+    ? await paletteLineFromFile(dir, link.palFile, link.pal)
+    : await checkoutPaletteLine(link.pal, target);
   if (words) {
     const colors: Color[] = Array.from({ length: 16 }, (_, i) => {
       const c = decodeGenesisColor(words[i] ?? 0);
