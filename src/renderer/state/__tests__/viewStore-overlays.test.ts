@@ -71,11 +71,18 @@ describe('OVERLAY_KEYS_BY_ENGINE', () => {
     }
   });
 
-  it('lists exactly the four overlays classic\'s chip row offers', () => {
-    // Classic's OptionBar and the View menu must agree — the chips are the same
-    // four toggles, and a key in one and not the other reads as a broken menu.
+  it('lists exactly the five overlays classic\'s viewport draws', () => {
+    // The four originally shared with classic's chip row, plus the priority
+    // lens (per-8x8-tile VDP bit-15 overlay, feat/s1-priority-lens). Classic-
+    // only: aeon's tile words are a different engine's format and its viewport
+    // has no drawPriority, so listing it there would be a dead toggle.
     expect([...OVERLAY_KEYS_BY_ENGINE.s1].sort()).toEqual(
-      ['showCollision', 'showCollisionAngles', 'showObjects', 'showStart'],
+      ['showCollision', 'showCollisionAngles', 'showObjects', 'showPriority', 'showStart'],
     );
+    expect(OVERLAY_KEYS_BY_ENGINE.aeon).not.toContain('showPriority');
+  });
+
+  it('keeps the priority lens OFF by default, like the collision lens', () => {
+    expect(defaults().showPriority).toBe(false);
   });
 });

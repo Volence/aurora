@@ -30,7 +30,7 @@ import {
   worldToCollisionCell, rectFromCorners, COLLISION_CELL_PX,
   type ObjectHitBounds, type StampCell,
 } from './viewport-math';
-import { drawCollision, drawObjects, drawStart, GHOST_MARKER_BOUNDS } from './classic-overlays';
+import { drawCollision, drawObjects, drawPriority, drawStart, GHOST_MARKER_BOUNDS } from './classic-overlays';
 import CollisionLegend from '../CollisionLegend';
 import { isTypingTarget } from './composer-shared';
 import { classicSurfaceProps } from './classic-surface';
@@ -489,6 +489,20 @@ export default function ClassicLevelViewport() {
         // layout byte carries S1's bit-7 loop flag, kept a constant on-screen size
         // (world units × invZoom) so it reads at any zoom.
         if (cell & 0x80) drawLoopGlyph(ctx, col * CHUNK_PX, row * CHUNK_PX, invZoom);
+      }
+    }
+
+    // Priority lens (per visible chunk, per 8x8 tile). NOT inside the fg gate
+    // below: the VDP priority bit lives on the pattern words of whichever
+    // plane's chunks are displayed, so the lens follows the plane toggle
+    // rather than being an FG-only concept like collision/objects/start.
+    if (overlays.showPriority) {
+      for (let row = range.startRow; row < range.endRow; row++) {
+        for (let col = range.startCol; col < range.endCol; col++) {
+          const cell = layoutCellAt(grid, col, row);
+          if (cell === undefined) continue;
+          drawPriority(ctx, doc, col, row, cell & 0x7f, invZoom);
+        }
       }
     }
 

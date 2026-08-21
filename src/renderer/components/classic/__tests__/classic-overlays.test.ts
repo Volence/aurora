@@ -8,7 +8,7 @@
 // (hex-box fallback) rather than drawing it.
 
 import { describe, it, expect } from 'vitest';
-import { drawObjects, drawCollision } from '../classic-overlays';
+import { drawObjects, drawCollision, drawPriority } from '../classic-overlays';
 import type { ObjectSprite } from '../../../state/classicObjectArtStore';
 import type { LevelDoc } from '../../../../core/level-classic/model';
 
@@ -160,5 +160,81 @@ describe('drawCollision block 0', () => {
     drawCollision(ctx, doc, 0, 0, 1, true);
     expect(fills).toBe(0);
     expect(pts.length).toBe(0);
+  });
+});
+
+/** A recording context for the priority lens: captures veil rects + edge lines. */
+function priorityCtx() {
+  const rects: { x: number; y: number; w: number; h: number }[] = [];
+  const lines: { x: number; y: number }[] = [];
+  const ctx = {
+    lineWidth: 0, fillStyle: '', strokeStyle: '',
+    beginPath() {}, stroke() {},
+    fillRect(x: number, y: number, w: number, h: number) { rects.push({ x, y, w, h }); },
+    moveTo(x: number, y: number) { lines.push({ x, y }); },
+    lineTo(x: number, y: number) { lines.push({ x, y }); },
+  };
+  return { ctx: ctx as unknown as CanvasRenderingContext2D, rects, lines };
+}
+
+/**
+ * One chunk placing real SBZ block $5A's pattern (single high tile at TL —
+ * words 0xC0AE 0x4087 0x4015 0x4015, pinned against the file in
+ * core/level-classic/__tests__/priority-mask.test.ts) at chunk cell 0 with the
+ * given chunk-cell flips. Every other cell points at the all-low block 0.
+ */
+function priorityDoc(xf: boolean, yf: boolean, allLow = false): LevelDoc {
+  const lowCell = { tile: 0, xf: false, yf: false, pal: 0, pri: false };
+  const cells = Array.from({ length: 256 }, () => ({ block: 0, xf: false, yf: false, solidity: 0 }));
+  cells[0] = { block: 1, xf, yf, solidity: 0 };
+  return {
+    chunks: [{ cells }],
+    blocks: [
+      { cells: [lowCell, lowCell, lowCell, lowCell] },
+      allLow
+        ? { cells: [lowCell, lowCell, lowCell, lowCell] }
+        : { cells: [{ ...lowCell, tile: 0xae, pri: true }, lowCell, lowCell, lowCell] },
+    ],
+  } as unknown as LevelDoc;
+}
+
+describe('drawPriority', () => {
+  it('veils exactly the high tile — at TL unflipped, mirrored to TR when the CHUNK cell is x-flipped', () => {
+    const plain = priorityCtx();
+    drawPriority(plain.ctx, priorityDoc(false, false), 0, 0, 1, 1);
+    expect(plain.rects).toEqual([{ x: 0, y: 0, w: 8, h: 8 }]); // TL tile of cell (0,0)
+    const flipped = priorityCtx();
+    drawPriority(flipped.ctx, priorityDoc(true, false), 0, 0, 1, 1);
+    // The flip trap: the chunk-cell xf mirrors the ARRANGEMENT, so the single
+    // high tile lands in the TR quadrant (x=8), not still at x=0.
+    expect(flipped.rects).toEqual([{ x: 8, y: 0, w: 8, h: 8 }]);
+  });
+
+  it('outlines the lone high tile on its interior boundaries only', () => {
+    const { ctx, lines } = priorityCtx();
+    drawPriority(ctx, priorityDoc(false, true), 0, 0, 1, 1);
+    // yf puts the high tile at BL of cell (0,0) = tile (0,1): y=8..16, x=0..8.
+    // Its left side sits ON the chunk perimeter → skipped; the other 3 stroke.
+    expect(lines.length).toBe(6); // 3 segments × (moveTo + lineTo)
+    for (const p of lines) {
+      expect(p.x === 0 || p.x === 8).toBe(true);
+      expect(p.y === 8 || p.y === 16).toBe(true);
+    }
+  });
+
+  it('draws NOTHING when every tile is low priority (anti-vacuous)', () => {
+    const { ctx, rects, lines } = priorityCtx();
+    drawPriority(ctx, priorityDoc(false, false, true), 0, 0, 1, 1);
+    expect(rects).toEqual([]);
+    expect(lines).toEqual([]);
+  });
+
+  it('draws nothing for air ($00) and offsets veils by the layout cell', () => {
+    const air = priorityCtx();
+    drawPriority(air.ctx, priorityDoc(false, false), 3, 2, 0, 1);
+    expect(air.rects).toEqual([]);
+    const placed = priorityCtx();
+    drawPriority(placed.ctx, priorityDoc(false, false), 3, 2, 1, 1);
+    expect(placed.rects).toEqual([{ x: 3 * 256, y: 2 * 256, w: 8, h: 8 }]);
   });
 });

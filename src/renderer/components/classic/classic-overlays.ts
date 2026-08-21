@@ -9,6 +9,7 @@
 // identical to the inline versions they replaced.
 
 import { chunkIndexForId, type LevelDoc } from '../../../core/level-classic/model';
+import { chunkPriorityMask, CHUNK_TILES } from '../../../core/level-classic/priority-mask';
 import { columnSolidRun } from '../../../core/collision/collision-render';
 import { angleNeedle } from './collision-needle';
 import { objectFrameRect } from '../../../core/level-classic/object-sprite';
@@ -21,6 +22,7 @@ import {
   COLLISION_SURFACE_LINE, COLLISION_ANGLE_TICK,
   OBJECT_BOX_FILL, OBJECT_BOX_STROKE, OBJECT_LABEL, RING_FILL, RING_STROKE, START_MARKER,
   OBJECT_SELECTED_STROKE, GHOST_BOX_FILL, GHOST_BOX_STROKE, GHOST_LABEL,
+  PRIORITY_FILL, PRIORITY_EDGE,
 } from '../../canvas/canvas-colors';
 
 /** S1 ring object id — expands into a visible ring group (Ring_Main rule). */
@@ -127,6 +129,75 @@ export function drawCollision(
       ctx.stroke();
     }
   }
+}
+
+/**
+ * Draw the priority lens for one visible chunk at layout cell (col, row).
+ * `chunkId` is the S1 engine id (1-based; $00 = air draws nothing).
+ *
+ * PRESENTATION — mark the exception, not the rule. High-priority 8x8 tiles
+ * (they render ABOVE sprites — they will cover the player in game) get a
+ * translucent violet veil so their art stays readable under the mark; every
+ * high↔low boundary INSIDE the chunk additionally gets a crisp 1-screen-px
+ * stroke so a region of high tiles reads as one outlined shape instead of a
+ * tile-grid mush, and a lone high tile is unmissable at any zoom. Low-priority
+ * tiles are left untouched: they are ~86% of all tiles (audit §3.2), and
+ * veiling the rule would turn the lens into a full-map dimmer. Strokes are
+ * skipped on the chunk perimeter — this function sees one chunk, so it cannot
+ * know whether the region continues next door, and a false 256px seam grid in
+ * SBZ's dense high areas would lie; the fill edge still carries the truth
+ * there.
+ *
+ * Granularity is per 8x8 TILE, not per block — 73 mixed-priority blocks exist
+ * (68 in SBZ) — and the mask composes chunk-cell flips exactly as renderChunk
+ * does (both measured in the audit; the composition lives in
+ * core/level-classic/priority-mask.ts with its own flip-trap tests).
+ */
+export function drawPriority(
+  ctx: CanvasRenderingContext2D,
+  d: LevelDoc,
+  col: number,
+  row: number,
+  chunkId: number,
+  invZoom: number,
+): void {
+  const mask = chunkPriorityMask(d, chunkId);
+  if (!mask) return; // air / out-of-range
+  const baseX = col * CHUNK_PX;
+  const baseY = row * CHUNK_PX;
+  const TILE = 8;
+  const high = (tx: number, ty: number): boolean =>
+    tx >= 0 && ty >= 0 && tx < CHUNK_TILES && ty < CHUNK_TILES && mask[ty * CHUNK_TILES + tx] !== 0;
+
+  // Veils. Merged into horizontal runs so a solid SBZ region is a few wide
+  // rects instead of up to 1024 per chunk per frame.
+  ctx.fillStyle = PRIORITY_FILL;
+  for (let ty = 0; ty < CHUNK_TILES; ty++) {
+    for (let tx = 0; tx < CHUNK_TILES; tx++) {
+      if (!high(tx, ty)) continue;
+      let run = 1;
+      while (high(tx + run, ty)) run++;
+      ctx.fillRect(baseX + tx * TILE, baseY + ty * TILE, run * TILE, TILE);
+      tx += run; // skip past the run (loop's tx++ lands on the first low tile)
+    }
+  }
+
+  // Boundary strokes: each high tile's sides whose in-chunk neighbor is low.
+  ctx.strokeStyle = PRIORITY_EDGE;
+  ctx.lineWidth = 1 * invZoom;
+  ctx.beginPath();
+  for (let ty = 0; ty < CHUNK_TILES; ty++) {
+    for (let tx = 0; tx < CHUNK_TILES; tx++) {
+      if (!high(tx, ty)) continue;
+      const x = baseX + tx * TILE;
+      const y = baseY + ty * TILE;
+      if (ty > 0 && !high(tx, ty - 1)) { ctx.moveTo(x, y); ctx.lineTo(x + TILE, y); }
+      if (ty < CHUNK_TILES - 1 && !high(tx, ty + 1)) { ctx.moveTo(x, y + TILE); ctx.lineTo(x + TILE, y + TILE); }
+      if (tx > 0 && !high(tx - 1, ty)) { ctx.moveTo(x, y); ctx.lineTo(x, y + TILE); }
+      if (tx < CHUNK_TILES - 1 && !high(tx + 1, ty)) { ctx.moveTo(x + TILE, y); ctx.lineTo(x + TILE, y + TILE); }
+    }
+  }
+  ctx.stroke();
 }
 
 /** Blit an object sprite anchored at (ax, ay) with the object's flips. */
