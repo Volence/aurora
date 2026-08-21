@@ -252,10 +252,16 @@ async function main() {
     check('2', 'Finding A: the Eggman row sits under "Shared objects", not "GHZ objects"; Moto Bug stays under "GHZ objects"',
       egg.length > 0 && egg.every((r) => r.header === 'Shared objects') && moto?.header === 'GHZ objects',
       `eggman headers=${JSON.stringify([...new Set(egg.map((r) => r.header))])} motoBug header=${JSON.stringify(moto?.header ?? null)}`);
-    const coveredOk = egg.length === 1
-      && egg[0].text.includes('Eggman (Boss)')
-      && ['$3D', '$73', '$75', '$77', '$7A'].every((h) => (egg[0].text + ' ' + egg[0].title).includes(h));
-    check('3', 'Finding B: ONE "Eggman (Boss)" row covering $3D $73 $75 $77 $7A',
+    // $82 (SBZ2 cutscene) and $85 (FZ boss) are DISTINCT objects on separate
+    // links — they must stay their own rows; only the five shared-link zone
+    // bosses merge into "Eggman (Boss)".
+    const perZoneBossRows = egg.filter((r) => /Eggman \((GHZ|MZ|SYZ|LZ|SLZ) Boss\)/.test(r.text));
+    const merged = egg.filter((r) => r.text.includes('Eggman (Boss)'));
+    const coveredOk = perZoneBossRows.length === 0 && merged.length === 1
+      && ['$3D', '$73', '$75', '$77', '$7A'].every((h) => (merged[0].text + ' ' + merged[0].title).includes(h))
+      && egg.some((r) => r.text.includes('Eggman (SBZ2 Cutscene)'))
+      && egg.some((r) => r.text.includes('Eggman (FZ Boss)'));
+    check('3', 'Finding B: ONE "Eggman (Boss)" row covering $3D $73 $75 $77 $7A (the $82/$85 non-shared rows stay separate)',
       coveredOk,
       `eggman rows (${egg.length}) = ${JSON.stringify(egg.map((r) => r.text))}`);
 
@@ -266,45 +272,56 @@ async function main() {
     const lib = await c.json(EXPLORER_LIB_SCAN);
     await shot(c, 'explorer-library');
     const libRows = lib?.rows ?? [];
-    const libEgg = libRows.filter((r) => r.text.includes('Eggman') && !r.disabled);
+    const libEgg = libRows.filter((r) => r.text.includes('Eggman'));
+    const libPerZoneBoss = libEgg.filter((r) => /Eggman \((GHZ|MZ|SYZ|LZ|SLZ) Boss\)/.test(r.text));
+    const libMerged = libEgg.filter((r) => r.text.includes('Eggman (Boss)'));
     const heading = (lib?.headings ?? []).find((h) => h.includes('Not loaded in GHZ'));
-    const headIdx = libRows.length; // rows scan skips headings; use disabled split instead
     const firstDisabled = libRows.findIndex((r) => r.disabled);
     const availableBlockFirst = firstDisabled > 0 && libRows.slice(firstDisabled).every((r) => r.disabled);
     const jawsRow = libRows.find((r) => r.text.includes('Jaws'));
     check('4', 'Finding C: Object Library lists ALL objects — available block first, "Not loaded in GHZ" divider, then annotated unavailable rows (Jaws present+disabled); Eggman deduped here too',
       libRows.length > 60 && heading !== undefined && availableBlockFirst
       && jawsRow?.disabled === true && (jawsRow?.title ?? '').includes('Not loaded in GHZ')
-      && libEgg.length === 1 && libEgg[0].text.includes('Eggman (Boss)'),
+      && libPerZoneBoss.length === 0 && libMerged.length === 1,
       `rows=${libRows.length} headings=${JSON.stringify(lib?.headings ?? [])} firstDisabled=${firstDisabled} `
       + `jaws=${JSON.stringify(jawsRow ?? null)} eggmanRows=${JSON.stringify(libEgg.map((r) => r.text))}`);
 
     // --- Row 5: placing unavailable Jaws ($2C) places AND warns -------------
-    await c.evalExpr("void window.__dbg.activate('ghz', 1)");
+    // Focus the LEVEL TAB by clicking it (activate() readies the doc but does
+    // not move tab focus — the place-jaws screenshot proved the sprite tab was
+    // still frontmost). el.click() rather than coordinates throughout the
+    // chrome: the explorer expansion above shifts layout between measure and
+    // dispatch.
+    await c.evalExpr(`(() => { const t = [...document.querySelectorAll('div,button,span')].filter((x) => x.textContent.trim() === 'Green Hill Zone Act 1').pop(); if (t) t.click(); })()`);
     await sleep(1200);
-    await clickEl(c, `[...document.querySelectorAll('[role="group"][aria-label="Facets"] button')].find((b) => b.textContent.trim() === 'Objects')`);
-    await sleep(600);
+    await c.evalExpr(`(() => { const b = [...document.querySelectorAll('[role="group"][aria-label="Facets"] button')].find((x) => x.textContent.trim() === 'Objects'); if (b) b.click(); })()`);
+    await sleep(800);
+    const libboxReady = await c.evalExpr(`!!document.querySelector('[role="listbox"][aria-label="Object library"]')`);
+    const jawsBefore = await c.json('window.__dbg.classic.findObject(0x2c)');
     const armed = await armLibraryRow(c, 'Jaws', 'Place Jaws ($2C)');
     await clickLevelPoint(c, 700, 500, 1);
     const placedJaws = await c.json('window.__dbg.classic.findObject(0x2c)');
     const toasts1 = await c.json('window.__dbg.canvas.toasts()');
     await shot(c, 'place-jaws');
     const warn = toasts1.find((t) => t.type === 'warning' && t.message.includes('Jaws ($2C)'));
-    check('5', 'placing Jaws ($2C) in GHZ is ALLOWED and fires the honest warning naming object + zone',
-      armed && placedJaws !== null && warn !== undefined
+    check('5', 'placing Jaws ($2C) in GHZ is ALLOWED (objpos permits it) and fires the honest warning naming object + zone',
+      libboxReady && armed && jawsBefore === null && placedJaws !== null && warn !== undefined
       && warn.message.includes("GHZ's Pattern Load Cues never load its art")
       && warn.message.includes('LZ, SBZ'),
-      `armed=${armed} placed=${JSON.stringify(placedJaws)} toasts=${JSON.stringify(toasts1)}`);
+      `libbox=${libboxReady} armed=${armed} before=${JSON.stringify(jawsBefore)} placed=${JSON.stringify(placedJaws)} toasts=${JSON.stringify(toasts1)}`);
 
     // --- Row 6: anti-vacuous — an AVAILABLE placement stays silent ----------
-    const armed2 = await armLibraryRow(c, 'Crabmeat', 'Place Crabmeat ($1F)');
+    // Egg Prison ($3E): zone-free base link (available in GHZ), and GHZ1's
+    // objpos has none — so before/after findObject proves THIS placement.
+    const prisonBefore = await c.json('window.__dbg.classic.findObject(0x3e)');
+    const armed2 = await armLibraryRow(c, 'Egg Prison', 'Place Egg Prison ($3E)');
     await clickLevelPoint(c, 760, 500, 1);
-    const placedCrab = await c.json('window.__dbg.classic.findObject(0x1f)');
+    const placedPrison = await c.json('window.__dbg.classic.findObject(0x3e)');
     const toasts2 = await c.json('window.__dbg.canvas.toasts()');
-    const newWarns = toasts2.filter((t) => t.type === 'warning' && t.message.includes('Crabmeat'));
-    check('6', 'ANTI-VACUOUS: placing available Crabmeat ($1F) places with NO warning',
-      armed2 && placedCrab !== null && newWarns.length === 0,
-      `armed=${armed2} placed=${JSON.stringify(placedCrab)} crabToasts=${JSON.stringify(newWarns)}`);
+    const newWarns = toasts2.filter((t) => t.type === 'warning' && t.message.includes('Egg Prison'));
+    check('6', 'ANTI-VACUOUS: placing available Egg Prison ($3E) places with NO warning',
+      armed2 && prisonBefore === null && placedPrison !== null && newWarns.length === 0,
+      `armed=${armed2} before=${JSON.stringify(prisonBefore)} placed=${JSON.stringify(placedPrison)} prisonToasts=${JSON.stringify(newWarns)}`);
   } finally {
     try { c?.close(); } catch { /* closing */ }
     if (app?.pid) { try { process.kill(-app.pid, 'SIGKILL'); } catch { /* gone */ } }
