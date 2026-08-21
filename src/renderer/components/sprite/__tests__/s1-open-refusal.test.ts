@@ -1,0 +1,159 @@
+// The REAL openDiscoveredSet against the real s1disasm files, window.api
+// stubbed onto fs — integration-grade for the two Parcel-A honesty guarantees:
+//
+//  1. AUDIT TRAP #2 (save-back): captureS1ArtSource's guard is NOT lifted.
+//     Sonic (DPLC) and Spring (per-frame art swap) open EDIT/EXPORT-ONLY —
+//     s1ArtSource stays null — and a save attempt refuses with the SPECIFIC
+//     recorded reason (saveBackRefusal), not the generic line. The positive
+//     control (Signpost, plain non-DPLC Nemesis) still captures a target, so
+//     the guard was neither lifted nor over-tightened.
+//
+//  2. SPRING FRAMES 3-5 (render-bugs parcel): the frameSources slice makes the
+//     sideways frames draw Nem_VSpring — asserted by HAND-DERIVED pixels (the
+//     frame-3 body cell equals the decoded vertical tile 0), plus an
+//     anti-vacuous diff against the same open WITHOUT the slice.
+
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import * as fs from 'fs';
+import * as path from 'path';
+import { openDiscoveredSet, saveSpriteArt } from '../export-sprite';
+import type { DiscoveredSpriteSet } from '../../../../core/import/sprite-discovery';
+import { useSpriteStore } from '../../../state/spriteStore';
+import { useToastStore } from '../../../state/toastStore';
+import { parseTiles } from '../../../../core/formats/tiles';
+import { compressionFor } from '../../../../core/compress';
+
+const S1DIR = '/home/volence/sonic_hacks/s1disasm';
+
+// window.api over fs (read-only: s1disasm must never be written by a test).
+function stubWindowApi(): () => void {
+  const g = globalThis as unknown as { window?: unknown };
+  const prev = g.window;
+  g.window = {
+    api: {
+      readBinaryFile: async (base: string, rel: string): Promise<ArrayBuffer> => {
+        const b = fs.readFileSync(path.join(base, rel));
+        return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength);
+      },
+      fileMtime: async (base: string, rel: string): Promise<number | null> =>
+        fs.statSync(path.join(base, rel)).mtimeMs,
+    },
+  };
+  return () => { g.window = prev; };
+}
+
+let restoreApi: () => void;
+beforeEach(() => {
+  restoreApi = stubWindowApi();
+  useSpriteStore.getState().closeAll();
+  useToastStore.setState({ toasts: [] });
+});
+afterEach(() => {
+  restoreApi();
+  useSpriteStore.getState().closeAll();
+});
+
+const lastToast = () => useToastStore.getState().toasts.at(-1)?.message ?? '';
+
+// The exact sets editObjectArtCheckout builds for these rows (asserted in
+// edit-art-handoff.test.ts) — spelled out here so this file exercises the OPEN,
+// not the row lookup.
+const SONIC_SET: DiscoveredSpriteSet = {
+  name: 'Sonic', game: 's1',
+  mappings: '_maps/Sonic.asm', art: 'artunc/Sonic.unc',
+  dplc: '_maps/Sonic - Dynamic Gfx Script.asm',
+};
+const SPRING_SET: DiscoveredSpriteSet = {
+  name: 'Spring', game: 's1',
+  mappings: '_maps/Springs.asm', art: 'artnem/Spring Horizontal.nem',
+  frameSources: [{ firstFrame: 3, lastFrame: 5, art: 'artnem/Spring Vertical.nem', compression: 'nemesis' }],
+};
+
+describe.skipIf(!fs.existsSync(S1DIR))('openDiscoveredSet — Sonic DPLC open + honest save refusal', () => {
+  it('opens 88 frames, captures NO save-back target, and a save attempt quotes the DPLC refusal', async () => {
+    const ok = await openDiscoveredSet(S1DIR, SONIC_SET, 'uncompressed');
+    expect(ok).toBe(true);
+
+    const s = useSpriteStore.getState();
+    expect(s.frames).toHaveLength(88);
+    // Frame 1 (MS_Stand) renders substantially — a recognizable sprite, not blank.
+    const nonblank = s.frames[1].data.reduce((n, v) => n + (v !== 0 ? 1 : 0), 0);
+    expect(nonblank).toBeGreaterThan(400);
+
+    // AUDIT TRAP #2: the Nemesis-only, non-DPLC capture guard stands — no
+    // in-place target for a DPLC doc, and the WHY is recorded.
+    expect(s.s1ArtSource).toBeNull();
+    expect(s.saveBackRefusal).toBe(
+      "Sonic can't save back in place: its frames stream through a shared DPLC tile pool — "
+      + 'every frame\'s mapping indices resolve into one art file whose source tiles many frames share, '
+      + 'so writing one frame\'s pixels would silently rewrite other frames. Editing and Export still work.');
+
+    await saveSpriteArt();
+    expect(lastToast()).toBe(s.saveBackRefusal); // the save refuses with exactly that copy
+  });
+
+  it('animations stay ABSENT — the sonani dialect is not parsed (honest empty timeline)', async () => {
+    await openDiscoveredSet(S1DIR, SONIC_SET, 'uncompressed');
+    expect(useSpriteStore.getState().characterAnims).toEqual([]);
+    expect(useSpriteStore.getState().steps).toEqual([]);
+  });
+});
+
+describe.skipIf(!fs.existsSync(S1DIR))('openDiscoveredSet — Spring per-frame art swap', () => {
+  it('frames 3-5 draw Nem_VSpring (hand-derived pixels); frames 0-2 keep Nem_HSpring; save refuses honestly', async () => {
+    // Control open: the OLD single-pool behavior (no frameSources).
+    await openDiscoveredSet(S1DIR, { ...SPRING_SET, frameSources: undefined }, 'nemesis');
+    const oldFrames = useSpriteStore.getState().frames.map((f) => f.data.slice());
+    // s1ArtSource captured for the control (plain nemesis non-DPLC row shape).
+    expect(useSpriteStore.getState().s1ArtSource).not.toBeNull();
+
+    // The fixed open.
+    const ok = await openDiscoveredSet(S1DIR, SPRING_SET, 'nemesis');
+    expect(ok).toBe(true);
+    const s = useSpriteStore.getState();
+    expect(s.frames).toHaveLength(6);
+
+    // ANTI-VACUOUS DIFF: the sideways frame now differs from the old render;
+    // an upright frame is byte-identical (the swap touches ONLY its range).
+    expect(s.frames[3].data).not.toEqual(oldFrames[3]);
+    expect(s.frames[0].data).toEqual(oldFrames[0]);
+
+    // HAND-DERIVED: frame 3 (.spg_Left) is one 2x4-cell piece at (-8,-$10)
+    // whose tile indices 0..7 are VDP column-major into the VERTICAL pool
+    // (_maps/Springs.asm .spg_Left; _incObj/41 Springs.asm:54-58). So the
+    // 8x8 cell at piece-local (0,0) must be EXACTLY the decoded Nem_VSpring
+    // tile 0, pixel for pixel.
+    const vtiles = parseTiles(compressionFor('nemesis').decompress(
+      new Uint8Array(fs.readFileSync(path.join(S1DIR, 'artnem/Spring Vertical.nem')))));
+    const f3 = s.frames[3];
+    const at = (x: number, y: number) => f3.data[(y + s.originY) * f3.width + (x + s.originX)];
+    for (let py = 0; py < 8; py++) {
+      for (let px = 0; px < 8; px++) {
+        expect(at(-8 + px, -0x10 + py), `cell(0,0) px ${px},${py}`).toBe(vtiles[0].pixels[py * 8 + px]);
+      }
+    }
+    // And column-major: piece cell (col 1, row 2) — canvas x -8+8=0.., y
+    // -$10+16=0.. — shows vertical tile 1*4+2 = 6.
+    expect(at(0 + 3, 0 + 3)).toBe(vtiles[6].pixels[3 * 8 + 3]);
+
+    // Save-back: a frame-swap doc has NO single honest write target.
+    expect(s.s1ArtSource).toBeNull();
+    expect(s.saveBackRefusal).toContain("Spring can't save back in place");
+    expect(s.saveBackRefusal).toContain('different art file');
+    await saveSpriteArt();
+    expect(lastToast()).toBe(s.saveBackRefusal);
+  });
+});
+
+describe.skipIf(!fs.existsSync(S1DIR))('openDiscoveredSet — positive control: the capture guard is not over-tightened', () => {
+  it('Signpost (plain non-DPLC Nemesis) still captures an in-place target, no refusal recorded', async () => {
+    const ok = await openDiscoveredSet(S1DIR, {
+      name: 'Signpost', game: 's1', mappings: '_maps/Signpost.asm', art: 'artnem/Signpost.nem',
+    }, 'nemesis');
+    expect(ok).toBe(true);
+    const s = useSpriteStore.getState();
+    expect(s.s1ArtSource).not.toBeNull();
+    expect(s.s1ArtSource!.relPath).toBe('artnem/Signpost.nem');
+    expect(s.saveBackRefusal).toBeNull();
+  });
+});

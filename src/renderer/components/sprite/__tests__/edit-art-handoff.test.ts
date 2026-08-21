@@ -230,6 +230,79 @@ describe('editObjectArtCheckout', () => {
     expect(ok).toBe(true);
     expect(calls[0].set).toMatchObject({ mappings: '_maps/Bridge.asm', art: 'artnem/GHZ Bridge.nem' });
   });
+
+  it('Sonic ($01): the DPLC row threads the Gfx script into the set, uncompressed, LEVEL-FREE', async () => {
+    // Parcel A's whole core: the row carries dplcAsm and the checkout passes it
+    // as set.dplc, where openDiscoveredSet's dplcFromFile → renderFrames path
+    // (probe-proven, test/sprite/s1-sonic-dplc.test.ts) does the rest. Sonic is
+    // zone-free (one binclude streamed to $780 in every zone), so no level.
+    useClassicLevelStore.setState({ ref: null, doc: null });
+    const calls: OpenCall[] = [];
+    __setSpriteSetOpenerForTest(stubOpener(calls, 88));
+
+    const ok = await editObjectArtCheckout(0x01);
+    expect(ok).toBe(true);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].comp).toBe('uncompressed');
+    expect(calls[0].set).toMatchObject({
+      game: 's1',
+      name: 'Sonic',
+      mappings: '_maps/Sonic.asm',
+      art: 'artunc/Sonic.unc',
+      dplc: '_maps/Sonic - Dynamic Gfx Script.asm',
+    });
+    // Declared frame 1 = MS_Stand preselected (frame 0 is the blank MS_Null).
+    expect(useSpriteStore.getState().currentIndex).toBe(1);
+    // Animations stay ABSENT: the sonani dialect is the anim audit's standing
+    // TAG — the timeline opens empty-but-honest, no picker entries.
+    expect(useSpriteStore.getState().characterAnims).toEqual([]);
+  });
+
+  it('Spring ($41): the frameSources slice rides into the set — frames 3-5 name Nem_VSpring', async () => {
+    // _incObj/41 Springs.asm:54-58 swaps obGfx to ArtTile_Spring_Vertical for
+    // the sideways frames; the row transcribes that as a per-frame-range
+    // replacement pool the open path renders from.
+    const calls: OpenCall[] = [];
+    __setSpriteSetOpenerForTest(stubOpener(calls, 6));
+
+    const ok = await editObjectArtCheckout(0x41);
+    expect(ok).toBe(true);
+    expect(calls[0].set).toMatchObject({
+      mappings: '_maps/Springs.asm',
+      art: 'artnem/Spring Horizontal.nem',
+      frameSources: [{ firstFrame: 3, lastFrame: 5, art: 'artnem/Spring Vertical.nem', compression: 'nemesis' }],
+    });
+  });
+
+  it('Boss Items (named doc): a non-numeric ref opens Map_BossItems level-free with the table name', async () => {
+    // Map_BossItems lost its doc when $48 restructured to lead with the ball;
+    // S1_NAMED_ART_DOCS.bossitems is its home. Zone-free by construction
+    // (Nem_Weapons via PLC_Boss), so no level needed.
+    useClassicLevelStore.setState({ ref: null, doc: null });
+    const calls: OpenCall[] = [];
+    __setSpriteSetOpenerForTest(stubOpener(calls, 8));
+
+    const ok = await editObjectArtCheckout('bossitems');
+    expect(ok).toBe(true);
+    expect(calls[0].comp).toBe('nemesis');
+    expect(calls[0].set).toMatchObject({
+      game: 's1',
+      name: 'Boss_Items', // sanitizeName's space rule — the tab TITLE keeps the display name
+      mappings: '_maps/Boss Items.asm',
+      art: 'artnem/Boss - Weapons.nem',
+    });
+    expect(useSpriteStore.getState().characterAnims).toEqual([]); // no anim link for named docs
+  });
+
+  it('a NUMERIC STRING ref (the tab-activation form) still resolves the object row', async () => {
+    // The activation runner passes plan.ref through as a string now; '13'
+    // must reach $0D Signpost, not the named-doc branch.
+    const calls: OpenCall[] = [];
+    __setSpriteSetOpenerForTest(stubOpener(calls));
+    const ok = await editObjectArtCheckout('13');
+    expect(ok).toBe(true);
+    expect(calls[0].set).toMatchObject({ mappings: '_maps/Signpost.asm' });
+  });
 });
 
 // S1 anim Parcel 1 — the checkout auto-loads the object's `_anim` script into
