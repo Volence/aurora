@@ -87,7 +87,13 @@ export function aeonVersionKey(
   return `${zoneId}:${epoch}:${versions.get(id) ?? 0}`;
 }
 
-/** RGBA for one chunk at AEON_CHUNK_PX, or null when there is no such chunk. */
+/** RGBA for one chunk at AEON_CHUNK_PX, or null when there is no such chunk.
+ *  FIXED 128x128 whatever the chunk's own dims — the thumbnail grid's contract
+ *  (sourcePx). A caller sizing a canvas to the CHUNK must use
+ *  rasterizeAeonChunkNative below instead: pairing this buffer with a
+ *  native-size ImageData throws RangeError for any chunk smaller than 16x16
+ *  tiles (img.data.set with a longer source) and row-garbles any larger one —
+ *  the marquee-saved-stamp crash. */
 export function rasterizeAeonChunk(
   chunk: ChunkDef | undefined,
   tiles: readonly Tile[],
@@ -95,6 +101,20 @@ export function rasterizeAeonChunk(
 ): Uint8ClampedArray | null {
   if (!chunk) return null;
   return rasterizeNametableChunk(chunk, tiles, palette, AEON_CHUNK_PX, AEON_CHUNK_PX);
+}
+
+/** RGBA at the chunk's NATIVE size (widthTiles*8 x heightTiles*8) — for
+ *  callers that draw the chunk at its own footprint (the stamp ghost). The
+ *  buffer length is always exactly (widthTiles*8)*(heightTiles*8)*4, so an
+ *  ImageData of those dims accepts it for EVERY library chunk, the 16x16
+ *  imports and the arbitrary-size marquee-saved selections alike. */
+export function rasterizeAeonChunkNative(
+  chunk: ChunkDef | undefined,
+  tiles: readonly Tile[],
+  palette: Palette,
+): Uint8ClampedArray | null {
+  if (!chunk) return null;
+  return rasterizeNametableChunk(chunk, tiles, palette, chunk.widthTiles * 8, chunk.heightTiles * 8);
 }
 
 const EMPTY_PALETTE: Palette = { lines: [] };
