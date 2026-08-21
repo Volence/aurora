@@ -6,9 +6,9 @@
 // save already covered it), loads the new project's stored session (pruned to
 // tabs that still exist), or builds the default (Home + first level, focused),
 // then re-points the singleton editor at the restored active level tab.
-// The projectKey is the exact directory string the project was opened with
-// (classic dir / aeon config.basePath) — no normalization happens here, so
-// every caller that derives a session key must key on that same string.
+// The projectKey is the directory string the project was opened with (classic
+// dir / aeon config.basePath); sessionKeyFor normalizes it lexically (see
+// shared/project-path.ts), so every spelling of one directory shares a key.
 //
 // useActTabSync — some act switches do NOT come from the tab strip, and these
 // subscriptions reflect those back into an open+focused tab so the strip never
@@ -33,7 +33,7 @@ import { useClassicLevelStore } from '../state/classicLevelStore';
 import { useProjectStore } from '../state/projectStore';
 import { useWorkspaceStore } from '../workspace/workspaceStore';
 import { resetProjectRuntime } from '../state/project-runtime';
-import { loadStoredSession, saveStoredSession, loadStoredWorkspace, defaultProjectSession } from './session-storage';
+import { loadStoredSession, saveStoredSession, loadStoredWorkspace, defaultProjectSession, migrateSessionKeys } from './session-storage';
 import { classicLevelTab, aeonLevelTab, parseSpriteDocTabId, parseCanvasDocTabId, PROJECT_SETUP_TAB } from './tabs';
 import { canvasNameIsSafe } from '../state/canvas-file';
 import { activateLevelTarget, activateSpriteDocTarget, activateRestoredCanvasDocTarget } from './tab-activation';
@@ -102,6 +102,10 @@ export function restoredTabIsValid(
   return sd !== null && ((sd.engine === 'aeon' && ctx.aeonOpen) || (sd.engine === 's1' && ctx.classicOpen));
 }
 
+// Object (not a bare let) so tests could reset it if ever needed; the flag
+// makes the localStorage key migration a once-per-process scan.
+const sessionKeysMigratedRef = { migrated: false };
+
 export function useSessionLifecycle(): void {
   const classicDir = useClassicProjectStore((s) => (s.status === 'open' ? s.dir : null));
   // The aeon key gates on the PROJECT being resident, not just the config:
@@ -139,6 +143,13 @@ export function useSessionLifecycle(): void {
 
   useEffect(() => {
     if (keyRef.current === projectKey) return;
+    // Before the FIRST stored-session read: move any session saved under a
+    // pre-normalization key spelling to its normalized key, so it still
+    // restores (module flag, not per-mount — the scan only needs to run once).
+    if (!sessionKeysMigratedRef.migrated) {
+      sessionKeysMigratedRef.migrated = true;
+      migrateSessionKeys(localStorage);
+    }
     const isProjectSwitch = keyRef.current !== undefined;
     keyRef.current = projectKey;
     if (isProjectSwitch) resetProjectRuntime();
