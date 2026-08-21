@@ -37,8 +37,9 @@ describe('classicExplorerGroups', () => {
 
 describe('classicObjectLibraryItems', () => {
   // Real-table expectations, hand-derived (see s1-object-presentation.test.ts
-  // for the table citations): GHZ links 35 ids; the five shared-link Eggman
-  // ids dedup to one row, so the available block is 31 rows.
+  // for the table citations): GHZ links 36 ids (35 + Sonic's $01 DPLC row);
+  // the five shared-link Eggman ids dedup to one row → 32 object rows, plus
+  // the Boss Items named art doc → 33 rows before the heading.
   const items = classicObjectLibraryItems('ghz', true);
   const headingIdx = items.findIndex((i) => i.heading === true);
 
@@ -47,11 +48,15 @@ describe('classicObjectLibraryItems', () => {
     expect(items.filter((i) => i.heading)).toHaveLength(1);
     const available = items.slice(0, headingIdx);
     const rest = items.slice(headingIdx + 1);
-    expect(available).toHaveLength(31);
+    expect(available).toHaveLength(33);
+    // Named art docs (Boss Items) ride at the end of the available block with
+    // a doc:sprite: id — they are not object rows.
+    const namedDocs = available.filter((i) => i.id.startsWith('doc:sprite:'));
+    expect(namedDocs.map((i) => i.label)).toEqual(['Boss Items']);
     // Every named id appears exactly once across the two blocks (merged rows
     // carry their extra ids in the hint, not as rows).
     const linked = S1_OBJECT_LIST.filter((o) => resolveObjectArt(o.id, 'ghz') !== undefined);
-    expect(available.length + 4).toBe(linked.length); // Eggman merge swallowed 4 rows
+    expect(available.length - namedDocs.length + 4).toBe(linked.length); // Eggman merge swallowed 4 rows
     expect(rest).toHaveLength(S1_OBJECT_LIST.length - linked.length);
     for (const r of rest) expect(r.disabled).toBe(true);
   });
@@ -77,11 +82,21 @@ describe('classicObjectLibraryItems', () => {
     expect(teleporter.reason).toContain('Invisible trigger');
   });
 
-  it('available rows disable with the palette reason until a level doc is loaded', () => {
+  it('zone-SCOPED rows disable with the palette reason until a level doc is loaded; zone-FREE rows stay live', () => {
     const cold = classicObjectLibraryItems('ghz', false);
     const idx = cold.findIndex((i) => i.heading === true);
+    // Zone-scoped: Moto Bug is GHZ-map-only art — needs the open act.
+    const moto = cold.find((i) => i.label === 'Moto Bug')!;
+    expect(moto).toMatchObject({ disabled: true, reason: expect.stringContaining('Open a level first') });
+    // Zone-free: Ring / Sonic open genuinely level-free (base-map link, disk
+    // palette fallback) — the Explorer exemption (audit §4.4).
+    const ring = cold.find((i) => i.label === 'Ring')!;
+    expect(ring.disabled).toBeUndefined();
+    const sonic = cold.find((i) => i.label === 'Sonic')!;
+    expect(sonic.disabled).toBeUndefined();
+    // Every disabled pre-heading row carries the honest palette reason.
     for (const i of cold.slice(0, idx)) {
-      expect(i).toMatchObject({ disabled: true, reason: expect.stringContaining('Open a level first') });
+      if (i.disabled) expect(i.reason).toContain('Open a level first');
     }
   });
 
