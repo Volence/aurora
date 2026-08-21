@@ -2,7 +2,7 @@ import React, { useRef, useEffect, useCallback, useState } from 'react';
 import { useViewStore } from '../state/viewStore';
 import { isTypingTarget } from '../shell/typing-target';
 import { useProjectStore, getCurrentAct, getCurrentZone, getActiveLevel as getStoreActiveLevel } from '../state/projectStore';
-import { rasterizeAeonChunk } from '../providers/chunk-grid-aeon';
+import { rasterizeAeonChunkNative } from '../providers/chunk-grid-aeon';
 import { useEditorStore, executeCommand, setCommandInvalidationListener, RING_PATTERNS, type EditorTool } from '../state/editorStore';
 import { useAeonHistoryVersion } from '../hooks/useHistoryVersion';
 import { useArtStore } from '../state/artStore';
@@ -228,7 +228,13 @@ export default function MapViewport() {
           // ghost rather than showing a stale picture of it.
           const key = `${chunk.id}:${useEditorStore.getState().liveEditVersion}:${zone.id}`;
           if (stampGhostRef.current?.key !== key) {
-            const rgba = rasterizeAeonChunk(chunk, zone.tileset.tiles, zone.palette);
+            // NATIVE size, not the thumbnail rasterizer: the ghost canvas is
+            // sized to the chunk's own footprint below, and the fixed 128x128
+            // buffer threw RangeError on img.data.set for every marquee-saved
+            // chunk smaller than 16x16 tiles — from mousemove that ate the
+            // ghost, and re-thrown inside the render effect after the stamp
+            // click it unmounted the whole React root (the owner's crash).
+            const rgba = rasterizeAeonChunkNative(chunk, zone.tileset.tiles, zone.palette);
             if (rgba) {
               const px = chunk.widthTiles * 8, py = chunk.heightTiles * 8;
               const off = document.createElement('canvas');

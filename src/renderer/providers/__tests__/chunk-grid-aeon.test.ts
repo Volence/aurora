@@ -13,6 +13,7 @@ import {
   aeonVersionKey,
   isBlankChunk,
   rasterizeAeonChunk,
+  rasterizeAeonChunkNative,
 } from '../chunk-grid-aeon';
 import { packNametableWord } from '../../../core/model/s4-types';
 import type { ChunkDef, Palette, Tile } from '../../../core/model/s4-types';
@@ -101,5 +102,49 @@ describe('aeon chunk-grid port', () => {
 
   it('paints nothing for a missing chunk', () => {
     expect(rasterizeAeonChunk(undefined, tiles, palette)).toBeNull();
+  });
+
+  // --- the NATIVE rasterizer (the stamp ghost's source) --------------------
+  // The crash this guards: the ghost sizes an ImageData to the chunk's own
+  // footprint, and `ImageData.data.set(src)` throws RangeError whenever src is
+  // LONGER than the target. rasterizeAeonChunk is fixed 128x128, so every
+  // marquee-saved chunk under 16x16 tiles threw on hover and — re-thrown in
+  // the render effect after the stamp click — unmounted the React root.
+
+  it('native: the buffer is exactly the chunk footprint, so a native ImageData always accepts it', () => {
+    // A marquee-saved 6x4-tile selection — the owner's crashing case.
+    const small: ChunkDef = {
+      id: 's', name: 'Selection 3×2', widthTiles: 6, heightTiles: 4,
+      nametable: Uint16Array.from({ length: 24 }, (_, i) => packNametableWord(i % 2, 0, false, false, false)),
+      collisionA: new Uint16Array(6), collisionB: new Uint16Array(6),
+    };
+    const rgba = rasterizeAeonChunkNative(small, tiles, palette)!;
+    expect(rgba.length).toBe(48 * 32 * 4);
+    // The pairing that crashed: the fixed-size buffer is LONGER than the
+    // native ImageData for any chunk under 16x16 tiles.
+    expect(rasterizeAeonChunk(small, tiles, palette)!.length).toBeGreaterThan(rgba.length);
+  });
+
+  it('native: rows use the chunk’s own pitch, not the thumbnail’s 128px', () => {
+    // 2x1 tiles => a 16x8 buffer. Tile 1 (solid colour 1) sits at tile col 1,
+    // so pixel (8,0) is red at NATIVE pitch: index (0*16 + 8)*4. Under a
+    // 128px pitch that pixel would land 448 bytes later and this read would
+    // see the colour-0 fill instead.
+    const rgba = rasterizeAeonChunkNative(chunk('a', [0, 1]), tiles, palette)!;
+    const i = (0 * 16 + 8) * 4;
+    expect([rgba[i], rgba[i + 1], rgba[i + 2], rgba[i + 3]]).toEqual([200, 0, 0, 255]);
+    expect([rgba[0], rgba[1], rgba[2], rgba[3]]).toEqual([10, 20, 30, 40]);   // tile 0, colour 0
+  });
+
+  it('native: a chunk WIDER than 16 tiles keeps its far columns (the fixed raster clamps them off)', () => {
+    const wide = chunk('w', [...Array.from({ length: 19 }, () => 0), 1]);      // 20x1, art in col 19
+    const rgba = rasterizeAeonChunkNative(wide, tiles, palette)!;
+    expect(rgba.length).toBe(160 * 8 * 4);
+    const i = (0 * 160 + 19 * 8) * 4;
+    expect([rgba[i], rgba[i + 1], rgba[i + 2], rgba[i + 3]]).toEqual([200, 0, 0, 255]);
+  });
+
+  it('native: paints nothing for a missing chunk', () => {
+    expect(rasterizeAeonChunkNative(undefined, tiles, palette)).toBeNull();
   });
 });
