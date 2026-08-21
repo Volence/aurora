@@ -28,6 +28,7 @@ import { levelDocId } from './shell/tabs';
 import { buildUsageIndex } from '../core/level-classic/usage-index';
 import { buildChunkSurface } from '../core/art/classic-surface-buffer';
 import { tileLockReason } from '../core/project/editable-tiles';
+import { SECTION_TILES_WIDE } from '../core/model/s4-types';
 
 /**
  * Paint-through (Task 12) read-only query surface. Every function here reads
@@ -300,6 +301,23 @@ interface AeonProbeApi {
   /** SETUP, like the classic probe's setSelectedChunk: which plane the next
    *  stroke paints. The stroke itself is still a real drag on the real canvas. */
   setLayer(layer: 'fg' | 'bg'): void;
+  /** The committed marquee, if any — the marquee-drag rows read the snap result
+   *  back out rather than re-deriving it from pixels. Read-only. */
+  marquee(): { sectionIndex: number; col: number; row: number; w: number; h: number } | null;
+  /** The armed stamp source (editorStore.selectedChunkId). Read-only. */
+  selectedChunk(): string | null;
+  /** Every chunk-library id, in library order. Read-only. */
+  chunkIds(): string[];
+  /** One library chunk's shape + how much of it is actually art (nonzero
+   *  nametable words) — the anti-vacuous control for the stamp rows: a stamp
+   *  of an all-air chunk into a blank area proves nothing. Read-only. */
+  chunkInfo(id: string): {
+    name: string; widthTiles: number; heightTiles: number; nonzeroTiles: number;
+  } | null;
+  /** A rectangle of one section's FG nametable words, row-major — `ntAt` at
+   *  scale, so a harness can find blank/non-blank regions and compare a whole
+   *  stamped footprint without a WS round-trip per tile. Read-only. */
+  ntRect(sectionIndex: number, col: number, row: number, w: number, h: number): number[] | null;
 }
 
 interface CanvasProbeApi {
@@ -396,6 +414,30 @@ function installAeonProbe(): AeonProbeApi {
     activeSection: () => useEditorStore.getState().activeSectionIndex,
     toasts: () => useToastStore.getState().toasts.map((t) => ({ message: t.message, type: t.type })),
     setLayer: (layer) => useEditorStore.getState().setEditingLayer(layer),
+    marquee: () => {
+      const m = useEditorStore.getState().marquee;
+      return m ? { sectionIndex: m.sectionIndex, col: m.col, row: m.row, w: m.w, h: m.h } : null;
+    },
+    selectedChunk: () => useEditorStore.getState().selectedChunkId,
+    chunkIds: () => (useProjectStore.getState().project?.chunkLibrary ?? []).map((c) => c.id),
+    chunkInfo: (id) => {
+      const c = useProjectStore.getState().project?.chunkLibrary.find((k) => k.id === id);
+      if (!c) return null;
+      let nonzero = 0;
+      for (let i = 0; i < c.nametable.length; i++) if (c.nametable[i] !== 0) nonzero++;
+      return { name: c.name, widthTiles: c.widthTiles, heightTiles: c.heightTiles, nonzeroTiles: nonzero };
+    },
+    ntRect: (sectionIndex, col, row, w, h) => {
+      const s = section(sectionIndex);
+      if (!s) return null;
+      const out: number[] = [];
+      for (let r = 0; r < h; r++) {
+        for (let c = 0; c < w; c++) {
+          out.push(s.tileGrid.nametable[(row + r) * SECTION_TILES_WIDE + (col + c)] ?? 0);
+        }
+      }
+      return out;
+    },
   };
 }
 
