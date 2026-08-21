@@ -114,6 +114,28 @@ export function renderBlock(doc: LevelDoc, blockId: number): Uint8ClampedArray {
 }
 
 /**
+ * Render one block PLACEMENT — a 16x16 block as it appears at a chunk cell
+ * carrying flips xf/yf — to a 16x16 RGBA buffer. The chunk-cell flip mirrors
+ * the WHOLE block (2x2 tile arrangement AND each tile's pixels), composed with
+ * the very same blitRgba renderChunk uses, so a placement buffer is
+ * byte-identical to the region renderChunk composes for the same cell (proved
+ * in __tests__/s1-anim-cells.test.ts). The animated-art play overlay draws
+ * these over live cells; any future per-cell repaint should reuse it.
+ */
+export function renderBlockPlacement(
+  doc: LevelDoc,
+  blockId: number,
+  xf: boolean,
+  yf: boolean,
+): Uint8ClampedArray {
+  const block = drawBlock(doc, blockId, lutCache(doc));
+  if (!xf && !yf) return block;
+  const out = new Uint8ClampedArray(BLOCK_PX * BLOCK_PX * 4);
+  blitRgba(out, BLOCK_PX, block, BLOCK_PX, BLOCK_PX, 0, 0, xf, yf);
+  return out;
+}
+
+/**
  * Render a chunk to a 256x256 RGBA buffer (262144 bytes). `chunkId` is the S1
  * ENGINE id (1-based; $00 = air): it is resolved to a file-order chunk index via
  * chunkIndexForId, so id 0 and any id past the pool render fully transparent.

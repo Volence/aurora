@@ -24,6 +24,8 @@
 //
 // Pure core: no canvas, no DOM, no fs — sources are handed in as bytes.
 
+import { chunkIndexForId, type LevelDoc } from './model';
+
 // ---------------------------------------------------------------------------
 // Timing descriptors
 // ---------------------------------------------------------------------------
@@ -333,6 +335,50 @@ function lavaFrameAt(zone: string, t: number): number {
   const lava = familiesForZone(zone).find((f) => f.id === 'mz-lava-surface');
   if (!lava || lava.timing.kind === 'smoke' || lava.timing.kind === 'magma') return 0;
   return stripFrameAt(lava.timing, t);
+}
+
+/** One chunk cell whose block touches an animated tile. */
+export interface AnimatedCell {
+  /** Chunk-cell index (0..255, row-major 16x16). */
+  cell: number;
+  block: number;
+  /** The CHUNK cell's flips — they mirror the whole block (audit §3.3). */
+  xf: boolean;
+  yf: boolean;
+}
+
+/**
+ * The animated cells of one chunk: every cell whose block references a tile in
+ * `animTiles` (from animatedTilesForZone). Same walk and same fallbacks as
+ * chunkPriorityMask/renderChunk: engine id (1-based, 0 = air) resolved through
+ * chunkIndexForId; air / out-of-range chunk → [], out-of-range block refs
+ * contribute nothing (the renderer tolerates transient invalid state
+ * mid-edit). The viewport derives this per chunk on its version key.
+ */
+export function animatedCellsForChunk(
+  doc: LevelDoc,
+  chunkId: number,
+  animTiles: ReadonlySet<number>,
+): AnimatedCell[] {
+  const index = chunkIndexForId(doc, chunkId);
+  if (index === null) return [];
+  const chunk = doc.chunks[index];
+  if (!chunk) return [];
+  const out: AnimatedCell[] = [];
+  // Memo per distinct block id — a chunk has up to 256 cells but few blocks.
+  const animBlock = new Map<number, boolean>();
+  for (let i = 0; i < chunk.cells.length && i < 256; i++) {
+    const c = chunk.cells[i];
+    if (!c) continue;
+    if (c.block < 0 || c.block >= doc.blocks.length) continue;
+    let isAnim = animBlock.get(c.block);
+    if (isAnim === undefined) {
+      isAnim = doc.blocks[c.block]?.cells.some((bc) => animTiles.has(bc.tile)) ?? false;
+      animBlock.set(c.block, isAnim);
+    }
+    if (isAnim) out.push({ cell: i, block: c.block, xf: c.xf, yf: c.yf });
+  }
+  return out;
 }
 
 export interface AnimTilePatch {
