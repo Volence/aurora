@@ -8,14 +8,21 @@
 > `16:59:07 up 4 days, 17:22, load average: 21.53, 63.44, 51.52` (heavy parallel
 > load; the suite still finished in 10.50s, and nothing here is a timing claim).
 >
-> **RATIFIED 2026-08-22.** The controller ran both invocations and confirmed the
-> recommendation, on the harness's own numbers: `S9.r4` measured every other
-> section at **1202px** against a **528px** column — a **−674px** share against a
-> 160px floor, so the floor engages and the flex model is a no-op exactly where
-> it would matter. **"Leave all four alone" is ratified.** That run also found
-> three harness defects (§6.5); all three are fixed on this branch, and the row
-> taxonomy in §7 is re-stated accordingly — `c5` is withdrawn from the
-> discriminating list until it earns its way back.
+> **RATIFIED 2026-08-22.** The controller ran the harness and confirmed the
+> recommendation on its own numbers: `S9.r4` measured every other section at
+> **1202px** against a **528px** column — a **−674px** share against a 160px
+> floor, so the floor engages and the flex model is a no-op exactly where it
+> would matter. The second run's cross-size data **strengthened** that: every
+> surface overflows at both viewports by wide margins (§6.5). **"Leave all four
+> alone" is ratified.**
+>
+> Those runs also found **four harness defects** (§6.5) — the size axis was never
+> set, the CanvasMode block never created a canvas, `i1` compared the screen to
+> itself, and `c1` was aimed at border boxes rather than painted pixels so the
+> plant that reproduces the 954px defect could not turn it red. All four are
+> fixed here. Two new run-level invariants (`P.invariant`, `P.invariant2`) make a
+> green-with-a-poison-installed run a failure. The row taxonomy in §7 is
+> re-stated; `c5` was withdrawn after the first run and is now earned back.
 >
 > **The runtime half is a harness the controller runs.** Everything about
 > rendered geometry below is either a source fact, or a prediction the harness
@@ -39,7 +46,11 @@ before the app is even launched:
    `CollapsibleSection.tsx:87` hands the deficit straight back to `Panel`'s
    scrollbar — *"the pre-existing behaviour of an over-subscribed column,
    restored for the case that actually is one."* Which is what these columns do
-   today. Row `r4` prints that arithmetic per surface, per window size.
+   today. **Measured, not argued:** `S9.r4` = 1202px of other sections against a
+   528px column, a **−674px** share against a 160px floor. And the cross-size run
+   shows it is not an artefact of one window — every surface overflows at both
+   viewports, needing windows from **~1201px** (SpriteMode-6) to **~6326px**
+   (ProjectSetupTab) to lose its scrollbar (§6.5).
 2. **Two of the four are not columns at all.** `ProjectSetupTab` is an 860px
    centred document page with a pinned Apply footer; `Explorer` is a file tree.
    Giving a tree's groups per-group scrollbars is not a fix, it is a different
@@ -353,11 +364,15 @@ SpriteMode-7, CanvasMode at 1024×1024. Phase B (aeon only): SpriteMode-6. Phase
 
 ---
 
-## 6.5 The first controller run — what it found, and what it cost
+## 6.5 What the controller runs found — four instrument defects
 
 **The recommendation survived; the harness did not.** The controller ran both
 `SCREEN` invocations. Eight rows failed, and every one of them was the
 instrument, not the app.
+
+*Two controller runs, four instrument defects. None of them touched the
+conclusion — the source-level argument in §1 never depended on the harness — but
+all four are about whether this instrument can be trusted next time.*
 
 ### Defect 1 — `SCREEN` sized the xvfb display, not the Electron window
 
@@ -417,6 +432,39 @@ and `ImportSheetDialog`'s body — and `PaletteGrid.tsx:173` documents *"No
 CanvasMode.** The two failures are therefore *not* independent, and **the
 recommendation for CanvasMode is unchanged.**
 
+### The size fix worked, and the cross-size data strengthens evidence line 1
+
+`V.set` passes at both viewports (65/65 each), and `--compare` now compares two
+genuinely different runs — the setup tab's column measured **975px vs 725px**,
+SpriteMode-9's **706px vs 456px**. **Controller-measured, second run:**
+
+| surface | window height needed to lose its scrollbar |
+|---|---|
+| `ProjectSetupTab` | **~6326px** |
+| `SpriteMode` (nine) | **~2071px** |
+| `SpriteMode` (seven) | **~1780px** |
+| `CanvasMode` (1024×1024) | **~1306px** |
+| `SpriteMode` (six) | **~1201px** |
+
+**Every surface overflows at both viewports, by wide margins.** So the flex
+model's floor does not merely engage at today's window sizes — it engages across
+the whole range these columns are ever seen at. §1's point 1 is now measured
+rather than argued, and `S9.r4`'s −674px share is not an artefact of one window.
+
+**One sharpening, because the strong form overshoots for two rows.** "There is no
+window size a human owns where the floor wouldn't engage" holds outright for
+`ProjectSetupTab` (~6326px is beyond any display) and for the whole set at 1080p
+and 1440p, which is nearly every screen in use. It does *not* hold universally for
+the bottom three: a 4K panel maximised gives ~2160px of window, which would clear
+`SpriteMode`-6 (~1201px), CanvasMode (~1306px), `SpriteMode`-7 (~1780px) and even
+`SpriteMode`-9 (~2071px). The honest statement is: **at every display size in
+common use every one of these columns is over-subscribed, and the one surface
+that is over-subscribed at literally any size is `ProjectSetupTab`** — which is
+also the surface the flex model is least applicable to. That is still decisive
+for the recommendation, and it is what the numbers actually support.
+
+---
+
 ### Defect 3 — the one the controller could not see, and it was the worst
 
 Chasing defect 2 exposed a defect in the instrument built to prevent exactly this:
@@ -457,13 +505,68 @@ away. `armInnerScroller` now arms the **tallest** overflowing scroller rather
 than the last in DOM order, and S7/S9/C name the same wheel section, so two
 configurations measuring the same column cannot disagree by accident.
 
+### Defect 4 — `PLANT=list-no-scroller` deleted its own judge, and `c1` was aimed at the wrong geometry
+
+```
+PLANT=list-no-scroller SCREEN=1680x1050  ->  65/65 passed  (+19 NOT-MEASURED)
+PLANT=list-no-scroller SCREEN=1280x800   ->  65/65 passed  (+19 NOT-MEASURED)
+```
+
+NOT-MEASURED went 13 → 19 under the plant, and the six extra were all `c4`:
+the plant strips inner scrollers, `c4` judges inner-scroller behaviour, so the
+plant disabled the row and the run reported clean. Each note was honest about
+why; **the headline still read as a green run with a poison installed.**
+
+**But the deeper fault is `c1`, and it is mine.** `c1` was supposed to be this
+plant's judge, and it compared section **border boxes**:
+
+```js
+if (a.section.bottom > b.section.top + 1)   // the old test
+```
+
+The shape it exists for *does not move those boxes*. A section sized by the
+column paints its children below its own box while the box stays exactly where
+the column put it — that is what the effects panel shipped, 954px of layer cards
+over the assignment rows, with every border box where flexbox had placed it. **So
+`c1` was blind to the one defect it was written for**, and the plant that
+reproduces that defect could not turn it red at any window size. It was not just
+non-discriminating on an unplanted tree, as §7 disclosed; it was non-functional.
+
+**Fixed, three ways:**
+
+1. **`c1` now measures painted extent, not boxes.** A new `contentBottom(sec)` in
+   the probe walks descendants for the lowest painted pixel and **stops at any
+   box that clips** — descending into an `overflow: auto` list would report every
+   capped inner list in the app as an overlap, a false red, which is the opposite
+   failure and just as useless. A border-box overlap (strictly worse) is reported
+   separately as `c1box`.
+2. **`P.invariant`, the general fix the controller asked for:** if `PLANT` is set
+   and no row went red, that is a **FAILURE**, whatever the disclosure says. It
+   protects every future plant, not this one.
+3. **`P.invariant2`:** the plant's *named* judge (`PLANT_JUDGE`: `clip`→`c2`,
+   `nested`→`c3`, `contain`→`c4`, `list-no-scroller`→`c1`) is what must go red.
+   Some other row happening to fail does not make a plant coverage for the
+   property it names.
+
+**The plant is re-aimed, not retired** — it now has a judge that survives it.
+
+**And I withdraw the split I predicted.** I said `c1` should be red at 1280×800
+and possibly green at 1680×1050, because flexbox only squeezes when free space is
+negative. The cross-size numbers settle it: these columns are over-subscribed at
+*both* viewports by wide margins, so there is no slack to find at either size and
+the plant should be **red at both**. The reasoning about flexbox was right; the
+premise that these columns ever have room to spare was wrong.
+
+---
+
 ### One arithmetic reconciliation for the next run
 
-I count **six** measured surfaces, hence six `i4` rows; with `C.i0` and `C.c4`
-that is eight failures total. The run report described seven of the eight as
-`i4`. I cannot reconcile that from here and I am **not** assuming either number
-is wrong — the re-run should make it moot, since `V.set` now fails *once* instead
-of `i4` failing per surface.
+**Settled.** I counted six measured surfaces → six `i4` rows, plus `C.i0` and
+`C.c4` = eight. The controller recounted from their own output — `E.i4`, `P.i4`,
+`S7.i4`, `C.i4`, `S6.i4`, `S9.i4` — confirmed six, and corrected the "seven of
+eight" figure on their side. Recorded because a number that travelled in a status
+and turned out to be wrong is worth leaving a trace of. It is moot going forward:
+`V.set` now fails once at setup instead of `i4` failing per surface.
 
 ---
 
@@ -481,6 +584,9 @@ stronger than they were, and one of them was previously vacuous.*
 | `c2` | every section can be scrolled fully into view | `PLANT=clip`. Not trivially green: Explorer's root is `overflow: hidden` with the scroller nested inside, and the setup tab keeps its footer outside its scroller, so "which box actually scrolls" is a real question on two of the four |
 | `c3` | no row is more than two scrollbars deep | `PLANT=nested`. SpriteMode genuinely sits at depth 2 today; three would be the defect |
 | `c4` | a wheel over an exhausted inner list chains out to the column | `PLANT=contain`. The only place nested-scroll confusion is observable. **NOT MEASURED, by source-derived necessity, whenever CanvasMode is genuinely on screen** — that surface has no inner scroller at all |
+| `c5` | the natural stack height is a content property, not a window property (≤4% drift across sizes) | **Earned back.** `V.set` now passes at two genuinely different viewports (975 vs 725px, 706 vs 456px), so this compares real cross-size data instead of a run against itself. `--compare` still refuses when the two viewports match |
+| `P.invariant` | a run with `PLANT` set has at least one red row | **any plant that disables its own judge.** The general protection for every future plant |
+| `P.invariant2` | the plant's *named* judge is the row that went red | a plant whose coverage claim is carried by some unrelated failure |
 | `S6.doc` | `ui/primitives.tsx`'s "SpriteMode mounts six" holds in an aeon-only session | a section added or removed since |
 | `S7.seven` / `S9.nine` | the classic-only and both-resident counts | **`S9.nine` is the booking's central number.** Red = the nine-section column is unreachable and item 19's extreme case does not exist |
 | `i0` (per surface) | a STORE-level sentinel: the surface is really mounted | anything painted that is not this surface. **New — this is what defect 3 was missing** |
@@ -489,22 +595,21 @@ stronger than they were, and one of them was previously vacuous.*
 | `C.setup2` / `C.setup3` | Create is enabled before it is clicked; a 1024×1024 doc is checked out | **defect 2, at its own site** |
 | `i2`–`i4` | painted heights, one shared container with a real height, no viewport drift mid-run | upstream breakage |
 
-### Rows that do NOT discriminate — and one that has to earn its way back
+### Rows that do NOT discriminate on an unplanted tree
 
-**`c5` is withdrawn.** "The natural stack height is a content property" cannot
-discriminate until two runs are taken at two genuinely different viewports, and
-the first pair were not. `--compare` now **refuses** rather than reporting 0.0%
-drift as a pass. It rejoins the discriminating list the first time `V.set` passes
-at both sizes — not before.
+**`c1` still cannot go red without a plant** — every section on these four
+surfaces is `CONTENT_SECTION` = `flexShrink: 0` inside an `overflow: auto` box,
+so the stack grows and the container scrolls rather than anything overlapping. A
+green `c1` is not evidence that these columns are healthy; it is evidence that
+they are made of `flexShrink: 0`.
 
+**What changed is that it is now a functioning judge of the planted shape.** It
+compares painted extent rather than border boxes (defect 4), so
+`PLANT=list-no-scroller` turns it red — which it could not do before at any window
+size. `P.invariant2` now asserts that.
 
-**`c1` ("no section paints over the one below it") cannot go red on an unplanted
-tree.** Every section on these four surfaces is `CONTENT_SECTION` = `flexShrink:
-0` inside an `overflow: auto` box, so overlap is *structurally impossible*: the
-stack grows and the container scrolls. `c1` is a **regression tripwire** for the
-shape that did ship — the effects panel's 954px of layer cards — and it is red
-only under `PLANT=list-no-scroller`. A green `c1` is not evidence that these
-columns are healthy; it is evidence that they are made of `flexShrink: 0`.
+**Nothing is currently withdrawn from the discriminating list.** `c5` was, after
+the first run, and has been earned back.
 
 **`c4` reports NOT MEASURED rather than passing** on Explorer, ProjectSetupTab
 **and CanvasMode**: none has an inner list with anything to scroll, so
@@ -514,11 +619,13 @@ three sections — which is what makes a red `C.c4` proof that the surface was n
 CanvasMode. `c4` also reports NOT MEASURED where the outer column has nothing to
 scroll, and where no wheel event reached the page at all.
 
-**`PLANT=list-no-scroller` is expected to be red at 1280×800 and possibly green
-at 1680×1050**, and that split is a *finding*, not a harness fault: flexbox only
-squeezes a `flex: 1 1 0` item when free space is negative. A column with room to
-spare grows it instead, and nothing overlaps. Which columns have room to spare is
-precisely what §1's point 1 turns on.
+**`PLANT=list-no-scroller` is now expected RED AT BOTH SIZES.** The split this
+section previously predicted — red at 1280×800, possibly green at 1680×1050 — is
+**withdrawn**. Flexbox does only squeeze a `flex: 1 1 0` item when free space is
+negative, but the cross-size run showed free space is negative on every one of
+these columns at *both* viewports (the smallest, SpriteMode-6, still wants a
+~1201px window). There is no slack to find, so there is no split. The reasoning
+was right; the premise that these columns ever have room to spare was wrong.
 
 ---
 

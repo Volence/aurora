@@ -117,13 +117,23 @@
 //        reader reconstruct by hand which failures were downstream of which.
 //
 //   [c1] NO SECTION PAINTS OVER THE ONE BELOW IT.
-//        ** DOES NOT DISCRIMINATE ON THESE FOUR SURFACES AS THEY STAND. **
-//        Every section here is CONTENT_SECTION = flexShrink:0 inside an
-//        overflow:auto box, so overlap is structurally impossible: the stack
-//        grows and the container scrolls. This row is the regression tripwire
-//        for the shape that DID ship (the effects panel's 954px of layer cards)
-//        and it goes red under PLANT=list-no-scroller. On an unplanted tree,
-//        expect green for the trivial reason. Reported, not hidden.
+//        ** GREEN FOR A TRIVIAL REASON ON AN UNPLANTED TREE. ** Every section
+//        here is CONTENT_SECTION = flexShrink:0 inside an overflow:auto box, so
+//        the stack grows and the container scrolls rather than anything
+//        overlapping. It is the regression tripwire for the shape that DID ship
+//        (the effects panel's 954px of layer cards), and it goes red under
+//        PLANT=list-no-scroller.
+//
+//        IT DID NOT, AND THAT WAS THE THIRD DEFECT. c1 compared section BORDER
+//        BOXES, and the shape it exists for does not move them: a section sized
+//        by the COLUMN paints its children below its own box while the box stays
+//        exactly where the column put it. So the row was blind to the one defect
+//        it was written for, and the plant that reproduces that defect could not
+//        turn it red at any window size. It now compares PAINTED EXTENT
+//        (`contentBottom` in the probe), stopping at any box that clips — which
+//        is what "paints over" means, and what makes it a real judge of the
+//        plant rather than a decoration beside it. A border-box overlap, a
+//        strictly worse fault, is reported separately as `c1box`.
 //
 //   [c2] EVERY SECTION IS REACHABLE BY SCROLLING ITS CONTAINER.
 //        Discriminates: red under PLANT=clip. Not trivially green — Explorer's
@@ -170,11 +180,12 @@
 //        heights must agree within 4% between the two SCREEN sizes. If they do
 //        not, every px number below is window-dependent and the "minimum window
 //        height" finding is not a number at all. Reported NOT MEASURED from a
-//        single run — never quietly skipped — AND it now REFUSES outright when
-//        the two summaries were taken at the same viewport height, which is
-//        exactly what the xvfb defect produced. Until V.set passes at two
-//        genuinely different sizes, c5 is NOT a discriminating row, and it is
-//        listed as earned-back rather than assumed.
+//        single run — never quietly skipped — AND it REFUSES outright when the
+//        two summaries were taken at the same viewport height, which is exactly
+//        what the xvfb defect produced. EARNED BACK: V.set now passes at two
+//        genuinely different viewports (columns measured 975 vs 725px on the
+//        setup tab, 706 vs 456px on SpriteMode-9), so c5 compares real
+//        cross-size data and is a discriminating row again.
 //
 //   [r*] REPORTS. No verdict — these ARE the measurement. [r4] is the one the
 //        ruling turns on:
@@ -216,11 +227,29 @@
 // Plants are applied AT RUNTIME through CDP (no rebuild): they restyle the live
 // DOM into the shape whose absence the row asserts. `list-no-scroller`
 // reproduces the effects-panel defect exactly — LIST_SECTION's flex declaration
-// on a section whose body has no scroller — and is expected to go red ONLY on a
-// column that is already over-subscribed, because that is the only condition
-// under which flexbox squeezes rather than grows. A green c1 under that plant
-// at 1680x1050 and a red one at 1280x800 is a FINDING, not a harness fault: it
-// says which columns have room to spare.
+// on a section whose body has no scroller.
+//
+// EVERY PLANTED RUN CARRIES TWO INVARIANTS, checked at the end (P.invariant,
+// P.invariant2):
+//   * at least one row must be RED. A poisoned run that reports every row green
+//     is a FAILURE whatever the disclosure says about why;
+//   * the plant's NAMED judge (PLANT_JUDGE) is what must go red. Some other row
+//     happening to fail does not make the plant coverage for the property it
+//     names.
+// These exist because `list-no-scroller` once removed the inner scrollers, c4
+// is the row that judges inner-scroller behaviour, and the plant deleted its own
+// judge: 65/65 green with a defect installed and six honest NOT-MEASURED notes
+// underneath. A plant that cannot fail is worse than no plant, because the next
+// session reads it as coverage.
+//
+// THE SPLIT THIS HEADER ONCE PREDICTED IS WITHDRAWN. It said c1 should be red at
+// 1280x800 and possibly GREEN at 1680x1050, because flexbox only squeezes when
+// free space is negative. The cross-size run settled it: every one of these
+// columns is over-subscribed at BOTH viewports by wide margins (the smallest,
+// SpriteMode-6, still wants a ~1201px-tall window; ProjectSetupTab wants
+// ~6326px). So there is no room to spare to be found at either size and the
+// plant is expected RED at both. The prediction was not wrong about flexbox; it
+// was wrong that these columns ever have slack.
 //
 // VERBOSE=1 tees Electron's stdout/stderr. Screenshots land in
 // scratchpad/shots-section-column/.
@@ -585,6 +614,41 @@ window.__sc = (() => {
     top: Math.round(r.top), bottom: Math.round(r.bottom), left: Math.round(r.left),
     right: Math.round(r.right), h: Math.round(r.height), w: Math.round(r.width) }; };
 
+  /*
+   * HOW FAR DOWN THIS SECTION ACTUALLY PAINTS — which is NOT its border box.
+   *
+   * THE DEFECT THIS REPLACES. c1 used to compare section BORDER BOXES, and the
+   * shape it claims to guard does not move them. The effects panel's 954px
+   * defect was a section sized by the COLUMN whose CHILDREN, laid out at their
+   * natural height with overflow visible, painted straight over the rows
+   * beneath. The box stayed exactly where the column put it. So c1 was blind to
+   * the one defect it existed for, and PLANT=list-no-scroller — which
+   * reproduces that shape exactly — could not turn it red at any window size.
+   *
+   * STOP AT ANYTHING THAT CLIPS. A child inside an overflow:auto list still
+   * reports a layout rect below that list's bottom when it is scrolled out of
+   * view, but it does not PAINT there. Descending into a clipping box would
+   * report every capped inner list in the app as an overlap — a false red on an
+   * unplanted tree, which is the opposite failure and just as useless.
+   */
+  const contentBottom = (sec) => {
+    let bottom = sec.getBoundingClientRect().bottom;
+    const walk = (el) => {
+      for (const ch of el.children) {
+        const cs = getComputedStyle(ch);
+        if (cs.display === 'none' || cs.visibility === 'hidden') continue;
+        /* A fixed-position child is out of this flow entirely (portals, tooltips). */
+        if (cs.position === 'fixed') continue;
+        const r = ch.getBoundingClientRect();
+        if (r.width === 0 && r.height === 0) continue;
+        bottom = Math.max(bottom, r.bottom);
+        if (cs.overflowY === 'visible' && cs.overflowX === 'visible') walk(ch);
+      }
+    };
+    walk(sec);
+    return Math.round(bottom);
+  };
+
   /** Descendant scrollers INSIDE one section — a nested list with its own bar. */
   const innerScrollers = (sec) => [...sec.querySelectorAll('*')].filter((e) => {
     if (!scrolls(e) || !vis(e)) return false;
@@ -611,6 +675,8 @@ window.__sc = (() => {
       // A collapsed section renders no children at all (CollapsibleSection:71),
       // so its box is just its header row.
       collapsed: sec ? sec.children.length === 1 : null,
+      /* The lowest pixel this section paints, clipping boxes respected. */
+      contentBottom: sec ? contentBottom(sec) : null,
       flexShrink: cs ? cs.flexShrink : null,
       flexGrow: cs ? cs.flexGrow : null,
       flexBasis: cs ? cs.flexBasis : null,
@@ -829,6 +895,20 @@ const PLANT_CALLS = {
   'list-no-scroller': 'window.__sc.plantListNoScroller()',
 };
 
+/**
+ * WHICH ROW EACH PLANT IS SUPPOSED TO TURN RED.
+ *
+ * Not decoration — `P.invariant2` asserts it. A plant whose named judge stays
+ * green while some OTHER row happens to go red would otherwise satisfy the
+ * general invariant below and still be worthless as coverage.
+ */
+const PLANT_JUDGE = {
+  clip: /\.c2$/,
+  nested: /\.c3$/,
+  contain: /\.c4$/,
+  'list-no-scroller': /\.c1$/,
+};
+
 async function applyPlant(c, tag) {
   if (!PLANT) return;
   const call = PLANT_CALLS[PLANT];
@@ -973,20 +1053,35 @@ async function measureSurface(c, tag, label, expect, opts = {}) {
   }
 
   // ---- c1: nothing paints over the section below it ----------------------
-  // TRIPWIRE, NOT A DISCRIMINATOR HERE. See the file header: every section is
-  // flexShrink:0 in an overflow:auto box, so this is structurally green on an
-  // unplanted tree. It guards the shape that DID ship (the effects panel).
+  // A TRIPWIRE on an unplanted tree — every section here is flexShrink:0 in an
+  // overflow:auto box, so the stack grows and the container scrolls rather than
+  // anything overlapping — but it is NOW A REAL JUDGE of the planted shape,
+  // which it was not before: it compares PAINTED EXTENT, not border boxes.
   const overlaps = [];
+  const boxOverlaps = [];
   for (let i = 0; i + 1 < secs.length; i++) {
     const a = secs[i], b = secs[i + 1];
     if (!a.section || !b.section) continue;
+    // THE SUBJECT IS PAINTED PIXELS, NOT THE BORDER BOX. See `contentBottom` in
+    // the probe: a section squeezed by the column paints its children below its
+    // own box without moving it, which is what the effects panel shipped.
+    if (a.contentBottom > b.section.top + 1) {
+      overlaps.push(`"${a.title}" paints to ${a.contentBottom} over "${b.title}" top=${b.section.top} `
+        + `(${a.contentBottom - b.section.top}px of overlap; its own box ends at ${a.section.bottom})`);
+    }
     if (a.section.bottom > b.section.top + 1) {
-      overlaps.push(`"${a.title}" bottom=${a.section.bottom} over "${b.title}" top=${b.section.top} `
-        + `(${a.section.bottom - b.section.top}px of overlap)`);
+      boxOverlaps.push(`"${a.title}" box ${a.section.bottom} over "${b.title}" ${b.section.top}`);
     }
   }
-  check(`${tag}.c1`, `${label}: no section paints over the one below it [TRIPWIRE — cannot go red unplanted]`,
-    overlaps.length === 0, overlaps.length ? overlaps.join('\n        ') : `all ${Math.max(0, secs.length - 1)} consecutive pairs disjoint`);
+  check(`${tag}.c1`, `${label}: no section PAINTS over the one below it`,
+    overlaps.length === 0,
+    overlaps.length ? overlaps.join('\n        ')
+      : `all ${Math.max(0, secs.length - 1)} consecutive pairs disjoint `
+        + `(content extents: ${secs.map((x) => `${x.contentBottom - x.section.top}px in ${x.section.h}px`).join(', ')})`);
+  if (boxOverlaps.length) {
+    note(`${tag}.c1box`, `${label}: section BORDER BOXES overlap too — a stronger fault than painting over`,
+      boxOverlaps.join('\n        '));
+  }
 
   // ---- c2: every section is reachable by scrolling -----------------------
   const unreachable = [];
@@ -1497,6 +1592,41 @@ async function main() {
     results, notes,
   }, null, 2));
   console.log(`\nsummary -> ${file}`);
+
+  // ======================================================================
+  // THE POISONED-RUN INVARIANT
+  // ======================================================================
+  // A run with a defect installed that reports every row green is a FAILURE,
+  // whatever the disclosure says about why.
+  //
+  // EARNED, NOT ANTICIPATED. PLANT=list-no-scroller removes the inner scrollers
+  // from a section and c4 is the row that judges inner-scroller behaviour, so
+  // the plant deleted its own judge and the run reported a clean 65/65 with six
+  // extra NOT-MEASURED notes. Each note was honest and said exactly why; the
+  // HEADLINE still read as a green run with a poison installed, which is the
+  // "passes for the wrong reason" shape wearing a disclosure as cover. This is
+  // the general fix, so it protects every future plant rather than that one.
+  if (PLANT) {
+    const red = results.filter((r) => !r.ok);
+    check('P.invariant', `PLANT=${PLANT} is installed, so at least one row MUST be red`,
+      red.length > 0,
+      red.length
+        ? `${red.length} red: ${red.map((r) => r.id).join(', ')}`
+        : `EVERY ROW PASSED WITH A DEFECT INSTALLED. ${notes.length} NOT-MEASURED notes were emitted — `
+          + 'if the plant disabled the very rows that judge it, the plant is not coverage and must be '
+          + 're-aimed or retired (see the harness header). A plant that cannot fail is worse than no '
+          + 'plant, because the next session reads it as coverage.');
+    const judge = PLANT_JUDGE[PLANT];
+    if (judge) {
+      const hit = red.filter((r) => judge.test(r.id));
+      check('P.invariant2', `PLANT=${PLANT}'s NAMED judge (${judge.source}) is what went red`,
+        hit.length > 0,
+        hit.length ? `${hit.map((r) => r.id).join(', ')}`
+          : `no row matching ${judge.source} is red. Red rows: ${red.map((r) => r.id).join(', ') || '(none)'}. `
+            + 'Some other row going red does not make this plant coverage for the property it names.');
+    }
+  }
+
   compare(true);
 
   console.log(`\n    uptime/load at end: ${execSync('uptime', { encoding: 'utf8' }).trim()}`);
