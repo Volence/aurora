@@ -43,6 +43,15 @@ export interface S1ArtSource {
    *  frame count has since changed — index-paired frames→mappings would otherwise
    *  write pixels into the wrong tiles (add/delete/reorder is not S1-writable). */
   frameCount: number;
+  /** How the art file on disk is encoded — the writer the save picks. Nemesis
+   *  flat mappings keep the original apply-all writer; uncompressed and DPLC
+   *  sources route through the delta writer (byte-identical zero-edit saves,
+   *  shared-tile surfacing). Kosinski never captures a source (refusal). */
+  compression: 'nemesis' | 'uncompressed';
+  /** DPLC per-frame source-tile lists (Sonic): mapping tile indices are
+   *  frame-local and resolve through this into the shared pool. Absent for
+   *  flat-mapping sprites. */
+  dplc?: number[][];
 }
 
 /** One animation step: a reference to a frame + how long it holds (in 1/60s ticks).

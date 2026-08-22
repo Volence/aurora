@@ -11,7 +11,7 @@ type AddToast = (message: string, type?: ToastType) => void;
 function fakeSource(frameCount: number): S1ArtSource {
   return {
     basePath: '/tmp/x', relPath: 'X.nem', expectedMtimeMs: 1,
-    originalTiles: [], mappings: [], originX: 0, originY: 0, frameCount,
+    originalTiles: [], mappings: [], originX: 0, originY: 0, frameCount, compression: 'nemesis',
   };
 }
 

@@ -12,7 +12,7 @@ import { reconstructDPLCSprite, reconstructWithAdapter, reconstructFromFrames, r
 import { getAdapter } from '../../../core/formats/games';
 import { parseTiles } from '../../../core/formats/tiles';
 import { compressionFor } from '../../../core/compress';
-import { encodeS1ArtWriteBack, type EditedFrame } from '../../../core/formats/games/s1-art-write';
+import { encodeS1ArtWriteBack, encodeS1ArtWriteBackDelta, type EditedFrame } from '../../../core/formats/games/s1-art-write';
 import { parseAsmMappings, parseAsmDPLC, assembleDataAsm } from '../../../core/import/asm-mappings';
 import type { SpriteFrame } from '../../../core/model/sprite-types';
 import type { SpriteFormatAdapter } from '../../../core/formats/sprite-format-adapter';
@@ -176,20 +176,17 @@ const baseOf = (p: string) => p.replace(/\\/g, '/').split('/').filter(Boolean).p
 
 /**
  * Capture the in-place ART save-back target after an S1 object sprite opens
- * (Task 15). Only S1, non-DPLC, Nemesis art WITHOUT per-frame art swaps gets a
- * target — the write-back re-encodes with Nemesis and keeps the read-only
- * mappings, so any other shape (DPLC, non-Nemesis, frame-swapped, other games)
- * is left with no source (edit/export only). When the shape is one of the
- * S1-specific refusals, the WHY is recorded on the document (saveBackRefusal)
- * so a save attempt refuses with the honest, specific reason instead of the
- * generic "no S1 art source" line:
- *   • DPLC (Sonic): every frame's mapping indices resolve through a per-frame
- *     source-tile list into ONE shared art pool — frames share source tiles,
- *     so an in-place write of one frame's pixels would rewrite other frames.
+ * (Task 15 + the save-back parcel, audit §5 "Cross-cutting"). S1 Nemesis and
+ * UNCOMPRESSED art both capture a target now — including DPLC (Sonic), whose
+ * per-frame source-tile lists ride along so the delta writer can patch the
+ * shared pool and surface co-affected frames. Shapes that still can't write
+ * record the WHY on the document (saveBackRefusal) so a save attempt refuses
+ * with the honest, specific reason instead of the generic "no S1 art source":
  *   • frame swaps (Spring): frames 3-5 render from a different art file than
  *     the primary save target, so a single-file write would corrupt one side.
- *   • non-Nemesis (Giant Ring, Sonic again): the S1 writer is Nemesis-only by
- *     design (s1-art-write.ts header).
+ *   • other compressions (Kosinski): no S1 writer exists for them.
+ *   • uncompressed files that aren't whole 32-byte tiles: a serialize would
+ *     drop the trailing bytes — refuse rather than truncate.
  * `loadSprite` already cleared any prior source AND refusal, so an early return
  * here leaves them null/set exactly as decided.
  * Non-fatal: a decode/stat failure just means no in-place save, not a broken open.
@@ -201,7 +198,7 @@ async function captureS1ArtSource(
   mappings: SpriteFrame[],
   originX: number,
   originY: number,
-  hasDplc: boolean,
+  dplc: number[][] | undefined,
   basePath: string,
   relPath: string,
   hasFrameSwaps = false,
@@ -209,13 +206,6 @@ async function captureS1ArtSource(
   if (game !== 's1') return;
   const store = useSpriteStore.getState();
   const name = store.name;
-  if (hasDplc) {
-    store.setSaveBackRefusal(
-      `${name} can't save back in place: its frames stream through a shared DPLC tile pool — `
-      + `every frame's mapping indices resolve into one art file whose source tiles many frames share, `
-      + `so writing one frame's pixels would silently rewrite other frames. Editing and Export still work.`);
-    return;
-  }
   if (hasFrameSwaps) {
     store.setSaveBackRefusal(
       `${name} can't save back in place: some of its frames draw from a different art file than the `
@@ -223,16 +213,25 @@ async function captureS1ArtSource(
       + `corrupt one of the two files. Editing and Export still work.`);
     return;
   }
-  if (artCompression !== 'nemesis') {
+  if (artCompression !== 'nemesis' && artCompression !== 'uncompressed') {
     store.setSaveBackRefusal(
-      `${name} can't save back in place: its art file is not Nemesis-compressed, and the in-place S1 `
-      + `writer re-encodes Nemesis only. Editing and Export still work.`);
+      `${name} can't save back in place: its art file is ${artCompression}-compressed, and the in-place `
+      + `S1 writer handles Nemesis and uncompressed art only. Editing and Export still work.`);
+    return;
+  }
+  if (artCompression === 'uncompressed' && artBytes.length % 32 !== 0) {
+    store.setSaveBackRefusal(
+      `${name} can't save back in place: its art file is ${artBytes.length} bytes — not a whole number `
+      + `of 32-byte tiles — so an in-place write would drop the trailing bytes. Editing and Export still work.`);
     return;
   }
   try {
-    const originalTiles = parseTiles(compressionFor('nemesis').decompress(artBytes));
+    const originalTiles = parseTiles(compressionFor(artCompression).decompress(artBytes));
     const expectedMtimeMs = await window.api.fileMtime(basePath, relPath);
-    useSpriteStore.getState().setS1ArtSource({ basePath, relPath, expectedMtimeMs, originalTiles, mappings, originX, originY, frameCount: mappings.length });
+    useSpriteStore.getState().setS1ArtSource({
+      basePath, relPath, expectedMtimeMs, originalTiles, mappings, originX, originY,
+      frameCount: mappings.length, compression: artCompression, dplc,
+    });
   } catch { /* leave s1ArtSource null — sprite is still editable, just not save-back-able */ }
 }
 
@@ -295,12 +294,30 @@ export async function saveSpriteArt(docId?: string): Promise<void> {
     return;
   }
   const editedFrames: EditedFrame[] = frames.map((f) => ({ indices: f.data, width: f.width, height: f.height }));
-  const res = encodeS1ArtWriteBack(src.originalTiles, editedFrames, src.mappings, src.originX, src.originY);
-  if (!res.ok) { toast(`Art save failed: ${res.error}`, 'error'); return; }
+  // Nemesis flat mappings keep the original apply-all writer; uncompressed
+  // and/or DPLC sources go through the delta writer, which patches only the
+  // frames that changed (zero-edit saves are byte-identical for uncompressed)
+  // and reports frames co-affected through shared pool tiles.
+  const useDelta = src.compression === 'uncompressed' || !!src.dplc;
+  // Shared-pool contract (probe-measured: 178 of Sonic's 1289 tiles are shared
+  // by 2-5 frames): a save that patches a tile other frames also render is
+  // NEVER silent — the co-affected frames are named in the completion toast.
+  let coAffected: number[] = [];
+  let bytes: Uint8Array;
+  if (useDelta) {
+    const res = encodeS1ArtWriteBackDelta(src.originalTiles, editedFrames, src.mappings, src.originX, src.originY, src.compression, src.dplc);
+    if (!res.ok) { toast(`Art save failed: ${res.error}`, 'error'); return; }
+    coAffected = res.coAffectedFrames;
+    bytes = res.bytes;
+  } else {
+    const res = encodeS1ArtWriteBack(src.originalTiles, editedFrames, src.mappings, src.originX, src.originY);
+    if (!res.ok) { toast(`Art save failed: ${res.error}`, 'error'); return; }
+    bytes = res.bytes;
+  }
 
   let out;
   try {
-    out = await window.api.writeGuarded(src.basePath, [{ relPath: src.relPath, bytes: res.bytes, expectedMtimeMs: src.expectedMtimeMs }]);
+    out = await window.api.writeGuarded(src.basePath, [{ relPath: src.relPath, bytes, expectedMtimeMs: src.expectedMtimeMs }]);
   } catch (e) {
     toast(`Art save failed: ${e instanceof Error ? e.message : String(e)}`, 'error');
     return;
@@ -326,10 +343,13 @@ export async function saveSpriteArt(docId?: string): Promise<void> {
 
   const stillMatches = framesEqual(after.frames, frames);
   if (stillMatches) patchSpriteDoc(targetId, { unsavedEdits: false });
+  const sharedNote = coAffected.length
+    ? ` — shared pool tiles also changed frame${coAffected.length === 1 ? '' : 's'} ${coAffected.join(', ')}`
+    : '';
   toast(
     stillMatches
-      ? `Saved art to ${src.relPath} — S1 mappings are read-only in v1`
-      : `Saved art to ${src.relPath}, but edits made during the save are still unsaved — save again`,
+      ? `Saved art to ${src.relPath}${sharedNote} — S1 mappings are read-only in v1`
+      : `Saved art to ${src.relPath}${sharedNote}, but edits made during the save are still unsaved — save again`,
     stillMatches ? 'success' : 'info',
   );
 }
@@ -399,7 +419,7 @@ export async function openSprite(sourceFormat: SpriteFormatId = 's2', artCompres
     useSpriteStore.getState().setName(name);
     useSpriteStore.getState().setExportDplc(!!dplc);
     useSpriteStore.getState().setFormat(sourceFormat);
-    await captureS1ArtSource(sourceFormat, artCompression, artBytes, frames, recon.originX, recon.originY, !!dplc, dirOf(artPath), baseOf(artPath));
+    await captureS1ArtSource(sourceFormat, artCompression, artBytes, frames, recon.originX, recon.originY, dplc, dirOf(artPath), baseOf(artPath));
     toast(`Imported "${name}" as ${sourceFormat.toUpperCase()}: ${frameBufs.length} frames${dplc ? ' (DPLC)' : ''}`, 'success');
   } catch (e) {
     toast(`Import failed: ${e instanceof Error ? e.message : String(e)}`, 'error');
@@ -577,7 +597,7 @@ export async function openDiscoveredSet(baseDir: string, set: DiscoveredSpriteSe
     useSpriteStore.getState().setName(name);
     useSpriteStore.getState().setExportDplc(!!dplc);
     useSpriteStore.getState().setFormat(set.game);
-    await captureS1ArtSource(set.game, artCompression, artBytes, frames, recon.originX, recon.originY, !!dplc, artBase, artRel, !!set.frameSources?.length);
+    await captureS1ArtSource(set.game, artCompression, artBytes, frames, recon.originX, recon.originY, dplc, artBase, artRel, !!set.frameSources?.length);
     toast(`Opened "${set.name}" (${set.game.toUpperCase()}): ${frameBufs.length} frames${dplc ? ' (DPLC)' : ''}`, 'success');
     return true;
   } catch (e) {
