@@ -318,14 +318,17 @@ async function loadFullProject(
           }
 
           // Load meta sidecar (bgLayoutRef/paletteRef) — optional, only
-          // written when a section carries non-default refs.
+          // written when a section carries non-default refs. Absent, the
+          // defaults from createSection stand; present but unparseable is a
+          // different fact, and the loudest one here: all-null refs are exactly
+          // what makes the save side overwrite the sidecar with nulls.
           try {
             const metaRaw = await fa.read(`${prefix}.meta.json`);
             const meta = parseSectionMeta(new TextDecoder().decode(metaRaw));
             section.bgLayoutRef = meta.bgLayoutRef;
             section.paletteRef = meta.paletteRef;
-          } catch {
-            // no meta sidecar — defaults from createSection stand
+          } catch (e) {
+            await markUnreadable(fa, section, `${prefix}.meta.json`, 'meta.json', e, notices);
           }
 
           sections.push(section);
