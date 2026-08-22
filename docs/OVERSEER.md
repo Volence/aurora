@@ -126,6 +126,18 @@ Each has caught a real defect here.
    reads the live clock's actual quantum. Evidenced from both ends. Any harness claiming
    a capability should demonstrate it on inputs whose true answer is known in advance.
 
+16. *(Shared protocol, empyrean `9b604f0` — noted here because Aurora already had the
+   instinct.)* **Prefer the committed artifact to the recipe that recreates it.** Before
+   running a documented rebuild or recovery recipe, check whether the artifact already
+   exists as a committed blob somewhere in the suite, and take the blob — verified by
+   hashing the extracted bytes, never by trusting the message that pairs them. A recipe
+   carried in prose is a *claim* that it still reproduces the artifact; the blob **is**
+   the artifact. Local instance: the effects codec pins empyrean's schema by git **blob**
+   hash (`2d7a9fee…`, `test/formats/effects-schema-drift.test.ts`) rather than by commit,
+   because the doc moved twice with the wire shape byte-identical underneath — a commit
+   citation would have read stale twice for nothing. The same reasoning is why the
+   three-way reconciliation compares **bytes**, not versions.
+
 ## Editor↔engine coordination points
 
 Protocol details Aurora depends on and did not invent. All measured; re-verify before
