@@ -1,4 +1,5 @@
 import type { ObjectPlacement, RingPlacement, Section, Tileset, Palette, Color, Tile, ChunkDef, Act, BgLibraryEntry } from '../model/s4-types';
+import type { EffectsScene, EffectsSceneLibrary } from '../formats/effects/scene';
 
 export interface S4Level {
   sections: (Section | null)[];
@@ -7,6 +8,10 @@ export interface S4Level {
   chunkLibrary?: ChunkDef[];  // zone-level; present when set-chunk commands are used
   bgLibrary?: BgLibraryEntry[]; // project-level; present when set-bg-tiles is used
   act?: Act;                  // current act; present when set-bg commands are used
+  /** project-level; present when set-effects-scene is used. The whole library
+   *  value, not just its `scenes` array, because a scene id can collide with an
+   *  `unreadable` entry and the command has to be able to see that. */
+  effectsScenes?: EffectsSceneLibrary;
 }
 
 export interface EditCommand {
@@ -172,6 +177,33 @@ export interface SetSectionBgCommand extends EditCommand {
   newRef: string | null;
 }
 
+/**
+ * Create, replace or delete ONE scene in the project's effects-scene library.
+ *
+ * ONE COMMAND FOR ALL THREE, keyed by id with two nullable halves: `oldScene`
+ * null = the scene did not exist (create), `newScene` null = it goes away
+ * (delete), both present = an edit. That shape falls straight out of the codec's
+ * design — a scene document is opaque here, and enumerating "which field
+ * changed" would rebuild the field list the codec deliberately refuses to have.
+ * A single whole-document swap also makes every scene edit ONE undo step by
+ * construction, however many form controls a gesture happened to touch.
+ *
+ * Both halves are DEEP COPIES the caller owns (cloneEffectsScene), never aliases
+ * of the library's live object: a command holding the same object it is meant to
+ * restore restores nothing.
+ *
+ * `sectionIndex` is -1 — this is act-ambient, like set-bg. It records on the ACT
+ * stack rather than the zone's, the same place set-bg-tiles records its
+ * project-level bgLibrary edits; scenes are project-level and there is no
+ * project-level history to record on.
+ */
+export interface SetEffectsSceneCommand extends EditCommand {
+  type: 'set-effects-scene';
+  sceneId: string;
+  oldScene: EffectsScene | null;
+  newScene: EffectsScene | null;
+}
+
 export interface SetSectionsCommand extends EditCommand {
   type: 'set-sections';
   // Whole-act snapshot of the section grid: width/height plus the flat
@@ -213,4 +245,5 @@ export type AnyCommand =
   | SetBgCommand
   | SetBgTilesCommand
   | SetSectionBgCommand
+  | SetEffectsSceneCommand
   | SetSectionsCommand;

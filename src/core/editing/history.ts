@@ -1,4 +1,5 @@
 import type { AnyCommand, S4Level } from './commands';
+import type { EffectsScene, EffectsSceneLibrary } from '../formats/effects/scene';
 
 const MAX_HISTORY = 200;
 
@@ -64,6 +65,32 @@ function resolveBgLayout(level: S4Level, bgRef: string | null): Uint16Array | nu
   return level.act?.bgLayout ?? null;
 }
 
+/**
+ * Put `scene` at `sceneId` in the library, or remove it when null.
+ *
+ * ONE placement function, called by BOTH apply and undo — they differ only in
+ * which half of the command they hand it. Writing the placement twice is exactly
+ * how an apply and its undo drift into disagreeing about ordering or copying.
+ *
+ * Order survives a replace (in place at the existing index) and a new scene
+ * appends, so undoing an edit never silently reorders the author's scene list.
+ * The stored value is a deep copy: the command has to keep an untouched record of
+ * both states however the caller mutates the library afterwards — the rule
+ * `set-object` states one switch down.
+ */
+function placeEffectsScene(
+  library: EffectsSceneLibrary, sceneId: string, scene: EffectsScene | null,
+): void {
+  const at = library.scenes.findIndex((s) => s.id === sceneId);
+  if (scene === null) {
+    if (at >= 0) library.scenes.splice(at, 1);
+    return;
+  }
+  const copy = structuredClone(scene);
+  if (at >= 0) library.scenes[at] = copy;
+  else library.scenes.push(copy);
+}
+
 function applyCommand(cmd: AnyCommand, level: S4Level): void {
   if (cmd.type === 'batch') {
     for (const c of cmd.commands) applyCommand(c, level);
@@ -103,6 +130,14 @@ function applyCommand(cmd: AnyCommand, level: S4Level): void {
   if (cmd.type === 'set-bg-tiles') {
     const layout = resolveBgLayout(level, cmd.bgRef);
     if (layout) for (const e of cmd.entries) layout[e.index] = e.newNt;
+    return;
+  }
+  if (cmd.type === 'set-effects-scene') {
+    // Throw rather than skip — the rule set-palette-line states above. A silent
+    // no-op consumes an undo slot without doing anything, and here it would also
+    // leave the author's scene edit unrecorded and therefore unsaved.
+    if (!level.effectsScenes) throw new Error('set-effects-scene requires level.effectsScenes');
+    placeEffectsScene(level.effectsScenes, cmd.sceneId, cmd.newScene);
     return;
   }
   if (cmd.type === 'set-sections') {
@@ -229,6 +264,11 @@ function undoCommand(cmd: AnyCommand, level: S4Level): void {
   if (cmd.type === 'set-bg-tiles') {
     const layout = resolveBgLayout(level, cmd.bgRef);
     if (layout) for (const e of cmd.entries) layout[e.index] = e.oldNt;
+    return;
+  }
+  if (cmd.type === 'set-effects-scene') {
+    if (!level.effectsScenes) throw new Error('set-effects-scene requires level.effectsScenes');
+    placeEffectsScene(level.effectsScenes, cmd.sceneId, cmd.oldScene);
     return;
   }
   if (cmd.type === 'set-sections') {
