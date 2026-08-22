@@ -17,6 +17,13 @@ export interface OverlayOptions {
   /** The per-8x8-tile VDP priority lens (classic-only): marks tiles whose
    *  pattern word carries bit 15 — they render ABOVE sprites in game. */
   showPriority: boolean;
+  /** Occlusion-correct object previews (classic-only): re-draw high-priority
+   *  map-tile PIXELS above low-priority sprite pieces — what the VDP shows —
+   *  with the hidden portion kept discoverable as a translucent violet ghost.
+   *  ON by default: it is what the game renders, not a lens. The ghost rides
+   *  this same toggle (it is occlusion's discoverability affordance, not a
+   *  separate concept). */
+  occludeSprites: boolean;
   /** Play the S1 animations (classic-only), BOTH halves on one toggle/clock:
    *  the animated level art (GHZ waterfall/flowers, MZ lava/magma/torch, SBZ
    *  smoke at their real AnimateLevelGfx rates) and the curated object
@@ -41,7 +48,7 @@ export interface OverlayOptions {
  * overlay bar lands and classic's OptionBar stops declaring its own.
  */
 export const OVERLAY_KEYS_BY_ENGINE: Record<OpenEngine, readonly (keyof OverlayOptions)[]> = {
-  s1: ['showObjects', 'showStart', 'showCollision', 'showCollisionAngles', 'showPriority', 'playAnimatedArt'],
+  s1: ['showObjects', 'showStart', 'showCollision', 'showCollisionAngles', 'showPriority', 'occludeSprites', 'playAnimatedArt'],
   aeon: [
     'showObjects', 'showRings', 'showTileGrid', 'showBlockGrid', 'showChunkGrid',
     'showCollision', 'showCollisionAngles', 'showCollisionPathB', 'showBgPlane',
@@ -84,6 +91,9 @@ export const useViewStore = create<ViewState>((set) => ({
     showStart: true,
     // A lens, not ambient chrome: off until asked for, like the collision lens.
     showPriority: false,
+    // NOT a lens: occlusion-correct previews are what the game shows, so the
+    // default is ON; the toggle exists to compare against the flat composite.
+    occludeSprites: true,
     // Playback is asked for, never ambient: OFF by default like the lenses.
     playAnimatedArt: false,
   },

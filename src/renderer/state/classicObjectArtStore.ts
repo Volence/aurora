@@ -51,6 +51,15 @@ export interface ObjectSprite {
   height: number;
   originX: number;
   originY: number;
+  /**
+   * The HIGH-priority piece pixels only (same size/origin as `bitmap`, all
+   * other pixels transparent), or null/absent when no mappings piece carries
+   * the priority bit — the common case, so nothing extra is allocated. The
+   * occlusion pass re-blits this ABOVE the high-priority map pixels: on the
+   * VDP a high sprite piece outranks even a high plane tile (layer order
+   * ... B-high, A-high, sprite-high). Built from RenderedObjectFrame.priMask.
+   */
+  priBitmap?: ImageBitmap | null;
 }
 
 interface ClassicObjectArtState {
@@ -152,7 +161,25 @@ async function buildSpriteFromFiles(
   if (!rgba.some((v, i) => i % 4 === 3 && v !== 0)) return null; // fully transparent
   const img = new ImageData(new Uint8ClampedArray(rgba), frame.width, frame.height);
   const bitmap = await createImageBitmap(img);
-  return { bitmap, width: frame.width, height: frame.height, originX: frame.originX, originY: frame.originY };
+  const priBitmap = await buildPriBitmap(frame, rgba);
+  return { bitmap, width: frame.width, height: frame.height, originX: frame.originX, originY: frame.originY, priBitmap };
+}
+
+/**
+ * Build the hi-pri-pieces-only companion bitmap (ObjectSprite.priBitmap): the
+ * frame's RGBA with every pixel whose winning piece is NOT high priority made
+ * transparent. Null when the frame has no priority pieces at all (priMask null
+ * or empty) — the occlusion pass then has nothing to re-raise.
+ */
+async function buildPriBitmap(frame: RenderedObjectFrame, rgba: Uint8Array): Promise<ImageBitmap | null> {
+  const mask = frame.priMask;
+  if (!mask) return null;
+  let any = false;
+  for (let i = 0; i < mask.length; i++) if (mask[i] !== 0) { any = true; break; }
+  if (!any) return null;
+  const out = new Uint8ClampedArray(rgba);
+  for (let i = 0; i < mask.length; i++) if (mask[i] === 0) out[i * 4 + 3] = 0;
+  return createImageBitmap(new ImageData(out, frame.width, frame.height));
 }
 
 // The default builder (real IO + canvas). Indirected through `buildImpl` so tests
@@ -192,7 +219,7 @@ export function __resetObjectSpriteArtForTest(): void {
 // GPU-backed ImageBitmap on eviction/clear.
 const spriteCache = new ObjectSpriteCache<ObjectSprite, BuildCtx>(
   (id, zone, variant, ctx) => buildImpl(id, zone, variant, ctx),
-  (sprite) => sprite.bitmap.close(),
+  (sprite) => { sprite.bitmap.close(); sprite.priBitmap?.close(); },
 );
 
 /** Cache variant (== publish-key discriminator) for a placement: '' static, subtype-string for rules. */

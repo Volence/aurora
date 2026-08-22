@@ -16,6 +16,7 @@ import { objectSpriteEpoch } from '../../../core/level-classic/object-sprite-clo
 import { useToastStore } from '../../state/toastStore';
 import { useAetherStore } from '../../state/aetherStore';
 import { renderBlockPlacement, renderChunk } from '../../../core/level-classic/render';
+import { CHUNK_TILES } from '../../../core/level-classic/priority-mask';
 import { applyCollisionShapeCells, applyCollisionShapeRect } from '../../state/collision-dispatch';
 import type { LevelDoc } from '../../../core/level-classic/model';
 // TYPE-ONLY (erased at runtime): the gesture's cells and the report it hands to
@@ -31,7 +32,10 @@ import {
   worldToCollisionCell, rectFromCorners, COLLISION_CELL_PX,
   type ObjectHitBounds, type StampCell,
 } from './viewport-math';
-import { drawAnimatedArt, drawCollision, drawObjects, drawPriority, drawStart, GHOST_MARKER_BOUNDS } from './classic-overlays';
+import {
+  buildHiPriChunkCanvas, drawAnimatedArt, drawCollision, drawObjects, drawPriority, drawStart,
+  GHOST_MARKER_BOUNDS, type SpriteOcclusion,
+} from './classic-overlays';
 import {
   animStateKey, animTilePatchesAt, animatedCellsForChunk, animatedTilesForZone,
   familiesForZone, type AnimatedCell,
@@ -273,6 +277,21 @@ export default function ClassicLevelViewport() {
   useEffect(() => {
     chunkCache.current = new Map();
   }, [ref]);
+
+  // ---- sprite occlusion (ROADMAP §5.1 item 7) ------------------------------
+  // Per-chunk HI-PRI overlay canvases (only the high-priority tiles' opaque
+  // pixels), keyed exactly like the base chunk cache so an edit that re-rasters
+  // a chunk also rebuilds its overlay. `canvas: null` is a cached verdict —
+  // "this chunk has no high tiles" — which is most chunks in most zones, so the
+  // steady-state cost of the pass is a map lookup per object per chunk cell.
+  const hiPriCache = useRef<Map<number, { canvas: HTMLCanvasElement | null; mask: Uint8Array | null; key: string }>>(new Map());
+  useEffect(() => {
+    hiPriCache.current = new Map();
+  }, [ref]);
+  // Honest cost meter for the occlusion half of the object pass (read by the
+  // CDP harness/report): ms spent building overlays + occluding + re-raising.
+  const occlPerfRef = useRef<{ draws: number; sumMs: number; maxMs: number; builds: number }>(
+    { draws: 0, sumMs: 0, maxMs: 0, builds: 0 });
 
   // ---- animated-art playback (audit Parcel B, §2.2) ------------------------
   // Overlay-only playback of the S1 AniArt_* families: a wall-clock game-frame
@@ -648,6 +667,11 @@ export default function ClassicLevelViewport() {
       }
     }
 
+    // While playback runs, the occlusion pass must not freeze animated map art
+    // at frame 0 inside sprite rects (MZ's hi-pri lava/magma). Set inside the
+    // playAnim block below, consumed by the occlusion context further down.
+    let occlAnimPatch: ((actx: CanvasRenderingContext2D, col: number, row: number, dx: number, dy: number) => void) | null = null;
+
     // Animated-art play overlay: blit the current-frame block placements over
     // just the visible animated cells (audit §2.2 — never chunk-cache
     // invalidation). Drawn on whichever plane is displayed — the waterfall/
@@ -718,6 +742,37 @@ export default function ClassicLevelViewport() {
           }
         }
       }
+      // Occluder re-patch hook (SpriteOcclusion.patchAnimated): clear + redraw
+      // just the HI-PRI 8x8 sub-rects of this chunk's animated cells from the
+      // per-tick placement canvases, so an occluded sprite in MZ sees the
+      // CURRENT lava frame in front of it — and a transparent current-frame
+      // pixel stops occluding (clearRect first, exactly the void-fill logic
+      // drawAnimatedArt applies to the main pass).
+      occlAnimPatch = (actx, ocol, orow, dx, dy) => {
+        const ocell = layoutCellAt(grid, ocol, orow);
+        if (ocell === undefined) return;
+        const ochunkId = ocell & 0x7f;
+        const mask = hiPriCache.current.get(ochunkId)?.mask;
+        if (!mask) return;
+        const overKey = `${chunkEpoch}:${chunkVersions.get(ochunkId) ?? 0}`;
+        let oentry = animCellsRef.current.get(ochunkId);
+        if (!oentry || oentry.key !== overKey) {
+          oentry = { key: overKey, cells: animatedCellsForChunk(doc, ochunkId, animTiles) };
+          animCellsRef.current.set(ochunkId, oentry);
+        }
+        for (const ac of oentry.cells) {
+          const cx = (ac.cell % 16) * 16;
+          const cy = ((ac.cell / 16) | 0) * 16;
+          const pc = getPlacementCanvas(ac.block, ac.xf, ac.yf);
+          for (let q = 0; q < 4; q++) {
+            const sx = (q & 1) * 8, sy = (q >> 1) * 8;
+            const tx = (cx + sx) >> 3, ty = (cy + sy) >> 3;
+            if (!mask[ty * CHUNK_TILES + tx]) continue;
+            actx.clearRect(dx + cx + sx, dy + cy + sy, 8, 8);
+            actx.drawImage(pc, sx, sy, 8, 8, dx + cx + sx, dy + cy + sy, 8, 8);
+          }
+        }
+      };
       const animMs = performance.now() - animT0;
       const acc = animPerfRef.current;
       acc.draws++;
@@ -786,10 +841,50 @@ export default function ClassicLevelViewport() {
             return { sprite, xf: step.xFlip !== obj.xflip, yf: step.yFlip !== obj.yflip };
           };
         }
+        // Occlusion-correct compositing (view default; the toggle exists to
+        // compare with the flat composite). The context resolves the hi-pri
+        // overlay canvas per chunk cell through hiPriCache; a null canvas is a
+        // cached "no high tiles here" verdict. Cost lands in occlPerfRef via
+        // onCost — the harness reads __auroraOcclPerf.
+        let occlusion: SpriteOcclusion | undefined;
+        let occlFrameMs = 0;
+        if (overlays.occludeSprites) {
+          occlusion = {
+            hiPriCanvasAt: (col, row) => {
+              const cell = layoutCellAt(grid, col, row);
+              if (cell === undefined) return null;
+              const chunkId = cell & 0x7f;
+              if (chunkId === 0) return null;
+              const key = `${chunkEpoch}:${chunkVersions.get(chunkId) ?? 0}`;
+              const hit = hiPriCache.current.get(chunkId);
+              if (hit && hit.key === key) return hit.canvas;
+              const t0 = performance.now();
+              const built = buildHiPriChunkCanvas(doc, chunkId, getChunkCanvas(doc, chunkId, key));
+              occlPerfRef.current.builds++;
+              occlFrameMs += performance.now() - t0;
+              hiPriCache.current.set(chunkId, { canvas: built?.canvas ?? null, mask: built?.mask ?? null, key });
+              return built?.canvas ?? null;
+            },
+            patchAnimated: occlAnimPatch ?? undefined,
+            visible: { left: cam.x, top: cam.y, width: w * invZoom, height: h * invZoom },
+            lensVeil: overlays.showPriority,
+            onCost: (ms) => { occlFrameMs += ms; },
+          };
+        }
         const objT0 = animFor ? performance.now() : 0;
-        drawObjects(ctx, doc, invZoom, objectSprites, ref?.zone ?? '', selIndex, previewPos, animFor);
+        drawObjects(ctx, doc, invZoom, objectSprites, ref?.zone ?? '', selIndex, previewPos, animFor, occlusion);
+        if (occlusion) {
+          const acc = occlPerfRef.current;
+          acc.draws++;
+          acc.sumMs += occlFrameMs;
+          acc.maxMs = Math.max(acc.maxMs, occlFrameMs);
+          (window as unknown as Record<string, unknown>).__auroraOcclPerf = acc;
+        }
         if (animFor) {
-          const ms = performance.now() - objT0;
+          // Subtract the occlusion share so this meter keeps meaning "the
+          // animated-preview cost" it had before occlusion landed (the
+          // occlusion share has its own meter above).
+          const ms = performance.now() - objT0 - occlFrameMs;
           const acc = objAnimPerfRef.current;
           acc.draws++;
           acc.sumMs += ms;

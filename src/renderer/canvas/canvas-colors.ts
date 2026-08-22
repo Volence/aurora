@@ -46,6 +46,16 @@ export const PRIORITY_FILL = 'rgba(200, 90, 255, 0.42)';
  *  enough to survive light art). */
 export const PRIORITY_EDGE = 'rgba(245, 215, 255, 0.9)';
 
+// ---------- sprite occlusion ghost (classic-overlays drawObjects) ----------
+// The occluded portion of an object preview — sprite pixels the game hides
+// behind high-priority plane tiles — stays discoverable as a translucent ghost
+// washed with the SAME violet the priority lens uses, so "violet = the high
+// plane is in front here" reads as one language across lens and ghost.
+/** Violet wash composited source-atop onto the ghost's own pixels. */
+export const OCCLUSION_GHOST_TINT = 'rgba(200, 90, 255, 0.55)';
+/** Global alpha the tinted ghost is blitted with over the occluding map art. */
+export const OCCLUSION_GHOST_ALPHA = 0.4;
+
 // ---------- collision shape palette (CollisionPalette previews / thumbnails) ----------
 /** Neutral teal silhouette fill for a drawn collision shape. */
 export const COLLISION_SHAPE_FILL = 'rgba(70,200,150,0.9)';      // shape body — teal
