@@ -1,5 +1,7 @@
 import type { ObjectPlacement, RingPlacement, Section, Tileset, Palette, Color, Tile, ChunkDef, Act, BgLibraryEntry } from '../model/s4-types';
 import type { EffectsScene, EffectsSceneLibrary } from '../formats/effects/scene';
+import type { BgOverrideBand, BgOverrideDocument } from '../formats/bg-override/bg-override';
+import type { BandSlotPlan } from '../formats/bg-override/bg-anim-band';
 
 export interface S4Level {
   sections: (Section | null)[];
@@ -12,6 +14,8 @@ export interface S4Level {
    *  value, not just its `scenes` array, because a scene id can collide with an
    *  `unreadable` entry and the command has to be able to see that. */
   effectsScenes?: EffectsSceneLibrary;
+  /** project-level (one per GAME, not per act); present when band commands are used. */
+  bgOverride?: BgOverrideDocument;
 }
 
 export interface EditCommand {
@@ -220,6 +224,40 @@ export interface SetSectionSceneCommand extends EditCommand {
   newRef: string | null;
 }
 
+/**
+ * Add or remove ONE BgAnim band in `editor_bg_override.json` — and, in the same
+ * undo step, the tile renumbering and layout rewrite that go with it.
+ *
+ * ONE COMMAND, NOT THREE, and that is the entire reason this command type
+ * exists. A band's animated slots are a PREFIX of `tiles`, so inserting a band
+ * inserts tiles at the front-ward end of the blob, renumbers every static tile
+ * after them, and invalidates every `layout` word that named one. A history that
+ * could undo the `anims` half without the `tiles` half would leave a document
+ * that passes every consumer assert, bakes cleanly, and ships silently corrupt
+ * art — the accident aeon already suffered once (docs/BUGS.md TOOL-01).
+ *
+ * `adding` NAMES THE DIRECTION rather than the `oldX`/`newX` pair the neighbours
+ * use. Both halves of that pair would be whole ~400 KB documents, and a history
+ * of 200 of them is not a history; the plan below is the difference instead, and
+ * it is SYMMETRIC — each layout entry records both its with-band and its
+ * without-band word, so apply and undo are the same two functions with their
+ * arguments swapped rather than two implementations that can disagree.
+ *
+ * `band` is a DEEP COPY the command owns, phases and all: it is the only record
+ * of the removed art, and a command holding the same object it is meant to
+ * restore restores nothing.
+ *
+ * `sectionIndex` is -1 — the document is per-game, so this is act-ambient like
+ * `set-effects-scene`, and records on the act stack for the same reason.
+ */
+export interface SetBgOverrideBandCommand extends EditCommand {
+  type: 'set-bg-override-band';
+  /** true = the command's forward direction ADDS the band; false = it REMOVES it. */
+  adding: boolean;
+  band: BgOverrideBand;
+  plan: BandSlotPlan;
+}
+
 export interface SetSectionsCommand extends EditCommand {
   type: 'set-sections';
   // Whole-act snapshot of the section grid: width/height plus the flat
@@ -263,4 +301,5 @@ export type AnyCommand =
   | SetSectionBgCommand
   | SetEffectsSceneCommand
   | SetSectionSceneCommand
+  | SetBgOverrideBandCommand
   | SetSectionsCommand;

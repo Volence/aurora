@@ -121,6 +121,17 @@ export const BG_LAYOUT_WORDS = constant('BG_LAYOUT_WORDS');
 export const BG_LAYOUT_WORDS_LEGACY = constant('BG_LAYOUT_WORDS_LEGACY');
 /** Layout entries are packed `>H`. */
 export const LAYOUT_WORD_MAX = constant('LAYOUT_WORD_MAX');
+/**
+ * The blob-local tile index inside a layout word; every bit above it is a
+ * nametable attribute (priority / palette / flips) the consumer preserves.
+ *
+ * NOT enforced by this module — it validates whole words against
+ * `LAYOUT_WORD_MAX` and never looks inside one. It is exported because
+ * `bg-anim-band.ts` renumbers the blob and must rewrite the index half of every
+ * word without disturbing the other half, and because a word of exactly 0 is
+ * the consumer's blank escape rather than a reference to `tiles[0]`.
+ */
+export const LAYOUT_TILE_INDEX_MASK = constant('LAYOUT_TILE_INDEX_MASK');
 
 /** `{ camera_x: 0, camera_y: 1, timer: 2 }` — the SCALAR SOURCE, never an axis. */
 export const BGANIM_DRIVERS: Readonly<Record<string, number>> = Object.freeze(

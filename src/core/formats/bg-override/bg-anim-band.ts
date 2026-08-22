@@ -1,0 +1,589 @@
+// The BgAnim band model — wave-1 surface 4, part 2.
+//
+// The codec next door reads, validates and writes `editor_bg_override.json`.
+// This file is the only thing allowed to CHANGE which bands it carries, and it
+// exists as one module because adding or removing a band is one indivisible
+// edit to three keys.
+//
+// WHY ONE EDIT AND NOT THREE. A band's animated slots are a PREFIX of `tiles`,
+// not an addition to it: bands pack contiguously from slot 0 and DMA over the
+// FRONT of the static blob, so `phases[0] == tiles[slot_base : slot_base + n]`
+// (aeon `inject_editor_bg.py::validate_band_coherence`). Inserting a band
+// therefore inserts n tiles at the front-ward end of the blob, which RENUMBERS
+// every static tile after it, which invalidates every `layout` word that named
+// one. Applying any two of those three and not the third produces a document
+// that passes every consumer assert, bakes cleanly, and ships silently corrupt
+// art — the accident that already destroyed real work once (aeon `dd93a840`,
+// docs/BUGS.md TOOL-01).
+//
+// So the unit of work here is a PLAN: the slot range, plus the exact layout
+// rewrite, computed before anything is touched. The plan is what the undo
+// command stores, and `insertBand`/`removeBand` are exact inverses over it —
+// one function pair used by both the apply and the undo direction, which is the
+// only way an apply and its undo cannot drift apart.
+//
+// EVERY BOUND IS READ FROM THE CONTRACT. `BGANIM_MAX_BANDS`, `BG_TILE_CAPACITY`,
+// `LAYOUT_TILE_INDEX_MASK`, `BGANIM_PHASE_BANKS`, `TILE_PIXELS` and the driver
+// table all come through the codec's loud accessor. Nothing here restates a
+// number, including the ones a reviewer would recognise on sight.
+//
+// THE RENDERED IMAGE IS THE INVARIANT. Adding a band must not change one pixel
+// of what the layout draws: the new art goes in unreferenced, and every cell
+// that named a static tile is rewritten to name the same tile at its new index.
+// That is stronger than "the document still validates" and it is the property
+// the tests assert cell by cell over the real b0e5a661 document.
+
+import {
+  BAND_DEFAULTS,
+  BGANIM_DRIVERS,
+  BGANIM_MAX_BANDS,
+  BGANIM_PHASE_BANKS,
+  BG_LAYOUT_WORDS,
+  BG_TILE_CAPACITY,
+  BgOverrideError,
+  LAYOUT_TILE_INDEX_MASK,
+  TILE_PIXELS,
+  TILE_WIDTH_PX,
+  bandColumnBytes,
+  bandTileCount,
+  cloneBgOverride,
+  validateBgOverride,
+  type BgAnimDriver,
+  type BgOverrideBand,
+  type BgOverrideDocument,
+} from './bg-override';
+
+// ---------------------------------------------------------------------------
+// The editor-facing read model
+// ---------------------------------------------------------------------------
+
+/**
+ * One band as a band editor wants to see it: geometry, driver, rate, and the
+ * slot range it owns, with the consumer's defaults resolved.
+ *
+ * DERIVED AND READ-ONLY. Nothing writes a document back from a view — a view
+ * names only the fields a UI renders, and a document may carry keys Aurora does
+ * not model at all (the sole-writer round-trip). Reconstructing a band from one
+ * of these would drop exactly those keys, which is the silent-erasure class
+ * this whole surface is built against. Edits go through the plan/insert/remove
+ * path below, which copies bands by spread and never by field list.
+ */
+export interface BgAnimBandView {
+  /** Position in `anims`. Bands are ordered, and the order sets the slot base. */
+  index: number;
+  cols: number;
+  rows: number;
+  /** `cols * rows` — the slots this band covers. */
+  tileCount: number;
+  /** `cols * TILE_WIDTH_PX`, as the consumer asserts it. */
+  patternPx: number;
+  /** `rows * TILE_BYTES` — the quantity the runtime shifts, so a power of two. */
+  columnBytes: number;
+  /**
+   * The SCALAR SOURCE the band's step is read from — never an axis. Every band
+   * moves HORIZONTALLY whichever driver it names, `camera_y` included.
+   */
+  driver: BgAnimDriver;
+  /** false = the document leaves `driver` out and the consumer's default applies. */
+  driverIsExplicit: boolean;
+  rateShift: number;
+  /** false = the document leaves `rate_shift` out. */
+  rateShiftIsExplicit: boolean;
+  /** The running cursor. Derived from the bands before it, never trusted from the key. */
+  slotBase: number;
+  /** false = the document leaves `slot_base` out, which is the normal shape. */
+  slotBaseIsExplicit: boolean;
+  /** Banks present. The contract requires exactly `BGANIM_PHASE_BANKS`. */
+  phaseBanks: number;
+}
+
+/** The bands of a document, or the empty list. `anims` is optional and absent-means-none. */
+export function documentBands(doc: BgOverrideDocument): readonly BgOverrideBand[] {
+  return Array.isArray(doc.anims) ? doc.anims : [];
+}
+
+/**
+ * The slot each band starts at, derived by walking the list — NOT read out of
+ * the `slot_base` keys, which are optional, and which the consumer treats as an
+ * assertion about the cursor rather than a placement.
+ *
+ * Returns `bands.length + 1` entries: the last is the total animated slot
+ * count, which is also where the next band would go.
+ */
+export function bandSlotBases(bands: readonly BgOverrideBand[]): number[] {
+  const bases: number[] = [0];
+  for (const band of bands) bases.push(bases[bases.length - 1] + bandTileCount(band));
+  return bases;
+}
+
+/** Every band of a document as a view, with slot bases derived positionally. */
+export function describeBands(doc: BgOverrideDocument): BgAnimBandView[] {
+  const bands = documentBands(doc);
+  const bases = bandSlotBases(bands);
+  return bands.map((band, index) => ({
+    index,
+    cols: band.cols,
+    rows: band.rows,
+    tileCount: bandTileCount(band),
+    patternPx: band.cols * TILE_WIDTH_PX,
+    columnBytes: bandColumnBytes(band),
+    driver: (band.driver ?? BAND_DEFAULTS.driver) as BgAnimDriver,
+    driverIsExplicit: band.driver !== undefined,
+    rateShift: (band.rate_shift ?? BAND_DEFAULTS.rate_shift) as number,
+    rateShiftIsExplicit: band.rate_shift !== undefined,
+    slotBase: bases[index],
+    slotBaseIsExplicit: band.slot_base !== undefined,
+    phaseBanks: Array.isArray(band.phases) ? band.phases.length : 0,
+  }));
+}
+
+/** How many more bands this document may carry. Zero means the ceiling is reached. */
+export function bandsRemaining(doc: BgOverrideDocument): number {
+  return Math.max(0, BGANIM_MAX_BANDS - documentBands(doc).length);
+}
+
+/** How many more static slots the blob can take, ceiling included. */
+export function tileSlotsRemaining(doc: BgOverrideDocument): number {
+  return Math.max(0, BG_TILE_CAPACITY - (Array.isArray(doc.tiles) ? doc.tiles.length : 0));
+}
+
+// ---------------------------------------------------------------------------
+// Constructing a band
+// ---------------------------------------------------------------------------
+
+/** What an author picks when creating a band; everything else is derived. */
+export interface NewBandSpec {
+  cols: number;
+  rows: number;
+  /**
+   * Omit for a blank band (all-zero art in every bank). When given it must
+   * already be `BGANIM_PHASE_BANKS` banks of `cols*rows` tiles of
+   * `TILE_PIXELS` values — the validator says so precisely if it is not.
+   */
+  phases?: number[][][];
+  /** Omit to leave the key out, so the document tracks the consumer's default. */
+  driver?: BgAnimDriver;
+  /** Omit to leave the key out. */
+  rate_shift?: number;
+}
+
+/**
+ * Build a new band.
+ *
+ * IT DOES NOT EMIT DEFAULTS IT WAS NOT GIVEN, and it never emits `slot_base`.
+ * Writing `driver: "camera_x"` into a document that did not ask for it freezes
+ * today's default into a file that should track the contract's, and `slot_base`
+ * is derived from list order — the consumer only ever checks it against the
+ * cursor, so spelling it out buys nothing and can only ever disagree.
+ *
+ * The band is checked through the codec's OWN validator rather than a second
+ * copy of its rules: it is placed at slot 0 of a probe document whose static
+ * blob is the band's own phase-0 art, which is exactly the prefix-identity
+ * shape, so every geometry rule (power-of-two column bytes, `pattern_px`, the
+ * bank count, 4bpp pixel range) is enforced by the one implementation that
+ * already has aeon's citations attached to it.
+ */
+export function createBand(spec: NewBandSpec): BgOverrideBand {
+  const n = bandTileCount(spec);
+  const phases = spec.phases ?? blankPhases(n);
+
+  const band: BgOverrideBand = {
+    cols: spec.cols,
+    rows: spec.rows,
+    pattern_px: spec.cols * TILE_WIDTH_PX,
+    phases,
+  };
+  if (spec.driver !== undefined) band.driver = spec.driver;
+  if (spec.rate_shift !== undefined) band.rate_shift = spec.rate_shift;
+
+  const issues = validateBandInIsolation(band);
+  if (issues.length > 0) {
+    throw new BgOverrideError('refusing to create a BgAnim band', issues);
+  }
+  return band;
+}
+
+/** `BGANIM_PHASE_BANKS` banks of `n` all-zero tiles. Every size read from the contract. */
+function blankPhases(n: number): number[][][] {
+  return Array.from({ length: BGANIM_PHASE_BANKS }, () =>
+    Array.from({ length: n }, () => new Array<number>(TILE_PIXELS).fill(0)));
+}
+
+/**
+ * Run the codec's validator over one band, by building the smallest document
+ * that puts it in a legal position: at slot 0, over a blob that IS its phase-0
+ * art, under a zeroed layout of the contract's own length.
+ *
+ * Issues come back with `anims[0].` prefixes because they came from the real
+ * validator. That is the point — a second, band-only rule list beside it is how
+ * the two drift.
+ */
+function validateBandInIsolation(band: BgOverrideBand): string[] {
+  const phase0 = Array.isArray(band.phases) && Array.isArray(band.phases[0])
+    ? band.phases[0] : [];
+  // A spelled-out slot_base is a claim about the cursor, which is 0 here.
+  const probeBand = band.slot_base === undefined ? band : { ...band, slot_base: 0 };
+  return validateBgOverride({
+    layout: new Array<number>(BG_LAYOUT_WORDS).fill(0),
+    tiles: phase0,
+    anims: [probeBand],
+  });
+}
+
+// ---------------------------------------------------------------------------
+// The plan
+// ---------------------------------------------------------------------------
+
+/**
+ * One layout word that differs between the with-band and without-band states.
+ *
+ * BOTH VALUES ARE RECORDED, not a direction and a delta, so `insertBand` and
+ * `removeBand` are literal inverses: one writes `withBandNt` everywhere, the
+ * other writes `withoutBandNt` everywhere, over the same entry list.
+ */
+export interface BandLayoutRemap {
+  /** Index into `doc.layout`. */
+  index: number;
+  /** The word when the band is present. */
+  withBandNt: number;
+  /** The word when the band is absent. */
+  withoutBandNt: number;
+}
+
+/**
+ * Everything adding or removing one band does to the other two keys, computed
+ * against a document before anything is touched.
+ *
+ * A plan is symmetric: it describes the DIFFERENCE between the with-band and
+ * without-band documents, and says nothing about which direction it is applied
+ * in. That is what lets one plan serve both an add command's apply and its undo.
+ */
+export interface BandSlotPlan {
+  /** Position in `anims`. */
+  bandIndex: number;
+  /** First slot the band covers, derived from the bands ahead of it. */
+  slotBase: number;
+  /** `cols * rows`. */
+  tileCount: number;
+  /** Every layout word that differs between the two states. */
+  layout: BandLayoutRemap[];
+  /**
+   * Layout words naming a tile index past the end of `tiles`. They are left
+   * exactly as they are — there is no tile for them to follow — and counted so
+   * a caller can say so rather than discover it later.
+   */
+  danglingRefs: number;
+  /**
+   * Layout cells that name a slot INSIDE the band. On a removal these are the
+   * cells whose art is being deleted; on an insertion this is always 0, because
+   * the inserted art arrives unreferenced.
+   */
+  referencingCells: number;
+}
+
+/** How a removal treats layout cells that draw the band being removed. */
+export interface RemoveBandOptions {
+  /**
+   * Repoint cells that draw the band to the blank word (0) instead of refusing.
+   *
+   * OFF BY DEFAULT AND DELIBERATELY UNAVOIDABLE. A band exists in order to be
+   * drawn, so removing one usually does destroy visible art — the real
+   * b0e5a661 document draws its two bands in 2560 of its 4096 cells. Blanking
+   * them silently would be an unrequested edit to the author's picture; a bare
+   * refusal with no way through would make the command useless for the only
+   * case that occurs. So the caller states which it meant, and the error says
+   * how many cells are at stake.
+   */
+  blankReferencingCells?: boolean;
+}
+
+function requireOwnedArrays(doc: BgOverrideDocument): { layout: number[]; tiles: number[][] } {
+  if (!Array.isArray(doc.layout) || !Array.isArray(doc.tiles)) {
+    throw new BgOverrideError(
+      'refusing to change the bands of a document whose `layout` or `tiles` is not an array. ' +
+      'The three owned keys are edited as one unit, so a band edit cannot proceed over a ' +
+      'document the codec would not have accepted in the first place.',
+    );
+  }
+  return { layout: doc.layout, tiles: doc.tiles };
+}
+
+/**
+ * The layout rewrite for a tile-index permutation.
+ *
+ * `moved(idx)` returns the tile's new index, or `null` when the tile is going
+ * away. Everything about the word format is derived from the contract, and both
+ * escapes below are the consumer's, not conveniences:
+ *
+ *   • a word of EXACTLY 0 is passed through unrebased by the consumer and draws
+ *     VRAM tile 0. It is not a reference to `tiles[0]`, so it must not be
+ *     renumbered — and a nonzero word must never BECOME 0, because that silently
+ *     turns a drawn cell blank.
+ *   • the bits above `LAYOUT_TILE_INDEX_MASK` are the nametable's own attributes
+ *     (priority, palette line, flips). The consumer preserves them; so does this.
+ */
+function planLayoutRemap(
+  layout: readonly number[],
+  tileCount: number,
+  moved: (idx: number) => number | null,
+  /**
+   * Which side `moved` computes. An insertion maps the CURRENT (without-band)
+   * indices forward; a removal maps the CURRENT (with-band) indices back.
+   * Naming the side is what lets ONE entry shape serve both directions.
+   */
+  movedSide: 'withBand' | 'withoutBand',
+  onRemoved: 'refuse' | 'blank',
+): { entries: BandLayoutRemap[]; danglingRefs: number; referencingCells: number } {
+  const entries: BandLayoutRemap[] = [];
+  let danglingRefs = 0;
+  let referencingCells = 0;
+
+  for (let i = 0; i < layout.length; i++) {
+    const word = layout[i];
+    if (word === 0) continue;                       // the consumer's blank escape
+    const idx = word & LAYOUT_TILE_INDEX_MASK;
+    if (idx >= tileCount) { danglingRefs++; continue; }
+
+    const to = moved(idx);
+    if (to === null) {
+      // Only a removal reaches this: the tile itself is going away.
+      referencingCells++;
+      if (onRemoved === 'refuse') continue;         // counted; the caller is about to be told
+      entries.push({ index: i, withBandNt: word, withoutBandNt: 0 });
+      continue;
+    }
+    if (to === idx) continue;                       // this cell does not move
+
+    if (to > LAYOUT_TILE_INDEX_MASK) {
+      throw new BgOverrideError(
+        `layout[${i}] would need tile index ${to}, past the ${LAYOUT_TILE_INDEX_MASK} a nametable ` +
+        'word can carry. The blob would have to exceed the capacity the plan already checked, so ' +
+        'this is a bug in the plan rather than in the document.',
+      );
+    }
+    const next = (word & ~LAYOUT_TILE_INDEX_MASK) | to;
+    if (next === 0) {
+      throw new BgOverrideError(
+        `layout[${i}] draws tile ${idx} with no attribute bits set, and renumbering it to tile ` +
+        `${to} would make the whole word 0 — which the consumer reads as the BLANK escape, not as ` +
+        'tile 0. The nametable cannot express "tile 0, no attributes", so that cell would silently ' +
+        'go blank. Give it a palette line, or order the bands so the tile does not land on 0.',
+      );
+    }
+    entries.push(movedSide === 'withBand'
+      ? { index: i, withBandNt: next, withoutBandNt: word }
+      : { index: i, withBandNt: word, withoutBandNt: next });
+  }
+  return { entries, danglingRefs, referencingCells };
+}
+
+/**
+ * Plan the insertion of `band` at `bandIndex` (default: after the last band).
+ *
+ * Refuses BEFORE touching anything, on every bound the resulting document could
+ * not satisfy: the band ceiling, the blob capacity, a `slot_base` that disagrees
+ * with where list order puts the band, and a layout word the renumbering could
+ * not express. Each bound is read from the contract.
+ */
+export function planBandInsertion(
+  doc: BgOverrideDocument, band: BgOverrideBand, bandIndex?: number,
+): BandSlotPlan {
+  const { layout, tiles } = requireOwnedArrays(doc);
+  const bands = documentBands(doc);
+  const at = bandIndex ?? bands.length;
+
+  if (!Number.isInteger(at) || at < 0 || at > bands.length) {
+    throw new BgOverrideError(
+      `cannot insert a band at position ${at}: the document has ${bands.length} band(s), so the ` +
+      `legal positions are 0..${bands.length}.`,
+    );
+  }
+  if (bands.length + 1 > BGANIM_MAX_BANDS) {
+    throw new BgOverrideError(
+      `cannot add a ${bands.length + 1}th band: the engine sizes BgAnim_LastStep for at most ` +
+      `BGANIM_MAX_BANDS = ${BGANIM_MAX_BANDS}. Raising that ceiling is a three-file engine change ` +
+      '(two .emp constants plus the emitter cap, drift-gated together), never a writer decision.',
+    );
+  }
+
+  const bandIssues = validateBandInIsolation(band);
+  if (bandIssues.length > 0) {
+    throw new BgOverrideError('refusing to insert an invalid BgAnim band', bandIssues);
+  }
+
+  const n = bandTileCount(band);
+  const slotBase = bandSlotBases(bands)[at];
+
+  if (band.slot_base !== undefined && band.slot_base !== slotBase) {
+    throw new BgOverrideError(
+      `the band spells slot_base ${JSON.stringify(band.slot_base)} but list position ${at} puts it ` +
+      `at slot ${slotBase}. Bands pack contiguously from slot 0 in list order, so slot_base is ` +
+      'derived and may only be spelled out to agree — it cannot place a band.',
+    );
+  }
+  if (tiles.length + n > BG_TILE_CAPACITY) {
+    throw new BgOverrideError(
+      `the band needs ${n} slot(s) at the front of a ${tiles.length}-tile blob, which would make ` +
+      `${tiles.length + n} — over the BG tile capacity of ${BG_TILE_CAPACITY}. Animated slots are a ` +
+      'PREFIX of `tiles` rather than an addition to it, so they are counted here exactly once.',
+    );
+  }
+
+  // Static tiles at or after the insertion point slide up by n; nothing is lost.
+  const { entries, danglingRefs, referencingCells } = planLayoutRemap(
+    layout, tiles.length, idx => (idx < slotBase ? idx : idx + n), 'withBand', 'refuse',
+  );
+  return {
+    bandIndex: at, slotBase, tileCount: n, layout: entries, danglingRefs, referencingCells,
+  };
+}
+
+/**
+ * Plan the removal of the band at `bandIndex`.
+ *
+ * The band's slots leave the blob entirely, which is what makes removal the
+ * exact inverse of insertion. Surviving tiles slide back down, and every layout
+ * word following one follows it.
+ */
+export function planBandRemoval(
+  doc: BgOverrideDocument, bandIndex: number, options: RemoveBandOptions = {},
+): BandSlotPlan {
+  const { layout, tiles } = requireOwnedArrays(doc);
+  const bands = documentBands(doc);
+
+  if (!Number.isInteger(bandIndex) || bandIndex < 0 || bandIndex >= bands.length) {
+    throw new BgOverrideError(
+      `cannot remove band ${bandIndex}: the document has ${bands.length} band(s)` +
+      (bands.length === 0 ? ' — there is nothing to remove.' : `, indexed 0..${bands.length - 1}.`),
+    );
+  }
+
+  const n = bandTileCount(bands[bandIndex]);
+  const slotBase = bandSlotBases(bands)[bandIndex];
+  const blank = options.blankReferencingCells === true;
+
+  const { entries, danglingRefs, referencingCells } = planLayoutRemap(
+    layout, tiles.length,
+    idx => {
+      if (idx < slotBase) return idx;
+      if (idx < slotBase + n) return null;          // inside the band: the art is going away
+      return idx - n;
+    },
+    'withoutBand', blank ? 'blank' : 'refuse',
+  );
+
+  if (referencingCells > 0 && !blank) {
+    throw new BgOverrideError(
+      `band ${bandIndex} covers slots ${slotBase}..${slotBase + n} and ${referencingCells} layout ` +
+      'cell(s) draw them. Removing the band deletes that art, so those cells have nothing left to ' +
+      'name. Aurora will not decide that for you: remove the band with blankReferencingCells to ' +
+      'turn those cells blank (undoable, like any other edit), or repoint them at static tiles ' +
+      'first if the picture is meant to survive.',
+    );
+  }
+
+  return {
+    bandIndex, slotBase, tileCount: n, layout: entries, danglingRefs, referencingCells,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Applying a plan — the two halves, and they are inverses
+// ---------------------------------------------------------------------------
+
+/**
+ * Re-derive the `slot_base` key of every band that spells one.
+ *
+ * Only bands that ALREADY carry the key are touched: injecting it into a band
+ * that left it out would write a derived value into someone's file for no
+ * reason, and the codec's whole posture is that a save of an untouched document
+ * is not a diff.
+ *
+ * The copy is a SPREAD, which is total. A band may carry keys Aurora does not
+ * model; a field-by-field rebuild here is precisely the copier that would drop
+ * them, untested, in a way the round-trip tests next door could not see.
+ */
+function resyncSlotBases(bands: readonly BgOverrideBand[]): BgOverrideBand[] {
+  let cursor = 0;
+  return bands.map(band => {
+    const n = bandTileCount(band);
+    const out = band.slot_base !== undefined && band.slot_base !== cursor
+      ? { ...band, slot_base: cursor }
+      : band;
+    cursor += n;
+    return out;
+  });
+}
+
+/**
+ * Rebuild a document around new owned keys, carrying everything else through.
+ *
+ * The spread is the round-trip: `palette`, `palette_line` and every key Aurora
+ * has never heard of survive because they are never enumerated. An empty band
+ * list DELETES `anims` rather than writing `[]` — the no-bands document has no
+ * such key at all, which is what aeon's own gate asserts of the shipped file
+ * and what the codec refuses to write.
+ */
+function withOwnedKeys(
+  doc: BgOverrideDocument, layout: number[], tiles: number[][], bands: BgOverrideBand[],
+): BgOverrideDocument {
+  const out: BgOverrideDocument = { ...doc, layout, tiles };
+  if (bands.length > 0) out.anims = bands;
+  else delete out.anims;
+  return out;
+}
+
+/**
+ * The with-band document: band spliced into `anims`, its phase-0 art spliced
+ * into `tiles` at `slotBase`, and every planned layout word moved to its
+ * with-band value.
+ *
+ * The art goes in as a DEEP COPY. Sharing the arrays would make `tiles` and
+ * `phases[0]` the same objects, which reads as prefix identity holding for free
+ * and stops being true the moment anything serializes, clones or edits either
+ * side. They are equal by value here because the invariant says they must be,
+ * not because they are the same memory.
+ */
+export function insertBand(
+  doc: BgOverrideDocument, plan: BandSlotPlan, band: BgOverrideBand,
+): BgOverrideDocument {
+  const { layout, tiles } = requireOwnedArrays(doc);
+
+  const bands = documentBands(doc).slice();
+  bands.splice(plan.bandIndex, 0, band);
+
+  const phase0 = Array.isArray(band.phases) ? band.phases[0] : undefined;
+  if (!Array.isArray(phase0) || phase0.length !== plan.tileCount) {
+    throw new BgOverrideError(
+      `cannot insert a band whose phases[0] holds ${Array.isArray(phase0) ? phase0.length : 'no'} ` +
+      `tile(s) where the plan reserves ${plan.tileCount} slot(s). phases[0] IS the static art of ` +
+      'the slots the band covers, so the two cannot differ.',
+    );
+  }
+  const nextTiles = tiles.slice();
+  nextTiles.splice(plan.slotBase, 0, ...cloneBgOverride(phase0));
+
+  const nextLayout = layout.slice();
+  for (const e of plan.layout) nextLayout[e.index] = e.withBandNt;
+
+  return withOwnedKeys(doc, nextLayout, nextTiles, resyncSlotBases(bands));
+}
+
+/** The without-band document. The exact inverse of `insertBand` over the same plan. */
+export function removeBand(doc: BgOverrideDocument, plan: BandSlotPlan): BgOverrideDocument {
+  const { layout, tiles } = requireOwnedArrays(doc);
+
+  const bands = documentBands(doc).slice();
+  bands.splice(plan.bandIndex, 1);
+
+  const nextTiles = tiles.slice();
+  nextTiles.splice(plan.slotBase, plan.tileCount);
+
+  const nextLayout = layout.slice();
+  for (const e of plan.layout) nextLayout[e.index] = e.withoutBandNt;
+
+  return withOwnedKeys(doc, nextLayout, nextTiles, resyncSlotBases(bands));
+}
+
+/** Re-exported so callers of this module do not need two imports to name a driver. */
+export { BGANIM_DRIVERS };

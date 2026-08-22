@@ -102,6 +102,13 @@
       "authorities": [
         "aeon tools/inject_editor_bg.py — `struct.pack_into('>H', nt, (col * ROWS + row) * 2, word)`"
       ]
+    },
+    "LAYOUT_TILE_INDEX_MASK": {
+      "value": 2047,
+      "why": "The low bits of a layout word hold the BLOB-LOCAL tile index; every bit above them is the Genesis nametable's own attribute field (priority / palette line / flips), which the consumer PRESERVES verbatim. A writer that renumbers `tiles` must therefore rewrite `word & LAYOUT_TILE_INDEX_MASK` and leave `word & ~LAYOUT_TILE_INDEX_MASK` alone. THE ESCAPE MATTERS AS MUCH AS THE MASK: the consumer rebases only `if word != 0`, so a layout word of EXACTLY zero is passed through unrebased and renders VRAM tile 0 (blank) — it does NOT mean tiles[0]. A renumbering that turns a nonzero word into zero, or a zero word into nonzero, silently changes what that cell renders while every other assert in the consumer still passes.",
+      "authorities": [
+        "aeon tools/inject_editor_bg.py — the nametable loop: `if word != 0: idx = word & 0x7FF; word = (word & ~0x7FF) | ((idx + BG_TILE_BASE_SLOT) & 0x7FF)`"
+      ]
     }
   },
 
@@ -168,6 +175,7 @@
     "contiguousPacking": "bands pack contiguously from slot 0 in list order; slot_base, when present, must equal the running cursor",
     "insideTheBlob": "slot_base + cols*rows <= len(tiles) for every band",
     "prefixIdentity": "phases[0] == tiles[slot_base : slot_base + cols*rows] — the band's rest state IS the static tiles it covers. This is the invariant that makes anims/tiles/layout ONE unit rather than three separable keys: a violation bakes CLEANLY and ships silently corrupt art, and every other assert in the consumer still passes (aeon docs/BUGS.md TOOL-01; tools/bg_override_io.py's docstring; aeon tools/test_bg_emit.py::TestBgAnimBandCoherence).",
-    "capacity": "len(tiles) <= BG_TILE_CAPACITY. Animated slots are a PREFIX of tiles, NOT an addition — they cost no capacity beyond the array that already holds them (empyrean §5.1, which corrects an earlier `tiles + animated slots <= 448` rule that would have told Aurora the flagship act cannot carry any band at all)."
+    "capacity": "len(tiles) <= BG_TILE_CAPACITY. Animated slots are a PREFIX of tiles, NOT an addition — they cost no capacity beyond the array that already holds them (empyrean §5.1, which corrects an earlier `tiles + animated slots <= 448` rule that would have told Aurora the flagship act cannot carry any band at all).",
+    "layoutTileIndex": "layout[row*64 + col] is a nametable word whose low LAYOUT_TILE_INDEX_MASK bits are a blob-local index into `tiles` and whose remaining bits are attributes the consumer preserves — EXCEPT that a word of exactly 0 is passed through unrebased and renders VRAM tile 0 (blank) rather than tiles[0]. Adding or removing a band renumbers `tiles`, so every nonzero word must be rewritten INDEX-ONLY, and a rewrite that would produce the value 0 is unrepresentable rather than merely different."
   }
 }
