@@ -138,6 +138,27 @@ Each has caught a real defect here.
    citation would have read stale twice for nothing. The same reasoning is why the
    three-way reconciliation compares **bytes**, not versions.
 
+   **Companion clause** (empyrean `e650b96`): look for the artifact at the revision that
+   **pinned** it, not at the tip — a golden path is a moving pointer, and for a vintage
+   artifact the tip is the one revision guaranteed not to have it. Check reachability
+   (`git merge-base --is-ancestor <rev> <tip>`) before depending on a historical blob.
+   *A SHA has a class; a path has a time* — and both failures look like a competent
+   lookup returning a clean answer.
+
+   ⚠ **Aurora-local trap, because two operations here look identical and are not.**
+   Do not "correct" the schema reconciliation ritual to compare at the pinning revision.
+   The two are different questions:
+   - **"Has the contract moved?"** — the ritual. Compare empyrean **at tip** against the
+     vendored copy. Comparing at the pinning revision instead makes it **vacuous**: a
+     pinned blob equals itself by construction, so the check would pass forever and
+     never once detect the thing it exists to detect (bar 11's gate-that-passes-for-the-
+     wrong-reason, in its most convincing costume).
+   - **"What exactly did we pin?"** — recovery/inspection. That one goes to the pinning
+     revision, and the companion clause governs it.
+
+   The tip is right for the first and wrong for the second. Read which question is being
+   asked before choosing the revision.
+
 ## Editor↔engine coordination points
 
 Protocol details Aurora depends on and did not invent. All measured; re-verify before
