@@ -1,0 +1,137 @@
+# Ruling — MapViewport preview posture for effects wave 1
+
+*Ruled 2026-08-22. Closes the design half of ROADMAP §5.1 item 9, which the
+MapViewport measurement (`253cb0e`, 37/37) explicitly refused to conclude: it could not
+separate "no loop because none is needed" from "no loop and one must be ADDED", since
+nothing in the aeon viewport animates and both hypotheses predict the identical zero.*
+
+*Decided by a dispatched fable agent on the measurement plus firsthand source reads, per
+the standing practice of routing design forks to a decider rather than to the owner.
+Every load-bearing citation below was **re-verified by the overseer** against source
+before banking — see §5.*
+
+## 1. The framing was wrong, and that is the ruling's substance
+
+The fork as posed ("static preview / scrub control / running clock") assumes **time is
+the independent variable for BgAnim bands**. It is not, for two of three drivers.
+
+`aeon/engine/level/bg_anim.emp` — band record `$00 dc.w driver`, and the runtime walk at
+`:135-147`:
+
+| driver | value read | time-varying? |
+|---|---|---|
+| `0` `camera_x` | `Camera_X` (integer px, 16.16 high word) | **no** — a function of camera position |
+| `1` `camera_y` | `Camera_Y` | **no** — same |
+| `2` `timer` | `Logic_Tick+2` (low word, lag-immune) | **yes** |
+
+`step = driver_value >> rate_shift`, then masked by `step_mask`. And `camera_x` is the
+**schema default** (`empyrean/docs/AURORA_EFFECTS_SCHEMA.md` §5 table, `driver` row).
+
+So the ruled answer is a **fourth option the fork did not name: driver-faithful
+preview.**
+
+- **Camera bands are clockless *by construction*.** `MapViewport.tsx:574`'s draw-effect
+  dep array already carries `vpX, vpY` — panning already repaints. A camera band's phase
+  is a pure function of the camera, so computing its step inside the existing draw pass
+  is both sufficient and correct.
+- **Only `timer` bands need a clock.**
+
+This is also the *honest* preview. A camera-driven band auto-scrolling on a wall clock
+would teach the author the wrong driver model — precisely the misreading class the
+wave-1 design §5 warns about with its "camera_y is not vertical motion" banner. Labeled-
+approximate licenses an approximate *phase*; it does not license a wrong *driver model*.
+
+## 2. The four questions
+
+**Q1 — is a clock needed?** Yes, but only for `timer` bands. A scrub/bank-stepper is
+worth having independently (checking continuity across the 8 phase banks is static art
+inspection), but the one authoring decision unique to a `timer` band is `rate_shift`, and
+**rate is only judgeable in motion**. The oracle loop is the truth channel at ~2s; a
+slider beats a compile loop for that one parameter.
+
+**Q2 — prerequisite or concurrent?** **Concurrent.** The wave-1 design §5's
+"wave-1 prerequisite on the Aurora lane" is **overdrawn** and is corrected here: nothing
+in the band *editor/writer* work — region marking, bank authoring/import, constraint UX,
+the `anims` writer, the sidecar codec work, scene JSON, `sceneRef` — reads or depends on
+a clock. The real sequencing gate was the meta-gating fix, discharged at `a88db05`. The
+clock is its own small parcel with **one intra-wave ordering edge** (it must land no
+later than the band-preview parcel) and gates nothing else. Do not hold the opener on it.
+
+**Q3 — what shape?** Classic's shape, copied **locally**, not hoisted:
+
+- **Gate:** promote `playAnimatedArt` into `OVERLAY_KEYS_BY_ENGINE.aeon`
+  (`viewStore.ts:52-56`), **OFF by default**. The store key and toggle plumbing already
+  exist and are engine-scoped by design.
+- **Clock:** the `ClassicLevelViewport.tsx:401-431` pattern verbatim — effect mounted only
+  while `playAnimatedArt && timerBands.length > 0`, wall-clock game-frame counter, `t0` at
+  toggle-on so playback is deterministic from game-frame 0, **repaint only when a band's
+  step key changes** (at `rate_shift` 2 that is ~15 repaints/s, not 60), rAF cancelled on
+  toggle-off/unmount.
+- **The zero-repaint idle property is conditioned, not spent.** With the toggle off the
+  effect body returns before scheduling anything — idle cost stays literally zero, exactly
+  as classic's does.
+- **Rejected:** always-on rAF (spends the idle property for nothing); panel-open coupling
+  (playback is view state — an author wants bands running while placing objects beside
+  them — and it invents a new mechanism where a proven toggle exists, one that a CDP
+  harness can already freeze).
+- **"The *shared* play-clock" (wave-1 design §5) is aspirational.** Classic's clock is
+  component-local (`animFrameRef`/`animKeyRef`). There is no shared clock service in the
+  tree. **Do not build one for wave 1.** If a later scene lens previews `SceneDeform` with
+  nonzero `speed` (schema §2.2 — also time-varying), it rides the same local gate. Hoist
+  only if wave 2 proves a cross-viewport sync need.
+
+**Q4 — does the unmeasured palette-recompose path change the answer?** No; correctly
+deferred to wave 2 as booked. Nothing wave 1 writes involves palettes-over-time: §2's
+scene surface is scroll factors/deform/vsplit, §5's bands are tile-pixel phase banks
+previewable by overlay blit, `sceneRef` is a pointer.
+
+**One caution attached to the wave-2 booking:** measure the full-recompose path
+(`SectionRenderer.ts:13`'s `RECOMPOSE_DIRTY_THRESHOLD = 2000`) as booked, but expect the
+wave-2 preview design to **bypass** it — per-tick recompose is the naive route classic's
+animated-art path explicitly refused. The recompose number therefore **bounds the wrong
+implementation**. Keep it as the honesty baseline; do not let it price wave 2.
+
+## 3. Affordability
+
+Licensed by the item-9 measurement **for the repaint half only**: worst cell p95 1.000ms
+= 6.0% of a 16.69ms frame at zoom 0.25, ~0.03ms at working zooms, ~+0.050ms per extra
+full-viewport pass. The band blit (≤4 bands × cols×rows cells, overlay-blitted, never
+through cache invalidation) is a smaller shape of work than the Tile Grid pass. **The
+standing caveat travels:** the bracket excludes React commit, compositor and GPU upload,
+so these are an **upper** bound on available headroom.
+
+## 4. Overseer's addition — the coordinate derivation is the real correctness risk
+
+Not raised by the decider, and it is where a driver-faithful camera preview will actually
+go wrong: **`vpX`/`vpY` are an editor pan in editor space; `Camera_X`/`Camera_Y` are the
+engine's world-pixel camera.** They are not the same quantity — the editor's is
+zoom-scaled and has its own origin. A camera-band preview must **derive** the engine
+camera value the band would see from the editor's pan, and that derivation is load-bearing:
+get it wrong and the preview is confidently, silently wrong about phase *and* about rate.
+
+Per the repo's derived-never-copied bar, that mapping must come from whatever already
+relates editor viewport coordinates to act world pixels — not from a fresh constant. The
+band-preview parcel must state the derivation and test it; the "labeled-approximate"
+posture does **not** cover a wrong camera mapping.
+
+## 5. Verified firsthand by the overseer before banking
+
+- `aeon/engine/level/bg_anim.emp` — the three drivers, their record offsets, the runtime
+  dispatch at `:135-147`, and `step = driver_value >> rate_shift`. **Confirmed exactly.**
+- `empyrean/docs/AURORA_EFFECTS_SCHEMA.md` §5 — `driver` enum and its `"camera_x"`
+  default. **Confirmed.**
+- `MapViewport.tsx:574` — `vpX`, `vpY` present in the draw-effect dep array. **Confirmed.**
+- `ClassicLevelViewport.tsx:401-431` — early-return gate, `t0`-deterministic start,
+  step-keyed repaint, rAF cancel on cleanup. **Confirmed; the described shape is real.**
+- The decider reported grep counts (0 rAF in `MapViewport`, 4 in `ClassicLevelViewport`),
+  `viewStore.ts:52-56` s1-scoping, and `RECOMPOSE_DIRTY_THRESHOLD = 2000` — all consistent
+  with the item-9 measurement, which established them independently.
+
+## 6. Tagged for a foreground pass (agents cannot run these)
+
+1. Once a band-preview prototype exists: re-run the CDP harness at the worst case — 4
+   `timer` bands, playback ON, zoom 0.25 — asserting the **step-keyed repaint rate** (not
+   60Hz) and per-repaint cost. This is the "effects prototype" measurement item 9 already
+   anticipated; the ~+0.050ms per-pass figure must not be used as a planning constant in
+   its place.
+2. The wave-2 palette-recompose measurement stands as booked, with §2's Q4 caveat attached.
