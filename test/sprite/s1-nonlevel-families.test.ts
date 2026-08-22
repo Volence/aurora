@@ -15,6 +15,7 @@ import * as path from 'path';
 import { parseAsmMappings } from '../../src/core/import/asm-mappings';
 import {
   reconstructFromFrames, reconstructFromTilePool, reconstructFromFramePools, composeTilePool,
+  synthesizeGridFrames,
 } from '../../src/core/import/sprite-import';
 import { compressionFor } from '../../src/core/compress';
 import { parseTiles } from '../../src/core/formats/tiles';
@@ -39,6 +40,13 @@ const FAMILIES = Object.entries(S1_NAMED_ART_DOCS).filter(([k]) => k !== 'bossit
  * openDiscoveredSet composition (same core functions, same order).
  */
 function renderLink(link: ObjectArtLink) {
+  if (link.rawGrid) {
+    // Raw-grid rows (Parcel C): no mappings file — frames are synthesized from
+    // the decoded art, exactly as openDiscoveredSet's rawGrid branch does.
+    const tiles = decode(link.artFile, link.compression);
+    const gframes = synthesizeGridFrames(tiles.length, link.rawGrid);
+    return { frames: gframes, recon: reconstructFromFrames(gframes, read(link.artFile), link.compression) };
+  }
   const frames = parseAsmMappings(readText(link.mapAsm));
   if (link.sources?.length || link.frameSources?.length) {
     const slices = [{ bytes: read(link.artFile), compression: link.compression, tileBase: 0 }];
@@ -80,14 +88,46 @@ const FRAME_COUNTS: Record<string, number> = {
   ssresults: 7,       // _maps/SS Result Chaos Emeralds.asm: one per emerald
 };
 
+/**
+ * Raw-grid families (Parcel C): the PIN is the cell geometry (transcribed
+ * from the consumer's index math — see the rows' citations); the frame count
+ * is DERIVED per test from the real file's size, never hand-copied:
+ * count = decoded tiles ÷ (widthCells × heightCells).
+ */
+const GRID_GEOMETRY: Record<string, { widthCells: number; heightCells: number }> = {
+  hudnumbers: { widthCells: 1, heightCells: 2 },      // digit*$40, _inc/HUD Update.asm:336
+  livesnumbers: { widthCells: 1, heightCells: 1 },    // digit*$20, _inc/HUD Update.asm:579
+  levelselectfont: { widthCells: 1, heightCells: 1 }, // 1 nametable entry per glyph, sonic.asm:1961-1963
+};
+
+/** A family's expected frame count: hand-counted mapping tables for (a)-model
+ *  rows, size-derived cells for raw grids. */
+function expectedFrameCount(key: string, link: ObjectArtLink): number {
+  if (link.rawGrid) {
+    const per = link.rawGrid.widthCells * link.rawGrid.heightCells;
+    const tiles = decode(link.artFile, link.compression).length;
+    expect(tiles % per, `${key} art is whole ${link.rawGrid.widthCells}×${link.rawGrid.heightCells} cells`).toBe(0);
+    return tiles / per;
+  }
+  return FRAME_COUNTS[key];
+}
+
 describe.skipIf(!fs.existsSync(S1DIR))('S1 non-level families — every row: real files, real render', () => {
   it('covers exactly the transcribed family set (a new row must bring its pins)', () => {
-    expect(Object.keys(FRAME_COUNTS).sort()).toEqual(FAMILIES.map(([k]) => k).sort());
+    expect([...Object.keys(FRAME_COUNTS), ...Object.keys(GRID_GEOMETRY)].sort())
+      .toEqual(FAMILIES.map(([k]) => k).sort());
+    // Every grid pin matches its row's transcription (and only grid rows pin here).
+    for (const [key, geom] of Object.entries(GRID_GEOMETRY)) {
+      expect(S1_NAMED_ART_DOCS[key].link.rawGrid, `${key} is a rawGrid row`).toEqual(geom);
+    }
+    for (const key of Object.keys(FRAME_COUNTS)) {
+      expect(S1_NAMED_ART_DOCS[key].link.rawGrid, `${key} is a mapped row`).toBeUndefined();
+    }
   });
 
   it.each(FAMILIES)('%s: parses its hand-counted frames and renders the declared frame substantially nonblank', (key, doc) => {
     const { frames, recon } = renderLink(doc.link);
-    expect(frames, `${key} frame count`).toHaveLength(FRAME_COUNTS[key]);
+    expect(frames, `${key} frame count`).toHaveLength(expectedFrameCount(key, doc.link));
     expect(doc.link.frame).toBeLessThan(frames.length);
 
     // The declared frame must be a REAL sprite: its pieces cover N 8x8 cells;
@@ -116,7 +156,9 @@ describe.skipIf(!fs.existsSync(S1DIR))('S1 non-level families — every row: rea
 
   it.each(FAMILIES)('%s: the declared frame\'s tile refs resolve inside its pool (no silent blank pieces)', (key, doc) => {
     const link = doc.link;
-    const frames = parseAsmMappings(readText(link.mapAsm));
+    const frames = link.rawGrid
+      ? synthesizeGridFrames(decode(link.artFile, link.compression).length, link.rawGrid)
+      : parseAsmMappings(readText(link.mapAsm));
     const decl = frames[link.frame];
     // Pool the declared frame draws from: a frameSources range's own file, else
     // primary + sources composite (pool length = last slice base + its tiles).

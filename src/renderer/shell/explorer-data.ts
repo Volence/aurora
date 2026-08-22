@@ -119,7 +119,8 @@ export function classicObjectLibraryItems(
   // existing `doc:sprite:` Explorer branch. Zone-free by construction, so
   // never gated on an open level.
   const namedDocs: ExplorerItemModel[] = Object.entries(S1_NAMED_ART_DOCS).map(([key, d]) => ({
-    id: `doc:sprite:s1:${key}`, label: d.name, hint: 'maps',
+    // Raw-grid rows (Parcel C) have no mappings file — disclose the model.
+    id: `doc:sprite:s1:${key}`, label: d.name, hint: d.link.rawGrid ? 'tiles' : 'maps',
   }));
   const rest: ExplorerItemModel[] = S1_OBJECT_LIST
     .filter((o) => !linkedIds.has(o.id))

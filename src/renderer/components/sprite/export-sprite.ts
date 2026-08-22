@@ -783,6 +783,10 @@ export async function editObjectArtCheckout(id: number | string, zoneKey?: S1Zon
     // open, where dplcFromFile parses it and renderFrames resolves each
     // frame's FRAME-LOCAL tile indices through it.
     dplc: link.dplcAsm,
+    // Raw-grid rows (link.rawGrid — Parcel C: HUD/lives digits, level-select
+    // font) have no mappings file (mapAsm ''): the open synthesizes one frame
+    // per cell of this geometry and records the read-only refusal.
+    rawGrid: link.rawGrid,
     // Composite rows (link.sources) ride into the open as extra pool slices at
     // their transcribed VRAM-relative tile offsets (see ObjectArtExtraSource).
     extraSources: link.sources?.map((s) => ({

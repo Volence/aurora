@@ -326,6 +326,49 @@ describe('editObjectArtCheckout', () => {
     expect(palReads).toEqual([`${DIR}|palette/Special Stage Continue Bonus.bin`]);
   });
 
+  it('HUD Digits (raw grid, Parcel C): rawGrid cell geometry threads into the set, no mappings file, level-free', async () => {
+    // Model (c): artunc/HUD Numbers.unc has NO mappings — the engine indexes
+    // it digit*$40 (2 tiles per 8×16 digit, _inc/HUD Update.asm:336). The row
+    // carries the cell geometry; the open synthesizes the frames.
+    useClassicLevelStore.setState({ ref: null, doc: null });
+    const calls: OpenCall[] = [];
+    __setSpriteSetOpenerForTest(stubOpener(calls, 12));
+
+    const ok = await editObjectArtCheckout('hudnumbers');
+    expect(ok).toBe(true);
+    expect(calls[0].comp).toBe('uncompressed');
+    expect(calls[0].set).toMatchObject({
+      game: 's1',
+      mappings: '', // no mappings file exists for this family
+      art: 'artunc/HUD Numbers.unc',
+      rawGrid: { widthCells: 1, heightCells: 2 },
+    });
+    expect(calls[0].set.dplc).toBeUndefined();
+    expect(useSpriteStore.getState().characterAnims).toEqual([]); // no anim link for named docs
+  });
+
+  it('Level Select Font (raw grid): 8×8 glyph cells + palette LINE 3 of palette/Level Select.bin (levsel_white)', async () => {
+    // Tile_Pal4 = 3<<13 → CRAM line 3 (levsel_white, sonic.asm:2525); the
+    // 128-byte Pal_LevelSel file carries all 4 lines from line 0.
+    useClassicLevelStore.setState({ ref: null, doc: null });
+    const calls: OpenCall[] = [];
+    __setSpriteSetOpenerForTest(stubOpener(calls, 41));
+    const palReads: string[] = [];
+    __setPalFileReaderForTest(async (base, rel) => {
+      palReads.push(`${base}|${rel}`);
+      return new Uint8Array(128); // shape-only: threading is this test's subject
+    });
+
+    const ok = await editObjectArtCheckout('levelselectfont');
+    expect(ok).toBe(true);
+    expect(calls[0].set).toMatchObject({
+      mappings: '',
+      art: 'artunc/Level Select & Debug Text.unc',
+      rawGrid: { widthCells: 1, heightCells: 1 },
+    });
+    expect(palReads).toEqual([`${DIR}|palette/Level Select.bin`]);
+  });
+
   it('a palFile row seeds the standalone palette from the DECLARED LINE of the real palette file', async () => {
     // titlesonic declares pal line 1 (Tile_Pal2 in obGfx, _incObj/0E,0F:28) of
     // palette/Title Screen.bin. Feed the REAL s1disasm bytes through the seam
