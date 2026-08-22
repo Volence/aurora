@@ -17,13 +17,35 @@ export function decodeGenesisColor(word: number): Color {
 }
 
 /**
+ * Snap one 8-bit channel to the hardware's 3-bit level (0-7).
+ *
+ * THE ONE ROUNDING RULE. Anything that works in the Genesis colour space —
+ * the encoder below, the median-cut quantizer, the default ramp — has to agree
+ * on where the eight levels fall, or a colour picked in one place stops being
+ * reachable from another and "the palette already holds it" quietly becomes
+ * false by one level.
+ */
+export function genesisLevel(v: number): number {
+  return Math.round(Math.min(255, Math.max(0, v)) / 255 * 7);
+}
+
+/** Pack three 3-bit levels (0-7 each) into a CRAM word, no 8-bit round trip. */
+export function genesisWordFromLevels(r: number, g: number, b: number): number {
+  return ((b & 7) << 9) | ((g & 7) << 5) | ((r & 7) << 1);
+}
+
+/** The three 3-bit levels a CRAM word holds, `[r, g, b]`, each 0-7. */
+export function genesisLevelsOf(word: number): [number, number, number] {
+  return [(word >> 1) & 7, (word >> 5) & 7, (word >> 9) & 7];
+}
+
+/**
  * Encode an RGB color as a Genesis VDP 16-bit color word (0000BBB0 GGG0RRR0).
  * Each 8-bit channel is clamped and rounded to the nearest 3-bit level (0-7).
  * Inverse of decodeGenesisColor: encode(decode(w)) === w for valid words.
  */
 export function encodeGenesisColor(color: { r: number; g: number; b: number }): number {
-  const to3 = (v: number) => Math.round(Math.min(255, Math.max(0, v)) / 255 * 7);
-  return (to3(color.b) << 9) | (to3(color.g) << 5) | (to3(color.r) << 1);
+  return genesisWordFromLevels(genesisLevel(color.r), genesisLevel(color.g), genesisLevel(color.b));
 }
 
 /**
