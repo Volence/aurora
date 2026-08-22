@@ -55,21 +55,36 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { COMPONENTS, derivePanels, deriveSections, panelName } from './helpers/section-panels';
+import {
+  COMPONENTS, code, derivePanels, deriveOwners, deriveSections, panelName, styleBlocks,
+} from './helpers/section-panels';
 
 const read = (file: string): string => readFileSync(file, 'utf8');
 
+/** The panel FILES a section mounts — section content end to end, so a
+ *  whole-file rule is sound on them. */
 const PANELS = derivePanels();
 const SECTIONS = deriveSections();
 
 /**
- * Flat style blocks, with `${…}` interpolations flattened first so a template
- * literal's braces cannot cut a block in half. Same helper shape as
- * panel-headings.test.ts's — style objects in these files are one level deep.
+ * THE SUBJECT IS A SECTION, NOT A FILE — ROADMAP §5.1 item 18.
+ *
+ * A file that DECLARES a section usually declares other things too: Explorer's
+ * own tree scroller, the setup tab's page scroller, SpriteMode's and CanvasMode's
+ * canvas wrappers. All four are `overflow: auto` with no cap, all four are
+ * correct, and all four sit outside every section in their file. Attributing
+ * them to a section is how a widened guard buys its coverage with false
+ * positives — so an owner file is checked through its sections' own bodies
+ * (`section.styles`), and only a panel file mounted INSIDE a section is checked
+ * whole.
  */
-function styleBlocks(source: string): string[] {
-  return (source.replace(/\$\{[^{}]*\}/g, 'X').match(/\{[^{}]*\}/g) ?? []);
-}
+const OWNERS = deriveOwners();
+
+/** Everything that renders inside `section`: its own body plus the panels it mounts. */
+const sectionStyles = (s: (typeof SECTIONS)[number]): string[] =>
+  [...s.styles, ...s.reaches.flatMap((f) => styleBlocks(code(f)))];
+
+const sectionName = (s: (typeof SECTIONS)[number]): string => `${s.owner} ${s.id}`;
 
 /** A style block that turns itself into a scroller. */
 const SCROLLS = /overflow(?:Y|X)?:\s*['"`](?:auto|scroll)/;
@@ -129,7 +144,7 @@ describe('the column is a flex column with a height its sections can divide', ()
   it('the fixed cap is gone from the tree, not merely unused', () => {
     // It was imported by four panels and is the thing this model replaces; a
     // surviving definition is an invitation to reach for it again.
-    for (const file of [...PANELS, join(COMPONENTS, 'ui/primitives.tsx')]) {
+    for (const file of [...PANELS, ...OWNERS, join(COMPONENTS, 'ui/primitives.tsx')]) {
       expect(read(file), `${panelName(file)} still mentions SECTION_LIST_MAX_HEIGHT`)
         .not.toMatch(/SECTION_LIST_MAX_HEIGHT/);
     }
@@ -143,6 +158,11 @@ describe('a scrolling panel inside a CollapsibleSection cannot grow without boun
     // reachable TRANSITIVELY — no facet mounts it directly.
     expect(PANELS.map(panelName)).toContain('shared/ChunkGrid.tsx');
     expect(PANELS.map(panelName)).toContain('shared/ObjectList.tsx');
+    // And the panel that groups its OWN sections, which the facet-walking
+    // derivation could not see at all (§5.1 item 18).
+    expect(OWNERS.map(panelName)).toContain('effects/EffectsScenePanel.tsx');
+    expect(SECTIONS.filter((s) => s.owner.endsWith('EffectsScenePanel.tsx')).map((s) => s.id))
+      .toEqual(['aeon.effects.scenes', 'aeon.effects.scene', 'aeon.effects.layers', 'aeon.effects.assign']);
   });
 
   it('finds scrollers at all (a regex drift would pass vacuously)', () => {
@@ -186,6 +206,63 @@ describe('a scrolling panel inside a CollapsibleSection cannot grow without boun
     const names = PANELS.map(panelName);
     for (const exempt of VESTIGIAL_SCROLLERS) expect(names).toContain(exempt);
   });
+
+  // The same question asked of a SECTION rather than a file, which is the only
+  // form that reaches a panel drawing its own body: EffectsScenePanel's list
+  // bodies are two style constants in the file that declares the sections, and
+  // the whole-file rule above deliberately does not read that file (see OWNERS).
+  it.each(SECTIONS.map((s) => [sectionName(s), s] as const))(
+    '%s bounds every scroller its own body declares', (_name, section) => {
+      const unbounded = section.styles
+        .filter((b) => SCROLLS.test(b) && !CAPPED.test(b)
+          && !(section.variant === 'list' && SHRINKABLE.test(b)))
+        .map((b) => b.replace(/\s+/g, ' ').trim());
+      expect(unbounded,
+        `${sectionName(section)} (variant=${section.variant}) has an unbounded scroller in its own body`)
+        .toEqual([]);
+    });
+});
+
+// ---------------------------------------------------------------------------
+// THE RULE THE 954px DEFECT ACTUALLY BROKE
+// ---------------------------------------------------------------------------
+// `variant="list"` is a promise with two halves, and ui/CollapsibleSection's own
+// docblock states both: a list section "takes an equal share of whatever the
+// content sections leave AND SCROLLS INSIDE IT". The section supplies the share;
+// the scroller is the body's job. Declaring the variant and never supplying the
+// scroller leaves `overflow: visible` content sized by the data inside a box
+// sized by the column — which draws straight over whatever is beneath it.
+//
+// That is exactly what shipped: both of the effects panel's list sections
+// declared the variant with no scroller, and at eight layers with every packed
+// factor form open the measured overhang was 954px of layer cards over the
+// SECTION ASSIGNMENT rows. Overlapping text, not a density opinion.
+//
+// DERIVED, WITH NO LIST TO FORGET SOMETHING IN. UNBOUNDED_BY_NATURE above names
+// four panels because "the data decides my height" is not a property of source;
+// "this section claims a share of the column" IS one, and it is written at the
+// call site. So every list section is enrolled by declaring itself one.
+describe('a variant="list" section supplies the scroller the variant promises', () => {
+  const LISTS = SECTIONS.filter((s) => s.variant === 'list');
+
+  it('finds list sections at all (an attribute-scan drift would pass vacuously)', () => {
+    expect(LISTS.length).toBeGreaterThanOrEqual(8);
+    // Both engines, and the panel that groups its own sections.
+    expect(LISTS.map((s) => s.id)).toContain('classic.chunks');
+    expect(LISTS.map((s) => s.id)).toContain('aeon.ringPatterns');
+    expect(LISTS.map((s) => s.id)).toContain('aeon.effects.layers');
+  });
+
+  it.each(LISTS.map((s) => [sectionName(s), s] as const))(
+    '%s scrolls inside its share instead of painting over what is below it', (_name, section) => {
+      const scrollers = sectionStyles(section)
+        .filter((b) => SCROLLS.test(b) && (SHRINKABLE.test(b) || CAPPED.test(b)))
+        .map((b) => b.replace(/\s+/g, ' ').trim());
+      expect(scrollers.length,
+        `${sectionName(section)} declares variant="list" — a share of the column — but nothing in it scrolls: `
+        + 'its content is laid out at its natural height inside a box the column sized, so it draws over the sections beneath it')
+        .toBeGreaterThan(0);
+    });
 });
 
 // The mirror guard. The rule above only sees a scroller that EXISTS, and only
@@ -213,9 +290,9 @@ describe('the panels whose item count is unbounded by nature are mounted as list
   it.each(UNBOUNDED_BY_NATURE)('%s is only ever mounted in a variant="list" section', (name) => {
     // Named, not derived — being data-driven is not a property of the source.
     const hosts = sectionsReaching(join(COMPONENTS, name));
-    expect(hosts.length, `${name} is mounted in no facet section at all`).toBeGreaterThan(0);
+    expect(hosts.length, `${name} is mounted in no titled section at all`).toBeGreaterThan(0);
     const content = hosts.filter((s) => s.variant !== 'list');
-    expect(content.map((s) => `${s.facet}:${s.id}`),
+    expect(content.map((s) => `${s.owner}:${s.id}`),
       `${name} is mounted in a content section, which gives it no height to shrink into`).toEqual([]);
   });
 
