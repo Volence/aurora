@@ -588,7 +588,11 @@ interface DebugApi {
    * activation owns the document lifecycle). Resolves true when the object's
    * sprite-doc ended up checked out.
    */
-  editObjectArt(id: number): Promise<boolean>;
+  /** Open an object's sprite doc (numeric id) or a NAMED art doc (string key
+   *  from S1_NAMED_ART_DOCS, e.g. 'gameover') — the same tab-open the sprite
+   *  list / Explorer rows drive, so harnesses can exercise level-free named
+   *  opens even while the zone-gated sprite list is unmounted. */
+  editObjectArt(id: number | string): Promise<boolean>;
   /**
    * The checked-out sprite document's timeline state, read from the store (not
    * from any loader's return value): the anim picker's contents with full
@@ -618,6 +622,13 @@ interface DebugApi {
      */
     frameHashes: string[];
   };
+  /**
+   * The sprite editor's active palette source + colors — lets a harness assert
+   * a checkout SEEDED the right colors (e.g. a named family's palFile line —
+   * Pal_Title line 1 for titlesonic), not merely that pixels exist. `mode` is
+   * the store's paletteMode; colors are the 16 standalone RGBA entries.
+   */
+  spritePalette(): { mode: string; colors: { r: number; g: number; b: number; a: number }[] };
 }
 
 /** The file's fnv1a as 8 hex digits — the frameHashes encoding. Mirrored in
@@ -681,7 +692,8 @@ export function installDebugHooks(): void {
     canvas: installCanvasProbe(),
     setPaintColor: (v) => useArtStore.getState().setSelectedColor(v),
     editObjectArt: async (id) => {
-      const { editObjectArt } = await import('./components/sprite/export-sprite');
+      const { editObjectArt, editNamedArtDoc } = await import('./components/sprite/export-sprite');
+      if (typeof id === 'string') return editNamedArtDoc(id);
       return editObjectArt(id);
     },
     spriteState: () => {
@@ -701,6 +713,10 @@ export function installDebugHooks(): void {
         }),
         frameHashes: s.frames.map((f) => frameHash(f.data)),
       };
+    },
+    spritePalette: () => {
+      const s = useSpriteStore.getState();
+      return { mode: s.paletteMode, colors: s.standalonePalette.map((c) => ({ ...c })) };
     },
   };
   (window as unknown as { __dbg: DebugApi }).__dbg = dbg;
