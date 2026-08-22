@@ -26,6 +26,7 @@ import {
   PRIORITY_FILL, PRIORITY_EDGE,
   OCCLUSION_GHOST_TINT, OCCLUSION_GHOST_ALPHA,
 } from '../../canvas/canvas-colors';
+import { fitLabelInContext, labelBudget } from '../../canvas/label-fit';
 import type { WorldRect } from '../../../core/level-classic/object-sprite';
 
 /** S1 ring object id — expands into a visible ring group (Ring_Main rule). */
@@ -37,6 +38,20 @@ export const RING_OBJ_ID = 0x25;
  * hit-test (the grab region) so grabbing matches what's drawn.
  */
 export const GHOST_MARKER_BOUNDS = { width: 24, height: 16, originX: 12, originY: 8 };
+
+/**
+ * Side of the red anchor box drawn for an object with no sprite and no ghost
+ * definition — the `$XX` hex fallback. Named so the box and the label budget
+ * measured against it in `drawObjects` cannot drift apart.
+ */
+export const HEX_MARKER_SIZE = 16;
+
+/**
+ * `ctx.lineWidth` both marker boxes here are stroked at, in SCREEN pixels — the
+ * caller multiplies by `invZoom` to get world units, so their label budgets are
+ * screen-space quantities too. See `canvas/label-fit.ts` for what a budget is.
+ */
+export const MARKER_STROKE_PX = 1;
 
 function solidityFill(solidity: number): string {
   switch (solidity) {
@@ -516,15 +531,29 @@ export function drawObjects(
       ctx.strokeRect(gl, gt, gw, gh);
       ctx.setLineDash([]);
       ctx.fillStyle = GHOST_LABEL;
-      ctx.fillText(s1ObjectName(obj.id), ox, oy + 3 * invZoom);
+      // MEASURED (ROADMAP §5.1 item 17). These names are object NAMES, not hex:
+      // "Conveyor Belt Controller" measures 95.999px at an 8px monospace and was
+      // being drawn straight through a 24px box — a 4x overflow, and worse the
+      // further you zoom out, because the font is screen-constant while the box
+      // is not. Elide to what the box can hold; draw nothing when that is nothing.
+      const gfit = fitLabelInContext(ctx, s1ObjectName(obj.id),
+        labelBudget(gw, MARKER_STROKE_PX * invZoom));
+      if (gfit.text) ctx.fillText(gfit.text, ox, oy + 3 * invZoom);
       selRect = { left: gl, top: gt, width: gw, height: gh };
     } else {
+      const hh = HEX_MARKER_SIZE / 2;
       ctx.fillStyle = OBJECT_BOX_FILL;
-      ctx.fillRect(ox - 8, oy - 8, 16, 16);
+      ctx.fillRect(ox - hh, oy - hh, HEX_MARKER_SIZE, HEX_MARKER_SIZE);
       ctx.strokeStyle = OBJECT_BOX_STROKE;
-      ctx.strokeRect(ox - 8, oy - 8, 16, 16);
+      ctx.strokeRect(ox - hh, oy - hh, HEX_MARKER_SIZE, HEX_MARKER_SIZE);
       ctx.fillStyle = OBJECT_LABEL;
-      ctx.fillText(obj.id.toString(16).toUpperCase().padStart(2, '0'), ox, oy + 3 * invZoom);
+      // Two hex digits fit this box comfortably at zoom 1 (8px of glyph in 14px
+      // of room) — but the font is screen-constant and the box is not, so by
+      // zoom 0.5 the same two digits are 16 world px wide in a 16 world px box
+      // and by zoom 0.25 they are double it. Measured like the others.
+      const hfit = fitLabelInContext(ctx, obj.id.toString(16).toUpperCase().padStart(2, '0'),
+        labelBudget(HEX_MARKER_SIZE, MARKER_STROKE_PX * invZoom));
+      if (hfit.text) ctx.fillText(hfit.text, ox, oy + 3 * invZoom);
     }
     if (isSel) {
       // Highlight box around the drawn frame, drawn last so it sits on top.
