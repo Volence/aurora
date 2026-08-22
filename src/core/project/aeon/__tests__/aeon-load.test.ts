@@ -3,6 +3,7 @@ import type { FileAccess } from '../../adapter';
 import { loadAeonProject, dominantPaletteLine } from '../load';
 import { serializeNametable } from '../../../formats/s4-nametable';
 import { serializeTiles } from '../../../export/tile-dedup';
+import { serializeSectionMeta } from '../../../formats/section-meta';
 import { SECTION_TILES_WIDE, SECTION_TILES_HIGH } from '../../../model/s4-types';
 import type { Tile } from '../../../model/s4-types';
 
@@ -62,6 +63,13 @@ function fixtureFiles(): Map<string, Uint8Array> {
   return files;
 }
 
+// Meta-sidecar fixture. The well-formed text comes from the serializer rather
+// than being spelled out, so it stays the exact shape a save would have left.
+const META_PATH = 'data/ojz/act1/section_0.meta.json';
+const META_REFS = { bgLayoutRef: 'bg-cave', paletteRef: 'pal-dusk' };
+const WELL_FORMED_META = serializeSectionMeta(META_REFS)!;
+const MALFORMED_META = WELL_FORMED_META.slice(0, -1);  // truncated hand-edit
+
 describe('loadAeonProject', () => {
   it('loads config, zones, sections, objects and the object library from FileAccess', async () => {
     const r = await loadAeonProject(memFa(fixtureFiles()), '/proj');
@@ -111,6 +119,52 @@ describe('loadAeonProject', () => {
     const r = await loadAeonProject(memFa(files), '/proj');
     const section = r.project.zones[0].acts[0].sections[0]!;
     expect(section.objects).toEqual([]);
+    expect(section.unreadable).toBeUndefined();
+    expect(r.notices).toEqual([]);
+  });
+
+  it('loads the meta sidecar refs when it parses', async () => {
+    const files = fixtureFiles();
+    files.set(META_PATH, new TextEncoder().encode(WELL_FORMED_META));
+    const r = await loadAeonProject(memFa(files), '/proj');
+    const section = r.project.zones[0].acts[0].sections[0]!;
+    expect(section.bgLayoutRef).toBe(META_REFS.bgLayoutRef);
+    expect(section.paletteRef).toBe(META_REFS.paletteRef);
+    expect(section.unreadable).toBeUndefined();
+    expect(r.notices).toEqual([]);
+  });
+
+  /**
+   * R7 for the meta sidecar. A malformed sidecar was indistinguishable from an
+   * absent one: both refs fell back to their createSection defaults with no
+   * notice, and all-null is exactly the state that makes save.ts overwrite the
+   * file with `{bgLayoutRef: null, paletteRef: null}`.
+   */
+  it('flags a present-but-unparseable meta.json instead of loading it as defaults', async () => {
+    const files = fixtureFiles();
+    // The instrument really is malformed, and really does carry the refs it is
+    // about to lose — a test over an all-null sidecar would prove nothing.
+    expect(() => JSON.parse(MALFORMED_META)).toThrow();
+    expect(MALFORMED_META).toContain(META_REFS.bgLayoutRef);
+    expect(MALFORMED_META).toContain(META_REFS.paletteRef);
+    files.set(META_PATH, new TextEncoder().encode(MALFORMED_META));
+
+    const r = await loadAeonProject(memFa(files), '/proj');
+    const section = r.project.zones[0].acts[0].sections[0]!;
+    expect(section.bgLayoutRef).toBeNull();               // nothing to show
+    expect(section.paletteRef).toBeNull();
+    expect(section.unreadable).toContain('meta.json');    // but not "nothing there"
+    expect(r.notices.join(' ')).toMatch(/meta\.json exists but could not be read/);
+  });
+
+  it('says nothing about a section with no meta sidecar', async () => {
+    // The ordinary case: an all-default section has no sidecar at all.
+    const files = fixtureFiles();
+    expect(files.has(META_PATH)).toBe(false);
+    const r = await loadAeonProject(memFa(files), '/proj');
+    const section = r.project.zones[0].acts[0].sections[0]!;
+    expect(section.bgLayoutRef).toBeNull();
+    expect(section.paletteRef).toBeNull();
     expect(section.unreadable).toBeUndefined();
     expect(r.notices).toEqual([]);
   });

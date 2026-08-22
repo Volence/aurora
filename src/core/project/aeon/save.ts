@@ -115,14 +115,22 @@ export async function buildAeonSavePlan(
     // nulls) so a previously-saved ref that was cleared in-session cannot
     // resurrect on the next load. An exists probe gates that overwrite so
     // the common all-default case creates no files.
-    const metaJson = serializeSectionMeta({ bgLayoutRef: section.bgLayoutRef, paletteRef: section.paletteRef });
-    const metaPath = `${prefix}.meta.json`;
-    if (metaJson !== null) {
-      const metaBytes = new TextEncoder().encode(metaJson);
-      files.push({ path: metaPath, bytes: metaBytes });
-    } else if (await fa.exists(metaPath)) {
-      const clearedBytes = new TextEncoder().encode(JSON.stringify({ bgLayoutRef: null, paletteRef: null }, null, 2));
-      files.push({ path: metaPath, bytes: clearedBytes });
+    //
+    // The clearing branch needs the understood() gate as much as the write
+    // does — more, in fact: a sidecar the load could not parse leaves both
+    // refs at their defaults, which is indistinguishable here from refs the
+    // user cleared, and the exists probe then finds the very file that was
+    // never read.
+    if (understood('meta.json')) {
+      const metaJson = serializeSectionMeta({ bgLayoutRef: section.bgLayoutRef, paletteRef: section.paletteRef });
+      const metaPath = `${prefix}.meta.json`;
+      if (metaJson !== null) {
+        const metaBytes = new TextEncoder().encode(metaJson);
+        files.push({ path: metaPath, bytes: metaBytes });
+      } else if (await fa.exists(metaPath)) {
+        const clearedBytes = new TextEncoder().encode(JSON.stringify({ bgLayoutRef: null, paletteRef: null }, null, 2));
+        files.push({ path: metaPath, bytes: clearedBytes });
+      }
     }
   }
 
