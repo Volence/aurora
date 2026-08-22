@@ -128,7 +128,7 @@
       "required": false,
       "ownership": "own",
       "cite": "inject_editor_bg.py — `anims = data.get('anims')`; absent or falsy -> the disabled stub (band_count = 0)",
-      "emptyIsADefect": "aeon tools/test_bg_emit.py::TestBgAnimBandCoherence::test_live_override_file_is_coherent_if_it_has_bands asserts `assertNotIn('anims', live)` when there are no bands, with the reason 'an empty `anims` key is neither absent nor authored'. So an empty array is refused in both directions here."
+      "emptyIsUnauthored": "aeon tools/test_bg_emit.py::TestBgAnimBandCoherence::test_live_override_file_is_coherent_if_it_has_bands asserts `assertNotIn('anims', live)` when there are no bands, with the reason 'an empty `anims` key is neither absent nor authored'. That binds the WRITER: Aurora never emits an empty array. It does NOT bind the reader — inject_editor_bg.py bakes such a document as the disabled stub without complaint, so refusing to open it would make Aurora unable to load a file its own consumer accepts. The reader therefore DROPS the key and reports it in notices; the refusal lives on the write path, which is the boundary that can enforce it. The single exception is an empty `anims` beside a legacy `anim`: the consumer's fallback is keyed on `anims is None`, so an empty array suppresses it and the band is silently dropped — there the emptiness is load-bearing and normalizing would be a guess, so the reader refuses."
     },
     "anim": {
       "required": false,

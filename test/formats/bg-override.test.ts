@@ -297,6 +297,38 @@ describe('the legacy singular `anim` key', () => {
     expect(() => parseBgOverride(text)).toThrow(/would silently ignore one of them/);
   });
 
+  /**
+   * The `anims: []` + legacy `anim` carve-out. The consumer's fallback is
+   * `if anims is None and data.get('anim')` — keyed on ABSENCE — so an empty
+   * array suppresses it and the band is silently dropped. Emptiness is
+   * load-bearing here, which is exactly why the benign normalization must not
+   * reach it: dropping the empty key would silently promote the legacy band,
+   * and keeping it would silently discard it. Both are guesses.
+   */
+  it('refuses an EMPTY anims beside a legacy anim, in its own words', () => {
+    const doc = minimal();
+    const text = JSON.stringify({ ...doc, anims: [], [LEGACY_ANIM_KEY]: band(doc.tiles, 0, 2, 4) });
+    expect(() => parseBgOverride(text)).toThrow(/carries an EMPTY "anims" alongside the legacy/);
+    expect(() => parseBgOverride(text)).toThrow(/would be SILENTLY DROPPED/);
+    // ...and it does NOT read as the other accident: the two messages are
+    // distinct because the two accidents are.
+    expect(() => parseBgOverride(text)).not.toThrow(/would silently ignore one of them/);
+  });
+
+  it('CONTROL: a NON-empty anims beside a legacy anim gets the other message', () => {
+    const doc = withOneBand();
+    const text = JSON.stringify({ ...doc, [LEGACY_ANIM_KEY]: band(doc.tiles, 0, 2, 4) });
+    expect(() => parseBgOverride(text)).toThrow(/would silently ignore one of them/);
+    expect(() => parseBgOverride(text)).not.toThrow(/EMPTY "anims"/);
+  });
+
+  it('CONTROL: an empty anims with NO legacy anim is benign and normalizes', () => {
+    // The attribution check for the pair above: the refusal is caused by the
+    // COMBINATION, not by the empty array on its own.
+    const text = JSON.stringify({ ...minimal(), anims: [] });
+    expect(() => parseBgOverride(text)).not.toThrow();
+  });
+
   it('refuses a falsy legacy key instead of reading it as no-bands', () => {
     const text = JSON.stringify({ ...minimal(), [LEGACY_ANIM_KEY]: null });
     expect(() => parseBgOverride(text)).toThrow(/holds ONE band object/);
@@ -306,6 +338,74 @@ describe('the legacy singular `anim` key', () => {
     const doc = minimal();
     (doc as Record<string, unknown>)[LEGACY_ANIM_KEY] = band(doc.tiles, 0, 2, 4);
     expect(() => serializeBgOverride(doc)).toThrow(/refusing to write the legacy "anim" key/);
+  });
+});
+
+// ── The empty-`anims` normalization (read) vs refusal (write) ───────────────
+
+describe('an empty `anims` key is unauthored, not invalid', () => {
+  /**
+   * The ruling: refusing this on READ would make Aurora unable to open a
+   * document `inject_editor_bg.py` bakes perfectly well (`if anims:` is false,
+   * so it emits the disabled stub), leaving an author no recourse but to
+   * hand-edit JSON — the outcome sole ownership exists to prevent. It is the
+   * same SHAPE as the legacy `anim` upgrade: a fact about the document that
+   * changes on the next save. So the reader normalizes and reports; the writer
+   * refuses, which is the boundary that can actually enforce it.
+   */
+  it('parses as the no-bands document, dropping the key', () => {
+    const { doc } = parseBgOverride(JSON.stringify({ ...minimal(), anims: [] }));
+    expect('anims' in doc).toBe(false);
+  });
+
+  it('says so in a notice rather than doing it silently', () => {
+    const { notices } = parseBgOverride(JSON.stringify({ ...minimal(), anims: [] }));
+    expect(notices).toHaveLength(1);
+    expect(notices[0]).toMatch(/carried an empty "anims" key/);
+    expect(notices[0]).toMatch(/neither absent nor authored/);
+    expect(notices[0]).toMatch(/saving will drop the key/);
+    // Not alarming about a loss that did not happen.
+    expect(notices[0]).toMatch(/No band was lost: there was none/);
+  });
+
+  it('CONTROL: a document with no `anims` key at all is silent', () => {
+    // Without this, "a notice was emitted" is equally true of a reader that
+    // notices every document.
+    const { doc, notices } = parseBgOverride(JSON.stringify(minimal()));
+    expect('anims' in doc).toBe(false);
+    expect(notices).toEqual([]);
+  });
+
+  it('CONTROL: a document with real bands keeps them and stays silent', () => {
+    const { doc, notices } = parseBgOverride(JSON.stringify(withOneBand()));
+    expect(doc.anims).toHaveLength(1);
+    expect(notices).toEqual([]);
+  });
+
+  it('round-trips: the normalized document saves, where the raw one would not', () => {
+    // The whole point of normalizing rather than refusing — a file that opens
+    // must also be saveable, or the trap has only moved.
+    const raw = { ...minimal(), anims: [] } as BgOverrideDocument;
+    expect(() => serializeBgOverride(raw)).toThrow(/neither absent nor authored/);
+    const { doc } = parseBgOverride(JSON.stringify(raw));
+    const out = JSON.parse(serializeBgOverride(doc));
+    expect('anims' in out).toBe(false);
+  });
+
+  it('leaves every other key alone while normalizing', () => {
+    const src = { ...minimal(), anims: [], palette: [1, 2], future_thing: { a: 1 } };
+    const { doc } = parseBgOverride(JSON.stringify(src));
+    const out = JSON.parse(serializeBgOverride(doc)) as Record<string, unknown>;
+    const expected = Object.keys(src).filter(k => k !== 'anims').sort();
+    expect(Object.keys(out).sort()).toEqual(expected);
+    expect(out.future_thing).toEqual({ a: 1 });
+    expect(out.palette).toEqual([1, 2]);
+  });
+
+  it('the write-side refusal points at the reader rather than blaming the author', () => {
+    const doc = minimal();
+    doc.anims = [];
+    expect(issuesOf(doc)).toMatch(/did not come through the reader/);
   });
 });
 
@@ -426,12 +526,14 @@ describe('band invariants — each one is a document that would bake CLEANLY', (
     expect(issuesOf(doc)).toBe('');
   });
 
-  it('refuses an `anims` key that is present but empty', () => {
+  it('refuses an `anims` key that is present but empty — on the WRITE path', () => {
     // aeon's own gate asserts the no-bands document has NO `anims` key: "an
-    // empty `anims` key is neither absent nor authored".
+    // empty `anims` key is neither absent nor authored". That binds the writer.
+    // The reader's half of this is the normalization suite below.
     const doc = minimal();
     doc.anims = [];
     expect(issuesOf(doc)).toMatch(/neither absent nor authored/);
+    expect(() => serializeBgOverride(doc)).toThrow(/neither absent nor authored/);
   });
 });
 

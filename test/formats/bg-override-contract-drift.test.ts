@@ -53,7 +53,7 @@ const CONTRACT_PATH = resolve(
   __dirname, '../../src/core/formats/bg-override/bganim-consumer-contract.json',
 );
 const CONTRACT_TEXT = readFileSync(CONTRACT_PATH, 'utf8');
-const CONTRACT_SHA256 = '3836d05d46708b95c0cb6284e802a144b3e6ef3a24480eb07c46f8f780d527cb';
+const CONTRACT_SHA256 = 'ccb822a1f5dab8f297a5683983f0738d103c278945ace6654e1d491c625a0c88';
 
 describe('the vendored contract is the one we pinned', () => {
   it('matches the pinned content hash', () => {

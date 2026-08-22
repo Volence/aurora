@@ -18,10 +18,19 @@
 //              through untouched and NOT validated: judging a key you do not
 //              own means refusing a file its owner considers fine, over a
 //              constraint the drift rule lets them change without telling you
-//   upgrade    `anim` (legacy singular) — read as `anims[0]`, never re-emitted
+//   normalize  `anim` (legacy singular) — read as `anims[0]`, never re-emitted;
+//              and an EMPTY `anims`, which is unauthored rather than invalid —
+//              dropped on read. Both are reported in `notices`, never silent,
+//              and both are refused on WRITE, which is the boundary that can
+//              actually enforce them. Refusing either on READ would make Aurora
+//              unable to open a document its own consumer bakes fine, leaving
+//              an author no recourse but hand-editing JSON.
 //   refuse     nothing on key identity; only on the invariants below, each of
 //              which describes a document that would BAKE CLEANLY and ship
-//              corrupt
+//              corrupt — plus the one combination where a normalization would
+//              be a GUESS: an empty `anims` beside a legacy `anim`, where the
+//              consumer's absence-keyed fallback does not fire and the band is
+//              silently dropped
 //
 // WHY THE THREE OWNED KEYS ARE ONE UNIT AND NOT THREE. Bands pack contiguously
 // from slot 0 and DMA over the FRONT of the static blob, so a band's phase-0 art
@@ -490,10 +499,17 @@ export function validateBgOverride(doc: unknown): string[] {
     if (!Array.isArray(anims)) {
       issues.push('anims must be an array of bands');
     } else if (anims.length === 0) {
+      // WRITE-SIDE ONLY. `parseBgOverride` never reaches this: it drops an empty
+      // `anims` and says so in a notice, because the consumer bakes such a
+      // document perfectly well and refusing to OPEN it would leave an author
+      // with no recourse but hand-editing JSON — the exact outcome sole
+      // ownership exists to prevent. The invariant is enforced here instead,
+      // at the boundary that can actually enforce it.
       issues.push(
         'anims is present but empty. An empty `anims` key is neither absent nor authored — the ' +
         'no-bands document has NO `anims` key at all (that is what the consumer\'s own gate ' +
-        'asserts of the shipped file). Delete the key rather than emptying it.',
+        'asserts of the shipped file). parseBgOverride drops it on read, so a document still ' +
+        'carrying it did not come through the reader.',
       );
     } else {
       if (anims.length > BGANIM_MAX_BANDS) {
@@ -555,6 +571,20 @@ export function parseBgOverride(text: string): BgOverrideParseResult {
   const notices: string[] = [];
 
   if (LEGACY_ANIM_KEY in doc) {
+    // THE CARVE-OUT, and it is TWO different accidents, so it gets two messages.
+    // The consumer's fallback is `if anims is None and data.get('anim')`, keyed
+    // on ABSENCE — an empty `anims` is present, so the fallback does not fire.
+    if (Array.isArray(doc.anims) && doc.anims.length === 0) {
+      throw new BgOverrideError(
+        `${BG_OVERRIDE_CONSUMER_PATH} carries an EMPTY "anims" alongside the legacy ` +
+        `"${LEGACY_ANIM_KEY}". The consumer falls back to "${LEGACY_ANIM_KEY}" only when "anims" is ` +
+        'ABSENT, and an empty array is present — so it would bake the disabled stub and your band ' +
+        'would be SILENTLY DROPPED. An empty `anims` alone is benign and the reader normalizes it ' +
+        `away, but not here: normalizing it would mean guessing whether you meant the ` +
+        `"${LEGACY_ANIM_KEY}" band or meant to have no bands. Delete whichever key is not the one ` +
+        'you meant.',
+      );
+    }
     if ('anims' in doc) {
       throw new BgOverrideError(
         `${BG_OVERRIDE_CONSUMER_PATH} carries BOTH "anims" and the legacy "${LEGACY_ANIM_KEY}". The ` +
@@ -578,6 +608,28 @@ export function parseBgOverride(text: string): BgOverrideParseResult {
       `${BG_OVERRIDE_CONSUMER_PATH} used the legacy single-band "${LEGACY_ANIM_KEY}" key. It has been ` +
       'read as "anims": [ … ]; the band is unchanged, but saving this document will rewrite the key, ' +
       'because writers must not emit the legacy spelling.',
+    );
+  }
+
+  // An `anims` key that is present but empty is UNAUTHORED, not invalid. The
+  // consumer bakes it as the disabled stub without complaint, so refusing to
+  // OPEN such a file would make Aurora unable to load a document its own
+  // consumer accepts — leaving an author no recourse but to hand-edit JSON,
+  // which is what sole ownership exists to prevent. It is the same SHAPE as the
+  // legacy `anim` upgrade above: a fact about the document that changes on the
+  // next save. So it is normalized here and reported, and the write-side
+  // refusal in validateBgOverride stays as the backstop for a document that did
+  // not come through this reader.
+  //
+  // (The `anims: []` + legacy `anim` combination is NOT this case and threw
+  // above — there the emptiness is load-bearing and normalizing would be a
+  // guess.)
+  if (Array.isArray(doc.anims) && doc.anims.length === 0) {
+    delete doc.anims;
+    notices.push(
+      `${BG_OVERRIDE_CONSUMER_PATH} carried an empty "anims" key. An empty array is neither absent ` +
+      'nor authored — the no-bands document has no "anims" key at all — so it has been read as a ' +
+      'document with no bands, and saving will drop the key. No band was lost: there was none.',
     );
   }
 
