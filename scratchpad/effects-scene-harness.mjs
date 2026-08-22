@@ -44,11 +44,21 @@
 
 import { spawn } from 'node:child_process';
 import { writeFileSync, mkdirSync, existsSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname } from 'node:path';
 import * as http from 'node:http';
 
 const PORT = Number(process.env.PORT ?? 9391);
+// ROOT defaults to the tree this harness FILE lives in, never a hardcoded path.
+// A pinned worktree path is a landmine: run from the main clone it silently
+// serves the WORKTREE's dist/, so a "re-verified on the merged tree" run is
+// actually re-verifying the branch — the exact thing the landing rule forbids,
+// wearing the costume of having followed it. (Caught at landing, 2026-08-22:
+// the overseer rebuilt the merged tree, ran this, and got the branch's build.)
+// Deriving it from import.meta.url means the harness and the tree it tests
+// cannot come apart.
 const ROOT = process.env.AURORA_ROOT
-  ?? '/home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a318550ad976debb1';
+  ?? dirname(dirname(fileURLToPath(import.meta.url)));
 // The electron BINARY and the app ROOT are separate on purpose. A git worktree
 // has no node_modules of its own (node resolution walks up to the main clone's),
 // so a harness run from a worktree has to take the binary from wherever it is
