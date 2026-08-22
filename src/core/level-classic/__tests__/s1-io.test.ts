@@ -224,13 +224,72 @@ function decodeFor(kind: 'nem' | 'eni' | 'kos', b: Uint8Array): Uint8Array {
   return kosinskiDecompress(b);
 }
 
+/**
+ * The set of files a save with EVERY domain dirty must emit, derived from the
+ * resolved paths rather than counted: writeS1Level emits each pristine tile
+ * file, the seven single-path domains, and one buffer per distinct palette
+ * component file. Used as the per-act non-vacuity gate — without it a case
+ * whose writer emitted nothing would sail through the comparison loop below
+ * with zero iterations and report green.
+ */
+function expectedWrittenPaths(p: ResolvedLevelPaths): Set<string> {
+  return new Set<string>([
+    ...p.tiles,
+    p.blocks,
+    p.chunks,
+    p.fg,
+    p.bg,
+    p.objpos,
+    p.startpos,
+    p.colind,
+    ...p.palette,
+  ]);
+}
+
+/**
+ * ONE CASE PER ACT, DELIBERATELY — this is the fix for the load-dependent
+ * flake, not a stylistic split.
+ *
+ * As a single 18-act loop this spent ~986ms of a 5000ms default budget (5.1x
+ * headroom), and under CPU oversubscription that headroom was not enough: the
+ * run blew the wall clock and reported `Test timed out in 5000ms`, an error
+ * that is indistinguishable from a real regression. Per act the same work costs
+ * 40-71ms (measured across all 18; the spread tracks tile/block counts), so each
+ * case now carries 70-125x headroom against the SAME untouched default timeout.
+ * No magic number was introduced and none was raised; the load sensitivity is
+ * gone structurally, and a genuinely slow act now names itself instead of
+ * merging into one timeout.
+ */
 describe('s1-io (c) zero-edit round-trip (all 18 acts)', () => {
-  it.skipIf(!S1_PRESENT)('re-encodes every domain identically (decode-identical for compressed)', async () => {
-    const fa = realFs(S1DIR);
-    for (const { zone, act } of allActs()) {
-      const state = await readS1Level(act, realPaths(act), fa);
+  const roundTripCases = allActs().map(({ zone, act }) => ({
+    name: `${zone} act${act.act}`,
+    zone,
+    act,
+  }));
+
+  /** Incremented by each case body; the coverage gate below reads it. */
+  let actsExercised = 0;
+
+  it.skipIf(!S1_PRESENT).each(roundTripCases)(
+    '$name re-encodes every domain identically (decode-identical for compressed)',
+    async ({ zone, act }) => {
+      // Counted here, at the top: the gate below asks "did every act's body
+      // RUN", not "did every act pass". A genuine round-trip regression must
+      // show up as the failing acts and nothing else — not as an extra, and
+      // false, "an act was dropped".
+      actsExercised++;
+      const fa = realFs(S1DIR);
+      const paths = realPaths(act);
+      const state = await readS1Level(act, paths, fa);
       const result = writeS1Level(state, ALL_DIRTY);
       expect(result.errors, `${zone} act${act.act}: ${JSON.stringify(result.errors)}`).toEqual([]);
+
+      // Non-vacuity: the comparison loop below must have something to compare,
+      // and it must cover every domain the save claims to write.
+      expect(
+        new Set(result.files.map((f) => f.path)),
+        `${zone} act${act.act}: written file set`,
+      ).toEqual(expectedWrittenPaths(paths));
 
       for (const f of result.files) {
         const disk = readDisk(f.path);
@@ -246,7 +305,17 @@ describe('s1-io (c) zero-edit round-trip (all 18 acts)', () => {
           );
         }
       }
-    }
+    },
+  );
+
+  // Registered last, so it runs after every case above (vitest runs a file's
+  // tests in declaration order). Splitting a loop into N cases can silently
+  // drop acts — a case list built wrong registers fewer tests and the suite
+  // still reads green. This counts the bodies that actually ran.
+  it.skipIf(!S1_PRESENT)('exercised every act in the profile — none silently dropped', () => {
+    const declared = s1Profile.zones.reduce((n, z) => n + z.acts.length, 0);
+    expect(roundTripCases.length).toBe(declared);
+    expect(actsExercised).toBe(declared);
   });
 });
 
