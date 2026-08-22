@@ -76,20 +76,45 @@
 // discriminators, and saying so is the point (object-label-harness's precedent:
 // 23/23 with one row disclosed as passing on master too).
 //
-//   [i*] INSTRUMENT rows. Anti-vacuous. They assert the harness saw its
-//        subject: the exact expected title set (i1), non-zero painted heights
-//        (i2), a real shared scroll container (i3), a window of the size asked
-//        for (i4), and — where the subject is data-driven — that the data is
-//        actually there: the Explorer's ~102-row Object Library (E.i0) and the
-//        canvas commit plan's 16 per-chunk rows (C.i0). A green claim row
-//        underneath a red i-row means nothing.
+//   [V.set] THE VIEWPORT ROW, once, at setup. Did the page actually become the
+//        size this run asked for, and by which mechanism. It exists because the
+//        first controller run of this harness measured two "different" sizes at
+//        an identical 1400x872 — SCREEN sized the xvfb display, not the window.
+//        If neither mechanism takes, the run is BLOCKED on the size axis and
+//        says so; it does not quietly measure whatever it got.
 //
-//        E.i0 exists because of a trap this harness fell into while being
-//        written: the Explorer's groups are `defaultCollapsed` and the obvious
-//        way to open them all is the filter box (`collapsedOverride`), but a
-//        query also FILTERS the items — so the widest tree in the app would
-//        have been measured at its narrowest and reported as comfortable. The
-//        groups are opened by clicking their real headers, unfiltered, instead.
+//   [i*] INSTRUMENT rows, per surface. Anti-vacuous, and now GATING (below):
+//        i0  a SENTINEL read from the STORE, not the DOM — "is this surface
+//            really mounted", answered by something no leftover paint can
+//            satisfy;
+//        i0b where the subject is data-driven, that the data is there: the
+//            Explorer's ~102-row Object Library, the commit plan's 16 rows;
+//        i1  the exact expected title set, TRANSCRIBED FROM THE CALL SITES;
+//        i2  non-zero painted heights and a real pointer toggle;
+//        i3  one shared scroll container with a real height;
+//        i4  the viewport has not DRIFTED from what V.set achieved.
+//
+//        i0 AND i1 ARE THE FIX FOR THIS HARNESS'S OWN WORST DEFECT. The first
+//        version read the expected titles OFF THE SCREEN and then asserted the
+//        screen matched them — an i1 that compared the subject to itself and
+//        could not go red for any reason. In the controller's run CanvasMode
+//        never opened (the New Canvas dialog's Create is disabled until a name
+//        is typed, and the harness typed none), so the block measured
+//        SpriteMode's column a second time under CanvasMode's name and i1
+//        reported green. Only C.i0 noticed. Titles are now literals; the
+//        sentinel is now the store.
+//
+//        E.i0b exists for a second trap: the Explorer's groups are
+//        `defaultCollapsed` and the obvious way to open them all is the filter
+//        box (`collapsedOverride`), but a query also FILTERS the items — so the
+//        widest tree in the app would have been measured at its narrowest and
+//        reported as comfortable. The groups are opened by clicking their real
+//        headers, unfiltered, instead.
+//
+//   THE GATE. If any instrument row for a surface fails, EVERY claim row and
+//        report for that surface is NOT MEASURED — never red, never green. A
+//        verdict with no subject is not evidence, and the previous run made the
+//        reader reconstruct by hand which failures were downstream of which.
 //
 //   [c1] NO SECTION PAINTS OVER THE ONE BELOW IT.
 //        ** DOES NOT DISCRIMINATE ON THESE FOUR SURFACES AS THEY STAND. **
@@ -119,14 +144,37 @@
 //        overscroll-behavior, so chaining should work — but that has never been
 //        checked on a real wheel event, which is the only place it is
 //        observable. NOT MEASURED (not passed) where there is no inner list, or
-//        where the outer column has nothing to scroll.
+//        where the outer column has nothing to scroll, or where no wheel event
+//        reached the page at all.
+//
+//        C.c4 MUST BE "NOT MEASURED" WHENEVER CanvasMode IS GENUINELY ON
+//        SCREEN, and that is a source fact rather than an expectation: there is
+//        no `overflow: auto/scroll` anywhere inside CanvasMode's three sections
+//        (grep of components/canvas: only `canvasWrap`, which is the canvas area
+//        outside the Panel, and the import dialog; PaletteGrid.tsx:173 documents
+//        "No overflow: auto anywhere below"). So a RED C.c4 is proof the surface
+//        under measurement was not CanvasMode — which is exactly what it was in
+//        the first controller run.
+//
+//        The row now reports the armed element's identity, how many wheel events
+//        the page saw, whether anything cancelled them, and the inner scroller's
+//        own movement, because "the column did not move" is otherwise compatible
+//        with three different findings. Ticks are 400ms apart: Chromium LATCHES
+//        a scroll sequence to the element the first event hit, and ticks close
+//        together can stay latched to the exhausted inner box and look exactly
+//        like a dead-end. That is this row's most likely reason to report a
+//        false red, and it is spaced out and disclosed rather than hoped away.
 //
 //   [c5] THE COLUMN'S NATURAL HEIGHT IS A PROPERTY OF ITS CONTENT, NOT OF THE
 //        WINDOW. Cross-run self-check (`--compare`): the summed natural section
 //        heights must agree within 4% between the two SCREEN sizes. If they do
 //        not, every px number below is window-dependent and the "minimum window
 //        height" finding is not a number at all. Reported NOT MEASURED from a
-//        single run — never quietly skipped.
+//        single run — never quietly skipped — AND it now REFUSES outright when
+//        the two summaries were taken at the same viewport height, which is
+//        exactly what the xvfb defect produced. Until V.set passes at two
+//        genuinely different sizes, c5 is NOT a discriminating row, and it is
+//        listed as earned-back rather than assumed.
 //
 //   [r*] REPORTS. No verdict — these ARE the measurement. [r4] is the one the
 //        ruling turns on:
@@ -150,6 +198,9 @@
 //   # the two window sizes, in either order; each writes a JSON summary
 //   SCREEN=1680x1050 node scratchpad/section-column-harness.mjs
 //   SCREEN=1280x800  node scratchpad/section-column-harness.mjs
+//   # SCREEN sets the PAGE VIEWPORT (verified by V.set), not the xvfb display.
+//   # XVFB=WxH sets the virtual display; it only has to be big enough to hold
+//   # the viewport, and defaults to 1920x1200.
 //   # 800 tall is a 13" laptop with OS chrome; 1050 is what every other harness
 //   # in this directory uses, so these numbers are comparable to theirs.
 //
@@ -185,13 +236,80 @@ const ELECTRON = `${ROOT}/node_modules/.bin/electron`;
 const S1DIR = '/home/volence/sonic_hacks/s1disasm';
 const AEONDIR = '/home/volence/sonic_hacks/aeon';
 const SHOTS = `${ROOT}/scratchpad/shots-section-column`;
+/**
+ * THE VIEWPORT THE MEASUREMENT IS TAKEN AT — and it is NOT the xvfb screen.
+ *
+ * The first controller run of this harness found the defect: `-screen 0 WxH`
+ * sizes the virtual DISPLAY, and Electron opens its window at its own configured
+ * size regardless. Both invocations produced a 1400x872 window, so `--compare`
+ * would have compared two runs at the SAME size and called it a cross-size
+ * check, and the PLANT=list-no-scroller split (predicted red at 1280x800, green
+ * at 1680x1050) could never occur. The `i4` rows caught it and failed loudly
+ * rather than letting the geometry rows report numbers from a window nobody
+ * asked for — which is the anti-vacuous discipline working, and is why this fix
+ * exists rather than a quiet re-run.
+ *
+ * So SCREEN now drives the PAGE VIEWPORT, set explicitly and VERIFIED (see
+ * `setViewport`), and XVFB drives the virtual display, which only has to be big
+ * enough to hold it.
+ */
 const SCREEN = process.env.SCREEN ?? '1680x1050';
 const [SCREEN_W, SCREEN_H] = SCREEN.split('x').map(Number);
+const XVFB = process.env.XVFB ?? '1920x1200';
+const [XVFB_W, XVFB_H] = XVFB.split('x').map(Number);
 const PLANT = process.env.PLANT ?? '';
+/** Filled in by `setViewport`: what we actually got, and how. */
+const VIEWPORT = { requested: { w: SCREEN_W, h: SCREEN_H }, achieved: null, mechanism: 'none' };
 const SUMMARY = (s) => `${ROOT}/scratchpad/section-column-${s}.json`;
 /** x past which the Explorer ends and a right-hand / page column begins. The
  *  Explorer is a fixed 240px wide (Explorer.tsx styles.root). */
 const PAGE_X = 280;
+
+// --------------------------------------------------------------------------
+// WHAT EACH SURFACE MUST BE SHOWING — READ OUT OF SOURCE, NOT OFF THE SCREEN
+// --------------------------------------------------------------------------
+// THE DEFECT THIS REPLACES, and it was mine. The first version of this harness
+// read the titles off the screen and then asserted the screen matched them — an
+// `i1` that compared the subject to itself and could not go red for any reason.
+// In the controller's run, CanvasMode never opened, and `C.i1` reported a clean
+// green against SpriteMode's titles while `C.i0` (a real anti-vacuous row) was
+// the only thing that noticed. That is the exact defect class this repo keeps
+// finding, one level inside the instrument built to catch it.
+//
+// So the expected sets are now LITERALS transcribed from the call sites, and
+// each surface additionally carries a SENTINEL read from the STORE — not the
+// DOM — so "is this surface even mounted" is answered by something that cannot
+// be satisfied by whatever happens to be painted.
+const T_SPRITE_ALWAYS = ['Mapping', 'Sprite', 'Open — import a sprite to edit or convert', 'Palette'];
+const T_SPRITE_AEON = ['Export to project', 'Load engine character'];
+// `${zone.toUpperCase()} objects` is data-driven (S1ObjectSection.tsx:93) — the
+// restored act decides the zone, so this one is a matcher rather than a literal.
+const T_SPRITE_CLASSIC = [/^[A-Z]{2,4} objects$/, 'Shared objects', 'Save to source (S1)'];
+const T_CANVAS = ['Canvas', 'Palette', 'Commit to level'];
+/**
+ * The section every SpriteMode configuration wheels over, named ONCE.
+ *
+ * S7 and S9 measure the same column, so they must wheel over the same box or a
+ * disagreement between them is about the harness rather than about the app.
+ * `${zone} objects` is where S1ObjectSection's maxHeight-240 row list lives
+ * (S1ObjectSection.tsx:132) — the deepest real nested scroller on any of the
+ * four surfaces.
+ */
+const SPRITE_WHEEL_SECTION = /^[A-Z]{2,4} objects$/;
+const T_EXPLORER_CLASSIC = ['Levels', 'Object Library', 'Canvases', 'Tools'];
+
+/** Does `titles` match `want` exactly, as a set, allowing RegExp entries? */
+function titlesMatch(titles, want) {
+  if (titles.length !== want.length) return false;
+  const left = [...titles];
+  for (const w of want) {
+    const i = left.findIndex((t) => (w instanceof RegExp ? w.test(t) : t === w));
+    if (i === -1) return false;
+    left.splice(i, 1);
+  }
+  return left.length === 0;
+}
+const showWant = (want) => JSON.stringify(want.map((w) => (w instanceof RegExp ? w.source : w)));
 
 /** CollapsibleSection.tsx's own floor. Read out of the source so r4's
  *  counterfactual uses the app's number rather than one re-typed here — if the
@@ -290,6 +408,103 @@ async function shot(c, name) {
   const { data } = await c.send('Page.captureScreenshot', { format: 'png' });
   writeFileSync(`${SHOTS}/${name}.png`, Buffer.from(data, 'base64'));
   console.log(`        shot -> scratchpad/shots-section-column/${name}.png`);
+}
+
+// --------------------------------------------------------------------------
+// MAKING THE PAGE THE SIZE THIS RUN ASKED FOR
+// --------------------------------------------------------------------------
+/**
+ * Two mechanisms, tried best-first, and EVERY ONE IS VERIFIED BY READING
+ * `window.innerWidth/innerHeight` BACK. Nothing here trusts a CDP call that
+ * returned without throwing — that is precisely how the xvfb defect survived a
+ * whole run.
+ *
+ *   1. `Browser.setWindowBounds` on the BROWSER endpoint. A real OS window
+ *      resize: real scrollbars, real chrome, nothing emulated. Electron does not
+ *      implement the whole Browser domain, so this may simply throw.
+ *   2. `Emulation.setDeviceMetricsOverride` on the page. The layout viewport
+ *      becomes exactly WxH and the page reflows. For measuring CSS column
+ *      geometry this is equivalent — every piece of chrome in this app is
+ *      in-page — but it is EMULATED, and any run that lands here must say so,
+ *      because overlay-vs-classic scrollbar width and OS window chrome are
+ *      the two things it does not reproduce.
+ *
+ * If neither takes, the run is BLOCKED on the size axis: `V.set` fails, every
+ * size-dependent row reports NOT MEASURED, and nothing silently degrades to
+ * "measured at whatever we got".
+ */
+async function setViewport(c, browserWsUrl, targetId, w, h) {
+  const read = () => c.json('({ w: window.innerWidth, h: window.innerHeight, dpr: window.devicePixelRatio })');
+  const before = await read();
+  const fits = (v) => Math.abs(v.w - w) <= 4 && Math.abs(v.h - h) <= 4;
+
+  // --- 1. a real window resize ------------------------------------------
+  if (browserWsUrl && targetId) {
+    try {
+      const b = cdp(browserWsUrl);
+      await b.ready;
+      const { windowId } = await b.send('Browser.getWindowForTarget', { targetId });
+      // normal first: a maximized/fullscreen window ignores bounds.
+      await b.send('Browser.setWindowBounds', { windowId, bounds: { windowState: 'normal' } }).catch(() => {});
+      await b.send('Browser.setWindowBounds', { windowId, bounds: { width: w, height: h } });
+      b.close();
+      await sleep(1200);
+      const after = await read();
+      if (fits(after)) {
+        VIEWPORT.achieved = after; VIEWPORT.mechanism = 'Browser.setWindowBounds';
+        return VIEWPORT;
+      }
+      // A real resize that lands short by the OS frame is still a REAL resize —
+      // accept it and record the delta rather than emulating on top of it.
+      if (Math.abs(after.w - before.w) > 4 || Math.abs(after.h - before.h) > 4) {
+        note('V.bounds', 'Browser.setWindowBounds moved the window but not to the exact size asked for',
+          `asked ${w}x${h}, got ${after.w}x${after.h} (was ${before.w}x${before.h}) — `
+          + 'falling through to the emulation path so the two SCREEN runs differ by a known amount');
+      }
+    } catch (e) {
+      note('V.bounds', 'Browser.setWindowBounds is not available on this Electron build', e.message);
+    }
+  }
+
+  // --- 2. emulate the layout viewport -----------------------------------
+  try {
+    await c.send('Emulation.setDeviceMetricsOverride', {
+      width: w, height: h, deviceScaleFactor: 1, mobile: false,
+    });
+    await sleep(1200);
+    const after = await read();
+    if (fits(after)) {
+      VIEWPORT.achieved = after; VIEWPORT.mechanism = 'Emulation.setDeviceMetricsOverride';
+      return VIEWPORT;
+    }
+    note('V.emul', 'Emulation.setDeviceMetricsOverride did not take',
+      `asked ${w}x${h}, page reports ${after.w}x${after.h}`);
+  } catch (e) {
+    note('V.emul', 'Emulation.setDeviceMetricsOverride threw', e.message);
+  }
+
+  VIEWPORT.achieved = await read();
+  VIEWPORT.mechanism = 'none';
+  return VIEWPORT;
+}
+
+/** Re-assert the viewport after anything that can drop it (a Page.reload drops
+ *  a device-metrics override on some builds). Verified, like the first time. */
+async function reassertViewport(c) {
+  if (VIEWPORT.mechanism === 'none') return;
+  const now = await c.json('({ w: window.innerWidth, h: window.innerHeight })');
+  if (Math.abs(now.w - SCREEN_W) <= 4 && Math.abs(now.h - SCREEN_H) <= 4) return;
+  if (VIEWPORT.mechanism === 'Emulation.setDeviceMetricsOverride') {
+    await c.send('Emulation.setDeviceMetricsOverride', {
+      width: SCREEN_W, height: SCREEN_H, deviceScaleFactor: 1, mobile: false,
+    }).catch(() => {});
+    await sleep(900);
+  }
+  const after = await c.json('({ w: window.innerWidth, h: window.innerHeight })');
+  if (Math.abs(after.h - SCREEN_H) > 4) {
+    note('V.drift', 'the viewport drifted and could not be re-asserted',
+      `now ${after.w}x${after.h}, wanted ${SCREEN_W}x${SCREEN_H} — the i4 rows after this point will fail`);
+  }
 }
 
 // --------------------------------------------------------------------------
@@ -437,6 +652,56 @@ window.__sc = (() => {
   A.setScrollTop = (v) => { const el = A.containerEl(); if (!el) return null; el.scrollTop = v; return el.scrollTop; };
   A.outerScrollTop = () => { const el = A.containerEl(); return el ? el.scrollTop : null; };
 
+  /**
+   * Instrument the wheel BEFORE dispatching any, so a red c4 can name its cause.
+   * A capture-phase listener on window sees every wheel event whatever
+   * stopPropagation does, and re-reading defaultPrevented in a BUBBLE-phase
+   * listener on window (the last thing to run) is how we learn whether anything
+   * in between cancelled it. Without this, "the column did not move" is
+   * compatible with the app preventing default, with Chromium latching the
+   * scroll sequence to the inner box, and with a genuine dead-end — three
+   * different findings behind one red row.
+   */
+  A.watchWheel = () => {
+    if (A._wheelOff) A._wheelOff();
+    const st = { seen: 0, cancelled: 0, cancelledBy: null, target: null };
+    const cap = (ev) => {
+      st.seen++;
+      if (st.target === null) {
+        const t = ev.target;
+        st.target = t && t.tagName
+          ? t.tagName.toLowerCase() + (t.className && typeof t.className === 'string'
+              ? '.' + t.className.split(/\s+/)[0] : '')
+            + ' "' + ((t.textContent || '').trim().slice(0, 24)) + '"'
+          : String(t);
+      }
+    };
+    const bub = (ev) => {
+      if (ev.defaultPrevented) {
+        st.cancelled++;
+        if (st.cancelledBy === null) st.cancelledBy = 'something between capture and bubble on window';
+      }
+    };
+    window.addEventListener('wheel', cap, { capture: true, passive: true });
+    window.addEventListener('wheel', bub, { capture: false, passive: true });
+    A._wheel = st;
+    A._wheelOff = () => {
+      window.removeEventListener('wheel', cap, { capture: true });
+      window.removeEventListener('wheel', bub, { capture: false });
+    };
+    return true;
+  };
+  A.wheelReport = () => {
+    const st = A._wheel || { seen: 0, cancelled: 0, cancelledBy: null, target: null };
+    const el = A._armed;
+    return {
+      seen: st.seen, cancelled: st.cancelled, cancelledBy: st.cancelledBy,
+      target: st.target,
+      innerTopAfter: el ? Math.round(el.scrollTop) : null,
+      innerMax: el ? el.scrollHeight - el.clientHeight : null,
+    };
+  };
+
   A.scrollIntoViewByTitle = (t) => {
     const sec = A.sectionEl(t);
     if (!sec) return null;
@@ -465,12 +730,25 @@ window.__sc = (() => {
     if (!sec) return { armed: false, why: 'no such section' };
     const inner = innerScrollers(sec).filter((e) => e.scrollHeight > e.clientHeight + 1);
     if (!inner.length) return { armed: false, why: 'no inner scroller with anything to scroll' };
-    const el = inner[inner.length - 1];
+    /* THE TALLEST OVERFLOW, not the last in DOM order. "Shared objects" holds
+       TWO maxHeight-240 lists (the row list and the named-art-docs list), and
+       taking whichever came last made which box got wheeled depend on the data.
+       Two configurations measuring the same column must arm the same element or
+       a disagreement between them is about this harness, not about the app. */
+    inner.sort((a, b) => (b.scrollHeight - b.clientHeight) - (a.scrollHeight - a.clientHeight));
+    const el = inner[0];
     el.scrollTop = el.scrollHeight;
+    A._armed = el;
     const r = el.getBoundingClientRect();
     const outer = scrollAncestors(el)[0] || null;
     return {
       armed: true,
+      // Named, so a red row says WHAT it wheeled over rather than only that it
+      // wheeled. overflow: auto on a box nobody thinks of as a list is the
+      // most likely way this row arms the wrong element.
+      what: el.tagName.toLowerCase()
+        + (typeof el.className === 'string' && el.className ? '.' + el.className.split(/\s+/)[0] : '')
+        + ' [maxHeight ' + getComputedStyle(el).maxHeight + ']',
       innerTop: Math.round(el.scrollTop), innerMax: el.scrollHeight - el.clientHeight,
       x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2),
       outerTop: outer ? Math.round(outer.scrollTop) : null,
@@ -518,8 +796,19 @@ window.__sc = (() => {
   };
   A.dlg = () => document.querySelector('[role="dialog"][aria-label="New Canvas"]');
   A.dlgNums = () => { const d = A.dlg(); return d ? [...d.querySelectorAll('input[type=number]')] : []; };
+  A.dlgName = () => { const d = A.dlg(); return d ? d.querySelector('input:not([type=number])') : null; };
+  A.dlgSelect = () => { const d = A.dlg(); return d ? d.querySelector('select') : null; };
   A.dlgCreate = () => { const d = A.dlg(); return d
     ? [...d.querySelectorAll('button')].find((b) => /^Creat/.test(b.textContent.trim())) : null; };
+  /* The dialog opens with an EMPTY name and a disabled Create (new-canvas.ts:77).
+     A harness that fills only the size clicks a dead button and creates nothing,
+     which is exactly what the first controller run did. */
+  A.dlgSnapshot = () => { const d = A.dlg(); if (!d) return null;
+    const cr = A.dlgCreate(); const nm = A.dlgName();
+    return { name: nm ? nm.value : null, nums: A.dlgNums().map((n) => n.value),
+             profile: A.dlgSelect() ? A.dlgSelect().value : null,
+             createDisabled: cr ? cr.disabled : null,
+             createText: cr ? cr.textContent.trim() : null }; };
   A.paletteInput = () => [...document.querySelectorAll('input')].find(
     (i) => i.placeholder && /command|search|type/i.test(i.placeholder) && vis(i)) || null;
   /** Anti-vacuous readout for CanvasMode: CommitPlanView draws one "chunk N"
@@ -604,15 +893,29 @@ async function measureSurface(c, tag, label, expect, opts = {}) {
     }
   }
 
+  // ---- i0: THE SENTINEL, read from the STORE, not from the DOM -----------
+  // "Is this surface even mounted?" answered by something no amount of leftover
+  // paint can satisfy. In the controller's first run CanvasMode never opened and
+  // the harness measured SpriteMode's column a second time under CanvasMode's
+  // name; this row is what makes that impossible to repeat.
+  let sentinelOk = true;
+  if (expect.sentinel) {
+    const v = await c.json(expect.sentinel.expr).catch((e) => ({ threw: e.message }));
+    sentinelOk = !!expect.sentinel.ok(v);
+    check(`${tag}.i0`, `${label}: the surface is really mounted — ${expect.sentinel.desc}`,
+      sentinelOk, JSON.stringify(v));
+  }
+
   // ANTI-VACUOUS for a data-driven tree: the Explorer's Object Library carries
   // ~102 named S1 objects (s1-objects.ts's S1_OBJECT_LIST), and a run that
   // measured it filtered, collapsed or before the project loaded would report a
-  // short, tidy column that no user ever sees. `rowFloor` says how many rows
-  // must be on screen for the geometry below to be about the real thing.
+  // short, tidy column that no user ever sees.
+  let rowsOk = true;
   if (opts.rowFloor) {
     const rows = await c.evalExpr('window.__sc.explorerRows().length');
-    check(`${tag}.i0`, `${label}: the tree is fully populated (>= ${opts.rowFloor} rows on screen)`,
-      rows >= opts.rowFloor, `${rows} clickable rows in the Explorer column`);
+    rowsOk = rows >= opts.rowFloor;
+    check(`${tag}.i0b`, `${label}: the tree is fully populated (>= ${opts.rowFloor} rows on screen)`,
+      rowsOk, `${rows} clickable rows in the Explorer column`);
   }
 
   await applyPlant(c, tag);
@@ -624,10 +927,20 @@ async function measureSurface(c, tag, label, expect, opts = {}) {
 
   // ---- instrument rows --------------------------------------------------
   const titles = secs.map((s) => s.title);
-  const want = expect.titles;
-  const same = titles.length === want.length && want.every((t) => titles.includes(t));
-  check(`${tag}.i1`, `${label}: exactly the ${want.length} expected sections are on screen`, same,
-    `saw ${titles.length}: ${JSON.stringify(titles)}\n        wanted ${want.length}: ${JSON.stringify(want)}`);
+  const want = expect.titles ?? null;
+  let titlesOk = true;
+  if (want) {
+    titlesOk = titlesMatch(titles, want);
+    check(`${tag}.i1`, `${label}: exactly the ${want.length} sections this surface declares are on screen`,
+      titlesOk,
+      `saw ${titles.length}: ${JSON.stringify(titles)}\n        wanted ${want.length}: ${showWant(want)}`);
+  } else {
+    // Data-driven group titles (the setup tab's are zone ids). A literal set is
+    // not available, so the row asserts a floor AND leans on the sentinel above.
+    titlesOk = secs.length >= (expect.minCount ?? 1);
+    check(`${tag}.i1`, `${label}: at least ${expect.minCount ?? 1} data-driven sections are on screen`,
+      titlesOk, `${secs.length}: ${JSON.stringify(titles)}`);
+  }
   check(`${tag}.i2`, `${label}: every section header is painted (h > 0) and its toggle is a pointer`,
     secs.length > 0 && secs.every((s) => s.header.h > 0 && s.toggleIsPointer),
     secs.map((s) => `${s.title}=${s.header.h}px/${s.toggleIsPointer}`).join(' ') || '(no sections)');
@@ -635,12 +948,27 @@ async function measureSurface(c, tag, label, expect, opts = {}) {
     !!cont && cont.shared === true && cont.clientH > 0,
     cont ? `shared=${cont.shared} clientH=${cont.clientH} scrollH=${cont.scrollH} `
       + `overflowY=${cont.overflowY} overflow=${cont.overflow} outerScrollers=${cont.outerScrollers}` : 'no container');
-  check(`${tag}.i4`, `${label}: the window is the size this run asked for (SCREEN=${SCREEN})`,
-    Math.abs(win.innerH - SCREEN_H) <= 80 && Math.abs(win.innerW - SCREEN_W) <= 80,
-    `innerW=${win.innerW} innerH=${win.innerH} dpr=${win.dpr} (asked ${SCREEN_W}x${SCREEN_H})`);
+  // i4 checks the viewport has not DRIFTED from what setViewport achieved.
+  // Whether that achievement matched the request is `V.set`'s job, once, at
+  // setup — two different failures that used to be one confusing row.
+  const gotH = VIEWPORT.achieved ? VIEWPORT.achieved.h : SCREEN_H;
+  const gotW = VIEWPORT.achieved ? VIEWPORT.achieved.w : SCREEN_W;
+  check(`${tag}.i4`, `${label}: the viewport is still the one this run set (${gotW}x${gotH} via ${VIEWPORT.mechanism})`,
+    Math.abs(win.innerH - gotH) <= 4 && Math.abs(win.innerW - gotW) <= 4,
+    `innerW=${win.innerW} innerH=${win.innerH} dpr=${win.dpr} (set ${gotW}x${gotH}, asked ${SCREEN_W}x${SCREEN_H})`);
 
-  if (!cont || !secs.length) {
-    note(`${tag}.skip`, `${label}: NO MEASURABLE COLUMN — the claim rows for this surface are NOT MEASURED`);
+  // ---- THE GATE -----------------------------------------------------------
+  // A claim row underneath a failed instrument row has no subject, and its
+  // verdict is NOT MEASURED — never red, never green. The controller inferred
+  // exactly this about C.c4 in the first run; it is now enforced rather than
+  // inferred, so no future reader has to reconstruct which failures were
+  // downstream of which.
+  const instrumentOk = sentinelOk && rowsOk && titlesOk && !!cont && secs.length > 0;
+  if (!instrumentOk) {
+    note(`${tag}.gated`, `${label}: INSTRUMENT ROWS FAILED — every claim row (c1..c4) and every `
+      + 'report (r1..r4) for this surface is NOT MEASURED',
+      `sentinel=${sentinelOk} rows=${rowsOk} titles=${titlesOk} container=${!!cont} sections=${secs.length}`);
+    await shot(c, `${tag}-${SCREEN}${PLANT ? `-plant-${PLANT}` : ''}-GATED`);
     return null;
   }
 
@@ -689,8 +1017,24 @@ async function measureSurface(c, tag, label, expect, opts = {}) {
     deep.length === 0, deep.length ? deep.join('\n        ') : `deepest row is ${maxDepth} bar(s) deep`);
 
   // ---- c4: the wheel chains out of an exhausted inner list ---------------
-  const wheelTarget = opts.wheelSection
+  //
+  // WHY THIS ROW GREW DIAGNOSTICS. In the controller's first run `C.c4` came
+  // back red with a one-line detail that could not distinguish three completely
+  // different worlds: a genuine `overscroll-behavior` dead-end, a handler that
+  // calls preventDefault on the wheel, and Chromium's scroll LATCHING keeping
+  // the sequence pinned to the inner box. A red row that cannot say which is not
+  // a finding — so the row now reports the armed element's identity, whether the
+  // wheel events reached the page at all, whether anything cancelled them, and
+  // the inner scroller's own movement alongside the outer column's.
+  const named = opts.wheelSection instanceof RegExp
+    ? secs.find((s) => opts.wheelSection.test(s.title))?.title
+    : opts.wheelSection;
+  const wheelTarget = named
     ?? (secs.find((s) => s.innerScrollers.some((i) => i.scrollH > i.clientH + 1))?.title ?? null);
+  if (opts.wheelSection && !named) {
+    note(`${tag}.c4pick`, `${label}: the named wheel section was not on screen; falling back to the `
+      + 'first section with an overflowing inner list', String(opts.wheelSection));
+  }
   if (!wheelTarget) {
     note(`${tag}.c4`, `${label}: NOT MEASURED — no section here has an inner list with anything to scroll, `
       + 'so nested-scroll dead-ending cannot arise on this surface in this configuration');
@@ -703,19 +1047,35 @@ async function measureSurface(c, tag, label, expect, opts = {}) {
       note(`${tag}.c4`, `${label}: NOT MEASURED — the outer column has nothing to scroll `
         + `(outerMax=${armed.outerMax}), so chaining has no observable effect at this window size`);
     } else {
+      await c.evalExpr('window.__sc.watchWheel()');
       const before = armed.outerTop;
+      // 400ms between ticks, deliberately: Chromium LATCHES a scroll sequence to
+      // the element the first event hit, and the latch only releases after the
+      // sequence idles. Ticks 140ms apart can stay latched to the exhausted inner
+      // box and look exactly like a dead-end. This is the harness's own most
+      // likely reason to report a false red, so it is spaced out and disclosed.
       for (let i = 0; i < 5; i++) {
         await c.send('Input.dispatchMouseEvent', {
           type: 'mouseWheel', x: armed.x, y: armed.y, deltaX: 0, deltaY: 120, modifiers: 0,
         });
-        await sleep(140);
+        await sleep(400);
       }
-      await sleep(500);
+      await sleep(600);
+      const w = await c.json('window.__sc.wheelReport()');
       const after = await c.evalExpr('window.__sc.outerScrollTop()');
-      check(`${tag}.c4`, `${label}: a wheel over an exhausted inner list chains out to the column`,
-        after > before,
-        `inner "${wheelTarget}" parked at ${armed.innerTop}/${armed.innerMax}, `
-        + `overscroll-behavior=${armed.overscroll}; column scrollTop ${before} -> ${after} (max ${armed.outerMax})`);
+      if (w.seen === 0) {
+        note(`${tag}.c4`, `${label}: NOT MEASURED — no wheel event reached the page at all `
+          + `(dispatched 5 at ${armed.x},${armed.y}). The verdict would be about CDP, not about scroll chaining.`,
+          JSON.stringify(w));
+      } else {
+        check(`${tag}.c4`, `${label}: a wheel over an exhausted inner list chains out to the column`,
+          after > before,
+          `inner "${wheelTarget}" = ${armed.what}; wheel landed on ${w.target}; `
+          + `parked at ${armed.innerTop}/${armed.innerMax} `
+          + `-> ${w.innerTopAfter}; overscroll-behavior=${armed.overscroll}; `
+          + `column scrollTop ${before} -> ${after} (max ${armed.outerMax}); `
+          + `wheel events seen=${w.seen}, cancelled=${w.cancelled}, cancelledBy=${w.cancelledBy}`);
+      }
       await c.evalExpr('window.__sc.setScrollTop(0)');
     }
   }
@@ -779,6 +1139,10 @@ async function freshSession(c) {
   await sleep(4500);
   const ok = await waitDbg(c);
   if (!ok) throw new Error('__dbg never installed after reload — was the build made with VITE_AURORA_DEBUG=1?');
+  // A Page.reload can drop a device-metrics override, and a run that lost it
+  // between phases would report two phases at two different sizes under one
+  // SCREEN heading. Verified, not assumed.
+  await reassertViewport(c);
   await c.evalExpr(INSTALL);
 }
 async function openClassic(c) {
@@ -836,7 +1200,9 @@ async function main() {
 
   const env = { ...process.env, AURORA_DEBUG_PORT: String(PORT), AURORA_NO_GPU: '1' };
   delete env.DISPLAY;
-  const child = spawn('/usr/bin/xvfb-run', ['-a', '-s', `-screen 0 ${SCREEN_W}x${SCREEN_H}x24`, ELECTRON, `${ROOT}/dist/main/index.mjs`], {
+  // The xvfb screen only has to be big enough to HOLD the viewport; it does not
+  // set it. That confusion is what the first controller run exposed.
+  const child = spawn('/usr/bin/xvfb-run', ['-a', '-s', `-screen 0 ${XVFB_W}x${XVFB_H}x24`, ELECTRON, `${ROOT}/dist/main/index.mjs`], {
     cwd: ROOT, env, stdio: ['ignore', 'pipe', 'pipe'], detached: true,
   });
   child.stdout.on('data', (d) => { if (process.env.VERBOSE) process.stdout.write(`[main] ${d}`); });
@@ -845,11 +1211,40 @@ async function main() {
   const measured = [];
   let c;
   try {
-    c = cdp(await waitForTarget());
+    const wsUrl = await waitForTarget();
+    c = cdp(wsUrl);
     await c.ready;
     await c.send('Runtime.enable');
     await c.send('Page.enable').catch(() => {});
     await waitDbg(c);
+
+    // ---- SIZE THE VIEWPORT, AND PROVE IT TOOK --------------------------
+    let browserWs = null, targetId = null;
+    try {
+      browserWs = (await getJSON('/json/version')).webSocketDebuggerUrl ?? null;
+      const list = await getJSON('/json/list');
+      targetId = (list.find((t) => t.webSocketDebuggerUrl === wsUrl) ?? {}).id ?? null;
+    } catch { /* the Browser path is optional */ }
+    await setViewport(c, browserWs, targetId, SCREEN_W, SCREEN_H);
+    // THE ROW THAT WOULD HAVE CAUGHT THE xvfb DEFECT AT ITS SOURCE. Before, the
+    // only symptom was six confusing i4 failures scattered through the run.
+    check('V.set', `the page viewport is the ${SCREEN_W}x${SCREEN_H} this run asked for`,
+      !!VIEWPORT.achieved && Math.abs(VIEWPORT.achieved.w - SCREEN_W) <= 4
+        && Math.abs(VIEWPORT.achieved.h - SCREEN_H) <= 4,
+      `achieved ${VIEWPORT.achieved ? `${VIEWPORT.achieved.w}x${VIEWPORT.achieved.h}` : '(none)'} `
+      + `via ${VIEWPORT.mechanism}; xvfb screen ${XVFB_W}x${XVFB_H}`);
+    if (VIEWPORT.mechanism === 'none') {
+      note('V.blocked', 'BLOCKED ON THE SIZE AXIS — neither Browser.setWindowBounds nor '
+        + 'Emulation.setDeviceMetricsOverride moved the viewport. Every number in this run is taken at '
+        + `${VIEWPORT.achieved ? `${VIEWPORT.achieved.w}x${VIEWPORT.achieved.h}` : 'an unknown size'}, `
+        + 'the i4 rows will fail, c5 is not computable, and the PLANT=list-no-scroller split cannot be '
+        + 'observed. Do not read the cross-size comparison from this run.');
+    } else if (VIEWPORT.mechanism === 'Emulation.setDeviceMetricsOverride') {
+      note('V.emulated', 'THE SIZE AXIS IS EMULATED, not a real OS window resize. The layout viewport '
+        + 'is exactly the size asked for and the page reflows, which is what CSS column geometry is made '
+        + 'of — but scrollbar gutter width and OS window chrome are NOT reproduced. Every px number below '
+        + 'carries that caveat.');
+    }
 
     // =====================================================================
     // PHASE A — a CLASSIC-ONLY session: Explorer, ProjectSetupTab,
@@ -868,11 +1263,16 @@ async function main() {
     // their items, so the widest tree would be measured at its narrowest. The
     // groups are expanded by clicking their real headers instead, with no query
     // — which is the state a user leaves behind and localStorage remembers.
-    const expTitles = await bound(c, 0, PAGE_X);
     note('E.titles', 'Explorer groups on screen (no filter — every group expanded by clicking its header)',
-      JSON.stringify(expTitles));
-    measured.push(await measureSurface(c, 'E', 'Explorer (classic, all groups expanded, UNFILTERED)',
-      { titles: expTitles }, { minLeft: 0, maxLeft: PAGE_X, expandAll: true, rowFloor: 100 }));
+      JSON.stringify(await bound(c, 0, PAGE_X)));
+    measured.push(await measureSurface(c, 'E', 'Explorer (classic, all groups expanded, UNFILTERED)', {
+      titles: T_EXPLORER_CLASSIC,
+      sentinel: {
+        expr: '({ proj: window.__dbg.projStatus(), filter: window.__sc.filterInput() !== null })',
+        desc: 'the classic project is open and the Explorer\'s own filter field is on screen',
+        ok: (v) => v && v.proj && v.proj.status === 'open' && v.filter === true,
+      },
+    }, { minLeft: 0, maxLeft: PAGE_X, expandAll: true, rowFloor: 100 }));
 
     // --- ProjectSetupTab -------------------------------------------------
     await explorerFilter(c, 'Project Setup');
@@ -882,10 +1282,24 @@ async function main() {
     await sleep(800);
     check('P.setup', 'the Project Setup tab is open', openedSetup === true, `clicked=${openedSetup}`);
     if (openedSetup) {
-      const pTitles = await bound(c, PAGE_X, 1e9);
-      note('P.titles', 'ProjectSetupTab groups on screen', JSON.stringify(pTitles));
-      measured.push(await measureSurface(c, 'P', 'ProjectSetupTab (classic, all groups expanded)',
-        { titles: pTitles }, { minLeft: PAGE_X, expandAll: true }));
+      note('P.titles', 'ProjectSetupTab groups on screen',
+        JSON.stringify(await bound(c, PAGE_X, 1e9)));
+      // The setup tab's group titles are ZONE IDS (ProjectSetupTab.tsx:251,
+      // `g.id.toUpperCase()`), so there is no literal set to transcribe — the
+      // profile decides them. A floor plus a DOM sentinel that only this page
+      // can satisfy is the honest substitute; both halves are load-bearing.
+      measured.push(await measureSurface(c, 'P', 'ProjectSetupTab (classic, all groups expanded)', {
+        minCount: 2,
+        sentinel: {
+          expr: `(() => { const t = [...document.querySelectorAll('div')]
+              .some((e) => e.children.length === 0 && e.textContent.trim() === 'Project Setup');
+            const apply = [...document.querySelectorAll('button')]
+              .some((b) => /Apply & re-validate/.test(b.textContent || ''));
+            return { title: t, apply }; })()`,
+          desc: 'the page draws its own "Project Setup" title AND its Apply & re-validate footer',
+          ok: (v) => v && v.title === true && v.apply === true,
+        },
+      }, { minLeft: PAGE_X, expandAll: true }));
     }
 
     // --- SpriteMode, CLASSIC ONLY (expect 7) -----------------------------
@@ -902,14 +1316,30 @@ async function main() {
     // classic gate adds. `project` is null here, so export/character are absent.
     check('S7.seven', 'SpriteMode mounts SEVEN sections in a classic-only session',
       s7.length === 7, `${s7.length}: ${JSON.stringify(s7)}`);
-    measured.push(await measureSurface(c, 'S7', 'SpriteMode (classic only — seven)',
-      { titles: s7 }, { minLeft: PAGE_X, expandAll: true, wheelSection: s7.find((t) => /objects$/i.test(t)) }));
+    measured.push(await measureSurface(c, 'S7', 'SpriteMode (classic only — seven)', {
+      titles: [...T_SPRITE_ALWAYS, ...T_SPRITE_CLASSIC],
+      sentinel: {
+        expr: '({ sprite: window.__dbg.spriteState().activeDocId, '
+          + 'aeon: window.__dbg.aeon.state().open, classic: window.__dbg.projStatus().status })',
+        desc: 'a sprite doc is checked out, classic is open and NO aeon project is resident',
+        ok: (v) => v && v.sprite && v.classic === 'open' && v.aeon !== true,
+      },
+    }, { minLeft: PAGE_X, expandAll: true, wheelSection: SPRITE_WHEEL_SECTION }));
 
     // --- CanvasMode, worst case (1024x1024 -> 16 commit rows) ------------
     // CommitPlanView renders one target row per 256x256 chunk
     // (CommitPlanView.tsx:128) with no cap and no scroller of its own, and
     // CANVAS_MAX_SIDE = 1024 (canvas-doc.ts:142) makes 4x4 = 16 the ceiling.
     // That is the largest a `canvas.commit` content section can ever be.
+    // THE BUG THE FIRST CONTROLLER RUN EXPOSED, and it was in this block.
+    // `NEW_CANVAS_DEFAULTS` has no default NAME on purpose (new-canvas.ts:77:
+    // "the name field opens empty on purpose — Create starts disabled until the
+    // artist types one"). The first version of this harness set only the width
+    // and height, so Create was disabled, the click did nothing, NO CANVAS WAS
+    // EVER CREATED, and the block went on to measure SpriteMode's column a
+    // second time under CanvasMode's name. `C.i0` was the only row that noticed.
+    // Type the name first, set the profile explicitly, and VERIFY Create is
+    // enabled before clicking it.
     let dlg = false;
     for (let i = 0; i < 3 && !dlg; i++) {
       await escapeKey(c); await sleep(300);
@@ -923,22 +1353,51 @@ async function main() {
     }
     check('C.setup', 'the New Canvas dialog opened', dlg === true, `dlgOpen=${dlg}`);
     if (dlg) {
+      const canvasName = `sectioncol${Date.now().toString(36)}`;
+      await clickEl(c, 'window.__sc.dlgName()');
+      await key(c, 'a', 'KeyA', 65, 2);
+      await typeText(c, canvasName);
       for (const [i, v] of [[0, '1024'], [1, '1024']]) {
         await clickEl(c, `window.__sc.dlgNums()[${i}]`);
         await key(c, 'a', 'KeyA', 65, 2);
         await typeText(c, v);
       }
+      // `genesis-level-art` is the default AND the only profile whose grids match
+      // the tile/block/chunk ladder a commit speaks; set it explicitly so a
+      // changed default cannot silently move this measurement.
+      await c.evalExpr(`(() => { const s = window.__sc.dlgSelect(); if (!s) return null;
+        const set = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set;
+        set.call(s, 'genesis-level-art'); s.dispatchEvent(new Event('change', { bubbles: true }));
+        return s.value; })()`);
       await sleep(500);
+      const snap = await c.json('window.__sc.dlgSnapshot()');
+      // The row that would have caught the original defect at its own site,
+      // rather than four steps downstream in a geometry number.
+      check('C.setup2', 'the New Canvas form is valid and Create is ENABLED before it is clicked',
+        snap !== null && snap.createDisabled === false, JSON.stringify(snap));
       await clickEl(c, 'window.__sc.dlgCreate()');
       await sleep(4000);
       await c.evalExpr(INSTALL);
+      // STORE-LEVEL PROOF that a 1024x1024 canvas exists, before any DOM is read.
+      const cdoc = await c.json(`(() => { const id = window.__dbg.canvas.activeDocId();
+        return { id, state: id ? window.__dbg.canvas.state(id) : null,
+                 dlgStillOpen: window.__sc.dlg() !== null }; })()`).catch((e) => ({ threw: e.message }));
+      check('C.setup3', 'a 1024x1024 canvas document is checked out',
+        !!(cdoc.state && cdoc.state.width === 1024 && cdoc.state.height === 1024), JSON.stringify(cdoc));
       const rows = await c.evalExpr('window.__sc.commitRows()');
-      check('C.i0', 'the commit plan really rendered its 16 per-chunk target rows',
-        rows === 16, `"chunk N" labels on screen: ${rows} (a canvas under 256px would show none)`);
-      const cTitles = await bound(c, PAGE_X, 1e9);
-      note('C.titles', 'CanvasMode sections (1024x1024 canvas)', JSON.stringify(cTitles));
-      measured.push(await measureSurface(c, 'C', 'CanvasMode (1024x1024 — worst case)',
-        { titles: cTitles }, { minLeft: PAGE_X, expandAll: true }));
+      note('C.rows', 'commit-plan target rows on screen', `${rows} (16 expected for 1024x1024)`);
+      measured.push(await measureSurface(c, 'C', 'CanvasMode (1024x1024 — worst case)', {
+        titles: T_CANVAS,
+        sentinel: {
+          expr: `(() => { const id = window.__dbg.canvas.activeDocId();
+            return { id, w: id ? window.__dbg.canvas.state(id).width : null,
+                     h: id ? window.__dbg.canvas.state(id).height : null,
+                     commitRows: window.__sc.commitRows() }; })()`,
+          desc: 'the canvas store has a 1024x1024 document checked out AND the commit '
+            + 'plan drew its 16 per-chunk rows',
+          ok: (v) => v && v.id && v.w === 1024 && v.h === 1024 && v.commitRows === 16,
+        },
+      }, { minLeft: PAGE_X, expandAll: true }));
     }
 
     // =====================================================================
@@ -963,8 +1422,15 @@ async function main() {
       // mounts six". This is the configuration in which that is true.
       check('S6.doc', 'ui/primitives.tsx\'s "SpriteMode mounts six" holds in an aeon-only session',
         s6.length === 6, `${s6.length} sections: ${JSON.stringify(s6)}`);
-      measured.push(await measureSurface(c, 'S6', 'SpriteMode (aeon only — the docblock\'s six)',
-        { titles: s6 }, { minLeft: PAGE_X, expandAll: true }));
+      measured.push(await measureSurface(c, 'S6', 'SpriteMode (aeon only — the docblock\'s six)', {
+        titles: [...T_SPRITE_ALWAYS, ...T_SPRITE_AEON],
+        sentinel: {
+          expr: '({ sprite: window.__dbg.spriteState().activeDocId, '
+            + 'aeon: window.__dbg.aeon.state().open, classic: window.__dbg.projStatus().status })',
+          desc: 'a sprite doc is checked out, aeon is open and NO classic project is resident',
+          ok: (v) => v && v.sprite && v.aeon === true && v.classic !== 'open',
+        },
+      }, { minLeft: PAGE_X, expandAll: true }));
 
       // =================================================================
       // PHASE C — THE NINE. Aeon first, classic SECOND, without clearing:
@@ -988,8 +1454,15 @@ async function main() {
       // the most useful possible outcome of this harness, not a failure of it.
       check('S9.nine', 'the nine-section SpriteMode column is REACHABLE (item 19\'s extreme case)',
         s9.length === 9, `${s9.length} sections: ${JSON.stringify(s9)}`);
-      measured.push(await measureSurface(c, 'S9', 'SpriteMode (BOTH projects — the nine)',
-        { titles: s9 }, { minLeft: PAGE_X, expandAll: true, wheelSection: s9.find((t) => /objects$/i.test(t)) }));
+      measured.push(await measureSurface(c, 'S9', 'SpriteMode (BOTH projects — the nine)', {
+        titles: [...T_SPRITE_ALWAYS, ...T_SPRITE_AEON, ...T_SPRITE_CLASSIC],
+        sentinel: {
+          expr: '({ sprite: window.__dbg.spriteState().activeDocId, '
+            + 'aeon: window.__dbg.aeon.state().open, classic: window.__dbg.projStatus().status })',
+          desc: 'a sprite doc is checked out and BOTH projects are resident at once',
+          ok: (v) => v && v.sprite && v.aeon === true && v.classic === 'open',
+        },
+      }, { minLeft: PAGE_X, expandAll: true, wheelSection: SPRITE_WHEEL_SECTION }));
     }
   } finally {
     if (c) {
@@ -1013,8 +1486,9 @@ async function main() {
     // The window as the PAGE saw it, not as xvfb was asked for — the two differ
     // by the OS frame, and every derived "needs a window N px tall" is computed
     // from this rather than from SCREEN_H.
-    innerH: clean.length ? clean[0].win.innerH : null,
-    innerW: clean.length ? clean[0].win.innerW : null,
+    innerH: VIEWPORT.achieved ? VIEWPORT.achieved.h : (clean.length ? clean[0].win.innerH : null),
+    innerW: VIEWPORT.achieved ? VIEWPORT.achieved.w : (clean.length ? clean[0].win.innerW : null),
+    viewport: VIEWPORT.mechanism,
     surfaces: clean.map((m) => ({
       tag: m.tag, label: m.label, natural: m.natural, share: m.share, floored: m.floored,
       clientH: m.container.clientH, scrollH: m.container.scrollH, overflowPx: m.container.overflowPx,
@@ -1048,7 +1522,21 @@ function compare(quiet = false) {
     return;
   }
   const A = JSON.parse(readFileSync(a, 'utf8')), B = JSON.parse(readFileSync(b, 'utf8'));
+  // THE GUARD THE FIRST CONTROLLER RUN EARNED. `SCREEN` used to size the xvfb
+  // display rather than the window, so both runs came back at 1400x872 and this
+  // comparison would have reported "0.0% drift, PASS" about two runs at the SAME
+  // size — measuring nondeterminism and calling it cross-size behaviour. c5
+  // cannot discriminate unless the sizes actually differ, so it refuses.
+  if (A.innerH === null || B.innerH === null || Math.abs(A.innerH - B.innerH) < 40) {
+    console.log(`FAIL  [c5] NOT COMPUTABLE — the two runs were taken at the SAME viewport height `
+      + `(${A.innerH} vs ${B.innerH}). c5 measures cross-SIZE behaviour; comparing two identically `
+      + 'sized runs would measure run-to-run noise and report it as a size property.');
+    console.log(`      mechanisms: ${A.viewport ?? '?'} / ${B.viewport ?? '?'}. Fix the viewport before `
+      + 'reading anything below, and treat the minimum-window-height derivation as NOT MEASURED.');
+    return;
+  }
   console.log('\n=== [c5] cross-size self-check: is the natural stack height a content property? ===');
+  console.log(`    viewports: ${A.innerW}x${A.innerH} (${A.viewport}) vs ${B.innerW}x${B.innerH} (${B.viewport})`);
   let worst = 0;
   let compared = 0;
   for (const sa of A.surfaces) {

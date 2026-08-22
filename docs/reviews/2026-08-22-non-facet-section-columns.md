@@ -8,6 +8,15 @@
 > `16:59:07 up 4 days, 17:22, load average: 21.53, 63.44, 51.52` (heavy parallel
 > load; the suite still finished in 10.50s, and nothing here is a timing claim).
 >
+> **RATIFIED 2026-08-22.** The controller ran both invocations and confirmed the
+> recommendation, on the harness's own numbers: `S9.r4` measured every other
+> section at **1202px** against a **528px** column — a **−674px** share against a
+> 160px floor, so the floor engages and the flex model is a no-op exactly where
+> it would matter. **"Leave all four alone" is ratified.** That run also found
+> three harness defects (§6.5); all three are fixed on this branch, and the row
+> taxonomy in §7 is re-stated accordingly — `c5` is withdrawn from the
+> discriminating list until it earns its way back.
+>
 > **The runtime half is a harness the controller runs.** Everything about
 > rendered geometry below is either a source fact, or a prediction the harness
 > is built to confirm or refute. Predictions are labelled as such and never
@@ -344,22 +353,150 @@ SpriteMode-7, CanvasMode at 1024×1024. Phase B (aeon only): SpriteMode-6. Phase
 
 ---
 
+## 6.5 The first controller run — what it found, and what it cost
+
+**The recommendation survived; the harness did not.** The controller ran both
+`SCREEN` invocations. Eight rows failed, and every one of them was the
+instrument, not the app.
+
+### Defect 1 — `SCREEN` sized the xvfb display, not the Electron window
+
+```
+SCREEN=1680x1050  ->  window 1400x872
+SCREEN=1280x800   ->  window 1400x872
+```
+
+Electron opens its window at its own configured size regardless of the virtual
+display. **The six `i4` rows caught it and failed loudly** rather than letting
+the geometry rows report numbers from a window nobody asked for — the
+anti-vacuous discipline doing exactly its job.
+
+What it cost, stated in the terms §7 used:
+
+- **`c5` could not discriminate as invoked.** `--compare` would have compared two
+  runs at the *same* viewport, reported "0.0% drift, PASS", and called
+  run-to-run noise a size property. **`c5` is withdrawn from the discriminating
+  list until `V.set` passes at two genuinely different sizes.**
+- **The `PLANT=list-no-scroller` split was untestable.** The prediction (red at
+  1280×800, possibly green at 1680×1050) stands, unmeasured.
+
+**Fixed.** `SCREEN` now drives the *page viewport*, set explicitly and verified:
+`Browser.setWindowBounds` first (a real OS resize), `Emulation.setDeviceMetricsOverride`
+second, and if neither takes the run is **BLOCKED** on the size axis and says so
+rather than measuring whatever it got. `XVFB` sizes the display and only has to
+be big enough to hold the viewport. A new row **`V.set`** asserts this once, at
+setup — the row that would have caught the defect at its source instead of as six
+scattered `i4` failures. `--compare` now **refuses** when the two summaries share
+a viewport height. If the emulation path is what takes, the run says so: layout
+viewport geometry is faithful, scrollbar gutter width and OS chrome are not.
+
+### Defect 2 — `C.i0` and `C.c4`: one cause, and it is not nested scroll
+
+The controller asked me to check rather than adopt their inference. **Their
+bottom line is right and their mechanism is not, and the difference matters.**
+
+**Root cause, found in source:** `NEW_CANVAS_DEFAULTS` has no default name, on
+purpose — `new-canvas.ts:77`: *"the name field opens empty on purpose (Create
+starts disabled until the artist types one)"*, enforced at
+`NewCanvasDialog.tsx:106` (`newCanvasFieldErrors`) and `:125` (`submit` returns
+early). **The harness set only the width and height.** Create was disabled, the
+click did nothing, **no canvas was ever created**, and the block went on to
+measure SpriteMode's column a second time under CanvasMode's name.
+
+`C.i0` failed correctly. `C.c4` then armed *SpriteMode's* row list, so its red is
+a verdict about a run whose subject was wrong. **It is not evidence about
+CanvasMode and not evidence about nested scroll.**
+
+**And there is a hard source fact that settles it independently of the
+diagnosis:** there is **no `overflow: auto` or `scroll` anywhere inside
+CanvasMode's three sections.** `grep -rn overflow src/renderer/components/canvas/`
+returns exactly two hits — `canvasWrap` (the canvas area, outside the `Panel`)
+and `ImportSheetDialog`'s body — and `PaletteGrid.tsx:173` documents *"No
+`overflow: auto` anywhere below"*. So **when CanvasMode is genuinely on screen,
+`C.c4` must report NOT MEASURED. A red `C.c4` is proof the surface was not
+CanvasMode.** The two failures are therefore *not* independent, and **the
+recommendation for CanvasMode is unchanged.**
+
+### Defect 3 — the one the controller could not see, and it was the worst
+
+Chasing defect 2 exposed a defect in the instrument built to prevent exactly this:
+
+> **`expect.titles` was read off the screen immediately before being asserted
+> against the screen.** `C.i1` — "exactly the 3 expected sections are on
+> screen" — compared the subject to itself and **could not go red for any
+> reason**. It reported green against SpriteMode's seven titles while
+> CanvasMode was nowhere on screen.
+
+That is the dominant defect class in this repo, one level inside the harness
+written to catch it, and the controller's trust in "`i1` saw its subject" was
+misplaced for **every** surface in that run.
+
+**Fixed three ways:**
+1. **Titles are literals now**, transcribed from the call sites (`T_SPRITE_ALWAYS`,
+   `T_SPRITE_AEON`, `T_SPRITE_CLASSIC`, `T_CANVAS`, `T_EXPLORER_CLASSIC`). The one
+   data-driven title (`${zone.toUpperCase()} objects`) is a matcher; the setup
+   tab's are zone ids with no literal set, so that surface uses a floor plus a
+   DOM sentinel and says so.
+2. **A store-level sentinel (`i0`) per surface** — `__dbg.canvas.activeDocId()` +
+   the document's real dimensions, `__dbg.spriteState().activeDocId` plus which
+   projects are resident, and so on. Answered by the store, which no leftover
+   paint can satisfy.
+3. **The gate.** If any instrument row fails, **every** claim row and report for
+   that surface is NOT MEASURED — never red, never green. The controller's
+   inference about `C.c4` is now an enforced property rather than something a
+   reader has to reconstruct.
+
+Two smaller fixes fell out: `C.setup2` asserts Create is **enabled before it is
+clicked**, and `C.setup3` asserts a 1024×1024 document is checked out — the
+defect caught at its own site rather than four steps downstream in a geometry
+number. `c4` now reports the armed element's identity, how many wheel events the
+page saw and whether anything cancelled them, and spaces its ticks 400ms apart
+because Chromium latches a scroll sequence to the element the first event hit —
+this row's most likely reason to report a false red, disclosed rather than hoped
+away. `armInnerScroller` now arms the **tallest** overflowing scroller rather
+than the last in DOM order, and S7/S9/C name the same wheel section, so two
+configurations measuring the same column cannot disagree by accident.
+
+### One arithmetic reconciliation for the next run
+
+I count **six** measured surfaces, hence six `i4` rows; with `C.i0` and `C.c4`
+that is eight failures total. The run report described seven of the eight as
+`i4`. I cannot reconcile that from here and I am **not** assuming either number
+is wrong — the re-run should make it moot, since `V.set` now fails *once* instead
+of `i4` failing per surface.
+
+---
+
 ## 7. What each row should print, and which rows can go red
+
+*Re-stated after the first controller run. `c5` has moved OUT of the
+discriminating list; `V.set` is new; the instrument rows are materially
+stronger than they were, and one of them was previously vacuous.*
 
 ### Rows that discriminate
 
 | row | asserts | goes red under |
 |---|---|---|
+| `V.set` | the page viewport really is the size this run asked for, and by which mechanism | the xvfb defect, and anything else that leaves the window at its own size. **Would have caught defect 1 at its source.** If neither mechanism takes, the run is BLOCKED on the size axis rather than measuring what it got |
 | `c2` | every section can be scrolled fully into view | `PLANT=clip`. Not trivially green: Explorer's root is `overflow: hidden` with the scroller nested inside, and the setup tab keeps its footer outside its scroller, so "which box actually scrolls" is a real question on two of the four |
 | `c3` | no row is more than two scrollbars deep | `PLANT=nested`. SpriteMode genuinely sits at depth 2 today; three would be the defect |
-| `c4` | a wheel over an exhausted inner list chains out to the column | `PLANT=contain`. The only place nested-scroll confusion is observable, and it has never been checked on a real wheel event |
-| `c5` | the natural stack height is a content property, not a window property (cross-size, ≤4% drift) | a layout whose section heights track the window — which would make every px number here meaningless. Reported **NOT MEASURED** from a single run, never quietly skipped |
+| `c4` | a wheel over an exhausted inner list chains out to the column | `PLANT=contain`. The only place nested-scroll confusion is observable. **NOT MEASURED, by source-derived necessity, whenever CanvasMode is genuinely on screen** — that surface has no inner scroller at all |
 | `S6.doc` | `ui/primitives.tsx`'s "SpriteMode mounts six" holds in an aeon-only session | a section added or removed since |
 | `S7.seven` / `S9.nine` | the classic-only and both-resident counts | **`S9.nine` is the booking's central number.** Red = the nine-section column is unreachable and item 19's extreme case does not exist |
-| `C.i0` / `E.i0` | the data-driven subjects really rendered their data (16 commit rows; ≥100 tree rows) | a canvas under 256px, a filtered tree, a collapsed group, an unloaded project — every way this measurement could be of nothing |
-| `i1`–`i4` | exact title set, painted heights, one shared container with a real height, the requested window size | any of the above going wrong upstream |
+| `i0` (per surface) | a STORE-level sentinel: the surface is really mounted | anything painted that is not this surface. **New — this is what defect 3 was missing** |
+| `i0b` | the data-driven subjects really rendered their data (16 commit rows; ≥100 tree rows) | a canvas under 256px, a filtered tree, a collapsed group, an unloaded project |
+| `i1` | the exact expected title set, **transcribed from the call sites** | a surface that is not the one named. **Previously vacuous — it read its expectation off the screen and compared the screen to itself** |
+| `C.setup2` / `C.setup3` | Create is enabled before it is clicked; a 1024×1024 doc is checked out | **defect 2, at its own site** |
+| `i2`–`i4` | painted heights, one shared container with a real height, no viewport drift mid-run | upstream breakage |
 
-### Rows that do NOT discriminate — say so when reporting
+### Rows that do NOT discriminate — and one that has to earn its way back
+
+**`c5` is withdrawn.** "The natural stack height is a content property" cannot
+discriminate until two runs are taken at two genuinely different viewports, and
+the first pair were not. `--compare` now **refuses** rather than reporting 0.0%
+drift as a pass. It rejoins the discriminating list the first time `V.set` passes
+at both sizes — not before.
+
 
 **`c1` ("no section paints over the one below it") cannot go red on an unplanted
 tree.** Every section on these four surfaces is `CONTENT_SECTION` = `flexShrink:
@@ -369,11 +506,13 @@ shape that did ship — the effects panel's 954px of layer cards — and it is r
 only under `PLANT=list-no-scroller`. A green `c1` is not evidence that these
 columns are healthy; it is evidence that they are made of `flexShrink: 0`.
 
-**`c4` reports NOT MEASURED rather than passing** on Explorer and
-ProjectSetupTab: neither has an inner list with anything to scroll, so
-dead-ending cannot arise there. It also reports NOT MEASURED where the outer
-column has nothing to scroll — chaining has no observable effect on a column that
-already fits.
+**`c4` reports NOT MEASURED rather than passing** on Explorer, ProjectSetupTab
+**and CanvasMode**: none has an inner list with anything to scroll, so
+dead-ending cannot arise there. For CanvasMode this is a *source-derived
+necessity*, not an observation — there is no `overflow: auto` inside any of its
+three sections — which is what makes a red `C.c4` proof that the surface was not
+CanvasMode. `c4` also reports NOT MEASURED where the outer column has nothing to
+scroll, and where no wheel event reached the page at all.
 
 **`PLANT=list-no-scroller` is expected to be red at 1280×800 and possibly green
 at 1680×1050**, and that split is a *finding*, not a harness fault: flexbox only
