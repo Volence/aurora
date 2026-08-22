@@ -28,6 +28,7 @@ export function cloneSection(sec: Section, index: number, name?: string): Sectio
     paletteRef: sec.paletteRef,
     parallaxRef: sec.parallaxRef,
     bgLayoutRef: sec.bgLayoutRef,
+    sceneRef: sec.sceneRef,
     flags: sec.flags,
     music: sec.music,
   };

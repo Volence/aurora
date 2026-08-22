@@ -115,7 +115,7 @@ export async function buildAeonSavePlan(
     }
 
     // Write meta sidecar (.meta.json) — scalar refs (bgLayoutRef,
-    // paletteRef). Written only when at least one ref is non-null; when
+    // paletteRef, sceneRef). Written only when at least one ref is non-null; when
     // all refs are null we still OVERWRITE an existing sidecar (with
     // nulls) so a previously-saved ref that was cleared in-session cannot
     // resurrect on the next load. An exists probe gates that overwrite so
@@ -127,13 +127,21 @@ export async function buildAeonSavePlan(
     // user cleared, and the exists probe then finds the very file that was
     // never read.
     if (understood('meta.json')) {
-      const metaJson = serializeSectionMeta({ bgLayoutRef: section.bgLayoutRef, paletteRef: section.paletteRef });
+      const metaJson = serializeSectionMeta({
+        bgLayoutRef: section.bgLayoutRef,
+        paletteRef: section.paletteRef,
+        sceneRef: section.sceneRef,
+      });
       const metaPath = `${prefix}.meta.json`;
       if (metaJson !== null) {
         const metaBytes = new TextEncoder().encode(metaJson);
         files.push({ path: metaPath, bytes: metaBytes });
       } else if (await fa.exists(metaPath)) {
-        const clearedBytes = new TextEncoder().encode(JSON.stringify({ bgLayoutRef: null, paletteRef: null }, null, 2));
+        // Every ref the sidecar can hold must be named here, not just the ones
+        // this branch happened to know about when it was written: a ref missing
+        // from the cleared body is a ref that resurrects on the next load.
+        const clearedBytes = new TextEncoder().encode(
+          JSON.stringify({ bgLayoutRef: null, paletteRef: null, sceneRef: null }, null, 2));
         files.push({ path: metaPath, bytes: clearedBytes });
       }
     }
