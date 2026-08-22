@@ -11,6 +11,7 @@ import { describe, it, expect } from 'vitest';
 import { drawObjects, drawCollision, drawPriority } from '../classic-overlays';
 import type { ObjectSprite } from '../../../state/classicObjectArtStore';
 import type { LevelDoc } from '../../../../core/level-classic/model';
+import { monoMeasureText } from '../../../../test/mono-measure';
 
 /** A recording 2D-context stand-in: captures drawImage/fillRect call counts. */
 function mockCtx() {
@@ -18,6 +19,10 @@ function mockCtx() {
   const ctx = {
     lineWidth: 0, font: '', textAlign: '' as CanvasTextAlign, fillStyle: '', strokeStyle: '',
     save() {}, restore() {}, translate() {}, scale() {}, beginPath() {}, fill() {}, stroke() {}, setLineDash() {},
+    // The overlay measures its labels now (ROADMAP 5.1 item 17), so a stand-in
+    // context has to answer measureText. `monoMeasureText` reports the metric the
+    // real app resolves, read at the stub's own font.
+    measureText: monoMeasureText,
     drawImage() { calls.drawImage++; },
     fillRect() { calls.fillRect++; },
     strokeRect() { calls.strokeRect++; },

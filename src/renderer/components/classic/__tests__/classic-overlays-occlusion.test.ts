@@ -14,6 +14,7 @@ import { describe, it, expect, beforeAll } from 'vitest';
 import { drawObjects, type SpriteOcclusion } from '../classic-overlays';
 import type { ObjectSprite } from '../../../state/classicObjectArtStore';
 import type { LevelDoc } from '../../../../core/level-classic/model';
+import { monoMeasureText } from '../../../../test/mono-measure';
 
 interface RecCtx {
   drawImageArgs: unknown[][];
@@ -31,6 +32,8 @@ function makeRecordingCtx(): CanvasRenderingContext2D & { __rec: RecCtx } {
     drawImage(...args: unknown[]) { rec.drawImageArgs.push(args); rec.ops.push('drawImage'); },
     fillRect() { rec.fillRects++; rec.ops.push('fillRect'); },
     strokeRect() {}, fillText() {}, arc() {},
+    // Labels are measured before they are drawn (ROADMAP 5.1 item 17).
+    measureText: monoMeasureText,
   };
   return ctx as unknown as CanvasRenderingContext2D & { __rec: RecCtx };
 }

@@ -8,6 +8,7 @@ import {
   COLLISION_SURFACE_LINE, COLLISION_ANGLE_TICK, COLLISION_UNKNOWN, COLLISION_FALLBACK, COLLISION_DIFF,
   OBJECT_BOX_FILL, OBJECT_BOX_STROKE, OBJECT_LABEL, RING_FILL, RING_STROKE,
 } from './canvas-colors';
+import { fitLabelInContext, labelBudget } from './label-fit';
 import type { CollisionProfileSet, Solidity } from '../../core/collision/collision-model';
 import { columnSolidRun } from '../../core/collision/collision-render';
 import { resolveCell, resolvePlaneWords, SECTION_PLANE_WORDS } from '../../core/collision/collision-cell-resolve';
@@ -19,6 +20,21 @@ export interface SectionOverlayInfo {
   offsetX: number;
   offsetY: number;
 }
+
+// ---- the generic "no sprite preview" object marker (ROADMAP §5.1 item 17) ----
+// One set of numbers for the box AND for the label's budget, so the two cannot
+// drift apart the way they did when the box was a literal 16 in `fillRect` and
+// the label was never measured against anything at all.
+/** Side of the marker box, in WORLD pixels, centred on the placement point. */
+export const OBJECT_BOX_SIZE = 16;
+/** `ctx.lineWidth` for the marker's border, world px — painted centred on the path. */
+export const OBJECT_BOX_STROKE_WIDTH = 1;
+/** Clear world-space room kept between that border's inner edge and glyph ink. */
+export const OBJECT_LABEL_GAP = 0.5;
+/** Label size in SCREEN pixels — see the note at the draw site for why. */
+export const OBJECT_LABEL_FONT_PX = 8;
+/** Baseline drop from the box centre, in screen px (the pre-existing `+3`). */
+export const OBJECT_LABEL_BASELINE_PX = 3;
 
 function solidityFill(s: Solidity): string {
   switch (s) {
@@ -287,16 +303,33 @@ export class OverlayRenderer {
         continue;
       }
 
+      const half = OBJECT_BOX_SIZE / 2;
       ctx.fillStyle = OBJECT_BOX_FILL;
-      ctx.fillRect(wx - 8, wy - 8, 16, 16);
+      ctx.fillRect(wx - half, wy - half, OBJECT_BOX_SIZE, OBJECT_BOX_SIZE);
       ctx.strokeStyle = OBJECT_BOX_STROKE;
-      ctx.lineWidth = 1;
-      ctx.strokeRect(wx - 8, wy - 8, 16, 16);
+      ctx.lineWidth = OBJECT_BOX_STROKE_WIDTH;
+      ctx.strokeRect(wx - half, wy - half, OBJECT_BOX_SIZE, OBJECT_BOX_SIZE);
 
+      // The label is sized in SCREEN pixels — `8 * invZoom` world px — which is
+      // the convention `classic-overlays.drawObjects` has always used. Under the
+      // old world-space `8px` the fit was zoom-INVARIANT: the box and the glyphs
+      // scaled together, so a typeId too wide for its box at zoom 1 was too wide
+      // at every zoom and no amount of zooming could ever reveal it. Screen-
+      // constant turns zoom into the affordance: a 16px box holds 3 cells at
+      // zoom 1 (=> `s…` for "solid"), 7 at zoom 2 — where the whole id reads.
+      // At zoom 1, the default and the configuration item 15 measured, the drawn
+      // glyph size is exactly what it was.
+      const invZoom = 1 / zoom;
       ctx.fillStyle = OBJECT_LABEL;
-      ctx.font = '8px monospace';
+      ctx.font = `${OBJECT_LABEL_FONT_PX * invZoom}px monospace`;
       ctx.textAlign = 'center';
-      ctx.fillText(obj.typeId, wx, wy + 3);
+      // MEASURED against the box, in the box's own world units (the font is set
+      // in world units too, so `measureText` answers in the same space). An
+      // empty fit means nothing legible fits and the box goes unlabelled — never
+      // a bare ellipsis, never the half glyph this item was booked for.
+      const fit = fitLabelInContext(ctx, obj.typeId,
+        labelBudget(OBJECT_BOX_SIZE, OBJECT_BOX_STROKE_WIDTH, OBJECT_LABEL_GAP));
+      if (fit.text) ctx.fillText(fit.text, wx, wy + OBJECT_LABEL_BASELINE_PX * invZoom);
     }
   }
 
