@@ -61,15 +61,22 @@ const SUPPRESSED: FittedLabel = { text: '', width: 0, elided: false };
 
 /**
  * Horizontal room a marker box leaves for a centred label, in the box's own
- * units.
+ * units: the box minus the part of its own border that is painted inside it.
  *
  * DERIVED, NOT PICKED. A canvas stroke is painted centred on the path, so a
- * `strokeWidth` border eats `strokeWidth / 2` of the interior on each side.
- * `gap` is the clear space kept between that border's inner edge and glyph ink,
- * so a descender or an overshooting round never touches the frame.
+ * `strokeWidth` border eats `strokeWidth / 2` of the interior on each side —
+ * `strokeWidth` in total. The interior clear of the border is the boundary, and
+ * there is deliberately NO extra breathing gap on top of it: a gap costs nothing
+ * at zoom 1 (every marker here fits the same number of cells with or without
+ * one) and costs a whole label at the classic viewport's fit-to-window zoom,
+ * where the box shrinks with the world while the font does not. `"0E"` at
+ * zoom 0.58 is 13.8 world px inside a 16 world px box whose border reaches
+ * 0.86 in — it clears the frame, and half a pixel of politeness would have
+ * deleted it. A glyph touching the frame is legible; a glyph that is not drawn
+ * is not.
  */
-export function labelBudget(boxWidth: number, strokeWidth: number, gap: number): number {
-  return Math.max(0, boxWidth - 2 * (strokeWidth / 2 + gap));
+export function labelBudget(boxWidth: number, strokeWidth: number): number {
+  return Math.max(0, boxWidth - strokeWidth);
 }
 
 /**

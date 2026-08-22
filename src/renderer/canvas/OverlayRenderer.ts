@@ -29,8 +29,6 @@ export interface SectionOverlayInfo {
 export const OBJECT_BOX_SIZE = 16;
 /** `ctx.lineWidth` for the marker's border, world px — painted centred on the path. */
 export const OBJECT_BOX_STROKE_WIDTH = 1;
-/** Clear world-space room kept between that border's inner edge and glyph ink. */
-export const OBJECT_LABEL_GAP = 0.5;
 /** Label size in SCREEN pixels — see the note at the draw site for why. */
 export const OBJECT_LABEL_FONT_PX = 8;
 /** Baseline drop from the box centre, in screen px (the pre-existing `+3`). */
@@ -328,7 +326,7 @@ export class OverlayRenderer {
       // empty fit means nothing legible fits and the box goes unlabelled — never
       // a bare ellipsis, never the half glyph this item was booked for.
       const fit = fitLabelInContext(ctx, obj.typeId,
-        labelBudget(OBJECT_BOX_SIZE, OBJECT_BOX_STROKE_WIDTH, OBJECT_LABEL_GAP));
+        labelBudget(OBJECT_BOX_SIZE, OBJECT_BOX_STROKE_WIDTH));
       if (fit.text) ctx.fillText(fit.text, wx, wy + OBJECT_LABEL_BASELINE_PX * invZoom);
     }
   }

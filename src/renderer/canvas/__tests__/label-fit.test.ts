@@ -24,10 +24,10 @@ import {
   MONO_ADVANCE_EM, MONO_ELLIPSIS_CELLS, monoWidth, monoCells,
 } from '../../../test/mono-measure';
 import {
-  OBJECT_BOX_SIZE, OBJECT_BOX_STROKE_WIDTH, OBJECT_LABEL_GAP, OBJECT_LABEL_FONT_PX,
+  OBJECT_BOX_SIZE, OBJECT_BOX_STROKE_WIDTH, OBJECT_LABEL_FONT_PX,
 } from '../OverlayRenderer';
 import {
-  GHOST_MARKER_BOUNDS, HEX_MARKER_SIZE, MARKER_STROKE_PX, MARKER_LABEL_GAP_PX,
+  GHOST_MARKER_BOUNDS, HEX_MARKER_SIZE, MARKER_STROKE_PX,
 } from '../../components/classic/classic-overlays';
 
 /** A measurer at a fixed font size, in whatever units that size is expressed in. */
@@ -37,17 +37,30 @@ const at = (fontPx: number) => (s: string) => monoWidth(s, fontPx);
 const cell = (fontPx: number) => fontPx * MONO_ADVANCE_EM;
 
 describe('labelBudget', () => {
-  it('subtracts the half-stroke each side, plus the gap each side', () => {
+  it('subtracts the half-stroke each side and nothing else', () => {
     // A canvas stroke straddles the path: a 1px border eats 0.5px of interior
-    // on each side, and the gap is clear space on top of that.
-    expect(labelBudget(16, 1, 0.5)).toBe(16 - 2 * (0.5 + 0.5));
-    expect(labelBudget(24, 1, 0.5)).toBe(24 - 2 * (0.5 + 0.5));
-    // Zoom-scaled stroke/gap (the classic markers' shape).
-    expect(labelBudget(24, 1 * 4, 0.5 * 4)).toBe(24 - 2 * (2 + 2));
+    // on each side, so a 16px box with a 1px frame holds 15px of label.
+    expect(labelBudget(16, 1)).toBe(16 - 2 * 0.5);
+    expect(labelBudget(24, 1)).toBe(24 - 2 * 0.5);
+    // Zoom-scaled stroke (the classic markers' shape at zoom 0.25).
+    expect(labelBudget(24, 1 * 4)).toBe(24 - 2 * 2);
   });
 
   it('never returns a negative budget for a box smaller than its own border', () => {
-    expect(labelBudget(2, 4, 1)).toBe(0);
+    expect(labelBudget(2, 4)).toBe(0);
+  });
+
+  it('THE CASE THAT SET THE GAP TO ZERO: a fit-to-window classic viewport', () => {
+    // The classic viewport opens fit-to-window — measured at 0.5796875 on a
+    // 856px canvas. The font is screen-constant so "0E" is 2 cells of 8/0.58 =
+    // 13.8 world px, in a 16 world px box whose 1-screen-px border reaches
+    // 0.86 world px in. It clears the frame with room to spare...
+    const zoom = 0.5796875;
+    expect(monoWidth('0E', 8 / zoom)).toBeCloseTo(13.8, 1);
+    expect(monoWidth('0E', 8 / zoom)).toBeLessThan(labelBudget(16, 1 / zoom));
+    // ...and half a pixel of breathing room on each side would have deleted it.
+    const withHalfPixelGap = labelBudget(16, 1 / zoom) - 2 * (0.5 / zoom);
+    expect(monoWidth('0E', 8 / zoom)).toBeGreaterThan(withHalfPixelGap);
   });
 });
 
@@ -185,13 +198,13 @@ describe('fitLabelInContext measures at the context\'s own font', () => {
 // ---------------------------------------------------------------------------
 
 describe('the aeon object marker (OverlayRenderer.drawObjects)', () => {
-  // Box 16 world px, 1 world px border, 0.5 world px gap => 14 world px.
-  const budget = labelBudget(OBJECT_BOX_SIZE, OBJECT_BOX_STROKE_WIDTH, OBJECT_LABEL_GAP);
+  // Box 16 world px minus its own 1 world px border => 15 world px.
+  const budget = labelBudget(OBJECT_BOX_SIZE, OBJECT_BOX_STROKE_WIDTH);
   /** Label font in WORLD px at a given zoom — screen-constant, so 8 / zoom. */
   const worldFont = (zoom: number) => OBJECT_LABEL_FONT_PX / zoom;
 
-  it('the budget is the box minus its own border and gap', () => {
-    expect(budget).toBe(14);
+  it('the budget is the box minus its own border', () => {
+    expect(budget).toBe(15);
   });
 
   it('THE BOOKED CASE: "solid" does not fit this box at zoom 1', () => {
@@ -202,8 +215,8 @@ describe('the aeon object marker (OverlayRenderer.drawObjects)', () => {
   });
 
   it('at zoom 1 it elides to one character plus the marker', () => {
-    // 14 px budget / 4 px cell = 3 cells; the ellipsis is 2 of them.
-    expect(budget / cell(worldFont(1))).toBe(3.5);
+    // 15 px budget / 4 px cell = 3 cells; the ellipsis is 2 of them.
+    expect(Math.floor(budget / cell(worldFont(1)))).toBe(3);
     const fit = fitLabel('solid', budget, at(worldFont(1)));
     expect(fit.text).toBe(`s${LABEL_ELLIPSIS}`);
     expect(fit.elided).toBe(true);
@@ -229,7 +242,7 @@ describe('the aeon object marker (OverlayRenderer.drawObjects)', () => {
 describe('the classic ghost marker (invisible/trigger objects)', () => {
   // Box 24 world px; border and gap are SCREEN px, so both scale with invZoom.
   const budget = (zoom: number) => labelBudget(
-    GHOST_MARKER_BOUNDS.width, MARKER_STROKE_PX / zoom, MARKER_LABEL_GAP_PX / zoom);
+    GHOST_MARKER_BOUNDS.width, MARKER_STROKE_PX / zoom);
   const worldFont = (zoom: number) => 8 / zoom;
   const NAME = 'Conveyor Belt Controller'; // s1-objects.ts $68, the longest of the six
 
@@ -240,9 +253,9 @@ describe('the classic ghost marker (invisible/trigger objects)', () => {
   });
 
   it('at zoom 1 it elides to three characters plus the marker', () => {
-    // budget 24 - 2 = 22 world px; 22 / 4 = 5.5 cells; 5 usable, 2 for the
+    // budget 24 - 1 = 23 world px; 23 / 4 = 5.75 cells; 5 usable, 2 for the
     // ellipsis, 3 for the name.
-    expect(budget(1)).toBe(22);
+    expect(budget(1)).toBe(23);
     const fit = fitLabel(NAME, budget(1), at(worldFont(1)));
     expect(fit.text).toBe(`Con${LABEL_ELLIPSIS}`);
     expect(fit.width).toBeLessThanOrEqual(budget(1));
@@ -266,7 +279,7 @@ describe('the classic ghost marker (invisible/trigger objects)', () => {
 
 describe('the classic hex fallback marker', () => {
   const budget = (zoom: number) => labelBudget(
-    HEX_MARKER_SIZE, MARKER_STROKE_PX / zoom, MARKER_LABEL_GAP_PX / zoom);
+    HEX_MARKER_SIZE, MARKER_STROKE_PX / zoom);
   const worldFont = (zoom: number) => 8 / zoom;
 
   it('two hex digits fit unchanged at zoom 1 — this fix costs the common case nothing', () => {
@@ -277,7 +290,7 @@ describe('the classic hex fallback marker', () => {
 
   it('but the SAME two digits overflow once the screen-sized font outgrows the box', () => {
     // zoom 0.5: cells are 8 world px, so "0E" is 16 world px in a 16 world px
-    // box — edge to edge, over the border, before any gap.
+    // box — edge to edge, straight over the border on both sides.
     expect(monoWidth('0E', worldFont(0.5))).toBe(HEX_MARKER_SIZE);
     expect(monoWidth('0E', worldFont(0.5))).toBeGreaterThan(budget(0.5));
     expect(fitLabel('0E', budget(0.5), at(worldFont(0.5))).text).toBe('');
