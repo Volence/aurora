@@ -38,7 +38,7 @@ import { angleDegrees, isAir, isKnownProfile } from '../../core/collision/collis
 import { cellTileIndices } from '../../core/collision/collision-cell';
 import { collisionPaintTargets } from '../../core/collision/collision-paint';
 import { unpackCollisionCell, selectedCollisionWord } from '../../core/collision/collision-cell-word';
-import { resolveCell, resolvePlaneWords, ensureCollisionPlanes } from '../../core/collision/collision-cell-resolve';
+import { resolveCell, resolvePlaneWords, ensureCollisionPlanes, SECTION_PLANE_WORDS } from '../../core/collision/collision-cell-resolve';
 import { drawCollisionShape } from '../../core/collision/collision-shape-draw';
 import type { ShapeDrawCtx, ShapeDrawOpts } from '../../core/collision/collision-shape-draw';
 import { heightSparkline } from '../../core/collision/collision-render';
@@ -1543,7 +1543,10 @@ export default function MapViewport() {
             const cellRow = Math.floor(info.row / 2) * 2;
             // In the A/B diff (both overlays on) the base shown is A, so report A.
             const pathB = overlays.showCollisionPathB && !overlays.showCollision;
-            const len = section.engineCollision?.length ?? section.tileGrid.nametable.length;
+            // Same bound the overlay uses, and the same one this readout
+            // indexes with below (cellRow * SECTION_TILES_WIDE + cellCol) —
+            // never an array's own length (ROADMAP §5.1 item 10).
+            const len = SECTION_PLANE_WORDS;
             const words = pathB
               ? resolvePlaneWords(section.collisionEditB, section.engineCollisionB ?? section.engineCollision, len)
               : resolvePlaneWords(section.collisionEdit, section.engineCollision, len);
