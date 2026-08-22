@@ -59,7 +59,8 @@ describe('s4-types', () => {
       expect(section.objects).toEqual([]);
       expect(section.rings).toEqual([]);
       expect(section.paletteRef).toBeNull();
-      expect(section.parallaxRef).toBeNull();
+      expect(section.bgLayoutRef).toBeNull();
+      expect(section.sceneRef).toBeNull();
       expect(section.flags).toBe(0);
       expect(section.music).toBe(0);
     });

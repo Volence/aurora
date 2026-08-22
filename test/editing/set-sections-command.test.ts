@@ -14,7 +14,6 @@ function makeLevel(): { level: S4Level; act: Act; original: Section } {
     startPosition: { secX: 0, secY: 0, localX: 0, localY: 0 },
     bgLayout: null,
     bgTiles: null,
-    parallaxRef: null,
   };
   return { level: { sections: act.sections, act }, act, original };
 }
