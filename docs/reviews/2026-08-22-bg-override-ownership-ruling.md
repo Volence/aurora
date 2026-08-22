@@ -70,6 +70,30 @@ rest state.
 rewrites the layout.** It must be ONE automatic, single-undo command — already named in
 Aurora's piece-D design as the main correctness risk there.
 
+### 3a. The blob GREW across the loss — 340 → 448 tiles
+
+Contributed by the aeon overseer, verified here: `len(tiles)` is **340** at `b0e5a661`
+and **448** at `dd93a840` and today. So the static blob was not merely renumbered by the
+re-import — **it grew by 108 tiles**. A merge preserving `anims` would therefore not have
+produced subtly-stale art in slots 0..191; it would have pointed two bands at a blob whose
+entire contents had shifted underneath them. §4's "silent visual corruption that clears
+every gate" is, if anything, **understated**.
+
+### 3b. Why §5's wrong budget rule is worse than over-reservation
+
+`BG_TILE_CAPACITY = 448` (`aeon/tools/vram_map.py:26`), and the current OJZ file holds
+**exactly 448 tiles**.
+
+Under empyrean §5's rule as written — `tiles` + animated slots ≤ 448 — this act is
+already **at** capacity, so a writer following it literally would conclude that OJZ act 1
+**cannot have any bands at all** without first shrinking the static art. Under the correct
+prefix rule (`Σ(band tiles) ≤ len(tiles) ≤ 448`) bands are perfectly possible: they
+overlay the first Σn slots and cost no additional capacity.
+
+**So §5's error does not merely cause over-reservation — it would tell Aurora that the
+flagship act cannot have the feature this entire arc exists to build.** A demonstrated
+consequence on real data, not a theoretical one.
+
 **This kills candidate (b)** (move `anims` to its own Aurora-owned file): it would split a
 *body* across two files joined by a slot-numbering invariant no gate checks. The sidecar
 precedent does not extend, and the reason is exact — that precedent works because a
