@@ -10,6 +10,7 @@ import {
   BG_LAYOUT_WORDS,
   BG_LAYOUT_WORDS_LEGACY,
   LAYOUT_WORD_MAX,
+  LAYOUT_TILE_INDEX_MASK,
   TILE_BYTES,
   TILE_PIXELS,
   TILE_PIXEL_MAX,
@@ -53,7 +54,7 @@ const CONTRACT_PATH = resolve(
   __dirname, '../../src/core/formats/bg-override/bganim-consumer-contract.json',
 );
 const CONTRACT_TEXT = readFileSync(CONTRACT_PATH, 'utf8');
-const CONTRACT_SHA256 = 'ccb822a1f5dab8f297a5683983f0738d103c278945ace6654e1d491c625a0c88';
+const CONTRACT_SHA256 = '09729a7bd91b0fac9efc11cd31ca86e9066b3b9582c0035c69b7c4f502523a48';
 
 describe('the vendored contract is the one we pinned', () => {
   it('matches the pinned content hash', () => {
@@ -84,6 +85,7 @@ describe('every exported constant is READ from the contract, not typed beside it
   const EXPORTED: Record<string, number> = {
     BGANIM_MAX_BANDS, BGANIM_PHASE_BANKS, BG_TILE_CAPACITY, TILE_BYTES, TILE_PIXELS,
     TILE_PIXEL_MAX, TILE_WIDTH_PX, BG_LAYOUT_WORDS, BG_LAYOUT_WORDS_LEGACY, LAYOUT_WORD_MAX,
+    LAYOUT_TILE_INDEX_MASK,
   };
 
   it('every exported constant equals its contract value', () => {
@@ -157,14 +159,19 @@ describe('the contract declares a complete, well-formed key model', () => {
     expect(required.slice().sort()).toEqual(['cols', 'pattern_px', 'phases', 'rows']);
   });
 
-  it('names every invariant the codec enforces, prefix identity included', () => {
+  it('names every invariant the codec and the band command enforce, prefix identity included', () => {
     const invariants = at(['invariants']) as Record<string, string>;
     expect(Object.keys(invariants).sort()).toEqual([
       'bandCeiling', 'capacity', 'columnBytesPowerOfTwo', 'contiguousPacking',
-      'insideTheBlob', 'patternWidth', 'prefixIdentity',
+      'insideTheBlob', 'layoutTileIndex', 'patternWidth', 'prefixIdentity',
     ]);
     expect(invariants.prefixIdentity).toContain('phases[0] == tiles[slot_base');
     expect(invariants.capacity).toContain('PREFIX');
+    // The layout-word rule the band command renumbers through. Both halves are
+    // load-bearing and the second is the one a reader forgets: the index mask,
+    // and the `word == 0` blank escape that is NOT a reference to tiles[0].
+    expect(invariants.layoutTileIndex).toContain('attributes the consumer preserves');
+    expect(invariants.layoutTileIndex).toContain('exactly 0');
   });
 
   it('records the driver table as a scalar-source map, not an axis list', () => {
