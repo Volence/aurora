@@ -36,7 +36,15 @@ import * as http from 'node:http';
 
 const PORT = Number(process.env.PORT ?? 9397);
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));   // this worktree
-const ELECTRON = `${ROOT}/node_modules/.bin/electron`;
+// Worktrees have no node_modules of their own — walk up (the same resolution
+// npx uses) until the electron binary appears.
+const ELECTRON = (() => {
+  for (let d = ROOT; d !== dirname(d); d = dirname(d)) {
+    const p = join(d, 'node_modules/.bin/electron');
+    if (existsSync(p)) return p;
+  }
+  throw new Error('electron binary not found above ' + ROOT);
+})();
 const S1DIR = '/home/volence/sonic_hacks/s1disasm';
 const SHOTS = join(ROOT, 'scratchpad/shots-s1-families');
 mkdirSync(SHOTS, { recursive: true });
