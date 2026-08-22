@@ -39,7 +39,8 @@ describe('classicObjectLibraryItems', () => {
   // Real-table expectations, hand-derived (see s1-object-presentation.test.ts
   // for the table citations): GHZ links 36 ids (35 + Sonic's $01 DPLC row);
   // the five shared-link Eggman ids dedup to one row → 32 object rows, plus
-  // the Boss Items named art doc → 33 rows before the heading.
+  // the named art docs (Boss Items + the 13 non-level families, Parcel B)
+  // → 46 rows before the heading.
   const items = classicObjectLibraryItems('ghz', true);
   const headingIdx = items.findIndex((i) => i.heading === true);
 
@@ -48,11 +49,19 @@ describe('classicObjectLibraryItems', () => {
     expect(items.filter((i) => i.heading)).toHaveLength(1);
     const available = items.slice(0, headingIdx);
     const rest = items.slice(headingIdx + 1);
-    expect(available).toHaveLength(33);
-    // Named art docs (Boss Items) ride at the end of the available block with
-    // a doc:sprite: id — they are not object rows.
+    expect(available).toHaveLength(46);
+    // Named art docs ride at the end of the available block with a
+    // doc:sprite: id — they are not object rows. Table order = declaration
+    // order in S1_NAMED_ART_DOCS.
     const namedDocs = available.filter((i) => i.id.startsWith('doc:sprite:'));
-    expect(namedDocs.map((i) => i.label)).toEqual(['Boss Items']);
+    expect(namedDocs.map((i) => i.label)).toEqual([
+      'Boss Items', 'Shield & Invincibility', 'HUD', 'Title Screen Sonic',
+      'Press Start / TM', 'Title Cards', 'Game Over', 'Continue Screen',
+      'Ending Sonic', 'Ending Emeralds', 'Ending StH Logo', 'Try Again',
+      'Credits Font', 'SS Result Emeralds',
+    ]);
+    // NEVER gated on a level: named rows are zone-free by construction.
+    for (const d of namedDocs) expect(d.disabled).toBeUndefined();
     // Every named id appears exactly once across the two blocks (merged rows
     // carry their extra ids in the hint, not as rows).
     const linked = S1_OBJECT_LIST.filter((o) => resolveObjectArt(o.id, 'ghz') !== undefined);
@@ -94,6 +103,9 @@ describe('classicObjectLibraryItems', () => {
     expect(ring.disabled).toBeUndefined();
     const sonic = cold.find((i) => i.label === 'Sonic')!;
     expect(sonic.disabled).toBeUndefined();
+    // Named family rows (Parcel B) are zone-free by construction — never gated.
+    const cont = cold.find((i) => i.label === 'Continue Screen')!;
+    expect(cont.disabled).toBeUndefined();
     // Every disabled pre-heading row carries the honest palette reason.
     for (const i of cold.slice(0, idx)) {
       if (i.disabled) expect(i.reason).toContain('Open a level first');

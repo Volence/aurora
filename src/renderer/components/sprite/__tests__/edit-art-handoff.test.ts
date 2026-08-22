@@ -17,14 +17,17 @@ import {
   __setSpriteSetOpenerForTest,
   __resetSpriteSetOpenerForTest,
   __setAnimScriptReaderForTest,
+  __setPalFileReaderForTest,
   syncedTimelineAnims,
 } from '../export-sprite';
+import { decodeGenesisColor } from '../../../../core/formats/palette';
 import { resolveObjectAnims } from '../../../../core/project/profiles/s1-object-anims';
 import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import type { DiscoveredSpriteSet } from '../../../../core/import/sprite-discovery';
 import type { CompressionKind } from '../../../../core/compress';
 import { useClassicProjectStore } from '../../../state/classicProjectStore';
+import { useToastStore } from '../../../state/toastStore';
 import { useClassicLevelStore } from '../../../state/classicLevelStore';
 import { useSpriteStore } from '../../../state/spriteStore';
 import { useSessionStore } from '../../../state/sessionStore';
@@ -73,6 +76,7 @@ afterEach(() => {
   useSpriteStore.getState().closeAll();
   __resetSpriteSetOpenerForTest();
   __setAnimScriptReaderForTest(null);
+  __setPalFileReaderForTest(null);
   useConfirmStore.setState({ ask: realAsk }); // undo any stubbed confirm
   vi.restoreAllMocks();
 });
@@ -292,6 +296,80 @@ describe('editObjectArtCheckout', () => {
       art: 'artnem/Boss - Weapons.nem',
     });
     expect(useSpriteStore.getState().characterAnims).toEqual([]); // no anim link for named docs
+  });
+
+  it('Continue Screen (named): composite slice + mini-Sonic frameSources + palette FILE all thread into the open, level-free', async () => {
+    // Parcel B's densest row — obj $80/$81's VRAM composed statically: the
+    // title-card letter pool at +$80 (sonic.asm:3462-3468), the mini-Sonic
+    // frames 5-7 on their own obGfx pool, and Pal_Continue seeding from
+    // palette/Special Stage Continue Bonus.bin instead of any level palette.
+    useClassicLevelStore.setState({ ref: null, doc: null });
+    const calls: OpenCall[] = [];
+    __setSpriteSetOpenerForTest(stubOpener(calls, 8));
+    const palReads: string[] = [];
+    __setPalFileReaderForTest(async (base, rel) => {
+      palReads.push(`${base}|${rel}`);
+      return new Uint8Array(64); // shape-only: threading is this test's subject
+    });
+
+    const ok = await editObjectArtCheckout('continue');
+    expect(ok).toBe(true);
+    expect(calls[0].comp).toBe('nemesis');
+    expect(calls[0].set).toMatchObject({
+      game: 's1',
+      mappings: '_maps/Continue Screen.asm',
+      art: 'artnem/Continue Screen Sonic.nem',
+      extraSources: [{ art: 'artnem/Title Cards.nem', compression: 'nemesis', tileBase: 0x80 }],
+      frameSources: [{ firstFrame: 5, lastFrame: 7, art: 'artnem/Continue Screen Stuff.nem', compression: 'nemesis' }],
+    });
+    // The palette came from the ROW's file, read against the project dir.
+    expect(palReads).toEqual([`${DIR}|palette/Special Stage Continue Bonus.bin`]);
+  });
+
+  it('a palFile row seeds the standalone palette from the DECLARED LINE of the real palette file', async () => {
+    // titlesonic declares pal line 1 (Tile_Pal2 in obGfx, _incObj/0E,0F:28) of
+    // palette/Title Screen.bin. Feed the REAL s1disasm bytes through the seam
+    // and demand the seeded colors equal that file's SECOND 32-byte line —
+    // derived here from the same bytes, not hardcoded.
+    const S1DIR = '/home/volence/sonic_hacks/s1disasm';
+    if (!existsSync(join(S1DIR, 'palette/Title Screen.bin'))) return; // tree absent — the render suite already skips
+    useClassicLevelStore.setState({ ref: null, doc: null });
+    __setSpriteSetOpenerForTest(stubOpener([], 8));
+    const bytes = new Uint8Array(readFileSync(join(S1DIR, 'palette/Title Screen.bin')));
+    __setPalFileReaderForTest(async () => bytes);
+
+    const ok = await editObjectArtCheckout('titlesonic');
+    expect(ok).toBe(true);
+    const s = useSpriteStore.getState();
+    expect(s.paletteMode).toBe('standalone');
+    const expected = Array.from({ length: 16 }, (_, i) => {
+      const w = (bytes[32 + i * 2] << 8) | bytes[32 + i * 2 + 1]; // line 1 = bytes 32..63
+      const c = decodeGenesisColor(w);
+      return i === 0 ? { ...c, a: 0 } : c;
+    });
+    expect(s.standalonePalette).toEqual(expected);
+    // Anti-vacuous: line 1 differs from line 0 in this file, so a wrong-line
+    // seed cannot pass (derived from the same bytes).
+    expect(bytes.slice(32, 64)).not.toEqual(bytes.slice(0, 32));
+    // Frame preselection: the finger-wag pose (row frame 6).
+    expect(s.currentIndex).toBe(6);
+  });
+
+  it('a palFile too short for the declared line SKIPS seeding loudly instead of seeding wrong colors', async () => {
+    useClassicLevelStore.setState({ ref: null, doc: null });
+    __setSpriteSetOpenerForTest(stubOpener([], 8));
+    __setPalFileReaderForTest(async () => new Uint8Array(32)); // one line — titlesonic wants line 1
+    const toasts: string[] = [];
+    const addToast = useToastStore.getState().addToast;
+    useToastStore.setState({ addToast: (m: string, k?: string) => { toasts.push(m); addToast(m, k as never); } } as never);
+
+    const before = useSpriteStore.getState().standalonePalette;
+    const ok = await editObjectArtCheckout('titlesonic');
+    useToastStore.setState({ addToast } as never);
+
+    expect(ok).toBe(true); // the art still opens — colors are the soft part
+    expect(useSpriteStore.getState().standalonePalette).toBe(before); // untouched
+    expect(toasts.some((m) => m.includes('no line 1'))).toBe(true);
   });
 
   it('a NUMERIC STRING ref (the tab-activation form) still resolves the object row', async () => {
