@@ -9,6 +9,46 @@
 The role, delegation discipline, review bars, and peer protocol live in the shared
 protocol doc. This file is what's Aurora-specific.
 
+## ⚠ Read the shared protocol at a COMMITTED REVISION, not through the path
+
+*(Added 2026-08-22. This is the shared protocol's own most-upstream rule — empyrean
+`baf15c28`, Boot section — recorded here because the boot sequence that would tell you
+about it is the one thing that happens before you have read it.)*
+
+```sh
+git -C ../empyrean fetch -q origin && \
+git -C ../empyrean show origin/main:docs/OVERSEER-PROTOCOL.md
+```
+
+`../empyrean/docs/OVERSEER-PROTOCOL.md` is **the empyrean lane's live working tree.** On
+this machine every sibling repo is some peer's working directory, so reading the suite's
+shared contract by path delivers it out of somebody's uncommitted edits, once per session,
+as step two of boot. Boot while that lane is mid-edit and you reason from half-written
+rules all session, dispatch agents under them, and bank them as contract — and **nothing
+ever looks wrong**, because correct citation discipline applied to a bad source produces a
+*more* convincing artifact, not a less convincing one. You go on to cite those rules
+accurately and hand peers perfectly-formed anchors to rules that never existed.
+
+Two boundaries, not glossed: `origin/main` can lag legitimately-pushed work, so this trades
+an **invisible failure for a visible lag** — the right trade, but a real one. And it is the
+*recovery* direction, so it takes freshly-fetched tip and **never** a pinning revision (the
+currency-check scope note in the peer section governs the opposite question).
+
+**Re-read mid-session — the boot read is the only one anybody performs.** A long-running
+overseer drifts from that document monotonically and nothing prompts a re-read on its own.
+Triggers: **when a peer cites a bar you do not recognise, before dispatching a wave of
+agents under the bars, and at any landing.**
+
+*This session's own instance, since it is the argument:* this lane booted by path at
+`682e2893`, dispatched two parcels, and re-read only when a peer mentioned the defect in
+passing. The document had gone **303 → 464 lines** in the interim. Nothing had gone wrong
+yet, and there was no mechanism by which it would have surfaced.
+
+**Adopting this read is entirely within a session's own discretion** — it changes nothing
+outside the process and touches no config. The `/overseer` skill file still names the path;
+three lanes have surfaced that to the owner rather than patching it, which is the correct
+posture for a file that is his.
+
 ## The queue
 
 **`docs/ROADMAP.md` is the plan of record — read §2.6 then §5.1 and stop.** §2.6 records
