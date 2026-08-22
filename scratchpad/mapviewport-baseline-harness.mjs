@@ -97,18 +97,42 @@
 // Usage:
 //   VITE_AURORA_DEBUG=1 npm run build
 //   node scratchpad/mapviewport-baseline-harness.mjs        (VERBOSE=1 for app logs)
+//                                                          (PORT=... to move off 9427)
+//                                                          (AURORA_ROOT=... to pin the tree)
 
 import { spawn, execSync } from 'node:child_process';
-import { writeFileSync, statSync, mkdirSync } from 'node:fs';
+import { writeFileSync, statSync, existsSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as http from 'node:http';
 
 const PORT = Number(process.env.PORT ?? 9427);
-const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));   // this worktree
+
+/**
+ * WHICH TREE ACTUALLY RUNS. A git worktree shares no node_modules and no dist/
+ * with the checkout it was cut from, so `<worktree>/node_modules/.bin/electron`
+ * does not exist there. Rather than fail with ENOENT halfway through a spawn,
+ * walk up until a tree has BOTH a built main bundle and an electron binary, and
+ * announce which one was chosen — the run is against THAT tree's build, and a
+ * reader has to know whether it was the one they edited.
+ */
+function resolveRoot() {
+  const here = dirname(dirname(fileURLToPath(import.meta.url)));
+  const runnable = (d) => existsSync(join(d, 'node_modules/.bin/electron')) && existsSync(join(d, 'dist/main/index.mjs'));
+  if (process.env.AURORA_ROOT) return { root: process.env.AURORA_ROOT, here, borrowed: process.env.AURORA_ROOT !== here };
+  let dir = here;
+  for (let i = 0; i < 8; i++) {
+    if (runnable(dir)) return { root: dir, here, borrowed: dir !== here };
+    const up = dirname(dir);
+    if (up === dir) break;
+    dir = up;
+  }
+  return { root: here, here, borrowed: false };
+}
+const { root: ROOT, here: HERE, borrowed: BORROWED } = resolveRoot();
 const ELECTRON = `${ROOT}/node_modules/.bin/electron`;
 const AEON_DIR = '/home/volence/sonic_hacks/aeon';               // OPEN ONLY — never saved
-const SHOTS = join(ROOT, 'scratchpad/shots-mapviewport-baseline');
+const SHOTS = join(HERE, 'scratchpad/shots-mapviewport-baseline');
 mkdirSync(SHOTS, { recursive: true });
 
 const FRAME_MS = 1000 / 59.92275;   // 16.6881ms — one NTSC Mega Drive frame
@@ -414,6 +438,15 @@ function assertCell(cell) {
 
 // -------------------------------------------------------------------- the run
 async function main() {
+  console.log(`root: ${ROOT}${BORROWED ? `  (script lives in ${HERE}; that tree has no built app, so the app under test is ${ROOT}'s build)` : ''}`);
+  if (BORROWED) {
+    note('root', 'The measured binary is NOT built from the tree this script sits in. That is only safe while the '
+      + 'two trees share their src/ — check `git diff` between them before trusting a number, or build in place.');
+  }
+  if (!existsSync(join(ROOT, 'dist/main/index.mjs'))) {
+    throw new Error(`no built app at ${ROOT}/dist/main/index.mjs — run VITE_AURORA_DEBUG=1 npm run build there first`);
+  }
+  if (!existsSync(ELECTRON)) throw new Error(`no electron binary at ${ELECTRON} — npm install in ${ROOT}`);
   // A STALE dist/ MAKES EVERY ROW VACUOUS.
   const distM = statSync(join(ROOT, 'dist/main/index.mjs')).mtimeMs;
   const newest = execSync(
