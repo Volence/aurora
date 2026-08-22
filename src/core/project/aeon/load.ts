@@ -339,7 +339,7 @@ async function loadFullProject(
             await markUnreadable(fa, section, `${prefix}.rings.json`, 'rings.json', e, notices);
           }
 
-          // Load meta sidecar (bgLayoutRef/paletteRef) — optional, only
+          // Load meta sidecar (bgLayoutRef/paletteRef/sceneRef) — optional, only
           // written when a section carries non-default refs. Absent, the
           // defaults from createSection stand; present but unparseable is a
           // different fact, and the loudest one here: all-null refs are exactly
@@ -349,6 +349,7 @@ async function loadFullProject(
             const meta = parseSectionMeta(new TextDecoder().decode(metaRaw));
             section.bgLayoutRef = meta.bgLayoutRef;
             section.paletteRef = meta.paletteRef;
+            section.sceneRef = meta.sceneRef;
           } catch (e) {
             await markUnreadable(fa, section, `${prefix}.meta.json`, 'meta.json', e, notices);
           }

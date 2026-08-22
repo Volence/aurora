@@ -120,6 +120,17 @@ export interface Section {
   paletteRef: string | null;
   parallaxRef: string | null;
   bgLayoutRef: string | null;
+  /**
+   * Effects scene assigned to this section: null = the act default, else an id
+   * from the editor effects library. Persisted through the meta sidecar's
+   * `sceneRef` (src/core/formats/section-meta.ts), which aeon's effects
+   * generator also reads.
+   *
+   * Not to be confused with `parallaxRef` above, which this does NOT replace:
+   * that one is never persisted, and the act-level scene default lives on
+   * `Act.parallaxRef` instead.
+   */
+  sceneRef: string | null;
   flags: number;
   music: number;
 }
@@ -135,6 +146,7 @@ export function createSection(index: number, name: string): Section {
     paletteRef: null,
     parallaxRef: null,
     bgLayoutRef: null,
+    sceneRef: null,
     flags: 0,
     music: 0,
   };

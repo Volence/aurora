@@ -69,9 +69,21 @@ function fixtureFiles(): Map<string, Uint8Array> {
 // Meta-sidecar fixture. The well-formed text comes from the serializer rather
 // than being spelled out, so it stays the exact shape a save would have left.
 const META_PATH = 'data/ojz/act1/section_0.meta.json';
-const META_REFS = { bgLayoutRef: 'bg-cave', paletteRef: 'pal-dusk' };
+const META_REFS = { bgLayoutRef: 'bg-cave', paletteRef: 'pal-dusk', sceneRef: null };
 const WELL_FORMED_META = serializeSectionMeta(META_REFS)!;
 const MALFORMED_META = WELL_FORMED_META.slice(0, -1);  // truncated hand-edit
+
+// A sidecar as some OTHER writer leaves it — aeon's generator, or a hand edit —
+// carrying the effects-arc scene assignment. Hand-written rather than built by
+// serializeSectionMeta: a serializer that dropped sceneRef would drop it from
+// the fixture too, and the test would pass while proving nothing.
+const SCENE_META_ON_DISK = [
+  '{',
+  '  "bgLayoutRef": "bg-cave",',
+  '  "paletteRef": "pal-dusk",',
+  '  "sceneRef": "canopy_dusk"',
+  '}',
+].join('\n');
 
 // ── Editable collision-plane fixture ────────────────────────────────────────
 // The editable planes are only read when the act declares strip source, which
@@ -196,6 +208,43 @@ describe('loadAeonProject', () => {
     expect(section.paletteRef).toBe(META_REFS.paletteRef);
     expect(section.unreadable).toBeUndefined();
     expect(r.notices).toEqual([]);
+  });
+
+  /**
+   * The effects-arc assignment ref (empyrean docs/AURORA_EFFECTS_SCHEMA.md §3 at
+   * 1326ceb; aeon tools/EFFECTS_CONSUMER_CONTRACT.md §2.2 at 00607dd5): a string
+   * scene id or null, loaded exactly like its two siblings.
+   */
+  it('loads sceneRef from the sidecar alongside the other refs', async () => {
+    const files = fixtureFiles();
+    files.set(META_PATH, new TextEncoder().encode(SCENE_META_ON_DISK));
+    const r = await loadAeonProject(memFa(files), '/proj');
+    const section = r.project.zones[0].acts[0].sections[0]!;
+    expect(section.sceneRef).toBe('canopy_dusk');
+    expect(section.bgLayoutRef).toBe('bg-cave');   // siblings unaffected
+    expect(section.paletteRef).toBe('pal-dusk');
+    expect(section.unreadable).toBeUndefined();
+    expect(r.notices).toEqual([]);
+  });
+
+  it('loads a sidecar whose only ref is sceneRef', async () => {
+    const files = fixtureFiles();
+    const onlyScene = serializeSectionMeta({ bgLayoutRef: null, paletteRef: null, sceneRef: 'canopy_dusk' })!;
+    expect(onlyScene).toContain('canopy_dusk');   // anti-vacuous: really written
+    files.set(META_PATH, new TextEncoder().encode(onlyScene));
+    const r = await loadAeonProject(memFa(files), '/proj');
+    const section = r.project.zones[0].acts[0].sections[0]!;
+    expect(section.sceneRef).toBe('canopy_dusk');
+    expect(section.bgLayoutRef).toBeNull();
+    expect(section.paletteRef).toBeNull();
+    expect(section.unreadable).toBeUndefined();
+  });
+
+  it('leaves sceneRef null for a section with no sidecar', async () => {
+    const files = fixtureFiles();
+    expect(files.has(META_PATH)).toBe(false);
+    const r = await loadAeonProject(memFa(files), '/proj');
+    expect(r.project.zones[0].acts[0].sections[0]!.sceneRef).toBeNull();
   });
 
   /**

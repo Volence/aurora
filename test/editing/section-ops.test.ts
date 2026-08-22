@@ -62,6 +62,45 @@ describe('cloneSection', () => {
     const noTiles = sec(0, 1);
     expect(cloneSection(noTiles, 1).tiles).toBeNull();
   });
+
+  /**
+   * cloneSection enumerates its fields by hand rather than spreading, so a ref
+   * added to Section and forgotten here is dropped from every copy/paste with
+   * nothing to notice it — and the scalar refs had no coverage at all until
+   * sceneRef arrived. Asserted over every ref together, from a section whose
+   * refs are genuinely distinct and non-null, so no one of them can stand in
+   * for another.
+   */
+  it('carries every scalar ref onto the copy', () => {
+    const src = sec(0, 1);
+    src.paletteRef = 'pal-dusk';
+    src.parallaxRef = 'plx-legacy';
+    src.bgLayoutRef = 'bg-cave';
+    src.sceneRef = 'canopy_dusk';
+    src.flags = 3;
+    src.music = 7;
+
+    const clone = cloneSection(src, 5, 'Renamed');
+    expect(clone.paletteRef).toBe('pal-dusk');
+    expect(clone.parallaxRef).toBe('plx-legacy');
+    expect(clone.bgLayoutRef).toBe('bg-cave');
+    expect(clone.sceneRef).toBe('canopy_dusk');
+    expect(clone.flags).toBe(3);
+    expect(clone.music).toBe(7);
+  });
+
+  /**
+   * The same list from the other direction: a clone of a default section must
+   * not invent refs. Together with the test above this pins both halves of a
+   * hand-enumerated copy — carried when set, null when not.
+   */
+  it('leaves the scalar refs null when the source has none', () => {
+    const clone = cloneSection(sec(0, 1), 5);
+    expect(clone.paletteRef).toBeNull();
+    expect(clone.parallaxRef).toBeNull();
+    expect(clone.bgLayoutRef).toBeNull();
+    expect(clone.sceneRef).toBeNull();
+  });
 });
 
 describe('addSection', () => {

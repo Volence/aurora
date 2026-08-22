@@ -72,9 +72,23 @@ function fixtureFiles(): Map<string, Uint8Array> {
 // Meta-sidecar fixture, as in aeon-load.test.ts: the well-formed text comes from
 // the serializer so it is the exact shape a previous save would have left.
 const META_PATH = 'data/ojz/act1/section_0.meta.json';
-const META_REFS = { bgLayoutRef: 'bg-cave', paletteRef: 'pal-dusk' };
+const META_REFS = { bgLayoutRef: 'bg-cave', paletteRef: 'pal-dusk', sceneRef: null };
 const WELL_FORMED_META = serializeSectionMeta(META_REFS)!;
 const MALFORMED_META = WELL_FORMED_META.slice(0, -1);  // truncated hand-edit
+
+// A sidecar as some OTHER writer leaves it — aeon's generator, or a hand edit —
+// carrying the effects-arc scene assignment. Hand-written rather than built by
+// serializeSectionMeta: a serializer that dropped sceneRef would drop it from
+// the fixture too, and a byte comparison against that fixture would pass while
+// the key was being erased. This text is the contract's example body
+// (empyrean docs/AURORA_EFFECTS_SCHEMA.md §3 at 1326ceb).
+const SCENE_META_ON_DISK = [
+  '{',
+  '  "bgLayoutRef": "bg-cave",',
+  '  "paletteRef": "pal-dusk",',
+  '  "sceneRef": "canopy_dusk"',
+  '}',
+].join('\n');
 
 // ── Editable collision-plane fixture, as in aeon-load.test.ts ───────────────
 // The editable planes are only read when the act declares strip source, which
@@ -288,7 +302,107 @@ describe('buildAeonSavePlan', () => {
       { legacyAtlasMerged: false });
     const written = plan.files.find((f) => f.path === META_PATH);
     expect(written).toBeDefined();
-    expect(parseSectionMeta(text(written!.bytes)!)).toEqual({ bgLayoutRef: null, paletteRef: null });
+    expect(parseSectionMeta(text(written!.bytes)!)).toEqual({ bgLayoutRef: null, paletteRef: null, sceneRef: null });
+  });
+
+  // ---- sceneRef: the effects-arc assignment ref ----------------------------
+
+  /**
+   * THE contract property, measured on bytes on disk: a sidecar carrying
+   * sceneRef survives load -> save unchanged. Named as a requirement rather
+   * than an implementation detail in both halves — empyrean
+   * docs/AURORA_EFFECTS_SCHEMA.md §3/§6/§8 at 1326ceb ("parse->serialize must
+   * preserve `sceneRef`") and aeon tools/EFFECTS_CONSUMER_CONTRACT.md §2.2 at
+   * 00607dd5 — because parse builds a fresh object from keys it enumerates and
+   * serialize emits only what it enumerates, so a key either side misses is
+   * erased on the next save with no error anywhere.
+   */
+  it('round-trips a sceneRef sidecar byte-for-byte through load -> save', async () => {
+    const files = fixtureFiles();
+    files.set(META_PATH, new TextEncoder().encode(SCENE_META_ON_DISK));
+    // Anti-vacuous on disk: the subject really is present, and really non-null.
+    expect(text(files.get(META_PATH))).toContain('"sceneRef": "canopy_dusk"');
+
+    const fa = memFa(files);
+    const r = await loadAeonProject(fa, '/proj');
+    const section = r.project.zones[0].acts[0].sections[0]!;
+    // Anti-vacuous in memory: the load understood the file AND carries the ref,
+    // so the save below is exercising a preserved value, not a re-emitted null.
+    expect(section.unreadable).toBeUndefined();
+    expect(section.sceneRef).toBe('canopy_dusk');
+
+    const plan = await buildAeonSavePlan(fa, r.config, r.project, 'ojz', 'act1',
+      { legacyAtlasMerged: false });
+    const written = plan.files.find((f) => f.path === META_PATH);
+    expect(written).toBeDefined();
+    expect(text(written!.bytes)).toBe(SCENE_META_ON_DISK);
+  });
+
+  /**
+   * The same property where the other two refs cannot carry it. A three-ref
+   * document stays a non-empty, byte-stable file even if the sceneRef arm is
+   * broken at the write-condition site; a sceneRef-only section does not — with
+   * that site unaware of sceneRef the whole sidecar stops being written.
+   */
+  it('writes a sidecar for a section whose only ref is sceneRef', async () => {
+    const files = fixtureFiles();
+    expect(files.has(META_PATH)).toBe(false);       // no sidecar to start from
+    const fa = memFa(files);
+    const r = await loadAeonProject(fa, '/proj');
+    const section = r.project.zones[0].acts[0].sections[0]!;
+    expect(section.bgLayoutRef).toBeNull();         // genuinely all-default...
+    expect(section.paletteRef).toBeNull();
+    section.sceneRef = 'canopy_dusk';               // ...but for this one ref
+
+    const plan = await buildAeonSavePlan(fa, r.config, r.project, 'ojz', 'act1',
+      { legacyAtlasMerged: false });
+    const written = plan.files.find((f) => f.path === META_PATH);
+    expect(written).toBeDefined();
+    expect(JSON.parse(text(written!.bytes)!)).toEqual({
+      bgLayoutRef: null, paletteRef: null, sceneRef: 'canopy_dusk',
+    });
+  });
+
+  /**
+   * The cleared-overwrite body is its own hardcoded literal, separate from the
+   * serializer, and a third ref missing from it resurrects on the next load.
+   */
+  it('names sceneRef in the cleared-overwrite body', async () => {
+    const files = fixtureFiles();
+    files.set(META_PATH, new TextEncoder().encode(SCENE_META_ON_DISK));
+    const fa = memFa(files);
+    const r = await loadAeonProject(fa, '/proj');
+    const section = r.project.zones[0].acts[0].sections[0]!;
+    expect(section.sceneRef).toBe('canopy_dusk');   // there was something to clear
+    section.bgLayoutRef = null;
+    section.paletteRef = null;
+    section.sceneRef = null;
+
+    const plan = await buildAeonSavePlan(fa, r.config, r.project, 'ojz', 'act1',
+      { legacyAtlasMerged: false });
+    const written = plan.files.find((f) => f.path === META_PATH);
+    expect(written).toBeDefined();
+    expect(text(written!.bytes)).toContain('"sceneRef"');
+    expect(JSON.parse(text(written!.bytes)!)).toEqual({
+      bgLayoutRef: null, paletteRef: null, sceneRef: null,
+    });
+  });
+
+  /**
+   * The understood('meta.json') gate from a88db05 still holds with three refs:
+   * a sidecar Aurora could not parse is left exactly as the user left it, scene
+   * assignment included.
+   */
+  it('leaves an unreadable sidecar carrying a sceneRef byte-identical', async () => {
+    const malformed = SCENE_META_ON_DISK.slice(0, -1);   // truncated hand-edit
+    const files = fixtureFiles();
+    files.set(META_PATH, new TextEncoder().encode(malformed));
+    // Anti-vacuous: really unparseable, and really carrying the ref it would lose.
+    expect(() => JSON.parse(malformed)).toThrow();
+    expect(malformed).toContain('canopy_dusk');
+
+    const out = await loadSaveApply(files);
+    expect(text(out.get(META_PATH))).toBe(malformed);
   });
 
   it('creates no sidecar for the ordinary all-default section', async () => {
