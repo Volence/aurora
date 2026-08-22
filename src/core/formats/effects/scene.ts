@@ -1,0 +1,421 @@
+// Effects scene definition files — `{dataRoot}editor/effects/<scene_id>.json`.
+//
+// Wave-1 surface 1 of the parallax/raster effects arc. One scene per file; the
+// per-section pointer at it is `sceneRef` in the meta sidecar (surface 2,
+// src/core/formats/section-meta.ts, already landed).
+//
+// CONTRACT, both halves, pinned:
+//   • empyrean docs/AURORA_EFFECTS_SCHEMA.md §2 (shape), §6 (hazards), §8
+//     (golden protocol) — read at empyrean 069cf59, an ancestor of c2c81e2.
+//   • empyrean contract/schema/aurora-effects-scene.schema.json — the
+//     machine-readable half, vendored beside this file. Its git blob hash is
+//     2d7a9fee37d85334103ca1a3e03e1a40466d6d9c and the vendored copy is pinned
+//     against that hash by test/formats/effects-schema-drift.test.ts. The BLOB
+//     hash, not a commit citation, is the load-bearing invariant: the schema
+//     doc has moved twice (2f3b6fd, 069cf59) with the schema JSON byte-identical
+//     underneath, so a commit pin would read as drift that is not there.
+//   • aeon tools/EFFECTS_CONSUMER_CONTRACT.md §2.1/§2.3 at aeon 00607dd5 — the
+//     consumer's read set, and the drift rule that governs both directions.
+//
+// THE ONE STRUCTURAL IDEA HERE. This codec does not enumerate fields. Parse
+// hands back the object JSON.parse produced, untouched; serialize reorders keys
+// using the SCHEMA's own declaration order and refuses to drop anything. That is
+// the direct answer to §6 hazard 1 ("round-trip what you do not understand, or
+// refuse the file") and to the failure mode the sidecar codec has to fight with
+// a hostile comment at four hardcoded sites: a field the wave-1 UI does not
+// edit cannot be lost here, because there is no list for it to be missing from.
+//
+// VALIDATION SPLIT, restated because it is easy to over-build: this module
+// validates SHAPE against the committed schema and IDENTITY (stem == id,
+// schema == 1). Authored VALUES are sigil's — `tools/effects_gen.py` emits .emp
+// calling the same constructors the hand path uses, so every `ensure` and
+// `scene_budget_enforce` fires at build time (schema doc §2 preamble, scanline
+// design §7). Aurora may pre-check as ADVISORY UX; see
+// advisoryLayerDeformConflicts below, which is advisory in the literal sense —
+// nothing in the read or write path calls it.
+
+import type { FileAccess } from '../../project/adapter';
+import type { JsonSchema } from './json-schema-subset';
+import {
+  validateAgainstSchema,
+  canonicalizeBySchema,
+} from './json-schema-subset';
+import schemaJson from './aurora-effects-scene.schema.json';
+
+/** The committed contract schema, vendored byte-identical. */
+export const EFFECTS_SCENE_SCHEMA = schemaJson as unknown as JsonSchema;
+
+// ---------------------------------------------------------------------------
+// Model (§2.1 top level, §2.2 layer, §2.3 factor, §2.4 tableRef)
+//
+// Optional fields are optional in the TYPE too, and absent means "the schema's
+// default applies". Parse never fills a default in and serialize never writes
+// one out that was not on disk: injecting defaults would turn every load/save
+// of an untouched file into a diff, and would silently freeze today's default
+// into files that should track the contract's.
+// ---------------------------------------------------------------------------
+
+export type EffectsFactorName =
+  | 'FACTOR_LOCKED' | 'FACTOR_0' | 'FACTOR_1' | 'FACTOR_1_2' | 'FACTOR_1_4'
+  | 'FACTOR_1_8' | 'FACTOR_1_16' | 'FACTOR_1_32' | 'FACTOR_3_4' | 'FACTOR_3_8'
+  | 'FACTOR_3_16' | 'FACTOR_5_8' | 'FACTOR_5_16' | 'FACTOR_7_8' | 'FACTOR_7_16'
+  | 'FACTOR_15_16';
+
+/** `packed(s1:, s2:, op:)` — s1=15 term zero/locked, s2=15 single-term, op 0 add / 1 sub. */
+export interface EffectsPackedFactor { s1: number; s2: number; op: 0 | 1 }
+
+export type EffectsFactor = EffectsFactorName | EffectsPackedFactor;
+
+/** A 256-byte signed deform/column table: a generator call, or a raw .bin. */
+export type EffectsTableRef =
+  | { generator: 'sine'; amplitude: number; period: number }
+  | { generator: 'triangle'; amplitude: number; period: number }
+  | { generator: 'zero' }
+  | { generator: 'v_column_perspective'; focal: number; max_offset: number }
+  | { generator: 'v_column_floor'; center: number; max_offset: number }
+  | { bin: string };
+
+export type EffectsLayerDeform =
+  | 'none'
+  | { own: { table: EffectsTableRef; shift_a: number; shift_b: number; phase: number; speed: number } };
+
+export type EffectsSceneDeform =
+  | 'none'
+  | { shared: { table: EffectsTableRef; speed: number } };
+
+export type EffectsCurve = 'none' | { to: EffectsFactor };
+export type EffectsVSplit = 'none' | { at: number };
+export type EffectsVDeform =
+  | 'none'
+  | { columns: { table: EffectsTableRef; speed: number; amp_shift: number } };
+export type EffectsAnchor = 'none' | { at: { channel: number; dsa: number; dsb: number } };
+
+export interface EffectsLayer {
+  world_y: number;
+  fa: EffectsFactor;
+  fb: EffectsFactor;
+  dsa?: number;
+  dsb?: number;
+  phase?: number;
+  enabled?: boolean;
+  deform?: EffectsLayerDeform;
+  curve?: EffectsCurve;
+  vsplit?: EffectsVSplit;
+}
+
+export interface EffectsScene {
+  schema: 1;
+  id: string;
+  /** Display label. Writer-owned: the generator ignores it and must keep ignoring it. */
+  name?: string;
+  layers: EffectsLayer[];
+  v_factor: EffectsFactor;
+  v_center?: number;
+  v_offset?: number;
+  v_factor_fg?: EffectsFactor;
+  deform_fg?: EffectsSceneDeform;
+  deform_bg?: EffectsSceneDeform;
+  v_deform?: EffectsVDeform;
+  anchor?: EffectsAnchor;
+  left_column_mask?: 'undeclared' | 'sprite_mask' | 'factor0_lock' | 'accept';
+  precision?: 'cell' | 'line';
+  transition?: 'smooth' | 'instant';
+  budget_class?: string;
+}
+
+// ---------------------------------------------------------------------------
+// Constants derived FROM the schema, never re-typed beside it
+// ---------------------------------------------------------------------------
+
+function schemaProp(path: string[]): Record<string, unknown> {
+  let node: unknown = EFFECTS_SCENE_SCHEMA;
+  for (const seg of path) node = (node as Record<string, unknown>)[seg];
+  if (typeof node !== 'object' || node === null) {
+    throw new Error(`effects scene schema is missing ${path.join('.')}`);
+  }
+  return node as Record<string, unknown>;
+}
+
+/**
+ * `^[a-z][a-z0-9_]{0,31}$`, read out of the schema rather than restated.
+ *
+ * THE ASYMMETRY THAT BITES: Aurora's BG-library ids are hyphenated slugs
+ * (`makeBgId` in ../bg-library.ts emits `forest-1718000000`), and unicode is
+ * legal there. Neither is legal here — a scene id becomes part of generated
+ * .emp symbol names (schema doc §2 "Identity"). A ref that is a perfectly good
+ * bgLayoutRef is not a legal sceneRef.
+ */
+export const EFFECTS_SCENE_ID_PATTERN =
+  new RegExp(schemaProp(['properties', 'id']).pattern as string);
+
+/** Per-layer defaults, read out of the schema (`$defs.layer.properties.*.default`). */
+export const EFFECTS_LAYER_DEFAULTS = {
+  dsa: schemaProp(['$defs', 'layer', 'properties', 'dsa']).default as number,
+  dsb: schemaProp(['$defs', 'layer', 'properties', 'dsb']).default as number,
+  phase: schemaProp(['$defs', 'layer', 'properties', 'phase']).default as number,
+} as const;
+
+/**
+ * §2.1 "Deliberately excluded from the JSON surface". Both are byte-identity
+ * bridges for hand-migrated legacy scenes; editor-authored scenes derive them
+ * (-1). The consumer contract lists them under NOT read (§2.1).
+ */
+export const EXCLUDED_RAW_FIELDS = ['layer_mask_raw', 'v_deform_shift_raw'] as const;
+
+// ---------------------------------------------------------------------------
+// Paths
+// ---------------------------------------------------------------------------
+
+/** `{dataRoot}editor/effects/` — the whole editor scene library, one file per scene. */
+export function effectsSceneDir(dataRoot: string): string {
+  return `${dataRoot}editor/effects/`;
+}
+
+/** `{dataRoot}editor/effects/<scene_id>.json`. */
+export function effectsScenePath(dataRoot: string, id: string): string {
+  return `${effectsSceneDir(dataRoot)}${id}.json`;
+}
+
+/** The scene id a library filename claims, or null when it is not a scene file. */
+export function sceneIdFromFileName(fileName: string): string | null {
+  if (!fileName.endsWith('.json')) return null;
+  return fileName.slice(0, -'.json'.length);
+}
+
+// ---------------------------------------------------------------------------
+// Errors
+// ---------------------------------------------------------------------------
+
+export class EffectsSceneError extends Error {
+  readonly issues: string[];
+  constructor(message: string, issues: string[] = []) {
+    super(issues.length > 0 ? `${message}\n${issues.map(i => `  - ${i}`).join('\n')}` : message);
+    this.name = 'EffectsSceneError';
+    this.issues = issues;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Read
+// ---------------------------------------------------------------------------
+
+/** Every object key appearing anywhere in a parsed document, for the raw-field scan. */
+function everyKey(value: unknown, out: Set<string> = new Set()): Set<string> {
+  if (Array.isArray(value)) { value.forEach(v => everyKey(v, out)); return out; }
+  if (typeof value !== 'object' || value === null) return out;
+  for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+    out.add(k);
+    everyKey(v, out);
+  }
+  return out;
+}
+
+/**
+ * Parse and validate one scene definition file.
+ *
+ * `filenameStem` is the `<scene_id>` part of the path the text came from; the
+ * identity check (§2 "Identity": the stem must equal `id`, and the generator
+ * refuses a mismatch) is why it is required rather than optional. A caller with
+ * no file — a paste, a test — passes the id it intends.
+ *
+ * Throws EffectsSceneError on anything wrong. Loud, never lenient: a scene the
+ * reader "fixed up" would be written back over the author's file in that fixed
+ * shape, which is the silent-erasure class the whole contract is built against.
+ */
+export function parseEffectsScene(text: string, filenameStem: string): EffectsScene {
+  let doc: unknown;
+  try {
+    doc = JSON.parse(text);
+  } catch (e) {
+    throw new EffectsSceneError(
+      `${filenameStem}.json is not valid JSON: ${e instanceof Error ? e.message : String(e)}`,
+    );
+  }
+
+  if (typeof doc !== 'object' || doc === null || Array.isArray(doc)) {
+    throw new EffectsSceneError(`${filenameStem}.json must contain a JSON object`);
+  }
+  const obj = doc as Record<string, unknown>;
+
+  // Version first, with its own words. `"schema": {"const": 1}` would reject it
+  // anyway, but "expected the constant 1, got 2" does not tell an author that
+  // there is deliberately no migration machinery to ask for.
+  if (obj.schema !== 1) {
+    throw new EffectsSceneError(
+      `${filenameStem}.json declares "schema": ${JSON.stringify(obj.schema)}; wave 1 refuses ` +
+      'anything but 1. There is no migration machinery in v1 (AURORA_EFFECTS_SCHEMA.md §2, ' +
+      'Versioning) — a new schema version is a contract change, not a file the reader upgrades.',
+    );
+  }
+
+  const issues = validateAgainstSchema(obj, EFFECTS_SCENE_SCHEMA)
+    .map(i => `${i.path || '<document>'}: ${i.message}`);
+
+  // The two excluded raw fields get their reason, not just "unknown property".
+  // They are REJECTED, not preserved: the schema is closed on the writer path
+  // (§8), and the consumer lists them under NOT read (§2.1), so a file carrying
+  // one asks for behaviour nothing in the pipeline honours. Failing at read is
+  // the loud half of "round-trip what you do not understand, or refuse the
+  // file" (§6 hazard 1) — preserve-and-refuse-on-write would let the file live
+  // in the editor and only blow up at save, after the author had worked on it.
+  const present = everyKey(obj);
+  const rawHits = EXCLUDED_RAW_FIELDS.filter(f => present.has(f));
+  if (rawHits.length > 0) {
+    issues.push(
+      `${rawHits.join(' and ')} ${rawHits.length > 1 ? 'are' : 'is'} deliberately excluded from ` +
+      'the JSON surface (AURORA_EFFECTS_SCHEMA.md §2.1): byte-identity bridges for hand-migrated ' +
+      'legacy scenes, which editor-authored scenes derive. A layer that should be off authors ' +
+      '"enabled": false.',
+    );
+  }
+
+  if (issues.length > 0) {
+    throw new EffectsSceneError(`${filenameStem}.json does not match the effects scene schema`, issues);
+  }
+
+  const scene = obj as unknown as EffectsScene;
+
+  if (scene.id !== filenameStem) {
+    throw new EffectsSceneError(
+      `${filenameStem}.json declares "id": ${JSON.stringify(scene.id)}; the filename stem and the ` +
+      'id must match (AURORA_EFFECTS_SCHEMA.md §2, Identity — the generator refuses a mismatch).',
+    );
+  }
+
+  return scene;
+}
+
+// ---------------------------------------------------------------------------
+// Write
+// ---------------------------------------------------------------------------
+
+/**
+ * Serialize a scene. Validates on the way out — the writer path is the one this
+ * schema is closed for (§8: "the party validating is the party publishing what
+ * it writes"), so an invalid scene must never reach disk.
+ *
+ * Key order comes from the schema's own `properties` order via
+ * canonicalizeBySchema, so two Auroras (or an Aurora and a hand edit that
+ * happens to follow the contract's order) produce byte-identical files, and the
+ * ordering cannot drift from the contract because nothing here restates it.
+ */
+export function serializeEffectsScene(scene: EffectsScene): string {
+  const issues = validateAgainstSchema(scene, EFFECTS_SCENE_SCHEMA)
+    .map(i => `${i.path || '<document>'}: ${i.message}`);
+  if (issues.length > 0) {
+    throw new EffectsSceneError(
+      `refusing to write scene ${JSON.stringify(scene?.id)}: it does not match the effects scene schema`,
+      issues,
+    );
+  }
+  return JSON.stringify(canonicalizeBySchema(scene, EFFECTS_SCENE_SCHEMA), null, 2);
+}
+
+// ---------------------------------------------------------------------------
+// Library load (§2: an absent directory is "no editor scenes", not an error)
+// ---------------------------------------------------------------------------
+
+export interface UnreadableScene {
+  /** Project-relative path of the file that could not be read. */
+  path: string;
+  reason: string;
+}
+
+export interface EffectsSceneLibrary {
+  scenes: EffectsScene[];
+  /**
+   * Files that exist but could not be parsed. They are NOT scenes and NOT
+   * silently dropped: a caller that later writes the library must skip these
+   * paths, exactly as buildAeonSavePlan skips a section's `unreadable` files.
+   */
+  unreadable: UnreadableScene[];
+  notices: string[];
+}
+
+/**
+ * Load every scene in `{dataRoot}editor/effects/`.
+ *
+ * ABSENT AND UNREADABLE ARE NOT THE SAME FACT (the rule aeon/load.ts's
+ * markUnreadable already states for section sidecars). An absent directory is
+ * the ordinary "this project has no editor scenes yet" and is silent — §2 says
+ * so in as many words. A file that exists and will not parse is loud: it lands
+ * in `unreadable` with a notice, and its id is NOT returned, so nothing can
+ * round-trip a repaired-looking empty scene over the author's broken one.
+ */
+export async function loadEffectsSceneLibrary(
+  fa: FileAccess,
+  dataRoot: string,
+): Promise<EffectsSceneLibrary> {
+  const dir = effectsSceneDir(dataRoot);
+  const scenes: EffectsScene[] = [];
+  const unreadable: UnreadableScene[] = [];
+  const notices: string[] = [];
+
+  let present = false;
+  try { present = await fa.exists(dir); } catch { present = false; }
+  if (!present) return { scenes, unreadable, notices };
+
+  const entries = (await fa.list(dir)).slice().sort();
+  for (const entry of entries) {
+    const stem = sceneIdFromFileName(entry);
+    if (stem === null) continue; // .bin deform tables and anything else live here too
+    const path = `${dir}${entry}`;
+    try {
+      scenes.push(parseEffectsScene(new TextDecoder().decode(await fa.read(path)), stem));
+    } catch (e) {
+      const reason = e instanceof Error ? e.message : String(e);
+      unreadable.push({ path, reason });
+      notices.push(
+        `${path} exists but could not be read as an effects scene (${reason}). ` +
+        'Aurora is ignoring it and will NOT overwrite the file — fix it by hand and reopen.',
+      );
+    }
+  }
+
+  return { scenes, unreadable, notices };
+}
+
+// ---------------------------------------------------------------------------
+// Advisory only — NOT enforcement
+// ---------------------------------------------------------------------------
+
+export interface SceneAdvisory { path: string; message: string }
+
+/**
+ * The two-sources guard, as ADVICE.
+ *
+ * §2.2: "When `own` is present, `dsa`/`dsb`/`phase` must be absent or at their
+ * defaults — they lower into the SAME record fields (two-sources guard; sigil
+ * enforces with the exact reason)."
+ *
+ * Aurora does NOT enforce it. The contract assigns value semantics to sigil and
+ * says the build gate is the rulebook; a second enforcement here would be a
+ * second rulebook, free to drift from sigil's in either its condition or its
+ * wording, and the first divergence would present as "the editor let me save a
+ * file the build rejects" or — far worse — "the editor refused a file the build
+ * accepts". What §2 does license is advisory UX ("Aurora may pre-check anything
+ * it likes as advisory UX"), which is this: a pure function nothing in the read
+ * or write path calls, for a UI to surface as a warning.
+ *
+ * The defaults it compares against are read out of the schema
+ * (EFFECTS_LAYER_DEFAULTS), so even the advisory cannot drift on what "at their
+ * defaults" means.
+ */
+export function advisoryLayerDeformConflicts(scene: EffectsScene): SceneAdvisory[] {
+  const out: SceneAdvisory[] = [];
+  scene.layers.forEach((layer, i) => {
+    const deform = layer.deform;
+    if (deform === undefined || deform === 'none' || !('own' in deform)) return;
+    const clashes = (['dsa', 'dsb', 'phase'] as const)
+      .filter(k => layer[k] !== undefined && layer[k] !== EFFECTS_LAYER_DEFAULTS[k]);
+    if (clashes.length === 0) return;
+    out.push({
+      path: `/layers/${i}`,
+      message:
+        `deform.own is set alongside ${clashes.join('/')}; both lower into the same record fields ` +
+        '(two-sources guard). sigil refuses this at build time with the exact reason — ' +
+        'clear one source before building.',
+    });
+  });
+  return out;
+}
