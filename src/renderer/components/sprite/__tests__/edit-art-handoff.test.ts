@@ -257,9 +257,48 @@ describe('editObjectArtCheckout', () => {
     });
     // Declared frame 1 = MS_Stand preselected (frame 0 is the blank MS_Null).
     expect(useSpriteStore.getState().currentIndex).toBe(1);
-    // Animations stay ABSENT: the sonani dialect is the anim audit's standing
-    // TAG — the timeline opens empty-but-honest, no picker entries.
-    expect(useSpriteStore.getState().characterAnims).toEqual([]);
+  });
+
+  const S1TREE = '/home/volence/sonic_hacks/s1disasm';
+  (existsSync(join(S1TREE, '_anim/Sonic.asm')) ? it : it.skip)(
+    'Sonic ($01): the sonani-dialect timeline opens — every table anim listed, specials DYNAMIC', async () => {
+    // The sonani parcel closes the audit §1.4 exclusion: the checkout parses
+    // `_anim/Sonic.asm` with the DEDICATED dialect parser and lists the whole
+    // table. Entry count is DERIVED from the file's own sonani rows.
+    const sonicText = readFileSync(join(S1TREE, '_anim/Sonic.asm'), 'utf8');
+    const rowCount = (sonicText.match(/^id_\w+:\s*sonani\b/gm) ?? []).length;
+    expect(rowCount).toBeGreaterThan(0);
+
+    useClassicLevelStore.setState({ ref: null, doc: null });
+    __setSpriteSetOpenerForTest(stubOpener([], 88));
+    __setAnimScriptReaderForTest(async (_base, rel) => readFileSync(join(S1TREE, rel), 'utf8'));
+
+    const ok = await editObjectArtCheckout(0x01);
+    expect(ok).toBe(true);
+    const s = useSpriteStore.getState();
+    expect(s.characterAnims).toHaveLength(rowCount);
+    // The five special scripts lead the table and surface as dynamic, labelled
+    // with their Sonic_Animate mode — never as frozen fake steps.
+    expect(s.characterAnims.slice(0, 5).map((a) => [a.name, a.dynamic?.mode, a.steps.length])).toEqual([
+      ['Walk', 'walkrun', 0],
+      ['Run', 'walkrun', 0],
+      ['Roll', 'roll', 0],
+      ['Roll2', 'roll', 0],
+      ['Push', 'push', 0],
+    ]);
+    // Every REGULAR anim is an ordinary playable script (frames present, raw
+    // N durations — the engine holds N+1 ticks, Timeline adds the +1).
+    for (const a of s.characterAnims.slice(5)) {
+      expect(a.dynamic).toBeUndefined();
+      expect(a.steps.length).toBeGreaterThan(0);
+    }
+    // The pre-loaded first animation is Walk — dynamic, so the playable steps
+    // strip is honestly empty (the interpreter preview drives it instead).
+    expect(s.steps).toEqual([]);
+    // The dynamic entries carry the interpreter's five script bodies.
+    const scripts = s.characterAnims[0].dynamic!.scripts;
+    expect(scripts.walk).toHaveLength(7);
+    expect(scripts.push).toHaveLength(7);
   });
 
   it('Spring ($41): the frameSources slice rides into the set — frames 3-5 name Nem_VSpring', async () => {

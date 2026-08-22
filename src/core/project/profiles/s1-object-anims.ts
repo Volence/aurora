@@ -13,10 +13,6 @@
 // Aurora never parses `_incObj` at runtime; per-row provenance is cited below.
 //
 // Deliberately UNLINKED, with reasons:
-//   • Sonic ($01): `_anim/Sonic.asm` is a DIFFERENT dialect (sonani macro
-//     table, fr_* equates, negative duration mode markers, code-driven walk/run
-//     rotation) — excluded from the s1 dialect parser by design; see
-//     docs/reviews/2026-08-20-s1-animation-audit.md §1.4.
 //   • Caterkiller ($78): its script `Ani_Cat` is defined INLINE in
 //     `_incObj/78 Badnik - Caterkiller.asm:444`, not an `_anim/` file — out of
 //     scope for the file-level link (both its lea sites, :125/:288, bind it).
@@ -94,9 +90,13 @@ export interface SyncAnimEntry {
 }
 
 /** One object's animation linkage: an `_anim/*.asm` script (disasm-relative),
- *  synchronized entries, or both. At least one is always present. */
+ *  synchronized entries, or both. At least one is always present. `dialect`
+ *  marks the ONE file that is not the common s1disasm grammar: Sonic's sonani
+ *  table (`dialect: 'sonic'` → parse with core/import/sonic-anim-import, not
+ *  parseS1DisasmAnimScript — audit §1.4). */
 export interface ObjectAnimLink {
   animAsm?: string;
+  dialect?: 'sonic';
   sync?: readonly SyncAnimEntry[];
 }
 
@@ -109,6 +109,12 @@ const anim = (animAsm: string): ObjectAnimLink => ({ animAsm });
  */
 export const S1_OBJECT_ANIMS: Readonly<Record<number, ObjectAnimLink>> = {
   // --- Placeable objects / badniks -----------------------------------------
+  // Sonic: `_anim/Sonic.asm` included from _incObj/01 Sonic.asm (SonicAniData).
+  // The sonani DIALECT (fr_* equates, macro table, $FF/$FE/$FD mode markers —
+  // audit §1.4) gets its own parser; the walk/run/roll/push specials play via
+  // the Sonic_Animate interpreter (core/anim/sonic-animate.ts, semantics per
+  // docs/reviews/2026-08-21-sonic-animate-live-study.md).
+  0x01: { animAsm: '_anim/Sonic.asm', dialect: 'sonic' },
   0x08: anim('_anim/Water Splash.asm'), // lea Ani_Splash ← _incObj/08 LZ Water Splash.asm
   0x17: { // GHZ Spiked Pole Helix — sync-only (no _anim script)
     sync: [{
