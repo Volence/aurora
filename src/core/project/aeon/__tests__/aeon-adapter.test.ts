@@ -212,7 +212,8 @@ describe('aeonAdapter.open', () => {
     const handle = await aeonAdapter.open(memFa(fixtureFiles()));
     expect(handle.type).toBe('aeon');
     expect(handle.levels).toBeNull();
-    expect(handle.capabilities.facets).toEqual(['layout', 'art', 'objects', 'rings', 'collision', 'palette']);
+    expect(handle.capabilities.facets)
+      .toEqual(['layout', 'art', 'objects', 'rings', 'collision', 'palette', 'parallax']);
     // Aeon's ladder has no 16px middle tier and its chunk tier is flattened on
     // stamp, so `shared: false` (spec §2.1 / §3.0.2).
     expect(handle.capabilities.artTiers).toEqual([

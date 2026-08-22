@@ -7,20 +7,22 @@ describe('facets', () => {
     registerBuiltinFacets();
   });
 
-  it('registers the six built-in facets', () => {
+  it('registers the seven built-in facets', () => {
     expect(facetRegistry.list().map((f) => f.id)).toEqual([
-      'layout', 'objects', 'rings', 'collision', 'palette', 'art',
+      'layout', 'objects', 'parallax', 'rings', 'collision', 'palette', 'art',
     ]);
   });
 
-  it('puts the canvas-SWAPPING facet last, behind the five that share the map', () => {
+  it('puts the canvas-SWAPPING facet last, behind the six that share the map', () => {
     // The ordering rule, asserted rather than left to the docblock (see
     // BUILTIN_FACETS). Five facets are lenses over one map viewport and `art`
     // replaces the canvas with a composer, so `art` last is what makes a pill
     // press inside the group read as a tool/panel swap over a scene that stays
     // put. `art` sat SECOND until 2026-08-14, which put the one real scene
     // change in the middle of the group that isn't one.
-    const MAP_FACETS = ['layout', 'objects', 'rings', 'collision', 'palette'];
+    // `parallax` (the Effects lens) joined the map group on 2026-08-22: its
+    // right-hand column is the scene editor and its canvas is the same act.
+    const MAP_FACETS = ['layout', 'objects', 'parallax', 'rings', 'collision', 'palette'];
     const byOrder = facetRegistry.list()
       .slice()
       .sort((a, b) => a.order - b.order)
@@ -35,7 +37,7 @@ describe('facets', () => {
 
   it('registerBuiltinFacets is idempotent (safe to call from multiple entry points)', () => {
     registerBuiltinFacets();
-    expect(facetRegistry.list()).toHaveLength(6);
+    expect(facetRegistry.list()).toHaveLength(7);
   });
 
   it('facetsFor returns only capability-granted facets, in order', () => {
@@ -53,16 +55,30 @@ describe('facets', () => {
     expect(aeon.map((f) => f.id)).toEqual(['layout', 'objects', 'rings', 'collision', 'palette', 'art']);
   });
 
+  it("orders aeon's Effects pill between Objects and Rings", () => {
+    // The aeon grant, in full. Stated as the whole real list rather than a pair
+    // so it also says the Effects pill does not displace anything.
+    const aeon = facetsFor(['layout', 'art', 'objects', 'rings', 'collision', 'palette', 'parallax']);
+    expect(aeon.map((f) => f.id))
+      .toEqual(['layout', 'objects', 'parallax', 'rings', 'collision', 'palette', 'art']);
+  });
+
   it('a capability with no registered facet renders nothing (no dead chrome)', () => {
-    expect(facetsFor(['parallax'])).toEqual([]);
+    // `parallax` used to be the example here and is now BUILT (the Effects
+    // facet). `events` and `preview` are the two remaining declared-but-unbuilt
+    // capabilities — FACET_CAPABILITIES exists precisely so a profile can name
+    // one before its facet is written.
+    expect(facetsFor(['events'])).toEqual([]);
+    expect(facetsFor(['preview'])).toEqual([]);
   });
 
   it('a later-registered facet slots in by order, not registration sequence', () => {
-    // 15 sits between `objects` (10) and `rings` (20) — inside the map group,
-    // which is where a parallax facet belongs; its canvas would be the act.
-    facetRegistry.register({ id: 'parallax', label: 'Parallax', order: 15 });
-    const ids = facetsFor(['layout', 'parallax', 'collision']).map((f) => f.id);
-    expect(ids).toEqual(['layout', 'parallax', 'collision']);
+    // 35 sits between `collision` (30) and `palette` (40) — the slot the
+    // ordering docblock names for `events`, and the same shape the built-in
+    // `parallax` (15) now occupies for real.
+    facetRegistry.register({ id: 'events', label: 'Events', order: 35 });
+    const ids = facetsFor(['layout', 'events', 'palette']).map((f) => f.id);
+    expect(ids).toEqual(['layout', 'events', 'palette']);
   });
 
   it('S1 capability list yields no rings facet; aeon yields rings', () => {

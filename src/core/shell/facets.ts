@@ -49,6 +49,9 @@ export const facetRegistry: Registry<FacetDescriptor> = createRegistry<FacetDesc
 const BUILTIN_FACETS: FacetDescriptor[] = [
   { id: 'layout', label: 'Layout', order: 0 },
   { id: 'objects', label: 'Objects', order: 10 },
+  // The effects/parallax lens (schema §2 scenes). Its canvas is the map, so it
+  // belongs in this group; 15 is the slot the ordering rule's own docblock names.
+  { id: 'parallax', label: 'Effects', order: 15 },
   { id: 'rings', label: 'Rings', order: 20 },
   { id: 'collision', label: 'Collision', order: 30 },
   { id: 'palette', label: 'Palette', order: 40 },

@@ -22,6 +22,13 @@ export const FACET_TOOLS: Partial<Record<FacetCapability, readonly EditorTool[]>
   rings: ['place-ring', 'select', 'view'],
   collision: ['paint-collision', 'view'],
   palette: ['view'],
+  // The Effects lens is view-only over the map, `palette`'s shape exactly: the
+  // authoring happens in the right-hand column, and no scene parameter is edited
+  // by clicking the act. An EMPTY list would have been the other reading, and it
+  // is wrong — `toolForFacet` returns the CURRENT tool for an empty set, so
+  // arriving here from Layout would leave `stamp-chunk` armed over a canvas with
+  // no dock to disarm it from.
+  parallax: ['view'],
   // 'art' is absent: the Art facet runs the artStore tool system, not EditorTool.
 };
 

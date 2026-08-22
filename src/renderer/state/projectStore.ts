@@ -136,6 +136,9 @@ export function getActiveLevel(state: ProjectState): S4Level | null {
     palette: zone.palette,
     chunkLibrary: state.project?.chunkLibrary,
     bgLibrary: state.project?.bgLibrary,
+    // Same rule as the two above: `set-effects-scene` THROWS on a level without
+    // it rather than silently consuming an undo slot, so it is always included.
+    effectsScenes: state.project?.effectsScenes,
     act,
   };
 }

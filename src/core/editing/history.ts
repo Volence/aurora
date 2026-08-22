@@ -160,6 +160,9 @@ function applyCommand(cmd: AnyCommand, level: S4Level): void {
     case 'set-section-bg':
       section.bgLayoutRef = cmd.newRef;
       break;
+    case 'set-section-scene':
+      section.sceneRef = cmd.newRef;
+      break;
     case 'set-collision-edit': {
       const arr = cmd.plane === 'b' ? section.collisionEditB : section.collisionEdit;
       if (arr) for (const e of cmd.entries) arr[e.index] = e.newColl;
@@ -290,6 +293,9 @@ function undoCommand(cmd: AnyCommand, level: S4Level): void {
       break;
     case 'set-section-bg':
       section.bgLayoutRef = cmd.oldRef;
+      break;
+    case 'set-section-scene':
+      section.sceneRef = cmd.oldRef;
       break;
     case 'set-collision-edit': {
       const arr = cmd.plane === 'b' ? section.collisionEditB : section.collisionEdit;

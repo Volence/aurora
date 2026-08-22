@@ -204,6 +204,22 @@ export interface SetEffectsSceneCommand extends EditCommand {
   newScene: EffectsScene | null;
 }
 
+/**
+ * Assign which effects scene a section uses — `Section.sceneRef`, the key the
+ * meta sidecar already persists (empyrean AURORA_EFFECTS_SCHEMA.md §3; the
+ * sidecar half landed at 61d4b80). null = the act default.
+ *
+ * A SEPARATE COMMAND from `set-section-bg` rather than a field on it, even though
+ * the two are the same shape over the same sidecar. They are independent
+ * assignments an author makes at different times, and folding them together would
+ * make changing a background undo a scene assignment made three steps earlier.
+ */
+export interface SetSectionSceneCommand extends EditCommand {
+  type: 'set-section-scene';
+  oldRef: string | null;
+  newRef: string | null;
+}
+
 export interface SetSectionsCommand extends EditCommand {
   type: 'set-sections';
   // Whole-act snapshot of the section grid: width/height plus the flat
@@ -246,4 +262,5 @@ export type AnyCommand =
   | SetBgTilesCommand
   | SetSectionBgCommand
   | SetEffectsSceneCommand
+  | SetSectionSceneCommand
   | SetSectionsCommand;
