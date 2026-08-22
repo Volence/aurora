@@ -22,7 +22,7 @@ function realSource(): S1ArtSource {
     basePath: '/p', relPath: 'X.nem', expectedMtimeMs: 1,
     originalTiles: [{ pixels: new Uint8Array(64) }],
     mappings: [{ id: 'f0', pieces: [] }],
-    originX: 0, originY: 0, frameCount: 1,
+    originX: 0, originY: 0, frameCount: 1, compression: 'nemesis',
   };
 }
 

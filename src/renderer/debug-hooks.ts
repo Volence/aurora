@@ -629,6 +629,30 @@ interface DebugApi {
    * the store's paletteMode; colors are the 16 standalone RGBA entries.
    */
   spritePalette(): { mode: string; colors: { r: number; g: number; b: number; a: number }[] };
+  /**
+   * Paint ONE pixel of one frame through the REAL edit path (selectFrame +
+   * setBuffer, which records undo + flips unsavedEdits exactly like a canvas
+   * stroke commit). The deterministic seam under the mouse — same rationale as
+   * `aether.push`: the save-back harness proves the store -> delta writer ->
+   * guarded IPC path, and canvas hit-testing is exercised by humans/CDP
+   * clicks elsewhere. Returns false (and paints nothing) when the frame or
+   * pixel is out of range.
+   */
+  spritePaint(frameIndex: number, x: number, y: number, value: number): boolean;
+  /**
+   * The checked-out sprite document's SAVE-BACK posture, read from the store:
+   * where an in-place save would write, with which writer inputs, or why it
+   * refuses. The save-back harness's capture assertion.
+   */
+  spriteSaveInfo(): {
+    relPath: string | null;
+    compression: string | null;
+    hasDplc: boolean;
+    refusal: string | null;
+    unsavedEdits: boolean;
+  };
+  /** Currently-visible toast messages (they expire — poll while waiting). */
+  toasts(): { message: string; type: string }[];
 }
 
 /** The file's fnv1a as 8 hex digits — the frameHashes encoding. Mirrored in
@@ -718,6 +742,28 @@ export function installDebugHooks(): void {
       const s = useSpriteStore.getState();
       return { mode: s.paletteMode, colors: s.standalonePalette.map((c) => ({ ...c })) };
     },
+    spritePaint: (frameIndex, x, y, value) => {
+      const s = useSpriteStore.getState();
+      if (frameIndex < 0 || frameIndex >= s.frames.length) return false;
+      s.selectFrame(frameIndex);
+      const cur = useSpriteStore.getState().frames[frameIndex];
+      if (x < 0 || x >= cur.width || y < 0 || y >= cur.height) return false;
+      const data = cur.data.slice();
+      data[y * cur.width + x] = value & 0xf;
+      useSpriteStore.getState().setBuffer({ width: cur.width, height: cur.height, data });
+      return true;
+    },
+    spriteSaveInfo: () => {
+      const s = useSpriteStore.getState();
+      return {
+        relPath: s.s1ArtSource?.relPath ?? null,
+        compression: s.s1ArtSource?.compression ?? null,
+        hasDplc: !!s.s1ArtSource?.dplc,
+        refusal: s.saveBackRefusal,
+        unsavedEdits: s.unsavedEdits,
+      };
+    },
+    toasts: () => useToastStore.getState().toasts.map((t) => ({ message: t.message, type: t.type })),
   };
   (window as unknown as { __dbg: DebugApi }).__dbg = dbg;
 }

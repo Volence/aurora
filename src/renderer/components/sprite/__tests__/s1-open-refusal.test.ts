@@ -1,12 +1,14 @@
 // The REAL openDiscoveredSet against the real s1disasm files, window.api
-// stubbed onto fs — integration-grade for the two Parcel-A honesty guarantees:
+// stubbed onto fs — integration-grade for the open-path honesty guarantees:
 //
-//  1. AUDIT TRAP #2 (save-back): captureS1ArtSource's guard is NOT lifted.
-//     Sonic (DPLC) and Spring (per-frame art swap) open EDIT/EXPORT-ONLY —
-//     s1ArtSource stays null — and a save attempt refuses with the SPECIFIC
-//     recorded reason (saveBackRefusal), not the generic line. The positive
-//     control (Signpost, plain non-DPLC Nemesis) still captures a target, so
-//     the guard was neither lifted nor over-tightened.
+//  1. Save-back capture (updated by the uncompressed/DPLC save-back parcel):
+//     Sonic (DPLC, uncompressed) now CAPTURES an in-place target carrying its
+//     compression + per-frame DPLC lists (the delta writer's inputs). Spring
+//     (per-frame art swap) still opens EDIT/EXPORT-ONLY — s1ArtSource stays
+//     null — and a save attempt refuses with the SPECIFIC recorded reason
+//     (saveBackRefusal), not the generic line. The positive control (Signpost,
+//     plain non-DPLC Nemesis) still captures a target, so the capture was
+//     neither broken nor over-widened.
 //
 //  2. SPRING FRAMES 3-5 (render-bugs parcel): the frameSources slice makes the
 //     sideways frames draw Nem_VSpring — asserted by HAND-DERIVED pixels (the
@@ -69,8 +71,8 @@ const SPRING_SET: DiscoveredSpriteSet = {
   frameSources: [{ firstFrame: 3, lastFrame: 5, art: 'artnem/Spring Vertical.nem', compression: 'nemesis' }],
 };
 
-describe.skipIf(!fs.existsSync(S1DIR))('openDiscoveredSet — Sonic DPLC open + honest save refusal', () => {
-  it('opens 88 frames, captures NO save-back target, and a save attempt quotes the DPLC refusal', async () => {
+describe.skipIf(!fs.existsSync(S1DIR))('openDiscoveredSet — Sonic DPLC open captures a save-back target', () => {
+  it('opens 88 frames and captures an in-place target carrying compression + DPLC lists', async () => {
     const ok = await openDiscoveredSet(S1DIR, SONIC_SET, 'uncompressed');
     expect(ok).toBe(true);
 
@@ -80,16 +82,23 @@ describe.skipIf(!fs.existsSync(S1DIR))('openDiscoveredSet — Sonic DPLC open + 
     const nonblank = s.frames[1].data.reduce((n, v) => n + (v !== 0 ? 1 : 0), 0);
     expect(nonblank).toBeGreaterThan(400);
 
-    // AUDIT TRAP #2: the Nemesis-only, non-DPLC capture guard stands — no
-    // in-place target for a DPLC doc, and the WHY is recorded.
-    expect(s.s1ArtSource).toBeNull();
-    expect(s.saveBackRefusal).toBe(
-      "Sonic can't save back in place: its frames stream through a shared DPLC tile pool — "
-      + 'every frame\'s mapping indices resolve into one art file whose source tiles many frames share, '
-      + 'so writing one frame\'s pixels would silently rewrite other frames. Editing and Export still work.');
-
-    await saveSpriteArt();
-    expect(lastToast()).toBe(s.saveBackRefusal); // the save refuses with exactly that copy
+    // Save-back parcel: Sonic now captures a DPLC-aware in-place target — the
+    // delta writer's inputs ride on the source, and no refusal is recorded.
+    expect(s.saveBackRefusal).toBeNull();
+    expect(s.s1ArtSource).not.toBeNull();
+    const src = s.s1ArtSource!;
+    expect(src.relPath).toBe('artunc/Sonic.unc');
+    expect(src.compression).toBe('uncompressed');
+    expect(src.frameCount).toBe(88);
+    // DPLC lists are per-frame and 1:1 with mappings (derived from the files
+    // via the same parse the open used — 88 entries, first frame non-empty).
+    expect(src.dplc).toHaveLength(88);
+    expect(src.dplc![1].length).toBeGreaterThan(0);
+    // The decoded pool matches the .unc byte count (41,248 / 32 = 1,289 tiles —
+    // derived from the file, not asserted as a constant).
+    const uncBytes = fs.statSync(path.join(S1DIR, 'artunc/Sonic.unc')).size;
+    expect(uncBytes % 32).toBe(0);
+    expect(src.originalTiles).toHaveLength(uncBytes / 32);
   });
 
   it('animations stay ABSENT — the sonani dialect is not parsed (honest empty timeline)', async () => {
