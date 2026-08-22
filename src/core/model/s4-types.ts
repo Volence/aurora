@@ -1,3 +1,7 @@
+// Type-only (erased at compile), so the effects codec's own reach back into
+// project/adapter cannot make this a runtime import cycle. See S4Project.
+import type { EffectsSceneLibrary } from '../formats/effects/scene';
+
 export const SECTION_TILES_WIDE = 256;
 export const SECTION_TILES_HIGH = 256;
 export const SECTION_PIXEL_SIZE = 2048;
@@ -267,6 +271,29 @@ export interface S4Project {
   chunkLibrary: ChunkDef[];
   bgLibrary: BgLibraryEntry[];
   basePath: string;
+  /**
+   * The editor effects-scene library — `{dataRoot}editor/effects/<id>.json`,
+   * one scene per file (empyrean AURORA_EFFECTS_SCHEMA.md §2). Sections point
+   * at entries by id via `Section.sceneRef` (null = the act default), exactly
+   * as `bgLayoutRef` points into `bgLibrary`.
+   *
+   * REQUIRED, not optional. There is one constructor of S4Project in the tree
+   * (aeon/load.ts's loadFullProject), and an optional field would let a future
+   * second one omit it — which reads downstream as "this project has no scenes"
+   * and, at save time, writes nothing. The whole-library value (not a bare
+   * array) because `unreadable` is load-bearing on the WRITE path: a scene file
+   * that exists and did not parse must never be overwritten, and that fact has
+   * to travel with the scenes it is about.
+   *
+   * The type is IMPORTED from the codec rather than mirrored here. A structural
+   * copy was the first shape and it does not survive contact with TypeScript:
+   * `EffectsScene` is an interface, so it is not assignable to a mirror carrying
+   * an index signature, and a mirror WITHOUT one would have to enumerate the
+   * scene's fields — the one thing the codec's design forbids. The import is
+   * `import type`, so it is erased at compile and opens no runtime cycle even
+   * though scene.ts reaches back to project/adapter for `FileAccess`.
+   */
+  effectsScenes: EffectsSceneLibrary;
 }
 
 export const SF_HAS_WATER = 1 << 0;

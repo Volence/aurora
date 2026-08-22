@@ -16,6 +16,7 @@ import type { SidecarState } from './mapping';
 import type { LoadedS4Config } from '../config/s4-config';
 import type { S4Project } from '../model/s4-types';
 import type { CollisionProfileSet } from '../collision/collision-model';
+import type { EffectsSceneLibrary } from '../formats/effects/scene';
 
 /**
  * The narrow file-system view core code is allowed to use. Paths are always
@@ -183,6 +184,23 @@ export interface AeonProjectData {
   /** True when the legacy chunk-tiles atlas was merged THIS load — gates the
    *  save-time truncation of chunks_tiles.bin (see buildAeonSavePlan). */
   legacyAtlasMerged: boolean;
+  /**
+   * The effects-scene library this project declares (empyrean
+   * AURORA_EFFECTS_SCHEMA.md §2; hazard 2 names its absence here by name — "nothing
+   * in `AeonProjectData` names a scene, preset, band or budget").
+   *
+   * IT IS THE SAME VALUE AS `project.effectsScenes`, not a copy. Two names for one
+   * object rather than two objects: the handle-level name is what makes the scene
+   * concept legible at the adapter boundary, and the model-level one is what save,
+   * the store and the undo history all reach. A copy would be free to drift the
+   * moment anything mutated one of them; `aeon-load.test.ts` pins the identity with
+   * `toBe`, not `toEqual`.
+   *
+   * An ABSENT `{dataRoot}editor/effects/` directory yields an empty library and no
+   * error — §2 says so in as many words, and today that is the ordinary case, since
+   * the directory does not exist in the aeon tree at all.
+   */
+  scenes: EffectsSceneLibrary;
 }
 
 export interface ProjectHandle {
