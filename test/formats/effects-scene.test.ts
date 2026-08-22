@@ -10,6 +10,7 @@ import {
   sceneIdFromFileName,
   EFFECTS_SCENE_ID_PATTERN,
   EFFECTS_LAYER_DEFAULTS,
+  EFFECTS_SCENE_SCHEMA,
   EffectsSceneError,
   type EffectsScene,
 } from '../../src/core/formats/effects/scene';
@@ -23,11 +24,19 @@ import { makeBgId } from '../../src/core/formats/bg-library';
  * tools/EFFECTS_CONSUMER_CONTRACT.md §2 at 00607dd5.
  */
 
-/** The smallest legal scene: `schema`, `id`, `layers`, `v_factor` and nothing else. */
+/**
+ * The smallest legal scene: `schema`, `id`, `layers`, `v_factor` and nothing
+ * else — written in §5 CANONICAL key order, which is alphabetical at every
+ * depth, so it is also what the writer emits.
+ *
+ * It reads worse than contract order: `schema` and `id` no longer lead. §5 says
+ * so in as many words and accepts the cost — "a self-describing order that
+ * cannot drift is worth more than a familiar one that can".
+ */
 const MINIMAL = JSON.stringify({
-  schema: 1,
   id: 'plain',
-  layers: [{ world_y: 0, fa: 'FACTOR_1', fb: 'FACTOR_1_2' }],
+  layers: [{ fa: 'FACTOR_1', fb: 'FACTOR_1_2', world_y: 0 }],
+  schema: 1,
   v_factor: 'FACTOR_1_2',
 }, null, 2);
 
@@ -225,22 +234,24 @@ describe('effects scene writer — round trip', () => {
    * codec never lists fields, so there is no list for one to be missing from.
    */
   it('preserves fields the UI does not edit, byte for byte', () => {
+    // Written in §5 canonical order — alphabetical at every depth, including
+    // inside the layer and inside `vsplit`.
     const onDisk = [
       '{',
-      '  "schema": 1,',
+      '  "budget_class": "ojz_heavy",',
       '  "id": "wave2_ready",',
       '  "layers": [',
       '    {',
-      '      "world_y": 64,',
       '      "fa": "FACTOR_1_8",',
       '      "fb": "FACTOR_1_16",',
       '      "vsplit": {',
       '        "at": 208',
-      '      }',
+      '      },',
+      '      "world_y": 64',
       '    }',
       '  ],',
-      '  "v_factor": "FACTOR_1_2",',
-      '  "budget_class": "ojz_heavy"',
+      '  "schema": 1,',
+      '  "v_factor": "FACTOR_1_2"',
       '}',
     ].join('\n');
     // Anti-vacuous: the fields whose survival is the point are really in there.
@@ -251,12 +262,16 @@ describe('effects scene writer — round trip', () => {
   });
 
   /**
-   * Key order on the way out is the SCHEMA's declaration order, so a document
-   * written in some other order normalizes without losing anything. The value
-   * comparison is the assertion that matters — reordering must not be a
-   * disguised drop.
+   * Key order on the way out is §5 CANONICAL — alphabetical, recursively — so a
+   * document written in some other order normalizes without losing anything.
+   * The value comparison is the assertion that matters: reordering must not be
+   * a disguised drop.
+   *
+   * It used to be the SCHEMA's declaration order. §5 ruled against that
+   * (aeon 768eb2d8): alphabetical is derivable from the data alone, where a
+   * declaration order has to be maintained identically in two repos.
    */
-  it('normalizes key order to the schema without dropping a key', () => {
+  it('normalizes key order to §5 canonical order without dropping a key', () => {
     const scrambled = JSON.stringify({
       budget_class: 'x',
       v_factor: 'FACTOR_1_2',
@@ -267,12 +282,74 @@ describe('effects scene writer — round trip', () => {
     }, null, 2);
     const out = serializeEffectsScene(parseEffectsScene(scrambled, 'scrambled'));
     expect(JSON.parse(out)).toEqual(JSON.parse(scrambled));
+    // Derived from the document rather than typed: whatever keys it has, sorted.
     expect(Object.keys(JSON.parse(out)))
-      .toEqual(['schema', 'id', 'name', 'layers', 'v_factor', 'budget_class']);
+      .toEqual(Object.keys(JSON.parse(scrambled)).slice().sort());
     expect(Object.keys(JSON.parse(out).layers[0]))
-      .toEqual(['world_y', 'fa', 'fb', 'vsplit']);
+      .toEqual(['fa', 'fb', 'vsplit', 'world_y']);
+    // Subject check: alphabetical is NOT the schema's order, so a
+    // schema-ordered writer fails this rather than passing by coincidence.
+    const schemaOrder = Object.keys(EFFECTS_SCENE_SCHEMA.properties as Record<string, unknown>)
+      .filter(k => k in JSON.parse(scrambled));
+    expect(Object.keys(JSON.parse(out))).not.toEqual(schemaOrder);
     // And it is now a fixed point: writing what we wrote changes nothing.
     expect(serializeEffectsScene(parseEffectsScene(out, 'scrambled'))).toBe(out);
+  });
+
+  /**
+   * §5 DETERMINISM, which binds universally — no document classes. Nothing here
+   * is compared to a literal: the claim is that two writers handed the same
+   * content agree with each other.
+   *
+   * HONEST SCOPE — this row is a REGRESSION GUARD, not a refutation. Measured:
+   * it passes against the pre-§5 schema-order writer too, and it has to. A
+   * scene document cannot carry a key the schema does not declare (the writer
+   * refuses one), so schema order was already total over its key set and
+   * already insertion-order-independent. The row that actually discriminates
+   * alphabetical from schema order is the one above. What this one defends is
+   * a future writer that stops normalizing at all — which is where the
+   * BG override codec was, because ITS key set is open.
+   */
+  it('DETERMINISM: different insertion orders, identical content -> identical bytes', () => {
+    const content = {
+      schema: 1, id: 'det', name: 'Det',
+      layers: [{ world_y: 0, fa: 'FACTOR_1', fb: 'FACTOR_1_2', vsplit: { at: 4 } }],
+      v_factor: 'FACTOR_1_2', budget_class: 'x',
+    };
+    /** The same content, every object rebuilt with its keys inserted backwards. */
+    function reversedKeys(value: unknown): unknown {
+      if (Array.isArray(value)) return value.map(reversedKeys);
+      if (typeof value !== 'object' || value === null) return value;
+      const src = value as Record<string, unknown>;
+      const out: Record<string, unknown> = {};
+      for (const k of Object.keys(src).reverse()) out[k] = reversedKeys(src[k]);
+      return out;
+    }
+    const a = JSON.stringify(content, null, 2);
+    const b = JSON.stringify(reversedKeys(content), null, 2);
+    // Anti-vacuity: two real orderings of one content, not a document and itself.
+    expect(b).not.toBe(a);
+    expect(JSON.parse(b)).toEqual(JSON.parse(a));
+
+    expect(serializeEffectsScene(parseEffectsScene(b, 'det')))
+      .toBe(serializeEffectsScene(parseEffectsScene(a, 'det')));
+  });
+
+  /**
+   * §5's COMPACTNESS half, which is the one that DOES split by document class.
+   * A scene file is a handful of scalars, so it pretty-prints at indent 2 —
+   * where `editor_bg_override.json`, dominated by tile arrays, minifies.
+   *
+   * Also a regression guard rather than a refutation: this file already
+   * pretty-printed, so the row passes against the pre-§5 writer. It exists
+   * because §5's letter once reached scene files and would have minified them,
+   * and the ruling that says otherwise lives in the other repo.
+   */
+  it('pretty-prints at indent 2 — the scalar document class', () => {
+    const text = serializeEffectsScene(parseEffectsScene(MINIMAL, 'plain'));
+    expect(text).toContain('\n');
+    expect(text.split('\n')[1].startsWith('  "')).toBe(true);
+    expect(text.split('\n')[1]).not.toMatch(/^ {3}"|^ "/);
   });
 
   it('refuses to write a scene that does not match the schema', () => {

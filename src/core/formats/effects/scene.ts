@@ -41,6 +41,7 @@ import {
   canonicalizeBySchema,
 } from './json-schema-subset';
 import schemaJson from './aurora-effects-scene.schema.json';
+import { canonicalJsonPretty } from '../canonical-json';
 
 /** The committed contract schema, vendored byte-identical. */
 export const EFFECTS_SCENE_SCHEMA = schemaJson as unknown as JsonSchema;
@@ -294,10 +295,25 @@ export function parseEffectsScene(text: string, filenameStem: string): EffectsSc
  * schema is closed for (§8: "the party validating is the party publishing what
  * it writes"), so an invalid scene must never reach disk.
  *
- * Key order comes from the schema's own `properties` order via
- * canonicalizeBySchema, so two Auroras (or an Aurora and a hand edit that
- * happens to follow the contract's order) produce byte-identical files, and the
- * ordering cannot drift from the contract because nothing here restates it.
+ * KEY ORDER is aeon's §5 canonical order — alphabetical, recursively — via
+ * `canonicalKeyOrder`. It used to be the schema's own `properties` order; §5's
+ * scope ruling (aeon 768eb2d8) replaced that, and the reason generalizes past
+ * this file: a declaration order has to be maintained identically in two repos,
+ * where alphabetical is derivable by both from the data alone.
+ *
+ * `canonicalizeBySchema` still runs, for the OTHER thing it does: it refuses any
+ * key the schema does not declare, so serializing can never silently erase a
+ * field. Its ordering no longer reaches disk — the sort runs after it.
+ *
+ * PRETTY-PRINTED at indent 2, and that is not an oversight. §5 splits
+ * COMPACTNESS by document class while DETERMINISM binds universally: a scene
+ * file is a handful of scalars, so a pretty diff is genuinely more reviewable,
+ * where `editor_bg_override.json` is dominated by tile arrays and minifies.
+ *
+ * The cost §5 names and accepts: alphabetical puts `schema` and `id` in the
+ * middle of the file rather than at the top, which reads worse than contract
+ * order. "A self-describing order that cannot drift is worth more than a
+ * familiar one that can."
  */
 export function serializeEffectsScene(scene: EffectsScene): string {
   const issues = validateAgainstSchema(scene, EFFECTS_SCENE_SCHEMA)
@@ -308,7 +324,7 @@ export function serializeEffectsScene(scene: EffectsScene): string {
       issues,
     );
   }
-  return JSON.stringify(canonicalizeBySchema(scene, EFFECTS_SCENE_SCHEMA), null, 2);
+  return canonicalJsonPretty(canonicalizeBySchema(scene, EFFECTS_SCENE_SCHEMA));
 }
 
 // ---------------------------------------------------------------------------

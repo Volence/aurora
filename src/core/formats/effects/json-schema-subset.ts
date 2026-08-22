@@ -282,10 +282,14 @@ export function validateAgainstSchema(
  * function only reorders, and throws if it meets a key the schema does not
  * declare (which validation should already have caught).
  *
- * The point is that the writer's key order is derived from the committed
- * contract file instead of being re-typed in a serializer, so it cannot drift
- * from it. Callers must validate first: branch selection below relies on the
- * value conforming.
+ * WHAT IT IS STILL FOR, since its ORDERING no longer reaches disk: the throw.
+ * `serializeEffectsScene` sorts alphabetically after this runs (aeon
+ * EFFECTS_CONSUMER_CONTRACT.md §5, ruled at 768eb2d8), so the schema order this
+ * builds is overwritten. The refusal on an undeclared key is not — it is what
+ * stops serializing from silently erasing a field the schema does not model.
+ *
+ * Callers must validate first: branch selection below relies on the value
+ * conforming.
  */
 export function canonicalizeBySchema(value: unknown, schema: JsonSchema, root?: JsonSchema): unknown {
   const rootSchema = root ?? schema;

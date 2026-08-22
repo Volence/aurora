@@ -1,131 +1,4 @@
 {
-  "schema": 1,
-  "id": "canopy_dusk",
-  "name": "Canopy — dusk",
-  "layers": [
-    {
-      "world_y": 0,
-      "fa": "FACTOR_LOCKED",
-      "fb": "FACTOR_0"
-    },
-    {
-      "world_y": 96,
-      "fa": {
-        "s1": 2,
-        "s2": 4,
-        "op": 1
-      },
-      "fb": "FACTOR_1_4",
-      "dsa": 3,
-      "dsb": 4,
-      "phase": 128,
-      "enabled": false,
-      "curve": {
-        "to": "FACTOR_1_2"
-      },
-      "vsplit": {
-        "at": 192
-      }
-    },
-    {
-      "world_y": 160,
-      "fa": "FACTOR_3_8",
-      "fb": "FACTOR_3_16",
-      "deform": {
-        "own": {
-          "table": {
-            "generator": "sine",
-            "amplitude": 12,
-            "period": 64
-          },
-          "shift_a": 5,
-          "shift_b": 6,
-          "phase": 32,
-          "speed": -4
-        }
-      },
-      "curve": {
-        "to": {
-          "s1": 15,
-          "s2": 15,
-          "op": 0
-        }
-      }
-    },
-    {
-      "world_y": 224,
-      "fa": "FACTOR_7_16",
-      "fb": "FACTOR_15_16",
-      "deform": {
-        "own": {
-          "table": {
-            "bin": "tables/canopy_wind.bin"
-          },
-          "shift_a": 0,
-          "shift_b": 15,
-          "phase": 255,
-          "speed": 1
-        }
-      },
-      "vsplit": "none"
-    },
-    {
-      "world_y": 288,
-      "fa": "FACTOR_1",
-      "fb": "FACTOR_1_32",
-      "dsa": 15,
-      "dsb": 15,
-      "phase": 0,
-      "enabled": true,
-      "deform": {
-        "own": {
-          "table": {
-            "generator": "v_column_floor",
-            "center": 112,
-            "max_offset": 24
-          },
-          "shift_a": 2,
-          "shift_b": 2,
-          "phase": 8,
-          "speed": 0
-        }
-      },
-      "curve": "none"
-    }
-  ],
-  "v_factor": "FACTOR_1_2",
-  "v_center": 112,
-  "v_offset": -8,
-  "v_factor_fg": "FACTOR_0",
-  "deform_fg": {
-    "shared": {
-      "table": {
-        "generator": "triangle",
-        "amplitude": 7,
-        "period": 128
-      },
-      "speed": 2
-    }
-  },
-  "deform_bg": {
-    "shared": {
-      "table": {
-        "generator": "zero"
-      },
-      "speed": 0
-    }
-  },
-  "v_deform": {
-    "columns": {
-      "table": {
-        "generator": "v_column_perspective",
-        "focal": 96,
-        "max_offset": 40
-      },
-      "speed": 1,
-      "amp_shift": 3
-    }
-  },
   "anchor": {
     "at": {
       "channel": 2,
@@ -133,8 +6,135 @@
       "dsb": 7
     }
   },
+  "budget_class": "ojz_heavy",
+  "deform_bg": {
+    "shared": {
+      "speed": 0,
+      "table": {
+        "generator": "zero"
+      }
+    }
+  },
+  "deform_fg": {
+    "shared": {
+      "speed": 2,
+      "table": {
+        "amplitude": 7,
+        "generator": "triangle",
+        "period": 128
+      }
+    }
+  },
+  "id": "canopy_dusk",
+  "layers": [
+    {
+      "fa": "FACTOR_LOCKED",
+      "fb": "FACTOR_0",
+      "world_y": 0
+    },
+    {
+      "curve": {
+        "to": "FACTOR_1_2"
+      },
+      "dsa": 3,
+      "dsb": 4,
+      "enabled": false,
+      "fa": {
+        "op": 1,
+        "s1": 2,
+        "s2": 4
+      },
+      "fb": "FACTOR_1_4",
+      "phase": 128,
+      "vsplit": {
+        "at": 192
+      },
+      "world_y": 96
+    },
+    {
+      "curve": {
+        "to": {
+          "op": 0,
+          "s1": 15,
+          "s2": 15
+        }
+      },
+      "deform": {
+        "own": {
+          "phase": 32,
+          "shift_a": 5,
+          "shift_b": 6,
+          "speed": -4,
+          "table": {
+            "amplitude": 12,
+            "generator": "sine",
+            "period": 64
+          }
+        }
+      },
+      "fa": "FACTOR_3_8",
+      "fb": "FACTOR_3_16",
+      "world_y": 160
+    },
+    {
+      "deform": {
+        "own": {
+          "phase": 255,
+          "shift_a": 0,
+          "shift_b": 15,
+          "speed": 1,
+          "table": {
+            "bin": "tables/canopy_wind.bin"
+          }
+        }
+      },
+      "fa": "FACTOR_7_16",
+      "fb": "FACTOR_15_16",
+      "vsplit": "none",
+      "world_y": 224
+    },
+    {
+      "curve": "none",
+      "deform": {
+        "own": {
+          "phase": 8,
+          "shift_a": 2,
+          "shift_b": 2,
+          "speed": 0,
+          "table": {
+            "center": 112,
+            "generator": "v_column_floor",
+            "max_offset": 24
+          }
+        }
+      },
+      "dsa": 15,
+      "dsb": 15,
+      "enabled": true,
+      "fa": "FACTOR_1",
+      "fb": "FACTOR_1_32",
+      "phase": 0,
+      "world_y": 288
+    }
+  ],
   "left_column_mask": "sprite_mask",
+  "name": "Canopy — dusk",
   "precision": "cell",
+  "schema": 1,
   "transition": "instant",
-  "budget_class": "ojz_heavy"
+  "v_center": 112,
+  "v_deform": {
+    "columns": {
+      "amp_shift": 3,
+      "speed": 1,
+      "table": {
+        "focal": 96,
+        "generator": "v_column_perspective",
+        "max_offset": 40
+      }
+    }
+  },
+  "v_factor": "FACTOR_1_2",
+  "v_factor_fg": "FACTOR_0",
+  "v_offset": -8
 }
