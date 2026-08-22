@@ -39,8 +39,8 @@ describe('classicObjectLibraryItems', () => {
   // Real-table expectations, hand-derived (see s1-object-presentation.test.ts
   // for the table citations): GHZ links 36 ids (35 + Sonic's $01 DPLC row);
   // the five shared-link Eggman ids dedup to one row → 32 object rows, plus
-  // the named art docs (Boss Items + the 13 non-level families, Parcel B)
-  // → 46 rows before the heading.
+  // the named art docs (Boss Items + the 13 non-level families, Parcel B,
+  // + the 3 raw-grid families, Parcel C) → 49 rows before the heading.
   const items = classicObjectLibraryItems('ghz', true);
   const headingIdx = items.findIndex((i) => i.heading === true);
 
@@ -49,7 +49,7 @@ describe('classicObjectLibraryItems', () => {
     expect(items.filter((i) => i.heading)).toHaveLength(1);
     const available = items.slice(0, headingIdx);
     const rest = items.slice(headingIdx + 1);
-    expect(available).toHaveLength(46);
+    expect(available).toHaveLength(49);
     // Named art docs ride at the end of the available block with a
     // doc:sprite: id — they are not object rows. Table order = declaration
     // order in S1_NAMED_ART_DOCS.
@@ -59,9 +59,17 @@ describe('classicObjectLibraryItems', () => {
       'Press Start / TM', 'Title Cards', 'Game Over', 'Continue Screen',
       'Ending Sonic', 'Ending Emeralds', 'Ending StH Logo', 'Try Again',
       'Credits Font', 'SS Result Emeralds',
+      'HUD Digits', 'Lives Counter Digits', 'Level Select Font',
     ]);
     // NEVER gated on a level: named rows are zone-free by construction.
     for (const d of namedDocs) expect(d.disabled).toBeUndefined();
+    // Raw-grid rows (Parcel C) disclose their model in the hint — 'tiles',
+    // not 'maps': there is no mappings file behind them.
+    const hintOf = (label: string) => namedDocs.find((i) => i.label === label)?.hint;
+    expect(hintOf('HUD Digits')).toBe('tiles');
+    expect(hintOf('Lives Counter Digits')).toBe('tiles');
+    expect(hintOf('Level Select Font')).toBe('tiles');
+    expect(hintOf('Game Over')).toBe('maps');
     // Every named id appears exactly once across the two blocks (merged rows
     // carry their extra ids in the hint, not as rows).
     const linked = S1_OBJECT_LIST.filter((o) => resolveObjectArt(o.id, 'ghz') !== undefined);

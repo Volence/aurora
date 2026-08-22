@@ -109,11 +109,13 @@ export default function S1ObjectSection({ busy, onBusy }: { busy: boolean; onBus
                   key={key}
                   onClick={() => { if (!busy) { onBusy(true); void editNamedArtDoc(key).finally(() => onBusy(false)); } }}
                   disabled={busy}
-                  title={current ? `${d.name} — currently open` : `Open ${d.name}'s art + mappings`}
+                  title={current ? `${d.name} — currently open`
+                    : d.link.rawGrid ? `Open ${d.name}'s tile grid` : `Open ${d.name}'s art + mappings`}
                   style={{ ...styles.row, ...(current ? styles.rowCurrent : {}), ...(busy ? styles.busy : {}) }}
                 >
                   <span style={styles.thumbWrap} />
-                  <span style={{ ...styles.hex, ...(current ? styles.onCur : {}) }}>maps</span>
+                  {/* Raw-grid rows (Parcel C) have no mappings file — honest badge. */}
+                  <span style={{ ...styles.hex, ...(current ? styles.onCur : {}) }}>{d.link.rawGrid ? 'tiles' : 'maps'}</span>
                   <span style={styles.text}><span style={styles.name}>{d.name}</span></span>
                 </button>
               );

@@ -8,7 +8,7 @@ import { buildSpriteExport, buildDPLCData } from '../../../core/export/sprite-ex
 import type { SpriteManifest } from '../../../core/export/sprite-export';
 import { assembleSprite } from '../../../core/art/sprite-decompose';
 import { writeAsmMappings, writeAsmDPLC } from '../../../core/export/sprite-asm-export';
-import { reconstructDPLCSprite, reconstructWithAdapter, reconstructFromFrames, reconstructFromTilePool, reconstructFromFramePools, composeTilePool } from '../../../core/import/sprite-import';
+import { reconstructDPLCSprite, reconstructWithAdapter, reconstructFromFrames, reconstructFromTilePool, reconstructFromFramePools, composeTilePool, synthesizeGridFrames } from '../../../core/import/sprite-import';
 import { getAdapter } from '../../../core/formats/games';
 import { parseTiles } from '../../../core/formats/tiles';
 import { compressionFor } from '../../../core/compress';
@@ -202,10 +202,22 @@ async function captureS1ArtSource(
   basePath: string,
   relPath: string,
   hasFrameSwaps = false,
+  isRawGrid = false,
 ): Promise<void> {
   if (game !== 's1') return;
   const store = useSpriteStore.getState();
   const name = store.name;
+  if (isRawGrid) {
+    // Parcel C scope decision: raw-grid families open READ-ONLY. Their frames
+    // are synthesized cells, not engine mappings — wiring a write for them is
+    // a deliberate non-goal until an editing surface asks for it, so refuse
+    // with the specific why instead of capturing a target.
+    store.setSaveBackRefusal(
+      `${name} can't save back in place: its frames are synthesized cells of a raw tile grid `
+      + `(the engine blits this art with no mappings file), and grid save-back isn't wired. `
+      + `Editing and Export still work.`);
+    return;
+  }
   if (hasFrameSwaps) {
     store.setSaveBackRefusal(
       `${name} can't save back in place: some of its frames draw from a different art file than the `
@@ -523,9 +535,15 @@ export async function openDiscoveredSet(baseDir: string, set: DiscoveredSpriteSe
   const toast = useToastStore.getState().addToast;
   try {
     const adapter = getAdapter(set.game);
-    const mapBytes = new Uint8Array(await window.api.readBinaryFile(baseDir, set.mappings));
-    const frames = framesFromMapping(set.mappings, mapBytes, adapter);
-    if (frames.length === 0) { toast(`"${set.name}" has no readable sprite mappings`, 'error'); return false; }
+    // Raw-grid sets (set.rawGrid — audit §3 model (c)) have NO mappings file:
+    // their frames are synthesized from the decoded art below, so `mappings`
+    // (the rows carry '') is never read.
+    let frames: SpriteFrame[] = [];
+    if (!set.rawGrid) {
+      const mapBytes = new Uint8Array(await window.api.readBinaryFile(baseDir, set.mappings));
+      frames = framesFromMapping(set.mappings, mapBytes, adapter);
+      if (frames.length === 0) { toast(`"${set.name}" has no readable sprite mappings`, 'error'); return false; }
+    }
 
     let artBytes: Uint8Array;
     let artBase: string, artRel: string; // guarded-write target for the save-back path
@@ -537,6 +555,15 @@ export async function openDiscoveredSet(baseDir: string, set: DiscoveredSpriteSe
       if (!artPath) { toast('Art file required to open the sprite', 'error'); return false; }
       artBytes = await readAbsolute(artPath);
       artBase = dirOf(artPath); artRel = baseOf(artPath);
+    }
+    if (set.rawGrid) {
+      // One synthesized frame per fixed-size cell; the FRAME COUNT is derived
+      // from the decoded art itself (tiles ÷ cell size), never carried on the
+      // row. A partial trailing cell throws (loud) → the outer catch toasts.
+      frames = synthesizeGridFrames(
+        parseTiles(compressionFor(artCompression).decompress(artBytes)).length,
+        set.rawGrid,
+      );
     }
     const dplc = set.dplc
       ? dplcFromFile(set.dplc, new Uint8Array(await window.api.readBinaryFile(baseDir, set.dplc)), adapter)
@@ -597,7 +624,7 @@ export async function openDiscoveredSet(baseDir: string, set: DiscoveredSpriteSe
     useSpriteStore.getState().setName(name);
     useSpriteStore.getState().setExportDplc(!!dplc);
     useSpriteStore.getState().setFormat(set.game);
-    await captureS1ArtSource(set.game, artCompression, artBytes, frames, recon.originX, recon.originY, dplc, artBase, artRel, !!set.frameSources?.length);
+    await captureS1ArtSource(set.game, artCompression, artBytes, frames, recon.originX, recon.originY, dplc, artBase, artRel, !!set.frameSources?.length, !!set.rawGrid);
     toast(`Opened "${set.name}" (${set.game.toUpperCase()}): ${frameBufs.length} frames${dplc ? ' (DPLC)' : ''}`, 'success');
     return true;
   } catch (e) {
@@ -756,6 +783,10 @@ export async function editObjectArtCheckout(id: number | string, zoneKey?: S1Zon
     // open, where dplcFromFile parses it and renderFrames resolves each
     // frame's FRAME-LOCAL tile indices through it.
     dplc: link.dplcAsm,
+    // Raw-grid rows (link.rawGrid — Parcel C: HUD/lives digits, level-select
+    // font) have no mappings file (mapAsm ''): the open synthesizes one frame
+    // per cell of this geometry and records the read-only refusal.
+    rawGrid: link.rawGrid,
     // Composite rows (link.sources) ride into the open as extra pool slices at
     // their transcribed VRAM-relative tile offsets (see ObjectArtExtraSource).
     extraSources: link.sources?.map((s) => ({

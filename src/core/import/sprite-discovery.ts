@@ -31,6 +31,17 @@ export interface DiscoveredSpriteSet {
    * the transcribed object-art rows, where each range is cited.
    */
   frameSources?: { firstFrame: number; lastFrame: number; art: string; compression: 'nemesis' | 'uncompressed' }[];
+  /**
+   * RAW TILE GRID (audit 2026-08-20 §3 model (c)): the set has NO mappings
+   * file — the art is a strip of fixed-size cells (S1's HUD digits, lives
+   * digits, level-select font, raw-blitted by `_inc/HUD Update.asm` / the
+   * title-screen font loader). The open synthesizes one frame per cell
+   * (synthesizeGridFrames), deriving the frame count from the decoded tile
+   * count, and ignores `mappings` (rows carry `''`). Discovery never sets
+   * this — it comes from the transcribed named-doc rows, where each cell
+   * geometry is cited.
+   */
+  rawGrid?: { widthCells: number; heightCells: number };
 }
 
 const norm = (p: string) => p.replace(/\\/g, '/');

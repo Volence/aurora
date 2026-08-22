@@ -163,6 +163,16 @@ export interface ObjectArtLink {
    * results, credits) are the only users.
    */
   palFile?: string;
+  /**
+   * RAW TILE GRID (audit 2026-08-20 §3 model (c), Parcel C): the family has NO
+   * mappings file — the engine consumes the art as fixed-size cells of
+   * consecutive tiles (raw VRAM blits / plane-font loads). `mapAsm` is `''`
+   * and the open synthesizes one frame per cell (synthesizeGridFrames),
+   * deriving the frame count from the file size at open time. Cell size is in
+   * 8-pixel cells per axis. Rows carrying this open READ-ONLY (a specific
+   * saveBackRefusal is recorded — see captureS1ArtSource).
+   */
+  rawGrid?: { widthCells: number; heightCells: number };
   /** Additional art files at their VRAM-relative tile offsets (see ObjectArtExtraSource). */
   sources?: ObjectArtExtraSource[];
   /** Per-frame-range replacement art pools (see ObjectArtFrameSource). */
@@ -187,6 +197,17 @@ const unc = (
 const dplc = (
   artFile: string, mapAsm: string, dplcAsm: string, frame: number, pal: number,
 ): ObjectArtLink => ({ artFile, mapAsm, dplcAsm, frame, pal, compression: 'uncompressed', artSource: 'file' });
+
+/**
+ * A raw-tile-grid link (see ObjectArtLink.rawGrid): uncompressed art with no
+ * mappings file, sliced into `widthCells`×`heightCells` cell frames.
+ */
+const grid = (
+  artFile: string, widthCells: number, heightCells: number, frame: number, pal: number,
+): ObjectArtLink => ({
+  artFile, mapAsm: '', frame, pal, compression: 'uncompressed', artSource: 'file',
+  rawGrid: { widthCells, heightCells },
+});
 
 /**
  * A LevelArt-backed link: tiles come from `LevelDoc.tiles` (the act's own pool), not
@@ -788,6 +809,56 @@ export const S1_NAMED_ART_DOCS: Readonly<Record<string, S1NamedArtDoc>> = {
     link: {
       ...nem('artnem/Special Result Emeralds.nem', '_maps/SS Result Chaos Emeralds.asm', 0, 0),
       palFile: 'palette/Special Stage Results.bin',
+    },
+  },
+
+  // --- Raw tile grids (audit 2026-08-20 §3 model (c) / §5 Parcel C) ----------
+  //
+  // These families have NO mappings file at all: the engine blits their tiles
+  // straight into VRAM cells (`grid()` rows — synthesized one-frame-per-cell
+  // docs, READ-ONLY). Cell geometry is transcribed from the consumer's index
+  // math; the frame COUNT is never transcribed — the open derives it from the
+  // file size (tiles ÷ cell size), so a re-drawn file changes the doc, not
+  // this table.
+
+  // Art_Hud "artunc/HUD Numbers.unc" (sonic.asm:4339, "8x16 pixel numbers on
+  // HUD"). Each digit is TWO consecutive tiles: the writers index the file by
+  // digit*$40 (`lsl.w #6 ; multiply by $40 (tile_size*2)`, _inc/HUD Update.
+  // asm:336/383/461/513) and copy both tiles to consecutive VRAM cells of one
+  // 8×16 column → cell = 1×2 cells. Cells 0-9 are the digits; the file's two
+  // extra cells are ":" (tile $14) and "E" (tile $16) per the Hud_Init_8x16
+  // Digits init-data comment (:229). Drawn into the HUD's VRAM digit slots
+  // (Map_HUD pieces, obGfx with no pal bits) → LEVEL palette line 0, same as
+  // the hudlabels row.
+  hudnumbers: {
+    name: 'HUD Digits',
+    link: grid('artunc/HUD Numbers.unc', 1, 2, 0, 0),
+  },
+
+  // Art_LivesNums "artunc/Lives Counter Numbers.unc" (sonic.asm:4341, "8x8
+  // pixel numbers on lives counter"). One tile per digit: indexed digit*$20
+  // (`lsl.w #5 ; multiply by $20 (tile_size)`, _inc/HUD Update.asm:579) →
+  // cell = 1×1. Blitted into the lives counter's slots next to the Nem_Lives
+  // icon (level palette line 0, as the hudlabels row's extra slice).
+  livesnumbers: {
+    name: 'Lives Counter Digits',
+    link: grid('artunc/Lives Counter Numbers.unc', 1, 1, 0, 0),
+  },
+
+  // Art_Text "artunc/Level Select & Debug Text.unc" (sonic.asm:631). A plane
+  // FONT, one 8×8 tile per glyph: the title screen streams the whole file
+  // word-by-word into consecutive tiles at ArtTile_Level_Select_Font
+  // (sonic.asm:1961-1963) and the menu writes one nametable entry per glyph.
+  // Palette: the menu draws text as levsel_white = ArtTile_Level_Select_Font|
+  // Tile_Pal4|Tile_Prio (sonic.asm:2525) — Tile_Pal4 = 3<<13 (_Constants.asm:
+  // 439) → LINE 3 of Pal_LevelSel, "palette/Level Select.bin" (128 B = all 4
+  // lines, loaded from line 0: _inc/Palette Index.asm:18,50). Line 2
+  // (levsel_yellow) is the selected-row variant; the doc seeds the white line.
+  levelselectfont: {
+    name: 'Level Select Font',
+    link: {
+      ...grid('artunc/Level Select & Debug Text.unc', 1, 1, 0, 3),
+      palFile: 'palette/Level Select.bin',
     },
   },
 };

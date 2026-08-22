@@ -119,6 +119,49 @@ export function reconstructFromFrames(
   return renderFrames(frames, tiles, dplc);
 }
 
+/** Fixed cell size of a raw tile grid, in 8-pixel cells per axis (1..4). */
+export interface RawGridCell {
+  widthCells: number;
+  heightCells: number;
+}
+
+/**
+ * Synthesize one-piece SpriteFrames for a RAW TILE GRID — art with NO mappings
+ * file, consumed by the engine as fixed-size cells of consecutive tiles (audit
+ * 2026-08-20 §3 model (c): S1's HUD digits, lives-counter digits, level-select
+ * font). Frame `i` is a single unflipped piece at the origin whose tiles start
+ * at `i * widthCells*heightCells`; within a piece the renderer consumes tiles
+ * VDP column-major (`tile + col*heightCells + row`, sprite-render.ts), which
+ * for a 1-wide column IS the file order the blitters write — the HUD copies 2
+ * consecutive tiles per 8×16 digit (`lsl.w #6`, s1disasm `_inc/HUD Update.asm:
+ * 336`) into consecutive VRAM cells of one tile column.
+ *
+ * LOUD contract: a tile count that is not a whole number of cells throws
+ * (silently truncating a partial glyph would misrender every later frame),
+ * as does cell geometry outside the VDP's 1..4 cells per axis.
+ */
+export function synthesizeGridFrames(tileCount: number, cell: RawGridCell): SpriteFrame[] {
+  const { widthCells, heightCells } = cell;
+  for (const [name, v] of [['widthCells', widthCells], ['heightCells', heightCells]] as const) {
+    if (!Number.isInteger(v) || v < 1 || v > 4) {
+      throw new Error(`synthesizeGridFrames: cell ${name}=${v} out of the VDP's range [1,4]`);
+    }
+  }
+  const perCell = widthCells * heightCells;
+  if (!Number.isInteger(tileCount) || tileCount < perCell || tileCount % perCell !== 0) {
+    throw new Error(
+      `synthesizeGridFrames: ${tileCount} tiles is not a whole number of ${widthCells}×${heightCells}-cell frames`,
+    );
+  }
+  return Array.from({ length: tileCount / perCell }, (_, i) => ({
+    id: `cell${i}`,
+    pieces: [{
+      xOffset: 0, yOffset: 0, widthCells, heightCells,
+      tile: i * perCell, palette: 0, priority: false, xFlip: false, yFlip: false,
+    }],
+  }));
+}
+
 /** One art file placed into a composite tile pool at a fixed tile offset. */
 export interface ArtPoolSlice {
   bytes: Uint8Array;
