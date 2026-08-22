@@ -223,13 +223,76 @@ describe('the ownership boundary (sole writer of record)', () => {
     expect(out.anims[0].authored_by).toBe('aurora');
   });
 
-  it('writes owned keys first in contract order, then the rest in document order', () => {
+  /**
+   * §5, at aeon 768eb2d8: keys sorted ALPHABETICALLY, not in contract order.
+   * The ruling's reason is the one that bites exactly here — contract order has
+   * no answer at all for the unknown keys this codec round-trips untouched,
+   * because insertion order is not reproducible across writers. Alphabetical is
+   * derivable from the data alone, so a key nobody has declared still has a
+   * defined position.
+   */
+  it('writes every top-level key in alphabetical order, declared or not', () => {
     const doc: BgOverrideDocument = { z_last: 1, palette: [], tiles: tiles(4), a_first: 2,
       layout: Array.from({ length: BG_LAYOUT_WORDS }, () => 0) };
     const keys = Object.keys(JSON.parse(serializeBgOverride(doc)));
+    // Derived from the document, not typed: whatever keys it has, sorted.
+    expect(keys).toEqual(Object.keys(doc).slice().sort());
+    // Subject check: the sorted order is NOT the contract order, so a
+    // contract-ordered writer fails this rather than passing by coincidence.
     const declared = TOP_LEVEL_KEYS.filter(k => k in doc);
-    expect(keys.slice(0, declared.length)).toEqual(declared);
-    expect(keys.slice(declared.length)).toEqual(['z_last', 'a_first']);
+    expect(keys.slice(0, declared.length)).not.toEqual(declared);
+    // ...and an unknown key really did sort INTO the declared ones rather than
+    // being appended after them, which is the visible half of the change.
+    expect(keys.indexOf('a_first')).toBeLessThan(keys.indexOf('layout'));
+  });
+
+  it('sorts RECURSIVELY — inside a band, and inside a key it does not understand', () => {
+    // Python's sort_keys is recursive, so "the equivalent on the Aurora side"
+    // is too. A band is the in-contract nested object; the unknown key is the
+    // one nothing in this repo models, and it must sort just the same.
+    const doc = withOneBand();
+    const b = doc.anims![0] as Record<string, unknown>;
+    b.zeta_extra = 1;
+    b.alpha_extra = 2;
+    doc.some_future_key = { zz: 1, aa: { yy: 1, bb: 2 } };
+
+    const out = JSON.parse(serializeBgOverride(doc)) as Record<string, unknown>;
+    const band0 = (out.anims as Record<string, unknown>[])[0];
+    expect(Object.keys(band0)).toEqual(Object.keys(band0).slice().sort());
+    expect(Object.keys(band0)[0]).toBe('alpha_extra');
+    const future = out.some_future_key as Record<string, Record<string, unknown>>;
+    expect(Object.keys(future)).toEqual(['aa', 'zz']);
+    expect(Object.keys(future.aa)).toEqual(['bb', 'yy']);
+  });
+
+  /**
+   * The property §5 buys, and the one this codec did not have: not "the bytes
+   * are these bytes" but "two writers of the same content agree". Nothing here
+   * is compared to a literal.
+   */
+  it('DETERMINISM: different insertion orders, identical content -> identical bytes', () => {
+    const first = withOneBand();
+    first.palette = [1, 2, 3];
+    first.some_future_key = { zz: 1, aa: 2 };
+    (first.anims![0] as Record<string, unknown>).zeta_extra = 7;
+
+    // The same content, assembled by a writer that inserted differently — at
+    // top level, inside the band, and inside the unknown key.
+    const second: BgOverrideDocument = { some_future_key: { aa: 2, zz: 1 } } as BgOverrideDocument;
+    second.tiles = first.tiles;
+    second.palette = [1, 2, 3];
+    second.anims = [{ zeta_extra: 7 } as unknown as BgOverrideBand];
+    for (const k of Object.keys(first.anims![0] as Record<string, unknown>).reverse()) {
+      (second.anims[0] as Record<string, unknown>)[k] =
+        (first.anims![0] as Record<string, unknown>)[k];
+    }
+    second.layout = first.layout;
+
+    // Anti-vacuity: they really are two different orderings of one content.
+    expect(JSON.stringify(second)).not.toBe(JSON.stringify(first));
+    expect(second).toEqual(first);
+
+    expect(serializeBgOverride(second)).toBe(serializeBgOverride(first));
   });
 });
 
@@ -604,9 +667,16 @@ describe('bg-override writer', () => {
   });
 
   it('emits minified JSON (the file is ~400 KB with no bands at all)', () => {
-    const text = serializeBgOverride(minimal());
+    // §5's COMPACTNESS half: this is the tile-array document class, so
+    // separators are (",", ":") — the scalar class (scene files) is the one
+    // that pretty-prints.
+    const doc = minimal();
+    const text = serializeBgOverride(doc);
     expect(text).not.toContain('\n');
-    expect(text.startsWith('{"layout":[')).toBe(true);
+    expect(text).not.toContain(', ');
+    expect(text).not.toContain(': ');
+    // Derived: whatever the first key sorts to, that is what the file opens on.
+    expect(text.startsWith(`{"${Object.keys(doc).slice().sort()[0]}":`)).toBe(true);
   });
 
   it('is idempotent — the writer has one canonical rendering', () => {

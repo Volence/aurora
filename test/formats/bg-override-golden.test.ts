@@ -175,6 +175,55 @@ describe('the golden round-trips', () => {
     expect(Object.keys(out).sort()).toEqual(Object.keys(before).sort());
   });
 
+  /**
+   * §5 DETERMINISM, on the real 407 KB document rather than a synthetic one.
+   *
+   * The fixture is reshuffled key-by-key at every depth — top level, each band,
+   * and every nested object — so what is compared is two assemblies of one
+   * content, never a document to itself. Nothing here is a pinned string: the
+   * claim is that two writers agree, which is exactly what §5 buys and what
+   * insertion-order canonicalization could not promise.
+   */
+  it('DETERMINISM: the same content assembled in reverse key order gives identical bytes', () => {
+    /** Rebuild every object with its keys inserted in the OPPOSITE order. */
+    function reversedKeys(value: unknown): unknown {
+      if (Array.isArray(value)) return value.map(reversedKeys);
+      if (typeof value !== 'object' || value === null) return value;
+      const src = value as Record<string, unknown>;
+      const out: Record<string, unknown> = {};
+      for (const k of Object.keys(src).reverse()) out[k] = reversedKeys(src[k]);
+      return out;
+    }
+
+    /**
+     * The fixture is DECORATED with unknown keys first, and that is the whole
+     * discriminating power of this gate. b0e5a661 carries only declared keys,
+     * so a contract-order writer already renders it deterministically and this
+     * gate passes against the code it is meant to refute — measured: it did.
+     * The keys nobody declared are the ones whose position insertion order
+     * decides, so they are the ones that have to be here.
+     */
+    function decorated(): BgOverrideDocument {
+      const doc = golden();
+      doc.palette = Array.from({ length: 16 }, (_, i) => 0x0e00 + i);
+      doc.palette_line = 2;
+      doc.some_future_key = { zz: 1, aa: { yy: 1, bb: 2 } };
+      (doc.anims![0] as unknown as Record<string, unknown>).authored_by = 'aurora';
+      return doc;
+    }
+    const shuffled = reversedKeys(decorated()) as BgOverrideDocument;
+
+    // Anti-vacuity, three ways: the reshuffle really changed the insertion
+    // order, it changed it INSIDE a band, and the document really carries keys
+    // the contract does not declare.
+    expect(JSON.stringify(shuffled)).not.toBe(JSON.stringify(decorated()));
+    expect(Object.keys(shuffled.anims![0])).not.toEqual(Object.keys(decorated().anims![0]));
+    expect(Object.keys(shuffled)).toContain('some_future_key');
+    expect(shuffled).toEqual(decorated());
+
+    expect(serializeBgOverride(shuffled)).toBe(serializeBgOverride(decorated()));
+  });
+
   it('is idempotent — a second write of the same document is byte-identical', () => {
     const once = serializeBgOverride(golden());
     const twice = serializeBgOverride(parseBgOverride(once).doc);

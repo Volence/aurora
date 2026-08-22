@@ -57,6 +57,7 @@
 // does the same. This module produces TEXT; it performs no I/O.
 
 import contractJson from './bganim-consumer-contract.json';
+import { canonicalJsonMinified, canonicalKeyOrder } from '../canonical-json';
 
 /** The vendored contract, as data. Loose on purpose — the JSON is the authority. */
 type ContractNode = Record<string, unknown>;
@@ -155,12 +156,18 @@ export const BGANIM_DRIVER_NAMES = Object.freeze(Object.keys(BGANIM_DRIVERS));
 
 export type BgAnimDriver = string;
 
-/** Canonical top-level key order = the consumer contract §1.1 table order. */
+/**
+ * The top-level keys the contract declares, in its §1.1 table order.
+ *
+ * DECLARATION order, not WRITE order — the writer sorts alphabetically per §5
+ * (see `serializeBgOverride`). This list drives the reader, the validator and
+ * the drift gate, all of which care about which keys exist, not their order.
+ */
 export const TOP_LEVEL_KEYS = Object.freeze(
   Object.keys(at(['topLevelKeys']) as Record<string, unknown>).filter(k => !k.startsWith('$')),
 );
 
-/** Canonical band key order = the consumer contract §1.2 table order. */
+/** The per-band keys the contract declares, in its §1.2 table order (see above). */
 export const BAND_KEYS = Object.freeze(
   Object.keys(at(['bandKeys']) as Record<string, unknown>).filter(k => !k.startsWith('$')),
 );
@@ -656,50 +663,33 @@ export function parseBgOverride(text: string): BgOverrideParseResult {
 // ---------------------------------------------------------------------------
 
 /**
- * Canonical key order: the contract's own declaration order for the keys it
- * declares, then every remaining key in the document's own order.
+ * Serialize the whole document, in aeon's §5 canonical form.
  *
- * The tail is the round-trip half, and it is a LOOP over `Object.keys`, not a
- * list — that is what makes "carry what you do not understand" structural
- * rather than a promise someone has to remember to keep.
- */
-function canonicalize(doc: BgOverrideDocument): Record<string, unknown> {
-  const src = doc as Record<string, unknown>;
-  const out: Record<string, unknown> = {};
-  for (const key of TOP_LEVEL_KEYS) {
-    if (key in src) out[key] = src[key];
-  }
-  for (const key of Object.keys(src)) {
-    if (!(key in out)) out[key] = src[key];
-  }
-  return out;
-}
-
-/** The same ordering for a band, so two Auroras produce identical bytes. */
-function canonicalizeBand(band: BgOverrideBand): Record<string, unknown> {
-  const src = band as Record<string, unknown>;
-  const out: Record<string, unknown> = {};
-  for (const key of BAND_KEYS) {
-    if (key in src) out[key] = src[key];
-  }
-  for (const key of Object.keys(src)) {
-    if (!(key in out)) out[key] = src[key];
-  }
-  return out;
-}
-
-/**
- * Serialize the whole document.
+ * CANONICAL: keys sorted alphabetically and RECURSIVELY, minified with
+ * separators `(",", ":")` — `canonicalJsonMinified`, which is the Aurora
+ * equivalent of `json.dumps(obj, sort_keys=True, separators=(",", ":"))`. See
+ * that module for the clause and its citation.
  *
- * MINIFIED, deliberately. The shipped file is ~400 KB minified — `tiles` alone
- * is 448 arrays of 64 numbers, and one band adds 8 banks x cols*rows x 64 more.
- * At a 2-space indent with one value per line that becomes tens of megabytes
- * and hundreds of thousands of lines, which is unreviewable in a diff either
- * way. aeon's own writer minifies (`json.dumps(obj)` in tools/bg_override_io.py),
- * and Aurora is the sole writer of record, so its rendering is authoritative.
- * Byte-identity with a Python-written file is NOT a goal and is not achievable:
- * `json.dumps` defaults to `", "` / `": "` separators. What IS pinned is
- * IDEMPOTENCE — serialize(parse(serialize(x))) == serialize(x).
+ * IT USED TO BE CONTRACT ORDER, and the ruling that changed it names the reason
+ * that lives right here: this codec is a sole writer of record that round-trips
+ * every key it does not understand, and contract order has no answer at all for
+ * those keys — it appended them in the document's own insertion order, which is
+ * not reproducible across writers. Two Auroras handed the same content by
+ * different paths could emit different bytes. Alphabetical is derivable from the
+ * data alone, so an undeclared key has a defined position too.
+ *
+ * `TOP_LEVEL_KEYS` and `BAND_KEYS` therefore no longer decide write order. They
+ * remain the contract's DECLARATION order, which is what the reader, the
+ * validator and the drift gate use them for.
+ *
+ * MINIFIED, deliberately, and that half did not change. §5 splits compactness
+ * per document class: this is the tile-array class — `tiles` alone is up to 448
+ * arrays of 64 numbers and one band adds 8 banks x cols*rows x 64 more, so at
+ * indent 2 the file becomes tens of megabytes and hundreds of thousands of
+ * lines. (Scene files are the scalar class and DO pretty-print.) Byte-identity
+ * with a Python-written file is now a REACHABLE goal rather than an abandoned
+ * one, since both sides spell the same two arguments; it is measured against
+ * `json.dumps` in the parcel that landed `canonical-json.ts`, not asserted here.
  *
  * Validates on the way out. The writer path is where refusal must bite: this
  * module is the sole writer of the document, so an invalid document reaching
@@ -721,15 +711,23 @@ export function serializeBgOverride(doc: BgOverrideDocument): string {
     throw new BgOverrideError(`refusing to write ${BG_OVERRIDE_CONSUMER_PATH}`, issues);
   }
 
-  const out = canonicalize(doc);
-  if (Array.isArray(out.anims)) {
-    out.anims = (out.anims as BgOverrideBand[]).map(canonicalizeBand);
-  }
+  const out = canonicalKeyOrder(doc) as Record<string, unknown>;
 
-  // Refuse to drop anything — asserted, not assumed. The two loops above are
-  // meant to be total; this is the check that makes "total" a property rather
-  // than a reading of the code.
-  const lost = Object.keys(doc as Record<string, unknown>).filter(k => !(k in out));
+  // Refuse to drop anything — asserted, not assumed. The reorder is meant to be
+  // total; this is the check that makes "total" a property rather than a
+  // reading of the code. Sorting REORDERS the round-tripped keys, which stays
+  // semantically faithful (key order is not meaning in JSON) — but reordering
+  // must never become dropping, and this is where that is enforced.
+  //
+  // Checked at both levels the codec rewrites: the document, and each band.
+  const srcBands = Array.isArray(doc.anims) ? doc.anims as Record<string, unknown>[] : [];
+  const outBands = Array.isArray(out.anims) ? out.anims as Record<string, unknown>[] : [];
+  const lost = [
+    ...Object.keys(doc as Record<string, unknown>).filter(k => !(k in out)),
+    ...srcBands.flatMap((b, i) =>
+      Object.keys(b).filter(k => outBands[i] === undefined || !(k in outBands[i]))
+        .map(k => `anims[${i}].${k}`)),
+  ];
   if (lost.length > 0) {
     throw new BgOverrideError(
       `refusing to write ${BG_OVERRIDE_CONSUMER_PATH}: canonicalization would drop ` +
@@ -737,5 +735,5 @@ export function serializeBgOverride(doc: BgOverrideDocument): string {
     );
   }
 
-  return JSON.stringify(out);
+  return canonicalJsonMinified(out);
 }
