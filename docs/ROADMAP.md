@@ -130,10 +130,16 @@ What landed:
 
 **Deferrals — status after v1.1** (2026-08-09 afternoon, Tasks B1–B4 on the same
 branch; plan `plans/2026-08-09-classic-v1.1-batch.md`):
-- **Aeon adapter is a routing marker** — *STILL DEFERRED.* `AeonProjectAdapter.open()`
-  returns a capability-marker handle; the renderer still runs the untouched
-  `useProject.loadFromPath` (zero behavior change). Wrapping `loadFromPath` behind
-  `open()` (and populating the report) awaits a core-callable aeon loader.
+- **Aeon adapter is a routing marker** — *CLOSED 2026-08-13 (`4782e86`); this entry was
+  STALE for nine days and is corrected 2026-08-22.* `AeonProjectAdapter.open()` performs
+  the **real project load** — `index.ts:115` calls `loadAeonProject(fa, …)` and returns it
+  on `handle.aeon` — and `useProject.loadFromPath` **no longer exists anywhere in `src/`**
+  (the renderer's aeon branch goes through `state/aeon-open.ts` → `aeonAdapter.open()`).
+  What IS still deferred is narrower and should be described as such: the aeon `report` is
+  not populated (`buildReport([])`), and `AeonProjectData` carries no scene/preset/band or
+  budget concepts. Extending that model is a data-shape change, **not** "building a loader".
+  This stale text was handed across the fence into aeon's 2026-08-22 effects assessment and
+  refuted there; see `reviews/2026-08-22-aeon-effects-survey-verification.md`.
 - **Composer wiring for classic content editing** — *CLOSED (v1.1 B3).* A
   self-contained `ClassicComposerDock` (Chunk/Block/Tile tabs) edits tile pixels,
   blocks, and chunks in the classic view with shared-structure UX (usage counts +
@@ -494,6 +500,18 @@ mode (layout) — no separate "menu art" tool needed.
 
 ### 4.6 Parallax/raster — execute design #8 (Aurora half)
 
+> ⚠ **SUPERSEDED IN ITS DATA CONTRACT (2026-08-22).** The incoming effects-authoring arc
+> (§5.2) ruled **Option B**, owner-confirmed: Aurora authors `games/sonic4/data/editor/`
+> **`effects/`**`*.json` and aeon's **`tools/effects_gen.py`** bakes generated `.emp`.
+> The paths, packer and generators named below — `data/editor/{parallax,raster}/*.json`,
+> `core/formats/parallax-pack.ts`, `parallax_gen.py`/`raster_gen.py` — are **NOT the
+> contract**; neither generator was ever built, so nothing is lost by dropping them.
+> Ruled here rather than left ambiguous so Aurora does not carry two contradictory
+> contracts (`reviews/2026-08-22-aeon-effects-survey-verification.md`). The *editor
+> surface* described below — band editor, curve editor, raster timeline, sequencer —
+> stands and is what waves 1–2 build. Also note ruling 4 targets **`Act.parallaxRef`**
+> (`s4-types.ts:227`), not the dead `Section.parallaxRef` (`:121`).
+
 The flagship "modern studio" feature: author per-scanline effects visually and see
 them **in the running engine at 60fps** instead of hand-tuning asm tables. Per the
 spec: 5th AppMode `'raster'` with band editor (drag boundaries over the rendered BG,
@@ -635,7 +653,7 @@ don't re-find it), and the sweep's three REFUTED findings (§6 of the review).
 | **P7** | Import pipeline (PNG/sheet quantization) + craft backlog pulls | none | **PARTLY DONE** — the PNG import path shipped on 2C's resolver for classic (§2.6 B). Remaining: sprite-frame targets, sheet slicing (grid / auto-bounds), auto-palette suggestion (median-cut to 15 + transparent) |
 | **P8** | Multi-game level adapters (own design cycle) | none hard | substrate delivered by §2.5; remaining work is the cross-game adapters + world assembly (§4.10) |
 | **UX 5–6** | The UX overhaul's own leftovers: typed cross-tab/cross-window clipboard, Converter tab, and the stage-6 polish pass | none | open (§2.6 A) |
-| **§2.5** | ✅ **DONE** — Disassembly-as-Project: engine-agnostic `ProjectAdapter` + S1 in-place editing + guarded save + 12 MCP tools + aeon detection unified. Aeon adapter is still a routing marker (real loader deferred). | delivered 2026-08-09 | done |
+| **§2.5** | ✅ **DONE** — Disassembly-as-Project: engine-agnostic `ProjectAdapter` + S1 in-place editing + guarded save + 12 MCP tools + aeon detection unified. Aeon adapter's `open()` performs the real load (`4782e86`, 2026-08-13) — the long-standing "routing marker" claim was stale and is corrected in §2.5; what remains deferred is the unpopulated aeon `report` and `AeonProjectData`'s missing scene/budget concepts. | delivered 2026-08-09 | done |
 | **§2.6** | ✅ **DONE** — the August line: UX overhaul stages 1–4, art authoring 1/2A/2B/2C, classic collision authoring + the agent surface, the lens-sweep defect campaign. | delivered 2026-08-12 → 08-19 | done |
 
 Rationale: P2 is the suite's keystone gap — Aurora already *serves* Aether and the outbound
@@ -645,7 +663,7 @@ P1's aeon half, so P1's remainder should be re-cut against what facet parity alr
 free rather than executed as written. P3 and P7 stay pure-Aurora work that can interleave any
 time engine work stalls.
 
-**Incoming arc (agreed 2026-08-22 with the aeon overseer): parallax/raster effects authoring view** — multi-band parallax + raster effects + BgAnim tile bands, Aurora-authored (the OJZ BG showcase direction). Sequence: aeon's read-only survey of this repo (pinned at `4cffe45`) → owner design review → aeon's S4LZ-slicing engine parcel → Aurora parcels cut HERE against aeon's committed briefs/contracts (SHAs to be pinged across). Lane split: Aurora's overseer dispatches and lands all Aurora parcels; aeon ships committed briefs; cross-tool contract material goes to empyrean. Known load-bearing caveat handed to their survey: the aeon ProjectAdapter is still a routing marker (§2.5) — deeper aeon-project loading than the current facets use must be named as a gap in their assessment.
+**Incoming arc (agreed 2026-08-22 with the aeon overseer): parallax/raster effects authoring view** — multi-band parallax + raster effects + BgAnim tile bands, Aurora-authored (the OJZ BG showcase direction). Sequence: aeon's read-only survey of this repo (pinned at `4cffe45`) → owner design review → aeon's S4LZ-slicing engine parcel → Aurora parcels cut HERE against aeon's committed briefs/contracts (SHAs to be pinged across). Lane split: Aurora's overseer dispatches and lands all Aurora parcels; aeon ships committed briefs; cross-tool contract material goes to empyrean. ~~Known load-bearing caveat handed to their survey: the aeon ProjectAdapter is still a routing marker (§2.5)~~ — **THAT CAVEAT WAS FALSE and Aurora is the source of the error** (corrected 2026-08-22). `open()` has performed the real load since `4782e86` (2026-08-13); `useProject.loadFromPath` no longer exists. The stale §2.5 text propagated into aeon's effects assessment and was refuted there — see `reviews/2026-08-22-aeon-effects-survey-verification.md`. The real gap is narrower: `AeonProjectData` names no scene, preset, band or budget, so that model must be **extended**; it is not a loader that must be built, and any estimate priced as such is wrong.
 
 Watch items from the engine side: `section_id` byte→word (floating origin) — check Aurora's
 section keying when it lands; engine/game split (#5) — `project.json` may gain a
