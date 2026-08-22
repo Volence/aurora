@@ -184,6 +184,32 @@ Each has caught a real defect here.
    a decision that survives it is *verified*, not merely plausible, and the next session
    inherits the stronger claim.
 
+18. *(Shared protocol, empyrean `e33531f` — bar 12 there, plus bar 8's new technique. Both
+   came out of this repo's `editor_bg_override.json` arc; recorded here with that
+   precedent.)* Two halves of one lesson:
+
+   **(a) A document's universally-quantified rules bind every actor they describe, not
+   just the party in its title.** The `editor_bg_override.json` ownership fork was treated
+   as an open design question by **three sessions across three repos** — and it had been
+   answered the whole time by `empyrean/docs/AURORA_EFFECTS_SCHEMA.md` §6 hazard 1:
+   *"The general rule for **every wave-1 writer**: round-trip what you do not understand,
+   or refuse the file."* Nobody cited it because the doc is titled as **Aurora's** schema,
+   so its rules were read as binding Aurora. `png_to_bg_override.py` is an aeon tool and a
+   writer of a document that contract owns; the rule reached it and no one looked.
+   **Authoring corollary: a rule meant to bind others must name whom it binds.**
+
+   **(b) Changing the frame means finding the load-bearing step NOBODY cited.** Bar 8 says
+   mutual verification cannot catch a shared frame — this is the technique for breaking
+   one. The whole prefix finding rests on the bands' DMA base being the tile blob's own
+   base; three sessions cross-verified the band geometry, the slot arithmetic and the
+   consumer's asserts, and **not one of us checked that step**. Had `BG_TILE_BASE_VRAM`
+   (`inject_editor_bg.py:125`, hardcoded `0x8000`) and `BG_TILE_BASE_SLOT`
+   (`vram_map.py:25`, `1024`) diverged, bands would land *beside* the static tiles rather
+   than over them and the entire report would have been backwards. They don't —
+   `1024 * 32 = $8000`, identity confirmed — but that was checked **fourth**, by the one
+   session that went looking for the uncited joint. **The shared frame lives in the
+   joints, not the links.**
+
 ## Editor↔engine coordination points
 
 Protocol details Aurora depends on and did not invent. All measured; re-verify before
