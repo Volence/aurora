@@ -631,6 +631,13 @@ what is actually being built. **P2 — the playtest loop — is next.**
 | 5 | ~~Write three already-settled decisions into the art spec~~ — **DONE 2026-08-19.** All three verified against source, then written into §7 of `2026-08-15-in-app-art-authoring-design.md` (retitled *Settled decisions*) with citations: `ChunkTab.tsx:441`/`BlockTab.tsx:347`, `canvas-file.ts:36`, `use-canvas-constraints.ts` + `canvas-budget.test.ts`. | XS | sweep §7.4 |
 | 6 | ~~`ChunkGrid`'s status hint needs 213px in a 157px slot~~ — **DONE 2026-08-19**, and the framing was wrong. Measured under CDP: classic loses 58px, but **aeon loses 158px** (a chunk-NAME badge plus the S/M/L control leave the hint 29px), so no rewrite could have fixed it. The hint now takes its own line. `scratchpad/chunkgrid-hint-harness.mjs`, 20/20, six rows proven red first. | XS | handoff §4 |
 
+**Open (added 2026-08-22, from the effects-arc verification):**
+
+| # | Work | Size | Source |
+|---|---|---|---|
+| 8 | **The 448-tile BG ceiling has no expression in Aurora.** `src/main/mcp/agent-handler.ts:51-52` still caps at `BG_TILES_HIGH = 32` / `BG_MAX_TILES = 512`, so the agent path cannot author a 64-row BG — the stage-4 design claimed this "Fixed here"; it was not. The 448 ceiling the BgAnim band invariants depend on is represented **nowhere** in this repo. Ruled 2026-08-22 with the aeon overseer as **NOT in effects wave-1 scope** (wave 1 needs a human authoring surface first; agent parity on bands is a distinct capability). Booked anyway: it is a real invariant with no local expression, and re-rule if agent-authored bands become how the first act's content gets produced. | S | `reviews/2026-08-22-aeon-effects-survey-verification.md` |
+| 9 | **No aeon-viewport performance datum exists, and the OJZ showcase runs there.** `MapViewport.tsx` has **zero** `requestAnimationFrame` calls (vs. four in `ClassicLevelViewport.tsx`), and `viewStore.ts:52-56` scopes `playAnimatedArt`/`occludeSprites` to `s1` only — so the play-clock + overlay-pass machinery the effects arc was assumed to ride is **classic-only**. Whether `MapViewport` needs its own animation loop is a **wave-1 prerequisite on Aurora's lane**, not a detail; aeon holds its preview posture provisional until this is measured. Foreground CDP measurement — the overseer runs it, agents cannot. | S–M | same |
+
 **Open (added 2026-08-21, owner-named):**
 
 | # | Work | Size | Source |
