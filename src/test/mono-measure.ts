@@ -24,6 +24,18 @@
 //      BUILD — which is the whole reason `fitLabel` measures the candidate
 //      instead of counting characters.
 //
+// ⚠ IT IS A MODEL, AND THE MODEL IS ADDITIVE WHERE THE REAL SHAPER IS NOT.
+// Measured in the app on the fixed branch, `measureText("s…")` reports
+// 12.471848px, where this helper's `measure("s") + measure("…")` gives 11.99985
+// — 0.47px of shaping the model does not carry, because U+2026 is served by a
+// fallback face and the run is not laid out cell by cell. That gap changes no
+// outcome any test here turns on (at the aeon marker's 15px budget, "s…" fits
+// under both numbers at 12.0 and 12.47, and "so…" misses under both at 16.0 and
+// 16.47), and it CANNOT change a production outcome, because `fitLabel`
+// measures the actual candidate string in the actual context and never counts
+// characters. It is recorded so nobody later mistakes this table for the
+// authority: `scratchpad/object-label-harness.mjs` is.
+//
 // The production code never imports this: it measures the live context. This
 // exists so a node test can state an expectation that was DERIVED from the real
 // metric rather than copied from an observed output.
