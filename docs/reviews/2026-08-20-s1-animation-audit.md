@@ -149,6 +149,10 @@ Concretely:
 3. **`S1_OBJECT_ANIMS`** next to `s1-object-art.ts`: transcribed object-id/zone → `_anim` file (+ optional anim-name labels), sourced by sweeping the 49 `include` sites and 90 `lea (Ani_*)` sites. ~40 placeable ids get links; document unlinked ids with reasons, exactly as `s1-object-art.ts` does.
 4. **Auto-load**: `editObjectArtCheckout` reads the link, parses the script, populates the existing anim picker/timeline. No new UI.
 
+> **Update 2026-08-21:** §1.4's rotation TAG and §5's live-timing TAG are CLOSED
+> (confirmed, two octants, all durations 2–8) by `2026-08-21-sonic-animate-live-study.md`;
+> push remains static-only.
+
 **Explicitly out of Parcel 1:** `_anim/Sonic.asm` (macro table + negative-duration dynamic anims + rotation fan-out in `Sonic_Animate` — code, not data; TAG: if a faithful Sonic walk preview is ever wanted, confirm the rotation-offset behavior in a foreground emulator run first), animated layout previews, any writing.
 
 **Why this cut and not a smaller or different one:** a parser alone ships nothing visible (the only entry point is a manual file-pick that a user would have to aim at `_anim/` by hand — and it currently *silently* returns "No animations found"); a facet is the largest possible first bite and the facet vocabulary shows no engine has needed one for sprites. The sprite-doc route reuses every shipped piece (mappings parse, art decode, palette seeding, timeline playback) and the parcel's only genuinely new core is the dialect grammar + one transcribed table — the same shape as B1/B5/B6, which this codebase has landed three times already.
