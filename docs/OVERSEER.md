@@ -60,6 +60,16 @@ everything after them.
 
 Do not duplicate queue content here. This file only says where it is.
 
+**A row written to be self-sufficient for a fresh session must be DELETED the moment it
+lands, not left beside its own DELIVERED row.** Self-sufficiency is exactly what makes a
+stale copy dangerous: an in-flight row says *"if you are a fresh session and no agent is
+running, re-dispatch from this row alone"*, and that instruction stays persuasive after the
+work is on master. Precedent (found at boot 2026-08-22): §5.1 carried **two** row 27s — the
+DELIVERED one and the IN-FLIGHT one it was supposed to replace — two lines apart, and the
+stale one was the more actionable of the pair. Nothing was wrong with either row when it was
+written. The landing step that closes an item is *replace the row*, never *add the outcome
+beside it*.
+
 ## What the overseer implements
 
 Aurora is a TypeScript/Electron app: features, tests and harnesses all go to agents in
