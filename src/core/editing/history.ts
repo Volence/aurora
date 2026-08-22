@@ -1,5 +1,6 @@
 import type { AnyCommand, S4Level } from './commands';
 import type { EffectsScene, EffectsSceneLibrary } from '../formats/effects/scene';
+import { insertBand, removeBand } from '../formats/bg-override/bg-anim-band';
 
 const MAX_HISTORY = 200;
 
@@ -140,6 +141,17 @@ function applyCommand(cmd: AnyCommand, level: S4Level): void {
     placeEffectsScene(level.effectsScenes, cmd.sceneId, cmd.newScene);
     return;
   }
+  if (cmd.type === 'set-bg-override-band') {
+    // Throw, don't skip — the rule set-palette-line states above, and here a
+    // silent no-op would also leave `anims`, `tiles` and `layout` out of step
+    // with each other, which is the one corruption this command exists to
+    // prevent.
+    if (!level.bgOverride) throw new Error('set-bg-override-band requires level.bgOverride');
+    level.bgOverride = cmd.adding
+      ? insertBand(level.bgOverride, cmd.plan, cmd.band)
+      : removeBand(level.bgOverride, cmd.plan);
+    return;
+  }
   if (cmd.type === 'set-sections') {
     if (!level.act) throw new Error('set-sections requires level.act');
     level.act.gridWidth = cmd.newGridWidth;
@@ -272,6 +284,16 @@ function undoCommand(cmd: AnyCommand, level: S4Level): void {
   if (cmd.type === 'set-effects-scene') {
     if (!level.effectsScenes) throw new Error('set-effects-scene requires level.effectsScenes');
     placeEffectsScene(level.effectsScenes, cmd.sceneId, cmd.oldScene);
+    return;
+  }
+  if (cmd.type === 'set-bg-override-band') {
+    // The SAME two functions as apply, with the direction flipped — not a
+    // second implementation. An apply and an undo written separately are
+    // exactly how the two drift into disagreeing about slot arithmetic.
+    if (!level.bgOverride) throw new Error('set-bg-override-band requires level.bgOverride');
+    level.bgOverride = cmd.adding
+      ? removeBand(level.bgOverride, cmd.plan)
+      : insertBand(level.bgOverride, cmd.plan, cmd.band);
     return;
   }
   if (cmd.type === 'set-sections') {
