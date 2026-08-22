@@ -145,7 +145,9 @@ Each has caught a real defect here.
    *A SHA has a class; a path has a time* — and both failures look like a competent
    lookup returning a clean answer.
 
-   ⚠ **Aurora-local trap, because two operations here look identical and are not.**
+   ⚠ **Now the shared protocol's own Scope block** (empyrean `aadf63f`, from this repo's
+   correction — the text below is the shared rule, not an Aurora fork of it).
+   **Two operations here look identical and are not.**
    Do not "correct" the schema reconciliation ritual to compare at the pinning revision.
    The two are different questions:
    - **"Has the contract moved?"** — the ritual. Compare empyrean **at tip** against the
