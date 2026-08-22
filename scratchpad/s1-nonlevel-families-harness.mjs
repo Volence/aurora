@@ -22,6 +22,13 @@
 //      — the line SELECTION is load-bearing, not just the file read
 //   7  LEVEL-FREE: with the level store reset to idle, the Game Over family
 //      still opens (named docs are zone-free by construction)
+//   2g VENUE (Parcel C): the 3 raw-grid rows sit in the sprite list's "Shared
+//      objects" with the honest 'tiles' badge (no mappings file behind them)
+//   8  RAW GRID (Parcel C): still level-free, HUD Digits opens from the
+//      EXPLORER (filter → click the 'HUD Digits' row) — frame count DERIVED
+//      from the real file (size ÷ 64 bytes per 8×16 cell), digit-0 cell's
+//      coverage equal to the file's own nonzero nibbles (exact), and the
+//      read-only refusal recorded (raw grids never capture a save target)
 //
 // A STALE dist/ MAKES EVERY ROW VACUOUS — same guard as the siblings: refuse
 // to run when any source file is newer than the built main bundle.
@@ -147,7 +154,7 @@ const FAMILY_NAMES = [
 
 const SPRITE_ROW_SCAN = `(() => {
   const rows = [...document.querySelectorAll('button')]
-    .filter((b) => (b.title || '').includes('art + mappings') || (b.title || '').includes('currently open'));
+    .filter((b) => (b.title || '').includes('art + mappings') || (b.title || '').includes('tile grid') || (b.title || '').includes('currently open'));
   return rows.map((b) => {
     let sect = b.parentElement; // the list div
     const root = sect ? sect.parentElement : null;
@@ -237,6 +244,19 @@ async function main() {
       missing.length === 0,
       missing.length ? `missing: ${missing.join(' | ')}` : `${FAMILY_NAMES.length} rows present`);
 
+    // --- Row 2g: the 3 raw-grid rows (Parcel C) badge 'tiles' ---------------
+    // Same scan, same section — but these rows disclose the model: no
+    // mappings file, so the badge/title say 'tiles'/'tile grid', not 'maps'.
+    // (Checked here while the level is ready: S1ObjectSection unmounts with
+    // no zone, which is what rows 7-8 go on to exercise via the Explorer.)
+    const GRID_NAMES = ['HUD Digits', 'Lives Counter Digits', 'Level Select Font'];
+    const gridMissing = GRID_NAMES.filter((n) => !rows.some((r) =>
+      (r.title.startsWith(`Open ${n}`) || r.title.startsWith(`${n} —`))
+      && r.header === 'Shared objects' && r.text.includes('tiles')));
+    check('2g', "the 3 raw-grid rows sit under 'Shared objects' with the honest 'tiles' badge",
+      gridMissing.length === 0,
+      gridMissing.length ? `missing: ${gridMissing.join(' | ')}` : `${GRID_NAMES.length} rows present`);
+
     // --- Rows 3+4: Continue Screen — composite render + palFile palette -----
     const cont = await openFamily(c, 'Continue Screen', 'continue');
     await shot(c, 'continue-doc');
@@ -285,6 +305,49 @@ async function main() {
       lvlDown.status !== 'ready' && gover.clicked && gover.s?.activeDocId === 'doc:sprite:s1:gameover'
       && gover.s?.frames === 4 && gover.s?.frameCoverage[0] > 300,
       `levelBefore=${lvlDown.status} clicked=${gover.clicked} doc=${gover.s?.activeDocId} frames=${gover.s?.frames} coverage[0]=${gover.s?.frameCoverage?.[0]}`);
+
+    // --- Row 8: RAW GRID from the EXPLORER, still level-free ----------------
+    // Derivations from the real file (never the audit's numbers): 8×16 digits
+    // are 2 tiles = 64 bytes per cell (digit*$40, _inc/HUD Update.asm:336), so
+    // frames = size/64; digit 0's rendered coverage = the nonzero 4bpp nibbles
+    // of the file's first 64 bytes (2 pixels per byte) — exact, anti-vacuous.
+    const hudBytes = readFileSync(join(S1DIR, 'artunc/HUD Numbers.unc'));
+    const hudFrames = hudBytes.length / 64;
+    let digit0Cover = 0;
+    for (let i = 0; i < 64; i++) {
+      if ((hudBytes[i] >> 4) !== 0) digit0Cover++;
+      if ((hudBytes[i] & 0xf) !== 0) digit0Cover++;
+    }
+    // Surface the row through the Explorer's filter (typing expands every
+    // section), then click the real row button — the genuine Explorer doorway.
+    const setFilter = (text) => c.evalExpr(`(() => {
+      const input = [...document.querySelectorAll('input')].find((i) => i.placeholder === 'Filter…');
+      if (!input) return false;
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+      setter.call(input, ${JSON.stringify(text)});
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      return true;
+    })()`);
+    await setFilter('HUD Digits');
+    await sleep(400);
+    const hudClicked = await clickEl(c,
+      `[...document.querySelectorAll('button')].find((b) => b.textContent.includes('HUD Digits') && b.textContent.includes('tiles'))`);
+    let hud = null;
+    for (let i = 0; i < 20; i++) {
+      await sleep(500);
+      hud = await c.json('window.__dbg.spriteState()').catch(() => null);
+      if (hud && hud.activeDocId === 'doc:sprite:s1:hudnumbers') break;
+    }
+    const hudSave = await c.json('window.__dbg.spriteSaveInfo()').catch(() => null);
+    await shot(c, 'hudnumbers-doc');
+    check('8', `RAW GRID: HUD Digits opens from the Explorer level-free — ${hudFrames} derived 8×16 frames, digit-0 coverage exact, read-only refusal recorded`,
+      hudClicked && hud?.activeDocId === 'doc:sprite:s1:hudnumbers'
+      && hud?.frames === hudFrames && hud?.frameW === 8 && hud?.frameH === 16
+      && hud?.frameCoverage[0] === digit0Cover && digit0Cover > 0
+      && hudSave?.relPath === null && /raw tile grid/.test(hudSave?.refusal ?? ''),
+      `clicked=${hudClicked} doc=${hud?.activeDocId} frames=${hud?.frames}/${hudFrames} wh=${hud?.frameW}x${hud?.frameH} `
+      + `coverage[0]=${hud?.frameCoverage?.[0]}/${digit0Cover} save=${JSON.stringify(hudSave)}`);
+
   } finally {
     try { c?.close(); } catch { /* closing */ }
     if (app?.pid) { try { process.kill(-app.pid, 'SIGKILL'); } catch { /* gone */ } }
