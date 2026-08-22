@@ -315,6 +315,15 @@ trusting, the repos move.
   human paths), `live-palette-e2e-harness` (two processes, independent observer),
   `warp-tearing-harness` (same-destination-two-ways), `chunkgrid-hint-harness` (layout
   measurement).
+- `object-label-harness` (2026-08-22, item 17) — the reference for **stating which rows do
+  not discriminate**. 23/23 on the fix, 15/23 on master, with every instrument and
+  anti-vacuous row green on master and exactly the eight claim rows red; both frames re-run
+  by the overseer before landing. Its `6c` row — label containment on the 0px-clearance
+  Effects facet — **passes on master too**, because the canvas edge clips the half of the
+  overflow that would have failed it, so the discriminating row is Layout's `5d` instead.
+  The parcel said so in the harness header and the ROADMAP row rather than reporting 23/23
+  and letting a reader assume all 23 were earned. That disclosure is bar 5 at the moment it
+  costs something.
 - **A harness must not ask the component under test whether it worked.** The palette
   harness reads `Palette_Buffer` out of the machine over a SECOND client connection.
 - **Subagents NEVER touch `mcp__oracle__*`** — they deadlock. Runtime work is the
