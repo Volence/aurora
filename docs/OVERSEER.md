@@ -65,9 +65,13 @@ Each has caught a real defect here.
    cited as the anchor for a code guarantee is invisible once it is in prose, and these
    citations cross repos — two other repos' contract docs pinned Aurora SHAs on
    2026-08-22. `git show --stat` it and cite the **merge** that put the code on master,
-   not whatever master happened to be when you typed the message. Caught by the aeon
-   overseer when `945f5c6` (2 insertions, `docs/ROADMAP.md` only) was sent as the anchor
-   for the collision-plane fix; the code anchor was `6fc7359`.
+   not whatever master happened to be when you typed the message. Both of that night's
+   outcomes are the precedent, and the pairing is the point: `945f5c6` (2 insertions,
+   `docs/ROADMAP.md` only) went out as the anchor for a 472-line collision-plane fix and
+   was wrong — the code anchor was `6fc7359` — while `a88db05`, sent the same casual way
+   in the same message, was a genuine merge and held. One miss in two. **The rule polices
+   citations, not reputations**: checking is the discipline, and the receiver's `--stat`
+   is what caught it in both directions.
 10. *(Illustration, not a new rule — this is the shared protocol's "derived, never
    copied" bar read correctly; ruled local by the empyrean overseer, `43fbfc9`.)*
    **Derive the expectation from the thing it guards, so the two cannot drift.** The
