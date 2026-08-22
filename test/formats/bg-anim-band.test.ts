@@ -275,22 +275,24 @@ describe('adding a band leaves the rendered picture untouched', () => {
     }
   });
 
-  it('leaves the consumer BLANK escape alone, where a renumbering would have moved it', () => {
-    // Chosen by search, not by guess: a cell that the append DOES renumber.
-    const moved = GOLDEN.layout.findIndex(
-      w => w !== 0 && (w & AEON_TILE_INDEX_MASK) >= animatedSlotCount(documentBands(GOLDEN)));
-    expect(moved).toBeGreaterThanOrEqual(0);
-
-    const poisoned = withLayout(GOLDEN, layout => { layout[moved] = 0; });
-    const plan = planBandInsertion(poisoned, band);
+  it('leaves the consumer BLANK escape alone, where every other index moves', () => {
+    // INSERTED FIRST, deliberately. On an append, tile index 0 does not move at
+    // all, so a blanked cell would sit still whether or not the escape exists —
+    // the row would pass with the escape deleted, which is no row at all. At
+    // position 0 every index shifts by the band's size, so a zero word that was
+    // renumbered would become `0 | n`: a blank cell turned into a drawn one.
+    const blanked = 0;
+    const poisoned = withLayout(GOLDEN, layout => { layout[blanked] = 0; });
+    const plan = planBandInsertion(poisoned, band, 0);
     const after = insertBand(poisoned, plan, band);
 
-    // A word of exactly 0 draws VRAM tile 0, not tiles[0], so renumbering it
-    // would turn a blank cell into a drawn one.
-    expect(after.layout[moved]).toBe(0);
-    expect(plan.layout.some(e => e.index === moved)).toBe(false);
-    // ...and its neighbours still moved, so this is not a no-op run.
-    expect(plan.layout.length).toBeGreaterThan(0);
+    expect(after.layout[blanked]).toBe(0);
+    expect(resolveCell(after, blanked)).toEqual({ kind: 'blank' });
+    expect(plan.layout.some(e => e.index === blanked)).toBe(false);
+    // Not a no-op run: every OTHER cell of the same document did move.
+    expect(plan.layout).toHaveLength(poisoned.layout.filter(w => w !== 0).length);
+    // And a blank is not miscounted as a reference into nothing.
+    expect(plan.danglingRefs).toBe(0);
   });
 
   it('leaves a dangling reference where it is, and counts it', () => {
