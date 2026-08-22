@@ -271,20 +271,42 @@ async function loadFullProject(
               section.engineCollision = engineColl;
               section.engineCollisionB = engineCollB;
               // Editable collision plane: a saved .collattr.bin (16-bit packed cell
-              // words) if present, else seed by packing the strip path-A baseline
-              // into cell words (so paints don't mutate the diff baseline).
-              try {
-                const caRaw = await fa.read(`${prefix}.collattr.bin`);
-                section.collisionEdit = parseCollAttr(caRaw);
-              } catch {
-                section.collisionEdit = resolvePlaneWords(null, engineColl, engineColl.length);
-              }
-              try {
-                const cbRaw = await fa.read(`${prefix}.collattrb.bin`);
-                section.collisionEditB = parseCollAttr(cbRaw);
-              } catch {
-                section.collisionEditB = resolvePlaneWords(null, engineCollB, engineCollB.length);
-              }
+              // words) if present, else seed by packing that plane's strip
+              // baseline into cell words (so paints don't mutate the diff
+              // baseline). ABSENT is that ordinary case and stays silent;
+              // anything else marks the file not-understood, so the save omits
+              // it — the baseline below is only ever something to DRAW.
+              //
+              // The length check has to live here rather than in parseCollAttr:
+              // the authoritative plane length is the section's cell count, which
+              // the codec has no way to know (it is a pure byte codec, and its
+              // unit tests parse buffers of arbitrary length). The loader has
+              // that figure in hand — it is the same `engineColl.length` the
+              // fallback packs. Without the check a truncated file never reaches
+              // the catch at all: parseCollAttr never throws, so it yields a SHORT
+              // plane that serializeCollAttr then writes back short, and an
+              // odd-length file loses its trailing byte to `>> 1`. Short, long and
+              // odd are all "not this section's plane", so one equality covers them.
+              const readPlane = async (
+                suffix: string,
+                baseline: Uint8Array,
+              ): Promise<Uint16Array> => {
+                const path = `${prefix}.${suffix}`;
+                try {
+                  const raw = await fa.read(path);
+                  if (raw.length !== baseline.length * 2) {
+                    throw new Error(
+                      `collision plane is ${raw.length} bytes; this section needs ${baseline.length * 2}`,
+                    );
+                  }
+                  return parseCollAttr(raw);
+                } catch (e) {
+                  await markUnreadable(fa, section, path, suffix, e, notices);
+                  return resolvePlaneWords(null, baseline, baseline.length);
+                }
+              };
+              section.collisionEdit = await readPlane('collattr.bin', engineColl);
+              section.collisionEditB = await readPlane('collattrb.bin', engineCollB);
               loaded = true;
             } catch (stripErr) {
               const msg = stripErr instanceof Error ? stripErr.message : String(stripErr);

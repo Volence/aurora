@@ -86,11 +86,16 @@ export async function buildAeonSavePlan(
     // Write editable collision attr plane (.collattr.bin) — the authored
     // collision. (Legacy .coll.bin is no longer written; stray files from
     // older saves are ignored on load.)
-    if (section.collisionEdit) {
+    //
+    // The null checks alone were no gate at all: the load's fallback assigns a
+    // real Uint16Array of the strip baseline, so both refs are ALWAYS set by the
+    // time a save runs, and a plane Aurora could not read was overwritten with
+    // the baked baseline — every authored cell in the section, gone.
+    if (understood('collattr.bin') && section.collisionEdit) {
       const caData = serializeCollAttr(section.collisionEdit);
       files.push({ path: `${prefix}.collattr.bin`, bytes: caData });
     }
-    if (section.collisionEditB) {
+    if (understood('collattrb.bin') && section.collisionEditB) {
       const cbData = serializeCollAttr(section.collisionEditB);
       files.push({ path: `${prefix}.collattrb.bin`, bytes: cbData });
     }
