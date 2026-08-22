@@ -608,6 +608,12 @@ what is actually being built. **P2 — the playtest loop — is next.**
 | 5 | ~~Write three already-settled decisions into the art spec~~ — **DONE 2026-08-19.** All three verified against source, then written into §7 of `2026-08-15-in-app-art-authoring-design.md` (retitled *Settled decisions*) with citations: `ChunkTab.tsx:441`/`BlockTab.tsx:347`, `canvas-file.ts:36`, `use-canvas-constraints.ts` + `canvas-budget.test.ts`. | XS | sweep §7.4 |
 | 6 | ~~`ChunkGrid`'s status hint needs 213px in a 157px slot~~ — **DONE 2026-08-19**, and the framing was wrong. Measured under CDP: classic loses 58px, but **aeon loses 158px** (a chunk-NAME badge plus the S/M/L control leave the hint 29px), so no rewrite could have fixed it. The hint now takes its own line. `scratchpad/chunkgrid-hint-harness.mjs`, 20/20, six rows proven red first. | XS | handoff §4 |
 
+**Open (added 2026-08-21, owner-named):**
+
+| # | Work | Size | Source |
+|---|---|---|---|
+| 7 | **Priority-aware object previews + occlusion ghost.** In the map viewport, object previews composite above ALL map tiles; the VDP draws high-priority plane tiles in front of low-priority sprites (owner screenshot: an invincibility monitor rendered in front of GHZ tree leaves it should sit behind). Add a third compositing pass — high-priority map-tile pixels re-drawn above the object layer, honoring each sprite piece's own priority bit from its mappings — and a ghost affordance (occluded portion drawn translucent/outlined) so hidden objects stay discoverable and selectable. The priority lens (`337d2d3`) already derives the per-tile priority mask; reuse it. Applies to both engines' viewports where object previews exist. | S–M | owner, 2026-08-21 |
+
 ⚠ **Item 1 is the first phase that needs the emulator.** Background agents must never call
 `mcp__oracle__*` — they deadlock. Runtime work goes in a CDP / foreground harness the
 controller runs, exactly as the two collision harnesses do.
