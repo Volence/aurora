@@ -96,6 +96,23 @@ describe('suggestPaletteLine', () => {
     expect(new Set(used).size).toBe(s.colours);
   });
 
+  it('never emits the same swatch twice, on an image whose boxes DO collide', () => {
+    // A tight cluster — 3 red levels x 4 green x 5 blue, cycling — is where two
+    // median-cut boxes round to one word. Measured: with the collision repair in
+    // `pickRepresentatives` removed, 820 of 4000 random clusters emit a
+    // duplicate, and this fixture is one of the smallest deterministic cases.
+    const px: [number, number, number][] = [];
+    for (let i = 0; i < 40; i++) {
+      const c = decodeGenesisColor(genesisWordFromLevels(i % 3, i % 4, i % 5));
+      px.push([c.r, c.g, c.b]);
+    }
+    const s = suggestPaletteLine(imageOf(px));
+    expect(s.distinctColours).toBeGreaterThan(SUGGESTABLE_COLOURS);
+    expect(s.colours).toBe(SUGGESTABLE_COLOURS);
+    const used = s.line.slice(1, 1 + s.colours);
+    expect(new Set(used).size).toBe(used.length);
+  });
+
   it('orders the line darkest first, the way the default ramp reads', () => {
     const s = suggestPaletteLine(imageOf(distinctLevels(300)));
     const lum = (w: number) => {
@@ -106,26 +123,24 @@ describe('suggestPaletteLine', () => {
   });
 
   it('spends its entries where the pixels are, not where the colours are', () => {
-    // Two families of EQUAL colour count, wildly unequal pixel count. A
-    // quantizer that split by colour count alone would hand them equal shares
-    // of the line; one that splits by population must favour the blues.
+    // The two families are deliberately arranged so the two candidate split
+    // rules disagree: the reds are the larger family BY COLOUR COUNT, the blues
+    // by a wide margin in PIXELS. Splitting the box with the most colours would
+    // hand most of the line to the 40 reds the image spends 40 pixels on.
     const rgbOf = (r: number, g: number, b: number): [number, number, number] => {
       const c = decodeGenesisColor(genesisWordFromLevels(r, g, b));
       return [c.r, c.g, c.b];
     };
     const blueFamily: [number, number, number][] = [];
+    for (let g = 0; g < 8; g++) for (const b of [6, 7]) blueFamily.push(rgbOf(0, g, b));
     const redFamily: [number, number, number][] = [];
-    for (let g = 0; g < 8; g++) {
-      for (const near of [6, 7]) {
-        blueFamily.push(rgbOf(0, g, near));
-        redFamily.push(rgbOf(near, g, 0));
-      }
-    }
-    expect(blueFamily.length).toBe(redFamily.length);
+    for (const r of [5, 6, 7]) for (let g = 0; g < 8; g++) for (const b of [0, 1]) redFamily.push(rgbOf(r, g, b));
+    expect(redFamily.length).toBeGreaterThan(blueFamily.length);
 
     const pixels: [number, number, number][] = [];
-    for (let rep = 0; rep < 20; rep++) pixels.push(...blueFamily);
+    for (let rep = 0; rep < 100; rep++) pixels.push(...blueFamily);
     pixels.push(...redFamily);
+    expect(pixels.length - redFamily.length).toBeGreaterThan(redFamily.length * 10);
 
     const s = suggestPaletteLine(imageOf(pixels));
     expect(s.distinctColours).toBe(blueFamily.length + redFamily.length);

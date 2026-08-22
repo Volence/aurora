@@ -13,8 +13,8 @@
 // colours onto an act's palette and needs a PLTE to map. Slicing asks a
 // different question — "where is there art?" — which is about coverage, not
 // colour, and a caller holding a truecolour sheet, an ImageData, or a decoded
-// indexed PNG expanded to RGBA can all ask it. See `PALETTE_SUGGEST` in
-// palette-suggest.ts, which takes the same view for the same reason.
+// indexed PNG expanded to RGBA can all ask it. `palette-suggest.ts` takes the
+// same view for the same reason.
 //
 // Pure core — no store, no fs, no React, no DOM (an ImageData is structurally a
 // SheetImage, so a renderer caller passes one straight in).
@@ -46,8 +46,8 @@ export type SliceResult<T> = { ok: true; value: T } | { ok: false; refusal: Slic
 /**
  * Alpha at or above which a pixel counts as drawn.
  *
- * Matches the threshold the tile quantizer already uses (`core/import/
- * color-quantize.ts`) rather than picking a second one: the Genesis has no
+ * The same half-opacity line `core/import/color-quantize.ts` already draws,
+ * rather than a second one: the Genesis has no
  * partial alpha at all, so anything below half opacity is going to be dropped
  * by the time these pixels reach hardware, and a bounding box that includes a
  * feathered edge no tile will ever draw is not tight.
