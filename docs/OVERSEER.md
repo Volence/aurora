@@ -100,22 +100,26 @@ Each has caught a real defect here.
    the same way. When counting the places a field lives, grep for the TYPE and for every
    constructor/copier of it, not just for the field name in its own module.
 
-13. **Never change the subject to suit the instrument.** Chromium clamps
+13. *(Now shared protocol review bar 9, empyrean `c2c81e2` — kept here with its local
+   precedent.)* **Never change the subject to suit the instrument.** Chromium clamps
    `performance.now()` to 100µs, and the only supported way to unclamp it is
    cross-origin isolation — i.e. editing the app's security headers. Taking that would
    have measured a *differently configured application* and reported the number as if it
    described the real one. Rejected; the answer was amortised batching instead (12
    repaints per bracket, 6× finer than the tick). A confound wearing a solution's
    clothes. When the instrument can't reach the subject, change the instrument.
-14. **A gate whose VERDICT is right while its stated REASON is fabricated is more
-   dangerous than a failing gate** — the reason is what a reader carries forward. The
+14. *(Now shared protocol review bar 10, empyrean `c2c81e2` — kept here with its local
+   precedent.)* **A gate whose VERDICT is right while its stated REASON is fabricated is
+   more dangerous than a failing gate** — the reason is what a reader carries forward. The
    MapViewport confound row fired correctly, but its spread formula `(hi-lo)/lo` fell
    through a divide-by-zero branch and announced "medians agree to within 0.00%" about a
    set spanning 0.000→0.800ms. The verdict was sound and the justification was noise.
    Read a firing gate's *message* against its data before quoting it, and when repairing
    one, prefer a formula provably no weaker than the original (`(hi-lo)/hi` is always ≤
    the old ratio, so the bar got stricter, not looser).
-15. **Measure the instrument's claim; don't assert it.** A resolution fix that says "I
+15. *(Ruled local — this is the shared protocol's "derived, never copied" bar pointed at
+   an instrument rather than an expectation; empyrean `c2c81e2`.)* **Measure the
+   instrument's claim; don't assert it.** A resolution fix that says "I
    batched, so it should be finer" is unevidenced. The fix that landed pushes three
    workloads in a **known 1:2:4 ratio, each individually below one clock tick**, through
    the identical machinery and recovers 2.00 / 4.00 with zero residual — and separately
