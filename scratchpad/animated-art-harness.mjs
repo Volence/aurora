@@ -137,7 +137,9 @@ async function samplePx(c, lx, ly) {
 const eq = (a, b) => a.length === b.length && a.every((v, i) => v === b[i]);
 const px = (p) => `[${p.join(',')}]`;
 
-const PLAY_LABEL = `[...document.querySelectorAll('label')].find((l) => l.textContent.includes('Play animated art'))`;
+// Matches the toggle across its rename ('Play animated art' → 'Play animations'
+// when the object-preview half landed on the same toggle).
+const PLAY_LABEL = `[...document.querySelectorAll('label')].find((l) => l.textContent.includes('Play anim'))`;
 
 async function togglePlay(c) {
   const opened = await clickEl(c, `[...document.querySelectorAll('button')].find((b) => b.textContent.trim().startsWith('View'))`);

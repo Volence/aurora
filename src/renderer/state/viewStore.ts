@@ -17,9 +17,12 @@ export interface OverlayOptions {
   /** The per-8x8-tile VDP priority lens (classic-only): marks tiles whose
    *  pattern word carries bit 15 — they render ABOVE sprites in game. */
   showPriority: boolean;
-  /** Play the S1 animated level art (classic-only): GHZ waterfall/flowers, MZ
-   *  lava/magma/torch, SBZ smoke animate at their real AnimateLevelGfx rates.
-   *  Overlay-only playback — never touches doc.tiles (audit §2.3). */
+  /** Play the S1 animations (classic-only), BOTH halves on one toggle/clock:
+   *  the animated level art (GHZ waterfall/flowers, MZ lava/magma/torch, SBZ
+   *  smoke at their real AnimateLevelGfx rates) and the curated object
+   *  previews (rings spin on the synced channel, badniks play their spawn/
+   *  locomotion anims — s1-object-anim.ts). Overlay-only playback — never
+   *  touches doc.tiles (audit §2.3) nor the object list. */
   playAnimatedArt: boolean;
 }
 
