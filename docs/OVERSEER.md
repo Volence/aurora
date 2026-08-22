@@ -281,6 +281,22 @@ trusting, the repos move.
   Aurora runs no re-bake of its own. The canonical build fails loud on stale editor data.
   Build the flavour matching the RUNNING ROM (`emulator/status.romPath`), or the reload
   targets a file the build never touched.
+- **Level-staleness is an MTIME gate, and `editor_bg_override.json` is on its INPUT side.**
+  Raised by the aeon overseer 2026-08-22 as a `project.json` hazard; verified firsthand at
+  their pushed master and it is **stronger than the warning given**.
+  `tools/level_staleness.py` compares `newest mtime(editor sources) > newest mtime(generated
+  tree) ==> STALE` (:30), and the editor-sources list (:134-137) is the editor tree,
+  **`games/<game>/data/editor_bg_override.json`**, and `project.json`. So the trap is not
+  merely "a save path that rewrites `project.json` unchanged trips it on mtime alone" — the
+  BgAnim composition proof writes an input **directly**, which makes the staleness failure
+  **certain rather than conditional**. Run `tools/regenerate-level.sh` after the save and
+  before the build.
+  **Why it matters more than an extra step:** the gate hard-fails *before* a ROM is emitted,
+  so a staleness stop presents as the `anims` refusal gate rejecting Aurora's bytes when it
+  never judged them. Attribute the failure to a STAGE before reading it as a verdict.
+  **Companion, same family as the byte-neutral CRC bar:** if the build does not run, leftover
+  ROMs on disk greet you with four matching CRCs from a build that never happened. `rm -f`
+  the ROMs first so existence proves freshness.
 - **Boot-position override** (DEBUG shape only, aeon `a2a24eb9`, ARCH §4.12b):
   `Boot_At_X`/`Boot_At_Y` (u16 world px) + `Boot_At_Flag`, same clamp/publish-back/
   cleared-flag-ack contract as the warp mailbox, consumed by Build & Run's restore
