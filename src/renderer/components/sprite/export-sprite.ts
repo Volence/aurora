@@ -31,6 +31,8 @@ import type { S1ZoneKey } from '../../../core/shell/session-persistence';
 import { resolveObjectAnims } from '../../../core/project/profiles/s1-object-anims';
 import type { SyncAnimEntry } from '../../../core/project/profiles/s1-object-anims';
 import { parseS1DisasmAnimScript } from '../../../core/import/anim-import';
+import { parseSonicAnimTable, sonicSpecialScripts } from '../../../core/import/sonic-anim-import';
+import type { SonicAnimParse } from '../../../core/import/sonic-anim-import';
 import { s1ObjectName, s1ObjectHex } from '../../../core/project/profiles/s1-objects';
 import type { Color } from '../../../core/model/s4-types';
 import type { ParsedAnim } from '../../../core/import/anim-import';
@@ -478,6 +480,43 @@ export function syncedTimelineAnims(sync: readonly SyncAnimEntry[] | undefined, 
   })).filter((a) => a.steps.length > 0);
 }
 
+/** Picker wording for a Sonic special script's Sonic_Animate mode. */
+const SONIC_MODE_LABEL: Record<string, string> = { walkrun: 'walk/run', roll: 'roll', push: 'push' };
+
+/**
+ * Convert a parsed sonani table (core/import/sonic-anim-import) into timeline
+ * entries — the WHOLE table, in animation-id order. Regular scripts become
+ * ordinary playable steps (raw duration byte N; Timeline's playback adds the
+ * engine's +1 tick). The five special scripts ($FF walk/run, $FE roll, $FD
+ * push) surface as DYNAMIC entries: empty steps (no frozen fake cadence) plus
+ * the interpreter payload the preview panel scrubs — never mangled durations.
+ */
+export function sonicTimelineAnims(parse: SonicAnimParse, frameCount: number): CharacterAnimUI[] {
+  const scripts = sonicSpecialScripts(parse);
+  const out: CharacterAnimUI[] = [];
+  for (const e of parse.entries) {
+    if (e.special !== null) {
+      if (!scripts) continue; // malformed special set — parse.problems already names it
+      out.push({
+        name: e.name,
+        steps: [],
+        dynamic: { mode: e.special, scripts },
+        note: `Dynamic ${SONIC_MODE_LABEL[e.special]} script — Sonic_Animate computes frames and cadence `
+          + 'from inertia/angle (scrub them in the preview). '
+          + 'Semantics: docs/reviews/2026-08-21-sonic-animate-live-study.md.',
+      });
+    } else {
+      out.push({
+        name: e.name,
+        steps: e.frames
+          .filter((f) => f < frameCount)
+          .map((f) => ({ frameIndex: f, duration: e.duration ?? 0, xFlip: false, yFlip: false })),
+      });
+    }
+  }
+  return out;
+}
+
 /**
  * Load an animation script (.asm) for the CURRENT sprite — classic Sonic ($FF/$FE)
  * or S4-engine (AF_*) form, auto-detected. Populates the animation picker and loads
@@ -839,8 +878,19 @@ export async function editObjectArtCheckout(id: number | string, zoneKey?: S1Zon
     const timeline = syncedTimelineAnims(animLink.sync, animFrameCount);
     if (animLink.animAsm) {
       try {
-        const { anims, problems } = parseS1DisasmAnimScript(await readAnimImpl(dir, animLink.animAsm));
-        timeline.push(...toTimelineAnims(anims, animFrameCount));
+        const text = await readAnimImpl(dir, animLink.animAsm);
+        let problems: string[];
+        if (animLink.dialect === 'sonic') {
+          // Sonic's sonani dialect (audit §1.4): dedicated parser; specials
+          // become dynamic interpreter entries, regulars ordinary steps.
+          const parse = parseSonicAnimTable(text);
+          timeline.push(...sonicTimelineAnims(parse, animFrameCount));
+          problems = parse.problems;
+        } else {
+          const res = parseS1DisasmAnimScript(text);
+          timeline.push(...toTimelineAnims(res.anims, animFrameCount));
+          problems = res.problems;
+        }
         if (problems.length) {
           useToastStore.getState().addToast(
             `Animation script ${animLink.animAsm}: ${problems.length} entr${problems.length === 1 ? 'y' : 'ies'} not understood (loaded the rest)`, 'info');

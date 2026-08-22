@@ -6,6 +6,7 @@ import type { SpriteFormatId } from '../../core/formats/sprite-format-adapter';
 import type { Tile } from '../../core/model/s4-types';
 import type { SpriteFrame } from '../../core/model/sprite-types';
 import { SpriteDocHistory, type SpriteSnapshot } from '../../core/editing/sprite-history';
+import type { SonicSpecialMode, SonicSpecialScripts } from '../../core/anim/sonic-animate';
 import { documentHistoryHub } from './history-hub';
 import { UNTITLED_SPRITE_TAB_ID } from '../shell/tabs';
 import type { SpritePaletteMode } from '../../core/art/sprite-palette';
@@ -114,15 +115,27 @@ export interface SpriteDoc {
   characterAnims: CharacterAnimUI[];
 }
 
+/** A DYNAMIC (Sonic special-script) picker entry's interpreter payload: the
+ *  Sonic_Animate mode the script's marker byte selects plus the five script
+ *  bodies the interpreter switches between (core/anim/sonic-animate.ts). */
+export interface SonicDynamicAnim {
+  mode: SonicSpecialMode;
+  scripts: SonicSpecialScripts;
+}
+
 /** One picker entry. `synced` marks a transcribed SynchroAnimate cycle (a global
  *  engine counter shared by all instances — read-only data, not an `_anim`
  *  script); `note` is its honest caveat (approximate rate, phase offset),
- *  surfaced as the picker option's tooltip. */
+ *  surfaced as the picker option's tooltip. `dynamic` marks a Sonic special
+ *  script whose frames/cadence are COMPUTED from inertia/angle at runtime —
+ *  such entries keep `steps` empty (no frozen fake steps) and are played by
+ *  the interpreter preview instead. */
 export interface CharacterAnimUI {
   name: string;
   steps: AnimStepUI[];
   synced?: boolean;
   note?: string;
+  dynamic?: SonicDynamicAnim;
 }
 
 /**

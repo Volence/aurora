@@ -8,14 +8,19 @@ import type { Color } from '../../../core/model/s4-types';
 import { resolveDisplayPalette } from '../../../core/art/sprite-palette';
 import { T } from '../ui';
 import { CHECKER_A, CHECKER_B, OOB_MARKER } from '../../canvas/canvas-colors';
+import SonicDynamicPreview from './SonicDynamicPreview';
+import { useSonicPreviewStore } from '../../state/sonicPreviewStore';
 
 const MODES: PlaybackMode[] = ['forward', 'reverse', 'pingpong'];
+
+/** Picker wording for a dynamic (Sonic special) entry's interpreter mode. */
+const DYN_MODE_LABEL: Record<string, string> = { walkrun: 'walk/run', roll: 'roll', push: 'push' };
 
 /** Renders a frame buffer at an integer scale using the active palette line.
  *  `xFlip`/`yFlip` mirror the DRAW (per-step S1 animation flips, e.g. Crabmeat's
  *  `2|aniXFlip` walk frames) — the checker stays unflipped, matching hardware
  *  where flipping is a sprite attribute, not a background one. */
-function BufferView({ buffer, colors, scale, xFlip, yFlip }: {
+export function BufferView({ buffer, colors, scale, xFlip, yFlip }: {
   buffer: PixelBuffer; colors: Color[]; scale: number; xFlip?: boolean; yFlip?: boolean;
 }) {
   const ref = useRef<HTMLCanvasElement>(null);
@@ -60,6 +65,20 @@ export default function Timeline() {
 
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState(1);
+  // Controlled picker selection — needed so a DYNAMIC (Sonic special) entry
+  // can swap the preview for the interpreter panel. Resets with the doc's anims.
+  const [animIdx, setAnimIdx] = useState(0);
+  useEffect(() => { setAnimIdx(0); }, [characterAnims]);
+  const activeAnim = characterAnims[animIdx];
+  const dyn = activeAnim?.dynamic;
+  // Mirror the selection into the sonic preview store (the debug/harness
+  // surface); cleared when a non-dynamic anim — or no anim — is active.
+  useEffect(() => {
+    const st = useSonicPreviewStore.getState();
+    if (dyn && activeAnim) st.setActive({ name: activeAnim.name, mode: dyn.mode, scripts: dyn.scripts });
+    else st.setActive(null);
+    return () => useSonicPreviewStore.getState().setActive(null);
+  }, [dyn, activeAnim]);
   const posRef = useRef(0);
   const accRef = useRef(0);
   const speedRef = useRef(1);
@@ -99,8 +118,12 @@ export default function Timeline() {
   return (
     <div style={styles.root}>
       <div style={styles.preview}>
-        <BufferView buffer={previewBuffer} colors={colors} scale={3}
-          xFlip={previewStep?.xFlip} yFlip={previewStep?.yFlip} />
+        {dyn && activeAnim
+          // A dynamic (Sonic special) anim: the interpreter panel replaces the
+          // step preview — frames + cadence come from the scrubbed inputs.
+          ? <SonicDynamicPreview name={activeAnim.name} dynamic={dyn} frames={frames} colors={colors} speed={speed} />
+          : <BufferView buffer={previewBuffer} colors={colors} scale={3}
+              xFlip={previewStep?.xFlip} yFlip={previewStep?.yFlip} />}
         <div style={styles.controls}>
           <button style={styles.playBtn} onClick={() => setPlaying((p) => !p)} disabled={steps.length === 0}>
             {playing ? '❚❚ Pause' : '▶ Play'}
@@ -114,14 +137,24 @@ export default function Timeline() {
           </select>
         </div>
         {characterAnims.length > 0 && (
-          <select style={styles.select} defaultValue="0"
-            onChange={(e) => { const a = characterAnims[Number(e.target.value)]; if (a) useSpriteStore.getState().setSteps(a.steps); }}>
+          <select style={styles.select} value={animIdx}
+            onChange={(e) => {
+              const i = Number(e.target.value);
+              const a = characterAnims[i];
+              if (!a) return;
+              setAnimIdx(i);
+              useSpriteStore.getState().setSteps(a.steps);
+            }}>
             {characterAnims.map((a, i) => (
               // Synced entries are transcribed SynchroAnimate cycles (global
               // engine counters), labeled so, with their honest caveat (e.g.
               // the accumulator channel's average rate) as the tooltip.
+              // Dynamic entries are Sonic's special scripts, labeled with
+              // their Sonic_Animate mode instead of a fake step count.
               <option key={a.name} value={i} title={a.note}>
-                {a.name} ({a.steps.length}f{a.synced ? ', synced' : ''})
+                {a.dynamic
+                  ? `${a.name} (dynamic ${DYN_MODE_LABEL[a.dynamic.mode]})`
+                  : `${a.name} (${a.steps.length}f${a.synced ? ', synced' : ''})`}
               </option>
             ))}
           </select>
@@ -129,7 +162,13 @@ export default function Timeline() {
       </div>
 
       <div style={styles.steps}>
-        {steps.length === 0 && <div style={styles.hint}>No steps. Add the current frame to start an animation →</div>}
+        {dyn && (
+          <div style={styles.hint}>
+            Dynamic {DYN_MODE_LABEL[dyn.mode]} script — Sonic_Animate picks frames and cadence from the
+            scrubbed inertia/angle; there are no editable steps.
+          </div>
+        )}
+        {!dyn && steps.length === 0 && <div style={styles.hint}>No steps. Add the current frame to start an animation →</div>}
         {steps.map((st, i) => (
           <div key={i} style={{ ...styles.stepCell, ...(playing && i === liveStepIdx ? styles.stepLive : {}) }}>
             <BufferView buffer={frames[st.frameIndex] ?? frames[0]} colors={colors} scale={1}
@@ -144,9 +183,11 @@ export default function Timeline() {
             </div>
           </div>
         ))}
-        <button style={styles.addStep} onClick={() => useSpriteStore.getState().addStep(currentIndex)}>
-          + Frame {currentIndex}
-        </button>
+        {!dyn && (
+          <button style={styles.addStep} onClick={() => useSpriteStore.getState().addStep(currentIndex)}>
+            + Frame {currentIndex}
+          </button>
+        )}
       </div>
     </div>
   );
