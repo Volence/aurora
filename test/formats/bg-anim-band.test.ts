@@ -22,14 +22,19 @@ import {
   type BgOverrideDocument,
 } from '../../src/core/formats/bg-override/bg-override';
 import {
+  bandFromStaticTiles,
   bandSlotBases,
   bandsRemaining,
   createBand,
+  demoteBand,
   describeBands,
   documentBands,
   insertBand,
+  planBandDemotion,
   planBandInsertion,
+  planBandPromotion,
   planBandRemoval,
+  promoteBand,
   removeBand,
   tileSlotsRemaining,
 } from '../../src/core/formats/bg-override/bg-anim-band';
@@ -577,5 +582,473 @@ describe('the sole-writer round-trip survives the command', () => {
     const base = animatedSlotCount(documentBands(GOLDEN));
     expect(after.tiles[base]).toEqual(band.phases[0][0]);
     expect(after.tiles[base]).not.toBe(band.phases[0][0]);
+  });
+});
+
+// ===========================================================================
+// PROMOTION AND DEMOTION — the pair that does not change `tiles.length`
+//
+// The operations above GROW and SHRINK the blob, because an inserted band's
+// phase-0 art comes from outside the document. aeon's live file has no room for
+// that: it is at BG_TILE_CAPACITY exactly, so `planBandInsertion` refuses there
+// at every size including 1x1, and BgAnim authoring is impossible on the
+// document that actually ships.
+//
+// Promotion declares a range of tiles the blob ALREADY carries to be animated.
+// Nothing is added — the range MOVES to the front, where bands must pack from
+// slot 0 — so a full blob is not an obstacle. Demotion hands the same slots back
+// to the static blob, and unlike removal it destroys NOTHING: the band's phase-0
+// art stays in `tiles`, so the picture survives in BOTH directions.
+//
+// The zero-headroom subject is built by PADDING the real fixture to the
+// contract's own capacity rather than by pinning aeon's 448, so what is under
+// test is "a document with no free tile slots" — which stays true when their
+// number moves.
+// ===========================================================================
+
+/** Tiles as comparable values, for proving the blob was permuted and not rewritten. */
+const tileBag = (tiles: number[][]) => tiles.map(t => t.join(',')).sort();
+
+/**
+ * A document at BG_TILE_CAPACITY exactly, in the shape aeon's live file has:
+ * `layout` + `tiles`, no `anims` at all. Padded from the real fixture, so its
+ * nametable is the real one and every cell still draws a real tile.
+ */
+function fullBandlessDoc(): BgOverrideDocument {
+  const tiles = cloneBgOverride(GOLDEN.tiles);
+  while (tiles.length < BG_TILE_CAPACITY) tiles.push(tile(tiles.length));
+  return { layout: GOLDEN.layout.slice(), tiles };
+}
+
+describe('the zero-headroom document is real, and insertion genuinely cannot touch it', () => {
+  const full = fullBandlessDoc();
+
+  it('is full, bandless, valid, and draws every one of its cells', () => {
+    // ANTI-VACUITY, and it is the whole point of this subject: a document with
+    // spare slots would let `insertBand` through and prove nothing below.
+    expect(tileSlotsRemaining(full)).toBe(0);
+    expect(full.tiles).toHaveLength(BG_TILE_CAPACITY);
+    expect(documentBands(full)).toHaveLength(0);
+    expect(bandsRemaining(full)).toBe(BGANIM_MAX_BANDS);   // slots free, and unreachable
+    expect(validateBgOverride(full)).toEqual([]);
+    expect(renderAll(full).every(c => c.kind === 'tile')).toBe(true);
+  });
+
+  it('refuses EVERY insertable band size, down to the smallest one that exists', () => {
+    // 1x1 is the floor: cols >= 1, rows >= 1, and rows*TILE_BYTES is already a
+    // power of two there. If the smallest band that exists is refused, all are.
+    for (const [cols, rows] of [[1, 1], [2, 1], [1, 2], [8, 4]] as const) {
+      expect(() => planBandInsertion(full, bandOf(cols, rows, 2)))
+        .toThrow(new RegExp(`capacity of ${BG_TILE_CAPACITY}`));
+    }
+  });
+
+  it('PROMOTES on it, which is the operation this whole pair exists for', () => {
+    const from = 200;
+    const spec = { cols: 8, rows: 4 } as const;
+    const band = bandFromStaticTiles(full, from, spec);
+    const plan = planBandPromotion(full, band, from);
+    const after = promoteBand(full, plan, band);
+
+    expect(validateBgOverride(after)).toEqual([]);
+    expect(documentBands(after)).toHaveLength(1);
+    // The blob did not grow by a single slot, and it is still exactly full.
+    expect(after.tiles).toHaveLength(full.tiles.length);
+    expect(tileSlotsRemaining(after)).toBe(0);
+    // The instrument saw its subject: cells really moved, and the picture held.
+    expect(plan.layout.length).toBeGreaterThan(0);
+    expect(renderAll(after)).toEqual(renderAll(full));
+  });
+});
+
+describe('promotion changes no picture and no blob length', () => {
+  const from = 200;
+  const spec = { cols: 8, rows: 1 } as const;
+
+  for (const where of [0, 1, 2]) {
+    it(`renders every cell identically with the band promoted at ${where}`, () => {
+      const band = bandFromStaticTiles(GOLDEN, from, spec);
+      const plan = planBandPromotion(GOLDEN, band, from, where);
+      const after = promoteBand(GOLDEN, plan, band);
+
+      // The subject is not a no-op: real cells drew the promoted range, and this
+      // counts them off the nametable rather than out of the plan.
+      const n = spec.cols * spec.rows;
+      const drawnFromRange = GOLDEN.layout.filter(
+        w => w !== 0 && (w & AEON_TILE_INDEX_MASK) >= from
+          && (w & AEON_TILE_INDEX_MASK) < from + n).length;
+      expect(drawnFromRange).toBeGreaterThan(0);
+      expect(plan.layout.length).toBeGreaterThan(0);
+
+      const before = renderAll(GOLDEN);
+      const now = renderAll(after);
+      expect(now).toHaveLength(before.length);
+      for (let i = 0; i < before.length; i++) expect(now[i]).toEqual(before[i]);
+    });
+  }
+
+  it('keeps tiles.length exactly, and permutes the blob rather than rewriting it', () => {
+    const band = bandFromStaticTiles(GOLDEN, from, spec);
+    const after = promoteBand(GOLDEN, planBandPromotion(GOLDEN, band, from, 0), band);
+
+    expect(after.tiles).toHaveLength(GOLDEN.tiles.length);
+    // DERIVED, not asserted: the same multiset of tiles, so nothing was created,
+    // destroyed or altered — only moved.
+    expect(tileBag(after.tiles)).toEqual(tileBag(GOLDEN.tiles));
+    // ...and it really was a move: the order changed.
+    expect(after.tiles.map(t => t.join(','))).not.toEqual(GOLDEN.tiles.map(t => t.join(',')));
+  });
+
+  it('destroys nothing, so it never reports a referencing cell', () => {
+    const band = bandFromStaticTiles(GOLDEN, from, spec);
+    const plan = planBandPromotion(GOLDEN, band, from, 0);
+    expect(plan.referencingCells).toBe(0);
+    expect(plan.danglingRefs).toBe(0);
+  });
+
+  it('keeps prefix identity and contiguous packing for EVERY band afterwards', () => {
+    const band = bandFromStaticTiles(GOLDEN, from, spec);
+    const after = promoteBand(GOLDEN, planBandPromotion(GOLDEN, band, from, 1), band);
+
+    // By construction if the move is right, which is exactly why it is asserted.
+    const bands = documentBands(after);
+    expect(bands).toHaveLength(documentBands(GOLDEN).length + 1);
+    let cursor = 0;
+    for (const b of bands) {
+      const n = bandTileCount(b);
+      expect(b.phases[0]).toEqual(after.tiles.slice(cursor, cursor + n));
+      if (b.slot_base !== undefined) expect(b.slot_base).toBe(cursor);
+      cursor += n;
+    }
+    expect(cursor).toBe(animatedSlotCount(bands));
+  });
+
+  it('keeps the attribute bits and only rewrites the index half', () => {
+    const band = bandFromStaticTiles(GOLDEN, from, spec);
+    const plan = planBandPromotion(GOLDEN, band, from, 0);
+    expect(plan.layout.length).toBeGreaterThan(0);
+    for (const e of plan.layout) {
+      expect(e.withBandNt & ~AEON_TILE_INDEX_MASK).toBe(e.withoutBandNt & ~AEON_TILE_INDEX_MASK);
+    }
+  });
+
+  it('does not alias the promoted art into the blob it came from', () => {
+    const band = bandFromStaticTiles(GOLDEN, from, spec);
+    const after = promoteBand(GOLDEN, planBandPromotion(GOLDEN, band, from), band);
+    const base = animatedSlotCount(documentBands(GOLDEN));
+    expect(after.tiles[base]).toEqual(GOLDEN.tiles[from]);
+    expect(after.tiles[base]).not.toBe(GOLDEN.tiles[from]);
+    expect(band.phases[0][0]).not.toBe(GOLDEN.tiles[from]);
+  });
+
+  it('never mutates the document it was handed', () => {
+    const before = serializeBgOverride(GOLDEN);
+    const band = bandFromStaticTiles(GOLDEN, from, spec);
+    promoteBand(GOLDEN, planBandPromotion(GOLDEN, band, from, 0), band);
+    expect(serializeBgOverride(GOLDEN)).toBe(before);
+  });
+});
+
+describe('DEMOTION DESTROYS NOTHING, which is the whole difference from removal', () => {
+  it('refuses to REMOVE the drawn band, and demotes the same band with the picture intact', () => {
+    // THE DISCRIMINATING ROW. Both operations take band 0 out of `anims`. One
+    // deletes 2560 cells' worth of art and has to say so; the other moves the
+    // same art into the static blob and changes nothing an author can see.
+    const n = bandTileCount(documentBands(GOLDEN)[0]);
+    const drawn = GOLDEN.layout.filter(
+      w => w !== 0 && (w & AEON_TILE_INDEX_MASK) < n).length;
+    expect(drawn).toBeGreaterThan(0);
+    expect(() => planBandRemoval(GOLDEN, 0)).toThrow(new RegExp(`${drawn} layout`));
+
+    const plan = planBandDemotion(GOLDEN, 0);
+    const after = demoteBand(GOLDEN, plan);
+    expect(validateBgOverride(after)).toEqual([]);
+    expect(documentBands(after)).toHaveLength(documentBands(GOLDEN).length - 1);
+    expect(after.tiles).toHaveLength(GOLDEN.tiles.length);
+    expect(renderAll(after)).toEqual(renderAll(GOLDEN));
+    // Not one cell went blank, where removal would have blanked `drawn` of them.
+    expect(after.layout.filter(w => w === 0)).toHaveLength(
+      GOLDEN.layout.filter(w => w === 0).length);
+    // And the demotion really moved something.
+    expect(plan.layout.length).toBeGreaterThan(0);
+  });
+
+  it('takes no `blankReferencingCells` decision, because there is nothing to blank', () => {
+    // Removal counts the cells it is about to destroy; demotion has none.
+    expect(planBandDemotion(GOLDEN, 0).referencingCells).toBe(0);
+    expect(planBandRemoval(GOLDEN, 0, { blankReferencingCells: true }).referencingCells)
+      .toBeGreaterThan(0);
+  });
+
+  it('drops `anims` entirely when the last band is demoted, and keeps every tile', () => {
+    let doc: BgOverrideDocument = GOLDEN;
+    for (let i = documentBands(doc).length - 1; i >= 0; i--) {
+      doc = demoteBand(doc, planBandDemotion(doc, i));
+    }
+    expect(documentBands(doc)).toHaveLength(0);
+    expect(Object.hasOwn(doc, 'anims')).toBe(false);
+    expect(validateBgOverride(doc)).toEqual([]);
+    // The contrast with the removal row of exactly this shape above: THERE the
+    // blob shrank by every animated slot; here it did not shrink at all, and the
+    // picture is untouched where removal had to blank 2560 cells to get here.
+    expect(doc.tiles).toHaveLength(GOLDEN.tiles.length);
+    expect(tileBag(doc.tiles)).toEqual(tileBag(GOLDEN.tiles));
+    expect(renderAll(doc)).toEqual(renderAll(GOLDEN));
+  });
+
+  it('moves no tile at all when the LAST band is demoted to the default place', () => {
+    // The default target is the first slot the shortened animated prefix no
+    // longer covers, which for the last band is where it already sits.
+    const last = documentBands(GOLDEN).length - 1;
+    const plan = planBandDemotion(GOLDEN, last);
+    expect(plan.staticBase).toBe(plan.slotBase);
+    expect(plan.layout).toHaveLength(0);
+    const after = demoteBand(GOLDEN, plan);
+    expect(after.tiles).toEqual(GOLDEN.tiles);
+    expect(after.layout).toEqual(GOLDEN.layout);
+  });
+
+  it('lands the art anywhere in the static region the caller names', () => {
+    const bands = documentBands(GOLDEN);
+    const n = bandTileCount(bands[0]);
+    const to = GOLDEN.tiles.length - n;             // the very end of the blob
+    const after = demoteBand(GOLDEN, planBandDemotion(GOLDEN, 0, to));
+    expect(after.tiles.slice(to, to + n)).toEqual(bands[0].phases[0]);
+    expect(after.tiles).toHaveLength(GOLDEN.tiles.length);
+    expect(renderAll(after)).toEqual(renderAll(GOLDEN));
+  });
+});
+
+describe('promote and demote are byte-identical inverses, through the serializer', () => {
+  const from = 200;
+  const spec = { cols: 8, rows: 1 } as const;
+
+  it('serializes the untouched document identically to itself (the control)', () => {
+    // Without this the round trips below could be measuring a stable serializer
+    // rather than a correct pair of edits.
+    expect(serializeBgOverride(GOLDEN)).toBe(serializeBgOverride(GOLDEN));
+  });
+
+  for (const where of [0, 1, 2]) {
+    it(`restores the exact bytes after a promotion at ${where} and its demotion`, () => {
+      const band = bandFromStaticTiles(GOLDEN, from, spec);
+      const upPlan = planBandPromotion(GOLDEN, band, from, where);
+      const promoted = promoteBand(GOLDEN, upPlan, band);
+      expect(serializeBgOverride(promoted)).not.toBe(serializeBgOverride(GOLDEN));
+
+      // Re-planned independently, and it must reproduce the same symmetric plan.
+      const downPlan = planBandDemotion(promoted, where, from);
+      expect(downPlan.slotBase).toBe(upPlan.slotBase);
+      expect(downPlan.tileCount).toBe(upPlan.tileCount);
+      expect(downPlan.staticBase).toBe(upPlan.staticBase);
+      expect(downPlan.layout).toEqual(upPlan.layout);
+
+      expect(serializeBgOverride(demoteBand(promoted, downPlan))).toBe(serializeBgOverride(GOLDEN));
+      // ...and the SAME plan read backwards, which is what undo does.
+      expect(serializeBgOverride(demoteBand(promoted, upPlan))).toBe(serializeBgOverride(GOLDEN));
+    });
+  }
+
+  it('restores the exact bytes the other way round: demote then promote', () => {
+    const bands = documentBands(GOLDEN);
+    expect(bands.length).toBeGreaterThan(0);
+    for (let i = 0; i < bands.length; i++) {
+      const to = GOLDEN.tiles.length - bandTileCount(bands[i]);
+      const downPlan = planBandDemotion(GOLDEN, i, to);
+      const demoted = demoteBand(GOLDEN, downPlan);
+      expect(serializeBgOverride(demoted)).not.toBe(serializeBgOverride(GOLDEN));
+
+      const upPlan = planBandPromotion(demoted, bands[i], to, i);
+      expect(upPlan.layout).toEqual(downPlan.layout);
+      expect(serializeBgOverride(promoteBand(demoted, upPlan, bands[i])))
+        .toBe(serializeBgOverride(GOLDEN));
+      expect(serializeBgOverride(promoteBand(demoted, downPlan, bands[i])))
+        .toBe(serializeBgOverride(GOLDEN));
+    }
+  });
+});
+
+describe('bandFromStaticTiles reads phase 0 from the blob and leaves the picture inert', () => {
+  it('takes phase 0 out of the static range, byte for byte', () => {
+    const from = 200;
+    const band = bandFromStaticTiles(GOLDEN, from, { cols: 4, rows: 2 });
+    expect(band.phases[0]).toEqual(GOLDEN.tiles.slice(from, from + bandTileCount(band)));
+  });
+
+  it('fills every later bank with phase 0, so a promoted band is inert until authored', () => {
+    // THE DESIGN CALL, pinned. Blank banks would flash the picture to nothing on
+    // the band's second phase — an unrequested edit to the author's background.
+    // A copy animates to exactly what was already there.
+    const band = bandFromStaticTiles(GOLDEN, 200, { cols: 4, rows: 2 });
+    expect(band.phases).toHaveLength(BGANIM_PHASE_BANKS);
+    for (const bank of band.phases) expect(bank).toEqual(band.phases[0]);
+    // Not the blank band `createBand` makes without art: this is real art.
+    expect(band.phases[0].some(t => t.some(p => p !== 0))).toBe(true);
+  });
+
+  it('does not alias the blob it read, in any bank', () => {
+    const band = bandFromStaticTiles(GOLDEN, 200, { cols: 4, rows: 2 });
+    expect(band.phases[0][0]).not.toBe(GOLDEN.tiles[200]);
+    for (let b = 1; b < BGANIM_PHASE_BANKS; b++) {
+      expect(band.phases[b][0]).not.toBe(band.phases[0][0]);
+    }
+  });
+
+  it('writes the optional keys only when asked, exactly as createBand does', () => {
+    const bare = bandFromStaticTiles(GOLDEN, 200, { cols: 4, rows: 2 });
+    expect(Object.hasOwn(bare, 'driver')).toBe(false);
+    expect(Object.hasOwn(bare, 'rate_shift')).toBe(false);
+    expect(Object.hasOwn(bare, 'slot_base')).toBe(false);
+    const spelled = bandFromStaticTiles(GOLDEN, 200, {
+      cols: 4, rows: 2, driver: 'timer', rate_shift: 5,
+    });
+    expect(spelled.driver).toBe('timer');
+    expect(spelled.rate_shift).toBe(5);
+  });
+});
+
+describe('the promotion bounds are loud, and each names the rule it enforces', () => {
+  it('refuses a range that reaches past the end of the blob', () => {
+    // MATCHED ON THIS GUARD'S OWN WORDS, not on "has only N tiles": the codec's
+    // prefix check says that too, so a looser regex passes against a range whose
+    // bounds were never checked at all. (It did, once, and this row was re-cut.)
+    const from = GOLDEN.tiles.length - 2;
+    expect(() => bandFromStaticTiles(GOLDEN, from, { cols: 4, rows: 1 }))
+      .toThrow(new RegExp(`cannot promote tiles ${from}\\.\\.${from + 4}`));
+    expect(() => bandFromStaticTiles(GOLDEN, from, { cols: 4, rows: 1 }))
+      .toThrow(/it never adds any/);
+    // ...and exactly the range that fits is allowed, so the boundary is the boundary.
+    expect(() => bandFromStaticTiles(GOLDEN, GOLDEN.tiles.length - 4, { cols: 4, rows: 1 }))
+      .not.toThrow();
+  });
+
+  it('refuses a range that overlaps the slots existing bands already own', () => {
+    const animated = animatedSlotCount(documentBands(GOLDEN));
+    expect(animated).toBeGreaterThan(0);
+    // One slot too far in, derived — never a typed index.
+    expect(() => bandFromStaticTiles(GOLDEN, animated - 1, { cols: 2, rows: 1 }))
+      .toThrow(new RegExp(`slots 0\\.\\.${animated} already belong`));
+    // ...and exactly at the boundary it is allowed, so the boundary is the boundary.
+    expect(() => bandFromStaticTiles(GOLDEN, animated, { cols: 2, rows: 1 })).not.toThrow();
+  });
+
+  it('refuses a band whose phases[0] is not the art being promoted', () => {
+    const from = 200;
+    const honest = bandFromStaticTiles(GOLDEN, from, { cols: 4, rows: 1 });
+    const lying = cloneBgOverride(honest);
+    lying.phases[0][0] = tile(15);
+    expect(() => planBandPromotion(GOLDEN, lying, from)).toThrow(/phases\[0\] is not that art/);
+    // The honest one goes through, so the row discriminates.
+    expect(() => planBandPromotion(GOLDEN, honest, from)).not.toThrow();
+  });
+
+  it('refuses a demotion target inside the remaining bands prefix', () => {
+    const bands = documentBands(GOLDEN);
+    const remaining = animatedSlotCount(bands) - bandTileCount(bands[0]);
+    expect(remaining).toBeGreaterThan(0);
+    expect(() => planBandDemotion(GOLDEN, 0, remaining - 1))
+      .toThrow(new RegExp(`must land at or after ${remaining}`));
+    expect(() => planBandDemotion(GOLDEN, 0, remaining)).not.toThrow();
+  });
+
+  it('refuses a demotion target that would run off the end of the blob', () => {
+    const n = bandTileCount(documentBands(GOLDEN)[0]);
+    const last = GOLDEN.tiles.length - n;
+    expect(() => planBandDemotion(GOLDEN, 0, last + 1)).toThrow(/does not grow it/);
+    expect(() => planBandDemotion(GOLDEN, 0, last)).not.toThrow();
+  });
+
+  it('refuses positions that are not positions, in both directions', () => {
+    const band = bandFromStaticTiles(GOLDEN, 200, { cols: 4, rows: 1 });
+    const count = documentBands(GOLDEN).length;
+    expect(() => planBandPromotion(GOLDEN, band, 200, count + 1)).toThrow(/legal positions/);
+    expect(() => planBandPromotion(GOLDEN, band, 200, -1)).toThrow(/legal positions/);
+    expect(() => planBandDemotion(GOLDEN, count)).toThrow(/indexed 0\.\./);
+    expect(() => planBandDemotion({ ...GOLDEN, anims: undefined }, 0))
+      .toThrow(/nothing to demote/);
+  });
+
+  it('refuses a band past BGANIM_MAX_BANDS on the promotion door too', () => {
+    // The ceiling is not insertion's to own: it belongs to every arrival.
+    let doc: BgOverrideDocument = GOLDEN;
+    let seed = 60;
+    while (documentBands(doc).length < BGANIM_MAX_BANDS) {
+      const b = bandOf(1, 1, seed++);
+      doc = insertBand(doc, planBandInsertion(doc, b), b);
+    }
+    const at = animatedSlotCount(documentBands(doc));
+    const overflow = bandFromStaticTiles(doc, at, { cols: 1, rows: 1 });
+    expect(() => planBandPromotion(doc, overflow, at))
+      .toThrow(new RegExp(`BGANIM_MAX_BANDS = ${BGANIM_MAX_BANDS}`));
+  });
+});
+
+describe('a plan of one kind cannot be applied through the other kind of door', () => {
+  // The two plan kinds disagree about `tiles.length`, so crossing them is a
+  // silent-corruption shape: an insertion plan promoted would grow a full blob,
+  // and a promotion plan removed would delete art the caller was told survives.
+  const band = bandOf(2, 2, 70);
+
+  it('refuses an insertion plan at the promotion door', () => {
+    const plan = planBandInsertion(GOLDEN, band);
+    expect(plan.staticBase).toBeNull();
+    expect(() => promoteBand(GOLDEN, plan, band)).toThrow(/CREATES\/DESTROYS/);
+    expect(() => demoteBand(GOLDEN, plan)).toThrow(/CREATES\/DESTROYS/);
+  });
+
+  it('refuses a promotion plan at the insertion door', () => {
+    const from = 200;
+    const promoted = bandFromStaticTiles(GOLDEN, from, { cols: 4, rows: 1 });
+    const plan = planBandPromotion(GOLDEN, promoted, from);
+    expect(plan.staticBase).toBe(from);
+    expect(() => insertBand(GOLDEN, plan, promoted)).toThrow(/MOVES/);
+    expect(() => removeBand(GOLDEN, plan)).toThrow(/MOVES/);
+  });
+});
+
+describe('the sole-writer round-trip survives promotion and demotion too', () => {
+  const unowned = {
+    palette: 'not a palette at all',
+    palette_line: { nonsense: true },
+    some_future_key: [1, 2, 3],
+  };
+  const bandExtras = { authored_by: 'a tool that does not exist yet', hint: { wobble: 3 } };
+
+  function decorated(): BgOverrideDocument {
+    const anims = documentBands(GOLDEN).map(b => ({ ...cloneBgOverride(b), ...bandExtras }));
+    return { ...GOLDEN, ...unowned, anims };
+  }
+
+  it('carries unknown top-level and unknown BAND keys through a promotion', () => {
+    const doc = decorated();
+    const from = 200;
+    const band = bandFromStaticTiles(doc, from, { cols: 4, rows: 1 });
+    const after = promoteBand(doc, planBandPromotion(doc, band, from, 0), band);
+
+    for (const [k, v] of Object.entries(unowned)) expect(after[k]).toEqual(v);
+    expect(validateBgOverride(after)).toEqual([]);   // unjudged, not merely carried
+    const survivors = documentBands(after).slice(1);
+    expect(survivors).toHaveLength(documentBands(doc).length);
+    for (const b of survivors) {
+      expect(b.authored_by).toBe(bandExtras.authored_by);
+      expect(b.hint).toEqual(bandExtras.hint);
+      expect(b.slot_base).not.toBe(undefined);       // it WAS rewritten, so it was copied
+    }
+  });
+
+  it('returns the decorated document byte-for-byte after promote and demote', () => {
+    const doc = decorated();
+    const from = 200;
+    const band = bandFromStaticTiles(doc, from, { cols: 4, rows: 1 });
+    const plan = planBandPromotion(doc, band, from, 0);
+    expect(serializeBgOverride(demoteBand(promoteBand(doc, plan, band), plan)))
+      .toBe(serializeBgOverride(doc));
+  });
+
+  it('carries an unknown key on the DEMOTED band through the demotion itself', () => {
+    const doc = decorated();
+    const demoted = demoteBand(doc, planBandDemotion(doc, 0));
+    expect(documentBands(demoted)[0].authored_by).toBe(bandExtras.authored_by);
+    for (const [k, v] of Object.entries(unowned)) expect(demoted[k]).toEqual(v);
   });
 });

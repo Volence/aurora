@@ -44,6 +44,7 @@ import {
   LAYOUT_TILE_INDEX_MASK,
   TILE_PIXELS,
   TILE_WIDTH_PX,
+  animatedSlotCount,
   bandColumnBytes,
   bandTileCount,
   cloneBgOverride,
@@ -265,6 +266,25 @@ export interface BandSlotPlan {
   slotBase: number;
   /** `cols * rows`. */
   tileCount: number;
+  /**
+   * Where the band's `tileCount` slots live in `tiles` when the band is ABSENT.
+   *
+   *   null    NOWHERE. The without-band document does not carry this art at
+   *           all: the band's phase-0 art arrives from outside, so `tiles`
+   *           GROWS by `tileCount` in the with-band direction and SHRINKS by it
+   *           in the without-band direction. This is insert/remove.
+   *
+   *   index   The static blob index the same art occupies when the band is
+   *           absent. Nothing is created and nothing is destroyed — the slots
+   *           MOVE between the front (where bands must live) and this static
+   *           position, so `tiles.length` is UNCHANGED in both directions.
+   *           This is promote/demote.
+   *
+   * The field is required rather than optional on purpose: every plan has to
+   * say which of the two it is, and a new construction site that forgets fails
+   * to compile rather than defaulting into the growing kind.
+   */
+  staticBase: number | null;
   /** Every layout word that differs between the two states. */
   layout: BandLayoutRemap[];
   /**
@@ -378,23 +398,27 @@ function planLayoutRemap(
 }
 
 /**
- * Plan the insertion of `band` at `bandIndex` (default: after the last band).
+ * Everything a band ARRIVING in `anims` must satisfy however its art gets
+ * there, checked before anything is touched.
  *
- * Refuses BEFORE touching anything, on every bound the resulting document could
- * not satisfy: the band ceiling, the blob capacity, a `slot_base` that disagrees
- * with where list order puts the band, and a layout word the renumbering could
- * not express. Each bound is read from the contract.
+ * Shared by insertion and promotion deliberately. The two differ in exactly one
+ * thing — where the phase-0 art comes from, outside the blob or inside it — and
+ * every other bound (the position, the band ceiling, the band's own geometry,
+ * a `slot_base` that tries to place rather than agree) is the same rule. A
+ * second copy of these four refusals is how the two entry points drift into
+ * accepting different documents.
  */
-export function planBandInsertion(
-  doc: BgOverrideDocument, band: BgOverrideBand, bandIndex?: number,
-): BandSlotPlan {
+function planBandArrival(
+  doc: BgOverrideDocument, band: BgOverrideBand, bandIndex: number | undefined, verb: string,
+): { layout: number[]; tiles: number[][]; bands: readonly BgOverrideBand[]; at: number;
+     n: number; slotBase: number } {
   const { layout, tiles } = requireOwnedArrays(doc);
   const bands = documentBands(doc);
   const at = bandIndex ?? bands.length;
 
   if (!Number.isInteger(at) || at < 0 || at > bands.length) {
     throw new BgOverrideError(
-      `cannot insert a band at position ${at}: the document has ${bands.length} band(s), so the ` +
+      `cannot ${verb} a band at position ${at}: the document has ${bands.length} band(s), so the ` +
       `legal positions are 0..${bands.length}.`,
     );
   }
@@ -408,7 +432,7 @@ export function planBandInsertion(
 
   const bandIssues = validateBandInIsolation(band);
   if (bandIssues.length > 0) {
-    throw new BgOverrideError('refusing to insert an invalid BgAnim band', bandIssues);
+    throw new BgOverrideError(`refusing to ${verb} an invalid BgAnim band`, bandIssues);
   }
 
   const n = bandTileCount(band);
@@ -421,6 +445,26 @@ export function planBandInsertion(
       'derived and may only be spelled out to agree — it cannot place a band.',
     );
   }
+  return { layout, tiles, bands, at, n, slotBase };
+}
+
+/**
+ * Plan the insertion of `band` at `bandIndex` (default: after the last band).
+ *
+ * Refuses BEFORE touching anything, on every bound the resulting document could
+ * not satisfy: the band ceiling, the blob capacity, a `slot_base` that disagrees
+ * with where list order puts the band, and a layout word the renumbering could
+ * not express. Each bound is read from the contract.
+ *
+ * THE BLOB GROWS. The band's phase-0 art comes from outside the document, so
+ * this is the entry point a full blob has no room for — see `planBandPromotion`
+ * for the one that does not grow it.
+ */
+export function planBandInsertion(
+  doc: BgOverrideDocument, band: BgOverrideBand, bandIndex?: number,
+): BandSlotPlan {
+  const { layout, tiles, at, n, slotBase } = planBandArrival(doc, band, bandIndex, 'insert');
+
   if (tiles.length + n > BG_TILE_CAPACITY) {
     throw new BgOverrideError(
       `the band needs ${n} slot(s) at the front of a ${tiles.length}-tile blob, which would make ` +
@@ -434,7 +478,8 @@ export function planBandInsertion(
     layout, tiles.length, idx => (idx < slotBase ? idx : idx + n), 'withBand', 'refuse',
   );
   return {
-    bandIndex: at, slotBase, tileCount: n, layout: entries, danglingRefs, referencingCells,
+    bandIndex: at, slotBase, tileCount: n, staticBase: null,
+    layout: entries, danglingRefs, referencingCells,
   };
 }
 
@@ -483,7 +528,249 @@ export function planBandRemoval(
   }
 
   return {
-    bandIndex, slotBase, tileCount: n, layout: entries, danglingRefs, referencingCells,
+    bandIndex, slotBase, tileCount: n, staticBase: null,
+    layout: entries, danglingRefs, referencingCells,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Promotion and demotion — the pair that does not change `tiles.length`
+//
+// WHY THIS EXISTS. `insertBand` GROWS the blob, because a band's phase-0 art
+// arrives from outside it. aeon's live document is at BG_TILE_CAPACITY exactly
+// (448/448 at aeon 9b3f11f6), so insertion refuses there for every band size
+// including 1x1 and BgAnim authoring is impossible on the file that ships.
+//
+// Promotion is the other entry point on the same machinery: take a range of
+// tiles the blob ALREADY carries and declare it animated. The band's phase 0 IS
+// the static art of the slots it covers, so those tiles are already present —
+// nothing is added, and `tiles.length` is unchanged. What must happen is that
+// the range MOVES to the front, because bands pack contiguously from slot 0
+// (aeon `inject_editor_bg.py` asserts that twice, in `validate_band_coherence`
+// and again in `main`). That move is the same whole-blob renumber plus layout
+// rewrite an insertion does, entered from the other end — so it runs through
+// `planLayoutRemap`, unchanged, exactly as insertion does.
+//
+// DEMOTION LOSES NOTHING, and that is the pair's real advantage over
+// insert/remove. `removeBand` deletes the band's slots from the blob, so it
+// destroys art and must refuse or blank. Demotion hands the same slots back to
+// the static blob at a static index, so every cell that drew the band keeps
+// drawing exactly the same art — the picture is unchanged in BOTH directions,
+// and there is no `blankReferencingCells` here because there is nothing to
+// blank. If a demotion ever needed one, something has gone wrong.
+// ---------------------------------------------------------------------------
+
+/** What an author picks when promoting a static tile range; the art is already there. */
+export interface PromoteBandSpec {
+  cols: number;
+  rows: number;
+  /** Omit to leave the key out, so the document tracks the consumer's default. */
+  driver?: BgAnimDriver;
+  /** Omit to leave the key out. */
+  rate_shift?: number;
+}
+
+/**
+ * The static range a promotion may take, checked once for every door that needs
+ * it (`bandFromStaticTiles` reads the art; `planBandPromotion` places it).
+ *
+ * Two rules, and both are the prefix rule seen from different sides:
+ *   • the range must fit inside `tiles`, or there is no art to promote;
+ *   • it must lie entirely in the STATIC region, past every slot the existing
+ *     bands already own. Slots below `animatedSlotCount` belong to a band; a
+ *     range overlapping them would be promoting art that is already animated.
+ */
+function requirePromotableRange(
+  doc: BgOverrideDocument, staticBase: number, n: number,
+): { tiles: number[][]; animated: number } {
+  const { tiles } = requireOwnedArrays(doc);
+  const animated = animatedSlotCount(documentBands(doc));
+
+  if (!Number.isInteger(staticBase) || staticBase < 0) {
+    throw new BgOverrideError(
+      `cannot promote from tile ${JSON.stringify(staticBase)}: the static base is an index into ` +
+      '`tiles`, so it must be a non-negative integer.',
+    );
+  }
+  if (staticBase + n > tiles.length) {
+    throw new BgOverrideError(
+      `cannot promote tiles ${staticBase}..${staticBase + n}: the static blob has only ` +
+      `${tiles.length} tiles. Promotion declares art the blob ALREADY carries to be animated — it ` +
+      'never adds any, so the whole range has to be there first.',
+    );
+  }
+  if (staticBase < animated) {
+    throw new BgOverrideError(
+      `cannot promote tiles ${staticBase}..${staticBase + n}: slots 0..${animated} already belong ` +
+      'to the bands this document carries. Animated slots are a PREFIX of `tiles`, so a promotable ' +
+      'range starts at or after the end of that prefix — promoting art that is already animated ' +
+      'would mean two bands DMAing over the same slots.',
+    );
+  }
+  return { tiles, animated };
+}
+
+/**
+ * Build the band a promotion of `tiles[staticBase : staticBase+n]` would create,
+ * reading its phase-0 art straight out of the blob.
+ *
+ * PHASE 0 IS NOT A CHOICE. It is the static art of the slots the band covers,
+ * so it is read, never supplied — a phase 0 that differed from the blob would
+ * either break prefix identity or change the picture at rest, and both of those
+ * bake cleanly.
+ *
+ * BANKS 1..N-1 ARE A COPY OF PHASE 0, so a promoted band is VISUALLY INERT
+ * until it is authored: it draws the promoted art at every step, which is what
+ * it drew before. The alternative — blank banks — would make the picture break
+ * on the band's second phase, an unrequested edit to the author's background
+ * and the exact defect class this surface is built against. The third
+ * possibility, generating banks 1..N-1 as pre-shifted copies (the contract calls
+ * `phases` "pre-shifted art 1px apart"), was MEASURED and rejected: no
+ * horizontal offset, under either tile ordering, reproduces any bank of either
+ * real b0e5a661 band from its bank 0 — the shipped banks are hand-drawn frames,
+ * not shifts, so a generated shift would be art Aurora invented rather than art
+ * the author drew.
+ *
+ * An author with real frames does not go through here: build the band, keep
+ * `phases[0]` equal to the blob range, and hand it to `planBandPromotion`, which
+ * checks exactly that.
+ */
+export function bandFromStaticTiles(
+  doc: BgOverrideDocument, staticBase: number, spec: PromoteBandSpec,
+): BgOverrideBand {
+  const n = bandTileCount(spec);
+  const { tiles } = requirePromotableRange(doc, staticBase, n);
+  const phase0 = cloneBgOverride(tiles.slice(staticBase, staticBase + n));
+  return createBand({
+    ...spec,
+    phases: Array.from({ length: BGANIM_PHASE_BANKS }, () => cloneBgOverride(phase0)),
+  });
+}
+
+/** Deep value equality over tile art, spelled the way the codec's prefix check spells it. */
+function sameTiles(a: readonly number[][], b: readonly number[][]): boolean {
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
+/**
+ * Plan the promotion of `tiles[staticBase : staticBase+n]` into `band`, placed
+ * at `bandIndex` (default: after the last band).
+ *
+ * `tiles.length` IS UNCHANGED. The range is not copied to the front, it MOVES
+ * there: everything between the band's slot base and the range slides up by n
+ * to make room, and the range lands at the slot base. That is a permutation of
+ * the blob, so the capacity check insertion needs has nothing to check here —
+ * which is the whole point, and why this works on a full document.
+ */
+export function planBandPromotion(
+  doc: BgOverrideDocument, band: BgOverrideBand, staticBase: number, bandIndex?: number,
+): BandSlotPlan {
+  const { layout, tiles, at, n, slotBase } = planBandArrival(doc, band, bandIndex, 'promote');
+  requirePromotableRange(doc, staticBase, n);
+
+  // THE PROMOTION RULE. A band's phase 0 is the rest state of the slots it
+  // covers, and promotion is the claim that those slots are this range — so the
+  // band's phase-0 art has to BE the range, byte for byte. Anything else is
+  // either a picture change smuggled in as a structural edit, or a prefix
+  // identity violation, and both of those bake cleanly.
+  const phase0 = Array.isArray(band.phases) ? band.phases[0] : undefined;
+  if (!Array.isArray(phase0) || !sameTiles(phase0 as number[][], tiles.slice(staticBase, staticBase + n))) {
+    throw new BgOverrideError(
+      `refusing to promote tiles ${staticBase}..${staticBase + n}: the band's phases[0] is not that ` +
+      'art. Promotion declares an existing static range animated, so phase 0 is READ from the blob ' +
+      'rather than supplied — build the band with bandFromStaticTiles, or keep phases[0] equal to ' +
+      'the range and author banks 1.. only. A band whose phase 0 differs would change the picture ' +
+      'at rest, or would break `phases[0] == tiles[slot_base : slot_base + cols*rows]`, and both of ' +
+      'those bake cleanly.',
+    );
+  }
+
+  // The permutation, and it is a bijection of [0, tiles.length) onto itself:
+  //   [0, slotBase)                 stay
+  //   [slotBase, staticBase)        slide up by n, making room at the front
+  //   [staticBase, staticBase + n)  the promoted range, landing at slotBase
+  //   [staticBase + n, len)         stay
+  // Nothing maps to null, so nothing is destroyed and `referencingCells` is 0:
+  // cells that drew the promoted tiles now draw the band's slots, which is how
+  // a promoted band comes to be drawn at all.
+  const { entries, danglingRefs, referencingCells } = planLayoutRemap(
+    layout, tiles.length,
+    idx => {
+      if (idx < slotBase) return idx;
+      if (idx < staticBase) return idx + n;
+      if (idx < staticBase + n) return slotBase + (idx - staticBase);
+      return idx;
+    },
+    'withBand', 'refuse',
+  );
+  return {
+    bandIndex: at, slotBase, tileCount: n, staticBase,
+    layout: entries, danglingRefs, referencingCells,
+  };
+}
+
+/**
+ * Plan the demotion of the band at `bandIndex` back to plain static art, landing
+ * its slots at `staticBase` (default: the front of the static region, which is
+ * where they end up when the last band is demoted without moving at all).
+ *
+ * THE EXACT INVERSE OF A PROMOTION with the same `staticBase`, and unlike
+ * `planBandRemoval` it is IMAGE-PRESERVING: the band's phase-0 art stays in the
+ * blob, so every cell that drew the band goes on drawing the same picture from a
+ * static slot. There is no art to lose and therefore no refusal to make.
+ */
+export function planBandDemotion(
+  doc: BgOverrideDocument, bandIndex: number, staticBase?: number,
+): BandSlotPlan {
+  const { layout, tiles } = requireOwnedArrays(doc);
+  const bands = documentBands(doc);
+
+  if (!Number.isInteger(bandIndex) || bandIndex < 0 || bandIndex >= bands.length) {
+    throw new BgOverrideError(
+      `cannot demote band ${bandIndex}: the document has ${bands.length} band(s)` +
+      (bands.length === 0 ? ' — there is nothing to demote.' : `, indexed 0..${bands.length - 1}.`),
+    );
+  }
+
+  const n = bandTileCount(bands[bandIndex]);
+  const slotBase = bandSlotBases(bands)[bandIndex];
+  // Where the art goes when it stops being animated. The default is the first
+  // slot the shortened animated prefix no longer covers — for the LAST band
+  // that is `slotBase` itself, so demoting the newest band moves no tile at all.
+  const animatedAfter = animatedSlotCount(bands) - n;
+  const to = staticBase ?? animatedAfter;
+
+  if (!Number.isInteger(to) || to < animatedAfter) {
+    throw new BgOverrideError(
+      `cannot demote band ${bandIndex} to tile ${JSON.stringify(to)}: with this band gone the ` +
+      `remaining bands own slots 0..${animatedAfter}, and demoted art is STATIC — it must land at ` +
+      `or after ${animatedAfter}, or it would sit inside another band's prefix.`,
+    );
+  }
+  if (to + n > tiles.length) {
+    throw new BgOverrideError(
+      `cannot demote band ${bandIndex} to tiles ${to}..${to + n}: the blob has ${tiles.length} ` +
+      'tiles and demotion does not grow it — the band\'s slots MOVE into the static region rather ' +
+      'than being added to it, so the whole range must already fit.',
+    );
+  }
+
+  // The inverse permutation of the promotion above, read on the with-band
+  // document: the band's slots go to `to`, and everything between them and
+  // there slides back down by n to close the gap.
+  const { entries, danglingRefs, referencingCells } = planLayoutRemap(
+    layout, tiles.length,
+    idx => {
+      if (idx < slotBase) return idx;
+      if (idx < slotBase + n) return to + (idx - slotBase);
+      if (idx < to + n) return idx - n;
+      return idx;
+    },
+    'withoutBand', 'refuse',
+  );
+  return {
+    bandIndex, slotBase, tileCount: n, staticBase: to,
+    layout: entries, danglingRefs, referencingCells,
   };
 }
 
@@ -534,9 +821,17 @@ function withOwnedKeys(
 }
 
 /**
- * The with-band document: band spliced into `anims`, its phase-0 art spliced
- * into `tiles` at `slotBase`, and every planned layout word moved to its
- * with-band value.
+ * The WITH-BAND document: band spliced into `anims`, its phase-0 art placed in
+ * `tiles` at `slotBase`, and every planned layout word moved to its with-band
+ * value.
+ *
+ * ONE IMPLEMENTATION FOR BOTH KINDS OF PLAN, differing in a single line. When
+ * `plan.staticBase` is null the art comes from outside and `tiles` grows; when
+ * it is an index the art is already in the blob at that index and MOVES, so the
+ * length is unchanged. Everything else — the `anims` splice, the slot_base
+ * resync, the layout rewrite, the round-trip of every unowned key — is the same
+ * code in both cases, which is the only way the two operations cannot drift
+ * apart on the arithmetic they share.
  *
  * The art goes in as a DEEP COPY. Sharing the arrays would make `tiles` and
  * `phases[0]` the same objects, which reads as prefix identity holding for free
@@ -544,7 +839,7 @@ function withOwnedKeys(
  * side. They are equal by value here because the invariant says they must be,
  * not because they are the same memory.
  */
-export function insertBand(
+export function applyWithBand(
   doc: BgOverrideDocument, plan: BandSlotPlan, band: BgOverrideBand,
 ): BgOverrideDocument {
   const { layout, tiles } = requireOwnedArrays(doc);
@@ -555,12 +850,17 @@ export function insertBand(
   const phase0 = Array.isArray(band.phases) ? band.phases[0] : undefined;
   if (!Array.isArray(phase0) || phase0.length !== plan.tileCount) {
     throw new BgOverrideError(
-      `cannot insert a band whose phases[0] holds ${Array.isArray(phase0) ? phase0.length : 'no'} ` +
+      `cannot add a band whose phases[0] holds ${Array.isArray(phase0) ? phase0.length : 'no'} ` +
       `tile(s) where the plan reserves ${plan.tileCount} slot(s). phases[0] IS the static art of ` +
       'the slots the band covers, so the two cannot differ.',
     );
   }
   const nextTiles = tiles.slice();
+  // A promotion MOVES the art: take it out of the static region first, so the
+  // insert below is a relocation rather than a duplication. slotBase <= staticBase
+  // always (the range is past the animated prefix), so removing first leaves
+  // slotBase pointing where it did.
+  if (plan.staticBase !== null) nextTiles.splice(plan.staticBase, plan.tileCount);
   nextTiles.splice(plan.slotBase, 0, ...cloneBgOverride(phase0));
 
   const nextLayout = layout.slice();
@@ -569,20 +869,73 @@ export function insertBand(
   return withOwnedKeys(doc, nextLayout, nextTiles, resyncSlotBases(bands));
 }
 
-/** The without-band document. The exact inverse of `insertBand` over the same plan. */
-export function removeBand(doc: BgOverrideDocument, plan: BandSlotPlan): BgOverrideDocument {
+/** The WITHOUT-BAND document. The exact inverse of `applyWithBand` over the same plan. */
+export function applyWithoutBand(doc: BgOverrideDocument, plan: BandSlotPlan): BgOverrideDocument {
   const { layout, tiles } = requireOwnedArrays(doc);
 
   const bands = documentBands(doc).slice();
   bands.splice(plan.bandIndex, 1);
 
   const nextTiles = tiles.slice();
-  nextTiles.splice(plan.slotBase, plan.tileCount);
+  const freed = nextTiles.splice(plan.slotBase, plan.tileCount);
+  // A demotion hands the same slots back to the static blob rather than dropping
+  // them. THIS LINE IS WHY DEMOTION IS LOSSLESS: the art never leaves `tiles`.
+  if (plan.staticBase !== null) nextTiles.splice(plan.staticBase, 0, ...freed);
 
   const nextLayout = layout.slice();
   for (const e of plan.layout) nextLayout[e.index] = e.withoutBandNt;
 
   return withOwnedKeys(doc, nextLayout, nextTiles, resyncSlotBases(bands));
+}
+
+/**
+ * The four named doors, each asserting which KIND of plan it was handed.
+ *
+ * The appliers above are deliberately mode-agnostic so history can run either
+ * operation through one dispatch. These wrappers are where a plan built by one
+ * planner and applied by the other function pair is caught: an insertion plan
+ * handed to `promoteBand` would grow a full blob past capacity, and a promotion
+ * plan handed to `removeBand` would delete art the caller was told is preserved.
+ * Both are silent-corruption shapes, so neither is allowed to be a no-op.
+ */
+function requirePlanKind(plan: BandSlotPlan, kind: 'moves' | 'grows', what: string): void {
+  const moves = plan.staticBase !== null;
+  if (moves !== (kind === 'moves')) {
+    throw new BgOverrideError(
+      `refusing to ${what}: this plan ${moves ? 'MOVES' : 'CREATES/DESTROYS'} the band's slots ` +
+      `(staticBase ${JSON.stringify(plan.staticBase)}), so it came from ` +
+      `${moves ? 'planBandPromotion/planBandDemotion' : 'planBandInsertion/planBandRemoval'}. ` +
+      'The two kinds are not interchangeable: one changes `tiles.length` and the other does not.',
+    );
+  }
+}
+
+/** Add a band whose art comes from outside the blob. `tiles` grows by `tileCount`. */
+export function insertBand(
+  doc: BgOverrideDocument, plan: BandSlotPlan, band: BgOverrideBand,
+): BgOverrideDocument {
+  requirePlanKind(plan, 'grows', 'insert a band');
+  return applyWithBand(doc, plan, band);
+}
+
+/** Remove a band and its slots. `tiles` shrinks by `tileCount`; the art is gone. */
+export function removeBand(doc: BgOverrideDocument, plan: BandSlotPlan): BgOverrideDocument {
+  requirePlanKind(plan, 'grows', 'remove a band');
+  return applyWithoutBand(doc, plan);
+}
+
+/** Declare an existing static range animated. `tiles.length` is unchanged. */
+export function promoteBand(
+  doc: BgOverrideDocument, plan: BandSlotPlan, band: BgOverrideBand,
+): BgOverrideDocument {
+  requirePlanKind(plan, 'moves', 'promote static tiles to a band');
+  return applyWithBand(doc, plan, band);
+}
+
+/** Hand a band's slots back to the static blob. `tiles.length` is unchanged; no art is lost. */
+export function demoteBand(doc: BgOverrideDocument, plan: BandSlotPlan): BgOverrideDocument {
+  requirePlanKind(plan, 'moves', 'demote a band to static tiles');
+  return applyWithoutBand(doc, plan);
 }
 
 /** Re-exported so callers of this module do not need two imports to name a driver. */
