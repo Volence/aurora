@@ -19,6 +19,14 @@ MEASURED (aeon @ 9b3f11f60def3dbad10fe69fff719ea92874d749):
     BgAnim_Table goes from the disabled stub (band_count = 0, which the ROM has
     carried since dd93a840 on 2026-07-21) to `u16 = 1`.
   * bg_anim_banks.bin 0 -> 8192 B = cols*rows*BANKS*32, DERIVED from geometry.
+    FOOTNOTE: that 0 is what the injector emits into THIS probe's clean tempdir,
+    and it matches what reaches the ROM (the disabled stub emits Data.empty).
+    It is NOT aeon's tree, where the file is 49,152 B of stale banks -- the
+    injector writes it only inside `if anims:`, so the stub path leaves whatever
+    was there. Known and deliberate on their side: it is in verify_level_bin.py's
+    _ORPHAN_ALLOWLIST with a reason, because that checker walks embed->file and
+    never file->embed. Expect the apparent contradiction the first time a real
+    promotion writes that file.
   * bg_tiles.bin delta ZERO. Promotion adds no tiles -- the entire reason it
     exists, since insertBand cannot touch a 448/448 document at any band size.
   * IMAGE INVARIANCE on aeon's emitted artifacts: 2464 raw nametable words
