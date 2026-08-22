@@ -8,11 +8,11 @@
 //
 //   MapViewport.tsx                       0 requestAnimationFrame calls
 //   classic/ClassicLevelViewport.tsx      4 (:195 comment, :212, :427, :429)
-//   state/viewStore.ts:50-56              playAnimatedArt + occludeSprites are
+//   state/viewStore.ts:51 / :52-55        playAnimatedArt + occludeSprites are
 //                                         listed for 's1' ONLY; neither appears
 //                                         in the 'aeon' overlay list
 //
-// So aeon's viewport is EVENT-DRIVEN: one useEffect (MapViewport.tsx:528-577)
+// So aeon's viewport is EVENT-DRIVEN: one useEffect (MapViewport.tsx:528-574)
 // keyed on [vpX, vpY, zoom, overlays, project, currentZoneId, currentActId,
 // activeSectionIndex, editingLayer, historyVersion, liveEditVersion, selection,
 // objectSprites, collisionProfiles, drawCollisionPreview]. Nothing in that list
@@ -26,7 +26,7 @@
 // and times the component's REAL draw calls:
 //
 //   start of a repaint  = the assignment `canvas.width = rect.width`
-//                         (MapViewport.tsx:536 — the first statement of the draw
+//                         (MapViewport.tsx:537 — the first statement of the draw
 //                         effect after its guards; also the resize path's first
 //                         statement). Caught by patching the HTMLCanvasElement
 //                         `width` accessor on the prototype.
@@ -249,7 +249,8 @@ const INSTALL_PROBE = String.raw`
 
   let cur = null;
 
-  // --- repaint START: canvas.width assignment (MapViewport.tsx:536 / :587) ---
+  // --- repaint START: canvas.width assignment (MapViewport.tsx:537 draw effect,
+  //     :585 the ResizeObserver path) ---
   const wd = Object.getOwnPropertyDescriptor(HTMLCanvasElement.prototype, 'width');
   Object.defineProperty(HTMLCanvasElement.prototype, 'width', {
     configurable: true,
