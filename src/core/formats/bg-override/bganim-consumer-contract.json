@@ -1,0 +1,173 @@
+{
+  "$comment": "VENDORED, MACHINE-READABLE EXTRACT OF THE AEON CONSUMER CONTRACT — DO NOT HAND-EDIT. Every value here was read out of the aeon source cited beside it at aeon commit 1ee8f8e68d826b18023639ab32a8f7c82f238e62 (origin/master, 2026-08-22), not copied from prose. src/core/formats/bg-override/bg-override.ts reads its constants FROM this file so the codec has no second copy of any number, and test/formats/bg-override-contract-drift.test.ts holds this file to a content hash. That hash proves only that OUR copy is the one we pinned — nothing inside this repo can observe aeon changing; re-reconciling by hand when a wave parcel is cut is the same overseer ritual the effects schema pin established (aurora ROADMAP item 12).",
+  "source": {
+    "repo": "aeon",
+    "commit": "1ee8f8e68d826b18023639ab32a8f7c82f238e62",
+    "read": "2026-08-22",
+    "documents": [
+      "tools/EFFECTS_CONSUMER_CONTRACT.md §1.1/§1.2 (blob 45961f8f9b96de7a17164a535387e1a4d3a79b98)",
+      "tools/inject_editor_bg.py — THE CONSUMER; where it and the contract doc disagree, it wins (blob 5cef80aaac156a7627ab119c06d6d846f450ca40)",
+      "tools/bg_override_io.py — the shared read/refuse/write and the inseparability argument (blob 76b97b408c79f085eadce6d3422ce214eb1e4d88)",
+      "tools/test_bg_emit.py — TestBgAnimBandCeiling + TestBgAnimBandCoherence (blob dd46fdf1893798d406f253a502550aadc3969d4f)",
+      "engine/level/bg_anim.emp — the runtime (blob 3954cea3d7f18b0856ea78da5965e5804d7321ed)",
+      "engine/system/constants.emp — the ceiling's sizing authority (blob 41c6b577454581cb149d8ea090fa2231fe177f2b)",
+      "tools/vram_map.py — generated from games/sonic4/vram.toml (blob afd8a47ed0fc904268f67b09e4b8d419d3312a62)"
+    ],
+    "empyrean": "docs/AURORA_EFFECTS_SCHEMA.md §5 / §5.1 / §5.2 at empyrean 8f3fbf1 — the writer-normative half and the sole-writer ruling"
+  },
+  "path": "games/sonic4/data/editor_bg_override.json",
+
+  "constants": {
+    "BGANIM_MAX_BANDS": {
+      "value": 4,
+      "why": "The band ceiling. NOT pinned from prose: read out of all THREE deliberate authorities, which agree at 4. Raising it is a three-file engine change and never a writer decision.",
+      "authorities": [
+        "aeon engine/system/constants.emp:212 — `pub const BGANIM_MAX_BANDS = 4`; sizes engine/ram.emp:526 `BgAnim_LastStep: [u16; BGANIM_MAX_BANDS]`",
+        "aeon engine/level/bg_anim.emp — `const BGANIM_MAX_BANDS = 4`, a DELIBERATE module-local mirror (the file is lowered standalone by bg_anim_port against an empty symbol table, so it may not import engine.constants); bounds the DEBUG-only runtime assert",
+        "aeon tools/inject_editor_bg.py — `BGANIM_MAX_BANDS = 4`, the emitter cap and the RELEASE defense (`assert len(anims) <= BGANIM_MAX_BANDS`)"
+      ],
+      "aeonGate": "aeon tools/test_bg_emit.py::TestBgAnimBandCeiling::test_all_three_authorities_agree — reads all three and fails on disagreement"
+    },
+    "BGANIM_PHASE_BANKS": {
+      "value": 8,
+      "why": "`phases` carries EXACTLY this many banks — not at most, not at least. Pre-shifted art 1px apart; the fine phase is `step & 7`.",
+      "authorities": [
+        "aeon engine/level/bg_anim.emp — `const BGANIM_BANKS = 8` and `banks: [*u8; BGANIM_BANKS]` in `struct bganim_band`",
+        "aeon tools/inject_editor_bg.py — `assert len(b['bank_offsets']) == 8, 'bganim_band.banks is [*u8; 8]: each band needs exactly 8 phases'`, and `bank_offsets` is built `for ph in range(len(a['phases']))`, so 8 phases in is the only input that satisfies it"
+      ]
+    },
+    "BG_TILE_CAPACITY": {
+      "value": 448,
+      "why": "`len(tiles) <= BG_TILE_CAPACITY`. The nominal 512 is wrong — the sprite table ($B800) and HScroll table ($BC00) sit in the top of the $8000-$BFFF region.",
+      "authorities": [
+        "aeon tools/vram_map.py:26 — `BG_TILE_CAPACITY = 448`, GENERATED from games/sonic4/vram.toml (the one authority; the four-copies-of-448 incident is why inject_editor_bg.py imports it rather than restating it)",
+        "aeon tools/inject_editor_bg.py — `assert len(tiles) <= BG_TILE_CAPACITY`"
+      ]
+    },
+    "BG_TILE_BASE_SLOT": {
+      "value": 1024,
+      "why": "Not enforced by this codec — recorded because it is what makes the PREFIX identity an identity: a band's DMA destination is BG_TILE_BASE_VRAM + slot_base*32 with BG_TILE_BASE_VRAM = $8000, and 1024 * 32 = $8000 IS the tile blob's own base. So slot 0 is literally tiles[0]; bands DMA OVER the static blob's leading slots, never beside them.",
+      "authorities": [
+        "aeon tools/vram_map.py:25 — `BG_TILE_BASE_SLOT = 1024`",
+        "aeon tools/inject_editor_bg.py — `BG_TILE_BASE_VRAM = 0x8000`; `vram_dest = BG_TILE_BASE_VRAM + b['slot_base'] * 32`; and the layout rebase `(idx + BG_TILE_BASE_SLOT) & 0x7FF`"
+      ]
+    },
+    "TILE_BYTES": {
+      "value": 32,
+      "why": "One 8x8 4bpp tile. `col_bytes = rows * TILE_BYTES` is the quantity required to be a power of two.",
+      "authorities": [
+        "aeon tools/inject_editor_bg.py — `col_bytes = rows * 32`",
+        "aeon engine/level/bg_anim.emp — `const TILE_BYTES_SHIFT = 5  // log2(32 bytes per 8x8 tile)`"
+      ]
+    },
+    "TILE_PIXELS": {
+      "value": 64,
+      "why": "Each tile in `tiles` and in every `phases` bank is a flat array of exactly this many pixel values, row-major 8x8.",
+      "authorities": [
+        "aeon tools/inject_editor_bg.py — the pack loop `for row in range(8): for col in range(4)` indexes `t[row*8 + col*2]` and `t[row*8 + col*2 + 1]`, whose highest index is 63"
+      ]
+    },
+    "TILE_PIXEL_MAX": {
+      "value": 15,
+      "why": "4bpp. The consumer MASKS rather than rejects (`hi = t[...] & 0xF`), so a 16 bakes silently as a 0 — which is why the writer refuses out-of-range instead of relying on the mask.",
+      "authorities": [
+        "aeon tools/inject_editor_bg.py — `hi = t[row*8 + col*2] & 0xF`",
+        "empyrean docs/AURORA_EFFECTS_SCHEMA.md §5 — writer-normative: `each tile = cols*rows tiles, each tile = 64 pixel values 0..15`"
+      ]
+    },
+    "TILE_WIDTH_PX": {
+      "value": 8,
+      "why": "`pattern_px` must equal `cols * TILE_WIDTH_PX` — the pattern's width in pixels, from which the consumer derives `step_mask = pattern_px - 1`.",
+      "authorities": [
+        "aeon tools/inject_editor_bg.py — `assert pattern_px == cols * 8, 'pattern width must equal cols*8'`"
+      ]
+    },
+    "BG_LAYOUT_WORDS": {
+      "value": 4096,
+      "why": "64x64 nametable words, the post-pad length the consumer asserts.",
+      "authorities": [
+        "aeon tools/inject_editor_bg.py — `assert len(layout) == 4096, 'layout must be 64x32 or 64x64 words'`; `COLS, ROWS = 64, 64`"
+      ]
+    },
+    "BG_LAYOUT_WORDS_LEGACY": {
+      "value": 2048,
+      "why": "64x32. The consumer ZERO-PADS it to 4096 rather than refusing, so a legacy file is legal input. This codec accepts it and does NOT rewrite it: silently re-lengthening someone's layout is an unrequested edit, and the pad is the consumer's business.",
+      "authorities": [
+        "aeon tools/inject_editor_bg.py — `if len(layout) == 2048: layout = layout + [0]*2048  # legacy 32-row layout: pad to 64 rows`"
+      ]
+    },
+    "LAYOUT_WORD_MAX": {
+      "value": 65535,
+      "why": "Each layout entry is packed big-endian unsigned 16-bit; anything outside 0..65535 raises inside the consumer rather than baking.",
+      "authorities": [
+        "aeon tools/inject_editor_bg.py — `struct.pack_into('>H', nt, (col * ROWS + row) * 2, word)`"
+      ]
+    }
+  },
+
+  "drivers": {
+    "$comment": "aeon tools/inject_editor_bg.py — `DRIVERS = {'camera_x': 0, 'camera_y': 1, 'timer': 2}`, mirrored by engine/level/bg_anim.emp's `driver` field doc (0 = Camera_X, 1 = Camera_Y, 2 = Logic_Tick low word). A driver names the SCALAR SOURCE only: every band moves HORIZONTALLY whichever driver it picks (bg_anim.emp: 'Each band is a horizontally-periodic pattern'). `camera_y` does NOT mean vertical motion.",
+    "camera_x": 0,
+    "camera_y": 1,
+    "timer": 2
+  },
+
+  "topLevelKeys": {
+    "$comment": "Declaration order IS the canonical write order (aeon EFFECTS_CONSUMER_CONTRACT.md §1.1 table order). `ownership` is Aurora's, per the 2026-08-22 sole-writer ruling (aurora docs/reviews/2026-08-22-bg-override-ownership-ruling.md §5; empyrean AURORA_EFFECTS_SCHEMA.md §5.2).",
+    "layout": {
+      "required": true,
+      "ownership": "own",
+      "cite": "inject_editor_bg.py — `layout, tiles = data['layout'], data['tiles']`, then the row-major -> column-major transpose"
+    },
+    "tiles": {
+      "required": true,
+      "ownership": "own",
+      "cite": "inject_editor_bg.py — `data['tiles']`, capacity-asserted and packed into bg_tiles.bin"
+    },
+    "anims": {
+      "required": false,
+      "ownership": "own",
+      "cite": "inject_editor_bg.py — `anims = data.get('anims')`; absent or falsy -> the disabled stub (band_count = 0)",
+      "emptyIsADefect": "aeon tools/test_bg_emit.py::TestBgAnimBandCoherence::test_live_override_file_is_coherent_if_it_has_bands asserts `assertNotIn('anims', live)` when there are no bands, with the reason 'an empty `anims` key is neither absent nor authored'. So an empty array is refused in both directions here."
+    },
+    "anim": {
+      "required": false,
+      "ownership": "legacy-read-only",
+      "cite": "inject_editor_bg.py — `if anims is None and data.get('anim'): anims = [data['anim']]`",
+      "writerRule": "aeon EFFECTS_CONSUMER_CONTRACT.md §1.1: 'LEGACY single-band form … Writers must not emit it (read-side compatibility only)'. This codec therefore UPGRADES it on read (anim -> anims[0]) and refuses to serialize a document still carrying it — the only behaviour that neither emits the legacy key nor destroys the band it holds."
+    },
+    "palette": {
+      "required": false,
+      "ownership": "round-trip",
+      "cite": "inject_editor_bg.py — `if 'palette' in data:` -> `assert len(words) == 16` -> stamped into ojz_palette.bin",
+      "notValidatedHere": "Aurora does not own this key, so it does not judge it. Refusing a file over a key whose constraint belongs to someone else (and which the drift rule lets them change) would block an author from opening a file its owner considers fine."
+    },
+    "palette_line": {
+      "required": false,
+      "ownership": "round-trip",
+      "cite": "inject_editor_bg.py — `cram_line = int(data.get('palette_line', 2)) & 3`; `file_line = cram_line - 1` must be >= 0",
+      "notValidatedHere": "same reason as `palette`"
+    }
+  },
+
+  "bandKeys": {
+    "$comment": "Each element of `anims`. aeon EFFECTS_CONSUMER_CONTRACT.md §1.2; declaration order is that table's order and is the canonical write order for a band.",
+    "cols": { "required": true, "kind": "positiveInt", "cite": "inject_editor_bg.py — `cols, rows = a['cols'], a['rows']`" },
+    "rows": { "required": true, "kind": "positiveInt", "cite": "inject_editor_bg.py — `col_bytes = rows * 32`; `col_shift = col_bytes.bit_length() - 1`; `assert (1 << col_shift) == col_bytes`" },
+    "pattern_px": { "required": true, "kind": "positiveInt", "cite": "inject_editor_bg.py — `assert pattern_px == cols * 8`" },
+    "driver": { "required": false, "kind": "driverName", "default": "camera_x", "cite": "inject_editor_bg.py — `DRIVERS[a.get('driver', 'camera_x')]`; an unlisted name is a KeyError at bake" },
+    "rate_shift": { "required": false, "kind": "nonNegativeInt", "default": 2, "cite": "inject_editor_bg.py — `a.get('rate_shift', 2)`; engine: `step = driver_value >> rate_shift`" },
+    "slot_base": { "required": false, "kind": "nonNegativeInt", "cite": "inject_editor_bg.py — `slot_base = a.get('slot_base', slot_cursor)`; `assert slot_base == slot_cursor, 'bands must pack contiguously from slot 0'`" },
+    "phases": { "required": true, "kind": "phaseBanks", "cite": "inject_editor_bg.py — `for bank in a['phases']: assert len(bank) == n`, and validate_band_coherence's `phases[0] == tiles[base:base+n]`" }
+  },
+
+  "invariants": {
+    "bandCeiling": "len(anims) <= BGANIM_MAX_BANDS",
+    "columnBytesPowerOfTwo": "rows * TILE_BYTES must be a power of two (the consumer derives col_shift = log2 of it and asserts the round trip)",
+    "patternWidth": "pattern_px == cols * TILE_WIDTH_PX",
+    "contiguousPacking": "bands pack contiguously from slot 0 in list order; slot_base, when present, must equal the running cursor",
+    "insideTheBlob": "slot_base + cols*rows <= len(tiles) for every band",
+    "prefixIdentity": "phases[0] == tiles[slot_base : slot_base + cols*rows] — the band's rest state IS the static tiles it covers. This is the invariant that makes anims/tiles/layout ONE unit rather than three separable keys: a violation bakes CLEANLY and ships silently corrupt art, and every other assert in the consumer still passes (aeon docs/BUGS.md TOOL-01; tools/bg_override_io.py's docstring; aeon tools/test_bg_emit.py::TestBgAnimBandCoherence).",
+    "capacity": "len(tiles) <= BG_TILE_CAPACITY. Animated slots are a PREFIX of tiles, NOT an addition — they cost no capacity beyond the array that already holds them (empyrean §5.1, which corrects an earlier `tiles + animated slots <= 448` rule that would have told Aurora the flagship act cannot carry any band at all)."
+  }
+}
