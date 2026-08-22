@@ -645,6 +645,8 @@ P1's aeon half, so P1's remainder should be re-cut against what facet parity alr
 free rather than executed as written. P3 and P7 stay pure-Aurora work that can interleave any
 time engine work stalls.
 
+**Incoming arc (agreed 2026-08-22 with the aeon overseer): parallax/raster effects authoring view** — multi-band parallax + raster effects + BgAnim tile bands, Aurora-authored (the OJZ BG showcase direction). Sequence: aeon's read-only survey of this repo (pinned at `4cffe45`) → owner design review → aeon's S4LZ-slicing engine parcel → Aurora parcels cut HERE against aeon's committed briefs/contracts (SHAs to be pinged across). Lane split: Aurora's overseer dispatches and lands all Aurora parcels; aeon ships committed briefs; cross-tool contract material goes to empyrean. Known load-bearing caveat handed to their survey: the aeon ProjectAdapter is still a routing marker (§2.5) — deeper aeon-project loading than the current facets use must be named as a gap in their assessment.
+
 Watch items from the engine side: `section_id` byte→word (floating origin) — check Aurora's
 section keying when it lands; engine/game split (#5) — `project.json` may gain a
 game-manifest pointer (the split happened on 2026-07-07: `games/demo` now boots on the
