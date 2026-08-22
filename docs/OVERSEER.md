@@ -89,6 +89,17 @@ Each has caught a real defect here.
    so in its report. A gate that passes for the wrong reason is worse than no gate — and
    this is bar 5's discipline at the moment it is hardest to hold.
 
+12. **Enumerate by what TOUCHES the data, not by what DEFINES it.** Two overseers
+   independently counted the section-sidecar ref sites and both got 8; the real count was
+   13. Both passes enumerated the *codec* — parse, serialize, the interface, the header —
+   and neither asked **what else copies a `Section`**. `cloneSection`
+   (`editing/section-ops.ts`) carried all four scalar refs in a hand-enumerated literal
+   with no spread and **no test**: deleting `sceneRef` OR `bgLayoutRef` from it survived a
+   3909-test suite, so a copy/paste silently losing a section's background or palette
+   assignment was invisible. A second hardcoded enumeration at `save.ts:130` was missed
+   the same way. When counting the places a field lives, grep for the TYPE and for every
+   constructor/copier of it, not just for the field name in its own module.
+
 ## Editor↔engine coordination points
 
 Protocol details Aurora depends on and did not invent. All measured; re-verify before
