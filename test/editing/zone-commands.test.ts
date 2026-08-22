@@ -146,7 +146,7 @@ describe('set-bg command', () => {
     return {
       id: 'act1', gridWidth: 1, gridHeight: 1, sections: [],
       startPosition: { secX: 0, secY: 0, localX: 0, localY: 0 },
-      bgLayout: null, bgTiles: null, parallaxRef: null,
+      bgLayout: null, bgTiles: null, sceneRef: null,
     };
   }
 

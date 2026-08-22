@@ -20,7 +20,7 @@ const PROJECT_JSON = {
     id: 'ojz', name: 'OJ Zone', tileset: 'data/ojz_tiles.bin', palette: 'data/ojz_pal.bin',
     acts: ['act1', 'act2'].map((id) => ({
       id, gridWidth: 1, gridHeight: 1, dataPath: `data/ojz/${id}/`,
-      bgLayout: '', bgTiles: '', parallax: null,
+      bgLayout: '', bgTiles: '', sceneRef: null,
       startPosition: { secX: 0, secY: 0, localX: 64, localY: 64 },
     })),
   }],

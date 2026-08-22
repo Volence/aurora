@@ -74,7 +74,6 @@ describe('cloneSection', () => {
   it('carries every scalar ref onto the copy', () => {
     const src = sec(0, 1);
     src.paletteRef = 'pal-dusk';
-    src.parallaxRef = 'plx-legacy';
     src.bgLayoutRef = 'bg-cave';
     src.sceneRef = 'canopy_dusk';
     src.flags = 3;
@@ -82,11 +81,31 @@ describe('cloneSection', () => {
 
     const clone = cloneSection(src, 5, 'Renamed');
     expect(clone.paletteRef).toBe('pal-dusk');
-    expect(clone.parallaxRef).toBe('plx-legacy');
     expect(clone.bgLayoutRef).toBe('bg-cave');
     expect(clone.sceneRef).toBe('canopy_dusk');
     expect(clone.flags).toBe(3);
     expect(clone.music).toBe(7);
+  });
+
+  /**
+   * ...and the same claim WITHOUT a hand-written list, which is the half that
+   * survives the next field being added. The three assertions above name their
+   * fields, so they can only catch a drop someone remembered to add a line for;
+   * this one derives the expectation from the source object's own shape, so a
+   * field added to `Section` (hence to `createSection`, hence to `src`) and
+   * forgotten in `cloneSection` fails here with no test edit at all.
+   *
+   * `sec()` builds through `createSection`, so the key set IS the model's.
+   */
+  it('reproduces the source section key-for-key (no hand-list to forget)', () => {
+    const src = sec(0, 1);
+    // The instrument must have seen a real section, not {}: if this ever reads
+    // as a near-empty object the key-set comparison below is vacuously true.
+    expect(Object.keys(src).length).toBeGreaterThanOrEqual(9);
+    expect(Object.keys(src)).toContain('sceneRef');
+
+    const clone = cloneSection(src, 5, 'Renamed');
+    expect(Object.keys(clone).sort()).toEqual(Object.keys(src).sort());
   });
 
   /**
@@ -97,7 +116,6 @@ describe('cloneSection', () => {
   it('leaves the scalar refs null when the source has none', () => {
     const clone = cloneSection(sec(0, 1), 5);
     expect(clone.paletteRef).toBeNull();
-    expect(clone.parallaxRef).toBeNull();
     expect(clone.bgLayoutRef).toBeNull();
     expect(clone.sceneRef).toBeNull();
   });

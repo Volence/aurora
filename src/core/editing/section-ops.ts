@@ -26,7 +26,6 @@ export function cloneSection(sec: Section, index: number, name?: string): Sectio
     rings: sec.rings.map((r) => ({ ...r })),
     tiles: sec.tiles ? sec.tiles.map((t) => ({ pixels: new Uint8Array(t.pixels) })) : null,
     paletteRef: sec.paletteRef,
-    parallaxRef: sec.parallaxRef,
     bgLayoutRef: sec.bgLayoutRef,
     sceneRef: sec.sceneRef,
     flags: sec.flags,

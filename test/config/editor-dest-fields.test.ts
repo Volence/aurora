@@ -68,6 +68,11 @@ function baseProject(): Json {
         dataPath: 'games/sonic4/data/editor/ojz/act1/',
         bgLayout: 'games/sonic4/data/generated/ojz/act1/ojz_bg.bin',
         bgTiles: 'games/sonic4/data/generated/ojz/act1/ojz_bg_tiles.bin',
+        // DELIBERATELY the key aeon DELETED (`7bff8488` replaced `parallax`
+        // with `sceneRef`; empyrean AURORA_EFFECTS_SCHEMA.md §4). This fixture
+        // is a pre-change project.json, so keeping it here is what proves one
+        // still loads and that its now-unmodelled key round-trips like any
+        // other. The sceneRef-carrying project is a separate fixture, below.
         parallax: null,
         unknownActKey: [1, 2, 3],
         startPosition: { secX: 0, secY: 0, localX: 64, localY: 64 },
@@ -341,5 +346,131 @@ describe('legacy-atlas truncation guard', () => {
     expect(p.files.some(f => f.path === ATLAS && f.bytes.length === 0)).toBe(false);
     // ...and the tile bytes really were written there.
     expect(p.files.find(f => f.path === ATLAS)!.bytes.length).toBe(64);
+  });
+});
+
+// ── Act-level sceneRef (empyrean AURORA_EFFECTS_SCHEMA.md §4) ────────────────
+//
+// aeon deleted the act entry's `parallax` key and replaced it with `sceneRef`
+// (a scene id, or an explicit null) in one edit — aeon `7bff8488`, merged at
+// `98100905`. Two halves are pinned here:
+//
+//   READ  — `Act.sceneRef` comes from the act entry's `sceneRef`, with null and
+//           ABSENT collapsed to one value, because §4 gives them one meaning
+//           ("the hand-authored engine default stands").
+//   WRITE — nothing. The save re-serialises `LoadedS4Config.raw`, so the key
+//           survives untouched and no `parallax` key is reintroduced. That is
+//           the whole reason a cross-repo key change needed no save-side edit,
+//           and it earns a gate precisely BECAUSE it is invisible: a save
+//           rewritten as a hand-enumerated literal would pass every other test
+//           in this repo while silently deleting sceneRef on first save.
+
+/** Act entry in aeon's post-`7bff8488` shape: no `parallax`, a real `sceneRef`. */
+function sceneRefFixture(sceneRef: string | null | undefined): Map<string, Uint8Array> {
+  return fixtureFiles({
+    edit: (proj) => {
+      const act = proj.zones[0].acts[0];
+      delete act.parallax;
+      if (sceneRef === undefined) delete act.sceneRef;
+      else act.sceneRef = sceneRef;
+    },
+  });
+}
+
+async function loadedAct(files: Map<string, Uint8Array>) {
+  const r = await loadAeonProject(memFa(files), '/proj');
+  const act = r.project.zones[0].acts[0];
+  // The instrument must have seen its subject: a real act off a real project.
+  // Without this, "sceneRef is null" is equally true of a project that never
+  // loaded at all.
+  expect(act.id).toBe('act1');
+  expect(act.gridWidth).toBe(1);
+  return act;
+}
+
+describe('act-level sceneRef — the reader (schema §4)', () => {
+  it('reads the act entry sceneRef into Act.sceneRef', async () => {
+    expect((await loadedAct(sceneRefFixture('canopy_dusk'))).sceneRef).toBe('canopy_dusk');
+  });
+
+  it('collapses an explicit null to null', async () => {
+    expect((await loadedAct(sceneRefFixture(null))).sceneRef).toBeNull();
+  });
+
+  it('collapses an ABSENT key to the same null, not undefined', async () => {
+    const act = await loadedAct(sceneRefFixture(undefined));
+    // toBeNull and not toBeFalsy: the declared type is `string | null`, and an
+    // undefined sitting in it is exactly the typed lie this re-point closed.
+    expect(act.sceneRef).toBeNull();
+  });
+
+  it('gives a pre-change project.json (parallax, no sceneRef) that same null', async () => {
+    // The `parallax` value is a PATH. If any reader were still wired to that
+    // key this would come back as 'games/...' — a path where a scene id
+    // belongs, which is the confusion §4 renamed the key to make impossible.
+    const files = fixtureFiles({
+      edit: (proj) => {
+        proj.zones[0].acts[0].parallax = 'games/sonic4/data/parallax/ojz_default.asm';
+      },
+    });
+    expect((await loadedAct(files)).sceneRef).toBeNull();
+  });
+});
+
+describe('act-level sceneRef — the save round-trip (raw re-serialisation)', () => {
+  /** The act keys buildAeonSavePlan is documented to OWN and may rewrite. */
+  const SAVE_OWNED_ACT_KEYS = ['bgLayout', 'bgTiles'];
+
+  function omitOwned(act: Json): Json {
+    const out: Json = {};
+    for (const k of Object.keys(act)) if (!SAVE_OWNED_ACT_KEYS.includes(k)) out[k] = act[k];
+    return out;
+  }
+
+  it('writes sceneRef back exactly as it found it, and reintroduces no parallax key', async () => {
+    const p = await plan(sceneRefFixture('canopy_dusk'), {
+      afterLoad: (r) => {
+        // Subject check: the model really carries the id, so the assertion
+        // below is about a round trip and not two unrelated nulls agreeing.
+        expect(r.project.zones[0].acts[0].sceneRef).toBe('canopy_dusk');
+      },
+    });
+    const outAct = JSON.parse(textOf(p, 'project.json')).zones[0].acts[0];
+    expect(outAct.sceneRef).toBe('canopy_dusk');
+    expect('parallax' in outAct).toBe(false);
+  });
+
+  it('preserves an explicit null as a PRESENT key, not a dropped one', async () => {
+    // aeon spells the empty case `"sceneRef": null` rather than omitting it,
+    // deliberately (`7bff8488`: an explicit null is discoverable to Aurora's
+    // reader). A save that dropped the key would still be "correct" under §4's
+    // null==absent rule while quietly undoing that choice.
+    const p = await plan(sceneRefFixture(null));
+    const outAct = JSON.parse(textOf(p, 'project.json')).zones[0].acts[0];
+    expect('sceneRef' in outAct).toBe(true);
+    expect(outAct.sceneRef).toBeNull();
+  });
+
+  /**
+   * The general claim, stated so it cannot be satisfied by remembering to
+   * enumerate one more key: EVERY act key the save does not own comes back
+   * unchanged. Derived from the input object rather than a copied literal, so
+   * it grows with the fixture — and it is what fails if `save.ts` is ever
+   * rewritten to reconstruct project.json from the model.
+   */
+  it('returns every act key it does not own, unchanged', async () => {
+    const inProj = baseProject();
+    delete inProj.zones[0].acts[0].parallax;
+    inProj.zones[0].acts[0].sceneRef = 'canopy_dusk';
+
+    const p = await plan(sceneRefFixture('canopy_dusk'));
+    const outAct = JSON.parse(textOf(p, 'project.json')).zones[0].acts[0];
+
+    const expected = omitOwned(inProj.zones[0].acts[0]);
+    // Subject check: the comparison covers a non-trivial key set that really
+    // includes the contract key. An empty `expected` would pass vacuously.
+    expect(Object.keys(expected)).toContain('sceneRef');
+    expect(Object.keys(expected).length).toBeGreaterThanOrEqual(7);
+    expect(omitOwned(outAct)).toEqual(expected);
   });
 });

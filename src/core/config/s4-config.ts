@@ -27,7 +27,17 @@ export interface S4ActConfig {
   editorBgLayout?: string;
   /** Repo-declared destination for the act's BG tile blob (see above). */
   editorBgTiles?: string;
-  parallax: string | null;
+  /**
+   * The act's default effects scene: a scene id, or null. ABSENT is legal and
+   * means the same as null (empyrean AURORA_EFFECTS_SCHEMA.md §4), hence the
+   * optional marker — the key only appeared in aeon `7bff8488`, replacing the
+   * deleted `parallax` path key, so a project.json predating that edit has no
+   * `sceneRef` at all and must still load.
+   *
+   * Aurora never writes it: the save re-serialises `raw`, so aeon's value
+   * round-trips whatever this reader does with it.
+   */
+  sceneRef?: string | null;
   startPosition: { secX: number; secY: number; localX: number; localY: number };
 }
 

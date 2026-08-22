@@ -98,7 +98,7 @@ function mockCtx() {
 function sectionWith(p: Partial<Section>): Section {
   return {
     index: 0, name: 's', objects: [], rings: [], tiles: null,
-    paletteRef: null, parallaxRef: null, bgLayoutRef: null,
+    paletteRef: null, bgLayoutRef: null,
     tileGrid: {
       width: SECTION_TILES_WIDE, height: SECTION_TILES_HIGH,
       nametable: new Uint16Array(SECTION_TILES_WIDE * SECTION_TILES_HIGH),

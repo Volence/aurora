@@ -401,7 +401,11 @@ async function loadFullProject(
         startPosition: actConfig.startPosition,
         bgLayout,
         bgTiles,
-        parallaxRef: actConfig.parallax,
+        // Act-level effects scene (AURORA_EFFECTS_SCHEMA.md §4). null and absent
+        // are the same fact — "no editor assignment, the engine's hand-authored
+        // act_parallax_config stands" — so they collapse to null here rather
+        // than reaching the model as null vs undefined.
+        sceneRef: actConfig.sceneRef ?? null,
       });
     }
 
