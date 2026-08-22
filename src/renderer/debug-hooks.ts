@@ -99,6 +99,13 @@ interface ClassicProbeApi {
   allTileHashes(): number[];
   /** The first placed object with this engine id (S1ObjectEntry.id), or null. */
   findObject(id: number): { x: number; y: number; subtype: number } | null;
+  /**
+   * One FNV hash over the doc state playback could conceivably touch (tile
+   * pool bytes + palettes + the full object list + start) — the animated-
+   * preview harness's "the document was NEVER written by play" sentinel.
+   * Read-only, cheap, and stable across pure repaints.
+   */
+  docHash(): number | null;
   setSelectedChunk(id: number): void;
   setComposerBlock(id: number): void;
 }
@@ -236,6 +243,20 @@ function installClassicProbe(): ClassicProbeApi {
       if (!doc) return null;
       const o = doc.objects.find((e) => e.id === id);
       return o ? { x: o.x, y: o.y, subtype: o.subtype } : null;
+    },
+    docHash: () => {
+      const { doc } = state();
+      if (!doc) return null;
+      let h = fnv1a(doc.tiles, 0, doc.tiles.length);
+      const enc = new TextEncoder();
+      const mix = (s: string) => {
+        const b = enc.encode(s);
+        h = (h ^ fnv1a(b, 0, b.length)) >>> 0;
+      };
+      mix(JSON.stringify(doc.objects));
+      mix(JSON.stringify(doc.palettes.map((p) => [...p])));
+      mix(JSON.stringify(doc.start));
+      return h;
     },
     setSelectedChunk: (id) => state().setSelectedChunkId(id),
     setComposerBlock: (id) => state().setComposerBlockId(id),

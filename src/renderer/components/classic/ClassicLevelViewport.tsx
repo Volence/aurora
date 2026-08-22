@@ -36,6 +36,11 @@ import {
   animStateKey, animTilePatchesAt, animatedCellsForChunk, animatedTilesForZone,
   familiesForZone, type AnimatedCell,
 } from '../../../core/level-classic/s1-anim-art';
+import { previewStepIndexAt } from '../../../core/level-classic/s1-object-anim';
+import {
+  closeStrips, loadObjectAnimStrips, stripKeyFor, stripSignature, stripStateKey,
+  type StripMap,
+} from './object-anim-strips';
 import { createIpcFileAccess } from '../../state/classic-file-access';
 import CollisionLegend from '../CollisionLegend';
 import { isTypingTarget } from './composer-shared';
@@ -306,6 +311,50 @@ export default function ClassicLevelViewport() {
   // total ms spent in the animated-art section of the draw pass.
   const animPerfRef = useRef<{ draws: number; sumMs: number; maxMs: number }>({ draws: 0, sumMs: 0, maxMs: 0 });
 
+  // ---- animated OBJECT previews (the animation line's Parcel 2) ------------
+  // The SAME play toggle drives object-preview strips: per curated id
+  // (s1-object-anim.ts) the strip loader renders each anim frame once, and the
+  // draw pass swaps which bitmap drawObjects blits at the shared clock's game
+  // frame t. Overlay/frame-selection only — the doc, the object list and the
+  // static sprite store are never written by playback. Objects are an
+  // FG-plane concept, so strips follow the same gates as drawObjects itself.
+  const stripSig =
+    overlays.playAnimatedArt && overlays.showObjects && plane === 'fg' && doc
+      ? stripSignature(doc.objects)
+      : '';
+  const playObjAnim = stripSig !== '' && zone !== null;
+  const objStripsRef = useRef<{ key: string; strips: StripMap } | null>(null);
+  const objStripGen = useRef(0);
+  useEffect(() => {
+    if (!playObjAnim || !projectDir || !zone || !doc) return;
+    // Strips depend on the id/anim set + the two content clocks (palette for
+    // every frame's colors; tiles for LevelArt-backed frames) — object drags
+    // and deletes that keep the set never re-render a bitmap.
+    const key = `${zone}:${stripSig}:${paletteEpoch}:${tileEpoch}`;
+    if (objStripsRef.current?.key === key) return;
+    const gen = ++objStripGen.current;
+    void loadObjectAnimStrips(projectDir, doc, zone).then((strips) => {
+      if (gen !== objStripGen.current) { closeStrips(strips); return; }
+      if (objStripsRef.current) closeStrips(objStripsRef.current.strips);
+      objStripsRef.current = { key, strips };
+      // Harness/report diagnostics (read-only; mirrors __auroraAnimArtPerf).
+      (window as unknown as Record<string, unknown>).__auroraObjAnim = {
+        strips: strips.size, keys: [...strips.keys()],
+      };
+      redraw();
+    });
+  }, [playObjAnim, projectDir, zone, doc, stripSig, paletteEpoch, tileEpoch, redraw]);
+  // Honest cost meter for the object-preview half of the draw pass.
+  const objAnimPerfRef = useRef<{ draws: number; sumMs: number; maxMs: number }>({ draws: 0, sumMs: 0, maxMs: 0 });
+  // Close the strip bitmaps on unmount (replace-time closing lives in the load
+  // effect; toggle-off deliberately KEEPS the strips so resume is instant).
+  useEffect(() => () => {
+    if (objStripsRef.current) {
+      closeStrips(objStripsRef.current.strips);
+      objStripsRef.current = null;
+    }
+  }, []);
+
   useEffect(() => {
     if (!playAnim || !projectDir || !zone) return;
     if (animSourcesRef.current?.zone === zone) return;
@@ -331,7 +380,12 @@ export default function ClassicLevelViewport() {
   }, [playAnim, projectDir, zone, redraw]);
 
   useEffect(() => {
-    if (!playAnim || !zone) return;
+    // ONE clock for both animated halves (level art + object previews): the
+    // same wall-clock game-frame counter t drives the art families' core clock
+    // AND the object strips' step selection, so a Ring and the waterfall next
+    // to it stay on one timebase (and the harness can freeze one clock, not
+    // two).
+    if ((!playAnim && !playObjAnim) || !zone) return;
     // Playback starts at game-frame 0 (level init) every time it is switched
     // on — deterministic, and exactly the state the static view shows for SBZ
     // (blank smoke) and GHZ frame-0 families.
@@ -340,10 +394,16 @@ export default function ClassicLevelViewport() {
     const tick = () => {
       const t = Math.floor(((performance.now() - t0) * 60) / 1000);
       animFrameRef.current = t;
-      const key = animStateKey(zone, t);
+      // Repaint only when something actually stepped: an art family (zone
+      // clock key) or any object strip (step-index key).
+      const artKey = playAnim ? animStateKey(zone, t) : '';
+      const objKey = playObjAnim && objStripsRef.current
+        ? stripStateKey(objStripsRef.current.strips, t)
+        : '';
+      const key = `${artKey}|${objKey}`;
       if (key !== animKeyRef.current) {
         animKeyRef.current = key;
-        redraw(); // repaint only when some family actually stepped
+        redraw();
       }
       handle = requestAnimationFrame(tick);
     };
@@ -357,7 +417,7 @@ export default function ClassicLevelViewport() {
       animFrameRef.current = 0;
       animKeyRef.current = '';
     };
-  }, [playAnim, zone, redraw]);
+  }, [playAnim, playObjAnim, zone, redraw]);
 
   // ---- paint instrumentation (AURORA_PERF=1) -------------------------------
   // The current act load's paint accumulator (null when perf is off). Written by
@@ -706,7 +766,36 @@ export default function ClassicLevelViewport() {
         // objectArtVersion is read so this depless render effect re-runs when a
         // sprite finishes loading (the store republishes + bumps version).
         void objectArtVersion;
-        drawObjects(ctx, doc, invZoom, objectSprites, ref?.zone ?? '', selIndex, previewPos);
+        // Animated-preview override (play toggle): resolve each placement's
+        // strip + current step at the shared clock's game frame. Pure
+        // frame-selection — placements without a strip fall through to their
+        // static sprite inside drawObjects.
+        let animFor: ((obj: LevelDoc['objects'][number]) => { sprite: ObjectSprite; xf: boolean; yf: boolean } | null) | undefined;
+        const strips = playObjAnim ? objStripsRef.current?.strips : undefined;
+        if (strips && strips.size > 0) {
+          const t = animFrameRef.current;
+          animFor = (obj) => {
+            const k = stripKeyFor(obj);
+            const strip = k ? strips.get(k) : undefined;
+            if (!strip) return null;
+            const step = strip.anim.steps[previewStepIndexAt(strip.anim, t)];
+            const sprite = strip.frames.get(step.frame);
+            if (!sprite) return null;
+            // Script per-frame flips XOR the placement's own (the engine eors
+            // the anim flip bits into obRender).
+            return { sprite, xf: step.xFlip !== obj.xflip, yf: step.yFlip !== obj.yflip };
+          };
+        }
+        const objT0 = animFor ? performance.now() : 0;
+        drawObjects(ctx, doc, invZoom, objectSprites, ref?.zone ?? '', selIndex, previewPos, animFor);
+        if (animFor) {
+          const ms = performance.now() - objT0;
+          const acc = objAnimPerfRef.current;
+          acc.draws++;
+          acc.sumMs += ms;
+          acc.maxMs = Math.max(acc.maxMs, ms);
+          (window as unknown as Record<string, unknown>).__auroraObjAnimPerf = acc;
+        }
       }
       if (overlays.showStart) {
         // During a start drag the ref carries the live (clamped) preview position.

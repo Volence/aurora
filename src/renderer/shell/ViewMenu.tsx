@@ -8,7 +8,9 @@ const LABELS: Record<string, string> = {
   showCollision: 'Collision (path A)', showCollisionPathB: 'Collision (path B)',
   showCollisionAngles: 'Collision angles', showStart: 'Player start',
   showPriority: 'Priority (above sprites)',
-  playAnimatedArt: 'Play animated art',
+  // One toggle plays BOTH animated halves: level-art families AND the curated
+  // object previews (rings spin, badniks walk) — they share one clock.
+  playAnimatedArt: 'Play animations',
 };
 function pretty(key: string) {
   return LABELS[key] ?? key.replace('show', '').replace(/([A-Z])/g, ' $1').trim();

@@ -220,6 +220,12 @@ function drawSprite(ctx: CanvasRenderingContext2D, s: ObjectSprite, ax: number, 
  *
  * `previewPos`, if given, overrides the selected object's centre only (the live
  * position during an in-progress drag, before the store commit lands on mouseup).
+ *
+ * `animFor`, if given, is the animated-preview override (the play toggle): per
+ * placement it returns the CURRENT anim-step sprite + the final flips (script
+ * step flips already XORed with the placement's own), or null → the static
+ * sprite draws as ever. Overlay-only: the doc and the sprite map are untouched;
+ * a strip simply swaps which bitmap this pass blits.
  */
 export function drawObjects(
   ctx: CanvasRenderingContext2D,
@@ -229,6 +235,7 @@ export function drawObjects(
   zone: string,
   selectedIndex?: number | null,
   previewPos?: { x: number; y: number } | null,
+  animFor?: (obj: LevelDoc['objects'][number]) => { sprite: ObjectSprite; xf: boolean; yf: boolean } | null,
 ): void {
   ctx.lineWidth = 1 * invZoom;
   ctx.font = `${8 * invZoom}px monospace`;
@@ -247,16 +254,23 @@ export function drawObjects(
     // hex box / ring markers; the fresh map's live bitmaps redraw on the next frame.
     const raw = sprites.get(objectArtKey(obj.id, zone, obj.subtype));
     const sprite = raw && raw.bitmap.width > 0 ? raw : null;
+    // Animated-preview override (guarded against closed bitmaps exactly like
+    // the static map above — a strip replaced mid-flush reports width 0).
+    const animRaw = animFor?.(obj) ?? null;
+    const anim = animRaw && animRaw.sprite.bitmap.width > 0 ? animRaw : null;
     // Selection box: sized to the drawn frame when a sprite is loaded, else the
     // legacy anchor box. Computed per-object so it tracks flips + frame size.
     let selRect = { left: ox - 11, top: oy - 11, width: 22, height: 22 };
+    // What this pass actually blits: the animated step when playing, else the
+    // static sprite with the placement's own flips.
+    const drawn = anim ?? (sprite ? { sprite, xf: obj.xflip, yf: obj.yflip } : null);
 
     if (obj.id === RING_OBJ_ID) {
       const positions = ringGroupPositions(obj.subtype, ox, oy);
-      if (sprite) {
-        for (const p of positions) drawSprite(ctx, sprite, p.x, p.y, obj.xflip, obj.yflip);
+      if (drawn) {
+        for (const p of positions) drawSprite(ctx, drawn.sprite, p.x, p.y, drawn.xf, drawn.yf);
         // Selection box spans the whole ring row/column footprint.
-        const rects = positions.map((p) => objectFrameRect(sprite, p.x, p.y, obj.xflip, obj.yflip));
+        const rects = positions.map((p) => objectFrameRect(drawn.sprite, p.x, p.y, drawn.xf, drawn.yf));
         const l = Math.min(...rects.map((r) => r.left));
         const t = Math.min(...rects.map((r) => r.top));
         const r2 = Math.max(...rects.map((r) => r.left + r.width));
@@ -272,9 +286,9 @@ export function drawObjects(
           ctx.stroke();
         }
       }
-    } else if (sprite) {
-      drawSprite(ctx, sprite, ox, oy, obj.xflip, obj.yflip);
-      selRect = objectFrameRect(sprite, ox, oy, obj.xflip, obj.yflip);
+    } else if (drawn) {
+      drawSprite(ctx, drawn.sprite, ox, oy, drawn.xf, drawn.yf);
+      selRect = objectFrameRect(drawn.sprite, ox, oy, drawn.xf, drawn.yf);
     } else if (s1ObjectIsInvisible(obj.id)) {
       // Ghost marker: an invisible/trigger object has no real sprite. Draw a muted
       // dashed box labelled with the object NAME so it reads as a deliberate marker,
