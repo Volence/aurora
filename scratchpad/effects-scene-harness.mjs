@@ -25,6 +25,29 @@
 //    spend that. Rows 7a/7b sit on the Effects facet for 3s and assert zero map
 //    repaints while the page is provably still painting.
 //
+// THREE MORE THINGS, ADDED BY ROADMAP §5.1 ITEM 15.
+//
+// 3. A DOCK WITH NO RIGHT PADDING. Section 10 reads the RENDERED geometry of the
+//    four controls the landing pass flagged and compares each one's inset to the
+//    inset of the section header above it — read off the live computed style, so
+//    the number is never typed here. On master every one of them measured
+//    rightInset = 0: flush to x = the window's right edge.
+//
+// 4. WHOSE RED `soli…` BADGE IS IT? Section 12 attributes it instead of
+//    assigning it. It scans the map canvas's own pixels for the object
+//    overlay's box colours, on the Effects facet AND on Layout, and measures the
+//    label in the app's own 2D context. Verdict lives in the row details: the
+//    badge does not move between facets, the canvas's right edge does.
+//
+// 5. THE STATE NOBODY HAD PHOTOGRAPHED. Item 13 flagged "layer cards stack tall
+//    with the packed factor spinners open" for human judgement, and then every
+//    screenshot it took had that section shut. Section 11 drives the app into
+//    that state at two layers AND at the schema's maximum of eight, proves it is
+//    genuinely open before it shoots (a collapsed section photographs calm and
+//    means nothing), and measures the stack. It found a real defect doing it —
+//    the list sections had no scroller, so at eight layers 954px of cards were
+//    painted straight over SECTION ASSIGNMENT.
+//
 // ANTI-VACUOUS THROUGHOUT. Every row that could pass on an empty screen or an
 // unloaded project has a companion that proves the instrument saw its subject:
 // the project is open with sections, the panel's own heading is on screen, the
@@ -72,6 +95,9 @@ const SHOTS = `${ROOT}/scratchpad/shots-effects-scene`;
 mkdirSync(SHOTS, { recursive: true });
 
 const SCENE_ID = 'harness_probe';
+// Schema §2's layer ceiling, mirrored here so section 11d can grow the stack to
+// it. Row 4b already proves the app's own copy of the schema is intact.
+const EFFECTS_MAX_LAYERS = 8;
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 function getJSON(path, timeoutMs = 1500) {
@@ -433,6 +459,370 @@ async function main() {
     check('9b', 'the whole session was a SMALL number of steps, not one per keystroke',
       undos > 0 && undos <= 8, `${undos} undo steps for 6 authoring gestures`);
     await shot(c, '3-after-undo');
+
+    // ---- 10. THE DOCK'S OWN GEOMETRY, and the state nobody had seen. ------
+    //
+    // Everything below re-authors a scene from scratch, AFTER the undo
+    // accounting in section 9 has finished. That is deliberate: rows 9a/9b
+    // assert the whole authoring session was a small number of undo steps, and
+    // an extra half-dozen gestures folded in above would have moved a number
+    // those rows exist to pin. Nothing here is undone; the run ends with a
+    // reload, and nothing was ever written to disk.
+    await c.evalExpr(SET_INPUT(
+      `document.querySelector('input[placeholder="new_scene_id"]')`, SCENE_ID));
+    await c.evalExpr(clickByText('/^New$/'));
+    await sleep(700);
+    await c.evalExpr(clickByText('/Add layer/'));
+    await sleep(700);
+
+    // OPEN EVERY PACKED-FACTOR FORM. This is the state item 13 flagged for human
+    // judgement ("layer cards stack tall with the packed-factor spinners open")
+    // and which no screenshot has ever contained. Each `__packed__` choice
+    // replaces a named factor with the s1/s2/op triple, and the triple's three
+    // controls are what makes a layer card tall.
+    const openAllPackedForms = async () => {
+      const titles = await c.json(String.raw`
+        [...document.querySelectorAll('select')].map(e => e.title || '')
+          .filter(t => /^Layer \d+ f[ab]$/.test(t))`);
+      for (const t of titles) {
+        await c.evalExpr(SET_INPUT(
+          `[...document.querySelectorAll('select')].find(e => e.title === ${JSON.stringify(t)})`,
+          '__packed__'));
+        await sleep(150);
+      }
+      await sleep(600);
+      return titles;
+    };
+    const packedOpened = await openAllPackedForms();
+
+    // ---- 10a/10b. THE RIGHT PADDING, derived rather than eyeballed. --------
+    //
+    // The number this row compares against is NOT typed here. It is read off the
+    // live computed style of the section header the controls sit under, which
+    // gets it from ui/primitives' PANEL_INSET — the same constant PanelHeader
+    // has always used. So the assertion is "the body is inset like the header
+    // above it", and it keeps holding if the token ever changes.
+    const geom = await c.json(String.raw`
+      (() => {
+        const hdrSpan = [...document.querySelectorAll('span')]
+          .find(e => (e.textContent || '').trim() === 'Scenes');
+        if (!hdrSpan) return { error: 'no Scenes heading on screen' };
+        let header = hdrSpan;
+        while (header && !(header.tagName === 'DIV'
+               && parseFloat(getComputedStyle(header).paddingLeft) > 0)) {
+          header = header.parentElement;
+        }
+        if (!header) return { error: 'no padded header ancestor' };
+        const hcs = getComputedStyle(header);
+        let panel = header;
+        while (panel) {
+          const cs = getComputedStyle(panel);
+          if (cs.overflowY === 'auto' && parseFloat(cs.borderLeftWidth) >= 1) break;
+          panel = panel.parentElement;
+        }
+        if (!panel) return { error: 'no Panel ancestor (overflow:auto + borderLeft)' };
+        const pcs = getComputedStyle(panel);
+        const pr = panel.getBoundingClientRect();
+        const contentLeft = pr.left + parseFloat(pcs.borderLeftWidth);
+        const contentRight = contentLeft + panel.clientWidth;
+        const rowInput = (t) => {
+          const s = [...document.querySelectorAll('span')]
+            .find(e => (e.textContent || '').trim() === t);
+          return s && s.parentElement ? s.parentElement.querySelector('input, select') : null;
+        };
+        const named = [
+          ['new_scene_id', document.querySelector('input[placeholder="new_scene_id"]')],
+          ['Name', rowInput('Name')],
+          ['V factor', document.querySelector('select[title="Scene v_factor"]')],
+          ['Section select', [...document.querySelectorAll('select')]
+            .find(e => /sceneRef/.test(e.title || '')) || null],
+        ];
+        return {
+          headerPadLeft: parseFloat(hcs.paddingLeft),
+          headerPadRight: parseFloat(hcs.paddingRight),
+          windowRight: document.documentElement.clientWidth,
+          panel: {
+            left: Math.round(pr.left), right: Math.round(pr.right),
+            contentLeft: Math.round(contentLeft), contentRight: Math.round(contentRight),
+            clientWidth: panel.clientWidth, clientHeight: panel.clientHeight,
+            scrollHeight: panel.scrollHeight, overflowY: pcs.overflowY,
+          },
+          controls: named.map(([name, el]) => {
+            if (!el) return { name, found: false };
+            const r = el.getBoundingClientRect();
+            return {
+              name, found: true,
+              left: Math.round(r.left), right: Math.round(r.right),
+              leftInset: Math.round((r.left - contentLeft) * 10) / 10,
+              rightInset: Math.round((contentRight - r.right) * 10) / 10,
+            };
+          }),
+        };
+      })()`);
+
+    // ANTI-VACUOUS: an inset assertion over zero controls, or against a header
+    // whose own padding is 0, passes on an empty screen. Both are asserted here
+    // so the row below cannot be satisfied by absence.
+    const found = (geom.controls ?? []).filter((x) => x.found);
+    check('10a', 'the four flagged controls are on screen under a header with a real inset',
+      !geom.error && found.length === 4 && geom.headerPadRight > 0 && geom.panel.clientWidth > 100,
+      geom.error ?? `headerPad=${geom.headerPadLeft}/${geom.headerPadRight} `
+        + `panel ${geom.panel.contentLeft}..${geom.panel.contentRight} of ${geom.windowRight} `
+        + `| ${(geom.controls ?? []).map((x) => `${x.name}:${x.found ? 'yes' : 'MISSING'}`).join(' ')}`);
+
+    // THE ROW ITEM 15(a) IS ABOUT. On master every one of these reads
+    // rightInset=0 — the input, the Name field, the V factor select and the
+    // Section select all end at the window's right edge.
+    const flush = found.filter((x) => x.rightInset < geom.headerPadRight - 0.5
+      || x.leftInset < geom.headerPadLeft - 0.5);
+    check('10b', 'no dock control runs flush to the panel edge — every one is inset like its header',
+      found.length === 4 && flush.length === 0,
+      found.map((x) => `${x.name} L+${x.leftInset} R+${x.rightInset}`).join(' | ')
+      + ` (header inset ${geom.headerPadLeft}/${geom.headerPadRight})`);
+
+    // ---- 11. THE DENSITY EVIDENCE GAP (item 15c). -------------------------
+    //
+    // The layer stack has never been photographed with its factor forms open,
+    // so "layer cards stack tall" has never been judgeable. These rows prove the
+    // section really is expanded and the spinners really are open — a shot of a
+    // collapsed section would look calm and mean nothing — and then MEASURE the
+    // stack. No aesthetic claim is made here; the numbers are the deliverable.
+    const DENSITY_PROBE = String.raw`
+      (() => {
+        const hdrSpan = [...document.querySelectorAll('span')]
+          .find(e => /^Layers \(\d+\/\d+\)$/.test((e.textContent || '').trim()));
+        if (!hdrSpan) return { error: 'no Layers heading on screen' };
+        let header = hdrSpan;
+        while (header && !(header.tagName === 'DIV'
+               && parseFloat(getComputedStyle(header).paddingLeft) > 0)) {
+          header = header.parentElement;
+        }
+        // section = the CollapsibleSection div: header -> click wrapper -> section
+        const section = header.parentElement.parentElement;
+        let panel = section;
+        while (panel) {
+          const cs = getComputedStyle(panel);
+          if (cs.overflowY === 'auto' && parseFloat(cs.borderLeftWidth) >= 1) break;
+          panel = panel.parentElement;
+        }
+        // A layer card is a bordered box holding a "#N world_y" label.
+        // A layer CARD is the bordered box. Its inner "#N world_y" row matches a
+        // naive text query too, which is how the first run of this row counted
+        // four cards for two layers and reported [154,24,154,24] — the 24s were
+        // the rows inside the 154s. The border is what distinguishes them.
+        const cards = [...section.querySelectorAll('div')].filter((d) =>
+          parseFloat(getComputedStyle(d).borderTopWidth) >= 1
+          && /^#\d+ world_y$/.test((d.querySelector('span')?.textContent || '').trim()));
+        const spinners = [...section.querySelectorAll('input[type=number]')]
+          .filter((e) => /^s[12] —/.test(e.title || ''));
+        const pr = panel.getBoundingClientRect();
+        const sr = section.getBoundingClientRect();
+        const hr = header.getBoundingClientRect();
+        const rects = cards.map((d) => {
+          const r = d.getBoundingClientRect();
+          return { h: Math.round(r.height), top: Math.round(r.top), bottom: Math.round(r.bottom) };
+        });
+        // FULLY VISIBLE means inside BOTH clips: the section body's own window
+        // and the dock's. getBoundingClientRect knows nothing about clipping, so
+        // a card "at" y=1200 in a 306px scroller still reports a rect — which is
+        // why this counts against the body box rather than the card's own.
+        const bodyEl = cards.length ? cards[0].parentElement : null;
+        const br = bodyEl ? bodyEl.getBoundingClientRect() : sr;
+        const top = Math.max(br.top, pr.top), bot = Math.min(br.bottom, pr.bottom);
+        const visible = rects.filter((r) => r.top >= top - 1 && r.bottom <= bot + 1).length;
+        // The body box between the header and the cards — the thing that either
+        // scrolls or lets the stack out over the sections underneath.
+        const body = bodyEl;
+        const bcs = body ? getComputedStyle(body) : null;
+        return {
+          title: hdrSpan.textContent.trim(),
+          cards: cards.length, spinners: spinners.length,
+          headerHeight: Math.round(hr.height),
+          sectionHeight: Math.round(sr.height),
+          bodyHeight: Math.round(sr.height - hr.height),
+          cardHeights: rects.map((r) => r.h),
+          stackHeight: rects.reduce((a, r) => a + r.h, 0),
+          cardsFullyVisibleInDock: visible,
+          panelClientHeight: panel.clientHeight,
+          panelScrollHeight: panel.scrollHeight,
+          panelOverflowY: getComputedStyle(panel).overflowY,
+          sectionBottomBelowDock: Math.round(sr.bottom - pr.bottom),
+          bodyOverflowY: bcs ? bcs.overflowY : null,
+          bodyClientHeight: body ? body.clientHeight : null,
+          bodyScrollHeight: body ? body.scrollHeight : null,
+          // How much of the stack is outside the section's window. With a
+          // scroller that is what the scrollbar reaches; with overflow visible
+          // — which is what shipped — it is what gets PAINTED over the section
+          // below instead.
+          beyondTheWindow: body ? body.scrollHeight - body.clientHeight : null,
+        };
+      })()`;
+    const density = await c.json(DENSITY_PROBE);
+
+    // ANTI-VACUOUS, and the whole point of the row: a shot of a COLLAPSED
+    // section is what the item-13 parcel already had, and it showed nothing.
+    // `bodyHeight > 0` is what distinguishes expanded from collapsed —
+    // CollapsibleSection renders `{!collapsed && children}`, so a collapsed
+    // section is exactly its header tall.
+    check('11a', 'the Layers section is genuinely EXPANDED (a body, not just a header)',
+      !density.error && density.cards === 2 && density.bodyHeight > density.headerHeight,
+      density.error ?? `${density.title}: ${density.cards} cards, header ${density.headerHeight}px, `
+        + `body ${density.bodyHeight}px`);
+    // 2 layers x (fa + fb) x (s1 + s2) = 8 packed spinners, and their `op`
+    // selects beside them. Fewer means a factor form did not open and the shot
+    // would be of the compact state again.
+    check('11b', 'every packed-factor form is genuinely OPEN (8 spinners for 2 layers)',
+      density.spinners === 8,
+      `${density.spinners} packed spinners; opened: ${JSON.stringify(packedOpened)}`);
+    // THE ONLY NON-AESTHETIC INVARIANT HERE: whatever the density turns out to
+    // be, the stack must be REACHABLE — it either fits the dock or the dock
+    // scrolls to it. "Tall" is a judgement; "present but unreachable" is a bug.
+    // THE INVARIANT, and it is not an aesthetic one: whatever the stack's height
+    // turns out to be, it must stay INSIDE the section that titles it. A list
+    // section that lets its rows out paints them over the section below —
+    // ui/CollapsibleSection's model says a list "scrolls inside its share", and
+    // this is that half of the model, measured.
+    const describe = (d) => `stack ${d.stackHeight}px (${(d.cardHeights || []).join('+')}) in a `
+      + `${d.bodyHeight}px section body [overflowY:${d.bodyOverflowY}, `
+      + `${d.bodyClientHeight}px window on ${d.bodyScrollHeight}px of content, `
+      + `${d.beyondTheWindow}px beyond it]; dock ${d.panelClientHeight}px tall over `
+      + `${d.panelScrollHeight}px of column; layer cards fully visible: `
+      + `${d.cardsFullyVisibleInDock}/${d.cards}`;
+    check('11c', 'the layer stack is clipped by its own section rather than let out over the next one',
+      density.bodyOverflowY === 'auto' && density.bodyClientHeight > 0,
+      describe(density));
+    console.log(`        DENSITY (reported, not judged): ${JSON.stringify(density)}`);
+    await shot(c, '4-layers-expanded-packed-spinners');
+
+    // ---- 11d. THE SAME STATE AT THE SCHEMA'S MAXIMUM. --------------------
+    // Two layers is what the item-13 shots had; eight is what the schema
+    // permits, and a density question answered only at the small end is half an
+    // answer. Grown here through the real Add-layer control, with every packed
+    // form re-opened afterwards so the tall state is the tall state.
+    for (let i = 0; i < EFFECTS_MAX_LAYERS - 2; i++) {
+      await c.evalExpr(clickByText('/Add layer/'));
+      await sleep(300);
+    }
+    await sleep(600);
+    const openedMax = await openAllPackedForms();
+    const dense = await c.json(DENSITY_PROBE);
+    check('11d', 'the maximum stack really is at the maximum, expanded, with every form open',
+      !dense.error && dense.cards === EFFECTS_MAX_LAYERS
+      && dense.spinners === EFFECTS_MAX_LAYERS * 4
+      && dense.bodyHeight > dense.headerHeight,
+      dense.error ?? `${dense.title}: ${dense.cards} cards, ${dense.spinners} spinners `
+        + `(opened ${openedMax.length} forms)`);
+    // THE ROW THE DENSITY MEASUREMENT WAS ACTUALLY FOR. At eight layers with
+    // every packed form open the stack is four times its section's height, and
+    // before the list scroller landed `overflowY` read `visible`, so all 966px
+    // of it beyond the window was PAINTED over the SECTION ASSIGNMENT rows —
+    // photographed on master, shots-effects-scene/6-*.png. It must scroll.
+    check('11e', 'the maximum stack scrolls inside its section instead of painting over the one below',
+      dense.bodyOverflowY === 'auto' && dense.beyondTheWindow > 100,
+      describe(dense));
+    console.log(`        DENSITY AT MAX (reported, not judged): ${JSON.stringify(dense)}`);
+    await shot(c, '6-layers-max-expanded-packed-spinners');
+
+    // ---- 12. THE RED `soli…` BADGE — whose is it? (item 15b) --------------
+    //
+    // Attribution, not repair. The badge is the generic object box the map
+    // overlay draws for a placement with no sprite preview
+    // (canvas/OverlayRenderer.drawObjects): a red box with the placement's
+    // typeId centred in it, in 8px monospace. aeon's act1 section_0 holds
+    // exactly one placement and its typeId is the five-letter string "solid".
+    const obj0 = await c.json('window.__dbg.aeon.objectAt(0, 0)');
+    check('12a', 'the fixture still holds the placement this attribution was made against',
+      !!obj0 && obj0.typeId === 'solid', JSON.stringify(obj0));
+
+    // The scan is for the object box's OWN colours (canvas-colors.ts:
+    // fill rgba(255,100,100,.7) over the art, stroke #ff4444) — reddish, and
+    // nothing else on this act's canvas is. The control is spatial: the hits
+    // must form ONE small cluster. A scan that matched the artwork would light
+    // up the whole canvas and fail its own bounding-box check.
+    const SCAN = String.raw`
+      (() => {
+        const cv = document.getElementById('map-canvas');
+        if (!cv) return { error: 'no-map-canvas' };
+        const ctx = cv.getContext('2d');
+        const im = ctx.getImageData(0, 0, cv.width, cv.height).data;
+        let n = 0, x0 = 1e9, y0 = 1e9, x1 = -1, y1 = -1;
+        for (let y = 0; y < cv.height; y++) {
+          for (let x = 0; x < cv.width; x++) {
+            const i = (y * cv.width + x) * 4;
+            const r = im[i], g = im[i + 1], b = im[i + 2];
+            if (r > 190 && r - g > 60 && r - b > 60 && Math.abs(g - b) < 34) {
+              n++;
+              if (x < x0) x0 = x; if (y < y0) y0 = y;
+              if (x > x1) x1 = x; if (y > y1) y1 = y;
+            }
+          }
+        }
+        ctx.save(); ctx.font = '8px monospace';
+        const labelWidth = ctx.measureText('solid').width;
+        ctx.restore();
+        const r = cv.getBoundingClientRect();
+        // The dock beside the canvas — the thing the badge is said to bleed into.
+        const dock = [...document.querySelectorAll('div')].find((d) => {
+          const cs = getComputedStyle(d);
+          return cs.overflowY === 'auto' && parseFloat(cs.borderLeftWidth) >= 1
+            && d.getBoundingClientRect().left > r.left;
+        });
+        const dockLeft = dock ? Math.round(dock.getBoundingClientRect().left) : null;
+        const sx = (px) => Math.round(r.left + px * (r.width / cv.width));
+        return {
+          hits: n, bbox: n ? [x0, y0, x1, y1] : null,
+          w: n ? x1 - x0 + 1 : 0, h: n ? y1 - y0 + 1 : 0,
+          labelWidth, canvas: { w: cv.width, h: cv.height },
+          css: { left: Math.round(r.left), right: Math.round(r.right), width: Math.round(r.width) },
+          screen: n ? { left: sx(x0), right: sx(x1 + 1) } : null,
+          gapToCanvasRight: n ? Math.round(r.right - sx(x1 + 1)) : null,
+          dockLeftEdge: dockLeft,
+        };
+      })()`;
+
+    const onEffects = await c.json(SCAN);
+    // Now the SAME window, a DIFFERENT facet. If the badge is the Effects
+    // facet's, it is not here.
+    const wentLayout = await c.evalExpr(clickByText('/^Layout$/'));
+    await sleep(2000);
+    const onLayout = await c.json(SCAN);
+    await shot(c, '5-badge-on-layout-facet');
+    check('12b', 'the facet bar switched away from Effects to Layout', wentLayout === true);
+    check('12c', 'the red badge is on the LAYOUT facet too — it is the map overlay, not Effects',
+      onLayout.hits > 0 && onEffects.hits > 0
+      && Math.abs(onLayout.bbox[0] - onEffects.bbox[0]) <= 2
+      && Math.abs(onLayout.bbox[1] - onEffects.bbox[1]) <= 2,
+      `effects ${onEffects.hits} px bbox ${JSON.stringify(onEffects.bbox)} | `
+      + `layout ${onLayout.hits} px bbox ${JSON.stringify(onLayout.bbox)}`);
+    // THE SPATIAL CONTROL: one 16px box, not a canvas full of red artwork.
+    check('12d', 'the scan found ONE small cluster, not reddish artwork everywhere',
+      onLayout.w > 0 && onLayout.w <= 24 && onLayout.h > 0 && onLayout.h <= 24,
+      `cluster ${onLayout.w}x${onLayout.h}px on a ${onLayout.canvas.w}x${onLayout.canvas.h} canvas`);
+    // WHY IT LOOKS CUT OFF: the label is drawn centred on a 16px box and is
+    // wider than it, measured in the app's own renderer. The "bleed" is that
+    // overflow meeting the canvas's right edge — it has nothing to do with the
+    // panel beside it.
+    check('12e', 'the label is WIDER than the 16px box it is centred in (the truncation)',
+      onLayout.labelWidth > 16,
+      `"solid" measures ${onLayout.labelWidth}px in 8px monospace, box is 16px wide`);
+
+    // WHY IT ONLY LOOKS WRONG ON THE EFFECTS FACET, stated as a measurement
+    // rather than a guess: the badge does not move (same screen x on both
+    // facets, from the same act at the same camera) — the CANVAS's right edge
+    // moves, because the Effects dock is wider than every other map facet's.
+    // The object simply lands near the edge of the narrower canvas.
+    check('12f', 'the badge does not move between facets — the canvas edge does',
+      onEffects.screen && onLayout.screen
+      && Math.abs(onEffects.screen.right - onLayout.screen.right) <= 2,
+      `badge screen x ${JSON.stringify(onEffects.screen)} on Effects vs `
+      + `${JSON.stringify(onLayout.screen)} on Layout | canvas css width `
+      + `${onEffects.css.width} vs ${onLayout.css.width}, dock left edge `
+      + `${onEffects.dockLeftEdge} vs ${onLayout.dockLeftEdge} | clearance to the canvas's own `
+      + `right edge: ${onEffects.gapToCanvasRight}px on Effects, `
+      + `${onLayout.gapToCanvasRight}px on Layout`);
+
+    await c.evalExpr(clickByText('/^Effects$/'));
+    await sleep(600);
 
     // Leave the tree as found: nothing was ever written, and the store is reset
     // by the reload so a stray Ctrl+S from a later session cannot pick this up.
