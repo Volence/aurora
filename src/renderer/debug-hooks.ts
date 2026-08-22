@@ -99,6 +99,9 @@ interface ClassicProbeApi {
   allTileHashes(): number[];
   /** The first placed object with this engine id (S1ObjectEntry.id), or null. */
   findObject(id: number): { x: number; y: number; subtype: number } | null;
+  /** EVERY placement of an id (read-only) — the animated-preview harness's
+   *  phase-lock rows need two distinct Rings, not just the first. */
+  listObjects(id: number): { x: number; y: number; subtype: number; xflip: boolean; yflip: boolean }[];
   /**
    * One FNV hash over the doc state playback could conceivably touch (tile
    * pool bytes + palettes + the full object list + start) — the animated-
@@ -243,6 +246,13 @@ function installClassicProbe(): ClassicProbeApi {
       if (!doc) return null;
       const o = doc.objects.find((e) => e.id === id);
       return o ? { x: o.x, y: o.y, subtype: o.subtype } : null;
+    },
+    listObjects: (id) => {
+      const { doc } = state();
+      if (!doc) return [];
+      return doc.objects
+        .filter((o) => o.id === id)
+        .map((o) => ({ x: o.x, y: o.y, subtype: o.subtype, xflip: o.xflip, yflip: o.yflip }));
     },
     docHash: () => {
       const { doc } = state();
