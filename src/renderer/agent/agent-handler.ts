@@ -14,6 +14,11 @@ import { computeActBudget, canonicalTileHash } from '../../core/agent/budget';
 import { decodeGenesisColor, encodeGenesisColor } from '../../core/formats/palette';
 import { BG_WIDTH } from '../../core/formats/bg-tiles';
 import { makeBgId } from '../../core/formats/bg-library';
+import { parseEffectsScene } from '../../core/formats/effects/scene';
+import { sceneIdRefusal } from '../../core/formats/effects/scene-ui';
+import {
+  deleteSceneCommand, replaceSceneCommand, sectionSceneCommand,
+} from '../providers/effects-aeon';
 import { buildStampCommand } from '../../core/editing/map-stamp';
 import { ensureCollisionPlanes } from '../../core/collision/collision-cell-resolve';
 import { paintCollisionRectEntries } from '../../core/collision/collision-paint';
@@ -571,6 +576,95 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
         entries: library.map(b => ({ id: b.id, name: b.name, tiles: b.tiles.length })),
         sections: ctx.act.sections.map((s, i) => s ? { index: i, bgId: s.bgLayoutRef } : null),
       };
+    }
+
+    // ---- The effects arc, wave 1 (AURORA_EFFECTS_SCHEMA.md §2/§3) ----------
+    //
+    // These three go through the SAME provider functions the Effects facet's
+    // controls do (providers/effects-aeon), so the agent path and the human path
+    // cannot diverge on what a no-op is, which refs are assignable, or how a
+    // scene edit is recorded. What they add is the validation an agent needs and
+    // a form does not: a form can only produce documents its own controls allow,
+    // where an agent hands over arbitrary JSON.
+
+    case 'list-effects-scenes': {
+      const ctx = requireProject();
+      const library = useProjectStore.getState().project!.effectsScenes;
+      return {
+        scenes: library.scenes.map(s => ({
+          id: s.id,
+          name: typeof s.name === 'string' ? s.name : null,
+          layers: s.layers.length,
+        })),
+        // NOT silently omitted. A file that would not parse is a scene id an
+        // agent must not take and a file it must not expect to be rewritten.
+        unreadable: library.unreadable.map(u => ({ path: u.path, reason: u.reason })),
+        sections: ctx.act.sections.map((s, i) => s ? { index: i, sceneId: s.sceneRef } : null),
+      };
+    }
+
+    case 'get-effects-scene': {
+      requireProject();
+      const library = useProjectStore.getState().project!.effectsScenes;
+      const scene = library.scenes.find(s => s.id === req.id);
+      if (!scene) {
+        const broken = library.unreadable.find(u => u.path.endsWith(`/${req.id}.json`));
+        throw new Error(broken
+          ? `scene "${req.id}" exists at ${broken.path} but could not be read (${broken.reason})`
+          : `scene "${req.id}" not found (use list_effects_scenes)`);
+      }
+      // The whole document, unfiltered — the point of the tool.
+      return { scene };
+    }
+
+    case 'set-effects-scene': {
+      const ctx = requireProject();
+      const library = useProjectStore.getState().project!.effectsScenes;
+
+      if (req.scene === null) {
+        const command = deleteSceneCommand(library, req.id);
+        if (!command) return { id: req.id, deleted: false, reason: 'no such scene' };
+        executeAmbientCommand(command, ctx.level);
+        return { id: req.id, deleted: true };
+      }
+
+      // VALIDATED BY THE CODEC, not by a shape restated on this boundary. Going
+      // through parseEffectsScene rather than validateAgainstSchema buys the two
+      // rules that are not in the JSON schema at all: the filename-stem identity
+      // check, and the loud rejection of layer_mask_raw / v_deform_shift_raw.
+      const scene = parseEffectsScene(JSON.stringify(req.scene), req.id);
+
+      const existing = library.scenes.find(s => s.id === req.id) ?? null;
+      if (!existing) {
+        // A CREATE has to answer an id question a replace does not: the id may
+        // already be taken by a file that did not parse, which is invisible to
+        // list_effects_scenes and which the save path refuses to write over.
+        const refusal = sceneIdRefusal(req.id, library);
+        if (refusal) throw new Error(refusal);
+      }
+      const command = replaceSceneCommand(library, req.id, scene);
+      if (!command) return { id: req.id, changed: false };
+      executeAmbientCommand(command, ctx.level);
+      return { id: req.id, changed: true, created: existing === null };
+    }
+
+    case 'assign-section-scene': {
+      const ctx = requireProject();
+      if (!Number.isInteger(req.section) || req.section < 0 || req.section >= ctx.act.sections.length) {
+        throw new Error(`section ${req.section} out of range (0-${ctx.act.sections.length - 1})`);
+      }
+      const section = ctx.act.sections[req.section];
+      if (!section) throw new Error(`section ${req.section} is empty`);
+      const library = useProjectStore.getState().project!.effectsScenes;
+      if (req.sceneId !== null && !library.scenes.some(s => s.id === req.sceneId)) {
+        // Deliberately refuses an UNREADABLE id too — it is not in `scenes`.
+        // Writing a ref the build cannot resolve is worse than writing none.
+        throw new Error(`scene "${req.sceneId}" is not a readable scene in this project (use list_effects_scenes)`);
+      }
+      const command = sectionSceneCommand(req.section, section.sceneRef, req.sceneId ?? '');
+      if (!command) return { section: req.section, sceneId: req.sceneId, changed: false };
+      executeAmbientCommand(command, ctx.level);
+      return { section: req.section, sceneId: req.sceneId, changed: true };
     }
 
     case 'screenshot': {

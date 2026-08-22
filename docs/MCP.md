@@ -14,8 +14,8 @@ is one undo step (Ctrl+Z), and nothing touches disk until you save.
 
 ## Tools
 
-Query: `get_project_info`, `get_palette`, `get_tiles`, `get_nametable_region`, `check_budget`, `get_bg`, `list_bgs`
-Mutate (one undo step each): `set_palette`, `write_tiles`, `paint_region`, `paint_collision`, `save_chunk`*, `stamp_chunk`, `set_bg`*, `assign_section_bg`
+Query: `get_project_info`, `get_palette`, `get_tiles`, `get_nametable_region`, `check_budget`, `get_bg`, `list_bgs`, `list_effects_scenes`, `get_effects_scene`
+Mutate (one undo step each): `set_palette`, `write_tiles`, `paint_region`, `paint_collision`, `save_chunk`*, `stamp_chunk`, `set_bg`*, `assign_section_bg`, `set_effects_scene`, `assign_section_scene`
 View: `goto`, `screenshot`
 
 The tools above operate on an **aeon** project. The classic (Sonic 1 disassembly)
@@ -72,6 +72,44 @@ its assigned BG. Assignments are one undo step each and persist in per-section
 `.meta.json` sidecars; library entries persist under `data/editor/` on save.
 Export emits `{zone}_BG_{id}` labels in the act descriptor's section table —
 the engine build must BINCLUDE the referenced binaries.
+
+## Effects scenes (parallax/raster)
+
+A **scene** is one JSON document under `data/editor/effects/<scene_id>.json`
+describing how the two planes scroll: a list of 1–8 layers (`world_y` plus a
+Plane A and Plane B scroll factor each) and scene-level vertical parameters.
+The wire shape is the suite contract, `empyrean/docs/AURORA_EFFECTS_SCHEMA.md`
+§2; Aurora vendors the machine-readable schema and validates against it.
+
+`list_effects_scenes` gives you the inventory plus every section's current
+assignment. `get_effects_scene` returns ONE WHOLE DOCUMENT and
+`set_effects_scene` takes one back — deliberately not a field patch. Read,
+change, send: fields this editor does not itself expose survive the round trip
+because nothing on the path enumerates them.
+
+A **factor** is either a published name (`FACTOR_1`, `FACTOR_1_2`,
+`FACTOR_3_16`, … 16 of them) or a custom packed triple `{"s1":…, "s2":…,
+"op":…}` — the engine's shift-add encoding, where `s1: 15` means the term is
+zero/locked, `s2: 15` means a single term, and `op` is 0 add / 1 subtract.
+Arbitrary fractions are not representable and are refused.
+
+`set_effects_scene` validates the whole document before anything is written: an
+invalid one is refused with the specific issues and consumes no undo step. Two
+rules beyond the JSON schema also apply — the document's `id` must equal the
+`id` argument (it becomes part of generated symbol names), and the excluded raw
+bridge fields `layer_mask_raw` / `v_deform_shift_raw` are rejected outright.
+Pass `scene: null` to delete.
+
+`assign_section_scene` writes `sceneRef` into a section's `.meta.json` sidecar
+(`sceneId: null` = the act default). It refuses an id that is not a READABLE
+scene, including one whose file exists but did not parse: a ref the build cannot
+resolve is worse than no ref. Scene files Aurora could not read are reported by
+`list_effects_scenes` and are never overwritten.
+
+**Nothing authored here reaches a ROM yet.** aeon's `tools/effects_gen.py` — the
+generator that bakes these documents into the engine — is booked and not built,
+so scenes persist to disk and stop there. That is the accepted sequencing, not
+an oversight.
 
 ## Classic project tools
 

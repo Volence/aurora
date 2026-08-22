@@ -219,6 +219,28 @@ export function deleteSceneCommand(
 }
 
 /**
+ * Put a WHOLE scene document at `id`, creating or replacing.
+ *
+ * The agent surface's shape rather than the form's: a caller that already has a
+ * complete document (`set_effects_scene` takes one, because a field-patch API
+ * would need the field enumeration this format is handled without). Null when the
+ * document is byte-identical to what is already there, so a re-send is not an
+ * undo step.
+ *
+ * It does NOT check the id rules — a REPLACE of an existing scene must not be
+ * refused for an id that is obviously already in use, and a CREATE's extra
+ * question (is this id taken by an unreadable file?) belongs to the caller, which
+ * is the only party that knows which of the two it is doing.
+ */
+export function replaceSceneCommand(
+  library: EffectsSceneLibrary, id: string, scene: EffectsScene,
+): SetEffectsSceneCommand | null {
+  const existing = library.scenes.find((s) => s.id === id) ?? null;
+  if (existing && JSON.stringify(existing) === JSON.stringify(scene)) return null;
+  return sceneCommand(id, existing ? `Replace scene ${id}` : `New scene ${id}`, existing, scene);
+}
+
+/**
  * THE ONE EDIT PATH. Every form control on this surface goes through it: clone
  * the scene, let `mutate` change whatever it likes, and emit a whole-document
  * swap — or null when nothing actually moved.

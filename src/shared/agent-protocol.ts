@@ -37,6 +37,17 @@ export type AgentRequest =
   | { kind: 'set-bg'; layout: number[]; tiles: number[][]; name?: string }
   | { kind: 'assign-section-bg'; section: number; bgId: string | null }  // null = act default
   | { kind: 'list-bgs' }
+  // ---- The effects arc, wave 1 (empyrean AURORA_EFFECTS_SCHEMA.md §2/§3) ----
+  // `scene` is deliberately UNTYPED on the wire — a whole scene definition
+  // document, validated by the codec (parseEffectsScene) rather than by a shape
+  // restated here. Enumerating the fields on this boundary would rebuild exactly
+  // the field list core/formats/effects is built around not having, and would let
+  // an agent's document silently lose a key the enumeration had not caught up
+  // with. null deletes the scene.
+  | { kind: 'list-effects-scenes' }
+  | { kind: 'get-effects-scene'; id: string }
+  | { kind: 'set-effects-scene'; id: string; scene: unknown | null }
+  | { kind: 'assign-section-scene'; section: number; sceneId: string | null }  // null = act default
   | { kind: 'screenshot'; region?: { x: number; y: number; w: number; h: number }; showBg?: boolean }
   // ---- Classic (Sonic 1 disassembly) project surface (Task 16) ----
   // Thin wrappers over the classic open bridge + the Task-12 editing commands;
