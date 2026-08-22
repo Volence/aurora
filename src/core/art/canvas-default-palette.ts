@@ -57,7 +57,7 @@
 // Pure core — no store, no fs, no React.
 
 import { CANVAS_COLORS, CANVAS_LINE_LENGTH, canvasIndex, paletteEntryOf } from './canvas-doc';
-import { decodeGenesisColor } from '../formats/palette';
+import { decodeGenesisColor, genesisWordFromLevels } from '../formats/palette';
 
 /** One channel triple in the Genesis' 3-bit-per-channel space (0..7 each). */
 type Rgb3 = readonly [number, number, number];
@@ -107,11 +107,10 @@ function lerp3(a: Rgb3, b: Rgb3, t: number): Rgb3 {
   ];
 }
 
-/** A 3-bit triple as a CRAM word (0000 BBB0 GGG0 RRR0), the same layout
- *  `encodeGenesisColor` writes — built directly from 3-bit levels so no
+/** A 3-bit triple as a CRAM word — built directly from 3-bit levels so no
  *  8-bit round trip can introduce an off-by-one. */
 function cramWord(c: Rgb3): number {
-  return (c[2] << 9) | (c[1] << 5) | (c[0] << 1);
+  return genesisWordFromLevels(c[0], c[1], c[2]);
 }
 
 /**
