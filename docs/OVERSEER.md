@@ -161,6 +161,29 @@ Each has caught a real defect here.
    The tip is right for the first and wrong for the second. Read which question is being
    asked before choosing the revision.
 
+17. *(Shared protocol review bar 11, empyrean `20a8e81` — the set's first
+   packaging-of-truth bar.)* **A confidently-offered weak point is a misdirection, even
+   in good faith.** "Here is the assumption I think is fragile" should **raise** the bar
+   on everything else in the claim, not lower it: a volunteered caveat reads as a
+   certificate that the remainder got the same care, and it steers scrutiny toward the
+   part the author already doubted — away from the part they didn't. Not a rule against
+   caveats; a rule about what a caveat does **not** certify. Cheap check: **read the
+   lines around a cited line before accepting what it proves** — a citation is a pointer
+   into code that keeps executing past the line you were shown.
+
+   **Local instance, run against an already-landed decision (2026-08-22).** The effects
+   codec's no-ajv call rests entirely on one cited line: `src/renderer/index.html:6` is
+   `script-src 'self'` with no `unsafe-eval`, so ajv's `new Function` codegen would pass
+   every node test and throw in the app. I had accepted that by grepping the line, which
+   is exactly the shape this bar warns about — an Electron app can override the page CSP
+   from the main process (`onHeadersReceived`) or defeat it with `webSecurity: false`,
+   both of which execute far past the line I was shown. **Checked: it holds.** That meta
+   tag is the ONLY `Content-Security-Policy` in `src/`, `src/main/` sets no header
+   override and no `webSecurity` flag, and `unsafe-eval` appears nowhere in the tree. The
+   citation survived reading around it — which is the other reason to run this check:
+   a decision that survives it is *verified*, not merely plausible, and the next session
+   inherits the stronger claim.
+
 ## Editor↔engine coordination points
 
 Protocol details Aurora depends on and did not invent. All measured; re-verify before
