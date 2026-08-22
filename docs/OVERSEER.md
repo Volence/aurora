@@ -60,25 +60,30 @@ Each has caught a real defect here.
 8. **Plans state the PROPERTY, never invented fixture numbers.** Nine defects came from
    plans carrying guessed values; the dispatches that stated the property produced zero.
 
-9. **Check the CLASS of every SHA before it hardens into a citation.** A docs-only commit
+9. *(Now also in the shared protocol, `43fbfc9` — kept here with its local precedent.)*
+   **Check the CLASS of every SHA before it hardens into a citation.** A docs-only commit
    cited as the anchor for a code guarantee is invisible once it is in prose, and these
    citations cross repos — two other repos' contract docs pinned Aurora SHAs on
    2026-08-22. `git show --stat` it and cite the **merge** that put the code on master,
    not whatever master happened to be when you typed the message. Caught by the aeon
    overseer when `945f5c6` (2 insertions, `docs/ROADMAP.md` only) was sent as the anchor
    for the collision-plane fix; the code anchor was `6fc7359`.
-10. **Derive the expectation from the thing it guards, so the two cannot drift.** The
+10. *(Illustration, not a new rule — this is the shared protocol's "derived, never
+   copied" bar read correctly; ruled local by the empyrean overseer, `43fbfc9`.)*
+   **Derive the expectation from the thing it guards, so the two cannot drift.** The
    collattr length check reads `baseline.length * 2` from the loader's *own* fallback
    rather than pinning 131072, so the check and the fallback are the same figure by
-   construction. This is bar 8's positive form and the cleanest worked example in the
-   repo (`fix/collattr-unreadable-guard`, merge `6fc7359`).
-11. **Never manufacture a stronger-looking assertion than the evidence supports.** When
+   construction. The cleanest worked example in the repo, and the positive form of bar 8
+   above (`fix/collattr-unreadable-guard`, merge `6fc7359`).
+11. *(Illustration, not a new rule — the shared protocol's faithful-reporting bar applied
+   under pressure; ruled local by the empyrean overseer, `43fbfc9`.)*
+   **Never manufacture a stronger-looking assertion than the evidence supports.** When
    the natural assertion is weak, prove the claim another way and *say* that is what you
    did. Even-length collattr truncation is byte-identical through a round trip by
    construction (short in, same short out), so the parcel proved that half through
    loader-accepts-then-save-recertifies instead of inventing a byte delta — and stated
-   so in its report. A gate that passes for the wrong reason is worse than no gate. This
-   is bar 5's discipline applied at the moment it is hardest to hold.
+   so in its report. A gate that passes for the wrong reason is worse than no gate — and
+   this is bar 5's discipline at the moment it is hardest to hold.
 
 ## Editor↔engine coordination points
 
