@@ -10,54 +10,72 @@
 // palette two facets away. Nothing throws, nothing else in the suite can see
 // it, and the ids are string literals inside .tsx the node suite cannot render.
 // So this reads them.
+//
+// ---------------------------------------------------------------------------
+// AND IT READS ALL OF THEM NOW (ROADMAP §5.1 item 18)
+// ---------------------------------------------------------------------------
+// This file used to walk `workspace/facets/*` for its own copy of the scan —
+// the THIRD guard on that frame, and it had the same hole the other two did:
+// a section composed one level below a facet was invisible. 18 of the 43
+// sections in this tree are, including all four of the effects panel's, all
+// nine of SpriteMode's and all three of CanvasMode's. The panel-state map is
+// global, so an id collision between a facet section and a sprite-mode section
+// is exactly as real as one between two facets — and no scan could see it.
+//
+// The derivation is now the shared one in components/__tests__/helpers, which
+// enumerates by the section primitive's own call sites. Its own docblock is
+// where the reasoning and the residual blind spot live.
 
 import { describe, it, expect } from 'vitest';
-import { readFileSync, readdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { deriveSections } from '../../components/__tests__/helpers/section-panels';
 
-const FACETS = join(__dirname, '..', 'facets');
-
-interface Section { readonly file: string; readonly id: string; readonly title: string }
-
-function sections(): Section[] {
-  const out: Section[] = [];
-  const files = readdirSync(FACETS).filter((f) => f.endsWith('.tsx'));
-  expect(files.length, 'no facet modules found').toBeGreaterThan(0);
-  for (const file of files) {
-    const source = readFileSync(join(FACETS, file), 'utf8');
-    for (const m of source.matchAll(/<CollapsibleSection\s+id="([^"]+)"\s+title=(?:"([^"]+)"|\{([^}]+)\})/g)) {
-      out.push({ file, id: m[1], title: m[2] ?? m[3] });
-    }
-  }
-  return out;
-}
-
-const ALL = sections();
+const ALL = deriveSections();
 
 describe('CollapsibleSection ids', () => {
   it('finds the sections it is scanning (a regex drift would pass vacuously)', () => {
     expect(ALL.length).toBeGreaterThanOrEqual(15);
     expect(ALL.map((s) => s.id)).toContain('classic.chunks');
     expect(ALL.map((s) => s.id)).toContain('aeon.ringPatterns');
+    // Declared outside a facet module — the half this file could not see.
+    expect(ALL.map((s) => s.id)).toContain('aeon.effects.layers');
+    expect(ALL.map((s) => s.id)).toContain('sprite.palette');
   });
+
+  /**
+   * THE SCOPES THAT OWN A PANEL-STATE KEY.
+   *
+   * `aeon.` / `classic.` are engines; the rest are surfaces that are not a map
+   * facet at all — the art and palette tabs, the canvas editor, the sprite
+   * editor, the left-hand Explorer, the project setup tab. Hand-maintained, and
+   * safe in the way the old PANELS list was not: a scope missing from this list
+   * is a FAILING test, not a silent pass.
+   */
+  const SCOPES = ['aeon', 'classic', 'art', 'palette', 'canvas', 'sprite', 'explorer', 'setup'];
 
   it('are engine- or surface-scoped, never bare', () => {
     // An unprefixed id is what let one slot name leak across engines. Every id
-    // carries the engine (`aeon.` / `classic.`) or the surface that owns it
-    // (`art.` / `palette.`), which is what makes a collision visible on sight.
+    // carries the engine or the surface that owns it, which is what makes a
+    // collision visible on sight.
     for (const s of ALL) {
-      expect(s.id, `${s.file}: ${s.id}`).toMatch(/^(aeon|classic|art|palette)\./);
+      expect(s.id, `${s.owner}: ${s.id}`).toMatch(new RegExp(`^(${SCOPES.join('|')})\\.`));
     }
+  });
+
+  it('every named scope is one some section still uses', () => {
+    // Otherwise a scope outlives the surface it was written for and quietly
+    // admits whatever takes that prefix later.
+    const used = new Set(ALL.map((s) => s.id.split('.')[0]));
+    for (const scope of SCOPES) expect([...used], `scope '${scope}' names no section`).toContain(scope);
   });
 
   /**
    * ONE ID, ONE NAME. The discriminator between the bug and the legitimate
    * reuse is the TITLE, not the file:
    *
-   *  - `aeon.props` is `Properties` on Layout, Objects, Rings and Collision —
-   *    four mounts of the SAME section doing the SAME job. One collapse
-   *    preference across them is what a user would expect, and collapsing one
-   *    visibly collapses a section that reads identically. Legal.
+   *  - `aeon.props` is `Properties` on Layout, Objects, Rings, Collision and
+   *    Effects — five mounts of the SAME section doing the SAME job. One
+   *    collapse preference across them is what a user would expect, and
+   *    collapsing one visibly collapses a section that reads identically. Legal.
    *  - `map.palette` was `Chunks`, `Marquee`, `Paste`, `Ring Patterns`,
    *    `Collision` and `Objects`. Collapsing the chunk library and finding the
    *    ring palette collapsed two facets later is not a preference anyone
