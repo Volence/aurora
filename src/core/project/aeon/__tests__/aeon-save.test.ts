@@ -5,6 +5,9 @@ import { buildAeonSavePlan } from '../save';
 import { serializeNametable } from '../../../formats/s4-nametable';
 import { serializeTiles } from '../../../export/tile-dedup';
 import { serializeSectionMeta, parseSectionMeta } from '../../../formats/section-meta';
+import { serializeCollAttr } from '../../../formats/s4-collattr';
+import { STRIP_ROWS, STRIP_COLS, WIDE_STRIP_SIZE } from '../../../formats/s4-strips';
+import { packCollisionCell } from '../../../collision/collision-cell-word';
 import { SECTION_TILES_WIDE, SECTION_TILES_HIGH } from '../../../model/s4-types';
 import type { Tile } from '../../../model/s4-types';
 
@@ -73,15 +76,92 @@ const META_REFS = { bgLayoutRef: 'bg-cave', paletteRef: 'pal-dusk' };
 const WELL_FORMED_META = serializeSectionMeta(META_REFS)!;
 const MALFORMED_META = WELL_FORMED_META.slice(0, -1);  // truncated hand-edit
 
-/** Load `files`, plan a save, and apply the plan — the resulting on-disk map. */
-async function loadSaveApply(files: Map<string, Uint8Array>): Promise<Map<string, Uint8Array>> {
-  const fa = memFa(files);
+// ── Editable collision-plane fixture, as in aeon-load.test.ts ───────────────
+// The editable planes are only read when the act declares strip source, which
+// the base fixture does not — hence a second project.json. Strip path A and
+// path B are seeded with DIFFERENT bytes so the two baselines are
+// distinguishable and no test can pass by inspecting the wrong twin.
+const STRIP_PROJECT_JSON = {
+  ...PROJECT_JSON,
+  zones: [{
+    ...PROJECT_JSON.zones[0],
+    acts: [{ ...PROJECT_JSON.zones[0].acts[0], stripPath: 'data/ojz/act1/', stripPrefix: 'sec' }],
+  }],
+};
+
+const COLL_A_PATH = 'data/ojz/act1/section_0.collattr.bin';
+const COLL_B_PATH = 'data/ojz/act1/section_0.collattrb.bin';
+/** The section's authoritative plane length in cells — the same figure the
+ *  loader's own fallback uses (`engineColl.length`, one byte per section cell). */
+const PLANE_CELLS = SECTION_TILES_WIDE * SECTION_TILES_HIGH;
+
+function stripBytes(): Uint8Array {
+  const NT_BYTES = STRIP_ROWS * 2;    // per column, ahead of the collision cells
+  const COLL_CELLS = STRIP_ROWS / 2;  // one collision byte per 16px cell
+  const buf = new Uint8Array(STRIP_COLS * WIDE_STRIP_SIZE);
+  const word = (2 << 13) | 1;         // the tile the .tiles.bin fixture also uses
+  buf[0] = word >> 8; buf[1] = word & 0xFF;
+  buf[NT_BYTES] = 0x05;               // column 0, cell 0, path A
+  buf[NT_BYTES + COLL_CELLS] = 0x06;  // ... path B — deliberately not A's byte
+  return buf;
+}
+
+function stripFixtureFiles(): Map<string, Uint8Array> {
+  const files = fixtureFiles();
+  files.set('project.json', new TextEncoder().encode(JSON.stringify(STRIP_PROJECT_JSON)));
+  files.set('data/ojz/act1/sec0_strips_source.bin', stripBytes());
+  return files;
+}
+
+/** An authored plane: air except hand-set cells at both ends, so a plane
+ *  truncated anywhere loses one of them. `seed` distinguishes A from B. */
+function authoredPlane(seed: number): Uint16Array {
+  const w = new Uint16Array(PLANE_CELLS);
+  w[0] = packCollisionCell({ shape: seed, xFlip: true, yFlip: false, solidity: 'top' });
+  w[PLANE_CELLS - 1] = packCollisionCell({ shape: seed + 1, xFlip: false, yFlip: true, solidity: 'all' });
+  return w;
+}
+const AUTHORED_A = authoredPlane(0x111);
+const AUTHORED_B = authoredPlane(0x222);
+
+/** memFa in which `denied` paths EXIST but cannot be read — a host fs error
+ *  (EACCES), which is not the same fact as absence. */
+function memFaDenying(files: Map<string, Uint8Array>, denied: Set<string>): FileAccess {
+  const base = memFa(files);
+  return {
+    ...base,
+    read: async (rel) => {
+      if (denied.has(rel)) throw new Error(`EACCES: permission denied, open '${rel}'`);
+      return base.read(rel);
+    },
+  };
+}
+
+/** A strip fixture carrying both authored planes, well-formed. */
+function authoredFixture(): Map<string, Uint8Array> {
+  const files = stripFixtureFiles();
+  files.set(COLL_A_PATH, serializeCollAttr(AUTHORED_A));
+  files.set(COLL_B_PATH, serializeCollAttr(AUTHORED_B));
+  return files;
+}
+
+/** As loadSaveApply, but over a caller-supplied adapter, so a test can make a
+ *  present file unreadable without changing what is on disk. */
+async function loadSaveApplyVia(
+  fa: FileAccess,
+  files: Map<string, Uint8Array>,
+): Promise<Map<string, Uint8Array>> {
   const r = await loadAeonProject(fa, '/proj');
   const plan = await buildAeonSavePlan(fa, r.config, r.project, 'ojz', 'act1',
     { legacyAtlasMerged: r.legacyAtlasMerged });
   const out = new Map(files);
   for (const f of plan.files) out.set(f.path, f.bytes);
   return out;
+}
+
+/** Load `files`, plan a save, and apply the plan — the resulting on-disk map. */
+async function loadSaveApply(files: Map<string, Uint8Array>): Promise<Map<string, Uint8Array>> {
+  return loadSaveApplyVia(memFa(files), files);
 }
 
 function text(bytes: Uint8Array | undefined): string | undefined {
@@ -248,5 +328,149 @@ describe('buildAeonSavePlan', () => {
     expect(paths.filter((p) => p.startsWith(`${dataPath}export/`))).toEqual([]);
     expect(paths.filter((p) => p.endsWith('.asm'))).toEqual([]);
     expect(paths.filter((p) => p.endsWith('.art.bin'))).toEqual([]);
+  });
+});
+
+/**
+ * R7 for the editable collision planes, measured where it hurts: the bytes on
+ * disk after a load→save round trip.
+ *
+ * Both writes were gated on `section.collisionEdit` / `collisionEditB` alone,
+ * and the load's catch assigns a real Uint16Array — so those gates are ALWAYS
+ * truthy and an authored plane Aurora could not read was overwritten with the
+ * baked strip baseline. Truncation is worse still: it never reaches the catch,
+ * so the short plane is written back short and certified as the section's.
+ */
+describe('buildAeonSavePlan — editable collision planes', () => {
+  /** The baseline bytes a section with no authored planes saves — precisely what
+   *  an unreadable plane must NOT be replaced by. */
+  async function baselineBytes(path: string): Promise<Uint8Array> {
+    const out = await loadSaveApply(stripFixtureFiles());
+    return out.get(path)!;
+  }
+
+  it('writes a well-formed pair back byte-identical, twice over', async () => {
+    const files = authoredFixture();
+    const before = files.get(COLL_A_PATH)!;
+    // Anti-vacuous: the authored planes are really on disk and really are not
+    // the baseline the save would otherwise emit.
+    expect(before.length).toBe(PLANE_CELLS * 2);
+    expect(before).not.toEqual(await baselineBytes(COLL_A_PATH));
+
+    const out = await loadSaveApply(files);
+    const outAgain = await loadSaveApply(files);
+    expect(outAgain.get(COLL_A_PATH)!).toEqual(out.get(COLL_A_PATH)!);   // zero, or we
+    expect(outAgain.get(COLL_B_PATH)!).toEqual(out.get(COLL_B_PATH)!);   // measure noise
+    expect(out.get(COLL_A_PATH)!).toEqual(serializeCollAttr(AUTHORED_A));
+    expect(out.get(COLL_B_PATH)!).toEqual(serializeCollAttr(AUTHORED_B));
+  });
+
+  it('leaves a .collattr.bin it could not read byte-identical, as a well-formed one is', async () => {
+    const good = authoredFixture();
+    const bad = authoredFixture();
+    const authoredABytes = bad.get(COLL_A_PATH)!;
+    const baselineA = await baselineBytes(COLL_A_PATH);
+    expect(authoredABytes).not.toEqual(baselineA);   // there is something to lose
+
+    const goodOut = await loadSaveApply(good);
+    const goodOutAgain = await loadSaveApply(good);
+    const badOut = await loadSaveApplyVia(memFaDenying(bad, new Set([COLL_A_PATH])), bad);
+
+    // Known-good path against itself first: zero difference, or the comparison
+    // below is measuring nondeterminism rather than damage.
+    expect(goodOutAgain.get(COLL_A_PATH)!).toEqual(goodOut.get(COLL_A_PATH)!);
+    expect(goodOut.get(COLL_A_PATH)!).toEqual(authoredABytes);
+    // The damaged path: untouched, NOT replaced by the strip baseline.
+    expect(badOut.get(COLL_A_PATH)!).toEqual(authoredABytes);
+    // ... and its twin, which read fine, still saves normally.
+    expect(badOut.get(COLL_B_PATH)!).toEqual(serializeCollAttr(AUTHORED_B));
+  });
+
+  it('leaves a .collattrb.bin it could not read byte-identical, as a well-formed one is', async () => {
+    const good = authoredFixture();
+    const bad = authoredFixture();
+    const authoredBBytes = bad.get(COLL_B_PATH)!;
+    const baselineB = await baselineBytes(COLL_B_PATH);
+    expect(authoredBBytes).not.toEqual(baselineB);
+
+    const goodOut = await loadSaveApply(good);
+    const goodOutAgain = await loadSaveApply(good);
+    const badOut = await loadSaveApplyVia(memFaDenying(bad, new Set([COLL_B_PATH])), bad);
+
+    expect(goodOutAgain.get(COLL_B_PATH)!).toEqual(goodOut.get(COLL_B_PATH)!);
+    expect(goodOut.get(COLL_B_PATH)!).toEqual(authoredBBytes);
+    expect(badOut.get(COLL_B_PATH)!).toEqual(authoredBBytes);
+    expect(badOut.get(COLL_A_PATH)!).toEqual(serializeCollAttr(AUTHORED_A));
+  });
+
+  it('does not shave a byte off an odd-length .collattr.bin on the way past', async () => {
+    // The byte-visible half of the truncation defect: `data.length >> 1` drops
+    // the trailing byte, and the save writes `words.length * 2` back — so the
+    // file on disk comes out ONE BYTE SHORTER than Aurora found it.
+    const files = stripFixtureFiles();
+    const odd = serializeCollAttr(AUTHORED_A).slice(0, PLANE_CELLS * 2 - 129);
+    expect(odd.length % 2).toBe(1);
+    files.set(COLL_A_PATH, odd);
+    files.set(COLL_B_PATH, serializeCollAttr(AUTHORED_B));
+
+    const out = await loadSaveApply(files);
+    expect(out.get(COLL_A_PATH)!.length).toBe(odd.length);
+    expect(out.get(COLL_A_PATH)!).toEqual(odd);
+    expect(out.get(COLL_B_PATH)!).toEqual(serializeCollAttr(AUTHORED_B));  // twin unharmed
+  });
+
+  it('never writes back a .collattr.bin that is not the section plane length', async () => {
+    const files = stripFixtureFiles();
+    const truncated = serializeCollAttr(AUTHORED_A).slice(0, PLANE_CELLS * 2 - 128);
+    files.set(COLL_A_PATH, truncated);
+    files.set(COLL_B_PATH, serializeCollAttr(AUTHORED_B));
+
+    const fa = memFa(files);
+    const r = await loadAeonProject(fa, '/proj');
+    const section = r.project.zones[0].acts[0].sections[0]!;
+    expect(section.unreadable).toContain('collattr.bin');
+
+    const plan = await buildAeonSavePlan(fa, r.config, r.project, 'ojz', 'act1',
+      { legacyAtlasMerged: r.legacyAtlasMerged });
+    expect(plan.files.find((f) => f.path === COLL_A_PATH)).toBeUndefined();
+    // One file, not a veto: the twin and the rest of the section still write.
+    const b = plan.files.find((f) => f.path === COLL_B_PATH);
+    expect(b!.bytes).toEqual(serializeCollAttr(AUTHORED_B));
+    expect(plan.files.map((f) => f.path)).toContain('data/ojz/act1/section_0.tiles.bin');
+  });
+
+  it('never writes back a .collattrb.bin that is not the section plane length', async () => {
+    const files = stripFixtureFiles();
+    const truncated = serializeCollAttr(AUTHORED_B).slice(0, PLANE_CELLS * 2 - 128);
+    files.set(COLL_A_PATH, serializeCollAttr(AUTHORED_A));
+    files.set(COLL_B_PATH, truncated);
+
+    const fa = memFa(files);
+    const r = await loadAeonProject(fa, '/proj');
+    const section = r.project.zones[0].acts[0].sections[0]!;
+    expect(section.unreadable).toContain('collattrb.bin');
+
+    const plan = await buildAeonSavePlan(fa, r.config, r.project, 'ojz', 'act1',
+      { legacyAtlasMerged: r.legacyAtlasMerged });
+    expect(plan.files.find((f) => f.path === COLL_B_PATH)).toBeUndefined();
+    const a = plan.files.find((f) => f.path === COLL_A_PATH);
+    expect(a!.bytes).toEqual(serializeCollAttr(AUTHORED_A));
+    expect(plan.files.map((f) => f.path)).toContain('data/ojz/act1/section_0.tiles.bin');
+  });
+
+  it('still saves the strip-seeded planes for a section that never had a .collattr.bin', async () => {
+    const files = stripFixtureFiles();
+    expect(files.has(COLL_A_PATH)).toBe(false);
+    const fa = memFa(files);
+    const r = await loadAeonProject(fa, '/proj');
+    expect(r.project.zones[0].acts[0].sections[0]!.unreadable).toBeUndefined();
+
+    const plan = await buildAeonSavePlan(fa, r.config, r.project, 'ojz', 'act1',
+      { legacyAtlasMerged: r.legacyAtlasMerged });
+    const a = plan.files.find((f) => f.path === COLL_A_PATH);
+    const b = plan.files.find((f) => f.path === COLL_B_PATH);
+    expect(a!.bytes.length).toBe(PLANE_CELLS * 2);
+    expect(b!.bytes.length).toBe(PLANE_CELLS * 2);
+    expect(a!.bytes).not.toEqual(b!.bytes);   // the two planes really are distinct
   });
 });
