@@ -19,7 +19,12 @@ import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import { EditHistory } from '../history';
 import type { S4Level } from '../commands';
-import { makeAddBandCommand, makeRemoveBandCommand } from '../bg-override-band';
+import {
+  makeAddBandCommand,
+  makeDemoteBandCommand,
+  makePromoteBandCommand,
+  makeRemoveBandCommand,
+} from '../bg-override-band';
 import {
   parseBgOverride,
   serializeBgOverride,
@@ -30,7 +35,13 @@ import {
   type BgOverrideBand,
   type BgOverrideDocument,
 } from '../../formats/bg-override/bg-override';
-import { createBand, documentBands } from '../../formats/bg-override/bg-anim-band';
+import {
+  bandFromStaticTiles,
+  createBand,
+  documentBands,
+  tileSlotsRemaining,
+} from '../../formats/bg-override/bg-anim-band';
+import { BG_TILE_CAPACITY, cloneBgOverride } from '../../formats/bg-override/bg-override';
 
 const GOLDEN_PATH = resolve(
   __dirname, '../../../../test/fixtures/bg-override/editor_bg_override.b0e5a661.json',
@@ -177,5 +188,130 @@ describe('set-bg-override-band', () => {
     const short: BgOverrideDocument = { ...GOLDEN, layout: GOLDEN.layout.slice(0, 100) };
     expect(() => makeAddBandCommand(short, band(1, 1, 13)))
       .toThrow(/resulting document would not be valid/);
+  });
+});
+
+/**
+ * A document at BG_TILE_CAPACITY exactly and carrying no bands — aeon's live
+ * shape, and the one `makeAddBandCommand` provably cannot touch. Padded from the
+ * real fixture rather than pinned to their tile count, so the subject is "a
+ * document with no free slots" rather than "448".
+ */
+function fullBandlessDoc(): BgOverrideDocument {
+  const tiles = cloneBgOverride(GOLDEN.tiles);
+  while (tiles.length < BG_TILE_CAPACITY) {
+    tiles.push(new Array<number>(TILE_PIXELS).fill(tiles.length & 0xF));
+  }
+  return { layout: GOLDEN.layout.slice(), tiles };
+}
+
+describe('set-bg-override-band — promotion and demotion', () => {
+  it('PROMOTES on a document with no free tile slots, where adding refuses outright', () => {
+    // THE ACCEPTANCE ROW. The property, not the number: a full blob has nowhere
+    // for an inserted band's art to go, and promotion needs none.
+    const full = fullBandlessDoc();
+    expect(tileSlotsRemaining(full)).toBe(0);
+    expect(() => makeAddBandCommand(full, band(1, 1, 20)))
+      .toThrow(new RegExp(`capacity of ${BG_TILE_CAPACITY}`));
+
+    const l = level(full);
+    const h = new EditHistory();
+    const from = 200;
+    const b = bandFromStaticTiles(full, from, { cols: 8, rows: 4, driver: 'camera_x' });
+    const fullBytes = serializeBgOverride(full);
+
+    h.execute(makePromoteBandCommand(l.bgOverride!, b, from), l);
+    expect(documentBands(l.bgOverride!)).toHaveLength(1);
+    // The blob did not grow by one slot, and the document is still writable.
+    expect(l.bgOverride!.tiles).toHaveLength(full.tiles.length);
+    expect(bytes(l)).not.toBe(fullBytes);
+
+    // ONE step, and it takes all three owned keys back together.
+    expect(h.canUndo).toBe(true);
+    h.undo(l);
+    expect(bytes(l)).toBe(fullBytes);
+    h.redo(l);
+    expect(documentBands(l.bgOverride!)).toHaveLength(1);
+    expect(l.bgOverride!.tiles).toHaveLength(full.tiles.length);
+  });
+
+  it('PROMOTES into a document that already carries bands, and one undo takes it back', () => {
+    const l = level();
+    const h = new EditHistory();
+    const from = 200;
+    const b = bandFromStaticTiles(GOLDEN, from, { cols: 8, rows: 1 });
+
+    expect(documentBands(GOLDEN).length).toBeGreaterThan(0);
+    h.execute(makePromoteBandCommand(l.bgOverride!, b, from, 0), l);
+    expect(documentBands(l.bgOverride!)).toHaveLength(documentBands(GOLDEN).length + 1);
+    expect(l.bgOverride!.tiles).toHaveLength(GOLDEN.tiles.length);
+    // Promoted at the front, so every pre-existing band moved up the blob.
+    expect(documentBands(l.bgOverride!)[1].slot_base).toBe(bandTileCount(b));
+
+    h.undo(l);
+    expect(bytes(l)).toBe(GOLDEN_BYTES);
+  });
+
+  it('DEMOTES the band REMOVAL refuses, and loses nothing doing it', () => {
+    // The pair's whole advantage, at the command level: `makeRemoveBandCommand`
+    // will not touch band 0 without being told to destroy the art that draws it.
+    expect(() => makeRemoveBandCommand(GOLDEN, 0)).toThrow(/blankReferencingCells/);
+
+    const l = level();
+    const h = new EditHistory();
+    h.execute(makeDemoteBandCommand(l.bgOverride!, 0), l);
+
+    expect(documentBands(l.bgOverride!)).toHaveLength(documentBands(GOLDEN).length - 1);
+    // Where removal shrank the blob and blanked cells, demotion did neither.
+    expect(l.bgOverride!.tiles).toHaveLength(GOLDEN.tiles.length);
+    expect(l.bgOverride!.layout.some(w => w === 0)).toBe(false);
+
+    h.undo(l);
+    expect(bytes(l)).toBe(GOLDEN_BYTES);
+    h.redo(l);
+    expect(documentBands(l.bgOverride!)).toHaveLength(documentBands(GOLDEN).length - 1);
+  });
+
+  it('owns the demoted band, so undo rebuilds it from the command and not the document', () => {
+    const l = level();
+    const h = new EditHistory();
+    const original = documentBands(GOLDEN)[0];
+    const cmd = makeDemoteBandCommand(l.bgOverride!, 0);
+
+    expect(cmd.band).not.toBe(original);
+    expect(cmd.band.phases[0][0]).not.toBe(original.phases[0][0]);
+    h.execute(cmd, l);
+    // The document no longer holds this band's later banks anywhere: phase 0 is
+    // in `tiles`, banks 1.. exist only in the command.
+    expect(documentBands(l.bgOverride!).some(b => b.pattern_px === original.pattern_px
+      && b.cols === original.cols && b.rows === original.rows)).toBe(false);
+    h.undo(l);
+    expect(bytes(l)).toBe(GOLDEN_BYTES);
+  });
+
+  it('is act-ambient and describes itself as the operation it is', () => {
+    const from = 200;
+    const b = bandFromStaticTiles(GOLDEN, from, { cols: 8, rows: 1 });
+    const up = makePromoteBandCommand(GOLDEN, b, from);
+    expect(up.type).toBe('set-bg-override-band');
+    expect(up.sectionIndex).toBe(-1);
+    expect(up.adding).toBe(true);
+    expect(up.description).toMatch(/promote/i);
+    expect(up.plan.staticBase).toBe(from);
+
+    const down = makeDemoteBandCommand(GOLDEN, 0);
+    expect(down.adding).toBe(false);
+    expect(down.description).toMatch(/demote/i);
+    expect(down.plan.staticBase).not.toBeNull();
+    // The add/remove pair stays the OTHER kind, so history can tell them apart.
+    expect(makeAddBandCommand(GOLDEN, band(1, 1, 21)).plan.staticBase).toBeNull();
+  });
+
+  it('refuses before the command exists when the band does not match the art', () => {
+    const from = 200;
+    const lying = cloneBgOverride(bandFromStaticTiles(GOLDEN, from, { cols: 8, rows: 1 }));
+    lying.phases[0][0] = new Array<number>(TILE_PIXELS).fill(0xF);
+    expect(() => makePromoteBandCommand(GOLDEN, lying, from))
+      .toThrow(/phases\[0\] is not that art/);
   });
 });

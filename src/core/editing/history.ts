@@ -1,6 +1,6 @@
 import type { AnyCommand, S4Level } from './commands';
 import type { EffectsScene, EffectsSceneLibrary } from '../formats/effects/scene';
-import { insertBand, removeBand } from '../formats/bg-override/bg-anim-band';
+import { applyWithBand, applyWithoutBand } from '../formats/bg-override/bg-anim-band';
 
 const MAX_HISTORY = 200;
 
@@ -147,9 +147,14 @@ function applyCommand(cmd: AnyCommand, level: S4Level): void {
     // with each other, which is the one corruption this command exists to
     // prevent.
     if (!level.bgOverride) throw new Error('set-bg-override-band requires level.bgOverride');
+    // ONE dispatch for BOTH band operations. `adding` says which direction the
+    // command's forward step points; `cmd.plan.staticBase` says whether the
+    // band's slots are created/destroyed (insert/remove) or moved to and from
+    // the static blob (promote/demote), and the appliers read it. A second
+    // branch here would be a third place slot arithmetic could disagree.
     level.bgOverride = cmd.adding
-      ? insertBand(level.bgOverride, cmd.plan, cmd.band)
-      : removeBand(level.bgOverride, cmd.plan);
+      ? applyWithBand(level.bgOverride, cmd.plan, cmd.band)
+      : applyWithoutBand(level.bgOverride, cmd.plan);
     return;
   }
   if (cmd.type === 'set-sections') {
@@ -292,8 +297,8 @@ function undoCommand(cmd: AnyCommand, level: S4Level): void {
     // exactly how the two drift into disagreeing about slot arithmetic.
     if (!level.bgOverride) throw new Error('set-bg-override-band requires level.bgOverride');
     level.bgOverride = cmd.adding
-      ? removeBand(level.bgOverride, cmd.plan)
-      : insertBand(level.bgOverride, cmd.plan, cmd.band);
+      ? applyWithoutBand(level.bgOverride, cmd.plan)
+      : applyWithBand(level.bgOverride, cmd.plan, cmd.band);
     return;
   }
   if (cmd.type === 'set-sections') {
