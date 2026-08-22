@@ -20,11 +20,17 @@
 // only checks the cases someone remembered to list, and it has bitten this
 // branch three times.
 //
-// So the list is now READ OUT OF THE FACET MODULES: every component mounted as
-// the direct child of a `<CollapsibleSection>` in workspace/facets/*.tsx,
-// resolved to its source file through that facet's own imports. Adding a
-// section to a facet adds its panel to this test with no edit here, and there
-// is no way to mount a panel in a titled section without this seeing it.
+// So the list is now READ OUT OF THE SECTION PRIMITIVE'S CALL SITES: every
+// `<CollapsibleSection>` anywhere under src/renderer, and every component its
+// body mounts, resolved through that file's own imports. Adding a section
+// anywhere adds its panel to this test with no edit here.
+//
+// IT USED TO SAY "workspace/facets/*.tsx" THERE, and that was the same bug one
+// level up (ROADMAP §5.1 item 18). A facet module is where a section is USUALLY
+// declared, not where it is DEFINED to be: `<Panel><EffectsScenePanel /></Panel>`
+// puts four titled sections one composition level deeper, and this rule and
+// panel-scrollers' beside it saw none of them. Enumerate by what a section IS,
+// not by what usually contains one.
 //
 // The derivation itself moved to `./helpers/section-panels` once a SECOND rule
 // about these same panels needed it (panel-scrollers.test.ts). One derivation,
@@ -39,11 +45,14 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { COMPONENTS, derivePanels, panelName } from './helpers/section-panels';
+import { COMPONENTS, derivePanels, deriveOwners, panelName } from './helpers/section-panels';
 
 const read = (file: string): string => readFileSync(file, 'utf8');
 
-const PANELS = derivePanels();
+// Both halves: the panel FILES a section mounts, and the files that declare a
+// section and draw its body themselves. A self-drawn body can double a title
+// exactly as a mounted panel can — that is what all four effects sections do.
+const PANELS = [...new Set([...derivePanels(), ...deriveOwners()])].sort();
 
 /**
  * Heading type = bold AND uppercase in ONE style object, which is what
@@ -76,6 +85,19 @@ describe('a panel inside a CollapsibleSection does not title itself', () => {
     expect(names).toContain('ArtBrowser.tsx');
     // The one the hand-written list omitted, and the reason this is derived.
     expect(names).toContain('RingPatternPalette.tsx');
+    // The one the FACET-walking derivation omitted, and the reason it no longer
+    // walks facets: four titled sections composed one level below the facet.
+    expect(names).toContain('effects/EffectsScenePanel.tsx');
+  });
+
+  it('reaches sections declared outside a facet module at all', () => {
+    // The item-18 property stated as a property, not as one example: if every
+    // name this derivation produces sat under workspace/facets, the widening
+    // would have been undone without a single case turning red.
+    const owners = deriveOwners().map(panelName);
+    const outside = owners.filter((n) => !n.includes('workspace/facets/'));
+    expect(outside.length, `every section is declared in a facet module again: ${owners.join(' ')}`)
+      .toBeGreaterThan(0);
   });
 
   it('finds panels across BOTH engines (a classic-only scan would pass vacuously)', () => {
