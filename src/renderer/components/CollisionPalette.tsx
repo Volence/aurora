@@ -2,10 +2,9 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useEditorStore, executeCommand } from '../state/editorStore';
 import { useProjectStore, getActiveLevel } from '../state/projectStore';
 import { useViewStore } from '../state/viewStore';
-import { SECTION_TILES_WIDE, SECTION_TILES_HIGH } from '../../core/model/s4-types';
 import { angleDegrees } from '../../core/collision/collision-model';
 import type { CollisionProfile } from '../../core/collision/collision-model';
-import { resolvePlaneWords } from '../../core/collision/collision-cell-resolve';
+import { resolvePlaneWords, SECTION_PLANE_WORDS } from '../../core/collision/collision-cell-resolve';
 import { flipProfile } from '../../core/collision/collision-flip';
 import { organizePalette, effectiveXFlip } from '../../core/collision/collision-palette-organize';
 import type { Solidity } from '../../core/collision/collision-model';
@@ -87,7 +86,7 @@ export default function CollisionPalette({ variant = 'map' }: { variant?: 'map' 
     const section = level.sections[ed.activeSectionIndex];
     if (!section) return;
     const p = ed.collisionPaintPlane;
-    const N = SECTION_TILES_WIDE * SECTION_TILES_HIGH;
+    const N = SECTION_PLANE_WORDS;
     if (p === 'b') {
       if (!section.collisionEditB) section.collisionEditB = resolvePlaneWords(null, section.engineCollisionB, N);
     } else if (!section.collisionEdit) {
@@ -117,11 +116,15 @@ export default function CollisionPalette({ variant = 'map' }: { variant?: 'map' 
     const engine = p === 'b' ? section.engineCollisionB : section.engineCollision;
     if (!engine) return; // no baseline loaded — re-open the project first
     // The engine baseline is raw attr indices; pack it to cell words to compare/assign.
-    const engineWords = resolvePlaneWords(null, engine, engine.length);
+    // Sized by the section geometry, never by `engine.length`: a short baseline
+    // would otherwise yield short `engineWords`, and the comparison below would
+    // read `undefined` past its end and push `newColl: undefined` into the
+    // command (ROADMAP §5.1 item 10).
+    const engineWords = resolvePlaneWords(null, engine, SECTION_PLANE_WORDS);
     if (p === 'b') {
-      if (!section.collisionEditB) section.collisionEditB = resolvePlaneWords(null, engine, engine.length);
+      if (!section.collisionEditB) section.collisionEditB = resolvePlaneWords(null, engine, SECTION_PLANE_WORDS);
     } else if (!section.collisionEdit) {
-      section.collisionEdit = resolvePlaneWords(null, engine, engine.length);
+      section.collisionEdit = resolvePlaneWords(null, engine, SECTION_PLANE_WORDS);
     }
     const ce = p === 'b' ? section.collisionEditB : section.collisionEdit;
     if (!ce) return;

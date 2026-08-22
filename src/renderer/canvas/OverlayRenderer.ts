@@ -10,7 +10,7 @@ import {
 } from './canvas-colors';
 import type { CollisionProfileSet, Solidity } from '../../core/collision/collision-model';
 import { columnSolidRun } from '../../core/collision/collision-render';
-import { resolveCell, resolvePlaneWords } from '../../core/collision/collision-cell-resolve';
+import { resolveCell, resolvePlaneWords, SECTION_PLANE_WORDS } from '../../core/collision/collision-cell-resolve';
 
 type Ctx = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
 
@@ -56,9 +56,13 @@ export class OverlayRenderer {
         // dual-layer/loop regions stand out instead of the planes hiding each other.
         // Resolve each plane to a uniform array of 16-bit packed cell words
         // (editable plane verbatim, else the engine baseline packed to words).
-        const len = info.section.collisionEdit?.length
-          ?? info.section.engineCollision?.length
-          ?? info.section.tileGrid.nametable.length;
+        // The bound is the SECTION GEOMETRY, not whatever length the stored
+        // arrays happen to have: drawCollisionOverlay below indexes
+        // (cr*2)*SECTION_TILES_WIDE + cc*2 over the full cell grid regardless.
+        // Deriving it from `collisionEdit?.length ?? engineCollision?.length`
+        // let a short plane A set the bound for plane B as well, and left a
+        // short plane B to be read past its end (ROADMAP §5.1 item 10).
+        const len = SECTION_PLANE_WORDS;
         const a = resolvePlaneWords(info.section.collisionEdit, info.section.engineCollision, len);
         const b = (info.section.collisionEditB || info.section.engineCollisionB)
           ? resolvePlaneWords(info.section.collisionEditB, info.section.engineCollisionB, len)
