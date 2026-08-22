@@ -585,6 +585,13 @@ async function measureSurface(c, tag, label, expect, opts = {}) {
       const collapsed = await c.json('window.__sc.sections().filter((s) => s.collapsed).map((s) => s.title)');
       if (!collapsed.length) break;
       for (const t of collapsed) {
+        // SCROLL IT INTO VIEW FIRST. Each expansion pushes the headers below it
+        // down, and a header that has moved past the bottom of the container
+        // still has a non-zero rect — so a click at its coordinates would land
+        // on whatever is painted there instead, silently expanding the wrong
+        // section (or nothing) and reporting a shorter column than exists.
+        await c.json(`window.__sc.scrollIntoViewByTitle(${JSON.stringify(t)})`);
+        await sleep(120);
         const p = await c.json(`window.__sc.headerPoint(${JSON.stringify(t)})`);
         if (p) await clickAt(c, p.x, p.y);
       }
