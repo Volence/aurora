@@ -27,6 +27,21 @@ export interface RenderedObjectFrame {
   /** Origin offset: the object's (x,y) maps to (originX, originY) in the bitmap. */
   originX: number;
   originY: number;
+  /**
+   * Per-pixel sprite-piece PRIORITY mask (width*height; 1 = the pixel's winning
+   * piece carries the VDP priority bit), or null when NO piece does (the common
+   * case — all-low, nothing to allocate). The bit is bit 15 of the mappings
+   * attrs word (sprite-mappings-import.ts: `priority: (attrs & 0x8000) !== 0`;
+   * ASM call-site path: `spritePiece` arg 9, asm-mappings.ts `priority: !!pri`).
+   * On hardware it is compared PER PIECE against the plane tile's own bit: a
+   * high piece's pixels render above high-priority plane tiles, a low piece's
+   * behind them — which is exactly what the viewport's occlusion pass needs and
+   * what the flat composite alone cannot say. "Winning" follows the pixel
+   * composite's own rule (first mappings piece on top; transparent pixels never
+   * claim), so mask and indices agree pixel-for-pixel. Only meaningful where
+   * `indices` is non-zero.
+   */
+  priMask: Uint8Array | null;
 }
 
 /** Decode an object's 8x8 art file into tiles (nemesis-compressed or raw 4bpp). */
@@ -63,7 +78,7 @@ export function renderObjectFrame(
   frames: SpriteFrame[], tiles: Tile[], frameIndex: number,
 ): RenderedObjectFrame {
   const frame = frames[frameIndex];
-  if (!frame) return { indices: new Uint8Array(64), width: 8, height: 8, originX: 0, originY: 0 };
+  if (!frame) return { indices: new Uint8Array(64), width: 8, height: 8, originX: 0, originY: 0, priMask: null };
   const { minX, minY, width, height } = frameBounds(frame);
   const originX = -minX;
   const originY = -minY;
@@ -75,7 +90,21 @@ export function renderObjectFrame(
   // identical.
   const ordered: SpriteFrame = { ...frame, pieces: [...frame.pieces].reverse() };
   const indices = renderFrameToIndices(ordered, tiles, width, height, originX, originY);
-  return { indices, width, height, originX, originY };
+  // Per-pixel piece-priority mask (see RenderedObjectFrame.priMask). Composed
+  // with the SAME later-overwrites-earlier walk as the pixels — each piece is
+  // rasterized alone through the very same renderFrameToIndices, so a pixel's
+  // mask bit is exactly its winning piece's priority bit. Skipped entirely
+  // (null) when no piece carries the bit.
+  let priMask: Uint8Array | null = null;
+  if (frame.pieces.some((p) => p.priority)) {
+    priMask = new Uint8Array(width * height);
+    for (const p of ordered.pieces) {
+      const single = renderFrameToIndices({ id: 'pri', pieces: [p] }, tiles, width, height, originX, originY);
+      const bit = p.priority ? 1 : 0;
+      for (let i = 0; i < single.length; i++) if (single[i] !== 0) priMask[i] = bit;
+    }
+  }
+  return { indices, width, height, originX, originY, priMask };
 }
 
 /** Convenience: decode a standalone art file + parse mappings + render one frame. */
@@ -136,17 +165,28 @@ function flipIndicesY(src: Uint8Array, width: number, height: number): Uint8Arra
 export function composeObjectFrames(
   frames: SpriteFrame[], tiles: Tile[], pieces: readonly ObjectPiece[],
 ): RenderedObjectFrame {
-  if (pieces.length === 0) return { indices: new Uint8Array(64), width: 8, height: 8, originX: 0, originY: 0 };
-  // Render + flip each piece once; track its anchor-relative top-left.
+  if (pieces.length === 0) return { indices: new Uint8Array(64), width: 8, height: 8, originX: 0, originY: 0, priMask: null };
+  // Render + flip each piece once; track its anchor-relative top-left. The
+  // sub-frame's priMask is flipped alongside its indices (same axes, same
+  // functions) so mask and pixels stay in lockstep.
   const rendered = pieces.map((p) => {
     const sub = renderObjectFrame(frames, tiles, p.frame);
     let indices = sub.indices;
+    let mask = sub.priMask;
     let oX = sub.originX;
     let oY = sub.originY;
-    if (p.xf) { indices = flipIndicesX(indices, sub.width, sub.height); oX = sub.width - sub.originX; }
-    if (p.yf) { indices = flipIndicesY(indices, sub.width, sub.height); oY = sub.height - sub.originY; }
+    if (p.xf) {
+      indices = flipIndicesX(indices, sub.width, sub.height);
+      if (mask) mask = flipIndicesX(mask, sub.width, sub.height);
+      oX = sub.width - sub.originX;
+    }
+    if (p.yf) {
+      indices = flipIndicesY(indices, sub.width, sub.height);
+      if (mask) mask = flipIndicesY(mask, sub.width, sub.height);
+      oY = sub.height - sub.originY;
+    }
     // Top-left of this piece relative to the composite anchor.
-    return { indices, width: sub.width, height: sub.height, left: p.dx - oX, top: p.dy - oY };
+    return { indices, mask, width: sub.width, height: sub.height, left: p.dx - oX, top: p.dy - oY };
   });
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
   for (const r of rendered) {
@@ -162,6 +202,10 @@ export function composeObjectFrames(
   const originX = -minX + 0;
   const originY = -minY + 0;
   const out = new Uint8Array(width * height);
+  // Composite mask: allocated only if any sub-frame carries one. A later
+  // piece's winning pixel overwrites the mask too — with 0 when that piece has
+  // no mask — so the mask always follows the visible pixel's owner.
+  const outMask = rendered.some((r) => r.mask !== null) ? new Uint8Array(width * height) : null;
   for (const r of rendered) {
     const bx = originX + r.left; // piece top-left in composite buffer coords
     const by = originY + r.top;
@@ -172,10 +216,11 @@ export function composeObjectFrames(
         const dx = bx + x, dy = by + y;
         if (dx < 0 || dx >= width || dy < 0 || dy >= height) continue;
         out[dy * width + dx] = v;
+        if (outMask) outMask[dy * width + dx] = r.mask ? r.mask[y * r.width + x] : 0;
       }
     }
   }
-  return { indices: out, width, height, originX, originY };
+  return { indices: out, width, height, originX, originY, priMask: outMask };
 }
 
 /** Decode a standalone art file + parse mappings + compose the given rule pieces. */
