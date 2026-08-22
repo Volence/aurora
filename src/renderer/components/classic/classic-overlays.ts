@@ -248,6 +248,18 @@ export interface SpriteOcclusion {
   /** Visible world rect — objects outside it skip the pass (they are clipped
    *  off-canvas anyway; building hi-pri canvases for them would be waste). */
   visible: WorldRect;
+  /**
+   * Present only while animated-art playback runs: re-patch the occluder with
+   * the CURRENT animation frame's pixels for the chunk at layout cell
+   * (col, row), whose origin lands at scratch coords (dx, dy). MZ's lava/magma
+   * is largely HIGH priority AND animated (measured: 4.8–6.5k hi-pri animated
+   * FG cells per MZ act), so an occluder built from the static chunk canvas
+   * would freeze frame-0 lava inside sprite rects while it animates outside.
+   * The hook clears + redraws just the hi-pri 8x8 sub-rects of animated cells
+   * from the per-tick placement canvases — transparent current-frame pixels
+   * therefore stop occluding, exactly like static transparent pixels.
+   */
+  patchAnimated?: (actx: CanvasRenderingContext2D, col: number, row: number, dx: number, dy: number) => void;
   /** Re-apply the priority lens veil on the re-drawn hi-pri pixels, so lens +
    *  occlusion stacked stay consistent (the veil the sprite covered returns
    *  when the map pixel does). */
@@ -282,7 +294,7 @@ function occludeDrawnSprite(
   const h = Math.ceil(rect.height);
   if (w <= 0 || h <= 0) return false;
   // Which chunks intersect the frame rect, and their hi-pri canvases (if any).
-  const overlaps: { canvas: HTMLCanvasElement; ox: number; oy: number }[] = [];
+  const overlaps: { canvas: HTMLCanvasElement; col: number; row: number; ox: number; oy: number }[] = [];
   const c0 = Math.floor(rect.left / CHUNK_PX);
   const c1 = Math.floor((rect.left + rect.width - 1) / CHUNK_PX);
   const r0 = Math.floor(rect.top / CHUNK_PX);
@@ -290,7 +302,7 @@ function occludeDrawnSprite(
   for (let row = r0; row <= r1; row++) {
     for (let col = c0; col <= c1; col++) {
       const canvas = occl.hiPriCanvasAt(col, row);
-      if (canvas) overlaps.push({ canvas, ox: col * CHUNK_PX - rect.left, oy: row * CHUNK_PX - rect.top });
+      if (canvas) overlaps.push({ canvas, col, row, ox: col * CHUNK_PX - rect.left, oy: row * CHUNK_PX - rect.top });
     }
   }
   if (overlaps.length === 0) return false;
@@ -308,8 +320,12 @@ function occludeDrawnSprite(
   actx.imageSmoothingEnabled = false;
   bctx.imageSmoothingEnabled = false;
 
-  // Scratch A = the hi-pri map pixels within the rect (transparent elsewhere).
-  for (const o of overlaps) actx.drawImage(o.canvas, o.ox, o.oy);
+  // Scratch A = the hi-pri map pixels within the rect (transparent elsewhere),
+  // re-patched to the current animation frame while playback runs.
+  for (const o of overlaps) {
+    actx.drawImage(o.canvas, o.ox, o.oy);
+    occl.patchAnimated?.(actx, o.col, o.row, o.ox, o.oy);
+  }
   if (occl.lensVeil) {
     // The lens veiled these pixels before the sprite covered them; veil the
     // re-drawn copies too so lens + occlusion stacked don't flicker holes.
@@ -349,13 +365,15 @@ function occludeDrawnSprite(
  * air / out-of-range / has no high tiles at all — the common case, and the
  * viewport caches that verdict on the same version key as the base canvas.
  * Reuses the SAME flip-exact per-tile mask as the priority lens
- * (chunkPriorityMask) — one derivation, two consumers.
+ * (chunkPriorityMask) — one derivation, two consumers. The mask is returned
+ * alongside the canvas so the animated re-patch hook can test individual tiles
+ * without re-deriving it per object per frame.
  */
 export function buildHiPriChunkCanvas(
   d: LevelDoc,
   chunkId: number,
   base: HTMLCanvasElement,
-): HTMLCanvasElement | null {
+): { canvas: HTMLCanvasElement; mask: Uint8Array } | null {
   const mask = chunkPriorityMask(d, chunkId);
   if (!mask) return null;
   let any = false;
@@ -378,7 +396,7 @@ export function buildHiPriChunkCanvas(
       tx += run;
     }
   }
-  return c;
+  return { canvas: c, mask };
 }
 
 /**

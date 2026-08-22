@@ -16,6 +16,7 @@ import { objectSpriteEpoch } from '../../../core/level-classic/object-sprite-clo
 import { useToastStore } from '../../state/toastStore';
 import { useAetherStore } from '../../state/aetherStore';
 import { renderBlockPlacement, renderChunk } from '../../../core/level-classic/render';
+import { CHUNK_TILES } from '../../../core/level-classic/priority-mask';
 import { applyCollisionShapeCells, applyCollisionShapeRect } from '../../state/collision-dispatch';
 import type { LevelDoc } from '../../../core/level-classic/model';
 // TYPE-ONLY (erased at runtime): the gesture's cells and the report it hands to
@@ -283,7 +284,7 @@ export default function ClassicLevelViewport() {
   // a chunk also rebuilds its overlay. `canvas: null` is a cached verdict —
   // "this chunk has no high tiles" — which is most chunks in most zones, so the
   // steady-state cost of the pass is a map lookup per object per chunk cell.
-  const hiPriCache = useRef<Map<number, { canvas: HTMLCanvasElement | null; key: string }>>(new Map());
+  const hiPriCache = useRef<Map<number, { canvas: HTMLCanvasElement | null; mask: Uint8Array | null; key: string }>>(new Map());
   useEffect(() => {
     hiPriCache.current = new Map();
   }, [ref]);
@@ -666,6 +667,11 @@ export default function ClassicLevelViewport() {
       }
     }
 
+    // While playback runs, the occlusion pass must not freeze animated map art
+    // at frame 0 inside sprite rects (MZ's hi-pri lava/magma). Set inside the
+    // playAnim block below, consumed by the occlusion context further down.
+    let occlAnimPatch: ((actx: CanvasRenderingContext2D, col: number, row: number, dx: number, dy: number) => void) | null = null;
+
     // Animated-art play overlay: blit the current-frame block placements over
     // just the visible animated cells (audit §2.2 — never chunk-cache
     // invalidation). Drawn on whichever plane is displayed — the waterfall/
@@ -736,6 +742,37 @@ export default function ClassicLevelViewport() {
           }
         }
       }
+      // Occluder re-patch hook (SpriteOcclusion.patchAnimated): clear + redraw
+      // just the HI-PRI 8x8 sub-rects of this chunk's animated cells from the
+      // per-tick placement canvases, so an occluded sprite in MZ sees the
+      // CURRENT lava frame in front of it — and a transparent current-frame
+      // pixel stops occluding (clearRect first, exactly the void-fill logic
+      // drawAnimatedArt applies to the main pass).
+      occlAnimPatch = (actx, ocol, orow, dx, dy) => {
+        const ocell = layoutCellAt(grid, ocol, orow);
+        if (ocell === undefined) return;
+        const ochunkId = ocell & 0x7f;
+        const mask = hiPriCache.current.get(ochunkId)?.mask;
+        if (!mask) return;
+        const overKey = `${chunkEpoch}:${chunkVersions.get(ochunkId) ?? 0}`;
+        let oentry = animCellsRef.current.get(ochunkId);
+        if (!oentry || oentry.key !== overKey) {
+          oentry = { key: overKey, cells: animatedCellsForChunk(doc, ochunkId, animTiles) };
+          animCellsRef.current.set(ochunkId, oentry);
+        }
+        for (const ac of oentry.cells) {
+          const cx = (ac.cell % 16) * 16;
+          const cy = ((ac.cell / 16) | 0) * 16;
+          const pc = getPlacementCanvas(ac.block, ac.xf, ac.yf);
+          for (let q = 0; q < 4; q++) {
+            const sx = (q & 1) * 8, sy = (q >> 1) * 8;
+            const tx = (cx + sx) >> 3, ty = (cy + sy) >> 3;
+            if (!mask[ty * CHUNK_TILES + tx]) continue;
+            actx.clearRect(dx + cx + sx, dy + cy + sy, 8, 8);
+            actx.drawImage(pc, sx, sy, 8, 8, dx + cx + sx, dy + cy + sy, 8, 8);
+          }
+        }
+      };
       const animMs = performance.now() - animT0;
       const acc = animPerfRef.current;
       acc.draws++;
@@ -822,12 +859,13 @@ export default function ClassicLevelViewport() {
               const hit = hiPriCache.current.get(chunkId);
               if (hit && hit.key === key) return hit.canvas;
               const t0 = performance.now();
-              const canvas = buildHiPriChunkCanvas(doc, chunkId, getChunkCanvas(doc, chunkId, key));
+              const built = buildHiPriChunkCanvas(doc, chunkId, getChunkCanvas(doc, chunkId, key));
               occlPerfRef.current.builds++;
               occlFrameMs += performance.now() - t0;
-              hiPriCache.current.set(chunkId, { canvas, key });
-              return canvas;
+              hiPriCache.current.set(chunkId, { canvas: built?.canvas ?? null, mask: built?.mask ?? null, key });
+              return built?.canvas ?? null;
             },
+            patchAnimated: occlAnimPatch ?? undefined,
             visible: { left: cam.x, top: cam.y, width: w * invZoom, height: h * invZoom },
             lensVeil: overlays.showPriority,
             onCost: (ms) => { occlFrameMs += ms; },

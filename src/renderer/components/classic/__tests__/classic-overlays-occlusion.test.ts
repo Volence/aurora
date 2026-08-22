@@ -139,6 +139,21 @@ describe('drawObjects sprite occlusion pass', () => {
     expect(tagsOf(ctx)).toEqual(['sprite']);
   });
 
+  it('patchAnimated is invoked per intersecting chunk, into the occluder scratch', () => {
+    const ctx = makeRecordingCtx();
+    const hi = makeFakeCanvas('hipri');
+    const o = occl(hi);
+    const calls: { col: number; row: number; dx: number; dy: number }[] = [];
+    (o as SpriteOcclusion).patchAnimated = (actx, col, row, dx, dy) => {
+      calls.push({ col, row, dx, dy });
+      // Must be handed the occluder scratch's context (scratch A), not the main ctx.
+      expect(actx).not.toBe(ctx);
+    };
+    drawObjects(ctx, doc(), 1, new Map([['16', sprite(false)]]), '', null, null, undefined, o);
+    // The 32x32 frame at (100,100) sits inside chunk (0,0) only.
+    expect(calls).toEqual([{ col: 0, row: 0, dx: -84, dy: -84 }]);
+  });
+
   it('fallback hex-box objects (no sprite) are editor chrome — never occluded', () => {
     const ctx = makeRecordingCtx();
     const hi = makeFakeCanvas('hipri');
