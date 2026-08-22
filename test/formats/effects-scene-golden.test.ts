@@ -23,11 +23,19 @@ import { validateAgainstSchema, type JsonSchema } from '../../src/core/formats/e
  *   • aeon tools/EFFECTS_CONSUMER_CONTRACT.md at 00607dd5 (commit) — the
  *     consumer read set (§2.1 scene fields, §2.3 referenced binaries).
  *
- * THE FIXTURE IS HAND-WRITTEN. test/fixtures/effects/canopy_dusk.json was typed
- * against the schema, never produced by serializeEffectsScene — a
- * serializer-built golden drifts in lockstep with a broken serializer and
- * passes while proving nothing (the standard set by the sceneRef parcel,
- * aurora 61d4b80).
+ * THE FIXTURE IS NOT PRODUCED BY THE WRITER UNDER TEST, and that is the whole
+ * point of it: a serializer-built golden drifts in lockstep with a broken
+ * serializer and passes while proving nothing (the standard set by the sceneRef
+ * parcel, aurora 61d4b80). It was typed by hand against the schema, and when §5
+ * canonical order was adopted it was re-sorted by the OTHER implementation the
+ * clause names — `json.dumps(doc, sort_keys=True, indent=2,
+ * ensure_ascii=False)` — never by serializeEffectsScene. So the byte round-trip
+ * below is now cross-implementation evidence that Aurora and aeon agree on the
+ * rendering, which is strictly more than it proved before.
+ *
+ * The re-sort was FORMAT-ONLY, measured rather than assumed: 2,524 bytes and
+ * 140 lines before and after, sha256 1f99f25ccb2742f3… -> 9034790c09ec0935…,
+ * and `json.loads(before) == json.loads(after)` is True.
  *
  * It is a SHAPE-COVERAGE document, not a scene anyone would ship: it carries
  * every optional key and every alternative form so the coverage assertions
@@ -77,6 +85,41 @@ describe('effects scene golden (AURORA_EFFECTS_SCHEMA.md §8)', () => {
     expect(GOLDEN).toContain('"s1": 2');
 
     expect(serializeEffectsScene(parseEffectsScene(GOLDEN, 'canopy_dusk'))).toBe(GOLDEN);
+  });
+
+  /**
+   * The fixture is itself in §5 canonical order, checked against the DOCUMENT
+   * rather than against the serializer — so the round-trip above cannot pass by
+   * both sides agreeing on a wrong order.
+   */
+  it('the golden on disk is in §5 canonical key order, at every depth', () => {
+    function everyObjectSorted(value: unknown, path = '<document>'): string[] {
+      if (Array.isArray(value)) return value.flatMap((v, i) => everyObjectSorted(v, `${path}[${i}]`));
+      if (typeof value !== 'object' || value === null) return [];
+      const keys = Object.keys(value as Record<string, unknown>);
+      const bad = keys.join(',') === keys.slice().sort().join(',') ? [] : [path];
+      return [...bad, ...Object.entries(value as Record<string, unknown>)
+        .flatMap(([k, v]) => everyObjectSorted(v, `${path}.${k}`))];
+    }
+    const doc = JSON.parse(GOLDEN) as Record<string, unknown>;
+
+    // Subject check: the walker really does reach nested objects and really
+    // does report them, so an empty result below means "all sorted" rather
+    // than "nothing looked at". Proven by unsorting one object DEEP inside a
+    // layer's deform table and seeing that exact path come back.
+    const poisoned = JSON.parse(GOLDEN) as Record<string, unknown>;
+    const table = ((poisoned.layers as Record<string, Record<string, Record<string, unknown>>>[])
+      .find(l => l.deform)!.deform.own.table) as Record<string, unknown>;
+    const unsorted: Record<string, unknown> = {};
+    for (const k of Object.keys(table).reverse()) unsorted[k] = table[k];
+    ((poisoned.layers as Record<string, Record<string, Record<string, unknown>>>[])
+      .find(l => l.deform)!.deform.own).table = unsorted;
+    expect(Object.keys(unsorted).length).toBeGreaterThan(1);
+    expect(everyObjectSorted(poisoned).join(',')).toMatch(/\.deform\.own\.table$/);
+
+    expect(everyObjectSorted(doc)).toEqual([]);
+    // ...and alphabetical really did move things: `schema` is no longer first.
+    expect(Object.keys(doc)[0]).not.toBe('schema');
   });
 
   /**
