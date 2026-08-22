@@ -31,6 +31,7 @@ import {
 import { serializeBgTiles } from '../../formats/bg-tiles';
 import { bgLibIndexPath, bgLibLayoutPath, bgLibTilesPath, serializeBgLibraryIndex } from '../../formats/bg-library';
 import { serializeSectionMeta } from '../../formats/section-meta';
+import { effectsScenePath, serializeEffectsScene } from '../../formats/effects/scene';
 import { serializeNametable } from '../../formats/s4-nametable';
 import { serializeCollAttr } from '../../formats/s4-collattr';
 import { serializeTiles } from '../../export/tile-dedup';
@@ -241,6 +242,54 @@ export async function buildAeonSavePlan(
       const tileBytes = serializeBgTiles(entry.tiles);
       files.push({ path: bgLibTilesPath(dataRoot, zone.id, entry.id), bytes: tileBytes });
     }
+  }
+
+  // Persist the effects-scene library — one JSON per scene under
+  // `{dataRoot}editor/effects/` (empyrean AURORA_EFFECTS_SCHEMA.md §2). Written
+  // beside the BG library and for the same reason: the model holds ONE library
+  // per project, and the plan is built per act, so both land in every act's plan.
+  // That is not a duplicate write — the bytes are identical, and aeon-save.ts
+  // compares before writing, so only the first act's plan touches disk.
+  //
+  // THE PATH IS ACT-INDEPENDENT (no zone.id in it, unlike the BG library's): the
+  // contract fixes it at `<dataRoot>editor/effects/<scene_id>.json` and the scene
+  // id is globally unique by the schema's own identity rule.
+  //
+  // TWO REFUSALS, both deliberate and both LOUD:
+  //
+  //   • serializeEffectsScene VALIDATES on the way out and throws. It is not
+  //     caught here: the writer path is the one the schema is closed for (§8),
+  //     and a save that silently omitted an invalid scene would present to the
+  //     author as "my edit didn't stick".
+  //
+  //   • a scene whose id would land on a file the LOAD could not parse is
+  //     refused, with that file's name in the message.
+  //
+  // THE SECOND ONE IS NOT THE `understood()` RULE THE SECTION LOOP USES, and the
+  // difference is worth stating because the first version of it was a skip that
+  // asserted nothing. An unparsable scene file never enters `scenes` at all (the
+  // library puts it in `unreadable` and returns no id for it), so a by-path skip
+  // over `scenes` can never fire on a straight load→save. The ONE reachable way
+  // to aim a write at a broken file is for the session to CREATE a scene whose id
+  // happens to be that file's stem — which an author can easily do, precisely
+  // because the broken scene is invisible in the UI's list.
+  //
+  // Skipping there would be the worst of both: the author's new scene silently
+  // never saved AND their broken file still on disk. So it throws, the file is
+  // untouched, and the message names the collision. The UI refuses the id at
+  // CREATE time (see effects-scene-ui's takenSceneIds) so this is a backstop, not
+  // the user-facing path.
+  const unreadableScenePaths = new Set(project.effectsScenes.unreadable.map(u => u.path));
+  for (const scene of project.effectsScenes.scenes) {
+    const path = effectsScenePath(dataRoot, scene.id);
+    if (unreadableScenePaths.has(path)) {
+      throw new Error(
+        `refusing to save scene "${scene.id}": ${path} exists and could not be read as an ` +
+        'effects scene, so writing there would destroy it. Fix or remove that file by hand, ' +
+        'or rename the scene.',
+      );
+    }
+    files.push({ path, bytes: new TextEncoder().encode(serializeEffectsScene(scene)) });
   }
 
   if (configChanged) {

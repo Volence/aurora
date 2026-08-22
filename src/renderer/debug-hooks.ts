@@ -350,6 +350,22 @@ interface AeonProbeApi {
    *  scale, so a harness can find blank/non-blank regions and compare a whole
    *  stamped footprint without a WS round-trip per tile. Read-only. */
   ntRect(sectionIndex: number, col: number, row: number, w: number, h: number): number[] | null;
+  /**
+   * The effects-scene library as the MODEL holds it — READ-ONLY, and the only
+   * way a harness can see what the Effects facet's controls actually did.
+   *
+   * Nothing about a scene is on screen except the form fields themselves, so a
+   * harness that only read the DOM would be checking that a `<select>` shows
+   * what it was told to show. `scenesJson()` returns the whole documents, so a
+   * row can assert on a field the form never touched (the property the codec's
+   * whole design turns on) — as a JSON STRING because CDP's returnByValue would
+   * otherwise flatten a `oneOf` union oddly across versions.
+   */
+  scenes(): { id: string; name: string | null; layers: number }[];
+  scenesJson(): string;
+  unreadableScenes(): { path: string; reason: string }[];
+  /** One section's `sceneRef` — what the assignment dropdown writes. */
+  sceneRef(sectionIndex: number): string | null;
 }
 
 interface CanvasProbeApi {
@@ -459,6 +475,16 @@ function installAeonProbe(): AeonProbeApi {
       for (let i = 0; i < c.nametable.length; i++) if (c.nametable[i] !== 0) nonzero++;
       return { name: c.name, widthTiles: c.widthTiles, heightTiles: c.heightTiles, nonzeroTiles: nonzero };
     },
+    scenes: () => (useProjectStore.getState().project?.effectsScenes.scenes ?? []).map((s) => ({
+      id: s.id,
+      name: typeof s.name === 'string' ? s.name : null,
+      layers: s.layers.length,
+    })),
+    scenesJson: () => JSON.stringify(useProjectStore.getState().project?.effectsScenes.scenes ?? []),
+    unreadableScenes: () =>
+      (useProjectStore.getState().project?.effectsScenes.unreadable ?? [])
+        .map((u) => ({ path: u.path, reason: u.reason })),
+    sceneRef: (sectionIndex) => section(sectionIndex)?.sceneRef ?? null,
     ntRect: (sectionIndex, col, row, w, h) => {
       const s = section(sectionIndex);
       if (!s) return null;

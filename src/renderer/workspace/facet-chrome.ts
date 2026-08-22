@@ -78,11 +78,17 @@ const NOTHING: FacetChrome = {
  *    facet exists precisely so a recolour can be judged against the act. It is
  *    on the list because the chip is LIVE there, which is the actual rule; a
  *    chip is dead chrome only where the canvas ignores it.
+ *  - `parallax` (the Effects lens, aeon-only) is view-only over the same
+ *    MapViewport, which is `palette`'s case exactly: nothing writes invisibly,
+ *    but the canvas reads the plane, so with no chip a plane left on BG shows
+ *    Plane B under a scene editor whose whole subject is how the two planes
+ *    scroll relative to each other.
  *
  * That leaves exactly one served facet off: `art`, whose canvas is a composer
  * under both engines and reads no plane at all.
  */
-const PLANE_GATED: readonly FacetCapability[] = ['layout', 'objects', 'rings', 'collision', 'palette'];
+const PLANE_GATED: readonly FacetCapability[] =
+  ['layout', 'objects', 'rings', 'collision', 'palette', 'parallax'];
 
 export function isPlaneGated(facet: FacetCapability): boolean {
   return PLANE_GATED.includes(facet);

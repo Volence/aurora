@@ -113,6 +113,48 @@ export const EDITOR_METHODS: EditorMethod[] = [
   { name: 'assign_section_bg', kind: 'assign-section-bg', result: 'json',
     params: { section: z.number().int().min(0), bgId: z.string().nullable().describe('BG library entry id, or null for the act default') },
     description: 'Assign which background a section displays: a BG library id, or null to revert to the act default. The viewport composites the assigned BG while that section is active. One undo step.' },
+  // ---- The effects arc, wave 1 -------------------------------------------
+  // One registry entry lights a capability up on BOTH MCP and Aether, so agent
+  // parity is a property of adding it here (this file's header, and ROADMAP §6's
+  // first amendment). There is no MCP-specific half to write.
+  { name: 'list_effects_scenes', kind: 'list-effects-scenes', result: 'json', params: {},
+    description: 'List the project\'s effects scenes (parallax/raster scene definition documents under '
+      + 'data/editor/effects/): each scene\'s id, name and layer count, plus which scene each section is '
+      + 'assigned to (sceneRef null = the act default). Also reports scene files that exist but could NOT '
+      + 'be read — those ids are unusable and Aurora will not overwrite them.' },
+  { name: 'get_effects_scene', kind: 'get-effects-scene', result: 'json',
+    params: { id: z.string().min(1).describe('scene id') },
+    description: 'Read one effects scene as its WHOLE document, exactly as it is on disk — including any '
+      + 'field this editor does not itself expose. Feed the result straight back to set_effects_scene.' },
+  { name: 'set_effects_scene', kind: 'set-effects-scene', result: 'json',
+    params: {
+      // THE ID PATTERN IS NOT RESTATED HERE. It lives in the contract schema
+      // (`^[a-z][a-z0-9_]{0,31}$`), the reader enforces it along with the
+      // filename-stem identity rule, and a second copy on this boundary could
+      // only drift from it. What the description owes an agent is the SHAPE of
+      // the rule and why it differs from a background id.
+      id: z.string().min(1)
+        .describe('scene id — lowercase letters, digits and underscores, starting with a letter, max 32. '
+          + 'It becomes part of generated .emp symbol names, so hyphens are NOT legal (unlike a background id).'),
+      scene: z.unknown().nullable()
+        .describe('the whole scene definition document (schema 1), or null to delete the scene. Its "id" '
+          + 'must equal the id parameter. Validated against the contract schema; an invalid document is '
+          + 'refused with the specific issues and nothing is written.'),
+    },
+    description: 'Create, replace or delete one effects scene. Takes the WHOLE document, not a field patch: '
+      + 'read the current one with get_effects_scene, change what you want, send it back. Fields this '
+      + 'editor does not expose survive because nothing enumerates them. One undo step. The document is '
+      + 'validated against the contract schema on the way in — layers 1..8, factors from the published '
+      + 'FACTOR_* set or a packed {s1,s2,op} triple, no unknown keys.' },
+  { name: 'assign_section_scene', kind: 'assign-section-scene', result: 'json',
+    params: {
+      section: z.number().int().min(0),
+      sceneId: z.string().nullable().describe('effects scene id, or null for the act default'),
+    },
+    description: 'Assign which effects scene a section uses (sceneRef in its meta sidecar): a scene id, or '
+      + 'null to fall back to the act default. One undo step. Refuses an id that is not a readable scene — '
+      + 'a ref the build cannot resolve is worse than no ref.' },
+
   { name: 'screenshot', kind: 'screenshot', result: 'image',
     params: { region: z.object({ x: z.number().int().min(0), y: z.number().int().min(0), w: z.number().int().min(1), h: z.number().int().min(1) }).optional(), showBg: z.boolean().optional().describe('render the background plane during capture') },
     description: 'PNG of the map canvas (current viewport). Optional region crop in canvas device pixels (not tile/world coords).' },

@@ -29,6 +29,7 @@ import { parseTiles } from '../../formats/tiles';
 import { parseBgTiles, normalizeBgLayout, BG_TILE_BASE_SLOT, BG_WIDTH } from '../../formats/bg-tiles';
 import { bgLibIndexPath, bgLibLayoutPath, bgLibTilesPath, parseBgLibraryIndex } from '../../formats/bg-library';
 import { parseSectionMeta } from '../../formats/section-meta';
+import { loadEffectsSceneLibrary } from '../../formats/effects/scene';
 import { buildPalette } from '../../formats/palette';
 import { parseNametable } from '../../formats/s4-nametable';
 import { parseCollAttr } from '../../formats/s4-collattr';
@@ -142,7 +143,14 @@ export async function loadAeonProject(fa: FileAccess, dir: string): Promise<Aeon
   const notices: string[] = [];
   const { project, legacyAtlasMerged } = await loadFullProject(fa, config, collisionProfiles, notices);
 
-  return { config, project, collisionProfiles, notices, legacyAtlasMerged };
+  // `scenes` is the SAME object as `project.effectsScenes`, deliberately — see
+  // AeonProjectData.scenes. Naming it at the handle level is what closes the
+  // model gap hazard 2 records; aliasing rather than copying is what keeps the
+  // two names from ever disagreeing.
+  return {
+    config, project, collisionProfiles, notices, legacyAtlasMerged,
+    scenes: project.effectsScenes,
+  };
 }
 
 /**
@@ -536,6 +544,17 @@ async function loadFullProject(
     }
   }
 
+  // The effects-scene library (empyrean AURORA_EFFECTS_SCHEMA.md §2). Loaded
+  // LAST and unconditionally: it depends on nothing above it, and an absent
+  // `{dataRoot}editor/effects/` is the ordinary "no editor scenes yet" answer
+  // rather than a failure — which today is the only answer any real aeon tree
+  // gives, because the directory does not exist there yet.
+  //
+  // Its notices join the project's, so an unreadable scene file surfaces as a
+  // toast on the same channel a truncated section sidecar does.
+  const effectsScenes = await loadEffectsSceneLibrary(fa, projectDataRoot(config.raw));
+  notices.push(...effectsScenes.notices);
+
   return {
     project: {
       name: config.name,
@@ -544,6 +563,7 @@ async function loadFullProject(
       chunkLibrary,
       bgLibrary,
       basePath,
+      effectsScenes,
     },
     legacyAtlasMerged,
   };

@@ -9,11 +9,13 @@ import { objectsFacet } from './facets/objects-facet';
 import { ringsFacet } from './facets/rings-facet';
 import { collisionFacet } from './facets/collision-facet';
 import { paletteFacet } from './facets/palette-facet';
+import { effectsFacet } from './facets/effects-facet';
 import { s1LayoutFacet, s1ObjectsFacet, s1CollisionFacet, s1PaletteFacet, s1ArtFacet } from './facets/s1-facets';
 
 export function registerAeonFacetModules(): void {
   registerBuiltinFacets();
-  for (const m of [layoutFacet, artFacet, objectsFacet, ringsFacet, collisionFacet, paletteFacet]) {
+  for (const m of [layoutFacet, artFacet, objectsFacet, ringsFacet, collisionFacet, paletteFacet,
+    effectsFacet]) {
     registerFacetModule(['aeon'], m);
   }
 }
