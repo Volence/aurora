@@ -1,0 +1,251 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://empyrean/contract/aurora-effects-scene.schema.json",
+  "title": "Aurora Effects — Scene Definition File (wave 1)",
+  "description": "Wire shape for one scene definition file, games/sonic4/data/editor/effects/<scene_id>.json (aeon repo, editor-owned tree). NORMATIVE for shape only — which keys exist, their JSON types and ranges; docs/AURORA_EFFECTS_SCHEMA.md is normative for semantics, and semantic validation of authored VALUES belongs to sigil: tools/effects_gen.py (aeon) emits generated .emp calling the scene DSL constructors, so every ensure and scene_budget_enforce fires on authored content at build time. CLOSED on the writer path (unevaluatedProperties: false, the bus request-path precedent): on this path the party validating is the party publishing what it writes; wave-2 keys (presets, effectsRef, variants, cycles, fires — reserved in the doc's section 7) enter by amending this schema, never by unilateral emission. Aurora's writer-side golden validates against this file and is pinned against BOTH repo SHAs (empyrean + aeon) per the doc's section 8.",
+  "$defs": {
+    "factor": {
+      "description": "A packed shift-add scroll factor (engine/level/parallax_dsl.emp). Either a published FACTOR_* const name emitted verbatim into the constructor call, or a custom packed() triple: s1=15 means term zero (locked), s2=15 means single-term, op 0=add / 1=subtract the second term.",
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "FACTOR_LOCKED", "FACTOR_0", "FACTOR_1", "FACTOR_1_2", "FACTOR_1_4",
+            "FACTOR_1_8", "FACTOR_1_16", "FACTOR_1_32", "FACTOR_3_4", "FACTOR_3_8",
+            "FACTOR_3_16", "FACTOR_5_8", "FACTOR_5_16", "FACTOR_7_8", "FACTOR_7_16",
+            "FACTOR_15_16"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "s1": { "type": "integer", "minimum": 0, "maximum": 15 },
+            "s2": { "type": "integer", "minimum": 0, "maximum": 15 },
+            "op": { "type": "integer", "enum": [0, 1] }
+          },
+          "required": ["s1", "s2", "op"],
+          "unevaluatedProperties": false
+        }
+      ]
+    },
+    "tableRef": {
+      "description": "A 256-byte signed deform/column table: a DSL generator call, or a raw .bin (path relative to games/sonic4/data/editor/effects/, no .. segments; baked via embed(), the inject_editor_bg precedent). No registry-symbol form in wave 1 (deliberate; see doc section 2.4).",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "generator": { "const": "sine" },
+            "amplitude": { "type": "integer", "minimum": 1, "maximum": 127 },
+            "period": { "type": "integer", "minimum": 1, "maximum": 256 }
+          },
+          "required": ["generator", "amplitude", "period"],
+          "unevaluatedProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "generator": { "const": "triangle" },
+            "amplitude": { "type": "integer", "minimum": 1, "maximum": 127 },
+            "period": { "type": "integer", "minimum": 1, "maximum": 256 }
+          },
+          "required": ["generator", "amplitude", "period"],
+          "unevaluatedProperties": false
+        },
+        {
+          "type": "object",
+          "properties": { "generator": { "const": "zero" } },
+          "required": ["generator"],
+          "unevaluatedProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "generator": { "const": "v_column_perspective" },
+            "focal": { "type": "integer" },
+            "max_offset": { "type": "integer" }
+          },
+          "required": ["generator", "focal", "max_offset"],
+          "unevaluatedProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "generator": { "const": "v_column_floor" },
+            "center": { "type": "integer" },
+            "max_offset": { "type": "integer" }
+          },
+          "required": ["generator", "center", "max_offset"],
+          "unevaluatedProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "bin": { "type": "string", "pattern": "^(?!.*\\.\\.)[A-Za-z0-9_./-]+\\.bin$" }
+          },
+          "required": ["bin"],
+          "unevaluatedProperties": false
+        }
+      ]
+    },
+    "layerDeform": {
+      "description": "Per-layer H-deform attachment (SceneDeform at layer level): \"none\" or Own(table, shift_a, shift_b, phase, speed). When own is present the layer's dsa/dsb/phase must be absent or at defaults — they lower into the same record fields (two-sources guard; sigil enforces).",
+      "oneOf": [
+        { "const": "none" },
+        {
+          "type": "object",
+          "properties": {
+            "own": {
+              "type": "object",
+              "properties": {
+                "table": { "$ref": "#/$defs/tableRef" },
+                "shift_a": { "type": "integer", "minimum": 0, "maximum": 15 },
+                "shift_b": { "type": "integer", "minimum": 0, "maximum": 15 },
+                "phase": { "type": "integer", "minimum": 0, "maximum": 255 },
+                "speed": { "type": "integer" }
+              },
+              "required": ["table", "shift_a", "shift_b", "phase", "speed"],
+              "unevaluatedProperties": false
+            }
+          },
+          "required": ["own"],
+          "unevaluatedProperties": false
+        }
+      ]
+    },
+    "sceneDeform": {
+      "description": "Scene-level shared H-deform attachment (SceneDeform.Shared): \"none\" or one table both planes sample.",
+      "oneOf": [
+        { "const": "none" },
+        {
+          "type": "object",
+          "properties": {
+            "shared": {
+              "type": "object",
+              "properties": {
+                "table": { "$ref": "#/$defs/tableRef" },
+                "speed": { "type": "integer" }
+              },
+              "required": ["table", "speed"],
+              "unevaluatedProperties": false
+            }
+          },
+          "required": ["shared"],
+          "unevaluatedProperties": false
+        }
+      ]
+    },
+    "layer": {
+      "type": "object",
+      "properties": {
+        "world_y": { "type": "integer", "minimum": 0, "maximum": 32767 },
+        "fa": { "$ref": "#/$defs/factor" },
+        "fb": { "$ref": "#/$defs/factor" },
+        "dsa": { "type": "integer", "minimum": 0, "maximum": 15, "default": 15 },
+        "dsb": { "type": "integer", "minimum": 0, "maximum": 15, "default": 15 },
+        "phase": { "type": "integer", "minimum": 0, "maximum": 255, "default": 0 },
+        "enabled": { "type": "boolean", "default": true },
+        "deform": { "$ref": "#/$defs/layerDeform", "default": "none" },
+        "curve": {
+          "oneOf": [
+            { "const": "none" },
+            {
+              "type": "object",
+              "properties": { "to": { "$ref": "#/$defs/factor" } },
+              "required": ["to"],
+              "unevaluatedProperties": false
+            }
+          ],
+          "default": "none"
+        },
+        "vsplit": {
+          "oneOf": [
+            { "const": "none" },
+            {
+              "type": "object",
+              "properties": { "at": { "type": "integer", "minimum": 0, "maximum": 511 } },
+              "required": ["at"],
+              "unevaluatedProperties": false
+            }
+          ],
+          "default": "none"
+        }
+      },
+      "required": ["world_y", "fa", "fb"],
+      "unevaluatedProperties": false
+    }
+  },
+  "type": "object",
+  "properties": {
+    "schema": { "const": 1 },
+    "id": { "type": "string", "pattern": "^[a-z][a-z0-9_]{0,31}$" },
+    "name": { "type": "string" },
+    "layers": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/layer" },
+      "minItems": 1,
+      "maxItems": 8
+    },
+    "v_factor": { "$ref": "#/$defs/factor" },
+    "v_center": { "type": "integer", "default": 0 },
+    "v_offset": { "type": "integer", "default": 0 },
+    "v_factor_fg": { "$ref": "#/$defs/factor" },
+    "deform_fg": { "$ref": "#/$defs/sceneDeform", "default": "none" },
+    "deform_bg": { "$ref": "#/$defs/sceneDeform", "default": "none" },
+    "v_deform": {
+      "oneOf": [
+        { "const": "none" },
+        {
+          "type": "object",
+          "properties": {
+            "columns": {
+              "type": "object",
+              "properties": {
+                "table": { "$ref": "#/$defs/tableRef" },
+                "speed": { "type": "integer" },
+                "amp_shift": { "type": "integer", "minimum": 0, "maximum": 15 }
+              },
+              "required": ["table", "speed", "amp_shift"],
+              "unevaluatedProperties": false
+            }
+          },
+          "required": ["columns"],
+          "unevaluatedProperties": false
+        }
+      ],
+      "default": "none"
+    },
+    "anchor": {
+      "oneOf": [
+        { "const": "none" },
+        {
+          "type": "object",
+          "properties": {
+            "at": {
+              "type": "object",
+              "properties": {
+                "channel": { "type": "integer", "minimum": 0, "maximum": 3 },
+                "dsa": { "type": "integer", "minimum": 0, "maximum": 15 },
+                "dsb": { "type": "integer", "minimum": 0, "maximum": 15 }
+              },
+              "required": ["channel", "dsa", "dsb"],
+              "unevaluatedProperties": false
+            }
+          },
+          "required": ["at"],
+          "unevaluatedProperties": false
+        }
+      ],
+      "default": "none"
+    },
+    "left_column_mask": {
+      "type": "string",
+      "enum": ["undeclared", "sprite_mask", "factor0_lock", "accept"],
+      "default": "undeclared"
+    },
+    "precision": { "type": "string", "enum": ["cell", "line"], "default": "cell" },
+    "transition": { "type": "string", "enum": ["smooth", "instant"], "default": "smooth" },
+    "budget_class": { "type": "string" }
+  },
+  "required": ["schema", "id", "layers", "v_factor"],
+  "unevaluatedProperties": false
+}
