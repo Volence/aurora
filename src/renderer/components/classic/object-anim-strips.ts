@@ -165,10 +165,23 @@ export async function loadObjectAnimStrips(
       // A fully transparent frame still gets a bitmap: some anims legitimately
       // hold a blank frame (SBZ vanishing platform's vanish phase) and drawing
       // nothing there IS the engine-faithful preview.
+      //
+      // priBitmap: the hi-pri-pieces-only companion, per FRAME — so occlusion
+      // composes with animation (a frame that carries a priority piece keeps
+      // exactly that frame's hi-pri pixels above the map while it shows).
+      let priBitmap: ImageBitmap | null = null;
+      if (rendered.priMask && rendered.priMask.some((v) => v !== 0)) {
+        const priRgba = new Uint8ClampedArray(rgba);
+        for (let i = 0; i < rendered.priMask.length; i++) {
+          if (rendered.priMask[i] === 0) priRgba[i * 4 + 3] = 0;
+        }
+        priBitmap = await createImageBitmap(new ImageData(priRgba, rendered.width, rendered.height));
+      }
       frames.set(step.frame, {
         bitmap: await createImageBitmap(img),
         width: rendered.width, height: rendered.height,
         originX: rendered.originX, originY: rendered.originY,
+        priBitmap,
       });
     }
     if (frames.size === 0) continue;
@@ -186,5 +199,5 @@ export function stripStateKey(strips: StripMap, t: number): string {
 
 /** Close every bitmap in a strip map (on replace/unmount). */
 export function closeStrips(strips: StripMap): void {
-  for (const s of strips.values()) for (const f of s.frames.values()) f.bitmap.close();
+  for (const s of strips.values()) for (const f of s.frames.values()) { f.bitmap.close(); f.priBitmap?.close(); }
 }

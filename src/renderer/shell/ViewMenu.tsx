@@ -8,6 +8,7 @@ const LABELS: Record<string, string> = {
   showCollision: 'Collision (path A)', showCollisionPathB: 'Collision (path B)',
   showCollisionAngles: 'Collision angles', showStart: 'Player start',
   showPriority: 'Priority (above sprites)',
+  occludeSprites: 'Sprite occlusion (game order)',
   // One toggle plays BOTH animated halves: level-art families AND the curated
   // object previews (rings spin, badniks walk) — they share one clock.
   playAnimatedArt: 'Play animations',
