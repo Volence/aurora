@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, existsSync } from 'fs';
 import { join } from 'path';
 import { parseS1DisasmAnimScript } from '../../src/core/import/anim-import';
+import { parseSonicAnimTable } from '../../src/core/import/sonic-anim-import';
 import type { AnimFrame } from '../../src/core/import/anim-import';
 import { S1_OBJECT_ANIMS } from '../../src/core/project/profiles/s1-object-anims';
 
@@ -177,12 +178,31 @@ describe('S1_OBJECT_ANIMS links resolve against the real tree', () => {
     }
     const path = join('/home/volence/sonic_hacks/s1disasm', link.animAsm);
     expect(existsSync(path), `${link.animAsm} missing on disk`).toBe(true);
+    if (link.dialect === 'sonic') {
+      // Sonic's row parses with the DEDICATED sonani parser (the general one
+      // refuses this dialect by design — audit §1.4). Deep round-trip coverage
+      // lives in src/core/import/__tests__/sonic-anim-import.test.ts.
+      const parse = parseSonicAnimTable(readFileSync(path, 'utf8'));
+      expect(parse.problems, `${link.animAsm}: sonani parse problems`).toEqual([]);
+      expect(parse.entries.length, `${link.animAsm}: zero animations`).toBeGreaterThanOrEqual(1);
+      return;
+    }
     const { anims, problems } = parseS1DisasmAnimScript(readFileSync(path, 'utf8'));
     expect(problems, `${link.animAsm}: parse problems`).toEqual([]);
     expect(anims.length, `${link.animAsm}: zero animations`).toBeGreaterThanOrEqual(1);
   });
 
-  it('never links _anim/Sonic.asm (different dialect, excluded by design)', () => {
-    for (const [, link] of entries) expect(link.animAsm).not.toBe('_anim/Sonic.asm');
+  it('links _anim/Sonic.asm ONLY through the sonic dialect (never the general parser)', () => {
+    // The sonani parcel un-excluded Sonic ($01): his row must carry
+    // dialect: 'sonic' so the checkout routes to the dedicated parser, and no
+    // dialect-less row may point the general parser at the Sonic file.
+    for (const [id, link] of entries) {
+      if (link.animAsm === '_anim/Sonic.asm') {
+        expect(Number(id), 'only Sonic links the sonani file').toBe(0x01);
+        expect(link.dialect).toBe('sonic');
+      } else {
+        expect(link.dialect, `id ${id}: dialect is reserved for the Sonic file`).toBeUndefined();
+      }
+    }
   });
 });

@@ -22,6 +22,7 @@ import { useArtStore } from './state/artStore';
 import { useCanvasStore } from './state/canvasStore';
 import { useSpriteStore } from './state/spriteStore';
 import { useToastStore } from './state/toastStore';
+import { useSonicPreviewStore } from './state/sonicPreviewStore';
 import { confirmProjectOpen } from './shell/project-open-guard';
 import { activateLevelTarget } from './shell/tab-activation';
 import { levelDocId } from './shell/tabs';
@@ -601,7 +602,12 @@ interface DebugApi {
   spriteState(): {
     activeDocId: string | null;
     frames: number;
-    anims: { name: string; synced?: boolean; note?: string; steps: { frameIndex: number; duration: number; xFlip?: boolean; yFlip?: boolean }[] }[];
+    anims: {
+      name: string; synced?: boolean; note?: string;
+      /** Sonic special-script entries: the Sonic_Animate mode (walkrun/roll/push). */
+      dynamic?: string;
+      steps: { frameIndex: number; duration: number; xFlip?: boolean; yFlip?: boolean }[];
+    }[];
     steps: { frameIndex: number; duration: number; xFlip?: boolean; yFlip?: boolean }[];
     unsavedEdits: boolean;
     /** Shared frame canvas size (every frame is the same buffer size). */
@@ -651,6 +657,27 @@ interface DebugApi {
     refusal: string | null;
     unsavedEdits: boolean;
   };
+  /**
+   * The Sonic dynamic-preview surface: which special anim the timeline has
+   * active, the scrubbed interpreter inputs, and the LAST published sample —
+   * `sample.hold`+1 is the cadence in editor ticks, `sample.tick` advances
+   * while the preview is live (poll twice to prove liveness).
+   */
+  sonicPreview(): {
+    active: boolean;
+    name: string | null;
+    mode: string | null;
+    inertia: number;
+    angle: number;
+    xflip: boolean;
+    sample: { tick: number; frame: number; xFlip: boolean; yFlip: boolean; variant: string; hold: number } | null;
+  };
+  /**
+   * Scrub the dynamic preview's inputs through the SAME store setters the
+   * sliders call (deterministic seam under the slider, same rationale as
+   * spritePaint under the canvas). Omitted fields are left untouched.
+   */
+  sonicScrub(v: { inertia?: number; angle?: number; xflip?: boolean }): void;
   /** Currently-visible toast messages (they expire — poll while waiting). */
   toasts(): { message: string; type: string }[];
 }
@@ -725,7 +752,11 @@ export function installDebugHooks(): void {
       return {
         activeDocId: s.activeDocId,
         frames: s.frames.length,
-        anims: s.characterAnims.map((a) => ({ name: a.name, synced: a.synced, note: a.note, steps: a.steps.map((st) => ({ ...st })) })),
+        anims: s.characterAnims.map((a) => ({
+          name: a.name, synced: a.synced, note: a.note,
+          dynamic: a.dynamic?.mode,
+          steps: a.steps.map((st) => ({ ...st })),
+        })),
         steps: s.steps.map((st) => ({ ...st })),
         unsavedEdits: s.unsavedEdits,
         frameW: s.frames[0]?.width ?? 0,
@@ -762,6 +793,24 @@ export function installDebugHooks(): void {
         refusal: s.saveBackRefusal,
         unsavedEdits: s.unsavedEdits,
       };
+    },
+    sonicPreview: () => {
+      const s = useSonicPreviewStore.getState();
+      return {
+        active: s.active !== null,
+        name: s.active?.name ?? null,
+        mode: s.active?.mode ?? null,
+        inertia: s.inertia,
+        angle: s.angle,
+        xflip: s.xflip,
+        sample: s.sample ? { ...s.sample } : null,
+      };
+    },
+    sonicScrub: (v) => {
+      const s = useSonicPreviewStore.getState();
+      if (v.inertia !== undefined) s.setInertia(v.inertia);
+      if (v.angle !== undefined) s.setAngle(v.angle);
+      if (v.xflip !== undefined) s.setXflip(v.xflip);
     },
     toasts: () => useToastStore.getState().toasts.map((t) => ({ message: t.message, type: t.type })),
   };
