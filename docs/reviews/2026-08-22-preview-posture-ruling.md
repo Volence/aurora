@@ -114,6 +114,44 @@ relates editor viewport coordinates to act world pixels — not from a fresh con
 band-preview parcel must state the derivation and test it; the "labeled-approximate"
 posture does **not** cover a wrong camera mapping.
 
+### 4a. The coordinate authority — answered by the aeon overseer, verified here
+
+Asked across the fence rather than reconstructed. Answer received and **re-verified
+firsthand against aeon's tree** (§5b); aeon's spec correction is `c1cee0a4` (docs-only,
+1 file / 20 insertions — correct class for the docs correction it anchors).
+
+**`Camera_X`/`Camera_Y` are the camera's LEFT/TOP EDGE in world pixels, measured from the
+ACT ORIGIN (0,0), with no bias of any kind.** Cite `aeon/docs/ENGINE_ARCHITECTURE.md:2244`
+as the authority, not the peer message:
+
+> `Camera_X/Y` and player positions are 16.16 **world** coordinates running
+> `0 … level extent`. There is no bounded engine space, no `$200`/`SLOT_ORIGIN` bias, and
+> nothing shifts under the player as it scrolls.
+
+**The clamp is what proves "edge" rather than "centre"** — and it is the detail to build
+the mapping on. `Camera_X_Max = (grid_w << SECTION_SIZE_SHIFT) - SCREEN_WIDTH`
+(`engine/ram.emp:681`; `SCREEN_WIDTH = 320` at `engine/system/constants.emp:388`), stated
+in `ENGINE_ARCHITECTURE.md:2255` as `[0, level_width − SCREEN_W]`. A centre-referenced
+camera would clamp to `level_width − SCREEN_W/2`. Unbiased, left/top edge, act origin.
+
+Two mechanical details a faithful derivation must get right:
+
+1. **The band consumes the INTEGER pixel, from the 16.16 HIGH word.** `bg_anim.emp:144` is
+   `move.w Camera_X, d0` on a `u32` 16.16 cell — on big-endian 68000 that word read takes
+   the upper half. **Sub-pixel camera motion does not advance a band at all**; phase
+   changes only on whole-pixel movement. **Truncate to integer BEFORE `>> rate_shift`** —
+   truncating after the shift smears phase across sub-pixel pans.
+2. **`Camera_X_Biased` (`ram.emp:661`) is a DIFFERENT quantity** — the integer minus the
+   VDP +128 SAT offset, for sprite emission. **Do not map `vpX` onto it.** It is not what
+   the band reads, and it is the near-miss a reconstruction would plausibly land on.
+
+So: `world_px = f(vpX, zoom, editor_origin)` yielding an unbiased world-pixel left edge,
+integer-truncated, then `>> rate_shift`, then `& step_mask`. Aurora's existing authority
+for the editor-to-world half is `sectionRenderer.sectionWorldOffset(i)` (used in
+`MapViewport.tsx`'s draw pass) together with `SECTION_SIZE = $800 = 2048px`
+(`ENGINE_ARCHITECTURE.md:2244`'s fixed world ranges) — **derive from those, do not
+introduce a parallel constant.**
+
 ## 5. Verified firsthand by the overseer before banking
 
 - `aeon/engine/level/bg_anim.emp` — the three drivers, their record offsets, the runtime
@@ -126,6 +164,25 @@ posture does **not** cover a wrong camera mapping.
 - The decider reported grep counts (0 rAF in `MapViewport`, 4 in `ClassicLevelViewport`),
   `viewStore.ts:52-56` s1-scoping, and `RECOMPOSE_DIRTY_THRESHOLD = 2000` — all consistent
   with the item-9 measurement, which established them independently.
+
+### 5b. The peer's coordinate answer, verified rather than taken on trust
+
+Per the protocol's verify-the-peer's-claims bar. All five cites re-read in aeon's tree:
+
+- `ENGINE_ARCHITECTURE.md:2244` — quoted text present **verbatim**, including the explicit
+  "no `$200`/`SLOT_ORIGIN` bias". ✅
+- `ENGINE_ARCHITECTURE.md:2255` — clamp stated as `[0, level_width − SCREEN_W]`. ✅
+- `engine/ram.emp:681` — `Camera_X_Max` comment reads
+  `(grid_w << SECTION_SIZE_SHIFT) - SCREEN_WIDTH`. ✅
+- `engine/system/constants.emp:388` — `SCREEN_WIDTH = 320`. ✅
+- `engine/ram.emp:661` — `Camera_X_Biased: u16, // Camera_X(int) - VDP_SPRITE_X_OFFSET`,
+  confirmed a distinct cell from `Camera_X: u32`. ✅
+
+**The clamp argument is the load-bearing one and it holds**: clamping to
+`level_width − SCREEN_W` is only consistent with an edge-referenced camera; a
+centre-referenced one clamps to `level_width − SCREEN_W/2`. This is a derivation from the
+engine's own constant, not an assertion about it — which is why it is the fact to build
+on rather than the prose.
 
 ## 6. Tagged for a foreground pass (agents cannot run these)
 
