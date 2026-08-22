@@ -73,7 +73,12 @@ until that doc is refreshed — trust `aeon/structs.asm` + the 2026-07-02 specs)
   S4LZ v3 with per-section dictionaries. Camera bounds are grid-derived, not authored.
 - Editor-owned inputs the build already consumes: `section_{N}.tiles.bin`,
   `.collattr.bin`/`.collattrb.bin`, `objects.json`, `rings.json`, `meta.json`,
-  `data/editor/{zone}_tiles.bin`, BG library + `editor_bg_override.json`.
+  `data/editor/{zone}_tiles.bin`, BG library. ⚠ **Corrected 2026-08-22:**
+  `editor_bg_override.json` was listed here and is NOT Aurora-owned — it has
+  **zero references in `src/`** and is produced by aeon's own
+  `tools/png_to_bg_override.py`. Load-bearing for the effects arc: wave 1's
+  BgAnim bands ride that file's `anims` key, so Aurora must **become a writer of
+  a file it has never touched** — not extend a path it already owns.
 - Coming from the design week: `section_id` widens byte→word (floating origin, #2);
   per-act ROM budget gates (#1); an engine/game split with a game manifest (#5).
 
@@ -630,7 +635,7 @@ what is actually being built. **P2 — the playtest loop — is next.**
 
 | # | Work | Size | Source |
 |---|---|---|---|
-| 7 | ~~**Priority-aware object previews + occlusion ghost**~~ — **DONE 2026-08-21 (classic/S1)**, merge `feat/s1-priority-occlusion`: per-pixel compositor (map wins iff hi tile ∧ opaque ∧ low sprite piece; piece pri = attrs bit 15), violet-wash ghost at 0.4α riding the same "Sprite occlusion (game order)" toggle (default ON), MZ animated hi-pri cells re-patched per play-tick, 0.18ms avg pass. Harness 30/30 (found the owner's exact monitor, GHZ1 $26). **Still open: the aeon viewport half** — no priority-mask derivation exists there yet; re-book when aeon previews grow occlusion needs. Original booking:  In the map viewport, object previews composite above ALL map tiles; the VDP draws high-priority plane tiles in front of low-priority sprites (owner screenshot: an invincibility monitor rendered in front of GHZ tree leaves it should sit behind). Add a third compositing pass — high-priority map-tile pixels re-drawn above the object layer, honoring each sprite piece's own priority bit from its mappings — and a ghost affordance (occluded portion drawn translucent/outlined) so hidden objects stay discoverable and selectable. The priority lens (`337d2d3`) already derives the per-tile priority mask; reuse it. Applies to both engines' viewports where object previews exist. | S–M | owner, 2026-08-21 |
+| 7 | ~~**Priority-aware object previews + occlusion ghost**~~ — **DONE 2026-08-21 (classic/S1)**, merge `feat/s1-priority-occlusion`: per-pixel compositor (map wins iff hi tile ∧ opaque ∧ low sprite piece; piece pri = attrs bit 15), violet-wash ghost at 0.4α riding the same "Sprite occlusion (game order)" toggle (default ON), MZ animated hi-pri cells re-patched per play-tick. Harness 30/30, and what it **guards** is `avg < 5ms` (`s1-priority-occlusion-harness.mjs:620`) — the 0.18ms figure once quoted here was a single observation, never an assertion, and is not a held property (corrected 2026-08-22) (found the owner's exact monitor, GHZ1 $26). **Still open: the aeon viewport half** — no priority-mask derivation exists there yet; re-book when aeon previews grow occlusion needs. Original booking:  In the map viewport, object previews composite above ALL map tiles; the VDP draws high-priority plane tiles in front of low-priority sprites (owner screenshot: an invincibility monitor rendered in front of GHZ tree leaves it should sit behind). Add a third compositing pass — high-priority map-tile pixels re-drawn above the object layer, honoring each sprite piece's own priority bit from its mappings — and a ghost affordance (occluded portion drawn translucent/outlined) so hidden objects stay discoverable and selectable. The priority lens (`337d2d3`) already derives the per-tile priority mask; reuse it. Applies to both engines' viewports where object previews exist. | S–M | owner, 2026-08-21 |
 
 ⚠ **Item 1 is the first phase that needs the emulator.** Background agents must never call
 `mcp__oracle__*` — they deadlock. Runtime work goes in a CDP / foreground harness the
