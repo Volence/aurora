@@ -13,7 +13,7 @@
 // not move.
 
 import React from 'react';
-import { T, Panel, CollapsibleSection, Select, NumberField, Chip, IconButton } from '../ui';
+import { T, Panel, SectionBody, CollapsibleSection, Select, NumberField, Chip, IconButton } from '../ui';
 import { useProjectStore, getActiveLevel } from '../../state/projectStore';
 import { useEditorStore, executeCommand } from '../../state/editorStore';
 import { useHistoryVersion } from '../../hooks/useHistoryVersion';
@@ -37,6 +37,30 @@ const label: React.CSSProperties = {
 };
 const note: React.CSSProperties = { fontSize: T.tXs, color: T.textLo, lineHeight: 1.5 };
 const warn: React.CSSProperties = { ...note, color: T.warning };
+
+/**
+ * A `variant="list"` section's body, WITH THE SCROLLER THE MODEL REQUIRES.
+ *
+ * ui/CollapsibleSection's own docblock says a list section "takes an equal share
+ * of whatever the content sections leave and scrolls inside it" — the scrolling
+ * half is the panel's job, and this panel never did it. Measured on the CDP
+ * harness (rows 11d/11e), the consequence at eight layers with every packed
+ * factor form open is 1232px of layer cards inside a 306px section, drawn with
+ * `overflow: visible` straight over the SECTION ASSIGNMENT rows beneath them.
+ * Not a density opinion — overlapping text.
+ *
+ * `minHeight: 0` comes from SectionBody, which is what lets the section's share
+ * actually bind (the same line Panel needs, one level down). No number of its
+ * own: the ceiling arrives from the column, exactly as ChunkGrid's and
+ * ObjectList's do.
+ *
+ * NOTHING IN THE NODE SUITE SEES THIS. panel-scrollers.test.ts's derivation
+ * walks `<CollapsibleSection><Child` inside FACET modules, and effects-facet
+ * mounts `<EffectsScenePanel />` straight under `<Panel>` — so all four of this
+ * panel's titled sections, both list variants included, are invisible to that
+ * guard and to panel-headings' beside it. That gap is its own booking.
+ */
+const LIST_BODY: React.CSSProperties = { overflowY: 'auto' };
 
 /**
  * Run a command on the focused aeon document, or do nothing when the provider
@@ -126,6 +150,7 @@ export default function EffectsScenePanel(): React.ReactElement {
   return (
     <>
       <CollapsibleSection id="aeon.effects.scenes" title="Scenes" variant="list">
+       <SectionBody style={LIST_BODY}>
         {entries.length === 0 && (
           <div style={note}>
             No effects scenes yet. A scene is one file under
@@ -168,12 +193,14 @@ export default function EffectsScenePanel(): React.ReactElement {
           <Chip onClick={create} disabled={newId.trim() === ''}>New</Chip>
         </div>
         {refusal && <div style={warn}>{refusal}</div>}
+       </SectionBody>
       </CollapsibleSection>
 
       {selected && (
         <CollapsibleSection id="aeon.effects.scene" title={`Scene — ${selected.id}`}
           right={<IconButton icon={<span>Delete</span>} label={`Delete scene ${selected.id}`}
             onClick={() => run(deleteSceneCommand(library, selected.id))} />}>
+         <SectionBody>
           <div style={row}>
             <span style={label}>Name</span>
             <input value={typeof selected.name === 'string' ? selected.name : ''}
@@ -218,6 +245,7 @@ export default function EffectsScenePanel(): React.ReactElement {
               {SCENE_FORM_CHOICES.transition.map((t) => <option key={t} value={t}>{t}</option>)}
             </Select>
           </div>
+         </SectionBody>
         </CollapsibleSection>
       )}
 
@@ -227,6 +255,7 @@ export default function EffectsScenePanel(): React.ReactElement {
           right={<IconButton icon={<span>Add</span>} label="Add layer"
             disabled={selected.layers.length >= EFFECTS_LAYER_COUNT.max}
             onClick={() => run(addLayerCommand(library, selected.id))} />}>
+         <SectionBody style={LIST_BODY}>
           {selected.layers.map((layer, i) => (
             <div key={i} style={{
               border: `1px solid ${T.border}`, borderRadius: T.rMd,
@@ -260,10 +289,12 @@ export default function EffectsScenePanel(): React.ReactElement {
               </div>
             </div>
           ))}
+         </SectionBody>
         </CollapsibleSection>
       )}
 
       <CollapsibleSection id="aeon.effects.assign" title="Section assignment">
+       <SectionBody>
         {!section ? (
           <div style={note}>Section {activeSectionIndex} is empty — nothing to assign a scene to.</div>
         ) : (
@@ -287,6 +318,7 @@ export default function EffectsScenePanel(): React.ReactElement {
             </div>
           </>
         )}
+       </SectionBody>
       </CollapsibleSection>
     </>
   );

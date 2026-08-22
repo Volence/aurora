@@ -40,11 +40,46 @@ export function Panel({ children, width, scroll = false, style }: {
   );
 }
 
+/**
+ * THE HORIZONTAL INSET EVERY DOCK IN THIS SHELL DRAWS ITS CHROME AT.
+ *
+ * It already existed as a number typed into PanelHeader (`${T.s2} ${T.s4}`) and
+ * nowhere else, which is why a panel that renders its own body content had
+ * nothing to derive an inset FROM: the Effects panel's inputs and selects ran
+ * flush to x = the window's right edge because no shared thing said where the
+ * edge was. Named here so a body and the header above it cannot come apart, and
+ * so the value is a token rather than a pixel someone re-types.
+ */
+export const PANEL_INSET = T.s4;
+
+/**
+ * A section's body, inset to match the header directly above it.
+ *
+ * NOT folded into CollapsibleSection, deliberately: most panels in this tree
+ * already pad themselves (CollisionPalette, RingPatternPalette, ArtBrowser,
+ * PropertiesPanel all set their own `padding`), so an inset applied by the
+ * section would double up on every one of them. A panel opts in.
+ *
+ * `minHeight: 0` + `flex: 1 1 auto` so a body inside a `variant="list"` section
+ * still divides the column the way the section's own children used to — the
+ * wrapper must be transparent to the flex model, not a new box in it.
+ */
+export function SectionBody({ children, style }: {
+  children: React.ReactNode; style?: React.CSSProperties;
+}) {
+  return (
+    <div style={{
+      display: 'flex', flexDirection: 'column', minHeight: 0, flex: '1 1 auto',
+      padding: `0 ${PANEL_INSET} ${PANEL_INSET}`, ...style,
+    }}>{children}</div>
+  );
+}
+
 export function PanelHeader({ children, right }: { children: React.ReactNode; right?: React.ReactNode }) {
   return (
     <div style={{
       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-      padding: `${T.s2} ${T.s4}`, fontSize: T.t2xs, fontWeight: T.wSemibold, color: T.textLo,
+      padding: `${T.s2} ${PANEL_INSET}`, fontSize: T.t2xs, fontWeight: T.wSemibold, color: T.textLo,
       textTransform: 'uppercase', letterSpacing: 1, borderBottom: `1px solid ${T.border}`,
     }}>
       <span>{children}</span>{right}
