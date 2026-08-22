@@ -39,7 +39,7 @@ const PROJECT_JSON = {
     acts: [{
       id: 'act1', gridWidth: 1, gridHeight: 1,
       dataPath: 'data/ojz/act1/',
-      bgLayout: '', bgTiles: '', parallax: null,
+      bgLayout: '', bgTiles: '', sceneRef: null,
       startPosition: { secX: 0, secY: 0, localX: 64, localY: 64 },
     }],
   }],

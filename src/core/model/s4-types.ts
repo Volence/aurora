@@ -245,7 +245,27 @@ export interface Act {
   startPosition: { secX: number; secY: number; localX: number; localY: number };
   bgLayout: Uint16Array | null;
   bgTiles: Tile[] | null;
-  parallaxRef: string | null;
+  /**
+   * The act's DEFAULT effects scene: null = no editor assignment, which leaves
+   * the engine's hand-authored `act_parallax_config` (act_descriptor.emp)
+   * standing untouched; else an id from the editor effects library, the same id
+   * space `Section.sceneRef` draws from.
+   *
+   * Read from the act entry's `sceneRef` in project.json (empyrean
+   * AURORA_EFFECTS_SCHEMA.md §4, aeon `7bff8488`). `null` and ABSENT mean the
+   * same thing and the loader collapses them.
+   *
+   * NOT a file path. This field used to be `parallaxRef`, carrying project.json's
+   * `parallax` key — a path to a .asm file. aeon deleted that key and replaced it
+   * with `sceneRef` in one edit, no interim fossil, and the contract renamed the
+   * reader rather than re-valuing it precisely so that no reader can mistake a
+   * scene id for a path.
+   *
+   * Aurora does not WRITE this key. The save re-serialises the raw parsed
+   * project.json (`LoadedS4Config.raw`), so whatever aeon put here round-trips
+   * untouched; there is no act-level assignment UI yet.
+   */
+  sceneRef: string | null;
 }
 
 export interface Zone {
