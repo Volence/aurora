@@ -32,5 +32,22 @@
     "typescript": "^6.0.2",
     "vite": "^8.0.8",
     "vitest": "^4.1.4"
+  },
+  "//overrides": [
+    "electron-vite@5 (the newest stable) declares a peer of vite@^5 || ^6 || ^7, so a plain",
+    "`npm install` or `npm ci` on this repo dies with ERESOLVE against our vite@8.",
+    "This override asserts a narrow, empirical claim: THIS combination — vite 8 +",
+    "electron-vite 5 + @vitejs/plugin-react 6 — is the tree we already run. It is what",
+    "`npm run dev`, `npm run build`, `npm run preview` and `npm test` all use today, and it",
+    "passes the full vitest suite. It is NOT a claim that electron-vite 5 is compatible with",
+    "vite 8 in general; only that nothing Aurora exercises is broken by the gap.",
+    "REMOVAL CONDITION: electron-vite 6 (currently 6.0.0-beta.1) widens the peer to include",
+    "^8.0.0. When electron-vite@6 ships stable, bump the dependency and DELETE this override",
+    "and this note. Recheck with: npm view electron-vite dist-tags"
+  ],
+  "overrides": {
+    "electron-vite": {
+      "vite": "$vite"
+    }
   }
 }
