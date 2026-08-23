@@ -70,6 +70,37 @@ stale one was the more actionable of the pair. Nothing was wrong with either row
 written. The landing step that closes an item is *replace the row*, never *add the outcome
 beside it*.
 
+## Owner state — never record an approval whose granting act you have not seen
+
+*(Added 2026-08-22, raised by the empyrean lane after two lanes hit it the same day by
+different mechanisms; audited here and Aurora had two instances.)*
+
+**Aurora has no Log. The queue ROW is the log**, which changes the failure's shape rather
+than sparing this repo: elsewhere the defect is an owner ruling landing in a Log's middle
+where head-and-tail boot reading never looks; here a row accretes its whole history in one
+line, so a **stale label at the FRONT of the row survives every later correction appended
+to its back.** The front is what a scanning session reads.
+
+Both instances found in one audit:
+
+- **Item 14 said PARKED FOR THE OWNER and was closed by a dispatched decision agent.** The
+  outcome was defensible — facts re-verified firsthand, then discharged in code across the
+  fence at aeon `bd31e133` — but the label claimed an authority the closure never had, and
+  the half that genuinely was the owner's had been reserved by the ruling and left open.
+  **A decision ratified by implementation is stronger than one asserted, and still is not
+  an approval.**
+- **Item 19 recorded "the owner ran the harness and confirmed it"** — reported by the
+  session that wrote the sentence, leaving no repo artifact, unverifiable by any later
+  session. Left in place and flagged rather than deleted or re-asserted, because the row's
+  authority is its measurements, which are in-repo and were re-run.
+
+The discipline: **before putting a question to the owner OR funding work off a settled
+one, grep the item for what actually closed it, and name the granting act.** When an
+overseer or an agent settles something that was parked for the owner, say so in the row —
+in the same breath as the outcome, not appended below it. And when a claimed owner act
+leaves no artifact, mark it unverifiable rather than laundering it into fact by repetition;
+the cheap fix is to ask, because the owner is usually one sentence away.
+
 ## What the overseer implements
 
 Aurora is a TypeScript/Electron app: features, tests and harnesses all go to agents in
