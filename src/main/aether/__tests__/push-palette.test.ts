@@ -1,21 +1,52 @@
 import { describe, it, expect } from 'vitest';
 import { pushPaletteLine, pushPaletteWords, PaletteGateReason } from '../push-palette';
+import { MethodNotServedError } from '../unserved';
 
 /** A client stand-in recording the wire calls in order. */
-function fakeClient(opts: { symbols?: Record<string, number>; methods?: string[]; connected?: boolean; wasRunning?: boolean } = {}) {
+function fakeClient(opts: {
+  symbols?: Record<string, number>; methods?: string[]; connected?: boolean; wasRunning?: boolean;
+  /**
+   * `emulator/lookup_symbol` is ADVERTISED and answers -32601 anyway. The
+   * advertised list cannot see this shape, so only the reply proves it — and it
+   * is the ONLY route that reaches the catch around symbol resolution.
+   */
+  lookupUnimplemented?: boolean;
+} = {}) {
   const symbols = opts.symbols ?? { Pal_Base: 0xff8ad2, Pal_Base_Dirty: 0xff8ca7 };
   const calls: Array<{ method: string; params: Record<string, unknown> }> = [];
   return {
     calls,
     status: opts.connected === false ? 'disconnected' : 'connected',
-    hasMethod: (m: string) => (opts.methods ?? ['emulator/write_memory', 'emulator/pause', 'emulator/resume']).includes(m),
+    server: { name: 'oracle-next' },
+    // `emulator/lookup_symbol` belongs here because this fake's `resolve`
+    // stands in for exactly that call — a fake that omits it is not modelling
+    // a server, it is modelling one with a hole the real one does not have.
+    hasMethod: (m: string) => (opts.methods ?? [
+      'emulator/write_memory', 'emulator/pause', 'emulator/resume', 'emulator/lookup_symbol',
+    ]).includes(m),
     resolve: async (name: string) => {
+      if (opts.lookupUnimplemented) {
+        throw new MethodNotServedError('emulator/lookup_symbol', 'rpc-error', 'oracle-next');
+      }
+      if (!(opts.methods ?? [
+        'emulator/write_memory', 'emulator/pause', 'emulator/resume', 'emulator/lookup_symbol',
+      ]).includes('emulator/lookup_symbol')) {
+        throw new MethodNotServedError('emulator/lookup_symbol', 'advertised-list', 'oracle-next');
+      }
       const a = symbols[name];
       if (a === undefined) throw new Error(`no symbol named ${name}`);
       return a;
     },
     call: async (method: string, params: Record<string, unknown>) => {
       calls.push({ method, params });
+      // A real client REJECTS an unadvertised method rather than answering it.
+      // Without this the fake would serve a method it claims not to have, and
+      // any row about the unserved path would be testing the fake.
+      if (!(opts.methods ?? [
+        'emulator/write_memory', 'emulator/pause', 'emulator/resume', 'emulator/lookup_symbol',
+      ]).includes(method)) {
+        throw new MethodNotServedError(method, 'advertised-list', 'oracle-next');
+      }
       if (method === 'emulator/pause') return { wasRunning: opts.wasRunning ?? true };
       return {};
     },
@@ -191,5 +222,74 @@ describe('pushPaletteWords on a classic (S1) project', () => {
     expect(r.pushed).toBe(true);
     const writes = c.calls.filter((x) => x.method === 'emulator/write_memory');
     expect(writes).toHaveLength(2);                        // payload then flag
+  });
+});
+
+/**
+ * THE CUTOVER ROWS. The push had two stories — "no write_memory" and "no
+ * symbols" — and the second was quietly absorbing a third: a server that cannot
+ * look symbols up at all. "Your ROM has no palette symbols" is a claim about the
+ * artist's ROM, and making it when the ROM was never asked is a fabrication.
+ */
+describe('pushPalette and a server that does not serve what it needs', () => {
+  it('does NOT call an unserved lookup "no symbols" — it names the method', async () => {
+    const c = fakeClient({ methods: ['emulator/write_memory', 'emulator/pause', 'emulator/resume'] });
+    const r = await pushPaletteLine(c as never, 1, line());
+
+    expect(r.pushed).toBe(false);
+    expect(r.gate).toBe(PaletteGateReason.UnservedMethod);
+    expect(r.gate).not.toBe(PaletteGateReason.NoSymbols);
+    expect(r.unservedMethod).toBe('emulator/lookup_symbol');
+    // Nothing touched the wire, so the machine was never paused for a push that
+    // could not happen.
+    expect(c.calls).toEqual([]);
+  });
+
+  /**
+   * THE ROUTE THAT REACHES THE CATCH. When `lookup_symbol` is simply
+   * unadvertised the up-front check refuses first, so the catch around symbol
+   * resolution is only ever entered by the advertised-and-unimplemented shape.
+   * A row that did not use that shape would leave that branch untested — and it
+   * did, until a planted violation there came back green.
+   */
+  it('names an ADVERTISED-but-unimplemented lookup instead of blaming the ROM', async () => {
+    const c = fakeClient({ lookupUnimplemented: true });
+    const r = await pushPaletteLine(c as never, 1, line());
+
+    expect(r.pushed).toBe(false);
+    expect(r.gate).toBe(PaletteGateReason.UnservedMethod);
+    expect(r.gate).not.toBe(PaletteGateReason.NoSymbols);
+    expect(r.unservedMethod).toBe('emulator/lookup_symbol');
+    // ANTI-VACUOUS: the up-front check PASSED (the method is advertised), so
+    // this refusal came from the reply and not from the list.
+    expect(c.hasMethod('emulator/lookup_symbol')).toBe(true);
+  });
+
+  /** The discrimination: a served server with an unhelpful ROM still gates NoSymbols. */
+  it('still says no-symbols when the server is fine and the ROM lacks them', async () => {
+    const c = fakeClient({ symbols: {} });
+    const r = await pushPaletteLine(c as never, 1, line());
+    expect(r.gate).toBe(PaletteGateReason.NoSymbols);
+    expect(r.unservedMethod).toBeUndefined();
+  });
+
+  it('names the method on the pre-existing write_memory gate too', async () => {
+    const c = fakeClient({ methods: ['emulator/pause', 'emulator/resume', 'emulator/lookup_symbol'] });
+    const r = await pushPaletteLine(c as never, 1, line());
+    // The GATE VALUE is unchanged, so UI copy that already reads it keeps
+    // working; what is new is that the result says which method.
+    expect(r.gate).toBe(PaletteGateReason.NoMethod);
+    expect(r.unservedMethod).toBe('emulator/write_memory');
+    expect(r.error).toContain('emulator/write_memory');
+  });
+
+  it('reports a machine left PAUSED when resume is unserved', async () => {
+    const c = fakeClient({ methods: ['emulator/write_memory', 'emulator/pause', 'emulator/lookup_symbol'] });
+    const r = await pushPaletteLine(c as never, 1, line());
+    expect(r.gate).toBe(PaletteGateReason.UnservedMethod);
+    expect(r.unservedMethod).toBe('emulator/resume');
+    // ANTI-VACUOUS, and the reason this gate is checked up front: refusing here
+    // means the machine was never paused in the first place.
+    expect(c.calls).toEqual([]);
   });
 });

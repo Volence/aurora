@@ -3,6 +3,7 @@ import { mkdtempSync, writeFileSync, chmodSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { runBuild } from '../build-run';
+import { MethodNotServedError } from '../unserved';
 
 /**
  * These drive a REAL spawn against a throwaway script, because the things worth
@@ -18,13 +19,40 @@ function scriptDir(body: string, name = 'build.sh'): string {
   return dir;
 }
 
-function fakeClient(opts: { failOn?: string; romPath?: string; wasRunning?: boolean } = {}) {
+/**
+ * The methods a healthy server serves for this path. Spelled out rather than
+ * `() => true` so a test can take ONE away and see what the runner does — which
+ * is the whole subject of the unserved-method rows below.
+ */
+const SERVED = [
+  'emulator/status', 'emulator/pause', 'emulator/resume', 'emulator/reload_rom',
+  'emulator/load_symbols', 'emulator/lookup_symbol', 'emulator/read_memory',
+  'emulator/write_memory', 'emulator/run_to', 'emulator/run_frames',
+];
+
+function fakeClient(opts: {
+  failOn?: string; romPath?: string; wasRunning?: boolean;
+  /** Methods this server does NOT serve — dropped from the advertised list. */
+  unserved?: string[];
+  /** Methods advertised but answered with -32601, the advertised-and-unimplemented shape. */
+  notFoundOn?: string[];
+} = {}) {
   const calls: string[] = [];
+  const served = SERVED.filter((m) => !(opts.unserved ?? []).includes(m));
   return {
     calls,
     status: 'connected' as const,
-    hasMethod: () => true,
-    resolve: async () => 0,
+    server: { name: 'oracle-next' },
+    hasMethod: (m: string) => served.includes(m),
+    resolve: async () => {
+      // The real client resolves THROUGH `emulator/lookup_symbol`, so a server
+      // that does not serve it cannot resolve anything. A fake whose `resolve`
+      // ignored that would hide the very case these rows are about.
+      if (!served.includes('emulator/lookup_symbol')) {
+        throw new MethodNotServedError('emulator/lookup_symbol', 'advertised-list', 'oracle-next');
+      }
+      return 0;
+    },
     loadSymbols: async (path: string) => {
       calls.push(`load_symbols:${path}`);
       if (opts.failOn === 'load_symbols') throw new Error('listing does not bind to the loaded ROM');
@@ -32,6 +60,14 @@ function fakeClient(opts: { failOn?: string; romPath?: string; wasRunning?: bool
     },
     call: async (method: string, params?: Record<string, unknown>) => {
       calls.push(`${method}:${params?.path ?? ''}`);
+      if (!served.includes(method)) {
+        throw new MethodNotServedError(method, 'advertised-list', 'oracle-next');
+      }
+      if ((opts.notFoundOn ?? []).includes(method)) {
+        // What the wire produces for an ADVERTISED but unimplemented method:
+        // the client turns a -32601 reply into the named condition itself.
+        throw Object.assign(new Error(`no such method: ${method}`), { code: -32601, method });
+      }
       if (opts.failOn === method) throw new Error('reload refused');
       if (method === 'emulator/status') return { romPath: opts.romPath ?? '/engine/s4.bin' };
       if (method === 'emulator/pause') return { wasRunning: opts.wasRunning ?? true };
@@ -431,6 +467,8 @@ describe('runBuild and the position restore (boot override + warp fallback)', ()
     /** Which symbols this ROM carries (default: all of RSYM). */
     symbols?: Record<string, number>;
     running?: boolean;
+    /** Methods this server does NOT serve — dropped from the advertised list. */
+    unserved?: string[];
   }) {
     const symbols = opts.symbols ?? RSYM;
     const ram = new Map<number, number>();
@@ -461,10 +499,16 @@ describe('runBuild and the position restore (boot override + warp fallback)', ()
       if (symbols.Warp_Req_Flag !== undefined) consume('Warp_Req_X', 'Warp_Req_Y', 'Warp_Req_Flag', false);
     };
 
+    const served = SERVED.filter((m) => !(opts.unserved ?? []).includes(m));
     const client = {
       log,
       status: 'connected' as const,
+      server: { name: 'oracle-next' },
+      hasMethod: (m: string) => served.includes(m),
       resolve: async (name: string): Promise<number> => {
+        if (!served.includes('emulator/lookup_symbol')) {
+          throw new MethodNotServedError('emulator/lookup_symbol', 'advertised-list', 'oracle-next');
+        }
         const a = symbols[name];
         if (a === undefined) throw new Error(`symbol ${name} did not resolve`);
         return a;
@@ -472,6 +516,12 @@ describe('runBuild and the position restore (boot override + warp fallback)', ()
       loadSymbols: async (path: string) => { log.push(`load_symbols:${path}`); return {}; },
       call: async (method: string, params?: Record<string, unknown>): Promise<unknown> => {
         log.push(`${method}:${params?.symbol ?? params?.addr ?? params?.path ?? ''}`);
+        // A real client REJECTS an unadvertised method rather than answering it.
+      // Without this the fake would serve a method it claims not to have, and
+      // any row about the unserved path would be testing the fake.
+      if (!served.includes(method)) {
+          throw new MethodNotServedError(method, 'advertised-list', 'oracle-next');
+        }
         const requirePaused = () => {
           if (running) throw new Error(`${method} needs the machine paused; call emulator/pause first`);
         };
@@ -608,6 +658,47 @@ describe('runBuild and the position restore (boot override + warp fallback)', ()
       expect(f.log.some((c) => c.startsWith('emulator/write_memory'))).toBe(false);
     } finally { rmSync(dir, { recursive: true, force: true }); }
   });
+
+  /**
+   * THE RESTORE PROBE, and the cutover's second failure mode. Defaulting is
+   * still RIGHT here — a build must not fail because the player's position
+   * could not be read — so the BEHAVIOUR is unchanged and only the reason stops
+   * being silent. "No symbols, no restore" sends the artist to look at their
+   * listing; an unserved lookup is not their listing's fault.
+   */
+  it('still reloads when the position lookup is unserved, and names it instead of losing it', async () => {
+    const dir = scriptDir('exit 0');
+    const f = restoreFake({ playerAt: { x: 0x0234, y: 0x0567 }, unserved: ['emulator/lookup_symbol'] });
+    try {
+      const r = await runBuild({ basePath: dir, client: f.client as never, env: {} });
+      expect(r.ok).toBe(true);
+      expect(r.reloaded).toBe(true);              // the build STILL lands
+      expect(r.restoredVia).toBeUndefined();      // the restore is still skipped
+      expect(r.unservedMethods ?? []).toContain('emulator/lookup_symbol');
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  /**
+   * The other half of that discrimination. A ROM with no mailbox symbols is the
+   * documented reason this catch exists, and it must stay silent — otherwise
+   * every release-ROM build starts reporting a capability gap that is not there,
+   * and the field stops meaning anything.
+   */
+  it('reports no unserved methods when a healthy server meets a ROM without symbols', async () => {
+    const dir = scriptDir('exit 0');
+    // NO SYMBOLS AT ALL, so the position read itself throws an ordinary
+    // resolution error and the catch under test is genuinely entered. An earlier
+    // version of this row left `Player_1` resolvable, which meant it never
+    // reached that catch and was quietly measuring a different gate — a planted
+    // violation there came back green and said so.
+    const f = restoreFake({ playerAt: { x: 0x0234, y: 0x0567 }, symbols: {} });
+    try {
+      const r = await runBuild({ basePath: dir, client: f.client as never, env: {} });
+      expect(r.reloaded).toBe(true);
+      expect(r.restoredVia).toBeUndefined();
+      expect(r.unservedMethods).toBeUndefined();
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
 });
 
 describe('runBuild on a classic (S1) project', () => {
@@ -709,6 +800,99 @@ describe('runBuild on a classic (S1) project', () => {
       await runBuild({ basePath: dir, client: client as never, env: {}, restorePosition: false });
       const sym = client.calls.find((c) => c.startsWith('load_symbols:'));
       expect(sym).toBe('load_symbols:/engine/s4.debug.lst');
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+});
+
+/**
+ * THE CUTOVER ROWS, and the one with a bug already behind it.
+ *
+ * `runBuild` asks `emulator/status` which ROM is loaded, because building the
+ * release flavour while the DEBUG ROM is running reloads a file the build never
+ * touched — the game comes back byte-identical and the edit appears to have done
+ * nothing. That happened, to the owner, once.
+ *
+ * The original `catch` around that probe fell back to the configured flavour.
+ * Right for a dead link (nothing was going to be reloaded anyway); WRONG for a
+ * server that does not serve `emulator/status`, where the fallback is a coin
+ * flip whose losing side is exactly that bug, under a "Build succeeded" toast.
+ */
+describe('runBuild against a server that does not serve what it needs', () => {
+  it('builds, then REFUSES the reload rather than guessing which ROM is loaded', async () => {
+    const dir = scriptDir('echo building; exit 0');
+    const client = fakeClient({ unserved: ['emulator/status'] });
+    try {
+      const r = await runBuild({ basePath: dir, client: client as never, env: {} });
+
+      // The build is not the casualty — an artist still learns their level
+      // assembles, which is the property the no-emulator path already had.
+      expect(r.ok).toBe(true);
+      expect(r.exitCode).toBe(0);
+      expect(r.output.join('\n')).toContain('building');
+
+      // THE REFUSAL. Not a defaulted flavour, not a silent skip.
+      expect(r.reloaded).toBe(false);
+      // AND IT NEVER ASKED. The advertised list already said so, so the refusal
+      // costs no round trip — which is also the only observable that separates
+      // this route from the -32601 one in the next row. Without it, deleting the
+      // pre-check entirely leaves this row green.
+      expect(client.calls.filter((c) => c.startsWith('emulator/status'))).toEqual([]);
+      expect(r.unservedMethods ?? []).toContain('emulator/status');
+      expect(r.reloadError).toContain('emulator/status');
+      // And it MUST NOT have reloaded on a guess — the whole point.
+      expect(client.calls.filter((c) => c.startsWith('emulator/reload_rom'))).toEqual([]);
+      expect(client.calls.filter((c) => c.startsWith('load_symbols'))).toEqual([]);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  /**
+   * THE OTHER ROUTE. `emulator/status` is advertised here and answers -32601 —
+   * the advertised-and-unimplemented shape, which no check of the list can see.
+   * A client that only pre-checked would fall straight back into the guess.
+   */
+  it('refuses the same way when status is ADVERTISED but answers -32601', async () => {
+    const dir = scriptDir('exit 0');
+    const client = fakeClient({ notFoundOn: ['emulator/status'] });
+    try {
+      const r = await runBuild({ basePath: dir, client: client as never, env: {} });
+      // ANTI-VACUOUS: the call really was made — this is the reply route, not
+      // the list route, and the row would be meaningless if status were skipped.
+      expect(client.calls.some((c) => c.startsWith('emulator/status'))).toBe(true);
+      expect(r.ok).toBe(true);
+      expect(r.reloaded).toBe(false);
+      expect(r.unservedMethods ?? []).toContain('emulator/status');
+      expect(client.calls.filter((c) => c.startsWith('emulator/reload_rom'))).toEqual([]);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  /**
+   * THE DISCRIMINATION. A dead link is the failure this catch was WRITTEN for,
+   * and defaulting is still right there: nothing is going to be reloaded, so a
+   * flavour guess costs nothing. Without this row an implementation that
+   * refused on every probe failure would pass, and the no-emulator build — the
+   * one an artist without an emulator runs — would start reporting a fault.
+   */
+  it('still defaults quietly when the link is simply not connected', async () => {
+    const dir = scriptDir('exit 0');
+    try {
+      const r = await runBuild({ basePath: dir, client: null, env: {} });
+      expect(r.ok).toBe(true);
+      expect(r.reloaded).toBe(false);
+      expect(r.unservedMethods).toBeUndefined();
+      expect(r.reloadError).toBeUndefined();
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it('refuses BEFORE pausing when reload_rom is unserved', async () => {
+    const dir = scriptDir('exit 0');
+    const client = fakeClient({ unserved: ['emulator/reload_rom'] });
+    try {
+      const r = await runBuild({ basePath: dir, client: client as never, env: {} });
+      expect(r.reloaded).toBe(false);
+      expect(r.unservedMethods ?? []).toContain('emulator/reload_rom');
+      // Discovering the gap after `emulator/pause` would leave a live machine
+      // stopped, still running the old ROM, under a "Build succeeded" toast.
+      expect(client.calls.filter((c) => c.startsWith('emulator/pause'))).toEqual([]);
     } finally { rmSync(dir, { recursive: true, force: true }); }
   });
 });

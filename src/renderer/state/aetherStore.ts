@@ -34,6 +34,22 @@ interface AetherState {
    * project, so a classic panel never writes aeon symbols or vice versa.
    */
   paletteKind?: 'aeon' | 'classic';
+  /**
+   * HOW MANY METHODS THE CONNECTED SERVER SERVES, straight from `initialize`.
+   * Two implementations answer the same socket and serve different subsets, so
+   * "connected" alone does not say what is on the other end — and an installed
+   * binary can advertise a different count from the source tree it was built
+   * from. Undefined until a handshake has completed.
+   */
+  methodCount?: number;
+  /** The advertised list itself, for anything that wants to check a specific one. */
+  servedMethods?: string[];
+  /**
+   * Set when the live-palette probe was blocked by the SERVER (no lookup
+   * method) rather than by the ROM. The two are indistinguishable from
+   * `palette: false` alone, and only one of them is the artist's to fix.
+   */
+  paletteUnservedMethod?: string;
   /** True while a push is in flight, for the badge's activity dot. */
   pushing: boolean;
   /** Last push failure, shown once rather than logged into the void. */
@@ -98,6 +114,9 @@ export const useAetherStore = create<AetherState>((set, get) => ({
       error: s.error,
       palette: s.palette ?? false,
       paletteKind: s.paletteKind,
+      methodCount: s.methodCount,
+      servedMethods: s.servedMethods,
+      paletteUnservedMethod: s.paletteUnservedMethod,
     });
     // Drive the status-bar badge, which predates this client and was written
     // waiting for it ("when the client connects it calls setBusStatus").

@@ -31,7 +31,14 @@ const INIT_RESULT = {
   serverVersion: '0.1.0',
   protocolVersion: 1,
   running: false,
-  methods: ['emulator/status', 'emulator/lookup_symbol', 'emulator/write_memory', 'emulator/reload_rom'],
+  // Everything these rows actually call. `emulator/registers` is here because
+  // the framing rows call it: a fixture that advertised `status` but not
+  // `registers` describes a server nobody ships, and the client now refuses an
+  // unadvertised method before it reaches the wire.
+  methods: [
+    'emulator/status', 'emulator/registers', 'emulator/lookup_symbol',
+    'emulator/write_memory', 'emulator/reload_rom',
+  ],
   capabilities: { events: ['emulator/stopped', 'emulator/resumed', 'emulator/romReloaded'] },
 };
 
@@ -109,10 +116,15 @@ describe('AetherClient framing', () => {
 describe('AetherClient calls', () => {
   it('surfaces a JSON-RPC error as a rejection carrying the code', async () => {
     const { sock, client } = await connected();
-    const p = client.call('emulator/write_cram', { line: 0 });
-    const id = sock.sent().find((m) => m.method === 'emulator/write_cram')!.id;
-    sock.reply({ jsonrpc: '2.0', id, error: { code: -32601, message: 'no such method: emulator/write_cram' } });
-    await expect(p).rejects.toMatchObject({ code: -32601 });
+    // An ADVERTISED method that fails for an ordinary reason. Deliberately not
+    // -32601: this row is about the generic error path, and if it used the
+    // unserved code it would pass through the unserved path instead and stop
+    // testing what its name says.
+    const p = client.call('emulator/write_memory', { addr: '0x0' });
+    const id = sock.sent().find((m) => m.method === 'emulator/write_memory')!.id;
+    sock.reply({ jsonrpc: '2.0', id, error: { code: -32000, message: 'needs the machine paused' } });
+    await expect(p).rejects.toMatchObject({ code: -32000 });
+    await expect(p).rejects.toThrow(/needs the machine paused/);
   });
 
   it('rejects in-flight calls when the socket closes, instead of hanging forever', async () => {

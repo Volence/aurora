@@ -32,6 +32,7 @@ import {
 } from '../../core/aether/build-plan';
 import { warpTo } from './warp';
 import { bootRestoreTo } from './boot-restore';
+import { MethodNotServedError, isMethodNotServed, unservedMethodOf } from './unserved';
 
 export interface BuildRunResult {
   ok: boolean;
@@ -41,6 +42,15 @@ export interface BuildRunResult {
   output: string[];
   /** Set when the build ran but the emulator step failed afterwards. */
   reloadError?: string;
+  /**
+   * Every Aether method this run needed and the connected server did not serve.
+   *
+   * A SEPARATE FIELD, not folded into `reloadError`, because "the server cannot
+   * do this" and "the call failed" want different answers: the first is fixed by
+   * building the method into the server, the second by looking at the emulator.
+   * Empty/absent when the whole run only ever met the ordinary failures.
+   */
+  unservedMethods?: string[];
   /** True when the emulator was reloaded; false when no link was connected. */
   reloaded: boolean;
   /** Which ROM was actually reloaded — the running one, not the configured guess. */
@@ -134,12 +144,31 @@ export async function runBuild(opts: BuildRunOptions): Promise<BuildRunResult> {
   // release flavour and then reloading the debug ROM reloads a file the build
   // never touched — so the game comes back byte-identical and the edit appears
   // to have done nothing, which is exactly what the owner saw.
+  //
+  // AND A SILENT FALLBACK HERE RESTORES THAT BUG. The original `catch` treated
+  // every failure as "no answer, use the configured flavour" — correct for a
+  // link that died (nothing is going to be reloaded anyway), and WRONG for a
+  // server that does not serve `emulator/status`, because then the fallback is
+  // a guess that reproduces exactly the defect described above, with a
+  // "Build succeeded" toast on top. The two are told apart, and the unserved
+  // one refuses the reload rather than guessing.
+  const unserved = new Set<string>();
   let runningRom: string | null = null;
   if (opts.client && opts.client.status === 'connected') {
-    try {
-      const status = await opts.client.call('emulator/status') as { romPath?: string };
-      runningRom = status?.romPath ?? null;
-    } catch { /* not fatal: fall back to the configured flavour */ }
+    if (!opts.client.hasMethod('emulator/status')) {
+      unserved.add('emulator/status');
+    } else {
+      try {
+        const status = await opts.client.call('emulator/status') as { romPath?: string };
+        runningRom = status?.romPath ?? null;
+      } catch (e) {
+        // Advertised and unimplemented is a real shape — only the reply proves
+        // it, which is why this route exists alongside the check above.
+        const u = unservedMethodOf(e);
+        if (u !== null) unserved.add(u);
+        /* else — a dead link: not fatal, and the reload below will not run either */
+      }
+    }
   }
   const plan = buildPlanFor({
     basePath: opts.basePath,
@@ -193,6 +222,7 @@ export async function runBuild(opts: BuildRunOptions): Promise<BuildRunResult> {
       return {
         ok: false, exitCode: pre.code, output: summariseBuildOutput(output),
         reloaded: false, missingEnv: plan.missingEnv, plan, debugBuild: wantsDebug,
+        unservedMethods: unserved.size > 0 ? [...unserved] : undefined,
       };
     }
   }
@@ -224,6 +254,7 @@ export async function runBuild(opts: BuildRunOptions): Promise<BuildRunResult> {
       resolve({
         ok: false, exitCode: null, output: summariseBuildOutput(output),
         reloaded: false, missingEnv: plan.missingEnv, plan, debugBuild: wantsDebug,
+        unservedMethods: unserved.size > 0 ? [...unserved] : undefined,
       });
     });
 
@@ -234,6 +265,9 @@ export async function runBuild(opts: BuildRunOptions): Promise<BuildRunResult> {
         const base = {
           exitCode: code, output: summariseBuildOutput(output),
           missingEnv: plan.missingEnv, plan,
+          get unservedMethods(): string[] | undefined {
+            return unserved.size > 0 ? [...unserved] : undefined;
+          },
           // Facts about the BUILD, so they are reported whether or not anything
           // was reloaded afterwards.
           debugBuild: wantsDebug, fast: plan.fast,
@@ -248,6 +282,33 @@ export async function runBuild(opts: BuildRunOptions): Promise<BuildRunResult> {
         }
         if (!opts.client || opts.client.status !== 'connected') {
           resolve({ ...base, ok: true, reloaded: false });
+          return;
+        }
+        // REFUSE, DO NOT GUESS. Without `emulator/status` we cannot know which
+        // ROM is loaded, so pairing the build flavour with the reload target is
+        // a coin flip — and the losing side is the silent no-op this file's
+        // header describes. The build still ran and is still reported; only the
+        // handoff is refused, and it says why and names the method.
+        //
+        // The reload sequence's own methods are checked here too, BEFORE the
+        // pause: finding a gap after `emulator/pause` succeeded leaves the
+        // machine stopped with the old ROM in it, which looks like a hang.
+        for (const m of [
+          'emulator/pause', 'emulator/reload_rom', 'emulator/load_symbols', 'emulator/resume',
+        ] as const) {
+          if (!opts.client.hasMethod(m)) unserved.add(m);
+        }
+        if (unserved.size > 0) {
+          const missing = [...unserved];
+          resolve({
+            ...base, ok: true, reloaded: false,
+            unservedMethods: missing,
+            reloadError:
+              `${opts.client.server?.name ?? 'the connected Aether server'} does not serve ` +
+              `${missing.join(', ')} — the build ran, but Aurora refused to reload rather than ` +
+              'guess which ROM is loaded (a wrong guess reloads a file the build never touched, ' +
+              'and the game comes back byte-identical).',
+          });
           return;
         }
         try {
@@ -307,7 +368,16 @@ export async function runBuild(opts: BuildRunOptions): Promise<BuildRunResult> {
                 return Number.parseInt(r.bytes.replace(/^0x/i, ''), 16) >>> 16;
               };
               restoreTo = { x: await rd(player + 0x02), y: await rd(player + 0x06) };
-            } catch { /* no symbols, no restore — not worth failing the build over */ }
+            } catch (e) {
+              // NO SYMBOLS, NO RESTORE — still right, and still not worth
+              // failing a good build over. But an unserved `lookup_symbol` or
+              // `read_memory` is not "this ROM has no symbols": the restore is
+              // skipped either way, and only one of them means the user should
+              // go and look at their listing. So the behaviour defaults and the
+              // REASON does not.
+              const u = unservedMethodOf(e);
+              if (u !== null) unserved.add(u);
+            }
           }
 
           const tReload = Date.now();
@@ -320,6 +390,8 @@ export async function runBuild(opts: BuildRunOptions): Promise<BuildRunResult> {
           // must then NOT resume again (and must never resume a machine that
           // somebody else deliberately stopped — wasRunning is the courtesy).
           let resumedByRestore = false;
+          /** Set when an UNSERVED resume left a live machine stopped by us. */
+          let resumeLeftPaused = false;
           try {
             await opts.client.call('emulator/reload_rom', { path: romPath });
             await opts.client.loadSymbols(symbolsPath);
@@ -351,8 +423,19 @@ export async function runBuild(opts: BuildRunOptions): Promise<BuildRunResult> {
             // rather than leaving a frozen first frame that looks hung. When
             // the boot restore already resumed (its `continue` step), a second
             // resume here would be redundant at best.
+            //
+            // "reported below" was only ever true for a throw from the TRY: a
+            // resume that fails here has nothing downstream to report it. A dead
+            // link is genuinely nothing to say (the machine is gone); an
+            // unserved `resume` means we stopped a live machine and cannot start
+            // it, so it is recorded and surfaced.
             if (wasRunning && !resumedByRestore) {
-              try { await opts.client.call('emulator/resume'); } catch { /* reported below */ }
+              try {
+                await opts.client.call('emulator/resume');
+              } catch (e) {
+                const u = unservedMethodOf(e);
+                if (u !== null) { unserved.add(u); resumeLeftPaused = true; }
+              }
             }
           }
           // FALLBACK: the warp mailbox, for a DEBUG ROM that predates the
@@ -377,14 +460,21 @@ export async function runBuild(opts: BuildRunOptions): Promise<BuildRunResult> {
             ...base, ok: true, reloaded: true, romPath,
             restoredTo: landed,
             restoredVia,
+            unservedMethods: unserved.size > 0 ? [...unserved] : undefined,
+            reloadError: resumeLeftPaused
+              ? `${opts.client.server?.name ?? 'the connected Aether server'} does not serve ` +
+                'emulator/resume — the ROM was reloaded but the machine was left PAUSED.'
+              : undefined,
             timings: { build: buildMs, reload: reloadMs, restore: restoreMs },
           });
         } catch (e) {
           // The build succeeded; only the handoff failed. Saying so is the
           // difference between "your build is broken" and "the emulator did not
           // pick it up", which are different problems with different fixes.
+          if (isMethodNotServed(e)) unserved.add((e as MethodNotServedError).method);
           resolve({
             ...base, ok: true, reloaded: false,
+            unservedMethods: unserved.size > 0 ? [...unserved] : undefined,
             reloadError: e instanceof Error ? e.message : String(e),
           });
         }

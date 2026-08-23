@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { warpTo, WarpGateReason, WARP_SYMBOLS } from '../warp';
+import { MethodNotServedError } from '../unserved';
 
 function fakeClient(opts: {
   symbols?: Record<string, number>;
@@ -10,6 +11,8 @@ function fakeClient(opts: {
   connected?: boolean;
   /** Whether the machine was running when the warp arrived. */
   wasRunning?: boolean;
+  /** Methods this server does NOT serve — dropped from the advertised list. */
+  unserved?: string[];
 } = {}) {
   const symbols = opts.symbols ?? { Warp_Req_X: 0xffe502, Warp_Req_Y: 0xffe504, Warp_Req_Flag: 0xffe506 };
   const calls: Array<{ method: string; params: Record<string, unknown> }> = [];
@@ -21,14 +24,24 @@ function fakeClient(opts: {
   return {
     calls,
     status: opts.connected === false ? 'disconnected' : 'connected',
-    hasMethod: () => true,
+    server: { name: 'oracle-next' },
+    hasMethod: (m: string) => !(opts.unserved ?? []).includes(m),
     resolve: async (name: string) => {
+      if ((opts.unserved ?? []).includes('emulator/lookup_symbol')) {
+        throw new MethodNotServedError('emulator/lookup_symbol', 'advertised-list', 'oracle-next');
+      }
       const a = symbols[name];
       if (a === undefined) throw new Error(`no symbol named ${name}`);
       return a;
     },
     call: async (method: string, params: Record<string, unknown>) => {
       calls.push({ method, params });
+      // A real client REJECTS an unadvertised method rather than answering it.
+      // Without this the fake would serve a method it claims not to have, and
+      // any row about the unserved path would be testing the fake.
+      if ((opts.unserved ?? []).includes(method)) {
+        throw new MethodNotServedError(method, 'advertised-list', 'oracle-next');
+      }
       if (method === 'emulator/pause') return { wasRunning };
       if (method === 'emulator/write_memory') {
         const addr = Number.parseInt(String(params.addr), 16);
@@ -187,5 +200,68 @@ describe('warpTo and the machine it borrows', () => {
     const c = fakeClient({ wasRunning: true, ackAfter: Number.MAX_SAFE_INTEGER });
     await warpTo(c as never, 10, 10, { maxPolls: 3 });
     expect(c.calls.map((x) => x.method)).toContain('emulator/resume');
+  });
+});
+
+/**
+ * THE CUTOVER ROWS. `warpTo` had exactly one story for a resolution failure —
+ * "a release ROM does not carry the mailbox" — and the new server adds a second
+ * one that is not about the ROM at all. Telling a user to rebuild a ROM that was
+ * never the problem is a plausible, documented, WRONG answer, which is worse
+ * than a refusal.
+ */
+describe('warpTo and a server that does not serve what it needs', () => {
+  it('does NOT call an unserved lookup a release ROM — it names the method instead', async () => {
+    const c = fakeClient({ unserved: ['emulator/lookup_symbol'] });
+    const r = await warpTo(c as never, 0x100, 0x100);
+
+    expect(r.warped).toBe(false);
+    expect(r.gate).toBe(WarpGateReason.UnservedMethod);
+    expect(r.gate).not.toBe(WarpGateReason.NoSymbols);
+    expect(r.unservedMethod).toBe('emulator/lookup_symbol');
+    // ANTI-VACUOUS: the machine was never touched, so this is not "the fake
+    // refused everything" — it is a refusal made before the wire.
+    expect(c.calls).toEqual([]);
+  });
+
+  /**
+   * THE DISCRIMINATION, stated as its own row. A guard that only checked the
+   * unserved case would pass against an implementation that returned
+   * `UnservedMethod` for EVERY resolution failure — including the release ROM,
+   * which is the case the gate was built for and must keep.
+   */
+  it('still says no-symbols when the server is fine and the ROM simply lacks them', async () => {
+    const c = fakeClient({ symbols: {} });
+    const r = await warpTo(c as never, 0x100, 0x100);
+    expect(r.gate).toBe(WarpGateReason.NoSymbols);
+    expect(r.unservedMethod).toBeUndefined();
+  });
+
+  it('refuses BEFORE pausing when a write method is unserved, so nothing is left stopped', async () => {
+    const c = fakeClient({ unserved: ['emulator/write_memory'] });
+    const r = await warpTo(c as never, 0x100, 0x100);
+
+    expect(r.warped).toBe(false);
+    expect(r.gate).toBe(WarpGateReason.UnservedMethod);
+    expect(r.unservedMethod).toBe('emulator/write_memory');
+    // THE OBSERVABLE THAT MATTERS. Discovering the gap after `emulator/pause`
+    // would leave a live machine stopped with a half-written mailbox in it.
+    expect(c.calls.map((x) => x.method)).not.toContain('emulator/pause');
+    // ANTI-VACUOUS: the symbols DID resolve, so the refusal came from the
+    // method check and not from an incidentally broken fixture.
+    expect(r.gate).not.toBe(WarpGateReason.NoSymbols);
+  });
+
+  it('says the machine was left PAUSED when resume itself is unserved', async () => {
+    const c = fakeClient({ unserved: ['emulator/resume'] });
+    const r = await warpTo(c as never, 0x100, 0x100);
+
+    expect(r.warped).toBe(false);
+    expect(r.error).toContain('left PAUSED');
+    expect(r.unservedMethod).toBe('emulator/resume');
+    // ANTI-VACUOUS: the sequence really ran — it paused and wrote the mailbox
+    // before it got as far as needing a resume it could not make.
+    expect(c.calls.map((x) => x.method)).toContain('emulator/pause');
+    expect(c.calls.filter((x) => x.method === 'emulator/write_memory')).toHaveLength(3);
   });
 });

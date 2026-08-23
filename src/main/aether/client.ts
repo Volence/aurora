@@ -13,7 +13,8 @@
  * open one anyway.
  */
 
-import { PROTOCOL_VERSION, type JsonRpcResponse } from './protocol';
+import { ERR, PROTOCOL_VERSION, type JsonRpcResponse } from './protocol';
+import { MethodNotServedError } from './unserved';
 
 /** The slice of a socket this client needs. `net.Socket` satisfies it. */
 export interface AetherSocket {
@@ -29,6 +30,12 @@ export type AetherStatus = 'disconnected' | 'connecting' | 'connected';
 export interface AetherClientOptions {
   connect: () => AetherSocket;
   socketPath: string;
+  /**
+   * Where the one-line handshake record goes. Injected for the same reason
+   * `connect` is: a test needs to read it without a global spy, and the main
+   * process wants it on stdout where a terminal running Aurora will show it.
+   */
+  log?: (message: string) => void;
 }
 
 export interface RpcFailure extends Error { code: number; data?: unknown }
@@ -41,6 +48,36 @@ interface InitializeResult {
   serverVersion?: string;
   protocolVersion?: number;
   methods?: string[];
+  capabilities?: Record<string, unknown>;
+}
+
+/**
+ * WHAT ANSWERED `initialize`. Recorded because the socket chain does not
+ * identify the implementation: the legacy C++ server and the Rust core resolve
+ * the same path, so Aurora can be swapped between them with nothing in this
+ * codebase changing.
+ *
+ * `serverName` IS a real discriminator today and not an invented one — the
+ * legacy server reports `oracle` (ControlSocket.cpp `kServerName`) and the Rust
+ * core reports `oracle-next` (oracle-aether engine.rs `server_name`) — but it is
+ * a name, and names get aligned. `methodCount` is the load-bearing field: an
+ * installed `oracle-aether` binary can banner a different count from the source
+ * tree it was built from, and a consumer measuring against the binary gets the
+ * older answer with nothing announcing it. Record the count that ACTUALLY
+ * arrived rather than any number written down elsewhere.
+ */
+export interface AetherHandshake {
+  serverName?: string;
+  serverVersion?: string;
+  protocolVersion?: number;
+  /** Exactly what `initialize` advertised, in the order it advertised it. */
+  methods: string[];
+  /** `methods.length` — the number the banner claims, measured at the wire. */
+  methodCount: number;
+  /** The raw `capabilities` object, when the server sent one. */
+  capabilities?: Record<string, unknown>;
+  /** When this handshake completed (ms since epoch). */
+  at: number;
 }
 
 export class AetherClient {
@@ -48,7 +85,7 @@ export class AetherClient {
   private sock: AetherSocket | null = null;
   private buf = '';
   private nextId = 1;
-  private readonly pending = new Map<number, { resolve: (v: unknown) => void; reject: (e: unknown) => void }>();
+  private readonly pending = new Map<number, { method: string; resolve: (v: unknown) => void; reject: (e: unknown) => void }>();
   private readonly eventSubs = new Set<(method: string, params: unknown) => void>();
   private readonly statusSubs = new Set<(status: AetherStatus) => void>();
 
@@ -63,6 +100,15 @@ export class AetherClient {
   private methods = new Set<string>();
   status: AetherStatus = 'disconnected';
   server: { name?: string; version?: string } = {};
+
+  /**
+   * The LAST handshake this client completed. Deliberately NOT cleared by
+   * teardown: `hasMethod` must go honest the moment the link dies (a stale
+   * capability is a lie), but "which server answered" is a record of something
+   * that happened, and the most useful moment to ask it is after the link has
+   * gone. Null only before the first successful handshake.
+   */
+  handshake: AetherHandshake | null = null;
 
   constructor(opts: AetherClientOptions) { this.opts = opts; }
 
@@ -92,8 +138,27 @@ export class AetherClient {
         );
       }
 
-      this.methods = new Set(init.methods ?? []);
+      const methods = init.methods ?? [];
+      this.methods = new Set(methods);
       this.server = { name: init.serverName, version: init.serverVersion };
+      this.handshake = {
+        serverName: init.serverName,
+        serverVersion: init.serverVersion,
+        protocolVersion: init.protocolVersion,
+        methods: [...methods],
+        methodCount: methods.length,
+        capabilities: init.capabilities,
+        at: Date.now(),
+      };
+      // ONCE, AT THE HANDSHAKE, because this is the only moment the answer is
+      // free. Two different servers answer this socket; the count is how a swap
+      // becomes visible in a log rather than as a feature that stopped working.
+      (this.opts.log ?? ((m: string) => console.log(m)))(
+        `[aether] handshake: ${init.serverName ?? 'unnamed server'}` +
+        ` ${init.serverVersion ?? '(no version)'}` +
+        ` protocol ${init.protocolVersion ?? '(unstated)'}` +
+        ` — ${methods.length} methods served`,
+      );
 
       // STEP TWO, AND IT IS NOT OPTIONAL. The server registers this connection
       // for events when `initialized` arrives, never on `initialize`
@@ -178,7 +243,16 @@ export class AetherClient {
     if (!waiter) return;
     this.pending.delete(id);
     if ('error' in msg && msg.error) {
-      waiter.reject(rpcError(msg.error.code, msg.error.message, msg.error.data));
+      // -32601 IS the unserved condition, and it is the route the advertised
+      // list cannot cover: a method can be ADVERTISED AND UNIMPLEMENTED, and
+      // only the reply proves it. Raising the same named error here means a
+      // call site's discrimination works either way round without knowing
+      // which route caught it.
+      waiter.reject(
+        msg.error.code === ERR.METHOD_NOT_FOUND
+          ? new MethodNotServedError(waiter.method, 'rpc-error', this.server.name, msg.error.data)
+          : rpcError(msg.error.code, msg.error.message, msg.error.data),
+      );
     } else {
       waiter.resolve((msg as { result: unknown }).result);
     }
@@ -189,7 +263,7 @@ export class AetherClient {
     if (!sock) return Promise.reject(new Error('Aether client is not connected'));
     const id = this.nextId++;
     return new Promise((resolve, reject) => {
-      this.pending.set(id, { resolve, reject });
+      this.pending.set(id, { method, resolve, reject });
       sock.write(JSON.stringify({ jsonrpc: '2.0', id, method, params }) + '\n');
     });
   }
@@ -198,10 +272,25 @@ export class AetherClient {
     this.sock?.write(JSON.stringify({ jsonrpc: '2.0', method, params }) + '\n');
   }
 
-  /** Call a server method. Rejects with a `code` when the server refuses. */
+  /**
+   * Call a server method. Rejects with a `code` when the server refuses, and
+   * with a `MethodNotServedError` when the refusal is "this server does not
+   * serve that" — which is a different condition from "the call failed", and
+   * the whole reason this client exists in its current shape.
+   *
+   * The advertised list is consulted FIRST, so an unserved method costs no
+   * round trip and — more importantly — never reaches a sequence that pauses
+   * the machine on its way to failing. When the server advertised no list at
+   * all we cannot pre-check, and the -32601 route in `dispatch` is what
+   * catches it; that is a real degradation, but a silent one would be worse,
+   * so it is stated here rather than papered over.
+   */
   call(method: string, params?: unknown): Promise<unknown> {
     if (this.status !== 'connected' && method !== 'initialize') {
       return Promise.reject(new Error('Aether client is not connected'));
+    }
+    if (this.methods.size > 0 && !this.methods.has(method)) {
+      return Promise.reject(new MethodNotServedError(method, 'advertised-list', this.server.name));
     }
     return this.request(method, params);
   }
@@ -214,6 +303,27 @@ export class AetherClient {
    * method appearing here is a method that answers.
    */
   hasMethod(method: string): boolean { return this.methods.has(method); }
+
+  /**
+   * Everything the CURRENT link serves. Empty while disconnected, on purpose —
+   * for what the last server advertised, read `handshake`, which survives.
+   */
+  servedMethods(): string[] { return [...this.methods]; }
+
+  /** How many methods the current link serves. Zero while disconnected. */
+  get servedMethodCount(): number { return this.methods.size; }
+
+  /**
+   * Throw the named condition if `method` is not advertised. For call sites
+   * that want to refuse BEFORE building a sequence around a method — the
+   * cheapest possible discrimination, and the one that never leaves a machine
+   * paused halfway through.
+   */
+  requireMethod(method: string): void {
+    if (this.methods.size > 0 && !this.methods.has(method)) {
+      throw new MethodNotServedError(method, 'advertised-list', this.server.name);
+    }
+  }
 
   onEvent(fn: (method: string, params: unknown) => void): () => void {
     this.eventSubs.add(fn);

@@ -1130,6 +1130,12 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
       return {
         status: s.status,
         server: s.serverName ?? null,
+        // WHAT ANSWERED. The legacy C++ server and the Rust core resolve the
+        // same socket chain and serve different subsets, so an agent measuring
+        // capability against `status` alone is measuring nothing. The count is
+        // the durable signal; the name (`oracle` vs `oracle-next`) can be
+        // aligned between them at any time.
+        methodCount: s.methodCount ?? null,
         // A palette symbol family resolved — i.e. a push can actually land…
         palettePushAvailable: s.palette,
         // …and WHICH family the running ROM carries ('aeon' | 'classic'). A
@@ -1180,9 +1186,16 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
       if (!s.palette || s.paletteKind !== kind) {
         return {
           pushed: false,
+          // NEVER BLAME THE ROM FOR THE SERVER. "This ROM has no live-palette
+          // symbols" is a claim about the artist's build, and making it when
+          // the probe could not even run — because the connected server does
+          // not serve the lookup — is a confident wrong answer that sends them
+          // to rebuild something that was never at fault.
           reason: s.palette
             ? `the running ROM carries ${s.paletteKind} palette symbols, not ${kind} — wrong emulator for this project`
-            : 'this ROM has no live-palette symbols — live palette is unavailable',
+            : s.paletteUnservedMethod
+              ? `the connected Aether server does not serve ${s.paletteUnservedMethod}, so the live-palette symbols were never looked up — this is a server gap, not a ROM problem`
+              : 'this ROM has no live-palette symbols — live palette is unavailable',
         };
       }
       s.pushPaletteLine(req.line, words, kind);

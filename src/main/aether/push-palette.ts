@@ -8,6 +8,7 @@
  */
 
 import type { AetherClient } from './client';
+import { MethodNotServedError, isMethodNotServed, unservedMethodOf } from './unserved';
 import {
   planPalettePush, planPalettePushWordsFor,
   type PalettePushPlan, type PalettePushKind,
@@ -18,6 +19,14 @@ export enum PaletteGateReason {
   Disconnected = 'disconnected',
   NoMethod = 'no-write-memory',
   NoSymbols = 'no-symbols',
+  /**
+   * Some OTHER method this push needs is not served — `lookup_symbol`,
+   * `pause`, `resume`. Kept apart from `NoSymbols` because "your ROM has no
+   * palette symbols" is a claim about the ROM, and a client that makes it when
+   * the real answer is "this server cannot look symbols up" has invented a
+   * diagnosis. `unservedMethod` says which.
+   */
+  UnservedMethod = 'unserved-method',
   /** Line 0 is the character palette; `Pal_Base` does not include it. */
   LineZero = 'line-0',
 }
@@ -26,6 +35,8 @@ export interface PalettePushResult {
   pushed: boolean;
   gate?: PaletteGateReason;
   error?: string;
+  /** Set when the failure was "the server does not serve this" — names which. */
+  unservedMethod?: string;
 }
 
 const hex = (n: number) => '0x' + (n >>> 0).toString(16).toUpperCase();
@@ -68,7 +79,28 @@ async function pushPlanned(
     return { pushed: false, gate: PaletteGateReason.Disconnected };
   }
   if (!client.hasMethod('emulator/write_memory')) {
-    return { pushed: false, gate: PaletteGateReason.NoMethod };
+    // The pre-existing gate, kept at its own reason so the UI copy that already
+    // reads it does not change meaning — but now it NAMES the method too.
+    return {
+      pushed: false,
+      gate: PaletteGateReason.NoMethod,
+      unservedMethod: 'emulator/write_memory',
+      error: new MethodNotServedError('emulator/write_memory', 'advertised-list', client.server?.name).message,
+    };
+  }
+  // The push also NEEDS these, and learning it after the pause is how a machine
+  // gets left stopped. `lookup_symbol` in particular: without it the resolution
+  // below fails and the old code called that "no symbols", which names the ROM
+  // for something the server did.
+  for (const m of ['emulator/lookup_symbol', 'emulator/pause', 'emulator/resume'] as const) {
+    if (!client.hasMethod(m)) {
+      return {
+        pushed: false,
+        gate: PaletteGateReason.UnservedMethod,
+        unservedMethod: m,
+        error: new MethodNotServedError(m, 'advertised-list', client.server?.name).message,
+      };
+    }
   }
 
   // Planned BEFORE anything touches the wire, so a line-0 push is refused
@@ -92,9 +124,14 @@ async function pushPlanned(
   try {
     for (const s of plan.symbols) addrs.set(s, await client.resolve(s));
   } catch (e) {
+    // A ROM built without them greys the feature out. `lookup_symbol` being
+    // unserved does NOT — that is the server, not the ROM, and it gets its own
+    // gate so nobody goes rebuilding a listing that was always fine.
+    const unserved = unservedMethodOf(e);
     return {
       pushed: false,
-      gate: PaletteGateReason.NoSymbols,
+      gate: unserved !== null ? PaletteGateReason.UnservedMethod : PaletteGateReason.NoSymbols,
+      unservedMethod: unserved ?? undefined,
       error: e instanceof Error ? e.message : String(e),
     };
   }
@@ -112,6 +149,9 @@ async function pushPlanned(
   // resumed it, and the observer's next call was refused `machineRunning`.
   const pauseResult = await client.call('emulator/pause') as { wasRunning?: boolean };
   const shouldResume = pauseResult?.wasRunning !== false;
+  let result: PalettePushResult;
+  /** A resume the server could not perform leaves the machine STOPPED. */
+  let resumeFailure: string | null = null;
   try {
     for (const w of plan.writes) {
       await client.call('emulator/write_memory', {
@@ -119,12 +159,33 @@ async function pushPlanned(
         bytes: hexBytes(w.bytes),
       });
     }
-    return { pushed: true };
+    result = { pushed: true };
   } catch (e) {
-    return { pushed: false, error: e instanceof Error ? e.message : String(e) };
+    result = {
+      pushed: false,
+      gate: isMethodNotServed(e) ? PaletteGateReason.UnservedMethod : undefined,
+      unservedMethod: unservedMethodOf(e) ?? undefined,
+      error: e instanceof Error ? e.message : String(e),
+    };
   } finally {
     if (shouldResume) {
-      try { await client.call('emulator/resume'); } catch { /* a dead link is already reported */ }
+      try {
+        await client.call('emulator/resume');
+      } catch (e) {
+        // A DEAD LINK is already reported by whatever killed it, and there is
+        // no machine left to un-freeze. An UNSERVED `resume` is a live machine
+        // that WE stopped and cannot start again — the artist's next drag lands
+        // on a frozen game, and silence here is what makes that inexplicable.
+        if (isMethodNotServed(e)) resumeFailure = (e as Error).message;
+      }
     }
   }
+  if (resumeFailure !== null) {
+    return {
+      ...result,
+      unservedMethod: result.unservedMethod ?? 'emulator/resume',
+      error: [result.error, `the machine was left PAUSED: ${resumeFailure}`].filter(Boolean).join('; '),
+    };
+  }
+  return result;
 }

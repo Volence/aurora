@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { bootRestoreTo, BOOT_SYMBOLS, BOOT_INIT_SYMBOL, BootRestoreGate } from '../boot-restore';
+import { MethodNotServedError } from '../unserved';
 
 /**
  * The fake here is a MODEL OF THE ENGINE'S CONTRACT (ENGINE_ARCHITECTURE.md
@@ -36,10 +37,23 @@ const SYMS: Record<string, number> = {
 const BOUND_X = 0x0900;
 const BOUND_Y = 0x0700;
 
+/**
+ * Everything this fake's `call` switch actually implements, plus the lookup its
+ * `resolve` stands in for. Written out instead of `() => true` so a row can drop
+ * exactly one method and watch the routine refuse — a fake that serves
+ * everything cannot express the condition under test.
+ */
+const SERVED = [
+  'emulator/run_to', 'emulator/write_memory', 'emulator/read_memory',
+  'emulator/resume', 'emulator/run_frames', 'emulator/lookup_symbol',
+];
+
 interface FakeOpts {
   symbols?: Record<string, number>;
   /** run_to answers reached:false (deadline) instead of stopping at the init. */
   initUnreachable?: boolean;
+  /** Methods this server does NOT serve — dropped from the advertised list. */
+  unserved?: string[];
 }
 
 function fakeEngine(opts: FakeOpts = {}) {
@@ -72,15 +86,29 @@ function fakeEngine(opts: FakeOpts = {}) {
     }
   };
 
+  const served = SERVED.filter((m) => !(opts.unserved ?? []).includes(m));
   const client = {
     status: 'connected' as const,
+    server: { name: 'oracle-next' },
+    hasMethod: (m: string) => served.includes(m),
     resolve: async (name: string): Promise<number> => {
+      // `resolve` IS `emulator/lookup_symbol` — model that, or the unserved
+      // case cannot be expressed at all.
+      if (!served.includes('emulator/lookup_symbol')) {
+        throw new MethodNotServedError('emulator/lookup_symbol', 'advertised-list', 'oracle-next');
+      }
       const a = symbols[name];
       if (a === undefined) throw new Error(`symbol ${name} did not resolve`);
       return a;
     },
     call: async (method: string, params?: Record<string, unknown>): Promise<unknown> => {
       log.push(`${method}:${params?.symbol ?? params?.addr ?? ''}`);
+      // A real client REJECTS an unadvertised method rather than answering it.
+      // Without this the fake would serve a method it claims not to have, and
+      // any row about the unserved path would be testing the fake.
+      if (!served.includes(method)) {
+        throw new MethodNotServedError(method, 'advertised-list', 'oracle-next');
+      }
       const requirePaused = () => {
         if (!paused) throw new Error(`${method} needs the machine paused; call emulator/pause first`);
       };
@@ -224,5 +252,65 @@ describe('the model actually bites (anti-vacuous check on the fake itself)', () 
     await client.call('emulator/run_frames', { frames: 1 });
     // Nothing consumes it: the flag stays raised forever, no ack, no publish.
     expect(ram.get(symbols.Boot_At_Flag)).toBe(0x01);
+  });
+});
+
+/**
+ * THE CUTOVER ROWS. `NoSymbols` here means "this ROM predates the boot
+ * override", and it sends the caller to its warp fallback. An unserved method
+ * breaks the warp fallback too, so answering NoSymbols would route the caller
+ * down a second path that cannot work either, for a reason nobody was told.
+ */
+describe('bootRestoreTo and a server that does not serve what it needs', () => {
+  it('gates UnservedMethod, not NoSymbols, when run_to is missing — and does not advance', async () => {
+    const f = fakeEngine({ unserved: ['emulator/run_to'] });
+    const r = await bootRestoreTo(f.client as never, 0x100, 0x100, { wasRunning: true });
+
+    expect(r.restored).toBe(false);
+    expect(r.gate).toBe(BootRestoreGate.UnservedMethod);
+    expect(r.gate).not.toBe(BootRestoreGate.NoSymbols);
+    expect(r.unservedMethod).toBe('emulator/run_to');
+    expect(r.resumed).toBe(false);
+    // The precondition is a machine paused at reset; the caller's fallback
+    // starts from there, so this must not have moved it.
+    expect(f.log).toEqual([]);
+  });
+
+  it('gates UnservedMethod when the lookup itself is not served', async () => {
+    const f = fakeEngine({ unserved: ['emulator/lookup_symbol'] });
+    const r = await bootRestoreTo(f.client as never, 0x100, 0x100, { wasRunning: true });
+    expect(r.gate).toBe(BootRestoreGate.UnservedMethod);
+    expect(r.unservedMethod).toBe('emulator/lookup_symbol');
+    expect(f.log).toEqual([]);
+  });
+
+  /**
+   * The discrimination. Without this row, an implementation that answered
+   * UnservedMethod for every resolution failure would pass — and the release-ROM
+   * gate this routine was built around would be gone with nothing complaining.
+   */
+  it('still gates NoSymbols on a ROM that simply lacks the mailbox', async () => {
+    const f = fakeEngine({ symbols: { [BOOT_INIT_SYMBOL]: 0xa1724 } });
+    const r = await bootRestoreTo(f.client as never, 0x100, 0x100, { wasRunning: true });
+    expect(r.gate).toBe(BootRestoreGate.NoSymbols);
+    expect(r.unservedMethod).toBeUndefined();
+  });
+
+  it('needs run_frames rather than resume when somebody else owns the pause', async () => {
+    // The ack step differs by who stopped the machine, so the required-method
+    // list is built from `wasRunning` instead of being one fixed list.
+    const stepping = await bootRestoreTo(
+      fakeEngine({ unserved: ['emulator/run_frames'] }).client as never,
+      0x100, 0x100, { wasRunning: false },
+    );
+    expect(stepping.unservedMethod).toBe('emulator/run_frames');
+
+    const running = await bootRestoreTo(
+      fakeEngine({ unserved: ['emulator/run_frames'] }).client as never,
+      0x100, 0x100, { wasRunning: true },
+    );
+    // A running machine never steps frames, so its absence must NOT gate.
+    expect(running.gate).not.toBe(BootRestoreGate.UnservedMethod);
+    expect(running.restored).toBe(true);
   });
 });
