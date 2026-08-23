@@ -125,6 +125,35 @@ Each has caught a real defect here.
 
 2c. **A uniqueness grep over the SOURCE does not make an assertion's MATCHER unique.** Bar 2 says grep the call site before planting. That protects against two call sites sharing a line; it does nothing about **two different errors sharing a phrase**, and the second is subtler because no grep over the code under test would ever surface it. Precedent (2026-08-22, band promotion, ROADMAP item 27): a red-first plant on *"refuses a range that reaches past the end of the blob"* came back **GREEN with its guard deleted** — the row matched `/has only \\d+ tiles/`, and the **codec's own prefix check** says *"the static tile blob has only N tiles"*. The row had been passing by catching an unrelated rule's error the whole time. Re-cut against the guard's own words plus a boundary row, it fails correctly. **When a poison comes back green, the first suspect is the assertion's matcher, not the guard** — and a matcher loose enough to catch a neighbouring error is a row that will report coverage it does not have, forever, in a suite that looks green.
 
+2d. **RED-FIRST IS NECESSARY AND NOT SUFFICIENT — a poison that comes back GREEN has THREE
+   distinct causes, and only one of them is a bad guard.** *(Added 2026-08-22 from the
+   `fix/aether-unserved-methods` parcel, where 27 plants went red and **three** of the
+   parcel's own new rows went green; refined with the oracle lane, who took it as a bar and
+   relayed it live to an agent mid-parcel.)* Bars 2b and 2c are two of these; this row names
+   the set so the diagnosis does not stop at the first one that fits.
+   - **(i) The matcher is too loose** — bar 2c. One code path, but the assertion's wording
+     also matches a *different rule's* error. The observable is unique to the rule; the
+     assertion is not. **Fix: re-point at wording only this rule uses.**
+   - **(ii) Two independent code paths produce ONE observable** *(oracle's formulation, and
+     the distinction is theirs — accepted here)*. Deleting the guard under test leaves the
+     **other path** holding the row green. Same symptom as (i), different cause, and the
+     matcher bar sends you hunting a matcher that is fine. Instance: a row proving only
+     *"it refused"*, satisfied by **both** the advertised-list pre-check and the `-32601`
+     reply. **Fix: assert WHICH path ran** — that row now checks whether `emulator/status`
+     was called at all.
+   - **(iii) The row is measuring the WRONG QUANTITY** — bar 2b. Instance: the fixture left
+     `Player_1` resolvable, so the catch the row was named after was **never entered**; it
+     was measuring a different gate. **Planting a violation cannot reveal this**, because the
+     row never touches the subject.
+   **The tell that separates (i) from (ii), which is the pair that gets confused:** ask
+   whether the observable is unique to the rule. If it is, the assertion is too loose — (i).
+   If it is not — if something else in the system can produce it — the assertion may be
+   perfectly precise and still worthless — (ii).
+   **Operational form** *(oracle's, and better than asking "did it fire")*: **"if this row
+   went green for a reason OTHER than the rule holding, what would that reason be?"** Then
+   check that specific reason, and **report the alternative green-path you ruled out** —
+   naming what you eliminated is the part that survives review.
+
 3. **Anti-vacuous rows.** A row that would pass on an empty screen, an unloaded project
    or a blank chunk proves nothing. Assert the instrument saw its subject. A stamp-ghost
    check once "passed" against `OJZ $45`, which is legitimately blank.
