@@ -101,6 +101,33 @@ in the same breath as the outcome, not appended below it. And when a claimed own
 leaves no artifact, mark it unverifiable rather than laundering it into fact by repetition;
 the cheap fix is to ask, because the owner is usually one sentence away.
 
+### Push authorization — RELAYED 2026-08-23, and the distinction matters
+
+**The grant, as received:** standing approval to push **this repo's own master** without
+asking each time. Conditions ride with it and are part of it, not gloss: **verify `origin`
+actually moved** (the push is not the act, the remote moving is); **never rewrite
+already-pushed history**; **never push another lane's repo**; **publication to the public
+wiki site stays a separate explicit ask.**
+
+**Scope, stated because this is the class of grant that gets restated wider:** it authorizes
+**pushing, not the work being pushed.** It does not release the boot stop and it is not
+approval to dispatch, to land a parcel, or to start a queue item. A lane still holding for
+his word on WHAT to do is still holding.
+
+**⚠ EPISTEMIC STATUS, per this section's own rule — read this before citing the grant.**
+The ruling reached Aurora **relayed by the empyrean lane**, banked at empyrean `2bd72a03`
+(verified firsthand here: reachable from their `origin/main`, `docs/OVERSEER.md` +23, and its
+text **names the granting act** — he was asked directly as a consolidated suite-wide question
+and chose this option over "standing for docs, ask for code" and "per-push"). That is
+genuinely better than the usual relay, and it is still **an artifact of the RELAY, not of the
+granting act.** This session did not witness him rule it. **So: verified as far as it goes,
+and marked as relayed rather than laundered into "the owner told Aurora".** The cheap fix is
+this section's own — ask, because he is usually one sentence away — and it was taken: the
+confirmation was put to him in the same turn this was written. **If a later session finds his
+answer recorded nowhere, treat the grant as relayed-only and ask again rather than citing
+this row as the approval.**
+
+
 ## What the overseer implements
 
 Aurora is a TypeScript/Electron app: features, tests and harnesses all go to agents in
