@@ -16,6 +16,8 @@ import { useClassicObjectArtStore } from './state/classicObjectArtStore';
 import { useProjectStore, getCurrentAct } from './state/projectStore';
 import { useEditorStore, focusedHistory } from './state/editorStore';
 import { openAeonProject } from './state/aeon-open';
+import { bandBudget, bandRows } from './providers/bg-anim-aeon';
+import { serializeBgOverride } from '../core/formats/bg-override/bg-override';
 import { useAetherStore } from './state/aetherStore';
 import { useViewStore } from './state/viewStore';
 import { useArtStore } from './state/artStore';
@@ -366,6 +368,45 @@ interface AeonProbeApi {
   unreadableScenes(): { path: string; reason: string }[];
   /** One section's `sceneRef` — what the assignment dropdown writes. */
   sceneRef(sectionIndex: number): string | null;
+  /**
+   * The BgAnim bands as the MODEL holds them — READ-ONLY, and the only way a
+   * harness can see what the band panel's controls actually did.
+   *
+   * IT EXISTS FOR A DEFECT THE DOM CANNOT SHOW. A band edit replaces the whole
+   * override document inside the project's holder; if that write-back is broken
+   * the panel still renders, the button still depresses, and the only visible
+   * difference is that the list does not change — which is exactly what a
+   * correctly-refused operation also looks like. Reading the band list back out
+   * of the store is what tells those two apart.
+   */
+  bands(): {
+    index: number; cols: number; rows: number; tileCount: number;
+    driver: string; driverIsExplicit: boolean;
+    rateShift: number; rateShiftIsExplicit: boolean;
+    slotBase: number; phaseBanks: number;
+  }[];
+  /** Tile-blob and band-count budgets — the numbers the panel prints. */
+  bandBudget(): {
+    bands: number; maxBands: number; bandsRemaining: number;
+    animatedSlots: number; tiles: number; tileCapacity: number;
+    tileSlotsRemaining: number; firstPromotableSlot: number;
+  };
+  /** Whether the file was there, and whether it parsed. Absent != unreadable. */
+  bgOverrideStatus(): {
+    path: string; present: boolean; unreadable: { path: string; reason: string } | null;
+  } | null;
+  /**
+   * FNV-1a over the whole serialized override document — "is this the same
+   * document". A string of ~89 KB would cross CDP on every call; a hash lets a
+   * row assert that an undo landed back on the EXACT bytes it started from,
+   * which is a stronger claim than "the band count went back to what it was".
+   * Null when there is no document, or when it would not serialize.
+   */
+  bgOverrideHash(): number | null;
+  /** One layout word of the override document — the cell-level image check. */
+  bgOverrideLayoutAt(index: number): number | null;
+  /** One override tile's 64 pixel values — the art-level image check. */
+  bgOverrideTileAt(index: number): number[] | null;
 }
 
 interface CanvasProbeApi {
@@ -423,6 +464,11 @@ interface CanvasProbeApi {
 function installAeonProbe(): AeonProbeApi {
   const act = () => getCurrentAct(useProjectStore.getState());
   const section = (i: number) => act()?.sections[i] ?? null;
+  // Re-read per call, never captured: a band command REPLACES the document
+  // inside the holder, so a captured reference would report the pre-edit
+  // document forever — and the rows that check a band edit landed would pass
+  // against a broken write-back, which is the one thing they exist to catch.
+  const bgDoc = () => useProjectStore.getState().project?.bgOverride.doc ?? null;
   return {
     open: (dir) => openAeonProject(dir).then(() => undefined),
     state: () => {
@@ -485,6 +531,41 @@ function installAeonProbe(): AeonProbeApi {
       (useProjectStore.getState().project?.effectsScenes.unreadable ?? [])
         .map((u) => ({ path: u.path, reason: u.reason })),
     sceneRef: (sectionIndex) => section(sectionIndex)?.sceneRef ?? null,
+    bands: () => bandRows(bgDoc()).map((b) => ({
+      index: b.index, cols: b.cols, rows: b.rows, tileCount: b.tileCount,
+      driver: b.driver, driverIsExplicit: b.driverIsExplicit,
+      rateShift: b.rateShift, rateShiftIsExplicit: b.rateShiftIsExplicit,
+      slotBase: b.slotBase, phaseBanks: b.phaseBanks,
+    })),
+    bandBudget: () => bandBudget(bgDoc()),
+    bgOverrideStatus: () => {
+      const s = useProjectStore.getState().project?.bgOverride;
+      if (!s) return null;
+      return { path: s.path, present: s.doc !== null, unreadable: s.unreadable };
+    },
+    bgOverrideHash: () => {
+      const doc = bgDoc();
+      if (!doc) return null;
+      let text: string;
+      try { text = serializeBgOverride(doc); } catch { return null; }
+      // FNV-1a, the same spelling canvasProbe.pixelsHash uses.
+      let h = 0x811c9dc5;
+      for (let i = 0; i < text.length; i++) {
+        h ^= text.charCodeAt(i);
+        h = Math.imul(h, 0x01000193) >>> 0;
+      }
+      return h >>> 0;
+    },
+    bgOverrideLayoutAt: (index) => {
+      const doc = bgDoc();
+      if (!doc || !Array.isArray(doc.layout)) return null;
+      return doc.layout[index] ?? null;
+    },
+    bgOverrideTileAt: (index) => {
+      const doc = bgDoc();
+      if (!doc || !Array.isArray(doc.tiles)) return null;
+      return doc.tiles[index] ?? null;
+    },
     ntRect: (sectionIndex, col, row, w, h) => {
       const s = section(sectionIndex);
       if (!s) return null;
