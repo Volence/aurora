@@ -19,6 +19,10 @@ import { sceneIdRefusal } from '../../core/formats/effects/scene-ui';
 import {
   deleteSceneCommand, replaceSceneCommand, sectionSceneCommand,
 } from '../providers/effects-aeon';
+import {
+  addBandCommand, bandBudget, bandRows, demoteBandCommand,
+  promoteBandCommand, removeBandCommand,
+} from '../providers/bg-anim-aeon';
 import { buildStampCommand } from '../../core/editing/map-stamp';
 import { ensureCollisionPlanes } from '../../core/collision/collision-cell-resolve';
 import { paintCollisionRectEntries } from '../../core/collision/collision-paint';
@@ -85,6 +89,19 @@ function requireProject(): Ctx {
   const level = getActiveLevel(state);
   if (!state.project || !zone || !act || !level) throw new Error('no project loaded');
   return { zone, act, level };
+}
+
+/**
+ * The BG override document as the project holds it RIGHT NOW.
+ *
+ * Re-read on every use rather than captured once: a band command REPLACES the
+ * document inside the project's holder, so a reply built from a value read
+ * before the command would describe the document the operation started from.
+ * That is the same aliasing hazard `getActiveLevel`'s accessor exists for, seen
+ * from the reader's side.
+ */
+function currentBgOverride() {
+  return useProjectStore.getState().project?.bgOverride.doc ?? null;
 }
 
 function budgetSummary(ctx: Ctx) {
@@ -665,6 +682,95 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
       if (!command) return { section: req.section, sceneId: req.sceneId, changed: false };
       executeAmbientCommand(command, ctx.level);
       return { section: req.section, sceneId: req.sceneId, changed: true };
+    }
+
+    // ---- Wave-1 surface 4: BgAnim bands ------------------------------------
+    //
+    // These five go through the SAME provider functions the band panel's
+    // controls do (providers/bg-anim-aeon), which in turn go through the same
+    // four command factories, which in turn go through the codec's own
+    // validator. Three layers, one rulebook: an agent and an author cannot
+    // disagree about what a full blob refuses, because neither of them owns the
+    // refusal — the codec does, and both quote it.
+    //
+    // THE REFUSALS ARE THROWN, not returned as `{ok:false}`. A provider result
+    // is a form's business (it greys a control and prints a reason beside it);
+    // an agent asked for an operation and either got it or did not, and an
+    // error is the only reply an MCP client cannot mistake for success.
+
+    case 'list-bg-anim-bands': {
+      const ctx = requireProject();
+      const state = useProjectStore.getState().project!.bgOverride;
+      return {
+        path: state.path,
+        // NOT silently omitted, on the rule list_effects_scenes states: a file
+        // that would not parse is a document an agent must not expect to be
+        // rewritten, and it is why every operation below will refuse.
+        unreadable: state.unreadable,
+        present: state.doc !== null,
+        budget: bandBudget(state.doc),
+        bands: bandRows(state.doc).map(b => ({
+          index: b.index, cols: b.cols, rows: b.rows, tileCount: b.tileCount,
+          patternPx: b.patternPx, columnBytes: b.columnBytes,
+          // `driver` is the EFFECTIVE value and `driverIsExplicit` says whether
+          // the document spells it. An agent that read only the first would
+          // write today's default into a file that was tracking the contract's.
+          driver: b.driver, driverIsExplicit: b.driverIsExplicit,
+          rateShift: b.rateShift, rateShiftIsExplicit: b.rateShiftIsExplicit,
+          slotBase: b.slotBase, phaseBanks: b.phaseBanks,
+        })),
+        // Stated on every reply because it is the fact that decides which of the
+        // two authoring doors an agent should reach for.
+        note: 'Every band shifts HORIZONTALLY; `driver` names the scalar source '
+          + '(camera_x/camera_y/timer), never an axis. Adding a band grows the tile blob; '
+          + 'promoting an existing static range does not.',
+        actSections: ctx.act.sections.length,
+      };
+    }
+
+    case 'promote-bg-anim-band': {
+      const ctx = requireProject();
+      const doc = useProjectStore.getState().project!.bgOverride.doc;
+      const result = promoteBandCommand(doc, req.staticBase, {
+        cols: req.cols, rows: req.rows,
+        ...(req.driver !== undefined ? { driver: req.driver } : {}),
+        ...(req.rateShift !== undefined ? { rateShift: req.rateShift } : {}),
+      });
+      if (!result.ok) throw new Error(result.reason);
+      executeAmbientCommand(result.command, ctx.level);
+      return { promoted: true, bands: bandRows(currentBgOverride()).length, budget: bandBudget(currentBgOverride()) };
+    }
+
+    case 'demote-bg-anim-band': {
+      const ctx = requireProject();
+      const result = demoteBandCommand(currentBgOverride(), req.band, req.staticBase);
+      if (!result.ok) throw new Error(result.reason);
+      executeAmbientCommand(result.command, ctx.level);
+      return { demoted: true, bands: bandRows(currentBgOverride()).length, budget: bandBudget(currentBgOverride()) };
+    }
+
+    case 'add-bg-anim-band': {
+      const ctx = requireProject();
+      const result = addBandCommand(currentBgOverride(), {
+        cols: req.cols, rows: req.rows,
+        ...(req.driver !== undefined ? { driver: req.driver } : {}),
+        ...(req.rateShift !== undefined ? { rateShift: req.rateShift } : {}),
+      }, req.phases);
+      if (!result.ok) throw new Error(result.reason);
+      executeAmbientCommand(result.command, ctx.level);
+      return { added: true, bands: bandRows(currentBgOverride()).length, budget: bandBudget(currentBgOverride()) };
+    }
+
+    case 'remove-bg-anim-band': {
+      const ctx = requireProject();
+      // `blankReferencingCells` defaults OFF here exactly as it does in the
+      // command: an agent that did not say it meant to lose the art gets the
+      // refusal WITH the cell count, which is the only reply that lets it decide.
+      const result = removeBandCommand(
+        currentBgOverride(), req.band, req.blankReferencingCells === true);
+      if (!result.ok) throw new Error(result.reason);
+      executeAmbientCommand(result.command, ctx.level);
+      return { removed: true, bands: bandRows(currentBgOverride()).length, budget: bandBudget(currentBgOverride()) };
     }
 
     case 'screenshot': {

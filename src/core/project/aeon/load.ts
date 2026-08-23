@@ -30,6 +30,7 @@ import { parseBgTiles, normalizeBgLayout, BG_TILE_BASE_SLOT, BG_WIDTH } from '..
 import { bgLibIndexPath, bgLibLayoutPath, bgLibTilesPath, parseBgLibraryIndex } from '../../formats/bg-library';
 import { parseSectionMeta } from '../../formats/section-meta';
 import { loadEffectsSceneLibrary } from '../../formats/effects/scene';
+import { loadBgOverride } from '../../formats/bg-override/bg-override-io';
 import { buildPalette } from '../../formats/palette';
 import { parseNametable } from '../../formats/s4-nametable';
 import { parseCollAttr } from '../../formats/s4-collattr';
@@ -150,6 +151,10 @@ export async function loadAeonProject(fa: FileAccess, dir: string): Promise<Aeon
   return {
     config, project, collisionProfiles, notices, legacyAtlasMerged,
     scenes: project.effectsScenes,
+    // Same aliasing rule, same object — see AeonProjectData.bgOverride. Hazard 2
+    // named "nothing in `AeonProjectData` names a scene, preset, band or budget";
+    // `scenes` closed the first, this closes the third.
+    bgOverride: project.bgOverride,
   };
 }
 
@@ -559,6 +564,15 @@ async function loadFullProject(
   const effectsScenes = await loadEffectsSceneLibrary(fa, projectDataRoot(config.raw));
   notices.push(...effectsScenes.notices);
 
+  // The BG override document (aeon EFFECTS_CONSUMER_CONTRACT.md §1.1), loaded
+  // on exactly the same terms and for the same reason: it depends on nothing
+  // above it, an absent file is the ordinary "this game has no BG override"
+  // rather than a failure, and a file that exists and will not parse is loud AND
+  // is never written back over. Unlike the scene directory, this file DOES exist
+  // in the live aeon tree.
+  const bgOverride = await loadBgOverride(fa, projectDataRoot(config.raw));
+  notices.push(...bgOverride.notices);
+
   return {
     project: {
       name: config.name,
@@ -568,6 +582,7 @@ async function loadFullProject(
       bgLibrary,
       basePath,
       effectsScenes,
+      bgOverride,
     },
     legacyAtlasMerged,
   };

@@ -32,6 +32,7 @@ import { serializeBgTiles } from '../../formats/bg-tiles';
 import { bgLibIndexPath, bgLibLayoutPath, bgLibTilesPath, serializeBgLibraryIndex } from '../../formats/bg-library';
 import { serializeSectionMeta } from '../../formats/section-meta';
 import { effectsScenePath, serializeEffectsScene } from '../../formats/effects/scene';
+import { saveFileFor } from '../../formats/bg-override/bg-override-io';
 import { serializeNametable } from '../../formats/s4-nametable';
 import { serializeCollAttr } from '../../formats/s4-collattr';
 import { serializeTiles } from '../../export/tile-dedup';
@@ -291,6 +292,19 @@ export async function buildAeonSavePlan(
     }
     files.push({ path, bytes: new TextEncoder().encode(serializeEffectsScene(scene)) });
   }
+
+  // The BG override document. `saveFileFor` owns all three "write nothing"
+  // cases — no file on disk, a file that would not parse, and a document that
+  // re-serializes to exactly the text it was loaded from — and it THROWS rather
+  // than skipping on an invalid document, on the same rule the scene write
+  // above states: Aurora is the sole writer of this file, so a refusal here is
+  // the last place anything can catch it before the bake.
+  //
+  // Measured 2026-08-22 against aeon's live 88,993-byte document: parse →
+  // serialize is byte-identical, so opening and saving an untouched project
+  // adds no write at all.
+  const bgOverrideFile = saveFileFor(project.bgOverride);
+  if (bgOverrideFile) files.push(bgOverrideFile);
 
   if (configChanged) {
     // A pointer rewrite should read as a pointer rewrite in review, nothing

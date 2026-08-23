@@ -48,6 +48,30 @@ export type AgentRequest =
   | { kind: 'get-effects-scene'; id: string }
   | { kind: 'set-effects-scene'; id: string; scene: unknown | null }
   | { kind: 'assign-section-scene'; section: number; sceneId: string | null }  // null = act default
+  // ---- Wave-1 surface 4: BgAnim bands (aeon EFFECTS_CONSUMER_CONTRACT §1.1/§1.2) ----
+  //
+  // PROMOTE IS THE PRIMARY OPERATION, not add. A band's slots are a PREFIX of
+  // the tile blob, so adding one GROWS the blob — and the live document ships at
+  // its capacity, where every add refuses. Promotion MOVES an existing static
+  // range to the front instead, leaving `tiles.length` unchanged, so it is the
+  // only door that works on a full document. `add` is kept for documents with
+  // free slots and takes `phases` (8 banks of cols*rows tiles of 64 pixels);
+  // omitted, the band arrives blank.
+  //
+  // Each of these is ONE undo step, and each goes through the same command
+  // factories the panel's controls do — so the agent path and the human path
+  // cannot diverge on a bound, a refusal, or what an undo restores.
+  | { kind: 'list-bg-anim-bands' }
+  | {
+      kind: 'promote-bg-anim-band'; cols: number; rows: number; staticBase: number;
+      driver?: string; rateShift?: number;
+    }
+  | { kind: 'demote-bg-anim-band'; band: number; staticBase?: number }
+  | {
+      kind: 'add-bg-anim-band'; cols: number; rows: number;
+      phases?: number[][][]; driver?: string; rateShift?: number;
+    }
+  | { kind: 'remove-bg-anim-band'; band: number; blankReferencingCells?: boolean }
   | { kind: 'screenshot'; region?: { x: number; y: number; w: number; h: number }; showBg?: boolean }
   // ---- Classic (Sonic 1 disassembly) project surface (Task 16) ----
   // Thin wrappers over the classic open bridge + the Task-12 editing commands;

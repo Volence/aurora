@@ -17,6 +17,7 @@ import type { LoadedS4Config } from '../config/s4-config';
 import type { S4Project } from '../model/s4-types';
 import type { CollisionProfileSet } from '../collision/collision-model';
 import type { EffectsSceneLibrary } from '../formats/effects/scene';
+import type { BgOverrideState } from '../formats/bg-override/bg-override-io';
 
 /**
  * The narrow file-system view core code is allowed to use. Paths are always
@@ -201,6 +202,17 @@ export interface AeonProjectData {
    * the directory does not exist in the aeon tree at all.
    */
   scenes: EffectsSceneLibrary;
+  /**
+   * The BG override document + its file facts (aeon EFFECTS_CONSUMER_CONTRACT.md
+   * §1.1), which is where this project's BgAnim BANDS live — the third of the
+   * four nouns hazard 2 said `AeonProjectData` named none of.
+   *
+   * IT IS THE SAME VALUE AS `project.bgOverride`, not a copy, on exactly the
+   * rule `scenes` states above: the handle-level name is what makes the concept
+   * legible at the adapter boundary, and a copy would be free to drift the
+   * moment a band edit replaced one holder's `doc` and not the other's.
+   */
+  bgOverride: BgOverrideState;
 }
 
 export interface ProjectHandle {
