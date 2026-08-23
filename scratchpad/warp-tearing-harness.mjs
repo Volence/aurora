@@ -27,7 +27,7 @@
 // Usage: node scratchpad/warp-tearing-harness.mjs   (VERBOSE=1 for server log)
 
 import { spawn } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import net from 'node:net';
@@ -158,11 +158,19 @@ async function main() {
     };
     const ALL_WORDS = PLANE_LEN / 2;
     const shot = async (name) => {
-      const r = await call('emulator/screenshot', {});
-      const b64 = typeof r === 'string' ? r : (r.png ?? r.data ?? r.image);
-      if (typeof b64 === 'string') {
-        writeFileSync(join(SHOTS, `${name}.png`), Buffer.from(b64.replace(/^data:image\/png;base64,/, ''), 'base64'));
+      // `emulator/screenshot` WRITES A FILE and returns its `path`; it does not
+      // return image bytes. This read `r.png ?? r.data ?? r.image` until
+      // 2026-08-22 — three guesses at fields the server has never had, so every
+      // call silently captured nothing while the harness reported clean. `bytes`
+      // is a byte COUNT, not the image, and is the field that makes the mistake
+      // look plausible. Ask for the destination explicitly rather than letting
+      // the server default it into a tempdir we would then have to guess at.
+      const dest = join(SHOTS, `${name}.png`);
+      const r = await call('emulator/screenshot', { path: dest });
+      if (!r || r.path !== dest) {
+        throw new Error(`screenshot did not write ${dest}: ${JSON.stringify(r)}`);
       }
+      if (!existsSync(dest)) throw new Error(`screenshot reported ${dest} but no file is there`);
     };
 
     /** Put camera + player at (x,y) with zeroed velocities, the bare-poke way. */

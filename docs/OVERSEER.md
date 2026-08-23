@@ -310,8 +310,17 @@ trusting, the repos move.
   then an `initialized` NOTIFICATION; subscription happens on the second, and skipping it
   gives a healthy connection that silently never receives an event. Feature-detect off
   the advertised method list, never a version.
-- **`require_paused`**: `write_memory`, `reload_rom`, `run_frames`, `run_to`, `press`,
-  `play_input`. NOT `read_memory`/`read`/`sprites`/`scanlines` (pure reads). Always
+- **`require_paused`** — **the full list, re-derived from oracle's call sites at `e484ace`
+  2026-08-22, because this row was missing four for months**: `run_frames`, `run_to`,
+  `step`, `step_over`, `step_out`, `write_memory`, `write_cram`, `press`, `play_input`,
+  `reload_rom`. NOT `read_memory`/`read`/`sprites`/`scanlines` (pure reads), and
+  **`reset` is deliberately NOT gated** (it replaces the machine wholesale between frames).
+  The four that were missing — `step`, `step_over`, `step_out`, `write_cram` — are exactly
+  the ones added to the server after this row was written, which is the shape to expect:
+  **a hand-copied list of someone else's gates does not grow when theirs does.** Derive it
+  from their source (`grep require_paused` over `crates/oracle-aether/src/engine.rs` at a
+  committed revision) rather than trusting this row; it is a snapshot and is cited here so
+  its staleness is detectable. Always
   honour `pause`'s `wasRunning` — the bus is multi-client and an unconditional resume
   starts a machine somebody else stopped.
 - **Live palette**: write `Pal_Base` (96 bytes = **lines 1–3 ONLY**; line 0 is the
