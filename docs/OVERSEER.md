@@ -304,14 +304,49 @@ Each has caught a real defect here.
 Protocol details Aurora depends on and did not invent. All measured; re-verify before
 trusting, the repos move.
 
+**⚠ CLASSIFY EVERY ITEM HERE AS AN ENGINE FACT OR A SERVER FACT BEFORE TRUSTING IT**
+*(added 2026-08-22, from the oracle lane's implication of Aurora's own socket-chain finding)*.
+Which implementation answers a bus call is decided by **whoever launched on the socket chain
+first, not by any config** — so **every measurement any lane has ever banked carries an
+unstated assumption about which server answered, and nothing in the transport makes that
+assumption checkable.** That reaches *backwards* into this list. Until `initialize` carries a
+build identity, the split is the mitigation, because the two halves have completely different
+exposure:
+
+- **ENGINE facts — unaffected by the cutover, because the server is only a window onto aeon.**
+  The live-palette contract (`Pal_Base`, 96 bytes = lines 1–3, payload then flag), the warp
+  mailbox, the boot-position override, DEBUG booting into debug-fly, boot zeroing all 64KB of
+  work RAM, `FAST=1 ./build.sh`, and the level-staleness mtime gate. **Re-derive these against
+  aeon**, and no server question arises.
+- **SERVER facts — exposed, and re-verified only against the implementation you re-verify on.**
+  The two-message handshake, the `require_paused` set, fresh-headless-paused-at-frame-0,
+  post-`reload_rom` RAM persistence, `emulator/reset` being off-limits on the hosted build, and
+  the `.lst` third-`EQU`-section parser. **Each needs the implementation named beside it.**
+  Where this file states one without naming the server, treat it as measured against *an*
+  implementation, not *the* implementation.
+  Worked example, and the reason the split is not academic: the `require_paused` list below was
+  re-derived 2026-08-22 from **oracle's Rust source at `e484ace`**. That is now stated in the
+  row. It is not known to hold on the legacy C++ server, and this file previously carried it as
+  though it were a property of "the bus".
+
+**Two conditions Aurora holds oracle to on the `initialize` build-identity parcel** *(their
+ask, recorded here because a consumer-side condition living only in the producing lane's queue
+is the one that gets dropped in a handover — the same reason `bypassesVdpPort` is written down
+below)*: **(1)** it must distinguish *implementation* (which server) from *build* (which
+commit), because these fail **independently** — a 21-Aug and a 22-Aug binary differing by four
+served methods are identical under `CARGO_PKG_VERSION`; **(2)** it must be
+**unforgeable-by-config** — `serverName` is config-supplied today and proves nothing an
+impostor could not also claim, so a value read from a config file would reproduce the exact
+defect the parcel exists to fix.
+
 - **Aether client** (`src/main/aether/`). Socket order `$ORACLE_SOCKET` → `$EXODUS_SOCKET`
   → `$XDG_RUNTIME_DIR/oracle.sock` → `/tmp/oracle.sock`; a long path dies on `SUN_LEN`.
   **The handshake is TWO messages** — `initialize` with `clientCapabilities:{events:true}`
   then an `initialized` NOTIFICATION; subscription happens on the second, and skipping it
   gives a healthy connection that silently never receives an event. Feature-detect off
   the advertised method list, never a version.
-- **`require_paused`** — **the full list, re-derived from oracle's call sites at `e484ace`
-  2026-08-22, because this row was missing four for months**: `run_frames`, `run_to`,
+- **`require_paused`** — **the full list, re-derived from **oracle's RUST source** at `e484ace`
+  2026-08-22 (**server fact** — not known to hold on the legacy C++ server), because this row was missing four for months**: `run_frames`, `run_to`,
   `step`, `step_over`, `step_out`, `write_memory`, `write_cram`, `press`, `play_input`,
   `reload_rom`. NOT `read_memory`/`read`/`sprites`/`scanlines` (pure reads), and
   **`reset` is deliberately NOT gated** (it replaces the machine wholesale between frames).
