@@ -1,8 +1,14 @@
 # MCP Integration
 
-The editor embeds an MCP server (Streamable HTTP) while running. It exposes
-art-generation tools that operate on the live editing session — every mutation
-is one undo step (Ctrl+Z), and nothing touches disk until you save.
+Aurora embeds an MCP server (Streamable HTTP) while running. It exposes the
+`editor/*` registry (`src/main/editor-methods.ts`) against the live editing
+session: aeon art, palette, background and effects tools; the classic (Sonic 1
+disassembly) project surface; and the playtest methods. Every mutation is one
+undo step (Ctrl+Z), and nothing touches disk until you save.
+
+The same registry is served over the Aether bus at `POST /aether` (JSON-RPC 2.0,
+events over SSE at `/aether/events`) for non-AI suite clients — see the README.
+Every route is loopback-only.
 
 ## Connect (one time)
 
