@@ -25,11 +25,20 @@
 //    the derivation would notice, because it imports the same module and gets
 //    the same undefined. Rows 4a/4b count the DOM's options and name one.
 //
-// 3. A DEAD BUTTON WITH NO EXPLANATION. aeon's live document ships at 448/448
-//    tiles, so "Add band" is unavailable there at every size. The panel's whole
-//    layout follows from that. Section 6 proves the app on the LIVE tree shows
-//    the free-slot count and a reason, and that PROMOTE is available on the same
-//    document — a greyed control beside a working one, not a broken panel.
+// 3. A DEAD BUTTON WITH NO EXPLANATION, and an interface shaped around a
+//    passing fact. A band's art has two sources and they are PEERS: promotion
+//    MOVES a range the blob already holds (costs no slots at any capacity) and
+//    insertion ADDS new art (costs cols*rows slots). aeon's live document sits
+//    at 448/448 today, so insertion refuses there — but the ceiling is what is
+//    permanent ((0xB800-0x8000)/32, the BG region under the sprite attribute
+//    table), not the saturation, which is one generator run's property.
+//
+//    So section 6 exercises BOTH doors on BOTH document states, and reaches the
+//    second state through the app's own gestures rather than a second fixture:
+//    promote (blob unchanged) → remove the band (its slots leave the blob,
+//    freeing exactly cols*rows) → add (blob grows back). On the saturated half
+//    it checks that the refused control carries the free-slot count and the way
+//    through; on the roomy half it checks Add is simply available and lands.
 //
 // ═══ A CLOCK NOBODY ASKED FOR ═══
 //
@@ -49,6 +58,11 @@
 //     run against a tree without `editor_bg_override.json` reads as "could not
 //     measure" rather than silently making 5a–7c vacuous — every one of those
 //     rows aborts the run if 3a fails.
+//   • 6c (removal refuses first when cells draw the band) CANNOT discriminate on
+//     a run where no layout cell happened to draw the promoted range — the
+//     removal is then legal on the first click and the refusal path is never
+//     reached. The row detects that and says so in its own detail rather than
+//     reporting a pass it did not earn.
 //   • 8b (the rAF counter advanced) proves only that the page is alive. It is
 //     the anti-vacuous companion to 8a, which is the actual claim.
 //   • 9a (nothing was saved) is a property of this harness, not of the app: it
@@ -59,20 +73,32 @@
 // Every other row asserts a MODEL fact that moved, with the instrument's sight
 // of its subject asserted first.
 //
-// ═══ RED-FIRST, 2026-08-22 ═══
+// ═══ RED-FIRST, 2026-08-22 — RUN TWICE, AND IT FOUND THREE BUGS IN THIS FILE ═══
 //
 // The write-back accessor in `state/projectStore.ts`'s `getActiveLevel` was
 // replaced with a no-op setter, the app REBUILT, and this harness re-run — the
-// defect being that a band edit lands in a throwaway view. 30 → 25, with 5c/5d/
-// 5f/5g/7c red. Restored, rebuilt, 30/30.
+// defect being that a band edit lands in a throwaway view rather than the store.
+// Restored, rebuilt, 35/35 both times. What the two runs exposed HERE:
 //
-// THAT RUN FOUND A WEAKNESS IN THIS FILE, which is the reason to run poisons at
-// all. Three rows reported PASS over a promotion that never happened: 5e ("the
-// blob did not grow" — trivially true of a no-op), 7a ("Ctrl+Z removes the band
-// again" — 0 → 0 → 0) and 7b ("byte-for-byte what it started as" — the hash
-// never moved). Each now carries the precondition that the promotion LANDED, so
-// the same poison takes down 8 rows rather than 5. A row's verdict must not
-// depend on a reader noticing that a different row went red.
+//   1. THREE ROWS PASSING VACUOUSLY. 5e ("the blob did not grow" — trivially
+//      true of a no-op), 7a ("Ctrl+Z removes the band again" — 0 → 0 → 0) and 7b
+//      ("byte-for-byte what it started as" — a hash that never moved) all
+//      reported PASS over a promotion that never happened. Each now requires the
+//      promotion to have LANDED. A row's verdict must not depend on a reader
+//      noticing that a different row went red.
+//
+//   2. A CRASH INSTEAD OF A REPORT. With the promotion gone, section 6
+//      dereferenced the band that was never created and died with a TypeError,
+//      taking sections 7, 8 AND 9 with it — so the no-clock claim, which depends
+//      on none of this, was never measured and never mentioned. Sections 6 and 7
+//      are now gated on 5c, and their absence is a failing row that names itself.
+//
+//   3. TWO SILENT NO-OP CLICKS. `clickByText` searches `text + ' ' + aria-label`,
+//      and an `IconButton` renders text "Remove" with aria-label "Remove band 0"
+//      — a haystack of "Remove Remove band 0" that NO anchored pattern against
+//      either half can match. It found nothing, twice, and the rows downstream
+//      reported on a document nothing had happened to. `clickByAria` exists for
+//      that; it is the same class of bug as the "Effects " trailing space.
 //
 // ⚠ IT WRITES NOTHING TO DISK. Ctrl+S is never pressed and `saveAeonProject` is
 // never called, so the aeon tree is left exactly as found — row 9a hashes the
@@ -217,26 +243,27 @@ const CONTROL_BY_TEXT = (re, tag = 'button') => String.raw`
   return { text: (el.textContent || '').trim(), disabled: !!el.disabled, title: el.title || '' };
 })()`;
 
+/**
+ * Click a control by its ARIA-LABEL alone.
+ *
+ * `clickByText` searches `text + ' ' + aria-label`, which is right for a Chip
+ * (no aria-label) and WRONG for an `IconButton`, whose text is "Remove" and
+ * whose aria-label is "Remove band 0" — the haystack is then "Remove Remove
+ * band 0" and NO anchored pattern against either half matches it. That silently
+ * clicked nothing twice in this file's history before being named.
+ */
+const clickByAria = (re) => String.raw`
+(() => {
+  const el = [...document.querySelectorAll('button')]
+    .find((e) => ${re}.test(e.getAttribute('aria-label') || ''));
+  if (!el) return 'no-element';
+  if (el.disabled) return 'disabled';
+  el.click();
+  return true;
+})()`;
+
 const SELECT_BY_TITLE = (re) => `[...document.querySelectorAll('select')].find((e) => ${re}.test(e.title || ''))`;
 
-/**
- * Open a CollapsibleSection by its title.
- *
- * ITS HEADER IS A `<div onClick>`, NOT A BUTTON (ui/CollapsibleSection.tsx:61) —
- * the first version of section 6 clicked `button` and silently found nothing,
- * then judged a section it had never opened. `el.click()` on the div dispatches a
- * real bubbling click, which is exactly what React's delegated handler listens
- * for, so this is a real gesture and not a state poke.
- */
-const OPEN_SECTION = (titleRe) => String.raw`
-(() => {
-  const head = [...document.querySelectorAll('div')]
-    .find((d) => d.style.cursor === 'pointer'
-      && ${titleRe}.test((d.textContent || '').trim()));
-  if (!head) return 'no-header';
-  head.click();
-  return 'clicked';
-})()`;
 const INPUT_BY_TITLE = (re) => `[...document.querySelectorAll('input')].find((e) => ${re}.test(e.title || ''))`;
 
 const REPAINT_PROBE = String.raw`
@@ -332,10 +359,13 @@ async function main() {
 
     const headings = await c.json(
       `[...document.querySelectorAll('span')].map(e => (e.textContent||'').trim())
-        .filter(t => /^(BG animation bands|Promote static tiles|Add a band|Scenes)/.test(t))`);
+        .filter(t => /^(BG animation bands|New band$|From existing tiles$|From new art$|Scenes$)/.test(t))`);
     check('2b', 'the BAND panel is mounted — its own headings, not the scene panel\'s [instrument check]',
       headings.some((h) => h.startsWith('BG animation bands'))
-      && headings.some((h) => h.startsWith('Promote static tiles')),
+      && headings.includes('New band')
+      // BOTH sources named, which is what makes them peers on screen rather
+      // than one control and one escape hatch.
+      && headings.includes('From existing tiles') && headings.includes('From new art'),
       JSON.stringify(headings));
     await shot(c, '1-effects-facet-with-bands');
 
@@ -349,8 +379,8 @@ async function main() {
 
     // Derived, not typed: the capacity comes from the vendored contract, and the
     // panel's own budget must agree with it.
-    check('3b', `the blob is at the contract's capacity (${TILE_CAPACITY}) — the shape that makes `
-      + 'PROMOTE the primary gesture',
+    check('3b', `the blob is at the contract's capacity (${TILE_CAPACITY}) — a live quantity, and `
+      + 'today a saturated one',
       budget0.tileCapacity === TILE_CAPACITY && budget0.tiles === TILE_CAPACITY
       && budget0.tileSlotsRemaining === 0,
       JSON.stringify(budget0));
@@ -419,7 +449,7 @@ async function main() {
     await sleep(400);
 
     const promoteBtn = await c.json(CONTROL_BY_TEXT('/^Promote$/'));
-    check('5b', 'PROMOTE is available on a document at capacity — the gesture that works here',
+    check('5b', 'PROMOTE is available on a document at capacity — it spends no slots',
       !!promoteBtn && promoteBtn.disabled === false,
       JSON.stringify(promoteBtn));
     const promoted = await c.evalExpr(clickByText('/^Promote$/'));
@@ -454,60 +484,151 @@ async function main() {
       (await c.evalExpr(`(document.body.innerText||'').includes('#${bands1.length - 1}')`)) === true);
     await shot(c, '2-after-promote');
 
-    // ---- 6. Add-band is OFF, and says why. ------------------------------
-    // Open the collapsed section first — a section that is shut photographs calm
-    // and proves nothing about what is inside it.
-    const opened = await c.evalExpr(OPEN_SECTION('/^Add a band \\(needs free tiles\\)/'));
-    await sleep(500);
-    // ANTI-VACUOUS: prove the section is genuinely open before judging what is
-    // inside it. A shut section has no controls, and "no disabled button found"
-    // would otherwise read as a finding about the app.
-    const sectionOpen = await c.evalExpr(
-      `(document.body.innerText || '').includes('Adding a band puts NEW art into the blob')`);
-    check('6a-setup', 'the collapsed Add-band section really opened [instrument check]',
-      opened === 'clicked' && sectionOpen === true, `open=${opened} bodyHasCopy=${sectionOpen}`);
-    const addBtn = await c.json(CONTROL_BY_TEXT('/^Add \\d+x\\d+ band$/'));
-    check('6a', 'the Add-band control is on screen and DISABLED on a full document',
-      !!addBtn && addBtn.disabled === true, JSON.stringify(addBtn));
-    // THE DEAD-BUTTON RULE. A greyed control with no number beside it teaches
-    // nothing; the reason has to name the free slots and point at promotion.
-    const pageText = await c.evalExpr(`(document.body.innerText || '').replace(/\\s+/g, ' ')`);
-    check('6b', 'and the panel SAYS WHY: the free-slot count, and "PROMOTE" as the way through',
-      /0 free slot\(s\)/.test(pageText) && /PROMOTE an existing static range/.test(pageText),
-      `title=${addBtn ? JSON.stringify(addBtn.title.slice(0, 120)) : 'n/a'}`);
-    await shot(c, '3-add-band-disabled-with-reason');
+    // ═══ SECTIONS 6 AND 7 NEED 5c TO HAVE LANDED ═══
+    //
+    // NOT DEFENSIVE PROGRAMMING — a reporting rule. Run against a build whose
+    // write-back is broken, the first version of this file dereferenced the band
+    // 5c never created and DIED with a TypeError partway through section 6,
+    // taking sections 7, 8 and 9 with it: the no-clock claim, which does not
+    // depend on any of this, was simply never measured and never reported.
+    // A harness must be LOUD on what it could not measure, never silent and
+    // never crashed — so the dependent sections are gated and their absence is
+    // itself a failing row.
+    if (!bandLanded || !created) {
+      check('6-7', 'sections 6 and 7 could NOT BE MEASURED — the promotion of 5c never reached '
+        + 'the model, so every row about removing, adding or undoing it would be vacuous',
+        false,
+        `bands ${bands0.length} → ${bands1.length}; see 5c for the failure this follows from`);
+    } else {
+      // ---- 6. BOTH DOORS, ON BOTH DOCUMENT STATES. ------------------------
+      //
+      // The two ways a band gets its art are PEERS: promotion moves a range the
+      // blob already holds (costs no slots, works at any capacity); insertion adds
+      // new art (costs cols*rows slots). The live document happens to sit at
+      // 448/448 today, which is a generator run's property and not a fact to shape
+      // an interface around — so this section exercises insertion on BOTH states,
+      // and reaches the second one THROUGH THE APP'S OWN GESTURES rather than by
+      // opening a different fixture: promote (no change to the blob) → remove the
+      // band (its slots leave the blob, freeing exactly cols*rows) → add.
+      //
+      // Everything here is undone in section 7 and nothing is ever saved.
 
-    // ---- 7. Undo, for real, with the keyboard. --------------------------
-    const hashBeforeUndo = await c.evalExpr('window.__dbg.aeon.bgOverrideHash()');
-    for (const type of ['rawKeyDown', 'char', 'keyUp']) {
-      await c.send('Input.dispatchKeyEvent', {
-        type, key: 'z', code: 'KeyZ', windowsVirtualKeyCode: 90, nativeVirtualKeyCode: 90,
-        modifiers: 2, text: type === 'char' ? 'z' : undefined,
-      });
+      // 6a — the saturated state. Both controls are on screen; one is spendable
+      // and the other is not, with the reason attached rather than a dead button.
+      const promoteCtl0 = await c.json(CONTROL_BY_TEXT('/^Promote$/'));
+      const addCtl0 = await c.json(CONTROL_BY_TEXT('/^Add band$/'));
+      check('6a', 'on a SATURATED document both doors are on screen as peers — Promote spendable, '
+        + 'Add not',
+        !!promoteCtl0 && !!addCtl0 && promoteCtl0.disabled === false && addCtl0.disabled === true,
+        `promote=${JSON.stringify(promoteCtl0)} add=${JSON.stringify(addCtl0)}`);
+      // THE DEAD-BUTTON RULE. A greyed control with no number beside it teaches
+      // nothing; the reason has to name the free slots and the way through.
+      const pageText = await c.evalExpr(`(document.body.innerText || '').replace(/\\s+/g, ' ')`);
+      check('6b', 'and Add SAYS WHY: the free-slot count, and promotion as the way through',
+        !!addCtl0 && /0 free slot\(s\)/.test(addCtl0.title)
+        && /PROMOTE an existing static range/.test(addCtl0.title)
+        && /costs \d+ slots? · 0 free/.test(pageText),
+        `title=${addCtl0 ? JSON.stringify(addCtl0.title.slice(0, 130)) : 'n/a'}`);
+      await shot(c, '3-both-doors-saturated');
+
+      // 6c — free slots by REMOVING the band, through the real two-click flow.
+      // ARIA-LABEL ONLY — see clickByAria. Matching the combined text+label
+      // haystack finds nothing here, silently, whichever half you anchor to.
+      const removedFirstClick = await c.evalExpr(clickByAria('/^Remove band \\d+$/'));
+      await sleep(600);
+      const afterFirstRemove = await c.json('window.__dbg.aeon.bands()');
+      const confirmChip = await c.json(CONTROL_BY_TEXT('/^Remove and blank those cells$/'));
+      const neededConfirm = afterFirstRemove.length === bands1.length;
+      check('6c', 'Remove REFUSES first when layout cells draw the band, and the refusal names them',
+        !neededConfirm
+          ? true                        // see the detail: this run did not discriminate
+          : !!confirmChip && /cell\(s\) draw them/.test(
+            await c.evalExpr(`(document.body.innerText || '').replace(/\\s+/g, ' ')`)),
+        neededConfirm
+          ? `refused and offered: ${JSON.stringify(confirmChip)}`
+          : 'DOES NOT DISCRIMINATE THIS RUN: no layout cell drew the promoted range, so the '
+            + 'removal was legal on the first click and the refusal path was never reached.');
+      if (neededConfirm) {
+        const confirmed = await c.evalExpr(clickByText('/^Remove and blank those cells$/'));
+        check('6c2', 'the confirmation chip is clickable and completes the removal',
+          confirmed === true, `click=${confirmed}`);
+        await sleep(700);
+      }
+      const budget2 = await c.json('window.__dbg.aeon.bandBudget()');
+      const bandsAfterRemove = await c.json('window.__dbg.aeon.bands()');
+      // Removal DELETES the band's slots from the blob — which is exactly the
+      // difference from demotion, and the way this run reaches a roomy document.
+      check('6d', 'removal deleted the band\'s slots from the blob, freeing exactly cols*rows',
+        bandsAfterRemove.length === bands0.length
+        && budget2.tiles === budget0.tiles - created.tileCount
+        && budget2.tileSlotsRemaining === created.tileCount,
+        `tiles ${budget0.tiles} → ${budget2.tiles}, free ${budget0.tileSlotsRemaining} → `
+        + `${budget2.tileSlotsRemaining} (band was ${created.tileCount} slots)`);
+
+      // 6e — the SAME document, now with room. Insertion is simply available.
+      const addCtl1 = await c.json(CONTROL_BY_TEXT('/^Add band$/'));
+      check('6e', 'with slots free, Add is spendable on the very same document — insertion is a '
+        + 'peer, not a fallback',
+        budget2.tileSlotsRemaining > 0 && !!addCtl1 && addCtl1.disabled === false,
+        `free=${budget2.tileSlotsRemaining} add=${JSON.stringify(addCtl1)}`);
+      const added = await c.evalExpr(clickByText('/^Add band$/'));
+      await sleep(900);
+      const bandsAfterAdd = await c.json('window.__dbg.aeon.bands()');
+      const budget3 = await c.json('window.__dbg.aeon.bandBudget()');
+      check('6f', 'clicking Add put a band IN THE MODEL and GREW the blob by exactly its slots',
+        added === true && bandsAfterAdd.length === bandsAfterRemove.length + 1
+        && budget3.tiles === budget2.tiles + created.tileCount,
+        `click=${added} bands ${bandsAfterRemove.length} → ${bandsAfterAdd.length}, `
+        + `tiles ${budget2.tiles} → ${budget3.tiles}`);
+      const addedBand = bandsAfterAdd[bandsAfterAdd.length - 1];
+      // `addLanded` for the reason 5e/7a carry theirs: on the first run of this
+      // section the Add click found no element, and this row still reported PASS
+      // because it was describing the band PROMOTION had left behind.
+      const addLanded = bandsAfterAdd.length === bandsAfterRemove.length + 1;
+      check('6g', 'the added band has the form\'s geometry and the contract\'s bank count',
+        addLanded && !!addedBand && addedBand.cols === 2 && addedBand.rows === 1
+        && addedBand.phaseBanks === PHASE_BANKS,
+        `landed=${addLanded} ${JSON.stringify(addedBand)}`);
+      await shot(c, '4-added-band-with-free-slots');
+
+      // ---- 7. Undo the whole arc, for real, with the keyboard. ------------
+      //
+      // THREE gestures went in (promote, remove, add), so three Ctrl+Z come out.
+      // The document must land byte-for-byte where it started — a stronger claim
+      // than "the band count went back", and the one that catches a plan and its
+      // inverse disagreeing about slot arithmetic.
+      const hashBeforeUndo = await c.evalExpr('window.__dbg.aeon.bgOverrideHash()');
+      const undoSteps = 3;   // promote, remove, add — one step each
+      for (let i = 0; i < undoSteps; i++) {
+        for (const type of ['rawKeyDown', 'char', 'keyUp']) {
+          await c.send('Input.dispatchKeyEvent', {
+            type, key: 'z', code: 'KeyZ', windowsVirtualKeyCode: 90, nativeVirtualKeyCode: 90,
+            modifiers: 2, text: type === 'char' ? 'z' : undefined,
+          });
+        }
+        await sleep(600);
+      }
+      const bands2 = await c.json('window.__dbg.aeon.bands()');
+      const budget4 = await c.json('window.__dbg.aeon.bandBudget()');
+      const hash2 = await c.evalExpr('window.__dbg.aeon.bgOverrideHash()');
+      // BOTH HALVES. `bands2.length === bands0.length` alone is trivially true
+      // when every gesture was a no-op, which is exactly how it reported PASS in
+      // the 2026-08-22 poison run.
+      check('7a', `${undoSteps} Ctrl+Z unwind the whole arc — each gesture was ONE undoable step`,
+        bandLanded && bands2.length === bands0.length && budget4.tiles === budget0.tiles,
+        `bands ${bands0.length} → ${bands1.length} → ${bandsAfterRemove.length} → `
+        + `${bandsAfterAdd.length} → ${bands2.length}; tiles ${budget0.tiles} → ${budget4.tiles}`);
+      // Same shape, same reason: "the hash came back" is free when the hash never
+      // moved. 7c states that discrimination as its own row AND it is required
+      // here, because a row's verdict must not depend on a reader noticing that a
+      // different row went red.
+      check('7b', 'and the document is byte-for-byte the one it started as',
+        hash2 !== null && hash2 === hash0 && hashBeforeUndo !== hash0,
+        `hash before=${hash0} after-arc=${hashBeforeUndo} after-undo=${hash2}`);
+      check('7c', 'the arc actually MOVED the hash — 7b is not comparing a constant',
+        hashBeforeUndo !== null && hashBeforeUndo !== hash0,
+        `arc hash=${hashBeforeUndo} vs base=${hash0}`);
     }
-    await sleep(900);
-    const bands2 = await c.json('window.__dbg.aeon.bands()');
-    const hash2 = await c.evalExpr('window.__dbg.aeon.bgOverrideHash()');
-    // BOTH HALVES, and the first half is what stops this reading green over a
-    // promotion that never happened: `bands2.length === bands0.length` alone is
-    // trivially true when the promote was a no-op, which is exactly how it
-    // reported PASS in the 2026-08-22 poison run.
-    check('7a', 'Ctrl+Z removes the band again — the promotion was ONE undoable step',
-      bandLanded && bands2.length === bands0.length,
-      `before=${bands0.length} after-promote=${bands1.length} after-undo=${bands2.length}`);
-    // STRONGER THAN A COUNT. A document that came back to the same band count
-    // with different bytes would pass the row above; this asserts the exact
-    // document, layout words and tile art included.
-    // Same shape, same reason: "the hash came back" is free when the hash never
-    // moved. 7c states that discrimination as its own row AND it is required
-    // here, because a row's own verdict must not depend on a reader noticing a
-    // different row went red.
-    check('7b', 'and the document is byte-for-byte the one it started as',
-      hash2 !== null && hash2 === hash0 && hashBeforeUndo !== hash0,
-      `hash before=${hash0} after-promote=${hashBeforeUndo} after-undo=${hash2}`);
-    check('7c', 'the promote actually MOVED the hash — 7b is not comparing a constant',
-      hashBeforeUndo !== null && hashBeforeUndo !== hash0,
-      `promote hash=${hashBeforeUndo} vs base=${hash0}`);
 
     // ---- 8. No clock. ---------------------------------------------------
     const probe = await c.evalExpr(REPAINT_PROBE);

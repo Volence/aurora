@@ -15,12 +15,19 @@
 //     command's actual behaviour. The rows below pin them TO the command: if
 //     availability says yes, the command must not refuse, and vice versa.
 //
-// TWO DOCUMENTS, and the pairing is the point. `b0e5a661` (340 tiles, 108 free)
-// is where insertion works. `FULL` is the same document padded to
-// BG_TILE_CAPACITY, which is the shape aeon's live file actually ships in
-// (448/448, verified 2026-08-22) — and where insertion refuses at every size
-// while promotion still works. A test suite that only used the first would
-// certify a panel that does nothing on real content.
+// TWO DOCUMENTS, AND BOTH ARE ORDINARY. `b0e5a661` (340 tiles, 108 free) is a
+// document with room: BOTH doors work there, and the rows say so. `FULL` is the
+// same document padded to BG_TILE_CAPACITY — the state aeon's live file happens
+// to sit in today — where insertion refuses at every size and promotion still
+// works.
+//
+// NEITHER IS THE "REAL" CASE. The 448 ceiling is real and immovable
+// ((0xB800-0x8000)/32, the BG region below the sprite attribute table); the
+// SATURATION is a transient property of one generator run, and the aeon lane is
+// adding a band-tile reserve. So a suite that only exercised the full document
+// would certify an interface shaped around a passing fact, and one that only
+// exercised the roomy document would miss the refusal an author meets while the
+// budget is tight. Both, as peers.
 
 import { describe, it, expect } from 'vitest';
 import type { AnyCommand } from '../../../core/editing/commands';
@@ -151,16 +158,22 @@ describe('the budget the panel puts on screen', () => {
 });
 
 describe('availability agrees with what the command actually does', () => {
-  it('on a document with room, insert is available AND the command succeeds', () => {
+  it('on a document with room, BOTH doors are open and both commands succeed', () => {
+    // The peer row. Insertion is not an exotic path reached after promotion
+    // fails — on any document with slots to spare it is simply available.
     const d = doc();
     expect(bandBudget(d).tileSlotsRemaining).toBeGreaterThan(0);   // anti-vacuous
     expect(insertUnavailableReason(d, 2, 1)).toBeNull();
+    expect(promoteUnavailableReason(d)).toBeNull();
     expect(addBandCommand(d, { cols: 2, rows: 1 }).ok).toBe(true);
+    expect(promoteBandCommand(d, bandBudget(d).firstPromotableSlot, { cols: 2, rows: 1 }).ok)
+      .toBe(true);
   });
 
   it('ON A FULL DOCUMENT insert is unavailable at EVERY size, and the command refuses', () => {
-    // The shape aeon ships. This is the row the whole panel's layout follows
-    // from: if this ever passed, "Add band" could have been the primary control.
+    // A capacity fact, not a verdict on the gesture: when the blob is full there
+    // are no slots to spend, and the author needs the count and the alternative
+    // rather than a silent dead control.
     const d = fullDoc();
     expect(bandBudget(d).tileSlotsRemaining).toBe(0);
     for (const [cols, rows] of [[1, 1], [2, 1], [8, 2], [32, 4]]) {
@@ -175,7 +188,8 @@ describe('availability agrees with what the command actually does', () => {
   });
 
   it('…and PROMOTION is available on that same full document, and succeeds', () => {
-    // The other half, and the reason the first half is not simply a dead end.
+    // The other half, and the reason the first half is not simply a dead end:
+    // promotion costs no slots at any capacity.
     const d = fullDoc();
     expect(promoteUnavailableReason(d)).toBeNull();
     const r = promoteBandCommand(d, bandBudget(d).firstPromotableSlot, { cols: 2, rows: 1 });

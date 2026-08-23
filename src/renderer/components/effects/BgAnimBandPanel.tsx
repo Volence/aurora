@@ -10,17 +10,36 @@
 // can check. This component reads stores, renders rows, and hands events to pure
 // functions. The only thing it decides is layout.
 //
-// ═══ PROMOTE FIRST. INSERT IS THE SPECIAL CASE. ═══
+// ═══ TWO SOURCES FOR A BAND, AND THEY ARE PEERS ═══
 //
-// aeon's live `editor_bg_override.json` carries 448 tiles against a capacity of
-// 448. `insertBand` refuses at EVERY band size on that document, so a panel
-// whose primary control is "Add band" is a panel that does nothing on the only
-// real content there is. PROMOTE is first, is the default, and works on a full
-// blob because it MOVES art the document already carries rather than adding
-// any. "Add band" is still here — a non-full document is an ordinary thing to
-// author against — but it is below, and when it is unavailable it says the
-// number of free slots and points at promotion, because a disabled control with
-// no number beside it teaches nothing.
+// A band needs geometry, a driver, and ART. The geometry and driver mean the
+// same thing either way, so they are asked ONCE, at the top of "New band". What
+// differs is where the art comes from, and the two answers sit side by side
+// under that one form:
+//
+//   FROM EXISTING TILES (promote) — the range MOVES to the front of the blob.
+//   Costs no tiles, ever, so it is the only door that works on a document with
+//   no free slots. The picture is unchanged in both directions.
+//
+//   FROM NEW ART (insert) — the band's art is added, so the blob GROWS by
+//   cols*rows and the operation needs that many free slots.
+//
+// NEITHER IS THE FALLBACK. An earlier revision of this panel put insertion in a
+// collapsed section titled "(needs free tiles)", on the reading that aeon's
+// live document ships at 448/448 and therefore insertion never works on real
+// content. THE CEILING IS REAL — 448 is `(0xB800-0x8000)/32`, the BG tile region
+// below the sprite attribute table — BUT THE SATURATION IS NOT: the owner has
+// ruled that background a non-final generator experiment, and the aeon lane is
+// adding a band-tile reserve to the generator precisely so this art can carry
+// parallax and animation. A document being full today is one import run's
+// property, not a fact to shape an interface around.
+//
+// WHAT THAT DOES NOT CHANGE is the capacity readout. `tileSlotsRemaining` and
+// `bandsRemaining` stay on screen beside both actions, and a refused control
+// still carries the codec's reason rather than being a dead button — for a
+// better reason than the first draft had: capacity is a LIVE quantity the author
+// is actively managing, so the number belongs next to the control that spends
+// it, in both directions.
 //
 // ═══ THERE IS NO VERTICAL BAND, AND THE PANEL SAYS SO ═══
 //
@@ -254,8 +273,13 @@ export default function BgAnimBandPanel(): React.ReactElement {
        </SectionBody>
       </CollapsibleSection>
 
-      <CollapsibleSection id="aeon.bganim.promote" title="Promote static tiles to a band">
+      <CollapsibleSection id="aeon.bganim.new" title="New band">
        <SectionBody>
+        {/* ONE GEOMETRY, TWO SOURCES. Cols, rows and driver describe the band
+            itself and mean the same thing whichever way its art arrives, so
+            they are asked once, above both actions. Duplicating them into two
+            sections would have been the shape that quietly says one of the two
+            is the real one. */}
         <div style={row}>
           <span style={label} title="Pattern width in tiles">Cols</span>
           <NumberField title={`cols — pattern_px will be ${patternPxFor(cols)}`}
@@ -271,6 +295,16 @@ export default function BgAnimBandPanel(): React.ReactElement {
             style={{ width: 80 }}>
             {rowChoices().map((r) => <option key={r} value={String(r)}>{r}</option>)}
           </Select>
+          <span style={note}>
+            {tileCount} slot{tileCount === 1 ? '' : 's'} · {patternPxFor(cols)}px pattern
+          </span>
+        </div>
+        <div style={row}>{driverField}</div>
+
+        {/* ── Source 1: art the document already carries ────────────────── */}
+        <div style={{ ...row, marginTop: T.s3, marginBottom: T.s1 }}>
+          <span style={{ fontSize: T.tSm, color: T.textHi }}>From existing tiles</span>
+          <span style={note}>costs no tiles — the range moves, it is not copied</span>
         </div>
         <div style={row}>
           <span style={label} title="First tile of the static range this band takes over">From tile</span>
@@ -279,45 +313,42 @@ export default function BgAnimBandPanel(): React.ReactElement {
               + `Slots 0..${budget.animatedSlots} already belong to bands.`}
             min={budget.firstPromotableSlot} width={72} value={staticBase}
             onChange={(n) => setStaticBase(Math.max(0, Math.round(n) || 0))} />
-          <span style={note}>
-            takes {tileCount} tile{tileCount === 1 ? '' : 's'} → {staticBase}..{staticBase + tileCount}
-          </span>
-        </div>
-        <div style={row}>{driverField}</div>
-        <div style={row}>
+          <span style={note}>→ {staticBase}..{staticBase + tileCount}</span>
           <Chip disabled={promoteOff !== null}
             title={promoteOff ?? 'Declare this static range animated. The blob does not grow.'}
             onClick={() => apply(promoteBandCommand(doc, staticBase, spec))}>
             Promote
           </Chip>
-          <span style={note}>
-            The picture does not change: phase 0 IS this art, and banks 1–7 arrive as copies of it,
-            so the band is inert until you draw its frames.
-          </span>
+        </div>
+        <div style={note}>
+          The picture does not change: phase 0 IS this art, and banks 1–7 arrive as copies of it,
+          so the band is inert until you draw its frames.
         </div>
         {promoteOff && <div style={warn}>{promoteOff}</div>}
-       </SectionBody>
-      </CollapsibleSection>
 
-      <CollapsibleSection id="aeon.bganim.add" title="Add a band (needs free tiles)" defaultCollapsed>
-       <SectionBody>
-        <div style={note}>
-          Adding a band puts NEW art into the blob, so it needs {tileCount} free
-          slot{tileCount === 1 ? '' : 's'}. On a full document use Promote instead — it moves art the
-          document already carries. The band arrives blank and unreferenced; nothing on screen
-          changes until you point layout cells at it.
+        {/* ── Source 2: new art ─────────────────────────────────────────── */}
+        <div style={{ ...row, marginTop: T.s3, marginBottom: T.s1 }}>
+          <span style={{ fontSize: T.tSm, color: T.textHi }}>From new art</span>
+          <span style={note}>
+            costs {tileCount} slot{tileCount === 1 ? '' : 's'} ·{' '}
+            <strong>{budget.tileSlotsRemaining}</strong> free
+          </span>
         </div>
-        <div style={{ ...row, marginTop: T.s2 }}>
+        <div style={row}>
           <Chip disabled={insertOff !== null}
             title={insertOff ?? `Add a blank ${cols}x${bandRowCount} band (${tileCount} tiles)`}
             onClick={() => apply(addBandCommand(doc, spec))}>
-            Add {cols}x{bandRowCount} band
+            Add band
           </Chip>
-          <span style={note}>{budget.tileSlotsRemaining} free slot(s)</span>
+          <span style={note}>
+            The band arrives blank and unreferenced; nothing on screen changes until you point
+            layout cells at it.
+          </span>
         </div>
         {insertOff && <div style={warn}>{insertOff}</div>}
        </SectionBody>
       </CollapsibleSection>
+
     </>
   );
 }

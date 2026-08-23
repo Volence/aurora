@@ -16,16 +16,26 @@
 //
 // ═══ THE TWO THINGS THIS SURFACE IS SHAPED BY ═══
 //
-// 1. PROMOTION IS THE PRIMARY GESTURE, NOT INSERTION. aeon's live
-//    `editor_bg_override.json` carries 448 tiles against a BG_TILE_CAPACITY of
-//    448 (verified 2026-08-22 on the file itself). `planBandInsertion` refuses
-//    at EVERY band size on that document, because insertion grows the blob and
-//    there is not one slot free. Promotion moves art the blob already carries,
-//    so `tiles.length` is unchanged and it works on a full document — which is
-//    the only document that exists. A panel built around "add a band" is a panel
-//    that does not work on real content, so promote/demote come first and insert
-//    is presented as the case that NEEDS free tiles, with the number of free
-//    tiles on screen beside it.
+// 1. A BAND'S ART HAS TWO SOURCES, AND THEY ARE PEERS. Promotion MOVES a static
+//    range to the front of the blob (`tiles.length` unchanged, so it works at
+//    any capacity); insertion ADDS new art (the blob grows by cols*rows, so it
+//    needs that many free slots). Both are first-class doors and this file
+//    treats them symmetrically — same result type, same refusal discipline, an
+//    availability answer for each.
+//
+//    THE CAPACITY CEILING IS REAL AND THE SATURATION IS NOT. 448 is
+//    `(0xB800-0x8000)/32`, the BG tile region below the sprite attribute table,
+//    and it does not move. aeon's live document happening to sit at 448/448
+//    today is one generator run's property — the owner has ruled that background
+//    a non-final experiment and the aeon lane is adding a band-tile reserve — so
+//    an interface shaped around "insertion never works" would be shaped around a
+//    transient. An earlier revision of this file said exactly that; it is
+//    corrected here rather than quietly rewritten.
+//
+//    What the ceiling DOES earn is the readout. `bandBudget` exists so
+//    `tileSlotsRemaining` and `bandsRemaining` can sit beside the controls that
+//    spend them, and so a refusal explains itself: capacity is a live quantity
+//    an author manages, in both directions.
 //
 // 2. A DRIVER IS A SCALAR SOURCE, NEVER AN AXIS. Every band moves
 //    HORIZONTALLY whichever driver it names, `camera_y` included — the runtime
@@ -237,13 +247,17 @@ export function bandRows(doc: BgOverrideDocument | null): BandRow[] {
 /**
  * Why an INSERT of a `cols x rows` band is unavailable, or null when it is not.
  *
- * ASKED AHEAD OF THE COMMAND, and it is the one place on this surface where a
- * reason is composed here rather than quoted from the codec. It has to be:
- * `makeAddBandCommand` answers by throwing, and a panel cannot throw once per
- * render to decide whether to grey a button. The wording is kept deliberately
- * close to the codec's own refusals, and the two are pinned against each other
- * in the tests — if this ever says "available" where the command refuses, that
- * is the dead button this whole shape exists to prevent.
+ * ASKED AHEAD OF THE COMMAND, and it is one of the two places on this surface
+ * where a reason is composed here rather than quoted from the codec. It has to
+ * be: `makeAddBandCommand` answers by throwing, and a panel cannot throw once
+ * per render to decide whether to grey a button. The wording is kept
+ * deliberately close to the codec's own refusals, and the two are pinned against
+ * each other in the tests — if this ever says "available" where the command
+ * refuses, that is the dead button this whole shape exists to prevent.
+ *
+ * IT NAMES PROMOTION AS THE WAY THROUGH, and that is not a demotion of
+ * insertion. The two doors are peers; when this one is shut for want of slots,
+ * the other one is the fact the author needs, exactly as `tileSlotsRemaining` is.
  */
 export function insertUnavailableReason(
   doc: BgOverrideDocument | null, cols: number, rows: number,
@@ -300,7 +314,7 @@ export interface BandSpec {
 /**
  * PROMOTE `tiles[staticBase : staticBase + cols*rows]` into a new band.
  *
- * THE PRIMARY AUTHORING GESTURE. The band's phase-0 art is READ from the blob
+ * ART THE DOCUMENT ALREADY CARRIES. The band's phase-0 art is READ from the blob
  * (`bandFromStaticTiles`) and banks 1..7 arrive as copies of it, so the band is
  * visually inert until an author draws its frames — the picture is identical
  * before and after, which is what lets a structural edit be safe on a shipping
@@ -341,9 +355,10 @@ export function demoteBandCommand(
 /**
  * ADD a band whose art comes from OUTSIDE the document — blank by default.
  *
- * Grows the blob, so this is the door a full document has no room for. Kept
- * because a document that is not full is a perfectly ordinary thing to author
- * against; presented second because the one that exists today is full.
+ * NEW ART. Grows the blob by `cols*rows`, so it needs that many free slots —
+ * which is a capacity question, not a rarity: this is a first-class door beside
+ * promotion, and the free-slot count sits next to it so an author managing the
+ * budget can see what the operation costs before spending it.
  */
 export function addBandCommand(
   doc: BgOverrideDocument | null, spec: BandSpec, phases?: number[][][],
