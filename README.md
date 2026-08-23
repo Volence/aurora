@@ -74,13 +74,43 @@ The socket path resolves `ORACLE_SOCKET` → `EXODUS_SOCKET` →
 Requires Node.js and npm.
 
 ```bash
-npm install --legacy-peer-deps
+npm install
 npm run dev        # launch the editor (electron-vite dev)
 ```
 
-`--legacy-peer-deps` is currently required: `electron-vite@5` declares a peer of
-`vite@^5 || ^6 || ^7`, and this project is on `vite@8`. Plain `npm install` and
-`npm ci` both fail with `ERESOLVE` until that peer range widens.
+Plain `npm install` and `npm ci` both work; no `--legacy-peer-deps` is needed.
+
+<details>
+<summary>Why <code>package.json</code> carries an <code>overrides</code> entry for <code>electron-vite</code></summary>
+
+`electron-vite@5` — the newest **stable** release — declares a peer of
+`vite@^5 || ^6 || ^7`, and this project is on `vite@8`. Without help, npm refuses
+the tree with `ERESOLVE`, so a new contributor's first command fails. The
+`overrides` entry pins `electron-vite`'s `vite` edge to the `vite` the root
+project already depends on:
+
+```json
+"overrides": { "electron-vite": { "vite": "$vite" } }
+```
+
+**What the override asserts, and on what evidence.** Only that *this* combination
+— `vite@8.0.8` + `electron-vite@5.0.0` + `@vitejs/plugin-react@6.0.1` — is the
+tree Aurora actually runs: it is what `npm run dev`, `npm run build`,
+`npm run preview` and `npm test` all use today, and the full vitest suite passes
+on it. It is **not** a general claim that `electron-vite@5` supports `vite@8`;
+only that nothing Aurora exercises is broken by the gap. The peer range is stale
+metadata relative to our usage, not a demonstrated incompatibility. The
+alternatives were worse: downgrading means moving *two* packages backwards
+(vite 8→7 and plugin-react 6→5) to fix a packaging problem in a tree that works,
+and `electron-vite@6` — which does accept `vite@^8` — is still a beta, which does
+not belong in the toolchain the app ships from.
+
+**Removal condition.** When `electron-vite@6` goes stable, bump the dependency
+and **delete the override** along with this section. Check with
+`npm view electron-vite dist-tags`. An override with no removal condition turns
+into folklore.
+
+</details>
 
 Other scripts (all of `package.json`'s):
 
