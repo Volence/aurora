@@ -155,6 +155,81 @@ export const EDITOR_METHODS: EditorMethod[] = [
       + 'null to fall back to the act default. One undo step. Refuses an id that is not a readable scene — '
       + 'a ref the build cannot resolve is worse than no ref.' },
 
+  // ---- Wave-1 surface 4: BgAnim bands -------------------------------------
+  // Same registry, same rule as the scene block above: one entry lights the
+  // capability up on BOTH MCP and Aether, so agent parity is a property of
+  // adding it here rather than a second surface to keep in step.
+  //
+  // THE DESCRIPTIONS CARRY TWO FACTS AN AGENT CANNOT GUESS, and both of them
+  // are ones a plausible-sounding wrong model would get backwards:
+  //   • a driver is a SCALAR SOURCE, not an axis — every band moves horizontally;
+  //   • promotion does not grow the tile blob and addition does, which is why
+  //     promotion is the operation that works on a document at capacity.
+  { name: 'list_bg_anim_bands', kind: 'list-bg-anim-bands', result: 'json', params: {},
+    description: 'List the BgAnim bands of this game\'s BG override document '
+      + '(data/editor_bg_override.json): each band\'s geometry, driver, rate shift and slot range, '
+      + 'plus the tile-blob and band-count budgets. Also reports whether that file exists and '
+      + 'whether it could be read — an unreadable one is never overwritten, and every band '
+      + 'operation will refuse against it.' },
+  { name: 'promote_bg_anim_band', kind: 'promote-bg-anim-band', result: 'json',
+    params: {
+      cols: z.number().int().min(1).describe('pattern width in tiles; pattern_px becomes cols*8'),
+      rows: z.number().int().min(1)
+        .describe('pattern height in tiles. rows*32 (the bytes in one pattern column) must be an '
+          + 'exact power of two, because the runtime rotates a column by shifting it'),
+      staticBase: z.number().int().min(0)
+        .describe('first tile of the existing static range to declare animated. It must lie at or '
+          + 'after the end of the current animated prefix (list_bg_anim_bands reports it as '
+          + 'budget.firstPromotableSlot) and the whole cols*rows range must already be in the blob'),
+      driver: z.string().optional()
+        .describe('camera_x, camera_y or timer — the SCALAR the band\'s step is read from. Every '
+          + 'band shifts HORIZONTALLY whichever driver it uses; camera_y does NOT mean vertical '
+          + 'motion. Omit to leave the key out so the document tracks the engine default'),
+      rateShift: z.number().int().optional()
+        .describe('right shift applied to the driver scalar. Omit to leave the key out'),
+    },
+    description: 'Promote an existing static tile range into a new BgAnim band. THE PRIMARY WAY TO '
+      + 'AUTHOR A BAND: the range MOVES to the front of the blob rather than being added to it, so '
+      + 'tiles.length is unchanged and this works on a document that has spent its whole tile '
+      + 'budget (which the shipping one has). Phase 0 is READ from the blob and banks 1-7 arrive as '
+      + 'copies of it, so the rendered picture is identical before and after — the band is inert '
+      + 'until its frames are drawn. One undo step.' },
+  { name: 'demote_bg_anim_band', kind: 'demote-bg-anim-band', result: 'json',
+    params: {
+      band: z.number().int().min(0).describe('index into the band list'),
+      staticBase: z.number().int().min(0).optional()
+        .describe('where the band\'s slots land in the static region. Omit for the front of it, '
+          + 'which for the LAST band moves no tile at all'),
+    },
+    description: 'Demote a BgAnim band back to plain static tiles. LOSSLESS in both directions and '
+      + 'the safe counterpart to remove_bg_anim_band: the slots move into the static region instead '
+      + 'of being deleted, so every cell that drew the band goes on drawing the same picture and '
+      + 'there is nothing to blank. One undo step.' },
+  { name: 'add_bg_anim_band', kind: 'add-bg-anim-band', result: 'json',
+    params: {
+      cols: z.number().int().min(1).describe('pattern width in tiles; pattern_px becomes cols*8'),
+      rows: z.number().int().min(1).describe('pattern height in tiles; rows*32 must be a power of two'),
+      phases: z.array(z.array(z.array(z.number().int().min(0).max(15)).length(64))).optional()
+        .describe('the band art: exactly 8 banks, each of cols*rows tiles, each tile 64 pixel '
+          + 'values 0-15 row-major. Omit for a blank band'),
+      driver: z.string().optional().describe('camera_x, camera_y or timer — the scalar source, never an axis'),
+      rateShift: z.number().int().optional().describe('right shift applied to the driver scalar'),
+    },
+    description: 'Add a NEW BgAnim band whose art comes from outside the document. THIS GROWS THE '
+      + 'TILE BLOB by cols*rows, so it refuses on a document at capacity — use '
+      + 'promote_bg_anim_band there instead. The art arrives unreferenced, so nothing on screen '
+      + 'changes until layout cells point at it. One undo step.' },
+  { name: 'remove_bg_anim_band', kind: 'remove-bg-anim-band', result: 'json',
+    params: {
+      band: z.number().int().min(0).describe('index into the band list'),
+      blankReferencingCells: z.boolean().optional()
+        .describe('repoint layout cells that draw this band to the blank word instead of refusing. '
+          + 'Off by default: removal DESTROYS the band\'s art, and this is how you say you meant to'),
+    },
+    description: 'Remove a BgAnim band, deleting its slots from the tile blob. DESTRUCTIVE, unlike '
+      + 'demote_bg_anim_band — refuses by default when layout cells draw the band, naming how many, '
+      + 'and only blanks them when blankReferencingCells says so. One undo step.' },
+
   { name: 'screenshot', kind: 'screenshot', result: 'image',
     params: { region: z.object({ x: z.number().int().min(0), y: z.number().int().min(0), w: z.number().int().min(1), h: z.number().int().min(1) }).optional(), showBg: z.boolean().optional().describe('render the background plane during capture') },
     description: 'PNG of the map canvas (current viewport). Optional region crop in canvas device pixels (not tile/world coords).' },
