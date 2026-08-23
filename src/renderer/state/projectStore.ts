@@ -4,6 +4,7 @@ import type { S4Project, Zone, Act, Tileset, Palette, ObjectDef, ChunkDef, BgLib
 import type { S4Level } from '../../core/editing/commands';
 import type { CollisionProfileSet } from '../../core/collision/collision-model';
 import type { CapabilityManifest } from '../../core/project/adapter';
+import type { BgOverrideDocument } from '../../core/formats/bg-override/bg-override';
 
 /** A rendered object-preview image + its origin (for centering on the placement point). */
 export interface ObjectPreview {
@@ -130,7 +131,7 @@ export function getActiveLevel(state: ProjectState): S4Level | null {
   const zone = getCurrentZone(state);
   const act = getCurrentAct(state);
   if (!zone || !act) return null;
-  return {
+  const level: S4Level = {
     sections: act.sections,
     tileset: zone.tileset,
     palette: zone.palette,
@@ -141,4 +142,37 @@ export function getActiveLevel(state: ProjectState): S4Level | null {
     effectsScenes: state.project?.effectsScenes,
     act,
   };
+
+  // `bgOverride` IS AN ACCESSOR, AND IT HAS TO BE. Every other field above is a
+  // reference to an object the project owns, so a command that mutates one
+  // (`level.act.bgLayout = …`, `placeEffectsScene(level.effectsScenes, …)`)
+  // mutates the project. A BgAnim band command does not mutate — the plan
+  // appliers are pure and return a NEW document, and history.ts accordingly
+  // writes `level.bgOverride = applyWithBand(…)`.
+  //
+  // This object is not the project. It is rebuilt from scratch on every gesture
+  // and on every undo (BoundEditHistory calls its `getLevel` supplier fresh each
+  // time), so a plain data field here would take that assignment, hold it for
+  // the length of one call, and be garbage-collected with the band edit still
+  // inside it. The document would never reach the store, the panel would never
+  // repaint, and the save plan would write the file it loaded — a whole editing
+  // surface silently doing nothing, with the node suite unable to see it.
+  //
+  // So the field READS the project's holder and WRITES BACK INTO IT. The
+  // command layer's `level.bgOverride = doc` stays exactly as items 20/23/27
+  // landed it; the aliasing that makes it an edit lives here, where the view is
+  // built, which is the only place that knows the view is a view.
+  const holder = state.project?.bgOverride;
+  if (holder) {
+    Object.defineProperty(level, 'bgOverride', {
+      enumerable: true,
+      configurable: true,
+      // null (absent/unreadable file) surfaces as `undefined`, so the command's
+      // own `if (!level.bgOverride) throw` fires with its own message rather
+      // than this layer inventing a second refusal.
+      get: () => holder.doc ?? undefined,
+      set: (doc: BgOverrideDocument) => { holder.doc = doc; },
+    });
+  }
+  return level;
 }

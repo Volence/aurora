@@ -1,6 +1,7 @@
 // Type-only (erased at compile), so the effects codec's own reach back into
 // project/adapter cannot make this a runtime import cycle. See S4Project.
 import type { EffectsSceneLibrary } from '../formats/effects/scene';
+import type { BgOverrideState } from '../formats/bg-override/bg-override-io';
 
 export const SECTION_TILES_WIDE = 256;
 export const SECTION_TILES_HIGH = 256;
@@ -319,6 +320,27 @@ export interface S4Project {
    * though scene.ts reaches back to project/adapter for `FileAccess`.
    */
   effectsScenes: EffectsSceneLibrary;
+  /**
+   * The BG override document — `{dataRoot}editor_bg_override.json`, ONE PER
+   * GAME rather than per zone or per act (aeon EFFECTS_CONSUMER_CONTRACT.md
+   * §1.1). It carries the Plane B layout, its tile blob, and the BgAnim bands
+   * that animate a prefix of that blob.
+   *
+   * REQUIRED, and a HOLDER rather than the bare document, for two different
+   * reasons that both matter:
+   *
+   *   • required, on the same rule `effectsScenes` states above — an optional
+   *     field reads downstream as "this project has no override" and, at save
+   *     time, writes nothing.
+   *
+   *   • a holder, because a band edit REPLACES the document (the plan appliers
+   *     are pure functions returning a new one) and an S4Level is a fresh view
+   *     object built per gesture. Writing the new document into the view would
+   *     be thrown away with the view; writing it into this object, which the
+   *     project owns, is the edit. `unreadable` and `loadedText` ride along for
+   *     the write path, exactly as `EffectsSceneLibrary.unreadable` does.
+   */
+  bgOverride: BgOverrideState;
 }
 
 export const SF_HAS_WATER = 1 << 0;
