@@ -163,6 +163,46 @@ their build order, and that is the whole point of this document.
 > Aurora should say so loudly, because it would move `write_vram` up their order. If it does
 > not survive, the ask is a RAM-source or engine-mailbox story on aeon's side and the bus owes
 > nothing — same as CRAM. **TAGGED for foreground runtime follow-up (§5).**
+>
+> ---
+>
+> ### ⚠ FOREGROUND FOLLOW-UP RUN, 2026-08-22 — **the tagged measurement is CIRCULAR and cannot be taken.**
+>
+> Run by the overseer against `aeon/s4.debug.bin` (`sha256 903b194659dfdd8e74…`) on
+> `oracle-aether` release, headless. **`emulator/write_vram` is not served.** The call returns
+> `[-32601] no such method`, and in oracle's source at `e484ace` the token `write_vram` occurs
+> **once in the whole 5,173-line `engine.rs`, inside a doc comment referring to "the sibling's
+> `write_vram`"** — i.e. the legacy C++ server. There is no handler.
+>
+> **So the condition written above cannot be evaluated: the probe that would justify asking for
+> `write_vram` requires `write_vram`.** This is worth stating plainly because the refusal reads
+> as evidenced and is not — it is a **prediction with a stated revival condition, and the
+> revival condition is unreachable with the current toolset.** Anyone pricing this ask should
+> price it as such.
+>
+> **Indirect evidence, gathered by changing the instrument rather than the subject** (read-only,
+> since reads are served and writes are not). Across **5,728 px of real camera motion**
+> (`Camera_X` 96 → 3872 → 5824, verified by reading the symbol at each step, not assumed from
+> button presses), these VRAM regions were **byte-identical**: `$8000` (BG tile blob, 64 B),
+> `$2000` and `$0800` (level art, 64 B each).
+>
+> **What that does NOT establish, stated rather than left implied.** aeon's ROM carries a real
+> tile cache — **85 `TileCache*` symbols**, incl. `Tile_Cache_GetTile`, `TileCache_FindStagedBlock`,
+> `TileCache_InvalidateStaging` — so unchanged bytes at three sampled points are **not** evidence
+> that nothing streams. The honest reading is that **the streamed region was not located**, not
+> that streaming does not occur. Three points are a sample, and the machinery to refute them
+> demonstrably exists.
+>
+> **One probe is discarded as vacuous and is not counted above.** A fourth scroll attempt (300
+> frames of `right`) left `Camera_X` at `0x16C0` — unchanged — so the player had stalled against
+> something, and the `$4000`/`$6000` before/after pair spans a window in which the camera never
+> moved. It would have read as two more clean confirmations. It is a comparison against a
+> stationary subject and proves nothing; **the only reason it was caught is that `Camera_X` was
+> re-read rather than inferred from the button press succeeding.**
+>
+> **Verdict unchanged, evidentiary status downgraded:** still do not ask for `write_vram`. But the
+> reason is no longer "we predict a poke would not survive" — it is **"nobody can find out until
+> it exists, and building it to find out is a cost with no promised return."**
 
 ---
 
