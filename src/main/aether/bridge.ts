@@ -16,6 +16,7 @@ import { ipcMain, type BrowserWindow } from 'electron';
 import { IPC_CHANNELS, type AetherStatusPayload, type AetherWarpResult, type AetherBuildResult } from '../../shared/ipc-types';
 import { AetherClient } from './client';
 import { resolveSocketPath } from './socket-path';
+import { unservedMethodOf } from './unserved';
 import { pushPaletteWords } from './push-palette';
 import { warpTo } from './warp';
 import { runBuild } from './build-run';
@@ -29,17 +30,25 @@ let client: AetherClient | null = null;
 let win: BrowserWindow | null = null;
 let lastError: string | undefined;
 let paletteKind: PalettePushKind | null = null;
+/**
+ * Set when the palette probe could not run because the SERVER lacks the method,
+ * as opposed to the ROM lacking the symbols. Both grey the control out; only one
+ * of them is the artist's problem.
+ */
+let paletteUnservedMethod: string | undefined;
 
 function publish(): void {
-  const payload: AetherStatusPayload = {
-    status: client?.status ?? 'disconnected',
-    serverName: client?.server.name,
-    serverVersion: client?.server.version,
-    error: lastError,
-    palette: paletteKind !== null,
-    paletteKind: paletteKind ?? undefined,
-  };
-  win?.webContents.send(IPC_CHANNELS.AETHER_STATUS, payload);
+  win?.webContents.send(IPC_CHANNELS.AETHER_STATUS, statusPayload());
+}
+
+export interface PaletteProbe {
+  kind: PalettePushKind | null;
+  /**
+   * Set when the probe could not RUN — the server does not serve the lookup —
+   * as opposed to running and finding nothing. Both leave `kind` null and both
+   * grey the control out; only one of them is the artist's ROM to fix.
+   */
+  unservedMethod?: string;
 }
 
 /**
@@ -51,18 +60,34 @@ function publish(): void {
  * `v_palette_line_N`. A stripped ROM, or one whose engine renamed them,
  * resolves neither and the feature stays grey.
  */
-async function probePalette(c: AetherClient): Promise<PalettePushKind | null> {
+export async function probePalette(c: AetherClient): Promise<PaletteProbe> {
+  // NOT AN AETHER GAP — a genuine either/or. Failing to resolve `Pal_Base` is
+  // how this probe LEARNS the listing is not aeon's, and turning that into an
+  // error would break the only detection there is. It stays a fall-through.
+  //
+  // What must NOT fall through is `lookup_symbol` being unserved: then neither
+  // arm can resolve anything, both fail, and the honest answer "no palette
+  // symbols in this ROM" is a fabrication — the ROM was never asked. Recorded
+  // and reported instead, and the classic arm is not even attempted, because
+  // running a probe whose instrument is missing only produces a second wrong
+  // negative.
   try {
     await c.resolve(PAL_BASE_SYMBOL);
     await c.resolve(PAL_BASE_DIRTY_SYMBOL);
-    return 'aeon';
-  } catch { /* not an aeon listing — try classic */ }
+    return { kind: 'aeon' };
+  } catch (e) {
+    const u = unservedMethodOf(e);
+    if (u !== null) return { kind: null, unservedMethod: u };
+    /* else: not an aeon listing — try classic */
+  }
   try {
     for (let line = 0; line < CLASSIC_LINES; line++) {
       await c.resolve(classicPaletteSymbol(line));
     }
-    return 'classic';
-  } catch { return null; }
+    return { kind: 'classic' };
+  } catch (e) {
+    return { kind: null, unservedMethod: unservedMethodOf(e) ?? undefined };
+  }
 }
 
 /**
@@ -102,6 +127,7 @@ export function registerAetherBridge(browserWindow: BrowserWindow): void {
     c.onStatusChange((status) => {
       if (status === 'disconnected') {
         paletteKind = null;
+        paletteUnservedMethod = undefined;
         if (client === c) client = null;
       }
       publish();
@@ -110,10 +136,13 @@ export function registerAetherBridge(browserWindow: BrowserWindow): void {
 
     try {
       await c.connect();
-      paletteKind = await probePalette(c);
+      const probe = await probePalette(c);
+      paletteKind = probe.kind;
+      paletteUnservedMethod = probe.unservedMethod;
     } catch (e) {
       lastError = e instanceof Error ? e.message : String(e);
       paletteKind = null;
+      paletteUnservedMethod = undefined;
       client = null;
     }
     publish();
@@ -124,6 +153,7 @@ export function registerAetherBridge(browserWindow: BrowserWindow): void {
     client?.disconnect();
     client = null;
     paletteKind = null;
+    paletteUnservedMethod = undefined;
     lastError = undefined;
     publish();
     return statusPayload();
@@ -150,6 +180,7 @@ export function registerAetherBridge(browserWindow: BrowserWindow): void {
         restoredVia: r.restoredVia,
         fast: r.fast,
         timings: r.timings,
+        unservedMethods: r.unservedMethods,
       };
     },
   );
@@ -159,7 +190,10 @@ export function registerAetherBridge(browserWindow: BrowserWindow): void {
     async (_e, x: number, y: number): Promise<AetherWarpResult> => {
       if (!client) return { warped: false, error: 'not connected' };
       const r = await warpTo(client, x, y);
-      return { warped: r.warped, gate: r.gate, error: r.error, landed: r.landed, clamped: r.clamped };
+      return {
+        warped: r.warped, gate: r.gate, error: r.error, landed: r.landed, clamped: r.clamped,
+        unservedMethod: r.unservedMethod,
+      };
     },
   );
 
@@ -167,13 +201,13 @@ export function registerAetherBridge(browserWindow: BrowserWindow): void {
     IPC_CHANNELS.AETHER_PUSH_PALETTE,
     async (
       _e, line: number, words: number[], kind?: PalettePushKind,
-    ): Promise<{ pushed: boolean; error?: string }> => {
+    ): Promise<{ pushed: boolean; error?: string; unservedMethod?: string }> => {
       if (!client) return { pushed: false, error: 'not connected' };
       // The renderer hands CRAM words; they go to the wire as-is rather than
       // round-tripping through 8-bit colour and back. `kind` is the OPEN
       // PROJECT's family; a mismatched ROM gates on symbol resolution inside.
       const r = await pushPaletteWords(client, line, words, kind);
-      return { pushed: r.pushed, error: r.error };
+      return { pushed: r.pushed, error: r.error, unservedMethod: r.unservedMethod };
     },
   );
 }
@@ -187,6 +221,13 @@ function statusPayload(socketPath?: string): AetherStatusPayload {
     error: lastError,
     palette: paletteKind !== null,
     paletteKind: paletteKind ?? undefined,
+    // WHICH SERVER ANSWERED. Two implementations resolve the same socket and
+    // serve different subsets, so "connected" alone does not say what Aurora is
+    // talking to. The count travels with the name because the name is the thing
+    // most likely to be aligned between them, and the count is not.
+    methodCount: client?.handshake?.methodCount,
+    servedMethods: client?.handshake?.methods,
+    paletteUnservedMethod,
   };
 }
 
@@ -197,4 +238,5 @@ export function resetAetherBridge(): void {
   win = null;
   lastError = undefined;
   paletteKind = null;
+  paletteUnservedMethod = undefined;
 }

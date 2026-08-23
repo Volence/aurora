@@ -74,6 +74,12 @@ export interface AetherBuildResult {
   fast?: boolean;
   /** Milliseconds per phase, so a slow loop can be attributed rather than guessed at. */
   timings?: { build: number; reload: number; restore: number };
+  /**
+   * Aether methods the connected server does NOT serve, which this run needed.
+   * Present means a capability gap, not a broken build — different problem,
+   * different fix, so it never hides inside `reloadError`.
+   */
+  unservedMethods?: string[];
 }
 
 export interface AetherWarpResult {
@@ -83,6 +89,11 @@ export interface AetherWarpResult {
   /** Where the ENGINE says the player landed, after its own clamping. */
   landed?: { x: number; y: number };
   clamped?: boolean;
+  /**
+   * The method the server does not serve, when THAT is why the warp did not
+   * happen. Distinguishes a capability gap from a release ROM with no mailbox.
+   */
+  unservedMethod?: string;
 }
 
 /** What the renderer knows about the outbound link. */
@@ -101,6 +112,21 @@ export interface AetherStatusPayload {
    * classic panel does not light up green against an aeon ROM (or vice versa).
    */
   paletteKind?: 'aeon' | 'classic';
+  /**
+   * WHAT ANSWERED THE HANDSHAKE. The legacy C++ server and the Rust core resolve
+   * the SAME socket chain, so `status: 'connected'` says nothing about which one
+   * is on the other end. `serverName` differs today (`oracle` vs `oracle-next`)
+   * but names get aligned; the served-method count is the durable signal, and it
+   * is what an installed binary and its source tree can disagree about.
+   */
+  methodCount?: number;
+  /** The advertised list itself, exactly as it arrived. */
+  servedMethods?: string[];
+  /**
+   * Set when the palette probe was blocked by the SERVER rather than the ROM.
+   * Without it, "no palette symbols" is indistinguishable from "never asked".
+   */
+  paletteUnservedMethod?: string;
 }
 
 export type IpcChannels = typeof IPC_CHANNELS;

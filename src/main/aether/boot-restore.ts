@@ -37,6 +37,7 @@
  */
 
 import type { AetherClient } from './client';
+import { MethodNotServedError, isMethodNotServed, unservedMethodOf } from './unserved';
 
 /** Declaration order mirrors `aeon/games/sonic4/config/ram.emp` (X, Y, Flag) — and the WRITE order is the protocol: payload first, flag LAST. */
 export const BOOT_SYMBOLS = ['Boot_At_X', 'Boot_At_Y', 'Boot_At_Flag'] as const;
@@ -54,12 +55,23 @@ export enum BootRestoreGate {
   NoSymbols = 'no-symbols',
   /** The boot never reached the init within the run bound — the window never opened. */
   InitNotReached = 'init-not-reached',
+  /**
+   * The SERVER does not serve a method this sequence needs. Emphatically NOT
+   * `NoSymbols`: that gate means "this ROM predates the boot override", which
+   * is a statement about the artifact and sends the caller to its warp
+   * fallback. An unserved `run_to` or `write_memory` breaks the warp fallback
+   * too, so reporting it as NoSymbols would send the caller down a second path
+   * that cannot work either, for a reason nobody was told.
+   */
+  UnservedMethod = 'unserved-method',
 }
 
 export interface BootRestoreResult {
   restored: boolean;
   gate?: BootRestoreGate;
   error?: string;
+  /** Set when the failure was "the server does not serve this" — names which. */
+  unservedMethod?: string;
   /** The engine-published (clamped) pair — where the player actually IS. */
   landed?: { x: number; y: number };
   /** True when the engine moved the destination — worth telling the user. */
@@ -123,6 +135,26 @@ export async function bootRestoreTo(
     }
   }
 
+  // ASKED BEFORE THE MACHINE MOVES, for the same reason the resolution below
+  // happens before `run_to`: the documented precondition is a machine paused at
+  // reset, and discovering a gap after the boot has advanced leaves the caller's
+  // fallback starting somewhere this routine never described. The ack step
+  // needs a different method depending on who owns the pause, so the list is
+  // built from `wasRunning` rather than guessed at.
+  for (const m of [
+    'emulator/lookup_symbol', 'emulator/run_to', 'emulator/write_memory', 'emulator/read_memory',
+    opts.wasRunning ? 'emulator/resume' : 'emulator/run_frames',
+  ]) {
+    if (!client.hasMethod(m)) {
+      return {
+        restored: false, resumed: false,
+        gate: BootRestoreGate.UnservedMethod,
+        unservedMethod: m,
+        error: new MethodNotServedError(m, 'advertised-list', client.server?.name).message,
+      };
+    }
+  }
+
   // Resolve EVERYTHING before advancing the machine one frame: a ROM missing
   // any of these gates off cleanly with the machine still at reset, so the
   // caller's fallback starts from the same place this routine did.
@@ -132,8 +164,13 @@ export async function bootRestoreTo(
       [...BOOT_SYMBOLS, BOOT_INIT_SYMBOL].map((s) => client.resolve(s)),
     );
   } catch (e) {
+    // NoSymbols is a claim about the ROM ("older than the override"). Only make
+    // it when the lookup actually ran and came back empty-handed.
+    const unserved = unservedMethodOf(e);
     return {
-      restored: false, gate: BootRestoreGate.NoSymbols, resumed: false,
+      restored: false, resumed: false,
+      gate: unserved !== null ? BootRestoreGate.UnservedMethod : BootRestoreGate.NoSymbols,
+      unservedMethod: unserved ?? undefined,
       error: e instanceof Error ? e.message : String(e),
     };
   }
@@ -198,6 +235,11 @@ export async function bootRestoreTo(
       clamped: landedX !== x || landedY !== y,
     };
   } catch (e) {
-    return { restored: false, resumed, error: e instanceof Error ? e.message : String(e) };
+    return {
+      restored: false, resumed,
+      gate: isMethodNotServed(e) ? BootRestoreGate.UnservedMethod : undefined,
+      unservedMethod: unservedMethodOf(e) ?? undefined,
+      error: e instanceof Error ? e.message : String(e),
+    };
   }
 }
