@@ -22,6 +22,7 @@
 import React from 'react';
 import AeonPropertiesPanel from '../../components/AeonPropertiesPanel';
 import EffectsScenePanel from '../../components/effects/EffectsScenePanel';
+import BgAnimBandPanel from '../../components/effects/BgAnimBandPanel';
 import { Panel, CollapsibleSection } from '../../components/ui';
 import { mapFacet, type FacetModule } from '../facet-registry';
 
@@ -29,6 +30,13 @@ function EffectsPanels() {
   return (
     <Panel width={300} scroll>
       <EffectsScenePanel />
+      {/* The BgAnim band editor belongs in THIS column, not a facet of its own.
+          A band is the tile-blob half of the same parallax lens the scenes are
+          the scroll half of — both are authored against the act in the canvas
+          beside them, both live in the `parallax` capability, and splitting them
+          would make an author switch facets to answer "what does this background
+          do". Wave-1 surface 4, part 3 (ROADMAP item 28). */}
+      <BgAnimBandPanel />
       {/* Subscriptions live in the AeonPropertiesPanel leaf, not this column —
           the reason its own docblock gives. */}
       <CollapsibleSection id="aeon.props" title="Properties" defaultCollapsed>
