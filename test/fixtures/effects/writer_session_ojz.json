@@ -1,0 +1,56 @@
+{
+  "id": "writer_session_ojz",
+  "layers": [
+    {
+      "fa": "FACTOR_LOCKED",
+      "fb": {
+        "op": 0,
+        "s1": 0,
+        "s2": 15
+      },
+      "world_y": 0
+    },
+    {
+      "fa": "FACTOR_0",
+      "fb": "FACTOR_15_16",
+      "world_y": 32
+    },
+    {
+      "fa": "FACTOR_1",
+      "fb": "FACTOR_7_16",
+      "world_y": 64
+    },
+    {
+      "fa": "FACTOR_1_2",
+      "fb": "FACTOR_7_8",
+      "world_y": 96
+    },
+    {
+      "fa": "FACTOR_1_4",
+      "fb": "FACTOR_5_16",
+      "world_y": 128
+    },
+    {
+      "fa": "FACTOR_1_8",
+      "fb": "FACTOR_5_8",
+      "world_y": 160
+    },
+    {
+      "fa": "FACTOR_1_16",
+      "fb": "FACTOR_3_16",
+      "world_y": 192
+    },
+    {
+      "fa": "FACTOR_1_32",
+      "fb": "FACTOR_3_8",
+      "world_y": 224
+    }
+  ],
+  "name": "Oracle Jungle Zone — writer session",
+  "precision": "cell",
+  "schema": 1,
+  "transition": "instant",
+  "v_center": 8,
+  "v_factor": "FACTOR_3_4",
+  "v_offset": -8
+}
