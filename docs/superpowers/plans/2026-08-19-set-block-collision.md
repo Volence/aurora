@@ -2006,6 +2006,6 @@ Discovered during this plan, deliberately not done:
 - **Plant every guard.** Three guards in the previous plan asserted nothing and were caught only by planting the defect they name. Tasks 1, 6, 8 and 9 have explicit planting steps; do not skip them.
 - **Do not touch `paint_collision`.** It is aeon's, with different semantics.
 - **Do not "fix" `scratchpad/commit-collision-harness.mjs`'s 5/6.** It is stage 4's, proven by A/B at `bd7700b`.
-- **Work in the worktree** at `.claude/worktrees/set-block-collision`, branch `feat/set-block-collision`. `npm install` there needs `--legacy-peer-deps` (package.json declares vite ^8; electron-vite@5 peers on ^5||^6||^7).
+- **Work in the worktree** at `.claude/worktrees/set-block-collision`, branch `feat/set-block-collision`. ~~`npm install` there needs `--legacy-peer-deps`~~ **— SUPERSEDED 2026-08-22 (ROADMAP item 30): plain `npm install`/`npm ci` now work; the peer conflict is fixed by an `overrides` entry. Left struck rather than deleted because this is a historical plan record, but it sat in an AGENT-INSTRUCTION block, which is a live instruction, not a note.** (package.json declares vite ^8; electron-vite@5 peers on ^5||^6||^7).
 - **`git add` enumerated paths only** — never `-A` or globs. Verify every commit with `git show --stat`.
 - **BLOCKED beats a silent downgrade.** If a constraint here seems to force a worse design, stop on that item, record why, and continue with the rest.
