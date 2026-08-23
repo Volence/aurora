@@ -375,6 +375,34 @@ trusting, the repos move.
   machine is stopped at the init's entry and nothing is painted yet.
 - **`emulator/reset` is off-limits on the hosted build** until aeon's F-HOSTED-RESET-SRM
   closes — it bypasses the player's `.srm` flush. `reload_rom` is unaffected.
+- **The MCP SHIM and the Aether SERVER are independent, and only one of them is config**
+  *(established firsthand 2026-08-22, during the Rust-core cutover)*. `mcp__oracle__*` in this
+  workspace runs **oracle-old's Python shim** — a *client* — which dials the same socket chain
+  everything else does. **So the shim's provenance does not determine the server's.** Proven
+  here end to end: an `oracle-old` shim (PID 14139, started 12:54) served every emulator call
+  this session, and they all reached a **Rust `oracle-aether`** — decisive because
+  `emulator/status` returned `romPath: ../aeon/s4.debug.bin`, the *relative* argv passed to the
+  Rust binary from this repo's cwd, while the C++ `oracle_gui` on the same machine carries the
+  **absolute** path. A legacy shim against the Rust core already works; nobody had tested it.
+  Two consequences. **(a)** "Cut over `mcp__oracle__*`" is two changes, not one: which shim
+  Claude launches (config, **on the process command line — a running session cannot pick it up,
+  so it needs a full restart, not a `/clear`**), and which server holds the socket (whoever ran
+  a process first). **(b) A session can silently change which implementation it is talking to
+  with no config change and no signal** — the socket chain is the only arbiter. Read the
+  banner's method count, and treat it as the freshness tell it is.
+- **A built binary is a third enumeration parameter, and it is the one source greps cannot
+  reach** *(same day)*: `oracle-aether` release bannered **37 methods** while oracle's source
+  served 41 — the binary predated four landed methods. Two lanes had derived the count from
+  source by different methods and agreed; both were blind to the artifact. **A consumer
+  measuring the bus against an installed binary gets the old answer with nothing announcing
+  it**, so a cutover must rebuild and **verify by executing, never by grepping source**.
+- **When `write_vram` is eventually built, require `bypassesVdpPort: true` in the reply**
+  *(oracle's condition, recorded here because Aurora is the consumer)*. The debug read/write
+  path skips the VDP port path, FIFO and DMA entirely. **The flag is what protects an agent;
+  a cautionary name only helps someone who already suspects something.** Aurora's own ask for
+  it is currently a *prediction with an unreachable revival condition* — see
+  `reviews/2026-08-22-oracle-instrument-gaps.md`: the probe that would justify the method
+  requires the method.
 - **`.lst` listings carry a third `EQU` section**; oracle-next's parser handles it.
   Equates can never answer address lookups in either direction.
 
