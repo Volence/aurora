@@ -109,6 +109,38 @@ which is the arm that is hardest to reproduce deliberately.
   the implementation named beside it**. The `require_paused` list there was re-derived from oracle's
   **Rust** source and is **not known to hold on the legacy C++ server**.
 
+## 4b. ⚠ `v_factor` — the UI offers values no engine can consume, and the SCHEMA told it to
+
+*Raised by the aeon lane, ruled by empyrean `45136a1`, verified here 2026-08-22. **Do not
+rediscover this as a mystery.***
+
+Aurora's vendored schema types `v_factor` as `{"$ref": "#/$defs/factor"}` — the packed shift-add
+scroll factor, same as a layer's `fa`/`fb`. **The engine means something else entirely:**
+`scene_dsl.emp` declares `sc_v_factor: u8` (whole-plane Plane-B vshift) and `parallax.emp` uses it
+as a **shift amount** — `target_b = ((camY - v_center_y) >> v_factor_bg) + v_offset` — with **15 as
+a documented lock sentinel**. Every shipped scene spells `3` or `15`. `FACTOR_3_4` folds to **288**,
+which is neither a legal shift nor a `u8`.
+
+**RULED: the schema moves, not the engine** — retype to an integer `0..15`. A field *rename* is the
+better fix and is deliberately **not** ruled: `v_factor` reads like `fa`/`fb`, which is almost
+certainly how the wrong `$ref` got written, but a rename is a wire break and needs pricing.
+
+**Why it reaches a ROM rather than being caught:** `FACTOR_*` names are **emitted verbatim as
+symbols** into the engine's constructor call, so Aurora writes a *name*, not a number, and nothing on
+our side folds it. Our new-scene default is `v_factor: 'FACTOR_0'` (`scene-ui.ts`). **Whether
+`FACTOR_0` coincidentally equals a legal `0` in the engine is UNCHECKED here** — that determines
+whether default scenes are affected or only edited ones, and it is one lookup in aeon's constants.
+Do not assume either way.
+
+**`v_offset` is a SEPARATE and UNRULED question — do not fix it alongside.** Schema says
+`{"type":"integer"}`; aeon's `pcfg_v_offset` is **u16**, so a negative vertical offset is
+schema-legal and engine-illegal. A negative vertical offset is **physically meaningful**, so this may
+be the **engine** that is wrong. Our writer-originated fixture carries `v_offset: -8`.
+
+**Nothing has moved under our pin.** The blob pin is still valid; empyrean is routing the change
+through the CR flow precisely because Aurora pins by blob and cannot observe their repo changing.
+**Do not pre-apply the retype** — re-vendor when the CR lands.
+
 ## 5. The failure mode to watch for, and what to do
 
 **Once the new server is the only one reachable, every failure presents as *Aurora* being broken**,
