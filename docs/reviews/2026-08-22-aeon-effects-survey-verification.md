@@ -614,6 +614,8 @@ corrected in the same pass.
 
 ### 7.4 The stale BG ceilings §7.6 said were "Fixed here" are still stale
 
+> **DISCHARGED 2026-08-24 by ROADMAP item 8** (branch `fix/bg-ceiling-derived`). The finding below stands exactly as measured on 2026-08-22 and is left unedited as the record. Two things it did not reach: the gate with the actual teeth was **`src/main/editor-methods.ts`** — `set_bg`'s zod schema, in the main process, one layer *before* the handler, hardcoding `.length(2048)` and `.max(512)` plus both published tool descriptions — so a fix confined to `agent-handler.ts` would still have refused a 64-row layout; and the two halves are **not symmetric** (the tile ceiling was too LOOSE, accepting documents the hardware cannot hold; the height was too NARROW, refusing documents the engine bakes fine). Both are now derived from the vendored contract through `bg-override.ts`, and the surface has its first tests.
+
 `2026-08-13-ux-overhaul-stage4-design.md:362-365` records: *"`src/renderer/agent/agent-handler.ts`
 has `BG_TILES_HIGH = 32` and `BG_MAX_TILES = 512`; both are wrong (all 64 rows are live; the ceiling
 is 448). `get-bg` reports `height: 32` unconditionally and `set-bg` rejects any layout that is not
