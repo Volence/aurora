@@ -587,6 +587,38 @@ defect the parcel exists to fix.
   it is currently a *prediction with an unreachable revival condition* — see
   `reviews/2026-08-22-oracle-instrument-gaps.md`: the probe that would justify the method
   requires the method.
+- **The BgAnim DRIVER IS ALIVE, and the only thing that calls it is sonic4's BOOT STATE**
+  *(ENGINE facts — re-derivable against aeon, no server question. Relayed by the hub from the
+  aeon lane 2026-08-24; every claim below re-verified firsthand here at aeon `origin/master`
+  before being written down, and the last one is this lane's own addition.)*
+  **`BgAnim_Init` (`9B30`) and `BgAnim_Update` (`9B3C`) are both emitted** in `s4.debug.lst`.
+  Aeon's OWN banked memory said BgAnim had been silently deleted and BG was dead since
+  2026-07-21; they re-checked and **corrected it**. This lane's memory carried a
+  near-miss of the same error, phrased as *"OJZ BG animation dead in the ROM"* — true of the
+  DATA (`anims` wiped, so `BgAnim_Table: u16 = 0`, the disabled stub) and false of the CODE.
+  **Dead data is not dead code**; keep the two words apart when speaking about this.
+  **Call sites, enumerated over every `.emp`:** the ONLY `jbsr`s are in
+  `games/sonic4/test/ojz_scroll_test.emp` — `BgAnim_Init` at `:515` and `:1159`,
+  `BgAnim_Update` at `:821`. Everything else is a definition, a comment, or generated data.
+  **There is no separate shipping game-loop call site.**
+  **But the scroll test IS the shipping boot path, which is this lane's addition to their
+  finding and it changes the risk:** `games/sonic4/config/game.emp:58-60` binds
+  `const ENTRY_ID = GS_OJZ_SCROLL_TEST` and `proc entry = GameState_OJZScroll_Init`. So a ROM
+  test reaches the driver by **booting** — no special entry, and "test module" understates
+  what it is.
+  **STILL UNVERIFIED, and preserved exactly as the hub scoped it:** that the path from
+  `GameState_OJZScroll_Init` actually reaches `:821` **every frame** — `:821` sits inside a
+  proc and may be conditional. **If a band loads but never steps, look there first**, and at
+  that point it is plausibly an engine item and therefore aeon's; send it to them rather than
+  working around it here.
+  ⚠ **`engine/level/bg_anim.emp:103` reads *"call once per frame from the main loop"* — that
+  is the CONTRACT THE PROC WAS WRITTEN TO, not a description of what calls it.** A reader who
+  greps the definition finds a sentence that looks exactly like proof of a call site. This is
+  the third perishable-claim-in-a-code-comment instance in three repos in one day (aeon's
+  `effects_gen.py` SLICE 1 docstring; this repo's stage-4 spec claiming a fix that never
+  landed; and now this). Not a bar yet — the hub is holding it at three and explicitly
+  declined to write one from a single afternoon's instances. **If runtime work here turns up
+  a fourth, tell them.**
 - **`.lst` listings carry a third `EQU` section**; oracle-next's parser handles it.
   Equates can never answer address lookups in either direction.
 
