@@ -13,6 +13,13 @@ import { validatePaletteLine, validateTilePixels, validatePaintRegion, validateE
 import { computeActBudget, canonicalTileHash } from '../../core/agent/budget';
 import { decodeGenesisColor, encodeGenesisColor } from '../../core/formats/palette';
 import { BG_WIDTH } from '../../core/formats/bg-tiles';
+// The BG plane's real engine bounds, read from the vendored aeon contract by
+// the ONE module that reads it. Restating any of these here is the defect this
+// import exists to close (ROADMAP item 8).
+import {
+  BG_LAYOUT_WORDS, BG_LAYOUT_WORDS_LEGACY, BG_TILE_CAPACITY,
+  LAYOUT_TILE_INDEX_MASK, LAYOUT_WORD_MAX,
+} from '../../core/formats/bg-override/bg-override';
 import { makeBgId } from '../../core/formats/bg-library';
 import { parseEffectsScene } from '../../core/formats/effects/scene';
 import { sceneIdRefusal } from '../../core/formats/effects/scene-ui';
@@ -52,13 +59,31 @@ import { useWorkspaceStore } from '../workspace/workspaceStore';
 
 let registered = false;
 
-// Zone-wide background (Plane B): a fixed 64x32 nametable with its own tile
-// blob — a SEPARATE tile space from the zone tileset (the engine loads it at
-// VRAM slot 1024+). Layout tile indices are local to the BG blob in BOTH
+// Zone-wide background (Plane B): the engine's 64x64 nametable with its own
+// tile blob — a SEPARATE tile space from the zone tileset (the engine loads it
+// at VRAM slot 1024+). Layout tile indices are local to the BG blob in BOTH
 // directions: load-time normalization (normalizeBgLayout) guarantees the
 // in-memory layout get_bg returns is local, and set_bg validates local input.
-const BG_TILES_HIGH = 32;
-const BG_MAX_TILES = 512;
+//
+// EVERY BOUND BELOW IS READ FROM THE VENDORED CONTRACT, never restated here —
+// bg-override.ts is the one module that reads
+// `bganim-consumer-contract.json`, and these are its exports. This file used to
+// hardcode `BG_TILES_HIGH = 32` / `BG_MAX_TILES = 512`, and both were wrong in
+// OPPOSITE directions:
+//
+//   • too NARROW on height — the engine's nametable is BG_LAYOUT_WORDS words
+//     (64x64), so a 2048-word `.length` check made the full-height plane
+//     literally unrepresentable on the agent path, on a document the BG library
+//     already holds at that size. The legacy 64x32 shape stays legal: the
+//     consumer ZERO-PADS it rather than refusing (BG_LAYOUT_WORDS_LEGACY), so
+//     refusing it here would reject a file aeon bakes fine.
+//   • too LOOSE on tiles — the BG tile region is $8000..$B7FF, i.e.
+//     BG_TILE_CAPACITY tiles, because the sprite attribute table sits at
+//     $B800. 512 accepted blobs the hardware cannot hold; the surplus sprays
+//     into the SAT. A loose ceiling is the dangerous half: it takes documents
+//     the engine's own injector asserts against.
+const BG_ROWS = BG_LAYOUT_WORDS / BG_WIDTH;
+const BG_ROWS_LEGACY = BG_LAYOUT_WORDS_LEGACY / BG_WIDTH;
 
 export function registerAgentHandler(): void {
   if (registered || !window.agentBridge) return;
@@ -498,9 +523,14 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
 
     case 'get-bg': {
       const ctx = requireProject();
+      // `height` is MEASURED off the layout this act actually holds, never
+      // announced from a constant: the same document is legal at BG_ROWS and at
+      // BG_ROWS_LEGACY, so a fixed number would misdescribe one of them. Null
+      // when there is no background, matching `layout`/`tiles` — the reply's
+      // existing convention, and honest about a plane that is not there.
       return {
         width: BG_WIDTH,
-        height: BG_TILES_HIGH,
+        height: ctx.act.bgLayout ? ctx.act.bgLayout.length / BG_WIDTH : null,
         layout: ctx.act.bgLayout ? Array.from(ctx.act.bgLayout) : null,
         tiles: ctx.act.bgTiles ? ctx.act.bgTiles.map(t => Array.from(t.pixels)) : null,
       };
@@ -508,8 +538,13 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
 
     case 'set-bg': {
       const ctx = requireProject();
-      if (!Array.isArray(req.tiles) || req.tiles.length < 1 || req.tiles.length > BG_MAX_TILES) {
-        throw new Error(`tiles must be 1-${BG_MAX_TILES} tiles, got ${Array.isArray(req.tiles) ? req.tiles.length : typeof req.tiles}`);
+      if (!Array.isArray(req.tiles) || req.tiles.length < 1 || req.tiles.length > BG_TILE_CAPACITY) {
+        throw new Error(
+          `the BG tile blob holds 1-${BG_TILE_CAPACITY} tiles, got `
+          + `${Array.isArray(req.tiles) ? req.tiles.length : typeof req.tiles}. `
+          + `${BG_TILE_CAPACITY} is the BG VRAM region $8000..$B7FF, not a policy — the sprite `
+          + `attribute table sits at $B800, so tile ${BG_TILE_CAPACITY} would spray into it.`,
+        );
       }
       const newTiles: Tile[] = [];
       for (let i = 0; i < req.tiles.length; i++) {
@@ -517,15 +552,21 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
         if (err) throw new Error(`tile ${i}: ${err}`);
         newTiles.push({ pixels: Uint8Array.from(req.tiles[i]) });
       }
-      if (!Array.isArray(req.layout) || req.layout.length !== BG_WIDTH * BG_TILES_HIGH) {
-        throw new Error(`layout must have ${BG_WIDTH * BG_TILES_HIGH} words (${BG_WIDTH}x${BG_TILES_HIGH}), got ${Array.isArray(req.layout) ? req.layout.length : typeof req.layout}`);
+      if (!Array.isArray(req.layout)
+        || (req.layout.length !== BG_LAYOUT_WORDS && req.layout.length !== BG_LAYOUT_WORDS_LEGACY)) {
+        throw new Error(
+          `layout must have ${BG_LAYOUT_WORDS} words (${BG_WIDTH}x${BG_ROWS}) or `
+          + `${BG_LAYOUT_WORDS_LEGACY} (${BG_WIDTH}x${BG_ROWS_LEGACY} legacy, which the engine's `
+          + `injector zero-pads to ${BG_LAYOUT_WORDS} rather than refusing), got `
+          + `${Array.isArray(req.layout) ? req.layout.length : typeof req.layout}`,
+        );
       }
       for (let i = 0; i < req.layout.length; i++) {
         const word = req.layout[i];
-        if (!Number.isInteger(word) || word < 0 || word > 0xFFFF) {
+        if (!Number.isInteger(word) || word < 0 || word > LAYOUT_WORD_MAX) {
           throw new Error(`layout word ${i} = ${word}: must be a 16-bit nametable word`);
         }
-        const tileIdx = word & 0x7FF;
+        const tileIdx = word & LAYOUT_TILE_INDEX_MASK;
         if (tileIdx >= newTiles.length) {
           throw new Error(`layout word ${i}: tile index ${tileIdx} out of range (blob has ${newTiles.length} tiles; indices are local to the BG blob)`);
         }
