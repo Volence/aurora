@@ -196,6 +196,41 @@ Each has caught a real defect here.
    check that specific reason, and **report the alternative green-path you ruled out** —
    naming what you eliminated is the part that survives review.
 
+2e. **THE UNIFYING FORM FOR 2b-2d, and the three instances are all this lane's.** *(The
+   class and its formulation are the empyrean hub's, ledgered by them as Q-20, a
+   PROMOTION CANDIDATE — not yet in the shared protocol. Recorded here as theirs, with
+   our local precedents, and it should be re-read as protocol if it ever lands there.)*
+   **A check can be correctly performed, pass honestly, and assert nothing.** That is not
+   a broken check — a broken check fails and gets noticed. It is a correct check aimed one
+   step to the side, and its distinguishing property is that **it can only ever return
+   green**, so running it produces no evidence at any volume.
+   The three instances, all found here, all in different surfaces:
+   - **A pinned blob answering a currency question.** A pinned blob equals itself by
+     construction, so the gate passes forever and can never detect the drift it exists
+     for (the schema-reconciliation scope note under bar 16).
+   - **`[ -S "$socket" ]` as a liveness probe.** The inode outlives the process, so it
+     reports a corpse as a server — item 36's own measurement, made by a probe written in
+     this lane in the session that was checking somebody else's liveness claim.
+   - **`min`/`max` on an `<input type="number">` as a bound.** They govern the spinner and
+     `:invalid` and stop no typed value; `clampVFactor()` beside them does the actual work
+     (item 37).
+   **The mechanism, which is why this is a class and not three tips: the vacuous check is
+   always EASIER TO WRITE AND EASIER TO READ than the real one, and resembles it closely
+   enough that a reviewer's eye stops.** `[ -S ]` is shorter than `ss -lx`. A blob pin is
+   local and deterministic where currency needs the remote. `min={0} max={15}` is inline
+   at the call site where a clamp lives in another file. **The costume is always
+   convenience** — so the suspicion belongs on the check that was pleasant to write.
+   **Operational form: name the property, then ask what a GREEN result would have ruled
+   out. If nothing, the gate is vacuous however correct it is.** This subsumes bar 2's
+   red-first plant rather than replacing it: a plant answers "does it fire", and this
+   answers "could it ever have failed".
+   **Note how the third one was found, because it is Q-16's discriminator firing BY
+   ACCIDENT for the third time** *(the hub's observation, and it is a warning not a
+   compliment)*: I went to read the mechanism bounding the SAFE field expecting to CONFIRM
+   it, and found the mechanism was somewhere else entirely. Nobody was auditing the
+   enumeration. **A discriminator that only fires by luck is not yet a practice** (bar 21
+   in the shared protocol), and this is the instance that proves it still is not one here.
+
 3. **Anti-vacuous rows.** A row that would pass on an empty screen, an unloaded project
    or a blank chunk proves nothing. Assert the instrument saw its subject. A stamp-ghost
    check once "passed" against `OJZ $45`, which is legitimately blank.
