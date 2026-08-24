@@ -271,6 +271,34 @@ Each has caught a real defect here.
    checkable numbers generates the most caught errors. Reading it the other way punishes
    exactly the behaviour that makes the catching possible.
 
+2g. **A GAP BETWEEN BOUNDARY LABELS IS NEVER EVIDENCE OF FREE SPACE — and a rule that
+   forbids a conclusion MUST NAME THE INSTRUMENT that can reach it** *(2026-08-24; my
+   formulation, adopted by the aeon lane as a repo bar at their `2625718b`)*. A boundary
+   table lists a **subset** of labels, so everything between two listed entries is invisible
+   in it **by construction**. Reading a gap as room is therefore not a slip — the instrument
+   *cannot* answer occupancy, and it returns a clean confident number anyway.
+   **Instance, three lanes, three hours, three revisions of one figure.** A ~119 KB gap
+   before a hardware-pinned anchor was reported as slack, and I carried it to the owner
+   twice. It is **Sonic**: `AngleTable`, `SolidityTable`, `Map_Sonic`, `DPLC_Sonic`,
+   `Art_Sonic`. Measured on the image, 43.8% zero. Real free tail: **11,427 B** — and even
+   that sits inside `Art_Sonic`'s allotment, so spending it shrinks what the game's most
+   growth-prone art may grow into. **Only the `.lst` or the ROM image can answer this.**
+   ⚠ **THE HALF THAT WAS MISSING, and why knowing the rule did not help.** Our booking
+   already said *"a gap is an ALLOTMENT, never proven free space"* — and then committed the
+   error two paragraphs later on a different label pair. **A prohibition without a named
+   instrument leaves everyone holding the only tool they have, and using it correctly, and
+   getting the wrong answer politely.** When banking a "do not conclude X from Y", the bar is
+   incomplete until it says what DOES conclude X.
+   **PROPAGATION COROLLARY — an arithmetic step built on someone else's number looks like
+   CORROBORATION and is PROPAGATION.** I took a peer's slack figure and derived a margin from
+   it with my own arithmetic. My step was sound, my number was mine, and it read to both of us
+   as independent confirmation — while carrying their error intact. **Doing real work on top of
+   an unverified input launders it**, and it is *more* convincing than repeating it, because
+   the second party visibly computed something. **The check is on the INPUT's provenance, not
+   on your own step**: before deriving from a peer's figure, ask which instrument produced it.
+   (This is bar 19's echo-versus-corroboration at one remove — the parameters differed, so it
+   looked independent; the *source* did not.)
+
 3. **Anti-vacuous rows.** A row that would pass on an empty screen, an unloaded project
    or a blank chunk proves nothing. Assert the instrument saw its subject. A stamp-ghost
    check once "passed" against `OJZ $45`, which is legitimately blank.
