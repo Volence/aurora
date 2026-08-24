@@ -40,7 +40,7 @@ staleness gate BY CONSTRUCTION (docs/OVERSEER.md) -- attribute by stage.
 
 aeon files load at an ls-remote-resolved revision, never the sibling working tree.
 """
-import sys, importlib.util, pathlib, tempfile, struct, io, contextlib, shutil, subprocess
+import sys, importlib.util, pathlib, tempfile, struct, io, contextlib, shutil, subprocess, json
 
 AEON_REV = "9b3f11f60def3dbad10fe69fff719ea92874d749"
 sp = pathlib.Path(sys.argv[1] if len(sys.argv) > 1 else ".")
@@ -82,7 +82,21 @@ print(f"       before: {pre_tbl}\n       after : {new_tbl}")
 if "= 1" not in new_tbl: print("       **VACUOUS: no band reached the emit**"); ok = False
 
 def sz(d, n): return (d / n).stat().st_size if (d / n).exists() else 0
-exp = 8 * 4 * 8 * 32
+# DERIVED FROM THE BAND UNDER TEST, NOT TYPED IN. This was `8 * 4 * 8 * 32` --
+# the geometry of the band THIS probe's own emit.ts happens to make -- which
+# silently reported **MISMATCH** for every correct band of any other size. Found
+# 2026-08-24 by ROADMAP item 29, whose UI-authored band is 2x1: the injector
+# emitted exactly 512 B and the probe called it a mismatch against 8192.
+# The constants come from the vendored consumer contract, so they cannot drift
+# from the thing they describe.
+_contract = json.loads((pathlib.Path(__file__).resolve().parents[1]
+                        / "src/core/formats/bg-override/bganim-consumer-contract.json").read_text())
+PHASE_BANKS = _contract["constants"]["BGANIM_PHASE_BANKS"]["value"]
+TILE_BYTES = _contract["constants"]["TILE_BYTES"]["value"]
+_anims = json.loads((sp / "live-promoted.json").read_text()).get("anims") or []
+assert len(_anims) == 1, f"expected exactly one band in live-promoted.json, found {len(_anims)}"
+_b = _anims[0]
+exp = _b["cols"] * _b["rows"] * PHASE_BANKS * TILE_BYTES
 got = sz(new, "bg_anim_banks.bin") - sz(pre, "bg_anim_banks.bin")
 tdelta = sz(new, "bg_tiles.bin") - sz(pre, "bg_tiles.bin")
 print(f"       banks delta expected cols*rows*BANKS*32 = {exp}; got {got} -> {'MATCH' if exp == got else '**MISMATCH**'}")
