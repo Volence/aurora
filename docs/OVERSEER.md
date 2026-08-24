@@ -478,7 +478,18 @@ defect the parcel exists to fix.
   Two consequences. **(a)** "Cut over `mcp__oracle__*`" is two changes, not one: which shim
   Claude launches (config, **on the process command line — a running session cannot pick it up,
   so it needs a full restart, not a `/clear`**), and which server holds the socket (whoever ran
-  a process first). **(b) A session can silently change which implementation it is talking to
+  a process first). ⚠ **RETRACTED IN PART 2026-08-24, and the retraction is this lane's own —
+  read it before repeating the sentence above.** That framing describes what a full cutover
+  WOULD involve *if anyone wanted a different shim*. It is not a claim that anyone needs one,
+  and it was carried to the owner by the empyrean lane as "the shim half is real and is his"
+  before this lane caught it. **Nobody has argued for changing the shim**: the finding directly
+  above is that the legacy shim already reaches the Rust core, so a restart is the price of a
+  change with no proponent. Confirmed 2026-08-24 by reading the owner's binding read-only —
+  `mcpServers.oracle` carries `"args": []` and `"env": {}`, i.e. **no socket override**, so the
+  shim walks the same default chain as everything else and its provenance cannot determine which
+  server answers. **Evidence about the CLIENT is not evidence about the SERVER** (banked by the
+  hub as their bar 14, empyrean `2eb2737`); their own tell is worth keeping: *the config was easy
+  to read and the behaviour was not, so the readable thing stood in for the measurable one.* **(b) A session can silently change which implementation it is talking to
   with no config change and no signal** — the socket chain is the only arbiter. Read the
   banner's method count, and treat it as the freshness tell it is.
 - **A built binary is a third enumeration parameter, and it is the one source greps cannot
@@ -487,6 +498,14 @@ defect the parcel exists to fix.
   source by different methods and agreed; both were blind to the artifact. **A consumer
   measuring the bus against an installed binary gets the old answer with nothing announcing
   it**, so a cutover must rebuild and **verify by executing, never by grepping source**.
+  **UPDATE 2026-08-24, RELAYED BY THE ORACLE LANE AND RECORDED WITH THEIR STATED LIMIT — not
+  re-measured here.** They report this specific staleness closed: `target/release/oracle-aether`
+  is dated 2026-08-22 21:52, zero non-docs files changed between their `12cc17e` and their HEAD,
+  and `12cc17e` banks a handshake that read **41 methods over the wire**, committed 21:54, two
+  minutes after that binary was built. **Their own limit, carried rather than dropped: that is
+  mtime plus a docs-only diff plus a previously-banked wire check, and they did NOT re-handshake
+  it.** So the artifact is argued to be the verified one, not observed to be. The bar itself is
+  untouched, and the freshness tell is still the banner read by executing.
 - **When `write_vram` is eventually built, require `bypassesVdpPort: true` in the reply**
   *(oracle's condition, recorded here because Aurora is the consumer)*. The debug read/write
   path skips the VDP port path, FIFO and DMA entirely. **The flag is what protects an agent;
