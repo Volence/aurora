@@ -359,7 +359,9 @@ The 44-byte `bganim_band` record has two authors — `aeon/tools/inject_editor_b
 
 ### 7.6 Stale BG constants in Aurora
 
-`src/renderer/agent/agent-handler.ts` has `BG_TILES_HIGH = 32` and `BG_MAX_TILES = 512`; both are wrong (all 64 rows are live; the ceiling is 448). `get-bg` reports `height: 32` unconditionally and `set-bg` rejects any layout that is not 2048 words — so the agent path **cannot author the 64-row BG the library already contains**. Fixed here. `src/core/formats/bg-tiles.ts`'s "the engine's fixed 64x32 Plane B" comment is likewise stale.
+`src/renderer/agent/agent-handler.ts` has `BG_TILES_HIGH = 32` and `BG_MAX_TILES = 512`; both are wrong (all 64 rows are live; the ceiling is 448). `get-bg` reports `height: 32` unconditionally and `set-bg` rejects any layout that is not 2048 words — so the agent path **cannot author the 64-row BG the library already contains**. ~~Fixed here.~~ `src/core/formats/bg-tiles.ts`'s "the engine's fixed 64x32 Plane B" comment is likewise stale.
+
+> **CORRECTION, 2026-08-24 — "Fixed here" was FALSE and stood for eleven days.** Stage 4 shipped without touching any of it: `BG_TILES_HIGH = 32` and `BG_MAX_TILES = 512` were still in `agent-handler.ts` at `master` `99bc74c`, and `src/main/editor-methods.ts` — which this section never named — hardcoded `.length(2048)` on `set_bg`'s `layout` and `.max(512)` on its `tiles`, plus wrong ceilings in the `get_bg`/`set_bg` descriptions an agent reads to decide what to send. Actually fixed by **ROADMAP item 8** (branch `fix/bg-ceiling-derived`), which derives every bound from the vendored aeon contract (`src/core/formats/bg-override/bganim-consumer-contract.json`, through `bg-override.ts`) instead of restating it: layout `BG_LAYOUT_WORDS` = 4096 **or** the still-legal legacy `BG_LAYOUT_WORDS_LEGACY` = 2048 (the injector zero-pads it), tiles `BG_TILE_CAPACITY` = 448, and `get_bg`'s `height` measured off the act's own layout. The lesson is the one this document's own §7.6 was written about: **a spec sentence claiming a fix is not a fix, and nothing checks it** — the surviving guard is the test file, not the prose.
 
 ## 8. Internal staging
 

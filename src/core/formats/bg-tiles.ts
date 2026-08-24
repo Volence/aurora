@@ -34,7 +34,18 @@ export function serializeBgTiles(tiles: Tile[]): Uint8Array {
   return out;
 }
 
-/** Plane B nametable width in tiles (the engine's fixed 64x32 Plane B). */
+/**
+ * Plane B nametable width in tiles.
+ *
+ * The WIDTH is fixed; the HEIGHT is not a constant here and must never become
+ * one. The engine's plane is 64x64 (`BG_LAYOUT_WORDS` in the vendored aeon
+ * contract) and the legacy 64x32 shape (`BG_LAYOUT_WORDS_LEGACY`) is still
+ * legal input, because the injector zero-pads it rather than refusing. Every
+ * consumer in this repo therefore MEASURES height as `layout.length /
+ * BG_WIDTH` — the loader, the renderer and `list_bgs` all do. This comment used
+ * to say "the engine's fixed 64x32 Plane B", which was wrong and was the excuse
+ * a hardcoded 32 leaned on in the agent path (ROADMAP item 8).
+ */
 export const BG_WIDTH = 64;
 
 /**

@@ -140,9 +140,15 @@ export interface SetChunkCommand extends EditCommand {
 
 export interface SetBgCommand extends EditCommand {
   type: 'set-bg';
-  // Whole-plane swap of the act's zone-wide background (Plane B): 64x32
+  // Whole-plane swap of the act's zone-wide background (Plane B): a 64-column
   // nametable plus its own tile blob (a separate tile space from the zone
   // tileset — layout indices are local to the BG blob).
+  //
+  // The HEIGHT is not fixed and this command does not care: the engine's plane
+  // is 64x64 and the legacy 64x32 shape is still legal, so the arrays below are
+  // swapped whole and every consumer measures `layout.length / BG_WIDTH`. This
+  // comment said "64x32" until ROADMAP item 8; that was the stale belief the
+  // agent path enforced.
   oldLayout: Uint16Array | null;
   newLayout: Uint16Array | null;
   oldTiles: Tile[] | null;

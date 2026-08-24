@@ -59,16 +59,29 @@ step covering both) and requires even x/y, since collision cells are
 16px/2-tile aligned; there is no art-only agent stamp (the UI's Alt-stamp
 art-only mode is a human-only shortcut).
 
-`get_bg`/`set_bg` operate on the zone-wide background (Plane B): a 64x32 tile
-nametable plus its own tile blob (max 512 tiles) — a separate tile space from
-the FG tileset. Both directions use the LOCAL index convention (nametable tile
+`get_bg`/`set_bg` operate on the zone-wide background (Plane B): a **64x64**
+tile nametable (4096 row-major VDP words) plus its own tile blob (max **448**
+tiles) — a separate tile space from the FG tileset. The legacy **64x32** shape
+(2048 words) is still accepted, because the engine's injector zero-pads it to
+64 rows rather than refusing; `get_bg` reports the `height` it MEASURES off the
+act's own layout (`null` when the act has no background) rather than announcing
+a fixed number, so either shape round-trips. 448 is not a policy: the BG tile
+region is VRAM `$8000..$B7FF`, and the sprite attribute table sits at `$B800`.
+Both numbers are read from the vendored aeon contract
+(`src/core/formats/bg-override/bganim-consumer-contract.json`, via
+`bg-override.ts`) by the handler AND by the tool schema — neither this doc nor
+either of them holds its own copy.
+
+Both directions use the LOCAL index convention (nametable tile
 indices index directly into the BG blob): engine-emitted files with
 VRAM-absolute indices (1024+) are normalized once at load, so a `get_bg`
 result round-trips straight back into `set_bg`. `set_bg` (without `name`)
 replaces the whole plane in one undo step. `screenshot` accepts `showBg: true`
 to render the background plane during capture (restores the overlay state
 afterwards). Note that the editor renders Plane B once at world origin
-(512x256 px) — screenshots of regions away from the origin won't show it.
+(512 px wide by 8 px per layout row — 512x512 at full height, 512x256 for a
+legacy 32-row layout) — screenshots of regions away from the origin won't show
+it.
 
 Per-section backgrounds: every section displays the act default unless
 `assign_section_bg` points it at a BG library entry (`bgId` from `set_bg` with

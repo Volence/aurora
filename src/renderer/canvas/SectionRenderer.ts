@@ -147,8 +147,10 @@ export class SectionRenderer {
 
   /**
    * Compose the whole BG plane in JS and upload it with ONE putImageData
-   * instead of one canvas op per cell. 64x32 cells is small next to a section,
-   * but the per-cell path still measured ~90ms on a GPU-backed canvas.
+   * instead of one canvas op per cell. The plane is 64 columns by whatever the
+   * layout holds (64 rows for the engine's shape, 32 for a legacy one) — small
+   * next to a section either way, but the per-cell path still measured ~90ms on
+   * a GPU-backed canvas.
    */
   private renderFullBg(): void {
     if (!this.bg) return;

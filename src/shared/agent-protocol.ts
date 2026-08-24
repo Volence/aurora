@@ -31,7 +31,14 @@ export type AgentRequest =
   | { kind: 'stamp-chunk'; chunkId: string; section: number; x: number; y: number }
   | { kind: 'goto'; section: number; x?: number; y?: number; zoom?: number }
   | { kind: 'get-bg' }
-  // 64x32 words; tiles: 64 values 0-15 each, indices local to this blob.
+  // layout: the engine's 64x64 nametable (BG_LAYOUT_WORDS words), or the legacy
+  // 64x32 shape (BG_LAYOUT_WORDS_LEGACY), which the engine's injector zero-pads
+  // rather than refusing. tiles: 64 values 0-15 each, at most BG_TILE_CAPACITY
+  // of them, indices local to this blob. The numbers themselves live in
+  // core/formats/bg-override/bganim-consumer-contract.json and are read through
+  // bg-override.ts — the handler and the MCP schema both derive from there,
+  // and this comment deliberately names the constants rather than restating
+  // their values (it was "64x32 words" and wrong, ROADMAP item 8).
   // name set: ADD to the BG library under a generated id (reply includes it)
   // instead of replacing the act default.
   | { kind: 'set-bg'; layout: number[]; tiles: number[][]; name?: string }

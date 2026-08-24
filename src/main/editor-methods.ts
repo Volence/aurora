@@ -13,6 +13,21 @@ import { FLAT_SHAPE } from '../core/art/commit-collision';
 // runtime-heavy follows it into the main process). The collision tool's schema
 // bounds are DERIVED from them rather than restated.
 import { MAX_FG_CELLS_W, MAX_FG_CELLS_H } from '../core/level-classic/model';
+// The BG plane's real engine bounds. `bg-override.ts` is the ONE module that
+// reads the vendored aeon contract (bganim-consumer-contract.json); every
+// number below therefore has a single definition, and get_bg/set_bg cannot
+// ADVERTISE a shape the handler refuses (or, worse, accept one the hardware
+// cannot hold). This schema used to hardcode `.length(2048)` and `.max(512)`:
+// the first made the engine's full-height nametable unrepresentable, the second
+// took blobs that overrun the sprite attribute table. ROADMAP item 8.
+import {
+  BG_LAYOUT_WORDS, BG_LAYOUT_WORDS_LEGACY, BG_TILE_CAPACITY,
+  LAYOUT_WORD_MAX, TILE_PIXELS, TILE_PIXEL_MAX,
+} from '../core/formats/bg-override/bg-override';
+import { BG_WIDTH } from '../core/formats/bg-tiles';
+
+const BG_ROWS = BG_LAYOUT_WORDS / BG_WIDTH;
+const BG_ROWS_LEGACY = BG_LAYOUT_WORDS_LEGACY / BG_WIDTH;
 
 /**
  * The editor's capability surface, defined once and consumed by BOTH the MCP
@@ -104,10 +119,28 @@ export const EDITOR_METHODS: EditorMethod[] = [
     params: { section: z.number().int().min(0), x: z.number().int().min(0).optional(), y: z.number().int().min(0).optional(), zoom: z.number().min(0.125).max(8).optional() },
     description: 'Set the active section and scroll the shared viewport to tile coords (x,y) at optional zoom (0.125-8).' },
   { name: 'get_bg', kind: 'get-bg', result: 'json', params: {},
-    description: 'Read the zone-wide background (Plane B): a 64x32 tile nametable plus its own tile blob (max 512 tiles), a SEPARATE tile space from the FG tileset. Nametable indices are local to the BG blob; a get_bg result can be fed straight back to set_bg. Returns nulls when the act has no background.' },
+    description: `Read the zone-wide background (Plane B): a ${BG_WIDTH}x${BG_ROWS} tile nametable `
+      + `(${BG_WIDTH}x${BG_ROWS_LEGACY} in legacy files) plus its own tile blob (max `
+      + `${BG_TILE_CAPACITY} tiles), a SEPARATE tile space from the FG tileset. "height" is measured `
+      + 'off this act\'s layout, not assumed. Nametable indices are local to the BG blob; a get_bg '
+      + 'result can be fed straight back to set_bg. Returns nulls when the act has no background.' },
   { name: 'set_bg', kind: 'set-bg', result: 'json',
-    params: { layout: z.array(z.number().int().min(0).max(0xFFFF)).length(2048), tiles: z.array(z.array(z.number().int().min(0).max(15)).length(64)).min(1).max(512), name: z.string().min(1).optional().describe('save to the BG library under this name instead of replacing the act default; the reply includes the generated id') },
-    description: 'Write a zone-wide background (Plane B): a 64x32 tile nametable (2048 row-major VDP words) plus its tile blob (max 512 tiles). Without "name" replaces the act-default BG (one undo step); with "name" saves to the project BG library (additive). Tile indices are local to the BG blob.' },
+    params: {
+      layout: z.array(z.number().int().min(0).max(LAYOUT_WORD_MAX))
+        .refine((a) => a.length === BG_LAYOUT_WORDS || a.length === BG_LAYOUT_WORDS_LEGACY, {
+          message: `layout must have ${BG_LAYOUT_WORDS} words (${BG_WIDTH}x${BG_ROWS}) or `
+            + `${BG_LAYOUT_WORDS_LEGACY} (${BG_WIDTH}x${BG_ROWS_LEGACY} legacy, zero-padded by the engine)`,
+        }),
+      tiles: z.array(z.array(z.number().int().min(0).max(TILE_PIXEL_MAX)).length(TILE_PIXELS))
+        .min(1).max(BG_TILE_CAPACITY),
+      name: z.string().min(1).optional().describe('save to the BG library under this name instead of replacing the act default; the reply includes the generated id'),
+    },
+    description: `Write a zone-wide background (Plane B): a ${BG_WIDTH}x${BG_ROWS} tile nametable `
+      + `(${BG_LAYOUT_WORDS} row-major VDP words; the legacy ${BG_WIDTH}x${BG_ROWS_LEGACY} / `
+      + `${BG_LAYOUT_WORDS_LEGACY}-word shape is still accepted and the engine zero-pads it) plus its `
+      + `tile blob (max ${BG_TILE_CAPACITY} tiles — the BG VRAM region $8000..$B7FF, below the sprite `
+      + 'attribute table at $B800). Without "name" replaces the act-default BG (one undo step); with '
+      + '"name" saves to the project BG library (additive). Tile indices are local to the BG blob.' },
   { name: 'list_bgs', kind: 'list-bgs', result: 'json', params: {},
     description: "List available backgrounds: the act default, every BG library entry (id, name, tile count), and each section's current assignment (bgId null = act default)." },
   { name: 'assign_section_bg', kind: 'assign-section-bg', result: 'json',
