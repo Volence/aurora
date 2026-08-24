@@ -101,7 +101,22 @@ in the same breath as the outcome, not appended below it. And when a claimed own
 leaves no artifact, mark it unverifiable rather than laundering it into fact by repetition;
 the cheap fix is to ask, because the owner is usually one sentence away.
 
-### Push authorization — RELAYED 2026-08-23, and the distinction matters
+### Push authorization — **CONFIRMED BY THE OWNER DIRECTLY 2026-08-24. The relay question is CLOSED; do not re-ask.**
+
+He answered this lane's `d-2` in session on 2026-08-24 and chose **grant**: publish this repo's own master without asking
+each time. That is the granting act this section's own rule demanded, witnessed by the session that recorded it, and it
+discharges the relayed-only status below. **The conditions below still ride with it and are part of the grant.** First
+exercise the same day: `58ff2ae..2448969`, seven commits, with `git ls-remote` confirming the remote actually moved rather
+than reading the push's own output as proof.
+
+**The scope paragraph below remains exactly as true as it was:** this authorizes *pushing*, not the work being pushed. It
+does not release the boot stop. A lane holding for his word on WHAT to do is still holding. (Item 35 was released
+separately, as `d-3`, in the same session — two answers, not one.)
+
+The original relayed-status text is kept below unedited, because it is the record of what was believed before he answered
+and it is the worked example this section teaches from.
+
+#### Original entry — RELAYED 2026-08-23, superseded above
 
 **The grant, as received:** standing approval to push **this repo's own master** without
 asking each time. Conditions ride with it and are part of it, not gloss: **verify `origin`
