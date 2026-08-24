@@ -220,6 +220,24 @@ Each has caught a real defect here.
    local and deterministic where currency needs the remote. `min={0} max={15}` is inline
    at the call site where a clamp lives in another file. **The costume is always
    convenience** — so the suspicion belongs on the check that was pleasant to write.
+   **FOURTH INSTANCE, 2026-08-24, MINE — produced hours after banking this class, against
+   myself, while arguing about someone else's bug.** Diagnosing a ROM section collision I
+   took the span from BUILD output (`ojz_bg_anim [0x3b270, 0x3d29e)`) and grepped the GOLDEN
+   boundary table for bases inside it. **Zero hits**, which I reported as *"the damage is
+   local to that seam"* and used to withdraw a correct prediction. The golden table has **no
+   labels anywhere in `0x38000..0x40000`** — 80 sparse head-labels across a ~668 KB ROM, with
+   `BgAnim_Table` at `0x27e70`, nowhere near the span. **The query could return only one
+   answer whatever the truth was.** The right observable was the ordering: `BgAnim_Table` is
+   label 65 of 80, so **15 labels follow it**, and that set is what "does it cascade" means.
+   **The verdict was not weakly supported, it was UNSUPPORTED — and it read as a measurement
+   because it had a number attached.** That sentence is the class in one line; keep it.
+   ⚠ **And the companion failure, the hub's, which is the same disease with the symptom
+   inverted:** their corroborating count used a wrong population (lines, not labels) AND a
+   wrong sort (hex as strings) and **still produced the correct 15, by cancellation** — every
+   contaminating row sorted upstream of the label, so the error lived in the prefix and
+   vanished in the subtraction. **A right answer from two wrong steps, sitting inside a number
+   whose job was to corroborate someone else** — which is the worst possible host, because a
+   corroboration is the one claim nobody re-checks once it agrees.
    **Operational form: name the property, then ask what a GREEN result would have ruled
    out. If nothing, the gate is vacuous however correct it is.** This subsumes bar 2's
    red-first plant rather than replacing it: a plant answers "does it fire", and this
@@ -230,6 +248,28 @@ Each has caught a real defect here.
    it, and found the mechanism was somewhere else entirely. Nobody was auditing the
    enumeration. **A discriminator that only fires by luck is not yet a practice** (bar 21
    in the shared protocol), and this is the instance that proves it still is not one here.
+
+2f. **READ THE ARTIFACT, NOT THE STORY ABOUT IT — it ended THREE disagreements in one day
+   where argument ended none** *(2026-08-24, across aurora/aeon/empyrean; the arc-level
+   finding of the BgAnim ROM attempt)*. Each time, two lanes reasoned carefully in opposite
+   directions and **one file read settled it in a single command**:
+   - *Which section was deferred?* Three lanes carried "BgAnim is the deferred one" as a
+     **premise nobody ever cited, and therefore nobody ever checked**. `map.toml:73` says the
+     order check keys on **head-labels**, and `BgAnim_Table` was in the list all along.
+   - *What is the reserved slot for?* The comment names its subject in its **own first line**
+     — `ojz_effects_editor_act1`, a different tool's section. Two of us opened that comment at
+     the line we had been pointed to and missed the two lines above it.
+   - *Does the collision cascade?* Neither lane's argument settled it. `map.toml:166-176`
+     declares `[[anchor]] dac_banks at = 0x48000`, **hardware-pinned because the Z80's
+     `SetBank` latches the LMA**, so growth is absorbed before it: **five labels shift, not
+     fifteen.** Bounded re-derivation, not a full re-baseline.
+   **The tell that you are about to need this: everyone agrees on a premise and nobody has
+   cited a line for it.** That is not consensus, it is an uncited joint (bar 18b's shared
+   frame), and the cheapest possible move is to open the file it lives in.
+   **Corollary on counting defects across seats** *(aeon's, and it is right)*: a tally of who
+   was wrong most often measures **exposure, not competence** — whoever sends the most
+   checkable numbers generates the most caught errors. Reading it the other way punishes
+   exactly the behaviour that makes the catching possible.
 
 3. **Anti-vacuous rows.** A row that would pass on an empty screen, an unloaded project
    or a blank chunk proves nothing. Assert the instrument saw its subject. A stamp-ghost
