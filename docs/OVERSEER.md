@@ -299,6 +299,23 @@ Each has caught a real defect here.
    (This is bar 19's echo-versus-corroboration at one remove — the parameters differed, so it
    looked independent; the *source* did not.)
 
+2h. **TRUNCATION LEAVES NO MARK — `head -N` on a definition you then make a COMPLETENESS
+   claim about** *(2026-08-24, the aeon lane's, against themselves; banked here because this
+   lane reads files this way constantly)*. They claimed "exactly two length-variable fragment
+   kinds", having read a 94-line type through `head -40`. There are **three**, plus a fourth
+   kind their argument structurally could not reach. The conclusion survived — on a different
+   check than the one presented as the rigorous half.
+   **Why it belongs beside bar 16(d) rather than inside it.** A suppressed error and an empty
+   world produce the same output, which is bad enough; **truncation is worse, because the
+   output looks like a COMPLETE ANSWER rather than an empty one.** `2>/dev/null` destroys a
+   correcting signal; `head -N` fabricates a plausible whole. There is no exit status to check
+   and nothing on screen says "there was more".
+   **Operational form: a window is not a document.** Before any claim of the form *"there are
+   exactly N"*, *"the only X is"*, or *"nothing else does this"*, **re-read the subject
+   unwindowed** — `wc -l` it, or `sed -n` the full range, or grep the whole file — and say
+   which you did. Reading a window is fine; **concluding over one is not**, and the tell is
+   that the sentence quantifies.
+
 3. **Anti-vacuous rows.** A row that would pass on an empty screen, an unloaded project
    or a blank chunk proves nothing. Assert the instrument saw its subject. A stamp-ghost
    check once "passed" against `OJZ $45`, which is legitimately blank.
