@@ -606,11 +606,25 @@ defect the parcel exists to fix.
   `const ENTRY_ID = GS_OJZ_SCROLL_TEST` and `proc entry = GameState_OJZScroll_Init`. So a ROM
   test reaches the driver by **booting** — no special entry, and "test module" understates
   what it is.
-  **STILL UNVERIFIED, and preserved exactly as the hub scoped it:** that the path from
-  `GameState_OJZScroll_Init` actually reaches `:821` **every frame** — `:821` sits inside a
-  proc and may be conditional. **If a band loads but never steps, look there first**, and at
-  that point it is plausibly an engine item and therefore aeon's; send it to them rather than
-  working around it here.
+  ✅ **CLOSED 2026-08-24 — THE DRIVER TICKS EVERY FRAME ON A PLAIN `s4.bin` BOOT.** Traced by
+  aeon, re-traced by the hub, and the two links carrying the actual risk re-verified firsthand
+  here: `game.emp:59-60` binds `entry = GameState_OJZScroll_Init`, and
+  **`GameState_OJZScroll_Update` (`:556`) contains ZERO `rts` between its head and the
+  `jbsr BgAnim_Update` at `:821`** — the only exit is the `rts` at `:822` immediately after it,
+  and no branch guards the call. (Mechanical middle links, taken as traced: `:549` stores
+  `GameState_OJZScroll_Update` into `Game_State`; `game_loop.emp:41-42` does the per-frame
+  `movea.l Game_State, a0` / `jsr (a0)` computed dispatch; `boot.emp:349` seeds it from
+  `Game.entry`.)
+  **So the ROM half arranges nothing — build it and watch it.** No special entry, no test build
+  shape, no harness. **And if a band loads but never steps, it is NOT the wiring** — look at the
+  data or the proc body, and at that point it is plausibly an engine item and therefore aeon's.
+  ⚠ **`test` IN A PATH IS A KNOWN-BAD SIGNAL IN AEON'S TREE, not a description.** The sole caller
+  lives in a module named `test` **and that module is the shipping boot entry**. Both wrong
+  readings this cost the suite — *"the driver is dead"* and *"it needs a harness"* — come from
+  that one word. Aeon's own first draft of the repaired comment said *"there is NO shipping
+  game-loop call site"*: literally true, reads as *dead driver*, and they caught it before
+  committing — i.e. they nearly shipped the INVERSE error into the very comment they were
+  fixing. Treat `test` in an aeon path as unlabelled until checked.
   ⚠ **`engine/level/bg_anim.emp:103` reads *"call once per frame from the main loop"* — that
   is the CONTRACT THE PROC WAS WRITTEN TO, not a description of what calls it.** A reader who
   greps the definition finds a sentence that looks exactly like proof of a call site. This is
