@@ -134,7 +134,7 @@
       }
     }
   },
-  "v_factor": "FACTOR_1_2",
-  "v_factor_fg": "FACTOR_0",
+  "v_factor": 1,
+  "v_factor_fg": 0,
   "v_offset": -8
 }

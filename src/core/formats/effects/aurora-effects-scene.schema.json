@@ -185,10 +185,16 @@
       "minItems": 1,
       "maxItems": 8
     },
-    "v_factor": { "$ref": "#/$defs/factor" },
+    "v_factor": {
+      "description": "Whole-plane Plane-B vertical scroll, as a RIGHT-SHIFT AMOUNT — not a packed factor. The engine computes target_b = ((camY - v_center) >> v_factor) + v_offset (engine/level/parallax.emp). 15 is the LOCK SENTINEL: it is tested before the shift and pins the BG plane to v_offset regardless of the camera. This is a different space from a layer's fa/fb, where locked is the packed value $0FF; do not spell this field with a FACTOR_* name.",
+      "type": "integer", "minimum": 0, "maximum": 15
+    },
     "v_center": { "type": "integer", "default": 0 },
     "v_offset": { "type": "integer", "default": 0 },
-    "v_factor_fg": { "$ref": "#/$defs/factor" },
+    "v_factor_fg": {
+      "description": "Plane-A counterpart of v_factor, same shift encoding. RESERVED in the v1 runtime — the pipeline always sets fg_vscroll = camY (engine/structs.emp) — and authored for identity only. Typed here so a v2 that starts consuming it does not inherit the packed-factor mistake.",
+      "type": "integer", "minimum": 0, "maximum": 15, "default": 0
+    },
     "deform_fg": { "$ref": "#/$defs/sceneDeform", "default": "none" },
     "deform_bg": { "$ref": "#/$defs/sceneDeform", "default": "none" },
     "v_deform": {

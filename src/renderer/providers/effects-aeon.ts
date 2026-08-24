@@ -28,7 +28,8 @@ import type {
 } from '../../core/formats/effects/scene';
 import {
   EFFECTS_FACTOR_NAMES, EFFECTS_PACKED_FACTOR_BOUNDS, EFFECTS_LAYER_COUNT,
-  EFFECTS_WORLD_Y_BOUNDS, WAVE1_PRECISION_VALUES, EFFECTS_TRANSITION_VALUES,
+  EFFECTS_WORLD_Y_BOUNDS, EFFECTS_V_FACTOR_BOUNDS, WAVE1_PRECISION_VALUES,
+  EFFECTS_TRANSITION_VALUES,
   cloneEffectsScene, factorLabel, isNamedFactor, newEffectsLayer, newEffectsScene,
   sceneIdRefusal,
 } from '../../core/formats/effects/scene-ui';
@@ -91,6 +92,20 @@ export function clampPackedField(field: 's1' | 's2', value: number): number {
 /** Clamp a layer's `world_y` to the schema's range (§2.2). */
 export function clampWorldY(value: number): number {
   const { min, max } = EFFECTS_WORLD_Y_BOUNDS;
+  if (!Number.isFinite(value)) return min;
+  return Math.min(max, Math.max(min, Math.round(value)));
+}
+
+/**
+ * Clamp a scene's `v_factor` to the schema's range.
+ *
+ * DELIBERATELY NOT A FACTOR PICKER. `v_factor` is a right-shift amount 0..15,
+ * not a `$defs/factor` — see EFFECTS_V_FACTOR_BOUNDS. The form offers a spinner
+ * over this range and nothing else, because the FACTOR_* names that used to be
+ * on offer here are values no engine can consume (ROADMAP item 35).
+ */
+export function clampVFactor(value: number): number {
+  const { min, max } = EFFECTS_V_FACTOR_BOUNDS;
   if (!Number.isFinite(value)) return min;
   return Math.min(max, Math.max(min, Math.round(value)));
 }
@@ -328,4 +343,7 @@ export const SCENE_FORM_CHOICES = {
   transition: EFFECTS_TRANSITION_VALUES,
 } as const;
 
-export { factorLabel, EFFECTS_LAYER_COUNT, EFFECTS_PACKED_FACTOR_BOUNDS, EFFECTS_WORLD_Y_BOUNDS };
+export {
+  factorLabel, EFFECTS_LAYER_COUNT, EFFECTS_PACKED_FACTOR_BOUNDS, EFFECTS_WORLD_Y_BOUNDS,
+  EFFECTS_V_FACTOR_BOUNDS,
+};

@@ -172,6 +172,44 @@ export const EFFECTS_LAYER_COUNT = Object.freeze((() => {
 /** `world_y` is an act-axis coordinate, 0..32767 (§2.2). */
 export const EFFECTS_WORLD_Y_BOUNDS = boundsAt('$defs', 'layer', 'properties', 'world_y');
 
+/**
+ * `v_factor` is a RIGHT-SHIFT AMOUNT, 0..15 — read out of the schema, not typed.
+ *
+ * NOT A FACTOR, despite the name. `fa`/`fb` are packed `$defs/factor` values
+ * where locked is the byte `$0FF`; this is a shift count the engine hands to
+ * `asr.w`, where locked is the sentinel **15**. The contract used to `$ref` both
+ * to `$defs/factor`, which is what made the two spaces look like one type
+ * (empyrean CR-1, `a32bcb03`; ROADMAP item 35). Reading the bounds through
+ * `boundsAt` rather than through `$defs/factor` is what stops that recurring: if
+ * a future amendment `$ref`s this field again, `boundsAt` finds no numeric
+ * minimum/maximum on it and the module's import fails loudly.
+ */
+export const EFFECTS_V_FACTOR_BOUNDS = boundsAt('properties', 'v_factor');
+
+/**
+ * The value that pins the BG plane: `v_factor`'s maximum, which the schema's own
+ * description names as the lock sentinel.
+ *
+ * DERIVED, TWICE, so the two halves cannot drift apart. The number comes from
+ * `maximum`; the claim that this particular number is the sentinel comes from
+ * the schema's `description`, checked at module load below. A schema that moved
+ * the ceiling and the sentinel together still works; one that decoupled them
+ * fails the import instead of quietly redefining "locked".
+ */
+export const EFFECTS_V_FACTOR_LOCK: number = EFFECTS_V_FACTOR_BOUNDS.max;
+
+(function assertVFactorLockSentinel(): void {
+  const description = at('properties', 'v_factor').description;
+  if (typeof description !== 'string'
+      || !new RegExp(`\\b${EFFECTS_V_FACTOR_LOCK}\\b[^.]*LOCK SENTINEL`).test(description)) {
+    throw new Error(
+      `effects scene schema properties.v_factor no longer names ${EFFECTS_V_FACTOR_LOCK} as its ` +
+      'LOCK SENTINEL — EFFECTS_V_FACTOR_LOCK derives the locked value from `maximum`, and that ' +
+      'coupling has just been broken. Re-derive it against the amended schema.',
+    );
+  }
+})();
+
 // ---------------------------------------------------------------------------
 // Identity
 // ---------------------------------------------------------------------------
@@ -238,17 +276,25 @@ export function sceneIdRefusal(id: string, library: EffectsSceneLibrary): string
  * and would silently freeze today's default into files that should track the
  * contract's". A new scene is the same document a hand author would write.
  *
- * `FACTOR_1` for the layer's two factors and `FACTOR_0` for `v_factor` are the
- * neutral starting point an author edits away from — 1:1 with the camera
+ * `FACTOR_1` for the layer's two factors and the LOCK SENTINEL for `v_factor`
+ * are the neutral starting point an author edits away from — 1:1 with the camera
  * horizontally, no vertical scroll — not a schema default, and there is no schema
  * default for either (both are `required`).
+ *
+ * `v_factor` USED TO BE `'FACTOR_0'` HERE, AND THAT WAS THE DEFECT. In the packed
+ * factor space `FACTOR_0` genuinely is locked; in the shift space this field
+ * actually occupies, locked spells `EFFECTS_V_FACTOR_LOCK` (15) and `FACTOR_0`
+ * is not a value at all — it folded to the byte 255, which a 68000 `asr.w` takes
+ * mod 64 as 63, sign-filling the term so the plane rendered *almost* like a
+ * locked one. Every scene this function has ever created carried it. Migrated
+ * under ROADMAP item 35, behind empyrean's CR-1 (`a32bcb03`).
  */
 export function newEffectsScene(id: string, name?: string): EffectsScene {
   const scene: EffectsScene = {
     schema: 1,
     id,
     layers: [{ world_y: 0, fa: 'FACTOR_1', fb: 'FACTOR_1' }],
-    v_factor: 'FACTOR_0',
+    v_factor: EFFECTS_V_FACTOR_LOCK,
   };
   if (name !== undefined && name !== '') scene.name = name;
   return scene;

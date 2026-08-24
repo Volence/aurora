@@ -18,6 +18,7 @@ import { documentHistoryHub } from '../../state/history-hub';
 import type { AgentRequest } from '../../../shared/agent-protocol';
 import type { Color } from '../../../core/model/s4-types';
 import type { EffectsScene, EffectsSceneLibrary } from '../../../core/formats/effects/scene';
+import { EFFECTS_V_FACTOR_LOCK } from '../../../core/formats/effects/scene-ui';
 
 const black = (): Color => ({ r: 0, g: 0, b: 0, a: 255 });
 const line = () => ({ colors: Array.from({ length: 16 }, black) });
@@ -56,7 +57,7 @@ const canopy = (): EffectsScene => ({
     { world_y: 0, fa: 'FACTOR_1', fb: { s1: 2, s2: 4, op: 1 } },
     { world_y: 96, fa: 'FACTOR_1_2', fb: 'FACTOR_1_4', enabled: false },
   ],
-  v_factor: 'FACTOR_1_4',
+  v_factor: 2,
   budget_class: 'heavy',
 });
 
@@ -138,7 +139,7 @@ describe('set_effects_scene', () => {
     // `layers` must have at least one item, and `v_factor` is required.
     await expect(ask({
       kind: 'set-effects-scene', id: 'canopy',
-      scene: { schema: 1, id: 'canopy', layers: [], v_factor: 'FACTOR_0' },
+      scene: { schema: 1, id: 'canopy', layers: [], v_factor: EFFECTS_V_FACTOR_LOCK },
     })).rejects.toThrow(/schema/);
     expect(lib().scenes).toEqual([]);
     expect(actHistory().canUndo, 'a refused write must not consume an undo slot').toBe(false);

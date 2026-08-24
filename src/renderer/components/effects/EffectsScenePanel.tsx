@@ -18,13 +18,17 @@ import { useProjectStore, getActiveLevel } from '../../state/projectStore';
 import { useEditorStore, executeCommand } from '../../state/editorStore';
 import { useHistoryVersion } from '../../hooks/useHistoryVersion';
 import type { AnyCommand } from '../../../core/editing/commands';
-import type { EffectsScene, EffectsSceneLibrary } from '../../../core/formats/effects/scene';
+import type {
+  EffectsScene, EffectsSceneLibrary, EffectsLayer,
+} from '../../../core/formats/effects/scene';
 import {
   factorOptions, factorSelectValue, factorFromSelect, clampPackedField, clampWorldY,
+  clampVFactor,
   sceneListEntries, sceneRefOptions, unassignableSceneRef,
   sectionSceneCommand, createSceneCommand, deleteSceneCommand,
   addLayerCommand, removeLayerCommand, setLayerFieldCommand, setSceneFieldCommand,
   SCENE_FORM_CHOICES, EFFECTS_LAYER_COUNT, EFFECTS_PACKED_FACTOR_BOUNDS, EFFECTS_WORLD_Y_BOUNDS,
+  EFFECTS_V_FACTOR_BOUNDS,
 } from '../../providers/effects-aeon';
 
 const EMPTY_LIBRARY: EffectsSceneLibrary = { scenes: [], unreadable: [], notices: [] };
@@ -77,9 +81,19 @@ function run(command: AnyCommand | null): void {
   executeCommand(command, level);
 }
 
+/**
+ * A `$defs/factor` picker — the named set plus the custom packed escape hatch.
+ *
+ * USED FOR A LAYER'S `fa`/`fb` AND NOTHING ELSE. It used to drive the scene's
+ * `v_factor` too, which is the whole of ROADMAP item 35: that field is a
+ * right-shift amount 0..15, not a packed factor, so every name this control
+ * offers is a value no engine can consume there. `EffectsLayer['fa']` is the
+ * type deliberately — naming the field it actually serves is what stops it
+ * being re-pointed at a scalar a third time.
+ */
 function FactorField({ value, onChange, title }: {
-  value: EffectsScene['v_factor'];
-  onChange: (f: EffectsScene['v_factor']) => void;
+  value: EffectsLayer['fa'];
+  onChange: (f: EffectsLayer['fa']) => void;
   title: string;
 }) {
   const selected = factorSelectValue(value);
@@ -213,11 +227,26 @@ export default function EffectsScenePanel(): React.ReactElement {
               }} />
           </div>
           <div style={row}>
-            <span style={label} title="Vertical scroll factor for the whole scene">V factor</span>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <FactorField title="Scene v_factor" value={selected.v_factor}
-                onChange={(f) => run(setSceneFieldCommand(library, selected.id, 'v_factor', f))} />
-            </div>
+            <span style={label}
+              title="Vertical scroll for the whole background plane, as a right-shift amount">
+              V factor
+            </span>
+            {/*
+              A SPINNER, NOT A FACTOR PICKER (ROADMAP item 35). `v_factor` is a
+              right-shift count the engine feeds to `asr.w`; the FACTOR_* names
+              this row used to offer belong to a different space and folded to a
+              byte no engine reads. Bounds come from the schema so the spinner
+              cannot offer a shift the engine has no room for, and the max is the
+              lock sentinel, which is why it is also the new-scene default.
+            */}
+            <NumberField
+              title={`v_factor — background vertical shift, ${EFFECTS_V_FACTOR_BOUNDS.min}`
+                + `..${EFFECTS_V_FACTOR_BOUNDS.max}; `
+                + `${EFFECTS_V_FACTOR_BOUNDS.max} locks the plane to v_offset`}
+              min={EFFECTS_V_FACTOR_BOUNDS.min} max={EFFECTS_V_FACTOR_BOUNDS.max}
+              value={selected.v_factor}
+              onChange={(n) => run(setSceneFieldCommand(
+                library, selected.id, 'v_factor', clampVFactor(n)))} />
           </div>
           <div style={row}>
             <span style={label}>V center</span>

@@ -13,10 +13,11 @@ import { validateAgainstSchema, type JsonSchema } from '../../src/core/formats/e
  *
  * PINS (re-verified at dispatch, not taken on trust):
  *   • empyrean contract/schema/aurora-effects-scene.schema.json, git blob
- *     2d7a9fee37d85334103ca1a3e03e1a40466d6d9c — byte-identical from empyrean
- *     1326ceb (commit, the merge landing the contract) through c2c81e2 (commit,
- *     HEAD at cut). The blob hash is the invariant; the vendored copy is held to
- *     it by effects-schema-drift.test.ts.
+ *     cab3ca5817ceb4db3a8c51405e9ec9dba038ee09 — re-vendored from empyrean
+ *     a32bcb03 (commit, CR-1: `v_factor`/`v_factor_fg` retyped from a `$ref` to
+ *     `$defs/factor` into plain integers 0..15). It replaced blob 2d7a9fee, which
+ *     was byte-identical from 1326ceb through c2c81e2. The blob hash is the
+ *     invariant; the vendored copy is held to it by effects-schema-drift.test.ts.
  *   • empyrean docs/AURORA_EFFECTS_SCHEMA.md at 069cf59 (commit) — §2 unchanged
  *     since 0ea8734 landed it; the two later doc commits (2f3b6fd, 069cf59)
  *     touched §3's site count and §3's cites, not §2.
@@ -163,13 +164,24 @@ describe('effects scene golden (AURORA_EFFECTS_SCHEMA.md §8)', () => {
   /**
    * Both factor spellings (§2.3) appear: a published FACTOR_* name and a custom
    * packed triple.
+   *
+   * BOTH SAMPLES ARE LAYER FACTORS. The named half used to be read off
+   * `v_factor`, which was never a `$defs/factor` at all — item 35. Sampling two
+   * different layers keeps the row discriminating: layer 0 carries a name and
+   * layer 1 carries the packed triple, so a golden that lost either spelling
+   * fails rather than passing on one field that happens to satisfy both.
    */
   it('exercises both factor spellings', () => {
     const factorBranches = ((EFFECTS_SCENE_SCHEMA.$defs as Record<string, JsonSchema>)
       .factor.oneOf) as JsonSchema[];
     expect(factorBranches).toHaveLength(2);
     const doc = JSON.parse(GOLDEN) as { v_factor: unknown; layers: { fa: unknown }[] };
-    expect(validateAgainstSchema(doc.v_factor, factorBranches[0], EFFECTS_SCENE_SCHEMA)).toEqual([]);
+    expect(validateAgainstSchema(doc.layers[0].fa, factorBranches[0], EFFECTS_SCENE_SCHEMA)).toEqual([]);
     expect(validateAgainstSchema(doc.layers[1].fa, factorBranches[1], EFFECTS_SCENE_SCHEMA)).toEqual([]);
+    // And the field that is NOT a factor: `v_factor` matches NEITHER branch.
+    for (const branch of factorBranches) {
+      expect(validateAgainstSchema(doc.v_factor, branch, EFFECTS_SCENE_SCHEMA).length,
+        'v_factor is a shift count, not a $defs/factor').toBeGreaterThan(0);
+    }
   });
 });
