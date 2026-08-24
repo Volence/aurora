@@ -23,6 +23,8 @@ import {
   LEGACY_ANIM_KEY,
   BG_OVERRIDE_CONSUMER_PATH,
 } from '../../src/core/formats/bg-override/bg-override';
+// The ONE number this repo genuinely holds twice — see the row that pins it.
+import { BG_TILE_BASE_SLOT as LOADER_BG_TILE_BASE_SLOT } from '../../src/core/formats/bg-tiles';
 
 /**
  * Drift gate for the vendored aeon consumer contract.
@@ -106,6 +108,24 @@ describe('every exported constant is READ from the contract, not typed beside it
     // exception to exactly one name.
     expect(uncovered).toEqual(['BG_TILE_BASE_SLOT']);
     expect(at(['constants', 'BG_TILE_BASE_SLOT', 'why'])).toMatch(/Not enforced by this codec/);
+  });
+
+  /**
+   * BG_TILE_BASE_SLOT is not enforced by the CODEC — but it is used, as a
+   * second literal, by the LOADER: `bg-tiles.ts` exports its own
+   * `BG_TILE_BASE_SLOT = 1024` and `normalizeBgLayout` rebases every
+   * engine-emitted layout by it. That is a second copy of a contract number
+   * living in a module nobody greps when reconciling the contract — the
+   * "four-copies-of-448" shape the vendored file's own comment warns about,
+   * found while enumerating ceiling sites for ROADMAP item 8.
+   *
+   * Left as a PIN rather than an import: `bg-tiles.ts` is the classic/S1 loader
+   * too, and making the aeon contract a hard dependency of it would be a wider
+   * change than this parcel earns. The pin makes the two disagree LOUDLY
+   * instead of silently, which is the property that was missing.
+   */
+  it('the LOADER\'s BG_TILE_BASE_SLOT agrees with the contract\'s', () => {
+    expect(LOADER_BG_TILE_BASE_SLOT).toBe(at(['constants', 'BG_TILE_BASE_SLOT', 'value']));
   });
 
   it('every constant carries at least one aeon authority', () => {
