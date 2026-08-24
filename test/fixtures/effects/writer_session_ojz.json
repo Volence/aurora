@@ -51,6 +51,6 @@
   "schema": 1,
   "transition": "instant",
   "v_center": 8,
-  "v_factor": "FACTOR_3_4",
+  "v_factor": 8,
   "v_offset": -8
 }

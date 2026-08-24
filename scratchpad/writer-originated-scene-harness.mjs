@@ -28,7 +28,15 @@
 //       For i = 0 that is the LAST option, which is the custom-packed sentinel —
 //       so the packed triple in the emitted file is whatever the app seeds, never
 //       something typed here.
-//   R7  scene v_factor = the option at index N (N = the layer count from R3).
+//   R7  scene v_factor = N (N = the layer count from R3), typed into the real
+//       spinner. It USED to be "the option at index N of the v_factor select",
+//       and that select is gone: ROADMAP item 35 retyped `v_factor` from a
+//       $defs/factor to a plain 0..15 shift count, so the control is a bounded
+//       number field. N is chosen by the same rule R8 uses and for the same
+//       reason — it is the app's own ceiling, not a number picked here — and it
+//       is deliberately NOT the field's `max`, because `max` is also the
+//       new-scene default and a fixture carrying it would prove the control
+//       moved nothing. The affordance itself is checked separately (row 6d).
 //   R8  v_center = N, v_offset = -N.
 //   R9  precision and transition = the LAST option each select offers.
 //   R10 the section-assignment select is set to the scene's id.
@@ -321,8 +329,32 @@ async function main() {
       JSON.stringify(doc[0].layers[0].fb));
 
     // ---- 6. R7/R8/R9: scene-level fields. --------------------------------
-    await c.evalExpr(SET_INPUT(SEL_BY_TITLE('/^Scene v_factor$/'),
-      factorOpts[N % factorOpts.length]));
+    // ITEM 35, ON THE RENDERED SURFACE. `v_factor` is a shift count, so its
+    // control must be a bounded number input and must NOT be the factor picker.
+    // Read the affordance off the DOM before driving it: what the running app
+    // offers is the parameter this whole item turned on, and the node suite
+    // cannot see it.
+    const vfCtl = await c.json(`(() => {
+      const sel = [...document.querySelectorAll('select')]
+        .find(e => /v_factor/.test(e.title || ''));
+      const inp = [...document.querySelectorAll('input')]
+        .find(e => /^v_factor/.test(e.title || ''));
+      return {
+        isSelect: !!sel,
+        selOptions: sel ? [...sel.options].map(o => o.value) : null,
+        isNumber: !!inp && inp.type === 'number',
+        min: inp ? inp.min : null,
+        max: inp ? inp.max : null,
+      };
+    })()`);
+    check('6d', 'v_factor is a bounded NUMBER control, and offers no FACTOR_* name',
+      vfCtl.isNumber && !vfCtl.isSelect
+      && Number(vfCtl.min) === 0 && Number(vfCtl.max) > Number(vfCtl.min),
+      JSON.stringify(vfCtl));
+    check('6e', 'the v_factor control the session drives is NOT the layer factor picker',
+      !(vfCtl.selOptions || []).some((o) => /^FACTOR_/.test(o)),
+      `select options at v_factor: ${JSON.stringify(vfCtl.selOptions)}`);
+    await c.evalExpr(SET_INPUT(NUM_BY_TITLE('/^v_factor/'), N));
     await sleep(300);
     await c.evalExpr(SET_INPUT(NUM_BY_TITLE('/^v_center/'), N));
     await sleep(300);
@@ -341,7 +373,8 @@ async function main() {
     await sleep(500);
     doc = JSON.parse(await c.evalExpr('window.__dbg.aeon.scenesJson()'));
     check('6b', 'the scene-level enumerated choices reached the DOCUMENT',
-      doc[0].v_center === N && doc[0].v_offset === -N
+      doc[0].v_factor === N
+      && doc[0].v_center === N && doc[0].v_offset === -N
       && doc[0].precision === precOpts[precOpts.length - 1]
       && doc[0].transition === transOpts[transOpts.length - 1],
       JSON.stringify({ v_center: doc[0].v_center, v_offset: doc[0].v_offset,
@@ -382,6 +415,12 @@ async function main() {
       Array.isArray(parsed.layers) && parsed.layers.length === N,
       `${parsed.layers?.length} layers in the file, ${N} in the model`);
     check('7d', 'the emitted file is non-trivial', bytes.length > 200, `${bytes.length} bytes`);
+    // ITEM 35: the value the engine reads must be a number the engine can read.
+    // The old select wrote 'FACTOR_0', which folds to the byte 255.
+    check('7e', 'the emitted v_factor is an integer in the control\'s own range',
+      Number.isInteger(parsed.v_factor)
+      && parsed.v_factor >= Number(vfCtl.min) && parsed.v_factor <= Number(vfCtl.max),
+      `v_factor=${JSON.stringify(parsed.v_factor)} range=[${vfCtl.min},${vfCtl.max}]`);
     writeFileSync(OUT, bytes);
     console.log(`\n        emitted bytes → ${OUT} (${bytes.length} bytes)`);
     console.log(`        sha256 = ${(await import('node:crypto')).createHash('sha256').update(bytes).digest('hex')}`);
