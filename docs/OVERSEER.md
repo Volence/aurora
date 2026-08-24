@@ -278,10 +278,14 @@ Each has caught a real defect here.
    hashing the extracted bytes, never by trusting the message that pairs them. A recipe
    carried in prose is a *claim* that it still reproduces the artifact; the blob **is**
    the artifact. Local instance: the effects codec pins empyrean's schema by git **blob**
-   hash (`2d7a9fee…`, `test/formats/effects-schema-drift.test.ts`) rather than by commit,
+   hash (`cab3ca58…` today, `2d7a9fee…` before item 35's re-vendor;
+   `test/formats/effects-schema-drift.test.ts`) rather than by commit,
    because the doc moved twice with the wire shape byte-identical underneath — a commit
    citation would have read stale twice for nothing. The same reasoning is why the
-   three-way reconciliation compares **bytes**, not versions.
+   three-way reconciliation compares **bytes**, not versions. **And the re-vendor is the
+   other half of the lesson: when the pin DOES move, extract the new blob
+   (`git -C ../empyrean show <rev>:<path> > <vendored>`) and re-hash it — never hand-edit
+   the vendored copy to match a diff you read.**
 
    **Companion clause** (empyrean `e650b96`): look for the artifact at the revision that
    **pinned** it, not at the tip — a golden path is a moving pointer, and for a vintage

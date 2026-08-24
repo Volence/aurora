@@ -9,11 +9,15 @@
 //     (golden protocol) — read at empyrean 069cf59, an ancestor of c2c81e2.
 //   • empyrean contract/schema/aurora-effects-scene.schema.json — the
 //     machine-readable half, vendored beside this file. Its git blob hash is
-//     2d7a9fee37d85334103ca1a3e03e1a40466d6d9c and the vendored copy is pinned
+//     cab3ca5817ceb4db3a8c51405e9ec9dba038ee09 and the vendored copy is pinned
 //     against that hash by test/formats/effects-schema-drift.test.ts. The BLOB
 //     hash, not a commit citation, is the load-bearing invariant: the schema
 //     doc has moved twice (2f3b6fd, 069cf59) with the schema JSON byte-identical
 //     underneath, so a commit pin would read as drift that is not there.
+//     PREVIOUS PIN 2d7a9fee37d85334103ca1a3e03e1a40466d6d9c, re-vendored at
+//     empyrean a32bcb03 (CR-1): `v_factor` and `v_factor_fg` lost their `$ref`
+//     to `$defs/factor` and became plain integers 0..15. See the v_factor field
+//     comment below for why that was a defect and not a preference.
 //   • aeon tools/EFFECTS_CONSUMER_CONTRACT.md §2.1/§2.3 at aeon 00607dd5 — the
 //     consumer's read set, and the drift rule that governs both directions.
 //
@@ -110,10 +114,26 @@ export interface EffectsScene {
   /** Display label. Writer-owned: the generator ignores it and must keep ignoring it. */
   name?: string;
   layers: EffectsLayer[];
-  v_factor: EffectsFactor;
+  /**
+   * Whole-plane Plane-B vertical scroll, as a RIGHT-SHIFT AMOUNT 0..15 — a plain
+   * integer, NOT a packed `EffectsFactor`.
+   *
+   * TWO DIFFERENT SPACES THAT LOOKED LIKE ONE TYPE. A layer's `fa`/`fb` are
+   * packed factors where locked is the byte `$0FF`; this field is a shift count
+   * the engine feeds straight to `asr.w`, where locked is the sentinel **15**.
+   * The contract originally `$ref`'d both to `$defs/factor` — the mistake this
+   * type exists to make un-writable — and the near-miss is why it survived: a
+   * `FACTOR_0` here folds to 255, a 68000 register shift is taken mod 64, and
+   * `ASR.W` by 63 sign-fills, so the term collapses and the plane renders
+   * *almost* like a locked one instead of failing visibly. Fixed at empyrean
+   * `a32bcb03` (CR-1); Aurora followed in ROADMAP item 35. `$defs/factor` is
+   * untouched and still governs `fa`, `fb` and `curve.to`, which were correct.
+   */
+  v_factor: number;
   v_center?: number;
   v_offset?: number;
-  v_factor_fg?: EffectsFactor;
+  /** Plane-A counterpart of `v_factor`, same shift encoding. RESERVED in v1. */
+  v_factor_fg?: number;
   deform_fg?: EffectsSceneDeform;
   deform_bg?: EffectsSceneDeform;
   v_deform?: EffectsVDeform;

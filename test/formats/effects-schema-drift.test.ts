@@ -27,12 +27,18 @@ import { EFFECTS_SCENE_SCHEMA } from '../../src/core/formats/effects/scene';
  * this file is the payment.
  *
  * WHAT THE PIN IS. The load-bearing invariant is the schema file's GIT BLOB
- * HASH — 2d7a9fee37d85334103ca1a3e03e1a40466d6d9c — not a commit citation. The
- * blob is byte-identical from empyrean 1326ceb (the merge landing the contract)
- * through c2c81e2 (HEAD when this parcel was cut), while the schema DOC moved
- * twice underneath it (2f3b6fd, 069cf59) with no §2 change. A commit pin would
- * therefore read as drift that is not there; a blob hash cannot drift out from
- * under a commit citation.
+ * HASH — cab3ca5817ceb4db3a8c51405e9ec9dba038ee09 — not a commit citation. The
+ * previous pin, 2d7a9fee37d85334103ca1a3e03e1a40466d6d9c, was byte-identical
+ * from empyrean 1326ceb (the merge landing the contract) through c2c81e2, while
+ * the schema DOC moved twice underneath it (2f3b6fd, 069cf59) with no §2 change.
+ * A commit pin would therefore read as drift that is not there; a blob hash
+ * cannot drift out from under a commit citation.
+ *
+ * WHY IT MOVED. empyrean a32bcb03 applied CR-1: `v_factor` and `v_factor_fg`
+ * were `$ref`'d to `$defs/factor` (the packed named-factor set) and are read by
+ * the engine as plain 0..15 shift counts. `$defs/factor` itself is UNTOUCHED and
+ * still governs `fa`, `fb` and `curve.to`. Re-vendored by extraction from that
+ * commit, never retyped — ROADMAP item 35.
  *
  * WHAT THIS GATE CANNOT DO, said plainly: it proves the vendored copy is
  * byte-identical to the blob Aurora pinned. It cannot notice that empyrean has
@@ -47,7 +53,7 @@ const SCHEMA_PATH = resolve(
 );
 
 /** empyrean contract/schema/aurora-effects-scene.schema.json, blob hash. */
-const PINNED_BLOB = '2d7a9fee37d85334103ca1a3e03e1a40466d6d9c';
+const PINNED_BLOB = 'cab3ca5817ceb4db3a8c51405e9ec9dba038ee09';
 
 /** git's object id: sha1 over "blob <bytelen>\0" + the file's bytes. */
 function gitBlobHash(bytes: Buffer): string {

@@ -20,7 +20,7 @@ import { makeBgId } from '../../src/core/formats/bg-library';
  * Effects scene definition codec — wave-1 surface 1.
  *
  * Contract: empyrean docs/AURORA_EFFECTS_SCHEMA.md §2/§6/§8 at 069cf59, the
- * committed JSON schema at blob 2d7a9fee, aeon
+ * committed JSON schema at blob cab3ca58 (empyrean a32bcb03, CR-1), aeon
  * tools/EFFECTS_CONSUMER_CONTRACT.md §2 at 00607dd5.
  */
 
@@ -37,7 +37,7 @@ const MINIMAL = JSON.stringify({
   id: 'plain',
   layers: [{ fa: 'FACTOR_1', fb: 'FACTOR_1_2', world_y: 0 }],
   schema: 1,
-  v_factor: 'FACTOR_1_2',
+  v_factor: 1,
 }, null, 2);
 
 function withDoc(mutate: (doc: Record<string, unknown>) => void): string {
@@ -205,13 +205,38 @@ describe('effects scene reader — the closed schema', () => {
     }), 'plain')).toThrow(/expected integer, got boolean/);
   });
 
+  /**
+   * Aimed at a LAYER's `fa`, which is what `$defs/factor` governs. It used to be
+   * aimed at `v_factor`, and that was the item-35 defect in the test's own
+   * frame: `v_factor` is a shift count and never had a `oneOf` to fall through.
+   */
   it('refuses an unpublished factor name and a malformed packed triple', () => {
-    expect(() => parseEffectsScene(withDoc(d => { d.v_factor = 'FACTOR_2_3'; }), 'plain'))
+    const withFa = (fa: unknown) => withDoc(d => {
+      (d.layers as Record<string, unknown>[])[0].fa = fa;
+    });
+    expect(() => parseEffectsScene(withFa('FACTOR_2_3'), 'plain'))
       .toThrow(/matches none of the 2 allowed forms/);
-    expect(() => parseEffectsScene(withDoc(d => { d.v_factor = { s1: 1, s2: 2 }; }), 'plain'))
+    expect(() => parseEffectsScene(withFa({ s1: 1, s2: 2 }), 'plain'))
       .toThrow(/matches none of the 2 allowed forms/);
-    expect(() => parseEffectsScene(withDoc(d => { d.v_factor = { s1: 1, s2: 2, op: 0, note: 'x' }; }), 'plain'))
+    expect(() => parseEffectsScene(withFa({ s1: 1, s2: 2, op: 0, note: 'x' }), 'plain'))
       .toThrow(/matches none of the 2 allowed forms/);
+  });
+
+  /**
+   * `v_factor`'s OWN refusals — the shape the `$ref` used to hide. A string is
+   * refused by type, and 16 by range; both are values the old contract accepted.
+   */
+  it('refuses a FACTOR_* name and an out-of-range shift at v_factor', () => {
+    // Bounds read out of the committed schema, so the row cannot drift from it.
+    const vf = (EFFECTS_SCENE_SCHEMA.properties as Record<string, { minimum: number; maximum: number }>)
+      .v_factor;
+    expect(typeof vf.minimum, 'v_factor lost its numeric bounds').toBe('number');
+    expect(() => parseEffectsScene(withDoc(d => { d.v_factor = 'FACTOR_0'; }), 'plain'))
+      .toThrow(/v_factor: expected integer, got string/);
+    expect(() => parseEffectsScene(withDoc(d => { d.v_factor = vf.maximum + 1; }), 'plain'))
+      .toThrow(new RegExp(`v_factor: ${vf.maximum + 1} is above the maximum ${vf.maximum}`));
+    expect(() => parseEffectsScene(withDoc(d => { d.v_factor = vf.minimum - 1; }), 'plain'))
+      .toThrow(new RegExp(`v_factor: ${vf.minimum - 1} is below the minimum ${vf.minimum}`));
   });
 
   it('refuses a tableRef .bin path that escapes the effects directory', () => {
@@ -251,7 +276,7 @@ describe('effects scene writer — round trip', () => {
       '    }',
       '  ],',
       '  "schema": 1,',
-      '  "v_factor": "FACTOR_1_2"',
+      '  "v_factor": 1',
       '}',
     ].join('\n');
     // Anti-vacuous: the fields whose survival is the point are really in there.
@@ -274,7 +299,7 @@ describe('effects scene writer — round trip', () => {
   it('normalizes key order to §5 canonical order without dropping a key', () => {
     const scrambled = JSON.stringify({
       budget_class: 'x',
-      v_factor: 'FACTOR_1_2',
+      v_factor: 1,
       id: 'scrambled',
       layers: [{ fb: 'FACTOR_1', vsplit: { at: 1 }, world_y: 3, fa: 'FACTOR_1' }],
       schema: 1,
@@ -314,7 +339,7 @@ describe('effects scene writer — round trip', () => {
     const content = {
       schema: 1, id: 'det', name: 'Det',
       layers: [{ world_y: 0, fa: 'FACTOR_1', fb: 'FACTOR_1_2', vsplit: { at: 4 } }],
-      v_factor: 'FACTOR_1_2', budget_class: 'x',
+      v_factor: 1, budget_class: 'x',
     };
     /** The same content, every object rebuilt with its keys inserted backwards. */
     function reversedKeys(value: unknown): unknown {
@@ -353,7 +378,7 @@ describe('effects scene writer — round trip', () => {
   });
 
   it('refuses to write a scene that does not match the schema', () => {
-    const bad = { schema: 1, id: 'bad', layers: [], v_factor: 'FACTOR_1' } as unknown as EffectsScene;
+    const bad = { schema: 1, id: 'bad', layers: [], v_factor: 1 } as unknown as EffectsScene;
     expect(() => serializeEffectsScene(bad)).toThrow(/refusing to write scene "bad"/);
     const unknownKey = {
       ...JSON.parse(MINIMAL), presets: [],
