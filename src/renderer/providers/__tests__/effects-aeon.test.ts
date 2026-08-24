@@ -249,7 +249,7 @@ describe('scene commands', () => {
     const before = JSON.stringify(lib.scenes[0]);
 
     h.execute(setLayerFieldCommand(lib, 'canopy', 0, 'fa', 'FACTOR_1_8')!, level);
-    h.execute(setSceneFieldCommand(lib, 'canopy', 'v_factor', 'FACTOR_1_2')!, level);
+    h.execute(setSceneFieldCommand(lib, 'canopy', 'v_factor', 1)!, level);
     h.execute(addLayerCommand(lib, 'canopy')!, level);
     expect(lib.scenes[0].layers).toHaveLength(3);
 

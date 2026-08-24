@@ -69,7 +69,7 @@ describe('set-effects-scene', () => {
     after.layers[0].world_y = 96;
     after.layers[0].fa = 'FACTOR_1_4';
     after.layers[0].fb = { s1: 2, s2: 4, op: 1 };
-    after.v_factor = 'FACTOR_1_2';
+    after.v_factor = 1;
 
     h.execute(cmd({ sceneId: 'canopy', oldScene: cloneEffectsScene(before), newScene: after }), l);
     expect(l.effectsScenes!.scenes[0]).toEqual(after);

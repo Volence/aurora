@@ -23,6 +23,8 @@ import {
   EFFECTS_LEFT_COLUMN_MASK_VALUES,
   EFFECTS_LAYER_COUNT,
   EFFECTS_WORLD_Y_BOUNDS,
+  EFFECTS_V_FACTOR_BOUNDS,
+  EFFECTS_V_FACTOR_LOCK,
   isNamedFactor,
   factorLabel,
   isValidSceneId,
@@ -67,7 +69,9 @@ describe('factor set (schema §2.3)', () => {
     for (const name of EFFECTS_FACTOR_NAMES) {
       const scene = newEffectsScene('probe');
       scene.layers[0].fa = name;
-      scene.v_factor = name;
+      // NOT `scene.v_factor = name` — that line used to be here, and it was the
+      // defect. `v_factor` is a shift count, not a $defs/factor (item 35); its
+      // own coverage is the v_factor describe block below.
       expect(() => serializeEffectsScene(scene), `factor ${name} was refused`).not.toThrow();
     }
     const packedScene = newEffectsScene('probe');
@@ -105,6 +109,67 @@ describe('scene-level enumerations and bounds (schema §2.1/§2.2)', () => {
     for (const v of WAVE1_PRECISION_VALUES) expect(EFFECTS_PRECISION_VALUES).toContain(v);
     expect([...WAVE1_PRECISION_VALUES])
       .toEqual(S.properties.precision.enum.filter((v: string) => v !== 'line'));
+  });
+
+  it('reads v_factor\'s range out of the schema, NOT out of $defs/factor', () => {
+    expect(EFFECTS_V_FACTOR_BOUNDS).toEqual({
+      min: S.properties.v_factor.minimum,
+      max: S.properties.v_factor.maximum,
+    });
+    // The derivation that matters: this field is NOT a factor. If a future
+    // amendment $ref'd it back to $defs/factor, `minimum`/`maximum` would be
+    // gone and boundsAt would have thrown at import — but assert the shape
+    // directly too, because that is the class of defect item 35 was.
+    expect(S.properties.v_factor.$ref, 'v_factor must not be a $ref again').toBeUndefined();
+    expect(S.properties.v_factor.type).toBe('integer');
+    // $defs/factor is deliberately untouched and still governs fa/fb/curve.to.
+    expect(S.$defs.factor.oneOf, 'the factor set must survive the retype').toBeInstanceOf(Array);
+    expect(S.$defs.layer.properties.fa.$ref).toBe('#/$defs/factor');
+  });
+
+  it('derives the lock sentinel from the schema, and the schema still names it', () => {
+    expect(EFFECTS_V_FACTOR_LOCK).toBe(S.properties.v_factor.maximum);
+    // The other half of the derivation: the number is `maximum`, and the CLAIM
+    // that this number means "locked" is the schema's own description. scene-ui
+    // asserts this at module load; restated here so the coupling is visible.
+    expect(S.properties.v_factor.description)
+      .toMatch(new RegExp(`\\b${EFFECTS_V_FACTOR_LOCK}\\b[^.]*LOCK SENTINEL`));
+  });
+
+  it('offers a v_factor range the validator really enforces at both ends', () => {
+    // ANTI-VACUOUS: the bounds are only worth offering if one past each end is
+    // actually refused, and every value inside is actually accepted.
+    const { min, max } = EFFECTS_V_FACTOR_BOUNDS;
+    for (let v = min; v <= max; v++) {
+      const scene = newEffectsScene('probe');
+      scene.v_factor = v;
+      expect(() => serializeEffectsScene(scene), `v_factor ${v} was refused`).not.toThrow();
+    }
+    // MATCHERS ARE THE BOUNDS RULE'S OWN WORDING, not just "/v_factor/". A loose
+    // matcher here would be satisfied by the `required` error too, so a schema
+    // that DROPPED the field would report this row green (bar 2c/2d(i)).
+    const scene = newEffectsScene('probe');
+    scene.v_factor = min - 1;
+    expect(() => serializeEffectsScene(scene), `v_factor ${min - 1} was accepted`)
+      .toThrow(new RegExp(`v_factor: ${min - 1} is below the minimum ${min}`));
+    scene.v_factor = max + 1;
+    expect(() => serializeEffectsScene(scene), `v_factor ${max + 1} was accepted`)
+      .toThrow(new RegExp(`v_factor: ${max + 1} is above the maximum ${max}`));
+  });
+
+  it('REFUSES every FACTOR_* name at v_factor — the item-35 regression', () => {
+    // The defect, stated as a property: the sixteen names that are legal at a
+    // LAYER's fa are all illegal at the SCENE's v_factor. Driven off the schema's
+    // own enum, so it covers whatever set §2.3 publishes.
+    expect(EFFECTS_FACTOR_NAMES.length, 'the factor enum is empty').toBeGreaterThan(0);
+    for (const name of EFFECTS_FACTOR_NAMES) {
+      const scene = newEffectsScene('probe');
+      // The cast is the point: TypeScript refuses this now, and the run-time
+      // codec must refuse it too — a document off disk carries no types.
+      (scene as unknown as Record<string, unknown>).v_factor = name;
+      expect(() => serializeEffectsScene(scene), `v_factor accepted the name ${name}`)
+        .toThrow(/v_factor: expected integer, got string/);
+    }
   });
 
   it('reads the layer count and world_y range out of the schema', () => {
@@ -178,6 +243,13 @@ describe('construction', () => {
     expect(Object.keys(written.layers as object[])).toHaveLength(1);
     expect(Object.keys((written.layers as Record<string, unknown>[])[0]).sort())
       .toEqual(['fa', 'fb', 'world_y']);
+
+    // ITEM 35. A new scene starts LOCKED, spelled in the shift space this field
+    // actually occupies — a number, and specifically the schema's own sentinel.
+    // The default used to be the string 'FACTOR_0', which is locked in the PACKED
+    // space and folds to the byte 255 in this one.
+    expect(written.v_factor).toBe(EFFECTS_V_FACTOR_LOCK);
+    expect(typeof written.v_factor, 'a FACTOR_* name would be a string').toBe('number');
   });
 
   it('omits an empty name rather than writing an empty string', () => {
@@ -198,7 +270,8 @@ describe('construction', () => {
     const original = parseEffectsScene(JSON.stringify({
       schema: 1, id: 'canopy_dusk', name: 'x',
       layers: [{ world_y: 0, fa: 'FACTOR_1', fb: { s1: 2, s2: 4, op: 1 } }],
-      v_factor: 'FACTOR_0', budget_class: 'heavy', anchor: { at: { channel: 1, dsa: 3, dsb: 4 } },
+      v_factor: EFFECTS_V_FACTOR_LOCK, budget_class: 'heavy',
+      anchor: { at: { channel: 1, dsa: 3, dsb: 4 } },
     }), 'canopy_dusk');
 
     const copy = cloneEffectsScene(original);

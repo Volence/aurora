@@ -22,6 +22,7 @@ import type { FileAccess } from '../../adapter';
 import { loadAeonProject } from '../load';
 import { buildAeonSavePlan } from '../save';
 import { parseEffectsScene, serializeEffectsScene, type EffectsScene } from '../../../formats/effects/scene';
+import { EFFECTS_V_FACTOR_LOCK } from '../../../formats/effects/scene-ui';
 import { serializeNametable } from '../../../formats/s4-nametable';
 import { serializeTiles } from '../../../export/tile-dedup';
 import { SECTION_TILES_WIDE, SECTION_TILES_HIGH } from '../../../model/s4-types';
@@ -123,7 +124,7 @@ const CANOPY_ON_DISK = [
   '      "enabled": false',
   '    }',
   '  ],',
-  '  "v_factor": "FACTOR_1_4",',
+  '  "v_factor": 2,',
   '  "v_center": 112,',
   '  "precision": "cell",',
   '  "budget_class": "heavy"',
@@ -231,7 +232,7 @@ describe('buildAeonSavePlan — the effects-scene library', () => {
     const r = await loadAeonProject(fa, '/proj');
     const added: EffectsScene = {
       schema: 1, id: 'new_scene', layers: [{ world_y: 0, fa: 'FACTOR_1', fb: 'FACTOR_1_2' }],
-      v_factor: 'FACTOR_0',
+      v_factor: EFFECTS_V_FACTOR_LOCK,
     };
     r.project.effectsScenes.scenes.push(added);
 
@@ -271,7 +272,7 @@ describe('buildAeonSavePlan — the effects-scene library', () => {
 
     r.project.effectsScenes.scenes.push({
       schema: 1, id: 'broken', layers: [{ world_y: 0, fa: 'FACTOR_1', fb: 'FACTOR_1' }],
-      v_factor: 'FACTOR_0',
+      v_factor: EFFECTS_V_FACTOR_LOCK,
     });
 
     await expect(buildAeonSavePlan(fa, r.config, r.project, 'ojz', 'act1',
@@ -284,7 +285,7 @@ describe('buildAeonSavePlan — the effects-scene library', () => {
     const r = await loadAeonProject(fa, '/proj');
     // `layers` is required with minItems 1 (schema `required` + `minItems`).
     r.project.effectsScenes.scenes.push(
-      { schema: 1, id: 'empty_scene', layers: [], v_factor: 'FACTOR_0' } as EffectsScene);
+      { schema: 1, id: 'empty_scene', layers: [], v_factor: EFFECTS_V_FACTOR_LOCK } as EffectsScene);
 
     await expect(buildAeonSavePlan(fa, r.config, r.project, 'ojz', 'act1',
       { legacyAtlasMerged: r.legacyAtlasMerged })).rejects.toThrow(/empty_scene/);
