@@ -513,8 +513,28 @@ defect the parcel exists to fix.
   source by different methods and agreed; both were blind to the artifact. **A consumer
   measuring the bus against an installed binary gets the old answer with nothing announcing
   it**, so a cutover must rebuild and **verify by executing, never by grepping source**.
-  **UPDATE 2026-08-24, RELAYED BY THE ORACLE LANE AND RECORDED WITH THEIR STATED LIMIT — not
-  re-measured here.** They report this specific staleness closed: `target/release/oracle-aether`
+  ✅ **CLOSED 2026-08-24 BY EXECUTING, which is what this row demands and what the update below
+  could not supply.** The oracle lane started `oracle-aether` on `/run/user/1000/oracle.sock` and
+  handshook it fresh: **41 methods**, `serverName: oracle-next`, `serverVersion: 0.0.0`,
+  `breakpoints=false`, `z80=false`. **Aurora then verified independently from this session rather
+  than adopting their number**: `emulator/status` returned `romPath: "../aeon/s4.debug.bin"` —
+  the **relative** argv only the Rust binary is given, where the C++ `oracle_gui` carries the
+  absolute path — with `symbolCount: 2674`, `symbolsPath: ../aeon/s4.debug.lst`, paused at frame
+  0 with `pc` at `EntryPoint`. **So the legacy Python shim reaching the Rust core is now confirmed
+  against a SECOND server instance, by this lane's own 2026-08-22 discriminator, re-used to certify
+  the server that discriminator was first derived against.** Note what this is NOT: the shim is the
+  same one in both runs, so this is a re-confirmation, not an independent derivation.
+  ⚠ **`serverName` and `serverVersion` remain unforgeable-by-nothing** — a config default and a
+  literal that has never moved. **Neither can tell you which server answered**, which is exactly
+  the gap Aurora's two conditions on the `initialize` build-identity parcel exist to close. The
+  wire now demonstrates the gap instead of it being argued from source.
+  **Loud-failure verified too, not asserted**: `emulator/write_vram` returns `-32601`,
+  `"no such method: emulator/write_vram"`, with the frame/mclk envelope attached — a gap refuses
+  by name and feeds the queue rather than degrading to a plausible answer.
+
+  *Superseded reasoning, kept because it is the worked example of banking a relay with its limit
+  rather than laundering it:* **UPDATE 2026-08-24, RELAYED BY THE ORACLE LANE AND RECORDED WITH
+  THEIR STATED LIMIT — not re-measured here.** They report this specific staleness closed: `target/release/oracle-aether`
   is dated 2026-08-22 21:52, zero non-docs files changed between their `12cc17e` and their HEAD,
   and `12cc17e` banks a handshake that read **41 methods over the wire**, committed 21:54, two
   minutes after that binary was built. **Their own limit, carried rather than dropped: that is
