@@ -52,13 +52,40 @@ export function CollapsibleSection({ id, title, right, variant = 'content', defa
     savePanelState(next);
     setState(next);
   };
+  // A HEADER ACTION IS NOT A TOGGLE, and the header is still the hit target.
+  //
+  // The `right` slot holds ACTION controls (Delete scene, Add layer), and the
+  // toggle lives on a div that wraps the whole header row — so every action
+  // click used to bubble into `toggle` and flip the section as a side effect.
+  // That is how ROADMAP item 32 was found: the 7th (odd) `Add layer` click
+  // collapsed the section it had just filled, leaving "Layers (8/8)" over an
+  // empty panel.
+  //
+  // TWO REJECTED FIXES, and why this one is here instead.
+  //
+  // `e.stopPropagation()` at the CALL SITES fixes today's two buttons and none
+  // of tomorrow's: `right` is a slot, so the rule has to hold for a control
+  // nobody has written yet or it is not a rule, it is a list to forget to
+  // update. Wrapping `right` in a stopPropagation div inside this component is
+  // structural but too wide — it would also kill the toggle for the plain
+  // `<span>` counters that `Explorer` and `ProjectSetupTab` pass, which today
+  // are part of the generous hit area and should stay part of it.
+  //
+  // So the discrimination is on what was CLICKED, not on where the slot is:
+  // walk up from the click target to the header and refuse the toggle if an
+  // interactive element is on that path. The title, the chevron and every bit
+  // of dead space in the row still toggle, which is requirement 2.
+  const onHeaderClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (isHeaderAction(e.target, e.currentTarget)) return;
+    toggle();
+  };
   // A COLLAPSED LIST IS A CONTENT SECTION. Its children are not rendered at
   // all, so a share of the column would be a share given to a lone header —
   // which is case 5 of the brief ("a collapsed section gives its space back")
   // falling out of the model rather than needing a rule.
   return (
     <div style={collapsed || variant !== 'list' ? CONTENT_SECTION : LIST_SECTION}>
-      <div onClick={toggle} style={{ cursor: 'pointer' }}>
+      <div onClick={onHeaderClick} style={{ cursor: 'pointer' }}>
         <PanelHeader right={right}>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
             <span style={{ display: 'inline-flex', transform: collapsed ? 'rotate(-90deg)' : 'none', transition: 'transform 0.1s', color: T.textLo }}>
@@ -71,6 +98,49 @@ export function CollapsibleSection({ id, title, right, variant = 'content', defa
       {!collapsed && children}
     </div>
   );
+}
+
+/**
+ * WHAT COUNTS AS "the user clicked a control, not the header".
+ *
+ * Roles as well as tags, because an interactive thing in this tree is not
+ * always a `<button>` — `Chip` renders a span with `role="button"` when it is
+ * only decorative-looking, and a future header action could be a switch or a
+ * menu item. `label` is here because clicking a label IS clicking its control:
+ * the label's own click event is what reaches this handler.
+ */
+const INTERACTIVE_IN_HEADER = [
+  'button', 'a[href]', 'input', 'select', 'textarea', 'label',
+  '[role="button"]', '[role="checkbox"]', '[role="switch"]',
+  '[role="menuitem"]', '[role="tab"]', '[role="link"]',
+  '[contenteditable="true"]',
+].join(',');
+
+/**
+ * True when this click belongs to a control in the header rather than to the
+ * header itself.
+ *
+ * The walk STOPS AT THE HEADER rather than using a bare `closest()`, because
+ * `closest` would keep climbing into the section's own ancestors — a
+ * CollapsibleSection rendered inside anything interactive would then have a
+ * permanently dead toggle, which is a worse bug than the one being fixed and
+ * an invisible one.
+ *
+ * A target that is NOT inside the header at all is treated as an action, not
+ * as a header click. That is the portal case: a header action that opens a
+ * menu renders its items outside this DOM subtree, but React's synthetic event
+ * still bubbles through the component tree into this handler — so a
+ * containment test alone would hand the menu's clicks straight back to the
+ * toggle. There is nothing else that can dispatch a click on this handler from
+ * outside the header, so refusing is the safe reading.
+ */
+function isHeaderAction(target: EventTarget | null, header: Element): boolean {
+  if (!(target instanceof Element)) return false; // not an element — treat as a header click
+  if (!header.contains(target)) return true;      // portaled out of the header
+  for (let el: Element | null = target; el && el !== header; el = el.parentElement) {
+    if (el.matches(INTERACTIVE_IN_HEADER)) return true;
+  }
+  return false;
 }
 
 /**
