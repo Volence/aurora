@@ -27,8 +27,8 @@ import { EFFECTS_SCENE_SCHEMA } from '../../src/core/formats/effects/scene';
  * this file is the payment.
  *
  * WHAT THE PIN IS. The load-bearing invariant is the schema file's GIT BLOB
- * HASH — cab3ca5817ceb4db3a8c51405e9ec9dba038ee09 — not a commit citation. The
- * previous pin, 2d7a9fee37d85334103ca1a3e03e1a40466d6d9c, was byte-identical
+ * HASH — d4345af54ad61c841a7f1797cfddaf4dc0167f98 — not a commit citation. An
+ * earlier pin, 2d7a9fee37d85334103ca1a3e03e1a40466d6d9c, was byte-identical
  * from empyrean 1326ceb (the merge landing the contract) through c2c81e2, while
  * the schema DOC moved twice underneath it (2f3b6fd, 069cf59) with no §2 change.
  * A commit pin would therefore read as drift that is not there; a blob hash
@@ -39,6 +39,13 @@ import { EFFECTS_SCENE_SCHEMA } from '../../src/core/formats/effects/scene';
  * the engine as plain 0..15 shift counts. `$defs/factor` itself is UNTOUCHED and
  * still governs `fa`, `fb` and `curve.to`. Re-vendored by extraction from that
  * commit, never retyped — ROADMAP item 35.
+ *
+ * WHY IT MOVED AGAIN (cab3ca58 → d4345af5). empyrean 5c930d6 bounded
+ * `v_center` (0..32767) and `v_offset` (-32768..32767, SIGNED — it always was
+ * in the engine's add.w; the unsigned type was the error). Nothing else in the
+ * schema changed. Re-vendored by `git show 5c930d6:contract/schema/...`, never
+ * retyped — ROADMAP item 37. The UI clamps for both fields read these bounds
+ * out of the vendored file (scene-ui.ts `boundsAt`), so they cannot drift.
  *
  * WHAT THIS GATE CANNOT DO, said plainly: it proves the vendored copy is
  * byte-identical to the blob Aurora pinned. It cannot notice that empyrean has
@@ -53,7 +60,7 @@ const SCHEMA_PATH = resolve(
 );
 
 /** empyrean contract/schema/aurora-effects-scene.schema.json, blob hash. */
-const PINNED_BLOB = 'cab3ca5817ceb4db3a8c51405e9ec9dba038ee09';
+const PINNED_BLOB = 'd4345af54ad61c841a7f1797cfddaf4dc0167f98';
 
 /** git's object id: sha1 over "blob <bytelen>\0" + the file's bytes. */
 function gitBlobHash(bytes: Buffer): string {
