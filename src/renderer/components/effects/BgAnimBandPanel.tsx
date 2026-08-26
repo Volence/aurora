@@ -171,6 +171,26 @@ import { BAND_LENS_FILL, BAND_LENS_EDGE } from '../../canvas/canvas-colors';
  * constants imported rather than restated, so the chip cannot drift from the
  * wash it stands for.
  */
+/**
+ * The way OUT of the lens. Any left-click on the Plane-B rectangle seeds it
+ * (`commitBandMark`), and until parcel A nothing wrote `bandLensTarget = null`
+ * back — the owner lit it and could not get out. Sits beside every
+ * "highlighted on the map" line, because that line is where the eye is when the
+ * question is "how do I make this go away". Escape on the map does the same.
+ *
+ * The click must not reach the band card behind it: the card's own `onClick`
+ * re-lights the lens it just put out.
+ */
+function HideLensChip({ onHide }: { onHide: () => void }): React.ReactElement {
+  return (
+    <span onClick={(e) => e.stopPropagation()}>
+      <Chip onClick={onHide} title="Stop tinting the map. The candidate keeps its values; Escape on the map does the same.">
+        Hide
+      </Chip>
+    </span>
+  );
+}
+
 function LensSwatch(): React.ReactElement {
   return (
     <span aria-hidden style={{
@@ -404,6 +424,7 @@ export default function BgAnimBandPanel(): React.ReactElement {
             {lit && lens.coverage !== null && (
               <Hint under>
                 <LensSwatch />highlighted on the map · {coverageSummary(lens.coverage)}
+                {' '}<HideLensChip onHide={() => setLensTarget(null)} />
               </Hint>
             )}
             <Row style={{ marginLeft: CONTROL_INSET }}>
@@ -595,6 +616,7 @@ export default function BgAnimBandPanel(): React.ReactElement {
           {lensTarget?.kind === 'candidate' && lens.coverage !== null && (
             <Hint under>
               <LensSwatch />highlighted on the map · {coverageSummary(lens.coverage)}
+              {' '}<HideLensChip onHide={() => setLensTarget(null)} />
             </Hint>
           )}
           {lensTarget?.kind !== 'candidate' && (
