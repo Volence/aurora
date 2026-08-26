@@ -192,6 +192,40 @@ interface EditorState {
    */
   selectedEffectsSceneId: string | null;
 
+  /**
+   * The promotion candidate the band panel's "From existing tiles" form holds —
+   * the geometry and the static base a Promote would use.
+   *
+   * LIFTED OUT OF `BgAnimBandPanel`'s `React.useState` FOR THE REASON
+   * `selectedEffectsSceneId` was (ROADMAP item 43): MapViewport is a SIBLING,
+   * not a child, so it cannot read the panel's local state — and the band lens
+   * needs the same range the form is about to promote, or the map would be
+   * showing the footprint of a different band from the one the button makes.
+   *
+   * `staticBase` IS NOT CLAMPED HERE. `firstPromotableSlot` is a property of the
+   * document, which this store does not hold; the panel clamps the seed to it
+   * (so a seeded candidate is legal by construction) and the codec refuses
+   * anything else. A store that clamped would be a third opinion about
+   * legality.
+   */
+  bandCandidate: { staticBase: number; cols: number; rows: number };
+
+  /**
+   * What the map's BAND LENS is lighting, or null for "nothing marked".
+   *
+   * NULL ON ARRIVAL, DELIBERATELY. The candidate always holds *some* range (it
+   * seeds at 1x1), and tinting cells for a range the author never chose would
+   * teach them the lens is noise. The lens turns on when they MARK something —
+   * a click on the map, a click on a band card, or a touch of the form.
+   *
+   * `{ kind: 'band' }` CARRIES AN INDEX THAT MAY GO STALE. Undoing a promote, or
+   * opening another project, leaves an index naming no band. Resolution — and
+   * the fallback — is `resolveBandLens` (providers/bganim-preview-aeon), which
+   * both the panel and the canvas call, exactly as `resolveSelectedScene` is
+   * shared one field up.
+   */
+  bandLensTarget: { kind: 'band'; index: number } | { kind: 'candidate' } | null;
+
   marquee: MarqueeState | null;
   mapClipboard: MapClipboard | null;
   pasteLayers: PasteLayers;
@@ -225,6 +259,17 @@ interface EditorState {
   setCollisionPaintPlane: (plane: 'a' | 'b') => void;
   setCollisionBrushSize: (size: number) => void;
   setSelectedEffectsSceneId: (id: string | null) => void;
+  /**
+   * Move the promotion candidate, and point the lens AT it.
+   *
+   * The two happen together because they are one act: an author who changes
+   * `cols`, `rows` or the static base is describing the candidate, so that is
+   * what the map should be showing. Leaving a band card selected while the form
+   * moved underneath would put the panel and the canvas on different subjects —
+   * the exact split the lift exists to prevent.
+   */
+  setBandCandidate: (patch: Partial<{ staticBase: number; cols: number; rows: number }>) => void;
+  setBandLensTarget: (target: { kind: 'band'; index: number } | { kind: 'candidate' } | null) => void;
   setMarquee: (marquee: MarqueeState | null) => void;
   setMapClipboard: (clipboard: MapClipboard | null) => void;
   setPasteLayers: (layers: PasteLayers) => void;
@@ -334,6 +379,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   collisionPaintPlane: 'a',
   collisionBrushSize: 1,
   selectedEffectsSceneId: null,
+  // 1x1 at slot 0: the smallest legal band, and a base the panel re-seeds to
+  // `firstPromotableSlot` as soon as a document is open. `bandLensTarget: null`
+  // is what keeps this from lighting anything before the author marks.
+  bandCandidate: { staticBase: 0, cols: 1, rows: 1 },
+  bandLensTarget: null,
 
   marquee: null,
   mapClipboard: null,
@@ -370,6 +420,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   setCollisionPaintPlane: (collisionPaintPlane) => set({ collisionPaintPlane }),
   setCollisionBrushSize: (size) => set({ collisionBrushSize: Math.max(1, Math.min(31, size | 0)) }),
   setSelectedEffectsSceneId: (id) => set({ selectedEffectsSceneId: id }),
+  setBandCandidate: (patch) => set((s) => ({
+    bandCandidate: { ...s.bandCandidate, ...patch },
+    bandLensTarget: { kind: 'candidate' },
+  })),
+  setBandLensTarget: (bandLensTarget) => set({ bandLensTarget }),
   setMarquee: (marquee) => set({ marquee }),
   setMapClipboard: (mapClipboard) => set({ mapClipboard }),
   setPasteLayers: (pasteLayers) => set({ pasteLayers }),

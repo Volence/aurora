@@ -144,12 +144,24 @@ export function Group({ label, note, children }: {
  * column as the panel's own, so a card is a nested form rather than a
  * differently-shaped one.
  */
-export function Card({ children, raised = false }: { children: React.ReactNode; raised?: boolean }) {
+export function Card({ children, raised = false, selected = false, onClick, title }: {
+  children: React.ReactNode;
+  raised?: boolean;
+  /** Drawn with the accent border — the card the map's band lens is lighting. */
+  selected?: boolean;
+  /** Makes the card itself a target. Buttons inside still get their own clicks. */
+  onClick?: () => void;
+  title?: string;
+}) {
   return (
-    <div style={{
-      border: `1px solid ${T.border}`, borderRadius: T.rMd,
-      padding: `${T.s2} ${T.s2} 0`, marginBottom: T.s2,
-      ...(raised ? { background: T.raised } : {}),
-    }}>{children}</div>
+    <div
+      onClick={onClick}
+      title={title}
+      style={{
+        border: `1px solid ${selected ? T.accent : T.border}`, borderRadius: T.rMd,
+        padding: `${T.s2} ${T.s2} 0`, marginBottom: T.s2,
+        ...(onClick ? { cursor: 'pointer' } : {}),
+        ...(raised ? { background: T.raised } : {}),
+      }}>{children}</div>
   );
 }
