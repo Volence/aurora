@@ -81,18 +81,33 @@ Per-height totals for b0e5a661, static art only (`promotable`):
 | **h=8** | 0.00% | 0.00% | 0.00% | 0.00% | 0.00% | 0.00% |
 
 At `h=4` — the height **both** shipped bands use — the `contiguous` column reads
-40–55%, which looks like a result until you ask where those marquees are:
+40–55%, which looks like a result until you notice that `promotable` on the same
+rows is **exactly 0**, at every width:
 
 ```
-WHERE the contiguous marquees are (b0e5a661):
+ 1x4  contiguous 2180 / 3904 (55.84%)   promotable 0
+ 2x4  contiguous 2098 / 3843 (54.59%)   promotable 0
+ 4x4  contiguous 1942 / 3721 (52.19%)   promotable 0
+ 8x4  contiguous 1630 / 3477 (46.88%)   promotable 0
+16x4  contiguous 1231 / 2989 (41.18%)   promotable 0
+32x4  contiguous  957 / 2013 (47.54%)   promotable 0
+```
+
+**Every** contiguous 4-row window on this background sits on the animated
+prefix: it is one of the two existing bands being drawn, and `promoteBand`
+refuses it by rule because its slots already belong to a band. Across all
+heights the same split reads:
+
+```
+WHERE the contiguous marquees are (b0e5a661, ALL heights):
   over the ANIMATED prefix (already a band, promotion refuses): 20168  [column-major: 8712]
   over STATIC art (what promotion is for):                       3032  [column-major: 2822]
 ```
 
+— and of that 3,032, all but 18 are a single row of tiles.
+
 **The only art in the document laid out the way a band needs is art that is
-already a band.** Those 4-row contiguous windows are the two existing bands
-being drawn; `promoteBand` refuses them by rule, correctly, because their slots
-are inside the animated prefix.
+already a band.**
 
 ## 2. What the near-miss looks like
 
