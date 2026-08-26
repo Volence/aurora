@@ -76,11 +76,13 @@ describe('the new wording fits the column the existing wording already fits', ()
 
 describe('fa / fb say which plane, and "packed" stays inside the custom expander', () => {
   it('labels the rows by plane and role', () => {
-    expect(PLANE_FACTOR_ROWS.fa.label).toBe('Plane A (foreground)');
-    expect(PLANE_FACTOR_ROWS.fb.label).toBe('Plane B (background)');
+    expect(PLANE_FACTOR_ROWS.fa.label).toBe('Plane A (fg)');
+    expect(PLANE_FACTOR_ROWS.fb.label).toBe('Plane B (bg)');
   });
 
-  it('the hint says what the fraction is, and what 1 means', () => {
+  it('the hint spells out fg / bg, says what the fraction is, and what 1 means', () => {
+    expect(PLANE_FACTOR_HINT).toMatch(/A = foreground/);
+    expect(PLANE_FACTOR_HINT).toMatch(/B = background/);
     expect(PLANE_FACTOR_HINT).toMatch(/fraction of camera/i);
     expect(PLANE_FACTOR_HINT).toMatch(/1 = with the camera/);
   });
