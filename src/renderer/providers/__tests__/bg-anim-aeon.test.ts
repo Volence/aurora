@@ -38,7 +38,7 @@ import {
   parseBgOverride, bandColumnBytes,
   type BgOverrideDocument,
 } from '../../../core/formats/bg-override/bg-override';
-import { applyWithBand, describeBands } from '../../../core/formats/bg-override/bg-anim-band';
+import { applyWithBand, describeBands, documentBands } from '../../../core/formats/bg-override/bg-anim-band';
 import type { BandSlotPlan } from '../../../core/formats/bg-override/bg-anim-band';
 import type { BgOverrideBand } from '../../../core/formats/bg-override/bg-override';
 import type { SetBgOverrideBandCommand } from '../../../core/editing/commands';
@@ -354,14 +354,14 @@ describe('the rate reaches the document through BOTH doors, and only when asked'
     const d = doc();
     const r = promoteBandCommand(d, bandBudget(d).firstPromotableSlot, spec);
     if (!r.ok) throw new Error(r.reason);
-    return applyForTest(d, r.command).anims.at(-1)!;
+    return documentBands(applyForTest(d, r.command)).at(-1)!;
   }
   /** The raw band a spec produces at the insertion door. */
   function inserted(spec: BandSpec): BgOverrideBand {
     const d = doc();
     const r = addBandCommand(d, spec);
     if (!r.ok) throw new Error(r.reason);
-    return applyForTest(d, r.command).anims.at(-1)!;
+    return documentBands(applyForTest(d, r.command)).at(-1)!;
   }
 
   it('PROMOTION spells rate_shift only when the spec carries one', () => {
