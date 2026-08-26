@@ -32,6 +32,7 @@
 
 import type { Tile } from '../../model/s4-types';
 import type { BgOverrideDocument } from './bg-override';
+import { writeTilePixels, writePhaseBank } from './bg-anim-art';
 
 /** The document as the canvas needs it. `layout` is stable per document. */
 export interface BgOverrideDisplay {
@@ -102,4 +103,46 @@ export function writeBgOverrideLayoutWord(
   if (entry !== undefined && entry.layoutSource === doc.layout && index < entry.layout.length) {
     entry.layout[index] = word;
   }
+}
+
+/**
+ * Write one tile's pixels into the document AND into its display mirror.
+ *
+ * THE ONLY WRITER of a tile's pixels the canvas can see, for the reason the
+ * layout writer above states: the renderer holds `tiles[i].pixels` by
+ * reference and repaints from it. The document half goes through
+ * `writeTilePixels`, which also lands the pixels in the owning band's
+ * `phases[0]` when the slot is inside the animated prefix — so a command's
+ * apply and undo both keep aeon's `validate_band_coherence` true by calling
+ * this one function with different arguments.
+ *
+ * Out-of-range indices THROW (unlike the layout writer's ignore): the callers
+ * are commands whose builders already bounded the index, so an escape here is
+ * a stale command over a shrunk blob, and a silent skip would consume an undo
+ * slot while leaving the band's phase and the tile out of step.
+ */
+export function writeBgOverrideTile(
+  doc: BgOverrideDocument, index: number, pixels: readonly number[],
+): void {
+  writeTilePixels(doc, index, pixels);
+  mirrorTile(doc, index);
+}
+
+/**
+ * Write one whole phase bank of a band. Bank 0 rewrites the prefix tiles
+ * through `writeTilePixels`; the mirror follows every slot that moved.
+ */
+export function writeBgOverridePhaseBank(
+  doc: BgOverrideDocument, bandIndex: number, bank: number, tiles: readonly (readonly number[])[],
+): void {
+  for (const index of writePhaseBank(doc, bandIndex, bank, tiles)) mirrorTile(doc, index);
+}
+
+function mirrorTile(doc: BgOverrideDocument, index: number): void {
+  const entry = cache.get(doc);
+  if (entry === undefined || entry.tilesSource !== doc.tiles) return;
+  const mirror = entry.tiles[index];
+  const src = doc.tiles[index];
+  if (mirror === undefined || mirror.pixels.length !== src.length) return;
+  mirror.pixels.set(src);
 }

@@ -11,10 +11,23 @@ export type ArtTool =
 
 export type BrushSpace = 'pixel' | 'tile';
 
+/**
+ * A pixel document that edits BAND ART in the BG override document
+ * (`editor_bg_override.json`) rather than the zone tileset: one static tile
+ * slot, or one phase bank of one band. Every write commits through
+ * `set-bg-override-tiles` / `set-bg-override-phases` (parcel I), so the
+ * prefix identity the injector checks holds after every stroke and undo.
+ */
+export type BgArtTarget =
+  | { kind: 'tile'; tileIndex: number }
+  | { kind: 'bank'; bandIndex: number; bank: number };
+
 export interface OpenDocument {
   doc: ComposerDoc;
   /** atlas tile index when editing an existing tile in place; null otherwise */
   liveTileIndex: number | null;
+  /** Set when the document edits the BG override's art (see BgArtTarget). */
+  bgOverride?: BgArtTarget | null;
   /** chunk id when editing an existing chunk; null otherwise */
   chunkId: string | null;
   name: string;

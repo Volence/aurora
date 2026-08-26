@@ -258,3 +258,45 @@ describe('demote_bg_anim_band and remove_bg_anim_band', () => {
     }
   });
 });
+
+// ---- Band ART (parcel I): the two agent verbs mirror the panel's commands ----
+describe('set_bg_override_tiles and regenerate_bg_anim_band_shift', () => {
+  beforeEach(() => open(state(doc())));
+
+  const phase0Of = (band: number, offset: number) => held()!.anims![band].phases[0][offset];
+
+  it('a prefix-slot write reaches the band\'s phases[0] in the SAME undo step, on the act stack', async () => {
+    const px = new Array<number>(TILE_PIXELS).fill(0xA);
+    // Slot 0 is band 0's first slot (the list row above pins 32x4@0).
+    expect(held()!.tiles[0]).not.toEqual(px);
+    const r = await ask({ kind: 'set-bg-override-tiles', tiles: [{ index: 0, pixels: px }] }) as Record<string, unknown>;
+    expect(r.written).toEqual([0]);
+    expect(held()!.tiles[0]).toEqual(px);
+    expect(phase0Of(0, 0)).toEqual(px);
+    expect(actHistory().canUndo).toBe(true);
+    actHistory().undo();
+    expect(held()!.tiles[0]).not.toEqual(px);
+    expect(phase0Of(0, 0)).toEqual(held()!.tiles[0]);
+    expect(actHistory().canUndo).toBe(false);
+  });
+
+  it('THROWS the codec\'s words on a bad slot rather than returning a cheerful reply', async () => {
+    const n = held()!.tiles.length;
+    await expect(ask({
+      kind: 'set-bg-override-tiles', tiles: [{ index: n, pixels: new Array<number>(TILE_PIXELS).fill(0) }],
+    })).rejects.toThrow(/cannot write tile/);
+    expect(actHistory().canUndo).toBe(false);
+  });
+
+  it('regenerates banks 1..7 from phase 0 as one undo step, and refuses a missing band', async () => {
+    const before = JSON.stringify(held()!.anims![0].phases[7]);
+    await ask({ kind: 'set-bg-override-tiles', tiles: [{ index: 0, pixels: new Array<number>(TILE_PIXELS).fill(0x9) }] });
+    const r = await ask({ kind: 'regenerate-bg-anim-band-shift', band: 0 }) as Record<string, unknown>;
+    expect(r.regenerated).toBe(true);
+    expect(JSON.stringify(held()!.anims![0].phases[7])).not.toBe(before);
+    actHistory().undo();
+    actHistory().undo();
+    expect(JSON.stringify(held()!.anims![0].phases[7])).toBe(before);
+    await expect(ask({ kind: 'regenerate-bg-anim-band-shift', band: 99 })).rejects.toThrow(/band 99/);
+  });
+});

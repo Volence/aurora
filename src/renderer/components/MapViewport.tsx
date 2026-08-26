@@ -770,6 +770,13 @@ export default function MapViewport() {
           // not exist, because a band edit could not change what was on screen.)
           reloadBg();
           break;
+        case 'set-bg-override-tiles':
+        case 'set-bg-override-phases':
+          // Parcel I: a tile's pixels changed (the writer already updated the
+          // canvas's mirror in place); every cell drawing it must repaint.
+          // Re-resolve rather than compute the cell set here.
+          reloadBg();
+          break;
         case 'set-bg':
           // The BG entry's canvas and TileRenderer are built from the
           // resolved layout/tiles arrays in loadBg — rebuild from the new

@@ -1,7 +1,9 @@
 import type { AnyCommand, S4Level } from './commands';
 import type { EffectsScene, EffectsSceneLibrary } from '../formats/effects/scene';
 import { applyWithBand, applyWithoutBand } from '../formats/bg-override/bg-anim-band';
-import { writeBgOverrideLayoutWord } from '../formats/bg-override/bg-override-view';
+import {
+  writeBgOverrideLayoutWord, writeBgOverrideTile, writeBgOverridePhaseBank,
+} from '../formats/bg-override/bg-override-view';
 
 const MAX_HISTORY = 200;
 
@@ -168,6 +170,20 @@ function applyCommand(cmd: AnyCommand, level: S4Level): void {
       : applyWithoutBand(level.bgOverride, cmd.plan);
     return;
   }
+  if (cmd.type === 'set-bg-override-tiles') {
+    // Throw, don't skip — the rule set-palette-line states above. Through the
+    // ONE tile writer, which lands each pixel array in the tile AND in the
+    // owning band's phases[0]: the prefix identity holds after this by
+    // construction, not by a second loop here.
+    if (!level.bgOverride) throw new Error('set-bg-override-tiles requires level.bgOverride');
+    for (const t of cmd.tiles) writeBgOverrideTile(level.bgOverride, t.index, t.newPixels);
+    return;
+  }
+  if (cmd.type === 'set-bg-override-phases') {
+    if (!level.bgOverride) throw new Error('set-bg-override-phases requires level.bgOverride');
+    for (const b of cmd.banks) writeBgOverridePhaseBank(level.bgOverride, cmd.bandIndex, b.bank, b.newTiles);
+    return;
+  }
   if (cmd.type === 'set-sections') {
     if (!level.act) throw new Error('set-sections requires level.act');
     level.act.gridWidth = cmd.newGridWidth;
@@ -318,6 +334,17 @@ function undoCommand(cmd: AnyCommand, level: S4Level): void {
     level.bgOverride = cmd.adding
       ? applyWithoutBand(level.bgOverride, cmd.plan)
       : applyWithBand(level.bgOverride, cmd.plan, cmd.band);
+    return;
+  }
+  if (cmd.type === 'set-bg-override-tiles') {
+    // The SAME writer as apply, with the other half of each entry.
+    if (!level.bgOverride) throw new Error('set-bg-override-tiles requires level.bgOverride');
+    for (const t of cmd.tiles) writeBgOverrideTile(level.bgOverride, t.index, t.oldPixels);
+    return;
+  }
+  if (cmd.type === 'set-bg-override-phases') {
+    if (!level.bgOverride) throw new Error('set-bg-override-phases requires level.bgOverride');
+    for (const b of cmd.banks) writeBgOverridePhaseBank(level.bgOverride, cmd.bandIndex, b.bank, b.oldTiles);
     return;
   }
   if (cmd.type === 'set-sections') {

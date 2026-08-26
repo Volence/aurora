@@ -290,6 +290,39 @@ export interface SetBgOverrideBandCommand extends EditCommand {
   plan: BandSlotPlan;
 }
 
+/**
+ * Write the PIXELS of one or more `tiles[i]` in `editor_bg_override.json`.
+ *
+ * THE PREFIX RULE RIDES IN THE APPLIER, NOT IN THE COMMAND. A slot inside the
+ * animated prefix (`0 .. Σ(cols*rows)`) is mirrored by its band's `phases[0]`,
+ * and aeon's `validate_band_coherence` refuses a file where the two differ. The
+ * command records only the tile halves; `writeBgOverrideTile` (the one writer)
+ * lands each pixel array in the tile AND in the owning band's phase 0, on apply
+ * and on undo alike — so the phase half can never be recorded, restored or
+ * forgotten separately from the tile half. A write past the prefix touches no
+ * band.
+ *
+ * `sectionIndex` is -1 — act-ambient, like every override command.
+ */
+export interface SetBgOverrideTilesCommand extends EditCommand {
+  type: 'set-bg-override-tiles';
+  tiles: Array<{ index: number; oldPixels: number[]; newPixels: number[] }>;
+}
+
+/**
+ * Write whole phase BANKS of one BgAnim band: `phases[bank]` for each entry.
+ * Bank 0 is the rest state, so an entry for bank 0 also rewrites the band's
+ * prefix tiles (through the same writer as above). A `regenerate-shift` is this
+ * command with banks 1..7 derived from phase 0 by the shift fill.
+ *
+ * `sectionIndex` is -1 — act-ambient, like every override command.
+ */
+export interface SetBgOverridePhasesCommand extends EditCommand {
+  type: 'set-bg-override-phases';
+  bandIndex: number;
+  banks: Array<{ bank: number; oldTiles: number[][]; newTiles: number[][] }>;
+}
+
 export interface SetSectionsCommand extends EditCommand {
   type: 'set-sections';
   // Whole-act snapshot of the section grid: width/height plus the flat
@@ -335,4 +368,6 @@ export type AnyCommand =
   | SetEffectsSceneCommand
   | SetSectionSceneCommand
   | SetBgOverrideBandCommand
+  | SetBgOverrideTilesCommand
+  | SetBgOverridePhasesCommand
   | SetSectionsCommand;

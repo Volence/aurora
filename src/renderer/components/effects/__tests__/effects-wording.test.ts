@@ -19,9 +19,15 @@ import {
   BAND_MECHANISM_HINT, bandMotion, BAND_SCROLL_DIRECTION,
 } from '../../../providers/bganim-preview-aeon';
 
+// Parcel I: the bank strip's wording is measured against the same bar.
+import {
+  SHIFT_BUTTON_LABEL, SHIFT_BUTTON_TITLE, BANK_STRIP_HINT, BANK_THUMB_TITLE,
+} from '../../../providers/bg-anim-art';
+
 const HERE = join(__dirname, '..');
 const scenePanel = readFileSync(join(HERE, 'EffectsScenePanel.tsx'), 'utf8');
 const bandPanel = readFileSync(join(HERE, 'BgAnimBandPanel.tsx'), 'utf8');
+const bankStrip = readFileSync(join(HERE, 'BandBankStrip.tsx'), 'utf8');
 
 /** Every `label="…"` / label={`…`} literal in a panel source, `${x}` holes narrowed to one digit. */
 function labelLiterals(src: string): string[] {
@@ -36,15 +42,17 @@ const existingLabels = [...labelLiterals(scenePanel), ...labelLiterals(bandPanel
 const longestExistingLabel = Math.max(...existingLabels.map((s) => s.length));
 const longestToken = (s: string) => Math.max(...s.split(/\s+/).map((t) => t.length));
 
-// Parcel D's rows, then parcel H's two control rows and their hints — the same
-// bar, extended rather than re-measured.
+// Parcel D's rows, parcel H's two control rows and their hints, and parcel I's
+// bank strip — the same bar, extended rather than re-measured.
 const newLabels = [
   PLANE_FACTOR_ROWS.fa.label, PLANE_FACTOR_ROWS.fb.label,
   LAYER_CURVE_ROW.label, LAYER_VSPLIT_ROW.label, LAYER_VSPLIT_ROW.none, LAYER_VSPLIT_ROW.at,
+  SHIFT_BUTTON_LABEL, ...labelLiterals(bankStrip),
 ];
 const newStrings = [
   ...newLabels, PLANE_FACTOR_HINT, BAND_MECHANISM_HINT,
   LAYER_CURVE_ROW.hint, LAYER_VSPLIT_ROW.hint, LAYER_CURVE_ROW.none,
+  SHIFT_BUTTON_TITLE, BANK_STRIP_HINT, BANK_THUMB_TITLE(0), BANK_THUMB_TITLE(7),
   ...[0, 2, 3].flatMap((n) => [
     bandMotion({ driver: 'timer', rateShift: n }, 'band'),
     bandMotion({ driver: 'camera_x', rateShift: n }, 'candidate'),
