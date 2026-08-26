@@ -24,12 +24,20 @@ export interface OverlayOptions {
    *  this same toggle (it is occlusion's discoverability affordance, not a
    *  separate concept). */
   occludeSprites: boolean;
-  /** Play the S1 animations (classic-only), BOTH halves on one toggle/clock:
-   *  the animated level art (GHZ waterfall/flowers, MZ lava/magma/torch, SBZ
-   *  smoke at their real AnimateLevelGfx rates) and the curated object
-   *  previews (rings spin on the synced channel, badniks play their spawn/
-   *  locomotion anims — s1-object-anim.ts). Overlay-only playback — never
-   *  touches doc.tiles (audit §2.3) nor the object list. */
+  /** Play the animations. ONE key, both engines, and what it plays differs:
+   *
+   *  • classic — BOTH halves on one clock: the animated level art (GHZ
+   *    waterfall/flowers, MZ lava/magma/torch, SBZ smoke at their real
+   *    AnimateLevelGfx rates) and the curated object previews (rings spin on
+   *    the synced channel, badniks play their spawn/locomotion anims —
+   *    s1-object-anim.ts).
+   *  • aeon — the BgAnim bands of the BG override document, at the phase the
+   *    consumer would bake (bganim-preview.ts). ONLY `timer` bands need the
+   *    clock; `camera_x`/`camera_y` bands are functions of the pan and preview
+   *    clocklessly inside the draw pass that already repaints on it.
+   *
+   *  Overlay-only playback in both: never `doc.tiles`, never the object list,
+   *  never the BG override document. */
   playAnimatedArt: boolean;
 }
 
@@ -52,6 +60,12 @@ export const OVERLAY_KEYS_BY_ENGINE: Record<OpenEngine, readonly (keyof OverlayO
   aeon: [
     'showObjects', 'showRings', 'showTileGrid', 'showBlockGrid', 'showChunkGrid',
     'showCollision', 'showCollisionAngles', 'showCollisionPathB', 'showBgPlane',
+    // PROMOTED for the BgAnim band preview (ROADMAP item 42), per
+    // docs/reviews/2026-08-22-preview-posture-ruling.md §2 Q3. The key, the
+    // toggle plumbing and the OFF-by-default posture already existed and were
+    // engine-scoped exactly so this could happen without new mechanism — the
+    // ruling rejected inventing a panel-open coupling for the same reason.
+    'playAnimatedArt',
   ],
 };
 

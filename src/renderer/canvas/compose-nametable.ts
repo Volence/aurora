@@ -93,39 +93,60 @@ export function composeNametable(
     const src = lookup(nt.tileIndex, nt.palette);
     if (!src) continue; // no bitmap: transparent, as the old clearRect
 
-    const px = col * 8;
-    const py = row * 8;
-    const baseByte = py * rowBytes + px * 4;
+    blitTile8(dest, rowBytes, col * 8, row * 8, src, nt.hFlip, nt.vFlip);
+  }
+}
 
-    if (!nt.hFlip && !nt.vFlip) {
-      for (let r = 0; r < 8; r++) {
-        const s = r * TILE_ROW_BYTES;
-        dest.set(src.subarray(s, s + TILE_ROW_BYTES), baseByte + r * rowBytes);
-      }
-      continue;
-    }
+/**
+ * Copy one prerendered 8x8 RGBA tile into `dest` at pixel (`px`,`py`), applying
+ * the nametable flips. REPLACES the destination pixels, matching the
+ * `putImageData` semantics the equivalence note above argues from.
+ *
+ * Extracted so the BgAnim band overlay composes its cells through the exact
+ * same code path as the plane underneath it — a second copy of this loop would
+ * be a second place for the flip handling to be subtly different, and a band
+ * cell drawn one flip out of step with the tile it replaces is precisely the
+ * kind of wrongness a preview must not invent.
+ */
+export function blitTile8(
+  dest: Uint8ClampedArray,
+  rowBytes: number,
+  px: number,
+  py: number,
+  src: Uint8ClampedArray,
+  hFlip: boolean,
+  vFlip: boolean,
+): void {
+  const baseByte = py * rowBytes + px * 4;
 
-    if (!nt.hFlip) {
-      // Vertical flip only: whole rows still copy contiguously, just reversed.
-      for (let r = 0; r < 8; r++) {
-        const s = (7 - r) * TILE_ROW_BYTES;
-        dest.set(src.subarray(s, s + TILE_ROW_BYTES), baseByte + r * rowBytes);
-      }
-      continue;
-    }
-
-    // Horizontal flip (with or without vertical): per-pixel.
+  if (!hFlip && !vFlip) {
     for (let r = 0; r < 8; r++) {
-      const srcRow = nt.vFlip ? 7 - r : r;
-      let d = baseByte + r * rowBytes;
-      for (let c = 7; c >= 0; c--) {
-        const s = (srcRow * 8 + c) * 4;
-        dest[d] = src[s];
-        dest[d + 1] = src[s + 1];
-        dest[d + 2] = src[s + 2];
-        dest[d + 3] = src[s + 3];
-        d += 4;
-      }
+      const s = r * TILE_ROW_BYTES;
+      dest.set(src.subarray(s, s + TILE_ROW_BYTES), baseByte + r * rowBytes);
+    }
+    return;
+  }
+
+  if (!hFlip) {
+    // Vertical flip only: whole rows still copy contiguously, just reversed.
+    for (let r = 0; r < 8; r++) {
+      const s = (7 - r) * TILE_ROW_BYTES;
+      dest.set(src.subarray(s, s + TILE_ROW_BYTES), baseByte + r * rowBytes);
+    }
+    return;
+  }
+
+  // Horizontal flip (with or without vertical): per-pixel.
+  for (let r = 0; r < 8; r++) {
+    const srcRow = vFlip ? 7 - r : r;
+    let d = baseByte + r * rowBytes;
+    for (let c = 7; c >= 0; c--) {
+      const s = (srcRow * 8 + c) * 4;
+      dest[d] = src[s];
+      dest[d + 1] = src[s + 1];
+      dest[d + 2] = src[s + 2];
+      dest[d + 3] = src[s + 3];
+      d += 4;
     }
   }
 }
