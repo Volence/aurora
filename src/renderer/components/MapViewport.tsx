@@ -22,6 +22,9 @@ import { snapMarquee, copyFromSection, buildPasteCommand } from '../../core/edit
 import type { PasteLayers } from '../../core/editing/map-clipboard';
 import { SectionRenderer } from '../canvas/SectionRenderer';
 import { bandPreview, refreshBandPreview, resolveDisplayedBg } from '../providers/bganim-preview-aeon';
+import type { DisplayedBgSource } from '../providers/bganim-preview-aeon';
+import { writeBgOverrideLayoutWord } from '../../core/formats/bg-override/bg-override-view';
+import { LAYOUT_TILE_INDEX_MASK } from '../../core/formats/bg-override/bg-override';
 import { editorPanToCameraPx } from '../../core/formats/bg-override/bganim-preview';
 import { OverlayRenderer } from '../canvas/OverlayRenderer';
 import type { SectionOverlayInfo } from '../canvas/OverlayRenderer';
@@ -75,9 +78,23 @@ export default function MapViewport() {
   // ghost preview. `alt` latches the live Alt key (propagate to matching blocks).
   const previewHoverRef = useRef<{ sectionIndex: number; cellCol: number; cellRow: number; alt: boolean } | null>(null);
   const isDragging = useRef(false);
-  /** The BG paint gesture in flight: which background, and the first-seen old
-   *  value per tile. Committed as ONE command on release — see endBgStroke. */
-  const bgStroke = useRef<{ bgRef: string | null; entries: Map<number, { oldNt: number; newNt: number }> } | null>(null);
+  /**
+   * The BG paint gesture in flight: which background, and the first-seen old
+   * value per tile. Committed as ONE command on release — see endBgStroke.
+   *
+   * `source` is what decides WHICH command that is, and it is here rather than
+   * derived at release for the reason `bgRef` already was: the resolution can
+   * move mid-gesture (a section switch, a band edit), and a stroke that recorded
+   * against one background and committed against another would revert cells
+   * nobody painted. A change of either field flushes the stroke and starts a new
+   * one.
+   */
+  const bgStroke = useRef<
+    { source: DisplayedBgSource; bgRef: string | null;
+      entries: Map<number, { oldNt: number; newNt: number }> } | null
+  >(null);
+  /** One refusal toast per gesture, not one per cell. Cleared with the stroke. */
+  const bgRefusalShown = useRef(false);
   /**
    * The FG tile / collision paint gesture in flight — same rule as bgStroke.
    *
@@ -376,9 +393,9 @@ export default function MapViewport() {
   }, []);
 
   // Rebuild only the BG entry from the resolved background of the ACTIVE
-  // section (bgLayoutRef -> library entry, else act default). Lighter than
-  // reloadAllSections — used when the active section or its assignment
-  // changes (FG canvases are untouched).
+  // section (the BG override on the act it binds; else bgLayoutRef -> library
+  // entry; else act default). Lighter than reloadAllSections — used when the
+  // active section or its assignment changes (FG canvases are untouched).
   const reloadBg = useCallback(() => {
     const state = useProjectStore.getState();
     const zone = getCurrentZone(state);
@@ -390,6 +407,7 @@ export default function MapViewport() {
       act,
       state.project?.bgLibrary ?? [],
       useEditorStore.getState().activeSectionIndex,
+      state.project?.bgOverride ?? null,
     );
     if (resolved) {
       const bgHeight = Math.floor(resolved.layout.length / BG_WIDTH);
@@ -507,8 +525,21 @@ export default function MapViewport() {
           reloadAllSections();
           break;
         case 'set-bg-tiles':
+        case 'set-bg-override-layout':
           // Per-tile: repaint just those, the same way the live stroke does.
+          // Sound for the override too, because the command's applier writes the
+          // canvas's mirror through the same writer the stroke used — the array
+          // the renderer is holding is already correct by the time this runs.
           sectionRenderer.markBgDirty(cmd.entries.map((e) => e.index));
+          break;
+        case 'set-bg-override-band':
+          // A band insert/remove RENUMBERS the whole tile blob and rewrites every
+          // layout word that named a moved tile, and it does so by replacing the
+          // DOCUMENT. On the act that binds the override the viewport is painting
+          // that document, so nothing here is still valid — re-resolve, do not
+          // dirty cells. (Before the canvas painted the override this case did
+          // not exist, because a band edit could not change what was on screen.)
+          reloadBg();
           break;
         case 'set-bg':
           // The BG entry's canvas and TileRenderer are built from the
@@ -953,11 +984,16 @@ export default function MapViewport() {
     if (!act) return;
 
     // Paint the RESOLVED layout — the same array loadBg handed the renderer
-    // (held by reference, so markBgDirty repaints from it). When the active
-    // section displays a library BG, this edits that library entry in place
-    // (additive store state, like chunk edits in Art mode).
+    // (held by reference, so markBgDirty repaints from it). WHICH file that
+    // array belongs to is `resolved.source`, and it decides where the stroke is
+    // recorded: the BG override document on the act aeon bakes it into, else the
+    // library entry the active section displays (additive store state, like
+    // chunk edits in Art mode), else the act's own plane.
     const activeSection = useEditorStore.getState().activeSectionIndex;
-    const resolved = resolveDisplayedBg(act, state.project?.bgLibrary ?? [], activeSection);
+    const overrideHolder = state.project?.bgOverride ?? null;
+    const resolved = resolveDisplayedBg(
+      act, state.project?.bgLibrary ?? [], activeSection, overrideHolder,
+    );
     if (!resolved) return;
 
     const tile = worldToBgTile(worldX, worldY);
@@ -965,6 +1001,30 @@ export default function MapViewport() {
 
     const { selectedTileIndex, selectedPaletteLine } = useEditorStore.getState();
     const newNt = (selectedTileIndex & 0x7FF) | ((selectedPaletteLine & 0x3) << 13);
+
+    // THE ONE REFUSAL, and it is loud. A nametable word's low bits are an index
+    // into the blob the ROM bakes; the override's blob is only as long as the
+    // document says. An index past its end is not a tile — the consumer rebases
+    // it into VRAM anyway, so it bakes cleanly and ships whatever art happens to
+    // sit at that slot. There is no clamp that would be honest here (any tile we
+    // chose would be a tile the author did not pick), so the cell is left alone
+    // and the reason is put on screen. Word 0 is the format's blank escape and
+    // is always legal, whatever the blob's length.
+    const doc = resolved.source === 'override' ? overrideHolder?.doc ?? null : null;
+    if (doc !== null && newNt !== 0 && (newNt & LAYOUT_TILE_INDEX_MASK) >= doc.tiles.length) {
+      if (!bgRefusalShown.current) {
+        bgRefusalShown.current = true;
+        useToastStore.getState().addToast(
+          `Tile ${selectedTileIndex} is outside this background. The act's background is the ` +
+          `${doc.tiles.length}-tile blob in editor_bg_override.json — the one the ROM is built ` +
+          'from — and the tile browser is showing the zone TILESET, which is different art. ' +
+          `Nothing was painted. Pick a tile below ${doc.tiles.length}.`,
+          'warning',
+        );
+      }
+      return;
+    }
+
     if (resolved.layout[tile.tileIndex] === newNt) return;
 
     // The stroke paints LIVE and records as it goes; the whole gesture becomes
@@ -973,10 +1033,12 @@ export default function MapViewport() {
     // drag; painting through none — which is what this used to do — left the
     // mutation outside history entirely, so the next Ctrl+Z reverted whatever
     // act-scoped command happened to precede the strokes.
-    const bgRef = act.sections[activeSection]?.bgLayoutRef ?? null;
-    if (!bgStroke.current || bgStroke.current.bgRef !== bgRef) {
+    const bgRef = resolved.source === 'library' ? resolved.libraryId : null;
+    if (!bgStroke.current
+        || bgStroke.current.source !== resolved.source
+        || bgStroke.current.bgRef !== bgRef) {
       endBgStroke();
-      bgStroke.current = { bgRef, entries: new Map() };
+      bgStroke.current = { source: resolved.source, bgRef, entries: new Map() };
     }
     // FIRST value wins: a stroke crossing its own path must undo to what was
     // there before the gesture, not to what the gesture itself put down.
@@ -986,7 +1048,15 @@ export default function MapViewport() {
       bgStroke.current.entries.get(tile.tileIndex)!.newNt = newNt;
     }
 
-    resolved.layout[tile.tileIndex] = newNt;
+    if (doc !== null) {
+      // The document AND the canvas's mirror of it, through the one writer.
+      // Writing `resolved.layout` alone would paint a picture the file does not
+      // carry; writing `doc.layout` alone would change the file and not the
+      // screen. Both are the silent failure this parcel exists to remove.
+      writeBgOverrideLayoutWord(doc, tile.tileIndex, newNt);
+    } else {
+      resolved.layout[tile.tileIndex] = newNt;
+    }
     sectionRenderer.markBgDirty([tile.tileIndex]);
     useEditorStore.getState().markDirty();
     useEditorStore.getState().bumpLiveEdit();
@@ -1061,12 +1131,29 @@ export default function MapViewport() {
   function endBgStroke(): void {
     const stroke = bgStroke.current;
     bgStroke.current = null;
+    bgRefusalShown.current = false;
     if (!stroke || stroke.entries.size === 0) return;
     const level = getActiveLevel();
     if (!level) return;
+    const n = stroke.entries.size;
+    const description = `Paint ${n} background tile${n === 1 ? '' : 's'}`;
+    if (stroke.source === 'override') {
+      // A DIFFERENT FILE, so a different command — see SetBgOverrideLayoutCommand.
+      // `sectionIndex: -1` because the document is per-game and the plane is
+      // act-wide, matching set-bg-override-band beside it.
+      executeCommand({
+        type: 'set-bg-override-layout',
+        description,
+        sectionIndex: -1,
+        entries: [...stroke.entries].map(([index, e]) => ({
+          index, oldWord: e.oldNt, newWord: e.newNt,
+        })),
+      }, level);
+      return;
+    }
     executeCommand({
       type: 'set-bg-tiles',
-      description: `Paint ${stroke.entries.size} background tile${stroke.entries.size === 1 ? '' : 's'}`,
+      description,
       // The BG plane is act-wide, not per-section; the field is required by
       // EditCommand and the active section is the honest answer to "where was
       // the artist" for the description.

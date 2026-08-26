@@ -176,6 +176,32 @@ export interface SetBgTilesCommand extends EditCommand {
   entries: Array<{ index: number; oldNt: number; newNt: number }>;
 }
 
+/**
+ * Paint background cells in `editor_bg_override.json` — the plane the ROM is
+ * actually built from (docs/decisions.jsonl d-12).
+ *
+ * A SEPARATE COMMAND FROM `set-bg-tiles`, not a third value of its `bgRef`, and
+ * the reason is the write path rather than the data. `set-bg-tiles` edits an
+ * in-memory array the act or the BG library owns and the save plan re-serialises
+ * to `<zone>_bg_<id>.bin`; this edits a JSON document that has its own codec, its
+ * own sole-writer ruling, its own "the file exists and did not parse, do not
+ * touch it" refusal, and its own consumer. Overloading one command's `bgRef`
+ * with a sentinel would put the two paths one typo apart — and the failure mode
+ * that typo produces is the one this whole parcel exists to remove: a stroke
+ * that paints on screen and lands in a file nobody bakes.
+ *
+ * `entries` carry WORDS, not tile indices: a nametable word is an index plus the
+ * palette/priority/flip attributes the consumer preserves, and undo has to
+ * restore all of it.
+ *
+ * `sectionIndex` is -1. The document is per-GAME and the plane is act-wide, so
+ * this is act-ambient exactly like `set-bg-override-band` beside it.
+ */
+export interface SetBgOverrideLayoutCommand extends EditCommand {
+  type: 'set-bg-override-layout';
+  entries: Array<{ index: number; oldWord: number; newWord: number }>;
+}
+
 export interface SetSectionBgCommand extends EditCommand {
   type: 'set-section-bg';
   // Assign which background (Plane B) the section displays: null = the act
@@ -304,6 +330,7 @@ export type AnyCommand =
   | SetChunkCommand
   | SetBgCommand
   | SetBgTilesCommand
+  | SetBgOverrideLayoutCommand
   | SetSectionBgCommand
   | SetEffectsSceneCommand
   | SetSectionSceneCommand
