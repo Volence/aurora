@@ -14,6 +14,7 @@ import { fileURLToPath } from 'node:url';
 import {
   worldYToCanvasY, canvasYToWorldY, guideAtCanvasY, layerGuideGeometry,
   layerIsEnabled, GUIDE_GRAB_PX, publishGuideReport, lastGuideReport,
+  guideOriginWorldY, canvasYToLayerTop, guideCaption,
   type GuideViewport,
 } from '../effects-guides';
 import { EFFECTS_WORLD_Y_BOUNDS, clampWorldY } from '../../providers/effects-aeon';
@@ -167,5 +168,66 @@ describe('the guide report', () => {
     });
     expect(lastGuideReport().sceneId).toBe('sky');
     expect(lastGuideReport().paints).toBe(before + 2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Locked scenes: the guides are screen lines, not act rows (feedback 2026-08-26 pt 4)
+// ---------------------------------------------------------------------------
+
+describe('a locked scene draws its guides as screen lines', () => {
+  // For a locked plane a layer top IS a plane line (aeon scene_plane_line:
+  // identity mapping), so drawing it at act Y is wrong everywhere except
+  // inside the plane rectangle at world origin, where the two coincide by
+  // accident. Until the screen-frame overlay (parcel G) lands, "the screen"
+  // is the viewport's own top edge: line N is N world px below `vp.y`.
+  it('anchors screen space at the viewport top, act space at the act origin', () => {
+    expect(guideOriginWorldY(vp(1234, 2), 'screen')).toBe(1234);
+    expect(guideOriginWorldY(vp(1234, 2), 'act')).toBe(0);
+  });
+
+  it('places line N at N*zoom canvas px whatever the pan — the guide does not scroll with the act', () => {
+    for (const vpY of [0, 37, 2048, 20000]) {
+      for (const zoom of [0.5, 1, 3]) {
+        const rows = layerGuideGeometry([layer(0), layer(160)], vp(vpY, zoom), { space: 'screen' });
+        expect(rows.map((r) => r.canvasY)).toEqual([0, 160 * zoom]);
+        // The reported top is still the document's number, not a world Y.
+        expect(rows.map((r) => r.worldY)).toEqual([0, 160]);
+      }
+    }
+  });
+
+  it('defaults to act space, so every existing caller is unchanged', () => {
+    const a = layerGuideGeometry([layer(160)], vp(500, 1));
+    const b = layerGuideGeometry([layer(160)], vp(500, 1), { space: 'act' });
+    expect(a).toEqual(b);
+    expect(a[0].canvasY).toBe(160 - 500);
+  });
+
+  it('the two spaces disagree everywhere except at the act origin', () => {
+    // The coincidence that hid the defect: with the view at world 0 both
+    // spellings land on the same row.
+    const atOrigin = (space: 'screen' | 'act') =>
+      layerGuideGeometry([layer(112)], vp(0, 1), { space })[0].canvasY;
+    expect(atOrigin('screen')).toBe(atOrigin('act'));
+    const panned = (space: 'screen' | 'act') =>
+      layerGuideGeometry([layer(112)], vp(300, 1), { space })[0].canvasY;
+    expect(panned('screen')).not.toBe(panned('act'));
+  });
+
+  it('grabs and drags in the same space it draws in', () => {
+    const v = vp(1000, 2);
+    const rows = layerGuideGeometry([layer(50), layer(200)], v, { space: 'screen' });
+    expect(guideAtCanvasY(rows[1].canvasY, [layer(50), layer(200)], v, 'screen')).toBe(1);
+    // In act space the same canvas row finds nothing (the act guide is off-screen).
+    expect(guideAtCanvasY(rows[1].canvasY, [layer(50), layer(200)], v, 'act')).toBeNull();
+    // Round trip: the row a guide draws at converts back to its own top.
+    expect(canvasYToLayerTop(rows[1].canvasY, v, 'screen')).toBe(200);
+    expect(canvasYToLayerTop(worldYToCanvasY(200, v.y, v.zoom), v, 'act')).toBe(200);
+  });
+
+  it('captions the guide layer so the space is visible, and only when locked', () => {
+    expect(guideCaption('screen')).toBe('screen lines — locked scene');
+    expect(guideCaption('act')).toBeNull();
   });
 });
