@@ -2,9 +2,9 @@
  * "The server does not serve this method" — as a condition of its own.
  *
  * WHY THIS EXISTS. The suite is cutting over from the legacy C++ Aether server
- * to the Rust core, and both resolve the SAME socket chain
- * (`$ORACLE_SOCKET` -> `$EXODUS_SOCKET` -> `$XDG_RUNTIME_DIR/oracle.sock` ->
- * `/tmp/oracle.sock`, see `socket-path.ts`). Aurora can therefore change which
+ * to the Rust core, and both SELECT the same socket path by env-var presence
+ * (first set of `$ORACLE_SOCKET`, `$EXODUS_SOCKET`, `$XDG_RUNTIME_DIR/oracle.sock`,
+ * else `/tmp/oracle.sock`; no step probes, see `socket-path.ts`). Aurora can therefore change which
  * implementation it is talking to with nothing in this codebase changing, and
  * the new server serves a SUBSET of the old surface — the rest gets built on
  * demand.

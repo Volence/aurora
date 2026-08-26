@@ -534,8 +534,13 @@ served methods are identical under `CARGO_PKG_VERSION`; **(2)** it must be
 impostor could not also claim, so a value read from a config file would reproduce the exact
 defect the parcel exists to fix.
 
-- **Aether client** (`src/main/aether/`). Socket order `$ORACLE_SOCKET` → `$EXODUS_SOCKET`
-  → `$XDG_RUNTIME_DIR/oracle.sock` → `/tmp/oracle.sock`; a long path dies on `SUN_LEN`.
+- **Aether client** (`src/main/aether/`). The socket path is SELECTED by env-var presence, not
+  searched: `resolveSocketPath` (`socket-path.ts:35-50`) takes the first set-and-non-empty of
+  `$ORACLE_SOCKET`, `$EXODUS_SOCKET`, `$XDG_RUNTIME_DIR/oracle.sock`, else `/tmp/oracle.sock`, and
+  hands that one path to `net.connect` (`bridge.ts:119`); nothing stats or probes, and nothing
+  falls through on a connect error. At a socket FILE nobody listens on the client surfaces
+  `ECONNREFUSED`, at no file `ENOENT`, both naming the path (measured by
+  `__tests__/socket-dead-link.test.ts`). A long path dies on `SUN_LEN`.
   **The handshake is TWO messages** — `initialize` with `clientCapabilities:{events:true}`
   then an `initialized` NOTIFICATION; subscription happens on the second, and skipping it
   gives a healthy connection that silently never receives an event. Feature-detect off
