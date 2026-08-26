@@ -14,6 +14,9 @@
 
 import { BgAnimPreviewRenderer, type BandPreviewVerdict } from '../canvas/BgAnimPreviewRenderer';
 import { documentBands } from '../../core/formats/bg-override/bg-anim-band';
+import { actBindsBgOverride } from '../../core/formats/bg-override/bg-override-binding';
+import { bgOverrideDisplay } from '../../core/formats/bg-override/bg-override-view';
+import type { BgOverrideState } from '../../core/formats/bg-override/bg-override-io';
 import { BG_WIDTH } from '../../core/formats/bg-tiles';
 import { useProjectStore, getCurrentAct, getCurrentZone } from '../state/projectStore';
 import { useEditorStore } from '../state/editorStore';
@@ -45,26 +48,66 @@ const EMPTY_SNAPSHOT: Omit<BandPreviewSnapshot, 'documentPresent' | 'backgroundP
 };
 
 /**
+ * Where the background the viewport is painting came from. The paint gesture
+ * needs this: each source is a different file with a different write path, and
+ * a stroke that recorded against the wrong one would be an edit that never
+ * reaches the project.
+ */
+export type DisplayedBgSource = 'override' | 'library' | 'act';
+
+export interface DisplayedBg {
+  source: DisplayedBgSource;
+  layout: Uint16Array;
+  tiles: Tile[];
+  /** The library entry's id — `source: 'library'` only, null otherwise. */
+  libraryId: string | null;
+}
+
+/**
  * Resolve which background (Plane B) the viewport should display for the ACTIVE
- * section: its `bgLayoutRef` names a BG-library entry, null (or a dangling id)
- * falls back to the act default. Returns null when no BG exists at all.
+ * section.
+ *
+ * THE ORDER IS THE RULING (docs/decisions.jsonl d-12, "the game's copy wins"):
+ *
+ *   1. the BG OVERRIDE document, when this act is the one aeon's injector bakes
+ *      it into (`actBindsBgOverride`) and the document is readable. This is what
+ *      the ROM is built from — `inject_editor_bg.py` reads it and writes the
+ *      act's `zone_bg.bin` / `bg_tiles.bin`, and no aeon tool reads the BG
+ *      library at all — so on the overridden act it is the only honest picture.
+ *   2. the section's `bgLayoutRef` -> a BG-library entry;
+ *   3. the act default (`act.bgLayout`/`act.bgTiles`).
+ *
+ * Null when no BG exists at all.
  *
  * MOVED HERE FROM `MapViewport` rather than copied. The preview's licence check
  * is a claim about the blob ON SCREEN, so it has to resolve the background
  * through the SAME function that hands it to `SectionRenderer.loadBg` — a second
  * copy that agreed today would be free to disagree later, and the failure it
  * would produce (a licence granted against a blob nobody is painting) is
- * invisible: right art, wrong cells, no error.
+ * invisible: right art, wrong cells, no error. That divergence is exactly what
+ * step 1 exists to end.
  */
 export function resolveDisplayedBg(
-  act: Act, bgLibrary: readonly BgLibraryEntry[], activeSectionIndex: number,
-): { layout: Uint16Array; tiles: Tile[] } | null {
+  act: Act,
+  bgLibrary: readonly BgLibraryEntry[],
+  activeSectionIndex: number,
+  bgOverride?: BgOverrideState | null,
+): DisplayedBg | null {
+  const doc = bgOverride?.doc ?? null;
+  if (doc !== null && actBindsBgOverride(act) && doc.layout.length > 0) {
+    const view = bgOverrideDisplay(doc);
+    return { source: 'override', layout: view.layout, tiles: view.tiles, libraryId: null };
+  }
   const ref = act.sections[activeSectionIndex]?.bgLayoutRef ?? null;
   if (ref !== null) {
     const entry = bgLibrary.find((b) => b.id === ref);
-    if (entry) return { layout: entry.layout, tiles: entry.tiles };
+    if (entry) {
+      return { source: 'library', layout: entry.layout, tiles: entry.tiles, libraryId: entry.id };
+    }
   }
-  if (act.bgLayout && act.bgTiles) return { layout: act.bgLayout, tiles: act.bgTiles };
+  if (act.bgLayout && act.bgTiles) {
+    return { source: 'act', layout: act.bgLayout, tiles: act.bgTiles, libraryId: null };
+  }
   return null;
 }
 
@@ -85,7 +128,7 @@ export function refreshBandPreview(version: string): BandPreviewSnapshot {
   const bands = doc ? documentBands(doc) : [];
   const activeSectionIndex = useEditorStore.getState().activeSectionIndex;
   const resolved = zone && act
-    ? resolveDisplayedBg(act, state.project?.bgLibrary ?? [], activeSectionIndex)
+    ? resolveDisplayedBg(act, state.project?.bgLibrary ?? [], activeSectionIndex, holder)
     : null;
 
   if (!zone || !act || !resolved || bands.length === 0) {
@@ -105,7 +148,9 @@ export function refreshBandPreview(version: string): BandPreviewSnapshot {
 
   // The active section's BG ref is in the signature on its own: swapping one
   // library entry for another of the same shape changes which blob a slot index
-  // MEANS, and no length or clock in here would move.
+  // MEANS, and no length or clock in here would move. The SOURCE joins it for
+  // the same reason one step up: an act that starts or stops being the
+  // overridden one swaps the whole blob without moving a ref or a length.
   const bgRef = act.sections[activeSectionIndex]?.bgLayoutRef ?? '@act';
   bandPreview.prepare({
     bands,
@@ -114,8 +159,8 @@ export function refreshBandPreview(version: string): BandPreviewSnapshot {
     heightTiles: Math.floor(resolved.layout.length / BG_WIDTH),
     blobTiles: resolved.tiles,
     paletteLines: zone.palette.lines,
-  }, `${version}:${zone.id}:${act.id}:${activeSectionIndex}:${bgRef}:${bands.length}:` +
-     `${resolved.tiles.length}:${resolved.layout.length}`);
+  }, `${version}:${zone.id}:${act.id}:${activeSectionIndex}:${resolved.source}:${bgRef}:` +
+     `${bands.length}:${resolved.tiles.length}:${resolved.layout.length}`);
 
   return {
     verdicts: bandPreview.bandVerdicts(),
