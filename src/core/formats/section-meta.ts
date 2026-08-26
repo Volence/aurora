@@ -19,6 +19,16 @@
 // aeon's generator writes sceneRef into these same files (empyrean
 // docs/AURORA_EFFECTS_SCHEMA.md §3/§6/§8; aeon tools/EFFECTS_CONSUMER_CONTRACT.md
 // §2.2). Add a ref here and to save.ts together, or don't add it.
+//
+// KEY ORDER is not this file's to choose. Contract §2.2 names the sidecar as a
+// document of the contract, so §5 binds it: keys sorted alphabetically, scalar
+// document pretty-printed at indent 2 — `canonicalJsonPretty`. The emit
+// literal below stays a literal (so the emitted SET is the interface's, type
+// checked), but its ORDER is a non-fact: the canonical writer sorts it. Add a
+// fourth ref wherever reads best; the bytes come out sorted regardless, and
+// test/formats/section-meta.test.ts asserts they do.
+
+import { canonicalJsonPretty } from './canonical-json';
 
 export interface SectionMeta {
   bgLayoutRef: string | null;
@@ -32,11 +42,11 @@ export interface SectionMeta {
  */
 export function serializeSectionMeta(meta: SectionMeta): string | null {
   if (meta.bgLayoutRef === null && meta.paletteRef === null && meta.sceneRef === null) return null;
-  return JSON.stringify({
+  return canonicalJsonPretty({
     bgLayoutRef: meta.bgLayoutRef,
     paletteRef: meta.paletteRef,
     sceneRef: meta.sceneRef,
-  }, null, 2);
+  });
 }
 
 /**

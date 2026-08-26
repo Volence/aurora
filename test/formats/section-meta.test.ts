@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { serializeSectionMeta, parseSectionMeta } from '../../src/core/formats/section-meta';
+import type { SectionMeta } from '../../src/core/formats/section-meta';
+import { canonicalJsonPretty, canonicalKeyOrder } from '../../src/core/formats/canonical-json';
 
 describe('section meta sidecar ({prefix}.meta.json)', () => {
   it('round-trips bgLayoutRef and paletteRef', () => {
@@ -78,6 +80,46 @@ describe('section meta sidecar ({prefix}.meta.json)', () => {
     ].join('\n');
     expect(JSON.parse(onDisk).sceneRef).toBe('canopy_dusk');
     expect(serializeSectionMeta(parseSectionMeta(onDisk))).toBe(onDisk);
+  });
+
+  // ---- §5 canonical form: the sortedness gate (ROADMAP item 26) -------------
+  // Contract §2.2 names this sidecar a document of the contract, so §5 binds
+  // it: keys sorted alphabetically, scalar document pretty at indent 2. Before
+  // this gate the writer was a hand-enumerated literal that HAPPENED to be
+  // alphabetical; a fourth ref added in the natural place would have broken
+  // §5 silently. Expectations below are derived from canonical-json.ts, never
+  // typed — a typed string proves one input renders one way, not that the
+  // writer agrees with the §5 chokepoint.
+
+  describe('§5 canonical form', () => {
+    const full: SectionMeta = { bgLayoutRef: 'forest-1718000000', paletteRef: 'OJZ_AltPal', sceneRef: 'canopy_dusk' };
+
+    it('emits exactly the canonical pretty form of its own content', () => {
+      const text = serializeSectionMeta(full)!;
+      // Independent derivation: parse the bytes back to a plain object and
+      // re-canonicalize through the chokepoint. A writer whose key order or
+      // indentation differs from §5 cannot equal this.
+      const independent = canonicalJsonPretty(JSON.parse(text));
+      expect(text).toBe(independent);
+      // Anti-vacuous: the emitted key sequence really is the sorted one, and
+      // the document really has all three keys (a one-key document is
+      // trivially sorted).
+      const keys = Object.keys(JSON.parse(text) as object);
+      expect(keys).toHaveLength(3);
+      expect(keys).toEqual(Object.keys(canonicalKeyOrder(full) as object));
+    });
+
+    it('poison: a meta whose keys arrive out of order still serializes sorted', () => {
+      // The interface's declaration order is bgLayoutRef, paletteRef,
+      // sceneRef; build the value with insertion order REVERSED (and via a
+      // cast so a type-widening refactor cannot silently narrow this back).
+      const reversed = { sceneRef: 'canopy_dusk', paletteRef: 'OJZ_AltPal', bgLayoutRef: 'forest-1718000000' } as SectionMeta;
+      expect(Object.keys(reversed)).toEqual(['sceneRef', 'paletteRef', 'bgLayoutRef']); // the poison is real
+      const text = serializeSectionMeta(reversed)!;
+      expect(text).toBe(canonicalJsonPretty(JSON.parse(text)));
+      expect(text).toBe(serializeSectionMeta(full)); // insertion order is invisible in the bytes
+      expect(Object.keys(JSON.parse(text) as object)).toEqual(Object.keys(canonicalKeyOrder(reversed) as object));
+    });
   });
 
   /**
