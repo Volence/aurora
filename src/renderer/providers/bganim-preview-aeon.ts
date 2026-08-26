@@ -13,7 +13,10 @@
 // frames where something actually moved.
 
 import { BgAnimPreviewRenderer, type BandPreviewVerdict } from '../canvas/BgAnimPreviewRenderer';
-import { documentBands } from '../../core/formats/bg-override/bg-anim-band';
+import { documentBands, bandSlotBases } from '../../core/formats/bg-override/bg-anim-band';
+import {
+  bandCoverage, slotRange, type BandCoverage, type SlotRange,
+} from './band-coverage';
 import { actBindsBgOverride } from '../../core/formats/bg-override/bg-override-binding';
 import { bgOverrideDisplay } from '../../core/formats/bg-override/bg-override-view';
 import type { BgOverrideState } from '../../core/formats/bg-override/bg-override-io';
@@ -274,4 +277,121 @@ export function bandStatus(
     return { kind: 'no-cells', rate, verdict: 'Licensed, but no background cell draws its slots.' };
   }
   return { kind: 'previewing', rate, verdict: `previewing · ${verdict.cells} background cells` };
+}
+
+// ---------------------------------------------------------------------------
+// THE BAND LENS — ROADMAP item 43 part 2
+// ---------------------------------------------------------------------------
+//
+// ONE RESOLUTION, TWO READERS, exactly as `resolveDisplayedBg` above is one
+// resolution for the renderer and for the licence check. `MapViewport` calls
+// this to tint; `BgAnimBandPanel` calls it to print the footprint. A second copy
+// that agreed today would be free to disagree later, and the failure it would
+// produce — the panel saying 1,244 cells while the map lights a different set —
+// is exactly the class of defect the shared-resolution rule exists for.
+//
+// ═══ IT IS GATED ON WHICH BACKGROUND IS ON SCREEN, AND ONLY ON THAT ═══
+//
+// A slot index means a position in the BG OVERRIDE DOCUMENT'S blob. Aurora
+// paints whichever background `resolveDisplayedBg` picks, and on an act the
+// override does not bind that is a DIFFERENT blob holding different art at the
+// same indices (docs/reviews/2026-08-26-bganim-preview-blob-divergence.md).
+// Tinting that picture from this document's slot numbers would light real cells,
+// in a plausible shape, on the wrong art — no error anywhere.
+//
+// So the lens draws only when `source === 'override'`, and SAYS WHY when it does
+// not. That is a refusal about the DOCUMENT, never about the range:
+// `bandCoverage` itself is total, and `cells: []` is a real answer it returns.
+
+/** What the lens is lighting, and what it found. `range: null` means "no mark". */
+export interface BandLensResolution {
+  /** 'band' or 'candidate' — which subject resolved, or null when none did. */
+  kind: 'band' | 'candidate' | null;
+  /** The band index, when `kind === 'band'`. */
+  bandIndex: number | null;
+  /** The slot range on screen, or null when nothing is marked. */
+  range: SlotRange | null;
+  /** The footprint, or null when it could not be computed. */
+  coverage: BandCoverage | null;
+  /**
+   * Why there is no coverage for a range that IS marked, or null.
+   *
+   * LOUD ON UNMEASURABLE. A lens that quietly drew nothing when the background
+   * on screen is not this document's would be indistinguishable from a range
+   * that legitimately paints no cells — and those two mean opposite things.
+   */
+  reason: string | null;
+  /** Where the background the viewport paints came from. Null when there is none. */
+  source: DisplayedBgSource | null;
+}
+
+const NO_LENS: BandLensResolution = {
+  kind: null, bandIndex: null, range: null, coverage: null, reason: null, source: null,
+};
+
+/**
+ * Resolve the band lens from current store state.
+ *
+ * STALE TARGETS FALL BACK RATHER THAN THROW — the `resolveSelectedScene` rule.
+ * Undoing a promote can leave `bandLensTarget` naming band 3 of a document that
+ * now has one. That is not an error to surface: it is a mark whose subject went
+ * away, so the lens goes dark.
+ */
+export function resolveBandLens(): BandLensResolution {
+  const target = useEditorStore.getState().bandLensTarget;
+  if (target === null) return NO_LENS;
+
+  const state = useProjectStore.getState();
+  const act = getCurrentAct(state);
+  const holder = state.project?.bgOverride ?? null;
+  const doc = holder?.doc ?? null;
+  if (!act || !doc) return NO_LENS;
+
+  const bands = documentBands(doc);
+  let kind: 'band' | 'candidate';
+  let bandIndex: number | null = null;
+  let range: SlotRange;
+  if (target.kind === 'band') {
+    const band = bands[target.index];
+    if (!band) return NO_LENS; // the mark outlived its subject
+    kind = 'band';
+    bandIndex = target.index;
+    range = slotRange(bandSlotBases(bands)[target.index], band.cols, band.rows);
+  } else {
+    const c = useEditorStore.getState().bandCandidate;
+    kind = 'candidate';
+    range = slotRange(c.staticBase, c.cols, c.rows);
+  }
+
+  const resolved = resolveDisplayedBg(
+    act, state.project?.bgLibrary ?? [],
+    useEditorStore.getState().activeSectionIndex, holder,
+  );
+  if (!resolved) {
+    return {
+      kind, bandIndex, range, coverage: null, source: null,
+      reason: 'the active section resolves to no background, so there is no picture to light.',
+    };
+  }
+  if (resolved.source !== 'override') {
+    return {
+      kind, bandIndex, range, coverage: null, source: resolved.source,
+      reason: "the background on screen is not this document's. A slot index names a tile in the "
+        + 'blob this file carries, and the act is painting another one, so nothing here can say '
+        + 'which cells the range paints.',
+    };
+  }
+
+  // `BG_WIDTH` is the width `reloadBg` hands `SectionRenderer.loadBg`, so the
+  // lens decodes the plane exactly as the viewport painted it.
+  let coverage: BandCoverage;
+  try {
+    coverage = bandCoverage(resolved.layout, range, BG_WIDTH);
+  } catch (e) {
+    return {
+      kind, bandIndex, range, coverage: null, source: resolved.source,
+      reason: e instanceof Error ? e.message : String(e),
+    };
+  }
+  return { kind, bandIndex, range, coverage, reason: null, source: resolved.source };
 }

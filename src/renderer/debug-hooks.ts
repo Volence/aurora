@@ -21,6 +21,8 @@ import { serializeBgOverride } from '../core/formats/bg-override/bg-override';
 import { resolveDisplayedBg } from './providers/bganim-preview-aeon';
 import { lastGuideReport } from './canvas/effects-guides';
 import type { GuideReport } from './canvas/effects-guides';
+import { lastBandLensReport, lastBandMarkReport } from './canvas/band-lens';
+import type { BandLensReport, BandMarkReport } from './canvas/band-lens';
 import { useAetherStore } from './state/aetherStore';
 import { useViewStore } from './state/viewStore';
 import { useArtStore } from './state/artStore';
@@ -413,6 +415,37 @@ interface AeonProbeApi {
    * catch. See canvas/effects-guides.ts's `GuideReport`.
    */
   guides(): GuideReport;
+  /**
+   * THE BAND LENS AS THE LAST REPAINT DREW IT (ROADMAP item 43 part 2).
+   *
+   * Same contract as `guides()` and for the same reason: a PUBLISH from the end
+   * of the draw body, not a recomputation. A probe that re-scanned the layout
+   * from the stores would prove two copies of one scan agree, which stays true
+   * when the draw pass never ran. `active: false` is a real answer.
+   */
+  bandLens(): BandLensReport;
+  /**
+   * THE LAST CLICK-TO-SEED MARK, whatever it resolved to.
+   *
+   * The cases worth asserting are the ones that CHANGE NOTHING — a blank cell, a
+   * slot past the end of the blob, a document that moved under the press. Those
+   * leave the tint untouched, so `bandLens()` cannot tell them from a click that
+   * never happened; `marks` advancing is what proves the gesture ran.
+   */
+  bandMark(): BandMarkReport;
+  /** What the lens resolves RIGHT NOW, independent of the draw pass. */
+  bandLensTarget(): { kind: 'band'; index: number } | { kind: 'candidate' } | null;
+  /**
+   * A DOOR, not an assertion — the same shape as `selectScene`.
+   *
+   * A pixel probe has to compare the SAME cell with the lens on and off to
+   * prove the tint is the lens rather than the art; without a way to turn the
+   * mark off, the only baseline available is a different cell, which is a
+   * weaker claim about a different pixel.
+   */
+  setBandLensTarget(t: { kind: 'band'; index: number } | { kind: 'candidate' } | null): void;
+  /** The promotion candidate the panel form and the map now share. */
+  bandCandidate(): { staticBase: number; cols: number; rows: number };
   /** One section's `sceneRef` — what the assignment dropdown writes. */
   sceneRef(sectionIndex: number): string | null;
   /**
@@ -622,6 +655,11 @@ function installAeonProbe(): AeonProbeApi {
     selectedScene: () => useEditorStore.getState().selectedEffectsSceneId,
     selectScene: (id) => useEditorStore.getState().setSelectedEffectsSceneId(id),
     guides: () => lastGuideReport(),
+    bandLens: () => lastBandLensReport(),
+    bandMark: () => lastBandMarkReport(),
+    bandLensTarget: () => useEditorStore.getState().bandLensTarget,
+    setBandLensTarget: (t) => useEditorStore.getState().setBandLensTarget(t),
+    bandCandidate: () => useEditorStore.getState().bandCandidate,
     bands: () => bandRows(bgDoc()).map((b) => ({
       index: b.index, cols: b.cols, rows: b.rows, tileCount: b.tileCount,
       driver: b.driver, driverIsExplicit: b.driverIsExplicit,

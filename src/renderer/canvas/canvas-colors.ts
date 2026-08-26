@@ -239,3 +239,51 @@ export const EFFECTS_GUIDE_ACTIVE = 'rgba(150, 245, 255, 1)';
 /** Backing plate behind the `L0 y=…` label, so it stays readable over art. */
 export const EFFECTS_GUIDE_LABEL_BG = 'rgba(10, 12, 18, 0.78)';
 export const EFFECTS_GUIDE_LABEL_TEXT = 'rgba(190, 245, 255, 0.95)';
+
+// --- The BgAnim band lens (ROADMAP item 43 part 2, effects facet) -------------
+//
+// MAGENTA, AND IT WAS TESTED ON THE PERSON WHO COMMISSIONED THE FEATURE.
+//
+// THE ONE-SENTENCE DEFENCE: it has to be unmistakably an OVERLAY over OJZ's
+// grey-on-black background art, and every value-based alternative — a pale
+// wash, a neutral haze — reads as more of that art rather than as something
+// laid on top of it.
+//
+// ⚠ IT WAS CHANGED TO A COOL NEAR-NEUTRAL AND CHANGED BACK, and the round trip
+// is worth recording because both halves are evidence.
+//
+// The worry was that hot magenta would read as an ALARM, which the ruling on
+// this surface forbids — a footprint is NEUTRAL INFORMATION, and whether a
+// range that paints 964 cells is the look wanted is the owner's call, not this
+// canvas's to pre-judge. Asked directly, he said the opposite: the magenta "did
+// read as 'something/information', nothing scary — just didn't know what it
+// was". So the alarm reading was never there. THE REAL DEFECT WAS THAT NOTHING
+// NAMED THE WASH, and it is fixed where it belongs — see `band-lens.ts`'s
+// caption (a swatch of this exact colour, anchored beside the coverage) and the
+// band panel's `LensSwatch`.
+//
+// The neutral was then built and MEASURED on the live OJZ background, and it
+// lost on figure/ground: at `rgba(214,224,238,0.30)` a covered cell over the
+// dark sky came out at `rgb(65,68,72)`, which is the same value range as the
+// grey block art beside it. A lens that can be mistaken for the picture is
+// worse than one that is obviously not.
+//
+// The secondary argument — that magenta collides with `COLLISION_UNKNOWN`, the
+// palette's word for an out-of-range attr index — was weighed and is not
+// load-bearing: that constant is CLASSIC-only and this lens is aeon-side, so
+// they essentially never share a screen.
+//
+// Nothing here brightens, thickens or shifts as a footprint grows — every
+// covered cell draws identically whether the range owns one or a thousand.
+
+/** Fill over a background cell whose word names a slot in the marked range. */
+export const BAND_LENS_FILL = 'rgba(255, 90, 200, 0.34)';
+/**
+ * Hairline around the same cells, so ONE cell stays legible at low zoom where
+ * an 8px fill over busy art is a smudge. Same role as `COLLISION_SURFACE_LINE`
+ * and `PRIORITY_EDGE`: the fill is the area, the edge is the shape.
+ */
+export const BAND_LENS_EDGE = 'rgba(255, 150, 220, 0.85)';
+/** Backing plate behind the caption. */
+export const BAND_LENS_LABEL_BG = 'rgba(10, 12, 18, 0.82)';
+export const BAND_LENS_LABEL_TEXT = 'rgba(255, 200, 235, 0.95)';

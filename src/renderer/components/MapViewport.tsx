@@ -21,8 +21,19 @@ import { buildStampCommand } from '../../core/editing/map-stamp';
 import { snapMarquee, copyFromSection, buildPasteCommand } from '../../core/editing/map-clipboard';
 import type { PasteLayers } from '../../core/editing/map-clipboard';
 import { SectionRenderer } from '../canvas/SectionRenderer';
-import { bandPreview, refreshBandPreview, resolveDisplayedBg } from '../providers/bganim-preview-aeon';
+import {
+  bandPreview, refreshBandPreview, resolveDisplayedBg, resolveBandLens,
+} from '../providers/bganim-preview-aeon';
 import type { DisplayedBgSource } from '../providers/bganim-preview-aeon';
+import {
+  drawBandLens, drawBandLensLabel, bandLensAnchor, cellAtWorld,
+  publishBandLensReport, publishBandMark,
+} from '../canvas/band-lens';
+import {
+  coverageSummary, coverageSubject, coverageBounds, markFromLayoutWord,
+} from '../providers/band-coverage';
+import { documentBands, bandSlotBases } from '../../core/formats/bg-override/bg-anim-band';
+import { bandTileCount } from '../../core/formats/bg-override/bg-override';
 import { writeBgOverrideLayoutWord } from '../../core/formats/bg-override/bg-override-view';
 import { LAYOUT_TILE_INDEX_MASK } from '../../core/formats/bg-override/bg-override';
 import { editorPanToCameraPx } from '../../core/formats/bg-override/bganim-preview';
@@ -90,6 +101,80 @@ function activeGuideScene(): EffectsScene | null {
   const library = useProjectStore.getState().project?.effectsScenes;
   if (!library) return null;
   return resolveSelectedScene(library, useEditorStore.getState().selectedEffectsSceneId);
+}
+
+/** True while the author is standing in the effects lens. The gate both effects overlays share. */
+function inEffectsFacet(): boolean {
+  const tabId = useSessionStore.getState().activeId;
+  return useWorkspaceStore.getState().facetFor(tabId) === EFFECTS_FACET;
+}
+
+/**
+ * The band lens for the CURRENT repaint, or null.
+ *
+ * Same shape and same reasoning as `activeGuideScene` above: ONE RESOLUTION,
+ * READ AT CALL TIME, so the draw pass and the click gesture can never be looking
+ * at different subjects, and `redraw` stays dependency-free.
+ *
+ * THE FACET IS THE GATE, and there is deliberately no overlay toggle: the lens
+ * exists because the author is in the parallax lens with a band or a candidate
+ * marked, and a toggle would be a second thing to find before the feature could
+ * be discovered at all. (It is the guides' argument, and the guides' precedent.)
+ */
+function activeBandLens(): ReturnType<typeof resolveBandLens> | null {
+  if (!inEffectsFacet()) return null;
+  const lens = resolveBandLens();
+  return lens.range === null ? null : lens;
+}
+
+/**
+ * Everything a click on the BG plane needs to resolve into a mark, read fresh.
+ *
+ * ⚠ IT RESOLVES THE BACKGROUND THROUGH `resolveDisplayedBg`, so the word a click
+ * reads is the word the cell the author is LOOKING AT was painted from. Reading
+ * `doc.layout` directly would be right whenever the override is on screen and
+ * silently wrong whenever it is not — a click on someone else's picture seeding
+ * this document's slot numbers.
+ */
+function bandMarkContext(): {
+  layout: Uint16Array;
+  planeCols: number;
+  planeRows: number;
+  bases: number[];
+  counts: number[];
+  firstPromotableSlot: number;
+  blobTileCount: number;
+  /** The band list as it was read, so a commit can tell whether it moved. */
+  witness: string;
+} | null {
+  const state = useProjectStore.getState();
+  const act = getCurrentAct(state);
+  const holder = state.project?.bgOverride ?? null;
+  const doc = holder?.doc ?? null;
+  if (!act || !doc) return null;
+  const resolved = resolveDisplayedBg(
+    act, state.project?.bgLibrary ?? [],
+    useEditorStore.getState().activeSectionIndex, holder,
+  );
+  // Only the override's own picture can be clicked into slot numbers. Anything
+  // else is a different blob at the same indices — see `resolveBandLens`.
+  if (!resolved || resolved.source !== 'override') return null;
+  if (resolved.layout.length % BG_WIDTH !== 0) return null;
+  const bands = documentBands(doc);
+  const counts = bands.map((b) => bandTileCount(b));
+  const bases = bandSlotBases(bands);
+  return {
+    layout: resolved.layout,
+    planeCols: BG_WIDTH,
+    planeRows: resolved.layout.length / BG_WIDTH,
+    bases,
+    counts,
+    // `bandSlotBases`' tail IS the animated slot count — where the next band
+    // would go, which is `bandBudget.firstPromotableSlot` by the same walk.
+    firstPromotableSlot: bases[bases.length - 1],
+    blobTileCount: doc.tiles.length,
+    witness: JSON.stringify({ bases, counts, tiles: doc.tiles.length }),
+  };
 }
 
 interface CtxMenuState {
@@ -257,6 +342,31 @@ export default function MapViewport() {
   const activeTabId = useSessionStore((s) => s.activeId);
   const activeFacet = useWorkspaceStore((s) => s.facetFor(activeTabId));
   const selectedEffectsSceneId = useEditorStore((s) => s.selectedEffectsSceneId);
+
+  // ---- The band lens (ROADMAP item 43 part 2) ------------------------------
+  // Subscribed for the same reason the two above are: `redraw` is dependency-
+  // free by design, so nothing about marking a band or moving the candidate
+  // would repaint the canvas on its own. Both are discrete state changes — a
+  // click on a cell, a click on a card, a keystroke in the form — never a tick,
+  // so this is a state-change repaint like `activeSectionIndex` and the
+  // viewport's zero-idle-repaint property is untouched.
+  const bandLensTarget = useEditorStore((s) => s.bandLensTarget);
+  const bandCandidate = useEditorStore((s) => s.bandCandidate);
+  /**
+   * The cell a press landed on, held from mousedown to mouseup.
+   *
+   * A REF, NOT STATE — a press is not a React render. It carries a WITNESS of
+   * the band list and blob size as they were at mousedown, because a band
+   * command RENUMBERS `tiles` and rewrites every layout word: if the document
+   * moves between press and release (an undo through the window keydown
+   * listener, a synthetic click on Demote — the non-pointer paths item 43 part 1
+   * enumerates), the slot this cell named is not the slot it names now, and
+   * seeding from it would mark a range the author never pointed at. The commit
+   * re-reads and drops the mark rather than writing through a stale word.
+   */
+  const bandMark = useRef<
+    { cell: number; word: number; witness: string } | null
+  >(null);
 
   // ---- BgAnim band preview state (ROADMAP item 42) -------------------------
   // The game frame the preview is showing. Zero (level init) whenever playback
@@ -732,6 +842,47 @@ export default function MapViewport() {
       overlayRenderer.render(ctx, sectionInfos, overlayOpts, viewport, state.objectSprites, state.collisionProfiles);
     }
 
+    // THE BAND LENS (ROADMAP item 43 part 2), under the guides and over
+    // everything else, in BOTH branches for the guides' reason one block down:
+    // it is authoring chrome about the background, and an author in the effects
+    // facet is free to be on either layer. A tint that vanished on a layer
+    // switch would read as a bug in the tint.
+    //
+    // NO CLOCK. This is inside the pass that already repaints on a pan, a zoom,
+    // a store change and an undo; it schedules nothing.
+    const lens = activeBandLens();
+    if (lens && lens.range) {
+      const cells = lens.coverage?.cells ?? [];
+      const drawn = drawBandLens(ctx, viewport, cells);
+      // THE CAPTION, and it leads with WHAT THE WASH IS rather than with slot
+      // arithmetic. The first person to see this lens read the tint as
+      // information and could not tell what information — so line 1 is
+      // `coverageSubject` ("highlighted: the cells band 0 animates"), carrying a
+      // swatch of the wash's own colour, anchored beside the coverage instead of
+      // in the opposite corner. Line 2 is the SHAPE, in the same neutral words
+      // the panel prints. It is on the canvas at all because both band sections
+      // arrive collapsed (item 45), so an author who clicks a cell on arrival
+      // would otherwise have a wash whose range lives inside a shut box.
+      drawBandLensLabel(ctx, viewport, [
+        coverageSubject(lens.kind ?? 'candidate', lens.bandIndex, lens.range),
+        lens.reason !== null ? lens.reason.slice(0, 96)
+          : lens.coverage ? coverageSummary(lens.coverage) : '',
+      ].filter((s) => s !== ''),
+      bandLensAnchor(viewport, coverageBounds(cells)));
+      publishBandLensReport({
+        active: true, kind: lens.kind, bandIndex: lens.bandIndex,
+        range: { base: lens.range.base, count: lens.range.count },
+        cells: cells.length, drawn,
+        largestSlotCells: lens.coverage?.largest?.cells ?? null,
+        reason: lens.reason,
+      });
+    } else {
+      publishBandLensReport({
+        active: false, kind: null, bandIndex: null, range: null,
+        cells: 0, drawn: 0, largestSlotCells: null, reason: null,
+      });
+    }
+
     // Parallax layer guides, LAST and in BOTH branches (ROADMAP item 43). Last
     // because a world-Y division is authoring chrome, not art: it has to stay
     // readable over the foreground it divides. Both branches because the effects
@@ -769,6 +920,14 @@ export default function MapViewport() {
     // highlight. Each is a discrete state change — a pill click, a list click,
     // the cursor crossing a line — never a tick.
     activeFacet, selectedEffectsSceneId, guideHover,
+    // The band lens (item 43 part 2): the mark and the candidate geometry.
+    // ⚠ `bandCandidate` is BELT-AND-BRACES and measured to be so: dropping it
+    // alone turns no harness row red, because `setBandCandidate` also writes a
+    // fresh `{kind:'candidate'}` into `bandLensTarget`, whose identity change
+    // already carries the repaint. It stays because a future setter that
+    // preserved that identity would silently kill the live update, and because
+    // a dependency list should name what the pass reads.
+    bandLensTarget, bandCandidate,
     redraw]);
 
   // Handle resize. The observer repaints through the SAME `redraw` the visual
@@ -1276,6 +1435,62 @@ export default function MapViewport() {
     if (cmd) executeCommand(cmd, level);
   }
 
+  /**
+   * Commit a band-lens MARK (ROADMAP item 43 part 2) — the click half of the
+   * lens, and the "I mark somewhere" the owner asked for.
+   *
+   * FOUR THINGS IT REFUSES TO DO.
+   *
+   *  1. IT WRITES NOTHING TO THE DOCUMENT. A mark moves the EDITOR's idea of
+   *     what the lens is showing and nothing else; no layout word, no band, no
+   *     undo entry. The only document writes on this surface remain the panel's
+   *     two commands, `promoteBandCommand` and `addBandCommand`.
+   *  2. IT DOES NOT WRITE THROUGH A STALE WORD. A band command RENUMBERS the
+   *     blob and rewrites every layout word, so the slot a cell named at
+   *     mousedown may be a different slot by mouseup. The witness is the band
+   *     list and blob size as they were; the word is re-read; either moving
+   *     drops the mark rather than seeding from arithmetic that no longer holds.
+   *  3. IT DOES NOT INVENT A SLOT FOR A BLANK CELL. A layout word of exactly 0
+   *     is the consumer's blank escape and does NOT mean `tiles[0]` — seeding 0
+   *     from it would silently mark the first ANIMATED slot from a cell that
+   *     draws nothing.
+   *  4. IT NEEDS NO REFUSAL MACHINERY, because a seeded base is legal by
+   *     construction: `markFromLayoutWord` clamps to `firstPromotableSlot`, and
+   *     an animated slot becomes a band SELECTION rather than a candidate.
+   */
+  function commitBandMark(): void {
+    const mark = bandMark.current;
+    bandMark.current = null;
+    if (!mark || !inEffectsFacet()) return;
+    const ctxt = bandMarkContext();
+    const stale = !ctxt || ctxt.witness !== mark.witness || ctxt.layout[mark.cell] !== mark.word;
+    if (stale) {
+      publishBandMark({ kind: 'dropped', cell: mark.cell, slot: null, value: null });
+      return;
+    }
+    const ed = useEditorStore.getState();
+    const decided = markFromLayoutWord(
+      mark.word, ctxt.bases, ctxt.counts, ctxt.firstPromotableSlot, ctxt.blobTileCount,
+    );
+    if (decided.kind === 'band') {
+      ed.setBandLensTarget({ kind: 'band', index: decided.index });
+      publishBandMark({ kind: 'band', cell: mark.cell, slot: decided.slot, value: decided.index });
+      return;
+    }
+    if (decided.kind === 'candidate') {
+      ed.setBandCandidate({ staticBase: decided.staticBase });
+      publishBandMark({ kind: 'candidate', cell: mark.cell, slot: decided.slot, value: decided.staticBase });
+      return;
+    }
+    // `blank` and `out-of-blob` name no promotable slot. The mark changes
+    // nothing and whatever the lens was showing stays — a click that does
+    // nothing is the honest answer here, and the report says WHICH nothing.
+    publishBandMark({
+      kind: decided.kind, cell: mark.cell,
+      slot: decided.kind === 'out-of-blob' ? decided.slot : null, value: null,
+    });
+  }
+
   /** Commit the FG tile / collision stroke as one undo step. Idempotent. */
   function endPaintStroke(): void {
     const stroke = paintStroke.current;
@@ -1470,6 +1685,29 @@ export default function MapViewport() {
           setGuideHover(idx);
           e.preventDefault();
           return;
+        }
+      }
+    }
+
+    // THE BAND-LENS MARK (ROADMAP item 43 part 2). It RECORDS and FALLS THROUGH
+    // — it never takes the press.
+    //
+    // That is the whole design of this branch. The effects facet's only tool is
+    // `view`, so taking the press here would kill panning on the one facet the
+    // lens lives in; and a mark is a CLICK, which is not knowable until the
+    // button comes up. So the press notes which cell it landed on, the pan
+    // proceeds exactly as before, and `handleMouseUp` decides whether the
+    // gesture was a click and commits.
+    bandMark.current = null;
+    if (e.button === 0 && inEffectsFacet()) {
+      const ctxt = bandMarkContext();
+      if (ctxt) {
+        const world = screenToWorld(e.clientX, e.clientY);
+        const hit = cellAtWorld(world.x, world.y, ctxt.planeCols, ctxt.planeRows);
+        if (hit) {
+          bandMark.current = {
+            cell: hit.cell, word: ctxt.layout[hit.cell], witness: ctxt.witness,
+          };
         }
       }
     }
@@ -2075,7 +2313,7 @@ export default function MapViewport() {
     // barely-moved press into "select the section under the cursor", and the
     // effects facet's only tool IS `view` — so without this, nudging a guide by
     // two pixels would also change the active section under the author.
-    if (guideDrag.current) { downPos.current = null; finishGesture(); return; }
+    if (guideDrag.current) { downPos.current = null; bandMark.current = null; finishGesture(); return; }
     isPaintDragging.current = false;
     // A click with no drag already committed a 2x2-tile marquee at mousedown —
     // mouseup just ends the drag; the final marquee (set live on mousemove)
@@ -2095,9 +2333,11 @@ export default function MapViewport() {
         if (secIdx >= 0 && act && act.sections[secIdx]) {
           useEditorStore.getState().setActiveSectionIndex(secIdx);
         }
+        commitBandMark();
       }
     }
     downPos.current = null;
+    bandMark.current = null;
 
     // The commit itself lives in finishGesture, which the window listener also
     // calls — one body, so a release inside and a release outside can never

@@ -156,7 +156,30 @@ import BgAnimPreviewStrip from './BgAnimPreviewStrip';
 import { useProjectStore, getActiveLevel } from '../../state/projectStore';
 import { executeCommand, useEditorStore } from '../../state/editorStore';
 import { useHistoryVersion } from '../../hooks/useHistoryVersion';
-import { bandStatus, refreshBandPreview } from '../../providers/bganim-preview-aeon';
+import { bandStatus, refreshBandPreview, resolveBandLens } from '../../providers/bganim-preview-aeon';
+import { coverageSummary } from '../../providers/band-coverage';
+import { BAND_LENS_FILL, BAND_LENS_EDGE } from '../../canvas/canvas-colors';
+
+/**
+ * THE SAME WASH THE MAP DRAWS, as a chip in the column.
+ *
+ * The defect it exists for is the owner's own sentence about the first
+ * revision: the tint "read as 'something/information' — just didn't know what it
+ * was". A footprint line that says "highlighted on the map" beside a square of
+ * the ACTUAL highlight colour makes the link at the moment the author selects
+ * the band, which is the moment they are asking the question. Two canvas
+ * constants imported rather than restated, so the chip cannot drift from the
+ * wash it stands for.
+ */
+function LensSwatch(): React.ReactElement {
+  return (
+    <span aria-hidden style={{
+      display: 'inline-block', width: 9, height: 9, marginRight: 5,
+      verticalAlign: 'baseline',
+      background: BAND_LENS_FILL, border: `1px solid ${BAND_LENS_EDGE}`,
+    }} />
+  );
+}
 import type { AnyCommand } from '../../../core/editing/commands';
 import {
   DEFAULT_DRIVER, DEFAULT_PHASE_FILL, DEFAULT_RATE_SHIFT, addBandCommand, bandBudget,
@@ -194,13 +217,30 @@ export default function BgAnimBandPanel(): React.ReactElement {
   const budget = bandBudget(doc);
   const rows = bandRows(doc);
 
-  // The promotion form. `cols`/`rows` seed at 1x1 — the smallest legal band, and
-  // the one most likely to fit whatever range an author points at; the static
-  // base seeds at the first slot no band already owns, which is where a
-  // promotion is legal by construction.
-  const [cols, setCols] = React.useState(1);
-  const [bandRowCount, setBandRowCount] = React.useState(1);
-  const [staticBase, setStaticBase] = React.useState(0);
+  // THE PROMOTION FORM'S GEOMETRY LIVES IN THE STORE (ROADMAP item 43 part 2).
+  //
+  // It was `React.useState` here, and `MapViewport` — a SIBLING, not a child —
+  // cannot read that. The map now tints every background cell the candidate
+  // range would animate, so the form and the canvas have to agree on what the
+  // candidate IS; one store field is the only way they can. Exactly the lift
+  // `selectedEffectsSceneId` took for part 1, for exactly the same reason.
+  //
+  // `cols`/`rows` still seed at 1x1 — the smallest legal band, and the one most
+  // likely to fit whatever range an author points at; the static base still
+  // seeds at the first slot no band already owns, which is where a promotion is
+  // legal by construction.
+  const candidate = useEditorStore((s) => s.bandCandidate);
+  const setCandidate = useEditorStore((s) => s.setBandCandidate);
+  const lensTarget = useEditorStore((s) => s.bandLensTarget);
+  const setLensTarget = useEditorStore((s) => s.setBandLensTarget);
+  const { cols, rows: bandRowCount, staticBase } = candidate;
+  const setCols = (n: number): void => setCandidate({ cols: n });
+  const setBandRowCount = (n: number): void => setCandidate({ rows: n });
+  const setStaticBase = (n: number): void => setCandidate({ staticBase: n });
+  // WHAT THE MAP IS LIGHTING, resolved through the SAME function the canvas
+  // calls (`resolveBandLens`) so the sentence in this column and the tint on the
+  // map cannot describe different sets of cells.
+  const lens = resolveBandLens();
   const [driver, setDriver] = React.useState<string>(DEFAULT_DRIVER);
   const [explicitDriver, setExplicitDriver] = React.useState(false);
   // The rate, in the same two-part shape the driver has and for the same reason:
@@ -218,9 +258,18 @@ export default function BgAnimBandPanel(): React.ReactElement {
   // Not a clamp on the author's typing — this only moves the seed when the
   // document moved under it, so a base the author chose is never rewritten
   // while it is still legal.
+  //
+  // ⚠ IT MUST NOT LIGHT THE LENS. `setBandCandidate` points the lens at the
+  // candidate — that is right for an author's keystroke and wrong for a
+  // document that moved on its own, which would make an undo of somebody else's
+  // promote silently take over the map. So this writes the field directly.
+  const firstPromotableSlot = budget.firstPromotableSlot;
   React.useEffect(() => {
-    setStaticBase((b) => (b < budget.firstPromotableSlot ? budget.firstPromotableSlot : b));
-  }, [budget.firstPromotableSlot]);
+    const b = useEditorStore.getState().bandCandidate;
+    if (b.staticBase < firstPromotableSlot) {
+      useEditorStore.setState({ bandCandidate: { ...b, staticBase: firstPromotableSlot } });
+    }
+  }, [firstPromotableSlot]);
 
   const spec: BandSpec = {
     cols, rows: bandRowCount, phaseFill,
@@ -296,12 +345,22 @@ export default function BgAnimBandPanel(): React.ReactElement {
           // by a provider, never here: what `rate_shift` means in the units this
           // band's driver reads, and whether the blob on screen lets it preview.
           const status = bandStatus(b, preview.verdicts[b.index]);
+          // THE CARD IS THE LENS'S OTHER END. Clicking an ANIMATED cell on the
+          // map selects this card; clicking this card lights those same cells.
+          // One target, two doors — which is what makes the map band NAVIGATION
+          // rather than a one-way readout.
+          const lit = lensTarget?.kind === 'band' && lensTarget.index === b.index;
           return (
           // THE INDEX TITLES THE CARD and the geometry is its value, so a band
           // row reads in the same label column as every form row above it.
           // Everything under it hangs off the control column (`under`), which
           // is what makes the readout a block rather than four ragged lines.
-          <Card key={b.index} raised>
+          <Card key={b.index} raised selected={lit}
+            title={lit
+              ? 'The map is tinting every background cell this band paints. Click a card or a '
+                + 'cell to move the lens.'
+              : 'Show this band on the map — every background cell its slots paint.'}
+            onClick={() => setLensTarget({ kind: 'band', index: b.index })}>
             <Field label={`Band ${b.index}`}>
               <span style={{ fontSize: T.tSm, color: T.textHi }}>{b.geometry}</span>
             </Field>
@@ -328,6 +387,23 @@ export default function BgAnimBandPanel(): React.ReactElement {
             {status.verdict !== null && (
               <Hint under tone={status.kind === 'previewing' ? undefined : 'warning'}>
                 {status.verdict}
+              </Hint>
+            )}
+            {/* THE FOOTPRINT, and it is NEUTRAL INFORMATION. A band animates
+                whichever tiles its slots name WHEREVER THE PICTURE USES THEM —
+                aeon's live 8x4 band has one slot painting 964 cells of sky, and
+                that is what promotion MEANS, not corruption. So this states the
+                shape and stops: no threshold, no alarm colour, no "only" and no
+                "but". Whether a large footprint is the look wanted is the
+                owner's call. The warning tone below is for the one case that is
+                a genuine COULD-NOT-MEASURE — a background on screen that is not
+                this document's — never for a number. */}
+            {lit && lens.reason !== null && (
+              <Hint under tone="warning">on the map: cannot say — {lens.reason}</Hint>
+            )}
+            {lit && lens.coverage !== null && (
+              <Hint under>
+                <LensSwatch />highlighted on the map · {coverageSummary(lens.coverage)}
               </Hint>
             )}
             <Row style={{ marginLeft: CONTROL_INSET }}>
@@ -508,6 +584,25 @@ export default function BgAnimBandPanel(): React.ReactElement {
             → slots {staticBase}..{staticBase + tileCount}. The picture at rest does not
             change: phase 0 IS this art, and {fillOption.note}
           </Hint>
+          {/* WHAT THIS RANGE WOULD ACTUALLY TAKE OVER — the one fact no amount
+              of reading the form can give you, and the reason the lens exists.
+              Promotion animates the range's tiles wherever the picture uses
+              them, and the blob is de-duplicated, so a 4-slot candidate can own
+              a thousand cells. Stated neutrally: see the band card above. */}
+          {lensTarget?.kind === 'candidate' && lens.reason !== null && (
+            <Hint under tone="warning">on the map: cannot say — {lens.reason}</Hint>
+          )}
+          {lensTarget?.kind === 'candidate' && lens.coverage !== null && (
+            <Hint under>
+              <LensSwatch />highlighted on the map · {coverageSummary(lens.coverage)}
+            </Hint>
+          )}
+          {lensTarget?.kind !== 'candidate' && (
+            <Hint under>
+              Click a background cell on the map to point this at the art you can see — the map
+              then <LensSwatch />highlights every cell the range would take over.
+            </Hint>
+          )}
           {promoteOff && <Hint under tone="warning">{promoteOff}</Hint>}
         </Group>
 
