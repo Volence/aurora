@@ -750,6 +750,18 @@ defect the parcel exists to fix.
   harness reads `Palette_Buffer` out of the machine over a SECOND client connection.
 - **Subagents NEVER touch `mcp__oracle__*`** — they deadlock. Runtime work is the
   overseer's, in the foreground, or a headless bus script.
+- **`mcp__oracle__*` in this session SPAWNS A PRIVATE EMULATOR by default — it is NOT the window
+  the owner is watching** *(item 38, 2026-08-26; empyrean protocol §7.1 at `5ff8c9f`, the CR-SOCKET
+  ruling under the owner's d-4)*. Two arrangements, and a client MUST know which it is in: **own
+  instance** (the shim starts `oracle-aether <rom> --socket <private mkdtemp path>`; the env order is
+  not consulted) and **attached** (path SELECTED once by the first set of `$ORACLE_SOCKET`,
+  `$EXODUS_SOCKET`, `$XDG_RUNTIME_DIR/oracle.sock`, else `/tmp/oracle.sock`; no step probes).
+  **So a foreground check of the owner's `oracle-frontend --aether` window needs `ORACLE_SOCKET`
+  set to that window's socket** — otherwise every read is of a second, private machine and reads as
+  a clean confident answer about the wrong one. Aurora's `AETHER_CONNECT` attaches by design (it
+  drives the watched emulator) and reports absence rather than spawning — conformant per §7.1's
+  2026-08-26 scope clause. `socket-path.ts` re-checked against §7.1 clause by clause at item 36: the
+  one divergence, exported-but-empty treated as unset, is recorded in §11.19 and not ruled against.
 - Emulators: `oracle-aether <rom>` headless for harnesses; `oracle-frontend <rom>
   --aether` when a human needs to SEE it. Its startup banner's method count is the
   freshness tell — a mismatch between the two binaries means one is stale, not that the
