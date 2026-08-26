@@ -1,6 +1,9 @@
 import { create } from 'zustand';
 import type { Solidity } from '../../core/collision/collision-model';
 import type { ToolId } from '../../core/project/adapter';
+// Type-only: the candidate's shape is owned by the verbs module that turns it
+// into a BandSpec, so the store and the two surfaces cannot disagree on it.
+import type { BandCandidate } from '../providers/band-verbs';
 import type { AnyCommand, S4Level } from '../../core/editing/commands';
 import { chunkIdsAffectedByCommand } from '../../core/editing/chunk-invalidation';
 import type { MapClipboard, PasteLayers } from '../../core/editing/map-clipboard';
@@ -208,7 +211,7 @@ interface EditorState {
    * anything else. A store that clamped would be a third opinion about
    * legality.
    */
-  bandCandidate: { staticBase: number; cols: number; rows: number };
+  bandCandidate: BandCandidate;
 
   /**
    * What the map's BAND LENS is lighting, or null for "nothing marked".
@@ -268,7 +271,7 @@ interface EditorState {
    * moved underneath would put the panel and the canvas on different subjects —
    * the exact split the lift exists to prevent.
    */
-  setBandCandidate: (patch: Partial<{ staticBase: number; cols: number; rows: number }>) => void;
+  setBandCandidate: (patch: Partial<BandCandidate>) => void;
   setBandLensTarget: (target: { kind: 'band'; index: number } | { kind: 'candidate' } | null) => void;
   setMarquee: (marquee: MarqueeState | null) => void;
   setMapClipboard: (clipboard: MapClipboard | null) => void;

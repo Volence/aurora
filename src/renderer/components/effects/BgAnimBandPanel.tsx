@@ -202,12 +202,17 @@ function LensSwatch(): React.ReactElement {
 }
 import type { AnyCommand } from '../../../core/editing/commands';
 import {
-  DEFAULT_DRIVER, DEFAULT_PHASE_FILL, DEFAULT_RATE_SHIFT, addBandCommand, bandBudget,
-  bandRows, clampRateShift, demoteBandCommand, driverOptions, insertUnavailableReason,
-  patternPxFor, phaseFillOptions, promoteBandCommand, promoteUnavailableReason,
+  DEFAULT_DRIVER, DEFAULT_PHASE_FILL, DEFAULT_RATE_SHIFT, bandBudget,
+  bandRows, clampRateShift, demoteBandCommand, driverOptions,
+  patternPxFor, phaseFillOptions,
   rateShiftNote, removeBandCommand, rowChoices,
-  type BandCommandResult, type BandPhaseFill, type BandSpec,
+  type BandCommandResult, type BandPhaseFill,
 } from '../../providers/bg-anim-aeon';
+// The two creation verbs — label, disabled reason, command — derived ONCE and
+// shared with the Effects facet's tool-options bar (parcel B). This panel no
+// longer calls `promoteBandCommand` / `addBandCommand` itself, so the two
+// surfaces cannot run different specs or disagree about why a chip is off.
+import { bandVerbs } from '../../providers/band-verbs';
 
 /** Run a command on the focused aeon document. */
 function run(command: AnyCommand): void {
@@ -261,16 +266,23 @@ export default function BgAnimBandPanel(): React.ReactElement {
   // calls (`resolveBandLens`) so the sentence in this column and the tint on the
   // map cannot describe different sets of cells.
   const lens = resolveBandLens();
-  const [driver, setDriver] = React.useState<string>(DEFAULT_DRIVER);
-  const [explicitDriver, setExplicitDriver] = React.useState(false);
+  // THE REST OF THE FORM IS ON THE CANDIDATE TOO (parcel B). Driver, rate and
+  // phase fill were `React.useState` here, and the Effects facet's tool-options
+  // bar — a sibling — now runs the same two commands, so it has to see the
+  // same spec: the lift `cols`/`rows`/`staticBase` took, for the same reason.
+  // ABSENT IS THE DEFAULT, exactly as before: an omitted `driver` / `rateShift`
+  // leaves the key out of the document so it tracks the consumer, and the
+  // `(default)` options below write `undefined` rather than today's number.
+  const driver = candidate.driver ?? DEFAULT_DRIVER;
+  const explicitDriver = candidate.driver !== undefined;
   // The rate, in the same two-part shape the driver has and for the same reason:
   // "default" is a STATE OF THE DOCUMENT (the key is absent and the file tracks
   // the consumer), not a number to pre-fill the box with. The seed the box takes
   // when an author does switch to a custom rate is the contract's default —
   // derived, never a literal.
-  const [rateShift, setRateShift] = React.useState(DEFAULT_RATE_SHIFT);
-  const [explicitRateShift, setExplicitRateShift] = React.useState(false);
-  const [phaseFill, setPhaseFill] = React.useState<BandPhaseFill>(DEFAULT_PHASE_FILL);
+  const rateShift = candidate.rateShift ?? DEFAULT_RATE_SHIFT;
+  const explicitRateShift = candidate.rateShift !== undefined;
+  const phaseFill: BandPhaseFill = candidate.phaseFill ?? DEFAULT_PHASE_FILL;
   const [refusalText, setRefusalText] = React.useState<string | null>(null);
   const [pendingRemoval, setPendingRemoval] = React.useState<number | null>(null);
 
@@ -291,11 +303,6 @@ export default function BgAnimBandPanel(): React.ReactElement {
     }
   }, [firstPromotableSlot]);
 
-  const spec: BandSpec = {
-    cols, rows: bandRowCount, phaseFill,
-    ...(explicitDriver ? { driver } : {}),
-    ...(explicitRateShift ? { rateShift } : {}),
-  };
   const fillOption = phaseFillOptions().find((o) => o.value === phaseFill)
     ?? phaseFillOptions()[0];
   const tileCount = cols * bandRowCount;
@@ -306,8 +313,11 @@ export default function BgAnimBandPanel(): React.ReactElement {
     run(result.command);
   }
 
-  const promoteOff = promoteUnavailableReason(doc);
-  const insertOff = insertUnavailableReason(doc, cols, bandRowCount);
+  // The spec, the two reasons and the two commands, from the one derivation the
+  // tool-options bar also reads.
+  const verbs = bandVerbs(doc, candidate);
+  const promoteOff = verbs.promote.reason;
+  const insertOff = verbs.add.reason;
 
   return (
     <>
@@ -508,10 +518,7 @@ export default function BgAnimBandPanel(): React.ReactElement {
             title="Which scalar drives this band's step. Every band shifts HORIZONTALLY whichever
                    driver it uses — camera_y does NOT mean vertical motion."
             value={explicitDriver ? driver : ''}
-            onChange={(v) => {
-              if (v === '') { setExplicitDriver(false); return; }
-              setExplicitDriver(true); setDriver(v);
-            }}
+            onChange={(v) => setCandidate({ driver: v === '' ? undefined : v })}
             style={{ flex: 1, minWidth: 0 }}>
             {/* The empty option LEAVES THE KEY OUT, which is the shape the codec
                 prefers: a document that does not spell `driver` tracks whatever the
@@ -544,7 +551,7 @@ export default function BgAnimBandPanel(): React.ReactElement {
                    many bits (step = driver >> rate_shift), so each +1 halves the band's speed.
                    Leave it at (default) to omit the key and track aeon's own default."
             value={explicitRateShift ? 'custom' : ''}
-            onChange={(v) => setExplicitRateShift(v === 'custom')}
+            onChange={(v) => setCandidate({ rateShift: v === 'custom' ? DEFAULT_RATE_SHIFT : undefined })}
             style={{ flex: 1, minWidth: 0 }}>
             {/* Same contract as the driver's empty option: this LEAVES THE KEY OUT. */}
             <option value=""
@@ -565,7 +572,7 @@ export default function BgAnimBandPanel(): React.ReactElement {
               // the contract has no upper bound and inventing one would refuse a
               // value aeon accepts.
               min={0} width={64} value={rateShift}
-              onChange={(n) => setRateShift(clampRateShift(n))} />
+              onChange={(n) => setCandidate({ rateShift: clampRateShift(n) })} />
           )}
         </Field>
         <Hint under>
@@ -579,7 +586,7 @@ export default function BgAnimBandPanel(): React.ReactElement {
             title="phase fill — how banks 1-7 (the contract's pre-shifted phases, selected by
                    step & 7) are derived from the band's phase 0"
             value={phaseFill}
-            onChange={(v) => setPhaseFill(v as BandPhaseFill)}
+            onChange={(v) => setCandidate({ phaseFill: v as BandPhaseFill })}
             style={{ flex: 1, minWidth: 0 }}>
             {phaseFillOptions().map((o) => (
               <option key={o.value} value={o.value} title={o.title}>{o.label}</option>
@@ -597,7 +604,7 @@ export default function BgAnimBandPanel(): React.ReactElement {
               onChange={(n) => setStaticBase(Math.max(0, Math.round(n) || 0))} />
             <Chip disabled={promoteOff !== null}
               title={promoteOff ?? 'Declare this static range animated. The blob does not grow.'}
-              onClick={() => apply(promoteBandCommand(doc, staticBase, spec))}>
+              onClick={() => apply(verbs.promote.run())}>
               Promote
             </Chip>
           </Field>
@@ -635,7 +642,7 @@ export default function BgAnimBandPanel(): React.ReactElement {
           <Field label="Blank band">
             <Chip disabled={insertOff !== null}
               title={insertOff ?? `Add a blank ${cols}x${bandRowCount} band (${tileCount} tiles)`}
-              onClick={() => apply(addBandCommand(doc, spec))}>
+              onClick={() => apply(verbs.add.run())}>
               Add band
             </Chip>
           </Field>
