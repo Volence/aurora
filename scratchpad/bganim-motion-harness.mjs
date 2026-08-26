@@ -69,7 +69,7 @@
 // Run (live project):      AEON_LIVE=1 node scratchpad/bganim-motion-harness.mjs
 
 import { spawn } from 'node:child_process';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as http from 'node:http';
@@ -77,7 +77,15 @@ import { AEON, buildFixture, documentFacts } from './bganim-preview-fixture.mjs'
 
 const PORT = Number(process.env.PORT ?? 9397);
 const ROOT = process.env.AURORA_ROOT ?? dirname(dirname(fileURLToPath(import.meta.url)));
-const ELECTRON = process.env.ELECTRON_BIN ?? `${ROOT}/node_modules/.bin/electron`;
+// A git WORKTREE has no `node_modules` of its own — module resolution walks up
+// to the main checkout — so `${ROOT}/node_modules/.bin/electron` does not exist
+// there and the spawn failed with "CDP target never appeared", which reads like
+// a hung app rather than a missing binary. Same fallback the effects-column
+// harness already carries. (Found running this from a worktree, item 45.)
+const ELECTRON = process.env.ELECTRON_BIN
+  ?? (existsSync(`${ROOT}/node_modules/.bin/electron`)
+    ? `${ROOT}/node_modules/.bin/electron`
+    : '/home/volence/sonic_hacks/aurora/node_modules/.bin/electron');
 const SHOTS = `${ROOT}/scratchpad/shots-bganim-motion`;
 mkdirSync(SHOTS, { recursive: true });
 
@@ -427,34 +435,97 @@ async function main() {
       throw new Error('the probe read no pixels — every row below would be vacuous');
     }
 
-    // ---- 1b. THE LABEL IS ON SCREEN. ------------------------------------
+    // ---- 1b. THE LABEL IS REACHABLE. ------------------------------------
     // The preview's honesty label is a deliverable, not decoration: an
     // approximate preview that does not say WHICH four things are approximate
     // teaches an author to distrust the parts that are exact.
+    //
+    // ⚠ IT IS BEHIND A CLICK NOW (ROADMAP item 45). The `Band preview` section
+    // was folded into `BG animation bands` and the four sentences — the tallest
+    // thing left in a column that overflowed — sit behind a `why approximate?`
+    // chip. So this row CLICKS IT, and asserts absent-then-present: absent-only
+    // is a deleted label, and present-without-clicking would let the row pass on
+    // text some other panel happened to carry.
+    //
     // textContent, NOT innerText: innerText is layout-dependent and returned an
     // empty string for the whole body in this headless window, which made an
     // earlier revision of these two rows report a mounted, correct note as
     // missing. textContent sees the DOM whatever the layout is doing.
-    const bodyText = await c.evalExpr(String.raw`(document.body.textContent || '').replace(/\s+/g, ' ')`);
+    const readBody = () => c.evalExpr(
+      String.raw`(document.body.textContent || '').replace(/\s+/g, ' ')`);
     const labelBits = [
       'The preview is approximate',
       "the editor's wall clock",
       'clamps its camera to the level',
       'The ROM is the truth channel',
     ];
-    check('1b', 'the Effects column carries the approximate label, and it NAMES its four caveats',
-      labelBits.every((b) => bodyText.includes(b)),
-      labelBits.map((b) => `${bodyText.includes(b) ? 'ok' : 'MISSING'}: ${b}`).join(' | '));
-    // Both bands report themselves as previewing, with their resolved driver and
-    // rate — the readout an author judges rate_shift against.
+    const beforeChip = await readBody();
+    const openedCaveats = await c.evalExpr(clickByText('/why approximate/i'));
+    await sleep(400);
+    const bodyText = await readBody();
+    const leaked = labelBits.filter((b) => beforeChip.includes(b));
+    check('1b', 'the approximate label is one click away in the Effects column, and it NAMES '
+      + 'its four caveats',
+      openedCaveats === true && labelBits.every((b) => bodyText.includes(b)) && leaked.length === 0,
+      `chip -> ${JSON.stringify(openedCaveats)}; `
+      + labelBits.map((b) => `${bodyText.includes(b) ? 'ok' : 'MISSING'}: ${b}`).join(' | ')
+      + (leaked.length ? `; ON SCREEN BEFORE THE CLICK: ${JSON.stringify(leaked)}` : ''));
+
+    // ---- 1c. EVERY BAND CARD REPORTS ITSELF AS PREVIEWING. ---------------
+    // Both bands report their resolved driver, rate and cell count — the
+    // readout an author judges rate_shift against.
+    //
     // THE LICENCE, and on the live target this is the whole acceptance test:
-    // before d-12 the note said "Not previewing" here, because the band named
-    // slots in a blob the canvas was not painting.
-    check('1c', `the note reports ${camera ? 'both bands' : 'the band'} as PREVIEWING, with the `
-      + 'resolved driver and cell count — no refusal',
-      /Band 0 .* timer/.test(bodyText) && (!camera || /Band 1 .* camera_x/.test(bodyText))
-      && /background cells/.test(bodyText) && !/Not previewing/.test(bodyText),
-      bodyText.slice(bodyText.indexOf('Band preview'), bodyText.indexOf('Band preview') + 320));
+    // before d-12 this said "Not previewing", because the band named slots in a
+    // blob the canvas was not painting.
+    //
+    // ⚠ SCOPED TO THE CARD, NOT TO document.body (ROADMAP item 45). The old
+    // version tested `/Band 0 .* timer/` against the whole page, which worked
+    // only because the deleted `Band preview` section printed "Band 0 · 8x4 ·
+    // timer" as one run of text. The band card prints "Band 0" as a Field label
+    // and its driver three hints lower, so a whole-page regex would now be
+    // asking whether the word "timer" appears ANYWHERE after the word "Band 0" —
+    // green for the wrong reason on any page that mentions either. This reads
+    // each card's own text instead.
+    // THE CARD IS FOUND BY CLIMBING FROM ITS TITLE, not by matching its own
+    // text: `textContent` glues the title span to the geometry span beside it
+    // ("Band 08x4"), so no anchored regex over a container's text can find a
+    // card. The climb stops at the first ancestor that carries the word
+    // `driver`, which is the card and never the section body — and `found`
+    // reports a climb that hit nothing, so a restructure reads as "could not
+    // measure" rather than as an empty pass.
+    const cards = await c.json(String.raw`
+(() => {
+  const norm = (el) => (el.textContent || '').replace(/\s+/g, ' ').trim();
+  const RE = /^Band (\d+)$/;
+  return [...document.querySelectorAll('span')]
+    .filter((s) => RE.test(norm(s)))
+    .map((s) => {
+      let el = s, card = null;
+      for (let i = 0; i < 6 && el.parentElement; i++) {
+        el = el.parentElement;
+        // "driver " WITH ITS TRAILING SPACE, not \bdriver\b: textContent glues
+        // sibling nodes together, so the card reads "...8 banksdriver timer..."
+        // and there is no word boundary before the d. The first revision of this
+        // row used \b and reported "NO CARD FOUND" against a perfectly good card
+        // — bar 2c, the matcher was wrong, not the subject.
+        if (/driver /.test(norm(el))) { card = el; break; }
+      }
+      return { index: Number(RE.exec(norm(s))[1]), found: !!card, text: norm(card || s) };
+    })
+    .sort((a, b) => a.index - b.index);
+})()`);
+    const cardText = (i) => (cards.find((x) => x.index === i && x.found) || { text: '' }).text;
+    const previews = (i, driver) => new RegExp(`driver\\s*${driver}`).test(cardText(i))
+      && /background cells/.test(cardText(i)) && !/Not previewing/.test(cardText(i));
+    check('1c', `${camera ? 'both band cards report' : 'the band card reports'} PREVIEWING, with `
+      + 'the resolved driver and cell count — no refusal',
+      cards.length > 0 && cards.every((x) => x.found)
+      && previews(0, 'timer') && (!camera || previews(1, 'camera_x')),
+      cards.length
+        ? cards.map((x) => `[${x.index}]${x.found ? '' : ' NO CARD FOUND'} ${x.text.slice(0, 240)}`)
+          .join('  ||  ')
+        : 'NO BAND CARD ON SCREEN — this row would be vacuous');
 
     // ---- 2. THE IDLE PROPERTY, WITH PLAYBACK OFF. ------------------------
     // The property the MapViewport measurement established and this parcel
