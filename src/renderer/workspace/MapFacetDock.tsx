@@ -21,6 +21,8 @@ const TOOL_ICONS: Record<EditorTool, React.FC<{ size?: number }>> = {
   // The eyedropper: the mark READS the cell under the cursor (its layout word)
   // and points the lens at what it names — a pick, not a paint.
   'mark-band': Icons.IconEyedrop,
+  // The dither grid: a repeating cell pattern, which is what the stamp lays.
+  'stamp-band': Icons.IconDither,
 };
 
 export function MapFacetDock({ facet }: { facet: FacetCapability }) {
