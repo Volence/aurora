@@ -21,6 +21,7 @@ import { serializeBgOverride } from '../core/formats/bg-override/bg-override';
 import { resolveDisplayedBg } from './providers/bganim-preview-aeon';
 import { lastGuideReport } from './canvas/effects-guides';
 import type { GuideReport } from './canvas/effects-guides';
+import { lastScreenFrameReport, type ScreenFrameReport } from './canvas/screen-frame';
 import { lastBandLensReport, lastBandMarkReport } from './canvas/band-lens';
 import type { BandLensReport, BandMarkReport } from './canvas/band-lens';
 import { useAetherStore } from './state/aetherStore';
@@ -416,6 +417,12 @@ interface AeonProbeApi {
    */
   guides(): GuideReport;
   /**
+   * THE SCREEN FRAME AS THE LAST REPAINT DREW IT (triage 2026-08-26 row G).
+   * Same publish-not-recompute contract as `guides()`; `active: false` is what
+   * the View toggle OFF reports, and `paints` proves a repaint happened.
+   */
+  screenFrame(): ScreenFrameReport;
+  /**
    * THE BAND LENS AS THE LAST REPAINT DREW IT (ROADMAP item 43 part 2).
    *
    * Same contract as `guides()` and for the same reason: a PUBLISH from the end
@@ -655,6 +662,7 @@ function installAeonProbe(): AeonProbeApi {
     selectedScene: () => useEditorStore.getState().selectedEffectsSceneId,
     selectScene: (id) => useEditorStore.getState().setSelectedEffectsSceneId(id),
     guides: () => lastGuideReport(),
+    screenFrame: () => lastScreenFrameReport(),
     bandLens: () => lastBandLensReport(),
     bandMark: () => lastBandMarkReport(),
     bandLensTarget: () => useEditorStore.getState().bandLensTarget,

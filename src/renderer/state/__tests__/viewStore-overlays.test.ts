@@ -103,3 +103,25 @@ describe('OVERLAY_KEYS_BY_ENGINE', () => {
     expect(defaults().playAnimatedArt).toBe(false);
   });
 });
+
+describe('the screen frame (triage 2026-08-26 row G)', () => {
+  it('is OFF by default — a reference the author asks for, like the lenses', () => {
+    expect(defaults().showScreenFrame).toBe(false);
+  });
+  it('toggles through the same toggleOverlay the View menu uses', () => {
+    useViewStore.getState().toggleOverlay('showScreenFrame');
+    expect(defaults().showScreenFrame).toBe(true);
+    useViewStore.getState().toggleOverlay('showScreenFrame');
+    expect(defaults().showScreenFrame).toBe(false);
+  });
+  it('is reachable from aeon\'s View menu', () => {
+    expect(OVERLAY_KEYS_BY_ENGINE.aeon).toContain('showScreenFrame');
+  });
+  it('keeps its anchor in the store, clamped to the world origin, for the session', () => {
+    expect(useViewStore.getState().screenFrame).toEqual({ x: 0, y: 0 });
+    useViewStore.getState().setScreenFrame(640, 224);
+    expect(useViewStore.getState().screenFrame).toEqual({ x: 640, y: 224 });
+    useViewStore.getState().setScreenFrame(-5, -5);
+    expect(useViewStore.getState().screenFrame).toEqual({ x: 0, y: 0 });
+  });
+});
