@@ -173,6 +173,19 @@ export const EFFECTS_LAYER_COUNT = Object.freeze((() => {
 export const EFFECTS_WORLD_Y_BOUNDS = boundsAt('$defs', 'layer', 'properties', 'world_y');
 
 /**
+ * `vsplit.at` is a PLANE-B ROW, 0..511 (§2.2) — read out of the `oneOf`'s
+ * object branch, the same index rule `$defs/factor` uses above (branch 0 is the
+ * `"none"` const, branch 1 the `{at}` object). The engine's own guard is
+ * `split_off >= 0 && split_off < 512` (aeon engine/level/scene_dsl.emp,
+ * `layer()`): VSRAM is read modulo the plane's 512-row height, so a wider or
+ * negative value is not a bigger scroll, it is silently one of the rows that
+ * already had a spelling. The clamp in the provider is the bound (ROADMAP item
+ * 37: a NumberField's min/max only style the spinner).
+ */
+export const EFFECTS_VSPLIT_AT_BOUNDS =
+  boundsAt('$defs', 'layer', 'properties', 'vsplit', 'oneOf', 1, 'properties', 'at');
+
+/**
  * `v_factor` is a RIGHT-SHIFT AMOUNT, 0..15 — read out of the schema, not typed.
  *
  * NOT A FACTOR, despite the name. `fa`/`fb` are packed `$defs/factor` values

@@ -32,7 +32,7 @@ import {
   EFFECTS_FACTOR_NAMES, EFFECTS_PACKED_FACTOR_BOUNDS, EFFECTS_LAYER_COUNT,
   EFFECTS_WORLD_Y_BOUNDS, EFFECTS_V_FACTOR_BOUNDS, EFFECTS_V_CENTER_BOUNDS,
   EFFECTS_V_OFFSET_BOUNDS, EFFECTS_V_CENTER_DEFAULT, EFFECTS_V_OFFSET_DEFAULT,
-  EFFECTS_V_FACTOR_LOCK,
+  EFFECTS_V_FACTOR_LOCK, EFFECTS_VSPLIT_AT_BOUNDS,
   WAVE1_PRECISION_VALUES,
   EFFECTS_TRANSITION_VALUES,
   cloneEffectsScene, factorLabel, isNamedFactor, newEffectsLayer, newEffectsScene,
@@ -526,14 +526,47 @@ export function removeLayerCommand(
   });
 }
 
-/** Set one field of one layer. */
-export function setLayerFieldCommand<K extends 'world_y' | 'fa' | 'fb'>(
-  library: EffectsSceneLibrary, id: string, index: number, field: K, value: EffectsLayer[K],
+/** The layer keys the card has a control for. `curve`/`vsplit` are parcel H. */
+export type LayerCardKey = 'world_y' | 'fa' | 'fb' | 'curve' | 'vsplit';
+/** The optional ones, where the control has a "none" state that CLEARS the key. */
+export type LayerCardOptionalKey = 'curve' | 'vsplit';
+const LAYER_CARD_OPTIONAL: ReadonlySet<string> = new Set<LayerCardOptionalKey>(['curve', 'vsplit']);
+
+/**
+ * Set one field of one layer.
+ *
+ * For `curve` / `vsplit`, `undefined` means the control's "none" state, and it
+ * DELETES the key rather than writing `"none"` — the same rule
+ * setSceneFieldCommand states: the schema's default for both is `"none"`, so an
+ * absent key already means it, and writing the word would turn a file that
+ * never carried the key into a diff (§6 hazard 1, from the other side).
+ *
+ * A layer whose file spells the key as an explicit `"none"` is LEFT AS SPELLED
+ * on clear: it already means none, so the gesture is a no-op (null, no undo
+ * slot), and the spelling on disk survives the next write untouched. Only a
+ * SET key is ever rewritten.
+ */
+export function setLayerFieldCommand<K extends LayerCardKey>(
+  library: EffectsSceneLibrary, id: string, index: number, field: K,
+  value: K extends LayerCardOptionalKey ? EffectsLayer[K] | undefined : EffectsLayer[K],
 ): SetEffectsSceneCommand | null {
   return editSceneCommand(library, id, `Layer ${index} ${field}`, (scene) => {
     const layer = scene.layers[index];
-    if (layer) layer[field] = value;
+    if (!layer) return;
+    if (value === undefined) {
+      // Only an optional key can be cleared; a required one stays as it was.
+      if (LAYER_CARD_OPTIONAL.has(field) && layer[field] !== 'none') delete layer[field];
+      return;
+    }
+    layer[field] = value as EffectsLayer[K];
   });
+}
+
+/** Clamp a layer's `vsplit.at` to the Plane-B row span the schema declares (0..511). */
+export function clampVSplitAt(value: number): number {
+  const { min, max } = EFFECTS_VSPLIT_AT_BOUNDS;
+  if (!Number.isFinite(value)) return min;
+  return Math.min(max, Math.max(min, Math.round(value)));
 }
 
 /**
@@ -622,4 +655,5 @@ export const SCENE_FORM_CHOICES = {
 export {
   factorLabel, EFFECTS_LAYER_COUNT, EFFECTS_PACKED_FACTOR_BOUNDS, EFFECTS_WORLD_Y_BOUNDS,
   EFFECTS_V_FACTOR_BOUNDS, EFFECTS_V_CENTER_BOUNDS, EFFECTS_V_OFFSET_BOUNDS,
+  EFFECTS_VSPLIT_AT_BOUNDS,
 };
