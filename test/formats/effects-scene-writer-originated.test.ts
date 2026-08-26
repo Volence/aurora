@@ -128,10 +128,11 @@ describe('writer-originated effects scene fixture', () => {
   /**
    * A NECESSARY CONDITION for "this came out of the wave-1 Effects panel": it
    * carries no key that panel has no control for. `anchor`, `budget_class`,
-   * `deform*`, `curve`, `vsplit`, `dsa/dsb`, `phase`, `enabled`,
-   * `left_column_mask`, `v_deform`, `v_factor_fg` are all schema-legal and all
-   * unreachable from the UI today, so any of them appearing here means the file
-   * did not come from a session.
+   * `deform*`, `dsa/dsb`, `phase`, `enabled`, `left_column_mask`, `v_deform`,
+   * `v_factor_fg` are all schema-legal and all unreachable from the UI today, so
+   * any of them appearing here means the file did not come from a session.
+   * (`curve` and `vsplit` became authorable in parcel H; the fixture predates
+   * that and carries neither, which the set below still permits.)
    *
    * It is NOT a sufficient condition. A hand-written document restricted to these
    * keys passes. Said again because this is the assertion most likely to be
@@ -147,7 +148,11 @@ describe('writer-originated effects scene fixture', () => {
     expect(sceneKeys.has('precision')).toBe(true);
     expect(sceneKeys.has('budget_class')).toBe(false);
     expect(layerKeys.has('world_y')).toBe(true);
-    expect(layerKeys.has('vsplit')).toBe(false);
+    // Parcel H gave the card curve/vsplit controls, so those two are authorable
+    // now; `deform` is the layer key that still is not (wave 2).
+    expect(layerKeys.has('curve')).toBe(true);
+    expect(layerKeys.has('vsplit')).toBe(true);
+    expect(layerKeys.has('deform')).toBe(false);
     // And the set genuinely discriminates: the schema offers strictly more.
     const schemaKeys = Object.keys(EFFECTS_SCENE_SCHEMA.properties as Record<string, unknown>);
     expect(schemaKeys.filter(k => !sceneKeys.has(k)).length).toBeGreaterThan(0);

@@ -26,13 +26,13 @@ import type {
 import {
   EFFECTS_LAYER_DEFAULTS,
   type EffectsScene, type EffectsSceneLibrary, type EffectsFactor, type EffectsLayer,
-  type EffectsTableRef,
+  type EffectsTableRef, type EffectsCurve, type EffectsVSplit,
 } from '../../core/formats/effects/scene';
 import {
   EFFECTS_FACTOR_NAMES, EFFECTS_PACKED_FACTOR_BOUNDS, EFFECTS_LAYER_COUNT,
   EFFECTS_WORLD_Y_BOUNDS, EFFECTS_V_FACTOR_BOUNDS, EFFECTS_V_CENTER_BOUNDS,
   EFFECTS_V_OFFSET_BOUNDS, EFFECTS_V_CENTER_DEFAULT, EFFECTS_V_OFFSET_DEFAULT,
-  EFFECTS_V_FACTOR_LOCK,
+  EFFECTS_V_FACTOR_LOCK, EFFECTS_VSPLIT_AT_BOUNDS,
   WAVE1_PRECISION_VALUES,
   EFFECTS_TRANSITION_VALUES,
   cloneEffectsScene, factorLabel, isNamedFactor, newEffectsLayer, newEffectsScene,
@@ -101,6 +101,83 @@ export const PLANE_FACTOR_ROWS = Object.freeze({
 export const PLANE_FACTOR_HINT =
   'fraction of camera movement this strip scrolls; 1 = with the camera';
 
+// ---------------------------------------------------------------------------
+// curve.to and vsplit.at — parcel H (triage 2026-08-26 §A.7, §B row H)
+// ---------------------------------------------------------------------------
+//
+// What the engine does with each (schema §2.2; aeon engine/level/scene_dsl.emp
+// SceneCurve / SceneVSplit banners):
+//   curve   Plane B's scroll factor RAMPS across the layer, from the layer's own
+//           `fb` at its top to `curve.to` at its bottom. `to` IS a factor
+//           (§2.3), so the control is the same picker `fb` uses, plus a none
+//           state. The engine refuses `to == fb` (a ramp that goes nowhere,
+//           layer() guard 4) — surfaced here as ADVICE, never enforced.
+//   vsplit  from this layer's top DOWN, Plane B's whole-plane vertical scroll
+//           is `at` — one raster fire. `at` is a Plane-B ROW and the plane wraps
+//           at 512, so 0..511 (EFFECTS_VSPLIT_AT_BOUNDS, from the schema).
+// Both were read-only on the card (parcel E) and are controls now; the extras
+// line no longer lists them, so a value is said once.
+
+/** The curve row: label, title, the one hint, and the word for its none state. */
+export const LAYER_CURVE_ROW = Object.freeze({
+  key: 'curve' as const,
+  label: 'Plane B curve to',
+  title: 'curve.to — the Plane B factor at this strip\'s bottom; none keeps fb the whole way down',
+  hint: "Plane B speed ramps from fb at this strip's top to this value at its bottom",
+  none: 'none',
+});
+
+/** The vsplit row: label, title (with the schema's bound), hint, and its two states. */
+export const LAYER_VSPLIT_ROW = Object.freeze({
+  key: 'vsplit' as const,
+  label: 'Plane B split at',
+  title: `vsplit.at — the Plane B row scrolled to from this strip down `
+    + `(${EFFECTS_VSPLIT_AT_BOUNDS.min}..${EFFECTS_VSPLIT_AT_BOUNDS.max}); none leaves the plane alone`,
+  hint: 'from this strip down, Plane B scrolls vertically as a whole',
+  none: 'none',
+  at: 'row',
+});
+
+/** The curve picker's value: the far-end factor, or none (absent and explicit "none" alike). */
+export function curveFieldValue(layer: Pick<EffectsLayer, 'curve'>): EffectsFactor | 'none' {
+  const c = layer.curve;
+  return c === undefined || c === 'none' ? 'none' : c.to;
+}
+
+/** What the picker's choice writes: `undefined` clears the key (setLayerFieldCommand), else `{to}`. */
+export function curveFromField(f: EffectsFactor | 'none'): EffectsCurve | undefined {
+  return f === 'none' ? undefined : { to: f };
+}
+
+/** The vsplit spinner's value, or null when the layer has no split. */
+export function vsplitFieldValue(layer: Pick<EffectsLayer, 'vsplit'>): number | null {
+  const v = layer.vsplit;
+  return v === undefined || v === 'none' ? null : v.at;
+}
+
+/**
+ * Turning the split on or off. Off clears the key. On seeds the strip's own
+ * top clamped into the plane: "from this strip down" is the sentence, and on
+ * a locked scene `world_y` already IS a plane line, so the row under the
+ * strip's top is the least surprising first value to then tune.
+ */
+export function vsplitFromToggle(on: boolean, layer: Pick<EffectsLayer, 'world_y'>): EffectsVSplit | undefined {
+  return on ? { at: clampVSplitAt(layer.world_y) } : undefined;
+}
+
+/**
+ * Advice, not enforcement: the engine's layer() guard 4 refuses a curve whose
+ * far end equals `fb` ("the ramp's two ends are equal and the emitted HScroll
+ * is byte-identical to the flat path"). Equality is by value, so a packed
+ * triple spelled twice is caught too.
+ */
+export function curveAdvisory(layer: Pick<EffectsLayer, 'fb' | 'curve'>): string | null {
+  const to = curveFieldValue(layer);
+  if (to === 'none') return null;
+  if (JSON.stringify(to) !== JSON.stringify(layer.fb)) return null;
+  return `curve to ${factorLabel(to)} is the same factor as Plane B — the ramp goes nowhere and the build refuses it`;
+}
+
 /** Which option is selected for a factor that may be either form. */
 export function factorSelectValue(f: EffectsFactor): string {
   return isNamedFactor(f) ? f : CUSTOM_FACTOR_VALUE;
@@ -119,6 +196,30 @@ export function factorFromSelect(value: string, current: EffectsFactor): Effects
   if (value !== CUSTOM_FACTOR_VALUE) return value as EffectsFactor;
   if (!isNamedFactor(current)) return current;
   return { s1: EFFECTS_PACKED_FACTOR_BOUNDS.s1.min, s2: EFFECTS_PACKED_FACTOR_BOUNDS.s2.max, op: 0 };
+}
+
+/**
+ * The sentinel a factor `<select>` WITH A NONE STATE uses for "none".
+ *
+ * Same argument as CUSTOM_FACTOR_VALUE: not a `FACTOR_*` name, and not the
+ * custom sentinel either (asserted in the tests). Only the curve picker has a
+ * none state — `fa`/`fb` are required and never offer it.
+ */
+export const NONE_FACTOR_VALUE = '__none__';
+
+/** `factorSelectValue`, for a field that may also be none. */
+export function factorFieldSelectValue(f: EffectsFactor | 'none'): string {
+  return f === 'none' ? NONE_FACTOR_VALUE : factorSelectValue(f);
+}
+
+/**
+ * `factorFromSelect`, for a field that may also be none. Picking custom from
+ * the none state has no packed triple to keep, so it seeds the same
+ * single-term identity a named factor would (`factorFromSelect`'s rule).
+ */
+export function factorFieldFromSelect(value: string, current: EffectsFactor | 'none'): EffectsFactor | 'none' {
+  if (value === NONE_FACTOR_VALUE) return 'none';
+  return factorFromSelect(value, current === 'none' ? EFFECTS_FACTOR_NAMES[0] : current);
 }
 
 /** Clamp a packed-factor field to the schema's range for it. */
@@ -526,14 +627,47 @@ export function removeLayerCommand(
   });
 }
 
-/** Set one field of one layer. */
-export function setLayerFieldCommand<K extends 'world_y' | 'fa' | 'fb'>(
-  library: EffectsSceneLibrary, id: string, index: number, field: K, value: EffectsLayer[K],
+/** The layer keys the card has a control for. `curve`/`vsplit` are parcel H. */
+export type LayerCardKey = 'world_y' | 'fa' | 'fb' | 'curve' | 'vsplit';
+/** The optional ones, where the control has a "none" state that CLEARS the key. */
+export type LayerCardOptionalKey = 'curve' | 'vsplit';
+const LAYER_CARD_OPTIONAL: ReadonlySet<string> = new Set<LayerCardOptionalKey>(['curve', 'vsplit']);
+
+/**
+ * Set one field of one layer.
+ *
+ * For `curve` / `vsplit`, `undefined` means the control's "none" state, and it
+ * DELETES the key rather than writing `"none"` — the same rule
+ * setSceneFieldCommand states: the schema's default for both is `"none"`, so an
+ * absent key already means it, and writing the word would turn a file that
+ * never carried the key into a diff (§6 hazard 1, from the other side).
+ *
+ * A layer whose file spells the key as an explicit `"none"` is LEFT AS SPELLED
+ * on clear: it already means none, so the gesture is a no-op (null, no undo
+ * slot), and the spelling on disk survives the next write untouched. Only a
+ * SET key is ever rewritten.
+ */
+export function setLayerFieldCommand<K extends LayerCardKey>(
+  library: EffectsSceneLibrary, id: string, index: number, field: K,
+  value: K extends LayerCardOptionalKey ? EffectsLayer[K] | undefined : EffectsLayer[K],
 ): SetEffectsSceneCommand | null {
   return editSceneCommand(library, id, `Layer ${index} ${field}`, (scene) => {
     const layer = scene.layers[index];
-    if (layer) layer[field] = value;
+    if (!layer) return;
+    if (value === undefined) {
+      // Only an optional key can be cleared; a required one stays as it was.
+      if (LAYER_CARD_OPTIONAL.has(field) && layer[field] !== 'none') delete layer[field];
+      return;
+    }
+    layer[field] = value as EffectsLayer[K];
   });
+}
+
+/** Clamp a layer's `vsplit.at` to the Plane-B row span the schema declares (0..511). */
+export function clampVSplitAt(value: number): number {
+  const { min, max } = EFFECTS_VSPLIT_AT_BOUNDS;
+  if (!Number.isFinite(value)) return min;
+  return Math.min(max, Math.max(min, Math.round(value)));
 }
 
 /**
@@ -564,11 +698,12 @@ export function setSceneFieldCommand<K extends 'name' | 'v_factor' | 'v_center' 
 // carry the curve the owner was looking at and the UI show nothing setting it.
 // This is the read-only answer: one short descriptor per non-default key, in
 // schema key order, and NOTHING for a default so a plain layer gets no line.
-// Controls for these are parcel H; this deliberately builds none.
+// `curve` and `vsplit` LEFT this line in parcel H, when they got controls: a
+// value the card edits two rows up is not repeated here.
 
 export interface LayerExtra {
   /** The §2.2 key the descriptor is about. */
-  key: 'dsa' | 'dsb' | 'phase' | 'enabled' | 'deform' | 'curve' | 'vsplit';
+  key: 'dsa' | 'dsb' | 'phase' | 'enabled' | 'deform';
   /** The descriptor as the card prints it. */
   text: string;
 }
@@ -596,14 +731,6 @@ export function layerExtras(layer: EffectsLayer): LayerExtra[] {
   if (deform !== undefined && deform !== 'none') {
     out.push({ key: 'deform', text: `deform: own ${tableRefLabel(deform.own.table)}` });
   }
-  const curve = layer.curve;
-  if (curve !== undefined && curve !== 'none') {
-    out.push({ key: 'curve', text: `curve → ${factorLabel(curve.to)}` });
-  }
-  const vsplit = layer.vsplit;
-  if (vsplit !== undefined && vsplit !== 'none') {
-    out.push({ key: 'vsplit', text: `vsplit at ${vsplit.at}` });
-  }
   return out;
 }
 
@@ -622,4 +749,5 @@ export const SCENE_FORM_CHOICES = {
 export {
   factorLabel, EFFECTS_LAYER_COUNT, EFFECTS_PACKED_FACTOR_BOUNDS, EFFECTS_WORLD_Y_BOUNDS,
   EFFECTS_V_FACTOR_BOUNDS, EFFECTS_V_CENTER_BOUNDS, EFFECTS_V_OFFSET_BOUNDS,
+  EFFECTS_VSPLIT_AT_BOUNDS,
 };
