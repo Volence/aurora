@@ -11,11 +11,21 @@
       "tools/test_bg_emit.py — TestBgAnimBandCeiling + TestBgAnimBandCoherence (blob dd46fdf1893798d406f253a502550aadc3969d4f)",
       "engine/level/bg_anim.emp — the runtime (blob 3954cea3d7f18b0856ea78da5965e5804d7321ed)",
       "engine/system/constants.emp — the ceiling's sizing authority (blob 41c6b577454581cb149d8ea090fa2231fe177f2b)",
-      "tools/vram_map.py — generated from games/sonic4/vram.toml (blob afd8a47ed0fc904268f67b09e4b8d419d3312a62)"
+      "tools/vram_map.py — generated from games/sonic4/vram.toml (blob afd8a47ed0fc904268f67b09e4b8d419d3312a62)",
+      "tools/regenerate-level.sh — the caller, which is what makes OUT_DIR project-root-relative (blob e80c9b00023d8c750ff85b1f6828ab84567fdfc7)"
     ],
     "empyrean": "docs/AURORA_EFFECTS_SCHEMA.md §5 / §5.1 / §5.2 at empyrean 8f3fbf1 — the writer-normative half and the sole-writer ruling"
   },
   "path": "games/sonic4/data/editor_bg_override.json",
+  "outputDir": {
+    "value": "games/sonic4/data/generated/ojz/act1",
+    "read": "2026-08-26 — added at the SAME pinned commit 1ee8f8e6… and the SAME blob 5cef80aa… the rest of this file was read from, verified byte-for-byte with `git -C ../aeon show <commit>:tools/inject_editor_bg.py`. Not a re-vendoring: no other value in this file moved.",
+    "why": "THE ACT BINDING, and the one fact that says WHICH act this per-GAME document governs. The consumer reads one input file and writes zone_bg.bin / bg_tiles.bin / bg_anim.emp / bg_anim_banks.bin into ONE hardcoded directory, so the document describes exactly the act whose generated data lives there — not every act in the project. Nothing inside the document names an act; this literal is the whole of the binding, which is why it is vendored here rather than inferred. Aurora matches it against project.json's per-act `stripPath` (the same project-root-relative directory) and treats a project whose acts point elsewhere as having NO overridden act — the safe direction, since the document then governs nothing Aurora is showing. SEAM, reported to aeon: the pairing is a coincidence of two hardcodes, one per repo. Closing it means aeon deriving OUT_DIR from project.json (or naming the act in the document) rather than both sides spelling the same path.",
+    "authorities": [
+      "aeon tools/inject_editor_bg.py — `OUT_DIR = os.path.join(os.path.dirname(__file__), '..', 'games', 'sonic4', 'data', 'generated', 'ojz', 'act1')`, and every write in `main()` is `os.path.join(OUT_DIR, ...)`: zone_bg.bin, bg_tiles.bin, bg_anim.emp, bg_anim_banks.bin, ojz_palette.bin",
+      "aeon tools/regenerate-level.sh — `if [[ -f games/sonic4/data/editor_bg_override.json ]]; then python3 \"${TOOLS}/inject_editor_bg.py\"; fi`, run with the repo root as cwd, which is what makes OUT_DIR project-root-relative"
+    ]
+  },
 
   "constants": {
     "BGANIM_MAX_BANDS": {

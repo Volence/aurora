@@ -267,6 +267,23 @@ export interface Act {
    * untouched; there is no act-level assignment UI yet.
    */
   sceneRef: string | null;
+  /**
+   * The act's GENERATED-DATA directory — project.json's `stripPath`, verbatim
+   * and project-root-relative, or null when the act declares none.
+   *
+   * A plain fact about the act, not a verdict, and it is on the model for one
+   * reason: it is the only thing that binds the per-GAME BG override document
+   * (`{dataRoot}editor_bg_override.json`) to a particular ACT. aeon's
+   * `inject_editor_bg.py` reads that one file and writes `zone_bg.bin` /
+   * `bg_tiles.bin` into ONE hardcoded directory; the act that owns that
+   * directory is the act the override governs, and every other act keeps its
+   * library / act-default background. `actBindsBgOverride` (core/formats/
+   * bg-override/bg-override-binding.ts) is the one reader.
+   *
+   * Aurora does not WRITE this key — the save re-serialises the raw parsed
+   * project.json, exactly as it does for `sceneRef`.
+   */
+  stripPath: string | null;
 }
 
 export interface Zone {

@@ -22,6 +22,7 @@ import {
   ROUND_TRIPPED_KEYS,
   LEGACY_ANIM_KEY,
   BG_OVERRIDE_CONSUMER_PATH,
+  BG_OVERRIDE_CONSUMER_OUT_DIR,
 } from '../../src/core/formats/bg-override/bg-override';
 // The ONE number this repo genuinely holds twice — see the row that pins it.
 import { BG_TILE_BASE_SLOT as LOADER_BG_TILE_BASE_SLOT } from '../../src/core/formats/bg-tiles';
@@ -50,13 +51,21 @@ import { BG_TILE_BASE_SLOT as LOADER_BG_TILE_BASE_SLOT } from '../../src/core/fo
  * tools/EFFECTS_CONSUMER_CONTRACT.md, tools/inject_editor_bg.py,
  * tools/bg_override_io.py, tools/test_bg_emit.py, tools/vram_map.py,
  * engine/level/bg_anim.emp and engine/system/constants.emp.
+ *
+ * EXTENDED 2026-08-26 with `outputDir` — the consumer's hardcoded OUTPUT
+ * directory, which is the whole of the answer to "which act does this per-game
+ * document govern?" (docs/decisions.jsonl d-12). NOT a re-vendoring: it was read
+ * at the SAME commit and the SAME blob (tools/inject_editor_bg.py
+ * 5cef80aaac156a7627ab119c06d6d846f450ca40, verified with `git -C ../aeon show`),
+ * and no other value in the file moved. tools/regenerate-level.sh joined
+ * `source.documents` because it is what makes that path project-root-relative.
  */
 
 const CONTRACT_PATH = resolve(
   __dirname, '../../src/core/formats/bg-override/bganim-consumer-contract.json',
 );
 const CONTRACT_TEXT = readFileSync(CONTRACT_PATH, 'utf8');
-const CONTRACT_SHA256 = '09729a7bd91b0fac9efc11cd31ca86e9066b3b9582c0035c69b7c4f502523a48';
+const CONTRACT_SHA256 = '280221247fcd7d6c7211ef671226a69cd8115ab69b041df9580447b2b38b5bbf';
 
 describe('the vendored contract is the one we pinned', () => {
   it('matches the pinned content hash', () => {
@@ -201,5 +210,31 @@ describe('the contract declares a complete, well-formed key model', () => {
 
   it('records the consumer-hardcoded path', () => {
     expect(BG_OVERRIDE_CONSUMER_PATH).toBe('games/sonic4/data/editor_bg_override.json');
+  });
+
+  /**
+   * The OUTPUT directory, which is a different KIND of fact from every other
+   * value in the file: the rest describe the document, this one describes which
+   * ACT the document is about. Nothing inside the document says, and nothing in
+   * project.json points back — the binding is this path and only this path, so
+   * the vendored literal has to carry its citations the way a constant does.
+   */
+  it('records the consumer-hardcoded OUTPUT directory, with its aeon authorities', () => {
+    expect(BG_OVERRIDE_CONSUMER_OUT_DIR).toBe('games/sonic4/data/generated/ojz/act1');
+    // Project-root-relative and directory-shaped: a trailing slash here would
+    // silently change what `actBindsBgOverride` compares.
+    expect(BG_OVERRIDE_CONSUMER_OUT_DIR.endsWith('/')).toBe(false);
+    const auth = (at(['outputDir', 'authorities']) as string[]).join('\n');
+    expect(auth).toContain('tools/inject_editor_bg.py');
+    expect(auth).toContain('OUT_DIR');
+    expect(auth).toContain('tools/regenerate-level.sh');
+    for (const a of at(['outputDir', 'authorities']) as string[]) expect(a).toMatch(/^aeon /);
+    // The seam is recorded IN the contract, not only in prose: this pairing is
+    // two hardcodes, one per repo, and only one of them is observable here.
+    expect(at(['outputDir', 'why'])).toContain('SEAM');
+    // Every document a value here cites must be listed in `source`, so a reader
+    // can re-derive rather than trust.
+    const docs = (at(['source', 'documents']) as string[]).join('\n');
+    expect(docs).toContain('tools/regenerate-level.sh');
   });
 });
