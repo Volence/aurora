@@ -19,13 +19,16 @@
 // and the one-label-per-row rule. What is decided HERE is which of these four
 // sections claims a share of the column:
 //
-//   Scenes             CONTENT. A scene picker is one line per scene and this
-//                      project has one; giving it an equal third of the column
-//                      bought a 160px box (`SECTION_LIST_MIN_HEIGHT`, the FLOOR
-//                      — measured) around 26px of buttons, with a scrollbar
-//                      that never engaged. It keeps a cap of its own instead,
-//                      so a project with thirty scenes still cannot push the
-//                      rest of the column off the screen.
+//   Scenes             CONTENT. A scene picker is one line per scene — and it
+//                      really is one line now, see the button's own comment;
+//                      it took ROADMAP item 45's open tail to notice it had
+//                      quietly become three on aeon's prose scene names.
+//                      Giving it an equal third of the column bought a 160px
+//                      box (`SECTION_LIST_MIN_HEIGHT`, the FLOOR — measured)
+//                      around 26px of buttons, with a scrollbar that never
+//                      engaged. It keeps a cap of its own instead, so a project
+//                      with thirty scenes still cannot push the rest of the
+//                      column off the screen.
 //   Scene              CONTENT. A form.
 //   Layers             LIST — the only one. Up to eight cards, each ~100px,
 //                      and the cards are the tallest data anything in this
@@ -236,17 +239,35 @@ export default function EffectsScenePanel(): React.ReactElement {
           <div style={SCENE_LIST}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: T.s1 }}>
               {entries.map((e) => (
+                // ONE LINE PER SCENE, AND THAT IS A MEASUREMENT (ROADMAP item
+                // 45's open tail). A scene's `name` is prose — aeon's own are
+                // "OJZ act 1 depth — curved horizon over a split canopy" — and
+                // in a 300px column an unconstrained label wrapped to THREE
+                // lines: measured, two scenes cost 74px where two one-line rows
+                // cost 50, and the picker's height grew per scene at a rate
+                // nothing could predict. Ellipsis rather than a shorter label:
+                // the full name is on the button's own `title`, it is the
+                // section title of the selected scene one section down, and it
+                // is the editable `Name` field inside it. Nothing here is the
+                // only place a name is readable.
                 <button key={e.id} type="button" onClick={() => setSelectedId(e.id)}
+                  title={`${e.label} (${e.id})`}
                   style={{
                     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                    gap: T.s2,
                     padding: `${T.s1} ${T.s2}`, font: 'inherit', fontSize: T.tXs, textAlign: 'left',
                     background: selected?.id === e.id ? T.accent : T.raised,
                     color: selected?.id === e.id ? T.onAccent : T.textBase,
                     border: `1px solid ${selected?.id === e.id ? T.accent : T.border}`,
                     borderRadius: T.rMd, cursor: 'pointer',
                   }}>
-                  <span>{e.label}</span>
-                  <span style={{ opacity: 0.7 }}>{e.layers} layer{e.layers === 1 ? '' : 's'}</span>
+                  <span style={{
+                    minWidth: 0, overflow: 'hidden',
+                    textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                  }}>{e.label}</span>
+                  <span style={{ opacity: 0.7, flexShrink: 0 }}>
+                    {e.layers} layer{e.layers === 1 ? '' : 's'}
+                  </span>
                 </button>
               ))}
             </div>
@@ -405,7 +426,8 @@ export default function EffectsScenePanel(): React.ReactElement {
         ) : (
           <>
             <Field label={`Section ${activeSectionIndex}`}>
-              <Select title="Which effects scene this section uses (sceneRef)"
+              <Select title={'Which effects scene this section uses (sceneRef). '
+                + "Act default means the act's own scene."}
                 value={section.sceneRef ?? ''} style={{ flex: 1, minWidth: 0 }}
                 onChange={(v) => run(sectionSceneCommand(activeSectionIndex, section.sceneRef, v))}>
                 {sceneRefOptions(library).map((o) => (
@@ -416,9 +438,17 @@ export default function EffectsScenePanel(): React.ReactElement {
             {unassignableSceneRef(library, section.sceneRef) && (
               <Hint under tone="warning">{unassignableSceneRef(library, section.sceneRef)}</Hint>
             )}
+            {/* ONE FACT, NOT TWO. This hint used to close with "Act default
+                means the act's own scene", which is the DEFINITION OF AN OPTION
+                in the select above it — measured, the two sentences wrapped to
+                three lines (52px) where the persistence path alone takes two.
+                The definition moved onto the control's own title, where a
+                reader asking "what does this option mean" already looks; what
+                stays on screen is the thing no control can tell you, which is
+                WHERE THE VALUE IS WRITTEN. */}
             <Hint under style={{ marginBottom: 0 }}>
               Saved to <code>section_{activeSectionIndex}.meta.json</code> as
-              {' '}<code>sceneRef</code>. Act default means the act&apos;s own scene.
+              {' '}<code>sceneRef</code>.
             </Hint>
           </>
         )}

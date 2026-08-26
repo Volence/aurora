@@ -87,6 +87,7 @@
 //                       band it was pinned to the 160px list FLOOR and still
 //                       overflowed by 65px — a scrollbar on a section whose
 //                       content is four rows at its theoretical worst.
+//                       IT IS `defaultCollapsed` NOW — see the next block.
 //   New band            CONTENT, and now `defaultCollapsed`. It is a CREATION
 //                       form, not something an author arriving at this facet is
 //                       reading, and it was measured as the single tallest box
@@ -95,10 +96,58 @@
 //                       the Layers list to stop sitting on its floor — the
 //                       whole tidy-up turns on this one attribute.
 //
-// ⚠ FOUR CDP HARNESSES DRIVE THIS FORM (bganim-band, -rate-shift, -insert-roomy,
-// -ui-authored-composition) and each now opens the section before touching it.
-// A collapsed section renders no children at all, so a harness that reaches
-// straight for a control gets `null` and reports the control as missing.
+// ═══ THE COLUMN ARRIVES ON THE SCENE; THE BANDS ARE ONE CLICK AWAY ═══
+//
+// ROADMAP item 45 closed with an explicit refusal: "1280x800 DOES NOT REACH
+// ZERO", 214px of the column still needing a scroll at that height. This is
+// that parcel, and the arithmetic is what decided it — not taste.
+//
+// Measured on the merged tree at 1280x800, the column has 702px of client
+// height and 954px of content. Its seven section boxes are Scenes 137, Scene
+// 207, Layers 160 (its floor), Section assignment 115, BG animation bands 286,
+// New band 25 and Properties 25. FOUR of those five open sections are the
+// SCENE — pick it, read its parameters, edit its layers, bind it to a section —
+// and they total 619px before this one is drawn. There is no arrangement of
+// 619 + 286 + 50 that fits in 702, so no amount of tightening reaches zero:
+// something has to arrive closed, and only one section in this column is not
+// about the scene.
+//
+// THAT IS THE ARGUMENT, and it is not "delete until it fits". This section is
+// the column's SECOND SUBJECT — the background's animated tile blob, which an
+// author reaches deliberately, not on the way to tuning parallax. Its creation
+// form was already `defaultCollapsed` for exactly that reason; leaving its
+// READOUT open while its form was closed split one subject across two arrival
+// states. Now the whole subject is one click behind a header that still names
+// it and still counts its bands (`BG animation bands (1/4)`), so the facet's
+// band capability and the document's band count are both on screen without
+// opening anything, and everything inside — the verdicts, the refusal path, the
+// honesty label — is one click away. That is the standard: one click, never
+// invisible.
+//
+// WHAT IT BUYS, MEASURED AT BOTH FRAMES: the column reaches ZERO overflow at
+// 1280x800 and stays at zero at 1680x1050, with ONE live scrollbar instead of
+// two, and all seven headers reachable without scrolling at both. At 1680x1050
+// the 292px this releases goes where EffectsScenePanel's docblock says the
+// column's leftover height belongs — the Layers list comes off its 160px floor
+// and draws the scene's layers instead of one and a third of them.
+//
+// THE ALTERNATIVE THAT WAS WEIGHED AND REJECTED: keying `defaultCollapsed` on
+// window height, so the section stays open on a 1050px screen where there IS
+// room for it. It would have preserved more on arrival at the big frame — and
+// `defaultCollapsed` is read once, at first mount, so the state would then be
+// whatever height the window happened to be the first time an author opened
+// this facet, and would not follow a resize. An arrival state nobody can
+// predict is worse than one that is the same everywhere, and it would have made
+// the harness's [A1] row carry frame-dependent expectations, which is where
+// regressions hide.
+//
+// ⚠ FIVE CDP HARNESSES DRIVE THESE TWO SECTIONS (bganim-band, -rate-shift,
+// -insert-roomy, -ui-authored-composition, -motion) and each now opens BOTH
+// before touching anything in them. A collapsed section renders no children at
+// all, so a harness that reaches straight for a control gets `null` and reports
+// the control as missing. Measured when `BG animation bands` joined `New band`
+// in arriving collapsed: bganim-motion went 23/23 to 11/23 on that alone, ten
+// rows calling a working feature broken.
 
 import React from 'react';
 import { T, SectionBody, CollapsibleSection, Select, NumberField, Chip, IconButton } from '../ui';
@@ -193,8 +242,13 @@ export default function BgAnimBandPanel(): React.ReactElement {
 
   return (
     <>
+      {/* DEFAULT-COLLAPSED — the column's second subject, and the only section
+          in it that is not about the scene. See the file docblock: at 1280x800
+          the four scene sections and the seven headers leave no room for it,
+          and the header keeps its name and its band count on screen. */}
       <CollapsibleSection
         id="aeon.bganim.bands"
+        defaultCollapsed
         title={`BG animation bands (${budget.bands}/${budget.maxBands})`}>
        <SectionBody>
         {state === null && (
@@ -225,6 +279,17 @@ export default function BgAnimBandPanel(): React.ReactElement {
         {/* THE PREVIEW'S NON-PER-BAND HALF, above the list it governs. It draws
             nothing at all when there are no bands. ROADMAP item 45. */}
         <BgAnimPreviewStrip />
+
+        {/* SAID ONCE, NOT PER BAND. This sentence explains what the Demote
+            BUTTON does, and every card carries the same button — so it was the
+            same 37px of text repeated for every band in the list, measured, and
+            the contract allows four. It governs the list, so it sits above the
+            list, which is the rule the strip one line up already follows. The
+            per-band lines below it are the ones whose CONTENT differs per band:
+            geometry, slots, driver, resolved rate, verdict. */}
+        {doc !== null && rows.length > 0 && (
+          <Hint>lossless — Demote keeps a band&apos;s art, it just stops animating</Hint>
+        )}
 
         {rows.map((b) => {
           // THE PREVIEW'S PER-BAND HALF, folded in (ROADMAP item 45). Composed
@@ -281,7 +346,6 @@ export default function BgAnimBandPanel(): React.ReactElement {
                   setPendingRemoval(b.index);
                 }} />
             </Row>
-            <Hint under>lossless — Demote keeps the art, it just stops animating</Hint>
             {pendingRemoval === b.index && (
               <Row style={{ marginLeft: CONTROL_INSET }}>
                 <Chip tone="warning"
