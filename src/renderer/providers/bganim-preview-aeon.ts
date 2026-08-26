@@ -170,3 +170,108 @@ export function refreshBandPreview(version: string): BandPreviewSnapshot {
     backgroundPresent: true,
   };
 }
+
+// ---------------------------------------------------------------------------
+// WHAT ONE BAND CARD SAYS — ROADMAP item 45
+// ---------------------------------------------------------------------------
+//
+// Until this parcel the effects column drew TWO cards per band: the band
+// editor's (geometry, slots, driver, `rate_shift`, Demote/Remove) and the
+// preview note's (driver again, geometry again, the resolved rate, and the
+// verdict). One band, two cards, in a 300px column that overflowed. The fold
+// kept the half only the preview knew and dropped the half it repeated, and
+// THAT half is composed here rather than in the panel — bar 1: a sentence built
+// inside a `.tsx` is a sentence `vitest run` cannot see.
+//
+// THE TWO FACTS THAT SURVIVED, and why neither is a duplicate:
+//
+//   THE RESOLVED RATE. The card already prints `rate_shift 2 (default)`, which
+//   is the DOCUMENT'S value. What an author actually wants to know is what that
+//   number does, and the answer depends on the DRIVER: a `timer` band advances
+//   one pixel per 2^n game FRAMES (so it has a px/s), a camera band advances one
+//   pixel per 2^n CAMERA PIXELS (so it has none, and printing one would invent a
+//   speed the engine does not have).
+//
+//   THE VERDICT. Licence and cell count are properties of the BLOB ON SCREEN,
+//   which no amount of reading the document can tell you.
+
+/** GAME FRAMES PER SECOND — the rate the preview's clock and the engine share. */
+export const GAME_FRAMES_PER_SECOND = 60;
+
+/**
+ * The slowest px/s this readout will print as a plain decimal.
+ *
+ * `(60 / units).toFixed(2)` folds to "0.00" the moment `units` passes 6000, and
+ * a band that advances one pixel every two minutes is slow, not stopped —
+ * telling an author it moves at zero px/s is a lie about the one quantity this
+ * readout exists for. Below this the sentence switches to a `<` bound, which
+ * stays true at every `rate_shift` however absurd.
+ */
+const SLOWEST_PRINTABLE_PX_PER_SEC = 0.01;
+
+export type BandStatusKind = 'previewing' | 'no-cells' | 'refused' | 'unresolved';
+
+/** The two lines a band card carries that only the preview knows. */
+export interface BandStatus {
+  kind: BandStatusKind;
+  /** What this band's `rate_shift` MEANS, in the units its driver reads. */
+  rate: string;
+  /**
+   * The verdict sentence, or null when there is nothing per-band to say — no
+   * document, or an active section that resolves to no background. The strip
+   * carries ONE column-wide warning for that case, and repeating it inside every
+   * card would be the duplication this item exists to remove.
+   */
+  verdict: string | null;
+}
+
+/**
+ * Compose one band card's preview status.
+ *
+ * `band` carries the RESOLVED driver and `rate_shift` (`describeBands` has
+ * already applied the contract defaults through `BAND_DEFAULTS`), so the two
+ * lines of one card cannot disagree about what an absent key means. `verdict` is
+ * the preview's own, or `undefined` when the snapshot has none for this band.
+ */
+export function bandStatus(
+  band: { driver: string; rateShift: number },
+  verdict: { cells: number; refusal: string | null } | undefined,
+): BandStatus {
+  // `2 **`, not `1 <<`: `rate_shift` has no upper bound in the contract
+  // (`clampRateShift`'s docblock says why), and a shift of 32 wraps to 1 under
+  // the 68000-shaped operator while the arithmetic one keeps saying something
+  // true.
+  const units = 2 ** band.rateShift;
+  const per = Number.isFinite(units) ? units.toLocaleString('en-US') : `2^${band.rateShift}`;
+  let rate: string;
+  if (band.driver !== 'timer') {
+    // A camera band's phase is a function of the pan, so it has no speed. This
+    // is `bandIsTimeVarying`'s question asked of an already-resolved driver.
+    rate = `1px per ${per} camera px`;
+  } else {
+    const pxPerSec = GAME_FRAMES_PER_SECOND / units;
+    // The injector prints the same sentence into its bake report ("1px per N
+    // units"). `px` is already both singular and plural, so only the frame word
+    // takes an s.
+    rate = `1px per ${per} frame${units === 1 ? '' : 's'} · ${
+      pxPerSec < SLOWEST_PRINTABLE_PX_PER_SEC
+        ? `<${SLOWEST_PRINTABLE_PX_PER_SEC} px/s`
+        : `≈${pxPerSec.toFixed(pxPerSec < 1 ? 2 : 0)} px/s`}`;
+  }
+
+  if (verdict === undefined) return { kind: 'unresolved', rate, verdict: null };
+  // A REFUSAL OUTRANKS A CELL COUNT. A band whose slots name a blob nobody is
+  // painting is not previewing, however many cells point at those indices.
+  if (verdict.refusal !== null) {
+    return {
+      kind: 'refused',
+      rate,
+      verdict: `Not previewing: ${verdict.refusal}. The band names slots in the BG tile blob, `
+        + 'and the blob on screen is not the one this document describes.',
+    };
+  }
+  if (verdict.cells === 0) {
+    return { kind: 'no-cells', rate, verdict: 'Licensed, but no background cell draws its slots.' };
+  }
+  return { kind: 'previewing', rate, verdict: `previewing · ${verdict.cells} background cells` };
+}

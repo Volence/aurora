@@ -49,10 +49,30 @@
 // options come from BGANIM_DRIVER_NAMES (read out of the vendored consumer
 // contract) and every one of them carries that correction in its title.
 //
-// NO PREVIEW, DELIBERATELY, and it is not an omission — see
-// docs/reviews/2026-08-22-preview-posture-ruling.md. Nothing here starts a
-// clock, schedules a frame, or touches MapViewport, so the viewport's measured
-// zero-idle-repaint property is left exactly as it was.
+// ═══ THE PREVIEW LIVES IN THIS SECTION NOW (ROADMAP item 45) ═══
+//
+// An earlier revision of this docblock said "NO PREVIEW, DELIBERATELY". That was
+// true of item 42's shape, where the preview was an eighth section of its own —
+// and it is what produced the defect item 45 fixes: `Band preview` drew a SECOND
+// card per band (driver, geometry, resolved rate, verdict) beside the card
+// below, in a column that overflowed by 235px at 1680x1050.
+//
+// So the per-band half is folded into the card: the RESOLVED RATE (what
+// `rate_shift` means in the units this band's driver reads) and the VERDICT
+// (previewing / licensed-but-undrawn / refused-and-why). Both come from
+// `bandStatus`, a pure function in providers/bganim-preview-aeon with its own
+// unit tests — the rule this file's docblock states two paragraphs up, applied
+// to the one thing this panel gained.
+//
+// `BgAnimPreviewStrip` renders the rest — the playback chip, the honesty label,
+// and the two warnings that were never per band — at the top of this section,
+// because a control belongs above the list it governs.
+//
+// STILL NO CLOCK HERE. `refreshBandPreview` is a pure re-derivation, idempotent
+// on an unchanged signature; nothing in this file starts a clock, schedules a
+// frame, or touches MapViewport, so the viewport's measured zero-idle-repaint
+// property is left exactly as it was. See
+// docs/reviews/2026-08-22-preview-posture-ruling.md.
 //
 // ═══ WHERE THESE TWO SECTIONS SIT IN THE COLUMN (ROADMAP item 41) ═══
 //
@@ -83,9 +103,11 @@
 import React from 'react';
 import { T, SectionBody, CollapsibleSection, Select, NumberField, Chip, IconButton } from '../ui';
 import { Field, Row, Hint, Group, Card, CONTROL_INSET } from './column-layout';
+import BgAnimPreviewStrip from './BgAnimPreviewStrip';
 import { useProjectStore, getActiveLevel } from '../../state/projectStore';
-import { executeCommand } from '../../state/editorStore';
+import { executeCommand, useEditorStore } from '../../state/editorStore';
 import { useHistoryVersion } from '../../hooks/useHistoryVersion';
+import { bandStatus, refreshBandPreview } from '../../providers/bganim-preview-aeon';
 import type { AnyCommand } from '../../../core/editing/commands';
 import {
   DEFAULT_DRIVER, DEFAULT_PHASE_FILL, DEFAULT_RATE_SHIFT, addBandCommand, bandBudget,
@@ -106,8 +128,17 @@ export default function BgAnimBandPanel(): React.ReactElement {
   // Re-read after any execute/undo/redo. A band edit REPLACES the document
   // inside the project's holder, so there is no store identity change to
   // subscribe to — exactly the situation this hook exists for.
-  useHistoryVersion();
+  const historyVersion = useHistoryVersion();
   const project = useProjectStore((s) => s.project);
+  // THE SAME SUBSCRIPTIONS THE STRIP TAKES, and for the same reason: a band's
+  // verdict is a claim about the blob ON SCREEN, and the act and the active
+  // section each re-resolve which blob that is without moving an edit clock.
+  const liveEditVersion = useEditorStore((s) => s.liveEditVersion);
+  useProjectStore((s) => s.currentActId);
+  useEditorStore((s) => s.activeSectionIndex);
+  // Derived at render, never stored. Idempotent on an unchanged signature, so
+  // this costs a map lookup on every frame the document did not move.
+  const preview = refreshBandPreview(`${historyVersion}:${liveEditVersion}`);
 
   const state = project?.bgOverride ?? null;
   const doc = state?.doc ?? null;
@@ -191,7 +222,16 @@ export default function BgAnimBandPanel(): React.ReactElement {
           </Hint>
         )}
 
-        {rows.map((b) => (
+        {/* THE PREVIEW'S NON-PER-BAND HALF, above the list it governs. It draws
+            nothing at all when there are no bands. ROADMAP item 45. */}
+        <BgAnimPreviewStrip />
+
+        {rows.map((b) => {
+          // THE PREVIEW'S PER-BAND HALF, folded in (ROADMAP item 45). Composed
+          // by a provider, never here: what `rate_shift` means in the units this
+          // band's driver reads, and whether the blob on screen lets it preview.
+          const status = bandStatus(b, preview.verdicts[b.index]);
+          return (
           // THE INDEX TITLES THE CARD and the geometry is its value, so a band
           // row reads in the same label column as every form row above it.
           // Everything under it hangs off the control column (`under`), which
@@ -213,6 +253,18 @@ export default function BgAnimBandPanel(): React.ReactElement {
               rate_shift <strong>{b.rateShift}</strong>
               {b.rateShiftIsExplicit ? '' : ' (default)'}
             </Hint>
+            {/* WHAT THAT NUMBER DOES. The line above is the DOCUMENT's value;
+                this is the consequence, and it depends on the driver — a timer
+                band has a px/s and a camera band cannot have one. */}
+            <Hint under>{status.rate}</Hint>
+            {/* A refusal and an undrawn licence are both warnings; a band that
+                previews is not. `unresolved` prints nothing here, because the
+                strip above already carries that one column-wide warning. */}
+            {status.verdict !== null && (
+              <Hint under tone={status.kind === 'previewing' ? undefined : 'warning'}>
+                {status.verdict}
+              </Hint>
+            )}
             <Row style={{ marginLeft: CONTROL_INSET }}>
               <IconButton icon={<span>Demote</span>}
                 label={`Demote band ${b.index} to static tiles`}
@@ -245,7 +297,8 @@ export default function BgAnimBandPanel(): React.ReactElement {
               </Row>
             )}
           </Card>
-        ))}
+          );
+        })}
 
         {doc !== null && (
           <Hint style={{ marginTop: T.s2, marginBottom: 0 }}>

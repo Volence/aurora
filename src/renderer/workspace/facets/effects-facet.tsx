@@ -8,10 +8,11 @@
 //
 // IT SHOWS WHAT THE BANDS DO, AND STILL NOTHING THE SCENES DO. Item 42 landed
 // the BgAnim half of the preview parcel governed by
-// docs/reviews/2026-08-22-preview-posture-ruling.md: `MapViewport` now blits the
-// current phase of each licensed band over Plane B, and `BgAnimPreviewNote`
-// below carries the control and the honesty label. The SCENE half (§2 scroll
-// factors, SceneDeform, vsplit) is still unpreviewed and is wave 2.
+// docs/reviews/2026-08-22-preview-posture-ruling.md: `MapViewport` blits the
+// current phase of each licensed band over Plane B, and the band panel below
+// carries the control, the honesty label and the per-band verdicts (item 45
+// folded them into the band cards). The SCENE half (§2 scroll factors,
+// SceneDeform, vsplit) is still unpreviewed and is wave 2.
 //
 // THE ZERO-IDLE-REPAINT PROPERTY IS CONDITIONED, NOT SPENT. The clock is local
 // to `MapViewport`, mounts only while playback is on AND a drawable band reads
@@ -34,7 +35,6 @@ import React from 'react';
 import AeonPropertiesPanel from '../../components/AeonPropertiesPanel';
 import EffectsScenePanel from '../../components/effects/EffectsScenePanel';
 import BgAnimBandPanel from '../../components/effects/BgAnimBandPanel';
-import BgAnimPreviewNote from '../../components/effects/BgAnimPreviewNote';
 import { Panel, CollapsibleSection } from '../../components/ui';
 import { mapFacet, type FacetModule } from '../facet-registry';
 
@@ -48,13 +48,16 @@ function EffectsPanels() {
           beside them, both live in the `parallax` capability, and splitting them
           would make an author switch facets to answer "what does this background
           do". Wave-1 surface 4, part 3 (ROADMAP item 28). */}
+      {/* THE PREVIEW IS INSIDE THIS PANEL, NOT BESIDE IT (ROADMAP item 45).
+          Item 42 mounted `BgAnimPreviewNote` here as a section of its own, and
+          it drew a second card per band beside the band editor's — one band,
+          two cards, in a column that overflowed. The per-band status is folded
+          into the band card and the rest (playback chip, honesty label, the two
+          column-wide warnings) renders as a strip at the top of
+          `BG animation bands`. Still not on the canvas, for item 42's reason:
+          what has to be said is per band, which is a list, and a badge painted
+          over the map would be chrome every aeon author pays for. */}
       <BgAnimBandPanel />
-      {/* The preview's control and its label, directly under the editor whose
-          output it previews. NOT on the canvas: what has to be said is per
-          band ("this one previews, that one does not and here is why"), which
-          is a list, and a badge painted over the map would be chrome every
-          aeon author pays for. ROADMAP item 42. */}
-      <BgAnimPreviewNote />
       {/* Subscriptions live in the AeonPropertiesPanel leaf, not this column —
           the reason its own docblock gives. */}
       <CollapsibleSection id="aeon.props" title="Properties" defaultCollapsed>
