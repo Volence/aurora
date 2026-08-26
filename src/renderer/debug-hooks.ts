@@ -451,6 +451,14 @@ interface AeonProbeApi {
    * weaker claim about a different pixel.
    */
   setBandLensTarget(t: { kind: 'band'; index: number } | { kind: 'candidate' } | null): void;
+  /**
+   * The band `stamp-band` is armed with (parcel J) — what a click on an Art
+   * panel band card sets. The setter exists so a harness can arm the stamp
+   * without the card when it is pinning the GESTURE rather than the picker;
+   * the card click is still the row that proves the picker.
+   */
+  selectedBand(): number | null;
+  setSelectedBand(index: number | null): void;
   /** The promotion candidate the panel form and the map now share. */
   bandCandidate(): { staticBase: number; cols: number; rows: number };
   /** One section's `sceneRef` — what the assignment dropdown writes. */
@@ -667,6 +675,8 @@ function installAeonProbe(): AeonProbeApi {
     bandMark: () => lastBandMarkReport(),
     bandLensTarget: () => useEditorStore.getState().bandLensTarget,
     setBandLensTarget: (t) => useEditorStore.getState().setBandLensTarget(t),
+    selectedBand: () => useEditorStore.getState().selectedBgBand,
+    setSelectedBand: (index) => useEditorStore.getState().setSelectedBgBand(index),
     bandCandidate: () => useEditorStore.getState().bandCandidate,
     bands: () => bandRows(bgDoc()).map((b) => ({
       index: b.index, cols: b.cols, rows: b.rows, tileCount: b.tileCount,
