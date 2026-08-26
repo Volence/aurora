@@ -52,16 +52,20 @@ export default function BgAnimPreviewNote() {
   const toggleOverlay = useViewStore((s) => s.toggleOverlay);
   const editingLayer = useEditorStore((s) => s.editingLayer);
   const liveEditVersion = useEditorStore((s) => s.liveEditVersion);
-  const activeSectionIndex = useEditorStore((s) => s.activeSectionIndex);
   const project = useProjectStore((s) => s.project);
-  const currentActId = useProjectStore((s) => s.currentActId);
+  // SUBSCRIPTIONS, not values. The snapshot below is DERIVED at render time, so
+  // this component only repaints when React tells it to — and the two facts that
+  // change the verdicts without touching an edit clock are the act and the
+  // active section (each re-resolves which background is on screen, and so which
+  // blob a band's slot index means). Reading them is what makes this re-render.
+  useProjectStore((s) => s.currentActId);
+  useEditorStore((s) => s.activeSectionIndex);
   const historyVersion = useHistoryVersion();
 
   // Derived, not stored. `refreshBandPreview` is idempotent on an unchanged
   // signature, so calling it here as well as from the viewport's draw pass costs
   // a map lookup — and it means this note never shows a verdict one render
   // behind the canvas, which is what reading the viewport's cache would give.
-  void project; void currentActId; void activeSectionIndex;
   const snapshot = refreshBandPreview(`${historyVersion}:${liveEditVersion}`);
 
   const doc = project?.bgOverride?.doc ?? null;
