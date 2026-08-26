@@ -152,6 +152,123 @@ export function tileSlotsRemaining(doc: BgOverrideDocument): number {
 // Constructing a band
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Phase fill — how banks 1..BGANIM_PHASE_BANKS-1 are derived from phase 0
+// ---------------------------------------------------------------------------
+
+/**
+ * How a band arriving with only phase-0 art fills its remaining banks.
+ *
+ *   'copy'   Banks 1.. are copies of phase 0. The band is VISUALLY INERT until
+ *            authored — it draws the same art at every step. Promotion's
+ *            default, ratified by measurement (ROADMAP item 27): the historical
+ *            shipped bands were hand-drawn frames, so nothing generated could
+ *            reproduce them, and a copy is the only fill that edits nothing.
+ *
+ *   'blank'  Banks 1.. are all-zero art. Insertion's default (a blank band has
+ *            a blank phase 0, so every fill agrees there). On a promotion this
+ *            makes the picture break on the band's second phase — offered as a
+ *            deliberate authoring start, never a default.
+ *
+ *   'shift'  Bank k is phase 0 scrolled k pixels within the band's own pattern
+ *            width — exactly what the contract calls `phases` ("pre-shifted art
+ *            1px apart, selected by step & 7"), and what aeon's own generator
+ *            emits. The one fill that makes a saved band visibly MOVE with no
+ *            further authoring. See `shiftedPhaseBanks` for the direction
+ *            derivation.
+ */
+export type BandPhaseFill = 'copy' | 'blank' | 'shift';
+
+/**
+ * SHIFT DIRECTION, derived from the consumer rather than chosen.
+ *
+ * The vendored contract's prose ("pre-shifted art 1px apart, selected by
+ * `step & 7`") does not spell a direction, but the runtime and the generator it
+ * cites both do, and they must agree with each other or the fine and coarse
+ * halves of the scroll would tear at every 8th step:
+ *
+ *   • COARSE (aeon engine/level/bg_anim.emp, the two-piece bank DMA): piece 1
+ *     copies art from `bank + shift_bytes` to the band's base slot, piece 2
+ *     wraps columns 0..coarse-1 behind it — so at coarse step c, band slot
+ *     column j holds ART column (j + c) mod cols. On-screen pixel x draws art
+ *     pixel x + 8c: the pattern translates toward -x as the step grows.
+ *   • FINE (aeon tools/forest_bg_gen.py, `pat_pixel(v, y, ph)` sampling
+ *     `trunk_pixel((v + ph) % PAT_W, ...)`): bank ph's pixel at x IS phase 0's
+ *     pixel at (x + ph) mod pattern_px — the same direction, 1px per bank.
+ *
+ * So bank k reads its pixels from phase 0 at `x + k * PHASE_SHIFT_SRC_PX`,
+ * wrapping at the band's `pattern_px`. The constant is named so the direction
+ * is greppable and single-sited; +1 is "content moves toward -x as the driver
+ * scalar grows", which for `camera_x` is the background receding as the camera
+ * advances.
+ */
+export const PHASE_SHIFT_SRC_PX = 1;
+
+/**
+ * Banks 0..BGANIM_PHASE_BANKS-1 as pre-shifted copies of `phase0`: bank k is
+ * phase 0 scrolled k pixels, wrapping within the band's own `pattern_px`.
+ *
+ * Bank 0 is the k=0 roll, which is phase 0 exactly — the prefix identity
+ * (`phases[0] == tiles[slot_base : slot_base+n]`) survives by construction.
+ *
+ * THE PIXEL GEOMETRY IS THE RUNTIME'S. A band's slots are COLUMN-MAJOR — "a
+ * pattern column's tiles are contiguous in VRAM" (aeon engine/level/bg_anim.emp
+ * header; forest_bg_gen.py builds its banks `for col: for vrow:`; the injector
+ * comments the banks blob "column-major so whole-column rotation is two wrapped
+ * DMAs") — so tile index t is column floor(t/rows), row t%rows, and the band's
+ * horizontal pixel axis runs across columns 8px (TILE_WIDTH_PX) at a time.
+ * Each tile is a flat row-major 8x8 of TILE_PIXELS values (the contract's
+ * TILE_PIXELS entry cites the injector's pack loop).
+ */
+export function shiftedPhaseBanks(
+  spec: Pick<BgOverrideBand, 'cols' | 'rows'>, phase0: readonly number[][],
+): number[][][] {
+  const n = bandTileCount(spec);
+  const patternPx = spec.cols * TILE_WIDTH_PX;
+  if (phase0.length !== n || phase0.some((t) => !Array.isArray(t) || t.length !== TILE_PIXELS)) {
+    throw new BgOverrideError(
+      `cannot derive shifted phase banks: phase 0 must be ${n} tiles of ${TILE_PIXELS} pixels for ` +
+      `a ${spec.cols}x${spec.rows} band, got ${phase0.length} tile(s). The shift is a permutation ` +
+      'of exactly the band\'s own pixels, so it has nothing to say about any other shape.',
+    );
+  }
+  return Array.from({ length: BGANIM_PHASE_BANKS }, (_, bank) =>
+    Array.from({ length: n }, (_, t) => {
+      const col = Math.floor(t / spec.rows);
+      const row = t % spec.rows;
+      const out = new Array<number>(TILE_PIXELS);
+      for (let py = 0; py < TILE_WIDTH_PX; py++) {
+        for (let px = 0; px < TILE_WIDTH_PX; px++) {
+          const srcX = (col * TILE_WIDTH_PX + px + bank * PHASE_SHIFT_SRC_PX) % patternPx;
+          const srcTile = Math.floor(srcX / TILE_WIDTH_PX) * spec.rows + row;
+          out[py * TILE_WIDTH_PX + px] = phase0[srcTile][py * TILE_WIDTH_PX + (srcX % TILE_WIDTH_PX)];
+        }
+      }
+      return out;
+    }));
+}
+
+/** Banks 0.. from phase 0 under one fill mode. The single dispatch every door shares. */
+function phaseBanksFrom(
+  spec: Pick<BgOverrideBand, 'cols' | 'rows'>, phase0: readonly number[][], fill: BandPhaseFill,
+): number[][][] {
+  switch (fill) {
+    case 'copy':
+      return Array.from({ length: BGANIM_PHASE_BANKS },
+        () => cloneBgOverride(phase0 as number[][]));
+    case 'blank':
+      return [cloneBgOverride(phase0 as number[][]),
+        ...blankPhases(bandTileCount(spec)).slice(1)];
+    case 'shift':
+      return shiftedPhaseBanks(spec, phase0);
+    default:
+      throw new BgOverrideError(
+        `unknown phase fill mode ${JSON.stringify(fill)}: the modes are 'copy', 'blank' and ` +
+        "'shift'. A silent fallback here would fill someone's banks with art they did not pick.",
+      );
+  }
+}
+
 /** What an author picks when creating a band; everything else is derived. */
 export interface NewBandSpec {
   cols: number;
@@ -162,6 +279,14 @@ export interface NewBandSpec {
    * `TILE_PIXELS` values — the validator says so precisely if it is not.
    */
   phases?: number[][][];
+  /**
+   * How banks 1.. are filled when `phases` is omitted (default 'blank', which
+   * is what an omitted `phases` has always meant). A blank band's phase 0 is
+   * blank art, so every mode agrees here — the option exists so the one
+   * authoring surface offers the same three answers at both doors. Giving it
+   * TOGETHER with `phases` is refused: `phases` already spells every bank.
+   */
+  phaseFill?: BandPhaseFill;
   /** Omit to leave the key out, so the document tracks the consumer's default. */
   driver?: BgAnimDriver;
   /** Omit to leave the key out. */
@@ -186,7 +311,15 @@ export interface NewBandSpec {
  */
 export function createBand(spec: NewBandSpec): BgOverrideBand {
   const n = bandTileCount(spec);
-  const phases = spec.phases ?? blankPhases(n);
+  if (spec.phases !== undefined && spec.phaseFill !== undefined) {
+    throw new BgOverrideError(
+      'refusing to create a band with BOTH `phases` and `phaseFill`: `phases` spells every bank ' +
+      'already, so a fill mode beside it either agrees (and says nothing) or disagrees (and one ' +
+      'of the two is silently ignored). Hand in phase 0 alone via a fill mode, or all the banks.',
+    );
+  }
+  const phases = spec.phases
+    ?? phaseBanksFrom(spec, blankPhases(n)[0], spec.phaseFill ?? 'blank');
 
   const band: BgOverrideBand = {
     cols: spec.cols,
@@ -564,6 +697,12 @@ export function planBandRemoval(
 export interface PromoteBandSpec {
   cols: number;
   rows: number;
+  /**
+   * How banks 1.. are filled from the promoted range (default 'copy', which is
+   * exactly what promotion has always done). Phase 0 is READ from the blob in
+   * every mode — the fill only ever decides the banks the range does not pin.
+   */
+  phaseFill?: BandPhaseFill;
   /** Omit to leave the key out, so the document tracks the consumer's default. */
   driver?: BgAnimDriver;
   /** Omit to leave the key out. */
@@ -619,17 +758,19 @@ function requirePromotableRange(
  * either break prefix identity or change the picture at rest, and both of those
  * bake cleanly.
  *
- * BANKS 1..N-1 ARE A COPY OF PHASE 0, so a promoted band is VISUALLY INERT
- * until it is authored: it draws the promoted art at every step, which is what
- * it drew before. The alternative — blank banks — would make the picture break
- * on the band's second phase, an unrequested edit to the author's background
- * and the exact defect class this surface is built against. The third
- * possibility, generating banks 1..N-1 as pre-shifted copies (the contract calls
- * `phases` "pre-shifted art 1px apart"), was MEASURED and rejected: no
- * horizontal offset, under either tile ordering, reproduces any bank of either
- * real b0e5a661 band from its bank 0 — the shipped banks are hand-drawn frames,
- * not shifts, so a generated shift would be art Aurora invented rather than art
- * the author drew.
+ * BANKS 1..N-1 DEFAULT TO A COPY OF PHASE 0, so a promoted band is VISUALLY
+ * INERT until it is authored: it draws the promoted art at every step, which is
+ * what it drew before. Blank banks would make the picture break on the band's
+ * second phase, an unrequested edit to the author's background and the exact
+ * defect class this surface is built against. Generating banks 1..N-1 as
+ * pre-shifted copies (the contract calls `phases` "pre-shifted art 1px apart")
+ * was MEASURED and rejected AS THE DEFAULT: no horizontal offset, under either
+ * tile ordering, reproduces any bank of either real b0e5a661 band from its bank
+ * 0 — the shipped banks are hand-drawn frames, not shifts, so a silently
+ * generated shift would be art Aurora invented rather than art the author drew.
+ * As an EXPLICIT `phaseFill: 'shift'` it is the authoring primitive the contract
+ * describes — the one fill that makes a saved band move with no further work —
+ * and picking it is the author's sentence, never this function's.
  *
  * An author with real frames does not go through here: build the band, keep
  * `phases[0]` equal to the blob range, and hand it to `planBandPromotion`, which
@@ -641,9 +782,10 @@ export function bandFromStaticTiles(
   const n = bandTileCount(spec);
   const { tiles } = requirePromotableRange(doc, staticBase, n);
   const phase0 = cloneBgOverride(tiles.slice(staticBase, staticBase + n));
+  const { phaseFill, ...bandSpec } = spec;
   return createBand({
-    ...spec,
-    phases: Array.from({ length: BGANIM_PHASE_BANKS }, () => cloneBgOverride(phase0)),
+    ...bandSpec,
+    phases: phaseBanksFrom(spec, phase0, phaseFill ?? 'copy'),
   });
 }
 
