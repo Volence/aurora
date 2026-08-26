@@ -9,11 +9,12 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useEditorStore, focusedHistory } from '../editorStore';
 import { documentHistoryHub } from '../history-hub';
+import { BAND_DEFAULTS } from '../../../core/formats/bg-override/bg-override';
 
 describe('band lens: seed then clear', () => {
   beforeEach(() => {
     documentHistoryHub.clearAll();
-    useEditorStore.setState({ bandLensTarget: null, bandCandidate: { staticBase: 0, cols: 1, rows: 1 } });
+    useEditorStore.setState({ bandLensTarget: null, bandCandidate: { staticBase: 0, cols: 1, rows: 1, driver: BAND_DEFAULTS.driver, rateShift: BAND_DEFAULTS.rate_shift } });
   });
 
   it('seeding a candidate lights the lens (anti-vacuous)', () => {

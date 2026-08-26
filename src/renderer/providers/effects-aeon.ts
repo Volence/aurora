@@ -65,9 +65,41 @@ export interface FactorOption { value: string; label: string }
 export function factorOptions(): FactorOption[] {
   return [
     ...EFFECTS_FACTOR_NAMES.map((n) => ({ value: n, label: n })),
-    { value: CUSTOM_FACTOR_VALUE, label: 'Custom packed…' },
+    { value: CUSTOM_FACTOR_VALUE, label: 'Custom…' },
   ];
 }
+
+// ---------------------------------------------------------------------------
+// What fa / fb ARE — parcel D (triage 2026-08-26 §A.5)
+// ---------------------------------------------------------------------------
+//
+// The owner asked what "plane a packed scroll factor" means. The rows were the
+// raw keys with the schema's own words for titles. Engine meaning (schema
+// §2.2/§2.3): per layer, `fa` is how far PLANE A (the foreground / level
+// plane) scrolls per pixel of camera movement and `fb` the same for PLANE B
+// (the background); `FACTOR_1` moves with the camera, `FACTOR_1_16` at a
+// sixteenth (far away), `FACTOR_LOCKED` not at all. "Packed" is the engine's
+// shift-add ENCODING of that fraction — the custom escape hatch — and the word
+// belongs inside the custom expander, where `s1`/`s2`/`op` live, not on the
+// row an author reads first.
+
+/** The two factor rows of a layer: label, and the title the label carries. */
+export const PLANE_FACTOR_ROWS = Object.freeze({
+  fa: Object.freeze({
+    key: 'fa' as const,
+    label: 'Plane A (foreground)',
+    title: 'fa — how far Plane A, the foreground level plane, scrolls per pixel of camera movement',
+  }),
+  fb: Object.freeze({
+    key: 'fb' as const,
+    label: 'Plane B (background)',
+    title: 'fb — how far Plane B, the background, scrolls per pixel of camera movement',
+  }),
+});
+
+/** One line under both rows, said once per layer. */
+export const PLANE_FACTOR_HINT =
+  'fraction of camera movement this strip scrolls; 1 = with the camera';
 
 /** Which option is selected for a factor that may be either form. */
 export function factorSelectValue(f: EffectsFactor): string {

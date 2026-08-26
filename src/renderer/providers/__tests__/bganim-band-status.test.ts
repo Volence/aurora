@@ -14,7 +14,10 @@
 // not delete it. The `refused` rows below are that guarantee.
 
 import { describe, it, expect } from 'vitest';
-import { GAME_FRAMES_PER_SECOND, bandStatus } from '../bganim-preview-aeon';
+import {
+  GAME_FRAMES_PER_SECOND, bandStatus,
+  BAND_SCROLL_DIRECTION, bandMotion, bandLensCaptionLines, BAND_MECHANISM_HINT,
+} from '../bganim-preview-aeon';
 import { BAND_DEFAULTS } from '../../../core/formats/bg-override/bg-override';
 
 const previewing = (cells: number) => ({ cells, refusal: null });
@@ -27,11 +30,12 @@ describe('bandStatus — the resolved rate', () => {
     expect(s.rate).toContain(`${GAME_FRAMES_PER_SECOND / 2 ** 2} px/s`);
   });
 
-  it('reads a camera band in CAMERA PIXELS, and offers no px/s at all', () => {
+  it('reads a camera band in PIXELS OF CAMERA TRAVEL, and offers no px/s at all', () => {
     // A camera band's phase is a function of the pan, not of the clock. A px/s
-    // figure would be a speed the engine never has.
+    // figure would be a speed the engine never has. ("camera px" became "px of
+    // camera travel" in parcel D — the owner could not tell what a camera px was.)
     const s = bandStatus({ driver: 'camera_x', rateShift: 3 }, previewing(10));
-    expect(s.rate).toContain(`${2 ** 3} camera px`);
+    expect(s.rate).toContain(`${2 ** 3} px of camera travel`);
     expect(s.rate).not.toContain('px/s');
   });
 
@@ -103,5 +107,94 @@ describe('bandStatus — the verdict', () => {
     expect(s.verdict).toBeNull();
     // The rate is still knowable without a background, and is still printed.
     expect(s.rate).toContain('frames');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// WHAT A BAND DOES — the mechanism sentence (parcel D, triage §A.6)
+// ---------------------------------------------------------------------------
+//
+// The owner: the magenta cells "don't say what they do at all — draw left to
+// right? rotate?". The caption said WHICH cells and the card said `driver timer
+// · rate_shift 2`; nothing said the band SCROLLS. One sentence, one provider,
+// printed verbatim on the canvas caption and on the card, so the two cannot
+// drift apart. The direction word is FOREGROUND-gated behind one constant that
+// ships empty until the overseer has watched the built ROM.
+
+describe('bandMotion — the one sentence that says what a band does', () => {
+  it.each([0, 2, 3])('derives "1px per 2^%i" from rate_shift, in the driver\'s units', (n) => {
+    const units = 2 ** n;
+    const timer = bandMotion({ driver: 'timer', rateShift: n }, 'band');
+    expect(timer).toContain(`1px per ${units} frame${units === 1 ? '' : 's'}`);
+    for (const driver of ['camera_x', 'camera_y']) {
+      const cam = bandMotion({ driver, rateShift: n }, 'band');
+      expect(cam).toContain(`1px per ${units} px of camera travel`);
+      expect(cam).not.toContain('px/s');
+    }
+  });
+
+  it('leads with the verb — a band SCROLLS — and a candidate says "would scroll"', () => {
+    expect(bandMotion({ driver: 'timer', rateShift: 2 }, 'band')).toMatch(/^scrolls/);
+    expect(bandMotion({ driver: 'timer', rateShift: 2 }, 'candidate')).toMatch(/^would scroll/);
+  });
+
+  it('ships with NO direction word until the ROM has been watched (FOREGROUND gate)', () => {
+    expect(BAND_SCROLL_DIRECTION).toBe('');
+    const s = bandMotion({ driver: 'timer', rateShift: 2 }, 'band');
+    expect(s).not.toMatch(/\b(left|right)\b/);
+    // The shape the flipped constant produces is fixed here so the flip is one
+    // edit and not a rewrite: `scrolls <dir> · 1px per …`.
+    expect(s).toMatch(/^scrolls · 1px per /);
+  });
+
+  it("IS the card's rate line — bandStatus prints it verbatim", () => {
+    for (const band of [
+      { driver: 'timer', rateShift: 0 }, { driver: 'timer', rateShift: 2 },
+      { driver: 'camera_x', rateShift: 3 }, { driver: 'camera_y', rateShift: 5 },
+    ]) {
+      expect(bandStatus(band, previewing(1)).rate).toBe(bandMotion(band, 'band'));
+    }
+  });
+});
+
+describe('bandLensCaptionLines — the caption prints the same sentence as the card', () => {
+  const range = { base: 0, count: 32 };
+  // A real-shaped empty coverage: `coverageSummary` reads `range` off it.
+  const coverage = { range, cells: [], largest: null, undrawnSlots: 0, perSlot: [] } as never;
+
+  it('line 2 of a band caption is bandStatus(...).rate, character for character', () => {
+    const band = { driver: 'timer', rateShift: 2 };
+    const lines = bandLensCaptionLines({
+      kind: 'band', bandIndex: 0, range, motion: bandMotion(band, 'band'),
+      coverage, reason: null,
+    });
+    expect(lines[0]).toMatch(/^highlighted/);
+    expect(lines[1]).toBe(bandStatus(band, previewing(1)).rate);
+  });
+
+  it('a candidate caption says "would scroll", and a refusal still follows the motion', () => {
+    const band = { driver: 'camera_x', rateShift: 3 };
+    const lines = bandLensCaptionLines({
+      kind: 'candidate', bandIndex: null, range, motion: bandMotion(band, 'candidate'),
+      coverage: null, reason: 'the active section resolves to no background',
+    });
+    expect(lines[1]).toMatch(/^would scroll · 1px per 8 px of camera travel/);
+    expect(lines[2]).toContain('no background');
+  });
+
+  it('prints no motion line when none is resolved, rather than an empty line', () => {
+    const lines = bandLensCaptionLines({
+      kind: 'band', bandIndex: 1, range, motion: null, coverage, reason: null,
+    });
+    expect(lines.every((l) => l !== '')).toBe(true);
+  });
+});
+
+describe('BAND_MECHANISM_HINT — what a band IS, said once at the top of the section', () => {
+  it('names the pattern, the eight frames over the same tiles, and the shared motion', () => {
+    expect(BAND_MECHANISM_HINT).toMatch(/cols\s*[x×]\s*rows/);
+    expect(BAND_MECHANISM_HINT).toMatch(/\b8\b|eight/);
+    expect(BAND_MECHANISM_HINT).toMatch(/same tiles/);
+    expect(BAND_MECHANISM_HINT).toMatch(/every cell/i);
   });
 });

@@ -65,6 +65,7 @@ import {
   layerExtrasLine,
   SCENE_FORM_CHOICES, EFFECTS_LAYER_COUNT, EFFECTS_PACKED_FACTOR_BOUNDS,
   EFFECTS_V_FACTOR_BOUNDS, EFFECTS_V_CENTER_BOUNDS, EFFECTS_V_OFFSET_BOUNDS,
+  PLANE_FACTOR_ROWS, PLANE_FACTOR_HINT,
 } from '../../providers/effects-aeon';
 
 const EMPTY_LIBRARY: EffectsSceneLibrary = { scenes: [], unreadable: [], notices: [] };
@@ -437,14 +438,21 @@ export default function EffectsScenePanel(): React.ReactElement {
                   </>
                 );
               })()}
-              <Field label="fa" title="Plane A packed scroll factor">
-                <FactorField title={`Layer ${i} fa`} value={layer.fa}
+              {/* WHICH PLANE, AND WHAT THE NUMBER IS. These read `fa` / `fb`
+                  with "packed scroll factor" for a title, which is the schema's
+                  word for the ENCODING and told the owner nothing (parcel D).
+                  The label names the plane and its role; the one hint under
+                  both says what the fraction means. "packed" lives inside
+                  `FactorField`'s custom expander, with `s1`/`s2`/`op`. */}
+              <Field label={PLANE_FACTOR_ROWS.fa.label} title={PLANE_FACTOR_ROWS.fa.title}>
+                <FactorField title={`Layer ${i} ${PLANE_FACTOR_ROWS.fa.title}`} value={layer.fa}
                   onChange={(f) => run(setLayerFieldCommand(library, selected.id, i, 'fa', f))} />
               </Field>
-              <Field label="fb" title="Plane B packed scroll factor">
-                <FactorField title={`Layer ${i} fb`} value={layer.fb}
+              <Field label={PLANE_FACTOR_ROWS.fb.label} title={PLANE_FACTOR_ROWS.fb.title}>
+                <FactorField title={`Layer ${i} ${PLANE_FACTOR_ROWS.fb.title}`} value={layer.fb}
                   onChange={(f) => run(setLayerFieldCommand(library, selected.id, i, 'fb', f))} />
               </Field>
+              <Hint under style={{ marginBottom: 0 }}>{PLANE_FACTOR_HINT}</Hint>
               {/* WHAT THE FILE SETS THAT THE CARD CANNOT: curve, vsplit, deform,
                   disabled. Read-only, mono, at the hint tier so it cannot be
                   mistaken for a fourth control — the owner opened the curved

@@ -13,9 +13,12 @@
 // frames where something actually moved.
 
 import { BgAnimPreviewRenderer, type BandPreviewVerdict } from '../canvas/BgAnimPreviewRenderer';
-import { documentBands, bandSlotBases } from '../../core/formats/bg-override/bg-anim-band';
 import {
-  bandCoverage, slotRange, type BandCoverage, type SlotRange,
+  documentBands, bandSlotBases, describeBands,
+} from '../../core/formats/bg-override/bg-anim-band';
+import {
+  bandCoverage, slotRange, coverageSubject, coverageSummary,
+  type BandCoverage, type SlotRange,
 } from './band-coverage';
 import { actBindsBgOverride } from '../../core/formats/bg-override/bg-override-binding';
 import { bgOverrideDisplay } from '../../core/formats/bg-override/bg-override-view';
@@ -212,6 +215,80 @@ export const GAME_FRAMES_PER_SECOND = 60;
  */
 const SLOWEST_PRINTABLE_PX_PER_SEC = 0.01;
 
+// ---------------------------------------------------------------------------
+// WHAT A BAND DOES — parcel D (triage 2026-08-26 §A.6)
+// ---------------------------------------------------------------------------
+//
+// The owner, looking at the magenta lens: "they don't say what they do at all —
+// draw left to right? rotate?". The caption said WHICH cells and the card said
+// `driver timer · rate_shift 2`; nothing on either surface said the band
+// SCROLLS. So the mechanism is one sentence, composed here and printed
+// VERBATIM on the canvas caption and on the card — one provider, two readers,
+// the rule every other band fact on this file already follows.
+//
+// FROM SOURCE, not from a description: a band is a `cols x rows` tile pattern
+// whose eight banks are DMA'd over the same VRAM slots; with `phaseFill:
+// 'shift'` bank k is phase 0 rolled k px (`bg-anim-aeon.ts`), so the pattern
+// scrolls horizontally inside its own `pattern_px = cols*8` window; the driver
+// advances it 1 px per `2^rate_shift` units (schema §5). Every cell whose
+// layout word names a band slot shows the same motion.
+//
+// ═══ THE DIRECTION WORD IS FOREGROUND-GATED ═══
+//
+// The memory bank records bank k at x as phase 0 at x+k, i.e. the art moves
+// LEFT as the driver increases — but that is a reading of the fill, not a
+// watching of the ROM, and a caption that stated the wrong direction would be
+// worse than one that states none. So the sentence ships as `scrolls · …`, and
+// the overseer flips ONE constant after watching the built ROM. The tests pin
+// the flipped shape (`scrolls left · …`) so the flip is one edit.
+
+/** The direction word the motion sentence carries. Empty until confirmed on the ROM. */
+export const BAND_SCROLL_DIRECTION: '' | 'left' | 'right' = '';
+
+/**
+ * The one sentence that says what a band does, in the units its driver reads.
+ *
+ *   band:      `scrolls · 1px per 4 frames · ≈15 px/s`
+ *   candidate: `would scroll · 1px per 8 px of camera travel`
+ *
+ * A `timer` band advances one pixel per 2^n game FRAMES, so it has a px/s; a
+ * camera band advances one pixel per 2^n pixels of CAMERA TRAVEL, so it has
+ * none, and printing one would invent a speed the engine does not have.
+ */
+export function bandMotion(
+  band: { driver: string; rateShift: number }, kind: 'band' | 'candidate',
+): string {
+  // `2 **`, not `1 <<`: `rate_shift` has no upper bound in the contract
+  // (`clampRateShift`'s docblock says why), and a shift of 32 wraps to 1 under
+  // the 68000-shaped operator while the arithmetic one keeps saying something
+  // true.
+  const units = 2 ** band.rateShift;
+  const per = Number.isFinite(units) ? units.toLocaleString('en-US') : `2^${band.rateShift}`;
+  const verb = kind === 'band' ? 'scrolls' : 'would scroll';
+  const dir = BAND_SCROLL_DIRECTION === '' ? '' : ` ${BAND_SCROLL_DIRECTION}`;
+  if (band.driver !== 'timer') {
+    // A camera band's phase is a function of the pan, so it has no speed. This
+    // is `bandIsTimeVarying`'s question asked of an already-resolved driver.
+    return `${verb}${dir} · 1px per ${per} px of camera travel`;
+  }
+  const pxPerSec = GAME_FRAMES_PER_SECOND / units;
+  // The injector prints the same sentence into its bake report ("1px per N
+  // units"). `px` is already both singular and plural, so only the frame word
+  // takes an s.
+  return `${verb}${dir} · 1px per ${per} frame${units === 1 ? '' : 's'} · ${
+    pxPerSec < SLOWEST_PRINTABLE_PX_PER_SEC
+      ? `<${SLOWEST_PRINTABLE_PX_PER_SEC} px/s`
+      : `≈${pxPerSec.toFixed(pxPerSec < 1 ? 2 : 0)} px/s`}`;
+}
+
+/**
+ * What a band IS, said once at the top of the band section. The paragraph
+ * above, compressed to one hint line; the per-band sentence is `bandMotion`.
+ */
+export const BAND_MECHANISM_HINT =
+  'A band is a cols x rows tile pattern with 8 frames swapped over the same tiles, so it '
+  + 'scrolls inside its own window. Every cell that points at the band moves the same way.';
+
 export type BandStatusKind = 'previewing' | 'no-cells' | 'refused' | 'unresolved';
 
 /** The two lines a band card carries that only the preview knows. */
@@ -240,27 +317,9 @@ export function bandStatus(
   band: { driver: string; rateShift: number },
   verdict: { cells: number; refusal: string | null } | undefined,
 ): BandStatus {
-  // `2 **`, not `1 <<`: `rate_shift` has no upper bound in the contract
-  // (`clampRateShift`'s docblock says why), and a shift of 32 wraps to 1 under
-  // the 68000-shaped operator while the arithmetic one keeps saying something
-  // true.
-  const units = 2 ** band.rateShift;
-  const per = Number.isFinite(units) ? units.toLocaleString('en-US') : `2^${band.rateShift}`;
-  let rate: string;
-  if (band.driver !== 'timer') {
-    // A camera band's phase is a function of the pan, so it has no speed. This
-    // is `bandIsTimeVarying`'s question asked of an already-resolved driver.
-    rate = `1px per ${per} camera px`;
-  } else {
-    const pxPerSec = GAME_FRAMES_PER_SECOND / units;
-    // The injector prints the same sentence into its bake report ("1px per N
-    // units"). `px` is already both singular and plural, so only the frame word
-    // takes an s.
-    rate = `1px per ${per} frame${units === 1 ? '' : 's'} · ${
-      pxPerSec < SLOWEST_PRINTABLE_PX_PER_SEC
-        ? `<${SLOWEST_PRINTABLE_PX_PER_SEC} px/s`
-        : `≈${pxPerSec.toFixed(pxPerSec < 1 ? 2 : 0)} px/s`}`;
-  }
+  // THE SAME SENTENCE THE LENS CAPTION PRINTS (`bandLensCaptionLines`), by
+  // construction: the card and the canvas call one function.
+  const rate = bandMotion(band, 'band');
 
   if (verdict === undefined) return { kind: 'unresolved', rate, verdict: null };
   // A REFUSAL OUTRANKS A CELL COUNT. A band whose slots name a blob nobody is
@@ -314,6 +373,12 @@ export interface BandLensResolution {
   /** The footprint, or null when it could not be computed. */
   coverage: BandCoverage | null;
   /**
+   * WHAT THE BAND DOES — `bandMotion`, resolved from the band's own driver and
+   * `rate_shift` (or the candidate's), so the caption says the sentence the
+   * card says. Null only when nothing is marked.
+   */
+  motion: string | null;
+  /**
    * Why there is no coverage for a range that IS marked, or null.
    *
    * LOUD ON UNMEASURABLE. A lens that quietly drew nothing when the background
@@ -326,8 +391,29 @@ export interface BandLensResolution {
 }
 
 const NO_LENS: BandLensResolution = {
-  kind: null, bandIndex: null, range: null, coverage: null, reason: null, source: null,
+  kind: null, bandIndex: null, range: null, coverage: null, motion: null, reason: null, source: null,
 };
+
+/**
+ * The lines the canvas caption prints, composed here so the sentence on the
+ * canvas and the sentence on the card are the SAME CALL (`bandMotion`), not two
+ * strings that agree today.
+ *
+ *   1. what the wash is (`coverageSubject`), with the swatch;
+ *   2. what the band does (`motion`) — `scrolls · 1px per …`;
+ *   3. the shape, or the reason there is none.
+ */
+export function bandLensCaptionLines(
+  lens: Pick<BandLensResolution, 'kind' | 'bandIndex' | 'coverage' | 'motion' | 'reason'>
+    & { range: SlotRange },
+): string[] {
+  return [
+    coverageSubject(lens.kind ?? 'candidate', lens.bandIndex, lens.range),
+    lens.motion ?? '',
+    lens.reason !== null ? lens.reason.slice(0, 96)
+      : lens.coverage ? coverageSummary(lens.coverage) : '',
+  ].filter((s) => s !== '');
+}
 
 /**
  * Resolve the band lens from current store state.
@@ -351,16 +437,21 @@ export function resolveBandLens(): BandLensResolution {
   let kind: 'band' | 'candidate';
   let bandIndex: number | null = null;
   let range: SlotRange;
+  let motion: string;
   if (target.kind === 'band') {
     const band = bands[target.index];
     if (!band) return NO_LENS; // the mark outlived its subject
     kind = 'band';
     bandIndex = target.index;
     range = slotRange(bandSlotBases(bands)[target.index], band.cols, band.rows);
+    // `describeBands` resolves the contract defaults, exactly as the card's
+    // `bandRows` does — so an absent `rate_shift` reads the same on both.
+    motion = bandMotion(describeBands(doc)[target.index], 'band');
   } else {
     const c = useEditorStore.getState().bandCandidate;
     kind = 'candidate';
     range = slotRange(c.staticBase, c.cols, c.rows);
+    motion = bandMotion(c, 'candidate');
   }
 
   const resolved = resolveDisplayedBg(
@@ -369,13 +460,13 @@ export function resolveBandLens(): BandLensResolution {
   );
   if (!resolved) {
     return {
-      kind, bandIndex, range, coverage: null, source: null,
+      kind, bandIndex, range, coverage: null, motion, source: null,
       reason: 'the active section resolves to no background, so there is no picture to light.',
     };
   }
   if (resolved.source !== 'override') {
     return {
-      kind, bandIndex, range, coverage: null, source: resolved.source,
+      kind, bandIndex, range, coverage: null, motion, source: resolved.source,
       reason: "the background on screen is not this document's. A slot index names a tile in the "
         + 'blob this file carries, and the act is painting another one, so nothing here can say '
         + 'which cells the range paints.',
@@ -389,9 +480,9 @@ export function resolveBandLens(): BandLensResolution {
     coverage = bandCoverage(resolved.layout, range, BG_WIDTH);
   } catch (e) {
     return {
-      kind, bandIndex, range, coverage: null, source: resolved.source,
+      kind, bandIndex, range, coverage: null, motion, source: resolved.source,
       reason: e instanceof Error ? e.message : String(e),
     };
   }
-  return { kind, bandIndex, range, coverage, reason: null, source: resolved.source };
+  return { kind, bandIndex, range, coverage, motion, reason: null, source: resolved.source };
 }

@@ -9,6 +9,7 @@ import { useArtStore } from './artStore';
 import { BoundEditHistory } from '../../core/editing/bound-edit-history';
 import { documentHistoryHub } from './history-hub';
 import { useProjectStore } from './projectStore';
+import { BAND_DEFAULTS } from '../../core/formats/bg-override/bg-override';
 import { useSessionStore } from './sessionStore';
 import { useWorkspaceStore } from '../workspace/workspaceStore';
 import { levelDocId, parseLevelTabId, isSpriteDocTabId, isCanvasDocTabId, zoneArtDocId } from '../shell/tabs';
@@ -208,7 +209,17 @@ interface EditorState {
    * anything else. A store that clamped would be a third opinion about
    * legality.
    */
-  bandCandidate: { staticBase: number; cols: number; rows: number };
+  bandCandidate: {
+    staticBase: number; cols: number; rows: number;
+    /**
+     * The RESOLVED driver and `rate_shift` the candidate would get — the
+     * form's explicit choice, or the contract default when the key is to be
+     * left out. In the store (parcel D) for the reason cols/rows are: the map's
+     * lens caption says what the candidate WOULD do, and a sibling cannot read
+     * the panel's local state.
+     */
+    driver: string; rateShift: number;
+  };
 
   /**
    * What the map's BAND LENS is lighting, or null for "nothing marked".
@@ -268,7 +279,7 @@ interface EditorState {
    * moved underneath would put the panel and the canvas on different subjects —
    * the exact split the lift exists to prevent.
    */
-  setBandCandidate: (patch: Partial<{ staticBase: number; cols: number; rows: number }>) => void;
+  setBandCandidate: (patch: Partial<EditorState['bandCandidate']>) => void;
   setBandLensTarget: (target: { kind: 'band'; index: number } | { kind: 'candidate' } | null) => void;
   setMarquee: (marquee: MarqueeState | null) => void;
   setMapClipboard: (clipboard: MapClipboard | null) => void;
@@ -382,7 +393,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   // 1x1 at slot 0: the smallest legal band, and a base the panel re-seeds to
   // `firstPromotableSlot` as soon as a document is open. `bandLensTarget: null`
   // is what keeps this from lighting anything before the author marks.
-  bandCandidate: { staticBase: 0, cols: 1, rows: 1 },
+  bandCandidate: {
+    staticBase: 0, cols: 1, rows: 1,
+    driver: BAND_DEFAULTS.driver, rateShift: BAND_DEFAULTS.rate_shift,
+  },
   bandLensTarget: null,
 
   marquee: null,
