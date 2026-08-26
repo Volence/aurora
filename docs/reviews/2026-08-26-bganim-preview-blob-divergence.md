@@ -97,6 +97,12 @@ about *this band's slots*, which is all the overlay touches.
 `bganim-preview.ts::bandRestArtMismatch` is that check;
 `BgAnimPreviewNote` reports the refusal to the author in their own terms.
 
+> **File moved, 2026-08-26 (ROADMAP item 45).** `BgAnimPreviewNote` no longer
+> exists. Its per-band half — including this refusal, which is still shown, just
+> not here — was folded into the band card in `BgAnimBandPanel`, composed by
+> `providers/bganim-preview-aeon.ts::bandStatus`; what was left became
+> `BgAnimPreviewStrip`. Nothing about the reasoning below changed.
+
 On today's live tree the guard **refuses**, and the note says why. That is the
 correct behaviour and it is also, honestly, a preview that shows nothing on the
 one real project — which is why this document exists rather than a line in a

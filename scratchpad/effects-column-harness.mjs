@@ -40,9 +40,21 @@
 //      declared-but-never-engaged `overflowY: auto` is not counted as a
 //      scrollbar the author has to deal with. The Panel itself is one of them.
 //
-//   4. SEVEN SECTIONS, SIX OF THEM OPEN ON ARRIVAL. Measured after a real
-//      `localStorage.clear()` + reload, so it is the ARRIVAL state and not
-//      whatever this machine's panel-state happened to hold.
+//   4. TOO MANY SECTIONS, TOO MANY OF THEM OPEN ON ARRIVAL. Measured after a
+//      real `localStorage.clear()` + reload, so it is the ARRIVAL state and not
+//      whatever this machine's panel-state happened to hold. The intended set is
+//      EXPECTED_OPEN/EXPECTED_CLOSED below, and its history is written there.
+//
+//   5. THE SAME BAND ENUMERATED TWICE (added for ROADMAP item 45). Two sections
+//      of this column each drew a card per band — the band editor's and the
+//      preview's — which is 222px + 385px of one band said twice. `Band preview`
+//      is now a strip inside `BG animation bands` and the per-band status lives
+//      in the band card. [D1] counts, across the whole column, the elements that
+//      ENUMERATE a band ("Band <n>" as the start of their own text); one per
+//      band is the property. [D2] then proves the honesty label survived the
+//      fold: its four named caveats are behind a disclosure chip, and the row
+//      opens it and reads all four rather than trusting that "approximate" is
+//      still backed by something.
 //
 // ===========================================================================
 // WHICH OBSERVABLE EACH ROW USES, AND WHY IT CAN SEE THE CHANGE
@@ -78,6 +90,17 @@
 //        `defaultCollapsed` attribute — that is source, and a source scan
 //        cannot tell you that the section also got force-expanded by an
 //        override or that its body is empty for want of data.
+//   [D1] the INNERMOST elements in the column whose own text begins "Band <n>".
+//        Innermost, so a card and the row inside it are not counted twice; text,
+//        not component identity, because the two cards this row exists to
+//        forbid were written by two different components and the duplication an
+//        AUTHOR sees is the words. Asked twice: [D1] at arrival and [D1b] with
+//        every section open, because a duplicate hiding in a collapsed section
+//        is still a duplicate and phase 1 cannot see it.
+//   [D2] the four named caveats, read out of the DOM BEFORE and AFTER clicking
+//        the disclosure chip. Absent-then-present is the property: absent-only
+//        is a deleted label, present-only would mean the row could pass on text
+//        that some other panel happened to be carrying.
 //
 // ===========================================================================
 // ANTI-VACUITY (bar 3)
@@ -113,6 +136,9 @@
 //   PLANT=overhang  take the scroller off the list body  -> judge C1
 //                   (the 954px effects-panel shape, reproduced)
 //   PLANT=arrival   expand a section that arrives closed -> judge A1
+//   PLANT=duplicate a SECOND element enumerating band 0  -> judge D1
+//                   (the "Band 0 · 8x4 · timer" card item 45 removed)
+//   PLANT=approx    delete the disclosure chip           -> judge D2
 //
 // ===========================================================================
 //   VITE_AURORA_DEBUG=1 npm run build      # __dbg only exists with the flag
@@ -171,25 +197,29 @@ const SUBJECT_SCENE = 'ojz_act1_start';
  * at four rows by the contract, and closing it would hide the fact that the
  * facet does bands at all.
  */
-// 'Band preview' ADDED 2026-08-26 BY THE OVERSEER AT LANDING, and it is a design
-// decision rather than a red being silenced — the distinction matters, so it is
-// written down here.
+// ⚠ 'Band preview' IS GONE FROM THIS LIST BECAUSE THE SECTION IS GONE — ROADMAP
+// item 45, 2026-08-26. The ruling this comment used to carry is SUPERSEDED and is
+// recorded here only so nobody re-derives it from an old shot of the column.
 //
-// Item 41 (this harness's parcel) and item 42 (the motion preview) were built
-// CONCURRENTLY off the same master. 41 tidied a SEVEN-section column and took its
-// overflow to zero; 42 then added an eighth section, `Band preview`, which 41 could
-// not have known about. On the merged tree A1 therefore failed, correctly: the
-// intended arrival state had genuinely changed underneath the guard.
+// WHAT IT USED TO SAY. Items 41 (this harness's parcel) and 42 (the motion
+// preview) were built concurrently off one master; 42 added an eighth section,
+// `Band preview`, and at landing the overseer ruled it ARRIVES OPEN — because it
+// carried the per-band text explaining why a band was NOT previewing, and
+// collapsing a feature's explanation of its own silence is the wrong default.
 //
-// Ruled: `Band preview` ARRIVES OPEN. It is the surface the owner asked for, and it
-// carries the per-band refusal text that explains why a band is not previewing
-// (the blob divergence, decision d-11) — collapsing the explanation of a feature's
-// own silence is exactly the wrong default. The cost is honest and is recorded in
-// ROADMAP row 41: the merged column overflows ~285px at 1680x1050 with one column
-// scrollbar, so 41's headline 0px was true of its own branch and is NOT true of
-// master. Folding the preview's per-band status into the band cards it duplicates
-// is booked as item 45.
-const EXPECTED_OPEN = ['Scenes', 'Scene', 'Layers', 'Section assignment', 'BG animation bands', 'Band preview'];
+// WHY THAT IS NO LONGER A REASON. Decision d-12 ("the game's copy wins", item 46)
+// made the canvas paint the override document, so on the overridden act there is
+// no silence to explain — the readout is a driver/rate/cell-count line, not an
+// apology. Item 45 then folded that per-band line into the band card it
+// duplicated and deleted the section: `Band preview` is a STRIP inside
+// `BG animation bands` now (playback chip, honesty label, two column-wide
+// warnings), and the per-band verdict lives in each band's own card. Seven
+// sections, five open. [D1] is the row that holds the fold — it fails if any band
+// is enumerated twice anywhere in the column.
+//
+// THE REFUSAL PATH IS NOT DEAD: an act the override does not bind still shows it,
+// inside the card. It was folded in, not deleted.
+const EXPECTED_OPEN = ['Scenes', 'Scene', 'Layers', 'Section assignment', 'BG animation bands'];
 const EXPECTED_CLOSED = ['New band', 'Properties'];
 
 /**
@@ -215,7 +245,24 @@ const isForeign = (title) => FOREIGN_SECTIONS.includes(title.replace(/\s*[—(].
 /** Which row each plant must turn red. A plant whose judge stays green is a failed run. */
 const PLANT_JUDGE = {
   label: 'L1', narrow: 'L2', pair: 'L3', list: 'S1', scroller: 'S2', overhang: 'C1', arrival: 'A1',
+  duplicate: 'D1', approx: 'D2',
 };
+
+/**
+ * THE FOUR SENTENCES THE HONESTY LABEL MUST STILL BE ABLE TO SAY — [D2].
+ *
+ * Quoted from `BgAnimPreviewStrip`'s own text, one fragment per named caveat, so
+ * a run that finds three of four fails and names the missing one. Item 45 moved
+ * this text behind a disclosure chip to buy back column height; the whole point
+ * of the row is that "moved behind a click" and "quietly diluted into
+ * 'approximate'" look identical from the ROADMAP and completely different here.
+ */
+const APPROX_CAVEATS = [
+  'The preview is approximate',
+  "the editor's wall clock",
+  'clamps its camera to the level',
+  'The ROM is the truth channel',
+];
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 function getJSON(path, timeoutMs = 1500) {
@@ -497,6 +544,80 @@ const COLUMN_PROBE = String.raw`
   };
 })()`;
 
+// ---------------------------------------------------------------------------
+// WHO ENUMERATES A BAND — the [D1] observable (ROADMAP item 45)
+// ---------------------------------------------------------------------------
+// The defect was two sections each drawing a card per band. The observable is
+// therefore NOT "how many sections are there" (a column could grow a third band
+// list and still have seven sections) and NOT "does BgAnimPreviewNote exist" (a
+// source scan, and this file measures rendered geometry on principle). It is:
+// how many places on screen START a line with "Band <n>".
+//
+// INNERMOST ONLY. A band card CONTAINS the row that titles it, and the card's
+// own text begins with the same two words — counting both would report every
+// tidy column as a duplicate. So an element counts only when no descendant of it
+// also counts. That also makes the count independent of how deeply either panel
+// happens to nest its cards.
+//
+// THE ANCHOR IS "^Band <n>" AND NOT A SUBSTRING. `Demote band 0 to static tiles`
+// is an aria-label on a button whose text is "Demote"; a substring match would
+// count it and a per-band action is not a per-band enumeration.
+const BAND_ENUM_PROBE = String.raw`
+(() => {
+  const isHeader = (el) => {
+    if (el.tagName !== 'DIV') return false;
+    const cs = getComputedStyle(el);
+    return cs.textTransform === 'uppercase' && cs.letterSpacing === '1px'
+      && !!el.firstElementChild && el.firstElementChild.tagName === 'SPAN';
+  };
+  const headers = [...document.querySelectorAll('div')].filter(isHeader);
+  if (!headers.length) return { error: 'no PanelHeader on screen' };
+  const boxes = headers.map((h) => ({ header: h, box: h.parentElement && h.parentElement.parentElement }))
+    .filter((s) => s.box);
+  const byParent = new Map();
+  for (const s of boxes) {
+    const p = s.box.parentElement;
+    if (!p) continue;
+    if (!byParent.has(p)) byParent.set(p, []);
+    byParent.get(p).push(s);
+  }
+  let column = null, best = -1;
+  for (const [p, list] of byParent) {
+    const left = p.getBoundingClientRect().left;
+    if (left > best) { best = left; column = { el: p, list }; }
+  }
+  if (!column) return { error: 'no section column found' };
+  const col = column.el;
+  const titleOf = (s) => (s.header.firstElementChild.textContent || '').trim();
+  const sectionOf = (el) => {
+    for (let p = el; p; p = p.parentElement) {
+      const s = column.list.find((x) => x.box === p);
+      if (s) return titleOf(s);
+    }
+    return '?';
+  };
+  const norm = (el) => (el.textContent || '').replace(/\s+/g, ' ').trim();
+  // "Band 0", "Band 0 · 8x4 · timer" — the index must END the token, so a
+  // geometry glued straight onto it by textContent ("Band 08x4") is NOT a match
+  // and the row that only titles the card is.
+  const RE = /^Band (\d+)(?:[\s·]|$)/;
+  const all = [...col.querySelectorAll('*')].filter((el) => RE.test(norm(el)));
+  const innermost = all.filter((el) => !all.some((o) => o !== el && el.contains(o)));
+  const hits = innermost.map((el) => ({
+    index: Number(RE.exec(norm(el))[1]),
+    section: sectionOf(el),
+    text: norm(el).slice(0, 60),
+  }));
+  return { hits, sections: column.list.map(titleOf) };
+})()`;
+
+/** The four named caveats, read out of the whole page. Text, not a component. */
+const CAVEAT_PROBE = (bits) => String.raw`
+(() => {
+  const t = (document.body.textContent || '').replace(/\s+/g, ' ');
+  return ${JSON.stringify(bits)}.map((b) => ({ bit: b, present: t.includes(b) }));
+})()`;
+
 /**
  * Click every collapsed section in the right-hand column open, by its header —
  * the gesture a human makes, not a store write. Returns what it clicked.
@@ -653,6 +774,36 @@ const PLANTS = {
   const title = (h => (h.firstElementChild.textContent||'').trim())(closed);
   closed.click();
   return 'planted:' + title;
+})()`,
+  // THE DEFECT ITEM 45 REMOVED, PUT BACK. A second element enumerating band 0,
+  // in the exact words the deleted `Band preview` card used. It is appended
+  // beside the card's own title row rather than into a section of its own,
+  // because D1 must fire on a duplicate ANYWHERE — a row that could only see a
+  // duplicate in a separate section would be a row about section counts.
+  duplicate: String.raw`
+(() => {
+  const RE = /^Band (\d+)(?:[\s·]|$)/;
+  const norm = (el) => (el.textContent || '').replace(/\s+/g, ' ').trim();
+  const all = [...document.querySelectorAll('*')]
+    .filter((el) => el.getBoundingClientRect().left > 400 && RE.test(norm(el)));
+  const innermost = all.filter((el) => !all.some((o) => o !== el && el.contains(o)));
+  if (!innermost.length) return 'no-band';
+  const src = innermost[0];
+  const clone = document.createElement('div');
+  clone.textContent = norm(src).replace(RE, (m, n) => 'Band ' + n + ' ') + '· 8x4 · timer';
+  src.parentElement.appendChild(clone);
+  return 'planted:' + clone.textContent;
+})()`,
+  // THE HONESTY LABEL MADE UNREACHABLE. Not "hidden with CSS" — the chip is
+  // REMOVED, which is what a parcel that quietly dropped the disclosure would
+  // leave behind, and D2 cannot then open anything.
+  approx: String.raw`
+(() => {
+  const btn = [...document.querySelectorAll('button')]
+    .find((b) => /why approximate/i.test(b.textContent || ''));
+  if (!btn) return 'no-chip';
+  btn.remove();
+  return 'planted';
 })()`,
 };
 
@@ -862,6 +1013,31 @@ async function main() {
       `open=${JSON.stringify(open)}  closed=${JSON.stringify(closed)}  want open=${JSON.stringify(EXPECTED_OPEN)}`
       + `  want closed=${JSON.stringify(EXPECTED_CLOSED)}`);
 
+    // ---- D1: ONE CARD PER BAND ------------------------------------------
+    // ROADMAP item 45. See BAND_ENUM_PROBE for why this is the observable.
+    const bandEnum = async (id, name) => {
+      const e = await c.json(BAND_ENUM_PROBE);
+      if (e.error) { check(id, name, false, `COULD NOT MEASURE: ${e.error}`); return null; }
+      const per = {};
+      for (const h of e.hits) (per[h.index] ??= []).push(`${h.section}:"${h.text}"`);
+      const indices = Object.keys(per).map(Number).sort((a, b) => a - b);
+      const dupes = indices.filter((i) => per[i].length > 1);
+      // ANTI-VACUITY, and it is the whole risk in this row: "no band appears
+      // twice" is trivially true of a column that draws no bands at all — which
+      // is exactly what a collapsed section, a closed project or a renamed label
+      // would produce. So the row FAILS when it found nothing to count, and
+      // prints what it did find either way.
+      const sawSubject = indices.length > 0;
+      target(id, name, sawSubject && dupes.length === 0,
+        sawSubject
+          ? `${indices.length} band(s) enumerated ${JSON.stringify(indices)}; `
+            + `${dupes.length} enumerated more than once. ${JSON.stringify(per)}`
+          : 'NOTHING TO COUNT: no element in the column enumerates a band, so this row '
+            + `would be vacuous. Column sections: ${JSON.stringify(e.sections)}`);
+      return e;
+    };
+    await bandEnum('D1', 'each band is enumerated by exactly ONE card in the column');
+
     // ---- the reports the owner is owed ----------------------------------
     report('r1', 'column overflow (how much taller its content is than the column)',
       `${m.column.overflow}px  (content ${m.column.scrollHeight}px in ${m.column.clientHeight}px, `
@@ -947,10 +1123,39 @@ async function main() {
           .map((r) => `${r.label}=${r.naturalW}px`))]));
       writeFileSync(`${SHOTS}/measure-allopen-${PLANT || (BASELINE ? 'baseline' : 'after')}`
         + `-${SCREEN_W}x${SCREEN_H}.json`, JSON.stringify(m2, null, 2));
+      // Asked again with EVERY section open: a duplicate card living in a
+      // section that arrives closed is still a duplicate, and phase 1 cannot
+      // see it. This is the same alternative-green-path argument [i5] makes for
+      // the label rows.
+      await bandEnum('D1b', 'no band is enumerated twice with EVERY section open');
     } else {
       check('L1b', 'the label column still holds with EVERY section open', false,
         'COULD NOT MEASURE: not every section opened');
     }
+
+    // ---- D2: the honesty label survived being made compact ----------------
+    // ROADMAP item 45 bought column height by putting the four named caveats
+    // behind a disclosure chip. From a doc, "moved behind a click" and "diluted
+    // to the word approximate" are the same sentence; here they are not.
+    //
+    // RUN LAST, DELIBERATELY: opening the disclosure adds a paragraph to the
+    // column, and every height above ([r1], [r3], [r6], [C1]) would then be
+    // measuring a state no author arrives in.
+    const before = await c.json(CAVEAT_PROBE(APPROX_CAVEATS));
+    const clickedApprox = await c.evalExpr(clickByText('/why approximate/i'));
+    await sleep(400);
+    const after = await c.json(CAVEAT_PROBE(APPROX_CAVEATS));
+    const missing = after.filter((x) => !x.present).map((x) => x.bit);
+    const leaked = before.filter((x) => x.present).map((x) => x.bit);
+    target('D2', 'the four named approximations are one click away, in full, and not before',
+      clickedApprox === true && missing.length === 0 && leaked.length === 0,
+      `chip click -> ${JSON.stringify(clickedApprox)}; `
+      + `after: ${after.map((x) => `${x.present ? 'ok' : 'MISSING'}: ${x.bit}`).join(' | ')}`
+      + (leaked.length
+        ? `; ALREADY ON SCREEN BEFORE THE CLICK (so the row could pass without the `
+          + `disclosure working): ${JSON.stringify(leaked)}`
+        : '; none of the four was on screen before the click'));
+    if (clickedApprox === true) await shot(c, `caveats-${PLANT || 'after'}-${SCREEN_W}x${SCREEN_H}`);
 
     // ---- plant invariants ------------------------------------------------
     if (PLANT) {
