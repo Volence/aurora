@@ -283,11 +283,19 @@ const LAYER_CARDS = String.raw`
   while (header && !(header.tagName === 'DIV'
          && parseFloat(getComputedStyle(header).paddingLeft) > 0)) header = header.parentElement;
   const section = header.parentElement.parentElement;
-  // The bordered box, not the "#N world_y" row inside it — the effects harness
-  // learned that the naive text query counts both and reports 4 cards for 2.
+  // The bordered box, not a row inside it — the effects harness learned that a
+  // naive text query counts both and reports 4 cards for 2.
+  //
+  // MATCHED ON THE world_y SPINNER'S TITLE, not on a label's text (ROADMAP item
+  // 41). This used to key on a "#N world_y" label, which the item-41 layout pass
+  // renamed to "world_y" under a "Layer N" card title — and a card counter that
+  // depends on a LABEL is one a layout parcel can silently zero. The spinner's
+  // "title" is the field's own name and is what the panel binds the model
+  // through, so it moves only if the field does.
   return [...section.querySelectorAll('div')].filter((d) =>
     parseFloat(getComputedStyle(d).borderTopWidth) >= 1
-    && /^#\d+ world_y$/.test((d.querySelector('span')?.textContent || '').trim())).length;
+    && [...d.querySelectorAll('input[type=number]')]
+         .some((e) => /^Layer \d+ world_y/.test(e.title || ''))).length;
 })()`;
 
 const panelState = (c) => c.evalExpr(`localStorage.getItem(${JSON.stringify(PANEL_KEY)})`);
@@ -364,8 +372,19 @@ async function main() {
     const pressedNew = typed === 'ok' && await c.evalExpr(clickByText('/^New$/'));
     await sleep(900);
     const scenes = await c.json('window.__dbg.aeon.scenes()');
-    check('0d', 'a fixture scene exists, so the Scene and Layers sections are mounted',
-      scenes.length === 1 && scenes[0].id === SCENE_ID,
+    // ADDRESSED BY ID, NOT BY POSITION, and that is a repair rather than a
+    // preference. This row used to assert `scenes.length === 1 && scenes[0].id
+    // === SCENE_ID`, which was true only while aeon's tree carried NO scene of
+    // its own. It gained one on 2026-08-26 (`ojz_act1_start`, the handover-band
+    // fixture) and every model-side row below silently started reading THAT
+    // scene's layer count instead of this fixture's: nine rows went red at once
+    // with the panel behaving perfectly, because the DOM side was right and the
+    // model side was pointed at a different object. Measured on the tree before
+    // and after ROADMAP item 41's layout pass — 22/31 both times, same nine
+    // rows — so the break is the fixture's, not that parcel's.
+    const sceneOf = (list) => list.find((s) => s.id === SCENE_ID) ?? null;
+    check('0d', 'the fixture scene exists, so the Scene and Layers sections are mounted',
+      sceneOf(scenes) !== null,
       `typed=${typed} new=${pressedNew} scenes=${JSON.stringify(scenes)}`);
     await sleep(700);
 
@@ -468,7 +487,7 @@ async function main() {
     // after EVERY click, starting with the first.
     const stateBefore3 = await panelState(c);
     for (let n = 1; n <= 3; n++) {
-      const layersBefore = (await c.json('window.__dbg.aeon.scenes()'))[0].layers;
+      const layersBefore = sceneOf(await c.json('window.__dbg.aeon.scenes()')).layers;
       const shot0 = await c.json(SECTION_PROBE('/^Layers \\(\\d+\\/\\d+\\)$/'));
       if (!shot0.found || !shot0.actionPt) {
         unmeasurable(`3a.${n}`, `click ${n}: the Add layer control is on screen`,
@@ -476,7 +495,7 @@ async function main() {
         break;
       }
       await clickAt(c, shot0.actionPt);
-      const layersAfter = (await c.json('window.__dbg.aeon.scenes()'))[0].layers;
+      const layersAfter = sceneOf(await c.json('window.__dbg.aeon.scenes()')).layers;
       const after = await c.json(SECTION_PROBE('/^Layers \\(\\d+\\/\\d+\\)$/'));
       const cardsAfter = await c.evalExpr(LAYER_CARDS);
       const stateAfter = await panelState(c);
@@ -502,13 +521,13 @@ async function main() {
     // Item 32 was found at "Layers (8/8) over an empty panel". Growing the stack
     // to the maximum reproduces the exact reported state rather than a nearby
     // one — and the last click is the 7th, the odd one that did it.
-    let scene = (await c.json('window.__dbg.aeon.scenes()'))[0];
+    let scene = sceneOf(await c.json('window.__dbg.aeon.scenes()'));
     let guardTrips = 0;
     while (scene.layers < 8 && guardTrips < 12) {
       const s = await c.json(SECTION_PROBE('/^Layers \\(\\d+\\/\\d+\\)$/'));
       if (!s.found || !s.actionPt || s.actionDisabled) break;
       await clickAt(c, s.actionPt);
-      scene = (await c.json('window.__dbg.aeon.scenes()'))[0];
+      scene = sceneOf(await c.json('window.__dbg.aeon.scenes()'));
       guardTrips++;
     }
     const atMax = await c.json(SECTION_PROBE('/^Layers \\(\\d+\\/\\d+\\)$/'));
@@ -545,8 +564,8 @@ async function main() {
       await clickAt(c, sceneProbe.actionPt);
       const scenesAfter = await c.json('window.__dbg.aeon.scenes()');
       const stateAfter5 = await panelState(c);
-      check('5b', 'the Delete click reached the button (the scene left the model)',
-        scenesAfter.length === 0, `scenes=${JSON.stringify(scenesAfter)}`);
+      check('5b', 'the Delete click reached the button (the FIXTURE scene left the model)',
+        sceneOf(scenesAfter) === null, `scenes=${JSON.stringify(scenesAfter)}`);
       check('5c', `Delete did not write ${SCENE_SECTION_ID} into persisted panel state`,
         stateAfter5 === stateBefore5
         && !(JSON.parse(stateAfter5 ?? '{}')[SCENE_SECTION_ID] === true),

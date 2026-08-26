@@ -312,15 +312,26 @@ async function main() {
     await sleep(600);
     const factorSel = await c.json(String.raw`
       (() => {
-        const sels = [...document.querySelectorAll('select')].filter(e => /fa|v_factor|fb/.test(e.title || ''));
+        const sels = [...document.querySelectorAll('select')]
+          .filter(e => /^Layer \d+ f[ab]$/.test(e.title || ''));
         return sels.map(s => ({
           title: s.title,
           options: [...s.options].map(o => o.value),
           value: s.value,
         }));
       })()`);
-    check('4a', 'a layer fa/fb picker and the scene v_factor picker are all on screen',
-      factorSel.length >= 3, JSON.stringify(factorSel.map((s) => s.title)));
+    // TWO PICKERS, AND THE MATCHER IS RE-CUT (OVERSEER bar 2c). This row asked
+    // for `>= 3` selects whose title matched /fa|v_factor|fb/, and it had been
+    // passing on a coincidence: `/fa/` matches the word "default", which the
+    // band panel's driver / rate-shift / phase-fill options all carry. There is
+    // no v_factor PICKER — ROADMAP item 35 replaced it with a spinner, because
+    // v_factor is a right-shift count and every FACTOR_* name is a value no
+    // engine can consume there — so three was never the right number. ROADMAP
+    // item 41 collapsed the band form on arrival, which took the accidental
+    // third away and made the row fail for the first time. Anchored on the
+    // pickers' own titles now, and the count is the two that exist.
+    check('4a', 'both of a layer\'s factor pickers are on screen',
+      factorSel.length === 2, JSON.stringify(factorSel.map((s) => s.title)));
     const anyFactor = factorSel[0];
     // THE ROW THIS HARNESS EXISTS FOR: 16 published names + one custom sentinel.
     // A derivation that yielded undefined renders an EMPTY select, and nothing
@@ -605,14 +616,20 @@ async function main() {
           if (cs.overflowY === 'auto' && parseFloat(cs.borderLeftWidth) >= 1) break;
           panel = panel.parentElement;
         }
-        // A layer card is a bordered box holding a "#N world_y" label.
-        // A layer CARD is the bordered box. Its inner "#N world_y" row matches a
-        // naive text query too, which is how the first run of this row counted
-        // four cards for two layers and reported [154,24,154,24] — the 24s were
-        // the rows inside the 154s. The border is what distinguishes them.
+        // A layer CARD is the bordered box. A row inside it matches a naive
+        // text query too, which is how the first run of this row counted four
+        // cards for two layers and reported [154,24,154,24] — the 24s were the
+        // rows inside the 154s. The border is what distinguishes them.
+        //
+        // MATCHED ON THE world_y SPINNER'S TITLE, not on a label's text (ROADMAP
+        // item 41): the label used to read "#N world_y" and now reads "world_y"
+        // under a "Layer N" card title. A card counter keyed on a LABEL is one a
+        // layout parcel can silently zero; the spinner's title is the field's own
+        // name, which moves only if the field does.
         const cards = [...section.querySelectorAll('div')].filter((d) =>
           parseFloat(getComputedStyle(d).borderTopWidth) >= 1
-          && /^#\d+ world_y$/.test((d.querySelector('span')?.textContent || '').trim()));
+          && [...d.querySelectorAll('input[type=number]')]
+               .some((e) => /^Layer \d+ world_y/.test(e.title || '')));
         const spinners = [...section.querySelectorAll('input[type=number]')]
           .filter((e) => /^s[12] —/.test(e.title || ''));
         const pr = panel.getBoundingClientRect();
