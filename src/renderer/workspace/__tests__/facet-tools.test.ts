@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { FACET_TOOLS, toolsForFacet, toolForFacet, switchFacet } from '../facet-tools';
-import { TOOL_LABELS, dockOrder } from '../tool-meta';
+import { TOOL_LABELS, TOOL_KEYS, dockOrder } from '../tool-meta';
 import { TOOL_IDS } from '../../../core/project/adapter';
 import { useWorkspaceStore } from '../workspaceStore';
 import { useEditorStore, type EditorTool } from '../../state/editorStore';
@@ -178,5 +178,56 @@ describe('dockOrder', () => {
 
   it('orders by the one vocabulary, so an unknown tool cannot reshuffle a rail', () => {
     expect(dockOrder([...TOOL_IDS])).toEqual([...TOOL_IDS]);
+  });
+});
+
+// THE EFFECTS FACET HAS A SECOND TOOL (triage 2026-08-26 §A.3, parcel B).
+// Item 43 hung the band mark on View's mouseup because View was the facet's only
+// tool, and that made every pan-click a band gesture. The mark is a tool now;
+// View leads (pure pan) and `mark-band` sits beside it.
+describe('effects facet tools', () => {
+  it('offers View first and Mark band second — nothing else', () => {
+    expect(FACET_TOOLS.parallax).toEqual(['view', 'mark-band']);
+  });
+  it('mark-band is offered by NO other facet', () => {
+    for (const [facet, tools] of Object.entries(FACET_TOOLS)) {
+      if (facet === 'parallax') continue;
+      expect(tools, facet).not.toContain('mark-band');
+    }
+  });
+});
+
+// THE KEYBOARD LETTERS LIVE IN A TABLE, NOT A SWITCH. `MapViewport`'s hotkey
+// branch used to spell them as `case 'v'` … `case 'm'`, which no test could
+// enumerate; `TOOL_KEYS` is that table lifted out so uniqueness can be asserted
+// over the SAME data the viewport reads. Derived from FACET_TOOLS × TOOL_KEYS,
+// never typed: the letter parcel B reserves for mark-band must not collide with
+// any letter another facet's tool already answers to.
+describe('tool keys', () => {
+  it('assigns every tool exactly one lowercase letter', () => {
+    expect(Object.keys(TOOL_KEYS).sort()).toEqual([...TOOL_IDS].sort());
+    for (const k of Object.values(TOOL_KEYS)) expect(k).toMatch(/^[a-z]$/);
+  });
+  it('no two tools share a letter, across every facet', () => {
+    const letters = TOOL_IDS.map((t) => TOOL_KEYS[t]);
+    expect(new Set(letters).size).toBe(TOOL_IDS.length);
+  });
+  it("mark-band's letter collides with nothing the layout facet answers to", () => {
+    const layoutLetters = FACET_TOOLS.layout!.map((t) => TOOL_KEYS[t]);
+    expect(layoutLetters).not.toContain(TOOL_KEYS['mark-band']);
+  });
+  it('within each facet the letters are distinct (the dock is what the key arms)', () => {
+    for (const [facet, tools] of Object.entries(FACET_TOOLS)) {
+      const letters = tools.map((t) => TOOL_KEYS[t]);
+      expect(new Set(letters).size, facet).toBe(letters.length);
+    }
+  });
+  it('keeps the letters the viewport has always answered to', () => {
+    // The pre-parcel switch, transcribed so a table edit that silently rebinds
+    // an old letter has to come through here.
+    expect(TOOL_KEYS).toMatchObject({
+      view: 'v', select: 's', 'place-object': 'o', 'place-ring': 'r', 'paint-tile': 't',
+      'paint-block': 'b', 'paint-collision': 'c', 'stamp-chunk': 'k', marquee: 'm',
+    });
   });
 });

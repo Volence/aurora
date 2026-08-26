@@ -8,6 +8,7 @@ import { useAeonHistoryVersion } from '../hooks/useHistoryVersion';
 import { useArtStore } from '../state/artStore';
 import { useSessionStore } from '../state/sessionStore';
 import { switchFacet, toolsForFacet } from '../workspace/facet-tools';
+import { toolForKey } from '../workspace/tool-meta';
 import { useWorkspaceStore } from '../workspace/workspaceStore';
 import { levelKeysEnabled } from '../workspace/level-keys';
 import { useToastStore } from '../state/toastStore';
@@ -1176,6 +1177,12 @@ export default function MapViewport() {
       // map's own pan and are equally not Ctrl-chords.
       if (e.ctrlKey || e.metaKey || e.altKey) return;
 
+      // The tool letters come from ONE table (tool-meta TOOL_KEYS), asserted
+      // collision-free against FACET_TOOLS in the node suite — a `case 'x'`
+      // here could shadow a neighbour and nothing would enumerate it.
+      const keyedTool = toolForKey(e.key);
+      if (keyedTool) { setToolScoped(keyedTool); return; }
+
       const step = 64;
       switch (e.key) {
         case 'ArrowLeft': pan(step, 0); e.preventDefault(); break;
@@ -1185,15 +1192,6 @@ export default function MapViewport() {
         case '=': case '+': setZoom(zoom * 1.5); e.preventDefault(); break;
         case '-': setZoom(zoom / 1.5); e.preventDefault(); break;
         case '0': setZoom(1); e.preventDefault(); break;
-        case 'v': setToolScoped('view'); break;
-        case 's': setToolScoped('select'); break;
-        case 'o': setToolScoped('place-object'); break;
-        case 'r': setToolScoped('place-ring'); break;
-        case 't': setToolScoped('paint-tile'); break;
-        case 'b': setToolScoped('paint-block'); break;
-        case 'c': setToolScoped('paint-collision'); break;
-        case 'k': setToolScoped('stamp-chunk'); break;
-        case 'm': setToolScoped('marquee'); break;
         case 'Escape': {
           // The order lives in `resolveEscape` (paste, then marquee from any
           // tool, then the band lens in the Effects facet) so the node suite can

@@ -22,13 +22,17 @@ export const FACET_TOOLS: Partial<Record<FacetCapability, readonly EditorTool[]>
   rings: ['place-ring', 'select', 'view'],
   collision: ['paint-collision', 'view'],
   palette: ['view'],
-  // The Effects lens is view-only over the map, `palette`'s shape exactly: the
-  // authoring happens in the right-hand column, and no scene parameter is edited
-  // by clicking the act. An EMPTY list would have been the other reading, and it
-  // is wrong — `toolForFacet` returns the CURRENT tool for an empty set, so
-  // arriving here from Layout would leave `stamp-chunk` armed over a canvas with
-  // no dock to disarm it from.
-  parallax: ['view'],
+  // The Effects lens: View (a pure pan — it leads, so a facet switch lands on
+  // it) and the band mark. Item 43 hung the mark on View's mouseup because View
+  // was this facet's only tool, and that made every pan-click a band gesture
+  // with a wash the owner could not put out (triage 2026-08-26 §A.2/§A.3). The
+  // guide drag stays on View: it grabs a LINE, and a miss pans. No scene
+  // parameter is edited by clicking the act; the mark writes nothing either.
+  // An EMPTY list would have been the other reading, and it is wrong —
+  // `toolForFacet` returns the CURRENT tool for an empty set, so arriving here
+  // from Layout would leave `stamp-chunk` armed over a canvas with no dock to
+  // disarm it from.
+  parallax: ['view', 'mark-band'],
   // 'art' is absent: the Art facet runs the artStore tool system, not EditorTool.
 };
 
