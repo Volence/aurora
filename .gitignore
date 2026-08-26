@@ -13,3 +13,10 @@ docs/lane-status.json
 # The BgAnim preview harness fixture: a hardlinked copy of the aeon tree with
 # two files regenerated. Rebuilt by scratchpad/bganim-preview-fixture.mjs.
 scratchpad/fixtures/aeon-bganim-coherent/
+
+# The BG-override display/paint harness fixtures: hardlinked copies of the aeon
+# tree, one with the act retargeted off the injector's output directory and one
+# the paint rows save into. Rebuilt by scratchpad/bg-override-paints-harness.mjs
+# on every run, and never a source of truth.
+scratchpad/fixtures/aeon-bg-unbound/
+scratchpad/fixtures/aeon-bg-writable/

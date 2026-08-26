@@ -46,7 +46,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = process.env.AURORA_ROOT ?? dirname(dirname(fileURLToPath(import.meta.url)));
-const AEON = process.env.AEON_DIR ?? '/home/volence/sonic_hacks/aeon';
+export const AEON = process.env.AEON_DIR ?? '/home/volence/sonic_hacks/aeon';
 export const FIXTURE = join(ROOT, 'scratchpad/fixtures/aeon-bganim-coherent');
 
 const CONTRACT = JSON.parse(readFileSync(
@@ -167,10 +167,21 @@ export function buildFixture({ force = false } = {}) {
   return FIXTURE;
 }
 
-/** What the harness needs to know about the fixture, derived from the document. */
-export function fixtureFacts() {
+/**
+ * What a harness needs to know about a TREE's bands, derived from its document.
+ *
+ * Takes the tree because, since decision d-12, the LIVE aeon project can
+ * exercise the preview too: the canvas paints `editor_bg_override.json`, so a
+ * band's rest art IS the blob on screen by construction and the licence check
+ * passes. The fixture is still built and still measured — it carries a SECOND,
+ * `camera_x` band, which the live document does not, and the camera/timer
+ * contrast is what makes the posture rows a contrast rather than two separate
+ * measurements. Neither replaces the other: the fixture proves the contrast, the
+ * live tree proves the feature works where an author would use it.
+ */
+export function documentFacts(tree = FIXTURE) {
   const doc = JSON.parse(readFileSync(
-    join(FIXTURE, 'games/sonic4/data/editor_bg_override.json'), 'utf8'));
+    join(tree, 'games/sonic4/data/editor_bg_override.json'), 'utf8'));
   return {
     layout: doc.layout,
     bands: doc.anims.map((b, i) => ({
@@ -184,6 +195,9 @@ export function fixtureFacts() {
     })),
   };
 }
+
+/** The fixture's own facts — `documentFacts(FIXTURE)`, kept as the old name. */
+export function fixtureFacts() { return documentFacts(FIXTURE); }
 
 if (process.argv[1] && process.argv[1].endsWith('bganim-preview-fixture.mjs')) {
   const dir = buildFixture({ force: process.argv.includes('--force') });
