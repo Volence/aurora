@@ -192,6 +192,29 @@ function cdp(wsUrl) {
   return { ready, send, evalExpr, json, close: () => ws.close() };
 }
 
+// ═══ "New band" ARRIVES COLLAPSED (ROADMAP item 41) ═══
+// It is a creation form and was measured as the tallest box in the effects
+// column (474px of 1229px), so the item-41 layout pass gave it
+// `defaultCollapsed`. A collapsed CollapsibleSection renders NO children at
+// all, so every control below this point would come back `null` and read as
+// "the control is missing" — which is exactly the defect these harnesses were
+// written to detect. Opened the way a human opens it: a click on its header.
+const OPEN_NEW_BAND = String.raw`
+(() => {
+  const isHeader = (el) => {
+    if (el.tagName !== 'DIV') return false;
+    const cs = getComputedStyle(el);
+    return cs.textTransform === 'uppercase' && cs.letterSpacing === '1px'
+      && !!el.firstElementChild && el.firstElementChild.tagName === 'SPAN';
+  };
+  const hdr = [...document.querySelectorAll('div')].filter(isHeader)
+    .find((h) => (h.firstElementChild.textContent || '').trim() === 'New band');
+  if (!hdr) return 'no-section';
+  if (hdr.parentElement.parentElement.children.length > 1) return 'already-open';
+  hdr.click();
+  return 'clicked';
+})()`;
+
 const results = [];
 const fails = [];
 function check(id, name, ok, detail) {
@@ -356,6 +379,9 @@ async function main() {
     check('2a', 'the facet bar offers an Effects pill [instrument check]', clicked === true,
       `buttons on screen: ${JSON.stringify(pills.slice(0, 25))}`);
     await sleep(1200);
+    const openedNewBand = await c.evalExpr(OPEN_NEW_BAND);
+    if (openedNewBand === 'no-section') throw new Error('no "New band" section on screen');
+    await sleep(900);
 
     const headings = await c.json(
       `[...document.querySelectorAll('span')].map(e => (e.textContent||'').trim())
@@ -480,8 +506,11 @@ async function main() {
     check('5f', 'the band leaves `driver` unspelled, so the document tracks the engine default',
       created && created.driverIsExplicit === false && DRIVERS.includes(created.driver),
       `driver=${created && created.driver} explicit=${created && created.driverIsExplicit}`);
-    check('5g', 'the new band is on screen in the list, with its slot range',
-      (await c.evalExpr(`(document.body.innerText||'').includes('#${bands1.length - 1}')`)) === true);
+    check('5g', 'the new band is on screen in the list, with its index',
+      // "Band N", not "#N": ROADMAP item 41 moved the band card's index into
+      // the shared label column, where it titles the card the way "Layer N"
+      // titles a layer card. The index is still what identifies the row.
+      (await c.evalExpr(`(document.body.innerText||'').includes('Band ${bands1.length - 1}')`)) === true);
     await shot(c, '2-after-promote');
 
     // ═══ SECTIONS 6 AND 7 NEED 5c TO HAVE LANDED ═══
