@@ -12,6 +12,7 @@
 // calling this from a render AND from an rAF costs one map lookup on all but the
 // frames where something actually moved.
 
+import { BAND_DEFAULTS } from '../../core/formats/bg-override/bg-override';
 import { BgAnimPreviewRenderer, type BandPreviewVerdict } from '../canvas/BgAnimPreviewRenderer';
 import {
   documentBands, bandSlotBases, describeBands,
@@ -451,7 +452,9 @@ export function resolveBandLens(): BandLensResolution {
     const c = useEditorStore.getState().bandCandidate;
     kind = 'candidate';
     range = slotRange(c.staticBase, c.cols, c.rows);
-    motion = bandMotion(c, 'candidate');
+    // Absent driver/rate mean "leave the key out" (parcel B), so the caption
+    // resolves the contract default the way the document would.
+    motion = bandMotion({ driver: c.driver ?? BAND_DEFAULTS.driver, rateShift: c.rateShift ?? BAND_DEFAULTS.rate_shift }, 'candidate');
   }
 
   const resolved = resolveDisplayedBg(

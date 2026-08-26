@@ -200,6 +200,11 @@ describe('registerS1FacetModules registers every facet the s1 profile grants', (
     expect(moduleFor('aeon', 'layout')).not.toBeNull();
     expect(moduleFor('aeon', 'layout')?.ToolOptions).toBeUndefined();
     expect(moduleFor('aeon', 'palette')?.ToolOptions).toBeUndefined();
+    // …except Effects (parcel B): its bar carries the two band verbs so the
+    // collapsed `New band` section is not the only door to making one. It is
+    // NOT classic's hint line — a component of its own.
+    expect(moduleFor('aeon', 'parallax')?.ToolOptions).toBeDefined();
+    expect(moduleFor('aeon', 'parallax')?.ToolOptions).not.toBe(layout);
   });
 
   it('gives every facet its own right panel — the columns are what differ', async () => {

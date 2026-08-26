@@ -101,6 +101,10 @@ export type FacetCapability = (typeof FACET_CAPABILITIES)[number];
 export const TOOL_IDS = [
   'view', 'select', 'paint-tile', 'paint-block', 'stamp-chunk',
   'paint-collision', 'place-object', 'place-ring', 'marquee',
+  // The Effects facet's band mark (parcel B, triage 2026-08-26 §A.3): a click on
+  // a Plane-B cell seeds the band lens. It was a side-effect of View's mouseup
+  // and so fired on every pan-click; it is a tool now, and View is a pure pan.
+  'mark-band',
 ] as const;
 export type ToolId = (typeof TOOL_IDS)[number];
 

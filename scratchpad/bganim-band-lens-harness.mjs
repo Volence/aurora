@@ -80,6 +80,14 @@
 // (section 10's Demote) is undone, and the run ends by asserting the override
 // document hashes back to exactly what it was at [2c].
 //
+// ⚠ PARCEL B (2026-08-26, branch parcel/mark-band-tool) MOVED THE MARK OFF
+//    VIEW. The click gesture every section below drives now fires only under
+//    the `mark-band` dock tool (letter `n` with the map focused); in View a
+//    click seeds nothing, by design (triage §A.3). RE-RUN WITH THE TOOL
+//    SELECTED and expect the same rows (37/38 + 1 NM). The pan row (section 9)
+//    holds under both tools; a View-tool click is now a second "seeds nothing"
+//    case this harness does not yet have a row for.
+//
 // ⚠ NO EMULATOR. Nothing here touches oracle or any emulator MCP tool.
 //
 // Requires a debug build:  VITE_AURORA_DEBUG=1 npx electron-vite build

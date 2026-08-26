@@ -24,6 +24,7 @@ export const TOOL_LABELS: Record<ToolId, string> = {
   'paint-collision': 'Paint Collision',
   'place-object': 'Place Object',
   'place-ring': 'Place Ring',
+  'mark-band': 'Mark Band',
 };
 
 /**
@@ -46,7 +47,39 @@ export const TOOL_HINTS: Record<ToolId, string> = {
   'paint-collision': 'Click to set the collision type on tiles',
   'place-object': 'Click to place the selected object type',
   'place-ring': 'Click to place the selected ring pattern',
+  'mark-band': 'Click a background cell to mark a band there; drag to pan · Esc hides the lens',
 };
+
+/**
+ * The hotkey letter that arms each tool — the ONE table `MapViewport`'s keydown
+ * branch reads. It was a `switch` of `case 'v'` … `case 'm'` inside the
+ * viewport, which nothing could enumerate; a table can be asserted collision-
+ * free against FACET_TOOLS (workspace/__tests__/facet-tools.test.ts). Letters
+ * are unique across the WHOLE vocabulary, not just within a facet, so a tool
+ * moving between facets can never start shadowing a neighbour.
+ *
+ * `n` for the band mark: `b` is paint-block's, `m` is marquee's, and the layout
+ * facet holds v/s/m/t/b/k — parcel B picked the letter against that table,
+ * not by guess.
+ */
+export const TOOL_KEYS: Record<ToolId, string> = {
+  view: 'v',
+  select: 's',
+  marquee: 'm',
+  'paint-tile': 't',
+  'paint-block': 'b',
+  'stamp-chunk': 'k',
+  'paint-collision': 'c',
+  'place-object': 'o',
+  'place-ring': 'r',
+  'mark-band': 'n',
+};
+
+/** The tool a bare (unmodified) key arms, or null when the key is no tool's. */
+export function toolForKey(key: string): ToolId | null {
+  for (const id of TOOL_IDS) if (TOOL_KEYS[id] === key) return id;
+  return null;
+}
 
 /**
  * The dock's BUTTON ORDER, which is not the facet's tool order.

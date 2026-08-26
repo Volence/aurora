@@ -18,6 +18,9 @@ const TOOL_ICONS: Record<EditorTool, React.FC<{ size?: number }>> = {
   'paint-collision': Icons.IconCollision,
   'place-object': Icons.IconPlaceObject,
   'place-ring': Icons.IconRing,
+  // The eyedropper: the mark READS the cell under the cursor (its layout word)
+  // and points the lens at what it names — a pick, not a paint.
+  'mark-band': Icons.IconEyedrop,
 };
 
 export function MapFacetDock({ facet }: { facet: FacetCapability }) {

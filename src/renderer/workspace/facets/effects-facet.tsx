@@ -35,6 +35,7 @@ import React from 'react';
 import AeonPropertiesPanel from '../../components/AeonPropertiesPanel';
 import EffectsScenePanel from '../../components/effects/EffectsScenePanel';
 import BgAnimBandPanel from '../../components/effects/BgAnimBandPanel';
+import EffectsToolOptions from '../../components/effects/EffectsToolOptions';
 import { Panel, CollapsibleSection } from '../../components/ui';
 import { mapFacet, type FacetModule } from '../facet-registry';
 
@@ -67,4 +68,12 @@ function EffectsPanels() {
   );
 }
 
-export const effectsFacet: FacetModule = mapFacet('parallax', { RightPanel: EffectsPanels });
+// THE TOOL-OPTIONS BAR CARRIES THE TWO BAND VERBS (parcel B). Both band
+// sections in the column arrive collapsed, so until this bar nothing on the
+// canvas or the dock said a band could be made at all. The chips run the SAME
+// two commands the panel runs, disabled with the same reasons — one derivation
+// in providers/band-verbs, read by both.
+export const effectsFacet: FacetModule = mapFacet('parallax', {
+  ToolOptions: EffectsToolOptions,
+  RightPanel: EffectsPanels,
+});
