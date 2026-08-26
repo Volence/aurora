@@ -159,6 +159,31 @@ const OPEN_NEW_BAND = String.raw`
   return 'clicked';
 })()`;
 
+// ⚠ `BG animation bands` ARRIVES COLLAPSED TOO, since ROADMAP item 45's open
+// tail (the 1280x800 parcel): the column could not reach zero at that height
+// with five sections open, and the band list is the one section in it that is
+// not about the parallax scene the facet arrives on. The same reasoning as
+// `New band` above therefore applies to it, and so does the same fix — a
+// collapsed CollapsibleSection renders NO children, so the band cards, the
+// Demote/Remove buttons and the blob-budget readout below all come back `null`
+// and read as "missing" unless this runs first. Opened by clicking its header,
+// the way a human opens it.
+const OPEN_BAND_LIST = String.raw`
+(() => {
+  const isHeader = (el) => {
+    if (el.tagName !== 'DIV') return false;
+    const cs = getComputedStyle(el);
+    return cs.textTransform === 'uppercase' && cs.letterSpacing === '1px'
+      && !!el.firstElementChild && el.firstElementChild.tagName === 'SPAN';
+  };
+  const hdr = [...document.querySelectorAll('div')].filter(isHeader)
+    .find((h) => /^BG animation bands/.test((h.firstElementChild.textContent || '').trim()));
+  if (!hdr) return 'no-section';
+  if (hdr.parentElement.parentElement.children.length > 1) return 'already-open';
+  hdr.click();
+  return 'clicked';
+})()`;
+
 const results = [];
 const fails = [];
 function check(id, name, ok, detail) {
@@ -310,6 +335,8 @@ async function main() {
     check('2a', 'the facet bar offers an Effects pill [instrument check]', clicked === true,
       `click=${clicked}`);
     await sleep(1200);
+    await c.evalExpr(OPEN_BAND_LIST);
+    await sleep(400);
     const openedNewBand = await c.evalExpr(OPEN_NEW_BAND);
     if (openedNewBand === 'no-section') throw new Error('no "New band" section on screen');
     await sleep(900);

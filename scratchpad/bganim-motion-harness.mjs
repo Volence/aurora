@@ -208,6 +208,22 @@ async function toggleViewOverlay(c, re) {
   return res;
 }
 
+const OPEN_BAND_LIST = String.raw`
+(() => {
+  const isHeader = (el) => {
+    if (el.tagName !== 'DIV') return false;
+    const cs = getComputedStyle(el);
+    return cs.textTransform === 'uppercase' && cs.letterSpacing === '1px'
+      && !!el.firstElementChild && el.firstElementChild.tagName === 'SPAN';
+  };
+  const hdr = [...document.querySelectorAll('div')].filter(isHeader)
+    .find((h) => /^BG animation bands/.test((h.firstElementChild.textContent || '').trim()));
+  if (!hdr) return 'no-section';
+  if (hdr.parentElement.parentElement.children.length > 1) return 'already-open';
+  hdr.click();
+  return 'clicked';
+})()`;
+
 const clickByText = (re, tag = 'button') => String.raw`
 (() => {
   const el = [...document.querySelectorAll(${JSON.stringify(tag)})]
@@ -404,6 +420,25 @@ async function main() {
     await sleep(2000);
     check('0c', 'the Effects facet opens', await c.evalExpr(clickByText('/^Effects$/')) === true);
     await sleep(1200);
+    // ⚠ `BG animation bands` ARRIVES COLLAPSED since ROADMAP item 45's open tail
+    // (the 1280x800 parcel): the effects column could not reach zero overflow at
+    // that height with five sections open, and the band list is the one section
+    // in it that is not about the parallax scene the facet arrives on.
+    //
+    // EVERYTHING THIS HARNESS TOUCHES IN THE COLUMN IS INSIDE IT — the "Play
+    // bands" chip, the "why approximate?" disclosure and every band card. A
+    // collapsed CollapsibleSection renders no children at all, so without this
+    // click `clickByText('/^Play bands$/')` returns false and TEN rows report a
+    // feature that is working perfectly as broken. Measured: 11/23 before this
+    // line, 23/23 after. Opened the way a human opens it.
+    const openedBands = await c.evalExpr(OPEN_BAND_LIST);
+    check('0d', 'the BG animation bands section is open (it arrives collapsed) [instrument]',
+      openedBands === 'clicked' || openedBands === 'already-open',
+      `OPEN_BAND_LIST -> ${JSON.stringify(openedBands)}`);
+    if (openedBands === 'no-section') {
+      throw new Error('no "BG animation bands" section on screen — the preview control lives in it');
+    }
+    await sleep(700);
     // SETUP, not a measurement: the BG editing layer paints Plane B and nothing
     // else, so the pixel rows below read the band's own cells rather than
     // whatever the foreground happens to draw on top of them. The composite
