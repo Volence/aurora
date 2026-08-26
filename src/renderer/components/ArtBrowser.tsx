@@ -9,7 +9,8 @@ import type { Tile, Palette } from '../../core/model/s4-types';
 import { lutForPaletteLine, rasterizeTile } from '../../core/art/rasterize';
 import {
   resolveTilePickerSource, tilePickerCountLabel, tilePickerHoverLabel, pickedTileIndex,
-  tileThumbCacheStale, type TileThumbCacheKey,
+  tileThumbCacheStale, tilePickerBandGroups, tilePickerBandLabel,
+  type TileThumbCacheKey, type TilePickerBandGroup,
 } from '../providers/tile-picker-source';
 import { T } from './ui';
 import { CANVAS_VOID, TILE_SELECTED, TILE_HOVER } from '../canvas/canvas-colors';
@@ -83,6 +84,13 @@ export default function ArtBrowser() {
   const selectedTileIndex = pickedTileIndex(
     { selectedTileIndex: selectedFgTileIndex, selectedBgTileIndex }, editingLayer,
   );
+  // THE ANIMATED PREFIX BY BAND (parcel J). One card per band, its phase-0
+  // pattern as one picture; picking a card arms `stamp-band` with that band.
+  // Derived from the SAME source as the grid, so a card can never show a band
+  // the stroke would not find.
+  const bandGroups = tilePickerBandGroups(source, state.project?.bgOverride ?? null);
+  const selectedBgBand = useEditorStore((s) => s.selectedBgBand);
+  const tool = useEditorStore((s) => s.tool);
 
   // Build caches when the array being shown, or the palette line, changes.
   useEffect(() => {
@@ -243,13 +251,38 @@ export default function ArtBrowser() {
   }
 
   return (
-    <div style={styles.container}>
+    // Taller when the band cards are showing, so the grid under them keeps
+    // the room it has today.
+    <div style={{ ...styles.container, height: bandGroups.length > 0 ? 270 : 180 }}>
       <div style={styles.tabs}>
         <span style={styles.label}>
           {tilePickerCountLabel(source)}
         </span>
         <span ref={hoverLabelRef} style={styles.hoverLabel} />
       </div>
+      {bandGroups.length > 0 && (
+        // id: the CDP harness finds the cards here and clicks one to arm the
+        // stamp the way an author would.
+        <div id="art-browser-bands" style={styles.bandRow}>
+          {bandGroups.map((g) => (
+            <BandCard
+              key={g.index}
+              group={g}
+              tiles={tiles}
+              selected={tool === 'stamp-band' && selectedBgBand === g.index}
+              onPick={() => {
+                useEditorStore.getState().setSelectedBgBand(g.index);
+                useEditorStore.getState().setTool('stamp-band');
+              }}
+              onHover={(on) => {
+                if (hoverLabelRef.current) {
+                  hoverLabelRef.current.textContent = on ? tilePickerBandLabel(g) : '';
+                }
+              }}
+            />
+          ))}
+        </div>
+      )}
       <div
         ref={containerRef}
         style={styles.canvasWrap}
@@ -267,7 +300,72 @@ export default function ArtBrowser() {
   );
 }
 
+/**
+ * One band of the prefix as a picture: the `cols x rows` phase-0 pattern drawn
+ * from the picker's own thumbnail cache, at the grid's 2x. Selectable as a
+ * unit — this is the card the stamp is armed from.
+ */
+function BandCard({ group, tiles, selected, onPick, onHover }: {
+  group: TilePickerBandGroup;
+  tiles: readonly Tile[];
+  selected: boolean;
+  onPick: () => void;
+  onHover: (on: boolean) => void;
+}) {
+  const ref = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    const c = ref.current;
+    if (!c) return;
+    c.width = group.cols * 8;
+    c.height = group.rows * 8;
+    const ctx = c.getContext('2d');
+    if (!ctx) return;
+    ctx.imageSmoothingEnabled = false;
+    ctx.fillStyle = CANVAS_VOID;
+    ctx.fillRect(0, 0, c.width, c.height);
+    for (let r = 0; r < group.rows; r++) {
+      for (let col = 0; col < group.cols; col++) {
+        const slot = group.slots[r * group.cols + col];
+        const thumb = tileCache[slot];
+        if (thumb) ctx.drawImage(thumb, col * 8, r * 8, 8, 8);
+      }
+    }
+    // `tiles` is the cache's identity key: a rebuilt array is new art.
+  }, [group, tiles]);
+  return (
+    <div
+      className="art-browser-band"
+      data-band={group.index}
+      title={tilePickerBandLabel(group)}
+      onClick={onPick}
+      onMouseEnter={() => onHover(true)}
+      onMouseLeave={() => onHover(false)}
+      style={{
+        ...styles.bandCard,
+        outline: selected ? `2px solid ${TILE_SELECTED}` : `1px solid ${T.border}`,
+      }}
+    >
+      <canvas
+        ref={ref}
+        style={{ width: group.cols * 16, height: group.rows * 16, imageRendering: 'pixelated', display: 'block' }}
+      />
+      <span style={styles.bandLabel}>{group.label}</span>
+    </div>
+  );
+}
+
 const styles: Record<string, React.CSSProperties> = {
+  bandRow: {
+    display: 'flex', flexWrap: 'wrap', gap: 6, padding: '4px 8px',
+    borderBottom: `1px solid ${T.border}`, flexShrink: 0,
+  },
+  bandCard: {
+    display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 2,
+    padding: 2, cursor: 'pointer', background: CANVAS_VOID,
+  },
+  bandLabel: {
+    fontSize: T.t2xs, color: T.textLo, fontFamily: T.fontMono,
+  },
   container: {
     display: 'flex', flexDirection: 'column',
     background: T.surface, borderTop: `1px solid ${T.border}`,

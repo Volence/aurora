@@ -163,6 +163,15 @@ interface EditorState {
    * was picked in THAT space and changes nothing in the other.
    */
   selectedBgTileIndex: number;
+  /**
+   * The BAND pick for `stamp-band` (parcel J): an index into the override's
+   * `anims`, or null when no band is picked. A band, not a slot — the stamp
+   * derives the slot range from the band's position in the list at gesture
+   * time, so a band inserted before it moves the pick's slots, never its
+   * identity. Separate from `selectedBgTileIndex` because a band pick must not
+   * disturb the slot the per-tile stroke paints, and vice versa.
+   */
+  selectedBgBand: number | null;
   selectedPaletteLine: number;
   selectedChunkId: string | null;
   selectedObjectTypeId: string | null;
@@ -249,6 +258,7 @@ interface EditorState {
   setSelectedBgTileIndex: (index: number) => void;
   /** Set whichever of the two the given layer paints from. */
   setSelectedTileIndexForLayer: (layer: EditingLayer, index: number) => void;
+  setSelectedBgBand: (index: number | null) => void;
   setSelectedPaletteLine: (line: number) => void;
   setSelectedChunkId: (id: string | null) => void;
   setSelectedObjectTypeId: (id: string | null, subtype?: number) => void;
@@ -370,6 +380,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   editingLayer: 'fg',
   selectedTileIndex: 0,
   selectedBgTileIndex: 0,
+  selectedBgBand: null,
   selectedPaletteLine: 0,
   selectedChunkId: null,
   selectedObjectTypeId: null,
@@ -409,6 +420,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   setSelectedTileIndexForLayer: (layer, index) => set(
     layer === 'bg' ? { selectedBgTileIndex: index } : { selectedTileIndex: index },
   ),
+  setSelectedBgBand: (index) => set({ selectedBgBand: index }),
   setSelectedPaletteLine: (line) => set({ selectedPaletteLine: line }),
   setSelectedChunkId: (id) => set({ selectedChunkId: id }),
   setSelectedObjectTypeId: (id, subtype) => set({ selectedObjectTypeId: id, selectedObjectSubtype: subtype ?? 0 }),

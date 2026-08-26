@@ -17,7 +17,10 @@ import { useWorkspaceStore } from './workspaceStore';
  *  profile declares nothing for it. Written for aeon, which is why aeon's
  *  manifest declares no facetTools of its own. */
 export const FACET_TOOLS: Partial<Record<FacetCapability, readonly EditorTool[]>> = {
-  layout: ['stamp-chunk', 'select', 'view', 'marquee', 'paint-tile', 'paint-block'],
+  // `stamp-band` (parcel J) sits beside `paint-tile`: both write Plane B's
+  // layout words, one slot at a time or one band pattern at a time, and the
+  // band is picked from the same Art panel the tile is.
+  layout: ['stamp-chunk', 'select', 'view', 'marquee', 'paint-tile', 'paint-block', 'stamp-band'],
   objects: ['place-object', 'select', 'view'],
   rings: ['place-ring', 'select', 'view'],
   collision: ['paint-collision', 'view'],

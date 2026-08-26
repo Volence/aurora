@@ -17,6 +17,7 @@ import { warpTargetFor } from '../../core/aether/warp-math';
 import { openDocumentGuarded } from './art/open-document';
 import { resolveEscape } from './map-escape';
 import { shouldMarkBand } from './map-band-mark';
+import { beginBandStamp, moveBandStamp, endBandStamp, type BandStampGesture } from './map-band-stamp';
 import { docFromTile, docFromSectionRegion } from '../../core/art/composer-buffer';
 import { seedDocCollisionFromSection } from '../../core/art/composer-collision';
 import type { AnyCommand, S4Level, SetTilesCommand } from '../../core/editing/commands';
@@ -221,6 +222,12 @@ export default function MapViewport() {
   >(null);
   /** One refusal toast per gesture, not one per cell. Cleared with the stroke. */
   const bgRefusalShown = useRef(false);
+  /**
+   * The band-stamp gesture in flight (parcel J): press lays a pattern, drag
+   * reshapes it live, release commits ONE set-bg-override-layout. The machine
+   * itself is `map-band-stamp.ts`; this ref only says whether one is running.
+   */
+  const bandStamp = useRef<BandStampGesture | null>(null);
   /**
    * The FG tile / collision paint gesture in flight — same rule as bgStroke.
    *
@@ -1407,6 +1414,94 @@ export default function MapViewport() {
   }
 
   /**
+   * THE BAND STAMP (parcel J, triage 2026-08-26 §A.8): point a region of Plane B
+   * at a band in one gesture. Slots are column-major (measured on the ROM
+   * 2026-08-26), so hand-picking them was 32 clicks per region; this lays the
+   * picked band's `cols x rows` pattern under the press, tiled over a drag.
+   *
+   * Same resolution as `paintBgTile` — the plane is whatever `resolveDisplayedBg`
+   * says the canvas is drawing — and the same ONE writer for the document and
+   * its mirror. Bands exist only in the OVERRIDE, so any other source refuses,
+   * loudly and once, rather than writing slot indices into a plane that has no
+   * animated prefix for them to mean anything in.
+   */
+  function beginBandStampGesture(worldX: number, worldY: number): void {
+    const state = useProjectStore.getState();
+    const act = getCurrentAct(state);
+    if (!act) return;
+    const activeSection = useEditorStore.getState().activeSectionIndex;
+    const overrideHolder = state.project?.bgOverride ?? null;
+    const resolved = resolveDisplayedBg(
+      act, state.project?.bgLibrary ?? [], activeSection, overrideHolder,
+    );
+    if (!resolved) return;
+    const doc = resolved.source === 'override' ? overrideHolder?.doc ?? null : null;
+    const bandIndex = useEditorStore.getState().selectedBgBand;
+    const bands = doc ? documentBands(doc) : [];
+    const band = bandIndex !== null ? bands[bandIndex] : undefined;
+    if (doc === null || band === undefined) {
+      if (!bgRefusalShown.current) {
+        bgRefusalShown.current = true;
+        useToastStore.getState().addToast(
+          doc === null
+            ? 'Stamp band needs the act\'s BG override — this background has no animated bands. ' +
+              'Nothing was stamped.'
+            : 'Pick a band first: click one of the band cards in the Art panel (BG layer), ' +
+              'then stamp. Nothing was stamped.',
+          'warning',
+        );
+      }
+      return;
+    }
+    const tile = worldToBgTile(worldX, worldY);
+    const bg = sectionRenderer.getBg();
+    if (!tile || !bg) return;
+    const slotBase = bandSlotBases(bands)[bandIndex!];
+    // `resolved.layout` IS the display mirror `writeBgOverrideLayoutWord` keeps
+    // in step with the document, so reading it and writing through the writer
+    // are two views of one array — the invariant paintBgTile spells out.
+    const gesture = beginBandStamp(band, slotBase, { col: tile.col, row: tile.row }, {
+      cols: bg.width, rows: bg.height,
+      readWord: (i) => resolved.layout[i],
+      writeWord: (i, w) => writeBgOverrideLayoutWord(doc, i, w),
+    });
+    bandStamp.current = gesture;
+    sectionRenderer.markBgDirty([...gesture.applied.keys()]);
+    useEditorStore.getState().markDirty();
+    useEditorStore.getState().bumpLiveEdit();
+  }
+
+  function moveBandStampGesture(worldX: number, worldY: number): void {
+    const g = bandStamp.current;
+    if (!g) return;
+    // Off the plane still reshapes: the region clips to the plane's edge.
+    const col = Math.floor(worldX / 8), row = Math.floor(worldY / 8);
+    const dirty = moveBandStamp(g, { col, row });
+    if (dirty.length === 0) return;
+    sectionRenderer.markBgDirty(dirty);
+    useEditorStore.getState().bumpLiveEdit();
+  }
+
+  /** Release: the whole gesture as ONE command; undo restores every word. */
+  function endBandStampGesture(): void {
+    const g = bandStamp.current;
+    bandStamp.current = null;
+    bgRefusalShown.current = false;
+    if (!g) return;
+    const entries = endBandStamp(g);
+    if (entries.length === 0) return;
+    const level = getActiveLevel();
+    if (!level) return;
+    const bandIndex = useEditorStore.getState().selectedBgBand;
+    executeCommand({
+      type: 'set-bg-override-layout',
+      description: `Stamp band ${bandIndex} over ${entries.length} background tile${entries.length === 1 ? '' : 's'}`,
+      sectionIndex: -1,
+      entries,
+    }, level);
+  }
+
+  /**
    * Record one cell of a paint gesture and apply it live.
    *
    * FIRST value wins per index: a stroke crossing its own path must undo to
@@ -1872,6 +1967,14 @@ export default function MapViewport() {
       return;
     }
 
+    // The band stamp reads the PICKED BAND, not the editing layer: it can only
+    // ever write Plane B, so a layer toggle has nothing to say to it.
+    if (tool === 'stamp-band') {
+      beginBandStampGesture(world.x, world.y);
+      e.preventDefault();
+      return;
+    }
+
     if (tool === 'paint-tile') {
       if (useEditorStore.getState().editingLayer === 'bg') {
         paintBgTile(world.x, world.y);
@@ -2214,6 +2317,13 @@ export default function MapViewport() {
       return;
     }
 
+    // Band stamp in flight: the rectangle follows the cursor, live.
+    if (bandStamp.current) {
+      const world = screenToWorld(e.clientX, e.clientY);
+      moveBandStampGesture(world.x, world.y);
+      return;
+    }
+
     // Paint dragging
     if (isPaintDragging.current && (tool === 'paint-tile' || tool === 'paint-collision')) {
       const world = screenToWorld(e.clientX, e.clientY);
@@ -2377,6 +2487,7 @@ export default function MapViewport() {
     endGuideDrag();
     endFrameDrag();
     endBgStroke();
+    endBandStampGesture();
     endPaintStroke();
     isPaintDragging.current = false;
     isMarqueeDragging.current = false;
@@ -2579,7 +2690,7 @@ export default function MapViewport() {
     : tool === 'select' ? 'default'
     : tool === 'place-object' || tool === 'place-ring' ? 'crosshair'
     : tool === 'paint-tile' || tool === 'paint-block' || tool === 'paint-collision' ? 'cell'
-    : tool === 'stamp-chunk' ? 'cell'
+    : tool === 'stamp-chunk' || tool === 'stamp-band' ? 'cell'
     : tool === 'marquee' ? 'crosshair'
     : 'default';
 

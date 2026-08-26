@@ -197,6 +197,32 @@ describe('effects facet tools', () => {
   });
 });
 
+// THE LAYOUT FACET GAINS THE BAND STAMP (triage 2026-08-26 §A.8, parcel J).
+// It writes Plane B's layout — the same file `paint-tile` in the BG layer
+// writes — so it lives beside that tool, in the facet whose Art panel is the
+// picker the band is chosen from. It is a TOOL and not a paint-tile mode so a
+// dock button, a letter and a status-bar hint say it exists (the lesson of §A.3).
+describe('band stamp tool', () => {
+  it('is offered by the layout facet, after paint-tile', () => {
+    const layout = FACET_TOOLS.layout!;
+    expect(layout).toContain('stamp-band');
+    expect(layout.indexOf('stamp-band')).toBeGreaterThan(layout.indexOf('paint-tile'));
+    expect(layout[0]).not.toBe('stamp-band');
+  });
+  it('is offered by NO other facet', () => {
+    for (const [facet, tools] of Object.entries(FACET_TOOLS)) {
+      if (facet === 'layout') continue;
+      expect(tools, facet).not.toContain('stamp-band');
+    }
+  });
+  it('has a label, a hint and a letter no other tool answers to', () => {
+    expect(TOOL_LABELS['stamp-band']).toBe('Stamp Band');
+    expect(TOOL_KEYS['stamp-band']).toMatch(/^[a-z]$/);
+    const others = TOOL_IDS.filter((t) => t !== 'stamp-band').map((t) => TOOL_KEYS[t]);
+    expect(others).not.toContain(TOOL_KEYS['stamp-band']);
+  });
+});
+
 // THE KEYBOARD LETTERS LIVE IN A TABLE, NOT A SWITCH. `MapViewport`'s hotkey
 // branch used to spell them as `case 'v'` … `case 'm'`, which no test could
 // enumerate; `TOOL_KEYS` is that table lifted out so uniqueness can be asserted

@@ -25,6 +25,7 @@ export const TOOL_LABELS: Record<ToolId, string> = {
   'place-object': 'Place Object',
   'place-ring': 'Place Ring',
   'mark-band': 'Mark Band',
+  'stamp-band': 'Stamp Band',
 };
 
 /**
@@ -48,6 +49,7 @@ export const TOOL_HINTS: Record<ToolId, string> = {
   'place-object': 'Click to place the selected object type',
   'place-ring': 'Click to place the selected ring pattern',
   'mark-band': 'Click a background cell to mark a band there; drag to pan · Esc hides the lens',
+  'stamp-band': 'Pick a band in the Art panel, then click to lay one pattern or drag a region to tile it',
 };
 
 /**
@@ -61,6 +63,9 @@ export const TOOL_HINTS: Record<ToolId, string> = {
  * `n` for the band mark: `b` is paint-block's, `m` is marquee's, and the layout
  * facet holds v/s/m/t/b/k — parcel B picked the letter against that table,
  * not by guess.
+ *
+ * `d` for the band stamp (parcel J): it joins the layout facet, whose letters
+ * are v/s/m/t/b/k, and `n` is mark-band's across the vocabulary.
  */
 export const TOOL_KEYS: Record<ToolId, string> = {
   view: 'v',
@@ -73,6 +78,7 @@ export const TOOL_KEYS: Record<ToolId, string> = {
   'place-object': 'o',
   'place-ring': 'r',
   'mark-band': 'n',
+  'stamp-band': 'd',
 };
 
 /** The tool a bare (unmodified) key arms, or null when the key is no tool's. */

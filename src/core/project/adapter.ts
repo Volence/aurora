@@ -105,6 +105,10 @@ export const TOOL_IDS = [
   // a Plane-B cell seeds the band lens. It was a side-effect of View's mouseup
   // and so fired on every pan-click; it is a tool now, and View is a pure pan.
   'mark-band',
+  // The Layout facet's band stamp (parcel J, triage 2026-08-26 §A.8): lays a
+  // band's `cols x rows` column-major slot pattern under the brush so a region
+  // of Plane B is pointed at the band in one gesture instead of 32 picks.
+  'stamp-band',
 ] as const;
 export type ToolId = (typeof TOOL_IDS)[number];
 
