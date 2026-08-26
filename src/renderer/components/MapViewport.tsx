@@ -16,6 +16,7 @@ import { useAetherStore } from '../state/aetherStore';
 import { warpTargetFor } from '../../core/aether/warp-math';
 import { openDocumentGuarded } from './art/open-document';
 import { resolveEscape } from './map-escape';
+import { shouldMarkBand } from './map-band-mark';
 import { docFromTile, docFromSectionRegion } from '../../core/art/composer-buffer';
 import { seedDocCollisionFromSection } from '../../core/art/composer-collision';
 import type { AnyCommand, S4Level, SetTilesCommand } from '../../core/editing/commands';
@@ -1694,17 +1695,19 @@ export default function MapViewport() {
       }
     }
 
-    // THE BAND-LENS MARK (ROADMAP item 43 part 2). It RECORDS and FALLS THROUGH
-    // — it never takes the press.
+    // THE BAND-LENS MARK (ROADMAP item 43 part 2, re-homed by parcel B). It
+    // RECORDS and FALLS THROUGH — it never takes the press.
     //
-    // That is the whole design of this branch. The effects facet's only tool is
-    // `view`, so taking the press here would kill panning on the one facet the
-    // lens lives in; and a mark is a CLICK, which is not knowable until the
-    // button comes up. So the press notes which cell it landed on, the pan
-    // proceeds exactly as before, and `handleMouseUp` decides whether the
-    // gesture was a click and commits.
+    // A mark is a CLICK, which is not knowable until the button comes up, so
+    // the press notes which cell it landed on, the drag proceeds as a pan, and
+    // `handleMouseUp` decides whether the gesture was a click and commits. It
+    // used to record for ANY left press in the Effects facet, because View was
+    // the facet's only tool — and that made every pan-click a band gesture
+    // (triage 2026-08-26 §A.2). `shouldMarkBand` is the gate now: the
+    // `mark-band` tool, this facet, the left button. In View nothing is
+    // recorded, so there is nothing for the release to commit.
     bandMark.current = null;
-    if (e.button === 0 && inEffectsFacet()) {
+    if (shouldMarkBand(tool, inEffectsFacet(), e.button)) {
       const ctxt = bandMarkContext();
       if (ctxt) {
         const world = screenToWorld(e.clientX, e.clientY);
@@ -1717,7 +1720,11 @@ export default function MapViewport() {
       }
     }
 
-    if (tool === 'view' || e.button === 1) {
+    // `mark-band` drags like View: the mark is the CLICK half of the gesture
+    // (recorded above, committed on release), and a drag under it is the pan
+    // it always was — which is why the harness's "a drag pans and marks
+    // nothing" row holds unchanged with the tool selected.
+    if (tool === 'view' || tool === 'mark-band' || e.button === 1) {
       isDragging.current = true;
       lastMouse.current = { x: e.clientX, y: e.clientY };
       downPos.current = { x: e.clientX, y: e.clientY };
@@ -2326,9 +2333,14 @@ export default function MapViewport() {
     isMarqueeDragging.current = false;
     marqueeDragStart.current = null;
 
-    // View tool: a click (pointer barely moved) selects the section under the
-    // cursor — a pan-drag does not.
-    if (useEditorStore.getState().tool === 'view' && downPos.current) {
+    // View and mark-band: a click (pointer barely moved) selects the section
+    // under the cursor — a pan-drag does not. The band mark commits on the
+    // same click, gated by the SAME predicate the press recorded under
+    // (`shouldMarkBand`): in View `bandMark.current` is already null, and the
+    // gate here is what keeps a tool switch mid-press from committing a record
+    // the release's tool never asked for.
+    const upTool = useEditorStore.getState().tool;
+    if ((upTool === 'view' || upTool === 'mark-band') && downPos.current) {
       const dx = e.clientX - downPos.current.x;
       const dy = e.clientY - downPos.current.y;
       if (dx * dx + dy * dy < 25) { // moved < 5px → treat as a click
@@ -2338,7 +2350,7 @@ export default function MapViewport() {
         if (secIdx >= 0 && act && act.sections[secIdx]) {
           useEditorStore.getState().setActiveSectionIndex(secIdx);
         }
-        commitBandMark();
+        if (shouldMarkBand(upTool, inEffectsFacet(), e.button)) commitBandMark();
       }
     }
     downPos.current = null;
@@ -2447,6 +2459,9 @@ export default function MapViewport() {
   // only thing on screen that says so before the author commits to the press.
   const cursor = guideHover !== null ? 'ns-resize'
     : tool === 'view' ? 'grab'
+    // The mark is a click on a cell, so it reads as a pick even though a drag
+    // under it still pans.
+    : tool === 'mark-band' ? 'crosshair'
     : tool === 'select' ? 'default'
     : tool === 'place-object' || tool === 'place-ring' ? 'crosshair'
     : tool === 'paint-tile' || tool === 'paint-block' || tool === 'paint-collision' ? 'cell'
