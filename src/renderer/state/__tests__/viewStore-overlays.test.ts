@@ -76,15 +76,23 @@ describe('OVERLAY_KEYS_BY_ENGINE', () => {
     // lens (per-8x8-tile VDP bit-15 overlay, feat/s1-priority-lens), the
     // animated-art play toggle (feat/s1-animated-art-playback), and sprite
     // occlusion (feat/s1-priority-occlusion — occlusion-correct previews,
-    // default ON). Classic-only: aeon's tile words are a different engine's
-    // format and its viewport has no drawPriority/drawAnimatedArt/occlusion
-    // pass, so listing them there would be dead toggles.
+    // default ON). The two lenses stay classic-only: aeon's tile words are a
+    // different engine's format and its viewport has no
+    // drawPriority/occlusion pass, so listing them there would be dead toggles.
     expect([...OVERLAY_KEYS_BY_ENGINE.s1].sort()).toEqual(
       ['occludeSprites', 'playAnimatedArt', 'showCollision', 'showCollisionAngles', 'showObjects', 'showPriority', 'showStart'],
     );
     expect(OVERLAY_KEYS_BY_ENGINE.aeon).not.toContain('showPriority');
-    expect(OVERLAY_KEYS_BY_ENGINE.aeon).not.toContain('playAnimatedArt');
     expect(OVERLAY_KEYS_BY_ENGINE.aeon).not.toContain('occludeSprites');
+  });
+
+  it('SHARES the play toggle with aeon — it drives BgAnim bands there', () => {
+    // ROADMAP item 42. The two engines play different things off one key (the
+    // OverlayOptions docblock says which), and the ruling chose this key
+    // precisely because it already existed with the right default rather than
+    // inventing a second playback mechanism.
+    expect(OVERLAY_KEYS_BY_ENGINE.aeon).toContain('playAnimatedArt');
+    expect(OVERLAY_KEYS_BY_ENGINE.s1).toContain('playAnimatedArt');
   });
 
   it('keeps the priority lens OFF by default, like the collision lens', () => {

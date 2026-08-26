@@ -9,3 +9,7 @@ out/
 # Every prior harness cleaned these up; this rule makes that automatic.
 scratchpad/shots*/
 docs/lane-status.json
+
+# The BgAnim preview harness fixture: a hardlinked copy of the aeon tree with
+# two files regenerated. Rebuilt by scratchpad/bganim-preview-fixture.mjs.
+scratchpad/fixtures/aeon-bganim-coherent/
