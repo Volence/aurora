@@ -71,12 +71,13 @@ export type AgentRequest =
   | { kind: 'list-bg-anim-bands' }
   | {
       kind: 'promote-bg-anim-band'; cols: number; rows: number; staticBase: number;
-      driver?: string; rateShift?: number;
+      phaseFill?: 'copy' | 'blank' | 'shift'; driver?: string; rateShift?: number;
     }
   | { kind: 'demote-bg-anim-band'; band: number; staticBase?: number }
   | {
       kind: 'add-bg-anim-band'; cols: number; rows: number;
-      phases?: number[][][]; driver?: string; rateShift?: number;
+      phases?: number[][][]; phaseFill?: 'copy' | 'blank' | 'shift';
+      driver?: string; rateShift?: number;
     }
   | { kind: 'remove-bg-anim-band'; band: number; blankReferencingCells?: boolean }
   | { kind: 'screenshot'; region?: { x: number; y: number; w: number; h: number }; showBg?: boolean }

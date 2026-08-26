@@ -163,6 +163,29 @@ describe('promote_bg_anim_band', () => {
     expect(bandCount()).toBe(2);     // and nothing was written
   });
 
+  it("carries `phaseFill` through: 'shift' banks are the range rolled 1px per bank", async () => {
+    // Deterministic, x-asymmetric art in the promoted range, planted so the
+    // roll cannot be an identity by accident — and DERIVED here independently,
+    // through a whole-pixel-grid roll rather than the module's per-tile math.
+    const d = doc();
+    d.tiles[192] = Array.from({ length: TILE_PIXELS }, (_, i) => ((i % 8) * 3 + (i >> 3)) & 0xF);
+    d.tiles[193] = Array.from({ length: TILE_PIXELS }, (_, i) => ((i % 8) * 7 + (i >> 3) + 5) & 0xF);
+    open(state(d));
+
+    await ask({ kind: 'promote-bg-anim-band', cols: 2, rows: 1, staticBase: 192, phaseFill: 'shift' });
+    const band = held()!.anims!.at(-1)!;
+    // cols=2, rows=1: the band's pixel grid is 16x8, column-major tiles.
+    const grid = (tiles: number[][]): number[][] => Array.from({ length: 8 }, (_, y) =>
+      Array.from({ length: 16 }, (_, x) => tiles[x >> 3][y * 8 + (x & 7)]));
+    const g0 = grid(band.phases![0]);
+    expect(band.phases![0]).toEqual([d.tiles[192], d.tiles[193]]);   // bank 0 untouched
+    for (let k = 1; k < band.phases!.length; k++) {
+      const expected = g0.map((line) => line.map((_, x) => line[(x + k) % 16]));
+      expect(grid(band.phases![k])).toEqual(expected);
+      expect(band.phases![k]).not.toEqual(band.phases![0]);          // anti-vacuous
+    }
+  });
+
   it('leaves `driver` out unless asked, and writes it when asked', async () => {
     await ask({ kind: 'promote-bg-anim-band', cols: 1, rows: 1, staticBase: 192 });
     let bands = (await ask({ kind: 'list-bg-anim-bands' }) as { bands: Record<string, unknown>[] }).bands;

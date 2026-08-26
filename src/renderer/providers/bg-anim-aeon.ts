@@ -72,6 +72,7 @@ import {
   describeBands,
   documentBands,
   tileSlotsRemaining,
+  type BandPhaseFill,
   type BgAnimBandView,
 } from '../../core/formats/bg-override/bg-anim-band';
 import {
@@ -125,6 +126,60 @@ export function driverOptions(): DriverOption[] {
     title: `${name} — the SCALAR the band's step is read from. The band shifts HORIZONTALLY `
       + 'whichever driver it uses; a driver never sets an axis.',
   }));
+}
+
+// ---------------------------------------------------------------------------
+// Phase fill
+// ---------------------------------------------------------------------------
+
+export interface PhaseFillOption {
+  value: BandPhaseFill;
+  label: string;
+  title: string;
+  /** The sentence the panel prints under the action while this mode is picked. */
+  note: string;
+}
+
+/**
+ * The selector's default is 'copy' AT BOTH DOORS, deliberately: it is the fill
+ * that edits nothing the author did not ask for — a promoted band draws what
+ * its slots already drew, and an inserted band's phase 0 is blank art, over
+ * which every mode agrees. 'shift' is the authoring primitive and is always one
+ * explicit pick away, never a surprise.
+ */
+export const DEFAULT_PHASE_FILL: BandPhaseFill = 'copy';
+
+/**
+ * What the banks-1..7 selector offers, with the consequence of each mode spelled
+ * out where the panel can print it. In the provider rather than the component
+ * for the file-header reason: which sentence goes with which mode is a decision,
+ * and decisions in the component are decisions `vitest run` cannot see.
+ */
+export function phaseFillOptions(): PhaseFillOption[] {
+  return [
+    {
+      value: 'copy', label: 'copy of phase 0',
+      title: 'Banks 1–7 are copies of phase 0 — the band draws the same art at every '
+        + 'step, so nothing moves until you author its frames. The fill that edits nothing.',
+      note: 'banks 1–7 arrive as copies of phase 0, so the band is inert until you draw '
+        + 'its frames.',
+    },
+    {
+      value: 'shift', label: 'pre-shifted (moves)',
+      title: 'Bank k is phase 0 scrolled k px within the band’s own pattern width — the '
+        + 'contract’s "pre-shifted art 1px apart" — so the band scrolls as soon as it is '
+        + 'saved. Phase 0, the picture at rest, is unchanged.',
+      note: 'banks 1–7 are phase 0 pre-shifted 1 px per bank, wrapping at the pattern edge, '
+        + 'so the band MOVES with no further authoring. The picture at rest is unchanged.',
+    },
+    {
+      value: 'blank', label: 'blank',
+      title: 'Banks 1–7 are blank art. The picture holds at rest but BREAKS on the band’s '
+        + 'second phase until you draw the frames — a deliberate authoring start.',
+      note: 'banks 1–7 arrive blank: the picture BREAKS on the band’s second phase until '
+        + 'you draw the frames.',
+    },
+  ];
 }
 
 /**
@@ -305,6 +360,14 @@ export function promoteUnavailableReason(doc: BgOverrideDocument | null): string
 export interface BandSpec {
   cols: number;
   rows: number;
+  /**
+   * How banks 1..7 are filled from phase 0. Omit for each door's own default —
+   * 'copy' on a promotion, 'blank' on an insertion — which are the fills that
+   * change nothing the author did not ask for. 'shift' is the authoring
+   * primitive: bank k is phase 0 scrolled k px within the band's own pattern,
+   * which is the contract's "pre-shifted art 1px apart", so the band MOVES.
+   */
+  phaseFill?: BandPhaseFill;
   /** Omit to leave the key out, so the document tracks the consumer's default. */
   driver?: BgAnimDriver;
   /** Omit to leave the key out. */
@@ -315,10 +378,12 @@ export interface BandSpec {
  * PROMOTE `tiles[staticBase : staticBase + cols*rows]` into a new band.
  *
  * ART THE DOCUMENT ALREADY CARRIES. The band's phase-0 art is READ from the blob
- * (`bandFromStaticTiles`) and banks 1..7 arrive as copies of it, so the band is
- * visually inert until an author draws its frames — the picture is identical
- * before and after, which is what lets a structural edit be safe on a shipping
- * background.
+ * (`bandFromStaticTiles`); by default banks 1..7 arrive as copies of it, so the
+ * band is visually inert until an author draws its frames — the picture is
+ * identical before and after, which is what lets a structural edit be safe on a
+ * shipping background. `phaseFill: 'shift'` derives them as the contract's
+ * pre-shifted phases instead, so the promoted art scrolls with no further work;
+ * the picture at rest (phase 0) is still identical either way.
  */
 export function promoteBandCommand(
   doc: BgOverrideDocument | null, staticBase: number, spec: BandSpec,
@@ -327,6 +392,7 @@ export function promoteBandCommand(
   try {
     const band = bandFromStaticTiles(doc, staticBase, {
       cols: spec.cols, rows: spec.rows,
+      ...(spec.phaseFill !== undefined ? { phaseFill: spec.phaseFill } : {}),
       ...(spec.driver !== undefined ? { driver: spec.driver } : {}),
       ...(spec.rateShift !== undefined ? { rate_shift: spec.rateShift } : {}),
     });
@@ -368,6 +434,7 @@ export function addBandCommand(
     const band = createBand({
       cols: spec.cols, rows: spec.rows,
       ...(phases !== undefined ? { phases } : {}),
+      ...(spec.phaseFill !== undefined ? { phaseFill: spec.phaseFill } : {}),
       ...(spec.driver !== undefined ? { driver: spec.driver } : {}),
       ...(spec.rateShift !== undefined ? { rate_shift: spec.rateShift } : {}),
     });
@@ -401,3 +468,4 @@ export function removeBandCommand(
 // ---------------------------------------------------------------------------
 
 export { BGANIM_MAX_BANDS, BG_TILE_CAPACITY, TILE_BYTES, TILE_WIDTH_PX };
+export type { BandPhaseFill };
