@@ -159,11 +159,11 @@ describe('a drag cannot author a world_y the schema refuses', () => {
 describe('the guide report', () => {
   it('starts inactive, and every publish advances the paint counter', () => {
     const before = lastGuideReport().paints;
-    publishGuideReport({ active: false, sceneId: null, rows: [], dragIndex: null, hoverIndex: null });
+    publishGuideReport({ active: false, sceneId: null, space: null, rows: [], dragIndex: null, hoverIndex: null });
     expect(lastGuideReport().active).toBe(false);
     expect(lastGuideReport().paints).toBe(before + 1);
     publishGuideReport({
-      active: true, sceneId: 'sky', dragIndex: 2, hoverIndex: null,
+      active: true, sceneId: 'sky', space: 'act', dragIndex: 2, hoverIndex: null,
       rows: layerGuideGeometry([layer(0)], vp(0, 1)),
     });
     expect(lastGuideReport().sceneId).toBe('sky');

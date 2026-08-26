@@ -40,9 +40,12 @@ import { editorPanToCameraPx } from '../../core/formats/bg-override/bganim-previ
 import { OverlayRenderer } from '../canvas/OverlayRenderer';
 import type { SectionOverlayInfo } from '../canvas/OverlayRenderer';
 import {
-  drawLayerGuides, guideAtCanvasY, canvasYToWorldY, layerGuideGeometry, publishGuideReport,
+  drawLayerGuides, guideAtCanvasY, canvasYToWorldY, canvasYToLayerTop, layerGuideGeometry,
+  publishGuideReport,
 } from '../canvas/effects-guides';
-import { resolveSelectedScene, setLayerFieldCommand, clampWorldY } from '../providers/effects-aeon';
+import {
+  resolveSelectedScene, setLayerFieldCommand, clampLayerTop, layerTopSpace,
+} from '../providers/effects-aeon';
 import type { EffectsScene } from '../../core/formats/effects/scene';
 import type { FacetCapability } from '../../core/project/adapter';
 import { SECTION_TILES_WIDE, SECTION_TILES_HIGH, SECTION_PIXEL_SIZE, unpackNametableWord } from '../../core/model/s4-types';
@@ -891,20 +894,25 @@ export default function MapViewport() {
     const guideScene = activeGuideScene();
     if (guideScene) {
       const drag = guideDrag.current;
+      // A LOCKED scene's tops are screen lines (aeon scene_plane_line: identity
+      // mapping), so its guides are drawn from the viewport's top edge — until
+      // the screen frame (parcel G) lands and gives them a real 224-line frame
+      // to sit in — and carry a caption saying so. The provider decides.
       const opts = {
         dragIndex: drag && drag.sceneId === guideScene.id ? drag.index : null,
         dragWorldY: drag?.worldY,
         hoverIndex: guideHoverRef.current,
+        space: layerTopSpace(guideScene),
       };
       drawLayerGuides(ctx, viewport, guideScene.layers, opts);
       publishGuideReport({
-        active: true, sceneId: guideScene.id,
+        active: true, sceneId: guideScene.id, space: opts.space,
         rows: layerGuideGeometry(guideScene.layers, viewport, opts),
         dragIndex: opts.dragIndex, hoverIndex: opts.hoverIndex,
       });
     } else {
       publishGuideReport({
-        active: false, sceneId: null, rows: [], dragIndex: null, hoverIndex: null,
+        active: false, sceneId: null, space: null, rows: [], dragIndex: null, hoverIndex: null,
       });
     }
 
@@ -1673,7 +1681,7 @@ export default function MapViewport() {
       if (scene && rect) {
         const { vpY, zoom } = useViewStore.getState();
         const idx = guideAtCanvasY(e.clientY - rect.top, scene.layers,
-          { x: 0, y: vpY, width: rect.width, height: rect.height, zoom });
+          { x: 0, y: vpY, width: rect.width, height: rect.height, zoom }, layerTopSpace(scene));
         if (idx !== null) {
           const layer = scene.layers[idx];
           guideDrag.current = {
@@ -1992,11 +2000,15 @@ export default function MapViewport() {
     // `guideDrag.current` at call time.
     if (guideDrag.current) {
       const rect = canvasRef.current?.getBoundingClientRect();
-      if (rect) {
+      const scene = activeGuideScene();
+      if (rect && scene && scene.id === guideDrag.current.sceneId) {
         const { vpY, zoom } = useViewStore.getState();
-        // The SAME clamp the spinner routes through, so a drag cannot author a
-        // world_y a typed value could not (schema §2.2, enforced at emit).
-        const next = clampWorldY(canvasYToWorldY(e.clientY - rect.top, vpY, zoom));
+        // The SAME clamp the spinner routes through, in the SAME space the
+        // guide was drawn in, so a drag cannot author a top a typed value
+        // could not — and a locked layer stops at the plane's last line.
+        const space = layerTopSpace(scene);
+        const next = clampLayerTop(scene, canvasYToLayerTop(e.clientY - rect.top,
+          { x: 0, y: vpY, width: rect.width, height: rect.height, zoom }, space));
         if (next !== guideDrag.current.worldY) {
           guideDrag.current.worldY = next;
           redraw();
@@ -2039,7 +2051,7 @@ export default function MapViewport() {
       if (scene && rect) {
         const { vpY, zoom } = useViewStore.getState();
         next = guideAtCanvasY(e.clientY - rect.top, scene.layers,
-          { x: 0, y: vpY, width: rect.width, height: rect.height, zoom });
+          { x: 0, y: vpY, width: rect.width, height: rect.height, zoom }, layerTopSpace(scene));
       }
       if (next !== guideHoverRef.current) setGuideHover(next);
       // A press on a guide never reaches the tool branches below, so a hover

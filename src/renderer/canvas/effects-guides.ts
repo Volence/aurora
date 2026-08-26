@@ -34,6 +34,7 @@
 // bganim-preview.ts, which both already depend on it. Identity, no offset.
 
 import type { EffectsLayer } from '../../core/formats/effects/scene';
+import type { LayerTopSpace } from '../providers/effects-aeon';
 import {
   EFFECTS_GUIDE_LINE, EFFECTS_GUIDE_LINE_DISABLED, EFFECTS_GUIDE_ACTIVE,
   EFFECTS_GUIDE_LABEL_BG, EFFECTS_GUIDE_LABEL_TEXT,
@@ -65,6 +66,35 @@ export function canvasYToWorldY(canvasY: number, vpY: number, zoom: number): num
   return vpY + canvasY / zoom;
 }
 
+// ═══ TWO SPACES, ONE ORIGIN SWITCH ═══
+//
+// The docblock above says a layer's `world_y` is act-axis, and for an UNLOCKED
+// scene it is. But for a LOCKED scene (`v_factor` == the lock sentinel — both
+// shipped scenes) aeon's `scene_plane_line` maps a top to a plane line by the
+// IDENTITY: the authoring space IS the plane, and the eight layers divide the
+// visible screen, not the act. `providers/effects-aeon.layerTopSpace` decides
+// which; this module only asks where line 0 is. In act space it is world 0. In
+// screen space it is THE TOP OF THE VIEWPORT — until the screen-frame overlay
+// (parcel G, built in parallel) lands and gives the canvas a real 320x224
+// frame to be relative to, the viewport's own top edge stands in for the
+// screen's. A guide drawn that way does not scroll with the act, which is
+// exactly the property that distinguishes a screen line from a world row.
+
+/** World Y that line 0 of `space` sits at, for this viewport. */
+export function guideOriginWorldY(vp: Pick<GuideViewport, 'y'>, space: LayerTopSpace): number {
+  return space === 'screen' ? vp.y : 0;
+}
+
+/** Canvas-local Y -> a layer top in `space` (the drag's inverse of `layerGuideGeometry`). */
+export function canvasYToLayerTop(canvasY: number, vp: GuideViewport, space: LayerTopSpace): number {
+  return canvasYToWorldY(canvasY, vp.y, vp.zoom) - guideOriginWorldY(vp, space);
+}
+
+/** The one-line caption the guide layer carries so the space is visible; null when act. */
+export function guideCaption(space: LayerTopSpace): string | null {
+  return space === 'screen' ? 'screen lines — locked scene' : null;
+}
+
 /**
  * How close, in SCREEN px, the cursor has to be to a guide to grab it.
  *
@@ -82,11 +112,13 @@ export const GUIDE_GRAB_PX = 6;
  */
 export function guideAtCanvasY(
   canvasY: number, layers: readonly EffectsLayer[], vp: GuideViewport,
+  space: LayerTopSpace = 'act',
 ): number | null {
   let best: number | null = null;
   let bestDist = Infinity;
+  const origin = guideOriginWorldY(vp, space);
   for (let i = 0; i < layers.length; i++) {
-    const d = Math.abs(worldYToCanvasY(layers[i].world_y, vp.y, vp.zoom) - canvasY);
+    const d = Math.abs(worldYToCanvasY(origin + layers[i].world_y, vp.y, vp.zoom) - canvasY);
     if (d <= GUIDE_GRAB_PX && d <= bestDist) { best = i; bestDist = d; }
   }
   return best;
@@ -103,6 +135,8 @@ export interface GuideDrawOptions {
   dragWorldY?: number;
   /** The layer under the cursor, drawn brighter. */
   hoverIndex?: number | null;
+  /** Which space the tops are in (`layerTopSpace(scene)`); act when omitted. */
+  space?: LayerTopSpace;
 }
 
 /** Where one guide row ends up on the canvas — the shape the debug probe reports. */
@@ -126,10 +160,13 @@ export function layerGuideGeometry(
   layers: readonly EffectsLayer[], vp: GuideViewport, opts: GuideDrawOptions = {},
 ): GuideGeometry[] {
   const out: GuideGeometry[] = [];
+  const origin = guideOriginWorldY(vp, opts.space ?? 'act');
   for (let i = 0; i < layers.length; i++) {
     const worldY = (opts.dragIndex === i && typeof opts.dragWorldY === 'number')
       ? opts.dragWorldY : layers[i].world_y;
-    const canvasY = worldYToCanvasY(worldY, vp.y, vp.zoom);
+    // `worldY` stays the DOCUMENT's number (a screen line on a locked scene);
+    // only the canvas position knows which origin it is measured from.
+    const canvasY = worldYToCanvasY(origin + worldY, vp.y, vp.zoom);
     out.push({
       index: i,
       worldY,
@@ -191,6 +228,20 @@ export function drawLayerGuides(
     ctx.fillStyle = active ? EFFECTS_GUIDE_ACTIVE : EFFECTS_GUIDE_LABEL_TEXT;
     ctx.fillText(text, 8, boxY + 7);
   }
+  // The space, said once on the layer itself: a set of lines that stay put
+  // while the act pans under them needs a sentence explaining why, or it
+  // reads as a guide that forgot to scroll. Bottom-right, out of the labels'
+  // column and the band lens's corner.
+  const caption = guideCaption(opts.space ?? 'act');
+  if (caption !== null) {
+    const w = ctx.measureText(caption).width;
+    const boxX = vp.width - w - 12;
+    const boxY = vp.height - 17;
+    ctx.fillStyle = EFFECTS_GUIDE_LABEL_BG;
+    ctx.fillRect(boxX, boxY, w + 8, 13);
+    ctx.fillStyle = EFFECTS_GUIDE_LABEL_TEXT;
+    ctx.fillText(caption, boxX + 4, boxY + 7);
+  }
   ctx.restore();
 }
 
@@ -219,6 +270,8 @@ export interface GuideReport {
   active: boolean;
   /** The scene they came from, when active. */
   sceneId: string | null;
+  /** The space the rows were drawn in (`layerTopSpace(scene)`); null when inactive. */
+  space: LayerTopSpace | null;
   rows: GuideGeometry[];
   dragIndex: number | null;
   hoverIndex: number | null;
@@ -227,7 +280,7 @@ export interface GuideReport {
 }
 
 let lastReport: GuideReport = {
-  active: false, sceneId: null, rows: [], dragIndex: null, hoverIndex: null, paints: 0,
+  active: false, sceneId: null, space: null, rows: [], dragIndex: null, hoverIndex: null, paints: 0,
 };
 
 export function publishGuideReport(r: Omit<GuideReport, 'paints'>): void {
