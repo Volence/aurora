@@ -82,24 +82,32 @@ export function factorOptions(): FactorOption[] {
 // shift-add ENCODING of that fraction — the custom escape hatch — and the word
 // belongs inside the custom expander, where `s1`/`s2`/`op` live, not on the
 // row an author reads first.
+//
+// WHY `(fg)` / `(bg)` AND NOT THE FULL WORDS (parcel label-column-align): the
+// label column is a fixed 64px that wraps at spaces (column-layout.tsx), and
+// `(foreground)` is one 12-character token — wider than any token the column
+// was measured on (`Transition`, `Blank band`: 10). The first cut shipped the
+// full words and the live app drew the layer card's label column at three
+// widths. The short form wraps as `Plane A` / `(fg)`; the full words are said
+// once, in the hint under both rows, and in each row's title.
 
 /** The two factor rows of a layer: label, and the title the label carries. */
 export const PLANE_FACTOR_ROWS = Object.freeze({
   fa: Object.freeze({
     key: 'fa' as const,
-    label: 'Plane A (foreground)',
+    label: 'Plane A (fg)',
     title: 'fa — how far Plane A, the foreground level plane, scrolls per pixel of camera movement',
   }),
   fb: Object.freeze({
     key: 'fb' as const,
-    label: 'Plane B (background)',
+    label: 'Plane B (bg)',
     title: 'fb — how far Plane B, the background, scrolls per pixel of camera movement',
   }),
 });
 
 /** One line under both rows, said once per layer. */
 export const PLANE_FACTOR_HINT =
-  'fraction of camera movement this strip scrolls; 1 = with the camera';
+  'A = foreground, B = background; fraction of camera movement this strip scrolls; 1 = with the camera';
 
 // ---------------------------------------------------------------------------
 // curve.to and vsplit.at — parcel H (triage 2026-08-26 §A.7, §B row H)

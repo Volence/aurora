@@ -26,11 +26,19 @@
 // sized by the one label this pass removed: `#0 world_y` at 57px, which folded
 // a layer INDEX into a field name. The index now titles the layer card.
 //
-// IT IS A FLOOR (`minWidth`), NOT A FIXED WIDTH, and that is deliberate: a
-// label that outgrows the column pushes its own control right, which the
-// harness's [L1] row sees as a second distinct column width and fails on. A
-// hard `width` would instead wrap or clip the label silently. A guard that
-// fires beats a layout that lies.
+// IT IS A FIXED WIDTH THAT WRAPS, NOT A FLOOR. It was a `minWidth` floor for
+// one pass, on the argument that a label outgrowing the column would push its
+// control right and trip the harness's [L1] row. That guard is FOREGROUND, and
+// parcel D shipped `Plane A (foreground)` past it: the live app then drew the
+// layer card's label column at three widths (68 / 111 / 114px) and the factor
+// selects no longer lined up. A shared column that any one label can widen is
+// not shared. So the label is `width: LABEL_W` with `whiteSpace: 'normal'`:
+// every row is the same width by construction and a long label wraps at its
+// spaces. What can still break the column is a single unbreakable token wider
+// than it — `label-column-align.test.ts` pins every layer-card label's longest
+// token to the bar the static labels above set, so that is caught in node,
+// and there is deliberately no `overflowWrap`: a token that is too wide
+// overflows visibly rather than splitting mid-word.
 //
 // ═══ ONE LABEL PER ROW ═══
 //
@@ -63,7 +71,7 @@ const ROW: React.CSSProperties = {
 };
 
 const LABEL: React.CSSProperties = {
-  fontSize: T.tXs, color: T.textLo, minWidth: LABEL_W, flexShrink: 0,
+  fontSize: T.tXs, color: T.textLo, width: LABEL_W, flexShrink: 0, whiteSpace: 'normal',
 };
 
 /** A hint, a readout, a refusal — the column's one non-label text tier. */
