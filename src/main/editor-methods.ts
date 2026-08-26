@@ -214,6 +214,12 @@ export const EDITOR_METHODS: EditorMethod[] = [
         .describe('first tile of the existing static range to declare animated. It must lie at or '
           + 'after the end of the current animated prefix (list_bg_anim_bands reports it as '
           + 'budget.firstPromotableSlot) and the whole cols*rows range must already be in the blob'),
+      phaseFill: z.enum(['copy', 'blank', 'shift']).optional()
+        .describe('how banks 1..7 are derived from phase 0. copy (the default here) leaves the '
+          + 'band visually inert until its frames are drawn; blank breaks the picture on the '
+          + 'second phase; shift makes bank k phase 0 scrolled k px within the band\'s own '
+          + 'pattern width — the contract\'s "pre-shifted art 1px apart", so the band MOVES with '
+          + 'no further authoring. Phase 0 is always read from the promoted range itself'),
       driver: z.string().optional()
         .describe('camera_x, camera_y or timer — the SCALAR the band\'s step is read from. Every '
           + 'band shifts HORIZONTALLY whichever driver it uses; camera_y does NOT mean vertical '
@@ -224,9 +230,10 @@ export const EDITOR_METHODS: EditorMethod[] = [
     description: 'Promote an existing static tile range into a new BgAnim band. THE PRIMARY WAY TO '
       + 'AUTHOR A BAND: the range MOVES to the front of the blob rather than being added to it, so '
       + 'tiles.length is unchanged and this works on a document that has spent its whole tile '
-      + 'budget (which the shipping one has). Phase 0 is READ from the blob and banks 1-7 arrive as '
-      + 'copies of it, so the rendered picture is identical before and after — the band is inert '
-      + 'until its frames are drawn. One undo step.' },
+      + 'budget (which the shipping one has). Phase 0 is READ from the blob; by default banks 1-7 '
+      + 'arrive as copies of it (the band is inert until its frames are drawn), and '
+      + 'phaseFill=shift derives them as pre-shifted phases so the band scrolls immediately. The '
+      + 'rendered picture at rest is identical before and after either way. One undo step.' },
   { name: 'demote_bg_anim_band', kind: 'demote-bg-anim-band', result: 'json',
     params: {
       band: z.number().int().min(0).describe('index into the band list'),
@@ -245,6 +252,11 @@ export const EDITOR_METHODS: EditorMethod[] = [
       phases: z.array(z.array(z.array(z.number().int().min(0).max(15)).length(64))).optional()
         .describe('the band art: exactly 8 banks, each of cols*rows tiles, each tile 64 pixel '
           + 'values 0-15 row-major. Omit for a blank band'),
+      phaseFill: z.enum(['copy', 'blank', 'shift']).optional()
+        .describe('how banks 1..7 are derived from phase 0 when `phases` is omitted (a new band\'s '
+          + 'phase 0 is blank art, so all three agree today; the option is the same one '
+          + 'promote_bg_anim_band takes). Refused together with `phases`, which already spells '
+          + 'every bank'),
       driver: z.string().optional().describe('camera_x, camera_y or timer — the scalar source, never an axis'),
       rateShift: z.number().int().optional().describe('right shift applied to the driver scalar'),
     },

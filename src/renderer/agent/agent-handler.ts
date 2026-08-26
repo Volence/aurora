@@ -774,6 +774,7 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
       const doc = useProjectStore.getState().project!.bgOverride.doc;
       const result = promoteBandCommand(doc, req.staticBase, {
         cols: req.cols, rows: req.rows,
+        ...(req.phaseFill !== undefined ? { phaseFill: req.phaseFill } : {}),
         ...(req.driver !== undefined ? { driver: req.driver } : {}),
         ...(req.rateShift !== undefined ? { rateShift: req.rateShift } : {}),
       });
@@ -794,6 +795,7 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
       const ctx = requireProject();
       const result = addBandCommand(currentBgOverride(), {
         cols: req.cols, rows: req.rows,
+        ...(req.phaseFill !== undefined ? { phaseFill: req.phaseFill } : {}),
         ...(req.driver !== undefined ? { driver: req.driver } : {}),
         ...(req.rateShift !== undefined ? { rateShift: req.rateShift } : {}),
       }, req.phases);
