@@ -139,7 +139,26 @@ interface EditorState {
   // S4 tool state
   activeSectionIndex: number;
   editingLayer: EditingLayer;
+  /**
+   * The FOREGROUND pick: an index into the zone tileset, which is what the
+   * section nametables carry.
+   */
   selectedTileIndex: number;
+  /**
+   * The BACKGROUND pick: a BLOB-LOCAL index into whichever tile array
+   * `resolveDisplayedBg` says Plane B is drawn from (ROADMAP item 47).
+   *
+   * ═══ WHY THERE ARE TWO OF THESE ═══
+   *
+   * The two indices name DIFFERENT SPACES — 919 zone tiles vs a 320-tile
+   * override blob on the live tree, with no correspondence between them at any
+   * index. One shared value has to either lie (carry a foreground index into the
+   * background and paint whatever happens to sit at that slot) or silently move
+   * the author's pick to fit the other array. Both are the defect class item 47
+   * exists to remove, so the pick is per layer: switching layers restores what
+   * was picked in THAT space and changes nothing in the other.
+   */
+  selectedBgTileIndex: number;
   selectedPaletteLine: number;
   selectedChunkId: string | null;
   selectedObjectTypeId: string | null;
@@ -169,6 +188,9 @@ interface EditorState {
   setActiveSectionIndex: (index: number) => void;
   setEditingLayer: (layer: EditingLayer) => void;
   setSelectedTileIndex: (index: number) => void;
+  setSelectedBgTileIndex: (index: number) => void;
+  /** Set whichever of the two the given layer paints from. */
+  setSelectedTileIndexForLayer: (layer: EditingLayer, index: number) => void;
   setSelectedPaletteLine: (line: number) => void;
   setSelectedChunkId: (id: string | null) => void;
   setSelectedObjectTypeId: (id: string | null, subtype?: number) => void;
@@ -277,6 +299,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   activeSectionIndex: 0,
   editingLayer: 'fg',
   selectedTileIndex: 0,
+  selectedBgTileIndex: 0,
   selectedPaletteLine: 0,
   selectedChunkId: null,
   selectedObjectTypeId: null,
@@ -303,6 +326,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   setActiveSectionIndex: (index) => set({ activeSectionIndex: index }),
   setEditingLayer: (layer) => set({ editingLayer: layer }),
   setSelectedTileIndex: (index) => set({ selectedTileIndex: index }),
+  setSelectedBgTileIndex: (index) => set({ selectedBgTileIndex: index }),
+  setSelectedTileIndexForLayer: (layer, index) => set(
+    layer === 'bg' ? { selectedBgTileIndex: index } : { selectedTileIndex: index },
+  ),
   setSelectedPaletteLine: (line) => set({ selectedPaletteLine: line }),
   setSelectedChunkId: (id) => set({ selectedChunkId: id }),
   setSelectedObjectTypeId: (id, subtype) => set({ selectedObjectTypeId: id, selectedObjectSubtype: subtype ?? 0 }),

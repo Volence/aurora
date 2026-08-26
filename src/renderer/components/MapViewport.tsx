@@ -999,7 +999,13 @@ export default function MapViewport() {
     const tile = worldToBgTile(worldX, worldY);
     if (!tile) return;
 
-    const { selectedTileIndex, selectedPaletteLine } = useEditorStore.getState();
+    // THE BACKGROUND PICK, not the foreground one. The word's low bits are a
+    // BLOB-LOCAL index into `resolved.tiles`, and the zone tileset the FG picker
+    // shows is different art of a different length — arming a BG stroke from it
+    // was ROADMAP item 47, and the picker is now sourced from this same resolved
+    // blob (providers/tile-picker-source.ts).
+    const { selectedBgTileIndex, selectedPaletteLine } = useEditorStore.getState();
+    const selectedTileIndex = selectedBgTileIndex;
     const newNt = (selectedTileIndex & 0x7FF) | ((selectedPaletteLine & 0x3) << 13);
 
     // THE ONE REFUSAL, and it is loud. A nametable word's low bits are an index
@@ -1010,6 +1016,11 @@ export default function MapViewport() {
     // chose would be a tile the author did not pick), so the cell is left alone
     // and the reason is put on screen. Word 0 is the format's blank escape and
     // is always legal, whatever the blob's length.
+    //
+    // ITEM 47 DID NOT MAKE THIS DEAD. The picker can no longer offer an
+    // out-of-blob index, but a pick SURVIVES a blob that shrinks under it (a
+    // band removal replaces `doc.tiles`), and `__dbg.setSelectedTile` arms one
+    // directly. This is the last line of defence, not the first.
     const doc = resolved.source === 'override' ? overrideHolder?.doc ?? null : null;
     if (doc !== null && newNt !== 0 && (newNt & LAYOUT_TILE_INDEX_MASK) >= doc.tiles.length) {
       if (!bgRefusalShown.current) {
@@ -1017,8 +1028,9 @@ export default function MapViewport() {
         useToastStore.getState().addToast(
           `Tile ${selectedTileIndex} is outside this background. The act's background is the ` +
           `${doc.tiles.length}-tile blob in editor_bg_override.json — the one the ROM is built ` +
-          'from — and the tile browser is showing the zone TILESET, which is different art. ' +
-          `Nothing was painted. Pick a tile below ${doc.tiles.length}.`,
+          'from — and this pick is past its end, so there is no tile there to paint. ' +
+          `Nothing was painted. Pick again from the Art panel, which is showing this ` +
+          `background's ${doc.tiles.length} tiles.`,
           'warning',
         );
       }

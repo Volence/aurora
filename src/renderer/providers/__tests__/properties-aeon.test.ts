@@ -23,6 +23,8 @@ function input(over: Partial<AeonPropertiesInput> = {}): AeonPropertiesInput {
     showObjectSelection: false,
     tool: 'view',
     selectedTileIndex: 0,
+    selectedBgTileIndex: 0,
+    editingLayer: 'fg',
     selectedPaletteLine: 0,
     viewport: { x: 0, y: 0, zoom: 1 },
     onBackgroundChange: NOOP,
@@ -211,6 +213,21 @@ describe('aeonPropertySections — the paint tool readout', () => {
   it('reports the armed tile and palette line', () => {
     const i = input({ tool: 'paint-tile', selectedTileIndex: 7, selectedPaletteLine: 2 });
     expect(rows(i, 'Paint Tool')).toEqual([['Tile Index', '7'], ['Palette', '2']]);
+  });
+
+  // ROADMAP item 47. The two picks are indices into different arrays, so a
+  // readout that showed one under the other's label would be the same
+  // see-one-thing-paint-another defect at panel scale.
+  it('reports the BG pick, under a label that names the other space, in BG mode', () => {
+    const i = input({
+      tool: 'paint-tile', editingLayer: 'bg', selectedTileIndex: 7,
+      selectedBgTileIndex: 5, selectedPaletteLine: 2,
+    });
+    expect(rows(i, 'Paint Tool')).toEqual([['BG Tile Index', '5'], ['Palette', '2']]);
+    // Anti-vacuous: 5 and 7 really are different, so the row cannot pass by the
+    // two picks happening to agree.
+    expect(rows(input({ tool: 'paint-tile', editingLayer: 'fg', selectedTileIndex: 7, selectedBgTileIndex: 5 }),
+      'Paint Tool')[0]).toEqual(['Tile Index', '7']);
   });
 
   it('sits below the selection readouts', () => {
