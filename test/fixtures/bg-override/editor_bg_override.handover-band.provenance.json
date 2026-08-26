@@ -1,0 +1,135 @@
+{
+  "$what": "Provenance of editor_bg_override.handover-band.json — THE HANDOVER BAND. aeon's live shipped OJZ act-1 background with one 8x4 BgAnim band promoted onto it, authored through Aurora's REAL UI (Effects panel -> From existing tiles -> Promote, saved with a Ctrl+S keystroke) and certified against aeon's OWN injector. This is the file aeon's lane lands as their BGANIM-BAND item; it is a HANDOVER ARTIFACT, not a test fixture with a test bound to it.",
+  "$why_it_matters": "It is the first BgAnim band that is meant to actually MOVE in the ROM. `phaseFill: 'shift'` is what makes that true: the panel's DEFAULT fill is 'copy', which validates perfectly and is visually inert. Banks 1..7 here are true 1px rolls of phase 0.",
+  "aeon": {
+    "revision_pin": "bc95e32e174e28c62c9d167053e6f3487ed1413b",
+    "revision_also_certified": "3c0ef62433be5d0637bafffcb8f2db540b33fed1",
+    "note_on_the_two": "aeon's master moved DURING this session. bb5b8490 raised BGANIM_SECTION_CEILING 9394 -> 12288 (owner d-9) and 3c0ef624 logged it. `games/sonic4/data/editor_bg_override.json` is BYTE-IDENTICAL at both revisions (sha256 a21c9505…), so the authored band is the same file either way, and every probe below was run at BOTH pins with the same result. The band fits under the STRICTER of the two ceilings.",
+    "resolved_by": "git -C ../aeon ls-remote origin refs/heads/master, read via git archive into a mkdtemp — never the sibling working tree",
+    "source_document": {
+      "path": "games/sonic4/data/editor_bg_override.json",
+      "sha256": "a21c95058de85d68c14c6af03dff72a5e267de9f1d6cc81abe73f3776bde7c60",
+      "tiles": 320,
+      "layout_words": 4096,
+      "bands": 0,
+      "note": "identical to this repo's test/fixtures/bg-override/editor_bg_override.roomy.json — aeon adopted that regeneration as their live document"
+    }
+  },
+  "band": {
+    "entry_point": "PROMOTION, not insertion",
+    "why_not_insert": "planBandInsertion (src/core/formats/bg-override/bg-anim-band.ts) only REMAPS existing layout words (`idx < slotBase ? idx : idx + n`). It never points a layout cell at the new slots, so an inserted band is real in the blob and INVISIBLE on screen. Promotion converts tiles the layout ALREADY draws, so the band is on screen by construction and costs zero new slots.",
+    "geometry": "8 cols x 4 rows = 32 slots",
+    "promoted_from_static_tile": 2,
+    "why_tile_2": "measured, not chosen: over every 32-tile window of the source blob, `refs * horizontal-edges` is maximised at base 2 (tied with base 3). 1244 of 4096 layout cells (30.4% of the screen) draw that range, 775 horizontal pixel edges, zero flat tiles.",
+    "phase_fill": "shift",
+    "driver": "timer",
+    "why_timer": "a timer band animates with the camera still, so the motion is watchable standing in one place",
+    "rate_shift": null,
+    "rate_shift_note": "THE KEY IS ABSENT AND THAT IS NOT AN OVERSIGHT. Aurora's BgAnimBandPanel has NO rate_shift control (it builds its BandSpec from cols/rows/phaseFill/driver only), so a UI-authored band cannot spell it. aeon's own default therefore applies: `a.get('rate_shift', 2)` in tools/inject_editor_bg.py, i.e. step = Logic_Tick >> 2. The emitted band table was read back and says rate_shift=2. If the aeon lane wants a different rate, it is a one-key edit there or a panel control here — it is NOT authorable through Aurora today.",
+    "pattern_px": 64,
+    "layout_cells_drawing_the_band": 1244
+  },
+  "section": {
+    "bytes": 8238,
+    "formula": "BGANIM_COUNT_BYTES(2) + BGANIM_RECORD_BYTES(44) x 1 band + 32 slots x BGANIM_BYTES_PER_SLOT(256)",
+    "derived_by": "CALLING aeon's own tools/inject_editor_bg.py:bganim_section_bytes() at the pin — never re-implemented here",
+    "ceiling_at_bc95e32": 9394,
+    "spare_at_bc95e32": 1156,
+    "ceiling_at_3c0ef62": 12288,
+    "spare_at_3c0ef62": 4050,
+    "max_slots_for_one_band": "36 at the 9394 ceiling, 47 at 12288 — so 8x4 fits and 10x4 would be refused at the older one"
+  },
+  "how_it_was_made": {
+    "authoring": "node scratchpad/handover/handover-band-harness.mjs  (CDP over a real Electron build; requires VITE_AURORA_DEBUG=1 npm run build). 26/26 rows.",
+    "composition": "AEON_REV=<pin> python3 scratchpad/bganim-promoted-vs-aeon-injector.py scratchpad/handover/emit --after live-promoted-shift.json",
+    "section_fit": "python3 scratchpad/handover/aeon-section-fit.py <doc> --rev <pin>",
+    "motion": "python3 scratchpad/handover/aeon-banks-move.py <doc> --rev <pin>",
+    "all_of_it": "sh scratchpad/handover/run-handover.sh [AEON_REV]"
+  },
+  "fixture": {
+    "path": "test/fixtures/bg-override/editor_bg_override.handover-band.json",
+    "sha256": "9d05f5125004b2508fc978bb3747b7fb6ae7d46973c4beff34ebb67d95346a77",
+    "bytes": 110660,
+    "keys": ["anims", "layout", "tiles"],
+    "tiles": 320,
+    "layout_words": 4096,
+    "cross_check": "BYTE-IDENTICAL to the document Aurora's MODEL produces for the same band (scratchpad/bganim-promoted-vs-aeon-injector.emit.ts with PROMOTE_COLS=8 PROMOTE_ROWS=4 PROMOTE_FROM=2 PROMOTE_FILL=shift PROMOTE_RATE_SHIFT=none). ROADMAP row 29 asked whether the UI's writer and the model's agree; they agree to the byte."
+  },
+  "verification": {
+    "$note": "THIS IS THE COMMITTED RECORD. Re-run it with `sh scratchpad/handover/run-handover.sh <pin>`; it was green at BOTH pins above.",
+    "ui_authoring": {
+      "runner": "node scratchpad/handover/handover-band-harness.mjs (real Electron under CDP; needs VITE_AURORA_DEBUG=1 npm run build)",
+      "result": "26/26 rows passed",
+      "load_bearing_rows": [
+        "0d — the promoted range is drawn by 1244/4096 cells BEFORE anything is clicked",
+        "3b — the phase-fill select DEFAULTS to 'copy', the inert fill; this is why the run must change it",
+        "4b — the click made an 8x4 band at slot 0 with driver 'timer', explicit",
+        "4c — blob unchanged: 320 tiles, 128 free, before and after",
+        "4d — the picture at rest is unchanged, 0 of 4096 cells differ",
+        "5a — a real Ctrl+S keystroke changed the bytes on disk",
+        "6d — bank k = bank 0 rolled k px, ALL 8 banks, by a roll computed in the harness",
+        "6e — banks 1.. actually DIFFER from bank 0 (a 'copy' band passes 6d and fails 6e)",
+        "6g — the 1244 cells from row 0d now draw slots 0..32"
+      ],
+      "shots": "scratchpad/handover/shots/{1-before-promote,2-after-promote}.png",
+      "independence": "every row below the save reads the SAVED FILE off disk; the app is never asked whether it worked"
+    },
+    "composition_probe": {
+      "command": "AEON_REV=<pin> python3 scratchpad/bganim-promoted-vs-aeon-injector.py scratchpad/handover/emit --after live-promoted-shift.json",
+      "rows_identical_at_both_pins": [
+        "[PASS] aeon's injector ACCEPTED a band PROMOTED on a real document (320 -> 320 tiles)",
+        "before: // every act supplies BgAnim_Table; band_count = 0 disables the whole",
+        "after : pub data BgAnim_Table: u16 = 1   // band count",
+        "banks delta expected cols*rows*BANKS*32 = 8192; got 8192 -> MATCH",
+        "tiles delta expected (after.tiles - before.tiles)*32 = 0 (PROMOTED); got 0 -> MATCH",
+        "[anti-vacuous] 4096/4096 cells draw a tile, 320 distinct images",
+        "raw nametable words differ : 1260",
+        "RESOLVED attrs+tile bytes  : 0",
+        "VERDICT: picture IDENTICAL across the PROMOTED band, through aeon's own emitter.",
+        "RESULT: all rows as expected"
+      ],
+      "significance": "BgAnim_Table goes from the disabled stub to u16 = 1. aeon's ROM has carried band_count = 0 since dd93a840 (2026-07-21); this is the first document that turns it on.",
+      "what_it_CANNOT_see": "it checks the SIZE of bg_anim_banks.bin, not its contents — a copy-filled INERT band emits exactly 8192 B too. The motion probe below is what closes that."
+    },
+    "motion_probe": {
+      "command": "python3 scratchpad/handover/aeon-banks-move.py <doc> --rev <pin>",
+      "method": "bakes the document through aeon's injector and unpacks the emitted bg_anim_banks.bin in the PACKED 4bpp encoding the ROM DMAs (32 B/tile, 8 rows x 4 bytes, high nibble = even pixel) — independently of Aurora's JSON",
+      "emitted_band_table": "driver=2 (aeon's DRIVERS['timer'])  rate_shift=2  step_mask=63  col_shift=7  tile_count=32  vram_dest=$8000",
+      "result": "pattern 64px; bank k == bank 0 rolled k px LEFT for all 8 banks; banks 1..7 all differ from bank 0 -> THE BAND MOVES",
+      "encoding_trap": "A phase tile in editor_bg_override.json is 64 PIXEL NIBBLES, row-major — NOT 32 packed bytes. Decode it the packed way and every bank reads as broken in a way that looks exactly like a writer defect. The two probes read the two different encodings on purpose."
+    },
+    "red_first_proofs": [
+      {
+        "gate": "aeon's own check_bganim_section_fits",
+        "plant": "an over-ceiling band whose slot count is DERIVED from the pin's own ceiling (37 at 9394, 48 at 12288), so a raised ceiling cannot quietly make the proof vacuous — and it DID move mid-session",
+        "result": "REFUSED, naming the limit: 'the ceiling is <N> B (BGANIM_SECTION_CEILING) … so this is <M> B over'",
+        "self_guard": "an UNDER-ceiling plant (--plant-slots 40 at the 12288 ceiling) exits 1 with '**THE PLANT WAS ACCEPTED … so this run proves nothing**' rather than reporting a pass"
+      },
+      {
+        "gate": "the motion probe",
+        "plant": "banks 1..7 rewritten as copies of bank 0 — precisely the document the panel's DEFAULT fill produces, so the plant is not hypothetical",
+        "result": "all seven banks MISMATCH; 'banks 1..7 differing from bank 0: NONE — the band is INERT'"
+      },
+      {
+        "gate": "the re-pointed anti-vacuous guard in scratchpad/bganim-promoted-vs-aeon-injector.emit.ts",
+        "plant": "the source document with all 1244 cells referencing 2..34 repointed at tile 100",
+        "result": "RED with the guard's OWN words: 'VACUOUS: no layout cell draws tiles 2..34, so promoting that range produces a band nothing renders.'",
+        "matcher_uniqueness_bar_2c": "grep -rn 'no layout cell draws tiles' src scratchpad test -> ONE hit, this guard. No neighbouring rule shares the phrase.",
+        "alternative_green_ruled_out_bar_2d_ii": "the SAME poisoned document promotes cleanly at a range it DOES draw (PROMOTE_FROM=100 -> 1564 cells, green), so the refusal is about the range, not about the document being generally broken",
+        "restored": "the plant lives in the DATA, never in the code, so there is nothing to restore in the guard; the runner re-creates and deletes the poison on every run"
+      }
+    ],
+    "aurora_unit_suite": "npm test — 4516 passed, 3 skipped, 0 failed (353 files passed, 1 skipped)"
+  },
+  "guard_repointed": {
+    "file": "scratchpad/bganim-promoted-vs-aeon-injector.emit.ts",
+    "was": "if (free !== 0) throw new Error('VACUOUS: this document is not full; the point is that it is …')",
+    "why_it_was_right": "at 448/448 insertBand refuses at EVERY band size, so promotion was the only door and a roomy document meant the run was on the easy path by accident",
+    "why_it_is_obsolete": "aeon's live document was regenerated from a simplified source and is 320/448, so the guard refuses the real file — and asserts nothing about what makes a promotion worth running",
+    "now": "counts the layout cells pointing into FROM..FROM+n and refuses at ZERO. A promotion's whole claim is that it converts art the layout ALREADY draws; if nothing draws the range, the run proves nothing however perfectly the bytes validate. Occupancy is still printed and gates nothing.",
+    "also_added": "PROMOTE_COLS / PROMOTE_ROWS / PROMOTE_FROM / PROMOTE_FILL / PROMOTE_RATE_SHIFT env overrides (all defaults unchanged; PROMOTE_RATE_SHIFT=none omits the key, which is the only shape Aurora's UI can produce) so the model path can mirror a UI-authored band exactly"
+  },
+  "open_question_for_the_owner": "rate_shift. The brief asked for 3; Aurora's UI cannot express it at all, so the document leaves the key out and aeon's default 2 applies (1px per 4 ticks rather than per 8 — faster, not worse, for a first watchable band). Closing it is a one-key edit on aeon's side or a new control on ours. Not settled silently.",
+  "tagged_for_the_foreground": "Build aeon with this document in place and watch the band move. TWO KNOWN ARTIFACTS OF A FIRST REAL BAND, both already documented on aeon's side: (1) bg_anim_banks.bin in aeon's tree is currently 49,152 B of STALE banks — the injector writes it only inside `if anims:`, so the stub path leaves whatever was there; it is in verify_level_bin.py's _ORPHAN_ALLOWLIST with a reason. (2) Writing the real editor_bg_override.json trips aeon's level-staleness mtime gate BY CONSTRUCTION, because that file is on the gate's INPUT side — a staleness stop presents as the anims refusal gate rejecting Aurora's bytes when it never judged them.",
+  "not_proven": "NO BUILD, NO ROM, NO EMULATOR. Nothing here assembles the emitted .emp and the band has never run on hardware. The furthest this goes is: aeon's injector accepts it, the bytes it emits into bg_anim_banks.bin ARE pre-shifted phases, and the band table it writes says driver=timer. Whether it visibly moves on screen is the ROM stage."
+}
