@@ -28,6 +28,12 @@ import { LAYOUT_TILE_INDEX_MASK } from '../../core/formats/bg-override/bg-overri
 import { editorPanToCameraPx } from '../../core/formats/bg-override/bganim-preview';
 import { OverlayRenderer } from '../canvas/OverlayRenderer';
 import type { SectionOverlayInfo } from '../canvas/OverlayRenderer';
+import {
+  drawLayerGuides, guideAtCanvasY, canvasYToWorldY, layerGuideGeometry, publishGuideReport,
+} from '../canvas/effects-guides';
+import { resolveSelectedScene, setLayerFieldCommand, clampWorldY } from '../providers/effects-aeon';
+import type { EffectsScene } from '../../core/formats/effects/scene';
+import type { FacetCapability } from '../../core/project/adapter';
 import { SECTION_TILES_WIDE, SECTION_TILES_HIGH, SECTION_PIXEL_SIZE, unpackNametableWord } from '../../core/model/s4-types';
 import { BG_WIDTH } from '../../core/formats/bg-tiles';
 import type { Section, ObjectPlacement, RingPlacement } from '../../core/model/s4-types';
@@ -60,6 +66,31 @@ const COLLISION_PREVIEW_OPTS: ShapeDrawOpts = {
   showNeedle: true,
 };
 const overlayRenderer = new OverlayRenderer();
+
+/**
+ * The facet the parallax guides belong to. `FACET_CAPABILITIES`' key for the
+ * effects lens (workspace/facets/effects-facet.tsx mounts `mapFacet('parallax')`).
+ */
+const EFFECTS_FACET: FacetCapability = 'parallax';
+
+/**
+ * The scene whose layers draw as world-Y guides, or null for "no guides".
+ *
+ * ONE RESOLUTION, READ AT CALL TIME. The draw pass, the hit test and the commit
+ * all call this, so a guide can never be drawn from one scene and dragged
+ * against another. Reading state here rather than closing over it is what lets
+ * `redraw` stay dependency-free (its own docblock's rule).
+ *
+ * `resolveSelectedScene` is the panel's own fallback, imported rather than
+ * re-implemented — see its docblock.
+ */
+function activeGuideScene(): EffectsScene | null {
+  const tabId = useSessionStore.getState().activeId;
+  if (useWorkspaceStore.getState().facetFor(tabId) !== EFFECTS_FACET) return null;
+  const library = useProjectStore.getState().project?.effectsScenes;
+  if (!library) return null;
+  return resolveSelectedScene(library, useEditorStore.getState().selectedEffectsSceneId);
+}
 
 interface CtxMenuState {
   x: number;             // container-local px
@@ -146,6 +177,47 @@ export default function MapViewport() {
     startY: number;
   } | null>(null);
 
+  /**
+   * The parallax-guide drag in flight (ROADMAP item 43): which layer of which
+   * scene, and where it currently sits.
+   *
+   * ═══ WHY IT CARRIES A WITNESS ═══
+   *
+   * A gesture can outlive the thing it started on, and this repo has been bitten
+   * by exactly that: a window-level KEYDOWN handler switched the open document
+   * with no pointer event at all, and the in-flight drag wrote stale indices
+   * into the NEW document, once per mousemove. `sceneId` + `index` are a stale
+   * pair the moment a layer is added or removed, or a different project is
+   * opened — and `layers[3]` still resolves afterwards, so the write would
+   * SUCCEED against the wrong layer rather than fail loudly.
+   *
+   * `witness` is the grabbed layer serialized at mousedown. The commit re-reads
+   * `scenes[sceneId].layers[index]`, compares, and writes nothing if it differs.
+   * A drag whose subject moved commits nothing; it does not commit to whatever
+   * is at that index now.
+   *
+   * A REF, NOT STATE, so a mousemove is not a React render. The live preview
+   * repaints through `redraw()`, which reads this ref at call time.
+   */
+  const guideDrag = useRef<
+    { sceneId: string; index: number; startWorldY: number; worldY: number; witness: string } | null
+  >(null);
+  /**
+   * The guide under the cursor. STATE, not a ref, because it drives the
+   * container's `cursor` as well as the highlight — one source for both, so they
+   * cannot disagree about which guide is hot. `setGuideHover` is its only
+   * writer, and it fires on CROSSING a guide, not on every mousemove.
+   *
+   * `guideHoverRef` is a RENDER-TIME MIRROR of it, not a second source, and it
+   * exists for the reason `previewVersionRef` below does: `redraw` also runs
+   * from outside a render (the resize observer, the band clock) and is
+   * deliberately dependency-free, so it cannot close over a state value without
+   * capturing one forever.
+   */
+  const [guideHover, setGuideHover] = useState<number | null>(null);
+  const guideHoverRef = useRef<number | null>(null);
+  guideHoverRef.current = guideHover;
+
   const [ctxMenu, setCtxMenu] = useState<CtxMenuState | null>(null);
 
   const vpX = useViewStore((s) => s.vpX);
@@ -169,6 +241,22 @@ export default function MapViewport() {
   const activeSectionIndex = useEditorStore((s) => s.activeSectionIndex);
   const editingLayer = useEditorStore((s) => s.editingLayer);
   const selection = useEditorStore((s) => s.selection);
+
+  // ---- Parallax layer guides (ROADMAP item 43) ----------------------------
+  // THE FACET IS THE GATE, and there is deliberately no overlay toggle of its
+  // own: guides exist because the author is standing in the parallax lens with a
+  // scene selected, and a toggle would be a second thing to find before the
+  // feature could be discovered at all.
+  //
+  // BOTH OF THESE ARE SUBSCRIBED, not read through getState() inside `redraw`,
+  // and that is the whole reason they are here: `redraw` is dependency-free by
+  // design, so nothing about a facet switch or a scene pick would repaint the
+  // canvas on its own. Adding them to the visual effect's deps below is a
+  // state-change repaint like `activeSectionIndex`, not a clock — MapViewport's
+  // measured zero-idle-repaint property is untouched.
+  const activeTabId = useSessionStore((s) => s.activeId);
+  const activeFacet = useWorkspaceStore((s) => s.facetFor(activeTabId));
+  const selectedEffectsSceneId = useEditorStore((s) => s.selectedEffectsSceneId);
 
   // ---- BgAnim band preview state (ROADMAP item 42) -------------------------
   // The game frame the preview is showing. Zero (level init) whenever playback
@@ -643,6 +731,32 @@ export default function MapViewport() {
 
       overlayRenderer.render(ctx, sectionInfos, overlayOpts, viewport, state.objectSprites, state.collisionProfiles);
     }
+
+    // Parallax layer guides, LAST and in BOTH branches (ROADMAP item 43). Last
+    // because a world-Y division is authoring chrome, not art: it has to stay
+    // readable over the foreground it divides. Both branches because the effects
+    // facet leaves the author free to be on the BG layer, and a guide that
+    // vanishes when they switch layers reads as a bug in the guide.
+    const guideScene = activeGuideScene();
+    if (guideScene) {
+      const drag = guideDrag.current;
+      const opts = {
+        dragIndex: drag && drag.sceneId === guideScene.id ? drag.index : null,
+        dragWorldY: drag?.worldY,
+        hoverIndex: guideHoverRef.current,
+      };
+      drawLayerGuides(ctx, viewport, guideScene.layers, opts);
+      publishGuideReport({
+        active: true, sceneId: guideScene.id,
+        rows: layerGuideGeometry(guideScene.layers, viewport, opts),
+        dragIndex: opts.dragIndex, hoverIndex: opts.hoverIndex,
+      });
+    } else {
+      publishGuideReport({
+        active: false, sceneId: null, rows: [], dragIndex: null, hoverIndex: null,
+      });
+    }
+
     // Realign the collision paint ghost after any pan/zoom/version change.
     drawCollisionPreview();
   }, [drawCollisionPreview, syncBandPreview]);
@@ -650,7 +764,12 @@ export default function MapViewport() {
   // Re-render when anything visual changes
   useEffect(() => {
     redraw();
-  }, [vpX, vpY, zoom, overlays, project, currentZoneId, currentActId, activeSectionIndex, editingLayer, historyVersion, liveEditVersion, selection, objectSprites, collisionProfiles, redraw]);
+  }, [vpX, vpY, zoom, overlays, project, currentZoneId, currentActId, activeSectionIndex, editingLayer, historyVersion, liveEditVersion, selection, objectSprites, collisionProfiles,
+    // Parallax guides (item 43): the facet gate, the scene pick and the hover
+    // highlight. Each is a discrete state change — a pill click, a list click,
+    // the cursor crossing a line — never a tick.
+    activeFacet, selectedEffectsSceneId, guideHover,
+    redraw]);
 
   // Handle resize. The observer repaints through the SAME `redraw` the visual
   // effect uses — it used to carry its own copy of the draw body, which had
@@ -946,7 +1065,11 @@ export default function MapViewport() {
     const { vpX, vpY, zoom } = useViewStore.getState();
     return {
       x: vpX + (clientX - rect.left) / zoom,
-      y: vpY + (clientY - rect.top) / zoom,
+      // canvas/effects-guides owns the Y mapping, and this CALLS it rather than
+      // repeating it: the parallax guides draw with its inverse, and two copies
+      // of the same arithmetic in two files is exactly how a guide comes to land
+      // a few pixels off the row it prints (ROADMAP item 43).
+      y: canvasYToWorldY(clientY - rect.top, vpY, zoom),
     };
   }
 
@@ -1111,6 +1234,46 @@ export default function MapViewport() {
     // dirty dot need saying explicitly.
     useEditorStore.getState().markDirty();
     useEditorStore.getState().bumpLiveEdit();
+  }
+
+  /**
+   * Commit a parallax-guide drag as ONE undo step (ROADMAP item 43). Idempotent
+   * — the release arrives from the container's mouseup AND the window listener.
+   *
+   * THREE THINGS IT REFUSES TO DO.
+   *
+   *  1. A NO-OP COMMITS NOTHING. Released on the row it started from, this
+   *     returns before building a command at all. (`setLayerFieldCommand` would
+   *     also return null — `editSceneCommand` JSON-compares before and after —
+   *     but relying on that would make "one press puts nothing on the stack" a
+   *     property of a function two modules away rather than of this gesture.)
+   *  2. IT DOES NOT WRITE THROUGH A STALE INDEX. `witness` is the layer as it
+   *     was at mousedown; if `layers[index]` is not that layer any more, its
+   *     subject moved under it and the drag is dropped. See guideDrag's
+   *     docblock for the defect this is the fix for.
+   *  3. IT DOES NOT MUTATE THE SCENE DIRECTLY. The write is the same
+   *     `setLayerFieldCommand` the panel's spinner runs, through the same
+   *     `executeCommand`, so undo/redo, dirty-tracking and serialization are
+   *     the ones that already exist rather than a second set that looks right.
+   */
+  function endGuideDrag(): void {
+    const drag = guideDrag.current;
+    guideDrag.current = null;
+    if (!drag) return;
+    // Repaint out of the drag's live preview and back onto the document, even
+    // when nothing below commits — otherwise a dropped drag leaves the guide
+    // painted where the cursor left it.
+    redraw();
+    if (drag.worldY === drag.startWorldY) return;
+    const library = useProjectStore.getState().project?.effectsScenes;
+    if (!library) return;
+    const scene = library.scenes.find((s) => s.id === drag.sceneId);
+    const layer = scene?.layers[drag.index];
+    if (!layer || JSON.stringify(layer) !== drag.witness) return;
+    const level = getActiveLevel();
+    if (!level) return;
+    const cmd = setLayerFieldCommand(library, drag.sceneId, drag.index, 'world_y', drag.worldY);
+    if (cmd) executeCommand(cmd, level);
   }
 
   /** Commit the FG tile / collision stroke as one undo step. Idempotent. */
@@ -1280,6 +1443,35 @@ export default function MapViewport() {
       }
       e.preventDefault();
       return;
+    }
+
+    // A parallax guide under the cursor takes the press (ROADMAP item 43).
+    // AFTER paste mode, BEFORE every tool. Paste keeps its priority because it
+    // is a mode the author explicitly entered and can Escape; the tools do not,
+    // because the effects facet offers `view` and nothing else, so a guide grab
+    // that ran after the pan branch would never run at all. It costs nothing
+    // anywhere else: null unless the author is standing in the effects lens
+    // within GUIDE_GRAB_PX of a line.
+    if (e.button === 0) {
+      const scene = activeGuideScene();
+      const rect = canvasRef.current?.getBoundingClientRect();
+      if (scene && rect) {
+        const { vpY, zoom } = useViewStore.getState();
+        const idx = guideAtCanvasY(e.clientY - rect.top, scene.layers,
+          { x: 0, y: vpY, width: rect.width, height: rect.height, zoom });
+        if (idx !== null) {
+          const layer = scene.layers[idx];
+          guideDrag.current = {
+            sceneId: scene.id, index: idx,
+            startWorldY: layer.world_y, worldY: layer.world_y,
+            // The witness the commit compares against — see guideDrag's docblock.
+            witness: JSON.stringify(layer),
+          };
+          setGuideHover(idx);
+          e.preventDefault();
+          return;
+        }
+      }
     }
 
     if (tool === 'view' || e.button === 1) {
@@ -1555,6 +1747,26 @@ export default function MapViewport() {
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     const tool = useEditorStore.getState().tool;
 
+    // ---- Parallax guides (ROADMAP item 43) --------------------------------
+    // A DRAG IN FLIGHT PREVIEWS; IT DOES NOT EDIT. The document is untouched
+    // until release, so the undo stack gets ONE entry for the gesture instead of
+    // one per mousemove. The preview is the ref plus a repaint — `redraw` reads
+    // `guideDrag.current` at call time.
+    if (guideDrag.current) {
+      const rect = canvasRef.current?.getBoundingClientRect();
+      if (rect) {
+        const { vpY, zoom } = useViewStore.getState();
+        // The SAME clamp the spinner routes through, so a drag cannot author a
+        // world_y a typed value could not (schema §2.2, enforced at emit).
+        const next = clampWorldY(canvasYToWorldY(e.clientY - rect.top, vpY, zoom));
+        if (next !== guideDrag.current.worldY) {
+          guideDrag.current.worldY = next;
+          redraw();
+        }
+      }
+      return;
+    }
+
     // Paste mode: track the hovered even-snapped footprint origin for the
     // ghost preview. Independent of the active tool — takes priority over any
     // drag state so the ghost can't get stuck showing a stale cell.
@@ -1574,6 +1786,28 @@ export default function MapViewport() {
         drawCollisionPreview();
       }
       return;
+    }
+
+    {
+      // Hover: which guide is grabbable here. AFTER the paste branch, for the
+      // same reason the press is (paste is an explicit mode); before every
+      // tool, for the same reason too.
+      //
+      // Repaints only when the answer CHANGES — crossing a line, not moving
+      // along one.
+      const scene = activeGuideScene();
+      const rect = canvasRef.current?.getBoundingClientRect();
+      let next: number | null = null;
+      if (scene && rect) {
+        const { vpY, zoom } = useViewStore.getState();
+        next = guideAtCanvasY(e.clientY - rect.top, scene.layers,
+          { x: 0, y: vpY, width: rect.width, height: rect.height, zoom });
+      }
+      if (next !== guideHoverRef.current) setGuideHover(next);
+      // A press on a guide never reaches the tool branches below, so a hover
+      // over one must not either — otherwise the pan tool's grab cursor and the
+      // hover bar argue with the guide the author is about to grab.
+      if (next !== null) return;
     }
 
     // Stamp ghost: track where the chunk would land, snapped to its own size.
@@ -1760,7 +1994,7 @@ export default function MapViewport() {
         if (previewHoverRef.current) { previewHoverRef.current = null; drawCollisionPreview(); }
       }
     }
-  }, [pan, drawCollisionPreview]);
+  }, [pan, drawCollisionPreview, redraw]);
 
   /**
    * End whatever gesture is in flight, wherever the button was released.
@@ -1778,6 +2012,7 @@ export default function MapViewport() {
    * happens inside, and this must be harmless a second time.
    */
   const finishGesture = useCallback(() => {
+    endGuideDrag();
     endBgStroke();
     endPaintStroke();
     isPaintDragging.current = false;
@@ -1836,6 +2071,11 @@ export default function MapViewport() {
   }, [finishGesture]);
 
   const handleMouseUp = useCallback((e: React.MouseEvent) => {
+    // A guide release is not a map click. The `view`-tool branch below turns a
+    // barely-moved press into "select the section under the cursor", and the
+    // effects facet's only tool IS `view` — so without this, nudging a guide by
+    // two pixels would also change the active section under the author.
+    if (guideDrag.current) { downPos.current = null; finishGesture(); return; }
     isPaintDragging.current = false;
     // A click with no drag already committed a 2x2-tile marquee at mousedown —
     // mouseup just ends the drag; the final marquee (set live on mousemove)
@@ -1957,7 +2197,11 @@ export default function MapViewport() {
   }, []);
 
   const tool = useEditorStore((s) => s.tool);
-  const cursor = tool === 'view' ? 'grab'
+  // A guide under the cursor outranks the tool's cursor, because a press there
+  // grabs the guide rather than doing what the tool says — and the cursor is the
+  // only thing on screen that says so before the author commits to the press.
+  const cursor = guideHover !== null ? 'ns-resize'
+    : tool === 'view' ? 'grab'
     : tool === 'select' ? 'default'
     : tool === 'place-object' || tool === 'place-ring' ? 'crosshair'
     : tool === 'paint-tile' || tool === 'paint-block' || tool === 'paint-collision' ? 'cell'
@@ -1999,6 +2243,11 @@ export default function MapViewport() {
         // button comes up (finishGesture, on the window), so leaving and coming
         // back is continuous and releasing outside still commits.
         if (hoverBarRef.current) hoverBarRef.current.style.display = 'none';
+        // The guide HIGHLIGHT is a hover, so it clears here — but a guide DRAG
+        // is a gesture, and gestures survive leaving the viewport (finishGesture
+        // on the window commits it). Clearing the highlight mid-drag would only
+        // dim the line the author is still holding, so it is left alone.
+        if (!guideDrag.current && guideHoverRef.current !== null) setGuideHover(null);
         if (previewHoverRef.current) { previewHoverRef.current = null; drawCollisionPreview(); }
         if (pasteHoverRef.current) { pasteHoverRef.current = null; drawCollisionPreview(); }
       }}

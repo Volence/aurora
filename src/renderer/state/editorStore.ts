@@ -172,6 +172,26 @@ interface EditorState {
   collisionPaintPlane: 'a' | 'b';
   collisionBrushSize: number; // brush width in 16px blocks; 1 = reuse, >1 = positional N×N area
 
+  /**
+   * Which effects scene the Effects facet is editing, or null for "whatever the
+   * fallback resolves to".
+   *
+   * SHARED BECAUSE TWO SURFACES NEED IT, which is the whole reason it moved
+   * (ROADMAP item 43). It was `React.useState` inside EffectsScenePanel, and
+   * MapViewport — a sibling component, not a child — cannot read that. The
+   * canvas now draws the selected scene's layers as draggable world-Y guides,
+   * so the panel and the canvas have to agree on which scene that is, and one
+   * store field is the only way they can.
+   *
+   * IT IS A RAW ID AND MAY BE STALE. Undoing a create, or opening another
+   * project, leaves an id here that names nothing. Resolution — including the
+   * "fall back to the first scene" rule the panel has always had — lives in
+   * `resolveSelectedScene` (providers/effects-aeon), which both readers call.
+   * Storing the resolved scene instead would mean storing a slice of the
+   * project inside the editor store and keeping it in step with every undo.
+   */
+  selectedEffectsSceneId: string | null;
+
   marquee: MarqueeState | null;
   mapClipboard: MapClipboard | null;
   pasteLayers: PasteLayers;
@@ -204,6 +224,7 @@ interface EditorState {
   setSelectedCollisionSolidity: (s: Solidity) => void;
   setCollisionPaintPlane: (plane: 'a' | 'b') => void;
   setCollisionBrushSize: (size: number) => void;
+  setSelectedEffectsSceneId: (id: string | null) => void;
   setMarquee: (marquee: MarqueeState | null) => void;
   setMapClipboard: (clipboard: MapClipboard | null) => void;
   setPasteLayers: (layers: PasteLayers) => void;
@@ -312,6 +333,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   selectedCollisionSolidity: 'all',
   collisionPaintPlane: 'a',
   collisionBrushSize: 1,
+  selectedEffectsSceneId: null,
 
   marquee: null,
   mapClipboard: null,
@@ -347,6 +369,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   setSelectedCollisionSolidity: (s) => set({ selectedCollisionSolidity: s }),
   setCollisionPaintPlane: (collisionPaintPlane) => set({ collisionPaintPlane }),
   setCollisionBrushSize: (size) => set({ collisionBrushSize: Math.max(1, Math.min(31, size | 0)) }),
+  setSelectedEffectsSceneId: (id) => set({ selectedEffectsSceneId: id }),
   setMarquee: (marquee) => set({ marquee }),
   setMapClipboard: (mapClipboard) => set({ mapClipboard }),
   setPasteLayers: (pasteLayers) => set({ pasteLayers }),
