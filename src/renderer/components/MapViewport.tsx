@@ -1413,33 +1413,6 @@ export default function MapViewport() {
     // Right-click opens the context menu; never paint/drag from it.
     if (e.button === 2) return;
 
-    // A parallax guide under the cursor takes the press (ROADMAP item 43).
-    // FIRST, and specifically ahead of the `view` tool's pan: the effects facet
-    // offers `view` and nothing else, so a guide grab that ran after it would
-    // never run at all. Costs nothing anywhere else — it is null unless the
-    // author is standing in the effects lens within GUIDE_GRAB_PX of a line.
-    if (e.button === 0) {
-      const scene = activeGuideScene();
-      const rect = canvasRef.current?.getBoundingClientRect();
-      if (scene && rect) {
-        const { vpY, zoom } = useViewStore.getState();
-        const idx = guideAtCanvasY(e.clientY - rect.top, scene.layers,
-          { x: 0, y: vpY, width: rect.width, height: rect.height, zoom });
-        if (idx !== null) {
-          const layer = scene.layers[idx];
-          guideDrag.current = {
-            sceneId: scene.id, index: idx,
-            startWorldY: layer.world_y, worldY: layer.world_y,
-            // The witness the commit compares against — see guideDrag's docblock.
-            witness: JSON.stringify(layer),
-          };
-          setGuideHover(idx);
-          e.preventDefault();
-          return;
-        }
-      }
-    }
-
     // Paste mode takes priority over whatever tool is active — a click commits
     // the paste and STAYS in paste mode for repeat pastes (Escape exits).
     // Left-click only (button 0) — middle-click must still fall through to pan.
@@ -1470,6 +1443,35 @@ export default function MapViewport() {
       }
       e.preventDefault();
       return;
+    }
+
+    // A parallax guide under the cursor takes the press (ROADMAP item 43).
+    // AFTER paste mode, BEFORE every tool. Paste keeps its priority because it
+    // is a mode the author explicitly entered and can Escape; the tools do not,
+    // because the effects facet offers `view` and nothing else, so a guide grab
+    // that ran after the pan branch would never run at all. It costs nothing
+    // anywhere else: null unless the author is standing in the effects lens
+    // within GUIDE_GRAB_PX of a line.
+    if (e.button === 0) {
+      const scene = activeGuideScene();
+      const rect = canvasRef.current?.getBoundingClientRect();
+      if (scene && rect) {
+        const { vpY, zoom } = useViewStore.getState();
+        const idx = guideAtCanvasY(e.clientY - rect.top, scene.layers,
+          { x: 0, y: vpY, width: rect.width, height: rect.height, zoom });
+        if (idx !== null) {
+          const layer = scene.layers[idx];
+          guideDrag.current = {
+            sceneId: scene.id, index: idx,
+            startWorldY: layer.world_y, worldY: layer.world_y,
+            // The witness the commit compares against — see guideDrag's docblock.
+            witness: JSON.stringify(layer),
+          };
+          setGuideHover(idx);
+          e.preventDefault();
+          return;
+        }
+      }
     }
 
     if (tool === 'view' || e.button === 1) {
@@ -1764,23 +1766,6 @@ export default function MapViewport() {
       }
       return;
     }
-    {
-      // Hover: which guide is grabbable here. Repaints only when the answer
-      // CHANGES — crossing a line, not moving along one.
-      const scene = activeGuideScene();
-      const rect = canvasRef.current?.getBoundingClientRect();
-      let next: number | null = null;
-      if (scene && rect) {
-        const { vpY, zoom } = useViewStore.getState();
-        next = guideAtCanvasY(e.clientY - rect.top, scene.layers,
-          { x: 0, y: vpY, width: rect.width, height: rect.height, zoom });
-      }
-      if (next !== guideHoverRef.current) setGuideHover(next);
-      // A press on a guide never reaches the tool branches below, so a hover
-      // over one must not either — otherwise the pan tool's grab cursor and the
-      // hover bar argue with the guide the author is about to grab.
-      if (next !== null) return;
-    }
 
     // Paste mode: track the hovered even-snapped footprint origin for the
     // ghost preview. Independent of the active tool — takes priority over any
@@ -1801,6 +1786,28 @@ export default function MapViewport() {
         drawCollisionPreview();
       }
       return;
+    }
+
+    {
+      // Hover: which guide is grabbable here. AFTER the paste branch, for the
+      // same reason the press is (paste is an explicit mode); before every
+      // tool, for the same reason too.
+      //
+      // Repaints only when the answer CHANGES — crossing a line, not moving
+      // along one.
+      const scene = activeGuideScene();
+      const rect = canvasRef.current?.getBoundingClientRect();
+      let next: number | null = null;
+      if (scene && rect) {
+        const { vpY, zoom } = useViewStore.getState();
+        next = guideAtCanvasY(e.clientY - rect.top, scene.layers,
+          { x: 0, y: vpY, width: rect.width, height: rect.height, zoom });
+      }
+      if (next !== guideHoverRef.current) setGuideHover(next);
+      // A press on a guide never reaches the tool branches below, so a hover
+      // over one must not either — otherwise the pan tool's grab cursor and the
+      // hover bar argue with the guide the author is about to grab.
+      if (next !== null) return;
     }
 
     // Stamp ghost: track where the chunk would land, snapped to its own size.
