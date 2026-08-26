@@ -61,6 +61,7 @@ import {
   sceneListEntries, resolveSelectedScene, sceneRefOptions, unassignableSceneRef,
   sectionSceneCommand, createSceneCommand, deleteSceneCommand,
   addLayerCommand, removeLayerCommand, setLayerFieldCommand, setSceneFieldCommand,
+  layerExtrasLine,
   SCENE_FORM_CHOICES, EFFECTS_LAYER_COUNT, EFFECTS_PACKED_FACTOR_BOUNDS, EFFECTS_WORLD_Y_BOUNDS,
   EFFECTS_V_FACTOR_BOUNDS, EFFECTS_V_CENTER_BOUNDS, EFFECTS_V_OFFSET_BOUNDS,
 } from '../../providers/effects-aeon';
@@ -411,6 +412,21 @@ export default function EffectsScenePanel(): React.ReactElement {
                 <FactorField title={`Layer ${i} fb`} value={layer.fb}
                   onChange={(f) => run(setLayerFieldCommand(library, selected.id, i, 'fb', f))} />
               </Field>
+              {/* WHAT THE FILE SETS THAT THE CARD CANNOT: curve, vsplit, deform,
+                  disabled. Read-only, mono, at the hint tier so it cannot be
+                  mistaken for a fourth control — the owner opened the curved
+                  horizon and could not see what was curving it. Controls are
+                  parcel H; none are built here. Absent entirely for a plain
+                  layer: no empty line. */}
+              {(() => {
+                const line = layerExtrasLine(layer);
+                return line === null ? null : (
+                  <Hint under style={{ fontFamily: T.fontMono }}>
+                    <span data-testid={`layer-${i}-extras`}
+                      title="Set in the scene file; read-only here (no control yet)">{line}</span>
+                  </Hint>
+                );
+              })()}
             </Card>
           ))}
          </SectionBody>
