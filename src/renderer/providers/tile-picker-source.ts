@@ -21,6 +21,7 @@
 
 import { resolveDisplayedBg, type DisplayedBgSource } from './bganim-preview-aeon';
 import type { BgOverrideState } from '../../core/formats/bg-override/bg-override-io';
+import { describeBands } from '../../core/formats/bg-override/bg-anim-band';
 import type { Act, BgLibraryEntry, Tile, Zone } from '../../core/model/s4-types';
 
 export type TilePickerLayer = 'fg' | 'bg';
@@ -103,6 +104,61 @@ export function tilePickerHoverLabel(source: TilePickerSource, index: number): s
   if (index < 0 || index >= source.tiles.length) return '';
   const n = `#${index} (0x${index.toString(16).toUpperCase()})`;
   return source.layer === 'bg' ? `bg ${n}` : n;
+}
+
+/**
+ * One band of the animated prefix, as the picker shows it: a `cols x rows`
+ * picture of phase 0, selectable as a unit (parcel J, triage 2026-08-26 §A.8).
+ *
+ * `slots` is the picture ROW-major — the slot each picture cell draws — and
+ * the slots themselves are the band's COLUMN-major range: cell (c, r) is slot
+ * `slotBase + c * rows + r` (aeon `bg_anim.emp`; measured on the ROM
+ * 2026-08-26). The stamp lays this same arrangement on the plane, so the
+ * picture the author picks is the picture the region gets.
+ *
+ * Phase 0 IS the prefix art: `tiles[slotBase .. slotBase + cols*rows)` equals
+ * `phases[0]` by the codec's prefix rule, so the picture is drawn from the
+ * picker's own `tiles` array and no bank is consulted.
+ */
+export interface TilePickerBandGroup {
+  index: number;
+  cols: number;
+  rows: number;
+  slotBase: number;
+  /** Card caption: `Band 0 · 8x4`. */
+  label: string;
+  /** Row-major over the picture, `cols * rows` blob-local slots. */
+  slots: number[];
+}
+
+/**
+ * The bands of the override the picker is showing, or `[]` when the picker is
+ * showing anything else. Only the OVERRIDE carries bands — a library entry or
+ * the act's own plane has an animated prefix of length zero — so any other
+ * origin, and any layer but BG, groups nothing.
+ */
+export function tilePickerBandGroups(
+  source: TilePickerSource, bgOverride: BgOverrideState | null | undefined,
+): TilePickerBandGroup[] {
+  if (source.layer !== 'bg' || source.origin !== 'override') return [];
+  const doc = bgOverride?.doc;
+  if (!doc) return [];
+  return describeBands(doc).map((b) => {
+    const slots = new Array<number>(b.cols * b.rows);
+    for (let r = 0; r < b.rows; r++) {
+      for (let c = 0; c < b.cols; c++) slots[r * b.cols + c] = b.slotBase + c * b.rows + r;
+    }
+    return {
+      index: b.index, cols: b.cols, rows: b.rows, slotBase: b.slotBase,
+      label: `Band ${b.index} · ${b.cols}x${b.rows}`, slots,
+    };
+  });
+}
+
+/** The hover/pick readout for a band group, in the same space as the tile one. */
+export function tilePickerBandLabel(g: TilePickerBandGroup): string {
+  const last = g.slotBase + g.cols * g.rows - 1;
+  return `band ${g.index} · slots ${g.slotBase}..${last} (${g.cols}x${g.rows})`;
 }
 
 /**

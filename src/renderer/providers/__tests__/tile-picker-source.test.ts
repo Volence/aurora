@@ -20,7 +20,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   resolveTilePickerSource, tilePickerCountLabel, tilePickerHoverLabel,
-  pickedTileIndex, tileThumbCacheStale,
+  pickedTileIndex, tileThumbCacheStale, tilePickerBandGroups, tilePickerBandLabel,
 } from '../tile-picker-source';
 import { resolveDisplayedBg } from '../bganim-preview-aeon';
 import type { Act, BgLibraryEntry, Section, Tile, Zone } from '../../../core/model/s4-types';
@@ -213,5 +213,68 @@ describe('the labels name the space the index lives in', () => {
   it('is empty off the end of the array and for no hover', () => {
     expect(tilePickerHoverLabel(bg, N)).toBe('');
     expect(tilePickerHoverLabel(bg, -1)).toBe('');
+  });
+});
+
+// THE ANIMATED PREFIX, GROUPED BY BAND (parcel J, triage 2026-08-26 §A.8).
+// A band is `cols x rows` slots laid COLUMN-major in the picture, so the picker
+// shows each band's phase-0 pattern as ONE picture, selectable as a unit, and
+// the stamp lays exactly that pattern. Slot bases are derived by walking the
+// list (bandSlotBases), never typed; the fixtures use two shapes so a rule
+// that only held for 8x4 would show.
+describe('tilePickerBandGroups — the prefix by band', () => {
+  const band = (cols: number, rows: number) => ({
+    cols, rows, pattern_px: cols * 8,
+    phases: Array.from({ length: 8 }, () => rawTiles(cols * rows, 0)),
+  });
+  function bandedDoc(): BgOverrideDocument {
+    const a = band(8, 4), b = band(4, 2);
+    const total = 8 * 4 + 4 * 2 + N;
+    return { layout: doc(0, total).layout, tiles: rawTiles(total, 3), anims: [a, b] };
+  }
+
+  it('is one group per band, in band order, with derived slot bases and labels', () => {
+    const h = holder(bandedDoc());
+    const s = resolveTilePickerSource('bg', zone(FG), act(BOUND, 'lib-1'), LIB, 0, h);
+    const groups = tilePickerBandGroups(s, h);
+    expect(groups.map((g) => g.index)).toEqual([0, 1]);
+    expect(groups.map((g) => g.slotBase)).toEqual([0, 8 * 4]);
+    expect(groups.map((g) => g.label)).toEqual(['Band 0 · 8x4', 'Band 1 · 4x2']);
+  });
+
+  it("a group's picture is the band's slots laid column-major, row-major over the picture", () => {
+    const h = holder(bandedDoc());
+    const s = resolveTilePickerSource('bg', zone(FG), act(BOUND, 'lib-1'), LIB, 0, h);
+    const g = tilePickerBandGroups(s, h)[1];
+    expect(g.cols).toBe(4); expect(g.rows).toBe(2);
+    expect(g.slots).toHaveLength(g.cols * g.rows);
+    for (let r = 0; r < g.rows; r++) {
+      for (let c = 0; c < g.cols; c++) {
+        expect(g.slots[r * g.cols + c]).toBe(g.slotBase + c * g.rows + r);
+      }
+    }
+    // Every slot of the picture is inside the picker's own array.
+    for (const slot of g.slots) expect(slot).toBeLessThan(s.tiles.length);
+  });
+
+  it('is empty when the picker is not showing the override, or it has no bands', () => {
+    const banded = holder(bandedDoc());
+    expect(tilePickerBandGroups(
+      resolveTilePickerSource('fg', zone(FG), act(BOUND, 'lib-1'), LIB, 0, banded), banded,
+    )).toEqual([]);
+    expect(tilePickerBandGroups(
+      resolveTilePickerSource('bg', zone(FG), act(UNBOUND, 'lib-1'), LIB, 0, banded), banded,
+    )).toEqual([]);
+    const plain = holder(doc(3, N));
+    expect(tilePickerBandGroups(
+      resolveTilePickerSource('bg', zone(FG), act(BOUND, 'lib-1'), LIB, 0, plain), plain,
+    )).toEqual([]);
+  });
+
+  it('labels a picked band in the space it lives in', () => {
+    const h = holder(bandedDoc());
+    const s = resolveTilePickerSource('bg', zone(FG), act(BOUND, 'lib-1'), LIB, 0, h);
+    const g = tilePickerBandGroups(s, h)[0];
+    expect(tilePickerBandLabel(g)).toBe('band 0 · slots 0..31 (8x4)');
   });
 });
