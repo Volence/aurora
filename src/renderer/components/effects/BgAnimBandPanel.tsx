@@ -53,9 +53,36 @@
 // docs/reviews/2026-08-22-preview-posture-ruling.md. Nothing here starts a
 // clock, schedules a frame, or touches MapViewport, so the viewport's measured
 // zero-idle-repaint property is left exactly as it was.
+//
+// ═══ WHERE THESE TWO SECTIONS SIT IN THE COLUMN (ROADMAP item 41) ═══
+//
+// Rows, labels, hints and cards come from `column-layout`, shared with
+// EffectsScenePanel — the two panels draw ONE column and used to carry two
+// private copies of its geometry.
+//
+//   BG animation bands  CONTENT, not `list`. A band list is bounded at four
+//                       rows BY THE CONTRACT (BGANIM_MAX_BANDS), so its natural
+//                       height is a known, small quantity and it does not need
+//                       a share of the column to be readable. Measured at one
+//                       band it was pinned to the 160px list FLOOR and still
+//                       overflowed by 65px — a scrollbar on a section whose
+//                       content is four rows at its theoretical worst.
+//   New band            CONTENT, and now `defaultCollapsed`. It is a CREATION
+//                       form, not something an author arriving at this facet is
+//                       reading, and it was measured as the single tallest box
+//                       in the column: 474px of 1229px, 38% of everything.
+//                       Closing it is what gives the column enough height for
+//                       the Layers list to stop sitting on its floor — the
+//                       whole tidy-up turns on this one attribute.
+//
+// ⚠ FOUR CDP HARNESSES DRIVE THIS FORM (bganim-band, -rate-shift, -insert-roomy,
+// -ui-authored-composition) and each now opens the section before touching it.
+// A collapsed section renders no children at all, so a harness that reaches
+// straight for a control gets `null` and reports the control as missing.
 
 import React from 'react';
 import { T, SectionBody, CollapsibleSection, Select, NumberField, Chip, IconButton } from '../ui';
+import { Field, Row, Hint, Group, Card, CONTROL_INSET } from './column-layout';
 import { useProjectStore, getActiveLevel } from '../../state/projectStore';
 import { executeCommand } from '../../state/editorStore';
 import { useHistoryVersion } from '../../hooks/useHistoryVersion';
@@ -67,28 +94,6 @@ import {
   rateShiftNote, removeBandCommand, rowChoices,
   type BandCommandResult, type BandPhaseFill, type BandSpec,
 } from '../../providers/bg-anim-aeon';
-
-const row: React.CSSProperties = {
-  display: 'flex', alignItems: 'center', gap: T.s2, marginBottom: T.s2, flexWrap: 'wrap',
-};
-const label: React.CSSProperties = {
-  fontSize: T.tXs, color: T.textLo, minWidth: 68, flexShrink: 0,
-};
-const note: React.CSSProperties = { fontSize: T.tXs, color: T.textLo, lineHeight: 1.5 };
-const warn: React.CSSProperties = { ...note, color: T.warning };
-
-/**
- * A `variant="list"` section's body, with the scroller the model requires.
- *
- * The same constant EffectsScenePanel carries, and for the same measured reason:
- * CollapsibleSection's list variant takes a share of the column and expects the
- * content to scroll inside it, and a panel that does not supply `overflowY`
- * paints its rows straight over the sections beneath. Four bands is the ceiling
- * here so the stack is short, but the rule is about the container, not the
- * count — and `panel-scrollers.test.ts` cannot see either panel's sections,
- * because the facet mounts the components rather than the sections.
- */
-const LIST_BODY: React.CSSProperties = { overflowY: 'auto' };
 
 /** Run a command on the focused aeon document. */
 function run(command: AnyCommand): void {
@@ -155,199 +160,123 @@ export default function BgAnimBandPanel(): React.ReactElement {
   const promoteOff = promoteUnavailableReason(doc);
   const insertOff = insertUnavailableReason(doc, cols, bandRowCount);
 
-  const driverField = (
-    <>
-      <span style={label} title="The SCALAR the step is read from. Never an axis.">Driver</span>
-      <Select
-        title="Which scalar drives this band's step. Every band shifts HORIZONTALLY whichever
-               driver it uses — camera_y does NOT mean vertical motion."
-        value={explicitDriver ? driver : ''}
-        onChange={(v) => {
-          if (v === '') { setExplicitDriver(false); return; }
-          setExplicitDriver(true); setDriver(v);
-        }}
-        style={{ flex: 1, minWidth: 110 }}>
-        {/* The empty option LEAVES THE KEY OUT, which is the shape the codec
-            prefers: a document that does not spell `driver` tracks whatever the
-            consumer's default becomes, and writing today's default into it
-            would freeze it. */}
-        <option value="">(default — {DEFAULT_DRIVER})</option>
-        {driverOptions().map((o) => (
-          <option key={o.value} value={o.value} title={o.title}>{o.label}</option>
-        ))}
-      </Select>
-    </>
-  );
-
-  // THE SPEED CONTROL, AND IT RUNS BACKWARDS. `step = driver >> rate_shift`, so
-  // a HIGHER rate_shift is a SLOWER band — the opposite of what a field one
-  // reads as "speed" implies. Every label, title and note here says so, and
-  // `rateShiftNote` prints the exact consequence of the author's own number.
-  //
-  // TWO CONTROLS, NOT A PRE-FILLED SPINNER, for the reason the driver picker's
-  // empty option gives one field up: "default" here means THE KEY IS ABSENT, so
-  // the document tracks whatever the consumer's default becomes. A single
-  // spinner seeded at today's default would write today's default into every
-  // band an author never thought about the rate of — freezing it. The number box
-  // only appears once an author has said the rate is theirs.
-  const rateShiftField = (
-    <>
-      <span style={label}
-        title="rate_shift — a RIGHT SHIFT on the driver, so HIGHER IS SLOWER.">
-        Rate shift
-      </span>
-      <Select
-        title="rate_shift — HIGHER IS SLOWER. The step is the driver scalar shifted RIGHT by this
-               many bits (step = driver >> rate_shift), so each +1 halves the band's speed.
-               Leave it at (default) to omit the key and track aeon's own default."
-        value={explicitRateShift ? 'custom' : ''}
-        onChange={(v) => setExplicitRateShift(v === 'custom')}
-        style={{ flex: 1, minWidth: 110 }}>
-        {/* Same contract as the driver's empty option: this LEAVES THE KEY OUT. */}
-        <option value=""
-          title="Omit rate_shift. The band moves at whatever aeon's own default is, today and
-                 after any change to it.">
-          (default — {DEFAULT_RATE_SHIFT})
-        </option>
-        <option value="custom"
-          title="Spell rate_shift out in the document. Remember: higher is SLOWER.">
-          custom…
-        </option>
-      </Select>
-      {explicitRateShift && (
-        <NumberField
-          title={rateShiftNote(rateShift)}
-          // `min` styles the spinner and stops NOTHING an author types (ROADMAP
-          // item 37) — `clampRateShift` is the actual bound. There is no `max`:
-          // the contract has no upper bound and inventing one would refuse a
-          // value aeon accepts.
-          min={0} width={64} value={rateShift}
-          onChange={(n) => setRateShift(clampRateShift(n))} />
-      )}
-    </>
-  );
-
   return (
     <>
       <CollapsibleSection
         id="aeon.bganim.bands"
-        title={`BG animation bands (${budget.bands}/${budget.maxBands})`}
-        variant="list">
-       <SectionBody style={LIST_BODY}>
+        title={`BG animation bands (${budget.bands}/${budget.maxBands})`}>
+       <SectionBody>
         {state === null && (
-          <div style={note}>No aeon project is open.</div>
+          <Hint style={{ marginBottom: 0 }}>No aeon project is open.</Hint>
         )}
         {state !== null && state.unreadable !== null && (
-          <div style={warn}>
+          <Hint tone="warning" style={{ marginBottom: 0 }}>
             <code>{state.unreadable.path}</code> exists and could not be read, so no band can be
             edited. Aurora will NOT overwrite it. Reason: {state.unreadable.reason}
-          </div>
+          </Hint>
         )}
         {state !== null && state.unreadable === null && doc === null && (
-          <div style={note}>
+          <Hint style={{ marginBottom: 0 }}>
             This project has no <code>editor_bg_override.json</code>. Bands live in that document,
             which also carries the Plane B layout and its tile blob — there is nothing to animate
             until it exists.
-          </div>
+          </Hint>
         )}
 
         {doc !== null && rows.length === 0 && (
-          <div style={note}>
+          <Hint>
             No bands yet. A band declares a contiguous range of the background&apos;s tile blob
             animated: its slots become a prefix of <code>tiles</code> and the runtime shifts them
             horizontally. Promote a static range below.
-          </div>
+          </Hint>
         )}
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: T.s1 }}>
-          {rows.map((b) => (
-            <div key={b.index} style={{
-              border: `1px solid ${T.border}`, borderRadius: T.rMd,
-              padding: T.s2, background: T.raised,
-            }}>
-              <div style={{ ...row, marginBottom: T.s1 }}>
-                <span style={{ fontSize: T.tSm, color: T.textHi }}>
-                  #{b.index} &nbsp;{b.geometry}
-                </span>
-                <span style={{ ...note, opacity: 0.85 }}>
-                  slots {b.slotRange} · {b.tileCount} tile{b.tileCount === 1 ? '' : 's'} ·{' '}
-                  {b.patternPx}px pattern · {b.columnBytes}B/col · {b.phaseBanks} banks
-                </span>
-              </div>
-              <div style={{ ...row, marginBottom: T.s1 }}>
-                <span style={note}
-                  title="The scalar source. The band shifts HORIZONTALLY whichever driver it uses.">
-                  driver <strong>{b.driver}</strong>
-                  {b.driverIsExplicit ? '' : ' (default — the key is absent)'}
-                </span>
-                <span style={note}>
-                  · rate_shift <strong>{b.rateShift}</strong>
-                  {b.rateShiftIsExplicit ? '' : ' (default)'}
-                </span>
-              </div>
-              <div style={{ ...row, marginBottom: 0 }}>
-                <IconButton icon={<span>Demote</span>}
-                  label={`Demote band ${b.index} to static tiles`}
-                  onClick={() => { setPendingRemoval(null); apply(demoteBandCommand(doc, b.index)); }} />
-                <span style={note}>lossless — the art stays, it just stops animating</span>
-                <div style={{ flex: 1 }} />
-                <IconButton icon={<span>Remove</span>}
-                  label={`Remove band ${b.index}`}
+        {rows.map((b) => (
+          // THE INDEX TITLES THE CARD and the geometry is its value, so a band
+          // row reads in the same label column as every form row above it.
+          // Everything under it hangs off the control column (`under`), which
+          // is what makes the readout a block rather than four ragged lines.
+          <Card key={b.index} raised>
+            <Field label={`Band ${b.index}`}>
+              <span style={{ fontSize: T.tSm, color: T.textHi }}>{b.geometry}</span>
+            </Field>
+            <Hint under>
+              slots {b.slotRange} · {b.tileCount} tile{b.tileCount === 1 ? '' : 's'} ·{' '}
+              {b.patternPx}px pattern · {b.columnBytes}B/col · {b.phaseBanks} banks
+            </Hint>
+            <Hint under>
+              <span title="The scalar source. The band shifts HORIZONTALLY whichever driver it uses.">
+                driver <strong>{b.driver}</strong>
+                {b.driverIsExplicit ? '' : ' (default — the key is absent)'}
+              </span>
+              {' · '}
+              rate_shift <strong>{b.rateShift}</strong>
+              {b.rateShiftIsExplicit ? '' : ' (default)'}
+            </Hint>
+            <Row style={{ marginLeft: CONTROL_INSET }}>
+              <IconButton icon={<span>Demote</span>}
+                label={`Demote band ${b.index} to static tiles`}
+                onClick={() => { setPendingRemoval(null); apply(demoteBandCommand(doc, b.index)); }} />
+              <IconButton icon={<span>Remove</span>}
+                label={`Remove band ${b.index}`}
+                onClick={() => {
+                  // First press asks the COMMAND, which refuses when cells draw
+                  // the band and says how many. That refusal IS the prompt —
+                  // the panel never invents its own count.
+                  const r = removeBandCommand(doc, b.index, false);
+                  if (r.ok) { setPendingRemoval(null); apply(r); return; }
+                  setRefusalText(r.reason);
+                  setPendingRemoval(b.index);
+                }} />
+            </Row>
+            <Hint under>lossless — Demote keeps the art, it just stops animating</Hint>
+            {pendingRemoval === b.index && (
+              <Row style={{ marginLeft: CONTROL_INSET }}>
+                <Chip tone="warning"
                   onClick={() => {
-                    // First press asks the COMMAND, which refuses when cells draw
-                    // the band and says how many. That refusal IS the prompt —
-                    // the panel never invents its own count.
-                    const r = removeBandCommand(doc, b.index, false);
-                    if (r.ok) { setPendingRemoval(null); apply(r); return; }
-                    setRefusalText(r.reason);
-                    setPendingRemoval(b.index);
-                  }} />
-              </div>
-              {pendingRemoval === b.index && (
-                <div style={{ ...row, marginTop: T.s2, marginBottom: 0 }}>
-                  <Chip tone="warning"
-                    onClick={() => {
-                      setPendingRemoval(null);
-                      apply(removeBandCommand(doc, b.index, true));
-                    }}>
-                    Remove and blank those cells
-                  </Chip>
-                  <Chip onClick={() => { setPendingRemoval(null); setRefusalText(null); }}>
-                    Cancel
-                  </Chip>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
+                    setPendingRemoval(null);
+                    apply(removeBandCommand(doc, b.index, true));
+                  }}>
+                  Remove and blank those cells
+                </Chip>
+                <Chip onClick={() => { setPendingRemoval(null); setRefusalText(null); }}>
+                  Cancel
+                </Chip>
+              </Row>
+            )}
+          </Card>
+        ))}
 
         {doc !== null && (
-          <div style={{ ...note, marginTop: T.s3 }}>
+          <Hint style={{ marginTop: T.s2, marginBottom: 0 }}>
             Blob {budget.tiles}/{budget.tileCapacity} tiles ·{' '}
             <strong>{budget.tileSlotsRemaining}</strong> free ·{' '}
             {budget.animatedSlots} animated (slots 0..{budget.animatedSlots}) ·{' '}
             {budget.bandsRemaining} band slot{budget.bandsRemaining === 1 ? '' : 's'} left
-          </div>
+          </Hint>
         )}
-        {refusalText && <div style={{ ...warn, marginTop: T.s2 }}>{refusalText}</div>}
+        {refusalText && (
+          <Hint tone="warning" style={{ marginTop: T.s2, marginBottom: 0 }}>{refusalText}</Hint>
+        )}
        </SectionBody>
       </CollapsibleSection>
 
-      <CollapsibleSection id="aeon.bganim.new" title="New band">
+      {/* DEFAULT-COLLAPSED — a creation form, and the tallest box in the column.
+          See the file docblock; the four CDP harnesses that drive it open it. */}
+      <CollapsibleSection id="aeon.bganim.new" title="New band" defaultCollapsed>
        <SectionBody>
         {/* ONE GEOMETRY, TWO SOURCES. Cols, rows and driver describe the band
             itself and mean the same thing whichever way its art arrives, so
             they are asked once, above both actions. Duplicating them into two
             sections would have been the shape that quietly says one of the two
             is the real one. */}
-        <div style={row}>
-          <span style={label} title="Pattern width in tiles">Cols</span>
+        <Field label="Cols" title="Pattern width in tiles">
           <NumberField title={`cols — pattern_px will be ${patternPxFor(cols)}`}
             min={1} width={56} value={cols}
             onChange={(n) => setCols(Math.max(1, Math.round(n) || 1))} />
-          <span style={label} title="Rows must make rows*32 a power of two — the runtime shifts a whole column">
-            Rows
-          </span>
+        </Field>
+        <Field label="Rows"
+          title="Rows must make rows*32 a power of two — the runtime shifts a whole column">
           <Select title="rows — constrained so that rows * 32 bytes per column is an exact power of two,
                          because the runtime rotates a column by shifting it"
             value={String(bandRowCount)}
@@ -355,77 +284,133 @@ export default function BgAnimBandPanel(): React.ReactElement {
             style={{ width: 80 }}>
             {rowChoices().map((r) => <option key={r} value={String(r)}>{r}</option>)}
           </Select>
-          <span style={note}>
-            {tileCount} slot{tileCount === 1 ? '' : 's'} · {patternPxFor(cols)}px pattern
-          </span>
-        </div>
-        <div style={row}>{driverField}</div>
-        <div style={{ ...row, marginBottom: T.s1 }}>{rateShiftField}</div>
-        <div style={{ ...note, marginBottom: T.s2 }}>
+        </Field>
+        <Hint under>
+          {tileCount} slot{tileCount === 1 ? '' : 's'} · {patternPxFor(cols)}px pattern
+        </Hint>
+
+        <Field label="Driver" title="The SCALAR the step is read from. Never an axis.">
+          <Select
+            title="Which scalar drives this band's step. Every band shifts HORIZONTALLY whichever
+                   driver it uses — camera_y does NOT mean vertical motion."
+            value={explicitDriver ? driver : ''}
+            onChange={(v) => {
+              if (v === '') { setExplicitDriver(false); return; }
+              setExplicitDriver(true); setDriver(v);
+            }}
+            style={{ flex: 1, minWidth: 0 }}>
+            {/* The empty option LEAVES THE KEY OUT, which is the shape the codec
+                prefers: a document that does not spell `driver` tracks whatever the
+                consumer's default becomes, and writing today's default into it
+                would freeze it. */}
+            <option value="">(default — {DEFAULT_DRIVER})</option>
+            {driverOptions().map((o) => (
+              <option key={o.value} value={o.value} title={o.title}>{o.label}</option>
+            ))}
+          </Select>
+        </Field>
+
+        {/* THE SPEED CONTROL, AND IT RUNS BACKWARDS. `step = driver >> rate_shift`,
+            so a HIGHER rate_shift is a SLOWER band — the opposite of what a field
+            one reads as "speed" implies. Every label, title and note here says so,
+            and `rateShiftNote` prints the exact consequence of the author's own
+            number, in the hint slot every other field's explanation uses.
+
+            TWO CONTROLS, NOT A PRE-FILLED SPINNER, for the reason the driver
+            picker's empty option gives one field up: "default" here means THE KEY
+            IS ABSENT, so the document tracks whatever the consumer's default
+            becomes. A single spinner seeded at today's default would write today's
+            default into every band an author never thought about the rate of —
+            freezing it. The number box only appears once an author has said the
+            rate is theirs. */}
+        <Field label="Rate shift"
+          title="rate_shift — a RIGHT SHIFT on the driver, so HIGHER IS SLOWER.">
+          <Select
+            title="rate_shift — HIGHER IS SLOWER. The step is the driver scalar shifted RIGHT by this
+                   many bits (step = driver >> rate_shift), so each +1 halves the band's speed.
+                   Leave it at (default) to omit the key and track aeon's own default."
+            value={explicitRateShift ? 'custom' : ''}
+            onChange={(v) => setExplicitRateShift(v === 'custom')}
+            style={{ flex: 1, minWidth: 0 }}>
+            {/* Same contract as the driver's empty option: this LEAVES THE KEY OUT. */}
+            <option value=""
+              title="Omit rate_shift. The band moves at whatever aeon's own default is, today and
+                     after any change to it.">
+              (default — {DEFAULT_RATE_SHIFT})
+            </option>
+            <option value="custom"
+              title="Spell rate_shift out in the document. Remember: higher is SLOWER.">
+              custom…
+            </option>
+          </Select>
+          {explicitRateShift && (
+            <NumberField
+              title={rateShiftNote(rateShift)}
+              // `min` styles the spinner and stops NOTHING an author types (ROADMAP
+              // item 37) — `clampRateShift` is the actual bound. There is no `max`:
+              // the contract has no upper bound and inventing one would refuse a
+              // value aeon accepts.
+              min={0} width={64} value={rateShift}
+              onChange={(n) => setRateShift(clampRateShift(n))} />
+          )}
+        </Field>
+        <Hint under>
           {rateShiftNote(explicitRateShift ? rateShift : DEFAULT_RATE_SHIFT)}
-        </div>
-        <div style={row}>
-          <span style={label}
-            title="How banks 1-7 are filled from phase 0. Phase 0 itself is never a choice: it is
-                   the art the band rests at.">
-            Banks 1–7
-          </span>
+        </Hint>
+
+        <Field label="Banks 1–7"
+          title="How banks 1-7 are filled from phase 0. Phase 0 itself is never a choice: it is
+                 the art the band rests at.">
           <Select
             title="phase fill — how banks 1-7 (the contract's pre-shifted phases, selected by
                    step & 7) are derived from the band's phase 0"
             value={phaseFill}
             onChange={(v) => setPhaseFill(v as BandPhaseFill)}
-            style={{ flex: 1, minWidth: 130 }}>
+            style={{ flex: 1, minWidth: 0 }}>
             {phaseFillOptions().map((o) => (
               <option key={o.value} value={o.value} title={o.title}>{o.label}</option>
             ))}
           </Select>
-        </div>
+        </Field>
 
         {/* ── Source 1: art the document already carries ────────────────── */}
-        <div style={{ ...row, marginTop: T.s3, marginBottom: T.s1 }}>
-          <span style={{ fontSize: T.tSm, color: T.textHi }}>From existing tiles</span>
-          <span style={note}>costs no tiles — the range moves, it is not copied</span>
-        </div>
-        <div style={row}>
-          <span style={label} title="First tile of the static range this band takes over">From tile</span>
-          <NumberField
-            title={`static base — the range is ${staticBase}..${staticBase + tileCount}. `
-              + `Slots 0..${budget.animatedSlots} already belong to bands.`}
-            min={budget.firstPromotableSlot} width={72} value={staticBase}
-            onChange={(n) => setStaticBase(Math.max(0, Math.round(n) || 0))} />
-          <span style={note}>→ {staticBase}..{staticBase + tileCount}</span>
-          <Chip disabled={promoteOff !== null}
-            title={promoteOff ?? 'Declare this static range animated. The blob does not grow.'}
-            onClick={() => apply(promoteBandCommand(doc, staticBase, spec))}>
-            Promote
-          </Chip>
-        </div>
-        <div style={note}>
-          The picture at rest does not change: phase 0 IS this art, and {fillOption.note}
-        </div>
-        {promoteOff && <div style={warn}>{promoteOff}</div>}
+        <Group label="From existing tiles" note="costs no tiles — the range moves, it is not copied">
+          <Field label="From tile" title="First tile of the static range this band takes over">
+            <NumberField
+              title={`static base — the range is ${staticBase}..${staticBase + tileCount}. `
+                + `Slots 0..${budget.animatedSlots} already belong to bands.`}
+              min={budget.firstPromotableSlot} width={72} value={staticBase}
+              onChange={(n) => setStaticBase(Math.max(0, Math.round(n) || 0))} />
+            <Chip disabled={promoteOff !== null}
+              title={promoteOff ?? 'Declare this static range animated. The blob does not grow.'}
+              onClick={() => apply(promoteBandCommand(doc, staticBase, spec))}>
+              Promote
+            </Chip>
+          </Field>
+          <Hint under>
+            → slots {staticBase}..{staticBase + tileCount}. The picture at rest does not
+            change: phase 0 IS this art, and {fillOption.note}
+          </Hint>
+          {promoteOff && <Hint under tone="warning">{promoteOff}</Hint>}
+        </Group>
 
         {/* ── Source 2: new art ─────────────────────────────────────────── */}
-        <div style={{ ...row, marginTop: T.s3, marginBottom: T.s1 }}>
-          <span style={{ fontSize: T.tSm, color: T.textHi }}>From new art</span>
-          <span style={note}>
-            costs {tileCount} slot{tileCount === 1 ? '' : 's'} ·{' '}
-            <strong>{budget.tileSlotsRemaining}</strong> free
-          </span>
-        </div>
-        <div style={row}>
-          <Chip disabled={insertOff !== null}
-            title={insertOff ?? `Add a blank ${cols}x${bandRowCount} band (${tileCount} tiles)`}
-            onClick={() => apply(addBandCommand(doc, spec))}>
-            Add band
-          </Chip>
-          <span style={note}>
+        <Group label="From new art"
+          note={<>costs {tileCount} slot{tileCount === 1 ? '' : 's'} ·{' '}
+            <strong>{budget.tileSlotsRemaining}</strong> free</>}>
+          <Field label="Blank band">
+            <Chip disabled={insertOff !== null}
+              title={insertOff ?? `Add a blank ${cols}x${bandRowCount} band (${tileCount} tiles)`}
+              onClick={() => apply(addBandCommand(doc, spec))}>
+              Add band
+            </Chip>
+          </Field>
+          <Hint under style={{ marginBottom: 0 }}>
             The band arrives blank and unreferenced; nothing on screen changes until you point
             layout cells at it. (Its phase 0 is blank art, so every fill mode agrees here.)
-          </span>
-        </div>
-        {insertOff && <div style={warn}>{insertOff}</div>}
+          </Hint>
+          {insertOff && <Hint under tone="warning" style={{ marginTop: T.s2, marginBottom: 0 }}>{insertOff}</Hint>}
+        </Group>
        </SectionBody>
       </CollapsibleSection>
 

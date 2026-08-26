@@ -11,9 +11,40 @@
 // starts a clock or touches MapViewport. The facet mounts the ordinary map canvas
 // beside this panel so the author has the act in view while tuning; the act does
 // not move.
+//
+// ═══ THE COLUMN'S SHAPE (ROADMAP item 41) ═══
+//
+// Rows, labels, hints and cards all come from `column-layout`, which both
+// panels in this column share; its docblock carries the measured label width
+// and the one-label-per-row rule. What is decided HERE is which of these four
+// sections claims a share of the column:
+//
+//   Scenes             CONTENT. A scene picker is one line per scene and this
+//                      project has one; giving it an equal third of the column
+//                      bought a 160px box (`SECTION_LIST_MIN_HEIGHT`, the FLOOR
+//                      — measured) around 26px of buttons, with a scrollbar
+//                      that never engaged. It keeps a cap of its own instead,
+//                      so a project with thirty scenes still cannot push the
+//                      rest of the column off the screen.
+//   Scene              CONTENT. A form.
+//   Layers             LIST — the only one. Up to eight cards, each ~100px,
+//                      and the cards are the tallest data anything in this
+//                      column draws (measured: 498px of natural height at five
+//                      layers, in a 160px box). This is the section the
+//                      column's leftover height belongs to.
+//   Section assignment CONTENT. One control.
+//
+// THE MEASUREMENT THAT DECIDED IT (`scratchpad/effects-column-harness.mjs`, on
+// the live aeon tree at 1680x1050): with three sections in this column and one
+// in BgAnimBandPanel all declaring `variant="list"`, ALL THREE sat at exactly
+// the 160px floor, each with its own inner scrollbar, inside a column that was
+// itself overflowing by 292px. Four scrollbars, three of them 160px tall. The
+// flex model was working exactly as specified; there was simply nothing left to
+// divide, and dividing nothing three ways is what "messy" was.
 
 import React from 'react';
 import { T, Panel, SectionBody, CollapsibleSection, Select, NumberField, Chip, IconButton } from '../ui';
+import { Field, Hint, Card } from './column-layout';
 import { useProjectStore, getActiveLevel } from '../../state/projectStore';
 import { useEditorStore, executeCommand } from '../../state/editorStore';
 import { useHistoryVersion } from '../../hooks/useHistoryVersion';
@@ -33,14 +64,11 @@ import {
 
 const EMPTY_LIBRARY: EffectsSceneLibrary = { scenes: [], unreadable: [], notices: [] };
 
-const row: React.CSSProperties = {
-  display: 'flex', alignItems: 'center', gap: T.s2, marginBottom: T.s2,
+const textInput: React.CSSProperties = {
+  flex: 1, minWidth: 0, background: T.raised, color: T.textHi,
+  border: `1px solid ${T.border}`, borderRadius: T.rMd, fontSize: T.tSm,
+  padding: `${T.s2} ${T.s3}`,
 };
-const label: React.CSSProperties = {
-  fontSize: T.tXs, color: T.textLo, minWidth: 68, flexShrink: 0,
-};
-const note: React.CSSProperties = { fontSize: T.tXs, color: T.textLo, lineHeight: 1.5 };
-const warn: React.CSSProperties = { ...note, color: T.warning };
 
 /**
  * A `variant="list"` section's body, WITH THE SCROLLER THE MODEL REQUIRES.
@@ -58,13 +86,42 @@ const warn: React.CSSProperties = { ...note, color: T.warning };
  * own: the ceiling arrives from the column, exactly as ChunkGrid's and
  * ObjectList's do.
  *
+ * ONE SECTION USES THIS NOW — Layers. It is the only one in this column that
+ * takes a share of it (see the file docblock).
+ *
  * NOTHING IN THE NODE SUITE SEES THIS. panel-scrollers.test.ts's derivation
  * walks `<CollapsibleSection><Child` inside FACET modules, and effects-facet
  * mounts `<EffectsScenePanel />` straight under `<Panel>` — so all four of this
- * panel's titled sections, both list variants included, are invisible to that
+ * panel's titled sections, the list variant included, are invisible to that
  * guard and to panel-headings' beside it. That gap is its own booking.
  */
 const LIST_BODY: React.CSSProperties = { overflowY: 'auto' };
+
+/**
+ * The scene picker's own ceiling, which is what lets it stop being a list
+ * section (see the file docblock).
+ *
+ * A scene button is 11px of text plus `T.s1` of padding either side plus a 1px
+ * border ≈ 24px, and the stack gaps them by `T.s1`. Six of them is
+ * 6*24 + 5*2 = 154. Six is the point where a picker stops reading as "the
+ * scenes in this project" and starts needing to be scanned, and it is short
+ * enough that the sections beneath it stay on screen at a 13" laptop height.
+ *
+ * A NUMBER OF ITS OWN, and that is the trade this pass accepted. The model
+ * prefers a share of the column to the fixed per-list ceiling it replaced, and
+ * ui/CollapsibleSection's docblock says why that ceiling was wrong: it applied
+ * always, so it cost dead space in every column with room to spare. This is not
+ * that ceiling coming back — it is a cap on ONE sub-list inside a content
+ * section, and the alternative is measured and worse: an equal third of a
+ * column with nothing left to give IS the 160px floor, which is a fixed height
+ * wearing the flex model's clothes and costs the column a scrollbar as well.
+ *
+ * (Named indirectly on purpose: panel-scrollers.test.ts greps the whole tree
+ * for the deleted constant's identifier, prose included, so that it cannot come
+ * back by being mentioned back into existence. Spelling it here would fail that
+ * guard, and the guard is right to be that blunt.)
+ */
+const SCENE_LIST: React.CSSProperties = { overflowY: 'auto', maxHeight: 154, flexShrink: 0 };
 
 /**
  * Run a command on the focused aeon document, or do nothing when the provider
@@ -98,7 +155,7 @@ function FactorField({ value, onChange, title }: {
 }) {
   const selected = factorSelectValue(value);
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: T.s2, flexWrap: 'wrap' }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: T.s2, flexWrap: 'wrap', flex: 1, minWidth: 0 }}>
       <Select title={title} value={selected}
               onChange={(v) => onChange(factorFromSelect(v, value))} style={{ flex: 1, minWidth: 128 }}>
         {factorOptions().map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
@@ -163,50 +220,54 @@ export default function EffectsScenePanel(): React.ReactElement {
 
   return (
     <>
-      <CollapsibleSection id="aeon.effects.scenes" title="Scenes" variant="list">
-       <SectionBody style={LIST_BODY}>
+      <CollapsibleSection id="aeon.effects.scenes" title="Scenes">
+       <SectionBody>
         {entries.length === 0 && (
-          <div style={note}>
+          <Hint>
             No effects scenes yet. A scene is one file under
             {' '}<code>data/editor/effects/</code> — create one below.
+          </Hint>
+        )}
+        {entries.length > 0 && (
+          <div style={SCENE_LIST}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: T.s1 }}>
+              {entries.map((e) => (
+                <button key={e.id} type="button" onClick={() => setSelectedId(e.id)}
+                  style={{
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                    padding: `${T.s1} ${T.s2}`, font: 'inherit', fontSize: T.tXs, textAlign: 'left',
+                    background: selected?.id === e.id ? T.accent : T.raised,
+                    color: selected?.id === e.id ? T.onAccent : T.textBase,
+                    border: `1px solid ${selected?.id === e.id ? T.accent : T.border}`,
+                    borderRadius: T.rMd, cursor: 'pointer',
+                  }}>
+                  <span>{e.label}</span>
+                  <span style={{ opacity: 0.7 }}>{e.layers} layer{e.layers === 1 ? '' : 's'}</span>
+                </button>
+              ))}
+            </div>
           </div>
         )}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: T.s1 }}>
-          {entries.map((e) => (
-            <button key={e.id} type="button" onClick={() => setSelectedId(e.id)}
-              style={{
-                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                padding: `${T.s1} ${T.s2}`, font: 'inherit', fontSize: T.tXs, textAlign: 'left',
-                background: selected?.id === e.id ? T.accent : T.raised,
-                color: selected?.id === e.id ? T.onAccent : T.textBase,
-                border: `1px solid ${selected?.id === e.id ? T.accent : T.border}`,
-                borderRadius: T.rMd, cursor: 'pointer',
-              }}>
-              <span>{e.label}</span>
-              <span style={{ opacity: 0.7 }}>{e.layers} layer{e.layers === 1 ? '' : 's'}</span>
-            </button>
-          ))}
-        </div>
 
         {library.unreadable.length > 0 && (
-          <div style={{ ...warn, marginTop: T.s3 }}>
+          <Hint tone="warning" style={{ marginTop: T.s3 }}>
             {library.unreadable.length} scene file{library.unreadable.length === 1 ? '' : 's'} in this
             project could not be read and {library.unreadable.length === 1 ? 'is' : 'are'} not listed.
             Aurora will not overwrite {library.unreadable.length === 1 ? 'it' : 'them'}.
-          </div>
+          </Hint>
         )}
 
-        <div style={{ ...row, marginTop: T.s3 }}>
+        {/* "Scene id", not "New": the button beside it already says New, and a
+            row that reads `New … New` twice is the kind of noise this pass is
+            about. The label names the thing being typed. */}
+        <Field label="Scene id" title="Create a scene file under data/editor/effects/"
+          style={{ marginTop: T.s3, marginBottom: 0 }}>
           <input value={newId} placeholder="new_scene_id"
             onChange={(e) => { setNewId(e.target.value); setRefusal(null); }}
-            style={{
-              flex: 1, minWidth: 0, background: T.raised, color: T.textHi,
-              border: `1px solid ${T.border}`, borderRadius: T.rMd, fontSize: T.tSm,
-              padding: `${T.s2} ${T.s3}`,
-            }} />
+            style={textInput} />
           <Chip onClick={create} disabled={newId.trim() === ''}>New</Chip>
-        </div>
-        {refusal && <div style={warn}>{refusal}</div>}
+        </Field>
+        {refusal && <Hint under tone="warning" style={{ marginTop: T.s2, marginBottom: 0 }}>{refusal}</Hint>}
        </SectionBody>
       </CollapsibleSection>
 
@@ -215,22 +276,22 @@ export default function EffectsScenePanel(): React.ReactElement {
           right={<IconButton icon={<span>Delete</span>} label={`Delete scene ${selected.id}`}
             onClick={() => run(deleteSceneCommand(library, selected.id))} />}>
          <SectionBody>
-          <div style={row}>
-            <span style={label}>Name</span>
+          <Field label="Name">
             <input value={typeof selected.name === 'string' ? selected.name : ''}
               onChange={(e) => run(setSceneFieldCommand(
                 library, selected.id, 'name', e.target.value === '' ? undefined : e.target.value))}
-              style={{
-                flex: 1, minWidth: 0, background: T.raised, color: T.textHi,
-                border: `1px solid ${T.border}`, borderRadius: T.rMd, fontSize: T.tSm,
-                padding: `${T.s2} ${T.s3}`,
-              }} />
-          </div>
-          <div style={row}>
-            <span style={label}
-              title="Vertical scroll for the whole background plane, as a right-shift amount">
-              V factor
-            </span>
+              style={textInput} />
+          </Field>
+          {/*
+            ONE FIELD PER ROW (ROADMAP item 41). `V center` and `V offset` used
+            to share a line, and so did `Precision` and `Transition`: the second
+            label in each pair started wherever the first control happened to
+            end, so no label column could reach it. That is the half of "mixed
+            label widths" that was really wrong — every FIRST label already
+            agreed on 72px, measured.
+          */}
+          <Field label="V factor"
+            title="Vertical scroll for the whole background plane, as a right-shift amount">
             {/*
               A SPINNER, NOT A FACTOR PICKER (ROADMAP item 35). `v_factor` is a
               right-shift count the engine feeds to `asr.w`; the FACTOR_* names
@@ -247,9 +308,8 @@ export default function EffectsScenePanel(): React.ReactElement {
               value={selected.v_factor}
               onChange={(n) => run(setSceneFieldCommand(
                 library, selected.id, 'v_factor', clampVFactor(n)))} />
-          </div>
-          <div style={row}>
-            <span style={label}>V center</span>
+          </Field>
+          <Field label="V center">
             {/*
               BOUNDED BY THE CLAMP, NOT THE PROPS (ROADMAP item 37). `min`/`max`
               on a NumberField only bind the spinner; a typed value goes
@@ -262,30 +322,33 @@ export default function EffectsScenePanel(): React.ReactElement {
               value={typeof selected.v_center === 'number' ? selected.v_center : 0}
               onChange={(n) => run(setSceneFieldCommand(
                 library, selected.id, 'v_center', clampVCenter(n)))} />
-            <span style={label}>V offset</span>
+          </Field>
+          <Field label="V offset">
             <NumberField title={`v_offset — signed pixel offset added after the shift, `
                 + `${EFFECTS_V_OFFSET_BOUNDS.min}..${EFFECTS_V_OFFSET_BOUNDS.max}`}
               min={EFFECTS_V_OFFSET_BOUNDS.min} max={EFFECTS_V_OFFSET_BOUNDS.max} width={72}
               value={typeof selected.v_offset === 'number' ? selected.v_offset : 0}
               onChange={(n) => run(setSceneFieldCommand(
                 library, selected.id, 'v_offset', clampVOffset(n)))} />
-          </div>
-          <div style={row}>
-            <span style={label}>Precision</span>
+          </Field>
+          <Field label="Precision">
             <Select title="precision — wave 1 authors cell precision only ('line' is a reserved engine tier)"
               value={typeof selected.precision === 'string' ? selected.precision : SCENE_FORM_CHOICES.precision[0]}
               onChange={(v) => run(setSceneFieldCommand(
-                library, selected.id, 'precision', v as EffectsScene['precision']))}>
+                library, selected.id, 'precision', v as EffectsScene['precision']))}
+              style={{ flex: 1, minWidth: 0 }}>
               {SCENE_FORM_CHOICES.precision.map((p) => <option key={p} value={p}>{p}</option>)}
             </Select>
-            <span style={label}>Transition</span>
+          </Field>
+          <Field label="Transition" style={{ marginBottom: 0 }}>
             <Select title="transition"
               value={typeof selected.transition === 'string' ? selected.transition : SCENE_FORM_CHOICES.transition[0]}
               onChange={(v) => run(setSceneFieldCommand(
-                library, selected.id, 'transition', v as EffectsScene['transition']))}>
+                library, selected.id, 'transition', v as EffectsScene['transition']))}
+              style={{ flex: 1, minWidth: 0 }}>
               {SCENE_FORM_CHOICES.transition.map((t) => <option key={t} value={t}>{t}</option>)}
             </Select>
-          </div>
+          </Field>
          </SectionBody>
         </CollapsibleSection>
       )}
@@ -298,37 +361,32 @@ export default function EffectsScenePanel(): React.ReactElement {
             onClick={() => run(addLayerCommand(library, selected.id))} />}>
          <SectionBody style={LIST_BODY}>
           {selected.layers.map((layer, i) => (
-            <div key={i} style={{
-              border: `1px solid ${T.border}`, borderRadius: T.rMd,
-              padding: T.s2, marginBottom: T.s2,
-            }}>
-              <div style={{ ...row, marginBottom: T.s2 }}>
-                <span style={label}>#{i} world_y</span>
+            // THE INDEX TITLES THE CARD; it does not prefix a field name. The
+            // old first row read `#0 world_y`, which made the longest label in
+            // the whole column out of a field whose name is seven characters,
+            // and set the label column's width for every other row in it.
+            <Card key={i}>
+              <Field label={`Layer ${i}`}>
+                <IconButton icon={<span>Remove</span>} label={`Remove layer ${i}`}
+                  disabled={selected.layers.length <= EFFECTS_LAYER_COUNT.min}
+                  onClick={() => run(removeLayerCommand(library, selected.id, i))} />
+              </Field>
+              <Field label="world_y">
                 <NumberField title={`Layer ${i} world_y (${EFFECTS_WORLD_Y_BOUNDS.min}..${EFFECTS_WORLD_Y_BOUNDS.max})`}
                   min={EFFECTS_WORLD_Y_BOUNDS.min} max={EFFECTS_WORLD_Y_BOUNDS.max} width={72}
                   value={layer.world_y}
                   onChange={(n) => run(setLayerFieldCommand(
                     library, selected.id, i, 'world_y', clampWorldY(n)))} />
-                <div style={{ flex: 1 }} />
-                <IconButton icon={<span>Remove</span>} label={`Remove layer ${i}`}
-                  disabled={selected.layers.length <= EFFECTS_LAYER_COUNT.min}
-                  onClick={() => run(removeLayerCommand(library, selected.id, i))} />
-              </div>
-              <div style={row}>
-                <span style={label} title="Plane A packed scroll factor">fa</span>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <FactorField title={`Layer ${i} fa`} value={layer.fa}
-                    onChange={(f) => run(setLayerFieldCommand(library, selected.id, i, 'fa', f))} />
-                </div>
-              </div>
-              <div style={{ ...row, marginBottom: 0 }}>
-                <span style={label} title="Plane B packed scroll factor">fb</span>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <FactorField title={`Layer ${i} fb`} value={layer.fb}
-                    onChange={(f) => run(setLayerFieldCommand(library, selected.id, i, 'fb', f))} />
-                </div>
-              </div>
-            </div>
+              </Field>
+              <Field label="fa" title="Plane A packed scroll factor">
+                <FactorField title={`Layer ${i} fa`} value={layer.fa}
+                  onChange={(f) => run(setLayerFieldCommand(library, selected.id, i, 'fa', f))} />
+              </Field>
+              <Field label="fb" title="Plane B packed scroll factor">
+                <FactorField title={`Layer ${i} fb`} value={layer.fb}
+                  onChange={(f) => run(setLayerFieldCommand(library, selected.id, i, 'fb', f))} />
+              </Field>
+            </Card>
           ))}
          </SectionBody>
         </CollapsibleSection>
@@ -337,11 +395,12 @@ export default function EffectsScenePanel(): React.ReactElement {
       <CollapsibleSection id="aeon.effects.assign" title="Section assignment">
        <SectionBody>
         {!section ? (
-          <div style={note}>Section {activeSectionIndex} is empty — nothing to assign a scene to.</div>
+          <Hint style={{ marginBottom: 0 }}>
+            Section {activeSectionIndex} is empty — nothing to assign a scene to.
+          </Hint>
         ) : (
           <>
-            <div style={row}>
-              <span style={label}>Section {activeSectionIndex}</span>
+            <Field label={`Section ${activeSectionIndex}`}>
               <Select title="Which effects scene this section uses (sceneRef)"
                 value={section.sceneRef ?? ''} style={{ flex: 1, minWidth: 0 }}
                 onChange={(v) => run(sectionSceneCommand(activeSectionIndex, section.sceneRef, v))}>
@@ -349,14 +408,14 @@ export default function EffectsScenePanel(): React.ReactElement {
                   <option key={o.value} value={o.value}>{o.label}</option>
                 ))}
               </Select>
-            </div>
+            </Field>
             {unassignableSceneRef(library, section.sceneRef) && (
-              <div style={warn}>{unassignableSceneRef(library, section.sceneRef)}</div>
+              <Hint under tone="warning">{unassignableSceneRef(library, section.sceneRef)}</Hint>
             )}
-            <div style={note}>
+            <Hint under style={{ marginBottom: 0 }}>
               Saved to <code>section_{activeSectionIndex}.meta.json</code> as
               {' '}<code>sceneRef</code>. Act default means the act&apos;s own scene.
-            </div>
+            </Hint>
           </>
         )}
        </SectionBody>
