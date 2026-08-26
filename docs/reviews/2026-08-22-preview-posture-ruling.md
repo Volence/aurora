@@ -105,7 +105,35 @@ so these are an **upper** bound on available headroom.
 Not raised by the decider, and it is where a driver-faithful camera preview will actually
 go wrong: **`vpX`/`vpY` are an editor pan in editor space; `Camera_X`/`Camera_Y` are the
 engine's world-pixel camera.** They are not the same quantity — the editor's is
-zoom-scaled and has its own origin. A camera-band preview must **derive** the engine
+zoom-scaled and has its own origin.
+
+> ⚠ **CORRECTED 2026-08-26 by the item-42 parcel, and verified firsthand by the overseer
+> before this amendment was written. The sentence immediately above is WRONG on both
+> counts, and the mapping is the IDENTITY.**
+>
+> - **Not zoom-scaled.** `viewStore.ts:116` is `vpX: Math.max(0, state.vpX - dx / state.zoom)`
+>   — the divide happens on the way *in*, so the value STORED in `vpX` is already unzoomed
+>   world pixels. Zoom never multiplies the stored quantity.
+> - **Not its own origin.** `sectionWorldOffset(i)` is `col * SECTION_PIXEL_SIZE`, and
+>   `SECTION_PIXEL_SIZE = 2048` (`src/core/model/s4-types.ts:8`) is aeon's `$800`, with
+>   section (0,0) at world (0,0).
+>
+> So `vpX` **is** the unbiased world-pixel left edge — the same quantity `Camera_X` holds.
+> The parcel carries a test row asserting the identity, specifically so a scale factor
+> cannot be reintroduced later by someone reading the original sentence.
+>
+> **What this does NOT weaken is the ruling's actual requirement**, which was to DERIVE the
+> mapping rather than assume it. That requirement is what surfaced the error: an agent told
+> to derive went and read the store, and found the prediction it had been handed was wrong.
+> A ruling that had merely asserted the identity would have been right by luck and taught
+> nobody to check. **The instruction was sound; the guess attached to it was not** — and the
+> guess was the part that read as established fact, because it sat in a clause explaining
+> the instruction rather than in the instruction itself.
+>
+> Also kept from this section and still correct: truncate to integer **before** the shift (a
+> `move.w` on a 16.16 cell takes the high word), mask to a word, and do **not** model the
+> right/bottom clamp — `SCREEN_WIDTH` has no authority inside Aurora, so inventing a 320
+> would be the enshrine-a-neighbour's-number move. The label names it instead. A camera-band preview must **derive** the engine
 camera value the band would see from the editor's pan, and that derivation is load-bearing:
 get it wrong and the preview is confidently, silently wrong about phase *and* about rate.
 
