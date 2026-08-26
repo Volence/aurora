@@ -102,7 +102,8 @@ describe('writer-originated effects scene fixture', () => {
 
   /**
    * The committed bytes are exactly what the CURRENT writer emits for the parsed
-   * document — indentation, §5 key order, the missing trailing newline, all of it.
+   * document — indentation, §5 key order, the single trailing newline (empyrean
+   * e1ebd20 §8; the provenance note records the appended byte), all of it.
    *
    * WHAT THIS MEASURES, precisely: writer self-consistency. It goes red if the
    * file is hand-tidied into a shape the writer would not emit, and it goes red

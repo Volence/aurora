@@ -129,19 +129,19 @@ describe('setLayerFieldCommand: curve and vsplit, set and cleared', () => {
 // Row H's golden: the shipped curved-horizon scene, parse→serialize byte-stable
 // before and after an edit + undo. Read from the aeon tree; SKIPPED (not
 // passed) when it is absent.
+//
+// EXACT bytes, no "modulo one byte": empyrean e1ebd20 §8 ruled the canonical
+// file form — exactly one `\n` after the closing brace — so the writer now
+// produces the shipped file as-is and this pin compares whole files.
 const SHIPPED = '/home/volence/sonic_hacks/aeon/games/sonic4/data/editor/effects/ojz_act1_depth.json';
 
 describe('ojz_act1_depth.json round-trip golden (triage §B row H)', () => {
   it('is byte-stable through parse→serialize, and again after an edit and its undo', (ctx) => {
     if (!existsSync(SHIPPED)) { ctx.skip(`SKIPPED, NOT PASSED: ${SHIPPED} absent`); return; }
-    const onDisk = readFileSync(SHIPPED, 'utf8');
-    // FINDING, not a fix: the shipped file ends in one LF that the Aurora writer
-    // (and the §5 golden fixture, canopy_dusk.json) does not carry. Nothing in
-    // the contract names a trailing newline either way, so this pin is
-    // byte-stable MODULO that one byte and says so; the writer is not bent to
-    // match an aeon-side artifact from inside a controls parcel.
-    expect(onDisk.endsWith('\n')).toBe(true);
-    const bytes = onDisk.replace(/\n$/, '');
+    const bytes = readFileSync(SHIPPED, 'utf8');
+    // Anti-vacuous: the shipped file really carries the ruled terminator, once.
+    expect(bytes.endsWith('}\n')).toBe(true);
+    expect(bytes.endsWith('\n\n')).toBe(false);
     const parsed = parseEffectsScene(bytes, 'ojz_act1_depth');
     expect(serializeEffectsScene(parsed)).toBe(bytes);
 

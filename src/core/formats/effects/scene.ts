@@ -334,6 +334,13 @@ export function parseEffectsScene(text: string, filenameStem: string): EffectsSc
  * middle of the file rather than at the top, which reads worse than contract
  * order. "A self-describing order that cannot drift is worth more than a
  * familiar one that can."
+ *
+ * ENDS IN EXACTLY ONE `\n` after the closing brace — the canonical file form
+ * (empyrean e1ebd20, AURORA_EFFECTS_SCHEMA.md §8, ruled 2026-08-26): it is a
+ * POSIX text file, aeon's own shipped instance already ends that way, and a
+ * newline-less file puts "\ No newline at end of file" on every diff. Nothing
+ * else about surrounding whitespace is canonical; the parser accepts a file
+ * with zero or two terminators and the writer lands on one.
  */
 export function serializeEffectsScene(scene: EffectsScene): string {
   const issues = validateAgainstSchema(scene, EFFECTS_SCENE_SCHEMA)
@@ -344,7 +351,7 @@ export function serializeEffectsScene(scene: EffectsScene): string {
       issues,
     );
   }
-  return canonicalJsonPretty(canonicalizeBySchema(scene, EFFECTS_SCENE_SCHEMA));
+  return canonicalJsonPretty(canonicalizeBySchema(scene, EFFECTS_SCENE_SCHEMA)) + '\n';
 }
 
 // ---------------------------------------------------------------------------

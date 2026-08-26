@@ -38,7 +38,7 @@ const MINIMAL = JSON.stringify({
   layers: [{ fa: 'FACTOR_1', fb: 'FACTOR_1_2', world_y: 0 }],
   schema: 1,
   v_factor: 1,
-}, null, 2);
+}, null, 2) + '\n';
 
 function withDoc(mutate: (doc: Record<string, unknown>) => void): string {
   const doc = JSON.parse(MINIMAL) as Record<string, unknown>;
@@ -278,6 +278,7 @@ describe('effects scene writer — round trip', () => {
       '  "schema": 1,',
       '  "v_factor": 1',
       '}',
+      '',
     ].join('\n');
     // Anti-vacuous: the fields whose survival is the point are really in there.
     expect(JSON.parse(onDisk).budget_class).toBe('ojz_heavy');
@@ -370,6 +371,17 @@ describe('effects scene writer — round trip', () => {
    * because §5's letter once reached scene files and would have minified them,
    * and the ruling that says otherwise lives in the other repo.
    */
+  it('ends in exactly one LF — the canonical file form (empyrean e1ebd20 §8)', () => {
+    const text = serializeEffectsScene(parseEffectsScene(MINIMAL, 'plain'));
+    expect(text.endsWith('}\n')).toBe(true);
+    expect(text.endsWith('\n\n')).toBe(false);
+    // Two trailing newlines on the way in become one on the way out, not two,
+    // and a missing one is supplied: whitespace around the document is not
+    // canonical, the single terminator is.
+    expect(serializeEffectsScene(parseEffectsScene(MINIMAL + '\n', 'plain'))).toBe(text);
+    expect(serializeEffectsScene(parseEffectsScene(MINIMAL.trimEnd(), 'plain'))).toBe(text);
+  });
+
   it('pretty-prints at indent 2 — the scalar document class', () => {
     const text = serializeEffectsScene(parseEffectsScene(MINIMAL, 'plain'));
     expect(text).toContain('\n');

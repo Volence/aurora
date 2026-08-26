@@ -19,9 +19,21 @@ edit the JSON. Editing it converts it into a second `canopy_dusk`, silently.
 | | |
 |---|---|
 | fixture | `test/fixtures/effects/writer_session_ojz.json` |
-| git blob hash | `2ee83f89eaa15a549b2445e61f4858d18765c227` |
-| sha256 | `7dfaceaed0dc0c7a3bb0f1c2d424e40af7828691a85a4d7945459707bd76c75f` |
-| size | 955 bytes, no trailing newline |
+| git blob hash | `2c4104e465bff9d5f70399ab7e37a03ce6d49e4e` |
+| sha256 | `4564a270046a7f613e68b868cdcf8abcb332f075833e164e6cb53ec5b6de20bd` |
+| size | 956 bytes, exactly one trailing newline |
+
+**ONE BYTE APPENDED 2026-08-26 — the ruled terminator, not a content edit.** The hub
+ruled the canonical scene-file form (empyrean `e1ebd20`, `AURORA_EFFECTS_SCHEMA.md`
+§8): exactly one `\n` after the closing brace. The writer gained that byte, and so
+did this file — by `printf '\n' >>`, nothing else — because the fixture's fixed-point
+test (`is a byte-exact fixed point of the writer`) pins it to what the CURRENT writer
+emits. No key, value, ordering or indentation changed; every byte of the session's
+output is still here in front of the terminator, and appending a byte the ruling
+prescribes for every scene file involves no authoring choice, so the origination
+claim above stands. The record before the byte: blob
+`2ee83f89eaa15a549b2445e61f4858d18765c227`, sha256
+`7dfaceaed0dc0c7a3bb0f1c2d424e40af7828691a85a4d7945459707bd76c75f`, 955 bytes.
 
 **RE-ORIGINATED 2026-08-23 (ROADMAP item 35), not edited.** The contract retyped
 `v_factor` from a `$defs/factor` to a plain 0..15 shift count (empyrean
