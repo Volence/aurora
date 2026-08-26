@@ -243,8 +243,8 @@ const SLOWEST_PRINTABLE_PX_PER_SEC = 0.01;
 // the overseer flips ONE constant after watching the built ROM. The tests pin
 // the flipped shape (`scrolls left · …`) so the flip is one edit.
 
-/** The direction word the motion sentence carries. Empty until confirmed on the ROM. */
-export const BAND_SCROLL_DIRECTION: '' | 'left' | 'right' = '';
+/** The direction word the motion sentence carries. CONFIRMED on the built ROM 2026-08-26 (see bganim-band-status.test.ts). */
+export const BAND_SCROLL_DIRECTION: '' | 'left' | 'right' = 'left';
 
 /**
  * The one sentence that says what a band does, in the units its driver reads.

@@ -138,13 +138,16 @@ describe('bandMotion — the one sentence that says what a band does', () => {
     expect(bandMotion({ driver: 'timer', rateShift: 2 }, 'candidate')).toMatch(/^would scroll/);
   });
 
-  it('ships with NO direction word until the ROM has been watched (FOREGROUND gate)', () => {
-    expect(BAND_SCROLL_DIRECTION).toBe('');
+  it('says the art scrolls LEFT — measured on the built ROM 2026-08-26, not read off the fill', () => {
+    // aeon master ROM (built 2026-08-26 19:06, 8x4 timer band), private oracle-aether,
+    // scratchpad band-direction-probe: VRAM band image == phase 0 rolled by s, with
+    // s = 50,52,53,54,55,57,58,59,60,62 across 5-frame samples — the content at each
+    // screen pixel comes from progressively further RIGHT in phase 0, so the art
+    // moves LEFT, ~1px per 4 frames (rate_shift 2). Column-major slot layout was the
+    // only layout that matched at all (row-major: 0 of 10 samples).
+    expect(BAND_SCROLL_DIRECTION).toBe('left');
     const s = bandMotion({ driver: 'timer', rateShift: 2 }, 'band');
-    expect(s).not.toMatch(/\b(left|right)\b/);
-    // The shape the flipped constant produces is fixed here so the flip is one
-    // edit and not a rewrite: `scrolls <dir> · 1px per …`.
-    expect(s).toMatch(/^scrolls · 1px per /);
+    expect(s).toMatch(/^scrolls left · 1px per /);
   });
 
   it("IS the card's rate line — bandStatus prints it verbatim", () => {
@@ -178,7 +181,7 @@ describe('bandLensCaptionLines — the caption prints the same sentence as the c
       kind: 'candidate', bandIndex: null, range, motion: bandMotion(band, 'candidate'),
       coverage: null, reason: 'the active section resolves to no background',
     });
-    expect(lines[1]).toMatch(/^would scroll · 1px per 8 px of camera travel/);
+    expect(lines[1]).toMatch(/^would scroll left · 1px per 8 px of camera travel/);
     expect(lines[2]).toContain('no background');
   });
 
