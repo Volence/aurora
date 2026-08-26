@@ -83,6 +83,13 @@ export interface AetherHandshake {
 export class AetherClient {
   private readonly opts: AetherClientOptions;
   private sock: AetherSocket | null = null;
+  /**
+   * The socket's own error, kept until `close` so the teardown reason carries
+   * it. Without this every dead link read as a bare "disconnected" and the
+   * user could not tell a stale socket FILE (`ECONNREFUSED`) from no file at
+   * all (`ENOENT`) — the one axis on which "no emulator" is diagnosed.
+   */
+  private sockError: Error | null = null;
   private buf = '';
   private nextId = 1;
   private readonly pending = new Map<number, { method: string; resolve: (v: unknown) => void; reject: (e: unknown) => void }>();
@@ -122,7 +129,7 @@ export class AetherClient {
 
     sock.on('data', (chunk) => this.onData(chunk));
     sock.on('close', () => this.onClose());
-    sock.on('error', () => { /* close always follows; failing there keeps one path */ });
+    sock.on('error', (e) => { this.sockError = e instanceof Error ? e : new Error(String(e)); /* close always follows; failing there keeps one path */ });
 
     try {
       const init = await this.request('initialize', {
@@ -178,7 +185,13 @@ export class AetherClient {
     this.teardown(new Error('client disconnected'));
   }
 
-  private onClose(): void { this.teardown(new Error('Aether socket disconnected')); }
+  private onClose(): void {
+    const e = this.sockError;
+    this.sockError = null;
+    // `e.message` is node's `connect ECONNREFUSED /path` — code and path both
+    // named, which is exactly what a user at a stale link needs to read.
+    this.teardown(e ? new Error(`Aether socket error: ${e.message}`, { cause: e }) : new Error('Aether socket disconnected'));
+  }
 
   private teardown(reason: Error): void {
     const was = this.status;
