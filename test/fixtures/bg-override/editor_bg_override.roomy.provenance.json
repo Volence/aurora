@@ -1,0 +1,29 @@
+{
+  "$what": "Provenance of editor_bg_override.roomy.json — a ROOMY BG override document (free tile slots) that aeon's own generator wrote. ROADMAP item 24. TEST SCOPE under owner ruling d-7; not a replacement for aeon's shipped art.",
+  "aeon": {
+    "revision": "a840d68f69f27849b5b61c131a8387e4a6b0c024",
+    "resolved_by": "git ls-remote origin refs/heads/master, read via git archive — never the sibling working tree",
+    "generator": "tools/png_to_bg_override.py (lock mode, --lines 2,3 default, gate INTACT)",
+    "budget_source": "tools/vram_map.py: BG_TILE_CAPACITY 448, BG_BAND_RESERVE 128, BG_STATIC_TILE_BUDGET 320",
+    "palette": "games/sonic4/data/generated/ojz/act1/ojz_palette.bin at the same revision"
+  },
+  "source_png": {
+    "path": "games/sonic4/data/editor/bg_src/ojz_forest_flowers.png",
+    "sha256": "babf2c917aea48e639ca12b6ad956838bbe8f1d6ed5bc92b871ee9b569f13cba",
+    "why_this_one": "scratchpad/bg-provenance-probe.py: this PNG reproduces aeon's live editor_bg_override.json (sha256 3f5b8736d15a6af1db0391e6968632de2d3850f3a21fe8eedd858129feeff3e8, 448/448 tiles) byte for byte through the generator; ojz_cave_lilypad.png shares 0/448 tiles with it"
+  },
+  "simplified_png": {
+    "path": "scratchpad/fixtures/ojz_forest_flowers.roomy.png",
+    "sha256": "2204777e2f106e7cd4c567873667355d1bb03bfc74653e09d0ec3215a4a1e09f",
+    "method": "scratchpad/bg-simplify.py — greedy nearest-tile merge in the generator's own tile space (its quantise_tile + canonical imported, not re-implemented); closest pair under min-over-4-flips snapped-RGB distance merged first, the rarer tile replaced by the survivor with the flip composed in; 128 merges, 448 -> 320"
+  },
+  "fixture": {
+    "path": "test/fixtures/bg-override/editor_bg_override.roomy.json",
+    "sha256": "a21c95058de85d68c14c6af03dff72a5e267de9f1d6cc81abe73f3776bde7c60",
+    "generator_printed": "unique tiles: 320/320  (bg_region 448 - band_reserve 128)",
+    "keys": ["layout", "tiles"],
+    "tiles": 320,
+    "layout_words": 4096,
+    "regenerate": "sh scratchpad/bg-roomy-regenerate.sh a840d68f69f27849b5b61c131a8387e4a6b0c024"
+  }
+}
