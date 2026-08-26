@@ -28,7 +28,9 @@ import type {
 } from '../../core/formats/effects/scene';
 import {
   EFFECTS_FACTOR_NAMES, EFFECTS_PACKED_FACTOR_BOUNDS, EFFECTS_LAYER_COUNT,
-  EFFECTS_WORLD_Y_BOUNDS, EFFECTS_V_FACTOR_BOUNDS, WAVE1_PRECISION_VALUES,
+  EFFECTS_WORLD_Y_BOUNDS, EFFECTS_V_FACTOR_BOUNDS, EFFECTS_V_CENTER_BOUNDS,
+  EFFECTS_V_OFFSET_BOUNDS, EFFECTS_V_CENTER_DEFAULT, EFFECTS_V_OFFSET_DEFAULT,
+  WAVE1_PRECISION_VALUES,
   EFFECTS_TRANSITION_VALUES,
   cloneEffectsScene, factorLabel, isNamedFactor, newEffectsLayer, newEffectsScene,
   sceneIdRefusal,
@@ -108,6 +110,27 @@ export function clampVFactor(value: number): number {
   const { min, max } = EFFECTS_V_FACTOR_BOUNDS;
   if (!Number.isFinite(value)) return min;
   return Math.min(max, Math.max(min, Math.round(value)));
+}
+
+/**
+ * Clamp a scene's `v_center` (0..32767) / `v_offset` (-32768..32767, signed) to
+ * the schema's range. THE CLAMP IS THE BOUND — `NumberField`'s `min`/`max`
+ * only style the spinner and never stop a typed value (ROADMAP item 37), so
+ * these are what keep the document inside what aeon's emit accepts.
+ *
+ * A non-finite value (a half-typed '-' in the input) falls to the schema's
+ * `default`, not to `min`: for the signed `v_offset`, `min` would be -32768,
+ * which is not a sane thing to write into a document mid-keystroke.
+ */
+function clampSceneField(bounds: { min: number; max: number }, fallback: number, value: number): number {
+  if (!Number.isFinite(value)) return fallback;
+  return Math.min(bounds.max, Math.max(bounds.min, Math.round(value)));
+}
+export function clampVCenter(value: number): number {
+  return clampSceneField(EFFECTS_V_CENTER_BOUNDS, EFFECTS_V_CENTER_DEFAULT, value);
+}
+export function clampVOffset(value: number): number {
+  return clampSceneField(EFFECTS_V_OFFSET_BOUNDS, EFFECTS_V_OFFSET_DEFAULT, value);
 }
 
 // ---------------------------------------------------------------------------
@@ -345,5 +368,5 @@ export const SCENE_FORM_CHOICES = {
 
 export {
   factorLabel, EFFECTS_LAYER_COUNT, EFFECTS_PACKED_FACTOR_BOUNDS, EFFECTS_WORLD_Y_BOUNDS,
-  EFFECTS_V_FACTOR_BOUNDS,
+  EFFECTS_V_FACTOR_BOUNDS, EFFECTS_V_CENTER_BOUNDS, EFFECTS_V_OFFSET_BOUNDS,
 };

@@ -9,7 +9,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   CUSTOM_FACTOR_VALUE, factorOptions, factorSelectValue, factorFromSelect,
-  clampPackedField, clampWorldY, sceneListEntries, sceneRefOptions, unassignableSceneRef,
+  clampPackedField, clampWorldY, clampVCenter, clampVOffset, sceneListEntries, sceneRefOptions, unassignableSceneRef,
   sectionSceneCommand, createSceneCommand, deleteSceneCommand,
   addLayerCommand, removeLayerCommand, setLayerFieldCommand, setSceneFieldCommand,
   SCENE_FORM_CHOICES,
@@ -21,6 +21,11 @@ import {
 import { serializeEffectsScene, type EffectsScene, type EffectsSceneLibrary } from '../../../core/formats/effects/scene';
 import { EditHistory } from '../../../core/editing/history';
 import type { S4Level } from '../../../core/editing/commands';
+import rawSchema from '../../../core/formats/effects/aurora-effects-scene.schema.json';
+
+// The schema walked by hand, so an expectation here is not the module's own
+// constant read back to it.
+const S = rawSchema as unknown as Record<string, any>;
 
 function library(scenes: EffectsScene[] = [], unreadable: EffectsSceneLibrary['unreadable'] = []): EffectsSceneLibrary {
   return { scenes, unreadable, notices: [] };
@@ -81,6 +86,50 @@ describe('factor picker', () => {
     expect(clampWorldY(-1)).toBe(EFFECTS_WORLD_Y_BOUNDS.min);
     expect(clampWorldY(999999)).toBe(EFFECTS_WORLD_Y_BOUNDS.max);
     expect(clampWorldY(96.7)).toBe(97);
+  });
+
+  /**
+   * ROADMAP item 37. `NumberField`'s `min`/`max` are decorative for typed
+   * input, so these clamps ARE the bound. Every expectation is read out of the
+   * vendored schema, never typed: aeon refuses out-of-range at emit and asked
+   * that Aurora's clamps match exactly, and a literal here could drift.
+   */
+  it('clamps v_center and v_offset to the schema, and v_offset is SIGNED', () => {
+    const vc = S.properties.v_center;
+    const vo = S.properties.v_offset;
+    // Anti-vacuous: the schema really bounds both, and v_offset really is signed.
+    expect(typeof vc.minimum).toBe('number');
+    expect(typeof vo.minimum).toBe('number');
+    expect(vo.minimum, 'v_offset must admit negative values').toBeLessThan(0);
+    expect(vc.minimum, 'v_center must not admit negative values').toBeGreaterThanOrEqual(0);
+
+    // The engine-legal negative value the item was opened over.
+    expect(clampVOffset(-8)).toBe(-8);
+    // Out of range, at both ends of both fields.
+    expect(clampVOffset(-40000)).toBe(vo.minimum);
+    expect(clampVOffset(40000)).toBe(vo.maximum);
+    expect(clampVCenter(40000)).toBe(vc.maximum);
+    expect(clampVCenter(-1)).toBe(vc.minimum);
+    // One past each end is pulled back exactly to the end; the ends themselves pass.
+    expect(clampVCenter(vc.maximum + 1)).toBe(vc.maximum);
+    expect(clampVCenter(vc.maximum)).toBe(vc.maximum);
+    expect(clampVOffset(vo.minimum - 1)).toBe(vo.minimum);
+    expect(clampVOffset(vo.minimum)).toBe(vo.minimum);
+    // A half-typed '-' is NaN; it falls to the schema's default, NOT to min —
+    // min is -32768 for the signed field and nobody meant to type that.
+    expect(clampVOffset(NaN)).toBe(vo.default);
+    expect(clampVCenter(NaN)).toBe(vc.default);
+    expect(clampVOffset(Infinity)).toBe(vo.default);
+    expect(clampVCenter(12.6)).toBe(13);
+
+    // And the clamped values are what the codec accepts: the clamp's ceiling is
+    // the codec's ceiling, not one either side of it.
+    const scene = newEffectsScene('probe');
+    scene.v_center = clampVCenter(40000);
+    scene.v_offset = clampVOffset(-40000);
+    expect(() => serializeEffectsScene(scene)).not.toThrow();
+    scene.v_offset = -8;
+    expect(() => serializeEffectsScene(scene)).not.toThrow();
   });
 });
 

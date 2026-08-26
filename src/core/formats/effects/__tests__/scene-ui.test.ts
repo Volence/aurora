@@ -25,6 +25,10 @@ import {
   EFFECTS_WORLD_Y_BOUNDS,
   EFFECTS_V_FACTOR_BOUNDS,
   EFFECTS_V_FACTOR_LOCK,
+  EFFECTS_V_CENTER_BOUNDS,
+  EFFECTS_V_OFFSET_BOUNDS,
+  EFFECTS_V_CENTER_DEFAULT,
+  EFFECTS_V_OFFSET_DEFAULT,
   isNamedFactor,
   factorLabel,
   isValidSceneId,
@@ -169,6 +173,57 @@ describe('scene-level enumerations and bounds (schema §2.1/§2.2)', () => {
       (scene as unknown as Record<string, unknown>).v_factor = name;
       expect(() => serializeEffectsScene(scene), `v_factor accepted the name ${name}`)
         .toThrow(/v_factor: expected integer, got string/);
+    }
+  });
+
+  /**
+   * ROADMAP item 37: the UI clamps for v_center/v_offset read THESE, and this
+   * row is what keeps them and the schema from drifting apart. Walked by hand
+   * from the raw JSON, not through scene-ui's own `boundsAt`.
+   */
+  it('reads v_center and v_offset bounds and defaults out of the schema', () => {
+    expect(EFFECTS_V_CENTER_BOUNDS).toEqual({
+      min: S.properties.v_center.minimum,
+      max: S.properties.v_center.maximum,
+    });
+    expect(EFFECTS_V_OFFSET_BOUNDS).toEqual({
+      min: S.properties.v_offset.minimum,
+      max: S.properties.v_offset.maximum,
+    });
+    expect(EFFECTS_V_CENTER_DEFAULT).toBe(S.properties.v_center.default);
+    expect(EFFECTS_V_OFFSET_DEFAULT).toBe(S.properties.v_offset.default);
+    // The shape the contract settled: v_center is a world_y (same space, same
+    // range), v_offset is signed. Asserted so a schema that quietly went back
+    // to unsigned would fail here, not at aeon's emit.
+    expect(EFFECTS_V_CENTER_BOUNDS).toEqual(EFFECTS_WORLD_Y_BOUNDS);
+    expect(EFFECTS_V_OFFSET_BOUNDS.min).toBeLessThan(0);
+  });
+
+  it('offers v_center/v_offset ranges the codec really enforces at both ends', () => {
+    // ANTI-VACUOUS, on the v_factor row's pattern: one past each end is refused
+    // with the bounds rule's OWN wording, the ends themselves are accepted.
+    for (const [field, { min, max }] of [
+      ['v_center', EFFECTS_V_CENTER_BOUNDS],
+      ['v_offset', EFFECTS_V_OFFSET_BOUNDS],
+    ] as const) {
+      for (const v of [min, max, 0]) {
+        const scene = newEffectsScene('probe');
+        scene[field] = v;
+        expect(() => serializeEffectsScene(scene), `${field} ${v} was refused`).not.toThrow();
+      }
+      const scene = newEffectsScene('probe');
+      scene[field] = min - 1;
+      expect(() => serializeEffectsScene(scene), `${field} ${min - 1} was accepted`)
+        .toThrow(new RegExp(`${field}: ${min - 1} is below the minimum ${min}`));
+      scene[field] = max + 1;
+      expect(() => serializeEffectsScene(scene), `${field} ${max + 1} was accepted`)
+        .toThrow(new RegExp(`${field}: ${max + 1} is above the maximum ${max}`));
+      // And the read path refuses the same file, so a document authored
+      // elsewhere cannot smuggle the value in.
+      const onDisk = JSON.parse(serializeEffectsScene(newEffectsScene('probe')));
+      onDisk[field] = max + 1;
+      expect(() => parseEffectsScene(JSON.stringify(onDisk), 'probe'))
+        .toThrow(new RegExp(`${field}: ${max + 1} is above the maximum ${max}`));
     }
   });
 

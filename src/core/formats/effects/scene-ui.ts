@@ -187,6 +187,29 @@ export const EFFECTS_WORLD_Y_BOUNDS = boundsAt('$defs', 'layer', 'properties', '
 export const EFFECTS_V_FACTOR_BOUNDS = boundsAt('properties', 'v_factor');
 
 /**
+ * `v_center` is a world Y the vertical mapping pivots about — same space as a
+ * layer's `world_y`, 0..32767. `v_offset` is a SIGNED pixel offset added after
+ * the shift, -32768..32767 (a 16-bit add.w in the engine; it was always signed
+ * there, the unsigned field type was the error). Both read out of the schema,
+ * never typed: empyrean 5c930d6 bounded them, and aeon refuses out-of-range at
+ * emit, so Aurora's clamps must match EXACTLY (ROADMAP item 37).
+ */
+export const EFFECTS_V_CENTER_BOUNDS = boundsAt('properties', 'v_center');
+export const EFFECTS_V_OFFSET_BOUNDS = boundsAt('properties', 'v_offset');
+
+/** The schema's `default` for a field, which the UI clamps fall to on a non-finite input. */
+function integerDefaultAt(...path: (string | number)[]): number {
+  const node = at(...path);
+  const d = node.default;
+  if (typeof d !== 'number' || !Number.isInteger(d)) {
+    throw new Error(`effects scene schema ${path.join('.')} has no integer default`);
+  }
+  return d;
+}
+export const EFFECTS_V_CENTER_DEFAULT = integerDefaultAt('properties', 'v_center');
+export const EFFECTS_V_OFFSET_DEFAULT = integerDefaultAt('properties', 'v_offset');
+
+/**
  * The value that pins the BG plane: `v_factor`'s maximum, which the schema's own
  * description names as the lock sentinel.
  *

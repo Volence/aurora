@@ -23,12 +23,12 @@ import type {
 } from '../../../core/formats/effects/scene';
 import {
   factorOptions, factorSelectValue, factorFromSelect, clampPackedField, clampWorldY,
-  clampVFactor,
+  clampVFactor, clampVCenter, clampVOffset,
   sceneListEntries, sceneRefOptions, unassignableSceneRef,
   sectionSceneCommand, createSceneCommand, deleteSceneCommand,
   addLayerCommand, removeLayerCommand, setLayerFieldCommand, setSceneFieldCommand,
   SCENE_FORM_CHOICES, EFFECTS_LAYER_COUNT, EFFECTS_PACKED_FACTOR_BOUNDS, EFFECTS_WORLD_Y_BOUNDS,
-  EFFECTS_V_FACTOR_BOUNDS,
+  EFFECTS_V_FACTOR_BOUNDS, EFFECTS_V_CENTER_BOUNDS, EFFECTS_V_OFFSET_BOUNDS,
 } from '../../providers/effects-aeon';
 
 const EMPTY_LIBRARY: EffectsSceneLibrary = { scenes: [], unreadable: [], notices: [] };
@@ -250,13 +250,25 @@ export default function EffectsScenePanel(): React.ReactElement {
           </div>
           <div style={row}>
             <span style={label}>V center</span>
-            <NumberField title="v_center — the act-axis row the vertical factor pivots about"
+            {/*
+              BOUNDED BY THE CLAMP, NOT THE PROPS (ROADMAP item 37). `min`/`max`
+              on a NumberField only bind the spinner; a typed value goes
+              through unclamped. clampVCenter/clampVOffset read the schema's
+              range, which is the range aeon refuses beyond at emit.
+            */}
+            <NumberField title={`v_center — the act-axis row the vertical factor pivots about, `
+                + `${EFFECTS_V_CENTER_BOUNDS.min}..${EFFECTS_V_CENTER_BOUNDS.max}`}
+              min={EFFECTS_V_CENTER_BOUNDS.min} max={EFFECTS_V_CENTER_BOUNDS.max} width={72}
               value={typeof selected.v_center === 'number' ? selected.v_center : 0}
-              onChange={(n) => run(setSceneFieldCommand(library, selected.id, 'v_center', n))} />
+              onChange={(n) => run(setSceneFieldCommand(
+                library, selected.id, 'v_center', clampVCenter(n)))} />
             <span style={label}>V offset</span>
-            <NumberField title="v_offset"
+            <NumberField title={`v_offset — signed pixel offset added after the shift, `
+                + `${EFFECTS_V_OFFSET_BOUNDS.min}..${EFFECTS_V_OFFSET_BOUNDS.max}`}
+              min={EFFECTS_V_OFFSET_BOUNDS.min} max={EFFECTS_V_OFFSET_BOUNDS.max} width={72}
               value={typeof selected.v_offset === 'number' ? selected.v_offset : 0}
-              onChange={(n) => run(setSceneFieldCommand(library, selected.id, 'v_offset', n))} />
+              onChange={(n) => run(setSceneFieldCommand(
+                library, selected.id, 'v_offset', clampVOffset(n)))} />
           </div>
           <div style={row}>
             <span style={label}>Precision</span>
