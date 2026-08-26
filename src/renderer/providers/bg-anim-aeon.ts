@@ -54,6 +54,7 @@
 
 import type { AnyCommand } from '../../core/editing/commands';
 import {
+  BAND_DEFAULTS,
   BGANIM_DRIVER_NAMES,
   BGANIM_MAX_BANDS,
   BG_TILE_CAPACITY,
@@ -191,6 +192,73 @@ export function phaseFillOptions(): PhaseFillOption[] {
  * the engine changed it.
  */
 export const DEFAULT_DRIVER: BgAnimDriver = BGANIM_DRIVER_NAMES[0];
+
+// ---------------------------------------------------------------------------
+// Rate — the one number on this surface that runs BACKWARDS
+// ---------------------------------------------------------------------------
+
+/**
+ * The `rate_shift` a band uses when the document does not spell one out.
+ *
+ * READ FROM THE CONTRACT, never typed in — `BAND_DEFAULTS.rate_shift` is itself
+ * `bandKeys.rate_shift.default` out of the vendored consumer contract. The whole
+ * point of leaving the key absent is that the file tracks whatever the consumer
+ * defaults to, so a panel that PRINTED a literal would tell an author the wrong
+ * thing the day aeon changed it — and a form that SEEDED itself with a literal
+ * would freeze today's default into every document it wrote.
+ */
+export const DEFAULT_RATE_SHIFT: number = BAND_DEFAULTS.rate_shift;
+
+/**
+ * Clamp a typed `rate_shift` to what the contract accepts: `nonNegativeInt`.
+ *
+ * THE CLAMP IS THE BOUND. `NumberField`'s `min` governs the spinner and
+ * `:invalid` styling and stops no TYPED value (ROADMAP item 37) — so without
+ * this a `-3` in the box reaches `createBand`, and the codec's refusal
+ * ("rate_shift must be an integer >= 0") is the author's only feedback, arriving
+ * as a red sentence after a click rather than as a field that cannot hold a
+ * wrong value.
+ *
+ * NO UPPER BOUND, DELIBERATELY. The contract states `kind: nonNegativeInt` with
+ * no maximum, and a UI that refused a value aeon would happily bake is a worse
+ * defect than one that permits a silly one. A large shift is not illegal, only
+ * useless, and `rateShiftNote` is where that is said — in words, without
+ * blocking.
+ *
+ * A non-finite value (the empty box mid-keystroke) falls to the CONTRACT'S
+ * DEFAULT rather than to 0, the same choice `clampSceneField` makes in
+ * effects-aeon: 0 is a real, very fast rate, and silently landing on it is a
+ * worse surprise than landing on the value the document would have had anyway.
+ */
+export function clampRateShift(value: number): number {
+  if (!Number.isFinite(value)) return DEFAULT_RATE_SHIFT;
+  return Math.max(0, Math.round(value));
+}
+
+/**
+ * What a given `rate_shift` MEANS, in the direction an author gets wrong.
+ *
+ * `step = driver_value >> rate_shift` (the contract's own citation), so the band
+ * advances one step per `2^rate_shift` units of its driver: HIGHER IS SLOWER.
+ * That is backwards from every intuition about a field one reads as "speed", and
+ * it is the reason this sentence exists rather than a bare spinner.
+ *
+ * THE NUMBER IS DERIVED FROM THE FORMULA, NOT FROM A THRESHOLD. There is a
+ * useless end of this range — a shift wide enough that the step is always zero —
+ * but the vendored contract carries NO driver width to derive it from (the
+ * `drivers` block names the three scalar sources and nothing about their size;
+ * the only `u16` in the file sits inside an English `why` string about a
+ * different constant). So this states the exact consequence of the author's own
+ * number and lets it grow absurd on its own, rather than printing a bound this
+ * repo would have had to guess.
+ */
+export function rateShiftNote(rateShift: number): string {
+  const n = clampRateShift(rateShift);
+  const units = 2 ** n;
+  const per = Number.isFinite(units) ? units.toLocaleString('en-US') : `2^${n}`;
+  return `step = driver >> ${n}: the band advances 1 px per ${per} driver `
+    + `unit${units === 1 ? '' : 's'}. HIGHER IS SLOWER — each +1 halves the speed.`;
+}
 
 // ---------------------------------------------------------------------------
 // Geometry the pickers may offer

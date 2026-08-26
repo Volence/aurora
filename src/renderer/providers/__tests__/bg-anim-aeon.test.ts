@@ -38,14 +38,15 @@ import {
   parseBgOverride, bandColumnBytes,
   type BgOverrideDocument,
 } from '../../../core/formats/bg-override/bg-override';
-import { applyWithBand, describeBands } from '../../../core/formats/bg-override/bg-anim-band';
+import { applyWithBand, describeBands, documentBands } from '../../../core/formats/bg-override/bg-anim-band';
 import type { BandSlotPlan } from '../../../core/formats/bg-override/bg-anim-band';
 import type { BgOverrideBand } from '../../../core/formats/bg-override/bg-override';
 import type { SetBgOverrideBandCommand } from '../../../core/editing/commands';
 import {
-  DEFAULT_DRIVER, addBandCommand, bandBudget, bandRows, demoteBandCommand,
-  driverOptions, insertUnavailableReason, patternPxFor, promoteBandCommand,
-  promoteUnavailableReason, removeBandCommand, rowChoices,
+  DEFAULT_DRIVER, DEFAULT_RATE_SHIFT, addBandCommand, bandBudget, bandRows,
+  clampRateShift, demoteBandCommand, driverOptions, insertUnavailableReason,
+  patternPxFor, promoteBandCommand, promoteUnavailableReason, rateShiftNote,
+  removeBandCommand, rowChoices, type BandSpec,
 } from '../bg-anim-aeon';
 
 const FIXTURE = 'test/fixtures/bg-override/editor_bg_override.b0e5a661.json';
@@ -279,5 +280,123 @@ describe('the band rows the panel renders', () => {
     const created = bandRows(next).at(-1)!;
     expect(created.driverIsExplicit).toBe(false);
     expect(created.driver).toBe(DEFAULT_DRIVER);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The rate control (ROADMAP item 44)
+// ---------------------------------------------------------------------------
+//
+// The band panel built its BandSpec from cols/rows/phaseFill/driver only, so
+// EVERY band a human authored moved at exactly one speed: aeon's default. The
+// whole stack under the panel already carried the key — the model, the codec,
+// the command layer, both agent doors — which is precisely why nothing in this
+// suite noticed the gap. These rows pin what the new control can get wrong.
+
+/** The vendored contract, read as a FILE — the copy a drifting default drifts from. */
+const CONTRACT = JSON.parse(readFileSync(
+  'src/core/formats/bg-override/bganim-consumer-contract.json', 'utf8'));
+
+describe('the rate control', () => {
+  it('the default it displays is the CONTRACT\'S, read from the file, not a literal', () => {
+    // Compared against the JSON rather than against the codec's BAND_DEFAULTS:
+    // comparing the codec to itself would prove nothing about the panel.
+    expect(DEFAULT_RATE_SHIFT).toBe(CONTRACT.bandKeys.rate_shift.default);
+    expect(Number.isInteger(DEFAULT_RATE_SHIFT)).toBe(true);
+  });
+
+  it('clamps what the SPINNER cannot: a negative, a fraction, an empty box', () => {
+    // `min` on <input type="number"> is decorative for typed input (item 37).
+    expect(clampRateShift(-1)).toBe(0);
+    expect(clampRateShift(-999)).toBe(0);
+    expect(clampRateShift(2.7)).toBe(3);
+    expect(clampRateShift(0.4)).toBe(0);
+    // A half-typed box yields NaN, and 0 — a real, very FAST rate — is the wrong
+    // place to land silently. The contract's default is.
+    expect(clampRateShift(NaN)).toBe(DEFAULT_RATE_SHIFT);
+    expect(clampRateShift(Infinity)).toBe(DEFAULT_RATE_SHIFT);
+    // Every output is something the codec accepts.
+    for (const v of [-1, -999, 2.7, 0.4, NaN, Infinity, 0, 5, 31]) {
+      const n = clampRateShift(v);
+      expect(Number.isInteger(n)).toBe(true);
+      expect(n).toBeGreaterThanOrEqual(0);
+    }
+  });
+
+  it('and imposes NO ceiling, because the contract declares none', () => {
+    // A UI that refused a value aeon would bake is a worse defect than one that
+    // permits a useless one. Derived: if the contract ever grows a maximum, this
+    // row fails rather than silently certifying an unbounded control.
+    expect(CONTRACT.bandKeys.rate_shift.kind).toBe('nonNegativeInt');
+    expect(Object.hasOwn(CONTRACT.bandKeys.rate_shift, 'max')).toBe(false);
+    for (const big of [16, 31, 64, 4096]) expect(clampRateShift(big)).toBe(big);
+  });
+
+  it('says which way is faster, in the direction authors get backwards', () => {
+    const note = rateShiftNote(3);
+    expect(note).toMatch(/HIGHER IS SLOWER/);
+    expect(note).toMatch(/step = driver >> 3/);
+    // The count is 2^n, derived from the contract's own formula.
+    expect(rateShiftNote(0)).toMatch(/1 px per 1 driver unit\./);
+    expect(rateShiftNote(1)).toMatch(/1 px per 2 driver units/);
+    expect(rateShiftNote(3)).toMatch(/1 px per 8 driver units/);
+    expect(rateShiftNote(10)).toMatch(/1 px per 1,024 driver units/);
+    // A shift too wide for 2^n to be a finite double still prints something.
+    expect(rateShiftNote(1100)).toMatch(/2\^1100 driver units/);
+    // It clamps what it prints, so a mid-keystroke value never prints as NaN.
+    expect(rateShiftNote(-4)).toMatch(/step = driver >> 0/);
+  });
+});
+
+describe('the rate reaches the document through BOTH doors, and only when asked', () => {
+  /** The raw band a spec produces at the promotion door. */
+  function promoted(spec: BandSpec): BgOverrideBand {
+    const d = doc();
+    const r = promoteBandCommand(d, bandBudget(d).firstPromotableSlot, spec);
+    if (!r.ok) throw new Error(r.reason);
+    return documentBands(applyForTest(d, r.command)).at(-1)!;
+  }
+  /** The raw band a spec produces at the insertion door. */
+  function inserted(spec: BandSpec): BgOverrideBand {
+    const d = doc();
+    const r = addBandCommand(d, spec);
+    if (!r.ok) throw new Error(r.reason);
+    return documentBands(applyForTest(d, r.command)).at(-1)!;
+  }
+
+  it('PROMOTION spells rate_shift only when the spec carries one', () => {
+    expect(Object.hasOwn(promoted({ cols: 1, rows: 1 }), 'rate_shift')).toBe(false);
+    expect(promoted({ cols: 1, rows: 1, rateShift: 5 }).rate_shift).toBe(5);
+    // 0 is a REAL rate, not "unset" — a falsy check anywhere on the path would
+    // drop it and the band would silently run at the default instead.
+    expect(promoted({ cols: 1, rows: 1, rateShift: 0 }).rate_shift).toBe(0);
+    expect(Object.hasOwn(promoted({ cols: 1, rows: 1, rateShift: 0 }), 'rate_shift')).toBe(true);
+  });
+
+  it('INSERTION does the same — the two doors are peers here too', () => {
+    expect(Object.hasOwn(inserted({ cols: 1, rows: 1 }), 'rate_shift')).toBe(false);
+    expect(inserted({ cols: 1, rows: 1, rateShift: 5 }).rate_shift).toBe(5);
+    expect(inserted({ cols: 1, rows: 1, rateShift: 0 }).rate_shift).toBe(0);
+  });
+
+  it('and the band row reads back what the panel prints — value AND explicitness', () => {
+    // The read side the panel renders, not the raw band: an absent key must show
+    // the contract's default AND say it is not spelled, which is what stops an
+    // author from believing the file pins a rate it does not.
+    const d = doc();
+    const r = promoteBandCommand(d, bandBudget(d).firstPromotableSlot, {
+      cols: 1, rows: 1, rateShift: DEFAULT_RATE_SHIFT + 1,
+    });
+    if (!r.ok) throw new Error(r.reason);
+    const explicit = bandRows(applyForTest(d, r.command)).at(-1)!;
+    expect(explicit.rateShift).toBe(DEFAULT_RATE_SHIFT + 1);
+    expect(explicit.rateShiftIsExplicit).toBe(true);
+
+    const d2 = doc();
+    const r2 = promoteBandCommand(d2, bandBudget(d2).firstPromotableSlot, { cols: 1, rows: 1 });
+    if (!r2.ok) throw new Error(r2.reason);
+    const bare = bandRows(applyForTest(d2, r2.command)).at(-1)!;
+    expect(bare.rateShiftIsExplicit).toBe(false);
+    expect(bare.rateShift).toBe(DEFAULT_RATE_SHIFT);
   });
 });

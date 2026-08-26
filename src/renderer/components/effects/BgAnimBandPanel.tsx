@@ -61,10 +61,10 @@ import { executeCommand } from '../../state/editorStore';
 import { useHistoryVersion } from '../../hooks/useHistoryVersion';
 import type { AnyCommand } from '../../../core/editing/commands';
 import {
-  DEFAULT_DRIVER, DEFAULT_PHASE_FILL, addBandCommand, bandBudget, bandRows,
-  demoteBandCommand, driverOptions, insertUnavailableReason, patternPxFor,
-  phaseFillOptions, promoteBandCommand, promoteUnavailableReason,
-  removeBandCommand, rowChoices,
+  DEFAULT_DRIVER, DEFAULT_PHASE_FILL, DEFAULT_RATE_SHIFT, addBandCommand, bandBudget,
+  bandRows, clampRateShift, demoteBandCommand, driverOptions, insertUnavailableReason,
+  patternPxFor, phaseFillOptions, promoteBandCommand, promoteUnavailableReason,
+  rateShiftNote, removeBandCommand, rowChoices,
   type BandCommandResult, type BandPhaseFill, type BandSpec,
 } from '../../providers/bg-anim-aeon';
 
@@ -118,6 +118,13 @@ export default function BgAnimBandPanel(): React.ReactElement {
   const [staticBase, setStaticBase] = React.useState(0);
   const [driver, setDriver] = React.useState<string>(DEFAULT_DRIVER);
   const [explicitDriver, setExplicitDriver] = React.useState(false);
+  // The rate, in the same two-part shape the driver has and for the same reason:
+  // "default" is a STATE OF THE DOCUMENT (the key is absent and the file tracks
+  // the consumer), not a number to pre-fill the box with. The seed the box takes
+  // when an author does switch to a custom rate is the contract's default —
+  // derived, never a literal.
+  const [rateShift, setRateShift] = React.useState(DEFAULT_RATE_SHIFT);
+  const [explicitRateShift, setExplicitRateShift] = React.useState(false);
   const [phaseFill, setPhaseFill] = React.useState<BandPhaseFill>(DEFAULT_PHASE_FILL);
   const [refusalText, setRefusalText] = React.useState<string | null>(null);
   const [pendingRemoval, setPendingRemoval] = React.useState<number | null>(null);
@@ -133,6 +140,7 @@ export default function BgAnimBandPanel(): React.ReactElement {
   const spec: BandSpec = {
     cols, rows: bandRowCount, phaseFill,
     ...(explicitDriver ? { driver } : {}),
+    ...(explicitRateShift ? { rateShift } : {}),
   };
   const fillOption = phaseFillOptions().find((o) => o.value === phaseFill)
     ?? phaseFillOptions()[0];
@@ -168,6 +176,54 @@ export default function BgAnimBandPanel(): React.ReactElement {
           <option key={o.value} value={o.value} title={o.title}>{o.label}</option>
         ))}
       </Select>
+    </>
+  );
+
+  // THE SPEED CONTROL, AND IT RUNS BACKWARDS. `step = driver >> rate_shift`, so
+  // a HIGHER rate_shift is a SLOWER band — the opposite of what a field one
+  // reads as "speed" implies. Every label, title and note here says so, and
+  // `rateShiftNote` prints the exact consequence of the author's own number.
+  //
+  // TWO CONTROLS, NOT A PRE-FILLED SPINNER, for the reason the driver picker's
+  // empty option gives one field up: "default" here means THE KEY IS ABSENT, so
+  // the document tracks whatever the consumer's default becomes. A single
+  // spinner seeded at today's default would write today's default into every
+  // band an author never thought about the rate of — freezing it. The number box
+  // only appears once an author has said the rate is theirs.
+  const rateShiftField = (
+    <>
+      <span style={label}
+        title="rate_shift — a RIGHT SHIFT on the driver, so HIGHER IS SLOWER.">
+        Rate shift
+      </span>
+      <Select
+        title="rate_shift — HIGHER IS SLOWER. The step is the driver scalar shifted RIGHT by this
+               many bits (step = driver >> rate_shift), so each +1 halves the band's speed.
+               Leave it at (default) to omit the key and track aeon's own default."
+        value={explicitRateShift ? 'custom' : ''}
+        onChange={(v) => setExplicitRateShift(v === 'custom')}
+        style={{ flex: 1, minWidth: 110 }}>
+        {/* Same contract as the driver's empty option: this LEAVES THE KEY OUT. */}
+        <option value=""
+          title="Omit rate_shift. The band moves at whatever aeon's own default is, today and
+                 after any change to it.">
+          (default — {DEFAULT_RATE_SHIFT})
+        </option>
+        <option value="custom"
+          title="Spell rate_shift out in the document. Remember: higher is SLOWER.">
+          custom…
+        </option>
+      </Select>
+      {explicitRateShift && (
+        <NumberField
+          title={rateShiftNote(rateShift)}
+          // `min` styles the spinner and stops NOTHING an author types (ROADMAP
+          // item 37) — `clampRateShift` is the actual bound. There is no `max`:
+          // the contract has no upper bound and inventing one would refuse a
+          // value aeon accepts.
+          min={0} width={64} value={rateShift}
+          onChange={(n) => setRateShift(clampRateShift(n))} />
+      )}
     </>
   );
 
@@ -304,6 +360,10 @@ export default function BgAnimBandPanel(): React.ReactElement {
           </span>
         </div>
         <div style={row}>{driverField}</div>
+        <div style={{ ...row, marginBottom: T.s1 }}>{rateShiftField}</div>
+        <div style={{ ...note, marginBottom: T.s2 }}>
+          {rateShiftNote(explicitRateShift ? rateShift : DEFAULT_RATE_SHIFT)}
+        </div>
         <div style={row}>
           <span style={label}
             title="How banks 1-7 are filled from phase 0. Phase 0 itself is never a choice: it is
