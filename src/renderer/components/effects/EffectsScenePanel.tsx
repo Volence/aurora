@@ -53,10 +53,13 @@ import { useEditorStore, executeCommand } from '../../state/editorStore';
 import { useHistoryVersion } from '../../hooks/useHistoryVersion';
 import type { AnyCommand } from '../../../core/editing/commands';
 import type {
-  EffectsScene, EffectsSceneLibrary, EffectsLayer,
+  EffectsScene, EffectsSceneLibrary, EffectsLayer, EffectsPackedFactor,
 } from '../../../core/formats/effects/scene';
 import {
-  factorOptions, factorSelectValue, factorFromSelect, clampPackedField,
+  factorOptions, clampPackedField,
+  factorFieldSelectValue, factorFieldFromSelect, NONE_FACTOR_VALUE,
+  curveFieldValue, curveFromField, vsplitFieldValue, vsplitFromToggle, curveAdvisory, clampVSplitAt,
+  LAYER_CURVE_ROW, LAYER_VSPLIT_ROW, EFFECTS_VSPLIT_AT_BOUNDS,
   clampVFactor, clampVCenter, clampVOffset,
   layerTopBounds, clampLayerTop, planeLineOf, layerCountLine, vFactorHint,
   sceneListEntries, resolveSelectedScene, sceneRefOptions, unassignableSceneRef,
@@ -147,45 +150,56 @@ function run(command: AnyCommand | null): void {
 /**
  * A `$defs/factor` picker — the named set plus the custom packed escape hatch.
  *
- * USED FOR A LAYER'S `fa`/`fb` AND NOTHING ELSE. It used to drive the scene's
- * `v_factor` too, which is the whole of ROADMAP item 35: that field is a
- * right-shift amount 0..15, not a packed factor, so every name this control
- * offers is a value no engine can consume there. `EffectsLayer['fa']` is the
- * type deliberately — naming the field it actually serves is what stops it
- * being re-pointed at a scalar a third time.
+ * USED FOR A LAYER'S `fa`/`fb` AND `curve.to`, AND NOTHING ELSE. It used to
+ * drive the scene's `v_factor` too, which is the whole of ROADMAP item 35: that
+ * field is a right-shift amount 0..15, not a packed factor, so every name this
+ * control offers is a value no engine can consume there. `EffectsLayer['fa']`
+ * is the type deliberately — naming the field it actually serves is what stops
+ * it being re-pointed at a scalar a third time.
+ *
+ * `noneLabel` (parcel H) adds a leading none state for `curve.to`, which the
+ * schema spells `"none"` | `{to: factor}` — the SAME factor space as `fb`, so
+ * the picker is reused rather than cloned. `fa`/`fb` are required and never
+ * pass it; the type keeps 'none' out of their onChange.
  */
-function FactorField({ value, onChange, title }: {
-  value: EffectsLayer['fa'];
-  onChange: (f: EffectsLayer['fa']) => void;
+function FactorField<N extends string | undefined = undefined>({ value, onChange, title, noneLabel }: {
+  value: N extends string ? EffectsLayer['fa'] | 'none' : EffectsLayer['fa'];
+  onChange: (f: N extends string ? EffectsLayer['fa'] | 'none' : EffectsLayer['fa']) => void;
   title: string;
+  noneLabel?: N;
 }) {
-  const selected = factorSelectValue(value);
+  type V = N extends string ? EffectsLayer['fa'] | 'none' : EffectsLayer['fa'];
+  const selected = factorFieldSelectValue(value);
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: T.s2, flexWrap: 'wrap', flex: 1, minWidth: 0 }}>
       <Select title={title} value={selected}
-              onChange={(v) => onChange(factorFromSelect(v, value))} style={{ flex: 1, minWidth: 128 }}>
+              onChange={(v) => onChange(factorFieldFromSelect(v, value) as V)} style={{ flex: 1, minWidth: 128 }}>
+        {noneLabel !== undefined && <option value={NONE_FACTOR_VALUE}>{noneLabel}</option>}
         {factorOptions().map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
       </Select>
-      {typeof value !== 'string' && (
+      {typeof value !== 'string' && (() => {
         // The packed triple's own fields, shown only when the factor IS packed.
         // Bounds come from the schema, so the spinner cannot offer a shift the
         // encoding has no room for.
+        const packed = value as EffectsPackedFactor;
+        return (
         <div style={{ display: 'flex', alignItems: 'center', gap: T.s1 }}>
           <NumberField title="s1 — first shift (15 = term zero / locked)" width={44}
             min={EFFECTS_PACKED_FACTOR_BOUNDS.s1.min} max={EFFECTS_PACKED_FACTOR_BOUNDS.s1.max}
-            value={value.s1}
-            onChange={(n) => onChange({ ...value, s1: clampPackedField('s1', n) })} />
+            value={packed.s1}
+            onChange={(n) => onChange({ ...packed, s1: clampPackedField('s1', n) } as V)} />
           <NumberField title="s2 — second shift (15 = single term)" width={44}
             min={EFFECTS_PACKED_FACTOR_BOUNDS.s2.min} max={EFFECTS_PACKED_FACTOR_BOUNDS.s2.max}
-            value={value.s2}
-            onChange={(n) => onChange({ ...value, s2: clampPackedField('s2', n) })} />
-          <Select title="op — add or subtract the second term" value={String(value.op)}
-                  onChange={(v) => onChange({ ...value, op: v === '1' ? 1 : 0 })} style={{ width: 56 }}>
+            value={packed.s2}
+            onChange={(n) => onChange({ ...packed, s2: clampPackedField('s2', n) } as V)} />
+          <Select title="op — add or subtract the second term" value={String(packed.op)}
+                  onChange={(v) => onChange({ ...packed, op: v === '1' ? 1 : 0 } as V)} style={{ width: 56 }}>
             <option value="0">+</option>
             <option value="1">−</option>
           </Select>
         </div>
-      )}
+        );
+      })()}
     </div>
   );
 }
@@ -453,18 +467,57 @@ export default function EffectsScenePanel(): React.ReactElement {
                   onChange={(f) => run(setLayerFieldCommand(library, selected.id, i, 'fb', f))} />
               </Field>
               <Hint under style={{ marginBottom: 0 }}>{PLANE_FACTOR_HINT}</Hint>
-              {/* WHAT THE FILE SETS THAT THE CARD CANNOT: curve, vsplit, deform,
-                  disabled. Read-only, mono, at the hint tier so it cannot be
-                  mistaken for a fourth control — the owner opened the curved
-                  horizon and could not see what was curving it. Controls are
-                  parcel H; none are built here. Absent entirely for a plain
-                  layer: no empty line. */}
+              {/* THE CURVE (parcel H). `curve.to` is a factor in the same space
+                  as fb, so it is the same picker with a none state; the hint
+                  is the engine's sentence. The advisory below it is the
+                  engine's own refusal (to == fb), said before the build says it. */}
+              <Field label={LAYER_CURVE_ROW.label} title={LAYER_CURVE_ROW.title}>
+                <FactorField title={`Layer ${i} ${LAYER_CURVE_ROW.title}`} noneLabel={LAYER_CURVE_ROW.none}
+                  value={curveFieldValue(layer)}
+                  onChange={(f) => run(setLayerFieldCommand(
+                    library, selected.id, i, 'curve', curveFromField(f)))} />
+              </Field>
+              <Hint under style={{ marginBottom: 0 }}>{LAYER_CURVE_ROW.hint}</Hint>
+              {(() => {
+                const advice = curveAdvisory(layer);
+                return advice === null ? null : <Hint under tone="warning">{advice}</Hint>;
+              })()}
+              {/* THE SPLIT (parcel H). none / row, and the row spinner only when
+                  set. `clampVSplitAt` is the bound — NumberField's min/max only
+                  style the spinner (item 37). */}
+              {(() => {
+                const at = vsplitFieldValue(layer);
+                return (
+                  <Field label={LAYER_VSPLIT_ROW.label} title={LAYER_VSPLIT_ROW.title}>
+                    <Select title={`Layer ${i} ${LAYER_VSPLIT_ROW.title}`} value={at === null ? 'none' : 'at'}
+                            onChange={(v) => run(setLayerFieldCommand(
+                              library, selected.id, i, 'vsplit', vsplitFromToggle(v === 'at', layer)))}
+                            style={{ width: 72 }}>
+                      <option value="none">{LAYER_VSPLIT_ROW.none}</option>
+                      <option value="at">{LAYER_VSPLIT_ROW.at}</option>
+                    </Select>
+                    {at !== null && (
+                      <NumberField title={`Layer ${i} vsplit.at (${EFFECTS_VSPLIT_AT_BOUNDS.min}..${EFFECTS_VSPLIT_AT_BOUNDS.max})`}
+                        min={EFFECTS_VSPLIT_AT_BOUNDS.min} max={EFFECTS_VSPLIT_AT_BOUNDS.max} width={72}
+                        value={at}
+                        onChange={(n) => run(setLayerFieldCommand(
+                          library, selected.id, i, 'vsplit', { at: clampVSplitAt(n) }))} />
+                    )}
+                  </Field>
+                );
+              })()}
+              <Hint under style={{ marginBottom: 0 }}>{LAYER_VSPLIT_ROW.hint}</Hint>
+              {/* WHAT THE FILE SETS THAT THE CARD STILL CANNOT: deform, disabled,
+                  dsa/dsb/phase. Read-only, mono, at the hint tier so it cannot
+                  be mistaken for a control. curve and vsplit left this line
+                  when they got controls above (parcel H). Absent entirely for
+                  a plain layer: no empty line. */}
               {(() => {
                 const line = layerExtrasLine(layer);
                 return line === null ? null : (
                   <Hint under style={{ fontFamily: T.fontMono }}>
                     <span data-testid={`layer-${i}-extras`}
-                      title="Set in the scene file; read-only here (no control yet)">{line}</span>
+                      title="Set in the scene file; read-only here (deform is wave 2)">{line}</span>
                   </Hint>
                 );
               })()}

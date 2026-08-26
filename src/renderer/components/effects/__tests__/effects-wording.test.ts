@@ -12,7 +12,9 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { PLANE_FACTOR_ROWS, PLANE_FACTOR_HINT } from '../../../providers/effects-aeon';
+import {
+  PLANE_FACTOR_ROWS, PLANE_FACTOR_HINT, LAYER_CURVE_ROW, LAYER_VSPLIT_ROW,
+} from '../../../providers/effects-aeon';
 import {
   BAND_MECHANISM_HINT, bandMotion, BAND_SCROLL_DIRECTION,
 } from '../../../providers/bganim-preview-aeon';
@@ -34,9 +36,15 @@ const existingLabels = [...labelLiterals(scenePanel), ...labelLiterals(bandPanel
 const longestExistingLabel = Math.max(...existingLabels.map((s) => s.length));
 const longestToken = (s: string) => Math.max(...s.split(/\s+/).map((t) => t.length));
 
-const newLabels = [PLANE_FACTOR_ROWS.fa.label, PLANE_FACTOR_ROWS.fb.label];
+// Parcel D's rows, then parcel H's two control rows and their hints — the same
+// bar, extended rather than re-measured.
+const newLabels = [
+  PLANE_FACTOR_ROWS.fa.label, PLANE_FACTOR_ROWS.fb.label,
+  LAYER_CURVE_ROW.label, LAYER_VSPLIT_ROW.label, LAYER_VSPLIT_ROW.none, LAYER_VSPLIT_ROW.at,
+];
 const newStrings = [
   ...newLabels, PLANE_FACTOR_HINT, BAND_MECHANISM_HINT,
+  LAYER_CURVE_ROW.hint, LAYER_VSPLIT_ROW.hint, LAYER_CURVE_ROW.none,
   ...[0, 2, 3].flatMap((n) => [
     bandMotion({ driver: 'timer', rateShift: n }, 'band'),
     bandMotion({ driver: 'camera_x', rateShift: n }, 'candidate'),
@@ -86,7 +94,7 @@ describe('fa / fb say which plane, and "packed" stays inside the custom expander
   });
 
   it('in the panel source, the only quoted "packed" is inside FactorField (the custom expander)', () => {
-    const start = scenePanel.indexOf('function FactorField(');
+    const start = scenePanel.indexOf('function FactorField');
     const end = scenePanel.indexOf('export default function EffectsScenePanel');
     expect(start).toBeGreaterThan(-1);
     expect(end).toBeGreaterThan(start);
@@ -102,6 +110,16 @@ describe('the panels render the constants rather than a second copy of the words
     expect(scenePanel).toMatch(/PLANE_FACTOR_ROWS/);
     expect(scenePanel).toMatch(/PLANE_FACTOR_HINT/);
     expect(scenePanel).not.toMatch(/Plane [AB] packed scroll factor/);
+  });
+  it('EffectsScenePanel renders LAYER_CURVE_ROW / LAYER_VSPLIT_ROW and writes both keys through setLayerFieldCommand', () => {
+    for (const k of ['label', 'title', 'hint'] as const) {
+      expect(scenePanel).toMatch(new RegExp(`LAYER_CURVE_ROW\\.${k}`));
+      expect(scenePanel).toMatch(new RegExp(`LAYER_VSPLIT_ROW\\.${k}`));
+    }
+    expect(scenePanel).toMatch(/setLayerFieldCommand\(\s*library,\s*selected\.id,\s*i,\s*'curve'/);
+    expect(scenePanel).toMatch(/setLayerFieldCommand\(\s*library,\s*selected\.id,\s*i,\s*'vsplit'/);
+    // The read-only extras line no longer says "no control yet" for these two.
+    expect(scenePanel).not.toMatch(/no control yet/);
   });
   it('BgAnimBandPanel renders BAND_MECHANISM_HINT', () => {
     expect(bandPanel).toMatch(/BAND_MECHANISM_HINT/);

@@ -16,6 +16,9 @@ import {
   SCENE_FORM_CHOICES, layerExtras, layerExtrasLine,
   layerTopSpace, layerTopBounds, clampLayerTop, planeLineOf, PLANE_LINE_SPAN,
   layerCountLine, vFactorHint,
+  LAYER_CURVE_ROW, LAYER_VSPLIT_ROW, NONE_FACTOR_VALUE,
+  factorFieldSelectValue, factorFieldFromSelect, curveFieldValue, curveFromField,
+  vsplitFieldValue, vsplitFromToggle, curveAdvisory, clampVSplitAt,
 } from '../effects-aeon';
 import {
   EFFECTS_FACTOR_NAMES, EFFECTS_LAYER_COUNT, EFFECTS_PACKED_FACTOR_BOUNDS,
@@ -376,7 +379,7 @@ describe('layerExtras (parcel E)', () => {
     expect(layerExtrasLine(baseLayer())).toBeNull();
   });
 
-  it('names dsa/dsb/phase, disabled, deform, curve and vsplit, in schema key order', () => {
+  it('names dsa/dsb/phase, disabled and deform in schema key order — curve and vsplit have controls now (parcel H)', () => {
     const layer: EffectsLayer = {
       ...baseLayer(), dsa: 3, dsb: 4, phase: 9, enabled: false,
       deform: { own: { table: { generator: 'sine', amplitude: 8, period: 64 }, shift_a: 1, shift_b: 2, phase: 0, speed: 1 } },
@@ -384,13 +387,14 @@ describe('layerExtras (parcel E)', () => {
       vsplit: { at: 112 },
     };
     const extras = layerExtras(layer);
-    expect(extras.map((e) => e.key)).toEqual(['dsa', 'dsb', 'phase', 'enabled', 'deform', 'curve', 'vsplit']);
+    expect(extras.map((e) => e.key)).toEqual(['dsa', 'dsb', 'phase', 'enabled', 'deform']);
     expect(extras.map((e) => e.text)).toEqual([
       'dsa 3', 'dsb 4', 'phase 9', 'disabled',
       'deform: own sine(8, 64)',
-      'curve → packed(2, 4, -)',
-      'vsplit at 112',
     ]);
+    // A layer carrying ONLY the two keys the card now edits gets no line at all:
+    // the read-only line must not duplicate a control sitting right above it.
+    expect(layerExtrasLine({ ...baseLayer(), curve: { to: 'FACTOR_3_8' }, vsplit: { at: 20 } })).toBeNull();
     expect(layerExtrasLine(layer)).toBe(extras.map((e) => e.text).join(' · '));
   });
 
@@ -413,7 +417,7 @@ describe('layerExtras (parcel E)', () => {
   // The shipped scene, from the aeon tree. Expectations are re-derived from the
   // file's own JSON so a re-authored fixture cannot leave a stale pin green.
   const SHIPPED = '/home/volence/sonic_hacks/aeon/games/sonic4/data/editor/effects/ojz_act1_depth.json';
-  it('every layer of the shipped ojz_act1_depth.json — the curved layers show curve + vsplit, the flat ones nothing', (ctx) => {
+  it('every layer of the shipped ojz_act1_depth.json — nothing extra on any layer; the curve is on the controls, not the line', (ctx) => {
     if (!existsSync(SHIPPED)) {
       ctx.skip(`SKIPPED, NOT PASSED: shipped scene absent at ${SHIPPED}`);
       return;
@@ -432,8 +436,9 @@ describe('layerExtras (parcel E)', () => {
       if (r.phase !== undefined && r.phase !== EFFECTS_LAYER_DEFAULTS.phase) want.push(`phase ${r.phase}`);
       if (r.enabled === false) want.push('disabled');
       if (r.deform !== undefined && r.deform !== 'none') want.push(expect.stringMatching(/^deform: own /));
-      if (r.curve !== undefined && r.curve !== 'none') { want.push(`curve → ${r.curve.to}`); withCurve++; }
-      if (r.vsplit !== undefined && r.vsplit !== 'none') want.push(`vsplit at ${r.vsplit.at}`);
+      // curve / vsplit are the card's own controls now (parcel H) and must NOT
+      // appear here as well; counted so the fixture is proven to carry them.
+      if (r.curve !== undefined && r.curve !== 'none') withCurve++;
       if (want.length === 0) withNothing++;
       expect(layerExtras(layer).map((e) => e.text), `layer ${i}`).toEqual(want);
       if (want.every((w) => typeof w === 'string')) {
@@ -445,6 +450,91 @@ describe('layerExtras (parcel E)', () => {
     // either, this test must say so rather than pass vacuously.
     expect(withCurve, 'the shipped scene is the curved-horizon scene').toBeGreaterThan(0);
     expect(withNothing, 'the shipped scene has layers with no extras').toBeGreaterThan(0);
+    // ...and the curved layers read back through the CONTROLS' value functions.
+    scene.layers.forEach((layer, i) => {
+      const r = raw.layers[i];
+      expect(curveFieldValue(layer), `layer ${i} curve`).toEqual(r.curve?.to ?? 'none');
+      expect(vsplitFieldValue(layer), `layer ${i} vsplit`).toBe(r.vsplit?.at ?? null);
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Controls for curve.to and vsplit.at — parcel H. The card's FactorField grows
+// a "none" state for the curve, and vsplit is a none/at toggle over a bounded
+// row spinner. Every decision is here; the card wires events to it.
+// ---------------------------------------------------------------------------
+
+describe('curve / vsplit controls (parcel H)', () => {
+  it('the rows say what the engine does, in plain words, with one hint each', () => {
+    expect(LAYER_CURVE_ROW.key).toBe('curve');
+    expect(LAYER_VSPLIT_ROW.key).toBe('vsplit');
+    // Schema §2.2 / scene_dsl.emp SceneCurve.To: fb at the top, `to` at the bottom.
+    expect(LAYER_CURVE_ROW.hint).toBe("Plane B speed ramps from fb at this strip's top to this value at its bottom");
+    // SceneVSplit.At: whole-plane Plane-B vscroll from this layer's top down.
+    expect(LAYER_VSPLIT_ROW.hint).toBe('from this strip down, Plane B scrolls vertically as a whole');
+    for (const row of [LAYER_CURVE_ROW, LAYER_VSPLIT_ROW]) {
+      expect(row.label).not.toMatch(/packed/i);
+      expect(row.label.length).toBeGreaterThan(0);
+      expect(row.title).toContain(row.key);
+    }
+    // The bound is spelled INTO the vsplit title from the schema, not typed.
+    const at = LAYER_PROPS.vsplit.oneOf[1].properties.at;
+    expect(LAYER_VSPLIT_ROW.title).toContain(`${at.minimum}..${at.maximum}`);
+  });
+
+  it('the "none" sentinel is neither a FACTOR_* name nor the custom sentinel', () => {
+    expect(EFFECTS_FACTOR_NAMES).not.toContain(NONE_FACTOR_VALUE);
+    expect(NONE_FACTOR_VALUE).not.toBe(CUSTOM_FACTOR_VALUE);
+  });
+
+  it('a FactorField with a none state selects the sentinel for none and the factor otherwise', () => {
+    expect(factorFieldSelectValue('none')).toBe(NONE_FACTOR_VALUE);
+    expect(factorFieldSelectValue('FACTOR_3_8')).toBe('FACTOR_3_8');
+    expect(factorFieldSelectValue({ s1: 2, s2: 4, op: 1 })).toBe(CUSTOM_FACTOR_VALUE);
+  });
+
+  it('choosing from a none state: a name is that name, custom seeds the single-term packed identity', () => {
+    expect(factorFieldFromSelect(NONE_FACTOR_VALUE, 'FACTOR_1')).toBe('none');
+    expect(factorFieldFromSelect('FACTOR_3_8', 'none')).toBe('FACTOR_3_8');
+    expect(factorFieldFromSelect(CUSTOM_FACTOR_VALUE, 'none'))
+      .toEqual({ s1: EFFECTS_PACKED_FACTOR_BOUNDS.s1.min, s2: EFFECTS_PACKED_FACTOR_BOUNDS.s2.max, op: 0 });
+    // ...and from a packed state, custom keeps the triple (the existing rule).
+    expect(factorFieldFromSelect(CUSTOM_FACTOR_VALUE, { s1: 2, s2: 4, op: 1 })).toEqual({ s1: 2, s2: 4, op: 1 });
+  });
+
+  it('curveFieldValue reads the far end; absent and explicit "none" both read as none', () => {
+    expect(curveFieldValue(baseLayer())).toBe('none');
+    expect(curveFieldValue({ ...baseLayer(), curve: 'none' })).toBe('none');
+    expect(curveFieldValue({ ...baseLayer(), curve: { to: 'FACTOR_1' } })).toBe('FACTOR_1');
+    expect(curveFieldValue({ ...baseLayer(), curve: { to: { s1: 2, s2: 4, op: 1 } } })).toEqual({ s1: 2, s2: 4, op: 1 });
+  });
+
+  it('curveFromField: none CLEARS (undefined → key deleted), a factor becomes {to}', () => {
+    expect(curveFromField('none')).toBeUndefined();
+    expect(curveFromField('FACTOR_1_2')).toEqual({ to: 'FACTOR_1_2' });
+    const lib = library([{ ...canopy(), layers: [{ ...baseLayer(), curve: { to: 'FACTOR_1_2' } }] }]);
+    const cmd = setLayerFieldCommand(lib, 'canopy', 0, 'curve', curveFromField('none'));
+    expect(cmd!.newScene!.layers[0]).not.toHaveProperty('curve');
+  });
+
+  it("vsplitFieldValue is the row or null; the toggle seeds the strip's own top, clamped to the plane", () => {
+    expect(vsplitFieldValue(baseLayer())).toBeNull();
+    expect(vsplitFieldValue({ ...baseLayer(), vsplit: 'none' })).toBeNull();
+    expect(vsplitFieldValue({ ...baseLayer(), vsplit: { at: 44 } })).toBe(44);
+    expect(vsplitFromToggle(false, baseLayer())).toBeUndefined();
+    expect(vsplitFromToggle(true, { ...baseLayer(), world_y: 112 })).toEqual({ at: 112 });
+    expect(vsplitFromToggle(true, { ...baseLayer(), world_y: 4000 })).toEqual({ at: clampVSplitAt(4000) });
+    expect(clampVSplitAt(4000)).toBe(LAYER_PROPS.vsplit.oneOf[1].properties.at.maximum);
+  });
+
+  it('advises when the ramp goes nowhere — the engine refuses curve.to == fb (scene_dsl layer() guard 4)', () => {
+    expect(curveAdvisory(baseLayer())).toBeNull();
+    expect(curveAdvisory({ ...baseLayer(), fb: 'FACTOR_1_4', curve: { to: 'FACTOR_3_8' } })).toBeNull();
+    const flat = curveAdvisory({ ...baseLayer(), fb: 'FACTOR_1_4', curve: { to: 'FACTOR_1_4' } });
+    expect(flat).toMatch(/same/i);
+    const packed = curveAdvisory({ ...baseLayer(), fb: { s1: 2, s2: 4, op: 1 }, curve: { to: { s1: 2, s2: 4, op: 1 } } });
+    expect(packed).not.toBeNull();
   });
 });
 
