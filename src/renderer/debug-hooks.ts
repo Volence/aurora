@@ -18,6 +18,7 @@ import { useEditorStore, focusedHistory } from './state/editorStore';
 import { openAeonProject } from './state/aeon-open';
 import { bandBudget, bandRows } from './providers/bg-anim-aeon';
 import { serializeBgOverride } from '../core/formats/bg-override/bg-override';
+import { resolveDisplayedBg } from './providers/bganim-preview-aeon';
 import { useAetherStore } from './state/aetherStore';
 import { useViewStore } from './state/viewStore';
 import { useArtStore } from './state/artStore';
@@ -326,8 +327,15 @@ interface AeonProbeApi {
   objectAt(sectionIndex: number, index: number): { x: number; y: number; typeId: string } | null;
   /** One section nametable entry — the FG paint rows. */
   ntAt(sectionIndex: number, index: number): number | null;
-  /** One RESOLVED background nametable entry — the BG paint rows. */
+  /** One RESOLVED background nametable entry — the BG paint rows. Resolved
+   *  through the viewport's OWN resolver, so it cannot report a different
+   *  background from the one on screen. */
   bgAt(index: number): number | null;
+  /** Which file the resolved background came from: the ROM-bound override
+   *  document, a BG-library entry, or the act default. */
+  bgSource(): 'override' | 'library' | 'act' | null;
+  /** One RESOLVED background tile's 64 pixel values, at a blob-local slot. */
+  bgTileAt(slot: number): number[] | null;
   /** Which section the last gesture claimed. */
   activeSection(): number;
   /** Live toast messages, same as the canvas probe's. */
@@ -335,6 +343,17 @@ interface AeonProbeApi {
   /** SETUP, like the classic probe's setSelectedChunk: which plane the next
    *  stroke paints. The stroke itself is still a real drag on the real canvas. */
   setLayer(layer: 'fg' | 'bg'): void;
+  /**
+   * SETUP, on the same rule as `setLayer`: which tile the next stroke puts
+   * down.
+   *
+   * The armed tile comes from the ART BROWSER, a virtualised canvas grid — a
+   * harness that wanted index 500 would have to scroll it and hit-test a cell,
+   * and would then be measuring the browser rather than the thing under test.
+   * Arming is setup; the stroke is still a real drag, and what it WROTE is still
+   * read back out of the document.
+   */
+  setSelectedTile(index: number, paletteLine?: number): void;
   /** The committed marquee, if any — the marquee-drag rows read the snap result
    *  back out rather than re-deriving it from pixels. Read-only. */
   marquee(): { sectionIndex: number; col: number; row: number; w: number; h: number } | null;
@@ -495,19 +514,50 @@ function installAeonProbe(): AeonProbeApi {
     bgAt: (index) => {
       const a = act();
       if (!a) return null;
-      const ref = a.sections[useEditorStore.getState().activeSectionIndex]?.bgLayoutRef ?? null;
-      if (ref !== null) {
-        const entry = useProjectStore.getState().project?.bgLibrary.find((b) => b.id === ref);
-        if (entry) return entry.layout[index] ?? null;
-      }
-      if (!a.bgLayout || !a.bgTiles) return null;
-      return a.bgLayout[index] ?? null;
+      // THROUGH THE ONE RESOLVER, never a second copy of the rule. This used to
+      // reproduce the library/act-default fallback by hand, and after decision
+      // d-12 that copy would have reported the LIBRARY's word for a cell the
+      // canvas was painting from the override — a probe that lies is worse than
+      // no probe, and it is exactly the harness a BG paint row would trust.
+      const st = useProjectStore.getState();
+      const resolved = resolveDisplayedBg(
+        a, st.project?.bgLibrary ?? [], useEditorStore.getState().activeSectionIndex,
+        st.project?.bgOverride ?? null,
+      );
+      return resolved?.layout[index] ?? null;
+    },
+    /** Where `bgAt` is reading from — 'override' | 'library' | 'act', or null. */
+    bgSource: () => {
+      const a = act();
+      if (!a) return null;
+      const st = useProjectStore.getState();
+      return resolveDisplayedBg(
+        a, st.project?.bgLibrary ?? [], useEditorStore.getState().activeSectionIndex,
+        st.project?.bgOverride ?? null,
+      )?.source ?? null;
+    },
+    /** One RESOLVED background tile's 64 pixel values — the art the canvas is
+     *  painting at a slot, whichever file it came from. */
+    bgTileAt: (slot) => {
+      const a = act();
+      if (!a) return null;
+      const st = useProjectStore.getState();
+      const resolved = resolveDisplayedBg(
+        a, st.project?.bgLibrary ?? [], useEditorStore.getState().activeSectionIndex,
+        st.project?.bgOverride ?? null,
+      );
+      const t = resolved?.tiles[slot];
+      return t ? [...t.pixels] : null;
     },
     /** Which section the last gesture claimed — a paint lands wherever the
      *  cursor was, and the grid is 3x3 here. */
     activeSection: () => useEditorStore.getState().activeSectionIndex,
     toasts: () => useToastStore.getState().toasts.map((t) => ({ message: t.message, type: t.type })),
     setLayer: (layer) => useEditorStore.getState().setEditingLayer(layer),
+    setSelectedTile: (index, paletteLine) => {
+      useEditorStore.getState().setSelectedTileIndex(index);
+      if (paletteLine !== undefined) useEditorStore.getState().setSelectedPaletteLine(paletteLine);
+    },
     marquee: () => {
       const m = useEditorStore.getState().marquee;
       return m ? { sectionIndex: m.sectionIndex, col: m.col, row: m.row, w: m.w, h: m.h } : null;
