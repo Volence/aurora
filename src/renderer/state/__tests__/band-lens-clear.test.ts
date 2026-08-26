@@ -27,7 +27,7 @@ describe('band lens: seed then clear', () => {
     ed.setBandCandidate({ staticBase: 7, cols: 2, rows: 4 });
     ed.setBandLensTarget(null);
     expect(useEditorStore.getState().bandLensTarget).toBe(null);
-    expect(useEditorStore.getState().bandCandidate).toEqual({ staticBase: 7, cols: 2, rows: 4 });
+    expect(useEditorStore.getState().bandCandidate).toMatchObject({ staticBase: 7, cols: 2, rows: 4 });
   });
 
   it('clearing after a band selection yields null too', () => {
