@@ -352,8 +352,17 @@ interface AeonProbeApi {
    * and would then be measuring the browser rather than the thing under test.
    * Arming is setup; the stroke is still a real drag, and what it WROTE is still
    * read back out of the document.
+   *
+   * LAYER-AWARE since ROADMAP item 47: it arms the pick for whichever layer
+   * `setLayer` left active, because there are now two picks naming two different
+   * tile arrays. Calling it in BG mode therefore still reaches `paintBgTile`,
+   * including with an out-of-blob index — which is how the refusal row is
+   * reached now that the picker cannot offer one.
    */
   setSelectedTile(index: number, paletteLine?: number): void;
+  /** Both picks and the layer, straight out of the store. Read-only — the rows
+   *  that care what a click SELECTED read this, not what a component drew. */
+  selectedTile(): { layer: 'fg' | 'bg'; fg: number; bg: number; paletteLine: number };
   /** The committed marquee, if any — the marquee-drag rows read the snap result
    *  back out rather than re-deriving it from pixels. Read-only. */
   marquee(): { sectionIndex: number; col: number; row: number; w: number; h: number } | null;
@@ -555,8 +564,18 @@ function installAeonProbe(): AeonProbeApi {
     toasts: () => useToastStore.getState().toasts.map((t) => ({ message: t.message, type: t.type })),
     setLayer: (layer) => useEditorStore.getState().setEditingLayer(layer),
     setSelectedTile: (index, paletteLine) => {
-      useEditorStore.getState().setSelectedTileIndex(index);
-      if (paletteLine !== undefined) useEditorStore.getState().setSelectedPaletteLine(paletteLine);
+      const e = useEditorStore.getState();
+      e.setSelectedTileIndexForLayer(e.editingLayer, index);
+      if (paletteLine !== undefined) e.setSelectedPaletteLine(paletteLine);
+    },
+    selectedTile: () => {
+      const e = useEditorStore.getState();
+      return {
+        layer: e.editingLayer,
+        fg: e.selectedTileIndex,
+        bg: e.selectedBgTileIndex,
+        paletteLine: e.selectedPaletteLine,
+      };
     },
     marquee: () => {
       const m = useEditorStore.getState().marquee;

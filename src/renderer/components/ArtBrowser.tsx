@@ -1,20 +1,32 @@
+// THE TILE PICKER. What it shows depends on the layer being painted: the zone
+// TILESET in FG, and the RESOLVED background blob in BG (ROADMAP item 47) — the
+// same array `MapViewport.paintBgTile` writes an index into, so the art an
+// author picks from is the art the stroke puts down.
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { useProjectStore, getCurrentZone } from '../state/projectStore';
+import { useProjectStore, getCurrentZone, getCurrentAct } from '../state/projectStore';
 import { useEditorStore } from '../state/editorStore';
 import type { Tile, Palette } from '../../core/model/s4-types';
 import { lutForPaletteLine, rasterizeTile } from '../../core/art/rasterize';
+import {
+  resolveTilePickerSource, tilePickerCountLabel, tilePickerHoverLabel, pickedTileIndex,
+  tileThumbCacheStale, type TileThumbCacheKey,
+} from '../providers/tile-picker-source';
 import { T } from './ui';
 import { CANVAS_VOID, TILE_SELECTED, TILE_HOVER } from '../canvas/canvas-colors';
 
-// Pre-rendered tile thumbnail caches
+// Pre-rendered tile thumbnail cache.
+//
+// KEYED ON THE ARRAY'S OWN IDENTITY plus the palette line — the derivation, and
+// what the old `(zoneId, paletteLine, tiles.length)` key could not tell apart,
+// are written out in full at `tileThumbCacheStale`. The rule lives there rather
+// than here because the node suite cannot see a `.tsx` file.
 let tileCache: OffscreenCanvas[] = [];
-let cacheZoneId: string | null = null;
-let cachePalLine: number = -1;
+const cacheKey: TileThumbCacheKey = { tiles: null, paletteLine: -1 };
 
-function ensureTileCache(tiles: Tile[], palette: Palette, zoneId: string, paletteLine: number) {
-  if (cacheZoneId === zoneId && cachePalLine === paletteLine && tileCache.length === tiles.length) return;
-  cacheZoneId = zoneId;
-  cachePalLine = paletteLine;
+function ensureTileCache(tiles: readonly Tile[], palette: Palette, paletteLine: number) {
+  if (!tileThumbCacheStale(cacheKey, tiles, paletteLine)) return;
+  cacheKey.tiles = tiles;
+  cacheKey.paletteLine = paletteLine;
 
   // One RGBA lookup for the whole atlas; pixels come from the shared core
   // rasterizer, this loop only owns the canvas hand-off.
@@ -33,7 +45,14 @@ function ensureTileCache(tiles: Tile[], palette: Palette, zoneId: string, palett
 export default function ArtBrowser() {
   const project = useProjectStore((s) => s.project);
   const currentZoneId = useProjectStore((s) => s.currentZoneId);
-  const selectedTileIndex = useEditorStore((s) => s.selectedTileIndex);
+  // Subscribed, not read from getState: the picker's ART changes with the layer
+  // and with the active section (a BG-library ref is per section), so both have
+  // to re-render this component, not merely be true the next time something else
+  // does.
+  const editingLayer = useEditorStore((s) => s.editingLayer);
+  const activeSectionIndex = useEditorStore((s) => s.activeSectionIndex);
+  const selectedFgTileIndex = useEditorStore((s) => s.selectedTileIndex);
+  const selectedBgTileIndex = useEditorStore((s) => s.selectedBgTileIndex);
   const selectedPaletteLine = useEditorStore((s) => s.selectedPaletteLine);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const overlayRef = useRef<HTMLCanvasElement>(null);
@@ -47,16 +66,28 @@ export default function ArtBrowser() {
 
   const state = useProjectStore.getState();
   const zone = getCurrentZone(state);
-  const tiles = zone?.tileset.tiles ?? [];
+  const act = getCurrentAct(state);
+  // THE ONE RESOLUTION. In BG mode this goes through `resolveDisplayedBg` — the
+  // same call `MapViewport.reloadBg` and `paintBgTile` make — so the picker and
+  // the stroke cannot name different arrays.
+  const source = resolveTilePickerSource(
+    editingLayer, zone, act, state.project?.bgLibrary ?? [], activeSectionIndex,
+    state.project?.bgOverride ?? null,
+  );
+  const tiles = source.tiles;
+  // The BG canvas is rendered with the ZONE palette (MapViewport hands
+  // `zone.palette.lines` to `SectionRenderer.loadBg`), so the picker's colours
+  // come from the same place in both layers and only the ART differs.
   const palette = zone?.palette ?? { lines: [] };
   const itemCount = tiles.length;
+  const selectedTileIndex = pickedTileIndex(
+    { selectedTileIndex: selectedFgTileIndex, selectedBgTileIndex }, editingLayer,
+  );
 
-  // Build caches when zone or palette line changes
+  // Build caches when the array being shown, or the palette line, changes.
   useEffect(() => {
-    if (zone && currentZoneId) {
-      ensureTileCache(zone.tileset.tiles, zone.palette, currentZoneId, selectedPaletteLine);
-    }
-  }, [zone, currentZoneId, selectedPaletteLine]);
+    if (zone) ensureTileCache(tiles, zone.palette, selectedPaletteLine);
+  }, [zone, tiles, selectedPaletteLine]);
 
   // Draw the tile grid
   const renderGrid = useCallback(() => {
@@ -108,7 +139,11 @@ export default function ArtBrowser() {
       overlay.width = rect.width;
       overlay.height = rect.height;
     }
-  }, [zone, scrollTop, itemSize, itemCount, selectedTileIndex, selectedPaletteLine]);
+    // `tiles` is a dep in its own right, not covered by `itemCount`: two arrays
+    // of EQUAL length are different art, and keying the repaint on the length
+    // alone would leave the previous layer's thumbnails on screen whenever the
+    // counts happened to agree — the same mistake the old cache key made.
+  }, [zone, tiles, scrollTop, itemSize, itemCount, selectedTileIndex, selectedPaletteLine]);
 
   useEffect(() => {
     renderGrid();
@@ -157,11 +192,11 @@ export default function ArtBrowser() {
     }
 
     if (hoverLabelRef.current) {
-      hoverLabelRef.current.textContent = newIdx >= 0
-        ? `#${newIdx} (0x${newIdx.toString(16).toUpperCase()})`
-        : '';
+      // Labelled in the space the index actually lives in — a blob-local slot in
+      // BG, a zone tile index in FG.
+      hoverLabelRef.current.textContent = tilePickerHoverLabel(source, newIdx);
     }
-  }, [itemSize, itemCount]);
+  }, [itemSize, itemCount, source]);
 
   const handleClick = useCallback((e: React.MouseEvent) => {
     const canvas = canvasRef.current;
@@ -174,10 +209,13 @@ export default function ArtBrowser() {
     const row = Math.floor(y / (itemSize + 2));
     const idx = row * cols + col;
     if (idx >= 0 && idx < itemCount) {
-      useEditorStore.getState().setSelectedTileIndex(idx);
+      // Into the pick for THIS layer. The two indices name different arrays, so
+      // one shared value would carry a foreground index into a background stroke
+      // (editorStore.selectedBgTileIndex has the full reasoning).
+      useEditorStore.getState().setSelectedTileIndexForLayer(editingLayer, idx);
       useEditorStore.getState().setTool('paint-tile');
     }
-  }, [itemSize, itemCount]);
+  }, [itemSize, itemCount, editingLayer]);
 
   const handleMouseLeave = useCallback(() => {
     hoveredRef.current = -1;
@@ -208,7 +246,7 @@ export default function ArtBrowser() {
     <div style={styles.container}>
       <div style={styles.tabs}>
         <span style={styles.label}>
-          {itemCount} tiles
+          {tilePickerCountLabel(source)}
         </span>
         <span ref={hoverLabelRef} style={styles.hoverLabel} />
       </div>
@@ -220,7 +258,9 @@ export default function ArtBrowser() {
         onMouseLeave={handleMouseLeave}
         onClick={handleClick}
       >
-        <canvas ref={canvasRef} style={styles.canvas} />
+        {/* id: the CDP harness reads THESE pixels rather than asking the
+            component what it thinks it is showing (scratchpad/bg-tile-picker-harness.mjs). */}
+        <canvas id="art-browser-canvas" ref={canvasRef} style={styles.canvas} />
         <canvas ref={overlayRef} style={styles.overlay} />
       </div>
     </div>

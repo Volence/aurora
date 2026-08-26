@@ -55,6 +55,9 @@ export interface AeonPropertiesInput {
   readonly showObjectSelection: boolean;
   readonly tool: ToolId;
   readonly selectedTileIndex: number;
+  /** The BG pick. A blob-local slot in a different array — see below. */
+  readonly selectedBgTileIndex: number;
+  readonly editingLayer: 'fg' | 'bg';
   readonly selectedPaletteLine: number;
   readonly viewport: { readonly x: number; readonly y: number; readonly zoom: number };
   /** Receives the raw <select> value; '' is the act default. */
@@ -127,10 +130,16 @@ export function aeonPropertySections(input: AeonPropertiesInput): PropertySectio
   }
 
   if (input.tool === 'paint-tile' || input.tool === 'paint-block') {
+    // TWO PICKS, TWO SPACES (ROADMAP item 47). The FG index names the zone
+    // tileset; the BG one is blob-local to whatever Plane B resolves to, and
+    // they are unrelated numbers. The row is LABELLED with the space so this
+    // readout cannot show one and mean the other.
+    const bg = input.editingLayer === 'bg';
     out.push({
       title: 'Paint Tool',
       rows: [
-        row('Tile Index', String(input.selectedTileIndex)),
+        row(bg ? 'BG Tile Index' : 'Tile Index',
+          String(bg ? input.selectedBgTileIndex : input.selectedTileIndex)),
         row('Palette', String(input.selectedPaletteLine)),
       ],
     });
@@ -227,6 +236,8 @@ export function useAeonPropertiesPort(
   // Tool block showed whatever was armed the last time something ELSE it
   // subscribed to moved. Same rows, now not stale.
   const selectedTileIndex = useEditorStore((s) => s.selectedTileIndex);
+  const selectedBgTileIndex = useEditorStore((s) => s.selectedBgTileIndex);
+  const editingLayer = useEditorStore((s) => s.editingLayer);
   const selectedPaletteLine = useEditorStore((s) => s.selectedPaletteLine);
   // Re-read the selected placement's live coordinates after a committed edit and
   // during an in-flight drag (which mutates the object without a command).
@@ -266,6 +277,8 @@ export function useAeonPropertiesPort(
       showObjectSelection,
       tool,
       selectedTileIndex,
+      selectedBgTileIndex,
+      editingLayer,
       selectedPaletteLine,
       viewport: { x: vpX, y: vpY, zoom },
       onBackgroundChange,

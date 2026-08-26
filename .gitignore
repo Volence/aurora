@@ -20,3 +20,7 @@ scratchpad/fixtures/aeon-bganim-coherent/
 # on every run, and never a source of truth.
 scratchpad/fixtures/aeon-bg-unbound/
 scratchpad/fixtures/aeon-bg-writable/
+
+# The BG tile-picker harness's writable tree — same rule, rebuilt on every run
+# by scratchpad/bg-tile-picker-harness.mjs.
+scratchpad/fixtures/aeon-bg-picker-writable/
