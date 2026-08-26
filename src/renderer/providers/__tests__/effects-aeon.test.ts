@@ -14,15 +14,17 @@ import {
   sectionSceneCommand, createSceneCommand, deleteSceneCommand,
   addLayerCommand, removeLayerCommand, setLayerFieldCommand, setSceneFieldCommand,
   SCENE_FORM_CHOICES, layerExtras, layerExtrasLine,
+  layerTopSpace, layerTopBounds, clampLayerTop, planeLineOf, PLANE_LINE_SPAN,
+  layerCountLine, vFactorHint,
 } from '../effects-aeon';
 import {
   EFFECTS_FACTOR_NAMES, EFFECTS_LAYER_COUNT, EFFECTS_PACKED_FACTOR_BOUNDS,
-  EFFECTS_WORLD_Y_BOUNDS, newEffectsScene,
+  EFFECTS_WORLD_Y_BOUNDS, EFFECTS_V_FACTOR_LOCK, newEffectsScene,
 } from '../../../core/formats/effects/scene-ui';
-import {
-  serializeEffectsScene, parseEffectsScene, EFFECTS_LAYER_DEFAULTS,
-  type EffectsScene, type EffectsSceneLibrary, type EffectsLayer,
-} from '../../../core/formats/effects/scene';
+import { BG_LAYOUT_WORDS, TILE_WIDTH_PX } from '../../../core/formats/bg-override/bg-override';
+import { BG_WIDTH } from '../../../core/formats/bg-tiles';
+import { serializeEffectsScene, type EffectsScene, type EffectsSceneLibrary } from '../../../core/formats/effects/scene';
+import { EFFECTS_LAYER_DEFAULTS, parseEffectsScene, type EffectsLayer } from '../../../core/formats/effects/scene';
 import { existsSync, readFileSync } from 'node:fs';
 import { EditHistory } from '../../../core/editing/history';
 import type { S4Level } from '../../../core/editing/commands';
@@ -443,5 +445,91 @@ describe('layerExtras (parcel E)', () => {
     // either, this test must say so rather than pass vacuously.
     expect(withCurve, 'the shipped scene is the curved-horizon scene').toBeGreaterThan(0);
     expect(withNothing, 'the shipped scene has layers with no extras').toBeGreaterThan(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Which space a layer top is authored in (owner feedback 2026-08-26, point 4)
+// ---------------------------------------------------------------------------
+
+describe('layerTopSpace — a locked scene authors screen lines, an unlocked one world Y', () => {
+  // The engine's own words (aeon scene_dsl.emp `scene_plane_line`): "For a
+  // locked plane the authoring space IS the plane, so the mapping is the
+  // identity." Both shipped scenes are locked, so for every scene that exists
+  // a layer top is a plane/screen line, and the UI has to say so.
+  const locked = () => ({ ...newEffectsScene('l', 'L'), v_factor: EFFECTS_V_FACTOR_LOCK });
+  const unlocked = (vf = 2, vc = 0, vo = 0) =>
+    ({ ...newEffectsScene('u', 'U'), v_factor: vf, v_center: vc, v_offset: vo });
+
+  it('is "screen" exactly when v_factor is the lock sentinel, and "act" for every other shift', () => {
+    expect(layerTopSpace(locked())).toBe('screen');
+    for (let vf = S.properties.v_factor.minimum; vf < EFFECTS_V_FACTOR_LOCK; vf++) {
+      expect(layerTopSpace(unlocked(vf))).toBe('act');
+    }
+  });
+
+  it('a new scene is locked by default, so it starts in screen space', () => {
+    expect(layerTopSpace(newEffectsScene('n', 'N'))).toBe('screen');
+  });
+
+  it('bounds a locked top by the Plane-B span, derived from the plane geometry not typed', () => {
+    // aeon parallax.emp: PLANE_B_SPAN = PLANE_B_CELL_ROWS * 8, ensure == 512.
+    // Aurora has no rows constant; the plane is BG_LAYOUT_WORDS / BG_WIDTH rows
+    // of TILE_WIDTH_PX. The expectation is derived the same way, independently.
+    const rows = BG_LAYOUT_WORDS / BG_WIDTH;
+    expect(PLANE_LINE_SPAN).toBe(rows * TILE_WIDTH_PX);
+    const b = layerTopBounds(locked());
+    expect(b).toEqual({ space: 'screen', label: 'Screen line', min: 0, max: PLANE_LINE_SPAN - 1 });
+    expect(b.max).toBeLessThan(EFFECTS_WORLD_Y_BOUNDS.max);
+  });
+
+  it('bounds an unlocked top by the schema world_y range, under the existing label', () => {
+    expect(layerTopBounds(unlocked())).toEqual({
+      space: 'act', label: 'world_y',
+      min: S.$defs.layer.properties.world_y.minimum,
+      max: S.$defs.layer.properties.world_y.maximum,
+    });
+  });
+
+  it('clampLayerTop follows the space: a locked layer cannot reach past the plane', () => {
+    expect(clampLayerTop(locked(), 3000)).toBe(PLANE_LINE_SPAN - 1);
+    expect(clampLayerTop(locked(), -4)).toBe(0);
+    expect(clampLayerTop(locked(), 160.4)).toBe(160);
+    expect(clampLayerTop(unlocked(), 3000)).toBe(3000);
+    expect(clampLayerTop(unlocked(), 1e9)).toBe(EFFECTS_WORLD_Y_BOUNDS.max);
+    expect(clampLayerTop(locked(), NaN)).toBe(0);
+  });
+
+  it('planeLineOf reproduces scene_plane_line: identity when locked, ((wy - vc) >> vf) + vo otherwise', () => {
+    expect(planeLineOf(locked(), 160)).toEqual({ line: 160, hint: null });
+    // (1000 - 200) >> 2 = 200, + 16 = 216
+    expect(planeLineOf(unlocked(2, 200, 16), 1000)).toEqual({ line: 216, hint: null });
+    // Arithmetic shift, not division: (7 >> 1) is 3.
+    expect(planeLineOf(unlocked(1), 7).line).toBe(3);
+  });
+
+  it('planeLineOf carries the two engine refusals as advisory hints, not throws', () => {
+    // wy above v_center: the runtime's asr.w sign-extends, the top has no image.
+    const above = planeLineOf(unlocked(2, 500, 0), 100);
+    expect(above.hint).toMatch(/above .*v_center/);
+    // Line outside the span: Step 4a would rotate it onto another band's rows.
+    const outside = planeLineOf(unlocked(0, 0, 0), PLANE_LINE_SPAN);
+    expect(outside.line).toBe(PLANE_LINE_SPAN);
+    expect(outside.hint).toMatch(new RegExp(`outside .*${PLANE_LINE_SPAN}`));
+    // A locked top past the span gets the same hint — the clamp stops it in the
+    // UI, but the provider says so for a document that arrived that way.
+    expect(planeLineOf(locked(), PLANE_LINE_SPAN + 1).hint).toMatch(/outside/);
+  });
+
+  it('layerCountLine states the cap and its scope where the owner reads it', () => {
+    const s = locked();
+    expect(layerCountLine(s))
+      .toBe(`${s.layers.length} of ${EFFECTS_LAYER_COUNT.max} layers (per scene; scenes are assigned per section)`);
+    s.layers.push({ world_y: 32, fa: 'FACTOR_1', fb: 'FACTOR_1' });
+    expect(layerCountLine(s).startsWith(`${s.layers.length} of ${EFFECTS_LAYER_COUNT.max} layers`)).toBe(true);
+  });
+
+  it('vFactorHint says what the sentinel means inline, from the constant', () => {
+    expect(vFactorHint()).toBe(`${EFFECTS_V_FACTOR_LOCK} = locked (no vertical scroll)`);
   });
 });

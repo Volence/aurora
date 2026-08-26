@@ -32,11 +32,14 @@ import {
   EFFECTS_FACTOR_NAMES, EFFECTS_PACKED_FACTOR_BOUNDS, EFFECTS_LAYER_COUNT,
   EFFECTS_WORLD_Y_BOUNDS, EFFECTS_V_FACTOR_BOUNDS, EFFECTS_V_CENTER_BOUNDS,
   EFFECTS_V_OFFSET_BOUNDS, EFFECTS_V_CENTER_DEFAULT, EFFECTS_V_OFFSET_DEFAULT,
+  EFFECTS_V_FACTOR_LOCK,
   WAVE1_PRECISION_VALUES,
   EFFECTS_TRANSITION_VALUES,
   cloneEffectsScene, factorLabel, isNamedFactor, newEffectsLayer, newEffectsScene,
   sceneIdRefusal,
 } from '../../core/formats/effects/scene-ui';
+import { BG_LAYOUT_WORDS, TILE_WIDTH_PX } from '../../core/formats/bg-override/bg-override';
+import { BG_WIDTH } from '../../core/formats/bg-tiles';
 
 // ---------------------------------------------------------------------------
 // Factor picker
@@ -98,6 +101,142 @@ export function clampWorldY(value: number): number {
   const { min, max } = EFFECTS_WORLD_Y_BOUNDS;
   if (!Number.isFinite(value)) return min;
   return Math.min(max, Math.max(min, Math.round(value)));
+}
+
+// ---------------------------------------------------------------------------
+// Which space a layer top is authored in
+// ---------------------------------------------------------------------------
+//
+// Owner feedback 2026-08-26, point 4 ("why max 8 layers if they go well beyond
+// the screen?"). Schema §2.2 calls a layer's `world_y` an act-axis coordinate,
+// and for an UNLOCKED plane it is: aeon `scene_dsl.emp` `scene_plane_line`
+// lowers it to a Plane-B line as `((world_y - v_center) >> v_factor) + v_offset`
+// — the same mapping Parallax_Step5_Vscroll applies to the camera. But when
+// `v_factor` is the lock sentinel the plane ignores the camera entirely, that
+// expression collapses every top onto one line, and the engine's ruling is:
+//
+//   "For a locked plane the authoring space IS the plane, so the mapping is
+//    the identity. EIGHTEEN OF THE TWENTY shipped scenes are that case (tops
+//    0/32/80/112/160, which read as screen lines because v_offset is 0)."
+//
+// Both Aurora scene files are locked. So for every scene that exists a layer
+// top is a screen/plane line, and the eight layers divide the visible screen,
+// not the act — which is what the owner was asking for. The provider decides
+// the space per scene; the panel's label and bound, the drag clamp, the guide
+// origin and the guide caption all read it here rather than each re-deriving
+// "locked" from `v_factor`.
+
+/** `'screen'`: the top is a plane/screen line. `'act'`: it is a world Y the scene maps. */
+export type LayerTopSpace = 'screen' | 'act';
+
+/**
+ * The Plane-B vertical span in pixels — the modulus aeon's Step 4a rotates
+ * tops in, and the ceiling `scene_plane_line` refuses beyond (`pl < 512`).
+ *
+ * DERIVED THE WAY AEON DERIVES IT (`parallax.emp`: `PLANE_B_SPAN =
+ * PLANE_B_CELL_ROWS * 8`), not typed. Aurora carries no plane-rows constant;
+ * the plane is `BG_LAYOUT_WORDS / BG_WIDTH` rows (64x64 nametable words, from
+ * the vendored consumer contract) of `TILE_WIDTH_PX` each.
+ */
+export const PLANE_LINE_SPAN: number = (BG_LAYOUT_WORDS / BG_WIDTH) * TILE_WIDTH_PX;
+
+export function layerTopSpace(scene: Pick<EffectsScene, 'v_factor'>): LayerTopSpace {
+  return scene.v_factor === EFFECTS_V_FACTOR_LOCK ? 'screen' : 'act';
+}
+
+export interface LayerTopBounds {
+  space: LayerTopSpace;
+  /** The row label the panel shows for the field. */
+  label: 'Screen line' | 'world_y';
+  min: number;
+  max: number;
+}
+
+/**
+ * The label and bound for a layer's top in this scene's space.
+ *
+ * Locked: `0..PLANE_LINE_SPAN-1`, the engine's own ensure. The visible screen
+ * is the top 224 of those lines, but the plane is the authoring space (a top
+ * below the visible strip is legal and the plane wraps), so the bound is the
+ * plane's. Unlocked: the schema's `world_y` range, as before; `planeLineOf`
+ * carries the mapped-line advisory for that arm.
+ */
+export function layerTopBounds(scene: Pick<EffectsScene, 'v_factor'>): LayerTopBounds {
+  if (layerTopSpace(scene) === 'screen') {
+    return { space: 'screen', label: 'Screen line', min: 0, max: PLANE_LINE_SPAN - 1 };
+  }
+  return {
+    space: 'act', label: 'world_y',
+    min: EFFECTS_WORLD_Y_BOUNDS.min, max: EFFECTS_WORLD_Y_BOUNDS.max,
+  };
+}
+
+/**
+ * Clamp a layer top to the scene's space. THE CLAMP IS THE BOUND (ROADMAP
+ * item 37): the spinner's min/max only style it, and the guide drag routes
+ * through this too, so a locked layer cannot be dragged to a line the bake
+ * would refuse.
+ */
+export function clampLayerTop(scene: Pick<EffectsScene, 'v_factor'>, value: number): number {
+  const { min, max } = layerTopBounds(scene);
+  if (!Number.isFinite(value)) return min;
+  return Math.min(max, Math.max(min, Math.round(value)));
+}
+
+/**
+ * The Plane-B line a layer top lands on — aeon `scene_plane_line`, transcribed:
+ *
+ *     locked:   line = world_y
+ *     unlocked: line = ((world_y - v_center) >> v_factor) + v_offset
+ *
+ * with the engine's two `ensure`s returned as ADVISORY HINTS rather than
+ * thrown: the panel shows them beside the field so the author learns the bake
+ * would refuse before it does. `>>` is deliberate — the runtime is `asr.w`.
+ */
+export function planeLineOf(
+  scene: Pick<EffectsScene, 'v_factor' | 'v_center' | 'v_offset'>, worldY: number,
+): { line: number; hint: string | null } {
+  const vf = scene.v_factor;
+  const vc = scene.v_center ?? EFFECTS_V_CENTER_DEFAULT;
+  const vo = scene.v_offset ?? EFFECTS_V_OFFSET_DEFAULT;
+  const locked = layerTopSpace(scene) === 'screen';
+  if (!locked && worldY < vc) {
+    return {
+      line: ((worldY - vc) >> vf) + vo,
+      hint: `world_y ${worldY} is above this scene's v_center ${vc}: the plane never reaches it. `
+        + 'Move the top down, or v_center up.',
+    };
+  }
+  const line = locked ? worldY : ((worldY - vc) >> vf) + vo;
+  if (line < 0 || line >= PLANE_LINE_SPAN) {
+    return {
+      line,
+      hint: `${locked ? 'line' : `maps to plane line ${line},`} outside the ${PLANE_LINE_SPAN}-px `
+        + 'Plane-B span: the engine would wrap it onto another band\'s rows.',
+    };
+  }
+  return { line, hint: null };
+}
+
+/**
+ * "N of 8 layers (per scene; scenes are assigned per section)" — the cap and
+ * its scope, stated where the owner reads the count. 8 is `MAX_PARALLAX_BANDS`
+ * per SCENE (schema §2.1); a section binds its own scene (§3), so "per what's
+ * drawn" is the section, and on a locked scene the eight divide one screen.
+ */
+export function layerCountLine(scene: Pick<EffectsScene, 'layers'>): string {
+  return `${scene.layers.length} of ${EFFECTS_LAYER_COUNT.max} layers `
+    + '(per scene; scenes are assigned per section)';
+}
+
+/**
+ * The V-factor row's inline hint — the sentinel's meaning said on the row,
+ * not only in a tooltip. A hint under the control rather than in the label:
+ * the label column is a fixed 72px (`column-layout` LABEL_W) and a sentence
+ * there would push every control in the section rightward.
+ */
+export function vFactorHint(): string {
+  return `${EFFECTS_V_FACTOR_LOCK} = locked (no vertical scroll)`;
 }
 
 /**
