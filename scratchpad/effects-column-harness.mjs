@@ -101,6 +101,29 @@
 //        the disclosure chip. Absent-then-present is the property: absent-only
 //        is a deleted label, present-only would mean the row could pass on text
 //        that some other panel happened to be carrying.
+//   [H1] scrollHeight vs clientHeight ON THE COLUMN, plus its computed
+//        overflowY. The subtraction alone is not enough: a column switched to
+//        `overflow: visible` paints past its own box, and a row that only
+//        subtracted would call that a fit. So the row asserts the column IS a
+//        clipping scroller first, and says COULD NOT MEASURE if it is not.
+//   [H2] header rects against the column's rect. Reachability is a rendered
+//        position, not a section count.
+//   [H3] the same engagement test [S2] uses, tightened: after ROADMAP item 45's
+//        open tail the column itself must not be one of the live scrollbars.
+//
+// ===========================================================================
+// THE ENVIRONMENT IS PRINTED BESIDE THE NUMBERS — [r0]
+// ===========================================================================
+// docs/OVERSEER.md, 2026-08-26: Xvfb infers a device scale factor observed at
+// BOTH 1 and 1.35 hours apart in the same session, and at 1.35 element rects
+// come back fractional. Every height this file GATES on is a
+// `scrollHeight - clientHeight` or a rect comparison with no rounding, so the
+// scale factor does not enter the verdicts — but that is a claim, and a claim
+// needs its evidence in the same run as the numbers it defends, so [r0] prints
+// `devicePixelRatio`, the achieved inner size and the mechanism that set it.
+// Corollary from the same entry: A RUN THAT PASSES TWICE HAS PROVEN NOTHING
+// about stability here. Run the final figures more than twice, and never read
+// two rows of one claim out of two different runs.
 //
 // ===========================================================================
 // ANTI-VACUITY (bar 3)
@@ -136,9 +159,34 @@
 //   PLANT=overhang  take the scroller off the list body  -> judge C1
 //                   (the 954px effects-panel shape, reproduced)
 //   PLANT=arrival   expand a section that arrives closed -> judge A1
-//   PLANT=duplicate a SECOND element enumerating band 0  -> judge D1
+//   PLANT=duplicate a SECOND element enumerating band 0  -> judge D1b
 //                   (the "Band 0 · 8x4 · timer" card item 45 removed)
 //   PLANT=approx    delete the disclosure chip           -> judge D2
+//   PLANT=overflow  1200px of filler into the column     -> judge H1
+//                   (item 45's own open tail: a column that needs a scroll)
+//   PLANT=visible   take the scroller OFF the column     -> judge H1
+//                   (the wrong-observable escape: content that paints out of
+//                    the column instead of scrolling would make H1's
+//                    subtraction say "fits". It must say COULD NOT MEASURE.)
+//   PLANT=nobands   DELETE the band section outright     -> judge D1
+//                   (collapsed is one click away; deleted is invisible, and
+//                    the arrival state this parcel chose stands or falls on
+//                    that distinction being measurable)
+//
+// `duplicate` and `approx` are LATE plants — see LATE_PLANTS. `BG animation
+// bands` arrives closed now, and a collapsed section renders no children, so
+// both of their subjects only exist after phase 2 has opened it.
+//
+// [H2] IS NOT INDEPENDENTLY PLANTABLE and this file says so rather than
+// inventing a plant that only looks like one: a section header can leave the
+// column's box ONLY by the content exceeding the box, so any plant that reddens
+// it reddens [H1] first. PLANT=overflow is its red — and the FIRST version of
+// that plant, which appended its filler to the BOTTOM of the column, left [H2]
+// green at 7/7 while [H1] and [H3] went red. The filler was the only thing out
+// of reach. A plant calibrated to "the column now scrolls" is not a plant for
+// "a header is now unreachable"; it inserts high in the column for that reason.
+// [H3] does have an independent red — PLANT=scroller installs two extra live
+// scrollbars while the column stays at zero overflow.
 //
 // ===========================================================================
 //   VITE_AURORA_DEBUG=1 npm run build      # __dbg only exists with the flag
@@ -219,8 +267,33 @@ const SUBJECT_SCENE = 'ojz_act1_start';
 //
 // THE REFUSAL PATH IS NOT DEAD: an act the override does not bind still shows it,
 // inside the card. It was folded in, not deleted.
-const EXPECTED_OPEN = ['Scenes', 'Scene', 'Layers', 'Section assignment', 'BG animation bands'];
-const EXPECTED_CLOSED = ['New band', 'Properties'];
+//
+// ⚠ 'BG animation bands' MOVED FROM open TO closed — 2026-08-26, item 45's open
+// tail (the 1280x800 parcel). The ruling above it, that closing the section
+// "would hide the fact that the facet does bands at all", does not survive
+// contact with the arithmetic OR with the DOM: a collapsed CollapsibleSection
+// still renders its header, and that header reads `BG animation bands (1/4)` —
+// the capability and the document's band count are both on screen while the
+// section is shut.
+//
+// THE ARITHMETIC. At 1280x800 the column has 702px of client height. Measured
+// on the merged tree, its section boxes are Scenes 137, Scene 207, Layers 160
+// (its floor — it can give nothing), Section assignment 115, BG animation bands
+// 286, New band 25, Properties 25 = 954px. Four of the five open sections are
+// THE SCENE and total 619px; 619 + 286 + 50 does not fit in 702 by any
+// arrangement, and the tightenings this parcel also made (a one-line scene
+// picker, a one-fact assignment hint) are worth 42px between them. So the
+// arrival state had to change, and only one section in this column is about
+// something other than the scene the facet arrives on.
+//
+// EVERYTHING INSIDE IT IS ONE CLICK AWAY, WHICH IS THE STANDARD — the per-band
+// verdicts, the refusal path, the playback chip and the honesty label all still
+// exist and are all reachable by clicking one header. [D1b] and [D2] both run
+// AFTER phase 2 opens every section, so this list changing cannot make either
+// of them vacuous: [D1b] still fails if it finds nothing to count, and [D2]
+// still fails if the four caveats are absent after the click.
+const EXPECTED_OPEN = ['Scenes', 'Scene', 'Layers', 'Section assignment'];
+const EXPECTED_CLOSED = ['BG animation bands', 'New band', 'Properties'];
 
 /**
  * THE ONE SECTION IN THIS COLUMN THIS PARCEL DOES NOT OWN, named rather than
@@ -245,8 +318,25 @@ const isForeign = (title) => FOREIGN_SECTIONS.includes(title.replace(/\s*[—(].
 /** Which row each plant must turn red. A plant whose judge stays green is a failed run. */
 const PLANT_JUDGE = {
   label: 'L1', narrow: 'L2', pair: 'L3', list: 'S1', scroller: 'S2', overhang: 'C1', arrival: 'A1',
-  duplicate: 'D1', approx: 'D2',
+  duplicate: 'D1b', approx: 'D2', overflow: 'H1', nobands: 'D1', visible: 'H1',
 };
+
+/**
+ * PLANTS THAT CANNOT INSTALL UNTIL PHASE 2 HAS OPENED EVERY SECTION.
+ *
+ * `BG animation bands` arrives CLOSED now, and a collapsed CollapsibleSection
+ * renders no children at all — so at phase 1 there is no band card to duplicate
+ * and no `why approximate?` chip to delete. Applied at the top of the run both
+ * plants would report `no-band` / `no-chip` and the harness would abort with
+ * "a plant that cannot install is not evidence", which is TRUE and useless.
+ *
+ * They are applied instead immediately after OPEN_ALL and before the phase-2
+ * probe, which is where their judges ([D1b], [D2]) read. THE PLANT IS NOT
+ * WEAKER FOR IT: [D1b] is the row that asks the duplicate question over the
+ * whole column with every section open, which is where a duplicate could hide
+ * even when the section arrived open, and [D2] always ran last.
+ */
+const LATE_PLANTS = new Set(['duplicate', 'approx']);
 
 /**
  * THE FOUR SENTENCES THE HONESTY LABEL MUST STILL BE ABLE TO SAY — [D2].
@@ -794,6 +884,108 @@ const PLANTS = {
   src.parentElement.appendChild(clone);
   return 'planted:' + clone.textContent;
 })()`,
+  // THE DEFECT THIS PARCEL EXISTS TO REMOVE: a column with more content than it
+  // can show. Item 45 closed with 214px of it at 1280x800 and said so plainly.
+  //
+  // A FIXED BLOCK, NOT "RE-OPEN THE SECTION THIS PARCEL CLOSED", and the reason
+  // is that a plant must install the same violation at every frame this harness
+  // runs at. Re-opening `BG animation bands` costs 286px, which overflows a
+  // 1280x800 column and does NOT overflow a 1680x1050 one (it has 292px of
+  // slack after this parcel) — so that plant would be green at one frame for a
+  // reason that has nothing to do with the property, which is bar 2d exactly.
+  // 1200px exceeds the slack at both frames by construction.
+  //
+  // ⚠ IT IS THE NAMED JUDGE FOR [H1] AND THE ONLY RED [H2] HAS, and that is not
+  // sloppiness: a section header can leave the column's box ONLY by the content
+  // exceeding the box, so [H2] is not violable without [H1] also being violated
+  // and a plant that reddened it alone would be a fiction. [H3] does have an
+  // independent red: PLANT=scroller installs two extra live scrollbars while
+  // the column itself stays at zero overflow, which reddens [H3] without going
+  // through [H1] at all.
+  overflow: String.raw`
+(() => {
+  const isHeader = (el) => { if (el.tagName !== 'DIV') return false;
+    const cs = getComputedStyle(el);
+    return cs.textTransform === 'uppercase' && cs.letterSpacing === '1px'
+      && !!el.firstElementChild && el.firstElementChild.tagName === 'SPAN'; };
+  const boxes = [...document.querySelectorAll('div')].filter(isHeader)
+    .map((h) => h.parentElement.parentElement).filter(Boolean);
+  const byParent = new Map();
+  for (const b of boxes) {
+    const p = b.parentElement; if (!p) continue;
+    if (!byParent.has(p)) byParent.set(p, 0);
+    byParent.set(p, byParent.get(p) + 1);
+  }
+  let col = null, best = -1;
+  for (const [p] of byParent) {
+    const left = p.getBoundingClientRect().left;
+    if (left > best) { best = left; col = p; }
+  }
+  if (!col) return 'no-column';
+  const filler = document.createElement('div');
+  filler.style.cssText = 'height:1200px;flex:0 0 1200px';
+  filler.textContent = 'planted overflow';
+  // ⚠ AFTER THE FIRST SECTION, NOT AT THE END, AND THE FIRST VERSION OF THIS
+  // PLANT GOT IT WRONG. Appended to the bottom of the column the filler is the
+  // only thing that goes out of reach, so [H1] and [H3] went red and [H2]
+  // stayed GREEN with 7/7 headers reachable — the plant reproduced "the column
+  // scrolls" but NOT "a header is out of reach", which is the half of the
+  // defect [H2] exists for. Inserted high, it pushes the later HEADERS below
+  // the column's bottom edge, which is the 5-of-7 shape master actually had.
+  col.insertBefore(filler, col.children[1] || null);
+  return 'planted:1200px after section 1 of a '
+    + Math.round(col.getBoundingClientRect().height) + 'px column';
+})()`,
+  // ⚠ THE WRONG-OBSERVABLE ESCAPE, PLANTED ON PURPOSE (OVERSEER bar 2b). [H1]
+  // asks "does the content fit" by subtracting two numbers, and there is a way
+  // to make that subtraction say YES while the column is in fact worse off than
+  // before: take the scroller OFF it. With `overflow: visible` the content is
+  // not clipped and not scrolled — it paints straight out of the column, over
+  // whatever the shell draws below. This plant installs exactly that, and [H1]
+  // must answer COULD NOT MEASURE rather than "fits". A green here would mean
+  // the row is measuring the wrong quantity, which is the failure that cost
+  // this repo `section-column-harness.mjs` row c1.
+  visible: String.raw`
+(() => {
+  const isHeader = (el) => { if (el.tagName !== 'DIV') return false;
+    const cs = getComputedStyle(el);
+    return cs.textTransform === 'uppercase' && cs.letterSpacing === '1px'
+      && !!el.firstElementChild && el.firstElementChild.tagName === 'SPAN'; };
+  const boxes = [...document.querySelectorAll('div')].filter(isHeader)
+    .map((h) => h.parentElement.parentElement).filter(Boolean);
+  let col = null, best = -1;
+  for (const b of boxes) {
+    const p = b.parentElement; if (!p) continue;
+    const left = p.getBoundingClientRect().left;
+    if (left > best) { best = left; col = p; }
+  }
+  if (!col) return 'no-column';
+  col.style.overflowY = 'visible';
+  col.style.overflowX = 'visible';
+  return 'planted: the column no longer clips or scrolls (overflowY visible)';
+})()`,
+  // THE BAND SUBJECT MADE INVISIBLE RATHER THAN ONE CLICK AWAY — the exact
+  // failure this parcel's arrival state is one attribute away from, and the one
+  // thing the owner said must not happen. The whole defence of collapsing
+  // `BG animation bands` is that its HEADER stays on screen naming the
+  // capability and counting the document's bands; delete the section and the
+  // column silently stops mentioning that this facet does bands at all. [D1]
+  // must not confuse that with "arrives closed".
+  nobands: String.raw`
+(() => {
+  const isHeader = (el) => { if (el.tagName !== 'DIV') return false;
+    const cs = getComputedStyle(el);
+    return cs.textTransform === 'uppercase' && cs.letterSpacing === '1px'
+      && !!el.firstElementChild && el.firstElementChild.tagName === 'SPAN'; };
+  const hdr = [...document.querySelectorAll('div')].filter(isHeader)
+    .filter((h) => h.getBoundingClientRect().left > 400)
+    .find((h) => /^BG animation bands/.test((h.firstElementChild.textContent || '').trim()));
+  if (!hdr) return 'no-bands-section';
+  const box = hdr.parentElement.parentElement;
+  const title = (hdr.firstElementChild.textContent || '').trim();
+  box.remove();
+  return 'planted: removed "' + title + '" from the column';
+})()`,
   // THE HONESTY LABEL MADE UNREACHABLE. Not "hidden with CSS" — the chip is
   // REMOVED, which is what a parcel that quietly dropped the disclosure would
   // leave behind, and D2 cannot then open anything.
@@ -876,6 +1068,20 @@ async function main() {
     check('V.set', `the page viewport is ${SCREEN_W}x${SCREEN_H}`,
       VIEWPORT.mechanism !== 'FAILED',
       `${JSON.stringify(VIEWPORT.achieved)} via ${VIEWPORT.mechanism}`);
+    // ⚠ THE ENVIRONMENT, PRINTED BESIDE EVERY NUMBER THIS RUN REPORTS.
+    // OVERSEER, 2026-08-26: Xvfb infers a device scale factor that has been
+    // observed at BOTH 1 and 1.35 hours apart in the same session, and at 1.35
+    // element rects come back fractional. Every height this file reports is a
+    // `scrollHeight - clientHeight` on the column, which is INTEGER at any dpr
+    // (both are integer CSS-pixel properties) — but that is a claim, and a
+    // claim needs its evidence in the same run as the numbers it defends. So
+    // dpr is printed here, and [r1] prints the raw pair it subtracted.
+    const envInfo = await c.json(`({ dpr: window.devicePixelRatio,
+      inner: [window.innerWidth, window.innerHeight],
+      screen: [screen.width, screen.height] })`);
+    report('r0', 'the environment these numbers were measured in',
+      `devicePixelRatio ${envInfo.dpr} · innerWidth/Height ${JSON.stringify(envInfo.inner)} · `
+      + `screen ${JSON.stringify(envInfo.screen)} · viewport mechanism ${VIEWPORT.mechanism}`);
     if (VIEWPORT.mechanism === 'FAILED') throw new Error('viewport not settable — every px below would be from a window nobody asked for');
 
     // ---- instrument rows -------------------------------------------------
@@ -901,23 +1107,56 @@ async function main() {
     // The SUBJECT: the owner's own scene, read off the DOM heading that names
     // the selected scene — the section title is `Scene — ${selected.id}`, and
     // no leftover paint can produce it for a scene that is not selected.
+    //
+    // ⚠ THE SUBJECT IS NOW SELECTED BY CLICKING, NOT ASSUMED (2026-08-26, the
+    // 1280x800 parcel). Until today this project had ONE effects scene, so
+    // `resolveSelectedScene`'s "else the first scene" fallback landed on the
+    // subject and the row only had to read it back. Aeon then landed
+    // `ojz_act1_depth` (d-15, the OJZ showcase), which sorts FIRST — so on a
+    // clean arrival this harness opened a scene the owner was never looking at
+    // and [i2] correctly aborted the whole run rather than measure it. The row
+    // stays an assertion; what changed is that the harness now makes the human
+    // gesture that reaches the subject (click its button in the Scenes list)
+    // instead of depending on a scene count nobody controls. It clicks each
+    // scene button in turn and stops when the section title names the subject
+    // BY ID, so a renamed scene cannot silently redirect it.
+    const pickSubject = String.raw`
+(async () => {
+  const titles = () => [...document.querySelectorAll('span')]
+    .map((e) => (e.textContent || '').trim()).filter((t) => /^Scene — /.test(t));
+  if (titles().some((t) => t.includes(${JSON.stringify(SUBJECT_SCENE)}))) return 'already';
+  const buttons = [...document.querySelectorAll('button')]
+    .filter((b) => b.getBoundingClientRect().left > 400 && /\d+ layers?$/.test((b.textContent || '').trim()));
+  for (const b of buttons) {
+    b.click();
+    await new Promise((r) => setTimeout(r, 250));
+    if (titles().some((t) => t.includes(${JSON.stringify(SUBJECT_SCENE)}))) {
+      return 'clicked:' + (b.textContent || '').trim();
+    }
+  }
+  return 'NOT-FOUND among ' + buttons.length + ' scene buttons: '
+    + JSON.stringify(buttons.map((b) => (b.textContent || '').trim()));
+})()`;
+    const picked = await c.evalExpr(pickSubject);
+    await sleep(600);
     const sceneTitles = await c.json(
       `[...document.querySelectorAll('span')].map(e => (e.textContent||'').trim())
         .filter(t => /^Scene — /.test(t))`);
     const onSubject = sceneTitles.some((t) => t.includes(SUBJECT_SCENE));
     check('i2', `the selected scene is the owner's banded canopy (${SUBJECT_SCENE}) [instrument]`,
-      onSubject, JSON.stringify(sceneTitles));
+      onSubject, `${picked}; on screen: ${JSON.stringify(sceneTitles)}`);
     if (!onSubject) throw new Error('the subject scene is not selected — a tidy verdict here would be about nothing');
 
-    if (PLANT) {
+    const applyPlant = async (when) => {
       if (!PLANTS[PLANT]) throw new Error(`unknown PLANT=${PLANT}`);
       const r = await c.evalExpr(PLANTS[PLANT]);
-      console.log(`\n*** PLANT=${PLANT} applied: ${r}  (judge = ${PLANT_JUDGE[PLANT]}) ***\n`);
+      console.log(`\n*** PLANT=${PLANT} applied ${when}: ${r}  (judge = ${PLANT_JUDGE[PLANT]}) ***\n`);
       if (typeof r === 'string' && r.startsWith('no-')) {
         throw new Error(`plant ${PLANT} found no subject (${r}) — a plant that cannot install is not evidence`);
       }
       await sleep(600);
-    }
+    };
+    if (PLANT && !LATE_PLANTS.has(PLANT)) await applyPlant('at arrival');
 
     const m = await c.json(COLUMN_PROBE);
     if (m.error) throw new Error(`column probe: ${m.error}`);
@@ -1036,14 +1275,99 @@ async function main() {
             + `would be vacuous. Column sections: ${JSON.stringify(e.sections)}`);
       return e;
     };
-    await bandEnum('D1', 'each band is enumerated by exactly ONE card in the column');
+    // AT ARRIVAL the question changed, because the section that enumerates
+    // bands arrives CLOSED (see EXPECTED_OPEN). Asking `bandEnum` here would
+    // find nothing to count and fail on its own anti-vacuity clause — correctly,
+    // and uselessly. What IS worth asserting at arrival is the pair of facts the
+    // new arrival state rests on: the section is THERE (so the capability and
+    // the band count are on screen), and it is SHUT (so it is costing the column
+    // nothing). [D1b] then asks the duplicate question with it open.
+    const bandsSection = m.sections.find((s) => /^BG animation bands/.test(s.title));
+    const arrivalEnum = await c.json(BAND_ENUM_PROBE);
+    target('D1', 'the band list is present in the column and arrives CLOSED, enumerating nothing',
+      !!bandsSection && bandsSection.expanded === false
+        && !arrivalEnum.error && arrivalEnum.hits.length === 0,
+      bandsSection
+        ? `"${bandsSection.title}" expanded=${bandsSection.expanded}, box ${Math.round(bandsSection.rect.h)}px; `
+          + `${arrivalEnum.error ?? `${arrivalEnum.hits.length} band(s) enumerated at arrival`}`
+        : `NO SECTION TITLED "BG animation bands" IN THE COLUMN — the capability and the `
+          + `band count are not on screen at all. Sections: ${JSON.stringify(titles)}`);
 
     // ---- the reports the owner is owed ----------------------------------
     report('r1', 'column overflow (how much taller its content is than the column)',
       `${m.column.overflow}px  (content ${m.column.scrollHeight}px in ${m.column.clientHeight}px, `
-      + `overflowY: ${m.column.overflowY})`);
+      + `overflowY: ${m.column.overflowY}, dpr ${envInfo.dpr})`);
     report('r2', 'section headers reachable without scrolling the column',
       `${m.visibleHeaders} of ${m.sections.length}`);
+
+    // ---- H1/H2/H3: DOES THE COLUMN FIT THIS SCREEN? -----------------------
+    // ROADMAP item 45's open tail, made into a gate. Until now the column's
+    // overflow was [r1], a REPORT — which is why 214px could be booked as
+    // "still open" and nothing in any runner would ever go red about it again.
+    //
+    // THE EXPECTATION IS A PROPERTY, NOT A PIXEL (bar 8). "scrollHeight does not
+    // exceed clientHeight" is derived from what a scroll container IS; no
+    // measured height from this parcel or item 45's is written down anywhere,
+    // and the headroom is REPORTED beside the verdict rather than asserted, so a
+    // future section that eats it goes red on the property and not on a number
+    // somebody would have had to remember to update.
+    //
+    // LOUD ON UNMEASURABLE, and the trap is specific: a column switched to
+    // `overflow: visible` would paint its content straight past its own box, and
+    // a row that only subtracted two numbers could report that as a fit. So the
+    // row asserts the column IS a clipping scroller and prints the computed
+    // value it read. [C1] guards the painting half from the other side.
+    const colScrolls = /auto|scroll/.test(m.column.overflowY);
+    const headroom = m.column.clientHeight - m.column.scrollHeight;
+    target('H1', `the column's content FITS at ${SCREEN_W}x${SCREEN_H} — no column scrollbar`,
+      colScrolls && m.column.clientHeight > 0 && m.column.overflow <= 0,
+      colScrolls
+        ? `content ${m.column.scrollHeight}px in ${m.column.clientHeight}px `
+          + `→ overflow ${m.column.overflow}px, headroom ${headroom}px (dpr ${envInfo.dpr})`
+        : `COULD NOT MEASURE A FIT: the column's overflowY is "${m.column.overflowY}", not a `
+          + `scroller — content that did not fit would paint outside it and this subtraction `
+          + `would be meaningless`);
+    target('H2', 'every section header is reachable without scrolling the column',
+      m.sections.length > 0 && m.visibleHeaders === m.sections.length,
+      `${m.visibleHeaders} of ${m.sections.length} reachable: `
+      + JSON.stringify(m.sections.map((s) => `${s.title}@${Math.round(s.rect.y)}`))
+      + ` in a column at y ${Math.round(m.column.rect.y)}..${Math.round(m.column.rect.bottom)}`);
+    // ⚠ [H1]'s "headroom" READS 0 EVEN WHEN THE COLUMN HAS ROOM TO SPARE, and a
+    // reader who took it for the safety margin would be badly misled. The Layers
+    // section is `flex: 1 1 0`, so it absorbs every spare pixel up to its own
+    // content height: a column with 300px going begging shows headroom 0 and a
+    // 300px-taller list. THE REAL MARGIN is how far the list can be squeezed
+    // before it hits the floor the shell gives every list section — past that
+    // point the column has nothing left to give and starts to overflow.
+    //
+    // DERIVED FROM THE RENDERED ELEMENT, not from the constant's value: the
+    // floor is read as the list section's own computed `minHeight`, so if the
+    // shell ever moves SECTION_LIST_MIN_HEIGHT this row follows it instead of
+    // quietly disagreeing with it.
+    const listSection = m.sections.find((s) => s.flexGrow === '1');
+    const floorPx = listSection ? parseFloat(listSection.minHeight) : NaN;
+    report('r9', 'the column\'s REAL margin — how much taller its content can get before it scrolls',
+      listSection && Number.isFinite(floorPx)
+        ? `${Math.round(listSection.rect.h - floorPx)}px: "${listSection.title}" is `
+          + `${Math.round(listSection.rect.h)}px and its computed floor is ${floorPx}px, so that `
+          + `much can be taken from it before the column itself must scroll`
+        : `COULD NOT MEASURE: no section in this column has flex-grow 1`
+          + `${listSection ? ` (minHeight computed as "${listSection.minHeight}")` : ''}`);
+
+    // AT MOST ONE, NOT EXACTLY ONE, and the difference is a fixture dependency
+    // this row refuses to take. "Exactly one" would be asserting that the Layers
+    // list OVERFLOWS — true of the subject scene, which has five layers, and
+    // false of a two-layer scene that simply fits. That is a property of the
+    // aeon tree's content, not of this column's design, and a gate that goes red
+    // when somebody deletes a layer is a gate people learn to ignore. The
+    // property is the one item 45's open tail is about: THE COLUMN ITSELF must
+    // not be a scrollbar, and nothing inside it may add a second. A list that
+    // stopped clipping altogether is [C1]'s row, not this one.
+    const engagedNow = m.scrollers.filter((s) => s.engaged);
+    target('H3', 'the column itself is not a live scrollbar, and holds at most one',
+      engagedNow.every((s) => !s.isColumn) && engagedNow.length <= 1,
+      `${engagedNow.length} engaged of ${m.scrollers.length} declared: `
+      + JSON.stringify(engagedNow.map((s) => `${s.isColumn ? 'THE COLUMN' : s.tag}(+${s.over}px):"${s.text}"`)));
     report('r3', 'per-section painted height',
       JSON.stringify(m.sections.map((s) => `${s.title}: box ${Math.round(s.rect.h)}px, body ${s.bodyH}px`)));
     report('r4', 'label TEXT widths, measured with a Range — what the label column must fit',
@@ -1064,6 +1388,7 @@ async function main() {
     // again over the whole column.
     const opened = await c.json(OPEN_ALL);
     await sleep(900);
+    if (PLANT && LATE_PLANTS.has(PLANT)) await applyPlant('after every section was opened');
     const m2 = await c.json(COLUMN_PROBE);
     if (m2.error) throw new Error(`column probe (phase 2): ${m2.error}`);
     await shot(c, `all-open-${PLANT || (BASELINE ? 'baseline' : 'after')}-${SCREEN_W}x${SCREEN_H}`);
