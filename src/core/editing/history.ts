@@ -1,6 +1,7 @@
 import type { AnyCommand, S4Level } from './commands';
 import type { EffectsScene, EffectsSceneLibrary } from '../formats/effects/scene';
 import { applyWithBand, applyWithoutBand } from '../formats/bg-override/bg-anim-band';
+import { writeBgOverrideLayoutWord } from '../formats/bg-override/bg-override-view';
 
 const MAX_HISTORY = 200;
 
@@ -131,6 +132,16 @@ function applyCommand(cmd: AnyCommand, level: S4Level): void {
   if (cmd.type === 'set-bg-tiles') {
     const layout = resolveBgLayout(level, cmd.bgRef);
     if (layout) for (const e of cmd.entries) layout[e.index] = e.newNt;
+    return;
+  }
+  if (cmd.type === 'set-bg-override-layout') {
+    // Throw, don't skip — the rule set-palette-line states above.
+    if (!level.bgOverride) throw new Error('set-bg-override-layout requires level.bgOverride');
+    // Through the ONE writer: the document and the canvas's mirror of it are two
+    // representations of one fact, and only this function writes both.
+    for (const e of cmd.entries) {
+      writeBgOverrideLayoutWord(level.bgOverride, e.index, e.newWord);
+    }
     return;
   }
   if (cmd.type === 'set-effects-scene') {
@@ -284,6 +295,14 @@ function undoCommand(cmd: AnyCommand, level: S4Level): void {
   if (cmd.type === 'set-bg-tiles') {
     const layout = resolveBgLayout(level, cmd.bgRef);
     if (layout) for (const e of cmd.entries) layout[e.index] = e.oldNt;
+    return;
+  }
+  if (cmd.type === 'set-bg-override-layout') {
+    if (!level.bgOverride) throw new Error('set-bg-override-layout requires level.bgOverride');
+    // The SAME writer as apply, with the other half of each entry.
+    for (const e of cmd.entries) {
+      writeBgOverrideLayoutWord(level.bgOverride, e.index, e.oldWord);
+    }
     return;
   }
   if (cmd.type === 'set-effects-scene') {

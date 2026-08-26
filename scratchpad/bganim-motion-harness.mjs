@@ -22,19 +22,27 @@
 //              callbacks per second. An orphaned playback loop shows up here as
 //              ~60/s that never goes away, whether or not it repaints.
 //
-// ═══ THE FIXTURE, AND WHY THERE HAS TO BE ONE ═══
+// ═══ TWO TARGETS, AND WHAT EACH ONE PROVES ═══
 //
-// The live aeon tree cannot exercise this feature at all: its
-// `editor_bg_override.json` and the background Aurora paints for that section are
-// two different tile blobs holding the same art at different indices, so the
-// preview's licence check refuses (correctly) and every motion row would be
-// vacuous. `bganim-preview-fixture.mjs` builds the coherent state FROM the real
-// document. See docs/reviews/2026-08-26-bganim-preview-blob-divergence.md.
+// DEFAULT — THE FIXTURE. `bganim-preview-fixture.mjs` builds a coherent state
+// from the real document and PROMOTES A SECOND BAND with driver `camera_x`, so
+// both driver classes are on one screen at once. That is what lets rows 3c and
+// 3d be a CONTRAST rather than two separate measurements: in the same window, on
+// the same canvas, one band's cells move and the other's do not. The live
+// document carries one band, so the contrast exists only here.
 //
-// It also promotes a second band with driver `camera_x`, so both driver classes
-// are on one screen at once. That is what lets rows 3a and 3b be a CONTRAST
-// rather than two separate measurements: in the same window, on the same canvas,
-// one band's cells move and the other's do not.
+// AEON_LIVE=1 — THE REAL PROJECT, opened READ-ONLY and never saved. Until
+// decision d-12 this was impossible: the canvas painted a BG-library entry while
+// the band named slots in `editor_bg_override.json`, two blobs holding the same
+// art at different indices, so the licence check refused (correctly) and every
+// motion row was vacuous. See docs/reviews/2026-08-26-bganim-preview-blob-
+// divergence.md. The canvas now paints the override, so a band's rest art IS the
+// blob on screen by construction and the licence passes.
+//
+// NEITHER REPLACES THE OTHER, and a run of one is not a run of the other: the
+// fixture proves the driver contrast, the live target proves the feature works
+// where an author would actually use it. Rows that need a band the target does
+// not have report as NOTE, naming what was missing — never as a silent pass.
 //
 // ═══ WHICH ROWS DO NOT DISCRIMINATE (stated up front) ═══
 //
@@ -53,17 +61,19 @@
 // non-zero in row 3a, in the same session, minutes apart — so a zero in 2a means
 // the viewport was idle, not that the probe was dead.
 //
-// ⚠ WRITES NOTHING to the aeon tree: it opens the fixture copy, and never saves.
+// ⚠ WRITES NOTHING to the aeon tree, on EITHER target: the fixture is a
+// hardlinked copy, the live target is opened read-only, and no path here saves.
 //
 // Requires a debug build:  VITE_AURORA_DEBUG=1 npm run build
-// Run:                     node scratchpad/bganim-motion-harness.mjs
+// Run (fixture):           node scratchpad/bganim-motion-harness.mjs
+// Run (live project):      AEON_LIVE=1 node scratchpad/bganim-motion-harness.mjs
 
 import { spawn } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as http from 'node:http';
-import { buildFixture, fixtureFacts } from './bganim-preview-fixture.mjs';
+import { AEON, buildFixture, documentFacts } from './bganim-preview-fixture.mjs';
 
 const PORT = Number(process.env.PORT ?? 9397);
 const ROOT = process.env.AURORA_ROOT ?? dirname(dirname(fileURLToPath(import.meta.url)));
@@ -263,12 +273,30 @@ const sample = (c, cells, vp) => c.json(
 const setView = (c, vp) => c.evalExpr(`window.__dbg.setView(${vp.x}, ${vp.y}, ${vp.zoom})`);
 
 async function main() {
-  console.log('\nBUILDING THE COHERENT FIXTURE (derived from the live override document)…');
-  const dir = buildFixture();
-  const facts = fixtureFacts();
+  const LIVE = process.env.AEON_LIVE === '1';
+  let dir;
+  if (LIVE) {
+    console.log('\nTARGET: THE LIVE AEON PROJECT (read-only, never saved).');
+    console.log('  Possible only since d-12 — the canvas paints editor_bg_override.json, so a');
+    console.log('  band\'s rest art IS the blob on screen and the licence check passes.');
+    dir = AEON;
+  } else {
+    console.log('\nBUILDING THE COHERENT FIXTURE (derived from the live override document)…');
+    dir = buildFixture();
+  }
+  const facts = documentFacts(dir);
   const timer = facts.bands.find((b) => b.driver === 'timer');
   const camera = facts.bands.find((b) => b.driver === 'camera_x');
-  if (!timer || !camera) throw new Error('fixture must carry one timer band and one camera band');
+  if (!timer) {
+    throw new Error(`${LIVE ? 'the live document' : 'the fixture'} carries no timer band, so `
+      + 'every motion row would be vacuous');
+  }
+  if (!camera && !LIVE) throw new Error('the fixture must carry a camera band as well');
+  if (!camera) {
+    console.log('  NOTE: the live document carries no camera_x band, so the driver-contrast and');
+    console.log('        pan rows (1c, 3d, 4a-4d) cannot be measured here. The fixture run is');
+    console.log('        what covers them.');
+  }
 
   // DERIVED EXPECTATIONS. Not one of these is typed in.
   //   a timer band steps once per (1 << rate_shift) GAME FRAMES  -> steps/s
@@ -276,12 +304,14 @@ async function main() {
   //   both wrap after pattern_px steps, i.e. pattern_px << rate_shift units
   const timerUnits = 1 << timer.rateShift;
   const expectedStepsPerSec = FPS / timerUnits;
-  const camUnits = 1 << camera.rateShift;
-  const camPeriodPx = camera.patternPx * camUnits;
+  const camUnits = camera ? 1 << camera.rateShift : 0;
+  const camPeriodPx = camera ? camera.patternPx * camUnits : 0;
   console.log(`  timer band  ${timer.cols}x${timer.rows} rate_shift=${timer.rateShift}`
     + ` -> ${expectedStepsPerSec} steps/s (and so that many repaints/s, not ${FPS})`);
-  console.log(`  camera band ${camera.cols}x${camera.rows} rate_shift=${camera.rateShift}`
-    + ` -> 1 step per ${camUnits} camera px, wrapping every ${camPeriodPx} px`);
+  if (camera) {
+    console.log(`  camera band ${camera.cols}x${camera.rows} rate_shift=${camera.rateShift}`
+      + ` -> 1 step per ${camUnits} camera px, wrapping every ${camPeriodPx} px`);
+  }
 
   // Which background cells draw which band, read from the fixture's own layout.
   const owner = (idx) => {
@@ -305,11 +335,14 @@ async function main() {
   // Sample cells for the pan rows must stay ON SCREEN across the largest pan the
   // rows perform, so they are chosen to the RIGHT of it.
   const maxPan = camPeriodPx;
-  const camCells = cellsOf(camera.index, { minCol: Math.ceil(maxPan / CELL_PX) + 2, minRow: 1 }).slice(0, 24);
+  const camCells = camera
+    ? cellsOf(camera.index, { minCol: Math.ceil(maxPan / CELL_PX) + 2, minRow: 1 }).slice(0, 24)
+    : [];
   const timerCells = cellsOf(timer.index, { minRow: 1 }).slice(0, 24);
-  console.log(`  sampling ${timerCells.length} timer cells and ${camCells.length} camera cells`);
-  if (camCells.length === 0 || timerCells.length === 0) {
-    throw new Error('the fixture layout draws no cells for one of the bands — every row below '
+  console.log(`  sampling ${timerCells.length} timer cells`
+    + (camera ? ` and ${camCells.length} camera cells` : ' (no camera band on this target)'));
+  if (timerCells.length === 0 || (camera && camCells.length === 0)) {
+    throw new Error('the layout draws no cells for one of the bands — every row below '
       + 'would be vacuous');
   }
 
@@ -345,7 +378,8 @@ async function main() {
     await sleep(4000);
     await waitDbg();
 
-    // ---- 0. Open the FIXTURE (never the aeon tree). ----------------------
+    // ---- 0. Open the target. The fixture is a hardlinked copy; the LIVE
+    //         target is the aeon tree itself, opened read-only and never saved.
     await c.evalExpr(`window.__dbg.aeon.open(${JSON.stringify(dir)})`)
       .catch((e) => console.log('        open threw:', e.message));
     let st = null;
@@ -354,7 +388,8 @@ async function main() {
       if (st && st.open) break;
       await sleep(400);
     }
-    check('0b', 'the fixture project is open, with sections [precondition]',
+    check('0b', `the ${LIVE ? 'LIVE aeon' : 'fixture'} project is open, with sections `
+      + '[precondition]',
       !!(st && st.open && st.sections > 0), JSON.stringify(st));
     if (!st || !st.open) throw new Error('project did not open — nothing below can be measured');
 
@@ -380,13 +415,15 @@ async function main() {
 
     // ---- 1. THE INSTRUMENT CAN SEE ITS SUBJECT. --------------------------
     const base = await sample(c, timerCells, vp0);
-    const baseCam = await sample(c, camCells, vp0);
-    check('1a', 'both bands\' cells are on screen and are not blank [anti-vacuous precondition]',
+    const baseCam = camera ? await sample(c, camCells, vp0) : { cellsRead: 0, nonzeroBytes: 0 };
+    check('1a', `${camera ? 'both bands\'' : "the band's"} cells are on screen and are not blank `
+      + '[anti-vacuous precondition]',
       base.cellsRead === timerCells.length && base.nonzeroBytes > 0
-      && baseCam.cellsRead === camCells.length && baseCam.nonzeroBytes > 0,
-      `timer: ${base.cellsRead}/${timerCells.length} cells, ${base.nonzeroBytes} nonzero bytes; `
-      + `camera: ${baseCam.cellsRead}/${camCells.length} cells, ${baseCam.nonzeroBytes} nonzero`);
-    if (base.cellsRead === 0 || baseCam.cellsRead === 0) {
+      && (!camera || (baseCam.cellsRead === camCells.length && baseCam.nonzeroBytes > 0)),
+      `timer: ${base.cellsRead}/${timerCells.length} cells, ${base.nonzeroBytes} nonzero bytes`
+      + (camera ? `; camera: ${baseCam.cellsRead}/${camCells.length} cells, `
+        + `${baseCam.nonzeroBytes} nonzero` : '; no camera band on this target'));
+    if (base.cellsRead === 0 || (camera && baseCam.cellsRead === 0)) {
       throw new Error('the probe read no pixels — every row below would be vacuous');
     }
 
@@ -410,8 +447,12 @@ async function main() {
       labelBits.map((b) => `${bodyText.includes(b) ? 'ok' : 'MISSING'}: ${b}`).join(' | '));
     // Both bands report themselves as previewing, with their resolved driver and
     // rate — the readout an author judges rate_shift against.
-    check('1c', 'the note reports both bands with their resolved driver and cell count',
-      /Band 0 .* timer/.test(bodyText) && /Band 1 .* camera_x/.test(bodyText)
+    // THE LICENCE, and on the live target this is the whole acceptance test:
+    // before d-12 the note said "Not previewing" here, because the band named
+    // slots in a blob the canvas was not painting.
+    check('1c', `the note reports ${camera ? 'both bands' : 'the band'} as PREVIEWING, with the `
+      + 'resolved driver and cell count — no refusal',
+      /Band 0 .* timer/.test(bodyText) && (!camera || /Band 1 .* camera_x/.test(bodyText))
       && /background cells/.test(bodyText) && !/Not previewing/.test(bodyText),
       bodyText.slice(bodyText.indexOf('Band preview'), bodyText.indexOf('Band preview') + 320));
 
@@ -442,7 +483,7 @@ async function main() {
     const camHashes = new Set();
     for (let i = 0; i < 24; i++) {
       hashes.add((await sample(c, timerCells, vp0)).hash);
-      camHashes.add((await sample(c, camCells, vp0)).hash);
+      if (camera) camHashes.add((await sample(c, camCells, vp0)).hash);
       await sleep((WINDOW_S * 1000) / 24);
     }
     const onB = await snap(c);
@@ -461,16 +502,28 @@ async function main() {
     check('3c', 'the TIMER band\'s own cells change on the wall clock',
       hashes.size > 1, `${hashes.size} distinct pixel states over ${secs}s`);
     // THE RULING'S SUBSTANCE, and the row most likely to be got backwards.
-    check('3d', 'the CAMERA band\'s cells do NOT change on the wall clock — same window, '
-      + 'same canvas, same instrument',
-      camHashes.size === 1,
-      `${camHashes.size} distinct pixel states (must be 1) while the timer band showed `
-      + `${hashes.size} in the same window`);
+    if (camera) {
+      check('3d', 'the CAMERA band\'s cells do NOT change on the wall clock — same window, '
+        + 'same canvas, same instrument',
+        camHashes.size === 1,
+        `${camHashes.size} distinct pixel states (must be 1) while the timer band showed `
+        + `${hashes.size} in the same window`);
+    } else {
+      note('3d', 'the driver contrast could not be measured on this target',
+        'the live document carries one band and it is a timer band, so there is no camera band '
+        + 'to hold still beside it. The fixture run is what measures this row — it promotes a '
+        + 'second, camera_x band precisely so the contrast exists.');
+    }
     console.log(`        rAF scheduling with playback ON: ${rafRate.toFixed(1)}/s `
       + `(idle baseline ${idleRafRate.toFixed(1)}/s)`);
     await shot(c, '2-playing');
 
     // ---- 4. THE CAMERA BAND MOVES ON THE PAN, AT ITS OWN RATE. ----------
+    if (!camera) {
+      note('4a-4d', 'the pan rows could not be measured on this target',
+        'they are all about a camera_x band, and the live document has none. The fixture run '
+        + 'measures them; nothing about them is target-specific, so they are not re-derived here.');
+    } else {
     const at = async (dx, dy) => {
       const vp = { x: vp0.x + dx, y: vp0.y + dy, zoom: vp0.zoom };
       await setView(c, vp);
@@ -493,6 +546,7 @@ async function main() {
       + 'returns the SAME phase', hWrap === h0, `h(0)=${h0} h(${camPeriodPx})=${hWrap}`);
     check('4d', 'panning VERTICALLY does not move a camera_x band — a driver names a scalar '
       + 'source, not an axis', hVert === h0, `h(0)=${h0} h(vertical)=${hVert}`);
+    }
 
     // ---- 5. THE CLOCK IS REALLY CANCELLED. ------------------------------
     const offClick = await c.evalExpr(clickByText('/^Playing$/'));

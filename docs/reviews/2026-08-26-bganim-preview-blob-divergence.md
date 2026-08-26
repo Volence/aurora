@@ -6,6 +6,33 @@ was commissioned on the premise that the band's background is already on screen.
 by accident. Recorded here because the preview parcel is built around the guard
 that closes it, and because the sync itself is somebody else's parcel.*
 
+> ## ✅ CLOSED 2026-08-26 by owner decision **d-12** — "the game's copy wins"
+>
+> The divergence below is **historical from this date**. The map canvas now
+> resolves `project.bgOverride.doc` FIRST on the act aeon's injector bakes it into,
+> so the viewport's blob and the band's blob are the same blob and the licence
+> check passes by construction. Delivered on `feat/canvas-paints-rom-background`.
+>
+> **What changed, and what did not.** The divergence was never a bug in either
+> half; it was that nothing joined them, and the join needed a RULING about which
+> copy is the truth. §5's second option ("teach the viewport to paint the override")
+> is the one the owner took. §2's table is still an accurate description of the two
+> files — what is stale is only the last row: `resolveDisplayedBg` in
+> `renderer/providers/bganim-preview-aeon.ts` now reads the override, and it is the
+> ONE resolver, shared by the viewport, the preview and the paint gesture.
+>
+> **The part this document did not anticipate**, and the reason the fix is bigger
+> than a display change: the BG **paint gesture** writes whatever the canvas
+> resolved. Changing the display alone would have made a stroke paint the override
+> on screen while committing its undo step against the BG-library entry — an edit
+> that appears, saves, and never reaches the game. Painting was retargeted in the
+> same parcel (`set-bg-override-layout`), and a tile the ROM-bound blob does not
+> have is refused out loud rather than silently dropped.
+>
+> **The binding is derived, not spelled**, and one seam is left open for aeon: see
+> `docs/decisions.jsonl` d-12 and the `outputDir` entry in
+> `src/core/formats/bg-override/bganim-consumer-contract.json`.
+
 ## 1. The premise the parcel was written on
 
 > "The background IS on screen already. `MapViewport.tsx` resolves and draws Plane B

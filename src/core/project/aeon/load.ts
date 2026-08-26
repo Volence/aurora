@@ -411,6 +411,10 @@ async function loadFullProject(
         // act_parallax_config stands" — so they collapse to null here rather
         // than reaching the model as null vs undefined.
         sceneRef: actConfig.sceneRef ?? null,
+        // project.json's `stripPath` verbatim (absent -> null). Carried onto the
+        // model because it is what BINDS the per-game BG override document to an
+        // act — see Act.stripPath and bg-override-binding.ts.
+        stripPath: actConfig.stripPath ?? null,
       });
     }
 

@@ -210,6 +210,21 @@ export function bgOverridePath(dataRoot: string): string {
   return `${dataRoot}editor_bg_override.json`;
 }
 
+/**
+ * The directory the consumer hardcodes as its OUTPUT — and therefore the whole
+ * of the answer to "which act does this per-game document govern?".
+ *
+ * `inject_editor_bg.py` reads one input file and writes `zone_bg.bin`,
+ * `bg_tiles.bin`, `bg_anim.emp` and `bg_anim_banks.bin` into this one directory.
+ * Nothing inside the document names an act, so the act it governs is the act
+ * whose generated data lives here — matched against project.json's per-act
+ * `stripPath` by `actBindsBgOverride` (bg-override-binding.ts).
+ *
+ * Project-root-relative, because `regenerate-level.sh` invokes the tool with the
+ * repo root as cwd. See the contract entry's `authorities` for both citations.
+ */
+export const BG_OVERRIDE_CONSUMER_OUT_DIR = at(['outputDir', 'value']) as string;
+
 // ---------------------------------------------------------------------------
 // Model
 //
