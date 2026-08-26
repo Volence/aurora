@@ -88,6 +88,15 @@ describe('effects scene golden (AURORA_EFFECTS_SCHEMA.md §8)', () => {
     expect(serializeEffectsScene(parseEffectsScene(GOLDEN, 'canopy_dusk'))).toBe(GOLDEN);
   });
 
+  it('ends in exactly one LF after the closing brace (empyrean e1ebd20 §8)', () => {
+    expect(GOLDEN.endsWith('}\n')).toBe(true);
+    expect(GOLDEN.endsWith('\n\n')).toBe(false);
+    // A file saved with TWO terminators is not canonical and does not survive:
+    // the round trip lands on exactly one.
+    const doubled = GOLDEN + '\n';
+    expect(serializeEffectsScene(parseEffectsScene(doubled, 'canopy_dusk'))).toBe(GOLDEN);
+  });
+
   /**
    * The fixture is itself in §5 canonical order, checked against the DOCUMENT
    * rather than against the serializer — so the round-trip above cannot pass by
