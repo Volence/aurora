@@ -86,3 +86,41 @@ Probe: `scratchpad/bganim-rom-animation-probe.py`.
 - The 16 tool-suite failures seen on the first canonical attempt were the isolated
   checkout's missing sibling donors (`skdisasm`, paired `sigil`), not aeon breakage.
 - VRAM reads carry the server's own `bypassesVdpPort` caveat (debug read, not the VDP port path).
+
+---
+
+## Addendum — the UI-AUTHORED band, and a defect in this document's own probe
+
+**The handover band (authored through Aurora's real UI, merged at `54a7b2c`) animates too.**
+Rebuilt the isolated checkout with `test/fixtures/bg-override/editor_bg_override.handover-band.json`
+in place: `verify_level_bin: OK`, `s4.bin` crc **7e889eca**, banks blob 8,192 B.
+
+```
+[control] 40/40 STATIC tiles found in VRAM under hi_lo packing
+[control] first static tile at VRAM 0x8400; band prefix expected at 0x8000 (consistent)
+[model]   8 banks x 8 rotations = 64 combos -> 64 distinct images
+28 samples, unmatched 0 | banks visited [0..7] | rotations visited [0, 6, 7]
+[verdict] BAND ANIMATES — every sample is art this editor authored
+```
+
+So the chain is closed end to end: real UI -> real Ctrl+S -> aeon's injector -> built ROM
+-> moving on screen. The UI-saved document is **byte-identical** to what the model path
+emits for the same spec (110,660 B, sha256 `9d05f512…`), verified with an independently
+written emitter — which answers ROADMAP row 29 by hash rather than by agreeing numbers.
+
+**⚠ The probe first committed with this document was the NAIVE bank-only version** — the
+very trap described in section "Does it ANIMATE" above. Re-run against the handover band it
+reported *"banks found NOWHERE"* and exited claiming the art was not in VRAM: **a false
+negative, shipped next to a write-up describing the rigorous method.** A reader would have
+concluded the band was broken. `scratchpad/bganim-rom-animation-probe.py` now implements
+what was actually used — the control, the 64-pair model, and an explicit vacuity refusal if
+the pair images ever collide. Recorded rather than quietly replaced, because the failure is
+the interesting part: **the write-up was right and the artifact beside it was wrong**, and
+nothing about the pairing looked suspicious.
+
+**Ratified deviation:** `rate_shift: 3` was briefed and is **unreachable through the UI** —
+the band panel builds its spec from `cols`/`rows`/`phaseFill`/`driver` only. The agent left
+the key out rather than hand-editing the JSON, which would have falsified "authored through
+the real UI". aeon's default (2) applies, so the band steps every 4 ticks instead of 8 —
+faster than briefed, which is not a downgrade for a first watchable band. The missing panel
+control is booked as an open item.
