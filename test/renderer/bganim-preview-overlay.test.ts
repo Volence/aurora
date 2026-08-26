@@ -166,15 +166,14 @@ describe('BgAnimPreviewRenderer.prepare — the licence check and the cell scan'
       bands: [timer], nametable: nametable([0, 1, 2, 3]),
       widthTiles: 4, heightTiles: 1, blobTiles: divergedBlob(), paletteLines: palette(),
     }, 'sig-5');
-    const inputs = { cameraXPx: 0, cameraYPx: 0, gameFrame: 0 };
-    expect(r.hasTimerBand(inputs)).toBe(false);
+    expect(r.timerBandCount()).toBe(0);
 
     const ok = new BgAnimPreviewRenderer();
     ok.prepare({
       bands: [timer], nametable: nametable([0, 1, 2, 3]),
       widthTiles: 4, heightTiles: 1, blobTiles: asTiles(timer.phases[0]), paletteLines: palette(),
     }, 'sig-6');
-    expect(ok.hasTimerBand(inputs)).toBe(true);
+    expect(ok.timerBandCount()).toBe(1);
     // ...and a camera band, licensed and drawn, still needs NO clock.
     const cam = new BgAnimPreviewRenderer();
     cam.prepare({
@@ -182,7 +181,7 @@ describe('BgAnimPreviewRenderer.prepare — the licence check and the cell scan'
       widthTiles: 4, heightTiles: 1, blobTiles: coherentBlob(), paletteLines: palette(),
     }, 'sig-7');
     expect(cam.hasDrawableCells()).toBe(true);
-    expect(cam.hasTimerBand(inputs)).toBe(false);
+    expect(cam.timerBandCount()).toBe(0);
   });
 
   it('re-prepares on a new signature and no-ops on the same one', () => {

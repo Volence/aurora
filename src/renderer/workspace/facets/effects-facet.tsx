@@ -6,10 +6,21 @@
 // belongs to in front of them. That is the whole reason this is `mapFacet` and
 // not a canvas-swapping facet like `art`.
 //
-// IT SHOWS NOTHING THE SCENE DOES, deliberately. Previewing scene output is its
-// own parcel, governed by docs/reviews/2026-08-22-preview-posture-ruling.md, and
-// wave 1 adds no clock, no overlay pass and no rAF anywhere near this surface —
-// the MapViewport measurement's zero-idle-repaint property is left intact.
+// IT SHOWS WHAT THE BANDS DO, AND STILL NOTHING THE SCENES DO. Item 42 landed
+// the BgAnim half of the preview parcel governed by
+// docs/reviews/2026-08-22-preview-posture-ruling.md: `MapViewport` now blits the
+// current phase of each licensed band over Plane B, and `BgAnimPreviewNote`
+// below carries the control and the honesty label. The SCENE half (§2 scroll
+// factors, SceneDeform, vsplit) is still unpreviewed and is wave 2.
+//
+// THE ZERO-IDLE-REPAINT PROPERTY IS CONDITIONED, NOT SPENT. The clock is local
+// to `MapViewport`, mounts only while playback is on AND a drawable band reads
+// it, and repaints on a step change rather than on a tick. With the toggle off —
+// the default — there is no rAF at all and the measured idle cost is unchanged.
+// The one driver that reads a clock is `timer`; `camera_x`/`camera_y` bands
+// preview clocklessly out of the draw pass that already repaints on a pan,
+// because their phase is a function of the camera and previewing them on a wall
+// clock would teach a driver model the engine does not have.
 //
 // THE CAPABILITY IS `parallax`, which already existed in FACET_CAPABILITIES
 // (project/adapter.ts) as one of three declared-ahead-of-time keys, exactly so a
@@ -23,6 +34,7 @@ import React from 'react';
 import AeonPropertiesPanel from '../../components/AeonPropertiesPanel';
 import EffectsScenePanel from '../../components/effects/EffectsScenePanel';
 import BgAnimBandPanel from '../../components/effects/BgAnimBandPanel';
+import BgAnimPreviewNote from '../../components/effects/BgAnimPreviewNote';
 import { Panel, CollapsibleSection } from '../../components/ui';
 import { mapFacet, type FacetModule } from '../facet-registry';
 
@@ -37,6 +49,12 @@ function EffectsPanels() {
           would make an author switch facets to answer "what does this background
           do". Wave-1 surface 4, part 3 (ROADMAP item 28). */}
       <BgAnimBandPanel />
+      {/* The preview's control and its label, directly under the editor whose
+          output it previews. NOT on the canvas: what has to be said is per
+          band ("this one previews, that one does not and here is why"), which
+          is a list, and a badge painted over the map would be chrome every
+          aeon author pays for. ROADMAP item 42. */}
+      <BgAnimPreviewNote />
       {/* Subscriptions live in the AeonPropertiesPanel leaf, not this column —
           the reason its own docblock gives. */}
       <CollapsibleSection id="aeon.props" title="Properties" defaultCollapsed>

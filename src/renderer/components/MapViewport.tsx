@@ -21,11 +21,13 @@ import { buildStampCommand } from '../../core/editing/map-stamp';
 import { snapMarquee, copyFromSection, buildPasteCommand } from '../../core/editing/map-clipboard';
 import type { PasteLayers } from '../../core/editing/map-clipboard';
 import { SectionRenderer } from '../canvas/SectionRenderer';
+import { bandPreview, refreshBandPreview, resolveDisplayedBg } from '../providers/bganim-preview-aeon';
+import { editorPanToCameraPx } from '../../core/formats/bg-override/bganim-preview';
 import { OverlayRenderer } from '../canvas/OverlayRenderer';
 import type { SectionOverlayInfo } from '../canvas/OverlayRenderer';
 import { SECTION_TILES_WIDE, SECTION_TILES_HIGH, SECTION_PIXEL_SIZE, unpackNametableWord } from '../../core/model/s4-types';
 import { BG_WIDTH } from '../../core/formats/bg-tiles';
-import type { Section, ObjectPlacement, RingPlacement, Act, Tile, BgLibraryEntry } from '../../core/model/s4-types';
+import type { Section, ObjectPlacement, RingPlacement } from '../../core/model/s4-types';
 import { T } from './ui';
 import CollisionLegend from './CollisionLegend';
 import {
@@ -55,26 +57,6 @@ const COLLISION_PREVIEW_OPTS: ShapeDrawOpts = {
   showNeedle: true,
 };
 const overlayRenderer = new OverlayRenderer();
-
-/**
- * Resolve which background (Plane B) the viewport should display for the
- * ACTIVE section: its bgLayoutRef names a BG-library entry, null (or a
- * dangling id) falls back to the act default. Returns null when no BG exists
- * at all.
- */
-function resolveActiveBg(
-  act: Act,
-  bgLibrary: BgLibraryEntry[],
-  activeSectionIndex: number,
-): { layout: Uint16Array; tiles: Tile[] } | null {
-  const ref = act.sections[activeSectionIndex]?.bgLayoutRef ?? null;
-  if (ref !== null) {
-    const entry = bgLibrary.find(b => b.id === ref);
-    if (entry) return { layout: entry.layout, tiles: entry.tiles };
-  }
-  if (act.bgLayout && act.bgTiles) return { layout: act.bgLayout, tiles: act.bgTiles };
-  return null;
-}
 
 interface CtxMenuState {
   x: number;             // container-local px
@@ -170,6 +152,31 @@ export default function MapViewport() {
   const activeSectionIndex = useEditorStore((s) => s.activeSectionIndex);
   const editingLayer = useEditorStore((s) => s.editingLayer);
   const selection = useEditorStore((s) => s.selection);
+
+  // ---- BgAnim band preview state (ROADMAP item 42) -------------------------
+  // The game frame the preview is showing. Zero (level init) whenever playback
+  // is off, so the static view IS the band's rest state — the same picture the
+  // author sees with the toggle down, and the same one `phases[0]` bakes.
+  const bandFrameRef = useRef(0);
+  // The step key the last repaint drew at, so the clock repaints on a STEP
+  // change rather than on a tick.
+  const bandKeyRef = useRef('');
+  // How many DRAWABLE bands read the clock. STATE, not a ref, because the clock
+  // effect mounts on it: a band appearing (or being licensed by a background
+  // change) has to start the clock, and a ref would not re-run the effect.
+  const [timerBands, setTimerBands] = useState(0);
+  // The render-time edit clock the preview's prepare signature is keyed on.
+  // Held in a ref because `redraw` also runs from the clock's rAF — outside a
+  // render — and must see the last rendered value rather than close over one
+  // set forever.
+  const previewVersionRef = useRef('');
+  previewVersionRef.current = `${historyVersion}:${liveEditVersion}`;
+
+  /** Re-derive the preview and keep the clock's mount condition in step. */
+  const syncBandPreview = useCallback(() => {
+    const snapshot = refreshBandPreview(previewVersionRef.current);
+    setTimerBands((prev) => (prev === snapshot.timerBands ? prev : snapshot.timerBands));
+  }, []);
 
   // Collision paint ghost: on a separate canvas layered over the map, draw a
   // translucent preview of the selected shape under the cursor plus an outline of
@@ -379,7 +386,7 @@ export default function MapViewport() {
     if (!zone || !act) return;
 
     sectionRenderer.clearBg();
-    const resolved = resolveActiveBg(
+    const resolved = resolveDisplayedBg(
       act,
       state.project?.bgLibrary ?? [],
       useEditorStore.getState().activeSectionIndex,
@@ -524,8 +531,23 @@ export default function MapViewport() {
     return () => setCommandInvalidationListener(null);
   }, [reloadAllSections, rebuildTileArt, reloadBg]);
 
-  // Re-render when anything visual changes
-  useEffect(() => {
+  /**
+   * Paint the map canvas from CURRENT store state. ONE draw body, called from
+   * three places: the visual-change effect below, the ResizeObserver, and the
+   * BgAnim playback clock.
+   *
+   * DELIBERATELY DEPENDENCY-FREE. Everything it needs — viewport, overlays,
+   * layer, active section, project — is read through `getState()` at call time,
+   * so the callback identity never changes and the clock cannot capture a stale
+   * one. That is also why the resize path can share it: it had its own
+   * near-copy of this body, which had already drifted (it passed `undefined`
+   * for the object sprites, so a window resize silently downgraded every object
+   * preview to a box until the next real repaint).
+   *
+   * `canvas.width = rect.width` stays the first thing it does: it is both the
+   * clear and the marker the CDP repaint harnesses count.
+   */
+  const redraw = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
@@ -546,18 +568,39 @@ export default function MapViewport() {
       return;
     }
 
-    const viewport = { x: vpX, y: vpY, width: canvas.width, height: canvas.height, zoom };
+    const view = useViewStore.getState();
+    const ed = useEditorStore.getState();
+    const overlayOpts = view.overlays;
+    const viewport = { x: view.vpX, y: view.vpY, width: canvas.width, height: canvas.height, zoom: view.zoom };
 
-    if (editingLayer === 'bg') {
+    syncBandPreview();
+
+    // The band overlay goes over Plane B and UNDER the foreground, because that
+    // is where the art it replaces lives. Drawing it after the FG composite
+    // would put background tiles on top of the level.
+    const drawBands = () => {
+      if (!overlayOpts.playAnimatedArt) return;
+      bandPreview.draw(ctx, viewport, {
+        cameraXPx: editorPanToCameraPx(view.vpX),
+        cameraYPx: editorPanToCameraPx(view.vpY),
+        gameFrame: bandFrameRef.current,
+      });
+    };
+
+    if (ed.editingLayer === 'bg') {
       sectionRenderer.renderBg(ctx, viewport);
+      drawBands();
     } else {
       // showBgPlane: paint Plane B first, then composite the foreground over
       // it (empty FG words are transparent in the section canvases). Only
       // composite when a BG is actually loaded — otherwise render() must
       // clear the canvas itself or stale frames ghost through.
-      const bgVisible = overlays.showBgPlane && sectionRenderer.hasBg();
-      if (bgVisible) sectionRenderer.renderBg(ctx, viewport);
-      sectionRenderer.render(ctx, viewport, activeSectionIndex, !bgVisible);
+      const bgVisible = overlayOpts.showBgPlane && sectionRenderer.hasBg();
+      if (bgVisible) {
+        sectionRenderer.renderBg(ctx, viewport);
+        drawBands();
+      }
+      sectionRenderer.render(ctx, viewport, ed.activeSectionIndex, !bgVisible);
 
       const sectionInfos: SectionOverlayInfo[] = [];
       for (let i = 0; i < act.sections.length; i++) {
@@ -567,55 +610,83 @@ export default function MapViewport() {
         sectionInfos.push({ section, offsetX: offset.x, offsetY: offset.y });
       }
 
-      overlayRenderer.render(ctx, sectionInfos, overlays, viewport, useProjectStore.getState().objectSprites, useProjectStore.getState().collisionProfiles);
+      overlayRenderer.render(ctx, sectionInfos, overlayOpts, viewport, state.objectSprites, state.collisionProfiles);
     }
     // Realign the collision paint ghost after any pan/zoom/version change.
     drawCollisionPreview();
-  }, [vpX, vpY, zoom, overlays, project, currentZoneId, currentActId, activeSectionIndex, editingLayer, historyVersion, liveEditVersion, selection, objectSprites, collisionProfiles, drawCollisionPreview]);
+  }, [drawCollisionPreview, syncBandPreview]);
 
-  // Handle resize
+  // Re-render when anything visual changes
+  useEffect(() => {
+    redraw();
+  }, [vpX, vpY, zoom, overlays, project, currentZoneId, currentActId, activeSectionIndex, editingLayer, historyVersion, liveEditVersion, selection, objectSprites, collisionProfiles, redraw]);
+
+  // Handle resize. The observer repaints through the SAME `redraw` the visual
+  // effect uses — it used to carry its own copy of the draw body, which had
+  // already drifted from it (no object sprites, and now no band overlay). One
+  // body means a resize cannot show a different picture from a repaint.
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
-
-    const observer = new ResizeObserver(() => {
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-      const r = container.getBoundingClientRect();
-      canvas.width = r.width;
-      canvas.height = r.height;
-
-      const state = useProjectStore.getState();
-      const act = getCurrentAct(state);
-      if (!act) return;
-
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
-      ctx.imageSmoothingEnabled = false;
-
-      const viewport = { x: vpX, y: vpY, width: canvas.width, height: canvas.height, zoom };
-      const layer = useEditorStore.getState().editingLayer;
-
-      if (layer === 'bg') {
-        sectionRenderer.renderBg(ctx, viewport);
-      } else {
-        const bgVisible = overlays.showBgPlane && sectionRenderer.hasBg();
-        if (bgVisible) sectionRenderer.renderBg(ctx, viewport);
-        sectionRenderer.render(ctx, viewport, useEditorStore.getState().activeSectionIndex, !bgVisible);
-        const sectionInfos: SectionOverlayInfo[] = [];
-        for (let i = 0; i < act.sections.length; i++) {
-          const section = act.sections[i];
-          if (!section) continue;
-          const offset = sectionRenderer.sectionWorldOffset(i);
-          sectionInfos.push({ section, offsetX: offset.x, offsetY: offset.y });
-        }
-        overlayRenderer.render(ctx, sectionInfos, overlays, viewport, undefined, useProjectStore.getState().collisionProfiles);
-      }
-    });
-
+    const observer = new ResizeObserver(() => redraw());
     observer.observe(container);
     return () => observer.disconnect();
-  }, [vpX, vpY, zoom, overlays, project, currentZoneId, currentActId, editingLayer, historyVersion, liveEditVersion]);
+  }, [redraw]);
+
+  // ---- BgAnim band playback (ROADMAP item 42) ------------------------------
+  // The clock, and it is DELIBERATELY SMALL. Classic's shape
+  // (ClassicLevelViewport's animated-art clock) copied LOCALLY, not hoisted:
+  // there is no shared play-clock service in this tree and the preview-posture
+  // ruling §2 Q3 says not to grow one for wave 1.
+  //
+  // WHAT IT REFUSES TO DO IS THE POINT:
+  //
+  //  • It returns BEFORE scheduling anything unless playback is on AND a
+  //    drawable band actually reads the clock. The viewport's measured
+  //    zero-idle-repaint property is CONDITIONED by this parcel, not spent:
+  //    with the toggle off, no rAF exists at all.
+  //  • `camera_x` / `camera_y` bands never reach here. Their phase is a pure
+  //    function of the pan, and the draw effect already repaints on a pan —
+  //    `timerBandCount` is the count of DRAWABLE TIMER bands for exactly that
+  //    reason. A camera band scrolling on a wall clock would be a preview of a
+  //    driver model the engine does not have.
+  //  • It repaints on the STEP KEY, not on the tick. At the default rate_shift
+  //    that is ~15 repaints/s against 60 ticks.
+  //  • `t0` is taken at toggle-on, so playback is deterministic from game-frame
+  //    0 every time — the state the static view already shows.
+  useEffect(() => {
+    bandFrameRef.current = 0;
+    bandKeyRef.current = '';
+    if (!overlays.playAnimatedArt || timerBands === 0) return;
+
+    const t0 = performance.now();
+    let handle = 0;
+    const tick = () => {
+      const t = Math.floor(((performance.now() - t0) * 60) / 1000);
+      bandFrameRef.current = t;
+      const view = useViewStore.getState();
+      const key = bandPreview.stepKey({
+        cameraXPx: editorPanToCameraPx(view.vpX),
+        cameraYPx: editorPanToCameraPx(view.vpY),
+        gameFrame: t,
+      });
+      if (key !== bandKeyRef.current) {
+        bandKeyRef.current = key;
+        redraw();
+      }
+      handle = requestAnimationFrame(tick);
+    };
+    handle = requestAnimationFrame(tick);
+    return () => {
+      cancelAnimationFrame(handle);
+      // Toggle-off restores the static view with no explicit repaint of its
+      // own: flipping the overlay key re-renders, the visual effect repaints,
+      // and the draw pass simply skips the overlay. Nothing was ever written to
+      // the BG canvas, the blob, or the document.
+      bandFrameRef.current = 0;
+      bandKeyRef.current = '';
+    };
+  }, [overlays.playAnimatedArt, timerBands, redraw]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -886,7 +957,7 @@ export default function MapViewport() {
     // section displays a library BG, this edits that library entry in place
     // (additive store state, like chunk edits in Art mode).
     const activeSection = useEditorStore.getState().activeSectionIndex;
-    const resolved = resolveActiveBg(act, state.project?.bgLibrary ?? [], activeSection);
+    const resolved = resolveDisplayedBg(act, state.project?.bgLibrary ?? [], activeSection);
     if (!resolved) return;
 
     const tile = worldToBgTile(worldX, worldY);

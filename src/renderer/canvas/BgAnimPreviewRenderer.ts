@@ -38,7 +38,7 @@ import { unpackNametableWord } from '../../core/model/s4-types';
 import { TileRenderer } from './TileRenderer';
 import { composeBandOverlay, type BandOverlayCell, type BandOverlayPhase } from './bganim-compose';
 import {
-  bandPreviewStates, bandRestArtMismatch, bandStepKey,
+  bandIsTimeVarying, bandPreviewStates, bandRestArtMismatch, bandStepKey,
   type BandDriverInputs, type BandPreviewState,
 } from '../../core/formats/bg-override/bganim-preview';
 import { TILE_PIXELS, type BgOverrideBand } from '../../core/formats/bg-override/bg-override';
@@ -90,6 +90,8 @@ function artKey(band: number, bank: number, slot: number, palette: number): numb
 
 export class BgAnimPreviewRenderer {
   private prepared: PreparedBand[] = [];
+  /** Drawable bands whose driver is `timer`. The clock mounts on this. */
+  private timerBands = 0;
   private cells: BandOverlayCell[] = [];
   private verdicts: BandPreviewVerdict[] = [];
   private paletteLines: readonly PaletteLine[] = [];
@@ -123,6 +125,7 @@ export class BgAnimPreviewRenderer {
     this.widthTiles = source.widthTiles;
     this.heightTiles = source.heightTiles;
     this.prepared = [];
+    this.timerBands = 0;
     this.cells = [];
     this.verdicts = [];
     this.art.clear();
@@ -145,6 +148,7 @@ export class BgAnimPreviewRenderer {
       });
       if (!refusal) {
         this.prepared.push({ band });
+        if (bandIsTimeVarying(band)) this.timerBands++;
         for (let s = 0; s < n; s++) drawable.set(slotBase + s, { band: index, slotBase });
       }
       slotBase += n;
@@ -201,18 +205,19 @@ export class BgAnimPreviewRenderer {
   }
 
   /**
-   * Does any drawable band's phase move with the wall clock?
+   * How many DRAWABLE bands move with the wall clock. The gate on the whole
+   * clock, and deliberately a prepare-time scalar rather than a per-frame
+   * question: the viewport mounts its rAF on this value, so it must not change
+   * on a pan or a tick.
    *
-   * The gate on the whole clock. `camera_x`/`camera_y` bands are functions of
-   * the pan and are clockless BY CONSTRUCTION — the draw effect already repaints
-   * on a pan, so their phase is a pure function of state that pass already has.
-   * Starting a rAF for them would spend the viewport's zero-idle-repaint property
-   * to animate something that must not animate on time, and would teach the
-   * author that `camera_y` means vertical motion. It does not.
+   * `camera_x`/`camera_y` bands are clockless BY CONSTRUCTION — the draw effect
+   * already repaints on a pan, so their phase is a pure function of state that
+   * pass already holds. Starting a rAF for them would spend the viewport's
+   * zero-idle-repaint property to animate something that must not animate on
+   * time, and would teach the author that `camera_y` means vertical motion. It
+   * does not: a driver names a SCALAR SOURCE, and every band moves horizontally.
    */
-  hasTimerBand(inputs: BandDriverInputs): boolean {
-    return this.states(inputs).some((s) => s.timeVarying);
-  }
+  timerBandCount(): number { return this.timerBands; }
 
   /** The repaint key — what must change before a repaint is worth doing. */
   stepKey(inputs: BandDriverInputs): string { return bandStepKey(this.states(inputs)); }
