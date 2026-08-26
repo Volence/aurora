@@ -39,6 +39,11 @@ export interface OverlayOptions {
    *  Overlay-only playback in both: never `doc.tiles`, never the object list,
    *  never the BG override document. */
   playAnimatedArt: boolean;
+  /** The 320x224 screen frame (triage 2026-08-26 row G): a game-screen-sized
+   *  rectangle pinned at `screenFrame` on the map, dragged by its edge. Size
+   *  comes from core/model/screen.ts (mirrors aeon's SCREEN_WIDTH/HEIGHT).
+   *  A reference the author asks for, so OFF by default like the lenses. */
+  showScreenFrame: boolean;
 }
 
 /**
@@ -66,6 +71,9 @@ export const OVERLAY_KEYS_BY_ENGINE: Record<OpenEngine, readonly (keyof OverlayO
     // engine-scoped exactly so this could happen without new mechanism — the
     // ruling rejected inventing a panel-open coupling for the same reason.
     'playAnimatedArt',
+    // The screen frame (row G). Aeon only for now: classic's viewport is a
+    // separate draw path (classic-surface) that does not read this key yet.
+    'showScreenFrame',
   ],
 };
 
@@ -74,6 +82,10 @@ interface ViewState {
   vpY: number;
   zoom: number;
   overlays: OverlayOptions;
+  /** The screen frame's top-left, in WORLD px. Session-lived like the overlay
+   *  toggles: it is a reference the author placed, not document state, so it
+   *  does not enter the undo stack or the project file. */
+  screenFrame: { x: number; y: number };
 
   pan: (dx: number, dy: number) => void;
   setZoom: (zoom: number, centerX?: number, centerY?: number) => void;
@@ -83,6 +95,8 @@ interface ViewState {
   setViewport: (x: number, y: number, zoom: number) => void;
   toggleOverlay: (key: keyof OverlayOptions) => void;
   setOverlay: (key: keyof OverlayOptions, value: boolean) => void;
+  /** Pin the screen frame at a world point (clamped to the origin, whole px). */
+  setScreenFrame: (x: number, y: number) => void;
 }
 
 export const useViewStore = create<ViewState>((set) => ({
@@ -110,7 +124,10 @@ export const useViewStore = create<ViewState>((set) => ({
     occludeSprites: true,
     // Playback is asked for, never ambient: OFF by default like the lenses.
     playAnimatedArt: false,
+    // A reference, asked for: OFF like the lenses.
+    showScreenFrame: false,
   },
+  screenFrame: { x: 0, y: 0 },
 
   pan: (dx, dy) => set((state) => ({
     vpX: Math.max(0, state.vpX - dx / state.zoom),
@@ -146,4 +163,8 @@ export const useViewStore = create<ViewState>((set) => ({
   setOverlay: (key, value) => set((state) => ({
     overlays: { ...state.overlays, [key]: value },
   })),
+
+  setScreenFrame: (x, y) => set({
+    screenFrame: { x: Math.max(0, Math.round(x)), y: Math.max(0, Math.round(y)) },
+  }),
 }));

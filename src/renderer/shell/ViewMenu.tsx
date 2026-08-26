@@ -2,6 +2,7 @@ import React from 'react';
 import { Menu, T, Icons } from '../components/ui';
 import { useViewStore, OVERLAY_KEYS_BY_ENGINE, type OverlayOptions } from '../state/viewStore';
 import { useOpenEngine } from '../state/open-project';
+import { SCREEN_WIDTH, SCREEN_HEIGHT } from '../../core/model/screen';
 
 const LABELS: Record<string, string> = {
   showBlockGrid: 'Chunk grid (128px)', showChunkGrid: 'Section grid (2048px)',
@@ -12,6 +13,9 @@ const LABELS: Record<string, string> = {
   // One toggle plays BOTH animated halves: level-art families AND the curated
   // object previews (rings spin, badniks walk) — they share one clock.
   playAnimatedArt: 'Play animations',
+  // Row G: the size the label states is core/model/screen.ts's, which mirrors
+  // aeon's SCREEN_WIDTH/HEIGHT — not typed here.
+  showScreenFrame: `Screen frame (${SCREEN_WIDTH}x${SCREEN_HEIGHT})`,
 };
 function pretty(key: string) {
   return LABELS[key] ?? key.replace('show', '').replace(/([A-Z])/g, ' $1').trim();

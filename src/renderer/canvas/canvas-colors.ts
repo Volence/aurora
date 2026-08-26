@@ -287,3 +287,24 @@ export const BAND_LENS_EDGE = 'rgba(255, 150, 220, 0.85)';
 /** Backing plate behind the caption. */
 export const BAND_LENS_LABEL_BG = 'rgba(10, 12, 18, 0.82)';
 export const BAND_LENS_LABEL_TEXT = 'rgba(255, 200, 235, 0.95)';
+
+// --- The screen frame (triage 2026-08-26 row G) ------------------------------
+//
+// ORANGE, and it is the one warm hue left. The map's other overlays own white /
+// green / yellow (grids), green / amber / blue with red ticks (collision lens),
+// violet (priority), cyan (parallax guides) and magenta (band lens). The frame
+// is a reference the author lays AGAINST those — a guide at a screen line, a
+// band's footprint against what one screen sees — so it has to stay legible
+// stacked on every one of them at once. Orange collides with none of them and
+// is the only warm, unsaturated-enough hue that does not read as an alarm.
+//
+// Same alpha and label plate as the guides, so the two reference families read
+// as one language: a line, a small label, a backing plate over the art.
+
+/** The frame's 1px outline. */
+export const SCREEN_FRAME_LINE = 'rgba(255, 170, 60, 0.85)';
+/** Hovered on an edge or being dragged. */
+export const SCREEN_FRAME_ACTIVE = 'rgba(255, 210, 120, 1)';
+/** Backing plate behind the `screen 320x224 @ x,y` label. */
+export const SCREEN_FRAME_LABEL_BG = 'rgba(10, 12, 18, 0.78)';
+export const SCREEN_FRAME_LABEL_TEXT = 'rgba(255, 220, 160, 0.95)';

@@ -42,6 +42,10 @@ import type { SectionOverlayInfo } from '../canvas/OverlayRenderer';
 import {
   drawLayerGuides, guideAtCanvasY, canvasYToWorldY, layerGuideGeometry, publishGuideReport,
 } from '../canvas/effects-guides';
+import {
+  drawScreenFrame, screenFrameEdgeAt, dragScreenFrame, publishScreenFrameReport,
+  type ScreenFrameAnchor,
+} from '../canvas/screen-frame';
 import { resolveSelectedScene, setLayerFieldCommand, clampWorldY } from '../providers/effects-aeon';
 import type { EffectsScene } from '../../core/formats/effects/scene';
 import type { FacetCapability } from '../../core/project/adapter';
@@ -302,6 +306,20 @@ export default function MapViewport() {
   const [guideHover, setGuideHover] = useState<number | null>(null);
   const guideHoverRef = useRef<number | null>(null);
   guideHoverRef.current = guideHover;
+
+  // ---- The screen frame (triage 2026-08-26 row G) --------------------------
+  // Same shape as the guide drag, for the same reasons: a REF for the drag in
+  // flight (a mousemove is not a React render; `redraw` reads it at call time
+  // and the store is written ONCE on release), STATE for the hover because it
+  // drives the container's cursor, and a render-time mirror of that state so
+  // the dependency-free `redraw` can read it.
+  const frameDrag = useRef<
+    { startAnchor: ScreenFrameAnchor; pressWorld: { x: number; y: number }; anchor: ScreenFrameAnchor } | null
+  >(null);
+  const [frameHover, setFrameHover] = useState(false);
+  const frameHoverRef = useRef(false);
+  frameHoverRef.current = frameHover;
+  const screenFrame = useViewStore((s) => s.screenFrame);
 
   const [ctxMenu, setCtxMenu] = useState<CtxMenuState | null>(null);
 
@@ -850,6 +868,21 @@ export default function MapViewport() {
     //
     // NO CLOCK. This is inside the pass that already repaints on a pan, a zoom,
     // a store change and an undo; it schedules nothing.
+    // THE SCREEN FRAME (triage 2026-08-26 row G), UNDER the lens and the guides:
+    // it is a reference, not chrome about a document, so the things that ARE
+    // about the document draw over it. In both layer branches, like them.
+    //
+    // NO CLOCK. Inside the same pass; schedules nothing. A drag in flight reads
+    // the ref, otherwise the store's pinned anchor.
+    if (overlayOpts.showScreenFrame) {
+      const fd = frameDrag.current;
+      const anchor = fd ? fd.anchor : view.screenFrame;
+      const rect = drawScreenFrame(ctx, viewport, anchor, { active: fd !== null || frameHoverRef.current });
+      publishScreenFrameReport({ active: true, anchor, rect, dragging: fd !== null });
+    } else {
+      publishScreenFrameReport({ active: false, anchor: null, rect: null, dragging: false });
+    }
+
     const lens = activeBandLens();
     if (lens && lens.range) {
       const cells = lens.coverage?.cells ?? [];
@@ -928,6 +961,9 @@ export default function MapViewport() {
     // preserved that identity would silently kill the live update, and because
     // a dependency list should name what the pass reads.
     bandLensTarget, bandCandidate,
+    // The screen frame (row G): its pinned anchor (written once per release)
+    // and the edge hover. Discrete changes, never a tick.
+    screenFrame, frameHover,
     redraw]);
 
   // Handle resize. The observer repaints through the SAME `redraw` the visual
@@ -1436,6 +1472,22 @@ export default function MapViewport() {
   }
 
   /**
+   * Release the screen frame (row G): ONE store write for the whole gesture,
+   * then a repaint off the ref and onto the store. No command — the frame is a
+   * session reference, not document state, so it is not on the undo stack.
+   */
+  function endFrameDrag(): void {
+    const fd = frameDrag.current;
+    frameDrag.current = null;
+    if (!fd) return;
+    if (fd.anchor.x !== fd.startAnchor.x || fd.anchor.y !== fd.startAnchor.y) {
+      useViewStore.getState().setScreenFrame(fd.anchor.x, fd.anchor.y);
+    } else {
+      redraw();
+    }
+  }
+
+  /**
    * Commit a band-lens MARK (ROADMAP item 43 part 2) — the click half of the
    * lens, and the "I mark somewhere" the owner asked for.
    *
@@ -1683,6 +1735,30 @@ export default function MapViewport() {
             witness: JSON.stringify(layer),
           };
           setGuideHover(idx);
+          e.preventDefault();
+          return;
+        }
+      }
+    }
+
+    // THE SCREEN FRAME'S EDGE takes the press (row G). AFTER the guides (a
+    // guide is about the document, the frame is a reference, so the guide
+    // wins where they overlap), BEFORE every tool for the guides' reason. Costs
+    // nothing while hidden: the gate is the toggle, so a hidden frame never
+    // hit-tests and cannot steal a click from a tool. EDGE only — the interior
+    // falls through to the tool exactly as if the frame were not there.
+    if (e.button === 0) {
+      const view = useViewStore.getState();
+      const rect = canvasRef.current?.getBoundingClientRect();
+      if (view.overlays.showScreenFrame && rect) {
+        const vp = { x: view.vpX, y: view.vpY, width: rect.width, height: rect.height, zoom: view.zoom };
+        if (screenFrameEdgeAt(e.clientX - rect.left, e.clientY - rect.top, view.screenFrame, vp)) {
+          frameDrag.current = {
+            startAnchor: view.screenFrame,
+            pressWorld: screenToWorld(e.clientX, e.clientY),
+            anchor: view.screenFrame,
+          };
+          setFrameHover(true);
           e.preventDefault();
           return;
         }
@@ -2005,6 +2081,18 @@ export default function MapViewport() {
       return;
     }
 
+    // The screen frame's drag (row G): the same preview-through-ref shape as
+    // the guide drag above. The store is written once, on release.
+    if (frameDrag.current) {
+      const fd = frameDrag.current;
+      const next = dragScreenFrame(fd.startAnchor, fd.pressWorld, screenToWorld(e.clientX, e.clientY));
+      if (next.x !== fd.anchor.x || next.y !== fd.anchor.y) {
+        fd.anchor = next;
+        redraw();
+      }
+      return;
+    }
+
     // Paste mode: track the hovered even-snapped footprint origin for the
     // ghost preview. Independent of the active tool — takes priority over any
     // drag state so the ghost can't get stuck showing a stale cell.
@@ -2046,6 +2134,18 @@ export default function MapViewport() {
       // over one must not either — otherwise the pan tool's grab cursor and the
       // hover bar argue with the guide the author is about to grab.
       if (next !== null) return;
+
+      // The screen frame's edge hover (row G), AFTER the guide (same order as
+      // the press), gated on the toggle so a hidden frame is never consulted.
+      // State changes only on CROSSING an edge.
+      const view = useViewStore.getState();
+      let onEdge = false;
+      if (view.overlays.showScreenFrame && rect) {
+        const vp = { x: view.vpX, y: view.vpY, width: rect.width, height: rect.height, zoom: view.zoom };
+        onEdge = screenFrameEdgeAt(e.clientX - rect.left, e.clientY - rect.top, view.screenFrame, vp);
+      }
+      if (onEdge !== frameHoverRef.current) setFrameHover(onEdge);
+      if (onEdge) return;
     }
 
     // Stamp ghost: track where the chunk would land, snapped to its own size.
@@ -2251,6 +2351,7 @@ export default function MapViewport() {
    */
   const finishGesture = useCallback(() => {
     endGuideDrag();
+    endFrameDrag();
     endBgStroke();
     endPaintStroke();
     isPaintDragging.current = false;
@@ -2441,6 +2542,7 @@ export default function MapViewport() {
   // grabs the guide rather than doing what the tool says — and the cursor is the
   // only thing on screen that says so before the author commits to the press.
   const cursor = guideHover !== null ? 'ns-resize'
+    : frameHover ? 'move'
     : tool === 'view' ? 'grab'
     : tool === 'select' ? 'default'
     : tool === 'place-object' || tool === 'place-ring' ? 'crosshair'
