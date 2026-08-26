@@ -30,6 +30,8 @@ import {
   addBandCommand, bandBudget, bandRows, demoteBandCommand,
   promoteBandCommand, removeBandCommand,
 } from '../providers/bg-anim-aeon';
+import { regenerateShiftCommand } from '../providers/bg-anim-art';
+import { makeSetBgOverrideTilesCommand } from '../../core/editing/bg-override-art';
 import { buildStampCommand } from '../../core/editing/map-stamp';
 import { ensureCollisionPlanes } from '../../core/collision/collision-cell-resolve';
 import { paintCollisionRectEntries } from '../../core/collision/collision-paint';
@@ -814,6 +816,25 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
       if (!result.ok) throw new Error(result.reason);
       executeAmbientCommand(result.command, ctx.level);
       return { removed: true, bands: bandRows(currentBgOverride()).length, budget: bandBudget(currentBgOverride()) };
+    }
+
+    case 'set-bg-override-tiles': {
+      const ctx = requireProject();
+      const doc = currentBgOverride();
+      if (!doc) throw new Error('no BG override document (data/editor_bg_override.json) is open');
+      // The builder THROWS the codec's words on a bad index/pixel — surfaced as
+      // an error, on the rule the band cases above state.
+      const cmd = makeSetBgOverrideTilesCommand(doc, req.tiles);
+      executeAmbientCommand(cmd, ctx.level);
+      return { written: cmd.tiles.map((t) => t.index), bands: bandRows(currentBgOverride()).length };
+    }
+
+    case 'regenerate-bg-anim-band-shift': {
+      const ctx = requireProject();
+      const result = regenerateShiftCommand(currentBgOverride(), req.band);
+      if (!result.ok) throw new Error(result.reason);
+      executeAmbientCommand(result.command, ctx.level);
+      return { regenerated: true, band: req.band };
     }
 
     case 'screenshot': {

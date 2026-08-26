@@ -20,6 +20,7 @@ import {
 } from '../../../core/art/pixel-ops';
 import type { PixelBuffer } from '../../../core/art/pixel-ops';
 import { tileUsageCounts } from '../../../core/art/usage';
+import { bgArtAtlas, bgArtCommitCommand } from '../../providers/bg-anim-art';
 import type { AnyCommand, SetTilesetTilesCommand } from '../../../core/editing/commands';
 import { PixelEditController } from '../../../core/art/pixel-edit-controller';
 import type { GestureResult } from '../../../core/art/pixel-edit-controller';
@@ -130,7 +131,15 @@ export default function ComposerCanvas() {
   // ---------- helpers ----------
 
   function getAtlas(): Tile[] {
-    const zone = getCurrentZone(useProjectStore.getState());
+    const state = useProjectStore.getState();
+    // A BG override document (band slot / phase bank) indexes the override's
+    // tiles, not the zone tileset — see providers/bg-anim-art.ts.
+    const target = useArtStore.getState().open?.bgOverride;
+    if (target) {
+      const bg = state.project?.bgOverride.doc ?? null;
+      return bg ? bgArtAtlas(bg, target) : [];
+    }
+    const zone = getCurrentZone(state);
     return zone?.tileset.tiles ?? [];
   }
 
@@ -202,6 +211,19 @@ export default function ComposerCanvas() {
     // Live-tile doc: the whole canvas is one shared tileset tile.
     if (o.liveTileIndex !== null) {
       commitAtlasTile(o.liveTileIndex, 0, writes);
+      return;
+    }
+
+    // BG override doc (band slot / phase bank): one override command per
+    // gesture, through the provider that knows which command a write becomes.
+    // Never doc-local — a prefix slot's phase-0 half must move with it.
+    if (o.bgOverride) {
+      const level = getActiveLevel(useProjectStore.getState());
+      const bg = useProjectStore.getState().project?.bgOverride.doc ?? null;
+      if (!level || !bg) return;
+      const cmd = bgArtCommitCommand(bg, o.bgOverride, doc, writes);
+      if (cmd) executeCommand(cmd, level);
+      useArtStore.getState().bumpDoc();
       return;
     }
 
@@ -417,8 +439,9 @@ export default function ComposerCanvas() {
         const o = useArtStore.getState().open;
         if (!o) return;
         // Live-tile docs are a single atlas tile — stamping/collision is
-        // pointless (the chunk nametable carries those). Hint once.
-        if (o.liveTileIndex !== null) {
+        // pointless (the chunk nametable carries those). Hint once. A BG
+        // override doc is the same shape: its cells ARE the band's slots.
+        if (o.liveTileIndex !== null || o.bgOverride) {
           if (!tileHintRef.current) {
             tileHintRef.current = true;
             useToastStore.getState().addToast(

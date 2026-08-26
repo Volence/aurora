@@ -274,6 +274,27 @@ export const EDITOR_METHODS: EditorMethod[] = [
     description: 'Remove a BgAnim band, deleting its slots from the tile blob. DESTRUCTIVE, unlike '
       + 'demote_bg_anim_band — refuses by default when layout cells draw the band, naming how many, '
       + 'and only blanks them when blankReferencingCells says so. One undo step.' },
+  // Band ART (parcel I). Kept to the two verbs the panel has: set tile pixels,
+  // regenerate the shifted banks. Bank-by-bank authoring stays a human door.
+  { name: 'set_bg_override_tiles', kind: 'set-bg-override-tiles', result: 'json',
+    params: {
+      tiles: z.array(z.object({
+        index: z.number().int().min(0).describe('slot in the BG override tile blob'),
+        pixels: z.array(z.number().int().min(0).max(15)).length(64)
+          .describe('64 palette indices, row-major 8x8'),
+      })).min(1),
+    },
+    description: 'Write the pixels of one or more tiles of this game\'s BG override document '
+      + '(data/editor_bg_override.json). A slot inside the animated prefix (list_bg_anim_bands '
+      + 'reports each band\'s slot range) is a band\'s phase-0 art, and the write lands in that '
+      + 'band\'s phases[0] in the same step — the injector refuses a file where the two differ. '
+      + 'A slot past the prefix touches no band. One undo step.' },
+  { name: 'regenerate_bg_anim_band_shift', kind: 'regenerate-bg-anim-band-shift', result: 'json',
+    params: { band: z.number().int().min(0).describe('index into the band list') },
+    description: 'Rebuild banks 1..7 of a BgAnim band from its CURRENT phase 0 as pre-shifted '
+      + 'phases (bank k = phase 0 scrolled k px within the band\'s pattern width — the same fill '
+      + 'as phaseFill=shift). A REGENERATE, to run after each phase-0 edit; hand-drawn banks are '
+      + 'replaced. Phase 0 is untouched. One undo step.' },
 
   { name: 'screenshot', kind: 'screenshot', result: 'image',
     params: { region: z.object({ x: z.number().int().min(0), y: z.number().int().min(0), w: z.number().int().min(1), h: z.number().int().min(1) }).optional(), showBg: z.boolean().optional().describe('render the background plane during capture') },

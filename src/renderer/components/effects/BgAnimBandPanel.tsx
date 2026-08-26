@@ -215,6 +215,15 @@ import {
 // longer calls `promoteBandCommand` / `addBandCommand` itself, so the two
 // surfaces cannot run different specs or disagree about why a chip is off.
 import { bandVerbs } from '../../providers/band-verbs';
+// Parcel I: the bank strip and its two verbs (open bank k in the Art facet;
+// Shift = regenerate banks 1..7 from phase 0), decided in one provider.
+import BandBankStrip from './BandBankStrip';
+import { openBandBankDocument, regenerateShiftCommand } from '../../providers/bg-anim-art';
+import { useArtStore } from '../../state/artStore';
+import { useSessionStore } from '../../state/sessionStore';
+import { openDocumentGuarded } from '../art/open-document';
+import { switchFacet } from '../../workspace/facet-tools';
+import { getCurrentZone } from '../../state/projectStore';
 
 /** Run a command on the focused aeon document. */
 function run(command: AnyCommand): void {
@@ -260,6 +269,8 @@ export default function BgAnimBandPanel(): React.ReactElement {
   const setCandidate = useEditorStore((s) => s.setBandCandidate);
   const lensTarget = useEditorStore((s) => s.bandLensTarget);
   const setLensTarget = useEditorStore((s) => s.setBandLensTarget);
+  // Which band bank the Art facet has open, so its thumbnail reads selected.
+  const openBgArt = useArtStore((s) => s.open?.bgOverride ?? null);
   const { cols, rows: bandRowCount, staticBase } = candidate;
   const setCols = (n: number): void => setCandidate({ cols: n });
   const setBandRowCount = (n: number): void => setCandidate({ rows: n });
@@ -461,6 +472,26 @@ export default function BgAnimBandPanel(): React.ReactElement {
                   setPendingRemoval(b.index);
                 }} />
             </Row>
+            {/* THE BANK STRIP (parcel I): phase 0..7 as thumbnails, click to
+                draw one in the Art facet; Shift regenerates 1..7 from phase 0.
+                The band object is read fresh from the document each render —
+                the writers mutate it in place, and the clock key repaints. */}
+            {doc !== null && doc.anims?.[b.index] !== undefined && (
+              <BandBankStrip
+                doc={doc}
+                band={doc.anims[b.index]}
+                bandIndex={b.index}
+                palette={getCurrentZone(useProjectStore.getState())?.palette ?? null}
+                version={`${historyVersion}:${liveEditVersion}`}
+                selectedBank={openBgArt?.kind === 'bank' && openBgArt.bandIndex === b.index
+                  ? openBgArt.bank : null}
+                openBank={(k) => {
+                  const od = openBandBankDocument(doc, b.index, k);
+                  if (!od || !openDocumentGuarded(od)) return;
+                  switchFacet(useSessionStore.getState().activeId, 'art');
+                }}
+                onShift={() => { setPendingRemoval(null); apply(regenerateShiftCommand(doc, b.index)); }} />
+            )}
             {pendingRemoval === b.index && (
               <Row style={{ marginLeft: CONTROL_INSET }}>
                 <Chip tone="warning"

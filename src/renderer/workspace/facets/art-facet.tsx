@@ -24,6 +24,7 @@ import PaletteEditor from '../../components/art/PaletteEditor';
 import ChunkLibrary from '../../components/ChunkLibrary';
 import CollisionPalette from '../../components/CollisionPalette';
 import type { FacetModule } from '../facet-registry';
+import { bgArtTargetExists } from '../../providers/bg-anim-art';
 
 function slug(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'chunk';
@@ -182,6 +183,13 @@ function ArtCanvas() {
       useToastStore.getState().addToast('Tile no longer exists (undone) — document closed', 'info');
       return;
     }
+    // A BG override document can lose its target the same way: an undone
+    // band insert takes the bank with it; an undone add shrinks the blob.
+    if (o.bgOverride && !bgArtTargetExists(state.project?.bgOverride.doc ?? null, o.bgOverride)) {
+      useArtStore.getState().closeDocument();
+      useToastStore.getState().addToast('Band art no longer exists (undone) — document closed', 'info');
+      return;
+    }
     if (o.chunkId !== null && state.project
         && !state.project.chunkLibrary.some((c) => c.id === o.chunkId)) {
       useArtStore.getState().closeDocument();
@@ -250,7 +258,8 @@ function ArtCanvas() {
 
 function ArtOptions() {
   const open = useArtStore((s) => s.open);
-  const showSave = open !== null && open.liveTileIndex === null;
+  // BG override docs commit every stroke as a command; there is nothing to Save.
+  const showSave = open !== null && open.liveTileIndex === null && !open.bgOverride;
   // Chunk docs whose cells reference atlas tiles: pixel edits to those cells
   // write the shared tileset tile, so they show up everywhere it's used.
   const hasSharedTiles = open !== null && open.chunkId !== null
@@ -298,7 +307,8 @@ function ArtPanels() {
   const open = useArtStore((s) => s.open);
   // Collision tool needs a tile-space doc (chunk/block/new — not a single live
   // tile, same guard ComposerCanvas uses to hint-and-bail on live tiles).
-  const showCollisionPanel = tool === 'collision' && open !== null && open.liveTileIndex === null;
+  const showCollisionPanel = tool === 'collision' && open !== null && open.liveTileIndex === null
+    && !open.bgOverride;
   return (
     <Panel width={240} scroll>
       {showCollisionPanel && (

@@ -80,6 +80,11 @@ export type AgentRequest =
       driver?: string; rateShift?: number;
     }
   | { kind: 'remove-bg-anim-band'; band: number; blankReferencingCells?: boolean }
+  // ---- Band ART (parcel I). Pixels of `tiles[i]`; a prefix slot's write lands
+  // in its band's phases[0] in the same undo step. `regenerate-bg-anim-band-shift`
+  // rebuilds banks 1..7 from the band's current phase 0 (the shift fill).
+  | { kind: 'set-bg-override-tiles'; tiles: Array<{ index: number; pixels: number[] }> }
+  | { kind: 'regenerate-bg-anim-band-shift'; band: number }
   | { kind: 'screenshot'; region?: { x: number; y: number; w: number; h: number }; showBg?: boolean }
   // ---- Classic (Sonic 1 disassembly) project surface (Task 16) ----
   // Thin wrappers over the classic open bridge + the Task-12 editing commands;
