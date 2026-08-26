@@ -171,7 +171,25 @@ const SUBJECT_SCENE = 'ojz_act1_start';
  * at four rows by the contract, and closing it would hide the fact that the
  * facet does bands at all.
  */
-const EXPECTED_OPEN = ['Scenes', 'Scene', 'Layers', 'Section assignment', 'BG animation bands'];
+// 'Band preview' ADDED 2026-08-26 BY THE OVERSEER AT LANDING, and it is a design
+// decision rather than a red being silenced — the distinction matters, so it is
+// written down here.
+//
+// Item 41 (this harness's parcel) and item 42 (the motion preview) were built
+// CONCURRENTLY off the same master. 41 tidied a SEVEN-section column and took its
+// overflow to zero; 42 then added an eighth section, `Band preview`, which 41 could
+// not have known about. On the merged tree A1 therefore failed, correctly: the
+// intended arrival state had genuinely changed underneath the guard.
+//
+// Ruled: `Band preview` ARRIVES OPEN. It is the surface the owner asked for, and it
+// carries the per-band refusal text that explains why a band is not previewing
+// (the blob divergence, decision d-11) — collapsing the explanation of a feature's
+// own silence is exactly the wrong default. The cost is honest and is recorded in
+// ROADMAP row 41: the merged column overflows ~285px at 1680x1050 with one column
+// scrollbar, so 41's headline 0px was true of its own branch and is NOT true of
+// master. Folding the preview's per-band status into the band cards it duplicates
+// is booked as item 45.
+const EXPECTED_OPEN = ['Scenes', 'Scene', 'Layers', 'Section assignment', 'BG animation bands', 'Band preview'];
 const EXPECTED_CLOSED = ['New band', 'Properties'];
 
 /**
