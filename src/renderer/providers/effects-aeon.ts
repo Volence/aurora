@@ -153,6 +153,28 @@ export function sceneListEntries(library: EffectsSceneLibrary): SceneListEntry[]
 }
 
 /**
+ * The scene a selected id resolves to — id if it still exists, else the first
+ * scene, else nothing.
+ *
+ * LIFTED OUT OF THE PANEL VERBATIM (ROADMAP item 43). This was one expression
+ * inside EffectsScenePanel and its fallback is load-bearing: undoing a create,
+ * or opening a different project, leaves a stale id in the selection, and
+ * without the fallback the whole editor below it would vanish rather than land
+ * on the scene that IS there.
+ *
+ * It is a function now because there are two readers. The panel draws the form;
+ * MapViewport draws that scene's layers as world-Y guides. If they resolved a
+ * stale id differently — one falling back, one showing nothing — the canvas
+ * would be editing a scene the panel is not, which is worse than either
+ * behaviour alone.
+ */
+export function resolveSelectedScene(
+  library: EffectsSceneLibrary, selectedId: string | null,
+): EffectsScene | null {
+  return library.scenes.find((s) => s.id === selectedId) ?? library.scenes[0] ?? null;
+}
+
+/**
  * The `sceneRef` dropdown for one section: the act default plus every LOADED
  * scene.
  *

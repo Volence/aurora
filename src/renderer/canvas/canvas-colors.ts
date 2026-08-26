@@ -221,3 +221,21 @@ export const CANVAS_CLASH_EDGE = 'rgba(255, 96, 96, 0.9)';
  *  cell to find out which fix it wants. */
 export const CANVAS_RANGE_FILL = 'rgba(255, 176, 32, 0.26)';
 export const CANVAS_RANGE_EDGE = 'rgba(255, 196, 64, 0.9)';
+
+// --- Parallax layer guides (ROADMAP item 43, effects facet) ------------------
+//
+// Cyan, and deliberately not a hue the map's other overlays own: the tile /
+// block / section grids are white / green / yellow, the collision lens is
+// green / amber / blue fills with red ticks, and the priority lens is violet.
+// A guide has to be legible stacked on all of them at once, because the effects
+// facet mounts the ordinary map canvas with whatever overlays the author left on.
+
+/** An enabled layer's world-Y division line. */
+export const EFFECTS_GUIDE_LINE = 'rgba(80, 220, 240, 0.75)';
+/** `enabled: false` — still drawn (it is still a division), dashed and dim. */
+export const EFFECTS_GUIDE_LINE_DISABLED = 'rgba(80, 220, 240, 0.32)';
+/** Hovered or being dragged. */
+export const EFFECTS_GUIDE_ACTIVE = 'rgba(150, 245, 255, 1)';
+/** Backing plate behind the `L0 y=…` label, so it stays readable over art. */
+export const EFFECTS_GUIDE_LABEL_BG = 'rgba(10, 12, 18, 0.78)';
+export const EFFECTS_GUIDE_LABEL_TEXT = 'rgba(190, 245, 255, 0.95)';

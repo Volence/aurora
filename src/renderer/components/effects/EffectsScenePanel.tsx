@@ -55,7 +55,7 @@ import type {
 import {
   factorOptions, factorSelectValue, factorFromSelect, clampPackedField, clampWorldY,
   clampVFactor, clampVCenter, clampVOffset,
-  sceneListEntries, sceneRefOptions, unassignableSceneRef,
+  sceneListEntries, resolveSelectedScene, sceneRefOptions, unassignableSceneRef,
   sectionSceneCommand, createSceneCommand, deleteSceneCommand,
   addLayerCommand, removeLayerCommand, setLayerFieldCommand, setSceneFieldCommand,
   SCENE_FORM_CHOICES, EFFECTS_LAYER_COUNT, EFFECTS_PACKED_FACTOR_BOUNDS, EFFECTS_WORLD_Y_BOUNDS,
@@ -193,15 +193,19 @@ export default function EffectsScenePanel(): React.ReactElement {
 
   const library = project?.effectsScenes ?? EMPTY_LIBRARY;
   const entries = sceneListEntries(library);
-  const [selectedId, setSelectedId] = React.useState<string | null>(null);
+  // IN THE STORE, NOT `React.useState` (ROADMAP item 43). MapViewport draws this
+  // scene's layers as draggable world-Y guides, and a sibling component cannot
+  // read another's local state. The behaviour here is unchanged — including the
+  // stale-id fallback below, which is now `resolveSelectedScene` so that the
+  // canvas resolves it the same way rather than a second way.
+  const selectedId = useEditorStore((s) => s.selectedEffectsSceneId);
+  const setSelectedId = useEditorStore((s) => s.setSelectedEffectsSceneId);
   const [newId, setNewId] = React.useState('');
   const [refusal, setRefusal] = React.useState<string | null>(null);
 
   // Keep the selection on something that exists: undoing a create, or opening a
   // different project, leaves a stale id behind.
-  const selected = entries.some((e) => e.id === selectedId)
-    ? library.scenes.find((s) => s.id === selectedId)!
-    : (library.scenes[0] ?? null);
+  const selected = resolveSelectedScene(library, selectedId);
 
   const state = useProjectStore.getState();
   const act = state.project && state.currentActId

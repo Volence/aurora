@@ -9,7 +9,8 @@
 import { describe, it, expect } from 'vitest';
 import {
   CUSTOM_FACTOR_VALUE, factorOptions, factorSelectValue, factorFromSelect,
-  clampPackedField, clampWorldY, clampVCenter, clampVOffset, sceneListEntries, sceneRefOptions, unassignableSceneRef,
+  clampPackedField, clampWorldY, clampVCenter, clampVOffset,
+  sceneListEntries, resolveSelectedScene, sceneRefOptions, unassignableSceneRef,
   sectionSceneCommand, createSceneCommand, deleteSceneCommand,
   addLayerCommand, removeLayerCommand, setLayerFieldCommand, setSceneFieldCommand,
   SCENE_FORM_CHOICES,
@@ -305,5 +306,43 @@ describe('scene commands', () => {
     h.undo(level); h.undo(level); h.undo(level);
     expect(JSON.stringify(lib.scenes[0])).toBe(before);
     expect(h.canUndo).toBe(false);
+  });
+});
+
+describe('resolveSelectedScene — the selection the panel and the map canvas SHARE', () => {
+  // Lifted out of EffectsScenePanel by ROADMAP item 43 so MapViewport can
+  // resolve the same id the same way. Every case below is behaviour the panel
+  // already had; the point of testing it here is that it now has two callers
+  // and a divergence between them would put the canvas on a different scene
+  // from the form beside it.
+  const canyon = () => newEffectsScene('canyon', 'Canyon');
+
+  it('resolves an id that exists', () => {
+    const lib = library([canopy(), canyon()]);
+    expect(resolveSelectedScene(lib, 'canyon')?.id).toBe('canyon');
+  });
+
+  it('falls back to the FIRST scene for a stale id — undo-a-create, or another project', () => {
+    const lib = library([canopy(), canyon()]);
+    expect(resolveSelectedScene(lib, 'deleted_by_undo')?.id).toBe('canopy');
+  });
+
+  it('falls back to the first scene when nothing is selected yet', () => {
+    expect(resolveSelectedScene(library([canopy()]), null)?.id).toBe('canopy');
+  });
+
+  it('is null, not a throw, for a project with no scenes at all', () => {
+    // The NORMAL case: an aeon tree with no data/editor/effects/ directory.
+    expect(resolveSelectedScene(library([]), null)).toBeNull();
+    expect(resolveSelectedScene(library([]), 'anything')).toBeNull();
+  });
+
+  it('agrees with sceneListEntries about what exists', () => {
+    // The panel used to test existence against `entries` and then look the
+    // scene up in `library.scenes`. That is one list only because
+    // sceneListEntries maps scenes 1:1 — assert it, so a future entry filter
+    // (hiding a scene from the picker, say) cannot silently split them.
+    const lib = library([canopy(), canyon()]);
+    expect(sceneListEntries(lib).map((e) => e.id)).toEqual(lib.scenes.map((s) => s.id));
   });
 });

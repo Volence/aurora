@@ -19,6 +19,8 @@ import { openAeonProject } from './state/aeon-open';
 import { bandBudget, bandRows } from './providers/bg-anim-aeon';
 import { serializeBgOverride } from '../core/formats/bg-override/bg-override';
 import { resolveDisplayedBg } from './providers/bganim-preview-aeon';
+import { lastGuideReport } from './canvas/effects-guides';
+import type { GuideReport } from './canvas/effects-guides';
 import { useAetherStore } from './state/aetherStore';
 import { useViewStore } from './state/viewStore';
 import { useArtStore } from './state/artStore';
@@ -394,6 +396,23 @@ interface AeonProbeApi {
   scenes(): { id: string; name: string | null; layers: number }[];
   scenesJson(): string;
   unreadableScenes(): { path: string; reason: string }[];
+  /**
+   * WHICH SCENE THE FACET IS EDITING — the store field the panel and the map
+   * canvas now share (ROADMAP item 43). Raw and possibly stale by design; the
+   * resolved answer is in `guides().sceneId`.
+   */
+  selectedScene(): string | null;
+  selectScene(id: string | null): void;
+  /**
+   * THE PARALLAX GUIDES AS THE LAST REPAINT DREW THEM.
+   *
+   * The only honest way to check a line on a canvas short of sampling pixels.
+   * MapViewport publishes this at the end of its draw body — it is a record of
+   * what happened, not a recomputation of what should have, so `active: false`
+   * and a `paints` counter that has stopped moving are both things a row can
+   * catch. See canvas/effects-guides.ts's `GuideReport`.
+   */
+  guides(): GuideReport;
   /** One section's `sceneRef` — what the assignment dropdown writes. */
   sceneRef(sectionIndex: number): string | null;
   /**
@@ -600,6 +619,9 @@ function installAeonProbe(): AeonProbeApi {
       (useProjectStore.getState().project?.effectsScenes.unreadable ?? [])
         .map((u) => ({ path: u.path, reason: u.reason })),
     sceneRef: (sectionIndex) => section(sectionIndex)?.sceneRef ?? null,
+    selectedScene: () => useEditorStore.getState().selectedEffectsSceneId,
+    selectScene: (id) => useEditorStore.getState().setSelectedEffectsSceneId(id),
+    guides: () => lastGuideReport(),
     bands: () => bandRows(bgDoc()).map((b) => ({
       index: b.index, cols: b.cols, rows: b.rows, tileCount: b.tileCount,
       driver: b.driver, driverIsExplicit: b.driverIsExplicit,
