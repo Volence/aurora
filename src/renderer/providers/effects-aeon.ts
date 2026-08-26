@@ -23,8 +23,10 @@
 import type {
   SetEffectsSceneCommand, SetSectionSceneCommand,
 } from '../../core/editing/commands';
-import type {
-  EffectsScene, EffectsSceneLibrary, EffectsFactor, EffectsLayer,
+import {
+  EFFECTS_LAYER_DEFAULTS,
+  type EffectsScene, type EffectsSceneLibrary, type EffectsFactor, type EffectsLayer,
+  type EffectsTableRef,
 } from '../../core/formats/effects/scene';
 import {
   EFFECTS_FACTOR_NAMES, EFFECTS_PACKED_FACTOR_BOUNDS, EFFECTS_LAYER_COUNT,
@@ -380,6 +382,64 @@ export function setSceneFieldCommand<K extends 'name' | 'v_factor' | 'v_center' 
     if (value === undefined) delete scene[field];
     else scene[field] = value;
   });
+}
+
+// ---------------------------------------------------------------------------
+// Layer extras — what a layer carries beyond world_y / fa / fb (parcel E)
+// ---------------------------------------------------------------------------
+//
+// The card edits three keys. §2.2 has seven more, and the shipped curved-horizon
+// scene USES two of them (`curve.to`, `vsplit.at`) — which is how a file could
+// carry the curve the owner was looking at and the UI show nothing setting it.
+// This is the read-only answer: one short descriptor per non-default key, in
+// schema key order, and NOTHING for a default so a plain layer gets no line.
+// Controls for these are parcel H; this deliberately builds none.
+
+export interface LayerExtra {
+  /** The §2.2 key the descriptor is about. */
+  key: 'dsa' | 'dsb' | 'phase' | 'enabled' | 'deform' | 'curve' | 'vsplit';
+  /** The descriptor as the card prints it. */
+  text: string;
+}
+
+/** A 256-byte table reference, in the spelling the schema's generator names use. */
+function tableRefLabel(t: EffectsTableRef): string {
+  if ('bin' in t) return t.bin;
+  switch (t.generator) {
+    case 'zero': return 'zero';
+    case 'sine': case 'triangle': return `${t.generator}(${t.amplitude}, ${t.period})`;
+    case 'v_column_perspective': return `${t.generator}(${t.focal}, ${t.max_offset})`;
+    case 'v_column_floor': return `${t.generator}(${t.center}, ${t.max_offset})`;
+  }
+}
+
+/** Every non-default §2.2 key on a layer that the card has no control for. */
+export function layerExtras(layer: EffectsLayer): LayerExtra[] {
+  const out: LayerExtra[] = [];
+  for (const key of ['dsa', 'dsb', 'phase'] as const) {
+    const v = layer[key];
+    if (v !== undefined && v !== EFFECTS_LAYER_DEFAULTS[key]) out.push({ key, text: `${key} ${v}` });
+  }
+  if (layer.enabled === false) out.push({ key: 'enabled', text: 'disabled' });
+  const deform = layer.deform;
+  if (deform !== undefined && deform !== 'none') {
+    out.push({ key: 'deform', text: `deform: own ${tableRefLabel(deform.own.table)}` });
+  }
+  const curve = layer.curve;
+  if (curve !== undefined && curve !== 'none') {
+    out.push({ key: 'curve', text: `curve → ${factorLabel(curve.to)}` });
+  }
+  const vsplit = layer.vsplit;
+  if (vsplit !== undefined && vsplit !== 'none') {
+    out.push({ key: 'vsplit', text: `vsplit at ${vsplit.at}` });
+  }
+  return out;
+}
+
+/** The extras as one line for the card, or null when there is no line to draw. */
+export function layerExtrasLine(layer: EffectsLayer): string | null {
+  const extras = layerExtras(layer);
+  return extras.length === 0 ? null : extras.map((e) => e.text).join(' · ');
 }
 
 /** Everything the scene-level form may offer, in one place for the component. */
