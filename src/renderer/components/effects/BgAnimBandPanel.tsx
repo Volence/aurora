@@ -156,7 +156,9 @@ import BgAnimPreviewStrip from './BgAnimPreviewStrip';
 import { useProjectStore, getActiveLevel } from '../../state/projectStore';
 import { executeCommand, useEditorStore } from '../../state/editorStore';
 import { useHistoryVersion } from '../../hooks/useHistoryVersion';
-import { bandStatus, refreshBandPreview, resolveBandLens } from '../../providers/bganim-preview-aeon';
+import {
+  bandStatus, refreshBandPreview, resolveBandLens, BAND_MECHANISM_HINT,
+} from '../../providers/bganim-preview-aeon';
 import { coverageSummary } from '../../providers/band-coverage';
 import { BAND_LENS_FILL, BAND_LENS_EDGE } from '../../canvas/canvas-colors';
 
@@ -241,15 +243,29 @@ export default function BgAnimBandPanel(): React.ReactElement {
   // calls (`resolveBandLens`) so the sentence in this column and the tint on the
   // map cannot describe different sets of cells.
   const lens = resolveBandLens();
-  const [driver, setDriver] = React.useState<string>(DEFAULT_DRIVER);
-  const [explicitDriver, setExplicitDriver] = React.useState(false);
+  // THE RESOLVED DRIVER AND RATE LIVE IN THE CANDIDATE TOO (parcel D), for the
+  // reason its geometry does: the map's caption says what the candidate WOULD
+  // do (`would scroll · 1px per …`), and the map is a sibling. The two
+  // `explicit*` flags stay local — they are about whether the KEY is written,
+  // which only the writer here needs; the store holds what the band would get.
+  const { driver, rateShift } = candidate;
+  const setDriver = (d: string): void => setCandidate({ driver: d });
+  const [explicitDriver, setExplicitDriverFlag] = React.useState(false);
+  const setExplicitDriver = (on: boolean): void => {
+    setExplicitDriverFlag(on);
+    if (!on) setCandidate({ driver: DEFAULT_DRIVER });
+  };
   // The rate, in the same two-part shape the driver has and for the same reason:
   // "default" is a STATE OF THE DOCUMENT (the key is absent and the file tracks
   // the consumer), not a number to pre-fill the box with. The seed the box takes
   // when an author does switch to a custom rate is the contract's default —
   // derived, never a literal.
-  const [rateShift, setRateShift] = React.useState(DEFAULT_RATE_SHIFT);
-  const [explicitRateShift, setExplicitRateShift] = React.useState(false);
+  const setRateShift = (n: number): void => setCandidate({ rateShift: n });
+  const [explicitRateShift, setExplicitRateShiftFlag] = React.useState(false);
+  const setExplicitRateShift = (on: boolean): void => {
+    setExplicitRateShiftFlag(on);
+    if (!on) setCandidate({ rateShift: DEFAULT_RATE_SHIFT });
+  };
   const [phaseFill, setPhaseFill] = React.useState<BandPhaseFill>(DEFAULT_PHASE_FILL);
   const [refusalText, setRefusalText] = React.useState<string | null>(null);
   const [pendingRemoval, setPendingRemoval] = React.useState<number | null>(null);
@@ -316,6 +332,12 @@ export default function BgAnimBandPanel(): React.ReactElement {
             until it exists.
           </Hint>
         )}
+
+        {/* WHAT A BAND IS, said once at the top and never per card (parcel D).
+            The owner looked at the lens and asked "draw left to right? rotate?";
+            the per-band sentence (`bandMotion`, on the card and the caption)
+            says what THIS band does, and this line says what a band is at all. */}
+        {doc !== null && <Hint>{BAND_MECHANISM_HINT}</Hint>}
 
         {doc !== null && rows.length === 0 && (
           <Hint>

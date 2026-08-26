@@ -22,7 +22,7 @@ import { snapMarquee, copyFromSection, buildPasteCommand } from '../../core/edit
 import type { PasteLayers } from '../../core/editing/map-clipboard';
 import { SectionRenderer } from '../canvas/SectionRenderer';
 import {
-  bandPreview, refreshBandPreview, resolveDisplayedBg, resolveBandLens,
+  bandPreview, refreshBandPreview, resolveDisplayedBg, resolveBandLens, bandLensCaptionLines,
 } from '../providers/bganim-preview-aeon';
 import type { DisplayedBgSource } from '../providers/bganim-preview-aeon';
 import {
@@ -30,7 +30,7 @@ import {
   publishBandLensReport, publishBandMark,
 } from '../canvas/band-lens';
 import {
-  coverageSummary, coverageSubject, coverageBounds, markFromLayoutWord,
+  coverageBounds, markFromLayoutWord,
 } from '../providers/band-coverage';
 import { documentBands, bandSlotBases } from '../../core/formats/bg-override/bg-anim-band';
 import { bandTileCount } from '../../core/formats/bg-override/bg-override';
@@ -859,16 +859,16 @@ export default function MapViewport() {
       // information and could not tell what information — so line 1 is
       // `coverageSubject` ("highlighted: the cells band 0 animates"), carrying a
       // swatch of the wash's own colour, anchored beside the coverage instead of
-      // in the opposite corner. Line 2 is the SHAPE, in the same neutral words
+      // in the opposite corner. Line 3 is the SHAPE, in the same neutral words
       // the panel prints. It is on the canvas at all because both band sections
       // arrive collapsed (item 45), so an author who clicks a cell on arrival
       // would otherwise have a wash whose range lives inside a shut box.
-      drawBandLensLabel(ctx, viewport, [
-        coverageSubject(lens.kind ?? 'candidate', lens.bandIndex, lens.range),
-        lens.reason !== null ? lens.reason.slice(0, 96)
-          : lens.coverage ? coverageSummary(lens.coverage) : '',
-      ].filter((s) => s !== ''),
-      bandLensAnchor(viewport, coverageBounds(cells)));
+      // Line 2 is WHAT THE BAND DOES — `bandMotion`, the same call the card's
+      // rate line makes, so the canvas cannot say something the card does not
+      // (parcel D). The lines are composed in the provider, where the suite can
+      // see them.
+      drawBandLensLabel(ctx, viewport, bandLensCaptionLines({ ...lens, range: lens.range }),
+        bandLensAnchor(viewport, coverageBounds(cells)));
       publishBandLensReport({
         active: true, kind: lens.kind, bandIndex: lens.bandIndex,
         range: { base: lens.range.base, count: lens.range.count },
