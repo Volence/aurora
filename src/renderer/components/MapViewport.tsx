@@ -14,6 +14,7 @@ import { useToastStore } from '../state/toastStore';
 import { useAetherStore } from '../state/aetherStore';
 import { warpTargetFor } from '../../core/aether/warp-math';
 import { openDocumentGuarded } from './art/open-document';
+import { resolveEscape } from './map-escape';
 import { docFromTile, docFromSectionRegion } from '../../core/art/composer-buffer';
 import { seedDocCollisionFromSection } from '../../core/art/composer-collision';
 import type { AnyCommand, S4Level, SetTilesCommand } from '../../core/editing/commands';
@@ -1194,20 +1195,26 @@ export default function MapViewport() {
         case 'k': setToolScoped('stamp-chunk'); break;
         case 'm': setToolScoped('marquee'); break;
         case 'Escape': {
-          // Pasting wins first: Escape exits paste mode without touching the
-          // marquee (Ctrl+C leaves the marquee committed for repeat copies, and
-          // exiting paste shouldn't discard it). Otherwise Escape clears a
-          // committed marquee regardless of the active tool — the marquee stays
-          // visible/copyable after switching tools (see the Ctrl+C comment
-          // above), so Escape must be able to clear it from any tool too.
+          // The order lives in `resolveEscape` (paste, then marquee from any
+          // tool, then the band lens in the Effects facet) so the node suite can
+          // pin it; this branch only acts on the verdict. The lens needs no
+          // explicit repaint: `bandLensTarget` is in the repaint effect's deps.
           const ed = useEditorStore.getState();
-          if (ed.pasting) {
-            ed.setPasting(false);
-            pasteHoverRef.current = null;
-            drawCollisionPreview();
-          } else if (ed.marquee) {
-            ed.setMarquee(null);
-            drawCollisionPreview();
+          switch (resolveEscape(ed, inEffectsFacet())) {
+            case 'paste':
+              ed.setPasting(false);
+              pasteHoverRef.current = null;
+              drawCollisionPreview();
+              break;
+            case 'marquee':
+              ed.setMarquee(null);
+              drawCollisionPreview();
+              break;
+            case 'lens':
+              ed.setBandLensTarget(null);
+              break;
+            case null:
+              break;
           }
           break;
         }
