@@ -176,6 +176,15 @@ describe('the editor pan maps onto Camera_X/Y', () => {
   it('truncates to the integer pixel BEFORE the shift', () => {
     // The runtime reads the 16.16 HIGH word: sub-pixel camera motion does not
     // advance a band at all. Truncating after the shift would smear phase.
+    //
+    // A RED-FIRST PLANT WENT GREEN HERE, and the reason is worth keeping: JS's
+    // `&` runs ToInt32, which truncates on its own, so deleting the explicit
+    // `Math.floor` leaves the mask holding this row green. TWO INDEPENDENT
+    // PATHS, ONE OBSERVABLE — the row is not weak, it just cannot see which of
+    // the two did the work. Removing BOTH (returning `Math.max(0, pan) %
+    // 65536`) does turn it red, so the row measures the truncation itself.
+    // Keep the `Math.floor`: it states the intent the `&` only happens to
+    // satisfy, and a later change of mask shape would silently take it away.
     expect(editorPanToCameraPx(7.99)).toBe(7);
     expect(editorPanToCameraPx(8)).toBe(8);
     const mask = bandStepMask(band({ cols: 8 }));
