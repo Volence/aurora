@@ -61,10 +61,11 @@ import { executeCommand } from '../../state/editorStore';
 import { useHistoryVersion } from '../../hooks/useHistoryVersion';
 import type { AnyCommand } from '../../../core/editing/commands';
 import {
-  DEFAULT_DRIVER, addBandCommand, bandBudget, bandRows, demoteBandCommand,
-  driverOptions, insertUnavailableReason, patternPxFor, promoteBandCommand,
-  promoteUnavailableReason, removeBandCommand, rowChoices,
-  type BandCommandResult, type BandSpec,
+  DEFAULT_DRIVER, DEFAULT_PHASE_FILL, addBandCommand, bandBudget, bandRows,
+  demoteBandCommand, driverOptions, insertUnavailableReason, patternPxFor,
+  phaseFillOptions, promoteBandCommand, promoteUnavailableReason,
+  removeBandCommand, rowChoices,
+  type BandCommandResult, type BandPhaseFill, type BandSpec,
 } from '../../providers/bg-anim-aeon';
 
 const row: React.CSSProperties = {
@@ -117,6 +118,7 @@ export default function BgAnimBandPanel(): React.ReactElement {
   const [staticBase, setStaticBase] = React.useState(0);
   const [driver, setDriver] = React.useState<string>(DEFAULT_DRIVER);
   const [explicitDriver, setExplicitDriver] = React.useState(false);
+  const [phaseFill, setPhaseFill] = React.useState<BandPhaseFill>(DEFAULT_PHASE_FILL);
   const [refusalText, setRefusalText] = React.useState<string | null>(null);
   const [pendingRemoval, setPendingRemoval] = React.useState<number | null>(null);
 
@@ -129,9 +131,11 @@ export default function BgAnimBandPanel(): React.ReactElement {
   }, [budget.firstPromotableSlot]);
 
   const spec: BandSpec = {
-    cols, rows: bandRowCount,
+    cols, rows: bandRowCount, phaseFill,
     ...(explicitDriver ? { driver } : {}),
   };
+  const fillOption = phaseFillOptions().find((o) => o.value === phaseFill)
+    ?? phaseFillOptions()[0];
   const tileCount = cols * bandRowCount;
 
   function apply(result: BandCommandResult): void {
@@ -300,6 +304,23 @@ export default function BgAnimBandPanel(): React.ReactElement {
           </span>
         </div>
         <div style={row}>{driverField}</div>
+        <div style={row}>
+          <span style={label}
+            title="How banks 1-7 are filled from phase 0. Phase 0 itself is never a choice: it is
+                   the art the band rests at.">
+            Banks 1–7
+          </span>
+          <Select
+            title="phase fill — how banks 1-7 (the contract's pre-shifted phases, selected by
+                   step & 7) are derived from the band's phase 0"
+            value={phaseFill}
+            onChange={(v) => setPhaseFill(v as BandPhaseFill)}
+            style={{ flex: 1, minWidth: 130 }}>
+            {phaseFillOptions().map((o) => (
+              <option key={o.value} value={o.value} title={o.title}>{o.label}</option>
+            ))}
+          </Select>
+        </div>
 
         {/* ── Source 1: art the document already carries ────────────────── */}
         <div style={{ ...row, marginTop: T.s3, marginBottom: T.s1 }}>
@@ -321,8 +342,7 @@ export default function BgAnimBandPanel(): React.ReactElement {
           </Chip>
         </div>
         <div style={note}>
-          The picture does not change: phase 0 IS this art, and banks 1–7 arrive as copies of it,
-          so the band is inert until you draw its frames.
+          The picture at rest does not change: phase 0 IS this art, and {fillOption.note}
         </div>
         {promoteOff && <div style={warn}>{promoteOff}</div>}
 
@@ -342,7 +362,7 @@ export default function BgAnimBandPanel(): React.ReactElement {
           </Chip>
           <span style={note}>
             The band arrives blank and unreferenced; nothing on screen changes until you point
-            layout cells at it.
+            layout cells at it. (Its phase 0 is blank art, so every fill mode agrees here.)
           </span>
         </div>
         {insertOff && <div style={warn}>{insertOff}</div>}
