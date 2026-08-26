@@ -20,11 +20,11 @@
 //    below, which must NOT be that colour. A row that only asked "is the cyan
 //    channel high somewhere" would pass on a cyan background.
 //
-// 2. AN UNDO STACK WITH 40 ENTRIES FROM ONE GESTURE. Row 5c drags across ten
+// 2. AN UNDO STACK WITH 40 ENTRIES FROM ONE GESTURE. Row 5d drags across ten
 //    mousemove events and then presses Ctrl+Z ONCE. If the drag committed per
 //    move, one undo lands nine moves short and the row fails on the value.
 //
-// 3. A NO-OP THAT EATS AN UNDO STEP. Row 6 drags out and back to the row it
+// 3. A NO-OP THAT EATS AN UNDO STEP. Row 6b drags out and back to the row it
 //    started on, then presses Ctrl+Z once: if that release wrote a command, the
 //    undo is consumed by it and the PREVIOUS drag survives. The pre-state is
 //    part of the assertion, which is the trap the effects-scene harness's row 7c
@@ -48,6 +48,32 @@
 // subject: the project is open with sections, the scene is in the model, the
 // guide report is active with the right scene id and the right number of rows,
 // the paint counter advanced.
+//
+// ═══ AIM AT INTEGERS. THE CANVAS RECT IS NOT INTEGRAL. ═══
+//
+// This harness reported 28/28 twice and then 26/28, on a byte-identical tree,
+// and the difference was the ENVIRONMENT, not the app. Measured with
+// scratchpad/guide-aim-probe.mjs:
+//
+//   devicePixelRatio 1     -> rect = {left: 284,       top: 74}
+//   devicePixelRatio 1.35  -> rect = {left: 283.99304, top: 73.99305}
+//
+// Xvfb reports no DPI of its own, so Electron's device scale factor is whatever
+// it infers, and it is not the same on every host or every display `-a` picks.
+// (`--force-device-scale-factor=1` was tried and does NOT take here.)
+//
+// With a fractional rect, asking CDP for `rect.top + 380` = 453.993 delivers
+// clientY **453** — the pointer really does land on the previous device row —
+// and the app correctly resolves 453 - 73.993 = 379.007 -> world_y 379. The app
+// was never wrong. The HARNESS was asking for a position that does not exist on
+// the device pixel grid and then asserting the app had reached it.
+//
+// So: every mouse coordinate below goes through `aimY`/`aimX`, which round to
+// the integer client pixel CDP will actually deliver (verified: an integer aim
+// arrives intact at both scale factors), and every expectation is derived from
+// THAT integer through the app's own contract via `worldYAt`. The rows stay
+// strict equalities — there is no tolerance anywhere in section 5, and 5b's old
+// `< 2` window (which is what let this hide for a whole review cycle) is gone.
 //
 // ⚠ THE FIXTURE ALREADY HAS A SCENE. `aeon/games/sonic4/data/editor/effects/`
 // held `ojz_act1_start` (5 layers) when this was written — the effects-scene
@@ -355,6 +381,7 @@ async function main() {
 
     // ---- 4. IS THERE A LINE ON THE CANVAS? -------------------------------
     const rect = await c.json(CANVAS_RECT);
+    const dpr = await c.evalExpr('window.devicePixelRatio');
     check('4a', 'ANTI-VACUOUS: the map canvas is mounted and has a real box',
       !!rect && rect.width > 200 && rect.height > 200, JSON.stringify(rect));
 
@@ -392,43 +419,62 @@ async function main() {
       clickCount: 1, ...extra,
     });
     const DRAG_TO_CANVAS_Y = 380;
-    const expectedWorldY = Math.round(view.y + DRAG_TO_CANVAS_Y / view.zoom);
+    /** The integer client pixel CDP will actually deliver for a canvas row. */
+    const aimY = (canvasY) => Math.round(rect.top + canvasY);
+    const aimX = Math.round(rect.left + px);
+    /** The app's contract, evaluated on a delivered client pixel. Never a typed
+     *  number: this is `screenToWorld` + `clampWorldY` spelled out, so a row
+     *  built on it fails for any transform error and only stops failing for the
+     *  device grid — which is an input, not behaviour. */
+    const worldYAt = (clientY) => Math.round(view.y + (clientY - rect.top) / view.zoom);
+    const expectedWorldY = worldYAt(aimY(DRAG_TO_CANVAS_Y));
+    const expectedCanvasY = (expectedWorldY - view.y) * view.zoom;
+    check('4e', 'ANTI-VACUOUS: the aim is recorded, grid and all',
+      Number.isInteger(aimY(DRAG_TO_CANVAS_Y)) && Number.isInteger(aimY(0)),
+      `dpr=${dpr} rect.top=${rect.top} -> release aims at clientY ${aimY(DRAG_TO_CANVAS_Y)}, `
+      + `contract world_y ${expectedWorldY}, guide row ${expectedCanvasY}`);
 
     // Hover first: the cursor over a guide must say it is grabbable, and that
     // is the only thing on screen that says so before the press.
-    await mouse('mouseMoved', rect.left + px, rect.top + expectY(START_WORLD_Y), { buttons: 0 });
+    await mouse('mouseMoved', aimX, aimY(expectY(START_WORLD_Y)), { buttons: 0 });
     await sleep(400);
     const cursor = await c.evalExpr(
       `getComputedStyle(document.getElementById('map-canvas').parentElement).cursor`);
     check('5a', 'hovering a guide offers the resize cursor, not the pan tool\'s grab',
       cursor === 'ns-resize', `cursor=${cursor}`);
 
-    await mouse('mousePressed', rect.left + px, rect.top + expectY(START_WORLD_Y));
-    // TEN moves, not one. If the gesture commits per move, section 5c's single
+    await mouse('mousePressed', aimX, aimY(expectY(START_WORLD_Y)));
+    // TEN moves, not one. If the gesture commits per move, section 5d's single
     // Ctrl+Z lands nine moves short of where it started.
     const y0 = expectY(START_WORLD_Y);
     for (let i = 1; i <= 10; i++) {
-      await mouse('mouseMoved', rect.left + px, rect.top + y0 + ((DRAG_TO_CANVAS_Y - y0) * i) / 10);
+      await mouse('mouseMoved', aimX, aimY(y0 + ((DRAG_TO_CANVAS_Y - y0) * i) / 10));
       await sleep(40);
     }
     // Mid-drag, before release: the PREVIEW must already be showing the new row
     // while the document still holds the old one.
     const midGuides = await c.json('window.__dbg.aeon.guides()');
     const midDoc = JSON.parse(await c.evalExpr('window.__dbg.aeon.scenesJson()'));
+    // EXACT, not `< 2`. The old window was wide enough to swallow the very
+    // device-grid mismatch this harness was getting wrong, which is how a
+    // one-pixel aim error survived a review inside a "passing" row.
     check('5b', 'the drag PREVIEWS live while leaving the document alone',
       midGuides.dragIndex === 0
-      && Math.abs(midGuides.rows[0].canvasY - DRAG_TO_CANVAS_Y) < 2
+      && midGuides.rows[0].canvasY === expectedCanvasY
       && sceneOf(midDoc).layers[0].world_y === START_WORLD_Y,
-      `preview canvasY=${midGuides.rows[0]?.canvasY} dragIndex=${midGuides.dragIndex} `
+      `preview canvasY=${midGuides.rows[0]?.canvasY} expected=${expectedCanvasY} `
+      + `dragIndex=${midGuides.dragIndex} `
       + `document world_y=${sceneOf(midDoc)?.layers?.[0]?.world_y}`);
     await shot(c, '2-mid-drag');
 
-    await mouse('mouseReleased', rect.left + px, rect.top + DRAG_TO_CANVAS_Y);
+    await mouse('mouseReleased', aimX, aimY(DRAG_TO_CANVAS_Y));
     await sleep(700);
     doc = JSON.parse(await c.evalExpr('window.__dbg.aeon.scenesJson()'));
     check('5c', 'releasing writes the dragged world_y into the DOCUMENT',
       sceneOf(doc).layers[0].world_y === expectedWorldY,
-      `world_y=${sceneOf(doc)?.layers?.[0]?.world_y} expected=${expectedWorldY}`);
+      `world_y=${sceneOf(doc)?.layers?.[0]?.world_y} expected=${expectedWorldY} `
+      + `(released at clientY ${aimY(DRAG_TO_CANVAS_Y)}, rect.top ${rect.top}, `
+      + `live rect.top ${await c.evalExpr("document.getElementById('map-canvas').getBoundingClientRect().top")})`);
     await shot(c, '3-after-drag');
 
     // ONE GESTURE, ONE UNDO STEP. Ten mousemoves went by.
@@ -450,25 +496,35 @@ async function main() {
     // Set up a real edit to undo, then drag out and BACK to the row we started
     // on. If that release wrote a command, the single Ctrl+Z below is eaten by
     // it and the real edit survives.
-    await mouse('mousePressed', rect.left + px, rect.top + expectY(START_WORLD_Y));
-    await mouse('mouseMoved', rect.left + px, rect.top + DRAG_TO_CANVAS_Y);
-    await mouse('mouseReleased', rect.left + px, rect.top + DRAG_TO_CANVAS_Y);
+    await mouse('mousePressed', aimX, aimY(expectY(START_WORLD_Y)));
+    await mouse('mouseMoved', aimX, aimY(DRAG_TO_CANVAS_Y));
+    await mouse('mouseReleased', aimX, aimY(DRAG_TO_CANVAS_Y));
     await sleep(600);
     doc = JSON.parse(await c.evalExpr('window.__dbg.aeon.scenesJson()'));
-    const realEditLanded = sceneOf(doc).layers[0].world_y === expectedWorldY;
+    // TWO ROWS, NOT ONE, and the split is something an incident earned. These
+    // used to be `realEditLanded && …` in a single predicate, so when the
+    // harness's own aim was off by a device pixel the row failed reading "a
+    // drag released where it started consumes NO undo step" — naming a feature
+    // property that was in fact working perfectly. A setup step and the
+    // property under test must be able to fail separately.
+    check('6a', 'ANTI-VACUOUS: the setup drag landed an edit there is something to undo',
+      sceneOf(doc).layers[0].world_y === expectedWorldY,
+      `world_y=${sceneOf(doc)?.layers?.[0]?.world_y} expected=${expectedWorldY}`);
 
-    await mouse('mousePressed', rect.left + px, rect.top + DRAG_TO_CANVAS_Y);
-    await mouse('mouseMoved', rect.left + px, rect.top + DRAG_TO_CANVAS_Y - 60);
-    await mouse('mouseMoved', rect.left + px, rect.top + DRAG_TO_CANVAS_Y);
-    await mouse('mouseReleased', rect.left + px, rect.top + DRAG_TO_CANVAS_Y);
+    await mouse('mousePressed', aimX, aimY(DRAG_TO_CANVAS_Y));
+    await mouse('mouseMoved', aimX, aimY(DRAG_TO_CANVAS_Y - 60));
+    await mouse('mouseMoved', aimX, aimY(DRAG_TO_CANVAS_Y));
+    await mouse('mouseReleased', aimX, aimY(DRAG_TO_CANVAS_Y));
     await sleep(600);
+    const afterNoOp = JSON.parse(await c.evalExpr('window.__dbg.aeon.scenesJson()'));
     await undo();
     doc = JSON.parse(await c.evalExpr('window.__dbg.aeon.scenesJson()'));
-    check('6a', 'a drag released where it started consumes NO undo step',
-      realEditLanded && sceneOf(doc).layers[0].world_y === START_WORLD_Y,
-      `real edit landed=${realEditLanded}; after the no-op drag + one undo `
-      + `world_y=${sceneOf(doc)?.layers?.[0]?.world_y}, expected ${START_WORLD_Y}`
-      + ` (${expectedWorldY} means the no-op ate the undo)`);
+    check('6b', 'a drag released where it started consumes NO undo step',
+      sceneOf(afterNoOp).layers[0].world_y === expectedWorldY
+      && sceneOf(doc).layers[0].world_y === START_WORLD_Y,
+      `after the no-op drag world_y=${sceneOf(afterNoOp)?.layers?.[0]?.world_y}; `
+      + `after one further undo world_y=${sceneOf(doc)?.layers?.[0]?.world_y}, `
+      + `expected ${START_WORLD_Y} (${expectedWorldY} means the no-op ate the undo)`);
 
     // ---- 7. A DRAG WHOSE SUBJECT MOVES UNDER IT. -------------------------
     // Two layers, then remove layer 0 MID-DRAG through a synthetic DOM click —
@@ -483,12 +539,12 @@ async function main() {
     check('7a', 'ANTI-VACUOUS: there are two layers, so an index CAN go stale',
       twoLayers, `layers=${JSON.stringify(sceneOf(doc).layers.map((l) => l.world_y))}`);
 
-    await mouse('mousePressed', rect.left + px, rect.top + expectY(START_WORLD_Y));
-    await mouse('mouseMoved', rect.left + px, rect.top + expectY(START_WORLD_Y) + 40);
+    await mouse('mousePressed', aimX, aimY(expectY(START_WORLD_Y)));
+    await mouse('mouseMoved', aimX, aimY(expectY(START_WORLD_Y) + 40));
     const removed = await c.evalExpr(clickByText('/Remove layer 0/'));
     await sleep(600);
-    await mouse('mouseMoved', rect.left + px, rect.top + expectY(START_WORLD_Y) + 120);
-    await mouse('mouseReleased', rect.left + px, rect.top + expectY(START_WORLD_Y) + 120);
+    await mouse('mouseMoved', aimX, aimY(expectY(START_WORLD_Y) + 120));
+    await mouse('mouseReleased', aimX, aimY(expectY(START_WORLD_Y) + 120));
     await sleep(700);
     doc = JSON.parse(await c.evalExpr('window.__dbg.aeon.scenesJson()'));
     check('7b', 'a layer removed mid-drag: the release writes NOTHING through the stale index',
