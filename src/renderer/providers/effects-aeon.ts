@@ -227,9 +227,14 @@ export function layerCountLine(scene: Pick<EffectsScene, 'layers'>): string {
     + '(per scene; scenes are assigned per section)';
 }
 
-/** The V-factor row's label, with the sentinel's meaning inline rather than in a tooltip. */
-export function vFactorLabel(): string {
-  return `V factor (${EFFECTS_V_FACTOR_LOCK} = locked, no vertical scroll)`;
+/**
+ * The V-factor row's inline hint — the sentinel's meaning said on the row,
+ * not only in a tooltip. A hint under the control rather than in the label:
+ * the label column is a fixed 72px (`column-layout` LABEL_W) and a sentence
+ * there would push every control in the section rightward.
+ */
+export function vFactorHint(): string {
+  return `${EFFECTS_V_FACTOR_LOCK} = locked (no vertical scroll)`;
 }
 
 /**

@@ -15,7 +15,7 @@ import {
   addLayerCommand, removeLayerCommand, setLayerFieldCommand, setSceneFieldCommand,
   SCENE_FORM_CHOICES,
   layerTopSpace, layerTopBounds, clampLayerTop, planeLineOf, PLANE_LINE_SPAN,
-  layerCountLine, vFactorLabel,
+  layerCountLine, vFactorHint,
 } from '../effects-aeon';
 import {
   EFFECTS_FACTOR_NAMES, EFFECTS_LAYER_COUNT, EFFECTS_PACKED_FACTOR_BOUNDS,
@@ -432,7 +432,7 @@ describe('layerTopSpace — a locked scene authors screen lines, an unlocked one
     expect(layerCountLine(s).startsWith(`${s.layers.length} of ${EFFECTS_LAYER_COUNT.max} layers`)).toBe(true);
   });
 
-  it('vFactorLabel says what the sentinel means inline, from the constant', () => {
-    expect(vFactorLabel()).toBe(`V factor (${EFFECTS_V_FACTOR_LOCK} = locked, no vertical scroll)`);
+  it('vFactorHint says what the sentinel means inline, from the constant', () => {
+    expect(vFactorHint()).toBe(`${EFFECTS_V_FACTOR_LOCK} = locked (no vertical scroll)`);
   });
 });

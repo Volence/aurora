@@ -56,12 +56,13 @@ import type {
   EffectsScene, EffectsSceneLibrary, EffectsLayer,
 } from '../../../core/formats/effects/scene';
 import {
-  factorOptions, factorSelectValue, factorFromSelect, clampPackedField, clampWorldY,
+  factorOptions, factorSelectValue, factorFromSelect, clampPackedField,
   clampVFactor, clampVCenter, clampVOffset,
+  layerTopBounds, clampLayerTop, planeLineOf, layerCountLine, vFactorHint,
   sceneListEntries, resolveSelectedScene, sceneRefOptions, unassignableSceneRef,
   sectionSceneCommand, createSceneCommand, deleteSceneCommand,
   addLayerCommand, removeLayerCommand, setLayerFieldCommand, setSceneFieldCommand,
-  SCENE_FORM_CHOICES, EFFECTS_LAYER_COUNT, EFFECTS_PACKED_FACTOR_BOUNDS, EFFECTS_WORLD_Y_BOUNDS,
+  SCENE_FORM_CHOICES, EFFECTS_LAYER_COUNT, EFFECTS_PACKED_FACTOR_BOUNDS,
   EFFECTS_V_FACTOR_BOUNDS, EFFECTS_V_CENTER_BOUNDS, EFFECTS_V_OFFSET_BOUNDS,
 } from '../../providers/effects-aeon';
 
@@ -334,6 +335,12 @@ export default function EffectsScenePanel(): React.ReactElement {
               onChange={(n) => run(setSceneFieldCommand(
                 library, selected.id, 'v_factor', clampVFactor(n)))} />
           </Field>
+          {/*
+            SAID ON THE ROW, NOT ONLY IN THE TOOLTIP (owner feedback 2026-08-26
+            pt 4). The sentinel is what decides whether the layer tops below
+            are screen lines or world Ys, and both shipped scenes carry it.
+          */}
+          <Hint under>{vFactorHint()}</Hint>
           <Field label="V center">
             {/*
               BOUNDED BY THE CLAMP, NOT THE PROPS (ROADMAP item 37). `min`/`max`
@@ -380,11 +387,19 @@ export default function EffectsScenePanel(): React.ReactElement {
 
       {selected && (
         <CollapsibleSection id="aeon.effects.layers" variant="list"
-          title={`Layers (${selected.layers.length}/${EFFECTS_LAYER_COUNT.max})`}
+          title={`Layers (${selected.layers.length}/${EFFECTS_LAYER_COUNT.max} per scene)`}
           right={<IconButton icon={<span>Add</span>} label="Add layer"
             disabled={selected.layers.length >= EFFECTS_LAYER_COUNT.max}
             onClick={() => run(addLayerCommand(library, selected.id))} />}>
          <SectionBody style={LIST_BODY}>
+          {/*
+            THE CAP'S SCOPE, WHERE HE READS THE COUNT (owner feedback 2026-08-26
+            pt 4: "why max 8 layers if they go well beyond the screen?"). Eight
+            is MAX_PARALLAX_BANDS per SCENE; a section binds its own scene; and
+            on a locked scene — every scene that exists — the eight divide one
+            screen, which the field label below now says.
+          */}
+          <Hint><span title="a section can bind its own scene">{layerCountLine(selected)}</span></Hint>
           {selected.layers.map((layer, i) => (
             // THE INDEX TITLES THE CARD; it does not prefix a field name. The
             // old first row read `#0 world_y`, which made the longest label in
@@ -396,13 +411,31 @@ export default function EffectsScenePanel(): React.ReactElement {
                   disabled={selected.layers.length <= EFFECTS_LAYER_COUNT.min}
                   onClick={() => run(removeLayerCommand(library, selected.id, i))} />
               </Field>
-              <Field label="world_y">
-                <NumberField title={`Layer ${i} world_y (${EFFECTS_WORLD_Y_BOUNDS.min}..${EFFECTS_WORLD_Y_BOUNDS.max})`}
-                  min={EFFECTS_WORLD_Y_BOUNDS.min} max={EFFECTS_WORLD_Y_BOUNDS.max} width={72}
-                  value={layer.world_y}
-                  onChange={(n) => run(setLayerFieldCommand(
-                    library, selected.id, i, 'world_y', clampWorldY(n)))} />
-              </Field>
+              {/*
+                THE LABEL AND THE BOUND FOLLOW THE SCENE'S SPACE (owner feedback
+                2026-08-26 pt 4). On a locked scene a top is a screen/plane
+                line and the engine refuses one past the plane; the schema's
+                0..32767 `world_y` is the UNLOCKED arm only. `layerTopBounds`
+                decides, and the drag on the canvas routes through the same
+                `clampLayerTop`, so the spinner and the guide agree.
+              */}
+              {(() => {
+                const top = layerTopBounds(selected);
+                const mapped = planeLineOf(selected, layer.world_y);
+                return (
+                  <>
+                    <Field label={top.label}>
+                      <NumberField title={`Layer ${i} ${top.label} (${top.min}..${top.max})`
+                          + (top.space === 'screen' ? ' — a plane line; the scene is locked' : '')}
+                        min={top.min} max={top.max} width={72}
+                        value={layer.world_y}
+                        onChange={(n) => run(setLayerFieldCommand(
+                          library, selected.id, i, 'world_y', clampLayerTop(selected, n)))} />
+                    </Field>
+                    {mapped.hint !== null && <Hint under tone="warning">{mapped.hint}</Hint>}
+                  </>
+                );
+              })()}
               <Field label="fa" title="Plane A packed scroll factor">
                 <FactorField title={`Layer ${i} fa`} value={layer.fa}
                   onChange={(f) => run(setLayerFieldCommand(library, selected.id, i, 'fa', f))} />
