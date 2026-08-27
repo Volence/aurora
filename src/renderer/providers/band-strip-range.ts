@@ -131,7 +131,16 @@ export type StripDragOutcome =
      */
     trimmedToBlob: boolean;
   }
-  | { kind: 'refused'; reason: string };
+  | {
+    kind: 'refused';
+    /**
+     * ONE SHORT LINE. The picker's readout is a single row beside the count and
+     * is held to one line ON PURPOSE — see `stripDragLabel`.
+     */
+    reason: string;
+    /** The same answer at length, for the readout's `title`. */
+    hint: string;
+  };
 
 /**
  * Resolve a released strip drag. TOTAL — every input has an answer.
@@ -180,9 +189,10 @@ export function resolveStripDrag(input: StripDragInputs): StripDragOutcome {
   if (!rowChoices().includes(rows)) {
     return {
       kind: 'refused',
-      reason: `rows is ${rows}, which does not make rows*${TILE_BYTES} an exact power of two — `
+      reason: `rows ${rows} is not a legal band height`,
+      hint: `rows is ${rows}, which does not make rows*${TILE_BYTES} an exact power of two — `
         + 'the runtime rotates a whole pattern column by shifting it. Pick a row count from the '
-        + 'form before dragging a range.',
+        + "band form's Rows control before dragging a range.",
     };
   }
 
@@ -193,7 +203,8 @@ export function resolveStripDrag(input: StripDragInputs): StripDragOutcome {
   if (staticBase > runEnd) {
     return {
       kind: 'refused',
-      reason: `slots ${lo}..${runEnd} are all inside the animated prefix — slots 0..`
+      reason: `slots ${lo}..${runEnd} already belong to bands`,
+      hint: `slots ${lo}..${runEnd} are all inside the animated prefix — slots 0..`
         + `${firstPromotableSlot} already belong to bands, so there is no static art under this `
         + 'drag to promote. Drag a run that reaches past the prefix.',
     };
@@ -206,7 +217,8 @@ export function resolveStripDrag(input: StripDragInputs): StripDragOutcome {
   if (maxCols < 1) {
     return {
       kind: 'refused',
-      reason: `a band of ${rows} row(s) needs ${rows} slot(s) from ${staticBase}, but the blob `
+      reason: `no ${rows}-row column fits from slot ${staticBase}`,
+      hint: `a band of ${rows} row(s) needs ${rows} slot(s) from ${staticBase}, but the blob `
         + `ends at ${blobTileCount}. No column fits there, so the candidate is unchanged.`,
     };
   }
@@ -225,7 +237,7 @@ export function resolveStripDrag(input: StripDragInputs): StripDragOutcome {
 }
 
 /**
- * The one-line readout for the picker's hover label.
+ * The readout for the picker's hover label. ONE SHORT LINE, ALWAYS.
  *
  * IT IS THE ONLY SURFACE THIS GESTURE HAS. The strip has no other place to
  * speak, and the candidate it moves lives two panels away in a section that
@@ -233,17 +245,46 @@ export function resolveStripDrag(input: StripDragInputs): StripDragOutcome {
  * would be indistinguishable from a drag that did nothing at all. Every outcome
  * gets a sentence, including the refusals.
  *
+ * ═══ WHY IT IS SHORT, AND WHY THE REASONING MOVED TO `stripDragHint` ═══
+ *
+ * MEASURED, NOT PREFERRED. The first build put the whole refusal paragraph on
+ * this line. The label WRAPPED, the picker's header row grew by two text lines,
+ * and THE TILE GRID MOVED 36px DOWN UNDER THE CURSOR — so the next press landed
+ * two rows off the slot it aimed at, and a later one landed on the band cards,
+ * whose hover handler then erased the refusal that had just been written. A
+ * readout that moves the thing it is reporting on is worse than no readout.
+ *
+ * `scratchpad/bganim-strip-range-harness.mjs` [6h] is the row that found it and
+ * the row that holds it: the strip's box must be byte-identical before and after
+ * a readout is written. The component pairs this with `whiteSpace: nowrap` and
+ * an ellipsis, so no message length can reach the layout again.
+ *
  * ⚠ NEUTRAL ABOUT THE FOOTPRINT, exactly as `coverageSummary` is: it states the
- * range the drag aimed and what the run snapped to, and never whether that is a
- * good idea. `pick` returns '' because the pick has its own label already —
- * the hover readout the strip has always drawn.
+ * range the drag aimed and never whether that is a good idea. `pick` returns ''
+ * because the pick has its own label already — the hover readout the strip has
+ * always drawn.
  */
 export function stripDragLabel(outcome: StripDragOutcome): string {
   if (outcome.kind === 'pick') return '';
   if (outcome.kind === 'refused') return `no range — ${outcome.reason}`;
   const end = outcome.staticBase + outcome.cols * outcome.rows;
-  const parts = [`band candidate · slots ${outcome.staticBase}..${end} (${outcome.cols}x${outcome.rows})`];
-  parts.push(`from a run of ${outcome.runLength}`);
+  return `band ${outcome.staticBase}..${end} · ${outcome.cols}x${outcome.rows}`;
+}
+
+/**
+ * The same answer at length, for the readout's `title` — where a paragraph costs
+ * no layout. Everything `stripDragLabel` has to leave out lives here: the run the
+ * range was snapped from, whether the start was moved off the anchor, and a
+ * refusal's whole reasoning.
+ */
+export function stripDragHint(outcome: StripDragOutcome): string {
+  if (outcome.kind === 'pick') return '';
+  if (outcome.kind === 'refused') return outcome.hint;
+  const end = outcome.staticBase + outcome.cols * outcome.rows;
+  const parts = [
+    `band candidate · slots ${outcome.staticBase}..${end} (${outcome.cols}x${outcome.rows})`,
+    `from a dragged run of ${outcome.runLength} slot${outcome.runLength === 1 ? '' : 's'}`,
+  ];
   if (outcome.clampedToPrefix) parts.push('start moved past the animated prefix');
   if (outcome.trimmedToBlob) parts.push('trimmed to the end of the blob');
   return parts.join(' · ');
@@ -286,8 +327,10 @@ export function publishStripDrag(
 ): void {
   lastReport = {
     kind: outcome.kind,
+    // The refusal's FULL reasoning, not the one-line form: a report is read by
+    // a harness and by a person debugging, and neither is short of room.
     detail: outcome.kind === 'pick' ? outcome.why
-      : outcome.kind === 'refused' ? outcome.reason : null,
+      : outcome.kind === 'refused' ? outcome.hint : null,
     anchorSlot: input.anchorSlot,
     releaseSlot: input.releaseSlot,
     staticBase: outcome.kind === 'range' ? outcome.staticBase : null,

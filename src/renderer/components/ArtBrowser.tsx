@@ -13,7 +13,7 @@ import {
   type TileThumbCacheKey, type TilePickerBandGroup, type TilePickerSource,
 } from '../providers/tile-picker-source';
 import {
-  publishStripDrag, resolveStripDrag, stripDragLabel,
+  publishStripDrag, resolveStripDrag, stripDragHint, stripDragLabel,
 } from '../providers/band-strip-range';
 import { bandBudget } from '../providers/bg-anim-aeon';
 import { T } from './ui';
@@ -217,6 +217,9 @@ export default function ArtBrowser() {
       // Labelled in the space the index actually lives in — a blob-local slot in
       // BG, a zone tile index in FG.
       hoverLabelRef.current.textContent = tilePickerHoverLabel(source, newIdx);
+      // The strip drag's `title` belongs to the message it wrote; a move onto a
+      // new tile replaces the message, so the tooltip goes with it.
+      hoverLabelRef.current.title = '';
     }
   }, [itemSize, itemCount, source]);
 
@@ -303,8 +306,14 @@ export default function ArtBrowser() {
     }
     // `range` and `refused` both report on the picker's own hover line — the
     // strip has no other surface, and the candidate they aim lives two panels
-    // away in a section that arrives collapsed.
-    if (hoverLabelRef.current) hoverLabelRef.current.textContent = stripDragLabel(outcome);
+    // away in a section that arrives collapsed. The SHORT form goes on the line
+    // and the full reasoning into `title`: a readout long enough to wrap grew
+    // the header row and moved the tile grid out from under the cursor (see
+    // `stripDragLabel`, and the harness row that caught it).
+    if (hoverLabelRef.current) {
+      hoverLabelRef.current.textContent = stripDragLabel(outcome);
+      hoverLabelRef.current.title = stripDragHint(outcome);
+    }
   }, [slotAtEvent, editingLayer]);
 
   const handleMouseLeave = useCallback(() => {
@@ -314,7 +323,10 @@ export default function ArtBrowser() {
       const ctx = overlay.getContext('2d');
       if (ctx) ctx.clearRect(0, 0, overlay.width, overlay.height);
     }
-    if (hoverLabelRef.current) hoverLabelRef.current.textContent = '';
+    if (hoverLabelRef.current) {
+      hoverLabelRef.current.textContent = '';
+      hoverLabelRef.current.title = '';
+    }
   }, []);
 
   // Keep scrollTopRef in sync
@@ -456,20 +468,29 @@ const styles: Record<string, React.CSSProperties> = {
     background: T.surface, borderTop: `1px solid ${T.border}`,
     height: 180, flexShrink: 0,
   },
+  // ⚠ ONE LINE, AND IT MAY NOT GROW. The row below it is the tile grid, and this
+  // row growing pushes that grid DOWN UNDER THE CURSOR — measured at 36px when
+  // the strip-drag readout wrapped to three lines, which put the next press two
+  // slots off and let the band cards slide under the pointer and erase the
+  // message. `nowrap` here plus the ellipsis on `hoverLabel` means no message
+  // length can reach the layout. (ROADMAP item 43 wave 2; harness row [6h].)
   tabs: {
-    display: 'flex', alignItems: 'center', gap: 0,
-    borderBottom: `1px solid ${T.border}`, flexShrink: 0,
+    display: 'flex', alignItems: 'center', gap: 0, whiteSpace: 'nowrap',
+    borderBottom: `1px solid ${T.border}`, flexShrink: 0, overflow: 'hidden',
   },
   // A COUNT, not a heading. This panel is always mounted inside a
   // CollapsibleSection that names it (layout-facet.tsx: "Art"), and in heading
   // type this row read as a second, disagreeing title stacked under the first —
   // the same doubling ChunkGrid's countLabel fixed.
   label: {
-    padding: '6px 12px', fontSize: T.t2xs, color: T.textLo,
+    padding: '6px 12px', fontSize: T.t2xs, color: T.textLo, flexShrink: 0,
   },
+  // The readout truncates rather than wrapping — see `tabs`. The full text is
+  // always on the element's `title`, so nothing is lost to the ellipsis.
   hoverLabel: {
     marginLeft: 'auto', padding: '0 12px',
     fontSize: T.tXs, fontFamily: T.fontMono, color: T.accent,
+    minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
   },
   canvasWrap: {
     flex: 1, position: 'relative', overflow: 'hidden',

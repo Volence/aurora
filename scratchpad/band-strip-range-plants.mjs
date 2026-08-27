@@ -95,29 +95,15 @@ const PLANTS = [
   {
     id: 'prefix-silent',
     what: 'a run entirely inside the prefix silently resolves instead of refusing',
-    from: `  if (staticBase > runEnd) {
-    return {
-      kind: 'refused',
-      reason: \`slots \${lo}..\${runEnd} are all inside the animated prefix — slots 0..\`
-        + \`\${firstPromotableSlot} already belong to bands, so there is no static art under this \`
-        + 'drag to promote. Drag a run that reaches past the prefix.',
-    };
-  }`,
-    to: '',
+    from: '  if (staticBase > runEnd) {',
+    to:   '  if (false && staticBase > runEnd) {',
     expect: /entirely inside the animated prefix is refused/,
   },
   {
     id: 'blob-overrun',
     what: 'the blob bound dropped — a band may run off the end of the tile array',
-    from: `  if (maxCols < 1) {
-    return {
-      kind: 'refused',
-      reason: \`a band of \${rows} row(s) needs \${rows} slot(s) from \${staticBase}, but the blob \`
-        + \`ends at \${blobTileCount}. No column fits there, so the candidate is unchanged.\`,
-    };
-  }
-  const cols = Math.min(wanted, maxCols);`,
-    to: '  const cols = wanted;',
+    from: '  if (maxCols < 1) {',
+    to:   '  if (false && maxCols < 1) {',
     expect: /no room for even one column|boundary is exact/,
   },
   {
@@ -151,11 +137,31 @@ const PLANTS = [
   {
     id: 'alarm',
     what: 'the range label grows a warning — the NEUTRAL ruling violated',
-    from: "  parts.push(`from a run of ${outcome.runLength}`);",
-    to:   "  parts.push(`from a run of ${outcome.runLength} — careful, that is too many`);",
-    // Planted on the part EVERY range label carries, not on the trimmed branch,
-    // which no reachable input reaches (see `trimmedToBlob`'s docblock).
+    from: '  return `band ${outcome.staticBase}..${end} · ${outcome.cols}x${outcome.rows}`;',
+    to:   '  return `band ${outcome.staticBase}..${end} · ${outcome.cols}x${outcome.rows} — careful`;',
     expect: /NEUTRAL about the footprint/,
+  },
+  {
+    id: 'paragraph-on-the-line',
+    what: 'THE DEFECT THE CDP HARNESS FOUND: the whole refusal paragraph put back on the '
+      + 'one line, which wrapped the header row and moved the tile grid under the cursor',
+    from: "  if (outcome.kind === 'refused') return `no range — ${outcome.reason}`;",
+    to:   "  if (outcome.kind === 'refused') return `no range — ${outcome.hint}`;",
+    expect: /EVERY line is ONE line/,
+  },
+  {
+    id: 'hint-on-the-line',
+    what: 'the range line grows the hint\'s detail back onto it',
+    from: '  return `band ${outcome.staticBase}..${end} · ${outcome.cols}x${outcome.rows}`;',
+    to:   '  return stripDragHint(outcome);',
+    expect: /EVERY line is ONE line/,
+  },
+  {
+    id: 'hint-empty',
+    what: 'the hint drops the reasoning, so the ellipsised line is all there is',
+    from: "  if (outcome.kind === 'refused') return outcome.hint;",
+    to:   "  if (outcome.kind === 'refused') return outcome.reason;",
+    expect: /reasoning on the hint|run and the clamp are on the HINT/,
   },
   {
     id: 'report-frozen',

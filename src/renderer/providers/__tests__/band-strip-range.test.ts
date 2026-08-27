@@ -26,7 +26,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import {
-  publishStripDrag, lastStripDragReport, resolveStripDrag, stripDragLabel,
+  publishStripDrag, lastStripDragReport, resolveStripDrag, stripDragHint, stripDragLabel,
   type StripDragInputs,
 } from '../band-strip-range';
 import { markFromLayoutWord } from '../band-coverage';
@@ -201,16 +201,18 @@ describe('the two refusals — loud, and unchanged candidate', () => {
   it('a run entirely inside the animated prefix is refused, naming the prefix', () => {
     const r = resolveStripDrag(drag({ anchorSlot: 4, releaseSlot: 20, firstPromotableSlot: 32 }));
     expect(r.kind).toBe('refused');
-    expect(r.kind === 'refused' && r.reason).toMatch(/animated prefix/);
-    expect(r.kind === 'refused' && r.reason).toMatch(/0\.\.32/);
+    expect(r.kind === 'refused' && r.reason).toMatch(/already belong to bands/);
+    expect(r.kind === 'refused' && r.hint).toMatch(/animated prefix/);
+    expect(r.kind === 'refused' && r.hint).toMatch(/0\.\.32/);
   });
 
   it('a base with no room for even one column is refused, naming the blob\'s end', () => {
     // 338..339 at rows 4 in a 340-tile blob: floor((340-338)/4) = 0 columns fit.
     const r = resolveStripDrag(drag({ anchorSlot: 338, releaseSlot: 339, blobTileCount: 340 }));
     expect(r.kind).toBe('refused');
-    expect(r.kind === 'refused' && r.reason).toMatch(/ends at 340/);
-    expect(r.kind === 'refused' && r.reason).toMatch(/candidate is unchanged/);
+    expect(r.kind === 'refused' && r.reason).toMatch(/no 4-row column fits from slot 338/);
+    expect(r.kind === 'refused' && r.hint).toMatch(/ends at 340/);
+    expect(r.kind === 'refused' && r.hint).toMatch(/candidate is unchanged/);
   });
 
   it('the boundary is exact: one column short refuses, one column\'s worth resolves', () => {
@@ -224,7 +226,8 @@ describe('the two refusals — loud, and unchanged candidate', () => {
   it('a rows value the runtime cannot shift is refused, in the contract\'s own terms', () => {
     const r = resolveStripDrag(drag({ rows: 3, anchorSlot: 40, releaseSlot: 55 }));
     expect(r.kind).toBe('refused');
-    expect(r.kind === 'refused' && r.reason).toContain(`rows*${TILE_BYTES}`);
+    expect(r.kind === 'refused' && r.reason).toContain('rows 3 is not a legal band height');
+    expect(r.kind === 'refused' && r.hint).toContain(`rows*${TILE_BYTES}`);
   });
 
   it('rows 0 cannot divide by zero — it is refused before the arithmetic', () => {
@@ -290,27 +293,57 @@ describe('the gesture aims something the CODEC accepts', () => {
 });
 
 describe('the label — the strip\'s only surface', () => {
-  it('a range says the slots, the geometry and the run it came from', () => {
+  it('a range names the slot span and the geometry on the LINE', () => {
     const r = resolveStripDrag(drag({ anchorSlot: 40, releaseSlot: 55 }));
     const label = stripDragLabel(r);
-    expect(label).toContain('slots 40..56');   // base .. base + cols*rows
-    expect(label).toContain('(4x4)');
-    expect(label).toContain('run of 16');
+    expect(label).toContain('40..56');         // base .. base + cols*rows
+    expect(label).toContain('4x4');
   });
 
-  it('a clamped range says the start moved, so a surprising base is explained', () => {
+  it('the run and the clamp are on the HINT, where a paragraph costs no layout', () => {
     const r = resolveStripDrag(drag({ anchorSlot: 20, releaseSlot: 47 }));
-    expect(stripDragLabel(r)).toContain('start moved past the animated prefix');
+    expect(stripDragHint(r)).toContain('run of 16 slots');
+    expect(stripDragHint(r)).toContain('start moved past the animated prefix');
   });
 
-  it('a refusal is stated on the line, never swallowed', () => {
+  it('EVERY line is ONE line and stays short — a readout that wrapped moved the grid', () => {
+    // MEASURED, NOT A STYLE PREFERENCE. The first build put the refusal
+    // paragraph on the line; it wrapped, the picker's header row grew two text
+    // lines, and the tile grid moved 36px down UNDER THE CURSOR — the next press
+    // landed two slots off and the band cards slid under the pointer and erased
+    // the message. The CDP row that caught it is [6h]; this is the node half.
+    const outcomes = [
+      resolveStripDrag(drag({ anchorSlot: 40, releaseSlot: 55 })),
+      resolveStripDrag(drag({ anchorSlot: 20, releaseSlot: 47 })),
+      resolveStripDrag(drag({ anchorSlot: 4, releaseSlot: 20 })),
+      resolveStripDrag(drag({ anchorSlot: 338, releaseSlot: 339 })),
+      resolveStripDrag(drag({ rows: 3, anchorSlot: 40, releaseSlot: 55 })),
+    ];
+    // ANTI-VACUOUS: both branches that write a line are in the sample.
+    expect(outcomes.some((o) => o.kind === 'range')).toBe(true);
+    expect(outcomes.some((o) => o.kind === 'refused')).toBe(true);
+    for (const o of outcomes) {
+      const line = stripDragLabel(o);
+      expect(line).not.toContain('\n');
+      // The budget is the picker's own header row, which is one line of ~60
+      // monospace characters at the widths this panel docks to. Anything past
+      // that is a paragraph and belongs on the hint.
+      expect(line.length, `too long for one line: ${JSON.stringify(line)}`).toBeLessThanOrEqual(60);
+    }
+  });
+
+  it('a refusal is stated on the line, never swallowed, with the reasoning on the hint', () => {
     const r = resolveStripDrag(drag({ anchorSlot: 4, releaseSlot: 20 }));
     expect(stripDragLabel(r)).toMatch(/^no range — /);
-    expect(stripDragLabel(r)).toContain('animated prefix');
+    expect(stripDragLabel(r)).toContain('already belong to bands');
+    expect(stripDragHint(r)).toContain('animated prefix');
+    // The line is a summary of the hint, never the whole of it.
+    expect(stripDragHint(r).length).toBeGreaterThan(stripDragLabel(r).length);
   });
 
-  it('a pick writes NOTHING to the line — the strip\'s own hover readout stands', () => {
+  it('a pick writes NOTHING to the line or the hint — the strip\'s own readout stands', () => {
     expect(stripDragLabel(resolveStripDrag(drag({ anchorSlot: 9, releaseSlot: 9 })))).toBe('');
+    expect(stripDragHint(resolveStripDrag(drag({ anchorSlot: 9, releaseSlot: 9 })))).toBe('');
     expect(stripDragLabel(resolveStripDrag(
       drag({ layer: 'fg', origin: 'tileset', anchorSlot: 9, releaseSlot: 40 })))).toBe('');
   });
