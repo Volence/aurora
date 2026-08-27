@@ -843,6 +843,14 @@ defect the parcel exists to fix.
   and do not start trusting `tree:` until a relinked binary proves it can say `clean`. Sigil
   is deliberately **not** relinking to make it true while aeon has a seven-ROM freeze pinning
   the shared binary — which is this bar's own hazard being honoured, and is the right call.
+  ⚠ **THE GENERAL RULE, and it is why "quote the banner" was the wrong operational form of a
+  correct rule: A PROVENANCE RECORD IS NOT ONE CLAIM, IT IS SEVERAL, AND THEY DO NOT SHARE A
+  CLOCK.** `revision:` follows git refs (cargo re-captures on HEAD/refs moves); `tree:` follows
+  a *build* (cargo has no trigger for uncommitted). **Same line of output, two freshnesses, and
+  nothing in the formatting says so.** Adopted by the aeon lane as the headline of their own
+  bar. The question it hands the next person, in place of a fact to memorise: **which
+  components of this record can move, and on whose schedule?** Ask it before quoting any
+  provenance field — version banners, build stamps, `--version` output, embedded SHAs.
   **Downstream consequence worth knowing** *(aeon's, from this enumeration)*: because aeon
   **tracks** that file and edits it all session, their main tree is effectively always dirty,
   which is why their golden freezes must run from a clean worktree. They had been reading that
