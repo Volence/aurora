@@ -260,9 +260,13 @@ export function clampRateShift(value: number): number {
  * image of the defect this fixes. That end stays where it already is — a named
  * refusal out of `requirePromotableRange`, quoting the blob's real length.
  *
- * A non-finite value (the box mid-keystroke) falls to `firstPromotableSlot` —
- * the same slot the form seeds at, and the one place a promotion is legal by
- * construction.
+ * A non-finite value falls to `firstPromotableSlot` — the same slot the form
+ * seeds at, and the one place a promotion is legal by construction. THAT IS NOT
+ * "the box mid-keystroke", which is what this line used to say: an emptied box
+ * used to arrive as `Number('')`, which is 0 — finite, and floored straight up
+ * to `firstPromotableSlot` as though the author had typed it. `NumberField` now
+ * commits nothing for a box with no number in it, so this arm serves values
+ * from elsewhere only.
  */
 export function clampStaticBase(value: number, firstPromotableSlot: number): number {
   if (!Number.isFinite(value)) return firstPromotableSlot;

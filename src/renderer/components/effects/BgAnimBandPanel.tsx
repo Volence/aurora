@@ -539,6 +539,12 @@ export default function BgAnimBandPanel(): React.ReactElement {
             sections would have been the shape that quietly says one of the two
             is the real one. */}
         <Field label="Cols" title="Pattern width in tiles">
+          {/* `|| 1` USED TO BE THE EMPTY-BOX ARM, and it was the wrong shape
+              of fix: emptying the box handed this a `Number('')` of 0, which
+              this quietly turned into a 1 the author never typed. The field
+              now commits nothing at all for a box with no number in it, so an
+              empty "Cols" leaves the candidate's width alone. What is left
+              here is the floor, for a 0 or a negative somebody really typed. */}
           <NumberField title={`cols — pattern_px will be ${patternPxFor(cols)}`}
             min={1} width={56} value={cols}
             onChange={(n) => setCols(Math.max(1, Math.round(n) || 1))} />

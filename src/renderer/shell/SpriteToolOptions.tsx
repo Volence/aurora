@@ -56,6 +56,11 @@ export default function SpriteToolOptions({
           <Chip key={s} onClick={() => st().newSprite(s, s)}>{s}</Chip>
         ))}
       </span>
+      {/* `v || 8` USED TO BE THE EMPTY-BOX ARM: emptying the box handed this a
+          `Number('')` of 0, and this turned it into an 8 the author never
+          typed. The field now commits nothing for a box with no number in it,
+          so an empty custom size leaves the last one standing; the clamp here
+          is for a number somebody really typed. */}
       <NumberField value={newSize} min={8} max={128} width={48}
         title="custom size (px)"
         onChange={(v) => onNewSize(Math.max(8, Math.min(128, v || 8)))} />

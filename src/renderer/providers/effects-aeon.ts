@@ -403,9 +403,19 @@ export function clampVFactor(value: number): number {
  * only style the spinner and never stop a typed value (ROADMAP item 37), so
  * these are what keep the document inside what aeon's emit accepts.
  *
- * A non-finite value (a half-typed '-' in the input) falls to the schema's
- * `default`, not to `min`: for the signed `v_offset`, `min` would be -32768,
- * which is not a sane thing to write into a document mid-keystroke.
+ * A non-finite value falls to the schema's `default`, not to `min`: for the
+ * signed `v_offset`, `min` would be -32768, which is not a sane thing to write
+ * into a document.
+ *
+ * THAT ARM IS NOT THE FIELD'S MID-KEYSTROKE STATE, and this line used to claim
+ * it was ("a half-typed '-' in the input"). It was wrong twice over. `NumberField`
+ * used to hand on `Number(e.target.value)`, and an `<input type="number">`
+ * reports '' — not '-' — for text that is not yet a number, so a half-typed '-'
+ * arrived here as `Number('')`, which is **0**: a finite, in-range, silently
+ * COMMITTED zero that this branch never saw. `NumberField` now commits nothing
+ * at all for text with no number in it (see its docblock), so nothing
+ * mid-keystroke reaches this function from the form. What is left for this arm
+ * is a value from somewhere else — a drag, a port, a caller's own arithmetic.
  */
 function clampSceneField(bounds: { min: number; max: number }, fallback: number, value: number): number {
   if (!Number.isFinite(value)) return fallback;
