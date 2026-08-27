@@ -73,26 +73,108 @@ export function canvasYToWorldY(canvasY: number, vpY: number, zoom: number): num
 // shipped scenes) aeon's `scene_plane_line` maps a top to a plane line by the
 // IDENTITY: the authoring space IS the plane, and the eight layers divide the
 // visible screen, not the act. `providers/effects-aeon.layerTopSpace` decides
-// which; this module only asks where line 0 is. In act space it is world 0. In
-// screen space it is THE TOP OF THE VIEWPORT — until the screen-frame overlay
-// (parcel G, built in parallel) lands and gives the canvas a real 320x224
-// frame to be relative to, the viewport's own top edge stands in for the
-// screen's. A guide drawn that way does not scroll with the act, which is
-// exactly the property that distinguishes a screen line from a world row.
+// which; this module only asks where line 0 is. In act space it is world 0.
+//
+// IN SCREEN SPACE IT IS THE SCREEN FRAME'S TOP EDGE, and this is the whole of
+// the 2026-08-27 fix. It used to be `vp.y`, the viewport's own top edge, marked
+// in this comment as a stand-in "until the screen-frame overlay (parcel G)
+// lands". Parcel G landed (canvas/screen-frame.ts) and the stand-in did not
+// move, so the owner reported the symptom the stand-in guarantees: "if I zoom in
+// the bands hold relative to my screen, not the bg". `vp.y` is not a position in
+// the world at all — it changes on every pan and every zoom — so the entire
+// guide set slid under the art it was dividing.
+//
+// ═══ WHERE THE SCREEN SITS, AND WHY THE FRAME IS THE ANSWER ═══
+//
+// The chain is aeon's, up to its last step:
+//
+//   1. `scene_vsplit_line(s, wy) = scene_plane_line(s, wy) - v_offset`
+//      (aeon engine/level/scene_dsl.emp:2461), legal only under the lock.
+//   2. Locked, `scene_plane_line` is the identity — `pl = wy`
+//      (scene_dsl.emp:2417-2421: "For a locked plane the authoring space IS the
+//      plane, so the mapping is the identity").
+//   3. So a locked layer's SCREEN line is `wy - v_offset`, and a screen line is
+//      a row of the 224-line visible display.
+//   4. The visible display's top edge, in act world pixels, is the camera's
+//      unbiased top edge — `Camera_Y`. (Aurora's own `ScreenFrameAnchor` is
+//      documented as exactly that: "in WORLD pixels (act axis; the camera's
+//      unbiased edge)".)
+//   5. Therefore world Y of the guide for top `wy` is
+//      `Camera_Y + wy - v_offset`, i.e. an origin of `Camera_Y - v_offset`.
+//
+// STEP 5 IS A DERIVATION; THE VALUE OF `Camera_Y` IS A CHOICE, and it has to be,
+// because the lock's meaning is precisely that the answer does not depend on the
+// camera (`parallax.emp`'s `.v_locked` arm: "locked: BG = vOffset (static,
+// ignores camera + lerp)"). Every camera position is equally consistent with a
+// locked scene, so the engine cannot name one. Aurora already carries the
+// author's own statement of which one they mean: `viewStore.screenFrame`, the
+// pinned draggable 320x224 rectangle. Guides anchored to it stay on the same
+// background pixel across a pan and a zoom, and MOVE only when the author says
+// the camera is somewhere else — by dragging the frame.
+//
+// REJECTED, and why:
+//   - `vp.y`, the shipped stand-in — not a world position; the reported bug.
+//   - a hard-wired world 0 — it is the frame's DEFAULT anchor, so nothing
+//     regresses on first open, but as a fixed RULE it asserts the camera is
+//     pinned at the act's top-left, which is true only at an act's very start
+//     and false everywhere an author works. It also leaves the guides unmovable
+//     against the art they are being compared with.
+//   - the act's start position — a second source of truth that would silently
+//     disagree with the frame the author can drag, and a scene is assigned to
+//     many sections, so there is no one act position it belongs to.
+//   - a scene-document field — this is an authoring viewpoint, not scene data;
+//     aeon's editor JSON has no such key, so it would not round-trip.
 
-/** World Y that line 0 of `space` sits at, for this viewport. */
-export function guideOriginWorldY(vp: Pick<GuideViewport, 'y'>, space: LayerTopSpace): number {
-  return space === 'screen' ? vp.y : 0;
+/**
+ * Where line 0 of a screen-space guide set sits, in world pixels.
+ *
+ * `frameY` is the screen frame's top edge (`viewStore.screenFrame.y`), NOT the
+ * viewport's. `vOffset` is the scene's `v_offset`, because a locked layer's
+ * screen line is `top - v_offset` (aeon `scene_vsplit_line`).
+ */
+export interface GuideOrigin {
+  /** World Y of the screen frame's top edge — the camera's unbiased top edge. */
+  frameY: number;
+  /** The scene's `v_offset`; 0 in both shipped scenes. */
+  vOffset?: number;
+}
+
+/**
+ * The default origin: the screen frame's own default anchor, world 0.
+ *
+ * DELIBERATELY A WORLD CONSTANT AND NOT A VIEWPORT READ. A caller that forgets
+ * to pass an origin gets a guide fixed in the world — wrong place, maybe, but
+ * still fixed. The defect this parcel exists to remove can only come back by
+ * someone writing `vp.y` here on purpose.
+ */
+export const DEFAULT_GUIDE_ORIGIN: GuideOrigin = { frameY: 0, vOffset: 0 };
+
+/**
+ * World Y that line 0 of `space` sits at.
+ *
+ * ⚠ THE ARGUMENT ORDER CHANGED ON PURPOSE (2026-08-27). The old signature took
+ * the VIEWPORT first, and a viewport and a `GuideOrigin` would both satisfy a
+ * `{ y: number }` parameter — so a stale call site would have kept compiling
+ * while quietly restoring the bug. `space` first makes every one of them a type
+ * error until it is looked at.
+ */
+export function guideOriginWorldY(
+  space: LayerTopSpace, origin: GuideOrigin = DEFAULT_GUIDE_ORIGIN,
+): number {
+  return space === 'screen' ? origin.frameY - (origin.vOffset ?? 0) : 0;
 }
 
 /** Canvas-local Y -> a layer top in `space` (the drag's inverse of `layerGuideGeometry`). */
-export function canvasYToLayerTop(canvasY: number, vp: GuideViewport, space: LayerTopSpace): number {
-  return canvasYToWorldY(canvasY, vp.y, vp.zoom) - guideOriginWorldY(vp, space);
+export function canvasYToLayerTop(
+  canvasY: number, vp: GuideViewport, space: LayerTopSpace,
+  origin: GuideOrigin = DEFAULT_GUIDE_ORIGIN,
+): number {
+  return canvasYToWorldY(canvasY, vp.y, vp.zoom) - guideOriginWorldY(space, origin);
 }
 
 /** The one-line caption the guide layer carries so the space is visible; null when act. */
 export function guideCaption(space: LayerTopSpace): string | null {
-  return space === 'screen' ? 'screen lines — locked scene' : null;
+  return space === 'screen' ? 'screen lines — from the screen frame\'s top edge' : null;
 }
 
 /**
@@ -112,11 +194,11 @@ export const GUIDE_GRAB_PX = 6;
  */
 export function guideAtCanvasY(
   canvasY: number, layers: readonly EffectsLayer[], vp: GuideViewport,
-  space: LayerTopSpace = 'act',
+  space: LayerTopSpace = 'act', guideOrigin: GuideOrigin = DEFAULT_GUIDE_ORIGIN,
 ): number | null {
   let best: number | null = null;
   let bestDist = Infinity;
-  const origin = guideOriginWorldY(vp, space);
+  const origin = guideOriginWorldY(space, guideOrigin);
   for (let i = 0; i < layers.length; i++) {
     const d = Math.abs(worldYToCanvasY(origin + layers[i].world_y, vp.y, vp.zoom) - canvasY);
     if (d <= GUIDE_GRAB_PX && d <= bestDist) { best = i; bestDist = d; }
@@ -137,6 +219,12 @@ export interface GuideDrawOptions {
   hoverIndex?: number | null;
   /** Which space the tops are in (`layerTopSpace(scene)`); act when omitted. */
   space?: LayerTopSpace;
+  /**
+   * Where screen line 0 sits (the screen frame's top edge, and the scene's
+   * `v_offset`). Ignored in act space. Defaults to `DEFAULT_GUIDE_ORIGIN`, never
+   * to anything read off the viewport — see `guideOriginWorldY`.
+   */
+  origin?: GuideOrigin;
 }
 
 /** Where one guide row ends up on the canvas — the shape the debug probe reports. */
@@ -160,7 +248,7 @@ export function layerGuideGeometry(
   layers: readonly EffectsLayer[], vp: GuideViewport, opts: GuideDrawOptions = {},
 ): GuideGeometry[] {
   const out: GuideGeometry[] = [];
-  const origin = guideOriginWorldY(vp, opts.space ?? 'act');
+  const origin = guideOriginWorldY(opts.space ?? 'act', opts.origin ?? DEFAULT_GUIDE_ORIGIN);
   for (let i = 0; i < layers.length; i++) {
     const worldY = (opts.dragIndex === i && typeof opts.dragWorldY === 'number')
       ? opts.dragWorldY : layers[i].world_y;
