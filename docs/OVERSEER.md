@@ -239,7 +239,21 @@ Each has caught a real defect here.
    whose job was to corroborate someone else** — which is the worst possible host, because a
    corroboration is the one claim nobody re-checks once it agrees.
    **Operational form: name the property, then ask what a GREEN result would have ruled
-   out. If nothing, the gate is vacuous however correct it is.** This subsumes bar 2's
+   out. If nothing, the gate is vacuous however correct it is.**
+   ⚠ **SHARPER GENERAL FORM, and it is the sigil lane's** *(2026-08-27, given back after
+   watching this bar fire on my own hour-old rule — see the assembler-banner entry under
+   Quirks)*: **a vacuous check is one whose FAILURE STATE AND SUCCESS STATE EMIT THE SAME
+   ARTIFACT.** That is a test you can run on a rule you just wrote, without knowing anything
+   about the subject, and it is strictly easier to apply than "what would green have ruled
+   out". Instance, mine: a bar reading *"this field is vacuous until sigil fixes it"* is
+   itself vacuous, because the field cannot report its own repair — so following the rule
+   correctly yields *they never fixed it* whether they did or not. **The place to run this
+   check is on your OWN newly-written bars**, which is where nobody runs it; a rule is at its
+   most convincing in the hour after you write it. Companion enumeration lesson from the same
+   exchange: **enumerate across instances rather than reasoning within one.** One cross-lane
+   table of `docs/lane-status.json` produced two live findings pointing OPPOSITE ways — sigil
+   reporting dirt that meant nothing, aeon *having* dirt that meant nothing and blaming the
+   wrong subsystem for it. Neither lane could see its own from inside its own repo. This subsumes bar 2's
    red-first plant rather than replacing it: a plant answers "does it fire", and this
    answers "could it ever have failed".
    **Note how the third one was found, because it is Q-16's discriminator firing BY
