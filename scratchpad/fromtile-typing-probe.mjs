@@ -6,6 +6,23 @@
 // land on "19250" instead, because the box snaps to 192 after the first key.
 //
 // Node cannot see this. It is a keystroke on a controlled React input.
+//
+// ⚠ WHERE THIS PROBE STOPPED, AND THE WAY IN — recorded so the next attempt does
+// not repeat the search. The "From tile" field is NOT reachable by expanding the
+// "BG animation bands" disclosure: a real CDP click on that header (found at
+// y=777, so the element is located correctly) does not open it, and scrolling
+// every scrollable container to the bottom does not reveal the field either.
+// Only the ten SCENE/LAYER number inputs are ever in the DOM.
+//
+// The field lives in the promote form, which renders only once a BAND CANDIDATE
+// exists — and `__dbg.aeon` exposes `bandCandidate()` as a GETTER ONLY, with no
+// setter. The way in is therefore to CREATE a candidate the way a user does: a
+// drag on the blob strip. `scratchpad/bganim-strip-range-harness.mjs` already
+// performs exactly that gesture and gets the panel into this state (its own
+// screenshots show NEW BAND expanded with Cols/Rows/Driver). Start from that
+// harness's section 6 rather than from this file's DOM search.
+//
+// Until then item 40's typing wrinkle is UNTESTED, which is not the same as absent.
 import { spawn } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url'; import { dirname } from 'node:path';
@@ -54,10 +71,26 @@ try {
   // Expand the bands section with a REAL click (synthetic .click() misses the handler).
   const hdr = await c.json(`(() => { const el=[...document.querySelectorAll('*')].filter(e=>/^BG animation bands/i.test((e.textContent||'').trim())).pop();
     if(!el) return null; const r=el.getBoundingClientRect(); return {x:r.left,y:r.top,w:r.width,h:r.height}; })()`);
+  console.log(`  bands header: ${JSON.stringify(hdr)}`);
   if (hdr) { const x = Math.round(hdr.x + hdr.w/2), y = Math.round(hdr.y + hdr.h/2);
     await c.send('Input.dispatchMouseEvent', { type:'mousePressed', x, y, button:'left', clickCount:1 });
     await c.send('Input.dispatchMouseEvent', { type:'mouseReleased', x, y, button:'left', clickCount:1 }); }
   await sleep(1500);
+  // The band fields live below the fold of a scrolling dock. Scroll every
+  // scrollable container to the bottom so they are laid out before enumerating —
+  // an un-scrolled panel yields "no such input", which is indistinguishable from
+  // the field not existing.
+  const scrolled = await c.json(`(() => {
+    const out = [];
+    for (const e of document.querySelectorAll('*')) {
+      if (e.scrollHeight > e.clientHeight + 4 && e.clientHeight > 100) {
+        e.scrollTop = e.scrollHeight; out.push({ h: e.clientHeight, s: e.scrollHeight });
+      }
+    }
+    return out;
+  })()`);
+  console.log(`  scrolled ${scrolled.length} container(s) to the bottom`);
+  await sleep(1200);
 
   // Find the "From tile" number input by its label text.
   // Enumerate EVERY number input with its bounds and its own title, and pick the
