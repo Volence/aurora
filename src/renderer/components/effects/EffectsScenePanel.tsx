@@ -410,10 +410,14 @@ export default function EffectsScenePanel(): React.ReactElement {
          <SectionBody style={LIST_BODY}>
           {/*
             THE CAP'S SCOPE, WHERE HE READS THE COUNT (owner feedback 2026-08-26
-            pt 4: "why max 8 layers if they go well beyond the screen?"). Eight
-            is MAX_PARALLAX_BANDS per SCENE; a section binds its own scene; and
-            on a locked scene — every scene that exists — the eight divide one
-            screen, which the field label below now says.
+            pt 4: "why max 8 layers if they go well beyond the screen?" — asked
+            when the cap was 8; empyrean `277bc15` has since raised it to 16, and
+            the answer is unchanged because it was never about the number). The
+            cap is MAX_PARALLAX_BANDS per SCENE; a section binds its own scene;
+            and on a locked scene — every scene that exists — the layers divide
+            one screen, which the field label below now says. Deliberately
+            count-free: every rendered ceiling above comes from
+            EFFECTS_LAYER_COUNT, so a number here could only ever disagree.
           */}
           <Hint><span title="a section can bind its own scene">{layerCountLine(selected)}</span></Hint>
           {selected.layers.map((layer, i) => (

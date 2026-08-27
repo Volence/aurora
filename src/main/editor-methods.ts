@@ -25,6 +25,12 @@ import {
   LAYOUT_WORD_MAX, TILE_PIXELS, TILE_PIXEL_MAX,
 } from '../core/formats/bg-override/bg-override';
 import { BG_WIDTH } from '../core/formats/bg-tiles';
+// The layer bound an agent is TOLD about, read from the same vendored schema
+// the validator enforces. It was the literal `1..8` until empyrean `277bc15`
+// raised the ceiling to 16 — a description is the only place an agent can learn
+// a bound before it tries one, so a stale number here is a bound that is wrong
+// exactly where nothing will contradict it.
+import { EFFECTS_LAYER_COUNT } from '../core/formats/effects/scene-ui';
 
 const BG_ROWS = BG_LAYOUT_WORDS / BG_WIDTH;
 const BG_ROWS_LEGACY = BG_LAYOUT_WORDS_LEGACY / BG_WIDTH;
@@ -177,7 +183,7 @@ export const EDITOR_METHODS: EditorMethod[] = [
     description: 'Create, replace or delete one effects scene. Takes the WHOLE document, not a field patch: '
       + 'read the current one with get_effects_scene, change what you want, send it back. Fields this '
       + 'editor does not expose survive because nothing enumerates them. One undo step. The document is '
-      + 'validated against the contract schema on the way in — layers 1..8, factors from the published '
+      + `validated against the contract schema on the way in — layers ${EFFECTS_LAYER_COUNT.min}..${EFFECTS_LAYER_COUNT.max}, factors from the published `
       + 'FACTOR_* set or a packed {s1,s2,op} triple, no unknown keys.' },
   { name: 'assign_section_scene', kind: 'assign-section-scene', result: 'json',
     params: {

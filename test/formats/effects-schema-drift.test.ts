@@ -47,6 +47,36 @@ import { EFFECTS_SCENE_SCHEMA } from '../../src/core/formats/effects/scene';
  * retyped — ROADMAP item 37. The UI clamps for both fields read these bounds
  * out of the vendored file (scene-ui.ts `boundsAt`), so they cannot drift.
  *
+ * WHY IT MOVED A THIRD TIME (d4345af5 -> 0f661b70). empyrean 277bc15 raised
+ * `layers` maxItems from 8 to 16 -- the owner's parallax band-ceiling raise,
+ * reaching this contract via aeon (S3K MGZ2 precedent). Exactly one line of the
+ * schema changed; nothing else in it moved. Re-vendored by
+ * `git show 277bc15:contract/schema/...`, never retyped, and the extracted
+ * bytes hash to what that revision holds. Currency checked AT TIP as well as at
+ * the named commit: `origin/main:contract/schema/...` is the same blob, so this
+ * pin is current rather than merely correctly cited.
+ *
+ * NOTHING ELSE IN AURORA NEEDED AN EDIT, and that is a property worth stating
+ * because it is the whole reason this vendoring design was chosen. Every layer
+ * bound in the app is read from this file through `EFFECTS_LAYER_COUNT`
+ * (scene-ui.ts) -- the Add-layer button's disabled test, the Remove floor, the
+ * `Layers (n/m per scene)` section title and `layerCountLine`'s readout all
+ * consume it, and `grep` finds no literal ceiling anywhere. Enumerated at the
+ * re-pin rather than assumed: aeon's booking CLAIMED Aurora derived the cap and
+ * flagged the claim as unverified by them; it is true, and it was checked here
+ * by listing the consumers, not by trusting the claim.
+ *
+ * THE CONSUMER WAS STRICT WHEN THIS LANDED, which is what made landing first
+ * safe rather than merely convenient. At aeon's pushed master d5fb9778 the
+ * engine still asserts `MAX_PARALLAX_BANDS == 8` (scene_dsl.emp) and a scene
+ * with more layers is a BUILD REFUSAL that names the count, not a truncation --
+ * so an author who builds a 16-layer scene against an engine that has not
+ * caught up gets a named error, never silently dropped layers. (Their own
+ * ceiling-raise note also has the 15+ case measured: `Parallax_Init`'s `moveq`
+ * immediate is a signed byte and must become a `move.w`, which sigil refuses by
+ * name. Theirs to land; recorded here only because it is why the two halves
+ * want to land close together.)
+ *
  * WHAT THIS GATE CANNOT DO, said plainly: it proves the vendored copy is
  * byte-identical to the blob Aurora pinned. It cannot notice that empyrean has
  * since changed the schema — nothing inside this repo can, without the sibling
@@ -60,7 +90,7 @@ const SCHEMA_PATH = resolve(
 );
 
 /** empyrean contract/schema/aurora-effects-scene.schema.json, blob hash. */
-const PINNED_BLOB = 'd4345af54ad61c841a7f1797cfddaf4dc0167f98';
+const PINNED_BLOB = '0f661b7052cced56597e958849bbcd787db5a07e';
 
 /** git's object id: sha1 over "blob <bytelen>\0" + the file's bytes. */
 function gitBlobHash(bytes: Buffer): string {

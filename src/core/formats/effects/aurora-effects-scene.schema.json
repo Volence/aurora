@@ -183,7 +183,7 @@
       "type": "array",
       "items": { "$ref": "#/$defs/layer" },
       "minItems": 1,
-      "maxItems": 8
+      "maxItems": 16
     },
     "v_factor": {
       "description": "Whole-plane Plane-B vertical scroll, as a RIGHT-SHIFT AMOUNT — not a packed factor. The engine computes target_b = ((camY - v_center) >> v_factor) + v_offset (engine/level/parallax.emp). 15 is the LOCK SENTINEL: it is tested before the shift and pins the BG plane to v_offset regardless of the camera. This is a different space from a layer's fa/fb, where locked is the packed value $0FF; do not spell this field with a FACTOR_* name.",

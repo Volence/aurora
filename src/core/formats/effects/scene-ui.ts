@@ -2,9 +2,15 @@
 // of the committed contract schema at module load, never re-typed beside it.
 //
 // WHY THIS MODULE EXISTS AT ALL. §2.3's factor set is sixteen names; §2.1's
-// `precision` is two; the layer count is 1..8; `world_y` is 0..32767. Those are
+// `precision` is two; the layer count is a bounded range; `world_y` is
+// 0..32767. Those are
 // exactly the kind of facts a form types into a `const` array and then holds
-// forever, silently, after the contract moves. `scene.ts` already established the
+// forever, silently, after the contract moves.
+// (This paragraph used to say "the layer count is 1..8" and was wrong within
+// the day empyrean `277bc15` raised the ceiling to 16 — the sentence explaining
+// why numbers must not be typed in had a typed-in number inside it. The code
+// below was already right and needed no edit; only the prose was stale, which
+// is the perishable-claim-in-a-comment case exactly.) `scene.ts` already established the
 // pattern for its three (EFFECTS_SCENE_ID_PATTERN, EFFECTS_LAYER_DEFAULTS,
 // EXCLUDED_RAW_FIELDS); this is the rest of the set the wave-1 UI needs, in the
 // same shape and for the same reason.
@@ -159,7 +165,15 @@ export const EFFECTS_TRANSITION_VALUES = stringEnumAt('properties', 'transition'
 /** Everything the schema permits for `left_column_mask`, in schema order. */
 export const EFFECTS_LEFT_COLUMN_MASK_VALUES = stringEnumAt('properties', 'left_column_mask');
 
-/** `layers` is 1..8 items — 8 is the engine's MAX_PARALLAX_BANDS (§2.1). */
+/**
+ * The `layers` array's item bounds, READ FROM THE SCHEMA — the maximum is the
+ * engine's `MAX_PARALLAX_BANDS` (§2.1) and it MOVES: empyrean `277bc15` took it
+ * from 8 to 16. Deliberately not restated here as a number, because every
+ * surface that shows a ceiling (the Add-layer button's disabled test, the
+ * Remove floor, the section title, `layerCountLine`) consumes this constant,
+ * so the schema is the single authority and a number in this sentence would be
+ * a second one.
+ */
 export const EFFECTS_LAYER_COUNT = Object.freeze((() => {
   const node = at('properties', 'layers');
   const { minItems, maxItems } = node;

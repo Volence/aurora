@@ -15,6 +15,7 @@ import {
   type EffectsScene,
 } from '../../src/core/formats/effects/scene';
 import { makeBgId } from '../../src/core/formats/bg-library';
+import { EFFECTS_LAYER_COUNT } from '../../src/core/formats/effects/scene-ui';
 
 /**
  * Effects scene definition codec — wave-1 surface 1.
@@ -179,12 +180,23 @@ describe('effects scene reader — the closed schema', () => {
     expect(e.issues.join('\n')).toMatch(/"enabled": false/);
   });
 
-  it('enforces the schema ranges and the 1..8 layer count', () => {
+  it('enforces the schema ranges and the layer count, at whatever the schema says it is', () => {
     const layer = { world_y: 0, fa: 'FACTOR_1', fb: 'FACTOR_1' };
+    // BOTH HALVES DERIVED FROM THE SCHEMA, never typed. This row shipped as a
+    // literal `length: 9` against `/maximum 8/` and went red the day empyrean
+    // `277bc15` raised the ceiling to 16 — which is the good outcome, but only
+    // because 9 happened to still be legal. Had the contract moved DOWN, the
+    // over-long fixture would have stayed over-long and the row would have kept
+    // passing while asserting a bound that no longer existed.
+    const { min, max } = EFFECTS_LAYER_COUNT;
     expect(() => parseEffectsScene(withDoc(d => { d.layers = []; }), 'plain'))
-      .toThrow(/minimum 1/);
-    expect(() => parseEffectsScene(withDoc(d => { d.layers = Array.from({ length: 9 }, () => ({ ...layer })); }), 'plain'))
-      .toThrow(/maximum 8/);
+      .toThrow(new RegExp(`minimum ${min}`));
+    expect(() => parseEffectsScene(withDoc(d => { d.layers = Array.from({ length: max + 1 }, () => ({ ...layer })); }), 'plain'))
+      .toThrow(new RegExp(`maximum ${max}`));
+    // ANTI-VACUOUS: exactly `max` layers must be ACCEPTED, or the row above
+    // would pass against a parser that refused every multi-layer scene.
+    expect(() => parseEffectsScene(withDoc(d => { d.layers = Array.from({ length: max }, () => ({ ...layer })); }), 'plain'))
+      .not.toThrow();
     expect(() => parseEffectsScene(withDoc(d => {
       (d.layers as Record<string, unknown>[])[0].world_y = 32768;
     }), 'plain')).toThrow(/above the maximum 32767/);

@@ -360,10 +360,13 @@ export function planeLineOf(
 }
 
 /**
- * "N of 8 layers (per scene; scenes are assigned per section)" — the cap and
- * its scope, stated where the owner reads the count. 8 is `MAX_PARALLAX_BANDS`
- * per SCENE (schema §2.1); a section binds its own scene (§3), so "per what's
- * drawn" is the section, and on a locked scene the eight divide one screen.
+ * "N of M layers (per scene; scenes are assigned per section)" — the cap and
+ * its scope, stated where the owner reads the count. M is `EFFECTS_LAYER_COUNT.max`,
+ * the schema's own `maxItems` = the engine's `MAX_PARALLAX_BANDS` per SCENE
+ * (schema §2.1); a section binds its own scene (§3), so "per what's drawn" is
+ * the section, and on a locked scene the layers divide one screen. This
+ * docblock said "8" until empyrean `277bc15` raised it to 16 — the function was
+ * always derived, so only the sentence describing it was ever wrong.
  */
 export function layerCountLine(scene: Pick<EffectsScene, 'layers'>): string {
   return `${scene.layers.length} of ${EFFECTS_LAYER_COUNT.max} layers `
@@ -594,7 +597,8 @@ export function replaceSceneCommand(
  *
  * The no-op check is a JSON comparison of the whole document. That is honest
  * about what "changed" means here (any key, at any depth, including ones no form
- * shows) and is cheap: a scene is at most 8 layers of scalars.
+ * shows) and is cheap: a scene is at most `EFFECTS_LAYER_COUNT.max` layers of
+ * scalars.
  */
 export function editSceneCommand(
   library: EffectsSceneLibrary, id: string, description: string,
