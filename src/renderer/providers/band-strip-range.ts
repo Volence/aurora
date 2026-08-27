@@ -71,7 +71,7 @@
 // `band-coverage.ts` is the model this follows.
 
 import { TILE_BYTES } from '../../core/formats/bg-override/bg-override';
-import { rowChoices, slotSpanPhrase } from './bg-anim-aeon';
+import { rowChoices, slotSpanDigits, slotSpanPhrase } from './bg-anim-aeon';
 import type { TilePickerLayer, TilePickerOrigin } from './tile-picker-source';
 
 /** Everything a released strip drag needs to resolve, read fresh at mouseup. */
@@ -259,12 +259,28 @@ export function resolveStripDrag(input: StripDragInputs): StripDragOutcome {
  * this branch, while `cols = min(max(1, …), maxCols)` with `maxCols < 1`
  * already refused, so both factors are at least 1. What IS reachable is a
  * hand-built outcome — `StripDragOutcome` is exported and these two functions
- * are total over it — and `slotSpanPhrase` answers `NO_SLOTS_PHRASE` for that,
- * which both sentences stay grammatical around ("band · no slots · 0x4").
+ * are total over it — and BOTH span forms answer `NO_SLOTS_PHRASE` for that,
+ * which both sentences stay grammatical around ("no slots · 0x4" on the line,
+ * "band candidate · no slots (0x4)" on the title). That agreement is why the
+ * short form defers to `slotSpanDigits` instead of dropping the noun itself:
+ * a local `${base}..${base + count - 1}` would print `40..39` here.
  * A guard here would be a second opinion about what an empty range is called.
  */
+function rangeCount(outcome: Extract<StripDragOutcome, { kind: 'range' }>): number {
+  return outcome.cols * outcome.rows;
+}
+
+/** `"slots 34..41"` — for the `title`, which has room for the noun. */
 function rangeSlots(outcome: Extract<StripDragOutcome, { kind: 'range' }>): string {
-  return slotSpanPhrase(outcome.staticBase, outcome.cols * outcome.rows);
+  return slotSpanPhrase(outcome.staticBase, rangeCount(outcome));
+}
+
+/**
+ * `"34..41"` — the SAME span for the LINE, which has been measured not to have
+ * room for the noun. See `stripDragLabel` for the numbers.
+ */
+function rangeSpan(outcome: Extract<StripDragOutcome, { kind: 'range' }>): string {
+  return slotSpanDigits(outcome.staticBase, rangeCount(outcome));
 }
 
 /**
@@ -290,6 +306,38 @@ function rangeSlots(outcome: Extract<StripDragOutcome, { kind: 'range' }>): stri
  * a readout is written. The component pairs this with `whiteSpace: nowrap` and
  * an ellipsis, so no message length can reach the layout again.
  *
+ * ═══ AND WHY IT IS *THIS* SHORT — THE BOX, MEASURED ═══
+ *
+ * NOT WRAPPING WAS NEVER THE WHOLE JOB. `nowrap` + ellipsis stopped the line
+ * from moving the grid, and then the line quietly stopped being READABLE
+ * instead: measured in the running app at the docked width, `band · slots
+ * 34..41 · 2x4` wanted 173px in a 102px box and ~40% of it was under the
+ * ellipsis. A truncated readout on the gesture's ONLY surface is barely better
+ * than no readout, which is what the paragraph above says this line is for.
+ *
+ * THE BOX IS 102px AND IT IS NOT NEGOTIABLE. The picker docks at 224px; the
+ * count row beside this line ("320 background tiles") is 122px and
+ * `flexShrink: 0`; 224 - 122 = 102, minus the row's gutters. Widening the panel
+ * is the one thing this arc may not do — the strip canvas is `width: 100%` of
+ * it, so a wider panel is a differently-pitched strip and every aim moves. So
+ * the only slack in the row was the inner gutter (24px -> 16px) and this line's
+ * font, which was 11px next to a 10px count row and is now 10px like it. That
+ * bought 8px of box and ~9% of the text: real, and nowhere near 71px.
+ *
+ * SO THE WORDS WENT, IN MEASURED ORDER. `band · ` first — this line is written
+ * by nothing but a band-strip drag and the `title` opens "band candidate", so
+ * the noun was pure repetition. Then `slots`, which cost more to lose and was
+ * still forced: at 10px in a 102px box, `slots 320..383 · 32x4` — an ordinary
+ * span on a 320-slot blob — needs 134px, so keeping the noun would have left
+ * the defect alive for every three-digit document and green only on the
+ * harness's two-digit one. What survives is what the glance is FOR: the
+ * inclusive span (item 54's whole point) and the shape.
+ *
+ * A REFUSAL STILL ELLIPSISES, AND THAT IS THE DESIGN. `no range — slots 0..31
+ * already belong to bands` is a sentence; no box on this row could hold one.
+ * The rule is that the COMMON outcome — a range aimed — fits, and the sentence
+ * case leans on the `title` exactly as this block always said it would.
+ *
  * ⚠ NEUTRAL ABOUT THE FOOTPRINT, exactly as `coverageSummary` is: it states the
  * range the drag aimed and never whether that is a good idea. `pick` returns ''
  * because the pick has its own label already — the hover readout the strip has
@@ -298,10 +346,9 @@ function rangeSlots(outcome: Extract<StripDragOutcome, { kind: 'range' }>): stri
 export function stripDragLabel(outcome: StripDragOutcome): string {
   if (outcome.kind === 'pick') return '';
   if (outcome.kind === 'refused') return `no range — ${outcome.reason}`;
-  // `slotSpanPhrase` carries the word "slots" itself, so the span gets its own
-  // `·` segment. `band ${phrase}` would read "band slots 40..55"; the separator
-  // is what keeps the noun and the span from running together.
-  return `band · ${rangeSlots(outcome)} · ${outcome.cols}x${outcome.rows}`;
+  // NUMBERS AND SHAPE, NOTHING ELSE — and every word that is gone was measured
+  // out, not trimmed for taste. See the block above for the box.
+  return `${rangeSpan(outcome)} · ${outcome.cols}x${outcome.rows}`;
 }
 
 /**

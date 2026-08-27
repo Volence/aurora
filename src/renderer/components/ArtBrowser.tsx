@@ -482,14 +482,28 @@ const styles: Record<string, React.CSSProperties> = {
   // CollapsibleSection that names it (layout-facet.tsx: "Art"), and in heading
   // type this row read as a second, disagreeing title stacked under the first —
   // the same doubling ChunkGrid's countLabel fixed.
+  // ⚠ ASYMMETRIC PADDING ON PURPOSE: 12px on the LEFT is the panel's outer
+  // gutter and stays; the 12px on the right was an INNER gap, and this row is
+  // 224px wide with a `flexShrink: 0` label in it, so every pixel it spent came
+  // straight out of the readout's box. Outer gutters 12, inner gap 8 (8 here +
+  // 8 on `hoverLabel`) — the panel edge looks unchanged and the readout gains
+  // 8px. Measured against the truncation this was half of the fix for; see
+  // `stripDragLabel`.
   label: {
-    padding: '6px 12px', fontSize: T.t2xs, color: T.textLo, flexShrink: 0,
+    padding: '6px 8px 6px 12px', fontSize: T.t2xs, color: T.textLo, flexShrink: 0,
   },
   // The readout truncates rather than wrapping — see `tabs`. The full text is
   // always on the element's `title`, so nothing is lost to the ellipsis.
+  //
+  // ⚠ 10px (`t2xs`), NOT 11px, AND THAT IS BOTH HALVES OF ONE CALL. It shares
+  // this row with the count label, which is 10px — the readout being the larger
+  // of two items on one line read as a size disagreement — and at the docked
+  // 224px the 9% it gives back is room the line measurably needed. `t2xs` in
+  // MONO still reads as the more technical of the two, which is the distinction
+  // the size was carrying.
   hoverLabel: {
-    marginLeft: 'auto', padding: '0 12px',
-    fontSize: T.tXs, fontFamily: T.fontMono, color: T.accent,
+    marginLeft: 'auto', padding: '0 12px 0 8px',
+    fontSize: T.t2xs, fontFamily: T.fontMono, color: T.accent,
     minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
   },
   canvasWrap: {

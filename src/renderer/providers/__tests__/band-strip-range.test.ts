@@ -334,15 +334,45 @@ describe('the label — the strip\'s only surface', () => {
     // still static and still promotable by the next drag. Re-cut against
     // `rangeCovers`, and asserted as the WHOLE line so the hint's own sentence
     // (which also carries a span) cannot satisfy it.
+    //
+    // RE-CUT for the readout-fit parcel: the line dropped `band · ` and the
+    // noun `slots`, both measured out against a 102px box (see `stripDragLabel`
+    // for the numbers). THE INCLUSIVE SPAN IS WHAT SURVIVED — it is item 54's
+    // whole point — so this row still pins both ends, and the negative half is
+    // what makes it discriminate rather than merely describe.
     const r = resolveStripDrag(drag({ anchorSlot: 40, releaseSlot: 55 }));
     expect(r.kind).toBe('range');
     if (r.kind !== 'range') return;
     const last = lastOwnedSlot(r);
-    expect(stripDragLabel(r))
-      .toBe(`band · slots ${r.staticBase}..${last} · ${r.cols}x${r.rows}`);
+    expect(stripDragLabel(r)).toBe(`${r.staticBase}..${last} · ${r.cols}x${r.rows}`);
     expect(stripDragLabel(r)).not.toContain(`..${last + 1}`);
-    // and the noun is not glued to the span: never "band slots 40..55"
-    expect(stripDragLabel(r)).not.toMatch(/band slots/);
+  });
+
+  it('the LINE carries no noun and the TITLE carries it — the split the box forced', () => {
+    // THE PAIR IS THE POINT, not either half. Asserting only that the line is
+    // short would be satisfied by a line that dropped the span; asserting only
+    // that the title is long would be satisfied by a line that never shortened.
+    // What the parcel actually did is move two words from one to the other, and
+    // that is a relationship between the two strings.
+    //
+    // ⚠ THIS ROW DOES NOT PROVE THE LINE FITS. Fitting is a box, a font and a
+    // docked width, none of which exist in node — `bganim-strip-range-harness`
+    // rows [6g2]/[6g3] own that property and measure `scrollWidth > clientWidth`
+    // in the running app. This row owns the wording split only.
+    const r = resolveStripDrag(drag({ anchorSlot: 40, releaseSlot: 55 }));
+    expect(r.kind).toBe('range');
+    if (r.kind !== 'range') return;
+    const line = stripDragLabel(r);
+    const title = stripDragHint(r);
+    expect(line).not.toMatch(/slots/);
+    expect(line).not.toMatch(/band/);
+    expect(title).toMatch(/slots/);
+    expect(title).toMatch(/band candidate/);
+    // ANTI-VACUOUS: they are still talking about the SAME range, so the words
+    // moved rather than the line being emptied of its subject.
+    const last = lastOwnedSlot(r);
+    expect(line).toContain(`${r.staticBase}..${last}`);
+    expect(title).toContain(`${r.staticBase}..${last}`);
   });
 
   it('the HINT names the same owned slots, with no doubled "slots"', () => {
@@ -405,7 +435,10 @@ describe('the label — the strip\'s only surface', () => {
       kind: 'range', staticBase: 40, cols: 0, rows: 4, runEnd: 40, runLength: 1,
       clampedToPrefix: false, trimmedToBlob: false,
     };
-    expect(stripDragLabel(empty)).toBe(`band · ${NO_SLOTS_PHRASE} · 0x4`);
+    // RE-CUT with the line's shortening: the noun went, the EMPTY PHRASE did
+    // not. `slotSpanDigits` answers `NO_SLOTS_PHRASE` exactly as
+    // `slotSpanPhrase` does, so the short form cannot render `40..39` either.
+    expect(stripDragLabel(empty)).toBe(`${NO_SLOTS_PHRASE} · 0x4`);
     expect(stripDragHint(empty)).toContain(`band candidate · ${NO_SLOTS_PHRASE} (0x4)`);
     expect(stripDragLabel(empty)).not.toContain('..');
     expect(stripDragHint(empty)).not.toContain('..');
@@ -433,12 +466,18 @@ describe('the label — the strip\'s only surface', () => {
     // ANTI-VACUOUS: both branches that write a line are in the sample.
     expect(outcomes.some((o) => o.kind === 'range')).toBe(true);
     expect(outcomes.some((o) => o.kind === 'refused')).toBe(true);
+    // ⚠ WHAT THE CHARACTER BUDGET BELOW IS AND IS NOT. It is a guard against a
+    // PARAGRAPH landing back on this line — the regression that actually
+    // happened, and one a count catches. It is NOT the fit property, and the
+    // budget being green is exactly how item 43's tail survived to be measured
+    // by hand: `band · slots 34..41 · 2x4` is 25 characters, passed this row
+    // comfortably, and truncated at 173px in a 102px box. A box, a font and a
+    // docked width do not exist in node. `bganim-strip-range-harness` [6g2]
+    // (this run's string) and [6g3] (the widest the blob can produce) own
+    // fitting, and they measure `scrollWidth` against `clientWidth` in the app.
     for (const o of outcomes) {
       const line = stripDragLabel(o);
       expect(line).not.toContain('\n');
-      // The budget is the picker's own header row, which is one line of ~60
-      // monospace characters at the widths this panel docks to. Anything past
-      // that is a paragraph and belongs on the hint.
       expect(line.length, `too long for one line: ${JSON.stringify(line)}`).toBeLessThanOrEqual(60);
     }
   });
@@ -531,9 +570,22 @@ describe('band-strip-range prints no slot span of its own', () => {
 
   it('both readouts reach the shared helper, and neither sums a range end inline', () => {
     expect(src.match(/\.\.\$?\{[^}]*\+[^}]*\}/g) ?? []).toEqual([]);
-    // ANTI-VACUOUS: the definition plus one call from each readout.
-    expect(src.match(/rangeSlots\(/g)?.length ?? 0).toBeGreaterThanOrEqual(3);
+    // RE-CUT for the readout-fit parcel. The line now needs the span WITHOUT
+    // the noun, and the cheap way to get it — a local `${base}..${base + n - 1}`
+    // — is precisely the off-by-one item 54 removed, on the readout with the
+    // least room to show its working. So there are two span helpers and they
+    // both defer to `bg-anim-aeon`; the shape being pinned is that NEITHER
+    // readout formats a span or counts a range by hand.
+    //
+    // ANTI-VACUOUS on each: a definition plus at least one call site.
+    expect(src.match(/rangeSlots\(/g)?.length ?? 0).toBeGreaterThanOrEqual(2);
+    expect(src.match(/rangeSpan\(/g)?.length ?? 0).toBeGreaterThanOrEqual(2);
     expect(src).toMatch(/slotSpanPhrase\(/);
+    expect(src).toMatch(/slotSpanDigits\(/);
+    // The COUNT is computed in exactly one place too, so the two forms can
+    // never be handed different lengths of the same range.
+    expect(src.match(/cols \* [\w.]*rows/g) ?? []).toHaveLength(1);
+    expect(src.match(/rangeCount\(/g)?.length ?? 0).toBeGreaterThanOrEqual(3);
     // `end` was the local both readouts summed into; nothing reintroduces it.
     expect(src).not.toMatch(/const end = /);
   });

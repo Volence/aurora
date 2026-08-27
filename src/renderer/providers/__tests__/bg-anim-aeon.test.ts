@@ -46,7 +46,7 @@ import {
   DEFAULT_DRIVER, DEFAULT_RATE_SHIFT, addBandCommand, bandBudget, bandRows,
   clampRateShift, demoteBandCommand, driverOptions, insertUnavailableReason,
   patternPxFor, promoteBandCommand, promoteUnavailableReason, rateShiftNote,
-  removeBandCommand, rowChoices, slotSpanPhrase, NO_SLOTS_PHRASE, type BandSpec,
+  removeBandCommand, rowChoices, slotSpanPhrase, slotSpanDigits, NO_SLOTS_PHRASE, type BandSpec,
 } from '../bg-anim-aeon';
 
 const FIXTURE = 'test/fixtures/bg-override/editor_bg_override.b0e5a661.json';
@@ -325,6 +325,40 @@ describe('a printed slot range names the last slot it contains', () => {
       // and it never names the first slot PAST the range
       expect(slotSpanPhrase(base, count)).not.toContain(`..${base + count}`);
     }
+  });
+
+  it('the NOUNLESS form is the same span with the noun removed, never a second sum', () => {
+    // WHY THERE ARE TWO FORMS AT ALL: `ArtBrowser`'s hover line is ~102px wide
+    // beside a `flexShrink: 0` count label in a 224px docked panel, and the
+    // phrase form of an ordinary three-digit span overflows it by ~30px — so
+    // the line prints the digits and its `title` prints the sentence.
+    //
+    // WHY THAT IS A HELPER AND NOT A `.replace('slots ', '')` OR AN INLINE
+    // TEMPLATE: this is the exact seam item 54 closed. A surface that wanted a
+    // shorter span and wrote `${base}..${base + count - 1}` for itself would
+    // reintroduce the off-by-one on the narrowest readout there is. The two
+    // forms are pinned AGAINST EACH OTHER here, both ends derived from the same
+    // count, so neither can move without this row going red.
+    let checked = 0;
+    for (const [base, count] of [[0, 1], [0, 128], [7, 4], [128, 64], [40, 3], [319, 1]]) {
+      const digits = slotSpanDigits(base, count);
+      expect(slotSpanPhrase(base, count)).toBe(`slots ${digits}`);
+      const ends = endsOf(digits);
+      expect(ends, `${base}/${count}`).not.toBeNull();
+      expect(ends!.first).toBe(base);
+      expect(ends!.last - ends!.first + 1, `${base}/${count}`).toBe(count);
+      expect(digits).not.toContain(`..${base + count}`);
+      // ANTI-VACUOUS: the short form is genuinely shorter, so this is not two
+      // names for one string.
+      expect(digits.length).toBeLessThan(slotSpanPhrase(base, count).length);
+      checked++;
+    }
+    expect(checked).toBe(6);
+    // The empty range is the one case where they AGREE word for word: a bare
+    // `..` spelling of nothing is the `0..-1` the constant exists to prevent.
+    expect(slotSpanDigits(40, 0)).toBe(NO_SLOTS_PHRASE);
+    expect(slotSpanDigits(40, 0)).not.toContain('..');
+    expect(slotSpanDigits(40, -3)).toBe(NO_SLOTS_PHRASE);
   });
 
   it('the empty range is worded, not arithmetic — no `0..-1` reaches a reader', () => {
