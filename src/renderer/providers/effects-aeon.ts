@@ -36,6 +36,7 @@ import {
   EFFECTS_V_FACTOR_LOCK, EFFECTS_VSPLIT_AT_BOUNDS,
   EFFECTS_TABLE_REF_FORMS, EFFECTS_TABLE_REF_BIN_PATTERN, EFFECTS_DEFORM_TABLE_BYTES,
   EFFECTS_LAYER_DEFORM_BOUNDS, EFFECTS_V_DEFORM_AMP_SHIFT_BOUNDS,
+  EFFECTS_ANCHOR_SHIFT_BOUNDS,
   EFFECTS_LEFT_COLUMN_MASK_UNDECLARED, EFFECTS_LEFT_COLUMN_MASK_VALUES, EFFECTS_FACTOR_ZERO,
   EFFECTS_SCENE_KEY_DEFAULTS, EFFECTS_LAYER_KEY_DEFAULTS,
   type TableRefParam,
@@ -359,9 +360,132 @@ export function binPathRefusal(path: string): string | null {
 }
 
 /**
- * Advice on a table, or null: sigil requires a generator's period to DIVIDE the
- * table length ("period must divide 256", schema doc §2.4), and nothing in the
- * shape validator can see it. Said before the build says it, never enforced.
+ * The `period` values the ENGINE will accept — the divisors of the table length.
+ *
+ * COMPUTED, NEVER A LITERAL LIST. `EFFECTS_DEFORM_TABLE_BYTES` is itself derived
+ * from the schema's own prose and cross-checked against `period`'s ceiling at
+ * module load, so a contract that moved the table length moves this list with
+ * it. Typing `[1, 2, 4, …]` here would be a fourth place the number 256 lives.
+ *
+ * THE RULE IS THE ENGINE'S, NOT SIGIL'S AND NOT THE SCHEMA'S — a correction the
+ * guard-transcription parcel made and this parcel keeps:
+ *   engine/level/parallax_dsl.emp:52  ensure(256 % period == 0, "deform_sine: period {period} must divide 256")
+ *   engine/level/parallax_dsl.emp:87  the same, for deform_triangle
+ * Both measured refusing at `period: 100`, each naming its own generator.
+ *
+ * Bounded by the PARAMETER's declared range rather than by 1..length, so a
+ * schema that narrowed `period` narrows this too instead of offering a value the
+ * codec would then refuse.
+ */
+export function deformPeriodChoices(p: TableRefParam): number[] {
+  const lo = Math.max(1, p.min ?? 1);
+  const hi = p.max ?? EFFECTS_DEFORM_TABLE_BYTES;
+  const out: number[] = [];
+  for (let v = lo; v <= hi; v++) if (EFFECTS_DEFORM_TABLE_BYTES % v === 0) out.push(v);
+  return out;
+}
+
+/** One option on a table parameter rendered as a picker. */
+export interface TableParamOption {
+  value: number;
+  label: string;
+  /** True for a value the ENGINE refuses; rendered so a file's value shows, unpickable. */
+  disabled: boolean;
+  title: string;
+}
+
+/**
+ * A table parameter's options when it should be a PICKER, or null when it stays
+ * a spinner — ROADMAP row 63.
+ *
+ * WHY `period` STOPPED BEING A SPINNER. Its schema range is 1..256 and only the
+ * nine divisors of 256 build, so the control advertised 247 illegal values out
+ * of 256 — and two independent parcels had already had to work around it without
+ * anybody writing the constraint down (`seedTableRefParam` seeds at `max`
+ * *"guaranteed to divide the table length"*; row 60's harness rule R14 takes
+ * `max ÷ N` *"because the build refuses a period that does not divide it"*).
+ * Two workarounds for one control is the tell that the affordance was wrong
+ * rather than its users.
+ *
+ * ⚠ AND `min`/`max` ON A NUMBER INPUT WERE NEVER GOING TO FIX IT (ROADMAP item
+ * 37's bar). They govern the spinner and `:invalid`; they stop no TYPED value,
+ * and a clamp beside them can only hold a value inside a RANGE — it has no way
+ * to express "divides". A `<select>` has no typed value at all, so the
+ * constraint holds structurally rather than by a check somebody has to remember.
+ *
+ * ═══ THE STRICTNESS QUESTION, ANSWERED RATHER THAN ASSUMED ═══
+ *
+ * The schema is the LOOSER document: it admits every integer 1..256, and the
+ * engine refuses the non-divisors later. So a picker over nine values is
+ * stricter than the CONTRACT — the trap scene.ts names, where "the editor
+ * refused a file the build accepts" is the far worse failure. It is taken
+ * deliberately, on the same test that licenses `sprite_mask`'s disabled option
+ * and rules `factor0_lock`'s the other way:
+ *
+ *   • NO SCENE CONTENT CAN MAKE A NON-DIVISOR LEGAL. The two ensures are
+ *     unconditional and `sine`/`triangle` are the only forms with a `period` at
+ *     all, so there is no document where the picker's omission costs the author
+ *     something the build would have taken. (Contrast `factor0_lock`, whose
+ *     precondition is about the scene's own contents — which is exactly why
+ *     THAT one stays selectable and only advises.)
+ *   • A VALUE ALREADY IN THE FILE IS STILL RENDERED, disabled, and still
+ *     advised by `tableRefAdvisory`. A `<select>` whose current value has no
+ *     option silently shows a DIFFERENT one, which is the quiet lie
+ *     `unassignableSceneRef` and `leftColumnMaskOptions` both exist to stop —
+ *     and here it would be worse than the spinner it replaced, because the
+ *     author would see a legal number and the build would read an illegal one.
+ *   • THE DOCUMENT STILL SAVES. Narrowing the picker is not enforcement: the
+ *     advisory is untouched, nothing refuses the write, and sigil stays the
+ *     rulebook. Row 58's posture is intact.
+ *
+ * The derivation cannot leak into the `.bin` branch, which declares no
+ * parameters at all — `tableRefParams('bin')` is `[]`, so there is nothing here
+ * for it to reach.
+ */
+export function tableRefParamOptions(
+  formId: string, key: string, current: number,
+): TableParamOption[] | null {
+  if (key !== 'period') return null;
+  const p = tableRefParams(formId).find((q) => q.key === key);
+  if (!p) return null;
+  const legal = deformPeriodChoices(p);
+  if (legal.length === 0) return null;
+  const options: TableParamOption[] = legal.map((v) => ({
+    value: v,
+    label: String(v),
+    disabled: false,
+    title: v === EFFECTS_DEFORM_TABLE_BYTES
+      ? `one cycle over the whole ${EFFECTS_DEFORM_TABLE_BYTES}-byte table`
+      : `${EFFECTS_DEFORM_TABLE_BYTES / v} cycles over the ${EFFECTS_DEFORM_TABLE_BYTES}-byte table`,
+  }));
+  // The value the FILE carries, when the engine would refuse it: rendered so the
+  // control cannot show a number the build will not read, and disabled so the
+  // author cannot pick it back.
+  if (!legal.includes(current) && Number.isFinite(current)) {
+    options.push({
+      value: current,
+      label: String(current),
+      disabled: true,
+      title: `the build refuses it: ${current} does not divide `
+        + `${EFFECTS_DEFORM_TABLE_BYTES}, so the cycle would not close`,
+    });
+    options.sort((a, b) => a.value - b.value);
+  }
+  return options;
+}
+
+/**
+ * Advice on a table, or null: the ENGINE requires a generator's period to DIVIDE
+ * the table length (`engine/level/parallax_dsl.emp:52` for `deform_sine`, `:87`
+ * for `deform_triangle` — both literally `ensure(256 % period == 0, …)`), and
+ * nothing in the shape validator can see it. Said before the build says it,
+ * never enforced.
+ *
+ * STILL LOAD-BEARING NOW THAT `period` IS A PICKER (ROADMAP row 63). The picker
+ * governs what an author can LAND on; this governs what a document already
+ * CARRIES — a hand-edited file, an MCP write, a scene from before the picker.
+ * That is the same two-paths split `sprite_mask` has, and removing either half
+ * re-opens the path it covers.
  */
 export function tableRefAdvisory(t: EffectsTableRef): string | null {
   if ('bin' in t || !('period' in t)) return null;
@@ -532,11 +656,17 @@ export function layerDeformFromToggle(on: boolean): EffectsLayerDeform | undefin
 /**
  * What aeon's `scene()` would refuse about this scene's deform, as sentences.
  *
- * FOUR OF THE FIVE comptime guards on this surface are cross-field, so no
- * control can carry them and the codec's shape validator cannot see them
- * either. Each is transcribed from the `ensure` it mirrors
- * (aeon engine/level/scene_dsl.emp), and each is ADVICE: sigil stays the
- * rulebook, exactly as scene.ts's advisoryLayerDeformConflicts docblock argues.
+ * MOST OF THE guards on this surface are cross-field, so no control can carry
+ * them and the codec's shape validator cannot see them either. Each is
+ * transcribed from the `ensure` it mirrors (aeon engine/level/scene_dsl.emp),
+ * and each is ADVICE: sigil stays the rulebook, exactly as scene.ts's
+ * advisoryLayerDeformConflicts docblock argues.
+ *
+ * ONE ARM IS NOT CROSS-FIELD — `sprite_mask` (ROADMAP row 62), which the engine
+ * refuses on the declaration alone. It is here anyway because "here" is where
+ * the panel already renders warnings, and because the reason it was MISSING was
+ * precisely that a single-field refusal looked like the picker's problem. It is
+ * not: the picker only governs values an author selects.
  *
  * The fifth — `own` alongside a live dsa/dsb/phase — is already written, in the
  * codec, as `advisoryLayerDeformConflicts`. It is per-layer, so the card renders
@@ -570,6 +700,40 @@ export function sceneDeformAdvisories(scene: EffectsScene): string[] {
       + `wrote. Answer it on the ${LEFT_COLUMN_MASK_ROW.label} row below.`,
     );
   }
+  // GUARD 3, FOR A VALUE THAT ARRIVED RATHER THAN WAS PICKED (ROADMAP row 62).
+  //
+  // `sprite_mask` is rendered as a DISABLED option, and row 58 reasoned that
+  // correctly — but disabling an option protects the PICKER and protects nothing
+  // about a document that already holds the value. A hand-edited file, a scene
+  // copied from elsewhere, an MCP `edit_effects_scene` write or a future tool
+  // can all put it there, and until this arm existed the author opened such a
+  // scene, saw no warning anywhere, saved, and met the refusal at build time
+  // with no in-app explanation. Measured, not reasoned: on the identical
+  // document `sceneDeformAdvisories` returned `(none)` while the build went
+  // rc=1 (docs/reviews/2026-08-27-guard-transcription.md §4 guard 3, re-measured
+  // 2026-08-27 in docs/reviews/2026-08-27-guard-surface-gaps.md).
+  //
+  // THE DISABLED OPTION STAYS. The two cover different paths — the option stops
+  // the value being AUTHORED here, this arm explains it once it has ARRIVED —
+  // and removing either re-opens the one it covers.
+  //
+  // UNCONDITIONAL, unlike every other arm on this surface, because the engine's
+  // refusal is: `scene_dsl.emp:1354` fires on the declaration alone, with no
+  // reference to `v_deform` or to anything else the scene contains. So there is
+  // no scene edit that clears it and the remedy is to change the value — which
+  // is what the sentence asks for. A scene carrying `sprite_mask` with no
+  // `v_deform` therefore reads TWO advisories, this one and guard 2's; both are
+  // true, both are cleared by the same single edit, and suppressing either would
+  // be Aurora deciding which of two real refusals the author is allowed to see.
+  if (mask === 'sprite_mask') {
+    out.push(
+      'this scene declares left_column_mask "sprite_mask", which the build refuses in every '
+      + 'scene: the engine\'s left-column strip emission has not landed, so the declaration '
+      + 'would be accepted while the sliver stays uncovered. Declare factor0_lock or accept '
+      + `on the ${LEFT_COLUMN_MASK_ROW.label} row instead — the picker will not offer `
+      + 'sprite_mask back.',
+    );
+  }
   // GUARD 2's ARM IS NOT DEAD CODE NOW THAT THE TOGGLE CLEARS THE POLICY WITH
   // `v_deform`. The state is unreachable through the panel by construction —
   // and it is one hand-edited file away, which is precisely when an author has
@@ -582,9 +746,59 @@ export function sceneDeformAdvisories(scene: EffectsScene): string[] {
       + `to ${EFFECTS_LEFT_COLUMN_MASK_UNDECLARED}, or attach a V deform.`,
     );
   }
+  const anchorClash = curveAnchorDeformAdvisory(scene);
+  if (anchorClash !== null) out.push(anchorClash);
   const claim = leftColumnMaskAdvisory(scene);
   if (claim !== null) out.push(claim);
   return out;
+}
+
+/**
+ * Advice on a scene, or null: a curve layer alongside an anchor carrying LIVE
+ * deform shifts — aeon `scene_dsl.emp:1251` (ROADMAP row 64).
+ *
+ * WHY THIS ONE WAS MISSED, which is the useful half. Guard 5 is FOUR ensures,
+ * not the two Aurora's summary named. Three of them are per-LAYER facts and
+ * `layerCurveDeformAdvisory` carries them: `:580` (a curve with a live amplitude
+ * on the SAME layer) and `:586` (a curve with `deform: Own` on the same layer),
+ * plus `:1271`'s vsplit pair above. This one is not a layer fact at all — the
+ * curve is on one layer and the shifts are on the SCENE's anchor, so no
+ * per-layer scan can see the pair and the scene-level scan had no anchor arm.
+ * A guard whose two halves sit on different objects is exactly the one a
+ * transcription drops.
+ *
+ * THE MECHANISM, in the engine's own terms: the anchor overlay writes its
+ * shifts into every band from the split DOWN, including bands whose layer
+ * authored no deform. So a curve layer below the split becomes curve ∧ deform
+ * at RUNTIME, past every per-layer comptime check — and the fill resolves the
+ * collision by testing the curve first, silently dropping the anchor's deform
+ * on those rows. Refusing the combination is the honest half.
+ *
+ * ⚠ THE SENTINEL IS THE TRAP, and it is the same top-of-range shape row 60
+ * booked for `v_factor`. `15` here means NO DEFORM, so a pure-boundary anchor
+ * (`dsa 15, dsb 15`) is not the extreme case — it is the PERMITTED case, and
+ * design §2's own: "an anchor split inside a curve layer CONTINUES the curve".
+ * A check written as "shifts are large" would fire on the composing case and
+ * stay silent on the refused one. The condition is `!== the sentinel`, and the
+ * sentinel is read from the ANCHOR's own schema bounds rather than a layer's.
+ *
+ * EITHER shift arms it, matching the engine's `if dsa != 15 { … } if dsb != 15 { … }`
+ * over one flag — not both, which would miss `dsa 15 / dsb 2`, the shape the
+ * game's own `ojz_act1_start` already ships.
+ */
+export function curveAnchorDeformAdvisory(scene: EffectsScene): string | null {
+  const anchor = scene.anchor;
+  if (anchor === undefined || anchor === 'none') return null;
+  const offA = EFFECTS_ANCHOR_SHIFT_BOUNDS.dsa.max;
+  const offB = EFFECTS_ANCHOR_SHIFT_BOUNDS.dsb.max;
+  if (anchor.at.dsa === offA && anchor.at.dsb === offB) return null;
+  const curveLayer = scene.layers.findIndex((l) => curveFieldValue(l) !== 'none');
+  if (curveLayer < 0) return null;
+  return `layer ${curveLayer} authors a curve while this scene's anchor carries live deform `
+    + `shifts (anchor dsa ${anchor.at.dsa} / dsb ${anchor.at.dsb}; ${offA} is the no-deform `
+    + 'sentinel) — the anchor writes those shifts into every strip below the split, including '
+    + 'that one, so it would be curve and deform at once and the build refuses the pair. Take '
+    + `both anchor shifts to ${offA}, which composes with curves, or drop the curve.`;
 }
 
 // ---------------------------------------------------------------------------
@@ -873,6 +1087,13 @@ export function leftColumnMaskAdvisory(scene: EffectsScene): string | null {
  * curve ∧ deform because the fill's curve loop already spends every usable data
  * register) and guard 2, which names the attachment rather than the amplitude it
  * folded into.
+ *
+ * ⚠ THIS IS THE PER-LAYER HALF ONLY — `scene_dsl.emp:580` and `:586`. The
+ * engine's curve∧deform family has a THIRD member (`:1251`) whose two halves sit
+ * on different objects: a curve on a LAYER and live shifts on the SCENE's
+ * anchor. Nothing per-layer can see that pair, and it was silent here for a
+ * whole parcel because this function looked like it covered "curve and deform"
+ * entirely. It lives in `curveAnchorDeformAdvisory`, scene-level.
  */
 export function layerCurveDeformAdvisory(layer: EffectsLayer): string | null {
   if (curveFieldValue(layer) === 'none') return null;

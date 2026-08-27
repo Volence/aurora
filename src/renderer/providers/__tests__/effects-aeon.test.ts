@@ -23,6 +23,7 @@ import {
   tableRefLabel, tableRefFormOptions, tableRefFormOf, tableRefFromForm, tableRefParams,
   tableParamLabel, tableRefParamValue, setTableRefParam, clampTableRefParam,
   tableRefBinPath, binPathRefusal, tableRefAdvisory, newTableRef,
+  tableRefParamOptions, deformPeriodChoices,
   sceneDeformValue, sceneDeformFromToggle, vDeformValue, vDeformFromToggle,
   layerDeformValue, layerDeformFromToggle, layerDeformAdvisory, sceneDeformAdvisories,
   clampLayerDeformField, clampAmpShift, clampDeformSpeed,
@@ -35,6 +36,7 @@ import {
 import {
   EFFECTS_FACTOR_NAMES, EFFECTS_LAYER_COUNT, EFFECTS_PACKED_FACTOR_BOUNDS,
   EFFECTS_WORLD_Y_BOUNDS, EFFECTS_V_FACTOR_LOCK, newEffectsScene,
+  EFFECTS_ANCHOR_SHIFT_BOUNDS,
 } from '../../../core/formats/effects/scene-ui';
 import { BG_LAYOUT_WORDS, TILE_WIDTH_PX } from '../../../core/formats/bg-override/bg-override';
 import { BG_WIDTH } from '../../../core/formats/bg-tiles';
@@ -823,6 +825,70 @@ describe('tableRef — every form the contract admits, derived from it', () => {
     expect(tableRefAdvisory({ generator: 'zero' })).toBeNull();
   });
 
+  it('period is a PICKER over the divisors, computed — not a spinner over 256 values', () => {
+    // ROADMAP row 63. The engine's rule is `256 % period == 0`
+    // (parallax_dsl.emp:52 and :87, both measured refusing at 100 and each
+    // naming its own generator), so exactly nine values build. The spinner
+    // advertised all 256.
+    const bytes = branchOf('sine')!.properties.period.maximum;
+    const p = tableRefParams('sine').find((q) => q.key === 'period')!;
+    const legal = deformPeriodChoices(p);
+
+    // DERIVED, not typed: every value divides, and every divisor in range is
+    // offered. Asserting the LIST would pass against a hand-typed constant.
+    for (const v of legal) expect(bytes % v, `offered ${v}`).toBe(0);
+    for (let v = p.min ?? 1; v <= (p.max ?? bytes); v++) {
+      if (bytes % v === 0) expect(legal, `divisor ${v} missing`).toContain(v);
+    }
+    // ANTI-VACUOUS: the set is far smaller than the range it replaced, which is
+    // the entire point of the row. An empty or full list would satisfy the
+    // divisor assertions above.
+    expect(legal.length).toBe(9);
+    expect((p.max ?? 0) - (p.min ?? 0) + 1).toBeGreaterThan(legal.length * 10);
+
+    const opts = tableRefParamOptions('sine', 'period', 64)!;
+    expect(opts.map((o) => o.value)).toEqual(legal);
+    expect(opts.every((o) => !o.disabled)).toBe(true);
+
+    // A NON-DIVISOR THE FILE CARRIES IS STILL RENDERED, disabled and in order —
+    // a `<select>` missing its own value silently shows a different one, which
+    // here would let the author read a legal period while the build reads an
+    // illegal one. This is `leftColumnMaskOptions`'s rule, one control over.
+    const carried = tableRefParamOptions('sine', 'period', 100)!;
+    expect(carried.map((o) => o.value)).toContain(100);
+    expect(carried.find((o) => o.value === 100)!.disabled).toBe(true);
+    expect(carried.filter((o) => o.disabled).map((o) => o.value)).toEqual([100]);
+    expect(carried.map((o) => o.value)).toEqual([...carried.map((o) => o.value)].sort((a, b) => a - b));
+    // …and the advisory still fires on it. The picker governs what an author can
+    // LAND on; the advisory governs what a document CARRIES. Both, or one path
+    // is uncovered.
+    expect(tableRefAdvisory({ generator: 'sine', amplitude: 1, period: 100 })).not.toBeNull();
+
+    // ONLY `period`, and only where the schema declares one. The `.bin` branch
+    // has no parameters at all, so the derivation cannot reach it; `amplitude`
+    // is a genuine RANGE and stays a spinner.
+    expect(tableRefParamOptions('sine', 'amplitude', 8)).toBeNull();
+    expect(tableRefParamOptions('bin', 'period', 64)).toBeNull();
+    expect(tableRefParamOptions('zero', 'period', 64)).toBeNull();
+    expect(tableRefParamOptions('v_column_perspective', 'focal', 4)).toBeNull();
+    // Both generators that declare a period get one — :52 and :87 are separate
+    // ensures and a fix that only covered `sine` would leave `triangle` open.
+    for (const g of ['sine', 'triangle']) {
+      expect(tableRefParamOptions(g, 'period', 64), g).not.toBeNull();
+    }
+
+    // STILL NOT ENFORCEMENT (row 58's posture). Narrowing a picker is not a
+    // refusal: the document with period 100 saves exactly as it did before.
+    expect(() => serializeEffectsScene(sceneWith({
+      deform_fg: { shared: { table: { generator: 'sine', amplitude: 1, period: 100 }, speed: 0 } },
+    }))).not.toThrow();
+
+    // AND THE SEED IS STILL A LEGAL OPTION — `seedTableRefParam` seeds at `max`
+    // "guaranteed to divide the table length", so a new table opens on a value
+    // the picker offers rather than on a disabled one.
+    expect(legal).toContain(tableRefParamValue(newTableRef(), 'period'));
+  });
+
   it('a parameter label is the schema key, title-cased at its underscores', () => {
     expect(tableParamLabel('amplitude')).toBe('Amplitude');
     expect(tableParamLabel('max_offset')).toBe('Max offset');
@@ -1011,6 +1077,12 @@ describe('deform advisories — what the build would refuse, said first', () => 
       const got = sceneDeformAdvisories(sceneWith({ v_deform: columns, left_column_mask: v as never }));
       if (v === 'factor0_lock') {
         expect(got.join('\n'), v).toMatch(/left_column_mask factor0_lock:/);
+      } else if (v === 'sprite_mask') {
+        // ANSWERING guard 1 IS NOT ENOUGH FOR THIS VALUE (ROADMAP row 62). It
+        // silences "no policy declared" and immediately raises guard 3's own
+        // refusal, because the engine refuses the declaration outright.
+        expect(got.join('\n'), v).toMatch(/refuses in every scene/);
+        expect(got.join('\n'), v).not.toMatch(/no left_column_mask policy/);
       } else {
         expect(got, v).toEqual([]);
       }
@@ -1026,6 +1098,103 @@ describe('deform advisories — what the build would refuse, said first', () => 
     expect(a).toMatch(/the build refuses it/);
   });
 
+  it('sprite_mask that ARRIVED in the file is advised, not only disabled in the picker', () => {
+    // ROADMAP row 62. The disabled `<option>` protects the PICKER; it protects
+    // nothing about a document that already holds the value — a hand-edited
+    // file, a scene copied from elsewhere, an MCP write. Before this arm, that
+    // document produced `(none)` here while the build went rc=1 with
+    // "left_column_mask: SpriteMask is declared, but the engine's left-column
+    // strip emission has NOT landed" (measured, not read: guard-surface-gaps §2).
+    const carried = sceneWith({ v_deform: columns, left_column_mask: 'sprite_mask' });
+    const a = sceneDeformAdvisories(carried).join('\n');
+    expect(a).toMatch(/sprite_mask/);
+    expect(a).toMatch(/refuses in every scene/);
+    // It must point at the two values that ARE answers, or the advisory states a
+    // problem with no remedy — the row-58 trap ("set it by hand") one field over.
+    expect(a).toMatch(/factor0_lock/);
+    expect(a).toMatch(/accept/);
+
+    // UNCONDITIONAL, because the engine's ensure is: :1354 fires on the
+    // declaration alone. Without `v_deform` the scene reads BOTH this and guard
+    // 2's advisory — both true, both cleared by one edit.
+    const noVDeform = sceneDeformAdvisories(sceneWith({ left_column_mask: 'sprite_mask' }));
+    expect(noVDeform.join('\n')).toMatch(/refuses in every scene/);
+    expect(noVDeform.join('\n')).toMatch(/attaches no per-column V deform/);
+    expect(noVDeform.length).toBe(2);
+
+    // AND IT IS THE VALUE THAT FIRES IT, not the mere presence of a policy: the
+    // other two real answers stay silent on the identical scene. Without this
+    // row the arm could be `mask !== undeclared` and still pass everything above.
+    for (const other of ['accept', 'factor0_lock'] as const) {
+      const s = sceneWith({ v_deform: columns, left_column_mask: other });
+      expect(sceneDeformAdvisories(s).join('\n'), other).not.toMatch(/refuses in every scene/);
+    }
+  });
+
+  it('a curve layer beside an anchor with LIVE deform shifts — the fourth guard-5 ensure', () => {
+    // ROADMAP row 64, aeon scene_dsl.emp:1251. MEASURED before it was believed:
+    // the identical document builds rc=1 with "this scene carries a curve layer
+    // AND an anchor with live deform shifts (anchor dsa 3 / dsb 2 …)" while
+    // `sceneDeformAdvisories` returned [] (guard-surface-gaps §3).
+    const OFF = S.properties.anchor.oneOf[1].properties.at.properties.dsa.maximum;
+    const withCurve = (anchor: unknown) => {
+      const s = sceneWith({ anchor: anchor as never });
+      s.layers[0].curve = { to: 'FACTOR_1_2' };
+      return s;
+    };
+
+    const live = sceneDeformAdvisories(withCurve({ at: { channel: 0, dsa: 3, dsb: 2 } })).join('\n');
+    expect(live).toMatch(/layer 0 authors a curve/);
+    expect(live).toMatch(/anchor dsa 3 \/ dsb 2/);
+    expect(live).toMatch(new RegExp(`${OFF} is the no-deform sentinel`));
+
+    // ⚠ THE SENTINEL TRAP, pinned as its own row. `15` means NO DEFORM, so the
+    // saturated anchor is the PERMITTED case ("an anchor split inside a curve
+    // layer CONTINUES the curve", design §2) — not the extreme one. A check
+    // written as "the shifts are large" would fire here and stay silent above,
+    // and would agree with a build fixture that never tested it.
+    expect(sceneDeformAdvisories(withCurve({ at: { channel: 0, dsa: OFF, dsb: OFF } }))).toEqual([]);
+
+    // EITHER shift arms it — the engine ORs two tests into one flag. `dsa 15 /
+    // dsb 2` is the shape the game's own ojz_act1_start already ships, so a
+    // both-must-be-live check would miss the only anchor in the tree.
+    for (const [dsa, dsb] of [[OFF, 2], [3, OFF]] as const) {
+      expect(sceneDeformAdvisories(withCurve({ at: { channel: 0, dsa, dsb } })).join('\n'),
+        `dsa ${dsa} dsb ${dsb}`).toMatch(/authors a curve/);
+    }
+
+    // BOTH HALVES ARE LOAD-BEARING — the two controls that make the pair legal
+    // one at a time. These are the alternative green-paths: without them the arm
+    // could be "there is an anchor" or "there is a curve" and pass everything above.
+    expect(sceneDeformAdvisories(sceneWith({ anchor: { at: { channel: 0, dsa: 3, dsb: 2 } } })))
+      .toEqual([]);                                   // live anchor, NO curve
+    const curveOnly = sceneWith({});
+    curveOnly.layers[0].curve = { to: 'FACTOR_1_2' };
+    expect(sceneDeformAdvisories(curveOnly)).toEqual([]);   // curve, NO anchor
+    expect(sceneDeformAdvisories(withCurve('none'))).toEqual([]);  // curve, anchor "none"
+
+    // The curve may be on ANY strip — the anchor writes into every strip below
+    // the split, so a scan that only looked at layer 0 would miss the real case.
+    const deep = sceneWith({ anchor: { at: { channel: 0, dsa: 3, dsb: 2 } } });
+    deep.layers.push({ world_y: 64, fa: 'FACTOR_1', fb: 'FACTOR_1', curve: { to: 'FACTOR_1_2' } });
+    expect(sceneDeformAdvisories(deep).join('\n')).toMatch(/layer 1 authors a curve/);
+
+    // And it is ADVICE: the document still serializes.
+    expect(() => serializeEffectsScene(withCurve({ at: { channel: 0, dsa: 3, dsb: 2 } }))).not.toThrow();
+  });
+
+  it('the anchor sentinel is read from the ANCHOR schema, not a layer deform bound', () => {
+    // The two are 15 today and that agreement is held in place by nothing —
+    // different $defs, amendable apart. This row fails the moment the constant
+    // is re-derived from the wrong place, which is invisible while they agree.
+    const anchorMax = S.properties.anchor.oneOf[1].properties.at.properties.dsa.maximum;
+    expect(EFFECTS_ANCHOR_SHIFT_BOUNDS.dsa.max).toBe(anchorMax);
+    expect(EFFECTS_ANCHOR_SHIFT_BOUNDS.dsb.max)
+      .toBe(S.properties.anchor.oneOf[1].properties.at.properties.dsb.maximum);
+    expect(EFFECTS_ANCHOR_SHIFT_BOUNDS.dsa.min)
+      .toBe(S.properties.anchor.oneOf[1].properties.at.properties.dsa.minimum);
+  });
+
   it('every advisory is ADVICE — the writer still emits each of these documents', () => {
     // The posture scene.ts states: Aurora pre-checks, sigil is the rulebook. A
     // scene Aurora warns about must still save, or the editor has become a
@@ -1035,6 +1204,16 @@ describe('deform advisories — what the build would refuse, said first', () => 
     bad.layers[0].deform = own;
     expect(sceneDeformAdvisories(bad).length).toBeGreaterThan(0);
     expect(() => serializeEffectsScene(bad)).not.toThrow();
+
+    // INCLUDING sprite_mask (ROADMAP row 62), which is the one the picker
+    // PREVENTS. Prevention there and advice here are not in tension: the option
+    // stops the value being authored, and this arm explains one that arrived.
+    // Turning THIS into a refusal would reverse row 58's deliberate posture and
+    // strand the author with a file the editor will not write back.
+    const carried = sceneWith({ v_deform: columns, left_column_mask: 'sprite_mask' });
+    expect(sceneDeformAdvisories(carried).length).toBeGreaterThan(0);
+    expect(() => serializeEffectsScene(carried)).not.toThrow();
+    expect(serializeEffectsScene(carried)).toContain('sprite_mask');
   });
 });
 

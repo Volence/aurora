@@ -77,7 +77,7 @@ import {
   TABLE_REF_ROW, SCENE_DEFORM_ROWS, SCENE_DEFORM_ROW_SHARED, V_DEFORM_ROW, LAYER_DEFORM_ROW,
   tableRefFormOptions, tableRefFormOf, tableRefFromForm, tableRefParams, tableParamLabel,
   tableRefParamValue, setTableRefParam, tableRefBinPath, binPathRefusal, tableRefAdvisory,
-  tableRefLabel,
+  tableRefLabel, tableRefParamOptions, EFFECTS_DEFORM_TABLE_BYTES,
   sceneDeformValue, sceneDeformFromToggle, vDeformValue, vDeformFromToggle,
   layerDeformValue, layerDeformFromToggle, layerDeformAdvisory, sceneDeformAdvisories,
   layerCurveDeformAdvisory,
@@ -262,21 +262,51 @@ function TableRefField({ table, onChange, titlePrefix }: {
           {tableRefFormOptions().map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
         </Select>
       </Field>
-      {tableRefParams(form).map((p) => (
+      {tableRefParams(form).map((p) => {
+        // A PICKER WHERE THE ENGINE ADMITS A SET, A SPINNER WHERE IT ADMITS A
+        // RANGE (ROADMAP row 63). `period` must DIVIDE the table length, which
+        // is not a bound and so is not something `min`/`max` or a clamp can
+        // express — the spinner advertised 247 values the build refuses. The
+        // option list is computed from the schema's own table length, and a
+        // non-divisor the FILE carries is rendered disabled rather than dropped,
+        // for `leftColumnMaskOptions`'s reason: a `<select>` missing its own
+        // value shows a different one, which here would mean the author reading
+        // a legal period while the build reads an illegal one.
+        const options = tableRefParamOptions(form, p.key, tableRefParamValue(table, p.key));
+        if (options !== null) {
+          return (
+            <Field key={p.key} label={tableParamLabel(p.key)}>
+              <Select
+                title={`${titlePrefix} ${p.key} — must divide the `
+                  + `${EFFECTS_DEFORM_TABLE_BYTES}-byte table; the build refuses any other value`}
+                value={String(tableRefParamValue(table, p.key))}
+                onChange={(v) => onChange(setTableRefParam(table, p.key, Number(v)))}
+                style={{ width: 88 }}>
+                {options.map((o) => (
+                  <option key={o.value} value={o.value} disabled={o.disabled} title={o.title}>
+                    {o.label}{o.disabled ? ' (engine refuses)' : ''}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+          );
+        }
         // BOUNDED BY THE CLAMP, NOT THE PROPS (ROADMAP item 37) — `min`/`max`
         // here only style the spinner, and `setTableRefParam` is what actually
         // holds the value inside the branch's declared range. An UNBOUNDED
         // parameter (`focal`, `center`, `max_offset`) passes `undefined` for
         // both rather than inventing a ceiling the contract does not have.
-        <Field key={p.key} label={tableParamLabel(p.key)}>
-          <NumberField
-            title={`${titlePrefix} ${p.key}`
-              + (p.min !== null && p.max !== null ? ` (${p.min}..${p.max})` : ' — unbounded')}
-            min={p.min ?? undefined} max={p.max ?? undefined} width={72}
-            value={tableRefParamValue(table, p.key)}
-            onChange={(n) => onChange(setTableRefParam(table, p.key, n))} />
-        </Field>
-      ))}
+        return (
+          <Field key={p.key} label={tableParamLabel(p.key)}>
+            <NumberField
+              title={`${titlePrefix} ${p.key}`
+                + (p.min !== null && p.max !== null ? ` (${p.min}..${p.max})` : ' — unbounded')}
+              min={p.min ?? undefined} max={p.max ?? undefined} width={72}
+              value={tableRefParamValue(table, p.key)}
+              onChange={(n) => onChange(setTableRefParam(table, p.key, n))} />
+          </Field>
+        );
+      })}
       {binPath !== null && (
         <Field label={TABLE_REF_ROW.binLabel} title={TABLE_REF_ROW.binTitle}>
           <input value={binPath} placeholder="tables/name.bin"
