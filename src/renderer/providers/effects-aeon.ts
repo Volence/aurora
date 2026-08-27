@@ -532,11 +532,17 @@ export function layerDeformFromToggle(on: boolean): EffectsLayerDeform | undefin
 /**
  * What aeon's `scene()` would refuse about this scene's deform, as sentences.
  *
- * FOUR OF THE FIVE comptime guards on this surface are cross-field, so no
- * control can carry them and the codec's shape validator cannot see them
- * either. Each is transcribed from the `ensure` it mirrors
- * (aeon engine/level/scene_dsl.emp), and each is ADVICE: sigil stays the
- * rulebook, exactly as scene.ts's advisoryLayerDeformConflicts docblock argues.
+ * MOST OF THE guards on this surface are cross-field, so no control can carry
+ * them and the codec's shape validator cannot see them either. Each is
+ * transcribed from the `ensure` it mirrors (aeon engine/level/scene_dsl.emp),
+ * and each is ADVICE: sigil stays the rulebook, exactly as scene.ts's
+ * advisoryLayerDeformConflicts docblock argues.
+ *
+ * ONE ARM IS NOT CROSS-FIELD — `sprite_mask` (ROADMAP row 62), which the engine
+ * refuses on the declaration alone. It is here anyway because "here" is where
+ * the panel already renders warnings, and because the reason it was MISSING was
+ * precisely that a single-field refusal looked like the picker's problem. It is
+ * not: the picker only governs values an author selects.
  *
  * The fifth — `own` alongside a live dsa/dsb/phase — is already written, in the
  * codec, as `advisoryLayerDeformConflicts`. It is per-layer, so the card renders
@@ -568,6 +574,40 @@ export function sceneDeformAdvisories(scene: EffectsScene): string[] {
       'V deform is on and this scene declares no left_column_mask policy, which the build '
       + 'requires: in per-column mode the leftmost partial column renders at a scroll nothing '
       + `wrote. Answer it on the ${LEFT_COLUMN_MASK_ROW.label} row below.`,
+    );
+  }
+  // GUARD 3, FOR A VALUE THAT ARRIVED RATHER THAN WAS PICKED (ROADMAP row 62).
+  //
+  // `sprite_mask` is rendered as a DISABLED option, and row 58 reasoned that
+  // correctly — but disabling an option protects the PICKER and protects nothing
+  // about a document that already holds the value. A hand-edited file, a scene
+  // copied from elsewhere, an MCP `edit_effects_scene` write or a future tool
+  // can all put it there, and until this arm existed the author opened such a
+  // scene, saw no warning anywhere, saved, and met the refusal at build time
+  // with no in-app explanation. Measured, not reasoned: on the identical
+  // document `sceneDeformAdvisories` returned `(none)` while the build went
+  // rc=1 (docs/reviews/2026-08-27-guard-transcription.md §4 guard 3, re-measured
+  // 2026-08-27 in docs/reviews/2026-08-27-guard-surface-gaps.md).
+  //
+  // THE DISABLED OPTION STAYS. The two cover different paths — the option stops
+  // the value being AUTHORED here, this arm explains it once it has ARRIVED —
+  // and removing either re-opens the one it covers.
+  //
+  // UNCONDITIONAL, unlike every other arm on this surface, because the engine's
+  // refusal is: `scene_dsl.emp:1354` fires on the declaration alone, with no
+  // reference to `v_deform` or to anything else the scene contains. So there is
+  // no scene edit that clears it and the remedy is to change the value — which
+  // is what the sentence asks for. A scene carrying `sprite_mask` with no
+  // `v_deform` therefore reads TWO advisories, this one and guard 2's; both are
+  // true, both are cleared by the same single edit, and suppressing either would
+  // be Aurora deciding which of two real refusals the author is allowed to see.
+  if (mask === 'sprite_mask') {
+    out.push(
+      'this scene declares left_column_mask "sprite_mask", which the build refuses in every '
+      + 'scene: the engine\'s left-column strip emission has not landed, so the declaration '
+      + 'would be accepted while the sliver stays uncovered. Declare factor0_lock or accept '
+      + `on the ${LEFT_COLUMN_MASK_ROW.label} row instead — the picker will not offer `
+      + 'sprite_mask back.',
     );
   }
   // GUARD 2's ARM IS NOT DEAD CODE NOW THAT THE TOGGLE CLEARS THE POLICY WITH

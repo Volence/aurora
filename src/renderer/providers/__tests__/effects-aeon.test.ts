@@ -1011,6 +1011,12 @@ describe('deform advisories — what the build would refuse, said first', () => 
       const got = sceneDeformAdvisories(sceneWith({ v_deform: columns, left_column_mask: v as never }));
       if (v === 'factor0_lock') {
         expect(got.join('\n'), v).toMatch(/left_column_mask factor0_lock:/);
+      } else if (v === 'sprite_mask') {
+        // ANSWERING guard 1 IS NOT ENOUGH FOR THIS VALUE (ROADMAP row 62). It
+        // silences "no policy declared" and immediately raises guard 3's own
+        // refusal, because the engine refuses the declaration outright.
+        expect(got.join('\n'), v).toMatch(/refuses in every scene/);
+        expect(got.join('\n'), v).not.toMatch(/no left_column_mask policy/);
       } else {
         expect(got, v).toEqual([]);
       }
@@ -1026,6 +1032,39 @@ describe('deform advisories — what the build would refuse, said first', () => 
     expect(a).toMatch(/the build refuses it/);
   });
 
+  it('sprite_mask that ARRIVED in the file is advised, not only disabled in the picker', () => {
+    // ROADMAP row 62. The disabled `<option>` protects the PICKER; it protects
+    // nothing about a document that already holds the value — a hand-edited
+    // file, a scene copied from elsewhere, an MCP write. Before this arm, that
+    // document produced `(none)` here while the build went rc=1 with
+    // "left_column_mask: SpriteMask is declared, but the engine's left-column
+    // strip emission has NOT landed" (measured, not read: guard-surface-gaps §2).
+    const carried = sceneWith({ v_deform: columns, left_column_mask: 'sprite_mask' });
+    const a = sceneDeformAdvisories(carried).join('\n');
+    expect(a).toMatch(/sprite_mask/);
+    expect(a).toMatch(/refuses in every scene/);
+    // It must point at the two values that ARE answers, or the advisory states a
+    // problem with no remedy — the row-58 trap ("set it by hand") one field over.
+    expect(a).toMatch(/factor0_lock/);
+    expect(a).toMatch(/accept/);
+
+    // UNCONDITIONAL, because the engine's ensure is: :1354 fires on the
+    // declaration alone. Without `v_deform` the scene reads BOTH this and guard
+    // 2's advisory — both true, both cleared by one edit.
+    const noVDeform = sceneDeformAdvisories(sceneWith({ left_column_mask: 'sprite_mask' }));
+    expect(noVDeform.join('\n')).toMatch(/refuses in every scene/);
+    expect(noVDeform.join('\n')).toMatch(/attaches no per-column V deform/);
+    expect(noVDeform.length).toBe(2);
+
+    // AND IT IS THE VALUE THAT FIRES IT, not the mere presence of a policy: the
+    // other two real answers stay silent on the identical scene. Without this
+    // row the arm could be `mask !== undeclared` and still pass everything above.
+    for (const other of ['accept', 'factor0_lock'] as const) {
+      const s = sceneWith({ v_deform: columns, left_column_mask: other });
+      expect(sceneDeformAdvisories(s).join('\n'), other).not.toMatch(/refuses in every scene/);
+    }
+  });
+
   it('every advisory is ADVICE — the writer still emits each of these documents', () => {
     // The posture scene.ts states: Aurora pre-checks, sigil is the rulebook. A
     // scene Aurora warns about must still save, or the editor has become a
@@ -1035,6 +1074,16 @@ describe('deform advisories — what the build would refuse, said first', () => 
     bad.layers[0].deform = own;
     expect(sceneDeformAdvisories(bad).length).toBeGreaterThan(0);
     expect(() => serializeEffectsScene(bad)).not.toThrow();
+
+    // INCLUDING sprite_mask (ROADMAP row 62), which is the one the picker
+    // PREVENTS. Prevention there and advice here are not in tension: the option
+    // stops the value being authored, and this arm explains one that arrived.
+    // Turning THIS into a refusal would reverse row 58's deliberate posture and
+    // strand the author with a file the editor will not write back.
+    const carried = sceneWith({ v_deform: columns, left_column_mask: 'sprite_mask' });
+    expect(sceneDeformAdvisories(carried).length).toBeGreaterThan(0);
+    expect(() => serializeEffectsScene(carried)).not.toThrow();
+    expect(serializeEffectsScene(carried)).toContain('sprite_mask');
   });
 });
 
