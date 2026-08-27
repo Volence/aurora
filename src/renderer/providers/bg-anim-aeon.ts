@@ -346,10 +346,45 @@ export function bandBudget(doc: BgOverrideDocument | null): BandBudget {
   };
 }
 
+/**
+ * What an EMPTY range is called on screen. Its own words, because arithmetic
+ * has none: `base + count - 1` on a zero-length range renders `0..-1`, which is
+ * not a range a reader can act on. See `slotSpanPhrase`.
+ */
+export const NO_SLOTS_PHRASE = 'no slots';
+
+/**
+ * `"slots 12..19"` — the slots a `count`-long range starting at `base` ACTUALLY
+ * CONTAINS, for any readout that names one.
+ *
+ * ⚠ THE SECOND NUMBER IS THE LAST SLOT IN THE RANGE, NOT THE FIRST ONE PAST IT.
+ * Every count on this surface is a COUNT — `tileCount`, `animatedSlots`,
+ * `firstPromotableSlot` (`bandBudget` sets it from `animatedSlotCount`) — so
+ * `base + count` is the first slot the range does NOT own, and printing it
+ * hands the author a slot that belongs to somebody else. On the only real
+ * document there is, `slots 0..32` over 32 animated slots names slot 32, which
+ * is precisely the first slot a PROMOTION drag may take. `d7ec678` fixed that
+ * exact sentence in the strip's refusal hint the day before; this is the same
+ * convention, in one place, so the three surviving readouts cannot drift from
+ * the arithmetic again. Both halves are derived from the same `count` the range
+ * is built from — never typed.
+ *
+ * The empty range is DECIDED rather than inherited: `count <= 0` has no last
+ * slot, so it gets `NO_SLOTS_PHRASE` instead of a backwards `0..-1`.
+ */
+export function slotSpanPhrase(base: number, count: number): string {
+  if (count <= 0) return NO_SLOTS_PHRASE;
+  return `slots ${base}..${base + count - 1}`;
+}
+
 export interface BandRow extends BgAnimBandView {
   /** `"32x4"` — the geometry as an author says it out loud. */
   geometry: string;
-  /** Slot range the band owns, inclusive-exclusive, for the row's subtitle. */
+  /**
+   * `"slots 0..127"` — the slots the band owns, FIRST..LAST inclusive, ready to
+   * print in the row's subtitle. See `slotSpanPhrase` for why the second half
+   * is the last owned slot rather than one past it.
+   */
   slotRange: string;
 }
 
@@ -359,7 +394,7 @@ export function bandRows(doc: BgOverrideDocument | null): BandRow[] {
   return describeBands(doc).map((v) => ({
     ...v,
     geometry: `${v.cols}x${v.rows}`,
-    slotRange: `${v.slotBase}..${v.slotBase + v.tileCount}`,
+    slotRange: slotSpanPhrase(v.slotBase, v.tileCount),
   }));
 }
 
