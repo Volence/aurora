@@ -14,7 +14,7 @@ import { fileURLToPath } from 'node:url';
 import {
   worldYToCanvasY, canvasYToWorldY, guideAtCanvasY, layerGuideGeometry,
   layerIsEnabled, GUIDE_GRAB_PX, publishGuideReport, lastGuideReport,
-  guideOriginWorldY, canvasYToLayerTop, guideCaption, DEFAULT_GUIDE_ORIGIN,
+  guideOriginWorldY, canvasYToLayerTop, guideCaption,
   type GuideViewport,
 } from '../effects-guides';
 import { EFFECTS_WORLD_Y_BOUNDS, clampWorldY } from '../../providers/effects-aeon';
@@ -172,65 +172,63 @@ describe('the guide report', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Locked scenes: the guides are screen lines, not act rows (feedback 2026-08-26 pt 4)
+// Locked scenes: a layer top is a PLANE ROW, fixed on the art
 // ---------------------------------------------------------------------------
 
-describe('a locked scene draws its guides as screen lines', () => {
-  // For a locked plane a layer top IS a plane line (aeon scene_plane_line:
-  // identity mapping), so drawing it at act Y is wrong everywhere except
-  // inside the plane rectangle at world origin, where the two coincide by
-  // accident. Since 2026-08-27 "the screen" is THE SCREEN FRAME, a world
-  // rectangle the author pins — not the viewport's top edge, which is not a
-  // world position at all and slid the whole guide set on every pan and zoom.
-  it('anchors screen space at the screen frame, act space at the act origin', () => {
-    expect(guideOriginWorldY('screen', { frameY: 1234 })).toBe(1234);
-    expect(guideOriginWorldY('act', { frameY: 1234 })).toBe(0);
+describe('a locked scene draws its guides on the plane, at world origin', () => {
+  // ⚠ THIS BLOCK ASSERTED THE OPPOSITE EARLIER ON 2026-08-27. Row 65 anchored a
+  // locked scene's guides to the SCREEN FRAME, less v_offset. The owner
+  // disproved it the same day — "if I move the viewport it drags the layers
+  // which I don't want" — and the engine agrees with him:
+  //
+  //   .v_locked  ->  Vscroll_BG = v_offset, a scene constant; Camera_Y unread
+  //   Step 4a    ->  the screen shows plane rows v_offset .. v_offset+223
+  //   locked scene_plane_line is the IDENTITY, so a top IS a plane row
+  //   renderBg draws the plane at world (0,0), so plane row P is at world Y P
+  //
+  // The old rows are not deleted quietly: the last one in this block is the
+  // NEW catcher and it is the exact inverse of the old one.
+  it('anchors BOTH spaces at world origin', () => {
+    expect(guideOriginWorldY('screen')).toBe(0);
+    expect(guideOriginWorldY('act')).toBe(0);
   });
 
-  it('subtracts v_offset, because a locked screen line is `top - v_offset`', () => {
-    // aeon scene_vsplit_line: `scene_plane_line(s, wy) - v_offset`, and the
-    // locked plane_line is the identity. Both shipped scenes have v_offset 0,
-    // which is exactly why omitting it would never have been noticed.
-    expect(guideOriginWorldY('screen', { frameY: 1000, vOffset: 24 })).toBe(976);
-    expect(guideOriginWorldY('screen', { frameY: 1000, vOffset: 0 })).toBe(1000);
-    expect(guideOriginWorldY('screen', { frameY: 1000 })).toBe(1000);
+  it('does NOT subtract v_offset — that belongs to the FIRE LINE, not the position', () => {
+    // `scene_vsplit_line = scene_plane_line - v_offset` is the screen line a
+    // vsplit fires on (fireScreenLineOf / fireLineAdvisory own it). A guide is
+    // drawn where the layer IS; the fire line is what the layer BECOMES.
+    // Nothing here can be given a v_offset to subtract any more, which is the
+    // structural half of saying so.
+    expect(guideOriginWorldY.length).toBe(1);
   });
 
-  it('DEFAULTS TO A WORLD CONSTANT, never to anything read off the viewport', () => {
-    // The regression guard for the bug this parcel removed: a call site that
-    // forgets the origin must still get a FIXED world position, so the guide
-    // can be in the wrong place but can never slide under a pan again.
-    for (const vpY of [0, 37, 2048]) {
-      expect(layerGuideGeometry([layer(160)], vp(vpY, 1), { space: 'screen' })[0].canvasY)
-        .toBe(160 - vpY);
+  it('places a top at its own world row, at every pan and every zoom', () => {
+    for (const vpY of [0, 37, 2048, 20000]) {
+      for (const zoom of [0.5, 1, 3]) {
+        const rows = layerGuideGeometry([layer(0), layer(160)], vp(vpY, zoom), { space: 'screen' });
+        expect(rows.map((r) => r.canvasY)).toEqual([(0 - vpY) * zoom, (160 - vpY) * zoom]);
+        expect(rows.map((r) => r.worldY)).toEqual([0, 160]);
+      }
     }
-    expect(DEFAULT_GUIDE_ORIGIN).toEqual({ frameY: 0, vOffset: 0 });
   });
 
-  it('THE CATCHER: a pan moves the guide on the canvas by exactly the pan', () => {
-    // A screen guide is pinned to the FRAME, which is pinned to the world — so
-    // panning the editor must move it on the canvas exactly as it moves any
-    // world feature. Under the old viewport origin this row reads 0 for every
-    // pan, which is the whole of the reported symptom.
-    const origin = { frameY: 500, vOffset: 0 };
+  it('KEPT FROM ROW 65: a pan moves the guide on the canvas by exactly the pan', () => {
+    // Still the property that matters against the ORIGINAL bug (`vp.y` as the
+    // origin), and still true of the corrected rule: a guide pinned to the
+    // plane is pinned to the world, so panning moves it like any world feature.
+    // Under the `vp.y` origin this row reads 0 for every pan.
     const at = (vpY: number) =>
-      layerGuideGeometry([layer(112)], vp(vpY, 1), { space: 'screen', origin })[0].canvasY;
-    expect(at(0)).toBe(612);
-    expect(at(100)).toBe(512);
+      layerGuideGeometry([layer(112)], vp(vpY, 1), { space: 'screen' })[0].canvasY;
+    expect(at(0)).toBe(112);
+    expect(at(100)).toBe(12);
     expect(at(0) - at(100)).toBe(100);
   });
 
-  it('places line N at (frameY + N - vpY)*zoom — it rides the world, not the viewport', () => {
-    const origin = { frameY: 2048, vOffset: 0 };
-    for (const vpY of [0, 37, 2048, 20000]) {
-      for (const zoom of [0.5, 1, 3]) {
-        const rows = layerGuideGeometry([layer(0), layer(160)], vp(vpY, zoom),
-          { space: 'screen', origin });
-        expect(rows.map((r) => r.canvasY))
-          .toEqual([(2048 - vpY) * zoom, (2048 + 160 - vpY) * zoom]);
-        // The reported top is still the document's number, not a world Y.
-        expect(rows.map((r) => r.worldY)).toEqual([0, 160]);
-      }
+  it('the two spaces now agree everywhere, because both are the plane\'s own rows', () => {
+    for (const vpY of [0, 300]) {
+      const at = (space: 'screen' | 'act') =>
+        layerGuideGeometry([layer(112)], vp(vpY, 1), { space })[0].canvasY;
+      expect(at('screen')).toBe(at('act'));
     }
   });
 
@@ -241,35 +239,38 @@ describe('a locked scene draws its guides as screen lines', () => {
     expect(a[0].canvasY).toBe(160 - 500);
   });
 
-  it('the two spaces disagree everywhere except with the frame at the act origin', () => {
-    // The coincidence that hid the defect: with the frame at world 0 both
-    // spellings land on the same row.
-    const atOrigin = (space: 'screen' | 'act') =>
-      layerGuideGeometry([layer(112)], vp(0, 1), { space, origin: { frameY: 0 } })[0].canvasY;
-    expect(atOrigin('screen')).toBe(atOrigin('act'));
-    const moved = (space: 'screen' | 'act') =>
-      layerGuideGeometry([layer(112)], vp(0, 1), { space, origin: { frameY: 300 } })[0].canvasY;
-    expect(moved('screen')).not.toBe(moved('act'));
-  });
-
-  it('grabs and drags in the same space AND from the same origin it draws in', () => {
+  it('grabs and drags in the space it draws in, and round-trips', () => {
     const v = vp(1000, 2);
-    const origin = { frameY: 900, vOffset: 0 };
     const ls = [layer(50), layer(200)];
-    const rows = layerGuideGeometry(ls, v, { space: 'screen', origin });
-    expect(guideAtCanvasY(rows[1].canvasY, ls, v, 'screen', origin)).toBe(1);
-    // With the DEFAULT origin the same canvas row finds nothing — which is what
-    // says the hit test reads the frame rather than re-deriving a guess.
-    expect(guideAtCanvasY(rows[1].canvasY, ls, v, 'screen')).toBeNull();
-    // In act space the same canvas row finds nothing either.
-    expect(guideAtCanvasY(rows[1].canvasY, ls, v, 'act')).toBeNull();
-    // Round trip: the row a guide draws at converts back to its own top.
-    expect(canvasYToLayerTop(rows[1].canvasY, v, 'screen', origin)).toBe(200);
+    const rows = layerGuideGeometry(ls, v, { space: 'screen' });
+    expect(guideAtCanvasY(rows[1].canvasY, ls, v, 'screen')).toBe(1);
+    expect(canvasYToLayerTop(rows[1].canvasY, v, 'screen')).toBe(200);
     expect(canvasYToLayerTop(worldYToCanvasY(200, v.y, v.zoom), v, 'act')).toBe(200);
   });
 
+  it('a layer can sit anywhere on the 512-row plane, including below the visible strip', () => {
+    // The owner's own case: flower art at plane row ~430, well past 223. It is
+    // a legal top (the plane is 512 rows) and the guide belongs on the art.
+    const rows = layerGuideGeometry([layer(430)], vp(0, 1), { space: 'screen' });
+    expect(rows[0].canvasY).toBe(430);
+    expect(rows[0].worldY).toBe(430);
+  });
+
   it('captions the guide layer so the space is visible, and only when locked', () => {
-    expect(guideCaption('screen')).toBe("screen lines — from the screen frame's top edge");
+    expect(guideCaption('screen')).toBe('plane rows — fixed on the background, not on the frame');
     expect(guideCaption('act')).toBeNull();
+  });
+
+  it('THE NEW CATCHER: the guide does not move when the SCREEN FRAME moves', () => {
+    // ⚠ THE EXACT INVERSE OF THE ROW IT REPLACES, and the owner's sentence in
+    // one assertion. Nothing this function can be handed describes a frame, so
+    // the frame cannot enter the answer — which is why the parameter was
+    // REMOVED rather than defaulted: a default is a value a call site can still
+    // pass something else for.
+    const before = layerGuideGeometry([layer(112)], vp(0, 1), { space: 'screen' })[0].canvasY;
+    // Move the frame by any amount you like; there is no argument for it.
+    const after = layerGuideGeometry([layer(112)], vp(0, 1), { space: 'screen' })[0].canvasY;
+    expect(after).toBe(before);
+    expect(after).toBe(112);
   });
 });

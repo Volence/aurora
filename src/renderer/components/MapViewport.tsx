@@ -45,14 +45,20 @@ import { OverlayRenderer } from '../canvas/OverlayRenderer';
 import type { SectionOverlayInfo } from '../canvas/OverlayRenderer';
 import {
   drawLayerGuides, guideAtCanvasY, canvasYToWorldY, canvasYToLayerTop, layerGuideGeometry,
-  publishGuideReport, type GuideOrigin,
+  publishGuideReport,
 } from '../canvas/effects-guides';
 import {
+  cameraPreviewPlan, drawCameraPreview, publishCameraPreviewReport,
+  CAMERA_KEY_STEP_FINE, CAMERA_KEY_STEP_COARSE, type PlaneSource,
+} from '../canvas/camera-preview';
+import { SCREEN_WIDTH, SCREEN_HEIGHT } from '../../core/model/screen';
+import {
   drawScreenFrame, screenFrameEdgeAt, dragScreenFrame, publishScreenFrameReport,
-  type ScreenFrameAnchor,
+  screenFrameRect, type ScreenFrameAnchor,
 } from '../canvas/screen-frame';
 import {
   resolveSelectedScene, setLayerFieldCommand, clampLayerTop, layerTopSpace,
+  setSceneFieldCommand, clampVOffset,
 } from '../providers/effects-aeon';
 import { EFFECTS_V_OFFSET_DEFAULT } from '../../core/formats/effects/scene-ui';
 import type { EffectsScene } from '../../core/formats/effects/scene';
@@ -116,20 +122,36 @@ function activeGuideScene(): EffectsScene | null {
 }
 
 /**
- * Where screen line 0 sits for this scene, given the screen frame's top edge.
+ * WHERE THE SCREEN FRAME SITS, and the two axes do not come from the same place.
  *
- * ONE SPELLING, called by the draw pass, the hit test and the drag — the same
- * rule `activeGuideScene` above exists for. Three call sites each building the
- * `{ frameY, vOffset }` pair by hand is how one of them ends up reading the
- * store's anchor while a drag is in flight, and a guide then lags the frame it
- * is measured from by exactly the drag distance.
+ * ⚠ ON A LOCKED SCENE THE FRAME'S X IS A CAMERA POSITION AND ITS Y IS A SCENE
+ * FIELD. That reads oddly and it is what the engine says:
  *
- * `vOffset` is here because aeon's `scene_vsplit_line` is
- * `scene_plane_line(s, wy) - v_offset`; it is 0 in both shipped scenes, which is
- * precisely why leaving it out would never be noticed.
+ *   X — `Decode_Factor_A` reads `Camera_X` on every band on every frame, so a
+ *       horizontal camera position is a real, free thing the author states. It
+ *       stays `viewStore.screenFrame.x`: a session reference, not document
+ *       state, not on the undo stack.
+ *   Y — `Parallax_Step5_Vscroll`'s `.v_locked` arm never reads `Camera_Y`. The
+ *       plane's vertical scroll IS `v_offset`, so the screen shows plane rows
+ *       `v_offset .. v_offset+223` and the frame's top edge IS plane row
+ *       `v_offset`. There is no free vertical camera to state; there is a scene
+ *       field, and the frame is its handle.
+ *
+ * On an UNLOCKED scene the plane does track `Camera_Y`, so both axes are the
+ * session anchor and the frame is a camera in the ordinary sense.
+ *
+ * ONE SPELLING, called by the draw pass, the hit test and the drag — the rule
+ * `activeGuideScene` above exists for. Three call sites resolving this by hand
+ * is how one of them ends up reading the store while a drag is in flight.
  */
-function guideOriginOf(scene: EffectsScene, frameY: number): GuideOrigin {
-  return { frameY, vOffset: scene.v_offset ?? EFFECTS_V_OFFSET_DEFAULT };
+function frameAnchorFor(scene: EffectsScene | null, session: ScreenFrameAnchor): ScreenFrameAnchor {
+  if (scene === null || layerTopSpace(scene) !== 'screen') return session;
+  return { x: session.x, y: scene.v_offset ?? EFFECTS_V_OFFSET_DEFAULT };
+}
+
+/** True when this scene's frame Y is `v_offset` — i.e. a vertical drag edits the document. */
+function frameYIsVOffset(scene: EffectsScene | null): boolean {
+  return scene !== null && layerTopSpace(scene) === 'screen';
 }
 
 /**
@@ -876,6 +898,16 @@ export default function MapViewport() {
 
     syncBandPreview();
 
+    // ⚠ THE SCENE AND THE FRAME ANCHOR ARE RESOLVED HERE, ABOVE THE COMPOSITE,
+    // and they used to be resolved 60 lines further down beside the frame's
+    // stroke. The camera preview needs them BETWEEN Plane B and the foreground
+    // (see `drawCamera` below), and resolving them twice is how one copy ends up
+    // reading the store while a drag is in flight.
+    const guideScene = activeGuideScene();
+    const guideSpace = guideScene ? layerTopSpace(guideScene) : null;
+    const fd = frameDrag.current;
+    const frameAnchor = fd ? fd.anchor : frameAnchorFor(guideScene, view.screenFrame);
+
     // The band overlay goes over Plane B and UNDER the foreground, because that
     // is where the art it replaces lives. Drawing it after the FG composite
     // would put background tiles on top of the level.
@@ -888,9 +920,58 @@ export default function MapViewport() {
       });
     };
 
+    // ═══ THE CAMERA PREVIEW ═══ — inside the frame, Plane B as the ROM would
+    // compose it for a camera at `frameAnchor`.
+    //
+    // ⚠ IT SITS BETWEEN PLANE B AND THE FOREGROUND, and that position is the
+    // whole reason this is ONE canvas rather than a second view. The map has
+    // already drawn Plane B in plane space; this repaints the frame's interior
+    // with the per-band, per-factor composite; and then the section canvases
+    // composite the FOREGROUND over it exactly as they always did. The
+    // foreground under the frame IS the world under the frame, which is the
+    // camera's view of Plane A whenever that band's `fa` is FACTOR_1 — so the
+    // author gets background parallax and real level art in one rectangle,
+    // without either half being re-implemented.
+    //
+    // NO CLOCK. Inside the pass that already repaints on a pan, a zoom, a store
+    // change and an undo. It schedules nothing, so MapViewport's measured
+    // zero-idle-repaint property is untouched.
+    //
+    // AFTER `drawBands()` ON PURPOSE: `bandPreview.overlayCanvas()` is only
+    // current once `draw` has run for this frame (its own docblock says so).
+    const drawCamera = () => {
+      if (!guideScene || !overlayOpts.showCameraPreview) {
+        publishCameraPreviewReport({
+          active: false, sceneId: null, camX: null, camY: null, vscrollBase: null,
+          vLocked: null, bands: [], absent: [], blits: 0,
+        });
+        return;
+      }
+      const plane = sectionRenderer.bgPlaneCanvas();
+      if (!plane) {
+        publishCameraPreviewReport({
+          active: false, sceneId: guideScene.id, camX: null, camY: null, vscrollBase: null,
+          vLocked: null, bands: [], absent: [], blits: 0,
+        });
+        return;
+      }
+      const sources: PlaneSource[] = [plane];
+      const overlay = overlayOpts.playAnimatedArt ? bandPreview.overlayCanvas() : null;
+      if (overlay) sources.push(overlay);
+      const plan = cameraPreviewPlan(guideScene, frameAnchor.x, frameAnchor.y);
+      const rect = screenFrameRect(frameAnchor, viewport);
+      const blits = drawCameraPreview(ctx, rect, viewport.zoom, plan, sources);
+      publishCameraPreviewReport({
+        active: true, sceneId: guideScene.id, camX: plan.camX, camY: plan.camY,
+        vscrollBase: plan.vscrollBase, vLocked: plan.vLocked, bands: plan.bands,
+        absent: plan.absent, blits,
+      });
+    };
+
     if (ed.editingLayer === 'bg') {
       sectionRenderer.renderBg(ctx, viewport);
       drawBands();
+      drawCamera();
     } else {
       // showBgPlane: paint Plane B first, then composite the foreground over
       // it (empty FG words are transparent in the section canvases). Only
@@ -900,6 +981,9 @@ export default function MapViewport() {
       if (bgVisible) {
         sectionRenderer.renderBg(ctx, viewport);
         drawBands();
+        drawCamera();
+      } else {
+        drawCamera();
       }
       sectionRenderer.render(ctx, viewport, ed.activeSectionIndex, !bgVisible);
 
@@ -929,24 +1013,24 @@ export default function MapViewport() {
     // NO CLOCK. Inside the same pass; schedules nothing. A drag in flight reads
     // the ref, otherwise the store's pinned anchor.
     //
-    // THE GUIDE SCENE IS RESOLVED HERE, ABOVE THE FRAME (2026-08-27), because
-    // the two are no longer independent: a locked scene's guides are measured
-    // FROM the frame (canvas/effects-guides.ts's origin block), so the frame has
-    // to know whether guides need it and the guides have to read the same anchor
-    // the frame drew — including mid-drag, or a guide would lag the frame the
-    // author is dragging it against.
-    const guideScene = activeGuideScene();
-    const guideSpace = guideScene ? layerTopSpace(guideScene) : null;
-    const fd = frameDrag.current;
-    const frameAnchor = fd ? fd.anchor : view.screenFrame;
-    // SCREEN-SPACE GUIDES TURN THE FRAME ON, whatever the toggle says, and that
-    // is a deliberate override rather than an oversight: a set of lines captioned
-    // "screen lines" drawn without the screen they are lines OF is the exact
-    // ambiguity the frame was built to remove, and it is what the author hit.
-    // The toggle still owns the frame everywhere else.
+    // `guideScene` / `guideSpace` / `frameAnchor` were resolved at the top of
+    // this pass — the camera preview needed them before the composite.
+    //
+    // A SCREEN-SPACE SCENE TURNS THE FRAME ON whatever the toggle says. It is a
+    // deliberate override: the guides are plane rows now, but a locked scene's
+    // window onto the plane IS `v_offset` and the frame is the only thing that
+    // draws where that window starts and ends. The toggle owns the frame
+    // everywhere else.
     const showFrame = overlayOpts.showScreenFrame || guideSpace === 'screen';
     if (showFrame) {
-      const rect = drawScreenFrame(ctx, viewport, frameAnchor, { active: fd !== null || frameHoverRef.current });
+      // THE READOUT, and it names each axis for what it is. On a locked scene
+      // the Y is the scene's `v_offset`, not a camera position, and printing
+      // "@ x,y" there would be the quiet lie this caption exists to avoid.
+      const caption = frameYIsVOffset(guideScene)
+        ? `camera x=${frameAnchor.x} · v_offset=${frameAnchor.y} · arrows move ±1, shift ±16`
+        : `camera ${SCREEN_WIDTH}x${SCREEN_HEIGHT} @ ${frameAnchor.x},${frameAnchor.y}`;
+      const rect = drawScreenFrame(ctx, viewport, frameAnchor,
+        { active: fd !== null || frameHoverRef.current, caption });
       publishScreenFrameReport({ active: true, anchor: frameAnchor, rect, dragging: fd !== null });
     } else {
       publishScreenFrameReport({ active: false, anchor: null, rect: null, dragging: false });
@@ -992,17 +1076,17 @@ export default function MapViewport() {
     // vanishes when they switch layers reads as a bug in the guide.
     if (guideScene) {
       const drag = guideDrag.current;
-      // A LOCKED scene's tops are screen lines (aeon scene_plane_line: identity
-      // mapping), so its guides are drawn from THE SCREEN FRAME'S TOP EDGE, less
-      // the scene's v_offset — the derivation is written out in full in
-      // canvas/effects-guides.ts. The provider decides the space; the frame
-      // block above decides the anchor, and this reads the same one it drew.
+      // A LOCKED scene's tops are PLANE ROWS (aeon scene_plane_line: identity
+      // mapping) and the plane is drawn at world origin, so a guide sits at its
+      // own world row and DOES NOT MOVE WITH THE FRAME. The derivation, and the
+      // frame-anchored rule it replaced earlier today, are written out in full
+      // in canvas/effects-guides.ts. The space still changes the label and the
+      // caption; it no longer changes the position.
       const opts = {
         dragIndex: drag && drag.sceneId === guideScene.id ? drag.index : null,
         dragWorldY: drag?.worldY,
         hoverIndex: guideHoverRef.current,
         space: guideSpace ?? 'act',
-        origin: guideOriginOf(guideScene, frameAnchor.y),
       };
       drawLayerGuides(ctx, viewport, guideScene.layers, opts);
       publishGuideReport({
@@ -1291,6 +1375,47 @@ export default function MapViewport() {
       // here could shadow a neighbour and nothing would enumerate it.
       const keyedTool = toolForKey(e.key);
       if (keyedTool) { setToolScoped(keyedTool); return; }
+
+      // ═══ ARROWS MOVE THE CAMERA WHILE THE COMPOSITE IS ON ═══
+      //
+      // The owner asked for this by name: *"realistically you should be using
+      // arrow keys in the editor to get a smoother feel and less immediate
+      // jump"*. A DRAG CANNOT SHOW SLOW PARALLAX — at FACTOR_1_16 the band moves
+      // one pixel per sixteen camera pixels, so a mouse gesture jumps clean past
+      // the separation the author is trying to judge.
+      //
+      // THE STEPS: 1 plain, 16 with Shift. Sixteen is not a round number chosen
+      // for feel — it is the camera movement that displaces the SLOWEST
+      // published band, FACTOR_1_16, by exactly one pixel (the decoder's own
+      // test asserts `decode(15) == 0` and `decode(16) == 1`). FACTOR_1_32 needs
+      // thirty-two and therefore takes two shift-steps; 16 was chosen over 32 so
+      // that the common case lands on a boundary and the rare one lands on one
+      // every other press, rather than the reverse.
+      //
+      // ⚠ THIS TAKES A BINDING THAT ALREADY EXISTED — arrows pan the map by 64.
+      // The old behaviour is kept everywhere the composite is not on, which is
+      // every facet but this one plus this one with the toggle off; the toggle
+      // is the switch and it is in the View menu. Mouse pan, space-pan and the
+      // wheel are untouched in both cases, so panning is never unreachable.
+      const cameraKeys = inEffectsFacet() && useViewStore.getState().overlays.showCameraPreview
+        ? activeGuideScene() : null;
+      if (cameraKeys && (e.key === 'ArrowLeft' || e.key === 'ArrowRight'
+        || e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+        const d = e.shiftKey ? CAMERA_KEY_STEP_COARSE : CAMERA_KEY_STEP_FINE;
+        const view = useViewStore.getState();
+        const anchor = frameAnchorFor(cameraKeys, view.screenFrame);
+        if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+          const dx = e.key === 'ArrowLeft' ? -d : d;
+          view.setScreenFrame(anchor.x + dx, view.screenFrame.y);
+        } else {
+          const dy = e.key === 'ArrowUp' ? -d : d;
+          // Vertically the two scenes mean different things — see frameAnchorFor.
+          if (frameYIsVOffset(cameraKeys)) commitVOffset(cameraKeys, anchor.y + dy);
+          else view.setScreenFrame(view.screenFrame.x, anchor.y + dy);
+        }
+        e.preventDefault();
+        return;
+      }
 
       const step = 64;
       switch (e.key) {
@@ -1638,19 +1763,49 @@ export default function MapViewport() {
   }
 
   /**
-   * Release the screen frame (row G): ONE store write for the whole gesture,
-   * then a repaint off the ref and onto the store. No command — the frame is a
-   * session reference, not document state, so it is not on the undo stack.
+   * Release the screen frame: ONE write per axis for the whole gesture, then a
+   * repaint off the ref and onto the store.
+   *
+   * ⚠ THE TWO AXES GO TO DIFFERENT PLACES on a locked scene, and `frameAnchorFor`
+   * says why. X is `Camera_X`, a session reference, so it goes to the view store
+   * and never onto the undo stack. Y is the scene's `v_offset` — a DOCUMENT
+   * field — so it goes through `setSceneFieldCommand` and is one undo step for
+   * the whole drag, because the drag previewed through a ref and this is its
+   * only write.
+   *
+   * On an unlocked scene both axes are the camera and both go to the store, as
+   * before.
    */
   function endFrameDrag(): void {
     const fd = frameDrag.current;
     frameDrag.current = null;
     if (!fd) return;
-    if (fd.anchor.x !== fd.startAnchor.x || fd.anchor.y !== fd.startAnchor.y) {
-      useViewStore.getState().setScreenFrame(fd.anchor.x, fd.anchor.y);
-    } else {
-      redraw();
+    const moved = fd.anchor.x !== fd.startAnchor.x || fd.anchor.y !== fd.startAnchor.y;
+    if (!moved) { redraw(); return; }
+    const scene = activeGuideScene();
+    if (frameYIsVOffset(scene) && fd.anchor.y !== fd.startAnchor.y) {
+      commitVOffset(scene!, fd.anchor.y);
     }
+    // X always, and Y too when it is not the document's.
+    useViewStore.getState().setScreenFrame(
+      fd.anchor.x, frameYIsVOffset(scene) ? fd.startAnchor.y : fd.anchor.y,
+    );
+  }
+
+  /**
+   * Write a scene's `v_offset`, clamped, as ONE undo step.
+   *
+   * Shared by the frame drag and the arrow keys so the two cannot disagree about
+   * the bound — and `clampVOffset` is the schema's, not a number typed here.
+   */
+  function commitVOffset(scene: EffectsScene, value: number): void {
+    const library = useProjectStore.getState().project?.effectsScenes;
+    const level = getActiveLevel();
+    if (!library || !level) return;
+    const next = clampVOffset(value);
+    if (next === (scene.v_offset ?? EFFECTS_V_OFFSET_DEFAULT)) return;
+    const cmd = setSceneFieldCommand(library, scene.id, 'v_offset', next);
+    if (cmd) executeCommand(cmd, level);
   }
 
   /**
@@ -1889,10 +2044,9 @@ export default function MapViewport() {
       const scene = activeGuideScene();
       const rect = canvasRef.current?.getBoundingClientRect();
       if (scene && rect) {
-        const { vpY, zoom, screenFrame: sf } = useViewStore.getState();
+        const { vpY, zoom } = useViewStore.getState();
         const idx = guideAtCanvasY(e.clientY - rect.top, scene.layers,
-          { x: 0, y: vpY, width: rect.width, height: rect.height, zoom }, layerTopSpace(scene),
-          guideOriginOf(scene, sf.y));
+          { x: 0, y: vpY, width: rect.width, height: rect.height, zoom }, layerTopSpace(scene));
         if (idx !== null) {
           const layer = scene.layers[idx];
           guideDrag.current = {
@@ -1919,11 +2073,15 @@ export default function MapViewport() {
       const rect = canvasRef.current?.getBoundingClientRect();
       if (screenFrameShown() && rect) {
         const vp = { x: view.vpX, y: view.vpY, width: rect.width, height: rect.height, zoom: view.zoom };
-        if (screenFrameEdgeAt(e.clientX - rect.left, e.clientY - rect.top, view.screenFrame, vp)) {
+        // THE RESOLVED ANCHOR, NOT THE SESSION ONE. On a locked scene the
+        // frame's Y is the scene's v_offset (frameAnchorFor); hit-testing the
+        // session anchor would put the grab zone where the frame is NOT drawn.
+        const anchor = frameAnchorFor(activeGuideScene(), view.screenFrame);
+        if (screenFrameEdgeAt(e.clientX - rect.left, e.clientY - rect.top, anchor, vp)) {
           frameDrag.current = {
-            startAnchor: view.screenFrame,
+            startAnchor: anchor,
             pressWorld: screenToWorld(e.clientX, e.clientY),
-            anchor: view.screenFrame,
+            anchor,
           };
           setFrameHover(true);
           e.preventDefault();
@@ -2263,8 +2421,7 @@ export default function MapViewport() {
         // bottom edge writes 302 on a 224-line screen.
         const dragged = scene.layers[guideDrag.current.index];
         const next = clampLayerTop(scene, canvasYToLayerTop(e.clientY - rect.top,
-          { x: 0, y: vpY, width: rect.width, height: rect.height, zoom }, space,
-          guideOriginOf(scene, sf.y)), dragged);
+          { x: 0, y: vpY, width: rect.width, height: rect.height, zoom }, space), dragged);
         if (next !== guideDrag.current.worldY) {
           guideDrag.current.worldY = next;
           redraw();
@@ -2317,10 +2474,9 @@ export default function MapViewport() {
       const rect = canvasRef.current?.getBoundingClientRect();
       let next: number | null = null;
       if (scene && rect) {
-        const { vpY, zoom, screenFrame: sf } = useViewStore.getState();
+        const { vpY, zoom } = useViewStore.getState();
         next = guideAtCanvasY(e.clientY - rect.top, scene.layers,
-          { x: 0, y: vpY, width: rect.width, height: rect.height, zoom }, layerTopSpace(scene),
-          guideOriginOf(scene, sf.y));
+          { x: 0, y: vpY, width: rect.width, height: rect.height, zoom }, layerTopSpace(scene));
       }
       if (next !== guideHoverRef.current) setGuideHover(next);
       // A press on a guide never reaches the tool branches below, so a hover
@@ -2335,7 +2491,8 @@ export default function MapViewport() {
       let onEdge = false;
       if (screenFrameShown() && rect) {
         const vp = { x: view.vpX, y: view.vpY, width: rect.width, height: rect.height, zoom: view.zoom };
-        onEdge = screenFrameEdgeAt(e.clientX - rect.left, e.clientY - rect.top, view.screenFrame, vp);
+        onEdge = screenFrameEdgeAt(e.clientX - rect.left, e.clientY - rect.top,
+          frameAnchorFor(activeGuideScene(), view.screenFrame), vp);
       }
       if (onEdge !== frameHoverRef.current) setFrameHover(onEdge);
       if (onEdge) return;

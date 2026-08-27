@@ -288,4 +288,24 @@ export class BgAnimPreviewRenderer {
     ctx.drawImage(this.canvas, 0, 0);
     ctx.restore();
   }
+
+  /**
+   * The band overlay bitmap, in PLANE space, or null when there is nothing to
+   * overlay or `draw` has not run yet this frame.
+   *
+   * ⚠ IT IS ONLY CURRENT AFTER `draw`. The buffer is rebuilt inside `draw` when
+   * the step key moves, so a caller that reads it BEFORE the frame's `draw` gets
+   * the previous step's art. MapViewport calls this strictly after `drawBands()`
+   * and the ordering is load-bearing rather than incidental — hence this note
+   * rather than a defensive rebuild here, which would double the work every
+   * frame to paper over one call site's order.
+   */
+  overlayCanvas(): { image: OffscreenCanvas; pixelWidth: number; pixelHeight: number } | null {
+    if (this.cells.length === 0 || !this.canvas) return null;
+    return {
+      image: this.canvas,
+      pixelWidth: this.canvas.width,
+      pixelHeight: this.canvas.height,
+    };
+  }
 }

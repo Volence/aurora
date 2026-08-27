@@ -22,6 +22,7 @@ import { resolveDisplayedBg } from './providers/bganim-preview-aeon';
 import { lastGuideReport } from './canvas/effects-guides';
 import type { GuideReport } from './canvas/effects-guides';
 import { lastScreenFrameReport, type ScreenFrameReport } from './canvas/screen-frame';
+import { lastCameraPreviewReport, type CameraPreviewReport } from './canvas/camera-preview';
 import { lastBandLensReport, lastBandMarkReport } from './canvas/band-lens';
 import type { BandLensReport, BandMarkReport } from './canvas/band-lens';
 import { lastStripDragReport } from './providers/band-strip-range';
@@ -427,6 +428,14 @@ interface AeonProbeApi {
    */
   screenFrame(): ScreenFrameReport;
   /**
+   * What the last repaint's in-frame camera composite actually planned and drew.
+   *
+   * A PUBLISH, not a re-derivation: `bands` is the array `drawCameraPreview`
+   * blitted from, and `blits` is how many `drawImage` calls it issued — so a
+   * harness can tell "composed" from "would compose if anything were drawing".
+   */
+  cameraPreview(): CameraPreviewReport;
+  /**
    * THE BAND LENS AS THE LAST REPAINT DREW IT (ROADMAP item 43 part 2).
    *
    * Same contract as `guides()` and for the same reason: a PUBLISH from the end
@@ -729,6 +738,7 @@ function installAeonProbe(): AeonProbeApi {
     selectScene: (id) => useEditorStore.getState().setSelectedEffectsSceneId(id),
     guides: () => lastGuideReport(),
     screenFrame: () => lastScreenFrameReport(),
+    cameraPreview: () => lastCameraPreviewReport(),
     bandLens: () => lastBandLensReport(),
     bandMark: () => lastBandMarkReport(),
     stripDrag: () => lastStripDragReport(),
