@@ -350,12 +350,25 @@ export async function runBuild(opts: BuildRunOptions): Promise<BuildRunResult> {
           // and land back at the act start. Read now, restore after boot, and
           // the whole thing reads as a refresh rather than a restart.
           //
-          // CLASSIC: NO RESTORE, BY DESIGN. S1 has no boot-position override
-          // and no warp mailbox, so the only way to "restore" would be poking
-          // v_player on a running machine — which is link 4's unmeasured
-          // spike, not this parcel. The reload boots clean and the result
-          // reports it honestly: `restoredVia` absent, exactly the shape a
-          // release aeon ROM (no mailbox symbols) already produces.
+          // CLASSIC: STILL NO RESTORE, AND THE REASON IS NOW A DIFFERENT ONE.
+          //
+          // S1 has no boot-position override and no warp mailbox. Poking
+          // `v_player` on a running machine has since been measured and built
+          // — that is `s1-warp.ts`, which answers F7 — so the old note here
+          // ("link 4's unmeasured spike") no longer says anything true.
+          //
+          // What blocks a restore is the SHAPE OF A RELOAD, not the absence of
+          // a mechanism. `reload_rom` resets the machine: S1 comes back on the
+          // SEGA screen, not in the act. The poke needs a player object that is
+          // in a level and past its init — the spike measured that a poke
+          // inside the init window is discarded silently — and there is no
+          // point in this sequence where such a machine exists. Getting back
+          // into the act would mean driving the title screen with simulated
+          // input, which is a feature, not a field.
+          //
+          // So the reload boots clean and the result says so: `restoredVia`
+          // absent, exactly the shape a release aeon ROM (no mailbox symbols)
+          // already produces. That omission is a truthful report.
           let restoreTo: { x: number; y: number } | null = null;
           if (!classic && opts.restorePosition !== false) {
             try {
