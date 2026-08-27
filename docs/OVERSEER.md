@@ -887,3 +887,30 @@ defect the parcel exists to fix.
   **tracks** that file and edits it all session, their main tree is effectively always dirty,
   which is why their golden freezes must run from a clean worktree. They had been reading that
   as a property of the freeze tooling; it is a property of the status-file convention.
+
+## ⚠ A CROSS-REPO GREP IS SCOPED TO THE REPO IT RAN IN — and the ruling built on it inherits that scope
+
+*(Added 2026-08-27, from the hub's `precision` ruling under the owner's overnight delegation.)*
+
+The hub ruled `precision` removed from the shared effects schema and priced it: *"no shipped
+scene file carries it (aeon origin/master grep hits only `tools/effects_gen.py` + its test)"*.
+The ruling is right. **The price was wrong, because the grep enumerated aeon's tree and the
+schema's other consumer is this one** — both Aurora golden fixtures carry `precision: "cell"`,
+and with `unevaluatedProperties: false` a re-pin fails validation on both.
+
+**The half that makes this worth a bar rather than a correction:** the two fixtures are not
+equally fixable, and the difference is invisible from outside this repo.
+`test/fixtures/effects/canopy_dusk.json` is writer-**certified** — hand-written for shape
+coverage, then proven byte-identical through `serialize(parse(GOLDEN))` — so editing it is
+legitimate. `writer_session_ojz.json` is writer-**originated**: it came off disk from a real
+authoring session and its own `.provenance.md` says *"re-run the session — do not edit the
+JSON. Editing it converts it into a second `canopy_dusk`, silently."* Its value is that it was
+enumerated over the UI's affordances rather than the schema's, which is a frame nobody chose
+while writing the schema. **So the obvious fix — delete the key — destroys the only property
+the fixture exists for, and leaves a green suite behind.**
+
+**Operational form: when a ruling's cost line rests on an enumeration, ask which repo the
+enumeration ran in, and whether the thing being priced has consumers outside it.** A schema
+has as many consumers as it has vendored copies. This is the enumerate-across-instances
+lesson (bar 2e's sigil corollary) firing across repos instead of across lanes — the hub could
+not see this from inside empyrean, and I could not have seen their half from inside aurora.
