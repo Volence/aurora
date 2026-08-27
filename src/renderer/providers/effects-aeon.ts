@@ -360,9 +360,132 @@ export function binPathRefusal(path: string): string | null {
 }
 
 /**
- * Advice on a table, or null: sigil requires a generator's period to DIVIDE the
- * table length ("period must divide 256", schema doc §2.4), and nothing in the
- * shape validator can see it. Said before the build says it, never enforced.
+ * The `period` values the ENGINE will accept — the divisors of the table length.
+ *
+ * COMPUTED, NEVER A LITERAL LIST. `EFFECTS_DEFORM_TABLE_BYTES` is itself derived
+ * from the schema's own prose and cross-checked against `period`'s ceiling at
+ * module load, so a contract that moved the table length moves this list with
+ * it. Typing `[1, 2, 4, …]` here would be a fourth place the number 256 lives.
+ *
+ * THE RULE IS THE ENGINE'S, NOT SIGIL'S AND NOT THE SCHEMA'S — a correction the
+ * guard-transcription parcel made and this parcel keeps:
+ *   engine/level/parallax_dsl.emp:52  ensure(256 % period == 0, "deform_sine: period {period} must divide 256")
+ *   engine/level/parallax_dsl.emp:87  the same, for deform_triangle
+ * Both measured refusing at `period: 100`, each naming its own generator.
+ *
+ * Bounded by the PARAMETER's declared range rather than by 1..length, so a
+ * schema that narrowed `period` narrows this too instead of offering a value the
+ * codec would then refuse.
+ */
+export function deformPeriodChoices(p: TableRefParam): number[] {
+  const lo = Math.max(1, p.min ?? 1);
+  const hi = p.max ?? EFFECTS_DEFORM_TABLE_BYTES;
+  const out: number[] = [];
+  for (let v = lo; v <= hi; v++) if (EFFECTS_DEFORM_TABLE_BYTES % v === 0) out.push(v);
+  return out;
+}
+
+/** One option on a table parameter rendered as a picker. */
+export interface TableParamOption {
+  value: number;
+  label: string;
+  /** True for a value the ENGINE refuses; rendered so a file's value shows, unpickable. */
+  disabled: boolean;
+  title: string;
+}
+
+/**
+ * A table parameter's options when it should be a PICKER, or null when it stays
+ * a spinner — ROADMAP row 63.
+ *
+ * WHY `period` STOPPED BEING A SPINNER. Its schema range is 1..256 and only the
+ * nine divisors of 256 build, so the control advertised 247 illegal values out
+ * of 256 — and two independent parcels had already had to work around it without
+ * anybody writing the constraint down (`seedTableRefParam` seeds at `max`
+ * *"guaranteed to divide the table length"*; row 60's harness rule R14 takes
+ * `max ÷ N` *"because the build refuses a period that does not divide it"*).
+ * Two workarounds for one control is the tell that the affordance was wrong
+ * rather than its users.
+ *
+ * ⚠ AND `min`/`max` ON A NUMBER INPUT WERE NEVER GOING TO FIX IT (ROADMAP item
+ * 37's bar). They govern the spinner and `:invalid`; they stop no TYPED value,
+ * and a clamp beside them can only hold a value inside a RANGE — it has no way
+ * to express "divides". A `<select>` has no typed value at all, so the
+ * constraint holds structurally rather than by a check somebody has to remember.
+ *
+ * ═══ THE STRICTNESS QUESTION, ANSWERED RATHER THAN ASSUMED ═══
+ *
+ * The schema is the LOOSER document: it admits every integer 1..256, and the
+ * engine refuses the non-divisors later. So a picker over nine values is
+ * stricter than the CONTRACT — the trap scene.ts names, where "the editor
+ * refused a file the build accepts" is the far worse failure. It is taken
+ * deliberately, on the same test that licenses `sprite_mask`'s disabled option
+ * and rules `factor0_lock`'s the other way:
+ *
+ *   • NO SCENE CONTENT CAN MAKE A NON-DIVISOR LEGAL. The two ensures are
+ *     unconditional and `sine`/`triangle` are the only forms with a `period` at
+ *     all, so there is no document where the picker's omission costs the author
+ *     something the build would have taken. (Contrast `factor0_lock`, whose
+ *     precondition is about the scene's own contents — which is exactly why
+ *     THAT one stays selectable and only advises.)
+ *   • A VALUE ALREADY IN THE FILE IS STILL RENDERED, disabled, and still
+ *     advised by `tableRefAdvisory`. A `<select>` whose current value has no
+ *     option silently shows a DIFFERENT one, which is the quiet lie
+ *     `unassignableSceneRef` and `leftColumnMaskOptions` both exist to stop —
+ *     and here it would be worse than the spinner it replaced, because the
+ *     author would see a legal number and the build would read an illegal one.
+ *   • THE DOCUMENT STILL SAVES. Narrowing the picker is not enforcement: the
+ *     advisory is untouched, nothing refuses the write, and sigil stays the
+ *     rulebook. Row 58's posture is intact.
+ *
+ * The derivation cannot leak into the `.bin` branch, which declares no
+ * parameters at all — `tableRefParams('bin')` is `[]`, so there is nothing here
+ * for it to reach.
+ */
+export function tableRefParamOptions(
+  formId: string, key: string, current: number,
+): TableParamOption[] | null {
+  if (key !== 'period') return null;
+  const p = tableRefParams(formId).find((q) => q.key === key);
+  if (!p) return null;
+  const legal = deformPeriodChoices(p);
+  if (legal.length === 0) return null;
+  const options: TableParamOption[] = legal.map((v) => ({
+    value: v,
+    label: String(v),
+    disabled: false,
+    title: v === EFFECTS_DEFORM_TABLE_BYTES
+      ? `one cycle over the whole ${EFFECTS_DEFORM_TABLE_BYTES}-byte table`
+      : `${EFFECTS_DEFORM_TABLE_BYTES / v} cycles over the ${EFFECTS_DEFORM_TABLE_BYTES}-byte table`,
+  }));
+  // The value the FILE carries, when the engine would refuse it: rendered so the
+  // control cannot show a number the build will not read, and disabled so the
+  // author cannot pick it back.
+  if (!legal.includes(current) && Number.isFinite(current)) {
+    options.push({
+      value: current,
+      label: String(current),
+      disabled: true,
+      title: `the build refuses it: ${current} does not divide `
+        + `${EFFECTS_DEFORM_TABLE_BYTES}, so the cycle would not close`,
+    });
+    options.sort((a, b) => a.value - b.value);
+  }
+  return options;
+}
+
+/**
+ * Advice on a table, or null: the ENGINE requires a generator's period to DIVIDE
+ * the table length (`engine/level/parallax_dsl.emp:52` for `deform_sine`, `:87`
+ * for `deform_triangle` — both literally `ensure(256 % period == 0, …)`), and
+ * nothing in the shape validator can see it. Said before the build says it,
+ * never enforced.
+ *
+ * STILL LOAD-BEARING NOW THAT `period` IS A PICKER (ROADMAP row 63). The picker
+ * governs what an author can LAND on; this governs what a document already
+ * CARRIES — a hand-edited file, an MCP write, a scene from before the picker.
+ * That is the same two-paths split `sprite_mask` has, and removing either half
+ * re-opens the path it covers.
  */
 export function tableRefAdvisory(t: EffectsTableRef): string | null {
   if ('bin' in t || !('period' in t)) return null;

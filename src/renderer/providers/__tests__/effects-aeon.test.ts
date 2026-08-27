@@ -23,6 +23,7 @@ import {
   tableRefLabel, tableRefFormOptions, tableRefFormOf, tableRefFromForm, tableRefParams,
   tableParamLabel, tableRefParamValue, setTableRefParam, clampTableRefParam,
   tableRefBinPath, binPathRefusal, tableRefAdvisory, newTableRef,
+  tableRefParamOptions, deformPeriodChoices,
   sceneDeformValue, sceneDeformFromToggle, vDeformValue, vDeformFromToggle,
   layerDeformValue, layerDeformFromToggle, layerDeformAdvisory, sceneDeformAdvisories,
   clampLayerDeformField, clampAmpShift, clampDeformSpeed,
@@ -822,6 +823,70 @@ describe('tableRef — every form the contract admits, derived from it', () => {
     }))).not.toThrow();
     expect(tableRefAdvisory({ bin: 'x.bin' })).toBeNull();
     expect(tableRefAdvisory({ generator: 'zero' })).toBeNull();
+  });
+
+  it('period is a PICKER over the divisors, computed — not a spinner over 256 values', () => {
+    // ROADMAP row 63. The engine's rule is `256 % period == 0`
+    // (parallax_dsl.emp:52 and :87, both measured refusing at 100 and each
+    // naming its own generator), so exactly nine values build. The spinner
+    // advertised all 256.
+    const bytes = branchOf('sine')!.properties.period.maximum;
+    const p = tableRefParams('sine').find((q) => q.key === 'period')!;
+    const legal = deformPeriodChoices(p);
+
+    // DERIVED, not typed: every value divides, and every divisor in range is
+    // offered. Asserting the LIST would pass against a hand-typed constant.
+    for (const v of legal) expect(bytes % v, `offered ${v}`).toBe(0);
+    for (let v = p.min ?? 1; v <= (p.max ?? bytes); v++) {
+      if (bytes % v === 0) expect(legal, `divisor ${v} missing`).toContain(v);
+    }
+    // ANTI-VACUOUS: the set is far smaller than the range it replaced, which is
+    // the entire point of the row. An empty or full list would satisfy the
+    // divisor assertions above.
+    expect(legal.length).toBe(9);
+    expect((p.max ?? 0) - (p.min ?? 0) + 1).toBeGreaterThan(legal.length * 10);
+
+    const opts = tableRefParamOptions('sine', 'period', 64)!;
+    expect(opts.map((o) => o.value)).toEqual(legal);
+    expect(opts.every((o) => !o.disabled)).toBe(true);
+
+    // A NON-DIVISOR THE FILE CARRIES IS STILL RENDERED, disabled and in order —
+    // a `<select>` missing its own value silently shows a different one, which
+    // here would let the author read a legal period while the build reads an
+    // illegal one. This is `leftColumnMaskOptions`'s rule, one control over.
+    const carried = tableRefParamOptions('sine', 'period', 100)!;
+    expect(carried.map((o) => o.value)).toContain(100);
+    expect(carried.find((o) => o.value === 100)!.disabled).toBe(true);
+    expect(carried.filter((o) => o.disabled).map((o) => o.value)).toEqual([100]);
+    expect(carried.map((o) => o.value)).toEqual([...carried.map((o) => o.value)].sort((a, b) => a - b));
+    // …and the advisory still fires on it. The picker governs what an author can
+    // LAND on; the advisory governs what a document CARRIES. Both, or one path
+    // is uncovered.
+    expect(tableRefAdvisory({ generator: 'sine', amplitude: 1, period: 100 })).not.toBeNull();
+
+    // ONLY `period`, and only where the schema declares one. The `.bin` branch
+    // has no parameters at all, so the derivation cannot reach it; `amplitude`
+    // is a genuine RANGE and stays a spinner.
+    expect(tableRefParamOptions('sine', 'amplitude', 8)).toBeNull();
+    expect(tableRefParamOptions('bin', 'period', 64)).toBeNull();
+    expect(tableRefParamOptions('zero', 'period', 64)).toBeNull();
+    expect(tableRefParamOptions('v_column_perspective', 'focal', 4)).toBeNull();
+    // Both generators that declare a period get one — :52 and :87 are separate
+    // ensures and a fix that only covered `sine` would leave `triangle` open.
+    for (const g of ['sine', 'triangle']) {
+      expect(tableRefParamOptions(g, 'period', 64), g).not.toBeNull();
+    }
+
+    // STILL NOT ENFORCEMENT (row 58's posture). Narrowing a picker is not a
+    // refusal: the document with period 100 saves exactly as it did before.
+    expect(() => serializeEffectsScene(sceneWith({
+      deform_fg: { shared: { table: { generator: 'sine', amplitude: 1, period: 100 }, speed: 0 } },
+    }))).not.toThrow();
+
+    // AND THE SEED IS STILL A LEGAL OPTION — `seedTableRefParam` seeds at `max`
+    // "guaranteed to divide the table length", so a new table opens on a value
+    // the picker offers rather than on a disabled one.
+    expect(legal).toContain(tableRefParamValue(newTableRef(), 'period'));
   });
 
   it('a parameter label is the schema key, title-cased at its underscores', () => {
