@@ -561,6 +561,64 @@ async function main() {
         ? truncated6.map(f => `${JSON.stringify(f.text)} ${f.scrollWidth}>${f.clientWidth}`).join(' | ')
         : `${fit6.length} range-bearing strings all fit`);
 
+    // ── AND THE SAME PROPERTY FOR EVERY RANGE THIS DOCUMENT CAN PRODUCE ────
+    //
+    // ⚠ [6g2] ALONE IS THE VACUOUS SHAPE THIS REPO KEEPS FINDING. It measures
+    // the ONE string this run happens to make — `34..41 · 2x4`, two-digit slots
+    // on a base of 34 — and a fix tuned to that is green here while the real
+    // 320-slot blob still ellipsises the moment an author drags past slot 99.
+    // The property is "the readout fits its box at the docked width", for the
+    // whole value range the resolver can emit, so this row asks the box about
+    // ALL of them.
+    //
+    // DERIVED, NOT TYPED: the bases come from the app's own `firstPromotableSlot`
+    // and blob size, and `cols` is `resolveStripDrag`'s own maximum for each
+    // base (`floor((tiles - base) / rows)`), which is the widest label that base
+    // can ever carry. The template is pinned against the app's LIVE label first
+    // — otherwise a reformatted `stripDragLabel` would leave this row measuring
+    // a string the app no longer prints.
+    // EVERY LEGAL `rows`, NOT JUST THIS RUN'S. `rows` is an INPUT to
+    // `resolveStripDrag`, so a sweep that fixed it at 4 would miss the widest
+    // label the resolver can emit — at `rows = 1` the same blob yields a
+    // three-digit COLUMN count beside a three-digit base, which is the longest
+    // string this readout can ever be handed. Derived from the codec's own rule
+    // (`rowChoices`: rows * TILE_BYTES an exact power of two) rather than
+    // restated as a list.
+    const TILE_BYTES = 32;
+    const legalRows = [];
+    for (let r = 1; r <= budget.tiles; r++) {
+      const bytes = r * TILE_BYTES;
+      if ((bytes & (bytes - 1)) === 0) legalRows.push(r);
+    }
+    const spans = [];
+    for (const rows of legalRows) {
+      for (let base = fps; base + rows <= budget.tiles; base++) {
+        const cols = Math.floor((budget.tiles - base) / rows);
+        spans.push({ base, cols, rows, last: base + cols * rows - 1 });
+      }
+    }
+    const widest6 = await c.json(String.raw`((spans) => {
+      const el = document.getElementById('art-browser-hover-label');
+      const prev = el.textContent;
+      const mk = (s) => s.base + '..' + s.last + ' · ' + s.cols + 'x' + s.rows;
+      let worst = null;
+      for (const s of spans) {
+        el.textContent = mk(s);
+        const w = { text: el.textContent, sw: el.scrollWidth, cw: el.clientWidth };
+        if (!worst || w.sw > worst.sw) worst = w;
+      }
+      el.textContent = prev;
+      return worst;
+    })(` + JSON.stringify(spans) + `)`);
+    const template6 = `${cand6.staticBase}..${lastSlot6} · ${cand6.cols}x${cand6.rows}`;
+    check('6g3', `ITEM 43 TAIL, FOR THE WHOLE VALUE RANGE: the WIDEST readout any of the `
+      + `${spans.length} legal (base, rows) pairs on this blob can produce still fits the `
+      + 'docked box '
+      + '(and the template was pinned against the live label first)',
+      !!widest6 && template6 === label6.text && widest6.sw <= widest6.cw,
+      `widest=${JSON.stringify(widest6)} · template check ${JSON.stringify(template6)} `
+      + `vs live ${JSON.stringify(label6 && label6.text)}`);
+
     // ── THE ROW THAT CAUGHT A REAL DEFECT AND NOW HOLDS THE FIX ────────────
     //
     // THE DEFECT: the first build put the whole message on this line. It
