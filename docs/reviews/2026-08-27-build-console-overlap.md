@@ -1,7 +1,7 @@
 # The build console ate the properties column
 
 **Branch** `fix/build-console-overlap` · **from** master `dee1274` · 2026-08-27
-**Instrument** `scratchpad/build-console-overlap-harness.mjs` (19 rows)
+**Instrument** `scratchpad/build-console-overlap-harness.mjs` (21 rows)
 **Fix** `src/renderer/components/BuildPanel.tsx` — `styles.root`
 
 ---
@@ -226,6 +226,9 @@ guard and rows **9a/9b** are what make it a guard rather than a comment: at
 | 4 | + fix | **17/17** | 1 | 1400×872 | 1.93 1.87 2.03 | 19.8s |
 | 5 | + fix, +9a/9b | **19/19** | 1 | 1400×872 | 1.58 1.76 1.98 | 20.7s |
 | 6 | + fix, +9a/9b | **19/19** | 1 | 1400×872 | 2.60 1.99 2.05 | 20.7s |
+| 7 | + fix, +10a/10b | **21/21** | 1 | 1400×872 | 1.53 2.07 2.15 | 22.4s |
+| 8 | + fix, +10a/10b | **21/21** | 1 | 1400×872 | 1.14 1.87 2.07 | 22.4s |
+| 9 | + fix, +10a/10b | **21/21** | 1 | 1400×872 | 1.22 1.85 2.06 | 22.4s |
 
 `dpr` came back **1** on every run; no row here aims a mouse, so the fractional-rect
 trap that has cost this repo review cycles does not apply — but it is printed
@@ -252,14 +255,31 @@ as evidence.
   button works again — the no-dead-space row.
 - **8a** the console does not cover the bottom of the map canvas (the wider cause).
 - **9a/9b** a short window is not all console.
+- **10a/10b** the same question on the **Home tab**, which has no `EditorShell`
+  at all — the console is app-global, and that is precisely why the fix could
+  not be mounted inside the shell. 147 visible enabled controls, 0 unreachable.
+  ⚠ The census filters to controls with a non-zero box: the app keeps every
+  non-level tab MOUNTED behind `display: none`, so a document-wide sweep reports
+  ~12 zero-box buttons in hidden panes as unreachable — which they are, and
+  always were. The row requires `total > 10` so the filter cannot empty it.
+
+An earlier draft of this section carried a row asserting *the lowest control on
+the Home tab sits at or above the console's top*. It is **deleted, not
+weakened**: content inside a scroller legitimately extends past the fold
+(measured: lowest bottom 939 in an 872px window, on the FIXED tree), so the row
+was false of a healthy app too. Reachability is the predicate; a bottom edge is
+not.
 
 ### Non-discriminating rows, disclosed
 
-- **3a, 3b, 3c, 6a, 6b, 6c, 7a, 7b** are green on master *and* on the fix. They
+- **3a, 3b, 3c, 6a, 6b, 6c, 7a, 7b, 9b** are green on master *and* on the fix. They
   are **controls**, not catchers: without 3b/3c a red 5a/5b could mean the
   predicate is simply unsatisfiable, and 6a–6c are the rows that stop this
-  parcel trading one defect for another. **The catchers are 5a, 5b, 5c and 8a**,
-  and for the `maxHeight` guard, **9a and 9b**.
+  parcel trading one defect for another. **The catchers are 5a, 5b, 5c, 8a
+  and 10b**, and for the `maxHeight` guard specifically, **9a and 9b**. ⚠ **9b is
+  NON-DISCRIMINATING for the defect** — plant A leaves it green, because an
+  overlay never squeezes the canvas — and discriminating only for plant B. 9a is
+  red under both.
 - **0a, 1a, 1b, 2a, 4a** are setup assertions. They can only fail on a broken
   fixture, which is exactly their job.
 
@@ -280,6 +300,20 @@ FAIL  [8a] the console does not cover the bottom of the map canvas
 ```
 
 Identical to the master run. Restored, 19/19.
+
+**Plant A again, after rows 10a/10b were added** — the same restoration on the
+21-row instrument:
+
+```
+FAIL  [5a] … FAIL  [5b] … FAIL  [5c] … FAIL  [8a] …
+FAIL  [9a] on a short window the console yields half the height, not all of it
+FAIL  [10b] every VISIBLE enabled control on the Home tab (console included) is reachable
+=== 15/21 rows passed ===
+```
+
+Two things this bought that the 17-row run did not: the **Home tab was covered
+too**, and **9a is red under the defect as well as under plant B**. Restored,
+21/21 on three consecutive runs.
 
 **Plant B — the `maxHeight: '50vh'` guard deleted:**
 

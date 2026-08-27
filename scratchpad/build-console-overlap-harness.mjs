@@ -542,6 +542,41 @@ async function main() {
       (() => { const b = [...document.querySelectorAll('button')]
         .find(x => (x.getAttribute('title')||'').startsWith('Close (Esc)')); if (b) b.click(); return !!b; })()`);
 
+    // ── 10. THE HOME TAB. ─────────────────────────────────────────────────
+    // The console is APP-GLOBAL: it must work on a tab with no EditorShell,
+    // which is the reason the fix could not be mounted inside the shell. A
+    // reserved-space console changes that tab's layout too, and nothing above
+    // has looked at it.
+    await c.evalExpr(clickByText('/^Home$/', 'div'));
+    await sleep(900);
+    await c.evalExpr(`window.__dbg.aether.showFailedBuild(${JSON.stringify(BUILD_LINES.slice(0, 20))}, 2)`);
+    await sleep(700);
+    const homePanel = await c.json(PANEL_BOX);
+    // VISIBLE controls only. The app keeps every non-level tab MOUNTED behind
+    // `display: none` (App.tsx's keep-alive), so a document-wide sweep picks up
+    // ~12 zero-box buttons in hidden panes and reports them unreachable, which
+    // they are and always were. `width > 0` is the filter; the row prints the
+    // surviving count and requires > 10, so the filter cannot empty it.
+    const VISIBLE = String.raw`
+      [...document.querySelectorAll('button, input, select')].filter(e => {
+        if (e.disabled) return false;
+        const r = e.getBoundingClientRect();
+        return r.width > 0 && r.height > 0;
+      })`;
+    check('10a', 'ANTI-VACUOUS: the console opens on the Home tab too',
+      !!homePanel && homePanel.height > 40, JSON.stringify(homePanel));
+    const homeCensus = await c.json(String.raw`
+      (() => {
+        const ctrls = ${VISIBLE};
+        const bad = [];
+        for (const el of ctrls) { const r = window.__reach(el);
+          if (!r.reachable) bad.push({ el: window.__describeEl(el), rect: r.rect, hit: r.hit }); }
+        return { total: ctrls.length, unreachable: bad.length, worst: bad.slice(0, 3) };
+      })()`);
+    check('10b', 'every VISIBLE enabled control on the Home tab (console included) is reachable',
+      homeCensus.unreachable === 0 && homeCensus.total > 10, JSON.stringify(homeCensus));
+    await shot(c, '05-home-tab');
+
     // ── SUMMARY ────────────────────────────────────────────────────────────
     const pass = results.filter((r) => r.ok).length;
     console.log(`\n=== ${pass}/${results.length} rows passed ===`);
