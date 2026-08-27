@@ -888,6 +888,21 @@ defect the parcel exists to fix.
   which is why their golden freezes must run from a clean worktree. They had been reading that
   as a property of the freeze tooling; it is a property of the status-file convention.
 
+- ⚠ **A RELINK HOLD IS IN FORCE ON THE SHARED SIGIL BINARIES — DO NOT BUILD AEON WITHOUT CHECKING** *(2026-08-27, announced by the sigil lane for the length of aeon's SLOPE-SYMMETRY freeze; banked here because a hold that lives only in a chat message does not survive a `/clear`.)* Pinned **by hash, not by revision**, and every one verified firsthand here against the files on disk:
+
+```
+sigil            md5 5f325dca996be45f2c9a20c650d38c4b   mtime 07:20:23
+refreeze         md5 4e2099edb92007dc3a497cfd9accd5a2   mtime 07:20:16
+repin            md5 9ebc36241861d91ac31d7459fd4c2961   mtime 07:20:14
+emit_sound_blob  md5 3eba64ce3158124ef4764c100edc787a   mtime 07:20:13
+```
+
+  **If any of those hashes has moved and no lift has been announced, say so to sigil and aeon before building anything** — that is the agreed signal that somebody relinked unannounced. **A read is safe; `./build.sh` only executes these binaries.** ⛔ **Never run ANY `cargo` command in `/home/volence/sonic_hacks/sigil`** — and note the rule is about the **file, not the verb**: the incident that produced this hold was a `cargo test --release --workspace`, which relinks the identical artifact, so anyone honouring an older *"do not `cargo build`"* rule would have caused it too.
+
+  **WHY THE PIN IS A HASH — this lane's finding, adopted by both other lanes.** aeon originally handed out a `revision:` to quote. A revision names a property of the **source**, so it **cannot detect a relink of the artifact** by a lane that has legitimately moved on: the pin keeps reading correct while the binary underneath it changes. That is exactly what happened — `fbf60abd → 52882e2e → 537869e6` inside one morning, mid-parcel, while a freeze was pinning it. A hash is a property of the **file**, moves exactly when the file moves, and needs no cooperation from whoever relinks. Sigil's corroboration is the clincher: **three of those four binaries print no revision at all**, so a revision pin could not have described them.
+
+  **Two clauses that came out of the same incident and are now other lanes' rules:** sigil announces a hold **to every lane, not the one that asked** (the holder of a shared artifact cannot enumerate who depends on it — this lane was mid-build and in none of the bilateral conversation); and the cheapest structural fix is **no lane sharing `target/` at all** (`CARGO_TARGET_DIR` per worktree), with a landing run in the main checkout as the acknowledged residual.
+
 ## ⚠ A CROSS-REPO GREP IS SCOPED TO THE REPO IT RAN IN — and the ruling built on it inherits that scope
 
 *(Added 2026-08-27, from the hub's `precision` ruling under the owner's overnight delegation.)*
