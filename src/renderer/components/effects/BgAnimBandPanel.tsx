@@ -205,7 +205,7 @@ function LensSwatch(): React.ReactElement {
 import type { AnyCommand } from '../../../core/editing/commands';
 import {
   DEFAULT_DRIVER, DEFAULT_PHASE_FILL, DEFAULT_RATE_SHIFT, bandBudget,
-  bandRows, clampRateShift, demoteBandCommand, driverOptions,
+  bandRows, clampRateShift, clampStaticBase, demoteBandCommand, driverOptions,
   patternPxFor, phaseFillOptions,
   rateShiftNote, removeBandCommand, rowChoices, slotSpanPhrase,
   type BandCommandResult, type BandPhaseFill,
@@ -643,12 +643,17 @@ export default function BgAnimBandPanel(): React.ReactElement {
           <Field label="From tile" title="First tile of the static range this band takes over">
             <NumberField
               // Both halves through `slotSpanPhrase`: FIRST..LAST, never one
-              // past the end. The second sentence is the same fact `min` below
-              // enforces, and it named the first FREE slot as taken.
+              // past the end. The second sentence is the same fact the bound
+              // below states, and it named the first FREE slot as taken.
               title={`static base — the range is ${slotSpanPhrase(staticBase, tileCount)}. `
                 + `Bands already own ${slotSpanPhrase(0, budget.animatedSlots)}.`}
+              // THE CLAMP IS THE BOUND, and it reads the SAME expression `min`
+              // does (ROADMAP item 40). Was `Math.max(0, Math.round(n) || 0)`,
+              // which enforced a floor of 0 under a spinner advertising the
+              // animated prefix — so every slot a band already owned was
+              // typeable, and the title and hint above went on naming them.
               min={budget.firstPromotableSlot} width={72} value={staticBase}
-              onChange={(n) => setStaticBase(Math.max(0, Math.round(n) || 0))} />
+              onChange={(n) => setStaticBase(clampStaticBase(n, budget.firstPromotableSlot))} />
             <Chip disabled={promoteOff !== null}
               title={promoteOff ?? 'Declare this static range animated. The blob does not grow.'}
               onClick={() => apply(verbs.promote.run())}>
