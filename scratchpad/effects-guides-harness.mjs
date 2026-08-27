@@ -367,13 +367,21 @@ async function main() {
     // Park layer 0 somewhere well inside the viewport, through the panel's own
     // spinner — the control this gesture is the second spelling of.
     await c.evalExpr(SET_INPUT(
-      `[...document.querySelectorAll('input[type=number]')].find(e => /^Layer 0 world_y/.test(e.title||''))`,
+      `[...document.querySelectorAll('input[type=number]')].find(e => /^Layer 0 (world_y|Screen line)/.test(e.title||''))`,
       START_WORLD_Y));
     // Pin the camera so the arithmetic below is checkable. Read it BACK rather
     // than assuming the set stuck: setViewport clamps.
     await c.evalExpr('window.__dbg.setView(0, 0, 1)');
     await sleep(900);
     const view = await c.json('window.__dbg.view()');
+    // PARCEL C RE-AIM (2026-08-26): a LOCKED scene (v_factor 15, the default a
+    // new scene arrives with, and both shipped scenes) authors SCREEN lines, so
+    // line 0 sits at the TOP OF THE VIEWPORT (guideOriginWorldY = vp.y), not at
+    // world 0. Every row below that aimed by act Y now goes through `space`
+    // exactly as canvas/effects-guides.ts does: canvasY = (origin + top - vp.y) * zoom.
+    const SPACE = (await c.json('window.__dbg.aeon.guides()')).space;
+    const originOf = (vp) => (SPACE === 'screen' ? vp.y : 0);
+    note(`SPACE this scene authors in: ${JSON.stringify(SPACE)} (origin at view.y=${view.y} is ${originOf(view)})`);
     let doc = JSON.parse(await c.evalExpr('window.__dbg.aeon.scenesJson()'));
     check('3c', 'ANTI-VACUOUS: layer 0 is parked at a known world_y with a known camera',
       sceneOf(doc)?.layers?.[0]?.world_y === START_WORLD_Y && view.zoom === 1 && view.y === 0,
@@ -395,8 +403,8 @@ async function main() {
     // INDEPENDENT sources — the view store and the document. This is not the
     // harness re-deriving the answer it is checking: `guides()` is what
     // MapViewport actually drew, and this is what it was supposed to draw.
-    const expectY = (worldY) => (worldY - view.y) * view.zoom;
-    check('4c', 'the drawn row is at (world_y - vpY) * zoom, exactly',
+    const expectY = (worldY) => (originOf(view) + worldY - view.y) * view.zoom;   // re-aimed (C)
+    check('4c', 'the drawn row is at (origin + top - vpY) * zoom, exactly (origin = vpY when locked)',
       guides.rows[0].canvasY === expectY(START_WORLD_Y),
       `drawn canvasY=${guides.rows[0]?.canvasY} contract=${expectY(START_WORLD_Y)}`);
 
@@ -413,6 +421,56 @@ async function main() {
       + `below=${JSON.stringify(below)}(${cyanness(below)})`);
     await shot(c, '1-guide-drawn');
 
+    // ---- 4f. THE CAPTION (parcel C). Drawn on the canvas only — no DOM, no
+    // report field — so it is proven the way 4d proves the line: pixels. The
+    // box sits bottom-right (effects-guides.ts: boxY = vp.height - 17, 13 tall)
+    // in EFFECTS_GUIDE_LABEL_BG with EFFECTS_GUIDE_LABEL_TEXT glyphs. The row
+    // counts text-coloured pixels in that strip and demands NONE in the same
+    // strip 40px higher, so a pass cannot come from art that happens to be cyan.
+    const CAPTION_TEXT = { r: 190, g: 245, b: 255 };   // canvas-colors.ts EFFECTS_GUIDE_LABEL_TEXT
+    const captionScan = await c.json(String.raw`
+      (() => {
+        const cv = document.getElementById('map-canvas');
+        const ctx = cv.getContext('2d');
+        const W = cv.width, H = cv.height;
+        const count = (y0) => {
+          const d = ctx.getImageData(Math.max(0, W - 320), y0, Math.min(320, W), 13).data;
+          let n = 0;
+          for (let i = 0; i < d.length; i += 4) {
+            // The text is rgba(190,245,255,0.95) COMPOSITED over the plate, so an
+            // exact match never lands (run 1-3 of this row: 0 exact, 197 by shape
+            // on the same dump). The SHAPE predicate: blue and green well above red.
+            if (d[i+2] > d[i] + 30 && d[i+1] > d[i] + 30 && d[i] < 200) n++;
+          }
+          return n;
+        };
+        // WHERE the text-coloured pixels are, whole canvas, right 320px, so a
+        // red row says where the caption went rather than only that it is not
+        // in the strip. Rows with >= 8 such pixels, listed.
+        const rows = [];
+        for (let y = 0; y < H; y++) {
+          const d = ctx.getImageData(Math.max(0, W - 320), y, Math.min(320, W), 1).data;
+          let n = 0;
+          for (let i = 0; i < d.length; i += 4) {
+            if (d[i+2] > d[i] + 30 && d[i+1] > d[i] + 30 && d[i] < 200) n++;
+          }
+          if (n >= 8) rows.push(y + ':' + n);
+        }
+        return { W, H, strip: count(H - 17), control: count(H - 57), cyanRows: rows.filter((r) => Number(r.split(':')[0]) >= H - 60) };
+      })()`);
+    // THE CANVAS ITSELF, saved as the app holds it (toDataURL), so a red row can
+    // be looked at without trusting a window screenshot's scale.
+    const dataUrl = await c.evalExpr(`document.getElementById('map-canvas').toDataURL('image/png')`);
+    writeFileSync(`${SHOTS}/4f-map-canvas.png`, Buffer.from(dataUrl.split(',')[1], 'base64'));
+    console.log('        canvas → scratchpad/shots-effects-guides/4f-map-canvas.png');
+    check('4f', "the caption 'screen lines — locked scene' is painted bottom-right when the "
+      + 'scene is locked (text-coloured pixels in the 13px strip, none 40px above it)',
+      SPACE === 'screen' ? (captionScan.strip >= 30 && captionScan.control === 0)
+        : (captionScan.strip === 0),
+      `space=${SPACE} canvas ${captionScan.W}x${captionScan.H} strip=${captionScan.strip} `
+      + `text-coloured px, control(40px up)=${captionScan.control}; cyan-ish rows (y:count) in the right 320px, bottom 60 rows: `
+      + JSON.stringify(captionScan.cyanRows));
+
     // ---- 5. THE DRAG. -----------------------------------------------------
     const mouse = (type, x, y, extra = {}) => c.send('Input.dispatchMouseEvent', {
       type, x, y, button: 'left', buttons: type === 'mouseReleased' ? 0 : 1,
@@ -426,9 +484,9 @@ async function main() {
      *  number: this is `screenToWorld` + `clampWorldY` spelled out, so a row
      *  built on it fails for any transform error and only stops failing for the
      *  device grid — which is an input, not behaviour. */
-    const worldYAt = (clientY) => Math.round(view.y + (clientY - rect.top) / view.zoom);
+    const worldYAt = (clientY) => Math.round(view.y + (clientY - rect.top) / view.zoom) - originOf(view);   // re-aimed (C)
     const expectedWorldY = worldYAt(aimY(DRAG_TO_CANVAS_Y));
-    const expectedCanvasY = (expectedWorldY - view.y) * view.zoom;
+    const expectedCanvasY = (originOf(view) + expectedWorldY - view.y) * view.zoom;   // re-aimed (C)
     check('4e', 'ANTI-VACUOUS: the aim is recorded, grid and all',
       Number.isInteger(aimY(DRAG_TO_CANVAS_Y)) && Number.isInteger(aimY(0)),
       `dpr=${dpr} rect.top=${rect.top} -> release aims at clientY ${aimY(DRAG_TO_CANVAS_Y)}, `
@@ -587,7 +645,7 @@ async function main() {
     await sleep(900);
     const view2 = await c.json('window.__dbg.view()');
     guides = await c.json('window.__dbg.aeon.guides()');
-    const expect2 = (guides.rows[0].worldY - view2.y) * view2.zoom;
+    const expect2 = (originOf(view2) + guides.rows[0].worldY - view2.y) * view2.zoom;   // re-aimed (C)
     check('8d', 'a pan+zoom moves the guide to the new contract row, with no clock involved',
       guides.active === true && guides.rows[0].canvasY === expect2 && expect2 !== expectY(START_WORLD_Y),
       `view=${JSON.stringify(view2)} drawn=${guides.rows[0]?.canvasY} contract=${expect2}`);

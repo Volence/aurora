@@ -538,6 +538,33 @@ async function main() {
       await sleep(500);
     };
 
+    /** A real key press through CDP (the same spelling as tool-keys-harness). */
+    const pressKey = async (k, code, vk) => {
+      const base = { key: k, code, windowsVirtualKeyCode: vk, nativeVirtualKeyCode: vk, modifiers: 0 };
+      await c.send('Input.dispatchKeyEvent', { type: 'keyDown', ...base });
+      await c.send('Input.dispatchKeyEvent', { type: 'keyUp', ...base });
+      await sleep(250);
+    };
+    /** The dock's tool buttons carry the label as aria-label (ui ToolButton). */
+    const clickDockTool = async (label) => {
+      const ok = await c.evalExpr(`(() => {
+        const b = [...document.querySelectorAll('button')].find((e) => e.getAttribute('aria-label') === ${JSON.stringify(label)});
+        if (!b) return false; b.click(); return true; })()`);
+      await sleep(300);
+      return ok;
+    };
+
+    // ---- 3c. ARM THE TOOL (parcel B, 2026-08-26). Marking a band is its own
+    // tool now; in View a click on the plane seeds NOTHING. The letter is
+    // tool-meta's `n`, pressed as a REAL key with focus off any input.
+    const toolBefore = await c.evalExpr('window.__dbg.aeon.state().tool');
+    await c.evalExpr('document.activeElement && document.activeElement.blur()');
+    await pressKey('n', 'KeyN', 78);
+    const toolArmed = await c.evalExpr('window.__dbg.aeon.state().tool');
+    check('3c', "pressing `n` arms the `mark-band` tool (parcel B: the mark is a tool, not a View side-effect)",
+      toolBefore === 'view' && toolArmed === 'mark-band', `before=${toolBefore} after=${toolArmed}`);
+    if (toolArmed !== 'mark-band') throw new Error('mark-band did not arm — every click row below would be vacuous');
+
     const marks0 = (await c.json('window.__dbg.aeon.bandMark()')).marks;
     await clickAt(staticCell.aim.x, staticCell.aim.y);
     const mark1 = await c.json('window.__dbg.aeon.bandMark()');
@@ -709,11 +736,11 @@ async function main() {
     // the wash's own colour (a one-element span), which is the whole point of
     // the legibility fix. Prefix-anchored so an ancestor cannot match too.
     const footprintLine = await c.json(
-      `[...document.querySelectorAll('*')].filter(e => e.children.length <= 1
+      `[...document.querySelectorAll('*')].filter(e => e.children.length <= 2   /* swatch + parcel A's Hide chip */
          && /^highlighted on the map · paints/.test((e.textContent||'').trim()))
          .map(e => (e.textContent||'').trim())`);
     const footprintSwatch = await c.json(
-      `[...document.querySelectorAll('*')].filter(e => e.children.length === 1
+      `[...document.querySelectorAll('*')].filter(e => (e.children.length === 1 || e.children.length === 2)   /* swatch (+ Hide chip) */
          && /^highlighted on the map · paints/.test((e.textContent||'').trim()))
          .map(e => { const s = e.firstElementChild; const cs = getComputedStyle(s);
                      return { tag: s.tagName, bg: cs.backgroundColor, border: cs.borderTopColor,
@@ -873,7 +900,7 @@ async function main() {
       `click=${cardClicked} card-lens=${JSON.stringify(lens7f)} cell-lens=${JSON.stringify(lens2)}`);
 
     const cardLine = await c.json(
-      `[...document.querySelectorAll('*')].filter(e => e.children.length <= 1
+      `[...document.querySelectorAll('*')].filter(e => e.children.length <= 2   /* swatch + parcel A's Hide chip */
          && /^highlighted on the map · /.test((e.textContent||'').trim()))
          .map(e => (e.textContent||'').trim())`);
     check('7g', "THE RULING on the band card too: its footprint line names 1,244 cells and "
@@ -977,6 +1004,100 @@ async function main() {
       installed !== 'no-map-canvas' && probe.bound === true
       && probe.repaints === 0 && probe.ticks > 0,
       `repaints=${probe.repaints} rAF ticks=${probe.ticks} bound=${probe.bound} (probe=${installed})`);
+
+    // ---- 13. PARCELS A + B (2026-08-26): View seeds nothing; Escape / Hide clear ----
+    // [13a] In the VIEW tool a left click on the plane leaves both the lens
+    // target and the candidate exactly as they were. The click lands on the
+    // STATIC cell that seeded [4c], so this is the same gesture that DID seed
+    // under mark-band — the tool is the only thing that changed.
+    const viewArmed = await clickDockTool('View');
+    const toolView = await c.evalExpr('window.__dbg.aeon.state().tool');
+    const target13 = await c.json('window.__dbg.aeon.bandLensTarget()');
+    const cand13 = await c.json('window.__dbg.aeon.bandCandidate()');
+    const marks13 = (await c.json('window.__dbg.aeon.bandMark()')).marks;
+    await clickAt(staticCell.aim.x, staticCell.aim.y);
+    const target13b = await c.json('window.__dbg.aeon.bandLensTarget()');
+    const cand13b = await c.json('window.__dbg.aeon.bandCandidate()');
+    const marks13b = (await c.json('window.__dbg.aeon.bandMark()')).marks;
+    check('13a', 'VIEW tool: a left click on the plane leaves bandLensTarget AND bandCandidate '
+      + 'unchanged, and records no mark',
+      viewArmed && toolView === 'view'
+      && JSON.stringify(target13b) === JSON.stringify(target13)
+      && JSON.stringify(cand13b) === JSON.stringify(cand13)
+      && marks13b === marks13,
+      `tool=${toolView} target ${JSON.stringify(target13)} -> ${JSON.stringify(target13b)}; `
+      + `candidate ${JSON.stringify(cand13)} -> ${JSON.stringify(cand13b)}; marks ${marks13} -> ${marks13b}`);
+
+    // [13b] ESCAPE clears a lit lens, and the covered pixel returns to its
+    // lens-off byte — the [8b] method, at zoom 1, with the reference byte taken
+    // from the DOOR (setBandLensTarget(null)) and the verdict from the KEY.
+    await pressKey('n', 'KeyN', 78);
+    await c.evalExpr('window.__dbg.setView(0, 0, 1)');
+    await sleep(600);
+    const view13 = await c.json('window.__dbg.view()');
+    const aim13 = (col, row) => {
+      const cx = Math.round(rect.left + (col * CELL_PX + CELL_PX / 2) * view13.zoom);
+      const cy = Math.round(rect.top + (row * CELL_PX + CELL_PX / 2) * view13.zoom);
+      if (cx > rect.left + rect.width - 2 || cy > rect.top + rect.height - 2) return null;
+      const dCol = Math.floor((view13.x + (cx - rect.left) / view13.zoom) / CELL_PX);
+      const dRow = Math.floor((view13.y + (cy - rect.top) / view13.zoom) / CELL_PX);
+      return (dCol === col && dRow === row) ? { x: cx, y: cy } : null;
+    };
+    const px13 = async (aim) => c.json(PIXEL_AT(`${aim.x} - ${rect.left}`, `${aim.y} - ${rect.top}`));
+    const animAim13 = aim13(animCell.col, animCell.row);
+    await clickAt(animAim13.x, animAim13.y);
+    const lit13 = await c.json('window.__dbg.aeon.bandLens()');
+    const litTarget13 = await c.json('window.__dbg.aeon.bandLensTarget()');
+    const cover13 = lit13.active ? coverIndependently(lit13.range.base, lit13.range.count) : [];
+    const covered13 = cover13.find((cell) => aim13(cell % PLANE_COLS, Math.floor(cell / PLANE_COLS)));
+    const covAim13 = covered13 != null ? aim13(covered13 % PLANE_COLS, Math.floor(covered13 / PLANE_COLS)) : null;
+    check('13z', 'ANTI-VACUOUS: under mark-band at zoom 1 the lens is LIT on a band and a covered cell is on screen',
+      (await c.evalExpr('window.__dbg.aeon.state().tool')) === 'mark-band' && lit13.active === true
+      && litTarget13 !== null && covAim13 !== null,
+      `lens=${JSON.stringify(lit13)} target=${JSON.stringify(litTarget13)} covered cell=${covered13}`);
+    if (covAim13) {
+      const onPx = await px13(covAim13);
+      await c.evalExpr('window.__dbg.aeon.setBandLensTarget(null)');
+      await sleep(600);
+      const offRef = await px13(covAim13);                          // the lens-off byte
+      await c.evalExpr(`window.__dbg.aeon.setBandLensTarget(${JSON.stringify(litTarget13)})`);
+      await sleep(600);
+      const reLit = await px13(covAim13);
+      await c.evalExpr('document.activeElement && document.activeElement.blur()');
+      await pressKey('Escape', 'Escape', 27);
+      await sleep(600);
+      const afterEsc = await c.json('window.__dbg.aeon.bandLensTarget()');
+      const escPx = await px13(covAim13);
+      check('13b', 'ESCAPE on a lit lens: bandLensTarget === null and the covered pixel is '
+        + 'byte-identical to its lens-off value (and it really was washed before)',
+        afterEsc === null && JSON.stringify(escPx) === JSON.stringify(offRef)
+        && JSON.stringify(onPx) !== JSON.stringify(offRef) && JSON.stringify(reLit) === JSON.stringify(onPx),
+        `cell ${covered13}: lit=${JSON.stringify(onPx)} off-ref=${JSON.stringify(offRef)} `
+        + `after Escape target=${JSON.stringify(afterEsc)} px=${JSON.stringify(escPx)}`);
+
+      // [13c] The HIDE chip does the same. It renders beside the card's
+      // "highlighted on the map" line, so the band section must be open (it is —
+      // section 7 opened it) and the lens must be lit on a BAND.
+      await clickAt(animAim13.x, animAim13.y);
+      const litAgain = await c.json('window.__dbg.aeon.bandLensTarget()');
+      const litPx = await px13(covAim13);
+      const hideClicked = await c.evalExpr(clickByText('/^Hide$/'));
+      await sleep(600);
+      const afterHide = await c.json('window.__dbg.aeon.bandLensTarget()');
+      const hidePx = await px13(covAim13);
+      check('13c', 'the HIDE chip on a lit lens: bandLensTarget === null and the covered pixel '
+        + 'is byte-identical to its lens-off value',
+        litAgain !== null && JSON.stringify(litPx) === JSON.stringify(onPx)
+        && hideClicked === true && afterHide === null
+        && JSON.stringify(hidePx) === JSON.stringify(offRef),
+        `re-lit target=${JSON.stringify(litAgain)} px=${JSON.stringify(litPx)}; Hide chip clicked=${hideClicked}; `
+        + `after Hide target=${JSON.stringify(afterHide)} px=${JSON.stringify(hidePx)} (off-ref ${JSON.stringify(offRef)})`);
+    } else {
+      check('13b', 'ESCAPE on a lit lens clears it', false, 'COULD NOT MEASURE — see 13z');
+      check('13c', 'the HIDE chip on a lit lens clears it', false, 'COULD NOT MEASURE — see 13z');
+    }
+    await c.evalExpr(`window.__dbg.setView(0, 0, ${ZOOM})`);
+    await sleep(400);
 
     // ---- 12. TEARDOWN: nothing written -----------------------------------
     const hashEnd = await c.evalExpr('window.__dbg.aeon.bgOverrideHash()');
