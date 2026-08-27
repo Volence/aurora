@@ -217,6 +217,10 @@ export default function ComposerCanvas() {
     // BG override doc (band slot / phase bank): one override command per
     // gesture, through the provider that knows which command a write becomes.
     // Never doc-local — a prefix slot's phase-0 half must move with it.
+    // Records on the ACT stack, not zone art: focusedDocId() resolves the art
+    // facet to the act while `open.bgOverride` is set, so this stroke shares
+    // ONE history with the map's layout stamps and the panel's Shift, and
+    // Ctrl+Z from any of those facets reaches it (F1, band-art-undo-stack.test).
     if (o.bgOverride) {
       const level = getActiveLevel(useProjectStore.getState());
       const bg = useProjectStore.getState().project?.bgOverride.doc ?? null;
