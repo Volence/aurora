@@ -351,7 +351,10 @@ export function serializeEffectsScene(scene: EffectsScene): string {
       issues,
     );
   }
-  return canonicalJsonPretty(canonicalizeBySchema(scene, EFFECTS_SCENE_SCHEMA)) + '\n';
+  // The trailing newline is the chokepoint's (canonical-json.ts jsonFileText)
+  // since the §8 rule was generalised to every editor-owned JSON — not spelled
+  // here, or a scene would end in two.
+  return canonicalJsonPretty(canonicalizeBySchema(scene, EFFECTS_SCENE_SCHEMA));
 }
 
 // ---------------------------------------------------------------------------

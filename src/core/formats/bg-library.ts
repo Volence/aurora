@@ -9,6 +9,8 @@
 // tiles via serializeBgTiles, both in the LOCAL index convention (tile 0 =
 // first blob tile), so load(save(state)) reproduces the in-memory arrays.
 
+import { jsonFileText } from './canonical-json';
+
 // Paths take the project's data root (projectDataRoot — 'games/<game>/data/'
 // post-split, 'data/' legacy) so the library lands inside the game's data
 // tree, never at the engine repo root.
@@ -31,7 +33,7 @@ export interface BgLibraryIndexEntry {
 
 /** Serialize the index JSON (metadata only — binaries are written separately). */
 export function serializeBgLibraryIndex(entries: BgLibraryIndexEntry[]): string {
-  return JSON.stringify(entries.map(e => ({ id: e.id, name: e.name })), null, 2);
+  return jsonFileText(JSON.stringify(entries.map(e => ({ id: e.id, name: e.name })), null, 2));
 }
 
 /** Parse the index JSON, dropping malformed entries. */

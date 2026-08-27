@@ -35,6 +35,7 @@ import { effectsScenePath, serializeEffectsScene } from '../../formats/effects/s
 import { saveFileFor } from '../../formats/bg-override/bg-override-io';
 import { serializeNametable } from '../../formats/s4-nametable';
 import { serializeCollAttr } from '../../formats/s4-collattr';
+import { jsonFileText } from '../../formats/canonical-json';
 import { serializeTiles } from '../../export/tile-dedup';
 import type { S4Project } from '../../model/s4-types';
 
@@ -104,14 +105,16 @@ export async function buildAeonSavePlan(
 
     // Write objects (.objects.json)
     if (understood('objects.json')) {
-      const objectsJson = JSON.stringify(section.objects, null, 2);
+      // Trailing newline: the §8 canonical-file rule, via the chokepoint —
+      // see canonical-json.ts jsonFileText. Same for every JSON write below.
+      const objectsJson = jsonFileText(JSON.stringify(section.objects, null, 2));
       const objectsBytes = new TextEncoder().encode(objectsJson);
       files.push({ path: `${prefix}.objects.json`, bytes: objectsBytes });
     }
 
     // Write rings (.rings.json)
     if (understood('rings.json')) {
-      const ringsJson = JSON.stringify(section.rings, null, 2);
+      const ringsJson = jsonFileText(JSON.stringify(section.rings, null, 2));
       const ringsBytes = new TextEncoder().encode(ringsJson);
       files.push({ path: `${prefix}.rings.json`, bytes: ringsBytes });
     }
@@ -143,7 +146,7 @@ export async function buildAeonSavePlan(
         // this branch happened to know about when it was written: a ref missing
         // from the cleared body is a ref that resurrects on the next load.
         const clearedBytes = new TextEncoder().encode(
-          JSON.stringify({ bgLayoutRef: null, paletteRef: null, sceneRef: null }, null, 2));
+          jsonFileText(JSON.stringify({ bgLayoutRef: null, paletteRef: null, sceneRef: null }, null, 2)));
         files.push({ path: metaPath, bytes: clearedBytes });
       }
     }
@@ -160,7 +163,7 @@ export async function buildAeonSavePlan(
       collisionA: Array.from(chunk.collisionA),
       collisionB: Array.from(chunk.collisionB),
     }));
-    const chunksJson = JSON.stringify(serializedChunks);
+    const chunksJson = jsonFileText(JSON.stringify(serializedChunks));
     const chunksBytes = new TextEncoder().encode(chunksJson);
     files.push({ path: config.chunkLibraryPath, bytes: chunksBytes });
   }
@@ -302,19 +305,23 @@ export async function buildAeonSavePlan(
   //
   // Measured 2026-08-22 against aeon's live 88,993-byte document: parse →
   // serialize is byte-identical, so opening and saving an untouched project
-  // adds no write at all.
+  // adds no write at all. ONE exception since 2026-08-26: aeon's shipped file
+  // does not yet end in the canonical newline (§8), so the first save after
+  // the rule landed writes the document once with exactly that byte added,
+  // and every save after it is the no-op again. Aeon changes nothing.
   const bgOverrideFile = saveFileFor(project.bgOverride);
   if (bgOverrideFile) files.push(bgOverrideFile);
 
   if (configChanged) {
     // A pointer rewrite should read as a pointer rewrite in review, nothing
     // else: 2-space indent (what the committed project.json already uses, so
-    // every untouched line re-serializes byte-identically) plus the source
-    // file's own trailing-newline state, carried across the parse by the
-    // loader. Re-stringifying without it silently strips the last byte and
-    // adds a spurious "\ No newline at end of file" to every such diff.
-    const trailer = config.rawTrailingNewline ? '\n' : '';
-    const projectJsonBytes = new TextEncoder().encode(JSON.stringify(config.raw, null, 2) + trailer);
+    // every untouched line re-serializes byte-identically) plus the canonical
+    // trailer. Until 2026-08-26 the source file's own trailing-newline state
+    // was carried across the parse and reproduced (the "churn rider"); the §8
+    // ruling supersedes that — every JSON file Aurora writes into aeon's tree
+    // ends in exactly one newline, this one included — so a source without
+    // the byte gains it on its first pointer rewrite, once.
+    const projectJsonBytes = new TextEncoder().encode(jsonFileText(JSON.stringify(config.raw, null, 2)));
     files.push({ path: 'project.json', bytes: projectJsonBytes });
   }
 

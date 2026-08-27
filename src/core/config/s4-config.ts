@@ -76,21 +76,16 @@ export interface LoadedS4Config {
    * objects as `raw.zones`, so mutations through either are visible to both.
    */
   raw: S4ProjectConfig;
-  /**
-   * Whether the project.json TEXT this config was parsed from ended with a
-   * newline. A save re-stringifies `raw`, which cannot know that, so the fact
-   * is carried here and the newline reproduced — otherwise every pointer
-   * rewrite also silently strips the file's last byte, and the diff a reviewer
-   * sees is "\ No newline at end of file" on top of the real change.
-   * Absent (programmatic configs, no source text) means "no trailing newline".
-   */
-  rawTrailingNewline?: boolean;
+  // A `rawTrailingNewline` flag used to live here, carrying the source file's
+  // trailing-newline state across the parse so the save could reproduce it.
+  // Retired 2026-08-26: every JSON file Aurora writes into aeon's tree ends in
+  // exactly one newline regardless of source (empyrean
+  // docs/AURORA_EFFECTS_SCHEMA.md §8; canonical-json.ts jsonFileText).
 }
 
 export function loadS4Config(
   json: S4ProjectConfig,
   basePath: string,
-  opts: { rawTrailingNewline?: boolean } = {},
 ): LoadedS4Config {
   if (!json.name) throw new Error('Project config missing "name"');
   if (json.engine !== 's4') throw new Error(`Expected engine "s4", got "${json.engine}"`);
@@ -115,7 +110,6 @@ export function loadS4Config(
     objectLibraryPath: json.objectLibrary || '',
     chunkLibraryPath: json.chunkLibrary || '',
     raw: json,
-    rawTrailingNewline: opts.rawTrailingNewline ?? false,
   };
 }
 

@@ -672,7 +672,10 @@ describe('bg-override writer', () => {
     // that pretty-prints.
     const doc = minimal();
     const text = serializeBgOverride(doc);
-    expect(text).not.toContain('\n');
+    // One line — plus the canonical trailing newline (§8, 2026-08-26), which
+    // is the only `\n` in the file.
+    expect(text.endsWith('}\n')).toBe(true);
+    expect(text.slice(0, -1)).not.toContain('\n');
     expect(text).not.toContain(', ');
     expect(text).not.toContain(': ');
     // Derived: whatever the first key sorts to, that is what the file opens on.

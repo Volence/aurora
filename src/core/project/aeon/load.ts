@@ -124,9 +124,7 @@ export async function loadAeonProject(fa: FileAccess, dir: string): Promise<Aeon
   const jsonData = await fa.read('project.json');
   const jsonText = new TextDecoder().decode(jsonData);
   const json = JSON.parse(jsonText) as S4ProjectConfig;
-  // The trailing newline is a property of the TEXT, not of the parsed object,
-  // so it has to be carried across the parse for the save to reproduce it.
-  const config = loadS4Config(json, dir, { rawTrailingNewline: jsonText.endsWith('\n') });
+  const config = loadS4Config(json, dir);
 
   // Load the engine's collision tables (read-only view) BEFORE the full
   // project: chunk-library load needs the profile set to migrate legacy

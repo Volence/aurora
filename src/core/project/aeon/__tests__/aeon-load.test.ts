@@ -71,7 +71,9 @@ function fixtureFiles(): Map<string, Uint8Array> {
 const META_PATH = 'data/ojz/act1/section_0.meta.json';
 const META_REFS = { bgLayoutRef: 'bg-cave', paletteRef: 'pal-dusk', sceneRef: null };
 const WELL_FORMED_META = serializeSectionMeta(META_REFS)!;
-const MALFORMED_META = WELL_FORMED_META.slice(0, -1);  // truncated hand-edit
+// Truncated hand-edit: two bytes, not one — the well-formed text ends in the
+// canonical `}\n` (§8), and dropping only the newline leaves valid JSON.
+const MALFORMED_META = WELL_FORMED_META.slice(0, -2);
 
 // A sidecar as some OTHER writer leaves it — aeon's generator, or a hand edit —
 // carrying the effects-arc scene assignment. Hand-written rather than built by

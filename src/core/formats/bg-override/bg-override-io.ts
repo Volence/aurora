@@ -25,7 +25,10 @@
 // from, and `saveFileFor` compares the re-serialization against it. Measured
 // 2026-08-22 on aeon's live 88,993-byte document at commit 250ff26: the
 // round-trip is BYTE-IDENTICAL, so an untouched project saves with no write at
-// all rather than an 89 KB no-op diff in someone else's repo. The comparison is
+// all rather than an 89 KB no-op diff in someone else's repo. (Since the §8
+// trailing-newline rule of 2026-08-26 that identity holds for a file that ends
+// in `\n`; aeon's shipped instance does not yet, so the FIRST save adds exactly
+// that byte and the no-op resumes from there.) The comparison is
 // against the CONTENT rather than against a dirty flag on purpose — a flag can
 // be missed by a write path that forgets to set it, and the content cannot.
 
