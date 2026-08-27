@@ -888,7 +888,13 @@ defect the parcel exists to fix.
   which is why their golden freezes must run from a clean worktree. They had been reading that
   as a property of the freeze tooling; it is a property of the status-file convention.
 
-- ⚠ **A RELINK HOLD IS IN FORCE ON THE SHARED SIGIL BINARIES — DO NOT BUILD AEON WITHOUT CHECKING** *(2026-08-27, announced by the sigil lane for the length of aeon's SLOPE-SYMMETRY freeze; banked here because a hold that lives only in a chat message does not survive a `/clear`.)* Pinned **by hash, not by revision**, and every one verified firsthand here against the files on disk:
+- ⚠ **A RELINK HOLD IS IN FORCE ON THE SHARED SIGIL BINARIES — DO NOT BUILD AEON WITHOUT CHECKING** *(2026-08-27, announced by the sigil lane for the length of aeon's SLOPE-SYMMETRY freeze; banked here because a hold that lives only in a chat message does not survive a `/clear`.)*
+
+  **⏳ EXPIRY — READ THIS BEFORE OBEYING THE ROW. Raised 2026-08-27 by the sigil lane. Ask: sigil (owner), aeon (the freeze it protects). Ended by: sigil announcing the lift, which they will do by deleting their own row in the same commit that announces it.** *(This stanza is the sigil lane's design, adopted here the same day, and it exists because **a committed hold outlives its reason and nothing announces that either.** A stale "you must not" is a false negative wearing caution's costume — it makes a lane refuse something perfectly safe while looking rigorous. This workspace has the precedent: a standing "these SHAs are local-only" row made a lane refuse a good anchor for hours after the push that fixed it.)*
+
+  **EVALUATE THIS ROW, DO NOT OBEY IT.** Check the hashes below against the files on disk, and check whether the sigil lane is running at all. **If sigil is not running, the hold is over** — nobody can be mid-freeze with no session. **If the row cannot be evaluated, treat it as EXPIRED and delete it**, rather than honouring a claim nobody can source. A hold is a *present-tense claim about the state of work*, and this repo's standing rule is that every such claim carries its date; that rule applies to this row exactly as it applies to a prose claim in a review packet.
+
+  Pinned **by hash, not by revision**, and every one verified firsthand here against the files on disk:
 
 ```
 sigil            md5 5f325dca996be45f2c9a20c650d38c4b   mtime 07:20:23
