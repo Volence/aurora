@@ -326,12 +326,31 @@ foreground follow-up's.
 scratchpad copy. Nothing in this parcel writes to it, builds in it, or touches
 `scratchpad/fixtures/aeon-build-pin`. The harness refuses to start if `AEON_DIR` names either.
 
-⚠ **Reported rather than smoothed:** the full-tree md5 read `db236873f2a43130d1428ad41c180480` at session start
-and `b4eaca4efc48b89272006fac408ce577` later, then held stable across three consecutive re-reads. **No file in
-that tree has an mtime inside the last three hours**, so the difference is a deletion or a transient file
-present at the first reading (the owner is building; `c1.log`, `g_dbg.log`, `demo.lst` and friends are live
-build output), not a content change — and certainly not one of mine. Stated because "the hash moved and I did
-not move it" is worth more than a clean-looking number.
+⚠ **THE md5 THIS ROLE HAS BEEN ASKED TO REPORT IS THE WRONG MEASUREMENT, and here is the diagnosis.** The
+usual recipe — `find . -path ./.git -prune -o -type f -print0 | sort -z | xargs -0 md5sum | md5sum` — read
+`db236873f2a43130d1428ad41c180480`, then `b4eaca4efc48b89272006fac408ce577`, then
+`610eba7f2c575d82f13af9080ff48d2f`, each stable across consecutive re-reads, **while no file in the tree had an
+mtime inside the last three hours.**
+
+The cause: `-path ./.git -prune` prunes **only the top-level `.git`**. The walk therefore descends into
+
+* `./.claude/worktrees/agent-*/` — **other agents' worktrees, inside the aeon tree**, created and destroyed
+  while this session ran, and
+* nested repositories such as `./docs/research/external/harmony/.git`.
+
+So the number tracks **other lanes' scratch space**, not aeon's source, and it will move under any agent that
+reports it faithfully. Diffed against my rsync copy to confirm: every difference is one of those two classes.
+
+**The measurement that answers the question actually being asked** — did this parcel change aeon's source? —
+prunes `.git` *anywhere* and `.claude`:
+
+```
+find . -name .git -prune -o -path ./.claude -prune -o -type f -print0 | sort -z | xargs -0 md5sum | md5sum
+  ->  40fd4cce6f2287753c8ec8ff1e0cfc3a   (twice, consecutively)
+```
+
+**Recommend the successor's brief ask for that one.** This parcel's own interactions with the tree were
+`grep`, `sed -n`, `find` and an `rsync` **out of** it; nothing wrote, built or deleted.
 
 ---
 
