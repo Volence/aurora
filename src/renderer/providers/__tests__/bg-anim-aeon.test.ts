@@ -46,7 +46,7 @@ import {
   DEFAULT_DRIVER, DEFAULT_RATE_SHIFT, addBandCommand, bandBudget, bandRows,
   clampRateShift, demoteBandCommand, driverOptions, insertUnavailableReason,
   patternPxFor, promoteBandCommand, promoteUnavailableReason, rateShiftNote,
-  removeBandCommand, rowChoices, type BandSpec,
+  removeBandCommand, rowChoices, slotSpanPhrase, NO_SLOTS_PHRASE, type BandSpec,
 } from '../bg-anim-aeon';
 
 const FIXTURE = 'test/fixtures/bg-override/editor_bg_override.b0e5a661.json';
@@ -264,7 +264,14 @@ describe('the band rows the panel renders', () => {
     const rows = bandRows(doc());
     expect(rows).toHaveLength(2);
     expect(rows.map((r) => r.geometry)).toEqual(['32x4', '16x4']);
-    expect(rows.map((r) => r.slotRange)).toEqual(['0..128', '128..192']);
+    // DERIVED FROM THE BANDS, NOT TRANSCRIBED. This row shipped as the literal
+    // pair `['0..128', '128..192']` and passed against a subtitle that named one
+    // slot too many — the two ends were copied out of the same off-by-one the
+    // display had. Both halves now come off `describeBands`, and the count is
+    // the one the range is built from.
+    expect(rows.map((r) => r.slotRange)).toEqual(
+      describeBands(doc()).map((v) => `slots ${v.slotBase}..${v.slotBase + v.tileCount - 1}`),
+    );
     // The fixture spells both keys, so a panel reading only `driver` would look
     // right here — `driverIsExplicit` is what a panel needs to avoid writing
     // today's default into a file that was tracking the contract's.
@@ -280,6 +287,116 @@ describe('the band rows the panel renders', () => {
     const created = bandRows(next).at(-1)!;
     expect(created.driverIsExplicit).toBe(false);
     expect(created.driver).toBe(DEFAULT_DRIVER);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The slot ranges those readouts PRINT (ROADMAP item 54)
+// ---------------------------------------------------------------------------
+//
+// Every quantity on this surface is a COUNT — `tileCount`, `animatedSlots`,
+// `firstPromotableSlot` — so `base + count` is the first slot the range does NOT
+// own. Three readouts printed it anyway: the band card's subtitle, the blob
+// budget line, and the promote form's `→ slots …`. On the live document (32
+// animated slots) the budget line read `slots 0..32`, naming slot 32 — which is
+// exactly the first slot a promotion drag may take. `d7ec678` fixed the fourth
+// such sentence the day before; `slotSpanPhrase` is that convention in one
+// place, and these rows derive BOTH ends from the same count the range is built
+// from so the display and the arithmetic cannot drift apart again.
+//
+// The rows below deliberately do NOT match on `0..32`-shaped literals: that is
+// the exact matcher that passed against this defect last time.
+
+/** The `12` and `19` out of `"slots 12..19"`, or null if it is not a range. */
+function endsOf(phrase: string): { first: number; last: number } | null {
+  const m = /(\d+)\.\.(-?\d+)/.exec(phrase);
+  return m === null ? null : { first: Number(m[1]), last: Number(m[2]) };
+}
+
+describe('a printed slot range names the last slot it contains', () => {
+  it('the span covers exactly `count` slots, for every count a band can have', () => {
+    // The property, not a number: last - first + 1 IS the count, so a range
+    // that printed one past its end would over-count by one here.
+    for (const [base, count] of [[0, 1], [0, 128], [7, 4], [128, 64], [40, 3]]) {
+      const ends = endsOf(slotSpanPhrase(base, count));
+      expect(ends, `${base}/${count}`).not.toBeNull();
+      expect(ends!.first).toBe(base);
+      expect(ends!.last - ends!.first + 1, `${base}/${count}`).toBe(count);
+      // and it never names the first slot PAST the range
+      expect(slotSpanPhrase(base, count)).not.toContain(`..${base + count}`);
+    }
+  });
+
+  it('the empty range is worded, not arithmetic — no `0..-1` reaches a reader', () => {
+    // DECIDED, not inherited: a naive `base + count - 1` renders `0..-1` on the
+    // empty document, which is not a range anyone can act on.
+    for (const base of [0, 32]) {
+      const phrase = slotSpanPhrase(base, 0);
+      expect(phrase).toBe(NO_SLOTS_PHRASE);
+      expect(phrase).not.toContain('..');
+      expect(phrase).not.toContain('-1');
+      expect(endsOf(phrase)).toBeNull();
+      // and it still SAYS something — an empty string would render as a gap
+      expect(phrase.trim().length).toBeGreaterThan(0);
+    }
+  });
+
+  it('the band card\'s subtitle stops one slot short of the next band\'s base', () => {
+    // THE BOUNDARY CASE, walked across the whole document: band k's printed last
+    // slot is band k+1's base minus one, and the last band's printed last slot
+    // is the last animated slot there is. Both sides come off the same walk the
+    // codec does, so this fails the moment a readout claims a slot it does not
+    // own — including the one slot promotion needs.
+    const d = doc();
+    const rows = bandRows(d);
+    const bases = describeBands(d).map((v) => v.slotBase);
+    expect(rows.length).toBeGreaterThan(1);
+    rows.forEach((r, i) => {
+      const ends = endsOf(r.slotRange)!;
+      expect(ends, r.slotRange).not.toBeNull();
+      expect(ends.first).toBe(bases[i]);
+      if (i + 1 < bases.length) expect(ends.last + 1).toBe(bases[i + 1]);
+    });
+    const last = endsOf(rows.at(-1)!.slotRange)!;
+    const budget = bandBudget(d);
+    expect(last.last + 1).toBe(budget.animatedSlots);
+    // …which is to say: the FIRST PROMOTABLE SLOT is not inside any band's
+    // printed range. That is the whole point — `firstPromotableSlot` is where
+    // an author is told to drag, and it must not read as taken.
+    expect(last.last).toBeLessThan(budget.firstPromotableSlot);
+    for (const r of rows) expect(r.slotRange).not.toContain(`..${budget.firstPromotableSlot}`);
+  });
+
+  it('the blob budget line\'s animated prefix ends one before the first free slot', () => {
+    // The panel composes this exact call: `({slotSpanPhrase(0, animatedSlots)})`.
+    const budget = bandBudget(doc());
+    expect(budget.animatedSlots).toBeGreaterThan(0);
+    const phrase = slotSpanPhrase(0, budget.animatedSlots);
+    expect(phrase).toContain(`0..${budget.animatedSlots - 1}`);
+    expect(phrase).not.toContain(`0..${budget.animatedSlots}`);
+    // a document with no bands at all gets the words, not `0..-1`
+    const empty = { ...doc(), anims: [] };
+    expect(bandBudget(empty).animatedSlots).toBe(0);
+    expect(slotSpanPhrase(0, bandBudget(empty).animatedSlots)).toBe(NO_SLOTS_PHRASE);
+  });
+
+  it('the promote form\'s range is the slots the promotion would actually take', () => {
+    // The panel composes `slotSpanPhrase(staticBase, tileCount)` for a candidate
+    // parked at the first promotable slot — the default the panel clamps to.
+    const budget = bandBudget(doc());
+    const spec: BandSpec = { cols: 4, rows: 2 };
+    const tileCount = spec.cols * spec.rows;
+    const base = budget.firstPromotableSlot;
+    const phrase = slotSpanPhrase(base, tileCount);
+    expect(phrase).toContain(`${base}..${base + tileCount - 1}`);
+    expect(phrase).not.toContain(`..${base + tileCount}`);
+    // and the promotion the panel would run takes exactly those slots — the
+    // command is the authority the readout has to agree with.
+    const r = promoteBandCommand(doc(), base, spec);
+    if (!r.ok) throw new Error(r.reason);
+    const after = bandRows(applyForTest(doc(), r.command));
+    expect(after.at(-1)!.slotRange).toBe(phrase);
+    expect(endsOf(after.at(-1)!.slotRange)!.last - base + 1).toBe(tileCount);
   });
 });
 

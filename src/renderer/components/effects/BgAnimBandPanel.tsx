@@ -207,7 +207,7 @@ import {
   DEFAULT_DRIVER, DEFAULT_PHASE_FILL, DEFAULT_RATE_SHIFT, bandBudget,
   bandRows, clampRateShift, demoteBandCommand, driverOptions,
   patternPxFor, phaseFillOptions,
-  rateShiftNote, removeBandCommand, rowChoices,
+  rateShiftNote, removeBandCommand, rowChoices, slotSpanPhrase,
   type BandCommandResult, type BandPhaseFill,
 } from '../../providers/bg-anim-aeon';
 // The two creation verbs — label, disabled reason, command — derived ONCE and
@@ -414,7 +414,10 @@ export default function BgAnimBandPanel(): React.ReactElement {
               <span style={{ fontSize: T.tSm, color: T.textHi }}>{b.geometry}</span>
             </Field>
             <Hint under>
-              slots {b.slotRange} · {b.tileCount} tile{b.tileCount === 1 ? '' : 's'} ·{' '}
+              {/* `slotRange` already says "slots 0..127" — FIRST..LAST, from
+                  `slotSpanPhrase`, so the range and the tile count beside it
+                  cannot disagree about how many slots this band owns. */}
+              {b.slotRange} · {b.tileCount} tile{b.tileCount === 1 ? '' : 's'} ·{' '}
               {b.patternPx}px pattern · {b.columnBytes}B/col · {b.phaseBanks} banks
             </Hint>
             <Hint under>
@@ -514,7 +517,9 @@ export default function BgAnimBandPanel(): React.ReactElement {
           <Hint style={{ marginTop: T.s2, marginBottom: 0 }}>
             Blob {budget.tiles}/{budget.tileCapacity} tiles ·{' '}
             <strong>{budget.tileSlotsRemaining}</strong> free ·{' '}
-            {budget.animatedSlots} animated (slots 0..{budget.animatedSlots}) ·{' '}
+            {/* `animatedSlots` is a COUNT: the animated prefix is 0..count-1,
+                and an empty document says so in words rather than `0..-1`. */}
+            {budget.animatedSlots} animated ({slotSpanPhrase(0, budget.animatedSlots)}) ·{' '}
             {budget.bandsRemaining} band slot{budget.bandsRemaining === 1 ? '' : 's'} left
           </Hint>
         )}
@@ -637,8 +642,11 @@ export default function BgAnimBandPanel(): React.ReactElement {
         <Group label="From existing tiles" note="costs no tiles — the range moves, it is not copied">
           <Field label="From tile" title="First tile of the static range this band takes over">
             <NumberField
-              title={`static base — the range is ${staticBase}..${staticBase + tileCount}. `
-                + `Slots 0..${budget.animatedSlots} already belong to bands.`}
+              // Both halves through `slotSpanPhrase`: FIRST..LAST, never one
+              // past the end. The second sentence is the same fact `min` below
+              // enforces, and it named the first FREE slot as taken.
+              title={`static base — the range is ${slotSpanPhrase(staticBase, tileCount)}. `
+                + `Bands already own ${slotSpanPhrase(0, budget.animatedSlots)}.`}
               min={budget.firstPromotableSlot} width={72} value={staticBase}
               onChange={(n) => setStaticBase(Math.max(0, Math.round(n) || 0))} />
             <Chip disabled={promoteOff !== null}
@@ -648,7 +656,10 @@ export default function BgAnimBandPanel(): React.ReactElement {
             </Chip>
           </Field>
           <Hint under>
-            → slots {staticBase}..{staticBase + tileCount}. The picture at rest does not
+            {/* The slots this promotion would TAKE, FIRST..LAST — the author
+                reads this line to aim the drag, so one slot too many is one
+                slot they are told they own and do not. */}
+            → {slotSpanPhrase(staticBase, tileCount)}. The picture at rest does not
             change: phase 0 IS this art, and {fillOption.note}
           </Hint>
           {/* WHAT THIS RANGE WOULD ACTUALLY TAKE OVER — the one fact no amount

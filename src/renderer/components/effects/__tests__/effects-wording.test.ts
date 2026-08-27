@@ -135,3 +135,70 @@ describe('the panels render the constants rather than a second copy of the words
     expect(bandPanel).toMatch(/BAND_MECHANISM_HINT/);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Every slot range this panel prints goes through `slotSpanPhrase` (item 54)
+// ---------------------------------------------------------------------------
+//
+// The arithmetic is pinned in `providers/__tests__/bg-anim-aeon.test.ts`, where
+// the node suite can call it. What CANNOT be reached from there is whether the
+// panel calls it at all: three readouts each composed `base .. base + count`
+// inline in JSX, one past the end every time, and a provider row proves nothing
+// about a component that does its own sums. So these rows read the panel SOURCE
+// — the same instrument the section above uses — and hold each readout to the
+// shared helper by the words only that readout says.
+//
+// (What none of this can see is the rendered pixel. The strings are pinned here;
+// seeing them on screen is a foreground CDP job.)
+describe('the band panel prints no slot range of its own', () => {
+  // COMMENTS STRIPPED, for every row below. A `toMatch` over a whole .tsx will
+  // happily be satisfied by a COMMENT that quotes the call — including the
+  // comments this parcel added explaining the fix — which is a green that says
+  // nothing about what the panel renders. The panel carries no URLs, so eating
+  // `//` to end-of-line takes nothing but comments.
+  const code = bandPanel.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+
+  it('the stripped panel is still the panel', () => {
+    // Anti-vacuous: a strip that ate the file would make every row below pass
+    // its negatives and fail nothing.
+    // (Not a size ratio: over half this panel's characters ARE comment, which is
+    // the house style. Structural markers instead.)
+    expect(code).toMatch(/export default function BgAnimBandPanel/);
+    expect(code).toMatch(/<Hint under>/);
+    expect(code).toMatch(/slotSpanPhrase/);
+  });
+
+  it('the band card\'s subtitle prints the row\'s prepared range and adds no second "slots"', () => {
+    // Unique to this readout: it is the only line where the range is followed by
+    // the tile count and the singular/plural of "tile".
+    expect(code).toMatch(/\{b\.slotRange\} · \{b\.tileCount\} tile\{b\.tileCount === 1/);
+    // `slotRange` now carries the word itself; a leftover "slots {b.slotRange}"
+    // would render "slots slots 0..127".
+    expect(code).not.toMatch(/slots \{b\.slotRange\}/);
+  });
+
+  it('the blob budget line derives its animated prefix from the count', () => {
+    // Unique to this readout: "N animated (…)" inside the blob budget Hint.
+    expect(code).toMatch(
+      /\{budget\.animatedSlots\} animated \(\{slotSpanPhrase\(0, budget\.animatedSlots\)\}\)/,
+    );
+  });
+
+  it('the promote form\'s "→ slots …" line derives its range from the candidate\'s tile count', () => {
+    // Unique to this readout: the arrow that opens the promote hint.
+    expect(code).toMatch(/→ \{slotSpanPhrase\(staticBase, tileCount\)\}\./);
+    // …and the "From tile" field's title, the same fact as a tooltip.
+    expect(code).toMatch(/the range is \$\{slotSpanPhrase\(staticBase, tileCount\)\}/);
+    expect(code).toMatch(/already own \$\{slotSpanPhrase\(0, budget\.animatedSlots\)\}/);
+  });
+
+  it('no readout in the panel prints a range end computed inline', () => {
+    // THE SHAPE OF THE DEFECT, swept for rather than listed: `..{x + y}` or
+    // `..${x + y}` in a display string is a range end computed beside the range
+    // instead of derived with it — which is how all three of these came to name
+    // one slot too many.
+    expect(code.match(/\.\.\$?\{[^}]*\+[^}]*\}/g) ?? []).toEqual([]);
+    // anti-vacuous: the sweep can see the panel's real interpolations
+    expect(code.match(/\$?\{slotSpanPhrase\([^)]*\)\}/g)?.length ?? 0).toBeGreaterThanOrEqual(4);
+  });
+});
