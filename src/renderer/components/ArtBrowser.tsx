@@ -10,8 +10,12 @@ import { lutForPaletteLine, rasterizeTile } from '../../core/art/rasterize';
 import {
   resolveTilePickerSource, tilePickerCountLabel, tilePickerHoverLabel, pickedTileIndex,
   tileThumbCacheStale, tilePickerBandGroups, tilePickerBandLabel,
-  type TileThumbCacheKey, type TilePickerBandGroup,
+  type TileThumbCacheKey, type TilePickerBandGroup, type TilePickerSource,
 } from '../providers/tile-picker-source';
+import {
+  publishStripDrag, resolveStripDrag, stripDragHint, stripDragLabel,
+} from '../providers/band-strip-range';
+import { bandBudget } from '../providers/bg-anim-aeon';
 import { T } from './ui';
 import { CANVAS_VOID, TILE_SELECTED, TILE_HOVER } from '../canvas/canvas-colors';
 
@@ -62,6 +66,15 @@ export default function ArtBrowser() {
   const scrollTopRef = useRef(0);
   const [scrollTop, setScrollTop] = useState(0);
   const hoveredRef = useRef(-1);
+  // The slot under the PRESS, or -1 for "no gesture in flight". The press only
+  // RECORDS; the release decides (ROADMAP item 43 wave 2) — the same
+  // press-records / release-commits shape `MapViewport.commitBandMark` uses.
+  const dragAnchorRef = useRef(-1);
+  // The picker's resolved source, kept fresh for the release handler. The
+  // handlers are `useCallback`s that must NOT re-create on every source
+  // identity, and a stale closure here would gate the drag on the layer the
+  // author WAS on — see `resolveStripDrag`'s gate.
+  const sourceRef = useRef<TilePickerSource | null>(null);
 
   const itemSize = 16; // Tile displayed at 2x
 
@@ -89,6 +102,7 @@ export default function ArtBrowser() {
   // Derived from the SAME source as the grid, so a card can never show a band
   // the stroke would not find.
   const bandGroups = tilePickerBandGroups(source, state.project?.bgOverride ?? null);
+  sourceRef.current = source;
   const selectedBgBand = useEditorStore((s) => s.selectedBgBand);
   const tool = useEditorStore((s) => s.tool);
 
@@ -203,12 +217,16 @@ export default function ArtBrowser() {
       // Labelled in the space the index actually lives in — a blob-local slot in
       // BG, a zone tile index in FG.
       hoverLabelRef.current.textContent = tilePickerHoverLabel(source, newIdx);
+      // The strip drag's `title` belongs to the message it wrote; a move onto a
+      // new tile replaces the message, so the tooltip goes with it.
+      hoverLabelRef.current.title = '';
     }
   }, [itemSize, itemCount, source]);
 
-  const handleClick = useCallback((e: React.MouseEvent) => {
+  /** The strip cell under a pointer event, or -1 when it is past the end. */
+  const slotAtEvent = useCallback((e: React.MouseEvent): number => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!canvas) return -1;
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top + scrollTopRef.current;
@@ -216,14 +234,87 @@ export default function ArtBrowser() {
     const col = Math.floor(x / (itemSize + 2));
     const row = Math.floor(y / (itemSize + 2));
     const idx = row * cols + col;
-    if (idx >= 0 && idx < itemCount) {
+    return idx >= 0 && idx < itemCount ? idx : -1;
+  }, [itemSize, itemCount]);
+
+  /**
+   * THE PRESS ONLY RECORDS (ROADMAP item 43 wave 2). It never picks, never arms
+   * a tool and never touches the candidate — taking the decision here would make
+   * every drag commit its anchor before the author had finished choosing the far
+   * end, which is the same reason `MapViewport`'s mark commits at mouseup.
+   */
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    dragAnchorRef.current = slotAtEvent(e);
+  }, [slotAtEvent]);
+
+  /**
+   * THE RELEASE DECIDES, and `resolveStripDrag` is what decides — this function
+   * supplies state and applies the answer, and holds no rule of its own.
+   *
+   * Two outcomes, and the boundary between them is the whole point of wave 2:
+   *
+   *  • `pick` — a press and release on ONE slot, or a strip that is not this
+   *    document's blob. EXACTLY today's behaviour: the layer's picked tile moves
+   *    and `paint-tile` arms. Nothing about a plain click changed.
+   *  • `range` — a run across the slot axis. It sets the promotion CANDIDATE and
+   *    must leave `selectedBgTileIndex` and the tool alone: a drag is aiming a
+   *    band, not choosing a brush, and silently re-arming paint would put the
+   *    author one click away from a stroke they did not ask for.
+   *
+   * `refused` changes nothing at all and SAYS SO on the hover line. An unclear
+   * refusal is worse than a loud one.
+   */
+  const handleClick = useCallback((e: React.MouseEvent) => {
+    const anchor = dragAnchorRef.current;
+    dragAnchorRef.current = -1;
+    const idx = slotAtEvent(e);
+    if (idx < 0) return;
+
+    // The gesture surface only exists once a press was seen on this strip; a
+    // click arriving without one (a synthetic `.click()`, say) is a plain pick.
+    const src = sourceRef.current;
+    const ed = useEditorStore.getState();
+    const doc = useProjectStore.getState().project?.bgOverride?.doc ?? null;
+    const outcome = resolveStripDrag({
+      layer: src?.layer ?? 'fg',
+      origin: src?.origin ?? 'none',
+      anchorSlot: anchor >= 0 ? anchor : idx,
+      releaseSlot: idx,
+      rows: ed.bandCandidate.rows,
+      // The budget's own walk, never a second copy of it — `markFromLayoutWord`
+      // clamps a click-seeded base to exactly this value.
+      firstPromotableSlot: bandBudget(doc).firstPromotableSlot,
+      blobTileCount: src?.tiles.length ?? 0,
+    });
+    publishStripDrag({ anchorSlot: anchor >= 0 ? anchor : idx, releaseSlot: idx }, outcome);
+
+    if (outcome.kind === 'pick') {
       // Into the pick for THIS layer. The two indices name different arrays, so
       // one shared value would carry a foreground index into a background stroke
       // (editorStore.selectedBgTileIndex has the full reasoning).
-      useEditorStore.getState().setSelectedTileIndexForLayer(editingLayer, idx);
-      useEditorStore.getState().setTool('paint-tile');
+      ed.setSelectedTileIndexForLayer(editingLayer, idx);
+      ed.setTool('paint-tile');
+      return;
     }
-  }, [itemSize, itemCount, editingLayer]);
+    if (outcome.kind === 'range') {
+      // ONE store write, and it goes through `setBandCandidate` — which also
+      // points `bandLensTarget` at the candidate, so the map lights the
+      // footprint of this range the moment the button comes up. NO DOCUMENT
+      // WRITE: the only writers in this arc are still promoteBandCommand /
+      // addBandCommand.
+      ed.setBandCandidate({ staticBase: outcome.staticBase, cols: outcome.cols });
+    }
+    // `range` and `refused` both report on the picker's own hover line — the
+    // strip has no other surface, and the candidate they aim lives two panels
+    // away in a section that arrives collapsed. The SHORT form goes on the line
+    // and the full reasoning into `title`: a readout long enough to wrap grew
+    // the header row and moved the tile grid out from under the cursor (see
+    // `stripDragLabel`, and the harness row that caught it).
+    if (hoverLabelRef.current) {
+      hoverLabelRef.current.textContent = stripDragLabel(outcome);
+      hoverLabelRef.current.title = stripDragHint(outcome);
+    }
+  }, [slotAtEvent, editingLayer]);
 
   const handleMouseLeave = useCallback(() => {
     hoveredRef.current = -1;
@@ -232,7 +323,10 @@ export default function ArtBrowser() {
       const ctx = overlay.getContext('2d');
       if (ctx) ctx.clearRect(0, 0, overlay.width, overlay.height);
     }
-    if (hoverLabelRef.current) hoverLabelRef.current.textContent = '';
+    if (hoverLabelRef.current) {
+      hoverLabelRef.current.textContent = '';
+      hoverLabelRef.current.title = '';
+    }
   }, []);
 
   // Keep scrollTopRef in sync
@@ -258,7 +352,9 @@ export default function ArtBrowser() {
         <span style={styles.label}>
           {tilePickerCountLabel(source)}
         </span>
-        <span ref={hoverLabelRef} style={styles.hoverLabel} />
+        {/* id: the strip drag (item 43 wave 2) reports on THIS line — it is the
+            only surface the strip has — and the CDP harness reads it here. */}
+        <span id="art-browser-hover-label" ref={hoverLabelRef} style={styles.hoverLabel} />
       </div>
       {bandGroups.length > 0 && (
         // id: the CDP harness finds the cards here and clicks one to arm the
@@ -289,6 +385,7 @@ export default function ArtBrowser() {
         onWheel={handleScroll}
         onMouseMove={handleMouseMove}
         onMouseLeave={handleMouseLeave}
+        onMouseDown={handleMouseDown}
         onClick={handleClick}
       >
         {/* id: the CDP harness reads THESE pixels rather than asking the
@@ -371,20 +468,29 @@ const styles: Record<string, React.CSSProperties> = {
     background: T.surface, borderTop: `1px solid ${T.border}`,
     height: 180, flexShrink: 0,
   },
+  // ⚠ ONE LINE, AND IT MAY NOT GROW. The row below it is the tile grid, and this
+  // row growing pushes that grid DOWN UNDER THE CURSOR — measured at 36px when
+  // the strip-drag readout wrapped to three lines, which put the next press two
+  // slots off and let the band cards slide under the pointer and erase the
+  // message. `nowrap` here plus the ellipsis on `hoverLabel` means no message
+  // length can reach the layout. (ROADMAP item 43 wave 2; harness row [6h].)
   tabs: {
-    display: 'flex', alignItems: 'center', gap: 0,
-    borderBottom: `1px solid ${T.border}`, flexShrink: 0,
+    display: 'flex', alignItems: 'center', gap: 0, whiteSpace: 'nowrap',
+    borderBottom: `1px solid ${T.border}`, flexShrink: 0, overflow: 'hidden',
   },
   // A COUNT, not a heading. This panel is always mounted inside a
   // CollapsibleSection that names it (layout-facet.tsx: "Art"), and in heading
   // type this row read as a second, disagreeing title stacked under the first —
   // the same doubling ChunkGrid's countLabel fixed.
   label: {
-    padding: '6px 12px', fontSize: T.t2xs, color: T.textLo,
+    padding: '6px 12px', fontSize: T.t2xs, color: T.textLo, flexShrink: 0,
   },
+  // The readout truncates rather than wrapping — see `tabs`. The full text is
+  // always on the element's `title`, so nothing is lost to the ellipsis.
   hoverLabel: {
     marginLeft: 'auto', padding: '0 12px',
     fontSize: T.tXs, fontFamily: T.fontMono, color: T.accent,
+    minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
   },
   canvasWrap: {
     flex: 1, position: 'relative', overflow: 'hidden',
