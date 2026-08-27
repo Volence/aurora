@@ -125,11 +125,24 @@ the control itself advertises — the same discipline as R4–R9. Two carry a st
 exception, and **both exceptions are forced by the contract rather than
 preferred**:
 
-* **`period` takes the control's own `max` ÷ N**, not `N`. `max` IS the table
-  length, sigil refuses a generator whose period does not divide it, and `max/N`
-  is exact because both are powers of two. The plain rule (17) would have
-  authored a scene the build rejects. Harness row **8f** checks the emitted
-  file's periods against the number the spinner itself advertises.
+* **`period` takes the control's own `max` ÷ N**, not `N`. The plain rule (17)
+  would have authored a scene the build rejects; `max/N` is exact because both
+  are powers of two. Harness row **8f** checks the emitted file's periods against
+  the number the spinner itself advertises.
+  ⚠ **TWO DETAILS OF THE REASONING ABOVE WERE WRONG, corrected 2026-08-27 from
+  aeon's source rather than from the transcription** (the guard-transcription
+  check, `docs/reviews/2026-08-27-guard-transcription.md`). **The refusal is the
+  ENGINE's, not sigil's**, and **the divisor is a LITERAL `256`, not a derived
+  table length**: `engine/level/parallax_dsl.emp:52` reads
+  `ensure(256 % period == 0, "deform_sine: period {period} must divide 256")`,
+  with the same line at `:87` for `deform_triangle`. **The emitted values are
+  unaffected** — the control's `max` is 256, so `max/N` and `256/N` are the same
+  arithmetic — but the *rule* this fixture claims to follow is now stated
+  correctly, because a rule recorded with the wrong owner and a derived-looking
+  constant is the kind a later session re-derives differently and gets away with.
+  **A consequence worth seeing:** only the **9** divisors of 256 are legal, while
+  the control accepts 1..256 — booked as ROADMAP row 63, and two parcels had
+  independently worked around it before anyone wrote it down.
 * **`shift_a` / `shift_b` take `max − N` clamped** — R6's complement — because
   their schema default IS `max` (15, "this plane takes none of it") and that is
   precisely what `layerDeformFromToggle` seeds. The plain rule would have landed
