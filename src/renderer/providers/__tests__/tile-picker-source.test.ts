@@ -21,7 +21,10 @@ import { describe, it, expect } from 'vitest';
 import {
   resolveTilePickerSource, tilePickerCountLabel, tilePickerHoverLabel,
   pickedTileIndex, tileThumbCacheStale, tilePickerBandGroups, tilePickerBandLabel,
+  tilePickerBandHint,
 } from '../tile-picker-source';
+import { readFileSync } from 'node:fs';
+import { NO_SLOTS_PHRASE } from '../bg-anim-aeon';
 import { resolveDisplayedBg } from '../bganim-preview-aeon';
 import type { Act, BgLibraryEntry, Section, Tile, Zone } from '../../../core/model/s4-types';
 import type { BgOverrideState } from '../../../core/formats/bg-override/bg-override-io';
@@ -271,10 +274,114 @@ describe('tilePickerBandGroups — the prefix by band', () => {
     )).toEqual([]);
   });
 
-  it('labels a picked band in the space it lives in', () => {
+  // ═══ THE BAND READOUT: ONE LINE THAT FITS, AND THE REST ON THE TITLE ═══
+  //
+  // RE-CUT for the picker-label-fit parcel. The row below asserted
+  // `band 0 · slots 0..31 (8x4)` as the LINE, and that string was measured at
+  // 155px in the picker's 106px hover box — `whiteSpace: nowrap` with an
+  // ellipsis, i.e. ~30% of it invisible on the only surface a hovered card has.
+  // It is now the TITLE, verbatim, and the line is the span plus a two-character
+  // band tag. The pixels are a CDP job (`bganim-strip-range-harness.mjs`
+  // [6k]/[6l]/[6m]); what node can hold is the wording and the convention.
+  //
+  // ⚠ THE ENDS ARE DERIVED FROM `g.slots`, NOT RE-MULTIPLIED. `slots` is built
+  // by the row/col walk above — a different code path from the `cols * rows`
+  // the label is composed through — so an expectation written this way does not
+  // move with the arithmetic it is checking. Expectations spelled
+  // `slotSpanDigits(...)` would go green on a poisoned helper, which is the
+  // trap item 54's own rows were re-cut around.
+  const lastOwned = (g: { slots: number[] }): number => Math.max(...g.slots);
+
+  it('the LINE names the last slot the band contains, with a tag for which band', () => {
+    const h = holder(bandedDoc());
+    const s = resolveTilePickerSource('bg', zone(FG), act(BOUND, 'lib-1'), LIB, 0, h);
+    const [g0, g1] = tilePickerBandGroups(s, h);
+    expect(tilePickerBandLabel(g0)).toBe(`b0 · ${g0.slotBase}..${lastOwned(g0)}`);
+    // The SECOND band is the one that discriminates: its base is past zero, so
+    // a label that printed the count instead of the span, or the first slot
+    // past the range instead of the last one in it, differs here.
+    expect(g1.slotBase).toBe(8 * 4);
+    expect(tilePickerBandLabel(g1)).toBe(`b1 · ${g1.slotBase}..${lastOwned(g1)}`);
+    expect(tilePickerBandLabel(g1)).not.toContain(`..${lastOwned(g1) + 1}`);
+  });
+
+  it('and the LINE is short: no noun, no geometry — both are on the card already', () => {
     const h = holder(bandedDoc());
     const s = resolveTilePickerSource('bg', zone(FG), act(BOUND, 'lib-1'), LIB, 0, h);
     const g = tilePickerBandGroups(s, h)[0];
-    expect(tilePickerBandLabel(g)).toBe('band 0 · slots 0..31 (8x4)');
+    // NOT A CHARACTER BUDGET — that is the vacuous check this parcel exists to
+    // replace, and the box is measured in the harness. These are the two
+    // SUBSTRINGS the fit measurement removed, so a quiet restoration of either
+    // is caught here rather than only in a build nobody runs.
+    expect(tilePickerBandLabel(g)).not.toContain('slots');
+    expect(tilePickerBandLabel(g)).not.toContain(`${g.cols}x${g.rows}`);
+    // And the card itself is where both of them still are, unchanged.
+    expect(g.label).toBe(`Band ${g.index} · ${g.cols}x${g.rows}`);
+  });
+
+  it('the TITLE keeps everything the line dropped, in the words with room for them', () => {
+    const h = holder(bandedDoc());
+    const s = resolveTilePickerSource('bg', zone(FG), act(BOUND, 'lib-1'), LIB, 0, h);
+    const [g0, g1] = tilePickerBandGroups(s, h);
+    // Verbatim what the LINE used to say — the glance shortened, the
+    // information did not disappear.
+    expect(tilePickerBandHint(g0)).toBe('band 0 · slots 0..31 (8x4)');
+    expect(tilePickerBandHint(g1))
+      .toBe(`band 1 · slots ${g1.slotBase}..${lastOwned(g1)} (${g1.cols}x${g1.rows})`);
+    // Every span-bearing thing the line dropped is here, and the span agrees
+    // with the line's own.
+    expect(tilePickerBandHint(g1)).toContain(tilePickerBandLabel(g1).replace(/^b\d+ · /, ''));
+    expect(tilePickerBandHint(g1)).not.toContain(`..${lastOwned(g1) + 1}`);
+  });
+
+  it('an empty band is still not a backwards range', () => {
+    // `TilePickerBandGroup` is exported and both readouts are total over it, so
+    // a zero-slot group is reachable even though `tilePickerBandGroups` cannot
+    // build one. `slotSpanDigits`/`slotSpanPhrase` decide what nothing is
+    // called; a local `${base}..${base + n - 1}` would print `40..39`.
+    const empty = { index: 2, cols: 0, rows: 4, slotBase: 40, label: 'Band 2 · 0x4', slots: [] };
+    expect(tilePickerBandLabel(empty)).toBe(`b2 · ${NO_SLOTS_PHRASE}`);
+    expect(tilePickerBandLabel(empty)).not.toContain('..');
+    expect(tilePickerBandHint(empty)).toBe(`band 2 · ${NO_SLOTS_PHRASE} (0x4)`);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// THE CONVENTION HAS ONE SPELLING — and a comment is not a call
+// ---------------------------------------------------------------------------
+//
+// This file was item 54's FOURTH spelling of the inclusive span: it computed
+// `g.slotBase + g.cols * g.rows - 1` inline, rendered the right answer, and sat
+// outside every file that sweep touched — which is exactly why nothing caught
+// it. The rows below pin the routing, not the output, so the next narrow
+// readout cannot save six characters by re-deriving the span.
+//
+// ⚠ COMMENTS ARE STRIPPED FIRST. A whole-file `toMatch` over a `.ts` is
+// satisfied by a comment QUOTING the call — measured three times in this repo
+// this week — and this module's own doc comments now name both helpers and
+// print a hand-rolled span as the thing not to write. Both would satisfy an
+// unstripped match. (The module carries no `://`, so eating `//` to
+// end-of-line takes nothing but comments — checked.)
+describe('tile-picker-source: one spelling of the slot-span convention', () => {
+  const src = readFileSync('src/renderer/providers/tile-picker-source.ts', 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+
+  it('the stripped source is still the module', () => {
+    // Anti-vacuous: a strip that ate the file would pass every negative below.
+    expect(src).toMatch(/export function tilePickerBandLabel/);
+    expect(src).toMatch(/export function tilePickerBandHint/);
+    expect(src).toMatch(/export function tilePickerBandGroups/);
+  });
+
+  it('both readouts reach the shared helper, and neither formats a span inline', () => {
+    expect(src).toMatch(/slotSpanDigits\(/);
+    expect(src).toMatch(/slotSpanPhrase\(/);
+    // The shape the old label had: an interpolated `${…}..${…}` span.
+    expect(src.match(/\.\.\$?\{/g) ?? []).toEqual([]);
+    // The COUNT is computed in exactly one place on the readout path, so the
+    // two forms cannot be handed different lengths of the same range.
+    expect(src.match(/bandSlotCount\(/g)?.length ?? 0).toBeGreaterThanOrEqual(3);
+    // `last` was the local the old label summed into; nothing reintroduces it.
+    expect(src).not.toMatch(/const last = /);
   });
 });

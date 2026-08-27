@@ -676,6 +676,192 @@ async function main() {
       `before=${JSON.stringify(candBefore)} after=${JSON.stringify(cand6)}`);
     await shot(c, 'strip-drag-range');
 
+    // ---- 6B. THE BAND CARD'S OWN READOUT, ON THE SAME LINE -----------------
+    //
+    // ⚠ THE SAME DOM ELEMENT, A DIFFERENT FEATURE. `BandCard`'s hover handler
+    // writes `#art-browser-hover-label` — the line sections 6f/6g2/6g3 just
+    // measured for the strip drag — so everything the strip readout was
+    // shortened to satisfy applies to it word for word, and nothing above
+    // measures it: [6g2] reads whatever text is on the line, and a band label
+    // is only on the line while the pointer is on a card.
+    //
+    // It was found long: `band 0 · slots 0..31 (8x4)` wanted 155px in a 106px
+    // box (measured in this app, this branch's predecessor), i.e. ~30% of it
+    // under the ellipsis, on a line documented as unable to wrap.
+    //
+    // THE ROWS BELOW ARE ABOUT THE ELEMENT, NOT THE STRING. A character budget
+    // is the vacuous shape this repo keeps finding — `scrollWidth <=
+    // clientWidth` is the quantity `text-overflow: ellipsis` actually turns on.
+    const cards = await c.json(`(() => {
+      const el = [...document.querySelectorAll('.art-browser-band')];
+      return el.map((e) => {
+        const r = e.getBoundingClientRect();
+        return { band: Number(e.getAttribute('data-band')), title: e.title,
+          caption: (e.textContent || '').trim(),
+          x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) };
+      });
+    })()`);
+    const lineBefore = await c.json(HOVER_LABEL);
+    check('6j', 'ANTI-VACUOUS: a band card is on screen, its caption is the one the picker '
+      + 'builds, and the line still holds SECTION 6\'S DRAG MESSAGE going in — so a band '
+      + 'readout found on it below was written BY this hover and is not a leftover',
+      cards.length > 0 && bands.length === cards.length
+      && cards.every((k) => /^Band \d+ · \d+x\d+$/.test(k.caption))
+      && !!lineBefore && lineBefore.text === label6.text && lineBefore.text.trim() !== '',
+      `${cards.length} card(s) ${JSON.stringify(cards)} · line before = ${JSON.stringify(lineBefore)} `
+      + `· section 6's readout = ${JSON.stringify(label6 && label6.text)}`);
+
+    // Hover it the way a mouse does. `BandCard` writes the line from
+    // `onMouseEnter`, so a synthetic call into the store would prove nothing
+    // about the wiring.
+    const card0 = cards[0];
+    const band0 = bands.find((b) => b.index === card0.band);
+    await c.send('Input.dispatchMouseEvent',
+      { type: 'mouseMoved', x: card0.x, y: card0.y, button: 'none', buttons: 0 });
+    await sleep(400);
+    const hov = await c.json(`(() => {
+      const el = document.getElementById('art-browser-hover-label');
+      if (!el) return null;
+      const cs = getComputedStyle(el);
+      return { text: (el.textContent || ''), title: el.title,
+        sw: el.scrollWidth, cw: el.clientWidth, truncated: el.scrollWidth > el.clientWidth,
+        font: cs.font, overflow: cs.textOverflow, whiteSpace: cs.whiteSpace };
+    })()`);
+    console.log(`  BAND READOUT: ${JSON.stringify(hov)}`);
+
+    // THE INCLUSIVE END, DERIVED FROM THE CODEC'S OWN COUNT — `bandRows()`
+    // carries `tileCount` (`bandTileCount`, in the codec), so this row never
+    // re-multiplies the `cols * rows` the label itself is built from, and a
+    // label that went back to naming `base + count` fails on the negative half
+    // as well as the positive one.
+    const lastOwned0 = band0.slotBase + band0.tileCount - 1;
+    const pastEnd0 = band0.slotBase + band0.tileCount;
+    check('6k', 'hovering a band card SAYS which slots that band owns — naming the LAST slot '
+      + 'it contains, never the first past it — and the detail the line cannot hold (the noun '
+      + '"slots", and the geometry) is on the title, not gone',
+      !!hov && hov.text.includes(`${band0.slotBase}..${lastOwned0}`)
+      && !hov.text.includes(`${band0.slotBase}..${pastEnd0}`)
+      && hov.title.includes(`slots ${band0.slotBase}..${lastOwned0}`)
+      && hov.title.includes(`(${band0.cols}x${band0.rows})`)
+      && card0.title.includes(`slots ${band0.slotBase}..${lastOwned0}`)
+      && hov.text !== lineBefore.text,
+      `line=${JSON.stringify(hov && hov.text)} title=${JSON.stringify(hov && hov.title)} `
+      + `card title=${JSON.stringify(card0.title)} · expected ${band0.slotBase}..${lastOwned0}, `
+      + `NOT ${band0.slotBase}..${pastEnd0} (band ${band0.index}: base ${band0.slotBase}, `
+      + `tileCount ${band0.tileCount} straight off the codec)`);
+
+    check('6l', 'and the line FITS: the band readout the app just wrote is not truncated at the '
+      + 'docked panel width — the property text-overflow:ellipsis actually turns on',
+      !!hov && hov.sw <= hov.cw && hov.whiteSpace === 'nowrap',
+      `${JSON.stringify(hov && hov.text)} scrollWidth=${hov && hov.sw} `
+      + `clientWidth=${hov && hov.cw} whiteSpace=${hov && hov.whiteSpace}`);
+
+    // ── AND FOR EVERY BAND THIS CODEC CAN BUILD, NOT JUST THIS ONE ─────────
+    //
+    // [6l] alone is the vacuous shape [6g3] exists to prevent one row further
+    // up: it measures `b0 · 0..31`, a single-digit band index over two-digit
+    // slots, and a label tuned to that is green here while a 448-slot document
+    // ellipsises the moment its second band starts past slot 99.
+    //
+    // DERIVED FROM THE VENDORED CONTRACT, NEVER TYPED: `BGANIM_MAX_BANDS`
+    // bounds the index, `BG_TILE_CAPACITY` bounds `slot_base + cols*rows`, and
+    // the legal `rows` are enumerated through the codec's own rule (`rows *
+    // TILE_BYTES` an exact power of two) rather than restated as a list. That
+    // is every (index, slotBase, cols, rows) a `TilePickerBandGroup` can carry.
+    //
+    // THE REDUCTION IS MEASURED, NOT ASSUMED. ~800k tuples cannot each be laid
+    // in the DOM, so one representative per STRING LENGTH is measured instead —
+    // which is exact only if every digit renders at the same width, since the
+    // scaffold is fixed and every varying character is a digit. So the ten
+    // digits are measured first and the row is NOT-MEASURABLE, never green, if
+    // they disagree.
+    const CONTRACT = JSON.parse(readFileSync(
+      `${ROOT}/src/core/formats/bg-override/bganim-consumer-contract.json`, 'utf8'));
+    const konst = (name) => {
+      const v = CONTRACT?.constants?.[name]?.value;
+      if (typeof v !== 'number') throw new Error(`contract has no constants.${name}.value`);
+      return v;
+    };
+    const MAX_BANDS = konst('BGANIM_MAX_BANDS');
+    const CAPACITY = konst('BG_TILE_CAPACITY');
+    const T_BYTES = konst('TILE_BYTES');
+    const bandRowChoices = [];
+    for (let r = 1; r <= CAPACITY; r++) {
+      const bytes = r * T_BYTES;
+      if ((bytes & (bytes - 1)) === 0) bandRowChoices.push(r);
+    }
+    // One representative per rendered length. `reps` is what crosses into the
+    // page; `tuples` is only counted, so the whole space is walked here.
+    const byLen = new Map();
+    let tuples = 0;
+    const mkLabel = (i, base, cols, rows) => `b${i} · ${base}..${base + cols * rows - 1}`;
+    for (let i = 0; i < MAX_BANDS; i++) {
+      for (const rows of bandRowChoices) {
+        for (let base = 0; base + rows <= CAPACITY; base++) {
+          for (let cols = 1; base + cols * rows <= CAPACITY; cols++) {
+            tuples++;
+            const s = mkLabel(i, base, cols, rows);
+            if (!byLen.has(s.length)) byLen.set(s.length, s);
+          }
+        }
+      }
+    }
+    const reps = [...byLen.values()];
+    // ⚠ `clientWidth` IS NOT THE BOX WHEN THE TEXT IS NARROWER THAN IT. This
+    // line is a shrink-to-fit flex item: it reports the width of its OWN TEXT
+    // until the text outgrows the row, and only then caps at what the row has
+    // left. So the fit test is `sw <= cw` measured with the SAME string in
+    // place — [6g3]'s shape — where equality means the box gave the string
+    // everything it asked for. The `avail` figure the page also returns is that
+    // cap, forced onto the line by a string no row could hold. It is REPORTED
+    // for the record and never compared against: read `clientWidth` back after
+    // the short label is restored and it is the LABEL's width, not the box's,
+    // which is a comparison a fitting label loses. (Measured — it turned this
+    // row red at `avail=75` on a label the box had granted in full.)
+    const widest = await c.json(String.raw`((reps) => {
+      const el = document.getElementById('art-browser-hover-label');
+      if (!el) return null;
+      const prev = el.textContent;
+      const digits = [];
+      for (let d = 0; d <= 9; d++) { el.textContent = String(d).repeat(24); digits.push(el.scrollWidth); }
+      let worst = null;
+      for (const s of reps) {
+        el.textContent = s;
+        const w = { text: s, sw: el.scrollWidth, cw: el.clientWidth };
+        if (!worst || w.sw > worst.sw) worst = w;
+      }
+      el.textContent = 'W'.repeat(200);
+      const avail = el.clientWidth;
+      el.textContent = prev;
+      return { digits, worst, avail };
+    })(` + JSON.stringify(reps) + `)`);
+    const uniformDigits = !!widest && widest.digits.every((w) => w === widest.digits[0]);
+    const template6b = `b${band0.index} · ${band0.slotBase}..${lastOwned0}`;
+    if (!uniformDigits) {
+      unmeasurable('6m', 'the widest band readout the whole legal value range can produce fits '
+        + 'the docked box',
+        `the ten digits do NOT render at one width (${JSON.stringify(widest && widest.digits)}), `
+        + 'so one representative per string length is not the worst case and this reduction '
+        + 'cannot stand — enumerate the strings themselves');
+    } else {
+      check('6m', `FOR THE WHOLE LEGAL VALUE RANGE: the WIDEST band readout any of the ${tuples} `
+        + `legal (index, slotBase, cols, rows) tuples the contract allows (${MAX_BANDS} bands, `
+        + `capacity ${CAPACITY}, rows ${bandRowChoices.join('/')}) can produce still fits the `
+        + 'docked box — measured over one representative per rendered length, with the ten '
+        + 'digits measured equal first, and the template pinned against the live label',
+        template6b === hov.text && widest.worst.sw <= widest.worst.cw,
+        `widest=${JSON.stringify(widest && widest.worst)} avail=${widest && widest.avail} `
+        + `(margin ${widest && widest.avail - widest.worst.sw}px) · ${reps.length} lengths over `
+        + `${tuples} tuples · template ${JSON.stringify(template6b)} vs live `
+        + `${JSON.stringify(hov && hov.text)} · digit widths ${JSON.stringify(widest && widest.digits)}`);
+    }
+    await shot(c, 'band-card-readout');
+    // Off the card, so section 7 starts on the empty line [6j] asserted.
+    await c.send('Input.dispatchMouseEvent',
+      { type: 'mouseMoved', x: Math.round(geom.left + geom.width / 2),
+        y: Math.round(geom.top + geom.height / 2), button: 'none', buttons: 0 });
+    await sleep(300);
+
     // ---- 7. THE SAME RUN, DRAGGED BACKWARDS -------------------------------
     // EVERY LATER SECTION REUSES THE AIMS COMPUTED IN SECTION 3, so the box is
     // re-read before each one. A silent shift here would present as an
