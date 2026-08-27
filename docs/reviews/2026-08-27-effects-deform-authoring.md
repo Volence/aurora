@@ -23,6 +23,14 @@ in doing so found one thing that matters more than the controls — see
 | `e1f8cf1` | `scene-ui.ts` — the deform surface's constraints, derived from the committed schema |
 | `40a0de0` | the four attachments: provider, panel, and the tests |
 | `3ec5a2f` | `scratchpad/effects-deform-harness.mjs` — 29 CDP rows on the real app |
+| `4015c2f` | this report, first pass |
+| `bd6c632` | **the follow-up: `left_column_mask`** — see [§7](#7-the-follow-up-left_column_mask) |
+
+> **§7 is the follow-up the coordinator funded onto this branch after reading
+> §5.** It is not a separate parcel: shipping the `v_deform` row without it
+> means shipping a control that can author a build-refused scene, knowingly.
+> Everything above §7 describes the parcel as it stood at `3ec5a2f`; §7 says
+> what changed and where the numbers moved.
 
 **Files changed** (all paths from the aurora repo root):
 
@@ -308,16 +316,190 @@ control*, and applying it honestly means noticing where it was already broken.
 
 ## 6. What is open
 
-1. **`left_column_mask` needs a control.** See §5 — this parcel makes it the
-   critical path, not a nice-to-have. Gated on `v_deform`; `sprite_mask` excluded.
+1. ~~**`left_column_mask` needs a control.**~~ **BUILT — see §7.**
 2. **`anchor` has no control.** A fair parcel; read the engine's guards, not the
    stale doc line.
 3. **`precision` should lose its control** once empyrean amends the schema.
-4. **The two-sources advisory is not reachable from the UI** (§4). It becomes
-   reachable the day the card grows `dsa`/`dsb`/`phase` controls — and if it
-   ever does, the harness gets a real row for it.
+   *(Routed to the hub by the coordinator; not touched here.)*
+4. **The two-sources advisory is not reachable from the UI** (§4). Still true
+   after §7: the card still has no `dsa`/`dsb`/`phase` control, so the follow-up
+   did not make it reachable. It becomes reachable the day those land, and the
+   harness gets a real row for it then.
 5. **Nothing here was seen on hardware.** What a deform *looks* like is an
    emulator question, and this session is barred from the emulator. **Tagged for
    the controller's foreground follow-up:** author a `deform_fg` sine on a real
    scene, build, and confirm the plane wobbles.
 6. **`budget_class`:** the hub should rule whether it is reserved or dead.
+7. **Aurora's `factor0_lock` test is stricter than the engine's**, by one case,
+   on purpose — §7's *"Two forks"*. Closing the gap means a packer in Aurora,
+   which is a second copy of the engine's 9-bit encoding; nobody should do that
+   for this. Listed so it is a decision on record rather than a surprise.
+
+---
+
+## 7. The follow-up: `left_column_mask`
+
+*Commit `bd6c632`, same branch. Funded by the coordinator after §5, and it does
+not belong in a later parcel: without it the `v_deform` row above is a shipped
+control that can author a scene aeon's build refuses, with no in-app remedy.*
+
+Everything below was derived by reading `aeon/engine/level/scene_dsl.emp`
+lines 1280–1360 and `layer()` at 510–600 directly.
+
+### The gate is mutual — that is the part §5 understated
+
+| Guard | Condition | Result |
+|---|---|---|
+| `:1288` | `v_deform` on **+** policy `undeclared` | **refused** |
+| `:1293` | `v_deform` off **+** policy declared | **refused** |
+
+Aeon pins the first as a build-failure poison in its own suite
+(`tools/emp_expect_fail.py` → `poison_scene_lcm_undeclared.emp`, expected
+count 1), so it is load-bearing rather than advisory.
+
+So the control cannot merely *appear* when `v_deform` is set. Turning `v_deform`
+**off** takes the policy with it, in **one command** — `vDeformToggleCommand`,
+which mutates two keys inside a single `editSceneCommand`. A toggle that cleared
+one key would leave the document build-refused for the author having done
+nothing but turn a feature off, and — worse — pressing undo would restore
+`v_deform` while the policy stayed cleared, reaching the same refused state a
+second way. Turning it **on** seeds no policy: which one is an engine-visible
+claim about the scene, and Aurora does not sign that for the author.
+
+**The row is visible when `v_deform` is on — *or* whenever the document declares
+a policy without one.** That second arm is the whole lesson of §5 applied one
+field over: the policy-without-a-subject state is refused by guard 2 and is one
+hand-edited file away, and hiding the row there would leave an author reading an
+advisory with no control to act on.
+
+### The four values, and their preconditions
+
+| Value | Precondition, from the guard that enforces it | In the picker |
+|---|---|---|
+| `accept` | none — always legal. The engine's own message calls it *"a real answer, it is what this game's Rocking and Perspective families do"* | selectable, and titled as an answer rather than a fallback |
+| `factor0_lock` | **both halves.** `:1310` every real layer's `fb` is `FACTOR_0`; the scan covers **dormant** layers too, because a disabled band inherits the previous band's scroll words — so `enabled` is deliberately not consulted. `:1347` no live plane-B amplitude **AND** a table that can reach the plane: `dsb ≠ 15` on any layer or on the anchor, **and** either `deform_bg` or any layer's `own()` table (an own table serves both planes) | **selectable even when the precondition fails**, with the reason on the row |
+| `sprite_mask` | `:1354` **refused outright** — the left-column strip emission has not landed | **rendered, `disabled`,** with the engine's reason |
+| `undeclared` | required when there is no `v_deform` | selectable |
+
+**One subtlety worth spelling out, because a check that missed it would look
+right:** an `own()` layer's `shift_b` **is** that layer's `dsb` — `layer()`
+folds it (`eff_dsb = is_own ? own_sb : dsb`, `scene_dsl.emp:558`) and stores
+*that* in `ly_dsb`, which is the field the left-column guard scans. A check
+reading `layer.dsb` alone would miss every `own()` layer, which is most of what
+this parcel just made authorable. A node row and harness row 6j both discriminate
+it.
+
+### Two forks, going different ways on purpose
+
+`sprite_mask` is disabled. `factor0_lock` is **not**, even on a failed
+precondition. The principle is `scene.ts`'s: *"the editor let me save a file the
+build rejects"* is bad; *"the editor refused a file the build accepts"* is **far
+worse**.
+
+- No scene content can make `sprite_mask` legal, so disabling it cannot produce
+  the worse failure.
+- `factor0_lock`'s precondition is about the scene's own contents, and **Aurora's
+  test of it is deliberately stricter than the engine's**: the engine compares
+  the packed byte `$0FF`, Aurora holds a factor as a `FACTOR_*` name or a
+  `{s1,s2,op}` triple and **has no packer**. A packed triple therefore answers
+  "cannot prove it is `FACTOR_0`" — which makes Aurora stricter in exactly one
+  case (`{15,15,0}`, which really does pack to `$0FF`). Stricter is the harmless
+  direction; disabling the option on top of it would not be. Growing a packer
+  here would put a second copy of the engine's 9-bit encoding in this repo, free
+  to drift from the one that counts — see §6 item 7.
+
+The option is rendered either way, so a value already in the file is always
+**displayed**: a `<select>` whose current value has no option shows the first one
+instead, which is a quiet lie about what the build will read — the failure
+`unassignableSceneRef` already exists to stop for `sceneRef`.
+
+### One more guard found while reading: curve ∧ deform
+
+`layer()` refuses `curve` beside a live deform amplitude (`:580`) and beside an
+`own()` table at all (`:586`). **Both controls are on the same card, four rows
+apart** — the curve picker from parcel H, the deform toggle from wave 2 — so the
+pair is authorable entirely through the UI. `layerCurveDeformAdvisory` says so.
+
+### Numbers
+
+| | after §1–6 | after §7 |
+|---|---|---|
+| `npx tsc --noEmit` | clean | clean |
+| `npx vitest run` | 5056 passed, 7 skipped (5063) | **5069 passed, 7 skipped (5076)** · 387 files |
+| harness rows | 29 | **37** |
+
+**Three clean harness runs at 37/37, `dpr = 1` on all three**, same rect and same
+integer aim as the earlier four.
+
+### Red-first, the follow-up's own
+
+**Node** (`src/renderer/providers/__tests__/effects-aeon.test.ts`, and
+`effects-wording.test.ts`; both in the default `npx vitest run` glob):
+
+| Plant | Row that went red | Quoted failure |
+|---|---|---|
+| `layerFbIsZero` accepts any packed triple | `factor0_lock: a CUSTOM PACKED fb is refused because Aurora cannot prove it` | `.toMatch() expects to receive a string, but got object` (the refusal returned `null`) |
+| `effectiveDsb` drops the `own()` fold | `factor0_lock: a live plane-B amplitude WITH a table` | `.toMatch() expects to receive a string, but got object` — **isolated on its own build** |
+| half two's `amp && table` → `amp \|\| table` | same row, **different assertion** | `expected 'layer 0 has a live Plane B deform amp…' to be null` |
+| `sprite_mask` not disabled | `sprite_mask is rendered but NOT selectable` | `expected false to be true` |
+| `vDeformToggleCommand` stops clearing the policy | `turning V deform OFF clears the policy WITH it, in one command` | `expected true to be false` |
+| the panel drops `disabled={o.disabled}` | `renders the left_column_mask row and toggles v_deform ATOMICALLY` | `expected '// The wave-1 effects scene editor: p…' to match /disabled=\{o\.disabled\}/` |
+| the panel uses `setSceneFieldCommand` for the `v_deform` toggle | same row | `…to match /vDeformToggleCommand\(library,\s*sele…/` |
+
+**CDP** (five defects, one build):
+
+| Poison | Rows red |
+|---|---|
+| `sprite_mask` not disabled | **6g** |
+| `factor0_lock` disabled on a failed precondition | **6h** |
+| half two removed from `factor0LockRefusal` | **6j** |
+| the toggle stops clearing the policy | **6l** |
+| `layerCurveDeformAdvisory` inverted | **7b** |
+
+`32/37` — **exactly those five, no more and no fewer.**
+
+### Which follow-up rows discriminate, and which do not
+
+**Bar C, per row — the alternative green I checked:**
+
+- **6g** could not pass with the option simply *missing*: **6f** asserts the
+  option list equals the schema enum, so an absent `sprite_mask` fails there
+  first. Two rows, two independent facts.
+- **6h** could not pass with `factor0_lock` missing either — `.find(…)?.disabled
+  === false` is `undefined === false`, red.
+- **6j** could have gone green because half one never fired at all. **6i** is the
+  companion that rules it out: it proves half one *does* fire on this same scene
+  before the fbs are locked, quoting `Plane B factor is FACTOR_1`. The pair
+  6i → 6j is the discriminator, and 6j asserts the reason **changed** rather than
+  merely persisted.
+- **6l** could have gone green against a policy that was never set. The row
+  asserts its own **pre-state** (`beforeOff.m === 'factor0_lock'`) — the trap the
+  guides harness's row 7c fell into once, where an undo-to-null proves nothing if
+  the value was never non-null.
+- **7b** could have gone green because the advisory fires for the *curve alone*.
+  The row captures the panel text **before** turning deform on and asserts the
+  warning was absent then. Two observations of one run — and, per Bar E's
+  corollary, both from the *same* run.
+
+**Rows that do NOT discriminate these defects, stated:**
+
+- **6k** stayed green under the half-two removal. With half two gone the
+  advisory was already clear, so "the advisory clears" is exactly what the
+  broken build also shows. **6j** is the row that catches it; 6k's job is the
+  *supported* side — it is what stops the pair being an assertion that a refusal
+  merely exists.
+- **6m** stayed green under the non-atomic toggle: undo restored `v_deform`
+  either way. **6l** is the row that catches that one; 6m catches a *different*
+  defect (a toggle that wrote two commands).
+- **6i** stayed green under all five: it tests half one, which none of these
+  poisons touched.
+- **6f** stayed green under all five except by construction — it is the
+  enum/order row and only 6g's neighbour.
+
+### Carried forward, not dropped
+
+- **Row 7a still cannot reach the two-sources condition.** The follow-up did
+  **not** make it reachable — the card still has no `dsa`/`dsb`/`phase` control —
+  so 7a remains a wiring check and still says so in its own detail line.
+- **Every new absence row carries `panelIsDrawn`**: 6j, 6k, 6l. Without it,
+  "the warning cleared" and "the panel never rendered" emit the same artifact.
