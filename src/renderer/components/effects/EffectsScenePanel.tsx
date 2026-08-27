@@ -80,6 +80,9 @@ import {
   tableRefLabel,
   sceneDeformValue, sceneDeformFromToggle, vDeformValue, vDeformFromToggle,
   layerDeformValue, layerDeformFromToggle, layerDeformAdvisory, sceneDeformAdvisories,
+  layerCurveDeformAdvisory,
+  LEFT_COLUMN_MASK_ROW, leftColumnMaskOptions, leftColumnMaskValue,
+  leftColumnMaskRowVisible, leftColumnMaskCommand, vDeformToggleCommand,
   clampLayerDeformField, clampAmpShift, clampDeformSpeed,
   EFFECTS_LAYER_DEFORM_BOUNDS, EFFECTS_V_DEFORM_AMP_SHIFT_BOUNDS,
 } from '../../providers/effects-aeon';
@@ -539,9 +542,15 @@ export default function EffectsScenePanel(): React.ReactElement {
             return (
               <>
                 <Field label={V_DEFORM_ROW.label} title={V_DEFORM_ROW.title}>
+                  {/* THE TOGGLE IS NOT setSceneFieldCommand. Turning V deform
+                      OFF must take `left_column_mask` back to undeclared in the
+                      SAME gesture, because the engine refuses a declared policy
+                      on a scene with no per-column V deform — so a toggle that
+                      cleared one key would leave the document build-refused for
+                      having turned a feature off. Two keys, one command, one
+                      undo step. */}
                   <Select title={V_DEFORM_ROW.title} value={columns === null ? 'none' : 'on'}
-                    onChange={(v) => run(setSceneFieldCommand(
-                      library, selected.id, 'v_deform', vDeformFromToggle(v === 'on')))}
+                    onChange={(v) => run(vDeformToggleCommand(library, selected.id, v === 'on'))}
                     style={{ width: 88 }}>
                     <option value="none">{V_DEFORM_ROW.none}</option>
                     <option value="on">{V_DEFORM_ROW.on}</option>
@@ -569,6 +578,30 @@ export default function EffectsScenePanel(): React.ReactElement {
             );
           })()}
           <Hint under style={{ marginBottom: 0 }}>{V_DEFORM_ROW.hint}</Hint>
+          {/* THE POLICY V DEFORM MAKES MANDATORY.
+              Shown when there is a V deform to adjudicate — and ALSO whenever
+              the document already declares a policy without one, which the
+              build refuses and a hand-edited file can reach: hiding the row
+              there would leave the author reading an advisory with no control
+              to act on, which is the exact trap this row exists to close.
+              `sprite_mask` is rendered DISABLED with the engine's reason: the
+              schema admits the value and the engine refuses it outright, so it
+              must be visible (a file can carry it) and unpickable. */}
+          {leftColumnMaskRowVisible(selected) && (
+            <Field label={LEFT_COLUMN_MASK_ROW.label} title={LEFT_COLUMN_MASK_ROW.title}>
+              <Select title={LEFT_COLUMN_MASK_ROW.title} value={leftColumnMaskValue(selected)}
+                onChange={(v) => run(leftColumnMaskCommand(library, selected.id, v))}
+                style={{ flex: 1, minWidth: 0 }}>
+                {leftColumnMaskOptions(selected).map((o) => (
+                  <option key={o.value} value={o.value} disabled={o.disabled} title={o.title}>
+                    {o.label}{o.disabled ? ' (engine refuses)' : ''}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+          )}
+          {leftColumnMaskRowVisible(selected)
+            && <Hint under>{LEFT_COLUMN_MASK_ROW.hint}</Hint>}
           {/* WHAT THE BUILD WOULD REFUSE, said before the build says it. Four of
               aeon's five comptime deform guards are CROSS-FIELD — a table with
               no plane to sample from, a per-column scene colliding with a
@@ -753,6 +786,15 @@ export default function EffectsScenePanel(): React.ReactElement {
                     )}
                     <Hint under style={{ marginBottom: 0 }}>{LAYER_DEFORM_ROW.hint}</Hint>
                     {inert !== null && <Hint under tone="warning">{inert}</Hint>}
+                    {/* CURVE ∧ DEFORM ON ONE STRIP, which the build forbids —
+                        and which is now authorable from two controls four rows
+                        apart on this very card (the curve picker is parcel H's,
+                        the deform toggle is wave 2's). Exactly the shape a
+                        cross-field advisory exists for. */}
+                    {(() => {
+                      const clash = layerCurveDeformAdvisory(layer);
+                      return clash === null ? null : <Hint under tone="warning">{clash}</Hint>;
+                    })()}
                     {/* THE TWO-SOURCES GUARD, wired at last. §2.2: when `own` is
                         present, this layer's dsa/dsb/phase must be absent or at
                         their defaults, because both lower into the SAME record

@@ -15,7 +15,9 @@ import { join } from 'node:path';
 import {
   PLANE_FACTOR_ROWS, PLANE_FACTOR_HINT, LAYER_CURVE_ROW, LAYER_VSPLIT_ROW,
   SCENE_DEFORM_ROWS, SCENE_DEFORM_ROW_SHARED, V_DEFORM_ROW, LAYER_DEFORM_ROW, TABLE_REF_ROW,
+  LEFT_COLUMN_MASK_ROW, leftColumnMaskOptions,
 } from '../../../providers/effects-aeon';
+import { newEffectsScene } from '../../../../core/formats/effects/scene-ui';
 import {
   BAND_MECHANISM_HINT, bandMotion, BAND_SCROLL_DIRECTION,
 } from '../../../providers/bganim-preview-aeon';
@@ -55,11 +57,16 @@ const newLabels = [
   TABLE_REF_ROW.label, TABLE_REF_ROW.binLabel,
   SCENE_DEFORM_ROW_SHARED.none, SCENE_DEFORM_ROW_SHARED.on,
   V_DEFORM_ROW.none, V_DEFORM_ROW.on, LAYER_DEFORM_ROW.none, LAYER_DEFORM_ROW.on,
+  // The policy row and every value its picker renders — including the disabled
+  // one, which is still drawn and therefore still occupies the column.
+  LEFT_COLUMN_MASK_ROW.label,
+  ...leftColumnMaskOptions(newEffectsScene('wording')).map((o) => o.label),
 ];
 const newStrings = [
   ...newLabels, PLANE_FACTOR_HINT, BAND_MECHANISM_HINT,
   LAYER_CURVE_ROW.hint, LAYER_VSPLIT_ROW.hint, LAYER_CURVE_ROW.none,
   SCENE_DEFORM_ROW_SHARED.hint, V_DEFORM_ROW.hint, LAYER_DEFORM_ROW.hint,
+  LEFT_COLUMN_MASK_ROW.hint,
   SHIFT_BUTTON_TITLE, BANK_STRIP_HINT, BANK_THUMB_TITLE(0), BANK_THUMB_TITLE(7),
   ...[0, 2, 3].flatMap((n) => [
     bandMotion({ driver: 'timer', rateShift: n }, 'band'),
@@ -152,6 +159,23 @@ describe('the panels render the constants rather than a second copy of the words
     expect(scenePanel).not.toMatch(/deform is wave 2/);
     // And the advisory that had no caller anywhere now has one.
     expect(scenePanel).toMatch(/advisoryLayerDeformConflicts\(selected\)/);
+  });
+  it('EffectsScenePanel renders the left_column_mask row and toggles v_deform ATOMICALLY with it', () => {
+    expect(scenePanel).toMatch(/<Field label=\{LEFT_COLUMN_MASK_ROW\.label\}/);
+    expect(scenePanel).toMatch(/leftColumnMaskOptions\(selected\)/);
+    // The disabled flag has to REACH the option, or `sprite_mask` — which the
+    // engine refuses outright — would be pickable however carefully the
+    // provider marked it.
+    expect(scenePanel).toMatch(/disabled=\{o\.disabled\}/);
+    // THE ATOMIC TOGGLE. `v_deform` off must clear the policy in the same
+    // command; a plain setSceneFieldCommand on that row would leave the scene
+    // build-refused for having turned a feature off.
+    expect(scenePanel).toMatch(/vDeformToggleCommand\(library,\s*selected\.id,\s*v === 'on'\)/);
+    const code = scenePanel.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+    expect(code).toMatch(/export default function EffectsScenePanel/);   // anti-vacuous strip
+    expect(code).not.toMatch(/setSceneFieldCommand\(\s*\n?\s*library,\s*selected\.id,\s*'v_deform',\s*vDeform/);
+    // The old sentence that sent the author to a text editor is gone.
+    expect(scenePanel).not.toMatch(/no control for it yet/);
   });
   it('BgAnimBandPanel renders BAND_MECHANISM_HINT', () => {
     expect(bandPanel).toMatch(/BAND_MECHANISM_HINT/);

@@ -362,26 +362,54 @@ export const EFFECTS_V_DEFORM_AMP_SHIFT_BOUNDS =
   boundsAt(...oneOfBranchWith(['properties', 'v_deform'], 'columns'), 'properties', 'columns', 'properties', 'amp_shift');
 
 /**
- * Every key whose schema `default` is the string `"none"` — the keys where an
- * ABSENT key and an explicit `"none"` mean the same thing.
+ * Every key that declares a schema `default`, mapped to it — the keys where an
+ * ABSENT key and the default spelled out mean the same thing.
  *
  * WHY IT IS DERIVED AND NOT A LIST. This is the rule the write path needs to
- * clear an optional attachment without turning a file that never carried the key
- * into a diff (scene.ts's model comment, from the other side), and it is the rule
- * that says an explicit `"none"` on disk must be LEFT AS SPELLED. Both halves
- * were hand-listed for `curve`/`vsplit`; `deform_fg`, `deform_bg`, `v_deform`,
- * `anchor` and a layer's `deform` are five more, and the next amendment's are
- * whatever it declares.
+ * clear an optional field without turning a file that never carried the key into
+ * a diff (scene.ts's model comment, from the other side), and it is the rule
+ * that says a default spelled out on disk must be LEFT AS SPELLED. It was a
+ * hand-written pair for `curve`/`vsplit`; wave 2's four deform attachments made
+ * it a set of six, and the next amendment's members are whatever it declares.
+ *
+ * IT USED TO TEST FOR THE STRING `"none"` SPECIFICALLY, AND THAT WAS ONE FIELD
+ * TOO NARROW. `left_column_mask`'s "absent" spelling is `"undeclared"`, not
+ * `"none"` — so a rule keyed on the word would have silently rewritten a
+ * hand-authored `"left_column_mask": "undeclared"` into an absent key the first
+ * time an author cleared the row. The general rule is the schema's own default,
+ * whatever word it is, which is the rule that was always meant.
  */
-function noneDefaultKeys(props: Record<string, unknown>): ReadonlySet<string> {
-  const out = new Set<string>();
+function keyDefaults(props: Record<string, unknown>): ReadonlyMap<string, unknown> {
+  const out = new Map<string, unknown>();
   for (const [key, node] of Object.entries(props)) {
-    if ((node as Record<string, unknown> | null)?.default === 'none') out.add(key);
+    const d = (node as Record<string, unknown> | null)?.default;
+    if (d !== undefined) out.set(key, d);
   }
-  return Object.freeze(out);
+  return out;
 }
-export const EFFECTS_NONE_DEFAULT_SCENE_KEYS = noneDefaultKeys(at('properties'));
-export const EFFECTS_NONE_DEFAULT_LAYER_KEYS = noneDefaultKeys(at('$defs', 'layer', 'properties'));
+export const EFFECTS_SCENE_KEY_DEFAULTS = keyDefaults(at('properties'));
+export const EFFECTS_LAYER_KEY_DEFAULTS = keyDefaults(at('$defs', 'layer', 'properties'));
+
+/**
+ * `FACTOR_0` — the packed factor the engine spells `$0FF` and tests a layer's
+ * `fb` against when it adjudicates `left_column_mask: Factor0Lock`
+ * (aeon engine/level/scene_dsl.emp, P3 Task 12 guard 3 half one).
+ *
+ * DERIVED WITH A CHECK, not typed: the name must still be one the schema's own
+ * factor enum publishes, so a contract that renamed or dropped it fails this
+ * module's import rather than leaving a UI precondition quietly comparing
+ * against a string nothing can hold.
+ */
+export const EFFECTS_FACTOR_ZERO: EffectsFactorName = (() => {
+  const name = EFFECTS_FACTOR_NAMES.find((n) => n === 'FACTOR_0');
+  if (name === undefined) {
+    throw new Error(
+      'effects scene schema $defs.factor no longer publishes FACTOR_0 — the left-column '
+      + 'Factor0Lock precondition compares a layer\'s fb against it.',
+    );
+  }
+  return name;
+})();
 
 /** `left_column_mask`'s own default — the "no policy declared" spelling. */
 export const EFFECTS_LEFT_COLUMN_MASK_UNDECLARED: string = (() => {

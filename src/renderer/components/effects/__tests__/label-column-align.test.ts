@@ -22,6 +22,7 @@ import { join } from 'node:path';
 import {
   PLANE_FACTOR_ROWS, LAYER_CURVE_ROW, LAYER_VSPLIT_ROW, layerTopBounds,
   LAYER_DEFORM_ROW, TABLE_REF_ROW, tableParamLabel, tableRefFormOptions, tableRefParams,
+  LEFT_COLUMN_MASK_ROW,
 } from '../../../providers/effects-aeon';
 import { EFFECTS_V_FACTOR_LOCK } from '../../../../core/formats/effects/scene-ui';
 
@@ -64,6 +65,11 @@ const layerCardLabels = [
   ...tableRefFormOptions().flatMap((o) => tableRefParams(o.value).map((p) => tableParamLabel(p.key))),
   // …and the four the deform rows label from their own schema keys.
   ...['speed', 'amp_shift', 'shift_a', 'shift_b', 'phase'].map(tableParamLabel),
+  // The follow-up's policy row. Not a LAYER-card label — this array's real
+  // content is "every label rendered from a provider constant rather than a
+  // literal", which is what the static scan above cannot reach, and the scene
+  // form's deform rows are in it for the same reason.
+  LEFT_COLUMN_MASK_ROW.label,
 ];
 
 describe('Field is one fixed, wrapping label column', () => {

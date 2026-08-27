@@ -36,8 +36,8 @@ import {
   EFFECTS_V_FACTOR_LOCK, EFFECTS_VSPLIT_AT_BOUNDS,
   EFFECTS_TABLE_REF_FORMS, EFFECTS_TABLE_REF_BIN_PATTERN, EFFECTS_DEFORM_TABLE_BYTES,
   EFFECTS_LAYER_DEFORM_BOUNDS, EFFECTS_V_DEFORM_AMP_SHIFT_BOUNDS,
-  EFFECTS_LEFT_COLUMN_MASK_UNDECLARED,
-  EFFECTS_NONE_DEFAULT_SCENE_KEYS, EFFECTS_NONE_DEFAULT_LAYER_KEYS,
+  EFFECTS_LEFT_COLUMN_MASK_UNDECLARED, EFFECTS_LEFT_COLUMN_MASK_VALUES, EFFECTS_FACTOR_ZERO,
+  EFFECTS_SCENE_KEY_DEFAULTS, EFFECTS_LAYER_KEY_DEFAULTS,
   type TableRefParam,
   WAVE1_PRECISION_VALUES,
   EFFECTS_TRANSITION_VALUES,
@@ -568,17 +568,326 @@ export function sceneDeformAdvisories(scene: EffectsScene): string[] {
     out.push(
       'V deform is on and this scene declares no left_column_mask policy, which the build '
       + 'requires: in per-column mode the leftmost partial column renders at a scroll nothing '
-      + 'wrote. Set left_column_mask in the scene file by hand — this panel has no control for '
-      + 'it yet.',
+      + `wrote. Answer it on the ${LEFT_COLUMN_MASK_ROW.label} row below.`,
     );
   }
+  // GUARD 2's ARM IS NOT DEAD CODE NOW THAT THE TOGGLE CLEARS THE POLICY WITH
+  // `v_deform`. The state is unreachable through the panel by construction —
+  // and it is one hand-edited file away, which is precisely when an author has
+  // nothing else to tell them. `leftColumnMaskRowVisible` keeps the control on
+  // screen for exactly this case so the advice has something to act on.
   if (!vDeform && mask !== EFFECTS_LEFT_COLUMN_MASK_UNDECLARED) {
     out.push(
       `this scene declares left_column_mask "${mask}" but attaches no per-column V deform, so `
-      + 'the policy adjudicates an artifact that cannot occur; the build refuses it.',
+      + 'the policy adjudicates an artifact that cannot occur; the build refuses it. Clear it '
+      + `to ${EFFECTS_LEFT_COLUMN_MASK_UNDECLARED}, or attach a V deform.`,
     );
   }
+  const claim = leftColumnMaskAdvisory(scene);
+  if (claim !== null) out.push(claim);
   return out;
+}
+
+// ---------------------------------------------------------------------------
+// left_column_mask — the policy `v_deform` makes MANDATORY
+// ---------------------------------------------------------------------------
+//
+// WHY THIS IS PART OF THE DEFORM PARCEL AND NOT A LATER ONE. The `v_deform`
+// control above can author a scene aeon's build REFUSES, with no in-app remedy —
+// the ROADMAP item 35 defect class, shipped knowingly. aeon's own poison suite
+// pins the refusal (`tools/emp_expect_fail.py`, `poison_scene_lcm_undeclared.emp`,
+// count 1), so it is load-bearing, not a style note.
+//
+// THE GUARD IS MUTUAL (aeon engine/level/scene_dsl.emp, P3 Task 12):
+//
+//   (1) :1288  v_deform on  + policy undeclared -> REFUSED
+//   (2) :1293  v_deform off + policy declared   -> REFUSED ("adjudicates an
+//              artifact that cannot occur")
+//
+// So the control cannot merely APPEAR when `v_deform` is set: turning `v_deform`
+// off must take the policy back to undeclared in the SAME gesture, which is
+// `vDeformToggleCommand` below.
+//
+// AND THE VALUES ARE NOT A FLAT ENUM — three of the four carry preconditions,
+// transcribed here from the guards themselves:
+//
+//   accept        always legal. The engine's own message calls it "a real
+//                 answer, it is what this game's Rocking and Perspective
+//                 families do", so it is presented as an answer and not a
+//                 fallback.
+//   factor0_lock  a VERIFIED CLAIM, both halves or not at all:
+//                   half one (:1310) every real layer's `fb` is FACTOR_0
+//                     ($0FF). The engine's scan covers DORMANT layers too —
+//                     a disabled band inherits the previous band's scroll
+//                     words — so `enabled` is deliberately not consulted.
+//                   half two (:1347) no live plane-B amplitude WITH a table
+//                     that can reach the plane: `dsb != 15` on any layer (an
+//                     own() layer's `shift_b` IS that layer's dsb — layer()
+//                     folds it at :558) or on the anchor, AND either
+//                     `deform_bg` or any layer's own() table (an own table
+//                     serves BOTH planes).
+//   sprite_mask   REFUSED OUTRIGHT (:1354) until the engine's left-column strip
+//                 emission lands. Aurora's schema still admits the value, so
+//                 this is a live schema-vs-engine divergence and not a UI
+//                 preference.
+//   undeclared    the required value when there is no `v_deform`.
+//
+// ═══ TWO DESIGN FORKS, AND WHY THEY GO DIFFERENT WAYS ═══
+//
+// `sprite_mask` IS DISABLED IN THE PICKER. `factor0_lock` IS NOT, even when its
+// precondition fails. That asymmetry is principled, and the principle is
+// scene.ts's: "the editor let me save a file the build rejects" is bad, but "the
+// editor refused a file the build accepts" is FAR WORSE.
+//
+//   • No scene content can make `sprite_mask` legal — the engine refuses it
+//     unconditionally — so disabling it cannot produce the worse failure.
+//   • `factor0_lock`'s precondition is about the scene's own contents and
+//     Aurora's evaluation of it is deliberately STRICTER than the engine's (see
+//     `layerFbIsZero`), so disabling it on a failed precondition WOULD produce
+//     the worse failure. It stays selectable and the row advises.
+//
+// The option is rendered either way, disabled or not, so a value already in the
+// file is always DISPLAYED. A `<select>` whose current value has no option shows
+// the first one instead, which is a quiet lie about what the build will read —
+// the same failure `unassignableSceneRef` exists to stop for `sceneRef`.
+
+/** The row's wording, and the one hint under it. */
+export const LEFT_COLUMN_MASK_ROW = Object.freeze({
+  key: 'left_column_mask' as const,
+  label: 'Left col',
+  title: 'left_column_mask — how this scene answers for the leftmost partial column, '
+    + 'which per-column V scroll renders at a scroll the program never wrote',
+  hint: 'per-column V scroll needs this answered; the build refuses a scene that leaves it open',
+});
+
+/**
+ * Is a layer's Plane-B factor provably `FACTOR_0`?
+ *
+ * CONSERVATIVE, AND IN THE SAFE DIRECTION — this is the load-bearing sentence of
+ * the whole precondition. The engine tests the PACKED BYTE (`ly_fb != $0FF`);
+ * Aurora holds a factor as either a published `FACTOR_*` name or a `{s1,s2,op}`
+ * triple, and it has no packer — deriving one would put a second copy of the
+ * engine's 9-bit encoding in this repo, free to drift from the one that counts.
+ *
+ * So a packed triple answers **false**: not "this is not FACTOR_0" but "Aurora
+ * cannot prove it is". That makes Aurora STRICTER than the engine in exactly one
+ * case — `{s1:15, s2:15, op:0}`, which does pack to `$0FF` — and stricter is the
+ * direction that cannot hurt: Aurora offers `factor0_lock` less often than it is
+ * legal, and the author picks `accept` or hand-authors the policy, which the
+ * codec round-trips and this row then DISPLAYS. The opposite slip — Aurora
+ * green-lighting a scene the build refuses — is this whole finding repeating one
+ * layer up, and it is the one this asymmetry buys off.
+ */
+function layerFbIsZero(layer: Pick<EffectsLayer, 'fb'>): boolean {
+  return layer.fb === EFFECTS_FACTOR_ZERO;
+}
+
+/**
+ * A layer's EFFECTIVE plane-B deform amplitude — `own`'s `shift_b` when it has
+ * one, else its own `dsb`, else the schema default.
+ *
+ * THE FOLD IS THE ENGINE'S, NOT AN INTERPRETATION: `layer()` computes
+ * `eff_dsb = is_own ? own_sb : dsb` and stores THAT in `ly_dsb`
+ * (scene_dsl.emp:558), which is the field every amplitude scan in the engine
+ * reads — the left-column guard's included. A check here that read `layer.dsb`
+ * alone would miss every own() layer, which is most of what this parcel just
+ * made authorable.
+ */
+function effectiveDsb(layer: EffectsLayer): number {
+  const own = layerDeformValue(layer);
+  if (own !== null) return own.shift_b;
+  return layer.dsb ?? EFFECTS_LAYER_DEFAULTS.dsb;
+}
+
+/**
+ * Why `factor0_lock` is not a claim this scene can make, or null when it is.
+ *
+ * Both halves of scene_dsl.emp's guard 3, in the engine's own order, each
+ * naming the layer that breaks it so the author knows where to look.
+ */
+export function factor0LockRefusal(scene: EffectsScene): string | null {
+  const unlocked = scene.layers.findIndex((l) => !layerFbIsZero(l));
+  if (unlocked >= 0) {
+    const l = scene.layers[unlocked];
+    return `layer ${unlocked}'s Plane B factor is ${factorLabel(l.fb)}, not ${EFFECTS_FACTOR_ZERO}`
+      + (typeof l.fb === 'string' ? '' : ' (a custom packed factor: Aurora cannot prove it is locked)')
+      + ` — the partial column exists on every line where Plane B scrolls, so the claim is false `
+      + 'as authored and the build refuses it.';
+  }
+  // Half two: a live plane-B amplitude WITH a table that can reach the plane.
+  const noSentinel = EFFECTS_LAYER_DEFORM_BOUNDS.shift_b.max;
+  const ampLayer = scene.layers.findIndex((l) => effectiveDsb(l) !== noSentinel);
+  const anchorDsb = scene.anchor !== undefined && scene.anchor !== 'none'
+    ? scene.anchor.at.dsb : noSentinel;
+  const amp = ampLayer >= 0 || anchorDsb !== noSentinel;
+  const table = sceneDeformValue(scene, 'deform_bg') !== null
+    || scene.layers.some((l) => layerDeformValue(l) !== null);
+  if (amp && table) {
+    return `${ampLayer >= 0 ? `layer ${ampLayer}` : 'the anchor'} has a live Plane B deform `
+      + `amplitude (shift ${ampLayer >= 0 ? effectiveDsb(scene.layers[ampLayer]) : anchorDsb}; `
+      + `${noSentinel} is the no-sample sentinel) while a table can reach the plane — deform adds `
+      + 'per-line Plane B scroll on top of the locked factor, so the sliver comes back on those '
+      + 'rows. The build refuses it, conservatively: table contents are invisible at build time, '
+      + 'so even an all-zero table counts.';
+  }
+  return null;
+}
+
+export interface LeftColumnMaskOption {
+  value: string;
+  label: string;
+  /** True for a value the ENGINE refuses outright; the picker must not offer it. */
+  disabled: boolean;
+  /** The engine's reason, for the option's own title. Empty for a plain value. */
+  title: string;
+}
+
+/**
+ * What the policy `<select>` offers, in the schema's own enum order.
+ *
+ * Every value is rendered — see the section banner: an option missing for a
+ * value the FILE carries makes the select show a different value than the build
+ * will read.
+ */
+export function leftColumnMaskOptions(scene: EffectsScene): LeftColumnMaskOption[] {
+  const f0 = factor0LockRefusal(scene);
+  return EFFECTS_LEFT_COLUMN_MASK_VALUES.map((value) => {
+    if (value === 'sprite_mask') {
+      return {
+        value,
+        label: value,
+        disabled: true,
+        title: 'refused by the engine: the left-column strip emission has not landed, so the '
+          + 'declaration would be accepted while the sliver stays uncovered. Declare '
+          + 'factor0_lock or accept.',
+      };
+    }
+    if (value === 'factor0_lock') {
+      return {
+        value,
+        label: value,
+        // NOT disabled on a failed precondition — see the section banner.
+        disabled: false,
+        title: f0 === null
+          ? 'Plane B provably never H-scrolls, so the partial column cannot exist'
+          : `this scene cannot make that claim: ${f0}`,
+      };
+    }
+    if (value === 'accept') {
+      return {
+        value, label: value, disabled: false,
+        title: 'ship the artifact — a real answer, and the one this game\'s Rocking and '
+          + 'Perspective families give',
+      };
+    }
+    return {
+      value, label: value, disabled: false,
+      title: 'no policy declared — legal only while this scene has no per-column V deform',
+    };
+  });
+}
+
+/** The policy this scene declares — absent reads as the schema's own default. */
+export function leftColumnMaskValue(scene: Pick<EffectsScene, 'left_column_mask'>): string {
+  return scene.left_column_mask ?? EFFECTS_LEFT_COLUMN_MASK_UNDECLARED;
+}
+
+/**
+ * Should the policy row be on screen at all?
+ *
+ * WHEN `v_deform` IS ON, obviously — the build demands an answer. But ALSO
+ * whenever the document already declares a policy, even with no `v_deform`:
+ * that state is refused by guard 2, it is reachable from a hand-edited file,
+ * and hiding the row would leave the author staring at an advisory with no
+ * control to act on it — which is the exact trap this addition exists to close,
+ * rebuilt one field over.
+ */
+export function leftColumnMaskRowVisible(scene: EffectsScene): boolean {
+  return vDeformValue(scene) !== null
+    || leftColumnMaskValue(scene) !== EFFECTS_LEFT_COLUMN_MASK_UNDECLARED;
+}
+
+/** Set the policy; the schema's default CLEARS the key (setSceneFieldCommand's rule). */
+export function leftColumnMaskCommand(
+  library: EffectsSceneLibrary, id: string, value: string,
+): SetEffectsSceneCommand | null {
+  return setSceneFieldCommand(
+    library, id, 'left_column_mask',
+    value === EFFECTS_LEFT_COLUMN_MASK_UNDECLARED
+      ? undefined
+      : value as EffectsScene['left_column_mask'],
+  );
+}
+
+/**
+ * Turning `v_deform` on or off — AND, turning it off, clearing the policy with
+ * it, in ONE command.
+ *
+ * TWO KEYS, ONE GESTURE, ONE UNDO STEP. Guard 2 refuses a declared policy on a
+ * scene with no per-column V deform, so a toggle that cleared only `v_deform`
+ * would leave the document in a state the build refuses — the author having done
+ * nothing but turn a feature off. `editSceneCommand` takes a mutator over a whole
+ * clone, so a gesture that changes two keys is naturally one command; nothing
+ * about the undo stack had to learn anything.
+ *
+ * TURNING IT *ON* SEEDS NO POLICY, deliberately. Guard 1 demands one, but which
+ * one is an engine-visible claim about the scene — `factor0_lock` is a verifiable
+ * assertion and `accept` ships a visible artifact — and Aurora picking on the
+ * author's behalf would be Aurora answering a design question in a file the
+ * author signs. The row appears with the advisory pointing at it instead.
+ */
+export function vDeformToggleCommand(
+  library: EffectsSceneLibrary, id: string, on: boolean,
+): SetEffectsSceneCommand | null {
+  return editSceneCommand(library, id, `Scene ${id} v_deform`, (scene) => {
+    const next = vDeformFromToggle(on);
+    if (next === undefined) {
+      if (!(EFFECTS_SCENE_KEY_DEFAULTS.get('v_deform') === scene.v_deform)) delete scene.v_deform;
+      // The policy goes with it — guard 2.
+      if (!(EFFECTS_SCENE_KEY_DEFAULTS.get('left_column_mask') === scene.left_column_mask)) {
+        delete scene.left_column_mask;
+      }
+    } else {
+      scene.v_deform = next;
+    }
+  });
+}
+
+/**
+ * Advice on the policy itself, or null: the scene declares `factor0_lock` and
+ * cannot support the claim. The two MUTUAL-gating advisories live in
+ * `sceneDeformAdvisories` with the rest of the cross-field set.
+ */
+export function leftColumnMaskAdvisory(scene: EffectsScene): string | null {
+  if (leftColumnMaskValue(scene) !== 'factor0_lock') return null;
+  const why = factor0LockRefusal(scene);
+  return why === null ? null : `left_column_mask factor0_lock: ${why}`;
+}
+
+/**
+ * Advice on one layer, or null: `curve` and `deform` on the same strip.
+ *
+ * REACHABLE FROM TWO CONTROLS THAT NOW SIT FOUR ROWS APART on the same card —
+ * the curve picker (parcel H) and the deform toggle (wave 2) — which is the
+ * shape a cross-field advisory exists for. The engine refuses the pair twice
+ * over: layer() guard 1 (a curve with a live deform amplitude; design §2 forbids
+ * curve ∧ deform because the fill's curve loop already spends every usable data
+ * register) and guard 2, which names the attachment rather than the amplitude it
+ * folded into.
+ */
+export function layerCurveDeformAdvisory(layer: EffectsLayer): string | null {
+  if (curveFieldValue(layer) === 'none') return null;
+  if (layerDeformValue(layer) !== null) {
+    return 'this strip authors both a curve and its own deform table — the build forbids '
+      + 'curve and deform on one strip (the fill\'s curve loop has no registers left for a '
+      + 'sampled channel). Move the deform to another strip, or drop the curve.';
+  }
+  const off = EFFECTS_LAYER_DEFORM_BOUNDS.shift_a.max;
+  const dsa = layer.dsa ?? EFFECTS_LAYER_DEFAULTS.dsa;
+  const dsb = layer.dsb ?? EFFECTS_LAYER_DEFAULTS.dsb;
+  if (dsa === off && dsb === off) return null;
+  return `this strip authors a curve and a live deform amplitude (dsa ${dsa} / dsb ${dsb}; `
+    + `${off} is the no-deform sentinel) — the build forbids curve and deform on one strip.`;
 }
 
 /**
@@ -1078,11 +1387,11 @@ export type LayerCardOptionalKey = 'curve' | 'vsplit' | 'deform';
  * slot), and the spelling on disk survives the next write untouched. Only a
  * SET key is ever rewritten.
  *
- * WHICH KEYS THOSE ARE IS DERIVED (`EFFECTS_NONE_DEFAULT_LAYER_KEYS`), not
- * listed. It was a hand-written pair here until wave 2 made it a trio, which is
- * one revision short of the drift every constant in `scene-ui` exists to stop:
- * the rule is "the schema's default for this key is the string none", and that
- * is a question the schema answers.
+ * WHICH KEYS THOSE ARE IS DERIVED (`EFFECTS_LAYER_KEY_DEFAULTS`), not listed. It
+ * was a hand-written pair here until wave 2 made it a trio, which is one
+ * revision short of the drift every constant in `scene-ui` exists to stop: the
+ * rule is "the value equals this key's own schema default", and that is a
+ * question the schema answers.
  */
 export function setLayerFieldCommand<K extends LayerCardKey>(
   library: EffectsSceneLibrary, id: string, index: number, field: K,
@@ -1093,7 +1402,8 @@ export function setLayerFieldCommand<K extends LayerCardKey>(
     if (!layer) return;
     if (value === undefined) {
       // Only a none-defaulted key can be cleared; a required one stays as it was.
-      if (EFFECTS_NONE_DEFAULT_LAYER_KEYS.has(field) && layer[field] !== 'none') delete layer[field];
+      if (EFFECTS_LAYER_KEY_DEFAULTS.has(field)
+          && layer[field] !== EFFECTS_LAYER_KEY_DEFAULTS.get(field)) delete layer[field];
       return;
     }
     layer[field] = value as EffectsLayer[K];
@@ -1122,7 +1432,7 @@ export function clampVSplitAt(value: number): number {
  */
 export type SceneFormKey =
   | 'name' | 'v_factor' | 'v_center' | 'v_offset' | 'precision' | 'transition'
-  | 'deform_fg' | 'deform_bg' | 'v_deform';
+  | 'deform_fg' | 'deform_bg' | 'v_deform' | 'left_column_mask';
 
 /**
  * Set a scene-level field the form owns.
@@ -1145,7 +1455,8 @@ export function setSceneFieldCommand<K extends SceneFormKey>(
 ): SetEffectsSceneCommand | null {
   return editSceneCommand(library, id, `Scene ${id} ${field}`, (scene) => {
     if (value === undefined) {
-      if (EFFECTS_NONE_DEFAULT_SCENE_KEYS.has(field) && scene[field] === 'none') return;
+      if (EFFECTS_SCENE_KEY_DEFAULTS.has(field)
+          && scene[field] === EFFECTS_SCENE_KEY_DEFAULTS.get(field)) return;
       delete scene[field];
     } else scene[field] = value;
   });

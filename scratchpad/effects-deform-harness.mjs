@@ -122,6 +122,8 @@ const LAYER_DEFAULTS = {
   dsb: SCHEMA.$defs.layer.properties.dsb.default,
   phase: SCHEMA.$defs.layer.properties.phase.default,
 };
+const MASK_VALUES = SCHEMA.properties.left_column_mask.enum;
+const MASK_DEFAULT = SCHEMA.properties.left_column_mask.default;
 const SEED_PERIOD = TABLE_BRANCHES[0].properties.period.maximum;
 const SEED_AMPLITUDE = TABLE_BRANCHES[0].properties.amplitude.minimum;
 const FIRST_FORM = FORM_IDS[0];
@@ -573,11 +575,147 @@ async function main() {
       && /no left_column_mask policy/.test(text),
       `v_deform=${JSON.stringify(sceneOf(doc).v_deform)} `
       + `advisory on screen=${/no left_column_mask policy/.test(text)}`);
-    check('6f', 'and it says WHERE to fix it, because this panel has no control for it',
-      /in the scene file by hand/.test(text),
-      `on screen=${/in the scene file by hand/.test(text)}`);
+    // ═══ THE POLICY ROW (the follow-up) ═══
+    //
+    // Until this addition the advisory above ended "set it in the scene file by
+    // hand — this panel has no control for it yet", which is a shipped control
+    // that can author a build-refused scene with no in-app remedy. Rows 6f-6m
+    // are the control that closes it, and they are built to catch the two ways
+    // it could be there and still be wrong: a picker that offers a value the
+    // ENGINE refuses outright, and a gate that only works in one direction.
+    const maskSelect = String.raw`
+      [...document.querySelectorAll('select')].find(e => (e.title||'').startsWith('left_column_mask'))`;
+    const maskOptions = await c.json(String.raw`
+      (() => {
+        const el = ${maskSelect};
+        if (!el) return null;
+        return { value: el.value,
+                 options: [...el.options].map(o => ({ value: o.value, disabled: o.disabled })) };
+      })()`);
+    check('6f', 'the mandatory policy now has a ROW, offering exactly the schema enum in schema order',
+      !!maskOptions && maskOptions.options.map((o) => o.value).join(',') === MASK_VALUES.join(',')
+      && maskOptions.value === MASK_DEFAULT,
+      `rendered=${JSON.stringify(maskOptions)} schema=${JSON.stringify(MASK_VALUES)} `
+      + `default=${MASK_DEFAULT}`);
 
-    // 6g: the per-column / vsplit collision, through the panel's OWN vsplit
+    check('6g', 'sprite_mask is RENDERED but DISABLED — the schema admits it and the engine '
+      + 'refuses it outright, so it must be visible and unpickable',
+      !!maskOptions
+      && maskOptions.options.filter((o) => o.disabled).map((o) => o.value).join(',') === 'sprite_mask',
+      `disabled options=${JSON.stringify(maskOptions?.options.filter((o) => o.disabled))}`);
+
+    // …and factor0_lock is NOT disabled even though this scene cannot support
+    // the claim (its layers are FACTOR_1). Aurora's own test of that
+    // precondition is deliberately stricter than the engine's, so refusing the
+    // value in the picker would be the editor refusing what the build accepts.
+    check('6h', 'factor0_lock stays SELECTABLE on a scene that cannot make the claim — the '
+      + 'editor advises, it does not refuse what the build might accept',
+      !!maskOptions && maskOptions.options.find((o) => o.value === 'factor0_lock')?.disabled === false,
+      `factor0_lock=${JSON.stringify(maskOptions?.options.find((o) => o.value === 'factor0_lock'))}`);
+
+    // PICK IT, and watch the claim be adjudicated on screen.
+    await c.evalExpr(SET_INPUT(maskSelect, 'factor0_lock'));
+    await sleep(700);
+    text = await c.evalExpr(PANEL_TEXT);
+    doc = JSON.parse(await c.evalExpr('window.__dbg.aeon.scenesJson()'));
+    check('6i', 'choosing factor0_lock writes it AND raises the unsupportable-claim advisory, '
+      + "naming the layer whose Plane B factor is not FACTOR_0",
+      sceneOf(doc).left_column_mask === 'factor0_lock'
+      && /left_column_mask factor0_lock:/.test(text)
+      && /Plane B factor is FACTOR_1, not FACTOR_0/.test(text)
+      && !/no left_column_mask policy/.test(text),
+      `document=${JSON.stringify(sceneOf(doc).left_column_mask)} `
+      + `claim advisory=${/left_column_mask factor0_lock:/.test(text)} `
+      + `mandatory advisory cleared=${!/no left_column_mask policy/.test(text)}`);
+
+    // LOCK EVERY LAYER'S fb TO FACTOR_0 through the panel's own factor pickers.
+    // This is the row most at risk of being vacuous: a scene that FAILS the
+    // precondition is trivial to write, so an assertion that only ever saw the
+    // failing side would pass against a check that is hard-coded to refuse.
+    // Driving it to the SUPPORTED side, on screen, is what makes it discriminate.
+    const layerCount = sceneOf(doc).layers.length;
+    for (let i = 0; i < layerCount; i++) {
+      await c.evalExpr(SET_INPUT(
+        `[...document.querySelectorAll('select')].find(e => (e.title||'').startsWith('Layer ${i} fb —'))`,
+        'FACTOR_0'));
+      await sleep(250);
+    }
+    await sleep(600);
+    text = await c.evalExpr(PANEL_TEXT);
+    doc = JSON.parse(await c.evalExpr('window.__dbg.aeon.scenesJson()'));
+    const fbs = sceneOf(doc).layers.map((l) => l.fb);
+    // THE REASON MUST CHANGE, not merely persist. Half one is now satisfied, so
+    // the claim is adjudicated by half two — layer 0 still carries the own()
+    // table row 6a attached, with the shift_b row 6c lowered to 0, and
+    // deform_bg is attached from row 6d. A check that implemented only half one
+    // would report the claim SUPPORTED here; one that refuses unconditionally
+    // would still be quoting FACTOR_1.
+    check('6j', 'locking EVERY layer to FACTOR_0 satisfies half one — and the refusal switches '
+      + 'to HALF TWO rather than clearing or standing still',
+      fbs.every((f) => f === 'FACTOR_0')
+      && !/Plane B factor is FACTOR_1/.test(text)
+      && /live Plane B deform amplitude/.test(text)
+      && panelIsDrawn(text),
+      `layer fbs=${JSON.stringify(fbs)} `
+      + `half-one reason gone=${!/Plane B factor is FACTOR_1/.test(text)} `
+      + `half-two reason present=${/live Plane B deform amplitude/.test(text)} `
+      + `panel drawn=${panelIsDrawn(text)}`);
+
+    // …AND NOW THE SUPPORTED SIDE, which is the half that makes this row a
+    // measurement rather than an assertion that a refusal exists. Silence the
+    // Plane-B amplitude (shift_b back to the no-sample sentinel) and the claim
+    // becomes one this scene CAN make: the advisory must clear entirely.
+    await c.evalExpr(SET_INPUT(
+      `[...document.querySelectorAll('input')].find(e => /^Layer 0 shift_b —/.test(e.title||''))`,
+      String(LAYER_DEFAULTS.dsb)));
+    await sleep(700);
+    text = await c.evalExpr(PANEL_TEXT);
+    doc = JSON.parse(await c.evalExpr('window.__dbg.aeon.scenesJson()'));
+    check('6k', 'silencing the Plane B amplitude makes factor0_lock a claim this scene CAN '
+      + 'make — the advisory clears, with the panel still drawn',
+      sceneOf(doc).layers[0].deform.own.shift_b === LAYER_DEFAULTS.dsb
+      && !/left_column_mask factor0_lock:/.test(text)
+      && sceneOf(doc).left_column_mask === 'factor0_lock'
+      && panelIsDrawn(text),
+      `shift_b=${sceneOf(doc).layers[0].deform.own.shift_b} `
+      + `policy still declared=${sceneOf(doc).left_column_mask} `
+      + `advisory=${/left_column_mask factor0_lock:/.test(text)} `
+      + `panel drawn=${panelIsDrawn(text)}`);
+
+    // ═══ THE GATE IS MUTUAL ═══
+    // Turning V deform OFF must take the policy with it, in ONE command: the
+    // engine refuses a declared policy on a scene with no per-column V deform,
+    // so a toggle that cleared one key would leave the author's document
+    // build-refused for having turned a feature off.
+    const beforeOff = { v: sceneOf(doc).v_deform !== undefined, m: sceneOf(doc).left_column_mask };
+    await c.evalExpr(SET_INPUT(
+      `[...document.querySelectorAll('select')].find(e => (e.title||'').startsWith('v_deform'))`, 'none'));
+    await sleep(700);
+    doc = JSON.parse(await c.evalExpr('window.__dbg.aeon.scenesJson()'));
+    text = await c.evalExpr(PANEL_TEXT);
+    const afterOff = sceneOf(doc);
+    check('6l', 'turning V deform OFF clears left_column_mask WITH it — both keys absent, and '
+      + 'the row leaves the form',
+      beforeOff.v === true && beforeOff.m === 'factor0_lock'
+      && !('v_deform' in afterOff) && !('left_column_mask' in afterOff)
+      && !/adjudicates an artifact that cannot occur/.test(text)
+      && panelIsDrawn(text),
+      `before: v_deform set=${beforeOff.v} policy=${beforeOff.m}; `
+      + `after: v_deform in doc=${'v_deform' in afterOff} policy in doc=${'left_column_mask' in afterOff}; `
+      + `guard-2 advisory=${/adjudicates an artifact that cannot occur/.test(text)}; `
+      + `panel drawn=${panelIsDrawn(text)}`);
+
+    // ONE COMMAND, therefore ONE undo restores BOTH. A two-command toggle would
+    // put v_deform back while the policy stayed cleared — which is the
+    // build-refused state, reached by pressing undo.
+    await undo();
+    doc = JSON.parse(await c.evalExpr('window.__dbg.aeon.scenesJson()'));
+    check('6m', 'ONE Ctrl+Z puts BOTH keys back — the two-key clear is one command',
+      sceneOf(doc).v_deform !== undefined && sceneOf(doc).left_column_mask === 'factor0_lock',
+      `after one undo: v_deform=${sceneOf(doc).v_deform === undefined ? 'absent' : 'set'} `
+      + `policy=${JSON.stringify(sceneOf(doc).left_column_mask)}`);
+
+    // 6n: the per-column / vsplit collision, through the panel's OWN vsplit
     // control — two independent rows of the form disagreeing, which is the only
     // kind of defect a cross-field advisory exists for.
     await c.evalExpr(SET_INPUT(
@@ -585,7 +723,7 @@ async function main() {
     await sleep(700);
     text = await c.evalExpr(PANEL_TEXT);
     doc = JSON.parse(await c.evalExpr('window.__dbg.aeon.scenesJson()'));
-    check('6g', 'a layer split authored while V deform is on raises the VSRAM collision, '
+    check('6n', 'a layer split authored while V deform is on raises the VSRAM collision, '
       + 'naming the layer',
       /layer 1 authors a Plane B split/.test(text)
       && !!sceneOf(doc).layers[1].vsplit,
@@ -607,6 +745,31 @@ async function main() {
       + 'is on it. The CONDITION is covered red-first in the node suite '
       + '(providers/__tests__/effects-aeon.test.ts + the codec\'s own tests); it is NOT '
       + 'reachable from this panel because dsa/dsb/phase have no control.');
+
+    // ---- 7b. CURVE ∧ DEFORM ON ONE STRIP. --------------------------------
+    // Two controls four rows apart on ONE card — the curve picker (parcel H)
+    // and the deform toggle (wave 2) — authoring a pair the build forbids. This
+    // is reachable entirely through the UI, which is what separates it from 7a.
+    await c.evalExpr(SET_INPUT(
+      `[...document.querySelectorAll('select')].find(e => (e.title||'').startsWith('Layer 1 curve.to —'))`,
+      'FACTOR_1_2'));
+    await sleep(500);
+    const curveOnly = await c.evalExpr(PANEL_TEXT);
+    const lay1 = await setLayerDeform(1, 'on');
+    await sleep(700);
+    text = await c.evalExpr(PANEL_TEXT);
+    doc = JSON.parse(await c.evalExpr('window.__dbg.aeon.scenesJson()'));
+    check('7b', 'a curve AND a deform table on one strip is advised — and the curve alone was '
+      + 'NOT, so the row is about the pair and not about either control',
+      lay1 === 'ok'
+      && !/both a curve and its own deform table/.test(curveOnly)
+      && /both a curve and its own deform table/.test(text)
+      && !!sceneOf(doc).layers[1].curve && !!sceneOf(doc).layers[1].deform,
+      `curve alone advised=${/both a curve and its own deform table/.test(curveOnly)} `
+      + `pair advised=${/both a curve and its own deform table/.test(text)} `
+      + `layer 1 curve=${JSON.stringify(sceneOf(doc).layers[1]?.curve)} `
+      + `deform=${sceneOf(doc).layers[1]?.deform === undefined ? 'absent' : 'own'}`);
+    await shot(c, '5-curve-and-deform');
 
     // ---- 8. NO CLOCK WAS ADDED. -------------------------------------------
     const installed = await c.evalExpr(String.raw`
@@ -643,7 +806,7 @@ async function main() {
 
     // ---- 9. Leave the tree as found. --------------------------------------
     let teardown = 0;
-    for (let i = 0; i < 40; i++) {
+    for (let i = 0; i < 80; i++) {
       if (!(await c.evalExpr('window.__dbg.aeon.canUndo()'))) break;
       await undo();
       teardown++;

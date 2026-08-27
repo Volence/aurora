@@ -27,6 +27,10 @@ import {
   layerDeformValue, layerDeformFromToggle, layerDeformAdvisory, sceneDeformAdvisories,
   clampLayerDeformField, clampAmpShift, clampDeformSpeed,
   SCENE_DEFORM_ROWS, V_DEFORM_ROW, LAYER_DEFORM_ROW, TABLE_REF_ROW,
+  // the left_column_mask follow-up
+  LEFT_COLUMN_MASK_ROW, leftColumnMaskOptions, leftColumnMaskValue, leftColumnMaskRowVisible,
+  leftColumnMaskCommand, leftColumnMaskAdvisory, factor0LockRefusal, vDeformToggleCommand,
+  layerCurveDeformAdvisory,
 } from '../effects-aeon';
 import {
   EFFECTS_FACTOR_NAMES, EFFECTS_LAYER_COUNT, EFFECTS_PACKED_FACTOR_BOUNDS,
@@ -979,20 +983,31 @@ describe('deform advisories — what the build would refuse, said first', () => 
     expect(sceneDeformAdvisories(scene)).toEqual([]);
   });
 
-  it('V deform without a left_column_mask policy — the guard NO control in this panel can satisfy', () => {
+  it('V deform without a left_column_mask policy — and the advisory names the ROW that answers it', () => {
     const scene = sceneWith({ v_deform: columns });
     const a = sceneDeformAdvisories(scene).join('\n');
     expect(a).toMatch(/no left_column_mask policy/);
-    // The advisory must say WHERE to set it, because the panel cannot.
-    expect(a).toMatch(/in the scene file by hand/);
+    // It used to say "set left_column_mask in the scene file by hand — this
+    // panel has no control for it yet", which the follow-up made FALSE. A
+    // parcel that adds the control and leaves the sentence is worse than one
+    // that adds neither: it sends the author to a text editor for a row four
+    // lines below.
+    expect(a).not.toMatch(/by hand/);
+    expect(a).toContain(LEFT_COLUMN_MASK_ROW.label);
     // Every non-default policy silences it — read out of the schema's own enum,
     // so a value added to the contract is covered without editing this row.
+    // EXCEPT factor0_lock on a scene that cannot make the claim: this fixture's
+    // layer is FACTOR_1, so it raises a DIFFERENT advisory rather than none.
     const values = S.properties.left_column_mask.enum as string[];
     const dflt = S.properties.left_column_mask.default as string;
     expect(values.filter((v) => v !== dflt).length).toBeGreaterThan(1);
     for (const v of values.filter((x) => x !== dflt)) {
-      expect(sceneDeformAdvisories(sceneWith({ v_deform: columns, left_column_mask: v as never })), v)
-        .toEqual([]);
+      const got = sceneDeformAdvisories(sceneWith({ v_deform: columns, left_column_mask: v as never }));
+      if (v === 'factor0_lock') {
+        expect(got.join('\n'), v).toMatch(/left_column_mask factor0_lock:/);
+      } else {
+        expect(got, v).toEqual([]);
+      }
     }
     // …and the default spelled explicitly is still "no policy".
     expect(sceneDeformAdvisories(sceneWith({ v_deform: columns, left_column_mask: dflt as never })).join('\n'))
@@ -1013,6 +1028,232 @@ describe('deform advisories — what the build would refuse, said first', () => 
     bad.layers.push({ world_y: 64, fa: 'FACTOR_1', fb: 'FACTOR_1', vsplit: { at: 20 } });
     bad.layers[0].deform = own;
     expect(sceneDeformAdvisories(bad).length).toBeGreaterThan(0);
+    expect(() => serializeEffectsScene(bad)).not.toThrow();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// left_column_mask — the policy `v_deform` makes MANDATORY
+// ---------------------------------------------------------------------------
+//
+// Every expectation is derived from the SCHEMA (the enum, its default) and from
+// aeon's `scene_dsl.emp` guards read at source, never from a summary.
+//
+//   :1288 v_deform on  + undeclared -> refused   (pinned as a poison in aeon's
+//                                                 own emp_expect_fail suite)
+//   :1293 v_deform off + declared   -> refused
+//   :1310 factor0_lock, half one: every layer's fb is FACTOR_0
+//   :1347 factor0_lock, half two: no live plane-B amplitude WITH a table
+//   :1354 sprite_mask -> refused outright
+
+describe('left_column_mask — the policy, gated both ways on v_deform', () => {
+  const MASK_VALUES = S.properties.left_column_mask.enum as string[];
+  const MASK_DEFAULT = S.properties.left_column_mask.default as string;
+  const table = { generator: 'sine' as const, amplitude: 8, period: 64 };
+  const columns = { columns: { table, speed: 0, amp_shift: 0 } } as const;
+  /** A scene whose every layer IS locked to FACTOR_0 — half one satisfied. */
+  const lockedScene = (patch: Partial<EffectsScene> = {}): EffectsScene => ({
+    ...newEffectsScene('locked'),
+    layers: [
+      { world_y: 0, fa: 'FACTOR_1', fb: 'FACTOR_0' },
+      { world_y: 64, fa: 'FACTOR_1', fb: 'FACTOR_0' },
+    ],
+    ...patch,
+  });
+
+  it('the picker offers the whole schema enum, in schema order, and renders even a refused value', () => {
+    const opts = leftColumnMaskOptions(lockedScene());
+    expect(opts.map((o) => o.value)).toEqual(MASK_VALUES);
+    // ANTI-VACUOUS: the enum really is more than a yes/no.
+    expect(MASK_VALUES.length).toBeGreaterThan(3);
+  });
+
+  it('sprite_mask is rendered but NOT selectable, with the engine\'s own reason', () => {
+    // The schema admits it (`enum` above) and the engine refuses it outright —
+    // a live schema-vs-engine divergence, so the option must EXIST (a file can
+    // carry it and a select with no matching option silently shows another
+    // value) and must not be pickable.
+    const sprite = leftColumnMaskOptions(lockedScene()).find((o) => o.value === 'sprite_mask')!;
+    expect(MASK_VALUES).toContain('sprite_mask');
+    expect(sprite.disabled).toBe(true);
+    expect(sprite.title).toMatch(/strip emission has not landed/);
+    // …and it is the ONLY disabled one. `factor0_lock` stays selectable even
+    // when its precondition fails — see the provider's design-fork banner: an
+    // editor that refuses what the build accepts is the worse failure, and
+    // Aurora's factor0_lock test is deliberately stricter than the engine's.
+    const disabled = leftColumnMaskOptions(sceneWith({})).filter((o) => o.disabled);
+    expect(disabled.map((o) => o.value)).toEqual(['sprite_mask']);
+  });
+
+  it('accept is presented as a real answer, not a fallback', () => {
+    const accept = leftColumnMaskOptions(lockedScene()).find((o) => o.value === 'accept')!;
+    expect(accept.disabled).toBe(false);
+    expect(accept.title).toMatch(/Rocking and Perspective/);
+  });
+
+  // ── factor0_lock, half one (scene_dsl.emp:1310) ─────────────────────────
+  it('factor0_lock: available only when EVERY layer\'s fb is FACTOR_0', () => {
+    expect(factor0LockRefusal(lockedScene())).toBeNull();
+    // ONE layer out of two breaks it, and the refusal names WHICH.
+    const one = lockedScene();
+    one.layers[1] = { world_y: 64, fa: 'FACTOR_1', fb: 'FACTOR_1_16' };
+    const why = factor0LockRefusal(one);
+    expect(why).toMatch(/layer 1's Plane B factor is FACTOR_1_16/);
+    expect(why).toMatch(/not FACTOR_0/);
+    // DISCRIMINATION: it is the SECOND layer, so a check that only looked at
+    // layer 0 — or at "some layer is FACTOR_0" instead of "every layer is" —
+    // would still be reporting available here.
+    expect(factor0LockRefusal({ ...one, layers: [one.layers[0]] })).toBeNull();
+    // A DISABLED layer still counts: the engine's scan is over 0..count and
+    // does not consult `enabled`, because a dormant band inherits the previous
+    // band's scroll words and can still reach the hardware.
+    const dormant = lockedScene();
+    dormant.layers[1] = { world_y: 64, fa: 'FACTOR_1', fb: 'FACTOR_1_2', enabled: false };
+    expect(factor0LockRefusal(dormant)).toMatch(/layer 1/);
+  });
+
+  it('factor0_lock: a CUSTOM PACKED fb is refused because Aurora cannot prove it, and says so', () => {
+    // The one place Aurora is deliberately STRICTER than the engine. `$0FF` is
+    // {s1:15, s2:15, op:0} under the engine's 9-bit encoding, so the engine
+    // WOULD accept this scene — Aurora has no packer and will not grow a second
+    // copy of that encoding, so it refuses in the safe direction and the
+    // refusal names the reason rather than pretending the factor is something
+    // else. If this behaviour ever changes, THIS is the assertion to change.
+    const packed = lockedScene();
+    packed.layers[1] = { world_y: 64, fa: 'FACTOR_1', fb: { s1: 15, s2: 15, op: 0 } };
+    const why = factor0LockRefusal(packed);
+    expect(why).toMatch(/Aurora cannot prove it is locked/);
+    expect(why).toMatch(/layer 1/);
+  });
+
+  // ── factor0_lock, half two (scene_dsl.emp:1347) ─────────────────────────
+  it('factor0_lock: a live plane-B amplitude WITH a table that can reach the plane', () => {
+    const off = S.$defs.layer.properties.dsb.default as number;
+    // AMPLITUDE ALONE IS NOT ENOUGH — the engine ANDs the two halves, and a
+    // check that fired on either would refuse this scene, which the build
+    // accepts. This is the row that keeps the conjunction honest.
+    const ampOnly = lockedScene();
+    ampOnly.layers[0] = { ...ampOnly.layers[0], dsb: 0 };
+    expect(factor0LockRefusal(ampOnly)).toBeNull();
+    // A TABLE ALONE IS NOT ENOUGH EITHER.
+    expect(factor0LockRefusal(lockedScene({ deform_bg: { shared: { table, speed: 0 } } }))).toBeNull();
+    // BOTH: refused.
+    const both = lockedScene({ deform_bg: { shared: { table, speed: 0 } } });
+    both.layers[0] = { ...both.layers[0], dsb: 0 };
+    expect(factor0LockRefusal(both)).toMatch(/layer 0 has a live Plane B deform amplitude/);
+    // AN own() TABLE IS BOTH HALVES AT ONCE — it serves both planes, and its
+    // shift_b IS that layer's dsb (layer() folds it). A check that read
+    // `layer.dsb` alone would miss every own() layer, which is most of what
+    // this parcel made authorable.
+    const own = lockedScene();
+    own.layers[1] = {
+      world_y: 64, fa: 'FACTOR_1', fb: 'FACTOR_0',
+      deform: { own: { table, shift_a: off, shift_b: 0, phase: 0, speed: 0 } },
+    };
+    expect(factor0LockRefusal(own)).toMatch(/layer 1 has a live Plane B deform amplitude/);
+    // …and an own() table at the NO-SAMPLE sentinel is a table with no
+    // amplitude, so the claim survives. This is exactly the state
+    // `layerDeformFromToggle` seeds, so turning a strip's deform on does not
+    // silently invalidate a factor0_lock claim.
+    const silent = lockedScene();
+    silent.layers[1] = {
+      world_y: 64, fa: 'FACTOR_1', fb: 'FACTOR_0',
+      deform: { own: { table, shift_a: off, shift_b: off, phase: 0, speed: 0 } },
+    };
+    expect(factor0LockRefusal(silent)).toBeNull();
+    // THE ANCHOR'S dsb counts too, and Aurora has no anchor control — so this
+    // arm is only reachable from a hand-authored file, which is when it matters.
+    const anchored = lockedScene({
+      deform_bg: { shared: { table, speed: 0 } },
+      anchor: { at: { channel: 0, dsa: off, dsb: 2 } },
+    });
+    expect(factor0LockRefusal(anchored)).toMatch(/the anchor has a live Plane B deform amplitude/);
+  });
+
+  it('the advisory fires only when the scene DECLARES factor0_lock', () => {
+    const bad = sceneWith({ v_deform: columns, left_column_mask: 'factor0_lock' });
+    expect(leftColumnMaskAdvisory(bad)).toMatch(/left_column_mask factor0_lock:/);
+    // The same unsupportable scene, declaring something else: no advisory.
+    expect(leftColumnMaskAdvisory(sceneWith({ v_deform: columns, left_column_mask: 'accept' }))).toBeNull();
+    // …and a scene that CAN make the claim, declaring it: no advisory.
+    expect(leftColumnMaskAdvisory(lockedScene({ v_deform: columns, left_column_mask: 'factor0_lock' })))
+      .toBeNull();
+  });
+
+  // ── the mutual gate (scene_dsl.emp:1288 / :1293) ────────────────────────
+  it('the row is visible when there is a V deform — or when a stale policy needs clearing', () => {
+    expect(leftColumnMaskRowVisible(newEffectsScene('plain'))).toBe(false);
+    expect(leftColumnMaskRowVisible(sceneWith({ v_deform: columns }))).toBe(true);
+    // The build-refused state a hand-edited file can reach: policy, no subject.
+    // Hiding the row here would leave the advisory with no control to act on.
+    expect(leftColumnMaskRowVisible(sceneWith({ left_column_mask: 'accept' }))).toBe(true);
+    // The default spelled out is still "no policy", so still hidden.
+    expect(leftColumnMaskRowVisible(sceneWith({ left_column_mask: MASK_DEFAULT as never }))).toBe(false);
+  });
+
+  it('turning V deform OFF clears the policy WITH it, in one command', () => {
+    const lib = library([sceneWith({ v_deform: columns, left_column_mask: 'accept' })]);
+    const cmd = vDeformToggleCommand(lib, 'deform_probe', false);
+    expect('v_deform' in cmd!.newScene!).toBe(false);
+    expect('left_column_mask' in cmd!.newScene!).toBe(false);
+    // ONE command — so ONE undo step puts BOTH back. A toggle that cleared only
+    // v_deform would leave the document in a state the build refuses, for the
+    // author having done nothing but turn a feature off.
+    expect(cmd!.oldScene!.v_deform).toEqual(columns);
+    expect(cmd!.oldScene!.left_column_mask).toBe('accept');
+    // Turning it ON seeds NO policy: which one is an engine-visible claim about
+    // the scene, and Aurora does not answer it for the author.
+    const on = vDeformToggleCommand(library([newEffectsScene('s')]), 's', true);
+    expect(on!.newScene!.v_deform).toHaveProperty('columns');
+    expect('left_column_mask' in on!.newScene!).toBe(false);
+  });
+
+  it('the policy command clears to the schema default and leaves an explicit one as spelled', () => {
+    const lib = library([sceneWith({ v_deform: columns, left_column_mask: 'accept' })]);
+    expect('left_column_mask' in leftColumnMaskCommand(lib, 'deform_probe', MASK_DEFAULT)!.newScene!)
+      .toBe(false);
+    expect(leftColumnMaskCommand(lib, 'deform_probe', 'accept')).toBeNull();  // no-op
+    // A file that SPELLS the default keeps its spelling — the general rule the
+    // key-defaults map replaced the "none"-only one for. `left_column_mask`'s
+    // absent spelling is "undeclared", which a rule keyed on the word "none"
+    // would have silently rewritten away.
+    const spelled = library([sceneWith({ left_column_mask: MASK_DEFAULT as never })]);
+    expect(leftColumnMaskCommand(spelled, 'deform_probe', MASK_DEFAULT)).toBeNull();
+    expect(MASK_DEFAULT).not.toBe('none');
+  });
+
+  it('curve and deform on one strip is advised — two controls four rows apart on one card', () => {
+    const off = S.$defs.layer.properties.dsb.default as number;
+    const plain: EffectsLayer = { world_y: 0, fa: 'FACTOR_1', fb: 'FACTOR_1' };
+    expect(layerCurveDeformAdvisory(plain)).toBeNull();
+    expect(layerCurveDeformAdvisory({ ...plain, curve: { to: 'FACTOR_1_2' } })).toBeNull();
+    expect(layerCurveDeformAdvisory({
+      ...plain, deform: { own: { table, shift_a: off, shift_b: 0, phase: 0, speed: 0 } },
+    })).toBeNull();
+    // Both: refused by the engine twice over (layer() guards 1 and 2).
+    expect(layerCurveDeformAdvisory({
+      ...plain, curve: { to: 'FACTOR_1_2' },
+      deform: { own: { table, shift_a: off, shift_b: 0, phase: 0, speed: 0 } },
+    })).toMatch(/both a curve and its own deform table/);
+    // …and the amplitude-only arm, which the card cannot author but a file can.
+    expect(layerCurveDeformAdvisory({ ...plain, curve: { to: 'FACTOR_1_2' }, dsb: 3 }))
+      .toMatch(/a curve and a live deform amplitude \(dsa 15 \/ dsb 3;/);
+    // An own() at the seed (both shifts silent) still trips guard 2 — the
+    // engine refuses the ATTACHMENT, not just the amplitude.
+    expect(layerCurveDeformAdvisory({
+      ...plain, curve: { to: 'FACTOR_1_2' },
+      deform: { own: { table, shift_a: off, shift_b: off, phase: 0, speed: 0 } },
+    })).toMatch(/both a curve and its own deform table/);
+  });
+
+  it('every one of these is ADVICE — the writer still emits each document', () => {
+    const bad = sceneWith({ v_deform: columns, left_column_mask: 'factor0_lock' });
+    bad.layers[0] = {
+      ...bad.layers[0], curve: { to: 'FACTOR_1_2' },
+      deform: { own: { table, shift_a: 0, shift_b: 0, phase: 0, speed: 0 } },
+    };
+    expect(sceneDeformAdvisories(bad).length).toBeGreaterThan(0);
+    expect(layerCurveDeformAdvisory(bad.layers[0])).not.toBeNull();
     expect(() => serializeEffectsScene(bad)).not.toThrow();
   });
 });

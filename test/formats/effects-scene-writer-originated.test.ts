@@ -79,8 +79,17 @@ function uiAuthorableSceneKeys(): Set<string> {
     PANEL,
     'the panel drives SCENE_DEFORM_ROWS into setSceneFieldCommand as a loop variable',
   ).toMatch(/Object\.keys\(SCENE_DEFORM_ROWS\)[\s\S]{0,1600}?setSceneFieldCommand\(\s*\n?\s*library,\s*selected\.id,\s*key,/);
+  // AND ONE MORE THE LITERAL SCAN CANNOT SEE, for a different reason:
+  // `left_column_mask` is written through its own `leftColumnMaskCommand`,
+  // because the value is not a free choice — three of the four enum members
+  // carry engine preconditions and one is refused outright, so the panel asks
+  // the provider what to offer rather than passing a string through. Same
+  // treatment: pin the call in the panel source, then add the key.
+  expect(PANEL, 'the panel writes left_column_mask through leftColumnMaskCommand')
+    .toMatch(/leftColumnMaskCommand\(library,\s*selected\.id,\s*v\)/);
   return new Set([
-    'schema', 'id', 'layers', 'v_factor', ...found, ...Object.keys(SCENE_DEFORM_ROWS),
+    'schema', 'id', 'layers', 'v_factor', ...found,
+    ...Object.keys(SCENE_DEFORM_ROWS), 'left_column_mask',
   ]);
 }
 
@@ -181,7 +190,13 @@ describe('writer-originated effects scene fixture', () => {
     expect(sceneKeys.has('deform_fg')).toBe(true);
     expect(sceneKeys.has('deform_bg')).toBe(true);
     expect(sceneKeys.has('v_deform')).toBe(true);
-    expect(sceneKeys.has('left_column_mask')).toBe(false);
+    // `left_column_mask` joined them in the follow-up: `v_deform` makes it
+    // MANDATORY at build time, so shipping the one without the other let an
+    // author write a scene aeon refuses with no in-app remedy.
+    expect(sceneKeys.has('left_column_mask')).toBe(true);
+    // Still NOT authorable, and these are what keep this row discriminating:
+    expect(sceneKeys.has('anchor')).toBe(false);
+    expect(sceneKeys.has('v_factor_fg')).toBe(false);
     // And the set genuinely discriminates: the schema offers strictly more.
     const schemaKeys = Object.keys(EFFECTS_SCENE_SCHEMA.properties as Record<string, unknown>);
     expect(schemaKeys.filter(k => !sceneKeys.has(k)).length).toBeGreaterThan(0);
