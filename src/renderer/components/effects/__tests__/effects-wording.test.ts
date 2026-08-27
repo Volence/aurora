@@ -14,7 +14,10 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   PLANE_FACTOR_ROWS, PLANE_FACTOR_HINT, LAYER_CURVE_ROW, LAYER_VSPLIT_ROW,
+  SCENE_DEFORM_ROWS, SCENE_DEFORM_ROW_SHARED, V_DEFORM_ROW, LAYER_DEFORM_ROW, TABLE_REF_ROW,
+  LEFT_COLUMN_MASK_ROW, leftColumnMaskOptions,
 } from '../../../providers/effects-aeon';
+import { newEffectsScene } from '../../../../core/formats/effects/scene-ui';
 import {
   BAND_MECHANISM_HINT, bandMotion, BAND_SCROLL_DIRECTION,
 } from '../../../providers/bganim-preview-aeon';
@@ -48,10 +51,22 @@ const newLabels = [
   PLANE_FACTOR_ROWS.fa.label, PLANE_FACTOR_ROWS.fb.label,
   LAYER_CURVE_ROW.label, LAYER_VSPLIT_ROW.label, LAYER_VSPLIT_ROW.none, LAYER_VSPLIT_ROW.at,
   SHIFT_BUTTON_LABEL, ...labelLiterals(bankStrip),
+  // Wave 2's four deform rows and the table sub-form.
+  SCENE_DEFORM_ROWS.deform_fg.label, SCENE_DEFORM_ROWS.deform_bg.label,
+  V_DEFORM_ROW.label, LAYER_DEFORM_ROW.label,
+  TABLE_REF_ROW.label, TABLE_REF_ROW.binLabel,
+  SCENE_DEFORM_ROW_SHARED.none, SCENE_DEFORM_ROW_SHARED.on,
+  V_DEFORM_ROW.none, V_DEFORM_ROW.on, LAYER_DEFORM_ROW.none, LAYER_DEFORM_ROW.on,
+  // The policy row and every value its picker renders — including the disabled
+  // one, which is still drawn and therefore still occupies the column.
+  LEFT_COLUMN_MASK_ROW.label,
+  ...leftColumnMaskOptions(newEffectsScene('wording')).map((o) => o.label),
 ];
 const newStrings = [
   ...newLabels, PLANE_FACTOR_HINT, BAND_MECHANISM_HINT,
   LAYER_CURVE_ROW.hint, LAYER_VSPLIT_ROW.hint, LAYER_CURVE_ROW.none,
+  SCENE_DEFORM_ROW_SHARED.hint, V_DEFORM_ROW.hint, LAYER_DEFORM_ROW.hint,
+  LEFT_COLUMN_MASK_ROW.hint,
   SHIFT_BUTTON_TITLE, BANK_STRIP_HINT, BANK_THUMB_TITLE(0), BANK_THUMB_TITLE(7),
   ...[0, 2, 3].flatMap((n) => [
     bandMotion({ driver: 'timer', rateShift: n }, 'band'),
@@ -130,6 +145,37 @@ describe('the panels render the constants rather than a second copy of the words
     expect(scenePanel).toMatch(/setLayerFieldCommand\(\s*library,\s*selected\.id,\s*i,\s*'vsplit'/);
     // The read-only extras line no longer says "no control yet" for these two.
     expect(scenePanel).not.toMatch(/no control yet/);
+  });
+  it('EffectsScenePanel renders the four deform rows and writes all four keys', () => {
+    for (const c of ['SCENE_DEFORM_ROWS', 'SCENE_DEFORM_ROW_SHARED', 'V_DEFORM_ROW', 'LAYER_DEFORM_ROW', 'TABLE_REF_ROW']) {
+      expect(scenePanel, c).toMatch(new RegExp(`\\b${c}\\b`));
+    }
+    expect(scenePanel).toMatch(/setSceneFieldCommand\(\s*\n?\s*library,\s*selected\.id,\s*'v_deform'/);
+    expect(scenePanel).toMatch(/setLayerFieldCommand\(\s*\n?\s*library,\s*selected\.id,\s*i,\s*'deform'/);
+    // THE CARD'S OWN SENTENCE ABOUT ITSELF IS GONE. The extras line's tooltip
+    // said "(deform is wave 2)" — it was the panel telling the author the gap
+    // this parcel closed, and leaving it would be the card describing a version
+    // of itself that no longer exists.
+    expect(scenePanel).not.toMatch(/deform is wave 2/);
+    // And the advisory that had no caller anywhere now has one.
+    expect(scenePanel).toMatch(/advisoryLayerDeformConflicts\(selected\)/);
+  });
+  it('EffectsScenePanel renders the left_column_mask row and toggles v_deform ATOMICALLY with it', () => {
+    expect(scenePanel).toMatch(/<Field label=\{LEFT_COLUMN_MASK_ROW\.label\}/);
+    expect(scenePanel).toMatch(/leftColumnMaskOptions\(selected\)/);
+    // The disabled flag has to REACH the option, or `sprite_mask` — which the
+    // engine refuses outright — would be pickable however carefully the
+    // provider marked it.
+    expect(scenePanel).toMatch(/disabled=\{o\.disabled\}/);
+    // THE ATOMIC TOGGLE. `v_deform` off must clear the policy in the same
+    // command; a plain setSceneFieldCommand on that row would leave the scene
+    // build-refused for having turned a feature off.
+    expect(scenePanel).toMatch(/vDeformToggleCommand\(library,\s*selected\.id,\s*v === 'on'\)/);
+    const code = scenePanel.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+    expect(code).toMatch(/export default function EffectsScenePanel/);   // anti-vacuous strip
+    expect(code).not.toMatch(/setSceneFieldCommand\(\s*\n?\s*library,\s*selected\.id,\s*'v_deform',\s*vDeform/);
+    // The old sentence that sent the author to a text editor is gone.
+    expect(scenePanel).not.toMatch(/no control for it yet/);
   });
   it('BgAnimBandPanel renders BAND_MECHANISM_HINT', () => {
     expect(bandPanel).toMatch(/BAND_MECHANISM_HINT/);

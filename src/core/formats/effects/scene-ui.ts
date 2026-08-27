@@ -199,6 +199,229 @@ export const EFFECTS_WORLD_Y_BOUNDS = boundsAt('$defs', 'layer', 'properties', '
 export const EFFECTS_VSPLIT_AT_BOUNDS =
   boundsAt('$defs', 'layer', 'properties', 'vsplit', 'oneOf', 1, 'properties', 'at');
 
+// ---------------------------------------------------------------------------
+// §2.4 — the deform surface (wave 2 authoring)
+// ---------------------------------------------------------------------------
+//
+// `$defs/tableRef`, `$defs/layerDeform`, `$defs/sceneDeform` and `v_deform` are
+// all `oneOf`s, and the two constants above reach into a `oneOf` BY INDEX with a
+// module-load assertion behind them. Everything below finds its branch BY SHAPE
+// instead — `oneOfBranchWith(path, key)` returns the branch that declares a
+// property, or throws naming the path. A schema amendment that reorders the
+// branches is then simply not an event: index pinning plus an assertion turns a
+// harmless reorder into an import failure, where a shape search survives it and
+// still fails loudly on a genuine REMOVAL, which is the case that matters.
+
+/** The `oneOf` branch under `path` that declares `key`, as a path `at()` can walk. */
+function oneOfBranchWith(path: (string | number)[], key: string): (string | number)[] {
+  const branches = at(...path).oneOf;
+  if (!Array.isArray(branches)) {
+    throw new Error(`effects scene schema ${path.join('.')} is not a oneOf`);
+  }
+  const index = branches.findIndex((b) => {
+    const props = (b as Record<string, unknown> | null)?.properties;
+    return typeof props === 'object' && props !== null && key in (props as object);
+  });
+  if (index < 0) {
+    throw new Error(
+      `effects scene schema ${path.join('.')}.oneOf has no branch declaring "${key}" — the ` +
+      'shape a UI constraint was derived from is gone; re-derive it against the amended schema.',
+    );
+  }
+  return [...path, 'oneOf', index];
+}
+
+/**
+ * The table length, in bytes, that `$defs/tableRef` describes itself as producing.
+ *
+ * READ OUT OF THE DESCRIPTION, then CHECKED AGAINST `period`'s `maximum` below —
+ * the same two-derivations trick `EFFECTS_V_FACTOR_LOCK` uses for the lock
+ * sentinel, and for the same reason. The number is load-bearing twice over: a
+ * generator's `period` must DIVIDE it (sigil enforces; schema doc §2.4), which is
+ * the advisory the form shows, and one whole cycle over the table is the neutral
+ * period a new attachment seeds with. Typing 256 here would make both of those a
+ * guess that survives the contract moving.
+ */
+export const EFFECTS_DEFORM_TABLE_BYTES: number = (() => {
+  const description = at('$defs', 'tableRef').description;
+  const m = typeof description === 'string' ? /\b(\d+)-byte signed\b/.exec(description) : null;
+  if (!m) {
+    throw new Error(
+      'effects scene schema $defs.tableRef no longer describes itself as an N-byte signed ' +
+      'table — the deform table length was derived from that sentence.',
+    );
+  }
+  return Number(m[1]);
+})();
+
+/** One parameter of a `tableRef` form: its key and whatever range the schema declares. */
+export interface TableRefParam {
+  key: string;
+  /** `null` when the schema declares no bound (`focal`, `center`, `max_offset`). */
+  min: number | null;
+  max: number | null;
+}
+
+/** One authorable spelling of a `tableRef`: a generator call, or the raw `.bin`. */
+export interface TableRefForm {
+  /** The generator's name, or `'bin'` for the raw-file branch — the select's value. */
+  id: string;
+  kind: 'generator' | 'bin';
+  /** The form's own parameters, in the schema's `required` order. */
+  params: readonly TableRefParam[];
+}
+
+/**
+ * Every `tableRef` form the schema admits, in schema order.
+ *
+ * SIX, not the two a form would think to offer: `sine`, `triangle`, `zero`,
+ * `v_column_perspective`, `v_column_floor` and the raw `.bin`. Derived from the
+ * `oneOf` so a seventh arrives in the dropdown by re-vendoring the schema, and so
+ * the parameters and their ranges cannot drift from the branch that declares them.
+ */
+export const EFFECTS_TABLE_REF_FORMS: readonly TableRefForm[] = Object.freeze((() => {
+  const branches = at('$defs', 'tableRef').oneOf;
+  if (!Array.isArray(branches) || branches.length === 0) {
+    throw new Error('effects scene schema $defs.tableRef is not a non-empty oneOf');
+  }
+  return branches.map((raw, i) => {
+    const branch = raw as Record<string, unknown>;
+    const props = branch.properties as Record<string, Record<string, unknown>> | undefined;
+    const required = Array.isArray(branch.required) ? (branch.required as string[]) : [];
+    if (!props) {
+      throw new Error(`effects scene schema $defs.tableRef.oneOf[${i}] declares no properties`);
+    }
+    if ('bin' in props) {
+      return Object.freeze({ id: 'bin', kind: 'bin' as const, params: Object.freeze([]) });
+    }
+    const generator = props.generator?.const;
+    if (typeof generator !== 'string') {
+      throw new Error(
+        `effects scene schema $defs.tableRef.oneOf[${i}] is neither a {bin} branch nor a ` +
+        'generator branch with a const name — the tableRef form list was derived from those two shapes.',
+      );
+    }
+    const params = required
+      .filter((k) => k !== 'generator')
+      .map((k) => {
+        const p = props[k];
+        if (!p || p.type !== 'integer') {
+          throw new Error(
+            `effects scene schema $defs.tableRef generator "${generator}" requires "${k}", ` +
+            'which is not a declared integer property.',
+          );
+        }
+        return Object.freeze({
+          key: k,
+          min: typeof p.minimum === 'number' ? p.minimum : null,
+          max: typeof p.maximum === 'number' ? p.maximum : null,
+        });
+      });
+    return Object.freeze({ id: generator, kind: 'generator' as const, params: Object.freeze(params) });
+  });
+})());
+
+/**
+ * The precondition `EFFECTS_DEFORM_TABLE_BYTES` rests on: the prose length and
+ * `period`'s ceiling are the same number, so "one cycle over the whole table" is
+ * a value the schema actually admits. Checked at module load — a schema that
+ * decoupled them fails the import instead of quietly seeding an illegal period.
+ */
+(function assertPeriodSpansTheTable(): void {
+  const period = EFFECTS_TABLE_REF_FORMS
+    .flatMap((f) => f.params)
+    .find((p) => p.key === 'period');
+  if (!period || period.max !== EFFECTS_DEFORM_TABLE_BYTES) {
+    throw new Error(
+      `effects scene schema $defs.tableRef: period's maximum (${period?.max}) is no longer the ` +
+      `${EFFECTS_DEFORM_TABLE_BYTES}-byte table length its own description names. One cycle over ` +
+      'the whole table was derived from that coupling.',
+    );
+  }
+})();
+
+/** The `.bin` path pattern (`no `..` segments`), read out of the schema. */
+export const EFFECTS_TABLE_REF_BIN_PATTERN: RegExp = (() => {
+  const branch = at(...oneOfBranchWith(['$defs', 'tableRef'], 'bin'));
+  const pattern = (branch.properties as Record<string, Record<string, unknown>>).bin.pattern;
+  if (typeof pattern !== 'string') {
+    throw new Error('effects scene schema $defs.tableRef {bin} branch declares no string pattern');
+  }
+  return new RegExp(pattern);
+})();
+
+/** `$defs/layerDeform`'s `own` — the three shift-space bounds (§2.2, §2.4). */
+export const EFFECTS_LAYER_DEFORM_BOUNDS = Object.freeze({
+  shift_a: boundsAt(...oneOfBranchWith(['$defs', 'layerDeform'], 'own'), 'properties', 'own', 'properties', 'shift_a'),
+  shift_b: boundsAt(...oneOfBranchWith(['$defs', 'layerDeform'], 'own'), 'properties', 'own', 'properties', 'shift_b'),
+  phase: boundsAt(...oneOfBranchWith(['$defs', 'layerDeform'], 'own'), 'properties', 'own', 'properties', 'phase'),
+});
+
+/** `v_deform.columns.amp_shift` — 0..15, read out of the schema. */
+export const EFFECTS_V_DEFORM_AMP_SHIFT_BOUNDS =
+  boundsAt(...oneOfBranchWith(['properties', 'v_deform'], 'columns'), 'properties', 'columns', 'properties', 'amp_shift');
+
+/**
+ * Every key that declares a schema `default`, mapped to it — the keys where an
+ * ABSENT key and the default spelled out mean the same thing.
+ *
+ * WHY IT IS DERIVED AND NOT A LIST. This is the rule the write path needs to
+ * clear an optional field without turning a file that never carried the key into
+ * a diff (scene.ts's model comment, from the other side), and it is the rule
+ * that says a default spelled out on disk must be LEFT AS SPELLED. It was a
+ * hand-written pair for `curve`/`vsplit`; wave 2's four deform attachments made
+ * it a set of six, and the next amendment's members are whatever it declares.
+ *
+ * IT USED TO TEST FOR THE STRING `"none"` SPECIFICALLY, AND THAT WAS ONE FIELD
+ * TOO NARROW. `left_column_mask`'s "absent" spelling is `"undeclared"`, not
+ * `"none"` — so a rule keyed on the word would have silently rewritten a
+ * hand-authored `"left_column_mask": "undeclared"` into an absent key the first
+ * time an author cleared the row. The general rule is the schema's own default,
+ * whatever word it is, which is the rule that was always meant.
+ */
+function keyDefaults(props: Record<string, unknown>): ReadonlyMap<string, unknown> {
+  const out = new Map<string, unknown>();
+  for (const [key, node] of Object.entries(props)) {
+    const d = (node as Record<string, unknown> | null)?.default;
+    if (d !== undefined) out.set(key, d);
+  }
+  return out;
+}
+export const EFFECTS_SCENE_KEY_DEFAULTS = keyDefaults(at('properties'));
+export const EFFECTS_LAYER_KEY_DEFAULTS = keyDefaults(at('$defs', 'layer', 'properties'));
+
+/**
+ * `FACTOR_0` — the packed factor the engine spells `$0FF` and tests a layer's
+ * `fb` against when it adjudicates `left_column_mask: Factor0Lock`
+ * (aeon engine/level/scene_dsl.emp, P3 Task 12 guard 3 half one).
+ *
+ * DERIVED WITH A CHECK, not typed: the name must still be one the schema's own
+ * factor enum publishes, so a contract that renamed or dropped it fails this
+ * module's import rather than leaving a UI precondition quietly comparing
+ * against a string nothing can hold.
+ */
+export const EFFECTS_FACTOR_ZERO: EffectsFactorName = (() => {
+  const name = EFFECTS_FACTOR_NAMES.find((n) => n === 'FACTOR_0');
+  if (name === undefined) {
+    throw new Error(
+      'effects scene schema $defs.factor no longer publishes FACTOR_0 — the left-column '
+      + 'Factor0Lock precondition compares a layer\'s fb against it.',
+    );
+  }
+  return name;
+})();
+
+/** `left_column_mask`'s own default — the "no policy declared" spelling. */
+export const EFFECTS_LEFT_COLUMN_MASK_UNDECLARED: string = (() => {
+  const d = at('properties', 'left_column_mask').default;
+  if (typeof d !== 'string' || !EFFECTS_LEFT_COLUMN_MASK_VALUES.includes(d)) {
+    throw new Error(
+      'effects scene schema properties.left_column_mask has no string default inside its own enum',
+    );
+  }
+  return d;
+})();
+
 /**
  * `v_factor` is a RIGHT-SHIFT AMOUNT, 0..15 — read out of the schema, not typed.
  *

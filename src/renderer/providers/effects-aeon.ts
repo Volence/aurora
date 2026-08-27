@@ -27,12 +27,18 @@ import {
   EFFECTS_LAYER_DEFAULTS,
   type EffectsScene, type EffectsSceneLibrary, type EffectsFactor, type EffectsLayer,
   type EffectsTableRef, type EffectsCurve, type EffectsVSplit,
+  type EffectsSceneDeform, type EffectsVDeform, type EffectsLayerDeform,
 } from '../../core/formats/effects/scene';
 import {
   EFFECTS_FACTOR_NAMES, EFFECTS_PACKED_FACTOR_BOUNDS, EFFECTS_LAYER_COUNT,
   EFFECTS_WORLD_Y_BOUNDS, EFFECTS_V_FACTOR_BOUNDS, EFFECTS_V_CENTER_BOUNDS,
   EFFECTS_V_OFFSET_BOUNDS, EFFECTS_V_CENTER_DEFAULT, EFFECTS_V_OFFSET_DEFAULT,
   EFFECTS_V_FACTOR_LOCK, EFFECTS_VSPLIT_AT_BOUNDS,
+  EFFECTS_TABLE_REF_FORMS, EFFECTS_TABLE_REF_BIN_PATTERN, EFFECTS_DEFORM_TABLE_BYTES,
+  EFFECTS_LAYER_DEFORM_BOUNDS, EFFECTS_V_DEFORM_AMP_SHIFT_BOUNDS,
+  EFFECTS_LEFT_COLUMN_MASK_UNDECLARED, EFFECTS_LEFT_COLUMN_MASK_VALUES, EFFECTS_FACTOR_ZERO,
+  EFFECTS_SCENE_KEY_DEFAULTS, EFFECTS_LAYER_KEY_DEFAULTS,
+  type TableRefParam,
   WAVE1_PRECISION_VALUES,
   EFFECTS_TRANSITION_VALUES,
   cloneEffectsScene, factorLabel, isNamedFactor, newEffectsLayer, newEffectsScene,
@@ -184,6 +190,719 @@ export function curveAdvisory(layer: Pick<EffectsLayer, 'fb' | 'curve'>): string
   if (to === 'none') return null;
   if (JSON.stringify(to) !== JSON.stringify(layer.fb)) return null;
   return `curve to ${factorLabel(to)} is the same factor as Plane B — the ramp goes nowhere and the build refuses it`;
+}
+
+// ---------------------------------------------------------------------------
+// DEFORM — the panel's own wave 2 (schema §2.1 deform_fg/deform_bg/v_deform,
+// §2.2 layer deform, §2.4 tableRef)
+// ---------------------------------------------------------------------------
+//
+// WHAT THE CARD SAID ABOUT ITSELF UNTIL THIS PARCEL: "deform is wave 2". The
+// contract has carried it since wave 1, the codec round-trips it, `layerExtras`
+// could already PRINT it — and no author could reach it from the app. Four
+// attachments arrive here:
+//
+//   deform_fg / deform_bg   ONE table each plane samples, whole scene
+//                           (SceneDeform.Shared(table, speed)).
+//   v_deform                the per-COLUMN vertical table
+//                           (SceneVDeform.Columns(table, speed, amp_shift)),
+//                           which is a different VSRAM mode, not a variant of
+//                           the two above.
+//   layer deform            one layer's OWN table, overriding the plane-shared
+//                           one for that band (SceneDeform.Own).
+//
+// EVERY ONE OF THEM POINTS AT A `tableRef`, which has SIX spellings and not the
+// two "a generator or a file" suggests: sine, triangle, zero, two v_column
+// generators, and a raw .bin. The list, the parameters and their ranges are all
+// read out of the schema (scene-ui EFFECTS_TABLE_REF_FORMS).
+//
+// ADVISORY, NEVER ENFORCEMENT — the posture scene.ts states for
+// advisoryLayerDeformConflicts and `curveAdvisory` already follows. The deform
+// surface is where that matters most, because aeon's `scene()` carries FIVE
+// comptime `ensure`s an author can trip from these controls alone, and until
+// this parcel the only way to find out was a failed build. They are transcribed
+// below as sentences, with sigil left as the rulebook.
+//
+// ⚠ AND ONE OF THEM IS NOT REACHABLE FROM THIS PANEL AT ALL. Turning `v_deform`
+// on makes `left_column_mask` MANDATORY (aeon engine/level/scene_dsl.emp P3
+// Task 12 guard 1) and this panel has no control for it — out of this parcel's
+// scope by its brief. `vDeformAdvisories` therefore says so in as many words,
+// naming the file, rather than letting the author discover it at build time.
+// Booked in the parcel report as the immediate follow-up.
+
+/** A `tableRef` parameter's label: the schema's key, title-cased at the spaces. */
+export function tableParamLabel(key: string): string {
+  return key
+    .split('_')
+    .map((t, i) => (t.length === 1 ? t.toUpperCase() : i === 0 ? t[0].toUpperCase() + t.slice(1) : t))
+    .join(' ');
+}
+
+/** What the table `<select>` offers: every form the schema admits, in schema order. */
+export function tableRefFormOptions(): FactorOption[] {
+  return EFFECTS_TABLE_REF_FORMS.map((f) => ({
+    value: f.id,
+    // The GENERATOR'S OWN NAME for a generator — it is the word the schema, the
+    // generated .emp and `tableRefLabel`'s read-only summary all use, so a
+    // prettier synonym here would be a fourth name for one thing. The raw-file
+    // branch has no generator name, and `.bin file` is what it is.
+    label: f.kind === 'bin' ? '.bin file' : f.id,
+  }));
+}
+
+/** The form a table value is spelled in — `'bin'` for the raw-file branch. */
+export function tableRefFormOf(t: EffectsTableRef): string {
+  return 'bin' in t ? 'bin' : t.generator;
+}
+
+/** One form's parameters, or `[]` for a form that has none (`zero`, `.bin`). */
+export function tableRefParams(formId: string): readonly TableRefParam[] {
+  return EFFECTS_TABLE_REF_FORMS.find((f) => f.id === formId)?.params ?? [];
+}
+
+/**
+ * Clamp one table parameter to the schema's range for it.
+ *
+ * THE CLAMP IS THE BOUND (ROADMAP item 37), as everywhere else on this surface.
+ * An UNBOUNDED parameter (`focal`, `center`, `max_offset` declare no range) is
+ * rounded and otherwise passed through — inventing a ceiling the contract does
+ * not have would refuse a value aeon's emit accepts, which the item-37 docblock
+ * names as the worse of the two failures.
+ */
+export function clampTableRefParam(formId: string, key: string, value: number): number {
+  const p = tableRefParams(formId).find((q) => q.key === key);
+  const min = p?.min ?? null;
+  if (!Number.isFinite(value)) return min ?? 0;
+  const rounded = Math.round(value);
+  const lo = min === null ? rounded : Math.max(min, rounded);
+  return p?.max === null || p?.max === undefined ? lo : Math.min(p.max, lo);
+}
+
+/**
+ * The neutral value a parameter seeds with when a table takes a new form.
+ *
+ * `period` seeds at the WHOLE TABLE: its schema maximum IS the table length
+ * (scene-ui asserts that coupling at module load), so one cycle over the table
+ * is both in range and — the half that matters — guaranteed to divide the table
+ * length, which is sigil's own rule for a period. Every other bounded parameter
+ * seeds at its minimum: the quietest legal deflection, which is the value an
+ * author turns UP, exactly as `factorFromSelect` seeds the packed triple at the
+ * spelling closest to "one shift, nothing added". An unbounded parameter seeds
+ * at 0, which for `max_offset` is a column table that displaces nothing.
+ */
+function seedTableRefParam(p: TableRefParam): number {
+  if (p.key === 'period' && p.max !== null) return p.max;
+  return p.min ?? 0;
+}
+
+/**
+ * The table a form choice means, keeping every same-named parameter the current
+ * table already carries (sine ↔ triangle is the switch this is for: the two
+ * generators take the same amplitude and period, and an author comparing them
+ * must not lose the numbers they just tuned).
+ */
+export function tableRefFromForm(formId: string, current: EffectsTableRef): EffectsTableRef {
+  if (formId === tableRefFormOf(current)) return current;
+  if (formId === 'bin') return { bin: '' };
+  const next: Record<string, unknown> = { generator: formId };
+  for (const p of tableRefParams(formId)) {
+    const carried = (current as unknown as Record<string, unknown>)[p.key];
+    next[p.key] = typeof carried === 'number'
+      ? clampTableRefParam(formId, p.key, carried)
+      : seedTableRefParam(p);
+  }
+  return next as unknown as EffectsTableRef;
+}
+
+/** A brand-new table: the schema's FIRST form, at its seed values. */
+export function newTableRef(): EffectsTableRef {
+  const first = EFFECTS_TABLE_REF_FORMS[0];
+  if (first.kind === 'bin') return { bin: '' };
+  const t: Record<string, unknown> = { generator: first.id };
+  for (const p of first.params) t[p.key] = seedTableRefParam(p);
+  return t as unknown as EffectsTableRef;
+}
+
+/** One parameter's current value, or its seed when the table does not carry it. */
+export function tableRefParamValue(t: EffectsTableRef, key: string): number {
+  const v = (t as unknown as Record<string, unknown>)[key];
+  if (typeof v === 'number') return v;
+  const p = tableRefParams(tableRefFormOf(t)).find((q) => q.key === key);
+  return p ? seedTableRefParam(p) : 0;
+}
+
+/** A table with one parameter changed, clamped to the schema's range for it. */
+export function setTableRefParam(t: EffectsTableRef, key: string, value: number): EffectsTableRef {
+  return {
+    ...(t as unknown as Record<string, unknown>),
+    [key]: clampTableRefParam(tableRefFormOf(t), key, value),
+  } as unknown as EffectsTableRef;
+}
+
+/** The `.bin` path a table names, or null when it is a generator. */
+export function tableRefBinPath(t: EffectsTableRef): string | null {
+  return 'bin' in t ? t.bin : null;
+}
+
+/**
+ * Why a `.bin` path is not one the codec will write, or null.
+ *
+ * THE SCHEMA'S OWN PATTERN decides — `EFFECTS_TABLE_REF_BIN_PATTERN`, which
+ * carries the `..`-rejecting lookahead — so this cannot drift into a second,
+ * gentler rule. Aurora does not check the file EXISTS: the table is baked by
+ * aeon's `embed()` out of its own tree, and a path Aurora cannot see is not the
+ * same fact as a path that is malformed.
+ */
+export function binPathRefusal(path: string): string | null {
+  if (path === '') return null;   // an empty box is "not typed yet", not a refusal
+  if (EFFECTS_TABLE_REF_BIN_PATTERN.test(path)) return null;
+  return `"${path}" is not a legal table path — ${TABLE_REF_ROW.binRule}`;
+}
+
+/**
+ * Advice on a table, or null: sigil requires a generator's period to DIVIDE the
+ * table length ("period must divide 256", schema doc §2.4), and nothing in the
+ * shape validator can see it. Said before the build says it, never enforced.
+ */
+export function tableRefAdvisory(t: EffectsTableRef): string | null {
+  if ('bin' in t || !('period' in t)) return null;
+  const period = t.period;
+  if (EFFECTS_DEFORM_TABLE_BYTES % period === 0) return null;
+  return `period ${period} does not divide the ${EFFECTS_DEFORM_TABLE_BYTES}-byte table — `
+    + 'the cycle would not close and the build refuses it';
+}
+
+/** The table sub-form's wording, including the path rule the refusal quotes. */
+export const TABLE_REF_ROW = Object.freeze({
+  label: 'Table',
+  title: `table — the ${EFFECTS_DEFORM_TABLE_BYTES}-byte signed curve this deform samples: `
+    + 'a generator the build computes, or a raw .bin you drew',
+  binLabel: 'File',
+  binTitle: 'bin — a raw table file under data/editor/effects/',
+  binRule: 'a path under data/editor/effects/ ending in .bin, with no ".." segments',
+});
+
+/** The two scene-level plane attachments (`SceneDeform.Shared`), by key. */
+export const SCENE_DEFORM_ROWS = Object.freeze({
+  deform_fg: Object.freeze({
+    key: 'deform_fg' as const,
+    label: 'Deform fg',
+    title: 'deform_fg — one table Plane A samples on every line of the whole scene',
+  }),
+  deform_bg: Object.freeze({
+    key: 'deform_bg' as const,
+    label: 'Deform bg',
+    title: 'deform_bg — one table Plane B samples on every line of the whole scene',
+  }),
+});
+
+/**
+ * The one hint under both plane rows, and the words their select uses.
+ *
+ * NO LABELS HERE. Every field label on the deform rows comes from
+ * `tableParamLabel(<the schema key>)`, so `speed` is `Speed` and `amp_shift` is
+ * `Amp shift` by derivation rather than by a second spelling that can drift from
+ * the key it edits.
+ */
+export const SCENE_DEFORM_ROW_SHARED = Object.freeze({
+  none: 'none',
+  on: 'shared',
+  hint: 'a plane-wide horizontal wobble; each layer\'s own shifts decide how much of it it takes',
+  speedTitle: 'speed — how fast the sample point walks the table each frame; 0 holds it still',
+});
+
+/** The per-column vertical attachment (`SceneVDeform.Columns`). */
+export const V_DEFORM_ROW = Object.freeze({
+  key: 'v_deform' as const,
+  label: 'V deform',
+  title: 'v_deform — a per-column VERTICAL table: each 16px column of Plane B scrolls to its own row',
+  none: 'none',
+  on: 'columns',
+  hint: 'per-column vertical scroll — a different VSRAM mode, not a variant of the plane rows above',
+  ampTitle: `amp_shift — right-shift applied to each sampled byte, `
+    + `${EFFECTS_V_DEFORM_AMP_SHIFT_BOUNDS.min}..${EFFECTS_V_DEFORM_AMP_SHIFT_BOUNDS.max}; bigger = flatter`,
+});
+
+/** The per-layer attachment (`SceneDeform.Own`). */
+export const LAYER_DEFORM_ROW = Object.freeze({
+  key: 'deform' as const,
+  label: 'Deform',
+  title: 'deform.own — this strip\'s OWN table, overriding the scene\'s for this strip only',
+  none: 'none',
+  on: 'own',
+  hint: 'overrides the scene table for this strip; 15 on a shift means that plane takes none of it',
+  shiftATitle: `shift_a — Plane A amplitude as a right-shift, `
+    + `${EFFECTS_LAYER_DEFORM_BOUNDS.shift_a.min}..${EFFECTS_LAYER_DEFORM_BOUNDS.shift_a.max}; `
+    + `${EFFECTS_LAYER_DEFORM_BOUNDS.shift_a.max} = no sample`,
+  shiftBTitle: `shift_b — Plane B amplitude as a right-shift, `
+    + `${EFFECTS_LAYER_DEFORM_BOUNDS.shift_b.min}..${EFFECTS_LAYER_DEFORM_BOUNDS.shift_b.max}; `
+    + `${EFFECTS_LAYER_DEFORM_BOUNDS.shift_b.max} = no sample`,
+  phaseTitle: `phase — where in the table this strip starts, `
+    + `${EFFECTS_LAYER_DEFORM_BOUNDS.phase.min}..${EFFECTS_LAYER_DEFORM_BOUNDS.phase.max}`,
+});
+
+/** Clamp one of `own`'s three integer fields to the schema's range for it. */
+export function clampLayerDeformField(
+  field: 'shift_a' | 'shift_b' | 'phase', value: number,
+): number {
+  const { min, max } = EFFECTS_LAYER_DEFORM_BOUNDS[field];
+  if (!Number.isFinite(value)) return min;
+  return Math.min(max, Math.max(min, Math.round(value)));
+}
+
+/** Clamp `v_deform.columns.amp_shift` to the schema's range. */
+export function clampAmpShift(value: number): number {
+  const { min, max } = EFFECTS_V_DEFORM_AMP_SHIFT_BOUNDS;
+  if (!Number.isFinite(value)) return min;
+  return Math.min(max, Math.max(min, Math.round(value)));
+}
+
+/**
+ * `speed` has NO schema bound on any of the three attachments — it is a plain
+ * integer — so this rounds and does nothing else. Present so the form has one
+ * write path per field rather than a bare `Math.round` at three call sites, and
+ * so the day the contract bounds it there is one place to bound.
+ */
+export function clampDeformSpeed(value: number): number {
+  return Number.isFinite(value) ? Math.round(value) : 0;
+}
+
+/** A scene plane attachment's payload, or null when the scene has none. */
+export function sceneDeformValue(
+  scene: Pick<EffectsScene, 'deform_fg' | 'deform_bg'>, key: 'deform_fg' | 'deform_bg',
+): { table: EffectsTableRef; speed: number } | null {
+  const d = scene[key];
+  return d === undefined || d === 'none' ? null : d.shared;
+}
+
+/** Turning a plane attachment on (a fresh table, held still) or off (clears the key). */
+export function sceneDeformFromToggle(on: boolean): EffectsSceneDeform | undefined {
+  return on ? { shared: { table: newTableRef(), speed: 0 } } : undefined;
+}
+
+/** The per-column attachment's payload, or null. */
+export function vDeformValue(
+  scene: Pick<EffectsScene, 'v_deform'>,
+): { table: EffectsTableRef; speed: number; amp_shift: number } | null {
+  const d = scene.v_deform;
+  return d === undefined || d === 'none' ? null : d.columns;
+}
+
+/** Turning the per-column attachment on or off. */
+export function vDeformFromToggle(on: boolean): EffectsVDeform | undefined {
+  return on
+    ? { columns: { table: newTableRef(), speed: 0, amp_shift: EFFECTS_V_DEFORM_AMP_SHIFT_BOUNDS.min } }
+    : undefined;
+}
+
+/** A layer's own attachment, or null. */
+export function layerDeformValue(
+  layer: Pick<EffectsLayer, 'deform'>,
+): { table: EffectsTableRef; shift_a: number; shift_b: number; phase: number; speed: number } | null {
+  const d = layer.deform;
+  return d === undefined || d === 'none' ? null : d.own;
+}
+
+/**
+ * Turning a layer's own attachment on or off.
+ *
+ * ON SEEDS A TRUE NO-OP, and that is the deliberate half. `own`'s shift_a /
+ * shift_b / phase lower into the SAME record fields as the layer's own dsa /
+ * dsb / phase (the two-sources guard), so seeding each at the schema DEFAULT of
+ * the field it lowers into is the only seed that leaves the strip rendering
+ * exactly as it did a moment ago. The alternative — seeding a live shift — makes
+ * the toggle jump the picture before the author has chosen a table, and there is
+ * no non-arbitrary number to jump it by. The row's advisory says the attachment
+ * is silent and which spinner wakes it, so the no-op is legible rather than
+ * mysterious.
+ */
+export function layerDeformFromToggle(on: boolean): EffectsLayerDeform | undefined {
+  return on
+    ? {
+      own: {
+        table: newTableRef(),
+        shift_a: EFFECTS_LAYER_DEFAULTS.dsa,
+        shift_b: EFFECTS_LAYER_DEFAULTS.dsb,
+        phase: EFFECTS_LAYER_DEFAULTS.phase,
+        speed: 0,
+      },
+    }
+    : undefined;
+}
+
+/**
+ * What aeon's `scene()` would refuse about this scene's deform, as sentences.
+ *
+ * FOUR OF THE FIVE comptime guards on this surface are cross-field, so no
+ * control can carry them and the codec's shape validator cannot see them
+ * either. Each is transcribed from the `ensure` it mirrors
+ * (aeon engine/level/scene_dsl.emp), and each is ADVICE: sigil stays the
+ * rulebook, exactly as scene.ts's advisoryLayerDeformConflicts docblock argues.
+ *
+ * The fifth — `own` alongside a live dsa/dsb/phase — is already written, in the
+ * codec, as `advisoryLayerDeformConflicts`. It is per-layer, so the card renders
+ * it on the layer it is about rather than here.
+ */
+export function sceneDeformAdvisories(scene: EffectsScene): string[] {
+  const out: string[] = [];
+  const anyOwn = scene.layers.some((l) => layerDeformValue(l) !== null);
+  const sceneTable = sceneDeformValue(scene, 'deform_fg') !== null
+    || sceneDeformValue(scene, 'deform_bg') !== null;
+  if (anyOwn && !sceneTable) {
+    out.push(
+      'a strip attaches its own table but the scene attaches none on either plane — every other '
+      + 'strip with a live shift would sample from nothing, and the build refuses it. Set '
+      + `${SCENE_DEFORM_ROWS.deform_fg.label} or ${SCENE_DEFORM_ROWS.deform_bg.label}.`,
+    );
+  }
+  const vDeform = vDeformValue(scene) !== null;
+  const vsplitLayer = scene.layers.findIndex((l) => vsplitFieldValue(l) !== null);
+  if (vDeform && vsplitLayer >= 0) {
+    out.push(
+      `V deform is on and layer ${vsplitLayer} authors a Plane B split — both write the same `
+      + 'VSRAM word, and the build refuses the pair. Author one of them.',
+    );
+  }
+  const mask = scene.left_column_mask ?? EFFECTS_LEFT_COLUMN_MASK_UNDECLARED;
+  if (vDeform && mask === EFFECTS_LEFT_COLUMN_MASK_UNDECLARED) {
+    out.push(
+      'V deform is on and this scene declares no left_column_mask policy, which the build '
+      + 'requires: in per-column mode the leftmost partial column renders at a scroll nothing '
+      + `wrote. Answer it on the ${LEFT_COLUMN_MASK_ROW.label} row below.`,
+    );
+  }
+  // GUARD 2's ARM IS NOT DEAD CODE NOW THAT THE TOGGLE CLEARS THE POLICY WITH
+  // `v_deform`. The state is unreachable through the panel by construction —
+  // and it is one hand-edited file away, which is precisely when an author has
+  // nothing else to tell them. `leftColumnMaskRowVisible` keeps the control on
+  // screen for exactly this case so the advice has something to act on.
+  if (!vDeform && mask !== EFFECTS_LEFT_COLUMN_MASK_UNDECLARED) {
+    out.push(
+      `this scene declares left_column_mask "${mask}" but attaches no per-column V deform, so `
+      + 'the policy adjudicates an artifact that cannot occur; the build refuses it. Clear it '
+      + `to ${EFFECTS_LEFT_COLUMN_MASK_UNDECLARED}, or attach a V deform.`,
+    );
+  }
+  const claim = leftColumnMaskAdvisory(scene);
+  if (claim !== null) out.push(claim);
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// left_column_mask — the policy `v_deform` makes MANDATORY
+// ---------------------------------------------------------------------------
+//
+// WHY THIS IS PART OF THE DEFORM PARCEL AND NOT A LATER ONE. The `v_deform`
+// control above can author a scene aeon's build REFUSES, with no in-app remedy —
+// the ROADMAP item 35 defect class, shipped knowingly. aeon's own poison suite
+// pins the refusal (`tools/emp_expect_fail.py`, `poison_scene_lcm_undeclared.emp`,
+// count 1), so it is load-bearing, not a style note.
+//
+// THE GUARD IS MUTUAL (aeon engine/level/scene_dsl.emp, P3 Task 12):
+//
+//   (1) :1288  v_deform on  + policy undeclared -> REFUSED
+//   (2) :1293  v_deform off + policy declared   -> REFUSED ("adjudicates an
+//              artifact that cannot occur")
+//
+// So the control cannot merely APPEAR when `v_deform` is set: turning `v_deform`
+// off must take the policy back to undeclared in the SAME gesture, which is
+// `vDeformToggleCommand` below.
+//
+// AND THE VALUES ARE NOT A FLAT ENUM — three of the four carry preconditions,
+// transcribed here from the guards themselves:
+//
+//   accept        always legal. The engine's own message calls it "a real
+//                 answer, it is what this game's Rocking and Perspective
+//                 families do", so it is presented as an answer and not a
+//                 fallback.
+//   factor0_lock  a VERIFIED CLAIM, both halves or not at all:
+//                   half one (:1310) every real layer's `fb` is FACTOR_0
+//                     ($0FF). The engine's scan covers DORMANT layers too —
+//                     a disabled band inherits the previous band's scroll
+//                     words — so `enabled` is deliberately not consulted.
+//                   half two (:1347) no live plane-B amplitude WITH a table
+//                     that can reach the plane: `dsb != 15` on any layer (an
+//                     own() layer's `shift_b` IS that layer's dsb — layer()
+//                     folds it at :558) or on the anchor, AND either
+//                     `deform_bg` or any layer's own() table (an own table
+//                     serves BOTH planes).
+//   sprite_mask   REFUSED OUTRIGHT (:1354) until the engine's left-column strip
+//                 emission lands. Aurora's schema still admits the value, so
+//                 this is a live schema-vs-engine divergence and not a UI
+//                 preference.
+//   undeclared    the required value when there is no `v_deform`.
+//
+// ═══ TWO DESIGN FORKS, AND WHY THEY GO DIFFERENT WAYS ═══
+//
+// `sprite_mask` IS DISABLED IN THE PICKER. `factor0_lock` IS NOT, even when its
+// precondition fails. That asymmetry is principled, and the principle is
+// scene.ts's: "the editor let me save a file the build rejects" is bad, but "the
+// editor refused a file the build accepts" is FAR WORSE.
+//
+//   • No scene content can make `sprite_mask` legal — the engine refuses it
+//     unconditionally — so disabling it cannot produce the worse failure.
+//   • `factor0_lock`'s precondition is about the scene's own contents and
+//     Aurora's evaluation of it is deliberately STRICTER than the engine's (see
+//     `layerFbIsZero`), so disabling it on a failed precondition WOULD produce
+//     the worse failure. It stays selectable and the row advises.
+//
+// The option is rendered either way, disabled or not, so a value already in the
+// file is always DISPLAYED. A `<select>` whose current value has no option shows
+// the first one instead, which is a quiet lie about what the build will read —
+// the same failure `unassignableSceneRef` exists to stop for `sceneRef`.
+
+/** The row's wording, and the one hint under it. */
+export const LEFT_COLUMN_MASK_ROW = Object.freeze({
+  key: 'left_column_mask' as const,
+  label: 'Left col',
+  title: 'left_column_mask — how this scene answers for the leftmost partial column, '
+    + 'which per-column V scroll renders at a scroll the program never wrote',
+  hint: 'per-column V scroll needs this answered; the build refuses a scene that leaves it open',
+});
+
+/**
+ * Is a layer's Plane-B factor provably `FACTOR_0`?
+ *
+ * CONSERVATIVE, AND IN THE SAFE DIRECTION — this is the load-bearing sentence of
+ * the whole precondition. The engine tests the PACKED BYTE (`ly_fb != $0FF`);
+ * Aurora holds a factor as either a published `FACTOR_*` name or a `{s1,s2,op}`
+ * triple, and it has no packer — deriving one would put a second copy of the
+ * engine's 9-bit encoding in this repo, free to drift from the one that counts.
+ *
+ * So a packed triple answers **false**: not "this is not FACTOR_0" but "Aurora
+ * cannot prove it is". That makes Aurora STRICTER than the engine in exactly one
+ * case — `{s1:15, s2:15, op:0}`, which does pack to `$0FF` — and stricter is the
+ * direction that cannot hurt: Aurora offers `factor0_lock` less often than it is
+ * legal, and the author picks `accept` or hand-authors the policy, which the
+ * codec round-trips and this row then DISPLAYS. The opposite slip — Aurora
+ * green-lighting a scene the build refuses — is this whole finding repeating one
+ * layer up, and it is the one this asymmetry buys off.
+ */
+function layerFbIsZero(layer: Pick<EffectsLayer, 'fb'>): boolean {
+  return layer.fb === EFFECTS_FACTOR_ZERO;
+}
+
+/**
+ * A layer's EFFECTIVE plane-B deform amplitude — `own`'s `shift_b` when it has
+ * one, else its own `dsb`, else the schema default.
+ *
+ * THE FOLD IS THE ENGINE'S, NOT AN INTERPRETATION: `layer()` computes
+ * `eff_dsb = is_own ? own_sb : dsb` and stores THAT in `ly_dsb`
+ * (scene_dsl.emp:558), which is the field every amplitude scan in the engine
+ * reads — the left-column guard's included. A check here that read `layer.dsb`
+ * alone would miss every own() layer, which is most of what this parcel just
+ * made authorable.
+ */
+function effectiveDsb(layer: EffectsLayer): number {
+  const own = layerDeformValue(layer);
+  if (own !== null) return own.shift_b;
+  return layer.dsb ?? EFFECTS_LAYER_DEFAULTS.dsb;
+}
+
+/**
+ * Why `factor0_lock` is not a claim this scene can make, or null when it is.
+ *
+ * Both halves of scene_dsl.emp's guard 3, in the engine's own order, each
+ * naming the layer that breaks it so the author knows where to look.
+ */
+export function factor0LockRefusal(scene: EffectsScene): string | null {
+  const unlocked = scene.layers.findIndex((l) => !layerFbIsZero(l));
+  if (unlocked >= 0) {
+    const l = scene.layers[unlocked];
+    return `layer ${unlocked}'s Plane B factor is ${factorLabel(l.fb)}, not ${EFFECTS_FACTOR_ZERO}`
+      + (typeof l.fb === 'string' ? '' : ' (a custom packed factor: Aurora cannot prove it is locked)')
+      + ` — the partial column exists on every line where Plane B scrolls, so the claim is false `
+      + 'as authored and the build refuses it.';
+  }
+  // Half two: a live plane-B amplitude WITH a table that can reach the plane.
+  const noSentinel = EFFECTS_LAYER_DEFORM_BOUNDS.shift_b.max;
+  const ampLayer = scene.layers.findIndex((l) => effectiveDsb(l) !== noSentinel);
+  const anchorDsb = scene.anchor !== undefined && scene.anchor !== 'none'
+    ? scene.anchor.at.dsb : noSentinel;
+  const amp = ampLayer >= 0 || anchorDsb !== noSentinel;
+  const table = sceneDeformValue(scene, 'deform_bg') !== null
+    || scene.layers.some((l) => layerDeformValue(l) !== null);
+  if (amp && table) {
+    return `${ampLayer >= 0 ? `layer ${ampLayer}` : 'the anchor'} has a live Plane B deform `
+      + `amplitude (shift ${ampLayer >= 0 ? effectiveDsb(scene.layers[ampLayer]) : anchorDsb}; `
+      + `${noSentinel} is the no-sample sentinel) while a table can reach the plane — deform adds `
+      + 'per-line Plane B scroll on top of the locked factor, so the sliver comes back on those '
+      + 'rows. The build refuses it, conservatively: table contents are invisible at build time, '
+      + 'so even an all-zero table counts.';
+  }
+  return null;
+}
+
+export interface LeftColumnMaskOption {
+  value: string;
+  label: string;
+  /** True for a value the ENGINE refuses outright; the picker must not offer it. */
+  disabled: boolean;
+  /** The engine's reason, for the option's own title. Empty for a plain value. */
+  title: string;
+}
+
+/**
+ * What the policy `<select>` offers, in the schema's own enum order.
+ *
+ * Every value is rendered — see the section banner: an option missing for a
+ * value the FILE carries makes the select show a different value than the build
+ * will read.
+ */
+export function leftColumnMaskOptions(scene: EffectsScene): LeftColumnMaskOption[] {
+  const f0 = factor0LockRefusal(scene);
+  return EFFECTS_LEFT_COLUMN_MASK_VALUES.map((value) => {
+    if (value === 'sprite_mask') {
+      return {
+        value,
+        label: value,
+        disabled: true,
+        title: 'refused by the engine: the left-column strip emission has not landed, so the '
+          + 'declaration would be accepted while the sliver stays uncovered. Declare '
+          + 'factor0_lock or accept.',
+      };
+    }
+    if (value === 'factor0_lock') {
+      return {
+        value,
+        label: value,
+        // NOT disabled on a failed precondition — see the section banner.
+        disabled: false,
+        title: f0 === null
+          ? 'Plane B provably never H-scrolls, so the partial column cannot exist'
+          : `this scene cannot make that claim: ${f0}`,
+      };
+    }
+    if (value === 'accept') {
+      return {
+        value, label: value, disabled: false,
+        title: 'ship the artifact — a real answer, and the one this game\'s Rocking and '
+          + 'Perspective families give',
+      };
+    }
+    return {
+      value, label: value, disabled: false,
+      title: 'no policy declared — legal only while this scene has no per-column V deform',
+    };
+  });
+}
+
+/** The policy this scene declares — absent reads as the schema's own default. */
+export function leftColumnMaskValue(scene: Pick<EffectsScene, 'left_column_mask'>): string {
+  return scene.left_column_mask ?? EFFECTS_LEFT_COLUMN_MASK_UNDECLARED;
+}
+
+/**
+ * Should the policy row be on screen at all?
+ *
+ * WHEN `v_deform` IS ON, obviously — the build demands an answer. But ALSO
+ * whenever the document already declares a policy, even with no `v_deform`:
+ * that state is refused by guard 2, it is reachable from a hand-edited file,
+ * and hiding the row would leave the author staring at an advisory with no
+ * control to act on it — which is the exact trap this addition exists to close,
+ * rebuilt one field over.
+ */
+export function leftColumnMaskRowVisible(scene: EffectsScene): boolean {
+  return vDeformValue(scene) !== null
+    || leftColumnMaskValue(scene) !== EFFECTS_LEFT_COLUMN_MASK_UNDECLARED;
+}
+
+/** Set the policy; the schema's default CLEARS the key (setSceneFieldCommand's rule). */
+export function leftColumnMaskCommand(
+  library: EffectsSceneLibrary, id: string, value: string,
+): SetEffectsSceneCommand | null {
+  return setSceneFieldCommand(
+    library, id, 'left_column_mask',
+    value === EFFECTS_LEFT_COLUMN_MASK_UNDECLARED
+      ? undefined
+      : value as EffectsScene['left_column_mask'],
+  );
+}
+
+/**
+ * Turning `v_deform` on or off — AND, turning it off, clearing the policy with
+ * it, in ONE command.
+ *
+ * TWO KEYS, ONE GESTURE, ONE UNDO STEP. Guard 2 refuses a declared policy on a
+ * scene with no per-column V deform, so a toggle that cleared only `v_deform`
+ * would leave the document in a state the build refuses — the author having done
+ * nothing but turn a feature off. `editSceneCommand` takes a mutator over a whole
+ * clone, so a gesture that changes two keys is naturally one command; nothing
+ * about the undo stack had to learn anything.
+ *
+ * TURNING IT *ON* SEEDS NO POLICY, deliberately. Guard 1 demands one, but which
+ * one is an engine-visible claim about the scene — `factor0_lock` is a verifiable
+ * assertion and `accept` ships a visible artifact — and Aurora picking on the
+ * author's behalf would be Aurora answering a design question in a file the
+ * author signs. The row appears with the advisory pointing at it instead.
+ */
+export function vDeformToggleCommand(
+  library: EffectsSceneLibrary, id: string, on: boolean,
+): SetEffectsSceneCommand | null {
+  return editSceneCommand(library, id, `Scene ${id} v_deform`, (scene) => {
+    const next = vDeformFromToggle(on);
+    if (next === undefined) {
+      if (!(EFFECTS_SCENE_KEY_DEFAULTS.get('v_deform') === scene.v_deform)) delete scene.v_deform;
+      // The policy goes with it — guard 2.
+      if (!(EFFECTS_SCENE_KEY_DEFAULTS.get('left_column_mask') === scene.left_column_mask)) {
+        delete scene.left_column_mask;
+      }
+    } else {
+      scene.v_deform = next;
+    }
+  });
+}
+
+/**
+ * Advice on the policy itself, or null: the scene declares `factor0_lock` and
+ * cannot support the claim. The two MUTUAL-gating advisories live in
+ * `sceneDeformAdvisories` with the rest of the cross-field set.
+ */
+export function leftColumnMaskAdvisory(scene: EffectsScene): string | null {
+  if (leftColumnMaskValue(scene) !== 'factor0_lock') return null;
+  const why = factor0LockRefusal(scene);
+  return why === null ? null : `left_column_mask factor0_lock: ${why}`;
+}
+
+/**
+ * Advice on one layer, or null: `curve` and `deform` on the same strip.
+ *
+ * REACHABLE FROM TWO CONTROLS THAT NOW SIT FOUR ROWS APART on the same card —
+ * the curve picker (parcel H) and the deform toggle (wave 2) — which is the
+ * shape a cross-field advisory exists for. The engine refuses the pair twice
+ * over: layer() guard 1 (a curve with a live deform amplitude; design §2 forbids
+ * curve ∧ deform because the fill's curve loop already spends every usable data
+ * register) and guard 2, which names the attachment rather than the amplitude it
+ * folded into.
+ */
+export function layerCurveDeformAdvisory(layer: EffectsLayer): string | null {
+  if (curveFieldValue(layer) === 'none') return null;
+  if (layerDeformValue(layer) !== null) {
+    return 'this strip authors both a curve and its own deform table — the build forbids '
+      + 'curve and deform on one strip (the fill\'s curve loop has no registers left for a '
+      + 'sampled channel). Move the deform to another strip, or drop the curve.';
+  }
+  const off = EFFECTS_LAYER_DEFORM_BOUNDS.shift_a.max;
+  const dsa = layer.dsa ?? EFFECTS_LAYER_DEFAULTS.dsa;
+  const dsb = layer.dsb ?? EFFECTS_LAYER_DEFAULTS.dsb;
+  if (dsa === off && dsb === off) return null;
+  return `this strip authors a curve and a live deform amplitude (dsa ${dsa} / dsb ${dsb}; `
+    + `${off} is the no-deform sentinel) — the build forbids curve and deform on one strip.`;
+}
+
+/**
+ * Advice on one layer's own attachment, or null: both shifts at the no-sample
+ * sentinel is LEGAL — nothing refuses it — and completely silent. That is the
+ * state `layerDeformFromToggle` deliberately seeds, so the line saying so is
+ * what makes the seed legible rather than a control that appears to do nothing.
+ */
+export function layerDeformAdvisory(layer: Pick<EffectsLayer, 'deform'>): string | null {
+  const own = layerDeformValue(layer);
+  if (own === null) return null;
+  const off = EFFECTS_LAYER_DEFORM_BOUNDS.shift_a.max;
+  if (own.shift_a !== off || own.shift_b !== off) return null;
+  return `both shifts are ${off}: the table is attached but neither plane samples it. `
+    + 'Lower a shift to give that plane amplitude.';
 }
 
 /** Which option is selected for a factor that may be either form. */
@@ -649,25 +1368,30 @@ export function removeLayerCommand(
   });
 }
 
-/** The layer keys the card has a control for. `curve`/`vsplit` are parcel H. */
-export type LayerCardKey = 'world_y' | 'fa' | 'fb' | 'curve' | 'vsplit';
+/** The layer keys the card has a control for. `curve`/`vsplit` are parcel H, `deform` is wave 2. */
+export type LayerCardKey = 'world_y' | 'fa' | 'fb' | 'curve' | 'vsplit' | 'deform';
 /** The optional ones, where the control has a "none" state that CLEARS the key. */
-export type LayerCardOptionalKey = 'curve' | 'vsplit';
-const LAYER_CARD_OPTIONAL: ReadonlySet<string> = new Set<LayerCardOptionalKey>(['curve', 'vsplit']);
+export type LayerCardOptionalKey = 'curve' | 'vsplit' | 'deform';
 
 /**
  * Set one field of one layer.
  *
- * For `curve` / `vsplit`, `undefined` means the control's "none" state, and it
- * DELETES the key rather than writing `"none"` — the same rule
- * setSceneFieldCommand states: the schema's default for both is `"none"`, so an
- * absent key already means it, and writing the word would turn a file that
+ * For `curve` / `vsplit` / `deform`, `undefined` means the control's "none"
+ * state, and it DELETES the key rather than writing `"none"` — the same rule
+ * setSceneFieldCommand states: the schema's default for all three is `"none"`,
+ * so an absent key already means it, and writing the word would turn a file that
  * never carried the key into a diff (§6 hazard 1, from the other side).
  *
  * A layer whose file spells the key as an explicit `"none"` is LEFT AS SPELLED
  * on clear: it already means none, so the gesture is a no-op (null, no undo
  * slot), and the spelling on disk survives the next write untouched. Only a
  * SET key is ever rewritten.
+ *
+ * WHICH KEYS THOSE ARE IS DERIVED (`EFFECTS_LAYER_KEY_DEFAULTS`), not listed. It
+ * was a hand-written pair here until wave 2 made it a trio, which is one
+ * revision short of the drift every constant in `scene-ui` exists to stop: the
+ * rule is "the value equals this key's own schema default", and that is a
+ * question the schema answers.
  */
 export function setLayerFieldCommand<K extends LayerCardKey>(
   library: EffectsSceneLibrary, id: string, index: number, field: K,
@@ -677,8 +1401,9 @@ export function setLayerFieldCommand<K extends LayerCardKey>(
     const layer = scene.layers[index];
     if (!layer) return;
     if (value === undefined) {
-      // Only an optional key can be cleared; a required one stays as it was.
-      if (LAYER_CARD_OPTIONAL.has(field) && layer[field] !== 'none') delete layer[field];
+      // Only a none-defaulted key can be cleared; a required one stays as it was.
+      if (EFFECTS_LAYER_KEY_DEFAULTS.has(field)
+          && layer[field] !== EFFECTS_LAYER_KEY_DEFAULTS.get(field)) delete layer[field];
       return;
     }
     layer[field] = value as EffectsLayer[K];
@@ -693,21 +1418,47 @@ export function clampVSplitAt(value: number): number {
 }
 
 /**
- * Set a scene-level scalar the wave-1 form owns.
+ * The scene-level keys the form owns. Wave 2 adds the three deform attachments,
+ * which are the first OBJECT-valued fields on this path — every wave-1 caller
+ * passed a scalar or a string enum.
+ *
+ * NOTHING BELOW HAD TO CHANGE FOR THAT, and the reason is worth stating because
+ * it is the codec's design paying off one layer up: `editSceneCommand` takes a
+ * MUTATOR over a whole clone and diffs the whole document, so the value's shape
+ * was never part of the write path. A `{field, value}` delta API — the shape
+ * this could easily have been — would have needed a per-field kind here, and
+ * that is a field enumeration, which is the one thing this format is handled
+ * without.
+ */
+export type SceneFormKey =
+  | 'name' | 'v_factor' | 'v_center' | 'v_offset' | 'precision' | 'transition'
+  | 'deform_fg' | 'deform_bg' | 'v_deform' | 'left_column_mask';
+
+/**
+ * Set a scene-level field the form owns.
  *
  * `undefined` DELETES the key rather than writing a default. That is the model
  * rule scene.ts states — "parse never fills a default in and serialize never
  * writes one out that was not on disk" — expressed as an editing affordance:
  * clearing `v_center` must return the document to not-having-it, not to having
  * it set to the current default.
+ *
+ * A key whose schema default is the string `"none"` and whose file spells it
+ * that way explicitly is LEFT AS SPELLED, exactly as `setLayerFieldCommand` has
+ * always done for a layer's. Wave 1 had no such key at scene level and so had no
+ * arm for it; `deform_fg`, `deform_bg` and `v_deform` are three, and without
+ * this a scene that hand-authored `"deform_fg": "none"` would silently lose the
+ * line the first time an author toggled the row off.
  */
-export function setSceneFieldCommand<K extends 'name' | 'v_factor' | 'v_center' | 'v_offset'
-| 'precision' | 'transition'>(
+export function setSceneFieldCommand<K extends SceneFormKey>(
   library: EffectsSceneLibrary, id: string, field: K, value: EffectsScene[K] | undefined,
 ): SetEffectsSceneCommand | null {
   return editSceneCommand(library, id, `Scene ${id} ${field}`, (scene) => {
-    if (value === undefined) delete scene[field];
-    else scene[field] = value;
+    if (value === undefined) {
+      if (EFFECTS_SCENE_KEY_DEFAULTS.has(field)
+          && scene[field] === EFFECTS_SCENE_KEY_DEFAULTS.get(field)) return;
+      delete scene[field];
+    } else scene[field] = value;
   });
 }
 
@@ -722,16 +1473,31 @@ export function setSceneFieldCommand<K extends 'name' | 'v_factor' | 'v_center' 
 // schema key order, and NOTHING for a default so a plain layer gets no line.
 // `curve` and `vsplit` LEFT this line in parcel H, when they got controls: a
 // value the card edits two rows up is not repeated here.
+//
+// `deform` LEFT IT IN WAVE 2, for the same rule and on the same precedent. What
+// is left is exactly the set with no control anywhere on the card: `dsa`, `dsb`,
+// `phase` and `enabled` — and the first three of those are the two-sources
+// guard's other half, which is now surfaced beside the deform row as advice
+// rather than only printed here.
 
 export interface LayerExtra {
   /** The §2.2 key the descriptor is about. */
-  key: 'dsa' | 'dsb' | 'phase' | 'enabled' | 'deform';
+  key: 'dsa' | 'dsb' | 'phase' | 'enabled';
   /** The descriptor as the card prints it. */
   text: string;
 }
 
-/** A 256-byte table reference, in the spelling the schema's generator names use. */
-function tableRefLabel(t: EffectsTableRef): string {
+/**
+ * A deform table as one line of text, in the spelling the schema's generator
+ * names use — `sine(8, 64)`, `zero`, `tables/canopy.bin`.
+ *
+ * EXPORTED since wave 2: it was the read-only extras line's summary of a layer's
+ * deform, and that line no longer carries one (see the section banner above).
+ * The deform ROWS carry it now instead, on the table sub-form's title, where it
+ * is the whole attachment said in the one place a control cannot say it — a
+ * `<select>` on the form plus two spinners never spells the call.
+ */
+export function tableRefLabel(t: EffectsTableRef): string {
   if ('bin' in t) return t.bin;
   switch (t.generator) {
     case 'zero': return 'zero';
@@ -749,10 +1515,6 @@ export function layerExtras(layer: EffectsLayer): LayerExtra[] {
     if (v !== undefined && v !== EFFECTS_LAYER_DEFAULTS[key]) out.push({ key, text: `${key} ${v}` });
   }
   if (layer.enabled === false) out.push({ key: 'enabled', text: 'disabled' });
-  const deform = layer.deform;
-  if (deform !== undefined && deform !== 'none') {
-    out.push({ key: 'deform', text: `deform: own ${tableRefLabel(deform.own.table)}` });
-  }
   return out;
 }
 
@@ -772,4 +1534,6 @@ export {
   factorLabel, EFFECTS_LAYER_COUNT, EFFECTS_PACKED_FACTOR_BOUNDS, EFFECTS_WORLD_Y_BOUNDS,
   EFFECTS_V_FACTOR_BOUNDS, EFFECTS_V_CENTER_BOUNDS, EFFECTS_V_OFFSET_BOUNDS,
   EFFECTS_VSPLIT_AT_BOUNDS,
+  EFFECTS_LAYER_DEFORM_BOUNDS, EFFECTS_V_DEFORM_AMP_SHIFT_BOUNDS,
+  EFFECTS_DEFORM_TABLE_BYTES, EFFECTS_TABLE_REF_FORMS,
 };
