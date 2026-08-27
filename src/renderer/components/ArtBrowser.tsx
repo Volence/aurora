@@ -15,6 +15,13 @@ import {
 import {
   publishStripDrag, resolveStripDrag, stripDragHint, stripDragLabel,
 } from '../providers/band-strip-range';
+import {
+  openBgTileDocument, publishStripOpen, resolveStripOpen,
+  stripOpenHint, stripOpenLabel, stripOpenSpeaks,
+} from '../providers/bg-anim-art';
+import { openDocumentGuarded } from './art/open-document';
+import { useSessionStore } from '../state/sessionStore';
+import { switchFacet } from '../workspace/facet-tools';
 import { bandBudget } from '../providers/bg-anim-aeon';
 import { T } from './ui';
 import { CANVAS_VOID, TILE_SELECTED, TILE_HOVER } from '../canvas/canvas-colors';
@@ -316,6 +323,59 @@ export default function ArtBrowser() {
     }
   }, [slotAtEvent, editingLayer]);
 
+  /**
+   * DOUBLE CLICK OPENS THAT SLOT IN THE COMPOSER — ROADMAP row 57.
+   *
+   * The door `openBgTileDocument` waited a day for. All of the reasoning — why
+   * the strip and not a band-shaped surface, why a double click, and the
+   * structural argument that it cannot collide with the range drag — is at
+   * `resolveStripOpen` in `providers/bg-anim-art.ts`, where the node suite can
+   * read the rule. This function supplies state and applies the answer.
+   *
+   * ⚠ IT DOES NOT TOUCH THE PRESS OR THE CLICK. Both of a double click's clicks
+   * still run `handleClick` and both resolve to `pick` (anchor === release), so
+   * the tile is picked and `paint-tile` armed exactly as a single click has
+   * always left them — the tile you are about to draw is the tile in your hand,
+   * which is also what `TilesetPanel` does with the same gesture pair.
+   *
+   * ⚠ AND IT NEVER OPENS ON NULL. `openBgTileDocument` answers null for a slot
+   * the document does not have; `resolveStripOpen` has already refused that
+   * case out loud, so a null here is a document that changed between the two
+   * calls and the right move is still to open nothing.
+   */
+  const handleDoubleClick = useCallback((e: React.MouseEvent) => {
+    const slot = slotAtEvent(e);
+    const src = sourceRef.current;
+    const doc = useProjectStore.getState().project?.bgOverride?.doc ?? null;
+    const outcome = resolveStripOpen({
+      layer: src?.layer ?? 'fg',
+      origin: src?.origin ?? 'none',
+      slot,
+      doc,
+    });
+    publishStripOpen(slot, outcome);
+    if (outcome.kind === 'open' && doc !== null) {
+      const od = openBgTileDocument(doc, outcome.tileIndex);
+      // The bank strip's contract, verbatim (BgAnimBandPanel's `openBank`) —
+      // a second one would be free to disagree about the dirty-document guard.
+      if (od && openDocumentGuarded(od)) {
+        switchFacet(useSessionStore.getState().activeId, 'art');
+      }
+      return;
+    }
+    // The strip has no surface but the hover line, and it is SHARED — the range
+    // drag and the band cards write there too. A refusal SAYS SO; an `ignored`
+    // leaves the line EXACTLY as it found it rather than clearing it, because
+    // clearing would erase a message the author is mid-read. `stripOpenSpeaks`
+    // owns that split, not this branch. Both halves are written together for the
+    // reason the band cards' hover does it: text alone would leave the PREVIOUS
+    // message's title standing under a new line.
+    if (stripOpenSpeaks(outcome) && hoverLabelRef.current) {
+      hoverLabelRef.current.textContent = stripOpenLabel(outcome);
+      hoverLabelRef.current.title = stripOpenHint(outcome);
+    }
+  }, [slotAtEvent]);
+
   const handleMouseLeave = useCallback(() => {
     hoveredRef.current = -1;
     const overlay = overlayRef.current;
@@ -392,6 +452,7 @@ export default function ArtBrowser() {
         onMouseLeave={handleMouseLeave}
         onMouseDown={handleMouseDown}
         onClick={handleClick}
+        onDoubleClick={handleDoubleClick}
       >
         {/* id: the CDP harness reads THESE pixels rather than asking the
             component what it thinks it is showing (scratchpad/bg-tile-picker-harness.mjs). */}

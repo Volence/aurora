@@ -19,6 +19,9 @@ import {
   bgArtAtlas, bgArtCellAtlasIndex, bgArtCommitCommand, bgArtTargetExists, bankThumbnail,
   openBandBankDocument, openBgTileDocument, regenerateShiftCommand, bgPaletteLine,
   SHIFT_BUTTON_LABEL, SHIFT_BUTTON_TITLE,
+  resolveStripOpen, stripOpenLabel, stripOpenHint, stripOpenSpeaks,
+  publishStripOpen, lastStripOpenReport,
+  type StripOpenInputs,
 } from '../bg-anim-art';
 
 const FIXTURE = resolve(__dirname, '../../../../test/fixtures/bg-override/editor_bg_override.b0e5a661.json');
@@ -154,5 +157,120 @@ describe('the strip', () => {
     expect(bgArtTargetExists(doc, { kind: 'bank', bandIndex: documentBands(doc).length, bank: 1 })).toBe(false);
     expect(bgArtTargetExists(doc, { kind: 'tile', tileIndex: doc.tiles.length })).toBe(false);
     expect(bgArtTargetExists(null, { kind: 'tile', tileIndex: 0 })).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The strip's double click — ROADMAP row 57
+// ---------------------------------------------------------------------------
+//
+// ⚠ THESE ROWS PROVE THE RULE AND PROVE NOTHING ABOUT REACHABILITY, and saying
+// so is the point of the row they belong to. `openBgTileDocument` was fully
+// covered by the rows above for a day while NOTHING IN THE APP CALLED IT —
+// coverage of a function says nothing about whether anything calls it, and a
+// node suite that cannot see React would be just as green on a build with no
+// `onDoubleClick` on the strip at all. The reachability proof is a CDP harness
+// that drives the real app (`scratchpad/bganim-tile-door-harness.mjs`); what
+// lives here is the gate, the bounds and the wording, which are exactly the
+// parts a harness aiming one gesture cannot sweep.
+describe('resolveStripOpen — which strip double click opens a slot', () => {
+  const inputs = (over: Partial<StripOpenInputs> = {}): StripOpenInputs => ({
+    layer: 'bg', origin: 'override', slot: 0, doc: golden(), ...over,
+  });
+
+  it('opens the slot under the pointer, PAST THE ANIMATED PREFIX — the row\'s own target', () => {
+    const doc = golden();
+    // Derived, never pinned: the first slot no band owns is the sum of the
+    // bands' tile counts, which is what `bandBudget().firstPromotableSlot`
+    // walks. A literal here would drift the moment the fixture's bands change.
+    const prefix = documentBands(doc).reduce((n, b) => n + bandTileCount(b), 0);
+    expect(prefix).toBeGreaterThan(0);
+    expect(prefix).toBeLessThan(doc.tiles.length);
+    const staticSlot = doc.tiles.length - 1;
+    expect(staticSlot).toBeGreaterThanOrEqual(prefix);
+    expect(resolveStripOpen(inputs({ slot: staticSlot, doc })))
+      .toEqual({ kind: 'open', tileIndex: staticSlot });
+    // And it really names a document the composer can hold.
+    const od = openBgTileDocument(doc, staticSlot)!;
+    expect(od.bgOverride).toEqual({ kind: 'tile', tileIndex: staticSlot });
+    expect(od.doc.cells[0].atlasTile).toBe(staticSlot);
+  });
+
+  it('opens a PREFIX slot too — that write lands in the owning band\'s phases[0]', () => {
+    const doc = golden();
+    expect(resolveStripOpen(inputs({ slot: 0, doc }))).toEqual({ kind: 'open', tileIndex: 0 });
+    expect(openBgTileDocument(doc, 0)!.bgOverride).toEqual({ kind: 'tile', tileIndex: 0 });
+  });
+
+  it('THE GATE: only the BG layer showing the OVERRIDE reaches the document', () => {
+    // Foreground — silent. Double click is not a gesture that strip has.
+    expect(resolveStripOpen(inputs({ layer: 'fg', origin: 'tileset' })))
+      .toEqual({ kind: 'ignored', why: 'not-a-background' });
+    // A background that is not the override — LOUD. The same integers name
+    // different art there, so opening doc.tiles[n] would edit a tile the author
+    // is not looking at.
+    for (const origin of ['library', 'act', 'none'] as const) {
+      const out = resolveStripOpen(inputs({ origin }));
+      expect(out.kind).toBe('refused');
+      expect(stripOpenLabel(out)).toMatch(/^no edit — /);
+      expect(stripOpenHint(out).length).toBeGreaterThan(stripOpenLabel(out).length);
+    }
+    // And an `override` origin with no document is the same refusal, not a throw.
+    expect(resolveStripOpen(inputs({ doc: null })).kind).toBe('refused');
+  });
+
+  it('refuses a slot the blob does not have, naming the range FROM THE DOCUMENT', () => {
+    const doc = golden();
+    expect(resolveStripOpen(inputs({ slot: -1, doc })))
+      .toEqual({ kind: 'ignored', why: 'no-slot' });
+    const past = doc.tiles.length;
+    const out = resolveStripOpen(inputs({ slot: past, doc }));
+    expect(out.kind).toBe('refused');
+    // `tiles.length` is a COUNT, so the last slot is one less — the same
+    // off-by-one the strip drag's prefix hint had to be fixed for.
+    expect(stripOpenHint(out)).toContain(`0..${doc.tiles.length - 1}`);
+    expect(stripOpenHint(out)).not.toContain(`0..${doc.tiles.length}`);
+    // The caller must not open anything on a refusal, and the provider agrees.
+    expect(openBgTileDocument(doc, past)).toBeNull();
+    expect(resolveStripOpen(inputs({ slot: 1.5, doc })).kind).toBe('refused');
+  });
+
+  it('only a refusal speaks, and a silent outcome must not WRITE the empty line', () => {
+    const doc = golden();
+    // The strip's readout is ONE line shared with the range drag and the band
+    // cards. A double click that cleared it would erase a message the author is
+    // mid-read, so "silent" has to mean "leaves it alone" — which an empty
+    // label cannot express and `stripOpenSpeaks` can. Caught red on the real app
+    // by the CDP harness's sentinel row, not by anything that could live here.
+    for (const out of [
+      resolveStripOpen(inputs({ slot: doc.tiles.length - 1, doc })),
+      resolveStripOpen(inputs({ layer: 'fg', origin: 'tileset' })),
+      resolveStripOpen(inputs({ slot: -1, doc })),
+    ]) {
+      expect(stripOpenSpeaks(out)).toBe(false);
+      expect(stripOpenLabel(out)).toBe('');
+      expect(stripOpenHint(out)).toBe('');
+    }
+    const refused = resolveStripOpen(inputs({ origin: 'act' }));
+    expect(stripOpenSpeaks(refused)).toBe(true);
+    expect(stripOpenLabel(refused)).not.toBe('');
+  });
+
+  it('the report advances on EVERY double click and records which branch took it', () => {
+    const doc = golden();
+    const before = lastStripOpenReport().gestures;
+    publishStripOpen(3, resolveStripOpen(inputs({ slot: 3, doc })));
+    const opened = lastStripOpenReport();
+    expect(opened.gestures).toBe(before + 1);
+    expect(opened.kind).toBe('open');
+    expect(opened.openedTileIndex).toBe(3);
+    // The branch that changes NOTHING still advances the count — that is the
+    // whole reason this report exists rather than reading `bgArtOpen()`.
+    publishStripOpen(3, resolveStripOpen(inputs({ layer: 'fg', origin: 'tileset', slot: 3 })));
+    const ignored = lastStripOpenReport();
+    expect(ignored.gestures).toBe(before + 2);
+    expect(ignored.kind).toBe('ignored');
+    expect(ignored.detail).toBe('not-a-background');
+    expect(ignored.openedTileIndex).toBeNull();
   });
 });

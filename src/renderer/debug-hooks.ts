@@ -26,6 +26,8 @@ import { lastBandLensReport, lastBandMarkReport } from './canvas/band-lens';
 import type { BandLensReport, BandMarkReport } from './canvas/band-lens';
 import { lastStripDragReport } from './providers/band-strip-range';
 import type { StripDragReport } from './providers/band-strip-range';
+import { lastStripOpenReport } from './providers/bg-anim-art';
+import type { StripOpenReport } from './providers/bg-anim-art';
 import { useAetherStore } from './state/aetherStore';
 import { useViewStore } from './state/viewStore';
 import { useArtStore } from './state/artStore';
@@ -452,6 +454,21 @@ interface AeonProbeApi {
    * it, which is what a row needs when two paths can produce one observable.
    */
   stripDrag(): StripDragReport;
+  /**
+   * What the last DOUBLE CLICK on the blob strip did — ROADMAP row 57's door to
+   * a static slot.
+   *
+   * `bgArtOpen()` cannot stand in for this, and the gap is exactly the one row
+   * 57 exists about. It shows the document that is open, so it is equally happy
+   * with a document the BANK door opened — and on the two non-opening branches
+   * (`ignored` on the foreground strip, `refused` on a background that is not
+   * the override) it shows the document that was already there, which is
+   * byte-identical to what a build with no `onDoubleClick` at all would show.
+   * `gestures` advancing proves the gesture RAN; `kind` proves which branch took
+   * it; `openedTileIndex` proves WHICH slot, so a row cannot be satisfied by
+   * "some document opened".
+   */
+  stripOpen(): StripOpenReport;
   /** What the lens resolves RIGHT NOW, independent of the draw pass. */
   bandLensTarget(): { kind: 'band'; index: number } | { kind: 'candidate' } | null;
   /**
@@ -715,6 +732,7 @@ function installAeonProbe(): AeonProbeApi {
     bandLens: () => lastBandLensReport(),
     bandMark: () => lastBandMarkReport(),
     stripDrag: () => lastStripDragReport(),
+    stripOpen: () => lastStripOpenReport(),
     bandLensTarget: () => useEditorStore.getState().bandLensTarget,
     setBandLensTarget: (t) => useEditorStore.getState().setBandLensTarget(t),
     selectedBand: () => useEditorStore.getState().selectedBgBand,
