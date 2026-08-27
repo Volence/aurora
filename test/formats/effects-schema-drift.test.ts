@@ -56,6 +56,33 @@ import { EFFECTS_SCENE_SCHEMA } from '../../src/core/formats/effects/scene';
  * the named commit: `origin/main:contract/schema/...` is the same blob, so this
  * pin is current rather than merely correctly cited.
  *
+ * WHY IT MOVED A FOURTH TIME (0f661b70 -> dd972cf0). empyrean 0bd4753 RETIRED
+ * `precision`. This one is a DELETE, not a reservation, and the distinction is
+ * the whole content of the change: aeon's engine deleted the STORAGE, not merely
+ * the behaviour -- `engine/level/scene_dsl.emp:422-423` records `precision:
+ * cell | line` (PRECISION_CELL / PRECISION_LINE and the `Scene.sc_precision`
+ * field) as having "LIVED HERE until 2026-08-26", retired with the per-cell
+ * HScroll path under owner ruling d-29-corrected, and `:1009` records
+ * `sc_pad_5D` shrinking `u16 -> u8` to fill the byte `sc_precision` vacated.
+ * Contrast `v_factor_fg`, which stays in the schema RESERVED because the runtime
+ * will read it: a reserved slot is for a field that is coming, and this one is
+ * gone. Owner ruling d-16 in docs/decisions.jsonl chose removal over reservation
+ * for exactly that reason. The hub applied it to the shared contract; ROADMAP
+ * row 59 is Aurora's half. Re-vendored by `git show 0bd4753:contract/schema/...`,
+ * never retyped; the extracted bytes hash to what that revision holds, exactly
+ * one line left the file, and currency was checked AT TIP as well as at the
+ * named commit (`origin/main:contract/schema/...` is the same blob dd972cf0, and
+ * 0bd4753 is an ancestor of origin/main). The anchor bound (8->16) and the
+ * `left_column_mask` conditions that rode in on the same hub commit were ALREADY
+ * vendored here by ROADMAP rows 56 and 58, which is why this re-pin is one line.
+ *
+ * AURORA DID NEED EDITS THIS TIME, unlike the layer-ceiling re-pin below, and by
+ * design: `scene-ui.ts` read the enum out of the schema with
+ * `stringEnumAt('properties','precision')`, so deleting the key makes that read
+ * THROW at module load and take the suite with it. That is the derived-not-copied
+ * design working as specified two paragraphs down ("EVERY READ IS LOUD") -- the
+ * derivation was removed, not papered over with a fallback.
+ *
  * NOTHING ELSE IN AURORA NEEDED AN EDIT, and that is a property worth stating
  * because it is the whole reason this vendoring design was chosen. Every layer
  * bound in the app is read from this file through `EFFECTS_LAYER_COUNT`
@@ -90,7 +117,7 @@ const SCHEMA_PATH = resolve(
 );
 
 /** empyrean contract/schema/aurora-effects-scene.schema.json, blob hash. */
-const PINNED_BLOB = '0f661b7052cced56597e958849bbcd787db5a07e';
+const PINNED_BLOB = 'dd972cf0e203a11330dfcec60b8c3ca59eac5b49';
 
 /** git's object id: sha1 over "blob <bytelen>\0" + the file's bytes. */
 function gitBlobHash(bytes: Buffer): string {

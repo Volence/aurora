@@ -126,7 +126,14 @@ const CANOPY_ON_DISK = [
   '  ],',
   '  "v_factor": 2,',
   '  "v_center": 112,',
-  '  "precision": "cell",',
+  // `precision` sat here until ROADMAP row 59 retired it from the contract
+  // (empyrean 0bd4753). It could not simply be dropped and left at that: this
+  // constant's JOB is to be a scene carrying fields the wave-1 UI cannot edit,
+  // so the coverage has to be REPLACED, not deleted. `v_factor_fg` is the right
+  // substitute and the contrast row 59 turns on — it is the field that stays
+  // RESERVED in the schema because the runtime will read it, where `precision`
+  // was deleted outright because the engine dropped the storage.
+  '  "v_factor_fg": 3,',
   '  "budget_class": "heavy"',
   '}',
 ].join('\n');

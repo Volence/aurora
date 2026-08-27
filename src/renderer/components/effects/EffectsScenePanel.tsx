@@ -418,7 +418,8 @@ export default function EffectsScenePanel(): React.ReactElement {
           </Field>
           {/*
             ONE FIELD PER ROW (ROADMAP item 41). `V center` and `V offset` used
-            to share a line, and so did `Precision` and `Transition`: the second
+            to share a line, and so did `Precision` and `Transition` (until row
+            59 retired `Precision` outright): the second
             label in each pair started wherever the first control happened to
             end, so no label column could reach it. That is the half of "mixed
             label widths" that was really wrong — every FIRST label already
@@ -471,15 +472,20 @@ export default function EffectsScenePanel(): React.ReactElement {
               onChange={(n) => run(setSceneFieldCommand(
                 library, selected.id, 'v_offset', clampVOffset(n)))} />
           </Field>
-          <Field label="Precision">
-            <Select title="precision — wave 1 authors cell precision only ('line' is a reserved engine tier)"
-              value={typeof selected.precision === 'string' ? selected.precision : SCENE_FORM_CHOICES.precision[0]}
-              onChange={(v) => run(setSceneFieldCommand(
-                library, selected.id, 'precision', v as EffectsScene['precision']))}
-              style={{ flex: 1, minWidth: 0 }}>
-              {SCENE_FORM_CHOICES.precision.map((p) => <option key={p} value={p}>{p}</option>)}
-            </Select>
-          </Field>
+          {/*
+            `Precision` LIVED HERE, and it was a control for a field the engine
+            had already deleted (ROADMAP row 59, owner ruling d-16). aeon retired
+            `Scene.sc_precision` on 2026-08-26 with the per-cell HScroll path;
+            empyrean `0bd4753` then cut the key from the shared schema, so this
+            dropdown was writing a value nothing would ever read. Removed rather
+            than hidden: the schema has no key, the model has no field, and
+            `SCENE_FORM_CHOICES` has no entry, so there is nothing left to
+            re-grow it from by accident. An old scene file that still carries
+            `precision` does NOT quietly lose the key here — it is refused at
+            load, by name, because the contract schema is closed. That refusal is
+            the ruled behaviour and the affected population is empty; see
+            scene.ts's field note and docs/reviews/2026-08-27-retire-precision.md.
+          */}
           <Field label="Transition">
             <Select title="transition"
               value={typeof selected.transition === 'string' ? selected.transition : SCENE_FORM_CHOICES.transition[0]}

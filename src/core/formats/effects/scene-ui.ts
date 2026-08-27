@@ -2,7 +2,7 @@
 // of the committed contract schema at module load, never re-typed beside it.
 //
 // WHY THIS MODULE EXISTS AT ALL. §2.3's factor set is sixteen names; §2.1's
-// `precision` is two; the layer count is a bounded range; `world_y` is
+// `transition` is two; the layer count is a bounded range; `world_y` is
 // 0..32767. Those are
 // exactly the kind of facts a form types into a `const` array and then holds
 // forever, silently, after the contract moves.
@@ -140,24 +140,38 @@ export function factorLabel(f: EffectsFactor): string {
 // §2.1 — scene-level enumerations and bounds
 // ---------------------------------------------------------------------------
 
-/** Everything the schema permits for `precision`, in schema order. */
-export const EFFECTS_PRECISION_VALUES = stringEnumAt('properties', 'precision');
-
-/**
- * What the WAVE-1 UI offers for `precision` — `"cell"` only.
+/*
+ * `precision` LIVED HERE, as EFFECTS_PRECISION_VALUES (the schema's own enum)
+ * and WAVE1_PRECISION_VALUES (that enum filtered to `"cell"`). Both are gone —
+ * ROADMAP row 59, vendored schema blob 0f661b70 → dd972cf0 at empyrean 0bd4753.
  *
- * `"line"` is a reserved engine tier (schema §2.1's own note: "wave-1 UI exposes
- * `cell` only"). It is FILTERED OUT OF the schema's list rather than written as a
- * one-element literal, so if a future amendment renames or removes `cell` this
- * becomes empty and its test fails loudly, instead of the UI offering a value the
- * schema no longer has.
+ * REMOVED, NOT RESERVED, and the difference is the point. aeon deleted the
+ * STORAGE, not just the behaviour: `engine/level/scene_dsl.emp:422-423` records
+ * `PRECISION_CELL` / `PRECISION_LINE` and the `Scene.sc_precision` field as
+ * having "LIVED HERE until 2026-08-26" (retired with the per-cell HScroll path
+ * under owner ruling d-29-corrected — the field's only consumer was arm 4 of the
+ * per-line forcer, and with one fill there is nothing to force), and `:1009`
+ * records `sc_pad_5D` shrinking `u16 -> u8` to fill the byte it vacated. So
+ * there is nothing left to reserve a slot FOR. Contrast `v_factor_fg`, which
+ * stays in the schema because the runtime will read it. Owner ruling d-16.
  *
- * The filter is a wave-1 UI policy and NOT a validation rule: a scene document on
- * disk carrying `"line"` still loads, still round-trips and still saves — the
- * codec is the rulebook, and this list only decides what a dropdown shows.
+ * AND THE SCHEMA IS CLOSED, so this is not only a missing dropdown: a scene file
+ * still carrying `precision` is REFUSED at load rather than silently stripped.
+ * That is ruled, the affected population was verified empty, and no tolerant
+ * read was added — scene.ts's `precision` note carries the full reasoning.
+ *
+ * WHAT THIS DELETION IS EVIDENCE OF, worth one line because it is the reason the
+ * module is written this way: the read above was `stringEnumAt('properties',
+ * 'precision')`, and the moment the key left the vendored schema it THREW at
+ * module load —
+ *   "effects scene schema has nothing at properties.precision — a UI constraint
+ *    that used to be derivable no longer is; re-derive it against the amended
+ *    schema."
+ * — and took the whole suite with it. That is "EVERY READ IS LOUD" in the header
+ * doing its job. A hand-typed `['cell','line']` here would have gone on offering
+ * a dead control in silence, which is precisely the defect row 59 exists to fix.
+ * The fix was to DELETE the derivation, never to give it a fallback.
  */
-export const WAVE1_PRECISION_VALUES: readonly string[] =
-  Object.freeze(EFFECTS_PRECISION_VALUES.filter(v => v === 'cell'));
 
 /** Everything the schema permits for `transition`, in schema order. */
 export const EFFECTS_TRANSITION_VALUES = stringEnumAt('properties', 'transition');
@@ -543,7 +557,7 @@ export function sceneIdRefusal(id: string, library: EffectsSceneLibrary): string
  * `schema`, `id`, `layers` (one), `v_factor`. Plus `name`, which is the only
  * writer-owned field in the format and the only one an author sees in a list.
  *
- * NO DEFAULTS ARE WRITTEN OUT. `dsa`, `phase`, `precision`, `transition` and the
+ * NO DEFAULTS ARE WRITTEN OUT. `dsa`, `phase`, `transition` and the
  * rest are all absent, which is exactly what scene.ts's model comment demands:
  * "injecting defaults would turn every load/save of an untouched file into a diff,
  * and would silently freeze today's default into files that should track the

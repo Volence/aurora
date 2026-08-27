@@ -9,15 +9,25 @@
 //     (golden protocol) — read at empyrean 069cf59, an ancestor of c2c81e2.
 //   • empyrean contract/schema/aurora-effects-scene.schema.json — the
 //     machine-readable half, vendored beside this file. Its git blob hash is
-//     cab3ca5817ceb4db3a8c51405e9ec9dba038ee09 and the vendored copy is pinned
+//     dd972cf0e203a11330dfcec60b8c3ca59eac5b49 and the vendored copy is pinned
 //     against that hash by test/formats/effects-schema-drift.test.ts. The BLOB
 //     hash, not a commit citation, is the load-bearing invariant: the schema
 //     doc has moved twice (2f3b6fd, 069cf59) with the schema JSON byte-identical
 //     underneath, so a commit pin would read as drift that is not there.
-//     PREVIOUS PIN 2d7a9fee37d85334103ca1a3e03e1a40466d6d9c, re-vendored at
-//     empyrean a32bcb03 (CR-1): `v_factor` and `v_factor_fg` lost their `$ref`
-//     to `$defs/factor` and became plain integers 0..15. See the v_factor field
-//     comment below for why that was a defect and not a preference.
+//     THAT TEST IS THE PIN OF RECORD — it is the only citation a change can go red on,
+//     and this comment is prose beside it. (Said because this line CARRIED A
+//     STALE HASH for two whole re-pins: it still read cab3ca58 — item 35's
+//     value — after item 37 moved the blob to d4345af5 and row 56 moved it to
+//     0f661b70, and nothing went red, because nothing hashes a comment. Row 59
+//     corrected it to the current value rather than adding a fifth entry to a
+//     history that was already wrong.)
+//     PIN HISTORY, current last: 2d7a9fee (landing) → cab3ca58 (a32bcb03, CR-1:
+//     `v_factor`/`v_factor_fg` lost their `$ref` to `$defs/factor` and became
+//     plain integers 0..15 — see the v_factor field comment below for why that
+//     was a defect and not a preference) → d4345af5 (5c930d6, `v_center` and
+//     `v_offset` bounded) → 0f661b70 (277bc15, `layers` maxItems 8 → 16) →
+//     dd972cf0 (0bd4753, `precision` RETIRED — the engine deleted the storage,
+//     so this is a delete and not a reservation; ROADMAP row 59).
 //   • aeon tools/EFFECTS_CONSUMER_CONTRACT.md §2.1/§2.3 at aeon 00607dd5 — the
 //     consumer's read set, and the drift rule that governs both directions.
 //
@@ -139,7 +149,29 @@ export interface EffectsScene {
   v_deform?: EffectsVDeform;
   anchor?: EffectsAnchor;
   left_column_mask?: 'undeclared' | 'sprite_mask' | 'factor0_lock' | 'accept';
-  precision?: 'cell' | 'line';
+  /*
+   * `precision?: 'cell' | 'line'` LIVED HERE until 2026-08-27 (ROADMAP row 59).
+   * empyrean 0bd4753 retired it from the contract because aeon deleted the
+   * STORAGE — see the pin history above and scene-ui.ts's note.
+   *
+   * AND A DOCUMENT THAT STILL CARRIES IT IS NOW REFUSED, which is worth stating
+   * HERE because the paragraph above ("a field the wave-1 UI does not edit
+   * cannot be lost here") reads like it promises the opposite. It does not. That
+   * paragraph is about fields the SCHEMA still declares and the UI merely does
+   * not edit; `precision` is no longer declared at all, and this schema is CLOSED
+   * (`unevaluatedProperties: false`), so validation refuses it before any
+   * round-trip question arises. The two rules compose exactly as intended: the
+   * schema decides what may exist, and the codec refuses to drop anything the
+   * schema allows.
+   *
+   * NO TOLERANT READ WAS ADDED, and the hub explicitly left that call to Aurora
+   * ("a tolerant read that discards a stray `precision` is aurora's call"). The
+   * population is empty — checked on the owner's live aeon tree, not assumed —
+   * and a silent discard is the lossy behaviour §6 hazard 1 forbids. The refusal
+   * names the file; the author deletes one line. See
+   * test/formats/effects-scene.test.ts, "REFUSES a legacy scene", and
+   * docs/reviews/2026-08-27-retire-precision.md.
+   */
   transition?: 'smooth' | 'instant';
   budget_class?: string;
 }

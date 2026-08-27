@@ -39,7 +39,6 @@ import {
   EFFECTS_LEFT_COLUMN_MASK_UNDECLARED, EFFECTS_LEFT_COLUMN_MASK_VALUES, EFFECTS_FACTOR_ZERO,
   EFFECTS_SCENE_KEY_DEFAULTS, EFFECTS_LAYER_KEY_DEFAULTS,
   type TableRefParam,
-  WAVE1_PRECISION_VALUES,
   EFFECTS_TRANSITION_VALUES,
   cloneEffectsScene, factorLabel, isNamedFactor, newEffectsLayer, newEffectsScene,
   sceneIdRefusal,
@@ -1431,7 +1430,7 @@ export function clampVSplitAt(value: number): number {
  * without.
  */
 export type SceneFormKey =
-  | 'name' | 'v_factor' | 'v_center' | 'v_offset' | 'precision' | 'transition'
+  | 'name' | 'v_factor' | 'v_center' | 'v_offset' | 'transition'
   | 'deform_fg' | 'deform_bg' | 'v_deform' | 'left_column_mask';
 
 /**
@@ -1526,7 +1525,6 @@ export function layerExtrasLine(layer: EffectsLayer): string | null {
 
 /** Everything the scene-level form may offer, in one place for the component. */
 export const SCENE_FORM_CHOICES = {
-  precision: WAVE1_PRECISION_VALUES,
   transition: EFFECTS_TRANSITION_VALUES,
 } as const;
 
