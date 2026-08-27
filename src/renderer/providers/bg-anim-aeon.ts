@@ -374,7 +374,33 @@ export const NO_SLOTS_PHRASE = 'no slots';
  */
 export function slotSpanPhrase(base: number, count: number): string {
   if (count <= 0) return NO_SLOTS_PHRASE;
-  return `slots ${base}..${base + count - 1}`;
+  return `slots ${slotSpanDigits(base, count)}`;
+}
+
+/**
+ * `"12..19"` — the SAME span, without the noun, for a readout whose box has no
+ * room for one.
+ *
+ * ⚠ THIS IS WHERE THE ARITHMETIC LIVES, and `slotSpanPhrase` is now a wrapper
+ * over it rather than a second copy. That is the whole point: item 54 put every
+ * inclusive `base..last` in ONE place so the readouts could not drift apart
+ * again, and a narrow surface that hand-rolled `${base}..${base + count - 1}`
+ * to save six characters would put the off-by-one straight back — on the one
+ * readout with no room to show its working.
+ *
+ * WHEN TO USE WHICH: the phrase, always, unless the span has been MEASURED not
+ * to fit. `ArtBrowser`'s hover line is the only such surface today — its box is
+ * ~102px beside a `flexShrink: 0` count label in a 224px docked panel, and the
+ * phrase form of a real three-digit span overflows it by ~30px. Everywhere with
+ * room says "slots" out loud, including that line's own `title`.
+ *
+ * The empty range answers `NO_SLOTS_PHRASE` here too, so the two forms agree
+ * about what nothing is called — a bare `..` form of "no slots" would be the
+ * backwards `0..-1` this constant exists to prevent.
+ */
+export function slotSpanDigits(base: number, count: number): string {
+  if (count <= 0) return NO_SLOTS_PHRASE;
+  return `${base}..${base + count - 1}`;
 }
 
 export interface BandRow extends BgAnimBandView {
