@@ -9,6 +9,7 @@ import {
 } from '../../src/core/formats/effects/scene';
 import { validateAgainstSchema } from '../../src/core/formats/effects/json-schema-subset';
 import { SCENE_DEFORM_ROWS } from '../../src/renderer/providers/effects-aeon';
+import { EFFECTS_LAYER_COUNT } from '../../src/core/formats/effects/scene-ui';
 
 /**
  * THE WRITER-ORIGINATED FIXTURE (ROADMAP item 31).
@@ -109,15 +110,43 @@ describe('writer-originated effects scene fixture', () => {
   it('the fixture is the scene the session authored, not a stub', () => {
     const doc = JSON.parse(TEXT) as Record<string, unknown>;
     expect(doc.id).toBe('writer_session_ojz');
-    // Eight layers is the app's own ceiling, reached by clicking Add layer until
-    // it refused — see provenance R3.
-    expect(Array.isArray(doc.layers) && (doc.layers as unknown[]).length).toBe(8);
+    // THE COUNT IS THE APP'S CEILING, AND IT IS DERIVED HERE RATHER THAN TYPED
+    // (ROADMAP row 60). Gesture R3 clicks Add layer until the control refuses, so
+    // the number in this file is `layers.maxItems` and nothing else. It read
+    // `.toBe(8)` until 2026-08-27 — a literal, and it went stale in silence when
+    // empyrean `277bc15` raised the ceiling to 16: the fixture disagreed with its
+    // own gesture rule for a whole contract revision and no test could say so,
+    // because the pin agreed with the stale file. Bound to the constant, the next
+    // ceiling change turns this row RED and the fix is a re-run, exactly as the
+    // provenance demands.
+    expect(Array.isArray(doc.layers) && (doc.layers as unknown[]).length)
+      .toBe(EFFECTS_LAYER_COUNT.max);
     // The packed triple the app SEEDED when the enumeration landed on the
     // custom-factor sentinel (R6). Nothing in the session typed these numbers.
     expect((doc.layers as Record<string, unknown>[])[0].fb).toEqual({ op: 0, s1: 0, s2: 15 });
     // Non-ASCII survived the writer's `ensure_ascii=False`-equivalent rendering.
     expect(doc.name).toContain('—');
     expect(BYTES.length).toBeGreaterThan(200);
+    // THE DEFORM ATTACHMENTS ARE HERE NOW (ROADMAP row 60), and this is the row
+    // that keeps them here. The key-set assertion below is an UPPER bound — it
+    // permits a fixture carrying none of them — so a future re-run whose deform
+    // gestures silently stopped landing (the failure this fixture has now had
+    // five times) would emit a file with no deform keys and pass every other
+    // assertion in this file. This one goes red instead.
+    for (const k of ['deform_fg', 'deform_bg', 'v_deform', 'left_column_mask']) {
+      expect(doc, `the session authored ${k}`).toHaveProperty(k);
+    }
+    // And the MUTUAL gate the engine enforces (scene_dsl.emp:1288 / :1293): the
+    // per-column V deform and its policy stand or fall together, and `undeclared`
+    // beside a `v_deform` is a scene aeon's build refuses.
+    expect('v_deform' in doc).toBe('left_column_mask' in doc);
+    expect(doc.left_column_mask).not.toBe('undeclared');
+    // The layer attachment sits on the LAST strip and only there — R16 is a rule
+    // ("the last", as R6 and R9 use), so a run that put one on every card would
+    // not be the session this record describes.
+    const layers = doc.layers as Record<string, unknown>[];
+    expect(layers.filter(l => 'deform' in l).length).toBe(1);
+    expect(layers[layers.length - 1]).toHaveProperty('deform');
   });
 
   it('validates against the committed schema exactly as emitted', () => {
@@ -153,14 +182,17 @@ describe('writer-originated effects scene fixture', () => {
   /**
    * A NECESSARY CONDITION for "this came out of the wave-1 Effects panel": it
    * carries no key that panel has no control for. `anchor`, `budget_class`,
-   * `dsa/dsb`, `phase`, `enabled`, `left_column_mask` and `v_factor_fg` are all
-   * schema-legal and all unreachable from the UI today, so any of them appearing
-   * here means the file did not come from a session.
+   * `dsa/dsb`, `phase`, `enabled` and `v_factor_fg` are all schema-legal and all
+   * unreachable from the UI today, so any of them appearing here means the file
+   * did not come from a session.
    * (`curve` and `vsplit` became authorable in parcel H, and the four deform
-   * attachments — `deform_fg`, `deform_bg`, `v_deform`, a layer's `deform` — in
-   * wave 2. The fixture predates all six and carries none, which the set below
-   * still permits: it is an upper bound on what a session could produce, and it
-   * WIDENS as the panel grows controls. That is the point of deriving it.)
+   * attachments — `deform_fg`, `deform_bg`, `v_deform`, a layer's `deform` — plus
+   * `left_column_mask` in wave 2. ROADMAP row 60 widened the gesture sequence to
+   * the deform five and the fixture now carries all of them; `curve` and `vsplit`
+   * it still does not, which the set below permits, because the set is an UPPER
+   * bound on what a session could produce and it WIDENS as the panel grows
+   * controls. That is the point of deriving it. The row that stops the deform
+   * keys quietly vanishing again is in the anti-vacuous preamble, not here.)
    *
    * It is NOT a sufficient condition. A hand-written document restricted to these
    * keys passes. Said again because this is the assertion most likely to be

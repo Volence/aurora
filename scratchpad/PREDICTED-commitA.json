@@ -1,24 +1,4 @@
 {
-  "deform_bg": {
-    "shared": {
-      "speed": 16,
-      "table": {
-        "amplitude": 16,
-        "generator": "triangle",
-        "period": 16
-      }
-    }
-  },
-  "deform_fg": {
-    "shared": {
-      "speed": 16,
-      "table": {
-        "amplitude": 16,
-        "generator": "sine",
-        "period": 16
-      }
-    }
-  },
   "id": "writer_session_ojz",
   "layers": [
     {
@@ -101,38 +81,15 @@
       "world_y": 448
     },
     {
-      "deform": {
-        "own": {
-          "phase": 16,
-          "shift_a": 0,
-          "shift_b": 0,
-          "speed": 16,
-          "table": {
-            "focal": 16,
-            "generator": "v_column_perspective",
-            "max_offset": 16
-          }
-        }
-      },
       "fa": "FACTOR_15_16",
       "fb": "FACTOR_0",
       "world_y": 480
     }
   ],
-  "left_column_mask": "accept",
   "name": "Oracle Jungle Zone — writer session",
   "schema": 1,
   "transition": "instant",
   "v_center": 16,
-  "v_deform": {
-    "columns": {
-      "amp_shift": 15,
-      "speed": 16,
-      "table": {
-        "generator": "zero"
-      }
-    }
-  },
   "v_factor": 0,
   "v_offset": -16
 }
