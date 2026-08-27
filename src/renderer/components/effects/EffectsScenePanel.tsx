@@ -53,8 +53,13 @@ import { useEditorStore, executeCommand } from '../../state/editorStore';
 import { useHistoryVersion } from '../../hooks/useHistoryVersion';
 import type { AnyCommand } from '../../../core/editing/commands';
 import type {
-  EffectsScene, EffectsSceneLibrary, EffectsLayer, EffectsPackedFactor,
+  EffectsScene, EffectsSceneLibrary, EffectsLayer, EffectsPackedFactor, EffectsTableRef,
 } from '../../../core/formats/effects/scene';
+// THE ADVISORY NOTHING CALLED. `advisoryLayerDeformConflicts` has been a pure
+// function in the codec since wave 1 with no caller anywhere — the Aurora side
+// of §2.2's two-sources guard, written and then never wired. The layer card is
+// its reader: see the deform row.
+import { advisoryLayerDeformConflicts } from '../../../core/formats/effects/scene';
 import {
   factorOptions, clampPackedField,
   factorFieldSelectValue, factorFieldFromSelect, NONE_FACTOR_VALUE,
@@ -69,6 +74,14 @@ import {
   SCENE_FORM_CHOICES, EFFECTS_LAYER_COUNT, EFFECTS_PACKED_FACTOR_BOUNDS,
   EFFECTS_V_FACTOR_BOUNDS, EFFECTS_V_CENTER_BOUNDS, EFFECTS_V_OFFSET_BOUNDS,
   PLANE_FACTOR_ROWS, PLANE_FACTOR_HINT,
+  TABLE_REF_ROW, SCENE_DEFORM_ROWS, SCENE_DEFORM_ROW_SHARED, V_DEFORM_ROW, LAYER_DEFORM_ROW,
+  tableRefFormOptions, tableRefFormOf, tableRefFromForm, tableRefParams, tableParamLabel,
+  tableRefParamValue, setTableRefParam, tableRefBinPath, binPathRefusal, tableRefAdvisory,
+  tableRefLabel,
+  sceneDeformValue, sceneDeformFromToggle, vDeformValue, vDeformFromToggle,
+  layerDeformValue, layerDeformFromToggle, layerDeformAdvisory, sceneDeformAdvisories,
+  clampLayerDeformField, clampAmpShift, clampDeformSpeed,
+  EFFECTS_LAYER_DEFORM_BOUNDS, EFFECTS_V_DEFORM_AMP_SHIFT_BOUNDS,
 } from '../../providers/effects-aeon';
 
 const EMPTY_LIBRARY: EffectsSceneLibrary = { scenes: [], unreadable: [], notices: [] };
@@ -204,6 +217,77 @@ function FactorField<N extends string | undefined = undefined>({ value, onChange
   );
 }
 
+/**
+ * A `$defs/tableRef` sub-form — the 256-byte curve a deform samples.
+ *
+ * ONE COMPONENT FOR ALL FOUR ATTACHMENTS. `deform_fg`, `deform_bg`, `v_deform`
+ * and a layer's `deform.own` each point at the SAME `tableRef`, so a picker per
+ * attachment would be four copies of one contract; the sub-form is passed the
+ * table and told what to do with a new one.
+ *
+ * THE FORM LIST AND EVERY PARAMETER ROW ARE DERIVED. `tableRefFormOptions()`
+ * comes from the schema's `oneOf`, and the spinners below come from the chosen
+ * branch's own `required` list with its own ranges — so this renders SIX forms,
+ * not the two ("a wave shape, or a file") a hand-written form would have
+ * offered, and a seventh arrives by re-vendoring the schema. `zero` and `.bin`
+ * declare no parameters and correctly draw none.
+ *
+ * ONE FIELD PER ROW, like the rest of the column (ROADMAP item 41): a generator
+ * with two parameters is three rows, not a row with three controls wedged into
+ * a 220px gutter.
+ */
+function TableRefField({ table, onChange, titlePrefix }: {
+  table: EffectsTableRef;
+  onChange: (t: EffectsTableRef) => void;
+  titlePrefix: string;
+}) {
+  const form = tableRefFormOf(table);
+  const binPath = tableRefBinPath(table);
+  const refusal = binPath === null ? null : binPathRefusal(binPath);
+  const advice = tableRefAdvisory(table);
+  return (
+    <>
+      <Field label={TABLE_REF_ROW.label} title={TABLE_REF_ROW.title}>
+        {/* The whole attachment, spelled, on the control that picks its shape —
+            `sine(8, 64)`, `tables/canopy.bin`. A select showing `sine` and two
+            spinners never says the call; `tableRefLabel` is the one place it is
+            said, and it used to be said on the read-only extras line that the
+            deform row has now replaced. */}
+        <Select title={`${titlePrefix} table — ${tableRefLabel(table)}`} value={form}
+          onChange={(v) => onChange(tableRefFromForm(v, table))}
+          style={{ flex: 1, minWidth: 0 }}>
+          {tableRefFormOptions().map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+        </Select>
+      </Field>
+      {tableRefParams(form).map((p) => (
+        // BOUNDED BY THE CLAMP, NOT THE PROPS (ROADMAP item 37) — `min`/`max`
+        // here only style the spinner, and `setTableRefParam` is what actually
+        // holds the value inside the branch's declared range. An UNBOUNDED
+        // parameter (`focal`, `center`, `max_offset`) passes `undefined` for
+        // both rather than inventing a ceiling the contract does not have.
+        <Field key={p.key} label={tableParamLabel(p.key)}>
+          <NumberField
+            title={`${titlePrefix} ${p.key}`
+              + (p.min !== null && p.max !== null ? ` (${p.min}..${p.max})` : ' — unbounded')}
+            min={p.min ?? undefined} max={p.max ?? undefined} width={72}
+            value={tableRefParamValue(table, p.key)}
+            onChange={(n) => onChange(setTableRefParam(table, p.key, n))} />
+        </Field>
+      ))}
+      {binPath !== null && (
+        <Field label={TABLE_REF_ROW.binLabel} title={TABLE_REF_ROW.binTitle}>
+          <input value={binPath} placeholder="tables/name.bin"
+            title={`${titlePrefix} bin — ${TABLE_REF_ROW.binRule}`}
+            onChange={(e) => onChange({ bin: e.target.value })}
+            style={textInput} />
+        </Field>
+      )}
+      {refusal !== null && <Hint under tone="warning">{refusal}</Hint>}
+      {advice !== null && <Hint under tone="warning">{advice}</Hint>}
+    </>
+  );
+}
+
 export default function EffectsScenePanel(): React.ReactElement {
   // Re-read the library after any execute/undo/redo — a scene edit mutates the
   // project in place, so there is no store identity change to subscribe to.
@@ -226,6 +310,11 @@ export default function EffectsScenePanel(): React.ReactElement {
   // Keep the selection on something that exists: undoing a create, or opening a
   // different project, leaves a stale id behind.
   const selected = resolveSelectedScene(library, selectedId);
+
+  // ONCE PER SCENE, NOT ONCE PER CARD. The advisory walks every layer and
+  // returns `/layers/N` paths, so calling it inside the map would be N scans of
+  // N layers to render N cards.
+  const deformConflicts = selected ? advisoryLayerDeformConflicts(selected) : [];
 
   const state = useProjectStore.getState();
   const act = state.project && state.currentActId
@@ -388,7 +477,7 @@ export default function EffectsScenePanel(): React.ReactElement {
               {SCENE_FORM_CHOICES.precision.map((p) => <option key={p} value={p}>{p}</option>)}
             </Select>
           </Field>
-          <Field label="Transition" style={{ marginBottom: 0 }}>
+          <Field label="Transition">
             <Select title="transition"
               value={typeof selected.transition === 'string' ? selected.transition : SCENE_FORM_CHOICES.transition[0]}
               onChange={(v) => run(setSceneFieldCommand(
@@ -397,6 +486,99 @@ export default function EffectsScenePanel(): React.ReactElement {
               {SCENE_FORM_CHOICES.transition.map((t) => <option key={t} value={t}>{t}</option>)}
             </Select>
           </Field>
+          {/*
+            ═══ DEFORM (wave 2) ═══
+
+            The two plane rows are ONE loop over `SCENE_DEFORM_ROWS`, not two
+            hand-written blocks: `deform_fg` and `deform_bg` are the same
+            `$defs/sceneDeform` pointed at two planes, and the pair of them
+            written out twice is exactly the copy that lets one grow a control
+            the other does not have.
+
+            OFF CLEARS THE KEY, it does not write `"none"` — setSceneFieldCommand's
+            rule, and the reason it now has a none-defaulted arm at all.
+          */}
+          {(Object.keys(SCENE_DEFORM_ROWS) as (keyof typeof SCENE_DEFORM_ROWS)[]).map((key) => {
+            const row = SCENE_DEFORM_ROWS[key];
+            const shared = sceneDeformValue(selected, key);
+            const write = (next: { table: EffectsTableRef; speed: number }) => run(
+              setSceneFieldCommand(library, selected.id, key, { shared: next }));
+            return (
+              <React.Fragment key={key}>
+                <Field label={row.label} title={row.title}>
+                  <Select title={`${row.title}`} value={shared === null ? 'none' : 'on'}
+                    onChange={(v) => run(setSceneFieldCommand(
+                      library, selected.id, key, sceneDeformFromToggle(v === 'on')))}
+                    style={{ width: 88 }}>
+                    <option value="none">{SCENE_DEFORM_ROW_SHARED.none}</option>
+                    <option value="on">{SCENE_DEFORM_ROW_SHARED.on}</option>
+                  </Select>
+                </Field>
+                {shared !== null && (
+                  <>
+                    <TableRefField table={shared.table} titlePrefix={key}
+                      onChange={(t) => write({ ...shared, table: t })} />
+                    <Field label={tableParamLabel('speed')}>
+                      <NumberField title={`${key} ${SCENE_DEFORM_ROW_SHARED.speedTitle}`} width={72}
+                        value={shared.speed}
+                        onChange={(n) => write({ ...shared, speed: clampDeformSpeed(n) })} />
+                    </Field>
+                  </>
+                )}
+              </React.Fragment>
+            );
+          })}
+          <Hint under>{SCENE_DEFORM_ROW_SHARED.hint}</Hint>
+          {/* THE PER-COLUMN ONE, kept visually beside the plane rows and said to
+              be a different thing in its own hint: `v_deform` is per-column
+              VERTICAL scroll (VDP reg $0B bit 2), not a third plane table. */}
+          {(() => {
+            const columns = vDeformValue(selected);
+            const write = (next: { table: EffectsTableRef; speed: number; amp_shift: number }) => run(
+              setSceneFieldCommand(library, selected.id, 'v_deform', { columns: next }));
+            return (
+              <>
+                <Field label={V_DEFORM_ROW.label} title={V_DEFORM_ROW.title}>
+                  <Select title={V_DEFORM_ROW.title} value={columns === null ? 'none' : 'on'}
+                    onChange={(v) => run(setSceneFieldCommand(
+                      library, selected.id, 'v_deform', vDeformFromToggle(v === 'on')))}
+                    style={{ width: 88 }}>
+                    <option value="none">{V_DEFORM_ROW.none}</option>
+                    <option value="on">{V_DEFORM_ROW.on}</option>
+                  </Select>
+                </Field>
+                {columns !== null && (
+                  <>
+                    <TableRefField table={columns.table} titlePrefix={V_DEFORM_ROW.key}
+                      onChange={(t) => write({ ...columns, table: t })} />
+                    <Field label={tableParamLabel('speed')}>
+                      <NumberField title={`${V_DEFORM_ROW.key} ${SCENE_DEFORM_ROW_SHARED.speedTitle}`}
+                        width={72} value={columns.speed}
+                        onChange={(n) => write({ ...columns, speed: clampDeformSpeed(n) })} />
+                    </Field>
+                    <Field label={tableParamLabel('amp_shift')}>
+                      <NumberField title={V_DEFORM_ROW.ampTitle}
+                        min={EFFECTS_V_DEFORM_AMP_SHIFT_BOUNDS.min}
+                        max={EFFECTS_V_DEFORM_AMP_SHIFT_BOUNDS.max} width={72}
+                        value={columns.amp_shift}
+                        onChange={(n) => write({ ...columns, amp_shift: clampAmpShift(n) })} />
+                    </Field>
+                  </>
+                )}
+              </>
+            );
+          })()}
+          <Hint under style={{ marginBottom: 0 }}>{V_DEFORM_ROW.hint}</Hint>
+          {/* WHAT THE BUILD WOULD REFUSE, said before the build says it. Four of
+              aeon's five comptime deform guards are CROSS-FIELD — a table with
+              no plane to sample from, a per-column scene colliding with a
+              layer's split, the mandatory left_column_mask policy and its
+              mirror — so no single control can carry them and the shape
+              validator cannot see them either. Advice, never enforcement: sigil
+              stays the rulebook (scene.ts's advisory docblock). */}
+          {sceneDeformAdvisories(selected).map((a) => (
+            <Hint key={a} under tone="warning" style={{ marginBottom: 0 }}>{a}</Hint>
+          ))}
          </SectionBody>
         </CollapsibleSection>
       )}
@@ -511,17 +693,90 @@ export default function EffectsScenePanel(): React.ReactElement {
                 );
               })()}
               <Hint under style={{ marginBottom: 0 }}>{LAYER_VSPLIT_ROW.hint}</Hint>
-              {/* WHAT THE FILE SETS THAT THE CARD STILL CANNOT: deform, disabled,
+              {/* THE STRIP'S OWN DEFORM (wave 2). `own` overrides the scene's
+                  plane-shared table for this strip alone, and it carries the
+                  same `tableRef` the scene rows do — so the same sub-form.
+
+                  TURNING IT ON IS A NO-OP ON PURPOSE: the seed puts shift_a /
+                  shift_b / phase at the schema defaults of the very fields they
+                  lower into, so the picture does not jump before a table is
+                  chosen. `layerDeformAdvisory` is what makes that legible —
+                  without it the row would look broken. */}
+              {(() => {
+                const own = layerDeformValue(layer);
+                const write = (next: NonNullable<ReturnType<typeof layerDeformValue>>) => run(
+                  setLayerFieldCommand(library, selected.id, i, 'deform', { own: next }));
+                const inert = layerDeformAdvisory(layer);
+                return (
+                  <>
+                    <Field label={LAYER_DEFORM_ROW.label} title={LAYER_DEFORM_ROW.title}>
+                      <Select title={`Layer ${i} ${LAYER_DEFORM_ROW.title}`}
+                        value={own === null ? 'none' : 'on'}
+                        onChange={(v) => run(setLayerFieldCommand(
+                          library, selected.id, i, 'deform', layerDeformFromToggle(v === 'on')))}
+                        style={{ width: 88 }}>
+                        <option value="none">{LAYER_DEFORM_ROW.none}</option>
+                        <option value="on">{LAYER_DEFORM_ROW.on}</option>
+                      </Select>
+                    </Field>
+                    {own !== null && (
+                      <>
+                        <TableRefField table={own.table} titlePrefix={`Layer ${i} deform`}
+                          onChange={(t) => write({ ...own, table: t })} />
+                        <Field label={tableParamLabel('shift_a')}>
+                          <NumberField title={`Layer ${i} ${LAYER_DEFORM_ROW.shiftATitle}`}
+                            min={EFFECTS_LAYER_DEFORM_BOUNDS.shift_a.min}
+                            max={EFFECTS_LAYER_DEFORM_BOUNDS.shift_a.max} width={72}
+                            value={own.shift_a}
+                            onChange={(n) => write({ ...own, shift_a: clampLayerDeformField('shift_a', n) })} />
+                        </Field>
+                        <Field label={tableParamLabel('shift_b')}>
+                          <NumberField title={`Layer ${i} ${LAYER_DEFORM_ROW.shiftBTitle}`}
+                            min={EFFECTS_LAYER_DEFORM_BOUNDS.shift_b.min}
+                            max={EFFECTS_LAYER_DEFORM_BOUNDS.shift_b.max} width={72}
+                            value={own.shift_b}
+                            onChange={(n) => write({ ...own, shift_b: clampLayerDeformField('shift_b', n) })} />
+                        </Field>
+                        <Field label={tableParamLabel('phase')}>
+                          <NumberField title={`Layer ${i} ${LAYER_DEFORM_ROW.phaseTitle}`}
+                            min={EFFECTS_LAYER_DEFORM_BOUNDS.phase.min}
+                            max={EFFECTS_LAYER_DEFORM_BOUNDS.phase.max} width={72}
+                            value={own.phase}
+                            onChange={(n) => write({ ...own, phase: clampLayerDeformField('phase', n) })} />
+                        </Field>
+                        <Field label={tableParamLabel('speed')}>
+                          <NumberField title={`Layer ${i} ${SCENE_DEFORM_ROW_SHARED.speedTitle}`}
+                            width={72} value={own.speed}
+                            onChange={(n) => write({ ...own, speed: clampDeformSpeed(n) })} />
+                        </Field>
+                      </>
+                    )}
+                    <Hint under style={{ marginBottom: 0 }}>{LAYER_DEFORM_ROW.hint}</Hint>
+                    {inert !== null && <Hint under tone="warning">{inert}</Hint>}
+                    {/* THE TWO-SOURCES GUARD, wired at last. §2.2: when `own` is
+                        present, this layer's dsa/dsb/phase must be absent or at
+                        their defaults, because both lower into the SAME record
+                        fields. The card has no control for dsa/dsb/phase, so
+                        this state arrives from a HAND-EDITED file — which is
+                        precisely when an author has no other way to be told. */}
+                    {deformConflicts.filter((c) => c.path === `/layers/${i}`).map((c) => (
+                      <Hint key={c.path} under tone="warning">{c.message}</Hint>
+                    ))}
+                  </>
+                );
+              })()}
+              {/* WHAT THE FILE SETS THAT THE CARD STILL CANNOT: disabled, and
                   dsa/dsb/phase. Read-only, mono, at the hint tier so it cannot
                   be mistaken for a control. curve and vsplit left this line
-                  when they got controls above (parcel H). Absent entirely for
-                  a plain layer: no empty line. */}
+                  when they got controls above (parcel H); deform left it in
+                  wave 2, for the same reason. Absent entirely for a plain
+                  layer: no empty line. */}
               {(() => {
                 const line = layerExtrasLine(layer);
                 return line === null ? null : (
                   <Hint under style={{ fontFamily: T.fontMono }}>
                     <span data-testid={`layer-${i}-extras`}
-                      title="Set in the scene file; read-only here (deform is wave 2)">{line}</span>
+                      title="Set in the scene file; read-only here">{line}</span>
                   </Hint>
                 );
               })()}

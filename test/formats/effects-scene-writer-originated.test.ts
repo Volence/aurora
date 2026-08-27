@@ -8,6 +8,7 @@ import {
   EFFECTS_SCENE_SCHEMA,
 } from '../../src/core/formats/effects/scene';
 import { validateAgainstSchema } from '../../src/core/formats/effects/json-schema-subset';
+import { SCENE_DEFORM_ROWS } from '../../src/renderer/providers/effects-aeon';
 
 /**
  * THE WRITER-ORIGINATED FIXTURE (ROADMAP item 31).
@@ -66,7 +67,21 @@ function gitBlobHash(bytes: Buffer): string {
 function uiAuthorableSceneKeys(): Set<string> {
   const found = [...PANEL.matchAll(/setSceneFieldCommand\(\s*library,\s*selected\.id,\s*'([a-z_0-9]+)'/g)]
     .map(m => m[1]);
-  return new Set(['schema', 'id', 'layers', 'v_factor', ...found]);
+  // THE KEYS A LITERAL SCAN CANNOT SEE. The two plane-deform rows are ONE loop
+  // over `SCENE_DEFORM_ROWS` — deliberately, because `deform_fg` and `deform_bg`
+  // are the same `$defs/sceneDeform` pointed at two planes — so the key reaching
+  // `setSceneFieldCommand` there is the loop variable, not a literal. Rather
+  // than re-type the pair here (which is what this derivation exists to avoid),
+  // the loop is PINNED in the panel source and the provider constant's own keys
+  // join the set. If the panel stops mapping that constant into the command, the
+  // assertion below fails rather than the set quietly shrinking.
+  expect(
+    PANEL,
+    'the panel drives SCENE_DEFORM_ROWS into setSceneFieldCommand as a loop variable',
+  ).toMatch(/Object\.keys\(SCENE_DEFORM_ROWS\)[\s\S]{0,1600}?setSceneFieldCommand\(\s*\n?\s*library,\s*selected\.id,\s*key,/);
+  return new Set([
+    'schema', 'id', 'layers', 'v_factor', ...found, ...Object.keys(SCENE_DEFORM_ROWS),
+  ]);
 }
 
 /** Same, per layer. `world_y`/`fa`/`fb` are what `newEffectsLayer` seeds. */
@@ -129,11 +144,14 @@ describe('writer-originated effects scene fixture', () => {
   /**
    * A NECESSARY CONDITION for "this came out of the wave-1 Effects panel": it
    * carries no key that panel has no control for. `anchor`, `budget_class`,
-   * `deform*`, `dsa/dsb`, `phase`, `enabled`, `left_column_mask`, `v_deform`,
-   * `v_factor_fg` are all schema-legal and all unreachable from the UI today, so
-   * any of them appearing here means the file did not come from a session.
-   * (`curve` and `vsplit` became authorable in parcel H; the fixture predates
-   * that and carries neither, which the set below still permits.)
+   * `dsa/dsb`, `phase`, `enabled`, `left_column_mask` and `v_factor_fg` are all
+   * schema-legal and all unreachable from the UI today, so any of them appearing
+   * here means the file did not come from a session.
+   * (`curve` and `vsplit` became authorable in parcel H, and the four deform
+   * attachments — `deform_fg`, `deform_bg`, `v_deform`, a layer's `deform` — in
+   * wave 2. The fixture predates all six and carries none, which the set below
+   * still permits: it is an upper bound on what a session could produce, and it
+   * WIDENS as the panel grows controls. That is the point of deriving it.)
    *
    * It is NOT a sufficient condition. A hand-written document restricted to these
    * keys passes. Said again because this is the assertion most likely to be
@@ -149,11 +167,21 @@ describe('writer-originated effects scene fixture', () => {
     expect(sceneKeys.has('precision')).toBe(true);
     expect(sceneKeys.has('budget_class')).toBe(false);
     expect(layerKeys.has('world_y')).toBe(true);
-    // Parcel H gave the card curve/vsplit controls, so those two are authorable
-    // now; `deform` is the layer key that still is not (wave 2).
+    // Parcel H gave the card curve/vsplit controls and wave 2 gave it `deform`,
+    // so all three are authorable now. `dsa`/`dsb`/`phase`/`enabled` are the
+    // layer keys that still are not — and `dsa` is the one that keeps this row
+    // discriminating rather than merely permissive.
     expect(layerKeys.has('curve')).toBe(true);
     expect(layerKeys.has('vsplit')).toBe(true);
-    expect(layerKeys.has('deform')).toBe(false);
+    expect(layerKeys.has('deform')).toBe(true);
+    expect(layerKeys.has('dsa')).toBe(false);
+    expect(layerKeys.has('enabled')).toBe(false);
+    // The three deform attachments the scene form now writes — the two plane
+    // rows through the loop, `v_deform` as a literal.
+    expect(sceneKeys.has('deform_fg')).toBe(true);
+    expect(sceneKeys.has('deform_bg')).toBe(true);
+    expect(sceneKeys.has('v_deform')).toBe(true);
+    expect(sceneKeys.has('left_column_mask')).toBe(false);
     // And the set genuinely discriminates: the schema offers strictly more.
     const schemaKeys = Object.keys(EFFECTS_SCENE_SCHEMA.properties as Record<string, unknown>);
     expect(schemaKeys.filter(k => !sceneKeys.has(k)).length).toBeGreaterThan(0);

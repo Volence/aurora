@@ -19,6 +19,14 @@ import {
   LAYER_CURVE_ROW, LAYER_VSPLIT_ROW, NONE_FACTOR_VALUE,
   factorFieldSelectValue, factorFieldFromSelect, curveFieldValue, curveFromField,
   vsplitFieldValue, vsplitFromToggle, curveAdvisory, clampVSplitAt,
+  // wave 2 — deform authoring
+  tableRefLabel, tableRefFormOptions, tableRefFormOf, tableRefFromForm, tableRefParams,
+  tableParamLabel, tableRefParamValue, setTableRefParam, clampTableRefParam,
+  tableRefBinPath, binPathRefusal, tableRefAdvisory, newTableRef,
+  sceneDeformValue, sceneDeformFromToggle, vDeformValue, vDeformFromToggle,
+  layerDeformValue, layerDeformFromToggle, layerDeformAdvisory, sceneDeformAdvisories,
+  clampLayerDeformField, clampAmpShift, clampDeformSpeed,
+  SCENE_DEFORM_ROWS, V_DEFORM_ROW, LAYER_DEFORM_ROW, TABLE_REF_ROW,
 } from '../effects-aeon';
 import {
   EFFECTS_FACTOR_NAMES, EFFECTS_LAYER_COUNT, EFFECTS_PACKED_FACTOR_BOUNDS,
@@ -379,7 +387,7 @@ describe('layerExtras (parcel E)', () => {
     expect(layerExtrasLine(baseLayer())).toBeNull();
   });
 
-  it('names dsa/dsb/phase, disabled and deform in schema key order — curve and vsplit have controls now (parcel H)', () => {
+  it('names dsa/dsb/phase and disabled in schema key order — curve/vsplit (parcel H) and deform (wave 2) have controls now', () => {
     const layer: EffectsLayer = {
       ...baseLayer(), dsa: 3, dsb: 4, phase: 9, enabled: false,
       deform: { own: { table: { generator: 'sine', amplitude: 8, period: 64 }, shift_a: 1, shift_b: 2, phase: 0, speed: 1 } },
@@ -387,27 +395,36 @@ describe('layerExtras (parcel E)', () => {
       vsplit: { at: 112 },
     };
     const extras = layerExtras(layer);
-    expect(extras.map((e) => e.key)).toEqual(['dsa', 'dsb', 'phase', 'enabled', 'deform']);
-    expect(extras.map((e) => e.text)).toEqual([
-      'dsa 3', 'dsb 4', 'phase 9', 'disabled',
-      'deform: own sine(8, 64)',
-    ]);
-    // A layer carrying ONLY the two keys the card now edits gets no line at all:
-    // the read-only line must not duplicate a control sitting right above it.
-    expect(layerExtrasLine({ ...baseLayer(), curve: { to: 'FACTOR_3_8' }, vsplit: { at: 20 } })).toBeNull();
+    expect(extras.map((e) => e.key)).toEqual(['dsa', 'dsb', 'phase', 'enabled']);
+    expect(extras.map((e) => e.text)).toEqual(['dsa 3', 'dsb 4', 'phase 9', 'disabled']);
+    // A layer carrying ONLY the three keys the card now edits gets no line at
+    // all: the read-only line must not duplicate a control sitting above it.
+    expect(layerExtrasLine({
+      ...baseLayer(),
+      curve: { to: 'FACTOR_3_8' },
+      vsplit: { at: 20 },
+      deform: { own: { table: { generator: 'zero' }, shift_a: 15, shift_b: 15, phase: 0, speed: 0 } },
+    })).toBeNull();
     expect(layerExtrasLine(layer)).toBe(extras.map((e) => e.text).join(' · '));
   });
 
-  it('spells every table form the codec knows', () => {
+  it('spells every table form the codec knows — on tableRefLabel, which the deform ROWS now carry', () => {
+    // `tableRefLabel` left the extras line with `deform` in wave 2 and is
+    // exported for the table sub-form's title. Same six spellings, checked at
+    // the function rather than through a line that no longer prints them.
+    expect(tableRefLabel({ generator: 'sine', amplitude: 8, period: 64 })).toBe('sine(8, 64)');
+    expect(tableRefLabel({ generator: 'triangle', amplitude: 4, period: 32 })).toBe('triangle(4, 32)');
+    expect(tableRefLabel({ generator: 'zero' })).toBe('zero');
+    expect(tableRefLabel({ generator: 'v_column_perspective', focal: 96, max_offset: 12 }))
+      .toBe('v_column_perspective(96, 12)');
+    expect(tableRefLabel({ generator: 'v_column_floor', center: 100, max_offset: 6 }))
+      .toBe('v_column_floor(100, 6)');
+    expect(tableRefLabel({ bin: 'tables/canopy.bin' })).toBe('tables/canopy.bin');
+    // …and a layer that carries any of them contributes NOTHING to the line.
     const own = (table: any): EffectsLayer =>
       ({ ...baseLayer(), deform: { own: { table, shift_a: 15, shift_b: 15, phase: 0, speed: 0 } } });
-    expect(layerExtrasLine(own({ generator: 'triangle', amplitude: 4, period: 32 }))).toBe('deform: own triangle(4, 32)');
-    expect(layerExtrasLine(own({ generator: 'zero' }))).toBe('deform: own zero');
-    expect(layerExtrasLine(own({ generator: 'v_column_perspective', focal: 96, max_offset: 12 })))
-      .toBe('deform: own v_column_perspective(96, 12)');
-    expect(layerExtrasLine(own({ generator: 'v_column_floor', center: 100, max_offset: 6 })))
-      .toBe('deform: own v_column_floor(100, 6)');
-    expect(layerExtrasLine(own({ bin: 'tables/canopy.bin' }))).toBe('deform: own tables/canopy.bin');
+    expect(layerExtrasLine(own({ generator: 'triangle', amplitude: 4, period: 32 }))).toBeNull();
+    expect(layerExtrasLine(own({ bin: 'tables/canopy.bin' }))).toBeNull();
   });
 
   it('explicit "none" and enabled:true are defaults, not extras', () => {
@@ -435,7 +452,8 @@ describe('layerExtras (parcel E)', () => {
       if (r.dsb !== undefined && r.dsb !== EFFECTS_LAYER_DEFAULTS.dsb) want.push(`dsb ${r.dsb}`);
       if (r.phase !== undefined && r.phase !== EFFECTS_LAYER_DEFAULTS.phase) want.push(`phase ${r.phase}`);
       if (r.enabled === false) want.push('disabled');
-      if (r.deform !== undefined && r.deform !== 'none') want.push(expect.stringMatching(/^deform: own /));
+      // `deform` is a CONTROL in wave 2, so like curve/vsplit it contributes
+      // nothing here however the file spells it.
       // curve / vsplit are the card's own controls now (parcel H) and must NOT
       // appear here as well; counted so the fixture is proven to carry them.
       if (r.curve !== undefined && r.curve !== 'none') withCurve++;
@@ -455,6 +473,7 @@ describe('layerExtras (parcel E)', () => {
       const r = raw.layers[i];
       expect(curveFieldValue(layer), `layer ${i} curve`).toEqual(r.curve?.to ?? 'none');
       expect(vsplitFieldValue(layer), `layer ${i} vsplit`).toBe(r.vsplit?.at ?? null);
+      expect(layerDeformValue(layer), `layer ${i} deform`).toEqual(r.deform?.own ?? null);
     });
   });
 });
@@ -621,5 +640,395 @@ describe('layerTopSpace — a locked scene authors screen lines, an unlocked one
 
   it('vFactorHint says what the sentinel means inline, from the constant', () => {
     expect(vFactorHint()).toBe(`${EFFECTS_V_FACTOR_LOCK} = locked (no vertical scroll)`);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// DEFORM AUTHORING — wave 2
+// ---------------------------------------------------------------------------
+//
+// The panel's own comment named this gap: "deform is wave 2". Four attachments
+// (`deform_fg`, `deform_bg`, `v_deform`, a layer's `deform`) all point at one
+// `$defs/tableRef` with SIX spellings, and every expectation below is derived
+// from the committed schema through `S` rather than pinned — a clean constant
+// across varied inputs on this surface would be a confound, because the whole
+// risk is a form offering less than the contract carries.
+
+const TABLE_BRANCHES = S.$defs.tableRef.oneOf as Record<string, any>[];
+/** The schema's own branch for a form id, found the way the form list is. */
+const branchOf = (id: string) => TABLE_BRANCHES.find(
+  (b) => (id === 'bin' ? 'bin' in b.properties : b.properties.generator?.const === id));
+/** A scene carrying whatever the caller attached — for the writer's own validation. */
+const sceneWith = (patch: Partial<EffectsScene>): EffectsScene =>
+  ({ ...newEffectsScene('deform_probe'), ...patch });
+
+describe('tableRef — every form the contract admits, derived from it', () => {
+  it('the dropdown offers exactly the schema branches, in schema order', () => {
+    const want = TABLE_BRANCHES.map((b) => ('bin' in b.properties ? 'bin' : b.properties.generator.const));
+    expect(tableRefFormOptions().map((o) => o.value)).toEqual(want);
+    // ANTI-VACUOUS: the point of deriving is that there are MORE than the two a
+    // hand-written picker would have offered.
+    expect(want.length).toBeGreaterThan(2);
+    expect(want).toContain('zero');
+    expect(want).toContain('bin');
+    // A generator shows its own name; the raw-file branch has none to show.
+    for (const o of tableRefFormOptions()) {
+      expect(o.label === o.value || o.value === 'bin', o.value).toBe(true);
+    }
+  });
+
+  it('each form takes exactly the parameters its branch requires, with its ranges', () => {
+    for (const o of tableRefFormOptions()) {
+      const b = branchOf(o.value)!;
+      const want = (b.required as string[]).filter((k) => k !== 'generator');
+      const got = tableRefParams(o.value);
+      expect(got.map((p) => p.key), o.value).toEqual(o.value === 'bin' ? [] : want);
+      for (const p of got) {
+        expect(p.min, `${o.value}.${p.key} min`).toBe(b.properties[p.key].minimum ?? null);
+        expect(p.max, `${o.value}.${p.key} max`).toBe(b.properties[p.key].maximum ?? null);
+      }
+    }
+    // The two shapes this has to keep apart, named: a bounded parameter and an
+    // unbounded one. A form list that silently gave every parameter a range
+    // would pass a check that only looked at the keys.
+    expect(tableRefParams('sine').every((p) => p.min !== null && p.max !== null)).toBe(true);
+    expect(tableRefParams('v_column_perspective').every((p) => p.min === null && p.max === null)).toBe(true);
+    expect(tableRefParams('zero')).toEqual([]);
+  });
+
+  it('tableRefFormOf reads the form back off a value of every shape', () => {
+    expect(tableRefFormOf({ generator: 'sine', amplitude: 1, period: 256 })).toBe('sine');
+    expect(tableRefFormOf({ generator: 'zero' })).toBe('zero');
+    expect(tableRefFormOf({ bin: 'a.bin' })).toBe('bin');
+  });
+
+  it('a new table is the schema FIRST form at its seeds, and the writer accepts it', () => {
+    const first = TABLE_BRANCHES[0];
+    const t = newTableRef();
+    expect(tableRefFormOf(t)).toBe(first.properties.generator.const);
+    // `period` seeds at the whole table — the one value guaranteed to divide it.
+    expect((t as { period: number }).period).toBe(first.properties.period.maximum);
+    // …and every other bounded parameter at its own minimum.
+    expect((t as { amplitude: number }).amplitude).toBe(first.properties.amplitude.minimum);
+    expect(tableRefAdvisory(t)).toBeNull();
+    // THE REAL CHECK: the codec's writer validates on the way out, so a seed the
+    // schema refuses cannot reach disk — and a seed that is schema-legal proves
+    // it here rather than at save time.
+    expect(() => serializeEffectsScene(sceneWith({ deform_fg: { shared: { table: t, speed: 0 } } })))
+      .not.toThrow();
+  });
+
+  it('every form, seeded by the form picker, is a document the writer accepts', () => {
+    for (const o of tableRefFormOptions()) {
+      const t = tableRefFromForm(o.value, newTableRef());
+      const scene = sceneWith({ deform_bg: { shared: { table: t, speed: 0 } } });
+      if (o.value === 'bin') {
+        // The `.bin` branch seeds an EMPTY path, which the schema's pattern
+        // refuses — deliberately: a blank box is "not typed yet", and the
+        // refusal under it says so. The writer must be the one that stops it.
+        expect(() => serializeEffectsScene(scene), o.value).toThrow();
+        expect(binPathRefusal('')).toBeNull();
+      } else {
+        expect(() => serializeEffectsScene(scene), o.value).not.toThrow();
+      }
+    }
+  });
+
+  it('switching sine <-> triangle keeps the numbers the author just tuned', () => {
+    const sine = { generator: 'sine' as const, amplitude: 40, period: 64 };
+    expect(tableRefFromForm('triangle', sine)).toEqual({ generator: 'triangle', amplitude: 40, period: 64 });
+    // …and switching to a form with none of those keys drops to that form's seeds.
+    expect(tableRefFromForm('zero', sine)).toEqual({ generator: 'zero' });
+    // An unbounded parameter seeds at 0 — a column table that displaces nothing.
+    expect(tableRefFromForm('v_column_floor', sine))
+      .toEqual({ generator: 'v_column_floor', center: 0, max_offset: 0 });
+    // Re-picking the form already selected is the identity, not a reseed: a
+    // `<select>` fires onChange for the option already chosen.
+    expect(tableRefFromForm('sine', sine)).toBe(sine);
+  });
+
+  it('a carried parameter is clamped into the destination form rather than carried out of range', () => {
+    const over = { generator: 'sine' as const, amplitude: 9999, period: 64 };
+    const moved = tableRefFromForm('triangle', over) as { amplitude: number };
+    expect(moved.amplitude).toBe(branchOf('triangle')!.properties.amplitude.maximum);
+  });
+
+  it('clampTableRefParam is the bound, and an unbounded parameter has none invented for it', () => {
+    const amp = branchOf('sine')!.properties.amplitude;
+    expect(clampTableRefParam('sine', 'amplitude', amp.maximum + 5)).toBe(amp.maximum);
+    expect(clampTableRefParam('sine', 'amplitude', amp.minimum - 5)).toBe(amp.minimum);
+    expect(clampTableRefParam('sine', 'amplitude', 3.6)).toBe(4);
+    expect(clampTableRefParam('sine', 'amplitude', NaN)).toBe(amp.minimum);
+    // Unbounded: rounded, and otherwise left alone in BOTH directions.
+    expect(clampTableRefParam('v_column_perspective', 'focal', 1e6)).toBe(1e6);
+    expect(clampTableRefParam('v_column_perspective', 'focal', -1e6)).toBe(-1e6);
+    expect(clampTableRefParam('v_column_perspective', 'focal', NaN)).toBe(0);
+  });
+
+  it('setTableRefParam writes one parameter through the clamp and leaves the rest alone', () => {
+    const t = { generator: 'sine' as const, amplitude: 8, period: 64 };
+    expect(setTableRefParam(t, 'amplitude', 9999))
+      .toEqual({ generator: 'sine', amplitude: branchOf('sine')!.properties.amplitude.maximum, period: 64 });
+    expect(t.amplitude, 'the input is not mutated').toBe(8);
+  });
+
+  it('tableRefParamValue falls back to the seed rather than rendering undefined in a spinner', () => {
+    expect(tableRefParamValue({ generator: 'sine', amplitude: 12, period: 8 }, 'amplitude')).toBe(12);
+    // A hand-written document missing a required key still has to render.
+    expect(tableRefParamValue({ generator: 'sine' } as never, 'period'))
+      .toBe(branchOf('sine')!.properties.period.maximum);
+  });
+
+  it('a .bin path is refused by the SCHEMA pattern, not a second rule', () => {
+    expect(tableRefBinPath({ generator: 'zero' })).toBeNull();
+    expect(tableRefBinPath({ bin: 'tables/x.bin' })).toBe('tables/x.bin');
+    expect(binPathRefusal('tables/canopy.bin')).toBeNull();
+    expect(binPathRefusal('')).toBeNull();
+    for (const bad of ['../escape.bin', 'tables/../../x.bin', 'notatable.txt', 'has space.bin']) {
+      expect(binPathRefusal(bad), bad).toMatch(/not a legal table path/);
+    }
+    // The refusal quotes the rule the schema's own pattern encodes.
+    expect(binPathRefusal('../x.bin')).toContain(TABLE_REF_ROW.binRule);
+    // And a path this refuses is a path the WRITER refuses, which is the fact
+    // that makes the refusal worth showing.
+    expect(() => serializeEffectsScene(sceneWith({
+      deform_fg: { shared: { table: { bin: '../escape.bin' }, speed: 0 } },
+    }))).toThrow();
+  });
+
+  it('a period that does not divide the table is advised, never enforced', () => {
+    const bytes = branchOf('sine')!.properties.period.maximum;
+    for (const p of [1, 2, 4, 8, 16, 32, 64, 128, bytes]) {
+      expect(tableRefAdvisory({ generator: 'sine', amplitude: 1, period: p }), `period ${p}`).toBeNull();
+    }
+    const bad = tableRefAdvisory({ generator: 'triangle', amplitude: 1, period: 100 });
+    expect(bad).toMatch(new RegExp(`period 100 does not divide the ${bytes}-byte table`));
+    expect(bad).toMatch(/the build refuses it/);
+    // ADVISORY: the shape validator still writes it, because value semantics
+    // are sigil's (scene.ts's split).
+    expect(() => serializeEffectsScene(sceneWith({
+      v_deform: { columns: { table: { generator: 'triangle', amplitude: 1, period: 100 }, speed: 0, amp_shift: 0 } },
+    }))).not.toThrow();
+    expect(tableRefAdvisory({ bin: 'x.bin' })).toBeNull();
+    expect(tableRefAdvisory({ generator: 'zero' })).toBeNull();
+  });
+
+  it('a parameter label is the schema key, title-cased at its underscores', () => {
+    expect(tableParamLabel('amplitude')).toBe('Amplitude');
+    expect(tableParamLabel('max_offset')).toBe('Max offset');
+    expect(tableParamLabel('shift_a')).toBe('Shift A');
+    expect(tableParamLabel('amp_shift')).toBe('Amp shift');
+    // Derived, so every key the schema actually declares gets a label with no
+    // underscore left in it and no empty token.
+    const keys = new Set(tableRefFormOptions().flatMap((o) => tableRefParams(o.value).map((p) => p.key)));
+    expect(keys.size).toBeGreaterThan(3);
+    for (const k of keys) {
+      expect(tableParamLabel(k), k).not.toMatch(/_/);
+      expect(tableParamLabel(k).length, k).toBeGreaterThan(0);
+    }
+  });
+});
+
+describe('the four deform attachments read and write', () => {
+  const table = { generator: 'sine' as const, amplitude: 8, period: 64 };
+
+  it('a scene with no attachment reads null on every one of them', () => {
+    const s = newEffectsScene('plain');
+    expect(sceneDeformValue(s, 'deform_fg')).toBeNull();
+    expect(sceneDeformValue(s, 'deform_bg')).toBeNull();
+    expect(vDeformValue(s)).toBeNull();
+    expect(layerDeformValue(s.layers[0])).toBeNull();
+    // An EXPLICIT "none" is the same fact spelled out, and must read the same.
+    expect(sceneDeformValue({ deform_fg: 'none', deform_bg: 'none' }, 'deform_fg')).toBeNull();
+    expect(vDeformValue({ v_deform: 'none' })).toBeNull();
+    expect(layerDeformValue({ deform: 'none' })).toBeNull();
+  });
+
+  it('turning one on seeds a document the writer accepts; turning it off clears the key', () => {
+    const fg = sceneDeformFromToggle(true)!;
+    expect(fg).toHaveProperty('shared');
+    const cols = vDeformFromToggle(true)!;
+    expect(cols).toHaveProperty('columns');
+    const own = layerDeformFromToggle(true)!;
+    expect(own).toHaveProperty('own');
+    const scene = sceneWith({ deform_fg: fg, v_deform: cols });
+    scene.layers[0].deform = own;
+    expect(() => serializeEffectsScene(scene)).not.toThrow();
+    expect(sceneDeformFromToggle(false)).toBeUndefined();
+    expect(vDeformFromToggle(false)).toBeUndefined();
+    expect(layerDeformFromToggle(false)).toBeUndefined();
+  });
+
+  it("a layer's own attachment seeds at the DEFAULTS of the fields it lowers into", () => {
+    // The two-sources guard's other half: own.shift_a/shift_b/phase lower into
+    // dsa/dsb/phase, so the seed is a true no-op on the picture.
+    const own = layerDeformValue({ deform: layerDeformFromToggle(true) })!;
+    expect(own.shift_a).toBe(EFFECTS_LAYER_DEFAULTS.dsa);
+    expect(own.shift_b).toBe(EFFECTS_LAYER_DEFAULTS.dsb);
+    expect(own.phase).toBe(EFFECTS_LAYER_DEFAULTS.phase);
+    expect(own.speed).toBe(0);
+    // …and the row SAYS it is silent, which is what makes the no-op legible.
+    expect(layerDeformAdvisory({ deform: layerDeformFromToggle(true) }))
+      .toMatch(/both shifts are 15: the table is attached but neither plane samples it/);
+  });
+
+  it('the inert advisory clears the moment either plane is given amplitude', () => {
+    const own = layerDeformValue({ deform: layerDeformFromToggle(true) })!;
+    expect(layerDeformAdvisory({ deform: { own: { ...own, shift_b: 0 } } })).toBeNull();
+    expect(layerDeformAdvisory({ deform: { own: { ...own, shift_a: 3 } } })).toBeNull();
+    expect(layerDeformAdvisory({ deform: 'none' })).toBeNull();
+    expect(layerDeformAdvisory({})).toBeNull();
+  });
+
+  it('the three integer fields clamp to the schema, and speed is deliberately unbounded', () => {
+    const b = S.$defs.layerDeform.oneOf[1].properties.own.properties;
+    expect(clampLayerDeformField('shift_a', 99)).toBe(b.shift_a.maximum);
+    expect(clampLayerDeformField('shift_b', -4)).toBe(b.shift_b.minimum);
+    expect(clampLayerDeformField('phase', 9999)).toBe(b.phase.maximum);
+    expect(clampLayerDeformField('phase', NaN)).toBe(b.phase.minimum);
+    const amp = S.properties.v_deform.oneOf[1].properties.columns.properties.amp_shift;
+    expect(clampAmpShift(99)).toBe(amp.maximum);
+    expect(clampAmpShift(-1)).toBe(amp.minimum);
+    // `speed` has no bound in the schema, so none is invented — only rounding.
+    expect(clampDeformSpeed(4.6)).toBe(5);
+    expect(clampDeformSpeed(-99999)).toBe(-99999);
+    expect(clampDeformSpeed(NaN)).toBe(0);
+    expect(S.$defs.sceneDeform.oneOf[1].properties.shared.properties.speed.minimum).toBeUndefined();
+  });
+
+  it('setSceneFieldCommand carries an OBJECT value — the first non-scalar on this path', () => {
+    const lib = library([newEffectsScene('s')]);
+    const cmd = setSceneFieldCommand(lib, 's', 'deform_fg', { shared: { table, speed: 3 } });
+    expect(cmd!.newScene!.deform_fg).toEqual({ shared: { table, speed: 3 } });
+    // …and it is a whole-document swap, so the undo half is the document before.
+    expect(cmd!.oldScene!.deform_fg).toBeUndefined();
+  });
+
+  it('clearing an attachment DELETES the key, and re-sending the same value is not an undo step', () => {
+    const set = { shared: { table, speed: 0 } } as const;
+    const lib = library([{ ...newEffectsScene('s'), deform_bg: set }]);
+    expect(setSceneFieldCommand(lib, 's', 'deform_bg', set)).toBeNull();
+    const cleared = setSceneFieldCommand(lib, 's', 'deform_bg', undefined);
+    expect('deform_bg' in cleared!.newScene!).toBe(false);
+  });
+
+  it('an attachment SPELLED "none" on disk is left as spelled — clearing it is a no-op', () => {
+    // The rule setLayerFieldCommand has always had for curve/vsplit, which the
+    // scene path had no none-defaulted key to need until wave 2. Without it,
+    // toggling the row off would silently rewrite a hand-authored line.
+    for (const key of ['deform_fg', 'deform_bg', 'v_deform'] as const) {
+      const lib = library([{ ...newEffectsScene('s'), [key]: 'none' }]);
+      expect(setSceneFieldCommand(lib, 's', key, undefined), key).toBeNull();
+    }
+    // A key that is genuinely SET is still cleared.
+    const lib = library([{ ...newEffectsScene('s'), v_deform: { columns: { table, speed: 0, amp_shift: 0 } } }]);
+    expect('v_deform' in setSceneFieldCommand(lib, 's', 'v_deform', undefined)!.newScene!).toBe(false);
+    // …and the layer path keeps the behaviour it already had.
+    const l = library([{
+      ...newEffectsScene('s'),
+      layers: [{ world_y: 0, fa: 'FACTOR_1', fb: 'FACTOR_1', deform: 'none' }],
+    }]);
+    expect(setLayerFieldCommand(l, 's', 0, 'deform', undefined)).toBeNull();
+  });
+
+  it("setLayerFieldCommand writes and clears a layer's own attachment", () => {
+    const lib = library([newEffectsScene('s')]);
+    const own = layerDeformFromToggle(true)!;
+    const cmd = setLayerFieldCommand(lib, 's', 0, 'deform', own);
+    expect(cmd!.newScene!.layers[0].deform).toEqual(own);
+    const lib2 = library([{
+      ...newEffectsScene('s'),
+      layers: [{ world_y: 0, fa: 'FACTOR_1', fb: 'FACTOR_1', deform: own }],
+    }]);
+    expect('deform' in setLayerFieldCommand(lib2, 's', 0, 'deform', undefined)!.newScene!.layers[0]).toBe(false);
+  });
+});
+
+describe('deform advisories — what the build would refuse, said first', () => {
+  const table = { generator: 'sine' as const, amplitude: 8, period: 64 };
+  const shared = { shared: { table, speed: 0 } } as const;
+  const own = { own: { table, shift_a: 0, shift_b: 0, phase: 0, speed: 0 } } as const;
+  const columns = { columns: { table, speed: 0, amp_shift: 0 } } as const;
+
+  it('a clean scene is advised nothing', () => {
+    expect(sceneDeformAdvisories(newEffectsScene('clean'))).toEqual([]);
+    expect(sceneDeformAdvisories(sceneWith({ deform_fg: shared }))).toEqual([]);
+  });
+
+  it("a layer's own table with no scene table on either plane", () => {
+    const scene = sceneWith({});
+    scene.layers[0].deform = own;
+    expect(sceneDeformAdvisories(scene).join('\n')).toMatch(/attaches none on either plane/);
+    // EITHER plane satisfies it — that is the engine's own condition, and a
+    // check that only knew about fg would pass this test by accident.
+    for (const key of ['deform_fg', 'deform_bg'] as const) {
+      const ok = sceneWith({ [key]: shared });
+      ok.layers[0].deform = own;
+      expect(sceneDeformAdvisories(ok), key).toEqual([]);
+    }
+  });
+
+  it('per-column V deform colliding with a layer split, naming the layer', () => {
+    const scene = sceneWith({ v_deform: columns, left_column_mask: 'accept' });
+    scene.layers.push({ world_y: 64, fa: 'FACTOR_1', fb: 'FACTOR_1', vsplit: { at: 20 } });
+    const a = sceneDeformAdvisories(scene).join('\n');
+    expect(a).toMatch(/layer 1 authors a Plane B split/);
+    expect(a).toMatch(/same VSRAM word/);
+    // Without the split there is nothing to collide with.
+    scene.layers.pop();
+    expect(sceneDeformAdvisories(scene)).toEqual([]);
+  });
+
+  it('V deform without a left_column_mask policy — the guard NO control in this panel can satisfy', () => {
+    const scene = sceneWith({ v_deform: columns });
+    const a = sceneDeformAdvisories(scene).join('\n');
+    expect(a).toMatch(/no left_column_mask policy/);
+    // The advisory must say WHERE to set it, because the panel cannot.
+    expect(a).toMatch(/in the scene file by hand/);
+    // Every non-default policy silences it — read out of the schema's own enum,
+    // so a value added to the contract is covered without editing this row.
+    const values = S.properties.left_column_mask.enum as string[];
+    const dflt = S.properties.left_column_mask.default as string;
+    expect(values.filter((v) => v !== dflt).length).toBeGreaterThan(1);
+    for (const v of values.filter((x) => x !== dflt)) {
+      expect(sceneDeformAdvisories(sceneWith({ v_deform: columns, left_column_mask: v as never })), v)
+        .toEqual([]);
+    }
+    // …and the default spelled explicitly is still "no policy".
+    expect(sceneDeformAdvisories(sceneWith({ v_deform: columns, left_column_mask: dflt as never })).join('\n'))
+      .toMatch(/no left_column_mask policy/);
+  });
+
+  it('a left_column_mask policy with no per-column V deform to adjudicate', () => {
+    const a = sceneDeformAdvisories(sceneWith({ left_column_mask: 'accept' })).join('\n');
+    expect(a).toMatch(/attaches no per-column V deform/);
+    expect(a).toMatch(/the build refuses it/);
+  });
+
+  it('every advisory is ADVICE — the writer still emits each of these documents', () => {
+    // The posture scene.ts states: Aurora pre-checks, sigil is the rulebook. A
+    // scene Aurora warns about must still save, or the editor has become a
+    // second rulebook free to refuse what the build accepts.
+    const bad = sceneWith({ v_deform: columns, left_column_mask: 'accept' });
+    bad.layers.push({ world_y: 64, fa: 'FACTOR_1', fb: 'FACTOR_1', vsplit: { at: 20 } });
+    bad.layers[0].deform = own;
+    expect(sceneDeformAdvisories(bad).length).toBeGreaterThan(0);
+    expect(() => serializeEffectsScene(bad)).not.toThrow();
+  });
+});
+
+describe('the deform rows say what they are, inside the column', () => {
+  it('every row names its key in the title and fits the label column', () => {
+    const rows = [
+      SCENE_DEFORM_ROWS.deform_fg, SCENE_DEFORM_ROWS.deform_bg, V_DEFORM_ROW, LAYER_DEFORM_ROW,
+    ];
+    for (const r of rows) {
+      expect(r.title, r.label).toMatch(new RegExp(`^${r.key}`));
+      expect(Math.max(...r.label.split(/\s+/).map((t) => t.length)), r.label).toBeLessThanOrEqual(10);
+    }
+    // The two plane rows are the SAME shape pointed at two planes and must not
+    // have drifted into two descriptions.
+    expect(SCENE_DEFORM_ROWS.deform_fg.title.replace(/Plane A/, 'Plane B').replace(/_fg/, '_bg'))
+      .toBe(SCENE_DEFORM_ROWS.deform_bg.title);
   });
 });
