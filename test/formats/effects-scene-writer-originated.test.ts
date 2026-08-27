@@ -9,6 +9,7 @@ import {
 } from '../../src/core/formats/effects/scene';
 import { validateAgainstSchema } from '../../src/core/formats/effects/json-schema-subset';
 import { SCENE_DEFORM_ROWS } from '../../src/renderer/providers/effects-aeon';
+import { EFFECTS_LAYER_COUNT } from '../../src/core/formats/effects/scene-ui';
 
 /**
  * THE WRITER-ORIGINATED FIXTURE (ROADMAP item 31).
@@ -109,9 +110,17 @@ describe('writer-originated effects scene fixture', () => {
   it('the fixture is the scene the session authored, not a stub', () => {
     const doc = JSON.parse(TEXT) as Record<string, unknown>;
     expect(doc.id).toBe('writer_session_ojz');
-    // Eight layers is the app's own ceiling, reached by clicking Add layer until
-    // it refused — see provenance R3.
-    expect(Array.isArray(doc.layers) && (doc.layers as unknown[]).length).toBe(8);
+    // THE COUNT IS THE APP'S CEILING, AND IT IS DERIVED HERE RATHER THAN TYPED
+    // (ROADMAP row 60). Gesture R3 clicks Add layer until the control refuses, so
+    // the number in this file is `layers.maxItems` and nothing else. It read
+    // `.toBe(8)` until 2026-08-27 — a literal, and it went stale in silence when
+    // empyrean `277bc15` raised the ceiling to 16: the fixture disagreed with its
+    // own gesture rule for a whole contract revision and no test could say so,
+    // because the pin agreed with the stale file. Bound to the constant, the next
+    // ceiling change turns this row RED and the fix is a re-run, exactly as the
+    // provenance demands.
+    expect(Array.isArray(doc.layers) && (doc.layers as unknown[]).length)
+      .toBe(EFFECTS_LAYER_COUNT.max);
     // The packed triple the app SEEDED when the enumeration landed on the
     // custom-factor sentinel (R6). Nothing in the session typed these numbers.
     expect((doc.layers as Record<string, unknown>[])[0].fb).toEqual({ op: 0, s1: 0, s2: 15 });

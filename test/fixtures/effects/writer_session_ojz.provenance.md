@@ -19,9 +19,78 @@ edit the JSON. Editing it converts it into a second `canopy_dusk`, silently.
 | | |
 |---|---|
 | fixture | `test/fixtures/effects/writer_session_ojz.json` |
-| git blob hash | `893cd05586c4524fa919adc6bbbb111e710d1a7e` |
-| sha256 | `c28b6db065d2cf88a108d4f91baae3673fad66e67bf980c642f4a6e84ccb0dfd` |
-| size | 933 bytes, exactly one trailing newline |
+| git blob hash | `5ca0552bfc38a8bc2d359ad638b4dd0f089369da` |
+| sha256 | `bf395ce60117a37196fc04ba89bd593371a1b463d811dd52077ebabb305b2647` |
+| size | 1,626 bytes, exactly one trailing newline |
+
+**RE-ORIGINATED 2026-08-27 (ROADMAP row 60) — CEILING-DRIVEN, and the one-line
+corroboration was NOT available.** The previous record was blob
+`893cd05586c4524fa919adc6bbbb111e710d1a7e`, sha256
+`c28b6db065d2cf88a108d4f91baae3673fad66e67bf980c642f4a6e84ccb0dfd`, 933 bytes.
+
+Gesture R3's rule is *"click Add layer until the control refuses — the count is
+the app's own ceiling"*. That ceiling was **8** at origination and row 56 raised
+it to **16**; row 59 pinned `LAYERS=8` rather than fix it and printed the debt on
+every run. This run pays it: the pin is unset, the harness clicked until the
+button disabled itself at 16, and the file is ceiling-driven again.
+
+**AND THAT DESTROYS THE CORROBORATION EVERY PREVIOUS RE-ORIGINATION USED.** The
+two entries below both rest on the same sentence — *exactly one line differs
+between the two runs* — which is the only evidence separating "the session was
+re-run faithfully" from "the session was driven differently". A ceiling-driven
+re-run moves 43 lines. So the corroboration was **replaced, not waived**, by two
+things done in this order:
+
+1. **THE DELTA WAS PREDICTED IN ADVANCE.** Before the harness ran, R4/R5/R6 were
+   evaluated by hand into a complete expected file
+   (`scratchpad/predict-commitA.py` → `scratchpad/PREDICTED-commitA.json`,
+   committed beside the fixture). The emitted bytes then matched that prediction
+   **exactly, with no diff at all** — 16 layer blocks and every scalar. A
+   differently-driven session cannot land on a file written down before it ran.
+2. **THE FIRST EIGHT LAYERS ARE THE CONTINUITY ANCHOR.** They came back
+   byte-identical to the 8-layer file — the only character that moved in that
+   region is the `}` → `},` that a ninth layer forces.
+
+Determinism was measured too (three runs, identical bytes) and is recorded under
+"The session" — but it is listed separately and deliberately: **identical bytes
+across runs prove the session is DETERMINISTIC, not that it was driven
+correctly.** A harness driving the wrong gesture drives it identically every
+time. The prediction is what carries the faithfulness claim.
+
+### R7's rule collided with the new ceiling, and had to be amended
+
+`v_factor` is a 0..15 shift count. R7 said "= N, the layer count", with an
+explicit rider that it is deliberately **not** the field's `max`, because `max`
+is also the new-scene default (`newEffectsScene` seeds `EFFECTS_V_FACTOR_LOCK`)
+and a fixture carrying it would prove the control moved nothing. At N=16 the
+plain rule OVERFLOWS the control and the app's clamp folds it onto **15 — the max,
+the lock sentinel, and the default**: the one value the rule forbids. Measured,
+not reasoned: the un-amended rule was run as a red-first plant and the document
+came back `v_factor: 15`.
+
+R7 now reads **`min + (N % (max - min + 1))`** — N wrapped into the control's own
+advertised range by the same `%` R5 already applies when an index runs past the
+end of a list. At N=16 on a 0..15 control that is **0**. Harness row **6h** pins
+the result away from the control's `max`, so the collision cannot come back
+silently.
+
+### A FIFTH rot, found the same way as row 59's four
+
+R4's selector, `/^Layer i world_y/`, **matched nothing and had been driving
+nothing**. The layer card's top spinner is titled with the app's OWN label for
+the scene's vertical space (`layerTopBounds().label`) — `world_y` unlocked,
+**`Screen line`** locked — and a new scene starts locked, so at R4 time the title
+reads `Layer 0 Screen line (0..511) — a plane line; the scene is locked`.
+
+It stayed invisible for the worst possible reason: `addLayerCommand` pushes
+`last.world_y + 32`, so the app's own default for a stack of added layers **is**
+`i * 32`, exactly what R4 prescribes. Row 5b ("every layer took its enumerated
+world_y") is therefore **NON-DISCRIMINATING and always was**, and the planted
+re-rot emitted **byte-identical output** — which is both why nobody saw it and
+why fixing it changed no bytes. The catcher is the new blanket row **8a**, which
+watches the GESTURE rather than the value: every `SET_INPUT` now goes through a
+ledger and 8a asserts not one of them returned `'no-element'`. Under the plant it
+reported 16 misses and went red while 5b stayed green.
 
 **RE-ORIGINATED 2026-08-27 (ROADMAP row 59), not edited.** The contract RETIRED
 `precision` (empyrean `0bd4753`): aeon deleted the storage on 2026-08-26 —
@@ -68,6 +137,11 @@ otherwise:
    cell the enumeration lands on a value no default produces — and row 6b reads
    the **document** rather than trusting a gesture landed. Neither is decoration.
 4. **The layer count was already stale**, see the next entry.
+
+**⚠ THE PIN DESCRIBED BELOW WAS PAID OFF BY ROW 60 (2026-08-27) — see the entry
+at the top of this section. The paragraph is kept as written because it is the
+record of why the debt existed, and because its reasoning is the reason row 60
+had to replace the one-line corroboration rather than simply do without it.**
 
 **THE LAYER COUNT IS PINNED FOR THIS RUN, AND THAT IS A DEBT, NOT A FIX.** Gesture
 R3 says the layer count is the app's own ceiling. That ceiling was **8** when this
@@ -120,10 +194,10 @@ tests do NOT prove" for the limit of that.
 | | |
 |---|---|
 | harness | `scratchpad/writer-originated-scene-harness.mjs` |
-| run | 2026-08-27, **29/29** checks passed, and passed 29/29 on three consecutive runs whose emitted bytes were identical (sha256 `c28b6db065d2cf88a1…`). Earlier: 2026-08-23 re-origination 25/25; first run 2026-08-22, 22/22. The count moved 25 -> 29 because R9 lost `precision` (no row removed — 6a merely narrowed to `transition`) and four rows were ADDED: **6f** the retired control is gone from the running app, **6g** it did not reach the document, **7f** it is not in the emitted file, and **4c** the app's layer ceiling vs this run's count, reported rather than assumed |
+| run | 2026-08-27 (ROADMAP row 60), **32/32** checks passed, ceiling-driven. Earlier: row 59's pinned run 29/29; 2026-08-23 re-origination 25/25; first run 2026-08-22, 22/22. The count moved 29 -> 32 with three ADDED rows, all of them about gestures landing rather than values being legal: **8a** the blanket ledger — every `SET_INPUT` returned `'ok'` and the session issued exactly the prescribed number of gestures; **6h** the document's `v_factor` is not the control's `max` (= lock sentinel = new-scene default); **5d** every layer card really has a top spinner, and the title the app gave it is printed |
 | app build | `VITE_AURORA_DEBUG=1 npm run build` (electron-vite 5 / vite 8) |
-| built from | aurora `0d533e5`, branch `feat/retire-precision`. Earlier runs: `427cbd1` on `fix/v-factor-retype`; the first from `76ff28f` on `feat/writer-originated-scene-fixture` |
-| driven by | CDP against Electron under `xvfb-run -a -s '-screen 0 1680x1050x24'`, ports 9413/9414/9415 (three runs). Environment printed beside every run, because it varies here: load average 6.5–7.8, uptime 1 day 21:54–21:55 |
+| built from | aurora `71f8925`, branch `feat/writer-session-ceiling`. Earlier runs: `0d533e5` on `feat/retire-precision`; `427cbd1` on `fix/v-factor-retype`; the first from `76ff28f` on `feat/writer-originated-scene-fixture` |
+| driven by | CDP against Electron under `xvfb-run -a -s '-screen 0 1680x1050x24'`, one port per run. Environment printed beside every run, because it varies here: row 60's runs at load average 0.9–2.5, uptime 1 day 22:19–22:22 |
 | project opened | a **writable copy** of the aeon tree (`project.json` + `games/` + `art/`) in the session scratchpad. aeon's own tree was never opened and never written to — verified by the overseer's independent re-run, `md5sum` over aeon's live `editor/effects/*.json` **unchanged across it**. ⚠ **The clause that used to follow — *"it has no `games/sonic4/data/editor/effects/` directory before or after this run"* — is DELETED as false, 2026-08-27.** aeon has carried that directory since at least 2026-08-25 (`ojz_act1_start.json`, `ojz_act1_depth.json`), and that is not incidental: **it is rot 1's own cause**, recorded 100 lines above in this same file. The safety claim and the emptiness claim had been welded into one sentence, so a reader checking the half that matters would have read the half that had quietly gone false beside it — and the two are independent (a copy is safe whether or not the original is empty). Measure the mtimes; do not infer safety from absence |
 | saved by | a real `Ctrl+S` key event to the real window → `saveActive()` → `saveAeonProject()` → `buildAeonSavePlan()`. Toast read back: `success:Project saved` |
 | taken from | `<copy>/games/sonic4/data/editor/effects/writer_session_ojz.json`, byte-for-byte |
@@ -139,12 +213,12 @@ layer index by the one rule stated. No JSON key was typed anywhere.
 | R0 | open the project copy (setup, via `window.__dbg.aeon.open`), then click the **Effects** facet pill |
 | R1 | type `writer_session_ojz` into the real `new_scene_id` field; click **New** |
 | R2 | type `Oracle Jungle Zone — writer session` into the **Name** field |
-| R3 | click **Add layer** seven times, landing 8 layers. This gesture normally runs until the control refuses, so the count is the app's own ceiling rather than a number chosen here — and it was, at 8, when this fixture was originated. **For the 2026-08-27 run the count was PINNED to 8 while the app's real ceiling is 16**, to keep row 59's delta interpretable; see "THE LAYER COUNT IS PINNED FOR THIS RUN" above. The harness prints the pin next to the measured ceiling so the debt cannot go quiet |
-| R4 | layer *i*: `world_y` = `i * 32` |
+| R3 | click **Add layer** until the control refuses — it disables itself at the ceiling — so the count is the app's own and not a number chosen here. Row 60's run: **15 clicks, landing 16 layers, `refused=true`, the panel's own header reading `Layers (16/16)`**. The pin row 59 used (`LAYERS=8`) is unset, and a pinned run still prints the pin beside the measured ceiling so it can never be mistaken for a ceiling-driven one |
+| R4 | layer *i*: `world_y` = `i * 32`, typed into the card's top spinner **under whatever label the app gives the scene's vertical space** — `world_y` on an unlocked scene, `Screen line` on a locked one. Naming only one of the two is what rotted this gesture; see "A FIFTH rot" above |
 | R5 | layer *i*: `fa` = the option at index *i* of that select's own option list |
 | R6 | layer *i*: `fb` = the option at index `len - 1 - i` of the same list. For *i* = 0 that is the **last** option, the custom-packed sentinel — so the packed triple `{op: 0, s1: 0, s2: 15}` in the file is what the app seeds, never something typed here |
-| R7 | scene `v_factor` = **8**, the layer count, typed into the real spinner. Until item 35 this read "the option at index 8 of the `v_factor` select → `FACTOR_3_4`"; that select is gone, because `v_factor` is a 0..15 shift count and never was a `$defs/factor`. The layer count is the same rule R8 uses and for the same reason — it is the app's own ceiling, not a number chosen here. Deliberately **not** the field's own `max`: `max` is also the new-scene default, so a fixture carrying it would prove the control moved nothing. The affordance itself is checked instead (harness rows 6d/6e: the control is an `input[type=number]` with min 0, and no control at `v_factor` offers a `FACTOR_*` option) |
-| R8 | `v_center` = 8, `v_offset` = -8 (the layer count, and its negation) |
+| R7 | scene `v_factor` = the layer count **wrapped into the control's own advertised range**, `min + (N % (max − min + 1))`, typed into the real spinner. At N=16 on a 0..15 control that is **0**. Until item 35 this read "the option at index 8 of the `v_factor` select → `FACTOR_3_4`"; that select is gone, because `v_factor` is a 0..15 shift count and never was a `$defs/factor`. N is the same number R8 uses and for the same reason — the app's own ceiling, not a number chosen here — and the value is deliberately **not** the field's own `max`, because `max` is also the new-scene default and a fixture carrying it would prove the control moved nothing. **The `%` is row 60's, and it is forced**: the ceiling outgrew this control's range, so the plain rule overflowed and the clamp folded it onto exactly the value the rider forbids (measured — see "R7's rule collided" above). The wrap is the same one R5 applies to an over-long index. The affordance itself is checked separately (harness rows 6d/6e: the control is an `input[type=number]` with min 0, and no control at `v_factor` offers a `FACTOR_*` option), and row 6h pins the result away from `max` |
+| R8 | `v_center` = 16, `v_offset` = -16 (the layer count, and its negation) |
 | R9 | `transition` = the **last** option that select offers → `instant`. Until row 59 this read "`precision` and `transition` … → `cell`, `instant`"; the `Precision` control is gone, because aeon deleted the field's storage and empyrean `0bd4753` cut the key from the schema. Its **absence** is now measured instead of its value being set — harness rows 6f (no such control in the running app, with its row-mates checked present so an unmounted panel cannot pass it), 6g (no such key in the document) and 7f (no such key in the emitted file) |
 | R10 | the section-assignment select is set to the scene's id (section 0's `sceneRef`) |
 | R11 | `Ctrl+S`, dispatched as a real key event |

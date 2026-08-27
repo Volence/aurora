@@ -20,47 +20,64 @@
 // THE GESTURE RULE, in full (this is the provenance):
 //   R1  scene id typed into the real `new_scene_id` field, then "New" clicked.
 //   R2  the Name field takes a real keystroke.
-//   R3  "Add layer" is clicked LAYERS times; LAYERS defaults to the app's own
-//       ceiling (click until the control disables itself), so the count is
-//       derived and not chosen.
+//   R3  "Add layer" is clicked until the control REFUSES (it disables itself at
+//       the ceiling), so the count is the app's own and not a number chosen
+//       here. `LAYERS` can still pin it, and a pinned run prints the pin beside
+//       the measured ceiling so it can never be mistaken for a ceiling-driven
+//       one — but ROADMAP row 60's run is ceiling-driven and the pin is unset.
 //
-//       ⚠ IT IS PINNABLE NOW, AND THE 2026-08-27 RUN PINNED IT TO 8. Read this
-//       before assuming a re-run reproduces a previous one. When this fixture
-//       was last originated (2026-08-23) the app's ceiling was 8, and the file
-//       carries 8 layers with v_factor/v_center/v_offset all derived from that
-//       8. ROADMAP row 56 then raised the ceiling to 16 (empyrean 277bc15,
-//       `layers` maxItems 8 -> 16) and NOBODY RE-RAN THIS FIXTURE, so it was
-//       already stale against its own gesture rule before row 59 touched it.
-//
-//       A literal ceiling-driven re-run therefore moves ~9 lines at once — eight
-//       new layer blocks plus three N-derived scalars — and that would CONFOUND
-//       the corroboration this fixture is verified by: the re-origination
-//       protocol (see the provenance) reads a re-run as faithful when the delta
-//       is exactly the lines the contract change touched, and a delta carrying
-//       an unrelated capability change proves nothing about either. Row 59's
-//       brief refuses the same conflation for the row-58 deform controls in as
-//       many words ("do NOT widen the gesture sequence ... that would confound
-//       the one-line-delta corroboration"); the ceiling is that case exactly.
-//
-//       So LAYERS=8 was PINNED for row 59's run, with this note as the record,
-//       and the ceiling re-origination is booked as its own ROADMAP row. Row 4a
-//       still MEASURES the app's real ceiling and prints it, so the staleness
-//       stays visible instead of being hidden by the pin.
+//       THE PIN'S HISTORY, because it explains the file's shape. The ceiling was
+//       8 when this fixture was originated (2026-08-23); ROADMAP row 56 raised
+//       it to 16 (empyrean 277bc15, `layers` maxItems 8 -> 16) and nobody re-ran
+//       the fixture, so it went stale against its own gesture rule. Row 59
+//       PINNED LAYERS=8 rather than fix it, because a ceiling-driven re-run
+//       moves ~9 lines at once (eight layer blocks + three N-derived scalars)
+//       and would have confounded the one-line-delta corroboration row 59's own
+//       re-origination rested on. Row 60 pays that debt, and pays for the lost
+//       corroboration a different way: the delta is PREDICTED IN ADVANCE from
+//       R4/R5/R6 and compared line by line, and the first eight layers must come
+//       back byte-identical to the 8-layer file as a continuity anchor.
 //   R4  layer i: world_y = i * 32.
+//
+//       ⚠ THE SELECTOR FOR THIS ROW WAS ROTTED TOO, and row 60 found it — a
+//       FIFTH rot of the same family as row 59's four. The card's top spinner is
+//       titled with the app's OWN label for the scene's vertical space
+//       (`layerTopBounds().label`), which is `world_y` on an UNLOCKED scene and
+//       `Screen line` on a locked one. A new scene seeds `v_factor` at the LOCK
+//       SENTINEL, so the label at R4 time is "Screen line" and the old
+//       `/^Layer i world_y/` matched NOTHING: SET_INPUT returned 'no-element'
+//       and R4 drove nothing at all. It stayed invisible for the worst possible
+//       reason — `addLayerCommand` pushes `last.world_y + 32`, so the app's own
+//       default for a stack of added layers IS `i * 32`, exactly what R4
+//       prescribes. Row 5b ("every layer took its enumerated world_y") is
+//       therefore NON-DISCRIMINATING and always was; row 8a is the catcher.
+//       The selector now names both labels the app can render.
 //   R5  layer i: fa = the option at index i of that select's own option list.
 //   R6  layer i: fb = the option at index (len - 1 - i) of the same list.
 //       For i = 0 that is the LAST option, which is the custom-packed sentinel —
 //       so the packed triple in the emitted file is whatever the app seeds, never
 //       something typed here.
-//   R7  scene v_factor = N (N = the layer count from R3), typed into the real
-//       spinner. It USED to be "the option at index N of the v_factor select",
-//       and that select is gone: ROADMAP item 35 retyped `v_factor` from a
-//       $defs/factor to a plain 0..15 shift count, so the control is a bounded
-//       number field. N is chosen by the same rule R8 uses and for the same
-//       reason — it is the app's own ceiling, not a number picked here — and it
+//   R7  scene v_factor = N WRAPPED INTO THE CONTROL'S OWN RANGE, typed into the
+//       real spinner: `min + (N % (max - min + 1))`. It USED to be "the option
+//       at index N of the v_factor select", and that select is gone: ROADMAP
+//       item 35 retyped `v_factor` from a $defs/factor to a plain 0..15 shift
+//       count, so the control is a bounded number field. N is the same number
+//       R8 uses and for the same reason — the app's own ceiling, not a number
+//       picked here.
+//
+//       ⚠ THE WRAP IS ROW 60's, AND IT IS FORCED, not decoration. The rule read
+//       plainly "v_factor = N" until 2026-08-27, with an explicit rider that it
 //       is deliberately NOT the field's `max`, because `max` is also the
-//       new-scene default and a fixture carrying it would prove the control
-//       moved nothing. The affordance itself is checked separately (row 6d).
+//       new-scene default (`newEffectsScene` seeds `EFFECTS_V_FACTOR_LOCK`) and
+//       a fixture carrying it would prove the control moved nothing. Row 56
+//       raised the layer ceiling to 16 while this control's range stayed 0..15,
+//       so at N=16 the plain rule OVERFLOWS and the app's clamp folds it onto
+//       `max` — the one value the rule was written to avoid. The `%` is the same
+//       wrap R5 already applies when an index runs past the end of a list
+//       (`factorOpts[i % factorOpts.length]`), so the amended rule is the
+//       fixture's own existing discipline rather than a new one. Row 6h pins the
+//       result away from `max` so the collision cannot come back silently.
+//       The affordance itself is checked separately (row 6d).
 //   R8  v_center = N, v_offset = -N.
 //   R9  transition = the LAST option that select offers. It USED to read
 //       "precision and transition"; ROADMAP row 59 retired `precision` — aeon
@@ -189,6 +206,34 @@ const SET_INPUT = (selector, value) => String.raw`
   return 'ok';
 })()`;
 
+// EVERY GESTURE GOES THROUGH HERE, and the ledger it builds is row 8a.
+//
+// ⚠ THIS IS THE HIGHEST-VALUE ROW IN THE HARNESS, and it exists because the
+// instrument has now been caught FIVE times driving nothing while reporting
+// green (row 59 found three end-anchored selectors, row 60 found the layer-top
+// spinner's). Every one of them presented identically: `SET_INPUT` returned
+// 'no-element', the control kept the app's default, and the default was ITSELF a
+// legal value — so a row asserting "this field holds one of the schema's legal
+// answers" passed whether the gesture landed or never fired.
+//
+// A per-value row cannot close that on its own; only a row that watches the
+// GESTURE rather than the value can. So: nothing calls `c.evalExpr(SET_INPUT(…))`
+// directly any more. `drive()` records the selector's own verdict, and row 8a
+// asserts every one of them came back 'ok' — a claim no default can satisfy,
+// because a default is what you get when the answer is 'no-element'.
+const driven = [];
+// How many gestures the deform sequence (R12..R16) issued this run. Counted as
+// the sequence runs rather than pinned, because the number depends on which
+// `tableRef` FORM each attachment's index rule lands on — `zero` has no
+// parameters and `sine` has two — and a pinned total would have to be re-typed
+// every time the schema grows a generator. Zero until R12 runs.
+let DEFORM_DRIVES = 0;
+async function drive(c, label, expr) {
+  const r = await c.evalExpr(expr);
+  driven.push({ label, r });
+  return r;
+}
+
 const clickByText = (re, tag = 'button') => String.raw`
 (() => {
   const el = [...document.querySelectorAll(${JSON.stringify(tag)})]
@@ -287,7 +332,7 @@ async function main() {
       headings.some((h) => h === 'Scenes'), JSON.stringify(headings));
 
     // ---- 3. R1/R2: create the scene, name it. ----------------------------
-    const typed = await c.evalExpr(SET_INPUT(
+    const typed = await drive(c, 'R1 new_scene_id', SET_INPUT(
       `document.querySelector('input[placeholder="new_scene_id"]')`, SCENE_ID));
     check('3a', 'the new-scene id field accepts a real keystroke', typed === 'ok', `typed=${typed}`);
     const pressedNew = await c.evalExpr(clickByText('/^New$/'));
@@ -310,7 +355,7 @@ async function main() {
 
     // The Name field is the ONE text input on the surface with neither a title
     // nor a placeholder (the Filter box and new_scene_id both have placeholders).
-    const named = await c.evalExpr(SET_INPUT(
+    const named = await drive(c, 'R2 name', SET_INPUT(
       `[...document.querySelectorAll('input')].find(e => e.type === 'text'
          && !e.getAttribute('placeholder') && !e.title)`,
       SCENE_NAME));
@@ -398,7 +443,8 @@ async function main() {
     if (!Array.isArray(factorOpts) || factorOpts.length < 2) throw new Error('empty factor select');
 
     for (let i = 0; i < N; i++) {
-      await c.evalExpr(SET_INPUT(NUM_BY_TITLE(`/^Layer ${i} world_y/`), i * 32));
+      await drive(c, `R4 layer ${i} top`,
+        SET_INPUT(NUM_BY_TITLE(`/^Layer ${i} (world_y|Screen line)\\b/`), i * 32));
       await sleep(180);
       // `\\b`, NOT `$`. These read `/^Layer i fa$/` until 2026-08-27 and had
       // SILENTLY STOPPED MATCHING: the factor rows' titles gained an explanatory
@@ -408,9 +454,10 @@ async function main() {
       // and every layer kept its default FACTOR_1. The fixture has not been
       // re-originated since 2026-08-23, which is why nobody saw it. Row 5c is
       // what catches this — see its note.
-      await c.evalExpr(SET_INPUT(SEL_BY_TITLE(`/^Layer ${i} fa\\b/`), factorOpts[i % factorOpts.length]));
+      await drive(c, `R5 layer ${i} fa`,
+        SET_INPUT(SEL_BY_TITLE(`/^Layer ${i} fa\\b/`), factorOpts[i % factorOpts.length]));
       await sleep(180);
-      await c.evalExpr(SET_INPUT(SEL_BY_TITLE(`/^Layer ${i} fb\\b/`),
+      await drive(c, `R6 layer ${i} fb`, SET_INPUT(SEL_BY_TITLE(`/^Layer ${i} fb\\b/`),
         factorOpts[(factorOpts.length - 1 - i + factorOpts.length) % factorOpts.length]));
       await sleep(180);
     }
@@ -429,6 +476,23 @@ async function main() {
     check('5c', 'layer 0 fb is a PACKED triple, seeded by the app, not typed here',
       typeof sceneOf(doc).layers[0].fb === 'object' && sceneOf(doc).layers[0].fb !== null,
       JSON.stringify(sceneOf(doc).layers[0].fb));
+    // ROW 5d — ROADMAP row 60, and it is a REPORT of the thing that rotted.
+    //
+    // The card's top spinner is titled with the app's OWN label for the scene's
+    // vertical space, and that label CHANGES with `v_factor` (`world_y` unlocked,
+    // `Screen line` locked). R4's selector named only one of the two, and a new
+    // scene starts in the other. This prints the title the app actually rendered,
+    // so the next re-originator sees the moving part instead of rediscovering it.
+    // The pass/fail is only "there IS one per layer"; row 8a is what says the
+    // gesture reached it.
+    const topTitles = await c.json(
+      `[...document.querySelectorAll('input[type=number]')].map(e => e.title)
+         .filter(t => /^Layer \\d+ /.test(t) && /\\(\\d+\\.\\.\\d+\\)/.test(t)
+                      && !/ (vsplit|shift_|phase|amplitude|period)/.test(t))`);
+    check('5d', 'every layer card has a top spinner, under whatever label the app '
+      + 'gives the scene\'s vertical space',
+      topTitles.length === N,
+      `${topTitles.length} tops for ${N} layers; layer 0 reads ${JSON.stringify(topTitles[0])}`);
 
     // ---- 6. R7/R8/R9: scene-level fields. --------------------------------
     // ITEM 35, ON THE RENDERED SURFACE. `v_factor` is a shift count, so its
@@ -456,15 +520,20 @@ async function main() {
     check('6e', 'the v_factor control the session drives is NOT the layer factor picker',
       !(vfCtl.selOptions || []).some((o) => /^FACTOR_/.test(o)),
       `select options at v_factor: ${JSON.stringify(vfCtl.selOptions)}`);
-    await c.evalExpr(SET_INPUT(NUM_BY_TITLE('/^v_factor/'), N));
+    // R7's WRAP, computed off the control's OWN advertised bounds — see the R7
+    // note at the top for why the plain `= N` rule could not survive row 56.
+    const vfMin = Number(vfCtl.min);
+    const vfMax = Number(vfCtl.max);
+    const V_FACTOR = vfMin + (N % (vfMax - vfMin + 1));
+    await drive(c, 'R7 v_factor', SET_INPUT(NUM_BY_TITLE('/^v_factor/'), V_FACTOR));
     await sleep(300);
-    await c.evalExpr(SET_INPUT(NUM_BY_TITLE('/^v_center/'), N));
+    await drive(c, 'R8 v_center', SET_INPUT(NUM_BY_TITLE('/^v_center/'), N));
     await sleep(300);
     // `/^v_offset$/` until 2026-08-27, same silent no-match as the factor rows
     // above: the title is "v_offset — signed pixel offset added after the shift,
     // …". Row 6b is what caught it, by reading the DOCUMENT rather than trusting
     // the gesture — the key was simply absent from the authored scene.
-    await c.evalExpr(SET_INPUT(NUM_BY_TITLE('/^v_offset\\b/'), -N));
+    await drive(c, 'R8 v_offset', SET_INPUT(NUM_BY_TITLE('/^v_offset\\b/'), -N));
     await sleep(300);
     // ROW 6f — ROADMAP row 59, ON THE RENDERED SURFACE.
     //
@@ -516,17 +585,35 @@ async function main() {
     check('6a', 'the transition select has options in it',
       Array.isArray(transOpts) && transOpts.length > 0,
       `transition=${JSON.stringify(transOpts)}`);
-    await c.evalExpr(SET_INPUT(SEL_BY_TITLE('/^transition$/'), transOpts[transOpts.length - 1]));
+    await drive(c, 'R9 transition',
+      SET_INPUT(SEL_BY_TITLE('/^transition$/'), transOpts[transOpts.length - 1]));
     await sleep(500);
     doc = JSON.parse(await c.evalExpr('window.__dbg.aeon.scenesJson()'));
     // ROW 6b LIKEWISE. It reads the model rather than trusting that a gesture
     // landed, so a selector that matches nothing shows up as a missing key.
     check('6b', 'the scene-level enumerated choices reached the DOCUMENT',
-      sceneOf(doc).v_factor === N
+      sceneOf(doc).v_factor === V_FACTOR
       && sceneOf(doc).v_center === N && sceneOf(doc).v_offset === -N
       && sceneOf(doc).transition === transOpts[transOpts.length - 1],
       JSON.stringify({ v_center: sceneOf(doc).v_center, v_offset: sceneOf(doc).v_offset,
         transition: sceneOf(doc).transition, v_factor: sceneOf(doc).v_factor }));
+    // ROW 6h — ROADMAP row 60. R7's rider, PINNED instead of merely written down.
+    //
+    // `newEffectsScene` seeds `v_factor` at the LOCK SENTINEL, which is the
+    // control's own `max`. So `v_factor === max` in the document is exactly the
+    // state "the spinner was never moved", and R7's whole point is to land
+    // somewhere else. Row 6b cannot say this: it compares against V_FACTOR,
+    // which the same collision would have folded onto `max` too. This row reads
+    // the DOCUMENT against the CONTROL'S OWN max — a comparison no arithmetic in
+    // this file can satisfy vacuously.
+    check('6h', 'the v_factor in the document is NOT the control\'s max '
+      + '(= the lock sentinel = the new-scene default), so the spinner really moved',
+      sceneOf(doc).v_factor !== vfMax
+      // Anti-vacuous: it is still a legal shift count in the control's range.
+      && Number.isInteger(sceneOf(doc).v_factor)
+      && sceneOf(doc).v_factor >= vfMin && sceneOf(doc).v_factor <= vfMax,
+      `v_factor=${sceneOf(doc).v_factor}, control range [${vfMin},${vfMax}], `
+      + `N=${N}, rule min + (N % range) = ${V_FACTOR}`);
     // ROW 6g — the retired key must not reach the DOCUMENT by any other route.
     // 6f watches the screen; this watches the model the writer will serialise.
     // A default seeded in `newEffectsScene`, or a stale command replayed from
@@ -537,13 +624,38 @@ async function main() {
       `scene keys: ${JSON.stringify(Object.keys(sceneOf(doc)))}`);
 
     // ---- R10: assign the scene to the active section. --------------------
-    const assigned = await c.evalExpr(SET_INPUT(SEL_BY_TITLE('/sceneRef/'), SCENE_ID));
+    const assigned = await drive(c, 'R10 sceneRef',
+      SET_INPUT(SEL_BY_TITLE('/sceneRef/'), SCENE_ID));
     await sleep(600);
     const activeSection = await c.evalExpr('window.__dbg.aeon.activeSection()');
     const ref = await c.evalExpr(`window.__dbg.aeon.sceneRef(${activeSection})`);
     check('6c', "the assignment reached the section's sceneRef in the model",
       assigned === 'ok' && ref === SCENE_ID,
       `section ${activeSection} sceneRef=${JSON.stringify(ref)}`);
+
+    // ---- 8. THE BLANKET GESTURE LEDGER (ROADMAP row 60). -----------------
+    //
+    // ⚠ READ THE `drive()` NOTE ABOVE BEFORE TOUCHING THIS. Five separate
+    // selectors in this harness have now been caught matching NOTHING while the
+    // run reported green, because the control they missed kept a default that is
+    // itself a legal value. Every value row in this file can be fooled by that;
+    // this row cannot, because it does not look at a value at all — it asserts
+    // that every selector the session used FOUND ITS ELEMENT.
+    //
+    // THE COUNT IS ASSERTED TOO, and derived, not pinned: two typed fields
+    // (R1, R2), three per layer (R4/R5/R6), three scene spinners (R7, R8 x2),
+    // the transition select (R9) and the section assignment (R10), plus the
+    // deform gestures the run actually issued. A silently SKIPPED gesture leaves
+    // no 'no-element' behind, so a ledger that only checked its entries would
+    // miss exactly the failure a `continue` introduces.
+    const expectedDrives = 2 + 3 * N + 3 + 1 + 1 + DEFORM_DRIVES;
+    const missed = driven.filter((d) => d.r !== 'ok');
+    check('8a', 'EVERY gesture found its control — no selector returned `no-element`, '
+      + 'and the session issued exactly the gestures the rule prescribes',
+      missed.length === 0 && driven.length === expectedDrives,
+      `${driven.length} gestures issued (rule prescribes ${expectedDrives}), `
+      + `${missed.length} missed`
+      + (missed.length ? `: ${JSON.stringify(missed.slice(0, 12))}` : ''));
     await shot(c, '1-authored-scene');
 
     // ---- 7. R11: SAVE, through the app's own Ctrl+S. ---------------------
