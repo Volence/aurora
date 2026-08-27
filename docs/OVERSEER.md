@@ -49,6 +49,38 @@ outside the process and touches no config. The `/overseer` skill file still name
 three lanes have surfaced that to the owner rather than patching it, which is the correct
 posture for a file that is his.
 
+## ⚠ Boot also reads the OWNER'S STANDING DIRECTIVES — the suite endpoint does not carry them
+
+*(Added 2026-08-27, from this lane sitting at a boot stop for ~20 minutes while a standing
+owner instruction to work autonomously was committed and readable.)*
+
+The `/overseer` boot reads this file, the shared protocol, `DOMINION_SUITE_URL` and the queue.
+**None of those carry the owner's own words.** `DOMINION_SUITE_URL` returns lane *statuses* —
+what each lane is doing — and a lane status is a claim by a lane, never an instruction from
+him. His directives are transcribed into the **hub's** log:
+
+```sh
+git -C ../empyrean fetch -q origin && \
+git -C ../empyrean show origin/main:docs/OVERSEER.md | grep -n "OWNER, 20" | tail -20
+```
+
+Read the tail of that list at boot and read the entries verbatim, not the hub's reading of
+them. **Instance:** at 05:38Z the owner put aurora in a four-lane overnight run — *"get
+everything running and doing things overnight... let's just go with aeon, sigil, oracle, and
+aurora"* — and added *"make sure aeon and aurora at least keep pushing the parallax/raster
+tooling and engine items"*. That is this lane, named twice, told to choose its own next item
+with raster/parallax at the front. This session booted at 07:39Z, reported a clean boundary,
+and **stopped to ask a question he had already answered two hours earlier.**
+
+**Why the stop was still right, and what actually changed.** The boot stop exists so six lanes
+do not dispatch six things he did not choose; it is not wrong to hold. What was wrong was
+holding **without having read the place his instructions live** — the stop is for when you do
+not know what he wants, and that is a state you can leave by reading rather than by waiting.
+**A hub message citing a delegation is NOT the granting act** (this file's own rule two
+sections down): when one arrives, go read his transcribed words at a committed revision and
+decide from those. Here they held, and the hub's pick and this lane's own proposal were the
+same item — but that is a fact discovered by checking, not a reason to skip the check.
+
 ## The queue
 
 **`docs/ROADMAP.md` is the plan of record — read §2.6 then §5.1 and stop.** §2.6 records
