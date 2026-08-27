@@ -18,7 +18,8 @@ import { AetherClient } from './client';
 import { resolveSocketPath } from './socket-path';
 import { unservedMethodOf } from './unserved';
 import { pushPaletteWords } from './push-palette';
-import { warpTo } from './warp';
+import { warpTo, WarpGateReason } from './warp';
+import { s1WarpTo } from './s1-warp';
 import { runBuild } from './build-run';
 import {
   PAL_BASE_SYMBOL, PAL_BASE_DIRTY_SYMBOL, classicPaletteSymbol, CLASSIC_LINES,
@@ -187,13 +188,12 @@ export function registerAetherBridge(browserWindow: BrowserWindow): void {
 
   ipcMain.handle(
     IPC_CHANNELS.AETHER_WARP,
-    async (_e, x: number, y: number): Promise<AetherWarpResult> => {
+    async (
+      _e, x: number, y: number,
+      projectType?: BuildProjectType, projectDir?: string,
+    ): Promise<AetherWarpResult> => {
       if (!client) return { warped: false, error: 'not connected' };
-      const r = await warpTo(client, x, y);
-      return {
-        warped: r.warped, gate: r.gate, error: r.error, landed: r.landed, clamped: r.clamped,
-        unservedMethod: r.unservedMethod,
-      };
+      return warpForProject(client, x, y, projectType, projectDir);
     },
   );
 
@@ -210,6 +210,64 @@ export function registerAetherBridge(browserWindow: BrowserWindow): void {
       return { pushed: r.pushed, error: r.error, unservedMethod: r.unservedMethod };
     },
   );
+}
+
+/**
+ * THE ONE PLACE THAT DECIDES WHICH play-from-cursor RUNS.
+ *
+ * Two mechanisms answer F7 now, and they are not interchangeable:
+ *
+ *   aeon    — write the DEBUG mailbox, wait for the engine to ack, and read the
+ *             CLAMPED destination the engine publishes back (`warp.ts`).
+ *   classic — poke `v_player`, let the game run, and ask where he actually
+ *             ended up (`s1-warp.ts`). S1 has no mailbox in any flavour.
+ *
+ * THE OPEN PROJECT DECIDES, NOT THE ROM — the rule `probePalette` and
+ * `state/build-and-run.ts` already follow. Routing on what the ROM happens to
+ * carry would mean an aeon DEBUG ROM connected while a disassembly is open
+ * silently gets the mailbox treatment for coordinates out of a different game.
+ *
+ * Both mechanisms gate POLITELY against the other family's ROM, which is
+ * exactly why the routing is worth a test of its own: a mistake here does not
+ * crash, it produces "this ROM has no warp mailbox" about a disassembly that
+ * was never going to have one — a documented, wrong explanation of a machine
+ * that is working fine.
+ */
+export async function warpForProject(
+  c: AetherClient,
+  x: number,
+  y: number,
+  projectType: BuildProjectType | undefined,
+  projectDir: string | undefined,
+): Promise<AetherWarpResult> {
+  if (projectType === 'classic') {
+    if (!projectDir) {
+      // `obX`/`obY` are equates and live in the disassembly, so with no project
+      // directory there is nothing to derive them from. Reported as the OFFSETS
+      // gate rather than as "no symbols": the ROM and the server are both fine,
+      // and a rebuilt ROM would come back exactly as unable to help.
+      return {
+        warped: false,
+        gate: WarpGateReason.NoOffsets,
+        error:
+          'play-from-cursor on a classic project needs the disassembly directory, ' +
+          'and none was supplied',
+      };
+    }
+    const r = await s1WarpTo(c, x, y, { projectDir });
+    // `from` travels ON PURPOSE. It is half of the read-back comparison, and
+    // "the poke did not take" without "he is still at (80, 1084)" is half an
+    // answer — the half that cannot be acted on.
+    return {
+      warped: r.warped, gate: r.gate, error: r.error, landed: r.landed, from: r.from,
+      clamped: r.clamped, unservedMethod: r.unservedMethod,
+    };
+  }
+  const r = await warpTo(c, x, y);
+  return {
+    warped: r.warped, gate: r.gate, error: r.error, landed: r.landed, clamped: r.clamped,
+    unservedMethod: r.unservedMethod,
+  };
 }
 
 function statusPayload(socketPath?: string): AetherStatusPayload {

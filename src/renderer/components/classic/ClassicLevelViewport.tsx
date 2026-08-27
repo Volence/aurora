@@ -1564,12 +1564,12 @@ export default function ClassicLevelViewport() {
         return;
       }
       // F7 — play from cursor, the same key aeon's MapViewport binds
-      // (DSVEdit's convention). On classic this GATES today, and the gate is
-      // symbol detection against the running ROM — Warp_Req_* does not
-      // resolve, the exact path a release aeon ROM takes — because S1 has no
-      // warp mailbox in ANY build flavour (that is link 4, an s1disasm-side
-      // engine change out of this parcel's scope). The toast says so rather
-      // than sending anyone hunting for a DEBUG build that would not help.
+      // (DSVEdit's convention). This WORKS on classic now: S1 still has no
+      // warp mailbox in any build flavour, so `s1-warp.ts` pokes `v_player`
+      // instead, lets the game run, and reports where the player ACTUALLY
+      // ended up. The toast can therefore say "the game moved him", which is
+      // the answer for a cursor dropped inside a wall or over a pit — S1
+      // resolves collision against whatever position it is handed.
       if (e.key === 'F7') {
         e.preventDefault();
         const canvas = canvasRef.current;

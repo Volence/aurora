@@ -263,24 +263,54 @@ export const useAetherStore = create<AetherState>((set, get) => ({
 
   warp: async (x, y, kind = 'aeon') => {
     if (get().status !== 'connected') return null;
-    const r = await window.api.aetherWarp(x, y);
+    // ONE ROUTING SITE, as `build-and-run.ts` is for builds. The classic path
+    // pokes `v_player` and needs the DISASSEMBLY on disk to derive obX/obY
+    // from — those are equates, so no symbol lookup can answer them. Read here
+    // rather than at each caller so the three F7 entry points (the classic
+    // viewport, the agent surface, the debug hook) cannot drift apart on it.
+    // Dynamic, to keep the classic project graph out of this module's imports.
+    let projectDir: string | undefined;
+    if (kind === 'classic') {
+      const { useClassicProjectStore } = await import('./classicProjectStore');
+      projectDir = useClassicProjectStore.getState().dir ?? undefined;
+    }
+    const r = await window.api.aetherWarp(x, y, kind, projectDir);
     if (!r.warped) {
-      // A ROM without the mailbox simply does not carry the symbols — say
-      // that rather than reporting a failure the user cannot act on. On aeon
-      // the fix is actionable (build DEBUG); on classic there is no flavour to
-      // build — S1 has no warp mailbox at all — so the sentence must not send
-      // anyone hunting for one.
+      // A ROM without the symbols this path needs cannot be warped, and the
+      // fix differs by family: on aeon it is a DEBUG build (that is where the
+      // mailbox lives); on classic there is no flavour to build, so the
+      // sentence must point at the LISTING instead of sending anyone hunting
+      // for a debug ROM that would come back identical.
       if (r.gate === 'no-symbols') {
         return kind === 'classic'
-          ? 'Play-from-cursor is not available on classic — S1 has no warp mailbox (aeon-only for now)'
+          ? 'Play-from-cursor needs the disassembly\'s symbols — v_player did not resolve against the running ROM. Build s1disasm and reconnect.'
           : 'Warp needs a DEBUG build — this ROM has no warp mailbox';
+      }
+      // The disassembly, not the ROM and not the server. Its own sentence for
+      // its own reason: a rebuild fixes neither of the other two conditions
+      // and would not fix this one either.
+      if (r.gate === 'no-offsets') {
+        return `Play-from-cursor could not read obX/obY from the disassembly: ${r.error ?? 'unknown'}`;
+      }
+      // A DISCARDED poke is not an error the user should take to the emulator.
+      // It has its own sentence in `s1-warp.ts` naming the level-init window,
+      // and `from` says where he still is — so pass both through rather than
+      // wrapping them in "Warp failed", which points at the wrong thing.
+      if (r.from && r.landed) {
+        return `Play-from-cursor: ${r.error ?? 'the poke did not take'}`;
       }
       return `Warp failed: ${r.error ?? 'unknown'}`;
     }
-    // The engine clamps and publishes where it actually put the player, so the
-    // message reports the LANDING rather than the request.
+    // WHERE HE ACTUALLY IS, never the ask — aeon publishes its clamped
+    // destination, classic is asked after the game has had its turn. The
+    // wording of the moved case differs because the mechanisms differ: aeon
+    // clamps to the act bounds, S1 resolves collision against whatever
+    // position it was handed and may put him somewhere else entirely.
     const at = r.landed ? ` to (${r.landed.x}, ${r.landed.y})` : '';
-    return r.clamped ? `Warped${at} — clamped to the act bounds` : `Warped${at}`;
+    if (!r.clamped) return `Warped${at}`;
+    return kind === 'classic'
+      ? `Warped${at} — the game moved him from (${x}, ${y})`
+      : `Warped${at} — clamped to the act bounds`;
   },
 }));
 

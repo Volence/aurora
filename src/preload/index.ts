@@ -80,8 +80,13 @@ const api = {
     line: number, words: number[], kind?: 'aeon' | 'classic',
   ): Promise<{ pushed: boolean; error?: string }> =>
     ipcRenderer.invoke(IPC_CHANNELS.AETHER_PUSH_PALETTE, line, words, kind),
-  aetherWarp: (x: number, y: number): Promise<AetherWarpResult> =>
-    ipcRenderer.invoke(IPC_CHANNELS.AETHER_WARP, x, y),
+  // `projectType` + `projectDir` route play-from-cursor: the classic path pokes
+  // v_player and needs the disassembly on disk to derive obX/obY from, because
+  // those are equates and no symbol lookup can answer them.
+  aetherWarp: (
+    x: number, y: number, projectType?: 'aeon' | 'classic', projectDir?: string,
+  ): Promise<AetherWarpResult> =>
+    ipcRenderer.invoke(IPC_CHANNELS.AETHER_WARP, x, y, projectType, projectDir),
   aetherBuild: (
     basePath: string, raw?: Record<string, unknown>, projectType?: 'aeon' | 'classic',
   ): Promise<AetherBuildResult> =>
