@@ -306,9 +306,15 @@ describe('scene commands', () => {
     expect(removeLayerCommand(single, 'rocks', 0)).toBeNull();
   });
 
-  it('offers only cell precision, and both transitions', () => {
-    expect([...SCENE_FORM_CHOICES.precision]).toEqual(['cell']);
+  it('offers both transitions, and offers NO precision at all', () => {
     expect([...SCENE_FORM_CHOICES.transition]).toEqual(['smooth', 'instant']);
+    // ROADMAP row 59. This used to read `SCENE_FORM_CHOICES.precision -> ['cell']`.
+    // The choice set is what the panel maps over to build its dropdowns, so a
+    // key here is a control on screen; absence here is the control's absence.
+    // Anti-vacuous: the object is real and populated, so this is not an absence
+    // assertion against an empty map.
+    expect(Object.keys(SCENE_FORM_CHOICES).length).toBeGreaterThan(0);
+    expect(Object.keys(SCENE_FORM_CHOICES)).not.toContain('precision');
   });
 
   it("a whole form's worth of edits, run through history, is one step per gesture", () => {

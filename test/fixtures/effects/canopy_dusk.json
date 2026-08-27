@@ -119,7 +119,6 @@
   ],
   "left_column_mask": "sprite_mask",
   "name": "Canopy — dusk",
-  "precision": "cell",
   "schema": 1,
   "transition": "instant",
   "v_center": 112,

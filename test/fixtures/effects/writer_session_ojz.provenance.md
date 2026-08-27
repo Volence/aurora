@@ -19,9 +19,71 @@ edit the JSON. Editing it converts it into a second `canopy_dusk`, silently.
 | | |
 |---|---|
 | fixture | `test/fixtures/effects/writer_session_ojz.json` |
-| git blob hash | `2c4104e465bff9d5f70399ab7e37a03ce6d49e4e` |
-| sha256 | `4564a270046a7f613e68b868cdcf8abcb332f075833e164e6cb53ec5b6de20bd` |
-| size | 956 bytes, exactly one trailing newline |
+| git blob hash | `893cd05586c4524fa919adc6bbbb111e710d1a7e` |
+| sha256 | `c28b6db065d2cf88a108d4f91baae3673fad66e67bf980c642f4a6e84ccb0dfd` |
+| size | 933 bytes, exactly one trailing newline |
+
+**RE-ORIGINATED 2026-08-27 (ROADMAP row 59), not edited.** The contract RETIRED
+`precision` (empyrean `0bd4753`): aeon deleted the storage on 2026-08-26 —
+`engine/level/scene_dsl.emp:422-423` records `PRECISION_CELL`/`PRECISION_LINE`
+and the `Scene.sc_precision` field as having "LIVED HERE until", and `:1009`
+records the struct pad shrinking `u16 -> u8` to fill the byte — so the schema key
+went, and with it the panel's `Precision` dropdown. The schema is CLOSED
+(`unevaluatedProperties: false`), so the value this fixture carried stopped being
+legal, exactly as `FACTOR_3_4` did in item 35. Deleting the line would have
+converted the file into a second `canopy_dusk` precisely as the warning at the
+top says, so the **session was re-run** and the bytes taken off disk again. The
+previous record was blob `2c4104e465bff9d5f70399ab7e37a03ce6d49e4e`, sha256
+`4564a270046a7f613e68b868cdcf8abcb332f075833e164e6cb53ec5b6de20bd`, 956 bytes.
+**Exactly one line differs between the two runs** (`"precision": "cell"`,
+removed) — every layer, every factor spelling and every scene scalar came back
+byte-identical, which is the corroboration that the re-run was faithful rather
+than differently driven. Three independent runs of the harness produced the same
+933 bytes (sha256 `c28b6db065d2cf88a1…`), so the result is not a single
+measurement in an environment that varies.
+
+**AND THE RE-RUN FOUND FOUR THINGS THAT HAD ROTTED SINCE 2026-08-23**, none of
+them row 59's doing and all of them invisible until someone actually re-ran the
+session. They are recorded here because the next re-originator will hit them
+otherwise:
+
+1. **`doc[0]` was the wrong scene.** When this fixture was first originated the
+   aeon project had *no* `games/sonic4/data/editor/effects/` directory, so the
+   scene the session created was the only one and index 0 was safe. The project
+   has since gained `ojz_act1_start` and `ojz_act1_depth`, so index 0 became
+   somebody else's scene: the harness read *their* layer count as `N` and typed
+   it into `v_factor`/`v_center`/`v_offset`. The harness now addresses the
+   authored scene **by id** (`sceneOf`), which is what every one of those rows
+   meant all along.
+2. **Three selectors were end-anchored against titles that had grown a suffix.**
+   `/^Layer i fa$/`, `/^Layer i fb$/` and `/^v_offset$/` matched nothing once
+   those controls gained explanatory tooltips (`fa — how far Plane A, the
+   foreground level plane, scrolls…`). `SET_INPUT` returned `'no-element'` and
+   the gestures silently drove nothing — every layer kept the app's default
+   `FACTOR_1`, and `v_offset` never reached the document at all. Now `\b`.
+3. **Rows 5c and 6b are what caught it**, and that is worth naming: `FACTOR_1` is
+   both a legal enumerated answer *and* the app's default, so a row asserting
+   "fa is one of the schema's factors" would have stayed green through a run that
+   drove nothing. Row 5c pins layer 0's `fb` to the **packed sentinel** — the one
+   cell the enumeration lands on a value no default produces — and row 6b reads
+   the **document** rather than trusting a gesture landed. Neither is decoration.
+4. **The layer count was already stale**, see the next entry.
+
+**THE LAYER COUNT IS PINNED FOR THIS RUN, AND THAT IS A DEBT, NOT A FIX.** Gesture
+R3 says the layer count is the app's own ceiling. That ceiling was **8** when this
+fixture was originated and ROADMAP row 56 raised it to **16** (empyrean `277bc15`,
+`layers` maxItems 8 -> 16) on 2026-08-27 without anyone re-running this fixture —
+so the file was *already* stale against its own gesture rule before row 59 touched
+it. A literal ceiling-driven re-run would therefore have moved about nine lines at
+once: eight new layer blocks plus the three `N`-derived scalars. That would have
+**confounded the one-line corroboration above**, which is the only evidence that
+distinguishes a faithful re-run from a differently-driven one — the same reason
+row 59 deliberately did not widen the gestures to the new row-58 deform controls.
+So `LAYERS=8` was pinned for this run, the harness prints the pin beside the app's
+real ceiling on every run (rows 4a and 4c: *"app ceiling 16, this run authored 8 —
+STALE by 8"*), and **the ceiling re-origination is booked as its own ROADMAP row**.
+It is visible rather than hidden, which is the most this parcel can honestly do
+with it.
 
 **ONE BYTE APPENDED 2026-08-26 — the ruled terminator, not a content edit.** The hub
 ruled the canonical scene-file form (empyrean `e1ebd20`, `AURORA_EFFECTS_SCHEMA.md`
@@ -58,10 +120,10 @@ tests do NOT prove" for the limit of that.
 | | |
 |---|---|
 | harness | `scratchpad/writer-originated-scene-harness.mjs` |
-| run | 2026-08-23, 25/25 checks passed (re-origination; the first run was 2026-08-22, 22/22) |
+| run | 2026-08-27, **29/29** checks passed, and passed 29/29 on three consecutive runs whose emitted bytes were identical (sha256 `c28b6db065d2cf88a1…`). Earlier: 2026-08-23 re-origination 25/25; first run 2026-08-22, 22/22. The count moved 25 -> 29 because R9 lost `precision` (no row removed — 6a merely narrowed to `transition`) and four rows were ADDED: **6f** the retired control is gone from the running app, **6g** it did not reach the document, **7f** it is not in the emitted file, and **4c** the app's layer ceiling vs this run's count, reported rather than assumed |
 | app build | `VITE_AURORA_DEBUG=1 npm run build` (electron-vite 5 / vite 8) |
-| built from | aurora `427cbd1` (`feat(effects): the v_factor control is an integer spinner …`), branch `fix/v-factor-retype`, working tree clean under `src/`. The first run built from `76ff28f` on `feat/writer-originated-scene-fixture` |
-| driven by | CDP against Electron under `xvfb-run -a -s '-screen 0 1680x1050x24'`, `AURORA_DEBUG_PORT=9394` |
+| built from | aurora `0d533e5`, branch `feat/retire-precision`. Earlier runs: `427cbd1` on `fix/v-factor-retype`; the first from `76ff28f` on `feat/writer-originated-scene-fixture` |
+| driven by | CDP against Electron under `xvfb-run -a -s '-screen 0 1680x1050x24'`, ports 9413/9414/9415 (three runs). Environment printed beside every run, because it varies here: load average 6.5–7.8, uptime 1 day 21:54–21:55 |
 | project opened | a **writable copy** of the aeon tree (`project.json` + `games/` + `art/`) in the session scratchpad. aeon's own tree was never opened and never written to; it has no `games/sonic4/data/editor/effects/` directory before or after this run |
 | saved by | a real `Ctrl+S` key event to the real window → `saveActive()` → `saveAeonProject()` → `buildAeonSavePlan()`. Toast read back: `success:Project saved` |
 | taken from | `<copy>/games/sonic4/data/editor/effects/writer_session_ojz.json`, byte-for-byte |
@@ -77,13 +139,13 @@ layer index by the one rule stated. No JSON key was typed anywhere.
 | R0 | open the project copy (setup, via `window.__dbg.aeon.open`), then click the **Effects** facet pill |
 | R1 | type `writer_session_ojz` into the real `new_scene_id` field; click **New** |
 | R2 | type `Oracle Jungle Zone — writer session` into the **Name** field |
-| R3 | click **Add layer** until the control refuses — the layer count is the app's own ceiling (8), not a number chosen here. Seven clicks landed |
+| R3 | click **Add layer** seven times, landing 8 layers. This gesture normally runs until the control refuses, so the count is the app's own ceiling rather than a number chosen here — and it was, at 8, when this fixture was originated. **For the 2026-08-27 run the count was PINNED to 8 while the app's real ceiling is 16**, to keep row 59's delta interpretable; see "THE LAYER COUNT IS PINNED FOR THIS RUN" above. The harness prints the pin next to the measured ceiling so the debt cannot go quiet |
 | R4 | layer *i*: `world_y` = `i * 32` |
 | R5 | layer *i*: `fa` = the option at index *i* of that select's own option list |
 | R6 | layer *i*: `fb` = the option at index `len - 1 - i` of the same list. For *i* = 0 that is the **last** option, the custom-packed sentinel — so the packed triple `{op: 0, s1: 0, s2: 15}` in the file is what the app seeds, never something typed here |
 | R7 | scene `v_factor` = **8**, the layer count, typed into the real spinner. Until item 35 this read "the option at index 8 of the `v_factor` select → `FACTOR_3_4`"; that select is gone, because `v_factor` is a 0..15 shift count and never was a `$defs/factor`. The layer count is the same rule R8 uses and for the same reason — it is the app's own ceiling, not a number chosen here. Deliberately **not** the field's own `max`: `max` is also the new-scene default, so a fixture carrying it would prove the control moved nothing. The affordance itself is checked instead (harness rows 6d/6e: the control is an `input[type=number]` with min 0, and no control at `v_factor` offers a `FACTOR_*` option) |
 | R8 | `v_center` = 8, `v_offset` = -8 (the layer count, and its negation) |
-| R9 | `precision` and `transition` = the **last** option each select offers → `cell`, `instant` |
+| R9 | `transition` = the **last** option that select offers → `instant`. Until row 59 this read "`precision` and `transition` … → `cell`, `instant`"; the `Precision` control is gone, because aeon deleted the field's storage and empyrean `0bd4753` cut the key from the schema. Its **absence** is now measured instead of its value being set — harness rows 6f (no such control in the running app, with its row-mates checked present so an unmounted panel cannot pass it), 6g (no such key in the document) and 7f (no such key in the emitted file) |
 | R10 | the section-assignment select is set to the scene's id (section 0's `sceneRef`) |
 | R11 | `Ctrl+S`, dispatched as a real key event |
 
@@ -95,12 +157,27 @@ the codec actually encodes came from an index.
 
 ## What the session could NOT author
 
-The wave-1 Effects panel exposes `name`, `v_factor` (a bounded integer spinner),
-`v_center`, `v_offset`, `precision`, `transition`, and per layer
-`world_y` / `fa` / `fb`, plus
-add/remove layer and the section `sceneRef`. **It has no control for** `anchor`,
-`budget_class`, `deform_bg`, `deform_fg`, `deform`, `curve`, `vsplit`, `dsa`, `dsb`,
-`phase`, `enabled`, `left_column_mask`, `v_deform` or `v_factor_fg`.
+**This list was STALE and is corrected here (2026-08-27).** It still described the
+panel as of parcel H; ROADMAP row 58 (deform authoring, merged 2026-08-27) shipped
+controls for `deform_fg`, `deform_bg`, a layer's `deform`, `v_deform` and
+`left_column_mask`, and `curve`/`vsplit` became authorable earlier still. As of
+today:
+
+The Effects panel exposes `name`, `v_factor` (a bounded integer spinner),
+`v_center`, `v_offset`, `transition`, `deform_fg`, `deform_bg`, `v_deform` and
+`left_column_mask`, and per layer `world_y` / `fa` / `fb` / `curve` / `vsplit` /
+`deform`, plus add/remove layer and the section `sceneRef`. **It has no control
+for** `anchor`, `budget_class`, `dsa`, `dsb`, `phase`, `enabled` or `v_factor_fg`.
+`precision` is not on either list any more: it is RETIRED from the format, not
+merely un-authored.
+
+**THE GESTURE SEQUENCE WAS DELIBERATELY NOT WIDENED to exercise the row-58
+controls**, and this fixture therefore still carries none of them. Driving new
+controls in the same run that removed `precision` would have put many lines in
+the delta, and a delta of one line is the only thing separating "the re-run was
+faithful" from "the session was driven differently" — the same reasoning that
+pinned the layer count above. Widening the sequence to cover the deform controls
+is booked as its own ROADMAP row.
 
 So this fixture is *sparser* than `canopy_dusk.json` and always will be until the
 UI grows. That is data about the authoring surface, not a defect in the fixture,
@@ -126,6 +203,13 @@ patched here.
 fixture validates against the committed schema; it is a byte-exact fixed point of
 the writer; its blob hash matches the table above; and it uses only keys the wave-1
 UI can author.
+
+That last row's `precision` assertion was **flipped, not deleted**, by row 59: it
+read `expect(sceneKeys.has('precision')).toBe(true)` and now asserts `false`.
+Deleting it would have left the row merely *ceasing to be wrong*; flipping it
+keeps the row discriminating — re-add a `Precision` field to the panel and the
+key-set derivation finds its `setSceneFieldCommand` literal again and the row goes
+red. That is the only automatic guard against the dead control growing back.
 
 **And note which of those the retype actually caught.** When the schema moved, the
 first two went red and the hash guard stayed green — because the file had not been

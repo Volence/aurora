@@ -17,8 +17,6 @@ import rawSchema from '../aurora-effects-scene.schema.json';
 import {
   EFFECTS_FACTOR_NAMES,
   EFFECTS_PACKED_FACTOR_BOUNDS,
-  EFFECTS_PRECISION_VALUES,
-  WAVE1_PRECISION_VALUES,
   EFFECTS_TRANSITION_VALUES,
   EFFECTS_LEFT_COLUMN_MASK_VALUES,
   EFFECTS_LAYER_COUNT,
@@ -97,22 +95,37 @@ describe('factor set (schema §2.3)', () => {
 });
 
 describe('scene-level enumerations and bounds (schema §2.1/§2.2)', () => {
-  it('reads precision, transition and left_column_mask out of the schema', () => {
-    expect([...EFFECTS_PRECISION_VALUES]).toEqual(S.properties.precision.enum);
+  it('reads transition and left_column_mask out of the schema', () => {
     expect([...EFFECTS_TRANSITION_VALUES]).toEqual(S.properties.transition.enum);
     expect([...EFFECTS_LEFT_COLUMN_MASK_VALUES]).toEqual(S.properties.left_column_mask.enum);
   });
 
-  it('offers only "cell" precision in wave 1, and derives that BY FILTERING the schema', () => {
-    // The wave-1 policy: "line" is a reserved engine tier (§2.1).
-    expect([...WAVE1_PRECISION_VALUES]).toEqual(['cell']);
-    // The derivation, not just the answer: what it offers is a subset of what the
-    // schema permits, and it is what remains after dropping "line". A hardcoded
-    // ['cell'] would satisfy the line above and fail this one the moment the
-    // schema renamed the value.
-    for (const v of WAVE1_PRECISION_VALUES) expect(EFFECTS_PRECISION_VALUES).toContain(v);
-    expect([...WAVE1_PRECISION_VALUES])
-      .toEqual(S.properties.precision.enum.filter((v: string) => v !== 'line'));
+  /**
+   * THE RETIREMENT GATE (ROADMAP row 59). `precision` was a scene-level enum with
+   * a derived constant and a dropdown; empyrean `0bd4753` deleted the key because
+   * aeon deleted the STORAGE (`scene_dsl.emp:422-423`, `Scene.sc_precision`).
+   *
+   * WHAT THIS ROW IS FOR, since "a key is absent" sounds like it could only ever
+   * be green. It is the gate on the RE-VENDOR, not on Aurora's own code: the
+   * schema is a blob-pinned file extracted from empyrean, so this row goes red
+   * the moment someone re-vendors a schema that brings `precision` back, or
+   * hand-edits the vendored copy to re-add it — which is exactly how a dead
+   * control would grow back, because scene-ui.ts derives its dropdowns FROM this
+   * file. It is checked at BOTH levels deliberately: the key is gone from
+   * `properties`, and `at()` — the accessor every derived constant goes through —
+   * throws for it rather than yielding undefined.
+   */
+  it('has RETIRED precision: no schema key, and the accessor is loud about it', () => {
+    // Anti-vacuous: we are looking at a real schema whose §2.1 siblings are here,
+    // not at an empty object that would make any absence assertion pass.
+    expect(Object.keys(S.properties)).toContain('transition');
+    expect(Object.keys(S.properties)).toContain('left_column_mask');
+    expect(Object.keys(S.properties)).not.toContain('precision');
+    expect(() => at('properties', 'precision'))
+      .toThrow(/nothing at properties\.precision/);
+    // And nothing anywhere else in the schema spells it either — a retired field
+    // moved into $defs rather than deleted would satisfy the row above.
+    expect(JSON.stringify(rawSchema)).not.toMatch(/precision/);
   });
 
   it('reads v_factor\'s range out of the schema, NOT out of $defs/factor', () => {
@@ -292,7 +305,7 @@ describe('construction', () => {
       .toEqual([...S.required, 'name'].sort());
     // Named explicitly because it is the property scene.ts's model comment turns
     // on: writing a default out would make every untouched load/save a diff.
-    for (const defaulted of ['precision', 'transition', 'v_center', 'v_offset', 'deform_bg']) {
+    for (const defaulted of ['transition', 'v_center', 'v_offset', 'deform_bg']) {
       expect(written, `${defaulted} must not be written`).not.toHaveProperty(defaulted);
     }
     expect(Object.keys(written.layers as object[])).toHaveLength(1);

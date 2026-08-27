@@ -13,11 +13,17 @@ import { validateAgainstSchema, type JsonSchema } from '../../src/core/formats/e
  *
  * PINS (re-verified at dispatch, not taken on trust):
  *   • empyrean contract/schema/aurora-effects-scene.schema.json, git blob
- *     cab3ca5817ceb4db3a8c51405e9ec9dba038ee09 — re-vendored from empyrean
- *     a32bcb03 (commit, CR-1: `v_factor`/`v_factor_fg` retyped from a `$ref` to
- *     `$defs/factor` into plain integers 0..15). It replaced blob 2d7a9fee, which
- *     was byte-identical from 1326ceb through c2c81e2. The blob hash is the
- *     invariant; the vendored copy is held to it by effects-schema-drift.test.ts.
+ *     dd972cf0e203a11330dfcec60b8c3ca59eac5b49 — re-vendored from empyrean
+ *     0bd4753 (ROADMAP row 59: `precision` RETIRED, because aeon deleted the
+ *     storage). Earlier blobs, current last: 2d7a9fee (byte-identical 1326ceb
+ *     through c2c81e2) -> cab3ca58 (a32bcb03, CR-1: `v_factor`/`v_factor_fg`
+ *     retyped from a `$ref` to `$defs/factor` into plain integers 0..15) ->
+ *     d4345af5 (5c930d6, `v_center`/`v_offset` bounded) -> 0f661b70 (277bc15,
+ *     `layers` maxItems 8 -> 16). The blob hash is the invariant; the vendored
+ *     copy is held to it by effects-schema-drift.test.ts, which is the PIN OF
+ *     RECORD — this citation is prose, and it had gone THREE re-pins stale
+ *     (it still read cab3ca58) before row 59 corrected it, because nothing
+ *     hashes a comment.
  *   • empyrean docs/AURORA_EFFECTS_SCHEMA.md at 069cf59 (commit) — §2 unchanged
  *     since 0ea8734 landed it; the two later doc commits (2f3b6fd, 069cf59)
  *     touched §3's site count and §3's cites, not §2.
@@ -37,6 +43,24 @@ import { validateAgainstSchema, type JsonSchema } from '../../src/core/formats/e
  * The re-sort was FORMAT-ONLY, measured rather than assumed: 2,524 bytes and
  * 140 lines before and after, sha256 1f99f25ccb2742f3… -> 9034790c09ec0935…,
  * and `json.loads(before) == json.loads(after)` is True.
+ *
+ * EDITED 2026-08-27 (ROADMAP row 59) — and editing it is LEGITIMATE, which is the
+ * one place this fixture differs from `writer_session_ojz.json` beside it. This
+ * one is writer-CERTIFIED: hand-written, then proven byte-identical through
+ * `serializeEffectsScene(parseEffectsScene(GOLDEN))`. Its sibling is writer-
+ * ORIGINATED — it came off disk from a real session — so the same change there
+ * had to be made by RE-RUNNING the session, never by deleting the key. Confusing
+ * the two silently converts the sibling into a second copy of this file; see
+ * test/fixtures/effects/writer_session_ojz.provenance.md.
+ *
+ * The edit: `"precision": "cell"` removed, the retired key. Re-emitted by the
+ * same formatter §5 names above — `json.dumps(sort_keys=True, indent=2,
+ * ensure_ascii=False)` plus the §8 terminator — never by the writer under test,
+ * so the round-trip below stays cross-implementation evidence. EXACTLY ONE LINE
+ * changed, and the fixed point was re-proven after. Before: blob
+ * 01cadfae08bd044548c9754b9d321031e9ae3d1b, sha256 556a425de0f8308e9…, 2,505
+ * bytes, 140 lines. After: blob 67efc2684831a9b55f1fd0128d01c97b44e6e8fa,
+ * sha256 4a498433a96c8d1be9…, 2,482 bytes, 139 lines.
  *
  * It is a SHAPE-COVERAGE document, not a scene anyone would ship: it carries
  * every optional key and every alternative form so the coverage assertions

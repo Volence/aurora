@@ -254,7 +254,6 @@
       "enum": ["undeclared", "sprite_mask", "factor0_lock", "accept"],
       "default": "undeclared"
     },
-    "precision": { "type": "string", "enum": ["cell", "line"], "default": "cell" },
     "transition": { "type": "string", "enum": ["smooth", "instant"], "default": "smooth" },
     "budget_class": { "type": "string" }
   },

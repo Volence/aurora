@@ -173,7 +173,6 @@ describe('writer-originated effects scene fixture', () => {
     // would make the two assertions below vacuous. The panel really does drive
     // these, and really does NOT drive budget_class.
     expect(sceneKeys.has('name')).toBe(true);
-    expect(sceneKeys.has('precision')).toBe(true);
     expect(sceneKeys.has('budget_class')).toBe(false);
     expect(layerKeys.has('world_y')).toBe(true);
     // Parcel H gave the card curve/vsplit controls and wave 2 gave it `deform`,
@@ -197,6 +196,16 @@ describe('writer-originated effects scene fixture', () => {
     // Still NOT authorable, and these are what keep this row discriminating:
     expect(sceneKeys.has('anchor')).toBe(false);
     expect(sceneKeys.has('v_factor_fg')).toBe(false);
+    // RETIRED, not merely un-authored (ROADMAP row 59). This line read
+    // `.toBe(true)` until 2026-08-27: `precision` WAS a control, and the panel
+    // scan above found its `setSceneFieldCommand` literal. The engine deleted the
+    // storage on 2026-08-26 and empyrean `0bd4753` cut the key from the schema,
+    // so the control went with it. The assertion is FLIPPED rather than deleted
+    // on purpose — deleting it would leave this row merely stopping being wrong,
+    // where flipping it keeps the row DISCRIMINATING: re-add the `Precision`
+    // field to the panel and this goes red, which is the only automatic guard
+    // against the dead control growing back.
+    expect(sceneKeys.has('precision')).toBe(false);
     // And the set genuinely discriminates: the schema offers strictly more.
     const schemaKeys = Object.keys(EFFECTS_SCENE_SCHEMA.properties as Record<string, unknown>);
     expect(schemaKeys.filter(k => !sceneKeys.has(k)).length).toBeGreaterThan(0);

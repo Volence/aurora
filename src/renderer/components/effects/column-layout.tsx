@@ -22,6 +22,12 @@
 //     V center 43 · From tile 46 · Precision 47 · Section 0 47 · Rate shift 49
 //     Transition 52 · Banks 1-7 53 · Blank band 55
 //
+// `Precision` was REMOVED FROM THE PANEL by ROADMAP row 59 and is left in that
+// list on purpose: the list is a MEASUREMENT, and quietly deleting a row from a
+// measurement to match today's UI is how a record stops being evidence. It did
+// not set LABEL_W (47 < 55), so nothing here needed re-measuring — which is the
+// only reason this annotation is enough and a re-run is not.
+//
 // The widest is 55px, so 64 leaves 9px of headroom. The pre-pass value was 68,
 // sized by the one label this pass removed: `#0 world_y` at 57px, which folded
 // a layer INDEX into a field name. The index now titles the layer card.
@@ -44,7 +50,9 @@
 //
 // The half of "mixed label widths" that was actually wrong. Four rows in the
 // old column packed two fields into one line — `[V center][box][V offset][box]`,
-// `[Precision][select][Transition][select]`, `[Cols][box][Rows][select]`, and a
+// `[Precision][select][Transition][select]` (row 59 has since retired
+// `Precision` entirely, leaving `Transition` alone on its row),
+// `[Cols][box][Rows][select]`, and a
 // hint wedged between `From tile`'s box and its Promote chip. A second label
 // mid-row sits at whatever x the first control happened to end at, so NO shared
 // width can govern it: measured at 1680x1050 every FIRST label already agreed

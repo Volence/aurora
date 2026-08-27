@@ -47,7 +47,6 @@
     }
   ],
   "name": "Oracle Jungle Zone — writer session",
-  "precision": "cell",
   "schema": 1,
   "transition": "instant",
   "v_center": 8,

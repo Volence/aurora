@@ -90,9 +90,53 @@ describe('effects scene reader — identity and version', () => {
     // No defaults are injected. An absent optional key stays absent, so a file
     // Aurora never edited comes back out unchanged rather than gaining a dozen
     // keys the author did not write.
-    expect('precision' in scene).toBe(false);
     expect('v_center' in scene).toBe(false);
     expect(serializeEffectsScene(scene)).toBe(MINIMAL);
+  });
+
+  /**
+   * A RETIRED KEY IS A REFUSAL, NOT A SHRUG (ROADMAP row 59).
+   *
+   * `precision` was retired from the contract at empyrean `0bd4753` because aeon
+   * deleted the STORAGE (`scene_dsl.emp:422-423`; the struct's pad shrank
+   * `u16 -> u8` at `:1009` to fill the byte it vacated). This schema is CLOSED
+   * (`unevaluatedProperties: false` at the top level — its own `description`
+   * explains why: on the writer path the party validating is the party
+   * publishing what it writes), so deleting the key does not merely stop the UI
+   * offering it. It makes a document that still carries it FAIL VALIDATION.
+   *
+   * THAT IS THE RULED BEHAVIOUR, not an oversight, and this row exists so nobody
+   * "fixes" it back. The hub priced it in the same ruling: "the schema is closed,
+   * so a scene file carrying `precision` now fails validation; no shipped scene
+   * file carries it ... a tolerant read that discards a stray `precision` is
+   * aurora's call." Aurora's call, made here and recorded in
+   * docs/reviews/2026-08-27-retire-precision.md, is NOT to add one:
+   *   - the population is empty, verified on the owner's LIVE aeon tree (both
+   *     games/sonic4/data/editor/effects/*.json carry no `precision`), not
+   *     inferred from the hub's grep of aeon origin/master;
+   *   - a tolerant discard is a silent lossy path, which is exactly what §6
+   *     hazard 1 ("round-trip what you do not understand, or refuse the file")
+   *     and this codec's no-field-enumeration design exist to prevent;
+   *   - the refusal is loud and names the file, and the author's fix is deleting
+   *     one line.
+   *
+   * The row asserts the refusal is SPECIFIC, not merely that something threw: an
+   * unrelated defect making every parse throw would satisfy "it throws".
+   */
+  it('REFUSES a legacy scene still carrying the retired `precision` — closed schema', () => {
+    const legacy = withDoc((d) => { d.precision = 'cell'; });
+    expect(() => parseEffectsScene(legacy, 'plain'))
+      .toThrow(/does not match the effects scene schema/);
+    // The refusal is ABOUT precision, not incidental: the identical document
+    // without the key parses clean, so the key is the whole difference.
+    expect(() => parseEffectsScene(MINIMAL, 'plain')).not.toThrow();
+    // And it is the CLOSED-schema rule firing, not a type or range rule — any
+    // retired or unknown key is refused the same way, which is what makes the
+    // vendored schema the single place deciding what a scene may contain.
+    const alien = withDoc((d) => { d.not_a_real_key = 1; });
+    expect(() => parseEffectsScene(alien, 'plain'))
+      .toThrow(/does not match the effects scene schema/);
+    expect(EFFECTS_SCENE_SCHEMA.unevaluatedProperties).toBe(false);
   });
 
   it('refuses a filename stem that does not match the id', () => {
