@@ -30,6 +30,10 @@ import { documentBands, bandSlotBases } from '../../core/formats/bg-override/bg-
 import { bgOverrideDisplay } from '../../core/formats/bg-override/bg-override-view';
 import type { BgArtTarget, OpenDocument } from '../state/artStore';
 import type { BandCommandResult } from './bg-anim-aeon';
+// Type-only, and it stays that way: `tile-picker-source` resolves which array
+// the strip is showing, this module decides what a gesture on it MEANS, and a
+// value import either way would be a cycle waiting to happen.
+import type { TilePickerLayer, TilePickerOrigin } from './tile-picker-source';
 
 // ---------------------------------------------------------------------------
 // Wording — measured against the column by effects-wording.test.ts
@@ -116,6 +120,198 @@ export function openBgTileDocument(doc: BgOverrideDocument, tileIndex: number): 
     doc: d, liveTileIndex: null, chunkId: null, bgOverride: target,
     name: `BG tile #${tileIndex}`, dirty: false,
   };
+}
+
+// ---------------------------------------------------------------------------
+// THE DOOR TO A STATIC SLOT — ROADMAP row 57
+// ---------------------------------------------------------------------------
+//
+// `openBgTileDocument` above shipped with row 51 and had ZERO CALLERS outside
+// its own tests for a day: the composer could open a band's phase BANK from the
+// band card's strip, and could not open a band's STATIC SLOT from anywhere at
+// all. It was never broken — it was unreachable, which is why ~5,000 vitest
+// tests were green over it. Coverage of a function says nothing about whether
+// anything calls it.
+//
+// ═══ WHY THE BLOB STRIP IS THE DOOR ═══
+//
+// The row's target is the STATIC tiles PAST the animated prefix — the prefix is
+// already reachable through bank 0, which IS the prefix. A static tile past the
+// prefix belongs to NO BAND, so every band-shaped surface in the app is the
+// wrong place to hang the door: `BgAnimBandPanel`'s bank strip, `ArtBrowser`'s
+// band cards and the candidate form are all keyed by `doc.anims[i]`, and there
+// is no `i` for these tiles.
+//
+// The blob strip is the one surface that shows them as individually addressable
+// cells, and the index it hands over needs NO MAPPING: on the BG branch with
+// `origin === 'override'`, `resolveTilePickerSource` returns
+// `bgOverrideDisplay(doc).tiles`, which `bg-override-view.ts` builds 1:1 from
+// `doc.tiles` — same order, same length — and `tileIndex` here is bounded
+// against `doc.tiles.length`. `band-strip-range.ts` states the same fact from
+// the other side: "slot `n` is the strip's `n`th cell by construction".
+//
+// ═══ WHY A DOUBLE CLICK, AND HOW IT MISSES THE DRAG ═══
+//
+// `TilesetPanel` already pairs single-click = pick a brush with double-click =
+// open that tile in the composer. `ArtBrowser`'s single click already picks a
+// brush. So double-click = open is this app's existing idiom, not a new one.
+//
+// AND IT CANNOT COLLIDE WITH THE RANGE DRAG. That gesture lives on mousedown
+// (records the anchor) and click (resolves); this one is a third handler and
+// touches neither. `resolveStripDrag` returns `range` only when
+// `anchorSlot !== releaseSlot`, and a double click is two press/release pairs
+// that each set and consume the anchor at one slot — so both of its clicks
+// resolve to `{kind:'pick', why:'same-slot'}`, exactly what a single click has
+// always done. No double click can produce a range and no drag can produce a
+// `dblclick`.
+//
+// ═══ THE RULE LIVES HERE, NOT IN `ArtBrowser.tsx` ═══
+//
+// Same reason `band-strip-range.ts` gives: the node suite cannot see a `.tsx`
+// closure, and "which strip does this door work on" is exactly the kind of gate
+// that falls open silently. The component supplies the state and the event.
+
+/**
+ * What a double click on the blob strip resolves to.
+ *
+ * `ignored` is SILENT ON PURPOSE and `refused` is LOUD ON PURPOSE, which is the
+ * same split `resolveStripDrag` draws. Double click is not a gesture the
+ * FOREGROUND tileset strip has, and no cell under the pointer is not a gesture
+ * at all — neither is a refusal to explain. But an author looking at a
+ * BACKGROUND on the strip has every reason to expect this to work, and when the
+ * background on screen is a library entry or the act's own plane there is no
+ * override document to edit; going quiet there would be indistinguishable from
+ * a dead double click.
+ *
+ * `open` carries no message because the strip is about to UNMOUNT — the caller
+ * switches to the Art facet and `ArtBrowser` lives in the Layout facet, so a
+ * readout on success is a line nobody can read.
+ */
+export type StripOpenOutcome =
+  | { kind: 'open'; tileIndex: number }
+  | { kind: 'ignored'; why: 'no-slot' | 'not-a-background' }
+  | { kind: 'refused'; reason: string; hint: string };
+
+export interface StripOpenInputs {
+  /** The picker's own layer — `resolveTilePickerSource().layer`. */
+  layer: TilePickerLayer;
+  /** The picker's own origin — `resolveTilePickerSource().origin`. */
+  origin: TilePickerOrigin;
+  /** Strip cell under the double click, or -1 when it is past the end. */
+  slot: number;
+  /** The open override document, or null when the project has none. */
+  doc: BgOverrideDocument | null;
+}
+
+/**
+ * Resolve a double click on the blob strip. TOTAL — every input has an answer,
+ * and NO input opens a document this function did not name.
+ *
+ * THE `origin` GATE IS THE WHOLE SAFETY PROPERTY. A slot index means a position
+ * in THIS document's blob; on a library entry, the act's own plane or the
+ * foreground tileset the SAME integers name different art, and opening
+ * `doc.tiles[n]` from one of those would put the author's strokes into a tile
+ * they were not looking at. The `layer` half is checked alongside it for the
+ * reason `resolveStripDrag` keeps its own: the two are independently-defaulted
+ * fields at the call site, and the pair disagreeing is the one shape that would
+ * let a foreground index reach a background document.
+ *
+ * THE BOUNDS CHECK IS NOT DELEGATED. `openBgTileDocument` returns null for a
+ * slot the document does not have, and the caller must not open anything on
+ * null — but a null there is indistinguishable from "the geometry was fine and
+ * something else went wrong", so the range is decided here where it can say so.
+ * Reachable when the blob shrinks under a strip that has not repainted (an
+ * undone band insert), which is precisely when a silent no-op is worst.
+ */
+export function resolveStripOpen(input: StripOpenInputs): StripOpenOutcome {
+  const { layer, origin, slot, doc } = input;
+  if (layer !== 'bg') return { kind: 'ignored', why: 'not-a-background' };
+  if (slot < 0) return { kind: 'ignored', why: 'no-slot' };
+  if (origin !== 'override' || doc === null) {
+    return {
+      kind: 'refused',
+      reason: 'not the override document',
+      hint: 'The background on screen is not this act’s BG override document, so its tiles '
+        + 'are not editable here — a slot index means a position in the override’s own '
+        + 'blob and would name different art in any other background. Bake this background into '
+        + 'the override first, then double-click a tile to draw it.',
+    };
+  }
+  if (!Number.isInteger(slot) || slot >= doc.tiles.length) {
+    return {
+      kind: 'refused',
+      // Derived from the document, never a pinned count — `doc.tiles.length` is
+      // a COUNT, so the last slot is one less (the same off-by-one the strip
+      // drag's prefix hint had to fix).
+      reason: `slot ${slot} is past the end of the blob`,
+      hint: `the blob has ${doc.tiles.length} tiles, so slots run 0..${doc.tiles.length - 1} `
+        + `and slot ${slot} is not one of them. Nothing was opened.`,
+    };
+  }
+  return { kind: 'open', tileIndex: slot };
+}
+
+/**
+ * The readout for the picker's hover label, on the SAME one-short-line budget
+ * `stripDragLabel` documents in full — the 102px box, the `nowrap`, and the
+ * measured incident where a wrapped readout moved the tile grid out from under
+ * the cursor. Empty for `open` and `ignored`; see `StripOpenOutcome`.
+ */
+export function stripOpenLabel(outcome: StripOpenOutcome): string {
+  return outcome.kind === 'refused' ? `no edit — ${outcome.reason}` : '';
+}
+
+/** The same answer at length, for the readout's `title`, where a paragraph is free. */
+export function stripOpenHint(outcome: StripOpenOutcome): string {
+  return outcome.kind === 'refused' ? outcome.hint : '';
+}
+
+// ---------------------------------------------------------------------------
+// THE REPORT — what the last strip double click did, for a CDP harness
+// ---------------------------------------------------------------------------
+//
+// SAME REASON `StripDragReport` EXISTS, and here it is sharper. On the `open`
+// path `bgArtOpen()` shows the document that arrived, and on `refused` the
+// picker's hover line carries the sentence — but `ignored` CHANGES NOTHING AT
+// ALL. A foreground double click that was correctly ignored and a foreground
+// double click that never reached the handler leave byte-identical state, so
+// without `gestures` advancing the control row for the gate would be green on a
+// build where the handler is not wired at all. That is this row's own defect
+// class, one surface over.
+
+export interface StripOpenReport {
+  kind: StripOpenOutcome['kind'] | null;
+  /** `why` when ignored, `reason` when refused, null when a document opened. */
+  detail: string | null;
+  /** The slot the gesture was aimed at, as the component read it off the grid. */
+  slot: number | null;
+  /** The slot a document was actually opened for — null on every other branch. */
+  openedTileIndex: number | null;
+  /** Advances on every double click the strip saw, resolved or not. */
+  gestures: number;
+}
+
+const EMPTY_OPEN: StripOpenReport = {
+  kind: null, detail: null, slot: null, openedTileIndex: null, gestures: 0,
+};
+
+let lastOpenReport: StripOpenReport = EMPTY_OPEN;
+
+export function publishStripOpen(slot: number, outcome: StripOpenOutcome): void {
+  lastOpenReport = {
+    kind: outcome.kind,
+    // The refusal's FULL reasoning, not the one-line form — a report is read by
+    // a harness and by a person debugging, and neither is short of room.
+    detail: outcome.kind === 'ignored' ? outcome.why
+      : outcome.kind === 'refused' ? outcome.hint : null,
+    slot,
+    openedTileIndex: outcome.kind === 'open' ? outcome.tileIndex : null,
+    gestures: lastOpenReport.gestures + 1,
+  };
+}
+
+export function lastStripOpenReport(): StripOpenReport {
+  return lastOpenReport;
 }
 
 /** An OpenDocument for bank `bank` of band `bandIndex`. */
