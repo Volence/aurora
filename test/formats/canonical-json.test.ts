@@ -102,8 +102,10 @@ describe('the two document classes render as §5 says', () => {
 
   it('minified: separators (",", ":"), one line', () => {
     const text = canonicalJsonMinified(doc);
-    expect(text).toBe('{"a":{"c":2,"d":1},"b":[1,2]}');
-    expect(text).not.toContain('\n');
+    // One line, plus the canonical trailing newline (§8, ruled 2026-08-26 —
+    // every JSON file Aurora writes into aeon's tree ends in exactly one).
+    expect(text).toBe('{"a":{"c":2,"d":1},"b":[1,2]}\n');
+    expect(text.slice(0, -1)).not.toContain('\n');
     expect(text).not.toContain(', ');
     expect(text).not.toContain(': ');
   });

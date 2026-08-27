@@ -56,6 +56,7 @@ describe('section meta sidecar ({prefix}.meta.json)', () => {
       '  "paletteRef": "OJZ_AltPal",',
       '  "sceneRef": "canopy_dusk"',
       '}',
+      '',   // the canonical trailing newline (§8): aeon's shipped sidecar carries it
     ].join('\n');
     // Anti-vacuous: the document really carries a non-null sceneRef going in.
     expect(JSON.parse(onDisk).sceneRef).toBe('canopy_dusk');
@@ -77,6 +78,7 @@ describe('section meta sidecar ({prefix}.meta.json)', () => {
       '  "paletteRef": null,',
       '  "sceneRef": "canopy_dusk"',
       '}',
+      '',
     ].join('\n');
     expect(JSON.parse(onDisk).sceneRef).toBe('canopy_dusk');
     expect(serializeSectionMeta(parseSectionMeta(onDisk))).toBe(onDisk);

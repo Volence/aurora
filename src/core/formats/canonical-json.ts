@@ -87,16 +87,42 @@ export function canonicalKeyOrder<T>(value: T): T {
 }
 
 /**
+ * CANONICAL FILE FORM — TRAILING NEWLINE. Every JSON file Aurora writes into
+ * aeon's tree ends in EXACTLY ONE `\n` after the closing bracket (empyrean
+ * docs/AURORA_EFFECTS_SCHEMA.md §8, ruled 2026-08-26 for scenes and
+ * generalised the same day to every editor-owned JSON: `section_N.meta.json`,
+ * `editor_bg_override.json`, and any later sidecar). A POSIX text file, no
+ * "\ No newline at end of file" on every diff — and no blank line either.
+ *
+ * Applied HERE, once, so both document classes below carry it and every
+ * writer built on them inherits it. Writers that bypass this module (the
+ * `JSON.stringify` sites in project/aeon/save.ts, the BG library index) call
+ * this function on their text instead of spelling `+ '\n'` themselves —
+ * "one rule, one writer-side fix across all writers, rather than per-file
+ * discoveries" (§8). Idempotent: text already ending in one newline comes
+ * back unchanged, and a doubled trailer collapses to one.
+ *
+ * The `json.dumps` equivalences quoted below are for the BODY; Python's
+ * `json.dumps` emits no trailing newline, so a Python reproduction of these
+ * bytes appends one.
+ */
+export function jsonFileText(text: string): string {
+  return text.replace(/(?:\r?\n)+$/, '') + '\n';
+}
+
+/**
  * The tile-array document class: canonical order, minified.
- * Equivalent to `json.dumps(obj, sort_keys=True, separators=(",", ":"))`.
+ * Equivalent to `json.dumps(obj, sort_keys=True, separators=(",", ":"))`
+ * plus the trailing newline.
  */
 export function canonicalJsonMinified(value: unknown): string {
-  return JSON.stringify(canonicalKeyOrder(value));
+  return jsonFileText(JSON.stringify(canonicalKeyOrder(value)));
 }
 
 /**
  * The scalar document class: canonical order, pretty-printed at indent 2.
- * Equivalent to `json.dumps(obj, sort_keys=True, indent=2, ensure_ascii=False)`.
+ * Equivalent to `json.dumps(obj, sort_keys=True, indent=2, ensure_ascii=False)`
+ * plus the trailing newline.
  *
  * The `ensure_ascii=False` half is not a §5 requirement — the clause is silent
  * on escaping — but it is what `JSON.stringify` does, so it is what a Python
@@ -104,5 +130,5 @@ export function canonicalJsonMinified(value: unknown): string {
  * non-ASCII (the scene golden's display `name` does).
  */
 export function canonicalJsonPretty(value: unknown): string {
-  return JSON.stringify(canonicalKeyOrder(value), null, 2);
+  return jsonFileText(JSON.stringify(canonicalKeyOrder(value), null, 2));
 }

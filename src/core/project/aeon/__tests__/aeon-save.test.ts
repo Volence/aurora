@@ -74,7 +74,9 @@ function fixtureFiles(): Map<string, Uint8Array> {
 const META_PATH = 'data/ojz/act1/section_0.meta.json';
 const META_REFS = { bgLayoutRef: 'bg-cave', paletteRef: 'pal-dusk', sceneRef: null };
 const WELL_FORMED_META = serializeSectionMeta(META_REFS)!;
-const MALFORMED_META = WELL_FORMED_META.slice(0, -1);  // truncated hand-edit
+// Truncated hand-edit: two bytes, not one — the well-formed text ends in the
+// canonical `}\n` (§8), and dropping only the newline leaves valid JSON.
+const MALFORMED_META = WELL_FORMED_META.slice(0, -2);
 
 // A sidecar as some OTHER writer leaves it — aeon's generator, or a hand edit —
 // carrying the effects-arc scene assignment. Hand-written rather than built by
@@ -88,6 +90,7 @@ const SCENE_META_ON_DISK = [
   '  "paletteRef": "pal-dusk",',
   '  "sceneRef": "canopy_dusk"',
   '}',
+  '',   // aeon's shipped section_4.meta.json ends in exactly one newline (§8)
 ].join('\n');
 
 // ── Editable collision-plane fixture, as in aeon-load.test.ts ───────────────
@@ -394,7 +397,7 @@ describe('buildAeonSavePlan', () => {
    * assignment included.
    */
   it('leaves an unreadable sidecar carrying a sceneRef byte-identical', async () => {
-    const malformed = SCENE_META_ON_DISK.slice(0, -1);   // truncated hand-edit
+    const malformed = SCENE_META_ON_DISK.slice(0, -2);   // truncated hand-edit (past the `}\n`)
     const files = fixtureFiles();
     files.set(META_PATH, new TextEncoder().encode(malformed));
     // Anti-vacuous: really unparseable, and really carrying the ref it would lose.

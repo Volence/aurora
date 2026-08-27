@@ -139,12 +139,14 @@ const EDITOR_BG_TILES = 'games/sonic4/data/editor/ojz_act1_bg_tiles.bin';
  *  in order, with its byte length. */
 const BASELINE_PLAN: [string, number][] = [
   ['games/sonic4/data/editor/ojz/act1/section_0.tiles.bin', 131072],
-  ['games/sonic4/data/editor/ojz/act1/section_0.objects.json', 80],
-  ['games/sonic4/data/editor/ojz/act1/section_0.rings.json', 2],
+  // The three JSON sizes are each one byte over the original capture: the
+  // canonical trailing newline (§8, 2026-08-26). Nothing else moved.
+  ['games/sonic4/data/editor/ojz/act1/section_0.objects.json', 81],
+  ['games/sonic4/data/editor/ojz/act1/section_0.rings.json', 3],
   ['games/sonic4/data/editor/ojz_tiles.bin', 64],
   ['games/sonic4/data/editor/ojz_act1_bg.bin', 256],
   ['games/sonic4/data/editor/ojz_act1_bg_tiles.bin', 66],
-  ['project.json', 993],
+  ['project.json', 994],
   // The capture also ended with five `export/` writes — act_descriptor.asm,
   // entity_data.asm, vram_bases.asm and section_0.{tiles,art}.bin. The export
   // step was retired 2026-08-19 (ROADMAP §4.2); a save is editor files only
@@ -152,7 +154,8 @@ const BASELINE_PLAN: [string, number][] = [
   // unchanged from the original capture.
 ];
 
-/** The project.json text that same capture produced, verbatim. */
+/** The project.json text that same capture produced, verbatim — plus the one
+ *  canonical trailing newline the §8 rule added on 2026-08-26. */
 const BASELINE_PROJECT_JSON = `{
   "name": "Sonic 4",
   "engine": "s4",
@@ -192,7 +195,8 @@ const BASELINE_PROJECT_JSON = `{
   ],
   "objectLibrary": "games/sonic4/data/objdefs/objects.json",
   "chunkLibrary": ""
-}`;
+}
+`;
 
 describe('raw-verbatim preservation (load → buildAeonSavePlan → parse)', () => {
   it('carries unmodelled keys through at top, zone and act level', async () => {
@@ -215,15 +219,23 @@ describe('raw-verbatim preservation (load → buildAeonSavePlan → parse)', () 
   });
 });
 
-describe('project.json trailing newline (churn rider)', () => {
-  it('reproduces a source file that ended with a newline', async () => {
+describe('project.json trailing newline (the §8 canonical form supersedes the churn rider)', () => {
+  // Until 2026-08-26 the save reproduced the source file's own trailing-newline
+  // state. The ruling (empyrean AURORA_EFFECTS_SCHEMA.md §8, generalised the
+  // same day) is that EVERY JSON file Aurora writes into aeon's tree ends in
+  // exactly one newline — so a source without the byte gains it, once.
+  it('lands on exactly one newline for a source file that ended with one', async () => {
     const p = await plan(fixtureFiles({ trailingNewline: true }));
-    expect(textOf(p, 'project.json').endsWith('\n')).toBe(true);
+    const text = textOf(p, 'project.json');
+    expect(text.endsWith('}\n')).toBe(true);
+    expect(text.endsWith('\n\n')).toBe(false);
   });
 
-  it('does not invent one for a source file that did not', async () => {
+  it('lands on exactly one newline for a source file that had none', async () => {
     const p = await plan(fixtureFiles({ trailingNewline: false }));
-    expect(textOf(p, 'project.json').endsWith('\n')).toBe(false);
+    const text = textOf(p, 'project.json');
+    expect(text.endsWith('}\n')).toBe(true);
+    expect(text.endsWith('\n\n')).toBe(false);
   });
 });
 
