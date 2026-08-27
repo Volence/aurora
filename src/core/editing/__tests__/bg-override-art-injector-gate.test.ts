@@ -142,6 +142,75 @@ describe.skipIf(!toolPresent)('aeon inject_editor_bg.validate_band_coherence ove
   });
 });
 
+// ---------------------------------------------------------------------------
+// THE FOREGROUND DOOR — row 51's CDP tail hands its SAVED FILE to this gate.
+//
+// `scratchpad/band-art-foreground-harness.mjs` drives the real app: it opens a
+// bank from the strip, draws a stroke, presses Ctrl+S, and then runs THIS FILE
+// with `AURORA_FG_GATE_FILE` naming what the app wrote. The point of routing it
+// back through here rather than shelling out to python from the harness is that
+// there is then exactly ONE way this repo invokes aeon's validator — the same
+// `gate()` above, the same tool resolution, the same skip-with-a-message when
+// the sibling checkout is absent.
+//
+// BOTH HALVES RUN, ALWAYS. The saved file must be ACCEPTED *and* a poison
+// derived from that same file must be REFUSED naming its band; an accept row
+// on its own would be the vacuous shape the header warns about, and the poison
+// has to come from the harness's OWN artifact rather than the fixture, or the
+// red half proves nothing about what the app just wrote.
+// ---------------------------------------------------------------------------
+const FG_FILE = process.env.AURORA_FG_GATE_FILE ?? '';
+const fgReady = toolPresent && FG_FILE !== '' && existsSync(FG_FILE);
+if (FG_FILE !== '' && !fgReady) {
+  console.warn(`[injector gate] AURORA_FG_GATE_FILE=${FG_FILE}: `
+    + `${toolPresent ? 'file missing' : 'aeon tool absent'} — the foreground rows are SKIPPED`);
+}
+
+describe.skipIf(!fgReady)('the file the REAL APP saved after a band-art stroke', () => {
+  const text = (): string => readFileSync(FG_FILE, 'utf8');
+  const parsed = (): { anims?: { cols: number; rows: number; phases: number[][][] }[]; tiles: number[][] } =>
+    JSON.parse(text()) as { anims?: { cols: number; rows: number; phases: number[][][] }[]; tiles: number[][] };
+
+  it('ANTI-VACUOUS: it really carries bands with a non-empty animated prefix, so the '
+    + 'coherence assert has something to check', () => {
+    const d = parsed();
+    const anims = d.anims ?? [];
+    expect(anims.length, `${FG_FILE} has no anims — validate_band_coherence would pass trivially`)
+      .toBeGreaterThan(0);
+    const n = anims.reduce((acc, a) => acc + a.cols * a.rows, 0);
+    expect(n, 'the animated prefix is empty').toBeGreaterThan(0);
+    expect(d.tiles.length).toBeGreaterThanOrEqual(n);
+  });
+
+  it('is ACCEPTED by aeon validate_band_coherence', () => {
+    const r = gate(FG_FILE);
+    expect(r.verdict, r.detail).toBe('ACCEPT');
+  });
+
+  it('RED FIRST, on the app\'s own file: the same file with phases[0][0] perturbed is '
+    + 'REFUSED, naming the band', () => {
+    const d = parsed();
+    const anims = d.anims ?? [];
+    // The LAST band, deliberately: a poison in band 0 is refused by the very
+    // first iteration of the validator's cursor walk, leaving every later band
+    // unexercised, so this one is only reached if the walk really advances
+    // through the prefix. ⚠ DISCLOSED: aeon's shipped override carries exactly
+    // ONE band today, so on that document `bi` IS 0 and this row does not
+    // discriminate the walk — it still discriminates the assert. The index is
+    // derived so the row strengthens by itself the day a second band lands.
+    const bi = anims.length - 1;
+    anims[bi].phases[0][0] = anims[bi].phases[0][0].map((v) => (v + 1) & TILE_PIXEL_MAX);
+    const p = join(out, 'fg-poisoned.json');
+    writeFileSync(p, JSON.stringify(d));
+    const r = gate(p);
+    // Printed so the REFUSAL ITSELF is evidence in the harness transcript, not
+    // merely a green row asserting one happened.
+    console.warn(`[injector gate] foreground poison verdict: ${r.verdict} ${r.detail}`);
+    expect(r.verdict, r.detail).toBe('REFUSE');
+    expect(r.detail).toMatch(new RegExp(`band ${bi}: phases\\[0\\] != tiles\\[`));
+  });
+});
+
 describe('the gate rows are not silently green', () => {
   it('states whether the sibling tool was found', () => {
     // A reader of the totals sees 4 skipped rows when the tool is missing; this
