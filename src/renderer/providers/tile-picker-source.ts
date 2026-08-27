@@ -20,6 +20,7 @@
 // component supplies the state; the rules live here.
 
 import { resolveDisplayedBg, type DisplayedBgSource } from './bganim-preview-aeon';
+import { slotSpanDigits, slotSpanPhrase } from './bg-anim-aeon';
 import type { BgOverrideState } from '../../core/formats/bg-override/bg-override-io';
 import { describeBands } from '../../core/formats/bg-override/bg-anim-band';
 import type { Act, BgLibraryEntry, Tile, Zone } from '../../core/model/s4-types';
@@ -155,10 +156,68 @@ export function tilePickerBandGroups(
   });
 }
 
-/** The hover/pick readout for a band group, in the same space as the tile one. */
+/**
+ * How many slots a band group owns. A COUNT — the quantity `slotSpanPhrase`
+ * takes — never an end index, which is the distinction item 54 exists for.
+ *
+ * `cols * rows` is the codec's own `bandTileCount`, and `slots` is built to
+ * exactly this length above, so the two agree by construction.
+ */
+function bandSlotCount(g: TilePickerBandGroup): number {
+  return g.cols * g.rows;
+}
+
+/**
+ * The hover readout for a band card. ONE SHORT LINE, ALWAYS — see
+ * `stripDragLabel`, whose box this is.
+ *
+ * ⚠ IT IS THE SAME DOM ELEMENT, SO IT IS THE SAME BUDGET. `BandCard`'s hover
+ * handler writes `#art-browser-hover-label`, the picker's single header-row
+ * line, which is `whiteSpace: nowrap` with an ellipsis because a message that
+ * WRAPPED once grew the header two text lines and moved the tile grid 36px down
+ * under the cursor. Nothing about that box knows which feature wrote to it.
+ *
+ * MEASURED, AND THIS ONE WAS OVER: `band 0 · slots 0..31 (8x4)` wanted 155px in
+ * a 106px box in the running app — ~30% of it under the ellipsis, on the ONLY
+ * line a hovered card has to speak. Harness rows [6k]/[6l]/[6m].
+ *
+ * ═══ WHAT WENT, AND WHY IT WAS THESE WORDS ═══
+ *
+ * The card the pointer is on ALREADY DRAWS `Band 0 · 8x4` as its caption, two
+ * rows below this line — so the index and the geometry are both on screen, and
+ * a 106px box spending 49 of its characters restating them is the same pure
+ * repetition `stripDragLabel` dropped `band · ` for. THE SPAN IS THE ONLY THING
+ * THIS LINE ADDS: nothing else in the picker says which slots a band owns.
+ *
+ * So the noun and the geometry moved to the `title` (`tilePickerBandHint`) and
+ * what stayed is the span plus a two-character tag for WHICH band — measured at
+ * 90px worst case in a 106px box against every (index, slotBase, cols, rows)
+ * the contract allows, i.e. 16px of margin rather than the 1px the full-span
+ * form leaves. The tag is not decoration: this line is also where a strip
+ * drag's `34..41 · 2x4` lands, and the two readouts interleave on it as the
+ * pointer crosses from the strip to the cards.
+ *
+ * WHY NOT `band 0 · 0..31`: measured at 110px worst case — 4px OVER the box.
+ * The word did not fit, which is the whole reason the tag is short.
+ */
 export function tilePickerBandLabel(g: TilePickerBandGroup): string {
-  const last = g.slotBase + g.cols * g.rows - 1;
-  return `band ${g.index} · slots ${g.slotBase}..${last} (${g.cols}x${g.rows})`;
+  // `slotSpanDigits`, NOT a local `${base}..${base + n - 1}` — item 54 put every
+  // inclusive span in one helper precisely so a narrow readout could not
+  // re-derive it and drift. This is the surface that helper's doc comment names.
+  return `b${g.index} · ${slotSpanDigits(g.slotBase, bandSlotCount(g))}`;
+}
+
+/**
+ * The same answer at length, for the `title` — on the readout line AND on the
+ * card itself, where a paragraph costs no layout.
+ *
+ * This is exactly the string the LINE used to carry, so the glance shortened
+ * and the information did not disappear. It says "slots" out loud through
+ * `slotSpanPhrase`, which is the form everywhere with room uses.
+ */
+export function tilePickerBandHint(g: TilePickerBandGroup): string {
+  return `band ${g.index} · ${slotSpanPhrase(g.slotBase, bandSlotCount(g))} `
+    + `(${g.cols}x${g.rows})`;
 }
 
 /**

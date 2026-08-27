@@ -9,7 +9,7 @@ import type { Tile, Palette } from '../../core/model/s4-types';
 import { lutForPaletteLine, rasterizeTile } from '../../core/art/rasterize';
 import {
   resolveTilePickerSource, tilePickerCountLabel, tilePickerHoverLabel, pickedTileIndex,
-  tileThumbCacheStale, tilePickerBandGroups, tilePickerBandLabel,
+  tileThumbCacheStale, tilePickerBandGroups, tilePickerBandLabel, tilePickerBandHint,
   type TileThumbCacheKey, type TilePickerBandGroup, type TilePickerSource,
 } from '../providers/tile-picker-source';
 import {
@@ -371,8 +371,13 @@ export default function ArtBrowser() {
                 useEditorStore.getState().setTool('stamp-band');
               }}
               onHover={(on) => {
+                // BOTH HALVES, exactly as the strip drag writes them: the short
+                // line, and the full sentence on the `title`. Writing only the
+                // text would leave the PREVIOUS message's title standing under
+                // a new line — the drag's hint outlives its own text otherwise.
                 if (hoverLabelRef.current) {
                   hoverLabelRef.current.textContent = on ? tilePickerBandLabel(g) : '';
+                  hoverLabelRef.current.title = on ? tilePickerBandHint(g) : '';
                 }
               }}
             />
@@ -429,11 +434,14 @@ function BandCard({ group, tiles, selected, onPick, onHover }: {
     }
     // `tiles` is the cache's identity key: a rebuilt array is new art.
   }, [group, tiles]);
+  // ⚠ THE CARD'S `title` IS THE HINT, NOT THE LABEL. A tooltip has no layout
+  // budget, so it carries the full sentence — the same one the readout line's
+  // own `title` gets — while the 106px line carries `tilePickerBandLabel`.
   return (
     <div
       className="art-browser-band"
       data-band={group.index}
-      title={tilePickerBandLabel(group)}
+      title={tilePickerBandHint(group)}
       onClick={onPick}
       onMouseEnter={() => onHover(true)}
       onMouseLeave={() => onHover(false)}
