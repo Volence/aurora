@@ -66,115 +66,95 @@ export function canvasYToWorldY(canvasY: number, vpY: number, zoom: number): num
   return vpY + canvasY / zoom;
 }
 
-// ═══ TWO SPACES, ONE ORIGIN SWITCH ═══
+// ═══ TWO SPACES, ONE ORIGIN, AND THE ORIGIN IS THE PLANE'S ═══
 //
-// The docblock above says a layer's `world_y` is act-axis, and for an UNLOCKED
-// scene it is. But for a LOCKED scene (`v_factor` == the lock sentinel — both
-// shipped scenes) aeon's `scene_plane_line` maps a top to a plane line by the
-// IDENTITY: the authoring space IS the plane, and the eight layers divide the
-// visible screen, not the act. `providers/effects-aeon.layerTopSpace` decides
-// which; this module only asks where line 0 is. In act space it is world 0.
+// ⚠ THIS BLOCK SAID THE OPPOSITE EARLIER ON 2026-08-27 AND WAS WRONG. It is
+// written as a correction rather than quietly replaced, because the wrong rule
+// is the one a reader arrives with and it shipped for half a day.
 //
-// IN SCREEN SPACE IT IS THE SCREEN FRAME'S TOP EDGE, and this is the whole of
-// the 2026-08-27 fix. It used to be `vp.y`, the viewport's own top edge, marked
-// in this comment as a stand-in "until the screen-frame overlay (parcel G)
-// lands". Parcel G landed (canvas/screen-frame.ts) and the stand-in did not
-// move, so the owner reported the symptom the stand-in guarantees: "if I zoom in
-// the bands hold relative to my screen, not the bg". `vp.y` is not a position in
-// the world at all — it changes on every pan and every zoom — so the entire
-// guide set slid under the art it was dividing.
+// THE RULE THAT SHIPPED (row 65): a locked scene's guides are measured from the
+// SCREEN FRAME's top edge, less `v_offset` — "line 32 is line 32 wherever the
+// camera is". The owner disproved it on screen the same day: *"if I move the
+// viewport it drags the layers which I don't want"*, and *"I can't drag a layer
+// below the viewport when I need them here"*, pointing at flower art well below
+// the frame.
 //
-// ═══ WHERE THE SCREEN SITS, AND WHY THE FRAME IS THE ANSWER ═══
+// THE RULE NOW, AND IT IS THE ENGINE'S: a locked layer's top is a PLANE ROW, it
+// is FIXED ON THE ART, and its guide belongs at the map's own world Y for that
+// plane row — which is that row's own number, because the plane is drawn at
+// world (0,0). THE ORIGIN IS 0, IN BOTH SPACES.
 //
-// The chain is aeon's, up to its last step:
+// The derivation, all four steps in aeon:
 //
-//   1. `scene_vsplit_line(s, wy) = scene_plane_line(s, wy) - v_offset`
-//      (aeon engine/level/scene_dsl.emp:2461), legal only under the lock.
-//   2. Locked, `scene_plane_line` is the identity — `pl = wy`
-//      (scene_dsl.emp:2417-2421: "For a locked plane the authoring space IS the
-//      plane, so the mapping is the identity").
-//   3. So a locked layer's SCREEN line is `wy - v_offset`, and a screen line is
-//      a row of the 224-line visible display.
-//   4. The visible display's top edge, in act world pixels, is the camera's
-//      unbiased top edge — `Camera_Y`. (Aurora's own `ScreenFrameAnchor` is
-//      documented as exactly that: "in WORLD pixels (act axis; the camera's
-//      unbiased edge)".)
-//   5. Therefore world Y of the guide for top `wy` is
-//      `Camera_Y + wy - v_offset`, i.e. an origin of `Camera_Y - v_offset`.
+//   1. LOCKED, THE PLANE DOES NOT TRACK THE CAMERA AT ALL.
+//      `Parallax_Step5_Vscroll`'s `.v_locked` arm is
+//      `move.w pcfg_v_offset(a0), d2` -> `Parallax_Current_Vscroll_BG`: the
+//      whole-plane vertical scroll IS `v_offset`, a scene constant, and
+//      `Camera_Y` is not read on that arm at all. (parallax.emp, in its own
+//      words: "locked: BG = vOffset (static, ignores camera + lerp)".)
+//   2. SO THE SCREEN IS A FIXED WINDOW ON THE PLANE. Step 4a puts plane line
+//      `vs = Vscroll_BG & 511` at the screen's top row, so the display shows
+//      plane rows `v_offset .. v_offset+223` — the same rows, forever, whatever
+//      the camera does vertically.
+//   3. AND A LAYER TOP IS A PLANE ROW. `scene_plane_line` is the identity under
+//      the lock ("For a locked plane the authoring space IS the plane"), so top
+//      80 is plane row 80, permanently.
+//   4. THE MAP DRAWS THE PLANE AT WORLD ORIGIN. `SectionRenderer.renderBg` is
+//      `ctx.drawImage(this.bg.canvas, 0, 0)` under the viewport transform, so
+//      plane row P sits at map world Y = P.
 //
-// STEP 5 IS A DERIVATION; THE VALUE OF `Camera_Y` IS A CHOICE, and it has to be,
-// because the lock's meaning is precisely that the answer does not depend on the
-// camera (`parallax.emp`'s `.v_locked` arm: "locked: BG = vOffset (static,
-// ignores camera + lerp)"). Every camera position is equally consistent with a
-// locked scene, so the engine cannot name one. Aurora already carries the
-// author's own statement of which one they mean: `viewStore.screenFrame`, the
-// pinned draggable 320x224 rectangle. Guides anchored to it stay on the same
-// background pixel across a pan and a zoom, and MOVE only when the author says
-// the camera is somewhere else — by dragging the frame.
+// WHERE THE OLD RULE'S `- v_offset` CAME FROM, because it is a real quantity and
+// it is easy to put back by accident. `scene_vsplit_line(s, wy) =
+// scene_plane_line(s, wy) - v_offset` is the SCREEN line a vsplit FIRES on — the
+// number bounded to 3..223, which `fireScreenLineOf` computes and
+// `fireLineAdvisory` reports. It is a property OF a layer, not a layer's
+// POSITION. A guide is drawn where the layer IS; the fire line is what the layer
+// BECOMES. Subtracting it from the position was the confusion, and the symptom
+// was guides riding a rectangle instead of sitting on the art.
 //
-// REJECTED, and why:
-//   - `vp.y`, the shipped stand-in — not a world position; the reported bug.
-//   - a hard-wired world 0 — it is the frame's DEFAULT anchor, so nothing
-//     regresses on first open, but as a fixed RULE it asserts the camera is
-//     pinned at the act's top-left, which is true only at an act's very start
-//     and false everywhere an author works. It also leaves the guides unmovable
-//     against the art they are being compared with.
-//   - the act's start position — a second source of truth that would silently
-//     disagree with the frame the author can drag, and a scene is assigned to
-//     many sections, so there is no one act position it belongs to.
-//   - a scene-document field — this is an authoring viewpoint, not scene data;
-//     aeon's editor JSON has no such key, so it would not round-trip.
+// WHAT THE FRAME BECOMES INSTEAD — not nothing. Consequence (2) says the frame's
+// top edge IS plane row `v_offset`, so on a locked scene the frame's VERTICAL
+// position is the scene's own `v_offset` field, and dragging it edits the
+// document. Its HORIZONTAL position is still `Camera_X`, a session reference,
+// because `Decode_Factor_A(camX)` reads the camera on every band, every frame.
+// ⚠ THE TWO AXES OF ONE RECTANGLE THEREFORE MEAN DIFFERENT KINDS OF THING on a
+// locked scene: X is a camera position, Y is a scene field. That reads oddly and
+// it is exactly what the engine says — the lock's entire content is that the
+// vertical stopped being about the camera. `MapViewport.frameAnchorFor` owns
+// that resolution; this module only has to know the guides are not in it.
+//
+// STILL REJECTED, and now for a better reason than before:
+//   - `vp.y`, the original stand-in — not a world position at all, so the whole
+//     guide set slid on every pan. The bug row 65 was opened on.
+//   - the SCREEN FRAME's top edge — row 65's answer. It makes the guides move
+//     when the camera moves, which is precisely what a LOCKED plane does not do.
 
 /**
- * Where line 0 of a screen-space guide set sits, in world pixels.
+ * World Y that line 0 of `space` sits at. **Zero, in both spaces** — see the
+ * block above.
  *
- * `frameY` is the screen frame's top edge (`viewStore.screenFrame.y`), NOT the
- * viewport's. `vOffset` is the scene's `v_offset`, because a locked layer's
- * screen line is `top - v_offset` (aeon `scene_vsplit_line`).
+ * ⚠ IT KEPT ITS NAME AND LOST ITS ARGUMENTS ON PURPOSE. Deleting it outright
+ * would delete the only place the refutation is written down, and the next
+ * person to think "the guides should follow the camera" will think it at this
+ * exact line. Dropping the `origin` parameter makes every call site that still
+ * passes one a TYPE ERROR — which is how the stale ones were found rather than
+ * left compiling. The same trick row 65 played with the argument ORDER, for the
+ * same reason, one rule later.
  */
-export interface GuideOrigin {
-  /** World Y of the screen frame's top edge — the camera's unbiased top edge. */
-  frameY: number;
-  /** The scene's `v_offset`; 0 in both shipped scenes. */
-  vOffset?: number;
-}
-
-/**
- * The default origin: the screen frame's own default anchor, world 0.
- *
- * DELIBERATELY A WORLD CONSTANT AND NOT A VIEWPORT READ. A caller that forgets
- * to pass an origin gets a guide fixed in the world — wrong place, maybe, but
- * still fixed. The defect this parcel exists to remove can only come back by
- * someone writing `vp.y` here on purpose.
- */
-export const DEFAULT_GUIDE_ORIGIN: GuideOrigin = { frameY: 0, vOffset: 0 };
-
-/**
- * World Y that line 0 of `space` sits at.
- *
- * ⚠ THE ARGUMENT ORDER CHANGED ON PURPOSE (2026-08-27). The old signature took
- * the VIEWPORT first, and a viewport and a `GuideOrigin` would both satisfy a
- * `{ y: number }` parameter — so a stale call site would have kept compiling
- * while quietly restoring the bug. `space` first makes every one of them a type
- * error until it is looked at.
- */
-export function guideOriginWorldY(
-  space: LayerTopSpace, origin: GuideOrigin = DEFAULT_GUIDE_ORIGIN,
-): number {
-  return space === 'screen' ? origin.frameY - (origin.vOffset ?? 0) : 0;
+export function guideOriginWorldY(_space: LayerTopSpace): number {
+  return 0;
 }
 
 /** Canvas-local Y -> a layer top in `space` (the drag's inverse of `layerGuideGeometry`). */
 export function canvasYToLayerTop(
   canvasY: number, vp: GuideViewport, space: LayerTopSpace,
-  origin: GuideOrigin = DEFAULT_GUIDE_ORIGIN,
 ): number {
-  return canvasYToWorldY(canvasY, vp.y, vp.zoom) - guideOriginWorldY(space, origin);
+  return canvasYToWorldY(canvasY, vp.y, vp.zoom) - guideOriginWorldY(space);
 }
 
 /** The one-line caption the guide layer carries so the space is visible; null when act. */
 export function guideCaption(space: LayerTopSpace): string | null {
-  return space === 'screen' ? 'screen lines — from the screen frame\'s top edge' : null;
+  return space === 'screen' ? 'plane rows — fixed on the background, not on the frame' : null;
 }
 
 /**
@@ -194,11 +174,11 @@ export const GUIDE_GRAB_PX = 6;
  */
 export function guideAtCanvasY(
   canvasY: number, layers: readonly EffectsLayer[], vp: GuideViewport,
-  space: LayerTopSpace = 'act', guideOrigin: GuideOrigin = DEFAULT_GUIDE_ORIGIN,
+  space: LayerTopSpace = 'act',
 ): number | null {
   let best: number | null = null;
   let bestDist = Infinity;
-  const origin = guideOriginWorldY(space, guideOrigin);
+  const origin = guideOriginWorldY(space);
   for (let i = 0; i < layers.length; i++) {
     const d = Math.abs(worldYToCanvasY(origin + layers[i].world_y, vp.y, vp.zoom) - canvasY);
     if (d <= GUIDE_GRAB_PX && d <= bestDist) { best = i; bestDist = d; }
@@ -217,14 +197,14 @@ export interface GuideDrawOptions {
   dragWorldY?: number;
   /** The layer under the cursor, drawn brighter. */
   hoverIndex?: number | null;
-  /** Which space the tops are in (`layerTopSpace(scene)`); act when omitted. */
-  space?: LayerTopSpace;
   /**
-   * Where screen line 0 sits (the screen frame's top edge, and the scene's
-   * `v_offset`). Ignored in act space. Defaults to `DEFAULT_GUIDE_ORIGIN`, never
-   * to anything read off the viewport — see `guideOriginWorldY`.
+   * Which space the tops are in (`layerTopSpace(scene)`); act when omitted.
+   *
+   * It changes the LABEL and the CAPTION and nothing about the POSITION: both
+   * spaces are drawn at world origin now. See the origin block above for why the
+   * `origin` field that used to sit here is gone.
    */
-  origin?: GuideOrigin;
+  space?: LayerTopSpace;
 }
 
 /** Where one guide row ends up on the canvas — the shape the debug probe reports. */
@@ -248,7 +228,7 @@ export function layerGuideGeometry(
   layers: readonly EffectsLayer[], vp: GuideViewport, opts: GuideDrawOptions = {},
 ): GuideGeometry[] {
   const out: GuideGeometry[] = [];
-  const origin = guideOriginWorldY(opts.space ?? 'act', opts.origin ?? DEFAULT_GUIDE_ORIGIN);
+  const origin = guideOriginWorldY(opts.space ?? 'act');
   for (let i = 0; i < layers.length; i++) {
     const worldY = (opts.dragIndex === i && typeof opts.dragWorldY === 'number')
       ? opts.dragWorldY : layers[i].world_y;
