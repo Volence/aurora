@@ -140,6 +140,26 @@ export class SectionRenderer {
     return { nametable: this.bg.nametable, width: this.bg.width, height: this.bg.height };
   }
 
+  /**
+   * The composed Plane-B bitmap itself, in PLANE space, or null with no BG.
+   *
+   * For the camera preview, which re-samples this plane per band instead of
+   * blitting it once at world origin. It is the SAME canvas `renderBg` draws —
+   * deliberately not a copy — so the preview and the map can never be showing
+   * two different composites of one nametable. `flushBgDirty` is called here for
+   * the same reason `renderBg` calls it: a caller that reads the canvas without
+   * it gets the pixels from before the last edit.
+   */
+  bgPlaneCanvas(): { image: OffscreenCanvas; pixelWidth: number; pixelHeight: number } | null {
+    if (!this.bg) return null;
+    this.flushBgDirty();
+    return {
+      image: this.bg.canvas,
+      pixelWidth: this.bg.width * 8,
+      pixelHeight: this.bg.height * 8,
+    };
+  }
+
   markBgDirty(tileIndices: number[]): void {
     if (!this.bg) return;
     for (const idx of tileIndices) this.bg.dirtyTiles.add(idx);

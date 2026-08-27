@@ -16,6 +16,9 @@ const LABELS: Record<string, string> = {
   // Row G: the size the label states is core/model/screen.ts's, which mirrors
   // aeon's SCREEN_WIDTH/HEIGHT — not typed here.
   showScreenFrame: `Screen frame (${SCREEN_WIDTH}x${SCREEN_HEIGHT})`,
+  // Says what it does, not what it is: "camera preview" alone reads as a second
+  // view, which is the thing the owner rejected.
+  showCameraPreview: 'Compose the background in the frame (parallax)',
 };
 function pretty(key: string) {
   return LABELS[key] ?? key.replace('show', '').replace(/([A-Z])/g, ' $1').trim();

@@ -115,6 +115,15 @@ export function dragScreenFrame(
 export interface ScreenFrameDrawOptions {
   /** Being dragged or hovered on an edge: drawn brighter. */
   active?: boolean;
+  /**
+   * Override the corner caption.
+   *
+   * The default says `screen 320x224 @ x,y`, which is true of an unlocked scene
+   * and MISLEADING on a locked one: there, the Y is not a camera position at all
+   * but the scene's `v_offset` (MapViewport's `frameAnchorFor` derives why). The
+   * caller that knows the scene passes the honest sentence.
+   */
+  caption?: string;
 }
 
 /**
@@ -140,7 +149,7 @@ export function drawScreenFrame(
 
   // The corner label says WHAT this rectangle is and WHERE the camera would
   // be, because a bare rectangle on a map of rectangles answers neither.
-  const text = `screen ${SCREEN_WIDTH}x${SCREEN_HEIGHT} @ ${anchor.x},${anchor.y}`;
+  const text = opts.caption ?? `screen ${SCREEN_WIDTH}x${SCREEN_HEIGHT} @ ${anchor.x},${anchor.y}`;
   ctx.font = '10px system-ui, sans-serif';
   ctx.textBaseline = 'middle';
   const tw = ctx.measureText(text).width;

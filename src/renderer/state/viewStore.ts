@@ -44,6 +44,23 @@ export interface OverlayOptions {
    *  comes from core/model/screen.ts (mirrors aeon's SCREEN_WIDTH/HEIGHT).
    *  A reference the author asks for, so OFF by default like the lenses. */
   showScreenFrame: boolean;
+  /** Inside the screen frame, compose Plane B the way the ROM would for a
+   *  camera at the frame's anchor: each band at its own factor's offset, with
+   *  the vsplits selecting the vertical region from their line down.
+   *
+   *  The owner: "I just want it to appear how it would in game." ONE CANVAS —
+   *  he rejected a second view himself ("too cumbersome with wanting to do
+   *  edits and having to go back and forth"), so this repaints the frame's
+   *  interior inside the map's own pass and the foreground still composites
+   *  over it.
+   *
+   *  ⚠ IT IS NOT THE WHOLE PICTURE and the composite says so on the canvas:
+   *  no curve ramps, no deform (both need a clock this pass does not have),
+   *  no foreground factors, no sprites, no priority. See
+   *  canvas/camera-preview.ts's absence list.
+   *
+   *  A lens, so OFF by default. */
+  showCameraPreview: boolean;
 }
 
 /**
@@ -74,6 +91,9 @@ export const OVERLAY_KEYS_BY_ENGINE: Record<OpenEngine, readonly (keyof OverlayO
     // The screen frame (row G). Aeon only for now: classic's viewport is a
     // separate draw path (classic-surface) that does not read this key yet.
     'showScreenFrame',
+    // The in-frame camera composite. Aeon only, and effects-only in practice —
+    // it needs a scene, so it is inert in every other aeon facet.
+    'showCameraPreview',
   ],
 };
 
@@ -126,6 +146,8 @@ export const useViewStore = create<ViewState>((set) => ({
     playAnimatedArt: false,
     // A reference, asked for: OFF like the lenses.
     showScreenFrame: false,
+    // A lens: OFF until asked for.
+    showCameraPreview: false,
   },
   screenFrame: { x: 0, y: 0 },
 
