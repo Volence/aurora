@@ -308,3 +308,14 @@ export const SCREEN_FRAME_ACTIVE = 'rgba(255, 210, 120, 1)';
 /** Backing plate behind the `screen 320x224 @ x,y` label. */
 export const SCREEN_FRAME_LABEL_BG = 'rgba(10, 12, 18, 0.78)';
 export const SCREEN_FRAME_LABEL_TEXT = 'rgba(255, 220, 160, 0.95)';
+
+// ---- The in-frame camera composite (camera-preview.ts) --------------------
+// Its captions sit ON the composited background, so they need a heavier plate
+// than the guides' — a guide label lands on the map, this one lands on art the
+// author is judging and must not be mistaken for part of it.
+/** Plate behind a band caption inside the frame. */
+export const CAMERA_PREVIEW_LABEL_BG = 'rgba(12, 14, 18, 0.82)';
+/** A band caption's text. */
+export const CAMERA_PREVIEW_LABEL_TEXT = 'rgba(215, 226, 238, 0.95)';
+/** The absence line, and a LOCKED band's caption — both are "read this twice". */
+export const CAMERA_PREVIEW_LABEL_WARN = 'rgba(240, 198, 116, 0.98)';
