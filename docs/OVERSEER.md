@@ -888,7 +888,21 @@ defect the parcel exists to fix.
   which is why their golden freezes must run from a clean worktree. They had been reading that
   as a property of the freeze tooling; it is a property of the status-file convention.
 
-- ⚠ **`SIGIL_BUILD` MOVES ROUTINELY — NEVER PIN A CROSS-SESSION COMPARISON TO A SIGIL REVISION.** *(2026-08-27. Standing property, NOT a hold — nothing is in force and nothing needs checking before you build.)* Sigil lands from their main checkout and every landing relinks; three hashes moved inside one morning here. **Hash the binary you actually executed and quote that**, because a `revision:` names a property of the *source* and cannot describe a relinked artifact — three of sigil's four release binaries print no revision at all. Sigil announces every relink to all lanes as routine, and a hold, if one is ever in force again, will be a row in **their** `docs/OVERSEER.md`, removed in the same commit that lifts it. **Read it there; do not carry hashes in this file** — the 2026-08-27 hold's receipt was deleted from here precisely because its hash list went stale within the hour, which is the false-positive half of the expiry rule biting the document that wrote the rule.
+- ⚠ **BEFORE BUILDING AEON, GO READ SIGIL'S `docs/OVERSEER.md` — THIS FILE DOES NOT KNOW WHETHER A RELINK HOLD IS IN FORCE, AND CANNOT.** *(2026-08-27. This row deliberately states a PROCEDURE and no STATE.)*
+
+  ```sh
+  git -C ../sigil fetch -q origin && \
+  git -C ../sigil show origin/master:docs/OVERSEER.md | grep -i -A20 'relink hold'
+  ```
+
+  **Why this row carries no hashes, no dates and no "currently there is/isn't a hold": every version that did was WRONG WITHIN THE HOUR.** The sequence, all on 2026-08-27, and it is the argument:
+  1. A hold was banked here with its hashes → **sigil lifted it**, and the row became a false prohibition.
+  2. Replaced with a lift **receipt** carrying the verified hashes → **sigil landed and relinked all three**, and the receipt became stale numbers that read as current history. **A receipt is a present-tense claim too, and it is the worse case** — a hold announces itself as a constraint to evaluate, while a receipt reads as settled and invites no scrutiny (the sigil lane's formulation, and they proposed the date rule).
+  3. Replaced with *"standing property, NOT a hold — nothing is in force"* → **aeon requested a fresh hold minutes later.** My "nothing is in force" was accurate when written and false before the message announcing it arrived.
+
+  **Three corrections, each one level more abstract than the last, and each still a present-tense claim about somebody else's work.** The general rule, paid for three times: **a fact that can only be correct in ONE place must live in ONE place, and every other place points at it.** Sigil's doc is where a hold's existence and its hashes are current, because they are the lane that changes both. **Anything this file says about that state is a snapshot, and snapshots of another lane's live state are wrong by default.**
+
+  **What IS durable and safe to keep here** — properties, not state: `SIGIL_BUILD` **moves routinely** (sigil lands from their main checkout and every landing relinks; three hashes moved inside one morning). **Never pin a cross-session comparison to a sigil `revision`** — it names a property of the *source*, so it is **both insensitive and prone to false alarms**: it cannot detect a relinked artifact, and it fires on a healthy one when another lane commits mid-run. One property, both failures. **Hash the binary you actually executed and quote that.** Three of sigil's four release binaries print no revision at all. ⛔ **And never run ANY `cargo` command in `/home/volence/sonic_hacks/sigil`** — the rule is about the **file, not the verb**: a `cargo test --release --workspace` relinks the identical artifact, which is what caused the 2026-08-27 incident.
 
 ## ⚠ A CROSS-REPO GREP IS SCOPED TO THE REPO IT RAN IN — and the ruling built on it inherits that scope
 
