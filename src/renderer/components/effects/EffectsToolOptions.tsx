@@ -17,22 +17,21 @@
 
 import React from 'react';
 import { T, OptionBar, Chip } from '../ui';
-import { useProjectStore, getActiveLevel } from '../../state/projectStore';
-import { executeCommand, useEditorStore } from '../../state/editorStore';
+import { useProjectStore } from '../../state/projectStore';
+import { useEditorStore } from '../../state/editorStore';
 import { useHistoryVersion } from '../../hooks/useHistoryVersion';
 import { bandVerbs, type BandVerb } from '../../providers/band-verbs';
+import { runBandVerb } from '../../providers/band-follow';
 import { TOOL_HINTS } from '../../workspace/tool-meta';
 
 function VerbChip({ verb, onRefusal }: { verb: BandVerb; onRefusal: (reason: string | null) => void }) {
   return (
     <Chip disabled={verb.reason !== null} title={verb.reason ?? verb.label}
-      onClick={() => {
-        const result = verb.run();
-        if (!result.ok) { onRefusal(result.reason); return; }
-        onRefusal(null);
-        const level = getActiveLevel(useProjectStore.getState());
-        if (level) executeCommand(result.command, level);
-      }}>
+      // THE SAME `runBandVerb` THE PANEL'S CHIPS RUN. It executes AND points the
+      // author at the band it made; this bar had its own copy of the execute,
+      // which is how "I press add a band bank and idk where it is" could have
+      // been fixed on one door and left broken on the other.
+      onClick={() => onRefusal(runBandVerb(verb.run()))}>
       {verb.label}
     </Chip>
   );

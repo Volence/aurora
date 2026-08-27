@@ -45,7 +45,7 @@ import { OverlayRenderer } from '../canvas/OverlayRenderer';
 import type { SectionOverlayInfo } from '../canvas/OverlayRenderer';
 import {
   drawLayerGuides, guideAtCanvasY, canvasYToWorldY, canvasYToLayerTop, layerGuideGeometry,
-  publishGuideReport,
+  publishGuideReport, type GuideOrigin,
 } from '../canvas/effects-guides';
 import {
   drawScreenFrame, screenFrameEdgeAt, dragScreenFrame, publishScreenFrameReport,
@@ -54,6 +54,7 @@ import {
 import {
   resolveSelectedScene, setLayerFieldCommand, clampLayerTop, layerTopSpace,
 } from '../providers/effects-aeon';
+import { EFFECTS_V_OFFSET_DEFAULT } from '../../core/formats/effects/scene-ui';
 import type { EffectsScene } from '../../core/formats/effects/scene';
 import type { FacetCapability } from '../../core/project/adapter';
 import { SECTION_TILES_WIDE, SECTION_TILES_HIGH, SECTION_PIXEL_SIZE, unpackNametableWord } from '../../core/model/s4-types';
@@ -112,6 +113,39 @@ function activeGuideScene(): EffectsScene | null {
   const library = useProjectStore.getState().project?.effectsScenes;
   if (!library) return null;
   return resolveSelectedScene(library, useEditorStore.getState().selectedEffectsSceneId);
+}
+
+/**
+ * Where screen line 0 sits for this scene, given the screen frame's top edge.
+ *
+ * ONE SPELLING, called by the draw pass, the hit test and the drag — the same
+ * rule `activeGuideScene` above exists for. Three call sites each building the
+ * `{ frameY, vOffset }` pair by hand is how one of them ends up reading the
+ * store's anchor while a drag is in flight, and a guide then lags the frame it
+ * is measured from by exactly the drag distance.
+ *
+ * `vOffset` is here because aeon's `scene_vsplit_line` is
+ * `scene_plane_line(s, wy) - v_offset`; it is 0 in both shipped scenes, which is
+ * precisely why leaving it out would never be noticed.
+ */
+function guideOriginOf(scene: EffectsScene, frameY: number): GuideOrigin {
+  return { frameY, vOffset: scene.v_offset ?? EFFECTS_V_OFFSET_DEFAULT };
+}
+
+/**
+ * Is the screen frame on screen right now? The toggle, OR a locked scene's
+ * guides, which are measured from the frame and are unreadable without it.
+ *
+ * ONE PREDICATE for the draw, the press and the hover. The alternative — the
+ * draw pass ORing the two and the hit tests still reading the toggle alone —
+ * puts a frame on screen that cannot be grabbed, which is worse than no frame:
+ * the guides would then be anchored to something the author can see and cannot
+ * move.
+ */
+function screenFrameShown(): boolean {
+  if (useViewStore.getState().overlays.showScreenFrame) return true;
+  const scene = activeGuideScene();
+  return scene !== null && layerTopSpace(scene) === 'screen';
 }
 
 /** True while the author is standing in the effects lens. The gate both effects overlays share. */
@@ -894,11 +928,26 @@ export default function MapViewport() {
     //
     // NO CLOCK. Inside the same pass; schedules nothing. A drag in flight reads
     // the ref, otherwise the store's pinned anchor.
-    if (overlayOpts.showScreenFrame) {
-      const fd = frameDrag.current;
-      const anchor = fd ? fd.anchor : view.screenFrame;
-      const rect = drawScreenFrame(ctx, viewport, anchor, { active: fd !== null || frameHoverRef.current });
-      publishScreenFrameReport({ active: true, anchor, rect, dragging: fd !== null });
+    //
+    // THE GUIDE SCENE IS RESOLVED HERE, ABOVE THE FRAME (2026-08-27), because
+    // the two are no longer independent: a locked scene's guides are measured
+    // FROM the frame (canvas/effects-guides.ts's origin block), so the frame has
+    // to know whether guides need it and the guides have to read the same anchor
+    // the frame drew — including mid-drag, or a guide would lag the frame the
+    // author is dragging it against.
+    const guideScene = activeGuideScene();
+    const guideSpace = guideScene ? layerTopSpace(guideScene) : null;
+    const fd = frameDrag.current;
+    const frameAnchor = fd ? fd.anchor : view.screenFrame;
+    // SCREEN-SPACE GUIDES TURN THE FRAME ON, whatever the toggle says, and that
+    // is a deliberate override rather than an oversight: a set of lines captioned
+    // "screen lines" drawn without the screen they are lines OF is the exact
+    // ambiguity the frame was built to remove, and it is what the author hit.
+    // The toggle still owns the frame everywhere else.
+    const showFrame = overlayOpts.showScreenFrame || guideSpace === 'screen';
+    if (showFrame) {
+      const rect = drawScreenFrame(ctx, viewport, frameAnchor, { active: fd !== null || frameHoverRef.current });
+      publishScreenFrameReport({ active: true, anchor: frameAnchor, rect, dragging: fd !== null });
     } else {
       publishScreenFrameReport({ active: false, anchor: null, rect: null, dragging: false });
     }
@@ -941,18 +990,19 @@ export default function MapViewport() {
     // readable over the foreground it divides. Both branches because the effects
     // facet leaves the author free to be on the BG layer, and a guide that
     // vanishes when they switch layers reads as a bug in the guide.
-    const guideScene = activeGuideScene();
     if (guideScene) {
       const drag = guideDrag.current;
       // A LOCKED scene's tops are screen lines (aeon scene_plane_line: identity
-      // mapping), so its guides are drawn from the viewport's top edge — until
-      // the screen frame (parcel G) lands and gives them a real 224-line frame
-      // to sit in — and carry a caption saying so. The provider decides.
+      // mapping), so its guides are drawn from THE SCREEN FRAME'S TOP EDGE, less
+      // the scene's v_offset — the derivation is written out in full in
+      // canvas/effects-guides.ts. The provider decides the space; the frame
+      // block above decides the anchor, and this reads the same one it drew.
       const opts = {
         dragIndex: drag && drag.sceneId === guideScene.id ? drag.index : null,
         dragWorldY: drag?.worldY,
         hoverIndex: guideHoverRef.current,
-        space: layerTopSpace(guideScene),
+        space: guideSpace ?? 'act',
+        origin: guideOriginOf(guideScene, frameAnchor.y),
       };
       drawLayerGuides(ctx, viewport, guideScene.layers, opts);
       publishGuideReport({
@@ -1839,9 +1889,10 @@ export default function MapViewport() {
       const scene = activeGuideScene();
       const rect = canvasRef.current?.getBoundingClientRect();
       if (scene && rect) {
-        const { vpY, zoom } = useViewStore.getState();
+        const { vpY, zoom, screenFrame: sf } = useViewStore.getState();
         const idx = guideAtCanvasY(e.clientY - rect.top, scene.layers,
-          { x: 0, y: vpY, width: rect.width, height: rect.height, zoom }, layerTopSpace(scene));
+          { x: 0, y: vpY, width: rect.width, height: rect.height, zoom }, layerTopSpace(scene),
+          guideOriginOf(scene, sf.y));
         if (idx !== null) {
           const layer = scene.layers[idx];
           guideDrag.current = {
@@ -1860,13 +1911,13 @@ export default function MapViewport() {
     // THE SCREEN FRAME'S EDGE takes the press (row G). AFTER the guides (a
     // guide is about the document, the frame is a reference, so the guide
     // wins where they overlap), BEFORE every tool for the guides' reason. Costs
-    // nothing while hidden: the gate is the toggle, so a hidden frame never
-    // hit-tests and cannot steal a click from a tool. EDGE only — the interior
-    // falls through to the tool exactly as if the frame were not there.
+    // nothing while hidden: the gate is `screenFrameShown()`, so a hidden frame
+    // never hit-tests and cannot steal a click from a tool. EDGE only — the
+    // interior falls through to the tool exactly as if the frame were not there.
     if (e.button === 0) {
       const view = useViewStore.getState();
       const rect = canvasRef.current?.getBoundingClientRect();
-      if (view.overlays.showScreenFrame && rect) {
+      if (screenFrameShown() && rect) {
         const vp = { x: view.vpX, y: view.vpY, width: rect.width, height: rect.height, zoom: view.zoom };
         if (screenFrameEdgeAt(e.clientX - rect.left, e.clientY - rect.top, view.screenFrame, vp)) {
           frameDrag.current = {
@@ -2200,13 +2251,20 @@ export default function MapViewport() {
       const rect = canvasRef.current?.getBoundingClientRect();
       const scene = activeGuideScene();
       if (rect && scene && scene.id === guideDrag.current.sceneId) {
-        const { vpY, zoom } = useViewStore.getState();
+        const { vpY, zoom, screenFrame: sf } = useViewStore.getState();
         // The SAME clamp the spinner routes through, in the SAME space the
-        // guide was drawn in, so a drag cannot author a top a typed value
-        // could not — and a locked layer stops at the plane's last line.
+        // guide was drawn in, and from the SAME origin, so a drag cannot author
+        // a top a typed value could not — and a locked layer stops at the
+        // plane's last line.
         const space = layerTopSpace(scene);
+        // THE LAYER IS PASSED TO THE CLAMP, and that is what makes the drag
+        // unable to author a line the bake refuses (see clampLayerTop). Without
+        // it the clamp uses the plane's 0..511 and a drag below the frame's
+        // bottom edge writes 302 on a 224-line screen.
+        const dragged = scene.layers[guideDrag.current.index];
         const next = clampLayerTop(scene, canvasYToLayerTop(e.clientY - rect.top,
-          { x: 0, y: vpY, width: rect.width, height: rect.height, zoom }, space));
+          { x: 0, y: vpY, width: rect.width, height: rect.height, zoom }, space,
+          guideOriginOf(scene, sf.y)), dragged);
         if (next !== guideDrag.current.worldY) {
           guideDrag.current.worldY = next;
           redraw();
@@ -2259,9 +2317,10 @@ export default function MapViewport() {
       const rect = canvasRef.current?.getBoundingClientRect();
       let next: number | null = null;
       if (scene && rect) {
-        const { vpY, zoom } = useViewStore.getState();
+        const { vpY, zoom, screenFrame: sf } = useViewStore.getState();
         next = guideAtCanvasY(e.clientY - rect.top, scene.layers,
-          { x: 0, y: vpY, width: rect.width, height: rect.height, zoom }, layerTopSpace(scene));
+          { x: 0, y: vpY, width: rect.width, height: rect.height, zoom }, layerTopSpace(scene),
+          guideOriginOf(scene, sf.y));
       }
       if (next !== guideHoverRef.current) setGuideHover(next);
       // A press on a guide never reaches the tool branches below, so a hover
@@ -2274,7 +2333,7 @@ export default function MapViewport() {
       // State changes only on CROSSING an edge.
       const view = useViewStore.getState();
       let onEdge = false;
-      if (view.overlays.showScreenFrame && rect) {
+      if (screenFrameShown() && rect) {
         const vp = { x: view.vpX, y: view.vpY, width: rect.width, height: rect.height, zoom: view.zoom };
         onEdge = screenFrameEdgeAt(e.clientX - rect.left, e.clientY - rect.top, view.screenFrame, vp);
       }

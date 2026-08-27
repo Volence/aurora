@@ -160,7 +160,7 @@ export function Group({ label, note, children }: {
  * column as the panel's own, so a card is a nested form rather than a
  * differently-shaped one.
  */
-export function Card({ children, raised = false, selected = false, onClick, title }: {
+export function Card({ children, raised = false, selected = false, onClick, title, domId }: {
   children: React.ReactNode;
   raised?: boolean;
   /** Drawn with the accent border — the card the map's band lens is lighting. */
@@ -168,9 +168,19 @@ export function Card({ children, raised = false, selected = false, onClick, titl
   /** Makes the card itself a target. Buttons inside still get their own clicks. */
   onClick?: () => void;
   title?: string;
+  /**
+   * A DOM id, so something outside this card can find it and scroll to it.
+   *
+   * The band cards had no ref, no id and no data attribute, which is why "take
+   * me to the band I just made" had nothing to take anyone to (and why every
+   * harness finds a card by reading its text). Optional — a card nobody needs
+   * to address stays anonymous.
+   */
+  domId?: string;
 }) {
   return (
     <div
+      id={domId}
       onClick={onClick}
       title={title}
       style={{

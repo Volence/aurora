@@ -215,6 +215,7 @@ import {
 // longer calls `promoteBandCommand` / `addBandCommand` itself, so the two
 // surfaces cannot run different specs or disagree about why a chip is off.
 import { bandVerbs } from '../../providers/band-verbs';
+import { runBandVerb, bandCardDomId } from '../../providers/band-follow';
 // Parcel I: the bank strip and its two verbs (open bank k in the Art facet;
 // Shift = regenerate banks 1..7 from phase 0), decided in one provider.
 import BandBankStrip from './BandBankStrip';
@@ -269,6 +270,28 @@ export default function BgAnimBandPanel(): React.ReactElement {
   const setCandidate = useEditorStore((s) => s.setBandCandidate);
   const lensTarget = useEditorStore((s) => s.bandLensTarget);
   const setLensTarget = useEditorStore((s) => s.setBandLensTarget);
+  // THE SCROLL HALF of "where did my band go" (providers/band-follow). The
+  // selection and the section reveal both happen in the store; this is the one
+  // piece that needs the DOM, so it is the one piece that has to live here.
+  //
+  // WHY AN EFFECT AND NOT A CALL INSIDE THE CHIP. The card does not exist when
+  // the chip is clicked: `CollapsibleSection` renders no children while
+  // collapsed, so `revealPanel` has to re-render this panel FIRST and the
+  // element only exists on the render after that. The effect runs after that
+  // commit, which is exactly when the id resolves.
+  //
+  // `nonce` is why a repeat works: add, undo, add again lands on the same index,
+  // and an effect keyed on a bare number would not fire the second time.
+  const bandReveal = useEditorStore((s) => s.bandReveal);
+  React.useEffect(() => {
+    if (bandReveal === null) return;
+    const el = document.getElementById(bandCardDomId(bandReveal.index));
+    // `?.` rather than a guard: an index whose card is not mounted (the panel
+    // is on another facet, the document changed under it) consumes the request
+    // and scrolls nothing, which is better than a request that never clears.
+    el?.scrollIntoView({ block: 'nearest' });
+    useEditorStore.getState().clearBandReveal();
+  }, [bandReveal]);
   // Which band bank the Art facet has open, so its thumbnail reads selected.
   const openBgArt = useArtStore((s) => s.open?.bgOverride ?? null);
   const { cols, rows: bandRowCount, staticBase } = candidate;
@@ -320,10 +343,11 @@ export default function BgAnimBandPanel(): React.ReactElement {
     ?? phaseFillOptions()[0];
   const tileCount = cols * bandRowCount;
 
+  // THE ONE EXECUTE, SHARED WITH THE TOOL-OPTIONS BAR. `runBandVerb` executes
+  // the command AND points the author at the band it made — select it, open the
+  // Bands section, scroll to its card, say so once. See providers/band-follow.
   function apply(result: BandCommandResult): void {
-    if (!result.ok) { setRefusalText(result.reason); return; }
-    setRefusalText(null);
-    run(result.command);
+    setRefusalText(runBandVerb(result));
   }
 
   // The spec, the two reasons and the two commands, from the one derivation the
@@ -404,7 +428,7 @@ export default function BgAnimBandPanel(): React.ReactElement {
           // row reads in the same label column as every form row above it.
           // Everything under it hangs off the control column (`under`), which
           // is what makes the readout a block rather than four ragged lines.
-          <Card key={b.index} raised selected={lit}
+          <Card key={b.index} raised selected={lit} domId={bandCardDomId(b.index)}
             title={lit
               ? 'The map is tinting every background cell this band paints. Click a card or a '
                 + 'cell to move the lens.'

@@ -239,6 +239,25 @@ interface EditorState {
    */
   bandLensTarget: { kind: 'band'; index: number } | { kind: 'candidate' } | null;
 
+  /**
+   * A band the author should be LOOKING AT — the request to scroll its card
+   * into view, consumed by `BgAnimBandPanel` and then cleared.
+   *
+   * WHY THIS IS NOT `bandLensTarget`. The lens target is "what the map is
+   * tinting", and it changes on every card click and every map click; scrolling
+   * on all of those would yank the column under the author's cursor. This field
+   * is the narrower fact — "something just APPEARED and you cannot see it" — and
+   * only the band verbs raise it. The owner's report was exactly that: "I press
+   * add a band bank and idk where it is".
+   *
+   * `nonce` is what makes a repeat reachable: adding, undoing and adding again
+   * lands on the SAME index, and a bare number would be a no-op change that
+   * scrolls nothing. It is ephemeral UI chrome and NOT part of the document, so
+   * raising it cannot create an undo step (`band-lens-clear.test.ts` pins the
+   * same property for `bandLensTarget`).
+   */
+  bandReveal: { index: number; nonce: number } | null;
+
   marquee: MarqueeState | null;
   mapClipboard: MapClipboard | null;
   pasteLayers: PasteLayers;
@@ -284,6 +303,12 @@ interface EditorState {
    */
   setBandCandidate: (patch: Partial<BandCandidate>) => void;
   setBandLensTarget: (target: { kind: 'band'; index: number } | { kind: 'candidate' } | null) => void;
+  /**
+   * Ask the band panel to reveal and scroll to a band — see `bandReveal`.
+   * EPHEMERAL CHROME: no command, no undo step.
+   */
+  revealBand: (index: number) => void;
+  clearBandReveal: () => void;
   setMarquee: (marquee: MarqueeState | null) => void;
   setMapClipboard: (clipboard: MapClipboard | null) => void;
   setPasteLayers: (layers: PasteLayers) => void;
@@ -416,6 +441,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     driver: BAND_DEFAULTS.driver, rateShift: BAND_DEFAULTS.rate_shift,
   },
   bandLensTarget: null,
+  bandReveal: null,
 
   marquee: null,
   mapClipboard: null,
@@ -458,6 +484,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     bandLensTarget: { kind: 'candidate' },
   })),
   setBandLensTarget: (bandLensTarget) => set({ bandLensTarget }),
+  // ONE UP PER CALL, so two adds of the same index are two distinct requests.
+  revealBand: (index) => set((s) => ({
+    bandReveal: { index, nonce: (s.bandReveal?.nonce ?? 0) + 1 },
+  })),
+  clearBandReveal: () => set({ bandReveal: null }),
   setMarquee: (marquee) => set({ marquee }),
   setMapClipboard: (mapClipboard) => set({ mapClipboard }),
   setPasteLayers: (pasteLayers) => set({ pasteLayers }),
