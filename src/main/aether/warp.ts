@@ -39,6 +39,23 @@ export enum WarpGateReason {
    * rebuild is not the thing that changed.
    */
   UnservedMethod = 'unserved-method',
+  /**
+   * CLASSIC ONLY (`s1-warp.ts`). The listing resolved and the server is
+   * willing, but the DISASSEMBLY could not be read for `obX`/`obY` — those are
+   * equates, so they come out of the project's `_Constants.asm` rather than
+   * out of a symbol lookup.
+   *
+   * A third reason for the same reason the second one exists: the ROM is fine
+   * and the server is fine, so "release ROM, rebuild" and "this server cannot
+   * do it" are both wrong answers here, and a rebuilt ROM would come back
+   * exactly as unable to help.
+   *
+   * Lives in this enum rather than a parallel classic one so play-from-cursor
+   * has ONE gate vocabulary across both engine families — the IPC layer carries
+   * `gate` as a bare string and two enums with overlapping values is how they
+   * drift.
+   */
+  NoOffsets = 'no-offsets',
 }
 
 export interface WarpResult {

@@ -758,7 +758,15 @@ describe('runBuild on a classic (S1) project', () => {
     } finally { rmSync(dir, { recursive: true, force: true }); }
   });
 
-  it('attempts NO position restore — S1 has no boot override and no mailbox', async () => {
+  // STILL TRUE AFTER PLAY-FROM-CURSOR LANDED ON CLASSIC, and worth saying why.
+  // `s1-warp.ts` can now poke `v_player` on a running machine, so "there is no
+  // mechanism" stopped being the reason. What stops a restore here is that
+  // `reload_rom` RESETS the machine: S1 comes back on the SEGA screen, and the
+  // poke needs a player in a level and past its init (a poke inside the init
+  // window was measured to be discarded silently). No point in this sequence
+  // has such a machine. The absent `restoredVia` is a truthful report, not a
+  // gap left unfilled.
+  it('attempts NO position restore — a reload resets S1 to the SEGA screen', async () => {
     const dir = classicDir('print("ok")');
     const client = recordingClient({ romPath: join(dir, 's1built.bin') });
     try {

@@ -86,8 +86,21 @@ export interface AetherWarpResult {
   warped: boolean;
   gate?: string;
   error?: string;
-  /** Where the ENGINE says the player landed, after its own clamping. */
+  /** Where the player ACTUALLY IS — never the ask. */
   landed?: { x: number; y: number };
+  /**
+   * CLASSIC: where the player was BEFORE the poke.
+   *
+   * S1 has no mailbox, so the classic route pokes `v_player`, lets the game
+   * run, and asks again. `landed === from` is the signature of a poke that was
+   * silently discarded (S1's level init re-seeds Sonic from the start-position
+   * table while the act loads), and the UI needs both halves to say so — "it
+   * did not take" without "he is still at (80, 1084)" is half an answer.
+   *
+   * Absent on the aeon route: the engine publishes its own clamped
+   * destination there, so nothing has to be compared against a before-shot.
+   */
+  from?: { x: number; y: number };
   clamped?: boolean;
   /**
    * The method the server does not serve, when THAT is why the warp did not
