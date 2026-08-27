@@ -371,6 +371,23 @@ export const EFFECTS_LAYER_DEFORM_BOUNDS = Object.freeze({
   phase: boundsAt(...oneOfBranchWith(['$defs', 'layerDeform'], 'own'), 'properties', 'own', 'properties', 'phase'),
 });
 
+/**
+ * `anchor.at`'s two deform shifts — the anchor's OWN bounds, not a layer's.
+ *
+ * A SECOND SHIFT SPACE THAT LOOKS LIKE THE FIRST. The anchor overlay carries
+ * `dsa`/`dsb` in the same 0..15 encoding a layer does, with the same top-of-range
+ * no-deform sentinel — and because the two numbers agree today, code that wanted
+ * the anchor's sentinel has been reading `EFFECTS_LAYER_DEFORM_BOUNDS` for it.
+ * That is a coincidence held in place by nothing: the two live in different
+ * `$defs` and a contract amendment could move one without the other, at which
+ * point the reader silently tests the wrong sentinel and every anchor advisory
+ * inverts. Derived from `properties/anchor` itself so it cannot.
+ */
+export const EFFECTS_ANCHOR_SHIFT_BOUNDS = Object.freeze({
+  dsa: boundsAt(...oneOfBranchWith(['properties', 'anchor'], 'at'), 'properties', 'at', 'properties', 'dsa'),
+  dsb: boundsAt(...oneOfBranchWith(['properties', 'anchor'], 'at'), 'properties', 'at', 'properties', 'dsb'),
+});
+
 /** `v_deform.columns.amp_shift` — 0..15, read out of the schema. */
 export const EFFECTS_V_DEFORM_AMP_SHIFT_BOUNDS =
   boundsAt(...oneOfBranchWith(['properties', 'v_deform'], 'columns'), 'properties', 'columns', 'properties', 'amp_shift');

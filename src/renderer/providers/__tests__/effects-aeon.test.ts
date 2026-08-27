@@ -35,6 +35,7 @@ import {
 import {
   EFFECTS_FACTOR_NAMES, EFFECTS_LAYER_COUNT, EFFECTS_PACKED_FACTOR_BOUNDS,
   EFFECTS_WORLD_Y_BOUNDS, EFFECTS_V_FACTOR_LOCK, newEffectsScene,
+  EFFECTS_ANCHOR_SHIFT_BOUNDS,
 } from '../../../core/formats/effects/scene-ui';
 import { BG_LAYOUT_WORDS, TILE_WIDTH_PX } from '../../../core/formats/bg-override/bg-override';
 import { BG_WIDTH } from '../../../core/formats/bg-tiles';
@@ -1063,6 +1064,70 @@ describe('deform advisories — what the build would refuse, said first', () => 
       const s = sceneWith({ v_deform: columns, left_column_mask: other });
       expect(sceneDeformAdvisories(s).join('\n'), other).not.toMatch(/refuses in every scene/);
     }
+  });
+
+  it('a curve layer beside an anchor with LIVE deform shifts — the fourth guard-5 ensure', () => {
+    // ROADMAP row 64, aeon scene_dsl.emp:1251. MEASURED before it was believed:
+    // the identical document builds rc=1 with "this scene carries a curve layer
+    // AND an anchor with live deform shifts (anchor dsa 3 / dsb 2 …)" while
+    // `sceneDeformAdvisories` returned [] (guard-surface-gaps §3).
+    const OFF = S.properties.anchor.oneOf[1].properties.at.properties.dsa.maximum;
+    const withCurve = (anchor: unknown) => {
+      const s = sceneWith({ anchor: anchor as never });
+      s.layers[0].curve = { to: 'FACTOR_1_2' };
+      return s;
+    };
+
+    const live = sceneDeformAdvisories(withCurve({ at: { channel: 0, dsa: 3, dsb: 2 } })).join('\n');
+    expect(live).toMatch(/layer 0 authors a curve/);
+    expect(live).toMatch(/anchor dsa 3 \/ dsb 2/);
+    expect(live).toMatch(new RegExp(`${OFF} is the no-deform sentinel`));
+
+    // ⚠ THE SENTINEL TRAP, pinned as its own row. `15` means NO DEFORM, so the
+    // saturated anchor is the PERMITTED case ("an anchor split inside a curve
+    // layer CONTINUES the curve", design §2) — not the extreme one. A check
+    // written as "the shifts are large" would fire here and stay silent above,
+    // and would agree with a build fixture that never tested it.
+    expect(sceneDeformAdvisories(withCurve({ at: { channel: 0, dsa: OFF, dsb: OFF } }))).toEqual([]);
+
+    // EITHER shift arms it — the engine ORs two tests into one flag. `dsa 15 /
+    // dsb 2` is the shape the game's own ojz_act1_start already ships, so a
+    // both-must-be-live check would miss the only anchor in the tree.
+    for (const [dsa, dsb] of [[OFF, 2], [3, OFF]] as const) {
+      expect(sceneDeformAdvisories(withCurve({ at: { channel: 0, dsa, dsb } })).join('\n'),
+        `dsa ${dsa} dsb ${dsb}`).toMatch(/authors a curve/);
+    }
+
+    // BOTH HALVES ARE LOAD-BEARING — the two controls that make the pair legal
+    // one at a time. These are the alternative green-paths: without them the arm
+    // could be "there is an anchor" or "there is a curve" and pass everything above.
+    expect(sceneDeformAdvisories(sceneWith({ anchor: { at: { channel: 0, dsa: 3, dsb: 2 } } })))
+      .toEqual([]);                                   // live anchor, NO curve
+    const curveOnly = sceneWith({});
+    curveOnly.layers[0].curve = { to: 'FACTOR_1_2' };
+    expect(sceneDeformAdvisories(curveOnly)).toEqual([]);   // curve, NO anchor
+    expect(sceneDeformAdvisories(withCurve('none'))).toEqual([]);  // curve, anchor "none"
+
+    // The curve may be on ANY strip — the anchor writes into every strip below
+    // the split, so a scan that only looked at layer 0 would miss the real case.
+    const deep = sceneWith({ anchor: { at: { channel: 0, dsa: 3, dsb: 2 } } });
+    deep.layers.push({ world_y: 64, fa: 'FACTOR_1', fb: 'FACTOR_1', curve: { to: 'FACTOR_1_2' } });
+    expect(sceneDeformAdvisories(deep).join('\n')).toMatch(/layer 1 authors a curve/);
+
+    // And it is ADVICE: the document still serializes.
+    expect(() => serializeEffectsScene(withCurve({ at: { channel: 0, dsa: 3, dsb: 2 } }))).not.toThrow();
+  });
+
+  it('the anchor sentinel is read from the ANCHOR schema, not a layer deform bound', () => {
+    // The two are 15 today and that agreement is held in place by nothing —
+    // different $defs, amendable apart. This row fails the moment the constant
+    // is re-derived from the wrong place, which is invisible while they agree.
+    const anchorMax = S.properties.anchor.oneOf[1].properties.at.properties.dsa.maximum;
+    expect(EFFECTS_ANCHOR_SHIFT_BOUNDS.dsa.max).toBe(anchorMax);
+    expect(EFFECTS_ANCHOR_SHIFT_BOUNDS.dsb.max)
+      .toBe(S.properties.anchor.oneOf[1].properties.at.properties.dsb.maximum);
+    expect(EFFECTS_ANCHOR_SHIFT_BOUNDS.dsa.min)
+      .toBe(S.properties.anchor.oneOf[1].properties.at.properties.dsa.minimum);
   });
 
   it('every advisory is ADVICE — the writer still emits each of these documents', () => {

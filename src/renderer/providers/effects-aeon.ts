@@ -36,6 +36,7 @@ import {
   EFFECTS_V_FACTOR_LOCK, EFFECTS_VSPLIT_AT_BOUNDS,
   EFFECTS_TABLE_REF_FORMS, EFFECTS_TABLE_REF_BIN_PATTERN, EFFECTS_DEFORM_TABLE_BYTES,
   EFFECTS_LAYER_DEFORM_BOUNDS, EFFECTS_V_DEFORM_AMP_SHIFT_BOUNDS,
+  EFFECTS_ANCHOR_SHIFT_BOUNDS,
   EFFECTS_LEFT_COLUMN_MASK_UNDECLARED, EFFECTS_LEFT_COLUMN_MASK_VALUES, EFFECTS_FACTOR_ZERO,
   EFFECTS_SCENE_KEY_DEFAULTS, EFFECTS_LAYER_KEY_DEFAULTS,
   type TableRefParam,
@@ -622,9 +623,59 @@ export function sceneDeformAdvisories(scene: EffectsScene): string[] {
       + `to ${EFFECTS_LEFT_COLUMN_MASK_UNDECLARED}, or attach a V deform.`,
     );
   }
+  const anchorClash = curveAnchorDeformAdvisory(scene);
+  if (anchorClash !== null) out.push(anchorClash);
   const claim = leftColumnMaskAdvisory(scene);
   if (claim !== null) out.push(claim);
   return out;
+}
+
+/**
+ * Advice on a scene, or null: a curve layer alongside an anchor carrying LIVE
+ * deform shifts — aeon `scene_dsl.emp:1251` (ROADMAP row 64).
+ *
+ * WHY THIS ONE WAS MISSED, which is the useful half. Guard 5 is FOUR ensures,
+ * not the two Aurora's summary named. Three of them are per-LAYER facts and
+ * `layerCurveDeformAdvisory` carries them: `:580` (a curve with a live amplitude
+ * on the SAME layer) and `:586` (a curve with `deform: Own` on the same layer),
+ * plus `:1271`'s vsplit pair above. This one is not a layer fact at all — the
+ * curve is on one layer and the shifts are on the SCENE's anchor, so no
+ * per-layer scan can see the pair and the scene-level scan had no anchor arm.
+ * A guard whose two halves sit on different objects is exactly the one a
+ * transcription drops.
+ *
+ * THE MECHANISM, in the engine's own terms: the anchor overlay writes its
+ * shifts into every band from the split DOWN, including bands whose layer
+ * authored no deform. So a curve layer below the split becomes curve ∧ deform
+ * at RUNTIME, past every per-layer comptime check — and the fill resolves the
+ * collision by testing the curve first, silently dropping the anchor's deform
+ * on those rows. Refusing the combination is the honest half.
+ *
+ * ⚠ THE SENTINEL IS THE TRAP, and it is the same top-of-range shape row 60
+ * booked for `v_factor`. `15` here means NO DEFORM, so a pure-boundary anchor
+ * (`dsa 15, dsb 15`) is not the extreme case — it is the PERMITTED case, and
+ * design §2's own: "an anchor split inside a curve layer CONTINUES the curve".
+ * A check written as "shifts are large" would fire on the composing case and
+ * stay silent on the refused one. The condition is `!== the sentinel`, and the
+ * sentinel is read from the ANCHOR's own schema bounds rather than a layer's.
+ *
+ * EITHER shift arms it, matching the engine's `if dsa != 15 { … } if dsb != 15 { … }`
+ * over one flag — not both, which would miss `dsa 15 / dsb 2`, the shape the
+ * game's own `ojz_act1_start` already ships.
+ */
+export function curveAnchorDeformAdvisory(scene: EffectsScene): string | null {
+  const anchor = scene.anchor;
+  if (anchor === undefined || anchor === 'none') return null;
+  const offA = EFFECTS_ANCHOR_SHIFT_BOUNDS.dsa.max;
+  const offB = EFFECTS_ANCHOR_SHIFT_BOUNDS.dsb.max;
+  if (anchor.at.dsa === offA && anchor.at.dsb === offB) return null;
+  const curveLayer = scene.layers.findIndex((l) => curveFieldValue(l) !== 'none');
+  if (curveLayer < 0) return null;
+  return `layer ${curveLayer} authors a curve while this scene's anchor carries live deform `
+    + `shifts (anchor dsa ${anchor.at.dsa} / dsb ${anchor.at.dsb}; ${offA} is the no-deform `
+    + 'sentinel) — the anchor writes those shifts into every strip below the split, including '
+    + 'that one, so it would be curve and deform at once and the build refuses the pair. Take '
+    + `both anchor shifts to ${offA}, which composes with curves, or drop the curve.`;
 }
 
 // ---------------------------------------------------------------------------
@@ -913,6 +964,13 @@ export function leftColumnMaskAdvisory(scene: EffectsScene): string | null {
  * curve ∧ deform because the fill's curve loop already spends every usable data
  * register) and guard 2, which names the attachment rather than the amplitude it
  * folded into.
+ *
+ * ⚠ THIS IS THE PER-LAYER HALF ONLY — `scene_dsl.emp:580` and `:586`. The
+ * engine's curve∧deform family has a THIRD member (`:1251`) whose two halves sit
+ * on different objects: a curve on a LAYER and live shifts on the SCENE's
+ * anchor. Nothing per-layer can see that pair, and it was silent here for a
+ * whole parcel because this function looked like it covered "curve and deform"
+ * entirely. It lives in `curveAnchorDeformAdvisory`, scene-level.
  */
 export function layerCurveDeformAdvisory(layer: EffectsLayer): string | null {
   if (curveFieldValue(layer) === 'none') return null;
