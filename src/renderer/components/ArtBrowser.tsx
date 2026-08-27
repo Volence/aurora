@@ -16,7 +16,8 @@ import {
   publishStripDrag, resolveStripDrag, stripDragHint, stripDragLabel,
 } from '../providers/band-strip-range';
 import {
-  openBgTileDocument, publishStripOpen, resolveStripOpen, stripOpenHint, stripOpenLabel,
+  openBgTileDocument, publishStripOpen, resolveStripOpen,
+  stripOpenHint, stripOpenLabel, stripOpenSpeaks,
 } from '../providers/bg-anim-art';
 import { openDocumentGuarded } from './art/open-document';
 import { useSessionStore } from '../state/sessionStore';
@@ -362,11 +363,14 @@ export default function ArtBrowser() {
       }
       return;
     }
-    // The strip has no surface but the hover line. A refusal SAYS SO there; an
-    // `ignored` stays quiet, and `stripOpenLabel` owns that split. Both halves
-    // are written together for the reason the band cards' hover does it: text
-    // alone would leave the PREVIOUS message's title standing under a new line.
-    if (hoverLabelRef.current) {
+    // The strip has no surface but the hover line, and it is SHARED — the range
+    // drag and the band cards write there too. A refusal SAYS SO; an `ignored`
+    // leaves the line EXACTLY as it found it rather than clearing it, because
+    // clearing would erase a message the author is mid-read. `stripOpenSpeaks`
+    // owns that split, not this branch. Both halves are written together for the
+    // reason the band cards' hover does it: text alone would leave the PREVIOUS
+    // message's title standing under a new line.
+    if (stripOpenSpeaks(outcome) && hoverLabelRef.current) {
       hoverLabelRef.current.textContent = stripOpenLabel(outcome);
       hoverLabelRef.current.title = stripOpenHint(outcome);
     }

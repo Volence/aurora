@@ -19,7 +19,8 @@ import {
   bgArtAtlas, bgArtCellAtlasIndex, bgArtCommitCommand, bgArtTargetExists, bankThumbnail,
   openBandBankDocument, openBgTileDocument, regenerateShiftCommand, bgPaletteLine,
   SHIFT_BUTTON_LABEL, SHIFT_BUTTON_TITLE,
-  resolveStripOpen, stripOpenLabel, stripOpenHint, publishStripOpen, lastStripOpenReport,
+  resolveStripOpen, stripOpenLabel, stripOpenHint, stripOpenSpeaks,
+  publishStripOpen, lastStripOpenReport,
   type StripOpenInputs,
 } from '../bg-anim-art';
 
@@ -234,16 +235,25 @@ describe('resolveStripOpen — which strip double click opens a slot', () => {
     expect(resolveStripOpen(inputs({ slot: 1.5, doc })).kind).toBe('refused');
   });
 
-  it('only a refusal speaks — the strip unmounts on success, so a line there is unreadable', () => {
+  it('only a refusal speaks, and a silent outcome must not WRITE the empty line', () => {
     const doc = golden();
+    // The strip's readout is ONE line shared with the range drag and the band
+    // cards. A double click that cleared it would erase a message the author is
+    // mid-read, so "silent" has to mean "leaves it alone" — which an empty
+    // label cannot express and `stripOpenSpeaks` can. Caught red on the real app
+    // by the CDP harness's sentinel row, not by anything that could live here.
     for (const out of [
       resolveStripOpen(inputs({ slot: doc.tiles.length - 1, doc })),
       resolveStripOpen(inputs({ layer: 'fg', origin: 'tileset' })),
       resolveStripOpen(inputs({ slot: -1, doc })),
     ]) {
+      expect(stripOpenSpeaks(out)).toBe(false);
       expect(stripOpenLabel(out)).toBe('');
       expect(stripOpenHint(out)).toBe('');
     }
+    const refused = resolveStripOpen(inputs({ origin: 'act' }));
+    expect(stripOpenSpeaks(refused)).toBe(true);
+    expect(stripOpenLabel(refused)).not.toBe('');
   });
 
   it('the report advances on EVERY double click and records which branch took it', () => {

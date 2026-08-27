@@ -252,10 +252,36 @@ export function resolveStripOpen(input: StripOpenInputs): StripOpenOutcome {
 }
 
 /**
+ * Does this outcome have anything to SAY on the picker's hover line?
+ *
+ * ⚠ SILENT MEANS "LEAVES THE LINE ALONE", NOT "WRITES AN EMPTY LINE", and the
+ * difference is a defect the CDP harness caught on its first run
+ * (`scratchpad/bganim-tile-door-harness.mjs` [7b], against a sentinel written
+ * before the gesture — asserting the line was empty afterwards would have
+ * passed on both behaviours and on an unwired handler besides).
+ *
+ * The strip's readout is ONE shared line: the range drag writes refusals there,
+ * the band cards write their hints there, and it is the only surface any of
+ * them has. A double click that clears it would erase a message the author is
+ * mid-read — which is the exact incident `stripDragLabel` records, where the
+ * band cards' hover handler wiped a refusal that had just been written. So a
+ * gesture with nothing to say writes nothing at all.
+ *
+ * A PREDICATE RATHER THAN AN `=== ''` AT THE CALL SITE, because "which outcomes
+ * speak" is a rule and rules do not live in `.tsx` here — the node suite cannot
+ * see a component closure, and an empty string is indistinguishable from a
+ * message that happens to be empty.
+ */
+export function stripOpenSpeaks(outcome: StripOpenOutcome): boolean {
+  return outcome.kind === 'refused';
+}
+
+/**
  * The readout for the picker's hover label, on the SAME one-short-line budget
  * `stripDragLabel` documents in full — the 102px box, the `nowrap`, and the
  * measured incident where a wrapped readout moved the tile grid out from under
- * the cursor. Empty for `open` and `ignored`; see `StripOpenOutcome`.
+ * the cursor. Empty for `open` and `ignored`, which `stripOpenSpeaks` says the
+ * caller must not write at all.
  */
 export function stripOpenLabel(outcome: StripOpenOutcome): string {
   return outcome.kind === 'refused' ? `no edit — ${outcome.reason}` : '';
