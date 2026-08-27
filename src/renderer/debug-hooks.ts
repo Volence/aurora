@@ -947,6 +947,23 @@ interface DebugApi {
     build(): Promise<{ route: string; ran: boolean }>;
     /** Warp, worded per project kind — the classic F7 path's seam. */
     warp(x: number, y: number, kind?: 'aeon' | 'classic'): Promise<string | null>;
+    /**
+     * Put the store in EXACTLY the state a FAILED build leaves behind, without
+     * running one.
+     *
+     * `BuildPanel` is a pure function of five store fields — `buildPanelOpen`,
+     * `buildState`, `buildOutput`, `buildSummary`, `buildMissingEnv` — and this
+     * writes the same object `aetherStore.build()`'s failure branch writes
+     * (state 'failed', the process output, a `Build failed (exit N)` summary,
+     * panel open). The ONLY thing skipped is spawning build.sh, which the panel
+     * cannot observe.
+     *
+     * It exists because the alternative for a layout harness is
+     * `aether.build()`, and that runs a REAL aeon build in a REAL project tree
+     * and then reloads a REAL emulator — three side effects a question about
+     * where a column's bottom edge lands has no business having.
+     */
+    showFailedBuild(lines: string[], exitCode?: number): void;
   };
   /**
    * The classic "Edit art…" action, exactly as the object UI runs it (tab
@@ -1071,6 +1088,13 @@ export function installDebugHooks(): void {
         return startBuildAndRun();
       },
       warp: (x, y, kind) => useAetherStore.getState().warp(x, y, kind),
+      showFailedBuild: (lines, exitCode = 1) => useAetherStore.setState({
+        buildState: 'failed',
+        buildOutput: lines.slice(-500),
+        buildSummary: `Build failed (exit ${exitCode})`,
+        buildMissingEnv: [],
+        buildPanelOpen: true,
+      }),
     },
     openDir: (dir) => useClassicProjectStore.getState().openDirectory(dir),
     projStatus: () => {

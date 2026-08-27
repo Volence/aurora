@@ -24,3 +24,8 @@ scratchpad/fixtures/aeon-bg-writable/
 # The BG tile-picker harness's writable tree — same rule, rebuilt on every run
 # by scratchpad/bg-tile-picker-harness.mjs.
 scratchpad/fixtures/aeon-bg-picker-writable/
+
+# The build-console overlap harness's project: a plain copy of the aeon tree,
+# made because the owner is building in ../aeon live and this must not open it.
+# Rebuilt by the rsync line in scratchpad/build-console-overlap-harness.mjs.
+scratchpad/fixtures/aeon-console-fix/

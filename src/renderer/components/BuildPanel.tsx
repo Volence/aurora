@@ -92,9 +92,62 @@ export default function BuildPanel(): React.ReactElement | null {
   );
 }
 
+/**
+ * How tall the console is when it is open, and the ONE place that number lives.
+ *
+ * Capped at half the window (`maxHeight` below) so a short window is never all
+ * console and no app — the panel is `flexShrink: 0`, which is what keeps it from
+ * being squeezed away on a tall one.
+ */
+export const BUILD_CONSOLE_HEIGHT = 260;
+
 const styles = {
+  /**
+   * A FLOW CHILD OF THE APP ROOT, NOT AN OVERLAY. This is the fix for the
+   * defect the owner hit: he pressed Build, the console appeared, and the
+   * right-hand properties column was cut off at the bottom with the Remove
+   * button he needed underneath it and no way to scroll to it.
+   *
+   * It used to be `position: absolute; left: 0; right: 0; bottom: 22;
+   * height: 260`, which has two independent faults:
+   *
+   *  1. AN ABSOLUTE BOX REMOVES NO SPACE FROM THE LAYOUT, so nothing behind it
+   *     knows it exists. The properties column's scroller still measured itself
+   *     against the full window height, so scrolling it to the very bottom left
+   *     its last control sitting UNDER the console — visible through nothing,
+   *     hit-tested to the console, and unreachable at every scroll position
+   *     there is. Measured on the pre-fix tree with 16 layers authored: 94 of
+   *     the column's 126 enabled controls could not be clicked, against 0 with
+   *     the console closed (scratchpad/build-console-overlap-harness.mjs, rows
+   *     3c/5b). The same arithmetic covered the bottom 260px of the map canvas
+   *     and of the Explorer tree.
+   *
+   *  2. `bottom: 22` WAS A GUESS AT THE STATUS BAR'S HEIGHT, and it was wrong —
+   *     the bar measures 24px, so the console already overlapped it by two.
+   *     There is no constant to derive that number from because the status bar
+   *     is a facet's slot inside EditorShell, four levels below this component.
+   *     A number that cannot be derived is a number that will drift.
+   *
+   * As a flex item in the root column the height comes OUT of `styles.body`
+   * (App.tsx), so the Explorer, the canvas and the properties column all
+   * genuinely shrink and their scrollers re-measure. Every viewport in this app
+   * sizes off a ResizeObserver or off flex, and nothing listens for a window
+   * `resize` event, so the reflow needs no cooperation from any of them.
+   *
+   * WHAT THIS TRADES: the console now sits flush with the bottom of the window
+   * and the status bar rides directly above it, where before the bar was at the
+   * bottom and the console floated over everything else. Both bars stay fully
+   * visible; the ordering is the only change. Keeping the bar at the very bottom
+   * would mean mounting the console INSIDE EditorShell, and the console is
+   * app-global — it has to work on the Home tab, which has no EditorShell.
+   *
+   * `position: relative` + `zIndex` survive only so the top border and the
+   * shadow paint OVER the body above rather than being clipped by it. They no
+   * longer position anything.
+   */
   root: {
-    position: 'absolute' as const, left: 0, right: 0, bottom: 22, height: 260, zIndex: 40,
+    position: 'relative' as const, zIndex: 40,
+    height: BUILD_CONSOLE_HEIGHT, maxHeight: '50vh', flexShrink: 0,
     display: 'flex', flexDirection: 'column' as const,
     background: T.void, borderTop: `1px solid ${T.border}`, boxShadow: '0 -8px 24px rgba(0,0,0,0.45)',
   },
