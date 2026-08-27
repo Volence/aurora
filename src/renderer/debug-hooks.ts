@@ -24,6 +24,8 @@ import type { GuideReport } from './canvas/effects-guides';
 import { lastScreenFrameReport, type ScreenFrameReport } from './canvas/screen-frame';
 import { lastBandLensReport, lastBandMarkReport } from './canvas/band-lens';
 import type { BandLensReport, BandMarkReport } from './canvas/band-lens';
+import { lastStripDragReport } from './providers/band-strip-range';
+import type { StripDragReport } from './providers/band-strip-range';
 import { useAetherStore } from './state/aetherStore';
 import { useViewStore } from './state/viewStore';
 import { useArtStore } from './state/artStore';
@@ -440,6 +442,16 @@ interface AeonProbeApi {
    * never happened; `marks` advancing is what proves the gesture ran.
    */
   bandMark(): BandMarkReport;
+  /**
+   * THE LAST BLOB-STRIP DRAG (ROADMAP item 43 wave 2), whatever it resolved to.
+   *
+   * `bandCandidate()` cannot stand in for this. A REFUSED drag and a drag that
+   * never ran leave the candidate byte-identical, and a plain PICK leaves it
+   * untouched too — so the store cannot say which of the three happened.
+   * `gestures` advancing proves the release ran; `kind` proves WHICH branch took
+   * it, which is what a row needs when two paths can produce one observable.
+   */
+  stripDrag(): StripDragReport;
   /** What the lens resolves RIGHT NOW, independent of the draw pass. */
   bandLensTarget(): { kind: 'band'; index: number } | { kind: 'candidate' } | null;
   /**
@@ -673,6 +685,7 @@ function installAeonProbe(): AeonProbeApi {
     screenFrame: () => lastScreenFrameReport(),
     bandLens: () => lastBandLensReport(),
     bandMark: () => lastBandMarkReport(),
+    stripDrag: () => lastStripDragReport(),
     bandLensTarget: () => useEditorStore.getState().bandLensTarget,
     setBandLensTarget: (t) => useEditorStore.getState().setBandLensTarget(t),
     selectedBand: () => useEditorStore.getState().selectedBgBand,
