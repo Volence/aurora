@@ -19,14 +19,32 @@ edit the JSON. Editing it converts it into a second `canopy_dusk`, silently.
 | | |
 |---|---|
 | fixture | `test/fixtures/effects/writer_session_ojz.json` |
-| git blob hash | `5ca0552bfc38a8bc2d359ad638b4dd0f089369da` |
-| sha256 | `bf395ce60117a37196fc04ba89bd593371a1b463d811dd52077ebabb305b2647` |
-| size | 1,626 bytes, exactly one trailing newline |
+| git blob hash | `4022f5647a147ebd72f6b6d23bbc8c527614c06d` |
+| sha256 | `073283c6c5016cb06a639548c5cffbaa032b40581b7c51644ab3bb37b24d11a2` |
+| size | 2,411 bytes, exactly one trailing newline |
 
-**RE-ORIGINATED 2026-08-27 (ROADMAP row 60) — CEILING-DRIVEN, and the one-line
-corroboration was NOT available.** The previous record was blob
-`893cd05586c4524fa919adc6bbbb111e710d1a7e`, sha256
+**RE-ORIGINATED 2026-08-27 (ROADMAP row 60) — CEILING-DRIVEN AND WIDENED TO THE
+DEFORM CONTROLS, and the one-line corroboration was NOT available.** The record
+before row 60 was blob `893cd05586c4524fa919adc6bbbb111e710d1a7e`, sha256
 `c28b6db065d2cf88a108d4f91baae3673fad66e67bf980c642f4a6e84ccb0dfd`, 933 bytes.
+
+**IT WAS DONE IN TWO SESSIONS AND TWO COMMITS, ON PURPOSE.** The two changes are
+independently confounding, so running them together would have produced a
+sixty-line delta with nothing to check it against. Each commit has its own
+predicted delta, and the record of each is below.
+
+| commit | what moved | blob | sha256 | size |
+|---|---|---|---|---|
+| A — ceiling only | 8 layers → 16, and the three `N`-derived scalars | `5ca0552bfc38a8bc2d359ad638b4dd0f089369da` | `bf395ce60117a37196…` | 1,626 |
+| B — the deform gestures | `deform_fg`, `deform_bg`, `v_deform`, `left_column_mask`, layer 15's `deform` | `4022f5647a147ebd72f6b6d23bbc8c527614c06d` | `073283c6c5016cb06a…` | 2,411 |
+
+**Commit B's delta contains no removed line of substance at all** — every line in
+it is an addition, and every added key is one of `deform_bg`, `deform_fg`,
+`left_column_mask`, `v_deform`, a layer's `deform`, or a field inside one of
+them. Nothing outside the deform surface moved, which is that commit's own
+interpretability check.
+
+## Commit A — the ceiling
 
 Gesture R3's rule is *"click Add layer until the control refuses — the count is
 the app's own ceiling"*. That ceiling was **8** at origination and row 56 raised
@@ -91,6 +109,52 @@ why fixing it changed no bytes. The catcher is the new blanket row **8a**, which
 watches the GESTURE rather than the value: every `SET_INPUT` now goes through a
 ledger and 8a asserts not one of them returned `'no-element'`. Under the plant it
 reported 16 misses and went red while 5b stayed green.
+
+## Commit B — the deform controls
+
+ROADMAP row 58 shipped authoring for `deform_fg`, `deform_bg`, a layer's
+`deform`, `v_deform` and `left_column_mask` on 2026-08-27, and this fixture could
+exercise **none** of them; row 59 deliberately did not widen the sequence, for
+the same confounding reason it pinned the layer count. Commit B widens it, with
+its own prediction written first (`scratchpad/predict-commitB.py` →
+`scratchpad/PREDICTED-commitB.json`) and matched **exactly, with no diff**.
+
+The five new rules are R12–R16 in the gesture table below. Every one of them is
+an index into a control's own option list, or the layer ceiling `N`, or a bound
+the control itself advertises — the same discipline as R4–R9. Two carry a stated
+exception, and **both exceptions are forced by the contract rather than
+preferred**:
+
+* **`period` takes the control's own `max` ÷ N**, not `N`. `max` IS the table
+  length, sigil refuses a generator whose period does not divide it, and `max/N`
+  is exact because both are powers of two. The plain rule (17) would have
+  authored a scene the build rejects. Harness row **8f** checks the emitted
+  file's periods against the number the spinner itself advertises.
+* **`shift_a` / `shift_b` take `max − N` clamped** — R6's complement — because
+  their schema default IS `max` (15, "this plane takes none of it") and that is
+  precisely what `layerDeformFromToggle` seeds. The plain rule would have landed
+  on the app's own seed and asserted nothing: the row-5c trap, one field over.
+
+### The mutual gate was driven as a pair, and checked
+
+aeon refuses per-column V deform with no `left_column_mask`
+(`scene_dsl.emp:1288`) **and** a declared policy with no V deform (`:1293`) —
+which is why Aurora's `vDeformToggleCommand` clears both keys in one undo step.
+R12 and R15 therefore drive the pair, and harness row **8d** checks the emitted
+document against both arms rather than trusting it. `sprite_mask` is rendered
+DISABLED (the engine refuses it in every scene today) and R15's "last option"
+rule does not reach it; row **8c** checks the picked option's own `disabled` flag
+so the rule is *safe* rather than lucky, with the disabled option asserted
+present beside it so "not disabled" is a fact about this option and not about an
+empty list.
+
+### What commit B's rows can and cannot see
+
+Row **8a** — the blanket ledger — cannot catch a gesture that LANDS on a value
+equal to the app's default; it only sees `'no-element'`. Row **8b** is the
+catcher for that, and it was proven so: a plant that set `period` to the
+control's `max` (the seed) left 8a green at 78/78 gestures and took 8b red.
+Both rows are kept, because they catch different halves of the same failure.
 
 **RE-ORIGINATED 2026-08-27 (ROADMAP row 59), not edited.** The contract RETIRED
 `precision` (empyrean `0bd4753`): aeon deleted the storage on 2026-08-26 —
@@ -194,10 +258,11 @@ tests do NOT prove" for the limit of that.
 | | |
 |---|---|
 | harness | `scratchpad/writer-originated-scene-harness.mjs` |
-| run | 2026-08-27 (ROADMAP row 60), **32/32** checks passed, ceiling-driven. Earlier: row 59's pinned run 29/29; 2026-08-23 re-origination 25/25; first run 2026-08-22, 22/22. The count moved 29 -> 32 with three ADDED rows, all of them about gestures landing rather than values being legal: **8a** the blanket ledger — every `SET_INPUT` returned `'ok'` and the session issued exactly the prescribed number of gestures; **6h** the document's `v_factor` is not the control's `max` (= lock sentinel = new-scene default); **5d** every layer card really has a top spinner, and the title the app gave it is printed |
+| run | 2026-08-27 (ROADMAP row 60), **37/37** checks passed, ceiling-driven and deform-widened, on **four consecutive runs whose emitted bytes were identical** (sha256 `073283c6c5016cb06a…`, ports 9461/9472/9473/9474, load average 1.9 to 10.0). Commit A's ceiling-only state ran **32/32**. Earlier: row 59's pinned run 29/29; 2026-08-23 re-origination 25/25; first run 2026-08-22, 22/22. ⚠ **The four identical runs prove the session is DETERMINISTIC, not that it was driven correctly** — a harness driving the wrong gesture drives it identically too. The faithfulness claim rests on the two predicted deltas, not on this row |
+| rows added | 29 -> 32 in commit A, all about gestures LANDING rather than values being legal: **8a** the blanket ledger (every `SET_INPUT` returned `'ok'`, and the session issued exactly the prescribed count); **6h** the document's `v_factor` is not the control's `max` (= lock sentinel = new-scene default); **5d** every layer card really has a top spinner, with the title the app gave it printed. 32 -> 37 in commit B: **8b** the three scene attachments at the rule's values *and* none of them the seed its toggle would have left; **8c** the policy the last-option rule picked is one the app offers as pickable; **8d** the mutual gate in both directions; **8e** the layer attachment is on the last strip and only there; **8f** the emitted FILE carries every deform key and its periods divide the table length the control advertises |
 | app build | `VITE_AURORA_DEBUG=1 npm run build` (electron-vite 5 / vite 8) |
 | built from | aurora `71f8925`, branch `feat/writer-session-ceiling`. Earlier runs: `0d533e5` on `feat/retire-precision`; `427cbd1` on `fix/v-factor-retype`; the first from `76ff28f` on `feat/writer-originated-scene-fixture` |
-| driven by | CDP against Electron under `xvfb-run -a -s '-screen 0 1680x1050x24'`, one port per run. Environment printed beside every run, because it varies here: row 60's runs at load average 0.9–2.5, uptime 1 day 22:19–22:22 |
+| driven by | CDP against Electron under `xvfb-run -a -s '-screen 0 1680x1050x24'`, one port per run. Environment printed beside every run, because it varies here: row 60's runs at load average 0.9 to 10.0, uptime 1 day 22:19 to 22:34. This harness aims at titled DOM elements and `<select>` option indices, never at client pixel coordinates, so the fractional-rect hazard does not arise — there is no geometric aim to be off by one. What varies is machine load, which is why the run count and the environment are printed rather than assumed |
 | project opened | a **writable copy** of the aeon tree (`project.json` + `games/` + `art/`) in the session scratchpad. aeon's own tree was never opened and never written to — verified by the overseer's independent re-run, `md5sum` over aeon's live `editor/effects/*.json` **unchanged across it**. ⚠ **The clause that used to follow — *"it has no `games/sonic4/data/editor/effects/` directory before or after this run"* — is DELETED as false, 2026-08-27.** aeon has carried that directory since at least 2026-08-25 (`ojz_act1_start.json`, `ojz_act1_depth.json`), and that is not incidental: **it is rot 1's own cause**, recorded 100 lines above in this same file. The safety claim and the emptiness claim had been welded into one sentence, so a reader checking the half that matters would have read the half that had quietly gone false beside it — and the two are independent (a copy is safe whether or not the original is empty). Measure the mtimes; do not infer safety from absence |
 | saved by | a real `Ctrl+S` key event to the real window → `saveActive()` → `saveAeonProject()` → `buildAeonSavePlan()`. Toast read back: `success:Project saved` |
 | taken from | `<copy>/games/sonic4/data/editor/effects/writer_session_ojz.json`, byte-for-byte |
@@ -220,6 +285,11 @@ layer index by the one rule stated. No JSON key was typed anywhere.
 | R7 | scene `v_factor` = the layer count **wrapped into the control's own advertised range**, `min + (N % (max − min + 1))`, typed into the real spinner. At N=16 on a 0..15 control that is **0**. Until item 35 this read "the option at index 8 of the `v_factor` select → `FACTOR_3_4`"; that select is gone, because `v_factor` is a 0..15 shift count and never was a `$defs/factor`. N is the same number R8 uses and for the same reason — the app's own ceiling, not a number chosen here — and the value is deliberately **not** the field's own `max`, because `max` is also the new-scene default and a fixture carrying it would prove the control moved nothing. **The `%` is row 60's, and it is forced**: the ceiling outgrew this control's range, so the plain rule overflowed and the clamp folded it onto exactly the value the rider forbids (measured — see "R7's rule collided" above). The wrap is the same one R5 applies to an over-long index. The affordance itself is checked separately (harness rows 6d/6e: the control is an `input[type=number]` with min 0, and no control at `v_factor` offers a `FACTOR_*` option), and row 6h pins the result away from `max` |
 | R8 | `v_center` = 16, `v_offset` = -16 (the layer count, and its negation) |
 | R9 | `transition` = the **last** option that select offers → `instant`. Until row 59 this read "`precision` and `transition` … → `cell`, `instant`"; the `Precision` control is gone, because aeon deleted the field's storage and empyrean `0bd4753` cut the key from the schema. Its **absence** is now measured instead of its value being set — harness rows 6f (no such control in the running app, with its row-mates checked present so an unmounted panel cannot pass it), 6g (no such key in the document) and 7f (no such key in the emitted file) |
+| R12 | every deform **toggle** is set to the LAST option its own select offers — `shared` for the two plane rows, `columns` for `v_deform`, `own` for the layer row. R9's rule, one control over |
+| R13 | the *k*-th deform attachment, counted in the order the **panel** renders them, takes the table form at index *k* of the table select's own option list. *k* = 0 `deform_fg` → `sine`, 1 `deform_bg` → `triangle`, 2 `v_deform` → `zero`, 3 the layer attachment → `v_column_perspective`. With four attachments the rule reaches indices 0–3 and never index 5, the `.bin` branch — the one form that would need a typed path, i.e. a writer's choice. **The rule excludes it by arithmetic, not by an exception** |
+| R14 | every deform **integer** takes *N*, the app's layer ceiling — the same number R7/R8 use — clamped by the bounds the control itself advertises. So `amplitude` = 16, `focal` = `max_offset` = `speed` = 16, `phase` = 16, `amp_shift` = 15 (the clamp is the bound). **Two exceptions, both forced**: `period` = the control's own `max` ÷ *N* = 16, because the build refuses a period that does not divide the table and `max` *is* the table length; and `shift_a`/`shift_b` = `max − N` clamped = 0, R6's complement, because their schema default IS `max` and the plain rule would have landed on the app's own seed |
+| R15 | `left_column_mask` = the LAST option its select offers → **`accept`**. R9's rule again. The row only exists once `v_deform` is on — the two are mutually gated — so this is driven as one gesture with R12's `v_deform` toggle, and the picked option's own `disabled` flag is checked (harness 8c) because `sprite_mask` is rendered disabled and a rule landing there would author a refused scene |
+| R16 | the LAYER attachment goes on the LAST strip, index *N*−1 = **15** — "the last", the same selector R6 and R9 use. One strip, not all of them, and harness 8e checks the strip above it carries no `deform` so the rule is provably a rule |
 | R10 | the section-assignment select is set to the scene's id (section 0's `sceneRef`) |
 | R11 | `Ctrl+S`, dispatched as a real key event |
 
@@ -231,11 +301,11 @@ the codec actually encodes came from an index.
 
 ## What the session could NOT author
 
-**This list was STALE and is corrected here (2026-08-27).** It still described the
-panel as of parcel H; ROADMAP row 58 (deform authoring, merged 2026-08-27) shipped
-controls for `deform_fg`, `deform_bg`, a layer's `deform`, `v_deform` and
-`left_column_mask`, and `curve`/`vsplit` became authorable earlier still. As of
-today:
+**Corrected again 2026-08-27 (ROADMAP row 60).** The previous revision of this
+section said the sequence had *deliberately not been widened* to the row-58
+deform controls and that the fixture *carries none of them*. **Both halves are
+now false and are replaced, not annotated** — row 60 widened the sequence and the
+fixture carries all five. As of today:
 
 The Effects panel exposes `name`, `v_factor` (a bounded integer spinner),
 `v_center`, `v_offset`, `transition`, `deform_fg`, `deform_bg`, `v_deform` and
@@ -245,16 +315,30 @@ for** `anchor`, `budget_class`, `dsa`, `dsb`, `phase`, `enabled` or `v_factor_fg
 `precision` is not on either list any more: it is RETIRED from the format, not
 merely un-authored.
 
-**THE GESTURE SEQUENCE WAS DELIBERATELY NOT WIDENED to exercise the row-58
-controls**, and this fixture therefore still carries none of them. Driving new
-controls in the same run that removed `precision` would have put many lines in
-the delta, and a delta of one line is the only thing separating "the re-run was
-faithful" from "the session was driven differently" — the same reasoning that
-pinned the layer count above. Widening the sequence to cover the deform controls
-is booked as its own ROADMAP row.
+**WHAT THE SESSION AUTHORS AND THIS FILE THEREFORE CARRIES:** every scene-level
+key above, plus a layer's `world_y` / `fa` / `fb` and — on the last strip only,
+by R16 — its `deform`.
 
-So this fixture is *sparser* than `canopy_dusk.json` and always will be until the
-UI grows. That is data about the authoring surface, not a defect in the fixture,
+**WHAT IS AUTHORABLE AND STILL NOT AUTHORED HERE**, with the reason for each:
+
+* **`curve` and `vsplit`** (parcel H). `curve` is refused by the engine on a
+  strip that also carries a `deform` (Aurora renders the advisory), and `vsplit`
+  is refused on any scene carrying a `v_deform` — *"both write the same VSRAM
+  word, and the build refuses the pair"*. R16 puts a `deform` on the last strip
+  and R12 puts a `v_deform` on the scene, so authoring either of these two would
+  make the file a scene aeon rejects. **Booked, not forgotten**: covering them
+  needs a session that does not carry the deform pair, i.e. a second fixture
+  rather than a wider sequence on this one.
+* **The `.bin` table form** (index 5 of six). R13 reaches indices 0–3 and stops;
+  the `.bin` branch is the one form that needs a typed path, which would be a
+  writer's choice rather than an enumerated value. Four of the six forms *are*
+  covered — `sine`, `triangle`, `zero`, `v_column_perspective` — including the
+  no-parameter branch and an unbounded-parameter branch.
+* **`v_column_floor`** (index 4). The index rule reaches 0–3; a fifth attachment
+  would reach it. Nothing is wrong with it — there are only four attachments.
+
+So this fixture is still *sparser* than `canopy_dusk.json` and always will be
+until the UI grows, though the gap has narrowed considerably. That is data about the authoring surface, not a defect in the fixture,
 and it is exactly why both files exist: `canopy_dusk` covers the schema's shape,
 this one covers what an author can actually produce today.
 

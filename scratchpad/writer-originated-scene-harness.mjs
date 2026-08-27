@@ -623,6 +623,228 @@ async function main() {
       !('precision' in sceneOf(doc)),
       `scene keys: ${JSON.stringify(Object.keys(sceneOf(doc)))}`);
 
+    // ---- R12..R16: the DEFORM attachments (ROADMAP row 60). --------------
+    //
+    // Row 58 shipped controls for `deform_fg`, `deform_bg`, a layer's `deform`,
+    // `v_deform` and `left_column_mask` on 2026-08-27, and this fixture could
+    // exercise none of them. Row 59 deliberately did not widen the sequence,
+    // for the same one-line-delta reason it pinned the layer count; row 60 pays
+    // both debts, in two commits so each delta stays interpretable.
+    //
+    // THE RULES, in the same voice as R4..R9 — every value is an INDEX into a
+    // control's own option list, or the layer ceiling N, or a bound the control
+    // itself advertises. Nothing below is a number somebody chose:
+    //
+    //   R12  every deform TOGGLE is set to the LAST option its own select
+    //        offers (`shared` / `columns` / `own`) — R9's rule, one control over.
+    //   R13  the k-th deform attachment, counted in the order the PANEL renders
+    //        them, takes the table form at index k of the table select's own
+    //        option list. k = 0 deform_fg, 1 deform_bg, 2 v_deform, 3 the layer
+    //        attachment. With four attachments the rule reaches indices 0..3 and
+    //        never index 5, the `.bin` branch — which is the one form that would
+    //        need a typed path, i.e. a writer's choice. The rule excludes it by
+    //        arithmetic rather than by an exception.
+    //   R14  every deform INTEGER takes N, the app's layer ceiling — the same
+    //        number R7/R8 use — clamped by the control's own advertised bounds.
+    //        Two exceptions, and each is FORCED rather than preferred:
+    //          • `period` takes the control's own `max` divided by N. `max` IS
+    //            the table length (the schema derives both from one sentence),
+    //            the build refuses a period that does not divide it, and max/N
+    //            is exact because both are powers of two. The plain rule would
+    //            author a scene aeon rejects.
+    //          • `shift_a` / `shift_b` take `max - N` clamped, R6's complement.
+    //            Their schema DEFAULT is `max` (15 = "this plane takes none of
+    //            it"), which is exactly what `layerDeformFromToggle` seeds, so
+    //            the plain rule would land on the app's own seed and assert
+    //            nothing — the row-5c trap, one field over.
+    //   R15  `left_column_mask` = the LAST option its select offers. R9's rule
+    //        again, and the last option is `accept` — the one value the engine
+    //        accepts unconditionally. The rule is checked against the option's
+    //        own `disabled` flag (row 8c), because `sprite_mask` is rendered
+    //        DISABLED and a rule that landed on it would author a refused scene.
+    //   R16  the LAYER attachment goes on the LAST strip, index N-1 — "the
+    //        last", the same selector R6 and R9 use. One strip, not all of them,
+    //        so the delta stays confined and row 8e can prove the rule is a rule.
+    //
+    // ⚠ `v_deform` AND `left_column_mask` ARE MUTUALLY GATED BY THE ENGINE
+    // (scene_dsl.emp:1288 refuses per-column V-deform with no policy, :1293
+    // refuses a declared policy with no V-deform), which is why Aurora's
+    // `vDeformToggleCommand` clears both keys in one undo step. R12 and R15 are
+    // therefore driven as the PAIR the app treats them as, and row 8d checks the
+    // emitted document satisfies the gate in both directions.
+    const LAST = (opts) => opts[opts.length - 1].value;
+    const optionsOf = async (re) => c.json(
+      `(() => { const s = ${SEL_BY_TITLE(re)};
+        return s ? [...s.options].map(o => ({ value: o.value, disabled: !!o.disabled })) : null; })()`);
+    const boundsOf = async (re) => c.json(
+      `(() => { const e = ${NUM_BY_TITLE(re)};
+        return e ? { found: true, min: e.min, max: e.max } : { found: false }; })()`);
+    // R14, as one function so the rule is written once.
+    const deformInt = (key, min, max) => {
+      if (key === 'period') return Math.floor(max / N);
+      if (key === 'shift_a' || key === 'shift_b') return Math.max(min, max - N);
+      if (max === null) return N;
+      return Math.min(max, Math.max(min ?? 0, N));
+    };
+    // Drive one number control by R14, deriving the value from the bounds the
+    // control itself advertises. A control that is not on screen still gets its
+    // gesture ISSUED, so row 8a sees the 'no-element' rather than the row
+    // silently doing nothing — the failure mode this whole parcel is about.
+    const driveInt = async (label, re, key) => {
+      const b = await boundsOf(re);
+      const min = b.found && b.min !== '' ? Number(b.min) : null;
+      const max = b.found && b.max !== '' ? Number(b.max) : null;
+      const v = b.found ? deformInt(key, min, max) : 0;
+      await drive(c, label, SET_INPUT(NUM_BY_TITLE(re), v));
+      await sleep(160);
+      return v;
+    };
+    // One attachment's table sub-form: the form at index k, then every parameter
+    // row that form renders, each by R14. The parameter list is read from the DOM
+    // ONCE, before the loop that drives it, so a loop that skipped an entry would
+    // show up as a shortfall in row 8a's count rather than shrinking the target.
+    const driveTable = async (prefix, k) => {
+      const sel = `/^${prefix} table\\b/`;
+      const opts = await optionsOf(sel);
+      if (!opts || opts.length <= k) throw new Error(`${prefix}: table select has no index ${k}`);
+      await drive(c, `R13 ${prefix} table`, SET_INPUT(SEL_BY_TITLE(sel), opts[k].value));
+      await sleep(400);
+      // The form's own parameter rows: number inputs the sub-form titled with
+      // this attachment's prefix. `speed` is titled the same way and takes the
+      // same rule, so it rides along rather than being a second code path.
+      const params = await c.json(
+        `[...document.querySelectorAll('input[type=number]')]
+           .map(e => e.title || '')
+           .filter(t => t.startsWith(${JSON.stringify(`${prefix} `)}))
+           .map(t => t.slice(${prefix.length + 1}).split(/[ (]/)[0])`);
+      const got = {};
+      for (const key of params) {
+        got[key] = await driveInt(`R14 ${prefix} ${key}`, `/^${prefix} ${key}\\b/`, key);
+      }
+      return { form: opts[k].value, params: got, formOptions: opts.map((o) => o.value) };
+    };
+
+    const attach = {};
+    for (const [k, key] of ['deform_fg', 'deform_bg', 'v_deform'].entries()) {
+      const toggle = await optionsOf(`/^${key}\\b/`);
+      if (!toggle) throw new Error(`${key}: no toggle select on screen`);
+      await drive(c, `R12 ${key} on`, SET_INPUT(SEL_BY_TITLE(`/^${key}\\b/`), LAST(toggle)));
+      await sleep(500);
+      attach[key] = { toggleValue: LAST(toggle), ...(await driveTable(key, k)) };
+    }
+    // `amp_shift` is the one v_deform field the sub-form does not title with the
+    // attachment's prefix (its title starts with the key itself), so it is driven
+    // by its own title — same R14 rule, no second rule.
+    attach.v_deform.params.amp_shift = await driveInt(
+      'R14 v_deform amp_shift', '/^amp_shift\\b/', 'amp_shift');
+
+    // R15 — the policy the gate makes MANDATORY, driven in the same breath.
+    const maskOpts = await optionsOf('/^left_column_mask\\b/');
+    if (!maskOpts) throw new Error('left_column_mask row is not on screen — the gate is unsatisfiable');
+    const maskPick = maskOpts[maskOpts.length - 1];
+    await drive(c, 'R15 left_column_mask', SET_INPUT(SEL_BY_TITLE('/^left_column_mask\\b/'), maskPick.value));
+    await sleep(400);
+
+    // R16 — the LAST strip takes its own attachment.
+    const L = N - 1;
+    const layerToggle = await optionsOf(`/^Layer ${L} deform\\.own\\b/`);
+    if (!layerToggle) throw new Error(`layer ${L} has no deform toggle on screen`);
+    await drive(c, `R12 layer ${L} deform on`,
+      SET_INPUT(SEL_BY_TITLE(`/^Layer ${L} deform\\.own\\b/`), LAST(layerToggle)));
+    await sleep(500);
+    const layerTable = await driveTable(`Layer ${L} deform`, 3);
+    const layerOwn = { ...layerTable, params: { ...layerTable.params } };
+    for (const key of ['shift_a', 'shift_b', 'phase', 'speed']) {
+      layerOwn.params[key] = await driveInt(
+        `R14 layer ${L} ${key}`, `/^Layer ${L} ${key}\\b/`, key);
+    }
+    await sleep(500);
+
+    // The gesture count R12..R16 issued, derived from the FORMS the index rule
+    // landed on rather than pinned: `zero` has no parameters and `sine` has two,
+    // so a literal here would have to be re-typed every time the schema grows a
+    // generator. 3 scene toggles + 3 table selects + their parameter rows, the
+    // one amp_shift, the policy, the layer toggle + its table select + its
+    // parameter rows + its four own fields.
+    DEFORM_DRIVES = 3 + 3
+      + Object.values(attach).reduce((n, a) => n + Object.keys(a.params).length, 0)
+      + 1 + 1 + 1 + Object.keys(layerTable.params).length + 4;
+
+    doc = JSON.parse(await c.evalExpr('window.__dbg.aeon.scenesJson()'));
+    const S = sceneOf(doc);
+    // ROW 8b — THE ROW THAT CAN ONLY PASS IF THE GESTURES LANDED.
+    //
+    // Every toggle SEEDS a legal attachment (`sceneDeformFromToggle` →
+    // `{table: sine(amplitude 1, period 256), speed: 0}`), so a row asserting
+    // "deform_fg holds a legal sceneDeform" would pass through a run whose
+    // parameter gestures all missed — the exact shape of the five rots this
+    // harness has now had. So this row asserts the R13/R14 VALUES, and asserts
+    // separately that each one is NOT the seed the toggle would have left.
+    const fg = S.deform_fg?.shared, bg = S.deform_bg?.shared, vd = S.v_deform?.columns;
+    const seedEscape = fg && bg && vd
+      && fg.table.amplitude !== 1 && fg.table.period !== 256 && fg.speed !== 0
+      && bg.table.amplitude !== 1 && bg.table.period !== 256 && bg.speed !== 0
+      && vd.speed !== 0 && vd.amp_shift !== 0;
+    check('8b', 'the three scene deform attachments reached the DOCUMENT at the '
+      + 'rule\'s values, and not one of them is the seed its toggle would have left',
+      fg?.table?.generator === attach.deform_fg.form
+      && fg.table.amplitude === attach.deform_fg.params.amplitude
+      && fg.table.period === attach.deform_fg.params.period
+      && fg.speed === attach.deform_fg.params.speed
+      && bg?.table?.generator === attach.deform_bg.form
+      && bg.table.amplitude === attach.deform_bg.params.amplitude
+      && bg.table.period === attach.deform_bg.params.period
+      && bg.speed === attach.deform_bg.params.speed
+      && vd?.table?.generator === attach.v_deform.form
+      && vd.speed === attach.v_deform.params.speed
+      && vd.amp_shift === attach.v_deform.params.amp_shift
+      && seedEscape,
+      JSON.stringify({ deform_fg: S.deform_fg, deform_bg: S.deform_bg, v_deform: S.v_deform,
+        forms: attach.deform_fg.formOptions, seedEscape }));
+    // ROW 8c — R15's rule checked against the option's OWN disabled flag. The
+    // engine refuses `sprite_mask` outright and the panel renders it DISABLED, so
+    // a "last option" rule that landed on it would author a scene the build
+    // rejects. This row is what makes the rule safe rather than lucky.
+    check('8c', 'the policy the LAST-option rule picked is one the app offers as '
+      + 'PICKABLE (not the engine-refused, disabled one)',
+      maskPick.disabled === false
+      && S.left_column_mask === maskPick.value
+      // Anti-vacuous: the select really does render the refused value, so the
+      // "not disabled" half is a fact about this option and not about an empty
+      // list.
+      && maskOpts.some((o) => o.disabled),
+      JSON.stringify({ picked: maskPick, offered: maskOpts, inDoc: S.left_column_mask }));
+    // ROW 8d — THE MUTUAL GATE, both directions, transcribed from the engine.
+    //   :1288  v_deform on  + policy undeclared -> REFUSED
+    //   :1293  v_deform off + policy declared   -> REFUSED
+    // The panel's `vDeformToggleCommand` clears both keys together for exactly
+    // this reason; this row proves the document the session produced would not be
+    // refused by either arm, rather than trusting that it wouldn't.
+    check('8d', 'the emitted scene satisfies the v_deform / left_column_mask '
+      + 'MUTUAL gate in both directions',
+      ('v_deform' in S) === ('left_column_mask' in S)
+      && S.v_deform?.columns !== undefined
+      && S.left_column_mask !== 'undeclared' && S.left_column_mask !== 'sprite_mask',
+      JSON.stringify({ v_deform: 'v_deform' in S, left_column_mask: S.left_column_mask }));
+    // ROW 8e — R16 is a RULE, not "every layer". The last strip carries the
+    // attachment and the one above it carries no `deform` key at all; and the
+    // cross-field guard aeon applies to an `own` table (a strip with its own
+    // table needs a scene table on some plane, scene_dsl's own ensure) holds.
+    const own = S.layers[L].deform?.own;
+    check('8e', `the LAST strip (${L}) carries its own deform at the rule's values, `
+      + 'the strip above it carries none, and the scene attaches a plane table',
+      own !== undefined
+      && own.table.generator === layerTable.form
+      && own.shift_a === layerOwn.params.shift_a && own.shift_b === layerOwn.params.shift_b
+      && own.phase === layerOwn.params.phase && own.speed === layerOwn.params.speed
+      // NOT the seed: layerDeformFromToggle seeds shift_a/shift_b at the schema
+      // default 15 and phase/speed at 0, which is why R14 complements the shifts.
+      && own.shift_a !== 15 && own.shift_b !== 15 && own.phase !== 0 && own.speed !== 0
+      && S.layers[L - 1].deform === undefined
+      && S.layers[L].curve === undefined
+      && (S.deform_fg !== undefined || S.deform_bg !== undefined),
+      JSON.stringify({ own, above: S.layers[L - 1].deform, curve: S.layers[L].curve }));
+
     // ---- R10: assign the scene to the active section. --------------------
     const assigned = await drive(c, 'R10 sceneRef',
       SET_INPUT(SEL_BY_TITLE('/sceneRef/'), SCENE_ID));
@@ -692,6 +914,28 @@ async function main() {
       `keys=${JSON.stringify(Object.keys(parsed))}`);
     // ITEM 35: the value the engine reads must be a number the engine can read.
     // The old select wrote 'FACTOR_0', which folds to the byte 255.
+    // ROW 8f — the end of the deform chain: screen (the gestures), model (8b/8e),
+    // FILE ON DISK. The fixture IS these bytes, so a key that reached the model
+    // and not the writer would be invisible to every row above.
+    //
+    // AND THE BUILD'S OWN RULE ON `period`, checked against the number the CONTROL
+    // advertises rather than a 256 typed here: sigil refuses a generator whose
+    // period does not divide the table length, and the table length is what the
+    // period spinner's `max` is. R14's max/N exists precisely to satisfy this, so
+    // this row is what says the exception earned its place.
+    const periodMax = (await boundsOf('/^deform_fg period\\b/')).max;
+    const fileFg = parsed.deform_fg?.shared;
+    check('8f', 'every deform key reached the emitted FILE, and its generator '
+      + 'periods divide the table length the control itself advertises',
+      parsed.deform_fg !== undefined && parsed.deform_bg !== undefined
+      && parsed.v_deform !== undefined && parsed.left_column_mask !== undefined
+      && parsed.layers[N - 1].deform !== undefined
+      && Number(periodMax) > 0
+      && Number(periodMax) % fileFg.table.period === 0
+      && Number(periodMax) % parsed.deform_bg.shared.table.period === 0,
+      JSON.stringify({ keys: Object.keys(parsed), periodMax,
+        fg: fileFg?.table, bg: parsed.deform_bg?.shared?.table,
+        lastLayer: parsed.layers[N - 1].deform }));
     check('7e', 'the emitted v_factor is an integer in the control\'s own range',
       Number.isInteger(parsed.v_factor)
       && parsed.v_factor >= Number(vfCtl.min) && parsed.v_factor <= Number(vfCtl.max),
