@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { T } from './theme';
 import { PanelHeader } from './primitives';
 import { IconChevron } from './icons';
-import { loadPanelState, savePanelState, isCollapsed, togglePanel } from '../../shell/panel-state';
+import { loadPanelState, savePanelState, isCollapsed, togglePanel, subscribePanelState } from '../../shell/panel-state';
 
 /**
  * WHAT KIND OF SECTION THIS IS, which is the one thing the flex column cannot
@@ -42,6 +42,12 @@ export function CollapsibleSection({ id, title, right, variant = 'content', defa
   children: React.ReactNode;
 }) {
   const [state, setState] = useState(loadPanelState);
+  // A REVEAL FROM OUTSIDE lands here (shell/panel-state.revealPanel). Without
+  // this subscription an external `savePanelState` would change localStorage and
+  // re-render nothing, because `state` above is a MOUNT-TIME SNAPSHOT that only
+  // this section's own header click refreshes — so "open the section holding the
+  // thing I just created" would silently do nothing.
+  useEffect(() => subscribePanelState(() => setState(loadPanelState())), []);
   const collapsed = collapsedOverride ?? isCollapsed(state, id, defaultCollapsed);
   // Re-load the latest persisted state on each toggle (instead of writing this
   // section's mount-time snapshot) so collapsing one section never clobbers
