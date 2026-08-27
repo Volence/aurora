@@ -888,26 +888,11 @@ defect the parcel exists to fix.
   which is why their golden freezes must run from a clean worktree. They had been reading that
   as a property of the freeze tooling; it is a property of the status-file convention.
 
-- ⚠ **A RELINK HOLD IS IN FORCE ON THE SHARED SIGIL BINARIES — DO NOT BUILD AEON WITHOUT CHECKING** *(2026-08-27, announced by the sigil lane for the length of aeon's SLOPE-SYMMETRY freeze; banked here because a hold that lives only in a chat message does not survive a `/clear`.)*
+- ✅ **THE RELINK HOLD OF 2026-08-27 IS LIFTED AND ITS ROW IS DELETED** *(this line is the receipt, not a new hold; delete it too once it stops being useful.)* Sigil lifted it at their `d2f54752` — verified here rather than taken on report: the commit exists, **their own row is gone from their `origin/master`**, and I re-derived the binaries. `sigil` moved `5f325dca → 3d2ae999` (aeon's attest relinked it, announced by them at the time), while `refreeze`, `repin` and `emit_sound_blob` came back **byte-identical to the pinned values** — a second operator matching three of four hashes exactly, which is the corroboration a hash pin exists to make possible and a revision pin never could.
 
-  **⏳ EXPIRY — READ THIS BEFORE OBEYING THE ROW. Raised 2026-08-27 by the sigil lane. Ask: sigil (owner), aeon (the freeze it protects). Ended by: sigil announcing the lift, which they will do by deleting their own row in the same commit that announces it.** *(This stanza is the sigil lane's design, adopted here the same day, and it exists because **a committed hold outlives its reason and nothing announces that either.** A stale "you must not" is a false negative wearing caution's costume — it makes a lane refuse something perfectly safe while looking rigorous. This workspace has the precedent: a standing "these SHAs are local-only" row made a lane refuse a good anchor for hours after the push that fixed it.)*
+  **The row came out because the lane that raised it said the condition had ended — the evaluate-don't-obey path, used as designed.** And the part worth keeping: **aeon DECLINED to carry the hold forward** rather than let it ride, on the grounds that sigil's next landing relinks the binary anyway so a hold carried across it is meaningless, and said they would ask for a fresh one at their next freeze. **That is the stale-grant rule applied by the party it would have protected, against their own convenience** — which is the hardest direction for it to be applied in and the one that proves the design is not just paperwork.
 
-  **EVALUATE THIS ROW, DO NOT OBEY IT.** Check the hashes below against the files on disk, and check whether the sigil lane is running at all. **If sigil is not running, the hold is over** — nobody can be mid-freeze with no session. **If the row cannot be evaluated, treat it as EXPIRED and delete it**, rather than honouring a claim nobody can source. A hold is a *present-tense claim about the state of work*, and this repo's standing rule is that every such claim carries its date; that rule applies to this row exactly as it applies to a prose claim in a review packet.
-
-  Pinned **by hash, not by revision**, and every one verified firsthand here against the files on disk:
-
-```
-sigil            md5 5f325dca996be45f2c9a20c650d38c4b   mtime 07:20:23
-refreeze         md5 4e2099edb92007dc3a497cfd9accd5a2   mtime 07:20:16
-repin            md5 9ebc36241861d91ac31d7459fd4c2961   mtime 07:20:14
-emit_sound_blob  md5 3eba64ce3158124ef4764c100edc787a   mtime 07:20:13
-```
-
-  **If any of those hashes has moved and no lift has been announced, say so to sigil and aeon before building anything** — that is the agreed signal that somebody relinked unannounced. **A read is safe; `./build.sh` only executes these binaries.** ⛔ **Never run ANY `cargo` command in `/home/volence/sonic_hacks/sigil`** — and note the rule is about the **file, not the verb**: the incident that produced this hold was a `cargo test --release --workspace`, which relinks the identical artifact, so anyone honouring an older *"do not `cargo build`"* rule would have caused it too.
-
-  **WHY THE PIN IS A HASH — this lane's finding, adopted by both other lanes.** aeon originally handed out a `revision:` to quote. A revision names a property of the **source**, so it **cannot detect a relink of the artifact** by a lane that has legitimately moved on: the pin keeps reading correct while the binary underneath it changes. That is exactly what happened — `fbf60abd → 52882e2e → 537869e6` inside one morning, mid-parcel, while a freeze was pinning it. A hash is a property of the **file**, moves exactly when the file moves, and needs no cooperation from whoever relinks. Sigil's corroboration is the clincher: **three of those four binaries print no revision at all**, so a revision pin could not have described them.
-
-  **Two clauses that came out of the same incident and are now other lanes' rules:** sigil announces a hold **to every lane, not the one that asked** (the holder of a shared artifact cannot enumerate who depends on it — this lane was mid-build and in none of the bilateral conversation); and the cheapest structural fix is **no lane sharing `target/` at all** (`CARGO_TARGET_DIR` per worktree), with a landing run in the main checkout as the acknowledged residual.
+  **Standing expectation, no hold implied:** `SIGIL_BUILD` **moves routinely** — sigil has landings queued and each relinks in the main checkout. So **never pin a cross-session comparison to a sigil revision**; hash the binary you actually executed and quote that. Sigil now announces every relink to all lanes as a matter of routine, not only under a hold.
 
 ## ⚠ A CROSS-REPO GREP IS SCOPED TO THE REPO IT RAN IN — and the ruling built on it inherits that scope
 
