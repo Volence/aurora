@@ -1,5 +1,6 @@
 import React from 'react';
 import { T, Select, NumberField } from '../ui';
+import { clampFieldValue } from './object-inspector-model';
 import type {
   CommitResult, FieldValue, ObjectField, ObjectInspectorPort,
 } from './object-inspector-model';
@@ -98,7 +99,27 @@ function Form({
   );
 }
 
-function FieldRow({
+/**
+ * One field of the form. Exported for its test: the int branch takes no hooks,
+ * so the element it returns can be walked in node and the live `onChange`
+ * called with the number a keystroke would deliver — which is the only honest
+ * way to prove the next paragraph, this suite having no DOM.
+ *
+ * THE NUMBER FIELD'S BOUNDS ARE ENFORCED HERE (ROADMAP item 40). `min`/`max`
+ * on an `<input type="number">` govern the spinner and `:invalid` styling and
+ * stop NO TYPED VALUE, so the row used to advertise a range it did not hold:
+ * with `onChange={onCommit}` a typed `9999` reached the commit verbatim. It was
+ * survivable only because both ports call `clampPatch` on the way in — from a
+ * schema each RE-DERIVES inside its own commit callback, which is a second
+ * derivation that can drift from the one these props were read out of, and a
+ * third port could simply forget. `clampFieldValue(field, …)` closes that: the
+ * clamp and the two attributes read the same `field` object, so the displayed
+ * bound and the enforced bound cannot disagree.
+ *
+ * OUT OF RANGE CLAMPS, UNPARSEABLE REFUSES — the field model's own convention
+ * (see `clampFieldValue`), and the same split `HexByteField` below makes.
+ */
+export function FieldRow({
   field, value, onCommit,
 }: {
   field: ObjectField;
@@ -127,7 +148,14 @@ function FieldRow({
       ) : (
         <NumberField
           value={Number(value ?? 0)} min={field.min} max={field.max} width={72}
-          title={field.title} onChange={onCommit}
+          title={field.title}
+          // THE CLAMP IS THE BOUND, and it reads the SAME `field` the two
+          // attributes above do (ROADMAP item 40). Was `onChange={onCommit}`,
+          // which handed a typed 9999 straight through. See the docblock.
+          onChange={(raw) => {
+            const v = clampFieldValue(field, raw);
+            if (v !== undefined) onCommit(v);
+          }}
         />
       )}
     </label>

@@ -236,6 +236,40 @@ export function clampRateShift(value: number): number {
 }
 
 /**
+ * Clamp a typed promotion base to the first slot a promotion may legally take.
+ *
+ * THE CLAMP IS THE BOUND, and this one exists because the field was ALREADY
+ * ADVERTISING it (ROADMAP item 40). "From tile" renders `min={firstPromotableSlot}`
+ * and used to enforce `Math.max(0, …)` — so the number on the spinner and the
+ * number the form held were two different bounds, and every slot between 0 and
+ * the animated prefix was typeable. `requirePromotableRange` would refuse such
+ * a promotion, but only AFTER the click, and in the meantime the panel's own
+ * readouts lied: the field's title and the hint under it print
+ * `slotSpanPhrase(staticBase, …)`, naming slots that belong to a band, and the
+ * map lens tints those cells.
+ *
+ * `firstPromotableSlot` IS PASSED IN, not re-derived, so the caller can hand
+ * the same expression to `min` and to this and the two cannot drift.
+ *
+ * NO UPPER BOUND HERE, DELIBERATELY, and this is not the `clampRateShift` case
+ * (where the contract states none). A real ceiling exists — `staticBase + n`
+ * must fit inside `tiles` — but it moves with the candidate's `cols`/`rows`,
+ * which the author edits AFTER the base, so clamping to it would rewrite a base
+ * that a subsequent geometry edit makes legal again. It is also not displayed:
+ * the field carries no `max`, and enforcing an invisible ceiling is the mirror
+ * image of the defect this fixes. That end stays where it already is — a named
+ * refusal out of `requirePromotableRange`, quoting the blob's real length.
+ *
+ * A non-finite value (the box mid-keystroke) falls to `firstPromotableSlot` —
+ * the same slot the form seeds at, and the one place a promotion is legal by
+ * construction.
+ */
+export function clampStaticBase(value: number, firstPromotableSlot: number): number {
+  if (!Number.isFinite(value)) return firstPromotableSlot;
+  return Math.max(firstPromotableSlot, Math.round(value));
+}
+
+/**
  * What a given `rate_shift` MEANS, in the direction an author gets wrong.
  *
  * `step = driver_value >> rate_shift` (the contract's own citation), so the band
