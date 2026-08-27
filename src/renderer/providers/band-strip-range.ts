@@ -71,7 +71,7 @@
 // `band-coverage.ts` is the model this follows.
 
 import { TILE_BYTES } from '../../core/formats/bg-override/bg-override';
-import { rowChoices } from './bg-anim-aeon';
+import { rowChoices, slotSpanPhrase } from './bg-anim-aeon';
 import type { TilePickerLayer, TilePickerOrigin } from './tile-picker-source';
 
 /** Everything a released strip drag needs to resolve, read fresh at mouseup. */
@@ -244,6 +244,30 @@ export function resolveStripDrag(input: StripDragInputs): StripDragOutcome {
 }
 
 /**
+ * The slots a resolved range ACTUALLY OWNS, through the one convention that
+ * owns range punctuation (`slotSpanPhrase`, item 54).
+ *
+ * ⚠ `staticBase + cols*rows` IS THE FIRST SLOT PAST THE RANGE, not its last —
+ * the same off-by-one `d7ec678` fixed in the prefix refusal's hint, which both
+ * readouts below carried until now. `cols * rows` is the COUNT (the spelling
+ * `slotRange` uses in `band-coverage`), so the helper derives both halves from
+ * it and neither readout does its own sum.
+ *
+ * NO ZERO GUARD HERE, DELIBERATELY — and the reachability is derived, not
+ * assumed. `resolveStripDrag` cannot emit `cols * rows === 0`: `rowChoices()`
+ * enumerates from `rows = 1` upward and an illegal `rows` is refused before
+ * this branch, while `cols = min(max(1, …), maxCols)` with `maxCols < 1`
+ * already refused, so both factors are at least 1. What IS reachable is a
+ * hand-built outcome — `StripDragOutcome` is exported and these two functions
+ * are total over it — and `slotSpanPhrase` answers `NO_SLOTS_PHRASE` for that,
+ * which both sentences stay grammatical around ("band · no slots · 0x4").
+ * A guard here would be a second opinion about what an empty range is called.
+ */
+function rangeSlots(outcome: Extract<StripDragOutcome, { kind: 'range' }>): string {
+  return slotSpanPhrase(outcome.staticBase, outcome.cols * outcome.rows);
+}
+
+/**
  * The readout for the picker's hover label. ONE SHORT LINE, ALWAYS.
  *
  * IT IS THE ONLY SURFACE THIS GESTURE HAS. The strip has no other place to
@@ -274,8 +298,10 @@ export function resolveStripDrag(input: StripDragInputs): StripDragOutcome {
 export function stripDragLabel(outcome: StripDragOutcome): string {
   if (outcome.kind === 'pick') return '';
   if (outcome.kind === 'refused') return `no range — ${outcome.reason}`;
-  const end = outcome.staticBase + outcome.cols * outcome.rows;
-  return `band ${outcome.staticBase}..${end} · ${outcome.cols}x${outcome.rows}`;
+  // `slotSpanPhrase` carries the word "slots" itself, so the span gets its own
+  // `·` segment. `band ${phrase}` would read "band slots 40..55"; the separator
+  // is what keeps the noun and the span from running together.
+  return `band · ${rangeSlots(outcome)} · ${outcome.cols}x${outcome.rows}`;
 }
 
 /**
@@ -287,9 +313,10 @@ export function stripDragLabel(outcome: StripDragOutcome): string {
 export function stripDragHint(outcome: StripDragOutcome): string {
   if (outcome.kind === 'pick') return '';
   if (outcome.kind === 'refused') return outcome.hint;
-  const end = outcome.staticBase + outcome.cols * outcome.rows;
   const parts = [
-    `band candidate · slots ${outcome.staticBase}..${end} (${outcome.cols}x${outcome.rows})`,
+    // `rangeSlots` supplies the "slots …" half; a literal "slots" here would
+    // render "slots slots 192..199".
+    `band candidate · ${rangeSlots(outcome)} (${outcome.cols}x${outcome.rows})`,
     `from a dragged run of ${outcome.runLength} slot${outcome.runLength === 1 ? '' : 's'}`,
   ];
   if (outcome.clampedToPrefix) parts.push('start moved past the animated prefix');
