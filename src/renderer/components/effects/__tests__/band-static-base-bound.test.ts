@@ -52,10 +52,17 @@ describe('clampStaticBase — the promotion base the form is allowed to hold', (
     expect(clampStaticBase(first + 1.6, first)).toBe(first + 2);
     expect(clampStaticBase(Number.NaN, first)).toBe(first);
     expect(clampStaticBase(Number.POSITIVE_INFINITY, first)).toBe(first);
-    // `<input type="number">` reports '' for an emptied box, and `NumberField`
-    // hands on `Number('')`, which is 0 rather than NaN — so the emptied box
-    // lands on the first legal slot through the FLOOR, not through the
-    // non-finite branch. Both roads, one destination.
+    // `Number('')` is 0 rather than NaN, so a 0 arriving here lands on the
+    // first legal slot through the FLOOR, not through the non-finite branch.
+    // Both roads, one destination.
+    //
+    // THIS IS NO LONGER THE EMPTIED BOX. It was when this row was written —
+    // `NumberField` handed on `Number(e.target.value)` — and that was the
+    // defect: the emptied box committed a slot the author never typed, and
+    // this clamp could not tell it apart from a deliberate 0. `NumberField`
+    // now commits NOTHING for a box with no number in it, so the only 0 that
+    // reaches this clamp is one somebody meant. The row stays because 0 is
+    // still a value this clamp must floor.
     expect(clampStaticBase(Number(''), first)).toBe(first);
   });
 

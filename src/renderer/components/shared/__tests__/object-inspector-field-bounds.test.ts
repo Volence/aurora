@@ -94,6 +94,14 @@ describe('ObjectInspector number field — the displayed bound is the enforced o
     // `Number('')` is 0, but a half-typed '-' or '1e' parses to NaN, and the
     // field model's own convention is that a value with no honest number in it
     // is REJECTED (there is nothing to clamp it to), not written.
+    //
+    // WHERE SUCH A VALUE COMES FROM, since it is no longer the field. When this
+    // row was written `NumberField` handed on `Number(e.target.value)`, so an
+    // EMPTIED box arrived as a finite 0 and this arm never saw it — the guard
+    // below it in `clampFieldValue` (`raw.trim() === ''`) could not fire either.
+    // `NumberField` now commits nothing for text with no number in it (see
+    // `parseNumberFieldText`), which is what finally closed that hole; this row
+    // keeps the model's own convention honest for every OTHER caller.
     const f = numberFieldOf(x, 100);
     f.onChange(Number.NaN);
     f.onChange(Number.POSITIVE_INFINITY);
