@@ -814,9 +814,22 @@ defect the parcel exists to fix.
   answer: bar 2e in the very instrument this bar was about to adopt as its defence. Its own
   `freshness:` line concedes the second half — *"tree state is a build-time snapshot; cargo
   has no trigger for uncommitted"* — so it is **stale by construction** as well as stuck.
-  **The `revision:` half is load-bearing; the `tree:`/`-dirty` half is decorative until sigil
-  fixes it.** Enumerated across the suite from here, which sigil could not see from inside
-  their own repo: `docs/lane-status.json` is **tracked** in aeon, oracle, seraph and empyrean,
-  and **untracked-but-ignored** here — **sigil is the only lane where it is untracked AND
-  not ignored**, which is the whole cause and is fixable by either of the two arrangements
-  every other lane already uses.
+  **The `revision:` half is load-bearing; the `tree:`/`-dirty` half is not.** Enumerated
+  across the suite from here, which sigil could not see from inside their own repo:
+  `docs/lane-status.json` is **tracked** in aeon, oracle, seraph and empyrean, and
+  **untracked-but-ignored** here — **sigil was the only lane where it was untracked AND not
+  ignored**, which was the whole cause.
+  ✅ **CAUSE FIXED at sigil `e5bd4a4f`** (verified here: reachable from their `origin/master`,
+  a `.gitignore` commit, and their main checkout's `git status --porcelain` is now empty).
+  ⚠ **BUT THE FIELD IS NOW *STALE*, NOT FIXED, AND THE DIFFERENCE IS OPERATIONAL.** `tree:` is
+  a **build-time snapshot** cargo has no trigger to refresh, so the shared binary **still
+  prints `fbf60abd-dirty` today** — the cause was removed, the reported value was not. **The
+  tell that the fix has actually reached the banner is a `revision:` that is NOT `fbf60abd`;
+  it is NOT the dirty flag clearing.** Do not read a stale `dirty` as "sigil never fixed it",
+  and do not start trusting `tree:` until a relinked binary proves it can say `clean`. Sigil
+  is deliberately **not** relinking to make it true while aeon has a seven-ROM freeze pinning
+  the shared binary — which is this bar's own hazard being honoured, and is the right call.
+  **Downstream consequence worth knowing** *(aeon's, from this enumeration)*: because aeon
+  **tracks** that file and edits it all session, their main tree is effectively always dirty,
+  which is why their golden freezes must run from a clean worktree. They had been reading that
+  as a property of the freeze tooling; it is a property of the status-file convention.
