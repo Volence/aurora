@@ -247,21 +247,49 @@ const clickByText = (re, tag = 'button') => String.raw`
 const SEL_BY_TITLE = (re) => `[...document.querySelectorAll('select')].find((e) => ${re}.test(e.title || ''))`;
 const NUM_BY_TITLE = (re) => `[...document.querySelectorAll('input[type=number]')].find((e) => ${re}.test(e.title || ''))`;
 
-// A DEFECT THIS HARNESS HAD TO ROUTE AROUND, recorded rather than fixed here.
+// ⚠ A WORKAROUND THAT OUTLIVED ITS DEFECT, AND THEN BECAME ONE. Corrected by the
+// overseer 2026-08-27 in review of row 60; the three faults below are a SIXTH rot,
+// found by reading rather than by running, because running could not see it.
 //
-// CollapsibleSection wraps its whole PanelHeader — including the `right` action
-// slot — in `<div onClick={toggle}>`, and IconButton does not stop propagation.
-// So every click of the "Add layer" button in the Layers header ALSO toggles the
-// Layers section. Seven adds is an odd number of toggles, which is why the first
-// run of this harness found "Layers (8/8)" on screen with not one layer card
-// under it: the model had eight layers and the section was shut.
+// THE ORIGINAL DEFECT, now FIXED: CollapsibleSection wrapped its whole PanelHeader
+// — including the `right` action slot — in `<div onClick={toggle}>`, so every
+// "Add layer" click also toggled the section it lived in. Seven adds is an odd
+// number of toggles, which is why this harness's first run found "Layers (8/8)"
+// over an empty panel. **That was fixed at `5041f6e`** ("a header ACTION click
+// must not toggle its CollapsibleSection"): `isHeaderAction` now walks from the
+// click target to the header and refuses the toggle when an interactive element
+// is on the path. Adds no longer toggle anything.
 //
-// It is a real UI bug (same shape for the Scene section's Delete button), it is
-// out of this parcel's scope, and it is booked in the report. Here the section is
-// simply re-opened by clicking its own header — a real click, same as a user's.
+// WHAT THAT LEFT BEHIND, and why it is worse than a dead comment:
+//
+//   1. The `open()` probe was `/^Layer 0 fa$/`, END-anchored. The title is
+//      `Layer 0 fa — how far Plane A, …`, so it matched nothing and open() could
+//      ONLY EVER RETURN FALSE — the same end-anchoring that caused rot 2, in the
+//      one place row 59 did not re-cut.
+//   2. So this block CLICKS ON EVERY CALL, and since 5041f6e those clicks are now
+//      THE ONLY THING TOGGLING THE SECTION. It is called once per add plus once
+//      after, so the section ends open **iff that count happens to be even**.
+//      LAYERS=8 gives 7+1 and the ceiling run gives 15+1: both even, both lucky.
+//      An odd count would have collapsed the section, unrendered every layer card
+//      (`{!collapsed && children}`) and failed most of the run — presenting as a
+//      broken feature rather than a broken workaround.
+//   3. Row 4b asserted "the Layers section is open" and accepted the return value
+//      `'clicked'` as proof. `'clicked'` says a click HAPPENED. The row's claim is
+//      about the STATE AFTERWARDS. It could not fail, which is bar 2e exactly.
+//
+// The lesson is the one this harness keeps teaching in new places: a workaround is
+// a claim about the code around it, and nothing re-checks it when that code is
+// fixed. The probe is now \b-anchored, the block REPORTS ITS OUTCOME rather than
+// its action, and 4b reads the state.
 const EXPAND_LAYERS = String.raw`
 (() => {
-  const open = () => [...document.querySelectorAll('select')].some((e) => /^Layer 0 fa$/.test(e.title || ''));
+  // ⚠ THE PROBE IS \b-ANCHORED FOR ROT 2's REASON, AND END-ANCHORING IT HERE
+  // WAS A LIVE DEFECT UNTIL 2026-08-27. The fa select's title reads
+  // "Layer 0 fa — how far Plane A, …" (providers/effects-aeon.ts,
+  // PLANE_FACTOR_ROWS.fa.title), so /^Layer 0 fa$/ matched NOTHING and open()
+  // could only ever return false. See the block above this constant for what
+  // that cost.
+  const open = () => [...document.querySelectorAll('select')].some((e) => /^Layer 0 fa\b/.test(e.title || ''));
   if (open()) return 'already-open';
   const hdr = [...document.querySelectorAll('div')]
     .filter((d) => d.style && d.style.cursor === 'pointer'
@@ -269,7 +297,10 @@ const EXPAND_LAYERS = String.raw`
     .pop();
   if (!hdr) return 'no-header';
   hdr.click();
-  return 'clicked';
+  // REPORT THE OUTCOME, NOT THE ACTION. Returning 'clicked' told row 4b that a
+  // click happened; 4b was asserting the section is OPEN. Those are different
+  // claims and the row accepted the wrong one for months.
+  return open() ? 'clicked-open' : 'clicked-shut';
 })()`;
 
 async function main() {
@@ -389,8 +420,16 @@ async function main() {
     }
     const expanded = await c.evalExpr(EXPAND_LAYERS);
     await sleep(400);
+    // ⚠ THIS ROW USED TO ACCEPT `'clicked'`, WHICH REPORTS AN ACTION AND NOT A
+    // STATE — it could not fail. It now takes only the two return values that
+    // mean the section is actually open, and cross-checks against the DOM by
+    // the same predicate EXPAND_LAYERS uses, so a future rot in that probe
+    // reddens the row instead of quietly disarming it.
+    const layersOnScreen = await c.json(
+      `[...document.querySelectorAll('select')].some((e) => /^Layer 0 fa\\b/.test(e.title || ''))`);
     check('4b', 'the Layers section is open, so its cards are on screen to be driven',
-      expanded === 'already-open' || expanded === 'clicked', `expand=${expanded}`);
+      (expanded === 'already-open' || expanded === 'clicked-open') && layersOnScreen === true,
+      `expand=${expanded} layer0ControlsRendered=${layersOnScreen}`);
     doc = JSON.parse(await c.evalExpr('window.__dbg.aeon.scenesJson()'));
     const N = sceneOf(doc).layers.length;
     // The app's OWN ceiling, read off the panel rather than inferred from where

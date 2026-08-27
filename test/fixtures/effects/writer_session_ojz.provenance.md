@@ -342,18 +342,47 @@ until the UI grows, though the gap has narrowed considerably. That is data about
 and it is exactly why both files exist: `canopy_dusk` covers the schema's shape,
 this one covers what an author can actually produce today.
 
-## A defect the run found, and did not fix
+## A defect the run found — FIXED IN THE APP, and its WORKAROUND then became a defect of its own
 
-`CollapsibleSection` wraps its whole `PanelHeader` — including the `right` action
-slot — in `<div onClick={toggle}>`, and `IconButton` does not stop propagation. So
-clicking **Add layer** in the Layers header *also toggles the Layers section*. The
-first run of the harness found "Layers (8/8)" on screen with not one layer card
-under it: the model had eight layers and the section had been shut by the seventh
-(odd) click. The same shape applies to the Scene section's **Delete** button.
+**The original, and it is closed.** `CollapsibleSection` wrapped its whole
+`PanelHeader` — including the `right` action slot — in `<div onClick={toggle}>`,
+so clicking **Add layer** in the Layers header *also toggled the Layers section*.
+The harness's first run found "Layers (8/8)" on screen with not one layer card
+under it: eight layers in the model, and the section shut by the seventh (odd)
+click. **Fixed at `5041f6e`** — `isHeaderAction` walks from the click target to
+the header and refuses the toggle when an interactive element is on the path, so
+the title, the chevron and the dead space still toggle and the buttons no longer
+do. Adds have not toggled anything since.
 
-The harness re-opens the section with a real click on its header and carries on.
-The bug is real, is out of this parcel's scope, and is reported rather than
-patched here.
+⚠ **A SIXTH ROT, and the only one found by READING rather than by running**
+(overseer, 2026-08-27, reviewing row 60). The workaround this section used to
+describe outlived the bug it routed around, and nothing re-checks a workaround
+when the thing it works around is repaired. Three faults had stacked up in it:
+
+1. Its "is the section open?" probe was `/^Layer 0 fa$/`, **end-anchored**. The
+   real title is `Layer 0 fa — how far Plane A, …`, so it matched nothing and
+   **could only ever return false** — rot 2's exact defect, in the one place row
+   59 did not re-cut.
+2. So the workaround **clicked on every call**, and after `5041f6e` those clicks
+   became **the only thing toggling the section**. It runs once per add plus once
+   after, so the section ends open **iff that count happens to be even**.
+   `LAYERS=8` gives 7+1 and the ceiling run gives 15+1 — both even. **Every green
+   run of this harness has been green on parity.** An odd count would have
+   collapsed the section, unrendered every layer card, and failed most of the run
+   while looking like a broken feature.
+3. Row **4b** asserted *"the Layers section is open"* and accepted the return
+   value `'clicked'`. `'clicked'` reports that an action happened; the row's claim
+   is about the **state afterwards**. It could not fail.
+
+**All three are repaired**: the probe is `\b`-anchored, the block reports
+`clicked-open`/`clicked-shut` rather than `clicked`, and 4b requires an
+open-meaning value **and** independently confirms layer 0's controls are rendered.
+**Proven red-first:** restoring the end-anchored probe reddens 4b at **36/37** —
+and note *which* 36 passed. Every gesture row stayed green, because the section
+really was open; only the probe was lying about it. That is the signature of this
+whole class: **the instrument was wrong about the app while the app was fine**,
+and the only row that could see it is the one that asks the probe to state an
+outcome instead of an action.
 
 ## What the tests do NOT prove
 
