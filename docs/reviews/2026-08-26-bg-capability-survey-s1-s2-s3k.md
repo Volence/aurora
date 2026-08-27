@@ -231,3 +231,77 @@ bite.
 
 **BLOCKED**: none. Every row was resolved from source. Not surveyed (out of the question's scope):
 whether aeon supports S3K-style vertical level wrap (ICZ1/SSZ1) or screen shake on the BG.
+
+---
+
+## F. Addendum 2026-08-27 — the RAM half of "8 → 16 layers", measured
+
+**Asked by the owner; nobody had answered it.** §B row 4 and aeon's own
+`docs/DEFERRED_WORK.md` both say `MAX_PARALLAX_BANDS` is *"a RAM + cycle question"* and
+neither produces a number. This is the RAM number. **The cycle number is still un-costed
+and is the harder half — see the end.**
+
+**Answer: +224 bytes of work RAM.** The parallax state block goes **328 → 552 bytes**.
+
+**Measured from the ARTIFACT, then re-derived from source, and the two agree exactly.**
+Read out of aeon's built `s4.debug.lst` (dated 2026-08-26 19:06, the DEBUG build — the
+*larger* of the two shapes, so every headroom figure below is the conservative one):
+
+| symbol | address | span |
+|---|---|---|
+| `Parallax_State` | `$FFFF88A0` | |
+| `Parallax_State_End` | `$FFFF89E8` | **328 B** total today |
+| `Parallax_Shadow_Bands` | `$FFFF8928` | |
+| `Parallax_Shadow_Scroll_A` | `$FFFF89C8` | **160 B** = **20 B/band** |
+
+**Per band = 28 B**, enumerated over every field in `engine/ram.emp` that is indexed by
+`MAX_PARALLAX_BANDS` (`:345-346`, `:367-369`) rather than over the ones the comment
+mentions:
+
+- `Parallax_Current_Scroll_A` / `_B` — `u16` each → 2 + 2
+- `Parallax_Shadow_Bands` — `BAND_ENTRY_LEN + BAND_EXT_BYTES + BAND_CURVE_BYTES` = 10 + 0
+  + 10 → **20** (`ram.emp:38/:57/:65`; `BAND_CURVE_BYTES` moved 0 → 10 on 2026-08-26 with
+  the d-15 showcase parcel, because OJZ now authors a curve)
+- `Parallax_Shadow_Scroll_A` / `_B` — `u16` each → 2 + 2
+
+8 × 28 = 224 today; 16 × 28 = 448. Fixed (non-scaling) remainder = 104 B, so
+104 + 448 = **552**.
+
+⚠ **`engine/ram.emp:337` says the block is "244 bytes at MAX_PARALLAX_BANDS=8" and that is
+STALE — it is 328.** Kept here because the staleness is the check: 244 is exactly what the
+formula yields with `BAND_CURVE_BYTES = 0`, i.e. the comment is the pre-curve-tail figure
+and was not updated when the constant moved on 2026-08-26. Reproducing the stale number
+from the old constants is what proves the model is right rather than coincidentally close.
+**A costing done off that comment would be 84 B light.** aeon's comment, aeon's to fix; no
+message sent, because there is no live dependency to name.
+
+**Headroom: it fits, with room to spare.** `Game_RAM_End` is `$FFFFE50E` and the initial
+stack pointer is `$FFFFFF00` (first long of `s4.bin`, read from the ROM, not from a doc),
+and the stack grows down from there — so the free gap is **6,642 B**. 224 B is **3.4%** of
+it. **RAM is not the constraint.**
+
+**What this number does NOT cover, stated so it is not read as the whole cost:**
+
+1. **The cycle half — the real gate, still un-costed.** `ENGINE_ARCHITECTURE.md:2486`:
+   *"Step 4a stays copy-all."* The per-frame shadow copy is sized by
+   `MAX_PARALLAX_BANDS`, not by the layer count a scene actually declares, so **doubling
+   the constant doubles that work for every scene in the game including the 4-layer ones**.
+   On a scanline budget that is where this is won or lost, and nobody has measured it.
+   aeon has the instrument (`tools/parallax_cost_probe.py`, `deform_own_cost_probe.py`).
+2. **`PARALLAX_STATE_LONGS`** (`engine/level/parallax.emp:322`) is derived from the
+   constant and its `ensure` at `:276` pins the shadow span — both move with it.
+3. **Three mirrors that must move in lockstep**, and they are pinned to each other so the
+   build catches a partial edit: `scene_dsl.emp:54` (`ensure(MAX_PARALLAX_BANDS == 8, …)`,
+   an inlined ceiling), `tools/effects_gen.py:188`, and the record-shape set
+   `1..MAX_PARALLAX_BANDS` in `games/sonic4/data/effects/scene_registry.emp` —
+   **eight new `SceneCfgN` shapes would have to be declared**, which is the bulk of the
+   work and is code size, not RAM.
+4. **Aurora's side is one schema bump** (`layers` max) plus whatever the band panel's
+   derived cap reads — it already derives from the constant rather than carrying an 8.
+
+**Verified at:** aeon `origin/master` `65236705e1260575d49abd1dd8fc64fdf5b74c22`
+(`git ls-remote`-resolved; every source read taken with `git show <rev>:<path>`, never
+through the sibling working tree). The listing and `s4.bin` are the artifacts on aeon's
+disk at 2026-08-26 19:06 and are **not** pinned to that revision — they are the build the
+lane last ran, which is why the source re-derivation is carried beside them rather than
+the listing being trusted alone.
