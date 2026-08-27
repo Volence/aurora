@@ -13,11 +13,13 @@
 // position nothing else in the fixture shares.
 
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
 import {
   bandCoverage, bandOwningSlot, coverageBounds, coverageSubject, coverageSummary,
   layoutWordSlot, markFromLayoutWord,
-  rangeCovers, slotRange,
+  rangeCovers, slotRange, type SlotRange,
 } from '../band-coverage';
+import { NO_SLOTS_PHRASE } from '../bg-anim-aeon';
 import {
   LAYOUT_TILE_INDEX_MASK, TILE_WIDTH_PX, type BgOverrideBand,
 } from '../../../core/formats/bg-override/bg-override';
@@ -34,6 +36,30 @@ function band(cols: number, rows: number): BgOverrideBand {
 /** A plane of blank words — every cell the consumer's escape, nothing covered. */
 function blank(cols: number, rows: number): Uint16Array {
   return new Uint16Array(cols * rows);
+}
+
+/**
+ * THE LAST SLOT A RANGE OWNS, established by the module's own MEMBERSHIP TEST
+ * rather than by repeating the arithmetic under test.
+ *
+ * ⚠ THIS IS THE POINT OF THE HELPER, not a convenience. Every readout below
+ * names a slot span, and the defect being pinned is a span whose second number
+ * is one PAST the range. An expectation that computed `base + count - 1` would
+ * be the fix's own arithmetic checking itself, and one written as
+ * `slotSpanPhrase(...)` would move with the very function a poison changes — so
+ * both would stay green against a restored off-by-one. `rangeCovers` is a
+ * different function, is half-open BY DESIGN (this file's headline rule: the
+ * coverage arithmetic is correct and is not the defect), and is what actually
+ * decides which cells the lens paints. Walking it gives the boundary an
+ * independent witness.
+ */
+function lastOwnedSlot(r: SlotRange): number {
+  expect(rangeCovers(r, r.base)).toBe(true);       // a non-empty range, or the walk is meaningless
+  let last = r.base;
+  while (rangeCovers(r, last + 1)) last++;
+  expect(rangeCovers(r, last)).toBe(true);
+  expect(rangeCovers(r, last + 1)).toBe(false);    // and this is the slot no readout may name
+  return last;
 }
 
 /** Attribute bits ABOVE the index mask: priority + palette line 2 + hFlip. */
@@ -182,9 +208,32 @@ describe('coverageSummary — the shape, and NOTHING ELSE', () => {
     expect(s).toContain('largest single slot 40: 20 cells');
   });
 
-  it('says so plainly when nothing draws the range', () => {
-    expect(coverageSummary(bandCoverage(blank(COLS, ROWS), slotRange(40, 2, 2), COLS)))
-      .toBe('no background cell draws slots 40..44');
+  it('says so plainly when nothing draws the range, naming only slots the range OWNS', () => {
+    // ⚠ THE BOUNDARY IS THE WHOLE ROW. This sentence shipped as
+    // `slots ${base}..${base + count}` — the first slot PAST the range, in the
+    // one message whose subject is which slots the picture ignores. The fixture
+    // makes that concrete: the plane draws slot `last + 1` HEAVILY and nothing
+    // inside the range at all, so the defect's sentence would name a slot the
+    // picture demonstrably paints while reporting zero cells.
+    const range = slotRange(40, 2, 2);
+    const last = lastOwnedSlot(range);
+    const layout = blank(COLS, ROWS);
+    for (let i = 0; i < 7; i++) layout[i] = last + 1;
+    const cov = bandCoverage(layout, range, COLS);
+    expect(cov.cells).toEqual([]);              // ANTI-VACUOUS: the empty branch really ran
+    expect(coverageSummary(cov)).toBe(`no background cell draws slots ${range.base}..${last}`);
+  });
+
+  it('a range of NO SLOTS gets its own sentence, not a backwards span', () => {
+    // Zero CELLS and zero SLOTS are different facts that land in the same
+    // branch (an empty range covers nothing, so it always arrives with no
+    // cells). "no background cell draws no slots" is true and useless, and
+    // `base + count - 1` would render `40..39`.
+    const cov = bandCoverage(blank(COLS, ROWS), { base: 40, count: 0 }, COLS);
+    expect(cov.cells).toEqual([]);
+    expect(coverageSummary(cov))
+      .toBe(`this range covers ${NO_SLOTS_PHRASE}, so no background cell can draw it`);
+    expect(coverageSummary(cov)).not.toContain('..');   // no span punctuation at all
   });
 
   it('IS NEUTRAL — a huge footprint reads as a number, never as an alarm', () => {
@@ -241,18 +290,39 @@ describe('coverageSubject — WHAT the highlight is, in the author\'s words', ()
   // nothing in that named the WASH. So the sentence must lead with the
   // highlight, not with slot arithmetic.
   it('leads with the highlight and names the band it belongs to', () => {
-    const s = coverageSubject('band', 2, slotRange(0, 8, 4));
-    expect(s.startsWith('highlighted:')).toBe(true);
-    expect(s).toContain('band 2');
-    expect(s).toContain('slots 0..32');
+    const range = slotRange(0, 8, 4);
+    const last = lastOwnedSlot(range);
+    const s = coverageSubject('band', 2, range);
+    // The whole sentence, so this row cannot be satisfied by the candidate
+    // sentence or by `coverageSummary` — both of which also print a slot span.
+    expect(s).toBe(`highlighted: the cells band 2 animates (slots ${range.base}..${last})`);
+    expect(s).not.toContain(`..${last + 1}`);
   });
 
   it('says what a CANDIDATE would animate, in the conditional', () => {
-    const s = coverageSubject('candidate', null, slotRange(34, 4, 2));
-    expect(s.startsWith('highlighted:')).toBe(true);
-    expect(s).toContain('slots 34..42');
-    expect(s).toContain('would animate');
+    const range = slotRange(34, 4, 2);
+    const last = lastOwnedSlot(range);
+    const s = coverageSubject('candidate', null, range);
+    expect(s).toBe(`highlighted: the cells a band at slots ${range.base}..${last} would animate`);
+    expect(s).not.toContain(`..${last + 1}`);
     expect(s).not.toContain('band null');
+  });
+
+  it('a range of NO SLOTS is said in words — "a band at no slots" is not English', () => {
+    // DECIDED, not inherited. Substituting the empty phrase into either
+    // sentence breaks it: the candidate reads "a band at no slots would
+    // animate", and the band form would claim cells are highlighted while
+    // naming none. Both kinds get the honest sentence instead.
+    const empty: SlotRange = { base: 34, count: 0 };
+    expect(rangeCovers(empty, 34)).toBe(false);   // ANTI-VACUOUS: it really owns nothing
+    expect(coverageSubject('band', 2, empty))
+      .toBe(`highlighted: nothing — band 2 covers ${NO_SLOTS_PHRASE}`);
+    expect(coverageSubject('candidate', null, empty))
+      .toBe(`highlighted: nothing — this candidate covers ${NO_SLOTS_PHRASE}`);
+    for (const s of [coverageSubject('band', 2, empty), coverageSubject('candidate', null, empty)]) {
+      expect(s).not.toContain('..');            // never a backwards `34..33`
+      expect(s.startsWith('highlighted:')).toBe(true);
+    }
   });
 
   it('IS NEUTRAL — it names a subject, never a verdict', () => {
@@ -336,5 +406,52 @@ describe('markFromLayoutWord — what a click on one cell means', () => {
   it('a document with no bands makes every non-blank cell a candidate', () => {
     expect(markFromLayoutWord(1, bandSlotBases([]), [], 0, BLOB))
       .toEqual({ kind: 'candidate', staticBase: 1, slot: 1 });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// No sentence in this module computes its own range end (item 54's tail)
+// ---------------------------------------------------------------------------
+//
+// The rows above pin what the two readouts SAY. This one sweeps for the SHAPE
+// of the defect, so a third sentence added later cannot reintroduce it quietly:
+// `..${x + y}` in a display string is a range end computed beside the range
+// instead of derived with it, which is how both of these came to name one slot
+// too many.
+
+describe('band-coverage prints no slot span of its own', () => {
+  // ⚠ COMMENTS STRIPPED FIRST, and this is not tidiness. A whole-file match
+  // over a `.ts` is happily satisfied by a COMMENT that quotes the call —
+  // including the comments THIS parcel added explaining the fix — so the sweep
+  // would go green with both readouts poisoned back to the defect. That exact
+  // false green was found by the previous parcel on the panel's `.tsx`. The
+  // module carries no URLs (checked: no `://`), so eating `//` to end-of-line
+  // takes nothing but comments.
+  const src = readFileSync('src/renderer/providers/band-coverage.ts', 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+
+  it('the stripped source is still the module', () => {
+    // Anti-vacuous: a strip that ate the file would pass every negative below.
+    // Structural markers, not a size ratio — most of this file IS comment.
+    expect(src).toMatch(/export function coverageSummary/);
+    expect(src).toMatch(/export function coverageSubject/);
+    expect(src).toMatch(/export function rangeCovers/);
+  });
+
+  it('both readouts reach the shared helper, and neither sums a range end inline', () => {
+    expect(src.match(/\.\.\$?\{[^}]*\+[^}]*\}/g) ?? []).toEqual([]);
+    // ANTI-VACUOUS: the sweep can see real calls, one per readout.
+    expect(src.match(/slotSpanPhrase\(/g)?.length ?? 0).toBeGreaterThanOrEqual(2);
+  });
+
+  it('the half-open COVERAGE arithmetic is untouched — only the sentences moved', () => {
+    // The scoping rule of this parcel, pinned rather than remembered: the
+    // selection maths must stay exclusive. A "fix" that pushed `- 1` into
+    // `rangeCovers` or `slotRange` would make every readout right and every
+    // painted cell wrong.
+    expect(src).toMatch(/slot < range\.base \+ range\.count/);
+    expect(src).toMatch(/count: cols \* rows/);
+    expect(rangeCovers(slotRange(0, 2, 2), 4)).toBe(false);
+    expect(rangeCovers(slotRange(0, 2, 2), 3)).toBe(true);
   });
 });

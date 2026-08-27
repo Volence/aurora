@@ -27,10 +27,10 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import {
   publishStripDrag, lastStripDragReport, resolveStripDrag, stripDragHint, stripDragLabel,
-  type StripDragInputs,
+  type StripDragInputs, type StripDragOutcome,
 } from '../band-strip-range';
-import { markFromLayoutWord } from '../band-coverage';
-import { bandBudget, promoteBandCommand, rowChoices } from '../bg-anim-aeon';
+import { markFromLayoutWord, rangeCovers, slotRange } from '../band-coverage';
+import { NO_SLOTS_PHRASE, bandBudget, promoteBandCommand, rowChoices } from '../bg-anim-aeon';
 import {
   TILE_BYTES, bandTileCount, parseBgOverride, type BgOverrideDocument,
 } from '../../../core/formats/bg-override/bg-override';
@@ -54,6 +54,28 @@ function drag(over: Partial<StripDragInputs> = {}): StripDragInputs {
     rows: 4, firstPromotableSlot: 32, blobTileCount: 340,
     ...over,
   };
+}
+
+/**
+ * THE LAST SLOT A RESOLVED RANGE OWNS, from the model that decides which cells
+ * the lens paints — never from the readout's own arithmetic.
+ *
+ * ⚠ WHY IT WALKS INSTEAD OF SUBTRACTING. The defect these rows pin is a span
+ * whose second number is `staticBase + cols*rows`, the first slot PAST the
+ * range. An expectation that wrote `... - 1` would be the fix checking itself,
+ * and one written through `slotSpanPhrase` would move with the very function a
+ * poison edits — both stay green against a restored off-by-one. `slotRange` +
+ * `rangeCovers` in `band-coverage` are a different module, are half-open BY
+ * DESIGN, and are what the band lens actually consults about this same
+ * candidate, so they are an independent witness to where the range stops.
+ */
+function lastOwnedSlot(o: Extract<StripDragOutcome, { kind: 'range' }>): number {
+  const r = slotRange(o.staticBase, o.cols, o.rows);
+  expect(rangeCovers(r, r.base)).toBe(true);
+  let last = r.base;
+  while (rangeCovers(r, last + 1)) last++;
+  expect(rangeCovers(r, last + 1)).toBe(false);   // the slot no readout may name
+  return last;
 }
 
 describe('the fixture assumptions this file leans on', () => {
@@ -305,11 +327,88 @@ describe('the gesture aims something the CODEC accepts', () => {
 });
 
 describe('the label — the strip\'s only surface', () => {
-  it('a range names the slot span and the geometry on the LINE', () => {
+  it('a range names the slots it OWNS and the geometry on the LINE', () => {
+    // ⚠ THIS ROW SHIPPED PINNING THE DEFECT — `toContain('40..56')`, with the
+    // comment `base .. base + cols*rows` stating it as the intent. `56` is the
+    // first slot the candidate does NOT take, so the line named a slot that is
+    // still static and still promotable by the next drag. Re-cut against
+    // `rangeCovers`, and asserted as the WHOLE line so the hint's own sentence
+    // (which also carries a span) cannot satisfy it.
     const r = resolveStripDrag(drag({ anchorSlot: 40, releaseSlot: 55 }));
-    const label = stripDragLabel(r);
-    expect(label).toContain('40..56');         // base .. base + cols*rows
-    expect(label).toContain('4x4');
+    expect(r.kind).toBe('range');
+    if (r.kind !== 'range') return;
+    const last = lastOwnedSlot(r);
+    expect(stripDragLabel(r))
+      .toBe(`band · slots ${r.staticBase}..${last} · ${r.cols}x${r.rows}`);
+    expect(stripDragLabel(r)).not.toContain(`..${last + 1}`);
+    // and the noun is not glued to the span: never "band slots 40..55"
+    expect(stripDragLabel(r)).not.toMatch(/band slots/);
+  });
+
+  it('the HINT names the same owned slots, with no doubled "slots"', () => {
+    const r = resolveStripDrag(drag({ anchorSlot: 40, releaseSlot: 55 }));
+    expect(r.kind).toBe('range');
+    if (r.kind !== 'range') return;
+    const last = lastOwnedSlot(r);
+    // "band candidate ·" is said by this readout and by nothing else in the
+    // module — the label opens "band · " — so this matcher cannot be satisfied
+    // by the line above.
+    expect(stripDragHint(r))
+      .toContain(`band candidate · slots ${r.staticBase}..${last} (${r.cols}x${r.rows})`);
+    expect(stripDragHint(r)).not.toContain(`..${last + 1}`);
+    expect(stripDragHint(r)).not.toMatch(/slots slots/);
+  });
+
+  it('a range ending exactly at the END OF THE BLOB names no slot the blob lacks', () => {
+    // THE BOUNDARY CASE. `blobTileCount` is a COUNT, so the last slot the strip
+    // has is `blobTileCount - 1`. A run snapped flush against the end makes
+    // `staticBase + cols*rows === blobTileCount` exactly — so the old sentence
+    // named an index the blob does not contain, on the one drag where the
+    // author is hardest against the wall.
+    const blob = 340;
+    const r = resolveStripDrag(drag({ anchorSlot: 336, releaseSlot: 339, blobTileCount: blob }));
+    expect(r.kind).toBe('range');
+    if (r.kind !== 'range') return;
+    expect(r.staticBase + r.cols * r.rows).toBe(blob);   // ANTI-VACUOUS: flush, not merely near
+    const last = lastOwnedSlot(r);
+    for (const line of [stripDragLabel(r), stripDragHint(r)]) {
+      expect(line).toContain(`${r.staticBase}..${last}`);
+      // Every number either readout prints must be a slot the strip HAS.
+      for (const n of line.match(/\d+/g) ?? []) expect(Number(n)).toBeLessThan(blob);
+    }
+  });
+
+  it('a drag can never resolve to a zero-slot range — so the empty phrase is a defence', () => {
+    // WHY THE READOUTS CARRY NO ZERO GUARD OF THEIR OWN, measured rather than
+    // asserted: `rowChoices()` starts at 1 and an illegal `rows` is refused
+    // before the range branch, while `cols = min(max(1, …), maxCols)` with
+    // `maxCols < 1` already refused — so both factors are at least 1.
+    let ranges = 0;
+    for (const rows of rowChoices().slice(0, 4)) {
+      for (let a = 0; a <= 344; a += 7) {
+        for (const b of [a, a + 1, a + rows, a + 3 * rows, 339, 400]) {
+          const r = resolveStripDrag(drag({ rows, anchorSlot: a, releaseSlot: b }));
+          if (r.kind !== 'range') continue;
+          expect(r.cols * r.rows).toBeGreaterThanOrEqual(1);
+          ranges++;
+        }
+      }
+    }
+    expect(ranges).toBeGreaterThan(100);       // ANTI-VACUOUS
+  });
+
+  it('a hand-built empty outcome reads in WORDS, never as a backwards span', () => {
+    // `StripDragOutcome` is exported and both readouts are total over it, so
+    // the degenerate outcome is reachable even though `resolveStripDrag` cannot
+    // produce it. `base + count - 1` would print `40..39`.
+    const empty: StripDragOutcome = {
+      kind: 'range', staticBase: 40, cols: 0, rows: 4, runEnd: 40, runLength: 1,
+      clampedToPrefix: false, trimmedToBlob: false,
+    };
+    expect(stripDragLabel(empty)).toBe(`band · ${NO_SLOTS_PHRASE} · 0x4`);
+    expect(stripDragHint(empty)).toContain(`band candidate · ${NO_SLOTS_PHRASE} (0x4)`);
+    expect(stripDragLabel(empty)).not.toContain('..');
+    expect(stripDragHint(empty)).not.toContain('..');
   });
 
   it('the run and the clamp are on the HINT, where a paragraph costs no layout', () => {
@@ -398,5 +497,55 @@ describe('the report — which branch ran, when the store cannot say', () => {
     expect(lastStripDragReport()).toMatchObject({
       kind: 'range', anchorSlot: 40, releaseSlot: 55, staticBase: 40, cols: 4, rows: 4, detail: null,
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Neither readout computes its own range end (item 54's tail)
+// ---------------------------------------------------------------------------
+//
+// The rows above pin what the two readouts SAY. This one sweeps for the SHAPE
+// of the defect, so a third sentence added to this module later cannot
+// reintroduce it quietly. `d7ec678` fixed the refusal hint's span in this file
+// and did not reach these two, which is exactly the drift a sweep catches and a
+// per-sentence row does not.
+
+describe('band-strip-range prints no slot span of its own', () => {
+  // ⚠ COMMENTS STRIPPED FIRST, and this is not tidiness. A whole-file match
+  // over a `.ts` is happily satisfied by a COMMENT that quotes the call —
+  // including the comments THIS parcel added explaining the fix — so the sweep
+  // would go green with both readouts poisoned back to the defect. That exact
+  // false green was found by the previous parcel on the panel's `.tsx`. The
+  // module carries no URLs (checked: no `://`), so eating `//` to end-of-line
+  // takes nothing but comments.
+  const src = readFileSync('src/renderer/providers/band-strip-range.ts', 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+
+  it('the stripped source is still the module', () => {
+    // Anti-vacuous: a strip that ate the file would pass every negative below.
+    // Structural markers, not a size ratio — most of this file IS comment.
+    expect(src).toMatch(/export function stripDragLabel/);
+    expect(src).toMatch(/export function stripDragHint/);
+    expect(src).toMatch(/export function resolveStripDrag/);
+  });
+
+  it('both readouts reach the shared helper, and neither sums a range end inline', () => {
+    expect(src.match(/\.\.\$?\{[^}]*\+[^}]*\}/g) ?? []).toEqual([]);
+    // ANTI-VACUOUS: the definition plus one call from each readout.
+    expect(src.match(/rangeSlots\(/g)?.length ?? 0).toBeGreaterThanOrEqual(3);
+    expect(src).toMatch(/slotSpanPhrase\(/);
+    // `end` was the local both readouts summed into; nothing reintroduces it.
+    expect(src).not.toMatch(/const end = /);
+  });
+
+  it('the SNAPPING and CLAMPING arithmetic is untouched — only the strings moved', () => {
+    // The scoping rule of this parcel, pinned rather than remembered. The run
+    // is INCLUSIVE and the blob bound is EXCLUSIVE; a `- 1` pushed into either
+    // would make the sentences right and the aimed range wrong.
+    expect(src).toMatch(/runEnd - staticBase \+ 1/);
+    expect(src).toMatch(/Math\.floor\(\(blobTileCount - staticBase\) \/ rows\)/);
+    const r = resolveStripDrag(drag({ anchorSlot: 40, releaseSlot: 55 }));
+    expect(r.kind === 'range' && r.runLength).toBe(16);
+    expect(r.kind === 'range' && r.cols).toBe(4);
   });
 });

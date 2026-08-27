@@ -52,6 +52,12 @@
 // plain data.
 
 import { LAYOUT_TILE_INDEX_MASK } from '../../core/formats/bg-override/bg-override';
+// The ONE convention for naming a slot span on screen (item 54). Imported
+// rather than restated: `SlotRange` below is HALF-OPEN and every quantity in
+// this file is a COUNT, so `base + count` is the first slot the range does NOT
+// own — printing it hands the author somebody else's slot. The arithmetic that
+// SELECTS cells stays half-open; only the sentences go through the helper.
+import { NO_SLOTS_PHRASE, slotSpanPhrase } from './bg-anim-aeon';
 
 /** A contiguous half-open run of blob slots: `[base, base + count)`. */
 export interface SlotRange {
@@ -191,7 +197,21 @@ export function bandCoverage(
 export function coverageSummary(cov: BandCoverage): string {
   const n = cov.cells.length;
   if (n === 0) {
-    return `no background cell draws slots ${cov.range.base}..${cov.range.base + cov.range.count}`;
+    // ⚠ TWO DIFFERENT EMPTIES MEET HERE, and only the first is what `n === 0`
+    // means. Zero CELLS is "the document licenses this range and the picture
+    // never draws it" — a real result, per this file's header. Zero SLOTS is a
+    // different fact that lands in the same branch, because an empty range
+    // covers nothing (`rangeCovers` answers false for every slot) and so always
+    // arrives with zero cells. "no background cell draws no slots" is true and
+    // tells the author nothing, so the empty RANGE gets its own sentence.
+    //
+    // WHICH empty it is, is decided by `slotSpanPhrase` and not by a second
+    // `count <= 0` test here: that boundary is owned in one place, and a copy
+    // of it is a copy that can drift.
+    const slots = slotSpanPhrase(cov.range.base, cov.range.count);
+    return slots === NO_SLOTS_PHRASE
+      ? `this range covers ${NO_SLOTS_PHRASE}, so no background cell can draw it`
+      : `no background cell draws ${slots}`;
   }
   const parts = [`paints ${n} cell${n === 1 ? '' : 's'}`];
   if (cov.largest) {
@@ -247,7 +267,21 @@ export function coverageBounds(
 export function coverageSubject(
   kind: 'band' | 'candidate', bandIndex: number | null, range: SlotRange,
 ): string {
-  const slots = `slots ${range.base}..${range.base + range.count}`;
+  const slots = slotSpanPhrase(range.base, range.count);
+  // ⚠ THE EMPTY RANGE CANNOT BE HANDLED BY SUBSTITUTION, which is why it is
+  // decided rather than inherited. The candidate sentence reads "a band at
+  // ${slots} would animate", and "a band at no slots would animate" is not
+  // English; the band sentence would render "(no slots)" while still claiming
+  // cells are highlighted, which is worse than ungrammatical. A `count <= 0`
+  // range is representable here — `SlotRange` is a half-open run whose count
+  // this module already clamps at `Math.max(0, ...)`, and `setBandCandidate`
+  // takes an unvalidated patch — so this is a shape the type admits, not one
+  // only arithmetic could reach. Both kinds get the same honest sentence:
+  // nothing is highlighted, and why.
+  if (slots === NO_SLOTS_PHRASE) {
+    const subject = kind === 'band' ? `band ${bandIndex}` : 'this candidate';
+    return `highlighted: nothing — ${subject} covers ${NO_SLOTS_PHRASE}`;
+  }
   return kind === 'band'
     ? `highlighted: the cells band ${bandIndex} animates (${slots})`
     : `highlighted: the cells a band at ${slots} would animate`;
