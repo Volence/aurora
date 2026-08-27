@@ -2257,9 +2257,14 @@ export default function MapViewport() {
         // a top a typed value could not — and a locked layer stops at the
         // plane's last line.
         const space = layerTopSpace(scene);
+        // THE LAYER IS PASSED TO THE CLAMP, and that is what makes the drag
+        // unable to author a line the bake refuses (see clampLayerTop). Without
+        // it the clamp uses the plane's 0..511 and a drag below the frame's
+        // bottom edge writes 302 on a 224-line screen.
+        const dragged = scene.layers[guideDrag.current.index];
         const next = clampLayerTop(scene, canvasYToLayerTop(e.clientY - rect.top,
           { x: 0, y: vpY, width: rect.width, height: rect.height, zoom }, space,
-          guideOriginOf(scene, sf.y)));
+          guideOriginOf(scene, sf.y)), dragged);
         if (next !== guideDrag.current.worldY) {
           guideDrag.current.worldY = next;
           redraw();

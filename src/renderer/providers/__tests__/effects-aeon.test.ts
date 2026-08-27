@@ -15,6 +15,8 @@ import {
   addLayerCommand, removeLayerCommand, setLayerFieldCommand, setSceneFieldCommand,
   SCENE_FORM_CHOICES, layerExtras, layerExtrasLine,
   layerTopSpace, layerTopBounds, clampLayerTop, planeLineOf, PLANE_LINE_SPAN,
+  fireLineAdvisory, layerEmitsFire, fireScreenLineOf, vsplitOrderAdvisory,
+  EFFECTS_FIRE_LINE_MIN, EFFECTS_FIRE_LINE_MAX,
   layerCountLine, vFactorHint,
   LAYER_CURVE_ROW, LAYER_VSPLIT_ROW, NONE_FACTOR_VALUE,
   factorFieldSelectValue, factorFieldFromSelect, curveFieldValue, curveFromField,
@@ -673,6 +675,237 @@ const branchOf = (id: string) => TABLE_BRANCHES.find(
 /** A scene carrying whatever the caller attached — for the writer's own validation. */
 const sceneWith = (patch: Partial<EffectsScene>): EffectsScene =>
   ({ ...newEffectsScene('deform_probe'), ...patch });
+
+// ---------------------------------------------------------------------------
+// A LAYER THAT BECOMES A FIRE — the 3..223 bound, and WHO IT IS FOR
+// ---------------------------------------------------------------------------
+//
+// The owner's build died on `fire: screen line 303 outside 3..223` from a top
+// this panel offered him with a 0..511 bound. The bound is not wrong; it is
+// about a DIFFERENT SET OF LAYERS. The rows below are shaped around the trap:
+// most of them assert that a layer is NOT advised, because a blanket 3..223
+// would make Aurora refuse scenes the build accepts.
+
+describe('fireLineAdvisory — only the layers that actually become raster fires', () => {
+  const locked = (vo = 0) =>
+    ({ ...newEffectsScene('l', 'L'), v_factor: EFFECTS_V_FACTOR_LOCK, v_offset: vo });
+  const unlocked = () => ({ ...newEffectsScene('u', 'U'), v_factor: 2, v_center: 0, v_offset: 0 });
+  const plain = (world_y: number): EffectsLayer =>
+    ({ world_y, fa: 'FACTOR_1', fb: 'FACTOR_1' });
+  const split = (world_y: number, at = 0x43): EffectsLayer =>
+    ({ ...plain(world_y), vsplit: { at } });
+
+  it("the bound is the engine's own, not a rounded one", () => {
+    // aeon engine/effects/raster_dsl.emp:326-327 — `fire()` ensures
+    // `line >= 3 && line <= 223`.
+    expect([EFFECTS_FIRE_LINE_MIN, EFFECTS_FIRE_LINE_MAX]).toEqual([3, 223]);
+  });
+
+  it('layerEmitsFire is the VARIANT test, so vsplit at: 0 still emits one', () => {
+    // aeon scene_dsl.emp:832-837 — `None => 1, At(off) => 0`. 0 is a legal
+    // scroll value, not a "no split" sentinel (scene_dsl.emp:347-349), so a
+    // falsiness test here would silently exempt a layer the build DOES fire.
+    expect(layerEmitsFire(split(300, 0))).toBe(true);
+    expect(layerEmitsFire(split(300, 0x43))).toBe(true);
+    expect(layerEmitsFire(plain(300))).toBe(false);
+  });
+
+  it('⚠ THE WHOLE POINT: a layer with NO split is never advised, anywhere in 0..511', () => {
+    // Getting this wrong in the strict direction refuses scenes the build
+    // accepts. `ojz_act1_start` ships five plain tops (0/32/80/112/160) and
+    // nothing stops a locked scene putting a pure band boundary at 500.
+    for (const y of [0, 1, 2, 3, 112, 160, 223, 224, 303, 319, PLANE_LINE_SPAN - 1]) {
+      expect(fireLineAdvisory(locked(), plain(y))).toBeNull();
+    }
+  });
+
+  it("advises exactly the two tops the owner's build refused", () => {
+    for (const y of [303, 319]) {
+      const advice = fireLineAdvisory(locked(), split(y));
+      expect(advice).not.toBeNull();
+      expect(advice).toContain(`screen line ${y}`);
+      expect(advice).toContain('3..223');
+    }
+  });
+
+  it('is silent across the whole legal band, and speaks on both edges of it', () => {
+    for (let y = EFFECTS_FIRE_LINE_MIN; y <= EFFECTS_FIRE_LINE_MAX; y++) {
+      expect(fireLineAdvisory(locked(), split(y))).toBeNull();
+    }
+    expect(fireLineAdvisory(locked(), split(EFFECTS_FIRE_LINE_MIN - 1))).not.toBeNull();
+    expect(fireLineAdvisory(locked(), split(EFFECTS_FIRE_LINE_MAX + 1))).not.toBeNull();
+    // The floor is not 0: lines 0-2 belong to the priming records.
+    for (const y of [0, 1, 2]) expect(fireLineAdvisory(locked(), split(y))).not.toBeNull();
+  });
+
+  it('the LINE is `top - v_offset`, not the top — both shipped scenes hide this', () => {
+    // aeon scene_dsl.emp:2456-2461, `scene_vsplit_line`. v_offset is 0 in both
+    // shipped scenes, which is exactly why `3 <= world_y <= 223` would have
+    // looked right forever.
+    expect(fireScreenLineOf(locked(0), 300)).toBe(300);
+    expect(fireScreenLineOf(locked(200), 300)).toBe(100);
+    // A top of 300 is illegal at v_offset 0 and LEGAL at v_offset 200.
+    expect(fireLineAdvisory(locked(0), split(300))).not.toBeNull();
+    expect(fireLineAdvisory(locked(200), split(300))).toBeNull();
+    // ...and a top of 100 is legal at v_offset 0 and illegal at v_offset 200.
+    expect(fireLineAdvisory(locked(0), split(100))).toBeNull();
+    expect(fireLineAdvisory(locked(200), split(100))).not.toBeNull();
+    expect(fireLineAdvisory(locked(200), split(100))).toContain('v_offset 200');
+  });
+
+  it('says nothing on an UNLOCKED scene: a split there is a different refusal', () => {
+    // `scene()` refuses vsplit on a camera-tracked plane outright (the
+    // two-writer collision, scene_dsl.emp:1259-1261) and the layer top is not
+    // what is wrong with it. A screen line does not exist for that scene at all.
+    expect(fireLineAdvisory(unlocked(), split(303))).toBeNull();
+    expect(fireLineAdvisory(unlocked(), split(112))).toBeNull();
+  });
+
+  it('is an ADVISORY: with no layer in hand it does not narrow the bound (ROADMAP row 58)', () => {
+    const s = locked();
+    expect(layerTopBounds(s)).toEqual({
+      space: 'screen', label: 'Screen line', min: 0, max: PLANE_LINE_SPAN - 1,
+    });
+    expect(clampLayerTop(s, 303)).toBe(303);
+    expect(clampLayerTop(s, 319)).toBe(319);
+    // ...and it stays loose for a layer that emits no fire.
+    expect(clampLayerTop(s, 303, plain(0))).toBe(303);
+    expect(layerTopBounds(s, plain(0)).max).toBe(PLANE_LINE_SPAN - 1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// THE CLAMP KEEPS ITS OWN PROMISE — item 37's sentence, made true for a fire
+// ---------------------------------------------------------------------------
+//
+// The owner produced 303, then 304, then 302 in twenty minutes by DRAGGING a
+// guide, three dead builds. `canvasYToLayerTop` collapses to `canvasY / zoom` in
+// screen space, so the legal band occupies the first `223 * zoom` canvas px and
+// nothing marked where it ended. `clampLayerTop`'s docblock has promised since
+// item 37 that "a locked layer cannot be dragged to a line the bake would
+// refuse", and it was false for exactly the layers that break a build.
+
+// ---------------------------------------------------------------------------
+// SPLITS MUST DESCEND THE SCREEN — the OTHER engine rule a split can trip
+// ---------------------------------------------------------------------------
+//
+// aeon `scene_vsplit_fires()` (engine/level/scene_dsl.emp): `ensure(line > prev)`.
+//
+// ⚠ AND NOT THE ONE THAT LOOKED LIKE ITS SIBLING. `ojz_effects.emp` carries a
+// `== 2` on the vsplit COUNT whose own comment called itself derived while being
+// a literal — one scene's GAME DATA, not an engine rule, and there is no engine
+// cap on vsplit count at all. It is deliberately NOT transcribed here.
+
+describe('vsplitOrderAdvisory — the ordering rule, transcribed from the DSL and not from game data', () => {
+  const locked = (vo = 0) =>
+    ({ ...newEffectsScene('l', 'L'), v_factor: EFFECTS_V_FACTOR_LOCK, v_offset: vo });
+  const unlocked = () => ({ ...newEffectsScene('u', 'U'), v_factor: 2, v_center: 0, v_offset: 0 });
+  const plain = (world_y: number): EffectsLayer => ({ world_y, fa: 'FACTOR_1', fb: 'FACTOR_1' });
+  const split = (world_y: number): EffectsLayer => ({ ...plain(world_y), vsplit: { at: 0x43 } });
+  const advise = (scene: ReturnType<typeof locked>, ls: EffectsLayer[]) =>
+    ls.map((_, i) => vsplitOrderAdvisory(scene, ls, i));
+
+  it('says nothing when the splits descend', () => {
+    expect(advise(locked(), [split(20), plain(60), split(100), split(180)]))
+      .toEqual([null, null, null, null]);
+  });
+
+  it('names the layer above when two splits share a line, or go backwards', () => {
+    const same = advise(locked(), [split(100), split(100)]);
+    expect(same[0]).toBeNull();
+    expect(same[1]).toContain('layer 0');
+    expect(same[1]).toContain('line 100');
+    const back = advise(locked(), [split(180), split(60)]);
+    expect(back[1]).toContain('not BELOW');
+  });
+
+  it('THE FIRST SPLIT CAN NEVER TRIP IT — the engine seeds `prev` at -1', () => {
+    for (const y of [0, 3, 223, 500]) {
+      expect(vsplitOrderAdvisory(locked(), [split(y)], 0)).toBeNull();
+    }
+  });
+
+  it('LAYERS WITHOUT A SPLIT DO NOT PARTICIPATE, in either direction', () => {
+    // The engine updates `prev` only inside the `if`, so a plain layer between
+    // two splits neither breaks the chain nor joins it — and a plain layer is
+    // never itself advised, however out of order its top is.
+    const ls = [split(50), plain(400), split(120)];
+    expect(advise(locked(), ls)).toEqual([null, null, null]);
+    const ls2 = [plain(500), split(50), split(120)];
+    expect(advise(locked(), ls2)).toEqual([null, null, null]);
+  });
+
+  it('compares SCREEN lines, so v_offset cancels and cannot invent a violation', () => {
+    const ls = [split(300), split(360)];
+    expect(advise(locked(200), ls)).toEqual([null, null]);
+  });
+
+  it('says nothing on an UNLOCKED scene', () => {
+    const ls = [split(180), split(60)];
+    expect(ls.map((_, i) => vsplitOrderAdvisory(unlocked(), ls, i))).toEqual([null, null]);
+  });
+
+  it('⚠ THERE IS NO COUNT RULE: three splits in order are advised about nothing', () => {
+    // The `== 2` that refused the owner's third split was a literal in one
+    // scene's game data, since replaced. Transcribing it would have made Aurora
+    // refuse what the engine allows.
+    expect(advise(locked(), [split(20), split(80), split(160)])).toEqual([null, null, null]);
+    expect(advise(locked(), [split(20), split(60), split(100), split(140), split(180)]))
+      .toEqual([null, null, null, null, null]);
+  });
+});
+
+describe('clampLayerTop bounds a fire-emitting layer to the fire line, and nothing else', () => {
+  const locked = (vo = 0) =>
+    ({ ...newEffectsScene('l', 'L'), v_factor: EFFECTS_V_FACTOR_LOCK, v_offset: vo });
+  const unlocked = () => ({ ...newEffectsScene('u', 'U'), v_factor: 2, v_center: 0, v_offset: 0 });
+  const plain = (): EffectsLayer => ({ world_y: 0, fa: 'FACTOR_1', fb: 'FACTOR_1' });
+  const split = (): EffectsLayer => ({ ...plain(), vsplit: { at: 0x43 } });
+
+  it('a split layer cannot be dragged past 223, nor above 3', () => {
+    const s = locked();
+    // The three tops that actually killed his build.
+    for (const y of [302, 303, 304, 317, 318, 319]) {
+      expect(clampLayerTop(s, y, split())).toBe(EFFECTS_FIRE_LINE_MAX);
+    }
+    expect(clampLayerTop(s, 0, split())).toBe(EFFECTS_FIRE_LINE_MIN);
+    expect(clampLayerTop(s, 2, split())).toBe(EFFECTS_FIRE_LINE_MIN);
+    // Everything inside the band is untouched.
+    for (const y of [3, 112, 160, 223]) expect(clampLayerTop(s, y, split())).toBe(y);
+  });
+
+  it('⚠ AND A LAYER WITHOUT A SPLIT KEEPS THE PLANE, so no scene the build accepts is refused', () => {
+    const s = locked();
+    for (const y of [224, 302, 303, 319, PLANE_LINE_SPAN - 1]) {
+      expect(clampLayerTop(s, y, plain())).toBe(y);
+    }
+    expect(clampLayerTop(s, PLANE_LINE_SPAN, plain())).toBe(PLANE_LINE_SPAN - 1);
+  });
+
+  it('the clamped band rides v_offset, because the LINE is `top - v_offset`', () => {
+    const s = locked(100);
+    expect(layerTopBounds(s, split())).toEqual({
+      space: 'screen', label: 'Screen line',
+      min: EFFECTS_FIRE_LINE_MIN + 100, max: EFFECTS_FIRE_LINE_MAX + 100,
+    });
+    expect(clampLayerTop(s, 300, split())).toBe(300);   // line 200 — legal
+    expect(clampLayerTop(s, 350, split())).toBe(323);   // line 223 — the edge
+    expect(clampLayerTop(s, 0, split())).toBe(103);     // line 3
+  });
+
+  it('and it is intersected with the plane, never widened past it', () => {
+    // A v_offset that pushes 223 past the plane's last row must not produce a
+    // bound the plane refuses.
+    const s = locked(PLANE_LINE_SPAN);
+    expect(layerTopBounds(s, split()).max).toBe(PLANE_LINE_SPAN - 1);
+  });
+
+  it('leaves an UNLOCKED scene alone: a split there is refused for another reason entirely', () => {
+    const s = unlocked();
+    expect(clampLayerTop(s, 5000, split())).toBe(5000);
+    expect(layerTopBounds(s, split()).space).toBe('act');
+  });
+});
 
 describe('tableRef — every form the contract admits, derived from it', () => {
   it('the dropdown offers exactly the schema branches, in schema order', () => {

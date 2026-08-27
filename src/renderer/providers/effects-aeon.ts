@@ -1240,10 +1240,38 @@ export interface LayerTopBounds {
  * below the visible strip is legal and the plane wraps), so the bound is the
  * plane's. Unlocked: the schema's `world_y` range, as before; `planeLineOf`
  * carries the mapped-line advisory for that arm.
+ *
+ * ⚠ PASS THE LAYER WHENEVER YOU HAVE ONE (2026-08-27). A layer that carries a
+ * vsplit becomes a raster fire, and a fire's line must be 3..223 — so ITS bound
+ * is narrower than the plane's, and the difference is not cosmetic: the owner
+ * produced 303, then 304, then 302 in twenty minutes by DRAGGING a guide, three
+ * dead builds, because `canvasYToLayerTop` collapsed to `canvasY / zoom` and
+ * nothing on the canvas marked where line 223 was. The clamp's own docblock
+ * below has promised since ROADMAP item 37 that "a locked layer cannot be
+ * dragged to a line the bake would refuse"; without the layer that promise is
+ * false for exactly the layers that can break a build.
+ *
+ * Omitting the layer keeps the plane's bound, which is the right answer when
+ * the caller genuinely does not know which layer it is holding — and it is the
+ * LOOSE direction, so a forgetful call site refuses nothing the build accepts.
  */
-export function layerTopBounds(scene: Pick<EffectsScene, 'v_factor'>): LayerTopBounds {
+export function layerTopBounds(
+  scene: Pick<EffectsScene, 'v_factor' | 'v_offset'>,
+  layer?: Pick<EffectsLayer, 'vsplit'>,
+): LayerTopBounds {
   if (layerTopSpace(scene) === 'screen') {
-    return { space: 'screen', label: 'Screen line', min: 0, max: PLANE_LINE_SPAN - 1 };
+    const plane = { space: 'screen' as const, label: 'Screen line' as const, min: 0, max: PLANE_LINE_SPAN - 1 };
+    if (layer === undefined || !layerEmitsFire(layer)) return plane;
+    // `line = top - v_offset` must be in 3..223, so `top` is in
+    // `3 + v_offset .. 223 + v_offset` — intersected with the plane's own span,
+    // because a fire line legal on the screen is still refused by
+    // `scene_plane_line` if it falls off the plane.
+    const vo = scene.v_offset ?? EFFECTS_V_OFFSET_DEFAULT;
+    return {
+      ...plane,
+      min: Math.max(plane.min, EFFECTS_FIRE_LINE_MIN + vo),
+      max: Math.min(plane.max, EFFECTS_FIRE_LINE_MAX + vo),
+    };
   }
   return {
     space: 'act', label: 'world_y',
@@ -1256,9 +1284,19 @@ export function layerTopBounds(scene: Pick<EffectsScene, 'v_factor'>): LayerTopB
  * item 37): the spinner's min/max only style it, and the guide drag routes
  * through this too, so a locked layer cannot be dragged to a line the bake
  * would refuse.
+ *
+ * ⚠ THIS IS THE ONE PREVENTION IN THIS PARCEL, AND IT IS A NARROW ONE. It bounds
+ * a GESTURE and a KEYSTROKE; it does not touch loading, does not touch saving,
+ * and does not narrow anything for a layer that emits no fire. A document that
+ * ARRIVES holding 303 keeps 303, shows `fireLineAdvisory`, and still saves —
+ * ROADMAP row 58's ruling is untouched. What it removes is the ability to
+ * ORIGINATE an unauthorable value from a control that gave no sign of a limit.
  */
-export function clampLayerTop(scene: Pick<EffectsScene, 'v_factor'>, value: number): number {
-  const { min, max } = layerTopBounds(scene);
+export function clampLayerTop(
+  scene: Pick<EffectsScene, 'v_factor' | 'v_offset'>, value: number,
+  layer?: Pick<EffectsLayer, 'vsplit'>,
+): number {
+  const { min, max } = layerTopBounds(scene, layer);
   if (!Number.isFinite(value)) return min;
   return Math.min(max, Math.max(min, Math.round(value)));
 }
@@ -1296,6 +1334,163 @@ export function planeLineOf(
     };
   }
   return { line, hint: null };
+}
+
+// ---------------------------------------------------------------------------
+// A LAYER THAT BECOMES A RASTER FIRE — the 3..223 bound, and who it is FOR
+// ---------------------------------------------------------------------------
+//
+// The owner's build died with
+//
+//   [Error] fire: screen line 303 outside 3..223 (lines 0-2 belong to the
+//   priming records)
+//
+// twice (303 and 319), from tops he had set in this panel, which offered him
+// 0..511 and no reason to think 303 was different from 112. `layerTopBounds`
+// above returns `0..PLANE_LINE_SPAN-1` and IS CORRECT AND STAYS: 511 is the
+// Plane-B row span, which is what `scene_plane_line` bounds, and a layer that
+// is only a BAND RECORD may legitimately sit anywhere in it.
+//
+// ⚠ THE BOUND BELOW IS NOT A SECOND OPINION ABOUT THE SAME NUMBER — IT IS ABOUT
+// A DIFFERENT SET OF LAYERS. Only SOME layers become raster fires, and only
+// those are bounded to 3..223. Blanket-clamping every screen-space top to
+// 3..223 would make Aurora refuse scenes the build accepts — `ojz_act1_start`
+// ships a top at 160 with no split and would be unaffected, but any locked scene
+// wanting a plane row below 223 for a pure band boundary would be refused for a
+// rule that does not apply to it.
+//
+// WHICH LAYERS, MEASURED RATHER THAN GUESSED (aeon, read 2026-08-27):
+//
+//   - `scene_vsplit_fires()` (engine/level/scene_dsl.emp:2497-2508) walks the
+//     scene's real layers and emits one fire per layer for which
+//     `scene_vsplit_is_none(l.ly_vsplit) == 0` — and that predicate
+//     (scene_dsl.emp:832-837) is a VARIANT test, `None => 1, At(off) => 0`.
+//     So the condition is "this layer carries a vsplit attachment", full stop.
+//     `At(0)` counts: 0 is a legal scroll value, not a sentinel
+//     (scene_dsl.emp:347-349).
+//   - The fire itself is `fx_vscroll_split(line, offset)`
+//     (engine/effects/raster_dsl.emp:590-592) = `fire(line, [stream_vsram(...)])`,
+//     and `fire()` (raster_dsl.emp:326-327) is what carries 3..223.
+//   - The generator emits NO raster construct at all: `tools/effects_gen.py`'s
+//     `render_module()` writes `scene(...)`/`layer(...)`, the binding, the caps
+//     and the witnesses, and nothing else. The one live path from an editor
+//     scene to a fire is hand-authored — `games/sonic4/data/effects/
+//     ojz_effects.emp:671`, `scene_vsplit_fires(Scene_Editor_ojz_act1_depth)`.
+//   - Every OTHER `fire`/`patchable` call site in the aeon tree uses a typed
+//     literal line, so no other layer top reaches the bound. `patchable`'s
+//     sibling rule (raster_dsl.emp:432) is therefore NOT reachable from the
+//     editor path today; when wave 2 lands preset composition it will be, and
+//     its bound is the same 3..223, so nothing here would need loosening.
+//   - The other scene-side consumer of a top is `scene_band()`
+//     (scene_dsl.emp:2566), which produces a BAND RECORD and never a fire.
+//     That is the layer this panel's 0..511 belongs to.
+//
+// THE LINE IS NOT THE TOP. `scene_vsplit_line()` (scene_dsl.emp:2456-2461) is
+// `scene_plane_line(s, wy) - v_offset`, and under the lock `scene_plane_line` is
+// the identity — so the SCREEN line is `world_y - v_offset`. Both shipped scenes
+// have `v_offset: 0`, which is exactly why writing the rule as `3 <= world_y <=
+// 223` would have looked right forever and been wrong the first time anyone set
+// a `v_offset`.
+//
+// ⚠ ADVISORY, NOT PREVENTION, and that is ROADMAP row 58's ruling rather than a
+// softness: a warned scene still SAVES. So this returns a sentence; it does not
+// clamp `world_y`, does not narrow `layerTopBounds`, and does not disable the
+// spinner. The author gets the engine's own diagnostic before the build says it.
+
+/** The first and last screen line a raster fire may land on (aeon `fire()`). */
+export const EFFECTS_FIRE_LINE_MIN = 3;
+export const EFFECTS_FIRE_LINE_MAX = 223;
+
+/**
+ * Does this layer lower to a raster fire?
+ *
+ * The transcription of `scene_vsplit_is_none(l.ly_vsplit) == 0`: a vsplit
+ * attachment is present. `vsplitFieldValue` returns the `at` row or null, and
+ * `at: 0` is a real split — so the test is against `null`, never falsiness.
+ */
+export function layerEmitsFire(layer: Pick<EffectsLayer, 'vsplit'>): boolean {
+  return vsplitFieldValue(layer) !== null;
+}
+
+/** The SCREEN line a locked scene's layer fires on: `world_y - v_offset`. */
+export function fireScreenLineOf(
+  scene: Pick<EffectsScene, 'v_offset'>, worldY: number,
+): number {
+  return worldY - (scene.v_offset ?? EFFECTS_V_OFFSET_DEFAULT);
+}
+
+/**
+ * The advisory for a layer whose top cannot exist as a screen line, or null.
+ *
+ * Null for every layer that emits no fire — see the block above for how "emits a
+ * fire" was determined, and why bounding the rest would refuse scenes the build
+ * accepts.
+ */
+export function fireLineAdvisory(
+  scene: Pick<EffectsScene, 'v_factor' | 'v_offset'>,
+  layer: Pick<EffectsLayer, 'world_y' | 'vsplit'>,
+): string | null {
+  if (!layerEmitsFire(layer)) return null;
+  // An unlocked scene with a split is refused by `scene()` itself, on a
+  // different rule and with a different message (the two-writer collision); it
+  // already has its own advisory, and a layer top is not what is wrong with it.
+  if (layerTopSpace(scene) !== 'screen') return null;
+  const line = fireScreenLineOf(scene, layer.world_y);
+  if (line >= EFFECTS_FIRE_LINE_MIN && line <= EFFECTS_FIRE_LINE_MAX) return null;
+  const vo = scene.v_offset ?? EFFECTS_V_OFFSET_DEFAULT;
+  const from = vo === 0 ? '' : ` (top ${layer.world_y} less v_offset ${vo})`;
+  return `this layer authors a Plane B split, so it becomes a raster fire at screen `
+    + `line ${line}${from} — and a fire must land on ${EFFECTS_FIRE_LINE_MIN}`
+    + `..${EFFECTS_FIRE_LINE_MAX} (lines 0-2 belong to the priming records). `
+    + 'The build refuses it. Move the top onto the visible screen, or drop the split — '
+    + `a layer without one may sit anywhere in 0..${PLANE_LINE_SPAN - 1}.`;
+}
+
+/**
+ * The advisory for a split that does not sit BELOW the split above it, or null.
+ *
+ * aeon `scene_vsplit_fires()` (engine/level/scene_dsl.emp) walks the layers in
+ * order and, for each one carrying a split, ensures `line > prev`:
+ *
+ *   "layer {i}'s vertical split lands on screen line {line}, which is not below
+ *    the previous split's — two whole-plane vertical scroll values for one row.
+ *    compose() would merge them into a single fire carrying both writes and the
+ *    second would silently win."
+ *
+ * ⚠ WHY THIS RULE AND NOT THE OTHER ONE. A `== 2` on the vsplit COUNT lives in
+ * `games/sonic4/data/effects/ojz_effects.emp` — one scene's game data, whose own
+ * comment called itself derived while being a literal. It refused the owner's
+ * third split and there is NO engine cap on vsplit count at all. A rule in a
+ * game's data file is not an engine rule; every bound this module transcribes is
+ * checked to live in `scene_dsl.emp` or `raster_dsl.emp` first. This one does.
+ *
+ * ⚠ ADVISORY, NEVER A CLAMP. An ordering violation is a fact about TWO layers
+ * and there are two ways to resolve it — move either top, or drop either split.
+ * A control that picked one silently would be choosing for the author.
+ *
+ * `prev` starts at -1 in the engine, so the FIRST split can never trip this.
+ */
+export function vsplitOrderAdvisory(
+  scene: Pick<EffectsScene, 'v_factor' | 'v_offset'>,
+  layers: readonly Pick<EffectsLayer, 'world_y' | 'vsplit'>[],
+  index: number,
+): string | null {
+  const layer = layers[index];
+  if (layer === undefined || !layerEmitsFire(layer)) return null;
+  if (layerTopSpace(scene) !== 'screen') return null;
+  // The nearest split ABOVE this one in layer order — the engine's `prev`.
+  let prevIndex = -1;
+  for (let i = index - 1; i >= 0; i--) {
+    if (layerEmitsFire(layers[i])) { prevIndex = i; break; }
+  }
+  if (prevIndex < 0) return null;
+  const line = fireScreenLineOf(scene, layer.world_y);
+  const prevLine = fireScreenLineOf(scene, layers[prevIndex].world_y);
+  if (line > prevLine) return null;
+  return `this split lands on screen line ${line}, which is not BELOW layer ${prevIndex}'s `
+    + `split at line ${prevLine} — two whole-plane vertical scroll values for one row, and `
+    + 'the merged fire would carry both writes with the second silently winning. The build '
+    + 'refuses it. Give the two layers different screen lines, or drop one split.';
 }
 
 /**

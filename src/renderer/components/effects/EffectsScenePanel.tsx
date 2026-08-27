@@ -66,7 +66,8 @@ import {
   curveFieldValue, curveFromField, vsplitFieldValue, vsplitFromToggle, curveAdvisory, clampVSplitAt,
   LAYER_CURVE_ROW, LAYER_VSPLIT_ROW, EFFECTS_VSPLIT_AT_BOUNDS,
   clampVFactor, clampVCenter, clampVOffset,
-  layerTopBounds, clampLayerTop, planeLineOf, layerCountLine, vFactorHint,
+  layerTopBounds, clampLayerTop, planeLineOf, fireLineAdvisory, vsplitOrderAdvisory,
+  layerCountLine, vFactorHint,
   sceneListEntries, resolveSelectedScene, sceneRefOptions, unassignableSceneRef,
   sectionSceneCommand, createSceneCommand, deleteSceneCommand,
   addLayerCommand, removeLayerCommand, setLayerFieldCommand, setSceneFieldCommand,
@@ -691,8 +692,20 @@ export default function EffectsScenePanel(): React.ReactElement {
                 `clampLayerTop`, so the spinner and the guide agree.
               */}
               {(() => {
-                const top = layerTopBounds(selected);
+                const top = layerTopBounds(selected, layer);
                 const mapped = planeLineOf(selected, layer.world_y);
+                // THE FIRE-LINE ADVISORY (2026-08-27). Null unless this layer
+                // carries a split and so becomes a raster fire — the bound is
+                // about a SUBSET of layers, not about the field's range, and
+                // the provider's block says how that subset was measured. It is
+                // an advisory: the spinner keeps its 0..511 and the scene still
+                // saves (ROADMAP row 58).
+                const fire = fireLineAdvisory(selected, layer);
+                // The SECOND engine rule a split can trip, and the only other
+                // one reachable from this panel: splits must descend the screen
+                // (aeon scene_vsplit_fires). Advisory, never a clamp — the fix
+                // involves two layers and has two spellings.
+                const order = vsplitOrderAdvisory(selected, selected.layers, i);
                 return (
                   <>
                     <Field label={top.label}>
@@ -701,9 +714,11 @@ export default function EffectsScenePanel(): React.ReactElement {
                         min={top.min} max={top.max} width={72}
                         value={layer.world_y}
                         onChange={(n) => run(setLayerFieldCommand(
-                          library, selected.id, i, 'world_y', clampLayerTop(selected, n)))} />
+                          library, selected.id, i, 'world_y', clampLayerTop(selected, n, layer)))} />
                     </Field>
                     {mapped.hint !== null && <Hint under tone="warning">{mapped.hint}</Hint>}
+                    {fire !== null && <Hint under tone="warning">{fire}</Hint>}
+                    {order !== null && <Hint under tone="warning">{order}</Hint>}
                   </>
                 );
               })()}
