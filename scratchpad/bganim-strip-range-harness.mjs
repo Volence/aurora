@@ -515,13 +515,51 @@ async function main() {
     check('6e', 'the lens is pointed AT the candidate the moment the button comes up',
       target6 !== null && target6.kind === 'candidate', JSON.stringify(target6));
 
-    const end6 = cand6.staticBase + cand6.cols * cand6.rows;
+    // RE-CUT 2026-08-27 for item 54's tail. This row pinned the EXCLUSIVE end
+    // (`base + cols*rows`), which is the off-by-one item 54 removed from every
+    // slot readout — so the row was pinning the defect, and went red the moment
+    // the readout started telling the truth. Both ends are derived from the app's
+    // own reported candidate, and the negative half is what makes it discriminate:
+    // asserting only that the inclusive end is PRESENT would still pass on a
+    // string containing both.
+    const lastSlot6 = cand6.staticBase + cand6.cols * cand6.rows - 1;
+    const exclusiveEnd6 = cand6.staticBase + cand6.cols * cand6.rows;
     check('6f', 'the picker\'s readout SAYS what the drag aimed — the strip\'s only surface — '
-      + 'with the run it snapped from on the title',
-      !!label6 && label6.text.includes(`${cand6.staticBase}..${end6}`)
+      + 'naming the LAST slot the range contains, with the run it snapped from on the title',
+      !!label6 && label6.text.includes(`${cand6.staticBase}..${lastSlot6}`)
+      && !label6.text.includes(`${cand6.staticBase}..${exclusiveEnd6}`)
       && label6.text.includes(`${cand6.cols}x${cand6.rows}`)
       && /dragged run of \d+ slots/.test(label6.title),
-      JSON.stringify(label6));
+      `${JSON.stringify(label6)} · expected ${cand6.staticBase}..${lastSlot6}, `
+      + `and NOT ${cand6.staticBase}..${exclusiveEnd6}`);
+
+    // ── ITEM 43'S TAIL: DOES THE READOUT ELLIPSISE ON THE DOCKED PANEL? ─────
+    //
+    // Booked as "one human look wanted, machine-checked only" — and item 54's
+    // tail then made it live again by adding a separator to this very string.
+    // [6h] already proves a long message cannot MOVE the strip; it says nothing
+    // about whether the message is READABLE. `scrollWidth > clientWidth` is the
+    // quantity a text-overflow:ellipsis truncation actually turns on.
+    const fit6 = await c.json(`(() => {
+      const els = [...document.querySelectorAll('*')].filter(e =>
+        e.children.length === 0 && /\\d+\\.\\.\\d+/.test((e.textContent || '').trim()));
+      return els.map(e => {
+        const cs = getComputedStyle(e);
+        return {
+          text: (e.textContent || '').trim(),
+          scrollWidth: e.scrollWidth, clientWidth: e.clientWidth,
+          overflow: cs.textOverflow, whiteSpace: cs.whiteSpace,
+          truncated: e.scrollWidth > e.clientWidth,
+        };
+      });
+    })()`);
+    console.log(`  READOUT FIT: ${JSON.stringify(fit6)}`);
+    const truncated6 = fit6.filter(f => f.truncated);
+    check('6g2', 'ITEM 43 TAIL: the strip readout is not truncated at the docked panel width',
+      truncated6.length === 0,
+      truncated6.length
+        ? truncated6.map(f => `${JSON.stringify(f.text)} ${f.scrollWidth}>${f.clientWidth}`).join(' | ')
+        : `${fit6.length} range-bearing strings all fit`);
 
     // ── THE ROW THAT CAUGHT A REAL DEFECT AND NOW HOLDS THE FIX ────────────
     //
