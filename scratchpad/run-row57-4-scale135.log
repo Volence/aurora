@@ -1,0 +1,57 @@
+
+=== ROW 57 — THE DOOR TO A STATIC SLOT. aeon tree opened is a COPY: /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-aa7871802285f5ed4/scratchpad/fixtures/aeon-tile-door
+    override: 320 tiles, 4096 layout words, 1 band(s)
+
+PASS  [0a] the build under test contains row 57's strip-open probe (this branch, not master)
+        /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-aa7871802285f5ed4/dist
+PASS  [1a] ANTI-VACUOUS: the aeon project is open, with sections
+        {"open":true,"zone":"ojz","act":"act1","sections":9,"tool":"view","dirty":false,"dirtyActs":[]}
+PASS  [2a] the facet bar offers a Layout pill and the Art section is on screen
+PASS  [2c] ANTI-VACUOUS: the BG layer is picking, the strip IS this document's blob (its count row equals bandBudget().tiles), there is a real animated prefix, AND there are static slots past it — which is the only thing row 57 is about
+        bgSource=override layer=bg countRow=["320 background tiles"] budget={"bands":1,"maxBands":4,"bandsRemaining":3,"animatedSlots":32,"tiles":320,"tileCapacity":448,"tileSlotsRemaining":128,"firstPromotableSlot":32} bands=1 static slots = 32..319 hash=1422319328
+NOTE       ENVIRONMENT  devicePixelRatio=1.350000023841858  stripRect={"left":1160.74072265625,"top":378.65740966796875,"width":224.44444274902344,"height":149.6875,"cw":224,"ch":149,"countLabels":["320 background tiles"],"inWindow":true}  itemSize=16 pitch=18 (read off ArtBrowser.tsx)  screen=1680x1050  SCALE=1.35 (forced)
+PASS  [3a] ANTI-VACUOUS: the strip canvas is mounted, inside the window, with a grid big enough to reach a static slot without scrolling
+        12 cols x 8 visible rows, box={"left":1160.74072265625,"top":378.65740966796875,"width":224.44444274902344,"height":149.6875,"cw":224,"ch":149,"countLabels":["320 background tiles"],"inWindow":true}
+PASS  [3b] ANTI-VACUOUS: integer aims exist for static slots 37 and 49 and both re-derive to the slot they were built for
+        firstPromotableSlot=32  A={"x":1187,"y":441,"slot":37,"col":1,"row":3}  B={"x":1187,"y":459,"slot":49,"col":1,"row":4}
+PASS  [4a] ANTI-VACUOUS: no BG-override document is open before the gesture, so [4b] measures the door rather than something already on screen
+        null
+PASS  [4b] THE ROW — double-clicking strip slot 37 (a STATIC slot, past the animated prefix at 32) opens THAT SLOT in the Art facet's composer. Asserts WHICH target, not that something opened: kind "tile" and the index — the bank door that already worked produces kind "bank", and its document is the band's cols x rows, never 1x1
+        report={"kind":"open","detail":null,"slot":37,"openedTileIndex":37,"gestures":1}
+        open={"name":"BG tile #37","target":{"kind":"tile","tileIndex":37},"widthTiles":1,"heightTiles":1,"dirty":false,"tool":"pencil"}
+        aimed client (1187,441) → slot 37; prefix is 0..31
+        shot → scratchpad/shots-tile-door/composer-static-slot-a.png
+PASS  [4c-pre] ANTI-VACUOUS: the strip box did not move across the facet round trip, so the aims computed in section 3 still land
+        before={"left":1160.74072265625,"top":378.65740966796875,"width":224.44444274902344,"height":149.6875,"cw":224,"ch":149,"countLabels":["320 background tiles"],"inWindow":true}
+        after ={"left":1160.74072265625,"top":378.65740966796875,"width":224.44444274902344,"height":149.6875,"cw":224,"ch":149,"countLabels":["320 background tiles"],"inWindow":true}
+PASS  [4c] and the target MOVES — double-clicking slot 49 opens slot 49, not the 37 that was already open
+        report={"kind":"open","detail":null,"slot":49,"openedTileIndex":49,"gestures":2}
+        open={"name":"BG tile #49","target":{"kind":"tile","tileIndex":49},"widthTiles":1,"heightTiles":1,"dirty":false,"tool":"pencil"}
+PASS  [4d] the app really switched to the Art facet — a composer surface is on screen at the open document's own 1x1 tile (8x8 doc px), square, at 2x or better
+        crosshair canvases [{"cssW":64,"cssH":64}]
+PASS  [5a] a PREFIX slot opens too, and as a TILE target (its writes land in the owning band's phases[0]) — not a throw, and not a bank document
+        report={"kind":"open","detail":null,"slot":0,"openedTileIndex":0,"gestures":3}
+        open={"name":"BG tile #0","target":{"kind":"tile","tileIndex":0},"widthTiles":1,"heightTiles":1,"dirty":false,"tool":"pencil"}  (prefix is 0..31)
+PASS  [6-pre] ANTI-VACUOUS for the drag: the panel's own Rows control really set rows=4, so the run below has to SNAP rather than pass through
+        setRows=ok candidate rows=4
+PASS  [6a] THE DRAG IS UNTOUCHED — a real 11-slot run on the strip still resolves to a RANGE, with staticBase and cols matching arithmetic done in this file
+        app={"kind":"range","detail":null,"anchorSlot":34,"releaseSlot":44,"staticBase":34,"cols":2,"rows":4,"gestures":7}
+        this file expected {"kind":"range","base":34,"cols":2} (rows=4, firstPromotableSlot=32, blob=320)
+PASS  [6b] and the drag opened NOTHING — no double click was synthesised by the press/release pair, so the two gestures cannot reach each other
+        before={"name":"BG tile #0","target":{"kind":"tile","tileIndex":0},"widthTiles":1,"heightTiles":1,"dirty":false,"tool":"pencil"}
+        after ={"name":"BG tile #0","target":{"kind":"tile","tileIndex":0},"widthTiles":1,"heightTiles":1,"dirty":false,"tool":"pencil"}
+        strip-open gestures 3 -> 3
+NOTE       FG BOX  {"left":1160.74072265625,"top":285.15045166015625,"width":224.44444274902344,"height":153.19444274902344,"cw":224,"ch":153,"countLabels":["919 tiles"],"inWindow":true}  cols=12  aim={"x":1187,"y":347,"slot":37,"col":1,"row":3}
+PASS  [7a] THE GATE — the identical double click on the FOREGROUND strip is IGNORED: the gesture RAN (the count advanced, so this is not a dead handler reading as a good gate) and NOTHING opened
+        report={"kind":"ignored","detail":"not-a-background","slot":37,"openedTileIndex":null,"gestures":4}
+        open before={"name":"BG tile #0","target":{"kind":"tile","tileIndex":0},"widthTiles":1,"heightTiles":1,"dirty":false,"tool":"pencil"}
+        open after ={"name":"BG tile #0","target":{"kind":"tile","tileIndex":0},"widthTiles":1,"heightTiles":1,"dirty":false,"tool":"pencil"}
+PASS  [7b] and it stays SILENT on the picker's hover line — the foreground strip has no double-click gesture to refuse, and a refusal there would be noise. Asserted against a SENTINEL written first, so an unwired handler cannot pass this as an empty line
+        {"text":"sentinel-row-57","title":"sentinel-row-57"} (sentinel written before the gesture)
+        shot → scratchpad/shots-tile-door/fg-strip-ignored.png
+PASS  [8a] the whole run wrote NOTHING to the override document — opening a composer document is not an edit
+        1422319328 -> 1422319328
+PASS  [8b] and the LIVE aeon tree is byte-identical — this run drove a hardlinked copy
+        live 9d05f5125004b250…
+
+=== 19/19 checks passed
