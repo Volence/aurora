@@ -787,3 +787,36 @@ defect the parcel exists to fix.
   durable fix.
 - Aeon's tree may be live-edited by its own session. Building it from here is normal
   authoring; landing anything in it is not.
+
+- **⚠ A PINNED AEON CHECKOUT IS NOT A PINNED BUILD — THE TOOLCHAIN IS THE UNPINNED INPUT**
+  *(2026-08-27; `docs/reviews/2026-08-27-fixture-build-drift.md`, corrected at `b1c15d0`.)*
+  A `git clone` of aeon at a fixed SHA, tracked tree clean throughout, built to `4b4f1b5b`
+  and later to `f33b157e` — deterministically, never returning. `build.sh` takes **two
+  binaries from the environment and the checkout pins neither**: `SIGIL_EMIT` (which *writes*
+  `engine/sound/generated/`) and `SIGIL_BUILD` (the assembler). Both live in **sigil's live
+  working tree**, an active lane that relinks them during the day; both moved inside one
+  build window here. **So a cross-session CRC comparison is meaningless unless both sides
+  carry the same assembler revision** — quote `build.sh`'s own `Assembler: sigil <rev>`
+  banner (match on that TEXT, never a line number) beside every CRC recorded or handed out.
+  Adopted by the aeon lane as their landing bar at aeon `fd6ccc8e` (verified: reachable from
+  their `origin/master`, and it is an `OVERSEER.md` bar commit — the right class for a bar).
+  **My first diagnosis of this was wrong and the error is the lesson:** I wrote *"the checkout
+  SHIPPED gitignored artifacts"* into a committed packet **with no line cited**, and the aeon
+  lane accepted it and built a careful, inapplicable `cp -r` explanation on top. A clone
+  cannot carry ignored files; the reflog and `git ls-tree <sha>` each settle it in one
+  command, and neither of us ran either. Bar 2f, by this file's own author, two days after
+  writing it down.
+  ⚠ **AND THE BANNER'S `tree:` FIELD IS VACUOUS TODAY — DO NOT RECORD IT AS A SIGNAL.**
+  *(Caught by the sigil lane before this bar was banked, and verified here against the shared
+  binary.)* `sigil --version` reports `tree: dirty at capture — 0 modified, 1 untracked`, and
+  that **1 untracked is `docs/lane-status.json`** — permanently present, read by no build,
+  incapable of changing a byte. The flag is **stuck on**, so it can only ever return one
+  answer: bar 2e in the very instrument this bar was about to adopt as its defence. Its own
+  `freshness:` line concedes the second half — *"tree state is a build-time snapshot; cargo
+  has no trigger for uncommitted"* — so it is **stale by construction** as well as stuck.
+  **The `revision:` half is load-bearing; the `tree:`/`-dirty` half is decorative until sigil
+  fixes it.** Enumerated across the suite from here, which sigil could not see from inside
+  their own repo: `docs/lane-status.json` is **tracked** in aeon, oracle, seraph and empyrean,
+  and **untracked-but-ignored** here — **sigil is the only lane where it is untracked AND
+  not ignored**, which is the whole cause and is fixable by either of the two arrangements
+  every other lane already uses.
