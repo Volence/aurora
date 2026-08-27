@@ -514,6 +514,35 @@ interface AeonProbeApi {
   bgOverrideLayoutAt(index: number): number | null;
   /** One override tile's 64 pixel values — the art-level image check. */
   bgOverrideTileAt(index: number): number[] | null;
+  /**
+   * One tile of one PHASE BANK: `anims[bandIndex].phases[bank][slot]`.
+   *
+   * IT EXISTS BECAUSE `bgOverrideTileAt` CANNOT SEE BANKS 1..7. The static
+   * blob mirrors phase 0 only, so a harness reading tiles alone cannot tell a
+   * stroke that landed in the bank it opened from one that landed in bank 0 —
+   * both leave the same DOM, the same thumbnail count, and the same
+   * "something changed" verdict. This is the observable that separates them,
+   * and it is what makes "the composer really opened bank k" assertable
+   * rather than inferred from a canvas aspect ratio.
+   */
+  bandPhaseTile(bandIndex: number, bank: number, slot: number): number[] | null;
+  /**
+   * The Art facet's OPEN DOCUMENT, when it is a BG-override one: which target
+   * (`{kind:'tile',tileIndex}` / `{kind:'bank',bandIndex,bank}`), its name, and
+   * the composer document's tile dimensions.
+   *
+   * A bank click is claimed to "open bank k in the composer". The DOM shows a
+   * canvas either way, and every bank of one band has the SAME size and aspect
+   * — so the only place the identity of the opened bank exists is this store
+   * field. Read-only.
+   */
+  bgArtOpen(): {
+    name: string; target: unknown; widthTiles: number; heightTiles: number; dirty: boolean;
+    /** `artStore.tool` — the ART facet's armed tool. `aeon.state().tool` is the
+     *  MAP's, a different store, so a harness arming the pencil has nothing else
+     *  to read the result off. */
+    tool: string;
+  } | null;
 }
 
 interface CanvasProbeApi {
@@ -725,6 +754,25 @@ function installAeonProbe(): AeonProbeApi {
       const doc = bgDoc();
       if (!doc || !Array.isArray(doc.tiles)) return null;
       return doc.tiles[index] ?? null;
+    },
+    bandPhaseTile: (bandIndex, bank, slot) => {
+      const doc = bgDoc();
+      const band = doc?.anims?.[bandIndex];
+      const t = band?.phases?.[bank]?.[slot];
+      return Array.isArray(t) ? [...t] : null;
+    },
+    bgArtOpen: () => {
+      const a = useArtStore.getState();
+      const o = a.open;
+      if (!o || !o.bgOverride) return null;
+      return {
+        name: o.name,
+        target: JSON.parse(JSON.stringify(o.bgOverride)) as unknown,
+        widthTiles: o.doc.widthTiles,
+        heightTiles: o.doc.heightTiles,
+        dirty: o.dirty,
+        tool: a.tool,
+      };
     },
     ntRect: (sectionIndex, col, row, w, h) => {
       const s = section(sectionIndex);
