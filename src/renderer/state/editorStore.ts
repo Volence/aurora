@@ -350,7 +350,21 @@ export function focusedDocId(): string | null {
   if (!level) return null;
 
   const facet = useWorkspaceStore.getState().facetFor(activeId);
-  return ZONE_ART_FACETS.has(facet) ? zoneArtDocId(level.zone) : activeId;
+  if (!ZONE_ART_FACETS.has(facet)) return activeId;
+
+  // The art facet's composer can be opened on the BG OVERRIDE (a band slot or
+  // a phase bank, `OpenDocument.bgOverride` — parcel I). That art is not zone
+  // art: it is the same per-act document the map's `set-bg-override-layout`
+  // and the Effects panel's `regenerate-shift` edit on the ACT stack. While
+  // such a target is open the art facet edits the ACT, so a stroke records
+  // where Ctrl+Z from the map / Effects facets reaches it, and the art
+  // facet's own Ctrl+Z reaches the same stack. Without this, one document had
+  // two undo stacks interleaved by facet (live-app finding F1,
+  // docs/reviews/2026-08-26-effects-foreground-checks-2.md). `art` only: the
+  // composer lives there; palette / collision keep their zone-art routing.
+  if (facet === 'art' && useArtStore.getState().open?.bgOverride) return activeId;
+
+  return zoneArtDocId(level.zone);
 }
 
 /**
