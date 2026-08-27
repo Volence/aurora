@@ -204,9 +204,16 @@ export function resolveStripDrag(input: StripDragInputs): StripDragOutcome {
     return {
       kind: 'refused',
       reason: `slots ${lo}..${runEnd} already belong to bands`,
+      // ⚠ `firstPromotableSlot` is a COUNT, so it is the first FREE slot, not the
+      // last owned one — the animated slots are `0 .. firstPromotableSlot - 1`
+      // (`bandBudget` sets it from `animatedSlotCount`). Naming the boundary as
+      // `0..firstPromotableSlot` would tell the author that the one slot they
+      // CAN drag to is taken, in the single message where that instruction is
+      // the whole point. Derived here, and pinned by a node row that computes
+      // the boundary from `firstPromotableSlot` rather than restating a literal.
       hint: `slots ${lo}..${runEnd} are all inside the animated prefix — slots 0..`
-        + `${firstPromotableSlot} already belong to bands, so there is no static art under this `
-        + 'drag to promote. Drag a run that reaches past the prefix.',
+        + `${firstPromotableSlot - 1} already belong to bands, so there is no static art under `
+        + `this drag to promote. Drag a run that reaches slot ${firstPromotableSlot} or past it.`,
     };
   }
 

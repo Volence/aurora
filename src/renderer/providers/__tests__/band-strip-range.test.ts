@@ -199,11 +199,23 @@ describe('the base clamp — and the order it happens in', () => {
 
 describe('the two refusals — loud, and unchanged candidate', () => {
   it('a run entirely inside the animated prefix is refused, naming the prefix', () => {
-    const r = resolveStripDrag(drag({ anchorSlot: 4, releaseSlot: 20, firstPromotableSlot: 32 }));
+    const fps = 32;
+    const r = resolveStripDrag(drag({ anchorSlot: 4, releaseSlot: 20, firstPromotableSlot: fps }));
     expect(r.kind).toBe('refused');
     expect(r.kind === 'refused' && r.reason).toMatch(/already belong to bands/);
     expect(r.kind === 'refused' && r.hint).toMatch(/animated prefix/);
-    expect(r.kind === 'refused' && r.hint).toMatch(/0\.\.32/);
+    // THE BOUNDARY IS DERIVED FROM `firstPromotableSlot`, NOT TYPED.
+    // `bandBudget` sets it from `animatedSlotCount`, so it is a COUNT: the owned
+    // slots are `0 .. fps-1` and `fps` itself is the first slot the author may
+    // drag to. This row shipped as a literal `/0\.\.32/` and passed against a
+    // hint that said `0..32` — naming the one free slot as taken, inside the
+    // single message whose whole job is to say where to drag instead. A literal
+    // could not tell the two apart; deriving both halves is what makes it fail
+    // if the boundary moves back.
+    expect(r.kind === 'refused' && r.hint).toContain(`0..${fps - 1}`);
+    expect(r.kind === 'refused' && r.hint).not.toContain(`0..${fps}`);
+    // and it must point AT the first usable slot, not merely away from the prefix
+    expect(r.kind === 'refused' && r.hint).toContain(`reaches slot ${fps}`);
   });
 
   it('a base with no room for even one column is refused, naming the blob\'s end', () => {
