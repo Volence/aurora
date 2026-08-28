@@ -52,6 +52,38 @@ export type PasteLayers = 'both' | 'art' | 'collision';
 export type MarqueeGranularity = 'block' | 'tile';
 
 /**
+ * THE MODIFIER RULE: Ctrl/Cmd during a marquee drag means "the OTHER one".
+ *
+ * The owner asked for *"if you hold control it behaves like it did where it
+ * forces to draw collision size"* — Ctrl = block snapping, the pre-tile-
+ * granularity behaviour. Taken literally that is a NO-OP in the shipped state:
+ * `block` is still the default (`editorStore.marqueeGranularity`), so an author
+ * who never touched the Snap control is already in block mode and holding Ctrl
+ * would change nothing at all.
+ *
+ * So the modifier INVERTS the armed setting instead. Block + Ctrl gives tile,
+ * tile + Ctrl gives block — which IS what he asked for whenever the Snap
+ * control is set to Tile, and is the useful half of the gesture in the default
+ * state where the literal reading does nothing. One rule, symmetric in both
+ * directions, and the author never has to recall which way the panel is set:
+ * the modifier is always the other one.
+ *
+ * A separate named function rather than a ternary at the two call sites because
+ * three surfaces have to agree on it — MapViewport's mousedown, its mousemove,
+ * and the panel's readout of which mode is actually in force. Two of those
+ * decide the rect and the third describes it; a copy of the ternary in each is
+ * how a panel comes to lie about the drag it is watching.
+ *
+ * Like `marqueeGranularity` itself this is a property of the DRAG, never of the
+ * selection: the committed rect records only its geometry, and `isBlockAligned`
+ * answers every downstream question from that.
+ */
+export function effectiveGranularity(base: MarqueeGranularity, invert: boolean): MarqueeGranularity {
+  if (!invert) return base;
+  return base === 'block' ? 'tile' : 'block';
+}
+
+/**
  * Is this tile rect expressible in 16px collision cells?
  *
  * Origin AND size both have to be even: an odd origin puts the rect's first

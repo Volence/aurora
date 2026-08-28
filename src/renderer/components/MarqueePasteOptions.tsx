@@ -5,6 +5,7 @@ import { useToastStore } from '../state/toastStore';
 import type { PasteLayers, MarqueeGranularity } from '../../core/editing/map-clipboard';
 import {
   isBlockAligned, selectionSizeLabel, artOnlyReason, copyFromSection,
+  effectiveGranularity,
 } from '../../core/editing/map-clipboard';
 import { selectionToChunk } from '../../core/editing/selection-to-chunk';
 import { regionPreviewCanvas } from '../canvas/region-preview';
@@ -102,6 +103,7 @@ export default function MarqueePasteOptions() {
   const setPasteLayers = useEditorStore((s) => s.setPasteLayers);
   const granularity = useEditorStore((s) => s.marqueeGranularity);
   const setGranularity = useEditorStore((s) => s.setMarqueeGranularity);
+  const snapInvert = useEditorStore((s) => s.marqueeSnapInvert);
   const pasting = useEditorStore((s) => s.pasting);
   const marquee = useEditorStore((s) => s.marquee);
   const clipboard = useEditorStore((s) => s.mapClipboard);
@@ -110,6 +112,12 @@ export default function MarqueePasteOptions() {
   // WHICH RULE IS IN FORCE, derived from the RECT rather than the armed mode —
   // a Tile-mode drag that lands on even bounds is block-aligned and carries
   // collision like any other, so the mode is never what is reported.
+  // WHAT THE NEXT DRAG WILL ACTUALLY SNAP TO. Not `granularity` — that is the
+  // armed setting, and while Ctrl/Cmd is down it is NOT what a drag would do.
+  // The same `effectiveGranularity` MapViewport computes the rect from, so the
+  // control cannot come to describe a mode the drag is not in.
+  const effective = effectiveGranularity(granularity, snapInvert);
+
   const aligned = marquee ? isBlockAligned(marquee.col, marquee.row, marquee.w, marquee.h) : true;
   const sizeLabel = marquee ? selectionSizeLabel(marquee.col, marquee.row, marquee.w, marquee.h) : '';
   const reason = marquee ? artOnlyReason(marquee.col, marquee.row, marquee.w, marquee.h) : '';
@@ -164,9 +172,24 @@ export default function MarqueePasteOptions() {
         <div style={styles.planes}>
           <span style={styles.planeLabel}>Snap</span>
           {GRAIN_OPTS.map(({ value, label, title }) => (
-            <button key={value} onClick={() => setGranularity(value)} title={title}
-              style={{ ...styles.planeBtn, ...(granularity === value ? styles.planeSel : {}) }}>{label}</button>
+            <button key={value} onClick={() => setGranularity(value)}
+              title={snapInvert
+                ? `${title}  (Ctrl/Cmd is held, so a drag right now snaps to `
+                  + `${effective} — release it to go back to ${granularity}.)`
+                : `${title}  Hold Ctrl/Cmd while dragging to snap the other way.`}
+              style={{ ...styles.planeBtn, ...(effective === value ? styles.planeSel : {}) }}>{label}</button>
           ))}
+        </div>
+      )}
+      {/* THE MODIFIER, SAID OUT LOUD. Without this the highlight above would
+          simply MOVE while a key is held and nothing would explain it — and if
+          the highlight stayed put instead, the control would be claiming a mode
+          the drag is not in. The armed setting is named too, so the author can
+          see what he returns to on release. */}
+      {!pasting && snapInvert && (
+        <div style={styles.overrideLine}>
+          {`Ctrl held — snapping to ${effective === 'block' ? 'blocks (16px, carries collision)' : 'tiles (8px, art only unless it lands even)'}. `}
+          {`Release for ${granularity}.`}
         </div>
       )}
 
@@ -222,7 +245,7 @@ export default function MarqueePasteOptions() {
       <div style={styles.hint}>
         {pasting
           ? 'Click to paste · hold Alt for art only, Shift for collision only · Esc to stop'
-          : 'Drag to select · Ctrl+C copy · Ctrl+V paste'}
+          : 'Drag to select (hold Ctrl to snap the other way) · Ctrl+C copy · Ctrl+V paste'}
       </div>
       {/* Save-as-chunk: only meaningful with a committed selection and not while
           pasting. Captures the same FG nametable + collision the map clipboard
@@ -255,6 +278,7 @@ const styles: Record<string, React.CSSProperties> = {
   planeBtn: { padding: `2px ${T.s2}`, background: T.overlay, color: T.textBase, borderWidth: 1, borderStyle: 'solid', borderColor: T.border, borderRadius: T.rSm, cursor: 'pointer', fontSize: T.tXs, minWidth: 26, textAlign: 'center' },
   planeSel: { background: T.accent, color: T.onAccent, borderColor: T.accent },
   planeDead: { opacity: 0.4, cursor: 'not-allowed', color: T.textLo },
+  overrideLine: { fontSize: T.t2xs, color: T.accent, padding: `${T.s2} ${T.s2} 0`, lineHeight: 1.35 },
   warnLine: { fontSize: T.t2xs, color: T.warning, padding: `${T.s2} ${T.s2} 0`, lineHeight: 1.35 },
   sizeLine: { fontSize: T.tXs, padding: `${T.s2} ${T.s2} 2px` },
   dim: { color: T.textLo },

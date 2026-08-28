@@ -302,6 +302,26 @@ interface EditorState {
    * lands on even bounds behaves exactly like a Block-mode one.
    */
   marqueeGranularity: MarqueeGranularity;
+  /**
+   * Is the Ctrl/Cmd snap modifier held RIGHT NOW?
+   *
+   * The owner asked for *"if you hold control it behaves like it did where it
+   * forces to draw collision size"*. `effectiveGranularity` (map-clipboard)
+   * carries the rule; this carries only the key state, because THREE surfaces
+   * have to agree about it and two of them are not MapViewport: the drag writes
+   * the rect, and the marquee panel's Snap control must not sit there claiming
+   * `Block` while a Ctrl-held drag is snapping to tiles. A MapViewport-local
+   * ref could not be read by the panel, and a second copy of the key state in
+   * the panel is exactly how the two come to disagree.
+   *
+   * EPHEMERAL, like `bandReveal` and `bandLensTarget`: it is live keyboard
+   * chrome, never part of the document, and setting it must not create an undo
+   * step. It is also NOT a property of the selection — a committed marquee
+   * records only its rect, and every downstream rule is answered from that
+   * geometry via `isBlockAligned`, exactly as for `marqueeGranularity`. Nothing
+   * downstream may ever read this to decide what a selection can carry.
+   */
+  marqueeSnapInvert: boolean;
   mapClipboard: MapClipboard | null;
   pasteLayers: PasteLayers;
   /** True while the map paste-ghost/click-to-commit mode is active (entered by
@@ -372,6 +392,7 @@ interface EditorState {
   clearBandReveal: () => void;
   setMarquee: (marquee: MarqueeState | null) => void;
   setMarqueeGranularity: (granularity: MarqueeGranularity) => void;
+  setMarqueeSnapInvert: (invert: boolean) => void;
   setMapClipboard: (clipboard: MapClipboard | null) => void;
   setPasteLayers: (layers: PasteLayers) => void;
   setPasting: (pasting: boolean) => void;
@@ -510,6 +531,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   marquee: null,
   marqueeGranularity: 'block',
+  marqueeSnapInvert: false,
   mapClipboard: null,
   pasteLayers: 'both',
   pasting: false,
@@ -583,6 +605,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   clearBandReveal: () => set({ bandReveal: null }),
   setMarquee: (marquee) => set({ marquee }),
   setMarqueeGranularity: (marqueeGranularity) => set({ marqueeGranularity }),
+  setMarqueeSnapInvert: (marqueeSnapInvert) => set({ marqueeSnapInvert }),
   setMapClipboard: (mapClipboard) => set({ mapClipboard }),
   setPasteLayers: (pasteLayers) => set({ pasteLayers }),
   setPasting: (pasting) => set({ pasting }),
