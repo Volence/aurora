@@ -59,9 +59,17 @@ export interface OverlayOptions {
    *  over it.
    *
    *  ⚠ IT IS NOT THE WHOLE PICTURE and the composite says so on the canvas:
-   *  no curve ramps, no deform (both need a clock this pass does not have),
-   *  no foreground factors, no sprites, no priority. See
-   *  canvas/camera-preview.ts's absence list.
+   *  no deform (that one really does need a clock — its line loops index a
+   *  table by a phase `Parallax_Update` advances every frame), no foreground
+   *  factors, no sprites, no priority. See canvas/camera-preview.ts's absence
+   *  list, which is the live answer; this comment is prose beside it.
+   *
+   *  ⚠ CURVE RAMPS ARE DRAWN, and this line used to say they were not — "no
+   *  curve ramps, no deform (both need a clock this pass does not have)". The
+   *  parenthesis was true of deform and FALSE of curves, and lumping them cost
+   *  the feature a pass: a ramp is a function of the LINE, not of a frame
+   *  counter, so nothing about the map's clockless repaint was ever in its way.
+   *  See `curveRampRuns` for the measurement.
    *
    *  A lens, so OFF by default. */
   showCameraPreview: boolean;
