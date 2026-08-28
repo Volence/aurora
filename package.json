@@ -10,7 +10,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "gen:theme": "node scripts/gen-theme.mjs",
-    "harness:tile-attributes": "node scratchpad/tile-attribute-harness.mjs"
+    "harness:tile-attributes": "node scratchpad/tile-attribute-harness.mjs",
+    "harness:raster-timeline": "node scratchpad/raster-timeline-harness.mjs"
   },
   "keywords": [],
   "author": "",

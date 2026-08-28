@@ -27,6 +27,7 @@ import type { GuideReport } from './canvas/effects-guides';
 import { lastScreenFrameReport, type ScreenFrameReport } from './canvas/screen-frame';
 import { lastPriorityLensReport, type PriorityLensReport } from './canvas/priority-lens';
 import { lastCameraPreviewReport, type CameraPreviewReport } from './canvas/camera-preview';
+import { lastRasterTimelineReport, type RasterTimelineReport } from './canvas/raster-timeline';
 import { lastBandLensReport, lastBandMarkReport } from './canvas/band-lens';
 import type { BandLensReport, BandMarkReport } from './canvas/band-lens';
 import { lastStripDragReport } from './providers/band-strip-range';
@@ -504,6 +505,20 @@ interface AeonProbeApi {
    */
   cameraPreview(): CameraPreviewReport;
   /**
+   * THE RASTER TIMELINE AS THE LAST DRAW PUT IT DOWN (ROADMAP row 79).
+   *
+   * Same publish-not-recompute contract as `guides()`, and it matters more here
+   * than usual: the strip is a projection of `cameraPreview()`'s own plan, so a
+   * probe that re-derived it from the scene would prove the projection agrees
+   * with itself — which stays true when the canvas is blank. `fills` and
+   * `markers` are rectangles and rules ACTUALLY issued, and the strip's own
+   * constants (`lines`, `scale`, `originY`, `stripX`, `stripW`) are published so
+   * a harness derives every pixel aim from the app's contract instead of typing
+   * a number. Pixels are still the last word; see
+   * scratchpad/raster-timeline-harness.mjs.
+   */
+  rasterTimeline(): RasterTimelineReport;
+  /**
    * THE BAND LENS AS THE LAST REPAINT DREW IT (ROADMAP item 43 part 2).
    *
    * Same contract as `guides()` and for the same reason: a PUBLISH from the end
@@ -829,6 +844,7 @@ function installAeonProbe(): AeonProbeApi {
     screenFrame: () => lastScreenFrameReport(),
     priorityLens: () => lastPriorityLensReport(),
     cameraPreview: () => lastCameraPreviewReport(),
+    rasterTimeline: () => lastRasterTimelineReport(),
     bandLens: () => lastBandLensReport(),
     bandMark: () => lastBandMarkReport(),
     stripDrag: () => lastStripDragReport(),
