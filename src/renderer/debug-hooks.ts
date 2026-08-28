@@ -15,7 +15,8 @@ import { useClassicLevelStore } from './state/classicLevelStore';
 import { useClassicObjectArtStore } from './state/classicObjectArtStore';
 import { useProjectStore, getCurrentAct } from './state/projectStore';
 import { useEditorStore, focusedHistory } from './state/editorStore';
-import { isBlockAligned } from '../core/editing/map-clipboard';
+import { isBlockAligned, effectiveGranularity } from '../core/editing/map-clipboard';
+import { lastPasteGhostReport, type PasteGhostReport } from './canvas/region-preview';
 import { openAeonProject } from './state/aeon-open';
 import { bandBudget, bandRows } from './providers/bg-anim-aeon';
 import { serializeBgOverride } from '../core/formats/bg-override/bg-override';
@@ -401,6 +402,36 @@ interface AeonProbeApi {
    * button. A setter here would let a green row coexist with a dead control.
    */
   marqueeGranularity(): string;
+  /**
+   * THE SNAP MODIFIER, both halves, read-only.
+   *
+   * `invert` is the live Ctrl/Cmd state the store carries; `effective` is
+   * `effectiveGranularity(armed, invert)` called for real — never re-derived
+   * here. A probe that recomputed the inversion could agree with itself while
+   * disagreeing with the drag, which for a two-value function with a collapsed
+   * pair of outcomes is not a theoretical risk: BLOCK+held and TILE+plain
+   * produce identical rects, so half the state space cannot tell a working
+   * modifier from a broken one by geometry alone. This probe is what lets a
+   * harness row name WHICH of the four combinations it is standing in.
+   *
+   * No setter, for the reason `marqueeGranularity` has none: the modifier is a
+   * real key on a real keyboard, and a harness that set a flag instead of
+   * holding the key would go green over a drag that never read it.
+   */
+  marqueeSnapModifier(): { armed: string; invert: boolean; effective: string };
+  /**
+   * WHAT THE PASTE GHOST IS SHOWING, read-only — the hovered footprint the
+   * viewport last drew, straight out of `region-preview`'s published report.
+   *
+   * It exists because of a bug that could not be seen without it: a middle-drag
+   * pan in paste mode was swallowed by the ghost-tracking branch, and the fix
+   * had to pan AND keep the ghost live. Whether the ghost is stale is not
+   * visible in the store (the hovered cell is a viewport-local ref), not
+   * visible in the camera, and not reliably visible in a canvas scan — the
+   * ghost is drawn on a second overlay canvas that a colour scan cannot tell
+   * apart from the map beneath it.
+   */
+  pasteGhost(): PasteGhostReport;
   /**
    * WHAT THE MAP CLIPBOARD ACTUALLY HOLDS. Read-only.
    *
@@ -802,6 +833,15 @@ function installAeonProbe(): AeonProbeApi {
       } : null;
     },
     marqueeGranularity: () => useEditorStore.getState().marqueeGranularity,
+    pasteGhost: () => lastPasteGhostReport(),
+    marqueeSnapModifier: () => {
+      const e = useEditorStore.getState();
+      return {
+        armed: e.marqueeGranularity,
+        invert: e.marqueeSnapInvert,
+        effective: effectiveGranularity(e.marqueeGranularity, e.marqueeSnapInvert),
+      };
+    },
     mapClipboardInfo: () => {
       const c = useEditorStore.getState().mapClipboard;
       if (!c) return null;

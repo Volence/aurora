@@ -24,9 +24,10 @@ import { buildStampCommand } from '../../core/editing/map-stamp';
 import {
   snapMarquee, copyFromSection, buildPasteCommand, isBlockAligned,
   effectivePasteLayers, pasteBaseStep, selectionSizeLabel, artOnlyReason,
+  effectiveGranularity,
 } from '../../core/editing/map-clipboard';
 import type { MapClipboard } from '../../core/editing/map-clipboard';
-import { regionPreviewCanvas } from '../canvas/region-preview';
+import { regionPreviewCanvas, publishPasteGhostReport } from '../canvas/region-preview';
 import type { PasteLayers } from '../../core/editing/map-clipboard';
 import { SectionRenderer } from '../canvas/SectionRenderer';
 import {
@@ -341,6 +342,19 @@ export default function MapViewport() {
   // cursor wanders over another section's world space.
   const marqueeDragStart = useRef<{ sectionIndex: number; col: number; row: number } | null>(null);
   const isMarqueeDragging = useRef(false);
+  /**
+   * Where the cursor was when the marquee rect was last computed, in the
+   * drag-START section's tile space.
+   *
+   * Exists so the Ctrl/Cmd modifier can be sampled LIVE rather than only at the
+   * moments the mouse happens to move: pressing or releasing the key re-runs
+   * `snapMarquee` against THIS, so a drag held still while the key is tapped
+   * re-snaps under the author's eyes instead of waiting for a stray pixel of
+   * motion. Without it the panel and the rect could disagree for as long as the
+   * hand stayed still — a preview showing one grid over a rect committed on
+   * another, which is the exact defect this facet has spent the day removing.
+   */
+  const marqueeDragLast = useRef<{ col: number; row: number } | null>(null);
   // Paste mode (editorStore `pasting`): the hovered section + even-snapped
   // footprint origin for the ghost preview and click-to-commit. Purely local
   // render state (like previewHoverRef) — nothing outside MapViewport needs
@@ -1364,6 +1378,95 @@ export default function MapViewport() {
     return () => observer.disconnect();
   }, [redraw]);
 
+  // ---- THE MARQUEE SNAP MODIFIER (owner: "if you hold control it behaves like
+  //      it did where it forces to draw collision size") ---------------------
+  /**
+   * Recompute the in-flight marquee from the drag start, a cursor tile, and
+   * whatever the modifier says RIGHT NOW.
+   *
+   * ONE WRITER, and that is the whole design. `handleMouseUp` deliberately does
+   * NOT re-snap — it only tears the drag refs down — so the rect the author is
+   * looking at IS the rect that stands when the button comes up. Preview and
+   * commit are not two computations that have to be kept in agreement; they are
+   * the same store value, written here and rendered from here. That makes the
+   * "which event is authoritative?" question answerable in one line: THE LAST
+   * EVENT THAT MOVED EITHER THE CURSOR OR THE KEY, whichever came last.
+   *
+   * `granularity` therefore comes from `effectiveGranularity(armed, held)` at
+   * the instant of that event, never from a value latched at mousedown — a
+   * latch is how a modifier ends up governing a rect the author has since
+   * changed his mind about, with the panel narrating the old choice.
+   */
+  /** Its own boolean selector rather than the `tool` subscription further down:
+   *  that one is declared below this point, and a component-order dependency is
+   *  a worse thing to introduce than a second zustand selector over the same
+   *  slice (which re-renders only when the ANSWER flips, not on every tool
+   *  change). */
+  const marqueeToolActive = useEditorStore((s) => s.tool === 'marquee');
+
+  const applyMarqueeSnap = useCallback((col: number, row: number, invert: boolean) => {
+    const start = marqueeDragStart.current;
+    if (!start) return;
+    marqueeDragLast.current = { col, row };
+    const ed = useEditorStore.getState();
+    if (ed.marqueeSnapInvert !== invert) ed.setMarqueeSnapInvert(invert);
+    const snap = snapMarquee(start.col, start.row, col, row,
+      effectiveGranularity(ed.marqueeGranularity, invert));
+    useEditorStore.getState().setMarquee({ sectionIndex: start.sectionIndex, ...snap });
+    drawCollisionPreview();
+  }, [drawCollisionPreview]);
+
+  /**
+   * Ctrl/Cmd tracked as a KEY STATE, not only as a mouse-event bit.
+   *
+   * WHY THIS DOES NOT COLLIDE WITH Ctrl+C / Ctrl+V / THE TOOL LETTERS.
+   * Those are all chords - a modifier PLUS a character - handled by the window
+   * keydown listener further down, which either matches `e.key` against 'c'/'v'
+   * /'s' or bails outright on `if (e.ctrlKey || e.metaKey || e.altKey) return`.
+   * A bare Control or Meta press matches none of them and reaches that
+   * listener's early return, so this reads a signal nothing else was reading.
+   * It claims no chord, calls no `preventDefault`, and swallows nothing: Ctrl+C
+   * over a live marquee still copies exactly the rect on screen (which, held
+   * through a drag, is the inverted one - the one the author can see).
+   *
+   * Scoped to the marquee tool so no other facet pays for a listener, and
+   * cleared on blur: a window that loses focus mid-chord never delivers the
+   * keyup, and a stuck `true` would leave the panel claiming an override that
+   * no finger is holding.
+   */
+  useEffect(() => {
+    if (!marqueeToolActive) {
+      // Leaving the tool with the key down must not strand the flag - the panel
+      // that reads it unmounts, but the store outlives it.
+      if (useEditorStore.getState().marqueeSnapInvert) {
+        useEditorStore.getState().setMarqueeSnapInvert(false);
+      }
+      return;
+    }
+    const sync = (invert: boolean) => {
+      const ed = useEditorStore.getState();
+      if (ed.marqueeSnapInvert === invert) return;
+      // Mid-drag the rect must follow the key IMMEDIATELY, against the cursor
+      // tile the last mouse event resolved - otherwise a hand held still after
+      // tapping Ctrl watches a rect that disagrees with the panel until it
+      // twitches.
+      const last = marqueeDragLast.current;
+      if (isMarqueeDragging.current && last) applyMarqueeSnap(last.col, last.row, invert);
+      else ed.setMarqueeSnapInvert(invert);
+    };
+    const onKeyDown = (e: KeyboardEvent) => { if (e.ctrlKey || e.metaKey) sync(true); };
+    const onKeyUp = (e: KeyboardEvent) => { if (!e.ctrlKey && !e.metaKey) sync(false); };
+    const onBlur = () => sync(false);
+    window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('keyup', onKeyUp);
+    window.addEventListener('blur', onBlur);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keyup', onKeyUp);
+      window.removeEventListener('blur', onBlur);
+    };
+  }, [marqueeToolActive, applyMarqueeSnap]);
+
   // ---- BgAnim band playback (ROADMAP item 42) ------------------------------
   // The clock, and it is DELIBERATELY SMALL. Classic's shape
   // (ClassicLevelViewport's animated-art clock) copied LOCALLY, not hoisted:
@@ -1706,6 +1809,33 @@ export default function MapViewport() {
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [pan, setZoom, zoom]);
+
+  /**
+   * Advance the camera by this move event's delta, and remember where the
+   * cursor was.
+   *
+   * Extracted because it now has TWO callers, and the reason it has two is the
+   * bug it was extracted to fix: the pan handler sits at the bottom of
+   * `handleMouseMove` behind half a dozen `return`s, so any branch above it
+   * that returns has silently disabled panning for its whole mode. Paste mode
+   * did exactly that (owner, 2026-08-28: *"When I'm in paste mode with marquee
+   * I can't middle mouse click to move around"*). A second copy of these four
+   * lines in the paste branch would be the same defect wearing a different
+   * hat — this facet has now been bitten three times in one day by a rule
+   * enforced in one handler and not honoured by its sibling.
+   *
+   * ⚠ IT WRITES THE VIEW STORE SYNCHRONOUSLY, and callers depend on that:
+   * `screenToWorld` reads `useViewStore.getState()` on every call, so anything
+   * computed AFTER this sees the new camera. That is what lets the paste ghost
+   * follow the world cell it is actually over during a pan rather than lagging
+   * a frame behind it.
+   */
+  function panFromEvent(clientX: number, clientY: number): void {
+    const dx = clientX - lastMouse.current.x;
+    const dy = clientY - lastMouse.current.y;
+    lastMouse.current = { x: clientX, y: clientY };
+    pan(dx, dy);
+  }
 
   function screenToWorld(clientX: number, clientY: number): { x: number; y: number } {
     const rect = canvasRef.current?.getBoundingClientRect();
@@ -2664,10 +2794,11 @@ export default function MapViewport() {
 
       marqueeDragStart.current = { sectionIndex: info.sectionIndex, col: info.col, row: info.row };
       isMarqueeDragging.current = true;
-      const snap = snapMarquee(info.col, info.row, info.col, info.row,
-        useEditorStore.getState().marqueeGranularity);
-      useEditorStore.getState().setMarquee({ sectionIndex: info.sectionIndex, ...snap });
-      drawCollisionPreview();
+      // Ctrl/Cmd read off THIS event, not off a cached key state: a press that
+      // arrives while the window was unfocused (click-to-focus with the key
+      // already down) delivers no keydown, and the mouse event's own modifier
+      // bit is the only thing that saw it.
+      applyMarqueeSnap(info.col, info.row, e.ctrlKey || e.metaKey);
       e.preventDefault();
       return;
     }
@@ -2729,7 +2860,7 @@ export default function MapViewport() {
       e.preventDefault();
       return;
     }
-  }, []);
+  }, [applyMarqueeSnap]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     const tool = useEditorStore.getState().tool;
@@ -2757,6 +2888,33 @@ export default function MapViewport() {
     // ghost preview. Independent of the active tool — takes priority over any
     // drag state so the ghost can't get stuck showing a stale cell.
     if (useEditorStore.getState().pasting) {
+      // ═══ A MIDDLE-DRAG PAN IS NOT SOMETHING THIS BRANCH MAY SWALLOW ═══
+      //
+      // `handleMouseDown` already promises this in a comment — *"Left-click
+      // only (button 0) — middle-click must still fall through to pan"* — and
+      // it keeps that promise: the middle press falls through and sets
+      // `isDragging`. This handler then threw it away, returning below before
+      // the pan handler at the bottom ever ran. The mousedown made a promise
+      // its sibling broke, and the map was frozen for the whole of paste mode.
+      //
+      // WHY NOT `if (isDragging.current) return;` AT THE TOP. Because the
+      // comment above is a real prior decision, not an accident: this branch is
+      // unconditional so the ghost cannot get stuck showing a stale cell, and
+      // an early return would put that bug straight back.
+      //
+      // BOTH BEHAVIOURS ARE WANTED AT ONCE, and they are not in tension. A pan
+      // moves the map UNDER a stationary cursor, so the world position beneath
+      // the pointer genuinely changes and the ghost SHOULD follow it. So: pan
+      // first, then fall through and compute the footprint against the camera
+      // the pan just wrote. `screenToWorld` reads the view store live, so the
+      // `world` below is the post-pan position — the ghost tracks the cell it
+      // is really over instead of lagging a frame.
+      //
+      // Nothing can commit a paste from this gesture: the commit lives in
+      // `handleMouseDown` behind `e.button === 0`, and `handleMouseUp` has no
+      // paste path at all. A pan that pasted at the end would be far worse than
+      // a pan that did not work.
+      if (isDragging.current) panFromEvent(e.clientX, e.clientY);
       const world = screenToWorld(e.clientX, e.clientY);
       const info = worldToSectionTile(world.x, world.y);
       if (info) {
@@ -2780,6 +2938,11 @@ export default function MapViewport() {
         pasteHoverRef.current = null;
         drawCollisionPreview();
       }
+      // PUBLISHED UNCONDITIONALLY, on every move this branch handles — not only
+      // when the cell changes. "The ghost never updated" and "the ghost updated
+      // to the same cell" are different facts, and the second is what a frozen
+      // ghost looks like from outside; only a paint count can tell them apart.
+      publishPasteGhostReport({ pasting: true, hover: pasteHoverRef.current });
       return;
     }
 
@@ -2854,10 +3017,7 @@ export default function MapViewport() {
       const offset = sectionRenderer.sectionWorldOffset(start.sectionIndex);
       const col = Math.floor((world.x - offset.x) / 8);
       const row = Math.floor((world.y - offset.y) / 8);
-      const snap = snapMarquee(start.col, start.row, col, row,
-        useEditorStore.getState().marqueeGranularity);
-      useEditorStore.getState().setMarquee({ sectionIndex: start.sectionIndex, ...snap });
-      drawCollisionPreview();
+      applyMarqueeSnap(col, row, e.ctrlKey || e.metaKey);
       return;
     }
 
@@ -2928,12 +3088,10 @@ export default function MapViewport() {
       return;
     }
 
-    // Pan
+    // Pan — the same body the paste branch above calls, so the two can never
+    // drift into panning by different amounts.
     if (isDragging.current) {
-      const dx = e.clientX - lastMouse.current.x;
-      const dy = e.clientY - lastMouse.current.y;
-      lastMouse.current = { x: e.clientX, y: e.clientY };
-      pan(dx, dy);
+      panFromEvent(e.clientX, e.clientY);
       return;
     }
 
@@ -3011,7 +3169,7 @@ export default function MapViewport() {
         if (previewHoverRef.current) { previewHoverRef.current = null; drawCollisionPreview(); }
       }
     }
-  }, [pan, drawCollisionPreview, redraw]);
+  }, [pan, drawCollisionPreview, redraw, applyMarqueeSnap]);
 
   /**
    * End whatever gesture is in flight, wherever the button was released.
@@ -3037,6 +3195,10 @@ export default function MapViewport() {
     isPaintDragging.current = false;
     isMarqueeDragging.current = false;
     marqueeDragStart.current = null;
+    // ...and the cursor tile the modifier would re-snap against. Stale, it
+    // would let a Ctrl press AFTER the button came up re-write a committed
+    // marquee from a drag that is over.
+    marqueeDragLast.current = null;
 
     if (dragTarget.current && isDragging.current) {
       const target = dragTarget.current;
@@ -3127,6 +3289,10 @@ export default function MapViewport() {
     // stays in the store.
     isMarqueeDragging.current = false;
     marqueeDragStart.current = null;
+    // ...and the cursor tile the modifier would re-snap against. Stale, it
+    // would let a Ctrl press AFTER the button came up re-write a committed
+    // marquee from a drag that is over.
+    marqueeDragLast.current = null;
 
     // View and mark-band: a click (pointer barely moved) selects the section
     // under the cursor — a pan-drag does not. The band mark commits on the

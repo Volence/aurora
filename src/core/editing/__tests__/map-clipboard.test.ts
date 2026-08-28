@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   snapMarquee, isBlockAligned, copyFromSection, copyChunkToClipboard,
   buildPasteCommand, effectivePasteLayers, pasteBaseStep, selectionSizeLabel, artOnlyReason,
+  effectiveGranularity,
 } from '../map-clipboard';
 import { buildRegionWriteCommand } from '../map-stamp';
 import { selectionToChunk } from '../selection-to-chunk';
@@ -11,6 +12,7 @@ import {
   SECTION_TILES_WIDE, SECTION_TILES_HIGH,
 } from '../../model/s4-types';
 import type { Section } from '../../model/s4-types';
+import type { MarqueeGranularity } from '../map-clipboard';
 import type { AnyCommand, SetCollisionEditCommand, SetTilesCommand } from '../commands';
 
 /**
@@ -131,6 +133,69 @@ describe('2. snapMarquee at tile granularity', () => {
     // The shipped block contract, restated so a regression in it is visible
     // here and not only in the app: rounds OUT to cover what was dragged.
     expect(snapMarquee(3, 5, 8, 9, 'block')).toEqual({ col: 2, row: 4, w: 8, h: 6 });
+  });
+});
+
+describe('2M. the Ctrl/Cmd modifier INVERTS the armed granularity', () => {
+  // The owner's words were "if you hold control it behaves like it did where it
+  // forces to draw collision size" — Ctrl = block. These rows pin why that was
+  // built as an inversion instead of a constant: read literally it is a no-op in
+  // the state every author starts in.
+  it('2M-a. held: block becomes tile, and tile becomes block — symmetric', () => {
+    expect(effectiveGranularity('block', true)).toBe('tile');
+    expect(effectiveGranularity('tile', true)).toBe('block');
+  });
+
+  it('2M-b. not held: the armed setting passes through untouched, both ways', () => {
+    expect(effectiveGranularity('block', false)).toBe('block');
+    expect(effectiveGranularity('tile', false)).toBe('tile');
+  });
+
+  it('2M-c. WHY IT INVERTS: a literal "Ctrl means block" would be a no-op in the '
+    + 'shipped default, because the shipped default IS block', () => {
+    // Not a restatement of the store's initial value — this is the store's own
+    // initial value, so if the default ever moved to `tile` this row fails and
+    // the design note above must be re-read rather than quietly falsified.
+    const shippedDefault: MarqueeGranularity = 'block';
+    expect(effectiveGranularity(shippedDefault, true)).not.toBe(shippedDefault);
+  });
+
+  it('2M-d. THE HALF THE OWNER ASKED FOR: in Tile mode, holding it snaps to '
+    + 'collision size — the same rect a plain Block drag would give', () => {
+    // Derived end to end through `snapMarquee`, not asserted on the string: the
+    // claim is about the RECT, and the rect is what the author sees.
+    const drag = [3, 5, 8, 9] as const;
+    const tileHeld = snapMarquee(...drag, effectiveGranularity('tile', true));
+    const blockPlain = snapMarquee(...drag, effectiveGranularity('block', false));
+    expect(tileHeld).toEqual(blockPlain);
+    expect(isBlockAligned(tileHeld.col, tileHeld.row, tileHeld.w, tileHeld.h)).toBe(true);
+  });
+
+  it('2M-e. THE DISCRIMINATING PAIR: in Block mode, holding it gives the EXACT '
+    + 'dragged tiles — the one combination no setting alone can produce', () => {
+    const drag = [3, 5, 8, 9] as const;   // odd origin, odd size: block can never make it
+    const blockHeld = snapMarquee(...drag, effectiveGranularity('block', true));
+    expect(blockHeld).toEqual({ col: 3, row: 5, w: 6, h: 5 });
+    // ...and it is NOT what the same drag gives unheld, which is the whole point.
+    expect(blockHeld).not.toEqual(snapMarquee(...drag, effectiveGranularity('block', false)));
+    expect(isBlockAligned(blockHeld.col, blockHeld.row, blockHeld.w, blockHeld.h)).toBe(false);
+  });
+
+  it('2M-f. two of the four combinations are INDISTINGUISHABLE by their output — '
+    + 'so a test that only checks alignment cannot see the modifier at all', () => {
+    // This row exists to name the harness's own exposure. Block+plain and
+    // Tile+held produce byte-identical rects, so any row asserting only
+    // "is it block-aligned" would pass with the modifier entirely unimplemented.
+    const drag = [3, 5, 8, 9] as const;
+    const grid = {
+      blockPlain: snapMarquee(...drag, effectiveGranularity('block', false)),
+      blockHeld: snapMarquee(...drag, effectiveGranularity('block', true)),
+      tilePlain: snapMarquee(...drag, effectiveGranularity('tile', false)),
+      tileHeld: snapMarquee(...drag, effectiveGranularity('tile', true)),
+    };
+    expect(grid.blockPlain).toEqual(grid.tileHeld);      // the collapsed pair
+    expect(grid.blockHeld).toEqual(grid.tilePlain);      // ...and the other one
+    expect(grid.blockPlain).not.toEqual(grid.blockHeld); // the pairs differ
   });
 });
 
