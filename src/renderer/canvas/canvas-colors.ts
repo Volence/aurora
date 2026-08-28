@@ -99,6 +99,17 @@ export const ACTIVE_SECTION_BORDER = 'rgba(137, 180, 250, 0.6)';
 /** ~10% alpha fill for the map marquee region (stroke reuses SELECTION_MARQUEE,
  *  the same Catppuccin teal used by the composer's own marquee tool). */
 export const MAP_MARQUEE_FILL = 'rgba(148,226,213,0.1)';
+/**
+ * Stroke for a marquee that is NOT block-aligned — Catppuccin peach.
+ *
+ * The selection is art-only when it lands off the 16px collision grid
+ * (map-clipboard.ts `isBlockAligned`), and that is a fact about THE RECTANGLE
+ * ON SCREEN, so it is said on the rectangle on screen and not only in a panel
+ * the author may have collapsed. Warm-vs-teal rather than a second dash
+ * pattern: the marquee is already dashed, and two dash rhythms would read as
+ * noise where a colour reads as a state.
+ */
+export const MAP_MARQUEE_ART_ONLY = '#fab387';
 
 // ---------- pixel-editor grids / overlays (PixelViewport, ComposerCanvas) ----------
 export const PIXEL_GRID = 'rgba(255,255,255,0.08)';     // per-pixel grid (z>=8)

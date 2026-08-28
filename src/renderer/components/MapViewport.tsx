@@ -2,7 +2,6 @@ import React, { useRef, useEffect, useCallback, useState } from 'react';
 import { useViewStore } from '../state/viewStore';
 import { isTypingTarget } from '../shell/typing-target';
 import { useProjectStore, getCurrentAct, getCurrentZone, getActiveLevel as getStoreActiveLevel } from '../state/projectStore';
-import { rasterizeAeonChunkNative } from '../providers/chunk-grid-aeon';
 import { useEditorStore, executeCommand, setCommandInvalidationListener, RING_PATTERNS, type EditorTool } from '../state/editorStore';
 import { useAeonHistoryVersion } from '../hooks/useHistoryVersion';
 import { useArtStore } from '../state/artStore';
@@ -22,7 +21,12 @@ import { docFromTile, docFromSectionRegion } from '../../core/art/composer-buffe
 import { seedDocCollisionFromSection } from '../../core/art/composer-collision';
 import type { AnyCommand, S4Level, SetTilesCommand } from '../../core/editing/commands';
 import { buildStampCommand } from '../../core/editing/map-stamp';
-import { snapMarquee, copyFromSection, buildPasteCommand } from '../../core/editing/map-clipboard';
+import {
+  snapMarquee, copyFromSection, buildPasteCommand, isBlockAligned,
+  effectivePasteLayers, pasteBaseStep, selectionSizeLabel, artOnlyReason,
+} from '../../core/editing/map-clipboard';
+import type { MapClipboard } from '../../core/editing/map-clipboard';
+import { regionPreviewCanvas } from '../canvas/region-preview';
 import type { PasteLayers } from '../../core/editing/map-clipboard';
 import { SectionRenderer } from '../canvas/SectionRenderer';
 import {
@@ -72,7 +76,7 @@ import {
   CANVAS_VOID,
   COLLISION_SHAPE_LINE, COLLISION_SOLID_EDGE, COLLISION_ANGLE_NEEDLE,
   COLLISION_PREVIEW_FILL, COLLISION_PREVIEW_SCOPE, COLLISION_PREVIEW_PRIMARY, COLLISION_PREVIEW_ERASE,
-  SELECTION_MARQUEE, MAP_MARQUEE_FILL,
+  SELECTION_MARQUEE, MAP_MARQUEE_FILL, MAP_MARQUEE_ART_ONLY,
 } from '../canvas/canvas-colors';
 import { angleDegrees, isAir, isKnownProfile } from '../../core/collision/collision-model';
 import { cellTileIndices } from '../../core/collision/collision-cell';
@@ -326,6 +330,14 @@ export default function MapViewport() {
   const stampHoverRef = useRef<{ sectionIndex: number; baseCol: number; baseRow: number; chunkId: string } | null>(null);
   /** Rasterised chunk art for the ghost, cached so a mousemove is not a re-render. */
   const stampGhostRef = useRef<{ key: string; canvas: HTMLCanvasElement } | null>(null);
+  /**
+   * Rasterised CLIPBOARD art for the paste ghost, keyed on the clipboard object
+   * itself (never on its dimensions — two different 4x4 copies are two different
+   * pictures) plus the zone, since the same words rasterise differently under a
+   * different tileset. `setMapClipboard` always stores a freshly built object,
+   * so identity changing is exactly "the author copied something else".
+   */
+  const pasteGhostRef = useRef<{ clip: MapClipboard; zoneId: string; canvas: HTMLCanvasElement } | null>(null);
   const lastMouse = useRef({ x: 0, y: 0 });
   const dragTarget = useRef<{
     type: 'object' | 'ring';
@@ -510,7 +522,14 @@ export default function MapViewport() {
       ctx.translate(-mvpX, -mvpY);
       ctx.fillStyle = MAP_MARQUEE_FILL;
       ctx.fillRect(mx, my, mw, mh);
-      ctx.strokeStyle = SELECTION_MARQUEE;
+      // WHICH COLLISION RULE THIS SELECTION IS UNDER, said on the selection.
+      // Teal = block-aligned, so it carries art AND collision; peach = off the
+      // 16px grid, so it is art-only (map-clipboard.ts `isBlockAligned` and the
+      // asymmetry its docblock records). Read off the RECT, never off the armed
+      // granularity: a Tile-mode drag that happens to land on even bounds is
+      // block-aligned and must not be warned about.
+      ctx.strokeStyle = isBlockAligned(marquee.col, marquee.row, marquee.w, marquee.h)
+        ? SELECTION_MARQUEE : MAP_MARQUEE_ART_ONLY;
       ctx.lineWidth = 2 / mZoom;
       ctx.setLineDash([4 / mZoom, 4 / mZoom]);
       ctx.strokeRect(mx, my, mw, mh);
@@ -537,28 +556,18 @@ export default function MapViewport() {
           // ghost rather than showing a stale picture of it.
           const key = `${chunk.id}:${useEditorStore.getState().liveEditVersion}:${zone.id}`;
           if (stampGhostRef.current?.key !== key) {
-            // NATIVE size, not the thumbnail rasterizer: the ghost canvas is
-            // sized to the chunk's own footprint below, and the fixed 128x128
-            // buffer threw RangeError on img.data.set for every marquee-saved
-            // chunk smaller than 16x16 tiles — from mousemove that ate the
-            // ghost, and re-thrown inside the render effect after the stamp
-            // click it unmounted the whole React root (the owner's crash).
-            const rgba = rasterizeAeonChunkNative(chunk, zone.tileset.tiles, zone.palette);
-            if (rgba) {
-              const px = chunk.widthTiles * 8, py = chunk.heightTiles * 8;
-              const off = document.createElement('canvas');
-              off.width = px; off.height = py;
-              const octx = off.getContext('2d');
-              if (octx) {
-                // createImageData + set, matching TilesetPanel: the rasterizer
-                // hands back a Uint8ClampedArray, and the ImageData constructor
-                // wants its own buffer type.
-                const img = octx.createImageData(px, py);
-                img.data.set(rgba);
-                octx.putImageData(img, 0, 0);
-                stampGhostRef.current = { key, canvas: off };
-              }
-            }
+            // NATIVE size, via canvas/region-preview.ts — the ONE place the
+            // buffer and the ImageData are sized from the same two numbers.
+            // The fixed 128x128 thumbnail buffer threw RangeError on
+            // img.data.set for every marquee-saved chunk smaller than 16x16
+            // tiles: from mousemove that ate the ghost, and re-thrown inside
+            // the render effect after the stamp click it unmounted the whole
+            // React root (the owner's crash). That derivation used to live
+            // here alone; it is shared now because the paste ghost and the
+            // marquee panel preview do the same thing over regions that go
+            // smaller and odder than any chunk.
+            const off = regionPreviewCanvas(chunk, zone.tileset.tiles, zone.palette);
+            if (off) stampGhostRef.current = { key, canvas: off };
           }
           const sOffset = sectionRenderer.sectionWorldOffset(stampHover.sectionIndex);
           const { vpX: svpX, vpY: svpY, zoom: sZoom } = useViewStore.getState();
@@ -582,10 +591,31 @@ export default function MapViewport() {
       }
     }
 
-    // Paste ghost: the clipboard footprint as a translucent fill + outline at
-    // the hovered even-snapped origin, plus per-cell shading where the
-    // clipboard's collision is nonzero when a collision overlay is visible.
-    // Footprint-only — deliberately NOT a full art preview (placement aid).
+    // Paste ghost: THE CLIPBOARD'S ACTUAL ART, translucent, at the hovered
+    // origin, plus per-cell shading where the clipboard's collision is nonzero
+    // when a collision overlay is visible, plus a footprint outline.
+    //
+    // ═══ THIS USED TO BE FOOTPRINT-ONLY, AND THE REASON IS NOW REFUTED ═══
+    //
+    // The earlier decision (recorded on the stamp ghost above) drew the line
+    // like this: a stamp's contents are one of seventy library thumbnails you
+    // picked a moment ago, so "which chunk" needs answering — whereas "a
+    // paste's contents are what you just copied and still remember". That
+    // premise is an empirical claim about the author, and the owner has since
+    // reported the opposite from a real session: *"the marquee tool, when I
+    // select something it doesn't preview what's selected."* He did not
+    // remember, and he asked to see it. A premise contradicted by the person it
+    // was a premise about does not survive.
+    //
+    // Two things since have made it weaker still. A clipboard now outlives the
+    // rectangle it came from — the region can be repainted, and the marquee can
+    // be cleared — so there may be nothing left on screen to remember FROM.
+    // And an art-only clipboard now pastes on the TILE grid, where being one
+    // tile out is both possible and invisible against a footprint rectangle.
+    //
+    // It draws the CLIPBOARD's words, never a crop of the section under the
+    // cursor: the clipboard is a snapshot, and cropping the live map would show
+    // the wrong art with total confidence.
     if (useEditorStore.getState().pasting) {
       const pasteHover = pasteHoverRef.current;
       const clip = useEditorStore.getState().mapClipboard;
@@ -594,15 +624,33 @@ export default function MapViewport() {
         const { vpX: pvpX, vpY: pvpY, zoom: pZoom } = useViewStore.getState();
         const px = pOffset.x + pasteHover.baseCol * 8, py = pOffset.y + pasteHover.baseRow * 8;
         const pw = clip.widthTiles * 8, ph = clip.heightTiles * 8;
+
+        const pasteZone = getCurrentZone(useProjectStore.getState());
+        if (pasteZone
+          && (pasteGhostRef.current?.clip !== clip || pasteGhostRef.current?.zoneId !== pasteZone.id)) {
+          const pc = regionPreviewCanvas(clip, pasteZone.tileset.tiles, pasteZone.palette);
+          pasteGhostRef.current = pc ? { clip, zoneId: pasteZone.id, canvas: pc } : null;
+        }
+
         ctx.save();
         ctx.imageSmoothingEnabled = false;
         ctx.scale(pZoom, pZoom);
         ctx.translate(-pvpX, -pvpY);
+        const pGhost = pasteGhostRef.current;
+        if (pGhost && pGhost.clip === clip) {
+          ctx.globalAlpha = 0.55;    // clearly a preview, still readable as art
+          ctx.drawImage(pGhost.canvas, px, py, pw, ph);
+          ctx.globalAlpha = 1;
+        }
         ctx.fillStyle = MAP_MARQUEE_FILL;
         ctx.fillRect(px, py, pw, ph);
 
+        // Collision shading, SKIPPED ENTIRELY for an art-only clipboard —
+        // whose planes are length 0, so `plane[i]` is `undefined`, which is not
+        // `=== 0`, which would have shaded EVERY cell of the footprint and told
+        // the author the exact opposite of the truth about what he is pasting.
         const ov = useViewStore.getState().overlays;
-        if (ov.showCollision || ov.showCollisionPathB) {
+        if (!clip.artOnly && (ov.showCollision || ov.showCollisionPathB)) {
           const showB = ov.showCollisionPathB && !ov.showCollision;
           const plane = showB ? clip.collisionB : clip.collisionA;
           const cellsW = clip.widthTiles >> 1, cellsH = clip.heightTiles >> 1;
@@ -615,7 +663,9 @@ export default function MapViewport() {
           }
         }
 
-        ctx.strokeStyle = SELECTION_MARQUEE;
+        // Same colour language as the marquee: peach means this footprint
+        // carries art and no collision.
+        ctx.strokeStyle = clip.artOnly ? MAP_MARQUEE_ART_ONLY : SELECTION_MARQUEE;
         ctx.lineWidth = 2 / pZoom;
         ctx.setLineDash([4 / pZoom, 4 / pZoom]);
         ctx.strokeRect(px, py, pw, ph);
@@ -1234,8 +1284,16 @@ export default function MapViewport() {
           if (section) {
             const clip = copyFromSection(section, marquee.col, marquee.row, marquee.w, marquee.h);
             useEditorStore.getState().setMapClipboard(clip);
+            // WHAT WAS COPIED, in its own units, and — when it is art-only —
+            // WHY, at the moment the author would otherwise assume collision
+            // came with it. An art-only copy is a normal outcome of a
+            // tile-granular selection, not an error, so it is 'info' rather
+            // than a warning; what it must never be is silent.
+            const label = selectionSizeLabel(marquee.col, marquee.row, marquee.w, marquee.h);
+            const reason = artOnlyReason(marquee.col, marquee.row, marquee.w, marquee.h);
             useToastStore.getState().addToast(
-              `Copied ${marquee.w / 2}×${marquee.h / 2} blocks`, 'success',
+              reason ? `Copied ${label} — art only. ${reason}` : `Copied ${label}`,
+              reason ? 'info' : 'success',
             );
           }
           // Only claim the shortcut (and swallow browser text-copy) when there was
@@ -1271,6 +1329,21 @@ export default function MapViewport() {
           const marquee = ed.marquee;
           const section = act?.sections[marquee.sectionIndex];
           if (section) {
+            // A composer document sizes its collision with `chunkCellCount`,
+            // which FLOORS — so an odd-sized region would open a document whose
+            // art and collision disagree about its own footprint, and saving it
+            // to the library would put that disagreement in the project. The
+            // author is told which selection would work instead of being handed
+            // a quietly lossy document (or having his selection re-snapped
+            // behind his back, which is the same lie with better manners).
+            if (!isBlockAligned(marquee.col, marquee.row, marquee.w, marquee.h)) {
+              useToastStore.getState().addToast(
+                `Can't open a ${marquee.w}×${marquee.h}-tile selection as a chunk — `
+                + 'chunks are whole 16px blocks. Select on even tile bounds, or switch the '
+                + 'marquee to Block.', 'warning');
+              e.preventDefault();
+              return;
+            }
             const doc = docFromSectionRegion(section, marquee.col, marquee.row, marquee.w, marquee.h);
             seedDocCollisionFromSection(doc, section, marquee.col, marquee.row);
             if (openDocumentGuarded({
@@ -2015,10 +2088,22 @@ export default function MapViewport() {
           // Modifiers override the sticky pasteLayers setting for THIS click only.
           const layers: PasteLayers = e.altKey ? 'art' : e.shiftKey ? 'collision'
             : useEditorStore.getState().pasteLayers;
+          // Shift ('collision only') over an ART-ONLY clipboard has nothing to
+          // write — `buildPasteCommand` returns null for it. Say so, because a
+          // click that silently does nothing is the one outcome an author reads
+          // as a broken tool rather than a refused request.
+          if (effectivePasteLayers(clip, layers) === null) {
+            useToastStore.getState().addToast(
+              'This clipboard carries no collision — it was copied from a selection that '
+              + 'is not block-aligned. Paste art, or re-copy on even tile bounds.', 'warning');
+            e.preventDefault();
+            return;
+          }
           const cmd = buildPasteCommand({
             clip, section, sectionIndex: hover.sectionIndex,
             baseCol: hover.baseCol, baseRow: hover.baseRow, layers,
-            description: `Paste ${clip.widthTiles / 2}×${clip.heightTiles / 2} blocks at (${hover.baseCol}, ${hover.baseRow})`,
+            description: `Paste ${selectionSizeLabel(hover.baseCol, hover.baseRow, clip.widthTiles, clip.heightTiles)}`
+              + ` at (${hover.baseCol}, ${hover.baseRow})`,
           });
           if (cmd) {
             executeCommand(cmd, level);
@@ -2331,7 +2416,8 @@ export default function MapViewport() {
 
       marqueeDragStart.current = { sectionIndex: info.sectionIndex, col: info.col, row: info.row };
       isMarqueeDragging.current = true;
-      const snap = snapMarquee(info.col, info.row, info.col, info.row);
+      const snap = snapMarquee(info.col, info.row, info.col, info.row,
+        useEditorStore.getState().marqueeGranularity);
       useEditorStore.getState().setMarquee({ sectionIndex: info.sectionIndex, ...snap });
       drawCollisionPreview();
       e.preventDefault();
@@ -2449,8 +2535,17 @@ export default function MapViewport() {
       const world = screenToWorld(e.clientX, e.clientY);
       const info = worldToSectionTile(world.x, world.y);
       if (info) {
-        const baseCol = Math.floor(info.col / 2) * 2;
-        const baseRow = Math.floor(info.row / 2) * 2;
+        // THE GRID THE CLIPBOARD CAN LAND ON, asked of the clipboard rather
+        // than assumed to be 2. A clipboard carrying collision must stay on the
+        // 16px grid (`buildRegionWriteCommand` floors `baseCol >> 1`, so an odd
+        // origin puts the art one tile out of step with the collision it
+        // describes); an art-only clipboard has no such constraint, and pinning
+        // it to blocks anyway would make a tile-granular selection unplaceable
+        // at tile precision — a selection you can make but cannot paste.
+        const clipHere = useEditorStore.getState().mapClipboard;
+        const step = clipHere ? pasteBaseStep(clipHere) : 2;
+        const baseCol = Math.floor(info.col / step) * step;
+        const baseRow = Math.floor(info.row / step) * step;
         const prev = pasteHoverRef.current;
         if (!prev || prev.sectionIndex !== info.sectionIndex || prev.baseCol !== baseCol || prev.baseRow !== baseRow) {
           pasteHoverRef.current = { sectionIndex: info.sectionIndex, baseCol, baseRow };
@@ -2534,7 +2629,8 @@ export default function MapViewport() {
       const offset = sectionRenderer.sectionWorldOffset(start.sectionIndex);
       const col = Math.floor((world.x - offset.x) / 8);
       const row = Math.floor((world.y - offset.y) / 8);
-      const snap = snapMarquee(start.col, start.row, col, row);
+      const snap = snapMarquee(start.col, start.row, col, row,
+        useEditorStore.getState().marqueeGranularity);
       useEditorStore.getState().setMarquee({ sectionIndex: start.sectionIndex, ...snap });
       drawCollisionPreview();
       return;
