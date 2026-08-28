@@ -35,6 +35,18 @@
 // constructed fixture proves the code path, a real cell proves the bug — and it
 // PRINTS the word it found and DIES if the search comes up empty.
 //
+// ONE PHASE IS THE EXCEPTION AND SAYS SO: the [bg] rows. This project's
+// background carries 4,088 drawn words and ZERO priority ones (row [bg0]
+// measures that in-run), so there is no real cell to paint over. That phase
+// therefore AUTHORS its destination with the app's own brush first — [bg1],
+// which master cannot pass — and only then tests preservation against it.
+//
+// The phases also REWIND between each other (`undoAll`). Without that, a phase
+// would inherit the previous one's damage: on master [p1] truncates the
+// priority+flip cell, so a later row reading that same cell would find the bits
+// already gone and could go green on their ABSENCE rather than on the rule.
+// Two rows of an earlier draft of this file did exactly that.
+//
 // ═══ THE BIT POSITIONS ARE DERIVED, NEVER TYPED ═══
 //
 // A hard-coded `0x8000` in this file would be exactly the copied-pin defect
@@ -327,9 +339,18 @@ async function main() {
     await c.ready;
 
     // ── the debug surface must exist, or nothing below means anything ──────
-    const hasDbg = await c.evalExpr('typeof window.__dbg');
+    // POLLED, not sampled once. `__dbg` is installed from a dynamically
+    // imported chunk, so the CDP target can exist a beat before the hook does —
+    // a single read raced it and reported "no debug build" on a build that was
+    // fine, which is a false negative about the harness rather than the app.
+    let hasDbg = 'undefined';
+    for (let i = 0; i < 60; i++) {
+      hasDbg = await c.evalExpr('typeof window.__dbg');
+      if (hasDbg === 'object') break;
+      await sleep(500);
+    }
     if (hasDbg !== 'object') {
-      throw new Error('window.__dbg absent — this needs a VITE_AURORA_DEBUG=1 build of dist/');
+      throw new Error('window.__dbg absent after 30s — this needs a VITE_AURORA_DEBUG=1 build of dist/');
     }
 
     console.log('\n=== OPENING THE REAL AEON PROJECT ===');
@@ -437,6 +458,25 @@ async function main() {
     const toolNow = (await c.json('window.__dbg.aeon.state()')).tool;
     check('arm', "the REAL hotkey 't' armed paint-tile", toolNow === 'paint-tile', `tool = ${toolNow}`);
 
+    /**
+     * Rewind the document to where this run found it.
+     *
+     * Called between phases because a phase that inherited the PREVIOUS phase's
+     * damage would measure the wrong thing: on master, [p1] truncates the
+     * priority+flip cell, so a later row reading that same cell would find its
+     * bits already gone and could go green on the absence rather than on the
+     * rule. Two rows of this harness did exactly that before this existed.
+     */
+    async function undoAll(label) {
+      let n = 0;
+      while (n < 20 && (await c.evalExpr('window.__dbg.aeon.canUndo()'))) {
+        await key(c, 'z', 'KeyZ', 90, 2);
+        await sleep(120);
+        n++;
+      }
+      note('rewind', `${label}: ${n} undo step(s)`);
+    }
+
     /** Arm a tile index that is GUARANTEED to differ from the destination's, so
      *  "the paint happened" is itself checkable. */
     async function armTile(differentFrom) {
@@ -469,6 +509,11 @@ async function main() {
     check('p1c', 'painting puts down the BRUSH\'s flips (both off) — the picker showed an unflipped tile',
       (afterPF & (F.HF | F.VF)) === 0,
       `before flips=${hex(beforePF & (F.HF | F.VF))}  after flips=${hex(afterPF & (F.HF | F.VF))}`);
+    note('NON-DISCRIMINATING ON MASTER',
+      '[p1c] is green on the BROKEN build too — master hard-clears the flip bits, which is '
+      + 'accidentally what this rule asks for with an unflipped brush. It is here to pin the rule '
+      + 'going forward, NOT as evidence of the fix. Its discriminators are [b6b]/[b6c], where the '
+      + 'brush is armed and the bits must follow it in both directions.');
     await shot(c, 'p1-after-paint-tile');
 
     // ═══ [p2] paint-block (MapViewport ~:2533) ════════════════════════════
@@ -548,6 +593,7 @@ async function main() {
 
     // ═══ [b*] THE AUTHORING HALF — the brush chips ════════════════════════
     console.log('\n=== [b*] the brush: can the owner actually SET priority and the flips? ===');
+    await undoAll('before the brush phase — every row below needs the ORIGINAL document');
     const chipPri = /^Priority: /;
     const chipKeep = /^Priority: keep/;
     const chipOn = /^Priority: on/;
@@ -651,6 +697,12 @@ async function main() {
     // …and OFF takes it away again: a flip is part of the PICTURE, so it
     // follows the brush rather than the destination. That asymmetry with
     // priority is the whole preservation rule, and this is where it is asserted.
+    //
+    // THE PRECONDITION IS ITS OWN ROW. [b6c] paints over the cell [b6b] just
+    // flipped; if [b6b] had silently not flipped it, [b6c] would go green on a
+    // bit that was never there. This states the destination explicitly.
+    check('b6c-pre', 'the destination for the flip-OFF row REALLY carries the flip first',
+      (afterF & F.HF) === F.HF, describe(afterF));
     await c.evalExpr(clickByTitle(String(chipHF)));
     await sleep(150);
     const armedF2 = await armTile(afterF);
@@ -664,48 +716,109 @@ async function main() {
       `${describe(afterF)} → ${describe(afterF2)}`);
     await shot(c, 'b6-brush-chips');
 
-    // ═══ [bg] the FOURTH site — the background plane (MapViewport ~:1751) ══
-    console.log('\n=== [bg] the background paint path, same word layout, same defect ===');
-    await c.evalExpr(clickByTitle(String(chipKeep)));
-    await sleep(120);
+    // ═══ [bg] the FOURTH site — the background plane (MapViewport ~:1755) ══
+    //
+    // WHICH FIXTURE THIS PHASE USES, AND WHY IT IS NOT A REAL CELL.
+    //
+    // Everywhere else in this file the destination is a REAL authored cell. Not
+    // here, and the reason is a measurement: OJZ act 1's background carries
+    // 4,088 drawn words, 1,876 hFlipped and 2,100 vFlipped — and ZERO with the
+    // priority bit. There is no real high-priority background cell to paint
+    // over, in this project or (per the same scan) any of its acts.
+    //
+    // The flips cannot stand in for it. Under this rule a flip FOLLOWS THE
+    // BRUSH, so a background cell losing its hFlip to an unflipped stroke is
+    // CORRECT behaviour, not the defect. A row asserting flip preservation here
+    // would be asserting the opposite of the rule.
+    //
+    // So the phase is two steps, and the destination's non-zero bit is authored
+    // by the APP'S OWN brush rather than fabricated by the harness:
+    //
+    //   [bg1] arm `Priority: on`, paint, and demand the bit appear. On master
+    //         this is impossible — the site hard-cleared bit 15 — so the row is
+    //         fully discriminating on its own.
+    //   [bg2] return the brush to `keep`, paint the SAME cell again with a
+    //         different tile, and demand the bit survive. Its destination now
+    //         genuinely carries priority, and [bg1] is what proves it does.
+    console.log('\n=== [bg] the background paint path, same word layout, same rule ===');
+    await undoAll('before the background phase');
     await c.evalExpr("window.__dbg.aeon.setLayer('bg')");
     await sleep(200);
-    const bgLen = await c.evalExpr('(() => { const b = window.__dbg.aeon; let n = 0;'
-      + ' for (let i = 0; i < 4096; i++) if (b.bgAt(i) !== null) n++; return n; })()');
-    let bgCell = null;
-    for (let i = 0; i < bgLen; i++) {
+
+    const bgW = await c.evalExpr('(window.__dbg.aeon.bgWidth ? window.__dbg.aeon.bgWidth() : 64)');
+    // Count what the background actually holds, so the claim above is measured
+    // in THIS run rather than quoted from a scan done elsewhere.
+    const bgStats = await c.json(String.raw`(() => {
+      const d = window.__dbg.aeon; let words = 0, drawn = 0, pri = 0, hf = 0, vf = 0;
+      for (let i = 0; i < 8192; i++) {
+        const w = d.bgAt(i); if (w === null) break;
+        words++;
+        if (w & ${F.TILE}) drawn++;
+        if (w & ${F.PRI}) pri++;
+        if (w & ${F.HF}) hf++;
+        if (w & ${F.VF}) vf++;
+      }
+      return { words, drawn, pri, hf, vf };
+    })()`);
+    note('the background as the app resolves it',
+      `${bgStats.words} words · ${bgStats.drawn} drawn · ${bgStats.pri} priority · `
+      + `${bgStats.hf} hFlip · ${bgStats.vf} vFlip  (source: ${await c.evalExpr('window.__dbg.aeon.bgSource()')})`);
+    check('bg0', 'the background really has NO priority cells — so the fixture below must be app-authored',
+      bgStats.pri === 0 && bgStats.drawn > 0,
+      `${bgStats.pri} priority words among ${bgStats.drawn} drawn`);
+
+    // Pick a drawn background cell well inside the plane.
+    let bgSlot = null;
+    for (let i = 0; i < bgStats.words; i++) {
       const w = await ntAtBg(c, i);
-      if (w !== null && (w & F.TILE) && (w & ATTR)) { bgCell = { i, w }; break; }
+      if (w !== null && (w & F.TILE)) { bgSlot = { i, w }; break; }
     }
-    if (!bgCell) {
-      unmeasurable('bg1', 'the BG paint path preserves attributes',
-        `scanned ${bgLen} resolved BG words; none carries a drawn tile AND any of ${hex(ATTR)}. `
-        + 'A row painted onto an all-zero-attribute cell emits the same word fixed or broken, so it '
-        + 'is NOT reported as a pass. The FG rows above cover the same shared rule; this site is '
-        + 'covered by node tests over the shared helper and TAGGED for a foreground re-check on a '
-        + 'background that has attributes.');
+    if (bgSlot === null) {
+      unmeasurable('bg1', 'the BG paint path authors and preserves priority',
+        'no drawn background word found — the whole phase would be vacuous');
     } else {
-      note('bg subject', `slot ${bgCell.i} = ${describe(bgCell.w)} (source: ${await c.evalExpr('window.__dbg.aeon.bgSource()')})`);
-      // The BG plane's own geometry: 8px cells on a plane `bgWidth` wide.
-      const bgW = await c.evalExpr('(window.__dbg.aeon.bgWidth ? window.__dbg.aeon.bgWidth() : 64)');
-      const col = bgCell.i % bgW, row = Math.floor(bgCell.i / bgW);
-      await c.evalExpr(`window.__dbg.aeon.setSelectedTile(${((bgCell.w & F.TILE) + 1) & 0xF || 1}, 0)`);
+      const bgCol = bgSlot.i % bgW, bgRow = Math.floor(bgSlot.i / bgW);
+      note('bg subject', `slot ${bgSlot.i} = (${bgCol},${bgRow}) ${describe(bgSlot.w)}`);
+      // The BG pick is a BLOB-LOCAL index; keep it small and in range.
+      const bgTileA = ((bgSlot.w & F.TILE) + 1) & 0x3F || 1;
+      const bgTileB = ((bgSlot.w & F.TILE) + 2) & 0x3F || 2;
+
       await c.evalExpr("document.getElementById('map-canvas').focus()");
       await key(c, 't', 'KeyT', 84);
       await sleep(120);
-      const vxb = Math.max(0, col * TILE_PX - 200), vyb = Math.max(0, row * TILE_PX - 150);
-      await setView(c, vxb, vyb, ZOOM);
-      await sleep(120);
-      const aimBg = await aimAtCell(c, col, row, { x: 0, y: 0 });
-      await mouse(c, 'mousePressed', aimBg.x, aimBg.y);
-      await mouse(c, 'mouseReleased', aimBg.x, aimBg.y);
-      await sleep(250);
-      const afterBg = await ntAtBg(c, bgCell.i);
-      note('bg', `before ${describe(bgCell.w)}  after ${describe(afterBg)}`);
-      check('bg1', 'the BG paint path preserves the cell\'s priority bit too',
-        (afterBg & F.PRI) === (bgCell.w & F.PRI),
-        `before ${describe(bgCell.w)}  after ${describe(afterBg)}`);
+
+      async function paintBg(tile) {
+        await c.evalExpr(`window.__dbg.aeon.setSelectedTile(${tile}, 0)`);
+        const vxb = Math.max(0, bgCol * TILE_PX - 200), vyb = Math.max(0, bgRow * TILE_PX - 150);
+        await setView(c, vxb, vyb, ZOOM);
+        await sleep(120);
+        const a = await aimAtCell(c, bgCol, bgRow, { x: 0, y: 0 });
+        await mouse(c, 'mousePressed', a.x, a.y);
+        await mouse(c, 'mouseReleased', a.x, a.y);
+        await sleep(250);
+        return { word: await ntAtBg(c, bgSlot.i), aim: a };
+      }
+
+      // [bg1] AUTHOR it. Impossible on master.
+      await c.evalExpr(clickByTitle(String(chipOn)));
+      await sleep(150);
+      const bgOn = await paintBg(bgTileA);
+      note('bg aim', `(${bgCol},${bgRow}) → integer client (${bgOn.aim.x},${bgOn.aim.y})`);
+      check('bg1', 'the BG stroke can AUTHOR priority (the site goes through the same brush)',
+        (bgOn.word & F.PRI) === F.PRI && (bgOn.word & F.TILE) === bgTileA,
+        `before ${describe(bgSlot.w)}  after ${describe(bgOn.word)}  (armed tile ${bgTileA})`);
+
+      // [bg2] and PRESERVE it, over a destination bg1 just proved is non-zero.
+      await c.evalExpr(clickByTitle(String(chipKeep)));
+      await sleep(150);
+      check('bg2-pre', 'the preservation destination REALLY carries priority now',
+        (bgOn.word & F.PRI) === F.PRI, describe(bgOn.word));
+      const bgKeep = await paintBg(bgTileB);
+      check('bg2', 'a "keep" BG stroke preserves that priority bit while changing the tile',
+        (bgKeep.word & F.PRI) === F.PRI && (bgKeep.word & F.TILE) === bgTileB,
+        `before ${describe(bgOn.word)}  after ${describe(bgKeep.word)}  (armed tile ${bgTileB})`);
     }
+
     await c.evalExpr("window.__dbg.aeon.setLayer('fg')");
 
     // ── restore: undo everything this run painted ────────────────────────
