@@ -240,6 +240,22 @@ export const EFFECTS_GUIDE_ACTIVE = 'rgba(150, 245, 255, 1)';
 export const EFFECTS_GUIDE_LABEL_BG = 'rgba(10, 12, 18, 0.78)';
 export const EFFECTS_GUIDE_LABEL_TEXT = 'rgba(190, 245, 255, 0.95)';
 
+// A GUIDE THE ENGINE WOULD REFUSE (2026-08-28) — held at its bound, or already
+// out of range because `v_offset` moved under it.
+//
+// ⚠ RED, NOT A DIMMER CYAN, and the choice is load-bearing rather than taste.
+// The cyan family already carries three states (enabled / disabled / active) and
+// a fourth shade of it would be read as a fourth degree of the same axis —
+// "less selected" — when the meaning is categorical: the build refuses this. Red
+// is also NOT taken on this canvas at guide weight: the collision lens's red is
+// a tick mark inside a filled cell, the screen frame is amber, the band lens is
+// magenta. It is the one hue whose arrival on a line means only one thing.
+export const EFFECTS_GUIDE_REFUSED = 'rgba(255, 96, 96, 0.95)';
+/** The plate under the sentence — darker and redder than the label plate, so the
+ *  two are distinguishable at a glance without reading either. */
+export const EFFECTS_GUIDE_REFUSED_BG = 'rgba(40, 10, 12, 0.90)';
+export const EFFECTS_GUIDE_REFUSED_TEXT = 'rgba(255, 205, 200, 0.97)';
+
 // --- The BgAnim band lens (ROADMAP item 43 part 2, effects facet) -------------
 //
 // MAGENTA, AND IT WAS TESTED ON THE PERSON WHO COMMISSIONED THE FEATURE.

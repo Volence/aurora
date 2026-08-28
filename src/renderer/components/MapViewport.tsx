@@ -58,7 +58,7 @@ import {
 } from '../canvas/screen-frame';
 import {
   resolveSelectedScene, setLayerFieldCommand, clampLayerTop, layerTopSpace,
-  setSceneFieldCommand, clampVOffset,
+  setSceneFieldCommand, clampVOffset, guideBoundNotice,
 } from '../providers/effects-aeon';
 import { EFFECTS_V_OFFSET_DEFAULT } from '../../core/formats/effects/scene-ui';
 import type { EffectsScene } from '../../core/formats/effects/scene';
@@ -358,7 +358,20 @@ export default function MapViewport() {
    * repaints through `redraw()`, which reads this ref at call time.
    */
   const guideDrag = useRef<
-    { sceneId: string; index: number; startWorldY: number; worldY: number; witness: string } | null
+    {
+      sceneId: string; index: number; startWorldY: number; worldY: number; witness: string;
+      /**
+       * What the CURSOR asked for, before `clampLayerTop` had its say.
+       *
+       * ⚠ THE CLAMPED VALUE CANNOT ANSWER "IS THE AUTHOR PUSHING?", and that is
+       * the whole reason this field exists. Held at the floor, `worldY` reads 67
+       * whether the cursor is at 67 or at 12 — identical, so a notice keyed off
+       * it would either never appear or never go away. The raw request is the
+       * only thing that knows the difference between arriving at the bound and
+       * shoving against it.
+       */
+      requested: number;
+    } | null
   >(null);
   /**
    * The guide under the cursor. STATE, not a ref, because it drives the
@@ -1082,11 +1095,34 @@ export default function MapViewport() {
       // frame-anchored rule it replaced earlier today, are written out in full
       // in canvas/effects-guides.ts. The space still changes the label and the
       // caption; it no longer changes the position.
+      const dragHere = drag && drag.sceneId === guideScene.id ? drag : null;
+      // ---- THE BOUND, SAID OUT LOUD (2026-08-28) -------------------------
+      // One `guideBoundNotice` per layer, resolved HERE because this is the
+      // only place that holds the scene, the layer AND the live gesture. Two
+      // different questions get one answer shape:
+      //
+      //   - the layer being dragged is asked with the cursor's RAW request, so
+      //     it says "held at 67, and here is why" only while the author is
+      //     actually pushing past the bound;
+      //   - every other layer is asked with no request at all, which reports
+      //     only a top the document is ALREADY holding out of range — the
+      //     `v_offset` hole, where nothing was asking and nothing was said.
+      //
+      // Cheap by construction: a handful of layers, pure arithmetic, inside the
+      // draw pass that already runs. No clock, nothing scheduled — MapViewport's
+      // measured zero-idle-repaint property (37/37) is untouched.
+      const notices = new Map<number, { tone: 'held' | 'illegal'; text: string }>();
+      for (let i = 0; i < guideScene.layers.length; i++) {
+        const n = guideBoundNotice(guideScene, guideScene.layers[i],
+          dragHere && dragHere.index === i ? dragHere.requested : undefined);
+        if (n !== null) notices.set(i, { tone: n.tone, text: n.text });
+      }
       const opts = {
-        dragIndex: drag && drag.sceneId === guideScene.id ? drag.index : null,
+        dragIndex: dragHere ? dragHere.index : null,
         dragWorldY: drag?.worldY,
         hoverIndex: guideHoverRef.current,
         space: guideSpace ?? 'act',
+        notices,
       };
       drawLayerGuides(ctx, viewport, guideScene.layers, opts);
       publishGuideReport({
@@ -1742,6 +1778,60 @@ export default function MapViewport() {
    *     `executeCommand`, so undo/redo, dirty-tracking and serialization are
    *     the ones that already exist rather than a second set that looks right.
    */
+  /**
+   * Move a guide drag in flight to a client Y. PREVIEW ONLY — the document is
+   * untouched until release, so the undo stack gets ONE entry for the gesture.
+   *
+   * ⚠ IT TAKES A NUMBER, NOT AN EVENT, BECAUSE IT HAS TWO CALLERS NOW, and the
+   * second one is a bug fix rather than a refactor. Until 2026-08-28 the only
+   * caller was the container's `onMouseMove`, so a guide could not be dragged to
+   * a `world_y` scrolled off the top of the viewport: the cursor left the
+   * container, the handler stopped firing, and the guide froze on the last row
+   * that happened to be on screen. Measured in `scratchpad/layer-bound-harness.mjs`
+   * row 10b — dragging 50px above the canvas left the layer at `vp.y + 10`, the
+   * last in-container step, instead of the `vp.y - 50` the cursor asked for.
+   *
+   * That is the owner's literal sentence — *"layers are still bound to the
+   * window view"* — as a real and SEPARATE defect from the fire-line clamp he
+   * actually hit, and it is the same shape as the bug `finishGesture` was
+   * written for (a gesture that died at the container's edge, documented on
+   * `finishGesture` and in composer-shared.tsx). The cure is the same one: the
+   * gesture lives on the WINDOW for its duration, so leaving the viewport is a
+   * continuation rather than a wall.
+   */
+  function updateGuideDrag(clientY: number): void {
+    const drag = guideDrag.current;
+    if (!drag) return;
+    const rect = canvasRef.current?.getBoundingClientRect();
+    const scene = activeGuideScene();
+    if (!rect || !scene || scene.id !== drag.sceneId) return;
+    const { vpY, zoom } = useViewStore.getState();
+    // The SAME clamp the spinner routes through, in the SAME space the guide was
+    // drawn in, and from the SAME origin, so a drag cannot author a top a typed
+    // value could not — and a locked layer stops at the plane's last line.
+    const space = layerTopSpace(scene);
+    // THE LAYER IS PASSED TO THE CLAMP, and that is what makes the drag unable to
+    // author a line the bake refuses (see clampLayerTop). Without it the clamp
+    // uses the plane's 0..511 and a drag below the frame's bottom edge writes 302
+    // on a 224-line screen.
+    const dragged = scene.layers[drag.index];
+    const asked = canvasYToLayerTop(clientY - rect.top,
+      { x: 0, y: vpY, width: rect.width, height: rect.height, zoom }, space);
+    const next = clampLayerTop(scene, asked, dragged);
+    // THE REPAINT IS GATED ON THE REQUEST, NOT ON THE VALUE. Held at the floor
+    // `next` stops changing, so gating on it alone would freeze the notice at
+    // whatever it said on the move that first hit the bound — and, worse, would
+    // never CLEAR it when the cursor came back inside. The rounded request is
+    // what the notice is a function of, so it is what decides whether anything
+    // on screen needs to change.
+    const asking = Math.round(asked);
+    if (next !== drag.worldY || asking !== Math.round(drag.requested)) {
+      drag.worldY = next;
+      drag.requested = asked;
+      redraw();
+    }
+  }
+
   function endGuideDrag(): void {
     const drag = guideDrag.current;
     guideDrag.current = null;
@@ -2052,6 +2142,9 @@ export default function MapViewport() {
           guideDrag.current = {
             sceneId: scene.id, index: idx,
             startWorldY: layer.world_y, worldY: layer.world_y,
+            // Seeded from the layer's own top: a press that has not moved yet is
+            // not asking for anything the bound could refuse, so no notice.
+            requested: layer.world_y,
             // The witness the commit compares against — see guideDrag's docblock.
             witness: JSON.stringify(layer),
           };
@@ -2405,30 +2498,7 @@ export default function MapViewport() {
     // until release, so the undo stack gets ONE entry for the gesture instead of
     // one per mousemove. The preview is the ref plus a repaint — `redraw` reads
     // `guideDrag.current` at call time.
-    if (guideDrag.current) {
-      const rect = canvasRef.current?.getBoundingClientRect();
-      const scene = activeGuideScene();
-      if (rect && scene && scene.id === guideDrag.current.sceneId) {
-        const { vpY, zoom, screenFrame: sf } = useViewStore.getState();
-        // The SAME clamp the spinner routes through, in the SAME space the
-        // guide was drawn in, and from the SAME origin, so a drag cannot author
-        // a top a typed value could not — and a locked layer stops at the
-        // plane's last line.
-        const space = layerTopSpace(scene);
-        // THE LAYER IS PASSED TO THE CLAMP, and that is what makes the drag
-        // unable to author a line the bake refuses (see clampLayerTop). Without
-        // it the clamp uses the plane's 0..511 and a drag below the frame's
-        // bottom edge writes 302 on a 224-line screen.
-        const dragged = scene.layers[guideDrag.current.index];
-        const next = clampLayerTop(scene, canvasYToLayerTop(e.clientY - rect.top,
-          { x: 0, y: vpY, width: rect.width, height: rect.height, zoom }, space), dragged);
-        if (next !== guideDrag.current.worldY) {
-          guideDrag.current.worldY = next;
-          redraw();
-        }
-      }
-      return;
-    }
+    if (guideDrag.current) { updateGuideDrag(e.clientY); return; }
 
     // The screen frame's drag (row G): the same preview-through-ref shape as
     // the guide drag above. The store is written once, on release.
@@ -2761,10 +2831,36 @@ export default function MapViewport() {
 
   // Wherever the button comes up, the gesture ends there — including outside
   // this component entirely.
+  //
+  // ⚠ AND WHEREVER IT MOVES, A GUIDE DRAG FOLLOWS IT (2026-08-28). `mouseup` was
+  // on the window and `mousemove` was not, which made a guide drag *pause* the
+  // instant the cursor crossed the container's edge and resume on the way back:
+  // the layer could not be taken to any row scrolled off the top, because the
+  // only rows the handler ever saw were the ones already on screen. That is the
+  // owner's *"layers are still bound to the window view"*, literally, and it is
+  // a different mechanism from the fire-line clamp he was actually hitting.
+  // Harness row 10b is the measurement.
+  //
+  // GUIDES ONLY, DELIBERATELY. Every other gesture on this canvas keeps the old
+  // behaviour, because for the others "pause at the edge" is not a wall — an
+  // object drag, a paint stroke and a marquee are all about a position that
+  // exists on screen, and following the cursor into the panel would let a stroke
+  // land somewhere the author cannot see. A layer top is the one subject here
+  // whose legal range is much larger than the window showing it.
+  //
+  // The `guideDrag.current` null check is the first statement, so an ordinary
+  // mouse move over the app pays one ref read.
   useEffect(() => {
     const onUp = (): void => finishGesture();
+    const onMove = (e: MouseEvent): void => {
+      if (guideDrag.current) updateGuideDrag(e.clientY);
+    };
     window.addEventListener('mouseup', onUp);
-    return () => window.removeEventListener('mouseup', onUp);
+    window.addEventListener('mousemove', onMove);
+    return () => {
+      window.removeEventListener('mouseup', onUp);
+      window.removeEventListener('mousemove', onMove);
+    };
   }, [finishGesture]);
 
   const handleMouseUp = useCallback((e: React.MouseEvent) => {

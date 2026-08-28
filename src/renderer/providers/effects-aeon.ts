@@ -1419,6 +1419,48 @@ export function fireScreenLineOf(
   return worldY - (scene.v_offset ?? EFFECTS_V_OFFSET_DEFAULT);
 }
 
+// ═══ ONE RULE, ONE SENTENCE — the three clauses every surface shares ═══
+//
+// ⚠ THESE EXIST BECAUSE A SECOND SPELLING IS A DEFECT. The fire bound is now
+// reported from THREE places — the panel's hint (`fireLineAdvisory`), the
+// canvas plate under a held guide, and the canvas plate under a layer the
+// document is already holding out of range (`guideBoundNotice`). An author who
+// reads two different sentences about one engine `ensure` has to work out
+// whether they are two rules; the owner already lost time to exactly that class
+// of confusion on this bound. So the clauses are declared ONCE and composed.
+//
+// `fireLineAdvisory`'s output is BYTE-IDENTICAL to what it returned before the
+// clauses were extracted — this was a refactor, not a rewording, and its tests
+// were deliberately left untouched to prove that.
+
+/** What the layer IS, and why the rule applies to it at all. */
+const FIRE_IS = 'this layer authors a Plane B split, so it becomes a raster fire';
+/** The engine's own `ensure`, in the engine's own numbers (raster_dsl.emp:326-327). */
+const FIRE_LAW = `a fire must land on ${EFFECTS_FIRE_LINE_MIN}..${EFFECTS_FIRE_LINE_MAX} `
+  + `(lines 0-${EFFECTS_FIRE_LINE_MIN - 1} belong to the priming records)`;
+/** The remedy that is about the LAYER rather than about the camera. */
+const FIRE_REMEDY = `drop the split — a layer without one may sit anywhere in `
+  + `0..${PLANE_LINE_SPAN - 1}`;
+/**
+ * THE SENTENCE THIS WHOLE PARCEL EXISTS FOR.
+ *
+ * The owner reported *"layers are still bound to the window view — I can't move
+ * that above the orange line"*, twice, at `v_offset` 64 (stuck at 67) and then
+ * at 135 (stuck at 138). **His reading was the most reasonable one available
+ * from what was on screen**: on a locked scene the screen frame's top edge IS
+ * `v_offset` (`frameAnchorFor` / `commitVOffset`), and the fire floor is
+ * `EFFECTS_FIRE_LINE_MIN + v_offset` — so the floor really does sit three lines
+ * under the box and really does move with it. The correlation he could see was
+ * perfect and the cause was invisible.
+ *
+ * A message that printed only "min 138" would leave that reading intact. This
+ * one names the coupling he had already, correctly, noticed.
+ */
+const FIRE_FLOOR_IS_THE_BOX = (vo: number) =>
+  `On a locked scene the view box's top edge IS v_offset (${vo}), so this floor `
+  + `sits ${EFFECTS_FIRE_LINE_MIN} lines under the box and moves with it — that is `
+  + 'why the guide looks welded to the box';
+
 /**
  * The advisory for a layer whose top cannot exist as a screen line, or null.
  *
@@ -1439,11 +1481,133 @@ export function fireLineAdvisory(
   if (line >= EFFECTS_FIRE_LINE_MIN && line <= EFFECTS_FIRE_LINE_MAX) return null;
   const vo = scene.v_offset ?? EFFECTS_V_OFFSET_DEFAULT;
   const from = vo === 0 ? '' : ` (top ${layer.world_y} less v_offset ${vo})`;
-  return `this layer authors a Plane B split, so it becomes a raster fire at screen `
-    + `line ${line}${from} — and a fire must land on ${EFFECTS_FIRE_LINE_MIN}`
-    + `..${EFFECTS_FIRE_LINE_MAX} (lines 0-2 belong to the priming records). `
-    + 'The build refuses it. Move the top onto the visible screen, or drop the split — '
-    + `a layer without one may sit anywhere in 0..${PLANE_LINE_SPAN - 1}.`;
+  return `${FIRE_IS} at screen line ${line}${from} — and ${FIRE_LAW}. `
+    + `The build refuses it. Move the top onto the visible screen, or ${FIRE_REMEDY}.`;
+}
+
+// ---------------------------------------------------------------------------
+// THE BOUND, SAID OUT LOUD — the legibility half (2026-08-28)
+// ---------------------------------------------------------------------------
+//
+// ⚠ A CLAMP THAT CANNOT EXPLAIN ITSELF IS INDISTINGUISHABLE FROM A BUG. That is
+// not a slogan, it is the incident: `clampLayerTop` shipped doing exactly what
+// it promised, the guide stopped exactly where the engine says it must, and the
+// owner filed it as a broken editor — because the wall had no label. The clamp
+// was the whole of the last parcel's answer to "the author could originate an
+// unauthorable value from a control that gave no sign of a limit", and it fixed
+// the ORIGINATION and left the NO SIGN OF A LIMIT standing.
+//
+// ═══ THREE PATHS, ONE RULE, AND THEY DID NOT AGREE ═══
+//
+//   1. LOADING a document holding an out-of-range top: KEEPS it, advises, saves
+//      (ROADMAP row 58's explicit ruling).
+//   2. The layer's own CONTROLS (the panel spinner, the canvas guide drag):
+//      REFUSE it, via `clampLayerTop` (ROADMAP row 37's "the clamp is the
+//      bound") — silently, until now.
+//   3. CHANGING `v_offset` (the view-box drag, the arrow keys): *CREATES* an
+//      out-of-range top with no comment at all. `setSceneFieldCommand` writes
+//      one key and re-checks nothing, so raising `v_offset` lifts the floor PAST
+//      an already-placed layer and the document is left holding a top the bake
+//      refuses — reached without ever touching the layer. See the hole's own
+//      note on `guideBoundNotice` below.
+//
+// THE RULE THAT RECONCILES THEM, and it is about AUTHORSHIP rather than about
+// permissiveness: **the control that OWNS a value refuses to originate an
+// illegal one and says why; every other route surfaces it rather than silently
+// rewriting or blocking.** Path 2 keeps its clamp and gains a sentence; paths 1
+// and 3 both become permit-and-advise, which is what path 1 already was. Two
+// behaviours, one line between them, statable in a sentence.
+//
+// ⚠ THE REJECTED ALTERNATIVE, recorded because it is the tempting one. Making
+// path 3 REFUSE — clamping `v_offset` so it can never lift the floor past a
+// placed layer — would stop the view box moving because of a layer three lines
+// below it. That is a strictly worse spelling of the bug being reported here: an
+// invisible wall, on a second control, for a reason even further away. And
+// silently dragging the author's layers when the box moves is worse still: it
+// rewrites placements the author chose and did not ask about.
+
+/** What `guideBoundNotice` found, or nothing. */
+export interface GuideBoundNotice {
+  /** 'held' — a gesture asked for this value and was refused it NOW.
+   *  'illegal' — no gesture; the document is ALREADY holding an out-of-range top. */
+  tone: 'held' | 'illegal';
+  /** Which rule did the narrowing: the raster-fire `ensure`, or the Plane-B row span. */
+  rule: 'fire' | 'plane';
+  /** Which edge was hit ('held' only). */
+  edge: 'min' | 'max' | null;
+  /** The bound edge the value was held at ('held'), or the offending screen line ('illegal'). */
+  limit: number;
+  text: string;
+}
+
+/**
+ * The sentence to put in front of the author about this layer's top, or null.
+ *
+ * ⚠ IT MUST NOT SPEAK WHEN NOTHING IS WRONG. A guide dragged nowhere near its
+ * bound says nothing, and that is a requirement rather than a nicety: an
+ * advisory that is always on screen is read as decoration within a day and is
+ * then not read at the one moment it matters. The null cases are the majority
+ * case and the tests sweep the whole legal band to hold them.
+ *
+ * `requested` is the raw value a gesture is asking for — pass it during a drag,
+ * omit it otherwise. Rounded here, because `canvasYToLayerTop` is fractional and
+ * a guide dropped on 66.6 is asking for 67, not for a refusal.
+ *
+ * THE TWO TONES ARE DIFFERENT EVENTS, not two dressings of one:
+ *   - 'held' answers "why did the thing I am dragging stop?" — path 2.
+ *   - 'illegal' answers "why is this guide marked, when I never touched it?" —
+ *     path 3, the `v_offset` hole, whose whole problem was that nothing asked.
+ */
+export function guideBoundNotice(
+  scene: Pick<EffectsScene, 'v_factor' | 'v_offset'>,
+  layer: Pick<EffectsLayer, 'world_y' | 'vsplit'>,
+  requested?: number,
+): GuideBoundNotice | null {
+  const vo = scene.v_offset ?? EFFECTS_V_OFFSET_DEFAULT;
+  const bound = layerTopBounds(scene, layer);
+  const fires = layerEmitsFire(layer) && layerTopSpace(scene) === 'screen';
+
+  if (typeof requested === 'number' && Number.isFinite(requested)) {
+    const want = Math.round(requested);
+    if (want < bound.min || want > bound.max) {
+      const edge = want < bound.min ? 'min' : 'max';
+      const limit = edge === 'min' ? bound.min : bound.max;
+      // WHICH rule is doing the narrowing, asked of the bounds rather than
+      // assumed from the layer: a fire layer at a `v_offset` big enough to push
+      // its ceiling past the plane's is held by the PLANE at that edge, and
+      // saying "fire" there would send the author to change the wrong field.
+      const plane = layerTopBounds(scene);
+      const byFire = fires && (edge === 'min' ? bound.min > plane.min : bound.max < plane.max);
+      const text = byFire
+        ? (edge === 'min'
+          ? `held at ${limit}. ${FIRE_IS}, and ${FIRE_LAW}. `
+            + `${FIRE_FLOOR_IS_THE_BOX(vo)}. Drag the view box up to lower the floor, or ${FIRE_REMEDY}.`
+          : `held at ${limit}. ${FIRE_IS}, and ${FIRE_LAW}. `
+            + `With v_offset ${vo} that is rows ${bound.min}..${bound.max} of the plane. `
+            + `Drag the view box down to raise the ceiling, or ${FIRE_REMEDY}.`)
+        : `held at ${limit}. A layer top is a Plane B row, and the plane is `
+          + `${PLANE_LINE_SPAN} rows (0..${PLANE_LINE_SPAN - 1}).`;
+      return { tone: 'held', rule: byFire ? 'fire' : 'plane', edge, limit, text };
+    }
+    return null;
+  }
+
+  // NO GESTURE — so the only thing that can be wrong is a top the document is
+  // ALREADY holding, which is the `v_offset` hole's whole signature.
+  if (!fires) return null;
+  const line = fireScreenLineOf(scene, layer.world_y);
+  if (line >= EFFECTS_FIRE_LINE_MIN && line <= EFFECTS_FIRE_LINE_MAX) return null;
+  // ⚠ NOT `FIRE_FLOOR_IS_THE_BOX` HERE, and the difference is the tense rather
+  // than the fact. That clause explains a wall the author is pushing against
+  // RIGHT NOW; this one explains damage that has ALREADY happened to a layer the
+  // author is not touching. Splicing the two produced a genuine run-on in the
+  // first build ("...welded to the box, so MOVING THE BOX MOVED THIS FLOOR..."),
+  // which buries the one clause that assigns the cause.
+  const text = `top ${layer.world_y} is now screen line ${line} — ${FIRE_IS}, and ${FIRE_LAW}. `
+    + `The build refuses it. On a locked scene the view box's top edge IS v_offset (${vo}), `
+    + `so MOVING THE BOX MOVED THIS FLOOR and left the layer under it. `
+    + `Drag the box back, move the top into ${bound.min}..${bound.max}, or ${FIRE_REMEDY}.`;
+  return { tone: 'illegal', rule: 'fire', edge: null, limit: line, text };
 }
 
 /**
