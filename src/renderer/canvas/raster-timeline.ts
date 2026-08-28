@@ -108,7 +108,8 @@ import { factorLabel } from '../../core/formats/effects/scene-ui';
 import type { CameraPreviewPlan, CameraPreviewBand } from './camera-preview';
 import {
   layerTopSpace, fireScreenLineOf, layerEmitsFire, vsplitFieldValue,
-  EFFECTS_FIRE_LINE_MIN, EFFECTS_FIRE_LINE_MAX, type LayerTopSpace,
+  EFFECTS_FIRE_LINE_MIN, EFFECTS_FIRE_LINE_MAX, VSPLIT_LOCK_CLAUSES,
+  type LayerTopSpace,
 } from '../providers/effects-aeon';
 import { SCREEN_HEIGHT } from '../../core/model/screen';
 import {
@@ -243,13 +244,24 @@ export function rasterTimelineSpaceNotice(
  *     ensure) — the split has no baked line to draw;
  *   • a locked scene's fire must land on `3..223` (`fire()`), because lines
  *     0..2 belong to the priming records.
+ *
+ * ⚠ THE FIRST ARM COMPOSES THE PROVIDER'S CLAUSES (ROADMAP row 80). It used to
+ * carry its own wording, which named ONE of the engine's two remedies and never
+ * named the mechanism — and it was, until row 80, the ONLY thing in Aurora that
+ * said anything about this combination, in a collapsible section away from the
+ * controls that create it. `VSPLIT_LOCK_CLAUSES` is now the single declaration
+ * and the panel's two sentences compose the same words; see the block above
+ * `vsplitLockAdvisory` in `providers/effects-aeon.ts`.
  */
 export function splitRefusal(
   scene: Pick<EffectsScene, 'v_factor' | 'v_offset'>, layer: Pick<EffectsLayer, 'world_y' | 'vsplit'>,
 ): string | null {
   if (layerTopSpace(scene) !== 'screen') {
-    return 'this scene\'s Plane B tracks the camera, so a split has no baked fire line '
-      + '— the engine refuses the scene. Lock the plane (v_factor 15) to author depth as a split.';
+    // Phrased to follow the strip's own subject ("Layer N's split …"), which is
+    // why the clause itself carries no subject.
+    return `cannot be baked: ${VSPLIT_LOCK_CLAUSES.sceneIs(scene.v_factor)}, so it has no fire `
+      + `line and the build refuses the WHOLE SCENE. ${VSPLIT_LOCK_CLAUSES.mechanism} `
+      + VSPLIT_LOCK_CLAUSES.remedies;
   }
   const line = fireScreenLineOf(scene, layer.world_y);
   if (line >= EFFECTS_FIRE_LINE_MIN && line <= EFFECTS_FIRE_LINE_MAX) return null;

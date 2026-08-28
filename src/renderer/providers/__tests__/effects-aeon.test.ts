@@ -16,6 +16,7 @@ import {
   SCENE_FORM_CHOICES, layerExtras, layerExtrasLine,
   layerTopSpace, layerTopBounds, clampLayerTop, planeLineOf, PLANE_LINE_SPAN,
   fireLineAdvisory, layerEmitsFire, fireScreenLineOf, vsplitOrderAdvisory,
+  vsplitLockAdvisory, sceneVsplitLockAdvisory, VSPLIT_LOCK_CLAUSES, clampVFactor,
   guideBoundNotice,
   EFFECTS_FIRE_LINE_MIN, EFFECTS_FIRE_LINE_MAX,
   layerCountLine, vFactorHint,
@@ -762,10 +763,19 @@ describe('fireLineAdvisory — only the layers that actually become raster fires
 
   it('says nothing on an UNLOCKED scene: a split there is a different refusal', () => {
     // `scene()` refuses vsplit on a camera-tracked plane outright (the
-    // two-writer collision, scene_dsl.emp:1259-1261) and the layer top is not
-    // what is wrong with it. A screen line does not exist for that scene at all.
+    // two-writer collision, aeon `scene_dsl.emp:1290` at revision
+    // ea343260c42c961b544f14cede0a8f25a7a7a5fd) and the layer top is not what
+    // is wrong with it: no top on that scene has a screen line at all.
+    //
+    // ⚠ THIS SILENCE IS ONLY DEFENSIBLE BECAUSE SOMETHING ELSE SPEAKS, and
+    // until ROADMAP row 80 nothing in Aurora did — the early return cited an
+    // advisory that had never been written. `vsplitLockAdvisory` is that
+    // advisory, and the pairing is asserted here so the two cannot drift apart
+    // again without a test going red.
     expect(fireLineAdvisory(unlocked(), split(303))).toBeNull();
     expect(fireLineAdvisory(unlocked(), split(112))).toBeNull();
+    expect(vsplitLockAdvisory(unlocked(), split(303))).not.toBeNull();
+    expect(vsplitLockAdvisory(unlocked(), split(112))).not.toBeNull();
   });
 
   it('is an ADVISORY: with no layer in hand it does not narrow the bound (ROADMAP row 58)', () => {
@@ -859,6 +869,171 @@ describe('vsplitOrderAdvisory — the ordering rule, transcribed from the DSL an
     expect(advise(locked(), [split(20), split(80), split(160)])).toEqual([null, null, null]);
     expect(advise(locked(), [split(20), split(60), split(100), split(140), split(180)]))
       .toEqual([null, null, null, null, null]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// THE TWO-WRITER RULING — the advisory the panel never had (ROADMAP row 80)
+// ---------------------------------------------------------------------------
+//
+// aeon `engine/level/scene_dsl.emp:1290`, at revision
+// ea343260c42c961b544f14cede0a8f25a7a7a5fd:
+//
+//   ensure(any_vsplit == 0 || v_factor == 15, "scene(): a layer authors
+//   vsplit: At(..) while this scene's Plane-B vertical scroll TRACKS THE
+//   CAMERA ... That is the two-writer collision ... Lock the plane
+//   (v_factor: 15) and author the depth as a split, or express it horizontally
+//   (layer(fb:) / curve:), which the walker recomputes every frame")
+//
+// ⚠ WHAT THIS SUITE CANNOT SEE, said before the green is read. Every assertion
+// below is over a PURE FUNCTION, and a pure function returning the right string
+// proves nothing about whether an author ever reads it — which is exactly how
+// this gap survived: `fireLineAdvisory` returned null on this scene and a
+// comment asserted that somebody else was speaking.
+// `scratchpad/vsplit-advisory-harness.mjs` is the instrument that reads the
+// sentence out of the running app's DOM.
+//
+// ⚠ AND THE TRAP THIS PARCEL SHARES WITH ITS OWN DEFECT: a locked scene
+// produces no advisory, and so does a completely broken implementation. Every
+// positive row below is paired with a LOCKED control that must stay silent.
+
+describe('vsplitLockAdvisory — a split on a camera-tracked plane, said on the LAYER', () => {
+  const locked = () => ({ ...newEffectsScene('l', 'L'), v_factor: EFFECTS_V_FACTOR_LOCK });
+  const unlocked = (vf = 3) => ({ ...newEffectsScene('u', 'U'), v_factor: vf });
+  const plain = (world_y = 40): EffectsLayer => ({ world_y, fa: 'FACTOR_1', fb: 'FACTOR_1' });
+  const split = (world_y = 40, at = 0x43): EffectsLayer => ({ ...plain(world_y), vsplit: { at } });
+
+  it('⚠ DISCRIMINATING: an unlocked scene + a split is advised; the LOCKED control is silent', () => {
+    // Both halves in one row on purpose. The null half alone is what a deleted
+    // feature returns, and the non-null half alone is what an always-on hint
+    // returns; neither is evidence without the other.
+    expect(vsplitLockAdvisory(unlocked(), split())).not.toBeNull();
+    expect(vsplitLockAdvisory(locked(), split())).toBeNull();
+  });
+
+  it('fires for EVERY shift the schema allows below the lock, and only those', () => {
+    // Derived from the schema's own range, not from a typed 0..14 — the
+    // sentinel is `EFFECTS_V_FACTOR_LOCK` and everything under it tracks.
+    for (let vf = S.properties.v_factor.minimum; vf < EFFECTS_V_FACTOR_LOCK; vf++) {
+      expect(vsplitLockAdvisory(unlocked(vf), split()), `v_factor=${vf}`).not.toBeNull();
+    }
+    expect(vsplitLockAdvisory(unlocked(EFFECTS_V_FACTOR_LOCK), split())).toBeNull();
+  });
+
+  it('says NOTHING about a layer with no split, however unlocked the scene', () => {
+    // The majority case, and the reason this is not decoration: an unlocked
+    // scene with no split is exactly what camera-tracked parallax IS.
+    for (let vf = S.properties.v_factor.minimum; vf <= EFFECTS_V_FACTOR_LOCK; vf++) {
+      expect(vsplitLockAdvisory(unlocked(vf), plain()), `v_factor=${vf}`).toBeNull();
+    }
+  });
+
+  it('`at: 0` is a REAL split — the test is presence, not truthiness', () => {
+    // `layerEmitsFire` transcribes `scene_vsplit_is_none(...) == 0`. A
+    // falsiness test here would exempt the one split whose payload is zero.
+    expect(vsplitLockAdvisory(unlocked(), split(40, 0))).not.toBeNull();
+    expect(vsplitLockAdvisory(unlocked(), { ...plain(), vsplit: 'none' })).toBeNull();
+  });
+
+  it('⚠ NAMES THE MECHANISM, not just the illegality — the FIRE_FLOOR_IS_THE_BOX precedent', () => {
+    const a = vsplitLockAdvisory(unlocked(3), split()) ?? '';
+    // Composed from the shared clauses, never retyped here.
+    expect(a).toContain(VSPLIT_LOCK_CLAUSES.mechanism);
+    // ...and the mechanism clause really is a mechanism: two writers, one word,
+    // both named, plus why the split cannot stand in for the other writer.
+    expect(VSPLIT_LOCK_CLAUSES.mechanism).toMatch(/two writers, one word/i);
+    expect(VSPLIT_LOCK_CLAUSES.mechanism).toMatch(/every VBlank/);
+    expect(VSPLIT_LOCK_CLAUSES.mechanism).toMatch(/same word mid-frame/);
+    expect(VSPLIT_LOCK_CLAUSES.mechanism).toMatch(/ONE baked scroll value at ONE baked fire line/);
+    // The author's own field value is in it — a rule he can check against the
+    // spinner in front of him, rather than a generic prohibition.
+    expect(a).toContain('v_factor 3');
+    expect(a).toContain(`${EFFECTS_V_FACTOR_LOCK} is the lock sentinel`);
+  });
+
+  it('⚠ CARRIES BOTH REMEDIES — they are different products, not two spellings', () => {
+    const a = vsplitLockAdvisory(unlocked(), split()) ?? '';
+    expect(a).toContain(VSPLIT_LOCK_CLAUSES.remedyLock);
+    expect(a).toContain(VSPLIT_LOCK_CLAUSES.remedyHorizontal);
+    // They are distinct sentences and neither contains the other; an advisory
+    // offering only the lock silently narrows what the author can build.
+    expect(VSPLIT_LOCK_CLAUSES.remedyLock).not.toBe(VSPLIT_LOCK_CLAUSES.remedyHorizontal);
+    expect(VSPLIT_LOCK_CLAUSES.remedyLock).not.toContain(VSPLIT_LOCK_CLAUSES.remedyHorizontal);
+    expect(VSPLIT_LOCK_CLAUSES.remedyHorizontal).not.toContain(VSPLIT_LOCK_CLAUSES.remedyLock);
+    expect(VSPLIT_LOCK_CLAUSES.remedyLock).toContain(`v_factor ${EFFECTS_V_FACTOR_LOCK}`);
+    expect(VSPLIT_LOCK_CLAUSES.remedyHorizontal).toMatch(/horizontal/i);
+    expect(VSPLIT_LOCK_CLAUSES.remedyHorizontal).toMatch(/every frame/);
+  });
+
+  it('says the WHOLE SCENE is refused, because it is — the fault is not this layer\'s alone', () => {
+    // `scene()` refuses the constructor call. Wording that blamed the layer
+    // would send the author to delete a split when locking the plane keeps it.
+    expect(vsplitLockAdvisory(unlocked(), split())).toContain('WHOLE SCENE');
+  });
+});
+
+describe('sceneVsplitLockAdvisory — the same rule with the SCENE as its subject', () => {
+  const sceneWith = (v_factor: number, layers: EffectsLayer[]) =>
+    ({ ...newEffectsScene('s', 'S'), v_factor, layers });
+  const plain = (world_y = 40): EffectsLayer => ({ world_y, fa: 'FACTOR_1', fb: 'FACTOR_1' });
+  const split = (world_y = 40): EffectsLayer => ({ ...plain(world_y), vsplit: { at: 0x43 } });
+
+  it('⚠ DISCRIMINATING: unlocked + a split speaks; the LOCKED control with the same layers is silent', () => {
+    const layers = [plain(0), split(80)];
+    expect(sceneVsplitLockAdvisory(sceneWith(4, layers))).not.toBeNull();
+    expect(sceneVsplitLockAdvisory(sceneWith(EFFECTS_V_FACTOR_LOCK, layers))).toBeNull();
+  });
+
+  it('⚠ DISCRIMINATING: unlocked with NO split is silent — that scene is perfectly legal', () => {
+    // The other half of the pair. A build that keyed only on `v_factor` would
+    // shout at every camera-tracked scene in the game.
+    expect(sceneVsplitLockAdvisory(sceneWith(4, [plain(0), plain(80)]))).toBeNull();
+    expect(sceneVsplitLockAdvisory(sceneWith(0, [plain(0)]))).toBeNull();
+  });
+
+  it('NAMES WHICH LAYERS, which is the fact the v_factor route destroys', () => {
+    // Reaching the fault by moving `v_factor` means never touching a layer, so
+    // this is the only surface that can say where the splits are.
+    const one = sceneVsplitLockAdvisory(sceneWith(4, [plain(0), split(80)])) ?? '';
+    expect(one).toContain('layer 1 authors a Plane B split');
+    const many = sceneVsplitLockAdvisory(
+      sceneWith(4, [split(0), plain(40), split(80), split(160)])) ?? '';
+    expect(many).toContain('layers 0, 2, 3 author Plane B splits');
+  });
+
+  it('composes the SAME clauses as the layer sentence — one rule, not three', () => {
+    const s = sceneWith(4, [split(0)]);
+    const scn = sceneVsplitLockAdvisory(s) ?? '';
+    const lyr = vsplitLockAdvisory(s, s.layers[0]) ?? '';
+    for (const clause of [
+      VSPLIT_LOCK_CLAUSES.sceneIs(4),
+      VSPLIT_LOCK_CLAUSES.mechanism,
+      VSPLIT_LOCK_CLAUSES.remedyLock,
+      VSPLIT_LOCK_CLAUSES.remedyHorizontal,
+    ]) {
+      expect(scn, 'scene sentence').toContain(clause);
+      expect(lyr, 'layer sentence').toContain(clause);
+    }
+    // ...and they are still two different EVENTS, not one string printed twice
+    // (the `guideBoundNotice` two-tones precedent).
+    expect(scn).not.toBe(lyr);
+  });
+
+  it('is an ADVISORY: nothing here narrows a control or rewrites a value (ROADMAP rows 37/58)', () => {
+    // The rule "the control that owns a value refuses to originate an illegal
+    // one" is pending the owner's review, so this parcel surfaces and does not
+    // prevent. `clampVFactor` still offers the whole schema range, and a split
+    // layer's top bound on an unlocked scene is still the schema's world_y.
+    const s = sceneWith(4, [split(0)]);
+    for (let vf = S.properties.v_factor.minimum; vf <= EFFECTS_V_FACTOR_LOCK; vf++) {
+      expect(clampVFactor(vf), `v_factor=${vf}`).toBe(vf);
+    }
+    expect(layerTopBounds(s, s.layers[0])).toEqual({
+      space: 'act', label: 'world_y',
+      min: S.$defs.layer.properties.world_y.minimum,
+      max: S.$defs.layer.properties.world_y.maximum,
+    });
+    expect(clampLayerTop(s, 4096, s.layers[0])).toBe(4096);
   });
 });
 

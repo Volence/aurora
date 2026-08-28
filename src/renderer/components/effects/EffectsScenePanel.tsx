@@ -67,6 +67,7 @@ import {
   LAYER_CURVE_ROW, LAYER_VSPLIT_ROW, EFFECTS_VSPLIT_AT_BOUNDS,
   clampVFactor, clampVCenter, clampVOffset,
   layerTopBounds, clampLayerTop, planeLineOf, fireLineAdvisory, vsplitOrderAdvisory,
+  vsplitLockAdvisory, sceneVsplitLockAdvisory,
   layerCountLine, vFactorHint,
   sceneListEntries, resolveSelectedScene, sceneRefOptions, unassignableSceneRef,
   sectionSceneCommand, createSceneCommand, deleteSceneCommand,
@@ -481,6 +482,20 @@ export default function EffectsScenePanel(): React.ReactElement {
             are screen lines or world Ys, and both shipped scenes carry it.
           */}
           <Hint under>{vFactorHint()}</Hint>
+          {/*
+            THE TWO-WRITER RULING, ON THE FIELD THAT CAUSES IT (ROADMAP row 80).
+            Moving `v_factor` off the lock while any layer carries a split makes
+            the WHOLE SCENE unbuildable, and until this row nothing on screen
+            said so — `fireLineAdvisory` bowed out on a comment claiming an
+            advisory that did not exist. This is the scene-subject spelling; the
+            layer cards carry the layer-subject one, and both compose the same
+            clauses. Advisory, never prevention: the spinner still offers every
+            shift the schema allows and the document still saves (row 58).
+          */}
+          {(() => {
+            const lock = sceneVsplitLockAdvisory(selected);
+            return lock === null ? null : <Hint under tone="warning">{lock}</Hint>;
+          })()}
           <Field label="V center">
             {/*
               BOUNDED BY THE CLAMP, NOT THE PROPS (ROADMAP item 37). `min`/`max`
@@ -796,6 +811,16 @@ export default function EffectsScenePanel(): React.ReactElement {
                 );
               })()}
               <Hint under style={{ marginBottom: 0 }}>{LAYER_VSPLIT_ROW.hint}</Hint>
+              {/* THE TWO-WRITER RULING, UNDER THE CONTROL THAT TRIPS IT (row 80).
+                  Turning this split on while the scene's Plane B tracks the
+                  camera makes the whole document unbuildable. Null on a locked
+                  scene — which is every scene that ships, so this hint is
+                  invisible in the common case and the tests carry a locked
+                  control precisely because a broken build looks identical. */}
+              {(() => {
+                const lock = vsplitLockAdvisory(selected, layer);
+                return lock === null ? null : <Hint under tone="warning">{lock}</Hint>;
+              })()}
               {/* THE STRIP'S OWN DEFORM (wave 2). `own` overrides the scene's
                   plane-shared table for this strip alone, and it carries the
                   same `tableRef` the scene rows do — so the same sub-form.
