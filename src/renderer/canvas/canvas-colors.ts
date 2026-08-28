@@ -28,7 +28,33 @@ export const COLLISION_FILL_TOP = 'rgba(240,200,70,0.42)';        // jump-throug
 export const COLLISION_FILL_SIDES = 'rgba(90,150,240,0.42)';      // walls/ceiling — blue
 export const COLLISION_FILL_NONE = 'rgba(160,160,170,0.25)';      // no-solidity shape — faint gray
 export const COLLISION_SURFACE_LINE = 'rgba(255,255,255,0.85)';   // crisp top-of-surface stroke
-export const COLLISION_ANGLE_TICK = 'rgba(255,80,80,0.9)';        // angle indicator
+
+// --- THE ANGLE MARK: ONE HUE, ONE CASING, EVERY SURFACE ---------------------
+//
+// There used to be TWO colours for one concept: the map drew the angle in red
+// (this constant) and the picker thumbnails drew it in blue
+// (`COLLISION_ANGLE_NEEDLE`, 120,190,255). The owner read the picker's blue
+// lines and the map's red ticks as unrelated marks, which is what they looked
+// like, because they were.
+//
+// RED-ORANGE WINS THE HUE. Every other lens on this canvas is spoken for:
+// white/green/yellow (grids), green/amber/blue fills with a white surface line
+// (collision), violet (priority), cyan (parallax guides), magenta (band lens),
+// orange (screen frame). Warm red is the only hue the collision family can own
+// outright, it is already what the map trained the eye on, and it stays
+// distinct from the amber `COLLISION_FILL_TOP` it most often sits over because
+// the mark is a thin cased stroke and the fill is a 0.42-alpha wash.
+//
+// THE CASING IS NOT DECORATION. The overlay is drawn over high-contrast pixel
+// art in arbitrary colours, and "I can't see the shape over the art" is the
+// complaint that started this. A lone bright stroke vanishes on bright art; a
+// lone dark stroke vanishes on dark art. Casing first, core over it — the way
+// map labels survive an arbitrary basemap — so at least one of the two always
+// contrasts. Same trick, same reason, as `BAND_LENS_LABEL_BG`.
+/** Bright core of the angle mark (bar + outward barb). */
+export const COLLISION_ANGLE_TICK = 'rgba(255,90,70,1)';
+/** Near-black casing stroked UNDER the core so the mark reads over any art. */
+export const COLLISION_ANGLE_CASING = 'rgba(8,10,14,0.9)';
 export const COLLISION_UNKNOWN = 'rgba(255,0,255,0.5)';           // out-of-range attr index
 export const COLLISION_FALLBACK = 'rgba(120,160,220,0.35)';       // flat fill when no tables
 export const COLLISION_DIFF = 'rgba(255,120,40,0.95)';            // outline: A/B planes differ here
@@ -63,8 +89,11 @@ export const COLLISION_SHAPE_FILL = 'rgba(70,200,150,0.9)';      // shape body �
 export const COLLISION_SHAPE_LINE = 'rgba(150,235,205,0.95)';    // surface line — light teal
 /** Orange highlight for the solid-side box edges. */
 export const COLLISION_SOLID_EDGE = 'rgba(255,150,60,1)';        // solid edges — orange
-/** Blue angle needle. */
-export const COLLISION_ANGLE_NEEDLE = 'rgba(120,190,255,1)';     // angle needle — blue
+// NO SECOND ANGLE COLOUR LIVES HERE. `COLLISION_ANGLE_NEEDLE` (blue) used to,
+// and a second NAME for one concept is how the picker and the map drifted into
+// drawing the same angle byte in two colours AND two directions. The picker,
+// the big preview, the paint ghost and both map overlays all import
+// `COLLISION_ANGLE_TICK` + `COLLISION_ANGLE_CASING` above. Do not add another.
 
 // ---------- collision paint hover preview (MapViewport ghost) ----------
 /** Translucent silhouette fill for the ghost shape under the cursor. */

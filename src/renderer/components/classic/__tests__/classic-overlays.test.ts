@@ -12,6 +12,7 @@ import { drawObjects, drawCollision, drawPriority } from '../classic-overlays';
 import type { ObjectSprite } from '../../../state/classicObjectArtStore';
 import type { LevelDoc } from '../../../../core/level-classic/model';
 import { monoMeasureText } from '../../../../test/mono-measure';
+import { COLLISION_ANGLE_TICK } from '../../../canvas/canvas-colors';
 
 /** A recording 2D-context stand-in: captures drawImage/fillRect call counts. */
 function mockCtx() {
@@ -92,32 +93,50 @@ describe('drawObjects detached-bitmap guard', () => {
 });
 
 /** A recording context for the angle needle: captures moveTo/lineTo endpoints. */
-function needleCtx() {
-  const pts: { x: number; y: number }[] = [];
+/**
+ * A recording context that TAGS each point with the colour it was drawn in.
+ *
+ * The old version recorded bare points and relied on a fixture whose heights
+ * were all zero so that nothing but the needle drew. That fixture no longer
+ * works, and its not working is the correct behaviour: the angle mark anchors
+ * ON the collidable surface, so a shape with no solid column has nothing to
+ * annotate and draws no mark at all. Rather than keep a degenerate shape alive
+ * to isolate the mark, the shape is now REAL and the mark is isolated by
+ * colour — which is stricter, because it also proves the mark is drawn in the
+ * angle colour and not, say, accidentally in the surface line's.
+ *
+ * `scale` feeds `getTransform().a`, the live canvas scale the overlay derives
+ * its density gate and its screen-space stroke widths from.
+ */
+function needleCtx(scale = 1) {
+  const pts: { x: number; y: number; style: string }[] = [];
   const ctx = {
     lineWidth: 0, fillStyle: '', strokeStyle: '',
     save() {}, restore() {}, beginPath() {}, fill() {}, stroke() {}, setLineDash() {},
     fillRect() {}, strokeRect() {},
-    moveTo(x: number, y: number) { pts.push({ x, y }); },
-    lineTo(x: number, y: number) { pts.push({ x, y }); },
-    getTransform() { return { a: 1 }; },
+    moveTo(x: number, y: number) { pts.push({ x, y, style: ctx.strokeStyle }); },
+    lineTo(x: number, y: number) { pts.push({ x, y, style: ctx.strokeStyle }); },
+    getTransform() { return { a: scale }; },
   };
   return { ctx: ctx as unknown as CanvasRenderingContext2D, pts };
 }
 
+/** Just the points of the angle mark's bright core pass. */
+const corePts = (pts: { x: number; y: number; style: string }[]) =>
+  pts.filter((p) => p.style === COLLISION_ANGLE_TICK);
+
 /**
  * One chunk, one solid cell at index 0, pointing at block 1 → shape 1.
  *
- * Shape 1's height row is all-zero (no column has a solid run) so neither the
- * height fill nor the "crisp surface line" pass draws anything — both would
- * otherwise add their own moveTo/lineTo calls to the SAME recording ctx and
- * swamp the needle's 2 points. The needle itself is unconditional on column
- * contents (it only reads shapeIndex/angle), so it still draws.
+ * Shape 1 is a REAL flat floor (every column height 8), because the angle mark
+ * is anchored on the collidable surface and a shape with no solid column has
+ * no surface to anchor to. The surface-line pass draws too; `corePts` filters
+ * it out by colour.
  */
 function collisionDoc(xf: boolean, yf: boolean): LevelDoc {
   const cells = Array.from({ length: 256 }, () => ({ block: 0, xf: false, yf: false, solidity: 0 }));
   cells[0] = { block: 1, xf, yf, solidity: 3 };
-  const heights = [new Int8Array(16), new Int8Array(16)];
+  const heights = [new Int8Array(16), new Int8Array(16).fill(8)];
   return {
     chunks: [{ cells }],
     blocks: [{ cells: [] }, { cells: [] }],
@@ -125,20 +144,64 @@ function collisionDoc(xf: boolean, yf: boolean): LevelDoc {
   } as unknown as LevelDoc;
 }
 
-describe('drawCollision angle needle', () => {
-  it('draws the needle along angleNeedle, not its vertical mirror', () => {
+describe('drawCollision angle mark', () => {
+  // The mark's core pass is: moveTo/lineTo for the tangent bar, then
+  // moveTo/lineTo for the outward barb. Four points, in that order.
+  const BAR_A = 0, BAR_B = 1, BARB_ROOT = 2, BARB_TIP = 3;
+
+  it('draws the bar along angleNeedle, not its vertical mirror', () => {
     const { ctx, pts } = needleCtx();
     drawCollision(ctx, collisionDoc(false, false), 0, 0, 1, true);
-    expect(pts.length).toBe(2);
-    const dy = pts[1].y - pts[0].y;
+    const core = corePts(pts);
+    expect(core.length).toBe(4);
+    const dy = core[BAR_B].y - core[BAR_A].y;
     expect(dy).toBeLessThan(0); // $E0 ascends
   });
 
   it('honours the chunk cell flips the heights already honour', () => {
     const { ctx, pts } = needleCtx();
     drawCollision(ctx, collisionDoc(true, false), 0, 0, 1, true);
-    const dy = pts[1].y - pts[0].y;
+    const core = corePts(pts);
+    expect(core.length).toBe(4);
+    const dy = core[BAR_B].y - core[BAR_A].y;
     expect(dy).toBeGreaterThan(0); // X-flipped $E0 descends
+  });
+
+  // THE ASYMMETRY, ON CLASSIC'S SURFACE. The old bar was symmetric and so could
+  // not say which side of the surface was solid; this row is the one that fails
+  // if the barb is ever dropped back to a plain segment.
+  it('the barb leaves the surface on the open side — up, for a floor', () => {
+    const { ctx, pts } = needleCtx();
+    drawCollision(ctx, collisionDoc(false, false), 0, 0, 1, true);
+    const core = corePts(pts);
+    // The barb is rooted at the bar's midpoint...
+    expect(core[BARB_ROOT].x).toBeCloseTo((core[BAR_A].x + core[BAR_B].x) / 2, 10);
+    expect(core[BARB_ROOT].y).toBeCloseTo((core[BAR_A].y + core[BAR_B].y) / 2, 10);
+    // ...and points AWAY from the solid, which for a floor is upward (-y).
+    expect(core[BARB_TIP].y).toBeLessThan(core[BARB_ROOT].y);
+  });
+
+  it('the mark sits on the surface, not at the cell centre', () => {
+    const { ctx, pts } = needleCtx();
+    drawCollision(ctx, collisionDoc(false, false), 0, 0, 1, true);
+    const core = corePts(pts);
+    // Heights are all 8 -> columnSolidRun(8) = { y: 8, h: 8 } -> surface y 8.
+    // Cell 0 is at world y 0, so the anchor is world y 8. That coincides with
+    // the cell centre HERE only because the fixture floor is exactly half
+    // height; the discriminating row for the anchor is in
+    // collision-angle-mark.test.ts, which uses a shallow slope.
+    expect(core[BARB_ROOT].y).toBeCloseTo(8, 10);
+  });
+
+  // The density gate: below MIN_CELL_PX_FOR_MARK screen px per 16px cell the
+  // mark is skipped outright. At scale 0.5 a cell is 8 screen px.
+  it('is suppressed when a cell is too small to hold it', () => {
+    const { ctx, pts } = needleCtx(0.5);
+    drawCollision(ctx, collisionDoc(false, false), 0, 0, 1, true);
+    expect(corePts(pts).length).toBe(0);
+    // Anti-vacuous: the overlay still ran and still drew the surface line, so
+    // the zero above is the gate and not a fixture that drew nothing at all.
+    expect(pts.length).toBeGreaterThan(0);
   });
 });
 

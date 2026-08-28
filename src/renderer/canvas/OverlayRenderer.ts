@@ -5,14 +5,19 @@ import type { ObjectPreview } from '../state/projectStore';
 import {
   GRID_TILE, GRID_BLOCK, GRID_SECTION,
   COLLISION_FILL_ALL, COLLISION_FILL_TOP, COLLISION_FILL_SIDES, COLLISION_FILL_NONE,
-  COLLISION_SURFACE_LINE, COLLISION_ANGLE_TICK, COLLISION_UNKNOWN, COLLISION_FALLBACK, COLLISION_DIFF,
+  COLLISION_SURFACE_LINE, COLLISION_ANGLE_TICK, COLLISION_ANGLE_CASING,
+  COLLISION_UNKNOWN, COLLISION_FALLBACK, COLLISION_DIFF,
   OBJECT_BOX_FILL, OBJECT_BOX_STROKE, OBJECT_LABEL, RING_FILL, RING_STROKE,
 } from './canvas-colors';
 import { fitLabelInContext, labelBudget } from './label-fit';
 import { drawSectionPriority } from './priority-lens';
 import type { CollisionProfileSet, Solidity } from '../../core/collision/collision-model';
 import { columnSolidRun } from '../../core/collision/collision-render';
+import { angleMark, drawAngleMark, MIN_CELL_PX_FOR_MARK, BAR_HALF, BARB_LEN } from '../../core/collision/collision-angle-mark';
+import type { MarkDrawCtx } from '../../core/collision/collision-angle-mark';
 import { resolveCell, resolvePlaneWords, SECTION_PLANE_WORDS } from '../../core/collision/collision-cell-resolve';
+import { publishCollisionMarkReport, ROW_CAP } from './collision-mark-report';
+import type { CollisionMarkRow } from './collision-mark-report';
 
 type Ctx = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
 
@@ -67,6 +72,12 @@ export class OverlayRenderer {
     const { x: vpX, y: vpY, zoom } = viewport;
     const lens: PriorityLensPass = { veils: 0, segments: 0 };
 
+    // Collect the angle marks this pass draws, then publish ONCE at the end —
+    // per SECTION would overwrite, and a harness would read whichever section
+    // happened to draw last. See collision-mark-report.ts.
+    this.markRows = [];
+    this.markDrawn = 0;
+
     ctx.save();
     ctx.scale(zoom, zoom);
     ctx.translate(-vpX, -vpY);
@@ -119,8 +130,30 @@ export class OverlayRenderer {
     }
 
     ctx.restore();
+    // The publish. `active` is the toggle, `suppressed` the density gate — kept
+    // apart so "angles are off" and "angles are on but zoomed out" are
+    // different answers a row can fail on.
+    const anyCollision = options.showCollision || options.showCollisionPathB;
+    publishCollisionMarkReport({
+      active: anyCollision && options.showCollisionAngles,
+      suppressed: anyCollision && options.showCollisionAngles && 16 * zoom < MIN_CELL_PX_FOR_MARK,
+      zoom,
+      cellScreenPx: 16 * zoom,
+      drawn: this.markDrawn,
+      rows: this.markRows,
+    });
+
+    // Both parcels ended this method: the collision-mark report is published
+    // for its harness, and the priority lens's own report is RETURNED to the
+    // caller. Independent observers of one draw pass — neither supersedes the
+    // other, so the merge keeps both rather than choosing.
     return lens;
   }
+
+  /** Marks drawn by the in-flight `render()` pass (capped; see ROW_CAP). */
+  private markRows: CollisionMarkRow[] = [];
+  /** True count for the same pass, uncapped. */
+  private markDrawn = 0;
 
   drawTileGrid(ctx: Ctx, viewport: { x: number; y: number; width: number; height: number; zoom: number }): void {
     const { x: vpX, y: vpY, width, height, zoom } = viewport;
@@ -216,6 +249,9 @@ export class OverlayRenderer {
     // 16px cells = 128×128 per section (256 tiles / 2). cellsW bounds the column
     // loop, cellsH the row loop (a section is square today, but keep them distinct).
     const cellsW = SECTION_TILES_WIDE / 2, cellsH = SECTION_TILES_HIGH / 2;
+    // How many SCREEN px one 16px collision cell occupies — the quantity the
+    // angle mark's density gate is stated in (see MIN_CELL_PX_FOR_MARK).
+    const cellScreenPx = 16 * zoom;
     const startCol = Math.max(0, Math.floor(localVpX / 16));
     const startRow = Math.max(0, Math.floor(localVpY / 16));
     const endCol = Math.min(cellsW, Math.ceil((localVpX + vpW) / 16));
@@ -262,15 +298,43 @@ export class OverlayRenderer {
               ctx.lineTo(cx + c + 1, cy + surfaceY);
               ctx.stroke();
             }
-            if (showAngles && p.hasAngle) {
-              const a = (p.angle / 256) * Math.PI * 2;
-              const mx = cx + 8, my = cy + 8, len = 6;
-              ctx.strokeStyle = COLLISION_ANGLE_TICK;
-              ctx.lineWidth = 1.5 / zoom;
-              ctx.beginPath();
-              ctx.moveTo(mx - Math.cos(a) * len, my + Math.sin(a) * len);
-              ctx.lineTo(mx + Math.cos(a) * len, my - Math.sin(a) * len);
-              ctx.stroke();
+            // The angle mark. THIS BLOCK USED TO BE THE BUG: it drew a centred,
+            // symmetric segment at `(cos a, -sin a)` — vertically MIRRORED
+            // against both classic's overlay and the picker's thumbnails, so on
+            // the one surface an author actually paints on, the tick lay across
+            // the slope instead of along it. It is now the shared mark.
+            //
+            // ZOOM: the mark's LENGTHS are cell-local (world) px, because it
+            // annotates a 16px cell and must stay proportional to it; the
+            // stroke WIDTHS are `/zoom`, so a hairline stays a hairline. Below
+            // MIN_CELL_PX_FOR_MARK screen px per cell the mark is skipped
+            // outright — that density, not the mark itself, is what made the
+            // old overlay read as scattered noise when zoomed out. The
+            // silhouette and surface line still carry the shape down there.
+            if (showAngles && cellScreenPx >= MIN_CELL_PX_FOR_MARK) {
+              const mark = angleMark(p);
+              if (mark) {
+                drawAngleMark(ctx as unknown as MarkDrawCtx, cx, cy, 16, mark, {
+                  color: COLLISION_ANGLE_TICK,
+                  casing: COLLISION_ANGLE_CASING,
+                  coreWidth: 1.25 / zoom,
+                  casingWidth: 3 / zoom,
+                });
+                // Publish out of the SAME values just handed to the draw, in
+                // world px. Recomputing these anywhere else is the thing
+                // collision-mark-report.ts exists to avoid.
+                this.markDrawn++;
+                if (this.markRows.length < ROW_CAP) {
+                  const ax = cx + mark.ax, ay = cy + mark.ay;
+                  this.markRows.push({
+                    ax, ay,
+                    bar1x: ax - mark.tx * BAR_HALF, bar1y: ay - mark.ty * BAR_HALF,
+                    bar2x: ax + mark.tx * BAR_HALF, bar2y: ay + mark.ty * BAR_HALF,
+                    tipx: ax + mark.nx * BARB_LEN, tipy: ay + mark.ny * BARB_LEN,
+                    angle: p.angle,
+                  });
+                }
+              }
             }
           }
         }

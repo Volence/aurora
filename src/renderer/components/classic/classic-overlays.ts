@@ -12,6 +12,8 @@ import { chunkIndexForId, type LevelDoc } from '../../../core/level-classic/mode
 import { chunkPriorityMask, CHUNK_TILES } from '../../../core/level-classic/priority-mask';
 import { columnSolidRun } from '../../../core/collision/collision-render';
 import { angleNeedle } from './collision-needle';
+import { angleMarkFromColumns, drawAngleMark, MIN_CELL_PX_FOR_MARK } from '../../../core/collision/collision-angle-mark';
+import type { MarkDrawCtx } from '../../../core/collision/collision-angle-mark';
 import { objectFrameRect } from '../../../core/level-classic/object-sprite';
 import { objectArtKey } from '../../../core/project/profiles/object-subtype-rules';
 import { s1ObjectIsInvisible, s1ObjectName } from '../../../core/project/profiles/s1-objects';
@@ -20,7 +22,7 @@ import { CHUNK_PX, ringGroupPositions } from './viewport-math';
 import {
   CANVAS_VOID,
   COLLISION_FILL_ALL, COLLISION_FILL_TOP, COLLISION_FILL_SIDES, COLLISION_FILL_NONE,
-  COLLISION_SURFACE_LINE, COLLISION_ANGLE_TICK,
+  COLLISION_SURFACE_LINE, COLLISION_ANGLE_TICK, COLLISION_ANGLE_CASING,
   OBJECT_BOX_FILL, OBJECT_BOX_STROKE, OBJECT_LABEL, RING_FILL, RING_STROKE, START_MARKER,
   OBJECT_SELECTED_STROKE, GHOST_BOX_FILL, GHOST_BOX_STROKE, GHOST_LABEL,
   PRIORITY_FILL, PRIORITY_EDGE,
@@ -83,6 +85,9 @@ export function drawCollision(
   const baseY = row * CHUNK_PX;
   const heights = d.collision.shapes.heights;
   const angles = d.collision.shapes.angles;
+  // Live canvas scale: screen px per world px. Named once so the angle mark's
+  // density gate and its screen-space stroke widths read off one quantity.
+  const zoomScale = ctx.getTransform().a;
   for (let i = 0; i < 256; i++) {
     const cell = chunk.cells[i];
     // Block 0 first, because that is the order the engine tests in: FindFloor
@@ -105,19 +110,40 @@ export function drawCollision(
       const ry = cell.yf ? 16 - run.y - run.h : run.y;
       ctx.fillRect(cx + c, cy + ry, 1, run.h);
     }
-    if (showAngles) {
-      // Direction and flips both come from collision-needle.ts, which is
-      // anchored on the engine's own convention and unit-tested; this block
-      // used to inline a mirrored formula and ignore cell.xf/yf entirely,
-      // while the height rendering above honoured them.
+    // The angle mark — the SAME mark the aeon overlay, the picker thumbnails
+    // and the paint ghost draw (collision-angle-mark.ts). It replaces a centred
+    // symmetric bar which, being symmetric, could not say which side of the
+    // surface was solid.
+    //
+    // FLIPS. `angleNeedle` already resolves the chunk-cell x/y flips into the
+    // angle (it is the engine's own flip math, unit-tested), so the tangent is
+    // taken from it rather than re-derived; the heights are flip-resolved the
+    // same way the fill above does it, except that a y-flip is expressed as a
+    // height NEGATION, which is the identical operation — a floor of height 5
+    // (surface y 11) becomes a hanging run of depth 5 (surface y 5), and 16-11
+    // is 5. `angleMarkFromColumns` needs both resolved, and gets both.
+    //
+    // ZOOM: `ctx.getTransform().a` is the live scale, so `zoomScale` is the
+    // screen px one world px occupies; the gate below is stated in screen px
+    // per 16px cell, matching the aeon overlay exactly.
+    if (showAngles && zoomScale * 16 >= MIN_CELL_PX_FOR_MARK) {
       const { dx, dy } = angleNeedle(angles[shapeIndex] ?? 0, cell.xf, cell.yf);
-      const mx = cx + 8, my = cy + 8, len = 6;
-      ctx.strokeStyle = COLLISION_ANGLE_TICK;
-      ctx.lineWidth = 1 / ctx.getTransform().a;
-      ctx.beginPath();
-      ctx.moveTo(mx - dx * len, my - dy * len);
-      ctx.lineTo(mx + dx * len, my + dy * len);
-      ctx.stroke();
+      const mark = angleMarkFromColumns(
+        (c) => {
+          const sc = cell.xf ? 15 - c : c;
+          const h = cols[sc] ?? 0;
+          return cell.yf ? -h : h;
+        },
+        { tx: dx, ty: dy },
+      );
+      if (mark) {
+        drawAngleMark(ctx as unknown as MarkDrawCtx, cx, cy, 16, mark, {
+          color: COLLISION_ANGLE_TICK,
+          casing: COLLISION_ANGLE_CASING,
+          coreWidth: 1.25 / zoomScale,
+          casingWidth: 3 / zoomScale,
+        });
+      }
     }
   }
   // Crisp surface line along each column's collidable edge.
