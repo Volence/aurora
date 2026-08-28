@@ -242,10 +242,19 @@ export default function MarqueePasteOptions() {
         </>
       )}
 
+      {/* AN UNLISTED KEY IS AN UNDISCOVERABLE FEATURE. Both states name the
+          flip, because the same two letters mean the same mirror at both
+          moments — the pending paste while pasting, the selection itself
+          otherwise (map-flip.ts `resolveFlip`). Spelled with the axis AND the
+          direction: "X" alone is read both ways by different people, and the
+          engine's own word (collision-cell-word.ts bit 10, "mirror
+          horizontally") is the one this follows. */}
       <div style={styles.hint}>
         {pasting
-          ? 'Click to paste · hold Alt for art only, Shift for collision only · Esc to stop'
-          : 'Drag to select (hold Ctrl to snap the other way) · Ctrl+C copy · Ctrl+V paste'}
+          ? 'Click to paste · hold Alt for art only, Shift for collision only · '
+            + 'X flips it left↔right, Y top↕bottom · Esc to stop'
+          : 'Drag to select (hold Ctrl to snap the other way) · Ctrl+C copy · Ctrl+V paste · '
+            + 'X flips the selection left↔right, Y top↕bottom'}
       </div>
       {/* Save-as-chunk: only meaningful with a committed selection and not while
           pasting. Captures the same FG nametable + collision the map clipboard

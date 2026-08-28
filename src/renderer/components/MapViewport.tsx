@@ -15,6 +15,8 @@ import { useAetherStore } from '../state/aetherStore';
 import { warpTargetFor } from '../../core/aether/warp-math';
 import { openDocumentGuarded } from './art/open-document';
 import { resolveEscape } from './map-escape';
+import { flipAxisForKey, resolveFlip } from './map-flip';
+import { flipClipboard, flipSectionRegion, flipDescription } from '../../core/editing/region-flip';
 import { shouldMarkBand } from './map-band-mark';
 import { beginBandStamp, moveBandStamp, endBandStamp, type BandStampGesture } from './map-band-stamp';
 import { docFromTile, docFromSectionRegion } from '../../core/art/composer-buffer';
@@ -1723,6 +1725,71 @@ export default function MapViewport() {
       // carries no modifier of its own and stays below; the arrows are the
       // map's own pan and are equally not Ctrl-chords.
       if (e.ctrlKey || e.metaKey || e.altKey) return;
+
+      // ═══ FLIP: X MIRRORS HORIZONTALLY, Y VERTICALLY ═══
+      //
+      // The owner asked for this by name, from the budget fact: *"if I have
+      // something selected with marquee, because flip is free, how do I
+      // actually flip it?"* ONE transform at TWO moments — the pending
+      // clipboard while pasting (the ghost updates and the paste commits
+      // mirrored), or a committed marquee in place as one undoable edit. The
+      // transform lives in `core/editing/region-flip.ts` and is not written
+      // twice; `resolveFlip` (map-flip.ts) decides which moment this is, and
+      // its docblock defends the two letters against everything already spent.
+      const flipAxis = flipAxisForKey(e.key);
+      if (flipAxis) {
+        const ed = useEditorStore.getState();
+        const target = resolveFlip(ed);
+        if (target === 'clipboard' && ed.mapClipboard) {
+          ed.setMapClipboard(flipClipboard(ed.mapClipboard, flipAxis));
+          // THIS IS THE REPAINT. `mapClipboard` is not a redraw dependency, and
+          // the ghost is drawn on the preview overlay, so nothing else would
+          // put the mirrored art under the cursor. (The ghost's raster cache is
+          // keyed on the clipboard's object identity — `flipClipboard` returns
+          // a new object, which is what invalidates it.)
+          drawCollisionPreview();
+          e.preventDefault();
+          return;
+        }
+        if (target === 'selection' && ed.marquee && level) {
+          const m = ed.marquee;
+          const section = act?.sections[m.sectionIndex];
+          if (section) {
+            ensureCollisionPlanes(section);
+            const label = selectionSizeLabel(m.col, m.row, m.w, m.h);
+            const cmd = flipSectionRegion({
+              section, sectionIndex: m.sectionIndex,
+              col: m.col, row: m.row, w: m.w, h: m.h, axis: flipAxis,
+              description: flipDescription(flipAxis, label),
+            });
+            if (cmd) {
+              // ONE batch command, so ONE undo entry — and the invalidation
+              // listener walks batches (see it above), so the canvas repaints
+              // with the model rather than keeping the old picture.
+              executeCommand(cmd, level);
+              useEditorStore.getState().setActiveSectionIndex(m.sectionIndex);
+              // SAY WHAT WAS FLIPPED, and — for a non-block-aligned selection —
+              // that collision was NOT, at the moment the author would
+              // otherwise assume it came along. Same rule and same sentence as
+              // the Ctrl+C toast above: art-only is a normal outcome of a
+              // tile-granular selection, and what it must never be is silent.
+              const reason = artOnlyReason(m.col, m.row, m.w, m.h);
+              useToastStore.getState().addToast(
+                reason ? `${flipDescription(flipAxis, label)} — art only. ${reason}`
+                  : flipDescription(flipAxis, label),
+                reason ? 'info' : 'success');
+            } else {
+              // A rectangle that is already its own mirror. An empty undo step
+              // would be worse than a sentence.
+              useToastStore.getState().addToast(
+                `Nothing to flip — this selection already reads the same ${
+                  flipAxis === 'h' ? 'left to right' : 'top to bottom'}.`, 'info');
+            }
+          }
+          e.preventDefault();
+          return;
+        }
+      }
 
       // The tool letters come from ONE table (tool-meta TOOL_KEYS), asserted
       // collision-free against FACET_TOOLS in the node suite — a `case 'x'`

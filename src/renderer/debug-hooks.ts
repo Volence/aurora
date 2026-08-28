@@ -514,6 +514,36 @@ interface AeonProbeApi {
    *  stamped footprint without a WS round-trip per tile. Read-only. */
   ntRect(sectionIndex: number, col: number, row: number, w: number, h: number): number[] | null;
   /**
+   * A rectangle of one authored collision plane's words, row-major at TILE
+   * resolution (all four sub-tiles of a 16px cell hold the same word) — the
+   * collision counterpart to `ntRect`. Null when the section has no authored
+   * plane.
+   *
+   * The marquee FLIP needs this and `collisionAAt` cannot serve: a flip is a
+   * claim about a whole rectangle (words reverse AND their own X/Y-flip bits
+   * toggle), and a per-index probe can only ever sample it. Reading the plane
+   * at tile resolution rather than cell resolution is deliberate too — it is
+   * how the section actually stores it, so a flip that wrote a cell
+   * non-uniformly across its four tiles is VISIBLE here instead of being
+   * averaged away by a cell-level accessor.
+   */
+  collRect(sectionIndex: number, col: number, row: number, w: number, h: number,
+    plane: 'a' | 'b'): number[] | null;
+  /**
+   * THE MAP CLIPBOARD'S ACTUAL WORDS — nametable and both collision planes.
+   *
+   * `mapClipboardInfo` reports the clipboard's SHAPE, which is what the paste
+   * rules turn on; this reports its CONTENTS, which is the only way to see that
+   * a flip of the pending paste did both halves of its transform (the words
+   * reversed AND each word's own flip bit toggled). Nothing on screen can tell
+   * those apart: the ghost of a reverse-only flip is a picture, drawn, in the
+   * right place, wrong.
+   */
+  mapClipboardWords(): {
+    widthTiles: number; heightTiles: number;
+    nametable: number[]; collisionA: number[]; collisionB: number[];
+  } | null;
+  /**
    * The effects-scene library as the MODEL holds it — READ-ONLY, and the only
    * way a harness can see what the Effects facet's controls actually did.
    *
@@ -1043,6 +1073,27 @@ function installAeonProbe(): AeonProbeApi {
         }
       }
       return out;
+    },
+    collRect: (sectionIndex, col, row, w, h, plane) => {
+      const s = section(sectionIndex);
+      const p = plane === 'b' ? s?.collisionEditB : s?.collisionEdit;
+      if (!p) return null;
+      const out: number[] = [];
+      for (let r = 0; r < h; r++) {
+        for (let c = 0; c < w; c++) {
+          out.push(p[(row + r) * SECTION_TILES_WIDE + (col + c)] ?? 0);
+        }
+      }
+      return out;
+    },
+    mapClipboardWords: () => {
+      const c = useEditorStore.getState().mapClipboard;
+      if (!c) return null;
+      return {
+        widthTiles: c.widthTiles, heightTiles: c.heightTiles,
+        nametable: [...c.nametable],
+        collisionA: [...c.collisionA], collisionB: [...c.collisionB],
+      };
     },
   };
 }
