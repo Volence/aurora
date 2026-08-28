@@ -1,6 +1,6 @@
 // test/collision/shape-draw.test.ts
 import { describe, it, expect } from 'vitest';
-import { solidEdges, needleEndpoints } from '../../src/core/collision/collision-shape-draw';
+import { solidEdges } from '../../src/core/collision/collision-shape-draw';
 
 describe('solidEdges', () => {
   it('top solidity → only the top edge', () => {
@@ -17,37 +17,21 @@ describe('solidEdges', () => {
   });
 });
 
-describe('needleEndpoints', () => {
-  const cx = 10, cy = 20, L = 5;
-
-  it('deg 0 → horizontal (y1≈y2) with endpoints L either side of cx', () => {
-    const { x1, y1, x2, y2 } = needleEndpoints(0, cx, cy, L);
-    expect(y1).toBeCloseTo(y2);
-    expect(x1).toBeCloseTo(cx - L);
-    expect(x2).toBeCloseTo(cx + L);
-  });
-
-  it('deg 90 → vertical (x1≈x2)', () => {
-    const { x1, x2 } = needleEndpoints(90, cx, cy, L);
-    expect(x1).toBeCloseTo(x2);
-  });
-
-  it('deg 180 → horizontal (y1≈y2)', () => {
-    const { y1, y2 } = needleEndpoints(180, cx, cy, L);
-    expect(y1).toBeCloseTo(y2);
-  });
-
-  it('deg 45 points up-and-right in the CCW math convention (locks the sign drawCollisionShape negates)', () => {
-    const { x1, y1, x2, y2 } = needleEndpoints(45, cx, cy, L);
-    expect(x2).toBeGreaterThan(x1); // +x to the right
-    expect(y2).toBeLessThan(y1);    // -y is up (screen space) → +45° rises to the right
-  });
-
-  it('midpoint is the centre for any angle', () => {
-    for (const deg of [0, 90, 180, 37, 256]) {
-      const { x1, y1, x2, y2 } = needleEndpoints(deg, cx, cy, L);
-      expect((x1 + x2) / 2).toBeCloseTo(cx);
-      expect((y1 + y2) / 2).toBeCloseTo(cy);
-    }
-  });
-});
+// `needleEndpoints` AND ITS FIVE TESTS ARE GONE. The helper was a THIRD angle
+// convention (degrees, CCW, negated at every call site to undo itself) living
+// beside the two the map overlays each had, and the three disagreed — the aeon
+// map drew every non-flat angle vertically mirrored against the picker. The
+// properties those tests held are not lost, they MOVED, and to stronger rows:
+//
+//   "deg 0 -> horizontal", "deg 45 rises", the sign convention
+//       -> collision-angle-mark.test.ts, 'angleTangent — the engine
+//          convention', which checks the direction against classic's
+//          independently unit-tested `angleNeedle` for ALL 256 angle bytes
+//          rather than for four hand-picked degrees.
+//   "midpoint is the centre"
+//       -> deliberately NOT preserved. A mark whose midpoint is the cell centre
+//          is the defect: it floated off the surface it described, and being
+//          symmetric about that midpoint it could not say which side was solid.
+//          The replacement anchors on the surface and is asymmetric by design;
+//          'surfaceAnchor — the mark sits ON the surface' is the row that now
+//          holds the opposite property.

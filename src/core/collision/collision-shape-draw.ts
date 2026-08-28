@@ -1,7 +1,7 @@
 // src/core/collision/collision-shape-draw.ts
 import type { CollisionProfile, Solidity } from './collision-model';
-import { angleDegrees } from './collision-model';
 import { columnSolidRun } from './collision-render';
+import { angleMark, drawAngleMark } from './collision-angle-mark';
 
 export type Edge = 'top' | 'right' | 'bottom' | 'left';
 
@@ -17,20 +17,23 @@ export function solidEdges(solidity: Solidity): Edge[] {
   }
 }
 
-/** Endpoints of an angle needle of half-length L centred at (cx, cy), drawn at
- *  `deg` degrees. Screen-space: +x right, +y DOWN, so the y component is negated
- *  so that 90° points up. The midpoint is always (cx, cy). */
-export function needleEndpoints(deg: number, cx: number, cy: number, L: number) {
-  const r = (deg * Math.PI) / 180, dx = Math.cos(r) * L, dy = -Math.sin(r) * L;
-  return { x1: cx - dx, y1: cy - dy, x2: cx + dx, y2: cy + dy };
-}
+// `needleEndpoints` USED TO LIVE HERE and is deliberately deleted rather than
+// left unused. It was a THIRD angle convention (degrees, CCW, negated at every
+// call site to undo itself) sitting beside the map overlays' two — and a spare
+// convention in the tree is how the picker and the map came to disagree in the
+// first place. Angle direction now has exactly one home:
+// collision-angle-mark.ts's `angleTangent`, cross-checked against classic's
+// `angleNeedle` over all 256 bytes.
 
 /** Visual options for drawCollisionShape. */
 export interface ShapeDrawOpts {
   fill: string;
   line: string;
   solidEdge: string;
+  /** Bright core of the angle mark. */
   needle: string;
+  /** Casing stroked under the angle mark so it reads over arbitrary art. */
+  needleCasing: string;
   showSolidEdges?: boolean;
   showNeedle?: boolean;
 }
@@ -52,7 +55,8 @@ export interface ShapeDrawCtx {
  *  - the solid silhouette (one filled rect per 16px-cell column, via columnSolidRun),
  *  - a surface line tracing the column tops,
  *  - the solid-side edges (per solidEdges) when showSolidEdges,
- *  - the angle needle (centred, L≈size*0.32) when the profile hasAngle && showNeedle.
+ *  - the angle mark (surface-anchored bar + outward barb, cased) when the
+ *    profile hasAngle && showNeedle — see collision-angle-mark.ts.
  *  GUI-verified, not unit-tested. */
 export function drawCollisionShape(
   ctx: ShapeDrawCtx,
@@ -116,22 +120,28 @@ export function drawCollisionShape(
     }
   }
 
-  // 4) Angle needle, centred in the box.
-  if (opts.showNeedle && profile.hasAngle) {
-    const deg = angleDegrees(profile);
-    if (deg !== null) {
-      const cx = x + size / 2, cy = y + size / 2, L = size * 0.32;
-      // The engine angle is clockwise in screen space (y down): a small positive
-      // angle means the surface DESCENDS to the right. needleEndpoints uses the
-      // math (CCW) convention, so negate the angle so the needle lies ALONG the
-      // silhouette's actual slope instead of mirroring it.
-      const { x1, y1, x2, y2 } = needleEndpoints(-deg, cx, cy, L);
-      ctx.strokeStyle = opts.needle;
-      ctx.lineWidth = Math.max(1, (size / 16) * 1.5);
-      ctx.beginPath();
-      ctx.moveTo(x1, y1);
-      ctx.lineTo(x2, y2);
-      ctx.stroke();
+  // 4) The angle mark — a tangent bar ON the surface with an outward barb.
+  //
+  // This used to be a centred, symmetric needle sized at `size * 0.32` and
+  // routed through `angleDegrees` (which rounds to whole degrees). All three of
+  // those are gone, and each for its own reason:
+  //   • CENTRED     — it floated at the box middle instead of the edge it
+  //                   describes. `angleMark` anchors on the surface.
+  //   • SYMMETRIC   — it could not distinguish a floor from the ceiling at the
+  //                   same angle. The barb can.
+  //   • ROUNDED     — whole degrees drifted the thumbnail off the map's own
+  //                   direction by up to half a degree. `angleMark` works in
+  //                   angle BYTES.
+  // See collision-angle-mark.ts for the full account.
+  if (opts.showNeedle) {
+    const mark = angleMark(profile);
+    if (mark) {
+      drawAngleMark(ctx, x, y, size, mark, {
+        color: opts.needle,
+        casing: opts.needleCasing,
+        coreWidth: Math.max(1, (size / 16) * 1.25),
+        casingWidth: Math.max(2.5, (size / 16) * 3),
+      });
     }
   }
 }

@@ -5,12 +5,15 @@ import type { ObjectPreview } from '../state/projectStore';
 import {
   GRID_TILE, GRID_BLOCK, GRID_SECTION,
   COLLISION_FILL_ALL, COLLISION_FILL_TOP, COLLISION_FILL_SIDES, COLLISION_FILL_NONE,
-  COLLISION_SURFACE_LINE, COLLISION_ANGLE_TICK, COLLISION_UNKNOWN, COLLISION_FALLBACK, COLLISION_DIFF,
+  COLLISION_SURFACE_LINE, COLLISION_ANGLE_TICK, COLLISION_ANGLE_CASING,
+  COLLISION_UNKNOWN, COLLISION_FALLBACK, COLLISION_DIFF,
   OBJECT_BOX_FILL, OBJECT_BOX_STROKE, OBJECT_LABEL, RING_FILL, RING_STROKE,
 } from './canvas-colors';
 import { fitLabelInContext, labelBudget } from './label-fit';
 import type { CollisionProfileSet, Solidity } from '../../core/collision/collision-model';
 import { columnSolidRun } from '../../core/collision/collision-render';
+import { angleMark, drawAngleMark, MIN_CELL_PX_FOR_MARK } from '../../core/collision/collision-angle-mark';
+import type { MarkDrawCtx } from '../../core/collision/collision-angle-mark';
 import { resolveCell, resolvePlaneWords, SECTION_PLANE_WORDS } from '../../core/collision/collision-cell-resolve';
 
 type Ctx = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
@@ -193,6 +196,9 @@ export class OverlayRenderer {
     // 16px cells = 128×128 per section (256 tiles / 2). cellsW bounds the column
     // loop, cellsH the row loop (a section is square today, but keep them distinct).
     const cellsW = SECTION_TILES_WIDE / 2, cellsH = SECTION_TILES_HIGH / 2;
+    // How many SCREEN px one 16px collision cell occupies — the quantity the
+    // angle mark's density gate is stated in (see MIN_CELL_PX_FOR_MARK).
+    const cellScreenPx = 16 * zoom;
     const startCol = Math.max(0, Math.floor(localVpX / 16));
     const startRow = Math.max(0, Math.floor(localVpY / 16));
     const endCol = Math.min(cellsW, Math.ceil((localVpX + vpW) / 16));
@@ -239,15 +245,29 @@ export class OverlayRenderer {
               ctx.lineTo(cx + c + 1, cy + surfaceY);
               ctx.stroke();
             }
-            if (showAngles && p.hasAngle) {
-              const a = (p.angle / 256) * Math.PI * 2;
-              const mx = cx + 8, my = cy + 8, len = 6;
-              ctx.strokeStyle = COLLISION_ANGLE_TICK;
-              ctx.lineWidth = 1.5 / zoom;
-              ctx.beginPath();
-              ctx.moveTo(mx - Math.cos(a) * len, my + Math.sin(a) * len);
-              ctx.lineTo(mx + Math.cos(a) * len, my - Math.sin(a) * len);
-              ctx.stroke();
+            // The angle mark. THIS BLOCK USED TO BE THE BUG: it drew a centred,
+            // symmetric segment at `(cos a, -sin a)` — vertically MIRRORED
+            // against both classic's overlay and the picker's thumbnails, so on
+            // the one surface an author actually paints on, the tick lay across
+            // the slope instead of along it. It is now the shared mark.
+            //
+            // ZOOM: the mark's LENGTHS are cell-local (world) px, because it
+            // annotates a 16px cell and must stay proportional to it; the
+            // stroke WIDTHS are `/zoom`, so a hairline stays a hairline. Below
+            // MIN_CELL_PX_FOR_MARK screen px per cell the mark is skipped
+            // outright — that density, not the mark itself, is what made the
+            // old overlay read as scattered noise when zoomed out. The
+            // silhouette and surface line still carry the shape down there.
+            if (showAngles && cellScreenPx >= MIN_CELL_PX_FOR_MARK) {
+              const mark = angleMark(p);
+              if (mark) {
+                drawAngleMark(ctx as unknown as MarkDrawCtx, cx, cy, 16, mark, {
+                  color: COLLISION_ANGLE_TICK,
+                  casing: COLLISION_ANGLE_CASING,
+                  coreWidth: 1.25 / zoom,
+                  casingWidth: 3 / zoom,
+                });
+              }
             }
           }
         }

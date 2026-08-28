@@ -15,7 +15,8 @@ import type { ShapeDrawOpts, ShapeDrawCtx } from '../../core/collision/collision
 import { claimCollisionOverlay } from './collision-overlay-scope';
 import { T } from './ui';
 import {
-  COLLISION_SHAPE_FILL, COLLISION_SHAPE_LINE, COLLISION_SOLID_EDGE, COLLISION_ANGLE_NEEDLE,
+  COLLISION_SHAPE_FILL, COLLISION_SHAPE_LINE, COLLISION_SOLID_EDGE,
+  COLLISION_ANGLE_TICK, COLLISION_ANGLE_CASING,
 } from '../canvas/canvas-colors';
 
 const PX = 22;        // thumbnail size
@@ -36,7 +37,8 @@ const SHAPE_OPTS: ShapeDrawOpts = {
   fill: COLLISION_SHAPE_FILL,
   line: COLLISION_SHAPE_LINE,
   solidEdge: COLLISION_SOLID_EDGE,
-  needle: COLLISION_ANGLE_NEEDLE,
+  needle: COLLISION_ANGLE_TICK,
+  needleCasing: COLLISION_ANGLE_CASING,
   showSolidEdges: true,
   showNeedle: true,
 };
