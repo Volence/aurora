@@ -76,14 +76,24 @@ describe('OVERLAY_KEYS_BY_ENGINE', () => {
     // lens (per-8x8-tile VDP bit-15 overlay, feat/s1-priority-lens), the
     // animated-art play toggle (feat/s1-animated-art-playback), and sprite
     // occlusion (feat/s1-priority-occlusion — occlusion-correct previews,
-    // default ON). The two lenses stay classic-only: aeon's tile words are a
-    // different engine's format and its viewport has no
-    // drawPriority/occlusion pass, so listing them there would be dead toggles.
+    // default ON).
     expect([...OVERLAY_KEYS_BY_ENGINE.s1].sort()).toEqual(
       ['occludeSprites', 'playAnimatedArt', 'showCollision', 'showCollisionAngles', 'showObjects', 'showPriority', 'showStart'],
     );
-    expect(OVERLAY_KEYS_BY_ENGINE.aeon).not.toContain('showPriority');
+    // Sprite OCCLUSION stays classic-only: aeon's object previews have no
+    // per-pixel priority mask, so the key would be a dead toggle there. The
+    // priority LENS is a different matter and is now shared — see below.
     expect(OVERLAY_KEYS_BY_ENGINE.aeon).not.toContain('occludeSprites');
+  });
+
+  it('SHARES the priority lens with aeon — the owner could not see it there', () => {
+    // 2026-08-28. The owner, from a play session: "No way to see what art on fg
+    // is priority or not. Randomly sometimes sonic just goes behind a tile that
+    // I wasn't aware was prioritised." The checkbox was not in the aeon menu at
+    // all, which is why. It is ONE key with ONE label and ONE depiction
+    // (canvas/tile-lens.ts) drawn from two data sides — not a second lens.
+    expect(OVERLAY_KEYS_BY_ENGINE.aeon).toContain('showPriority');
+    expect(OVERLAY_KEYS_BY_ENGINE.s1).toContain('showPriority');
   });
 
   it('SHARES the play toggle with aeon — it drives BgAnim bands there', () => {

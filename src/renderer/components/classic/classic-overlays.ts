@@ -27,6 +27,7 @@ import {
   OCCLUSION_GHOST_TINT, OCCLUSION_GHOST_ALPHA,
 } from '../../canvas/canvas-colors';
 import { fitLabelInContext, labelBudget } from '../../canvas/label-fit';
+import { drawTileLens } from '../../canvas/tile-lens';
 import type { WorldRect } from '../../../core/level-classic/object-sprite';
 
 /** S1 ring object id — expands into a visible ring group (Ring_Main rule). */
@@ -170,6 +171,12 @@ export function drawCollision(
  * (68 in SBZ) — and the mask composes chunk-cell flips exactly as renderChunk
  * does (both measured in the audit; the composition lives in
  * core/level-classic/priority-mask.ts with its own flip-trap tests).
+ *
+ * THE PICTURE ITSELF is `drawTileLens` (canvas/tile-lens.ts), shared verbatim
+ * with the aeon viewport's lens so the two cannot drift into two different
+ * depictions of one rule. The loop that used to be inline here moved there
+ * unchanged: whole-chunk window, in-chunk neighbour probes, perimeter strokes
+ * skipped — this file's own drawPriority tests are what say so.
  */
 export function drawPriority(
   ctx: CanvasRenderingContext2D,
@@ -181,41 +188,15 @@ export function drawPriority(
 ): void {
   const mask = chunkPriorityMask(d, chunkId);
   if (!mask) return; // air / out-of-range
-  const baseX = col * CHUNK_PX;
-  const baseY = row * CHUNK_PX;
-  const TILE = 8;
-  const high = (tx: number, ty: number): boolean =>
-    tx >= 0 && ty >= 0 && tx < CHUNK_TILES && ty < CHUNK_TILES && mask[ty * CHUNK_TILES + tx] !== 0;
-
-  // Veils. Merged into horizontal runs so a solid SBZ region is a few wide
-  // rects instead of up to 1024 per chunk per frame.
-  ctx.fillStyle = PRIORITY_FILL;
-  for (let ty = 0; ty < CHUNK_TILES; ty++) {
-    for (let tx = 0; tx < CHUNK_TILES; tx++) {
-      if (!high(tx, ty)) continue;
-      let run = 1;
-      while (high(tx + run, ty)) run++;
-      ctx.fillRect(baseX + tx * TILE, baseY + ty * TILE, run * TILE, TILE);
-      tx += run; // skip past the run (loop's tx++ lands on the first low tile)
-    }
-  }
-
-  // Boundary strokes: each high tile's sides whose in-chunk neighbor is low.
-  ctx.strokeStyle = PRIORITY_EDGE;
-  ctx.lineWidth = 1 * invZoom;
-  ctx.beginPath();
-  for (let ty = 0; ty < CHUNK_TILES; ty++) {
-    for (let tx = 0; tx < CHUNK_TILES; tx++) {
-      if (!high(tx, ty)) continue;
-      const x = baseX + tx * TILE;
-      const y = baseY + ty * TILE;
-      if (ty > 0 && !high(tx, ty - 1)) { ctx.moveTo(x, y); ctx.lineTo(x + TILE, y); }
-      if (ty < CHUNK_TILES - 1 && !high(tx, ty + 1)) { ctx.moveTo(x, y + TILE); ctx.lineTo(x + TILE, y + TILE); }
-      if (tx > 0 && !high(tx - 1, ty)) { ctx.moveTo(x, y); ctx.lineTo(x, y + TILE); }
-      if (tx < CHUNK_TILES - 1 && !high(tx + 1, ty)) { ctx.moveTo(x + TILE, y); ctx.lineTo(x + TILE, y + TILE); }
-    }
-  }
-  ctx.stroke();
+  drawTileLens(ctx, {
+    cols: CHUNK_TILES, rows: CHUNK_TILES,
+    // The whole chunk: classic draws one chunk per call and has no window.
+    colStart: 0, colEnd: CHUNK_TILES, rowStart: 0, rowEnd: CHUNK_TILES,
+    tilePx: 8,
+    originX: col * CHUNK_PX, originY: row * CHUNK_PX,
+    marked: (tx, ty) => mask[ty * CHUNK_TILES + tx] !== 0,
+    fill: PRIORITY_FILL, edge: PRIORITY_EDGE, invZoom,
+  });
 }
 
 /** Blit one bitmap with an object frame's origin/flips, anchored at (ax, ay). */
