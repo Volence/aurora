@@ -52,18 +52,19 @@
 //    approximated with a subtraction because the wrap is where the one-line-off
 //    class lives (parallax.emp's re-glue note says so at length).
 //
+// 5. THE CURVE RAMP, per LINE — `Parallax_Step4_Fill`'s `.cap_factor_curve_hoist`
+//    (parallax.emp:1189-1277) and its `.lp_curve` line loop (:1841-1906).
+//    A `curve: To(..)` layer's Plane-B scroll RAMPS down the strip instead of
+//    holding one factor. `curveRampRuns` transcribes both halves; the argument
+//    for why this needed no clock, and why it was wrongly booked as if it did,
+//    is on that function.
+//
 // ═══ WHAT THIS DOES NOT REPRODUCE ═══
 //
 // Stated here, stated by `cameraPreviewPlan` in `absent` for the scene at hand,
 // and printed on the canvas — because a preview that quietly differs from the
 // ROM is worse than one that says what it leaves out.
 //
-//   • CURVE RAMPS (`curve: To(..)`). The engine ramps a band's factor across its
-//     own rows with a per-line Bresenham accumulator (parallax.emp:1214-1260).
-//     The plan below is per-BAND: one scroll for the whole strip. A curved band
-//     previews FLAT, at the factor its top decodes to. Booked, not approximated
-//     — a ramp guessed as a linear interpolation of the two ENDS is off by the
-//     truncation at every row, which is the whole difference a curve exists for.
 //   • DEFORM, of every kind — per-band `deform`, scene `deform`, and `v_deform`
 //     columns. All three are functions of a FRAME COUNTER, and this pass has no
 //     clock by construction (the map's measured zero-idle-repaint property).
@@ -79,7 +80,9 @@
 //     the VDP fetches at the screen's left edge.
 
 import type { EffectsScene, EffectsLayer, EffectsFactor } from '../../core/formats/effects/scene';
-import { decodeFactorScroll, factorIsLocked, factorRatioLabel } from '../../core/formats/effects/factor-decode';
+import {
+  decodeFactorScroll, factorIsLocked, factorRatioLabel, hscrollWord,
+} from '../../core/formats/effects/factor-decode';
 import { layerTopSpace, planeLineOf, PLANE_LINE_SPAN } from '../providers/effects-aeon';
 import { layerIsEnabled } from './effects-guides';
 import { SCREEN_WIDTH, SCREEN_HEIGHT } from '../../core/model/screen';
@@ -108,6 +111,137 @@ import {
 export const CAMERA_KEY_STEP_FINE = 1;
 export const CAMERA_KEY_STEP_COARSE = 16;
 
+// ---------------------------------------------------------------------------
+// THE CURVE RAMP — transcription 5. See `curveRampRuns`.
+// ---------------------------------------------------------------------------
+
+/**
+ * A run of consecutive screen rows inside one band that share a scroll value.
+ *
+ * The ramp is a per-LINE quantity and the draw is a per-RECT blit, so the line
+ * values are coalesced into runs. This is not an approximation: two adjacent
+ * lines are in one run only when the accumulator produced the SAME word for
+ * both, so every row is still drawn at the exact scroll its line has.
+ */
+export interface CurveRun {
+  /** First screen row of the run, absolute (not relative to the band's top). */
+  screenTop: number;
+  /** How many rows the run covers; always >= 1. */
+  rows: number;
+  /** Plane-B columns scrolled past the screen's left edge for these rows. */
+  scrollX: number;
+}
+
+/** `asr.w`/`add.w` sign-extension — the signed word every `.w` here works in. */
+function toWord(v: number): number {
+  return ((v | 0) << 16) >> 16;
+}
+
+/**
+ * A curve layer's per-line Plane-B scroll, as runs — `.cap_factor_curve_hoist`
+ * plus `.lp_curve`, transcribed.
+ *
+ * ═══ THIS NEEDED NO CLOCK, AND THE BOOKING THAT SAID IT DID WAS WRONG ═══
+ *
+ * `viewStore.showCameraPreview` said "no curve ramps, no deform (both need a
+ * clock this pass does not have)". Deform does: its line loops index a table by
+ * `Parallax_Deform_Phase_FG`/`_BG`, which `Parallax_Update` advances by
+ * `speed` every frame. A CURVE READS NO SUCH THING. Every input to the hoist is
+ * `Camera_X` and the two shadow band tops, and every input to the line loop is
+ * the hoist's three parked words plus the line index — measured by reading the
+ * whole span `parallax.emp:1189-1277` and `:1841-1906` for a phase or frame
+ * reference and finding none. A ramp is a function of POSITION. The map's
+ * measured zero-idle-repaint property is therefore not in the way of it, and
+ * this file's own booking note (which gave a different and better reason — the
+ * truncation, below) is the one that was right about the obstacle.
+ *
+ * ═══ WHY IT IS A TRANSCRIPTION AND NOT A LERP ═══
+ *
+ * The obvious shape — `base + (far - base) * i / span` — is off by up to a
+ * pixel at nearly every row, and a curve exists precisely for the rows between
+ * its ends. Two things make the engine's answer different from a lerp:
+ *
+ *   • THE ARITHMETIC HAPPENS IN HSCROLL-WORD SPACE, WHICH IS NEGATED. The
+ *     engine ramps the buffer word, `-decode`, and floor division is NOT
+ *     symmetric under negation: `floor(-7/2)` is -4 while `-floor(7/2)` is -3.
+ *     Ramping the un-negated preview scroll would be off by one on exactly the
+ *     rows whose division does not divide evenly, and only for ramps of one
+ *     sign — the shape of bug that looks like "it is nearly right".
+ *     So: convert in, ramp, convert out. `hscrollWord` is the conversion.
+ *   • THE REMAINDER IS CARRIED, NOT DROPPED. `divs.w` truncates toward zero and
+ *     the engine then normalises the pair to a FLOOR (`add.w d4,d2 / subq.w
+ *     #1,d1` when the remainder came back negative), because `.lp_curve`'s
+ *     correction is one-directional: `err += rem; if (err >= span) { err -=
+ *     span; acc += 1 }`. `step`/`rem` below are that normalised pair, which is
+ *     plain floor division and a non-negative remainder.
+ *
+ * ═══ THE THREE INPUTS, AND WHERE EACH COMES FROM ═══
+ *
+ *   `baseScrollX`  the band's FLAT scroll, un-negated. The engine seeds the
+ *                  accumulator from `Parallax_Shadow_Scroll_B` for the band,
+ *                  which is the post-inheritance word — so a DORMANT band
+ *                  carrying a curve ramps away from the band above's scroll,
+ *                  not from its own `fb`. Passing `bandScrollsX`'s value keeps
+ *                  that property instead of re-deriving it and losing it.
+ *   `span`         the LAYER's on-screen line span: the next band's screen top
+ *                  less this one's, or `SCREEN_HEIGHT` for the last. The engine
+ *                  divides by the layer's span and not by a split half, on
+ *                  purpose (design §2: "an anchor split inside a curve layer
+ *                  CONTINUES the curve"). The plan here is pre-split — one band
+ *                  per layer — so the two spans are the same quantity.
+ *   `to`           the far-end factor, decoded against the same `camX` the base
+ *                  was, then negated: `.curve_to_negate`'s `neg.w`.
+ *
+ * A span of 0 or less returns `[]` — the engine's `ble .curve_next`, a layer
+ * Step 4a clamped off the screen, which emits no lines and so ramps across
+ * nothing.
+ *
+ * ⚠ `to` IS THE SCROLL AT LINE `span`, WHICH IS THE FIRST ROW OF THE NEXT BAND
+ * — not a value this layer is made to land on. The accumulator equals
+ * `base + spread` after `span` steps; whether the LAST drawn row (`span - 1`)
+ * already shows it depends on where the truncation falls, so it sometimes does
+ * and sometimes does not. Do not "fix" a ramp that stops one pixel short: a
+ * function forced to end exactly on `to` is a different ramp, off by roughly
+ * `spread/span` at every row above it, and it is not the one the ROM runs.
+ */
+export function curveRampRuns(
+  camX: number, baseScrollX: number, to: EffectsFactor, screenTop: number, span: number,
+): CurveRun[] {
+  if (span <= 0) return [];
+  // Into the engine's space: the buffer word is the negated scroll.
+  const baseW = toWord(-baseScrollX);
+  const farW = hscrollWord(camX, to);
+  const spread = toWord(farW - baseW);
+  // `divs.w` + the normalisation at `.curve_rem_ok` == floor division, with the
+  // remainder in [0, span). Written as the result rather than as the two steps.
+  const step = Math.floor(spread / span);
+  const rem = spread - step * span;
+
+  const runs: CurveRun[] = [];
+  let acc = baseW;
+  let err = 0;
+  for (let i = 0; i < span; i++) {
+    // Back out of HScroll-word space. `toWord` and not a bare `-`: it is the
+    // same word negation `hscrollWord` applies going in, and it also folds the
+    // `-0` a bare negation of a zero accumulator would put in the plan — which
+    // reaches a caption as `x=-0` and a JSON report as `-0`.
+    const scrollX = toWord(-acc);
+    const last = runs[runs.length - 1];
+    if (last !== undefined && last.scrollX === scrollX) last.rows++;
+    else runs.push({ screenTop: screenTop + i, rows: 1, scrollX });
+    acc = toWord(acc + step);                   // acc += whole
+    err += rem;                                 // err += remainder
+    if (err >= span) { err -= span; acc = toWord(acc + 1); }
+  }
+  return runs;
+}
+
+/** The layer's far-end factor, or null when it authors no curve. */
+export function layerCurveTo(layer: Pick<EffectsLayer, 'curve'>): EffectsFactor | null {
+  const c = layer.curve;
+  return c === undefined || c === 'none' ? null : c.to;
+}
+
 /** One horizontal strip of the previewed screen. */
 export interface CameraPreviewBand {
   /** Index into `scene.layers`. */
@@ -128,6 +262,15 @@ export interface CameraPreviewBand {
   locked: boolean;
   /** Set when a `vsplit` on THIS layer changed `vscroll` from here down. */
   vsplitAt: number | null;
+  /**
+   * The per-line scroll of a `curve` layer, coalesced into runs — `null` on a
+   * flat band, which is every band that authors no curve.
+   *
+   * `scrollX` above stays the band's FLAT scroll on a curved band too: it is
+   * the ramp's seed, it is what the caption reports, and a consumer that does
+   * not know about ramps gets the old answer rather than a wrong one.
+   */
+  ramp: CurveRun[] | null;
 }
 
 export interface CameraPreviewPlan {
@@ -238,9 +381,10 @@ export function bandScrollsX(
 /** What this scene asks for that the composite cannot show. See the file docblock. */
 export function cameraPreviewAbsences(scene: EffectsScene): string[] {
   const absent: string[] = [];
-  if (scene.layers.some((l) => l.curve !== undefined && l.curve !== 'none')) {
-    absent.push('curve ramps (bands preview flat, at their top factor)');
-  }
+  // ⚠ NO `curve` LINE HERE ANY MORE, and its removal is the parcel. Ramps are
+  // composed per line by `curveRampRuns` — see transcription 5. A stale absence
+  // is worse than none: it tells the author the thing on screen is not the
+  // thing the ROM would draw, when it now is.
   const sceneDeform = (d: EffectsScene['deform_fg']) => d !== undefined && d !== 'none';
   if (scene.layers.some((l) => l.deform !== undefined && l.deform !== 'none')
     || sceneDeform(scene.deform_fg) || sceneDeform(scene.deform_bg)) {
@@ -292,12 +436,20 @@ export function cameraPreviewPlan(scene: EffectsScene, camX: number, camY: numbe
     const split = vLocked && layer.vsplit !== undefined && layer.vsplit !== 'none'
       ? layer.vsplit.at : null;
     if (split !== null) vscroll = split;
+    // TRANSCRIPTION 5. The span is the band's own screen extent, which on this
+    // pre-split plan IS the layer's — the quantity the engine's hoist divides
+    // by. `scrollX` is passed as the seed because it already carries the
+    // dormant-band inheritance the engine's shadow scroll word carries.
+    const curveTo = layerCurveTo(layer);
+    const ramp = curveTo === null ? null
+      : curveRampRuns(camX, scrolls[source].scrollX, curveTo, screenTop, screenBottom - screenTop);
     bands.push({
       layer: source,
       screenTop,
       screenBottom,
       scrollX: scrolls[source].scrollX,
       vscroll,
+      ramp: ramp !== null && ramp.length > 0 ? ramp : null,
       factor: layer.fb,
       inherited: scrolls[source].inherited,
       locked: factorIsLocked(layer.fb),
@@ -308,14 +460,27 @@ export function cameraPreviewPlan(scene: EffectsScene, camX: number, camY: numbe
   return { camX, camY, vscrollBase, vLocked, bands, absent: cameraPreviewAbsences(scene) };
 }
 
-/** One band's caption line: `L2 fb=FACTOR_1_16 (1/16) x=+20`. */
+/**
+ * One band's caption line: `L2 FACTOR_1_16 (1/16) x=+20`.
+ *
+ * A CURVED BAND READS `x=+20..+43 ramp` — the scroll its FIRST row gets and the
+ * scroll its LAST row gets, both taken off the runs the draw actually blitted.
+ * Not `curve.to`'s decode: that value lands one line past this band (see
+ * `curveRampRuns`), so printing it would name a number no row on screen shows.
+ */
 export function bandCaption(b: CameraPreviewBand): string {
   const f = typeof b.factor === 'string' ? b.factor : `packed(${b.factor.s1},${b.factor.s2},${b.factor.op})`;
   const ratio = factorRatioLabel(b.factor);
-  const sign = b.scrollX < 0 ? '' : '+';
-  return `L${b.layer} ${f} (${ratio}) x=${sign}${b.scrollX}`
+  const x = b.ramp === null ? signed(b.scrollX)
+    : `${signed(b.ramp[0].scrollX)}..${signed(b.ramp[b.ramp.length - 1].scrollX)} ramp`;
+  return `L${b.layer} ${f} (${ratio}) x=${x}`
     + (b.inherited ? ' [inherited]' : '')
     + (b.vsplitAt !== null ? ` v=${b.vsplitAt}` : '');
+}
+
+/** `+20` / `-3` — a scroll with an explicit sign, so a ramp's two ends line up. */
+function signed(v: number): string {
+  return v < 0 ? `${v}` : `+${v}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -368,25 +533,35 @@ export function drawCameraPreview(
   for (const band of plan.bands) {
     const rows = band.screenBottom - band.screenTop;
     if (rows <= 0) continue;
-    for (const src of sources) {
-      const pw = src.pixelWidth;
-      const ph = src.pixelHeight;
-      if (pw <= 0 || ph <= 0) continue;
-      const sx0 = mod(band.scrollX, pw);
-      const sy0 = mod(band.screenTop + band.vscroll, ph);
-      // Column split at the plane's right edge, row split at its bottom edge.
-      const xs = spans(sx0, SCREEN_WIDTH, pw);
-      const ys = spans(sy0, rows, ph);
-      for (const xr of xs) {
-        for (const yr of ys) {
-          ctx.drawImage(
-            src.image,
-            xr.src, yr.src, xr.len, yr.len,
-            frame.x + xr.off * zoom,
-            frame.y + (band.screenTop + yr.off) * zoom,
-            xr.len * zoom, yr.len * zoom,
-          );
-          blits++;
+    // A FLAT BAND IS ONE RUN, so the two cases are one loop and the flat path
+    // issues exactly the blits it did before this parcel. A curved band's runs
+    // partition the same rows — `curveRampRuns` emits `span` lines' worth — so
+    // no row is drawn twice and none is skipped.
+    const runs: readonly CurveRun[] = band.ramp
+      ?? [{ screenTop: band.screenTop, rows, scrollX: band.scrollX }];
+    for (const run of runs) {
+      for (const src of sources) {
+        const pw = src.pixelWidth;
+        const ph = src.pixelHeight;
+        if (pw <= 0 || ph <= 0) continue;
+        const sx0 = mod(run.scrollX, pw);
+        // `vscroll` is the BAND's — a curve ramps the horizontal scroll only,
+        // so the vertical source row still walks continuously down the strip.
+        const sy0 = mod(run.screenTop + band.vscroll, ph);
+        // Column split at the plane's right edge, row split at its bottom edge.
+        const xs = spans(sx0, SCREEN_WIDTH, pw);
+        const ys = spans(sy0, run.rows, ph);
+        for (const xr of xs) {
+          for (const yr of ys) {
+            ctx.drawImage(
+              src.image,
+              xr.src, yr.src, xr.len, yr.len,
+              frame.x + xr.off * zoom,
+              frame.y + (run.screenTop + yr.off) * zoom,
+              xr.len * zoom, yr.len * zoom,
+            );
+            blits++;
+          }
         }
       }
     }

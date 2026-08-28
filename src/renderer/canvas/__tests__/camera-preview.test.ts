@@ -13,8 +13,10 @@
 import { describe, it, expect } from 'vitest';
 import {
   cameraPreviewPlan, planeVscroll, rebasePlaneTopsToScreen, bandScrollsX,
-  cameraPreviewAbsences, bandCaption,
+  cameraPreviewAbsences, bandCaption, curveRampRuns,
 } from '../camera-preview';
+import type { CurveRun } from '../camera-preview';
+import { decodeFactorScroll } from '../../../core/formats/effects/factor-decode';
 import type { EffectsScene, EffectsLayer, EffectsFactor } from '../../../core/formats/effects/scene';
 import { PLANE_LINE_SPAN } from '../../providers/effects-aeon';
 
@@ -265,10 +267,19 @@ describe('the absence list — what the preview says it is NOT showing', () => {
     expect(cameraPreviewAbsences(fourBands()).join('|')).toContain('foreground factors');
   });
 
-  it('names curve ramps only when a layer has one', () => {
-    expect(cameraPreviewAbsences(fourBands()).join('|')).not.toContain('curve');
+  it('NEVER names curve ramps — they are drawn now, and a stale absence lies', () => {
+    // THE ROW THIS PARCEL INVERTED. It used to assert the opposite, which is
+    // what a booked gap looks like when it is honest. The composite ramps, so
+    // the line has to go; leaving it would tell the author the strip on screen
+    // is not what the ROM draws, at the moment it finally is.
     const s = scene([layer(0, 'FACTOR_1_2', { curve: { to: 'FACTOR_1_4' } })]);
-    expect(cameraPreviewAbsences(s).join('|')).toContain('curve');
+    expect(cameraPreviewAbsences(s).join('|')).not.toContain('curve');
+    // ...and the deform line is untouched, so this is not "the list stopped
+    // working". A curve layer that ALSO deforms still gets told about deform.
+    expect(cameraPreviewAbsences(scene([layer(0, 'FACTOR_1_2', {
+      curve: { to: 'FACTOR_1_4' },
+      deform: { own: { table: { generator: 'sine', amplitude: 8, period: 64 }, shift_a: 15, shift_b: 2, phase: 0, speed: 1 } },
+    })])).join('|')).toContain('deform');
   });
 
   it('names deform for a LAYER deform, a SCENE deform, and v_deform separately', () => {
@@ -298,5 +309,137 @@ describe('bandCaption', () => {
     ]);
     const plan = cameraPreviewPlan(s, 320, 0);
     expect(bandCaption(plan.bands[1])).toBe('L1 FACTOR_1_16 (1/16) x=+160 [inherited] v=96');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// THE CURVE RAMP — transcription 5.
+//
+// ⚠ EVERY ROW HERE USES camX != 0 AND ENDPOINTS THAT DIFFER, and both are
+// load-bearing. At camX = 0 every factor decodes to 0, so base and far are both
+// 0, the spread is 0, and a perfectly broken ramp is flat and GREEN. A curve
+// whose `to` EQUALS its layer's `fb` is the same trap by another road — the
+// engine's own layer() guard 4 refuses that pair precisely because it emits
+// HScroll bytes identical to the flat path. Each appears once below, named, AS
+// A CONTROL rather than as evidence.
+// ---------------------------------------------------------------------------
+
+/** One layer, locked scene: band 0 owns rows 0..223, so `span` is 224. */
+function oneCurved(fb: EffectsFactor, to: EffectsFactor): EffectsScene {
+  return scene([layer(0, fb, { curve: { to } })]);
+}
+
+/** The scroll one screen line shows, read back out of the runs. */
+function scrollAtLine(runs: readonly CurveRun[], line: number): number {
+  for (const r of runs) if (line >= r.screenTop && line < r.screenTop + r.rows) return r.scrollX;
+  throw new Error(`line ${line} is in no run`);
+}
+
+describe('curveRampRuns — the per-line ramp', () => {
+  it('a flat band has no ramp at all, and a curved one does', () => {
+    expect(cameraPreviewPlan(fourBands(), 320, 0).bands.every((b) => b.ramp === null)).toBe(true);
+    expect(cameraPreviewPlan(oneCurved('FACTOR_1_4', 'FACTOR_1_2'), 320, 0).bands[0].ramp)
+      .not.toBeNull();
+  });
+
+  it('THE CATCHER: the strip is not flat — its first and last rows differ', () => {
+    // camX 320, fb FACTOR_1_4 -> 320>>2 = 80; to FACTOR_1_2 -> 320>>1 = 160.
+    // The strip must SHOW that spread across its rows. A preview that ignored
+    // `curve` gives 80 at both ends, which is the state this parcel replaced.
+    const ramp = cameraPreviewPlan(oneCurved('FACTOR_1_4', 'FACTOR_1_2'), 320, 0).bands[0].ramp!;
+    expect(ramp[0].scrollX).toBe(80);
+    expect(ramp[ramp.length - 1].scrollX).not.toBe(80);
+  });
+
+  it("the ramp is the ENGINE's truncation, not a linear interpolation", () => {
+    // ⚠ THE ROW THAT SEPARATES A TRANSCRIPTION FROM A LERP, and the whole
+    // reason this was booked rather than eyeballed. Derivation, all of it from
+    // the app's own contract:
+    //   base  = decodeFactorScroll(320, FACTOR_1_4) = 320>>2       =  80
+    //   far   = decodeFactorScroll(320, FACTOR_1_2) = 320>>1       = 160
+    //   the engine ramps the HSCROLL WORD, which is the NEGATED scroll:
+    //   baseW = -80, farW = -160, spread = farW - baseW            = -80
+    //   span  = 224 (the band owns every screen row)
+    //   line i shows -(baseW + floor(i*spread/span)) = 80 + ceil(i*80/224)
+    //   i = 1 -> 80 + ceil(0.357) = 81
+    // A lerp in UN-NEGATED space truncates the other way: 80 + trunc(0.357)
+    // = 80. Off by one, on one sign of spread only, on the rows that do not
+    // divide evenly — "nearly right", which is the hardest kind to see.
+    const ramp = cameraPreviewPlan(oneCurved('FACTOR_1_4', 'FACTOR_1_2'), 320, 0).bands[0].ramp!;
+    expect(scrollAtLine(ramp, 0)).toBe(80);
+    expect(scrollAtLine(ramp, 1)).toBe(81);   // a lerp says 80 — this is the row
+    expect(scrollAtLine(ramp, 2)).toBe(81);
+    expect(scrollAtLine(ramp, 3)).toBe(82);   // ceil(240/224) = 2
+    expect(scrollAtLine(ramp, 6)).toBe(83);   // ceil(480/224) = 3
+  });
+
+  it('the runs partition the band exactly — every row once, none twice', () => {
+    const band = cameraPreviewPlan(oneCurved('FACTOR_1_4', 'FACTOR_1_2'), 320, 0).bands[0];
+    const runs = band.ramp!;
+    let next = band.screenTop;
+    for (const r of runs) {
+      expect(r.screenTop).toBe(next);         // contiguous, no gap and no overlap
+      expect(r.rows).toBeGreaterThan(0);
+      next += r.rows;
+    }
+    expect(next).toBe(band.screenBottom);
+    // ...and coalescing lost nothing: adjacent runs never share a scroll, or
+    // the run boundary would be describing a difference that is not there.
+    for (let i = 1; i < runs.length; i++) expect(runs[i].scrollX).not.toBe(runs[i - 1].scrollX);
+  });
+
+  it('CONTROL, non-discriminating by construction: to == fb is flat', () => {
+    // The pair the engine REFUSES (layer() guard 4, surfaced by curveAdvisory).
+    // It is here to show what the flat answer looks like, so no row above can
+    // be read as having proved something with it. It proves nothing itself.
+    const ramp = cameraPreviewPlan(oneCurved('FACTOR_1_4', 'FACTOR_1_4'), 320, 0).bands[0].ramp!;
+    expect(ramp).toHaveLength(1);
+    expect(ramp[0].rows).toBe(224);
+    expect(ramp[0].scrollX).toBe(80);
+  });
+
+  it('CONTROL: at camX 0 every ramp is flat, whatever the endpoints', () => {
+    // Named so that no row above can be run at camX 0 and believed.
+    const ramp = cameraPreviewPlan(oneCurved('FACTOR_1_4', 'FACTOR_1_2'), 0, 0).bands[0].ramp!;
+    expect(ramp).toHaveLength(1);
+    expect(ramp[0].scrollX).toBe(0);
+  });
+
+  it('ramping TO the locked factor walks the scroll toward zero, not toward camX>>15', () => {
+    // The sentinel row. `to: FACTOR_LOCKED` is far end 0 — the strip's bottom
+    // stands still. A decoder treating 15 as a shift would ramp toward -1 for
+    // this positive camX, so the ramp would overshoot past zero.
+    //   baseW = -160, farW = 0, spread = +160, span = 224
+    //   line i shows -(-160 + floor(i*160/224)) = 160 - floor(i*5/7)
+    const ramp = cameraPreviewPlan(oneCurved('FACTOR_1_2', 'FACTOR_LOCKED'), 320, 0).bands[0].ramp!;
+    expect(scrollAtLine(ramp, 0)).toBe(160);
+    expect(scrollAtLine(ramp, 112)).toBe(80);    // 160 - floor(560/7) = 160 - 80
+    expect(scrollAtLine(ramp, 223)).toBe(1);     // 160 - floor(1115/7) = 160 - 159
+  });
+
+  it("a DORMANT curved band ramps from the band ABOVE's scroll, not from its own fb", () => {
+    // `.cap_factor_curve_hoist` seeds the spread from Parallax_Shadow_Scroll_B,
+    // which is the POST-INHERITANCE word — `.band_disabled` already wrote the
+    // previous band's scroll there. Discriminating because band 1's own `fb`
+    // decodes to 20 and the inherited value is 160: a seed taken from `fb`
+    // would start this ramp at 20.
+    const s = scene([
+      layer(0, 'FACTOR_1_2'),
+      layer(64, 'FACTOR_1_16', { enabled: false, curve: { to: 'FACTOR_LOCKED' } }),
+    ]);
+    const b = cameraPreviewPlan(s, 320, 0).bands[1];
+    expect(b.inherited).toBe(true);
+    expect(decodeFactorScroll(320, 'FACTOR_1_16')).toBe(20);        // what it is NOT
+    expect(b.ramp![0].scrollX).toBe(160);                           // the band above's
+  });
+
+  it('a band Step 4a clamped to zero rows ramps across nothing', () => {
+    expect(curveRampRuns(320, 80, 'FACTOR_1_2', 224, 0)).toEqual([]);
+    expect(curveRampRuns(320, 80, 'FACTOR_1_2', 224, -3)).toEqual([]);
+  });
+
+  it("the caption reads the ramp's two ENDS, not one flat number", () => {
+    const plan = cameraPreviewPlan(oneCurved('FACTOR_1_4', 'FACTOR_1_2'), 320, 0);
+    expect(bandCaption(plan.bands[0])).toBe('L0 FACTOR_1_4 (1/4) x=+80..+160 ramp');
   });
 });
