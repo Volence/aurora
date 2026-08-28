@@ -35,6 +35,7 @@ import React from 'react';
 import AeonPropertiesPanel from '../../components/AeonPropertiesPanel';
 import EffectsScenePanel from '../../components/effects/EffectsScenePanel';
 import BgAnimBandPanel from '../../components/effects/BgAnimBandPanel';
+import RasterTimelineStrip from '../../components/effects/RasterTimelineStrip';
 import EffectsToolOptions from '../../components/effects/EffectsToolOptions';
 import { Panel, CollapsibleSection } from '../../components/ui';
 import { mapFacet, type FacetModule } from '../facet-registry';
@@ -43,6 +44,14 @@ function EffectsPanels() {
   return (
     <Panel width={300} scroll>
       <EffectsScenePanel />
+      {/* THE RASTER TIMELINE, DIRECTLY UNDER THE SCENE IT IS ABOUT (ROADMAP row
+          79). It is the SAME layers the scene panel lists and the map draws
+          guides for, on the SCREEN axis instead of the map's world axis — and
+          those two axes are only commensurable while the plane is locked, which
+          is why it is a strip in this column rather than a second ruler painted
+          over the act canvas. Read-only: the editing model waits on aeon's
+          N-bands design (canvas/raster-timeline.ts's docblock cites it). */}
+      <RasterTimelineStrip />
       {/* The BgAnim band editor belongs in THIS column, not a facet of its own.
           A band is the tile-blob half of the same parallax lens the scenes are
           the scroll half of — both are authored against the act in the canvas
