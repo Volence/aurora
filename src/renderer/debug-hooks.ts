@@ -16,6 +16,7 @@ import { useClassicObjectArtStore } from './state/classicObjectArtStore';
 import { useProjectStore, getCurrentAct } from './state/projectStore';
 import { useEditorStore, focusedHistory } from './state/editorStore';
 import { isBlockAligned, effectiveGranularity } from '../core/editing/map-clipboard';
+import { lastPasteGhostReport, type PasteGhostReport } from './canvas/region-preview';
 import { openAeonProject } from './state/aeon-open';
 import { bandBudget, bandRows } from './providers/bg-anim-aeon';
 import { serializeBgOverride } from '../core/formats/bg-override/bg-override';
@@ -419,6 +420,19 @@ interface AeonProbeApi {
    */
   marqueeSnapModifier(): { armed: string; invert: boolean; effective: string };
   /**
+   * WHAT THE PASTE GHOST IS SHOWING, read-only — the hovered footprint the
+   * viewport last drew, straight out of `region-preview`'s published report.
+   *
+   * It exists because of a bug that could not be seen without it: a middle-drag
+   * pan in paste mode was swallowed by the ghost-tracking branch, and the fix
+   * had to pan AND keep the ghost live. Whether the ghost is stale is not
+   * visible in the store (the hovered cell is a viewport-local ref), not
+   * visible in the camera, and not reliably visible in a canvas scan — the
+   * ghost is drawn on a second overlay canvas that a colour scan cannot tell
+   * apart from the map beneath it.
+   */
+  pasteGhost(): PasteGhostReport;
+  /**
    * WHAT THE MAP CLIPBOARD ACTUALLY HOLDS. Read-only.
    *
    * `artOnly` and the two plane lengths are the whole collision rule as the
@@ -819,6 +833,7 @@ function installAeonProbe(): AeonProbeApi {
       } : null;
     },
     marqueeGranularity: () => useEditorStore.getState().marqueeGranularity,
+    pasteGhost: () => lastPasteGhostReport(),
     marqueeSnapModifier: () => {
       const e = useEditorStore.getState();
       return {

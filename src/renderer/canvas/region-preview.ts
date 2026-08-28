@@ -99,3 +99,34 @@ export function regionPreviewCanvas(
   ctx.putImageData(img, 0, 0);
   return canvas;
 }
+
+/**
+ * WHAT THE PASTE GHOST IS CURRENTLY SHOWING — a published report, read-only.
+ *
+ * The hovered footprint is deliberately a MapViewport-local ref rather than
+ * store state (nothing outside the viewport needs the exact cell, only whether
+ * pasting is active), and that is still right. But it is also the quantity a
+ * bug can leave FROZEN while everything else keeps working, and a harness that
+ * cannot read it cannot tell a pan that carries the ghost from a pan that
+ * strands it. So it is published here the way `publishGuideReport` and
+ * `publishScreenFrameReport` publish theirs — a PUBLISH, never a
+ * re-derivation: whatever the viewport actually drew is what this says.
+ *
+ * `paints` makes "the ghost never updated" distinguishable from "the ghost
+ * updated to the same cell", which a null-vs-value read alone cannot do.
+ */
+export interface PasteGhostReport {
+  pasting: boolean;
+  hover: { sectionIndex: number; baseCol: number; baseRow: number } | null;
+  paints: number;
+}
+
+let lastPasteGhost: PasteGhostReport = { pasting: false, hover: null, paints: 0 };
+
+export function publishPasteGhostReport(r: Omit<PasteGhostReport, 'paints'>): void {
+  lastPasteGhost = { ...r, paints: lastPasteGhost.paints + 1 };
+}
+
+export function lastPasteGhostReport(): PasteGhostReport {
+  return lastPasteGhost;
+}

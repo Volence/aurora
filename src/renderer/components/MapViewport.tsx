@@ -27,7 +27,7 @@ import {
   effectiveGranularity,
 } from '../../core/editing/map-clipboard';
 import type { MapClipboard } from '../../core/editing/map-clipboard';
-import { regionPreviewCanvas } from '../canvas/region-preview';
+import { regionPreviewCanvas, publishPasteGhostReport } from '../canvas/region-preview';
 import type { PasteLayers } from '../../core/editing/map-clipboard';
 import { SectionRenderer } from '../canvas/SectionRenderer';
 import {
@@ -1810,6 +1810,33 @@ export default function MapViewport() {
     return () => window.removeEventListener('keydown', handler);
   }, [pan, setZoom, zoom]);
 
+  /**
+   * Advance the camera by this move event's delta, and remember where the
+   * cursor was.
+   *
+   * Extracted because it now has TWO callers, and the reason it has two is the
+   * bug it was extracted to fix: the pan handler sits at the bottom of
+   * `handleMouseMove` behind half a dozen `return`s, so any branch above it
+   * that returns has silently disabled panning for its whole mode. Paste mode
+   * did exactly that (owner, 2026-08-28: *"When I'm in paste mode with marquee
+   * I can't middle mouse click to move around"*). A second copy of these four
+   * lines in the paste branch would be the same defect wearing a different
+   * hat — this facet has now been bitten three times in one day by a rule
+   * enforced in one handler and not honoured by its sibling.
+   *
+   * ⚠ IT WRITES THE VIEW STORE SYNCHRONOUSLY, and callers depend on that:
+   * `screenToWorld` reads `useViewStore.getState()` on every call, so anything
+   * computed AFTER this sees the new camera. That is what lets the paste ghost
+   * follow the world cell it is actually over during a pan rather than lagging
+   * a frame behind it.
+   */
+  function panFromEvent(clientX: number, clientY: number): void {
+    const dx = clientX - lastMouse.current.x;
+    const dy = clientY - lastMouse.current.y;
+    lastMouse.current = { x: clientX, y: clientY };
+    pan(dx, dy);
+  }
+
   function screenToWorld(clientX: number, clientY: number): { x: number; y: number } {
     const rect = canvasRef.current?.getBoundingClientRect();
     if (!rect) return { x: 0, y: 0 };
@@ -2861,6 +2888,33 @@ export default function MapViewport() {
     // ghost preview. Independent of the active tool — takes priority over any
     // drag state so the ghost can't get stuck showing a stale cell.
     if (useEditorStore.getState().pasting) {
+      // ═══ A MIDDLE-DRAG PAN IS NOT SOMETHING THIS BRANCH MAY SWALLOW ═══
+      //
+      // `handleMouseDown` already promises this in a comment — *"Left-click
+      // only (button 0) — middle-click must still fall through to pan"* — and
+      // it keeps that promise: the middle press falls through and sets
+      // `isDragging`. This handler then threw it away, returning below before
+      // the pan handler at the bottom ever ran. The mousedown made a promise
+      // its sibling broke, and the map was frozen for the whole of paste mode.
+      //
+      // WHY NOT `if (isDragging.current) return;` AT THE TOP. Because the
+      // comment above is a real prior decision, not an accident: this branch is
+      // unconditional so the ghost cannot get stuck showing a stale cell, and
+      // an early return would put that bug straight back.
+      //
+      // BOTH BEHAVIOURS ARE WANTED AT ONCE, and they are not in tension. A pan
+      // moves the map UNDER a stationary cursor, so the world position beneath
+      // the pointer genuinely changes and the ghost SHOULD follow it. So: pan
+      // first, then fall through and compute the footprint against the camera
+      // the pan just wrote. `screenToWorld` reads the view store live, so the
+      // `world` below is the post-pan position — the ghost tracks the cell it
+      // is really over instead of lagging a frame.
+      //
+      // Nothing can commit a paste from this gesture: the commit lives in
+      // `handleMouseDown` behind `e.button === 0`, and `handleMouseUp` has no
+      // paste path at all. A pan that pasted at the end would be far worse than
+      // a pan that did not work.
+      if (isDragging.current) panFromEvent(e.clientX, e.clientY);
       const world = screenToWorld(e.clientX, e.clientY);
       const info = worldToSectionTile(world.x, world.y);
       if (info) {
@@ -2884,6 +2938,11 @@ export default function MapViewport() {
         pasteHoverRef.current = null;
         drawCollisionPreview();
       }
+      // PUBLISHED UNCONDITIONALLY, on every move this branch handles — not only
+      // when the cell changes. "The ghost never updated" and "the ghost updated
+      // to the same cell" are different facts, and the second is what a frozen
+      // ghost looks like from outside; only a paint count can tell them apart.
+      publishPasteGhostReport({ pasting: true, hover: pasteHoverRef.current });
       return;
     }
 
@@ -3029,12 +3088,10 @@ export default function MapViewport() {
       return;
     }
 
-    // Pan
+    // Pan — the same body the paste branch above calls, so the two can never
+    // drift into panning by different amounts.
     if (isDragging.current) {
-      const dx = e.clientX - lastMouse.current.x;
-      const dy = e.clientY - lastMouse.current.y;
-      lastMouse.current = { x: e.clientX, y: e.clientY };
-      pan(dx, dy);
+      panFromEvent(e.clientX, e.clientY);
       return;
     }
 
