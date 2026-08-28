@@ -15,6 +15,7 @@ import { useClassicLevelStore } from './state/classicLevelStore';
 import { useClassicObjectArtStore } from './state/classicObjectArtStore';
 import { useProjectStore, getCurrentAct } from './state/projectStore';
 import { useEditorStore, focusedHistory } from './state/editorStore';
+import { isBlockAligned } from '../core/editing/map-clipboard';
 import { openAeonProject } from './state/aeon-open';
 import { bandBudget, bandRows } from './providers/bg-anim-aeon';
 import { serializeBgOverride } from '../core/formats/bg-override/bg-override';
@@ -376,9 +377,50 @@ interface AeonProbeApi {
   /** Both picks and the layer, straight out of the store. Read-only — the rows
    *  that care what a click SELECTED read this, not what a component drew. */
   selectedTile(): { layer: 'fg' | 'bg'; fg: number; bg: number; paletteLine: number };
-  /** The committed marquee, if any — the marquee-drag rows read the snap result
-   *  back out rather than re-deriving it from pixels. Read-only. */
-  marquee(): { sectionIndex: number; col: number; row: number; w: number; h: number } | null;
+  /**
+   * The committed marquee, if any — the marquee-drag rows read the snap result
+   * back out rather than re-deriving it from pixels. Read-only.
+   *
+   * `aligned` comes from `map-clipboard.ts` `isBlockAligned` itself, NOT from a
+   * copy of its arithmetic here: it is the predicate the whole collision rule
+   * turns on, and a probe that re-implemented it could agree with itself while
+   * disagreeing with the app.
+   */
+  marquee(): {
+    sectionIndex: number; col: number; row: number; w: number; h: number; aligned: boolean;
+  } | null;
+  /**
+   * Which granularity the marquee tool is armed to. READ-ONLY ON PURPOSE, and
+   * that is the difference between this and `setSelectedTile`.
+   *
+   * The tile pick has no reachable UI for an arbitrary index (a virtualised
+   * grid), so arming it is setup. This control is two ordinary buttons in the
+   * marquee panel, so a harness can and must click the real one — and then this
+   * is what proves the click reached the store rather than merely repainting a
+   * button. A setter here would let a green row coexist with a dead control.
+   */
+  marqueeGranularity(): string;
+  /**
+   * WHAT THE MAP CLIPBOARD ACTUALLY HOLDS. Read-only.
+   *
+   * `artOnly` and the two plane lengths are the whole collision rule as the
+   * clipboard carries it, and none of it is on screen: the paste ghost draws
+   * art either way. `nonzeroTiles` is the anti-vacuous companion — a copy of a
+   * blank region and a copy that never happened both leave a clipboard whose
+   * dimensions look right.
+   */
+  mapClipboardInfo(): {
+    widthTiles: number; heightTiles: number; artOnly: boolean;
+    collisionALen: number; collisionBLen: number; nonzeroTiles: number;
+  } | null;
+  /**
+   * One tile index's authored collision word on plane A, or null when the
+   * section has no authored plane. The only way a row can tell "the paste wrote
+   * art and left collision alone" from "the paste wrote art and quietly cleared
+   * collision" — which is this parcel's worst failure mode and is invisible
+   * unless the collision overlay happens to be on.
+   */
+  collisionAAt(sectionIndex: number, index: number): number | null;
   /** The armed stamp source (editorStore.selectedChunkId). Read-only. */
   selectedChunk(): string | null;
   /** Every chunk-library id, in library order. Read-only. */
@@ -739,7 +781,27 @@ function installAeonProbe(): AeonProbeApi {
     },
     marquee: () => {
       const m = useEditorStore.getState().marquee;
-      return m ? { sectionIndex: m.sectionIndex, col: m.col, row: m.row, w: m.w, h: m.h } : null;
+      return m ? {
+        sectionIndex: m.sectionIndex, col: m.col, row: m.row, w: m.w, h: m.h,
+        aligned: isBlockAligned(m.col, m.row, m.w, m.h),
+      } : null;
+    },
+    marqueeGranularity: () => useEditorStore.getState().marqueeGranularity,
+    mapClipboardInfo: () => {
+      const c = useEditorStore.getState().mapClipboard;
+      if (!c) return null;
+      let nonzeroTiles = 0;
+      for (let i = 0; i < c.nametable.length; i++) if (c.nametable[i] !== 0) nonzeroTiles++;
+      return {
+        widthTiles: c.widthTiles, heightTiles: c.heightTiles, artOnly: c.artOnly,
+        collisionALen: c.collisionA.length, collisionBLen: c.collisionB.length, nonzeroTiles,
+      };
+    },
+    collisionAAt: (sectionIndex, index) => {
+      const section = getCurrentAct(useProjectStore.getState())?.sections[sectionIndex];
+      const plane = section?.collisionEdit;
+      if (!plane || index < 0 || index >= plane.length) return null;
+      return plane[index];
     },
     selectedChunk: () => useEditorStore.getState().selectedChunkId,
     chunkIds: () => (useProjectStore.getState().project?.chunkLibrary ?? []).map((c) => c.id),

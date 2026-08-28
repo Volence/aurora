@@ -55,9 +55,32 @@ export function buildRegionWriteCommand(args: {
     }
   }
 
-  if (writeCollision) {
-    const cellsW = source.widthTiles >> 1;
-    const cellsH = source.heightTiles >> 1;
+  // COLLISION IS PER-16px CELL AND CANNOT BE WRITTEN OFF-GRID.
+  //
+  // Two ways a caller can ask for a collision write this function has no
+  // honest answer to, both refused here rather than half-served:
+  //
+  //  1. An ODD base. The destination cell is `baseCol >> 1`, which FLOORS, so
+  //     an odd origin would silently drop the art and the collision half a
+  //     block out of step with each other.
+  //  2. A source whose planes do not cover its own footprint. An art-only
+  //     clipboard (map-clipboard.ts, a non-block-aligned marquee) carries
+  //     LENGTH-0 planes; reading them per-cell would yield `undefined -> 0` and
+  //     write AIR over every cell of the footprint, erasing the destination's
+  //     collision. That is the worst possible failure mode for this feature, so
+  //     the length is checked and not assumed.
+  //
+  // Refusing here is a structural backstop, not the primary rule: the paste
+  // path already resolves layers through `effectivePasteLayers` and snaps its
+  // base through `pasteBaseStep`. This is what stops a FUTURE call site that
+  // forgets both from being a data-loss bug instead of a no-op.
+  const cellsW = source.widthTiles >> 1;
+  const cellsH = source.heightTiles >> 1;
+  const collisionWritable = (baseCol % 2) === 0 && (baseRow % 2) === 0
+    && source.collisionA.length === cellsW * cellsH
+    && source.collisionB.length === cellsW * cellsH;
+
+  if (writeCollision && collisionWritable) {
     const baseCellCol = baseCol >> 1;
     const baseCellRow = baseRow >> 1;
 

@@ -6,7 +6,7 @@ import type { ToolId } from '../../core/project/adapter';
 import type { BandCandidate } from '../providers/band-verbs';
 import type { AnyCommand, S4Level } from '../../core/editing/commands';
 import { chunkIdsAffectedByCommand } from '../../core/editing/chunk-invalidation';
-import type { MapClipboard, PasteLayers } from '../../core/editing/map-clipboard';
+import type { MapClipboard, PasteLayers, MarqueeGranularity } from '../../core/editing/map-clipboard';
 import type { UndoStack } from '../../core/editing/undo-stack';
 import { useArtStore } from './artStore';
 import { BoundEditHistory } from '../../core/editing/bound-edit-history';
@@ -29,8 +29,12 @@ import { levelDocId, parseLevelTabId, isSpriteDocTabId, isCanvasDocTabId, zoneAr
  */
 export type EditorTool = ToolId;
 
-/** An in-progress or committed marquee selection, in tile coords, snapped to
- *  16px blocks (map-clipboard.ts snapMarquee) and pinned to one section. */
+/** An in-progress or committed marquee selection, in TILE coords, pinned to one
+ *  section and snapped by map-clipboard.ts `snapMarquee` to whichever
+ *  granularity was armed — 16px blocks by default, single 8px tiles when the
+ *  author picks Tile. The rect is therefore NOT guaranteed even any more; ask
+ *  `isBlockAligned` rather than assuming, since that is what decides whether the
+ *  selection can carry collision at all. */
 export interface MarqueeState {
   sectionIndex: number;
   col: number;
@@ -259,6 +263,19 @@ interface EditorState {
   bandReveal: { index: number; nonce: number } | null;
 
   marquee: MarqueeState | null;
+  /**
+   * What a marquee DRAG snaps to. `block` is the default and is what shipped
+   * before this field existed, so nothing changes for an author who never
+   * touches the control.
+   *
+   * A property of the TOOL, not of the selection: the committed marquee records
+   * only its rect, and every downstream rule (can it carry collision? can it be
+   * saved as a chunk? what grid can it paste on?) is answered from that rect's
+   * geometry via `isBlockAligned`. Flipping this control therefore never
+   * retro-changes a selection already on screen, and a Tile-mode drag that
+   * lands on even bounds behaves exactly like a Block-mode one.
+   */
+  marqueeGranularity: MarqueeGranularity;
   mapClipboard: MapClipboard | null;
   pasteLayers: PasteLayers;
   /** True while the map paste-ghost/click-to-commit mode is active (entered by
@@ -310,6 +327,7 @@ interface EditorState {
   revealBand: (index: number) => void;
   clearBandReveal: () => void;
   setMarquee: (marquee: MarqueeState | null) => void;
+  setMarqueeGranularity: (granularity: MarqueeGranularity) => void;
   setMapClipboard: (clipboard: MapClipboard | null) => void;
   setPasteLayers: (layers: PasteLayers) => void;
   setPasting: (pasting: boolean) => void;
@@ -444,6 +462,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   bandReveal: null,
 
   marquee: null,
+  marqueeGranularity: 'block',
   mapClipboard: null,
   pasteLayers: 'both',
   pasting: false,
@@ -490,6 +509,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   })),
   clearBandReveal: () => set({ bandReveal: null }),
   setMarquee: (marquee) => set({ marquee }),
+  setMarqueeGranularity: (marqueeGranularity) => set({ marqueeGranularity }),
   setMapClipboard: (mapClipboard) => set({ mapClipboard }),
   setPasteLayers: (pasteLayers) => set({ pasteLayers }),
   setPasting: (pasting) => set({ pasting }),

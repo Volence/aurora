@@ -1,9 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useEditorStore } from '../state/editorStore';
-import { useProjectStore, getCurrentAct } from '../state/projectStore';
+import { useProjectStore, getCurrentAct, getCurrentZone } from '../state/projectStore';
 import { useToastStore } from '../state/toastStore';
-import type { PasteLayers } from '../../core/editing/map-clipboard';
+import type { PasteLayers, MarqueeGranularity } from '../../core/editing/map-clipboard';
+import {
+  isBlockAligned, selectionSizeLabel, artOnlyReason, copyFromSection,
+} from '../../core/editing/map-clipboard';
 import { selectionToChunk } from '../../core/editing/selection-to-chunk';
+import { regionPreviewCanvas } from '../canvas/region-preview';
 import { T } from './ui';
 
 const LAYER_OPTS: ReadonlyArray<{ value: PasteLayers; label: string; title: string }> = [
@@ -12,6 +16,83 @@ const LAYER_OPTS: ReadonlyArray<{ value: PasteLayers; label: string; title: stri
   { value: 'collision', label: 'Collision', title: 'Paste collision only, leave the nametable untouched' },
 ];
 
+const GRAIN_OPTS: ReadonlyArray<{ value: MarqueeGranularity; label: string; title: string }> = [
+  {
+    value: 'block', label: 'Block',
+    title: 'Drag selects whole 16px blocks (rounded out). Carries art AND collision.',
+  },
+  {
+    value: 'tile', label: 'Tile',
+    title: 'Drag selects individual 8px tiles. Collision is stored per 16px block, '
+      + 'so a selection that lands off that grid carries art only.',
+  },
+];
+
+/** How wide the selection preview may draw. Matches the panel's own content
+ *  width (240px `Panel` minus the section padding), so the picture fills the
+ *  column without forcing it wider. */
+const PREVIEW_MAX_W = 208;
+/** ...and how tall, so a full-height section selection cannot push everything
+ *  below it off the column. */
+const PREVIEW_MAX_H = 160;
+
+/**
+ * WHAT THE SELECTION ACTUALLY CONTAINS — the owner's item 2.
+ *
+ * *"The marquee tool, when I select something it doesn't preview what's
+ * selected."* Before this, a committed marquee was a dashed rectangle and a
+ * toast counting blocks; nothing anywhere showed the ART. This draws the
+ * selection's own pixels, live, as the drag moves.
+ *
+ * It reads the SECTION, live, rather than the clipboard: this is a picture of
+ * the current selection, and the author has usually not pressed Ctrl+C yet.
+ * (The paste ghost is the one that must show the clipboard — see MapViewport.)
+ *
+ * It goes through `regionPreviewCanvas` like both ghosts do, which is what
+ * keeps it out of the RangeError class that once unmounted the React root: the
+ * raster buffer and the ImageData are sized from the same two numbers, at every
+ * size a marquee can produce — down to one 8x8 tile, and at odd widths and
+ * heights the block-aligned path could never make.
+ */
+function SelectionPreview({ sectionIndex, col, row, w, h }: {
+  sectionIndex: number; col: number; row: number; w: number; h: number;
+}) {
+  const hostRef = useRef<HTMLDivElement | null>(null);
+  // Redraws on any project mutation as well as any rect change: painting a tile
+  // inside a standing selection must change the picture, and the project object
+  // is mutated in place, so `liveEditVersion` is what moves.
+  const liveEditVersion = useEditorStore((s) => s.liveEditVersion);
+  const project = useProjectStore((s) => s.project);
+
+  useEffect(() => {
+    const host = hostRef.current;
+    if (!host) return;
+    host.replaceChildren();
+    const state = useProjectStore.getState();
+    const section = getCurrentAct(state)?.sections[sectionIndex];
+    const zone = getCurrentZone(state);
+    if (!section || !zone) return;
+    // copyFromSection is the SAME capture Ctrl+C performs, so the preview cannot
+    // show one thing and the clipboard hold another.
+    const clip = copyFromSection(section, col, row, w, h);
+    const canvas = regionPreviewCanvas(clip, zone.tileset.tiles, zone.palette);
+    if (!canvas) return;
+    // Integer nearest-neighbour scale so map art stays map art. Down-scaling a
+    // large selection is unavoidable (a whole section is 2048px), and there the
+    // browser's own filtering is disabled too — a blurred preview would invite
+    // the author to read detail that is not there.
+    const scale = Math.min(PREVIEW_MAX_W / canvas.width, PREVIEW_MAX_H / canvas.height, 4);
+    canvas.style.width = `${Math.max(1, Math.round(canvas.width * scale))}px`;
+    canvas.style.height = `${Math.max(1, Math.round(canvas.height * scale))}px`;
+    canvas.style.imageRendering = 'pixelated';
+    canvas.style.display = 'block';
+    canvas.style.background = T.void;
+    host.appendChild(canvas);
+  }, [sectionIndex, col, row, w, h, liveEditVersion, project]);
+
+  return <div ref={hostRef} style={styles.previewHost} />;
+}
+
 /** Mounted for the marquee tool (copy source) and while pasting (paste
  *  target) — same `pasteLayers` store field drives both, since a copy's
  *  layer choice is really "what will paste later" and pasting can override it
@@ -19,13 +100,27 @@ const LAYER_OPTS: ReadonlyArray<{ value: PasteLayers; label: string; title: stri
 export default function MarqueePasteOptions() {
   const pasteLayers = useEditorStore((s) => s.pasteLayers);
   const setPasteLayers = useEditorStore((s) => s.setPasteLayers);
+  const granularity = useEditorStore((s) => s.marqueeGranularity);
+  const setGranularity = useEditorStore((s) => s.setMarqueeGranularity);
   const pasting = useEditorStore((s) => s.pasting);
   const marquee = useEditorStore((s) => s.marquee);
+  const clipboard = useEditorStore((s) => s.mapClipboard);
   const [nameInput, setNameInput] = useState('');
 
-  // Default name uses BLOCK dims (marquee w/h are tiles; 2 tiles = one 16px
-  // block), matching the "Copied W×H blocks" copy toast's units.
-  const autoName = marquee ? `Selection ${marquee.w >> 1}×${marquee.h >> 1}` : '';
+  // WHICH RULE IS IN FORCE, derived from the RECT rather than the armed mode —
+  // a Tile-mode drag that lands on even bounds is block-aligned and carries
+  // collision like any other, so the mode is never what is reported.
+  const aligned = marquee ? isBlockAligned(marquee.col, marquee.row, marquee.w, marquee.h) : true;
+  const sizeLabel = marquee ? selectionSizeLabel(marquee.col, marquee.row, marquee.w, marquee.h) : '';
+  const reason = marquee ? artOnlyReason(marquee.col, marquee.row, marquee.w, marquee.h) : '';
+
+  // While PASTING the constraint belongs to the clipboard, not to whatever
+  // selection may still be lying around: you are placing what you copied.
+  const layersLocked = pasting ? (clipboard?.artOnly ?? false) : !aligned;
+
+  // Default name uses the selection's own units — `selectionSizeLabel` prints
+  // blocks for an aligned rect and tiles for one that has no block size.
+  const autoName = marquee ? `Selection ${sizeLabel}` : '';
 
   function saveAsChunk() {
     const m = useEditorStore.getState().marquee;
@@ -33,8 +128,17 @@ export default function MarqueePasteOptions() {
     const act = getCurrentAct(useProjectStore.getState());
     const section = act?.sections[m.sectionIndex];
     if (!section) return;
-    const name = nameInput.trim() || `Selection ${m.w >> 1}×${m.h >> 1}`;
+    const name = nameInput.trim() || `Selection ${selectionSizeLabel(m.col, m.row, m.w, m.h)}`;
     const def = selectionToChunk(section, m.col, m.row, m.w, m.h, name);
+    // Refused for a non-block-aligned rect (see selectionToChunk). The button is
+    // disabled in that case, so reaching here means something else changed the
+    // selection under the click — say so rather than failing silently.
+    if (!def) {
+      useToastStore.getState().addToast(
+        `Can't save a ${m.w}×${m.h}-tile selection as a chunk — chunks are whole 16px `
+        + 'blocks. Select on even tile bounds, or switch the marquee to Block.', 'warning');
+      return;
+    }
     useProjectStore.getState().addChunks([def]);
     // Select the chunk you just made: the obvious next act is stamping it, and
     // without this the user saves into a wall of 70+ thumbnails and has to
@@ -50,13 +154,71 @@ export default function MarqueePasteOptions() {
 
   return (
     <div>
+      {/* Granularity: the marquee's counterpart to the facet's two paint tools.
+          `paint-block` writes a 2x2 tile run and `paint-tile` writes one 8x8
+          tile, so "block or tile" is already this facet's vocabulary for
+          exactly this question — restated here rather than invented. Hidden
+          while pasting, where it would be a control over a drag you are not
+          doing. */}
+      {!pasting && (
+        <div style={styles.planes}>
+          <span style={styles.planeLabel}>Snap</span>
+          {GRAIN_OPTS.map(({ value, label, title }) => (
+            <button key={value} onClick={() => setGranularity(value)} title={title}
+              style={{ ...styles.planeBtn, ...(granularity === value ? styles.planeSel : {}) }}>{label}</button>
+          ))}
+        </div>
+      )}
+
       <div style={styles.planes}>
         <span style={styles.planeLabel}>Layers</span>
-        {LAYER_OPTS.map(({ value, label, title }) => (
-          <button key={value} onClick={() => setPasteLayers(value)} title={title}
-            style={{ ...styles.planeBtn, ...(pasteLayers === value ? styles.planeSel : {}) }}>{label}</button>
-        ))}
+        {LAYER_OPTS.map(({ value, label, title }) => {
+          // A layer this selection/clipboard CANNOT deliver is disabled, not
+          // silently downgraded at paste time. `Both` stays enabled and means
+          // "everything there is" — for an art-only source that is the art —
+          // while `Collision` is the one that would write nothing at all.
+          const dead = layersLocked && value === 'collision';
+          return (
+            <button key={value} onClick={() => !dead && setPasteLayers(value)} disabled={dead}
+              title={dead
+                ? 'No collision to paste — this selection is not block-aligned, and collision '
+                  + 'is stored per 16px block.'
+                : title}
+              style={{
+                ...styles.planeBtn,
+                ...(pasteLayers === value && !dead ? styles.planeSel : {}),
+                ...(dead ? styles.planeDead : {}),
+              }}>{label}</button>
+          );
+        })}
       </div>
+
+      {/* THE RULE IN FORCE, at the moment it matters — beside the control it
+          constrains, not buried in a tooltip. */}
+      {layersLocked && (
+        <div style={styles.warnLine}>
+          {pasting
+            ? 'Clipboard is art only — it was copied from a selection that is not block-aligned.'
+            : reason}
+        </div>
+      )}
+
+      {/* THE SELECTION ITSELF (owner item 2). Not shown while pasting: there the
+          question is "where does this land", and the answer is the ghost under
+          the cursor on the map. */}
+      {!pasting && marquee && (
+        <>
+          <div style={styles.sizeLine}>
+            <span style={{ color: aligned ? T.textBase : T.warning }}>{sizeLabel}</span>
+            <span style={styles.dim}>{` at (${marquee.col}, ${marquee.row}) · section ${marquee.sectionIndex}`}</span>
+          </div>
+          <SelectionPreview
+            sectionIndex={marquee.sectionIndex}
+            col={marquee.col} row={marquee.row} w={marquee.w} h={marquee.h}
+          />
+        </>
+      )}
+
       <div style={styles.hint}>
         {pasting
           ? 'Click to paste · hold Alt for art only, Shift for collision only · Esc to stop'
@@ -74,8 +236,13 @@ export default function MarqueePasteOptions() {
             title="Chunk name (blank = auto)"
             style={styles.nameInput}
           />
-          <button onClick={saveAsChunk} title="Save this selection as a stampable chunk"
-            style={styles.saveBtn}>Save as chunk</button>
+          <button onClick={saveAsChunk} disabled={!aligned}
+            title={aligned
+              ? 'Save this selection as a stampable chunk'
+              : `A ${marquee.w}×${marquee.h}-tile selection is not a whole number of 16px `
+                + 'blocks, and a chunk must be. Select on even tile bounds, or switch the '
+                + 'marquee to Block.'}
+            style={{ ...styles.saveBtn, ...(aligned ? {} : styles.saveBtnDead) }}>Save as chunk</button>
         </div>
       )}
     </div>
@@ -87,8 +254,14 @@ const styles: Record<string, React.CSSProperties> = {
   planeLabel: { fontSize: T.t2xs, color: T.textLo, marginRight: 2, minWidth: 38, flexShrink: 0 },
   planeBtn: { padding: `2px ${T.s2}`, background: T.overlay, color: T.textBase, borderWidth: 1, borderStyle: 'solid', borderColor: T.border, borderRadius: T.rSm, cursor: 'pointer', fontSize: T.tXs, minWidth: 26, textAlign: 'center' },
   planeSel: { background: T.accent, color: T.onAccent, borderColor: T.accent },
+  planeDead: { opacity: 0.4, cursor: 'not-allowed', color: T.textLo },
+  warnLine: { fontSize: T.t2xs, color: T.warning, padding: `${T.s2} ${T.s2} 0`, lineHeight: 1.35 },
+  sizeLine: { fontSize: T.tXs, padding: `${T.s2} ${T.s2} 2px` },
+  dim: { color: T.textLo },
+  previewHost: { padding: `0 ${T.s2} ${T.s2}`, overflow: 'hidden' },
   hint: { fontSize: T.t2xs, color: T.textLo, padding: `${T.s2} ${T.s2} ${T.s2}` },
   saveRow: { display: 'flex', alignItems: 'center', gap: 4, padding: `0 ${T.s2} ${T.s2}` },
   nameInput: { flex: 1, minWidth: 0, padding: `2px ${T.s2}`, background: T.overlay, color: T.textBase, border: `1px solid ${T.border}`, borderRadius: T.rSm, fontSize: T.tXs },
   saveBtn: { padding: `2px ${T.s2}`, background: T.accent, color: T.onAccent, border: `1px solid ${T.accent}`, borderRadius: T.rSm, cursor: 'pointer', fontSize: T.tXs, flexShrink: 0, whiteSpace: 'nowrap' },
+  saveBtnDead: { opacity: 0.4, cursor: 'not-allowed', background: T.overlay, color: T.textLo, borderColor: T.border },
 };

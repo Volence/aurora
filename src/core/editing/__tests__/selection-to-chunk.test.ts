@@ -32,7 +32,7 @@ function seedSection(col: number, row: number, w: number, h: number): Section {
 describe('selectionToChunk', () => {
   it('produces correct dims from a marquee rect', () => {
     const section = seedSection(4, 6, 4, 6);
-    const chunk = selectionToChunk(section, 4, 6, 4, 6, 'Selection 2×3', 'sel-1');
+    const chunk = selectionToChunk(section, 4, 6, 4, 6, 'Selection 2×3', 'sel-1')!;
     expect(chunk.id).toBe('sel-1');
     expect(chunk.name).toBe('Selection 2×3');
     expect(chunk.widthTiles).toBe(4);
@@ -45,7 +45,7 @@ describe('selectionToChunk', () => {
   it('copies the FG nametable in row order', () => {
     const w = 4, h = 4;
     const section = seedSection(2, 2, w, h);
-    const chunk = selectionToChunk(section, 2, 2, w, h, 'sel', 'id');
+    const chunk = selectionToChunk(section, 2, 2, w, h, 'sel', 'id')!;
     for (let r = 0; r < h; r++) {
       for (let c = 0; c < w; c++) {
         expect(chunk.nametable[r * w + c]).toBe(
@@ -57,7 +57,7 @@ describe('selectionToChunk', () => {
   it('carries both collision planes', () => {
     const w = 4, h = 4;
     const section = seedSection(0, 0, w, h);
-    const chunk = selectionToChunk(section, 0, 0, w, h, 'sel', 'id');
+    const chunk = selectionToChunk(section, 0, 0, w, h, 'sel', 'id')!;
     const cellsW = w >> 1;
     // Cell (0,0) top-left tile carried A=0x100, B=0x200.
     expect(chunk.collisionA[0]).toBe(0x100);
@@ -70,7 +70,7 @@ describe('selectionToChunk', () => {
 
   it('treats empty cells as air (word 0) and unseeded collision as air', () => {
     const section = createSection(0, 'blank'); // no region seeded, no collision planes
-    const chunk = selectionToChunk(section, 0, 0, 4, 4, 'blank', 'id');
+    const chunk = selectionToChunk(section, 0, 0, 4, 4, 'blank', 'id')!;
     expect(Array.from(chunk.nametable).every((w) => w === 0)).toBe(true);
     expect(Array.from(chunk.collisionA).every((w) => w === 0)).toBe(true);
     expect(Array.from(chunk.collisionB).every((w) => w === 0)).toBe(true);
@@ -78,7 +78,7 @@ describe('selectionToChunk', () => {
 
   it('owns its arrays (no aliasing of section state)', () => {
     const section = seedSection(0, 0, 2, 2);
-    const chunk = selectionToChunk(section, 0, 0, 2, 2, 'sel', 'id');
+    const chunk = selectionToChunk(section, 0, 0, 2, 2, 'sel', 'id')!;
     chunk.nametable[0] = 0xFFFF;
     expect(section.tileGrid.nametable[0]).not.toBe(0xFFFF);
   });
