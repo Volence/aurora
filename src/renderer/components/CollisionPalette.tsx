@@ -43,18 +43,37 @@ const SHAPE_OPTS: ShapeDrawOpts = {
   showNeedle: true,
 };
 
+/**
+ * Room around the shape box for the angle mark's outward barb.
+ *
+ * The barb points OUT of the solid, so on a full-height cell — surface at y=0 —
+ * it leaves the box entirely. ON THE MAP that is correct and wanted: the barb
+ * reaches into the air cell above, which is exactly what "the open side is up
+ * there" looks like. In a THUMBNAIL the box edge is a hard clip, and the first
+ * render of this showed every full-height shape with its barb sliced off at the
+ * border, which reads as a rendering fault rather than as a direction.
+ *
+ * So the canvas is bigger than the shape and the shape is drawn inset. The
+ * geometry is untouched — this is padding, not a clamp. Clamping the anchor to
+ * keep the barb inside would have moved the mark OFF the surface, which is the
+ * defect this whole parcel is about.
+ */
+const MARK_PAD = 5;
+
 /** Paint a single profile into a square canvas via drawCollisionShape. */
 function ShapeCanvas({ profile, size }: { profile: CollisionProfile; size: number }) {
   const ref = useRef<HTMLCanvasElement>(null);
+  const box = size + MARK_PAD * 2;
   useEffect(() => {
     const ctx = ref.current?.getContext('2d');
     if (!ctx) return;
-    ctx.clearRect(0, 0, size, size);
+    ctx.clearRect(0, 0, box, box);
     // CanvasRenderingContext2D structurally satisfies ShapeDrawCtx; its fillStyle/
     // strokeStyle are a wider union, so narrow via the minimal shape we draw with.
-    drawCollisionShape(ctx as unknown as ShapeDrawCtx, 0, 0, size, profile, SHAPE_OPTS);
-  }, [profile, size]);
-  return <canvas ref={ref} width={size} height={size} style={{ display: 'block' }} />;
+    drawCollisionShape(ctx as unknown as ShapeDrawCtx, MARK_PAD, MARK_PAD, size, profile, SHAPE_OPTS);
+  }, [profile, size, box]);
+  return <canvas ref={ref} width={box} height={box}
+    style={{ display: 'block', margin: -MARK_PAD }} />;
 }
 
 export default function CollisionPalette({ variant = 'map' }: { variant?: 'map' | 'art' }) {
