@@ -196,6 +196,17 @@ caught in the act.
   cannot silently widen.
 - **The barb was clipped at every full-height thumbnail.** Only visible in a
   rendered picker. Fixed with padding, not a clamp.
+- **The paint ghost drew the mark eight times too heavy.** `drawCollisionShape`
+  derived stroke widths from `size` as `(size / 16) * k` — right for an
+  unscaled thumbnail, wrong for the ghost, which draws at `size = 16` into a
+  context already scaled by `zoom`. No assertion could have caught it: the
+  geometry was correct and only the weight was wrong. The four widths are now
+  explicit fields on `ShapeDrawOpts` so each call site states its own space, and
+  the ghost passes the same `k / zoom` the map overlay uses — so the shape you
+  are about to paint is drawn at exactly the weight it will have once painted.
+  A second-order consequence, fixed rather than left silent: at 1.5 screen px
+  the orange solid-edge frame vanished under the blue cursor outline on the same
+  rectangle, so it is 3 screen px.
 
 ### CDP harness against the real app
 
@@ -221,6 +232,70 @@ act's orange-brown art would false-positive on the latter.
 `suppressed` is published separately from `active` so "angles off" and "angles
 on but zoomed out" are different answers a row can fail on, rather than one
 silence.
+
+**Result: 18/18, on five runs, with identical numbers.** Probe row `angle=$e0`
+(315°), anchor `(1227.50, 540.00)`, 9 marks published, `cellScreenPx=128`.
+
+| row | measured |
+|---|---|
+| bar on canvas | `red=4/25` at both quarter-points, `best=0` (exact colour hit) |
+| barb on canvas | `red=5/25` |
+| ⭐ mirrored barb | `red=0/25`, `best=121`, `nonblack=25/25` |
+| asymmetry pair | barb `5/25` vs mirror `0/25`, both 2.20 world px from the anchor |
+| off-mark control | `red=0/25`, nearest published mark 14.0 world px away |
+| casing | far-field `maxlum=211`, darkest near the core `56`, `dip=155` |
+| direction vs data | 9 rows checked, 0 mismatched; 8 can detect a y-mirror |
+| zoom gate | `suppressed=true, drawn=0`, whole-canvas red `0`; back in, `drawn=9`, red `508` |
+| angles off | `active=false`, red `0`, collision fill still drawn |
+
+**The harness rows were themselves proven red-first**, against the two defects
+this parcel actually fixed:
+
+- Planting the **old symmetric mark** (barb drawn both ways): rows 5 and 5c fail
+  with `barb side red=5/25 vs mirror side red=5/25` — perfectly symmetric, which
+  is exactly what the old mark was.
+- Planting the **shipped aeon mirror** (`ty` negated): row 8 fails with 9/9 rows
+  mismatched, e.g. `$e0: drawn(0.7071,0.7071) expected(0.7071,-0.7071)`.
+
+### Three harness defects found and fixed before the numbers were believed
+
+Worth recording, because two of them are the "wrong quantity" failure mode:
+
+- **A raw count threshold** (`checked >= 10`) failed while reporting
+  `0 mismatched` — the rule held and an invented number did not. Worse, a raw
+  count is the *wrong quantity*: a y-mirror is invisible at angle 0, so a park
+  of flat ground would pass while fully mirrored. Now requires ≥3 rows with
+  `|sin a| > 0.1` — rows that can actually detect the sign (measured 8).
+- **An invented fraction** (">20% of the canvas non-black") failed because at
+  zoom 0.5 this act is genuinely 5.8% non-black. Replaced with a
+  **differential**: toggle the plane off and on and require the pixel count to
+  move, which cannot pass on a dead overlay.
+- **The casing row measured something that does not exist.** It asked for a
+  fully-dark pixel beside the core. The visible casing band is
+  `(3 − 1.25) / 2 = 0.875` screen px per side — **thinner than a pixel**, so it
+  is never fully covered and the test reported nothing on a correctly drawn
+  casing. It now measures the property the casing actually has, a luminance dip
+  hugging the stroke, with the threshold derived from the compositing
+  (`0.9·(8,10,14) + 0.1·B`) rather than from the observed value. This is the
+  same class as the precedent in the brief: a quantity that looks like it
+  answers the question and does not.
+
+### Rows deliberately NOT written
+
+"Is angle-red present near this cell" was never written. It passes identically
+on the old symmetric tick, on a mirrored barb, and on the new mark. Rows 9a and
+10a are each non-discriminating **alone** — zero red is also what a dead overlay
+produces — which is why 9b/9c and 10b exist beside them.
+
+### Alternative green-paths ruled out
+
+Off-canvas probes (reported as `oob`, never silently zero); blank-void probes
+(every probe reports its own non-black count; the mirror row requires ≥20/25);
+the mirror probe landing on a *neighbouring* mark (nearest other anchor is 7.1
+world px against a 2.2 world px probe offset — 57 screen px apart at zoom 8,
+window ±2px); the casing row passing because everything is dark (far field
+required `maxlum >= 90`, measured 211, and the core `(255,90,70)` brightens so
+it cannot fake a dip).
 
 ### The environment trap, pinned rather than reported
 
@@ -248,6 +323,7 @@ derived from a measured rect. Separately, `MapViewport` sets
 | `before-noangles-z4.png` | `after-noangles-z4.png` | control: what the angle mark adds |
 | `before-picker.png` | `after-picker.png` | the picker thumbnails (complaint 5) |
 | `before-slope-z4-collision-facet.png` | `after-…` | the actual painting context |
+| — | `after-paint-ghost-z8.png` | the paint ghost: what you see before committing |
 
 The z4 pair is the one to look at. Before: red ticks floating in the black air
 above the curve, tilted against it. After: the marks hug the curve, lie along
