@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'fs';
+import { peerRepo, resolveRev, readAtRev } from '../support/peer-repo';
 import { actBindsBgOverride } from '../../src/core/formats/bg-override/bg-override-binding';
 import { BG_OVERRIDE_CONSUMER_OUT_DIR } from '../../src/core/formats/bg-override/bg-override';
 
@@ -57,19 +57,44 @@ describe('actBindsBgOverride', () => {
 
   /**
    * THE ROW THAT TOUCHES REALITY. Everything above is arithmetic on a string
-   * this repo owns; this one reads the aeon tree's actual project.json and
-   * asserts the join lands, so a rename on either side shows up as a failure
-   * here rather than as a canvas that quietly stops painting what ships.
+   * this repo owns; this one reads aeon's actual project.json and asserts the
+   * join lands, so a rename on either side shows up as a failure here rather
+   * than as a canvas that quietly stops painting what ships.
    *
-   * SKIPS when the sibling tree is absent — a worktree, a lone clone, a packaged
-   * build — and says so, rather than rendering "could not measure" as green.
-   * Every discriminating row above runs without it.
+   * AT A COMMITTED REVISION, NOT THROUGH THE WORKING TREE. Until 2026-08-28 this
+   * read `/home/volence/sonic_hacks/aeon/project.json` by path — on this machine
+   * that is the aeon lane's live checkout, so the row's colour was decided by a
+   * peer's uncommitted edits, and neither its pass nor its fail named anything a
+   * revision could be checked against. `origin/master` is what aeon SHIPS, which
+   * is what this row was always trying to ask. See
+   * docs/reviews/2026-08-28-golden-live-tree.md and the suite protocol's most
+   * upstream rule (empyrean origin/main 2fd7b5f0).
+   *
+   * SKIPS LOUDLY when it cannot be measured — no aeon checkout, or the ref is
+   * unfetched — naming the revision it wanted, rather than rendering "could not
+   * measure" as green. Every discriminating row above runs without it.
    */
-  const AEON_PROJECT = '/home/volence/sonic_hacks/aeon/project.json';
-  let raw: string | null = null;
-  try { raw = readFileSync(AEON_PROJECT, 'utf8'); } catch { raw = null; }
-  const live = raw === null ? it.skip : it;
-  live('joins the LIVE aeon project.json: exactly one act binds, and it is ojz/act1', () => {
+  const AEON_TIP = 'origin/master';
+  const aeon = peerRepo('aeon');
+  const tip = aeon === null ? null : resolveRev(aeon, AEON_TIP);
+  const read = aeon === null || tip === null ? null : readAtRev(aeon, tip, 'project.json');
+  const raw = read !== null && read.ok ? read.text : null;
+  it(`joins aeon's project.json at ${AEON_TIP} ${tip ?? '(unresolved)'}: exactly one act binds, and it is ojz/act1`, (ctx) => {
+    // A revision that resolved and a project.json that is NOT there at it is a
+    // measurement, and a damning one — that is the rename this row exists to
+    // catch. It must fail, not skip.
+    if (read !== null && !read.ok && read.why.startsWith('MEASURED')) {
+      expect.fail(`aeon ${AEON_TIP} ${tip} has no project.json: ${read.why}`);
+    }
+    if (raw === null) {
+      // ctx.skip, not it.skip: the reason has to reach the reader. A silent
+      // skip and a pass look identical in a suite total.
+      ctx.skip('SKIPPED, NOT PASSED: CANNOT MEASURE the aeon join — '
+        + (aeon === null ? 'no aeon checkout beside this repo (set AURORA_AEON_REPO)'
+          : tip === null ? `${AEON_TIP} does not resolve in ${aeon} (unfetched? shallow?)`
+            : 'unknown reason'));
+      return;
+    }
     const cfg = JSON.parse(raw as string) as {
       zones: { id: string; acts: { id: string; stripPath?: string }[] }[];
     };

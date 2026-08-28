@@ -45,7 +45,8 @@ import { BG_LAYOUT_WORDS, TILE_WIDTH_PX } from '../../../core/formats/bg-overrid
 import { BG_WIDTH } from '../../../core/formats/bg-tiles';
 import { serializeEffectsScene, type EffectsScene, type EffectsSceneLibrary } from '../../../core/formats/effects/scene';
 import { EFFECTS_LAYER_DEFAULTS, parseEffectsScene, type EffectsLayer } from '../../../core/formats/effects/scene';
-import { existsSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { EditHistory } from '../../../core/editing/history';
 import type { S4Level } from '../../../core/editing/commands';
 import rawSchema from '../../../core/formats/effects/aurora-effects-scene.schema.json';
@@ -446,14 +447,19 @@ describe('layerExtras (parcel E)', () => {
     expect(layerExtras({ ...baseLayer(), curve: 'none', vsplit: 'none', deform: 'none', enabled: true })).toEqual([]);
   });
 
-  // The shipped scene, from the aeon tree. Expectations are re-derived from the
-  // file's own JSON so a re-authored fixture cannot leave a stale pin green.
-  const SHIPPED = '/home/volence/sonic_hacks/aeon/games/sonic4/data/editor/effects/ojz_act1_depth.json';
-  it('every layer of the shipped ojz_act1_depth.json — nothing extra on any layer; the curve is on the controls, not the line', (ctx) => {
-    if (!existsSync(SHIPPED)) {
-      ctx.skip(`SKIPPED, NOT PASSED: shipped scene absent at ${SHIPPED}`);
-      return;
-    }
+  // The shipped scene, VENDORED into this repo at a named aeon revision (see
+  // test/fixtures/effects/ojz_act1_depth.provenance.json). Expectations are
+  // re-derived from the file's own JSON so a re-authored fixture cannot leave a
+  // stale pin green.
+  //
+  // It used to read the aeon lane's live working tree by absolute path, which
+  // meant a peer's uncommitted edits decided this row's colour; the currency of
+  // the pin is a separate question and has its own instrument in
+  // test/formats/aeon-fixture-currency.test.ts. See
+  // docs/reviews/2026-08-28-golden-live-tree.md.
+  const SHIPPED = resolve(__dirname, '../../../../test/fixtures/effects/ojz_act1_depth.json');
+  it('every layer of the shipped ojz_act1_depth.json — nothing extra on any layer; the curve is on the controls, not the line', () => {
+    // Committed here, so absence is a broken checkout: hard failure, not a skip.
     const text = readFileSync(SHIPPED, 'utf8');
     const scene = parseEffectsScene(text, 'ojz_act1_depth');
     const raw = JSON.parse(text) as { layers: Record<string, any>[] };

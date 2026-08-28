@@ -39,9 +39,21 @@ describe('parseCharacterAnims', () => {
 });
 
 // Integration: the real Sonic animation script.
+//
+// `s4_engine` DOES NOT EXIST on this machine (aeon replaced it), so this row has
+// measured NOTHING for a long time. It used to say so with a bare
+// `describe.skip`, which reads as a quiet zero in a suite total; audited
+// 2026-08-28 (docs/reviews/2026-08-28-golden-live-tree.md) and made to name what
+// it could not measure. It is left in place rather than deleted because the
+// decision — re-point at aeon, or drop it — belongs to the sprite lane.
 const FILE = '/home/volence/sonic_hacks/s4_engine/data/animations/sonic_anims.asm';
-(existsSync(FILE) ? describe : describe.skip)('real sonic_anims.asm', () => {
-  it('parses all 11 named animations with sane frame indices', () => {
+describe('real sonic_anims.asm', () => {
+  it('parses all 11 named animations with sane frame indices', (ctx) => {
+    if (!existsSync(FILE)) {
+      ctx.skip(`SKIPPED, NOT PASSED: ${FILE} is absent — the s4_engine tree is gone from this `
+        + 'machine, so this row measures nothing at all and has not for some time');
+      return;
+    }
     const anims = parseCharacterAnims(readFileSync(FILE, 'utf8'));
     expect(anims).toHaveLength(11);
     expect(anims.map((a) => a.name)).toEqual([

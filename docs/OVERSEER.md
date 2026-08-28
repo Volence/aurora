@@ -540,6 +540,70 @@ Each has caught a real defect here.
    session that went looking for the uncited joint. **The shared frame lives in the
    joints, not the links.**
 
+19. **A TEST MUST NOT READ A PEER REPO'S WORKING TREE.** *(2026-08-28,
+   `test/formats/effects-scene-curve-vsplit.test.ts`; packet
+   `docs/reviews/2026-08-28-golden-live-tree.md`.)* **The shared protocol governs on any
+   disagreement with the wording here** — this is that protocol's most upstream rule
+   (*"Read this file at a COMMITTED revision, never through the filesystem path"*, and its
+   operational form, *"prefer `git show <rev>:<path>` over reading a sibling's working
+   file, because the first names a revision and the second silently names 'whatever is on
+   disk right now'"*, read at `empyrean origin/main 2fd7b5f0`) applied to the one place
+   nobody had swept: **test fixtures**. This entry adds a local instance and a shape, not a
+   new rule, and never an exception to one.
+
+   On this machine every sibling repo is some peer lane's live checkout, so a test that
+   opens one by absolute path has its colour decided by that peer's uncommitted edits.
+   **Precedent:** a byte-exact golden pinned
+   `/home/volence/sonic_hacks/aeon/games/…/ojz_act1_depth.json`, which was ` M` and
+   uncommitted; it went red when the peer deleted a `vsplit`, and surfaced as
+   `TypeError: Cannot read properties of null` inside `EditHistory` — a trace naming no
+   peer, no path and no repo. **Three agents and an overseer filed it as "pre-existing,
+   unrelated"** without anyone asking why it failed; the suite hub found the cause.
+
+   **The part that outlives the instance:** the test had been **green its whole life, and
+   its green meant nothing verifiable** — it had no fixed thing to drift from, so its pass
+   and its fail were *both* decided outside this repo. A check like this cannot detect the
+   drift it exists for; it can only report the state of someone else's directory, in the
+   voice of an assertion about our code.
+
+   **The shape, when a fixture comes from a peer — separate the two questions, they need
+   different instruments:**
+   - *"Does our code round-trip / handle this document?"* is a property of **our** code.
+     **Vendor the fixture into this repo** at a named peer revision with a
+     `.provenance.json` beside it (repo, path, revision, blob id, how it was resolved,
+     re-vendor command). A pinned blob is **legitimate** here: the property is about the
+     behaviour, not about currency. Record the peer's **git blob id**, so the pin is
+     *checkable* rather than merely copied.
+   - *"Is that pin still what the peer ships?"* a pinned blob **can never answer** — it
+     equals itself by construction, so a check written that way passes forever and detects
+     nothing. Give it its own check that reads the peer at a **committed** revision
+     (`git -C ../<peer> show <rev>:<path>`), **names that revision in its messages**,
+     **fails** on drift, and **skips loudly** when it cannot run
+     (`SKIPPED, NOT PASSED: … CANNOT MEASURE …`) — never silently, never green. Compare
+     **content, not commit SHAs**, so the peer's ordinary commits do not turn this repo
+     red. Prefix a cross-repo failure with something like *"NOT AN AURORA REGRESSION"*:
+     the triage failure above was readers mistaking a cross-repo signal for an in-repo one.
+   - If you judge the currency question not worth a check, **say so and record why. Do not
+     leave a check that appears to cover it and does not.**
+
+   **Two corollaries that cost the most to learn:**
+   **(a) Proving it passes today is half the property.** The test must still pass when the
+   peer's working tree changes — demonstrate it, e.g. by running with the peer repo
+   **unreachable entirely**. A golden that passes with the peer absent cannot be reading
+   the peer.
+   **(b) Deleting the absolute path is not the fix, and can be worse than none.** Routing a
+   read through a helper that derives the peer's location removes the literal while leaving
+   the read pointed at the same live tree — a change that **looks** like this bar was met.
+   Where the real fix is out of scope (this parcel left `s1disasm`'s 37 sites alone for
+   exactly this reason), **report it and leave it legible.**
+
+   **Silent skips are the same defect in its purest form.** The sweep also found two
+   `describe.skip` blocks pinned to `s4_engine`, **a repo that does not exist on this
+   machine** — integration checks that had measured nothing for months as a quiet zero
+   inside a green total. `ctx.skip` with a message that says what could not be measured;
+   `it.skip`/`describe.skip` discard the reason, and a silent skip and a pass are
+   indistinguishable in a suite total.
+
 ## Editor↔engine coordination points
 
 Protocol details Aurora depends on and did not invent. All measured; re-verify before
