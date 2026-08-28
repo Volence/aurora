@@ -85,16 +85,39 @@ import { heightSparkline } from '../../core/collision/collision-render';
 
 export const sectionRenderer = new SectionRenderer();
 
-// Translucent variant of the shape draw opts for the collision paint ghost.
-const COLLISION_PREVIEW_OPTS: ShapeDrawOpts = {
-  fill: COLLISION_PREVIEW_FILL,
-  line: COLLISION_SHAPE_LINE,
-  solidEdge: COLLISION_SOLID_EDGE,
-  needle: COLLISION_ANGLE_TICK,
-  needleCasing: COLLISION_ANGLE_CASING,
-  showSolidEdges: true,
-  showNeedle: true,
-};
+/**
+ * The collision paint ghost's draw opts.
+ *
+ * ⚠ EVERY WIDTH IS `k / zoom`, because this shape is drawn at `size = 16` into
+ * a context ALREADY scaled by `zoom`. The constants are the SAME ones
+ * `OverlayRenderer` uses for a committed mark (1.25 core, 3 casing), so the
+ * shape you are about to paint is drawn at exactly the weight it will have once
+ * painted. Before this was a parameter, the ghost inherited a size-proportional
+ * width and came out eight times heavier than the identical mark in the cell
+ * beside it at zoom 8 — visible only in the running app, since the geometry was
+ * correct and only the weight was wrong.
+ */
+function collisionPreviewOpts(zoom: number): ShapeDrawOpts {
+  return {
+    fill: COLLISION_PREVIEW_FILL,
+    line: COLLISION_SHAPE_LINE,
+    solidEdge: COLLISION_SOLID_EDGE,
+    needle: COLLISION_ANGLE_TICK,
+    needleCasing: COLLISION_ANGLE_CASING,
+    // Surface line and solid edges sit BELOW the blue cursor outline on the
+    // same rectangle, so a hairline solid edge is simply swallowed by it —
+    // measured: at 1.5 screen px the orange "this shape is solid on all sides"
+    // frame vanished under COLLISION_PREVIEW_PRIMARY. 3 screen px keeps its
+    // outer half visible without the 12-screen-px slab the old world-px width
+    // produced at zoom 8.
+    lineWidth: 1.5 / zoom,
+    solidEdgeWidth: 3 / zoom,
+    markCoreWidth: 1.25 / zoom,
+    markCasingWidth: 3 / zoom,
+    showSolidEdges: true,
+    showNeedle: true,
+  };
+}
 const overlayRenderer = new OverlayRenderer();
 
 /**
@@ -670,7 +693,7 @@ export default function MapViewport() {
 
     // The shape ghost at the cursor cell + a brighter outline.
     const wx = offset.x + primary.cellCol * 16, wy = offset.y + primary.cellRow * 16;
-    if (profile) drawCollisionShape(ctx as unknown as ShapeDrawCtx, wx, wy, 16, profile, COLLISION_PREVIEW_OPTS);
+    if (profile) drawCollisionShape(ctx as unknown as ShapeDrawCtx, wx, wy, 16, profile, collisionPreviewOpts(zoom));
     ctx.strokeStyle = COLLISION_PREVIEW_PRIMARY;
     ctx.lineWidth = 1.5 / zoom;
     ctx.strokeRect(wx + 0.75 / zoom, wy + 0.75 / zoom, 16 - 1.5 / zoom, 16 - 1.5 / zoom);

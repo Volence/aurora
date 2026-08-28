@@ -25,7 +25,26 @@ export function solidEdges(solidity: Solidity): Edge[] {
 // collision-angle-mark.ts's `angleTangent`, cross-checked against classic's
 // `angleNeedle` over all 256 bytes.
 
-/** Visual options for drawCollisionShape. */
+/**
+ * Visual options for drawCollisionShape.
+ *
+ * ⚠ THE CALLER OWNS THE STROKE WIDTHS, AND THAT IS THE WHOLE POINT.
+ *
+ * These widths used to be derived here from `size` as `(size / 16) * k`, which
+ * is right for a picker thumbnail — an UNSCALED context where one unit is one
+ * screen pixel, and where a 120px preview should look like a scaled-up 22px
+ * thumbnail. It is badly wrong for the paint ghost, which draws at `size = 16`
+ * into a context already scaled by `zoom`: at zoom 8 a "1.25" came out as TEN
+ * screen pixels, and the ghost's angle mark rendered as a blob eight times
+ * heavier than the identical mark the map overlay drew in the next cell.
+ *
+ * Caught by looking at the running app, not by a test — the geometry was right
+ * and only the weight was wrong, so every assertion about position passed.
+ *
+ * So the space is now each call site's explicit decision: the picker passes
+ * size-proportional widths, the ghost passes `k / zoom` — the same numbers the
+ * map overlay uses — and the two finally match on screen.
+ */
 export interface ShapeDrawOpts {
   fill: string;
   line: string;
@@ -34,6 +53,14 @@ export interface ShapeDrawOpts {
   needle: string;
   /** Casing stroked under the angle mark so it reads over arbitrary art. */
   needleCasing: string;
+  /** Surface-line stroke width, in the caller's units. */
+  lineWidth: number;
+  /** Solid-edge stroke width, in the caller's units. */
+  solidEdgeWidth: number;
+  /** Angle-mark core stroke width, in the caller's units. */
+  markCoreWidth: number;
+  /** Angle-mark casing stroke width, in the caller's units. Must exceed core. */
+  markCasingWidth: number;
   showSolidEdges?: boolean;
   showNeedle?: boolean;
 }
@@ -86,7 +113,7 @@ export function drawCollisionShape(
   //    (height < 0) — so ceiling/overhang shapes read as a contour hugging the
   //    silhouette instead of a flat line across the box top.
   ctx.strokeStyle = opts.line;
-  ctx.lineWidth = Math.max(1, (size / 16) * 1.0);
+  ctx.lineWidth = opts.lineWidth;
   ctx.beginPath();
   let penDown = false;
   for (let c = 0; c < 16; c++) {
@@ -105,7 +132,7 @@ export function drawCollisionShape(
     const edges = solidEdges(profile.solidity);
     if (edges.length) {
       ctx.strokeStyle = opts.solidEdge;
-      ctx.lineWidth = Math.max(1, (size / 16) * 1.5);
+      ctx.lineWidth = opts.solidEdgeWidth;
       const x0 = x, y0 = y, x1 = x + size, y1 = y + size;
       ctx.beginPath();
       for (const e of edges) {
@@ -139,8 +166,8 @@ export function drawCollisionShape(
       drawAngleMark(ctx, x, y, size, mark, {
         color: opts.needle,
         casing: opts.needleCasing,
-        coreWidth: Math.max(1, (size / 16) * 1.25),
-        casingWidth: Math.max(2.5, (size / 16) * 3),
+        coreWidth: opts.markCoreWidth,
+        casingWidth: opts.markCasingWidth,
       });
     }
   }

@@ -33,15 +33,28 @@ const FLOOR_LABEL: Record<Solidity, string> = {
   all: 'solid', top: 'jump-thru', 'sides-bottom': 'L/R/B', none: 'none',
 };
 
-const SHAPE_OPTS: ShapeDrawOpts = {
-  fill: COLLISION_SHAPE_FILL,
-  line: COLLISION_SHAPE_LINE,
-  solidEdge: COLLISION_SOLID_EDGE,
-  needle: COLLISION_ANGLE_TICK,
-  needleCasing: COLLISION_ANGLE_CASING,
-  showSolidEdges: true,
-  showNeedle: true,
-};
+/**
+ * The picker's boxes are UNSCALED canvases — one unit is one screen pixel — so
+ * the widths are proportional to the box, and a 120px preview reads as a
+ * scaled-up 22px thumbnail. The paint ghost, which draws the same shapes into a
+ * zoom-scaled context, states its own widths for exactly the opposite reason;
+ * see `ShapeDrawOpts`.
+ */
+function shapeOpts(size: number): ShapeDrawOpts {
+  return {
+    fill: COLLISION_SHAPE_FILL,
+    line: COLLISION_SHAPE_LINE,
+    solidEdge: COLLISION_SOLID_EDGE,
+    needle: COLLISION_ANGLE_TICK,
+    needleCasing: COLLISION_ANGLE_CASING,
+    lineWidth: Math.max(1, (size / 16) * 1.0),
+    solidEdgeWidth: Math.max(1, (size / 16) * 1.5),
+    markCoreWidth: Math.max(1, (size / 16) * 1.25),
+    markCasingWidth: Math.max(2.5, (size / 16) * 3),
+    showSolidEdges: true,
+    showNeedle: true,
+  };
+}
 
 /**
  * Room around the shape box for the angle mark's outward barb.
@@ -70,7 +83,7 @@ function ShapeCanvas({ profile, size }: { profile: CollisionProfile; size: numbe
     ctx.clearRect(0, 0, box, box);
     // CanvasRenderingContext2D structurally satisfies ShapeDrawCtx; its fillStyle/
     // strokeStyle are a wider union, so narrow via the minimal shape we draw with.
-    drawCollisionShape(ctx as unknown as ShapeDrawCtx, MARK_PAD, MARK_PAD, size, profile, SHAPE_OPTS);
+    drawCollisionShape(ctx as unknown as ShapeDrawCtx, MARK_PAD, MARK_PAD, size, profile, shapeOpts(size));
   }, [profile, size, box]);
   return <canvas ref={ref} width={box} height={box}
     style={{ display: 'block', margin: -MARK_PAD }} />;
