@@ -9,6 +9,7 @@ import {
   OBJECT_BOX_FILL, OBJECT_BOX_STROKE, OBJECT_LABEL, RING_FILL, RING_STROKE,
 } from './canvas-colors';
 import { fitLabelInContext, labelBudget } from './label-fit';
+import { drawSectionPriority } from './priority-lens';
 import type { CollisionProfileSet, Solidity } from '../../core/collision/collision-model';
 import { columnSolidRun } from '../../core/collision/collision-render';
 import { resolveCell, resolvePlaneWords, SECTION_PLANE_WORDS } from '../../core/collision/collision-cell-resolve';
@@ -43,7 +44,18 @@ function solidityFill(s: Solidity): string {
   }
 }
 
+/** What one `render` call's priority lens painted, for the caller to publish. */
+export interface PriorityLensPass {
+  veils: number;
+  segments: number;
+}
+
 export class OverlayRenderer {
+  /**
+   * Returns what the PRIORITY LENS painted this pass (zero-zero when the toggle
+   * is off, which is why it is a struct and not a boolean). MapViewport
+   * publishes it; this class stays free of the debug surface.
+   */
   render(
     ctx: Ctx,
     sections: SectionOverlayInfo[],
@@ -51,8 +63,9 @@ export class OverlayRenderer {
     viewport: { x: number; y: number; width: number; height: number; zoom: number },
     objectSprites?: Map<string, ObjectPreview>,
     collisionProfiles?: CollisionProfileSet | null,
-  ): void {
+  ): PriorityLensPass {
     const { x: vpX, y: vpY, zoom } = viewport;
+    const lens: PriorityLensPass = { veils: 0, segments: 0 };
 
     ctx.save();
     ctx.scale(zoom, zoom);
@@ -88,6 +101,15 @@ export class OverlayRenderer {
           this.drawCollisionOverlay(ctx, viewport, coll, info.offsetX, info.offsetY, collisionProfiles ?? null, options.showCollisionAngles, null);
         }
       }
+      // THE PRIORITY LENS, over the art and UNDER the object/ring markers: it
+      // is a statement about the ART, so the markers an author drags stay
+      // legible on top of it. Windowed to the viewport inside
+      // drawSectionPriority — see priority-lens.ts for the 3.1M-probe reason.
+      if (options.showPriority) {
+        const drawn = drawSectionPriority(ctx, viewport, info.section.tileGrid.nametable, info.offsetX, info.offsetY);
+        lens.veils += drawn.veils;
+        lens.segments += drawn.segments;
+      }
       if (options.showRings) {
         this.drawRings(ctx, info.section.rings, viewport, info.offsetX, info.offsetY);
       }
@@ -97,6 +119,7 @@ export class OverlayRenderer {
     }
 
     ctx.restore();
+    return lens;
   }
 
   drawTileGrid(ctx: Ctx, viewport: { x: number; y: number; width: number; height: number; zoom: number }): void {

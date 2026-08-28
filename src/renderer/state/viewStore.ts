@@ -14,8 +14,12 @@ export interface OverlayOptions {
   /** The player-start marker. Classic-only so far — aeon has no spawn point in
    *  its level model — which is what OVERLAY_KEYS_BY_ENGINE below is for. */
   showStart: boolean;
-  /** The per-8x8-tile VDP priority lens (classic-only): marks tiles whose
-   *  pattern word carries bit 15 — they render ABOVE sprites in game. */
+  /** The per-8x8-tile VDP priority lens, BOTH engines: marks tiles whose
+   *  pattern word carries bit 15 — they render ABOVE sprites in game, i.e.
+   *  they will cover the player. One depiction (canvas/tile-lens.ts) drawn
+   *  from two different data sides (classic composes chunk→block→quad through
+   *  core/level-classic/priority-mask.ts; aeon reads the flat 8px nametable
+   *  through core/model/nametable-priority.ts). */
   showPriority: boolean;
   /** Occlusion-correct object previews (classic-only): re-draw high-priority
    *  map-tile PIXELS above low-priority sprite pieces — what the VDP shows —
@@ -82,6 +86,13 @@ export const OVERLAY_KEYS_BY_ENGINE: Record<OpenEngine, readonly (keyof OverlayO
   aeon: [
     'showObjects', 'showRings', 'showTileGrid', 'showBlockGrid', 'showChunkGrid',
     'showCollision', 'showCollisionAngles', 'showCollisionPathB', 'showBgPlane',
+    // PROMOTED 2026-08-28. The owner, from a play session: "No way to see what
+    // art on fg is priority or not. Randomly sometimes sonic just goes behind a
+    // tile that I wasn't aware was prioritised." The key, the label and the
+    // OFF-by-default posture already existed for classic; aeon now draws the
+    // SAME violet veil through the SAME shared depiction (canvas/tile-lens.ts),
+    // so this is a registration, not a second lens.
+    'showPriority',
     // PROMOTED for the BgAnim band preview (ROADMAP item 42), per
     // docs/reviews/2026-08-22-preview-posture-ruling.md §2 Q3. The key, the
     // toggle plumbing and the OFF-by-default posture already existed and were

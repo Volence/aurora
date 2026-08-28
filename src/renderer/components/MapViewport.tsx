@@ -56,6 +56,7 @@ import {
   drawScreenFrame, screenFrameEdgeAt, dragScreenFrame, publishScreenFrameReport,
   screenFrameRect, type ScreenFrameAnchor,
 } from '../canvas/screen-frame';
+import { publishPriorityLensReport } from '../canvas/priority-lens';
 import {
   resolveSelectedScene, setLayerFieldCommand, clampLayerTop, layerTopSpace,
   setSceneFieldCommand, clampVOffset,
@@ -972,6 +973,13 @@ export default function MapViewport() {
       sectionRenderer.renderBg(ctx, viewport);
       drawBands();
       drawCamera();
+      // The priority lens is about the FOREGROUND plane — "what will draw in
+      // front of the player". Editing the BG shows no foreground at all, so
+      // there is nothing to mark and the report says WHY, rather than going
+      // quiet and letting the previous frame's numbers stand.
+      publishPriorityLensReport({
+        active: false, reason: 'bg-layer', sections: 0, veils: 0, segments: 0,
+      });
     } else {
       // showBgPlane: paint Plane B first, then composite the foreground over
       // it (empty FG words are transparent in the section canvases). Only
@@ -995,7 +1003,17 @@ export default function MapViewport() {
         sectionInfos.push({ section, offsetX: offset.x, offsetY: offset.y });
       }
 
-      overlayRenderer.render(ctx, sectionInfos, overlayOpts, viewport, state.objectSprites, state.collisionProfiles);
+      const lens = overlayRenderer.render(ctx, sectionInfos, overlayOpts, viewport, state.objectSprites, state.collisionProfiles);
+      // THE PRIORITY LENS REPORT — published from the draw body, like the
+      // guides' and the frame's, so `active` and `veils` describe what HAPPENED
+      // rather than what would happen. `reason: 'off'` with the toggle off is a
+      // real answer a harness row can fail on.
+      publishPriorityLensReport({
+        active: overlayOpts.showPriority,
+        reason: overlayOpts.showPriority ? null : 'off',
+        sections: sectionInfos.length,
+        veils: lens.veils, segments: lens.segments,
+      });
     }
 
     // THE BAND LENS (ROADMAP item 43 part 2), under the guides and over

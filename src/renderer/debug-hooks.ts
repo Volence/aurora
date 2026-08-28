@@ -22,6 +22,7 @@ import { resolveDisplayedBg } from './providers/bganim-preview-aeon';
 import { lastGuideReport } from './canvas/effects-guides';
 import type { GuideReport } from './canvas/effects-guides';
 import { lastScreenFrameReport, type ScreenFrameReport } from './canvas/screen-frame';
+import { lastPriorityLensReport, type PriorityLensReport } from './canvas/priority-lens';
 import { lastCameraPreviewReport, type CameraPreviewReport } from './canvas/camera-preview';
 import { lastBandLensReport, lastBandMarkReport } from './canvas/band-lens';
 import type { BandLensReport, BandMarkReport } from './canvas/band-lens';
@@ -428,6 +429,18 @@ interface AeonProbeApi {
    */
   screenFrame(): ScreenFrameReport;
   /**
+   * THE PRIORITY LENS AS THE LAST REPAINT DREW IT (2026-08-28).
+   *
+   * Same publish-not-recompute contract as `guides()`. A probe that re-scanned
+   * the nametables for bit 15 would prove two copies of one scan agree, which
+   * stays true when the lens is never drawn — so this reports the DRAW: `veils`
+   * is `fillRect` calls actually issued, `segments` is boundary strokes, and
+   * `reason` distinguishes the toggle being off from the BG layer having no
+   * foreground to mark. Pixels are still the last word; see
+   * scratchpad/priority-lens-harness.mjs.
+   */
+  priorityLens(): PriorityLensReport;
+  /**
    * What the last repaint's in-frame camera composite actually planned and drew.
    *
    * A PUBLISH, not a re-derivation: `bands` is the array `drawCameraPreview`
@@ -738,6 +751,7 @@ function installAeonProbe(): AeonProbeApi {
     selectScene: (id) => useEditorStore.getState().setSelectedEffectsSceneId(id),
     guides: () => lastGuideReport(),
     screenFrame: () => lastScreenFrameReport(),
+    priorityLens: () => lastPriorityLensReport(),
     cameraPreview: () => lastCameraPreviewReport(),
     bandLens: () => lastBandLensReport(),
     bandMark: () => lastBandMarkReport(),
