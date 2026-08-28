@@ -74,7 +74,7 @@ import type { Section, ObjectPlacement, RingPlacement } from '../../core/model/s
 import { T } from './ui';
 import CollisionLegend from './CollisionLegend';
 import {
-  CANVAS_VOID,
+  CANVAS_VOID, CANVAS_BLACK,
   COLLISION_SHAPE_LINE, COLLISION_SOLID_EDGE, COLLISION_ANGLE_TICK, COLLISION_ANGLE_CASING,
   COLLISION_PREVIEW_FILL, COLLISION_PREVIEW_SCOPE, COLLISION_PREVIEW_PRIMARY, COLLISION_PREVIEW_ERASE,
   SELECTION_MARQUEE, MAP_MARQUEE_FILL, MAP_MARQUEE_ART_ONLY,
@@ -1126,6 +1126,14 @@ export default function MapViewport() {
       });
     };
 
+    // WILL `drawCamera` PUT ANYTHING ON THE CANVAS? The same three conditions
+    // its own body tests, hoisted because the FG branch must know BEFORE it
+    // decides who clears the background — see the note at that branch's `else`.
+    // Kept as one expression rather than as a flag `drawCamera` sets, because
+    // the decision is needed before the call, not after it.
+    const cameraPreviewActive = !!guideScene && overlayOpts.showCameraPreview
+      && sectionRenderer.bgPlaneCanvas() !== null;
+
     if (ed.editingLayer === 'bg') {
       sectionRenderer.renderBg(ctx, viewport);
       drawBands();
@@ -1148,9 +1156,29 @@ export default function MapViewport() {
         drawBands();
         drawCamera();
       } else {
+        // ⚠ THE COMPOSITE WAS DRAWN AND THEN PAINTED BLACK, ON EVERY FRAME,
+        // WHENEVER THE "Bg Plane" OVERLAY WAS OFF. `render`'s `clearBackground`
+        // arm is a `fillRect` over the WHOLE canvas and it ran AFTER this
+        // `drawCamera()`. Every instrument said the feature was working —
+        // `cameraPreview()` reported `active`, `blits` counted 81 real
+        // `drawImage` calls, the node suite was green — and the author saw
+        // nothing, because the last thing to touch those pixels was the clear.
+        // Measured by scratchpad/curve-editor-harness.mjs's calibration: 0 of
+        // 224 rows inside the frame changed when the composite was toggled with
+        // the overlay off, and 224 of 224 changed with it on.
+        //
+        // So the clear happens HERE when the composite is going to draw, and
+        // `render` is told not to repeat it. The order is then the same one the
+        // `bgVisible` arm already had, and the same one camera-preview.ts's
+        // docblock describes: backdrop, composite, then the FOREGROUND over it.
+        if (cameraPreviewActive) {
+          ctx.fillStyle = CANVAS_BLACK;
+          ctx.fillRect(0, 0, rect.width, rect.height);
+        }
         drawCamera();
       }
-      sectionRenderer.render(ctx, viewport, ed.activeSectionIndex, !bgVisible);
+      sectionRenderer.render(ctx, viewport, ed.activeSectionIndex,
+        !bgVisible && !cameraPreviewActive);
 
       const sectionInfos: SectionOverlayInfo[] = [];
       for (let i = 0; i < act.sections.length; i++) {
