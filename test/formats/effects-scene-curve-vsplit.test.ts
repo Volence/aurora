@@ -7,7 +7,8 @@
 // `$defs.layer.properties.{curve,vsplit}`.
 
 import { describe, it, expect } from 'vitest';
-import { existsSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import {
   parseEffectsScene, serializeEffectsScene, type EffectsScene, type EffectsSceneLibrary,
 } from '../../src/core/formats/effects/scene';
@@ -127,17 +128,30 @@ describe('setLayerFieldCommand: curve and vsplit, set and cleared', () => {
 });
 
 // Row H's golden: the shipped curved-horizon scene, parse→serialize byte-stable
-// before and after an edit + undo. Read from the aeon tree; SKIPPED (not
-// passed) when it is absent.
+// before and after an edit + undo.
+//
+// THIS READS A FIXTURE INSIDE THIS REPO, AND THAT IS THE POINT. Until 2026-08-28
+// it read `/home/volence/sonic_hacks/aeon/games/.../ojz_act1_depth.json` — the
+// aeon lane's LIVE WORKING TREE — so it compared Aurora's serializer against a
+// peer's uncommitted edits and flipped green/red as they typed. It could never
+// have detected drift, because it had no fixed thing to drift from. The property
+// under test is a property of AURORA'S CODEC over a real shipped document, so
+// the correct instrument is a document committed HERE, vendored at a named aeon
+// revision (see `ojz_act1_depth.provenance.json` beside it). The separate
+// question — "is that pin still what aeon ships?" — a pinned blob cannot answer
+// and is NOT asked here; it lives in `aeon-fixture-currency.test.ts`, which
+// reads aeon's origin/master through git objects. Precedent and reasoning:
+// docs/reviews/2026-08-28-golden-live-tree.md.
 //
 // EXACT bytes, no "modulo one byte": empyrean e1ebd20 §8 ruled the canonical
 // file form — exactly one `\n` after the closing brace — so the writer now
 // produces the shipped file as-is and this pin compares whole files.
-const SHIPPED = '/home/volence/sonic_hacks/aeon/games/sonic4/data/editor/effects/ojz_act1_depth.json';
+const SHIPPED = resolve(__dirname, '../fixtures/effects/ojz_act1_depth.json');
 
 describe('ojz_act1_depth.json round-trip golden (triage §B row H)', () => {
-  it('is byte-stable through parse→serialize, and again after an edit and its undo', (ctx) => {
-    if (!existsSync(SHIPPED)) { ctx.skip(`SKIPPED, NOT PASSED: ${SHIPPED} absent`); return; }
+  it('is byte-stable through parse→serialize, and again after an edit and its undo', () => {
+    // No existsSync guard and no skip: this fixture is committed to this repo,
+    // so its absence is a broken checkout and must be a hard, noisy failure.
     const bytes = readFileSync(SHIPPED, 'utf8');
     // Anti-vacuous: the shipped file really carries the ruled terminator, once.
     expect(bytes.endsWith('}\n')).toBe(true);
@@ -147,6 +161,14 @@ describe('ojz_act1_depth.json round-trip golden (triage §B row H)', () => {
 
     const curved = parsed.layers.findIndex((l) => l.curve !== undefined && l.curve !== 'none');
     expect(curved, 'the shipped scene carries a curve').toBeGreaterThan(-1);
+    // Anti-vacuous, and it is the row the 2026-08-28 failure needed: the edit
+    // below CLEARS a vsplit, which is a no-op returning null when the layer has
+    // none. Assert the precondition here so a re-vendored fixture that lost the
+    // key says WHICH property went missing, instead of throwing a TypeError out
+    // of EditHistory two lines later (that is exactly how the live-tree read
+    // presented, and three readers called it "pre-existing, unrelated").
+    expect(parsed.layers[curved].vsplit, 'the curved layer carries a vsplit to clear')
+      .toEqual({ at: expect.any(Number) });
     const lib = library([parsed]);
     const h = new EditHistory();
     const level = { sections: [], effectsScenes: lib } as unknown as S4Level;
