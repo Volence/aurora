@@ -92,10 +92,13 @@ describe('CollapsibleSection ids', () => {
       .filter(([, titles]) => titles.size > 1)
       .map(([id, titles]) => `${id}: ${[...titles].sort().join(' / ')}`);
     // ONE exception, and it names itself: Layout's tool-options slot holds
-    // Chunks, Marquee and Paste, which are mutually exclusive — never two
-    // headers on screen at once, so one preference governs one visible section.
+    // Chunks, Marquee, Paste and Brush, which are mutually exclusive — never
+    // two headers on screen at once, so one preference governs one visible
+    // section. `Brush` joined them with the tile-attribute brush (2026-08-28):
+    // it renders for paint-tile and paint-block, and both of those exclude
+    // stamp-chunk, marquee and pasting by being a different tool.
     expect(multiTitled).toEqual([
-      "aeon.layoutOptions: Chunks / pasting ? 'Paste' : 'Marquee'",
+      "aeon.layoutOptions: Brush / Chunks / pasting ? 'Paste' : 'Marquee'",
     ]);
   });
 });

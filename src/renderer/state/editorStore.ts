@@ -7,11 +7,19 @@ import type { BandCandidate } from '../providers/band-verbs';
 import type { AnyCommand, S4Level } from '../../core/editing/commands';
 import { chunkIdsAffectedByCommand } from '../../core/editing/chunk-invalidation';
 import type { MapClipboard, PasteLayers, MarqueeGranularity } from '../../core/editing/map-clipboard';
+import {
+  DEFAULT_BRUSH_ATTRIBUTES, brushAuthorsPriority,
+  type BrushPriority, type BrushAttributes,
+} from '../../core/editing/brush-word';
 import type { UndoStack } from '../../core/editing/undo-stack';
 import { useArtStore } from './artStore';
 import { BoundEditHistory } from '../../core/editing/bound-edit-history';
 import { documentHistoryHub } from './history-hub';
 import { useProjectStore } from './projectStore';
+// Both are LEAF stores (they import nothing from here), so the priority-lens
+// side effect in `setSelectedTilePriority` cannot create a cycle.
+import { useViewStore } from './viewStore';
+import { useToastStore } from './toastStore';
 import { BAND_DEFAULTS } from '../../core/formats/bg-override/bg-override';
 import { useSessionStore } from './sessionStore';
 import { useWorkspaceStore } from '../workspace/workspaceStore';
@@ -177,6 +185,24 @@ interface EditorState {
    */
   selectedBgBand: number | null;
   selectedPaletteLine: number;
+  /**
+   * THE TILE BRUSH'S ATTRIBUTES — the other three fields of the nametable word
+   * a stroke writes, beside the tile index and the palette line.
+   *
+   * These are STICKY MODES held until pressed again, exactly like
+   * `selectedCollisionXFlip` next door: an armed brush is a statement about
+   * every stroke until you disarm it, not about one click. See
+   * core/editing/brush-word.ts for what each one does to the destination and,
+   * more importantly, WHY priority is three-state where the flips are booleans.
+   *
+   * `selectedTilePriority: 'keep'` is the default and is the whole point: it
+   * PRESERVES the destination cell's priority bit. Before this existed, every
+   * paint site open-coded a word with bit 15 clear, so painting over a
+   * high-priority tile silently dropped it behind the player.
+   */
+  selectedTileHFlip: boolean;
+  selectedTileVFlip: boolean;
+  selectedTilePriority: BrushPriority;
   selectedChunkId: string | null;
   selectedObjectTypeId: string | null;
   selectedObjectSubtype: number;
@@ -296,6 +322,24 @@ interface EditorState {
   setSelectedTileIndexForLayer: (layer: EditingLayer, index: number) => void;
   setSelectedBgBand: (index: number | null) => void;
   setSelectedPaletteLine: (line: number) => void;
+  setSelectedTileHFlip: (on: boolean) => void;
+  setSelectedTileVFlip: (on: boolean) => void;
+  /**
+   * Arm the priority brush. Leaving the `keep` default SURFACES THE PRIORITY
+   * LENS (viewStore `showPriority`) and toasts that it did.
+   *
+   * That side effect lives HERE, in the one setter every surface must go
+   * through, and not in the chip's onClick: authoring a field while unable to
+   * see it is the exact state the owner was rescued from this morning, and a
+   * second surface arming the brush without the lens would put him back in it.
+   * It only ever turns the lens ON — returning to `keep` leaves it on, because
+   * silently undoing a view the author may now be relying on is its own
+   * surprise, and the View menu is right there.
+   */
+  setSelectedTilePriority: (priority: BrushPriority) => void;
+  /** The brush as `brushNametableWord` wants it — assembled in ONE place so no
+   *  caller can hand it a partially-read set of store fields. */
+  tileBrush: () => BrushAttributes;
   setSelectedChunkId: (id: string | null) => void;
   setSelectedObjectTypeId: (id: string | null, subtype?: number) => void;
   setSelectedRingPattern: (index: number) => void;
@@ -439,6 +483,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   selectedBgTileIndex: 0,
   selectedBgBand: null,
   selectedPaletteLine: 0,
+  selectedTileHFlip: DEFAULT_BRUSH_ATTRIBUTES.hFlip,
+  selectedTileVFlip: DEFAULT_BRUSH_ATTRIBUTES.vFlip,
+  selectedTilePriority: DEFAULT_BRUSH_ATTRIBUTES.priority,
   selectedChunkId: null,
   selectedObjectTypeId: null,
   selectedObjectSubtype: 0,
@@ -481,6 +528,32 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   ),
   setSelectedBgBand: (index) => set({ selectedBgBand: index }),
   setSelectedPaletteLine: (line) => set({ selectedPaletteLine: line }),
+  setSelectedTileHFlip: (on) => set({ selectedTileHFlip: !!on }),
+  setSelectedTileVFlip: (on) => set({ selectedTileVFlip: !!on }),
+  setSelectedTilePriority: (priority) => {
+    set({ selectedTilePriority: priority });
+    // THE FEEDBACK LOOP, wired to the rule rather than to the chip: the
+    // condition is `brushAuthorsPriority`, the same predicate brush-word.ts
+    // states the rule in, so the two cannot drift into disagreeing about when
+    // a stroke starts writing an invisible field.
+    if (!brushAuthorsPriority({ ...DEFAULT_BRUSH_ATTRIBUTES, priority })) return;
+    if (useViewStore.getState().overlays.showPriority) return;
+    useViewStore.getState().setOverlay('showPriority', true);
+    useToastStore.getState().addToast(
+      'Priority lens on — the violet veil marks the tiles that draw in front of the player, '
+      + 'so you can see the field this brush is now writing. Turn it off in View.',
+      'info',
+    );
+  },
+  tileBrush: () => {
+    const s = get();
+    return {
+      paletteLine: s.selectedPaletteLine,
+      hFlip: s.selectedTileHFlip,
+      vFlip: s.selectedTileVFlip,
+      priority: s.selectedTilePriority,
+    };
+  },
   setSelectedChunkId: (id) => set({ selectedChunkId: id }),
   setSelectedObjectTypeId: (id, subtype) => set({ selectedObjectTypeId: id, selectedObjectSubtype: subtype ?? 0 }),
   setSelectedRingPattern: (index) => set({ selectedRingPattern: index }),
