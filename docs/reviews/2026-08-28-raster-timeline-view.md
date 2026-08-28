@@ -1,6 +1,6 @@
 # The raster timeline — the VIEW half
 
-**Branch** `feat/raster-timeline-view` · **SHAs** `6d17484` (the strip), `a0c3f5a`-to-be (label/footer fixes) ·
+**Branch** `feat/raster-timeline-view` · **SHAs** `6d17484` (the strip), `0fa2630` (label/footer fixes + harness), `20744e8` (docs) ·
 **ROADMAP** §4.6 → §5.1 row 79 · **Instrument** `scratchpad/raster-timeline-harness.mjs`
 (`npm run harness:raster-timeline`)
 
