@@ -9,7 +9,8 @@
     "preview": "electron-vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "gen:theme": "node scripts/gen-theme.mjs"
+    "gen:theme": "node scripts/gen-theme.mjs",
+    "harness:tile-attributes": "node scratchpad/tile-attribute-harness.mjs"
   },
   "keywords": [],
   "author": "",
