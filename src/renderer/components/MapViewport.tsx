@@ -19,7 +19,7 @@ import { shouldMarkBand } from './map-band-mark';
 import { beginBandStamp, moveBandStamp, endBandStamp, type BandStampGesture } from './map-band-stamp';
 import { docFromTile, docFromSectionRegion } from '../../core/art/composer-buffer';
 import { seedDocCollisionFromSection } from '../../core/art/composer-collision';
-import type { AnyCommand, S4Level, SetTilesCommand } from '../../core/editing/commands';
+import type { AnyCommand, S4Level } from '../../core/editing/commands';
 import { buildStampCommand } from '../../core/editing/map-stamp';
 import {
   snapMarquee, copyFromSection, buildPasteCommand, isBlockAligned,
@@ -840,11 +840,60 @@ export default function MapViewport() {
   // Centralized renderer-cache invalidation: every command executed/undone/redone
   // (UI tools, keyboard undo/redo, or the agent handler) lands here so the
   // section canvases never go stale.
+  //
+  // === IT MUST WALK INTO BATCHES, AND IT DID NOT ===
+  //
+  // Owner report 2026-08-28: *"control + z or undo doesn't work with pasting
+  // from marquee."* The undo DID revert the model - the command is on the
+  // focused history and `executeCommand` throws rather than swallow - but this
+  // listener used to be a bare `switch (cmd.type)` with no `'batch'` case, so a
+  // batch fell to `default:` and NOTHING was marked dirty. The section canvas
+  // kept the pasted pixels, and an undo that changes nothing on screen is an
+  // undo that does not work.
+  //
+  // `buildRegionWriteCommand` (map-stamp.ts) returns a BATCH, so this hit BOTH
+  // paste and chunk stamp; `ComposerCanvas`'s multi-tile art edit is a batch of
+  // `set-tileset-tiles` and was equally invisible on the map. Its sibling
+  // `bumpStoreVersions` in editorStore recursed into batches from the start,
+  // which is why chunk thumbnails refreshed after an undo and the map did not.
+  //
+  // The paste and stamp CLICK handlers used to reach into the batch by hand for
+  // their `set-tiles` child and mark it dirty themselves. That manual reach is
+  // what made the forward edit visible while its undo was not - a workaround
+  // whose presence hid the general defect, and which the undo path cannot copy
+  // because `BoundEditHistory.undo()` is argument-free. Both are DELETED with
+  // this change: leaving them would double-invalidate every paste, and would let
+  // the next reader conclude the general path works.
+  //
+  // COALESCED, NOT JUST RECURSED. A naive `forEach(handle)` would call
+  // `rebuildTileArt()` once per child, and that reloads EVERY section - so a
+  // 60-tile art stroke would re-prerender the whole act sixty times. The leaves
+  // are collected first and each whole-viewport rebuild runs at most once.
   useEffect(() => {
     setCommandInvalidationListener((cmd: AnyCommand) => {
-      switch (cmd.type) {
+      const leaves: AnyCommand[] = [];
+      const flatten = (c: AnyCommand): void => {
+        if (c.type === 'batch') { for (const child of c.commands) flatten(child); return; }
+        leaves.push(c);
+      };
+      flatten(cmd);
+
+      // What the whole command asked for, accumulated across every leaf.
+      let wantAllSections = false;   // supersedes everything below
+      let wantTileArt = false;
+      let wantBg = false;
+      const dirtyTiles = new Map<number, number[]>();
+      const dirtyBgTiles: number[] = [];
+      const markSection = (sectionIndex: number, indices: number[]): void => {
+        const existing = dirtyTiles.get(sectionIndex);
+        if (existing) existing.push(...indices);
+        else dirtyTiles.set(sectionIndex, [...indices]);
+      };
+
+      for (const leaf of leaves) {
+      switch (leaf.type) {
         case 'set-tiles':
-          sectionRenderer.markDirty(cmd.sectionIndex, cmd.entries.map(e => e.index));
+          markSection(leaf.sectionIndex, leaf.entries.map(e => e.index));
           break;
         case 'set-tileset-tiles':
         case 'set-palette-line':
@@ -852,12 +901,12 @@ export default function MapViewport() {
           // bitmaps, so the sections must be repainted — but the nametables and
           // the grid are untouched, so this takes the in-place path rather than
           // tearing down and reallocating every section canvas.
-          rebuildTileArt();
+          wantTileArt = true;
           break;
         case 'set-sections':
           // A structural grid change (add/remove/resize/move/paste) re-indexes
           // the whole grid — full rebuild.
-          reloadAllSections();
+          wantAllSections = true;
           break;
         case 'set-bg-tiles':
         case 'set-bg-override-layout':
@@ -865,7 +914,7 @@ export default function MapViewport() {
           // Sound for the override too, because the command's applier writes the
           // canvas's mirror through the same writer the stroke used — the array
           // the renderer is holding is already correct by the time this runs.
-          sectionRenderer.markBgDirty(cmd.entries.map((e) => e.index));
+          for (const e of leaf.entries) dirtyBgTiles.push(e.index);
           break;
         case 'set-bg-override-band':
           // A band insert/remove RENUMBERS the whole tile blob and rewrites every
@@ -874,14 +923,14 @@ export default function MapViewport() {
           // that document, so nothing here is still valid — re-resolve, do not
           // dirty cells. (Before the canvas painted the override this case did
           // not exist, because a band edit could not change what was on screen.)
-          reloadBg();
+          wantBg = true;
           break;
         case 'set-bg-override-tiles':
         case 'set-bg-override-phases':
           // Parcel I: a tile's pixels changed (the writer already updated the
           // canvas's mirror in place); every cell drawing it must repaint.
           // Re-resolve rather than compute the cell set here.
-          reloadBg();
+          wantBg = true;
           break;
         case 'set-bg':
           // The BG entry's canvas and TileRenderer are built from the
@@ -890,7 +939,7 @@ export default function MapViewport() {
         case 'set-section-bg':
           // Which BG the viewport composites depends on the active section's
           // ref — re-resolve against the library/act default.
-          reloadBg();
+          wantBg = true;
           break;
         default:
           // set-chunk thumbnail invalidation is a store concern handled in
@@ -900,6 +949,27 @@ export default function MapViewport() {
           // history-clock bump already re-renders them — no markDirty needed.
           break;
       }
+      }
+
+      // ORDER MATTERS, and it is the order of decreasing scope.
+      //
+      // `reloadAllSections` tears down and rebuilds every section canvas AND
+      // calls `reloadBg` on its way out (see loadAllSections), so it subsumes
+      // both of the narrower rebuilds and they are skipped under it. Per-tile
+      // dirtying runs last either way: `markDirty` only records indices against
+      // a loaded section entry, so it has to happen AFTER any rebuild that
+      // replaces those entries, or the marks land on a canvas that is about to
+      // be thrown away.
+      if (wantAllSections) {
+        reloadAllSections();
+      } else {
+        if (wantTileArt) rebuildTileArt();
+        if (wantBg) reloadBg();
+      }
+      for (const [sectionIndex, indices] of dirtyTiles) {
+        sectionRenderer.markDirty(sectionIndex, indices);
+      }
+      if (dirtyBgTiles.length > 0) sectionRenderer.markBgDirty(dirtyBgTiles);
     });
     return () => setCommandInvalidationListener(null);
   }, [reloadAllSections, rebuildTileArt, reloadBg]);
@@ -2105,12 +2175,11 @@ export default function MapViewport() {
             description: `Paste ${selectionSizeLabel(hover.baseCol, hover.baseRow, clip.widthTiles, clip.heightTiles)}`
               + ` at (${hover.baseCol}, ${hover.baseRow})`,
           });
-          if (cmd) {
-            executeCommand(cmd, level);
-            const tilesChild = cmd.commands.find((c): c is SetTilesCommand => c.type === 'set-tiles');
-            const dirtyIndices = tilesChild ? tilesChild.entries.map((entry) => entry.index) : [];
-            sectionRenderer.markDirty(hover.sectionIndex, dirtyIndices);
-          }
+          // No manual reach into the batch for its `set-tiles` child any more:
+          // the invalidation listener walks batches now (see it above). The old
+          // reach made the paste visible and its UNDO invisible, which is the
+          // defect the owner reported; keeping it would double-invalidate.
+          if (cmd) executeCommand(cmd, level);
           useEditorStore.getState().setActiveSectionIndex(hover.sectionIndex);
         }
       }
@@ -2373,12 +2442,10 @@ export default function MapViewport() {
         description: `Stamp chunk ${selectedChunkId} at (${baseCol}, ${baseRow})`,
       });
 
-      if (cmd) {
-        executeCommand(cmd, level);
-        const tilesChild = cmd.commands.find((c): c is SetTilesCommand => c.type === 'set-tiles');
-        const dirtyIndices = tilesChild ? tilesChild.entries.map((entry) => entry.index) : [];
-        sectionRenderer.markDirty(info.sectionIndex, dirtyIndices);
-      }
+      // Same as the paste path: the listener walks batches, so this no longer
+      // reaches into the command by hand. A stamp's undo was invisible for the
+      // same reason a paste's was.
+      if (cmd) executeCommand(cmd, level);
       useEditorStore.getState().setActiveSectionIndex(info.sectionIndex);
       e.preventDefault();
       return;
