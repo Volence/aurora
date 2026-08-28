@@ -38,6 +38,7 @@ import type { LayerTopSpace } from '../providers/effects-aeon';
 import {
   EFFECTS_GUIDE_LINE, EFFECTS_GUIDE_LINE_DISABLED, EFFECTS_GUIDE_ACTIVE,
   EFFECTS_GUIDE_LABEL_BG, EFFECTS_GUIDE_LABEL_TEXT,
+  EFFECTS_GUIDE_REFUSED, EFFECTS_GUIDE_REFUSED_BG, EFFECTS_GUIDE_REFUSED_TEXT,
 } from './canvas-colors';
 
 /** The map viewport, in the shape the draw pass already has one. */
@@ -205,6 +206,22 @@ export interface GuideDrawOptions {
    * `origin` field that used to sit here is gone.
    */
   space?: LayerTopSpace;
+  /**
+   * The bound's own sentence, per layer index — `guideBoundNotice`'s output,
+   * resolved by the caller because only it holds the scene.
+   *
+   * ⚠ THE CALLER RESOLVES IT, THIS MODULE ONLY DRAWS IT. A draw pass that
+   * computed its own advisory would be a second opinion about an engine rule
+   * living in a file about pixels, and the whole point of the provider's shared
+   * clauses is that there is exactly one opinion.
+   */
+  notices?: ReadonlyMap<number, GuideNotice>;
+}
+
+/** The provider's `GuideBoundNotice`, narrowed to what a canvas needs. */
+export interface GuideNotice {
+  tone: 'held' | 'illegal';
+  text: string;
 }
 
 /** Where one guide row ends up on the canvas — the shape the debug probe reports. */
@@ -214,6 +231,14 @@ export interface GuideGeometry {
   canvasY: number;
   enabled: boolean;
   onScreen: boolean;
+  /**
+   * The bound's sentence for this row, or null.
+   *
+   * PUBLISHED, NOT RE-DERIVED, for the reason the whole report exists (see
+   * `GuideReport`): a harness that recomputed this from the scene would prove
+   * two copies of one arithmetic agree, which stays true when nothing is drawn.
+   */
+  notice: GuideNotice | null;
 }
 
 /**
@@ -241,9 +266,71 @@ export function layerGuideGeometry(
       canvasY,
       enabled: layerIsEnabled(layers[i]),
       onScreen: canvasY >= 0 && canvasY <= vp.height,
+      notice: opts.notices?.get(i) ?? null,
     });
   }
   return out;
+}
+
+/**
+ * Greedy word wrap against the context's CURRENT font, in canvas px.
+ *
+ * Measured rather than estimated from a character count: the plate carries a
+ * sentence with numbers in it, and a monospace assumption over a proportional
+ * `system-ui` overflows on exactly the wide lines it should be protecting.
+ */
+export function wrapNoticeText(
+  ctx: Pick<CanvasRenderingContext2D, 'measureText'>, text: string, maxWidth: number,
+): string[] {
+  const lines: string[] = [];
+  let line = '';
+  for (const word of text.split(' ')) {
+    const next = line === '' ? word : `${line} ${word}`;
+    // A single word wider than the plate still gets its own line rather than an
+    // infinite loop or a dropped word — it overhangs, which is visible and
+    // recoverable, where silence is not.
+    if (line !== '' && ctx.measureText(next).width > maxWidth) { lines.push(line); line = word; } else line = next;
+  }
+  if (line !== '') lines.push(line);
+  return lines;
+}
+
+/** Width the notice plate is allowed, given the viewport. */
+const NOTICE_MAX_W = 460;
+const NOTICE_LINE_H = 13;
+
+/**
+ * The refusal plate: the guide's own sentence, beside the guide it is about.
+ *
+ * ⚠ IT IS PLACED RELATIVE TO THE GUIDE, NOT PARKED IN A CORNER, and that is the
+ * requirement rather than a preference. The bug being fixed is that the author
+ * pushed against a wall HERE and the explanation was elsewhere (or nowhere); a
+ * sentence in the bottom-right is a second elsewhere. It sits under the line
+ * when there is room below and over it when there is not, and it is clamped
+ * into the viewport so a guide near an edge cannot push it off-canvas — the one
+ * failure mode that would return this parcel to silence.
+ */
+function drawNoticePlate(
+  ctx: CanvasRenderingContext2D, vp: GuideViewport, row: GuideGeometry, text: string,
+): void {
+  const maxW = Math.max(120, Math.min(NOTICE_MAX_W, vp.width - 24));
+  const lines = wrapNoticeText(ctx, text, maxW - 12);
+  const w = Math.min(maxW, Math.max(...lines.map((l) => ctx.measureText(l).width)) + 12);
+  const h = lines.length * NOTICE_LINE_H + 8;
+  const below = row.canvasY + 8;
+  const y = Math.round(below + h <= vp.height - 4 ? below : Math.max(4, row.canvasY - h - 8));
+  const x = Math.round(Math.max(4, Math.min(vp.width - w - 4, 8)));
+
+  ctx.fillStyle = EFFECTS_GUIDE_REFUSED_BG;
+  ctx.fillRect(x, y, w, h);
+  // A left rule in the refusal colour: the plate has to be attributable to the
+  // red line above it at a glance, before any of it is read.
+  ctx.fillStyle = EFFECTS_GUIDE_REFUSED;
+  ctx.fillRect(x, y, 2, h);
+  ctx.fillStyle = EFFECTS_GUIDE_REFUSED_TEXT;
+  for (let i = 0; i < lines.length; i++) {
+    ctx.fillText(lines[i], x + 8, y + 4 + i * NOTICE_LINE_H + NOTICE_LINE_H / 2);
+  }
 }
 
 /**
@@ -277,9 +364,13 @@ export function drawLayerGuides(
     ctx.beginPath();
     ctx.moveTo(0, y);
     ctx.lineTo(vp.width, y);
-    ctx.lineWidth = active ? 2 : 1;
-    ctx.strokeStyle = active ? EFFECTS_GUIDE_ACTIVE
-      : row.enabled ? EFFECTS_GUIDE_LINE : EFFECTS_GUIDE_LINE_DISABLED;
+    ctx.lineWidth = active || row.notice !== null ? 2 : 1;
+    // REFUSAL OUTRANKS SELECTION. A guide that is both hovered and unbakeable
+    // must read as unbakeable: "which line am I touching" is answerable from the
+    // cursor, "which line kills the build" is answerable from nothing else.
+    ctx.strokeStyle = row.notice !== null ? EFFECTS_GUIDE_REFUSED
+      : active ? EFFECTS_GUIDE_ACTIVE
+        : row.enabled ? EFFECTS_GUIDE_LINE : EFFECTS_GUIDE_LINE_DISABLED;
     ctx.setLineDash(row.enabled ? [] : [5, 4]);
     ctx.stroke();
     ctx.setLineDash([]);
@@ -291,10 +382,32 @@ export function drawLayerGuides(
     // Below the line when the line is near the top edge, above it otherwise, so
     // a guide at world 0 does not print its label off-canvas.
     const boxY = row.canvasY < 16 ? y + 2 : y - 15;
-    ctx.fillStyle = EFFECTS_GUIDE_LABEL_BG;
+    ctx.fillStyle = row.notice !== null ? EFFECTS_GUIDE_REFUSED_BG : EFFECTS_GUIDE_LABEL_BG;
     ctx.fillRect(4, boxY, w + 8, 13);
-    ctx.fillStyle = active ? EFFECTS_GUIDE_ACTIVE : EFFECTS_GUIDE_LABEL_TEXT;
+    ctx.fillStyle = row.notice !== null ? EFFECTS_GUIDE_REFUSED
+      : active ? EFFECTS_GUIDE_ACTIVE : EFFECTS_GUIDE_LABEL_TEXT;
     ctx.fillText(text, 8, boxY + 7);
+  }
+
+  // THE SENTENCE, and only ONE of them.
+  //
+  // ⚠ AT MOST ONE PLATE ON SCREEN, EVER. `v_offset` can put several layers out
+  // of range in one drag of the view box, and four stacked paragraphs of the
+  // same rule is the "advisory becomes decoration" failure — the author skips
+  // all of them and the one they needed goes with the rest. Every refused LINE
+  // is still marked red above, so nothing is hidden: the count is visible, the
+  // explanation is said once.
+  //
+  // The dragged row wins, because it is the row the author is asking about right
+  // now; otherwise the topmost refused row on screen.
+  const noticeRow = rows.find((r) => r.notice !== null && r.index === opts.dragIndex)
+    ?? rows.filter((r) => r.notice !== null && r.onScreen)
+      .sort((a, b) => a.canvasY - b.canvasY)[0];
+  if (noticeRow !== undefined && noticeRow.notice !== null) {
+    const refusedCount = rows.filter((r) => r.notice !== null).length;
+    const head = `L${noticeRow.index} ${noticeRow.notice.text}`
+      + (refusedCount > 1 ? ` (${refusedCount} layers are refused; the rest are marked)` : '');
+    drawNoticePlate(ctx, vp, noticeRow, head);
   }
   // The space, said once on the layer itself: a set of lines that stay put
   // while the act pans under them needs a sentence explaining why, or it

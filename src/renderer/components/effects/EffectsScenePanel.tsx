@@ -706,11 +706,30 @@ export default function EffectsScenePanel(): React.ReactElement {
                 // (aeon scene_vsplit_fires). Advisory, never a clamp — the fix
                 // involves two layers and has two spellings.
                 const order = vsplitOrderAdvisory(selected, selected.layers, i);
+                // WHAT NARROWED THE SPINNER'S RANGE, when something did. The
+                // plane's own bound is the unnarrowed one; anything tighter is
+                // the fire rule, and the author has no way to know that from a
+                // pair of numbers. Compared against `layerTopBounds` with NO
+                // layer, which is exactly "the bound before this layer's split
+                // was considered".
+                const plane = layerTopBounds(selected);
+                const topNarrowed = (top.min > plane.min || top.max < plane.max)
+                  ? `narrowed from ${plane.min}..${plane.max} because this layer authors a split, `
+                    + `so it becomes a raster fire, and a fire's screen line is its top less `
+                    + `v_offset (${selected.v_offset ?? 0}). Move the view box to move this range.`
+                  : null;
                 return (
                   <>
                     <Field label={top.label}>
+                      {/* WHY THE RANGE IS WHAT IT IS, not just what it is
+                          (2026-08-28). `(67..287)` on its own is barely better
+                          than silence — it is the number the owner was already
+                          looking at when he decided the editor was broken. The
+                          narrowing is only mentioned when it HAS been narrowed,
+                          so a plain layer's tooltip is unchanged. */}
                       <NumberField title={`Layer ${i} ${top.label} (${top.min}..${top.max})`
-                          + (top.space === 'screen' ? ' — a plane line; the scene is locked' : '')}
+                          + (top.space === 'screen' ? ' — a plane line; the scene is locked' : '')
+                          + (topNarrowed !== null ? ` — ${topNarrowed}` : '')}
                         min={top.min} max={top.max} width={72}
                         value={layer.world_y}
                         onChange={(n) => run(setLayerFieldCommand(

@@ -1,0 +1,115 @@
+NOTE       CONTRACT PARSED FROM SOURCE (no literals below):
+        EFFECTS_FIRE_LINE_MIN=3 EFFECTS_FIRE_LINE_MAX=223 from /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a36a97e9dd4080c90/src/renderer/providers/effects-aeon.ts
+        => floor(v_offset 64) = 3+64 = 67; floor(v_offset 135) = 3+135 = 138   [the owner observed exactly these two]
+PASS  [0z] ANTI-VACUOUS: the parsed contract reproduces BOTH of the owner's readings
+        derived 67 and 138; he reported 67 and 138. These two comparisons are the ONLY place those numbers appear, and they are a cross-check of the parse against the field report — never a source of truth.
+PASS  [0a] ANTI-VACUOUS: the build under test has the guide probe at all
+        /home/volence/sonic_hacks/aurora/.claude/worktrees/agent-a36a97e9dd4080c90/dist
+PASS  [1a] ANTI-VACUOUS: the aeon project is open, with sections
+        {"open":true,"zone":"ojz","act":"act1","sections":9,"tool":"view","dirty":false,"dirtyActs":[]}
+PASS  [2a] the facet bar offers an Effects pill
+NOTE       fixture scenes before this run: ["ojz_act1_depth","ojz_act1_start"]
+PASS  [3a0] ANTI-VACUOUS: the Add-layer control was found and clicked
+        click result = "ok"
+PASS  [3a1] ANTI-VACUOUS: layer 0's top field exists and took a value
+        set result = "ok" (wanted 200)
+PASS  [3a2] ANTI-VACUOUS: layer 1's top field exists and took a value
+        set result = "ok" (wanted 300)
+PASS  [3a3] the layer card offers a Plane B split control on layer 0
+        set result = "ok" (wanted at)
+PASS  [3a4] ANTI-VACUOUS: the scene's v_offset field exists and took the owner's value
+        set result = "ok" (wanted 64)
+PASS  [3b] ANTI-VACUOUS: the scene exists, is LOCKED, and holds v_offset
+        id=bound_probe v_factor=15 v_offset=64
+PASS  [3c] ⚠ THE CONTROL EXISTS AND IS REALLY A CONTROL: L0 carries a vsplit, L1 does not
+        L0.vsplit={"at":200} L1.vsplit=undefined — without this the section-6 control row proves nothing
+PASS  [3d] ANTI-VACUOUS: both layers parked at known rows, camera pinned
+        tops=[200,300] view={"x":0,"y":0,"zoom":1}
+PASS  [4a] ANTI-VACUOUS: the map canvas is mounted and has a real box
+        {"left":284,"top":106,"width":816,"height":742,"parentTop":106,"parentLeft":284,"parentHeight":742}
+PASS  [4b] ANTI-VACUOUS: the last repaint DREW guides, this scene, one row per layer
+        {"active":true,"id":"bound_probe","rows":2,"paints":12}
+PASS  [4c] PROVENANCE: the draw report carries a per-row `notice` (this branch, not master)
+        row0 keys = ["index","worldY","canvasY","enabled","onScreen","notice"]
+PASS  [4d] ANTI-VACUOUS: the aim is on the integer device grid, and recorded
+        dpr=1 rect={"left":284,"top":106,"width":816,"height":742,"parentTop":106,"parentLeft":284,"parentHeight":742}  aimX=692  canvasY 0 -> clientY 106; the owner's floor 67 -> clientY 173
+PASS  [5a] THE OWNER'S CASE: the fire layer is HELD at EFFECTS_FIRE_LINE_MIN + v_offset
+        cursor asked for world 22, guide sits at 67, contract floor = 3 + 64 = 67
+PASS  [5b] ⚠ THE RED ROW: something on screen EXPLAINS the stop, mid-gesture
+        notice = {"tone":"held","text":"held at 67. this layer authors a Plane B split, so it becomes a raster fire, and a fire must land on 3..223 (lines 0-2 belong to the priming records). On a locked scene the view box's top edge IS v_offset (64), so this floor sits 3 lines under the box and moves with it — that is why the guide looks welded to the box. Drag the view box up to lower the floor, or drop the split — a layer without one may sit anywhere in 0..511."}
+PASS  [5c] it names the REASON, not just the number: the fire rule, v_offset, and the view box
+        "held at 67. this layer authors a Plane B split, so it becomes a raster fire, and a fire must land on 3..223 (lines 0-2 belong to the priming records). On a locked scene the view box's top edge IS v_offset (64), so this floor sits 3 lines under the box and moves with it — that is why the guide looks welded to the box. Drag the view box up to lower the floor, or drop the split — a layer without one may sit anywhere in 0..511."
+PASS  [5d] ANTI-VACUOUS: the CONTROL layer, same scene same repaint, says nothing
+        L1 (no vsplit) at world 300: null
+PASS  [5e] the held guide is PAINTED in the refusal colour — and only there
+        redness on the line (canvasY 67) = 151, 24px above = 0, 24px below = 25; threshold 120 (set above the screen frame's amber, 85). The two off-line samples are what stop this passing on a red background.
+PASS  [5f] the SENTENCE is painted too, not merely published — its plate is on the canvas
+        refusal-coloured samples in the plate's left rule (x=9, 79..111) = 11/12; same column 64..32px ABOVE the guide = 0/12. The control column is what stops this passing on a red-tinted canvas, and 5e alone would have proven only that the LINE changed colour.
+        shot → scratchpad/shots-layer-bound/held-at-floor-vo64.png
+PASS  [5g] the commit agrees with the preview: the document got the floor, not the cursor
+        world_y=67
+PASS  [5h] the notice CLEARS on release — it is a gesture answer, not permanent chrome
+        null
+PASS  [6a] ⚠ NOT EVERYTHING IS STUCK: the no-split layer moves FREELY above the fire floor
+        L1 reached world 22; contract for delivered clientY 128 is 22, which is 45 rows above the fire floor 67. If this row is red the section-5 pass means "the canvas is frozen".
+PASS  [6b] and it says NOTHING while doing it — the advisory is not always-on
+        null
+PASS  [7a] a fire layer dragged well inside its bound says nothing
+        at world 177 (bound 67..287): null
+PASS  [8a0] the v_offset field took the owner's SECOND value
+        set result = "ok" (wanted 135)
+PASS  [8a] ANTI-VACUOUS: v_offset really moved to the owner's second value
+        v_offset=135
+PASS  [8b] ⚠ THE FLOOR MOVED WITH v_offset — a fire bound, not a fixed wall
+        v_offset 64 -> floor 67; v_offset 135 -> floor 138, contract 3 + 135 = 138. The owner observed exactly this pair.
+PASS  [8c] and the sentence moved with it: it quotes the NEW v_offset, not the old
+        "held at 138. this layer authors a Plane B split, so it becomes a raster fire, and a fire must land on 3..223 (lines 0-2 belong to the priming records). On a locked scene the view box's top edge IS v_offset (135), so this floor sits 3 lines under the box and moves with it — that is why the guide looks welded to the box. Drag the view box up to lower the floor, or drop the split — a layer without one may sit anywhere in 0..511."
+        shot → scratchpad/shots-layer-bound/held-at-floor-vo135.png
+PASS  [9a0] the v_offset field took a value that strands the placed layer
+        set result = "ok" (wanted 400)
+PASS  [9a] ⚠ THE HOLE IS REAL: raising v_offset lifts the floor PAST a placed layer, silently
+        top stayed 138 while the floor rose 138 -> 403. The layer is now 265 rows below its own legal minimum, and no layer gesture was ever made. This row DOCUMENTS a hole; it is not a feature passing.
+PASS  [9b] THE FIX FOR IT: the canvas now marks the stranded layer, with no gesture asking
+        notice = {"tone":"illegal","text":"top 138 is now screen line -262 — this layer authors a Plane B split, so it becomes a raster fire, and a fire must land on 3..223 (lines 0-2 belong to the priming records). The build refuses it. On a locked scene the view box's top edge IS v_offset (400), so MOVING THE BOX MOVED THIS FLOOR and left the layer under it. Drag the box back, move the top into 403..511, or drop the split — a layer without one may sit anywhere in 0..511."}
+PASS  [9c] and it says the BOX moved the floor — the causal link the author needs
+        "top 138 is now screen line -262 — this layer authors a Plane B split, so it becomes a raster fire, and a fire must land on 3..223 (lines 0-2 belong to the priming records). The build refuses it. On a locked scene the view box's top edge IS v_offset (400), so MOVING THE BOX MOVED THIS FLOOR and left the layer under it. Drag the box back, move the top into 403..511, or drop the split — a layer without one may sit anywhere in 0..511."
+PASS  [9d] ANTI-VACUOUS: the control layer is still silent — only the fire layer is stranded
+        null
+PASS  [9e] the stranded guide is PAINTED refused, with no cursor anywhere near it
+        redness on the line = 151 at canvasY 138; threshold 120
+        shot → scratchpad/shots-layer-bound/stranded-by-v-offset.png
+PASS  [10a0] v_offset restored for the viewport question
+        set result = "ok" (wanted 64)
+PASS  [10a1] the control layer is parked back on a known row
+        set result = "ok" (wanted 300)
+PASS  [10a] ANTI-VACUOUS: the view really panned, and the control guide is on screen
+        view={"x":0,"y":200,"zoom":1} L1 world 300 -> canvasY 100
+NOTE       THE WINDOW QUESTION, measured
+        canvas rect.top=106 parentTop=106 parentHeight=742; dragged to clientY 56 (50px above the canvas top). L1 reached world 150. Unconstrained contract = 150; window-bounded = 200.
+PASS  [10b] a guide CAN be dragged to a world row scrolled off the top of the view
+        reached 150; unconstrained 150, window-bounded 200. If this row is RED and `reached` equals the window-bounded value, the owner's literal words are a SECOND, separate bug: the gesture is imprisoned by the viewport independently of any value clamp.
+PASS  [11a] ANTI-VACUOUS: the repaint probe bound to the live #map-canvas
+        install=installed
+PASS  [11b] ANTI-VACUOUS: guides ARE drawn during the idle measurement
+        {"active":true,"rows":2}
+PASS  [11c] ANTI-VACUOUS: the page IS still painting and the probe is still bound
+        {"repaints":0,"ticks":962,"bound":true}
+PASS  [11d] the bound notice adds NO idle map repaints (MapViewport 37/37 stays conditioned)
+        0 repaints over 3.0s idle against 962 rAF ticks
+PASS  [12a] the whole session undoes back to the fixture — nothing was saved
+        15 undos; left ["ojz_act1_depth","ojz_act1_start"], found ["ojz_act1_depth","ojz_act1_start"]
+
+46/46 rows passed
+
+ROWS THAT DO NOT DISCRIMINATE, named so nobody counts them twice:
+  [3a] [4a] [4b] [10a] [11a] [11b] [11c] — anti-vacuous setup rows. They prove the
+      instrument saw its subject; none of them can fail for the bound being wrong.
+  [9a] — DOCUMENTS A HOLE. It passes because the app does NOT re-clamp on a v_offset
+      change. It would go red if someone fixed the hole by silently moving layers,
+      which is a change we would want to notice, but it is not a feature passing.
+  [0z] — a cross-check of the source parse against the field report. The two literals
+      in this file live there and nowhere else, and nothing asserts behaviour on them.
+THE DISCRIMINATING ROWS: [5a] [5b] [5c] [5e] [5f] [6a] [7a] [8b] [8c] [9b] [9c] [9e] [10b].
+  [8b]/[8c] are the ones a hard-coded floor cannot survive; [6a]/[5d]/[9d] are the ones
+  a frozen canvas cannot survive; [5e]/[9e] are the ones a published-but-unpainted
+  sentence cannot survive.

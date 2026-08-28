@@ -16,6 +16,7 @@ import {
   SCENE_FORM_CHOICES, layerExtras, layerExtrasLine,
   layerTopSpace, layerTopBounds, clampLayerTop, planeLineOf, PLANE_LINE_SPAN,
   fireLineAdvisory, layerEmitsFire, fireScreenLineOf, vsplitOrderAdvisory,
+  guideBoundNotice,
   EFFECTS_FIRE_LINE_MIN, EFFECTS_FIRE_LINE_MAX,
   layerCountLine, vFactorHint,
   LAYER_CURVE_ROW, LAYER_VSPLIT_ROW, NONE_FACTOR_VALUE,
@@ -904,6 +905,267 @@ describe('clampLayerTop bounds a fire-emitting layer to the fire line, and nothi
     const s = unlocked();
     expect(clampLayerTop(s, 5000, split())).toBe(5000);
     expect(layerTopBounds(s, split()).space).toBe('act');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// THE BOUND SAYS SO — a silent wall the owner mistook for a broken editor
+// ---------------------------------------------------------------------------
+//
+// `clampLayerTop` works and says NOTHING. The owner set v_offset 64, dragged the
+// guide up, and it stopped; he set v_offset 135, dragged, and it stopped
+// somewhere else; both times he concluded the editor had broken. The bound had
+// moved, because the fire floor is `EFFECTS_FIRE_LINE_MIN + v_offset` and not a
+// wall at any fixed line.
+//
+// ⚠ EVERY NUMBER BELOW IS DERIVED FROM THE CONSTANTS AND THE SCENE'S v_offset.
+// A literal 67 or 138 in this block would be the same mistake the bug report is
+// about — it would pass with the bound replaced by a fixed wall, which is
+// exactly the defect. Each row that can distinguish a moving bound from a fixed
+// one runs at FOUR v_offsets, and each carries a no-vsplit control layer,
+// because without one the suite cannot tell "the fire bound works" from
+// "everything is bounded".
+
+describe('guideBoundNotice — the fire bound is a MOVING wall, and it now says so', () => {
+  const locked = (vo = 0) =>
+    ({ ...newEffectsScene('l', 'L'), v_factor: EFFECTS_V_FACTOR_LOCK, v_offset: vo });
+  const unlocked = (vo = 0) =>
+    ({ ...newEffectsScene('u', 'U'), v_factor: 2, v_center: 0, v_offset: vo });
+  const plain = (world_y: number): EffectsLayer =>
+    ({ world_y, fa: 'FACTOR_1', fb: 'FACTOR_1' });
+  const split = (world_y: number, at = 0x43): EffectsLayer =>
+    ({ ...plain(world_y), vsplit: { at } });
+
+  // The bound, re-derived here the way the docblock states it — not read back
+  // from `layerTopBounds`, so a change to either side shows up as a difference.
+  const planeMin = 0;
+  const planeMax = PLANE_LINE_SPAN - 1;
+  const fireMin = (vo: number) => Math.max(planeMin, EFFECTS_FIRE_LINE_MIN + vo);
+  const fireMax = (vo: number) => Math.min(planeMax, EFFECTS_FIRE_LINE_MAX + vo);
+  /** Which rule OWNS an edge: the fire rule only when it narrowed the plane's. */
+  const ruleAt = (edge: number, planeEdge: number) => (edge === planeEdge ? 'plane' : 'fire');
+
+  // The owner's own two, the identity, and a negative one (v_offset is signed,
+  // schema minimum -32768) — at -32 the fire floor falls off the top of the
+  // plane and the PLANE owns the min edge, which is a different answer.
+  const OFFSETS = [0, 64, 135, -32];
+
+  // The three clauses the notice and `fireLineAdvisory` share verbatim. Built
+  // from the constants, so one rule cannot drift into two sentences.
+  const FIRE_IS = 'this layer authors a Plane B split, so it becomes a raster fire';
+  const FIRE_LAW = `a fire must land on ${EFFECTS_FIRE_LINE_MIN}..${EFFECTS_FIRE_LINE_MAX}`
+    + ` (lines 0-${EFFECTS_FIRE_LINE_MIN - 1} belong to the priming records)`;
+  const FIRE_REMEDY = `drop the split — a layer without one may sit anywhere in 0..${PLANE_LINE_SPAN - 1}`;
+
+  it('the bound MOVES with v_offset — four offsets, four different floors', () => {
+    // ANTI-FIXED-WALL: if any of these coincided, the row could not tell a
+    // derived bound from a literal.
+    expect(new Set(OFFSETS.map(fireMin)).size).toBe(OFFSETS.length);
+    for (const vo of OFFSETS) {
+      const b = layerTopBounds(locked(vo), split(fireMin(vo)));
+      expect(b.min, `min at v_offset ${vo}`).toBe(fireMin(vo));
+      expect(b.max, `max at v_offset ${vo}`).toBe(fireMax(vo));
+      // ...and the control keeps the plane's own bound at the same v_offset.
+      expect(layerTopBounds(locked(vo), plain(0)))
+        .toEqual({ space: 'screen', label: 'Screen line', min: planeMin, max: planeMax });
+    }
+  });
+
+  it('holds at the FLOOR and names the edge, at every v_offset', () => {
+    for (const vo of OFFSETS) {
+      const scene = locked(vo);
+      const layer = split(fireMin(vo));
+      const n = guideBoundNotice(scene, layer, fireMin(vo) - 1);
+      expect(n, `no notice below the floor at v_offset ${vo}`).not.toBeNull();
+      expect(n!.tone).toBe('held');
+      expect(n!.edge).toBe('min');
+      expect(n!.limit, `floor at v_offset ${vo}`).toBe(fireMin(vo));
+      expect(n!.rule).toBe(ruleAt(fireMin(vo), planeMin));
+      expect(n!.text.length).toBeGreaterThan(0);
+    }
+  });
+
+  it('holds at the CEILING and names the edge, at every v_offset', () => {
+    expect(new Set(OFFSETS.map(fireMax)).size).toBe(OFFSETS.length);
+    for (const vo of OFFSETS) {
+      const n = guideBoundNotice(locked(vo), split(fireMax(vo)), fireMax(vo) + 1);
+      expect(n, `no notice above the ceiling at v_offset ${vo}`).not.toBeNull();
+      expect(n!.tone).toBe('held');
+      expect(n!.edge).toBe('max');
+      expect(n!.limit, `ceiling at v_offset ${vo}`).toBe(fireMax(vo));
+      expect(n!.rule).toBe(ruleAt(fireMax(vo), planeMax));
+    }
+  });
+
+  it('SAYS NOTHING anywhere inside the band — the whole legal strip, at every v_offset', () => {
+    for (const vo of OFFSETS) {
+      const scene = locked(vo);
+      for (let y = fireMin(vo); y <= fireMax(vo); y++) {
+        expect(guideBoundNotice(scene, split(y), y), `v_offset ${vo}, requested ${y}`).toBeNull();
+      }
+      // And the stored value alone, with no gesture, is silent across the band.
+      expect(guideBoundNotice(scene, split(fireMin(vo)))).toBeNull();
+      expect(guideBoundNotice(scene, split(fireMax(vo)))).toBeNull();
+    }
+  });
+
+  it('⚠ CONTROL: a layer with NO vsplit is never held anywhere on the plane, at any v_offset', () => {
+    // Without this the block cannot distinguish "the fire bound works" from
+    // "everything is bounded". The control is silent across all 512 plane rows.
+    for (const vo of OFFSETS) {
+      const scene = locked(vo);
+      for (let y = planeMin; y <= planeMax; y++) {
+        expect(guideBoundNotice(scene, plain(y), y), `plain, v_offset ${vo}, y ${y}`).toBeNull();
+        expect(guideBoundNotice(scene, plain(y)), `plain stored, v_offset ${vo}, y ${y}`).toBeNull();
+      }
+      // ANTI-VACUOUS: the same call on the same scene DOES speak for a split
+      // layer at a row the control just walked silently.
+      const outside = fireMax(vo) + 1;
+      if (outside <= planeMax) {
+        expect(guideBoundNotice(scene, split(outside), outside), `split at ${outside}`).not.toBeNull();
+      }
+    }
+  });
+
+  it('the PLANE still owns its own edges: a control dragged off the plane is held by the plane rule', () => {
+    for (const vo of OFFSETS) {
+      const over = guideBoundNotice(locked(vo), plain(planeMax), planeMax + 1);
+      expect(over).not.toBeNull();
+      expect(over!.tone).toBe('held');
+      expect(over!.rule).toBe('plane');
+      expect(over!.edge).toBe('max');
+      expect(over!.limit).toBe(planeMax);
+      const under = guideBoundNotice(locked(vo), plain(0), planeMin - 1);
+      expect(under!.rule).toBe('plane');
+      expect(under!.edge).toBe('min');
+      expect(under!.limit).toBe(planeMin);
+    }
+  });
+
+  it('rounds a raw gesture value before deciding, so a half-pixel drag is not held', () => {
+    for (const vo of OFFSETS) {
+      const scene = locked(vo);
+      const layer = split(fireMin(vo));
+      // Rounds UP to the floor: legal, silent.
+      expect(guideBoundNotice(scene, layer, fireMin(vo) - 0.4), `v_offset ${vo}`).toBeNull();
+      // Rounds DOWN past it: held, at the derived floor.
+      expect(guideBoundNotice(scene, layer, fireMin(vo) - 0.6)!.limit).toBe(fireMin(vo));
+    }
+  });
+
+  it('says nothing on an UNLOCKED scene, where a split is refused on a different rule', () => {
+    for (const vo of OFFSETS) {
+      const scene = unlocked(vo);
+      for (const y of [0, EFFECTS_FIRE_LINE_MIN - 1, EFFECTS_FIRE_LINE_MAX + 1, 303, 5000]) {
+        expect(guideBoundNotice(scene, split(y)), `unlocked stored ${y}`).toBeNull();
+        expect(guideBoundNotice(scene, split(y), y), `unlocked requested ${y}`).toBeNull();
+        expect(guideBoundNotice(scene, plain(y), y)).toBeNull();
+      }
+      // The other refusal is `fireLineAdvisory`'s, and it is silent here too.
+      expect(fireLineAdvisory(scene, split(303))).toBeNull();
+    }
+  });
+
+  it('⚠ DOCUMENTED HOLE: raising v_offset through the real command LIFTS THE FLOOR PAST an already-placed layer, and does not re-clamp it', () => {
+    // Reached without ever touching the layer. `setSceneFieldCommand` writes one
+    // key; nothing re-checks the layers it just invalidated, so the document is
+    // left holding a top the aeon build refuses. This row asserts the hole, not
+    // a fix: if a later parcel makes the command re-clamp, THIS TEST MUST BE
+    // REWRITTEN rather than deleted, and the notice below is what stands between
+    // the author and a dead build in the meantime.
+    const placedAt = EFFECTS_FIRE_LINE_MIN + 64;   // legal while v_offset is 64: line 3
+    const scene = { ...newEffectsScene('hole', 'Hole'), v_factor: EFFECTS_V_FACTOR_LOCK, v_offset: 64 };
+    scene.layers[0] = split(placedAt);
+    const lib = library([scene]);
+    const level = { sections: [], effectsScenes: lib } as unknown as S4Level;
+    const h = new EditHistory();
+
+    // Legal before, by the bound itself.
+    expect(placedAt).toBeGreaterThanOrEqual(fireMin(64));
+    expect(placedAt).toBeLessThanOrEqual(fireMax(64));
+    expect(guideBoundNotice(lib.scenes[0], lib.scenes[0].layers[0])).toBeNull();
+    expect(fireLineAdvisory(lib.scenes[0], lib.scenes[0].layers[0])).toBeNull();
+
+    // The one gesture: v_offset 64 -> 135, through the command path.
+    const cmd = setSceneFieldCommand(lib, 'hole', 'v_offset', 135);
+    expect(cmd, 'the v_offset edit emitted no command').not.toBeNull();
+    h.execute(cmd!, level);
+    const after = lib.scenes[0];
+    expect(after.v_offset).toBe(135);
+
+    // (a) THE HOLE: the layer is untouched. The command does not re-clamp.
+    expect(after.layers[0].world_y).toBe(placedAt);
+    expect(placedAt).toBeLessThan(fireMin(135));   // ...and the floor moved past it
+
+    // (b) The stored top is now illegal, and the notice says so with no gesture.
+    const n = guideBoundNotice(after, after.layers[0]);
+    expect(n, 'the stored-illegal top is silent').not.toBeNull();
+    expect(n!.tone).toBe('illegal');
+    expect(n!.rule).toBe('fire');
+    expect(n!.edge).toBeNull();
+    // The offending SCREEN line, which is `top - v_offset` and is negative here.
+    expect(n!.limit).toBe(fireScreenLineOf(after, placedAt));
+    expect(n!.limit).toBeLessThan(EFFECTS_FIRE_LINE_MIN);
+
+    // (c) The existing advisory reports the same layer, on the same rule.
+    expect(fireLineAdvisory(after, after.layers[0])).toContain(FIRE_LAW);
+
+    // ...and the control layer on the SAME scene, at the SAME top, stays silent.
+    expect(guideBoundNotice(after, plain(placedAt))).toBeNull();
+  });
+
+  it('ONE RULE, ONE SENTENCE: the notice and the advisory carry the same three clauses', () => {
+    const vo = 135;
+    const y = EFFECTS_FIRE_LINE_MIN + 64;           // below the floor at this v_offset
+    const advisory = fireLineAdvisory(locked(vo), split(y));
+    const held = guideBoundNotice(locked(vo), split(fireMin(vo)), fireMin(vo) - 1);
+    const illegal = guideBoundNotice(locked(vo), split(y));
+    expect(advisory).not.toBeNull();
+    expect(held!.rule).toBe('fire');
+    expect(illegal!.rule).toBe('fire');
+    for (const clause of [FIRE_IS, FIRE_LAW, FIRE_REMEDY]) {
+      expect(advisory, `advisory lost: ${clause}`).toContain(clause);
+      expect(held!.text, `held notice lost: ${clause}`).toContain(clause);
+      expect(illegal!.text, `illegal notice lost: ${clause}`).toContain(clause);
+    }
+  });
+
+  it("fireLineAdvisory's sentence is UNCHANGED, byte for byte, built from those clauses", () => {
+    // The refactor that shares the clauses must not have reworded the advisory.
+    const vo = 135;
+    const y = EFFECTS_FIRE_LINE_MIN + 64;
+    const line = fireScreenLineOf(locked(vo), y);
+    expect(fireLineAdvisory(locked(vo), split(y))).toBe(
+      `${FIRE_IS} at screen line ${line} (top ${y} less v_offset ${vo}) — and ${FIRE_LAW}. `
+      + `The build refuses it. Move the top onto the visible screen, or ${FIRE_REMEDY}.`);
+    // ...and the v_offset 0 arm, which drops the parenthetical.
+    const y0 = EFFECTS_FIRE_LINE_MAX + 1;
+    expect(fireLineAdvisory(locked(0), split(y0))).toBe(
+      `${FIRE_IS} at screen line ${y0} — and ${FIRE_LAW}. `
+      + `The build refuses it. Move the top onto the visible screen, or ${FIRE_REMEDY}.`);
+  });
+
+  it('the fire notice NAMES the v_offset it moved with, so the wall stops being anonymous', () => {
+    const texts = new Set<string>();
+    for (const vo of OFFSETS) {
+      const n = guideBoundNotice(locked(vo), split(fireMax(vo)), fireMax(vo) + 1);
+      expect(n!.rule).toBe('fire');
+      expect(n!.text, `v_offset ${vo} unnamed`).toMatch(new RegExp(`v_offset\\s+${vo}\\b`));
+      // It states the edge it held the value at, in the same sentence.
+      expect(n!.text, `limit ${n!.limit} unstated`).toContain(String(n!.limit));
+      texts.add(n!.text);
+    }
+    // ANTI-FIXED-WALL: four v_offsets, four different sentences.
+    expect(texts.size).toBe(OFFSETS.length);
+  });
+
+  it('the fire notice explains WHY the wall moved: the locked box top IS v_offset', () => {
+    // The floor sits EFFECTS_FIRE_LINE_MIN lines under the view box, and the box
+    // top is v_offset — which is the only reason 64 and 135 gave different walls.
+    const n = guideBoundNotice(locked(135), split(fireMin(135)), fireMin(135) - 1)!;
+    expect(n.text).toContain('box');
+    expect(n.text).toContain(String(EFFECTS_FIRE_LINE_MIN));
+    expect(n.text).toContain('135');
   });
 });
 
