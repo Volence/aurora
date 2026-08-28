@@ -20,6 +20,8 @@ import { bandBudget, bandRows } from './providers/bg-anim-aeon';
 import { serializeBgOverride } from '../core/formats/bg-override/bg-override';
 import { resolveDisplayedBg } from './providers/bganim-preview-aeon';
 import { lastGuideReport } from './canvas/effects-guides';
+import { lastCollisionMarkReport } from './canvas/collision-mark-report';
+import type { CollisionMarkReport } from './canvas/collision-mark-report';
 import type { GuideReport } from './canvas/effects-guides';
 import { lastScreenFrameReport, type ScreenFrameReport } from './canvas/screen-frame';
 import { lastCameraPreviewReport, type CameraPreviewReport } from './canvas/camera-preview';
@@ -422,6 +424,17 @@ interface AeonProbeApi {
    */
   guides(): GuideReport;
   /**
+   * THE COLLISION ANGLE MARKS AS THE LAST REPAINT DREW THEM.
+   *
+   * Same publish-not-recompute contract as `guides()`. OverlayRenderer writes
+   * this out of the very geometry it hands to `drawAngleMark`, in world px, so
+   * a harness knows where on the canvas to sample — and, just as importantly,
+   * where the mark must NOT be. `suppressed: true` (angles on, zoom below the
+   * density gate) is distinct from `active: false` (angles off), so both are
+   * rows that can fail. See canvas/collision-mark-report.ts.
+   */
+  collisionMarks(): CollisionMarkReport;
+  /**
    * THE SCREEN FRAME AS THE LAST REPAINT DREW IT (triage 2026-08-26 row G).
    * Same publish-not-recompute contract as `guides()`; `active: false` is what
    * the View toggle OFF reports, and `paints` proves a repaint happened.
@@ -737,6 +750,7 @@ function installAeonProbe(): AeonProbeApi {
     selectedScene: () => useEditorStore.getState().selectedEffectsSceneId,
     selectScene: (id) => useEditorStore.getState().setSelectedEffectsSceneId(id),
     guides: () => lastGuideReport(),
+    collisionMarks: () => lastCollisionMarkReport(),
     screenFrame: () => lastScreenFrameReport(),
     cameraPreview: () => lastCameraPreviewReport(),
     bandLens: () => lastBandLensReport(),

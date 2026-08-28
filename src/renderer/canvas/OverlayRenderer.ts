@@ -12,9 +12,11 @@ import {
 import { fitLabelInContext, labelBudget } from './label-fit';
 import type { CollisionProfileSet, Solidity } from '../../core/collision/collision-model';
 import { columnSolidRun } from '../../core/collision/collision-render';
-import { angleMark, drawAngleMark, MIN_CELL_PX_FOR_MARK } from '../../core/collision/collision-angle-mark';
+import { angleMark, drawAngleMark, MIN_CELL_PX_FOR_MARK, BAR_HALF, BARB_LEN } from '../../core/collision/collision-angle-mark';
 import type { MarkDrawCtx } from '../../core/collision/collision-angle-mark';
 import { resolveCell, resolvePlaneWords, SECTION_PLANE_WORDS } from '../../core/collision/collision-cell-resolve';
+import { publishCollisionMarkReport, ROW_CAP } from './collision-mark-report';
+import type { CollisionMarkRow } from './collision-mark-report';
 
 type Ctx = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
 
@@ -56,6 +58,12 @@ export class OverlayRenderer {
     collisionProfiles?: CollisionProfileSet | null,
   ): void {
     const { x: vpX, y: vpY, zoom } = viewport;
+
+    // Collect the angle marks this pass draws, then publish ONCE at the end —
+    // per SECTION would overwrite, and a harness would read whichever section
+    // happened to draw last. See collision-mark-report.ts.
+    this.markRows = [];
+    this.markDrawn = 0;
 
     ctx.save();
     ctx.scale(zoom, zoom);
@@ -100,7 +108,25 @@ export class OverlayRenderer {
     }
 
     ctx.restore();
+
+    // The publish. `active` is the toggle, `suppressed` the density gate — kept
+    // apart so "angles are off" and "angles are on but zoomed out" are
+    // different answers a row can fail on.
+    const anyCollision = options.showCollision || options.showCollisionPathB;
+    publishCollisionMarkReport({
+      active: anyCollision && options.showCollisionAngles,
+      suppressed: anyCollision && options.showCollisionAngles && 16 * zoom < MIN_CELL_PX_FOR_MARK,
+      zoom,
+      cellScreenPx: 16 * zoom,
+      drawn: this.markDrawn,
+      rows: this.markRows,
+    });
   }
+
+  /** Marks drawn by the in-flight `render()` pass (capped; see ROW_CAP). */
+  private markRows: CollisionMarkRow[] = [];
+  /** True count for the same pass, uncapped. */
+  private markDrawn = 0;
 
   drawTileGrid(ctx: Ctx, viewport: { x: number; y: number; width: number; height: number; zoom: number }): void {
     const { x: vpX, y: vpY, width, height, zoom } = viewport;
@@ -267,6 +293,20 @@ export class OverlayRenderer {
                   coreWidth: 1.25 / zoom,
                   casingWidth: 3 / zoom,
                 });
+                // Publish out of the SAME values just handed to the draw, in
+                // world px. Recomputing these anywhere else is the thing
+                // collision-mark-report.ts exists to avoid.
+                this.markDrawn++;
+                if (this.markRows.length < ROW_CAP) {
+                  const ax = cx + mark.ax, ay = cy + mark.ay;
+                  this.markRows.push({
+                    ax, ay,
+                    bar1x: ax - mark.tx * BAR_HALF, bar1y: ay - mark.ty * BAR_HALF,
+                    bar2x: ax + mark.tx * BAR_HALF, bar2y: ay + mark.ty * BAR_HALF,
+                    tipx: ax + mark.nx * BARB_LEN, tipy: ay + mark.ny * BARB_LEN,
+                    angle: p.angle,
+                  });
+                }
               }
             }
           }
