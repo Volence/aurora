@@ -26,6 +26,7 @@ import {
 import { cameraPreviewPlan } from '../camera-preview';
 import {
   fireScreenLineOf, EFFECTS_FIRE_LINE_MIN, EFFECTS_FIRE_LINE_MAX, PLANE_LINE_SPAN,
+  VSPLIT_LOCK_CLAUSES,
 } from '../../providers/effects-aeon';
 import { SCREEN_HEIGHT } from '../../../core/model/screen';
 import type { EffectsScene, EffectsLayer, EffectsFactor } from '../../../core/formats/effects/scene';
@@ -145,7 +146,15 @@ describe('the two axes, and exactly where they meet', () => {
     const v = viewOf(s);
     expect(v.splits).toHaveLength(1);
     expect(v.splits[0].y).toBeNull();
-    expect(v.splits[0].refusal).toContain('tracks the camera');
+    // DERIVED, NOT RETYPED (ROADMAP row 80). The strip is one of three surfaces
+    // reporting this bound and it composes the provider's clauses, so the
+    // assertion is against the clause itself — a second spelling here would be
+    // the exact drift the shared declaration exists to prevent. It also pins
+    // BOTH remedies: this arm used to offer only the lock.
+    expect(v.splits[0].refusal).toContain(VSPLIT_LOCK_CLAUSES.sceneIs(4));
+    expect(v.splits[0].refusal).toContain(VSPLIT_LOCK_CLAUSES.mechanism);
+    expect(v.splits[0].refusal).toContain(VSPLIT_LOCK_CLAUSES.remedyLock);
+    expect(v.splits[0].refusal).toContain(VSPLIT_LOCK_CLAUSES.remedyHorizontal);
   });
 
   it('the LOCKED notice is absent — an advisory that is always on screen is decoration', () => {

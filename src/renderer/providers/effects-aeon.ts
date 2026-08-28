@@ -1474,8 +1474,16 @@ export function fireLineAdvisory(
 ): string | null {
   if (!layerEmitsFire(layer)) return null;
   // An unlocked scene with a split is refused by `scene()` itself, on a
-  // different rule and with a different message (the two-writer collision); it
-  // already has its own advisory, and a layer top is not what is wrong with it.
+  // different rule and with a different message (the two-writer collision), and
+  // a layer top is not what is wrong with it: on that scene NO top has a screen
+  // line at all, so this function has nothing true to say about one.
+  //
+  // ⚠ THIS COMMENT USED TO END "it already has its own advisory" AND THAT WAS
+  // FALSE — nothing in Aurora said anything about the combination, so this early
+  // return silenced the one message the author would have got, on the strength
+  // of a message that did not exist. `vsplitLockAdvisory` is that advisory now;
+  // its block below carries the whole account. The early return itself was
+  // always right and is unchanged.
   if (layerTopSpace(scene) !== 'screen') return null;
   const line = fireScreenLineOf(scene, layer.world_y);
   if (line >= EFFECTS_FIRE_LINE_MIN && line <= EFFECTS_FIRE_LINE_MAX) return null;
@@ -1655,6 +1663,187 @@ export function vsplitOrderAdvisory(
     + `split at line ${prevLine} — two whole-plane vertical scroll values for one row, and `
     + 'the merged fire would carry both writes with the second silently winning. The build '
     + 'refuses it. Give the two layers different screen lines, or drop one split.';
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// THE TWO-WRITER RULING, SAID IN THE PANEL — ROADMAP row 80 (2026-08-28)
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// ⚠ THE DEFECT WAS A COMMENT ASSERTING A GUARD NOBODY HAD WRITTEN.
+// `fireLineAdvisory` carried, from the day it landed, this early return:
+//
+//     // An unlocked scene with a split is refused by `scene()` itself, on a
+//     // different rule and with a different message (the two-writer collision);
+//     // it ALREADY HAS ITS OWN ADVISORY, and a layer top is not what is wrong
+//     // with it.
+//     if (layerTopSpace(scene) !== 'screen') return null;
+//
+// The early return is correct — a layer top genuinely is not what is wrong with
+// that scene. The premise it rests on was not: NOTHING in Aurora said anything
+// about the combination. Grepping the whole tree for a second sentence on this
+// bound found `canvas/raster-timeline.ts`'s `splitRefusal`, which landed the
+// same day and lives in a DIFFERENT collapsible section from the controls that
+// originate the fault, and even there it named only one of the engine's two
+// remedies and never named the mechanism. So the panel silenced the one message
+// the author would have got, on the strength of a message that did not exist,
+// and an author could build a document the engine refuses OUTRIGHT with nothing
+// on screen saying so. See docs/reviews/2026-08-28-vsplit-advisory.md.
+//
+// ═══ THE ENGINE'S SIDE, at aeon ea343260c42c961b544f14cede0a8f25a7a7a5fd ═══
+//
+// `engine/level/scene_dsl.emp:1290` — `scene()` itself:
+//
+//   ensure(any_vsplit == 0 || v_factor == 15,
+//     "scene(): a layer authors vsplit: At(..) while this scene's Plane-B vertical
+//      scroll TRACKS THE CAMERA (v_factor {v_factor}; 15 is the lock sentinel).
+//      That is the two-writer collision: Parallax_Step5_Vscroll recomputes
+//      ((camY - v_center) >> v_factor) + v_offset every VBlank and Vscroll_Write
+//      ships it to VSRAM entry 1 at frame top, while the lowered split writes an
+//      ABSOLUTE constant to the same word mid-frame. The two do not merely
+//      disagree about a value — the split cannot express what the other writer is
+//      for: it carries ONE baked scroll value at ONE baked fire line, and that
+//      line is derived at comptime from the layer top, which is a screen line
+//      only while Vscroll_BG is constant. Lock the plane (v_factor: 15) and
+//      author the depth as a split, or express it horizontally (layer(fb:) /
+//      curve:), which the walker recomputes every frame")
+//
+// `engine/level/scene_dsl.emp:2479` — `scene_vsplit_line()`'s backstop, whose
+// last clause is the reason this must be an EDITOR message rather than a build
+// one: "An authored scene cannot reach this (scene() refuses the combination
+// outright); a Scene{{ .. }} literal can, and this is where it stops." The
+// author's document takes the AUTHORED path, so the sentence he will eventually
+// see is `scene()`'s — at build time, in a terminal, after the fact.
+//
+// ═══ WHY THE MECHANISM AND NOT THE ILLEGALITY ═══
+//
+// The precedent is `FIRE_FLOOR_IS_THE_BOX` above. The owner's confusion about
+// the fire floor was resolved by a sentence naming the COUPLING he had already
+// correctly noticed; "min 138" would have left his wrong model intact. The same
+// applies here and harder, because the author's model is not merely incomplete
+// — it is that `v_factor` and `vsplit` are two independent fields. TWO WRITERS
+// TO ONE WORD is the fact that makes them one field, and no amount of "this is
+// refused" gets there.
+//
+// ═══ WHY BOTH REMEDIES ═══
+//
+// They are genuinely different products, not two spellings of one fix. Locking
+// the plane keeps the depth VERTICAL and gives up camera-tracked vertical
+// parallax for the whole scene. Expressing it horizontally keeps the camera
+// tracking and moves the depth onto `fb`/`curve`, which the walker recomputes
+// every frame. An advisory offering only the first silently narrows what the
+// author can build — which is what `splitRefusal` was doing.
+//
+// ═══ ONE DECLARATION, THREE COMPOSITIONS ═══
+//
+// Same rule as the fire-bound clauses above: the bound is now reported from the
+// LAYER card, the SCENE's v_factor row and the raster timeline strip, and an
+// author reading three different sentences about one engine `ensure` has to work
+// out whether they are three rules. `canvas/raster-timeline.ts` imports these.
+//
+// ⚠ ADVISORY, NOT PREVENTION, and deliberately so on BOTH controls. The rule
+// "the control that owns a value refuses to originate an illegal one" is real
+// and is pending the owner's review (it touches ROADMAP rows 37/58/66), so
+// neither the v_factor spinner nor the split select is narrowed here: they still
+// originate the combination, the document still keeps it, and it still saves
+// (ROADMAP row 58). This parcel makes it VISIBLE, nothing more.
+
+/**
+ * What the scene is doing, in the field the author can see.
+ *
+ * ⚠ SUBJECT-FREE ON PURPOSE. Three surfaces compose this and each already has
+ * its own subject ("this layer…", "Layer 3's split…", the v_factor row itself),
+ * so a clause that carried "this scene's" would read as a doubled subject in two
+ * of the three — which is how a shared clause quietly becomes three clauses.
+ */
+const VSPLIT_LOCK_SCENE_IS = (vf: number) =>
+  `Plane B's vertical scroll TRACKS THE CAMERA (v_factor ${vf}; `
+  + `${EFFECTS_V_FACTOR_LOCK} is the lock sentinel)`;
+
+/**
+ * THE MECHANISM — the clause this whole parcel exists to put on screen.
+ *
+ * Transcribed from `scene()`'s own ensure and shortened for a panel hint, but
+ * never past the point where it stops being an explanation: the two writers,
+ * the one word, and WHY the split cannot stand in for the other writer.
+ */
+const VSPLIT_LOCK_MECHANISM =
+  'Two writers, one word: the parallax step recomputes Plane B\'s vertical scroll every '
+  + 'VBlank and ships it at frame top, while the split writes an ABSOLUTE constant to the '
+  + 'same word mid-frame. The split cannot express what the other writer is for — it carries '
+  + 'ONE baked scroll value at ONE baked fire line, and that line is derived at build time '
+  + 'from the layer top, which is a screen line only while the plane\'s scroll is constant.';
+
+/** REMEDY 1 — keep the split; the whole scene gives up camera-tracked vertical scroll. */
+const VSPLIT_LOCK_REMEDY_LOCK =
+  `lock the plane (v_factor ${EFFECTS_V_FACTOR_LOCK}) and author the depth as a split`;
+
+/** REMEDY 2 — keep the camera tracking; the depth moves onto the horizontal factors. */
+const VSPLIT_LOCK_REMEDY_HORIZONTAL =
+  'express the depth horizontally instead (the layer\'s Plane B factor, or a Plane B curve), '
+  + 'which the walker recomputes every frame';
+
+/** Both remedies, in the engine's own order, as one sentence. */
+const VSPLIT_LOCK_REMEDIES =
+  `Either ${VSPLIT_LOCK_REMEDY_LOCK}, or ${VSPLIT_LOCK_REMEDY_HORIZONTAL}.`;
+
+/** The clauses, exported so every surface composes the SAME words and no test retypes them. */
+export const VSPLIT_LOCK_CLAUSES = Object.freeze({
+  sceneIs: VSPLIT_LOCK_SCENE_IS,
+  mechanism: VSPLIT_LOCK_MECHANISM,
+  remedyLock: VSPLIT_LOCK_REMEDY_LOCK,
+  remedyHorizontal: VSPLIT_LOCK_REMEDY_HORIZONTAL,
+  remedies: VSPLIT_LOCK_REMEDIES,
+});
+
+/**
+ * The advisory for THIS LAYER's split on a camera-tracked scene, or null.
+ *
+ * The subject is the LAYER, because this is what the layer card renders and the
+ * author reached it by turning THIS split on. Null for every layer without a
+ * split, and null on a locked scene — where the split is legal and the fire
+ * rules (`fireLineAdvisory`, `vsplitOrderAdvisory`) take over.
+ *
+ * ⚠ IT MUST STAY SILENT ON A LOCKED SCENE, and that is this parcel's own worst
+ * trap rather than a nicety: every scene that ships is locked, so a null return
+ * is the majority case AND is exactly what a completely broken implementation
+ * produces. Nothing here can be believed without a locked control beside it.
+ */
+export function vsplitLockAdvisory(
+  scene: Pick<EffectsScene, 'v_factor'>,
+  layer: Pick<EffectsLayer, 'vsplit'>,
+): string | null {
+  if (!layerEmitsFire(layer)) return null;
+  if (layerTopSpace(scene) === 'screen') return null;
+  return `this layer authors a Plane B split while ${VSPLIT_LOCK_SCENE_IS(scene.v_factor)} — `
+    + `the build refuses the WHOLE SCENE, not just this layer. ${VSPLIT_LOCK_MECHANISM} `
+    + VSPLIT_LOCK_REMEDIES;
+}
+
+/**
+ * The same rule with the SCENE as its subject, for the `v_factor` row, or null.
+ *
+ * ⚠ A DIFFERENT EVENT, NOT A SECOND DRESSING — the `guideBoundNotice` precedent.
+ * The layer-card sentence answers "what did turning this split on do?"; this one
+ * answers "what did moving v_factor off the lock do?", and the author who took
+ * that route never touched a layer. It is also the only surface that can name
+ * WHICH layers are now illegal, which is the fact that route destroys.
+ *
+ * Null on a locked scene, and null on an unlocked scene carrying no split —
+ * unlocked-with-no-split is a perfectly legal scene and the majority of what the
+ * engine's parallax exists for.
+ */
+export function sceneVsplitLockAdvisory(
+  scene: Pick<EffectsScene, 'v_factor' | 'layers'>,
+): string | null {
+  if (layerTopSpace(scene) === 'screen') return null;
+  const guilty = scene.layers.reduce<number[]>(
+    (acc, l, i) => (layerEmitsFire(l) ? [...acc, i] : acc), []);
+  if (guilty.length === 0) return null;
+  const which = guilty.length === 1
+    ? `layer ${guilty[0]} authors a Plane B split`
+    : `layers ${guilty.join(', ')} author Plane B splits`;
+  return `${VSPLIT_LOCK_SCENE_IS(scene.v_factor)}, and ${which} — the build refuses this scene. `
+    + `${VSPLIT_LOCK_MECHANISM} ${VSPLIT_LOCK_REMEDIES}`;
 }
 
 /**
