@@ -96,11 +96,23 @@ describe('reconstructDPLCSprite', () => {
   });
 });
 
-// Integration check against the REAL Sonic engine binaries (skips if absent).
+// Integration check against the REAL Sonic engine binaries.
+//
+// `s4_engine` DOES NOT EXIST on this machine (aeon replaced it), so this row has
+// measured NOTHING for a long time. It used to say so with a bare
+// `describe.skip`, which reads as a quiet zero in a suite total; audited
+// 2026-08-28 (docs/reviews/2026-08-28-golden-live-tree.md) and made to name what
+// it could not measure. Left in place rather than deleted because the decision —
+// re-point at aeon, or drop it — belongs to the sprite lane.
 const ENGINE = '/home/volence/sonic_hacks/s4_engine';
 const haveSonic = existsSync(`${ENGINE}/data/mappings/sonic.bin`);
-(haveSonic ? describe : describe.skip)('real Sonic data (s4_engine)', () => {
-  it('parses 224 frames and reconstructs sane, non-empty character bitmaps', () => {
+describe('real Sonic data (s4_engine)', () => {
+  it('parses 224 frames and reconstructs sane, non-empty character bitmaps', (ctx) => {
+    if (!haveSonic) {
+      ctx.skip(`SKIPPED, NOT PASSED: ${ENGINE}/data/mappings/sonic.bin is absent — the s4_engine `
+        + 'tree is gone from this machine, so this row measures nothing at all and has not for some time');
+      return;
+    }
     const map = new Uint8Array(readFileSync(`${ENGINE}/data/mappings/sonic.bin`));
     const dplc = new Uint8Array(readFileSync(`${ENGINE}/data/dplc/sonic.bin`));
     const art = new Uint8Array(readFileSync(`${ENGINE}/art/uncompressed/characters/sonic.bin`));
