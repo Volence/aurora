@@ -6,6 +6,7 @@ import React from 'react';
 import SectionGridNav from '../../components/SectionGridNav';
 import ChunkLibrary from '../../components/ChunkLibrary';
 import MarqueePasteOptions from '../../components/MarqueePasteOptions';
+import TileBrushOptions from '../../components/TileBrushOptions';
 import ArtBrowser from '../../components/ArtBrowser';
 import PaletteViewer from '../../components/PaletteViewer';
 import AeonPropertiesPanel from '../../components/AeonPropertiesPanel';
@@ -36,6 +37,19 @@ function LayoutPanels() {
       {(tool === 'marquee' || pasting) && (
         <CollapsibleSection id="aeon.layoutOptions" title={pasting ? 'Paste' : 'Marquee'}>
           <MarqueePasteOptions />
+        </CollapsibleSection>
+      )}
+      {/* THIRD ARM OF THE SAME SLOT, and the shared id is correct for exactly
+          the reason the note above gives: these are mutually exclusive contents
+          of one retitling slot (a tool is stamp-chunk OR marquee OR a paint
+          tool, never two), so a collapse preference here is a preference about
+          the slot. Both paint tools share it because they write the same word
+          through the same brush — a flip armed for paint-tile that silently
+          dropped when you pressed B would be its own small version of the bug
+          this panel exists to fix. */}
+      {!pasting && (tool === 'paint-tile' || tool === 'paint-block') && (
+        <CollapsibleSection id="aeon.layoutOptions" title="Brush">
+          <TileBrushOptions />
         </CollapsibleSection>
       )}
       <CollapsibleSection id="aeon.art" title="Art"><ArtBrowser /></CollapsibleSection>

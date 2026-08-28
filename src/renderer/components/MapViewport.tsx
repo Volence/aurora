@@ -69,6 +69,7 @@ import { EFFECTS_V_OFFSET_DEFAULT } from '../../core/formats/effects/scene-ui';
 import type { EffectsScene } from '../../core/formats/effects/scene';
 import type { FacetCapability } from '../../core/project/adapter';
 import { SECTION_TILES_WIDE, SECTION_TILES_HIGH, SECTION_PIXEL_SIZE, unpackNametableWord } from '../../core/model/s4-types';
+import { brushNametableWord } from '../../core/editing/brush-word';
 import { BG_WIDTH } from '../../core/formats/bg-tiles';
 import type { Section, ObjectPlacement, RingPlacement } from '../../core/model/s4-types';
 import { T } from './ui';
@@ -1746,9 +1747,13 @@ export default function MapViewport() {
     // shows is different art of a different length — arming a BG stroke from it
     // was ROADMAP item 47, and the picker is now sourced from this same resolved
     // blob (providers/tile-picker-source.ts).
-    const { selectedBgTileIndex, selectedPaletteLine } = useEditorStore.getState();
+    const { selectedBgTileIndex } = useEditorStore.getState();
     const selectedTileIndex = selectedBgTileIndex;
-    const newNt = (selectedTileIndex & 0x7FF) | ((selectedPaletteLine & 0x3) << 13);
+    // The BACKGROUND plane's words have the SAME five fields the foreground's
+    // do, so the same brush rule applies: `brushNametableWord` reads the
+    // destination for the bit the brush is set to keep.
+    const newNt = brushNametableWord(
+      selectedTileIndex, resolved.layout[tile.tileIndex], useEditorStore.getState().tileBrush());
 
     // THE ONE REFUSAL, and it is loud. A nametable word's low bits are an index
     // into the blob the ROM bakes; the override's blob is only as long as the
@@ -1763,8 +1768,16 @@ export default function MapViewport() {
     // out-of-blob index, but a pick SURVIVES a blob that shrinks under it (a
     // band removal replaces `doc.tiles`), and `__dbg.setSelectedTile` arms one
     // directly. This is the last line of defence, not the first.
+    //
+    // THE ESCAPE IS THE INDEX, NOT THE WORD. This used to read `newNt !== 0`,
+    // which was the same test only while every attribute bit was hard-cleared:
+    // now that a stroke can PRESERVE the destination's priority, painting the
+    // blank tile over a high-priority cell yields a word that is non-zero while
+    // still naming tile 0. Testing the index keeps the escape meaning what its
+    // comment above says it means.
     const doc = resolved.source === 'override' ? overrideHolder?.doc ?? null : null;
-    if (doc !== null && newNt !== 0 && (newNt & LAYOUT_TILE_INDEX_MASK) >= doc.tiles.length) {
+    const pickedSlot = newNt & LAYOUT_TILE_INDEX_MASK;
+    if (doc !== null && pickedSlot !== 0 && pickedSlot >= doc.tiles.length) {
       if (!bgRefusalShown.current) {
         bgRefusalShown.current = true;
         useToastStore.getState().addToast(
@@ -2493,9 +2506,10 @@ export default function MapViewport() {
       const section = getSectionByIndex(info.sectionIndex);
       if (!section) return;
 
-      const { selectedTileIndex, selectedPaletteLine } = useEditorStore.getState();
+      const { selectedTileIndex } = useEditorStore.getState();
       const oldNt = section.tileGrid.nametable[info.tileIndex];
-      const newNt = (selectedTileIndex & 0x7FF) | ((selectedPaletteLine & 0x3) << 13);
+      const newNt = brushNametableWord(
+        selectedTileIndex, oldNt, useEditorStore.getState().tileBrush());
       if (oldNt !== newNt) {
         // The gesture starts here and commits on release — one command whether
         // it turns out to be a click or a sixty-cell drag.
@@ -2518,7 +2532,8 @@ export default function MapViewport() {
 
       const baseCol = Math.floor(info.col / 2) * 2;
       const baseRow = Math.floor(info.row / 2) * 2;
-      const { selectedTileIndex, selectedPaletteLine } = useEditorStore.getState();
+      const { selectedTileIndex } = useEditorStore.getState();
+      const brush = useEditorStore.getState().tileBrush();
       const entries: Array<{ index: number; oldNt: number; newNt: number }> = [];
       const dirtyIndices: number[] = [];
 
@@ -2530,7 +2545,10 @@ export default function MapViewport() {
           const idx = r * SECTION_TILES_WIDE + c;
           const oldNt = section.tileGrid.nametable[idx];
           const tileOffset = dr * 2 + dc;
-          const newNt = ((selectedTileIndex + tileOffset) & 0x7FF) | ((selectedPaletteLine & 0x3) << 13);
+          // PER CELL, not per block: each of the four keeps ITS OWN priority
+          // bit, which is the only reading that survives a block straddling a
+          // priority boundary.
+          const newNt = brushNametableWord(selectedTileIndex + tileOffset, oldNt, brush);
           if (oldNt !== newNt) {
             entries.push({ index: idx, oldNt, newNt });
             dirtyIndices.push(idx);
@@ -2840,9 +2858,10 @@ export default function MapViewport() {
       if (!section) return;
 
       if (tool === 'paint-tile') {
-        const { selectedTileIndex, selectedPaletteLine } = useEditorStore.getState();
+        const { selectedTileIndex } = useEditorStore.getState();
         const oldNt = section.tileGrid.nametable[info.tileIndex];
-        const newNt = (selectedTileIndex & 0x7FF) | ((selectedPaletteLine & 0x3) << 13);
+        const newNt = brushNametableWord(
+          selectedTileIndex, oldNt, useEditorStore.getState().tileBrush());
         if (oldNt !== newNt) {
           // Live, and recorded: the whole drag becomes one command on release.
           section.tileGrid.nametable[info.tileIndex] = newNt;
