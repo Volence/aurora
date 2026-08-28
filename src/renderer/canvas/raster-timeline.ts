@@ -257,13 +257,31 @@ export function splitRefusal(
     + `(lines 0-${EFFECTS_FIRE_LINE_MIN - 1} belong to the priming records). The build refuses it.`;
 }
 
-/** What this strip does not draw. Never empty — see the two-grammars block. */
+/**
+ * What this strip does not draw. Never empty — see the two-grammars block.
+ *
+ * ⚠ SHORT PHRASES, BECAUSE THIS IS DRAWN. The first build put the whole
+ * interval-versus-boundary sentence in here and the canvas truncated it to
+ * "palette bands (an interval with tw…" — an honesty line that cannot be read is
+ * not an honesty line. The canvas says WHAT is missing; `RASTER_TIMELINE_GRAMMAR`
+ * below says WHY the two mechanisms are not interchangeable, in prose beside the
+ * strip where a sentence has room to be a sentence.
+ */
 export function rasterTimelineAbsences(): string[] {
-  return [
-    'palette bands (an interval with two edges; a split is a boundary with one)',
-    'per-line deform',
-  ];
+  return ['palette bands', 'per-line deform'];
 }
+
+/**
+ * THE SENTENCE THE STRIP'S SHAPE DEPENDS ON, for the panel to render beside it.
+ *
+ * Two mechanisms are both called "raster" and they are shaped differently. A
+ * reader who takes the split rules for band edges has the wrong model of the
+ * hardware, and that is a worse outcome than not drawing them at all.
+ */
+export const RASTER_TIMELINE_GRAMMAR =
+  'Read-only. A split is ONE edge: from its line to the bottom of the frame, until the next '
+  + 'split supersedes it — there is no paired restore and no end line. A palette band is an '
+  + 'INTERVAL with two edges, and those are not drawn yet.';
 
 /**
  * The whole view, derived from the plan the camera preview draws from.
@@ -337,6 +355,9 @@ const SPLIT_TEXT = 'rgba(255, 220, 160, 0.98)';
 
 /** Where every ruler tick goes. 32 is the shipped scenes' own spacing (0/32/80/112/160). */
 const RULER_STEP = 32;
+
+/** Below this height a band has no middle worth aiming at, and the label goes to its top. */
+const LABEL_MID_MIN_H = 20;
 
 /**
  * What one draw actually put down — counted while drawing, never re-derived.
@@ -421,7 +442,14 @@ export function drawRasterTimeline(
     const text = `${b.label}${extra}`;
     ctx.fillStyle = EFFECTS_GUIDE_LABEL_BG;
     const tw = ctx.measureText(text).width;
-    const ty = Math.min(bottom - 6, y + 6);
+    // ⚠ AT THE BAND'S MIDDLE, NOT ITS TOP. A split fires at its layer's own top,
+    // so a label at the top sits exactly where that split's caption goes — and
+    // the first build lost L1's and L2's labels underneath them entirely, which
+    // left an author unable to tell which band was which. The middle is also the
+    // truer place: the label names an INTERVAL, and the rules name EDGES.
+    const ty = h >= LABEL_MID_MIN_H
+      ? Math.round(y + h / 2)
+      : Math.min(bottom - 6, y + 6);
     ctx.fillRect(x + w + 4, ty - 6, tw + 6, 12);
     ctx.fillStyle = b.locked ? CAMERA_PREVIEW_LABEL_WARN : EFFECTS_GUIDE_LABEL_TEXT;
     ctx.fillText(text, x + w + 7, ty);
@@ -475,8 +503,10 @@ export function drawRasterTimeline(
   // rectangle the app is making a claim about what the ROM would do, and this
   // line is the boundary of the claim, said to the person the claim is made to.
   ctx.fillStyle = CAMERA_PREVIEW_LABEL_WARN;
-  const foot = `not drawn: ${view.absent.join('; ')}`;
-  ctx.fillText(foot.length > 46 ? `${foot.slice(0, 45)}…` : foot, 2, bottom + 8);
+  // ⚠ NOT TRUNCATED. The phrases are short (see `rasterTimelineAbsences`)
+  // precisely so this fits; if a future absence makes it overflow, the fix is a
+  // shorter phrase, never an ellipsis — half an honesty line reads as chrome.
+  ctx.fillText(`not drawn: ${view.absent.join('; ')}`, 2, bottom + 8);
   if (view.splits.length === 0) {
     ctx.fillStyle = CAMERA_PREVIEW_LABEL_TEXT;
     ctx.fillText('no Plane B splits in this scene', 2, bottom + 20);

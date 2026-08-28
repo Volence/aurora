@@ -32,7 +32,7 @@ import { cameraPreviewPlan } from '../../canvas/camera-preview';
 import {
   drawRasterTimeline, rasterTimelineView, publishRasterTimelineReport,
   inactiveRasterTimelineReport,
-  RASTER_TIMELINE_W, RASTER_TIMELINE_H,
+  RASTER_TIMELINE_W, RASTER_TIMELINE_H, RASTER_TIMELINE_GRAMMAR,
 } from '../../canvas/raster-timeline';
 import type { EffectsSceneLibrary } from '../../../core/formats/effects/scene';
 
@@ -155,10 +155,11 @@ export default function RasterTimelineStrip(): React.ReactElement {
                   Layer {s.layer}&apos;s split {s.refusal}
                 </Hint>
               ))}
-            <Hint under style={{ marginBottom: 0 }}>
-              Read-only. A split is one edge: from its line to the bottom of the frame,
-              until the next split. Palette bands are not drawn yet.
-            </Hint>
+            {/* THE GRAMMAR SENTENCE, in prose because it does not fit on the
+                canvas and must not be truncated there. The strip's own footer
+                names WHAT is missing; this names WHY the two mechanisms are not
+                interchangeable — see canvas/raster-timeline.ts. */}
+            <Hint under style={{ marginBottom: 0 }}>{RASTER_TIMELINE_GRAMMAR}</Hint>
           </>
         )}
       </SectionBody>

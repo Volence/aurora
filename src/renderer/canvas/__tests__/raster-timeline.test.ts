@@ -18,9 +18,9 @@
 import { describe, it, expect } from 'vitest';
 import {
   rasterTimelineView, rasterTimelineSpaceNotice, rasterTimelineAbsences,
-  splitRefusal, lineToStripY, drawRasterTimeline,
+  splitRefusal, lineToStripY, drawRasterTimeline, RASTER_TIMELINE_GRAMMAR,
   RASTER_TIMELINE_LINES, RASTER_TIMELINE_ORIGIN_Y, RASTER_TIMELINE_SCALE,
-  RASTER_TIMELINE_STRIP_X, RASTER_TIMELINE_STRIP_W,
+  RASTER_TIMELINE_STRIP_X, RASTER_TIMELINE_STRIP_W, RASTER_TIMELINE_W,
   publishRasterTimelineReport, lastRasterTimelineReport, inactiveRasterTimelineReport,
 } from '../raster-timeline';
 import { cameraPreviewPlan } from '../camera-preview';
@@ -259,16 +259,36 @@ describe('splitRefusal — the engine\'s two rules, and the null majority', () =
 // ═══════════════════════════════════════════════════════════════════════════
 
 describe('what the strip refuses to claim', () => {
-  it('names PALETTE BANDS as not drawn, and names the grammar difference', () => {
-    // ⚠ THE VOCABULARY COLLISION. Two mechanisms are both called "raster": a
-    // palette band is an INTERVAL with a paired ON op and `pal_restore`; a
-    // vertical split is a BOUNDARY with one edge and no restore at all. Drawing
-    // one as the other is a picture that misstates the mechanism.
+  it('names PALETTE BANDS as not drawn', () => {
     const absent = rasterTimelineAbsences();
     expect(absent.length).toBeGreaterThan(0);
     expect(absent.join(' ')).toContain('palette bands');
-    expect(absent.join(' ')).toContain('two edges');
-    expect(absent.join(' ')).toContain('one');
+  });
+
+  it('THE VOCABULARY COLLISION is stated in full, where a sentence has room', () => {
+    // ⚠ Two mechanisms are both called "raster": a palette band is an INTERVAL
+    // with a paired ON op and `pal_restore`; a vertical split is a BOUNDARY with
+    // one edge and no restore at all. Drawing one as the other is a picture that
+    // misstates the mechanism.
+    //
+    // THIS LIVES IN PROSE, NOT ON THE CANVAS, and the split is the lesson: the
+    // first build put the whole sentence in the drawn absence line and the strip
+    // truncated it to "an interval with tw…". An honesty line that cannot be
+    // read is not an honesty line.
+    expect(RASTER_TIMELINE_GRAMMAR).toContain('ONE edge');
+    expect(RASTER_TIMELINE_GRAMMAR).toContain('INTERVAL with two edges');
+    expect(RASTER_TIMELINE_GRAMMAR).toContain('no paired restore');
+  });
+
+  it('the drawn absence line FITS the strip — it is never ellipsised', () => {
+    // The footer is measured against the strip's own width using the same 9px
+    // metric the draw uses. A phrase long enough to overflow must be shortened,
+    // never cut: half a sentence about what the app cannot show reads as chrome.
+    const foot = `not drawn: ${rasterTimelineAbsences().join('; ')}`;
+    // The draw's font is 9px system-ui; ~5.4px/char is the conservative upper
+    // bound this repo's other canvas captions are sized against.
+    expect(foot.length * 5.4).toBeLessThan(RASTER_TIMELINE_W - 4);
+    expect(foot).not.toContain('…');
   });
 
   it('the absence list is on every view, including a scene with nothing wrong', () => {
