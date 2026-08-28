@@ -59,8 +59,14 @@
 // press Ctrl (no mouse event at all), read the rect; release Ctrl, read it
 // again; then release the button and read it a third time. If the modifier
 // were sampled only from mouse events the first two reads would be identical
-// and the row fails; if mouseup re-snapped independently the third would
-// disagree with the second and the row fails.
+// and the row fails (MEASURED: a mouse-only modifier turns 6b and 6c red and
+// leaves every other row green, which is what makes section 6 the part of this
+// file that discriminates live sampling from release sampling).
+//
+// 6g is the one that catches a RELEASE-TIME RECOMPUTE: it holds the key through
+// the mouseup, where a re-snap from the armed setting would throw the inversion
+// away. 6f, where the key is already up, cannot — both computations agree
+// there, and it says so.
 //
 // ═══ SECTION 7: THE MODIFIER-CONFLICT CHECK ═══
 //
@@ -584,10 +590,19 @@ async function main() {
       await mouse('mouseReleased', p1.x, p1.y, 0);
       await sleep(300);
       const committed = await marquee();
-      check('6f', 'PREVIEW AND COMMIT ARE THE SAME VALUE: mouseup changes the rect not at '
-        + 'all. It is the one authority question this design has to answer, and it answers '
-        + 'it by having exactly one writer — a rect that re-snapped at release could show '
-        + 'one grid and commit another',
+      // ⚠ WHAT THIS ROW DOES AND DOES NOT CATCH, measured rather than assumed.
+      // A release-time re-snap FROM THE ARMED SETTING was planted in
+      // `handleMouseUp` and this row stayed GREEN — because the key is already
+      // up here, so the armed computation and the live one agree and there is
+      // nothing to disagree about. Seven other rows went red (3c, 3d, 4c, 4d,
+      // 5a, 5b, 6g), which is where that defect is actually caught: they hold
+      // the key THROUGH the release, and a release-time recompute throws the
+      // inversion away. So this row's honest claim is the narrower one — mouseup
+      // adds no writer of its own in the ordinary case — and 6g is the row that
+      // stands between the design and a preview that commits a different grid.
+      check('6f', 'mouseup adds NO SECOND WRITER: the rect after the button comes up is the '
+        + 'rect that was on screen before it, byte for byte. (Narrow by measurement — see '
+        + 'the note above; 6g is what catches a release-time recompute)',
         eq(committed, midReleased),
         `at last repaint ${rectStr(midReleased)} · after mouseup ${rectStr(committed)}`);
     }
