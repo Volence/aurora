@@ -110,6 +110,7 @@ import { packCollisionCell } from '../collision/collision-cell-word';
 import type { MapClipboard } from './map-clipboard';
 import { copyFromSection } from './map-clipboard';
 import { buildRegionWriteCommand } from './map-stamp';
+import { withLinkBreaks } from './chunk-links';
 import type { BatchCommand } from './commands';
 
 /** Which mirror. `h` swaps left and right, `v` swaps top and bottom. */
@@ -251,8 +252,18 @@ export function flipSectionRegion(args: {
 }): BatchCommand | null {
   const { section, sectionIndex, col, row, w, h, axis, description } = args;
   const flipped = flipClipboard(copyFromSection(section, col, row, w, h), axis);
-  return buildRegionWriteCommand({
+  const cmd = buildRegionWriteCommand({
     source: flipped, section, sectionIndex, baseCol: col, baseRow: row,
     writeArt: true, writeCollision: !flipped.artOnly, description,
   });
+  if (!cmd) return null;
+  // A FLIPPED TILE NO LONGER COMES FROM ITS CHUNK. Mirroring a region rewrites
+  // its art in place, and a tile at (x,y) now holds the word from the other end
+  // of the rectangle — so the chunk identity a stamp recorded there is simply
+  // false afterwards, and leaving it would have the next propagation of that
+  // chunk un-flip the region one tile at a time. (Owner ruling d-18c.)
+  //
+  // `withLinkBreaks` returns a BATCH here because the input is one, so the cast
+  // holds: it only ever wraps a non-batch into a new batch.
+  return withLinkBreaks(section, cmd) as BatchCommand;
 }

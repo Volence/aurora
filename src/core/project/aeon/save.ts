@@ -31,6 +31,7 @@ import {
 import { serializeBgTiles } from '../../formats/bg-tiles';
 import { bgLibIndexPath, bgLibLayoutPath, bgLibTilesPath, serializeBgLibraryIndex } from '../../formats/bg-library';
 import { serializeSectionMeta } from '../../formats/section-meta';
+import { clearedChunkLinksText, serializeSectionChunkLinks } from '../../formats/section-chunk-links';
 import { effectsScenePath, serializeEffectsScene } from '../../formats/effects/scene';
 import { effectsPresetPath, serializeEffectsPreset } from '../../formats/effects/preset';
 import { saveFileFor } from '../../formats/bg-override/bg-override-io';
@@ -149,6 +150,27 @@ export async function buildAeonSavePlan(
         const clearedBytes = new TextEncoder().encode(
           jsonFileText(JSON.stringify({ bgLayoutRef: null, paletteRef: null, sceneRef: null }, null, 2)));
         files.push({ path: metaPath, bytes: clearedBytes });
+      }
+    }
+
+    // Write the chunk-identity sidecar (.chunklinks.json) — which library chunk
+    // each stamped tile still remembers (owner ruling d-18c).
+    //
+    // Same three-way shape as the meta sidecar above, and for the same reasons:
+    // write when there is something to say, OVERWRITE WITH AN EMPTY DOCUMENT
+    // when there is not but a file exists (or detaching every placement would
+    // come back on the next load), and create nothing in the common case. The
+    // `understood()` gate matters more here than anywhere: a links document
+    // Aurora refused reads as "no identity layer", which is indistinguishable
+    // from an author who detached everything — and the exists probe would then
+    // find the very file that was never read and clear it.
+    if (understood('chunklinks.json')) {
+      const linksText = serializeSectionChunkLinks(section.chunkLinks);
+      const linksPath = `${prefix}.chunklinks.json`;
+      if (linksText !== null) {
+        files.push({ path: linksPath, bytes: new TextEncoder().encode(jsonFileText(linksText)) });
+      } else if (await fa.exists(linksPath)) {
+        files.push({ path: linksPath, bytes: new TextEncoder().encode(jsonFileText(clearedChunkLinksText())) });
       }
     }
   }

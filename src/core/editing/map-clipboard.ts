@@ -1,6 +1,7 @@
 import { SECTION_TILES_WIDE, SECTION_TILES_HIGH } from '../model/s4-types';
 import type { Section, ChunkDef } from '../model/s4-types';
 import { buildRegionWriteCommand } from './map-stamp';
+import { withLinkBreaks } from './chunk-links';
 import type { BatchCommand } from './commands';
 
 /**
@@ -261,8 +262,24 @@ export function buildPasteCommand(args: {
   const { clip, section, sectionIndex, baseCol, baseRow, layers, description } = args;
   const effective = effectivePasteLayers(clip, layers);
   if (effective === null) return null;
-  return buildRegionWriteCommand({
+  const cmd = buildRegionWriteCommand({
     source: clip, section, sectionIndex, baseCol, baseRow,
     writeArt: effective !== 'collision', writeCollision: effective !== 'art', description,
   });
+  if (!cmd) return null;
+  // A PASTE PRODUCES PLAIN TILES, and it must also BREAK whatever chunk
+  // identity the destination had (owner ruling d-18c).
+  //
+  // A `MapClipboard` is a rectangle of words with no chunk identity of its own —
+  // a marquee can straddle any number of stamps, or none — so there is nothing
+  // to carry INTO the destination. But the tiles it overwrites may well have
+  // remembered a chunk, and that memory is now false: the next propagation of
+  // that chunk would silently undo the paste. Clearing is the honest half that
+  // is available; carrying identity through the clipboard is deliberately left
+  // to a later parcel (see the module header note in chunk-links.ts).
+  //
+  // A collision-only paste writes no nametable words, so `withLinkBreaks` finds
+  // nothing to clear and returns the command untouched — correct: collision is
+  // not what a chunk link is about.
+  return withLinkBreaks(section, cmd) as BatchCommand;
 }

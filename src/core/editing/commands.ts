@@ -1,4 +1,4 @@
-import type { ObjectPlacement, RingPlacement, Section, Tileset, Palette, Color, Tile, ChunkDef, Act, BgLibraryEntry } from '../model/s4-types';
+import type { ObjectPlacement, RingPlacement, Section, Tileset, Palette, Color, Tile, ChunkDef, ChunkPlacementLink, Act, BgLibraryEntry } from '../model/s4-types';
 import type { EffectsScene, EffectsSceneLibrary } from '../formats/effects/scene';
 import type { EffectsPreset, EffectsPresetLibrary } from '../formats/effects/preset';
 import type { BgOverrideBand, BgOverrideDocument } from '../formats/bg-override/bg-override';
@@ -57,6 +57,28 @@ export interface SetCollisionEditCommand extends EditCommand {
    * why a single merge broadcast to two planes is a real defect.
    */
   otherPlaneEntries?: Array<{ index: number; oldColl: number; newColl: number }>;
+}
+
+/**
+ * Chunk identity — one undoable change to a section's `chunkLinks`
+ * (owner ruling d-18c). Emitted by every builder in editing/chunk-links.ts:
+ * the stamp's identity child, detach, and the link-break wrapper.
+ *
+ * A DELTA, not a snapshot, for the same reason `set-tiles` is: a stamp is a few
+ * hundred entries and the plane is 64K, and an undo stack of plane snapshots
+ * would carry a quarter of a megabyte per stamp.
+ *
+ * `entries` are plane writes; `addedPlacements`/`removedPlacements` are the
+ * record-list half. Placement ids are STABLE and never reused, so the two halves
+ * commute and undo is exact: revert restores `oldRef` and swaps the two lists.
+ * Nothing here holds an array INDEX into `placements`, which is what would break
+ * when a sibling is detached.
+ */
+export interface SetChunkLinksCommand extends EditCommand {
+  type: 'set-chunk-links';
+  entries: Array<{ index: number; oldRef: number; newRef: number }>;
+  addedPlacements?: ChunkPlacementLink[];
+  removedPlacements?: ChunkPlacementLink[];
 }
 
 export interface MoveObjectCommand extends EditCommand {
@@ -393,6 +415,7 @@ export type AnyCommand =
   | BatchCommand
   | SetTilesCommand
   | SetCollisionEditCommand
+  | SetChunkLinksCommand
   | MoveObjectCommand
   | AddObjectCommand
   | DeleteObjectCommand

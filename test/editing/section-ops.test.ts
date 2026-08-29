@@ -119,6 +119,76 @@ describe('cloneSection', () => {
     expect(clone.bgLayoutRef).toBeNull();
     expect(clone.sceneRef).toBeNull();
   });
+
+  /**
+   * ⚠ THE KEY-SET GUARD ABOVE CANNOT SEE THIS FIELD, WHICH IS WHY THIS ROW IS
+   * NAMED AND SEPARATE.
+   *
+   * That guard's reference object comes from `createSection`, so it only covers
+   * fields `createSection` sets. `chunkLinks` — like `collisionEdit*`,
+   * `engineCollision*` and `unreadable` — is an OPTIONAL field populated later
+   * (by the loader, or by the first stamp), so it is absent from the reference
+   * and invisible there. Deleting the `chunkLinks` line from `cloneSection`
+   * leaves the whole rest of this file green.
+   *
+   * The DECISION being pinned (owner ruling d-18c, which names copy-paste
+   * explicitly): a copied section KEEPS its chunk identity. The three
+   * collision fields and `unreadable` remain deliberately DROPPED, unchanged by
+   * that ruling and out of its scope.
+   */
+  it('CARRIES chunkLinks, deeply — copy/paste keeps chunk identity (d-18c)', () => {
+    const src = sec(0, 1);
+    src.chunkLinks = {
+      placements: [{ id: 3, chunkId: 'canopy', baseCol: 2, baseRow: 4, collision: true }],
+      plane: new Uint32Array(src.tileGrid.nametable.length),
+    };
+    src.chunkLinks.plane[0] = 3;
+    src.chunkLinks.plane[1] = 3;
+
+    const clone = cloneSection(src, 5);
+    expect(clone.chunkLinks, 'cloneSection must carry chunkLinks').toBeDefined();
+    expect(clone.chunkLinks!.placements).toEqual(src.chunkLinks.placements);
+    expect(Array.from(clone.chunkLinks!.plane)).toEqual(Array.from(src.chunkLinks.plane));
+
+    // DEEP, not aliased: two sections sharing one mutable plane would have a
+    // stamp in the copy silently retarget the original.
+    clone.chunkLinks!.plane[0] = 0;
+    clone.chunkLinks!.placements[0].chunkId = 'MUTATED';
+    expect(src.chunkLinks.plane[0]).toBe(3);
+    expect(src.chunkLinks.placements[0].chunkId).toBe('canopy');
+  });
+
+  /**
+   * The other half, and the reason it is not `chunkLinks: undefined`: an own key
+   * holding `undefined` still appears in `Object.keys`, which would break the
+   * key-set guard above for a field that is legitimately absent.
+   */
+  it('does not invent a chunkLinks key on a section that has none', () => {
+    const clone = cloneSection(sec(0, 1), 5);
+    expect(Object.keys(clone)).not.toContain('chunkLinks');
+  });
+
+  /**
+   * The four fields this parcel did NOT change, recorded so the drop is a
+   * decision on the record rather than an oversight rediscovered later. If a
+   * future parcel makes cloneSection carry these, this row is the one to delete
+   * — deliberately.
+   */
+  it('still drops collisionEdit / engineCollision / unreadable (unchanged, and DELIBERATE)', () => {
+    const src = sec(0, 1);
+    src.collisionEdit = new Uint16Array(4);
+    src.collisionEditB = new Uint16Array(4);
+    src.engineCollision = new Uint8Array(4);
+    src.engineCollisionB = new Uint8Array(4);
+    src.unreadable = ['objects.json'];
+
+    const clone = cloneSection(src, 5);
+    expect(clone.collisionEdit).toBeUndefined();
+    expect(clone.collisionEditB).toBeUndefined();
+    expect(clone.engineCollision).toBeUndefined();
+    expect(clone.engineCollisionB).toBeUndefined();
+    expect(clone.unreadable).toBeUndefined();
+  });
 });
 
 describe('addSection', () => {
