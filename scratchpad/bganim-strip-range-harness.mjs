@@ -77,6 +77,7 @@ import { writeFileSync, mkdirSync, existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname } from 'node:path';
 import * as http from 'node:http';
+import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
 
 const PORT = Number(process.env.PORT ?? 9401);
 const ROOT = process.env.AURORA_ROOT ?? dirname(dirname(fileURLToPath(import.meta.url)));
@@ -266,7 +267,7 @@ async function main() {
   // off-by-one bug report. This knob makes that condition reproducible instead
   // of waiting for it, and every aim below re-derives through the app's own
   // formula either way.
-  const child = spawn('/usr/bin/xvfb-run',
+  const child = spawnGuarded('/usr/bin/xvfb-run',
     ['-a', '-s', '-screen 0 1680x1050x24', ELECTRON,
       ...(process.env.SCALE ? [`--force-device-scale-factor=${process.env.SCALE}`] : []),
       `${ROOT}/dist/main/index.mjs`],

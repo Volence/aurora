@@ -112,6 +112,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { homedir } from 'node:os';
 import * as http from 'node:http';
+import { spawnGuarded, killTree, restoreDiscoveryNow, readDiscoveryNow, resolveOwnedDiscovery } from './lib/harness-guard.mjs';
 
 const PORT = Number(process.env.PORT ?? 9411);
 // SELF-LOCATING, never a pinned path: run from the main clone this must serve
@@ -227,53 +228,16 @@ const STW = sectionTilesWide();
 // `snapshotDiscovery()`/`restoreDiscovery()` put the files back byte for byte
 // (or delete them if they did not exist), and `killTree()` kills the actual
 // Electron. Both run in the same `finally` as the CDP teardown.
-const DISCOVERY_FILES = ['.aurora', '.sonic-level-editor']
-  .map((sub) => join(homedir(), sub, 'mcp.json'));
-
-function snapshotDiscovery() {
-  return DISCOVERY_FILES.map((f) => {
-    try { return { f, content: readFileSync(f, 'utf8') }; } catch { return { f, content: null }; }
-  });
-}
-function restoreDiscovery(snap) {
-  for (const { f, content } of snap) {
-    try {
-      if (content === null) rmSync(f, { force: true });
-      else writeFileSync(f, content);
-    } catch (e) { console.log(`        WARN: could not restore ${f}: ${e.message}`); }
-  }
-}
-
-/** Every pid descended from `root`, `root` included. Linux /proc only. */
-function descendants(root) {
-  const parent = new Map();
-  for (const d of readdirSync('/proc')) {
-    if (!/^\d+$/.test(d)) continue;
-    try {
-      const m = /^PPid:\s*(\d+)$/m.exec(readFileSync(`/proc/${d}/status`, 'utf8'));
-      if (m) parent.set(Number(d), Number(m[1]));
-    } catch { /* raced with exit */ }
-  }
-  const out = new Set([root]);
-  let grew = true;
-  while (grew) {
-    grew = false;
-    for (const [pid, ppid] of parent) {
-      if (!out.has(pid) && out.has(ppid)) { out.add(pid); grew = true; }
-    }
-  }
-  return out;
-}
-
-/** SIGKILL a pid list, deepest first. Must be a list captured BEFORE any kill:
- *  once the wrapper dies its children reparent to init and become unfindable. */
-function killPids(pids) {
-  let n = 0;
-  for (const pid of [...pids].reverse()) {
-    try { process.kill(pid, 'SIGKILL'); n++; } catch { /* already gone */ }
-  }
-  return n;
-}
+// ── O16: THIS BLOCK MOVED TO scratchpad/lib/harness-guard.mjs ──────────────
+//
+// It was pasted here and in tile-attribute-harness.mjs, which is two copies of
+// the same treatment and exactly how this repo ended up with four open-coded
+// paint words and three broken collision writers (see
+// src/core/editing/brush-word.ts). There are ~90 launchers in scratchpad/; the
+// guards live in one module and every one of them imports it. `killTree` there
+// is also strictly better than what was here: it SIGTERMs first and gives
+// Chromium a grace period to flush localStorage before the SIGKILL, and it
+// prints the argv of every process it killed.
 
 let rpcId = 1;
 /** One JSON-RPC call over the REAL Aether HTTP binding. Returns the envelope. */
@@ -438,14 +402,12 @@ async function main() {
   console.log(`  SECTION_TILES_WIDE = ${STW}`);
 
   if (!(await portFree())) throw new Error(`port ${PORT} already serving a CDP target — kill it first`);
-  // §WIRE: the launched app will OVERWRITE the shared discovery files. Take a
-  // byte-for-byte snapshot now and put them back in the `finally` — the owner's
-  // Aurora publishes to the same paths.
-  const discoverySnapshot = snapshotDiscovery();
-  console.log(`  discovery snapshot: ${discoverySnapshot
-    .map((d) => `${d.f} ${d.content === null ? '(absent)' : `${d.content.length}B`}`).join(' · ')}`);
+  // §WIRE: the launched app will OVERWRITE the shared discovery files. The
+  // byte-for-byte snapshot is taken by `spawnGuarded` below, BEFORE the app can
+  // touch them, and put back in the `finally` — the owner's Aurora publishes to
+  // the same paths.
 
-  const child = spawn('/usr/bin/xvfb-run', [
+  const child = spawnGuarded('/usr/bin/xvfb-run', [
     '-a', '--server-args=-screen 0 1600x1000x24',
     ELECTRON, '.', `--remote-debugging-port=${PORT}`, '--no-sandbox',
   ], {
@@ -864,17 +826,11 @@ async function main() {
       // accepted once its `pid` is shown to be a descendant of the process this
       // harness spawned. `ours` is recomputed on every poll: the app writes the
       // file a beat after launch, and the pid set grows as Electron forks.
-      let disc = null;
-      for (let i = 0; i < 60 && !disc; i++) {
-        const ours = descendants(child.pid);
-        for (const f of DISCOVERY_FILES) {
-          try {
-            const j = JSON.parse(readFileSync(f, 'utf8'));
-            if (j.port && ours.has(j.pid)) { disc = { ...j, from: f }; break; }
-          } catch { /* not written yet, or not ours */ }
-        }
-        if (!disc) await sleep(250);
-      }
+      const owned = await resolveOwnedDiscovery({ roots: [child.pid], timeoutMs: 15000 });
+      // PRINT THE ARTIFACT THIS ROW JUDGES — the bytes seen and every refusal.
+      for (const r of owned.rejected ?? []) console.log(`        prov refused ${r}`);
+      if (owned.ok) console.log(`        prov ${owned.from} said ${owned.raw.trim()}`);
+      const disc = owned.ok ? { port: owned.port, pid: owned.pid, from: owned.from } : null;
       const MCP_PORT = disc?.port ?? -1;
       const info = disc ? await rpc(MCP_PORT, 'editor/get_project_info', {}) : null;
       const dbgState = await c.json('window.__dbg.aeon.state()');
@@ -1164,14 +1120,9 @@ async function main() {
     // so they are no longer descendants of anything this harness knows about.
     // (Measured: two Electron processes outlived the first two runs of this
     // phase exactly that way.)
-    const tree = [...descendants(child.pid)];
-    child.kill('SIGTERM');
-    await sleep(500);
-    const killed = killPids(tree);
-    await sleep(300);
-    console.log(`\ncleanup: SIGKILLed ${killed} process(es) under pid ${child.pid}`);
-    restoreDiscovery(discoverySnapshot);
-    console.log(`cleanup: restored ${discoverySnapshot.length} discovery file(s) to their pre-run state`);
+    await killTree(child);
+    for (const d of restoreDiscoveryNow()) console.log(`cleanup: restored ${d}`);
+    console.log(`cleanup: discovery on disk after restore:\n        ${readDiscoveryNow()}`);
   }
 
   const passed = results.filter((r) => r.ok).length;

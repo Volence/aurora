@@ -13,6 +13,7 @@
 
 import { spawn, execSync } from 'node:child_process';
 import * as http from 'node:http';
+import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
 
 const PORT = Number(process.env.PORT ?? 9366);
 const ROOT = '/home/volence/sonic_hacks/aurora';
@@ -53,7 +54,7 @@ function cdp(url) {
 async function run(label, body, mode) {
   const env = { ...process.env, AURORA_DEBUG_PORT: String(PORT), AURORA_NO_GPU: '1' };
   delete env.DISPLAY;
-  const child = spawn('/usr/bin/xvfb-run', ['-a', '-s', '-screen 0 1280x900x24', ELECTRON, `${ROOT}/dist/main/index.mjs`],
+  const child = spawnGuarded('/usr/bin/xvfb-run', ['-a', '-s', '-screen 0 1280x900x24', ELECTRON, `${ROOT}/dist/main/index.mjs`],
     { cwd: ROOT, env, stdio: ['ignore', 'ignore', 'ignore'], detached: true });
   const c = cdp(await waitForTarget());
   await c.ready;
@@ -71,7 +72,9 @@ async function run(label, body, mode) {
     await sleep(5000);
   }
   try { process.kill(-child.pid, 'SIGKILL'); } catch { /* */ }
-  try { execSync(`pkill -f 'aurora/dist/main/inde[x].mjs' 2>/dev/null; true`, { shell: '/bin/bash' }); } catch { /* */ }
+  // O16: a `pkill -f` on a dist path is NOT an ownership test — it matched the
+  // OWNER'S Aurora and (from a worktree) spared this run's own orphan. killTree()
+  // below signals only pids descended from what this harness spawned.
   await sleep(1500);
   console.log(`${label}: ${JSON.stringify(out)}`);
   return out;

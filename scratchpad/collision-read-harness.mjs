@@ -59,6 +59,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { homedir } from 'node:os';
 import * as http from 'node:http';
+import { spawnGuarded, killTree, restoreDiscoveryNow, readDiscoveryNow, resolveOwnedDiscovery } from './lib/harness-guard.mjs';
 
 const PORT = Number(process.env.PORT ?? 9414);
 const ROOT = process.env.AURORA_ROOT ?? dirname(dirname(fileURLToPath(import.meta.url)));
@@ -146,46 +147,16 @@ const hex = (w) => (w === null || w === undefined ? 'null' : `0x${(w >>> 0).toSt
 // own rows green. (2) `child.kill()` kills the `xvfb-run` WRAPPER, not the
 // Electron under it, so the throwaway survives holding the port. Snapshot +
 // restore, and killTree over /proc, both in ONE finally.
-const DISCOVERY_FILES = ['.aurora', '.sonic-level-editor'].map((sub) => join(homedir(), sub, 'mcp.json'));
-function snapshotDiscovery() {
-  return DISCOVERY_FILES.map((f) => {
-    try { return { f, content: readFileSync(f, 'utf8') }; } catch { return { f, content: null }; }
-  });
-}
-function restoreDiscovery(snap) {
-  for (const { f, content } of snap) {
-    try {
-      if (content === null) rmSync(f, { force: true });
-      else writeFileSync(f, content);
-    } catch (e) { console.log(`        WARN: could not restore ${f}: ${e.message}`); }
-  }
-}
-function descendants(root) {
-  const parent = new Map();
-  for (const d of readdirSync('/proc')) {
-    if (!/^\d+$/.test(d)) continue;
-    try {
-      const m = /^PPid:\s*(\d+)$/m.exec(readFileSync(`/proc/${d}/status`, 'utf8'));
-      if (m) parent.set(Number(d), Number(m[1]));
-    } catch { /* raced with exit */ }
-  }
-  const out = new Set([root]);
-  let grew = true;
-  while (grew) {
-    grew = false;
-    for (const [pid, ppid] of parent) {
-      if (!out.has(pid) && out.has(ppid)) { out.add(pid); grew = true; }
-    }
-  }
-  return out;
-}
-function killPids(pids) {
-  let n = 0;
-  for (const pid of [...pids].reverse()) {
-    try { process.kill(pid, 'SIGKILL'); n++; } catch { /* already gone */ }
-  }
-  return n;
-}
+// ── O16: THIS BLOCK MOVED TO scratchpad/lib/harness-guard.mjs ──────────────
+//
+// It was pasted here and in tile-attribute-harness.mjs, which is two copies of
+// the same treatment and exactly how this repo ended up with four open-coded
+// paint words and three broken collision writers (see
+// src/core/editing/brush-word.ts). There are ~90 launchers in scratchpad/; the
+// guards live in one module and every one of them imports it. `killTree` there
+// is also strictly better than what was here: it SIGTERMs first and gives
+// Chromium a grace period to flush localStorage before the SIGKILL, and it
+// prints the argv of every process it killed.
 
 let rpcId = 1;
 async function rpc(port, method, params) {
@@ -294,11 +265,9 @@ async function main() {
   }
 
   if (!(await portFree())) throw new Error(`port ${PORT} already serving a CDP target — kill it first`);
-  const discoverySnapshot = snapshotDiscovery();
-  console.log(`  discovery snapshot: ${discoverySnapshot
-    .map((d) => `${d.f} ${d.content === null ? '(absent)' : `${d.content.length}B`}`).join(' · ')}`);
-
-  const child = spawn('/usr/bin/xvfb-run', [
+  // `spawnGuarded` takes the discovery snapshot itself, on its first call,
+  // BEFORE the app it launches can overwrite the files — and it prints it.
+  const child = spawnGuarded('/usr/bin/xvfb-run', [
     '-a', '--server-args=-screen 0 1600x1000x24',
     ELECTRON, '.', `--remote-debugging-port=${PORT}`, '--no-sandbox',
   ], {
@@ -339,17 +308,12 @@ async function main() {
     if (!st0.open) throw new Error('aeon project never opened');
 
     // ── PROVENANCE: THE PORT IS OURS OR NOTHING BELOW RUNS ────────────────
-    let disc = null;
-    for (let i = 0; i < 60 && !disc; i++) {
-      const ours = descendants(child.pid);
-      for (const f of DISCOVERY_FILES) {
-        try {
-          const j = JSON.parse(readFileSync(f, 'utf8'));
-          if (j.port && ours.has(j.pid)) { disc = { ...j, from: f }; break; }
-        } catch { /* not written yet, or not ours */ }
-      }
-      if (!disc) await sleep(250);
-    }
+    const owned = await resolveOwnedDiscovery({ roots: [child.pid], timeoutMs: 15000 });
+    // PRINT THE ARTIFACT THE ROW JUDGES: the files seen, their bytes, and why
+    // each candidate was refused.
+    for (const r of owned.rejected ?? []) console.log(`        prov refused ${r}`);
+    if (owned.ok) console.log(`        prov ${owned.from} said ${owned.raw.trim()}`);
+    const disc = owned.ok ? { port: owned.port, pid: owned.pid, from: owned.from } : null;
     const MCP = disc?.port ?? -1;
     const info = disc ? await rpc(MCP, 'editor/get_project_info', {}) : null;
     const dbgState = await c.json('window.__dbg.aeon.state()');
@@ -698,14 +662,12 @@ async function main() {
   } finally {
     console.log('\n=== TEARDOWN ===');
     try { c?.close(); } catch { /* already gone */ }
-    // SNAPSHOT THE TREE FIRST, THEN KILL. `child` is the xvfb-run WRAPPER; once
-    // it dies its children reparent to init and become unfindable.
-    const tree = [...descendants(child.pid)];
-    console.log(`        process tree under ${child.pid}: ${tree.join(' ')}`);
-    child.kill('SIGKILL');
-    console.log(`        killTree: SIGKILLed ${killPids(tree)} pids`);
-    restoreDiscovery(discoverySnapshot);
-    console.log('        discovery files restored');
+    // killTree snapshots the tree BEFORE the first signal — once the xvfb-run
+    // wrapper dies its children reparent to init and become unfindable — and
+    // prints the argv of everything it killed.
+    await killTree(child);
+    for (const d of restoreDiscoveryNow()) console.log(`        restored ${d}`);
+    console.log(`        discovery on disk after restore:\n        ${readDiscoveryNow()}`);
   }
 
   const pass = results.filter((r) => r.ok).length;

@@ -258,6 +258,7 @@
 import { spawn, execSync } from 'node:child_process';
 import { writeFileSync, readFileSync, existsSync, mkdirSync } from 'node:fs';
 import * as http from 'node:http';
+import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
 
 const PORT = Number(process.env.PORT ?? 9381);
 const ROOT = '/home/volence/sonic_hacks/aurora';
@@ -1297,7 +1298,7 @@ async function main() {
   delete env.DISPLAY;
   // The xvfb screen only has to be big enough to HOLD the viewport; it does not
   // set it. That confusion is what the first controller run exposed.
-  const child = spawn('/usr/bin/xvfb-run', ['-a', '-s', `-screen 0 ${XVFB_W}x${XVFB_H}x24`, ELECTRON, `${ROOT}/dist/main/index.mjs`], {
+  const child = spawnGuarded('/usr/bin/xvfb-run', ['-a', '-s', `-screen 0 ${XVFB_W}x${XVFB_H}x24`, ELECTRON, `${ROOT}/dist/main/index.mjs`], {
     cwd: ROOT, env, stdio: ['ignore', 'pipe', 'pipe'], detached: true,
   });
   child.stdout.on('data', (d) => { if (process.env.VERBOSE) process.stdout.write(`[main] ${d}`); });
@@ -1568,7 +1569,9 @@ async function main() {
     try { process.kill(-child.pid, 'SIGTERM'); } catch { /* */ }
     try { execSync('sleep 3', { shell: '/bin/bash' }); } catch { /* */ }
     try { process.kill(-child.pid, 'SIGKILL'); } catch { /* */ }
-    try { execSync(`pkill -f 'aurora/dist/main/inde[x].mjs' 2>/dev/null; true`, { shell: '/bin/bash' }); } catch { /* */ }
+    // O16: a `pkill -f` on a dist path is NOT an ownership test — it matched the
+    // OWNER'S Aurora and (from a worktree) spared this run's own orphan. killTree()
+    // below signals only pids descended from what this harness spawned.
     await sleep(1000);
     console.log(`\nport free after teardown: ${await portFree()}`);
   }

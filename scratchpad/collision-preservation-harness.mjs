@@ -97,6 +97,7 @@ import { writeFileSync, readFileSync, mkdirSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname } from 'node:path';
 import * as http from 'node:http';
+import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
 
 const PORT = Number(process.env.PORT ?? 9413);
 // SELF-LOCATING, never a pinned path: run from the main clone this must serve
@@ -311,7 +312,7 @@ async function main() {
   }
   if (!(await portFree())) throw new Error(`port ${PORT} still serving a CDP target after 60s — kill it first`);
 
-  const child = spawn('/usr/bin/xvfb-run', [
+  const child = spawnGuarded('/usr/bin/xvfb-run', [
     '-a', '--server-args=-screen 0 1600x1000x24',
     ELECTRON, '.', `--remote-debugging-port=${PORT}`, '--no-sandbox',
   ], {

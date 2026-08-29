@@ -43,12 +43,29 @@
 //   Row 8  `dryRun` reports the real numbers and mutates nothing. Nothing in
 //          the node suite reads the document back ACROSS the bridge.
 //
-// PROVENANCE. `session()` launches `${ROOT}/dist/main/index.mjs`, but the port
-// comes from a discovery file in $HOME that a DIFFERENT Aurora (another
-// worktree, another session) may own. `editor/set_block_collision` exists only
-// on this branch, so if the port we found does not advertise it we are talking
-// to somebody else's app and every later row's PASS would be describing
-// somebody else's code. Row 1 aborts the run rather than fail one line.
+// PROVENANCE — REWRITTEN BY O16, AND THE OLD TEXT WAS WRONG.
+//
+// `session()` launches `${ROOT}/dist/main/index.mjs`, but the port comes from a
+// discovery file in $HOME that a DIFFERENT Aurora may own — another worktree,
+// another session, or THE OWNER'S OWN RUNNING EDITOR, which publishes to the
+// same paths.
+//
+// This used to be settled by row 1: "`editor/set_block_collision` exists only on
+// this branch, so if the port does not advertise it we are talking to somebody
+// else's app." That reasoning has two holes, and it is the more dangerous kind
+// of wrong because it reads like rigour:
+//
+//   * the premise expires. The method is on master now, so "advertises it"
+//     no longer distinguishes this branch from anything;
+//   * even when true it is a CAPABILITY test, not an IDENTITY test. It cannot
+//     tell this app from any other app with the same method — and the app most
+//     likely to be running with the same method is the owner's.
+//
+// The port is now accepted only if the pid its discovery file names is a
+// DESCENDANT of the process this harness spawned (`resolveOwnedDiscovery`, in
+// lib/harness-guard.mjs). Nothing else is accepted; the run reports UNMEASURABLE
+// and stops. Row 1 stays, demoted to what it always actually was: a check that
+// the app carries this branch's method.
 //
 // SAFETY. This drives the REAL /home/volence/sonic_hacks/s1disasm. Every write
 // below mutates the IN-MEMORY document only; **nothing here may call
@@ -58,10 +75,7 @@
 //
 //   VITE_AURORA_DEBUG=1 npm run build && node scratchpad/collision-agent-harness.mjs
 
-import { session, openProjectAndAct, clickEl, sleep, S1DIR, ROOT } from './canvas-cdp-harness.mjs';
-import { existsSync, readFileSync } from 'node:fs';
-import { homedir } from 'node:os';
-import { join } from 'node:path';
+import { session, openProjectAndAct, clickEl, sleep, S1DIR, ROOT, resolveOwnedDiscovery } from './canvas-cdp-harness.mjs';
 
 // FLAT/fully-solid, the value editor-methods.ts advertises in the `shape`
 // description (core/art/commit-collision.ts's FLAT_SHAPE = 0xff). Restated as a
@@ -81,19 +95,29 @@ function check(id, what, pass, detail = '') {
 // must be able to disagree about the app without disagreeing about the client.
 // ---------------------------------------------------------------------------
 
-/** The port the RUNNING app bound, from its discovery file. See PROVENANCE. */
-function discoverPort() {
-  for (const sub of ['.aurora', '.config/aurora', '.aether']) {
-    const p = join(homedir(), sub, 'mcp.json');
-    if (existsSync(p)) {
-      try {
-        const j = JSON.parse(readFileSync(p, 'utf8'));
-        if (j.port) return { port: j.port, from: p, pid: j.pid };
-      } catch { /* keep looking */ }
-    }
-  }
-  return null;
-}
+// ═══ O16: THE PORT IS OURS OR THIS HARNESS DOES NOT RUN ════════════════════
+//
+// What used to be here read ~/.aurora/mcp.json (then ~/.config/aurora, then
+// ~/.aether), took the FIRST `port` it found, and returned `j.pid` alongside it
+// — printed, never compared. The only provenance test downstream was row 1:
+// "does initialize advertise editor/set_block_collision?"
+//
+// That is a CAPABILITY test wearing an identity test's clothes. It establishes
+// that the app on that port is *a* build carrying that method. It does not
+// establish that it is *the app this harness launched* — and the owner's own
+// Aurora, built from a branch that has the method, passes it identically. Those
+// discovery paths are SHARED: his editor publishes to them too.
+//
+// So the failure this harness was one coincidence away from is not a crash. It
+// is: connect to the owner's running editor, `editor/set_block_collision` into
+// his OPEN DOCUMENT, read the write back through the same port, and report
+// every row green — describing nothing, while corrupting his work.
+//
+// The rule now is descent, which is the only thing that is actually about
+// ownership: the pid the discovery file names must be a descendant of a process
+// this harness spawned (`session()` launches through `spawnGuarded`). If no
+// file names such a pid, this reports UNMEASURABLE and stops. It never falls
+// back to "well, something answered".
 
 let nextId = 1;
 /** One JSON-RPC call over the real Aether HTTP binding. Returns the ENVELOPE. */
@@ -249,13 +273,30 @@ const main = async () => {
 
     // AFTER launch, never before: the discovery file exists only while an Aurora
     // is running, and the app removes it on shutdown.
-    const found = discoverPort();
-    if (!found) { console.error('no discovery file even after launch — did the server start?'); return; }
+    const found = await resolveOwnedDiscovery({ timeoutMs: 20000 });
+    // PRINT THE ARTIFACT THIS ROW JUDGED. Every candidate file, its bytes, and
+    // why each was refused — otherwise "provenance ok" is a claim about a
+    // decision nobody can see.
+    for (const r of found.rejected ?? []) console.log(`[prov] refused ${r}`);
+    if (!found.ok) {
+      console.error(`\nUNMEASURABLE: ${found.why}`);
+      console.error('Refusing to POST to a port this harness cannot prove it owns. The whole');
+      console.error('point of this guard is that the failure mode is SILENT SUCCESS: an app');
+      console.error("that answers is not evidence it is OUR app, and it may be the owner's.");
+      process.exitCode = 2;
+      return;
+    }
     const PORT = found.port;
-    console.log(`\n[wire] POST http://127.0.0.1:${PORT}/aether  (from ${found.from}, pid ${found.pid})`);
+    console.log(`\n[prov] discovery file ${found.from} said:\n       ${found.raw.trim()}`);
+    console.log(`[prov] pid ${found.pid} IS a descendant of ${found.roots.join(',')} — accepted`);
+    console.log(`[wire] POST http://127.0.0.1:${PORT}/aether`);
     console.log(`[app ] ${ROOT}/dist/main/index.mjs against ${S1DIR}\n`);
 
     // --- 1: provenance + discovery ---------------------------------------
+    // NOTE: this row is a CAPABILITY check and nothing more. It says the app
+    // carries this branch's method. Identity — that it is the app we launched —
+    // was settled above by descent, not here. Conflating the two is the defect
+    // O16 fixed.
     const init = await rpc(PORT, 'initialize', { protocolVersion: 1 });
     const methods = init.body.result?.methods ?? [];
     const advertised = methods.includes('editor/set_block_collision');

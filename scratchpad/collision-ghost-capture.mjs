@@ -20,6 +20,7 @@ import { writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname } from 'node:path';
 import * as http from 'node:http';
+import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
 
 const PORT = Number(process.env.PORT ?? 9397);
 const ROOT = process.env.AURORA_ROOT
@@ -174,7 +175,7 @@ async function main() {
   if (!(await portFree())) throw new Error(`port ${PORT} ALREADY serves a CDP target.`);
   const env = { ...process.env, AURORA_DEBUG_PORT: String(PORT), AURORA_NO_GPU: '1' };
   delete env.DISPLAY;
-  const child = spawn('/usr/bin/xvfb-run',
+  const child = spawnGuarded('/usr/bin/xvfb-run',
     // `-dpi 96` is NOT what pins the scale factor — MEASURED: with it present
     // this host still returned devicePixelRatio 1 on one run and 1.35 on the
     // next, which changes the PNG's pixel size (1400x872 vs 1890x1178) for a
