@@ -11,6 +11,8 @@ import {
 } from './canvas-colors';
 import { fitLabelInContext, labelBudget } from './label-fit';
 import { drawSectionPriority } from './priority-lens';
+import { drawSectionBothPlanes } from './both-planes-lens';
+import { drawSectionCrossovers } from './crossover-lens';
 import type { CollisionProfileSet, Solidity } from '../../core/collision/collision-model';
 import { columnSolidRun } from '../../core/collision/collision-render';
 import { angleMark, drawAngleMark, markTier, MIN_CELL_PX_FOR_MARK, BAR_HALF, NORMAL_LEN } from '../../core/collision/collision-angle-mark';
@@ -55,11 +57,41 @@ export interface PriorityLensPass {
   segments: number;
 }
 
+/** What one `render` call's BOTH-PLANES lens painted. A separate struct from
+ *  `PriorityLensPass` even though the numeric fields match, because it carries
+ *  `sectionsWithPlaneB` — the difference between "nothing is on both planes"
+ *  and "there was no second plane to compare against", which is exactly the
+ *  distinction a harness row must be able to fail on. */
+export interface BothPlanesLensPass {
+  veils: number;
+  segments: number;
+  sectionsWithPlaneB: number;
+}
+
+/** What one `render` call's CROSSOVER lens painted. `pairedVeils` and
+ *  `oneWayVeils` are kept apart, not summed, because "a loop with its crossover
+ *  on both planes" and "a loop that will work in one direction" are the two
+ *  states this lens exists to tell apart. */
+export interface CrossoverLensPass {
+  pairedVeils: number;
+  oneWayVeils: number;
+  segments: number;
+}
+
+/** What one `render` call's lenses painted. NAMED rather than one flat struct
+ *  because there are two of them now and a caller must not be able to publish
+ *  one lens's counts under the other's report. */
+export interface LensPasses {
+  priority: PriorityLensPass;
+  bothPlanes: BothPlanesLensPass;
+  crossover: CrossoverLensPass;
+}
+
 export class OverlayRenderer {
   /**
-   * Returns what the PRIORITY LENS painted this pass (zero-zero when the toggle
-   * is off, which is why it is a struct and not a boolean). MapViewport
-   * publishes it; this class stays free of the debug surface.
+   * Returns what each LENS painted this pass (all-zero when a toggle is off,
+   * which is why they are structs and not booleans). MapViewport publishes
+   * them; this class stays free of the debug surface.
    */
   render(
     ctx: Ctx,
@@ -68,9 +100,23 @@ export class OverlayRenderer {
     viewport: { x: number; y: number; width: number; height: number; zoom: number },
     objectSprites?: Map<string, ObjectPreview>,
     collisionProfiles?: CollisionProfileSet | null,
-  ): PriorityLensPass {
+    /**
+     * Which plane's crossover marks the crossover lens shows — the plane the
+     * collision palette is aimed at.
+     *
+     * A PARAMETER, NOT AN `OverlayOptions` KEY, and the distinction is not
+     * cosmetic: `OverlayOptions` is a set of BOOLEAN view toggles driven by
+     * `toggleOverlay` and enumerated by the View menu. A two-valued field in
+     * there would be dead chrome in the menu and a lie to `toggleOverlay`. It
+     * is also not a view preference at all — it is the brush's aim, which lives
+     * in the editor store.
+     */
+    crossoverPlane?: 'a' | 'b',
+  ): LensPasses {
     const { x: vpX, y: vpY, zoom } = viewport;
     const lens: PriorityLensPass = { veils: 0, segments: 0 };
+    const bothLens: BothPlanesLensPass = { veils: 0, segments: 0, sectionsWithPlaneB: 0 };
+    const xoverLens: CrossoverLensPass = { pairedVeils: 0, oneWayVeils: 0, segments: 0 };
 
     // Collect the angle marks this pass draws, then publish ONCE at the end —
     // per SECTION would overwrite, and a harness would read whichever section
@@ -121,6 +167,39 @@ export class OverlayRenderer {
         lens.veils += drawn.veils;
         lens.segments += drawn.segments;
       }
+      // THE BOTH-PLANES LENS, over the collision overlay it is a statement
+      // about and under the object markers, for the priority lens's reason.
+      //
+      // It resolves the planes itself rather than reusing the `a`/`b` the
+      // collision branch above computes, because those are computed ONLY when a
+      // collision overlay is on, and this lens must work with the collision
+      // overlays off — that is the state an author is in when they arm the
+      // brush from the Art facet or turn the overlays down to see the art.
+      if (options.showSolidBothPlanes || options.showCrossover) {
+        const a = resolvePlaneWords(info.section.collisionEdit, info.section.engineCollision, SECTION_PLANE_WORDS);
+        const hasB = !!(info.section.collisionEditB || info.section.engineCollisionB);
+        const b = hasB
+          ? resolvePlaneWords(info.section.collisionEditB, info.section.engineCollisionB, SECTION_PLANE_WORDS)
+          : null;
+        if (options.showSolidBothPlanes) {
+          if (hasB) bothLens.sectionsWithPlaneB++;
+          const drawn = drawSectionBothPlanes(ctx, viewport, a, b, info.offsetX, info.offsetY);
+          bothLens.veils += drawn.veils;
+          bothLens.segments += drawn.segments;
+        }
+        // THE CROSSOVER LENS, drawn LAST of the three so it is on top: a loop's
+        // crossover cells are usually solid-on-both as well (the shared ground
+        // under the loop), and the crossover is the rarer and more consequential
+        // of the two facts.
+        if (options.showCrossover) {
+          const aimedIsB = crossoverPlane === 'b';
+          const drawn = drawSectionCrossovers(
+            ctx, viewport, aimedIsB ? (b ?? a) : a, aimedIsB ? a : b, info.offsetX, info.offsetY);
+          xoverLens.pairedVeils += drawn.paired.veils;
+          xoverLens.oneWayVeils += drawn.oneWay.veils;
+          xoverLens.segments += drawn.paired.segments + drawn.oneWay.segments;
+        }
+      }
       if (options.showRings) {
         this.drawRings(ctx, info.section.rings, viewport, info.offsetX, info.offsetY);
       }
@@ -145,10 +224,10 @@ export class OverlayRenderer {
     });
 
     // Both parcels ended this method: the collision-mark report is published
-    // for its harness, and the priority lens's own report is RETURNED to the
-    // caller. Independent observers of one draw pass — neither supersedes the
-    // other, so the merge keeps both rather than choosing.
-    return lens;
+    // for its harness, and the lens reports are RETURNED to the caller.
+    // Independent observers of one draw pass — none supersedes another, so the
+    // merge keeps all of them rather than choosing.
+    return { priority: lens, bothPlanes: bothLens, crossover: xoverLens };
   }
 
   /** Marks drawn by the in-flight `render()` pass (capped; see ROW_CAP). */

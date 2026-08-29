@@ -33,6 +33,14 @@ import type { CollisionMarkReport } from './canvas/collision-mark-report';
 import type { GuideReport } from './canvas/effects-guides';
 import { lastScreenFrameReport, type ScreenFrameReport } from './canvas/screen-frame';
 import { lastPriorityLensReport, type PriorityLensReport } from './canvas/priority-lens';
+import { lastBothPlanesLensReport, type BothPlanesLensReport } from './canvas/both-planes-lens';
+import { lastCrossoverLensReport, type CrossoverLensReport } from './canvas/crossover-lens';
+import {
+  CROSSOVER_SHIFT, CROSSOVER_VALUE_MASK, CROSSOVER_BITS,
+  CROSSOVER_NONE, CROSSOVER_TO_A, CROSSOVER_TO_B, CROSSOVER_RESERVED,
+  readCrossover, crossoverRefusal,
+} from '../core/collision/layer-transition';
+import { auditCrossovers, crossoverAuditSeverity, type CrossoverAudit } from '../core/collision/crossover-audit';
 import { lastCameraPreviewReport, type CameraPreviewReport } from './canvas/camera-preview';
 import { lastRasterTimelineReport, type RasterTimelineReport } from './canvas/raster-timeline';
 import { lastBandLensReport, lastBandMarkReport } from './canvas/band-lens';
@@ -498,7 +506,52 @@ interface AeonProbeApi {
   armCollisionBrush(sel: {
     plane?: 'a' | 'b'; shape?: number; solidity?: 'none' | 'top' | 'sides-bottom' | 'all';
     xFlip?: boolean; yFlip?: boolean; brush?: number;
-  }): { plane: 'a' | 'b'; word: number };
+    /** The "A+B" chip. Goes through `setCollisionPaintBothPlanes`, NOT a raw
+     *  `set`, so the harness exercises the lens-surfacing side effect the chip
+     *  carries instead of a shortcut around it. */
+    bothPlanes?: boolean;
+    /** The crossover tri-state chip. Goes through
+     *  `setCollisionCrossoverBrush`, so the harness exercises the lens-surfacing
+     *  side effect rather than a shortcut around it. */
+    crossover?: 'keep' | 'clear' | 'hand-off';
+  }): { plane: 'a' | 'b'; word: number; bothPlanes: boolean; crossover: string };
+  /**
+   * The both-planes lens's last publish. Same role as `priorityLens()`: it
+   * reports what the last repaint DREW, so a harness can tell "veiled N cells"
+   * from "never ran", and `reason` distinguishes off / bg-layer / no-plane-b.
+   */
+  bothPlanesLens(): BothPlanesLensReport;
+  /** The crossover lens's last publish. `oneWayVeils` is the interesting one. */
+  crossoverLens(): CrossoverLensReport;
+  /**
+   * THE ENCODING, AS THE APP HOLDS IT.
+   *
+   * Published so a harness asserts against the running build's own constants
+   * rather than re-typing aeon's anchor into the harness — a second copy of a
+   * bit number is the exact defect this seam exists to prevent, and a harness
+   * is not exempt from that. The node test cross-checks these against the peer
+   * blob; this hook checks that the RUNNING app carries the same ones.
+   */
+  crossoverEncoding(): {
+    shift: number; valueMask: number; bits: number;
+    none: number; toA: number; toB: number; reserved: number;
+  };
+  /** One cell's crossover, by name, off the live document. `reserved` is a real
+   *  answer (the illegal value 3), never folded into `none`. */
+  crossoverAt(sectionIndex: number, plane: 'a' | 'b', index: number): string | null;
+  /**
+   * The paint-time loop audit over one section's two planes — the check aeon
+   * assigned to Aurora rather than to its build (anchor §8.2).
+   *
+   * Exposed because the audit is the only thing that can see a HALF-PAINTED
+   * loop, and a harness proving the brush wrote two bits proves nothing about
+   * whether the loop it belongs to is traversable in both directions.
+   */
+  crossoverAudit(sectionIndex: number): (CrossoverAudit & { severity: string }) | null;
+  /** The refusal text for writing `crossover` on `plane`, or null when legal.
+   *  A harness row asserts the editor REFUSES a self-mark, which is a hard
+   *  build error in aeon and must never reach a file. */
+  crossoverRefusal(plane: 'a' | 'b', crossover: string): string | null;
   /** The armed stamp source (editorStore.selectedChunkId). Read-only. */
   selectedChunk(): string | null;
   /** Every chunk-library id, in library order. Read-only. */
@@ -963,9 +1016,17 @@ function installAeonProbe(): AeonProbeApi {
       if (sel.xFlip !== undefined) e.setSelectedCollisionXFlip(sel.xFlip);
       if (sel.yFlip !== undefined) e.setSelectedCollisionYFlip(sel.yFlip);
       if (sel.brush !== undefined) e.setCollisionBrushSize(sel.brush);
+      // Through the SETTER, so the lens-surfacing side effect it carries is
+      // part of what the harness drives. A `set({...})` here would arm the mode
+      // without the lens and every subsequent row would be measuring a state no
+      // click can produce.
+      if (sel.bothPlanes !== undefined) e.setCollisionPaintBothPlanes(sel.bothPlanes);
+      if (sel.crossover !== undefined) e.setCollisionCrossoverBrush(sel.crossover);
       const s = useEditorStore.getState();
       return {
         plane: s.collisionPaintPlane,
+        bothPlanes: s.collisionPaintBothPlanes,
+        crossover: s.collisionCrossoverBrush,
         word: selectedCollisionWord({
           shape: s.selectedCollisionProfile, entryFlipX: s.selectedCollisionEntryFlipX,
           userXFlip: s.selectedCollisionXFlip, yFlip: s.selectedCollisionYFlip,
@@ -998,6 +1059,30 @@ function installAeonProbe(): AeonProbeApi {
     collisionMarks: () => lastCollisionMarkReport(),
     screenFrame: () => lastScreenFrameReport(),
     priorityLens: () => lastPriorityLensReport(),
+    bothPlanesLens: () => lastBothPlanesLensReport(),
+    crossoverLens: () => lastCrossoverLensReport(),
+    crossoverEncoding: () => ({
+      shift: CROSSOVER_SHIFT, valueMask: CROSSOVER_VALUE_MASK, bits: CROSSOVER_BITS,
+      none: CROSSOVER_NONE, toA: CROSSOVER_TO_A, toB: CROSSOVER_TO_B, reserved: CROSSOVER_RESERVED,
+    }),
+    crossoverAt: (sectionIndex, planeId, index) => {
+      const sec = getCurrentAct(useProjectStore.getState())?.sections[sectionIndex];
+      const plane = planeId === 'b' ? sec?.collisionEditB : sec?.collisionEdit;
+      if (!plane || index < 0 || index >= plane.length) return null;
+      return readCrossover(plane[index]);
+    },
+    crossoverAudit: (sectionIndex) => {
+      const sec = getCurrentAct(useProjectStore.getState())?.sections[sectionIndex];
+      if (!sec) return null;
+      const a = auditCrossovers(sec.collisionEdit, sec.collisionEditB);
+      return { ...a, severity: crossoverAuditSeverity(a) };
+    },
+    crossoverRefusal: (plane, crossover) =>
+      // Narrowed here rather than trusting the harness's string: an unknown
+      // value must not read as "legal".
+      (crossover === 'none' || crossover === 'to-a' || crossover === 'to-b')
+        ? crossoverRefusal(plane, crossover)
+        : `unknown crossover "${crossover}"`,
     cameraPreview: () => lastCameraPreviewReport(),
     rasterTimeline: () => lastRasterTimelineReport(),
     bandLens: () => lastBandLensReport(),
@@ -1165,6 +1250,18 @@ interface DebugApi {
    */
   view(): { x: number; y: number; zoom: number };
   setView(x: number, y: number, zoom: number): void;
+  /** Every View-menu overlay toggle, as the store holds them. Read-only. */
+  overlays(): Record<string, boolean>;
+  /**
+   * Flip one overlay toggle, exactly as the View menu's checkbox does.
+   *
+   * A harness needs this because two of the three lenses this repo now carries
+   * are ARMED AS A SIDE EFFECT of arming a brush — so a row that turned a lens
+   * on by reaching past the store could not tell "the app armed it" from "the
+   * harness did". This goes through `setOverlay`, the same action the menu
+   * calls, and rows that are about the arming read `overlays()` instead.
+   */
+  setOverlay(key: string, value: boolean): void;
   /**
    * Open an act the way the UI does — through the tab activation guard, which is
    * what carries the per-tab viewport snapshot/restore. `openAct` above goes
@@ -1412,6 +1509,9 @@ export function installDebugHooks(): void {
       return { x: v.vpX, y: v.vpY, zoom: v.zoom };
     },
     setView: (x, y, zoom) => useViewStore.getState().setViewport(x, y, zoom),
+    overlays: () => ({ ...useViewStore.getState().overlays }) as unknown as Record<string, boolean>,
+    setOverlay: (k, v) => useViewStore.getState()
+      .setOverlay(k as keyof ReturnType<typeof useViewStore.getState>['overlays'], v),
     activate: (zone, act) => activateLevelTarget(levelDocId(zone, String(act))),
     resetLevel: () => useClassicLevelStore.getState().reset(),
     // setState rather than setCurrentAct: the store action takes an act id, and

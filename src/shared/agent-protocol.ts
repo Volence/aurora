@@ -26,15 +26,46 @@ export type AgentRequest =
   | { kind: 'set-palette'; line: number; colors: number[] }   // 16 Genesis CRAM words
   | { kind: 'write-tiles'; tiles: number[][]; at?: number }   // each tile: 64 values 0-15
   | { kind: 'paint-region'; section: number; x: number; y: number; w: number; h: number; entries: NametableEntrySpec[] }
-  // EITHER `word` (fill the rectangle) OR `words` (one packed cell word per
-  // CELL, row-major, w*h long; null = leave that cell alone). Exactly one —
-  // enforced by `validateCollisionWrite`, not by this type, because a union of
-  // two request shapes here would have to be re-narrowed at every hop.
-  // `words` is the write half of `get-collision-region`: its reply's `words`
-  // array is this field, unchanged.
-  | { kind: 'paint-collision'; section: number; plane: 'a' | 'b'; x: number; y: number; w: number; h: number; word?: number; words?: (number | null)[] }
+  // ── paint_collision, after the 2026-08-29 merge of two parcels ────────────
+  //
+  // THREE INDEPENDENT AXES, and the combinations are decided in
+  // docs/reviews/2026-08-29-paint-collision-reconcile.md rather than left to
+  // fall out of the code:
+  //
+  //  • FORM — EITHER `word` (fill the rectangle) OR `words` (one packed cell
+  //    word per CELL, row-major, w*h long; null = leave that cell alone).
+  //    Exactly one — enforced by `validateCollisionWrite`, not by this type,
+  //    because a union of two request shapes here would have to be re-narrowed
+  //    at every hop. `words` is the write half of `get-collision-region`: its
+  //    reply's `words` array is this field, unchanged.
+  //  • PLANE — `'both'` is a MODE, not a third plane. It writes A and B in ONE
+  //    undo step, each cell merged against its own plane's word. See
+  //    core/collision/both-planes-paint.ts.
+  //  • CROSSOVER — the LOOP CROSSOVER tri-state, OPTIONAL, and absent means
+  //    `keep`, not "none". A request that names a shape without naming a
+  //    crossover has said nothing about layer handoff, and answering
+  //    "definitely none" for it is the exact collapse
+  //    `brushPriorityFromOptional` exists to prevent on the nametable road
+  //    (docs/reviews/2026-08-29-agent-paint-priority.md).
+  //
+  // ALL NINE COMBINATIONS ARE LEGAL and each axis keeps its own meaning under
+  // the others: `words` + `'both'` builds the cell plan once and hands it to
+  // each plane's OWN merge; `words` + a crossover applies the crossover to
+  // every cell the call WRITES and to none it skips.
+  | { kind: 'paint-collision'; section: number; plane: 'a' | 'b' | 'both'; x: number; y: number; w: number; h: number;
+      word?: number; words?: (number | null)[];
+      crossover?: 'keep' | 'clear' | 'hand-off' }
   // The READ half. Same 16px CELL units as paint-collision. `ascii` adds a
   // glyph grid a human can glance at; the JSON is the same either way.
+  //
+  // ⚠ `plane` IS 'a' | 'b' AND DELIBERATELY NOT 'both', which paint-collision
+  // does accept. A read of "both" has no honest answer in one reply: it would
+  // have to return two grids (a reply whose SHAPE depends on a parameter, and
+  // whose `words` would no longer be the one array paint-collision takes back)
+  // or merge the two planes into one grid — and merging is precisely the
+  // flattening the mixed-cell rule already refuses one level down, where four
+  // disagreeing sub-tiles report `null` rather than a sampled guess. Two calls
+  // say it exactly. `validateCollisionReadPlane` refuses `'both'` in prose.
   | { kind: 'get-collision-region'; section: number; plane: 'a' | 'b'; x: number; y: number; w: number; h: number; ascii?: boolean }
   | { kind: 'save-chunk'; name: string; w: number; h: number; entries: NametableEntrySpec[]; collisionA?: number[]; collisionB?: number[] }
   | { kind: 'stamp-chunk'; chunkId: string; section: number; x: number; y: number }

@@ -210,6 +210,14 @@ function applyCommand(cmd: AnyCommand, level: S4Level): void {
     case 'set-collision-edit': {
       const arr = cmd.plane === 'b' ? section.collisionEditB : section.collisionEdit;
       if (arr) for (const e of cmd.entries) arr[e.index] = e.newColl;
+      // The "Both planes" stroke's other half. APPLIER, not decider: these
+      // words were already merged against their own plane's cells by
+      // both-planes-paint.ts, so replaying them verbatim is correct and
+      // re-merging here would put the rule in two places.
+      if (cmd.otherPlaneEntries?.length) {
+        const other = cmd.plane === 'b' ? section.collisionEdit : section.collisionEditB;
+        if (other) for (const e of cmd.otherPlaneEntries) other[e.index] = e.newColl;
+      }
       break;
     }
     case 'move-object': {
@@ -373,6 +381,13 @@ function undoCommand(cmd: AnyCommand, level: S4Level): void {
     case 'set-collision-edit': {
       const arr = cmd.plane === 'b' ? section.collisionEditB : section.collisionEdit;
       if (arr) for (const e of cmd.entries) arr[e.index] = e.oldColl;
+      // Both halves of a "Both planes" stroke undo together, in one step. Each
+      // `oldColl` was captured WHOLE from its own plane, so this restores all
+      // sixteen bits of both cells — including bits no Aurora field owns.
+      if (cmd.otherPlaneEntries?.length) {
+        const other = cmd.plane === 'b' ? section.collisionEdit : section.collisionEditB;
+        if (other) for (const e of cmd.otherPlaneEntries) other[e.index] = e.oldColl;
+      }
       break;
     }
     case 'move-object': {

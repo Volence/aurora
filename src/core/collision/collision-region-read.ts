@@ -70,6 +70,7 @@ import { unpackCollisionCell } from './collision-cell-word';
 import { resolveCell } from './collision-cell-resolve';
 import { columnSolidRun } from './collision-render';
 import { unownedCollisionBits } from '../editing/collision-word';
+import { readCrossover, type CrossoverRead } from './layer-transition';
 import { SECTION_TILES_WIDE, SECTION_TILES_HIGH } from '../model/s4-types';
 
 /** A section's extent in 16px COLLISION CELLS. Derived from the tile extent and
@@ -119,6 +120,21 @@ export interface CollisionCellRead {
   /** Surface angle in 256-units, or null when air / unknown / the profile's
    *  own `hasAngle` is false. Flip-resolved, like `shape`'s profile. */
   angle?: number | null;
+  /**
+   * The LOOP CROSSOVER this cell carries, BY NAME — bits 15:14 of the per-plane
+   * word, read through `layer-transition.ts`, the only module allowed to know
+   * that number. Absent on a mixed cell, like every other unpacked field.
+   *
+   * ADDED BY THE 2026-08-29 MERGE, and it is not decoration. When this module
+   * was written those bits were a field nothing in Aurora named, so reporting
+   * the raw `word` and a count was the whole honest answer. Hours later
+   * `lp2-loop-paint` gave them a meaning and a brush — and a read that still
+   * only counted them would leave the agent able to WRITE a crossover by name
+   * and unable to SEE one, on the surface whose entire purpose is verifying
+   * what a write did. `reserved` is the illegal value 3, reported rather than
+   * normalised, for the reason `readCrossover` states.
+   */
+  crossover?: CrossoverRead;
 }
 
 export interface CollisionRegionRead {
@@ -142,11 +158,25 @@ export interface CollisionRegionRead {
   /** How many cells in this rectangle have disagreeing sub-tiles. Non-zero
    *  means some `word`s are null and this region has no single-word form. */
   mixedCells: number;
-  /** How many cells carry bits outside `COLLISION_CELL_OWNED_MASK`. Zero in
-   *  every act shipped so far, which is exactly why it is reported rather than
-   *  assumed: an agent that round-trips a region must know when it is moving a
-   *  field nothing in Aurora names. */
+  /** How many cells carry bits outside `COLLISION_CELL_OWNED_MASK` — the mask
+   *  DERIVED from `packCollisionCell`, so this counts "bits no picture field
+   *  writes" and would keep counting a second field that appeared up there
+   *  tomorrow. Zero in every act shipped so far, which is exactly why it is
+   *  reported rather than assumed. */
   cellsWithUnownedBits: number;
+  /** How many cells carry a non-`none` crossover — the SAME bits as
+   *  `cellsWithUnownedBits` at today's layout, counted from the crossover
+   *  field's own mask instead of from the encoder's complement.
+   *
+   *  BOTH ARE REPORTED, AND THE DUPLICATION IS THE POINT. They are computed
+   *  from two independent constants and agree today by a coincidence
+   *  `layer-transition.test.ts` asserts rather than assumes
+   *  (`COLLISION_CELL_UNOWNED_MASK === CROSSOVER_BITS`). The day
+   *  `packCollisionCell` grows into bit 14, or the crossover moves, they part
+   *  company — and an agent seeing them disagree has learned something true
+   *  that a single number would have hidden. `reserved` (the illegal value 3)
+   *  counts here: it is not `none`, and its whole purpose is to be visible. */
+  crossoverCells: number;
   /** False when no collision shape tables are loaded, in which case `known` is
    *  false everywhere, `angle` is null everywhere and the ascii view is all
    *  `?` for non-air. Reported so "no tables" cannot be misread as "no shapes". */
@@ -294,6 +324,10 @@ export function readCollisionCell(
     solidity: c.solidity,
     known: r.known,
     angle: r.profile && r.profile.hasAngle ? r.profile.angle : null,
+    // BY NAME, through the seam — never `(word >> 14) & 3` here. See the
+    // "PROBLEM 2" block at the top of this file for why the merge that gave
+    // these bits a meaning had to reach the read as well as the write.
+    crossover: readCrossover(word),
   };
 }
 
@@ -313,6 +347,7 @@ export function readCollisionRegion(args: {
   const words: (number | null)[] = [];
   let mixedCells = 0;
   let cellsWithUnownedBits = 0;
+  let crossoverCells = 0;
   for (let r = 0; r < h; r++) {
     const row: CollisionCellRead[] = [];
     for (let c = 0; c < w; c++) {
@@ -322,17 +357,22 @@ export function readCollisionRegion(args: {
         mixedCells++;
         // A mixed cell's unowned bits are counted if ANY sub-tile carries them:
         // there is no cell word to test, and reporting zero here would hide the
-        // field behind the very disagreement that made it hard to see.
+        // field behind the very disagreement that made it hard to see. The
+        // crossover count follows the same rule for the same reason — a cell
+        // whose sub-tiles disagree about a loop handoff is the most, not the
+        // least, worth surfacing.
         if (cell.sub!.some((s) => unownedCollisionBits(s) !== 0)) cellsWithUnownedBits++;
-      } else if (unownedCollisionBits(cell.word ?? 0) !== 0) {
-        cellsWithUnownedBits++;
+        if (cell.sub!.some((s) => readCrossover(s) !== 'none')) crossoverCells++;
+      } else {
+        if (unownedCollisionBits(cell.word ?? 0) !== 0) cellsWithUnownedBits++;
+        if (cell.crossover !== undefined && cell.crossover !== 'none') crossoverCells++;
       }
       row.push(cell);
     }
     cells.push(row);
   }
   const out: CollisionRegionRead = {
-    plane, x, y, w, h, cells, words, mixedCells, cellsWithUnownedBits,
+    plane, x, y, w, h, cells, words, mixedCells, cellsWithUnownedBits, crossoverCells,
     profilesLoaded: profiles !== null,
   };
   if (ascii) out.ascii = renderCollisionAscii(cells, profiles, x, y);

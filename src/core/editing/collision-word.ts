@@ -80,13 +80,32 @@
 // collision-cell-word.ts's docblock means by "the full Sonic 4 solidity bits =
 // this 2-bit field on plane A's word + the 2-bit field on plane B's word".
 //
-// This module encodes NO meaning for them, and must not. It makes the word
-// PRESERVE them, not USE them. The `bake_cell` reading above is recorded here
-// only so that the next person to find these bits empty does not conclude they
-// are free everywhere and quietly reintroduce path-B solidity into a word that
-// no longer means that.
+// ═══ UPDATE 2026-08-29 — 15:14 NOW MEAN SOMETHING, AND THIS FILE STILL DOES
+//     NOT KNOW WHAT ═══
+//
+// Aeon committed the anchor (`git -C ../aeon show
+// aa2a9f29:docs/LOOP_CROSSOVER_ENCODING.md`): in Aurora's per-plane word, bits
+// 15:14 are the LOOP CROSSOVER field. They remain path-B solidity in the donor
+// word, exactly as the block above warned, and the two must never be crossed.
+//
+// THE DIVISION OF LABOUR IS UNCHANGED AND THAT IS THE POINT. This module still
+// spells no bit number: `core/collision/layer-transition.ts` is the seam that
+// knows them, and `collisionPaintWord` below asks it for a NAMED value. What
+// changed is only that the seam is now filled.
+//
+// AND THE OLD RULE PAID FOR ITSELF ON THE DAY THE FIELD ARRIVED. Because the
+// preservation rule was stated as a MASK COMPLEMENT — "the brush owns its
+// fields, the cell keeps the rest" — rather than as "preserve bits 15:14",
+// every collision stroke, stamp, paste and agent call in the editor has been
+// carrying crossovers correctly since the moment they existed, with no edit.
+// `keep` is therefore the free default rather than a feature. A literal
+// `0xC000` anywhere in that parcel would have had to be revisited here today.
 
 import { packCollisionCell } from '../collision/collision-cell-word';
+import {
+  crossoverFor, withCrossover,
+  type CrossoverBrush, type CollisionPlaneId,
+} from '../collision/layer-transition';
 
 /**
  * Every bit `packCollisionCell` can set — the brush's fields, and nothing else.
@@ -122,9 +141,41 @@ export const COLLISION_CELL_UNOWNED_MASK = (~COLLISION_CELL_OWNED_MASK) & 0xFFFF
  * The brush word is masked too, so a caller that hands over a word with stray
  * high bits cannot smuggle them past the rule.
  */
-export function collisionPaintWord(brushWord: number, oldWord: number | undefined): number {
-  return ((brushWord & COLLISION_CELL_OWNED_MASK)
+export function collisionPaintWord(
+  brushWord: number,
+  oldWord: number | undefined,
+  /**
+   * What the stroke does to the destination's LOOP CROSSOVER field
+   * (bits 15:14 of the per-plane word — see core/collision/layer-transition.ts,
+   * the one module allowed to know that).
+   *
+   * DEFAULTS TO `keep`, AND `keep` IS A NO-OP HERE BY CONSTRUCTION. The
+   * crossover bits are outside `COLLISION_CELL_OWNED_MASK`, so the preservation
+   * rule above already carries them across untouched. That is not a
+   * coincidence to be relied on quietly — the test asserts it — but it does
+   * mean this parcel INHERITED the fix rather than needing one, which is the
+   * clearest possible argument for having stated the 2026-08-28 rule as a mask
+   * complement instead of as "preserve bits 15:14".
+   *
+   * `plane` is required whenever the brush authors, because the legal value
+   * depends on which plane the word belongs to and a self-mark is a hard build
+   * error in aeon's bake. There is no way to call this that produces one.
+   */
+  crossover: CrossoverBrush = 'keep',
+  plane?: CollisionPlaneId,
+): number {
+  const merged = ((brushWord & COLLISION_CELL_OWNED_MASK)
     | ((oldWord ?? 0) & COLLISION_CELL_UNOWNED_MASK)) & 0xFFFF;
+  if (crossover === 'keep') return merged;
+  if (plane === undefined) {
+    // A caller that authors without naming a plane has asked for something this
+    // function cannot answer. THROW rather than defaulting: silently picking a
+    // plane here would author a self-mark half the time, and a self-mark is a
+    // build failure in aeon rather than a visible editor defect.
+    throw new Error('collisionPaintWord: a crossover brush that authors must name its plane');
+  }
+  const value = crossoverFor(crossover, plane);
+  return value === null ? merged : withCrossover(merged, value);
 }
 
 /** The bits of `word` that no field of the collision encoding owns. 0 for every

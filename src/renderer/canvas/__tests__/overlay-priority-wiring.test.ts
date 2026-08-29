@@ -9,6 +9,11 @@
 //
 // WHAT IT STILL CANNOT SEE: React, a real canvas, the View menu, and whether
 // any of it is on screen. That is scratchpad/priority-lens-harness.mjs.
+//
+// `render` now returns NAMED lens passes (`{ priority, bothPlanes }`) rather
+// than one flat struct, because there are two lenses and a caller must not be
+// able to publish one's counts under the other's report. The rows below read
+// `lens.priority`; the both-planes lens has its own wiring file.
 
 import { describe, it, expect } from 'vitest';
 import { OverlayRenderer } from '../OverlayRenderer';
@@ -53,7 +58,8 @@ function overlays(over: Partial<OverlayOptions> = {}): OverlayOptions {
     showObjects: false, showRings: false, showTileGrid: false, showBlockGrid: false,
     showChunkGrid: false, showCollision: false, showCollisionAngles: false,
     showCollisionPathB: false, showBgPlane: false, showStart: false,
-    showPriority: false, occludeSprites: false, playAnimatedArt: false,
+    showPriority: false, showSolidBothPlanes: false,
+    occludeSprites: false, playAnimatedArt: false,
     showScreenFrame: false, showCameraPreview: false,
     ...over,
   } as OverlayOptions;
@@ -72,7 +78,7 @@ describe('OverlayRenderer.render — the priority lens gate', () => {
       overlays(), viewport,
     );
     expect(veils(fills)).toEqual([]);
-    expect(lens).toEqual({ veils: 0, segments: 0 });
+    expect(lens.priority).toEqual({ veils: 0, segments: 0 });
   });
 
   it('veils that tile with the toggle ON, at its world position', () => {
@@ -82,7 +88,7 @@ describe('OverlayRenderer.render — the priority lens gate', () => {
       overlays({ showPriority: true }), viewport,
     );
     expect(veils(fills)).toEqual([{ style: PRIORITY_FILL, x: 24, y: 16, w: 8, h: 8 }]);
-    expect(lens).toEqual({ veils: 1, segments: 4 });
+    expect(lens.priority).toEqual({ veils: 1, segments: 4 });
   });
 
   it('runs over EVERY section it is given, at each one\'s own world offset', () => {
@@ -103,7 +109,7 @@ describe('OverlayRenderer.render — the priority lens gate', () => {
       { style: PRIORITY_FILL, x: 24, y: 16, w: 8, h: 8 },
       { style: PRIORITY_FILL, x: SECTION_PIXEL_SIZE + 8, y: 8, w: 8, h: 8 },
     ]);
-    expect(lens).toEqual({ veils: 2, segments: 8 });
+    expect(lens.priority).toEqual({ veils: 2, segments: 8 });
   });
 
   it('reports zeroes — not silence — for a section with no high tile', () => {
@@ -117,6 +123,6 @@ describe('OverlayRenderer.render — the priority lens gate', () => {
       ctx, [{ section, offsetX: 0, offsetY: 0 }], overlays({ showPriority: true }), viewport,
     );
     expect(veils(fills)).toEqual([]);
-    expect(lens).toEqual({ veils: 0, segments: 0 });
+    expect(lens.priority).toEqual({ veils: 0, segments: 0 });
   });
 });

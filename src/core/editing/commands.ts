@@ -33,6 +33,25 @@ export interface SetCollisionEditCommand extends EditCommand {
   type: 'set-collision-edit';
   plane: 'a' | 'b';
   entries: Array<{ index: number; oldColl: number; newColl: number }>;
+  /**
+   * The OTHER plane's entries, when ONE gesture wrote both — the "Both planes"
+   * collision brush (core/collision/both-planes-paint.ts).
+   *
+   * There is no second `plane` field on purpose: "the other plane" is
+   * `plane === 'a' ? 'b' : 'a'` and a second field could contradict the first.
+   * `otherPlane()` is the one place that ternary is spelled.
+   *
+   * WHY IT RIDES THIS COMMAND RATHER THAN BEING A SECOND ONE. A stroke is one
+   * undo step — the property the collision drag has had since it started
+   * batching. Two commands would be two undos for one gesture, and an author
+   * who pressed undo once would be left with the geometry on exactly one plane,
+   * which is the half-finished second plane this feature exists to prevent.
+   *
+   * Every entry here was merged against ITS OWN plane's destination cell. It is
+   * NOT a copy of `entries` with the same words — see both-planes-paint.ts for
+   * why a single merge broadcast to two planes is a real defect.
+   */
+  otherPlaneEntries?: Array<{ index: number; oldColl: number; newColl: number }>;
 }
 
 export interface MoveObjectCommand extends EditCommand {

@@ -14,7 +14,7 @@ import {
 // omitted state got answered with "off". See core/editing/brush-word.ts.
 import { brushNametableWord, brushPriorityFromOptional } from '../../core/editing/brush-word';
 import type { Tile, Zone, Act } from '../../core/model/s4-types';
-import { validatePaletteLine, validateTilePixels, validatePaintRegion, validateEntries, validateChunkCollisionPlane, validatePaintCollisionRect, validateCollisionWrite } from '../../core/agent/validation';
+import { validatePaletteLine, validateTilePixels, validatePaintRegion, validateEntries, validateChunkCollisionPlane, validatePaintCollisionRect, validateCollisionWrite, validateCollisionReadPlane } from '../../core/agent/validation';
 import { computeActBudget, canonicalTileHash } from '../../core/agent/budget';
 import { decodeGenesisColor, encodeGenesisColor } from '../../core/formats/palette';
 import { BG_WIDTH } from '../../core/formats/bg-tiles';
@@ -39,10 +39,15 @@ import { regenerateShiftCommand } from '../providers/bg-anim-art';
 import { makeSetBgOverrideTilesCommand } from '../../core/editing/bg-override-art';
 import { buildStampCommand } from '../../core/editing/map-stamp';
 import { ensureCollisionPlanes } from '../../core/collision/collision-cell-resolve';
-import { paintCollisionRectEntries, paintCollisionCellEntries } from '../../core/collision/collision-paint';
+import {
+  paintCollisionRectBothPlanes, paintCollisionCellsBothPlanes,
+} from '../../core/collision/collision-paint';
 import {
   readCollisionRegion, SECTION_CELLS_WIDE, SECTION_CELLS_HIGH, COLLISION_REGION_MAX_CELLS,
 } from '../../core/collision/collision-region-read';
+import {
+  auditCrossovers, crossoverAuditSeverity, crossoverAuditMessage,
+} from '../../core/collision/crossover-audit';
 import type { AgentRequest, AgentRequestEnvelope } from '../../shared/agent-protocol';
 import { useClassicProjectStore } from '../state/classicProjectStore';
 import {
@@ -437,36 +442,91 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
       const formErr = validateCollisionWrite(req.word, req.words, req.w, req.h);
       if (formErr) throw new Error(formErr);
       ensureCollisionPlanes(section);
-      const plane = req.plane === 'b' ? section.collisionEditB! : section.collisionEdit!;
-      // Both forms are DECIDERS and both go through `collisionPaintWord` inside
-      // collision-paint.ts — two forms of one tool must not be two rules.
+      // "both" is a MODE, not a third plane — the aimed plane stays A so the
+      // command, its description and its undo all name a real plane. See
+      // core/collision/both-planes-paint.ts for why "solid on both planes"
+      // needs no new cell field and is therefore not blocked on aeon's
+      // encoding anchor the way a layer transition is.
+      const bothPlanes = req.plane === 'both';
+      const aimedId: 'a' | 'b' = req.plane === 'both' ? 'a' : req.plane;
+      const aimed = aimedId === 'b' ? section.collisionEditB! : section.collisionEdit!;
+      const other = aimedId === 'b' ? section.collisionEdit! : section.collisionEditB!;
+      // Absent means `keep`, never `clear` — see the protocol comment.
+      const crossover = req.crossover ?? 'keep';
+      // THE THREE AXES COMPOSE, AND NOTHING BRANCHES TWICE ON ANY OF THEM.
+      // FORM picks the builder; PLANE and CROSSOVER are passed through to the
+      // same `buildPlaneEntries` merge underneath either one. Both forms are
+      // DECIDERS and both reach `collisionPaintWord` — two forms of one tool
+      // must not be two rules
+      // (docs/reviews/2026-08-29-paint-collision-reconcile.md).
       const plan = req.words !== undefined && req.words !== null
-        ? paintCollisionCellEntries({
+        ? paintCollisionCellsBothPlanes({
           x: req.x, y: req.y, w: req.w, h: req.h, words: req.words,
-          plane, tileWidth: SECTION_TILES_WIDE,
+          aimedPlane: aimed, otherPlane: other, tileWidth: SECTION_TILES_WIDE, bothPlanes,
+          aimedPlaneId: aimedId, crossover,
         })
         : {
-          entries: paintCollisionRectEntries({
+          ...paintCollisionRectBothPlanes({
             x: req.x, y: req.y, w: req.w, h: req.h, word: req.word!,
-            plane, tileWidth: SECTION_TILES_WIDE,
+            aimedPlane: aimed, otherPlane: other, tileWidth: SECTION_TILES_WIDE, bothPlanes,
+            aimedPlaneId: aimedId, crossover,
           }),
+          // The FILL form names a word for every cell in the rectangle, so it
+          // can never skip one. Stated as a constant rather than left off the
+          // reply, so `skipped` means the same thing on both roads.
           skipped: 0,
         };
-      const entries = plan.entries;
-      if (entries.length > 0) {
+      const entries = plan.aimed;
+      const otherPlaneEntries = plan.other;
+      if (entries.length > 0 || otherPlaneEntries.length > 0) {
         executeAmbientCommand({
           type: 'set-collision-edit',
-          plane: req.plane,
-          description: `agent: paint collision ${req.plane.toUpperCase()} ${req.w}x${req.h} at (${req.x},${req.y})`,
+          plane: aimedId,
+          description: `agent: paint collision ${bothPlanes ? 'A+B (both planes)' : aimedId.toUpperCase()} `
+            + `${req.w}x${req.h} at (${req.x},${req.y})`,
           sectionIndex: req.section,
           entries,
+          ...(otherPlaneEntries.length ? { otherPlaneEntries } : {}),
         }, ctx.level);
       }
-      return { painted: entries.length, skipped: plan.skipped };
+      // `painted` stays the AIMED plane's count so an existing caller's number
+      // does not change meaning; `paintedOther` is the new half, reported
+      // separately rather than folded in. A single summed number would make
+      // "wrote 8 sub-tiles on one plane" and "wrote 4 on each of two"
+      // indistinguishable, and this parcel's whole risk is the second plane
+      // quietly not being written.
+      // `skipped` counts CELLS whose word was null — one number, not one per
+      // plane, because the nulls come from a single `words` array and a cell a
+      // caller declined to name is declined on both planes.
+      // The audit rides back on the reply rather than waiting to be asked for.
+      // An agent painting a loop is the caller LEAST able to notice that it
+      // marked only one plane — it has no lens — and aeon's build does not
+      // check it either (anchor §8.2 assigns the loop-shaped check to Aurora).
+      // So the number that says "this loop works in one direction" is returned
+      // beside the paint that could have caused it.
+      const audit = auditCrossovers(section.collisionEdit, section.collisionEditB);
+      return {
+        painted: entries.length, paintedOther: otherPlaneEntries.length, bothPlanes,
+        skipped: plan.skipped,
+        crossover,
+        crossoverAudit: {
+          marksA: audit.marksA, marksB: audit.marksB, pairs: audit.pairs,
+          oneWay: audit.oneWay, selfMarks: audit.selfMarks, reserved: audit.reserved,
+          severity: crossoverAuditSeverity(audit),
+          note: crossoverAuditMessage(audit),
+        },
+      };
     }
 
     case 'get-collision-region': {
       const ctx = requireProject();
+      // ⚠ THE ONE COMBINATION THE MERGE REFUSED. `paint_collision` takes
+      // plane: "both"; this does not, and a caller that just used it there will
+      // try it here. The refusal is prose, not a bare enum error, because the
+      // method description is the only documentation an agent gets. See
+      // `validateCollisionReadPlane` for the argument.
+      const planeErr = validateCollisionReadPlane(req.plane);
+      if (planeErr) throw new Error(planeErr);
       // THE SAME VALIDATOR THE WRITE USES, on purpose: read and write must not
       // drift on what a legal cell rectangle is, and its cellsW/cellsH come
       // from the derived section cell extent rather than a second /2 here.

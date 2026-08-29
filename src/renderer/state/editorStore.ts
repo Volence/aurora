@@ -11,6 +11,7 @@ import {
   DEFAULT_BRUSH_ATTRIBUTES, brushAuthorsPriority,
   type BrushPriority, type BrushAttributes,
 } from '../../core/editing/brush-word';
+import { crossoverBrushAuthors, type CrossoverBrush } from '../../core/collision/layer-transition';
 import type { UndoStack } from '../../core/editing/undo-stack';
 import { useArtStore } from './artStore';
 import { BoundEditHistory } from '../../core/editing/bound-edit-history';
@@ -213,6 +214,43 @@ interface EditorState {
   selectedCollisionYFlip: boolean;  // flip the painted shape vertically (floor↔ceiling)
   selectedCollisionSolidity: Solidity; // floor type painted: all / top (jump-through) / none / sides-bottom
   collisionPaintPlane: 'a' | 'b';
+  /**
+   * SOLID ON BOTH PLANES — the stroke writes `collisionPaintPlane` AND the
+   * other one, as a single undo step.
+   *
+   * A MODE, NOT A CELL STATE, and that distinction is the reason this half of
+   * the loop parcel is not blocked on aeon's encoding anchor. Each plane already
+   * carries its own 16-bit word, so "solid on both" is fully expressible today
+   * as the same shape in both arrays; what was missing was a gesture that wrote
+   * them together. Aeon measured the cost of not having one: OJZ section 0's
+   * plane B is a strict subset of plane A, 644 cells solid on A and air on B and
+   * none the other way — the signature of painting shared ground twice by hand
+   * and stopping partway. See core/collision/both-planes-paint.ts.
+   *
+   * Off by default: a stroke that quietly wrote a plane the author was not
+   * looking at would be its own surprise.
+   */
+  collisionPaintBothPlanes: boolean;
+  /**
+   * THE LOOP CROSSOVER BRUSH — what a stroke does to the destination cell's
+   * layer-transition field (bits 15:14 of the per-plane word; the encoding
+   * lives in core/collision/layer-transition.ts and nowhere else).
+   *
+   * TRI-STATE, DEFAULTING TO `keep`, for `brush-word.ts`'s priority reasoning
+   * exactly: nothing in the shape picker depicts a crossover, so an author
+   * retouching a slope is saying nothing about layer handoff and the editor
+   * must not answer for them. `clear` and `hand-off` AUTHOR it, which is what
+   * keeps `keep` honest.
+   *
+   * `hand-off` rather than a pair of to-A/to-B values because PER PLANE THERE
+   * ARE ONLY TWO LEGAL VALUES: a plane-A cell may say "go to B" or nothing, and
+   * a plane-B cell "go to A" or nothing. The reverse is a SELF-MARK that aeon's
+   * bake hard-errors on. A brush that offers exactly the legal values cannot
+   * author an illegal one — the illegal state is unreachable rather than
+   * guarded — and one armed brush does the right thing on either plane, which
+   * is what makes a two-way loop two ordinary strokes.
+   */
+  collisionCrossoverBrush: CrossoverBrush;
   collisionBrushSize: number; // brush width in 16px blocks; 1 = reuse, >1 = positional N×N area
 
   /**
@@ -371,6 +409,36 @@ interface EditorState {
   setSelectedCollisionYFlip: (on: boolean) => void;
   setSelectedCollisionSolidity: (s: Solidity) => void;
   setCollisionPaintPlane: (plane: 'a' | 'b') => void;
+  /**
+   * Arm the "solid on both planes" mode.
+   *
+   * Turning it ON SURFACES THE BOTH-PLANES LENS (viewStore
+   * `showSolidBothPlanes`) and toasts that it did — the same feedback loop
+   * `setSelectedTilePriority` carries, wired here for the same reason
+   * brush-word.ts gives: the moment a stroke starts writing something nothing
+   * on screen depicts is the moment the author needs it on screen. A
+   * both-planes stroke writes a plane that is, by definition, not the one the
+   * author is looking at (the palette shows one plane's overlay at a time), so
+   * without the lens the second half of every stroke is invisible.
+   *
+   * Like the priority one, it only ever turns the lens ON: silently undoing a
+   * view the author may now be relying on is its own surprise, and the View
+   * menu is right there.
+   */
+  setCollisionPaintBothPlanes: (on: boolean) => void;
+  /**
+   * Arm the crossover brush. Leaving `keep` SURFACES THE CROSSOVER LENS
+   * (viewStore `showCrossover`) and toasts that it did — the third instance of
+   * the same feedback loop, wired to the rule (`crossoverBrushAuthors`) rather
+   * than to the chip, so the condition and the rule cannot drift.
+   *
+   * A crossover is the most invisible field the editor has ever let anyone
+   * paint: two bits that no shape, colour or overlay depicts, whose only
+   * observable effect is which of two collision planes the player is on three
+   * seconds later. Arming this without the lens is the state the owner was
+   * rescued from on the priority bit, one field further from anything visible.
+   */
+  setCollisionCrossoverBrush: (brush: CrossoverBrush) => void;
   setCollisionBrushSize: (size: number) => void;
   setSelectedEffectsSceneId: (id: string | null) => void;
   /**
@@ -517,6 +585,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   selectedCollisionYFlip: false,
   selectedCollisionSolidity: 'all',
   collisionPaintPlane: 'a',
+  collisionPaintBothPlanes: false,
+  collisionCrossoverBrush: 'keep',
   collisionBrushSize: 1,
   selectedEffectsSceneId: null,
   // 1x1 at slot 0: the smallest legal band, and a base the panel re-seeds to
@@ -591,6 +661,32 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   setSelectedCollisionYFlip: (on) => set({ selectedCollisionYFlip: !!on }),
   setSelectedCollisionSolidity: (s) => set({ selectedCollisionSolidity: s }),
   setCollisionPaintPlane: (collisionPaintPlane) => set({ collisionPaintPlane }),
+  setCollisionPaintBothPlanes: (on) => {
+    set({ collisionPaintBothPlanes: !!on });
+    // THE FEEDBACK LOOP, wired to the rule and not to the chip — same shape as
+    // setSelectedTilePriority's. Arming the mode is what makes a second,
+    // unwatched plane start changing, so that is the condition, not the click.
+    if (!on) return;
+    if (useViewStore.getState().overlays.showSolidBothPlanes) return;
+    useViewStore.getState().setOverlay('showSolidBothPlanes', true);
+    useToastStore.getState().addToast(
+      'Both-planes lens on — the teal veil marks the cells that are solid on path A AND path B, '
+      + 'so you can see the second plane this brush is now writing. Turn it off in View.',
+      'info',
+    );
+  },
+  setCollisionCrossoverBrush: (collisionCrossoverBrush) => {
+    set({ collisionCrossoverBrush });
+    if (!crossoverBrushAuthors(collisionCrossoverBrush)) return;
+    if (useViewStore.getState().overlays.showCrossover) return;
+    useViewStore.getState().setOverlay('showCrossover', true);
+    useToastStore.getState().addToast(
+      'Crossover lens on — the amber veil marks the cells that hand the player to the other '
+      + 'collision path. Nothing else on the map depicts them, and a loop painted on one plane '
+      + 'only works in one direction. Turn it off in View.',
+      'info',
+    );
+  },
   setCollisionBrushSize: (size) => set({ collisionBrushSize: Math.max(1, Math.min(31, size | 0)) }),
   setSelectedEffectsSceneId: (id) => set({ selectedEffectsSceneId: id }),
   setBandCandidate: (patch) => set((s) => ({
