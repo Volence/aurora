@@ -7,6 +7,7 @@
 
 import { spawn } from 'node:child_process';
 import * as http from 'node:http';
+import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
 
 const PORT = 9337;
 const S1DIR = '/home/volence/sonic_hacks/s1disasm';
@@ -58,7 +59,7 @@ function cdp(wsUrl) {
 }
 
 async function main() {
-  const electron = spawn(`${ROOT}/node_modules/.bin/electron`, [`${ROOT}/dist/main/index.mjs`], {
+  const electron = spawnGuarded(`${ROOT}/node_modules/.bin/electron`, [`${ROOT}/dist/main/index.mjs`], {
     cwd: ROOT,
     env: { ...process.env, AURORA_DEBUG_PORT: String(PORT), AURORA_NO_GPU: '1' },
     stdio: ['ignore', 'pipe', 'pipe'],

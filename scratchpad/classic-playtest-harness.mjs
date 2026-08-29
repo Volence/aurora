@@ -49,6 +49,7 @@ import { fileURLToPath } from 'node:url';
 import net from 'node:net';
 import * as http from 'node:http';
 import * as esbuild from 'esbuild';
+import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
 
 const PORT = Number(process.env.PORT ?? 9382);
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));   // this worktree
@@ -211,7 +212,7 @@ async function main() {
     // --- Row 2: the app opens s1disasm; palette honestly absent pre-connect --
     const env = { ...process.env, AURORA_DEBUG_PORT: String(PORT), AURORA_NO_GPU: '1', ORACLE_SOCKET: SOCK };
     delete env.DISPLAY;
-    app = spawn('/usr/bin/xvfb-run', ['-a', '-s', '-screen 0 1680x1050x24', ELECTRON, `${ROOT}/dist/main/index.mjs`], {
+    app = spawnGuarded('/usr/bin/xvfb-run', ['-a', '-s', '-screen 0 1680x1050x24', ELECTRON, `${ROOT}/dist/main/index.mjs`], {
       cwd: ROOT, env, stdio: ['ignore', 'pipe', 'pipe'], detached: true,
     });
     app.stdout.on('data', (d) => { if (process.env.VERBOSE) process.stdout.write(`[app] ${d}`); });

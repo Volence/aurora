@@ -25,6 +25,7 @@
 import { spawn } from 'node:child_process';
 import { writeFileSync, mkdirSync } from 'node:fs';
 import * as http from 'node:http';
+import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
 
 const PORT = Number(process.env.PORT ?? 9351);
 const S1DIR = '/home/volence/sonic_hacks/s1disasm';
@@ -230,7 +231,7 @@ async function ctrlZ(c) {
 }
 
 function launch() {
-  const e = spawn(ELECTRON, [`${ROOT}/dist/main/index.mjs`], {
+  const e = spawnGuarded(ELECTRON, [`${ROOT}/dist/main/index.mjs`], {
     cwd: ROOT,
     env: { ...process.env, AURORA_DEBUG_PORT: String(PORT), AURORA_NO_GPU: '1' },
     stdio: ['ignore', 'pipe', 'pipe'],

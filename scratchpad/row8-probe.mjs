@@ -5,6 +5,7 @@ import { spawn } from 'node:child_process';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as http from 'node:http';
+import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
 
 const PORT = 9385;
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -59,7 +60,7 @@ function cdp(wsUrl) {
 async function main() {
   const env = { ...process.env, AURORA_DEBUG_PORT: String(PORT), AURORA_NO_GPU: '1' };
   delete env.DISPLAY;
-  const app = spawn('/usr/bin/xvfb-run', ['-a', '-s', '-screen 0 1680x1050x24', ELECTRON, `${ROOT}/dist/main/index.mjs`], {
+  const app = spawnGuarded('/usr/bin/xvfb-run', ['-a', '-s', '-screen 0 1680x1050x24', ELECTRON, `${ROOT}/dist/main/index.mjs`], {
     cwd: ROOT, env, stdio: ['ignore', 'ignore', 'ignore'], detached: true,
   });
   try {

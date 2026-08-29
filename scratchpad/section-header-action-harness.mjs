@@ -79,6 +79,7 @@ import { writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname } from 'node:path';
 import * as http from 'node:http';
+import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
 
 const PORT = Number(process.env.PORT ?? 9433);
 // ROOT is the tree this FILE lives in, never a hardcoded path — run from the
@@ -318,7 +319,7 @@ async function main() {
   if (!(await portFree())) throw new Error(`port ${PORT} ALREADY serves a CDP target.`);
   const env = { ...process.env, AURORA_DEBUG_PORT: String(PORT), AURORA_NO_GPU: '1' };
   delete env.DISPLAY;
-  const child = spawn('/usr/bin/xvfb-run',
+  const child = spawnGuarded('/usr/bin/xvfb-run',
     ['-a', '-s', '-screen 0 1680x1050x24', ELECTRON, `${ROOT}/dist/main/index.mjs`],
     { cwd: ROOT, env, stdio: ['ignore', 'pipe', 'pipe'], detached: true });
   child.stdout.on('data', (d) => { if (process.env.VERBOSE) process.stdout.write(`[main] ${d}`); });
@@ -642,7 +643,9 @@ async function main() {
     try { execSync('sleep 3', { shell: '/bin/bash' }); } catch { /* */ }
     try { process.kill(-child.pid, 'SIGKILL'); } catch { /* */ }
     // The bracket keeps the pattern from matching this very command line.
-    try { execSync(`pkill -f 'dist/main/inde[x].mjs' 2>/dev/null; true`, { shell: '/bin/bash' }); } catch { /* */ }
+    // O16: a `pkill -f` on a dist path is NOT an ownership test — it matched the
+    // OWNER'S Aurora and (from a worktree) spared this run's own orphan. killTree()
+    // below signals only pids descended from what this harness spawned.
     await sleep(1000);
     console.log(`\nport free after teardown: ${await portFree()}`);
   }

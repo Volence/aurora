@@ -4,6 +4,7 @@
 
 import { spawn, execSync } from 'node:child_process';
 import * as http from 'node:http';
+import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
 
 const PORT = Number(process.env.PORT ?? 9363);
 const ROOT = '/home/volence/sonic_hacks/aurora/.claude/worktrees/ux-plan6';
@@ -134,12 +135,14 @@ async function main() {
   if (!(await portFree())) throw new Error('port busy');
   const env = { ...process.env, AURORA_DEBUG_PORT: String(PORT), AURORA_NO_GPU: '1' };
   delete env.DISPLAY;
-  const child = spawn('/usr/bin/xvfb-run', ['-a', '-s', '-screen 0 1680x1050x24', ELECTRON, `${ROOT}/dist/main/index.mjs`], {
+  const child = spawnGuarded('/usr/bin/xvfb-run', ['-a', '-s', '-screen 0 1680x1050x24', ELECTRON, `${ROOT}/dist/main/index.mjs`], {
     cwd: ROOT, env, stdio: ['ignore', 'pipe', 'pipe'], detached: true,
   });
   const killGroup = () => {
     try { process.kill(-child.pid, 'SIGKILL'); } catch { /* gone */ }
-    try { execSync(`pkill -f 'ux-plan6/dist/main/index.mjs' 2>/dev/null; true`, { shell: '/bin/bash' }); } catch { /* */ }
+    // O16: a `pkill -f` on a dist path is NOT an ownership test — it matched the
+    // OWNER'S Aurora and (from a worktree) spared this run's own orphan. killTree()
+    // below signals only pids descended from what this harness spawned.
   };
   let c;
   try {

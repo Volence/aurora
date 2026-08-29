@@ -89,7 +89,7 @@
 // the gesture. Row 1 aborts the run when it is missing, because every later
 // PASS would be describing code this branch does not contain.
 
-import { session, openProjectAndAct, mouse, clickEl, sleep, S1DIR, ROOT } from './canvas-cdp-harness.mjs';
+import { session, openProjectAndAct, mouse, clickEl, sleep, S1DIR, ROOT, resolveOwnedDiscovery } from './canvas-cdp-harness.mjs';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
@@ -124,19 +124,14 @@ function note(what, detail = '') {
 // the client.
 // ---------------------------------------------------------------------------
 
-/** The port the RUNNING app bound, from its discovery file. */
-function discoverPort() {
-  for (const sub of ['.aurora', '.config/aurora', '.aether']) {
-    const p = join(homedir(), sub, 'mcp.json');
-    if (existsSync(p)) {
-      try {
-        const j = JSON.parse(readFileSync(p, 'utf8'));
-        if (j.port) return { port: j.port, from: p, pid: j.pid };
-      } catch { /* keep looking */ }
-    }
-  }
-  return null;
-}
+// O16: `discoverPort()` used to live here. It read the FIRST of
+// ~/.aurora, ~/.config/aurora, ~/.aether mcp.json that existed and took its
+// `port` — paths the OWNER'S OWN Aurora publishes to as well. A harness that
+// found his app would have driven his open document and read its own writes
+// straight back: every row green, describing nothing, while corrupting his
+// work. `resolveOwnedDiscovery()` accepts a port only when the pid the file
+// names is a descendant of a process this harness spawned; anything else is
+// UNMEASURABLE. See scratchpad/lib/harness-guard.mjs.
 
 let nextId = 1;
 async function rpc(port, method, params) {
@@ -652,11 +647,19 @@ const main = async () => {
 
     // ---- setup: the build, the act, the facet, the tool, the shape --------
     const markers = bundleMarkers();
-    const found = discoverPort();
-    if (!found) { console.error('no discovery file even after launch — did the server start?'); return; }
+    const found = await resolveOwnedDiscovery({ timeoutMs: 20000 });
+    for (const r of found.rejected ?? []) console.log(`[prov] refused ${r}`);
+    if (!found.ok) {
+      console.error(`\nUNMEASURABLE: ${found.why}`);
+      console.error('Refusing to POST to a port this harness cannot prove it owns.');
+      process.exitCode = 2;
+      return;
+    }
     const PORT = found.port;
     console.log(`\n[app ] ${ROOT}/dist/main/index.mjs against ${S1DIR}`);
-    console.log(`[wire] POST http://127.0.0.1:${PORT}/aether  (from ${found.from}, pid ${found.pid}) — SETUP ONLY`);
+    console.log(`[prov] discovery file ${found.from} said:\n       ${found.raw.trim()}`);
+    console.log(`[prov] pid ${found.pid} IS a descendant of ${found.roots.join(',')} — accepted`);
+    console.log(`[wire] POST http://127.0.0.1:${PORT}/aether — SETUP ONLY`);
 
     // THE COLLISION FACET FIRST, and it is not cosmetic: it is what arms the
     // gesture at all (ClassicLevelViewport's mousedown checks

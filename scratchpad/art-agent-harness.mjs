@@ -36,7 +36,7 @@
 //
 //   VITE_AURORA_DEBUG=1 npm run build && node scratchpad/art-agent-harness.mjs
 
-import { session, openProjectAndAct, S1DIR, CANVAS_DIR, ROOT, sleep } from './canvas-cdp-harness.mjs';
+import { session, openProjectAndAct, S1DIR, CANVAS_DIR, ROOT, sleep, resolveOwnedDiscovery } from './canvas-cdp-harness.mjs';
 import { deflateSync } from 'node:zlib';
 import { writeFileSync, rmSync, existsSync, readdirSync, mkdirSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
@@ -135,19 +135,14 @@ function clearCanvases() {
 // The wire.
 // ---------------------------------------------------------------------------
 
-/** The port the RUNNING app bound, from its discovery file. See PROVENANCE. */
-function discoverPort() {
-  for (const sub of ['.aurora', '.config/aurora', '.aether']) {
-    const p = join(homedir(), sub, 'mcp.json');
-    if (existsSync(p)) {
-      try {
-        const j = JSON.parse(readFileSync(p, 'utf8'));
-        if (j.port) return { port: j.port, from: p, pid: j.pid };
-      } catch { /* keep looking */ }
-    }
-  }
-  return null;
-}
+// O16: `discoverPort()` used to live here. It read the FIRST of
+// ~/.aurora, ~/.config/aurora, ~/.aether mcp.json that existed and took its
+// `port` — paths the OWNER'S OWN Aurora publishes to as well. A harness that
+// found his app would have driven his open document and read its own writes
+// straight back: every row green, describing nothing, while corrupting his
+// work. `resolveOwnedDiscovery()` accepts a port only when the pid the file
+// names is a descendant of a process this harness spawned; anything else is
+// UNMEASURABLE. See scratchpad/lib/harness-guard.mjs.
 
 let nextId = 1;
 /** One JSON-RPC call over the real Aether HTTP binding. Returns the ENVELOPE. */
@@ -172,10 +167,18 @@ const main = async () => {
     // AFTER launch, never before: the discovery file exists only while an Aurora
     // is running, and the app removes it on shutdown. Reading it up front found
     // nothing and aborted a run that would have been fine.
-    const found = discoverPort();
-    if (!found) { console.error('no discovery file even after launch — did the server start?'); return; }
+    const found = await resolveOwnedDiscovery({ timeoutMs: 20000 });
+    for (const r of found.rejected ?? []) console.log(`[prov] refused ${r}`);
+    if (!found.ok) {
+      console.error(`\nUNMEASURABLE: ${found.why}`);
+      console.error('Refusing to POST to a port this harness cannot prove it owns.');
+      process.exitCode = 2;
+      return;
+    }
     const PORT = found.port;
-    console.log(`\n[wire] POST http://127.0.0.1:${PORT}/aether  (from ${found?.from}, pid ${found?.pid})`);
+    console.log(`\n[prov] discovery file ${found.from} said:\n       ${found.raw.trim()}`);
+    console.log(`[prov] pid ${found.pid} IS a descendant of ${found.roots.join(',')} — accepted`);
+    console.log(`[wire] POST http://127.0.0.1:${PORT}/aether`);
     console.log(`[app ] ${ROOT}/dist/main/index.mjs against ${S1DIR}\n`);
 
     // TWO INDEPENDENT READERS, on purpose. `poolSizes()` comes off the live store

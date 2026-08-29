@@ -27,6 +27,7 @@ import { spawn } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url'; import { dirname } from 'node:path';
 import * as http from 'node:http';
+import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
 const PORT = Number(process.env.PORT ?? 9399);
 const ROOT = process.env.AURORA_ROOT ?? dirname(dirname(fileURLToPath(import.meta.url)));
 const ELECTRON = `${ROOT}/node_modules/.bin/electron`;
@@ -53,7 +54,7 @@ function cdp(u) { const ws = new WebSocket(u); let n = 1; const pend = new Map()
 
 if (!(await portFree())) throw new Error(`port ${PORT} busy`);
 const env = { ...process.env, AURORA_DEBUG_PORT: String(PORT), AURORA_NO_GPU: '1' }; delete env.DISPLAY;
-const child = spawn('/usr/bin/xvfb-run', ['-a', '-s', '-screen 0 1680x1050x24', ELECTRON, `${ROOT}/dist/main/index.mjs`],
+const child = spawnGuarded('/usr/bin/xvfb-run', ['-a', '-s', '-screen 0 1680x1050x24', ELECTRON, `${ROOT}/dist/main/index.mjs`],
   { cwd: ROOT, env, stdio: ['ignore', 'pipe', 'pipe'], detached: true });
 let c;
 try {

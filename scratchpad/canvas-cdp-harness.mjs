@@ -26,6 +26,7 @@ import { spawn, execSync } from 'node:child_process';
 import * as http from 'node:http';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import { writeFileSync, mkdirSync, existsSync, readFileSync, rmSync, cpSync } from 'node:fs';
+import { spawnGuarded, killTree, restoreDiscoveryNow, readDiscoveryNow, resolveOwnedDiscovery } from './lib/harness-guard.mjs';
 
 const PORT = Number(process.env.PORT ?? 9364);
 // SELF-LOCATING, not hardcoded. This file used to name the main checkout
@@ -504,7 +505,7 @@ async function session(label, body) {
   console.log(`\n=== session: ${label} (port ${PORT} verified free) ===`);
   const env = { ...process.env, AURORA_DEBUG_PORT: String(PORT), AURORA_NO_GPU: '1' };
   delete env.DISPLAY;
-  const child = spawn('/usr/bin/xvfb-run', ['-a', '-s', '-screen 0 1680x1050x24', ELECTRON, `${ROOT}/dist/main/index.mjs`], {
+  const child = spawnGuarded('/usr/bin/xvfb-run', ['-a', '-s', '-screen 0 1680x1050x24', ELECTRON, `${ROOT}/dist/main/index.mjs`], {
     cwd: ROOT, env, stdio: ['ignore', 'pipe', 'pipe'], detached: true,
   });
   child.stdout.on('data', (d) => { if (process.env.VERBOSE) process.stdout.write(`[main] ${d}`); });
@@ -514,14 +515,15 @@ async function session(label, body) {
   // writes — which made the restart rows read a STALE stored session and
   // report a focus-restore failure that was the harness's own doing. SIGTERM
   // lets Electron shut down and flush; the SIGKILL below is only the fallback.
-  const killGroup = () => {
-    try { process.kill(-child.pid, 'SIGTERM'); } catch { /* gone */ }
-    try { execSync('sleep 4', { shell: '/bin/bash' }); } catch { /* */ }
-    try { process.kill(-child.pid, 'SIGKILL'); } catch { /* gone */ }
-    // The bracket keeps the pattern from matching pkill's OWN command line —
-    // `pkill -f` sees the whole argv of every process, its own shell included.
-    try { execSync(`pkill -f 'aurora/dist/main/inde[x].mjs' 2>/dev/null; true`, { shell: '/bin/bash' }); } catch { /* */ }
-  };
+  // O16. This used to end with `pkill -f 'aurora/dist/main/inde[x].mjs'`, which
+  // is not an ownership test at all: it matches the OWNER'S Aurora (which runs
+  // from exactly that path) and, when this harness runs from a worktree, does
+  // NOT match its own instance — so it killed his editor and spared its own
+  // orphan. `killTree` walks /proc and signals only pids descended from the
+  // process this harness spawned. It also captures the tree BEFORE the first
+  // signal: once the xvfb-run wrapper dies its children reparent to init and
+  // stop being descendants of anything nameable.
+  const killGroup = () => killTree(child, { graceMs: 4000 });
 
   let c;
   try {
@@ -553,8 +555,15 @@ async function session(label, body) {
       await sleep(4000);
       try { c.close(); } catch { /* */ }
     }
-    killGroup();
+    await killGroup();
     await sleep(1200);
+    // O16 hazard 1a: the app we just launched overwrote the SHARED discovery
+    // files (~/.aurora/mcp.json and the legacy ~/.sonic-level-editor/mcp.json).
+    // Put them back byte for byte, in the same `finally` as the teardown, and
+    // PRINT what is on disk afterwards — a restore nobody reads back is the
+    // guard-that-asserts-nothing shape this repo keeps shipping.
+    for (const d of restoreDiscoveryNow()) console.log(`   restored ${d}`);
+    console.log(`   discovery on disk after restore:\n        ${readDiscoveryNow()}`);
     console.log(`   port free after teardown: ${await portFree()}`);
   }
 }
@@ -683,6 +692,10 @@ export {
   INSTALL, sleep, mouse, key, enter, escape, ctrlK, typeText, clickEl,
   drawArt, clickArt, focusTab, closeTab, shot, drain,
   ROOT, S1DIR, CANVAS_DIR, SHOTS,
+  // O16. Re-exported so the probes that drive a `session()` app over the Aether
+  // wire resolve its port through the OWNERSHIP rule instead of open-coding a
+  // read of the shared discovery file. See lib/harness-guard.mjs.
+  resolveOwnedDiscovery,
 };
 
 // ===========================================================================

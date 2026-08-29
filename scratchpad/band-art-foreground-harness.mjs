@@ -85,6 +85,7 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import * as http from 'node:http';
+import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
 
 const PORT = Number(process.env.PORT ?? 9412);
 const ROOT = process.env.AURORA_ROOT ?? dirname(dirname(fileURLToPath(import.meta.url)));
@@ -314,7 +315,7 @@ async function drive() {
   // condition that once turned an aiming error into a phantom off-by-one bug
   // report. Xvfb's inferred device scale varies run to run here anyway; every
   // aim below re-derives through the surface's own formula either way.
-  const child = spawn('/usr/bin/xvfb-run',
+  const child = spawnGuarded('/usr/bin/xvfb-run',
     ['-a', '-s', `-screen 0 ${SCREEN}x24`, ELECTRON,
       ...(process.env.SCALE ? [`--force-device-scale-factor=${process.env.SCALE}`] : []),
       `${ROOT}/dist/main/index.mjs`],

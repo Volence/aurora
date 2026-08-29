@@ -21,6 +21,7 @@
 
 import { spawn } from 'node:child_process';
 import * as http from 'node:http';
+import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
 
 const PORT = Number(process.env.PORT ?? 9343);
 const S1DIR = '/home/volence/sonic_hacks/s1disasm';
@@ -200,7 +201,7 @@ async function key(c, k, opts = {}) {
 }
 
 function launch() {
-  const electron = spawn(ELECTRON, [`${ROOT}/dist/main/index.mjs`], {
+  const electron = spawnGuarded(ELECTRON, [`${ROOT}/dist/main/index.mjs`], {
     cwd: ROOT,
     env: { ...process.env, AURORA_DEBUG_PORT: String(PORT), AURORA_NO_GPU: '1' },
     stdio: ['ignore', 'pipe', 'pipe'],

@@ -27,6 +27,7 @@ import { join } from 'node:path';
 import net from 'node:net';
 import * as http from 'node:http';
 import * as esbuild from 'esbuild';
+import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
 
 const PORT = Number(process.env.PORT ?? 9375);
 const ROOT = '/home/volence/sonic_hacks/aurora';
@@ -125,7 +126,7 @@ async function main() {
     // --- the app -----------------------------------------------------------
     const env = { ...process.env, AURORA_DEBUG_PORT: String(PORT), AURORA_NO_GPU: '1', ORACLE_SOCKET: SOCK };
     delete env.DISPLAY;
-    app = spawn('/usr/bin/xvfb-run', ['-a', '-s', '-screen 0 1680x1050x24', ELECTRON, `${ROOT}/dist/main/index.mjs`], {
+    app = spawnGuarded('/usr/bin/xvfb-run', ['-a', '-s', '-screen 0 1680x1050x24', ELECTRON, `${ROOT}/dist/main/index.mjs`], {
       cwd: ROOT, env, stdio: ['ignore', 'pipe', 'pipe'], detached: true,
     });
     app.stdout.on('data', (d) => { if (process.env.VERBOSE) process.stdout.write(`[app] ${d}`); });
@@ -262,7 +263,9 @@ async function main() {
     }
     await sleep(500);
     for (const p of [app, emu]) { if (p) { try { process.kill(-p.pid, 'SIGKILL'); } catch { /* */ } } }
-    try { execSync(`pkill -f 'aurora/dist/main/inde[x].mjs' 2>/dev/null; true`, { shell: '/bin/bash' }); } catch { /* */ }
+    // O16: a `pkill -f` on a dist path is NOT an ownership test — it matched the
+    // OWNER'S Aurora and (from a worktree) spared this run's own orphan. killTree()
+    // below signals only pids descended from what this harness spawned.
     try { rmSync(SOCK, { force: true }); } catch { /* */ }
     try { rmSync(workDir, { recursive: true, force: true }); } catch { /* */ }
   }

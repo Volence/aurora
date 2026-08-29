@@ -7,18 +7,19 @@
 // there, and a CDP row for it would have to open a different act.
 //
 // Reads only. Never calls save_project.
-import { session, openProjectAndAct } from './canvas-cdp-harness.mjs';
+import { session, openProjectAndAct, resolveOwnedDiscovery } from './canvas-cdp-harness.mjs';
 import { readFileSync, existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
-function discoverPort() {
-  for (const sub of ['.aurora', '.config/aurora', '.aether']) {
-    const p = join(homedir(), sub, 'mcp.json');
-    if (existsSync(p)) { try { const j = JSON.parse(readFileSync(p, 'utf8')); if (j.port) return j.port; } catch {} }
-  }
-  return null;
-}
+// O16: `discoverPort()` used to live here. It read the FIRST of
+// ~/.aurora, ~/.config/aurora, ~/.aether mcp.json that existed and took its
+// `port` — paths the OWNER'S OWN Aurora publishes to as well. A harness that
+// found his app would have driven his open document and read its own writes
+// straight back: every row green, describing nothing, while corrupting his
+// work. `resolveOwnedDiscovery()` accepts a port only when the pid the file
+// names is a descendant of a process this harness spawned; anything else is
+// UNMEASURABLE. See scratchpad/lib/harness-guard.mjs.
 let id = 1;
 const rpc = async (port, method, params) => (await (await fetch(`http://127.0.0.1:${port}/aether`, {
   method: 'POST', headers: { 'content-type': 'application/json', host: `127.0.0.1:${port}` },
@@ -27,7 +28,11 @@ const rpc = async (port, method, params) => (await (await fetch(`http://127.0.0.
 
 await session('loop cell probe', async (c) => {
   await openProjectAndAct(c);
-  const port = discoverPort();
+  const owned = await resolveOwnedDiscovery({ timeoutMs: 20000 });
+  for (const r of owned.rejected ?? []) console.log(`[prov] refused ${r}`);
+  if (!owned.ok) { console.error(`UNMEASURABLE: ${owned.why}`); process.exitCode = 2; return; }
+  console.log(`[prov] ${owned.from} said ${owned.raw.trim()} — pid ${owned.pid} descends from ${owned.roots.join(',')}`);
+  const port = owned.port;
   const out = {};
   for (const act of [1, 2, 3]) {
     const r = await rpc(port, 'editor/get_classic_level', { zone: 'ghz', act });

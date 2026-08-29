@@ -3,18 +3,19 @@
 // agent-handler.ts spreads the report verbatim (`{ ok: true, ...res.report }`),
 // so the claim is that the new field rides along for free. This asks the wire.
 // dryRun ONLY — nothing is written, and save_project is never called.
-import { session, openProjectAndAct, sleep } from './canvas-cdp-harness.mjs';
+import { session, openProjectAndAct, sleep, resolveOwnedDiscovery } from './canvas-cdp-harness.mjs';
 import { existsSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
-function discoverPort() {
-  for (const sub of ['.aurora', '.config/aurora', '.aether']) {
-    const p = join(homedir(), sub, 'mcp.json');
-    if (existsSync(p)) { try { const j = JSON.parse(readFileSync(p, 'utf8')); if (j.port) return j.port; } catch {} }
-  }
-  return null;
-}
+// O16: `discoverPort()` used to live here. It read the FIRST of
+// ~/.aurora, ~/.config/aurora, ~/.aether mcp.json that existed and took its
+// `port` — paths the OWNER'S OWN Aurora publishes to as well. A harness that
+// found his app would have driven his open document and read its own writes
+// straight back: every row green, describing nothing, while corrupting his
+// work. `resolveOwnedDiscovery()` accepts a port only when the pid the file
+// names is a descendant of a process this harness spawned; anything else is
+// UNMEASURABLE. See scratchpad/lib/harness-guard.mjs.
 let nextId = 1;
 async function rpc(port, method, params) {
   const res = await fetch(`http://127.0.0.1:${port}/aether`, {
@@ -27,7 +28,11 @@ async function rpc(port, method, params) {
 await session('skippedCells over the wire', async (c) => {
   await openProjectAndAct(c);
   await sleep(600);
-  const PORT = discoverPort();
+  const owned = await resolveOwnedDiscovery({ timeoutMs: 20000 });
+  for (const r of owned.rejected ?? []) console.log(`[prov] refused ${r}`);
+  if (!owned.ok) { console.error(`UNMEASURABLE: ${owned.why}`); process.exitCode = 2; return; }
+  console.log(`[prov] ${owned.from} said ${owned.raw.trim()} — pid ${owned.pid} descends from ${owned.roots.join(',')}`);
+  const PORT = owned.port;
   const where = await c.json(`window.__dbg.levelState()`);
   const level = (await rpc(PORT, 'editor/get_classic_level', { zone: where.zone, act: where.act })).result;
   const cellsWide = level.dims.fg.width * 16;

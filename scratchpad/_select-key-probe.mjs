@@ -1,6 +1,7 @@
 // THROWAWAY probe (not committed): can CDP real key events drive a native <select> here?
 import { spawn } from 'node:child_process';
 import * as http from 'node:http';
+import { spawnGuarded, killTree } from './lib/harness-guard.mjs';
 const PORT = 9422;
 const ROOT = '/home/volence/sonic_hacks/aurora/.claude/worktrees/agent-af1d3ca5fa3bf08c5';
 const ELECTRON = '/home/volence/sonic_hacks/aurora/node_modules/.bin/electron';
@@ -10,7 +11,7 @@ function getJSON(p){return new Promise((res,rej)=>{const q=http.get({host:'127.0
 async function waitForTarget(){for(let i=0;i<90;i++){try{const l=await getJSON('/json/list');const p=l.find(t=>t.type==='page'&&t.webSocketDebuggerUrl);if(p)return p.webSocketDebuggerUrl}catch{}await sleep(500)}throw new Error('no target')}
 function cdp(u){const ws=new WebSocket(u);let id=1;const pend=new Map();ws.addEventListener('message',e=>{const m=JSON.parse(e.data);if(m.id&&pend.has(m.id)){pend.get(m.id)(m);pend.delete(m.id)}});const ready=new Promise((r,j)=>{ws.addEventListener('open',r);ws.addEventListener('error',j)});const send=(m,p={})=>new Promise((res,rej)=>{const i=id++;pend.set(i,x=>x.error?rej(new Error(m+JSON.stringify(x.error))):res(x.result));ws.send(JSON.stringify({id:i,method:m,params:p}))});const ev=async(x)=>{const r=await send('Runtime.evaluate',{expression:x,awaitPromise:true,returnByValue:true});if(r.exceptionDetails)throw new Error(r.exceptionDetails.text);return r.result.value};return{ready,send,ev,close:()=>ws.close()}}
 const env={...process.env,AURORA_DEBUG_PORT:String(PORT),AURORA_NO_GPU:'1'};delete env.DISPLAY;
-const child=spawn('/usr/bin/xvfb-run',['-a','-s','-screen 0 1680x1050x24',ELECTRON,`${ROOT}/dist/main/index.mjs`],{cwd:ROOT,env,stdio:['ignore','pipe','pipe'],detached:true});
+const child=spawnGuarded('/usr/bin/xvfb-run',['-a','-s','-screen 0 1680x1050x24',ELECTRON,`${ROOT}/dist/main/index.mjs`],{cwd:ROOT,env,stdio:['ignore','pipe','pipe'],detached:true});
 const c=cdp(await waitForTarget());await c.ready;await c.send('Runtime.enable');
 for(let i=0;i<60;i++){if(await c.ev('typeof window.__dbg==="object"').catch(()=>false))break;await sleep(300)}
 await c.ev(`window.__dbg.aeon.open(${JSON.stringify(AEONDIR)})`).catch(()=>{});
