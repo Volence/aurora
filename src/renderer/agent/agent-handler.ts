@@ -38,6 +38,7 @@ import {
 import { regenerateShiftCommand } from '../providers/bg-anim-art';
 import { makeSetBgOverrideTilesCommand } from '../../core/editing/bg-override-art';
 import { buildStampCommand } from '../../core/editing/map-stamp';
+import { withLinkBreaks } from '../../core/editing/chunk-links';
 import { ensureCollisionPlanes } from '../../core/collision/collision-cell-resolve';
 import {
   paintCollisionRectBothPlanes, paintCollisionCellsBothPlanes,
@@ -418,12 +419,16 @@ export async function handleAgentRequest(req: AgentRequest): Promise<unknown> {
           });
         }
       }
-      executeAmbientCommand({
+      // A PAINTED TILE STOPS TRACKING ITS CHUNK (owner ruling d-18c) — the same
+      // rule the human brush follows in MapViewport. An agent bulk-paint over a
+      // stamped region is exactly the case where a surviving link would have the
+      // next chunk edit overwrite work the agent was asked to do.
+      executeAmbientCommand(withLinkBreaks(section, {
         type: 'set-tiles',
         description: `agent: paint ${req.w}x${req.h} at (${req.x},${req.y})`,
         sectionIndex: req.section,
         entries,
-      }, ctx.level);
+      }), ctx.level);
       return { painted: entries.length, budget: budgetSummary(ctx) };
     }
 
